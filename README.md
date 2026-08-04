@@ -51,7 +51,7 @@ Marqdo：Markdown **标记即语法**。源文件 `.mq.md` 既是文稿也是程
 - 依赖（Rust，无 Flex/Bison）：[dependencies.md](doc/design/dependencies.md)  
 - 选型：[ADR 0001 — Rust](doc/adr/0001-implementation-language.md)  
 
-下一步：Cargo 工程 M0 + 金样例框架，目标 `marqdo run index.mq.md`。
+下一步：按 [dev-setup.md](doc/dev-setup.md) 配置环境；M0 脚手架已就绪，M1 起实现词法。
   
 
 ---

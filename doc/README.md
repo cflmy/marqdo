@@ -21,7 +21,8 @@
 | [design/generated-yaml-manifest.md](design/generated-yaml-manifest.md) | 生成式 OKF 清单 |
 | [design/tech-stack.md](design/tech-stack.md) | 实现栈对比 |
 | [adr/0001-implementation-language.md](adr/0001-implementation-language.md) | **Accepted：Rust 参考解释器；不用 Flex/Bison** |
-| [design/dependencies.md](design/dependencies.md) | **依赖详单**：工具链、Cargo crate、为何不用 Flex/Bison |
+| [design/dependencies.md](design/dependencies.md) | 依赖详单（无 Flex/Bison） |
+| [dev-setup.md](dev-setup.md) | **开发环境配置（Rust M0）** |
 | [roadmap/interpreter.md](roadmap/interpreter.md) | 正经解释器路线图 |
 | [research/okf-and-marqdo.md](research/okf-and-marqdo.md) | OKF 调研 |
 

@@ -1,0 +1,13 @@
+/target/
+**/*.rs.bk
+.idea/
+.vscode/
+*.pdb
+.DS_Store
+
+# Python spike venv (local)
+spike/.venv/
+spike/__pycache__/
+spike/.pytest_cache/
+**/__pycache__/
+*.pyc
