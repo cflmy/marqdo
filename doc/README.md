@@ -8,19 +8,20 @@
 |------|------|
 | [`research/`](research/) | 外部标准与调研 |
 | [`design/`](design/) | 语言设计（语法映射、清单模型等） |
-| `adr/` | 架构决策记录（待建） |
+| [`adr/`](adr/) | 架构决策记录 |
 | `roadmap/` | 里程碑（待建） |
 
 ## 当前文档
 
 | 文档 | 摘要 |
 |------|------|
-| [design/markdown-mapping.md](design/markdown-mapping.md) | **v0 语法宪法**：Markup-as-Syntax 全映射 |
-| [design/code-vs-comment.md](design/code-vs-comment.md) | 叙述面 / 可执行面 / 外联面——无标记为何是注释 |
-| [design/return-hr-and-code-surface.md](design/return-hr-and-code-surface.md) | **提案**：`---` 返回、斜体注释、粗体程序面 vs 无标记代码 |
-| [design/generated-yaml-manifest.md](design/generated-yaml-manifest.md) | 机器生成的 OKF 风格依赖/文档清单 |
-| [design/tech-stack.md](design/tech-stack.md) | 参考实现选型**分析**（未定案，待 Spike） |
-| [research/okf-and-marqdo.md](research/okf-and-marqdo.md) | Google OKF 调研与借鉴 |
+| [design/markdown-mapping.md](design/markdown-mapping.md) | **v0.1 语法宪法** |
+| [design/code-vs-comment.md](design/code-vs-comment.md) | 叙述 / 可执行 / 外联 |
+| [design/return-hr-and-code-surface.md](design/return-hr-and-code-surface.md) | 语句/返回/输出/分割线决议记录 |
+| [design/generated-yaml-manifest.md](design/generated-yaml-manifest.md) | 生成式 OKF 清单 |
+| [design/tech-stack.md](design/tech-stack.md) | 实现栈对比分析 |
+| [adr/0001-implementation-language.md](adr/0001-implementation-language.md) | **选型 ADR（提议中）** |
+| [research/okf-and-marqdo.md](research/okf-and-marqdo.md) | OKF 调研 |
 
 示例程序见仓库 [`examples/`](../examples/)。
 
