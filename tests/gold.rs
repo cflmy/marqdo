@@ -28,52 +28,59 @@ fn assert_err(path: &str, substr: &str) {
 
 #[test]
 fn structure_hello() {
-    assert_out("examples/structure/hello.mq.md", "Hello World!");
+    assert_out("tests/structure/hello.mq.md", "Hello World!");
 }
 
 #[test]
 fn structure_nested_call() {
-    assert_out("examples/structure/nested-call.mq.md", "Hello World!");
+    assert_out("tests/structure/nested-call.mq.md", "Hello World!");
 }
 
 #[test]
 fn structure_positional_call() {
     assert_out(
-        "examples/structure/positional-call.mq.md",
+        "tests/structure/positional-call.mq.md",
         "Hello Marqdo!\nHello World!",
     );
 }
 
 #[test]
 fn structure_branch() {
-    assert_out("examples/structure/branch.mq.md", "零");
+    assert_out("tests/structure/branch.mq.md", "零");
 }
 
 #[test]
 fn structure_loop() {
     assert_out(
-        "examples/structure/loop.mq.md",
-        "3\n2\n1\n今天吃苹果\n今天吃梨",
+        "tests/structure/loop.mq.md",
+        "3
+2
+1
+今天吃苹果
+今天吃梨",
     );
 }
 
 #[test]
 fn structure_collection() {
-    assert_out("examples/structure/collection.mq.md", "苹果\n梨\n桃");
+    assert_out("tests/structure/collection.mq.md", "苹果
+梨
+桃");
 }
 
 #[test]
 fn structure_import() {
     assert_out(
-        "examples/structure/import/main.mq.md",
-        "42\n你好，Marqdo!",
+        "tests/structure/import/main.mq.md",
+        "42
+你好，Marqdo!",
     );
 }
 
 #[test]
 fn keywords_print() {
     assert_out(
-        "examples/keywords/print.mq.md",
+        "tests/keywords/print.mq.md",
         "named form\npositional",
     );
 }
@@ -81,7 +88,7 @@ fn keywords_print() {
 #[test]
 fn keywords_bool_logic() {
     assert_out(
-        "examples/keywords/bool-logic.mq.md",
+        "tests/keywords/bool-logic.mq.md",
         "ok\nnone-falsy",
     );
 }
@@ -89,7 +96,7 @@ fn keywords_bool_logic() {
 #[test]
 fn error_undefined_var() {
     assert_err(
-        "examples/errors/undefined-var.mq.md",
+        "tests/errors/undefined-var.mq.md",
         "undefined variable `missing`",
     );
 }
@@ -97,7 +104,7 @@ fn error_undefined_var() {
 #[test]
 fn error_unknown_fn() {
     assert_err(
-        "examples/errors/unknown-fn.mq.md",
+        "tests/errors/unknown-fn.mq.md",
         "unknown function `no_such_fn`",
     );
 }
@@ -105,7 +112,7 @@ fn error_unknown_fn() {
 #[test]
 fn error_bad_arity() {
     assert_err(
-        "examples/errors/bad-arity.mq.md",
+        "tests/errors/bad-arity.mq.md",
         "missing argument for parameter `x`",
     );
 }
@@ -113,7 +120,7 @@ fn error_bad_arity() {
 #[test]
 fn error_syntax_bad_line() {
     assert_err(
-        "examples/errors/syntax-bad-line.mq.md",
+        "tests/errors/syntax-bad-line.mq.md",
         "unrecognized statement",
     );
 }
@@ -131,7 +138,7 @@ fn assert_out_backend(path: &str, backend: &str, expect: &str) {
 #[test]
 fn bytecode_hello() {
     assert_out_backend(
-        "examples/structure/hello.mq.md",
+        "tests/structure/hello.mq.md",
         "bytecode",
         "Hello World!",
     );
@@ -139,31 +146,37 @@ fn bytecode_hello() {
 
 #[test]
 fn bytecode_branch() {
-    assert_out_backend("examples/structure/branch.mq.md", "bytecode", "零");
+    assert_out_backend("tests/structure/branch.mq.md", "bytecode", "零");
 }
 
 #[test]
 fn bytecode_loop() {
     assert_out_backend(
-        "examples/structure/loop.mq.md",
+        "tests/structure/loop.mq.md",
         "bytecode",
-        "3\n2\n1\n今天吃苹果\n今天吃梨",
+        "3
+2
+1
+今天吃苹果
+今天吃梨",
     );
 }
 
 #[test]
 fn bytecode_collection() {
     assert_out_backend(
-        "examples/structure/collection.mq.md",
+        "tests/structure/collection.mq.md",
         "bytecode",
-        "苹果\n梨\n桃",
+        "苹果
+梨
+桃",
     );
 }
 
 #[test]
 fn bytecode_print_keyword() {
     assert_out_backend(
-        "examples/keywords/print.mq.md",
+        "tests/keywords/print.mq.md",
         "bytecode",
         "named form\npositional",
     );
@@ -172,7 +185,7 @@ fn bytecode_print_keyword() {
 #[test]
 fn bytecode_bool_logic() {
     assert_out_backend(
-        "examples/keywords/bool-logic.mq.md",
+        "tests/keywords/bool-logic.mq.md",
         "bytecode",
         "ok\nnone-falsy",
     );
@@ -181,7 +194,7 @@ fn bytecode_bool_logic() {
 #[test]
 fn bytecode_nested_call() {
     assert_out_backend(
-        "examples/structure/nested-call.mq.md",
+        "tests/structure/nested-call.mq.md",
         "bytecode",
         "Hello World!",
     );
@@ -190,7 +203,7 @@ fn bytecode_nested_call() {
 #[test]
 fn bytecode_positional_call() {
     assert_out_backend(
-        "examples/structure/positional-call.mq.md",
+        "tests/structure/positional-call.mq.md",
         "bytecode",
         "Hello Marqdo!\nHello World!",
     );
@@ -199,8 +212,62 @@ fn bytecode_positional_call() {
 #[test]
 fn bytecode_import() {
     assert_out_backend(
-        "examples/structure/import/main.mq.md",
+        "tests/structure/import/main.mq.md",
         "bytecode",
-        "42\n你好，Marqdo!",
+        "42
+你好，Marqdo!",
     );
+}
+
+#[test]
+fn catalog_writes_yaml() {
+    let dir = tempfile_dir("mq-cat");
+    let (code, _, stderr) = run(&[
+        "catalog",
+        "tests",
+        "-o",
+        dir.to_str().unwrap(),
+    ]);
+    assert_eq!(code, 0, "{stderr}");
+    let yaml = std::fs::read_to_string(dir.join("catalog.yaml")).unwrap();
+    assert!(yaml.contains("type: Marqdo Catalog"));
+    assert!(yaml.contains("structure/hello"));
+    assert!(yaml.contains("utils.mq.md"), "{yaml}");
+    assert!(
+        yaml.contains("跨文件导入示例") || yaml.contains("imports:\n      - utils.mq.md"),
+        "{yaml}"
+    );
+}
+
+#[test]
+fn view_output_writes_html() {
+    let dir = tempfile_dir("mq-site");
+    let (code, _, stderr) = run(&[
+        "view",
+        "output",
+        "tests/structure/hello.mq.md",
+        "-o",
+        dir.to_str().unwrap(),
+        "--no-exec",
+    ]);
+    assert_eq!(code, 0, "{stderr}");
+    let index = std::fs::read_to_string(dir.join("index.html")).unwrap();
+    assert!(index.contains("marqdo"));
+    assert!(!index.contains("fonts.googleapis.com"));
+    assert!(index.contains("#ffffff") || index.contains("--surface: #ffffff"));
+    assert!(index.contains("nav-toggle"));
+    assert!(dir.join("pages").join("hello.mq.md.html").exists());
+}
+
+fn tempfile_dir(prefix: &str) -> std::path::PathBuf {
+    let dir = std::env::temp_dir().join(format!(
+        "{prefix}-{}",
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_millis()
+    ));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    dir
 }

@@ -149,11 +149,11 @@ Marqdo 有两层「文档」，不要混为一谈：
 
 ## 待决问题（后续 ADR）
 
-- [ ] 生成物落盘路径（例如 `.marqdo/` vs `docs/catalog/`）及是否提交进 git  
-- [ ] 单文件是否仍写入「生成型 frontmatter」，还是全部集中在工程级 OKF 包  
-- [ ] 与 `Cargo.toml` 式「可手写包身份（name/version）」的边界：是否允许极少量非生成的包清单，与全自动 OKF 目录如何分工  
-- [ ] `marqdo sync` / `marqdo doc` 命令的具体行为  
-- [ ] 是否沿用 OKF v0.2 的 `generated` / `sources` 字段描述溯源  
+- [x] 生成物默认路径：`.marqdo/`（`-o` 可改）— 见 [catalog-cli.md](catalog-cli.md)  
+- [x] `marqdo catalog` / `sync`；静态用户文档：`marqdo view output` — 见 [view.md](view.md)  
+- [ ] 是否提交生成物进 git（项目自定；CI 可校验干净生成）  
+- [ ] 与「可手写包身份 name/version」的边界  
+- [ ] 是否沿用 OKF v0.2 的 `sources` 等溯源字段  
 
 ---
 

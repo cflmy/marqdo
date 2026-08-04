@@ -1,24 +1,44 @@
-# `marqdo view` — 源结构浏览器
+# `marqdo view` — 源结构浏览器与静态文档导出
 
 | | |
 |---|---|
-| 状态 | 已定（实现中） |
+| 状态 | 已定（v0.0.2 方向） |
 | 日期 | 2026-08-04 |
-| 相关 | [examples-and-tests.md](examples-and-tests.md) · [pipeline-debug.md](pipeline-debug.md) · AST（`src/ast.rs`） |
+| 相关 | [examples-and-tests.md](examples-and-tests.md) · [generated-yaml-manifest.md](generated-yaml-manifest.md) · 视觉参考 [id.cflmy.cn](https://id.cflmy.cn) |
 
 ---
 
 ## 1. 动机
 
-`.mq.md` 既是文档也是程序。需要一种**可读渲染**，而不仅是纯文本或 `run` 的 stdout：
+`.mq.md` 既是文档也是程序。需要：
 
-- 按语法树展示函数、分支、循环、调用、返回；  
-- 同页展示**执行结果**；  
-- 支持打开**单个文件**或**文件夹**（扫描全部 `.mq.md` + 结构索引）。
+1. **本地浏览**：按 AST 展示结构 + 执行结果；  
+2. **静态导出**：同一套渲染写成 HTML，作为**用户文档站点**（勿手写第二套站点）；  
+3. **启动快**：样式极简，无外链字体/厚主题，避免 view 冷启动慢。
 
 ---
 
-## 2. CLI
+## 2. 视觉（Apple HIG / Docs 极简）
+
+对齐 [Apple HIG](https://developer.apple.com/design/human-interface-guidelines) 的 **clarity / deference / white space**，并参考常见 docs 布局（sticky 侧栏 + 居中主栏，见 Nextra / Docusaurus 类站点）：**系统灰底、白内容面、浅分隔线、系统字体**。作者站 [id.cflmy.cn](https://id.cflmy.cn) 仍作克制感参考，但不强行纯黑描边。
+
+| 规则 | 要求 |
+|------|------|
+| 色板 | 页底 `#f5f5f7`；内容面 `#ffffff`；正文 `#1d1d1f`；次要字 `#6e6e73`；分隔 `#d2d2d7`；选中侧栏项反白 |
+| 布局 | 壳层 `max-width ≈ 1400px` 居中；侧栏 ≈280px sticky；主内容 `max-width ≈ 58rem`（宽屏可读、不过窄）；**≤800px 侧栏收起**，顶栏汉堡（checkbox，无 JS） |
+| 默认页 | 打开目录时 **直接展示排序后的第一个 `.mq.md`**（实时 `/` 与静态 `index.html` 同），不要求用户先从欢迎页点选 |
+| 字体 | 仅系统栈：`-apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif`；等宽 `ui-monospace, SFMono-Regular, Menlo, Consolas, monospace` |
+| 外链 | **禁止** Google Fonts / CDN 样式；CSS 全部内联于 HTML |
+| 装饰 | 无多层阴影、无渐变、无发光；圆角 ≈12px；结构区为分组列表（底部分隔），非堆叠厚卡片 |
+| 诊断路径 | 展示时去掉 Windows `\\?\` 前缀，并优先用相对 view 根的路径 |
+
+验收：首屏无外网字体请求；宽屏主栏明显宽于早期 `40rem` 方案。
+
+---
+
+## 3. CLI
+
+### 3.1 实时浏览
 
 ```bash
 marqdo view [PATH] [--port PORT] [--host HOST] [--no-open]
@@ -26,94 +46,68 @@ marqdo view [PATH] [--port PORT] [--host HOST] [--no-open]
 
 | 参数 | 默认 | 说明 |
 |------|------|------|
-| `PATH` | `.` | `.mq.md` 文件，或目录（递归扫描 `*.mq.md`） |
-| `--port` | `7429` | HTTP 端口 |
-| `--host` | `127.0.0.1` | 仅本地 |
-| `--no-open` | 关 | 不尝试打开系统浏览器 |
+| `PATH` | `.` | `.mq.md` 或目录 |
+| `--port` | `7429` | |
+| `--host` | `127.0.0.1` | |
+| `--no-open` | 关 | 不打开浏览器 |
+
+### 3.2 静态导出（文档生成）
+
+```bash
+marqdo view output [PATH] -o OUT_DIR [--no-exec]
+```
+
+| 参数 | 默认 | 说明 |
+|------|------|------|
+| `PATH` | `.` | 与 `view` 相同扫描范围 |
+| `-o` / `--out` | （必填） | 输出目录（不存在则创建） |
+| `--no-exec` | 关 | 不跑程序，执行区显示「skipped」 |
+
+**产物布局：**
+
+```
+OUT_DIR/
+  index.html                 # 默认 = 排序后第一个 .mq.md 的完整页（侧栏高亮该项）
+  pages/
+    <相对路径>.html          # 每个 .mq.md 一页；路径中的 `/` 保留为子目录
+                             # 例：structure/hello.mq.md → pages/structure/hello.mq.md.html
+```
+
+- 页内链接一律**相对路径**，可用任意静态服务器或 `file://`（同目录结构下）打开。  
+- 用户文档推荐流程：`marqdo view output public -o public`，将生成物发布到 `gh-pages`（见 [user-site.md](user-site.md)）。  
+- 金样例浏览仍可用：`marqdo view output tests -o /tmp/mq-tests`（含 errors，勿当对外用户站）。  
+- 渲染逻辑与实时 `view` **共用**同一套 HTML 构件（结构 / 执行 / 源码），禁止两套皮肤分叉。
 
 示例：
 
 ```bash
-marqdo view examples/structure/hello.mq.md
-marqdo view examples
-marqdo view examples/keywords --port 8080
+marqdo view output public -o public
+marqdo view output tests/structure/hello.mq.md -o /tmp/hello-doc
 ```
-
-启动后打印 `http://127.0.0.1:7429/`，阻塞直至 Ctrl+C。
 
 ---
 
-## 3. 信息架构
+## 4. 信息架构（不变）
 
-### 3.1 目录模式
-
-```
-┌─────────────┬──────────────────────────────────┐
-│ 索引         │  选中文件 / 欢迎页                 │
-│ structure/  │                                  │
-│  hello      │  [源码结构] [执行结果] [原始文本]   │
-│  branch     │                                  │
-│ keywords/   │                                  │
-└─────────────┴──────────────────────────────────┘
-```
-
-- 侧栏：相对 `PATH` 的目录树；只列出 `.mq.md`。  
-- 点击文件：主区切换为该文件的三栏/三节视图。
-
-### 3.2 单文件模式
-
-无侧栏列表（或仅当前文件）；主区同「选中文件」视图。仍提供「执行」结果。
+侧栏索引 + 主区三节：结构（AST+注释插回）· 执行 · 源码。表达式为表面语法，非 Debug。
 
 ---
 
-## 4. 主区三节
-
-### 4.1 源码结构（AST 渲染）
-
-不依赖浏览器 Markdown 猜测语义，而用服务端已解析的 AST：
-
-| AST 节点 | 视觉 |
-|----------|------|
-| `Function` | 卡片：标题层级、形参芯片、子函数嵌套；**中间的注释行仍展示**（来自源行分类，不在 AST 内） |
-| `Stmt::*` | 绑定 / 返回 / 调用 / 分支 / 循环；表达式用**表面语法**（如 `` `x` > 0 ``），不用 Debug |
-
-样式：清晰分区，避免「通用仪表盘」堆砌；结构层级一眼可读。
-
-### 4.2 执行结果
-
-服务端对该文件跑与 `marqdo run` 相同的管线，**捕获 stdout/stderr** 与退出状态，展示在「输出」区。  
-含 `input` 的程序：view 中标注「需交互，未在 view 执行」或提供只读说明（v0：跳过/失败信息）。
-
-### 4.3 原始文本
-
-等宽展示源文件；可选行分类着色（Code / Comment / Blank），与 `--dump-lines` 一致。
-
----
-
-## 5. HTTP API（实现细节）
+## 5. HTTP（实时模式）
 
 | 方法 | 路径 | 含义 |
 |------|------|------|
-| `GET` | `/` | 索引 HTML |
-| `GET` | `/file?path=…` | 单文件页（path 相对根，防 `..` 逃逸） |
-| `GET` | `/api/tree` | JSON 文件树 |
-| `GET` | `/api/file?path=…` | JSON：`{ source, ast_html 或 ast_json, stdout, stderr, ok }` |
+| `GET` | `/` | 默认打开第一个 `.mq.md`（无文件时为空提示） |
+| `GET` | `/file?path=…` | 单文件页 |
+| `GET` | `/api/tree` | JSON 树（可选） |
 
-v0 可全部服务端渲染 HTML，API 可选。
-
-安全：根目录锁死为 CLI 给定的 `PATH`（若为文件则其父目录为根、仅一文件）；拒绝根外路径。
+根目录锁死；拒绝 `..` 逃逸。
 
 ---
 
-## 6. 依赖
+## 6. 验收
 
-本地同步 HTTP 即可（如 `tiny_http`），无强制前端构建；HTML/CSS/少量 JS 内嵌于 Rust。
-
----
-
-## 7. 验收
-
-1. `marqdo view examples/structure/hello.mq.md` 显示结构 + `Hello World!` 输出。  
-2. `marqdo view examples` 侧栏含 `structure/` 与 `keywords/` 分组。  
-3. 分支/循环样例在结构区可区分臂与循环体。  
-4. 路径逃逸被拒绝。
+1. 实时 `view`：HIG 风极简、无外链字体、结构与执行正确；打开目录即见首个文件。  
+2. `view output public -o public`（或临时目录）生成可点的 `index.html`（首文件）与各 `pages/…`。  
+3. 静态页中执行区与 `marqdo run` 一致（未加 `--no-exec` 时）；失败诊断路径无 `\\?\`。  
+4. 冷启动无明显外网依赖。

@@ -1,0 +1,50 @@
+# Build public/ with marqdo and publish to the gh-pages branch.
+name: User docs site
+
+on:
+  push:
+    branches: [main, master]
+    paths:
+      - "public/**"
+      - "src/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/pages.yml"
+      - "scripts/build-public.*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build & export site
+        run: |
+          cargo build --release
+          find public -name '*.mq.md' ! -name 'utils.mq.md' -print0 \
+            | xargs -0 -n1 ./target/release/marqdo run
+          ./target/release/marqdo view output public -o public
+
+      - name: Verify site shape
+        run: |
+          if grep -R "tests/errors" public --include='*.html' ; then
+            echo "user site must not include tests/errors fixtures" >&2
+            exit 1
+          fi
+          test -f public/index.html
+          test -f public/00-welcome.mq.md
+
+      - name: Deploy to gh-pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./public
+          publish_branch: gh-pages
+          force_orphan: true

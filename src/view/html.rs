@@ -1,6 +1,6 @@
-//! HTML shell for `marqdo view`.
+//! HTML shell for `marqdo view` — Apple-inspired monochrome, system fonts only.
 
-use std::path::Path;
+use std::path::{Component, Path, PathBuf};
 
 use crate::view::render::FileViewModel;
 
@@ -17,6 +17,333 @@ pub fn escape(s: &str) -> String {
         .collect()
 }
 
+/// How navigation hrefs are built.
+#[derive(Debug, Clone)]
+pub enum LinkMode {
+    /// Live server: `/file?path=…`
+    Live,
+    /// Static export: relative links under `pages/`.
+    /// `from` is the source rel path of the current page (`None` = index.html).
+    Static { from: Option<String> },
+}
+
+fn stylesheet() -> &'static str {
+    // Inspired by Apple HIG clarity + docs-site layouts (sticky sidebar, readable
+    // center column, system grays). Monochrome only; no remote fonts.
+    r#"
+:root {
+  --bg: #f5f5f7;
+  --surface: #ffffff;
+  --ink: #1d1d1f;
+  --muted: #6e6e73;
+  --line: #d2d2d7;
+  --line-strong: #1d1d1f;
+  --fill: #f5f5f7;
+  --hover: #e8e8ed;
+  --focus: #0071e3;
+  --fail-bg: #fff5f5;
+  --ok-bg: #f5f5f7;
+  --radius: 12px;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: var(--sans);
+  color: var(--ink);
+  background: var(--bg);
+  line-height: 1.47;
+  font-size: 17px;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+a { color: var(--ink); text-decoration: none; }
+a:hover { opacity: 0.72; }
+a:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+#nav-toggle { position: absolute; opacity: 0; pointer-events: none; }
+.topbar {
+  display: none;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.7rem 1rem;
+  border-bottom: 1px solid var(--line);
+  background: rgba(255,255,255,0.86);
+  backdrop-filter: saturate(180%) blur(16px);
+  -webkit-backdrop-filter: saturate(180%) blur(16px);
+  position: sticky;
+  top: 0;
+  z-index: 20;
+}
+.topbar .brand { margin: 0; font-size: 1.05rem; font-weight: 600; letter-spacing: -0.022em; }
+.nav-btn {
+  appearance: none;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+  border-radius: 10px;
+  width: 2.35rem;
+  height: 2.35rem;
+  font-size: 1.05rem;
+  line-height: 1;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.nav-btn:hover { background: var(--hover); }
+.shell {
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr);
+  min-height: 100vh;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+.nav {
+  border-right: 1px solid var(--line);
+  padding: 1.75rem 1rem 2.5rem 1.15rem;
+  overflow: auto;
+  background: var(--bg);
+  position: sticky;
+  top: 0;
+  align-self: start;
+  height: 100vh;
+}
+.nav-brand { display: block; padding: 0 0.35rem; }
+.brand {
+  font-size: 1.35rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  margin: 0 0 0.1rem;
+}
+.tagline {
+  color: var(--muted);
+  font-size: 0.78rem;
+  margin: 0 0 1.5rem;
+  font-weight: 500;
+}
+.nav h2 {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--muted);
+  font-weight: 600;
+  margin: 1.15rem 0.35rem 0.45rem;
+}
+.nav ul { list-style: none; padding: 0; margin: 0; }
+.nav li { margin: 0.08rem 0; }
+.nav a.file {
+  display: block;
+  padding: 0.42rem 0.65rem;
+  border-radius: 8px;
+  border-bottom: none;
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.nav a.file:hover { background: var(--hover); opacity: 1; }
+.nav a.file.active {
+  background: var(--ink);
+  color: #fff;
+  opacity: 1;
+  font-weight: 500;
+}
+.folder {
+  color: var(--muted);
+  font-size: 0.72rem;
+  margin: 1rem 0.35rem 0.35rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+.panel-wrap {
+  min-width: 0;
+  overflow: auto;
+  background: var(--bg);
+}
+main.panel {
+  padding: 2.25rem 2.5rem 4rem;
+  margin: 0 auto;
+  width: 100%;
+  max-width: 58rem;
+}
+h1.page {
+  font-size: clamp(1.75rem, 2.4vw, 2.35rem);
+  font-weight: 700;
+  letter-spacing: -0.035em;
+  margin: 0 0 0.3rem;
+  line-height: 1.15;
+}
+.meta {
+  color: var(--muted);
+  font-size: 0.88rem;
+  margin: 0 0 1.75rem;
+  font-family: var(--mono);
+}
+.status-pill {
+  display: inline-block;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 0.18rem 0.5rem;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  margin-left: 0.5rem;
+  vertical-align: middle;
+}
+.status-pill.ok { background: var(--surface); color: var(--muted); }
+.status-pill.fail { background: var(--ink); color: #fff; border-color: var(--ink); }
+section.block { margin: 2rem 0; }
+section.block > h2 {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  font-weight: 600;
+  margin: 0 0 0.85rem;
+}
+.structure {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 0.35rem 0.15rem;
+  box-shadow: 0 1px 0 rgba(0,0,0,0.02);
+}
+.card {
+  border: none;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  padding: 0.85rem 1.1rem;
+  margin: 0;
+  background: transparent;
+}
+.card:last-child { border-bottom: none; }
+.fun-card, .call-card, .branch-card, .loop-card, .ret-card {
+  border-left: 2px solid var(--line-strong);
+  padding-left: calc(1.1rem - 2px);
+}
+.comment-card {
+  border-left: 2px solid var(--line);
+  background: transparent;
+  padding-left: calc(1.1rem - 2px);
+}
+.badge {
+  display: inline-block;
+  font-family: var(--mono);
+  font-size: 0.66rem;
+  padding: 0.14rem 0.4rem;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: var(--fill);
+  color: var(--ink);
+  margin-right: 0.4rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+.params { margin: 0.35rem 0 0; }
+.chip {
+  display: inline-block;
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  padding: 0.14rem 0.45rem;
+  margin: 0.15rem 0.15rem 0 0;
+  border-radius: 6px;
+  background: var(--fill);
+  border: 1px solid transparent;
+  color: var(--ink);
+}
+.nested {
+  margin: 0.45rem 0 0.15rem 0.15rem;
+  padding-left: 0.85rem;
+  border-left: 1px solid var(--line);
+}
+.arm {
+  margin: 0.4rem 0;
+  padding: 0.55rem 0.7rem;
+  background: var(--fill);
+  border-radius: 10px;
+  border: 1px solid transparent;
+}
+.out, .source {
+  font-family: var(--mono);
+  font-size: 0.82rem;
+  white-space: pre-wrap;
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 1rem 1.15rem;
+  border: 1px solid var(--line);
+  line-height: 1.55;
+  box-shadow: 0 1px 0 rgba(0,0,0,0.02);
+}
+.out.ok { background: var(--ok-bg); }
+.out.fail {
+  background: var(--fail-bg);
+  border-color: #e4c1c1;
+  color: var(--ink);
+  font-weight: 500;
+}
+.comment-text { color: var(--muted); font-size: 0.92rem; }
+code.expr {
+  font-family: var(--mono);
+  font-size: 0.84rem;
+  color: var(--ink);
+}
+.err { color: var(--ink); font-weight: 600; padding: 0.75rem 1rem; }
+.welcome {
+  max-width: 40rem;
+  margin: 4rem auto;
+  text-align: center;
+}
+.welcome p { color: var(--muted); font-size: 1.05rem; }
+.backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.28);
+  z-index: 25;
+  animation: fade-in 0.18s ease;
+}
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+@media (max-width: 900px) {
+  .shell { grid-template-columns: 240px minmax(0, 1fr); }
+  main.panel { max-width: 48rem; padding: 1.75rem 1.5rem 3rem; }
+}
+@media (max-width: 800px) {
+  .topbar { display: flex; }
+  .nav-brand { display: none; }
+  .shell {
+    grid-template-columns: 1fr;
+    max-width: none;
+    min-height: calc(100vh - 3.25rem);
+  }
+  .nav {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: min(82vw, 300px);
+    height: 100vh;
+    z-index: 30;
+    transform: translateX(-105%);
+    transition: transform 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
+    border-right: 1px solid var(--line);
+    background: var(--surface);
+    box-shadow: 8px 0 32px rgba(0,0,0,0.08);
+  }
+  #nav-toggle:checked ~ .shell .nav { transform: translateX(0); }
+  #nav-toggle:checked ~ .backdrop { display: block; }
+  main.panel {
+    max-width: none;
+    padding: 1.4rem 1.15rem 3rem;
+  }
+}
+"#
+}
+
 pub fn layout(title: &str, nav: &str, main: &str) -> String {
     format!(
         r##"<!DOCTYPE html>
@@ -24,209 +351,41 @@ pub fn layout(title: &str, nav: &str, main: &str) -> String {
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>{title} · marqdo view</title>
-<link rel="preconnect" href="https://fonts.googleapis.com"/>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=IBM+Plex+Mono:wght@400;500&family=Sora:wght@400;600&display=swap" rel="stylesheet"/>
-<style>
-:root {{
-  --bg0: #0f1c1a;
-  --bg1: #162824;
-  --panel: #1c322d;
-  --ink: #e7f2ee;
-  --muted: #9bb5ac;
-  --accent: #3ecf8e;
-  --accent-dim: #2a9b6a;
-  --call: #5ec8ff;
-  --branch: #f0b429;
-  --loop: #ff7a59;
-  --ret: #c4a7ff;
-  --err: #ff6b6b;
-  --line: rgba(255,255,255,0.08);
-}}
-* {{ box-sizing: border-box; }}
-body {{
-  margin: 0;
-  min-height: 100vh;
-  font-family: "Sora", system-ui, sans-serif;
-  color: var(--ink);
-  background:
-    radial-gradient(1200px 600px at 10% -10%, #1a3d34 0%, transparent 55%),
-    radial-gradient(900px 500px at 100% 0%, #243528 0%, transparent 50%),
-    linear-gradient(165deg, var(--bg0), var(--bg1));
-}}
-a {{ color: var(--accent); text-decoration: none; }}
-a:hover {{ text-decoration: underline; }}
-.shell {{
-  display: grid;
-  grid-template-columns: minmax(220px, 280px) 1fr;
-  min-height: 100vh;
-}}
-@media (max-width: 800px) {{
-  .shell {{ grid-template-columns: 1fr; }}
-}}
-.nav {{
-  border-right: 1px solid var(--line);
-  background: rgba(0,0,0,0.22);
-  padding: 1.25rem 1rem 2rem;
-  overflow: auto;
-}}
-.brand {{
-  font-family: "Fraunces", Georgia, serif;
-  font-size: 1.45rem;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  margin: 0 0 0.25rem;
-}}
-.brand span {{ color: var(--accent); }}
-.tagline {{
-  color: var(--muted);
-  font-size: 0.8rem;
-  margin: 0 0 1.25rem;
-}}
-.nav h2 {{
-  font-size: 0.7rem;
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  color: var(--muted);
-  margin: 1rem 0 0.4rem;
-}}
-.nav ul {{ list-style: none; padding: 0; margin: 0; }}
-.nav li {{ margin: 0.15rem 0; }}
-.nav a.file {{
-  display: block;
-  padding: 0.35rem 0.5rem;
-  border-radius: 6px;
-  color: var(--ink);
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 0.78rem;
-}}
-.nav a.file:hover, .nav a.file.active {{
-  background: rgba(62, 207, 142, 0.12);
-  text-decoration: none;
-}}
-.folder {{ color: var(--muted); font-size: 0.75rem; margin-top: 0.75rem; }}
-main.panel {{
-  padding: 1.5rem 1.75rem 3rem;
-  overflow: auto;
-}}
-h1.page {{
-  font-family: "Fraunces", Georgia, serif;
-  font-size: 1.75rem;
-  margin: 0 0 0.5rem;
-}}
-.meta {{ color: var(--muted); font-size: 0.85rem; margin-bottom: 1.5rem; }}
-section.block {{
-  margin: 1.25rem 0 1.75rem;
-}}
-section.block > h2 {{
-  font-size: 0.75rem;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: var(--muted);
-  margin: 0 0 0.65rem;
-  border-bottom: 1px solid var(--line);
-  padding-bottom: 0.35rem;
-}}
-.card {{
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  padding: 0.85rem 1rem;
-  margin: 0.55rem 0;
-}}
-.fun-card {{ border-left: 3px solid var(--accent); }}
-.call-card {{ border-left: 3px solid var(--call); }}
-.branch-card {{ border-left: 3px solid var(--branch); }}
-.loop-card {{ border-left: 3px solid var(--loop); }}
-.ret-card {{ border-left: 3px solid var(--ret); }}
-.badge {{
-  display: inline-block;
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 0.7rem;
-  padding: 0.1rem 0.4rem;
-  border-radius: 4px;
-  background: rgba(255,255,255,0.06);
-  margin-right: 0.35rem;
-}}
-.params {{ margin: 0.35rem 0; }}
-.chip {{
-  display: inline-block;
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 0.75rem;
-  padding: 0.15rem 0.45rem;
-  margin: 0.15rem;
-  border-radius: 999px;
-  background: rgba(62, 207, 142, 0.15);
-  color: var(--accent);
-}}
-.nested {{ margin-left: 0.85rem; padding-left: 0.75rem; border-left: 1px dashed var(--line); }}
-.arm {{
-  margin: 0.4rem 0;
-  padding: 0.5rem 0.65rem;
-  background: rgba(0,0,0,0.2);
-  border-radius: 8px;
-}}
-.out {{
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 0.85rem;
-  white-space: pre-wrap;
-  background: #0a1210;
-  border-radius: 8px;
-  padding: 0.85rem 1rem;
-  border: 1px solid var(--line);
-}}
-.out.ok {{ box-shadow: inset 3px 0 0 var(--accent-dim); }}
-.out.fail {{ box-shadow: inset 3px 0 0 var(--err); color: #ffc9c9; }}
-.source {{
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 0.78rem;
-  white-space: pre-wrap;
-  background: #0a1210;
-  border-radius: 8px;
-  padding: 0.85rem 1rem;
-  border: 1px solid var(--line);
-  line-height: 1.45;
-}}
-.err {{ color: var(--err); }}
-.comment-card {{
-  border-left: 3px solid var(--muted);
-  background: rgba(255,255,255,0.03);
-}}
-.comment-text {{
-  color: var(--muted);
-  font-size: 0.9rem;
-  line-height: 1.45;
-}}
-code.expr {{
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 0.82rem;
-  color: var(--ink);
-}}
-.welcome {{ max-width: 36rem; }}
-.welcome p {{ color: var(--muted); line-height: 1.55; }}
-</style>
+<title>{title} · marqdo</title>
+<style>{css}</style>
 </head>
 <body>
+<input type="checkbox" id="nav-toggle"/>
+<label class="backdrop" for="nav-toggle" aria-hidden="true"></label>
+<header class="topbar">
+  <label class="nav-btn" for="nav-toggle" aria-label="Menu">☰</label>
+  <p class="brand">marqdo</p>
+</header>
 <div class="shell">
 <aside class="nav">
-  <p class="brand">marq<span>do</span> view</p>
-  <p class="tagline">Markup structure · live output</p>
+  <div class="nav-brand">
+    <p class="brand">marqdo</p>
+    <p class="tagline">view</p>
+  </div>
   {nav}
 </aside>
+<div class="panel-wrap">
 <main class="panel">
   {main}
 </main>
+</div>
 </div>
 </body>
 </html>
 "##,
         title = escape(title),
+        css = stylesheet(),
         nav = nav,
         main = main
     )
 }
 
-pub fn nav_html(files: &[std::path::PathBuf], active: Option<&str>) -> String {
+pub fn nav_html(files: &[PathBuf], active: Option<&str>, links: &LinkMode) -> String {
     let mut out = String::from("<h2>Files</h2><ul>");
     let mut last_folder = String::new();
     for f in files {
@@ -253,14 +412,66 @@ pub fn nav_html(files: &[std::path::PathBuf], active: Option<&str>) -> String {
         } else {
             ""
         };
-        let href = format!("/file?path={}", urlencoding_encode(&rel));
+        let href = href_file(links, &rel);
         out.push_str(&format!(
-            "<li><a class=\"file{active_cls}\" href=\"{href}\">{}</a></li>",
+            "<li><a class=\"file{active_cls}\" href=\"{}\">{}</a></li>",
+            escape(&href),
             escape(name)
         ));
     }
     out.push_str("</ul>");
+    // index link for static pages
+    if matches!(links, LinkMode::Static { from: Some(_) }) {
+        let home = href_index(links);
+        out.insert_str(
+            0,
+            &format!(
+                "<p style=\"margin:0 0 0.75rem\"><a href=\"{}\">Index</a></p>",
+                escape(&home)
+            ),
+        );
+    }
     out
+}
+
+fn href_file(links: &LinkMode, target_rel: &str) -> String {
+    match links {
+        LinkMode::Live => format!("/file?path={}", urlencoding_encode(target_rel)),
+        LinkMode::Static { from: None } => format!("pages/{}.html", target_rel),
+        LinkMode::Static {
+            from: Some(from_rel),
+        } => relative_page_href(from_rel, target_rel),
+    }
+}
+
+fn href_index(links: &LinkMode) -> String {
+    match links {
+        LinkMode::Live => "/".into(),
+        LinkMode::Static { from: None } => "index.html".into(),
+        LinkMode::Static {
+            from: Some(from_rel),
+        } => {
+            let depth = Path::new(from_rel)
+                .parent()
+                .map(|p| p.components().filter(|c| matches!(c, Component::Normal(_))).count())
+                .unwrap_or(0);
+            // pages/<dirs...>/file.html → up (depth+1) to OUT_DIR
+            format!("{}index.html", "../".repeat(depth + 1))
+        }
+    }
+}
+
+/// From `pages/<from>.html` to `pages/<to>.html`.
+fn relative_page_href(from_rel: &str, to_rel: &str) -> String {
+    let from_parent = Path::new(from_rel).parent().unwrap_or_else(|| Path::new(""));
+    let to_path = PathBuf::from(format!("{to_rel}.html"));
+    let mut ups = 0usize;
+    for c in from_parent.components() {
+        if matches!(c, Component::Normal(_)) {
+            ups += 1;
+        }
+    }
+    format!("{}{}", "../".repeat(ups), to_path.to_string_lossy().replace('\\', "/"))
 }
 
 fn urlencoding_encode(s: &str) -> String {
@@ -276,43 +487,56 @@ fn urlencoding_encode(s: &str) -> String {
     out
 }
 
-pub fn page_index(files: &[std::path::PathBuf], only: Option<&Path>) -> String {
-    let nav = nav_html(files, None);
+pub fn page_index(files: &[PathBuf], only: Option<&Path>, links: &LinkMode) -> String {
+    let nav = nav_html(files, None, links);
     let main = if let Some(p) = only {
         let rel = p.to_string_lossy().replace('\\', "/");
         format!(
-            "<div class=\"welcome\"><h1 class=\"page\">Single file</h1><p class=\"meta\">Open <a href=\"/file?path={}\">{}</a></p></div>",
-            urlencoding_encode(&rel),
+            "<div class=\"welcome\"><h1 class=\"page\">marqdo</h1><p class=\"meta\">Open <a href=\"{}\">{}</a></p></div>",
+            escape(&href_file(links, &rel)),
             escape(&rel)
         )
+    } else if files.is_empty() {
+        "<div class=\"welcome\"><h1 class=\"page\">marqdo</h1><p>No <code>.mq.md</code> files found in this path.</p></div>".into()
     } else {
+        // Prefer callers to render the first file at `/` / index.html; this is a fallback.
+        let first = files[0].to_string_lossy().replace('\\', "/");
         format!(
-            "<div class=\"welcome\"><h1 class=\"page\">Browse</h1><p>Select a <code>.mq.md</code> file in the index. Structure is rendered from the AST; output comes from the same pipeline as <code>marqdo run</code>.</p><p class=\"meta\">{} file(s)</p></div>",
-            files.len()
+            "<div class=\"welcome\"><h1 class=\"page\">marqdo</h1><p>Opening <a href=\"{}\">{}</a>…</p></div>",
+            escape(&href_file(links, &first)),
+            escape(&first)
         )
     };
     layout("index", &nav, &main)
 }
 
-pub fn page_file(files: &[std::path::PathBuf], rel: &str, vm: &FileViewModel) -> String {
-    let nav = nav_html(files, Some(rel));
+pub fn page_file(files: &[PathBuf], rel: &str, vm: &FileViewModel, links: &LinkMode) -> String {
+    let nav = nav_html(files, Some(rel), links);
     let status = if vm.ok { "ok" } else { "fail" };
+    let status_label = if vm.ok { "ok" } else { "fail" };
     let out_text = if vm.ok {
         if vm.stdout.is_empty() {
-            "(no stdout)".to_string()
+            "(no stdout)".into()
         } else {
             escape(&vm.stdout)
         }
+    } else if vm.stderr.is_empty() {
+        "(skipped)".into()
     } else {
         escape(&vm.stderr)
     };
+    let title = Path::new(rel)
+        .file_name()
+        .and_then(|s| s.to_str())
+        .unwrap_or(rel)
+        .trim_end_matches(".mq.md");
     let main = format!(
         r#"
-<h1 class="page">{title}</h1>
+<h1 class="page">{title}<span class="status-pill {status}">{status_label}</span></h1>
 <p class="meta">{rel}</p>
 <section class="block">
   <h2>Structure</h2>
-  {structure}
+  <div class="structure">{structure}</div>
 </section>
 <section class="block">
   <h2>Execution</h2>
@@ -323,15 +547,11 @@ pub fn page_file(files: &[std::path::PathBuf], rel: &str, vm: &FileViewModel) ->
   <pre class="source">{source}</pre>
 </section>
 "#,
-        title = escape(
-            Path::new(rel)
-                .file_stem()
-                .and_then(|s| s.to_str())
-                .unwrap_or(rel)
-        ),
+        title = escape(title),
+        status = status,
+        status_label = status_label,
         rel = escape(rel),
         structure = vm.structure_html,
-        status = status,
         out = out_text,
         source = escape(&vm.source),
     );

@@ -4,6 +4,11 @@
 .vscode/
 *.pdb
 .DS_Store
+.marqdo/
+
+# Generated HTML beside tracked public/*.mq.md (sources stay in git)
+/public/index.html
+/public/pages/
 
 # Python spike venv (local)
 spike/.venv/

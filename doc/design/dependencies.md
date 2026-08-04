@@ -1,4 +1,4 @@
-﻿# Marqdo 实现依赖说明（Rust 参考解释器）
+# Marqdo 实现依赖说明（Rust 参考解释器）
 
 | | |
 |---|---|
@@ -94,7 +94,7 @@ Marqdo 换 **Rust 或 C++** 都不改变「主前端不该是 Flex/Bison」这�
 | Crate | 角色 |
 |-------|------|
 | **rust 自带** `#[test]` | 单元测试 |
-| **insta** 或手写金文件 | examples 期望 stdout 快照（可选） |
+| **insta** 或手写金文件 | tests 期望 stdout 快照（可选） |
 | **assert_cmd** / **predicates** | CLI 集成测试（可选） |
 
 #### Phase II（字节码 VM，后加）
@@ -142,8 +142,8 @@ crates/marqdo/             # 或根包 marqdo
     interp/                # Phase I
     bytecode/              # Phase II
     runtime/
-  tests/
-examples/                  # 金样例（已有）
+  tests/                   # gold.rs + structure|keywords|errors
+public/                    # 用户可执行文档
 spike/                     # Python 风险探测存档（可保留，非运行时依赖）
 ```
 
@@ -152,7 +152,7 @@ spike/                     # Python 风险探测存档（可保留，非运行�
 ```bash
 cargo build
 cargo test
-cargo run -- run examples/structure/nested-call.mq.md
+cargo run -- run tests/structure/nested-call.mq.md
 ```
 
 ---

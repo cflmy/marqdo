@@ -33,7 +33,7 @@ cd marqdo
 
 cargo build
 cargo test
-cargo run -- run examples/structure/hello.mq.md
+cargo run -- run tests/structure/hello.mq.md
 ```
 
 当前 M0：`run` 会读入文件并明确报错「evaluation not implemented」（脚手架，非静默假成功）。
@@ -75,7 +75,8 @@ proxy = "http://127.0.0.1:7897"
 | `src/lex` | 行分类 / 词法（自研） |
 | `src/parse` | 递归下降语法 |
 | `src/diagnostics` | 诊断 |
-| `examples/` | 金样例（宪法） |
+| `tests/` | 金样例 + 集成测试（`structure` / `keywords` / `errors`） |
+| `public/` | 用户可执行文档（无 errors） |
 | `spike/` | 旧 Python 风险探测，非运行时依赖 |
 | `doc/` | 设计与路线图 |
 

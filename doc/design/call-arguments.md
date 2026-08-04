@@ -47,4 +47,4 @@ positional ::= value_token
 
 ## 4. 金样例
 
-见 `examples/structure/positional-call.mq.md` 与更新后的 `examples/structure/import/`。
+见 `tests/structure/positional-call.mq.md` 与更新后的 `tests/structure/import/`。

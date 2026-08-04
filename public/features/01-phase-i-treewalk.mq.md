@@ -1,0 +1,14 @@
+---
+title: Phase I — 树遍历解释器
+description: 词法 · 语法 · 语义 · 树遍历已贯通
+---
+
+# main
+
+里程碑：Phase I（树遍历）。
+
+流水线：加载 → 行分类 → 递归下降语法 → 语义检查 → 树遍历执行。实现不用 Flex/Bison。
+
+本页本身即可运行，证明「文档即程序」在解释器里已落地：
+
+> print text=Phase I：tree-walk interpreter is live.

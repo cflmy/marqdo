@@ -1,4 +1,4 @@
-﻿# 解释器流水线可视调试
+# 解释器流水线可视调试
 
 | | |
 |---|---|
@@ -43,7 +43,7 @@ marqdo dump FILE --stage lines|tokens|ast|sema|all
 ## 3. 横幅示例
 
 ```
-=== marqdo: lines (examples/hello.mq.md) ===
+=== marqdo: lines (tests/structure/hello.mq.md) ===
    1  Blank
    2  Comment  | # Hello World
    3  Blank

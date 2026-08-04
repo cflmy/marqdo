@@ -1,7 +1,10 @@
 //! `marqdo view` — local HTML browser for `.mq.md` structure + output.
 
 mod html;
+mod output;
 mod render;
+
+pub use output::{write_static, OutputOptions};
 
 use std::fs;
 use std::net::SocketAddr;
@@ -11,7 +14,7 @@ use std::process::Command;
 use anyhow::{bail, Context, Result};
 use tiny_http::{Header, Method, Request, Response, Server, StatusCode};
 
-use crate::view::html::{escape, page_file, page_index};
+use crate::view::html::{escape, page_file, page_index, LinkMode};
 use crate::view::render::{render_module_structure, FileViewModel};
 use crate::{run_file_capture, RunOptions};
 
@@ -22,12 +25,10 @@ pub struct ViewOptions {
     pub open_browser: bool,
 }
 
-struct ViewRoot {
-    /// Directory that paths are resolved against.
-    root: PathBuf,
-    /// If Some, only this relative file is in scope (single-file mode).
-    only_file: Option<PathBuf>,
-    files: Vec<PathBuf>,
+pub(crate) struct ViewRoot {
+    pub root: PathBuf,
+    pub only_file: Option<PathBuf>,
+    pub files: Vec<PathBuf>,
 }
 
 /// Block serving until Ctrl+C (process kill).
@@ -54,7 +55,7 @@ pub fn serve(opts: ViewOptions) -> Result<()> {
     Ok(())
 }
 
-fn build_root(path: &Path) -> Result<ViewRoot> {
+pub(crate) fn build_root(path: &Path) -> Result<ViewRoot> {
     let path = if path.exists() {
         path.canonicalize().unwrap_or_else(|_| path.to_path_buf())
     } else {
@@ -124,14 +125,23 @@ fn handle(root: &ViewRoot, request: Request) -> Result<()> {
     let (path_part, query) = split_url(&url);
     match path_part {
         "/" | "/index.html" => {
-            let body = page_index(&root.files, root.only_file.as_deref());
-            respond_html(request, body)
+            // Default: open the first file in the folder (sorted), no welcome pick screen.
+            if let Some(first) = root.files.first() {
+                let rel = first.to_string_lossy().replace('\\', "/");
+                let resolved = resolve_rel(root, &rel)?;
+                let vm = build_file_view(&resolved, &rel)?;
+                let body = page_file(&root.files, &rel, &vm, &LinkMode::Live);
+                respond_html(request, body)
+            } else {
+                let body = page_index(&root.files, None, &LinkMode::Live);
+                respond_html(request, body)
+            }
         }
         "/file" => {
             let rel = query_param(query, "path").unwrap_or_default();
             let resolved = resolve_rel(root, &rel)?;
             let vm = build_file_view(&resolved, &rel)?;
-            let body = page_file(&root.files, &rel, &vm);
+            let body = page_file(&root.files, &rel, &vm, &LinkMode::Live);
             respond_html(request, body)
         }
         "/api/tree" => {
@@ -146,18 +156,22 @@ fn handle(root: &ViewRoot, request: Request) -> Result<()> {
     }
 }
 
-fn build_file_view(abs: &Path, rel: &str) -> Result<FileViewModel> {
+pub(crate) fn build_file_view(abs: &Path, rel: &str) -> Result<FileViewModel> {
     let source = fs::read_to_string(abs).with_context(|| format!("read {}", abs.display()))?;
     let structure = match crate::load::load_module(abs) {
         Ok(module) => render_module_structure(&module, &source),
         Err(e) => format!(
             "<div class=\"err\">parse/load error: {}</div>",
-            escape(&format!("{e:#}"))
+            escape(&tidy_user_error(&format!("{e:#}"), abs, rel))
         ),
     };
     let (stdout, stderr, ok) = match run_file_capture(abs, &RunOptions::default()) {
         Ok(cap) => (cap.stdout, String::new(), true),
-        Err(e) => (String::new(), format!("{e:#}"), false),
+        Err(e) => (
+            String::new(),
+            tidy_user_error(&format!("{e:#}"), abs, rel),
+            false,
+        ),
     };
     Ok(FileViewModel {
         rel_path: rel.to_string(),
@@ -167,6 +181,30 @@ fn build_file_view(abs: &Path, rel: &str) -> Result<FileViewModel> {
         stderr,
         ok,
     })
+}
+
+/// Prefer view-relative paths and strip Windows `\\?\` noise in error text.
+fn tidy_user_error(msg: &str, abs: &Path, rel: &str) -> String {
+    use crate::diagnostics::display_path;
+    let mut s = msg.to_string();
+    let abs_disp = abs.display().to_string();
+    let abs_clean = display_path(abs);
+    for candidate in [
+        abs_disp.as_str(),
+        abs_clean.as_str(),
+        &abs_disp.replace('/', "\\"),
+        &abs_clean.replace('/', "\\"),
+        &abs_disp.replace('\\', "/"),
+        &abs_clean.replace('\\', "/"),
+    ] {
+        if !candidate.is_empty() {
+            s = s.replace(candidate, rel);
+        }
+    }
+    // Leftover extended prefixes anywhere in the message
+    s = s.replace(r"\\?\", "");
+    s = s.replace("//?/", "");
+    s
 }
 
 fn resolve_rel(root: &ViewRoot, rel: &str) -> Result<PathBuf> {

@@ -413,7 +413,7 @@ mod tests {
 
     #[test]
     fn structure_keeps_comments_and_surface_expr() {
-        let src = include_str!("../../examples/structure/nested-call.mq.md");
+        let src = include_str!("../../tests/structure/nested-call.mq.md");
         let module = crate::parse::parse_source(src).unwrap();
         let html = render_module_structure(&module, src);
         assert!(html.contains("comment-card"));

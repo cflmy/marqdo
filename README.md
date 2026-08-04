@@ -4,7 +4,7 @@
 
 Marqdo：Markdown **标记即语法**。源文件 `.mq.md` 既是文稿也是程序。
 
-语法宪法：[doc/design/markdown-mapping.md](doc/design/markdown-mapping.md) · 调用实参：[call-arguments.md](doc/design/call-arguments.md) · 示例布局：[examples-and-tests.md](doc/design/examples-and-tests.md) · 浏览：[view.md](doc/design/view.md) · 示例：[examples/](examples/)
+语法宪法：[doc/design/markdown-mapping.md](doc/design/markdown-mapping.md) · 调用实参：[call-arguments.md](doc/design/call-arguments.md) · 测试布局：[examples-and-tests.md](doc/design/examples-and-tests.md) · 用户站：[user-site.md](doc/design/user-site.md) · 浏览：[view.md](doc/design/view.md) · 金样例：[tests/](tests/) · 用户文档：[public/](public/)
 
 ---
 
@@ -48,19 +48,22 @@ Marqdo：Markdown **标记即语法**。源文件 `.mq.md` 既是文稿也是程
 
 - 映射 v0.1：[markdown-mapping.md](doc/design/markdown-mapping.md)  
 - 解释器路线图：[interpreter.md](doc/roadmap/interpreter.md)  
-- **Phase I（树遍历）已通**：`examples/structure/` 与 `examples/keywords/` 金样例均可 `marqdo run`  
-- **view**：`marqdo view examples` 按 AST 浏览结构与输出  
+- **Phase I（树遍历）已通**：`tests/structure/` 与 `tests/keywords/` 金样例均可 `marqdo run`  
+- **view**：`marqdo view public` 浏览用户文档；金样例用 `marqdo view tests`  
+- **用户静态站**：可执行文稿在 `public/`（无 errors）；`view output` 生成 HTML（ignore），CI 发布到 `gh-pages` — 见 [user-site.md](doc/design/user-site.md)  
 - 依赖（Rust，无 Flex/Bison）：[dependencies.md](doc/design/dependencies.md)  
 - 选型：[ADR 0001 — Rust](doc/adr/0001-implementation-language.md)  
 
 ```bash
-cargo run -- run examples/structure/hello.mq.md
-cargo run -- run examples/structure/hello.mq.md --backend bytecode
-cargo run -- view examples --no-open
+cargo run -- run tests/structure/hello.mq.md
+cargo run -- run tests/structure/hello.mq.md --backend bytecode
+cargo run -- view public --no-open
+cargo run -- view output public -o public
+powershell -File ./scripts/build-public.ps1
+cargo run -- catalog tests -o .marqdo
 ```
 
-当前发布：**v0.0.1**（Phase I 树遍历 + `view` + M5 字节码原型）。M5 见 [bytecode.md](doc/design/bytecode.md)；errors 见 `examples/errors/`。
-
+文档：用户站见 [public/](public/) 与 [user-site.md](doc/design/user-site.md)；设计文稿见 [doc/](doc/)；`view` 皮肤见 [view.md](doc/design/view.md)；OKF 清单见 [catalog-cli.md](doc/design/catalog-cli.md)。
 
 ---
 

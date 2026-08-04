@@ -1,4 +1,4 @@
-﻿# Marqdo 参考实现：正经解释器路线图
+# Marqdo 参考实现：正经解释器路线图
 
 | | |
 |---|---|
@@ -67,7 +67,7 @@ index.mq.md (+ 导入的 .mq.md)
 └─────────┬─────────┘
           ▼
 ┌───────────────────┐
-│ 4a. 树遍历解释器   │  ← Phase I（必须先完成，跑通全部 examples）
+│ 4a. 树遍历解释器   │  ← Phase I（必须先完成，跑通全部 tests 金样例）
 │  或                 │
 │ 4b. 字节码编译+VM  │  ← Phase II（性能与「更像真语言实现」）
 └─────────┬─────────┘
@@ -86,7 +86,7 @@ Phase I 对齐 Crafting Interpreters 的 **jlox（树遍历）**；Phase II 对�
 - 包名：`marqdo`（`src/marqdo/` 或 `marqdo/`）
 - CLI：`marqdo run <file.mq.md>`，默认找目录下 `index.mq.md`
 - 诊断：带文件名、行号、列号
-- 测试：每个 `examples/*.mq.md` 有期望 stdout（金样例）；CI 可跑
+- 测试：每个 `tests/{structure,keywords}/*.mq.md` 有期望 stdout（金样例）；CI 可跑
 
 ### Phase I — 可运行的语言核心（树遍历）
 
@@ -96,7 +96,7 @@ Phase I 对齐 Crafting Interpreters 的 **jlox（树遍历）**；Phase II 对�
 2. **语法 → AST**：函数、形参、`*` 语句、`**` 返回、`>` 调用、`+` 分支、`-` 循环、表格集合、绑定与 `==`。  
 3. **语义**：提升、嵌套作用域、`##` 私有、frontmatter 导入公有顶层。  
 4. **运行时**：环境、调用栈、值（文/数/表/记录）、内置 `print`。  
-5. **验收**：`examples/structure/*` 与 `examples/keywords/*` 全部 `marqdo run` 通过。
+5. **验收**：`tests/structure/*` 与 `tests/keywords/*` 全部 `marqdo run` 通过。
 
 ### Phase II — 字节码 VM（正经化）
 
@@ -140,11 +140,11 @@ Phase I 对齐 Crafting Interpreters 的 **jlox（树遍历）**；Phase II 对�
 
 ```
 Cargo.toml
-crates/marqdo/   # 或根包
   src/lex/ parse/ ast/ sema/ interp/ bytecode/ runtime/
-tests/
-examples/
-spike/           # Python 存档，非运行时依赖
+tests/               # gold.rs + structure|keywords|errors 夹具
+public/              # 用户可执行文档
+doc/                 # 设计文稿
+spike/               # Python 存档，非运行时依赖
 ```
 
 ---
@@ -170,9 +170,9 @@ spike/           # Python 存档，非运行时依赖
 在仓库根或任意含 `index.mq.md` 的目录：
 
 ```bash
-marqdo run examples/structure/nested-call.mq.md
+marqdo run tests/structure/nested-call.mq.md
 # 或
-marqdo run examples/structure/import/main.mq.md
+marqdo run tests/structure/import/main.mq.md
 ```
 
 输出与金样例一致；错误带位置；新增语法必须加金样例与单测。这才是「一门解释型语言」的最低合格线。

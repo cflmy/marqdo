@@ -6,6 +6,7 @@
 pub mod ast;
 pub mod bytecode;
 pub mod capture;
+pub mod catalog;
 pub mod debug;
 pub mod diagnostics;
 pub mod interp;

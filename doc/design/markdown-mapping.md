@@ -1,4 +1,4 @@
-﻿# Marqdo 语法映射 v0.1（Markup-as-Syntax）
+# Marqdo 语法映射 v0.1（Markup-as-Syntax）
 
 | | |
 |---|---|
@@ -208,4 +208,4 @@ v0.1 **推荐**绑定写在斜体语句内，以保持「语句=斜体」一致�
 
 ## 13. 示例索引
 
-见 [`examples/`](../../examples/)。
+见 [`tests/`](../../tests/)。

@@ -24,15 +24,17 @@
 | [design/dependencies.md](design/dependencies.md) | 依赖详单（无 Flex/Bison） |
 | [design/keywords.md](design/keywords.md) | **英文最小关键字 / 内置 `print` `input`** |
 | [design/call-arguments.md](design/call-arguments.md) | **调用：具名 + 位置实参** |
-| [design/examples-and-tests.md](design/examples-and-tests.md) | **示例即金样例目录布局** |
-| [design/view.md](design/view.md) | **`marqdo view` 源结构浏览器** |
+| [design/examples-and-tests.md](design/examples-and-tests.md) | **tests/ 金样例目录布局** |
+| [design/view.md](design/view.md) | **`marqdo view` / `view output` 黑白极简 + 静态文档** |
+| [design/user-site.md](design/user-site.md) | **用户站：`public/` → `gh-pages`** |
+| [design/catalog-cli.md](design/catalog-cli.md) | **`marqdo catalog` / `sync` OKF 清单命令** |
 | [design/bytecode.md](design/bytecode.md) | **M5 字节码 / 双后端** |
 | [design/pipeline-debug.md](design/pipeline-debug.md) | **流水线 `--dump-*` 可视调试** |
 | [dev-setup.md](dev-setup.md) | 开发环境配置（Rust M0） |
 | [roadmap/interpreter.md](roadmap/interpreter.md) | 正经解释器路线图 |
 | [research/okf-and-marqdo.md](research/okf-and-marqdo.md) | OKF 调研 |
 
-示例与验收集：[`examples/`](../examples/)。Spike 存档：[`spike/`](../spike/)。
+金样例与集成测试：[`tests/`](../tests/)。面向访客的可执行文档：[`public/`](../public/)。Spike 存档：[`spike/`](../spike/)。
 
 ## 写作原则
 

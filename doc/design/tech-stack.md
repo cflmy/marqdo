@@ -1,4 +1,4 @@
-﻿# 参考实现：技术选型分析（尚未拍板）
+# 参考实现：技术选型分析（尚未拍板）
 
 | | |
 |---|---|
@@ -18,7 +18,7 @@
 2. **对齐 GFM** 的结构：标题、列表（`-`/`+`/`1.`）、强调、表格、围栏、链接  
 3. **Lower**：行首判别、标题树作用域、列表符语义、注释剥离  
 4. **两遍**：收集定义 + 导入 → 求值  
-5. **CLI** + **金样例测试**（`examples/`）
+5. **CLI** + **金样例测试**（`tests/`）
 
 可选后期：字节码/编译、LSP、格式化。首版目标是**验证语法宪法**，不是上生产编译器。
 
@@ -51,7 +51,7 @@
   → Marqdo AST
   → 语义：导入图、提升、作用域
   → 后端：解释器（v0）／日后编译
-  → 测试：examples → 期望 stdout
+  → 测试：tests 金样例 → 期望 stdout
 ```
 
 **前端可复用成熟 GFM 库，也可自研**；Middle/后端必须自研（这是语言本体）。
@@ -130,7 +130,7 @@
    - 候选 A：TS + remark-gfm — 能否区分 `-`/`+` bullet、解析单列表格、读 strong/emphasis。  
    - 候选 B：Rust + comrak/pulldown — 同上。  
    - （可选）C 或 D 若团队有偏好再做。  
-2. **对照验收用例**（固定）：`examples/hello.mq.md`、`branch.mq.md`（`+`）、`collection.mq.md`（表）、含 `> x.mq.md` 的 frontmatter 行。  
+2. **对照验收用例**（固定）：`tests/structure/hello.mq.md`、`branch.mq.md`（`+`）、`collection.mq.md`（表）、含 `> x.mq.md` 的 frontmatter 行。  
 3. **出 ADR**：选定「验证期实现」与（可选）「生产目标实现」是否同一语言。  
 4. **再**建仓库脚手架与测试——禁止在 ADR 前默认生成 `package.json` / `Cargo.toml` 当既成事实。
 
