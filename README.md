@@ -59,7 +59,7 @@ cargo run -- run examples/structure/hello.mq.md --backend bytecode
 cargo run -- view examples --no-open
 ```
 
-M5 字节码见 [bytecode.md](doc/design/bytecode.md)；errors 见 `examples/errors/`。
+当前发布：**v0.0.1**（Phase I 树遍历 + `view` + M5 字节码原型）。M5 见 [bytecode.md](doc/design/bytecode.md)；errors 见 `examples/errors/`。
 
 
 ---

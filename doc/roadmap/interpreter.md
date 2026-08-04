@@ -158,7 +158,7 @@ spike/           # Python 存档，非运行时依赖
 | M2 | 解析：函数、输出调用、返回 | `hello` + `index` 金样例绿 | ✅ |
 | M3 | 分支、循环、表格、绑定 | `branch`/`loop`/`collection` 绿 | ✅ |
 | M4 | 导入与提升 | `with-import` 绿；**宣称 Phase I 达标** | ✅ |
-| M5 | 字节码设计文档 + 原型 opcode | 核心金样例双后端一致；覆盖表见 [bytecode.md](../design/bytecode.md) | 进行中 |
+| M5 | 字节码设计文档 + 原型 opcode | 核心金样例双后端一致；覆盖表见 [bytecode.md](../design/bytecode.md) | ✅ 原型 |
 
 **Phase I 完成前，不宣称「语言已实现」。**  
 **仅 hello 特判通过，不算完成。**
