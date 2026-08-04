@@ -77,6 +77,22 @@ fn structure_import() {
     );
 }
 
+
+#[test]
+fn structure_fn_end_hr() {
+    assert_out("tests/structure/fn-end-hr.mq.md", "Hello World!");
+}
+
+#[test]
+fn structure_fn_end_empty_return() {
+    assert_out("tests/structure/fn-end-empty-return.mq.md", "Hi Marqdo!");
+}
+
+#[test]
+fn structure_paragraph_comment() {
+    assert_out("tests/structure/paragraph-comment.mq.md", "ok");
+}
+
 #[test]
 fn keywords_print() {
     assert_out(
@@ -216,6 +232,34 @@ fn bytecode_import() {
         "bytecode",
         "42
 你好，Marqdo!",
+    );
+}
+
+
+#[test]
+fn bytecode_fn_end_hr() {
+    assert_out_backend(
+        "tests/structure/fn-end-hr.mq.md",
+        "bytecode",
+        "Hello World!",
+    );
+}
+
+#[test]
+fn bytecode_fn_end_empty_return() {
+    assert_out_backend(
+        "tests/structure/fn-end-empty-return.mq.md",
+        "bytecode",
+        "Hi Marqdo!",
+    );
+}
+
+#[test]
+fn bytecode_paragraph_comment() {
+    assert_out_backend(
+        "tests/structure/paragraph-comment.mq.md",
+        "bytecode",
+        "ok",
     );
 }
 

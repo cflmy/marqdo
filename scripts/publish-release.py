@@ -1,41 +1,23 @@
 # -*- coding: utf-8 -*-
-"""Create GitHub release v0.0.2 and upload Windows binaries using git credentials."""
+"""Create a GitHub release from Cargo.toml version and upload Windows binaries."""
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 import urllib.error
 import urllib.request
 from pathlib import Path
 
 REPO = "cflmy/marqdo"
-TAG = "v0.0.2"
-TITLE = "v0.0.2"
-NOTES = """## Marqdo v0.0.2
 
-User docs site, view polish, and project layout cleanup.
 
-### Highlights
-- User-facing executable docs in `public/`; static site on `gh-pages`
-- Gold fixtures moved under `tests/{structure,keywords,errors}/`
-- `marqdo view` / `view output` restyle; catalog CLI
-- Default open first file; cleaner diagnostic paths on Windows
-
-### Assets
-- `marqdo-0.0.2-x86_64-pc-windows-msvc.exe` — Windows x64 binary
-- `marqdo-0.0.2-x86_64-pc-windows-msvc.zip` — same binary zipped
-
-```text
-marqdo --version
-marqdo run tests/structure/hello.mq.md
-marqdo view public
-```
-"""
-
-ASSETS = [
-    Path("target/dist/marqdo-0.0.2-x86_64-pc-windows-msvc.exe"),
-    Path("target/dist/marqdo-0.0.2-x86_64-pc-windows-msvc.zip"),
-]
+def crate_version() -> str:
+    text = Path("Cargo.toml").read_text(encoding="utf-8")
+    m = re.search(r'(?m)^version\s*=\s*"([^"]+)"', text)
+    if not m:
+        raise SystemExit("version not found in Cargo.toml")
+    return m.group(1)
 
 
 def git_token() -> str:
@@ -70,24 +52,48 @@ def api(method: str, url: str, token: str, data: bytes | None = None, content_ty
 
 
 def main() -> None:
-    for p in ASSETS:
+    ver = crate_version()
+    tag = f"v{ver}"
+    stem = f"marqdo-{ver}-x86_64-pc-windows-msvc"
+    assets = [
+        Path(f"target/dist/{stem}.exe"),
+        Path(f"target/dist/{stem}.zip"),
+    ]
+    for p in assets:
         if not p.exists():
             raise SystemExit(f"missing asset: {p}")
 
+    notes = f"""## Marqdo {tag}
+
+### Highlights
+- Function body end via `---` / `***` or empty `****` return
+- Blank-line paragraph comments (lex + view rendering)
+- Brand logo / favicon from s3.cflmy.cn
+- Welcome docs and call-arg spaced named values
+
+### Assets
+- `{stem}.exe` — Windows x64 binary
+- `{stem}.zip` — same binary zipped
+
+```text
+marqdo --version
+marqdo run public/00-welcome.mq.md
+marqdo view public
+```
+"""
+
     token = git_token()
 
-    # If release already exists, reuse it; else create.
-    status, existing = 0, None
+    existing = None
     try:
-        status, existing = api(
+        _, existing = api(
             "GET",
-            f"https://api.github.com/repos/{REPO}/releases/tags/{TAG}",
+            f"https://api.github.com/repos/{REPO}/releases/tags/{tag}",
             token,
         )
     except SystemExit as e:
         if "404" not in str(e):
             raise
-        existing = None
 
     if existing:
         release_id = existing["id"]
@@ -96,9 +102,9 @@ def main() -> None:
     else:
         payload = json.dumps(
             {
-                "tag_name": TAG,
-                "name": TITLE,
-                "body": NOTES,
+                "tag_name": tag,
+                "name": tag,
+                "body": notes,
                 "draft": False,
                 "prerelease": False,
             }
@@ -114,14 +120,14 @@ def main() -> None:
         upload_url = created["upload_url"].split("{", 1)[0]
         print(f"created release id={release_id}")
 
-    # Delete existing assets with same names (idempotent re-upload)
     _, rel = api(
         "GET",
         f"https://api.github.com/repos/{REPO}/releases/{release_id}",
         token,
     )
+    want = {p.name for p in assets}
     for asset in rel.get("assets", []):
-        if asset["name"] in {p.name for p in ASSETS}:
+        if asset["name"] in want:
             api(
                 "DELETE",
                 f"https://api.github.com/repos/{REPO}/releases/assets/{asset['id']}",
@@ -129,14 +135,14 @@ def main() -> None:
             )
             print(f"deleted old asset {asset['name']}")
 
-    for path in ASSETS:
+    for path in assets:
         data = path.read_bytes()
         url = f"{upload_url}?name={path.name}"
         ctype = "application/zip" if path.suffix == ".zip" else "application/octet-stream"
         _, uploaded = api("POST", url, token, data=data, content_type=ctype)
         print(f"uploaded {path.name} -> {uploaded.get('browser_download_url')}")
 
-    print(f"OK https://github.com/{REPO}/releases/tag/{TAG}")
+    print(f"OK https://github.com/{REPO}/releases/tag/{tag}")
 
 
 if __name__ == "__main__":

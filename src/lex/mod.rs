@@ -1,7 +1,8 @@
 //! Line classification (M1) — no Flex.
 //!
-//! Unmarked lines are comments; lines whose first non-whitespace character
-//! opens a Marqdo/Markdown marker are code.
+//! Narrative comments are paragraph-scoped: blank lines separate paragraphs.
+//! After a comment line, subsequent non-blank lines stay comments until a blank
+//! (so mid-paragraph lines starting with `` ` `` are not treated as code).
 
 use std::fmt;
 
@@ -40,6 +41,9 @@ fn is_code_starter(c: char) -> bool {
 }
 
 /// Classify a single logical line (no trailing newline required).
+///
+/// This is the **paragraph-start** rule only. Prefer [`classify_source`] for
+/// full-file classification (paragraph continuation).
 pub fn classify_line(text: &str) -> LineKind {
     let trimmed = text.trim_end_matches(['\r', '\n']);
     if trimmed.chars().all(|c| c.is_whitespace()) {
@@ -53,7 +57,11 @@ pub fn classify_line(text: &str) -> LineKind {
     }
 }
 
-/// Classify every line of a source file.
+/// Classify every line of a source file (blank-line paragraph comments).
+///
+/// Structural end markers (`---` / `***` / empty `****`) always stay Code and
+/// break a comment paragraph, so frontmatter closers and function ends work
+/// even when adjacent to narrative.
 pub fn classify_source(source: &str) -> Vec<ClassifiedLine> {
     let source = source.strip_prefix('\u{feff}').unwrap_or(source);
     let lines: Vec<&str> = if source.is_empty() {
@@ -62,15 +70,46 @@ pub fn classify_source(source: &str) -> Vec<ClassifiedLine> {
         source.lines().collect()
     };
 
-    lines
-        .into_iter()
-        .enumerate()
-        .map(|(i, text)| ClassifiedLine {
+    let mut out = Vec::with_capacity(lines.len());
+    let mut in_comment_paragraph = false;
+
+    for (i, text) in lines.into_iter().enumerate() {
+        let base = classify_line(text);
+        let trimmed = text.trim();
+        let structural = is_structural_code_line(trimmed);
+        let kind = match base {
+            LineKind::Blank => {
+                in_comment_paragraph = false;
+                LineKind::Blank
+            }
+            LineKind::Comment => {
+                in_comment_paragraph = true;
+                LineKind::Comment
+            }
+            LineKind::Code if structural => {
+                in_comment_paragraph = false;
+                LineKind::Code
+            }
+            LineKind::Code if in_comment_paragraph => LineKind::Comment,
+            LineKind::Code => LineKind::Code,
+        };
+        out.push(ClassifiedLine {
             line_no: (i + 1) as u32,
-            kind: classify_line(text),
+            kind,
             text: text.to_string(),
-        })
-        .collect()
+        });
+    }
+    out
+}
+
+/// Function-end / frontmatter HR or empty bold return — never swallowed by paragraphs.
+fn is_structural_code_line(trimmed: &str) -> bool {
+    if trimmed.len() >= 3
+        && (trimmed.chars().all(|c| c == '-') || trimmed.chars().all(|c| c == '*'))
+    {
+        return true;
+    }
+    false
 }
 
 /// Human-readable dump for `--dump-lines`.
@@ -121,10 +160,30 @@ mod tests {
     }
 
     #[test]
+    fn paragraph_comment_keeps_backtick_continuation() {
+        let src = "采用了\n`.mq.md`的双层后缀\n\n> print text=ok\n";
+        let lines = classify_source(src);
+        assert_eq!(lines[0].kind, LineKind::Comment);
+        assert_eq!(lines[1].kind, LineKind::Comment);
+        assert_eq!(lines[2].kind, LineKind::Blank);
+        assert_eq!(lines[3].kind, LineKind::Code);
+    }
+
+    #[test]
+    fn frontmatter_closing_hr_stays_code() {
+        let src = "---\ntitle: x\n---\n\n# main\n";
+        let lines = classify_source(src);
+        assert_eq!(lines[0].kind, LineKind::Code);
+        assert_eq!(lines[1].kind, LineKind::Comment);
+        assert_eq!(lines[2].kind, LineKind::Code);
+        assert_eq!(lines[2].text.trim(), "---");
+    }
+
+    #[test]
     fn classify_hello_fixture() {
         let src = include_str!("../../tests/structure/hello.mq.md");
         let lines = classify_source(src);
-        assert!(lines.iter().any(|l| l.kind == LineKind::Code && l.text.contains("print")));
         assert!(lines.iter().any(|l| l.kind == LineKind::Comment));
+        assert!(lines.iter().any(|l| l.kind == LineKind::Code));
     }
 }

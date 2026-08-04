@@ -144,14 +144,29 @@ impl<'a> Cursor<'a> {
             break;
         }
 
-        // Body until next heading at level <= ours.
+        // Body until next heading at level <= ours, or explicit end (--- / *** / empty **).
         while self.skip_noise() {
             let Some(l) = self.peek() else { break };
             let trimmed = l.text.trim();
 
+            // Empty bold return ends the function body.
+            if is_empty_bold_return(trimmed) {
+                let span = Span {
+                    line: l.line_no,
+                    col: 1,
+                };
+                self.bump();
+                fun.body.push(Stmt::Return {
+                    value: Expr::Literal(Literal::None),
+                    span,
+                });
+                break;
+            }
+
+            // --- / *** at function body top level ends the function (no return).
             if is_frame(trimmed) {
                 self.bump();
-                continue;
+                break;
             }
 
             if is_heading(trimmed) {
@@ -191,10 +206,14 @@ impl<'a> Cursor<'a> {
             bail!("{span}: unexpected frame line as statement");
         }
 
-        // Bold return **…**
+        // Bold return **…** (empty inner → None)
         if trimmed.starts_with("**") && trimmed.ends_with("**") && trimmed.len() >= 4 {
             let inner = &trimmed[2..trimmed.len() - 2];
-            let value = parse_expr_str(inner)?;
+            let value = if inner.trim().is_empty() {
+                Expr::Literal(Literal::None)
+            } else {
+                parse_expr_str(inner)?
+            };
             return Ok(Stmt::Return { value, span });
         }
 
@@ -481,7 +500,19 @@ fn is_frame(trimmed: &str) -> bool {
     if trimmed.len() < 3 {
         return false;
     }
+    // Empty bold return `****` is handled separately; frames are --- or *** (etc.).
+    if is_empty_bold_return(trimmed) {
+        return false;
+    }
     trimmed.chars().all(|c| c == '-') || trimmed.chars().all(|c| c == '*')
+}
+
+/// `****` or `**` + whitespace only + `**`.
+fn is_empty_bold_return(trimmed: &str) -> bool {
+    if !(trimmed.starts_with("**") && trimmed.ends_with("**") && trimmed.len() >= 4) {
+        return false;
+    }
+    trimmed[2..trimmed.len() - 2].trim().is_empty()
 }
 
 fn is_ordered_branch(trimmed: &str) -> bool {

@@ -78,6 +78,21 @@ a:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
   z-index: 20;
 }
 .topbar .brand { margin: 0; font-size: 1.05rem; font-weight: 600; letter-spacing: -0.022em; }
+.brand-row {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+.brand-row .brand { margin: 0; }
+.logo {
+  width: 1.75rem;
+  height: 1.75rem;
+  object-fit: contain;
+  flex-shrink: 0;
+  border-radius: 6px;
+}
+.topbar .logo { width: 1.45rem; height: 1.45rem; }
+.nav-brand .logo { width: 2rem; height: 2rem; }
 .nav-btn {
   appearance: none;
   border: 1px solid var(--line);
@@ -112,7 +127,8 @@ a:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
   align-self: start;
   height: 100vh;
 }
-.nav-brand { display: block; padding: 0 0.35rem; }
+.nav-brand { display: block; padding: 0 0.35rem; margin-bottom: 1.15rem; }
+.nav-brand .tagline { margin: 0.1rem 0 0; }
 .brand {
   font-size: 1.35rem;
   font-weight: 700;
@@ -122,9 +138,10 @@ a:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .tagline {
   color: var(--muted);
   font-size: 0.78rem;
-  margin: 0 0 1.5rem;
+  margin: 0;
   font-weight: 500;
 }
+.nav > h2:first-of-type { margin-top: 0.35rem; }
 .nav h2 {
   font-size: 0.68rem;
   text-transform: uppercase;
@@ -286,7 +303,15 @@ section.block > h2 {
   color: var(--ink);
   font-weight: 500;
 }
-.comment-text { color: var(--muted); font-size: 0.92rem; }
+.comment-text {
+  color: var(--muted);
+  font-size: 0.92rem;
+  display: block;
+  margin-top: 0.35rem;
+  white-space: pre-line;
+  line-height: 1.55;
+  max-width: 42em;
+}
 code.expr {
   font-family: var(--mono);
   font-size: 0.84rem;
@@ -352,6 +377,9 @@ pub fn layout(title: &str, nav: &str, main: &str) -> String {
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>{title} · marqdo</title>
+<link rel="icon" href="https://s3.cflmy.cn/logo/Logo.ico" type="image/x-icon"/>
+<link rel="shortcut icon" href="https://s3.cflmy.cn/logo/Logo.ico" type="image/x-icon"/>
+<link rel="apple-touch-icon" href="https://s3.cflmy.cn/logo/Logo.png"/>
 <style>{css}</style>
 </head>
 <body>
@@ -359,13 +387,21 @@ pub fn layout(title: &str, nav: &str, main: &str) -> String {
 <label class="backdrop" for="nav-toggle" aria-hidden="true"></label>
 <header class="topbar">
   <label class="nav-btn" for="nav-toggle" aria-label="Menu">☰</label>
-  <p class="brand">marqdo</p>
+  <div class="brand-row">
+    <img class="logo" src="https://s3.cflmy.cn/logo/Logo.png" width="28" height="28" alt="marqdo"/>
+    <p class="brand">marqdo</p>
+  </div>
 </header>
 <div class="shell">
 <aside class="nav">
   <div class="nav-brand">
-    <p class="brand">marqdo</p>
-    <p class="tagline">view</p>
+    <div class="brand-row">
+      <img class="logo" src="https://s3.cflmy.cn/logo/Logo.png" width="32" height="32" alt="marqdo"/>
+      <div>
+        <p class="brand">marqdo</p>
+        <p class="tagline">view</p>
+      </div>
+    </div>
   </div>
   {nav}
 </aside>

@@ -10,3 +10,5 @@ description: 具名与位置两种写法
 > print text=named form
 
 > print positional
+
+这里的设计思路是具名实参允许空格的传入，位置实参则不允许。

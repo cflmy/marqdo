@@ -77,6 +77,20 @@ fn skip_frontmatter_end(lines: &[ClassifiedLine]) -> Option<u32> {
 
 fn emit_comments(lines: &[ClassifiedLine], from_line: u32, before_line: u32) -> String {
     let mut s = String::new();
+    let mut paragraph: Vec<String> = Vec::new();
+
+    let flush = |paragraph: &mut Vec<String>, s: &mut String| {
+        if paragraph.is_empty() {
+            return;
+        }
+        let text = paragraph.join("\n");
+        paragraph.clear();
+        s.push_str(&format!(
+            "<div class=\"card comment-card\"><span class=\"badge\">comment</span><span class=\"comment-text\">{}</span></div>",
+            escape(&text)
+        ));
+    };
+
     for l in lines {
         if l.line_no < from_line {
             continue;
@@ -84,17 +98,18 @@ fn emit_comments(lines: &[ClassifiedLine], from_line: u32, before_line: u32) -> 
         if l.line_no >= before_line {
             break;
         }
-        if l.kind == LineKind::Comment {
-            let text = l.text.trim();
-            if text.is_empty() {
-                continue;
+        match l.kind {
+            LineKind::Comment => {
+                let text = l.text.trim();
+                if !text.is_empty() {
+                    paragraph.push(text.to_string());
+                }
             }
-            s.push_str(&format!(
-                "<div class=\"card comment-card\"><span class=\"badge\">comment</span><span class=\"comment-text\">{}</span></div>",
-                escape(text)
-            ));
+            LineKind::Blank => flush(&mut paragraph, &mut s),
+            LineKind::Code => flush(&mut paragraph, &mut s),
         }
     }
+    flush(&mut paragraph, &mut s);
     s
 }
 
@@ -420,5 +435,16 @@ mod tests {
         assert!(html.contains("print"));
         assert!(!html.contains("Binary {"));
         assert!(!html.contains("Literal(Int"));
+    }
+
+    #[test]
+    fn comments_render_as_paragraphs() {
+        let src = "段首说明\n续行仍属同段\n\n下一段\n\n# main\n\n> print text=x\n";
+        let module = crate::parse::parse_source(src).unwrap();
+        let html = render_module_structure(&module, src);
+        let cards = html.matches("comment-card").count();
+        assert_eq!(cards, 2, "blank line should split comment paragraphs: {html}");
+        assert!(html.contains("段首说明\n续行仍属同段"));
+        assert!(html.contains("下一段"));
     }
 }
