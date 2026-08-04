@@ -1,10 +1,10 @@
-# Marqdo
+﻿# Marqdo
 
 **代码即文档。文档即代码。**
 
 Marqdo：Markdown **标记即语法**。源文件 `.mq.md` 既是文稿也是程序。
 
-语法宪法：[doc/design/markdown-mapping.md](doc/design/markdown-mapping.md) · 示例：[examples/](examples/)
+语法宪法：[doc/design/markdown-mapping.md](doc/design/markdown-mapping.md) · 关键字：[keywords.md](doc/design/keywords.md) · 示例：[examples/](examples/)
 
 ---
 
@@ -15,7 +15,7 @@ Marqdo：Markdown **标记即语法**。源文件 `.mq.md` 既是文稿也是程
 | 无标记行 | 注释 |
 | `*…*` | 程序语句 |
 | `**…**` | **返回值**（架构） |
-| `> 输出 …` 等 | 输出等副作用 = **普通函数**，非架构标记 |
+| `> print …` 等 | 输出等副作用 = **普通函数**，非架构标记 |
 | `#` / `##` | 函数与作用域 |
 | `+` / `1.` | 分支（臂头单独 `*` = else） |
 | `-` | 循环（头下纯名则为形参） |
@@ -25,7 +25,7 @@ Marqdo：Markdown **标记即语法**。源文件 `.mq.md` 既是文稿也是程
 ```markdown
 # main
 
-> 输出 内容=Hello World!
+> print text=Hello World!
 
 ## 加一
     - n

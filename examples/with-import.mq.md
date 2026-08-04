@@ -1,4 +1,4 @@
----
+﻿---
 title: 跨文件导入示例
 > utils.mq.md
 ---
@@ -9,6 +9,6 @@ title: 跨文件导入示例
 
 *`y` = > 加一 n=41*
 
-> 输出 内容=`y`
+> print text=`y`
 
 > 问候 谁=Marqdo

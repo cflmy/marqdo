@@ -1,4 +1,4 @@
-# Marqdo 开发文档
+﻿# Marqdo 开发文档
 
 本目录存放各阶段设计、选型与路线图。
 
@@ -22,7 +22,9 @@
 | [design/tech-stack.md](design/tech-stack.md) | 实现栈对比 |
 | [adr/0001-implementation-language.md](adr/0001-implementation-language.md) | **Accepted：Rust 参考解释器；不用 Flex/Bison** |
 | [design/dependencies.md](design/dependencies.md) | 依赖详单（无 Flex/Bison） |
-| [dev-setup.md](dev-setup.md) | **开发环境配置（Rust M0）** |
+| [design/keywords.md](design/keywords.md) | **英文最小关键字 / 内置 `print` `input`** |
+| [design/pipeline-debug.md](design/pipeline-debug.md) | **流水线 `--dump-*` 可视调试** |
+| [dev-setup.md](dev-setup.md) | 开发环境配置（Rust M0） |
 | [roadmap/interpreter.md](roadmap/interpreter.md) | 正经解释器路线图 |
 | [research/okf-and-marqdo.md](research/okf-and-marqdo.md) | OKF 调研 |
 

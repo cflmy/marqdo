@@ -1,4 +1,4 @@
-# Marqdo Spike（Python）
+﻿# Marqdo Spike（Python）
 
 快速验收 ADR 0001 中的 S1–S5，**不是**完整解释器。
 
