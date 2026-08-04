@@ -308,9 +308,29 @@ section.block > h2 {
   font-size: 0.92rem;
   display: block;
   margin-top: 0.35rem;
-  white-space: pre-line;
   line-height: 1.55;
   max-width: 42em;
+}
+.comment-text > :first-child { margin-top: 0; }
+.comment-text > :last-child { margin-bottom: 0; }
+.comment-text p { margin: 0.45em 0; }
+.comment-text a {
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 0.12em;
+  border-bottom: none;
+}
+.comment-text a:hover { opacity: 0.72; }
+.comment-text code {
+  font-family: var(--mono);
+  font-size: 0.86em;
+  background: var(--fill);
+  padding: 0.08em 0.28em;
+  border-radius: 4px;
+}
+.comment-text ul, .comment-text ol {
+  margin: 0.4em 0;
+  padding-left: 1.35em;
 }
 code.expr {
   font-family: var(--mono);

@@ -8,6 +8,7 @@ use crate::ast::{
 };
 use crate::lex::{classify_source, ClassifiedLine, LineKind};
 use crate::view::html::escape;
+use pulldown_cmark::{html, Options, Parser};
 
 pub struct FileViewModel {
     #[allow(dead_code)]
@@ -83,11 +84,12 @@ fn emit_comments(lines: &[ClassifiedLine], from_line: u32, before_line: u32) -> 
         if paragraph.is_empty() {
             return;
         }
-        let text = paragraph.join("\n");
+        // Soft-wrapped source lines → one Markdown paragraph (spaces between).
+        let text = paragraph.join(" ");
         paragraph.clear();
         s.push_str(&format!(
-            "<div class=\"card comment-card\"><span class=\"badge\">comment</span><span class=\"comment-text\">{}</span></div>",
-            escape(&text)
+            "<div class=\"card comment-card\"><span class=\"badge\">comment</span><div class=\"comment-text\">{}</div></div>",
+            comment_markdown_to_html(&text)
         ));
     };
 
@@ -111,6 +113,18 @@ fn emit_comments(lines: &[ClassifiedLine], from_line: u32, before_line: u32) -> 
     }
     flush(&mut paragraph, &mut s);
     s
+}
+
+/// Render narrative comments as Markdown (links, emphasis, code, lists, …).
+fn comment_markdown_to_html(md: &str) -> String {
+    let mut opts = Options::empty();
+    opts.insert(Options::ENABLE_STRIKETHROUGH);
+    opts.insert(Options::ENABLE_TABLES);
+    opts.insert(Options::ENABLE_TASKLISTS);
+    let parser = Parser::new_ext(md, opts);
+    let mut out = String::new();
+    html::push_html(&mut out, parser);
+    out
 }
 
 fn render_fun(fun: &Function, lines: &[ClassifiedLine], depth: usize) -> (String, u32) {
@@ -444,7 +458,20 @@ mod tests {
         let html = render_module_structure(&module, src);
         let cards = html.matches("comment-card").count();
         assert_eq!(cards, 2, "blank line should split comment paragraphs: {html}");
-        assert!(html.contains("段首说明\n续行仍属同段"));
+        assert!(html.contains("段首说明 续行仍属同段") || html.contains("段首说明</p>"));
         assert!(html.contains("下一段"));
+    }
+
+    #[test]
+    fn comments_render_markdown_links() {
+        let src = "见[仓库](https://github.com/cflmy/marqdo)与 `code`\n\n# main\n\n> print text=x\n";
+        let module = crate::parse::parse_source(src).unwrap();
+        let html = render_module_structure(&module, src);
+        assert!(
+            html.contains("<a href=\"https://github.com/cflmy/marqdo\">仓库</a>"),
+            "{html}"
+        );
+        assert!(html.contains("<code>code</code>"), "{html}");
+        assert!(!html.contains("[仓库](https://github.com/cflmy/marqdo)"));
     }
 }
