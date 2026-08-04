@@ -33,7 +33,7 @@ cd marqdo
 
 cargo build
 cargo test
-cargo run -- run examples/hello.mq.md
+cargo run -- run examples/structure/hello.mq.md
 ```
 
 当前 M0：`run` 会读入文件并明确报错「evaluation not implemented」（脚手架，非静默假成功）。

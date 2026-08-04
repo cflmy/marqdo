@@ -9,7 +9,7 @@ use anyhow::{bail, Result};
 use crate::ast::{
     BranchArm, Expr, Function, Literal, Module, Stmt,
 };
-use crate::diagnostics::Span;
+use crate::diagnostics::{Diagnostic, Span};
 use crate::lex::{classify_source, ClassifiedLine, LineKind};
 use crate::parse::expr::parse_call_after_gt as call_after_gt;
 use crate::parse::expr::parse_expr as parse_expr_str;
@@ -217,7 +217,7 @@ impl<'a> Cursor<'a> {
             }
         }
 
-        bail!("{span}: unrecognized statement: {trimmed}")
+        Err(Diagnostic::new(None, span, format!("unrecognized statement: {trimmed}")).into())
     }
 
     fn parse_backtick_assign(&mut self, trimmed: &str, span: Span) -> Result<Option<Stmt>> {
@@ -525,7 +525,7 @@ mod tests {
 
     #[test]
     fn parse_hello() {
-        let src = include_str!("../../examples/hello.mq.md");
+        let src = include_str!("../../examples/structure/hello.mq.md");
         let m = parse_source(src).unwrap();
         assert_eq!(m.functions.len(), 1);
         assert_eq!(m.functions[0].name, "Hello World");
@@ -535,7 +535,7 @@ mod tests {
 
     #[test]
     fn parse_index() {
-        let src = include_str!("../../examples/index.mq.md");
+        let src = include_str!("../../examples/structure/nested-call.mq.md");
         let m = parse_source(src).unwrap();
         assert!(m.imports.is_empty());
         let main = m.functions.iter().find(|f| f.name == "main").unwrap();
@@ -546,7 +546,7 @@ mod tests {
 
     #[test]
     fn parse_branch() {
-        let src = include_str!("../../examples/branch.mq.md");
+        let src = include_str!("../../examples/structure/branch.mq.md");
         let m = parse_source(src).unwrap();
         let main = &m.functions[0];
         assert!(main.body.iter().any(|s| matches!(s, Stmt::Branch { .. })));

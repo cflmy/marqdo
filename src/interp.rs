@@ -1,15 +1,21 @@
 //! Tree-walk interpreter (Phase I).
 
 use anyhow::{bail, Result};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
+use std::path::{Path, PathBuf};
 
 use crate::ast::{
-    BinaryOp, CallExpr, Expr, Function, InterpPart, Literal, Module, Stmt, UnaryOp,
+    Arg, BinaryOp, CallExpr, Expr, Function, InterpPart, Literal, Module, Stmt, UnaryOp,
 };
+use crate::diagnostics::{bail_at, Span};
 use crate::value::Value;
 
 pub struct Interpreter {
+    pub path: Option<PathBuf>,
     pub trace: bool,
+    capture: bool,
+    pub captured_stdout: String,
+    current_span: Span,
 }
 
 struct Env {
@@ -32,16 +38,49 @@ impl Env {
     }
 }
 
+enum EvArg {
+    Positional(Value),
+    Named(String, Value),
+}
+
 impl Interpreter {
-    pub fn new(trace: bool) -> Self {
-        Self { trace }
+    pub fn new(path: Option<&Path>, trace: bool) -> Self {
+        Self {
+            path: path.map(|p| p.to_path_buf()),
+            trace,
+            capture: false,
+            captured_stdout: String::new(),
+            current_span: Span::new(1, 1),
+        }
+    }
+
+    pub fn with_capture(path: Option<&Path>, trace: bool) -> Self {
+        Self {
+            path: path.map(|p| p.to_path_buf()),
+            trace,
+            capture: true,
+            captured_stdout: String::new(),
+            current_span: Span::new(1, 1),
+        }
+    }
+
+    fn err(&self, message: impl Into<String>) -> anyhow::Error {
+        bail_at(self.path.as_deref(), self.current_span, message)
+    }
+
+    fn emit_line(&mut self, text: &str) {
+        if self.capture {
+            self.captured_stdout.push_str(text);
+            self.captured_stdout.push('\n');
+        } else {
+            println!("{text}");
+        }
     }
 
     pub fn run_module(&mut self, module: &Module) -> Result<Value> {
         if let Some(main) = find_top(module, "main") {
             return self.run_function(module, main, Env::new(), &[]);
         }
-        // No main: run each level-1 function with empty args (hello-style demos).
         let tops: Vec<&Function> = module.functions.iter().filter(|f| f.level == 1).collect();
         if tops.is_empty() {
             bail!("no `# main` and no level-1 function to run");
@@ -68,7 +107,6 @@ impl Interpreter {
         for (k, v) in args {
             env.set(k.clone(), v.clone());
         }
-        // Bind missing params to None
         for p in &fun.params {
             if env.get(p).is_none() {
                 env.set(p.clone(), Value::None);
@@ -88,7 +126,6 @@ impl Interpreter {
         Ok(ret)
     }
 
-    /// Returns Some if function should return.
     fn exec_stmt(
         &mut self,
         module: &Module,
@@ -98,6 +135,7 @@ impl Interpreter {
     ) -> Result<Option<Value>> {
         match stmt {
             Stmt::Assign { name, value, span } => {
+                self.current_span = *span;
                 let v = self.eval_expr(module, fun, env, value)?;
                 if self.trace {
                     eprintln!("  assign {name} = {v:?} @{span}");
@@ -106,6 +144,7 @@ impl Interpreter {
                 Ok(None)
             }
             Stmt::Return { value, span } => {
+                self.current_span = *span;
                 let v = self.eval_expr(module, fun, env, value)?;
                 if self.trace {
                     eprintln!("  return {v:?} @{span}");
@@ -113,6 +152,7 @@ impl Interpreter {
                 Ok(Some(v))
             }
             Stmt::Call { call, span } => {
+                self.current_span = *span;
                 if self.trace {
                     eprintln!("  call-stmt {} @{span}", call.callee);
                 }
@@ -120,6 +160,7 @@ impl Interpreter {
                 Ok(None)
             }
             Stmt::Branch { arms, span } => {
+                self.current_span = *span;
                 if self.trace {
                     eprintln!("  branch @{span}");
                 }
@@ -144,15 +185,15 @@ impl Interpreter {
                 body,
                 span,
             } => {
+                self.current_span = *span;
                 if self.trace {
                     eprintln!("  while @{span}");
                 }
-                // Guard against infinite loops in buggy programs.
                 let mut guard = 0u32;
                 while self.eval_expr(module, fun, env, condition)?.truthy() {
                     guard += 1;
                     if guard > 1_000_000 {
-                        bail!("{span}: while loop exceeded iteration limit");
+                        return Err(self.err("while loop exceeded iteration limit"));
                     }
                     for s in body {
                         if let Some(v) = self.exec_stmt(module, fun, env, s)? {
@@ -168,16 +209,18 @@ impl Interpreter {
                 body,
                 span,
             } => {
+                self.current_span = *span;
                 if self.trace {
                     eprintln!("  foreach {item} in {collection} @{span}");
                 }
-                let coll = env
-                    .get(collection)
-                    .cloned()
-                    .ok_or_else(|| anyhow::anyhow!("{span}: undefined collection `{collection}`"))?;
+                let coll = env.get(collection).cloned().ok_or_else(|| {
+                    self.err(format!("undefined collection `{collection}`"))
+                })?;
                 let items = match coll {
                     Value::List(xs) => xs,
-                    other => bail!("{span}: foreach needs a list, got {other:?}"),
+                    other => {
+                        return Err(self.err(format!("foreach needs a list, got {other:?}")));
+                    }
                 };
                 for val in items {
                     env.set(item.clone(), val);
@@ -204,7 +247,7 @@ impl Interpreter {
             Expr::Var(name) => env
                 .get(name)
                 .cloned()
-                .ok_or_else(|| anyhow::anyhow!("undefined variable `{name}`")),
+                .ok_or_else(|| self.err(format!("undefined variable `{name}`"))),
             Expr::Interp(parts) => {
                 let mut s = String::new();
                 for part in parts {
@@ -213,7 +256,7 @@ impl Interpreter {
                         InterpPart::Var(n) => {
                             let v = env
                                 .get(n)
-                                .ok_or_else(|| anyhow::anyhow!("undefined variable `{n}`"))?;
+                                .ok_or_else(|| self.err(format!("undefined variable `{n}`")))?;
                             s.push_str(&v.as_display());
                         }
                     }
@@ -226,13 +269,12 @@ impl Interpreter {
                     UnaryOp::Not => Ok(Value::Bool(!v.truthy())),
                     UnaryOp::Neg => match v {
                         Value::Int(n) => Ok(Value::Int(-n)),
-                        _ => bail!("unary `-` needs int"),
+                        _ => Err(self.err("unary `-` needs int")),
                     },
                 }
             }
             Expr::Binary { op, left, right } => {
                 let l = self.eval_expr(module, fun, env, left)?;
-                // Short-circuit and/or
                 match op {
                     BinaryOp::And => {
                         if !l.truthy() {
@@ -251,7 +293,7 @@ impl Interpreter {
                     _ => {}
                 }
                 let r = self.eval_expr(module, fun, env, right)?;
-                eval_binary(*op, &l, &r)
+                eval_binary(*op, &l, &r).map_err(|e| self.err(e.to_string()))
             }
             Expr::Call(call) => self.eval_call(module, fun, env, call),
             Expr::List(items) => {
@@ -271,26 +313,41 @@ impl Interpreter {
         env: &mut Env,
         call: &CallExpr,
     ) -> Result<Value> {
-        let mut arg_vals = Vec::new();
-        for (k, e) in &call.args {
-            arg_vals.push((k.clone(), self.eval_expr(module, fun, env, e)?));
+        let mut ev_args = Vec::new();
+        for arg in &call.args {
+            match arg {
+                Arg::Positional(e) => {
+                    ev_args.push(EvArg::Positional(self.eval_expr(module, fun, env, e)?));
+                }
+                Arg::Named { name, value } => {
+                    ev_args.push(EvArg::Named(
+                        name.clone(),
+                        self.eval_expr(module, fun, env, value)?,
+                    ));
+                }
+            }
         }
 
         match call.callee.as_str() {
             "print" => {
-                let text = arg_vals
-                    .iter()
-                    .find(|(k, _)| k == "text")
-                    .map(|(_, v)| v.as_display())
-                    .ok_or_else(|| anyhow::anyhow!("print requires text=..."))?;
-                println!("{text}");
+                let bound = bind_args(&["text".into()], &ev_args, false)
+                    .map_err(|m| self.err(m))?;
+                let text = bound
+                    .get("text")
+                    .map(|v| v.as_display())
+                    .ok_or_else(|| self.err("print requires text (named or positional)"))?;
+                self.emit_line(&text);
                 return Ok(Value::None);
             }
             "input" => {
-                let prompt = arg_vals
-                    .iter()
-                    .find(|(k, _)| k == "prompt")
-                    .map(|(_, v)| v.as_display())
+                if self.capture {
+                    return Err(self.err("input is not available under capture / view"));
+                }
+                let bound = bind_args(&["prompt".into()], &ev_args, true)
+                    .map_err(|m| self.err(m))?;
+                let prompt = bound
+                    .get("prompt")
+                    .map(|v| v.as_display())
                     .unwrap_or_default();
                 if !prompt.is_empty() {
                     print!("{prompt}");
@@ -310,25 +367,69 @@ impl Interpreter {
             _ => {}
         }
 
-        let target = lookup_function(module, fun, &call.callee).ok_or_else(|| {
-            anyhow::anyhow!("unknown function `{}`", call.callee)
-        })?;
+        let target = lookup_function(module, fun, &call.callee)
+            .ok_or_else(|| self.err(format!("unknown function `{}`", call.callee)))?;
 
-        // Bind by param names: prefer named args matching params; also allow arg keys as env names.
+        let bound = bind_args(&target.params, &ev_args, false).map_err(|m| self.err(m))?;
         let mut call_env = Env::new();
-        for p in &target.params {
-            if let Some((_, v)) = arg_vals.iter().find(|(k, _)| k == p) {
-                call_env.set(p.clone(), v.clone());
-            }
-        }
-        for (k, v) in &arg_vals {
-            if call_env.get(k).is_none() {
-                call_env.set(k.clone(), v.clone());
-            }
+        for (k, v) in bound {
+            call_env.set(k, v);
         }
 
         self.run_function(module, target, call_env, &[])
     }
+}
+
+/// Bind evaluated args onto parameter names. Err is a plain message (caller adds span/path).
+fn bind_args(
+    params: &[String],
+    args: &[EvArg],
+    allow_missing: bool,
+) -> std::result::Result<HashMap<String, Value>, String> {
+    let mut named: HashMap<String, Value> = HashMap::new();
+    let mut positionals = Vec::new();
+    for a in args {
+        match a {
+            EvArg::Positional(v) => positionals.push(v.clone()),
+            EvArg::Named(k, v) => {
+                if named.contains_key(k) {
+                    return Err(format!("duplicate named argument `{k}`"));
+                }
+                named.insert(k.clone(), v.clone());
+            }
+        }
+    }
+
+    let mut out: HashMap<String, Value> = HashMap::new();
+    let mut used_named = HashSet::new();
+    let mut pos_i = 0usize;
+
+    for p in params {
+        if let Some(v) = named.get(p) {
+            out.insert(p.clone(), v.clone());
+            used_named.insert(p.clone());
+        } else if pos_i < positionals.len() {
+            out.insert(p.clone(), positionals[pos_i].clone());
+            pos_i += 1;
+        } else if !allow_missing {
+            return Err(format!("missing argument for parameter `{p}`"));
+        }
+    }
+
+    if pos_i < positionals.len() {
+        return Err(format!(
+            "too many positional arguments ({} extra)",
+            positionals.len() - pos_i
+        ));
+    }
+
+    for (k, v) in named {
+        if !used_named.contains(&k) && !out.contains_key(&k) {
+            out.insert(k, v);
+        }
+    }
+
+    Ok(out)
 }
 
 fn find_top<'a>(module: &'a Module, name: &str) -> Option<&'a Function> {
@@ -340,11 +441,9 @@ fn lookup_function<'a>(
     current: &'a Function,
     name: &str,
 ) -> Option<&'a Function> {
-    // Nested children of current (hoisted).
     if let Some(f) = find_in_tree(current, name) {
         return Some(f);
     }
-    // Top-level / imported.
     module.functions.iter().find(|f| f.name == name)
 }
 
@@ -376,7 +475,7 @@ fn eval_binary(op: BinaryOp, l: &Value, r: &Value) -> Result<Value> {
             (Value::Text(a), Value::Text(b)) => Ok(Value::Text(format!("{a}{b}"))),
             (Value::Text(a), b) => Ok(Value::Text(format!("{a}{}", b.as_display()))),
             (a, Value::Text(b)) => Ok(Value::Text(format!("{}{b}", a.as_display()))),
-            _ => bail!("`+` needs ints or text, got {l:?} and {r:?}"),
+            _ => bail!("`+` needs ints or text"),
         },
         BinaryOp::Sub => match (l, r) {
             (Value::Int(a), Value::Int(b)) => Ok(Value::Int(a - b)),
@@ -391,18 +490,14 @@ fn eval_binary(op: BinaryOp, l: &Value, r: &Value) -> Result<Value> {
             (Value::Int(a), Value::Int(b)) => Ok(Value::Int(a / b)),
             _ => bail!("`/` needs ints"),
         },
-        BinaryOp::Eq => Ok(Value::Bool(values_eq(l, r))),
-        BinaryOp::Ne => Ok(Value::Bool(!values_eq(l, r))),
+        BinaryOp::Eq => Ok(Value::Bool(l == r)),
+        BinaryOp::Ne => Ok(Value::Bool(l != r)),
         BinaryOp::Lt => cmp_ord(l, r, |o| o.is_lt()),
         BinaryOp::Le => cmp_ord(l, r, |o| o.is_le()),
         BinaryOp::Gt => cmp_ord(l, r, |o| o.is_gt()),
         BinaryOp::Ge => cmp_ord(l, r, |o| o.is_ge()),
         BinaryOp::And | BinaryOp::Or => unreachable!("handled above"),
     }
-}
-
-fn values_eq(l: &Value, r: &Value) -> bool {
-    l == r
 }
 
 fn cmp_ord(l: &Value, r: &Value, f: impl Fn(std::cmp::Ordering) -> bool) -> Result<Value> {

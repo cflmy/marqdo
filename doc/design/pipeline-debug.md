@@ -28,6 +28,8 @@ marqdo dump FILE --stage lines|tokens|ast|sema|all
 | `--dump-ast` | 语法 | S 表达式或缩进树（模块/函数/语句） |
 | `--dump-sema` | 语义 | 作用域、导入图、提升后的符号表 |
 | `--trace-eval` | 求值 | 进入/离开函数、绑定、分支臂选择、`print` 调用 |
+| `--dump-bytecode` | 字节码 | 反汇编 `Program`（见 [bytecode.md](bytecode.md)） |
+| `--backend tree\|bytecode` | 执行后端 | 默认 `tree`；`bytecode` 走栈式 VM |
 | `--dump-all` | 以上全部 | 按管道顺序打印，段之间用横幅分隔 |
 
 格式约定：

@@ -38,7 +38,7 @@
 
 | 名称 | 作用 | 调用示例 |
 |------|------|----------|
-| `print` | 写到 stdout（副作用） | `> print text=Hello World!` |
+| `print` | 写到 stdout（副作用） | `> print text=Hello` 或 `> print Hello`（位置实参，见 [call-arguments.md](call-arguments.md)） |
 | `input` | 从 stdin 读一行（返回文本） | `*`name` = > input prompt=Name: *` |
 
 参数约定（v0）：

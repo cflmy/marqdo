@@ -2,48 +2,71 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 
 use anyhow::Result;
-use clap::{Parser, Subcommand};
+use clap::{Parser, Subcommand, ValueEnum};
 
-use marqdo::RunOptions;
+use marqdo::view::{serve, ViewOptions};
+use marqdo::{Backend, RunOptions};
 
 #[derive(Parser, Debug)]
-#[command(name = "marqdo", version, about = "Marqdo interpreter — run .mq.md programs")]
+#[command(name = "marqdo", version, about = "Marqdo interpreter — run and view .mq.md programs")]
 struct Cli {
     #[command(subcommand)]
     command: Commands,
+}
+
+#[derive(Clone, Copy, Debug, ValueEnum)]
+enum BackendCli {
+    Tree,
+    Bytecode,
+}
+
+impl From<BackendCli> for Backend {
+    fn from(b: BackendCli) -> Self {
+        match b {
+            BackendCli::Tree => Backend::Tree,
+            BackendCli::Bytecode => Backend::Bytecode,
+        }
+    }
 }
 
 #[derive(Subcommand, Debug)]
 enum Commands {
     /// Execute a Marqdo source file (defaults to ./index.mq.md)
     Run {
-        /// Path to a `.mq.md` file
         #[arg(value_name = "FILE")]
         file: Option<PathBuf>,
 
-        /// Dump line classification
+        #[arg(long, value_enum, default_value_t = BackendCli::Tree)]
+        backend: BackendCli,
+
         #[arg(long)]
         dump_lines: bool,
-
-        /// Dump tokens (placeholder until lexer fills in)
         #[arg(long)]
         dump_tokens: bool,
-
-        /// Dump AST (placeholder until parser exists)
         #[arg(long)]
         dump_ast: bool,
-
-        /// Dump semantic info (placeholder)
         #[arg(long)]
         dump_sema: bool,
-
-        /// Trace evaluation (placeholder)
+        #[arg(long)]
+        dump_bytecode: bool,
         #[arg(long)]
         trace_eval: bool,
-
-        /// Enable all dumps
         #[arg(long)]
         dump_all: bool,
+    },
+    /// Browse `.mq.md` structure + execution in a local webpage
+    View {
+        #[arg(value_name = "PATH")]
+        path: Option<PathBuf>,
+
+        #[arg(long, default_value = "127.0.0.1")]
+        host: String,
+
+        #[arg(long, default_value_t = 7429)]
+        port: u16,
+
+        #[arg(long)]
+        no_open: bool,
     },
 }
 
@@ -62,10 +85,12 @@ fn try_main() -> Result<i32> {
     match cli.command {
         Commands::Run {
             file,
+            backend,
             dump_lines,
             dump_tokens,
             dump_ast,
             dump_sema,
+            dump_bytecode,
             trace_eval,
             dump_all,
         } => {
@@ -78,18 +103,29 @@ fn try_main() -> Result<i32> {
                     dump_tokens,
                     dump_ast,
                     dump_sema,
+                    dump_bytecode,
                     trace_eval,
+                    backend: backend.into(),
                 }
             };
-            // dump_all already set; individual flags merge if not dump_all
-            if !dump_all {
-                opts.dump_lines = dump_lines;
-                opts.dump_tokens = dump_tokens;
-                opts.dump_ast = dump_ast;
-                opts.dump_sema = dump_sema;
-                opts.trace_eval = trace_eval;
+            if dump_all {
+                opts.backend = backend.into();
             }
             marqdo::run_file(&path, &opts)?;
+            Ok(0)
+        }
+        Commands::View {
+            path,
+            host,
+            port,
+            no_open,
+        } => {
+            serve(ViewOptions {
+                path: path.unwrap_or_else(|| PathBuf::from(".")),
+                host,
+                port,
+                open_browser: !no_open,
+            })?;
             Ok(0)
         }
     }

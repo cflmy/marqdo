@@ -60,7 +60,13 @@ pub struct BranchArm {
 #[derive(Debug, Clone)]
 pub struct CallExpr {
     pub callee: String,
-    pub args: Vec<(String, Expr)>,
+    pub args: Vec<Arg>,
+}
+
+#[derive(Debug, Clone)]
+pub enum Arg {
+    Positional(Expr),
+    Named { name: String, value: Expr },
 }
 
 #[derive(Debug, Clone)]

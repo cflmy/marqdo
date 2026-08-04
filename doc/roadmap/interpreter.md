@@ -96,7 +96,7 @@ Phase I 对齐 Crafting Interpreters 的 **jlox（树遍历）**；Phase II 对�
 2. **语法 → AST**：函数、形参、`*` 语句、`**` 返回、`>` 调用、`+` 分支、`-` 循环、表格集合、绑定与 `==`。  
 3. **语义**：提升、嵌套作用域、`##` 私有、frontmatter 导入公有顶层。  
 4. **运行时**：环境、调用栈、值（文/数/表/记录）、内置 `print`。  
-5. **验收**：`examples/hello` … `with-import` 全部 `marqdo run` 通过。
+5. **验收**：`examples/structure/*` 与 `examples/keywords/*` 全部 `marqdo run` 通过。
 
 ### Phase II — 字节码 VM（正经化）
 
@@ -158,7 +158,7 @@ spike/           # Python 存档，非运行时依赖
 | M2 | 解析：函数、输出调用、返回 | `hello` + `index` 金样例绿 | ✅ |
 | M3 | 分支、循环、表格、绑定 | `branch`/`loop`/`collection` 绿 | ✅ |
 | M4 | 导入与提升 | `with-import` 绿；**宣称 Phase I 达标** | ✅ |
-| M5 | 字节码设计文档 + 原型 opcode | 同金样例双后端一致 | 未开始 |
+| M5 | 字节码设计文档 + 原型 opcode | 核心金样例双后端一致；覆盖表见 [bytecode.md](../design/bytecode.md) | 进行中 |
 
 **Phase I 完成前，不宣称「语言已实现」。**  
 **仅 hello 特判通过，不算完成。**
@@ -170,9 +170,9 @@ spike/           # Python 存档，非运行时依赖
 在仓库根或任意含 `index.mq.md` 的目录：
 
 ```bash
-marqdo run examples/index.mq.md
+marqdo run examples/structure/nested-call.mq.md
 # 或
-cd examples && marqdo run
+marqdo run examples/structure/import/main.mq.md
 ```
 
 输出与金样例一致；错误带位置；新增语法必须加金样例与单测。这才是「一门解释型语言」的最低合格线。

@@ -152,7 +152,7 @@ spike/                     # Python 风险探测存档（可保留，非运行�
 ```bash
 cargo build
 cargo test
-cargo run -- run examples/index.mq.md
+cargo run -- run examples/structure/nested-call.mq.md
 ```
 
 ---

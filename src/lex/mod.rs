@@ -122,7 +122,7 @@ mod tests {
 
     #[test]
     fn classify_hello_fixture() {
-        let src = include_str!("../../examples/hello.mq.md");
+        let src = include_str!("../../examples/structure/hello.mq.md");
         let lines = classify_source(src);
         assert!(lines.iter().any(|l| l.kind == LineKind::Code && l.text.contains("print")));
         assert!(lines.iter().any(|l| l.kind == LineKind::Comment));

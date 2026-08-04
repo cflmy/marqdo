@@ -4,7 +4,7 @@
 
 Marqdo：Markdown **标记即语法**。源文件 `.mq.md` 既是文稿也是程序。
 
-语法宪法：[doc/design/markdown-mapping.md](doc/design/markdown-mapping.md) · 关键字：[keywords.md](doc/design/keywords.md) · 示例：[examples/](examples/)
+语法宪法：[doc/design/markdown-mapping.md](doc/design/markdown-mapping.md) · 调用实参：[call-arguments.md](doc/design/call-arguments.md) · 示例布局：[examples-and-tests.md](doc/design/examples-and-tests.md) · 浏览：[view.md](doc/design/view.md) · 示例：[examples/](examples/)
 
 ---
 
@@ -48,16 +48,18 @@ Marqdo：Markdown **标记即语法**。源文件 `.mq.md` 既是文稿也是程
 
 - 映射 v0.1：[markdown-mapping.md](doc/design/markdown-mapping.md)  
 - 解释器路线图：[interpreter.md](doc/roadmap/interpreter.md)  
-- **Phase I（树遍历）已通**：`examples/` 下 hello / index / branch / loop / collection / with-import 均可 `marqdo run`  
+- **Phase I（树遍历）已通**：`examples/structure/` 与 `examples/keywords/` 金样例均可 `marqdo run`  
+- **view**：`marqdo view examples` 按 AST 浏览结构与输出  
 - 依赖（Rust，无 Flex/Bison）：[dependencies.md](doc/design/dependencies.md)  
 - 选型：[ADR 0001 — Rust](doc/adr/0001-implementation-language.md)  
 
 ```bash
-cargo run -- run examples/index.mq.md
-# Hello World!
+cargo run -- run examples/structure/hello.mq.md
+cargo run -- run examples/structure/hello.mq.md --backend bytecode
+cargo run -- view examples --no-open
 ```
 
-下一步：按需加强语义诊断与表达式；Phase II 字节码见路线图 M5。
+M5 字节码见 [bytecode.md](doc/design/bytecode.md)；errors 见 `examples/errors/`。
 
 
 ---

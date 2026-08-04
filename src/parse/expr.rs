@@ -15,15 +15,39 @@ pub fn parse_expr(input: &str) -> Result<Expr> {
 }
 
 /// Argument / template RHS: prefer a full expression; else interpolated text.
+/// Hyphenated prose (`none-falsy`) is not parsed as subtraction.
 pub fn parse_value_or_interp(input: &str) -> Result<Expr> {
     let s = input.trim();
     if s.is_empty() {
         return Ok(Expr::Literal(Literal::Text(String::new())));
     }
+    if has_hyphenated_prose(s) {
+        return Ok(parse_interp(s));
+    }
     match parse_expr(s) {
         Ok(e) => Ok(e),
         Err(_) => Ok(parse_interp(s)),
     }
+}
+
+fn has_hyphenated_prose(s: &str) -> bool {
+    let chars: Vec<char> = s.chars().collect();
+    for i in 1..chars.len().saturating_sub(1) {
+        if chars[i] != '-' {
+            continue;
+        }
+        let left = chars[i - 1];
+        let right = chars[i + 1];
+        if left.is_whitespace() || right.is_whitespace() || left == '`' || right == '`' {
+            continue;
+        }
+        // `none-falsy` / `Hello-World` — not `` `n` - 1 ``
+        if left.is_alphanumeric() || right.is_alphanumeric() || !left.is_ascii() || !right.is_ascii()
+        {
+            return true;
+        }
+    }
+    false
 }
 
 pub fn parse_interp(s: &str) -> Expr {
@@ -329,18 +353,20 @@ fn is_word_end(s: &str, len: usize) -> bool {
     }
 }
 
-/// Parse `name key=val key2=val2` from a string; returns call + bytes consumed.
+/// Parse `name key=val …` / positional args; returns call + bytes consumed.
 pub fn parse_call_tail(s: &str) -> Result<(CallExpr, usize)> {
-    let s = s.trim_start();
-    let trimmed_lead = s.len(); // not used — work on s
-    let _ = trimmed_lead;
-    let original_len = s.len(); // we'll compute from full — caller passes rest after >
+    use crate::ast::Arg;
 
-    let mut parts = s.split_whitespace();
-    let callee = parts
-        .next()
-        .ok_or_else(|| anyhow::anyhow!("missing callee"))?
-        .to_string();
+    let s = s.trim_start();
+    let original_len = s.len();
+
+    let callee = {
+        let mut parts = s.split_whitespace();
+        parts
+            .next()
+            .ok_or_else(|| anyhow::anyhow!("missing callee"))?
+            .to_string()
+    };
 
     let after_callee_offset = {
         let idx = s.find(&callee).unwrap();
@@ -348,26 +374,68 @@ pub fn parse_call_tail(s: &str) -> Result<(CallExpr, usize)> {
     };
     let mut args_str = s[after_callee_offset..].trim_start();
     let mut args = Vec::new();
+    let mut seen_named = false;
 
-    // Support one or more `key=value`; value may contain spaces until next ` key=` pattern.
     while !args_str.is_empty() {
-        let eq = args_str
-            .find('=')
-            .ok_or_else(|| anyhow::anyhow!("expected key=value in call args, got {args_str:?}"))?;
-        let key = args_str[..eq].trim().to_string();
-        if key.is_empty() {
-            bail!("empty argument name");
+        if let Some((key, after_eq)) = try_named_arg(args_str) {
+            seen_named = true;
+            let val_end = find_next_arg_boundary(after_eq);
+            let val_raw = after_eq[..val_end].trim_end();
+            args.push(Arg::Named {
+                name: key,
+                value: parse_value_or_interp(val_raw)?,
+            });
+            args_str = after_eq[val_end..].trim_start();
+        } else {
+            if seen_named {
+                bail!("positional argument after named argument is not allowed");
+            }
+            let (tok, rest) = split_first_token(args_str);
+            if tok.is_empty() {
+                break;
+            }
+            args.push(Arg::Positional(parse_value_or_interp(tok)?));
+            args_str = rest.trim_start();
         }
-        let after_eq = &args_str[eq + 1..];
-        // Value runs until ` word=` where word is next key, or end.
-        let val_end = find_next_arg_boundary(after_eq);
-        let val_raw = after_eq[..val_end].trim_end();
-        args.push((key, parse_value_or_interp(val_raw)?));
-        args_str = after_eq[val_end..].trim_start();
     }
 
-    let consumed = original_len; // entire rest consumed for stmt-form calls
-    Ok((CallExpr { callee, args }, consumed))
+    Ok((CallExpr { callee, args }, original_len))
+}
+
+/// If `s` begins with `ident=`, return (ident, rest_after_eq).
+fn try_named_arg(s: &str) -> Option<(String, &str)> {
+    let s = s.trim_start();
+    for (i, c) in s.char_indices() {
+        if c == '=' {
+            if i == 0 {
+                return None;
+            }
+            let key = &s[..i];
+            if key.chars().any(|ch| ch.is_whitespace()) {
+                return None;
+            }
+            return Some((key.to_string(), &s[i + 1..]));
+        }
+        if c.is_whitespace() {
+            return None;
+        }
+    }
+    None
+}
+
+fn split_first_token(s: &str) -> (&str, &str) {
+    let s = s.trim_start();
+    if s.starts_with('`') {
+        // `` `name` `` as one token
+        if let Some(end) = s[1..].find('`') {
+            let end = end + 2; // include closing `
+            return (&s[..end], &s[end..]);
+        }
+    }
+    match s.find(char::is_whitespace) {
+        Some(i) => (&s[..i], &s[i..]),
+        None => (s, ""),
+    }
 }
 
 fn find_next_arg_boundary(after_eq: &str) -> usize {
