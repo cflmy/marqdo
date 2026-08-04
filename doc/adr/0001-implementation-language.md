@@ -22,8 +22,8 @@
    - Python Spike **保留为算法原型/对照**，不是运行时依赖。
 
 2. **词法 / 语法：不使用 Flex、Bison**  
-   - 解释器需要词法·语法**阶段**，不需要这两个 C 生成器。  
-   - Marqdo 采用：自研行分类 + GFM 库 + **手写递归下降** → AST。  
+   - **主因是 Marqdo 的 Markdown 语法形态**，不是「因为选了 Rust」。换成 C++ 同样不建议用 Flex/Bison 做整语言前端。  
+   - 解释器需要词法·语法**阶段**；采用自研行分类 + GFM 库 + **手写递归下降** → AST。  
    - 详见 [dependencies.md](../design/dependencies.md)。
 
 3. **架构分期不变**  

@@ -10,20 +10,25 @@
 
 ## 1. 要不要 Flex / Bison？
 
-### 结论：**不需要。解释器也不依赖 Flex/Bison。**
+### 结论：**不需要。** 主因不是「用了 Rust」，而是 **Marqdo 的语法形态 + 解释器并不绑定生成器。**
 
-| 工具 | 典型用途 | Marqdo 为何不用 |
-|------|----------|-----------------|
-| **Flex** | 从正则生成 C 词法分析器 | 我们的「词法」是 **行分类 + Markdown 标记**，不是 C 式 `identifier|number|…` 字符流；且目标实现是 **Rust**，不是 C 工具链 |
-| **Bison** | 从 Yacc 文法生成 C LR 语法分析器 | Marqdo 表面是 **GFM 文档结构**；整体语法不适合写成单一 Bison 文法。解释器主流做法是 **手写递归下降** 或 Rust 生态的 PEG/组合子，而非 Bison |
+把两件事分开：
 
-[USTC 编译课 Lab1](https://ustc-compiler-2025.github.io/homepage/) 用 Flex/Bison 是为 **Cminusf 编译器** 教学服务的，和「从 `.mq.md` 解释执行」不是同一条产品路径。
+| 问题 | 答案 |
+|------|------|
+| 因为 Rust 才不用 Flex/Bison？ | **否。** Flex/Bison 生成的是 C（也可接 C++）。若实现改成 **C++**，**仍然不建议**用它们做 Marqdo 主前端。 |
+| 因为是解释器才不用？ | **部分相关，但不是全部。** 解释器**需要**词法/语法阶段，但**不规定**必须用 Flex/Bison；手写递归下降是主流。即便将来做「编译到字节码/原生」，Marqdo 也因 Markdown 外壳而不适合整语言 Bison 化。 |
+| 真正主因 | **Markup-as-Syntax**：源是 GFM 文档结构（标题/列表/强调/表格/行分类），不是 Cminusf 那种纯字符流文法。 |
 
-**解释型语言同样需要词法与语法分析**，但是：
+| 工具 | 典型用途 | Marqdo 为何不用（与宿主语言无关） |
+|------|----------|----------------------------------|
+| **Flex** | 正则 → C 词法分析器 | 「词法」是 **行分类 + Markdown 标记**，不是经典 `id\|num\|op` 字符流 |
+| **Bison** | Yacc 文法 → C LR 分析器 | 整体语法绑在 **GFM 块结构**上，硬写成单一 Bison 文法别扭且难与预览器对齐 |
 
-- 需要的是 **阶段**（lex → parse → AST），不是 **Flex/Bison 这两个具体程序**；
-- Python、Ruby、Lua、Crafting Interpreters 的 jlox/clox，大量使用 **手写 lexer + 递归下降**；
-- Flex/Bison 是「生成器」选项之一，不是解释器的充分或必要条件。
+[USTC 编译课 Lab1](https://ustc-compiler-2025.github.io/homepage/) 用 Flex/Bison，是因为对象语言是 **C 式源码的编译器**；换 C++ 写那个编译器也合理。  
+Marqdo 换 **Rust 或 C++** 都不改变「主前端不该是 Flex/Bison」这一判断。
+
+**解释型语言同样需要词法与语法分析**，要的是阶段，不是这两个具体程序。
 
 ---
 
