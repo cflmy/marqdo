@@ -27,15 +27,17 @@ marqdo dump FILE --stage lines|tokens|ast|sema|all
 | `--dump-tokens` | 词法 | Token 流：`type lexeme line:col` |
 | `--dump-ast` | 语法 | S 表达式或缩进树（模块/函数/语句） |
 | `--dump-sema` | 语义 | 作用域、导入图、提升后的符号表 |
-| `--trace-eval` | 求值 | 进入/离开函数、绑定、分支臂选择、`print` 调用 |
-| `--dump-bytecode` | 字节码 | 反汇编 `Program`（见 [bytecode.md](bytecode.md)） |
+| `--trace-eval` | 求值 | **JSON 行**（stderr）：语句级事件，含 `path` / `span`（`line:col`） |
+| `--dump-bytecode` | 字节码 | 反汇编 `Program`（指令旁带 `@line:col`；见 [bytecode.md](bytecode.md)） |
 | `--backend tree\|bytecode` | 执行后端 | 默认 `tree`；`bytecode` 走栈式 VM |
 | `--dump-all` | 以上全部 | 按管道顺序打印，段之间用横幅分隔 |
 
 格式约定：
 
-- 人类可读优先；段首统一：`=== marqdo: <stage> ===`  
-- 可选 `--dump-format=text|json`（json 后置，text 先做）  
+- dump 人类可读优先；段首统一：`=== marqdo: <stage> ===`  
+- `--trace-eval`：每条事件一行 JSON，例如  
+  `{"event":"stmt","path":"…","span":"5:1","kind":"call","callee":"print"}`  
+  树遍历：`enter_fn` / `stmt` / `leave_fn`；字节码：`op`（`print`/`input`/`call`/`return`）。  
 - 有 dump 时：若求值未实现，仍打印已实现阶段再以非 0 退出（便于 M1 只测 lines）
 
 ---

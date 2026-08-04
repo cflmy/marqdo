@@ -6,6 +6,7 @@ use std::path::{Path, PathBuf};
 
 use crate::builtin::{builtin_int, builtin_len, builtin_str};
 use crate::bytecode::{Op, Program};
+use crate::debug::emit_trace;
 use crate::diagnostics::{bail_at, Span};
 use crate::input_feed::InputFeed;
 use crate::value::Value;
@@ -15,6 +16,7 @@ pub struct Vm {
     capture: bool,
     pub captured_stdout: String,
     input: InputFeed,
+    trace: bool,
 }
 
 struct Frame {
@@ -30,6 +32,7 @@ impl Vm {
             capture: false,
             captured_stdout: String::new(),
             input: InputFeed::new(false, Vec::new()),
+            trace: false,
         }
     }
 
@@ -39,11 +42,17 @@ impl Vm {
             capture: true,
             captured_stdout: String::new(),
             input: InputFeed::new(true, Vec::new()),
+            trace: false,
         }
     }
 
     pub fn with_stdin(mut self, lines: Vec<String>) -> Self {
         self.input = InputFeed::new(self.capture, lines);
+        self
+    }
+
+    pub fn with_trace(mut self, trace: bool) -> Self {
+        self.trace = trace;
         self
     }
 
@@ -101,6 +110,32 @@ impl Vm {
             let op = fun.code[ip];
             let span = fun.spans.get(ip).copied().unwrap_or(Span::new(1, 1));
             frame.ip += 1;
+
+            if self.trace {
+                match op {
+                    Op::Print | Op::Input | Op::Call(_, _) | Op::Return => {
+                        let kind = match op {
+                            Op::Print => "print",
+                            Op::Input => "input",
+                            Op::Call(_, _) => "call",
+                            Op::Return => "return",
+                            _ => unreachable!(),
+                        };
+                        let ip_s = ip.to_string();
+                        emit_trace(
+                            self.path.as_deref(),
+                            Some(span),
+                            "op",
+                            &[
+                                ("kind", kind),
+                                ("fn", fun.name.as_str()),
+                                ("ip", ip_s.as_str()),
+                            ],
+                        );
+                    }
+                    _ => {}
+                }
+            }
 
             match op {
                 Op::Constant(i) => stack.push(fun.constants[i as usize].clone()),

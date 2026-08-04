@@ -141,8 +141,16 @@ pub fn run_file(path: &Path, opts: &RunOptions) -> Result<i32> {
             if opts.dump_bytecode {
                 print!("{}", program.disassemble());
             }
-            let mut vm = Vm::new(Some(path)).with_stdin(opts.stdin_lines.clone());
+            let mut vm = Vm::new(Some(path))
+                .with_stdin(opts.stdin_lines.clone())
+                .with_trace(opts.trace_eval);
+            if opts.trace_eval {
+                eprintln!("=== marqdo: trace-eval ({path_label}) ===");
+            }
             vm.run(&program)?;
+            if opts.trace_eval {
+                eprintln!("=== marqdo: end trace-eval ===");
+            }
         }
     }
 

@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| 状态 | **进行中**（P0 / P1a / P2-S0 / P1b 完成；下一：P2-S1 或 P3-D0） |
+| 状态 | **进行中**（P0–P1b / P2-S0 / P3-D0–D1 初版；下一：P3-D2 或 P2-S1） |
 | 日期 | 2026-08-04 |
 | 目标 | 交互 I/O、可信诊断、可生长标准库；view 渐进成为调试宿主 |
 | 相关 | [interpreter.md](interpreter.md) · [keywords.md](../design/keywords.md) · [pipeline-debug.md](../design/pipeline-debug.md) · [view.md](../design/view.md) |

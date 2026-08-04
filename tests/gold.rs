@@ -381,6 +381,33 @@ fn bytecode_paragraph_comment() {
 }
 
 #[test]
+fn trace_eval_json_tree() {
+    let (code, stdout, stderr) = run(&["run", "tests/structure/hello.mq.md", "--trace-eval"]);
+    assert_eq!(code, 0, "{stderr}");
+    assert_eq!(stdout.trim_end(), "Hello World!");
+    assert!(stderr.contains("\"event\":\"enter_fn\""), "{stderr}");
+    assert!(stderr.contains("\"event\":\"stmt\""), "{stderr}");
+    assert!(stderr.contains("\"span\":\"5:1\""), "{stderr}");
+    assert!(stderr.contains("\"event\":\"leave_fn\""), "{stderr}");
+}
+
+#[test]
+fn trace_eval_json_bytecode() {
+    let (code, stdout, stderr) = run(&[
+        "run",
+        "tests/structure/hello.mq.md",
+        "--backend",
+        "bytecode",
+        "--trace-eval",
+    ]);
+    assert_eq!(code, 0, "{stderr}");
+    assert_eq!(stdout.trim_end(), "Hello World!");
+    assert!(stderr.contains("\"event\":\"op\""), "{stderr}");
+    assert!(stderr.contains("\"kind\":\"print\""), "{stderr}");
+    assert!(stderr.contains("\"span\":\"5:1\""), "{stderr}");
+}
+
+#[test]
 fn catalog_writes_yaml() {
     let dir = tempfile_dir("mq-cat");
     let (code, _, stderr) = run(&[

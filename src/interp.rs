@@ -8,6 +8,7 @@ use crate::ast::{
     Arg, BinaryOp, CallExpr, Expr, Function, InterpPart, Literal, Module, Stmt, UnaryOp,
 };
 use crate::builtin::{builtin_int, builtin_len, builtin_str};
+use crate::debug::emit_trace;
 use crate::diagnostics::{bail_at, Span};
 use crate::input_feed::InputFeed;
 use crate::value::Value;
@@ -125,7 +126,12 @@ impl Interpreter {
         args: &[(String, Value)],
     ) -> Result<Value> {
         if self.trace {
-            eprintln!("enter fun {:?}", fun.name);
+            emit_trace(
+                self.path.as_deref(),
+                Some(fun.span),
+                "enter_fn",
+                &[("fn", fun.name.as_str())],
+            );
         }
         for (k, v) in args {
             env.set(k.clone(), v.clone());
@@ -144,7 +150,13 @@ impl Interpreter {
             }
         }
         if self.trace {
-            eprintln!("leave fun {:?} => {ret}", fun.name);
+            let display = ret.as_display();
+            emit_trace(
+                self.path.as_deref(),
+                Some(fun.span),
+                "leave_fn",
+                &[("fn", fun.name.as_str()), ("value", display.as_str())],
+            );
         }
         Ok(ret)
     }
@@ -161,7 +173,17 @@ impl Interpreter {
                 self.current_span = *span;
                 let v = self.eval_expr(module, fun, env, value)?;
                 if self.trace {
-                    eprintln!("  assign {name} = {v:?} @{span}");
+                    let display = v.as_display();
+                    emit_trace(
+                        self.path.as_deref(),
+                        Some(*span),
+                        "stmt",
+                        &[
+                            ("kind", "assign"),
+                            ("name", name.as_str()),
+                            ("value", display.as_str()),
+                        ],
+                    );
                 }
                 env.set(name.clone(), v);
                 Ok(None)
@@ -170,14 +192,25 @@ impl Interpreter {
                 self.current_span = *span;
                 let v = self.eval_expr(module, fun, env, value)?;
                 if self.trace {
-                    eprintln!("  return {v:?} @{span}");
+                    let display = v.as_display();
+                    emit_trace(
+                        self.path.as_deref(),
+                        Some(*span),
+                        "stmt",
+                        &[("kind", "return"), ("value", display.as_str())],
+                    );
                 }
                 Ok(Some(v))
             }
             Stmt::Call { call, span } => {
                 self.current_span = *span;
                 if self.trace {
-                    eprintln!("  call-stmt {} @{span}", call.callee);
+                    emit_trace(
+                        self.path.as_deref(),
+                        Some(*span),
+                        "stmt",
+                        &[("kind", "call"), ("callee", call.callee.as_str())],
+                    );
                 }
                 let _ = self.eval_call(module, fun, env, call)?;
                 Ok(None)
@@ -185,7 +218,12 @@ impl Interpreter {
             Stmt::Branch { arms, span } => {
                 self.current_span = *span;
                 if self.trace {
-                    eprintln!("  branch @{span}");
+                    emit_trace(
+                        self.path.as_deref(),
+                        Some(*span),
+                        "stmt",
+                        &[("kind", "branch")],
+                    );
                 }
                 for arm in arms {
                     let take = match &arm.condition {
@@ -210,7 +248,12 @@ impl Interpreter {
             } => {
                 self.current_span = *span;
                 if self.trace {
-                    eprintln!("  while @{span}");
+                    emit_trace(
+                        self.path.as_deref(),
+                        Some(*span),
+                        "stmt",
+                        &[("kind", "while")],
+                    );
                 }
                 let mut guard = 0u32;
                 while self.eval_expr(module, fun, env, condition)?.truthy() {
@@ -234,7 +277,16 @@ impl Interpreter {
             } => {
                 self.current_span = *span;
                 if self.trace {
-                    eprintln!("  foreach {item} in {collection} @{span}");
+                    emit_trace(
+                        self.path.as_deref(),
+                        Some(*span),
+                        "stmt",
+                        &[
+                            ("kind", "foreach"),
+                            ("item", item.as_str()),
+                            ("collection", collection.as_str()),
+                        ],
+                    );
                 }
                 let coll = env.get(collection).cloned().ok_or_else(|| {
                     self.err(format!("undefined collection `{collection}`"))
