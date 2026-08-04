@@ -20,7 +20,7 @@
 | [design/return-hr-and-code-surface.md](design/return-hr-and-code-surface.md) | 语句/返回/输出/分割线决议记录 |
 | [design/generated-yaml-manifest.md](design/generated-yaml-manifest.md) | 生成式 OKF 清单 |
 | [design/tech-stack.md](design/tech-stack.md) | 实现栈对比分析 |
-| [adr/0001-implementation-language.md](adr/0001-implementation-language.md) | **选型 ADR（提议中）** |
+| [adr/0001-implementation-language.md](adr/0001-implementation-language.md) | 选型 ADR（Python Spike **已通过**） |
 | [research/okf-and-marqdo.md](research/okf-and-marqdo.md) | OKF 调研 |
 
 示例程序见仓库 [`examples/`](../examples/)。

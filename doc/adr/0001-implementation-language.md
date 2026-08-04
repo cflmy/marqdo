@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| 状态 | **提议中（Proposed）** — 待确认后 Accepted |
+| 状态 | **Spike 通过（Python）** — 参考实现语言待勾选 |
 | 日期 | 2026-08-04 |
 | 决策者 | chaungming + 协作 |
 | 相关 | [tech-stack.md](../design/tech-stack.md) · [markdown-mapping.md](../design/markdown-mapping.md) |
@@ -48,13 +48,15 @@
 
 ### 验证期（现在 → 跑通 examples）
 
-**采用选项 A：TypeScript + remark-gfm + mdast + Vitest + Node ≥ 20。**
+**Spike 优先采用 Python（快速验证），不默认上 npm/TypeScript 脚手架。**
 
-理由：
+| 步骤 | 选择 |
+|------|------|
+| **Spike（进行中）** | **Python 3.11+** + 轻量 Markdown 库（如 `markdown-it-py`）+ `pytest` |
+| 验证通过后的参考实现 | 另议：可继续 Python，或再评 TypeScript / Rust（见原选项 A/B） |
 
-1. 与 GitHub 预览最接近，减少「能渲染不能跑」。  
-2. mdast 保留 list 的 `spread` / 子节点；需 Spike 确认 **bullet 字符 `-`/`+` 可取**（取不到则自研行扫描补一层）。  
-3. 迭代宪法快，符合「设计刚定、语义还在磨」的阶段。
+理由：npm 安装过慢会阻塞 Spike；Python 足以验收 S1–S5 与「行分类 / bullet 区分」风险。  
+**原选项 A（TypeScript + remark）降为验证通过后的候选实现，不再作为 Spike 必经之路。**
 
 ### 长期（宪法稳定后）
 
@@ -77,22 +79,14 @@
 | S4 | 文件头 `---` + 正文内 `---` | 能分开 frontmatter 与可选框线 |
 | S5 | frontmatter 行 `> x.mq.md` | 不被 YAML 解析掐死，可抽出导入 |
 
-**提议流程：** 先做 **Spike A（≤1 日）** → 若 S2 失败再评估自研行扫描或转 Spike B → 将本 ADR 标为 **Accepted** → 再允许添加 `package.json` 与 `src/`。
-
----
-
-## 后果
-
-- Accepted 后：仓库可建 `src/`、`tests/`，CLI `marqdo run`。  
-- 生成 OKF 清单、LSP 等不在本 ADR 范围。  
-- 实现须遵守：先做行分类，再求值（[code-vs-comment.md](../design/code-vs-comment.md)）。
+**提议流程：** 先做 **Python Spike（本目录 `spike/`，≤1 日）** → 记录 S1–S5 通过/补救 → 再决定参考实现语言（Python 延续 / TS / Rust）→ Accepted 后才建正式 `src/`。
 
 ---
 
 ## 确认栏
 
-- [ ] 同意验证期 = TypeScript + remark  
-- [ ] 改选：验证期 = Rust（先 Spike B）  
-- [ ] 改选：其它：________  
-
-确认后把状态改为 **Accepted**，并开始 Spike（不是直接铺全量解释器）。
+- [x] Spike 使用 Python（进行中）
+- [ ] Spike 通过后：参考实现继续 Python
+- [ ] Spike 通过后：改选 TypeScript
+- [ ] Spike 通过后：改选 Rust
+- [ ] 其它：________
