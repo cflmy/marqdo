@@ -40,7 +40,7 @@ Marqdo：Markdown **标记即语法**。源文件 `.mq.md` 既是文稿也是程
 1. 叙述默认安全（无标记 = 注释）。  
 2. 返回是架构；打印只是函数。  
 3. 依赖清单由工具生成（OKF 风格），不是手填配置。  
-4. **正经解释器**：词法/行分类 → 语法 → 语义 → 树遍历（再字节码）；见 [路线图](doc/roadmap/interpreter.md)。实现语言 **Python**（[ADR 0001](doc/adr/0001-implementation-language.md)）。
+4. **正经解释器（Rust）**：词法/行分类 → 递归下降语法 → 语义 → 树遍历 → 日后字节码；**不用 Flex/Bison**。见 [路线图](doc/roadmap/interpreter.md) 与 [依赖说明](doc/design/dependencies.md)。
 
 ---
 
@@ -48,10 +48,10 @@ Marqdo：Markdown **标记即语法**。源文件 `.mq.md` 既是文稿也是程
 
 - 映射 v0.1：[markdown-mapping.md](doc/design/markdown-mapping.md)  
 - 解释器路线图：[interpreter.md](doc/roadmap/interpreter.md)  
-- 选型：[ADR 0001 Accepted — Python](doc/adr/0001-implementation-language.md)  
-- Spike 存档：[spike/REPORT.md](spike/REPORT.md)  
+- 依赖（Rust，无 Flex/Bison）：[dependencies.md](doc/design/dependencies.md)  
+- 选型：[ADR 0001 — Rust](doc/adr/0001-implementation-language.md)  
 
-下一步：按路线图 M0 起建正式包，目标 `marqdo run index.mq.md`。
+下一步：Cargo 工程 M0 + 金样例框架，目标 `marqdo run index.mq.md`。
   
 
 ---

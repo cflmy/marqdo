@@ -20,8 +20,9 @@
 | [design/return-hr-and-code-surface.md](design/return-hr-and-code-surface.md) | 语句/返回/输出决议 |
 | [design/generated-yaml-manifest.md](design/generated-yaml-manifest.md) | 生成式 OKF 清单 |
 | [design/tech-stack.md](design/tech-stack.md) | 实现栈对比 |
-| [adr/0001-implementation-language.md](adr/0001-implementation-language.md) | **Accepted：Python 参考解释器** |
-| [roadmap/interpreter.md](roadmap/interpreter.md) | **正经解释器路线图**（词法→语法→语义→树遍历→字节码） |
+| [adr/0001-implementation-language.md](adr/0001-implementation-language.md) | **Accepted：Rust 参考解释器；不用 Flex/Bison** |
+| [design/dependencies.md](design/dependencies.md) | **依赖详单**：工具链、Cargo crate、为何不用 Flex/Bison |
+| [roadmap/interpreter.md](roadmap/interpreter.md) | 正经解释器路线图 |
 | [research/okf-and-marqdo.md](research/okf-and-marqdo.md) | OKF 调研 |
 
 示例与验收集：[`examples/`](../examples/)。Spike 存档：[`spike/`](../spike/)。

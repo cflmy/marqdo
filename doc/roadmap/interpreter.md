@@ -52,12 +52,13 @@ index.mq.md (+ 导入的 .mq.md)
           ▼
 ┌───────────────────┐
 │ 1. 词法·行分类     │  注释行丢弃语义；代码行 → Token 流
-│    (+ MD 块辅助)   │  markdown-it 管表/强调/标题；+/- 靠行扫描
+│    (+ MD 块辅助)   │  pulldown-cmark/comrak；+/- 靠行扫描
 └─────────┬─────────┘
           ▼
 ┌───────────────────┐
 │ 2. 语法分析        │  Token/块 → Marqdo AST
 │    (递归下降)      │  Module / Fun / Stmt / Expr / Branch / Loop …
+│                    │  **不用 Flex/Bison**（见 dependencies.md）
 └─────────┬─────────┘
           ▼
 ┌───────────────────┐
@@ -127,38 +128,24 @@ Phase I 对齐 Crafting Interpreters 的 **jlox（树遍历）**；Phase II 对�
 
 ## 5. 实现语言（本路线图默认）
 
-在 Spike 已通过的前提下，**参考解释器默认继续 Python 3.11+**：
+**参考解释器：Rust**（[ADR 0001](../adr/0001-implementation-language.md)）。
 
-- 与 `spike/` 同栈，立刻能长成正式包；  
-- 树遍历与日后字节码 VM 都可用 Python 写清；  
-- 若日后要单二进制/极致性能，再 ADR 引入 Rust **重写 VM 或全前端**，金样例不变。
-
-将 [ADR 0001](../adr/0001-implementation-language.md) 标为 Accepted（Python 参考实现）。
+- 词法/语法：**自研 + GFM crate**，不用 Flex/Bison（[dependencies.md](../design/dependencies.md)）。  
+- Python `spike/` 仅作风险探测与算法草稿。  
+- Phase I 树遍历、Phase II 字节码 VM 均在 Rust 中实现。
 
 ---
 
 ## 6. 目录规划（正式代码，非 spike）
 
 ```
-marqdo/                 # 可安装包
-  __init__.py
-  cli.py                # marqdo run
-  lex/                  # 行分类、标记词法
-  parse/                # 递归下降 → AST
-  ast_nodes.py
-  sema/                 # 作用域、导入、提升
-  runtime/              # 值、环境、内置
-  interp/               # Phase I 树遍历
-  bytecode/             # Phase II（后建）
-  diagnostics.py
+Cargo.toml
+crates/marqdo/   # 或根包
+  src/lex/ parse/ ast/ sema/ interp/ bytecode/ runtime/
 tests/
-  gold/                 # examples → expected.stdout
-  unit/
-examples/               # 已有宪法示例 = 验收集
-docs → 已有 doc/
+examples/
+spike/           # Python 存档，非运行时依赖
 ```
-
-`spike/` 仅保留为风险探测；**正式逻辑不得长期只活在 spike 里**。
 
 ---
 
