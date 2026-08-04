@@ -1,13 +1,20 @@
 //! Stack VM for Marqdo bytecode.
 
-use anyhow::{bail, Result};
+use anyhow::Result;
+use std::io::Write;
+use std::path::{Path, PathBuf};
 
+use crate::builtin::{builtin_int, builtin_len, builtin_str};
 use crate::bytecode::{Op, Program};
+use crate::diagnostics::{bail_at, Span};
+use crate::input_feed::InputFeed;
 use crate::value::Value;
 
 pub struct Vm {
+    path: Option<PathBuf>,
     capture: bool,
     pub captured_stdout: String,
+    input: InputFeed,
 }
 
 struct Frame {
@@ -17,18 +24,27 @@ struct Frame {
 }
 
 impl Vm {
-    pub fn new() -> Self {
+    pub fn new(path: Option<&Path>) -> Self {
         Self {
+            path: path.map(|p| p.to_path_buf()),
             capture: false,
             captured_stdout: String::new(),
+            input: InputFeed::new(false, Vec::new()),
         }
     }
 
-    pub fn with_capture() -> Self {
+    pub fn with_capture(path: Option<&Path>) -> Self {
         Self {
+            path: path.map(|p| p.to_path_buf()),
             capture: true,
             captured_stdout: String::new(),
+            input: InputFeed::new(true, Vec::new()),
         }
+    }
+
+    pub fn with_stdin(mut self, lines: Vec<String>) -> Self {
+        self.input = InputFeed::new(self.capture, lines);
+        self
     }
 
     fn emit_line(&mut self, text: &str) {
@@ -40,12 +56,33 @@ impl Vm {
         }
     }
 
+    fn emit_prompt(&mut self, prompt: &str) {
+        if prompt.is_empty() {
+            return;
+        }
+        if self.capture {
+            self.captured_stdout.push_str(prompt);
+        } else {
+            print!("{prompt}");
+            let _ = std::io::stdout().flush();
+        }
+    }
+
+    fn err_at(&self, span: Span, message: impl Into<String>) -> anyhow::Error {
+        bail_at(self.path.as_deref(), span, message)
+    }
+
     pub fn run(&mut self, program: &Program) -> Result<Value> {
         let mut stack: Vec<Value> = Vec::new();
         let entry = program.entry;
         let arity = program.functions[entry].params.len();
         if arity != 0 {
-            bail!("bytecode: entry function needs arguments");
+            let span = program.functions[entry]
+                .spans
+                .first()
+                .copied()
+                .unwrap_or(Span::new(1, 1));
+            return Err(self.err_at(span, "bytecode: entry function needs arguments"));
         }
         let mut frames = vec![Frame {
             fn_idx: entry,
@@ -57,9 +94,12 @@ impl Vm {
             let frame = frames.last_mut().unwrap();
             let fun = &program.functions[frame.fn_idx];
             if frame.ip >= fun.code.len() {
-                bail!("bytecode: ip out of range in {}", fun.name);
+                let span = fun.spans.last().copied().unwrap_or(Span::new(1, 1));
+                return Err(self.err_at(span, format!("bytecode: ip out of range in {}", fun.name)));
             }
-            let op = fun.code[frame.ip];
+            let ip = frame.ip;
+            let op = fun.code[ip];
+            let span = fun.spans.get(ip).copied().unwrap_or(Span::new(1, 1));
             frame.ip += 1;
 
             match op {
@@ -84,78 +124,105 @@ impl Vm {
                     fr.slots[slot] = v;
                 }
                 Op::Add => {
-                    let b = pop(&mut stack)?;
-                    let a = pop(&mut stack)?;
-                    stack.push(add(a, b)?);
+                    let b = pop(&mut stack).map_err(|m| self.err_at(span, m))?;
+                    let a = pop(&mut stack).map_err(|m| self.err_at(span, m))?;
+                    stack.push(add(a, b).map_err(|m| self.err_at(span, m))?);
                 }
-                Op::Sub => bin_int(&mut stack, |a, b| a - b)?,
-                Op::Mul => bin_int(&mut stack, |a, b| a * b)?,
+                Op::Sub => bin_int(&mut stack, |a, b| a - b).map_err(|m| self.err_at(span, m))?,
+                Op::Mul => bin_int(&mut stack, |a, b| a * b).map_err(|m| self.err_at(span, m))?,
                 Op::Div => {
-                    let b = pop(&mut stack)?;
-                    let a = pop(&mut stack)?;
+                    let b = pop(&mut stack).map_err(|m| self.err_at(span, m))?;
+                    let a = pop(&mut stack).map_err(|m| self.err_at(span, m))?;
                     match (a, b) {
-                        (Value::Int(_), Value::Int(0)) => bail!("division by zero"),
+                        (Value::Int(_), Value::Int(0)) => {
+                            return Err(self.err_at(span, "division by zero"));
+                        }
                         (Value::Int(x), Value::Int(y)) => stack.push(Value::Int(x / y)),
-                        _ => bail!("`/` needs ints"),
+                        _ => return Err(self.err_at(span, "`/` needs ints")),
                     }
                 }
-                Op::Negate => match pop(&mut stack)? {
+                Op::Negate => match pop(&mut stack).map_err(|m| self.err_at(span, m))? {
                     Value::Int(n) => stack.push(Value::Int(-n)),
-                    _ => bail!("unary `-` needs int"),
+                    _ => return Err(self.err_at(span, "unary `-` needs int")),
                 },
                 Op::Not => {
-                    let v = pop(&mut stack)?;
+                    let v = pop(&mut stack).map_err(|m| self.err_at(span, m))?;
                     stack.push(Value::Bool(!v.truthy()));
                 }
                 Op::Equal => {
-                    let b = pop(&mut stack)?;
-                    let a = pop(&mut stack)?;
+                    let b = pop(&mut stack).map_err(|m| self.err_at(span, m))?;
+                    let a = pop(&mut stack).map_err(|m| self.err_at(span, m))?;
                     stack.push(Value::Bool(a == b));
                 }
                 Op::NotEqual => {
-                    let b = pop(&mut stack)?;
-                    let a = pop(&mut stack)?;
+                    let b = pop(&mut stack).map_err(|m| self.err_at(span, m))?;
+                    let a = pop(&mut stack).map_err(|m| self.err_at(span, m))?;
                     stack.push(Value::Bool(a != b));
                 }
-                Op::Greater => cmp(&mut stack, |o| o.is_gt())?,
-                Op::GreaterEqual => cmp(&mut stack, |o| o.is_ge())?,
-                Op::Less => cmp(&mut stack, |o| o.is_lt())?,
-                Op::Lessequal => cmp(&mut stack, |o| o.is_le())?,
+                Op::Greater => cmp(&mut stack, |o| o.is_gt()).map_err(|m| self.err_at(span, m))?,
+                Op::GreaterEqual => {
+                    cmp(&mut stack, |o| o.is_ge()).map_err(|m| self.err_at(span, m))?
+                }
+                Op::Less => cmp(&mut stack, |o| o.is_lt()).map_err(|m| self.err_at(span, m))?,
+                Op::Lessequal => cmp(&mut stack, |o| o.is_le()).map_err(|m| self.err_at(span, m))?,
                 Op::Jump(t) => {
                     frames.last_mut().unwrap().ip = t as usize;
                 }
                 Op::JumpIfFalse(t) => {
-                    let v = pop(&mut stack)?;
+                    let v = pop(&mut stack).map_err(|m| self.err_at(span, m))?;
                     if !v.truthy() {
                         frames.last_mut().unwrap().ip = t as usize;
                     }
                 }
                 Op::Print => {
-                    let v = pop(&mut stack)?;
+                    let v = pop(&mut stack).map_err(|m| self.err_at(span, m))?;
                     self.emit_line(&v.as_display());
+                }
+                Op::Input => {
+                    let prompt = pop(&mut stack).map_err(|m| self.err_at(span, m))?;
+                    let text = prompt.as_display();
+                    self.emit_prompt(&text);
+                    let line = self.input.read_line().map_err(|e| {
+                        if e.to_string().contains("input is not available") {
+                            self.err_at(span, "input is not available under capture / view")
+                        } else {
+                            e
+                        }
+                    })?;
+                    stack.push(Value::Text(line));
                 }
                 Op::BuildList(n) => {
                     let n = n as usize;
                     let mut items = Vec::with_capacity(n);
                     for _ in 0..n {
-                        items.push(pop(&mut stack)?);
+                        items.push(pop(&mut stack).map_err(|m| self.err_at(span, m))?);
                     }
                     items.reverse();
                     stack.push(Value::List(items));
                 }
-                Op::Len => match pop(&mut stack)? {
-                    Value::List(xs) => stack.push(Value::Int(xs.len() as i64)),
-                    _ => bail!("len needs list"),
-                },
+                Op::Len => {
+                    let v = pop(&mut stack).map_err(|m| self.err_at(span, m))?;
+                    let n = builtin_len(&v).map_err(|m| self.err_at(span, m))?;
+                    stack.push(Value::Int(n));
+                }
+                Op::Str => {
+                    let v = pop(&mut stack).map_err(|m| self.err_at(span, m))?;
+                    stack.push(builtin_str(&v));
+                }
+                Op::Int => {
+                    let v = pop(&mut stack).map_err(|m| self.err_at(span, m))?;
+                    let n = builtin_int(&v).map_err(|m| self.err_at(span, m))?;
+                    stack.push(Value::Int(n));
+                }
                 Op::GetIndex => {
-                    let idx = pop(&mut stack)?;
-                    let list = pop(&mut stack)?;
+                    let idx = pop(&mut stack).map_err(|m| self.err_at(span, m))?;
+                    let list = pop(&mut stack).map_err(|m| self.err_at(span, m))?;
                     match (list, idx) {
                         (Value::List(xs), Value::Int(i)) if i >= 0 && (i as usize) < xs.len() => {
                             stack.push(xs[i as usize].clone());
                         }
                         (Value::List(_), Value::Int(_)) => stack.push(Value::None),
-                        _ => bail!("GetIndex needs list and int"),
+                        _ => return Err(self.err_at(span, "GetIndex needs list and int")),
                     }
                 }
                 Op::Call(fid, argc) => {
@@ -163,16 +230,12 @@ impl Vm {
                     let argc = argc as usize;
                     let callee = &program.functions[fid];
                     if callee.params.len() != argc {
-                        bail!("bytecode: call argc mismatch");
+                        return Err(self.err_at(span, "call argument count mismatch"));
                     }
                     let mut slots = vec![Value::None; callee.locals.len().max(argc).max(1)];
                     for i in (0..argc).rev() {
-                        slots[i] = pop(&mut stack)?;
+                        slots[i] = pop(&mut stack).map_err(|m| self.err_at(span, m))?;
                     }
-                    // args were pushed in param order; we popped reverse so slots[0] is last param — fix:
-                    // stack had p0, p1, p2 (top). pop → p2, p1, p0. So assign slots[argc-1-i] or pop into reverse.
-                    // Actually we did: for i in (0..argc).rev() { slots[i] = pop() } 
-                    // first pop → slots[argc-1] = top = last param. Good if push order was p0..plast.
                     frames.push(Frame {
                         fn_idx: fid,
                         ip: 0,
@@ -192,26 +255,25 @@ impl Vm {
     }
 }
 
-fn pop(stack: &mut Vec<Value>) -> Result<Value> {
+fn pop(stack: &mut Vec<Value>) -> Result<Value, String> {
     stack
         .pop()
-        .ok_or_else(|| anyhow::anyhow!("bytecode: stack underflow"))
+        .ok_or_else(|| "bytecode: stack underflow".to_string())
 }
 
-fn add(a: Value, b: Value) -> Result<Value> {
+fn add(a: Value, b: Value) -> Result<Value, String> {
     match (a, b) {
         (Value::Int(x), Value::Int(y)) => Ok(Value::Int(x + y)),
         (Value::Text(x), Value::Text(y)) => Ok(Value::Text(format!("{x}{y}"))),
         (Value::Text(x), y) => Ok(Value::Text(format!("{x}{}", y.as_display()))),
         (x, Value::Text(y)) => Ok(Value::Text(format!("{}{y}", x.as_display()))),
-        // Int + display for interp GetLocal Int + Lit text
         (Value::Int(x), y) => Ok(Value::Text(format!("{}{}", x, y.as_display()))),
         (x, Value::Int(y)) => Ok(Value::Text(format!("{}{y}", x.as_display()))),
-        _ => bail!("`+` needs ints or text"),
+        _ => Err("`+` needs ints or text".into()),
     }
 }
 
-fn bin_int(stack: &mut Vec<Value>, f: impl Fn(i64, i64) -> i64) -> Result<()> {
+fn bin_int(stack: &mut Vec<Value>, f: impl Fn(i64, i64) -> i64) -> Result<(), String> {
     let b = pop(stack)?;
     let a = pop(stack)?;
     match (a, b) {
@@ -219,17 +281,17 @@ fn bin_int(stack: &mut Vec<Value>, f: impl Fn(i64, i64) -> i64) -> Result<()> {
             stack.push(Value::Int(f(x, y)));
             Ok(())
         }
-        _ => bail!("binary op needs ints"),
+        _ => Err("binary op needs ints".into()),
     }
 }
 
-fn cmp(stack: &mut Vec<Value>, pred: impl Fn(std::cmp::Ordering) -> bool) -> Result<()> {
+fn cmp(stack: &mut Vec<Value>, pred: impl Fn(std::cmp::Ordering) -> bool) -> Result<(), String> {
     let b = pop(stack)?;
     let a = pop(stack)?;
     let ord = match (&a, &b) {
         (Value::Int(x), Value::Int(y)) => x.cmp(y),
         (Value::Text(x), Value::Text(y)) => x.cmp(y),
-        _ => bail!("comparison needs two ints or two texts"),
+        _ => return Err("comparison needs two ints or two texts".into()),
     };
     stack.push(Value::Bool(pred(ord)));
     Ok(())

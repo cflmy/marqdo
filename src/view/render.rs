@@ -18,6 +18,8 @@ pub struct FileViewModel {
     pub stdout: String,
     pub stderr: String,
     pub ok: bool,
+    /// Text shown in the live-view preset stdin box.
+    pub preset_stdin: String,
 }
 
 pub fn render_module_structure(module: &Module, source: &str) -> String {

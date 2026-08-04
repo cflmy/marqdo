@@ -40,11 +40,18 @@
 |------|------|----------|
 | `print` | 写到 stdout（副作用） | `> print text=Hello` 或 `> print Hello`（位置实参，见 [call-arguments.md](call-arguments.md)） |
 | `input` | 从 stdin 读一行（返回文本） | `*`name` = > input prompt=Name: *` |
+| `len` | 文本或表的长度 | `*`n` = > len `s`*` 或 `> len value=`s`` |
+| `str` | 转为显示文本 | `*`t` = > str 42*` |
+| `int` | 转为整数 | `*`i` = > int 7*` / `> int True` / 文本十进制 |
 
 参数约定（v0）：
 
 - `print`：具名实参 `text`（必填）；日后可扩展 `end` 等。  
-- `input`：可选 `prompt`；返回用户输入字符串（不含换行）。
+- `input`：可选 `prompt`；返回用户输入字符串（不含换行）。  
+- `len` / `str` / `int`：形参名均为 `value`（可位置传入）。  
+  - `len`：文本按 Unicode 标量计数；表/列表按元素数。  
+  - `str`：与 `print` 相同的显示规则。  
+  - `int`：`Int` 原样；`Bool` → 0/1；文本 trim 后按十进制解析，失败则诊断。
 
 旧文档中的中文 `print` **废弃**，统一为 `print`。
 
@@ -81,4 +88,4 @@
 
 ## 6. 后续可增（未批准）
 
-`len`、`str`、`int`、`float`、`range`；以及 `break`/`continue`（若循环需要）。增加前开短 ADR。
+`float`、`type`、`range`；以及 `break`/`continue`（若循环需要）。增加前开短 ADR。

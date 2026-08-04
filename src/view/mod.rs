@@ -14,6 +14,7 @@ use std::process::Command;
 use anyhow::{bail, Context, Result};
 use tiny_http::{Header, Method, Request, Response, Server, StatusCode};
 
+use crate::input_feed::split_stdin_text;
 use crate::view::html::{escape, page_file, page_index, LinkMode};
 use crate::view::render::{render_module_structure, FileViewModel};
 use crate::{run_file_capture, RunOptions};
@@ -129,7 +130,7 @@ fn handle(root: &ViewRoot, request: Request) -> Result<()> {
             if let Some(first) = root.files.first() {
                 let rel = first.to_string_lossy().replace('\\', "/");
                 let resolved = resolve_rel(root, &rel)?;
-                let vm = build_file_view(&resolved, &rel)?;
+                let vm = build_file_view(&resolved, &rel, &[])?;
                 let body = page_file(&root.files, &rel, &vm, &LinkMode::Live);
                 respond_html(request, body)
             } else {
@@ -139,8 +140,10 @@ fn handle(root: &ViewRoot, request: Request) -> Result<()> {
         }
         "/file" => {
             let rel = query_param(query, "path").unwrap_or_default();
+            let stdin_raw = query_param(query, "stdin").unwrap_or_default();
+            let stdin_lines = split_stdin_text(&stdin_raw);
             let resolved = resolve_rel(root, &rel)?;
-            let vm = build_file_view(&resolved, &rel)?;
+            let vm = build_file_view(&resolved, &rel, &stdin_lines)?;
             let body = page_file(&root.files, &rel, &vm, &LinkMode::Live);
             respond_html(request, body)
         }
@@ -156,7 +159,11 @@ fn handle(root: &ViewRoot, request: Request) -> Result<()> {
     }
 }
 
-pub(crate) fn build_file_view(abs: &Path, rel: &str) -> Result<FileViewModel> {
+pub(crate) fn build_file_view(
+    abs: &Path,
+    rel: &str,
+    stdin_lines: &[String],
+) -> Result<FileViewModel> {
     let source = fs::read_to_string(abs).with_context(|| format!("read {}", abs.display()))?;
     let structure = match crate::load::load_module(abs) {
         Ok(module) => render_module_structure(&module, &source),
@@ -165,7 +172,11 @@ pub(crate) fn build_file_view(abs: &Path, rel: &str) -> Result<FileViewModel> {
             escape(&tidy_user_error(&format!("{e:#}"), abs, rel))
         ),
     };
-    let (stdout, stderr, ok) = match run_file_capture(abs, &RunOptions::default()) {
+    let opts = RunOptions {
+        stdin_lines: stdin_lines.to_vec(),
+        ..RunOptions::default()
+    };
+    let (stdout, stderr, ok) = match run_file_capture(abs, &opts) {
         Ok(cap) => (cap.stdout, String::new(), true),
         Err(e) => (
             String::new(),
@@ -180,6 +191,7 @@ pub(crate) fn build_file_view(abs: &Path, rel: &str) -> Result<FileViewModel> {
         stdout,
         stderr,
         ok,
+        preset_stdin: stdin_lines.join("\n"),
     })
 }
 

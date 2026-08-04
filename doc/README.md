@@ -32,6 +32,7 @@
 | [design/pipeline-debug.md](design/pipeline-debug.md) | **流水线 `--dump-*` 可视调试** |
 | [dev-setup.md](dev-setup.md) | 开发环境配置（Rust M0） |
 | [roadmap/interpreter.md](roadmap/interpreter.md) | 正经解释器路线图 |
+| [roadmap/next-phase.md](roadmap/next-phase.md) | **下一阶段：input / 诊断 / 标准库 / view 调试** |
 | [research/okf-and-marqdo.md](research/okf-and-marqdo.md) | OKF 调研 |
 
 金样例与集成测试：[`tests/`](../tests/)。面向访客的可执行文档：[`public/`](../public/)。Spike 存档：[`spike/`](../spike/)。

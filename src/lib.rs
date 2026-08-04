@@ -4,11 +4,13 @@
 //! CLI also offers `view` for AST-backed browsing.
 
 pub mod ast;
+pub mod builtin;
 pub mod bytecode;
 pub mod capture;
 pub mod catalog;
 pub mod debug;
 pub mod diagnostics;
+pub mod input_feed;
 pub mod interp;
 pub mod lex;
 pub mod load;
@@ -54,6 +56,8 @@ pub struct RunOptions {
     pub dump_bytecode: bool,
     pub trace_eval: bool,
     pub backend: Backend,
+    /// Preset lines consumed by `input` (from `--stdin-file` or view).
+    pub stdin_lines: Vec<String>,
 }
 
 impl RunOptions {
@@ -66,6 +70,7 @@ impl RunOptions {
             dump_bytecode: true,
             trace_eval: true,
             backend: Backend::Tree,
+            stdin_lines: Vec::new(),
         }
     }
 
@@ -121,7 +126,8 @@ pub fn run_file(path: &Path, opts: &RunOptions) -> Result<i32> {
 
     match opts.backend {
         Backend::Tree => {
-            let mut interp = Interpreter::new(Some(path), opts.trace_eval);
+            let mut interp = Interpreter::new(Some(path), opts.trace_eval)
+                .with_stdin(opts.stdin_lines.clone());
             if opts.trace_eval {
                 eprintln!("=== marqdo: trace-eval ({path_label}) ===");
             }
@@ -131,18 +137,18 @@ pub fn run_file(path: &Path, opts: &RunOptions) -> Result<i32> {
             }
         }
         Backend::Bytecode => {
-            let program = compile_module(&module)?;
+            let program = compile_module(Some(path), &module)?;
             if opts.dump_bytecode {
                 print!("{}", program.disassemble());
             }
-            let mut vm = Vm::new();
+            let mut vm = Vm::new(Some(path)).with_stdin(opts.stdin_lines.clone());
             vm.run(&program)?;
         }
     }
 
     // dump bytecode even on tree backend if requested
     if opts.backend == Backend::Tree && opts.dump_bytecode {
-        let program = compile_module(&module)?;
+        let program = compile_module(Some(path), &module)?;
         print!("{}", program.disassemble());
     }
 
@@ -154,7 +160,8 @@ pub fn run_file_capture(path: &Path, opts: &RunOptions) -> Result<RunCapture> {
     let module = load_module(path)?;
     match opts.backend {
         Backend::Tree => {
-            let mut interp = Interpreter::with_capture(Some(path), false);
+            let mut interp = Interpreter::with_capture(Some(path), false)
+                .with_stdin(opts.stdin_lines.clone());
             let value = interp.run_module(&module)?;
             Ok(RunCapture {
                 stdout: interp.captured_stdout,
@@ -162,8 +169,8 @@ pub fn run_file_capture(path: &Path, opts: &RunOptions) -> Result<RunCapture> {
             })
         }
         Backend::Bytecode => {
-            let program = compile_module(&module)?;
-            let mut vm = Vm::with_capture();
+            let program = compile_module(Some(path), &module)?;
+            let mut vm = Vm::with_capture(Some(path)).with_stdin(opts.stdin_lines.clone());
             let value = vm.run(&program)?;
             Ok(RunCapture {
                 stdout: vm.captured_stdout,

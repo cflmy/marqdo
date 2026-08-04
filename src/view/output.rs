@@ -25,7 +25,7 @@ pub fn write_static(opts: OutputOptions) -> Result<()> {
     for rel_pb in &root.files {
         let rel = rel_pb.to_string_lossy().replace('\\', "/");
         let abs = resolve_abs(&root, &rel)?;
-        let mut vm = build_file_view(&abs, &rel)?;
+        let mut vm = build_file_view(&abs, &rel, &[])?;
         if opts.no_exec {
             vm.stdout.clear();
             vm.stderr = "execution skipped (--no-exec)".into();

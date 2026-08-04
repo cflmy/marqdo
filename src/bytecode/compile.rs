@@ -2,11 +2,13 @@
 
 use anyhow::{bail, Result};
 use std::collections::HashMap;
+use std::path::Path;
 
 use crate::ast::{
     Arg, BinaryOp, CallExpr, Expr, Function, InterpPart, Literal, Module, Stmt, UnaryOp,
 };
 use crate::bytecode::{FnChunk, Op, Program};
+use crate::diagnostics::{bail_at, Span};
 use crate::value::Value;
 
 struct FlatFun {
@@ -15,9 +17,10 @@ struct FlatFun {
     params: Vec<String>,
     body: Vec<Stmt>,
     children: Vec<usize>,
+    span: Span,
 }
 
-pub fn compile_module(module: &Module) -> Result<Program> {
+pub fn compile_module(path: Option<&Path>, module: &Module) -> Result<Program> {
     let mut flat = Vec::new();
     for fun in &module.functions {
         collect_fun(fun, None, &mut flat);
@@ -35,9 +38,10 @@ pub fn compile_module(module: &Module) -> Result<Program> {
         })
         .ok_or_else(|| anyhow::anyhow!("bytecode: no entry function"))?;
 
+    let path_buf = path.map(|p| p.to_path_buf());
     let mut functions = Vec::new();
     for i in 0..flat.len() {
-        functions.push(compile_function(i, &flat)?);
+        functions.push(compile_function(i, &flat, path_buf.as_deref())?);
     }
 
     Ok(Program { functions, entry })
@@ -51,6 +55,7 @@ fn collect_fun(fun: &Function, parent: Option<usize>, flat: &mut Vec<FlatFun>) -
         params: fun.params.clone(),
         body: fun.body.clone(),
         children: Vec::new(),
+        span: fun.span,
     });
     let mut child_ids = Vec::new();
     for child in &fun.children {
@@ -61,33 +66,39 @@ fn collect_fun(fun: &Function, parent: Option<usize>, flat: &mut Vec<FlatFun>) -
 }
 
 struct FnCompiler<'a> {
+    path: Option<&'a Path>,
     flat: &'a [FlatFun],
     fn_id: usize,
     chunk: FnChunk,
     locals: HashMap<String, u8>,
+    stmt_span: Span,
 }
 
-fn compile_function(fn_id: usize, flat: &[FlatFun]) -> Result<FnChunk> {
+fn compile_function(fn_id: usize, flat: &[FlatFun], path: Option<&Path>) -> Result<FnChunk> {
     let fun = &flat[fn_id];
     let mut locals = HashMap::new();
     for (i, p) in fun.params.iter().enumerate() {
         locals.insert(p.clone(), i as u8);
     }
     let mut c = FnCompiler {
+        path,
         flat,
         fn_id,
         chunk: FnChunk {
             name: fun.name.clone(),
             params: fun.params.clone(),
             code: Vec::new(),
+            spans: Vec::new(),
             constants: Vec::new(),
             locals: fun.params.clone(),
         },
         locals,
+        stmt_span: fun.span,
     };
     for stmt in &fun.body {
         c.compile_stmt(stmt)?;
     }
+    c.stmt_span = fun.span;
     c.emit(Op::None_);
     c.emit(Op::Return);
     let mut names = vec![String::new(); c.locals.len()];
@@ -95,12 +106,18 @@ fn compile_function(fn_id: usize, flat: &[FlatFun]) -> Result<FnChunk> {
         names[*slot as usize] = name.clone();
     }
     c.chunk.locals = names;
+    debug_assert_eq!(c.chunk.code.len(), c.chunk.spans.len());
     Ok(c.chunk)
 }
 
 impl<'a> FnCompiler<'a> {
+    fn err(&self, message: impl Into<String>) -> anyhow::Error {
+        bail_at(self.path, self.stmt_span, message)
+    }
+
     fn emit(&mut self, op: Op) {
         self.chunk.code.push(op);
+        self.chunk.spans.push(self.stmt_span);
     }
 
     fn here(&self) -> u16 {
@@ -150,23 +167,29 @@ impl<'a> FnCompiler<'a> {
                 return Ok(i);
             }
         }
-        bail!("bytecode: unknown function `{name}`")
+        Err(self.err(format!("unknown function `{name}`")))
     }
 
     fn compile_stmt(&mut self, stmt: &Stmt) -> Result<()> {
         match stmt {
-            Stmt::Assign { name, value, .. } => {
+            Stmt::Assign { name, value, span } => {
+                self.stmt_span = *span;
                 self.compile_expr(value)?;
                 let slot = self.local_slot(name);
                 self.emit(Op::SetLocal(slot));
                 self.emit(Op::Pop);
             }
-            Stmt::Return { value, .. } => {
+            Stmt::Return { value, span } => {
+                self.stmt_span = *span;
                 self.compile_expr(value)?;
                 self.emit(Op::Return);
             }
-            Stmt::Call { call, .. } => self.compile_call(call, true)?,
-            Stmt::Branch { arms, .. } => {
+            Stmt::Call { call, span } => {
+                self.stmt_span = *span;
+                self.compile_call(call, true)?;
+            }
+            Stmt::Branch { arms, span } => {
+                self.stmt_span = *span;
                 let mut end_jumps = Vec::new();
                 for (i, arm) in arms.iter().enumerate() {
                     let is_last = i + 1 == arms.len();
@@ -180,6 +203,7 @@ impl<'a> FnCompiler<'a> {
                     for st in &arm.body {
                         self.compile_stmt(st)?;
                     }
+                    self.stmt_span = *span;
                     if !is_last {
                         let j = self.here();
                         self.emit(Op::Jump(0));
@@ -195,8 +219,11 @@ impl<'a> FnCompiler<'a> {
                 }
             }
             Stmt::While {
-                condition, body, ..
+                condition,
+                body,
+                span,
             } => {
+                self.stmt_span = *span;
                 let loop_start = self.here();
                 self.compile_expr(condition)?;
                 let exit_j = self.here();
@@ -204,6 +231,7 @@ impl<'a> FnCompiler<'a> {
                 for st in body {
                     self.compile_stmt(st)?;
                 }
+                self.stmt_span = *span;
                 self.emit(Op::Jump(loop_start));
                 self.patch(exit_j, Op::JumpIfFalse(self.here()));
             }
@@ -211,8 +239,9 @@ impl<'a> FnCompiler<'a> {
                 item,
                 collection,
                 body,
-                ..
+                span,
             } => {
+                self.stmt_span = *span;
                 self.compile_expr(&Expr::Var(collection.clone()))?;
                 let coll_slot = self.local_slot(&format!("__coll_{collection}"));
                 self.emit(Op::SetLocal(coll_slot));
@@ -242,6 +271,7 @@ impl<'a> FnCompiler<'a> {
                     self.compile_stmt(st)?;
                 }
 
+                self.stmt_span = *span;
                 self.emit(Op::GetLocal(i_slot));
                 let one = self.add_const(Value::Int(1));
                 self.emit(Op::Constant(one));
@@ -271,7 +301,7 @@ impl<'a> FnCompiler<'a> {
                             _ => None,
                         })
                     })
-                    .ok_or_else(|| anyhow::anyhow!("bytecode: print needs text"))?;
+                    .ok_or_else(|| self.err("print requires text (named or positional)"))?;
                 self.compile_expr(text_expr)?;
                 self.emit(Op::Print);
                 if !as_stmt {
@@ -279,7 +309,60 @@ impl<'a> FnCompiler<'a> {
                 }
                 return Ok(());
             }
-            "input" => bail!("bytecode: input not supported"),
+            "input" => {
+                let prompt_expr = call
+                    .args
+                    .iter()
+                    .find_map(|a| match a {
+                        Arg::Named { name, value } if name == "prompt" => Some(value),
+                        _ => None,
+                    })
+                    .or_else(|| {
+                        call.args.iter().find_map(|a| match a {
+                            Arg::Positional(e) => Some(e),
+                            _ => None,
+                        })
+                    });
+                if let Some(e) = prompt_expr {
+                    self.compile_expr(e)?;
+                } else {
+                    let i = self.add_const(Value::Text(String::new()));
+                    self.emit(Op::Constant(i));
+                }
+                self.emit(Op::Input);
+                if as_stmt {
+                    self.emit(Op::Pop);
+                }
+                return Ok(());
+            }
+            "len" | "str" | "int" => {
+                let name = call.callee.as_str();
+                let value_expr = call
+                    .args
+                    .iter()
+                    .find_map(|a| match a {
+                        Arg::Named { name, value } if name == "value" => Some(value),
+                        _ => None,
+                    })
+                    .or_else(|| {
+                        call.args.iter().find_map(|a| match a {
+                            Arg::Positional(e) => Some(e),
+                            _ => None,
+                        })
+                    })
+                    .ok_or_else(|| self.err(format!("{name} requires value")))?;
+                self.compile_expr(value_expr)?;
+                self.emit(match name {
+                    "len" => Op::Len,
+                    "str" => Op::Str,
+                    "int" => Op::Int,
+                    _ => unreachable!(),
+                });
+                if as_stmt {
+                    self.emit(Op::Pop);
+                }
+                return Ok(());
+            }
             _ => {}
         }
 
@@ -303,11 +386,14 @@ impl<'a> FnCompiler<'a> {
                 self.compile_expr(positionals[pos_i])?;
                 pos_i += 1;
             } else {
-                bail!("bytecode: missing argument for parameter `{p}`");
+                return Err(self.err(format!("missing argument for parameter `{p}`")));
             }
         }
         if pos_i < positionals.len() {
-            bail!("bytecode: too many positional arguments");
+            return Err(self.err(format!(
+                "too many positional arguments ({} extra)",
+                positionals.len() - pos_i
+            )));
         }
         self.emit(Op::Call(fid as u16, params.len() as u8));
         if as_stmt {
@@ -336,7 +422,7 @@ impl<'a> FnCompiler<'a> {
                     .locals
                     .get(name)
                     .copied()
-                    .ok_or_else(|| anyhow::anyhow!("bytecode: undefined variable `{name}`"))?;
+                    .ok_or_else(|| self.err(format!("undefined variable `{name}`")))?;
                 self.emit(Op::GetLocal(slot));
             }
             Expr::Interp(parts) => {
@@ -352,9 +438,11 @@ impl<'a> FnCompiler<'a> {
                             self.emit(Op::Constant(i));
                         }
                         InterpPart::Var(n) => {
-                            let slot = self.locals.get(n).copied().ok_or_else(|| {
-                                anyhow::anyhow!("bytecode: undefined variable `{n}`")
-                            })?;
+                            let slot = self
+                                .locals
+                                .get(n)
+                                .copied()
+                                .ok_or_else(|| self.err(format!("undefined variable `{n}`")))?;
                             self.emit(Op::GetLocal(slot));
                         }
                     }
@@ -375,7 +463,6 @@ impl<'a> FnCompiler<'a> {
                 left,
                 right,
             } => {
-                // JumpIfFalse always pops the tested value.
                 self.compile_expr(left)?;
                 let j_false = self.here();
                 self.emit(Op::JumpIfFalse(0));

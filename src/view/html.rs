@@ -223,6 +223,45 @@ section.block > h2 {
   font-weight: 600;
   margin: 0 0 0.85rem;
 }
+.stdin-form {
+  margin: 0 0 1rem;
+  display: grid;
+  gap: 0.45rem;
+  max-width: 36rem;
+}
+.stdin-form label {
+  font-size: 0.85rem;
+  color: var(--text);
+}
+.stdin-form .hint {
+  color: var(--muted);
+  font-size: 0.8rem;
+  margin-left: 0.35rem;
+}
+.stdin-form textarea {
+  font: inherit;
+  font-family: var(--mono);
+  font-size: 0.9rem;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  resize: vertical;
+  min-height: 4.5rem;
+}
+.stdin-form button {
+  justify-self: start;
+  font: inherit;
+  font-size: 0.9rem;
+  padding: 0.45rem 0.9rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--text);
+  color: var(--bg);
+  cursor: pointer;
+}
+.stdin-form button:hover { opacity: 0.88; }
 .structure {
   background: var(--surface);
   border: 1px solid var(--line);
@@ -581,6 +620,19 @@ pub fn page_file(files: &[PathBuf], rel: &str, vm: &FileViewModel, links: &LinkM
     } else {
         escape(&vm.stderr)
     };
+    let stdin_panel = match links {
+        LinkMode::Live => format!(
+            r#"<form class="stdin-form" method="get" action="/file">
+  <input type="hidden" name="path" value="{path}"/>
+  <label for="stdin">Preset input <span class="hint">one line per input call</span></label>
+  <textarea id="stdin" name="stdin" rows="3" placeholder="Alice">{stdin}</textarea>
+  <button type="submit">Run with input</button>
+</form>"#,
+            path = escape(rel),
+            stdin = escape(&vm.preset_stdin),
+        ),
+        LinkMode::Static { .. } => String::new(),
+    };
     let title = Path::new(rel)
         .file_name()
         .and_then(|s| s.to_str())
@@ -596,6 +648,7 @@ pub fn page_file(files: &[PathBuf], rel: &str, vm: &FileViewModel, links: &LinkM
 </section>
 <section class="block">
   <h2>Execution</h2>
+  {stdin_panel}
   <div class="out {status}">{out}</div>
 </section>
 <section class="block">
@@ -608,6 +661,7 @@ pub fn page_file(files: &[PathBuf], rel: &str, vm: &FileViewModel, links: &LinkM
         status_label = status_label,
         rel = escape(rel),
         structure = vm.structure_html,
+        stdin_panel = stdin_panel,
         out = out_text,
         source = escape(&vm.source),
     );

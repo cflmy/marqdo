@@ -4,6 +4,8 @@
 
 Marqdo：Markdown **标记即语法**。源文件 `.mq.md` 既是文稿也是程序。
 
+欢迎访问[marqdo官方网站](https://www.marqdo.com/)阅读marqdo更多特性
+
 语法宪法：[doc/design/markdown-mapping.md](doc/design/markdown-mapping.md) · 调用实参：[call-arguments.md](doc/design/call-arguments.md) · 测试布局：[examples-and-tests.md](doc/design/examples-and-tests.md) · 用户站：[user-site.md](doc/design/user-site.md) · 浏览：[view.md](doc/design/view.md) · 金样例：[tests/](tests/) · 用户文档：[public/](public/)
 
 ---

@@ -7,7 +7,9 @@ use std::path::{Path, PathBuf};
 use crate::ast::{
     Arg, BinaryOp, CallExpr, Expr, Function, InterpPart, Literal, Module, Stmt, UnaryOp,
 };
+use crate::builtin::{builtin_int, builtin_len, builtin_str};
 use crate::diagnostics::{bail_at, Span};
+use crate::input_feed::InputFeed;
 use crate::value::Value;
 
 pub struct Interpreter {
@@ -16,6 +18,7 @@ pub struct Interpreter {
     capture: bool,
     pub captured_stdout: String,
     current_span: Span,
+    input: InputFeed,
 }
 
 struct Env {
@@ -51,6 +54,7 @@ impl Interpreter {
             capture: false,
             captured_stdout: String::new(),
             current_span: Span::new(1, 1),
+            input: InputFeed::new(false, Vec::new()),
         }
     }
 
@@ -61,7 +65,13 @@ impl Interpreter {
             capture: true,
             captured_stdout: String::new(),
             current_span: Span::new(1, 1),
+            input: InputFeed::new(true, Vec::new()),
         }
+    }
+
+    pub fn with_stdin(mut self, lines: Vec<String>) -> Self {
+        self.input = InputFeed::new(self.capture, lines);
+        self
     }
 
     fn err(&self, message: impl Into<String>) -> anyhow::Error {
@@ -74,6 +84,19 @@ impl Interpreter {
             self.captured_stdout.push('\n');
         } else {
             println!("{text}");
+        }
+    }
+
+    fn emit_prompt(&mut self, prompt: &str) {
+        if prompt.is_empty() {
+            return;
+        }
+        if self.capture {
+            self.captured_stdout.push_str(prompt);
+        } else {
+            print!("{prompt}");
+            use std::io::Write;
+            let _ = std::io::stdout().flush();
         }
     }
 
@@ -340,29 +363,47 @@ impl Interpreter {
                 return Ok(Value::None);
             }
             "input" => {
-                if self.capture {
-                    return Err(self.err("input is not available under capture / view"));
-                }
                 let bound = bind_args(&["prompt".into()], &ev_args, true)
                     .map_err(|m| self.err(m))?;
                 let prompt = bound
                     .get("prompt")
                     .map(|v| v.as_display())
                     .unwrap_or_default();
-                if !prompt.is_empty() {
-                    print!("{prompt}");
-                    use std::io::Write;
-                    let _ = std::io::stdout().flush();
-                }
-                let mut line = String::new();
-                std::io::stdin().read_line(&mut line)?;
-                if line.ends_with('\n') {
-                    line.pop();
-                    if line.ends_with('\r') {
-                        line.pop();
+                self.emit_prompt(&prompt);
+                let line = self.input.read_line().map_err(|e| {
+                    if e.to_string().contains("input is not available") {
+                        self.err("input is not available under capture / view")
+                    } else {
+                        e
                     }
-                }
+                })?;
                 return Ok(Value::Text(line));
+            }
+            "len" => {
+                let bound = bind_args(&["value".into()], &ev_args, false)
+                    .map_err(|m| self.err(m))?;
+                let v = bound
+                    .get("value")
+                    .ok_or_else(|| self.err("len requires value"))?;
+                let n = builtin_len(v).map_err(|m| self.err(m))?;
+                return Ok(Value::Int(n));
+            }
+            "str" => {
+                let bound = bind_args(&["value".into()], &ev_args, false)
+                    .map_err(|m| self.err(m))?;
+                let v = bound
+                    .get("value")
+                    .ok_or_else(|| self.err("str requires value"))?;
+                return Ok(builtin_str(v));
+            }
+            "int" => {
+                let bound = bind_args(&["value".into()], &ev_args, false)
+                    .map_err(|m| self.err(m))?;
+                let v = bound
+                    .get("value")
+                    .ok_or_else(|| self.err("int requires value"))?;
+                let n = builtin_int(v).map_err(|m| self.err(m))?;
+                return Ok(Value::Int(n));
             }
             _ => {}
         }

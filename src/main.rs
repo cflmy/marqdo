@@ -5,6 +5,7 @@ use anyhow::Result;
 use clap::{Parser, Subcommand, ValueEnum};
 
 use marqdo::catalog::{write_catalog, CatalogOptions};
+use marqdo::input_feed::load_stdin_file;
 use marqdo::view::{serve, write_static, OutputOptions, ViewOptions};
 use marqdo::{Backend, RunOptions};
 
@@ -54,6 +55,10 @@ enum Commands {
         trace_eval: bool,
         #[arg(long)]
         dump_all: bool,
+
+        /// Feed `input` from a text file (one line per call), instead of / after the terminal.
+        #[arg(long, value_name = "FILE")]
+        stdin_file: Option<PathBuf>,
     },
     /// Browse `.mq.md` structure + execution (live server or static output)
     View {
@@ -129,10 +134,18 @@ fn try_main() -> Result<i32> {
             dump_bytecode,
             trace_eval,
             dump_all,
+            stdin_file,
         } => {
             let path = file.unwrap_or_else(|| PathBuf::from("index.mq.md"));
+            let stdin_lines = match stdin_file {
+                Some(p) => load_stdin_file(&p)?,
+                None => Vec::new(),
+            };
             let mut opts = if dump_all {
-                RunOptions::dump_all()
+                RunOptions {
+                    stdin_lines: stdin_lines.clone(),
+                    ..RunOptions::dump_all()
+                }
             } else {
                 RunOptions {
                     dump_lines,
@@ -142,6 +155,7 @@ fn try_main() -> Result<i32> {
                     dump_bytecode,
                     trace_eval,
                     backend: backend.into(),
+                    stdin_lines,
                 }
             };
             if dump_all {

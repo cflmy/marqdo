@@ -1,4 +1,5 @@
-use std::process::Command;
+use std::io::Write;
+use std::process::{Command, Stdio};
 
 fn run(args: &[&str]) -> (i32, String, String) {
     let output = Command::new(env!("CARGO_BIN_EXE_marqdo"))
@@ -11,19 +12,49 @@ fn run(args: &[&str]) -> (i32, String, String) {
     (code, stdout, stderr)
 }
 
+fn run_with_stdin(args: &[&str], stdin: &str) -> (i32, String, String) {
+    let mut child = Command::new(env!("CARGO_BIN_EXE_marqdo"))
+        .args(args)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("failed to spawn marqdo");
+    {
+        let mut pipe = child.stdin.take().expect("stdin");
+        pipe.write_all(stdin.as_bytes()).expect("write stdin");
+    }
+    let output = child.wait_with_output().expect("wait marqdo");
+    let code = output.status.code().unwrap_or(1);
+    let stdout = String::from_utf8_lossy(&output.stdout).into_owned();
+    let stderr = String::from_utf8_lossy(&output.stderr).into_owned();
+    (code, stdout, stderr)
+}
+
 fn assert_out(path: &str, expect: &str) {
     let (code, stdout, stderr) = run(&["run", path]);
     assert_eq!(code, 0, "{path} stderr={stderr}");
     assert_eq!(stdout.trim_end(), expect.trim_end(), "{path}");
 }
 
-fn assert_err(path: &str, substr: &str) {
-    let (code, stdout, stderr) = run(&["run", path]);
-    assert_ne!(code, 0, "{path} unexpectedly succeeded stdout={stdout}");
-    assert!(
-        stderr.contains(substr),
-        "{path} stderr missing {substr:?}: {stderr}"
-    );
+/// Assert failure with `path:line:col:` prefix and message substring (both backends).
+fn assert_err(path: &str, line_col: &str, substr: &str) {
+    for backend in ["tree", "bytecode"] {
+        let (code, stdout, stderr) = run(&["run", path, "--backend", backend]);
+        assert_ne!(
+            code, 0,
+            "{path} backend={backend} unexpectedly succeeded stdout={stdout}"
+        );
+        let loc = format!("{path}:{line_col}:");
+        assert!(
+            stderr.contains(&loc),
+            "{path} backend={backend} stderr missing location {loc:?}: {stderr}"
+        );
+        assert!(
+            stderr.contains(substr),
+            "{path} backend={backend} stderr missing {substr:?}: {stderr}"
+        );
+    }
 }
 
 #[test]
@@ -110,9 +141,35 @@ fn keywords_bool_logic() {
 }
 
 #[test]
+fn keywords_stdlib() {
+    assert_out(
+        "tests/keywords/stdlib.mq.md",
+        "5
+3
+42
+42
+1",
+    );
+}
+
+#[test]
+fn bytecode_stdlib() {
+    assert_out_backend(
+        "tests/keywords/stdlib.mq.md",
+        "bytecode",
+        "5
+3
+42
+42
+1",
+    );
+}
+
+#[test]
 fn error_undefined_var() {
     assert_err(
         "tests/errors/undefined-var.mq.md",
+        "7:1",
         "undefined variable `missing`",
     );
 }
@@ -121,6 +178,7 @@ fn error_undefined_var() {
 fn error_unknown_fn() {
     assert_err(
         "tests/errors/unknown-fn.mq.md",
+        "7:1",
         "unknown function `no_such_fn`",
     );
 }
@@ -129,6 +187,7 @@ fn error_unknown_fn() {
 fn error_bad_arity() {
     assert_err(
         "tests/errors/bad-arity.mq.md",
+        "7:1",
         "missing argument for parameter `x`",
     );
 }
@@ -137,7 +196,22 @@ fn error_bad_arity() {
 fn error_syntax_bad_line() {
     assert_err(
         "tests/errors/syntax-bad-line.mq.md",
+        "7:1",
         "unrecognized statement",
+    );
+}
+
+#[test]
+fn error_div_zero() {
+    assert_err("tests/errors/div-zero.mq.md", "7:1", "division by zero");
+}
+
+#[test]
+fn error_bad_int() {
+    assert_err(
+        "tests/errors/bad-int.mq.md",
+        "7:1",
+        "cannot convert to int",
     );
 }
 
@@ -148,6 +222,49 @@ fn assert_out_backend(path: &str, backend: &str, expect: &str) {
         stdout.trim_end(),
         expect.trim_end(),
         "{path} backend={backend}"
+    );
+}
+
+fn assert_out_stdin(path: &str, backend: &str, stdin: &str, expect: &str) {
+    let (code, stdout, stderr) =
+        run_with_stdin(&["run", path, "--backend", backend], stdin);
+    assert_eq!(code, 0, "{path} backend={backend} stderr={stderr}");
+    assert_eq!(
+        stdout.trim_end(),
+        expect.trim_end(),
+        "{path} backend={backend} stdout={stdout:?}"
+    );
+}
+
+#[test]
+fn keywords_input() {
+    assert_out_stdin(
+        "tests/keywords/input.mq.md",
+        "tree",
+        "Alice\n",
+        "Name:Hello Alice!",
+    );
+}
+
+#[test]
+fn keywords_input_stdin_file() {
+    let (code, stdout, stderr) = run(&[
+        "run",
+        "tests/keywords/input.mq.md",
+        "--stdin-file",
+        "tests/keywords/input-stdin.txt",
+    ]);
+    assert_eq!(code, 0, "{stderr}");
+    assert_eq!(stdout.trim_end(), "Name:Hello Alice!");
+}
+
+#[test]
+fn bytecode_input() {
+    assert_out_stdin(
+        "tests/keywords/input.mq.md",
+        "bytecode",
+        "Alice\n",
+        "Name:Hello Alice!",
     );
 }
 
@@ -278,7 +395,8 @@ fn catalog_writes_yaml() {
     assert!(yaml.contains("structure/hello"));
     assert!(yaml.contains("utils.mq.md"), "{yaml}");
     assert!(
-        yaml.contains("跨文件导入示例") || yaml.contains("imports:\n      - utils.mq.md"),
+        yaml.contains("???????") || yaml.contains("imports:
+      - utils.mq.md"),
         "{yaml}"
     );
 }
@@ -300,6 +418,7 @@ fn view_output_writes_html() {
     assert!(!index.contains("fonts.googleapis.com"));
     assert!(index.contains("#ffffff") || index.contains("--surface: #ffffff"));
     assert!(index.contains("nav-toggle"));
+    assert!(!index.contains("Run with input"), "static export should omit live stdin form");
     assert!(dir.join("pages").join("hello.mq.md.html").exists());
 }
 

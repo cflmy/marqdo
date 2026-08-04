@@ -6,6 +6,7 @@ mod vm;
 pub use compile::compile_module;
 pub use vm::Vm;
 
+use crate::diagnostics::Span;
 use crate::value::Value;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -33,8 +34,15 @@ pub enum Op {
     Jump(u16),
     JumpIfFalse(u16),
     Print,
+    /// Pop prompt text, print it (no newline), read one stdin line → push Text.
+    Input,
     BuildList(u16),
+    /// Pop value → push `len` (text/list).
     Len,
+    /// Pop value → push display text.
+    Str,
+    /// Pop value → push int (or fail).
+    Int,
     GetIndex,
     /// Call function by index; argc values are on the stack (param order).
     Call(u16, u8),
@@ -46,6 +54,8 @@ pub struct FnChunk {
     pub name: String,
     pub params: Vec<String>,
     pub code: Vec<Op>,
+    /// Parallel to `code`: source location for diagnostics / debug.
+    pub spans: Vec<Span>,
     pub constants: Vec<Value>,
     /// Local slot names (params first).
     pub locals: Vec<String>,
@@ -71,7 +81,8 @@ impl Program {
                 out.push_str(&format!("  const[{i}] = {c:?}\n"));
             }
             for (ip, op) in fun.code.iter().enumerate() {
-                out.push_str(&format!("  {ip:04} {op:?}\n"));
+                let sp = fun.spans.get(ip).copied().unwrap_or(Span::new(1, 1));
+                out.push_str(&format!("  {ip:04} {op:?}  @{sp}\n"));
             }
         }
         out.push_str("=== marqdo: end bytecode ===\n");
