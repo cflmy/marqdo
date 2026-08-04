@@ -16,8 +16,10 @@
 | 文档 | 摘要 |
 |------|------|
 | [design/markdown-mapping.md](design/markdown-mapping.md) | **v0 语法宪法**：Markup-as-Syntax 全映射 |
+| [design/code-vs-comment.md](design/code-vs-comment.md) | 叙述面 / 可执行面 / 外联面——无标记为何是注释 |
+| [design/return-hr-and-code-surface.md](design/return-hr-and-code-surface.md) | **提案**：`---` 返回、斜体注释、粗体程序面 vs 无标记代码 |
 | [design/generated-yaml-manifest.md](design/generated-yaml-manifest.md) | 机器生成的 OKF 风格依赖/文档清单 |
-| [design/tech-stack.md](design/tech-stack.md) | 参考实现技术选型（TypeScript + remark + Vitest） |
+| [design/tech-stack.md](design/tech-stack.md) | 参考实现选型**分析**（未定案，待 Spike） |
 | [research/okf-and-marqdo.md](research/okf-and-marqdo.md) | Google OKF 调研与借鉴 |
 
 示例程序见仓库 [`examples/`](../examples/)。
