@@ -4,7 +4,7 @@ title: 循环示例
 
 # main
 
-## while：倒数
+倒数：
 
 *`n` = 3*
 
@@ -12,7 +12,7 @@ title: 循环示例
   > print text=`n`
   *`n` = `n` - 1*
 
-## foreach：遍历篮子
+遍历篮子：
 
 `篮子` =
 

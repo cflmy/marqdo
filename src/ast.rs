@@ -1,0 +1,202 @@
+//! Marqdo AST (Phase I).
+
+use crate::diagnostics::Span;
+
+#[derive(Debug, Clone)]
+pub struct Module {
+    pub imports: Vec<String>,
+    pub functions: Vec<Function>,
+}
+
+#[derive(Debug, Clone)]
+pub struct Function {
+    pub name: String,
+    pub level: u8,
+    pub span: Span,
+    pub params: Vec<String>,
+    pub body: Vec<Stmt>,
+    pub children: Vec<Function>,
+}
+
+#[derive(Debug, Clone)]
+pub enum Stmt {
+    Assign {
+        name: String,
+        value: Expr,
+        span: Span,
+    },
+    Return {
+        value: Expr,
+        span: Span,
+    },
+    /// Statement-form call (`> …`); return value discarded.
+    Call {
+        call: CallExpr,
+        span: Span,
+    },
+    Branch {
+        arms: Vec<BranchArm>,
+        span: Span,
+    },
+    While {
+        condition: Expr,
+        body: Vec<Stmt>,
+        span: Span,
+    },
+    ForEach {
+        item: String,
+        collection: String,
+        body: Vec<Stmt>,
+        span: Span,
+    },
+}
+
+#[derive(Debug, Clone)]
+pub struct BranchArm {
+    pub condition: Option<Expr>, // None = else
+    pub body: Vec<Stmt>,
+}
+
+#[derive(Debug, Clone)]
+pub struct CallExpr {
+    pub callee: String,
+    pub args: Vec<(String, Expr)>,
+}
+
+#[derive(Debug, Clone)]
+pub enum Expr {
+    Literal(Literal),
+    Var(String),
+    /// Text with embedded `` `var` `` segments.
+    Interp(Vec<InterpPart>),
+    Unary {
+        op: UnaryOp,
+        expr: Box<Expr>,
+    },
+    Binary {
+        op: BinaryOp,
+        left: Box<Expr>,
+        right: Box<Expr>,
+    },
+    Call(CallExpr),
+    List(Vec<Expr>),
+}
+
+#[derive(Debug, Clone)]
+pub enum InterpPart {
+    Lit(String),
+    Var(String),
+}
+
+#[derive(Debug, Clone)]
+pub enum Literal {
+    None,
+    Bool(bool),
+    Int(i64),
+    Text(String),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum UnaryOp {
+    Not,
+    Neg,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BinaryOp {
+    Add,
+    Sub,
+    Mul,
+    Div,
+    Eq,
+    Ne,
+    Lt,
+    Le,
+    Gt,
+    Ge,
+    And,
+    Or,
+}
+
+/// Pretty-print AST for `--dump-ast`.
+pub fn format_ast_dump(path: &str, module: &Module) -> String {
+    let mut out = String::new();
+    out.push_str(&format!("=== marqdo: ast ({path}) ===\n"));
+    if !module.imports.is_empty() {
+        out.push_str(&format!("(imports {:?})\n", module.imports));
+    }
+    for fun in &module.functions {
+        dump_fun(&mut out, fun, 0);
+    }
+    out.push_str("=== marqdo: end ast ===\n");
+    out
+}
+
+fn dump_fun(out: &mut String, fun: &Function, depth: usize) {
+    let pad = "  ".repeat(depth);
+    out.push_str(&format!(
+        "{pad}(fun level={} {:?} params={:?} @{}\n",
+        fun.level, fun.name, fun.params, fun.span
+    ));
+    for stmt in &fun.body {
+        dump_stmt(out, stmt, depth + 1);
+    }
+    for child in &fun.children {
+        dump_fun(out, child, depth + 1);
+    }
+    out.push_str(&format!("{pad})\n"));
+}
+
+fn dump_stmt(out: &mut String, stmt: &Stmt, depth: usize) {
+    let pad = "  ".repeat(depth);
+    match stmt {
+        Stmt::Assign { name, value, span } => {
+            out.push_str(&format!("{pad}(assign {name:?} {value:?} @{span})\n"));
+        }
+        Stmt::Return { value, span } => {
+            out.push_str(&format!("{pad}(return {value:?} @{span})\n"));
+        }
+        Stmt::Call { call, span } => {
+            out.push_str(&format!(
+                "{pad}(call {:?} {:?} @{span})\n",
+                call.callee, call.args
+            ));
+        }
+        Stmt::Branch { arms, span } => {
+            out.push_str(&format!("{pad}(branch @{span}\n"));
+            for arm in arms {
+                out.push_str(&format!("{pad}  (arm cond={:?}\n", arm.condition));
+                for s in &arm.body {
+                    dump_stmt(out, s, depth + 2);
+                }
+                out.push_str(&format!("{pad}  )\n"));
+            }
+            out.push_str(&format!("{pad})\n"));
+        }
+        Stmt::While {
+            condition,
+            body,
+            span,
+        } => {
+            out.push_str(&format!("{pad}(while {condition:?} @{span}\n"));
+            for s in body {
+                dump_stmt(out, s, depth + 1);
+            }
+            out.push_str(&format!("{pad})\n"));
+        }
+        Stmt::ForEach {
+            item,
+            collection,
+            body,
+            span,
+        } => {
+            out.push_str(&format!(
+                "{pad}(foreach {item:?} in {collection:?} @{span}\n"
+            ));
+            for s in body {
+                dump_stmt(out, s, depth + 1);
+            }
+            out.push_str(&format!("{pad})\n"));
+        }
+    }
+}

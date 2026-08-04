@@ -48,11 +48,17 @@ Marqdo：Markdown **标记即语法**。源文件 `.mq.md` 既是文稿也是程
 
 - 映射 v0.1：[markdown-mapping.md](doc/design/markdown-mapping.md)  
 - 解释器路线图：[interpreter.md](doc/roadmap/interpreter.md)  
+- **Phase I（树遍历）已通**：`examples/` 下 hello / index / branch / loop / collection / with-import 均可 `marqdo run`  
 - 依赖（Rust，无 Flex/Bison）：[dependencies.md](doc/design/dependencies.md)  
 - 选型：[ADR 0001 — Rust](doc/adr/0001-implementation-language.md)  
 
-下一步：按 [dev-setup.md](doc/dev-setup.md) 配置环境；M0 脚手架已就绪，M1 起实现词法。
-  
+```bash
+cargo run -- run examples/index.mq.md
+# Hello World!
+```
+
+下一步：按需加强语义诊断与表达式；Phase II 字节码见路线图 M5。
+
 
 ---
 

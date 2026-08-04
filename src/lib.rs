@@ -1,17 +1,24 @@
 //! Marqdo reference interpreter (Phase I).
 //!
-//! Pipeline: load → line classify / lex → parse → sema → tree-walk eval.
+//! Pipeline: load → line classify → parse → tree-walk eval.
 
+pub mod ast;
 pub mod debug;
 pub mod diagnostics;
+pub mod interp;
 pub mod lex;
+pub mod load;
 pub mod parse;
+pub mod value;
 
 use std::path::Path;
 
-use anyhow::{bail, Context, Result};
+use anyhow::{bail, Result};
 
+use crate::ast::format_ast_dump;
+use crate::interp::Interpreter;
 use crate::lex::{classify_source, format_lines_dump};
+use crate::load::load_module;
 
 /// Options for a single `run` / dump invocation.
 #[derive(Debug, Clone, Default)]
@@ -39,42 +46,53 @@ impl RunOptions {
     }
 }
 
-/// Run a `.mq.md` program (M1: line classify + dumps; eval still TODO).
+/// Run a `.mq.md` program.
 pub fn run_file(path: &Path, opts: &RunOptions) -> Result<i32> {
     let source = std::fs::read_to_string(path)
-        .with_context(|| format!("failed to read {}", path.display()))?;
+        .map_err(|e| anyhow::anyhow!("failed to read {}: {e}", path.display()))?;
+
+    if source.trim().is_empty() {
+        bail!("{} is empty", path.display());
+    }
 
     let path_label = path.display().to_string();
-    let lines = classify_source(&source);
 
     if opts.dump_lines {
+        let lines = classify_source(&source);
         print!("{}", format_lines_dump(&path_label, &lines));
     }
     if opts.dump_tokens {
         println!("=== marqdo: tokens ({path_label}) ===");
-        println!("(tokens not implemented yet — M1+)");
+        println!("(fine-grained tokens not implemented yet — use --dump-lines)");
         println!("=== marqdo: end tokens ===");
     }
+
+    let module = load_module(path)?;
+
     if opts.dump_ast {
-        println!("=== marqdo: ast ({path_label}) ===");
-        println!("(ast not implemented yet — M2)");
-        println!("=== marqdo: end ast ===");
+        print!("{}", format_ast_dump(&path_label, &module));
     }
     if opts.dump_sema {
         println!("=== marqdo: sema ({path_label}) ===");
-        println!("(sema not implemented yet — M3+)");
+        println!(
+            "functions: {:?}",
+            module
+                .functions
+                .iter()
+                .map(|f| f.name.as_str())
+                .collect::<Vec<_>>()
+        );
+        println!("imports: {:?}", module.imports);
         println!("=== marqdo: end sema ===");
     }
+
+    let mut interp = Interpreter::new(opts.trace_eval);
     if opts.trace_eval {
-        println!("=== marqdo: trace-eval ({path_label}) ===");
-        println!("(eval not implemented yet — M2+)");
-        println!("=== marqdo: end trace-eval ===");
+        eprintln!("=== marqdo: trace-eval ({path_label}) ===");
     }
-
-    if source.is_empty() {
-        bail!("{} is empty", path.display());
+    interp.run_module(&module)?;
+    if opts.trace_eval {
+        eprintln!("=== marqdo: end trace-eval ===");
     }
-
-    // Until eval exists: dumps are useful; run still fails loudly.
-    bail!("evaluation not implemented — see doc/roadmap/interpreter.md (M2+)")
+    Ok(0)
 }
