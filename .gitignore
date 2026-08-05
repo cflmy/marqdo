@@ -1,4 +1,4 @@
-/target/
+﻿/target/
 /dist/
 **/*.rs.bk
 .idea/
@@ -11,8 +11,6 @@
 /public/index.html
 /public/pages/
 
-# VS Code extension lives on branch `vscode-extension` only (see doc/design/vscode-extension.md)
-/vscode-extension/
 
 # Python spike venv (local)
 spike/.venv/

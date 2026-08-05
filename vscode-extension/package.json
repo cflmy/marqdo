@@ -1,0 +1,57 @@
+{
+  "name": "marqdo",
+  "displayName": "Marqdo",
+  "description": "Language support for Marqdo (.mq.md) — code as documentation.",
+  "version": "0.0.1",
+  "publisher": "cflmy",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "keywords": [
+    "marqdo",
+    "markdown",
+    "mq.md"
+  ],
+  "activationEvents": [
+    "onLanguage:marqdo"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "marqdo",
+        "aliases": [
+          "Marqdo",
+          "marqdo"
+        ],
+        "extensions": [
+          ".mq.md"
+        ],
+        "filenamePatterns": [
+          "*.mq.md"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "marqdo",
+        "scopeName": "source.marqdo",
+        "path": "./syntaxes/marqdo.tmLanguage.json"
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/vscode": "^1.85.0",
+    "typescript": "^5.3.0"
+  }
+}
