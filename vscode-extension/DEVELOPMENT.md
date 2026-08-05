@@ -14,7 +14,9 @@ cd vscode-extension
 npm install
 ```
 
-按 F5（「运行扩展」）打开 Extension Development Host，打开任意 `.mq.md` 验证语言 id / 高亮。
+**推荐**：用 VS Code / Cursor **打开 `vscode-extension/` 文件夹**（不要只开仓库根），再按 F5（「Run Extension」）。Extension Development Host 会带上上级语言仓，便于打开 `public/*.mq.md` 验收。
+
+验证：Language Mode = Marqdo；命令面板搜 `Marqdo: Run File` / `Open Debugger`。
 
 ## 日常脚本（约定）
 
@@ -52,9 +54,14 @@ git push -u origin vscode-extension
 
 不要把本目录合并进 `main`（`main` 的 `.gitignore` 会忽略它）。
 
-## 验收清单（P0）
+## 验收清单（P0 / P1）
 
 - [ ] `.mq.md` 打开后 Language Mode = Marqdo  
 - [ ] `#` / `*` / `**` / `>` / 表格 / 注释行有可区分着色  
 - [ ] 函数体内 `---` / `***`、空返回 `****` 不与普通 Markdown 粗体完全糊成一团（尽力）  
 - [ ] F5 开发宿主可重复加载，无激活期未捕获异常  
+- [ ] `Marqdo: Run File` 成功时 Output 有输出；失败时 Problems 出现 `path:line:col`  
+- [ ] `Marqdo: Open Debugger` 拉起本地 debug 页（默认 `http://127.0.0.1:7430/`）  
+- [ ] 无 CLI 时启动提示 Install；确认后下载 bundle（含 stdlib）并可 `Run File`  
+
+设置：`marqdo.cliPath`、`marqdo.libPath`、`marqdo.autoInstall.checkOnStartup`、`marqdo.debugOpen`。

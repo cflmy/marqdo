@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| 状态 | **规范起步**（伴随 Marqdo **v0.1.0** 稳定小版本） |
+| 状态 | **P0 高亮 + P1 Run/Problems + 轻量 Debug 入口**（伴随 Marqdo **v0.1.0**） |
 | 日期 | 2026-08-05 |
 | 语言仓 | [`cflmy/marqdo`](https://github.com/cflmy/marqdo) `main` |
 | 扩展仓形态 | **同仓库专用分支** `vscode-extension`（本目录）；`main` **不跟踪**本目录 |
@@ -42,13 +42,13 @@ v0.1.0 已是「可解释 + view + debug CLI + catalog」的阶段性稳定小�
 
 | 优先级 | 能力 | 说明 |
 |--------|------|------|
-| **P0** | `.mq.md` 语言登记 + 基础语法高亮 | TextMate / semantic 二选一；先 TextMate |
-| **P0** | 语言配置 | 注释、括号、自动缩进粗线条 |
-| **P1** | 任务 / 命令 | `marqdo run` 当前文件；探测 `PATH` / 工作区 `marqdo` |
-| **P1** | 问题面板 | 把 `path:line:col: message` 诊断喂给 Problems |
+| **P0** | `.mq.md` 语言登记 + 基础语法高亮 | TextMate（已落地） |
+| **P0** | 语言配置 | 括号 / 自动成对（已落地） |
+| **P1** | 任务 / 命令 | `Marqdo: Run File` → `marqdo run`（已落地） |
+| **P1** | 问题面板 | CLI `path:line:col` → Problems（已落地） |
 | **P2** | 轻量语言特性 | 大纲（`#` 函数）、跳转到定义（同文件 / 导入） |
-| **P3** | DAP / 调试 | 对接 `marqdo debug` 语义；勿与 CLI debug 页抢两套语义 |
-| **P3** | OKF / catalog | 调用 `marqdo catalog`，预览生成清单 |
+| **P3** | DAP / 调试 | 现已：`Marqdo: Open Debugger` 拉起 CLI debug 页；日后 DAP |
+| **P3** | OKF / catalog | `Marqdo: Generate Catalog`（已落地轻量入口） |
 
 原则：**扩展是 Marqdo CLI 的薄宿主**；语义以解释器与 [markdown-mapping.md](../doc/design/markdown-mapping.md) 为准，扩展不发明第二套语法。
 
@@ -63,10 +63,14 @@ vscode-extension/
   ARCHITECTURE.md           # 进程边界、与 CLI 的契约
   package.json              # 扩展清单（Marketplace id 待定）
   tsconfig.json
+  .vscode/                  # F5：Run Extension
   .vscodeignore
   src/
-    extension.ts            # activate / deactivate
+    extension.ts            # activate：命令 / 诊断
+    cli.ts                  # spawn marqdo
+    diagnostics.ts          # path:line:col → Problems
   syntaxes/                 # TextMate 语法（P0）
+    marqdo.tmLanguage.json
   language-configuration.json
 ```
 

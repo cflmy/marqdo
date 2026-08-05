@@ -2,8 +2,16 @@
   "name": "marqdo",
   "displayName": "Marqdo",
   "description": "Language support for Marqdo (.mq.md) — code as documentation.",
-  "version": "0.0.1",
+  "version": "0.0.3",
   "publisher": "cflmy",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/cflmy/marqdo.git"
+  },
+  "bugs": {
+    "url": "https://github.com/cflmy/marqdo/issues"
+  },
+  "homepage": "https://github.com/cflmy/marqdo/tree/vscode-extension/vscode-extension",
   "engines": {
     "vscode": "^1.85.0"
   },
@@ -16,7 +24,8 @@
     "mq.md"
   ],
   "activationEvents": [
-    "onLanguage:marqdo"
+    "onLanguage:marqdo",
+    "onStartupFinished"
   ],
   "main": "./out/extension.js",
   "contributes": {
@@ -42,7 +51,136 @@
         "scopeName": "source.marqdo",
         "path": "./syntaxes/marqdo.tmLanguage.json"
       }
-    ]
+    ],
+    "commands": [
+      {
+        "command": "marqdo.run",
+        "title": "Marqdo: Run File",
+        "category": "Marqdo"
+      },
+      {
+        "command": "marqdo.debug",
+        "title": "Marqdo: Open Debugger",
+        "category": "Marqdo"
+      },
+      {
+        "command": "marqdo.debug.stop",
+        "title": "Marqdo: Stop Debugger",
+        "category": "Marqdo"
+      },
+      {
+        "command": "marqdo.catalog",
+        "title": "Marqdo: Generate Catalog",
+        "category": "Marqdo"
+      },
+      {
+        "command": "marqdo.showOutput",
+        "title": "Marqdo: Show Output",
+        "category": "Marqdo"
+      },
+      {
+        "command": "marqdo.installCli",
+        "title": "Marqdo: Install / Repair CLI",
+        "category": "Marqdo"
+      },
+      {
+        "command": "marqdo.checkCli",
+        "title": "Marqdo: Check CLI Status",
+        "category": "Marqdo"
+      }
+    ],
+    "menus": {
+      "editor/title": [
+        {
+          "command": "marqdo.run",
+          "when": "resourceFilename =~ /\\.mq\\.md$/ || editorLangId == marqdo",
+          "group": "navigation@1"
+        },
+        {
+          "command": "marqdo.debug",
+          "when": "resourceFilename =~ /\\.mq\\.md$/ || editorLangId == marqdo",
+          "group": "navigation@2"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "marqdo.run",
+          "when": "editorLangId == marqdo || resourceFilename =~ /\\.mq\\.md$/"
+        }
+      ]
+    },
+    "keybindings": [
+      {
+        "command": "marqdo.run",
+        "key": "ctrl+shift+r",
+        "mac": "cmd+shift+r",
+        "when": "editorTextFocus && editorLangId == marqdo"
+      }
+    ],
+    "configuration": {
+      "title": "Marqdo",
+      "properties": {
+        "marqdo.cliPath": {
+          "type": "string",
+          "default": "marqdo",
+          "description": "Path to the marqdo CLI executable (default: marqdo on PATH, or extension-managed install)."
+        },
+        "marqdo.managedCliPath": {
+          "type": "string",
+          "default": "",
+          "description": "Path written by Marqdo: Install / Repair CLI (managed binary)."
+        },
+        "marqdo.libPath": {
+          "type": "string",
+          "default": "",
+          "description": "Standard library root (sets MARQDO_LIB when spawning the CLI)."
+        },
+        "marqdo.autoInstall.checkOnStartup": {
+          "type": "boolean",
+          "default": true,
+          "description": "On startup, detect missing CLI/stdlib and offer one-click install from GitHub Releases."
+        },
+        "marqdo.diagnoseOnSave": {
+          "type": "boolean",
+          "default": false,
+          "description": "Run `marqdo run` on save to refresh Problems (may hang on interactive input)."
+        },
+        "marqdo.runTimeoutMs": {
+          "type": "number",
+          "default": 60000,
+          "description": "Timeout for `marqdo run` / diagnose (milliseconds)."
+        },
+        "marqdo.debugHost": {
+          "type": "string",
+          "default": "127.0.0.1",
+          "description": "Host for `marqdo debug`."
+        },
+        "marqdo.debugPort": {
+          "type": "number",
+          "default": 7430,
+          "description": "Port for `marqdo debug`."
+        },
+        "marqdo.debugOpen": {
+          "type": "string",
+          "enum": [
+            "external",
+            "simpleBrowser"
+          ],
+          "default": "external",
+          "description": "How to open the debug UI after starting the server."
+        },
+        "marqdo.catalogOut": {
+          "type": "string",
+          "default": ".marqdo",
+          "description": "Output directory for `marqdo catalog`."
+        }
+      }
+    },
+    "configurationDefaults": {
+      "files.associations": {
+        "*.mq.md": "marqdo"
+      }
+    }
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",
@@ -52,6 +190,7 @@
   "devDependencies": {
     "@types/node": "^20.11.0",
     "@types/vscode": "^1.85.0",
+    "@vscode/vsce": "^3.9.2",
     "typescript": "^5.3.0"
   }
 }

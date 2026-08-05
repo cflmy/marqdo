@@ -2,7 +2,8 @@
 /dist/
 **/*.rs.bk
 .idea/
-.vscode/
+# Editor settings at repo root only (keep vscode-extension/.vscode for F5)
+/.vscode/
 *.pdb
 .DS_Store
 .marqdo/

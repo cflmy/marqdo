@@ -44,10 +44,17 @@ path:line:col: message
 
 扩展将相对路径解析到工作区 URI，`severity` 为 0-based。与语言仓 P0 诊断模型一致。
 
-## 调试（P3）
+## CLI 安装（扩展侧）
 
-- 短期：命令「在外部打开 `marqdo debug`」或 Simple Browser 打开本地 debug URL。  
-- 中期：DAP 适配器进程包装现有 debug session API（`src/view/debug_api.rs` 语义），避免第三套断点模型。
+- 启动时（`onStartupFinished`）检测 CLI + `lib/`；缺失则提示 **Install CLI + stdlib**。  
+- 从 GitHub Releases 下载推荐 zip（`marqdo.exe` + `lib/`）到扩展 `globalStorage/cli/`，并写入 `marqdo.cliPath` / `marqdo.libPath`（spawn 时带 `MARQDO_LIB`）。  
+- 手动命令：`Marqdo: Install / Repair CLI`、`Marqdo: Check CLI Status`。  
+- 当前自动安装预编译包以 **Windows x64** 为主（与现有 Release 资产一致）；其它平台无匹配资产时会提示打开 Releases。
+
+## 调试（P3 → 现有入口）
+
+- **已落地**：命令 `Marqdo: Open Debugger` 子进程启动 `marqdo debug --no-open`，再打开浏览器 / Simple Browser。  
+- **中期**：DAP 适配器包装现有 debug session API（`src/view/debug_api.rs` 语义），避免第三套断点模型。
 
 ## OKF / catalog（P3）
 

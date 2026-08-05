@@ -4,15 +4,19 @@
   "scopeName": "source.marqdo",
   "patterns": [
     { "include": "#frontmatter" },
+    { "include": "#code-fence" },
+    { "include": "#formula" },
     { "include": "#heading" },
+    { "include": "#empty-return" },
     { "include": "#hr-end" },
     { "include": "#call" },
-    { "include": "#return" },
-    { "include": "#empty-return" },
-    { "include": "#statement" },
-    { "include": "#list-structure" },
+    { "include": "#else-arm" },
+    { "include": "#return-line" },
+    { "include": "#statement-line" },
+    { "include": "#param-or-loop" },
+    { "include": "#branch" },
     { "include": "#table" },
-    { "include": "#code-fence" },
+    { "include": "#inline-code" },
     { "include": "#comment" }
   ],
   "repository": {
@@ -20,65 +24,145 @@
       "name": "meta.embedded.block.frontmatter.marqdo",
       "begin": "\\A---\\s*$",
       "end": "^---\\s*$",
+      "beginCaptures": {
+        "0": { "name": "punctuation.definition.frontmatter.begin.marqdo" }
+      },
+      "endCaptures": {
+        "0": { "name": "punctuation.definition.frontmatter.end.marqdo" }
+      },
       "patterns": [
-        { "name": "keyword.control.import.marqdo", "match": "^\\s*>\\s+.+$" },
-        { "name": "string.unquoted.frontmatter.marqdo", "match": "^.+$" }
+        {
+          "name": "meta.import.marqdo",
+          "match": "^(\\s*)(>)(\\s+)(\\S.*)$",
+          "captures": {
+            "2": { "name": "keyword.control.import.marqdo" },
+            "4": { "name": "string.unquoted.import.path.marqdo" }
+          }
+        },
+        {
+          "name": "meta.frontmatter.field.marqdo",
+          "match": "^([A-Za-z0-9_-]+)\\s*:\\s*(.*)$",
+          "captures": {
+            "1": { "name": "entity.name.tag.frontmatter.marqdo" },
+            "2": { "name": "string.unquoted.frontmatter.marqdo" }
+          }
+        }
       ]
     },
     "heading": {
       "name": "markup.heading.marqdo",
-      "match": "^(#{1,6})\\s+(.+)$",
+      "match": "^(#{1,6})(\\s+)(.+)$",
       "captures": {
         "1": { "name": "punctuation.definition.heading.marqdo" },
-        "2": { "name": "entity.name.function.marqdo" }
-      }
-    },
-    "hr-end": {
-      "name": "keyword.control.function.end.marqdo",
-      "match": "^(---+|\\*{3,})\\s*$"
-    },
-    "call": {
-      "name": "meta.call.marqdo",
-      "match": "^(\\s*)(>)\\s+(\\S+)(.*)$",
-      "captures": {
-        "2": { "name": "keyword.operator.call.marqdo" },
-        "3": { "name": "entity.name.function.call.marqdo" },
-        "4": { "name": "meta.call.args.marqdo" }
+        "3": { "name": "entity.name.function.marqdo" }
       }
     },
     "empty-return": {
       "name": "keyword.control.return.empty.marqdo",
       "match": "^\\s*(\\*{4}|\\*\\*\\s+\\*\\*)\\s*$"
     },
-    "return": {
+    "hr-end": {
+      "name": "keyword.control.function.end.marqdo",
+      "match": "^\\s*(---+|\\*{3})\\s*$"
+    },
+    "call": {
+      "name": "meta.call.marqdo",
+      "match": "^(\\s*)(>)(\\s+)(\\S+)(.*)$",
+      "captures": {
+        "2": { "name": "keyword.operator.call.marqdo" },
+        "4": { "name": "entity.name.function.call.marqdo" },
+        "5": { "name": "meta.call.args.marqdo" }
+      }
+    },
+    "else-arm": {
+      "name": "keyword.control.conditional.else.marqdo",
+      "match": "^(\\s*)(\\*)(\\s*)$"
+    },
+    "return-line": {
       "name": "meta.return.marqdo",
-      "begin": "\\*\\*",
-      "end": "\\*\\*",
-      "name": "markup.bold.return.marqdo",
+      "begin": "^(\\s*)(\\*\\*)(?!\\*)",
+      "beginCaptures": {
+        "2": { "name": "punctuation.definition.return.begin.marqdo" }
+      },
+      "end": "(\\*\\*)",
+      "endCaptures": {
+        "1": { "name": "punctuation.definition.return.end.marqdo" }
+      },
+      "contentName": "markup.bold.return.marqdo",
       "patterns": [
-        { "name": "variable.other.marqdo", "match": "`[^`]+`" }
+        { "include": "#inline-code" },
+        { "include": "#call-inline" }
       ]
     },
-    "statement": {
+    "statement-line": {
       "name": "meta.statement.marqdo",
-      "begin": "(?<!\\*)\\*(?!\\*)",
-      "end": "(?<!\\*)\\*(?!\\*)",
-      "name": "markup.italic.statement.marqdo"
+      "begin": "^(\\s*)(\\*)(?!\\*)",
+      "beginCaptures": {
+        "2": { "name": "punctuation.definition.statement.begin.marqdo" }
+      },
+      "end": "(?<!\\*)(\\*)(?!\\*)\\s*$",
+      "endCaptures": {
+        "1": { "name": "punctuation.definition.statement.end.marqdo" }
+      },
+      "contentName": "markup.italic.statement.marqdo",
+      "patterns": [
+        { "include": "#inline-code" },
+        { "include": "#call-inline" }
+      ]
     },
-    "list-structure": {
-      "name": "markup.list.marqdo",
-      "match": "^(\\s*)([-+]|\\d+\\.)\\s+"
+    "call-inline": {
+      "name": "meta.call.inline.marqdo",
+      "match": "(>)(\\s*)(\\S+)",
+      "captures": {
+        "1": { "name": "keyword.operator.call.marqdo" },
+        "3": { "name": "entity.name.function.call.marqdo" }
+      }
+    },
+    "param-or-loop": {
+      "name": "meta.list.structure.marqdo",
+      "match": "^(\\s*)(-)(\\s+)(.+)$",
+      "captures": {
+        "2": { "name": "punctuation.definition.list.marqdo" },
+        "4": { "name": "variable.parameter.marqdo" }
+      }
+    },
+    "branch": {
+      "name": "meta.branch.marqdo",
+      "match": "^(\\s*)([+]|\\d+\\.)(\\s+)(.*)$",
+      "captures": {
+        "2": { "name": "keyword.control.conditional.marqdo" },
+        "4": { "name": "meta.branch.condition.marqdo" }
+      }
     },
     "table": {
       "name": "markup.table.marqdo",
       "match": "^\\s*\\|.*\\|\\s*$"
     },
+    "formula": {
+      "name": "meta.embedded.math.marqdo",
+      "begin": "^\\s*\\$\\$\\s*$",
+      "end": "^\\s*\\$\\$\\s*$",
+      "contentName": "string.other.math.marqdo"
+    },
     "code-fence": {
       "name": "markup.fenced_code.block.marqdo",
-      "begin": "^\\s*```([\\w+-]*)\\s*$",
-      "end": "^\\s*```\\s*$",
+      "begin": "^(\\s*)(```)([\\w+-]*)\\s*$",
       "beginCaptures": {
-        "1": { "name": "entity.name.tag.lang.marqdo" }
+        "2": { "name": "punctuation.definition.raw.begin.marqdo" },
+        "3": { "name": "entity.name.tag.lang.marqdo" }
+      },
+      "end": "^(\\s*)(```)\\s*$",
+      "endCaptures": {
+        "2": { "name": "punctuation.definition.raw.end.marqdo" }
+      },
+      "contentName": "markup.raw.block.marqdo"
+    },
+    "inline-code": {
+      "name": "string.interpolated.marqdo",
+      "match": "`([^`]+)`",
+      "captures": {
+        "0": { "name": "markup.inline.raw.marqdo" },
+        "1": { "name": "variable.other.marqdo" }
       }
     },
     "comment": {
