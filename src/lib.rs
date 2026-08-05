@@ -11,6 +11,7 @@ pub mod capture;
 pub mod catalog;
 pub mod debug;
 pub mod diagnostics;
+pub mod formula;
 pub mod host;
 pub mod input_feed;
 pub mod interp;
@@ -24,7 +25,7 @@ use std::path::Path;
 
 use anyhow::{bail, Result};
 
-use crate::host::{HostCaps, HostContext};
+use crate::host::{flush_auto_plots, HostCaps, HostContext};
 use crate::ast::format_ast_dump;
 use crate::bytecode::{compile_module, Vm};
 use crate::capture::RunCapture;
@@ -178,6 +179,8 @@ pub fn run_file(path: &Path, opts: &RunOptions) -> Result<i32> {
             if opts.trace_eval {
                 eprintln!("=== marqdo: end trace-eval ===");
             }
+            let plots = interp.take_plots();
+            flush_auto_plots(Some(path), &plots).map_err(|e| anyhow::anyhow!(e))?;
         }
         Backend::Bytecode => {
             let program = compile_module(Some(path), &module)?;
@@ -196,6 +199,8 @@ pub fn run_file(path: &Path, opts: &RunOptions) -> Result<i32> {
             if opts.trace_eval {
                 eprintln!("=== marqdo: end trace-eval ===");
             }
+            let plots = vm.take_plots();
+            flush_auto_plots(Some(path), &plots).map_err(|e| anyhow::anyhow!(e))?;
         }
     }
 
@@ -228,9 +233,11 @@ pub fn run_file_capture(path: &Path, opts: &RunOptions) -> Result<RunCapture> {
                 .with_stdin(stdin_lines)
                 .with_host(host);
             let value = interp.run_module(&module)?;
+            let plots = interp.take_plots();
             Ok(RunCapture {
                 stdout: interp.captured_stdout,
                 value,
+                plots,
             })
         }
         Backend::Bytecode => {
@@ -247,9 +254,11 @@ pub fn run_file_capture(path: &Path, opts: &RunOptions) -> Result<RunCapture> {
                 .with_stdin(stdin_lines)
                 .with_host(host);
             let value = vm.run(&program)?;
+            let plots = vm.take_plots();
             Ok(RunCapture {
                 stdout: vm.captured_stdout,
                 value,
+                plots,
             })
         }
     }

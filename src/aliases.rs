@@ -51,6 +51,15 @@ pub fn canonical_param(builtin: &str, param: &str) -> String {
         ("split" | "join", "sep" | "分隔") => "sep".into(),
         ("at", "value" | "值") => "value".into(),
         ("at", "index" | "下标") => "index".into(),
+        (
+            "host_plot" | "host_plot_points" | "host_plot_conic",
+            "grid" | "网格",
+        ) => "grid".into(),
+        ("host_plot" | "host_plot_points" | "host_plot_conic", "path" | "路径") => {
+            "path".into()
+        }
+        ("host_plot", "steps" | "步数") => "steps".into(),
+        ("host_plot", "derivative" | "导数") => "derivative".into(),
         _ => param.to_string(),
     }
 }

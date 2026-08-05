@@ -1,6 +1,7 @@
 //! Marqdo AST (Phase I).
 
 use crate::diagnostics::Span;
+use crate::formula::Expr as FormulaExpr;
 
 #[derive(Debug, Clone)]
 pub struct Module {
@@ -24,6 +25,8 @@ pub enum Stmt {
         name: String,
         value: Expr,
         span: Span,
+        /// Inclusive last source line (covers following `$$` fence or table rows).
+        end_line: u32,
     },
     Return {
         value: Expr,
@@ -86,6 +89,8 @@ pub enum Expr {
     },
     Call(CallExpr),
     List(Vec<Expr>),
+    /// Parsed `$$…$$` formula tree (from assignment RHS).
+    Formula(FormulaExpr),
 }
 
 #[derive(Debug, Clone)]
@@ -156,8 +161,15 @@ fn dump_fun(out: &mut String, fun: &Function, depth: usize) {
 fn dump_stmt(out: &mut String, stmt: &Stmt, depth: usize) {
     let pad = "  ".repeat(depth);
     match stmt {
-        Stmt::Assign { name, value, span } => {
-            out.push_str(&format!("{pad}(assign {name:?} {value:?} @{span})\n"));
+        Stmt::Assign {
+            name,
+            value,
+            span,
+            end_line,
+        } => {
+            out.push_str(&format!(
+                "{pad}(assign {name:?} {value:?} @{span}..{end_line})\n"
+            ));
         }
         Stmt::Return { value, span } => {
             out.push_str(&format!("{pad}(return {value:?} @{span})\n"));

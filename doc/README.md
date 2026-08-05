@@ -27,7 +27,7 @@
 | [design/stdlib.md](design/stdlib.md) | **P2 标准库：内置 + `lib/` + 错误约定** |
 | [design/stdlib-i18n.md](design/stdlib-i18n.md) | **标准库中英命名：靠库文件名区分，无 lang 开关** |
 | [design/stdlib-modules.md](design/stdlib-modules.md) | **本波 L1：文件/系统/时间/JSON/网络（JSON 中英同库）** |
-| [design/stdlib-math.md](design/stdlib-math.md) | **暂缓：数学库（数值/符号/作图/`$$`）** |
+| [design/stdlib-math.md](design/stdlib-math.md) | **方案：数学库（数值/随机/作图/轻量求解）** |
 | [design/stdlib-foreign.md](design/stdlib-foreign.md) | **暂缓：外联胶水（\`\`\`lang 具名块）** |
 | [design/call-arguments.md](design/call-arguments.md) | **调用：具名 + 位置实参** |
 | [design/examples-and-tests.md](design/examples-and-tests.md) | **tests/ 金样例目录布局** |

@@ -1,4 +1,4 @@
-//! L0.5 host primitives for official stdlib (`lib/fs`, `time`, …).
+//! L0.5 host primitives for official stdlib (`lib/fs`, `time`, `math`, …).
 //!
 //! User docs should import L1 wrappers; these `host_*` names are the Rust surface.
 //! Capabilities default **on** (importing a lib means you intend to use it).
@@ -7,6 +7,7 @@
 mod dispatch;
 mod fs;
 mod json;
+pub mod math;
 mod net;
 mod sys;
 mod time;
@@ -34,6 +35,14 @@ impl Default for HostCaps {
     }
 }
 
+/// SVG plot produced during a run (for CLI auto-write / view embed).
+#[derive(Debug, Clone)]
+pub struct PlotArtifact {
+    /// User-requested path, if any.
+    pub path: Option<String>,
+    pub svg: String,
+}
+
 #[derive(Debug, Clone)]
 pub struct HostContext {
     pub caps: HostCaps,
@@ -43,6 +52,9 @@ pub struct HostContext {
     /// Soft mode: do not `process::exit`; honor sleep_limit (view / capture / export).
     pub soft_side_effects: bool,
     pub sleep_limit_ms: Option<u64>,
+    /// LCG state for `random` / `random_int`.
+    pub rng: u64,
+    pub plots: Vec<PlotArtifact>,
 }
 
 impl Default for HostContext {
@@ -54,6 +66,8 @@ impl Default for HostContext {
             argv: Vec::new(),
             soft_side_effects: false,
             sleep_limit_ms: Some(30_000),
+            rng: 0xC0FF_EE42_CAFE_BABE,
+            plots: Vec::new(),
         }
     }
 }
@@ -97,6 +111,23 @@ impl HostContext {
         self.caps.net
     }
 
+    pub fn next_u64(&mut self) -> u64 {
+        // SplitMix64-ish LCG step
+        self.rng = self
+            .rng
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1);
+        let mut z = self.rng;
+        z = (z ^ (z >> 30)).wrapping_mul(0xbf58476d1ce4e5b9);
+        z = (z ^ (z >> 27)).wrapping_mul(0x94d049bb133111eb);
+        z ^ (z >> 31)
+    }
+
+    pub fn next_f64(&mut self) -> f64 {
+        let x = self.next_u64() >> 11;
+        (x as f64) / ((1u64 << 53) as f64)
+    }
+
     pub fn resolve_path(&self, rel: &str) -> Result<PathBuf, String> {
         let p = Path::new(rel);
         let abs = if p.is_absolute() {
@@ -123,4 +154,29 @@ impl HostContext {
         }
         Ok(abs)
     }
+}
+
+/// Write auto-named plot files for CLI runs when `path` was omitted.
+pub fn flush_auto_plots(source_path: Option<&Path>, plots: &[PlotArtifact]) -> Result<(), String> {
+    let mut auto_i = 0usize;
+    for plot in plots {
+        if plot.path.is_some() {
+            continue;
+        }
+        auto_i += 1;
+        let stem = source_path
+            .and_then(|p| p.file_stem())
+            .and_then(|s| s.to_str())
+            .unwrap_or("out");
+        let stem = stem.trim_end_matches(".mq");
+        let name = format!("{stem}-plot-{auto_i}.svg");
+        let dir = source_path
+            .and_then(|p| p.parent())
+            .unwrap_or_else(|| Path::new("."));
+        let dest = dir.join(&name);
+        std::fs::write(&dest, plot.svg.as_bytes())
+            .map_err(|e| format!("failed to write plot {}: {e}", dest.display()))?;
+        println!("plot: {}", dest.display());
+    }
+    Ok(())
 }

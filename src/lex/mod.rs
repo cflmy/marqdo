@@ -36,7 +36,7 @@ pub struct ClassifiedLine {
 fn is_code_starter(c: char) -> bool {
     matches!(
         c,
-        '#' | '*' | '>' | '+' | '-' | '`' | '|' | '~'
+        '#' | '*' | '>' | '+' | '-' | '`' | '|' | '~' | '$'
     ) || c.is_ascii_digit()
 }
 
@@ -72,26 +72,40 @@ pub fn classify_source(source: &str) -> Vec<ClassifiedLine> {
 
     let mut out = Vec::with_capacity(lines.len());
     let mut in_comment_paragraph = false;
+    let mut in_math_fence = false;
 
     for (i, text) in lines.into_iter().enumerate() {
         let base = classify_line(text);
         let trimmed = text.trim();
         let structural = is_structural_code_line(trimmed);
-        let kind = match base {
-            LineKind::Blank => {
-                in_comment_paragraph = false;
-                LineKind::Blank
+        let kind = if in_math_fence {
+            if trimmed == "$$" {
+                in_math_fence = false;
             }
-            LineKind::Comment => {
-                in_comment_paragraph = true;
-                LineKind::Comment
+            LineKind::Code
+        } else {
+            match base {
+                LineKind::Blank => {
+                    in_comment_paragraph = false;
+                    LineKind::Blank
+                }
+                LineKind::Comment => {
+                    in_comment_paragraph = true;
+                    LineKind::Comment
+                }
+                LineKind::Code if structural => {
+                    in_comment_paragraph = false;
+                    LineKind::Code
+                }
+                LineKind::Code if in_comment_paragraph => LineKind::Comment,
+                LineKind::Code => {
+                    // Multi-line math fence opener (not same-line `$$…$$`).
+                    if trimmed == "$$" {
+                        in_math_fence = true;
+                    }
+                    LineKind::Code
+                }
             }
-            LineKind::Code if structural => {
-                in_comment_paragraph = false;
-                LineKind::Code
-            }
-            LineKind::Code if in_comment_paragraph => LineKind::Comment,
-            LineKind::Code => LineKind::Code,
         };
         out.push(ClassifiedLine {
             line_no: (i + 1) as u32,
@@ -185,5 +199,16 @@ mod tests {
         let lines = classify_source(src);
         assert!(lines.iter().any(|l| l.kind == LineKind::Comment));
         assert!(lines.iter().any(|l| l.kind == LineKind::Code));
+    }
+
+    #[test]
+    fn math_fence_body_stays_code() {
+        let lines = classify_source("`f` =\n$$\nx^2 - 2\n$$\n");
+        assert!(
+            lines
+                .iter()
+                .all(|l| l.kind == LineKind::Code || l.kind == LineKind::Blank),
+            "expected fence body as Code, got {lines:?}"
+        );
     }
 }

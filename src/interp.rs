@@ -87,6 +87,10 @@ impl Interpreter {
         self
     }
 
+    pub fn take_plots(&mut self) -> Vec<crate::host::PlotArtifact> {
+        std::mem::take(&mut self.host.plots)
+    }
+
     fn err(&self, message: impl Into<String>) -> anyhow::Error {
         bail_at(self.path.as_deref(), self.current_span, message)
     }
@@ -181,7 +185,7 @@ impl Interpreter {
         stmt: &Stmt,
     ) -> Result<Option<Value>> {
         match stmt {
-            Stmt::Assign { name, value, span } => {
+            Stmt::Assign { name, value, span, .. } => {
                 self.current_span = *span;
                 let v = self.eval_expr(module, fun, env, value)?;
                 if self.trace {
@@ -390,6 +394,7 @@ impl Interpreter {
                 }
                 Ok(Value::List(out))
             }
+            Expr::Formula(e) => Ok(Value::Formula(e.clone())),
         }
     }
 
@@ -539,7 +544,7 @@ impl Interpreter {
                         return Err(self.err(format!("{} requires `{req}`", hf.name())));
                     }
                 }
-                return call_host(&self.host, hf, &bound).map_err(|m| self.err(m));
+                return call_host(&mut self.host, hf, &bound).map_err(|m| self.err(m));
             }
             _ => {}
         }
@@ -680,7 +685,14 @@ fn eval_binary(op: BinaryOp, l: &Value, r: &Value) -> Result<Value> {
 fn cmp_ord(l: &Value, r: &Value, f: impl Fn(std::cmp::Ordering) -> bool) -> Result<Value> {
     match (l, r) {
         (Value::Int(a), Value::Int(b)) => Ok(Value::Bool(f(a.cmp(b)))),
+        (Value::Num(a), Value::Num(b)) => Ok(Value::Bool(f(a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal)))),
+        (Value::Int(a), Value::Num(b)) => {
+            Ok(Value::Bool(f((*a as f64).partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))))
+        }
+        (Value::Num(a), Value::Int(b)) => {
+            Ok(Value::Bool(f(a.partial_cmp(&(*b as f64)).unwrap_or(std::cmp::Ordering::Equal))))
+        }
         (Value::Text(a), Value::Text(b)) => Ok(Value::Bool(f(a.cmp(b)))),
-        _ => bail!("comparison needs two ints or two texts"),
+        _ => bail!("comparison needs two ints/nums or two texts"),
     }
 }

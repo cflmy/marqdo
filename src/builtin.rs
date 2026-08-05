@@ -20,6 +20,7 @@ pub fn builtin_str(v: &Value) -> Value {
 pub fn builtin_int(v: &Value) -> Result<i64, String> {
     match v {
         Value::Int(n) => Ok(*n),
+        Value::Num(n) => Ok(*n as i64),
         Value::Bool(true) => Ok(1),
         Value::Bool(false) => Ok(0),
         Value::Text(s) => {
@@ -27,20 +28,22 @@ pub fn builtin_int(v: &Value) -> Result<i64, String> {
             t.parse::<i64>()
                 .map_err(|_| format!("cannot convert to int: {s:?}"))
         }
-        _ => Err("int needs int, bool, or text".into()),
+        _ => Err("int needs int, num, bool, or text".into()),
     }
 }
 
-/// `type`: type tag as text (`none` / `bool` / `int` / `text` / `list` / `map`).
+/// `type`: type tag as text (`none` / `bool` / `int` / `num` / `text` / `list` / `map` / `formula`).
 pub fn builtin_type(v: &Value) -> Value {
     Value::Text(
         match v {
             Value::None => "none",
             Value::Bool(_) => "bool",
             Value::Int(_) => "int",
+            Value::Num(_) => "num",
             Value::Text(_) => "text",
             Value::List(_) => "list",
             Value::Map(_) => "map",
+            Value::Formula(_) => "formula",
         }
         .into(),
     )

@@ -1,181 +1,231 @@
-# 数学标准库（候选）
+# 数学标准库（方案）
 
 | | |
 |---|---|
-| 状态 | **草案 / 暂缓**（本波不实现；五库之后再议） |
+| 状态 | **已实现（M1–M4）** |
 | 日期 | 2026-08-05 |
-| 相关 | [stdlib-modules.md](stdlib-modules.md) · [stdlib-i18n.md](stdlib-i18n.md) · [view.md](view.md) · [markdown-mapping.md](markdown-mapping.md) |
-| 灵感 | Markdown `$$…$$` / `$…$` 公式面；文档即计算笔记本 |
+| 相关 | [stdlib-modules.md](stdlib-modules.md) · [stdlib-i18n.md](stdlib-i18n.md) · [markdown-mapping.md](markdown-mapping.md) · [view.md](view.md) |
+| 导入 | `lib/math.mq.md`（英）· `lib/数学.mq.md`（中） |
+| 范围 | **高中数学**（初等函数、导数、圆锥曲线、简单方程）；非大学 CAS |
 
 ---
 
-## 1. 为什么值得做
+## 1. 目标
 
-Markdown 读者已习惯用 `$$` 写公式。若 Marqdo 能：
+1. **公式类型**：解析 `$$…$$`（及行内 `$…$` 的可选支持），得到可绑定、可传递的 **`formula` 值**——语义上像「公式常量 / 公式变量」。  
+2. **数学库对 `formula`（及文本表达式）做操作**：求值、化简、求导、求解、作图等。  
+3. **数值 + 随机**：日常算术与可复现随机。  
+4. **作图**：view / 静态页内嵌 SVG；CLI 写本地文件（可指定 `path`）。
 
-1. **认出**文档中的公式（或显式传入 LaTeX/ASCII-math 字符串）；  
-2. **符号整理 / 求值 / 求解**；  
-3. 在 **`marqdo view` 里画出**简单图像；  
-
-则同一份 `.mq.md` 既是讲义又是可运行实验，差异化远大于「再包一层 `sin`」。
-
-风险同样大：CAS、数值稳定、渲染栈都会显著增加依赖与维护面。故标为**候选**：先定分层，允许只实现「数值 + 显式字符串」，再渐进接 `$$`。
+**难度自觉：** 只覆盖高中知识面，自研小型表达式 AST + 规则即可，**不**追求 Mathematica / SymPy 完备性。
 
 ---
 
-## 2. 产品分层（建议）
+## 2. 核心模型：`formula` 类型
 
-| 层 | 能力 | 依赖量 | 建议阶段 |
-|----|------|--------|----------|
-| **Math-N（数值）** | 四则、幂、根、三角函数、常数；列表上的 map 式计算 | 小（可纯 Rust） | 若纳入官方库，**先做这层** |
-| **Math-S（符号）** | 化简、展开、求导、代入、解方程（单变元优先） | 中–大（自研子集或嵌 CAS） | 第二期 |
-| **Math-P（作图）** | 把表达式/点列渲染为 SVG（或 PNG）嵌入 view | 中（SVG 即可） | 与 view 同期 |
-| **Math-D（文档公式）** | 解析正文 `$$…$$`，命名后供调用 | 中（词法/源映射） | 第三期 |
+### 2.1 运行时
 
-**默认发版建议：** 官方 `lib/math` 先只承诺 **Math-N**；S/P/D 放 `experimental` 或 feature `math-cas` / `math-plot`，避免「标准库」名不副实。
+| 类型 | `type` 标签 | 说明 |
+|------|-------------|------|
+| `Value::Num(f64)` | `num` | 浮点 |
+| `Value::Formula(…)` | `formula` | 已解析的表达式树（或等价内部表示） |
 
----
+`print` / `str` 对 `formula`：输出规范 ASCII（如 `2*x + 1`）或保留源 LaTeX 的一种（实现时写死并文档化；建议 **ASCII 规范式** 便于测试）。
 
-## 3. 导入与命名
+### 2.2 文档中的 `$$` = 公式赋值（与表格同构）
 
-| 导入 | API 语言 |
-|------|----------|
-| `> lib/math.mq.md` | 英文 |
-| `> lib/数学.mq.md` | 中文 |
+在可执行面用 **空 RHS 赋值** 后跟展示数学块，把公式绑到变量（与 `` `xs` = `` 后跟表格一致）：
 
-宿主原语（L0.5）示例：`math_sin`、`math_eval`、`math_solve` —— 仅供库包装。
+````markdown
+# main
 
----
+`f` =
+$$
+sin(x) + x
+$$
 
-## 4. 用户 API 草图
+*`df` = > diff formula=`f` var=x *
 
-### 4.1 数值（Math-N）
+> plot formula=`f` var=x min=-3 max=3 path=f.svg
+````
+
+也支持：
+
+- 单行围栏：下一行 `$$x^2 - 2$$`
+- 同行 compact：`*`f` = $$x^2 - 2$$ *`
+
+**废除：** `$$:name` / `$$ name=…` 模块级具名块（不再产生绑定）。
+
+**无名 `$$…$$`：** 仅在成段注释（叙述面）里作展示，**不**进入运行时。可执行区若出现未挂在赋值上的裸 `$$` 围栏 → 报错，提示使用 `` `name` = `` + 围栏。
+
+**行内 `$…$`：** v1 不做绑定；需要时用 `> formula text=…` 显式构造。
+
+### 2.3 从文本构造
 
 | 英文 | 中文 | 说明 |
 |------|------|------|
-| `pi` / `e` | `圆周率` / `自然底数` | 无参，返回文本或「十进制文本」——**本波仍无 float 类型时用文本十进制**，或引入 `num` 宿主类型 |
-| `add` `sub` `mul` `div` `pow` `sqrt` | `加` `减` `乘` `除` `幂` `根` | |
-| `sin` `cos` `tan` `ln` `exp` | `正弦` `余弦` `正切` `对数` `指数` | 弧度 |
-| `round` `floor` `ceil` | `四舍` `向下` `向上` | |
-| `eval_num` | `求值` | `expr` 文本 → 数值文本 |
+| `formula` | `公式` | `text=` 解析为 `formula`（ASCII 或简单 LaTeX 子集） |
 
-**类型抉择（必须先 ADR）：**
+数学库函数形参统一接受：**`formula` 值**，或能解析的 **文本**（内部先 `formula` 化）。
 
-| 选项 | 优点 | 缺点 |
+### 2.4 与叙述面的关系
+
+- `` `f` = `` + `$$…$$`：代码面赋值，得到 `formula` 值。  
+- 成段注释里的 `$$`：仍是注释，不解析为公式。  
+- view：公式赋值在 Structure 中显示为绑定，不是 comment。
+
+（见 [markdown-mapping.md](markdown-mapping.md)：空 RHS + `$$` → 公式赋值。）
+
+---
+
+## 3. 知识范围（高中）
+
+### 3.1 表达式与符号（S）
+
+| 纳入 | 例子 |
+|------|------|
+| 多项式 | `x^2 - 3*x + 2` |
+| 初等函数 | `sin` `cos` `tan` `ln` `exp` `sqrt` `abs` |
+| 四则、幂 | `+ - * / ^` |
+| 化简 / 展开 | 合并同类项、基本三角恒等（小集合） |
+| 求导 | 单变元，初等函数求导法则 |
+| 代入求值 | `subs` → `num` 或公式 |
+| 求解 | 一元一次 / 二次闭式；其它用数值求根并标明 |
+
+**不做（本波）：** 多元方程组、极限 ε-δ、级数、积分保证、矩阵、复数完备、任意证明。
+
+### 3.2 作图（P）
+
+| 纳入 | 说明 |
+|------|------|
+| 显函数 `y=f(x)` | 采样折线 SVG |
+| 导数曲线 | 对 `formula` 先 `diff` 再画，或 `plot` 选项 `derivative=true` |
+| 圆锥曲线 | 标准形：圆、椭圆、双曲线、抛物线（参数方程或隐式采样） |
+| 点列 | `plot_points` |
+
+**不做：** 三维、隐函数通用求解器、交互缩放（静态 SVG 足够）。
+
+### 3.3 数值与随机（N）
+
+常数、四则、三角、对数、取整、`num` 转换、`random` / `random_int` / `seed`（同前稿）。
+
+---
+
+## 4. API 草图（对 `formula` 操作）
+
+### 4.1 构造与数值
+
+| 英文 | 中文 | 要点 |
 |------|------|------|
-| A. 继续只用 `int` + 十进制 `text` | 不碰 L0 | 慢、易错 |
-| B. 新增宿主 `num`（十进制或 f64） | API 干净 | 类型与字节码要跟进 |
-| C. 数学库内部不透明 `handle` | 隔离好 | 与 `print`/`json` 互通差 |
+| `formula` | `公式` | 文本 → formula |
+| `pi` `e` | `圆周率` `自然底数` | → num |
+| `add`… / `sin`… | `加`… / `正弦`… | 对 num；若传入 formula 则返回 formula（符号）或报错——**v1 建议：算术函数只接 num；符号用 simplify/diff/subs** |
+| `eval` | `求值` | `formula` + 变量赋值 → num |
+| `random` / `random_int` / `seed` | `随机` / `随机整数` / `设种子` | 见前 |
 
-倾向：**B（`num`）**，与 JSON 的非整数数字策略一并设计。
-
-### 4.2 符号（Math-S）
+### 4.2 符号
 
 | 英文 | 中文 | 形参 | 结果 |
 |------|------|------|------|
-| `simplify` | `化简` | `expr` | 表达式文本（或 handle） |
-| `expand` | `展开` | `expr` | 同上 |
-| `diff` | `求导` | `expr`, `var` | 同上 |
-| `subs` | `代入` | `expr`, `var`, `value` | 同上 |
-| `solve` | `求解` | `expr`, `var` | 解列表（文本） |
+| `simplify` | `化简` | `formula` | formula |
+| `expand` | `展开` | `formula` | formula |
+| `diff` | `求导` | `formula`, `var` | formula |
+| `subs` | `代入` | `formula`, `var`, `value` | formula 或 num |
+| `solve` | `求解` | `formula`, `var`，可选区间 | list（num 或公式根） |
 
-表达式互换格式（草案）：**ASCII 优先**（`2*x^2 + 1`），LaTeX 作为可选输入 `format=latex`。
+### 4.3 作图
 
-单变元多项式 / 简单超越方程为 v1 目标；多变元方程组、积分：**不做承诺**。
-
-### 4.3 作图（Math-P）
-
-| 英文 | 中文 | 说明 |
+| 英文 | 中文 | 形参 |
 |------|------|------|
-| `plot_fn` | `绘函数` | `expr`, `var`, `min`, `max`, 可选 `steps` → **SVG 文本** |
-| `plot_points` | `绘点列` | `xs`, `ys` → SVG 文本 |
+| `plot` | `绘图` | **`formula`**（或 `expr` 文本）, `var`, `min`, `max`；可选 `steps`, `path`, `derivative`, **`grid`**（默认开；`False`/`假` 关） |
+| `plot_conic` | `绘圆锥` | `kind`（circle/ellipse/hyperbola/parabola）+ 系数；可选 `path`, `grid` |
+| `plot_points` | `绘点列` | `xs`, `ys`；可选 `path`, `grid` |
 
-view 行为：
+返回 **SVG 文本**；坐标轴带箭头与刻度，默认网格；写文件与 view 嵌入规则同前（§5）。
 
-- 若 stdout / 返回值为「带标记的 SVG」或约定 MIME，Execution 区**内嵌渲染**（非仅 `<pre>`）。  
-- 静态 `view output`：把 SVG 写入 HTML。  
-- CLI：默认打印 SVG 文本；`--plot-file out.svg` 可选。
+`diff` / `simplify` / `expand` / 未完全数值化的 `subs` 返回 **`formula`**，可继续链式调用。
 
-不引入完整浏览器 Chart 框架；**SVG 路径足够**教微积分与拟合入门。
+示例：
 
-### 4.4 文档公式面（Math-D）
+```markdown
+# main
 
-与 [markdown-mapping.md](markdown-mapping.md) 的衔接：
+`f` =
+$$
+x^2 - 2
+$$
 
-| 现状 | 目标 |
+*`roots` = > solve formula=`f` var=x *
+
+> print text=`roots`
+
+*`svg` = > plot formula=`f` var=x min=-3 max=3 path=parabola.svg *
+```
+
+---
+
+## 5. 作图：CLI / view / 静态（不变精神）
+
+| 场景 | 行为 |
 |------|------|
-| `$$` 多半落入叙述/未定义 | 可选：**命名公式块**可被引用 |
+| 带 `path=` | 写 SVG 到该路径（沙箱内） |
+| CLI 无 path | 自动 `{stem}-plot-{n}.svg` + 一行 `plot: …` |
+| view / 导出无 path | 不强制写盘；加入 **plots 产物列表**，Execution 内嵌 |
+| view / 导出有 path | 写盘 + 内嵌 |
 
-建议语法（草案，需进 mapping 修订）：
-
-```markdown
-$$:energy
-E = mc^2
-$$
-```
-
-或 frontmatter / 标题锚定：
-
-```markdown
-## energy
-$$
-E = mc^2
-$$
-```
-
-调用：
-
-```markdown
----`
-> lib/math.mq.md
----`
-
-*`e2` = > simplify expr=> formula name=energy *
-```
-
-更简单的 v1：**不解析正文 `$$`**，只接受：
-
-```markdown
-*`e2` = > simplify expr=E=mc^2 format=latex *
-```
-
-正文 `$$` 仍由 view 的 Markdown 渲染（KaTeX/MathJax）负责「好看」，计算走显式字符串——**降低词法耦合**，推荐作为第一刀。
+不把整段 SVG 默认灌进 CLI stdout。
 
 ---
 
-## 5. 实现策略选项
+## 6. 分期
 
-| 策略 | 说明 | 建议 |
-|------|------|------|
-| **纯 Rust 数值** | `libm` / 自写 | Math-N 必选 |
-| **嵌入轻量 CAS** | 如符号子集自研，或绑 `meval`/`fasteval` 仅数值 | 求值用 |
-| **外挂 SymPy（经外联库）** | 符号交给 Python | 与 [stdlib-foreign.md](stdlib-foreign.md) 合流；标准库变薄 |
-| **WASM CAS** | 可嵌入 view | 后期 |
+| 期 | 交付 |
+|----|------|
+| **M1** | `Num` + 数值/随机；`Formula` AST + `` `name` = `` + `$$…$$` 赋值绑定 |
+| **M2** | `simplify` / `diff` / `subs` / `eval` / 二次 `solve`（高中子集） |
+| **M3** | `plot` / `plot_points` / `plot_conic` + view 内嵌 + path 写盘 |
+| **M4** | 用户文档 `public/stdlib/math*` · 金样例 · mapping 文档补丁 |
 
-务实路径：**Math-N 自研 → Math-P SVG → Math-S 先外联 SymPy（可选）→ 再考虑内嵌**。这样「数学标准库」在官方包里可以很瘦，重能力走外联 feature。
-
----
-
-## 6. 安全与性能
-
-- 表达式长度、求解迭代、绘图采样点设硬上限。  
-- 禁止公式里跑任意宿主代码（与外联分离）。  
-- view 中绘图同步、限时。
+M1–M3 可在同一发版列车上连续落地；验收以「公式赋值 → 求导 → 作图」一条龙为准。
 
 ---
 
-## 7. 是否定为「标准库」的决策标准
+## 7. 实现要点
 
-纳入默认 `lib/math` 当且仅当：
+```text
+src/formula/          # 词法/AST/化简/求导/求值（高中规则表）
+src/host/math.rs      # 数值、随机、对 formula 的 host 入口
+src/host/plot.rs      # SVG
+lex/parse：空 RHS 赋值 + $$ 围栏 → Expr::Formula
+Value::Num / Value::Formula
+Interpreter.plots: Vec<String>
+lib/math.mq.md · lib/数学.mq.md
+```
 
-1. Math-N API 稳定且有中英金样例；  
-2. 不强制下载数百 MB 依赖；  
-3. 无外联时文档站示例仍可跑（纯数值 + 可选 SVG）。
-
-若符号/作图依赖 SymPy 或大型引擎 → 标 **`lib/math` = 数值**，符号示例放到 `examples/math-cas` 并要求 `--allow-foreign`。
+依赖：纯 Rust；不绑 SymPy。公式复杂度、采样点、SVG 大小设硬上限。
 
 ---
 
-## 8. 一句话
+## 8. 刻意不做
 
-**用 Markdown 的公式习惯服务「可计算文档」；官方数学库先数值与 SVG，符号与 `$$` 引用分期，必要时借外联而非做大内核。**
+- `$$:name` 模块级具名绑定（已废除）。  
+- 无名 `$$` 自动进运行时。  
+- 大学级数 / 完备积分 / 定理证明。  
+- 通用隐函数作图引擎。  
+- 3D、交互式图表库。
+
+---
+
+## 9. 验收
+
+1. `` `f` = `` + `$$…$$` + `diff` / `solve` / `plot` 金样例（中英库）。  
+2. 固定 `seed` 的随机金样例。  
+3. `plot` + `path` 在 CLI 落盘；view HTML 含 `<svg`。  
+4. `type` 对公式为 `formula`，对浮点为 `num`。  
+5. view Structure 将公式赋值显示为绑定，而非 comment。
+
+---
+
+## 10. 一句话
+
+**`` `f` = `` + `$$…$$` 产出 `formula` 值；数学库对它做高中范围的符号运算、求解与作图——数值与随机并行，图在 view 内嵌、在 CLI 写文件。**

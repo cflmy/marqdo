@@ -16,7 +16,7 @@ use tiny_http::{Header, Method, Request, Response, Server, StatusCode};
 
 use crate::input_feed::{effective_stdin, split_stdin_text};
 use crate::view::html::{escape, page_file, page_index, LinkMode};
-use crate::view::render::{render_module_structure, FileViewModel};
+use crate::view::render::{collect_input_prompts, render_module_structure, FileViewModel};
 use crate::{run_file_capture, RunOptions};
 
 pub struct ViewOptions {
@@ -167,11 +167,18 @@ pub(crate) fn build_file_view(
     live: bool,
 ) -> Result<FileViewModel> {
     let source = fs::read_to_string(abs).with_context(|| format!("read {}", abs.display()))?;
-    let structure = match crate::load::load_module(abs) {
-        Ok(module) => render_module_structure(&module, &source),
-        Err(e) => format!(
-            "<div class=\"err\">parse/load error: {}</div>",
-            escape(&tidy_user_error(&format!("{e:#}"), abs, rel))
+    // Structure shows this file only — do not merge imported lib bodies into the tree.
+    let (structure, input_prompts) = match crate::parse::parse_source(&source) {
+        Ok(module) => (
+            render_module_structure(&module, &source),
+            collect_input_prompts(&module),
+        ),
+        Err(e) => (
+            format!(
+                "<div class=\"err\">parse/load error: {}</div>",
+                escape(&tidy_user_error(&format!("{e:#}"), abs, rel))
+            ),
+            Vec::new(),
         ),
     };
     let effective = effective_stdin(&source, stdin_lines);
@@ -181,12 +188,18 @@ pub(crate) fn build_file_view(
     opts.sleep_limit_ms = if live { Some(30_000) } else { Some(0) };
     // Optional: sandbox to the whole view tree so sibling folders are reachable.
     opts.fs_root = Some(root.root.clone());
-    let (stdout, stderr, ok) = match run_file_capture(abs, &opts) {
-        Ok(cap) => (cap.stdout, String::new(), true),
+    let (stdout, stderr, ok, plots) = match run_file_capture(abs, &opts) {
+        Ok(cap) => (
+            cap.stdout,
+            String::new(),
+            true,
+            cap.plots.into_iter().map(|p| p.svg).collect(),
+        ),
         Err(e) => (
             String::new(),
             tidy_user_error(&format!("{e:#}"), abs, rel),
             false,
+            Vec::new(),
         ),
     };
     Ok(FileViewModel {
@@ -197,6 +210,8 @@ pub(crate) fn build_file_view(
         stderr,
         ok,
         preset_stdin: effective.join("\n"),
+        input_prompts,
+        plots,
     })
 }
 

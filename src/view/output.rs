@@ -30,6 +30,7 @@ pub fn write_static(opts: OutputOptions) -> Result<()> {
             vm.stdout.clear();
             vm.stderr = "execution skipped (--no-exec)".into();
             vm.ok = true;
+            vm.plots.clear();
         }
         let links = LinkMode::Static {
             from: Some(rel.clone()),

@@ -69,6 +69,10 @@ impl Vm {
         self
     }
 
+    pub fn take_plots(&mut self) -> Vec<crate::host::PlotArtifact> {
+        std::mem::take(&mut self.host.plots)
+    }
+
     fn emit_line(&mut self, text: &str) {
         if self.capture {
             self.captured_stdout.push_str(text);
@@ -312,7 +316,7 @@ impl Vm {
                         }
                     }
                     let result =
-                        call_host(&self.host, hf, &bound).map_err(|m| self.err_at(span, m))?;
+                        call_host(&mut self.host, hf, &bound).map_err(|m| self.err_at(span, m))?;
                     stack.push(result);
                 }
                 Op::Call(fid, argc) => {
@@ -380,8 +384,15 @@ fn cmp(stack: &mut Vec<Value>, pred: impl Fn(std::cmp::Ordering) -> bool) -> Res
     let a = pop(stack)?;
     let ord = match (&a, &b) {
         (Value::Int(x), Value::Int(y)) => x.cmp(y),
+        (Value::Num(x), Value::Num(y)) => x.partial_cmp(y).unwrap_or(std::cmp::Ordering::Equal),
+        (Value::Int(x), Value::Num(y)) => {
+            (*x as f64).partial_cmp(y).unwrap_or(std::cmp::Ordering::Equal)
+        }
+        (Value::Num(x), Value::Int(y)) => {
+            x.partial_cmp(&(*y as f64)).unwrap_or(std::cmp::Ordering::Equal)
+        }
         (Value::Text(x), Value::Text(y)) => x.cmp(y),
-        _ => return Err("comparison needs two ints or two texts".into()),
+        _ => return Err("comparison needs two ints/nums or two texts".into()),
     };
     stack.push(Value::Bool(pred(ord)));
     Ok(())

@@ -169,12 +169,49 @@ a:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
   opacity: 1;
   font-weight: 500;
 }
+.nav-root { margin: 0; padding: 0; list-style: none; }
 .folder {
+  margin: 0.55rem 0 0.2rem;
+  border: none;
+}
+.folder > summary {
+  list-style: none;
+  cursor: pointer;
+  user-select: none;
   color: var(--muted);
   font-size: 0.72rem;
-  margin: 1rem 0.35rem 0.35rem;
   font-weight: 600;
   letter-spacing: 0.01em;
+  padding: 0.35rem 0.45rem;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.folder > summary::-webkit-details-marker { display: none; }
+.folder > summary::before {
+  content: "";
+  width: 0;
+  height: 0;
+  border-style: solid;
+  border-width: 4px 0 4px 6px;
+  border-color: transparent transparent transparent var(--muted);
+  opacity: 0.85;
+  transition: transform 0.12s ease;
+  flex-shrink: 0;
+}
+.folder[open] > summary::before {
+  transform: rotate(90deg);
+}
+.folder > summary:hover {
+  background: var(--hover);
+  color: var(--ink);
+}
+.folder > ul {
+  list-style: none;
+  padding: 0.1rem 0 0.15rem 0.55rem;
+  margin: 0;
 }
 .panel-wrap {
   min-width: 0;
@@ -231,7 +268,7 @@ section.block > h2 {
 }
 .stdin-form label {
   font-size: 0.85rem;
-  color: var(--text);
+  color: var(--ink);
 }
 .stdin-form .hint {
   color: var(--muted);
@@ -243,10 +280,10 @@ section.block > h2 {
   font-family: var(--mono);
   font-size: 0.9rem;
   padding: 0.65rem 0.75rem;
-  border: 1px solid var(--border);
+  border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--surface);
-  color: var(--text);
+  color: var(--ink);
   resize: vertical;
   min-height: 4.5rem;
 }
@@ -254,14 +291,19 @@ section.block > h2 {
   justify-self: start;
   font: inherit;
   font-size: 0.9rem;
-  padding: 0.45rem 0.9rem;
-  border: 1px solid var(--border);
+  font-weight: 600;
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--ink);
   border-radius: 8px;
-  background: var(--text);
-  color: var(--bg);
+  background: var(--ink);
+  color: #ffffff;
   cursor: pointer;
 }
 .stdin-form button:hover { opacity: 0.88; }
+.stdin-form button:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
 .structure {
   background: var(--surface);
   border: 1px solid var(--line);
@@ -341,6 +383,38 @@ section.block > h2 {
   border-color: #e4c1c1;
   color: var(--ink);
   font-weight: 500;
+}
+.formula-card .math-block {
+  display: inline-block;
+  margin: 0.25rem 0 0.1rem 0.25rem;
+  vertical-align: middle;
+  overflow-x: auto;
+  max-width: 100%;
+}
+.formula-card .katex-display {
+  margin: 0.2rem 0;
+}
+.plots {
+  display: grid;
+  gap: 1rem;
+  margin-top: 1rem;
+  justify-items: center;
+}
+.plot {
+  overflow: auto;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 0.75rem;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+.plot svg {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin-inline: auto;
 }
 .comment-text {
   color: var(--muted);
@@ -439,6 +513,7 @@ pub fn layout(title: &str, nav: &str, main: &str) -> String {
 <link rel="icon" href="https://s3.cflmy.cn/logo/Logo.ico" type="image/x-icon"/>
 <link rel="shortcut icon" href="https://s3.cflmy.cn/logo/Logo.ico" type="image/x-icon"/>
 <link rel="apple-touch-icon" href="https://s3.cflmy.cn/logo/Logo.png"/>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" crossorigin="anonymous"/>
 <style>{css}</style>
 </head>
 <body>
@@ -470,6 +545,9 @@ pub fn layout(title: &str, nav: &str, main: &str) -> String {
 </main>
 </div>
 </div>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js" crossorigin="anonymous"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js" crossorigin="anonymous"
+  onload="renderMathInElement(document.body,{{delimiters:[{{left:'$$',right:'$$',display:true}},{{left:'\\(',right:'\\)',display:false}}],ignoredTags:['script','noscript','style','textarea','pre','code','kbd']}});"></script>
 </body>
 </html>
 "##,
@@ -481,23 +559,22 @@ pub fn layout(title: &str, nav: &str, main: &str) -> String {
 }
 
 pub fn nav_html(files: &[PathBuf], active: Option<&str>, links: &LinkMode) -> String {
-    let mut out = String::from("<h2>Files</h2><ul>");
-    let mut last_folder = String::new();
+    let mut out = String::from("<h2>Files</h2>");
+    let mut last_folder: Option<String> = None;
+
     for f in files {
         let rel = f.to_string_lossy().replace('\\', "/");
         let folder = Path::new(&rel)
             .parent()
-            .map(|p| p.to_string_lossy().to_string())
+            .map(|p| p.to_string_lossy().replace('\\', "/"))
             .unwrap_or_default();
-        if folder != last_folder {
-            if !folder.is_empty() {
-                out.push_str(&format!(
-                    "</ul><div class=\"folder\">{}</div><ul>",
-                    escape(&folder)
-                ));
-            }
-            last_folder = folder;
+
+        if last_folder.as_deref() != Some(folder.as_str()) {
+            close_nav_group(&mut out, last_folder.as_deref());
+            open_nav_group(&mut out, &folder, active);
+            last_folder = Some(folder);
         }
+
         let name = Path::new(&rel)
             .file_name()
             .and_then(|s| s.to_str())
@@ -514,7 +591,8 @@ pub fn nav_html(files: &[PathBuf], active: Option<&str>, links: &LinkMode) -> St
             escape(name)
         ));
     }
-    out.push_str("</ul>");
+    close_nav_group(&mut out, last_folder.as_deref());
+
     // index link for static pages
     if matches!(links, LinkMode::Static { from: Some(_) }) {
         let home = href_index(links);
@@ -527,6 +605,37 @@ pub fn nav_html(files: &[PathBuf], active: Option<&str>, links: &LinkMode) -> St
         );
     }
     out
+}
+
+fn close_nav_group(out: &mut String, folder: Option<&str>) {
+    match folder {
+        None => {}
+        Some("") => out.push_str("</ul>"),
+        Some(_) => out.push_str("</ul></details>"),
+    }
+}
+
+fn open_nav_group(out: &mut String, folder: &str, active: Option<&str>) {
+    if folder.is_empty() {
+        out.push_str("<ul class=\"nav-root\">");
+        return;
+    }
+    let contains_active = active.is_some_and(|a| {
+        Path::new(a)
+            .parent()
+            .map(|p| p.to_string_lossy().replace('\\', "/") == folder)
+            .unwrap_or(false)
+    });
+    // Index (no active): keep folders open for browsing; else open only the active folder.
+    let open_attr = if active.is_none() || contains_active {
+        " open"
+    } else {
+        ""
+    };
+    out.push_str(&format!(
+        "<details class=\"folder\"{open_attr}><summary>{}</summary><ul>",
+        escape(folder)
+    ));
 }
 
 fn href_file(links: &LinkMode, target_rel: &str) -> String {
@@ -620,26 +729,46 @@ pub fn page_file(files: &[PathBuf], rel: &str, vm: &FileViewModel, links: &LinkM
     } else {
         escape(&vm.stderr)
     };
-    let stdin_panel = match links {
-        LinkMode::Live => format!(
-            r#"<form class="stdin-form" method="get" action="/file">
+    let stdin_panel = if vm.input_prompts.is_empty() {
+        String::new()
+    } else {
+        let placeholder = vm.input_prompts.join("\n");
+        let rows = vm.input_prompts.len().clamp(2, 8);
+        match links {
+            LinkMode::Live => {
+                let hint = if vm.input_prompts.iter().any(|p| !p.is_empty()) {
+                    format!(
+                        "prompts: {}",
+                        escape(&vm.input_prompts.join(" · "))
+                    )
+                } else {
+                    "one line per <code>input</code>".into()
+                };
+                format!(
+                    r#"<form class="stdin-form" method="get" action="/file">
   <input type="hidden" name="path" value="{path}"/>
-  <label for="stdin">Preset input <span class="hint">one line per <code>input</code>; overrides frontmatter <code>stdin:</code> / <code>输入:</code></span></label>
-  <textarea id="stdin" name="stdin" rows="3" placeholder="Alice">{stdin}</textarea>
+  <label for="stdin">Preset input <span class="hint">{hint}</span></label>
+  <textarea id="stdin" name="stdin" rows="{rows}" placeholder="{placeholder}">{stdin}</textarea>
   <button type="submit">Run with input</button>
 </form>"#,
-            path = escape(rel),
-            stdin = escape(&vm.preset_stdin),
-        ),
-        LinkMode::Static { .. } => {
-            if vm.preset_stdin.is_empty() {
-                String::new()
-            } else {
-                format!(
-                    r#"<p class="hint">Demo stdin from frontmatter (static export cannot re-run interactively):</p>
-<pre class="source" style="margin-bottom:0.75rem">{stdin}</pre>"#,
+                    path = escape(rel),
+                    hint = hint,
+                    rows = rows,
+                    placeholder = escape(&placeholder),
                     stdin = escape(&vm.preset_stdin),
                 )
+            }
+            LinkMode::Static { .. } => {
+                if vm.preset_stdin.is_empty() {
+                    String::new()
+                } else {
+                    format!(
+                        r#"<p class="hint">Demo stdin (static export cannot re-run interactively); prompts: {prompts}</p>
+<pre class="source" style="margin-bottom:0.75rem">{stdin}</pre>"#,
+                        prompts = escape(&vm.input_prompts.join(" · ")),
+                        stdin = escape(&vm.preset_stdin),
+                    )
+                }
             }
         }
     };
@@ -648,6 +777,18 @@ pub fn page_file(files: &[PathBuf], rel: &str, vm: &FileViewModel, links: &LinkM
         .and_then(|s| s.to_str())
         .unwrap_or(rel)
         .trim_end_matches(".mq.md");
+    let plots_html = if vm.plots.is_empty() {
+        String::new()
+    } else {
+        let mut s = String::from(r#"<div class="plots">"#);
+        for svg in &vm.plots {
+            s.push_str(r#"<div class="plot">"#);
+            s.push_str(svg);
+            s.push_str("</div>");
+        }
+        s.push_str("</div>");
+        s
+    };
     let main = format!(
         r#"
 <h1 class="page">{title}<span class="status-pill {status}">{status_label}</span></h1>
@@ -660,6 +801,7 @@ pub fn page_file(files: &[PathBuf], rel: &str, vm: &FileViewModel, links: &LinkM
   <h2>Execution</h2>
   {stdin_panel}
   <div class="out {status}">{out}</div>
+  {plots}
 </section>
 <section class="block">
   <h2>Source</h2>
@@ -673,6 +815,7 @@ pub fn page_file(files: &[PathBuf], rel: &str, vm: &FileViewModel, links: &LinkM
         structure = vm.structure_html,
         stdin_panel = stdin_panel,
         out = out_text,
+        plots = plots_html,
         source = escape(&vm.source),
     );
     layout(rel, &nav, &main)

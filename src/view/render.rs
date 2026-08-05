@@ -20,6 +20,123 @@ pub struct FileViewModel {
     pub ok: bool,
     /// Text shown in the live-view preset stdin box.
     pub preset_stdin: String,
+    /// One entry per `input` / `输入` call (prompt text; may be empty).
+    /// Empty vec → page does not use input; hide the preset form.
+    pub input_prompts: Vec<String>,
+    /// SVG plots from math lib (embedded in Execution).
+    pub plots: Vec<String>,
+}
+
+/// Collect prompt strings from every `input` / `输入` call in the module (pre-order).
+pub fn collect_input_prompts(module: &Module) -> Vec<String> {
+    let mut out = Vec::new();
+    for fun in &module.functions {
+        collect_input_prompts_fun(fun, &mut out);
+    }
+    out
+}
+
+fn collect_input_prompts_fun(fun: &Function, out: &mut Vec<String>) {
+    for stmt in &fun.body {
+        collect_input_prompts_stmt(stmt, out);
+    }
+    for child in &fun.children {
+        collect_input_prompts_fun(child, out);
+    }
+}
+
+fn collect_input_prompts_stmt(stmt: &Stmt, out: &mut Vec<String>) {
+    match stmt {
+        Stmt::Assign { value, .. } | Stmt::Return { value, .. } => {
+            collect_input_prompts_expr(value, out);
+        }
+        Stmt::Call { call, .. } => {
+            push_input_prompt(call, out);
+            for a in &call.args {
+                match a {
+                    Arg::Positional(e) | Arg::Named { value: e, .. } => {
+                        collect_input_prompts_expr(e, out);
+                    }
+                }
+            }
+        }
+        Stmt::Branch { arms, .. } => {
+            for arm in arms {
+                if let Some(c) = &arm.condition {
+                    collect_input_prompts_expr(c, out);
+                }
+                for s in &arm.body {
+                    collect_input_prompts_stmt(s, out);
+                }
+            }
+        }
+        Stmt::While {
+            condition, body, ..
+        } => {
+            collect_input_prompts_expr(condition, out);
+            for s in body {
+                collect_input_prompts_stmt(s, out);
+            }
+        }
+        Stmt::ForEach { body, .. } => {
+            for s in body {
+                collect_input_prompts_stmt(s, out);
+            }
+        }
+    }
+}
+
+fn collect_input_prompts_expr(expr: &Expr, out: &mut Vec<String>) {
+    match expr {
+        Expr::Call(call) => {
+            push_input_prompt(call, out);
+            for a in &call.args {
+                match a {
+                    Arg::Positional(e) | Arg::Named { value: e, .. } => {
+                        collect_input_prompts_expr(e, out);
+                    }
+                }
+            }
+        }
+        Expr::Unary { expr, .. } => collect_input_prompts_expr(expr, out),
+        Expr::Binary { left, right, .. } => {
+            collect_input_prompts_expr(left, out);
+            collect_input_prompts_expr(right, out);
+        }
+        Expr::List(items) => {
+            for e in items {
+                collect_input_prompts_expr(e, out);
+            }
+        }
+        Expr::Literal(_) | Expr::Var(_) | Expr::Interp(_) | Expr::Formula(_) => {}
+    }
+}
+
+fn push_input_prompt(call: &CallExpr, out: &mut Vec<String>) {
+    if crate::aliases::canonical_builtin(&call.callee) != Some("input") {
+        return;
+    }
+    for a in &call.args {
+        if let Arg::Named { name, value } = a {
+            if crate::aliases::canonical_param("input", name) == "prompt" {
+                out.push(prompt_expr_text(value));
+                return;
+            }
+        }
+    }
+    if let Some(Arg::Positional(value)) = call.args.first() {
+        out.push(prompt_expr_text(value));
+        return;
+    }
+    out.push(String::new());
+}
+
+fn prompt_expr_text(expr: &Expr) -> String {
+    match expr {
+        Expr::Literal(Literal::Text(t)) => t.clone(),
+        Expr::Literal(lit) => lit_display(lit),
+        other => expr_display(other),
+    }
 }
 
 pub fn render_module_structure(module: &Module, source: &str) -> String {
@@ -209,9 +326,8 @@ fn stmt_start(stmt: &Stmt) -> u32 {
 
 fn stmt_end_line(stmt: &Stmt) -> u32 {
     match stmt {
-        Stmt::Assign { span, .. } | Stmt::Return { span, .. } | Stmt::Call { span, .. } => {
-            span.line + 1
-        }
+        Stmt::Assign { end_line, .. } => end_line + 1,
+        Stmt::Return { span, .. } | Stmt::Call { span, .. } => span.line + 1,
         Stmt::Branch { arms, span, .. } => {
             let mut end = span.line + 1;
             for arm in arms {
@@ -234,11 +350,25 @@ fn stmt_end_line(stmt: &Stmt) -> u32 {
 fn render_stmt(stmt: &Stmt, lines: &[ClassifiedLine]) -> (String, u32) {
     let end = stmt_end_line(stmt);
     let html = match stmt {
-        Stmt::Assign { name, value, .. } => format!(
-            "<div class=\"card\"><span class=\"badge\">bind</span><code class=\"expr\">`{}` = {}</code></div>",
-            escape(name),
-            escape(&expr_display(value))
-        ),
+            Stmt::Assign {
+                name,
+                value: Expr::Formula(e),
+                ..
+            } => {
+                let tex = escape(&formula_ascii_to_tex(&e.as_display()));
+                format!(
+                    "<div class=\"card formula-card\"><span class=\"badge\">formula</span> \
+                     <code class=\"expr\">`{}` =</code> \
+                     <div class=\"math-block\">$${}$$</div></div>",
+                    escape(name),
+                    tex
+                )
+            }
+            Stmt::Assign { name, value, .. } => format!(
+                "<div class=\"card\"><span class=\"badge\">bind</span> <code class=\"expr\">`{}` = {}</code></div>",
+                escape(name),
+                escape(&expr_display(value))
+            ),
         Stmt::Return { value, .. } => format!(
             "<div class=\"card ret-card\"><span class=\"badge\">return</span><code class=\"expr\">{}</code></div>",
             escape(&expr_display(value))
@@ -388,7 +518,65 @@ fn expr_prec(expr: &Expr, parent_prec: u8) -> String {
             let parts: Vec<String> = items.iter().map(|e| expr_prec(e, 0)).collect();
             format!("[{}]", parts.join(", "))
         }
+        Expr::Formula(e) => format!("$$ {} $$", e.as_display()),
     }
+}
+
+/// Best-effort ASCII formula → TeX for KaTeX in view Structure.
+fn formula_ascii_to_tex(ascii: &str) -> String {
+    let mut out = String::new();
+    let chars: Vec<char> = ascii.chars().collect();
+    let mut i = 0usize;
+    while i < chars.len() {
+        let c = chars[i];
+        if c == '*' {
+            // multiplication: a*b → a \cdot b
+            out.push_str(r" \cdot ");
+            i += 1;
+            continue;
+        }
+        if c == '^' {
+            out.push('^');
+            i += 1;
+            if i < chars.len() && chars[i] == '(' {
+                out.push('{');
+                i += 1;
+                let start = i;
+                let mut depth = 1i32;
+                while i < chars.len() && depth > 0 {
+                    match chars[i] {
+                        '(' => depth += 1,
+                        ')' => depth -= 1,
+                        _ => {}
+                    }
+                    if depth > 0 {
+                        i += 1;
+                    }
+                }
+                out.push_str(&chars[start..i].iter().collect::<String>());
+                if i < chars.len() && chars[i] == ')' {
+                    i += 1;
+                }
+                out.push('}');
+            } else if i < chars.len() {
+                out.push('{');
+                out.push(chars[i]);
+                out.push('}');
+                i += 1;
+            }
+            continue;
+        }
+        // TeX specials that may appear in identifiers rarely
+        match c {
+            '{' | '}' | '%' | '&' | '#' | '$' => {
+                out.push('\\');
+                out.push(c);
+            }
+            _ => out.push(c),
+        }
+        i += 1;
+    }
+    out
 }
 
 fn wrap(inner: String, prec: u8, parent_prec: u8) -> String {
@@ -475,5 +663,54 @@ mod tests {
         );
         assert!(html.contains("<code>code</code>"), "{html}");
         assert!(!html.contains("[仓库](https://github.com/cflmy/marqdo)"));
+    }
+
+    #[test]
+    fn collect_input_prompts_from_fixture() {
+        let src = include_str!("../../tests/keywords/input.mq.md");
+        let module = crate::parse::parse_source(src).unwrap();
+        let prompts = collect_input_prompts(&module);
+        assert_eq!(prompts, vec!["Name:".to_string()]);
+    }
+
+    #[test]
+    fn collect_input_prompts_absent_without_input() {
+        let src = include_str!("../../tests/structure/hello.mq.md");
+        let module = crate::parse::parse_source(src).unwrap();
+        assert!(collect_input_prompts(&module).is_empty());
+    }
+
+    #[test]
+    fn structure_omits_imported_lib_bodies() {
+        let src = "---\ntitle: t\n> lib/text.mq.md\n---\n\n# main\n\n> print text=hi\n";
+        let local = crate::parse::parse_source(src).unwrap();
+        let html = render_module_structure(&local, src);
+        assert!(html.contains("badge\">import"), "{html}");
+        assert!(html.contains("lib/text.mq.md"), "{html}");
+        assert!(html.contains("main"), "{html}");
+        assert!(!html.contains("trim"), "{html}");
+        assert_eq!(local.functions.len(), 1);
+        assert_eq!(local.functions[0].name, "main");
+    }
+
+    #[test]
+    fn structure_formula_assign_not_comment() {
+        let src = include_str!("../../tests/lib/math-formula.mq.md");
+        let module = crate::parse::parse_source(src).unwrap();
+        let html = render_module_structure(&module, src);
+        assert!(html.contains("badge\">formula"), "{html}");
+        assert!(html.contains("math-block"), "{html}");
+        assert!(html.contains("$$"), "{html}");
+        assert!(
+            !html.contains("comment-text\">x^2 - 2")
+                && !html.contains("comment-text\"><p>x^2 - 2"),
+            "formula fence leaked into comments: {html}"
+        );
+    }
+
+    #[test]
+    fn formula_ascii_to_tex_pow_and_mul() {
+        assert_eq!(formula_ascii_to_tex("x^2 - 2"), "x^{2} - 2");
+        assert_eq!(formula_ascii_to_tex("2*x"), r"2 \cdot x");
     }
 }

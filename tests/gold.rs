@@ -543,6 +543,12 @@ fn view_output_writes_html() {
     assert!(index.contains("#ffffff") || index.contains("--surface: #ffffff"));
     assert!(index.contains("nav-toggle"));
     assert!(!index.contains("Run with input"), "static export should omit live stdin form");
+    let page = std::fs::read_to_string(dir.join("pages").join("hello.mq.md.html")).unwrap();
+    assert!(page.contains("katex.min.css"), "view layout should load KaTeX");
+    assert!(
+        !page.contains("name=\"stdin\""),
+        "hello has no input; no preset form"
+    );
     assert!(dir.join("pages").join("hello.mq.md.html").exists());
 }
 
@@ -577,6 +583,57 @@ fn lib_sys_cwd() {
 #[test]
 fn lib_net_encode() {
     assert_out("tests/lib/net-encode.mq.md", "a+b");
+}
+
+#[test]
+fn lib_math_formula() {
+    assert_out(
+        "tests/lib/math-formula.mq.md",
+        "formula\n2*x\n[-1.4142135624, 1.4142135624]\n7",
+    );
+}
+
+#[test]
+fn lib_math_formula_chain() {
+    assert_out(
+        "tests/lib/math-formula-chain.mq.md",
+        "formula\n3*2*x\n12",
+    );
+}
+
+#[test]
+fn lib_math_random() {
+    assert_out("tests/lib/math-random.mq.md", "4\n7\n4");
+}
+
+#[test]
+fn lib_math_zh_num() {
+    assert_out("tests/lib/数学-数值.mq.md", "num\n0");
+}
+
+#[test]
+fn lib_math_plot() {
+    let path = "tests/lib/math-plot.mq.md";
+    let (code, stdout, stderr) = run(&["run", path]);
+    assert_eq!(code, 0, "{path} stderr={stderr}");
+    assert!(
+        stdout.lines().next() == Some("text"),
+        "{path} stdout={stdout}"
+    );
+    assert!(
+        stdout.contains("plot:"),
+        "{path} missing plot: line in {stdout}"
+    );
+    let _ = std::fs::remove_file("tests/lib/math-plot-plot-1.svg");
+}
+
+#[test]
+fn bytecode_lib_math_formula() {
+    assert_out_backend(
+        "tests/lib/math-formula.mq.md",
+        "bytecode",
+        "formula\n2*x\n[-1.4142135624, 1.4142135624]\n7",
+    );
 }
 
 #[test]

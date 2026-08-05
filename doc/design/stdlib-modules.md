@@ -2,10 +2,11 @@
 
 | | |
 |---|---|
-| 状态 | **本波已落地（M1–M5）**；HTTPS 与带 `/` 的裸路径字面量仍受限 |
+| 状态 | **五库已落地**；下一波：**数学库**（[stdlib-math.md](stdlib-math.md)）；外联仍暂缓 |
 | 日期 | 2026-08-05 |
-| 本波范围 | **仅前五个库**：文件 / 系统 / 时间 / JSON / 网络 |
-| 暂缓 | 数学、外联（重型；详稿保留、不排期）— [stdlib-math.md](stdlib-math.md) · [stdlib-foreign.md](stdlib-foreign.md) |
+| 本波范围 | 文件 / 系统 / 时间 / JSON / 网络（已完成） |
+| 下一波 | **数学**（数值+随机+作图+轻量求解） |
+| 暂缓 | 外联 — [stdlib-foreign.md](stdlib-foreign.md) |
 | 原则 | 全部经 frontmatter **导入**；除 JSON 外中英分文件；内核保持少而精 |
 | 相关 | [stdlib.md](stdlib.md) · [stdlib-i18n.md](stdlib-i18n.md) · [keywords-i18n.md](keywords-i18n.md) · [view.md](view.md) |
 
@@ -24,7 +25,7 @@
 | **时间** | `lib/time.mq.md` | `lib/时间.mq.md` | **做** |
 | **JSON** | `lib/json.mq.md` | **同文件（特例，§3.4）** | **做** |
 | **网络（简）** | `lib/net.mq.md` | `lib/网络.mq.md` | **做** |
-| 数学 | `lib/math.mq.md` | `lib/数学.mq.md` | **暂缓** |
+| 数学 | `lib/math.mq.md` | `lib/数学.mq.md` | **下一波** |
 | 外联 | `lib/foreign.mq.md` | `lib/外联.mq.md` | **暂缓** |
 
 ---

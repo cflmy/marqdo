@@ -60,6 +60,8 @@ fn json_to_value(v: &serde_json::Value) -> Result<Value, String> {
         serde_json::Value::Number(n) => {
             if let Some(i) = n.as_i64() {
                 Value::Int(i)
+            } else if let Some(f) = n.as_f64() {
+                Value::Num(f)
             } else {
                 Value::Text(n.to_string())
             }
@@ -87,6 +89,9 @@ fn value_to_json(v: &Value) -> Result<serde_json::Value, String> {
         Value::None => serde_json::Value::Null,
         Value::Bool(b) => serde_json::Value::Bool(*b),
         Value::Int(n) => serde_json::Value::Number((*n).into()),
+        Value::Num(n) => serde_json::Number::from_f64(*n)
+            .map(serde_json::Value::Number)
+            .unwrap_or(serde_json::Value::Null),
         Value::Text(s) => serde_json::Value::String(s.clone()),
         Value::List(xs) => {
             let mut arr = Vec::with_capacity(xs.len());
@@ -102,5 +107,6 @@ fn value_to_json(v: &Value) -> Result<serde_json::Value, String> {
             }
             serde_json::Value::Object(map)
         }
+        Value::Formula(e) => serde_json::Value::String(e.as_display()),
     })
 }

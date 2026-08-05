@@ -206,7 +206,7 @@ impl<'a> FnCompiler<'a> {
 
     fn compile_stmt(&mut self, stmt: &Stmt) -> Result<()> {
         match stmt {
-            Stmt::Assign { name, value, span } => {
+            Stmt::Assign { name, value, span, .. } => {
                 self.stmt_span = *span;
                 self.compile_expr(value)?;
                 let slot = self.local_slot(name);
@@ -636,6 +636,10 @@ impl<'a> FnCompiler<'a> {
                     self.compile_expr(it)?;
                 }
                 self.emit(Op::BuildList(items.len() as u16));
+            }
+            Expr::Formula(e) => {
+                let i = self.add_const(Value::Formula(e.clone()));
+                self.emit(Op::Constant(i));
             }
         }
         Ok(())

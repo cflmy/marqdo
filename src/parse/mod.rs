@@ -206,6 +206,13 @@ impl<'a> Cursor<'a> {
             bail!("{span}: unexpected frame line as statement");
         }
 
+        if trimmed.starts_with("$$") {
+            bail!(
+                "{span}: formula fence must follow an empty assignment (`name` =); \
+                 `$$:name` binding was removed"
+            );
+        }
+
         // Bold return **…** (empty inner → None)
         if trimmed.starts_with("**") && trimmed.ends_with("**") && trimmed.len() >= 4 {
             let inner = &trimmed[2..trimmed.len() - 2];
@@ -220,7 +227,7 @@ impl<'a> Cursor<'a> {
         // Italic statement *…*
         if trimmed.starts_with('*') && trimmed.ends_with('*') && !trimmed.starts_with("**") {
             let inner = &trimmed[1..trimmed.len() - 1];
-            return parse_assign_or_expr_stmt(inner, span);
+            return self.parse_italic_assign(inner, span);
         }
 
         // Call >
@@ -229,7 +236,7 @@ impl<'a> Cursor<'a> {
             return Ok(Stmt::Call { call, span });
         }
 
-        // Bare assign `` `x` = … `` possibly followed by table
+        // Bare assign `` `x` = … `` possibly followed by formula fence or table
         if trimmed.starts_with('`') {
             if let Some(stmt) = self.parse_backtick_assign(trimmed, span.clone())? {
                 return Ok(stmt);
@@ -237,6 +244,22 @@ impl<'a> Cursor<'a> {
         }
 
         Err(Diagnostic::new(None, span, format!("unrecognized statement: {trimmed}")).into())
+    }
+
+    fn parse_italic_assign(&mut self, inner: &str, span: Span) -> Result<Stmt> {
+        let Some((name, rhs)) = split_assign_inner(inner) else {
+            bail!("{span}: italic statement must be an assignment (`name` = …)");
+        };
+        if crate::aliases::is_reserved_keyword(&name) {
+            bail!("{span}: `{name}` is a reserved keyword");
+        }
+        let (value, end_line) = self.resolve_assign_rhs(&rhs, span)?;
+        Ok(Stmt::Assign {
+            name,
+            value,
+            span,
+            end_line,
+        })
     }
 
     fn parse_backtick_assign(&mut self, trimmed: &str, span: Span) -> Result<Option<Stmt>> {
@@ -255,21 +278,112 @@ impl<'a> Cursor<'a> {
         if !after.starts_with('=') {
             return Ok(None);
         }
-        let rhs = after[1..].trim();
-        if rhs.is_empty() {
-            // Consume following table if present.
-            let list = self.consume_table()?;
-            return Ok(Some(Stmt::Assign {
-                name,
-                value: Expr::List(list.into_iter().map(Expr::Literal).collect()),
-                span,
-            }));
-        }
+        let rhs = after[1..].trim().to_string();
+        let (value, end_line) = self.resolve_assign_rhs(&rhs, span)?;
         Ok(Some(Stmt::Assign {
             name,
-            value: parse_value_or_interp(rhs)?,
+            value,
             span,
+            end_line,
         }))
+    }
+
+    /// RHS on the same line, or empty RHS → following `$$` fence or table.
+    /// Returns `(expr, inclusive end_line)`.
+    fn resolve_assign_rhs(&mut self, rhs: &str, span: Span) -> Result<(Expr, u32)> {
+        let rhs = rhs.trim();
+        if rhs.is_empty() {
+            self.skip_blanks();
+            if self.peek_is_formula_fence() {
+                return self.consume_formula_fence(span);
+            }
+            let start_i = self.i;
+            let list = self.consume_table()?;
+            let end_line = if self.i > start_i {
+                self.lines[self.i - 1].line_no
+            } else {
+                span.line
+            };
+            return Ok((
+                Expr::List(list.into_iter().map(Expr::Literal).collect()),
+                end_line,
+            ));
+        }
+        if let Some(expr) = try_parse_inline_formula(rhs)? {
+            return Ok((expr, span.line));
+        }
+        if rhs.starts_with('>') {
+            return Ok((Expr::Call(call_after_gt(rhs[1..].trim())?), span.line));
+        }
+        Ok((parse_value_or_interp(rhs)?, span.line))
+    }
+
+    fn skip_blanks(&mut self) {
+        while let Some(l) = self.peek() {
+            if l.kind == LineKind::Blank {
+                self.i += 1;
+            } else {
+                break;
+            }
+        }
+    }
+
+    fn peek_is_formula_fence(&self) -> bool {
+        self.peek()
+            .map(|l| l.text.trim().starts_with("$$"))
+            .unwrap_or(false)
+    }
+
+    fn consume_formula_fence(&mut self, span: Span) -> Result<(Expr, u32)> {
+        let open = self
+            .bump()
+            .ok_or_else(|| anyhow::anyhow!("{span}: expected `$$` formula fence"))?;
+        let open_line = open.line_no;
+        let trimmed = open.text.trim();
+        if trimmed.starts_with("$$:") || trimmed.starts_with("$$ name=") {
+            bail!(
+                "{open_line}:1: `$$:name` / `$$ name=` binding was removed; \
+                 use `name` = then a `$$…$$` fence"
+            );
+        }
+        // Single-line: $$body$$
+        if trimmed.starts_with("$$") && trimmed.ends_with("$$") && trimmed.len() > 4 {
+            let body = trimmed[2..trimmed.len() - 2].trim();
+            if body.is_empty() {
+                bail!("{open_line}:1: empty formula");
+            }
+            let expr = crate::formula::parse(body)
+                .map_err(|e| anyhow::anyhow!("{open_line}:1: formula: {e}"))?;
+            return Ok((Expr::Formula(expr), open_line));
+        }
+        if trimmed != "$$" {
+            bail!(
+                "{open_line}:1: expected `$$` fence opener after empty assignment, got: {trimmed}"
+            );
+        }
+        let mut body_lines: Vec<String> = Vec::new();
+        let mut closed = false;
+        let mut end_line = open_line;
+        while let Some(l) = self.peek() {
+            if l.text.trim() == "$$" {
+                end_line = l.line_no;
+                self.bump();
+                closed = true;
+                break;
+            }
+            body_lines.push(l.text.clone());
+            self.bump();
+        }
+        if !closed {
+            bail!("{open_line}:1: unclosed formula fence `$$`");
+        }
+        let text = body_lines.join("\n").trim().to_string();
+        if text.is_empty() {
+            bail!("{open_line}:1: empty formula");
+        }
+        let expr = crate::formula::parse(&text)
+            .map_err(|e| anyhow::anyhow!("{open_line}:1: formula: {e}"))?;
+        Ok((Expr::Formula(expr), end_line))
     }
 
     fn consume_table(&mut self) -> Result<Vec<Literal>> {
@@ -416,33 +530,36 @@ impl<'a> Cursor<'a> {
     }
 }
 
-fn parse_assign_or_expr_stmt(inner: &str, span: Span) -> Result<Stmt> {
+fn split_assign_inner(inner: &str) -> Option<(String, String)> {
     let inner = inner.trim();
-    // `` `name` = … ``
-    if let Some(rest) = inner.strip_prefix('`') {
-        if let Some(end) = rest.find('`') {
-            let name = rest[..end].to_string();
-            if crate::aliases::is_reserved_keyword(&name) {
-                bail!("{span}: `{name}` is a reserved keyword");
-            }
-            let after = rest[end + 1..].trim_start();
-            if let Some(rhs) = after.strip_prefix('=') {
-                let rhs = rhs.trim();
-                // Inline call assign: `> fn …`
-                let value = if rhs.starts_with('>') {
-                    Expr::Call(call_after_gt(rhs[1..].trim())?)
-                } else {
-                    parse_value_or_interp(rhs)?
-                };
-                return Ok(Stmt::Assign {
-                    name,
-                    value,
-                    span,
-                });
-            }
-        }
+    let rest = inner.strip_prefix('`')?;
+    let end = rest.find('`')?;
+    let name = rest[..end].to_string();
+    let after = rest[end + 1..].trim_start();
+    let rhs = after.strip_prefix('=')?.trim().to_string();
+    Some((name, rhs))
+}
+
+/// Same-line `$$body$$` → Formula; otherwise None (caller parses normally).
+fn try_parse_inline_formula(rhs: &str) -> Result<Option<Expr>> {
+    let rhs = rhs.trim();
+    if !rhs.starts_with("$$") {
+        return Ok(None);
     }
-    bail!("{span}: italic statement must be an assignment (`name` = …)")
+    if rhs.starts_with("$$:") || rhs.starts_with("$$ name=") {
+        bail!(
+            "`$$:name` / `$$ name=` binding was removed; use `name` = then a `$$…$$` fence"
+        );
+    }
+    if rhs.ends_with("$$") && rhs.len() > 4 {
+        let body = rhs[2..rhs.len() - 2].trim();
+        if body.is_empty() {
+            bail!("empty formula");
+        }
+        let expr = crate::formula::parse(body).map_err(|e| anyhow::anyhow!("formula: {e}"))?;
+        return Ok(Some(Expr::Formula(expr)));
+    }
+    bail!("incomplete inline formula (expected `$$…$$` on one line)");
 }
 
 fn parse_param_line(trimmed: &str) -> Option<String> {
@@ -587,5 +704,25 @@ mod tests {
         let m = parse_source(src).unwrap();
         let main = &m.functions[0];
         assert!(main.body.iter().any(|s| matches!(s, Stmt::Branch { .. })));
+    }
+
+    #[test]
+    fn parse_formula_assign_fence() {
+        let src = "# main\n\n`f` =\n$$\nx^2 - 2\n$$\n\n> print text=`f`\n";
+        let m = parse_source(src).unwrap();
+        let body = &m.functions[0].body;
+        match &body[0] {
+            Stmt::Assign {
+                name,
+                value: Expr::Formula(e),
+                end_line,
+                ..
+            } => {
+                assert_eq!(name, "f");
+                assert_eq!(e.as_display(), "x^2 - 2");
+                assert!(*end_line > 3, "end_line should cover the fence, got {end_line}");
+            }
+            other => panic!("expected formula assign, got {other:?}"),
+        }
     }
 }
