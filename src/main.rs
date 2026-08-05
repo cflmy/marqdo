@@ -156,6 +156,7 @@ fn try_main() -> Result<i32> {
                     trace_eval,
                     backend: backend.into(),
                     stdin_lines,
+                    ..RunOptions::default()
                 }
             };
             if dump_all {

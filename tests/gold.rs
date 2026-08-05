@@ -546,6 +546,48 @@ fn view_output_writes_html() {
     assert!(dir.join("pages").join("hello.mq.md.html").exists());
 }
 
+#[test]
+fn lib_fs_read() {
+    assert_out("tests/lib/fs-read.mq.md", "exists\nhello-lib");
+}
+
+#[test]
+fn lib_fs_read_zh() {
+    assert_out("tests/lib/文件-读.mq.md", "存在\nhello-lib");
+}
+
+#[test]
+fn lib_time_format() {
+    assert_out("tests/lib/time-format.mq.md", "1970-01-01\n0");
+}
+
+#[test]
+fn lib_json_roundtrip() {
+    assert_out(
+        "tests/lib/json-roundtrip.mq.md",
+        "map\n1\n{\"a\":1,\"b\":\"x\"}",
+    );
+}
+
+#[test]
+fn lib_sys_cwd() {
+    assert_out("tests/lib/sys-cwd.mq.md", "cwd-ok");
+}
+
+#[test]
+fn lib_net_encode() {
+    assert_out("tests/lib/net-encode.mq.md", "a+b");
+}
+
+#[test]
+fn bytecode_lib_json() {
+    assert_out_backend(
+        "tests/lib/json-roundtrip.mq.md",
+        "bytecode",
+        "map\n1\n{\"a\":1,\"b\":\"x\"}",
+    );
+}
+
 fn tempfile_dir(prefix: &str) -> std::path::PathBuf {
     let dir = std::env::temp_dir().join(format!(
         "{prefix}-{}",

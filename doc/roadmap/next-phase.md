@@ -17,7 +17,7 @@
 | **`input`** | CLI 双后端 + `--stdin-file`；frontmatter `stdin:`/`输入:`；live view 表单覆盖；无预置时 capture 提示补线 | **P1a + P1b 完成** |
 | **诊断** | 语句级 `path:line:col: message`；字节码指令带 `spans`；errors 金样例双后端断言位置 | **P0 完成** |
 | **view** | 结构 + 一次执行 + 源码；注释已 Markdown 渲染；无暂停/断点 | **文档浏览器，不是调试器** |
-| **标准库** | S0–S3：`len`/`str`/`int`/`type`/`trim`/`split`/`join`/`at` + 官方 `lib/` | **P2 完成** |
+| **标准库** | S0–S3 完成；本波扩展 = 文件/系统/时间/JSON/网络（[stdlib-modules.md](../design/stdlib-modules.md)）；数学/外联暂缓 | **P2 完成；五库扩展设计中** |
 | **模块** | `> file.mq.md` 顶层函数合并，无命名空间 | 短期可继续用 |
 
 用户点名的三件事都对，但**不能并行硬开**：断点调试依赖「可信位置 + 可暂停执行」；标准库依赖稳定运行时与 I/O；`input` 在 CLI 与 view 是两条路径。

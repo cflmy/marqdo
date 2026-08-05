@@ -75,6 +75,7 @@ OUT_DIR/
 
 - 页内链接一律**相对路径**，可用任意静态服务器或 `file://`（同目录结构下）打开。  
 - 用户文档推荐流程：`marqdo view output public -o public`，将生成物发布到 `gh-pages`（见 [user-site.md](user-site.md)）。  
+- **执行权限**：与 `marqdo run` 一致（导入即用）；view/导出仅对 `exit`/`sleep` 做软化，避免拖垮进程。详见 [stdlib-modules.md](stdlib-modules.md) §6。  
 - 金样例浏览仍可用：`marqdo view output tests -o /tmp/mq-tests`（含 errors，勿当对外用户站）。  
 - 渲染逻辑与实时 `view` **共用**同一套 HTML 构件（结构 / 执行 / 源码），禁止两套皮肤分叉。
 

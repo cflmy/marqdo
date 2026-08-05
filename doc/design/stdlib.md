@@ -4,10 +4,10 @@
 |---|---|
 | 状态 | **S0–S3 落地** |
 | 日期 | 2026-08-04 |
-| 相关 | [keywords.md](keywords.md) · [call-arguments.md](call-arguments.md) · [stdlib-i18n.md](stdlib-i18n.md) · [roadmap/next-phase.md](../roadmap/next-phase.md) |
+| 相关 | [keywords.md](keywords.md) · [call-arguments.md](call-arguments.md) · [stdlib-i18n.md](stdlib-i18n.md) · [stdlib-modules.md](stdlib-modules.md) · [roadmap/next-phase.md](../roadmap/next-phase.md) |
 
-> **多语言库命名**已单独定稿方向：见 [stdlib-i18n.md](stdlib-i18n.md)。  
-> 要点：不设 `lang:`；`lib/text.mq.md`（英文函数）与 `lib/文本.mq.md`（中文函数）分文件导入。下文 §3 的单轨中文示例将在实现阶段按该草案改掉。
+> **多语言库命名**：见 [stdlib-i18n.md](stdlib-i18n.md)（不设 `lang:`；中英分文件）。  
+> **下一波模块（本波：文件 / 系统 / 时间 / JSON / 网络；数学·外联暂缓）**：见 [stdlib-modules.md](stdlib-modules.md)。
 
 ---
 
@@ -60,8 +60,17 @@ Frontmatter：
 
 | 路径 | 导出函数 |
 |------|----------|
-| `lib/text.mq.md` | `去空白` `拆分` `拼接` |
-| `lib/table.mq.md` | `行数` `取行` |
+| `lib/fs.mq.md` / `lib/文件.mq.md` | `read_text`… / `读文本`… |
+| `lib/time.mq.md` / `lib/时间.mq.md` | `now_unix`… / `此刻秒`… |
+| `lib/sys.mq.md` / `lib/系统.mq.md` | `env_get`… / `取环境`… |
+| `lib/json.mq.md` | `parse` `stringify` `get` `keys`（中英同文件） |
+| `lib/net.mq.md` / `lib/网络.mq.md` | `http_get`… / `获取`… |
+| `lib/text.mq.md` | `str_trim` `str_split` `str_join` |
+| `lib/文本.mq.md` | `去空白` `拆分` `拼接` |
+| `lib/table.mq.md` | `rows` `row_at` |
+| `lib/表.mq.md` | `行数` `取行` |
+
+规划中的 L1 扩展见 [stdlib-modules.md](stdlib-modules.md)。
 
 ---
 

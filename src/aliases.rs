@@ -22,6 +22,9 @@ pub fn is_reserved_keyword(name: &str) -> bool {
 /// Map a builtin callee (EN or ZH alias) to its English canonical name.
 /// Host primitives without ZH L0 aliases only match English.
 pub fn canonical_builtin(name: &str) -> Option<&'static str> {
+    if let Some(h) = crate::host::HostFn::from_name(name) {
+        return Some(h.name());
+    }
     match name {
         "print" | "打印" => Some("print"),
         "input" | "输入" => Some("input"),

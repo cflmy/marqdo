@@ -8,11 +8,13 @@ use crate::builtin::{
     builtin_at, builtin_int, builtin_join, builtin_len, builtin_split, builtin_str, builtin_trim,
     builtin_type,
 };
+use crate::host::{call_host, HostContext, HostFn};
 use crate::bytecode::{Op, Program};
 use crate::debug::emit_trace;
 use crate::diagnostics::{bail_at, Span};
 use crate::input_feed::InputFeed;
 use crate::value::Value;
+use std::collections::HashMap;
 
 pub struct Vm {
     path: Option<PathBuf>,
@@ -20,6 +22,7 @@ pub struct Vm {
     pub captured_stdout: String,
     input: InputFeed,
     trace: bool,
+    host: HostContext,
 }
 
 struct Frame {
@@ -36,6 +39,7 @@ impl Vm {
             captured_stdout: String::new(),
             input: InputFeed::new(false, Vec::new()),
             trace: false,
+            host: HostContext::for_run(path, Default::default(), Vec::new()),
         }
     }
 
@@ -46,6 +50,7 @@ impl Vm {
             captured_stdout: String::new(),
             input: InputFeed::new(true, Vec::new()),
             trace: false,
+            host: HostContext::for_capture(path, Default::default()),
         }
     }
 
@@ -56,6 +61,11 @@ impl Vm {
 
     pub fn with_trace(mut self, trace: bool) -> Self {
         self.trace = trace;
+        self
+    }
+
+    pub fn with_host(mut self, host: HostContext) -> Self {
+        self.host = host;
         self
     }
 
@@ -275,6 +285,35 @@ impl Vm {
                     let idx = pop(&mut stack).map_err(|m| self.err_at(span, m))?;
                     let list = pop(&mut stack).map_err(|m| self.err_at(span, m))?;
                     stack.push(builtin_at(&list, &idx).map_err(|m| self.err_at(span, m))?);
+                }
+                Op::HostCall(id, argc) => {
+                    let hf = HostFn::from_u16(id)
+                        .ok_or_else(|| self.err_at(span, format!("unknown host id {id}")))?;
+                    let argc = argc as usize;
+                    let params = hf.all_params();
+                    if params.len() != argc {
+                        return Err(self.err_at(span, "host call argc mismatch"));
+                    }
+                    let mut vals = Vec::with_capacity(argc);
+                    for _ in 0..argc {
+                        vals.push(pop(&mut stack).map_err(|m| self.err_at(span, m))?);
+                    }
+                    vals.reverse();
+                    let mut bound = HashMap::new();
+                    for (p, v) in params.iter().zip(vals.into_iter()) {
+                        bound.insert((*p).to_string(), v);
+                    }
+                    for req in hf.required_params() {
+                        if !bound.contains_key(*req) {
+                            return Err(self.err_at(
+                                span,
+                                format!("{} requires `{req}`", hf.name()),
+                            ));
+                        }
+                    }
+                    let result =
+                        call_host(&self.host, hf, &bound).map_err(|m| self.err_at(span, m))?;
+                    stack.push(result);
                 }
                 Op::Call(fid, argc) => {
                     let fid = fid as usize;

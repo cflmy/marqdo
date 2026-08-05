@@ -130,7 +130,7 @@ fn handle(root: &ViewRoot, request: Request) -> Result<()> {
             if let Some(first) = root.files.first() {
                 let rel = first.to_string_lossy().replace('\\', "/");
                 let resolved = resolve_rel(root, &rel)?;
-                let vm = build_file_view(&resolved, &rel, &[])?;
+                let vm = build_file_view(root, &resolved, &rel, &[], true)?;
                 let body = page_file(&root.files, &rel, &vm, &LinkMode::Live);
                 respond_html(request, body)
             } else {
@@ -143,7 +143,7 @@ fn handle(root: &ViewRoot, request: Request) -> Result<()> {
             let stdin_raw = query_param(query, "stdin").unwrap_or_default();
             let stdin_lines = split_stdin_text(&stdin_raw);
             let resolved = resolve_rel(root, &rel)?;
-            let vm = build_file_view(&resolved, &rel, &stdin_lines)?;
+            let vm = build_file_view(root, &resolved, &rel, &stdin_lines, true)?;
             let body = page_file(&root.files, &rel, &vm, &LinkMode::Live);
             respond_html(request, body)
         }
@@ -160,9 +160,11 @@ fn handle(root: &ViewRoot, request: Request) -> Result<()> {
 }
 
 pub(crate) fn build_file_view(
+    root: &ViewRoot,
     abs: &Path,
     rel: &str,
     stdin_lines: &[String],
+    live: bool,
 ) -> Result<FileViewModel> {
     let source = fs::read_to_string(abs).with_context(|| format!("read {}", abs.display()))?;
     let structure = match crate::load::load_module(abs) {
@@ -173,10 +175,12 @@ pub(crate) fn build_file_view(
         ),
     };
     let effective = effective_stdin(&source, stdin_lines);
-    let opts = RunOptions {
-        stdin_lines: effective.clone(),
-        ..RunOptions::default()
-    };
+    // Same host caps as `marqdo run`. Soft exit + sleep clamp only.
+    let mut opts = RunOptions::default();
+    opts.stdin_lines = effective.clone();
+    opts.sleep_limit_ms = if live { Some(30_000) } else { Some(0) };
+    // Optional: sandbox to the whole view tree so sibling folders are reachable.
+    opts.fs_root = Some(root.root.clone());
     let (stdout, stderr, ok) = match run_file_capture(abs, &opts) {
         Ok(cap) => (cap.stdout, String::new(), true),
         Err(e) => (

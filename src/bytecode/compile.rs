@@ -427,6 +427,45 @@ impl<'a> FnCompiler<'a> {
                 }
                 return Ok(());
             }
+            other if crate::host::HostFn::from_name(other).is_some() => {
+                let hf = crate::host::HostFn::from_name(other).unwrap();
+                let params = hf.all_params();
+                let mut named: HashMap<String, &Expr> = HashMap::new();
+                let mut positionals = Vec::new();
+                for a in &call.args {
+                    match a {
+                        Arg::Positional(e) => positionals.push(e),
+                        Arg::Named { name, value } => {
+                            named.insert(name.clone(), value);
+                        }
+                    }
+                }
+                let mut pos_i = 0usize;
+                let required_n = hf.required_params().len();
+                for (i, p) in params.iter().enumerate() {
+                    if let Some(e) = named.get(*p) {
+                        self.compile_expr(e)?;
+                    } else if pos_i < positionals.len() {
+                        self.compile_expr(positionals[pos_i])?;
+                        pos_i += 1;
+                    } else if i < required_n {
+                        return Err(self.err(format!("{} requires `{p}`", hf.name())));
+                    } else {
+                        self.emit(Op::None_);
+                    }
+                }
+                if pos_i < positionals.len() {
+                    return Err(self.err(format!(
+                        "too many positional arguments ({} extra)",
+                        positionals.len() - pos_i
+                    )));
+                }
+                self.emit(Op::HostCall(hf.as_u16(), params.len() as u8));
+                if as_stmt {
+                    self.emit(Op::Pop);
+                }
+                return Ok(());
+            }
             _ => {}
         }
 

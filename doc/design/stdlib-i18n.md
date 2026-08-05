@@ -5,7 +5,7 @@
 | 状态 | **草案（先文档、后实现）** |
 | 日期 | 2026-08-04 |
 | 原则 | **不指定语言**；靠**库文件名**区分中英（及日后其它语言） |
-| 相关 | [stdlib.md](stdlib.md) · [keywords.md](keywords.md) · [keywords-i18n.md](keywords-i18n.md) · [user-site.md](user-site.md) |
+| 相关 | [stdlib.md](stdlib.md) · [stdlib-modules.md](stdlib-modules.md) · [keywords.md](keywords.md) · [keywords-i18n.md](keywords-i18n.md) · [user-site.md](user-site.md) |
 
 ---
 
@@ -76,12 +76,24 @@
 
 ---
 
+## 2.4 特例：JSON
+
+`JSON` 为专有缩写，**不强求**中文库名或中文 API 翻译。官方只提供：
+
+```text
+lib/json.mq.md    # 中英文档均 `> lib/json.mq.md`；函数 parse / stringify / get / keys
+```
+
+不设 `lib/数据.mq.md` 等平行文件。其余模块仍遵守 §2.1。详见 [stdlib-modules.md](stdlib-modules.md) §3.4。
+
+---
+
 ## 3. 与「少而精内置」的边界
 
 | 层 | 内容 | 如何获得 |
 |----|------|----------|
 | **内置（L0）** | 极少：`print` `input` `len` `str` `int`（及语言字面量关键字） | 直接调用，无需导入 |
-| **标准库（L1）** | 文本/表等扩展 API；**中英各一套文件、各一套函数名** | frontmatter `> lib/…` |
+| **标准库（L1）** | 文本/表等扩展 API；**通常**中英各一套文件、各一套函数名（**JSON 例外**：仅 `lib/json.mq.md`） | frontmatter `> lib/…` |
 | **宿主原语（实现细节）** | 若 `trim`/`split` 等暂由解释器实现 | 仅供标准库包装调用；**文档与用户站引导走 L1**，不鼓励当「关键字」堆砌 |
 
 日后若某能力足够「核心」，可再升格为 L0；升格前先留在 L1。
@@ -92,11 +104,11 @@
 
 ```text
 lib/
-  text.mq.md      # 英文文本库
-  文本.mq.md      # 中文文本库
-  table.mq.md     # 英文表库
-  表.mq.md        # 中文表库
-  # 日后：texte.mq.md / テキスト.mq.md …
+  text.mq.md / 文本.mq.md
+  table.mq.md / 表.mq.md
+  # 本波：fs/文件 · sys/系统 · time/时间 · json（中英同文件）· net/网络
+  # 暂缓：math/数学 · foreign/外联
+  # 其它语言：texte.mq.md / テキスト.mq.md …
 ```
 
 扩展新语言时：
@@ -111,9 +123,9 @@ lib/
 
 ## 5. 文档与示例义务
 
-- 用户站：英文库、中文库各给一页（或同页两小节），导入路径与调用名并排出现。  
-- 金样例：`tests/…` 中英导入至少各一条，避免只测中文或只测英文。  
-- [keywords.md](keywords.md) 只列 L0；L1 指向本文 + [stdlib.md](stdlib.md)。
+- 用户站：英/中库各一页（或同页两小节），导入路径与调用名并排；**JSON** 可共用一页、同一导入。  
+- 金样例：分文件模块中英导入至少各一条；JSON 测 `lib/json.mq.md` 即可。  
+- [keywords.md](keywords.md) 只列 L0；L1 指向本文 + [stdlib.md](stdlib.md) + [stdlib-modules.md](stdlib-modules.md)。
 
 ---
 
@@ -131,4 +143,4 @@ lib/
 
 ## 7. 一句话
 
-**标准库用文件名区分语言；英文库名进英文 API，中文库名进中文 API——导入即选择，无语言开关。**
+**标准库用文件名区分语言（导入即选择）；JSON 为缩写特例，中英共用 `lib/json.mq.md`——无语言开关。**

@@ -54,6 +54,8 @@ pub enum Op {
     GetIndex,
     /// Call function by index; argc values are on the stack (param order).
     Call(u16, u8),
+    /// Host primitive: pop `argc` args (param order), push result.
+    HostCall(u16, u8),
     Return,
 }
 

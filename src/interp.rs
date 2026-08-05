@@ -13,6 +13,7 @@ use crate::builtin::{
 };
 use crate::debug::emit_trace;
 use crate::diagnostics::{bail_at, Span};
+use crate::host::{call_host, HostContext, HostFn};
 use crate::input_feed::InputFeed;
 use crate::value::Value;
 
@@ -23,6 +24,7 @@ pub struct Interpreter {
     pub captured_stdout: String,
     current_span: Span,
     input: InputFeed,
+    host: HostContext,
 }
 
 struct Env {
@@ -59,6 +61,7 @@ impl Interpreter {
             captured_stdout: String::new(),
             current_span: Span::new(1, 1),
             input: InputFeed::new(false, Vec::new()),
+            host: HostContext::for_run(path, Default::default(), Vec::new()),
         }
     }
 
@@ -70,11 +73,17 @@ impl Interpreter {
             captured_stdout: String::new(),
             current_span: Span::new(1, 1),
             input: InputFeed::new(true, Vec::new()),
+            host: HostContext::for_capture(path, Default::default()),
         }
     }
 
     pub fn with_stdin(mut self, lines: Vec<String>) -> Self {
         self.input = InputFeed::new(self.capture, lines);
+        self
+    }
+
+    pub fn with_host(mut self, host: HostContext) -> Self {
+        self.host = host;
         self
     }
 
@@ -516,6 +525,21 @@ impl Interpreter {
                     .get("index")
                     .ok_or_else(|| self.err("at requires index"))?;
                 return builtin_at(value, index).map_err(|m| self.err(m));
+            }
+            other if HostFn::from_name(other).is_some() => {
+                let hf = HostFn::from_name(other).unwrap();
+                let mut params: Vec<String> =
+                    hf.required_params().iter().map(|s| (*s).to_string()).collect();
+                for p in hf.optional_params() {
+                    params.push((*p).to_string());
+                }
+                let bound = bind_args(&params, &ev_args, true).map_err(|m| self.err(m))?;
+                for req in hf.required_params() {
+                    if !bound.contains_key(*req) {
+                        return Err(self.err(format!("{} requires `{req}`", hf.name())));
+                    }
+                }
+                return call_host(&self.host, hf, &bound).map_err(|m| self.err(m));
             }
             _ => {}
         }

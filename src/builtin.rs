@@ -31,7 +31,7 @@ pub fn builtin_int(v: &Value) -> Result<i64, String> {
     }
 }
 
-/// `type`: type tag as text (`none` / `bool` / `int` / `text` / `list`).
+/// `type`: type tag as text (`none` / `bool` / `int` / `text` / `list` / `map`).
 pub fn builtin_type(v: &Value) -> Value {
     Value::Text(
         match v {
@@ -40,6 +40,7 @@ pub fn builtin_type(v: &Value) -> Value {
             Value::Int(_) => "int",
             Value::Text(_) => "text",
             Value::List(_) => "list",
+            Value::Map(_) => "map",
         }
         .into(),
     )

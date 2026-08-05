@@ -11,6 +11,7 @@ pub mod capture;
 pub mod catalog;
 pub mod debug;
 pub mod diagnostics;
+pub mod host;
 pub mod input_feed;
 pub mod interp;
 pub mod lex;
@@ -23,6 +24,7 @@ use std::path::Path;
 
 use anyhow::{bail, Result};
 
+use crate::host::{HostCaps, HostContext};
 use crate::ast::format_ast_dump;
 use crate::bytecode::{compile_module, Vm};
 use crate::capture::RunCapture;
@@ -48,7 +50,7 @@ impl Backend {
 }
 
 /// Options for a single `run` / dump invocation.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct RunOptions {
     pub dump_lines: bool,
     pub dump_tokens: bool,
@@ -59,6 +61,36 @@ pub struct RunOptions {
     pub backend: Backend,
     /// Preset lines consumed by `input` (from `--stdin-file` or view).
     pub stdin_lines: Vec<String>,
+    pub allow_fs_write: bool,
+    pub allow_exec: bool,
+    pub allow_net: bool,
+    /// Exposed via `host_args` / `args`.
+    pub argv: Vec<String>,
+    /// Override filesystem sandbox root (default: source file's directory).
+    pub fs_root: Option<std::path::PathBuf>,
+    /// Sleep clamp when capturing (None = host default; view export uses `Some(0)`).
+    pub sleep_limit_ms: Option<u64>,
+}
+
+impl Default for RunOptions {
+    fn default() -> Self {
+        Self {
+            dump_lines: false,
+            dump_tokens: false,
+            dump_ast: false,
+            dump_sema: false,
+            dump_bytecode: false,
+            trace_eval: false,
+            backend: Backend::default(),
+            stdin_lines: Vec::new(),
+            allow_fs_write: true,
+            allow_exec: true,
+            allow_net: true,
+            argv: Vec::new(),
+            fs_root: None,
+            sleep_limit_ms: None,
+        }
+    }
 }
 
 impl RunOptions {
@@ -70,8 +102,7 @@ impl RunOptions {
             dump_sema: true,
             dump_bytecode: true,
             trace_eval: true,
-            backend: Backend::Tree,
-            stdin_lines: Vec::new(),
+            ..Self::default()
         }
     }
 
@@ -82,6 +113,14 @@ impl RunOptions {
             || self.dump_sema
             || self.dump_bytecode
             || self.trace_eval
+    }
+
+    pub fn host_caps(&self) -> HostCaps {
+        HostCaps {
+            fs_write: self.allow_fs_write,
+            exec: self.allow_exec,
+            net: self.allow_net,
+        }
     }
 }
 
@@ -128,8 +167,10 @@ pub fn run_file(path: &Path, opts: &RunOptions) -> Result<i32> {
 
     match opts.backend {
         Backend::Tree => {
+            let host = HostContext::for_run(Some(path), opts.host_caps(), opts.argv.clone());
             let mut interp = Interpreter::new(Some(path), opts.trace_eval)
-                .with_stdin(stdin_lines.clone());
+                .with_stdin(stdin_lines.clone())
+                .with_host(host);
             if opts.trace_eval {
                 eprintln!("=== marqdo: trace-eval ({path_label}) ===");
             }
@@ -143,9 +184,11 @@ pub fn run_file(path: &Path, opts: &RunOptions) -> Result<i32> {
             if opts.dump_bytecode {
                 print!("{}", program.disassemble());
             }
+            let host = HostContext::for_run(Some(path), opts.host_caps(), opts.argv.clone());
             let mut vm = Vm::new(Some(path))
                 .with_stdin(stdin_lines)
-                .with_trace(opts.trace_eval);
+                .with_trace(opts.trace_eval)
+                .with_host(host);
             if opts.trace_eval {
                 eprintln!("=== marqdo: trace-eval ({path_label}) ===");
             }
@@ -173,7 +216,17 @@ pub fn run_file_capture(path: &Path, opts: &RunOptions) -> Result<RunCapture> {
     let module = load_module(path)?;
     match opts.backend {
         Backend::Tree => {
-            let mut interp = Interpreter::with_capture(Some(path), false).with_stdin(stdin_lines);
+            let mut host = HostContext::for_capture(Some(path), opts.host_caps());
+            host.argv = opts.argv.clone();
+            if let Some(root) = &opts.fs_root {
+                host.fs_root = Some(root.clone());
+            }
+            if let Some(lim) = opts.sleep_limit_ms {
+                host.sleep_limit_ms = Some(lim);
+            }
+            let mut interp = Interpreter::with_capture(Some(path), false)
+                .with_stdin(stdin_lines)
+                .with_host(host);
             let value = interp.run_module(&module)?;
             Ok(RunCapture {
                 stdout: interp.captured_stdout,
@@ -182,7 +235,17 @@ pub fn run_file_capture(path: &Path, opts: &RunOptions) -> Result<RunCapture> {
         }
         Backend::Bytecode => {
             let program = compile_module(Some(path), &module)?;
-            let mut vm = Vm::with_capture(Some(path)).with_stdin(stdin_lines);
+            let mut host = HostContext::for_capture(Some(path), opts.host_caps());
+            host.argv = opts.argv.clone();
+            if let Some(root) = &opts.fs_root {
+                host.fs_root = Some(root.clone());
+            }
+            if let Some(lim) = opts.sleep_limit_ms {
+                host.sleep_limit_ms = Some(lim);
+            }
+            let mut vm = Vm::with_capture(Some(path))
+                .with_stdin(stdin_lines)
+                .with_host(host);
             let value = vm.run(&program)?;
             Ok(RunCapture {
                 stdout: vm.captured_stdout,
