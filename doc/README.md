@@ -22,7 +22,10 @@
 | [design/tech-stack.md](design/tech-stack.md) | 实现栈对比 |
 | [adr/0001-implementation-language.md](adr/0001-implementation-language.md) | **Accepted：Rust 参考解释器；不用 Flex/Bison** |
 | [design/dependencies.md](design/dependencies.md) | 依赖详单（无 Flex/Bison） |
-| [design/keywords.md](design/keywords.md) | **英文最小关键字 / 内置 `print` `input`** |
+| [design/keywords.md](design/keywords.md) | **英文最小关键字 / 内置函数** |
+| [design/keywords-i18n.md](design/keywords-i18n.md) | **内核中英双名（无需导入；少而精）** |
+| [design/stdlib.md](design/stdlib.md) | **P2 标准库：内置 + `lib/` + 错误约定** |
+| [design/stdlib-i18n.md](design/stdlib-i18n.md) | **标准库中英命名：靠库文件名区分，无 lang 开关** |
 | [design/call-arguments.md](design/call-arguments.md) | **调用：具名 + 位置实参** |
 | [design/examples-and-tests.md](design/examples-and-tests.md) | **tests/ 金样例目录布局** |
 | [design/view.md](design/view.md) | **`marqdo view` / `view output` 黑白极简 + 静态文档** |

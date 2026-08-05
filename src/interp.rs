@@ -7,7 +7,10 @@ use std::path::{Path, PathBuf};
 use crate::ast::{
     Arg, BinaryOp, CallExpr, Expr, Function, InterpPart, Literal, Module, Stmt, UnaryOp,
 };
-use crate::builtin::{builtin_int, builtin_len, builtin_str};
+use crate::builtin::{
+    builtin_at, builtin_int, builtin_join, builtin_len, builtin_split, builtin_str, builtin_trim,
+    builtin_type,
+};
 use crate::debug::emit_trace;
 use crate::diagnostics::{bail_at, Span};
 use crate::input_feed::InputFeed;
@@ -388,6 +391,13 @@ impl Interpreter {
         env: &mut Env,
         call: &CallExpr,
     ) -> Result<Value> {
+        let mut call = call.clone();
+        let callee = crate::aliases::normalize_call_callee_and_args(
+            &call.callee,
+            &mut call.args,
+        );
+        call.callee = callee;
+
         let mut ev_args = Vec::new();
         for arg in &call.args {
             match arg {
@@ -423,8 +433,9 @@ impl Interpreter {
                     .unwrap_or_default();
                 self.emit_prompt(&prompt);
                 let line = self.input.read_line().map_err(|e| {
-                    if e.to_string().contains("input is not available") {
-                        self.err("input is not available under capture / view")
+                    let msg = e.to_string();
+                    if msg.contains("input needs a line") {
+                        self.err(msg)
                     } else {
                         e
                     }
@@ -456,6 +467,55 @@ impl Interpreter {
                     .ok_or_else(|| self.err("int requires value"))?;
                 let n = builtin_int(v).map_err(|m| self.err(m))?;
                 return Ok(Value::Int(n));
+            }
+            "type" => {
+                let bound = bind_args(&["value".into()], &ev_args, false)
+                    .map_err(|m| self.err(m))?;
+                let v = bound
+                    .get("value")
+                    .ok_or_else(|| self.err("type requires value"))?;
+                return Ok(builtin_type(v));
+            }
+            "trim" => {
+                let bound = bind_args(&["value".into()], &ev_args, false)
+                    .map_err(|m| self.err(m))?;
+                let v = bound
+                    .get("value")
+                    .ok_or_else(|| self.err("trim requires value"))?;
+                return builtin_trim(v).map_err(|m| self.err(m));
+            }
+            "split" => {
+                let bound = bind_args(&["value".into(), "sep".into()], &ev_args, false)
+                    .map_err(|m| self.err(m))?;
+                let value = bound
+                    .get("value")
+                    .ok_or_else(|| self.err("split requires value"))?;
+                let sep = bound
+                    .get("sep")
+                    .ok_or_else(|| self.err("split requires sep"))?;
+                return builtin_split(value, sep).map_err(|m| self.err(m));
+            }
+            "join" => {
+                let bound = bind_args(&["value".into(), "sep".into()], &ev_args, false)
+                    .map_err(|m| self.err(m))?;
+                let value = bound
+                    .get("value")
+                    .ok_or_else(|| self.err("join requires value"))?;
+                let sep = bound
+                    .get("sep")
+                    .ok_or_else(|| self.err("join requires sep"))?;
+                return builtin_join(value, sep).map_err(|m| self.err(m));
+            }
+            "at" => {
+                let bound = bind_args(&["value".into(), "index".into()], &ev_args, false)
+                    .map_err(|m| self.err(m))?;
+                let value = bound
+                    .get("value")
+                    .ok_or_else(|| self.err("at requires value"))?;
+                let index = bound
+                    .get("index")
+                    .ok_or_else(|| self.err("at requires index"))?;
+                return builtin_at(value, index).map_err(|m| self.err(m));
             }
             _ => {}
         }

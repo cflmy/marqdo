@@ -1,11 +1,11 @@
 ---
-title: 布尔与逻辑
-description: True / False / None 与 and / or / not
+title: Booleans and logic
+description: True / False / None and and / or / not
 ---
 
 # main
 
-关键字：`True`、`False`、`None`，以及 `and` / `or` / `not`。
+Keywords: `True`, `False`, `None`, and `and` / `or` / `not`.
 
 *`a` = True*
 *`b` = False*

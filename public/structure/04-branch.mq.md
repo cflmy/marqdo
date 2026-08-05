@@ -1,17 +1,17 @@
 ---
-title: 分支
-description: `+` 臂；整行 `*` 为 else
+title: Branch
+description: `+` arms; a lone `*` arm is else
 ---
 
 # main
 
-斜体行是程序语句。分支用 `+`；臂头单独一行 `*` 表示 else。
+Italic lines are statements. Branches use `+`; a head that is only `*` is the else arm.
 
 *`x` = 0*
 
 + `x` > 0
-  > print text=正数
+  > print text=positive
 + `x` < 0
-  > print text=负数
+  > print text=negative
 + *
-  > print text=零
+  > print text=zero

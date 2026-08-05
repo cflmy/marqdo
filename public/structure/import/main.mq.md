@@ -1,17 +1,17 @@
 ---
-title: 跨文件导入
-description: frontmatter 中 `> 文件.mq.md` 导入模块
+title: Cross-file import
+description: Frontmatter `> file.mq.md` merges modules
 > utils.mq.md
 ---
 
 # main
 
-文件头 YAML 里写 `> utils.mq.md` 即可导入同目录模块。
+In the YAML header, `> utils.mq.md` imports a sibling module.
 
-导入后：用返回值绑定，再输出；并直接调用问候。
+Bind a return value, print it, then call greet:
 
-*`y` = > 加一 n=41*
+*`y` = > add_one n=41*
 
 > print text=`y`
 
-> 问候 谁=Marqdo
+> greet who=Marqdo

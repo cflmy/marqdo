@@ -248,6 +248,9 @@ impl<'a> Cursor<'a> {
             return Ok(None);
         };
         let name = rest[..end].to_string();
+        if crate::aliases::is_reserved_keyword(&name) {
+            bail!("{span}: `{name}` is a reserved keyword");
+        }
         let after = rest[end + 1..].trim_start();
         if !after.starts_with('=') {
             return Ok(None);
@@ -419,6 +422,9 @@ fn parse_assign_or_expr_stmt(inner: &str, span: Span) -> Result<Stmt> {
     if let Some(rest) = inner.strip_prefix('`') {
         if let Some(end) = rest.find('`') {
             let name = rest[..end].to_string();
+            if crate::aliases::is_reserved_keyword(&name) {
+                bail!("{span}: `{name}` is a reserved keyword");
+            }
             let after = rest[end + 1..].trim_start();
             if let Some(rhs) = after.strip_prefix('=') {
                 let rhs = rhs.trim();

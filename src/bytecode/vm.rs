@@ -4,7 +4,10 @@ use anyhow::Result;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
-use crate::builtin::{builtin_int, builtin_len, builtin_str};
+use crate::builtin::{
+    builtin_at, builtin_int, builtin_join, builtin_len, builtin_split, builtin_str, builtin_trim,
+    builtin_type,
+};
 use crate::bytecode::{Op, Program};
 use crate::debug::emit_trace;
 use crate::diagnostics::{bail_at, Span};
@@ -218,8 +221,9 @@ impl Vm {
                     let text = prompt.as_display();
                     self.emit_prompt(&text);
                     let line = self.input.read_line().map_err(|e| {
-                        if e.to_string().contains("input is not available") {
-                            self.err_at(span, "input is not available under capture / view")
+                        let msg = e.to_string();
+                        if msg.contains("input needs a line") {
+                            self.err_at(span, msg)
                         } else {
                             e
                         }
@@ -249,16 +253,28 @@ impl Vm {
                     let n = builtin_int(&v).map_err(|m| self.err_at(span, m))?;
                     stack.push(Value::Int(n));
                 }
+                Op::TypeOf => {
+                    let v = pop(&mut stack).map_err(|m| self.err_at(span, m))?;
+                    stack.push(builtin_type(&v));
+                }
+                Op::Trim => {
+                    let v = pop(&mut stack).map_err(|m| self.err_at(span, m))?;
+                    stack.push(builtin_trim(&v).map_err(|m| self.err_at(span, m))?);
+                }
+                Op::Split => {
+                    let sep = pop(&mut stack).map_err(|m| self.err_at(span, m))?;
+                    let value = pop(&mut stack).map_err(|m| self.err_at(span, m))?;
+                    stack.push(builtin_split(&value, &sep).map_err(|m| self.err_at(span, m))?);
+                }
+                Op::Join => {
+                    let sep = pop(&mut stack).map_err(|m| self.err_at(span, m))?;
+                    let value = pop(&mut stack).map_err(|m| self.err_at(span, m))?;
+                    stack.push(builtin_join(&value, &sep).map_err(|m| self.err_at(span, m))?);
+                }
                 Op::GetIndex => {
                     let idx = pop(&mut stack).map_err(|m| self.err_at(span, m))?;
                     let list = pop(&mut stack).map_err(|m| self.err_at(span, m))?;
-                    match (list, idx) {
-                        (Value::List(xs), Value::Int(i)) if i >= 0 && (i as usize) < xs.len() => {
-                            stack.push(xs[i as usize].clone());
-                        }
-                        (Value::List(_), Value::Int(_)) => stack.push(Value::None),
-                        _ => return Err(self.err_at(span, "GetIndex needs list and int")),
-                    }
+                    stack.push(builtin_at(&list, &idx).map_err(|m| self.err_at(span, m))?);
                 }
                 Op::Call(fid, argc) => {
                     let fid = fid as usize;

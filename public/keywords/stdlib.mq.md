@@ -1,11 +1,11 @@
 ---
-title: 内置 len / str / int
-description: 长度与类型转换（S0 最小标准库）
+title: Built-ins len / str / int / type / trim / split / join / at
+description: Host builtins for strings and tables
 ---
 
 # main
 
-len 接受文本（按 Unicode 标量计）或表/列表：
+Length and type:
 
 *`s` = hello*
 
@@ -13,10 +13,22 @@ len 接受文本（按 Unicode 标量计）或表/列表：
 
 > print text=`n`
 
-str 把值转成显示文本；int 解析整数（或把 True / False 当成 1 / 0）：
+*`ty` = > type `s`*
 
-*`t` = > str 7*
+> print text=`ty`
 
-*`i` = > int `t`*
+Trim, split, join, and index:
 
-> print text=`i`
+*`t` = > trim value=  hi  *
+
+*`parts` = > split value=a,b sep=,*
+
+*`mid` = > at value=`parts` index=0*
+
+*`j` = > join value=`parts` sep=-*
+
+> print text=`t`
+
+> print text=`mid`
+
+> print text=`j`

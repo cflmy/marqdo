@@ -120,6 +120,40 @@ impl<'a> FnCompiler<'a> {
         self.chunk.spans.push(self.stmt_span);
     }
 
+    fn named_or_first<'b>(&self, call: &'b CallExpr, name: &str) -> Option<&'b Expr> {
+        call.args
+            .iter()
+            .find_map(|a| match a {
+                Arg::Named { name: n, value } if n == name => Some(value),
+                _ => None,
+            })
+            .or_else(|| {
+                call.args.iter().find_map(|a| match a {
+                    Arg::Positional(e) => Some(e),
+                    _ => None,
+                })
+            })
+    }
+
+    fn named_or_pos<'b>(&self, call: &'b CallExpr, name: &str, pos: usize) -> Option<&'b Expr> {
+        if let Some(e) = call.args.iter().find_map(|a| match a {
+            Arg::Named { name: n, value } if n == name => Some(value),
+            _ => None,
+        }) {
+            return Some(e);
+        }
+        let mut i = 0usize;
+        for a in &call.args {
+            if let Arg::Positional(e) = a {
+                if i == pos {
+                    return Some(e);
+                }
+                i += 1;
+            }
+        }
+        None
+    }
+
     fn here(&self) -> u16 {
         self.chunk.code.len() as u16
     }
@@ -286,6 +320,10 @@ impl<'a> FnCompiler<'a> {
     }
 
     fn compile_call(&mut self, call: &CallExpr, as_stmt: bool) -> Result<()> {
+        let mut call = call.clone();
+        call.callee =
+            crate::aliases::normalize_call_callee_and_args(&call.callee, &mut call.args);
+
         match call.callee.as_str() {
             "print" => {
                 let text_expr = call
@@ -335,29 +373,55 @@ impl<'a> FnCompiler<'a> {
                 }
                 return Ok(());
             }
-            "len" | "str" | "int" => {
+            "len" | "str" | "int" | "type" | "trim" => {
                 let name = call.callee.as_str();
-                let value_expr = call
-                    .args
-                    .iter()
-                    .find_map(|a| match a {
-                        Arg::Named { name, value } if name == "value" => Some(value),
-                        _ => None,
-                    })
-                    .or_else(|| {
-                        call.args.iter().find_map(|a| match a {
-                            Arg::Positional(e) => Some(e),
-                            _ => None,
-                        })
-                    })
+                let value_expr = self
+                    .named_or_first(&call, "value")
                     .ok_or_else(|| self.err(format!("{name} requires value")))?;
                 self.compile_expr(value_expr)?;
                 self.emit(match name {
                     "len" => Op::Len,
                     "str" => Op::Str,
                     "int" => Op::Int,
+                    "type" => Op::TypeOf,
+                    "trim" => Op::Trim,
                     _ => unreachable!(),
                 });
+                if as_stmt {
+                    self.emit(Op::Pop);
+                }
+                return Ok(());
+            }
+            "split" | "join" => {
+                let name = call.callee.as_str();
+                let value_expr = self
+                    .named_or_pos(&call, "value", 0)
+                    .ok_or_else(|| self.err(format!("{name} requires value")))?;
+                let sep_expr = self
+                    .named_or_pos(&call, "sep", 1)
+                    .ok_or_else(|| self.err(format!("{name} requires sep")))?;
+                self.compile_expr(value_expr)?;
+                self.compile_expr(sep_expr)?;
+                self.emit(match name {
+                    "split" => Op::Split,
+                    "join" => Op::Join,
+                    _ => unreachable!(),
+                });
+                if as_stmt {
+                    self.emit(Op::Pop);
+                }
+                return Ok(());
+            }
+            "at" => {
+                let value_expr = self
+                    .named_or_pos(&call, "value", 0)
+                    .ok_or_else(|| self.err("at requires value"))?;
+                let index_expr = self
+                    .named_or_pos(&call, "index", 1)
+                    .ok_or_else(|| self.err("at requires index"))?;
+                self.compile_expr(value_expr)?;
+                self.compile_expr(index_expr)?;
+                self.emit(Op::GetIndex);
                 if as_stmt {
                     self.emit(Op::Pop);
                 }

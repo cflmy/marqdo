@@ -32,8 +32,10 @@ positional ::= value_token
 
 - `value`（具名右侧）：可含空格与 `` `var` `` 插值，直到下一个 `ident=` 边界。  
 - `value_token`（位置）：空白分隔的一个词法单元——数字、`` `名` ``、标识/文本词；**不含空格**。多词字符串请用具名，例如 `> print text=Hello World!`。  
-- 内置 `print` 形参名为 `text`：`> print Hi` 与 `> print text=Hi` 等价。  
-- 内置 `len` / `str` / `int` 形参名为 `value`。
+- 内置 `print` / `打印` 形参：`text` ≡ `内容`。  
+- `input` / `输入`：`prompt` ≡ `提示`。  
+- `len` / `长度`、`str` / `文本`、`int` / `整数`：`value` ≡ `值`。  
+- 完整中英双名见 [keywords-i18n.md](keywords-i18n.md)。
 
 ---
 

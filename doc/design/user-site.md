@@ -13,7 +13,7 @@
 | 路径 | 是否入库 | 职责 |
 |------|----------|------|
 | `doc/` | 是 | 开发者设计 / ADR / 路线图（单数 `doc`，勿再造 `docs/`） |
-| `public/**/*.mq.md` | 是 | 用户可读、可执行、可下载的介绍（结构 / 关键字 / 特性迭代） |
+| `public/**/*.mq.md` | 是 | 用户可读、可执行、可下载的介绍（结构 / 关键字 / 特性迭代）；**双语**：拉丁文件名 = 英文，中文文件名 = 中文编程，同目录并列 |
 | `public/index.html`、`public/pages/` | **否**（ignore） | `marqdo view output` 生成的 HTML |
 | `tests/{structure,keywords,errors}/` | 是 | 金样例与失败夹具（含 errors） |
 | 远程分支 `gh-pages` | 发布产物 | 发布整个 `public/`（源文件 + 生成 HTML） |

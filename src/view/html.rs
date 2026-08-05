@@ -624,14 +624,24 @@ pub fn page_file(files: &[PathBuf], rel: &str, vm: &FileViewModel, links: &LinkM
         LinkMode::Live => format!(
             r#"<form class="stdin-form" method="get" action="/file">
   <input type="hidden" name="path" value="{path}"/>
-  <label for="stdin">Preset input <span class="hint">one line per input call</span></label>
+  <label for="stdin">Preset input <span class="hint">one line per <code>input</code>; overrides frontmatter <code>stdin:</code> / <code>输入:</code></span></label>
   <textarea id="stdin" name="stdin" rows="3" placeholder="Alice">{stdin}</textarea>
   <button type="submit">Run with input</button>
 </form>"#,
             path = escape(rel),
             stdin = escape(&vm.preset_stdin),
         ),
-        LinkMode::Static { .. } => String::new(),
+        LinkMode::Static { .. } => {
+            if vm.preset_stdin.is_empty() {
+                String::new()
+            } else {
+                format!(
+                    r#"<p class="hint">Demo stdin from frontmatter (static export cannot re-run interactively):</p>
+<pre class="source" style="margin-bottom:0.75rem">{stdin}</pre>"#,
+                    stdin = escape(&vm.preset_stdin),
+                )
+            }
+        }
     };
     let title = Path::new(rel)
         .file_name()

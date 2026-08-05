@@ -1,18 +1,18 @@
 ---
-title: 字节码后端
-description: --backend bytecode 与树遍历共用语义
+title: Bytecode backend
+description: `--backend bytecode` shares semantics with tree-walk
 ---
 
 # main
 
-里程碑：字节码原型。
+Milestone: bytecode prototype.
 
-同一套 .mq.md 可用树遍历或字节码 VM 执行。命令示例：
+The same `.mq.md` runs on tree-walk or the bytecode VM:
 
   marqdo run FILE --backend tree
 
   marqdo run FILE --backend bytecode
 
-下面这段在两种后端下输出一致：
+Output matches on both backends:
 
-> print text=Bytecode backend：same program, alternate engine.
+> print text=Bytecode backend: same program, alternate engine.

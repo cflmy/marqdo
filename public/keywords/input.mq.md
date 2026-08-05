@@ -1,11 +1,12 @@
 ---
-title: 内置 input
-description: 从 stdin 读一行；可选 prompt。可用 --stdin-file 或 live view 预置输入。
+title: Built-in input
+description: Read one line from stdin; optional prompt. Demo via frontmatter stdin.
+stdin: Ada
 ---
 
 # main
 
-CLI 可用管道或 --stdin-file 喂入一行；live marqdo view 在 Execution 区可填预置输入后重跑。静态站点默认无 stdin，会看到 capture 提示。
+The input builtin reads one line. For demos and marqdo view / static export, put sample lines in frontmatter (stdin:). CLI can also use a pipe or --stdin-file. Live view can override with the Preset input box.
 
 *`name` = > input prompt=Name: *
 

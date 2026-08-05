@@ -3,6 +3,7 @@
 //! Pipeline: load → line classify → parse → tree-walk eval | bytecode VM.
 //! CLI also offers `view` for AST-backed browsing.
 
+pub mod aliases;
 pub mod ast;
 pub mod builtin;
 pub mod bytecode;
@@ -93,6 +94,7 @@ pub fn run_file(path: &Path, opts: &RunOptions) -> Result<i32> {
         bail!("{} is empty", path.display());
     }
 
+    let stdin_lines = crate::input_feed::effective_stdin(&source, &opts.stdin_lines);
     let path_label = path.display().to_string();
 
     if opts.dump_lines {
@@ -127,7 +129,7 @@ pub fn run_file(path: &Path, opts: &RunOptions) -> Result<i32> {
     match opts.backend {
         Backend::Tree => {
             let mut interp = Interpreter::new(Some(path), opts.trace_eval)
-                .with_stdin(opts.stdin_lines.clone());
+                .with_stdin(stdin_lines.clone());
             if opts.trace_eval {
                 eprintln!("=== marqdo: trace-eval ({path_label}) ===");
             }
@@ -142,7 +144,7 @@ pub fn run_file(path: &Path, opts: &RunOptions) -> Result<i32> {
                 print!("{}", program.disassemble());
             }
             let mut vm = Vm::new(Some(path))
-                .with_stdin(opts.stdin_lines.clone())
+                .with_stdin(stdin_lines)
                 .with_trace(opts.trace_eval);
             if opts.trace_eval {
                 eprintln!("=== marqdo: trace-eval ({path_label}) ===");
@@ -165,11 +167,13 @@ pub fn run_file(path: &Path, opts: &RunOptions) -> Result<i32> {
 
 /// Run and capture stdout (used by `view` and tests).
 pub fn run_file_capture(path: &Path, opts: &RunOptions) -> Result<RunCapture> {
+    let source = std::fs::read_to_string(path)
+        .map_err(|e| anyhow::anyhow!("failed to read {}: {e}", path.display()))?;
+    let stdin_lines = crate::input_feed::effective_stdin(&source, &opts.stdin_lines);
     let module = load_module(path)?;
     match opts.backend {
         Backend::Tree => {
-            let mut interp = Interpreter::with_capture(Some(path), false)
-                .with_stdin(opts.stdin_lines.clone());
+            let mut interp = Interpreter::with_capture(Some(path), false).with_stdin(stdin_lines);
             let value = interp.run_module(&module)?;
             Ok(RunCapture {
                 stdout: interp.captured_stdout,
@@ -178,7 +182,7 @@ pub fn run_file_capture(path: &Path, opts: &RunOptions) -> Result<RunCapture> {
         }
         Backend::Bytecode => {
             let program = compile_module(Some(path), &module)?;
-            let mut vm = Vm::with_capture(Some(path)).with_stdin(opts.stdin_lines.clone());
+            let mut vm = Vm::with_capture(Some(path)).with_stdin(stdin_lines);
             let value = vm.run(&program)?;
             Ok(RunCapture {
                 stdout: vm.captured_stdout,

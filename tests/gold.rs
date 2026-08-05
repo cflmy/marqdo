@@ -165,6 +165,94 @@ fn bytecode_stdlib() {
     );
 }
 
+
+#[test]
+fn keywords_stdlib_more() {
+    assert_out(
+        "tests/keywords/stdlib-more.mq.md",
+        "hi
+3
+b
+a-b-c
+list",
+    );
+}
+
+#[test]
+fn bytecode_stdlib_more() {
+    assert_out_backend(
+        "tests/keywords/stdlib-more.mq.md",
+        "bytecode",
+        "hi
+3
+b
+a-b-c
+list",
+    );
+}
+
+
+#[test]
+fn keywords_zh_builtins() {
+    assert_out(
+        "tests/keywords/zh-builtins.mq.md",
+        "5
+7",
+    );
+}
+
+#[test]
+fn bytecode_zh_builtins() {
+    assert_out_backend(
+        "tests/keywords/zh-builtins.mq.md",
+        "bytecode",
+        "5
+7",
+    );
+}
+
+#[test]
+fn keywords_zh_bool() {
+    assert_out(
+        "tests/keywords/zh-bool.mq.md",
+        "ok
+none-falsy",
+    );
+}
+
+#[test]
+fn bytecode_zh_bool() {
+    assert_out_backend(
+        "tests/keywords/zh-bool.mq.md",
+        "bytecode",
+        "ok
+none-falsy",
+    );
+}
+
+
+#[test]
+fn structure_import_lib() {
+    assert_out(
+        "tests/structure/import-lib.mq.md",
+        "x
+2
+a",
+    );
+}
+
+#[test]
+fn bytecode_import_lib() {
+    assert_out_backend(
+        "tests/structure/import-lib.mq.md",
+        "bytecode",
+        "x
+2
+a",
+    );
+}
+
+
 #[test]
 fn error_undefined_var() {
     assert_err(
@@ -212,6 +300,15 @@ fn error_bad_int() {
         "tests/errors/bad-int.mq.md",
         "7:1",
         "cannot convert to int",
+    );
+}
+
+#[test]
+fn error_bad_split_sep() {
+    assert_err(
+        "tests/errors/bad-split-sep.mq.md",
+        "7:1",
+        "split sep must not be empty",
     );
 }
 

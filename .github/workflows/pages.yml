@@ -28,7 +28,7 @@ jobs:
       - name: Build & export site
         run: |
           cargo build --release
-          find public -name '*.mq.md' ! -name 'utils.mq.md' -print0 \
+          find public -name '*.mq.md' ! -name 'utils.mq.md' ! -name '¹¤¾ß.mq.md' -print0 \
             | xargs -0 -n1 ./target/release/marqdo run
           ./target/release/marqdo view output public -o public
 

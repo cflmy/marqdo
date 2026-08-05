@@ -43,6 +43,14 @@ pub enum Op {
     Str,
     /// Pop value → push int (or fail).
     Int,
+    /// Pop value → push type name text.
+    TypeOf,
+    /// Pop text → push trimmed text.
+    Trim,
+    /// Pop sep, then value → push list of text parts.
+    Split,
+    /// Pop sep, then list → push joined text.
+    Join,
     GetIndex,
     /// Call function by index; argc values are on the stack (param order).
     Call(u16, u8),

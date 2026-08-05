@@ -1,17 +1,17 @@
 ---
-title: 函数与具名调用
-description: `#` 定义函数，`>` 调用；`-` 下列纯名为形参
+title: Functions and named calls
+description: `#` defines functions; `>` calls; `-` lists parameter names
 ---
 
 # main
 
-用 `#` / `##` 定义函数。形参写在函数头下方的 `-` 纯名行。
+Use `#` / `##` for functions. Parameters are bare `- name` lines under the heading.
 
-调用用 `>`：具名实参写作 `形参=值`。
+Call with `>` and named args `param=value`:
 
-> 问候 谁=World
+> greet who=World
 
-## 问候
-    - 谁
+## greet
+    - who
 
-> print text=Hello `谁`!
+> print text=Hello `who`!

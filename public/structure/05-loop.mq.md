@@ -1,13 +1,13 @@
 ---
-title: 循环
-description: 条件循环与表格遍历
+title: Loops
+description: Condition loops and table walks
 ---
 
 # main
 
-函数体内的 `-` 是循环（不是形参）。
+Inside a function body, `-` starts a loop (not a parameter).
 
-倒数：
+Countdown:
 
 *`n` = 3*
 
@@ -15,14 +15,14 @@ description: 条件循环与表格遍历
   > print text=`n`
   *`n` = `n` - 1*
 
-遍历篮子（表格是集合）：
+Walk a table (tables are collections):
 
-`篮子` =
+`basket` =
 
-| 果 |
-|----|
-| 苹果 |
-| 梨 |
+| fruit |
+|-------|
+| apple |
+| pear |
 
-- [果](篮子)
-  > print text=今天吃`果`
+- [fruit](basket)
+  > print text=today `fruit`

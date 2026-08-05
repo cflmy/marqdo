@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| 状态 | **进行中**（P0–P1b / P2-S0 / P3-D0–D1 初版；下一：P3-D2 或 P2-S1） |
+| 状态 | **进行中**（P2 完成；下一：P3-D2 调试会话） |
 | 日期 | 2026-08-04 |
 | 目标 | 交互 I/O、可信诊断、可生长标准库；view 渐进成为调试宿主 |
 | 相关 | [interpreter.md](interpreter.md) · [keywords.md](../design/keywords.md) · [pipeline-debug.md](../design/pipeline-debug.md) · [view.md](../design/view.md) |
@@ -14,10 +14,10 @@
 | 能力 | 现状 | 结论 |
 |------|------|------|
 | **`print`** | 树遍历 + 字节码均可用 | 够用 |
-| **`input`** | CLI 双后端 + `--stdin-file`；live view 预置输入表单；无队列时 capture 仍拒绝 | **P1a + P1b 完成** |
+| **`input`** | CLI 双后端 + `--stdin-file`；frontmatter `stdin:`/`输入:`；live view 表单覆盖；无预置时 capture 提示补线 | **P1a + P1b 完成** |
 | **诊断** | 语句级 `path:line:col: message`；字节码指令带 `spans`；errors 金样例双后端断言位置 | **P0 完成** |
 | **view** | 结构 + 一次执行 + 源码；注释已 Markdown 渲染；无暂停/断点 | **文档浏览器，不是调试器** |
-| **标准库** | S0：`len` / `str` / `int` 双后端可用；尚无官方 `lib/` | **P2-S0 完成** |
+| **标准库** | S0–S3：`len`/`str`/`int`/`type`/`trim`/`split`/`join`/`at` + 官方 `lib/` | **P2 完成** |
 | **模块** | `> file.mq.md` 顶层函数合并，无命名空间 | 短期可继续用 |
 
 用户点名的三件事都对，但**不能并行硬开**：断点调试依赖「可信位置 + 可暂停执行」；标准库依赖稳定运行时与 I/O；`input` 在 CLI 与 view 是两条路径。

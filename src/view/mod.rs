@@ -14,7 +14,7 @@ use std::process::Command;
 use anyhow::{bail, Context, Result};
 use tiny_http::{Header, Method, Request, Response, Server, StatusCode};
 
-use crate::input_feed::split_stdin_text;
+use crate::input_feed::{effective_stdin, split_stdin_text};
 use crate::view::html::{escape, page_file, page_index, LinkMode};
 use crate::view::render::{render_module_structure, FileViewModel};
 use crate::{run_file_capture, RunOptions};
@@ -172,8 +172,9 @@ pub(crate) fn build_file_view(
             escape(&tidy_user_error(&format!("{e:#}"), abs, rel))
         ),
     };
+    let effective = effective_stdin(&source, stdin_lines);
     let opts = RunOptions {
-        stdin_lines: stdin_lines.to_vec(),
+        stdin_lines: effective.clone(),
         ..RunOptions::default()
     };
     let (stdout, stderr, ok) = match run_file_capture(abs, &opts) {
@@ -191,7 +192,7 @@ pub(crate) fn build_file_view(
         stdout,
         stderr,
         ok,
-        preset_stdin: stdin_lines.join("\n"),
+        preset_stdin: effective.join("\n"),
     })
 }
 
@@ -277,33 +278,33 @@ fn query_param<'a>(query: &'a str, key: &str) -> Option<String> {
 }
 
 fn urlencoding_decode(s: &str) -> String {
-    // Minimal decode for %XX and +
-    let mut out = String::new();
+    // Minimal decode for %XX and + (UTF-8 byte sequences, not Latin-1 chars).
+    let mut out = Vec::new();
     let bytes = s.as_bytes();
     let mut i = 0;
     while i < bytes.len() {
         match bytes[i] {
             b'+' => {
-                out.push(' ');
+                out.push(b' ');
                 i += 1;
             }
             b'%' if i + 2 < bytes.len() => {
                 let hex = &s[i + 1..i + 3];
                 if let Ok(v) = u8::from_str_radix(hex, 16) {
-                    out.push(v as char);
+                    out.push(v);
                     i += 3;
                 } else {
-                    out.push('%');
+                    out.push(b'%');
                     i += 1;
                 }
             }
             c => {
-                out.push(c as char);
+                out.push(c);
                 i += 1;
             }
         }
     }
-    out
+    String::from_utf8_lossy(&out).into_owned()
 }
 
 fn files_json(files: &[PathBuf]) -> String {

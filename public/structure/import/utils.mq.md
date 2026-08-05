@@ -1,14 +1,14 @@
 ---
-title: 工具模块
-description: 被 main 导入；粗体是返回值
+title: Utility module
+description: Imported by main; bold is a return value
 ---
 
-# 加一
+# add_one
     - n
 
 **`n` + 1**
 
-# 问候
-    - 谁
+# greet
+    - who
 
-> print text=你好，`谁`!
+> print text=Hello, `who`!

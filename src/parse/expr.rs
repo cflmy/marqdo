@@ -129,16 +129,24 @@ impl<'a> Parser<'a> {
         }
     }
 
+    /// Eat English or Chinese logic keyword with word-boundary check.
+    fn eat_logic_kw(&mut self, en: &str, zh: &str) -> bool {
+        if self.starts_with(en) && is_word_end(self.rest(), en.len()) {
+            self.i += en.len();
+            return true;
+        }
+        if self.starts_with(zh) && is_word_end(self.rest(), zh.len()) {
+            self.i += zh.len();
+            return true;
+        }
+        false
+    }
+
     fn parse_or(&mut self) -> Result<Expr> {
         let mut left = self.parse_and()?;
         loop {
             self.skip_ws();
-            if self.eat("or") {
-                // ensure word boundary
-                if self.peek_char().map(|c| c.is_alphanumeric() || c == '_').unwrap_or(false) {
-                    self.i -= 2;
-                    break;
-                }
+            if self.eat_logic_kw("or", "或") {
                 let right = self.parse_and()?;
                 left = Expr::Binary {
                     op: BinaryOp::Or,
@@ -156,11 +164,7 @@ impl<'a> Parser<'a> {
         let mut left = self.parse_cmp()?;
         loop {
             self.skip_ws();
-            if self.eat("and") {
-                if self.peek_char().map(|c| c.is_alphanumeric() || c == '_').unwrap_or(false) {
-                    self.i -= 3;
-                    break;
-                }
+            if self.eat_logic_kw("and", "且") {
                 let right = self.parse_cmp()?;
                 left = Expr::Binary {
                     op: BinaryOp::And,
@@ -255,16 +259,12 @@ impl<'a> Parser<'a> {
 
     fn parse_unary(&mut self) -> Result<Expr> {
         self.skip_ws();
-        if self.eat("not") {
-            if self.peek_char().map(|c| c.is_alphanumeric() || c == '_').unwrap_or(false) {
-                self.i -= 3;
-            } else {
-                let expr = self.parse_unary()?;
-                return Ok(Expr::Unary {
-                    op: UnaryOp::Not,
-                    expr: Box::new(expr),
-                });
-            }
+        if self.eat_logic_kw("not", "非") {
+            let expr = self.parse_unary()?;
+            return Ok(Expr::Unary {
+                op: UnaryOp::Not,
+                expr: Box::new(expr),
+            });
         }
         if self.eat("-") {
             let expr = self.parse_unary()?;
@@ -312,12 +312,24 @@ impl<'a> Parser<'a> {
             self.i += 4;
             return Ok(Expr::Literal(Literal::Bool(true)));
         }
+        if self.starts_with("真") && is_word_end(self.rest(), '真'.len_utf8()) {
+            self.i += '真'.len_utf8();
+            return Ok(Expr::Literal(Literal::Bool(true)));
+        }
         if self.starts_with("False") && is_word_end(self.rest(), 5) {
             self.i += 5;
             return Ok(Expr::Literal(Literal::Bool(false)));
         }
+        if self.starts_with("假") && is_word_end(self.rest(), '假'.len_utf8()) {
+            self.i += '假'.len_utf8();
+            return Ok(Expr::Literal(Literal::Bool(false)));
+        }
         if self.starts_with("None") && is_word_end(self.rest(), 4) {
             self.i += 4;
+            return Ok(Expr::Literal(Literal::None));
+        }
+        if self.starts_with("空") && is_word_end(self.rest(), '空'.len_utf8()) {
+            self.i += '空'.len_utf8();
             return Ok(Expr::Literal(Literal::None));
         }
         if self.peek_char().map(|c| c.is_ascii_digit()).unwrap_or(false) {
@@ -485,8 +497,16 @@ mod tests {
     }
 
     #[test]
-    fn interp_hello() {
-        let e = parse_value_or_interp("Hello `谁`!").unwrap();
-        assert!(matches!(e, Expr::Interp(_)));
+    fn chinese_logic_and_literals() {
+        let e = parse_expr("`a` 且 非 `b`").unwrap();
+        assert!(matches!(e, Expr::Binary { op: BinaryOp::And, .. }));
+        assert!(matches!(
+            parse_expr("真").unwrap(),
+            Expr::Literal(Literal::Bool(true))
+        ));
+        assert!(matches!(
+            parse_expr("空").unwrap(),
+            Expr::Literal(Literal::None)
+        ));
     }
 }

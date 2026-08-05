@@ -1,19 +1,19 @@
 ---
-title: 位置实参
-description: 按形参顺序传参；也可继续用具名
+title: Positional arguments
+description: Bind by parameter order; named form still works
 ---
 
 # main
 
-位置实参：按形参声明顺序绑定，不必写 `谁=`。
+Positional args bind in declaration order (no `who=` needed):
 
-> 问候 Marqdo
+> greet Marqdo
 
-具名形式仍然可用：
+Named form still works:
 
-> 问候 谁=World
+> greet who=World
 
-## 问候
-    - 谁
+## greet
+    - who
 
-> print text=Hello `谁`!
+> print text=Hello `who`!

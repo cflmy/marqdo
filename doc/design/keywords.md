@@ -2,58 +2,63 @@
 
 | | |
 |---|---|
-| 状态 | 已定（前期够用） |
-| 日期 | 2026-08-04 |
-| 原则 | **英文**；参考 [Python](https://realpython.com/python-keywords/) 但远更少；控制流仍靠 Markdown 标记，不引入 `if`/`while`/`def` |
-| 相关 | [markdown-mapping.md](markdown-mapping.md) |
+| 状态 | 已定（中英双名） |
+| 日期 | 2026-08-05 |
+| 原则 | **少而精**；控制流靠 Markdown；内核中英**别名等价**（见 [keywords-i18n.md](keywords-i18n.md)） |
+| 相关 | [markdown-mapping.md](markdown-mapping.md) · [keywords-i18n.md](keywords-i18n.md) · [stdlib-i18n.md](stdlib-i18n.md) |
 
 ---
 
 ## 1. 设计原则
 
 1. **标记承担架构**：函数=`#`，分支=`+`，循环=`-`，返回=`**…**`，语句=`*…*`。因此 **不**把 `def`/`if`/`else`/`while`/`for`/`return` 做成关键字。  
-2. **英文标识**：内置与字面量用英文，便于工具高亮与国际协作。  
-3. **学 Python 的边界**：Python 3 里 [`print` / `input` 是内置函数，不是关键字](https://realpython.com/python-keywords/)；布尔与空值是字面量关键字。Marqdo 同样区分 **关键字** vs **内置函数名**。  
-4. **宁少勿多**：前期只列执行金样例所需；要加再进 ADR。
+2. **内核双名**：字面量 / 逻辑词 / 五个核心内置函数均有中英别名，**无需导入**，可混用。  
+3. **学 Python 的边界**：区分 **关键字** vs **内置函数名**。  
+4. **宁少勿多**：扩展能力进可导入标准库（中英分文件，见 [stdlib-i18n.md](stdlib-i18n.md)）。
 
 ---
 
 ## 2. 关键字（词法保留，不可作变量名）
 
-| 关键字 | 含义 | 备注 |
-|--------|------|------|
-| `True` | 布尔真 | 对齐 Python 大小写 |
-| `False` | 布尔假 | |
-| `None` | 空值 | |
-| `and` | 逻辑与 | 表达式内 |
-| `or` | 逻辑或 | |
-| `not` | 逻辑非 | |
+| 英文 | 中文 | 含义 |
+|------|------|------|
+| `True` | `真` | 布尔真 |
+| `False` | `假` | 布尔假 |
+| `None` | `空` | 空值 |
+| `and` | `且` | 逻辑与 |
+| `or` | `或` | 逻辑或 |
+| `not` | `非` | 逻辑非 |
 
-**本期不引入：** `if` `else` `elif` `while` `for` `def` `class` `return` `import` `pass` `break` `continue` `in` `is` `lambda` …  
-（`else` 分支臂仍用臂头单独的 `*` 标记，不是单词 `else`。）
+**不引入：** `if` `else` `while` `for` `def` `return` …（分支臂 `*` 不是单词 `else`。）
 
 ---
 
-## 3. 内置函数（可调用名，建议勿遮蔽）
+## 3. 内置函数（可调用，无需导入）
 
-| 名称 | 作用 | 调用示例 |
-|------|------|----------|
-| `print` | 写到 stdout（副作用） | `> print text=Hello` 或 `> print Hello`（位置实参，见 [call-arguments.md](call-arguments.md)） |
-| `input` | 从 stdin 读一行（返回文本） | `*`name` = > input prompt=Name: *` |
-| `len` | 文本或表的长度 | `*`n` = > len `s`*` 或 `> len value=`s`` |
-| `str` | 转为显示文本 | `*`t` = > str 42*` |
-| `int` | 转为整数 | `*`i` = > int 7*` / `> int True` / 文本十进制 |
+| 英文 | 中文 | 作用 |
+|------|------|------|
+| `print` | `打印` | 写 stdout |
+| `input` | `输入` | 读一行；capture / view 用 frontmatter `stdin:` / `输入:`、表单或 `--stdin-file` 预置 |
+| `len` | `长度` | 文本/表长度 |
+| `str` | `文本` | 转为显示文本 |
+| `int` | `整数` | 转为整数 |
 
-参数约定（v0）：
+形参别名：
 
-- `print`：具名实参 `text`（必填）；日后可扩展 `end` 等。  
-- `input`：可选 `prompt`；返回用户输入字符串（不含换行）。  
-- `len` / `str` / `int`：形参名均为 `value`（可位置传入）。  
-  - `len`：文本按 Unicode 标量计数；表/列表按元素数。  
-  - `str`：与 `print` 相同的显示规则。  
-  - `int`：`Int` 原样；`Bool` → 0/1；文本 trim 后按十进制解析，失败则诊断。
+| 英文 | 中文 | 用于 |
+|------|------|------|
+| `text` | `内容` | `print` / `打印` |
+| `prompt` | `提示` | `input` / `输入` |
+| `value` | `值` | `len`/`str`/`int` 及其中文名 |
 
-旧文档中的中文 `print` **废弃**，统一为 `print`。
+```markdown
+> print text=Hello
+> 打印 内容=你好
+
+*`n` = > 长度 值=`s`*
+```
+
+宿主原语 `type` / `trim` / `split` / `join` / `at` **无**内核中文别名；文本/表扩展走标准库文件（见 [stdlib-i18n.md](stdlib-i18n.md)）。转换错误见 [stdlib.md](stdlib.md)。
 
 ---
 
@@ -62,30 +67,29 @@
 ```markdown
 # main
 
-> print text=Hello World!
+> 打印 内容=Hello World!
 
 *`n` = 1*
 
 + `n` > 0
   > print text=positive
 + *
-  > print text=other
+  > 打印 内容=other
 ```
 
-- `>` 是**调用标记**（架构）。  
-- `print` 是**被调名字**（内置库）。  
-- 用户自定义 `# print` 会遮蔽内置（实现应警告）。
+- `>` 是调用标记；`print` / `打印` 是同一内置的别名。  
+- 用户 `# print` 或 `# 打印` 会遮蔽对应名字。
 
 ---
 
 ## 5. 标识符规则（摘要）
 
-- 变量：行内 `` `name` ``；`name` 不可为上表关键字。  
-- 函数名：`#` 标题文本；建议 ASCII/英文，中文标题仍允许但内置名保持英文。  
-- 比较：`==` `>` `<` `>=` `<=`；逻辑：`and` `or` `not`。
+- 变量：`` `name` ``；不可为上表任一中英文关键字。  
+- 函数名：`#` 标题；中英文均可。  
+- 比较：`==` `>` `<` `>=` `<=`；逻辑：`and`/`且`、`or`/`或`、`not`/`非`。
 
 ---
 
 ## 6. 后续可增（未批准）
 
-`float`、`type`、`range`；以及 `break`/`continue`（若循环需要）。增加前开短 ADR。
+`float`、`range`；以及 `break`/`continue`。增加前开短 ADR，并同步考虑是否值得占用双名配额。
