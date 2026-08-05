@@ -395,6 +395,7 @@ impl Interpreter {
                 Ok(Value::List(out))
             }
             Expr::Formula(e) => Ok(Value::Formula(e.clone())),
+            Expr::Code(c) => Ok(Value::Code(c.clone())),
         }
     }
 

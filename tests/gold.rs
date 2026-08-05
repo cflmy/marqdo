@@ -627,6 +627,47 @@ fn lib_math_plot() {
     let _ = std::fs::remove_file("tests/lib/math-plot-plot-1.svg");
 }
 
+fn python_available() -> bool {
+    for cmd in ["python", "python3"] {
+        if let Ok(out) = Command::new(cmd)
+            .args(["-c", "print(1)"])
+            .output()
+        {
+            if out.status.success() {
+                return true;
+            }
+        }
+    }
+    false
+}
+
+#[test]
+fn lib_foreign_python() {
+    if !python_available() {
+        eprintln!("skip lib_foreign_python: no python on PATH");
+        return;
+    }
+    assert_out("tests/lib/foreign-python.mq.md", "hello-from-python");
+}
+
+#[test]
+fn lib_foreign_run_lang() {
+    if !python_available() {
+        eprintln!("skip lib_foreign_run_lang: no python on PATH");
+        return;
+    }
+    assert_out("tests/lib/foreign-run-lang.mq.md", "4");
+}
+
+#[test]
+fn lib_foreign_zh() {
+    if !python_available() {
+        eprintln!("skip lib_foreign_zh: no python on PATH");
+        return;
+    }
+    assert_out("tests/lib/外联-python.mq.md", "中文外联");
+}
+
 #[test]
 fn bytecode_lib_math_formula() {
     assert_out_backend(

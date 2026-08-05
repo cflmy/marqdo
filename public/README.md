@@ -9,7 +9,7 @@
 | [`00-welcome.mq.md`](00-welcome.mq.md) / [`00-欢迎.mq.md`](00-欢迎.mq.md) | 首页（英 / 中） |
 | [`structure/`](structure/) | 基本结构 |
 | [`keywords/`](keywords/) | 关键字与 L0 内置 |
-| [`stdlib/`](stdlib/) | **标准库**（导入方式 + text/表/文件/时间/系统/json/网络/数学） |
+| [`stdlib/`](stdlib/) | **标准库**（导入方式 + text/表/文件/时间/系统/json/网络/数学/外联） |
 | [`features/`](features/) | 特性迭代 |
 
 **不放** `errors/`：失败样例只在 `tests/errors/`。

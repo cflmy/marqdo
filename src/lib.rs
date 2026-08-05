@@ -11,6 +11,7 @@ pub mod capture;
 pub mod catalog;
 pub mod debug;
 pub mod diagnostics;
+pub mod foreign;
 pub mod formula;
 pub mod host;
 pub mod input_feed;

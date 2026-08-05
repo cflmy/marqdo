@@ -117,6 +117,17 @@ fn is_mq_md(path: &Path) -> bool {
 fn handle(root: &ViewRoot, request: Request) -> Result<()> {
     let url = request.url().to_string();
     let method = request.method().clone();
+
+    if method == Method::Post {
+        let (path_part, _) = split_url(&url);
+        if path_part == "/api/foreign-run" {
+            return api_foreign_run(root, request);
+        }
+        let resp = Response::from_string("method not allowed").with_status_code(StatusCode(405));
+        let _ = request.respond(resp);
+        return Ok(());
+    }
+
     if method != Method::Get {
         let resp = Response::from_string("method not allowed").with_status_code(StatusCode(405));
         let _ = request.respond(resp);
@@ -336,6 +347,37 @@ fn files_json(files: &[PathBuf]) -> String {
 
 fn escape_json(s: &str) -> String {
     s.replace('\\', "\\\\").replace('"', "\\\"")
+}
+
+fn api_foreign_run(root: &ViewRoot, mut request: Request) -> Result<()> {
+    let mut body = Vec::new();
+    std::io::Read::read_to_end(&mut request.as_reader(), &mut body)?;
+    let body = String::from_utf8_lossy(&body);
+    let v: serde_json::Value = serde_json::from_str(&body).unwrap_or(serde_json::Value::Null);
+    let lang = v
+        .get("lang")
+        .and_then(|x| x.as_str())
+        .unwrap_or("python");
+    let source = v.get("source").and_then(|x| x.as_str()).unwrap_or("");
+    let cmd = v
+        .get("cmd")
+        .and_then(|x| x.as_str())
+        .map(str::trim)
+        .filter(|s| !s.is_empty());
+    let json = if source.is_empty() {
+        serde_json::json!({ "ok": false, "error": "missing source" }).to_string()
+    } else {
+        match crate::host::foreign::run_with_cmd_override(
+            &root.root,
+            lang,
+            source,
+            cmd,
+        ) {
+            Ok(stdout) => serde_json::json!({ "ok": true, "stdout": stdout }).to_string(),
+            Err(error) => serde_json::json!({ "ok": false, "error": error }).to_string(),
+        }
+    };
+    respond_json(request, json)
 }
 
 fn respond_html(request: Request, body: String) -> Result<()> {

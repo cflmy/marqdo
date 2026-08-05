@@ -108,5 +108,6 @@ fn value_to_json(v: &Value) -> Result<serde_json::Value, String> {
             serde_json::Value::Object(map)
         }
         Value::Formula(e) => serde_json::Value::String(e.as_display()),
+        Value::Code(c) => serde_json::Value::String(c.source.clone()),
     })
 }

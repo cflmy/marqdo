@@ -5,6 +5,7 @@
 //! Soft side-effects (no process::exit; sleep clamp) apply under view / capture only.
 
 mod dispatch;
+pub mod foreign;
 mod fs;
 mod json;
 pub mod math;
@@ -15,6 +16,7 @@ mod time;
 pub use dispatch::{call_host, HostFn};
 pub use fs::path_under_root;
 
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 /// Host capability flags. Default: all enabled.
@@ -55,6 +57,8 @@ pub struct HostContext {
     /// LCG state for `random` / `random_int`.
     pub rng: u64,
     pub plots: Vec<PlotArtifact>,
+    /// lang → interpreter argv (from `set_cmd`).
+    pub foreign_cmds: HashMap<String, Vec<String>>,
 }
 
 impl Default for HostContext {
@@ -68,6 +72,7 @@ impl Default for HostContext {
             sleep_limit_ms: Some(30_000),
             rng: 0xC0FF_EE42_CAFE_BABE,
             plots: Vec::new(),
+            foreign_cmds: HashMap::new(),
         }
     }
 }

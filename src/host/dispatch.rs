@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 
-use crate::host::{fs, json, math, net, sys, time, HostContext};
+use crate::host::{foreign, fs, json, math, net, sys, time, HostContext};
 use crate::value::Value;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -70,6 +70,10 @@ pub enum HostFn {
     Plot = 59,
     PlotPoints = 60,
     PlotConic = 61,
+    ForeignSetCmd = 62,
+    ForeignRun = 63,
+    ForeignRunLang = 64,
+    ForeignLangs = 65,
 }
 
 impl HostFn {
@@ -136,6 +140,10 @@ impl HostFn {
             59 => Self::Plot,
             60 => Self::PlotPoints,
             61 => Self::PlotConic,
+            62 => Self::ForeignSetCmd,
+            63 => Self::ForeignRun,
+            64 => Self::ForeignRunLang,
+            65 => Self::ForeignLangs,
             _ => return None,
         })
     }
@@ -205,6 +213,10 @@ impl HostFn {
             "host_plot" | "plot" | "绘图" => Self::Plot,
             "host_plot_points" | "plot_points" | "绘点列" => Self::PlotPoints,
             "host_plot_conic" | "plot_conic" | "绘圆锥" => Self::PlotConic,
+            "host_foreign_set_cmd" => Self::ForeignSetCmd,
+            "host_foreign_run" => Self::ForeignRun,
+            "host_foreign_run_lang" => Self::ForeignRunLang,
+            "host_foreign_langs" => Self::ForeignLangs,
             _ => return None,
         })
     }
@@ -276,6 +288,10 @@ impl HostFn {
             Self::Plot => "host_plot",
             Self::PlotPoints => "host_plot_points",
             Self::PlotConic => "host_plot_conic",
+            Self::ForeignSetCmd => "host_foreign_set_cmd",
+            Self::ForeignRun => "host_foreign_run",
+            Self::ForeignRunLang => "host_foreign_run_lang",
+            Self::ForeignLangs => "host_foreign_langs",
         }
     }
 
@@ -312,6 +328,10 @@ impl HostFn {
             Self::Plot => &["formula", "var", "min", "max"],
             Self::PlotPoints => &["xs", "ys"],
             Self::PlotConic => &["kind", "a"],
+            Self::ForeignSetCmd => &["lang", "cmd"],
+            Self::ForeignRun => &["code"],
+            Self::ForeignRunLang => &["lang", "source"],
+            Self::ForeignLangs => &[],
         }
     }
 
@@ -324,6 +344,8 @@ impl HostFn {
             Self::Plot => &["steps", "path", "derivative", "grid"],
             Self::PlotPoints => &["path", "grid"],
             Self::PlotConic => &["b", "h", "k", "path", "grid"],
+            Self::ForeignSetCmd => &["args"],
+            Self::ForeignRun | Self::ForeignRunLang => &["stdin"],
             _ => &[],
         }
     }
@@ -457,6 +479,20 @@ pub fn call_host(
             bound.get("path"),
             bound.get("grid"),
         ),
+        HostFn::ForeignSetCmd => foreign::set_cmd(
+            ctx,
+            require(bound, "lang")?,
+            require(bound, "cmd")?,
+            bound.get("args"),
+        ),
+        HostFn::ForeignRun => foreign::run(ctx, require(bound, "code")?, bound.get("stdin")),
+        HostFn::ForeignRunLang => foreign::run_lang(
+            ctx,
+            require(bound, "lang")?,
+            require(bound, "source")?,
+            bound.get("stdin"),
+        ),
+        HostFn::ForeignLangs => foreign::langs(ctx),
     }
 }
 

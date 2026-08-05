@@ -11,7 +11,7 @@ English-named files export English APIs; Chinese-named files export Chinese APIs
 
 No extra allow flags: importing a module means you intend to use it. Under marqdo view or static export, exit soft-fails and long sleeps are clamped so the console stays up.
 
-Modules: text (text / 文本), table (table / 表), files (fs / 文件), time (time / 时间), system (sys / 系统), json (json only), net (net / 网络), math (math / 数学).
+Modules: text (text / 文本), table (table / 表), files (fs / 文件), time (time / 时间), system (sys / 系统), json (json only), net (net / 网络), math (math / 数学), foreign (foreign / 外联).
 
 Sibling pages in this folder document each module. Chinese overview: 00-索引.mq.md.
 

@@ -1,6 +1,6 @@
 [package]
 name = "marqdo"
-version = "0.0.3"
+version = "0.0.4"
 edition = "2021"
 license = "Apache-2.0"
 description = "Marqdo — Markdown markers as an interpreted programming language"

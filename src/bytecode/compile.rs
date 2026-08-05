@@ -641,6 +641,10 @@ impl<'a> FnCompiler<'a> {
                 let i = self.add_const(Value::Formula(e.clone()));
                 self.emit(Op::Constant(i));
             }
+            Expr::Code(c) => {
+                let i = self.add_const(Value::Code(c.clone()));
+                self.emit(Op::Constant(i));
+            }
         }
         Ok(())
     }

@@ -108,7 +108,7 @@ fn collect_input_prompts_expr(expr: &Expr, out: &mut Vec<String>) {
                 collect_input_prompts_expr(e, out);
             }
         }
-        Expr::Literal(_) | Expr::Var(_) | Expr::Interp(_) | Expr::Formula(_) => {}
+        Expr::Literal(_) | Expr::Var(_) | Expr::Interp(_) | Expr::Formula(_) | Expr::Code(_) => {}
     }
 }
 
@@ -364,6 +364,34 @@ fn render_stmt(stmt: &Stmt, lines: &[ClassifiedLine]) -> (String, u32) {
                     tex
                 )
             }
+            Stmt::Assign {
+                name,
+                value: Expr::Code(c),
+                ..
+            } => {
+                let placeholder = escape(&crate::foreign::default_cmd_display(&c.lang));
+                let lang = escape(&c.lang);
+                let src = escape(&c.source);
+                format!(
+                    r#"<div class="card code-card" data-lang="{lang}">
+  <div class="code-head">
+    <span class="badge">code</span>
+    <code class="expr">`{name}` =</code>
+    <span class="code-lang">{lang}</span>
+    <div class="code-actions">
+      <input type="text" class="code-cmd" placeholder="{placeholder}" spellcheck="false" autocomplete="off"/>
+      <button type="button" class="code-run">Run</button>
+    </div>
+  </div>
+  <pre class="code-body"><code class="language-{lang}">{src}</code></pre>
+  <pre class="code-out" hidden></pre>
+</div>"#,
+                    lang = lang,
+                    name = escape(name),
+                    placeholder = placeholder,
+                    src = src,
+                )
+            }
             Stmt::Assign { name, value, .. } => format!(
                 "<div class=\"card\"><span class=\"badge\">bind</span> <code class=\"expr\">`{}` = {}</code></div>",
                 escape(name),
@@ -519,6 +547,7 @@ fn expr_prec(expr: &Expr, parent_prec: u8) -> String {
             format!("[{}]", parts.join(", "))
         }
         Expr::Formula(e) => format!("$$ {} $$", e.as_display()),
+        Expr::Code(c) => format!("```{} …```", c.lang),
     }
 }
 
@@ -706,6 +735,17 @@ mod tests {
                 && !html.contains("comment-text\"><p>x^2 - 2"),
             "formula fence leaked into comments: {html}"
         );
+    }
+
+    #[test]
+    fn structure_code_card() {
+        let src = include_str!("../../tests/lib/foreign-python.mq.md");
+        let module = crate::parse::parse_source(src).unwrap();
+        let html = render_module_structure(&module, src);
+        assert!(html.contains("code-card"), "{html}");
+        assert!(html.contains("code-run"), "{html}");
+        assert!(html.contains("hello-from-python"), "{html}");
+        assert!(!html.contains("python name=hi"), "{html}");
     }
 
     #[test]

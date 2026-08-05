@@ -73,6 +73,7 @@ pub fn classify_source(source: &str) -> Vec<ClassifiedLine> {
     let mut out = Vec::with_capacity(lines.len());
     let mut in_comment_paragraph = false;
     let mut in_math_fence = false;
+    let mut in_md_fence = false;
 
     for (i, text) in lines.into_iter().enumerate() {
         let base = classify_line(text);
@@ -83,6 +84,16 @@ pub fn classify_source(source: &str) -> Vec<ClassifiedLine> {
                 in_math_fence = false;
             }
             LineKind::Code
+        } else if in_md_fence {
+            // Markdown ``` fences are narrative / foreign sources — not Marqdo stmts.
+            if is_md_fence_line(trimmed) {
+                in_md_fence = false;
+            }
+            LineKind::Comment
+        } else if is_md_fence_opener(trimmed) {
+            in_md_fence = true;
+            in_comment_paragraph = false;
+            LineKind::Comment
         } else {
             match base {
                 LineKind::Blank => {
@@ -114,6 +125,18 @@ pub fn classify_source(source: &str) -> Vec<ClassifiedLine> {
         });
     }
     out
+}
+
+fn is_md_fence_opener(trimmed: &str) -> bool {
+    trimmed.starts_with("```")
+        && !trimmed
+            .chars()
+            .skip_while(|c| *c == '`')
+            .all(|c| c.is_whitespace())
+}
+
+fn is_md_fence_line(trimmed: &str) -> bool {
+    trimmed.starts_with("```")
 }
 
 /// Function-end / frontmatter HR or empty bold return — never swallowed by paragraphs.

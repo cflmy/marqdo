@@ -4,6 +4,13 @@ use std::fmt;
 
 use crate::formula::Expr as FormulaExpr;
 
+/// Bound Markdown code fence (`type` → `code`).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CodeBlock {
+    pub lang: String,
+    pub source: String,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {
     None,
@@ -18,6 +25,8 @@ pub enum Value {
     Map(Vec<(String, Value)>),
     /// Parsed symbolic expression (`type` → `formula`).
     Formula(FormulaExpr),
+    /// External language source from ```lang fence (`type` → `code`).
+    Code(CodeBlock),
 }
 
 impl Value {
@@ -31,6 +40,7 @@ impl Value {
             Value::List(xs) => !xs.is_empty(),
             Value::Map(xs) => !xs.is_empty(),
             Value::Formula(_) => true,
+            Value::Code(c) => !c.source.is_empty(),
         }
     }
 
@@ -48,6 +58,7 @@ impl Value {
             }
             Value::Map(_) => "<map>".into(),
             Value::Formula(e) => e.as_display(),
+            Value::Code(c) => format!("```{}\n{}\n```", c.lang, c.source),
         }
     }
 }

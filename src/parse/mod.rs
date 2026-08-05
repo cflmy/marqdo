@@ -288,7 +288,7 @@ impl<'a> Cursor<'a> {
         }))
     }
 
-    /// RHS on the same line, or empty RHS → following `$$` fence or table.
+    /// RHS on the same line, or empty RHS → following `$$` / ```lang fence or table.
     /// Returns `(expr, inclusive end_line)`.
     fn resolve_assign_rhs(&mut self, rhs: &str, span: Span) -> Result<(Expr, u32)> {
         let rhs = rhs.trim();
@@ -296,6 +296,9 @@ impl<'a> Cursor<'a> {
             self.skip_blanks();
             if self.peek_is_formula_fence() {
                 return self.consume_formula_fence(span);
+            }
+            if self.peek_is_code_fence() {
+                return self.consume_code_fence(span);
             }
             let start_i = self.i;
             let list = self.consume_table()?;
@@ -332,6 +335,50 @@ impl<'a> Cursor<'a> {
         self.peek()
             .map(|l| l.text.trim().starts_with("$$"))
             .unwrap_or(false)
+    }
+
+    fn peek_is_code_fence(&self) -> bool {
+        self.peek()
+            .map(|l| crate::foreign::is_fence_opener(l.text.trim()))
+            .unwrap_or(false)
+    }
+
+    fn consume_code_fence(&mut self, span: Span) -> Result<(Expr, u32)> {
+        let open = self
+            .bump()
+            .ok_or_else(|| anyhow::anyhow!("{span}: expected ```lang code fence"))?;
+        let open_line = open.line_no;
+        let trimmed = open.text.trim();
+        let lang = crate::foreign::fence_lang(trimmed).ok_or_else(|| {
+            anyhow::anyhow!("{open_line}:1: expected ```lang fence after empty assignment")
+        })?;
+        if trimmed.contains("name=") {
+            bail!(
+                "{open_line}:1: `name=` on fences was removed; \
+                 use `name` = then a ```{lang} fence (same shape as formulas)"
+            );
+        }
+        let mut body_lines: Vec<String> = Vec::new();
+        let mut closed = false;
+        let mut end_line = open_line;
+        while let Some(l) = self.peek() {
+            if crate::foreign::is_fence_closer(l.text.trim()) {
+                end_line = l.line_no;
+                self.bump();
+                closed = true;
+                break;
+            }
+            body_lines.push(l.text.clone());
+            self.bump();
+        }
+        if !closed {
+            bail!("{open_line}:1: unclosed code fence ```{lang}");
+        }
+        let source = body_lines.join("\n");
+        Ok((
+            Expr::Code(crate::value::CodeBlock { lang, source }),
+            end_line,
+        ))
     }
 
     fn consume_formula_fence(&mut self, span: Span) -> Result<(Expr, u32)> {
@@ -723,6 +770,24 @@ mod tests {
                 assert!(*end_line > 3, "end_line should cover the fence, got {end_line}");
             }
             other => panic!("expected formula assign, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn parse_code_assign_fence() {
+        let src = "# main\n\n`hi` =\n```python\nprint(1)\n```\n\n> print text=ok\n";
+        let m = parse_source(src).unwrap();
+        match &m.functions[0].body[0] {
+            Stmt::Assign {
+                name,
+                value: Expr::Code(c),
+                ..
+            } => {
+                assert_eq!(name, "hi");
+                assert_eq!(c.lang, "python");
+                assert_eq!(c.source, "print(1)");
+            }
+            other => panic!("expected code assign, got {other:?}"),
         }
     }
 }

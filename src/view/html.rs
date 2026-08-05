@@ -394,6 +394,87 @@ section.block > h2 {
 .formula-card .katex-display {
   margin: 0.2rem 0;
 }
+.code-card {
+  padding: 0;
+  overflow: hidden;
+}
+.code-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem 0.65rem;
+  padding: 0.65rem 0.85rem;
+  border-bottom: 1px solid var(--line);
+  background: #fafafa;
+}
+.code-lang {
+  font: 0.72rem/1 var(--mono);
+  color: var(--muted);
+  text-transform: lowercase;
+}
+.code-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.code-cmd {
+  min-width: 9rem;
+  max-width: 16rem;
+  padding: 0.35rem 0.55rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font: 0.78rem/1.2 var(--mono);
+  color: var(--ink);
+  background: #fff;
+}
+.code-cmd:focus {
+  outline: 2px solid rgba(29,29,31,0.18);
+  outline-offset: 1px;
+}
+.code-run {
+  padding: 0.35rem 0.75rem;
+  border: none;
+  border-radius: 8px;
+  background: var(--ink);
+  color: #fff;
+  font: 0.78rem/1.2 var(--sans);
+  font-weight: 600;
+  cursor: pointer;
+}
+.code-run:hover { opacity: 0.9; }
+.code-run:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.code-body {
+  margin: 0;
+  padding: 0.85rem 1rem;
+  overflow: auto;
+  background: #1e1e1e;
+  color: #d4d4d4;
+  font: 0.82rem/1.45 var(--mono);
+}
+.code-body code {
+  font: inherit;
+  background: none;
+  padding: 0;
+  color: inherit;
+}
+.code-out {
+  margin: 0;
+  padding: 0.75rem 1rem;
+  border-top: 1px solid var(--line);
+  background: #f0f0f2;
+  font: 0.8rem/1.45 var(--mono);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.code-out.err {
+  background: #fff5f5;
+  color: #9b1c1c;
+}
+.code-out:not([hidden]) { display: block; }
 .plots {
   display: grid;
   gap: 1rem;
@@ -514,6 +595,7 @@ pub fn layout(title: &str, nav: &str, main: &str) -> String {
 <link rel="shortcut icon" href="https://s3.cflmy.cn/logo/Logo.ico" type="image/x-icon"/>
 <link rel="apple-touch-icon" href="https://s3.cflmy.cn/logo/Logo.png"/>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" crossorigin="anonymous"/>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/github-dark.min.css" crossorigin="anonymous"/>
 <style>{css}</style>
 </head>
 <body>
@@ -548,6 +630,63 @@ pub fn layout(title: &str, nav: &str, main: &str) -> String {
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js" crossorigin="anonymous"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js" crossorigin="anonymous"
   onload="renderMathInElement(document.body,{{delimiters:[{{left:'$$',right:'$$',display:true}},{{left:'\\(',right:'\\)',display:false}}],ignoredTags:['script','noscript','style','textarea','pre','code','kbd']}});"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/highlight.min.js" crossorigin="anonymous"
+  onload="document.querySelectorAll('pre.code-body code').forEach(function(el){{hljs.highlightElement(el);}});"></script>
+<script>
+(function () {{
+  function initForeignCards() {{
+    var live = !!window.MARQDO_VIEW_LIVE;
+    document.querySelectorAll(".code-card").forEach(function (card) {{
+      var btn = card.querySelector(".code-run");
+      var cmd = card.querySelector(".code-cmd");
+      var out = card.querySelector(".code-out");
+      var body = card.querySelector(".code-body code");
+      if (!btn || !out || !body) return;
+      if (!live) {{
+        btn.disabled = true;
+        btn.title = "Run is available in live marqdo view";
+        if (cmd) cmd.disabled = true;
+        return;
+      }}
+      btn.addEventListener("click", function () {{
+        btn.disabled = true;
+        out.hidden = false;
+        out.classList.remove("err");
+        out.textContent = "Running…";
+        fetch("/api/foreign-run", {{
+          method: "POST",
+          headers: {{ "Content-Type": "application/json" }},
+          body: JSON.stringify({{
+            lang: card.getAttribute("data-lang") || "python",
+            source: body.textContent,
+            cmd: cmd ? cmd.value : ""
+          }})
+        }})
+          .then(function (r) {{ return r.json(); }})
+          .then(function (data) {{
+            if (data.ok) {{
+              out.classList.remove("err");
+              out.textContent = data.stdout === "" ? "(no stdout)" : data.stdout;
+            }} else {{
+              out.classList.add("err");
+              out.textContent = data.error || "foreign run failed";
+            }}
+          }})
+          .catch(function (e) {{
+            out.classList.add("err");
+            out.textContent = String(e);
+          }})
+          .finally(function () {{ btn.disabled = false; }});
+      }});
+    }});
+  }}
+  if (document.readyState === "loading") {{
+    document.addEventListener("DOMContentLoaded", initForeignCards);
+  }} else {{
+    initForeignCards();
+  }}
+}})();
+</script>
 </body>
 </html>
 "##,
@@ -789,8 +928,13 @@ pub fn page_file(files: &[PathBuf], rel: &str, vm: &FileViewModel, links: &LinkM
         s.push_str("</div>");
         s
     };
+    let live_flag = match links {
+        LinkMode::Live => "true",
+        LinkMode::Static { .. } => "false",
+    };
     let main = format!(
         r#"
+<script>window.MARQDO_VIEW_LIVE = {live};</script>
 <h1 class="page">{title}<span class="status-pill {status}">{status_label}</span></h1>
 <p class="meta">{rel}</p>
 <section class="block">
@@ -808,6 +952,7 @@ pub fn page_file(files: &[PathBuf], rel: &str, vm: &FileViewModel, links: &LinkM
   <pre class="source">{source}</pre>
 </section>
 "#,
+        live = live_flag,
         title = escape(title),
         status = status,
         status_label = status_label,

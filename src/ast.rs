@@ -2,6 +2,7 @@
 
 use crate::diagnostics::Span;
 use crate::formula::Expr as FormulaExpr;
+use crate::value::CodeBlock;
 
 #[derive(Debug, Clone)]
 pub struct Module {
@@ -91,6 +92,8 @@ pub enum Expr {
     List(Vec<Expr>),
     /// Parsed `$$…$$` formula tree (from assignment RHS).
     Formula(FormulaExpr),
+    /// Bound ```lang … ``` fence (`code` value).
+    Code(CodeBlock),
 }
 
 #[derive(Debug, Clone)]

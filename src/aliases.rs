@@ -60,6 +60,11 @@ pub fn canonical_param(builtin: &str, param: &str) -> String {
         }
         ("host_plot", "steps" | "步数") => "steps".into(),
         ("host_plot", "derivative" | "导数") => "derivative".into(),
+        ("host_foreign_run", "code" | "代码") => "code".into(),
+        ("host_foreign_run" | "host_foreign_run_lang", "stdin" | "标准输入") => "stdin".into(),
+        ("host_foreign_set_cmd" | "host_foreign_run_lang", "lang" | "语言") => "lang".into(),
+        ("host_foreign_set_cmd", "cmd" | "命令") => "cmd".into(),
+        ("host_foreign_run_lang", "source" | "源码") => "source".into(),
         _ => param.to_string(),
     }
 }

@@ -44,6 +44,7 @@ pub fn builtin_type(v: &Value) -> Value {
             Value::List(_) => "list",
             Value::Map(_) => "map",
             Value::Formula(_) => "formula",
+            Value::Code(_) => "code",
         }
         .into(),
     )
