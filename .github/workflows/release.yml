@@ -1,0 +1,45 @@
+# Build and attach release binaries when a version tag is pushed.
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build release
+        run: cargo build --release
+
+      - name: Package
+        shell: pwsh
+        run: |
+          $ver = "${{ github.ref_name }}".TrimStart("v")
+          $target = "x86_64-pc-windows-msvc"
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          $exe = "marqdo-$ver-$target.exe"
+          $zip = "marqdo-$ver-$target.zip"
+          Copy-Item target/release/marqdo.exe "dist/$exe"
+          Compress-Archive -Path "dist/$exe" -DestinationPath "dist/$zip" -Force
+          echo "EXE=$exe" >> $env:GITHUB_ENV
+          echo "ZIP=$zip" >> $env:GITHUB_ENV
+
+      - name: Upload release assets
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/${{ env.EXE }}
+            dist/${{ env.ZIP }}
+          fail_on_unmatched_files: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
