@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| 状态 | **P0 高亮 + P1 Run/Problems + 轻量 Debug 入口**（伴随 Marqdo **v0.1.0**） |
+| 状态 | **三按钮 Run / View / Debug + CLI 检测**（扩展 v0.0.5；封面 logo；需 CLI ≥ **0.1.0**） |
 | 日期 | 2026-08-05 |
 | 语言仓 | [`cflmy/marqdo`](https://github.com/cflmy/marqdo) `main` |
 | 扩展仓形态 | **同仓库专用分支** `vscode-extension`（本目录）；`main` **不跟踪**本目录 |

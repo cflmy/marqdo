@@ -129,28 +129,37 @@ export function probeMarqdo(
   }
 }
 
-export class DebugServer {
+export class LiveServer {
   private proc: ChildProcessWithoutNullStreams | null = null;
   private output: vscode.OutputChannel;
+  private label: string;
 
-  constructor(output: vscode.OutputChannel) {
+  constructor(output: vscode.OutputChannel, label: string) {
     this.output = output;
+    this.label = label;
   }
 
   get running(): boolean {
     return this.proc !== null && this.proc.exitCode === null;
   }
 
-  async start(targetPath: string, host: string, port: number): Promise<string> {
+  async start(
+    subcommand: "view" | "debug",
+    targetPath: string,
+    host: string,
+    port: number
+  ): Promise<string> {
     if (this.running) {
       await this.stop();
     }
     const cli = resolveMarqdoCli();
     const cwd = workspaceCwd(vscode.Uri.file(targetPath));
-    this.output.appendLine(`$ ${cli} debug ${targetPath} --host ${host} --port ${port} --no-open`);
+    this.output.appendLine(
+      `$ ${cli} ${subcommand} ${targetPath} --host ${host} --port ${port} --no-open`
+    );
     this.proc = spawn(
       cli,
-      ["debug", targetPath, "--host", host, "--port", String(port), "--no-open"],
+      [subcommand, targetPath, "--host", host, "--port", String(port), "--no-open"],
       {
         cwd,
         shell: process.platform === "win32",
@@ -161,11 +170,11 @@ export class DebugServer {
     this.proc.stdout.on("data", (d: Buffer) => this.output.append(d.toString()));
     this.proc.stderr.on("data", (d: Buffer) => this.output.append(d.toString()));
     this.proc.on("exit", (code) => {
-      this.output.appendLine(`[debug] exited (${code})`);
+      this.output.appendLine(`[${this.label}] exited (${code})`);
       this.proc = null;
     });
     this.proc.on("error", (err) => {
-      this.output.appendLine(`[debug] ${err.message}`);
+      this.output.appendLine(`[${this.label}] ${err.message}`);
       this.proc = null;
     });
     await new Promise((r) => setTimeout(r, 600));

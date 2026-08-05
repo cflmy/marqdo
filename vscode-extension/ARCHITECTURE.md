@@ -46,13 +46,13 @@ path:line:col: message
 
 ## CLI 安装（扩展侧）
 
-- 启动时（`onStartupFinished`）检测 CLI + `lib/`；缺失则提示 **Install CLI + stdlib**。  
-- 从 GitHub Releases 下载推荐 zip（`marqdo.exe` + `lib/`）到扩展 `globalStorage/cli/`，并写入 `marqdo.cliPath` / `marqdo.libPath`（spawn 时带 `MARQDO_LIB`）。  
-- 手动命令：`Marqdo: Install / Repair CLI`、`Marqdo: Check CLI Status`。  
-- 当前自动安装预编译包以 **Windows x64** 为主（与现有 Release 资产一致）；其它平台无匹配资产时会提示打开 Releases。
+- 启动时（`onStartupFinished`）检测：**CLI 是否存在**、**版本是否 ≥ `marqdo.minCliVersion`（默认 0.1.0）**、**stdlib (`lib/`) 是否可用**。  
+- 任一不满足 → 提示用户，由其选择安装 / 打开 Releases / 不再询问。  
+- 安装物落到扩展 `globalStorage/cli/`，并写入 `marqdo.cliPath` / `marqdo.libPath`（spawn 时带 `MARQDO_LIB`）。  
+- 命令：`Marqdo: Install / Repair CLI`、`Marqdo: Check CLI Status`。  
+- 预编译自动安装以 **Windows x64** Release zip 为主。
 
 ## 调试（P3 → 现有入口）
-
 - **已落地**：命令 `Marqdo: Open Debugger` 子进程启动 `marqdo debug --no-open`，再打开浏览器 / Simple Browser。  
 - **中期**：DAP 适配器包装现有 debug session API（`src/view/debug_api.rs` 语义），避免第三套断点模型。
 

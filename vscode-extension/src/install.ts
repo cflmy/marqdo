@@ -12,11 +12,39 @@ const MANAGED_DIR = "cli";
 export type InstallStatus = {
   cliOk: boolean;
   libOk: boolean;
+  versionOk: boolean;
   version?: string;
+  parsedVersion?: string;
+  requiredVersion: string;
   cliPath?: string;
   libRoot?: string;
   detail: string;
+  /** Suggested install mode when not fully ready */
+  suggestedMode?: "bundle" | "stdlib";
 };
+
+/** Parse first semver-like token from `marqdo --version` output. */
+export function parseCliVersion(raw: string): string | undefined {
+  const m = raw.match(/(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)/);
+  return m?.[1];
+}
+
+/** Compare a.b.c semver (pre-release suffix ignored for ordering). Returns <0 if a<b. */
+export function compareSemver(a: string, b: string): number {
+  const pa = a.split("-")[0].split(".").map((x) => Number.parseInt(x, 10) || 0);
+  const pb = b.split("-")[0].split(".").map((x) => Number.parseInt(x, 10) || 0);
+  for (let i = 0; i < 3; i++) {
+    const d = (pa[i] ?? 0) - (pb[i] ?? 0);
+    if (d !== 0) {
+      return d;
+    }
+  }
+  return 0;
+}
+
+function requiredVersion(): string {
+  return cfg().get<string>("minCliVersion")?.trim() || "0.1.0";
+}
 
 type GhAsset = { name: string; browser_download_url: string };
 type GhRelease = {
@@ -131,26 +159,52 @@ function stdlibPresent(cliPath: string, context?: vscode.ExtensionContext): { ok
 }
 
 export function checkInstallStatus(context: vscode.ExtensionContext): InstallStatus {
+  const need = requiredVersion();
   const cliPath = resolveCliPath(context);
   const probe = probeMarqdo(cliPath);
   if (!probe.ok) {
     return {
       cliOk: false,
       libOk: false,
+      versionOk: false,
+      requiredVersion: need,
       cliPath,
-      detail: probe.detail,
+      detail: `Marqdo CLI not found (${probe.detail}). Need ≥ ${need} with stdlib.`,
+      suggestedMode: "bundle",
     };
   }
+  const parsed = parseCliVersion(probe.version ?? "");
+  const versionOk = parsed !== undefined && compareSemver(parsed, need) >= 0;
   const lib = stdlibPresent(cliPath, context);
+
+  let suggestedMode: "bundle" | "stdlib" | undefined;
+  if (!versionOk) {
+    suggestedMode = "bundle";
+  } else if (!lib.ok) {
+    suggestedMode = "stdlib";
+  }
+
+  const parts: string[] = [`CLI ${probe.version}`];
+  if (!versionOk) {
+    parts.push(`version too old (need ≥ ${need}${parsed ? `, found ${parsed}` : ""})`);
+  }
+  if (lib.ok) {
+    parts.push(`stdlib at ${lib.root}`);
+  } else {
+    parts.push("stdlib missing (no lib/ next to binary / MARQDO_LIB)");
+  }
+
   return {
     cliOk: true,
     libOk: lib.ok,
+    versionOk,
     version: probe.version,
+    parsedVersion: parsed,
+    requiredVersion: need,
     cliPath,
     libRoot: lib.root,
-    detail: lib.ok
-      ? `CLI ${probe.version}; stdlib at ${lib.root}`
-      : `CLI ${probe.version}; stdlib missing (no lib/ next to binary, no MARQDO_LIB)`,
+    detail: parts.join("; "),
+    suggestedMode,
   };
 }
 
@@ -325,9 +379,13 @@ export async function installFromGitHub(
 
         const status = checkInstallStatus(context);
         output.appendLine(status.detail);
-        if (status.cliOk && status.libOk) {
+        if (status.cliOk && status.versionOk && status.libOk) {
           void vscode.window.showInformationMessage(
-            `Marqdo installed (${status.version}). Stdlib ready.`
+            `Marqdo ready (${status.parsedVersion ?? status.version}). Stdlib OK.`
+          );
+        } else if (status.cliOk && !status.versionOk) {
+          void vscode.window.showWarningMessage(
+            `Marqdo CLI still below ${status.requiredVersion}. ${status.detail}`
           );
         } else if (status.cliOk && !status.libOk) {
           void vscode.window.showWarningMessage(
@@ -378,24 +436,32 @@ export async function promptIfNeeded(
   const status = checkInstallStatus(context);
   output.appendLine(`[install] ${status.detail}`);
 
-  if (status.cliOk && status.libOk) {
+  if (status.cliOk && status.versionOk && status.libOk) {
+    output.appendLine(`[install] ready (CLI ≥ ${status.requiredVersion}, stdlib present)`);
     return;
   }
 
   let message: string;
   let primary: string;
+  const mode = status.suggestedMode ?? "bundle";
+
   if (!status.cliOk) {
-    message =
-      "Marqdo CLI not found. Download the official release (includes standard library) into the extension?";
+    message = `Marqdo CLI not detected. Install CLI ≥ ${status.requiredVersion} with the standard library?`;
     primary = "Install CLI + stdlib";
+  } else if (!status.versionOk) {
+    message = `Marqdo CLI version is too old (need ≥ ${status.requiredVersion}${
+      status.parsedVersion ? `, found ${status.parsedVersion}` : `, raw: ${status.version}`
+    }). Upgrade now (includes stdlib)?`;
+    primary = "Upgrade CLI + stdlib";
   } else {
     message =
-      "Marqdo CLI found, but the standard library (lib/) is missing. Download stdlib into the extension?";
+      "Marqdo CLI is OK, but the standard library (lib/) is missing. Download stdlib into the extension?";
     primary = "Install stdlib";
   }
 
   const choice = await vscode.window.showWarningMessage(
     message,
+    { modal: false },
     primary,
     "Open Releases",
     "Don't ask again"
@@ -403,7 +469,7 @@ export async function promptIfNeeded(
 
   if (choice === primary) {
     try {
-      await installFromGitHub(context, output, status.cliOk ? "stdlib" : "bundle");
+      await installFromGitHub(context, output, mode);
     } catch (e) {
       const err = e instanceof Error ? e.message : String(e);
       output.appendLine(`[install] ${err}`);

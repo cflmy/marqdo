@@ -2,8 +2,9 @@
   "name": "marqdo",
   "displayName": "Marqdo",
   "description": "Language support for Marqdo (.mq.md) — code as documentation.",
-  "version": "0.0.3",
+  "version": "0.0.5",
   "publisher": "cflmy",
+  "icon": "media/icon.png",
   "repository": {
     "type": "git",
     "url": "https://github.com/cflmy/marqdo.git"
@@ -55,56 +56,92 @@
     "commands": [
       {
         "command": "marqdo.run",
-        "title": "Marqdo: Run File",
-        "category": "Marqdo"
+        "title": "Run File",
+        "shortTitle": "Run",
+        "category": "Marqdo",
+        "icon": "$(play)"
+      },
+      {
+        "command": "marqdo.view",
+        "title": "Open View",
+        "shortTitle": "View",
+        "category": "Marqdo",
+        "icon": "$(open-preview)"
       },
       {
         "command": "marqdo.debug",
-        "title": "Marqdo: Open Debugger",
-        "category": "Marqdo"
+        "title": "Open Debugger",
+        "shortTitle": "Debug",
+        "category": "Marqdo",
+        "icon": "$(debug-alt)"
+      },
+      {
+        "command": "marqdo.view.stop",
+        "title": "Stop View",
+        "category": "Marqdo",
+        "icon": "$(close)"
       },
       {
         "command": "marqdo.debug.stop",
-        "title": "Marqdo: Stop Debugger",
-        "category": "Marqdo"
+        "title": "Stop Debugger",
+        "shortTitle": "Stop Debug",
+        "category": "Marqdo",
+        "icon": "$(debug-stop)"
       },
       {
         "command": "marqdo.catalog",
-        "title": "Marqdo: Generate Catalog",
-        "category": "Marqdo"
+        "title": "Generate Catalog",
+        "category": "Marqdo",
+        "icon": "$(book)"
       },
       {
         "command": "marqdo.showOutput",
-        "title": "Marqdo: Show Output",
-        "category": "Marqdo"
+        "title": "Show Output",
+        "category": "Marqdo",
+        "icon": "$(output)"
       },
       {
         "command": "marqdo.installCli",
-        "title": "Marqdo: Install / Repair CLI",
-        "category": "Marqdo"
+        "title": "Install / Repair CLI",
+        "category": "Marqdo",
+        "icon": "$(cloud-download)"
       },
       {
         "command": "marqdo.checkCli",
-        "title": "Marqdo: Check CLI Status",
-        "category": "Marqdo"
+        "title": "Check CLI Status",
+        "category": "Marqdo",
+        "icon": "$(info)"
       }
     ],
     "menus": {
       "editor/title": [
         {
           "command": "marqdo.run",
-          "when": "resourceFilename =~ /\\.mq\\.md$/ || editorLangId == marqdo",
-          "group": "navigation@1"
+          "when": "editorLangId == marqdo || resourceFilename =~ /\\.mq\\.md$/",
+          "group": "navigation@90"
+        },
+        {
+          "command": "marqdo.view",
+          "when": "editorLangId == marqdo || resourceFilename =~ /\\.mq\\.md$/",
+          "group": "navigation@91"
         },
         {
           "command": "marqdo.debug",
-          "when": "resourceFilename =~ /\\.mq\\.md$/ || editorLangId == marqdo",
-          "group": "navigation@2"
+          "when": "editorLangId == marqdo || resourceFilename =~ /\\.mq\\.md$/",
+          "group": "navigation@92"
         }
       ],
       "commandPalette": [
         {
           "command": "marqdo.run",
+          "when": "editorLangId == marqdo || resourceFilename =~ /\\.mq\\.md$/"
+        },
+        {
+          "command": "marqdo.view",
+          "when": "editorLangId == marqdo || resourceFilename =~ /\\.mq\\.md$/"
+        },
+        {
+          "command": "marqdo.debug",
           "when": "editorLangId == marqdo || resourceFilename =~ /\\.mq\\.md$/"
         }
       ]
@@ -138,7 +175,12 @@
         "marqdo.autoInstall.checkOnStartup": {
           "type": "boolean",
           "default": true,
-          "description": "On startup, detect missing CLI/stdlib and offer one-click install from GitHub Releases."
+          "description": "On startup, detect missing/outdated CLI or missing stdlib and offer install from GitHub Releases."
+        },
+        "marqdo.minCliVersion": {
+          "type": "string",
+          "default": "0.1.0",
+          "description": "Minimum required Marqdo CLI version (semver). Older installs trigger an upgrade prompt."
         },
         "marqdo.diagnoseOnSave": {
           "type": "boolean",
@@ -149,6 +191,25 @@
           "type": "number",
           "default": 60000,
           "description": "Timeout for `marqdo run` / diagnose (milliseconds)."
+        },
+        "marqdo.viewHost": {
+          "type": "string",
+          "default": "127.0.0.1",
+          "description": "Host for `marqdo view`."
+        },
+        "marqdo.viewPort": {
+          "type": "number",
+          "default": 7429,
+          "description": "Port for `marqdo view`."
+        },
+        "marqdo.viewOpen": {
+          "type": "string",
+          "enum": [
+            "external",
+            "simpleBrowser"
+          ],
+          "default": "external",
+          "description": "How to open the view UI after starting the server."
         },
         "marqdo.debugHost": {
           "type": "string",
