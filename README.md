@@ -6,7 +6,7 @@ Marqdo 把 Markdown **标记当作编程语法**：同一个 `.mq.md` 文件，�
 
 欢迎访问 [marqdo 官方网站](https://www.marqdo.com/) 阅读更多特性与可执行文档。
 
-语法宪法：[doc/design/markdown-mapping.md](doc/design/markdown-mapping.md) · 调用实参：[call-arguments.md](doc/design/call-arguments.md) · 用户站：[user-site.md](doc/design/user-site.md) · 浏览：[view.md](doc/design/view.md) · 调试：[view-debug.md](doc/design/view-debug.md) · 金样例：[tests/](tests/) · 用户文档：[public/](public/)
+语法宪法：[doc/design/markdown-mapping.md](doc/design/markdown-mapping.md) · 调用实参：[call-arguments.md](doc/design/call-arguments.md) · 用户站：[user-site.md](doc/design/user-site.md) · 浏览：[view.md](doc/design/view.md) · 调试：[view-debug.md](doc/design/view-debug.md) · OKF 清单：[catalog-cli.md](doc/design/catalog-cli.md) · 金样例：[tests/](tests/) · 用户文档：[public/](public/)
 
 ---
 
@@ -27,26 +27,37 @@ Marqdo 把 Markdown **标记当作编程语法**：同一个 `.mq.md` 文件，�
 
 | 标记 | 含义 |
 |------|------|
-| 无标记行 | 注释 |
+| 无标记行 | 注释（空行分段） |
 | `*…*` | 程序语句 |
 | `**…**` | **返回值**（架构） |
+| `****` / `**` + 空白 + `**` | **空返回**（`None`），并结束本函数体 |
 | `> print …` 等 | 输出等副作用 = **普通函数**，非架构标记 |
 | `#` / `##` | 函数与作用域 |
 | `+` / `1.` | 分支（臂头单独 `*` = else） |
 | `-` | 循环（头下纯名则为形参） |
 | 表格 | 集合 |
-| `---` / `***` | 可选：框住分支/循环（不强制） |
+| 函数体内单独一行 `---` / `***` | **结束本函数体**（无返回值收束；见 mapping §11） |
+| 文件开头成对 `---` … `---` | Frontmatter（元信息 / 导入），与函数结束符消歧 |
 
 ```markdown
 # main
 
-> print text=Hello World!
+> 问候 谁=World
+
+## 问候
+    - 谁
+
+> print text=Hello `谁`!
+
+---
 
 ## 加一
     - n
 
 **`n` + 1**
 ```
+
+完整约定：[markdown-mapping.md](doc/design/markdown-mapping.md)。
 
 ---
 
@@ -55,8 +66,32 @@ Marqdo 把 Markdown **标记当作编程语法**：同一个 `.mq.md` 文件，�
 1. **叙述默认安全**（无标记 = 注释）。  
 2. **返回是架构；打印只是函数。**  
 3. **代码即文档即知识库**：文稿可执行，执行可回看结构，结构可导航与调试。  
-4. **计划对齐 [OKF](doc/design/generated-yaml-manifest.md) 规范**：依赖与模块清单由工具生成（`marqdo catalog` / `sync`），不是手填配置——知识图谱与仓库结构同源生长。见 [catalog-cli.md](doc/design/catalog-cli.md)。  
+4. **对齐 [OKF](https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md)（Open Knowledge Format）方向**：清单由工具从 `.mq.md` **自动生成**，不是手填配置——见下节与 [catalog-cli.md](doc/design/catalog-cli.md)。  
 5. **正经解释器（Rust）**：词法/行分类 → 语法 → 语义 → 树遍历（及字节码）；**不用 Flex/Bison**。见 [路线图](doc/roadmap/interpreter.md)。
+
+---
+
+## OKF 风格清单（自动生成）
+
+从源码派生 YAML / Markdown 知识包（勿手改生成物）：
+
+```bash
+marqdo catalog [PATH] -o OUT_DIR
+marqdo sync [PATH] -o OUT_DIR          # catalog 的别名
+```
+
+| 参数 | 默认 | 说明 |
+|------|------|------|
+| `PATH` | `.` | 工程根或含 `.mq.md` 的目录 |
+| `-o` / `--out` | `.marqdo` | 输出目录 |
+
+产物示例：`catalog.yaml`、`index.md`、`modules/*.md`（`type: Marqdo Module` 等）。设计见 [generated-yaml-manifest.md](doc/design/generated-yaml-manifest.md) · 调研 [okf-and-marqdo.md](doc/research/okf-and-marqdo.md)。
+
+```bash
+cargo run -- catalog public -o .marqdo
+# 或已安装二进制时：
+marqdo catalog public -o .marqdo
+```
 
 ---
 
@@ -65,6 +100,7 @@ Marqdo 把 Markdown **标记当作编程语法**：同一个 `.mq.md` 文件，�
 - 映射与解释器：Phase I 树遍历 + 字节码后端可用；金样例在 `tests/`  
 - **`marqdo view`**：文档浏览器（Structure + 函数大纲/搜索 + Execution + Source）  
 - **`marqdo debug`**：独立调试页（断点 / 单步 / locals；默认端口 7430）  
+- **`marqdo catalog` / `sync`**：OKF 风格 YAML + 模块概念页  
 - 标准库：文本、文件、系统、时间、JSON、网络、数学（公式/绘图）、外联（Python 等）  
 - **用户静态站**：`public/` → `view output` → CI 发布 [gh-pages](https://cflmy.github.io/marqdo/)  
 - 选型：[ADR 0001 — Rust](doc/adr/0001-implementation-language.md)
@@ -74,9 +110,9 @@ cargo run -- run tests/structure/hello.mq.md
 cargo run -- run tests/structure/hello.mq.md --backend bytecode
 cargo run -- view public --no-open
 cargo run -- debug public --no-open
+cargo run -- catalog public -o .marqdo
 cargo run -- view output public -o public
 powershell -File ./scripts/build-public.ps1
-cargo run -- catalog tests -o .marqdo
 ```
 
 **发布包（GitHub Releases）**：单独 `.exe` **不含** `lib/`；请下载带 `lib/` 的 zip，或另下 `*-stdlib.zip` 解压到可执行文件旁（亦可设 `MARQDO_LIB`）。
