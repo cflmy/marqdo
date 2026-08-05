@@ -76,6 +76,7 @@ window.MARQDO_FILE_PATH = {path_js};
 </script>
 <header class="dbg-toolbar">
   <div class="dbg-brand">
+    <img class="dbg-logo" src="https://s3.cflmy.cn/logo/Logo.png" width="20" height="20" alt="marqdo"/>
     <span class="dbg-mark">marqdo</span>
     <span class="dbg-mode">debug</span>
   </div>
@@ -167,6 +168,9 @@ fn layout_debug(title: &str, main: &str) -> String {
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>debug · {title} · marqdo</title>
+<link rel="icon" href="https://s3.cflmy.cn/logo/Logo.ico" type="image/x-icon"/>
+<link rel="shortcut icon" href="https://s3.cflmy.cn/logo/Logo.ico" type="image/x-icon"/>
+<link rel="apple-touch-icon" href="https://s3.cflmy.cn/logo/Logo.png"/>
 <style>{css}</style>
 </head>
 <body class="dbg-body">
@@ -225,7 +229,8 @@ html, body { margin: 0; height: 100%; }
   border-bottom: 1px solid #000;
   flex-shrink: 0;
 }
-.dbg-brand { display: flex; align-items: baseline; gap: 0.35rem; }
+.dbg-brand { display: flex; align-items: center; gap: 0.4rem; }
+.dbg-logo { display: block; border-radius: 3px; flex-shrink: 0; }
 .dbg-mark { font-weight: 700; letter-spacing: -0.02em; color: #fff; font-size: 0.9rem; }
 .dbg-mode {
   font-size: 0.65rem;

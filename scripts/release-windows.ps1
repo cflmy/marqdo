@@ -2,7 +2,7 @@
 # to an existing GitHub Release tag.
 # Usage (from repo root):
 #   powershell -File ./scripts/release-windows.ps1
-#   powershell -File ./scripts/release-windows.ps1 -Tag v0.1.0
+#   powershell -File ./scripts/release-windows.ps1 -Tag v0.1.1
 param(
     [string]$Tag = ""
 )
@@ -79,26 +79,36 @@ $notes = @"
 | ``$exeName`` | **Executable only** — does **not** include the standard library |
 | ``$zipName`` | **Recommended**: ``marqdo.exe`` + ``lib/`` (place them together; ``lib/`` is resolved next to the binary) |
 | ``$stdlibName`` | Standard library only (``lib/*.mq.md``) — unpack next to an existing ``marqdo.exe``, or set ``MARQDO_LIB`` |
+| ``marqdo-0.0.5.vsix`` | **VS Code / Cursor extension** — syntax highlight, Run / View / Debug toolbar, CLI+stdlib install helper. Install via ``Extensions: Install from VSIX…``. Source: branch ``vscode-extension``. |
 
 > **Important:** the standalone ``.exe`` does **not** ship ``lib/``. Importing ``lib/text.mq.md`` etc. needs the bundle zip or the stdlib zip beside the binary (or ``MARQDO_LIB``).
 
 ### Highlights
 - Code as docs as knowledge: ``.mq.md`` is narrative + program
-- ``marqdo debug``: breakpoints / step / locals; ``marqdo view`` stays docs-only
-- View: function outline + search; wider layout
+- ``marqdo debug``: breakpoints / step / locals; page favicon and brand use the official Logo
+- ``marqdo view``: docs-only Structure + outline/search + Execution
+- VS Code extension v0.0.5: three editor actions (Run / View / Debug), logo cover icon, startup CLI version & stdlib detection with optional install
+- ``marqdo catalog`` / ``sync``: OKF-style YAML + module pages
 - Roadmap: deeper OKF-aligned catalog for human–AI knowledge bases
+
+### Quick start
 
 ``````text
 marqdo --version
 marqdo run public/00-welcome.mq.md
 marqdo view public
 marqdo debug public
+marqdo catalog public -o .marqdo
 ``````
+
+### Requirements
+- Windows x64 for the prebuilt ``.exe`` / zip assets above
+- Extension needs Marqdo CLI ≥ 0.1.0 (this release is 0.1.1); auto-install downloads the GitHub bundle when missing
 "@
 
 $body = @{
     tag_name   = $Tag
-    name       = $Tag
+    name       = "Marqdo $Tag"
     body       = $notes
     draft      = $false
     prerelease = $false

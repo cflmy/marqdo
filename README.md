@@ -95,14 +95,15 @@ marqdo catalog public -o .marqdo
 
 ---
 
-## 现状（v0.1.0）
+## 现状（v0.1.1）
 
 - 映射与解释器：Phase I 树遍历 + 字节码后端可用；金样例在 `tests/`  
 - **`marqdo view`**：文档浏览器（Structure + 函数大纲/搜索 + Execution + Source）  
-- **`marqdo debug`**：独立调试页（断点 / 单步 / locals；默认端口 7430）  
+- **`marqdo debug`**：独立调试页（断点 / 单步 / locals；默认端口 7430；页面 favicon / 品牌使用官方 Logo）  
 - **`marqdo catalog` / `sync`**：OKF 风格 YAML + 模块概念页  
 - 标准库：文本、文件、系统、时间、JSON、网络、数学（公式/绘图）、外联（Python 等）  
 - **用户静态站**：`public/` → `view output` → CI 发布 [gh-pages](https://cflmy.github.io/marqdo/)  
+- **VS Code 扩展**：分支 `vscode-extension`；Release 附带 `.vsix`（Run / View / Debug + CLI 安装助手）  
 - 选型：[ADR 0001 — Rust](doc/adr/0001-implementation-language.md)
 
 ```bash
