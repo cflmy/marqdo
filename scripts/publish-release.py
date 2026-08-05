@@ -51,25 +51,36 @@ def api(method: str, url: str, token: str, data: bytes | None = None, content_ty
         raise SystemExit(f"HTTP {e.code} {url}: {err}") from e
 
 
+def find_assets(stem: str) -> list[Path]:
+    assets: list[Path] = []
+    for base in (Path("dist"), Path("target/dist")):
+        for name in (f"{stem}.exe", f"{stem}.zip"):
+            p = base / name
+            if p.exists() and all(p.resolve() != a.resolve() for a in assets):
+                assets.append(p)
+        if len(assets) >= 2:
+            break
+    if len(assets) < 2:
+        raise SystemExit(
+            f"missing assets for {stem}.exe/.zip under dist/ or target/dist/"
+        )
+    return assets
+
+
 def main() -> None:
     ver = crate_version()
     tag = f"v{ver}"
     stem = f"marqdo-{ver}-x86_64-pc-windows-msvc"
-    assets = [
-        Path(f"target/dist/{stem}.exe"),
-        Path(f"target/dist/{stem}.zip"),
-    ]
-    for p in assets:
-        if not p.exists():
-            raise SystemExit(f"missing asset: {p}")
+    assets = find_assets(stem)
 
     notes = f"""## Marqdo {tag}
 
 ### Highlights
-- Function body end via `---` / `***` or empty `****` return
-- Blank-line paragraph comments (lex + view rendering)
-- Brand logo / favicon from s3.cflmy.cn
-- Welcome docs and call-arg spaced named values
+- **Code as docs as knowledge**: `.mq.md` is narrative + program in one tree
+- **`marqdo debug`**: dedicated debugger (breakpoints / step / locals); view stays docs-only
+- **View**: wider layout, function outline + search
+- Foreign code Run works in debug; math / stdlib / foreign as before
+- Roadmap: deeper **OKF**-aligned catalog so docs grow into a knowledge base for human–AI collaboration
 
 ### Assets
 - `{stem}.exe` — Windows x64 binary
@@ -79,6 +90,7 @@ def main() -> None:
 marqdo --version
 marqdo run public/00-welcome.mq.md
 marqdo view public
+marqdo debug public
 ```
 """
 

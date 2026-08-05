@@ -25,14 +25,14 @@
 | 规则 | 要求 |
 |------|------|
 | 色板 | 页底 `#f5f5f7`；内容面 `#ffffff`；正文 `#1d1d1f`；次要字 `#6e6e73`；分隔 `#d2d2d7`；选中侧栏项反白 |
-| 布局 | 壳层 `max-width ≈ 1400px` 居中；侧栏 ≈280px sticky；主内容 `max-width ≈ 58rem`（宽屏可读、不过窄）；**≤800px 侧栏收起**，顶栏汉堡（checkbox，无 JS） |
+| 布局 | 壳层 `max-width ≈ 1680px`；侧栏 ≈280px；主内容 `max-width ≈ 76rem`；Structure 旁函数大纲；**≤800px 侧栏收起** |
 | 默认页 | 打开目录时 **直接展示排序后的第一个 `.mq.md`**（实时 `/` 与静态 `index.html` 同），不要求用户先从欢迎页点选 |
 | 字体 | 仅系统栈：`-apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif`；等宽 `ui-monospace, SFMono-Regular, Menlo, Consolas, monospace` |
 | 外链 | **禁止** Google Fonts / CDN 样式；CSS 全部内联于 HTML |
 | 装饰 | 无多层阴影、无渐变、无发光；圆角 ≈12px；结构区为分组列表（底部分隔），非堆叠厚卡片 |
 | 诊断路径 | 展示时去掉 Windows `\\?\` 前缀，并优先用相对 view 根的路径 |
 
-验收：首屏无外网字体请求；宽屏主栏明显宽于早期 `40rem` 方案。
+验收：首屏无外网字体请求；宽屏主栏明显宽于早期 `58rem` 方案（现约 `76rem` / 壳 `1680px`）。
 
 ---
 
@@ -88,9 +88,10 @@ marqdo view output tests/structure/hello.mq.md -o /tmp/hello-doc
 
 ---
 
-## 4. 信息架构（不变）
+## 4. 信息架构
 
-侧栏索引 + 主区三节：结构（AST+注释插回）· 执行 · 源码。表达式为表面语法，非 Debug。
+侧栏文件索引 + 主区：结构（AST+注释；旁侧函数大纲可搜索）· 执行 · 源码。表达式为表面语法。  
+**断点调试**不在 view 内，见 [`marqdo debug`](view-debug.md)。
 
 ---
 
@@ -108,7 +109,8 @@ marqdo view output tests/structure/hello.mq.md -o /tmp/hello-doc
 
 ## 6. 验收
 
-1. 实时 `view`：HIG 风极简、无外链字体、结构与执行正确；打开目录即见首个文件。  
+1. 实时 `view`：HIG 风极简、无外链字体、结构与执行正确；打开目录即见首个文件；函数大纲可搜索跳转。  
 2. `view output public -o public`（或临时目录）生成可点的 `index.html`（首文件）与各 `pages/…`。  
 3. 静态页中执行区与 `marqdo run` 一致（未加 `--no-exec` 时）；失败诊断路径无 `\\?\`。  
-4. 冷启动无明显外网依赖。
+4. 冷启动无明显外网依赖。  
+5. 调试用 `marqdo debug`（默认端口 7430），与 view 页面分离。

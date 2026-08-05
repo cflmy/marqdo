@@ -6,11 +6,11 @@ use clap::{Parser, Subcommand, ValueEnum};
 
 use marqdo::catalog::{write_catalog, CatalogOptions};
 use marqdo::input_feed::load_stdin_file;
-use marqdo::view::{serve, write_static, OutputOptions, ViewOptions};
+use marqdo::view::{serve, serve_debug, write_static, DebugOptions, OutputOptions, ViewOptions};
 use marqdo::{Backend, RunOptions};
 
 #[derive(Parser, Debug)]
-#[command(name = "marqdo", version, about = "Marqdo interpreter — run, view, and catalog .mq.md")]
+#[command(name = "marqdo", version, about = "Marqdo interpreter — run, view, debug, and catalog .mq.md")]
 struct Cli {
     #[command(subcommand)]
     command: Commands,
@@ -76,6 +76,21 @@ enum Commands {
         port: u16,
 
         #[arg(long, global = true)]
+        no_open: bool,
+    },
+    /// Interactive debugger (tree-walk breakpoints; separate UI from `view`)
+    Debug {
+        /// Path to a `.mq.md` file or directory (default: `.`)
+        #[arg(value_name = "PATH")]
+        path: Option<PathBuf>,
+
+        #[arg(long, default_value = "127.0.0.1")]
+        host: String,
+
+        #[arg(long, default_value_t = 7430)]
+        port: u16,
+
+        #[arg(long)]
         no_open: bool,
     },
     /// Generate OKF-compatible catalog YAML + module pages
@@ -196,6 +211,20 @@ fn try_main() -> Result<i32> {
                 Ok(0)
             }
         },
+        Commands::Debug {
+            path,
+            host,
+            port,
+            no_open,
+        } => {
+            serve_debug(DebugOptions {
+                path: path.unwrap_or_else(|| PathBuf::from(".")),
+                host,
+                port,
+                open_browser: !no_open,
+            })?;
+            Ok(0)
+        }
         Commands::Catalog { path, out } | Commands::Sync { path, out } => {
             write_catalog(CatalogOptions {
                 path: path.unwrap_or_else(|| PathBuf::from(".")),

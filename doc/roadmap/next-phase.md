@@ -2,10 +2,10 @@
 
 | | |
 |---|---|
-| 状态 | **进行中**（P2 完成；下一：P3-D2 调试会话） |
-| 日期 | 2026-08-04 |
+| 状态 | **进行中**（P3-D1–D3 live view 断点 v1） |
+| 日期 | 2026-08-05 |
 | 目标 | 交互 I/O、可信诊断、可生长标准库；view 渐进成为调试宿主 |
-| 相关 | [interpreter.md](interpreter.md) · [keywords.md](../design/keywords.md) · [pipeline-debug.md](../design/pipeline-debug.md) · [view.md](../design/view.md) |
+| 相关 | [interpreter.md](interpreter.md) · [keywords.md](../design/keywords.md) · [pipeline-debug.md](../design/pipeline-debug.md) · [view.md](../design/view.md) · [view-debug.md](../design/view-debug.md) |
 
 ---
 
@@ -16,7 +16,8 @@
 | **`print`** | 树遍历 + 字节码均可用 | 够用 |
 | **`input`** | CLI 双后端 + `--stdin-file`；frontmatter `stdin:`/`输入:`；live view 表单覆盖；无预置时 capture 提示补线 | **P1a + P1b 完成** |
 | **诊断** | 语句级 `path:line:col: message`；字节码指令带 `spans`；errors 金样例双后端断言位置 | **P0 完成** |
-| **view** | 结构 + 一次执行 + 源码；注释已 Markdown 渲染；无暂停/断点 | **文档浏览器，不是调试器** |
+| **view** | 结构 + 执行 + 源码 + 函数大纲/搜索；无断点 | 文档浏览器 |
+| **debug** | 独立 `marqdo debug`：断点 / 单步 / locals（树遍历） | **P3-D3 v1** |
 | **标准库** | S0–S3 完成；本波扩展 = 文件/系统/时间/JSON/网络（[stdlib-modules.md](../design/stdlib-modules.md)）；数学/外联暂缓 | **P2 完成；五库扩展设计中** |
 | **模块** | `> file.mq.md` 顶层函数合并，无命名空间 | 短期可继续用 |
 

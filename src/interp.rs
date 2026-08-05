@@ -11,11 +11,12 @@ use crate::builtin::{
     builtin_at, builtin_int, builtin_join, builtin_len, builtin_split, builtin_str, builtin_trim,
     builtin_type,
 };
-use crate::debug::emit_trace;
+use crate::debug::{emit_trace, DebugController};
 use crate::diagnostics::{bail_at, Span};
 use crate::host::{call_host, HostContext, HostFn};
 use crate::input_feed::InputFeed;
 use crate::value::Value;
+use std::sync::Arc;
 
 pub struct Interpreter {
     pub path: Option<PathBuf>,
@@ -25,6 +26,7 @@ pub struct Interpreter {
     current_span: Span,
     input: InputFeed,
     host: HostContext,
+    debug: Option<Arc<DebugController>>,
 }
 
 struct Env {
@@ -62,6 +64,7 @@ impl Interpreter {
             current_span: Span::new(1, 1),
             input: InputFeed::new(false, Vec::new()),
             host: HostContext::for_run(path, Default::default(), Vec::new()),
+            debug: None,
         }
     }
 
@@ -74,6 +77,7 @@ impl Interpreter {
             current_span: Span::new(1, 1),
             input: InputFeed::new(true, Vec::new()),
             host: HostContext::for_capture(path, Default::default()),
+            debug: None,
         }
     }
 
@@ -84,6 +88,11 @@ impl Interpreter {
 
     pub fn with_host(mut self, host: HostContext) -> Self {
         self.host = host;
+        self
+    }
+
+    pub fn with_debug(mut self, debug: Arc<DebugController>) -> Self {
+        self.debug = Some(debug);
         self
     }
 
@@ -184,6 +193,12 @@ impl Interpreter {
         env: &mut Env,
         stmt: &Stmt,
     ) -> Result<Option<Value>> {
+        let span = stmt_span(stmt);
+        self.current_span = span;
+        if let Some(dbg) = &self.debug {
+            dbg.on_stmt(span.line, &fun.name, &env.vars, &self.captured_stdout)
+                .map_err(|m| self.err(m))?;
+        }
         match stmt {
             Stmt::Assign { name, value, span, .. } => {
                 self.current_span = *span;
@@ -695,5 +710,16 @@ fn cmp_ord(l: &Value, r: &Value, f: impl Fn(std::cmp::Ordering) -> bool) -> Resu
         }
         (Value::Text(a), Value::Text(b)) => Ok(Value::Bool(f(a.cmp(b)))),
         _ => bail!("comparison needs two ints/nums or two texts"),
+    }
+}
+
+fn stmt_span(stmt: &Stmt) -> Span {
+    match stmt {
+        Stmt::Assign { span, .. }
+        | Stmt::Return { span, .. }
+        | Stmt::Call { span, .. }
+        | Stmt::Branch { span, .. }
+        | Stmt::While { span, .. }
+        | Stmt::ForEach { span, .. } => *span,
     }
 }

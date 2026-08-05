@@ -114,7 +114,7 @@ a:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
   display: grid;
   grid-template-columns: 280px minmax(0, 1fr);
   min-height: 100vh;
-  max-width: 1400px;
+  max-width: 1680px;
   margin: 0 auto;
 }
 .nav {
@@ -219,10 +219,10 @@ a:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
   background: var(--bg);
 }
 main.panel {
-  padding: 2.25rem 2.5rem 4rem;
-  margin: 0 auto;
+  padding: 2rem 2.25rem 3.5rem;
+  margin: 0;
   width: 100%;
-  max-width: 58rem;
+  max-width: 76rem;
 }
 h1.page {
   font-size: clamp(1.75rem, 2.4vw, 2.35rem);
@@ -376,6 +376,77 @@ section.block > h2 {
   border: 1px solid var(--line);
   line-height: 1.55;
   box-shadow: 0 1px 0 rgba(0,0,0,0.02);
+}
+.stmt { display: block; }
+.stmt-body { min-width: 0; }
+.stmt-body > .card { border-bottom: 1px solid var(--line); }
+.structure > .stmt:last-child > .stmt-body > .card,
+.structure > .card:last-child { border-bottom: none; }
+.struct-wrap {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(9.5rem, 12.5rem);
+  gap: 0.75rem;
+  align-items: start;
+}
+@media (max-width: 960px) {
+  .struct-wrap { grid-template-columns: 1fr; }
+  .outline-panel { position: static; }
+}
+.outline-panel {
+  position: sticky;
+  top: 1rem;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 0.55rem 0.6rem 0.65rem;
+  box-shadow: 0 1px 0 rgba(0,0,0,0.02);
+}
+.fn-search {
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0 0 0.45rem;
+  padding: 0.4rem 0.5rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font: 0.78rem/1.2 var(--sans);
+  color: var(--ink);
+  background: #fff;
+}
+.fn-search:focus {
+  outline: 2px solid var(--focus);
+  outline-offset: 1px;
+}
+.outline-tree, .outline-tree ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.outline-tree ul {
+  padding-left: 0.7rem;
+  border-left: 1px solid var(--line);
+  margin-left: 0.25rem;
+}
+.outline-item {
+  margin: 0.12rem 0;
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+.outline-item.hidden { display: none; }
+.outline-item > a {
+  font-family: var(--mono);
+  font-size: 0.76rem;
+  color: var(--ink);
+}
+.outline-item > a:hover { opacity: 1; text-decoration: underline; }
+.outline-item .ol-meta {
+  color: var(--muted);
+  font-size: 0.66rem;
+  margin-left: 0.2rem;
+}
+.fun-card:target {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+  background: #f0f7ff;
 }
 .out.ok { background: var(--ok-bg); }
 .out.fail {
@@ -549,7 +620,7 @@ code.expr {
 @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
 @media (max-width: 900px) {
   .shell { grid-template-columns: 240px minmax(0, 1fr); }
-  main.panel { max-width: 48rem; padding: 1.75rem 1.5rem 3rem; }
+  main.panel { max-width: 64rem; padding: 1.75rem 1.5rem 3rem; }
 }
 @media (max-width: 800px) {
   .topbar { display: flex; }
@@ -681,9 +752,51 @@ pub fn layout(title: &str, nav: &str, main: &str) -> String {
     }});
   }}
   if (document.readyState === "loading") {{
-    document.addEventListener("DOMContentLoaded", initForeignCards);
+    document.addEventListener("DOMContentLoaded", function () {{
+      initForeignCards();
+      initOutlineSearch();
+    }});
   }} else {{
     initForeignCards();
+    initOutlineSearch();
+  }}
+
+  function initOutlineSearch() {{
+    var input = document.getElementById("fn-search");
+    var tree = document.querySelector(".outline-tree");
+    if (!input || !tree) return;
+    function applyFilter() {{
+      var q = (input.value || "").trim().toLowerCase();
+      var items = tree.querySelectorAll(".outline-item");
+      items.forEach(function (li) {{
+        if (!q) {{
+          li.classList.remove("hidden");
+          return;
+        }}
+        var name = (li.getAttribute("data-fn") || "").toLowerCase();
+        var path = (li.getAttribute("data-fn-path") || "").toLowerCase();
+        var selfMatch = name.indexOf(q) !== -1 || path.indexOf(q) !== -1;
+        var childMatch = false;
+        li.querySelectorAll(".outline-item").forEach(function (c) {{
+          var cn = (c.getAttribute("data-fn") || "").toLowerCase();
+          var cp = (c.getAttribute("data-fn-path") || "").toLowerCase();
+          if (cn.indexOf(q) !== -1 || cp.indexOf(q) !== -1) childMatch = true;
+        }});
+        li.classList.toggle("hidden", !(selfMatch || childMatch));
+      }});
+    }}
+    input.addEventListener("input", applyFilter);
+    tree.querySelectorAll("a[href^='#fn-']").forEach(function (a) {{
+      a.addEventListener("click", function (ev) {{
+        var id = (a.getAttribute("href") || "").slice(1);
+        var el = id ? document.getElementById(id) : null;
+        if (el) {{
+          ev.preventDefault();
+          el.scrollIntoView({{ behavior: "smooth", block: "start" }});
+          history.replaceState(null, "", "#" + id);
+        }}
+      }});
+    }});
   }}
 }})();
 </script>
@@ -932,14 +1045,37 @@ pub fn page_file(files: &[PathBuf], rel: &str, vm: &FileViewModel, links: &LinkM
         LinkMode::Live => "true",
         LinkMode::Static { .. } => "false",
     };
+    let outline_block = if vm.outline_html.is_empty() {
+        String::new()
+    } else {
+        vm.outline_html.clone()
+    };
+    let structure_block = if outline_block.is_empty() {
+        format!(
+            r#"<div class="structure" id="structure">{structure}</div>"#,
+            structure = vm.structure_html
+        )
+    } else {
+        format!(
+            r#"<div class="struct-wrap">
+  <div class="structure" id="structure">{structure}</div>
+  {outline}
+</div>"#,
+            structure = vm.structure_html,
+            outline = outline_block,
+        )
+    };
     let main = format!(
         r#"
-<script>window.MARQDO_VIEW_LIVE = {live};</script>
+<script>
+window.MARQDO_VIEW_LIVE = {live};
+window.MARQDO_FILE_PATH = {path_js};
+</script>
 <h1 class="page">{title}<span class="status-pill {status}">{status_label}</span></h1>
 <p class="meta">{rel}</p>
 <section class="block">
   <h2>Structure</h2>
-  <div class="structure">{structure}</div>
+  {structure_block}
 </section>
 <section class="block">
   <h2>Execution</h2>
@@ -953,15 +1089,34 @@ pub fn page_file(files: &[PathBuf], rel: &str, vm: &FileViewModel, links: &LinkM
 </section>
 "#,
         live = live_flag,
+        path_js = escape_js_string(rel),
         title = escape(title),
         status = status,
         status_label = status_label,
         rel = escape(rel),
-        structure = vm.structure_html,
+        structure_block = structure_block,
         stdin_panel = stdin_panel,
         out = out_text,
         plots = plots_html,
         source = escape(&vm.source),
     );
     layout(rel, &nav, &main)
+}
+
+fn escape_js_string(s: &str) -> String {
+    let mut out = String::from('"');
+    for c in s.chars() {
+        match c {
+            '\\' => out.push_str("\\\\"),
+            '"' => out.push_str("\\\""),
+            '\n' => out.push_str("\\n"),
+            '\r' => out.push_str("\\r"),
+            '\u{2028}' => out.push_str("\\u2028"),
+            '\u{2029}' => out.push_str("\\u2029"),
+            c if c.is_control() => out.push_str(&format!("\\u{:04x}", c as u32)),
+            c => out.push(c),
+        }
+    }
+    out.push('"');
+    out
 }

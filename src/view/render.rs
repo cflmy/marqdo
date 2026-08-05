@@ -10,11 +10,20 @@ use crate::lex::{classify_source, ClassifiedLine, LineKind};
 use crate::view::html::escape;
 use pulldown_cmark::{html, Options, Parser};
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum StructureMode {
+    /// Documentation browse: fun anchors, no breakpoint gutters
+    Browse,
+    /// Debugger: breakpoint gutters on statements
+    Debug,
+}
+
 pub struct FileViewModel {
     #[allow(dead_code)]
     pub rel_path: String,
     pub source: String,
     pub structure_html: String,
+    pub outline_html: String,
     pub stdout: String,
     pub stderr: String,
     pub ok: bool,
@@ -140,6 +149,14 @@ fn prompt_expr_text(expr: &Expr) -> String {
 }
 
 pub fn render_module_structure(module: &Module, source: &str) -> String {
+    render_module_structure_mode(module, source, StructureMode::Browse)
+}
+
+pub fn render_module_structure_mode(
+    module: &Module,
+    source: &str,
+    mode: StructureMode,
+) -> String {
     let lines = classify_source(source);
     let mut out = String::new();
 
@@ -171,7 +188,7 @@ pub fn render_module_structure(module: &Module, source: &str) -> String {
         if i > 0 {
             out.push_str(&emit_comments(&lines, cursor, fun.span.line));
         }
-        let (html, next) = render_fun(fun, &lines, 0);
+        let (html, next) = render_fun(fun, &lines, 0, "", mode);
         out.push_str(&html);
         cursor = next;
     }
@@ -179,6 +196,52 @@ pub fn render_module_structure(module: &Module, source: &str) -> String {
     // Trailing comments after last function tree
     out.push_str(&emit_comments(&lines, cursor, u32::MAX));
     out
+}
+
+pub fn render_function_outline(module: &Module) -> String {
+    if module.functions.is_empty() {
+        return String::new();
+    }
+    let mut out = String::from(
+        r#"<div class="outline-panel" id="fn-outline">
+<input type="search" id="fn-search" class="fn-search" placeholder="Search functions…" autocomplete="off" spellcheck="false"/>
+<ul class="outline-tree">"#,
+    );
+    for fun in &module.functions {
+        out.push_str(&outline_fun(fun, ""));
+    }
+    out.push_str("</ul></div>");
+    out
+}
+
+fn outline_fun(fun: &Function, parent_path: &str) -> String {
+    let fn_path = fn_path(parent_path, &fun.name);
+    let mut s = format!(
+        "<li class=\"outline-item\" data-fn=\"{}\" data-fn-path=\"{}\">\
+         <a href=\"#fn-{}\">{}</a> <span class=\"ol-meta\">h{}</span>",
+        escape(&fun.name),
+        escape(&fn_path),
+        fun.span.line,
+        escape(&fun.name),
+        fun.level,
+    );
+    if !fun.children.is_empty() {
+        s.push_str("<ul>");
+        for child in &fun.children {
+            s.push_str(&outline_fun(child, &fn_path));
+        }
+        s.push_str("</ul>");
+    }
+    s.push_str("</li>");
+    s
+}
+
+fn fn_path(parent_path: &str, name: &str) -> String {
+    if parent_path.is_empty() {
+        name.to_string()
+    } else {
+        format!("{parent_path}/{name}")
+    }
 }
 
 /// Line after closing frontmatter `---`, or 1 if none.
@@ -246,10 +309,22 @@ fn comment_markdown_to_html(md: &str) -> String {
     out
 }
 
-fn render_fun(fun: &Function, lines: &[ClassifiedLine], depth: usize) -> (String, u32) {
+fn render_fun(
+    fun: &Function,
+    lines: &[ClassifiedLine],
+    depth: usize,
+    parent_path: &str,
+    mode: StructureMode,
+) -> (String, u32) {
+    let fn_path = fn_path(parent_path, &fun.name);
     let mut s = String::new();
     let nest = if depth > 0 { " nested" } else { "" };
-    s.push_str(&format!("<div class=\"card fun-card{nest}\">"));
+    s.push_str(&format!(
+        "<div class=\"card fun-card{nest}\" id=\"fn-{}\" data-fn=\"{}\" data-fn-path=\"{}\">",
+        fun.span.line,
+        escape(&fun.name),
+        escape(&fn_path),
+    ));
     s.push_str(&format!(
         "<div><span class=\"badge\">fn · h{}</span><strong>{}</strong></div>",
         fun.level,
@@ -295,14 +370,14 @@ fn render_fun(fun: &Function, lines: &[ClassifiedLine], depth: usize) -> (String
             let stmt = &fun.body[bi];
             let start = stmt_start(stmt);
             s.push_str(&emit_comments(lines, cursor, start));
-            let (html, end) = render_stmt(stmt, lines);
+            let (html, end) = render_stmt(stmt, lines, mode);
             s.push_str(&html);
             cursor = end;
             bi += 1;
         } else {
             let child = &fun.children[ci];
             s.push_str(&emit_comments(lines, cursor, child.span.line));
-            let (html, end) = render_fun(child, lines, depth + 1);
+            let (html, end) = render_fun(child, lines, depth + 1, &fn_path, mode);
             s.push_str(&format!("<div class=\"nested\">{html}</div>"));
             cursor = end;
             ci += 1;
@@ -347,9 +422,10 @@ fn stmt_end_line(stmt: &Stmt) -> u32 {
     }
 }
 
-fn render_stmt(stmt: &Stmt, lines: &[ClassifiedLine]) -> (String, u32) {
+fn render_stmt(stmt: &Stmt, lines: &[ClassifiedLine], mode: StructureMode) -> (String, u32) {
     let end = stmt_end_line(stmt);
-    let html = match stmt {
+    let line = stmt_start(stmt);
+    let inner = match stmt {
             Stmt::Assign {
                 name,
                 value: Expr::Formula(e),
@@ -406,7 +482,7 @@ fn render_stmt(stmt: &Stmt, lines: &[ClassifiedLine]) -> (String, u32) {
             escape(&call_display(call))
         ),
         Stmt::Branch { arms, .. } => {
-            let mut inner =
+            let mut body =
                 String::from("<div class=\"card branch-card\"><span class=\"badge\">branch</span>");
             let mut arm_cursor = stmt_start(stmt) + 1;
             for arm in arms {
@@ -416,44 +492,44 @@ fn render_stmt(stmt: &Stmt, lines: &[ClassifiedLine]) -> (String, u32) {
                 };
                 // comments before first stmt in arm (approx: between arms hard; use body starts)
                 let arm_first = arm.body.first().map(stmt_start);
-                inner.push_str(&format!(
+                body.push_str(&format!(
                     "<div class=\"arm\"><span class=\"badge\">arm</span><code class=\"expr\">{}</code>",
                     escape(&label)
                 ));
                 if let Some(af) = arm_first {
-                    inner.push_str(&emit_comments(lines, arm_cursor, af));
+                    body.push_str(&emit_comments(lines, arm_cursor, af));
                     arm_cursor = af;
                 }
-                inner.push_str("<div class=\"nested\">");
+                body.push_str("<div class=\"nested\">");
                 for st in &arm.body {
                     let start = stmt_start(st);
-                    inner.push_str(&emit_comments(lines, arm_cursor, start));
-                    let (h, e) = render_stmt(st, lines);
-                    inner.push_str(&h);
+                    body.push_str(&emit_comments(lines, arm_cursor, start));
+                    let (h, e) = render_stmt(st, lines, mode);
+                    body.push_str(&h);
                     arm_cursor = e;
                 }
-                inner.push_str("</div></div>");
+                body.push_str("</div></div>");
             }
-            inner.push_str("</div>");
-            inner
+            body.push_str("</div>");
+            body
         }
         Stmt::While {
             condition, body, ..
         } => {
-            let mut inner = format!(
+            let mut body_html = format!(
                 "<div class=\"card loop-card\"><span class=\"badge\">while</span><code class=\"expr\">{}</code><div class=\"nested\">",
                 escape(&expr_display(condition))
             );
             let mut cursor = stmt_start(stmt) + 1;
             for st in body {
                 let start = stmt_start(st);
-                inner.push_str(&emit_comments(lines, cursor, start));
-                let (h, e) = render_stmt(st, lines);
-                inner.push_str(&h);
+                body_html.push_str(&emit_comments(lines, cursor, start));
+                let (h, e) = render_stmt(st, lines, mode);
+                body_html.push_str(&h);
                 cursor = e;
             }
-            inner.push_str("</div></div>");
-            inner
+            body_html.push_str("</div></div>");
+            body_html
         }
         Stmt::ForEach {
             item,
@@ -461,7 +537,7 @@ fn render_stmt(stmt: &Stmt, lines: &[ClassifiedLine]) -> (String, u32) {
             body,
             ..
         } => {
-            let mut inner = format!(
+            let mut body_html = format!(
                 "<div class=\"card loop-card\"><span class=\"badge\">foreach</span><code class=\"expr\">[{}]({})</code><div class=\"nested\">",
                 escape(item),
                 escape(collection)
@@ -469,16 +545,31 @@ fn render_stmt(stmt: &Stmt, lines: &[ClassifiedLine]) -> (String, u32) {
             let mut cursor = stmt_start(stmt) + 1;
             for st in body {
                 let start = stmt_start(st);
-                inner.push_str(&emit_comments(lines, cursor, start));
-                let (h, e) = render_stmt(st, lines);
-                inner.push_str(&h);
+                body_html.push_str(&emit_comments(lines, cursor, start));
+                let (h, e) = render_stmt(st, lines, mode);
+                body_html.push_str(&h);
                 cursor = e;
             }
-            inner.push_str("</div></div>");
-            inner
+            body_html.push_str("</div></div>");
+            body_html
         }
     };
-    (html, end)
+    (stmt_shell(line, &inner, mode), end)
+}
+
+fn stmt_shell(line: u32, inner: &str, mode: StructureMode) -> String {
+    match mode {
+        StructureMode::Browse => format!(
+            r#"<div class="stmt" data-line="{line}" id="stmt-{line}"><div class="stmt-body">{inner}</div></div>"#,
+            line = line,
+            inner = inner,
+        ),
+        StructureMode::Debug => format!(
+            r#"<div class="stmt" data-line="{line}" id="stmt-{line}"><button type="button" class="bp-gutter" title="Toggle breakpoint" aria-label="Breakpoint line {line}"></button><div class="stmt-body">{inner}</div></div>"#,
+            line = line,
+            inner = inner,
+        ),
+    }
 }
 
 fn call_display(call: &CallExpr) -> String {
@@ -718,6 +809,8 @@ mod tests {
         assert!(html.contains("lib/text.mq.md"), "{html}");
         assert!(html.contains("main"), "{html}");
         assert!(!html.contains("trim"), "{html}");
+        assert!(html.contains("class=\"stmt\""), "{html}");
+        assert!(html.contains("data-line="), "{html}");
         assert_eq!(local.functions.len(), 1);
         assert_eq!(local.functions[0].name, "main");
     }
@@ -752,5 +845,30 @@ mod tests {
     fn formula_ascii_to_tex_pow_and_mul() {
         assert_eq!(formula_ascii_to_tex("x^2 - 2"), "x^{2} - 2");
         assert_eq!(formula_ascii_to_tex("2*x"), r"2 \cdot x");
+    }
+
+    #[test]
+    fn structure_mode_browse_vs_debug() {
+        let src = include_str!("../../tests/structure/nested-call.mq.md");
+        let module = crate::parse::parse_source(src).unwrap();
+        let browse = render_module_structure_mode(&module, src, StructureMode::Browse);
+        let debug = render_module_structure_mode(&module, src, StructureMode::Debug);
+        assert!(browse.contains("id=\"fn-"), "{browse}");
+        assert!(!browse.contains("bp-gutter"), "{browse}");
+        assert!(debug.contains("bp-gutter"), "{debug}");
+        assert!(debug.contains("id=\"stmt-"), "{debug}");
+    }
+
+    #[test]
+    fn function_outline_lists_nested_names() {
+        let src = include_str!("../../tests/structure/nested-call.mq.md");
+        let module = crate::parse::parse_source(src).unwrap();
+        let outline = render_function_outline(&module);
+        assert!(outline.contains("outline-item"), "{outline}");
+        assert!(outline.contains("data-fn=\"main\""), "{outline}");
+        assert!(outline.contains("data-fn=\"问候\""), "{outline}");
+        assert!(outline.contains("data-fn-path=\"main/问候\""), "{outline}");
+        assert!(outline.contains("href=\"#fn-"), "{outline}");
+        assert!(outline.contains("ol-meta\">h"), "{outline}");
     }
 }

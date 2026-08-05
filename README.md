@@ -1,12 +1,25 @@
 ﻿# Marqdo
 
-**代码即文档。文档即代码。**
+**代码即文档。文档即代码。文档即知识库。**
 
-Marqdo：Markdown **标记即语法**。源文件 `.mq.md` 既是文稿也是程序。
+Marqdo 把 Markdown **标记当作编程语法**：同一个 `.mq.md` 文件，既是给人读的文稿，也是给机器跑的程序。写文档的过程就是在写可执行逻辑——大型项目里，说明、示例与实现不再分叉成三份真相。
 
-欢迎访问[marqdo官方网站](https://www.marqdo.com/)阅读marqdo更多特性
+欢迎访问 [marqdo 官方网站](https://www.marqdo.com/) 阅读更多特性与可执行文档。
 
-语法宪法：[doc/design/markdown-mapping.md](doc/design/markdown-mapping.md) · 调用实参：[call-arguments.md](doc/design/call-arguments.md) · 测试布局：[examples-and-tests.md](doc/design/examples-and-tests.md) · 用户站：[user-site.md](doc/design/user-site.md) · 浏览：[view.md](doc/design/view.md) · 金样例：[tests/](tests/) · 用户文档：[public/](public/)
+语法宪法：[doc/design/markdown-mapping.md](doc/design/markdown-mapping.md) · 调用实参：[call-arguments.md](doc/design/call-arguments.md) · 用户站：[user-site.md](doc/design/user-site.md) · 浏览：[view.md](doc/design/view.md) · 调试：[view-debug.md](doc/design/view-debug.md) · 金样例：[tests/](tests/) · 用户文档：[public/](public/)
+
+---
+
+## 为什么重要
+
+| 痛点 | Marqdo 的答案 |
+|------|----------------|
+| 文档过期、示例跑不通 | **一份源文件**：叙述、结构与执行结果同源 |
+| 知识散落在 Wiki / 注释 / 脚本里 | **`.mq.md` 即知识单元**，可浏览、可运行、可检索 |
+| 人写给人看，AI / 工具另起一套 | **人机同读同写同构**：标记语言对人类友好，对解释器确定 |
+| 大仓里「文档站」与「代码仓」脱节 | `view` 文档站 + `debug` 调试面 + `catalog` 清单，同一棵树长大 |
+
+这不是「再做一个 Markdown 渲染器」，而是：**把文档升格为可解释的程序与可生长的知识库**，让协作在大型项目里依然站得住。
 
 ---
 
@@ -39,33 +52,34 @@ Marqdo：Markdown **标记即语法**。源文件 `.mq.md` 既是文稿也是程
 
 ## 理念
 
-1. 叙述默认安全（无标记 = 注释）。  
-2. 返回是架构；打印只是函数。  
-3. 依赖清单由工具生成（OKF 风格），不是手填配置。  
-4. **正经解释器（Rust）**：词法/行分类 → 递归下降语法 → 语义 → 树遍历 → 日后字节码；**不用 Flex/Bison**。见 [路线图](doc/roadmap/interpreter.md) 与 [依赖说明](doc/design/dependencies.md)。
+1. **叙述默认安全**（无标记 = 注释）。  
+2. **返回是架构；打印只是函数。**  
+3. **代码即文档即知识库**：文稿可执行，执行可回看结构，结构可导航与调试。  
+4. **计划对齐 [OKF](doc/design/generated-yaml-manifest.md) 规范**：依赖与模块清单由工具生成（`marqdo catalog` / `sync`），不是手填配置——知识图谱与仓库结构同源生长。见 [catalog-cli.md](doc/design/catalog-cli.md)。  
+5. **正经解释器（Rust）**：词法/行分类 → 语法 → 语义 → 树遍历（及字节码）；**不用 Flex/Bison**。见 [路线图](doc/roadmap/interpreter.md)。
 
 ---
 
-## 现状
+## 现状（v0.1.0）
 
-- 映射 v0.1：[markdown-mapping.md](doc/design/markdown-mapping.md)  
-- 解释器路线图：[interpreter.md](doc/roadmap/interpreter.md)  
-- **Phase I（树遍历）已通**：`tests/structure/` 与 `tests/keywords/` 金样例均可 `marqdo run`  
-- **view**：`marqdo view public` 浏览用户文档；金样例用 `marqdo view tests`  
-- **用户静态站**：可执行文稿在 `public/`（无 errors）；`view output` 生成 HTML（ignore），CI 发布到 `gh-pages` — 见 [user-site.md](doc/design/user-site.md)  
-- 依赖（Rust，无 Flex/Bison）：[dependencies.md](doc/design/dependencies.md)  
-- 选型：[ADR 0001 — Rust](doc/adr/0001-implementation-language.md)  
+- 映射与解释器：Phase I 树遍历 + 字节码后端可用；金样例在 `tests/`  
+- **`marqdo view`**：文档浏览器（Structure + 函数大纲/搜索 + Execution + Source）  
+- **`marqdo debug`**：独立调试页（断点 / 单步 / locals；默认端口 7430）  
+- 标准库：文本、文件、系统、时间、JSON、网络、数学（公式/绘图）、外联（Python 等）  
+- **用户静态站**：`public/` → `view output` → CI 发布 [gh-pages](https://cflmy.github.io/marqdo/)  
+- 选型：[ADR 0001 — Rust](doc/adr/0001-implementation-language.md)
 
 ```bash
 cargo run -- run tests/structure/hello.mq.md
 cargo run -- run tests/structure/hello.mq.md --backend bytecode
 cargo run -- view public --no-open
+cargo run -- debug public --no-open
 cargo run -- view output public -o public
 powershell -File ./scripts/build-public.ps1
 cargo run -- catalog tests -o .marqdo
 ```
 
-文档：用户站见 [public/](public/) 与 [user-site.md](doc/design/user-site.md)；设计文稿见 [doc/](doc/)；`view` 皮肤见 [view.md](doc/design/view.md)；OKF 清单见 [catalog-cli.md](doc/design/catalog-cli.md)。
+文档：用户站 [public/](public/) · 设计 [doc/](doc/) · OKF / catalog [catalog-cli.md](doc/design/catalog-cli.md) · 调试 [view-debug.md](doc/design/view-debug.md)
 
 ---
 

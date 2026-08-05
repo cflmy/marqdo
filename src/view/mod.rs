@@ -1,5 +1,8 @@
 //! `marqdo view` — local HTML browser for `.mq.md` structure + output.
+//! `marqdo debug` — separate debugger host (tree-walk breakpoints).
 
+mod debug_api;
+mod debug_page;
 mod html;
 mod output;
 mod render;
@@ -15,11 +18,20 @@ use anyhow::{bail, Context, Result};
 use tiny_http::{Header, Method, Request, Response, Server, StatusCode};
 
 use crate::input_feed::{effective_stdin, split_stdin_text};
+use crate::view::debug_page::{build_debug_model, page_debug};
 use crate::view::html::{escape, page_file, page_index, LinkMode};
 use crate::view::render::{collect_input_prompts, render_module_structure, FileViewModel};
 use crate::{run_file_capture, RunOptions};
 
 pub struct ViewOptions {
+    pub path: PathBuf,
+    pub host: String,
+    pub port: u16,
+    pub open_browser: bool,
+}
+
+/// Options for `marqdo debug` (separate from view).
+pub struct DebugOptions {
     pub path: PathBuf,
     pub host: String,
     pub port: u16,
@@ -51,6 +63,30 @@ pub fn serve(opts: ViewOptions) -> Result<()> {
     for request in server.incoming_requests() {
         if let Err(err) = handle(&root_info, request) {
             eprintln!("view request error: {err:#}");
+        }
+    }
+    Ok(())
+}
+
+/// Live debugger UI (distinct from `view`). Default port usually 7430.
+pub fn serve_debug(opts: DebugOptions) -> Result<()> {
+    let root_info = build_root(&opts.path)?;
+    let addr: SocketAddr = format!("{}:{}", opts.host, opts.port)
+        .parse()
+        .context("invalid host/port")?;
+    let server = Server::http(addr).map_err(|e| anyhow::anyhow!("listen {addr}: {e}"))?;
+    let url = format!("http://{}:{}/", opts.host, opts.port);
+    eprintln!("marqdo debug: {url}");
+    eprintln!("root: {}", root_info.root.display());
+    eprintln!("{} .mq.md file(s). Ctrl+C to stop.", root_info.files.len());
+
+    if opts.open_browser {
+        let _ = open_url(&url);
+    }
+
+    for request in server.incoming_requests() {
+        if let Err(err) = handle_debug(&root_info, request) {
+            eprintln!("debug request error: {err:#}");
         }
     }
     Ok(())
@@ -137,7 +173,6 @@ fn handle(root: &ViewRoot, request: Request) -> Result<()> {
     let (path_part, query) = split_url(&url);
     match path_part {
         "/" | "/index.html" => {
-            // Default: open the first file in the folder (sorted), no welcome pick screen.
             if let Some(first) = root.files.first() {
                 let rel = first.to_string_lossy().replace('\\', "/");
                 let resolved = resolve_rel(root, &rel)?;
@@ -170,6 +205,85 @@ fn handle(root: &ViewRoot, request: Request) -> Result<()> {
     }
 }
 
+fn handle_debug(root: &ViewRoot, request: Request) -> Result<()> {
+    let url = request.url().to_string();
+    let method = request.method().clone();
+
+    if method == Method::Post {
+        let (path_part, _) = split_url(&url);
+        match path_part {
+            "/api/foreign-run" => return api_foreign_run(root, request),
+            "/api/debug/start" => {
+                return api_debug_post(request, |body| {
+                    debug_api::api_debug_start(&root.root, body)
+                })
+            }
+            "/api/debug/continue" => {
+                return api_debug_post(request, |body| {
+                    debug_api::api_debug_action(body, crate::debug::DebugAction::Continue)
+                })
+            }
+            "/api/debug/step" => {
+                return api_debug_post(request, |body| {
+                    debug_api::api_debug_action(body, crate::debug::DebugAction::Step)
+                })
+            }
+            "/api/debug/stop" => {
+                return api_debug_post(request, |body| debug_api::api_debug_stop(body))
+            }
+            "/api/debug/breakpoints" => {
+                return api_debug_post(request, |body| {
+                    debug_api::api_debug_set_breakpoints(body)
+                })
+            }
+            _ => {
+                let resp =
+                    Response::from_string("method not allowed").with_status_code(StatusCode(405));
+                let _ = request.respond(resp);
+                return Ok(());
+            }
+        }
+    }
+
+    if method != Method::Get {
+        let resp = Response::from_string("method not allowed").with_status_code(StatusCode(405));
+        let _ = request.respond(resp);
+        return Ok(());
+    }
+
+    let (path_part, query) = split_url(&url);
+    match path_part {
+        "/" | "/index.html" => {
+            if let Some(first) = root.files.first() {
+                let rel = first.to_string_lossy().replace('\\', "/");
+                let resolved = resolve_rel(root, &rel)?;
+                let source = fs::read_to_string(&resolved)
+                    .with_context(|| format!("read {}", resolved.display()))?;
+                let vm = build_debug_model(&resolved, &rel, &source);
+                let body = page_debug(&root.files, &rel, &vm);
+                respond_html(request, body)
+            } else {
+                let body = page_index(&root.files, None, &LinkMode::Live);
+                respond_html(request, body)
+            }
+        }
+        "/file" => {
+            let rel = query_param(query, "path").unwrap_or_default();
+            let resolved = resolve_rel(root, &rel)?;
+            let source = fs::read_to_string(&resolved)
+                .with_context(|| format!("read {}", resolved.display()))?;
+            let vm = build_debug_model(&resolved, &rel, &source);
+            let body = page_debug(&root.files, &rel, &vm);
+            respond_html(request, body)
+        }
+        _ => {
+            let resp = Response::from_string("not found").with_status_code(StatusCode(404));
+            let _ = request.respond(resp);
+            Ok(())
+        }
+    }
+}
+
 pub(crate) fn build_file_view(
     root: &ViewRoot,
     abs: &Path,
@@ -179,9 +293,10 @@ pub(crate) fn build_file_view(
 ) -> Result<FileViewModel> {
     let source = fs::read_to_string(abs).with_context(|| format!("read {}", abs.display()))?;
     // Structure shows this file only — do not merge imported lib bodies into the tree.
-    let (structure, input_prompts) = match crate::parse::parse_source(&source) {
+    let (structure, outline, input_prompts) = match crate::parse::parse_source(&source) {
         Ok(module) => (
             render_module_structure(&module, &source),
+            crate::view::render::render_function_outline(&module),
             collect_input_prompts(&module),
         ),
         Err(e) => (
@@ -189,6 +304,7 @@ pub(crate) fn build_file_view(
                 "<div class=\"err\">parse/load error: {}</div>",
                 escape(&tidy_user_error(&format!("{e:#}"), abs, rel))
             ),
+            String::new(),
             Vec::new(),
         ),
     };
@@ -217,6 +333,7 @@ pub(crate) fn build_file_view(
         rel_path: rel.to_string(),
         source,
         structure_html: structure,
+        outline_html: outline,
         stdout,
         stderr,
         ok,
@@ -347,6 +464,16 @@ fn files_json(files: &[PathBuf]) -> String {
 
 fn escape_json(s: &str) -> String {
     s.replace('\\', "\\\\").replace('"', "\\\"")
+}
+
+fn api_debug_post(
+    mut request: Request,
+    f: impl FnOnce(&str) -> serde_json::Value,
+) -> Result<()> {
+    let mut body = Vec::new();
+    std::io::Read::read_to_end(&mut request.as_reader(), &mut body)?;
+    let body = String::from_utf8_lossy(&body);
+    respond_json(request, f(&body).to_string())
 }
 
 fn api_foreign_run(root: &ViewRoot, mut request: Request) -> Result<()> {
