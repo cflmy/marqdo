@@ -1,0 +1,811 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>features/01-phase-i-treewalk.mq.md · marqdo</title>
+<link rel="icon" href="https://s3.cflmy.cn/logo/Logo.ico" type="image/x-icon"/>
+<link rel="shortcut icon" href="https://s3.cflmy.cn/logo/Logo.ico" type="image/x-icon"/>
+<link rel="apple-touch-icon" href="https://s3.cflmy.cn/logo/Logo.png"/>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" crossorigin="anonymous"/>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/github-dark.min.css" crossorigin="anonymous"/>
+<style>
+:root {
+  --bg: #f5f5f7;
+  --surface: #ffffff;
+  --ink: #1d1d1f;
+  --muted: #6e6e73;
+  --line: #d2d2d7;
+  --line-strong: #1d1d1f;
+  --fill: #f5f5f7;
+  --hover: #e8e8ed;
+  --focus: #0071e3;
+  --fail-bg: #fff5f5;
+  --ok-bg: #f5f5f7;
+  --radius: 12px;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: var(--sans);
+  color: var(--ink);
+  background: var(--bg);
+  line-height: 1.47;
+  font-size: 17px;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+a { color: var(--ink); text-decoration: none; }
+a:hover { opacity: 0.72; }
+a:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+#nav-toggle { position: absolute; opacity: 0; pointer-events: none; }
+.topbar {
+  display: none;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.7rem 1rem;
+  border-bottom: 1px solid var(--line);
+  background: rgba(255,255,255,0.86);
+  backdrop-filter: saturate(180%) blur(16px);
+  -webkit-backdrop-filter: saturate(180%) blur(16px);
+  position: sticky;
+  top: 0;
+  z-index: 20;
+}
+.topbar .brand { margin: 0; font-size: 1.05rem; font-weight: 600; letter-spacing: -0.022em; }
+.brand-row {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+.brand-row .brand { margin: 0; }
+.logo {
+  width: 1.75rem;
+  height: 1.75rem;
+  object-fit: contain;
+  flex-shrink: 0;
+  border-radius: 6px;
+}
+.topbar .logo { width: 1.45rem; height: 1.45rem; }
+.nav-brand .logo { width: 2rem; height: 2rem; }
+.nav-btn {
+  appearance: none;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+  border-radius: 10px;
+  width: 2.35rem;
+  height: 2.35rem;
+  font-size: 1.05rem;
+  line-height: 1;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.nav-btn:hover { background: var(--hover); }
+.shell {
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr);
+  min-height: 100vh;
+  max-width: 1680px;
+  margin: 0 auto;
+}
+.nav {
+  border-right: 1px solid var(--line);
+  padding: 1.75rem 1rem 2.5rem 1.15rem;
+  overflow: auto;
+  background: var(--bg);
+  position: sticky;
+  top: 0;
+  align-self: start;
+  height: 100vh;
+}
+.nav-brand { display: block; padding: 0 0.35rem; margin-bottom: 1.15rem; }
+.nav-brand .tagline { margin: 0.1rem 0 0; }
+.brand {
+  font-size: 1.35rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  margin: 0 0 0.1rem;
+}
+.tagline {
+  color: var(--muted);
+  font-size: 0.78rem;
+  margin: 0;
+  font-weight: 500;
+}
+.nav > h2:first-of-type { margin-top: 0.35rem; }
+.nav h2 {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--muted);
+  font-weight: 600;
+  margin: 1.15rem 0.35rem 0.45rem;
+}
+.nav ul { list-style: none; padding: 0; margin: 0; }
+.nav li { margin: 0.08rem 0; }
+.nav a.file {
+  display: block;
+  padding: 0.42rem 0.65rem;
+  border-radius: 8px;
+  border-bottom: none;
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.nav a.file:hover { background: var(--hover); opacity: 1; }
+.nav a.file.active {
+  background: var(--ink);
+  color: #fff;
+  opacity: 1;
+  font-weight: 500;
+}
+.nav-root { margin: 0; padding: 0; list-style: none; }
+.folder {
+  margin: 0.55rem 0 0.2rem;
+  border: none;
+}
+.folder > summary {
+  list-style: none;
+  cursor: pointer;
+  user-select: none;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  padding: 0.35rem 0.45rem;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.folder > summary::-webkit-details-marker { display: none; }
+.folder > summary::before {
+  content: "";
+  width: 0;
+  height: 0;
+  border-style: solid;
+  border-width: 4px 0 4px 6px;
+  border-color: transparent transparent transparent var(--muted);
+  opacity: 0.85;
+  transition: transform 0.12s ease;
+  flex-shrink: 0;
+}
+.folder[open] > summary::before {
+  transform: rotate(90deg);
+}
+.folder > summary:hover {
+  background: var(--hover);
+  color: var(--ink);
+}
+.folder > ul {
+  list-style: none;
+  padding: 0.1rem 0 0.15rem 0.55rem;
+  margin: 0;
+}
+.panel-wrap {
+  min-width: 0;
+  overflow: auto;
+  background: var(--bg);
+}
+main.panel {
+  padding: 2rem 2.25rem 3.5rem;
+  margin: 0;
+  width: 100%;
+  max-width: 76rem;
+}
+h1.page {
+  font-size: clamp(1.75rem, 2.4vw, 2.35rem);
+  font-weight: 700;
+  letter-spacing: -0.035em;
+  margin: 0 0 0.3rem;
+  line-height: 1.15;
+}
+.meta {
+  color: var(--muted);
+  font-size: 0.88rem;
+  margin: 0 0 1.75rem;
+  font-family: var(--mono);
+}
+.status-pill {
+  display: inline-block;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 0.18rem 0.5rem;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  margin-left: 0.5rem;
+  vertical-align: middle;
+}
+.status-pill.ok { background: var(--surface); color: var(--muted); }
+.status-pill.fail { background: var(--ink); color: #fff; border-color: var(--ink); }
+section.block { margin: 2rem 0; }
+section.block > h2 {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  font-weight: 600;
+  margin: 0 0 0.85rem;
+}
+.stdin-form {
+  margin: 0 0 1rem;
+  display: grid;
+  gap: 0.45rem;
+  max-width: 36rem;
+}
+.stdin-form label {
+  font-size: 0.85rem;
+  color: var(--ink);
+}
+.stdin-form .hint {
+  color: var(--muted);
+  font-size: 0.8rem;
+  margin-left: 0.35rem;
+}
+.stdin-form textarea {
+  font: inherit;
+  font-family: var(--mono);
+  font-size: 0.9rem;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink);
+  resize: vertical;
+  min-height: 4.5rem;
+}
+.stdin-form button {
+  justify-self: start;
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 600;
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--ink);
+  border-radius: 8px;
+  background: var(--ink);
+  color: #ffffff;
+  cursor: pointer;
+}
+.stdin-form button:hover { opacity: 0.88; }
+.stdin-form button:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+.structure {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 0.35rem 0.15rem;
+  box-shadow: 0 1px 0 rgba(0,0,0,0.02);
+}
+.card {
+  border: none;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  padding: 0.85rem 1.1rem;
+  margin: 0;
+  background: transparent;
+}
+.card:last-child { border-bottom: none; }
+.fun-card, .call-card, .branch-card, .loop-card, .ret-card {
+  border-left: 2px solid var(--line-strong);
+  padding-left: calc(1.1rem - 2px);
+}
+.comment-card {
+  border-left: 2px solid var(--line);
+  background: transparent;
+  padding-left: calc(1.1rem - 2px);
+}
+.badge {
+  display: inline-block;
+  font-family: var(--mono);
+  font-size: 0.66rem;
+  padding: 0.14rem 0.4rem;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: var(--fill);
+  color: var(--ink);
+  margin-right: 0.4rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+.params { margin: 0.35rem 0 0; }
+.chip {
+  display: inline-block;
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  padding: 0.14rem 0.45rem;
+  margin: 0.15rem 0.15rem 0 0;
+  border-radius: 6px;
+  background: var(--fill);
+  border: 1px solid transparent;
+  color: var(--ink);
+}
+.nested {
+  margin: 0.45rem 0 0.15rem 0.15rem;
+  padding-left: 0.85rem;
+  border-left: 1px solid var(--line);
+}
+.arm {
+  margin: 0.4rem 0;
+  padding: 0.55rem 0.7rem;
+  background: var(--fill);
+  border-radius: 10px;
+  border: 1px solid transparent;
+}
+.out, .source {
+  font-family: var(--mono);
+  font-size: 0.82rem;
+  white-space: pre-wrap;
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 1rem 1.15rem;
+  border: 1px solid var(--line);
+  line-height: 1.55;
+  box-shadow: 0 1px 0 rgba(0,0,0,0.02);
+}
+.stmt { display: block; }
+.stmt-body { min-width: 0; }
+.stmt-body > .card { border-bottom: 1px solid var(--line); }
+.structure > .stmt:last-child > .stmt-body > .card,
+.structure > .card:last-child { border-bottom: none; }
+.struct-wrap {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(9.5rem, 12.5rem);
+  gap: 0.75rem;
+  align-items: start;
+}
+@media (max-width: 960px) {
+  .struct-wrap { grid-template-columns: 1fr; }
+  .outline-panel { position: static; }
+}
+.outline-panel {
+  position: sticky;
+  top: 1rem;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 0.55rem 0.6rem 0.65rem;
+  box-shadow: 0 1px 0 rgba(0,0,0,0.02);
+}
+.fn-search {
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0 0 0.45rem;
+  padding: 0.4rem 0.5rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font: 0.78rem/1.2 var(--sans);
+  color: var(--ink);
+  background: #fff;
+}
+.fn-search:focus {
+  outline: 2px solid var(--focus);
+  outline-offset: 1px;
+}
+.outline-tree, .outline-tree ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.outline-tree ul {
+  padding-left: 0.7rem;
+  border-left: 1px solid var(--line);
+  margin-left: 0.25rem;
+}
+.outline-item {
+  margin: 0.12rem 0;
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+.outline-item.hidden { display: none; }
+.outline-item > a {
+  font-family: var(--mono);
+  font-size: 0.76rem;
+  color: var(--ink);
+}
+.outline-item > a:hover { opacity: 1; text-decoration: underline; }
+.outline-item .ol-meta {
+  color: var(--muted);
+  font-size: 0.66rem;
+  margin-left: 0.2rem;
+}
+.fun-card:target {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+  background: #f0f7ff;
+}
+.out.ok { background: var(--ok-bg); }
+.out.fail {
+  background: var(--fail-bg);
+  border-color: #e4c1c1;
+  color: var(--ink);
+  font-weight: 500;
+}
+.formula-card .math-block {
+  display: inline-block;
+  margin: 0.25rem 0 0.1rem 0.25rem;
+  vertical-align: middle;
+  overflow-x: auto;
+  max-width: 100%;
+}
+.formula-card .katex-display {
+  margin: 0.2rem 0;
+}
+.code-card {
+  padding: 0;
+  overflow: hidden;
+}
+.code-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem 0.65rem;
+  padding: 0.65rem 0.85rem;
+  border-bottom: 1px solid var(--line);
+  background: #fafafa;
+}
+.code-lang {
+  font: 0.72rem/1 var(--mono);
+  color: var(--muted);
+  text-transform: lowercase;
+}
+.code-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.code-cmd {
+  min-width: 9rem;
+  max-width: 16rem;
+  padding: 0.35rem 0.55rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font: 0.78rem/1.2 var(--mono);
+  color: var(--ink);
+  background: #fff;
+}
+.code-cmd:focus {
+  outline: 2px solid rgba(29,29,31,0.18);
+  outline-offset: 1px;
+}
+.code-run {
+  padding: 0.35rem 0.75rem;
+  border: none;
+  border-radius: 8px;
+  background: var(--ink);
+  color: #fff;
+  font: 0.78rem/1.2 var(--sans);
+  font-weight: 600;
+  cursor: pointer;
+}
+.code-run:hover { opacity: 0.9; }
+.code-run:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.code-body {
+  margin: 0;
+  padding: 0.85rem 1rem;
+  overflow: auto;
+  background: #1e1e1e;
+  color: #d4d4d4;
+  font: 0.82rem/1.45 var(--mono);
+}
+.code-body code {
+  font: inherit;
+  background: none;
+  padding: 0;
+  color: inherit;
+}
+.code-out {
+  margin: 0;
+  padding: 0.75rem 1rem;
+  border-top: 1px solid var(--line);
+  background: #f0f0f2;
+  font: 0.8rem/1.45 var(--mono);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.code-out.err {
+  background: #fff5f5;
+  color: #9b1c1c;
+}
+.code-out:not([hidden]) { display: block; }
+.plots {
+  display: grid;
+  gap: 1rem;
+  margin-top: 1rem;
+  justify-items: center;
+}
+.plot {
+  overflow: auto;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 0.75rem;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+.plot svg {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin-inline: auto;
+}
+.comment-text {
+  color: var(--muted);
+  font-size: 0.92rem;
+  display: block;
+  margin-top: 0.35rem;
+  line-height: 1.55;
+  max-width: 42em;
+}
+.comment-text > :first-child { margin-top: 0; }
+.comment-text > :last-child { margin-bottom: 0; }
+.comment-text p { margin: 0.45em 0; }
+.comment-text a {
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 0.12em;
+  border-bottom: none;
+}
+.comment-text a:hover { opacity: 0.72; }
+.comment-text code {
+  font-family: var(--mono);
+  font-size: 0.86em;
+  background: var(--fill);
+  padding: 0.08em 0.28em;
+  border-radius: 4px;
+}
+.comment-text ul, .comment-text ol {
+  margin: 0.4em 0;
+  padding-left: 1.35em;
+}
+code.expr {
+  font-family: var(--mono);
+  font-size: 0.84rem;
+  color: var(--ink);
+}
+.err { color: var(--ink); font-weight: 600; padding: 0.75rem 1rem; }
+.welcome {
+  max-width: 40rem;
+  margin: 4rem auto;
+  text-align: center;
+}
+.welcome p { color: var(--muted); font-size: 1.05rem; }
+.backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.28);
+  z-index: 25;
+  animation: fade-in 0.18s ease;
+}
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+@media (max-width: 900px) {
+  .shell { grid-template-columns: 240px minmax(0, 1fr); }
+  main.panel { max-width: 64rem; padding: 1.75rem 1.5rem 3rem; }
+}
+@media (max-width: 800px) {
+  .topbar { display: flex; }
+  .nav-brand { display: none; }
+  .shell {
+    grid-template-columns: 1fr;
+    max-width: none;
+    min-height: calc(100vh - 3.25rem);
+  }
+  .nav {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: min(82vw, 300px);
+    height: 100vh;
+    z-index: 30;
+    transform: translateX(-105%);
+    transition: transform 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
+    border-right: 1px solid var(--line);
+    background: var(--surface);
+    box-shadow: 8px 0 32px rgba(0,0,0,0.08);
+  }
+  #nav-toggle:checked ~ .shell .nav { transform: translateX(0); }
+  #nav-toggle:checked ~ .backdrop { display: block; }
+  main.panel {
+    max-width: none;
+    padding: 1.4rem 1.15rem 3rem;
+  }
+}
+</style>
+</head>
+<body>
+<input type="checkbox" id="nav-toggle"/>
+<label class="backdrop" for="nav-toggle" aria-hidden="true"></label>
+<header class="topbar">
+  <label class="nav-btn" for="nav-toggle" aria-label="Menu">☰</label>
+  <div class="brand-row">
+    <img class="logo" src="https://s3.cflmy.cn/logo/Logo.png" width="28" height="28" alt="marqdo"/>
+    <p class="brand">marqdo</p>
+  </div>
+</header>
+<div class="shell">
+<aside class="nav">
+  <div class="nav-brand">
+    <div class="brand-row">
+      <img class="logo" src="https://s3.cflmy.cn/logo/Logo.png" width="32" height="32" alt="marqdo"/>
+      <div>
+        <p class="brand">marqdo</p>
+        <p class="tagline">view</p>
+      </div>
+    </div>
+  </div>
+  <p style="margin:0 0 0.75rem"><a href="../../index.html">Index</a></p><h2>Files</h2><ul class="nav-root"><li><a class="file" href="../00-welcome.mq.md.html">00-welcome.mq.md</a></li><li><a class="file" href="../00-欢迎.mq.md.html">00-欢迎.mq.md</a></li></ul><details class="folder" open><summary>features</summary><ul><li><a class="file active" href="../features/01-phase-i-treewalk.mq.md.html">01-phase-i-treewalk.mq.md</a></li><li><a class="file" href="../features/01-树遍历.mq.md.html">01-树遍历.mq.md</a></li><li><a class="file" href="../features/02-bytecode.mq.md.html">02-bytecode.mq.md</a></li><li><a class="file" href="../features/02-字节码.mq.md.html">02-字节码.mq.md</a></li><li><a class="file" href="../features/03-view-and-docs.mq.md.html">03-view-and-docs.mq.md</a></li><li><a class="file" href="../features/03-view与文档.mq.md.html">03-view与文档.mq.md</a></li></ul></details><details class="folder"><summary>keywords</summary><ul><li><a class="file" href="../keywords/bool-logic.mq.md.html">bool-logic.mq.md</a></li><li><a class="file" href="../keywords/input.mq.md.html">input.mq.md</a></li><li><a class="file" href="../keywords/print.mq.md.html">print.mq.md</a></li><li><a class="file" href="../keywords/stdlib.mq.md.html">stdlib.mq.md</a></li><li><a class="file" href="../keywords/内核双名.mq.md.html">内核双名.mq.md</a></li><li><a class="file" href="../keywords/布尔逻辑.mq.md.html">布尔逻辑.mq.md</a></li><li><a class="file" href="../keywords/打印.mq.md.html">打印.mq.md</a></li><li><a class="file" href="../keywords/标准库.mq.md.html">标准库.mq.md</a></li><li><a class="file" href="../keywords/输入.mq.md.html">输入.mq.md</a></li></ul></details><details class="folder"><summary>stdlib</summary><ul><li><a class="file" href="../stdlib/00-overview.mq.md.html">00-overview.mq.md</a></li><li><a class="file" href="../stdlib/00-索引.mq.md.html">00-索引.mq.md</a></li><li><a class="file" href="../stdlib/foreign.mq.md.html">foreign.mq.md</a></li><li><a class="file" href="../stdlib/fs.mq.md.html">fs.mq.md</a></li><li><a class="file" href="../stdlib/json.mq.md.html">json.mq.md</a></li><li><a class="file" href="../stdlib/math.mq.md.html">math.mq.md</a></li><li><a class="file" href="../stdlib/net.mq.md.html">net.mq.md</a></li><li><a class="file" href="../stdlib/sys.mq.md.html">sys.mq.md</a></li><li><a class="file" href="../stdlib/table.mq.md.html">table.mq.md</a></li><li><a class="file" href="../stdlib/text.mq.md.html">text.mq.md</a></li><li><a class="file" href="../stdlib/time.mq.md.html">time.mq.md</a></li><li><a class="file" href="../stdlib/外联.mq.md.html">外联.mq.md</a></li><li><a class="file" href="../stdlib/数学.mq.md.html">数学.mq.md</a></li><li><a class="file" href="../stdlib/文件.mq.md.html">文件.mq.md</a></li><li><a class="file" href="../stdlib/文本.mq.md.html">文本.mq.md</a></li><li><a class="file" href="../stdlib/时间.mq.md.html">时间.mq.md</a></li><li><a class="file" href="../stdlib/系统.mq.md.html">系统.mq.md</a></li><li><a class="file" href="../stdlib/网络.mq.md.html">网络.mq.md</a></li><li><a class="file" href="../stdlib/表.mq.md.html">表.mq.md</a></li></ul></details><details class="folder"><summary>structure</summary><ul><li><a class="file" href="../structure/01-hello.mq.md.html">01-hello.mq.md</a></li><li><a class="file" href="../structure/01-你好.mq.md.html">01-你好.mq.md</a></li><li><a class="file" href="../structure/02-function.mq.md.html">02-function.mq.md</a></li><li><a class="file" href="../structure/02-函数.mq.md.html">02-函数.mq.md</a></li><li><a class="file" href="../structure/03-positional-call.mq.md.html">03-positional-call.mq.md</a></li><li><a class="file" href="../structure/03-位置调用.mq.md.html">03-位置调用.mq.md</a></li><li><a class="file" href="../structure/04-branch.mq.md.html">04-branch.mq.md</a></li><li><a class="file" href="../structure/04-分支.mq.md.html">04-分支.mq.md</a></li><li><a class="file" href="../structure/05-loop.mq.md.html">05-loop.mq.md</a></li><li><a class="file" href="../structure/05-循环.mq.md.html">05-循环.mq.md</a></li><li><a class="file" href="../structure/06-collection.mq.md.html">06-collection.mq.md</a></li><li><a class="file" href="../structure/06-集合.mq.md.html">06-集合.mq.md</a></li></ul></details><details class="folder"><summary>structure/import</summary><ul><li><a class="file" href="../structure/import/main.mq.md.html">main.mq.md</a></li><li><a class="file" href="../structure/import/utils.mq.md.html">utils.mq.md</a></li><li><a class="file" href="../structure/import/主.mq.md.html">主.mq.md</a></li><li><a class="file" href="../structure/import/工具.mq.md.html">工具.mq.md</a></li></ul></details>
+</aside>
+<div class="panel-wrap">
+<main class="panel">
+  
+<script>
+window.MARQDO_VIEW_LIVE = false;
+window.MARQDO_FILE_PATH = "features/01-phase-i-treewalk.mq.md";
+</script>
+<h1 class="page">01-phase-i-treewalk<span class="status-pill ok">ok</span></h1>
+<p class="meta">features/01-phase-i-treewalk.mq.md</p>
+<section class="block">
+  <h2>Structure</h2>
+  <div class="struct-wrap">
+  <div class="structure" id="structure"><div class="card fun-card" id="fn-6" data-fn="main" data-fn-path="main"><div><span class="badge">fn · h1</span><strong>main</strong></div><div class="card comment-card"><span class="badge">comment</span><div class="comment-text"><p>Milestone: Phase I (tree-walk).</p>
+</div></div><div class="card comment-card"><span class="badge">comment</span><div class="comment-text"><p>Pipeline: load → line classify → recursive-descent parse → semantic check → tree-walk eval. No Flex/Bison.</p>
+</div></div><div class="card comment-card"><span class="badge">comment</span><div class="comment-text"><p>This page runs as a program — documentation is executable:</p>
+</div></div><div class="stmt" data-line="14" id="stmt-14"><div class="stmt-body"><div class="card call-card"><span class="badge">call</span><code class="expr">&gt; print text=Phase I: tree-walk interpreter is live.</code></div></div></div></div></div>
+  <div class="outline-panel" id="fn-outline">
+<input type="search" id="fn-search" class="fn-search" placeholder="Search functions…" autocomplete="off" spellcheck="false"/>
+<ul class="outline-tree"><li class="outline-item" data-fn="main" data-fn-path="main"><a href="#fn-6">main</a> <span class="ol-meta">h1</span></li></ul></div>
+</div>
+</section>
+<section class="block">
+  <h2>Execution</h2>
+  
+  <div class="out ok">Phase I: tree-walk interpreter is live.
+</div>
+  
+</section>
+<section class="block">
+  <h2>Source</h2>
+  <pre class="source">---
+title: Phase I — tree-walk interpreter
+description: Lex · parse · check · tree-walk end to end
+---
+
+# main
+
+Milestone: Phase I (tree-walk).
+
+Pipeline: load → line classify → recursive-descent parse → semantic check → tree-walk eval. No Flex/Bison.
+
+This page runs as a program — documentation is executable:
+
+&gt; print text=Phase I: tree-walk interpreter is live.
+</pre>
+</section>
+
+</main>
+</div>
+</div>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js" crossorigin="anonymous"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js" crossorigin="anonymous"
+  onload="renderMathInElement(document.body,{delimiters:[{left:'$$',right:'$$',display:true},{left:'\\(',right:'\\)',display:false}],ignoredTags:['script','noscript','style','textarea','pre','code','kbd']});"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/highlight.min.js" crossorigin="anonymous"
+  onload="document.querySelectorAll('pre.code-body code').forEach(function(el){hljs.highlightElement(el);});"></script>
+<script>
+(function () {
+  function initForeignCards() {
+    var live = !!window.MARQDO_VIEW_LIVE;
+    document.querySelectorAll(".code-card").forEach(function (card) {
+      var btn = card.querySelector(".code-run");
+      var cmd = card.querySelector(".code-cmd");
+      var out = card.querySelector(".code-out");
+      var body = card.querySelector(".code-body code");
+      if (!btn || !out || !body) return;
+      if (!live) {
+        btn.disabled = true;
+        btn.title = "Run is available in live marqdo view";
+        if (cmd) cmd.disabled = true;
+        return;
+      }
+      btn.addEventListener("click", function () {
+        btn.disabled = true;
+        out.hidden = false;
+        out.classList.remove("err");
+        out.textContent = "Running…";
+        fetch("/api/foreign-run", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            lang: card.getAttribute("data-lang") || "python",
+            source: body.textContent,
+            cmd: cmd ? cmd.value : ""
+          })
+        })
+          .then(function (r) { return r.json(); })
+          .then(function (data) {
+            if (data.ok) {
+              out.classList.remove("err");
+              out.textContent = data.stdout === "" ? "(no stdout)" : data.stdout;
+            } else {
+              out.classList.add("err");
+              out.textContent = data.error || "foreign run failed";
+            }
+          })
+          .catch(function (e) {
+            out.classList.add("err");
+            out.textContent = String(e);
+          })
+          .finally(function () { btn.disabled = false; });
+      });
+    });
+  }
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", function () {
+      initForeignCards();
+      initOutlineSearch();
+    });
+  } else {
+    initForeignCards();
+    initOutlineSearch();
+  }
+
+  function initOutlineSearch() {
+    var input = document.getElementById("fn-search");
+    var tree = document.querySelector(".outline-tree");
+    if (!input || !tree) return;
+    function applyFilter() {
+      var q = (input.value || "").trim().toLowerCase();
+      var items = tree.querySelectorAll(".outline-item");
+      items.forEach(function (li) {
+        if (!q) {
+          li.classList.remove("hidden");
+          return;
+        }
+        var name = (li.getAttribute("data-fn") || "").toLowerCase();
+        var path = (li.getAttribute("data-fn-path") || "").toLowerCase();
+        var selfMatch = name.indexOf(q) !== -1 || path.indexOf(q) !== -1;
+        var childMatch = false;
+        li.querySelectorAll(".outline-item").forEach(function (c) {
+          var cn = (c.getAttribute("data-fn") || "").toLowerCase();
+          var cp = (c.getAttribute("data-fn-path") || "").toLowerCase();
+          if (cn.indexOf(q) !== -1 || cp.indexOf(q) !== -1) childMatch = true;
+        });
+        li.classList.toggle("hidden", !(selfMatch || childMatch));
+      });
+    }
+    input.addEventListener("input", applyFilter);
+    tree.querySelectorAll("a[href^='#fn-']").forEach(function (a) {
+      a.addEventListener("click", function (ev) {
+        var id = (a.getAttribute("href") || "").slice(1);
+        var el = id ? document.getElementById(id) : null;
+        if (el) {
+          ev.preventDefault();
+          el.scrollIntoView({ behavior: "smooth", block: "start" });
+          history.replaceState(null, "", "#" + id);
+        }
+      });
+    });
+  }
+})();
+</script>
+</body>
+</html>

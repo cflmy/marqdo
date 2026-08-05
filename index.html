@@ -1,0 +1,890 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>00-welcome.mq.md · marqdo</title>
+<link rel="icon" href="https://s3.cflmy.cn/logo/Logo.ico" type="image/x-icon"/>
+<link rel="shortcut icon" href="https://s3.cflmy.cn/logo/Logo.ico" type="image/x-icon"/>
+<link rel="apple-touch-icon" href="https://s3.cflmy.cn/logo/Logo.png"/>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" crossorigin="anonymous"/>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/github-dark.min.css" crossorigin="anonymous"/>
+<style>
+:root {
+  --bg: #f5f5f7;
+  --surface: #ffffff;
+  --ink: #1d1d1f;
+  --muted: #6e6e73;
+  --line: #d2d2d7;
+  --line-strong: #1d1d1f;
+  --fill: #f5f5f7;
+  --hover: #e8e8ed;
+  --focus: #0071e3;
+  --fail-bg: #fff5f5;
+  --ok-bg: #f5f5f7;
+  --radius: 12px;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: var(--sans);
+  color: var(--ink);
+  background: var(--bg);
+  line-height: 1.47;
+  font-size: 17px;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+a { color: var(--ink); text-decoration: none; }
+a:hover { opacity: 0.72; }
+a:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+#nav-toggle { position: absolute; opacity: 0; pointer-events: none; }
+.topbar {
+  display: none;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.7rem 1rem;
+  border-bottom: 1px solid var(--line);
+  background: rgba(255,255,255,0.86);
+  backdrop-filter: saturate(180%) blur(16px);
+  -webkit-backdrop-filter: saturate(180%) blur(16px);
+  position: sticky;
+  top: 0;
+  z-index: 20;
+}
+.topbar .brand { margin: 0; font-size: 1.05rem; font-weight: 600; letter-spacing: -0.022em; }
+.brand-row {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+.brand-row .brand { margin: 0; }
+.logo {
+  width: 1.75rem;
+  height: 1.75rem;
+  object-fit: contain;
+  flex-shrink: 0;
+  border-radius: 6px;
+}
+.topbar .logo { width: 1.45rem; height: 1.45rem; }
+.nav-brand .logo { width: 2rem; height: 2rem; }
+.nav-btn {
+  appearance: none;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+  border-radius: 10px;
+  width: 2.35rem;
+  height: 2.35rem;
+  font-size: 1.05rem;
+  line-height: 1;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.nav-btn:hover { background: var(--hover); }
+.shell {
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr);
+  min-height: 100vh;
+  max-width: 1680px;
+  margin: 0 auto;
+}
+.nav {
+  border-right: 1px solid var(--line);
+  padding: 1.75rem 1rem 2.5rem 1.15rem;
+  overflow: auto;
+  background: var(--bg);
+  position: sticky;
+  top: 0;
+  align-self: start;
+  height: 100vh;
+}
+.nav-brand { display: block; padding: 0 0.35rem; margin-bottom: 1.15rem; }
+.nav-brand .tagline { margin: 0.1rem 0 0; }
+.brand {
+  font-size: 1.35rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  margin: 0 0 0.1rem;
+}
+.tagline {
+  color: var(--muted);
+  font-size: 0.78rem;
+  margin: 0;
+  font-weight: 500;
+}
+.nav > h2:first-of-type { margin-top: 0.35rem; }
+.nav h2 {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--muted);
+  font-weight: 600;
+  margin: 1.15rem 0.35rem 0.45rem;
+}
+.nav ul { list-style: none; padding: 0; margin: 0; }
+.nav li { margin: 0.08rem 0; }
+.nav a.file {
+  display: block;
+  padding: 0.42rem 0.65rem;
+  border-radius: 8px;
+  border-bottom: none;
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.nav a.file:hover { background: var(--hover); opacity: 1; }
+.nav a.file.active {
+  background: var(--ink);
+  color: #fff;
+  opacity: 1;
+  font-weight: 500;
+}
+.nav-root { margin: 0; padding: 0; list-style: none; }
+.folder {
+  margin: 0.55rem 0 0.2rem;
+  border: none;
+}
+.folder > summary {
+  list-style: none;
+  cursor: pointer;
+  user-select: none;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  padding: 0.35rem 0.45rem;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.folder > summary::-webkit-details-marker { display: none; }
+.folder > summary::before {
+  content: "";
+  width: 0;
+  height: 0;
+  border-style: solid;
+  border-width: 4px 0 4px 6px;
+  border-color: transparent transparent transparent var(--muted);
+  opacity: 0.85;
+  transition: transform 0.12s ease;
+  flex-shrink: 0;
+}
+.folder[open] > summary::before {
+  transform: rotate(90deg);
+}
+.folder > summary:hover {
+  background: var(--hover);
+  color: var(--ink);
+}
+.folder > ul {
+  list-style: none;
+  padding: 0.1rem 0 0.15rem 0.55rem;
+  margin: 0;
+}
+.panel-wrap {
+  min-width: 0;
+  overflow: auto;
+  background: var(--bg);
+}
+main.panel {
+  padding: 2rem 2.25rem 3.5rem;
+  margin: 0;
+  width: 100%;
+  max-width: 76rem;
+}
+h1.page {
+  font-size: clamp(1.75rem, 2.4vw, 2.35rem);
+  font-weight: 700;
+  letter-spacing: -0.035em;
+  margin: 0 0 0.3rem;
+  line-height: 1.15;
+}
+.meta {
+  color: var(--muted);
+  font-size: 0.88rem;
+  margin: 0 0 1.75rem;
+  font-family: var(--mono);
+}
+.status-pill {
+  display: inline-block;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 0.18rem 0.5rem;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  margin-left: 0.5rem;
+  vertical-align: middle;
+}
+.status-pill.ok { background: var(--surface); color: var(--muted); }
+.status-pill.fail { background: var(--ink); color: #fff; border-color: var(--ink); }
+section.block { margin: 2rem 0; }
+section.block > h2 {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  font-weight: 600;
+  margin: 0 0 0.85rem;
+}
+.stdin-form {
+  margin: 0 0 1rem;
+  display: grid;
+  gap: 0.45rem;
+  max-width: 36rem;
+}
+.stdin-form label {
+  font-size: 0.85rem;
+  color: var(--ink);
+}
+.stdin-form .hint {
+  color: var(--muted);
+  font-size: 0.8rem;
+  margin-left: 0.35rem;
+}
+.stdin-form textarea {
+  font: inherit;
+  font-family: var(--mono);
+  font-size: 0.9rem;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink);
+  resize: vertical;
+  min-height: 4.5rem;
+}
+.stdin-form button {
+  justify-self: start;
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 600;
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--ink);
+  border-radius: 8px;
+  background: var(--ink);
+  color: #ffffff;
+  cursor: pointer;
+}
+.stdin-form button:hover { opacity: 0.88; }
+.stdin-form button:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+.structure {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 0.35rem 0.15rem;
+  box-shadow: 0 1px 0 rgba(0,0,0,0.02);
+}
+.card {
+  border: none;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  padding: 0.85rem 1.1rem;
+  margin: 0;
+  background: transparent;
+}
+.card:last-child { border-bottom: none; }
+.fun-card, .call-card, .branch-card, .loop-card, .ret-card {
+  border-left: 2px solid var(--line-strong);
+  padding-left: calc(1.1rem - 2px);
+}
+.comment-card {
+  border-left: 2px solid var(--line);
+  background: transparent;
+  padding-left: calc(1.1rem - 2px);
+}
+.badge {
+  display: inline-block;
+  font-family: var(--mono);
+  font-size: 0.66rem;
+  padding: 0.14rem 0.4rem;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: var(--fill);
+  color: var(--ink);
+  margin-right: 0.4rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+.params { margin: 0.35rem 0 0; }
+.chip {
+  display: inline-block;
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  padding: 0.14rem 0.45rem;
+  margin: 0.15rem 0.15rem 0 0;
+  border-radius: 6px;
+  background: var(--fill);
+  border: 1px solid transparent;
+  color: var(--ink);
+}
+.nested {
+  margin: 0.45rem 0 0.15rem 0.15rem;
+  padding-left: 0.85rem;
+  border-left: 1px solid var(--line);
+}
+.arm {
+  margin: 0.4rem 0;
+  padding: 0.55rem 0.7rem;
+  background: var(--fill);
+  border-radius: 10px;
+  border: 1px solid transparent;
+}
+.out, .source {
+  font-family: var(--mono);
+  font-size: 0.82rem;
+  white-space: pre-wrap;
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 1rem 1.15rem;
+  border: 1px solid var(--line);
+  line-height: 1.55;
+  box-shadow: 0 1px 0 rgba(0,0,0,0.02);
+}
+.stmt { display: block; }
+.stmt-body { min-width: 0; }
+.stmt-body > .card { border-bottom: 1px solid var(--line); }
+.structure > .stmt:last-child > .stmt-body > .card,
+.structure > .card:last-child { border-bottom: none; }
+.struct-wrap {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(9.5rem, 12.5rem);
+  gap: 0.75rem;
+  align-items: start;
+}
+@media (max-width: 960px) {
+  .struct-wrap { grid-template-columns: 1fr; }
+  .outline-panel { position: static; }
+}
+.outline-panel {
+  position: sticky;
+  top: 1rem;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 0.55rem 0.6rem 0.65rem;
+  box-shadow: 0 1px 0 rgba(0,0,0,0.02);
+}
+.fn-search {
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0 0 0.45rem;
+  padding: 0.4rem 0.5rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font: 0.78rem/1.2 var(--sans);
+  color: var(--ink);
+  background: #fff;
+}
+.fn-search:focus {
+  outline: 2px solid var(--focus);
+  outline-offset: 1px;
+}
+.outline-tree, .outline-tree ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.outline-tree ul {
+  padding-left: 0.7rem;
+  border-left: 1px solid var(--line);
+  margin-left: 0.25rem;
+}
+.outline-item {
+  margin: 0.12rem 0;
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+.outline-item.hidden { display: none; }
+.outline-item > a {
+  font-family: var(--mono);
+  font-size: 0.76rem;
+  color: var(--ink);
+}
+.outline-item > a:hover { opacity: 1; text-decoration: underline; }
+.outline-item .ol-meta {
+  color: var(--muted);
+  font-size: 0.66rem;
+  margin-left: 0.2rem;
+}
+.fun-card:target {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+  background: #f0f7ff;
+}
+.out.ok { background: var(--ok-bg); }
+.out.fail {
+  background: var(--fail-bg);
+  border-color: #e4c1c1;
+  color: var(--ink);
+  font-weight: 500;
+}
+.formula-card .math-block {
+  display: inline-block;
+  margin: 0.25rem 0 0.1rem 0.25rem;
+  vertical-align: middle;
+  overflow-x: auto;
+  max-width: 100%;
+}
+.formula-card .katex-display {
+  margin: 0.2rem 0;
+}
+.code-card {
+  padding: 0;
+  overflow: hidden;
+}
+.code-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem 0.65rem;
+  padding: 0.65rem 0.85rem;
+  border-bottom: 1px solid var(--line);
+  background: #fafafa;
+}
+.code-lang {
+  font: 0.72rem/1 var(--mono);
+  color: var(--muted);
+  text-transform: lowercase;
+}
+.code-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.code-cmd {
+  min-width: 9rem;
+  max-width: 16rem;
+  padding: 0.35rem 0.55rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font: 0.78rem/1.2 var(--mono);
+  color: var(--ink);
+  background: #fff;
+}
+.code-cmd:focus {
+  outline: 2px solid rgba(29,29,31,0.18);
+  outline-offset: 1px;
+}
+.code-run {
+  padding: 0.35rem 0.75rem;
+  border: none;
+  border-radius: 8px;
+  background: var(--ink);
+  color: #fff;
+  font: 0.78rem/1.2 var(--sans);
+  font-weight: 600;
+  cursor: pointer;
+}
+.code-run:hover { opacity: 0.9; }
+.code-run:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.code-body {
+  margin: 0;
+  padding: 0.85rem 1rem;
+  overflow: auto;
+  background: #1e1e1e;
+  color: #d4d4d4;
+  font: 0.82rem/1.45 var(--mono);
+}
+.code-body code {
+  font: inherit;
+  background: none;
+  padding: 0;
+  color: inherit;
+}
+.code-out {
+  margin: 0;
+  padding: 0.75rem 1rem;
+  border-top: 1px solid var(--line);
+  background: #f0f0f2;
+  font: 0.8rem/1.45 var(--mono);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.code-out.err {
+  background: #fff5f5;
+  color: #9b1c1c;
+}
+.code-out:not([hidden]) { display: block; }
+.plots {
+  display: grid;
+  gap: 1rem;
+  margin-top: 1rem;
+  justify-items: center;
+}
+.plot {
+  overflow: auto;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 0.75rem;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+.plot svg {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin-inline: auto;
+}
+.comment-text {
+  color: var(--muted);
+  font-size: 0.92rem;
+  display: block;
+  margin-top: 0.35rem;
+  line-height: 1.55;
+  max-width: 42em;
+}
+.comment-text > :first-child { margin-top: 0; }
+.comment-text > :last-child { margin-bottom: 0; }
+.comment-text p { margin: 0.45em 0; }
+.comment-text a {
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 0.12em;
+  border-bottom: none;
+}
+.comment-text a:hover { opacity: 0.72; }
+.comment-text code {
+  font-family: var(--mono);
+  font-size: 0.86em;
+  background: var(--fill);
+  padding: 0.08em 0.28em;
+  border-radius: 4px;
+}
+.comment-text ul, .comment-text ol {
+  margin: 0.4em 0;
+  padding-left: 1.35em;
+}
+code.expr {
+  font-family: var(--mono);
+  font-size: 0.84rem;
+  color: var(--ink);
+}
+.err { color: var(--ink); font-weight: 600; padding: 0.75rem 1rem; }
+.welcome {
+  max-width: 40rem;
+  margin: 4rem auto;
+  text-align: center;
+}
+.welcome p { color: var(--muted); font-size: 1.05rem; }
+.backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.28);
+  z-index: 25;
+  animation: fade-in 0.18s ease;
+}
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+@media (max-width: 900px) {
+  .shell { grid-template-columns: 240px minmax(0, 1fr); }
+  main.panel { max-width: 64rem; padding: 1.75rem 1.5rem 3rem; }
+}
+@media (max-width: 800px) {
+  .topbar { display: flex; }
+  .nav-brand { display: none; }
+  .shell {
+    grid-template-columns: 1fr;
+    max-width: none;
+    min-height: calc(100vh - 3.25rem);
+  }
+  .nav {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: min(82vw, 300px);
+    height: 100vh;
+    z-index: 30;
+    transform: translateX(-105%);
+    transition: transform 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
+    border-right: 1px solid var(--line);
+    background: var(--surface);
+    box-shadow: 8px 0 32px rgba(0,0,0,0.08);
+  }
+  #nav-toggle:checked ~ .shell .nav { transform: translateX(0); }
+  #nav-toggle:checked ~ .backdrop { display: block; }
+  main.panel {
+    max-width: none;
+    padding: 1.4rem 1.15rem 3rem;
+  }
+}
+</style>
+</head>
+<body>
+<input type="checkbox" id="nav-toggle"/>
+<label class="backdrop" for="nav-toggle" aria-hidden="true"></label>
+<header class="topbar">
+  <label class="nav-btn" for="nav-toggle" aria-label="Menu">☰</label>
+  <div class="brand-row">
+    <img class="logo" src="https://s3.cflmy.cn/logo/Logo.png" width="28" height="28" alt="marqdo"/>
+    <p class="brand">marqdo</p>
+  </div>
+</header>
+<div class="shell">
+<aside class="nav">
+  <div class="nav-brand">
+    <div class="brand-row">
+      <img class="logo" src="https://s3.cflmy.cn/logo/Logo.png" width="32" height="32" alt="marqdo"/>
+      <div>
+        <p class="brand">marqdo</p>
+        <p class="tagline">view</p>
+      </div>
+    </div>
+  </div>
+  <h2>Files</h2><ul class="nav-root"><li><a class="file active" href="pages/00-welcome.mq.md.html">00-welcome.mq.md</a></li><li><a class="file" href="pages/00-欢迎.mq.md.html">00-欢迎.mq.md</a></li></ul><details class="folder"><summary>features</summary><ul><li><a class="file" href="pages/features/01-phase-i-treewalk.mq.md.html">01-phase-i-treewalk.mq.md</a></li><li><a class="file" href="pages/features/01-树遍历.mq.md.html">01-树遍历.mq.md</a></li><li><a class="file" href="pages/features/02-bytecode.mq.md.html">02-bytecode.mq.md</a></li><li><a class="file" href="pages/features/02-字节码.mq.md.html">02-字节码.mq.md</a></li><li><a class="file" href="pages/features/03-view-and-docs.mq.md.html">03-view-and-docs.mq.md</a></li><li><a class="file" href="pages/features/03-view与文档.mq.md.html">03-view与文档.mq.md</a></li></ul></details><details class="folder"><summary>keywords</summary><ul><li><a class="file" href="pages/keywords/bool-logic.mq.md.html">bool-logic.mq.md</a></li><li><a class="file" href="pages/keywords/input.mq.md.html">input.mq.md</a></li><li><a class="file" href="pages/keywords/print.mq.md.html">print.mq.md</a></li><li><a class="file" href="pages/keywords/stdlib.mq.md.html">stdlib.mq.md</a></li><li><a class="file" href="pages/keywords/内核双名.mq.md.html">内核双名.mq.md</a></li><li><a class="file" href="pages/keywords/布尔逻辑.mq.md.html">布尔逻辑.mq.md</a></li><li><a class="file" href="pages/keywords/打印.mq.md.html">打印.mq.md</a></li><li><a class="file" href="pages/keywords/标准库.mq.md.html">标准库.mq.md</a></li><li><a class="file" href="pages/keywords/输入.mq.md.html">输入.mq.md</a></li></ul></details><details class="folder"><summary>stdlib</summary><ul><li><a class="file" href="pages/stdlib/00-overview.mq.md.html">00-overview.mq.md</a></li><li><a class="file" href="pages/stdlib/00-索引.mq.md.html">00-索引.mq.md</a></li><li><a class="file" href="pages/stdlib/foreign.mq.md.html">foreign.mq.md</a></li><li><a class="file" href="pages/stdlib/fs.mq.md.html">fs.mq.md</a></li><li><a class="file" href="pages/stdlib/json.mq.md.html">json.mq.md</a></li><li><a class="file" href="pages/stdlib/math.mq.md.html">math.mq.md</a></li><li><a class="file" href="pages/stdlib/net.mq.md.html">net.mq.md</a></li><li><a class="file" href="pages/stdlib/sys.mq.md.html">sys.mq.md</a></li><li><a class="file" href="pages/stdlib/table.mq.md.html">table.mq.md</a></li><li><a class="file" href="pages/stdlib/text.mq.md.html">text.mq.md</a></li><li><a class="file" href="pages/stdlib/time.mq.md.html">time.mq.md</a></li><li><a class="file" href="pages/stdlib/外联.mq.md.html">外联.mq.md</a></li><li><a class="file" href="pages/stdlib/数学.mq.md.html">数学.mq.md</a></li><li><a class="file" href="pages/stdlib/文件.mq.md.html">文件.mq.md</a></li><li><a class="file" href="pages/stdlib/文本.mq.md.html">文本.mq.md</a></li><li><a class="file" href="pages/stdlib/时间.mq.md.html">时间.mq.md</a></li><li><a class="file" href="pages/stdlib/系统.mq.md.html">系统.mq.md</a></li><li><a class="file" href="pages/stdlib/网络.mq.md.html">网络.mq.md</a></li><li><a class="file" href="pages/stdlib/表.mq.md.html">表.mq.md</a></li></ul></details><details class="folder"><summary>structure</summary><ul><li><a class="file" href="pages/structure/01-hello.mq.md.html">01-hello.mq.md</a></li><li><a class="file" href="pages/structure/01-你好.mq.md.html">01-你好.mq.md</a></li><li><a class="file" href="pages/structure/02-function.mq.md.html">02-function.mq.md</a></li><li><a class="file" href="pages/structure/02-函数.mq.md.html">02-函数.mq.md</a></li><li><a class="file" href="pages/structure/03-positional-call.mq.md.html">03-positional-call.mq.md</a></li><li><a class="file" href="pages/structure/03-位置调用.mq.md.html">03-位置调用.mq.md</a></li><li><a class="file" href="pages/structure/04-branch.mq.md.html">04-branch.mq.md</a></li><li><a class="file" href="pages/structure/04-分支.mq.md.html">04-分支.mq.md</a></li><li><a class="file" href="pages/structure/05-loop.mq.md.html">05-loop.mq.md</a></li><li><a class="file" href="pages/structure/05-循环.mq.md.html">05-循环.mq.md</a></li><li><a class="file" href="pages/structure/06-collection.mq.md.html">06-collection.mq.md</a></li><li><a class="file" href="pages/structure/06-集合.mq.md.html">06-集合.mq.md</a></li></ul></details><details class="folder"><summary>structure/import</summary><ul><li><a class="file" href="pages/structure/import/main.mq.md.html">main.mq.md</a></li><li><a class="file" href="pages/structure/import/utils.mq.md.html">utils.mq.md</a></li><li><a class="file" href="pages/structure/import/主.mq.md.html">主.mq.md</a></li><li><a class="file" href="pages/structure/import/工具.mq.md.html">工具.mq.md</a></li></ul></details>
+</aside>
+<div class="panel-wrap">
+<main class="panel">
+  
+<script>
+window.MARQDO_VIEW_LIVE = false;
+window.MARQDO_FILE_PATH = "00-welcome.mq.md";
+</script>
+<h1 class="page">00-welcome<span class="status-pill ok">ok</span></h1>
+<p class="meta">00-welcome.mq.md</p>
+<section class="block">
+  <h2>Structure</h2>
+  <div class="struct-wrap">
+  <div class="structure" id="structure"><div class="card"><span class="badge">import</span><span class="chip">lib/math.mq.md</span><span class="chip">lib/foreign.mq.md</span></div><div class="card fun-card" id="fn-8" data-fn="main" data-fn-path="main"><div><span class="badge">fn · h1</span><strong>main</strong></div><div class="card comment-card"><span class="badge">comment</span><div class="comment-text"><p>Hi — thanks for reading this far. I am Marqdo’s developer. Marqdo is a language where <strong>code is documentation, and documentation is code</strong>: Markdown markers are the program structure, so what you read is what runs.</p>
+</div></div><div class="card comment-card"><span class="badge">comment</span><div class="comment-text"><p>AI already prefers Markdown-shaped output. The idea was: why keep docs and code as two separate worlds? So Marqdo was born as a “docs are code” language. To keep every source renderable as Markdown, files use the <code>.mq.md</code> suffix. From early on we aimed for richer tooling — auto-generated YAML for OKF-style knowledge bases, even auto-generated slides — those are later goals. Happily, it already works well as a blogging tool: yes, this site is generated by Marqdo. And when AI writes Marqdo, you tend to burn fewer tokens — wallets everywhere thank you.</p>
+</div></div><div class="card comment-card"><span class="badge">comment</span><div class="comment-text"><p>The language is still young: structure markers, bilingual core names (<code>print</code> / <code>打印</code>, …), importable stdlibs (see <a href="stdlib/"><code>stdlib/</code></a> on this site), local <code>view</code>, and static export. Contribute on <a href="https://github.com/cflmy/marqdo">GitHub</a>.</p>
+</div></div><div class="card comment-card"><span class="badge">comment</span><div class="comment-text"><p>中文文档请看同目录的 <a href="00-%E6%AC%A2%E8%BF%8E.mq.md"><code>00-欢迎.mq.md</code></a>（叙述与内置均用中文）。</p>
+</div></div><div class="card comment-card"><span class="badge">comment</span><div class="comment-text"><p>A small function to say hello:</p>
+</div></div><div class="stmt" data-line="20" id="stmt-20"><div class="stmt-body"><div class="card call-card"><span class="badge">call</span><code class="expr">&gt; greet who=marqdo</code></div></div></div><div class="card comment-card"><span class="badge">comment</span><div class="comment-text"><p>Named args can include spaces:</p>
+</div></div><div class="stmt" data-line="24" id="stmt-24"><div class="stmt-body"><div class="card call-card"><span class="badge">call</span><code class="expr">&gt; greet who=marqdo user</code></div></div></div><div class="nested"><div class="card fun-card nested" id="fn-26" data-fn="greet" data-fn-path="main/greet"><div><span class="badge">fn · h2</span><strong>greet</strong></div><div class="params"><span class="chip">who</span></div><div class="stmt" data-line="29" id="stmt-29"><div class="stmt-body"><div class="card call-card"><span class="badge">call</span><code class="expr">&gt; print text=Welcome, `who`!</code></div></div></div></div></div><div class="card comment-card"><span class="badge">comment</span><div class="comment-text"><p>Beyond the basics above, Marqdo also ships standard libraries: table, time, text, files, system, math, foreign, and more.</p>
+</div></div><div class="card comment-card"><span class="badge">comment</span><div class="comment-text"><p>Math and foreign deserve a special mention. With the math library you can bind a formula like this:</p>
+</div></div><div class="stmt" data-line="37" id="stmt-37"><div class="stmt-body"><div class="card formula-card"><span class="badge">formula</span> <code class="expr">`f` =</code> <div class="math-block">$$x^{2} - 2$$</div></div></div></div><div class="card comment-card"><span class="badge">comment</span><div class="comment-text"><p>Then plot it:</p>
+</div></div><div class="stmt" data-line="44" id="stmt-44"><div class="stmt-body"><div class="card"><span class="badge">bind</span> <code class="expr">`_svg` = &gt; plot formula=`f` var=x min=-3 max=3</code></div></div></div><div class="card comment-card"><span class="badge">comment</span><div class="comment-text"><p>The foreign library lets you call external code, for example:</p>
+</div></div><div class="stmt" data-line="48" id="stmt-48"><div class="stmt-body"><div class="card code-card" data-lang="python">
+  <div class="code-head">
+    <span class="badge">code</span>
+    <code class="expr">`hi` =</code>
+    <span class="code-lang">python</span>
+    <div class="code-actions">
+      <input type="text" class="code-cmd" placeholder="python3" spellcheck="false" autocomplete="off"/>
+      <button type="button" class="code-run">Run</button>
+    </div>
+  </div>
+  <pre class="code-body"><code class="language-python">print(&quot;hello-from-python&quot;)</code></pre>
+  <pre class="code-out" hidden></pre>
+</div></div></div></div><div class="card comment-card"><span class="badge">comment</span><div class="comment-text"><p>Under Markdown this stays easy to read — which is the point: Marqdo’s design is code as documentation, documentation as code.</p>
+</div></div><div class="card comment-card"><span class="badge">comment</span><div class="comment-text"><p>Welcome again — enjoy exploring Marqdo.</p>
+</div></div></div>
+  <div class="outline-panel" id="fn-outline">
+<input type="search" id="fn-search" class="fn-search" placeholder="Search functions…" autocomplete="off" spellcheck="false"/>
+<ul class="outline-tree"><li class="outline-item" data-fn="main" data-fn-path="main"><a href="#fn-8">main</a> <span class="ol-meta">h1</span><ul><li class="outline-item" data-fn="greet" data-fn-path="main/greet"><a href="#fn-26">greet</a> <span class="ol-meta">h2</span></li></ul></li></ul></div>
+</div>
+</section>
+<section class="block">
+  <h2>Execution</h2>
+  
+  <div class="out ok">Welcome, marqdo!
+Welcome, marqdo user!
+</div>
+  <div class="plots"><div class="plot"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 360" width="520" height="360" role="img" aria-label="function plot">
+<defs>
+  <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+    <path d="M 0 0 L 10 5 L 0 10 z" fill="#4b5563"/>
+  </marker>
+</defs>
+<style>
+.grid { stroke: #e5e7eb; stroke-width: 1; }
+.axis { stroke: #4b5563; stroke-width: 1.5; }
+.tick { stroke: #4b5563; stroke-width: 1; }
+.curve { fill: none; stroke: #1f6feb; stroke-width: 2; }
+.pt { fill: #1f6feb; }
+.axis-label { font: 12px ui-sans-serif, system-ui, sans-serif; fill: #374151; font-weight: 600; }
+.tick-label { font: 10px ui-sans-serif, system-ui, sans-serif; fill: #6b7280; }
+</style>
+<line x1="36.00" y1="36" x2="36.00" y2="324" class="grid"/><line x1="110.67" y1="36" x2="110.67" y2="324" class="grid"/><line x1="185.33" y1="36" x2="185.33" y2="324" class="grid"/><line x1="260.00" y1="36" x2="260.00" y2="324" class="grid"/><line x1="334.67" y1="36" x2="334.67" y2="324" class="grid"/><line x1="409.33" y1="36" x2="409.33" y2="324" class="grid"/><line x1="484.00" y1="36" x2="484.00" y2="324" class="grid"/><line x1="36" y1="310.91" x2="484" y2="310.91" class="grid"/><line x1="36" y1="252.73" x2="484" y2="252.73" class="grid"/><line x1="36" y1="194.55" x2="484" y2="194.55" class="grid"/><line x1="36" y1="136.36" x2="484" y2="136.36" class="grid"/><line x1="36" y1="78.18" x2="484" y2="78.18" class="grid"/><line x1="36" y1="252.73" x2="484" y2="252.73" class="axis" marker-end="url(#arrow)"/><line x1="260.00" y1="324" x2="260.00" y2="36" class="axis" marker-end="url(#arrow)"/><text x="488.00" y="256.73" class="axis-label">x</text><text x="266.00" y="40.00" class="axis-label">y</text><line x1="36.00" y1="248.73" x2="36.00" y2="256.73" class="tick"/><text x="36.00" y="266.73" text-anchor="middle" class="tick-label">-3</text><line x1="110.67" y1="248.73" x2="110.67" y2="256.73" class="tick"/><text x="110.67" y="266.73" text-anchor="middle" class="tick-label">-2</text><line x1="185.33" y1="248.73" x2="185.33" y2="256.73" class="tick"/><text x="185.33" y="266.73" text-anchor="middle" class="tick-label">-1</text><line x1="334.67" y1="248.73" x2="334.67" y2="256.73" class="tick"/><text x="334.67" y="266.73" text-anchor="middle" class="tick-label">1</text><line x1="409.33" y1="248.73" x2="409.33" y2="256.73" class="tick"/><text x="409.33" y="266.73" text-anchor="middle" class="tick-label">2</text><line x1="484.00" y1="248.73" x2="484.00" y2="256.73" class="tick"/><text x="484.00" y="266.73" text-anchor="middle" class="tick-label">3</text><line x1="256.00" y1="310.91" x2="264.00" y2="310.91" class="tick"/><text x="252.00" y="310.91" text-anchor="end" dominant-baseline="middle" class="tick-label">-2</text><line x1="256.00" y1="194.55" x2="264.00" y2="194.55" class="tick"/><text x="252.00" y="194.55" text-anchor="end" dominant-baseline="middle" class="tick-label">2</text><line x1="256.00" y1="136.36" x2="264.00" y2="136.36" class="tick"/><text x="252.00" y="136.36" text-anchor="end" dominant-baseline="middle" class="tick-label">4</text><line x1="256.00" y1="78.18" x2="264.00" y2="78.18" class="tick"/><text x="252.00" y="78.18" text-anchor="end" dominant-baseline="middle" class="tick-label">6</text><text x="252.00" y="266.73" class="tick-label">0</text><path d="M 36.00 49.09 L 38.24 54.30 L 40.48 59.46 L 42.72 64.56 L 44.96 69.62 L 47.20 74.62 L 49.44 79.57 L 51.68 84.46 L 53.92 89.31 L 56.16 94.10 L 58.40 98.84 L 60.64 103.52 L 62.88 108.16 L 65.12 112.74 L 67.36 117.27 L 69.60 121.75 L 71.84 126.17 L 74.08 130.54 L 76.32 134.86 L 78.56 139.13 L 80.80 143.35 L 83.04 147.51 L 85.28 151.62 L 87.52 155.68 L 89.76 159.68 L 92.00 163.64 L 94.24 167.54 L 96.48 171.39 L 98.72 175.18 L 100.96 178.93 L 103.20 182.62 L 105.44 186.26 L 107.68 189.84 L 109.92 193.38 L 112.16 196.86 L 114.40 200.29 L 116.64 203.67 L 118.88 206.99 L 121.12 210.27 L 123.36 213.49 L 125.60 216.65 L 127.84 219.77 L 130.08 222.83 L 132.32 225.84 L 134.56 228.80 L 136.80 231.71 L 139.04 234.56 L 141.28 237.36 L 143.52 240.11 L 145.76 242.81 L 148.00 245.45 L 150.24 248.05 L 152.48 250.59 L 154.72 253.07 L 156.96 255.51 L 159.20 257.89 L 161.44 260.22 L 163.68 262.50 L 165.92 264.72 L 168.16 266.90 L 170.40 269.02 L 172.64 271.09 L 174.88 273.10 L 177.12 275.07 L 179.36 276.98 L 181.60 278.84 L 183.84 280.64 L 186.08 282.40 L 188.32 284.10 L 190.56 285.75 L 192.80 287.35 L 195.04 288.89 L 197.28 290.38 L 199.52 291.82 L 201.76 293.21 L 204.00 294.55 L 206.24 295.83 L 208.48 297.06 L 210.72 298.24 L 212.96 299.36 L 215.20 300.44 L 217.44 301.46 L 219.68 302.43 L 221.92 303.34 L 224.16 304.21 L 226.40 305.02 L 228.64 305.78 L 230.88 306.48 L 233.12 307.14 L 235.36 307.74 L 237.60 308.29 L 239.84 308.79 L 242.08 309.23 L 244.32 309.63 L 246.56 309.97 L 248.80 310.25 L 251.04 310.49 L 253.28 310.67 L 255.52 310.80 L 257.76 310.88 L 260.00 310.91 L 262.24 310.88 L 264.48 310.80 L 266.72 310.67 L 268.96 310.49 L 271.20 310.25 L 273.44 309.97 L 275.68 309.63 L 277.92 309.23 L 280.16 308.79 L 282.40 308.29 L 284.64 307.74 L 286.88 307.14 L 289.12 306.48 L 291.36 305.78 L 293.60 305.02 L 295.84 304.21 L 298.08 303.34 L 300.32 302.43 L 302.56 301.46 L 304.80 300.44 L 307.04 299.36 L 309.28 298.24 L 311.52 297.06 L 313.76 295.83 L 316.00 294.55 L 318.24 293.21 L 320.48 291.82 L 322.72 290.38 L 324.96 288.89 L 327.20 287.35 L 329.44 285.75 L 331.68 284.10 L 333.92 282.40 L 336.16 280.64 L 338.40 278.84 L 340.64 276.98 L 342.88 275.07 L 345.12 273.10 L 347.36 271.09 L 349.60 269.02 L 351.84 266.90 L 354.08 264.72 L 356.32 262.50 L 358.56 260.22 L 360.80 257.89 L 363.04 255.51 L 365.28 253.07 L 367.52 250.59 L 369.76 248.05 L 372.00 245.45 L 374.24 242.81 L 376.48 240.11 L 378.72 237.36 L 380.96 234.56 L 383.20 231.71 L 385.44 228.80 L 387.68 225.84 L 389.92 222.83 L 392.16 219.77 L 394.40 216.65 L 396.64 213.49 L 398.88 210.27 L 401.12 206.99 L 403.36 203.67 L 405.60 200.29 L 407.84 196.86 L 410.08 193.38 L 412.32 189.84 L 414.56 186.26 L 416.80 182.62 L 419.04 178.93 L 421.28 175.18 L 423.52 171.39 L 425.76 167.54 L 428.00 163.64 L 430.24 159.68 L 432.48 155.68 L 434.72 151.62 L 436.96 147.51 L 439.20 143.35 L 441.44 139.13 L 443.68 134.86 L 445.92 130.54 L 448.16 126.17 L 450.40 121.75 L 452.64 117.27 L 454.88 112.74 L 457.12 108.16 L 459.36 103.52 L 461.60 98.84 L 463.84 94.10 L 466.08 89.31 L 468.32 84.46 L 470.56 79.57 L 472.80 74.62 L 475.04 69.62 L 477.28 64.56 L 479.52 59.46 L 481.76 54.30 L 484.00 49.09" class="curve"/>
+</svg></div></div>
+</section>
+<section class="block">
+  <h2>Source</h2>
+  <pre class="source">---
+title: Welcome to Marqdo
+description: User docs home — code is documentation (English)
+&gt; lib/math.mq.md
+&gt; lib/foreign.mq.md
+---
+
+# main
+
+Hi — thanks for reading this far. I am Marqdo’s developer. Marqdo is a language where **code is documentation, and documentation is code**: Markdown markers are the program structure, so what you read is what runs.
+
+AI already prefers Markdown-shaped output. The idea was: why keep docs and code as two separate worlds? So Marqdo was born as a “docs are code” language. To keep every source renderable as Markdown, files use the `.mq.md` suffix. From early on we aimed for richer tooling — auto-generated YAML for OKF-style knowledge bases, even auto-generated slides — those are later goals. Happily, it already works well as a blogging tool: yes, this site is generated by Marqdo. And when AI writes Marqdo, you tend to burn fewer tokens — wallets everywhere thank you.
+
+The language is still young: structure markers, bilingual core names (`print` / `打印`, …), importable stdlibs (see [`stdlib/`](stdlib/) on this site), local `view`, and static export. Contribute on [GitHub](https://github.com/cflmy/marqdo).
+
+中文文档请看同目录的 [`00-欢迎.mq.md`](00-欢迎.mq.md)（叙述与内置均用中文）。
+
+A small function to say hello:
+
+&gt; greet who=marqdo
+
+Named args can include spaces:
+
+&gt; greet who=marqdo user
+
+## greet
+    - who
+
+&gt; print text=Welcome, `who`!
+
+---
+
+Beyond the basics above, Marqdo also ships standard libraries: table, time, text, files, system, math, foreign, and more.
+
+Math and foreign deserve a special mention. With the math library you can bind a formula like this:
+
+`f` =
+$$
+x^2 - 2
+$$
+
+Then plot it:
+
+*`_svg` = &gt; plot formula=`f` var=x min=-3 max=3 *
+
+The foreign library lets you call external code, for example:
+
+`hi` =
+```python
+print(&quot;hello-from-python&quot;)
+```
+
+Under Markdown this stays easy to read — which is the point: Marqdo’s design is code as documentation, documentation as code.
+
+Welcome again — enjoy exploring Marqdo.
+</pre>
+</section>
+
+</main>
+</div>
+</div>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js" crossorigin="anonymous"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js" crossorigin="anonymous"
+  onload="renderMathInElement(document.body,{delimiters:[{left:'$$',right:'$$',display:true},{left:'\\(',right:'\\)',display:false}],ignoredTags:['script','noscript','style','textarea','pre','code','kbd']});"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/highlight.min.js" crossorigin="anonymous"
+  onload="document.querySelectorAll('pre.code-body code').forEach(function(el){hljs.highlightElement(el);});"></script>
+<script>
+(function () {
+  function initForeignCards() {
+    var live = !!window.MARQDO_VIEW_LIVE;
+    document.querySelectorAll(".code-card").forEach(function (card) {
+      var btn = card.querySelector(".code-run");
+      var cmd = card.querySelector(".code-cmd");
+      var out = card.querySelector(".code-out");
+      var body = card.querySelector(".code-body code");
+      if (!btn || !out || !body) return;
+      if (!live) {
+        btn.disabled = true;
+        btn.title = "Run is available in live marqdo view";
+        if (cmd) cmd.disabled = true;
+        return;
+      }
+      btn.addEventListener("click", function () {
+        btn.disabled = true;
+        out.hidden = false;
+        out.classList.remove("err");
+        out.textContent = "Running…";
+        fetch("/api/foreign-run", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            lang: card.getAttribute("data-lang") || "python",
+            source: body.textContent,
+            cmd: cmd ? cmd.value : ""
+          })
+        })
+          .then(function (r) { return r.json(); })
+          .then(function (data) {
+            if (data.ok) {
+              out.classList.remove("err");
+              out.textContent = data.stdout === "" ? "(no stdout)" : data.stdout;
+            } else {
+              out.classList.add("err");
+              out.textContent = data.error || "foreign run failed";
+            }
+          })
+          .catch(function (e) {
+            out.classList.add("err");
+            out.textContent = String(e);
+          })
+          .finally(function () { btn.disabled = false; });
+      });
+    });
+  }
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", function () {
+      initForeignCards();
+      initOutlineSearch();
+    });
+  } else {
+    initForeignCards();
+    initOutlineSearch();
+  }
+
+  function initOutlineSearch() {
+    var input = document.getElementById("fn-search");
+    var tree = document.querySelector(".outline-tree");
+    if (!input || !tree) return;
+    function applyFilter() {
+      var q = (input.value || "").trim().toLowerCase();
+      var items = tree.querySelectorAll(".outline-item");
+      items.forEach(function (li) {
+        if (!q) {
+          li.classList.remove("hidden");
+          return;
+        }
+        var name = (li.getAttribute("data-fn") || "").toLowerCase();
+        var path = (li.getAttribute("data-fn-path") || "").toLowerCase();
+        var selfMatch = name.indexOf(q) !== -1 || path.indexOf(q) !== -1;
+        var childMatch = false;
+        li.querySelectorAll(".outline-item").forEach(function (c) {
+          var cn = (c.getAttribute("data-fn") || "").toLowerCase();
+          var cp = (c.getAttribute("data-fn-path") || "").toLowerCase();
+          if (cn.indexOf(q) !== -1 || cp.indexOf(q) !== -1) childMatch = true;
+        });
+        li.classList.toggle("hidden", !(selfMatch || childMatch));
+      });
+    }
+    input.addEventListener("input", applyFilter);
+    tree.querySelectorAll("a[href^='#fn-']").forEach(function (a) {
+      a.addEventListener("click", function (ev) {
+        var id = (a.getAttribute("href") || "").slice(1);
+        var el = id ? document.getElementById(id) : null;
+        if (el) {
+          ev.preventDefault();
+          el.scrollIntoView({ behavior: "smooth", block: "start" });
+          history.replaceState(null, "", "#" + id);
+        }
+      });
+    });
+  }
+})();
+</script>
+</body>
+</html>
