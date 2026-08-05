@@ -16,6 +16,7 @@
 | 文档 | 摘要 |
 |------|------|
 | [design/markdown-mapping.md](design/markdown-mapping.md) | **v0.1 语法宪法** |
+| [design/ai-skill.md](design/ai-skill.md) | **AI 接入 Skill**（[`skills/marqdo/`](../skills/marqdo/)） |
 | [design/code-vs-comment.md](design/code-vs-comment.md) | 叙述 / 可执行 / 外联 |
 | [design/return-hr-and-code-surface.md](design/return-hr-and-code-surface.md) | 语句/返回/输出决议 |
 | [design/generated-yaml-manifest.md](design/generated-yaml-manifest.md) | 生成式 OKF 清单 |
