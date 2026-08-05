@@ -51,19 +51,23 @@ def api(method: str, url: str, token: str, data: bytes | None = None, content_ty
         raise SystemExit(f"HTTP {e.code} {url}: {err}") from e
 
 
-def find_assets(stem: str) -> list[Path]:
+def find_assets(stem: str, ver: str) -> list[Path]:
+    names = [
+        f"{stem}.exe",
+        f"{stem}.zip",
+        f"marqdo-{ver}-stdlib.zip",
+    ]
     assets: list[Path] = []
-    for base in (Path("dist"), Path("target/dist")):
-        for name in (f"{stem}.exe", f"{stem}.zip"):
+    for name in names:
+        found = None
+        for base in (Path("dist"), Path("target/dist")):
             p = base / name
-            if p.exists() and all(p.resolve() != a.resolve() for a in assets):
-                assets.append(p)
-        if len(assets) >= 2:
-            break
-    if len(assets) < 2:
-        raise SystemExit(
-            f"missing assets for {stem}.exe/.zip under dist/ or target/dist/"
-        )
+            if p.exists():
+                found = p
+                break
+        if not found:
+            raise SystemExit(f"missing asset: {name} under dist/ or target/dist/")
+        assets.append(found)
     return assets
 
 
@@ -71,20 +75,25 @@ def main() -> None:
     ver = crate_version()
     tag = f"v{ver}"
     stem = f"marqdo-{ver}-x86_64-pc-windows-msvc"
-    assets = find_assets(stem)
+    assets = find_assets(stem, ver)
 
     notes = f"""## Marqdo {tag}
 
+### Downloads
+
+| Asset | Contents |
+|-------|----------|
+| `{stem}.exe` | **Executable only** — does **not** include the standard library |
+| `{stem}.zip` | **Recommended**: `marqdo.exe` + `lib/` (keep them together; `lib/` resolves next to the binary) |
+| `marqdo-{ver}-stdlib.zip` | Standard library only (`lib/*.mq.md`) — unpack next to an existing exe, or set `MARQDO_LIB` |
+
+> **Important:** the standalone `.exe` does **not** ship `lib/`. Importing `lib/text.mq.md` etc. needs the bundle zip or the stdlib zip.
+
 ### Highlights
 - **Code as docs as knowledge**: `.mq.md` is narrative + program in one tree
-- **`marqdo debug`**: dedicated debugger (breakpoints / step / locals); view stays docs-only
-- **View**: wider layout, function outline + search
-- Foreign code Run works in debug; math / stdlib / foreign as before
-- Roadmap: deeper **OKF**-aligned catalog so docs grow into a knowledge base for human–AI collaboration
-
-### Assets
-- `{stem}.exe` — Windows x64 binary
-- `{stem}.zip` — same binary zipped
+- **`marqdo debug`**: dedicated debugger; view stays docs-only
+- **View**: function outline + search
+- Roadmap: deeper **OKF**-aligned catalog for human–AI knowledge bases
 
 ```text
 marqdo --version

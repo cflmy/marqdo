@@ -29,17 +29,42 @@ jobs:
           New-Item -ItemType Directory -Force -Path dist | Out-Null
           $exe = "marqdo-$ver-$target.exe"
           $zip = "marqdo-$ver-$target.zip"
+          $stdlib = "marqdo-$ver-stdlib.zip"
           Copy-Item target/release/marqdo.exe "dist/$exe"
-          Compress-Archive -Path "dist/$exe" -DestinationPath "dist/$zip" -Force
+          $stage = "dist/stage-bundle"
+          if (Test-Path $stage) { Remove-Item $stage -Recurse -Force }
+          New-Item -ItemType Directory -Force -Path $stage | Out-Null
+          Copy-Item target/release/marqdo.exe "$stage/marqdo.exe"
+          Copy-Item lib "$stage/lib" -Recurse
+          if (Test-Path "dist/$zip") { Remove-Item "dist/$zip" -Force }
+          Compress-Archive -Path "$stage/*" -DestinationPath "dist/$zip" -Force
+          $stageLib = "dist/stage-stdlib"
+          if (Test-Path $stageLib) { Remove-Item $stageLib -Recurse -Force }
+          New-Item -ItemType Directory -Force -Path $stageLib | Out-Null
+          Copy-Item lib "$stageLib/lib" -Recurse
+          if (Test-Path "dist/$stdlib") { Remove-Item "dist/$stdlib" -Force }
+          Compress-Archive -Path "$stageLib/*" -DestinationPath "dist/$stdlib" -Force
           echo "EXE=$exe" >> $env:GITHUB_ENV
           echo "ZIP=$zip" >> $env:GITHUB_ENV
+          echo "STDLIB=$stdlib" >> $env:GITHUB_ENV
 
       - name: Upload release assets
         uses: softprops/action-gh-release@v2
         with:
+          body: |
+            ## Downloads
+
+            | Asset | Contents |
+            |-------|----------|
+            | `marqdo-*-windows-msvc.exe` | **Executable only** — does **not** include the standard library |
+            | `marqdo-*-windows-msvc.zip` | **Recommended**: `marqdo.exe` + `lib/` (keep them together) |
+            | `marqdo-*-stdlib.zip` | Standard library only — unpack next to the exe, or set `MARQDO_LIB` |
+
+            > The standalone `.exe` does **not** ship `lib/`. Use the bundle zip or stdlib zip for `lib/…` imports.
           files: |
             dist/${{ env.EXE }}
             dist/${{ env.ZIP }}
+            dist/${{ env.STDLIB }}
           fail_on_unmatched_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

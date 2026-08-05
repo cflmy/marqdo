@@ -79,6 +79,8 @@ powershell -File ./scripts/build-public.ps1
 cargo run -- catalog tests -o .marqdo
 ```
 
+**发布包（GitHub Releases）**：单独 `.exe` **不含** `lib/`；请下载带 `lib/` 的 zip，或另下 `*-stdlib.zip` 解压到可执行文件旁（亦可设 `MARQDO_LIB`）。
+
 文档：用户站 [public/](public/) · 设计 [doc/](doc/) · OKF / catalog [catalog-cli.md](doc/design/catalog-cli.md) · 调试 [view-debug.md](doc/design/view-debug.md)
 
 ---
