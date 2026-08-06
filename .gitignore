@@ -10,6 +10,8 @@
 /tests/ext/libagent.dylib
 /tests/ext/skel.mq.md
 /tests/ext/out-demo.mq.md
+/tests/ext/ticket.txt
+/tests/ext/ticket-stub.txt
 /tests/ext/agents/
 /tests/ext/runbooks/
 /tests/ext/templates/

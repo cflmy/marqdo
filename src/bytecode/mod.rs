@@ -37,6 +37,8 @@ pub enum Op {
     /// Pop prompt text, print it (no newline), read one stdin line → push Text.
     Input,
     BuildList(u16),
+    /// Stack (bottom→top): k0, v0, k1, v1, … (n pairs); push Map.
+    BuildMap(u16),
     /// Pop value → push `len` (text/list).
     Len,
     /// Pop value → push display text.

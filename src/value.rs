@@ -19,7 +19,7 @@ pub enum Value {
     /// Floating-point number (`type` → `num`).
     Num(f64),
     Text(String),
-    /// Single-column table rows (v0); multi-column later.
+    /// Single-column table rows, or list of row maps for multi-column tables.
     List(Vec<Value>),
     /// JSON object / string-keyed map (insertion order).
     Map(Vec<(String, Value)>),

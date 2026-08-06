@@ -729,6 +729,45 @@ fn ext_cli_add_agent_with_native() {
 }
 
 #[test]
+fn ext_agent_assign() {
+    let status = Command::new(env!("CARGO"))
+        .args(["build", "-p", "marqdo_plugin_agent"])
+        .status()
+        .expect("cargo build plugin agent");
+    assert!(status.success(), "failed to build marqdo_plugin_agent");
+
+    let lib_name = if cfg!(windows) {
+        "agent.dll"
+    } else if cfg!(target_os = "macos") {
+        "libagent.dylib"
+    } else {
+        "libagent.so"
+    };
+    let built = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("target")
+        .join("debug")
+        .join(lib_name);
+    let ext_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("tests")
+        .join("ext");
+    let plugin = ext_dir.join(lib_name);
+    std::fs::copy(&built, &plugin).expect("copy agent plugin");
+    let _ = std::fs::remove_file(ext_dir.join("ticket.txt"));
+    let _ = std::fs::remove_file(ext_dir.join("ticket-stub.txt"));
+
+    let output = Command::new(env!("CARGO_BIN_EXE_marqdo"))
+        .args(["run", "tests/ext/agent-assign.mq.md"])
+        .env("MARQDO_AGENT_PLUGIN", lib_name)
+        .output()
+        .expect("run agent-assign");
+    let code = output.status.code().unwrap_or(1);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert_eq!(code, 0, "agent-assign stderr={stderr}");
+    assert_eq!(stdout.trim_end(), "张三\nticket.txt\n3", "agent-assign");
+}
+
+#[test]
 fn ext_agent_scaffold() {
     let status = Command::new(env!("CARGO"))
         .args(["build", "-p", "marqdo_plugin_agent"])

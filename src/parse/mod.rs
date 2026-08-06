@@ -307,10 +307,7 @@ impl<'a> Cursor<'a> {
             } else {
                 span.line
             };
-            return Ok((
-                Expr::List(list.into_iter().map(Expr::Literal).collect()),
-                end_line,
-            ));
+            return Ok((Expr::List(list), end_line));
         }
         if let Some(expr) = try_parse_inline_formula(rhs)? {
             return Ok((expr, span.line));
@@ -433,9 +430,10 @@ impl<'a> Cursor<'a> {
         Ok((Expr::Formula(expr), end_line))
     }
 
-    fn consume_table(&mut self) -> Result<Vec<Literal>> {
+    fn consume_table(&mut self) -> Result<Vec<Expr>> {
         self.skip_noise();
-        let mut rows = Vec::new();
+        let mut header: Vec<String> = Vec::new();
+        let mut rows: Vec<Expr> = Vec::new();
         let mut header_done = false;
         let mut sep_done = false;
         while let Some(l) = self.peek() {
@@ -449,20 +447,31 @@ impl<'a> Cursor<'a> {
             self.bump();
             let cells = split_table_row(t);
             if !header_done {
+                header = cells;
                 header_done = true;
                 continue;
             }
-            if !sep_done && cells.iter().all(|c| c.chars().all(|ch| ch == '-' || ch == ':' || ch.is_whitespace() || ch == '|'))
+            if !sep_done
+                && cells
+                    .iter()
+                    .all(|c| c.chars().all(|ch| ch == '-' || ch == ':' || ch.is_whitespace()))
             {
-                // separator row like |----|
                 sep_done = true;
                 continue;
             }
-            // data row — single column examples: take first cell
-            if let Some(cell) = cells.first() {
-                rows.push(Literal::Text(cell.clone()));
-            }
             sep_done = true;
+            if header.len() <= 1 {
+                if let Some(cell) = cells.first() {
+                    rows.push(Expr::Literal(cell_literal(cell)));
+                }
+            } else {
+                let mut pairs = Vec::new();
+                for (i, key) in header.iter().enumerate() {
+                    let raw = cells.get(i).map(|s| s.as_str()).unwrap_or("");
+                    pairs.push((key.clone(), Expr::Literal(cell_literal(raw))));
+                }
+                rows.push(Expr::Map(pairs));
+            }
         }
         if !header_done {
             bail!("expected GFM table after empty assignment");
@@ -710,6 +719,17 @@ fn indent_of(text: &str) -> usize {
         .take_while(|c| *c == ' ' || *c == '\t')
         .map(|c| if c == '\t' { 4 } else { 1 })
         .sum()
+}
+
+fn cell_literal(raw: &str) -> Literal {
+    let t = raw.trim();
+    let digits = |s: &str| !s.is_empty() && s.bytes().all(|b| b.is_ascii_digit());
+    if digits(t) || t.strip_prefix('-').is_some_and(digits) {
+        if let Ok(n) = t.parse::<i64>() {
+            return Literal::Int(n);
+        }
+    }
+    Literal::Text(t.to_string())
 }
 
 fn split_table_row(line: &str) -> Vec<String> {

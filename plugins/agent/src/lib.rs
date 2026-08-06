@@ -183,6 +183,95 @@ fn scaffold(root: &Path, name: &str, template: &str, dest: &str) -> Result<Strin
     Ok(dest_path.to_string_lossy().into_owned())
 }
 
+fn map_get_str<'a>(m: &'a serde_json::Value, keys: &[&str]) -> Option<&'a str> {
+    let obj = m.as_object()?;
+    for k in keys {
+        if let Some(v) = obj.get(*k) {
+            if let Some(s) = v.as_str() {
+                return Some(s);
+            }
+            if let Some(n) = v.as_i64() {
+                // allow numeric fields to be read as display later
+                let _ = n;
+            }
+        }
+    }
+    None
+}
+
+fn map_get_i64(m: &serde_json::Value, keys: &[&str]) -> i64 {
+    let Some(obj) = m.as_object() else {
+        return i64::MAX;
+    };
+    for k in keys {
+        if let Some(v) = obj.get(*k) {
+            if let Some(n) = v.as_i64() {
+                return n;
+            }
+            if let Some(s) = v.as_str() {
+                if let Ok(n) = s.parse::<i64>() {
+                    return n;
+                }
+            }
+        }
+    }
+    i64::MAX
+}
+
+fn skills_text(m: &serde_json::Value) -> String {
+    map_get_str(m, &["技能", "skills", "skill"])
+        .unwrap_or("")
+        .to_string()
+}
+
+fn match_skill(skill: &str, members: &serde_json::Value) -> Result<serde_json::Value, String> {
+    let arr = members
+        .as_array()
+        .ok_or_else(|| "members must be a JSON array".to_string())?;
+    let skill = skill.trim();
+    if skill.is_empty() {
+        return Err("skill is empty".into());
+    }
+    let mut best: Option<&serde_json::Value> = None;
+    let mut best_load = i64::MAX;
+    for m in arr {
+        let sk = skills_text(m);
+        if sk.split(',').any(|p| p.trim() == skill) || sk.contains(skill) {
+            let load = map_get_i64(m, &["负载", "load"]);
+            if load < best_load {
+                best_load = load;
+                best = Some(m);
+            }
+        }
+    }
+    Ok(best.cloned().unwrap_or(serde_json::Value::Null))
+}
+
+fn bump_load(member: &serde_json::Value, delta: i64) -> Result<serde_json::Value, String> {
+    let mut obj = member
+        .as_object()
+        .cloned()
+        .ok_or_else(|| "member must be a JSON object".to_string())?;
+    let key = if obj.contains_key("负载") {
+        "负载"
+    } else if obj.contains_key("load") {
+        "load"
+    } else {
+        obj.insert("负载".into(), serde_json::Value::Number(0.into()));
+        "负载"
+    };
+    let cur = match obj.get(key) {
+        Some(serde_json::Value::Number(n)) => n.as_i64().unwrap_or(0),
+        Some(serde_json::Value::String(s)) => s.parse().unwrap_or(0),
+        _ => 0,
+    };
+    obj.insert(
+        key.into(),
+        serde_json::Value::Number((cur + delta).into()),
+    );
+    Ok(serde_json::Value::Object(obj))
+}
+
 unsafe extern "C" fn agent_find_root(
     args_json: *const c_char,
     out_json: *mut *mut c_char,
@@ -335,6 +424,99 @@ unsafe extern "C" fn agent_scaffold(
     }
 }
 
+unsafe extern "C" fn agent_match_skill(
+    args_json: *const c_char,
+    out_json: *mut *mut c_char,
+    err_msg: *mut *mut c_char,
+) -> c_int {
+    let v = match parse_args(args_json) {
+        Ok(v) => v,
+        Err(e) => {
+            set_err(err_msg, &format!("agent_match_skill: {e}"));
+            return 1;
+        }
+    };
+    let skill = match arg_str(&v, "skill") {
+        Ok(s) => s,
+        Err(e) => {
+            set_err(err_msg, &format!("agent_match_skill: {e}"));
+            return 1;
+        }
+    };
+    let members = match v.get("members") {
+        Some(m) => m.clone(),
+        None => {
+            set_err(err_msg, "agent_match_skill: missing members");
+            return 1;
+        }
+    };
+    // members may be a JSON string (from Marqdo stringify) or already an array
+    let members = if let Some(s) = members.as_str() {
+        match serde_json::from_str::<serde_json::Value>(s) {
+            Ok(j) => j,
+            Err(e) => {
+                set_err(err_msg, &format!("agent_match_skill: members JSON: {e}"));
+                return 1;
+            }
+        }
+    } else {
+        members
+    };
+    match match_skill(skill, &members) {
+        Ok(j) => {
+            set_out(out_json, &j.to_string());
+            0
+        }
+        Err(e) => {
+            set_err(err_msg, &format!("agent_match_skill: {e}"));
+            1
+        }
+    }
+}
+
+unsafe extern "C" fn agent_bump_load(
+    args_json: *const c_char,
+    out_json: *mut *mut c_char,
+    err_msg: *mut *mut c_char,
+) -> c_int {
+    let v = match parse_args(args_json) {
+        Ok(v) => v,
+        Err(e) => {
+            set_err(err_msg, &format!("agent_bump_load: {e}"));
+            return 1;
+        }
+    };
+    let member = match v.get("member") {
+        Some(m) => m.clone(),
+        None => {
+            set_err(err_msg, "agent_bump_load: missing member");
+            return 1;
+        }
+    };
+    let member = if let Some(s) = member.as_str() {
+        match serde_json::from_str::<serde_json::Value>(s) {
+            Ok(j) => j,
+            Err(e) => {
+                set_err(err_msg, &format!("agent_bump_load: member JSON: {e}"));
+                return 1;
+            }
+        }
+    } else {
+        member
+    };
+    let delta = v.get("delta").and_then(|x| x.as_i64()).unwrap_or(1);
+    match bump_load(&member, delta) {
+        Ok(j) => {
+            set_out(out_json, &j.to_string());
+            0
+        }
+        Err(e) => {
+            set_err(err_msg, &format!("agent_bump_load: {e}"));
+            1
+        }
+    }
+}
+
 fn register(host: &MarqdoHostApi, name: &str, params: &str, fn_ptr: PluginFn) -> c_int {
     let register = match host.register_fn {
         Some(f) => f,
@@ -374,6 +556,12 @@ pub unsafe extern "C" fn marqdo_plugin_init(host: *const MarqdoHostApi) -> c_int
         agent_scaffold,
     ) != 0
     {
+        return 1;
+    }
+    if register(host, "agent_match_skill", "skill,members", agent_match_skill) != 0 {
+        return 1;
+    }
+    if register(host, "agent_bump_load", "member,delta", agent_bump_load) != 0 {
         return 1;
     }
     0

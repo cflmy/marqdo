@@ -117,6 +117,11 @@ fn collect_input_prompts_expr(expr: &Expr, out: &mut Vec<String>) {
                 collect_input_prompts_expr(e, out);
             }
         }
+        Expr::Map(pairs) => {
+            for (_, e) in pairs {
+                collect_input_prompts_expr(e, out);
+            }
+        }
         Expr::Literal(_) | Expr::Var(_) | Expr::Interp(_) | Expr::Formula(_) | Expr::Code(_) => {}
     }
 }
@@ -643,6 +648,13 @@ fn expr_prec(expr: &Expr, parent_prec: u8) -> String {
         Expr::List(items) => {
             let parts: Vec<String> = items.iter().map(|e| expr_prec(e, 0)).collect();
             format!("[{}]", parts.join(", "))
+        }
+        Expr::Map(pairs) => {
+            let parts: Vec<String> = pairs
+                .iter()
+                .map(|(k, e)| format!("{}: {}", k, expr_prec(e, 0)))
+                .collect();
+            format!("{{{}}}", parts.join(", "))
         }
         Expr::Formula(e) => format!("$$ {} $$", e.as_display()),
         Expr::Code(c) => format!("```{} …```", c.lang),

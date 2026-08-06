@@ -100,6 +100,8 @@ pub enum Expr {
     },
     Call(CallExpr),
     List(Vec<Expr>),
+    /// Object literal / table row (`map` value).
+    Map(Vec<(String, Expr)>),
     /// Parsed `$$…$$` formula tree (from assignment RHS).
     Formula(FormulaExpr),
     /// Bound ```lang … ``` fence (`code` value).

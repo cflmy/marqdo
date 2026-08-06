@@ -60,6 +60,8 @@ Root markers (any): directory `agents` or `runbooks`, or file `marqdo.agent.json
 | `agent_ensure_layout` | `root` | int (dirs created) |
 | `agent_probe` | `root` | map (`has_agents`, …, `root`) |
 | `agent_scaffold` | `root`, `name`, `template`, `dest` | path written; body substitutes `{{name}}` |
+| `agent_match_skill` | `skill`, `members` | member map or `null` (JSON array of objects) |
+| `agent_bump_load` | `member`, `delta` | updated member map |
 
 Path safety: under `root`; reject `..`. Build: `cargo build -p marqdo_plugin_agent`.
 
@@ -67,13 +69,18 @@ Path safety: under `root`; reject `..`. Build: `cargo build -p marqdo_plugin_age
 
 | English | Chinese | Role |
 |---------|---------|------|
-| `## load_native` | `## 加载原生` | Env `MARQDO_AGENT_PLUGIN` → `lib/plugin` load |
+| `## load_native` | `## 加载原生` | Env / `ext add` → load ABI plugin |
 | `# agent` | `# 智能体` | Workspace handle; optional `root=` |
-| `## probe` | `## 探测` | Layout probe |
-| `## ensure_layout` | `## 确保布局` | Create convention dirs |
-| `## scaffold` | `## 脚手架` | `name=` `template=` `dest=` |
+| `## probe` / `ensure_layout` / `scaffold` | `## 探测` / `确保布局` / `脚手架` | Layout |
+| `## match_skill` | `## 技能匹配` | Match member maps; lowest load |
+| `## assign_task` | `## 分配任务` | `{success, task_id, assignee}` |
+| `## update_load` | `## 更新负载` | Bump load via ABI |
+| `## create_ticket` / `notify` | `## 创建工单` / `通知` | Stubs |
+| `## draft_message` | `## 起草消息` | Delegate to `ext/llm` |
 
-Gold: `tests/ext/agent-scaffold.mq.md`.
+Multi-column GFM tables → **list of maps** (header keys). Single-column stays list of cells.
+
+Gold: `tests/ext/agent-scaffold.mq.md`, `tests/ext/agent-assign.mq.md`.
 
 ---
 
@@ -152,8 +159,8 @@ Exact helper names (`技能匹配` / `match_skill`, `分配任务` / `assign`, �
 | Slice | Content |
 |-------|---------|
 | **A — Install** | [`ext-cli.md`](ext-cli.md): **shipped** `marqdo ext list` / `add` / `remove` |
-| **B — Compose LLM** | `ext/agent` frontmatter imports `ext/llm`; helpers that take a model handle or call `complete` internally |
-| **C — Match / assign** | Table-oriented match (substring / tag) + optional LLM rerank; assign + load update; escalate / ticket stubs (print or `reports/` files first) |
+| **B — Compose LLM** | **shipped**: `ext/agent` imports `ext/llm`; `## draft_message` / `## 起草消息` |
+| **C — Match / assign** | **shipped**: multi-column tables → row maps; `match_skill` / `update_load` (ABI); `assign_task`, `create_ticket`, `notify` stubs |
 | **D — Channels** | Optional notify hooks (mail/chat) via `lib/net` or thin ABI — still no third-party marketplace |
 | **E — Multi-agent** | Later: handoff between agent programs; out of scope until C is solid |
 

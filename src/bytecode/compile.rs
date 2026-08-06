@@ -792,6 +792,14 @@ impl<'a> FnCompiler<'a> {
                 }
                 self.emit(Op::BuildList(items.len() as u16));
             }
+            Expr::Map(pairs) => {
+                for (k, e) in pairs {
+                    let ki = self.add_const(Value::Text(k.clone()));
+                    self.emit(Op::Constant(ki));
+                    self.compile_expr(e)?;
+                }
+                self.emit(Op::BuildMap(pairs.len() as u16));
+            }
             Expr::Formula(e) => {
                 let i = self.add_const(Value::Formula(e.clone()));
                 self.emit(Op::Constant(i));

@@ -253,6 +253,23 @@ impl Vm {
                     items.reverse();
                     stack.push(Value::List(items));
                 }
+                Op::BuildMap(n) => {
+                    let n = n as usize;
+                    let mut pairs = Vec::with_capacity(n);
+                    for _ in 0..n {
+                        let v = pop(&mut stack).map_err(|m| self.err_at(span, m))?;
+                        let k = pop(&mut stack).map_err(|m| self.err_at(span, m))?;
+                        let ks = match k {
+                            Value::Text(s) => s,
+                            _ => {
+                                return Err(self.err_at(span, "map key must be text"));
+                            }
+                        };
+                        pairs.push((ks, v));
+                    }
+                    pairs.reverse();
+                    stack.push(Value::Map(pairs));
+                }
                 Op::Len => {
                     let v = pop(&mut stack).map_err(|m| self.err_at(span, m))?;
                     let n = builtin_len(&v).map_err(|m| self.err_at(span, m))?;

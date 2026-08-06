@@ -408,6 +408,13 @@ impl Interpreter {
                 }
                 Ok(Value::List(out))
             }
+            Expr::Map(pairs) => {
+                let mut out = Vec::new();
+                for (k, e) in pairs {
+                    out.push((k.clone(), self.eval_expr(module, fun, env, e)?));
+                }
+                Ok(Value::Map(out))
+            }
             Expr::Formula(e) => Ok(Value::Formula(e.clone())),
             Expr::Code(c) => Ok(Value::Code(c.clone())),
         }
