@@ -639,8 +639,137 @@ fn lib_plugin_demo() {
 }
 
 #[test]
-fn ext_llm_import() {
-    assert_out("tests/ext/llm-import.mq.md", "ext-ok");
+fn ext_cli_add_list_remove_llm() {
+    let tmp = tempfile_dir("marqdo-ext-cli");
+    let src = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("ext");
+    assert!(src.join("llm.mq.md").is_file());
+
+    let bin = env!("CARGO_BIN_EXE_marqdo");
+    let status = Command::new(bin)
+        .args(["ext", "add", "llm"])
+        .env("MARQDO_EXT", &tmp)
+        .env("MARQDO_EXT_SOURCE", &src)
+        .env_remove("USERPROFILE")
+        .env_remove("HOME")
+        .status()
+        .expect("ext add");
+    assert!(status.success(), "ext add llm failed");
+    assert!(tmp.join("llm.mq.md").is_file());
+    assert!(tmp.join("大模型.mq.md").is_file());
+
+    let out = Command::new(bin)
+        .args(["ext", "list"])
+        .env("MARQDO_EXT", &tmp)
+        .output()
+        .expect("ext list");
+    assert_eq!(out.status.code().unwrap_or(1), 0);
+    let list = String::from_utf8_lossy(&out.stdout);
+    assert!(list.contains("llm") && list.contains("yes"), "list={list}");
+
+    let mq = tmp.join("smoke.mq.md");
+    std::fs::write(
+        &mq,
+        "---\n> ext/llm.mq.md\n---\n\n# main\n\n> print text=ext-cli-ok\n",
+    )
+    .unwrap();
+    let run = Command::new(bin)
+        .args(["run", mq.to_str().unwrap()])
+        .env("MARQDO_EXT", &tmp)
+        .output()
+        .expect("run smoke");
+    assert_eq!(
+        run.status.code().unwrap_or(1),
+        0,
+        "stderr={}",
+        String::from_utf8_lossy(&run.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&run.stdout).trim_end(),
+        "ext-cli-ok"
+    );
+
+    let status = Command::new(bin)
+        .args(["ext", "remove", "llm"])
+        .env("MARQDO_EXT", &tmp)
+        .status()
+        .expect("ext remove");
+    assert!(status.success());
+    assert!(!tmp.join("llm.mq.md").is_file());
+}
+
+#[test]
+fn ext_cli_add_agent_with_native() {
+    let status = Command::new(env!("CARGO"))
+        .args(["build", "-p", "marqdo_plugin_agent"])
+        .status()
+        .expect("build agent plugin");
+    assert!(status.success());
+
+    let tmp = tempfile_dir("marqdo-ext-agent");
+    let src = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("ext");
+    let bin = env!("CARGO_BIN_EXE_marqdo");
+    let status = Command::new(bin)
+        .args(["ext", "add", "agent"])
+        .env("MARQDO_EXT", &tmp)
+        .env("MARQDO_EXT_SOURCE", &src)
+        .current_dir(env!("CARGO_MANIFEST_DIR"))
+        .status()
+        .expect("ext add agent");
+    assert!(status.success(), "ext add agent failed");
+    assert!(tmp.join("agent.mq.md").is_file());
+    let lib_name = if cfg!(windows) {
+        "agent.dll"
+    } else if cfg!(target_os = "macos") {
+        "libagent.dylib"
+    } else {
+        "libagent.so"
+    };
+    assert!(tmp.join("native").join(lib_name).is_file());
+    assert!(tmp.join("agent.plugin").is_file());
+}
+
+#[test]
+fn ext_agent_scaffold() {
+    let status = Command::new(env!("CARGO"))
+        .args(["build", "-p", "marqdo_plugin_agent"])
+        .status()
+        .expect("cargo build plugin agent");
+    assert!(status.success(), "failed to build marqdo_plugin_agent");
+
+    let lib_name = if cfg!(windows) {
+        "agent.dll"
+    } else if cfg!(target_os = "macos") {
+        "libagent.dylib"
+    } else {
+        "libagent.so"
+    };
+    let built = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("target")
+        .join("debug")
+        .join(lib_name);
+    assert!(
+        built.is_file(),
+        "missing plugin artifact {}",
+        built.display()
+    );
+    let ext_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("tests")
+        .join("ext");
+    let plugin = ext_dir.join(lib_name);
+    std::fs::copy(&built, &plugin).expect("copy agent plugin into tests/ext");
+    let _ = std::fs::remove_file(ext_dir.join("skel.mq.md"));
+    let _ = std::fs::remove_file(ext_dir.join("out-demo.mq.md"));
+
+    let output = Command::new(env!("CARGO_BIN_EXE_marqdo"))
+        .args(["run", "tests/ext/agent-scaffold.mq.md"])
+        .env("MARQDO_AGENT_PLUGIN", lib_name)
+        .output()
+        .expect("failed to run marqdo");
+    let code = output.status.code().unwrap_or(1);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert_eq!(code, 0, "agent-scaffold stderr={stderr}");
+    assert_eq!(stdout.trim_end(), "True\ndemo", "agent-scaffold");
 }
 
 #[test]

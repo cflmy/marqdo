@@ -5,12 +5,13 @@ use anyhow::Result;
 use clap::{Parser, Subcommand, ValueEnum};
 
 use marqdo::catalog::{write_catalog, CatalogOptions};
+use marqdo::ext_cli::{add_ext, list_ext, remove_ext};
 use marqdo::input_feed::load_stdin_file;
 use marqdo::view::{serve, serve_debug, write_static, DebugOptions, OutputOptions, ViewOptions};
 use marqdo::{Backend, RunOptions};
 
 #[derive(Parser, Debug)]
-#[command(name = "marqdo", version, about = "Marqdo interpreter — run, view, debug, and catalog .mq.md")]
+#[command(name = "marqdo", version, about = "Marqdo interpreter — run, view, debug, catalog, and ext")]
 struct Cli {
     #[command(subcommand)]
     command: Commands,
@@ -108,6 +109,27 @@ enum Commands {
 
         #[arg(short = 'o', long = "out", default_value = ".marqdo")]
         out: PathBuf,
+    },
+    /// Official extension installer (`list` / `add` / `remove`)
+    Ext {
+        #[command(subcommand)]
+        action: ExtAction,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+enum ExtAction {
+    /// List official extensions and install status
+    List,
+    /// Install an official extension into the local ext root
+    Add {
+        #[arg(value_name = "NAME")]
+        name: String,
+    },
+    /// Remove an installed official extension
+    Remove {
+        #[arg(value_name = "NAME")]
+        name: String,
     },
 }
 
@@ -230,6 +252,14 @@ fn try_main() -> Result<i32> {
                 path: path.unwrap_or_else(|| PathBuf::from(".")),
                 out_dir: out,
             })?;
+            Ok(0)
+        }
+        Commands::Ext { action } => {
+            match action {
+                ExtAction::List => list_ext()?,
+                ExtAction::Add { name } => add_ext(&name)?,
+                ExtAction::Remove { name } => remove_ext(&name)?,
+            }
             Ok(0)
         }
     }

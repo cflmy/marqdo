@@ -16,6 +16,7 @@
 | 文档 | 摘要 |
 |------|------|
 | [design/markdown-mapping.md](design/markdown-mapping.md) | **v0.1 语法宪法** |
+| [design/objects.md](design/objects.md) | **`#` 对象 / `##` 函数与方法** |
 | [design/ai-skill.md](design/ai-skill.md) | **AI 接入 Skill**（[`skills/marqdo/`](../skills/marqdo/)） |
 | [design/code-vs-comment.md](design/code-vs-comment.md) | 叙述 / 可执行 / 外联 |
 | [design/return-hr-and-code-surface.md](design/return-hr-and-code-surface.md) | 语句/返回/输出决议 |
@@ -25,11 +26,15 @@
 | [design/dependencies.md](design/dependencies.md) | 依赖详单（无 Flex/Bison） |
 | [design/keywords.md](design/keywords.md) | **英文最小关键字 / 内置函数** |
 | [design/keywords-i18n.md](design/keywords-i18n.md) | **内核中英双名（无需导入；少而精）** |
-| [design/stdlib.md](design/stdlib.md) | **P2 标准库：内置 + `lib/` + 错误约定** |
+| [design/stdlib.md](design/stdlib.md) | **标准库：内置 + `lib/` + 错误约定** |
 | [design/stdlib-i18n.md](design/stdlib-i18n.md) | **标准库中英命名：靠库文件名区分，无 lang 开关** |
-| [design/stdlib-modules.md](design/stdlib-modules.md) | **本波 L1：文件/系统/时间/JSON/网络（JSON 中英同库）** |
-| [design/stdlib-math.md](design/stdlib-math.md) | **方案：数学库（数值/随机/作图/轻量求解）** |
-| [design/stdlib-foreign.md](design/stdlib-foreign.md) | **暂缓：外联胶水（\`\`\`lang 具名块）** |
+| [design/stdlib-modules.md](design/stdlib-modules.md) | **L1：文件/系统/时间/JSON/网络/数学/外联/插件** |
+| [design/stdlib-math.md](design/stdlib-math.md) | **数学库（数值/随机/作图/轻量求解）** |
+| [design/stdlib-foreign.md](design/stdlib-foreign.md) | **外联胶水（\`\`\`lang 具名块）— 已落地** |
+| [design/ext-abi.md](design/ext-abi.md) | **原生插件 C ABI v1**（`lib/plugin`） |
+| [design/ext-llm.md](design/ext-llm.md) | **官方扩展 `ext/llm`（OpenAI 兼容）** |
+| [design/ext-agent.md](design/ext-agent.md) | **官方扩展 `ext/agent`（智能体开发框架；布局已落地，编排/大模型组合路线已记录）** |
+| [design/ext-cli.md](design/ext-cli.md) | **`marqdo ext list/add/remove` 官方扩展安装器** |
 | [design/call-arguments.md](design/call-arguments.md) | **调用：具名 + 位置实参** |
 | [design/examples-and-tests.md](design/examples-and-tests.md) | **tests/ 金样例目录布局** |
 | [design/view.md](design/view.md) | **`marqdo view` / `view output` 黑白极简 + 静态文档** |

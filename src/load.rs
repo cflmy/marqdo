@@ -116,6 +116,8 @@ fn ext_search_roots() -> Vec<PathBuf> {
     if let Ok(h) = env::var("MARQDO_EXT") {
         roots.push(PathBuf::from(h));
     }
+    // Official installer default (`marqdo ext add`)
+    roots.push(crate::ext_cli::default_user_ext_dir());
     if let Ok(cwd) = env::current_dir() {
         roots.push(cwd.join("ext"));
         roots.push(cwd);

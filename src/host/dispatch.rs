@@ -80,6 +80,7 @@ pub enum HostFn {
     PluginLoad = 69,
     PluginUnload = 70,
     PluginList = 71,
+    ExtNativePath = 72,
 }
 
 impl HostFn {
@@ -156,6 +157,7 @@ impl HostFn {
             69 => Self::PluginLoad,
             70 => Self::PluginUnload,
             71 => Self::PluginList,
+            72 => Self::ExtNativePath,
             _ => return None,
         })
     }
@@ -236,6 +238,7 @@ impl HostFn {
             "host_plugin_load" | "plugin_load" => Self::PluginLoad,
             "host_plugin_unload" | "plugin_unload" => Self::PluginUnload,
             "host_plugin_list" | "plugin_list" => Self::PluginList,
+            "host_ext_native_path" | "ext_native_path" => Self::ExtNativePath,
             _ => return None,
         })
     }
@@ -317,6 +320,7 @@ impl HostFn {
             Self::PluginLoad => "host_plugin_load",
             Self::PluginUnload => "host_plugin_unload",
             Self::PluginList => "host_plugin_list",
+            Self::ExtNativePath => "host_ext_native_path",
         }
     }
 
@@ -361,6 +365,7 @@ impl HostFn {
             Self::ForeignLangs => &[],
             Self::PluginLoad => &["path"],
             Self::PluginUnload | Self::PluginList => &[],
+            Self::ExtNativePath => &["name"],
         }
     }
 
@@ -539,6 +544,17 @@ pub fn call_host(
         HostFn::PluginLoad => plugin::load(ctx, require(bound, "path")?),
         HostFn::PluginUnload => plugin::unload(ctx),
         HostFn::PluginList => plugin::list(ctx),
+        HostFn::ExtNativePath => {
+            let name = require(bound, "name")?;
+            let s = match name {
+                Value::Text(t) => t.as_str(),
+                _ => return Err("name must be text".into()),
+            };
+            Ok(match crate::ext_cli::installed_native_path(s) {
+                Some(p) => Value::Text(p.to_string_lossy().into_owned()),
+                None => Value::None,
+            })
+        }
     }
 }
 

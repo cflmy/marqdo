@@ -2,10 +2,10 @@
 
 | | |
 |---|---|
-| 状态 | 已定论（修订：语句 / 返回 / 输出职责分离） |
-| 日期 | 2026-08-04 |
+| 状态 | 已定论（修订：语句 / 返回 / 输出职责分离；`#` = 对象） |
+| 日期 | 2026-08-06 |
 | 取代 | v0 中「`**`=输出、`*`=返回」 |
-| 相关 | [code-vs-comment.md](code-vs-comment.md) · [return-hr-and-code-surface.md](return-hr-and-code-surface.md) |
+| 相关 | [objects.md](objects.md) · [code-vs-comment.md](code-vs-comment.md) · [return-hr-and-code-surface.md](return-hr-and-code-surface.md) |
 
 Markdown **标记即语法**。输出**不是**语言架构原语，而是内置函数 **`print`**（英文；见 [keywords.md](keywords.md)）。
 
@@ -16,7 +16,7 @@ Markdown **标记即语法**。输出**不是**语言架构原语，而是内置
 1. `.mq.md`：打开即文档，运行即程序。  
 2. **叙述注释**以空行分段：段首无标记 → 注释；段内续行一律注释（见 §2）。  
 3. **可执行**靠标记：结构标记（`#` `>` `+` `-` 表…）与 **斜体语句** / **粗体返回**。  
-4. 作用域 = `#` 层数；入口 = `index.mq.md`。函数体可用 `---` / `***` 或空返回收束（见 §11）。
+4. **`#` = 对象/类型**，**`##`+ = 函数/方法**（嵌套按标题深度）；入口优先 `# main`（见 [objects.md](objects.md)）。函数体可用 `---` / `***` 或空返回收束（见 §11）。
 
 ---
 

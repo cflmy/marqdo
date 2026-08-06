@@ -13,7 +13,7 @@
 | 路径 | 是否入库 | 职责 |
 |------|----------|------|
 | `doc/` | 是 | 开发者设计 / ADR / 路线图（单数 `doc`，勿再造 `docs/`） |
-| `public/**/*.mq.md` | 是 | 用户可读、可执行、可下载的介绍（结构 / 关键字 / 特性迭代）；**双语**：拉丁文件名 = 英文，中文文件名 = 中文编程，同目录并列 |
+| `public/**/*.mq.md` | 是 | 用户可读、可执行、可下载的介绍（结构 / 关键字 / **stdlib** / 特性迭代）；**双语**：拉丁文件名 = 英文，中文文件名 = 中文编程，同目录并列。stdlib 含 `plugin`；特性页覆盖对象与 `ext/`（llm / agent） |
 | `public/index.html`、`public/pages/` | **否**（ignore） | `marqdo view output` 生成的 HTML |
 | `tests/{structure,keywords,errors}/` | 是 | 金样例与失败夹具（含 errors） |
 | 远程分支 `gh-pages` | 发布产物 | 发布整个 `public/`（源文件 + 生成 HTML） |
@@ -50,7 +50,16 @@ public/
 
 ---
 
-## 4. 验收
+## 4. 内容分层（用户站）
+
+| 目录 | 内容 |
+|------|------|
+| `public/stdlib/` | L1 模块页（含 `plugin` / `插件`）；概述注明 `ext/` 非 stdlib |
+| `public/features/` | 迭代特性：树遍历、字节码、view、**对象**、**官方扩展** |
+
+设计文档仍在 `doc/design/`（`objects.md`、`ext-llm.md`、`ext-abi.md`、`ext-agent.md`）。
+
+## 5. 验收
 
 1. `public/` 下每个 `.mq.md`（除纯工具模块外）`marqdo run` 退出码 0。  
 2. `view output public -o public` 后首页为欢迎页，侧栏无 errors。  

@@ -105,7 +105,29 @@ description: loads math
 > print text=`t`
 ```
 
-## 9. What not to emit
+## 9. Object handle + method
+
+See `tests/structure/object-handle.mq.md` and `ext/llm.mq.md`: `# Type` constructs a map with `_type`; methods use `` > `obj`.method `` and read `self` / `自`.
+
+## 10. Agent layout (ABI)
+
+```markdown
+---
+> ext/agent.mq.md
+---
+
+# main
+
+> load_native
+
+*`ws` = > agent *
+*`n` = > `ws`.ensure_layout *
+> print text=`n`
+```
+
+Requires `MARQDO_AGENT_PLUGIN` pointing at the built `agent` shared library (see `doc/design/ext-agent.md`).
+
+## 11. What not to emit
 
 ```markdown
 # BAD — bold is return, not print

@@ -19,7 +19,7 @@ Canonical design (repo): `doc/design/markdown-mapping.md`, `doc/design/keywords.
 1. **File suffix** must be `.mq.md` (never plain `.md` for executable sources).
 2. **Output is not `**bold**`.** Print with `> print text=…` (or `> 打印 内容=…`). Bold `**…**` is **return value only**.
 3. **Prose vs code:** after a blank line, an unmarked first line starts a **comment paragraph**; every following non-blank line stays comment until the next blank line. Put a **blank line** between narration and executable lines.
-4. **Do not invent keywords** `if` / `else` / `while` / `for` / `def` / `return`. Control flow is Markdown: `+` branch, `-` loop, arm-head lone `*` = else, `#` = function, `**…**` = return.
+4. **Do not invent keywords** `if` / `else` / `while` / `for` / `def` / `return`. Control flow is Markdown: `+` branch, `-` loop, arm-head lone `*` = else, `#` = **object/type**, `##`+ = **function/method**, `**…**` = return.
 5. **Structure lines are not wrapped in italics.** `#` `>` `+` `-` `|` lines stand alone; use `*…*` only for general statements (bindings / expressions).
 6. **Paths in bare expressions:** `/` is division. Prefer `` `path` `` vars, same-dir names, or call args — not raw `a/b` in expressions.
 7. Prefer ending side-effect-only function bodies with a lone `---` or `***` line (or `****` empty return) so later siblings are not swallowed.
@@ -121,8 +121,8 @@ title: example
 
 - Import **English** or **Chinese** library file; call that file’s API names (do not mix).
 - `lib/…` resolves via `MARQDO_LIB`, cwd `lib/`, or `lib/` next to the `marqdo` binary.
-- Official optional extensions: `ext/llm.mq.md` / `ext/大模型.mq.md` — `# llm` / `# 大模型` object handles + `## complete` / `## 运行`. Free `## load_env`. See `doc/design/ext-llm.md` and `doc/design/objects.md`.
-- Native plugins (optional shared libs): `lib/plugin.mq.md` / `lib/插件.mq.md` — `## load` / `## unload` / `## list`; after load, registered names are callable directly. C ABI: `include/marqdo_abi.h`, design `doc/design/ext-abi.md`, demo `plugins/demo`.
+- Official optional extensions (`ext/`, not stdlib): install with `marqdo ext add llm` / `add agent` (see `doc/design/ext-cli.md`). `ext/llm` — chat; `ext/agent` — agent framework (layout + ABI; compose LLM per `doc/design/ext-agent.md`).
+- Native plugins: `lib/plugin` — `## load` / `unload` / `list`. C ABI: `include/marqdo_abi.h`.
 - Builtins (no import): `print`/`打印`, `input`/`输入`, `len`/`长度`, `str`/`文本`, `int`/`整数`; literals `True`/`真`, `False`/`假`, `None`/`空`; logic `and`/`且`, `or`/`或`, `not`/`非`.
 
 Stdlib map: [reference.md](reference.md).

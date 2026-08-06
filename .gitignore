@@ -1,10 +1,19 @@
 /target/
 /dist/
 
-# Copied by gold harness for ABI plugin demo
+# Copied by gold harness for ABI plugins
 /tests/lib/demo.dll
 /tests/lib/libdemo.so
 /tests/lib/libdemo.dylib
+/tests/ext/agent.dll
+/tests/ext/libagent.so
+/tests/ext/libagent.dylib
+/tests/ext/skel.mq.md
+/tests/ext/out-demo.mq.md
+/tests/ext/agents/
+/tests/ext/runbooks/
+/tests/ext/templates/
+/tests/ext/reports/
 **/*.rs.bk
 .idea/
 .vscode/

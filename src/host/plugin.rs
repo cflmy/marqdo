@@ -172,7 +172,22 @@ pub fn load(ctx: &mut HostContext, path: &Value) -> Result<Value, String> {
         return Err("plugin_load denied by host policy".into());
     }
     let rel = as_text(path, "path")?;
-    let file = ctx.resolve_path(rel)?;
+    let file = match ctx.resolve_path(rel) {
+        Ok(p) => p,
+        Err(e) => {
+            let p = std::path::Path::new(rel);
+            let abs = if p.is_absolute() {
+                p.to_path_buf()
+            } else {
+                ctx.cwd.join(p)
+            };
+            if abs.is_file() && crate::ext_cli::path_is_trusted_plugin(&abs) {
+                abs
+            } else {
+                return Err(e);
+            }
+        }
+    };
     if !file.is_file() {
         return Err(format!("plugin_load: not a file: {}", file.display()));
     }

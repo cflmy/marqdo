@@ -26,7 +26,7 @@ zeroize = "=1.8.1"
 libloading = "=0.8.6"
 
 [workspace]
-members = ["plugins/demo"]
+members = ["plugins/demo", "plugins/agent"]
 resolver = "2"
 
 [dev-dependencies]

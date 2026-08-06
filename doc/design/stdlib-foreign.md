@@ -2,8 +2,8 @@
 
 | | |
 |---|---|
-| 状态 | **已定（v1）** |
-| 日期 | 2026-08-05 |
+| 状态 | **已落地（v1）** |
+| 日期 | 2026-08-06 |
 | 相关 | [stdlib-modules.md](stdlib-modules.md) · [stdlib-math.md](stdlib-math.md)（公式同构绑定） |
 
 ---

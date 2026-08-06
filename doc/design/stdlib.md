@@ -2,12 +2,13 @@
 
 | | |
 |---|---|
-| 状态 | **S0–S3 落地** |
-| 日期 | 2026-08-04 |
-| 相关 | [keywords.md](keywords.md) · [call-arguments.md](call-arguments.md) · [stdlib-i18n.md](stdlib-i18n.md) · [stdlib-modules.md](stdlib-modules.md) · [roadmap/next-phase.md](../roadmap/next-phase.md) |
+| 状态 | **S0–S3 + L1 全模块落地** |
+| 日期 | 2026-08-06 |
+| 相关 | [keywords.md](keywords.md) · [objects.md](objects.md) · [call-arguments.md](call-arguments.md) · [stdlib-i18n.md](stdlib-i18n.md) · [stdlib-modules.md](stdlib-modules.md) · [ext-abi.md](ext-abi.md) |
 
 > **多语言库命名**：见 [stdlib-i18n.md](stdlib-i18n.md)（不设 `lang:`；中英分文件）。  
-> **下一波模块（本波：文件 / 系统 / 时间 / JSON / 网络；数学·外联暂缓）**：见 [stdlib-modules.md](stdlib-modules.md)。
+> **L1 模块清单**（含 math/foreign/plugin）：见 [stdlib-modules.md](stdlib-modules.md)。  
+> **`ext/` 不是 stdlib**：官方可选扩展见 [ext-llm.md](ext-llm.md) / [ext-agent.md](ext-agent.md)。
 
 ---
 
@@ -15,8 +16,9 @@
 
 | 层 | 内容 |
 |----|------|
-| **L0 内置** | 解释器内：`print` `input` `len` `str` `int` `type` `trim` `split` `join` `at` |
+| **L0 内置** | 解释器内：`print` `input` `len` `str` `int` `type` `trim` `split` `join` `at`（`type` 可含 `map`） |
 | **L1 官方库** | 仓库根目录 [`lib/`](../../lib/)（`.mq.md`）；可用 `lib/…` 或别名 `std/…` 导入 |
+| **官方 ext** | [`ext/`](../../ext/)（`.mq.md` + 可选原生插件）；`MARQDO_EXT`；**不属于** L1 |
 | **L2** | catalog / 用户站收录（随发版） |
 
 ---
@@ -28,7 +30,7 @@
 | `len` | `value` | 文本标量数或列表长度 |
 | `str` | `value` | 显示文本 |
 | `int` | `value` | 整数（失败 → 诊断） |
-| `type` | `value` | `none`/`bool`/`int`/`text`/`list` |
+| `type` | `value` | `none`/`bool`/`int`/`text`/`list`/`map` |
 | `trim` | `value` | 去首尾空白 |
 | `split` | `value`, `sep` | 文本列表 |
 | `join` | `value`, `sep` | 拼接文本 |
@@ -56,21 +58,24 @@ Frontmatter：
 3. 当前工作目录的 `lib/`  
 4. 可执行文件附近的 `lib/`（含 `cargo run` 的相对路径）
 
-当前模块：
+当前模块（API 多为 `##` 自由函数；见 [objects.md](objects.md)）：
 
-| 路径 | 导出函数 |
-|------|----------|
+| 路径 | 导出 |
+|------|------|
 | `lib/fs.mq.md` / `lib/文件.mq.md` | `read_text`… / `读文本`… |
 | `lib/time.mq.md` / `lib/时间.mq.md` | `now_unix`… / `此刻秒`… |
-| `lib/sys.mq.md` / `lib/系统.mq.md` | `env_get`… / `取环境`… |
-| `lib/json.mq.md` | `parse` `stringify` `get` `keys`（中英同文件） |
-| `lib/net.mq.md` / `lib/网络.mq.md` | `http_get`… / `获取`… |
+| `lib/sys.mq.md` / `lib/系统.mq.md` | `env_get`…、`load_dotenv`… / `取环境`…、`加载环境`… |
+| `lib/json.mq.md` | `parse` `stringify` `get` `keys` `quote`（中英同文件） |
+| `lib/net.mq.md` / `lib/网络.mq.md` | `http_get`…（HTTPS）/ `获取`… |
+| `lib/math.mq.md` / `lib/数学.mq.md` | 数值 / 随机 / 公式 / 绘图 |
+| `lib/foreign.mq.md` / `lib/外联.mq.md` | 具名围栏外联 |
+| `lib/plugin.mq.md` / `lib/插件.mq.md` | `load` / `unload` / `list`（原生 ABI） |
 | `lib/text.mq.md` | `str_trim` `str_split` `str_join` |
 | `lib/文本.mq.md` | `去空白` `拆分` `拼接` |
 | `lib/table.mq.md` | `rows` `row_at` |
 | `lib/表.mq.md` | `行数` `取行` |
 
-规划中的 L1 扩展见 [stdlib-modules.md](stdlib-modules.md)。
+完整清单见 [stdlib-modules.md](stdlib-modules.md)。
 
 ---
 

@@ -6,7 +6,7 @@ Marqdo 把 Markdown **标记当作编程语法**：同一个 `.mq.md` 文件，�
 
 欢迎访问 [marqdo 官方网站](https://www.marqdo.com/) 阅读更多特性与可执行文档。
 
-语法宪法：[doc/design/markdown-mapping.md](doc/design/markdown-mapping.md) · 对象：[objects.md](doc/design/objects.md) · 调用实参：[call-arguments.md](doc/design/call-arguments.md) · 用户站：[user-site.md](doc/design/user-site.md) · 浏览：[view.md](doc/design/view.md) · 调试：[view-debug.md](doc/design/view-debug.md) · OKF 清单：[catalog-cli.md](doc/design/catalog-cli.md) · VS Code 扩展：[vscode-extension.md](doc/design/vscode-extension.md)（分支 `vscode-extension`） · **AI Skill**：[skills/marqdo/](skills/marqdo/)（说明 [ai-skill.md](doc/design/ai-skill.md)） · 官方扩展：[ext-llm.md](doc/design/ext-llm.md)（`ext/llm`） · 原生插件 ABI：[ext-abi.md](doc/design/ext-abi.md)（`lib/plugin`） · 金样例：[tests/](tests/) · 用户文档：[public/](public/)
+语法宪法：[doc/design/markdown-mapping.md](doc/design/markdown-mapping.md) · 对象：[objects.md](doc/design/objects.md) · 调用实参：[call-arguments.md](doc/design/call-arguments.md) · 用户站：[user-site.md](doc/design/user-site.md) · 浏览：[view.md](doc/design/view.md) · 调试：[view-debug.md](doc/design/view-debug.md) · OKF 清单：[catalog-cli.md](doc/design/catalog-cli.md) · VS Code 扩展：[vscode-extension.md](doc/design/vscode-extension.md)（分支 `vscode-extension`） · **AI Skill**：[skills/marqdo/](skills/marqdo/)（说明 [ai-skill.md](doc/design/ai-skill.md)） · 官方扩展：[ext-llm.md](doc/design/ext-llm.md)（`ext/llm`）· [ext-agent.md](doc/design/ext-agent.md)（智能体开发框架）· [ext-cli.md](doc/design/ext-cli.md)（`marqdo ext list/add/remove`） · 原生插件 ABI：[ext-abi.md](doc/design/ext-abi.md)（`lib/plugin`） · 金样例：[tests/](tests/) · 用户文档：[public/](public/)
 
 ---
 
@@ -32,7 +32,9 @@ Marqdo 把 Markdown **标记当作编程语法**：同一个 `.mq.md` 文件，�
 | `**…**` | **返回值**（架构） |
 | `****` / `**` + 空白 + `**` | **空返回**（`None`），并结束本函数体 |
 | `> print …` 等 | 输出等副作用 = **普通函数**，非架构标记 |
-| `#` / `##` | 函数与作用域 |
+| `#` | 对象 / 类型（构造体；`# main` = 入口） |
+| `##` … | 函数 / 方法（按标题深度嵌套） |
+| `` > `obj`.method … `` | 方法调用（`obj` 为带 `_type` 的 map） |
 | `+` / `1.` | 分支（臂头单独 `*` = else） |
 | `-` | 循环（头下纯名则为形参） |
 | 表格 | 集合 |
@@ -98,10 +100,13 @@ marqdo catalog public -o .marqdo
 ## 现状（v0.1.1）
 
 - 映射与解释器：Phase I 树遍历 + 字节码后端可用；金样例在 `tests/`  
+- **对象**：`#` = 类型/构造，`##`+ = 函数/方法；见 [objects.md](doc/design/objects.md)  
 - **`marqdo view`**：文档浏览器（Structure + 函数大纲/搜索 + Execution + Source）  
 - **`marqdo debug`**：独立调试页（断点 / 单步 / locals；默认端口 7430；页面 favicon / 品牌使用官方 Logo）  
 - **`marqdo catalog` / `sync`**：OKF 风格 YAML + 模块概念页  
-- 标准库：文本、文件、系统、时间、JSON、网络、数学（公式/绘图）、外联（Python 等）  
+- 标准库：文本、文件、系统（含 `load_dotenv`）、时间、JSON（含 `quote`）、网络（HTTPS + headers）、数学（公式/绘图）、外联（Python 等）、**插件**（`lib/plugin` 加载原生 ABI）  
+- **官方扩展 `ext/`**（非 stdlib）：[`ext/llm`](doc/design/ext-llm.md)；[`ext/agent`](doc/design/ext-agent.md) 智能体开发框架。安装：`marqdo ext list` / `add llm|agent` / `remove`（见 [ext-cli.md](doc/design/ext-cli.md)；默认 `~/.marqdo/ext` 或 `MARQDO_EXT`）  
+- **原生插件 ABI v1**：[`include/marqdo_abi.h`](include/marqdo_abi.h) · [ext-abi.md](doc/design/ext-abi.md)；demo `plugins/demo`  
 - **用户静态站**：`public/` → `view output` → CI 发布 [gh-pages](https://cflmy.github.io/marqdo/)  
 - **VS Code 扩展**：分支 `vscode-extension`；Release 附带 `.vsix`（Run / View / Debug + CLI 安装助手）  
 - 选型：[ADR 0001 — Rust](doc/adr/0001-implementation-language.md)
@@ -116,7 +121,7 @@ cargo run -- view output public -o public
 powershell -File ./scripts/build-public.ps1
 ```
 
-**发布包（GitHub Releases）**：单独 `.exe` **不含** `lib/` / `ext/`；请下载带 `lib/`（及可选 `ext/`）的 zip，或另下 `*-stdlib.zip` 解压到可执行文件旁（亦可设 `MARQDO_LIB` / `MARQDO_EXT`）。OpenAI 兼容聊天见 [ext-llm.md](doc/design/ext-llm.md)（在项目目录自建 `.env`，勿提交密钥）。
+**发布包（GitHub Releases）**：单独 `.exe` **不含** `lib/` / `ext/` / 原生插件 `.dll`；请下载带 `lib/`（及可选 `ext/`）的 zip，或另下 `*-stdlib.zip` 解压到可执行文件旁（亦可设 `MARQDO_LIB` / `MARQDO_EXT`）。OpenAI 兼容聊天见 [ext-llm.md](doc/design/ext-llm.md)（项目目录自建 `.env`，勿提交密钥）。智能体布局见 [ext-agent.md](doc/design/ext-agent.md)（`MARQDO_AGENT_PLUGIN` 指向构建出的 `agent` 共享库）。
 
 文档：用户站 [public/](public/) · 设计 [doc/](doc/) · OKF / catalog [catalog-cli.md](doc/design/catalog-cli.md) · 调试 [view-debug.md](doc/design/view-debug.md)
 
