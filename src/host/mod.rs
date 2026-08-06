@@ -4,6 +4,7 @@
 //! Capabilities default **on** (importing a lib means you intend to use it).
 //! Soft side-effects (no process::exit; sleep clamp) apply under view / capture only.
 
+pub mod agent_rt;
 mod dispatch;
 pub mod foreign;
 mod fs;
@@ -20,6 +21,8 @@ pub use plugin::PluginState;
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
+
+use crate::value::Value;
 
 /// Host capability flags. Default: all enabled.
 #[derive(Debug, Clone)]
@@ -65,6 +68,16 @@ pub struct HostContext {
     pub foreign_cmds: HashMap<String, Vec<String>>,
     /// Loaded native plugins (ABI v1).
     pub plugins: PluginState,
+    /// Entry `.mq.md` source text (for agent context injection).
+    pub entry_source: Option<String>,
+    pub entry_path: Option<PathBuf>,
+    /// Active function names (outer → inner) for call-site injection.
+    pub call_stack: Vec<String>,
+    /// Per-agent conversation history (id → turns).
+    pub agent_histories: HashMap<String, Vec<Value>>,
+    pub agent_seq: u64,
+    /// Last statement line (updated by interpreters for `host_call_site`).
+    pub current_line: u32,
 }
 
 impl Default for HostContext {
@@ -80,6 +93,12 @@ impl Default for HostContext {
             plots: Vec::new(),
             foreign_cmds: HashMap::new(),
             plugins: PluginState::default(),
+            entry_source: None,
+            entry_path: None,
+            call_stack: Vec::new(),
+            agent_histories: HashMap::new(),
+            agent_seq: 0,
+            current_line: 1,
         }
     }
 }

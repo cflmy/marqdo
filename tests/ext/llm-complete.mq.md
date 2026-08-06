@@ -1,7 +1,7 @@
 ---
 title: ext llm DeepSeek complete (live)
 description: Live OpenAI-compatible chat via DeepSeek. Needs tests/ext/.env (gitignored). Not in gold suite.
-> ext/llm.mq.md
+> ext/ai/llm.mq.md
 ---
 
 # main

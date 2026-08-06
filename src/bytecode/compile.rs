@@ -65,11 +65,16 @@ pub fn compile_module(path: Option<&Path>, module: &Module) -> Result<Program> {
         functions.push(compile_function(i, &flat, path_buf.as_deref())?);
     }
 
+    let parents: Vec<Option<usize>> = flat.iter().map(|f| f.parent).collect();
+    let children: Vec<Vec<usize>> = flat.iter().map(|f| f.children.clone()).collect();
+
     Ok(Program {
         functions,
         entry,
         objects,
         methods,
+        parents,
+        children,
     })
 }
 
@@ -465,6 +470,17 @@ impl<'a> FnCompiler<'a> {
                 self.compile_expr(value_expr)?;
                 self.compile_expr(index_expr)?;
                 self.emit(Op::GetIndex);
+                if as_stmt {
+                    self.emit(Op::Pop);
+                }
+                return Ok(());
+            }
+            "call_fn" => {
+                let name_expr = self
+                    .named_or_first(&call, "name")
+                    .ok_or_else(|| self.err("call_fn requires name"))?;
+                self.compile_expr(name_expr)?;
+                self.emit(Op::CallFn);
                 if as_stmt {
                     self.emit(Op::Pop);
                 }

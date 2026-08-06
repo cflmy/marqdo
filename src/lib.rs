@@ -171,7 +171,8 @@ pub fn run_file(path: &Path, opts: &RunOptions) -> Result<i32> {
 
     match opts.backend {
         Backend::Tree => {
-            let host = HostContext::for_run(Some(path), opts.host_caps(), opts.argv.clone());
+            let mut host = HostContext::for_run(Some(path), opts.host_caps(), opts.argv.clone());
+            host.set_entry_source(Some(path), &source);
             let mut interp = Interpreter::new(Some(path), opts.trace_eval)
                 .with_stdin(stdin_lines.clone())
                 .with_host(host);
@@ -190,7 +191,8 @@ pub fn run_file(path: &Path, opts: &RunOptions) -> Result<i32> {
             if opts.dump_bytecode {
                 print!("{}", program.disassemble());
             }
-            let host = HostContext::for_run(Some(path), opts.host_caps(), opts.argv.clone());
+            let mut host = HostContext::for_run(Some(path), opts.host_caps(), opts.argv.clone());
+            host.set_entry_source(Some(path), &source);
             let mut vm = Vm::new(Some(path))
                 .with_stdin(stdin_lines)
                 .with_trace(opts.trace_eval)
@@ -225,6 +227,7 @@ pub fn run_file_capture(path: &Path, opts: &RunOptions) -> Result<RunCapture> {
     match opts.backend {
         Backend::Tree => {
             let mut host = HostContext::for_capture(Some(path), opts.host_caps());
+            host.set_entry_source(Some(path), &source);
             host.argv = opts.argv.clone();
             if let Some(root) = &opts.fs_root {
                 host.fs_root = Some(root.clone());
@@ -246,6 +249,7 @@ pub fn run_file_capture(path: &Path, opts: &RunOptions) -> Result<RunCapture> {
         Backend::Bytecode => {
             let program = compile_module(Some(path), &module)?;
             let mut host = HostContext::for_capture(Some(path), opts.host_caps());
+            host.set_entry_source(Some(path), &source);
             host.argv = opts.argv.clone();
             if let Some(root) = &opts.fs_root {
                 host.fs_root = Some(root.clone());

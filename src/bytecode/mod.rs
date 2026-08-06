@@ -56,6 +56,8 @@ pub enum Op {
     GetIndex,
     /// Call function by index; argc values are on the stack (param order).
     Call(u16, u8),
+    /// Pop function name text → call zero-arg top-level or lexically visible function.
+    CallFn,
     /// After a constructor Call: tag top-of-stack map with `_type` = constants[idx].
     TagInstance(u16),
     /// Method call: stack has argc args (param order) then receiver on top.
@@ -88,6 +90,10 @@ pub struct Program {
     pub objects: Vec<(String, usize)>,
     /// (object_fn_idx, method_name) → method fn idx
     pub methods: Vec<(usize, String, usize)>,
+    /// Parallel to `functions`: parent fn index for dynamic `call_fn` lookup.
+    pub parents: Vec<Option<usize>>,
+    /// Parallel to `functions`: child fn indices.
+    pub children: Vec<Vec<usize>>,
 }
 
 impl Program {

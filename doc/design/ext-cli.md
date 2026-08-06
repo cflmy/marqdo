@@ -4,45 +4,58 @@
 |---|---|
 | Status | **Accepted (v0.1)** |
 | Date | 2026-08-06 |
-| Related | [ext-llm.md](ext-llm.md) · [ext-agent.md](ext-agent.md) · [ext-abi.md](ext-abi.md) |
+| Related | [ext-llm.md](ext-llm.md) · [ext-agent.md](ext-agent.md) |
 
 ## Commands
 
 ```text
-marqdo ext list              # official catalog + installed?
-marqdo ext add llm           # install into local ext directory
-marqdo ext add agent         # .mq.md + platform native plugin
+marqdo ext list
+marqdo ext add llm
+marqdo ext add agent
 marqdo ext remove llm
+marqdo ext remove agent
 ```
 
 ## Install root
 
 1. `MARQDO_EXT` if set  
-2. Else `~/.marqdo/ext` (`%USERPROFILE%\.marqdo\ext` on Windows)
+2. Else `~/.marqdo/ext`
 
-`ext/…` import resolution also searches this default user dir (see [`load.rs`](../../src/load.rs)).
+Imports use paths like `> ext/ai/llm.mq.md` (see [`load.rs`](../../src/load.rs)).
 
 ## Source for `add`
 
-1. `MARQDO_EXT_SOURCE` — directory containing `llm.mq.md` / `agent.mq.md` …  
-2. Else `./ext` near cwd / next to the binary (dev: Marqdo repo `ext/`)
+1. `MARQDO_EXT_SOURCE` — directory containing `ai/llm.mq.md` …  
+2. Else repo `./ext` near cwd / binary
 
-Native plugin for `agent`: `target/debug|release/agent.dll` (or `libagent.so` / `libagent.dylib`), or `MARQDO_EXT_SOURCE/native/`.
+## Layout (`ext/`)
 
-`ext add agent` also writes `agent.plugin` (absolute path) and `native/<lib>`; `## load_native` uses `host_ext_native_path` when `MARQDO_AGENT_PLUGIN` is unset. Plugin load may open trusted paths under the install root (sandbox allowlist).
+Official extensions live under **`ext/ai/`** (LLM + agent framework only). Do not add flat `.mq.md` files at `ext/` root — keeps the tree from accumulating unrelated modules.
+
+```text
+ext/
+  ai/
+    llm.mq.md
+    大模型.mq.md
+    agent.mq.md
+    智能体.mq.md
+```
+
+Future optional ext domains get their own subdirs (e.g. `ext/foo/`), not mixed into `ai/`.
 
 ## Catalog
 
-| Id | Ships |
-|----|-------|
-| `llm` | `llm.mq.md`, `大模型.mq.md` |
-| `agent` | `agent.mq.md`, `智能体.mq.md` + native |
+| Id | Installs under `MARQDO_EXT` |
+|----|-----------------------------|
+| `llm` | `ai/llm.mq.md`, `ai/大模型.mq.md` |
+| `agent` | `ai/agent.mq.md`, `ai/智能体.mq.md` |
 
 ## Tests
 
-`tests/gold.rs`: `ext_cli_add_list_remove_llm`, `ext_cli_add_agent_with_native`.
+`tests/gold.rs`: `ext_cli_add_list_remove_llm`, `ext_cli_add_agent`, `ext_agent_framework_smoke`, `ext_agent_run_live` (needs `tests/ext/.env`).
 
 ## Non-goals
 
-- Third-party registry / arbitrary download URLs as default  
-- Merging into `lib/`
+- Third-party registry  
+- Merging into `lib/`  
+- Bundling domain/task helpers in official ext

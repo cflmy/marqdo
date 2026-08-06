@@ -642,7 +642,7 @@ fn lib_plugin_demo() {
 fn ext_cli_add_list_remove_llm() {
     let tmp = tempfile_dir("marqdo-ext-cli");
     let src = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("ext");
-    assert!(src.join("llm.mq.md").is_file());
+    assert!(src.join("ai").join("llm.mq.md").is_file());
 
     let bin = env!("CARGO_BIN_EXE_marqdo");
     let status = Command::new(bin)
@@ -654,8 +654,8 @@ fn ext_cli_add_list_remove_llm() {
         .status()
         .expect("ext add");
     assert!(status.success(), "ext add llm failed");
-    assert!(tmp.join("llm.mq.md").is_file());
-    assert!(tmp.join("大模型.mq.md").is_file());
+    assert!(tmp.join("ai").join("llm.mq.md").is_file());
+    assert!(tmp.join("ai").join("大模型.mq.md").is_file());
 
     let out = Command::new(bin)
         .args(["ext", "list"])
@@ -669,7 +669,7 @@ fn ext_cli_add_list_remove_llm() {
     let mq = tmp.join("smoke.mq.md");
     std::fs::write(
         &mq,
-        "---\n> ext/llm.mq.md\n---\n\n# main\n\n> print text=ext-cli-ok\n",
+        "---\n> ext/ai/llm.mq.md\n---\n\n# main\n\n> print text=ext-cli-ok\n",
     )
     .unwrap();
     let run = Command::new(bin)
@@ -694,17 +694,11 @@ fn ext_cli_add_list_remove_llm() {
         .status()
         .expect("ext remove");
     assert!(status.success());
-    assert!(!tmp.join("llm.mq.md").is_file());
+    assert!(!tmp.join("ai").join("llm.mq.md").is_file());
 }
 
 #[test]
-fn ext_cli_add_agent_with_native() {
-    let status = Command::new(env!("CARGO"))
-        .args(["build", "-p", "marqdo_plugin_agent"])
-        .status()
-        .expect("build agent plugin");
-    assert!(status.success());
-
+fn ext_cli_add_agent() {
     let tmp = tempfile_dir("marqdo-ext-agent");
     let src = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("ext");
     let bin = env!("CARGO_BIN_EXE_marqdo");
@@ -716,99 +710,52 @@ fn ext_cli_add_agent_with_native() {
         .status()
         .expect("ext add agent");
     assert!(status.success(), "ext add agent failed");
-    assert!(tmp.join("agent.mq.md").is_file());
-    let lib_name = if cfg!(windows) {
-        "agent.dll"
-    } else if cfg!(target_os = "macos") {
-        "libagent.dylib"
-    } else {
-        "libagent.so"
-    };
-    assert!(tmp.join("native").join(lib_name).is_file());
-    assert!(tmp.join("agent.plugin").is_file());
+    assert!(tmp.join("ai").join("agent.mq.md").is_file());
+    assert!(tmp.join("ai").join("智能体.mq.md").is_file());
 }
 
 #[test]
-fn ext_agent_assign() {
-    let status = Command::new(env!("CARGO"))
-        .args(["build", "-p", "marqdo_plugin_agent"])
-        .status()
-        .expect("cargo build plugin agent");
-    assert!(status.success(), "failed to build marqdo_plugin_agent");
-
-    let lib_name = if cfg!(windows) {
-        "agent.dll"
-    } else if cfg!(target_os = "macos") {
-        "libagent.dylib"
-    } else {
-        "libagent.so"
-    };
-    let built = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("target")
-        .join("debug")
-        .join(lib_name);
-    let ext_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("tests")
-        .join("ext");
-    let plugin = ext_dir.join(lib_name);
-    std::fs::copy(&built, &plugin).expect("copy agent plugin");
-    let _ = std::fs::remove_file(ext_dir.join("ticket.txt"));
-    let _ = std::fs::remove_file(ext_dir.join("ticket-stub.txt"));
-
+fn ext_agent_framework_smoke() {
     let output = Command::new(env!("CARGO_BIN_EXE_marqdo"))
-        .args(["run", "tests/ext/agent-assign.mq.md"])
-        .env("MARQDO_AGENT_PLUGIN", lib_name)
+        .args(["run", "tests/ext/agent-smoke.mq.md"])
         .output()
-        .expect("run agent-assign");
+        .expect("run agent-smoke");
     let code = output.status.code().unwrap_or(1);
     let stdout = String::from_utf8_lossy(&output.stdout);
     let stderr = String::from_utf8_lossy(&output.stderr);
-    assert_eq!(code, 0, "agent-assign stderr={stderr}");
-    assert_eq!(stdout.trim_end(), "张三\nticket.txt\n3", "agent-assign");
-}
-
-#[test]
-fn ext_agent_scaffold() {
-    let status = Command::new(env!("CARGO"))
-        .args(["build", "-p", "marqdo_plugin_agent"])
-        .status()
-        .expect("cargo build plugin agent");
-    assert!(status.success(), "failed to build marqdo_plugin_agent");
-
-    let lib_name = if cfg!(windows) {
-        "agent.dll"
-    } else if cfg!(target_os = "macos") {
-        "libagent.dylib"
-    } else {
-        "libagent.so"
-    };
-    let built = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("target")
-        .join("debug")
-        .join(lib_name);
-    assert!(
-        built.is_file(),
-        "missing plugin artifact {}",
-        built.display()
+    assert_eq!(code, 0, "agent-smoke stderr={stderr}");
+    assert_eq!(
+        stdout.trim_end(),
+        "skill-ok\ntools-ok\nsource-ok\n2\n0\nmain",
+        "agent-smoke"
     );
-    let ext_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("tests")
-        .join("ext");
-    let plugin = ext_dir.join(lib_name);
-    std::fs::copy(&built, &plugin).expect("copy agent plugin into tests/ext");
-    let _ = std::fs::remove_file(ext_dir.join("skel.mq.md"));
-    let _ = std::fs::remove_file(ext_dir.join("out-demo.mq.md"));
+}
+
+#[test]
+fn ext_agent_run_live() {
+    let env_file = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/ext/.env");
+    if !env_file.is_file() {
+        eprintln!("skip ext_agent_run_live: missing {}", env_file.display());
+        return;
+    }
 
     let output = Command::new(env!("CARGO_BIN_EXE_marqdo"))
-        .args(["run", "tests/ext/agent-scaffold.mq.md"])
-        .env("MARQDO_AGENT_PLUGIN", lib_name)
+        .args(["run", "tests/ext/agent-run-live.mq.md"])
         .output()
-        .expect("failed to run marqdo");
+        .expect("run agent-run-live");
     let code = output.status.code().unwrap_or(1);
     let stdout = String::from_utf8_lossy(&output.stdout);
     let stderr = String::from_utf8_lossy(&output.stderr);
-    assert_eq!(code, 0, "agent-scaffold stderr={stderr}");
-    assert_eq!(stdout.trim_end(), "True\ndemo", "agent-scaffold");
+    assert_eq!(code, 0, "agent-run-live stderr={stderr}");
+    let lines: Vec<&str> = stdout.trim_end().lines().collect();
+    assert!(lines.len() >= 3, "agent-run-live stdout={stdout}");
+    assert!(
+        lines[0].contains('-') && lines[0].chars().any(|c| c.is_ascii_digit()),
+        "expected time in reply, got {:?}",
+        lines[0]
+    );
+    assert_eq!(lines[1], "2", "history after run");
+    assert_eq!(lines[2], "0", "history after clear");
 }
 
 #[test]

@@ -28,3 +28,16 @@ description: JSON parse/stringify (shared EN/ZH import)
     - text
 
 **> host_json_quote text=`text`**
+
+## set
+    - map
+    - key
+    - value
+
+**> host_map_set map=`map` key=`key` value=`value`**
+
+## append
+    - list
+    - item
+
+**> host_list_append list=`list` item=`item`**

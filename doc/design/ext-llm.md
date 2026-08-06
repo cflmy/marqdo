@@ -8,19 +8,19 @@
 
 ## Scope
 
-`ext/` holds **official optional extensions** shipped with Marqdo. They are **not** stdlib (`lib/`). Users import only what they need:
+`ext/ai/` holds **official LLM + agent** extensions. Import paths:
 
 ```markdown
 ---
-> ext/llm.mq.md
+> ext/ai/llm.mq.md
 ---
 ```
 
-Resolution: `MARQDO_EXT`, `./ext`, `ext/` next to the binary (same pattern as `MARQDO_LIB`).
+Resolution: `MARQDO_EXT/ai/…`, repo `ext/ai/…`, cwd `ext/ai/…` (see [ext-cli.md](ext-cli.md)).
 
 Other official ext: [ext-agent.md](ext-agent.md) (**agent development framework** — layout shipped; orchestration + LLM composition on roadmap). Installer CLI (planned): [ext-cli.md](ext-cli.md). Native plugins: [ext-abi.md](ext-abi.md).
 
-**Note:** Prefer `marqdo ext add llm` for end-user install ([ext-cli.md](ext-cli.md)). Resolving `> ext/llm.mq.md` from a repo checkout or local `ext/` still works without the installer.
+**Note:** Prefer `marqdo ext add llm`. Import `> ext/ai/llm.mq.md` from repo or install root.
 
 ## Platform prerequisites
 
@@ -30,7 +30,7 @@ Other official ext: [ext-agent.md](ext-agent.md) (**agent development framework*
 | Dotenv | `## load_env` in ext (or `load_dotenv` / `lib/sys`) |
 | JSON quote | `lib/json` → `quote` |
 
-## `ext/llm` / `ext/大模型` (object handles)
+## `ext/ai/llm` / `ext/ai/大模型` (object handles)
 
 | English | Chinese | Role |
 |---------|---------|------|
@@ -40,7 +40,7 @@ Other official ext: [ext-agent.md](ext-agent.md) (**agent development framework*
 
 ```markdown
 ---
-> ext/llm.mq.md
+> ext/ai/llm.mq.md
 ---
 
 # main
@@ -65,4 +65,6 @@ Fallbacks: `MARQDO_LLM_API_KEY`, `MARQDO_LLM_BASE_URL`, `MARQDO_LLM_MODEL`.
 ## Tests
 
 - Import smoke: `tests/ext/llm-import.mq.md`
-- Live complete (local only): `tests/ext/llm-complete.mq.md` + gitignored `tests/ext/.env` — do not commit API keys
+- Live complete (local): `tests/ext/llm-complete.mq.md` + `tests/ext/.env`
+- Live agent `执行`: `tests/ext/agent-run-live.mq.md` + same `.env` (gold: `ext_agent_run_live`, skips if missing)
+- Offline agent smoke: `tests/ext/agent-smoke.mq.md` (gold: `ext_agent_framework_smoke`)

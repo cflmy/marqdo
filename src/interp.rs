@@ -166,13 +166,18 @@ impl Interpreter {
             }
         }
 
-        let mut ret = Value::None;
-        for stmt in &fun.body {
-            if let Some(v) = self.exec_stmt(module, fun, &mut env, stmt)? {
-                ret = v;
-                break;
+        let ret = Value::None;
+        self.host.push_call_frame(&fun.name);
+        let body_result = (|| -> Result<Value> {
+            for stmt in &fun.body {
+                if let Some(v) = self.exec_stmt(module, fun, &mut env, stmt)? {
+                    return Ok(v);
+                }
             }
-        }
+            Ok(ret)
+        })();
+        self.host.pop_call_frame();
+        let ret = body_result?;
         if self.trace {
             let display = ret.as_display();
             emit_trace(
@@ -194,6 +199,7 @@ impl Interpreter {
     ) -> Result<Option<Value>> {
         let span = stmt_span(stmt);
         self.current_span = span;
+        self.host.current_line = span.line;
         if let Some(dbg) = &self.debug {
             dbg.on_stmt(span.line, &fun.name, &env.vars, &self.captured_stdout)
                 .map_err(|m| self.err(m))?;
@@ -556,6 +562,23 @@ impl Interpreter {
                     .get("index")
                     .ok_or_else(|| self.err("at requires index"))?;
                 return builtin_at(value, index).map_err(|m| self.err(m));
+            }
+            "call_fn" => {
+                let bound = bind_args(&["name".into()], &ev_args, false)
+                    .map_err(|m| self.err(m))?;
+                let name = match bound.get("name") {
+                    Some(Value::Text(s)) => s.as_str(),
+                    _ => return Err(self.err("call_fn requires text name")),
+                };
+                let target = lookup_function(module, fun, name).ok_or_else(|| {
+                    self.err(format!("call_fn: unknown function `{name}`"))
+                })?;
+                if !target.params.is_empty() {
+                    return Err(self.err(format!(
+                        "call_fn: `{name}` must have no parameters"
+                    )));
+                }
+                return self.run_function(module, target, Env::new(), &[]);
             }
             other if HostFn::from_name(other).is_some() => {
                 let hf = HostFn::from_name(other).unwrap();

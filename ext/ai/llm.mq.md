@@ -1,49 +1,49 @@
 ---
-title: ext/大模型
-description: 官方 OpenAI 兼容大模型对象（中文）。非标准库 — 导入 ext/大模型.mq.md。
-> lib/系统.mq.md
-> lib/网络.mq.md
+title: ext/ai/llm
+description: OpenAI-compatible LLM object (English). Import ext/ai/llm.mq.md.
+> lib/sys.mq.md
+> lib/net.mq.md
 > lib/json.mq.md
 ---
 
-## 加载环境
+## load_env
 
-从工作目录加载 `.env`（可选具名实参 `path=`）。不覆盖已有变量。
+Load `.env` from cwd (optional named arg `path=`). Does not override existing variables.
 
 **> load_dotenv**
 
-# 大模型
+# llm
 
-从 `OPENAI_*` / `MARQDO_LLM_*` 构造句柄（默认 OpenAI v1 + `gpt-4o-mini`）。
+Construct an LLM handle from `OPENAI_*` / `MARQDO_LLM_*` (default base OpenAI v1, model `gpt-4o-mini`).
 
 *`d` = > parse text={"base":"https://api.openai.com/v1","model":"gpt-4o-mini","suffix":"/chat/completions","bearer":"Bearer ","p1":"{\"model\":","p2":",\"messages\":[{\"role\":\"user\",\"content\":","p3":"}]}","h1":"{\"Authorization\":","h2":"}","a1":"{\"api_key\":","a2":",\"base_url\":","a3":",\"model\":","a4":",\"suffix\":","a5":",\"bearer\":","a6":",\"p1\":","a7":",\"p2\":","a8":",\"p3\":","a9":",\"h1\":","a10":",\"h2\":","a11":"}"} *
 
-*`api_key` = > 取环境 名=OPENAI_API_KEY *
+*`api_key` = > env_get name=OPENAI_API_KEY *
 + `api_key`
   *`_k` = 1*
 + *
-  *`api_key` = > 取环境 名=MARQDO_LLM_API_KEY *
+  *`api_key` = > env_get name=MARQDO_LLM_API_KEY *
 + `api_key`
   *`_k` = 1*
 + *
-  > 打印 内容=ext/大模型: 请设置 OPENAI_API_KEY 或 MARQDO_LLM_API_KEY
-  > 退出 码=1
+  > print text=ext/ai/llm: set OPENAI_API_KEY or MARQDO_LLM_API_KEY
+  > exit code=1
 
-*`base_url` = > 取环境 名=OPENAI_BASE_URL *
+*`base_url` = > env_get name=OPENAI_BASE_URL *
 + `base_url`
   *`_k` = 1*
 + *
-  *`base_url` = > 取环境 名=MARQDO_LLM_BASE_URL *
+  *`base_url` = > env_get name=MARQDO_LLM_BASE_URL *
 + `base_url`
   *`_k` = 1*
 + *
   *`base_url` = > get value=`d` key=base *
 
-*`model` = > 取环境 名=OPENAI_MODEL *
+*`model` = > env_get name=OPENAI_MODEL *
 + `model`
   *`_k` = 1*
 + *
-  *`model` = > 取环境 名=MARQDO_LLM_MODEL *
+  *`model` = > env_get name=MARQDO_LLM_MODEL *
 + `model`
   *`_k` = 1*
 + *
@@ -80,28 +80,28 @@ description: 官方 OpenAI 兼容大模型对象（中文）。非标准库 — 
 *`raw` = `a1` + `q_key` + `a2` + `q_base` + `a3` + `q_model` + `a4` + `q_suf` + `a5` + `q_br` + `a6` + `q_p1` + `a7` + `q_p2` + `a8` + `q_p3` + `a9` + `q_h1` + `a10` + `q_h2` + `a11` *
 **> parse text=`raw`**
 
-## 运行
-    - 提示
+## complete
+    - prompt
 
-使用 `自` / `self` 句柄字段做聊天补全。
+Chat completion using `self` / `自` handle fields.
 
-*`api_key` = > get value=`自` key=api_key *
-*`base_url` = > get value=`自` key=base_url *
-*`model` = > get value=`自` key=model *
-*`suffix` = > get value=`自` key=suffix *
-*`bearer` = > get value=`自` key=bearer *
-*`p1` = > get value=`自` key=p1 *
-*`p2` = > get value=`自` key=p2 *
-*`p3` = > get value=`自` key=p3 *
-*`h1` = > get value=`自` key=h1 *
-*`h2` = > get value=`自` key=h2 *
+*`api_key` = > get value=`self` key=api_key *
+*`base_url` = > get value=`self` key=base_url *
+*`model` = > get value=`self` key=model *
+*`suffix` = > get value=`self` key=suffix *
+*`bearer` = > get value=`self` key=bearer *
+*`p1` = > get value=`self` key=p1 *
+*`p2` = > get value=`self` key=p2 *
+*`p3` = > get value=`self` key=p3 *
+*`h1` = > get value=`self` key=h1 *
+*`h2` = > get value=`self` key=h2 *
 *`url` = `base_url` + `suffix` *
 *`auth` = `bearer` + `api_key` *
 *`q_auth` = > quote text=`auth` *
 *`hdr_raw` = `h1` + `q_auth` + `h2` *
 *`headers` = > parse text=`hdr_raw` *
 *`q_model` = > quote text=`model` *
-*`q_prompt` = > quote text=`提示` *
+*`q_prompt` = > quote text=`prompt` *
 *`body` = `p1` + `q_model` + `p2` + `q_prompt` + `p3` *
 *`resp` = > http_post url=`url` body=`body` headers=`headers` *
 *`status` = > get value=`resp` key=status *
@@ -115,16 +115,16 @@ description: 官方 OpenAI 兼容大模型对象（中文）。非标准库 — 
   *`content` = > get value=`message` key=content *
   **`content`**
 + *
-  > 打印 内容=ext/大模型: HTTP 错误
-  > 打印 内容=`status`
-  > 打印 内容=`raw`
-  > 退出 码=1
+  > print text=ext/ai/llm: HTTP error
+  > print text=`status`
+  > print text=`raw`
+  > exit code=1
 
 ---
 
-## 聊天
-    - 提示
+## chat
+    - prompt
 
-`运行` 的别名。
+Alias for `complete`.
 
-**> `自`.运行 提示=`提示`**
+**> `self`.complete prompt=`prompt`**

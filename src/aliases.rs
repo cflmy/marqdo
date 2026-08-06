@@ -36,6 +36,7 @@ pub fn canonical_builtin(name: &str) -> Option<&'static str> {
         "split" => Some("split"),
         "join" => Some("join"),
         "at" => Some("at"),
+        "call_fn" | "调用" => Some("call_fn"),
         _ => None,
     }
 }
@@ -51,6 +52,7 @@ pub fn canonical_param(builtin: &str, param: &str) -> String {
         ("split" | "join", "sep" | "分隔") => "sep".into(),
         ("at", "value" | "值") => "value".into(),
         ("at", "index" | "下标") => "index".into(),
+        ("call_fn", "name" | "名") => "name".into(),
         (
             "host_plot" | "host_plot_points" | "host_plot_conic",
             "grid" | "网格",

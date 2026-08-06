@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 
-use crate::host::{foreign, fs, json, math, net, plugin, sys, time, HostContext};
+use crate::host::{agent_rt, foreign, fs, json, math, net, plugin, sys, time, HostContext};
 use crate::value::Value;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -81,6 +81,17 @@ pub enum HostFn {
     PluginUnload = 70,
     PluginList = 71,
     ExtNativePath = 72,
+    ModuleSource = 73,
+    CallSite = 74,
+    MarqdoSkill = 75,
+    MapSet = 76,
+    ListAppend = 77,
+    AgentAlloc = 78,
+    AgentHistoryGet = 79,
+    AgentHistoryClear = 80,
+    AgentHistoryAppend = 81,
+    FormatToolsForLlm = 82,
+    ToolAllowed = 83,
 }
 
 impl HostFn {
@@ -158,6 +169,17 @@ impl HostFn {
             70 => Self::PluginUnload,
             71 => Self::PluginList,
             72 => Self::ExtNativePath,
+            73 => Self::ModuleSource,
+            74 => Self::CallSite,
+            75 => Self::MarqdoSkill,
+            76 => Self::MapSet,
+            77 => Self::ListAppend,
+            78 => Self::AgentAlloc,
+            79 => Self::AgentHistoryGet,
+            80 => Self::AgentHistoryClear,
+            81 => Self::AgentHistoryAppend,
+            82 => Self::FormatToolsForLlm,
+            83 => Self::ToolAllowed,
             _ => return None,
         })
     }
@@ -239,6 +261,17 @@ impl HostFn {
             "host_plugin_unload" | "plugin_unload" => Self::PluginUnload,
             "host_plugin_list" | "plugin_list" => Self::PluginList,
             "host_ext_native_path" | "ext_native_path" => Self::ExtNativePath,
+            "host_module_source" | "module_source" => Self::ModuleSource,
+            "host_call_site" | "call_site" => Self::CallSite,
+            "host_marqdo_skill" | "marqdo_skill" => Self::MarqdoSkill,
+            "host_map_set" | "map_set" => Self::MapSet,
+            "host_list_append" | "list_append" => Self::ListAppend,
+            "host_agent_alloc" | "agent_alloc" => Self::AgentAlloc,
+            "host_agent_history_get" | "agent_history_get" => Self::AgentHistoryGet,
+            "host_agent_history_clear" | "agent_history_clear" => Self::AgentHistoryClear,
+            "host_agent_history_append" | "agent_history_append" => Self::AgentHistoryAppend,
+            "host_format_tools_for_llm" | "format_tools_for_llm" => Self::FormatToolsForLlm,
+            "host_tool_allowed" | "tool_allowed" => Self::ToolAllowed,
             _ => return None,
         })
     }
@@ -321,6 +354,17 @@ impl HostFn {
             Self::PluginUnload => "host_plugin_unload",
             Self::PluginList => "host_plugin_list",
             Self::ExtNativePath => "host_ext_native_path",
+            Self::ModuleSource => "host_module_source",
+            Self::CallSite => "host_call_site",
+            Self::MarqdoSkill => "host_marqdo_skill",
+            Self::MapSet => "host_map_set",
+            Self::ListAppend => "host_list_append",
+            Self::AgentAlloc => "host_agent_alloc",
+            Self::AgentHistoryGet => "host_agent_history_get",
+            Self::AgentHistoryClear => "host_agent_history_clear",
+            Self::AgentHistoryAppend => "host_agent_history_append",
+            Self::FormatToolsForLlm => "host_format_tools_for_llm",
+            Self::ToolAllowed => "host_tool_allowed",
         }
     }
 
@@ -366,6 +410,13 @@ impl HostFn {
             Self::PluginLoad => &["path"],
             Self::PluginUnload | Self::PluginList => &[],
             Self::ExtNativePath => &["name"],
+            Self::ModuleSource | Self::CallSite | Self::MarqdoSkill | Self::AgentAlloc => &[],
+            Self::MapSet => &["map", "key", "value"],
+            Self::ListAppend => &["list", "item"],
+            Self::AgentHistoryGet | Self::AgentHistoryClear => &["id"],
+            Self::AgentHistoryAppend => &["id", "item"],
+            Self::FormatToolsForLlm => &["tools"],
+            Self::ToolAllowed => &["tools", "name"],
         }
     }
 
@@ -555,6 +606,32 @@ pub fn call_host(
                 None => Value::None,
             })
         }
+        HostFn::ModuleSource => agent_rt::module_source(ctx),
+        HostFn::CallSite => {
+            agent_rt::call_site(ctx, Some(ctx.current_line))
+        }
+        HostFn::MarqdoSkill => agent_rt::marqdo_skill(ctx),
+        HostFn::MapSet => {
+            agent_rt::map_set(require(bound, "map")?, require(bound, "key")?, require(bound, "value")?)
+        }
+        HostFn::ListAppend => {
+            agent_rt::list_append(require(bound, "list")?, require(bound, "item")?)
+        }
+        HostFn::AgentAlloc => agent_rt::agent_alloc(ctx),
+        HostFn::AgentHistoryGet => agent_rt::agent_history_get(ctx, require(bound, "id")?),
+        HostFn::AgentHistoryClear => {
+            agent_rt::agent_history_clear(ctx, require(bound, "id")?)
+        }
+        HostFn::AgentHistoryAppend => {
+            agent_rt::agent_history_append(ctx, require(bound, "id")?, require(bound, "item")?)
+        }
+        HostFn::FormatToolsForLlm => {
+            agent_rt::format_tools_for_llm(require(bound, "tools")?)
+        }
+        HostFn::ToolAllowed => agent_rt::tool_allowed(
+            require(bound, "tools")?,
+            require(bound, "name")?,
+        ),
     }
 }
 

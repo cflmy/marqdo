@@ -1,171 +1,137 @@
-# Official agent development framework (`ext/agent`)
+# Official agent development framework (`ext/ai/agent`)
 
 | | |
 |---|---|
-| Status | Accepted (v0.1 layout) · **roadmap recorded** |
+| Status | Accepted · **thin agent loop locked** |
 | Date | 2026-08-06 |
-| Related | [ext-llm.md](ext-llm.md) · [ext-cli.md](ext-cli.md) · [ext-abi.md](ext-abi.md) · [objects.md](objects.md) · [markdown-mapping.md](markdown-mapping.md) |
+| Related | [ext-llm.md](ext-llm.md) · [ext-cli.md](ext-cli.md) · [objects.md](objects.md) |
 
-## Positioning
+## What we are building
 
-`ext/agent` / `ext/智能体` is an **official agent-development framework**, not a single chatbot wrapper.
+An **agent-development framework** — smallest runtime surface for agents on Marqdo.
+
+**Not** task-dispatch, **not** bundled domain tools, **not** layout/match/ticket helpers in official ext.
+
+| In scope | Out of scope (your runbook / your code) |
+|----------|-------------------------------------------|
+| `# 智能体` ctor | `## 技能匹配` · `## 分配任务` · `## 创建工单` … |
+| `## 执行` | Anything task-specific in `ext/` |
+| `## 清空历史` | |
+| Auto context: source, position, history, Marqdo skill | |
+
+## Repo layout (`ext/`)
+
+Official extensions for LLM + agent live under **`ext/ai/`** only. No flat `.mq.md` at `ext/` root; future domains get their own subdir.
+
+```text
+ext/
+  ai/
+    llm.mq.md
+    大模型.mq.md
+    agent.mq.md
+    智能体.mq.md
+```
+
+Import: `> ext/ai/智能体.mq.md` · `> ext/ai/llm.mq.md`
+
+## Layering
 
 | Layer | Role |
 |-------|------|
-| **Marqdo program** | Orchestration: tables, loops, branches, narration — **prompts and control flow live in the same `.mq.md`** |
-| **`ext/llm`** | Model I/O (chat / complete); agent framework **imports and uses** it |
-| **`ext/agent`** | Workspace conventions + (roadmap) match / assign / report helpers; optional **ABI** for heavy or OS-bound work |
-| **`lib/*`** | fs / json / sys / net / table — generic I/O |
-
-**Why Marqdo:** an agent runbook is readable docs and executable policy at once. Skill matrices, task queues, and escalation rules stay next to the prose that explains them.
+| **Your runbook** | Tables, loops, **your** tools & logic |
+| **`ext/ai/llm`** | Model I/O |
+| **`ext/ai/agent`** | Framework: ctor + `执行` + `清空历史` |
+| **`lib/*`** | Generic I/O |
 
 ```text
-user agent .mq.md
-    │  > ext/agent.mq.md   (+ often > ext/llm.mq.md)
+> ext/ai/智能体.mq.md
     ▼
-framework (# agent / # 智能体 + helpers)
-    ├── ext/llm          → model
-    ├── lib/fs|json|…    → data / side effects
-    └── plugins/agent    → ABI helpers (layout today; more later)
+# 智能体 (大模型, 工具, 用户提示信息?)
+    ## 执行
+    ## 清空历史
 ```
 
-Install story for end users (not yet shipped): [`ext-cli.md`](ext-cli.md) — `marqdo ext add agent` / `add llm`.
+`工具` = caller-supplied **function catalog** (table of `##` names); framework resolves names via `call_fn` / `调用` and runs the matching zero-arg function in the runbook module.
+
+Install: [`ext-cli.md`](ext-cli.md) — `marqdo ext add agent` / `add llm`.
+
+### Tools (v1)
+
+Tools are **not** framework builtins — you define `## 函数名` in your runbook and list names in a table:
+
+```markdown
+`工具表` =
+| 工具 |
+|------|
+| 获取时间 |
+| 分配任务 |
+```
+
+- Single-column table → list of function **names** (text).
+- Multi-column table → each row is a map; name from column `工具` / `tools` / `name`.
+- Marqdo has no first-class function values in tables yet; the name must match a `##` in the same module (or imports). `执行` calls it with `call_fn` after the model replies `TOOL:<name>`.
+- Do **not** use `parse text=["fn"]` for the tools list — unquoted identifiers inside `parse` are evaluated as calls.
 
 ---
 
-## Shipped in v0.1 (layout)
+## Public API (v1)
 
-**Layout framework** for agent-oriented projects:
+| | Role |
+|--|------|
+| `# 智能体` / `# agent` | **大模型**, **工具**, optional **用户提示信息** |
+| `## 执行` / `## run` | **额外信息**; context + LLM + history append |
+| `## 清空历史` / `## clear_history` | Wipe history on this handle |
 
-- Convention dirs under a project root
-- Native helpers via **ABI v1** (`plugins/agent`)
-- Marqdo object API in `ext/agent.mq.md` / `ext/智能体.mq.md`
+Module-level `##` helpers (e.g. context assembly) are internal — not public contract.
 
-### Project layout
+### Auto context (each `执行`)
 
-| Path | Role |
-|------|------|
-| `agents/` | Agent programs (`.mq.md`) |
-| `runbooks/` | Executable handbooks / checks |
-| `templates/` | Scaffold sources |
-| `reports/` | Generated artifacts (convention: gitignore) |
+- `.mq.md` source
+- Call-site / position
+- Conversation history on this handle
+- Marqdo skill (`skills/marqdo/`)
 
-Root markers (any): directory `agents` or `runbooks`, or file `marqdo.agent.json`.
+### History (v1)
 
-### ABI surface (`plugins/agent`)
-
-| Name | Params | Result |
-|------|--------|--------|
-| `agent_find_root` | `start`, `markers` | text path |
-| `agent_ensure_layout` | `root` | int (dirs created) |
-| `agent_probe` | `root` | map (`has_agents`, …, `root`) |
-| `agent_scaffold` | `root`, `name`, `template`, `dest` | path written; body substitutes `{{name}}` |
-| `agent_match_skill` | `skill`, `members` | member map or `null` (JSON array of objects) |
-| `agent_bump_load` | `member`, `delta` | updated member map |
-
-Path safety: under `root`; reject `..`. Build: `cargo build -p marqdo_plugin_agent`.
-
-### Marqdo surface (v0.1)
-
-| English | Chinese | Role |
-|---------|---------|------|
-| `## load_native` | `## 加载原生` | Env / `ext add` → load ABI plugin |
-| `# agent` | `# 智能体` | Workspace handle; optional `root=` |
-| `## probe` / `ensure_layout` / `scaffold` | `## 探测` / `确保布局` / `脚手架` | Layout |
-| `## match_skill` | `## 技能匹配` | Match member maps; lowest load |
-| `## assign_task` | `## 分配任务` | `{success, task_id, assignee}` |
-| `## update_load` | `## 更新负载` | Bump load via ABI |
-| `## create_ticket` / `notify` | `## 创建工单` / `通知` | Stubs |
-| `## draft_message` | `## 起草消息` | Delegate to `ext/llm` |
-
-Multi-column GFM tables → **list of maps** (header keys). Single-column stays list of cells.
-
-Gold: `tests/ext/agent-scaffold.mq.md`, `tests/ext/agent-assign.mq.md`.
+- Host-backed id per handle
+- Append after each successful `执行`
+- `清空历史` ships with `执行`
 
 ---
 
-## Target product (record — not all implemented)
-
-Framework should make it natural to write agents like **task assignment**: read queues and skill tables, match people, assign or escalate — with optional LLM for soft matching / message drafting.
-
-### Orchestration sketch (illustrative)
-
-Syntax below is **aspirational**; names need not match final APIs. Point is: **tables + loop + framework methods + narration**.
+## Example runbook (application — not framework)
 
 ```markdown
 ---
-> ext/agent.mq.md
-> ext/llm.mq.md
-> lib/table.mq.md
+> ext/ai/智能体.mq.md
+> ext/ai/大模型.mq.md
 ---
 
 # main
 
-> load_env
-> load_native
-
-*`model` = > llm *
-*`bot` = > agent *
-
-团队成员技能表
-
-*`技能表` =
-| 成员 | 技能 | 负载 |
-|------|------|------|
-| 张三 | Python, ML | 2 |
-| 李四 | 前端, UX | 1 |
-| 王五 | 后端, 运维 | 3 |
-| 赵六 | 数据分析 | 0 |
-
-*`任务队列` =
-| 任务ID | 所需技能 | 优先级 |
-|--------|----------|--------|
-| T001 | Python | 高 |
-| T002 | 前端 | 中 |
-| T003 | 安全审计 | 高 |
-
-> 分配策略 任务队列=`任务队列` 技能表=`技能表` model=`model` bot=`bot`
-
-## 分配策略
-    - 任务队列
-    - 技能表
-    - model
-    - bot
+*`模型` = > 大模型 *
+*`工具名` = | 技能匹配 | 分配任务 | … |
+*`助手` = > 智能体 大模型=`模型` 工具=`工具名` 用户提示信息=… *
 
 - [任务](任务队列)
-  *`匹配` = > `bot`.技能匹配 技能=`任务`.所需技能 成员表=`技能表` model=`model` *
-
-  + `匹配`
-    *`结果` = > `bot`.分配任务 任务ID=`任务`.任务ID 分配给=`匹配` *
-    + …
-      > `bot`.通知 …   # or lib/net / future channel helpers
-  + *
-    > `bot`.创建工单 标题=… 详情=…
-
-> 完成报告
+  > `助手`.清空历史
+  *`结果` = > `助手`.执行 额外信息=`任务` *
 ```
 
-Marqdo strengths here:
+Domain `##` functions live in **this file** or your lib — never in `ext/ai/`.
 
-1. **Prompt next to policy** — escalation wording and match rules sit in the same file as the loop.
-2. **Tables as data** — skill matrix / queue are first-class collections.
-3. **LLM as a tool** — `ext/llm` for fuzzy skill match or message text; deterministic path when tables suffice.
-4. **Objects** — `# agent` / `# llm` handles; methods keep the runbook short.
+---
 
-Exact helper names (`技能匹配` / `match_skill`, `分配任务` / `assign`, …) to be fixed when implementing; may be pure Marqdo over `lib/table` + `ext/llm`, with ABI only where native code helps.
+## Shipped / roadmap
 
-### Roadmap slices (ordered)
+| Item | Status |
+|------|--------|
+| `ext/ai/` + framework + context injection | in progress |
+| Live `执行` test (`tests/ext/agent-run-live.mq.md` + `.env`) | shipped |
+| Tool-call loop in `执行` (`TOOL:<name>` → `call_fn`) | shipped |
 
-| Slice | Content |
-|-------|---------|
-| **A — Install** | [`ext-cli.md`](ext-cli.md): **shipped** `marqdo ext list` / `add` / `remove` |
-| **B — Compose LLM** | **shipped**: `ext/agent` imports `ext/llm`; `## draft_message` / `## 起草消息` |
-| **C — Match / assign** | **shipped**: multi-column tables → row maps; `match_skill` / `update_load` (ABI); `assign_task`, `create_ticket`, `notify` stubs |
-| **D — Channels** | Optional notify hooks (mail/chat) via `lib/net` or thin ABI — still no third-party marketplace |
-| **E — Multi-agent** | Later: handoff between agent programs; out of scope until C is solid |
+### Non-goals
 
-### Non-goals (still)
-
-- Third-party plugin registry / arbitrary remote packages
-- Embedding native plugins inside the main `marqdo` exe by default
-- Replacing `ext/llm` with a second chat stack inside agent
+- Domain tools in official ext
+- Flat `ext/*.mq.md` at repo root
+- Second chat stack beside llm

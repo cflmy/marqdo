@@ -20,15 +20,15 @@ pub struct ExtPackage {
 pub const CATALOG: &[ExtPackage] = &[
     ExtPackage {
         id: "llm",
-        description: "OpenAI-compatible chat object (ext/llm)",
-        mq_files: &["llm.mq.md", "大模型.mq.md"],
+        description: "OpenAI-compatible chat object (ext/ai/llm)",
+        mq_files: &["ai/llm.mq.md", "ai/大模型.mq.md"],
         native_crate: None,
     },
     ExtPackage {
         id: "agent",
-        description: "Agent development framework (ext/agent + ABI plugin)",
-        mq_files: &["agent.mq.md", "智能体.mq.md"],
-        native_crate: Some("marqdo_plugin_agent"),
+        description: "Agent development framework (ext/ai/agent)",
+        mq_files: &["ai/agent.mq.md", "ai/智能体.mq.md"],
+        native_crate: None,
     },
 ];
 
@@ -198,6 +198,10 @@ pub fn add_ext(id: &str) -> Result<()> {
     for f in pkg.mq_files {
         let src = find_source_file(f)?;
         let dest = root.join(f);
+        if let Some(parent) = dest.parent() {
+            fs::create_dir_all(parent)
+                .with_context(|| format!("create {}", parent.display()))?;
+        }
         fs::copy(&src, &dest)
             .with_context(|| format!("copy {} → {}", src.display(), dest.display()))?;
         println!("installed {}", dest.display());

@@ -115,6 +115,8 @@ impl Vm {
             ip: 0,
             slots: vec![Value::None; program.functions[entry].locals.len().max(1)],
         }];
+        self.host
+            .push_call_frame(&program.functions[entry].name.clone());
 
         loop {
             let frame = frames.last_mut().unwrap();
@@ -127,6 +129,7 @@ impl Vm {
             let op = fun.code[ip];
             let span = fun.spans.get(ip).copied().unwrap_or(Span::new(1, 1));
             frame.ip += 1;
+            self.host.current_line = span.line;
 
             if self.trace {
                 match op {
@@ -347,11 +350,13 @@ impl Vm {
                     for i in (0..argc).rev() {
                         slots[i] = pop(&mut stack).map_err(|m| self.err_at(span, m))?;
                     }
+                    let fname = program.functions[fid].name.clone();
                     frames.push(Frame {
                         fn_idx: fid,
                         ip: 0,
                         slots,
                     });
+                    self.host.push_call_frame(&fname);
                 }
                 Op::TagInstance(idx) => {
                     let type_name = match fun.constants.get(idx as usize) {
@@ -410,11 +415,13 @@ impl Vm {
                             slots[i] = recv.clone();
                         }
                     }
+                    let fname = callee.name.clone();
                     frames.push(Frame {
                         fn_idx: method_fid,
                         ip: 0,
                         slots,
                     });
+                    self.host.push_call_frame(&fname);
                 }
                 Op::PluginCall(name_idx, argc) => {
                     let argc = argc as usize;
@@ -478,9 +485,35 @@ impl Vm {
                         stack.push(result);
                     }
                 }
+                Op::CallFn => {
+                    let name_v = pop(&mut stack).map_err(|m| self.err_at(span, m))?;
+                    let name = match name_v {
+                        Value::Text(s) => s,
+                        _ => return Err(self.err_at(span, "call_fn requires text name")),
+                    };
+                    let current = frames.last().unwrap().fn_idx;
+                    let fid = resolve_fn_dynamic(program, current, &name)
+                        .map_err(|m| self.err_at(span, m))?;
+                    let callee = &program.functions[fid];
+                    if !callee.params.is_empty() {
+                        return Err(self.err_at(
+                            span,
+                            format!("call_fn: `{name}` must have no parameters"),
+                        ));
+                    }
+                    let slots = vec![Value::None; callee.locals.len().max(1)];
+                    let fname = callee.name.clone();
+                    frames.push(Frame {
+                        fn_idx: fid,
+                        ip: 0,
+                        slots,
+                    });
+                    self.host.push_call_frame(&fname);
+                }
                 Op::Return => {
                     let ret = pop(&mut stack).unwrap_or(Value::None);
                     frames.pop();
+                    self.host.pop_call_frame();
                     if frames.is_empty() {
                         return Ok(ret);
                     }
@@ -568,4 +601,27 @@ fn tag_instance_value(type_name: &str, value: Value) -> Value {
             ("value".into(), other),
         ]),
     }
+}
+
+fn resolve_fn_dynamic(program: &Program, current: usize, name: &str) -> Result<usize, String> {
+    for &cid in &program.children[current] {
+        if program.functions[cid].name == name {
+            return Ok(cid);
+        }
+    }
+    let mut parent = program.parents[current];
+    while let Some(pid) = parent {
+        for &cid in &program.children[pid] {
+            if program.functions[cid].name == name {
+                return Ok(cid);
+            }
+        }
+        parent = program.parents[pid];
+    }
+    for (i, f) in program.functions.iter().enumerate() {
+        if program.parents[i].is_none() && f.name == name {
+            return Ok(i);
+        }
+    }
+    Err(format!("call_fn: unknown function `{name}`"))
 }
