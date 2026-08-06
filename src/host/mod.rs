@@ -10,11 +10,13 @@ mod fs;
 mod json;
 pub mod math;
 mod net;
+pub mod plugin;
 mod sys;
 mod time;
 
 pub use dispatch::{call_host, HostFn};
 pub use fs::path_under_root;
+pub use plugin::PluginState;
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -25,6 +27,7 @@ pub struct HostCaps {
     pub fs_write: bool,
     pub exec: bool,
     pub net: bool,
+    pub plugin: bool,
 }
 
 impl Default for HostCaps {
@@ -33,6 +36,7 @@ impl Default for HostCaps {
             fs_write: true,
             exec: true,
             net: true,
+            plugin: true,
         }
     }
 }
@@ -59,6 +63,8 @@ pub struct HostContext {
     pub plots: Vec<PlotArtifact>,
     /// lang → interpreter argv (from `set_cmd`).
     pub foreign_cmds: HashMap<String, Vec<String>>,
+    /// Loaded native plugins (ABI v1).
+    pub plugins: PluginState,
 }
 
 impl Default for HostContext {
@@ -73,6 +79,7 @@ impl Default for HostContext {
             rng: 0xC0FF_EE42_CAFE_BABE,
             plots: Vec::new(),
             foreign_cmds: HashMap::new(),
+            plugins: PluginState::default(),
         }
     }
 }
@@ -114,6 +121,10 @@ impl HostContext {
 
     pub fn allow_net(&self) -> bool {
         self.caps.net
+    }
+
+    pub fn allow_plugin(&self) -> bool {
+        self.caps.plugin
     }
 
     pub fn next_u64(&mut self) -> u64 {

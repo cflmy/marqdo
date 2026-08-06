@@ -399,6 +399,68 @@ impl Vm {
                         slots,
                     });
                 }
+                Op::PluginCall(name_idx, argc) => {
+                    let argc = argc as usize;
+                    let raw_name = match fun.constants.get(name_idx as usize) {
+                        Some(Value::Text(s)) => s.clone(),
+                        _ => {
+                            return Err(self.err_at(span, "PluginCall needs name constant"));
+                        }
+                    };
+                    let mut bound = HashMap::new();
+                    if let Some(name) = raw_name.strip_prefix('@') {
+                        // named pairs: (name, value) × N, argc = 2N
+                        if argc % 2 != 0 {
+                            return Err(self.err_at(span, "PluginCall named argc must be even"));
+                        }
+                        let pairs = argc / 2;
+                        for _ in 0..pairs {
+                            let v = pop(&mut stack).map_err(|m| self.err_at(span, m))?;
+                            let k = pop(&mut stack).map_err(|m| self.err_at(span, m))?;
+                            let ks = match k {
+                                Value::Text(s) => s,
+                                _ => {
+                                    return Err(self.err_at(span, "plugin arg name must be text"));
+                                }
+                            };
+                            bound.insert(ks, v);
+                        }
+                        let result = crate::host::plugin::call_registered(&self.host, name, &bound)
+                            .map_err(|m| self.err_at(span, m))?;
+                        stack.push(result);
+                    } else {
+                        let mut vals = Vec::with_capacity(argc);
+                        for _ in 0..argc {
+                            vals.push(pop(&mut stack).map_err(|m| self.err_at(span, m))?);
+                        }
+                        vals.reverse();
+                        let reg = self
+                            .host
+                            .plugins
+                            .get(&raw_name)
+                            .cloned()
+                            .ok_or_else(|| {
+                                self.err_at(span, format!("unknown function `{raw_name}`"))
+                            })?;
+                        if reg.params.len() != vals.len() {
+                            return Err(self.err_at(
+                                span,
+                                format!(
+                                    "plugin `{raw_name}` expects {} args, got {}",
+                                    reg.params.len(),
+                                    vals.len()
+                                ),
+                            ));
+                        }
+                        for (p, v) in reg.params.iter().zip(vals.into_iter()) {
+                            bound.insert(p.clone(), v);
+                        }
+                        let result =
+                            crate::host::plugin::call_registered(&self.host, &raw_name, &bound)
+                                .map_err(|m| self.err_at(span, m))?;
+                        stack.push(result);
+                    }
+                }
                 Op::Return => {
                     let ret = pop(&mut stack).unwrap_or(Value::None);
                     frames.pop();

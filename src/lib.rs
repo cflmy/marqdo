@@ -122,6 +122,7 @@ impl RunOptions {
             fs_write: self.allow_fs_write,
             exec: self.allow_exec,
             net: self.allow_net,
+            plugin: true,
         }
     }
 }

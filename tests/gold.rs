@@ -596,6 +596,49 @@ fn lib_json_quote() {
 }
 
 #[test]
+fn lib_plugin_demo() {
+    let status = Command::new(env!("CARGO"))
+        .args(["build", "-p", "marqdo_plugin_demo"])
+        .status()
+        .expect("cargo build plugin demo");
+    assert!(status.success(), "failed to build marqdo_plugin_demo");
+
+    let lib_name = if cfg!(windows) {
+        "demo.dll"
+    } else if cfg!(target_os = "macos") {
+        "libdemo.dylib"
+    } else {
+        "libdemo.so"
+    };
+    let built = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("target")
+        .join("debug")
+        .join(lib_name);
+    assert!(
+        built.is_file(),
+        "missing plugin artifact {}",
+        built.display()
+    );
+    // Must live under the program's fs_root (`tests/lib/`) for path sandbox.
+    let plugin = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("tests")
+        .join("lib")
+        .join(lib_name);
+    std::fs::copy(&built, &plugin).expect("copy demo plugin into tests/lib");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_marqdo"))
+        .args(["run", "tests/lib/plugin-demo.mq.md"])
+        .env("MARQDO_TEST_PLUGIN", lib_name)
+        .output()
+        .expect("failed to run marqdo");
+    let code = output.status.code().unwrap_or(1);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert_eq!(code, 0, "plugin-demo stderr={stderr}");
+    assert_eq!(stdout.trim_end(), "3\nok", "plugin-demo");
+}
+
+#[test]
 fn ext_llm_import() {
     assert_out("tests/ext/llm-import.mq.md", "ext-ok");
 }

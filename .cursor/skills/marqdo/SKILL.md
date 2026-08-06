@@ -122,6 +122,7 @@ title: example
 - Import **English** or **Chinese** library file; call that file’s API names (do not mix).
 - `lib/…` resolves via `MARQDO_LIB`, cwd `lib/`, or `lib/` next to the `marqdo` binary.
 - Official optional extensions: `ext/llm.mq.md` / `ext/大模型.mq.md` — `# llm` / `# 大模型` object handles + `## complete` / `## 运行`. Free `## load_env`. See `doc/design/ext-llm.md` and `doc/design/objects.md`.
+- Native plugins (optional shared libs): `lib/plugin.mq.md` / `lib/插件.mq.md` — `## load` / `## unload` / `## list`; after load, registered names are callable directly. C ABI: `include/marqdo_abi.h`, design `doc/design/ext-abi.md`, demo `plugins/demo`.
 - Builtins (no import): `print`/`打印`, `input`/`输入`, `len`/`长度`, `str`/`文本`, `int`/`整数`; literals `True`/`真`, `False`/`假`, `None`/`空`; logic `and`/`且`, `or`/`或`, `not`/`非`.
 
 Stdlib map: [reference.md](reference.md).

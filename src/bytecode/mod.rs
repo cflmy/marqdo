@@ -59,6 +59,8 @@ pub enum Op {
     /// Method call: stack has argc args (param order) then receiver on top.
     /// constants[name_idx] is method name text; resolve via receiver `_type`.
     MethodCall(u16, u8),
+    /// Plugin call: stack has argc args in registered param order; name in constants.
+    PluginCall(u16, u8),
     /// Host primitive: pop `argc` args (param order), push result.
     HostCall(u16, u8),
     Return,

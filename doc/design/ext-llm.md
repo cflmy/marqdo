@@ -4,7 +4,7 @@
 |---|---|
 | Status | Accepted (v0.1.x) |
 | Date | 2026-08-06 |
-| Related | [objects.md](objects.md) |
+| Related | [objects.md](objects.md) · native plugins later → [ext-abi.md](ext-abi.md) |
 
 ## Scope
 

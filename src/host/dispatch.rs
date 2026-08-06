@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 
-use crate::host::{foreign, fs, json, math, net, sys, time, HostContext};
+use crate::host::{foreign, fs, json, math, net, plugin, sys, time, HostContext};
 use crate::value::Value;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -77,6 +77,9 @@ pub enum HostFn {
     DotenvLoad = 66,
     HttpRequest = 67,
     JsonQuote = 68,
+    PluginLoad = 69,
+    PluginUnload = 70,
+    PluginList = 71,
 }
 
 impl HostFn {
@@ -150,6 +153,9 @@ impl HostFn {
             66 => Self::DotenvLoad,
             67 => Self::HttpRequest,
             68 => Self::JsonQuote,
+            69 => Self::PluginLoad,
+            70 => Self::PluginUnload,
+            71 => Self::PluginList,
             _ => return None,
         })
     }
@@ -227,6 +233,9 @@ impl HostFn {
             "host_dotenv_load" | "load_dotenv" => Self::DotenvLoad,
             "host_http_request" | "http_request" => Self::HttpRequest,
             "host_json_quote" | "quote" => Self::JsonQuote,
+            "host_plugin_load" | "plugin_load" => Self::PluginLoad,
+            "host_plugin_unload" | "plugin_unload" => Self::PluginUnload,
+            "host_plugin_list" | "plugin_list" => Self::PluginList,
             _ => return None,
         })
     }
@@ -305,6 +314,9 @@ impl HostFn {
             Self::DotenvLoad => "host_dotenv_load",
             Self::HttpRequest => "host_http_request",
             Self::JsonQuote => "host_json_quote",
+            Self::PluginLoad => "host_plugin_load",
+            Self::PluginUnload => "host_plugin_unload",
+            Self::PluginList => "host_plugin_list",
         }
     }
 
@@ -347,6 +359,8 @@ impl HostFn {
             Self::ForeignRun => &["code"],
             Self::ForeignRunLang => &["lang", "source"],
             Self::ForeignLangs => &[],
+            Self::PluginLoad => &["path"],
+            Self::PluginUnload | Self::PluginList => &[],
         }
     }
 
@@ -522,6 +536,9 @@ pub fn call_host(
             bound.get("stdin"),
         ),
         HostFn::ForeignLangs => foreign::langs(ctx),
+        HostFn::PluginLoad => plugin::load(ctx, require(bound, "path")?),
+        HostFn::PluginUnload => plugin::unload(ctx),
+        HostFn::PluginList => plugin::list(ctx),
     }
 }
 

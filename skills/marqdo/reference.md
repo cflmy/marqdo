@@ -41,6 +41,7 @@ Import one file; use **that** file’s function names.
 | `lib/table.mq.md` | `lib/表.mq.md` | table/rows helpers |
 | `lib/fs.mq.md` | `lib/文件.mq.md` | filesystem |
 | `lib/sys.mq.md` | `lib/系统.mq.md` | process / cwd / load_dotenv |
+| `lib/plugin.mq.md` | `lib/插件.mq.md` | load native ABI plugins (`doc/design/ext-abi.md`) |
 | `lib/time.mq.md` | `lib/时间.mq.md` | time/format |
 | `lib/net.mq.md` | `lib/网络.mq.md` | HTTP(S) helpers (+ optional headers) |
 | `lib/json.mq.md` | (see design) | JSON (+ `quote`) |

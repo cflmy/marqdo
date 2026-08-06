@@ -23,6 +23,11 @@ tiny_http = "0.12"
 ureq = { version = "=2.9.7", default-features = false, features = ["tls", "gzip"] }
 idna_adapter = "=1.1.0"
 zeroize = "=1.8.1"
+libloading = "=0.8.6"
+
+[workspace]
+members = ["plugins/demo"]
+resolver = "2"
 
 [dev-dependencies]
 assert_cmd = "=2.0.14"

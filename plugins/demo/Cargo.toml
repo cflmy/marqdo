@@ -1,0 +1,14 @@
+[package]
+name = "marqdo_plugin_demo"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "Demo Marqdo ABI v1 plugin (cdylib)"
+publish = false
+
+[lib]
+name = "demo"
+crate-type = ["cdylib"]
+
+[dependencies]
+serde_json = "1"

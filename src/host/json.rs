@@ -64,7 +64,7 @@ pub fn quote(text: &Value) -> Result<Value, String> {
         .map_err(|e| format!("json quote: {e}"))
 }
 
-fn json_to_value(v: &serde_json::Value) -> Result<Value, String> {
+pub(crate) fn json_to_value(v: &serde_json::Value) -> Result<Value, String> {
     Ok(match v {
         serde_json::Value::Null => Value::None,
         serde_json::Value::Bool(b) => Value::Bool(*b),
@@ -95,7 +95,7 @@ fn json_to_value(v: &serde_json::Value) -> Result<Value, String> {
     })
 }
 
-fn value_to_json(v: &Value) -> Result<serde_json::Value, String> {
+pub(crate) fn value_to_json(v: &Value) -> Result<serde_json::Value, String> {
     Ok(match v {
         Value::None => serde_json::Value::Null,
         Value::Bool(b) => serde_json::Value::Bool(*b),

@@ -512,8 +512,54 @@ impl<'a> FnCompiler<'a> {
             _ => {}
         }
 
-        let fid = self.resolve_call(&call.callee)?;
-        let params = self.flat[fid].params.clone();
+        match self.resolve_call(&call.callee) {
+            Ok(fid) => {
+                let params = self.flat[fid].params.clone();
+                let mut named: HashMap<String, &Expr> = HashMap::new();
+                let mut positionals = Vec::new();
+                for a in &call.args {
+                    match a {
+                        Arg::Positional(e) => positionals.push(e),
+                        Arg::Named { name, value } => {
+                            named.insert(name.clone(), value);
+                        }
+                    }
+                }
+                let mut pos_i = 0;
+                for p in &params {
+                    if let Some(e) = named.get(p) {
+                        self.compile_expr(e)?;
+                    } else if pos_i < positionals.len() {
+                        self.compile_expr(positionals[pos_i])?;
+                        pos_i += 1;
+                    } else {
+                        return Err(self.err(format!("missing argument for parameter `{p}`")));
+                    }
+                }
+                if pos_i < positionals.len() {
+                    return Err(self.err(format!(
+                        "too many positional arguments ({} extra)",
+                        positionals.len() - pos_i
+                    )));
+                }
+                self.emit(Op::Call(fid as u16, params.len() as u8));
+                if self.flat[fid].parent.is_none() && self.flat[fid].level == 1 {
+                    let ti = self.add_const(Value::Text(self.flat[fid].name.clone()));
+                    self.emit(Op::TagInstance(ti));
+                }
+                if as_stmt {
+                    self.emit(Op::Pop);
+                }
+                Ok(())
+            }
+            Err(_) => self.compile_plugin_call(&call, as_stmt),
+        }
+    }
+
+    /// Unresolved callee → runtime plugin registry (or unknown-fn error).
+    /// Named args: stack pairs (name, value)×N, argc = 2N, name const prefixed with `@`.
+    /// Positional: stack values, argc = N, name const as-is.
+    fn compile_plugin_call(&mut self, call: &CallExpr, as_stmt: bool) -> Result<()> {
         let mut named: HashMap<String, &Expr> = HashMap::new();
         let mut positionals = Vec::new();
         for a in &call.args {
@@ -524,27 +570,27 @@ impl<'a> FnCompiler<'a> {
                 }
             }
         }
-        let mut pos_i = 0;
-        for p in &params {
-            if let Some(e) = named.get(p) {
+        if !named.is_empty() && !positionals.is_empty() {
+            return Err(self.err(
+                "plugin/unknown calls cannot mix positional and named args in bytecode",
+            ));
+        }
+        if !named.is_empty() {
+            let mut pairs: Vec<_> = named.into_iter().collect();
+            pairs.sort_by(|a, b| a.0.cmp(&b.0));
+            for (k, e) in &pairs {
+                let ki = self.add_const(Value::Text(k.clone()));
+                self.emit(Op::Constant(ki));
                 self.compile_expr(e)?;
-            } else if pos_i < positionals.len() {
-                self.compile_expr(positionals[pos_i])?;
-                pos_i += 1;
-            } else {
-                return Err(self.err(format!("missing argument for parameter `{p}`")));
             }
-        }
-        if pos_i < positionals.len() {
-            return Err(self.err(format!(
-                "too many positional arguments ({} extra)",
-                positionals.len() - pos_i
-            )));
-        }
-        self.emit(Op::Call(fid as u16, params.len() as u8));
-        if self.flat[fid].parent.is_none() && self.flat[fid].level == 1 {
-            let ti = self.add_const(Value::Text(self.flat[fid].name.clone()));
-            self.emit(Op::TagInstance(ti));
+            let ni = self.add_const(Value::Text(format!("@{}", call.callee)));
+            self.emit(Op::PluginCall(ni, (pairs.len() * 2) as u8));
+        } else {
+            for e in &positionals {
+                self.compile_expr(e)?;
+            }
+            let ni = self.add_const(Value::Text(call.callee.clone()));
+            self.emit(Op::PluginCall(ni, positionals.len() as u8));
         }
         if as_stmt {
             self.emit(Op::Pop);

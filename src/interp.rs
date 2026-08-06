@@ -568,6 +568,12 @@ impl Interpreter {
             _ => {}
         }
 
+        if let Some(reg) = self.host.plugins.get(&call.callee).cloned() {
+            let bound = bind_args(&reg.params, &ev_args, false).map_err(|m| self.err(m))?;
+            return crate::host::plugin::call_registered(&self.host, &call.callee, &bound)
+                .map_err(|m| self.err(m));
+        }
+
         let target = lookup_function(module, fun, &call.callee)
             .ok_or_else(|| self.err(format!("unknown function `{}`", call.callee)))?;
 
