@@ -82,6 +82,7 @@ OS / HTTP / 时钟 / …
 |------|------|------|------|
 | `env_get` | `取环境` | `name` / `名` | 文本或 `None` |
 | `env_set` | `设环境` | `name`, `value` / `名`, `值` | `None` |
+| `load_dotenv` | `加载环境` | 可选 `path` | 新写入的键数量；缺文件 → `0`；不覆盖已有环境变量 |
 | `args` | `参数表` | （无） | 文本列表 |
 | `cwd` | `工作目录` | （无） | 文本 |
 | `exit` | `退出` | `code` / `码` | 不返回 |
@@ -120,6 +121,7 @@ JSON 是专有缩写，**很难也不必要**做合规中文库名/API 翻译。
 | `stringify` | `value`, 可选 `indent` | JSON 文本 |
 | `get` | `value`, `key` | 值或 `None` |
 | `keys` | `value` | 文本列表 |
+| `quote` | `text` | JSON 字符串字面量（含引号，便于拼请求体） |
 
 **类型映射（草案）**：
 
@@ -143,9 +145,11 @@ JSON 是专有缩写，**很难也不必要**做合规中文库名/API 翻译。
 | `http_post` | `提交` | `url`, `body`, 可选 `content_type` | 同上 |
 | `url_encode` | `编码地址` | `text` / `内容` | 文本 |
 
-仅 **HTTP 明文**（HTTPS 本波未做，会诊断提示）；短超时、响应体上限；默认需 `--allow-net`；view / 静态站默认关。
+仅 **HTTP / HTTPS**（ureq）；短超时、响应体上限；默认 CLI 开网络。可选具名实参 `headers=`（map）、`content_type=`；`http_post` 默认 JSON Content-Type。
 
 **路径字面量：** 具名实参里 `path=a/b` 会被解析成除法。请用无斜杠文件名，或先赋给变量再传入。
+
+官方可选扩展（非 stdlib）：[`ext-llm.md`](ext-llm.md)（`ext/llm` OpenAI 兼容聊天）。
 
 ---
 

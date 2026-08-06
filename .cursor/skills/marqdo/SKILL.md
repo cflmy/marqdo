@@ -28,12 +28,14 @@ Canonical design (repo): `doc/design/markdown-mapping.md`, `doc/design/keywords.
 
 | Marker | Meaning |
 |--------|---------|
-| `#` … `######` | Function; heading depth = nesting/scope |
-| `- name` under a function heading | Parameter |
+| `#` | **Object / type** (constructor body). `# main` = entry object. |
+| `##` … `######` | **Function / method** (nesting by heading depth). |
+| `- name` under a heading | Parameter |
 | `- …` inside body | Loop |
 | `+ …` or `1.` | Branch arm (condition) |
 | Line that is only `*` | Else arm |
 | `> fn args` | Call (named `k=v` or positional) |
+| `` > `obj`.method args `` | Method call (`obj` must be a map with `_type`) |
 | Frontmatter `> path.mq.md` | Import |
 | `*…*` | Statement (bind / expr) |
 | `**…**` | Return value |
@@ -119,6 +121,7 @@ title: example
 
 - Import **English** or **Chinese** library file; call that file’s API names (do not mix).
 - `lib/…` resolves via `MARQDO_LIB`, cwd `lib/`, or `lib/` next to the `marqdo` binary.
+- Official optional extensions: `ext/llm.mq.md` / `ext/大模型.mq.md` — `# llm` / `# 大模型` object handles + `## complete` / `## 运行`. Free `## load_env`. See `doc/design/ext-llm.md` and `doc/design/objects.md`.
 - Builtins (no import): `print`/`打印`, `input`/`输入`, `len`/`长度`, `str`/`文本`, `int`/`整数`; literals `True`/`真`, `False`/`假`, `None`/`空`; logic `and`/`且`, `or`/`或`, `not`/`非`.
 
 Stdlib map: [reference.md](reference.md).

@@ -366,13 +366,14 @@ fn is_word_end(s: &str, len: usize) -> bool {
 }
 
 /// Parse `name key=val …` / positional args; returns call + bytes consumed.
+/// Callee may be a bare name or method form `` `recv`.method ``.
 pub fn parse_call_tail(s: &str) -> Result<(CallExpr, usize)> {
     use crate::ast::Arg;
 
     let s = s.trim_start();
     let original_len = s.len();
 
-    let callee = {
+    let callee_tok = {
         let mut parts = s.split_whitespace();
         parts
             .next()
@@ -380,9 +381,13 @@ pub fn parse_call_tail(s: &str) -> Result<(CallExpr, usize)> {
             .to_string()
     };
 
+    let (receiver, callee) = split_method_callee(&callee_tok)
+        .map(|(r, m)| (Some(r), m))
+        .unwrap_or((None, callee_tok.clone()));
+
     let after_callee_offset = {
-        let idx = s.find(&callee).unwrap();
-        idx + callee.len()
+        let idx = s.find(&callee_tok).unwrap();
+        idx + callee_tok.len()
     };
     let mut args_str = s[after_callee_offset..].trim_start();
     let mut args = Vec::new();
@@ -411,7 +416,33 @@ pub fn parse_call_tail(s: &str) -> Result<(CallExpr, usize)> {
         }
     }
 
-    Ok((CallExpr { callee, args }, original_len))
+    Ok((
+        CallExpr {
+            callee,
+            receiver,
+            args,
+        },
+        original_len,
+    ))
+}
+
+/// `` `recv`.method `` → (recv, method).
+fn split_method_callee(tok: &str) -> Option<(String, String)> {
+    if !tok.starts_with('`') {
+        return None;
+    }
+    let rest = &tok[1..];
+    let end = rest.find('`')?;
+    let recv = rest[..end].to_string();
+    if recv.is_empty() {
+        return None;
+    }
+    let after = &rest[end + 1..];
+    let method = after.strip_prefix('.')?;
+    if method.is_empty() || method.contains('`') || method.contains('.') {
+        return None;
+    }
+    Some((recv, method.to_string()))
 }
 
 /// If `s` begins with `ident=`, return (ident, rest_after_eq).

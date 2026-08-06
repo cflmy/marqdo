@@ -3,23 +3,28 @@ title: lib/json
 description: JSON parse/stringify (shared EN/ZH import)
 ---
 
-# parse
+## parse
     - text
 
 **> host_json_parse text=`text`**
 
-# stringify
+## stringify
     - value
 
 **> host_json_stringify value=`value`**
 
-# get
+## get
     - value
     - key
 
 **> host_json_get value=`value` key=`key`**
 
-# keys
+## keys
     - value
 
 **> host_json_keys value=`value`**
+
+## quote
+    - text
+
+**> host_json_quote text=`text`**

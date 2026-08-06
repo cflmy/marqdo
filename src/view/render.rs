@@ -573,7 +573,14 @@ fn stmt_shell(line: u32, inner: &str, mode: StructureMode) -> String {
 }
 
 fn call_display(call: &CallExpr) -> String {
-    let mut s = format!("> {}", call.callee);
+    let mut s = String::from("> ");
+    if let Some(recv) = &call.receiver {
+        s.push('`');
+        s.push_str(recv);
+        s.push('`');
+        s.push('.');
+    }
+    s.push_str(&call.callee);
     for a in &call.args {
         match a {
             Arg::Positional(e) => {

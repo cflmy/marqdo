@@ -13,11 +13,19 @@ pub struct Module {
 #[derive(Debug, Clone)]
 pub struct Function {
     pub name: String,
+    /// Heading depth 1–6. Level 1 = object/type; level ≥ 2 = function/method.
     pub level: u8,
     pub span: Span,
     pub params: Vec<String>,
     pub body: Vec<Stmt>,
     pub children: Vec<Function>,
+}
+
+impl Function {
+    /// `# Name` — object / type (constructor body).
+    pub fn is_object(&self) -> bool {
+        self.level == 1
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -64,6 +72,8 @@ pub struct BranchArm {
 #[derive(Debug, Clone)]
 pub struct CallExpr {
     pub callee: String,
+    /// When set, `` `recv`.callee `` method call; receiver is a variable name.
+    pub receiver: Option<String>,
     pub args: Vec<Arg>,
 }
 
@@ -148,8 +158,9 @@ pub fn format_ast_dump(path: &str, module: &Module) -> String {
 
 fn dump_fun(out: &mut String, fun: &Function, depth: usize) {
     let pad = "  ".repeat(depth);
+    let kind = if fun.is_object() { "object" } else { "fun" };
     out.push_str(&format!(
-        "{pad}(fun level={} {:?} params={:?} @{}\n",
+        "{pad}({kind} level={} {:?} params={:?} @{}\n",
         fun.level, fun.name, fun.params, fun.span
     ));
     for stmt in &fun.body {
@@ -179,8 +190,8 @@ fn dump_stmt(out: &mut String, stmt: &Stmt, depth: usize) {
         }
         Stmt::Call { call, span } => {
             out.push_str(&format!(
-                "{pad}(call {:?} {:?} @{span})\n",
-                call.callee, call.args
+                "{pad}(call recv={:?} {:?} {:?} @{span}\n",
+                call.receiver, call.callee, call.args
             ));
         }
         Stmt::Branch { arms, span } => {

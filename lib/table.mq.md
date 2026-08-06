@@ -3,12 +3,12 @@ title: lib/table
 description: English table helpers over len / at
 ---
 
-# rows
+## rows
     - xs
 
 **> len `xs`**
 
-# row_at
+## row_at
     - xs
     - i
 

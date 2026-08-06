@@ -63,6 +63,11 @@ fn structure_hello() {
 }
 
 #[test]
+fn structure_object_handle() {
+    assert_out("tests/structure/object-handle.mq.md", "counter\n3\n4");
+}
+
+#[test]
 fn structure_nested_call() {
     assert_out("tests/structure/nested-call.mq.md", "Hello World!");
 }
@@ -578,6 +583,21 @@ fn lib_json_roundtrip() {
 #[test]
 fn lib_sys_cwd() {
     assert_out("tests/lib/sys-cwd.mq.md", "cwd-ok");
+}
+
+#[test]
+fn lib_sys_dotenv() {
+    assert_out("tests/lib/sys-dotenv.mq.md", "loaded");
+}
+
+#[test]
+fn lib_json_quote() {
+    assert_out("tests/lib/json-quote.mq.md", "\"hi\"");
+}
+
+#[test]
+fn ext_llm_import() {
+    assert_out("tests/ext/llm-import.mq.md", "ext-ok");
 }
 
 #[test]

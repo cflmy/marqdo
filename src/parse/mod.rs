@@ -31,7 +31,7 @@ pub fn parse_classified(lines: &[ClassifiedLine]) -> Result<Module> {
             functions.push(cur.parse_function(1)?);
         } else {
             bail!(
-                "{}:1: expected function heading `# …`, got: {trimmed}",
+                "{}:1: expected heading (`#` object or `##` function), got: {trimmed}",
                 line.line_no
             );
         }

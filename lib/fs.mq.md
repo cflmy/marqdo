@@ -3,39 +3,39 @@ title: lib/fs
 description: English filesystem wrappers
 ---
 
-# read_text
+## read_text
     - path
 
 **> host_read_text path=`path`**
 
-# write_text
+## write_text
     - path
     - text
 
 **> host_write_text path=`path` text=`text`**
 
-# append_text
+## append_text
     - path
     - text
 
 **> host_append_text path=`path` text=`text`**
 
-# exists
+## exists
     - path
 
 **> host_exists path=`path`**
 
-# list_dir
+## list_dir
     - path
 
 **> host_list_dir path=`path`**
 
-# make_dir
+## make_dir
     - path
 
 **> host_make_dir path=`path`**
 
-# remove
+## remove
     - path
 
 **> host_remove path=`path`**

@@ -130,17 +130,16 @@ impl Interpreter {
         if let Some(main) = find_top(module, "main") {
             return self.run_function(module, main, Env::new(), &[]);
         }
-        let tops: Vec<&Function> = module.functions.iter().filter(|f| f.level == 1).collect();
-        if tops.is_empty() {
-            bail!("no `# main` and no level-1 function to run");
+        // Document-as-entry: sole top-level `#` object with no params (e.g. `# Hello World`).
+        let entries: Vec<&Function> = module
+            .functions
+            .iter()
+            .filter(|f| f.is_object() && f.params.is_empty())
+            .collect();
+        if entries.len() == 1 {
+            return self.run_function(module, entries[0], Env::new(), &[]);
         }
-        let mut last = Value::None;
-        for fun in tops {
-            if fun.params.is_empty() {
-                last = self.run_function(module, fun, Env::new(), &[])?;
-            }
-        }
-        Ok(last)
+        bail!("no `# main` object to run");
     }
 
     fn run_function(
@@ -443,6 +442,10 @@ impl Interpreter {
             }
         }
 
+        if let Some(recv_name) = &call.receiver {
+            return self.eval_method_call(module, env, recv_name, &call.callee, &ev_args);
+        }
+
         match call.callee.as_str() {
             "print" => {
                 let bound = bind_args(&["text".into()], &ev_args, false)
@@ -574,7 +577,73 @@ impl Interpreter {
             call_env.set(k, v);
         }
 
+        let result = self.run_function(module, target, call_env, &[])?;
+        if target.is_object() {
+            Ok(tag_instance(&target.name, result))
+        } else {
+            Ok(result)
+        }
+    }
+
+    fn eval_method_call(
+        &mut self,
+        module: &Module,
+        env: &mut Env,
+        recv_name: &str,
+        method: &str,
+        ev_args: &[EvArg],
+    ) -> Result<Value> {
+        let recv = env
+            .get(recv_name)
+            .cloned()
+            .ok_or_else(|| self.err(format!("undefined variable `{recv_name}`")))?;
+        let type_name = instance_type_name(&recv).map_err(|m| self.err(m))?;
+        let obj = find_top(module, &type_name)
+            .filter(|f| f.is_object())
+            .ok_or_else(|| self.err(format!("unknown object type `{type_name}`")))?;
+        let target = obj
+            .children
+            .iter()
+            .find(|c| c.name == method)
+            .ok_or_else(|| self.err(format!("unknown method `{type_name}.{method}`")))?;
+        let bound = bind_args(&target.params, ev_args, false).map_err(|m| self.err(m))?;
+        let mut call_env = Env::new();
+        for (k, v) in bound {
+            call_env.set(k, v);
+        }
+        call_env.set("自".into(), recv.clone());
+        call_env.set("self".into(), recv);
         self.run_function(module, target, call_env, &[])
+    }
+}
+
+fn instance_type_name(v: &Value) -> std::result::Result<String, String> {
+    match v {
+        Value::Map(entries) => entries
+            .iter()
+            .find(|(k, _)| k == "_type")
+            .and_then(|(_, v)| match v {
+                Value::Text(s) => Some(s.clone()),
+                _ => None,
+            })
+            .ok_or_else(|| "method receiver needs a map with `_type`".into()),
+        _ => Err("method receiver must be an object map".into()),
+    }
+}
+
+fn tag_instance(type_name: &str, value: Value) -> Value {
+    match value {
+        Value::Map(mut entries) => {
+            if !entries.iter().any(|(k, _)| k == "_type") {
+                entries.insert(0, ("_type".into(), Value::Text(type_name.into())));
+            }
+            Value::Map(entries)
+        }
+        Value::None => Value::Map(vec![("_type".into(), Value::Text(type_name.into()))]),
+        other => Value::Map(vec![
+            ("_type".into(), Value::Text(type_name.into())),
+            ("value".into(), other),
+        ]),
     }
 }
 

@@ -81,6 +81,7 @@ Marqdo 换 **Rust 或 C++** 都不改变「主前端不该是 Flex/Bison」这�
 | **thiserror** / **anyhow** | 错误类型 | 诊断与 CLI 报错 |
 | **clap** | CLI | `marqdo run [path]` |
 | **serde** + **serde_yaml** | 元信息 | 仅解析 frontmatter 中的 YAML **键值**；`> x.mq.md` 仍按**行**抽取（见 Spike） |
+| **ureq** (=2.9.7) | HTTP(S) | `lib/net`；为 Cargo 1.81 另钉 `idna_adapter`/`zeroize`（见根 `Cargo.toml`） |
 
 #### 强烈建议
 

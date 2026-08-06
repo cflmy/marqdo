@@ -336,6 +336,69 @@ impl Vm {
                         slots,
                     });
                 }
+                Op::TagInstance(idx) => {
+                    let type_name = match fun.constants.get(idx as usize) {
+                        Some(Value::Text(s)) => s.clone(),
+                        _ => {
+                            return Err(self.err_at(span, "TagInstance needs type name constant"));
+                        }
+                    };
+                    let v = pop(&mut stack).map_err(|m| self.err_at(span, m))?;
+                    stack.push(tag_instance_value(&type_name, v));
+                }
+                Op::MethodCall(name_idx, argc) => {
+                    let argc = argc as usize;
+                    let method_name = match fun.constants.get(name_idx as usize) {
+                        Some(Value::Text(s)) => s.clone(),
+                        _ => {
+                            return Err(self.err_at(span, "MethodCall needs method name constant"));
+                        }
+                    };
+                    let recv = pop(&mut stack).map_err(|m| self.err_at(span, m))?;
+                    let mut vals = Vec::with_capacity(argc);
+                    for _ in 0..argc {
+                        vals.push(pop(&mut stack).map_err(|m| self.err_at(span, m))?);
+                    }
+                    vals.reverse();
+                    let type_name = instance_type_name_bc(&recv).map_err(|m| self.err_at(span, m))?;
+                    let obj_idx = program
+                        .objects
+                        .iter()
+                        .find(|(n, _)| n == &type_name)
+                        .map(|(_, i)| *i)
+                        .ok_or_else(|| {
+                            self.err_at(span, format!("unknown object type `{type_name}`"))
+                        })?;
+                    let method_fid = program
+                        .methods
+                        .iter()
+                        .find(|(o, m, _)| *o == obj_idx && m == &method_name)
+                        .map(|(_, _, i)| *i)
+                        .ok_or_else(|| {
+                            self.err_at(
+                                span,
+                                format!("unknown method `{type_name}.{method_name}`"),
+                            )
+                        })?;
+                    let callee = &program.functions[method_fid];
+                    if callee.params.len() != argc {
+                        return Err(self.err_at(span, "method argument count mismatch"));
+                    }
+                    let mut slots = vec![Value::None; callee.locals.len().max(1)];
+                    for (i, v) in vals.into_iter().enumerate() {
+                        slots[i] = v;
+                    }
+                    for (i, name) in callee.locals.iter().enumerate() {
+                        if name == "自" || name == "self" {
+                            slots[i] = recv.clone();
+                        }
+                    }
+                    frames.push(Frame {
+                        fn_idx: method_fid,
+                        ip: 0,
+                        slots,
+                    });
+                }
                 Op::Return => {
                     let ret = pop(&mut stack).unwrap_or(Value::None);
                     frames.pop();
@@ -396,4 +459,34 @@ fn cmp(stack: &mut Vec<Value>, pred: impl Fn(std::cmp::Ordering) -> bool) -> Res
     };
     stack.push(Value::Bool(pred(ord)));
     Ok(())
+}
+
+fn instance_type_name_bc(v: &Value) -> Result<String, String> {
+    match v {
+        Value::Map(entries) => entries
+            .iter()
+            .find(|(k, _)| k == "_type")
+            .and_then(|(_, v)| match v {
+                Value::Text(s) => Some(s.clone()),
+                _ => None,
+            })
+            .ok_or_else(|| "method receiver needs a map with `_type`".into()),
+        _ => Err("method receiver must be an object map".into()),
+    }
+}
+
+fn tag_instance_value(type_name: &str, value: Value) -> Value {
+    match value {
+        Value::Map(mut entries) => {
+            if !entries.iter().any(|(k, _)| k == "_type") {
+                entries.insert(0, ("_type".into(), Value::Text(type_name.into())));
+            }
+            Value::Map(entries)
+        }
+        Value::None => Value::Map(vec![("_type".into(), Value::Text(type_name.into()))]),
+        other => Value::Map(vec![
+            ("_type".into(), Value::Text(type_name.into())),
+            ("value".into(), other),
+        ]),
+    }
 }

@@ -54,6 +54,11 @@ pub enum Op {
     GetIndex,
     /// Call function by index; argc values are on the stack (param order).
     Call(u16, u8),
+    /// After a constructor Call: tag top-of-stack map with `_type` = constants[idx].
+    TagInstance(u16),
+    /// Method call: stack has argc args (param order) then receiver on top.
+    /// constants[name_idx] is method name text; resolve via receiver `_type`.
+    MethodCall(u16, u8),
     /// Host primitive: pop `argc` args (param order), push result.
     HostCall(u16, u8),
     Return,
@@ -75,6 +80,10 @@ pub struct FnChunk {
 pub struct Program {
     pub functions: Vec<FnChunk>,
     pub entry: usize,
+    /// Top-level object name → function index (level-1).
+    pub objects: Vec<(String, usize)>,
+    /// (object_fn_idx, method_name) → method fn idx
+    pub methods: Vec<(usize, String, usize)>,
 }
 
 impl Program {

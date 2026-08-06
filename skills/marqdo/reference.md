@@ -17,6 +17,8 @@ Diagnostics look like `path:line:col: message` (1-based line/col).
 
 Stdlib search order for `lib/…` imports: `MARQDO_LIB`, `./lib`, directory of the `marqdo` executable (and a few parents). Prefer the **bundle zip** (`marqdo.exe` + `lib/`) over a bare exe.
 
+官方扩展（`ext/…`，非 stdlib）：`MARQDO_EXT`、`./ext`、或可执行文件旁 `ext/`。对象原语见 `doc/design/objects.md`。LLM：`ext/llm.mq.md` / `ext/大模型.mq.md`（`# llm` 句柄 + `` `x`.complete `` / `` `x`.运行 ``；项目本地 `.env` 配密钥）。
+
 ## Builtins (no import)
 
 | EN | ZH | Role |
@@ -38,12 +40,13 @@ Import one file; use **that** file’s function names.
 | `lib/text.mq.md` | `lib/文本.mq.md` | text helpers / 去空白·拆分·拼接… |
 | `lib/table.mq.md` | `lib/表.mq.md` | table/rows helpers |
 | `lib/fs.mq.md` | `lib/文件.mq.md` | filesystem |
-| `lib/sys.mq.md` | `lib/系统.mq.md` | process / cwd |
+| `lib/sys.mq.md` | `lib/系统.mq.md` | process / cwd / load_dotenv |
 | `lib/time.mq.md` | `lib/时间.mq.md` | time/format |
-| `lib/net.mq.md` | `lib/网络.mq.md` | network helpers |
-| `lib/json.mq.md` | (see design) | JSON |
+| `lib/net.mq.md` | `lib/网络.mq.md` | HTTP(S) helpers (+ optional headers) |
+| `lib/json.mq.md` | (see design) | JSON (+ `quote`) |
 | `lib/math.mq.md` | `lib/数学.mq.md` | num, trig, random, formula, plot |
 | `lib/foreign.mq.md` | `lib/外联.mq.md` | run foreign fenced blocks |
+| `ext/llm.mq.md` | `ext/大模型.mq.md` | `# llm` / `# 大模型` object + chat methods |
 
 Open the imported `.mq.md` under `lib/` to see exact `#` function names and parameters. Gold tests: `tests/lib/`, `tests/structure/`.
 

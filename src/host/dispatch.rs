@@ -74,6 +74,9 @@ pub enum HostFn {
     ForeignRun = 63,
     ForeignRunLang = 64,
     ForeignLangs = 65,
+    DotenvLoad = 66,
+    HttpRequest = 67,
+    JsonQuote = 68,
 }
 
 impl HostFn {
@@ -144,6 +147,9 @@ impl HostFn {
             63 => Self::ForeignRun,
             64 => Self::ForeignRunLang,
             65 => Self::ForeignLangs,
+            66 => Self::DotenvLoad,
+            67 => Self::HttpRequest,
+            68 => Self::JsonQuote,
             _ => return None,
         })
     }
@@ -172,8 +178,9 @@ impl HostFn {
             "host_json_stringify" => Self::JsonStringify,
             "host_json_get" => Self::JsonGet,
             "host_json_keys" => Self::JsonKeys,
-            "host_http_get" => Self::HttpGet,
-            "host_http_post" => Self::HttpPost,
+            // Aliases so optional `headers` / `content_type` bind like plot.
+            "host_http_get" | "http_get" => Self::HttpGet,
+            "host_http_post" | "http_post" => Self::HttpPost,
             "host_url_encode" => Self::UrlEncode,
             "host_pi" => Self::Pi,
             "host_e" => Self::EConst,
@@ -217,6 +224,9 @@ impl HostFn {
             "host_foreign_run" => Self::ForeignRun,
             "host_foreign_run_lang" => Self::ForeignRunLang,
             "host_foreign_langs" => Self::ForeignLangs,
+            "host_dotenv_load" | "load_dotenv" => Self::DotenvLoad,
+            "host_http_request" | "http_request" => Self::HttpRequest,
+            "host_json_quote" | "quote" => Self::JsonQuote,
             _ => return None,
         })
     }
@@ -292,6 +302,9 @@ impl HostFn {
             Self::ForeignRun => "host_foreign_run",
             Self::ForeignRunLang => "host_foreign_run_lang",
             Self::ForeignLangs => "host_foreign_langs",
+            Self::DotenvLoad => "host_dotenv_load",
+            Self::HttpRequest => "host_http_request",
+            Self::JsonQuote => "host_json_quote",
         }
     }
 
@@ -309,11 +322,13 @@ impl HostFn {
             Self::EnvSet => &["name", "value"],
             Self::Exit => &["code"],
             Self::Exec => &["cmd"],
-            Self::JsonParse | Self::UrlEncode => &["text"],
+            Self::JsonParse | Self::UrlEncode | Self::JsonQuote => &["text"],
             Self::JsonStringify | Self::JsonKeys => &["value"],
             Self::JsonGet => &["value", "key"],
             Self::HttpGet => &["url"],
             Self::HttpPost => &["url", "body"],
+            Self::HttpRequest => &["method", "url"],
+            Self::DotenvLoad => &[],
             Self::Pi | Self::EConst | Self::Random => &[],
             Self::Num | Self::MathNeg | Self::MathSin | Self::MathCos | Self::MathTan
             | Self::MathAsin | Self::MathAcos | Self::MathAtan | Self::MathSqrt
@@ -338,7 +353,10 @@ impl HostFn {
     pub fn optional_params(self) -> &'static [&'static str] {
         match self {
             Self::JsonStringify => &["indent"],
-            Self::HttpPost => &["content_type"],
+            Self::HttpGet => &["headers"],
+            Self::HttpPost => &["content_type", "headers"],
+            Self::HttpRequest => &["body", "content_type", "headers"],
+            Self::DotenvLoad => &["path"],
             Self::Exec => &["args"],
             Self::Solve => &["min", "max"],
             Self::Plot => &["steps", "path", "derivative", "grid"],
@@ -385,6 +403,7 @@ pub fn call_host(
         }
         HostFn::EnvGet => sys::env_get(require(bound, "name")?),
         HostFn::EnvSet => sys::env_set(require(bound, "name")?, require(bound, "value")?),
+        HostFn::DotenvLoad => sys::dotenv_load(ctx, bound.get("path")),
         HostFn::Args => sys::args(ctx),
         HostFn::Cwd => sys::cwd(ctx),
         HostFn::Exit => sys::exit(ctx, require(bound, "code")?),
@@ -395,12 +414,22 @@ pub fn call_host(
         }
         HostFn::JsonGet => json::get(require(bound, "value")?, require(bound, "key")?),
         HostFn::JsonKeys => json::keys(require(bound, "value")?),
-        HostFn::HttpGet => net::http_get(ctx, require(bound, "url")?),
+        HostFn::JsonQuote => json::quote(require(bound, "text")?),
+        HostFn::HttpGet => net::http_get(ctx, require(bound, "url")?, bound.get("headers")),
         HostFn::HttpPost => net::http_post(
             ctx,
             require(bound, "url")?,
             require(bound, "body")?,
             bound.get("content_type"),
+            bound.get("headers"),
+        ),
+        HostFn::HttpRequest => net::http_request(
+            ctx,
+            require(bound, "method")?,
+            require(bound, "url")?,
+            bound.get("body"),
+            bound.get("content_type"),
+            bound.get("headers"),
         ),
         HostFn::UrlEncode => net::url_encode(require(bound, "text")?),
         HostFn::Pi => math::pi(),

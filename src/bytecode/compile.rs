@@ -13,6 +13,7 @@ use crate::value::Value;
 
 struct FlatFun {
     name: String,
+    level: u8,
     parent: Option<usize>,
     params: Vec<String>,
     body: Vec<Stmt>,
@@ -33,10 +34,30 @@ pub fn compile_module(path: Option<&Path>, module: &Module) -> Result<Program> {
         .iter()
         .position(|f| f.name == "main" && f.parent.is_none())
         .or_else(|| {
-            flat.iter()
-                .position(|f| f.parent.is_none() && f.params.is_empty())
+            let tops: Vec<usize> = flat
+                .iter()
+                .enumerate()
+                .filter(|(_, f)| f.parent.is_none() && f.level == 1 && f.params.is_empty())
+                .map(|(i, _)| i)
+                .collect();
+            if tops.len() == 1 {
+                Some(tops[0])
+            } else {
+                None
+            }
         })
-        .ok_or_else(|| anyhow::anyhow!("bytecode: no entry function"))?;
+        .ok_or_else(|| anyhow::anyhow!("bytecode: no `# main` object"))?;
+
+    let mut objects = Vec::new();
+    let mut methods = Vec::new();
+    for (i, f) in flat.iter().enumerate() {
+        if f.parent.is_none() && f.level == 1 {
+            objects.push((f.name.clone(), i));
+            for &cid in &f.children {
+                methods.push((i, flat[cid].name.clone(), cid));
+            }
+        }
+    }
 
     let path_buf = path.map(|p| p.to_path_buf());
     let mut functions = Vec::new();
@@ -44,13 +65,19 @@ pub fn compile_module(path: Option<&Path>, module: &Module) -> Result<Program> {
         functions.push(compile_function(i, &flat, path_buf.as_deref())?);
     }
 
-    Ok(Program { functions, entry })
+    Ok(Program {
+        functions,
+        entry,
+        objects,
+        methods,
+    })
 }
 
 fn collect_fun(fun: &Function, parent: Option<usize>, flat: &mut Vec<FlatFun>) -> usize {
     let id = flat.len();
     flat.push(FlatFun {
         name: fun.name.clone(),
+        level: fun.level,
         parent,
         params: fun.params.clone(),
         body: fun.body.clone(),
@@ -79,6 +106,18 @@ fn compile_function(fn_id: usize, flat: &[FlatFun], path: Option<&Path>) -> Resu
     let mut locals = HashMap::new();
     for (i, p) in fun.params.iter().enumerate() {
         locals.insert(p.clone(), i as u8);
+    }
+    let is_method = fun
+        .parent
+        .map(|pid| flat[pid].level == 1 && flat[pid].parent.is_none())
+        .unwrap_or(false);
+    if is_method {
+        for name in ["自", "self"] {
+            if !locals.contains_key(name) {
+                let s = locals.len() as u8;
+                locals.insert(name.to_string(), s);
+            }
+        }
     }
     let mut c = FnCompiler {
         path,
@@ -324,6 +363,10 @@ impl<'a> FnCompiler<'a> {
         call.callee =
             crate::aliases::normalize_call_callee_and_args(&call.callee, &mut call.args);
 
+        if let Some(recv) = &call.receiver {
+            return self.compile_method_call(recv, &call, as_stmt);
+        }
+
         match call.callee.as_str() {
             "print" => {
                 let text_expr = call
@@ -499,6 +542,72 @@ impl<'a> FnCompiler<'a> {
             )));
         }
         self.emit(Op::Call(fid as u16, params.len() as u8));
+        if self.flat[fid].parent.is_none() && self.flat[fid].level == 1 {
+            let ti = self.add_const(Value::Text(self.flat[fid].name.clone()));
+            self.emit(Op::TagInstance(ti));
+        }
+        if as_stmt {
+            self.emit(Op::Pop);
+        }
+        Ok(())
+    }
+
+    fn compile_method_call(&mut self, recv: &str, call: &CallExpr, as_stmt: bool) -> Result<()> {
+        // Resolve method among all object children by name (unique enough for compile);
+        // runtime still checks `_type`.
+        let mut method_fid = None;
+        for f in self.flat {
+            if f.parent.is_none() && f.level == 1 {
+                for &cid in &f.children {
+                    if self.flat[cid].name == call.callee {
+                        method_fid = Some(cid);
+                        break;
+                    }
+                }
+            }
+            if method_fid.is_some() {
+                break;
+            }
+        }
+        let fid = method_fid.ok_or_else(|| {
+            self.err(format!("unknown method `{}`", call.callee))
+        })?;
+        let params = self.flat[fid].params.clone();
+        let mut named: HashMap<String, &Expr> = HashMap::new();
+        let mut positionals = Vec::new();
+        for a in &call.args {
+            match a {
+                Arg::Positional(e) => positionals.push(e),
+                Arg::Named { name, value } => {
+                    named.insert(name.clone(), value);
+                }
+            }
+        }
+        let mut pos_i = 0;
+        for p in &params {
+            if let Some(e) = named.get(p) {
+                self.compile_expr(e)?;
+            } else if pos_i < positionals.len() {
+                self.compile_expr(positionals[pos_i])?;
+                pos_i += 1;
+            } else {
+                return Err(self.err(format!("missing argument for parameter `{p}`")));
+            }
+        }
+        if pos_i < positionals.len() {
+            return Err(self.err(format!(
+                "too many positional arguments ({} extra)",
+                positionals.len() - pos_i
+            )));
+        }
+        let slot = self
+            .locals
+            .get(recv)
+            .copied()
+            .ok_or_else(|| self.err(format!("undefined variable `{recv}`")))?;
+        self.emit(Op::GetLocal(slot));
+        let name_i = self.add_const(Value::Text(call.callee.clone()));
+        self.emit(Op::MethodCall(name_i, params.len() as u8));
         if as_stmt {
             self.emit(Op::Pop);
         }

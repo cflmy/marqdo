@@ -3,183 +3,183 @@ title: lib/math
 description: High-school math — num, random, formula, plot
 ---
 
-# pi
+## pi
 
 **> host_pi**
 
-# e
+## e
 
 **> host_e**
 
-# num
+## num
     - value
 
 **> host_num value=`value`**
 
-# add
+## add
     - a
     - b
 
 **> host_math_add a=`a` b=`b`**
 
-# sub
+## sub
     - a
     - b
 
 **> host_math_sub a=`a` b=`b`**
 
-# mul
+## mul
     - a
     - b
 
 **> host_math_mul a=`a` b=`b`**
 
-# div
+## div
     - a
     - b
 
 **> host_math_div a=`a` b=`b`**
 
-# pow
+## pow
     - a
     - b
 
 **> host_math_pow a=`a` b=`b`**
 
-# neg
+## neg
     - value
 
 **> host_math_neg value=`value`**
 
-# sin
+## sin
     - value
 
 **> host_math_sin value=`value`**
 
-# cos
+## cos
     - value
 
 **> host_math_cos value=`value`**
 
-# tan
+## tan
     - value
 
 **> host_math_tan value=`value`**
 
-# asin
+## asin
     - value
 
 **> host_math_asin value=`value`**
 
-# acos
+## acos
     - value
 
 **> host_math_acos value=`value`**
 
-# atan
+## atan
     - value
 
 **> host_math_atan value=`value`**
 
-# sqrt
+## sqrt
     - value
 
 **> host_math_sqrt value=`value`**
 
-# abs
+## abs
     - value
 
 **> host_math_abs value=`value`**
 
-# ln
+## ln
     - value
 
 **> host_math_ln value=`value`**
 
-# exp
+## exp
     - value
 
 **> host_math_exp value=`value`**
 
-# floor
+## floor
     - value
 
 **> host_math_floor value=`value`**
 
-# ceil
+## ceil
     - value
 
 **> host_math_ceil value=`value`**
 
-# min
+## min
     - a
     - b
 
 **> host_math_min a=`a` b=`b`**
 
-# max
+## max
     - a
     - b
 
 **> host_math_max a=`a` b=`b`**
 
-# random
+## random
 
 **> host_random**
 
-# random_int
+## random_int
     - min
     - max
 
 **> host_random_int min=`min` max=`max`**
 
-# seed
+## seed
     - value
 
 **> host_seed value=`value`**
 
-# formula
+## formula
     - text
 
 **> host_formula value=`text`**
 
-# simplify
+## simplify
     - formula
 
 **> host_simplify value=`formula`**
 
-# expand
+## expand
     - formula
 
 **> host_expand value=`formula`**
 
-# diff
+## diff
     - formula
     - var
 
 **> host_diff formula=`formula` var=`var`**
 
-# subs
+## subs
     - formula
     - var
     - value
 
 **> host_subs formula=`formula` var=`var` value=`value`**
 
-# eval
+## eval
     - formula
     - var
     - value
 
 **> host_eval formula=`formula` var=`var` value=`value`**
 
-# solve
+## solve
     - formula
     - var
 
 **> host_solve formula=`formula` var=`var`**
 
-# plot
+## plot
     - formula
     - var
     - min
@@ -187,13 +187,13 @@ description: High-school math — num, random, formula, plot
 
 **> host_plot formula=`formula` var=`var` min=`min` max=`max`**
 
-# plot_points
+## plot_points
     - xs
     - ys
 
 **> host_plot_points xs=`xs` ys=`ys`**
 
-# plot_conic
+## plot_conic
     - kind
     - a
 

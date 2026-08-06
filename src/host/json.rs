@@ -53,6 +53,17 @@ pub fn keys(value: &Value) -> Result<Value, String> {
     }
 }
 
+/// JSON-encode a text value including surrounding quotes (for building request bodies).
+pub fn quote(text: &Value) -> Result<Value, String> {
+    let s = match text {
+        Value::Text(s) => s.as_str(),
+        _ => return Err("json quote needs text".into()),
+    };
+    serde_json::to_string(s)
+        .map(Value::Text)
+        .map_err(|e| format!("json quote: {e}"))
+}
+
 fn json_to_value(v: &serde_json::Value) -> Result<Value, String> {
     Ok(match v {
         serde_json::Value::Null => Value::None,
@@ -110,4 +121,15 @@ fn value_to_json(v: &Value) -> Result<serde_json::Value, String> {
         Value::Formula(e) => serde_json::Value::String(e.as_display()),
         Value::Code(c) => serde_json::Value::String(c.source.clone()),
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn quote_escapes_text() {
+        let q = quote(&Value::Text("a\"b".into())).unwrap();
+        assert_eq!(q, Value::Text("\"a\\\"b\"".into()));
+    }
 }

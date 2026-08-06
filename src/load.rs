@@ -41,8 +41,8 @@ fn load_module_inner(path: &Path, visited: &mut HashSet<PathBuf>) -> Result<Modu
     Ok(module)
 }
 
-/// Resolve an import path: relative to the importer first; `lib/…` and `std/…`
-/// also search official library roots (`MARQDO_LIB`, `./lib`, near the binary).
+/// Resolve an import path: relative to the importer first; `lib/…` / `std/…`
+/// and `ext/…` also search official roots (`MARQDO_LIB` / `MARQDO_EXT`, cwd, near the binary).
 pub fn resolve_import(from_dir: &Path, rel: &str) -> Result<PathBuf> {
     let rel = rel.replace('\\', "/");
     let direct = from_dir.join(&rel);
@@ -72,6 +72,22 @@ pub fn resolve_import(from_dir: &Path, rel: &str) -> Result<PathBuf> {
         );
     }
 
+    if let Some(remainder) = normalized.strip_prefix("ext/") {
+        for root in ext_search_roots() {
+            let as_ext_dir = root.join(remainder);
+            if as_ext_dir.is_file() {
+                return Ok(as_ext_dir);
+            }
+            let as_repo_root = root.join("ext").join(remainder);
+            if as_repo_root.is_file() {
+                return Ok(as_repo_root);
+            }
+        }
+        bail!(
+            "cannot resolve extension import `{rel}` (set MARQDO_EXT or keep an ext/ next to the project)"
+        );
+    }
+
     Ok(direct)
 }
 
@@ -90,6 +106,26 @@ fn lib_search_roots() -> Vec<PathBuf> {
             roots.push(dir.join("../lib"));
             roots.push(dir.join("../../lib"));
             roots.push(dir.join("../../../lib"));
+        }
+    }
+    roots
+}
+
+fn ext_search_roots() -> Vec<PathBuf> {
+    let mut roots = Vec::new();
+    if let Ok(h) = env::var("MARQDO_EXT") {
+        roots.push(PathBuf::from(h));
+    }
+    if let Ok(cwd) = env::current_dir() {
+        roots.push(cwd.join("ext"));
+        roots.push(cwd);
+    }
+    if let Ok(exe) = env::current_exe() {
+        if let Some(dir) = exe.parent() {
+            roots.push(dir.join("ext"));
+            roots.push(dir.join("../ext"));
+            roots.push(dir.join("../../ext"));
+            roots.push(dir.join("../../../ext"));
         }
     }
     roots
