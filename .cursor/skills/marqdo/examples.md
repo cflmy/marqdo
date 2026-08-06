@@ -26,7 +26,7 @@ Greeting via a nested function:
 > greet who=Marqdo
 
 ## greet
-    - who
+    + `who`
 
 > print text=Hello, `who`!
 
@@ -43,7 +43,7 @@ Greeting via a nested function:
 > print text=`b`
 
 ## add_one
-    - n
+    + `n`
 
 **`n` + 1**
 ```
@@ -55,15 +55,29 @@ Greeting via a nested function:
 
 *`n` = 0*
 
-+ `n` > 0
+1. `n` > 0
   > print text=positive
-+ `n` < 0
+2. `n` < 0
   > print text=negative
-+ *
+3. *
   > print text=zero
 ```
 
-## 6. Import text stdlib
+## 6. Foreach loop
+
+```markdown
+# main
+
+`篮子` =
+| 果 |
+|----|
+| 苹果 |
+
+- [`果`](`篮子`)
+  > print text=`果`
+```
+
+## 7. Import text stdlib
 
 ```markdown
 ---
@@ -77,7 +91,7 @@ title: split demo
 > print text=`parts`
 ```
 
-## 7. Comment paragraphs (blank-line rule)
+## 8. Comment paragraphs (blank-line rule)
 
 ```markdown
 # main
@@ -91,7 +105,7 @@ After a blank line, code runs:
 > print text=this runs
 ```
 
-## 8. Frontmatter import only
+## 9. Frontmatter import only
 
 ```markdown
 ---
@@ -105,11 +119,11 @@ description: loads math
 > print text=`t`
 ```
 
-## 9. Object handle + method
+## 10. Object handle + method
 
 See `tests/structure/object-handle.mq.md` and `ext/llm.mq.md`: `# Type` constructs a map with `_type`; methods use `` > `obj`.method `` and read `self` / `自`.
 
-## 10. Agent layout (ABI)
+## 11. Agent layout (ABI)
 
 ```markdown
 ---
@@ -127,7 +141,7 @@ See `tests/structure/object-handle.mq.md` and `ext/llm.mq.md`: `# Type` construc
 
 Requires `MARQDO_AGENT_PLUGIN` pointing at the built `agent` shared library (see `doc/design/ext-agent.md`).
 
-## 11. What not to emit
+## 12. What not to emit
 
 ```markdown
 # BAD — bold is return, not print
@@ -139,4 +153,10 @@ if x > 0:
 
 # BAD — wrapping a call in italics
 *> print text=hi*
+
+# BAD — old branch syntax (removed)
++ `x` > 0
+
+# GOOD — ordered list arms
+1. `x` > 0
 ```

@@ -4,11 +4,11 @@ description: Imported by main; bold is a return value
 ---
 
 ## add_one
-    - n
+    + `n`
 
 **`n` + 1**
 
 ## greet
-    - who
+    + `who`
 
 > print text=Hello, `who`!

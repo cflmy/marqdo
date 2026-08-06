@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use std::path::Path;
 
 use crate::ast::{
-    Arg, BinaryOp, CallExpr, Expr, Function, InterpPart, Literal, Module, Stmt, UnaryOp,
+    Arg, BinaryOp, CallExpr, Expr, Function, InterpPart, Literal, Module, Param, Stmt, UnaryOp,
 };
 use crate::bytecode::{FnChunk, Op, Program};
 use crate::diagnostics::{bail_at, Span};
@@ -15,7 +15,7 @@ struct FlatFun {
     name: String,
     level: u8,
     parent: Option<usize>,
-    params: Vec<String>,
+    params: Vec<Param>,
     body: Vec<Stmt>,
     children: Vec<usize>,
     span: Span,
@@ -110,7 +110,7 @@ fn compile_function(fn_id: usize, flat: &[FlatFun], path: Option<&Path>) -> Resu
     let fun = &flat[fn_id];
     let mut locals = HashMap::new();
     for (i, p) in fun.params.iter().enumerate() {
-        locals.insert(p.clone(), i as u8);
+        locals.insert(p.name.clone(), i as u8);
     }
     let is_method = fun
         .parent
@@ -130,11 +130,11 @@ fn compile_function(fn_id: usize, flat: &[FlatFun], path: Option<&Path>) -> Resu
         fn_id,
         chunk: FnChunk {
             name: fun.name.clone(),
-            params: fun.params.clone(),
+            params: fun.params.iter().map(|p| p.name.clone()).collect(),
             code: Vec::new(),
             spans: Vec::new(),
             constants: Vec::new(),
-            locals: fun.params.clone(),
+            locals: fun.params.iter().map(|p| p.name.clone()).collect(),
         },
         locals,
         stmt_span: fun.span,
@@ -530,7 +530,7 @@ impl<'a> FnCompiler<'a> {
 
         match self.resolve_call(&call.callee) {
             Ok(fid) => {
-                let params = self.flat[fid].params.clone();
+                let params = &self.flat[fid].params;
                 let mut named: HashMap<String, &Expr> = HashMap::new();
                 let mut positionals = Vec::new();
                 for a in &call.args {
@@ -542,14 +542,16 @@ impl<'a> FnCompiler<'a> {
                     }
                 }
                 let mut pos_i = 0;
-                for p in &params {
-                    if let Some(e) = named.get(p) {
+                for p in params {
+                    if let Some(e) = named.get(&p.name) {
                         self.compile_expr(e)?;
                     } else if pos_i < positionals.len() {
                         self.compile_expr(positionals[pos_i])?;
                         pos_i += 1;
+                    } else if let Some(def) = &p.default {
+                        self.compile_expr(def)?;
                     } else {
-                        return Err(self.err(format!("missing argument for parameter `{p}`")));
+                        return Err(self.err(format!("missing argument for parameter `{}`", p.name)));
                     }
                 }
                 if pos_i < positionals.len() {
@@ -647,13 +649,15 @@ impl<'a> FnCompiler<'a> {
         }
         let mut pos_i = 0;
         for p in &params {
-            if let Some(e) = named.get(p) {
+            if let Some(e) = named.get(&p.name) {
                 self.compile_expr(e)?;
             } else if pos_i < positionals.len() {
                 self.compile_expr(positionals[pos_i])?;
                 pos_i += 1;
+            } else if let Some(def) = &p.default {
+                self.compile_expr(def)?;
             } else {
-                return Err(self.err(format!("missing argument for parameter `{p}`")));
+                return Err(self.err(format!("missing argument for parameter `{}`", p.name)));
             }
         }
         if pos_i < positionals.len() {

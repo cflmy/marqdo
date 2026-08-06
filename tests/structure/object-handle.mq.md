@@ -4,7 +4,7 @@ title: object handle smoke
 ---
 
 # counter
-    - n
+    + `n`
 
 *`t` = > parse text={"p":"{\"n\":","s":"}"} *
 *`qn` = > str `n` *

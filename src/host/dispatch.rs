@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 
-use crate::host::{agent_rt, foreign, fs, json, math, net, plugin, sys, time, HostContext};
+use crate::host::{agent_rt, foreign, fs, json, math, net, plugin, subtask, sys, time, writeback, HostContext};
 use crate::value::Value;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -92,6 +92,15 @@ pub enum HostFn {
     AgentHistoryAppend = 81,
     FormatToolsForLlm = 82,
     ToolAllowed = 83,
+    WritebackRecord = 84,
+    WritebackGet = 85,
+    WritebackClear = 86,
+    WritebackList = 87,
+    SubtaskSpawn = 88,
+    SubtaskPoll = 89,
+    SubtaskJoin = 90,
+    SubtaskKill = 91,
+    SubtaskWaitAll = 92,
 }
 
 impl HostFn {
@@ -180,6 +189,15 @@ impl HostFn {
             81 => Self::AgentHistoryAppend,
             82 => Self::FormatToolsForLlm,
             83 => Self::ToolAllowed,
+            84 => Self::WritebackRecord,
+            85 => Self::WritebackGet,
+            86 => Self::WritebackClear,
+            87 => Self::WritebackList,
+            88 => Self::SubtaskSpawn,
+            89 => Self::SubtaskPoll,
+            90 => Self::SubtaskJoin,
+            91 => Self::SubtaskKill,
+            92 => Self::SubtaskWaitAll,
             _ => return None,
         })
     }
@@ -272,6 +290,15 @@ impl HostFn {
             "host_agent_history_append" | "agent_history_append" => Self::AgentHistoryAppend,
             "host_format_tools_for_llm" | "format_tools_for_llm" => Self::FormatToolsForLlm,
             "host_tool_allowed" | "tool_allowed" => Self::ToolAllowed,
+            "host_writeback_record" | "writeback_record" => Self::WritebackRecord,
+            "host_writeback_get" | "writeback_get" => Self::WritebackGet,
+            "host_writeback_clear" | "writeback_clear" => Self::WritebackClear,
+            "host_writeback_list" | "writeback_list" => Self::WritebackList,
+            "host_subtask_spawn" | "subtask_spawn" => Self::SubtaskSpawn,
+            "host_subtask_poll" | "subtask_poll" => Self::SubtaskPoll,
+            "host_subtask_join" | "subtask_join" => Self::SubtaskJoin,
+            "host_subtask_kill" | "subtask_kill" => Self::SubtaskKill,
+            "host_subtask_wait_all" | "subtask_wait_all" => Self::SubtaskWaitAll,
             _ => return None,
         })
     }
@@ -365,6 +392,15 @@ impl HostFn {
             Self::AgentHistoryAppend => "host_agent_history_append",
             Self::FormatToolsForLlm => "host_format_tools_for_llm",
             Self::ToolAllowed => "host_tool_allowed",
+            Self::WritebackRecord => "host_writeback_record",
+            Self::WritebackGet => "host_writeback_get",
+            Self::WritebackClear => "host_writeback_clear",
+            Self::WritebackList => "host_writeback_list",
+            Self::SubtaskSpawn => "host_subtask_spawn",
+            Self::SubtaskPoll => "host_subtask_poll",
+            Self::SubtaskJoin => "host_subtask_join",
+            Self::SubtaskKill => "host_subtask_kill",
+            Self::SubtaskWaitAll => "host_subtask_wait_all",
         }
     }
 
@@ -417,6 +453,12 @@ impl HostFn {
             Self::AgentHistoryAppend => &["id", "item"],
             Self::FormatToolsForLlm => &["tools"],
             Self::ToolAllowed => &["tools", "name"],
+            Self::WritebackRecord => &["value"],
+            Self::WritebackGet | Self::WritebackClear => &[],
+            Self::WritebackList => &[],
+            Self::SubtaskSpawn => &["path"],
+            Self::SubtaskPoll | Self::SubtaskJoin | Self::SubtaskKill => &["id"],
+            Self::SubtaskWaitAll => &[],
         }
     }
 
@@ -434,6 +476,8 @@ impl HostFn {
             Self::PlotConic => &["b", "h", "k", "path", "grid"],
             Self::ForeignSetCmd => &["args"],
             Self::ForeignRun | Self::ForeignRunLang => &["stdin"],
+            Self::WritebackRecord | Self::WritebackGet | Self::WritebackClear => &["at_end"],
+            Self::SubtaskSpawn => &["args"],
             _ => &[],
         }
     }
@@ -632,6 +676,23 @@ pub fn call_host(
             require(bound, "tools")?,
             require(bound, "name")?,
         ),
+        HostFn::WritebackRecord => writeback::record(
+            ctx,
+            require(bound, "value")?,
+            bound.get("at_end"),
+        ),
+        HostFn::WritebackGet => writeback::get(ctx, bound.get("at_end")),
+        HostFn::WritebackClear => writeback::clear(ctx, bound.get("at_end")),
+        HostFn::WritebackList => writeback::list(ctx),
+        HostFn::SubtaskSpawn => subtask::spawn(
+            ctx,
+            require(bound, "path")?,
+            bound.get("args"),
+        ),
+        HostFn::SubtaskPoll => subtask::poll(ctx, require(bound, "id")?),
+        HostFn::SubtaskJoin => subtask::join(ctx, require(bound, "id")?),
+        HostFn::SubtaskKill => subtask::kill(ctx, require(bound, "id")?),
+        HostFn::SubtaskWaitAll => subtask::wait_all(ctx),
     }
 }
 

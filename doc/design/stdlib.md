@@ -70,6 +70,8 @@ Frontmatter：
 | `lib/math.mq.md` / `lib/数学.mq.md` | 数值 / 随机 / 公式 / 绘图 |
 | `lib/foreign.mq.md` / `lib/外联.mq.md` | 具名围栏外联 |
 | `lib/plugin.mq.md` / `lib/插件.mq.md` | `load` / `unload` / `list`（原生 ABI） |
+| `lib/writeback.mq.md` / `lib/自写回.mq.md` | `record` `get` `clear` `list` |
+| `lib/subtask.mq.md` / `lib/子任务.mq.md` | `spawn` `poll` `wait` `kill` `wait_all` |
 | `lib/text.mq.md` | `str_trim` `str_split` `str_join` |
 | `lib/文本.mq.md` | `去空白` `拆分` `拼接` |
 | `lib/table.mq.md` | `rows` `row_at` |

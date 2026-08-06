@@ -12,7 +12,7 @@ Import lib/plugin.mq.md. Functions: load(path), unload(), list(). After load, re
 
 *`n` = > len `names` *
 
-+ `n` >= 0
+1. `n` >= 0
   > print text=plugin-ok
-+ *
+2. *
   > print text=plugin-bad

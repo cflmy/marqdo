@@ -25,8 +25,12 @@
 | 数学 | `lib/math.mq.md` | `lib/数学.mq.md` | 已有 |
 | 外联 | `lib/foreign.mq.md` | `lib/外联.mq.md` | 已有 |
 | **插件** | `lib/plugin.mq.md` | `lib/插件.mq.md` | **已有**（加载 C ABI 共享库） |
+| **自写回** | `lib/writeback.mq.md` | `lib/自写回.mq.md` | **已有**（Jupyter 式输出写回） |
+| **子任务** | `lib/subtask.mq.md` | `lib/子任务.mq.md` | **已有**（OS 子进程 + KillOnDrop） |
 
 官方可选扩展（**非** stdlib）：`ext/llm` · `ext/agent` — 见 [ext-llm.md](ext-llm.md) / [ext-agent.md](ext-agent.md)。
+
+设计细节：[stdlib-writeback.md](stdlib-writeback.md) · [stdlib-subtask.md](stdlib-subtask.md)。
 
 ---
 

@@ -10,6 +10,6 @@ description: Recommended entry — nested fn; print builtin; bold return
 > 问候 谁=World
 
 ## 问候
-    - 谁
+    + `谁`
 
 > print text=Hello `谁`!

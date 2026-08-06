@@ -19,34 +19,34 @@ Construct an LLM handle from `OPENAI_*` / `MARQDO_LLM_*` (default base OpenAI v1
 *`d` = > parse text={"base":"https://api.openai.com/v1","model":"gpt-4o-mini","suffix":"/chat/completions","bearer":"Bearer ","p1":"{\"model\":","p2":",\"messages\":[{\"role\":\"user\",\"content\":","p3":"}]}","h1":"{\"Authorization\":","h2":"}","a1":"{\"api_key\":","a2":",\"base_url\":","a3":",\"model\":","a4":",\"suffix\":","a5":",\"bearer\":","a6":",\"p1\":","a7":",\"p2\":","a8":",\"p3\":","a9":",\"h1\":","a10":",\"h2\":","a11":"}"} *
 
 *`api_key` = > env_get name=OPENAI_API_KEY *
-+ `api_key`
+1. `api_key`
   *`_k` = 1*
-+ *
+2. *
   *`api_key` = > env_get name=MARQDO_LLM_API_KEY *
-+ `api_key`
+3. `api_key`
   *`_k` = 1*
-+ *
+4. *
   > print text=ext/ai/llm: set OPENAI_API_KEY or MARQDO_LLM_API_KEY
   > exit code=1
 
 *`base_url` = > env_get name=OPENAI_BASE_URL *
-+ `base_url`
+1. `base_url`
   *`_k` = 1*
-+ *
+2. *
   *`base_url` = > env_get name=MARQDO_LLM_BASE_URL *
-+ `base_url`
+3. `base_url`
   *`_k` = 1*
-+ *
+4. *
   *`base_url` = > get value=`d` key=base *
 
 *`model` = > env_get name=OPENAI_MODEL *
-+ `model`
+1. `model`
   *`_k` = 1*
-+ *
+2. *
   *`model` = > env_get name=MARQDO_LLM_MODEL *
-+ `model`
+3. `model`
   *`_k` = 1*
-+ *
+4. *
   *`model` = > get value=`d` key=model *
 
 *`q_key` = > quote text=`api_key` *
@@ -81,7 +81,7 @@ Construct an LLM handle from `OPENAI_*` / `MARQDO_LLM_*` (default base OpenAI v1
 **> parse text=`raw`**
 
 ## complete
-    - prompt
+    + `prompt`
 
 Chat completion using `self` / `自` handle fields.
 
@@ -107,14 +107,14 @@ Chat completion using `self` / `自` handle fields.
 *`status` = > get value=`resp` key=status *
 *`raw` = > get value=`resp` key=body *
 
-+ `status` == 200
+1. `status` == 200
   *`data` = > parse text=`raw` *
   *`choices` = > get value=`data` key=choices *
   *`first` = > at value=`choices` index=0 *
   *`message` = > get value=`first` key=message *
   *`content` = > get value=`message` key=content *
   **`content`**
-+ *
+2. *
   > print text=ext/ai/llm: HTTP error
   > print text=`status`
   > print text=`raw`
@@ -123,7 +123,7 @@ Chat completion using `self` / `自` handle fields.
 ---
 
 ## chat
-    - prompt
+    + `prompt`
 
 Alias for `complete`.
 

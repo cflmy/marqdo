@@ -4,7 +4,7 @@ description: Load optional native ABI plugins (.dll / .so / .dylib)
 ---
 
 ## load
-    - path
+    + `path`
 
 **> host_plugin_load path=`path`**
 

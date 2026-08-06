@@ -18,9 +18,11 @@ marqdo ext remove llm|agent
 
 Diagnostics look like `path:line:col: message` (1-based line/col).
 
+**v0.2 surface:** parameters `` + `name` ``; branches `` 1. `cond` `` / `` 2. * ``; loops `` - [`item`](`coll`) ``; identifiers in backticks. See `doc/design/markdown-mapping.md`.
+
 Stdlib search order for `lib/…` imports: `MARQDO_LIB`, `./lib`, directory of the `marqdo` executable (and a few parents). Prefer the **bundle zip** (`marqdo.exe` + `lib/`) over a bare exe.
 
-官方扩展（`ext/ai/…`）：`marqdo ext add` 装到 `MARQDO_EXT`；导入写 `> ext/ai/llm.mq.md`。
+官方扩展（`ext/…`，非 stdlib）：`marqdo ext add` 装到 `MARQDO_EXT` 或 `~/.marqdo/ext`；导入仍写 `> ext/llm.mq.md`。解析还含 cwd `ext/`、二进制旁 `ext/`。对象：`doc/design/objects.md`。Agent：`doc/design/ext-agent.md` · 安装器：`doc/design/ext-cli.md`。
 
 ## Builtins (no import)
 
@@ -50,8 +52,8 @@ Import one file; use **that** file’s function names.
 | `lib/json.mq.md` | (see design) | JSON (+ `quote`) |
 | `lib/math.mq.md` | `lib/数学.mq.md` | num, trig, random, formula, plot |
 | `lib/foreign.mq.md` | `lib/外联.mq.md` | run foreign fenced blocks |
-| `ext/ai/llm.mq.md` | `ext/ai/大模型.mq.md` | `# llm` / `# 大模型` |
-| `ext/ai/agent.mq.md` | `ext/ai/智能体.mq.md` | agent framework: `# 智能体` + `## 执行` + `## 清空历史` |
+| `ext/llm.mq.md` | `ext/大模型.mq.md` | `# llm` / `# 大模型` object + chat methods |
+| `ext/agent.mq.md` | `ext/智能体.mq.md` | agent **framework** (layout now; LLM orchestration roadmap in `ext-agent.md`) |
 
 Open the imported `.mq.md` under `lib/` or `ext/` to see exact `##` / `#` names and parameters. Gold tests: `tests/lib/`, `tests/structure/`, `tests/ext/`.
 
@@ -128,6 +130,6 @@ See `doc/design/call-arguments.md`.
 | `doc/design/stdlib-modules.md` | L1 modules including plugin |
 | `doc/design/ext-abi.md` | Native C ABI v1 |
 | `doc/design/ext-llm.md` | `ext/llm` |
-| `doc/design/ext-agent.md` | `ext/agent` agent **framework** (ctor + run + clear_history; no bundled domain tools) |
+| `doc/design/ext-agent.md` | `ext/agent` agent **framework** (layout shipped; LLM orchestration roadmap) |
 | `doc/design/ext-cli.md` | `marqdo ext list/add/remove` |
 | `doc/design/view-debug.md` | view / debug hosts |

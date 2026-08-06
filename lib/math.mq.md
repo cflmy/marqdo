@@ -12,114 +12,114 @@ description: High-school math — num, random, formula, plot
 **> host_e**
 
 ## num
-    - value
+    + `value`
 
 **> host_num value=`value`**
 
 ## add
-    - a
-    - b
+    + `a`
+    + `b`
 
 **> host_math_add a=`a` b=`b`**
 
 ## sub
-    - a
-    - b
+    + `a`
+    + `b`
 
 **> host_math_sub a=`a` b=`b`**
 
 ## mul
-    - a
-    - b
+    + `a`
+    + `b`
 
 **> host_math_mul a=`a` b=`b`**
 
 ## div
-    - a
-    - b
+    + `a`
+    + `b`
 
 **> host_math_div a=`a` b=`b`**
 
 ## pow
-    - a
-    - b
+    + `a`
+    + `b`
 
 **> host_math_pow a=`a` b=`b`**
 
 ## neg
-    - value
+    + `value`
 
 **> host_math_neg value=`value`**
 
 ## sin
-    - value
+    + `value`
 
 **> host_math_sin value=`value`**
 
 ## cos
-    - value
+    + `value`
 
 **> host_math_cos value=`value`**
 
 ## tan
-    - value
+    + `value`
 
 **> host_math_tan value=`value`**
 
 ## asin
-    - value
+    + `value`
 
 **> host_math_asin value=`value`**
 
 ## acos
-    - value
+    + `value`
 
 **> host_math_acos value=`value`**
 
 ## atan
-    - value
+    + `value`
 
 **> host_math_atan value=`value`**
 
 ## sqrt
-    - value
+    + `value`
 
 **> host_math_sqrt value=`value`**
 
 ## abs
-    - value
+    + `value`
 
 **> host_math_abs value=`value`**
 
 ## ln
-    - value
+    + `value`
 
 **> host_math_ln value=`value`**
 
 ## exp
-    - value
+    + `value`
 
 **> host_math_exp value=`value`**
 
 ## floor
-    - value
+    + `value`
 
 **> host_math_floor value=`value`**
 
 ## ceil
-    - value
+    + `value`
 
 **> host_math_ceil value=`value`**
 
 ## min
-    - a
-    - b
+    + `a`
+    + `b`
 
 **> host_math_min a=`a` b=`b`**
 
 ## max
-    - a
-    - b
+    + `a`
+    + `b`
 
 **> host_math_max a=`a` b=`b`**
 
@@ -128,73 +128,73 @@ description: High-school math — num, random, formula, plot
 **> host_random**
 
 ## random_int
-    - min
-    - max
+    + `min`
+    + `max`
 
 **> host_random_int min=`min` max=`max`**
 
 ## seed
-    - value
+    + `value`
 
 **> host_seed value=`value`**
 
 ## formula
-    - text
+    + `text`
 
 **> host_formula value=`text`**
 
 ## simplify
-    - formula
+    + `formula`
 
 **> host_simplify value=`formula`**
 
 ## expand
-    - formula
+    + `formula`
 
 **> host_expand value=`formula`**
 
 ## diff
-    - formula
-    - var
+    + `formula`
+    + `var`
 
 **> host_diff formula=`formula` var=`var`**
 
 ## subs
-    - formula
-    - var
-    - value
+    + `formula`
+    + `var`
+    + `value`
 
 **> host_subs formula=`formula` var=`var` value=`value`**
 
 ## eval
-    - formula
-    - var
-    - value
+    + `formula`
+    + `var`
+    + `value`
 
 **> host_eval formula=`formula` var=`var` value=`value`**
 
 ## solve
-    - formula
-    - var
+    + `formula`
+    + `var`
 
 **> host_solve formula=`formula` var=`var`**
 
 ## plot
-    - formula
-    - var
-    - min
-    - max
+    + `formula`
+    + `var`
+    + `min`
+    + `max`
 
 **> host_plot formula=`formula` var=`var` min=`min` max=`max`**
 
 ## plot_points
-    - xs
-    - ys
+    + `xs`
+    + `ys`
 
 **> host_plot_points xs=`xs` ys=`ys`**
 
 ## plot_conic
-    - kind
-    - a
+    + `kind`
+    + `a`
 
 **> host_plot_conic kind=`kind` a=`a`**

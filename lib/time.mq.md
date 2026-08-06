@@ -12,18 +12,18 @@ description: English time wrappers
 **> host_now_ms**
 
 ## format
-    - unix
-    - pattern
+    + `unix`
+    + `pattern`
 
 **> host_format_time unix=`unix` pattern=`pattern`**
 
 ## sleep_ms
-    - ms
+    + `ms`
 
 **> host_sleep_ms ms=`ms`**
 
 ## parse
-    - text
-    - pattern
+    + `text`
+    + `pattern`
 
 **> host_parse_time text=`text` pattern=`pattern`**

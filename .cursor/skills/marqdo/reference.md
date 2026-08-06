@@ -18,6 +18,8 @@ marqdo ext remove llm|agent
 
 Diagnostics look like `path:line:col: message` (1-based line/col).
 
+**v0.2 surface:** parameters `` + `name` ``; branches `` 1. `cond` `` / `` 2. * ``; loops `` - [`item`](`coll`) ``; identifiers in backticks. See `doc/design/markdown-mapping.md`.
+
 Stdlib search order for `lib/…` imports: `MARQDO_LIB`, `./lib`, directory of the `marqdo` executable (and a few parents). Prefer the **bundle zip** (`marqdo.exe` + `lib/`) over a bare exe.
 
 官方扩展（`ext/…`，非 stdlib）：`marqdo ext add` 装到 `MARQDO_EXT` 或 `~/.marqdo/ext`；导入仍写 `> ext/llm.mq.md`。解析还含 cwd `ext/`、二进制旁 `ext/`。对象：`doc/design/objects.md`。Agent：`doc/design/ext-agent.md` · 安装器：`doc/design/ext-cli.md`。

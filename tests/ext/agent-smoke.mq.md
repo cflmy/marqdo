@@ -20,24 +20,24 @@ description: Ctor, context, clear_history — no network. Gold suite.
 
 *`has_skill` = > split value=`ctx` sep=Marqdo *
 *`sk_n` = > len value=`has_skill` *
-+ `sk_n` > 1
+1. `sk_n` > 1
   > print text=skill-ok
-+ *
+2. *
   > print text=skill-missing
 
 *`has_tools` = > split value=`ctx` sep=获取时间 *
 *`tool_n` = > len value=`has_tools` *
-+ `tool_n` > 1
+1. `tool_n` > 1
   > print text=tools-ok
-+ *
+2. *
   > print text=tools-missing
 
 *`src` = > host_module_source *
 *`has_src` = > split value=`src` sep=probe *
 *`src_n` = > len value=`has_src` *
-+ `src_n` > 1
+1. `src_n` > 1
   > print text=source-ok
-+ *
+2. *
   > print text=source-missing
 
 *`turn` = > parse text={"role":"user","content":"one"} *

@@ -357,6 +357,7 @@ impl Vm {
                         slots,
                     });
                     self.host.push_call_frame(&fname);
+                    self.host.push_call_site_line(span.line);
                 }
                 Op::TagInstance(idx) => {
                     let type_name = match fun.constants.get(idx as usize) {
@@ -422,6 +423,7 @@ impl Vm {
                         slots,
                     });
                     self.host.push_call_frame(&fname);
+                    self.host.push_call_site_line(span.line);
                 }
                 Op::PluginCall(name_idx, argc) => {
                     let argc = argc as usize;
@@ -509,11 +511,13 @@ impl Vm {
                         slots,
                     });
                     self.host.push_call_frame(&fname);
+                    self.host.push_call_site_line(span.line);
                 }
                 Op::Return => {
                     let ret = pop(&mut stack).unwrap_or(Value::None);
                     frames.pop();
                     self.host.pop_call_frame();
+                    self.host.pop_call_site_line();
                     if frames.is_empty() {
                         return Ok(ret);
                     }

@@ -14,6 +14,6 @@ Named form still works:
 > greet who=World
 
 ## greet
-    - who
+    + `who`
 
 > print text=Hello `who`!

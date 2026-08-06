@@ -17,7 +17,7 @@ use std::process::Command;
 use anyhow::{bail, Context, Result};
 use tiny_http::{Header, Method, Request, Response, Server, StatusCode};
 
-use crate::input_feed::{effective_stdin, split_stdin_text};
+use crate::input_feed::{effective_stdin, extract_frontmatter_stdin, split_stdin_text};
 use crate::view::debug_page::{build_debug_model, page_debug};
 use crate::view::html::{escape, page_file, page_index, LinkMode};
 use crate::view::render::{collect_input_prompts, render_module_structure, FileViewModel};
@@ -309,25 +309,30 @@ pub(crate) fn build_file_view(
         ),
     };
     let effective = effective_stdin(&source, stdin_lines);
+    let awaiting_input = awaiting_preset_input(&input_prompts, stdin_lines, &source);
     // Same host caps as `marqdo run`. Soft exit + sleep clamp only.
     let mut opts = RunOptions::default();
     opts.stdin_lines = effective.clone();
     opts.sleep_limit_ms = if live { Some(30_000) } else { Some(0) };
     // Optional: sandbox to the whole view tree so sibling folders are reachable.
     opts.fs_root = Some(root.root.clone());
-    let (stdout, stderr, ok, plots) = match run_file_capture(abs, &opts) {
-        Ok(cap) => (
-            cap.stdout,
-            String::new(),
-            true,
-            cap.plots.into_iter().map(|p| p.svg).collect(),
-        ),
-        Err(e) => (
-            String::new(),
-            tidy_user_error(&format!("{e:#}"), abs, rel),
-            false,
-            Vec::new(),
-        ),
+    let (stdout, stderr, ok, plots) = if awaiting_input {
+        (String::new(), String::new(), true, Vec::new())
+    } else {
+        match run_file_capture(abs, &opts) {
+            Ok(cap) => (
+                cap.stdout,
+                String::new(),
+                true,
+                cap.plots.into_iter().map(|p| p.svg).collect(),
+            ),
+            Err(e) => (
+                String::new(),
+                tidy_user_error(&format!("{e:#}"), abs, rel),
+                false,
+                Vec::new(),
+            ),
+        }
     };
     Ok(FileViewModel {
         rel_path: rel.to_string(),
@@ -339,8 +344,20 @@ pub(crate) fn build_file_view(
         ok,
         preset_stdin: effective.join("\n"),
         input_prompts,
+        awaiting_input,
         plots,
     })
+}
+
+/// Defer execution until the view preset-input form supplies lines (no query stdin, no FM stdin).
+pub(crate) fn awaiting_preset_input(
+    input_prompts: &[String],
+    stdin_lines: &[String],
+    source: &str,
+) -> bool {
+    !input_prompts.is_empty()
+        && stdin_lines.is_empty()
+        && extract_frontmatter_stdin(source).is_empty()
 }
 
 /// Prefer view-relative paths and strip Windows `\\?\` noise in error text.
@@ -543,4 +560,22 @@ fn open_url(url: &str) -> Result<()> {
             .context("open browser")?;
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::awaiting_preset_input;
+
+    #[test]
+    fn awaiting_input_when_no_stdin_source() {
+        let src = include_str!("../../tests/keywords/input.mq.md");
+        assert!(awaiting_preset_input(&["Name: ".into()], &[], src));
+        assert!(!awaiting_preset_input(&["Name: ".into()], &["Ada".into()], src));
+    }
+
+    #[test]
+    fn not_awaiting_when_frontmatter_stdin() {
+        let src = "---\nstdin: Ada\n---\n\n# main\n\n*`n` = > input*\n";
+        assert!(!awaiting_preset_input(&["p".into()], &[], src));
+    }
 }

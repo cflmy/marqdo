@@ -4,18 +4,18 @@ description: English text helpers over trim / split / join
 ---
 
 ## str_trim
-    - s
+    + `s`
 
 **> trim `s`**
 
 ## str_split
-    - s
-    - sep
+    + `s`
+    + `sep`
 
 **> split value=`s` sep=`sep`**
 
 ## str_join
-    - xs
-    - sep
+    + `xs`
+    + `sep`
 
 **> join value=`xs` sep=`sep`**

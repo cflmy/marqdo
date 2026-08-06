@@ -7,14 +7,14 @@ title: 布尔与逻辑关键字
 *`a` = True*
 *`b` = False*
 
-+ `a` and not `b`
+1. `a` and not `b`
   > print text=ok
-+ *
+2. *
   > print text=fail
 
 *`probe` = 1*
 
-+ None
+1. None
   > print text=none-truthy
-+ *
+2. *
   > print text=none-falsy

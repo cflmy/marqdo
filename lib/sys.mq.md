@@ -4,13 +4,13 @@ description: English system wrappers (load_dotenv accepts optional path via host
 ---
 
 ## env_get
-    - name
+    + `name`
 
 **> host_env_get name=`name`**
 
 ## env_set
-    - name
-    - value
+    + `name`
+    + `value`
 
 **> host_env_set name=`name` value=`value`**
 
@@ -29,11 +29,11 @@ Load `.env` (optional named arg `path=`). Existing process env is not overridden
 **> host_cwd**
 
 ## exit
-    - code
+    + `code`
 
 **> host_exit code=`code`**
 
 ## exec
-    - cmd
+    + `cmd`
 
 **> host_exec cmd=`cmd`**

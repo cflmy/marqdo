@@ -7,6 +7,6 @@ title: bad arity
 > needs_one
 
 ## needs_one
-    - x
+    + `x`
 
 > print text=`x`

@@ -5,15 +5,15 @@ description: Thin agent framework — ctor, run, clear_history only.
 ---
 
 ## build_agent_context
-    - agent
-    - extra
+    + `agent`
+    + `extra`
 
 Internal: assemble prompt (user prompt, extra, tool list, source, call site, history, Marqdo skill).
 
 *`user_prompt` = > get value=`agent` key=user_prompt *
-+ `user_prompt`
+1. `user_prompt`
   *`up` = `user_prompt`*
-+ *
+2. *
   *`up` = None*
 
 *`tools` = > get value=`agent` key=tools *
@@ -43,9 +43,9 @@ Internal: assemble prompt (user prompt, extra, tool list, source, call site, his
 **`p`**
 
 # agent
-    - model
-    - tools
-    - user_prompt
+    + `model`
+    + `tools`
+    + `user_prompt`
 
 *`id` = > host_agent_alloc *
 *`h` = > parse text={"_type":"agent"} *
@@ -53,9 +53,9 @@ Internal: assemble prompt (user prompt, extra, tool list, source, call site, his
 *`h` = > map_set map=`h` key=model value=`model` *
 *`h` = > map_set map=`h` key=tools value=`tools` *
 
-+ `user_prompt`
+1. `user_prompt`
   *`h` = > map_set map=`h` key=user_prompt value=`user_prompt` *
-+ *
+2. *
   *`_` = 1*
 
 **`h`**
@@ -67,7 +67,7 @@ Internal: assemble prompt (user prompt, extra, tool list, source, call site, his
 ****
 
 ## run
-    - extra
+    + `extra`
 
 *`ctx` = > build_agent_context agent=`self` extra=`extra` *
 *`id` = > get value=`self` key=id *
@@ -86,9 +86,9 @@ Internal: assemble prompt (user prompt, extra, tool list, source, call site, his
 *`tool_name` = > at value=`parts` index=1 *
 *`tool_name` = > trim value=`tool_name` *
 
-+ `head` == TOOL
+1. `head` == TOOL
   *`allowed` = > host_tool_allowed tools=`tools` name=`tool_name` *
-  + `allowed`
+  1. `allowed`
     *`tool_out` = > call_fn name=`tool_name` *
     *`tool_s` = > stringify value=`tool_out` *
     *`extra_s` = > stringify value=`extra` *
@@ -100,9 +100,9 @@ Internal: assemble prompt (user prompt, extra, tool list, source, call site, his
     *`fp` = `fp` + `tool_s` *
     *`fp` = `fp` + . Reply to the user in one brief sentence. *
     *`reply` = > `model`.complete prompt=`fp` *
-  + *
+  2. *
     *`reply` = Tool not allowed: `tool_name` *
-+ *
+2. *
   *`_` = 1*
 
 *`as_turn` = > parse text={"role":"assistant"} *

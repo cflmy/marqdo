@@ -12,8 +12,10 @@ mod json;
 pub mod math;
 mod net;
 pub mod plugin;
+pub mod subtask;
 mod sys;
 mod time;
+pub mod writeback;
 
 pub use dispatch::{call_host, HostFn};
 pub use fs::path_under_root;
@@ -21,6 +23,7 @@ pub use plugin::PluginState;
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
+use std::process::Child;
 
 use crate::value::Value;
 
@@ -52,7 +55,7 @@ pub struct PlotArtifact {
     pub svg: String,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct HostContext {
     pub caps: HostCaps,
     pub fs_root: Option<PathBuf>,
@@ -78,6 +81,11 @@ pub struct HostContext {
     pub agent_seq: u64,
     /// Last statement line (updated by interpreters for `host_call_site`).
     pub current_line: u32,
+    /// Entry-file line of each active user call (for writeback anchoring).
+    pub call_site_lines: Vec<u32>,
+    /// OS subprocess subtasks (`lib/subtask`).
+    pub subtasks: HashMap<u64, Child>,
+    pub subtask_seq: u64,
 }
 
 impl Default for HostContext {
@@ -99,7 +107,16 @@ impl Default for HostContext {
             agent_histories: HashMap::new(),
             agent_seq: 0,
             current_line: 1,
+            call_site_lines: Vec::new(),
+            subtasks: HashMap::new(),
+            subtask_seq: 0,
         }
+    }
+}
+
+impl Drop for HostContext {
+    fn drop(&mut self) {
+        subtask::kill_all(self);
     }
 }
 
@@ -140,6 +157,14 @@ impl HostContext {
 
     pub fn allow_net(&self) -> bool {
         self.caps.net
+    }
+
+    pub fn push_call_site_line(&mut self, line: u32) {
+        self.call_site_lines.push(line);
+    }
+
+    pub fn pop_call_site_line(&mut self) {
+        self.call_site_lines.pop();
     }
 
     pub fn allow_plugin(&self) -> bool {

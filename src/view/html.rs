@@ -250,6 +250,7 @@ h1.page {
   vertical-align: middle;
 }
 .status-pill.ok { background: var(--surface); color: var(--muted); }
+.status-pill.pending { background: var(--surface); color: var(--ink); border-color: var(--ink); }
 .status-pill.fail { background: var(--ink); color: #fff; border-color: var(--ink); }
 section.block { margin: 2rem 0; }
 section.block > h2 {
@@ -468,6 +469,17 @@ section.block > h2 {
 .code-card {
   padding: 0;
   overflow: hidden;
+}
+.output-card {
+  border-left: 3px solid #2563eb;
+  background: #f8fafc;
+}
+.output-card .output-body {
+  margin: 0.35rem 0 0;
+  padding: 0.5rem 0.65rem;
+  font: 0.85rem/1.45 var(--mono);
+  white-space: pre-wrap;
+  color: #0f172a;
 }
 .code-head {
   display: flex;
@@ -968,18 +980,26 @@ pub fn page_index(files: &[PathBuf], only: Option<&Path>, links: &LinkMode) -> S
 
 pub fn page_file(files: &[PathBuf], rel: &str, vm: &FileViewModel, links: &LinkMode) -> String {
     let nav = nav_html(files, Some(rel), links);
-    let status = if vm.ok { "ok" } else { "fail" };
-    let status_label = if vm.ok { "ok" } else { "fail" };
-    let out_text = if vm.ok {
-        if vm.stdout.is_empty() {
-            "(no stdout)".into()
-        } else {
-            escape(&vm.stdout)
-        }
+    let (status, status_label, out_text) = if vm.awaiting_input {
+        (
+            "pending",
+            "input",
+            "Fill preset input below, then click <strong>Run with input</strong>.".to_string(),
+        )
+    } else if vm.ok {
+        (
+            "ok",
+            "ok",
+            if vm.stdout.is_empty() {
+                "(no stdout)".into()
+            } else {
+                escape(&vm.stdout)
+            },
+        )
     } else if vm.stderr.is_empty() {
-        "(skipped)".into()
+        ("fail", "fail", "(skipped)".into())
     } else {
-        escape(&vm.stderr)
+        ("fail", "fail", escape(&vm.stderr))
     };
     let stdin_panel = if vm.input_prompts.is_empty() {
         String::new()

@@ -130,6 +130,19 @@ fn structure_paragraph_comment() {
 }
 
 #[test]
+fn structure_narrative_bold() {
+    assert_out("tests/structure/narrative-bold.mq.md", "ok");
+}
+
+#[test]
+fn structure_optional_param() {
+    assert_out(
+        "tests/structure/optional-param.mq.md",
+        "Hi, Ada!\nHello, Bob!",
+    );
+}
+
+#[test]
 fn keywords_print() {
     assert_out(
         "tests/keywords/print.mq.md",
@@ -349,6 +362,23 @@ fn keywords_input() {
 }
 
 #[test]
+fn keywords_input_escape() {
+    for backend in ["tree", "bytecode"] {
+        assert_out_stdin(
+            "tests/keywords/input-escape.mq.md",
+            backend,
+            "Ada\n",
+            "Name:\nHello Ada!",
+        );
+    }
+}
+
+#[test]
+fn keywords_quoted_string() {
+    assert_out("tests/keywords/quoted-string.mq.md", "a\nb");
+}
+
+#[test]
 fn keywords_input_stdin_file() {
     let (code, stdout, stderr) = run(&[
         "run",
@@ -558,6 +588,28 @@ fn view_output_writes_html() {
 }
 
 #[test]
+fn view_input_static_awaits_stdin() {
+    let dir = tempfile_dir("mq-input-view");
+    let (code, _, stderr) = run(&[
+        "view",
+        "output",
+        "tests/keywords/input.mq.md",
+        "-o",
+        dir.to_str().unwrap(),
+    ]);
+    assert_eq!(code, 0, "{stderr}");
+    let page = std::fs::read_to_string(dir.join("pages").join("input.mq.md.html")).unwrap();
+    assert!(
+        page.contains("Fill preset input") || page.contains("status-pill pending"),
+        "should defer execution, not fail"
+    );
+    assert!(
+        !page.contains("input needs a line"),
+        "static export should not surface input error before stdin"
+    );
+}
+
+#[test]
 fn lib_fs_read() {
     assert_out("tests/lib/fs-read.mq.md", "exists\nhello-lib");
 }
@@ -588,6 +640,16 @@ fn lib_sys_cwd() {
 #[test]
 fn lib_sys_dotenv() {
     assert_out("tests/lib/sys-dotenv.mq.md", "loaded");
+}
+
+#[test]
+fn lib_writeback_get() {
+    assert_out("tests/lib/writeback-get.mq.md", "hello-writeback");
+}
+
+#[test]
+fn lib_subtask_spawn() {
+    assert_out("tests/lib/subtask-spawn.mq.md", "done");
 }
 
 #[test]

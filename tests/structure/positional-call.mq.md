@@ -14,6 +14,6 @@ description: `> fn value` binds by parameter order; named form still works
 > 问候 谁=World
 
 ## 问候
-    - 谁
+    + `谁`
 
 > print text=Hello `谁`!

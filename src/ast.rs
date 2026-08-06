@@ -11,12 +11,18 @@ pub struct Module {
 }
 
 #[derive(Debug, Clone)]
+pub struct Param {
+    pub name: String,
+    pub default: Option<Expr>,
+}
+
+#[derive(Debug, Clone)]
 pub struct Function {
     pub name: String,
     /// Heading depth 1–6. Level 1 = object/type; level ≥ 2 = function/method.
     pub level: u8,
     pub span: Span,
-    pub params: Vec<String>,
+    pub params: Vec<Param>,
     pub body: Vec<Stmt>,
     pub children: Vec<Function>,
 }

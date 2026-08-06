@@ -3,9 +3,12 @@
 //! Comments are not in the AST; they are interleaved from classified source lines.
 //! Expressions are shown in surface syntax, never Rust `Debug`.
 
+use std::collections::HashMap;
+
 use crate::ast::{
     Arg, BinaryOp, CallExpr, Expr, Function, InterpPart, Literal, Module, Stmt, UnaryOp,
 };
+use crate::host::writeback;
 use crate::lex::{classify_source, ClassifiedLine, LineKind};
 use crate::view::html::escape;
 use pulldown_cmark::{html, Options, Parser};
@@ -32,6 +35,8 @@ pub struct FileViewModel {
     /// One entry per `input` / `输入` call (prompt text; may be empty).
     /// Empty vec → page does not use input; hide the preset form.
     pub input_prompts: Vec<String>,
+    /// Live view: program uses `input` but no stdin yet — execution deferred until form submit.
+    pub awaiting_input: bool,
     /// SVG plots from math lib (embedded in Execution).
     pub plots: Vec<String>,
 }
@@ -163,6 +168,7 @@ pub fn render_module_structure_mode(
     mode: StructureMode,
 ) -> String {
     let lines = classify_source(source);
+    let writebacks = writeback::writeback_map(source);
     let mut out = String::new();
 
     if !module.imports.is_empty() {
@@ -193,7 +199,7 @@ pub fn render_module_structure_mode(
         if i > 0 {
             out.push_str(&emit_comments(&lines, cursor, fun.span.line));
         }
-        let (html, next) = render_fun(fun, &lines, 0, "", mode);
+        let (html, next) = render_fun(fun, &lines, 0, "", mode, &writebacks);
         out.push_str(&html);
         cursor = next;
     }
@@ -294,8 +300,7 @@ fn emit_comments(lines: &[ClassifiedLine], from_line: u32, before_line: u32) -> 
                     paragraph.push(text.to_string());
                 }
             }
-            LineKind::Blank => flush(&mut paragraph, &mut s),
-            LineKind::Code => flush(&mut paragraph, &mut s),
+            LineKind::Blank | LineKind::Writeback | LineKind::Code => flush(&mut paragraph, &mut s),
         }
     }
     flush(&mut paragraph, &mut s);
@@ -320,6 +325,7 @@ fn render_fun(
     depth: usize,
     parent_path: &str,
     mode: StructureMode,
+    writebacks: &HashMap<u32, String>,
 ) -> (String, u32) {
     let fn_path = fn_path(parent_path, &fun.name);
     let mut s = String::new();
@@ -338,7 +344,7 @@ fn render_fun(
     if !fun.params.is_empty() {
         s.push_str("<div class=\"params\">");
         for p in &fun.params {
-            s.push_str(&format!("<span class=\"chip\">{}</span>", escape(p)));
+            s.push_str(&format!("<span class=\"chip\">{}</span>", escape(&p.name)));
         }
         s.push_str("</div>");
     }
@@ -375,14 +381,14 @@ fn render_fun(
             let stmt = &fun.body[bi];
             let start = stmt_start(stmt);
             s.push_str(&emit_comments(lines, cursor, start));
-            let (html, end) = render_stmt(stmt, lines, mode);
+            let (html, end) = render_stmt(stmt, lines, mode, writebacks);
             s.push_str(&html);
             cursor = end;
             bi += 1;
         } else {
             let child = &fun.children[ci];
             s.push_str(&emit_comments(lines, cursor, child.span.line));
-            let (html, end) = render_fun(child, lines, depth + 1, &fn_path, mode);
+            let (html, end) = render_fun(child, lines, depth + 1, &fn_path, mode, writebacks);
             s.push_str(&format!("<div class=\"nested\">{html}</div>"));
             cursor = end;
             ci += 1;
@@ -427,7 +433,22 @@ fn stmt_end_line(stmt: &Stmt) -> u32 {
     }
 }
 
-fn render_stmt(stmt: &Stmt, lines: &[ClassifiedLine], mode: StructureMode) -> (String, u32) {
+fn output_card(line: u32, writebacks: &HashMap<u32, String>) -> String {
+    match writebacks.get(&line) {
+        Some(body) => format!(
+            r#"<div class="card output-card"><span class="badge">output</span><pre class="output-body">{}</pre></div>"#,
+            escape(body)
+        ),
+        None => String::new(),
+    }
+}
+
+fn render_stmt(
+    stmt: &Stmt,
+    lines: &[ClassifiedLine],
+    mode: StructureMode,
+    writebacks: &HashMap<u32, String>,
+) -> (String, u32) {
     let end = stmt_end_line(stmt);
     let line = stmt_start(stmt);
     let inner = match stmt {
@@ -509,7 +530,7 @@ fn render_stmt(stmt: &Stmt, lines: &[ClassifiedLine], mode: StructureMode) -> (S
                 for st in &arm.body {
                     let start = stmt_start(st);
                     body.push_str(&emit_comments(lines, arm_cursor, start));
-                    let (h, e) = render_stmt(st, lines, mode);
+                    let (h, e) = render_stmt(st, lines, mode, writebacks);
                     body.push_str(&h);
                     arm_cursor = e;
                 }
@@ -529,7 +550,7 @@ fn render_stmt(stmt: &Stmt, lines: &[ClassifiedLine], mode: StructureMode) -> (S
             for st in body {
                 let start = stmt_start(st);
                 body_html.push_str(&emit_comments(lines, cursor, start));
-                let (h, e) = render_stmt(st, lines, mode);
+                let (h, e) = render_stmt(st, lines, mode, writebacks);
                 body_html.push_str(&h);
                 cursor = e;
             }
@@ -551,7 +572,7 @@ fn render_stmt(stmt: &Stmt, lines: &[ClassifiedLine], mode: StructureMode) -> (S
             for st in body {
                 let start = stmt_start(st);
                 body_html.push_str(&emit_comments(lines, cursor, start));
-                let (h, e) = render_stmt(st, lines, mode);
+                let (h, e) = render_stmt(st, lines, mode, writebacks);
                 body_html.push_str(&h);
                 cursor = e;
             }
@@ -559,6 +580,7 @@ fn render_stmt(stmt: &Stmt, lines: &[ClassifiedLine], mode: StructureMode) -> (S
             body_html
         }
     };
+    let inner = format!("{}{}", inner, output_card(line, writebacks));
     (stmt_shell(line, &inner, mode), end)
 }
 

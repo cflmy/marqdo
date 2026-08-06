@@ -5,7 +5,7 @@ use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
 use crate::ast::{
-    Arg, BinaryOp, CallExpr, Expr, Function, InterpPart, Literal, Module, Stmt, UnaryOp,
+    Arg, BinaryOp, CallExpr, Expr, Function, InterpPart, Literal, Module, Param, Stmt, UnaryOp,
 };
 use crate::builtin::{
     builtin_at, builtin_int, builtin_join, builtin_len, builtin_split, builtin_str, builtin_trim,
@@ -161,8 +161,8 @@ impl Interpreter {
             env.set(k.clone(), v.clone());
         }
         for p in &fun.params {
-            if env.get(p).is_none() {
-                env.set(p.clone(), Value::None);
+            if env.get(&p.name).is_none() {
+                env.set(p.name.clone(), Value::None);
             }
         }
 
@@ -456,7 +456,7 @@ impl Interpreter {
         }
 
         if let Some(recv_name) = &call.receiver {
-            return self.eval_method_call(module, env, recv_name, &call.callee, &ev_args);
+            return self.eval_method_call(module, fun, env, recv_name, &call.callee, &ev_args);
         }
 
         match call.callee.as_str() {
@@ -607,13 +607,17 @@ impl Interpreter {
         let target = lookup_function(module, fun, &call.callee)
             .ok_or_else(|| self.err(format!("unknown function `{}`", call.callee)))?;
 
-        let bound = bind_args(&target.params, &ev_args, false).map_err(|m| self.err(m))?;
+        let bound = bind_function_args(self, module, fun, env, &target.params, &ev_args, false)
+            .map_err(|m| self.err(m))?;
         let mut call_env = Env::new();
         for (k, v) in bound {
             call_env.set(k, v);
         }
 
-        let result = self.run_function(module, target, call_env, &[])?;
+        self.host.push_call_site_line(self.host.current_line);
+        let result = self.run_function(module, target, call_env, &[]);
+        self.host.pop_call_site_line();
+        let result = result?;
         if target.is_object() {
             Ok(tag_instance(&target.name, result))
         } else {
@@ -624,6 +628,7 @@ impl Interpreter {
     fn eval_method_call(
         &mut self,
         module: &Module,
+        fun: &Function,
         env: &mut Env,
         recv_name: &str,
         method: &str,
@@ -642,14 +647,18 @@ impl Interpreter {
             .iter()
             .find(|c| c.name == method)
             .ok_or_else(|| self.err(format!("unknown method `{type_name}.{method}`")))?;
-        let bound = bind_args(&target.params, ev_args, false).map_err(|m| self.err(m))?;
+        let bound = bind_function_args(self, module, fun, env, &target.params, ev_args, false)
+            .map_err(|m| self.err(m))?;
         let mut call_env = Env::new();
         for (k, v) in bound {
             call_env.set(k, v);
         }
         call_env.set("自".into(), recv.clone());
         call_env.set("self".into(), recv);
-        self.run_function(module, target, call_env, &[])
+        self.host.push_call_site_line(self.host.current_line);
+        let result = self.run_function(module, target, call_env, &[]);
+        self.host.pop_call_site_line();
+        result
     }
 }
 
@@ -684,6 +693,67 @@ fn tag_instance(type_name: &str, value: Value) -> Value {
 }
 
 /// Bind evaluated args onto parameter names. Err is a plain message (caller adds span/path).
+fn bind_function_args(
+    interp: &mut Interpreter,
+    module: &Module,
+    caller: &Function,
+    caller_env: &mut Env,
+    params: &[Param],
+    args: &[EvArg],
+    allow_missing: bool,
+) -> std::result::Result<HashMap<String, Value>, String> {
+    let mut named: HashMap<String, Value> = HashMap::new();
+    let mut positionals = Vec::new();
+    for a in args {
+        match a {
+            EvArg::Positional(v) => positionals.push(v.clone()),
+            EvArg::Named(k, v) => {
+                if named.contains_key(k) {
+                    return Err(format!("duplicate named argument `{k}`"));
+                }
+                named.insert(k.clone(), v.clone());
+            }
+        }
+    }
+
+    let mut out: HashMap<String, Value> = HashMap::new();
+    let mut used_named = HashSet::new();
+    let mut pos_i = 0usize;
+
+    for p in params {
+        if let Some(v) = named.get(&p.name) {
+            out.insert(p.name.clone(), v.clone());
+            used_named.insert(p.name.clone());
+        } else if pos_i < positionals.len() {
+            out.insert(p.name.clone(), positionals[pos_i].clone());
+            pos_i += 1;
+        } else if let Some(def) = &p.default {
+            let v = interp
+                .eval_expr(module, caller, caller_env, def)
+                .map_err(|e| e.to_string())?;
+            out.insert(p.name.clone(), v);
+        } else if !allow_missing {
+            return Err(format!("missing argument for parameter `{}`", p.name));
+        }
+    }
+
+    if pos_i < positionals.len() {
+        return Err(format!(
+            "too many positional arguments ({} extra)",
+            positionals.len() - pos_i
+        ));
+    }
+
+    for (k, v) in named {
+        if !used_named.contains(&k) && !out.contains_key(&k) {
+            out.insert(k, v);
+        }
+    }
+
+    Ok(out)
+}
+
+/// Bind evaluated args onto parameter names (host / plugin functions).
 fn bind_args(
     params: &[String],
     args: &[EvArg],

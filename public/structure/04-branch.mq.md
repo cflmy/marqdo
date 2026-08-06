@@ -9,9 +9,9 @@ Italic lines are statements. Branches use `+`; a head that is only `*` is the el
 
 *`x` = 0*
 
-+ `x` > 0
+1. `x` > 0
   > print text=positive
-+ `x` < 0
+2. `x` < 0
   > print text=negative
-+ *
+3. *
   > print text=zero

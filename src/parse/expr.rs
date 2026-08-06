@@ -286,6 +286,9 @@ impl<'a> Parser<'a> {
             }
             return Ok(e);
         }
+        if self.eat("\"") {
+            return self.parse_quoted_string();
+        }
         if self.eat("`") {
             let start = self.i;
             while let Some(c) = self.peek_char() {
@@ -345,7 +348,7 @@ impl<'a> Parser<'a> {
         {
             let start = self.i;
             while let Some(c) = self.peek_char() {
-                if c.is_whitespace() || matches!(c, '=' | '+' | '-' | '*' | '/' | '<' | '>' | '(' | ')' | '`' | '|' | ',')
+                if c.is_whitespace() || matches!(c, '=' | '+' | '-' | '*' | '/' | '<' | '>' | '(' | ')' | '`' | '|' | ',' | '"')
                 {
                     break;
                 }
@@ -355,6 +358,70 @@ impl<'a> Parser<'a> {
             return Ok(Expr::Literal(Literal::Text(word.to_string())));
         }
         bail!("unexpected expression input: {:?}", self.rest());
+    }
+
+    /// `"..."` string with `\n` `\t` `\r` `\\` `\"` and `` `var` `` interpolation.
+    fn parse_quoted_string(&mut self) -> Result<Expr> {
+        use crate::ast::InterpPart;
+        let mut parts: Vec<InterpPart> = Vec::new();
+        let mut lit = String::new();
+        loop {
+            let Some(c) = self.peek_char() else {
+                bail!("unterminated \" string");
+            };
+            if c == '"' {
+                self.bump_char();
+                break;
+            }
+            if c == '\\' {
+                self.bump_char();
+                let esc = self.peek_char().ok_or_else(|| anyhow::anyhow!("dangling \\ in string"))?;
+                self.bump_char();
+                lit.push(match esc {
+                    'n' => '\n',
+                    't' => '\t',
+                    'r' => '\r',
+                    '\\' => '\\',
+                    '"' => '"',
+                    other => bail!("unknown escape \\{other} in string"),
+                });
+                continue;
+            }
+            if c == '`' {
+                if !lit.is_empty() {
+                    parts.push(InterpPart::Lit(std::mem::take(&mut lit)));
+                }
+                self.bump_char();
+                let start = self.i;
+                while let Some(ch) = self.peek_char() {
+                    if ch == '`' {
+                        break;
+                    }
+                    self.bump_char();
+                }
+                let name = self.src[start..self.i].to_string();
+                if !self.eat("`") {
+                    bail!("unterminated `name` in string");
+                }
+                parts.push(InterpPart::Var(name));
+                continue;
+            }
+            lit.push(c);
+            self.bump_char();
+        }
+        if !lit.is_empty() {
+            parts.push(InterpPart::Lit(lit));
+        }
+        if parts.is_empty() {
+            return Ok(Expr::Literal(Literal::Text(String::new())));
+        }
+        if parts.len() == 1 {
+            return Ok(match parts.remove(0) {
+                InterpPart::Lit(t) => Expr::Literal(Literal::Text(t)),
+                InterpPart::Var(n) => Expr::Var(n),
+            });
+        }
+        Ok(Expr::Interp(parts))
     }
 }
 
@@ -468,6 +535,11 @@ fn try_named_arg(s: &str) -> Option<(String, &str)> {
 
 fn split_first_token(s: &str) -> (&str, &str) {
     let s = s.trim_start();
+    if s.starts_with('"') {
+        if let Some(end) = end_of_quoted_string(s) {
+            return (&s[..end], &s[end..]);
+        }
+    }
     if s.starts_with('`') {
         // `` `name` `` as one token
         if let Some(end) = s[1..].find('`') {
@@ -482,14 +554,36 @@ fn split_first_token(s: &str) -> (&str, &str) {
 }
 
 fn find_next_arg_boundary(after_eq: &str) -> usize {
-    // Look for ` <ident>=` pattern not inside backticks (UTF-8 safe).
+    // Look for ` <ident>=` pattern not inside backticks or quoted strings.
     let mut in_bt = false;
-    for (i, c) in after_eq.char_indices() {
-        if c == '`' {
-            in_bt = !in_bt;
+    let mut in_str = false;
+    let mut chars = after_eq.char_indices().peekable();
+    while let Some((i, c)) = chars.next() {
+        if in_str {
+            if c == '\\' {
+                chars.next();
+                continue;
+            }
+            if c == '"' {
+                in_str = false;
+            }
             continue;
         }
-        if !in_bt && c.is_whitespace() {
+        if in_bt {
+            if c == '`' {
+                in_bt = false;
+            }
+            continue;
+        }
+        if c == '`' {
+            in_bt = true;
+            continue;
+        }
+        if c == '"' {
+            in_str = true;
+            continue;
+        }
+        if c.is_whitespace() {
             let rest = &after_eq[i..];
             let trimmed = rest.trim_start();
             let skipped = rest.len() - trimmed.len();
@@ -509,6 +603,28 @@ fn find_next_arg_boundary(after_eq: &str) -> usize {
     after_eq.len()
 }
 
+/// Byte index after a leading `"..."` token (opening quote included in slice).
+fn end_of_quoted_string(s: &str) -> Option<usize> {
+    if !s.starts_with('"') {
+        return None;
+    }
+    let mut escaped = false;
+    for (i, c) in s.char_indices().skip(1) {
+        if escaped {
+            escaped = false;
+            continue;
+        }
+        if c == '\\' {
+            escaped = true;
+            continue;
+        }
+        if c == '"' {
+            return Some(i + c.len_utf8());
+        }
+    }
+    None
+}
+
 /// Parse `> callee args` call expression/statement text (without leading `>`).
 pub fn parse_call_after_gt(after_gt: &str) -> Result<CallExpr> {
     let (call, _) = parse_call_tail(after_gt.trim())?;
@@ -525,6 +641,26 @@ mod tests {
         assert!(matches!(e, Expr::Binary { op: BinaryOp::Gt, .. }));
         let e = parse_expr("`n` + 1").unwrap();
         assert!(matches!(e, Expr::Binary { op: BinaryOp::Add, .. }));
+    }
+
+    #[test]
+    fn quoted_string_escapes() {
+        let e = parse_expr("\"a\\nb\"").unwrap();
+        assert!(matches!(
+            e,
+            Expr::Literal(Literal::Text(ref s)) if s == "a\nb"
+        ));
+        let e = parse_expr("\"hi `x`!\"").unwrap();
+        assert!(matches!(e, Expr::Interp(_)));
+    }
+
+    #[test]
+    fn bare_token_no_escape() {
+        let e = parse_expr("a\\nb").unwrap();
+        assert!(matches!(
+            e,
+            Expr::Literal(Literal::Text(ref s)) if s == "a\\nb"
+        ));
     }
 
     #[test]

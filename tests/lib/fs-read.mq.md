@@ -7,9 +7,9 @@ title: fs read/exists
 
 *`ok` = > exists path=hello.txt *
 
-+ `ok`
+1. `ok`
   > print text=exists
-+ *
+2. *
   > print text=missing
 
 *`t` = > read_text path=hello.txt *

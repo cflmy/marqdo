@@ -24,5 +24,5 @@ Walk a table (tables are collections):
 | apple |
 | pear |
 
-- [fruit](basket)
+- [`fruit`](`basket`)
   > print text=today `fruit`

@@ -6,9 +6,9 @@ title: 分支示例
 
 *`x` = 0*
 
-+ `x` > 0
+1. `x` > 0
   > print text=正数
-+ `x` < 0
+2. `x` < 0
   > print text=负数
-+ *
+3. *
   > print text=零

@@ -4,12 +4,12 @@ description: English table helpers over len / at
 ---
 
 ## rows
-    - xs
+    + `xs`
 
 **> len `xs`**
 
 ## row_at
-    - xs
-    - i
+    + `xs`
+    + `i`
 
 **> at value=`xs` index=`i`**

@@ -11,6 +11,8 @@ use std::fmt;
 pub enum LineKind {
     Blank,
     Comment,
+    /// Jupyter-style persisted output (`<!-- marqdo-out … -->`).
+    Writeback,
     Code,
 }
 
@@ -19,6 +21,7 @@ impl fmt::Display for LineKind {
         match self {
             LineKind::Blank => write!(f, "Blank"),
             LineKind::Comment => write!(f, "Comment"),
+            LineKind::Writeback => write!(f, "Writeback"),
             LineKind::Code => write!(f, "Code"),
         }
     }
@@ -40,6 +43,25 @@ fn is_code_starter(c: char) -> bool {
     ) || c.is_ascii_digit()
 }
 
+/// `*` / `**` lines that are Marqdo executable (statement / return / else), not narrative Markdown.
+fn is_marqdo_star_line(trimmed: &str) -> bool {
+    if trimmed == "*" || trimmed == "****" {
+        return true;
+    }
+    if trimmed.starts_with("**") {
+        if trimmed.trim() == "** **" {
+            return true;
+        }
+        if let Some(rest) = trimmed.strip_prefix("**") {
+            if let Some(pos) = rest.find("**") {
+                return rest[pos + 2..].trim().is_empty();
+            }
+        }
+        return false;
+    }
+    trimmed.starts_with('*') && trimmed.ends_with('*') && trimmed.len() >= 2
+}
+
 /// Classify a single logical line (no trailing newline required).
 ///
 /// This is the **paragraph-start** rule only. Prefer [`classify_source`] for
@@ -49,9 +71,11 @@ pub fn classify_line(text: &str) -> LineKind {
     if trimmed.chars().all(|c| c.is_whitespace()) {
         return LineKind::Blank;
     }
+    let trimmed = text.trim();
     let first = trimmed.chars().find(|c| !c.is_whitespace());
     match first {
         None => LineKind::Blank,
+        Some('*') if !is_marqdo_star_line(trimmed) => LineKind::Comment,
         Some(c) if is_code_starter(c) => LineKind::Code,
         Some(_) => LineKind::Comment,
     }
@@ -74,12 +98,18 @@ pub fn classify_source(source: &str) -> Vec<ClassifiedLine> {
     let mut in_comment_paragraph = false;
     let mut in_math_fence = false;
     let mut in_md_fence = false;
+    let mut in_writeback = false;
 
     for (i, text) in lines.into_iter().enumerate() {
         let base = classify_line(text);
         let trimmed = text.trim();
         let structural = is_structural_code_line(trimmed);
-        let kind = if in_math_fence {
+        let kind = if in_writeback {
+            if trimmed.contains("-->") {
+                in_writeback = false;
+            }
+            LineKind::Writeback
+        } else if in_math_fence {
             if trimmed == "$$" {
                 in_math_fence = false;
             }
@@ -94,6 +124,13 @@ pub fn classify_source(source: &str) -> Vec<ClassifiedLine> {
             in_md_fence = true;
             in_comment_paragraph = false;
             LineKind::Comment
+        } else if trimmed.starts_with("<!--") && trimmed.contains("marqdo-out") {
+            in_writeback = true;
+            in_comment_paragraph = false;
+            if trimmed.contains("-->") {
+                in_writeback = false;
+            }
+            LineKind::Writeback
         } else {
             match base {
                 LineKind::Blank => {
@@ -109,6 +146,7 @@ pub fn classify_source(source: &str) -> Vec<ClassifiedLine> {
                     LineKind::Code
                 }
                 LineKind::Code if in_comment_paragraph => LineKind::Comment,
+                LineKind::Writeback => LineKind::Writeback,
                 LineKind::Code => {
                     // Multi-line math fence opener (not same-line `$$…$$`).
                     if trimmed == "$$" {
@@ -194,6 +232,27 @@ mod tests {
         assert_eq!(classify_line("1. arm"), LineKind::Code);
         assert_eq!(classify_line("| a |"), LineKind::Code);
         assert_eq!(classify_line("`x` = 1"), LineKind::Code);
+    }
+
+    #[test]
+    fn narrative_bold_in_comment_paragraph() {
+        let src = "说明如下：\n\n**强调信息**是什么什么\n\n> print text=ok\n";
+        let lines = classify_source(src);
+        assert_eq!(lines[0].kind, LineKind::Comment);
+        assert_eq!(lines[1].kind, LineKind::Blank);
+        assert_eq!(lines[2].kind, LineKind::Comment, "bold prose is comment");
+        assert_eq!(lines[3].kind, LineKind::Blank);
+        assert_eq!(lines[4].kind, LineKind::Code);
+    }
+
+    #[test]
+    fn writeback_block_classified() {
+        let src = "*`x` = 1*\n<!-- marqdo-out @line=1\n3\n-->\n";
+        let lines = classify_source(src);
+        assert_eq!(lines[0].kind, LineKind::Code);
+        assert_eq!(lines[1].kind, LineKind::Writeback);
+        assert_eq!(lines[2].kind, LineKind::Writeback);
+        assert_eq!(lines[3].kind, LineKind::Writeback);
     }
 
     #[test]

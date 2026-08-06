@@ -19,21 +19,22 @@ Canonical design (repo): `doc/design/markdown-mapping.md`, `doc/design/keywords.
 1. **File suffix** must be `.mq.md` (never plain `.md` for executable sources).
 2. **Output is not `**bold**`.** Print with `> print text=…` (or `> 打印 内容=…`). Bold `**…**` is **return value only**.
 3. **Prose vs code:** after a blank line, an unmarked first line starts a **comment paragraph**; every following non-blank line stays comment until the next blank line. Put a **blank line** between narration and executable lines.
-4. **Do not invent keywords** `if` / `else` / `while` / `for` / `def` / `return`. Control flow is Markdown: `+` branch, `-` loop, arm-head lone `*` = else, `#` = **object/type**, `##`+ = **function/method**, `**…**` = return.
-5. **Structure lines are not wrapped in italics.** `#` `>` `+` `-` `|` lines stand alone; use `*…*` only for general statements (bindings / expressions).
-6. **Paths in bare expressions:** `/` is division. Prefer `` `path` `` vars, same-dir names, or call args — not raw `a/b` in expressions.
-7. Prefer ending side-effect-only function bodies with a lone `---` or `***` line (or `****` empty return) so later siblings are not swallowed.
+4. **Do not invent keywords** `if` / `else` / `while` / `for` / `def` / `return`. Control flow is Markdown: **`+` params** (under heading), **`1.` `2.` … branches**, **`-` loops**, arm `N. *` = else, `#` = **object/type**, `##`+ = **function/method**, `**…**` = return.
+5. **Identifiers use backticks** — params `` + `name` ``, bindings `` `x` ``, foreach `` [`item`](`coll`) ``. **Complex text** uses `"..."` with escapes; bare tokens stay literal (no `\n` magic).
+6. **Structure lines are not wrapped in italics.** `#` `>` `+` `-` `|` lines stand alone; use `*…*` only for general statements (bindings / expressions).
+7. **Paths in bare expressions:** `/` is division. Prefer `` `path` `` vars, same-dir names, or call args — not raw `a/b` in expressions.
+8. Prefer ending side-effect-only function bodies with a lone `---` or `***` line (or `****` empty return) so later siblings are not swallowed.
 
-## Markup → meaning (v0.1)
+## Markup → meaning (v0.2)
 
 | Marker | Meaning |
 |--------|---------|
 | `#` | **Object / type** (constructor body). `# main` = entry object. |
 | `##` … `######` | **Function / method** (nesting by heading depth). |
-| `- name` under a heading | Parameter |
-| `- …` inside body | Loop |
-| `+ …` or `1.` | Branch arm (condition) |
-| Line that is only `*` | Else arm |
+| `` + `name` `` under heading | Parameter (optional `` `name`=default ``) |
+| `1.` `2.` … in body | Branch arm (condition or `N. *` else) |
+| `- …` inside body | Loop (`while` or `` [`item`](`coll`) ``) |
+| Line `N. *` | Else arm |
 | `> fn args` | Call (named `k=v` or positional) |
 | `` > `obj`.method args `` | Method call (`obj` must be a map with `_type`) |
 | Frontmatter `> path.mq.md` | Import |
@@ -43,6 +44,7 @@ Canonical design (repo): `doc/design/markdown-mapping.md`, `doc/design/keywords.
 | Lone `---` / `***` in function body | End function body (no value) |
 | GFM table after empty RHS bind | Collection |
 | `` ```lang `` | Foreign code block (via `lib/foreign`) |
+| `` `"text"` `` | Quoted string (`\n` `\t` `\\` `\"`; `` `var` `` inside); bare tokens unescaped |
 | Unmarked prose | Comment |
 
 Entry: load file (often `index.mq.md`) → collect defs → run `# main`.
@@ -71,7 +73,7 @@ Chinese builtins (same functions, no import):
 > greet who=Marqdo
 
 ## greet
-    - who
+    + `who`
 
 > print text=Hello, `who`!
 
@@ -88,8 +90,8 @@ Chinese builtins (same functions, no import):
 *`x` = 1*
 *`y` = `x` + 2*
 
-# add_one
-    - n
+## add_one
+    + `n`
 
 **`n` + 1**
 ```
@@ -97,11 +99,11 @@ Chinese builtins (same functions, no import):
 ```markdown
 *`n` = 0*
 
-+ `n` > 0
+1. `n` > 0
   > print text=positive
-+ `n` < 0
+2. `n` < 0
   > print text=negative
-+ *
+3. *
   > print text=zero
 ```
 
@@ -141,7 +143,7 @@ Stdlib map: [reference.md](reference.md).
 |-------|-------|
 | `**Hello**` to print | `> print text=Hello` |
 | `# main` then prose then code with no blank line | Blank line before code |
-| `if x > 0:` | `+ `x` > 0` |
+| `if x > 0:` | `1. `x` > 0` |
 | `* > print text=hi *` | `> print text=hi` |
 | Forgetting `---` after nested `##` helper | Add `---` / `***` / `****` |
 | Import `lib/text` then call `拆分` | Match file language |

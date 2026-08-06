@@ -12,7 +12,7 @@ Bare path words must not contain a slash character (parsed as division). Prefer 
 
 *`ok` = > exists path=demo.txt *
 
-+ `ok`
+1. `ok`
   > print text=demo-present
-+ *
+2. *
   > print text=demo-missing

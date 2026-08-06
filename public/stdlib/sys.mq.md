@@ -12,7 +12,7 @@ Import lib/sys.mq.md. Functions: env_get, env_set, load_dotenv(optional path), a
 
 *`n` = > len `d` *
 
-+ `n` > 0
+1. `n` > 0
   > print text=cwd-ok
-+ *
+2. *
   > print text=cwd-empty

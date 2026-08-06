@@ -63,7 +63,7 @@ impl<'a> Cursor<'a> {
     fn skip_noise(&mut self) -> bool {
         while let Some(l) = self.peek() {
             match l.kind {
-                LineKind::Blank | LineKind::Comment => {
+                LineKind::Blank | LineKind::Comment | LineKind::Writeback => {
                     self.i += 1;
                 }
                 LineKind::Code => return true,
@@ -179,7 +179,7 @@ impl<'a> Cursor<'a> {
             }
 
             // Nested params mid-body shouldn't happen; treat `-` as control flow.
-            if trimmed.starts_with('+') || is_ordered_branch(trimmed) {
+            if is_ordered_branch(trimmed) {
                 fun.body.push(self.parse_branch()?);
                 continue;
             }
@@ -495,9 +495,7 @@ impl<'a> Cursor<'a> {
                 break;
             }
             let trimmed = l.text.trim();
-            let cond_src = if let Some(rest) = trimmed.strip_prefix('+') {
-                rest.trim()
-            } else if let Some(rest) = strip_ordered(trimmed) {
+            let cond_src = if let Some(rest) = strip_ordered(trimmed) {
                 rest
             } else {
                 break;
@@ -571,7 +569,7 @@ impl<'a> Cursor<'a> {
             if is_heading(trimmed) {
                 break;
             }
-            if trimmed.starts_with('+') || is_ordered_branch(trimmed) {
+            if is_ordered_branch(trimmed) {
                 // Nested branch inside body
                 body.push(self.parse_branch()?);
                 continue;
@@ -618,34 +616,59 @@ fn try_parse_inline_formula(rhs: &str) -> Result<Option<Expr>> {
     bail!("incomplete inline formula (expected `$$…$$` on one line)");
 }
 
-fn parse_param_line(trimmed: &str) -> Option<String> {
-    let rest = trimmed.strip_prefix('-')?.trim();
-    if rest.is_empty() || rest.contains('`') || rest.contains('[') || rest.contains('=') {
+fn parse_backtick_ident(s: &str) -> Option<String> {
+    let s = s.trim();
+    if !s.starts_with('`') {
         return None;
     }
-    if rest.split_whitespace().count() != 1 {
+    let inner = &s[1..];
+    let end = inner.find('`')?;
+    let name = &inner[..end];
+    if name.is_empty() || s.len() != end + 2 {
         return None;
     }
-    // Reject if looks like comparison / operator expr
-    if rest.contains('>') || rest.contains('<') || rest.contains('+') || rest.contains('*') {
+    Some(name.to_string())
+}
+
+fn parse_param_line(trimmed: &str) -> Option<crate::ast::Param> {
+    use crate::ast::Param;
+    let rest = trimmed.strip_prefix('+')?.trim();
+    if rest.is_empty() || !rest.starts_with('`') {
         return None;
     }
-    Some(rest.to_string())
+    let end_tick = rest[1..].find('`')?;
+    let name = rest[1..end_tick + 1].to_string();
+    if name.is_empty() {
+        return None;
+    }
+    let after = rest[end_tick + 2..].trim();
+    let default = if let Some(def_s) = after.strip_prefix('=') {
+        let def_s = def_s.trim();
+        if def_s.is_empty() {
+            return None;
+        }
+        Some(parse_value_or_interp(def_s).ok()?)
+    } else if after.is_empty() {
+        None
+    } else {
+        return None;
+    };
+    Some(Param { name, default })
 }
 
 fn parse_foreach_header(rest: &str) -> Option<(String, String)> {
-    // [item](collection)
+    // [`item`](`collection`)
     let rest = rest.trim();
     if !rest.starts_with('[') {
         return None;
     }
     let end_item = rest.find(']')?;
-    let item = rest[1..end_item].to_string();
+    let item = parse_backtick_ident(&rest[1..end_item])?;
     let after = rest[end_item + 1..].trim_start();
     if !after.starts_with('(') || !after.ends_with(')') {
         return None;
     }
-    let coll = after[1..after.len() - 1].to_string();
+    let coll = parse_backtick_ident(&after[1..after.len() - 1])?;
     Some((item, coll))
 }
 
@@ -762,7 +785,45 @@ mod tests {
         let main = m.functions.iter().find(|f| f.name == "main").unwrap();
         assert_eq!(main.children.len(), 1);
         assert_eq!(main.children[0].name, "问候");
-        assert_eq!(main.children[0].params, vec!["谁".to_string()]);
+        assert_eq!(main.children[0].params[0].name, "谁");
+    }
+
+    #[test]
+    fn parse_optional_param_default() {
+        let src = "# main\n\n## f\n    + `a`\n    + `b`=Hi\n\n> print text=`a`\n";
+        let m = parse_source(src).unwrap();
+        let f = &m.functions[0].children[0];
+        assert_eq!(f.params.len(), 2);
+        assert_eq!(f.params[0].name, "a");
+        assert_eq!(f.params[1].name, "b");
+        assert!(matches!(
+            f.params[1].default,
+            Some(Expr::Literal(Literal::Text(ref s))) if s == "Hi"
+        ));
+    }
+
+    #[test]
+    fn parse_foreach_backtick_ids() {
+        let src = "# main\n\n- [`x`](`xs`)\n  > print text=`x`\n";
+        let m = parse_source(src).unwrap();
+        match &m.functions[0].body[0] {
+            Stmt::ForEach { item, collection, .. } => {
+                assert_eq!(item, "x");
+                assert_eq!(collection, "xs");
+            }
+            other => panic!("expected foreach, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn parse_branch_rejects_plus_arm() {
+        let src = "# main\n\n+ `x` > 0\n  > print text=ok\n";
+        let err = parse_source(src).unwrap_err();
+        let msg = format!("{err}");
+        assert!(
+            msg.contains("unrecognized") || msg.contains("empty branch"),
+            "{msg}"
+        );
     }
 
     #[test]

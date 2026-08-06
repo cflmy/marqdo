@@ -12,6 +12,6 @@ Call with `>` and named args `param=value`:
 > greet who=World
 
 ## greet
-    - who
+    + `who`
 
 > print text=Hello `who`!

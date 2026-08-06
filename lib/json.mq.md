@@ -4,40 +4,40 @@ description: JSON parse/stringify (shared EN/ZH import)
 ---
 
 ## parse
-    - text
+    + `text`
 
 **> host_json_parse text=`text`**
 
 ## stringify
-    - value
+    + `value`
 
 **> host_json_stringify value=`value`**
 
 ## get
-    - value
-    - key
+    + `value`
+    + `key`
 
 **> host_json_get value=`value` key=`key`**
 
 ## keys
-    - value
+    + `value`
 
 **> host_json_keys value=`value`**
 
 ## quote
-    - text
+    + `text`
 
 **> host_json_quote text=`text`**
 
 ## set
-    - map
-    - key
-    - value
+    + `map`
+    + `key`
+    + `value`
 
 **> host_map_set map=`map` key=`key` value=`value`**
 
 ## append
-    - list
-    - item
+    + `list`
+    + `item`
 
 **> host_list_append list=`list` item=`item`**
