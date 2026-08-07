@@ -54,12 +54,54 @@ pub fn canonical_param(builtin: &str, param: &str) -> String {
         ("at", "index" | "下标") => "index".into(),
         ("call_fn", "name" | "名") => "name".into(),
         (
+            "host_writeback_record" | "host_writeback_get" | "host_writeback_clear",
+            "key" | "键",
+        ) => "key".into(),
+        ("host_writeback_ensure", "key" | "键") => "key".into(),
+        (
+            "host_writeback_ensure",
+            "placeholder" | "占位",
+        ) => "placeholder".into(),
+        (
+            "host_writeback_record" | "host_writeback_get" | "host_writeback_clear",
+            "at_end" | "末尾",
+        ) => "at_end".into(),
+        (
+            "host_writeback_record"
+                | "host_writeback_get"
+                | "host_writeback_clear"
+                | "host_writeback_ensure",
+            "line" | "行",
+        ) => "line".into(),
+        (
+            "host_writeback_record",
+            "value" | "值",
+        ) => "value".into(),
+        (
             "host_plot" | "host_plot_points" | "host_plot_conic",
             "grid" | "网格",
         ) => "grid".into(),
         ("host_plot" | "host_plot_points" | "host_plot_conic", "path" | "路径") => {
             "path".into()
         }
+        ("host_dotenv_load" | "load_dotenv", "path" | "路径") => "path".into(),
+        ("host_exec" | "exec", "cmd" | "命令") => "cmd".into(),
+        ("host_exec" | "exec", "args" | "参数") => "args".into(),
+        (
+            "host_http_get" | "http_get" | "host_http_post" | "http_post" | "host_http_request"
+                | "http_request",
+            "headers" | "头",
+        ) => "headers".into(),
+        (
+            "host_http_post" | "http_post" | "host_http_request" | "http_request",
+            "content_type" | "类型",
+        ) => "content_type".into(),
+        ("host_http_get" | "http_get" | "host_http_post" | "http_post" | "host_http_request"
+            | "http_request", "url" | "地址") => "url".into(),
+        ("host_http_post" | "http_post" | "host_http_request" | "http_request", "body" | "内容") => {
+            "body".into()
+        }
+        ("host_json_stringify" | "stringify", "indent" | "缩进") => "indent".into(),
         ("host_plot", "steps" | "步数") => "steps".into(),
         ("host_plot", "derivative" | "导数") => "derivative".into(),
         ("host_foreign_run", "code" | "代码") => "code".into(),
@@ -67,6 +109,7 @@ pub fn canonical_param(builtin: &str, param: &str) -> String {
         ("host_foreign_set_cmd" | "host_foreign_run_lang", "lang" | "语言") => "lang".into(),
         ("host_foreign_set_cmd", "cmd" | "命令") => "cmd".into(),
         ("host_foreign_run_lang", "source" | "源码") => "source".into(),
+        ("host_ext_native_path", "name" | "名") => "name".into(),
         _ => param.to_string(),
     }
 }

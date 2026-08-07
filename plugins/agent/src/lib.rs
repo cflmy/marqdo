@@ -1,15 +1,25 @@
-//! Agent layout plugin (C ABI v1): find_root, ensure_layout, probe, scaffold.
+//! Agent plugin (C ABI v2): layout helpers + session bag + context via host_query.
 
+use std::collections::HashMap;
 use std::ffi::{CStr, CString};
 use std::os::raw::{c_char, c_int, c_void};
 use std::path::{Component, Path, PathBuf};
 use std::ptr;
+use std::sync::{LazyLock, Mutex};
 
-const ABI_VERSION: u32 = 1;
+const ABI_VERSION: u32 = 2;
 const DEFAULT_MARKERS: &str = "agents,runbooks,marqdo.agent.json";
 const LAYOUT_DIRS: &[&str] = &["agents", "runbooks", "templates", "reports"];
 
 type PluginFn = unsafe extern "C" fn(
+    args_json: *const c_char,
+    out_json: *mut *mut c_char,
+    err_msg: *mut *mut c_char,
+) -> c_int;
+
+type HostQueryFn = unsafe extern "C" fn(
+    userdata: *mut c_void,
+    name: *const c_char,
     args_json: *const c_char,
     out_json: *mut *mut c_char,
     err_msg: *mut *mut c_char,
@@ -28,10 +38,17 @@ pub struct MarqdoHostApi {
     >,
     pub alloc: Option<unsafe extern "C" fn(n: usize) -> *mut c_void>,
     pub free: Option<unsafe extern "C" fn(p: *mut c_void)>,
+    pub host_query: Option<HostQueryFn>,
 }
 
 static mut HOST_FREE: Option<unsafe extern "C" fn(*mut c_void)> = None;
 static mut HOST_ALLOC: Option<unsafe extern "C" fn(usize) -> *mut c_void> = None;
+static mut HOST_QUERY: Option<HostQueryFn> = None;
+static mut HOST_USERDATA: *mut c_void = ptr::null_mut();
+
+static HISTORIES: LazyLock<Mutex<HashMap<String, Vec<serde_json::Value>>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
+static AGENT_SEQ: LazyLock<Mutex<u64>> = LazyLock::new(|| Mutex::new(0));
 
 unsafe fn host_strdup(s: &str) -> *mut c_char {
     let alloc = HOST_ALLOC.expect("host alloc");
@@ -527,6 +544,307 @@ fn register(host: &MarqdoHostApi, name: &str, params: &str, fn_ptr: PluginFn) ->
     unsafe { register(host.userdata, n.as_ptr(), p.as_ptr(), fn_ptr) }
 }
 
+fn host_query_json(name: &str) -> Result<serde_json::Value, String> {
+    let query = unsafe { HOST_QUERY }.ok_or_else(|| "host_query not available".to_string())?;
+    let userdata = unsafe { HOST_USERDATA };
+    let c_name = CString::new(name).map_err(|e| e.to_string())?;
+    let c_args = CString::new("{}").unwrap();
+    let mut out_ptr: *mut c_char = ptr::null_mut();
+    let mut err_ptr: *mut c_char = ptr::null_mut();
+    let rc = unsafe {
+        query(
+            userdata,
+            c_name.as_ptr(),
+            c_args.as_ptr(),
+            &mut out_ptr,
+            &mut err_ptr,
+        )
+    };
+    let err = take_host_string(err_ptr);
+    let out = take_host_string(out_ptr);
+    if rc != 0 {
+        return Err(err.unwrap_or_else(|| format!("host_query `{name}` failed")));
+    }
+    let out = out.unwrap_or_else(|| "null".into());
+    serde_json::from_str(&out).map_err(|e| format!("host_query `{name}` bad JSON: {e}"))
+}
+
+fn take_host_string(p: *mut c_char) -> Option<String> {
+    if p.is_null() {
+        return None;
+    }
+    let s = unsafe { CStr::from_ptr(p) }
+        .to_str()
+        .ok()
+        .map(|s| s.to_string());
+    unsafe {
+        if let Some(free) = HOST_FREE {
+            free(p as *mut c_void);
+        }
+    }
+    s
+}
+
+unsafe extern "C" fn agent_alloc(
+    _args_json: *const c_char,
+    out_json: *mut *mut c_char,
+    err_msg: *mut *mut c_char,
+) -> c_int {
+    let mut seq = match AGENT_SEQ.lock() {
+        Ok(g) => g,
+        Err(_) => {
+            set_err(err_msg, "agent_alloc: lock poisoned");
+            return 1;
+        }
+    };
+    *seq = seq.wrapping_add(1);
+    let id = format!("agent-{seq}");
+    drop(seq);
+    if let Ok(mut map) = HISTORIES.lock() {
+        map.insert(id.clone(), Vec::new());
+    }
+    let out = serde_json::Value::String(id).to_string();
+    set_out(out_json, &out);
+    0
+}
+
+unsafe extern "C" fn agent_history_get(
+    args_json: *const c_char,
+    out_json: *mut *mut c_char,
+    err_msg: *mut *mut c_char,
+) -> c_int {
+    let v = match parse_args(args_json) {
+        Ok(v) => v,
+        Err(e) => {
+            set_err(err_msg, &format!("agent_history_get: {e}"));
+            return 1;
+        }
+    };
+    let id = match arg_str(&v, "id") {
+        Ok(s) => s.to_string(),
+        Err(e) => {
+            set_err(err_msg, &format!("agent_history_get: {e}"));
+            return 1;
+        }
+    };
+    let list = HISTORIES
+        .lock()
+        .map(|m| m.get(&id).cloned().unwrap_or_default())
+        .unwrap_or_default();
+    set_out(out_json, &serde_json::Value::Array(list).to_string());
+    0
+}
+
+unsafe extern "C" fn agent_history_clear(
+    args_json: *const c_char,
+    out_json: *mut *mut c_char,
+    err_msg: *mut *mut c_char,
+) -> c_int {
+    let v = match parse_args(args_json) {
+        Ok(v) => v,
+        Err(e) => {
+            set_err(err_msg, &format!("agent_history_clear: {e}"));
+            return 1;
+        }
+    };
+    let id = match arg_str(&v, "id") {
+        Ok(s) => s.to_string(),
+        Err(e) => {
+            set_err(err_msg, &format!("agent_history_clear: {e}"));
+            return 1;
+        }
+    };
+    if let Ok(mut map) = HISTORIES.lock() {
+        map.insert(id, Vec::new());
+    }
+    set_out(out_json, "null");
+    0
+}
+
+unsafe extern "C" fn agent_history_append(
+    args_json: *const c_char,
+    out_json: *mut *mut c_char,
+    err_msg: *mut *mut c_char,
+) -> c_int {
+    let v = match parse_args(args_json) {
+        Ok(v) => v,
+        Err(e) => {
+            set_err(err_msg, &format!("agent_history_append: {e}"));
+            return 1;
+        }
+    };
+    let id = match arg_str(&v, "id") {
+        Ok(s) => s.to_string(),
+        Err(e) => {
+            set_err(err_msg, &format!("agent_history_append: {e}"));
+            return 1;
+        }
+    };
+    let item = match v.get("item") {
+        Some(i) => i.clone(),
+        None => {
+            set_err(err_msg, "agent_history_append: missing item");
+            return 1;
+        }
+    };
+    let list = match HISTORIES.lock() {
+        Ok(mut map) => {
+            let list = map.entry(id).or_default();
+            list.push(item);
+            list.clone()
+        }
+        Err(_) => {
+            set_err(err_msg, "agent_history_append: lock poisoned");
+            return 1;
+        }
+    };
+    set_out(out_json, &serde_json::Value::Array(list).to_string());
+    0
+}
+
+unsafe extern "C" fn agent_module_source(
+    _args_json: *const c_char,
+    out_json: *mut *mut c_char,
+    err_msg: *mut *mut c_char,
+) -> c_int {
+    match host_query_json("module_source") {
+        Ok(j) => {
+            set_out(out_json, &j.to_string());
+            0
+        }
+        Err(e) => {
+            set_err(err_msg, &e);
+            1
+        }
+    }
+}
+
+unsafe extern "C" fn agent_call_site(
+    _args_json: *const c_char,
+    out_json: *mut *mut c_char,
+    err_msg: *mut *mut c_char,
+) -> c_int {
+    match host_query_json("call_site") {
+        Ok(j) => {
+            set_out(out_json, &j.to_string());
+            0
+        }
+        Err(e) => {
+            set_err(err_msg, &e);
+            1
+        }
+    }
+}
+
+unsafe extern "C" fn agent_marqdo_skill(
+    _args_json: *const c_char,
+    out_json: *mut *mut c_char,
+    err_msg: *mut *mut c_char,
+) -> c_int {
+    match host_query_json("marqdo_skill") {
+        Ok(j) => {
+            set_out(out_json, &j.to_string());
+            0
+        }
+        Err(e) => {
+            set_err(err_msg, &e);
+            1
+        }
+    }
+}
+
+fn tool_names(tools: &serde_json::Value) -> Vec<String> {
+    let mut out = Vec::new();
+    let rows = match tools {
+        serde_json::Value::Array(a) => a.as_slice(),
+        serde_json::Value::String(s) => {
+            if let Ok(serde_json::Value::Array(a)) = serde_json::from_str(s) {
+                return tool_names(&serde_json::Value::Array(a));
+            }
+            return out;
+        }
+        _ => return out,
+    };
+    for row in rows {
+        match row {
+            serde_json::Value::String(s) if !s.is_empty() => out.push(s.clone()),
+            serde_json::Value::Object(m) => {
+                for key in ["工具", "tools", "name"] {
+                    if let Some(serde_json::Value::String(s)) = m.get(key) {
+                        if !s.is_empty() {
+                            out.push(s.clone());
+                            break;
+                        }
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+    out
+}
+
+unsafe extern "C" fn agent_format_tools(
+    args_json: *const c_char,
+    out_json: *mut *mut c_char,
+    err_msg: *mut *mut c_char,
+) -> c_int {
+    let v = match parse_args(args_json) {
+        Ok(v) => v,
+        Err(e) => {
+            set_err(err_msg, &format!("agent_format_tools: {e}"));
+            return 1;
+        }
+    };
+    let tools = match v.get("tools") {
+        Some(t) => t,
+        None => {
+            set_err(err_msg, "agent_format_tools: missing tools");
+            return 1;
+        }
+    };
+    let mut text =
+        String::from("Available tools (invoke via CALL:<name> or 调用:<name>; runs as subtask):\n");
+    for name in tool_names(tools) {
+        text.push_str("- ");
+        text.push_str(&name);
+        text.push('\n');
+    }
+    set_out(out_json, &serde_json::Value::String(text).to_string());
+    0
+}
+
+unsafe extern "C" fn agent_tool_allowed(
+    args_json: *const c_char,
+    out_json: *mut *mut c_char,
+    err_msg: *mut *mut c_char,
+) -> c_int {
+    let v = match parse_args(args_json) {
+        Ok(v) => v,
+        Err(e) => {
+            set_err(err_msg, &format!("agent_tool_allowed: {e}"));
+            return 1;
+        }
+    };
+    let tools = match v.get("tools") {
+        Some(t) => t,
+        None => {
+            set_err(err_msg, "agent_tool_allowed: missing tools");
+            return 1;
+        }
+    };
+    let name = match arg_str(&v, "name") {
+        Ok(s) => s,
+        Err(_) => {
+            set_out(out_json, "false");
+            return 0;
+        }
+    };
+    let ok = tool_names(tools).iter().any(|n| n == name);
+    set_out(out_json, if ok { "true" } else { "false" });
+    0
+}
+
 #[no_mangle]
 pub unsafe extern "C" fn marqdo_plugin_abi_version() -> u32 {
     ABI_VERSION
@@ -540,6 +858,11 @@ pub unsafe extern "C" fn marqdo_plugin_init(host: *const MarqdoHostApi) -> c_int
     let host = &*host;
     HOST_ALLOC = host.alloc;
     HOST_FREE = host.free;
+    HOST_QUERY = host.host_query;
+    HOST_USERDATA = host.userdata;
+    if host.host_query.is_none() {
+        return 1;
+    }
     if register(host, "agent_find_root", "start,markers", agent_find_root) != 0 {
         return 1;
     }
@@ -564,6 +887,33 @@ pub unsafe extern "C" fn marqdo_plugin_init(host: *const MarqdoHostApi) -> c_int
     if register(host, "agent_bump_load", "member,delta", agent_bump_load) != 0 {
         return 1;
     }
+    if register(host, "agent_alloc", "", agent_alloc) != 0 {
+        return 1;
+    }
+    if register(host, "agent_history_get", "id", agent_history_get) != 0 {
+        return 1;
+    }
+    if register(host, "agent_history_clear", "id", agent_history_clear) != 0 {
+        return 1;
+    }
+    if register(host, "agent_history_append", "id,item", agent_history_append) != 0 {
+        return 1;
+    }
+    if register(host, "agent_module_source", "", agent_module_source) != 0 {
+        return 1;
+    }
+    if register(host, "agent_call_site", "", agent_call_site) != 0 {
+        return 1;
+    }
+    if register(host, "agent_marqdo_skill", "", agent_marqdo_skill) != 0 {
+        return 1;
+    }
+    if register(host, "agent_format_tools", "tools", agent_format_tools) != 0 {
+        return 1;
+    }
+    if register(host, "agent_tool_allowed", "tools,name", agent_tool_allowed) != 0 {
+        return 1;
+    }
     0
 }
 
@@ -571,4 +921,12 @@ pub unsafe extern "C" fn marqdo_plugin_init(host: *const MarqdoHostApi) -> c_int
 pub unsafe extern "C" fn marqdo_plugin_shutdown() {
     HOST_ALLOC = None;
     HOST_FREE = None;
+    HOST_QUERY = None;
+    HOST_USERDATA = ptr::null_mut();
+    if let Ok(mut map) = HISTORIES.lock() {
+        map.clear();
+    }
+    if let Ok(mut seq) = AGENT_SEQ.lock() {
+        *seq = 0;
+    }
 }

@@ -15,10 +15,11 @@ description: English system wrappers (load_dotenv accepts optional path via host
 **> host_env_set name=`name` value=`value`**
 
 ## load_dotenv
+    + `path`=None
 
 Load `.env` (optional named arg `path=`). Existing process env is not overridden.
 
-**> host_dotenv_load**
+**> host_dotenv_load path=`path`**
 
 ## args
 
@@ -35,5 +36,6 @@ Load `.env` (optional named arg `path=`). Existing process env is not overridden
 
 ## exec
     + `cmd`
+    + `args`=None
 
-**> host_exec cmd=`cmd`**
+**> host_exec cmd=`cmd` args=`args`**

@@ -10,6 +10,6 @@ title: foreign python hello
 print("hello-from-python")
 ```
 
-*`out` = > run code=`hi` *
+*`out` = > foreign.run code=`hi` *
 
 > print text=`out`

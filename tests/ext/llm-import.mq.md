@@ -5,6 +5,6 @@ title: ext llm import
 
 # main
 
-> load_env
+> llm.load_env
 
 > print text=ext-ok

@@ -3,8 +3,8 @@
 | | |
 |---|---|
 | 状态 | 已定（v0.1 增补） |
-| 日期 | 2026-08-04 |
-| 相关 | [markdown-mapping.md](markdown-mapping.md) · [keywords.md](keywords.md) |
+| 日期 | 2026-08-07 |
+| 相关 | [markdown-mapping.md](markdown-mapping.md) · [keywords.md](keywords.md) · [module-namespace.md](module-namespace.md) |
 
 ---
 
@@ -50,4 +50,4 @@ positional ::= value_token
 
 ## 4. 金样例
 
-见 `tests/structure/positional-call.mq.md` 与更新后的 `tests/structure/import/`。
+见 `tests/structure/positional-call.mq.md`、`tests/structure/ns/`（点号路径 / `use`）与 `tests/structure/import/`（导入解析）。

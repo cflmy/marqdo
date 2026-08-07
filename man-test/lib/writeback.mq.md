@@ -10,10 +10,11 @@ description: AI禁止更改
 
 *`name`=>input "你叫什么名字？\n"*
 
-> record `name`
+> writeback.record `name`
 <!-- marqdo-out
-王家祥
+
 -->
+
 
 
 

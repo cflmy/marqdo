@@ -81,17 +81,8 @@ pub enum HostFn {
     PluginUnload = 70,
     PluginList = 71,
     ExtNativePath = 72,
-    ModuleSource = 73,
-    CallSite = 74,
-    MarqdoSkill = 75,
     MapSet = 76,
     ListAppend = 77,
-    AgentAlloc = 78,
-    AgentHistoryGet = 79,
-    AgentHistoryClear = 80,
-    AgentHistoryAppend = 81,
-    FormatToolsForLlm = 82,
-    ToolAllowed = 83,
     WritebackRecord = 84,
     WritebackGet = 85,
     WritebackClear = 86,
@@ -101,6 +92,8 @@ pub enum HostFn {
     SubtaskJoin = 90,
     SubtaskKill = 91,
     SubtaskWaitAll = 92,
+    WritebackEnsure = 93,
+    OuterCallLine = 94,
 }
 
 impl HostFn {
@@ -178,17 +171,8 @@ impl HostFn {
             70 => Self::PluginUnload,
             71 => Self::PluginList,
             72 => Self::ExtNativePath,
-            73 => Self::ModuleSource,
-            74 => Self::CallSite,
-            75 => Self::MarqdoSkill,
             76 => Self::MapSet,
             77 => Self::ListAppend,
-            78 => Self::AgentAlloc,
-            79 => Self::AgentHistoryGet,
-            80 => Self::AgentHistoryClear,
-            81 => Self::AgentHistoryAppend,
-            82 => Self::FormatToolsForLlm,
-            83 => Self::ToolAllowed,
             84 => Self::WritebackRecord,
             85 => Self::WritebackGet,
             86 => Self::WritebackClear,
@@ -198,6 +182,8 @@ impl HostFn {
             90 => Self::SubtaskJoin,
             91 => Self::SubtaskKill,
             92 => Self::SubtaskWaitAll,
+            93 => Self::WritebackEnsure,
+            94 => Self::OuterCallLine,
             _ => return None,
         })
     }
@@ -279,21 +265,14 @@ impl HostFn {
             "host_plugin_unload" | "plugin_unload" => Self::PluginUnload,
             "host_plugin_list" | "plugin_list" => Self::PluginList,
             "host_ext_native_path" | "ext_native_path" => Self::ExtNativePath,
-            "host_module_source" | "module_source" => Self::ModuleSource,
-            "host_call_site" | "call_site" => Self::CallSite,
-            "host_marqdo_skill" | "marqdo_skill" => Self::MarqdoSkill,
-            "host_map_set" | "map_set" => Self::MapSet,
+                                                "host_map_set" | "map_set" => Self::MapSet,
             "host_list_append" | "list_append" => Self::ListAppend,
-            "host_agent_alloc" | "agent_alloc" => Self::AgentAlloc,
-            "host_agent_history_get" | "agent_history_get" => Self::AgentHistoryGet,
-            "host_agent_history_clear" | "agent_history_clear" => Self::AgentHistoryClear,
-            "host_agent_history_append" | "agent_history_append" => Self::AgentHistoryAppend,
-            "host_format_tools_for_llm" | "format_tools_for_llm" => Self::FormatToolsForLlm,
-            "host_tool_allowed" | "tool_allowed" => Self::ToolAllowed,
-            "host_writeback_record" | "writeback_record" => Self::WritebackRecord,
+                                                                                    "host_writeback_record" | "writeback_record" => Self::WritebackRecord,
             "host_writeback_get" | "writeback_get" => Self::WritebackGet,
             "host_writeback_clear" | "writeback_clear" => Self::WritebackClear,
             "host_writeback_list" | "writeback_list" => Self::WritebackList,
+            "host_writeback_ensure" | "writeback_ensure" => Self::WritebackEnsure,
+            "host_outer_call_line" | "outer_call_line" => Self::OuterCallLine,
             "host_subtask_spawn" | "subtask_spawn" => Self::SubtaskSpawn,
             "host_subtask_poll" | "subtask_poll" => Self::SubtaskPoll,
             "host_subtask_join" | "subtask_join" => Self::SubtaskJoin,
@@ -381,21 +360,14 @@ impl HostFn {
             Self::PluginUnload => "host_plugin_unload",
             Self::PluginList => "host_plugin_list",
             Self::ExtNativePath => "host_ext_native_path",
-            Self::ModuleSource => "host_module_source",
-            Self::CallSite => "host_call_site",
-            Self::MarqdoSkill => "host_marqdo_skill",
             Self::MapSet => "host_map_set",
             Self::ListAppend => "host_list_append",
-            Self::AgentAlloc => "host_agent_alloc",
-            Self::AgentHistoryGet => "host_agent_history_get",
-            Self::AgentHistoryClear => "host_agent_history_clear",
-            Self::AgentHistoryAppend => "host_agent_history_append",
-            Self::FormatToolsForLlm => "host_format_tools_for_llm",
-            Self::ToolAllowed => "host_tool_allowed",
             Self::WritebackRecord => "host_writeback_record",
             Self::WritebackGet => "host_writeback_get",
             Self::WritebackClear => "host_writeback_clear",
             Self::WritebackList => "host_writeback_list",
+            Self::WritebackEnsure => "host_writeback_ensure",
+            Self::OuterCallLine => "host_outer_call_line",
             Self::SubtaskSpawn => "host_subtask_spawn",
             Self::SubtaskPoll => "host_subtask_poll",
             Self::SubtaskJoin => "host_subtask_join",
@@ -446,16 +418,13 @@ impl HostFn {
             Self::PluginLoad => &["path"],
             Self::PluginUnload | Self::PluginList => &[],
             Self::ExtNativePath => &["name"],
-            Self::ModuleSource | Self::CallSite | Self::MarqdoSkill | Self::AgentAlloc => &[],
+            Self::OuterCallLine => &[],
             Self::MapSet => &["map", "key", "value"],
             Self::ListAppend => &["list", "item"],
-            Self::AgentHistoryGet | Self::AgentHistoryClear => &["id"],
-            Self::AgentHistoryAppend => &["id", "item"],
-            Self::FormatToolsForLlm => &["tools"],
-            Self::ToolAllowed => &["tools", "name"],
             Self::WritebackRecord => &["value"],
             Self::WritebackGet | Self::WritebackClear => &[],
             Self::WritebackList => &[],
+            Self::WritebackEnsure => &["key"],
             Self::SubtaskSpawn => &[],
             Self::SubtaskPoll | Self::SubtaskJoin | Self::SubtaskKill => &["id"],
             Self::SubtaskWaitAll => &[],
@@ -476,7 +445,10 @@ impl HostFn {
             Self::PlotConic => &["b", "h", "k", "path", "grid"],
             Self::ForeignSetCmd => &["args"],
             Self::ForeignRun | Self::ForeignRunLang => &["stdin"],
-            Self::WritebackRecord | Self::WritebackGet | Self::WritebackClear => &["at_end"],
+            Self::WritebackRecord | Self::WritebackGet | Self::WritebackClear => {
+                &["at_end", "key", "line"]
+            }
+            Self::WritebackEnsure => &["placeholder", "line"],
             Self::SubtaskSpawn => &["path", "fn", "args", "code", "lang", "source", "stdin"],
             _ => &[],
         }
@@ -650,40 +622,50 @@ pub fn call_host(
                 None => Value::None,
             })
         }
-        HostFn::ModuleSource => agent_rt::module_source(ctx),
-        HostFn::CallSite => {
-            agent_rt::call_site(ctx, Some(ctx.current_line))
-        }
-        HostFn::MarqdoSkill => agent_rt::marqdo_skill(ctx),
         HostFn::MapSet => {
             agent_rt::map_set(require(bound, "map")?, require(bound, "key")?, require(bound, "value")?)
         }
         HostFn::ListAppend => {
             agent_rt::list_append(require(bound, "list")?, require(bound, "item")?)
         }
-        HostFn::AgentAlloc => agent_rt::agent_alloc(ctx),
-        HostFn::AgentHistoryGet => agent_rt::agent_history_get(ctx, require(bound, "id")?),
-        HostFn::AgentHistoryClear => {
-            agent_rt::agent_history_clear(ctx, require(bound, "id")?)
-        }
-        HostFn::AgentHistoryAppend => {
-            agent_rt::agent_history_append(ctx, require(bound, "id")?, require(bound, "item")?)
-        }
-        HostFn::FormatToolsForLlm => {
-            agent_rt::format_tools_for_llm(require(bound, "tools")?)
-        }
-        HostFn::ToolAllowed => agent_rt::tool_allowed(
-            require(bound, "tools")?,
-            require(bound, "name")?,
-        ),
+        HostFn::OuterCallLine => Ok(Value::Int(
+            ctx.call_site_lines
+                .first()
+                .copied()
+                .unwrap_or(ctx.current_line) as i64,
+        )),
         HostFn::WritebackRecord => writeback::record(
             ctx,
             require(bound, "value")?,
             bound.get("at_end"),
+            bound.get("key"),
+            bound.get("line"),
         ),
-        HostFn::WritebackGet => writeback::get(ctx, bound.get("at_end")),
-        HostFn::WritebackClear => writeback::clear(ctx, bound.get("at_end")),
+        HostFn::WritebackGet => writeback::get(
+            ctx,
+            bound.get("at_end"),
+            bound.get("key"),
+            bound.get("line"),
+        ),
+        HostFn::WritebackClear => writeback::clear(
+            ctx,
+            bound.get("at_end"),
+            bound.get("key"),
+            bound.get("line"),
+        ),
         HostFn::WritebackList => writeback::list(ctx),
+        HostFn::WritebackEnsure => {
+            let placeholder = bound
+                .get("placeholder")
+                .cloned()
+                .unwrap_or_else(|| Value::Text("pending".into()));
+            writeback::ensure_slot(
+                ctx,
+                require(bound, "key")?,
+                &placeholder,
+                bound.get("line"),
+            )
+        }
         HostFn::SubtaskSpawn => subtask::spawn(ctx, bound),
         HostFn::SubtaskPoll => subtask::poll(ctx, require(bound, "id")?),
         HostFn::SubtaskJoin => subtask::join(ctx, require(bound, "id")?),

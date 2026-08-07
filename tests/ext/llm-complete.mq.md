@@ -1,14 +1,14 @@
 ---
-title: ext llm DeepSeek complete (live)
-description: Live OpenAI-compatible chat via DeepSeek. Needs tests/ext/.env (gitignored). Not in gold suite.
+title: ext llm DeepSeek complete
+description: OpenAI-compatible chat via DeepSeek. Credentials from tests/ext/.env.
 > ext/ai/llm.mq.md
 ---
 
 # main
 
-> load_env
+> llm.load_env path=.env
 
-*`model` = > llm *
+*`model` = > llm.llm *
 
 *`reply` = > `model`.complete prompt=Reply with exactly one English word: pong *
 

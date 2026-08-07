@@ -3,8 +3,8 @@
 | | |
 |---|---|
 | 状态 | **S0–S3 + L1 全模块落地** |
-| 日期 | 2026-08-06 |
-| 相关 | [keywords.md](keywords.md) · [objects.md](objects.md) · [call-arguments.md](call-arguments.md) · [stdlib-i18n.md](stdlib-i18n.md) · [stdlib-modules.md](stdlib-modules.md) · [ext-abi.md](ext-abi.md) |
+| 日期 | 2026-08-07 |
+| 相关 | [keywords.md](keywords.md) · [objects.md](objects.md) · [call-arguments.md](call-arguments.md) · [stdlib-i18n.md](stdlib-i18n.md) · [stdlib-modules.md](stdlib-modules.md) · [module-namespace.md](module-namespace.md) · [ext-abi.md](ext-abi.md) |
 
 > **多语言库命名**：见 [stdlib-i18n.md](stdlib-i18n.md)（不设 `lang:`；中英分文件）。  
 > **L1 模块清单**（含 math/foreign/plugin）：见 [stdlib-modules.md](stdlib-modules.md)。  
@@ -42,7 +42,7 @@
 
 ## 3. 官方库导入（S2）
 
-Frontmatter：
+Frontmatter 导入**绑定库名**（默认 = 文件名茎；`as` / `作为` 可改）。成员经点号路径调用（`time.parse`、`json.get`），不倒进全局短名。完整语义见 [module-namespace.md](module-namespace.md)。
 
 ```markdown
 ---
@@ -50,6 +50,8 @@ Frontmatter：
 > lib/table.mq.md
 ---
 ```
+
+调用示例：`> time.now_unix`、`> json.parse text=…`。需要本地短名时用 `> use time.format`（冲突 → 硬错误）。
 
 `std/text.mq.md` 等价于 `lib/text.mq.md`。解析顺序：
 

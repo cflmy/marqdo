@@ -1,18 +1,31 @@
-//! Native plugin loader (C ABI v1). Shared libs are not linked into marqdo.
+//! Native plugin loader (C ABI v1/v2). Shared libs are not linked into marqdo.
 
+use std::cell::Cell;
 use std::collections::HashMap;
 use std::ffi::{CStr, CString};
 use std::os::raw::{c_char, c_int, c_void};
 
 use libloading::{Library, Symbol};
 
+use crate::host::agent_rt;
 use crate::host::json::{json_to_value, value_to_json};
 use crate::host::HostContext;
 use crate::value::Value;
 
-pub const ABI_VERSION: u32 = 1;
+/// Highest ABI version this host speaks.
+pub const ABI_VERSION: u32 = 2;
+/// Oldest plugin ABI still accepted.
+pub const ABI_VERSION_MIN: u32 = 1;
 
 type PluginFn = unsafe extern "C" fn(
+    args_json: *const c_char,
+    out_json: *mut *mut c_char,
+    err_msg: *mut *mut c_char,
+) -> c_int;
+
+type HostQueryFn = unsafe extern "C" fn(
+    userdata: *mut c_void,
+    name: *const c_char,
     args_json: *const c_char,
     out_json: *mut *mut c_char,
     err_msg: *mut *mut c_char,
@@ -35,6 +48,12 @@ struct MarqdoHostApi {
     >,
     alloc: Option<unsafe extern "C" fn(n: usize) -> *mut c_void>,
     free: Option<unsafe extern "C" fn(p: *mut c_void)>,
+    host_query: Option<HostQueryFn>,
+}
+
+thread_local! {
+    /// Set around plugin calls so `host_query` can read entry source / call site.
+    static CURRENT_HOST: Cell<*const HostContext> = const { Cell::new(std::ptr::null()) };
 }
 
 struct RegisterBuf {
@@ -88,6 +107,10 @@ impl PluginState {
         names.sort();
         names
     }
+
+    pub fn has_fn(&self, name: &str) -> bool {
+        self.fns.contains_key(name)
+    }
 }
 
 fn as_text<'a>(v: &'a Value, label: &str) -> Result<&'a str, String> {
@@ -110,6 +133,17 @@ unsafe extern "C" fn host_free(p: *mut c_void) {
     if !p.is_null() {
         free(p);
     }
+}
+
+unsafe fn host_strdup(s: &str) -> *mut c_char {
+    let bytes = s.as_bytes();
+    let p = host_alloc(bytes.len() + 1) as *mut u8;
+    if p.is_null() {
+        return std::ptr::null_mut();
+    }
+    std::ptr::copy_nonoverlapping(bytes.as_ptr(), p, bytes.len());
+    *p.add(bytes.len()) = 0;
+    p as *mut c_char
 }
 
 unsafe extern "C" fn host_register(
@@ -167,6 +201,63 @@ unsafe extern "C" fn host_register(
     0
 }
 
+/// Allowlisted host introspection for ABI v2 plugins (`host_query`).
+unsafe extern "C" fn host_query(
+    _userdata: *mut c_void,
+    name: *const c_char,
+    _args_json: *const c_char,
+    out_json: *mut *mut c_char,
+    err_msg: *mut *mut c_char,
+) -> c_int {
+    let set_err = |msg: &str| {
+        if !err_msg.is_null() {
+            *err_msg = host_strdup(msg);
+        }
+    };
+    let set_out = |msg: &str| {
+        if !out_json.is_null() {
+            *out_json = host_strdup(msg);
+        }
+    };
+
+    if name.is_null() {
+        set_err("host_query: null name");
+        return 1;
+    }
+    let name = match CStr::from_ptr(name).to_str() {
+        Ok(s) => s,
+        Err(_) => {
+            set_err("host_query: name not utf-8");
+            return 1;
+        }
+    };
+
+    let ctx_ptr = CURRENT_HOST.with(|c| c.get());
+    if ctx_ptr.is_null() {
+        set_err("host_query: no active host context (call during plugin fn)");
+        return 1;
+    }
+    let ctx = &*ctx_ptr;
+
+    let result = match name {
+        "module_source" => agent_rt::module_source(ctx).and_then(|v| value_to_json(&v)),
+        "call_site" => agent_rt::call_site(ctx, Some(ctx.current_line)).and_then(|v| value_to_json(&v)),
+        "marqdo_skill" => agent_rt::marqdo_skill(ctx).and_then(|v| value_to_json(&v)),
+        other => Err(format!("host_query: unknown `{other}`")),
+    };
+
+    match result {
+        Ok(j) => {
+            set_out(&j.to_string());
+            0
+        }
+        Err(e) => {
+            set_err(&e);
+            1
+        }
+    }
+}
+
 pub fn load(ctx: &mut HostContext, path: &Value) -> Result<Value, String> {
     if !ctx.allow_plugin() {
         return Err("plugin_load denied by host policy".into());
@@ -200,9 +291,9 @@ pub fn load(ctx: &mut HostContext, path: &Value) -> Result<Value, String> {
             .map_err(|e| format!("plugin missing marqdo_plugin_abi_version: {e}"))?
     };
     let ver = unsafe { version_fn() };
-    if ver != ABI_VERSION {
+    if ver < ABI_VERSION_MIN || ver > ABI_VERSION {
         return Err(format!(
-            "plugin ABI version {ver} != host {ABI_VERSION} ({})",
+            "plugin ABI version {ver} not in host range {ABI_VERSION_MIN}..={ABI_VERSION} ({})",
             file.display()
         ));
     }
@@ -221,6 +312,7 @@ pub fn load(ctx: &mut HostContext, path: &Value) -> Result<Value, String> {
         register_fn: Some(host_register),
         alloc: Some(host_alloc),
         free: Some(host_free),
+        host_query: Some(host_query),
     };
 
     let rc = unsafe { init_fn(&api) };
@@ -235,6 +327,10 @@ pub fn load(ctx: &mut HostContext, path: &Value) -> Result<Value, String> {
 
     for k in buf.fns.keys() {
         if ctx.plugins.fns.contains_key(k) {
+            // Idempotent re-load of the same plugin surface (e.g. multiple `agent` ctors).
+            if buf.fns.keys().all(|name| ctx.plugins.fns.contains_key(name)) {
+                return Ok(Value::Int(0));
+            }
             return Err(format!("plugin function `{k}` already registered"));
         }
     }
@@ -282,7 +378,8 @@ pub fn call_registered(
     let reg = ctx
         .plugins
         .get(name)
-        .ok_or_else(|| format!("unknown function `{name}`"))?;
+        .ok_or_else(|| format!("unknown function `{name}`"))?
+        .clone();
 
     let mut map = serde_json::Map::new();
     for p in &reg.params {
@@ -299,7 +396,10 @@ pub fn call_registered(
 
     let mut out_ptr: *mut c_char = std::ptr::null_mut();
     let mut err_ptr: *mut c_char = std::ptr::null_mut();
+
+    CURRENT_HOST.with(|c| c.set(ctx as *const HostContext));
     let rc = unsafe { (reg.fn_ptr)(c_args.as_ptr(), &mut out_ptr, &mut err_ptr) };
+    CURRENT_HOST.with(|c| c.set(std::ptr::null()));
 
     let err_s = take_c_string(err_ptr);
     let out_s = take_c_string(out_ptr);

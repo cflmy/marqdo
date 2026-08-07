@@ -133,12 +133,10 @@ pub fn kill_all(ctx: &mut HostContext) {
                 let _ = task.stderr.join();
             }
             Handle::Function(mut task) => {
-                if let Ok(mut st) = task.state.lock() {
-                    if matches!(*st, FnState::Running) {
-                        *st = FnState::Killed;
-                    }
+                // Join so fire-and-forget writers (e.g. agent writeback) finish before exit.
+                if let Some(h) = task.handle.take() {
+                    let _ = h.join();
                 }
-                drop(task.handle.take());
             }
         }
     }

@@ -5,6 +5,6 @@ title: net url_encode
 
 # main
 
-*`e` = > url_encode text=a b *
+*`e` = > net.url_encode text=a b *
 
 > print text=`e`

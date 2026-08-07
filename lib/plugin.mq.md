@@ -15,3 +15,10 @@ description: Load optional native ABI plugins (.dll / .so / .dylib)
 ## list
 
 **> host_plugin_list**
+
+## native_path
+    + `name`
+
+Resolve installed / local native plugin path (e.g. `agent`).
+
+**> host_ext_native_path name=`name`**

@@ -176,25 +176,38 @@ description: High-school math — num, random, formula, plot
 ## solve
     + `formula`
     + `var`
+    + `min`=None
+    + `max`=None
 
-**> host_solve formula=`formula` var=`var`**
+**> host_solve formula=`formula` var=`var` min=`min` max=`max`**
 
 ## plot
     + `formula`
     + `var`
     + `min`
     + `max`
+    + `steps`=None
+    + `path`=None
+    + `derivative`=None
+    + `grid`=None
 
-**> host_plot formula=`formula` var=`var` min=`min` max=`max`**
+**> host_plot formula=`formula` var=`var` min=`min` max=`max` steps=`steps` path=`path` derivative=`derivative` grid=`grid`**
 
 ## plot_points
     + `xs`
     + `ys`
+    + `path`=None
+    + `grid`=None
 
-**> host_plot_points xs=`xs` ys=`ys`**
+**> host_plot_points xs=`xs` ys=`ys` path=`path` grid=`grid`**
 
 ## plot_conic
     + `kind`
     + `a`
+    + `b`=None
+    + `h`=None
+    + `k`=None
+    + `path`=None
+    + `grid`=None
 
-**> host_plot_conic kind=`kind` a=`a`**
+**> host_plot_conic kind=`kind` a=`a` b=`b` h=`h` k=`k` path=`path` grid=`grid`**

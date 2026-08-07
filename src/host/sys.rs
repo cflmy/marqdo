@@ -107,18 +107,17 @@ pub fn exec(ctx: &HostContext, cmd: &Value, args: Option<&Value>) -> Result<Valu
     let cmd = as_text(cmd, "cmd")?;
     let mut command = Command::new(cmd);
     command.current_dir(&ctx.cwd);
-    if let Some(a) = args {
-        match a {
-            Value::List(xs) => {
-                for x in xs {
-                    command.arg(x.as_display());
-                }
+    match args {
+        None | Some(Value::None) => {}
+        Some(Value::List(xs)) => {
+            for x in xs {
+                command.arg(x.as_display());
             }
-            Value::Text(s) => {
-                command.arg(s);
-            }
-            _ => return Err("exec args must be list or text".into()),
         }
+        Some(Value::Text(s)) => {
+            command.arg(s);
+        }
+        Some(_) => return Err("exec args must be list or text".into()),
     }
     let status = command
         .status()

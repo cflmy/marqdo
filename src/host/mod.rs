@@ -24,8 +24,6 @@ pub use plugin::PluginState;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
-use crate::value::Value;
-
 /// Host capability flags. Default: all enabled.
 #[derive(Debug, Clone)]
 pub struct HostCaps {
@@ -68,17 +66,14 @@ pub struct HostContext {
     pub plots: Vec<PlotArtifact>,
     /// lang → interpreter argv (from `set_cmd`).
     pub foreign_cmds: HashMap<String, Vec<String>>,
-    /// Loaded native plugins (ABI v1).
+    /// Loaded native plugins (ABI v1/v2).
     pub plugins: PluginState,
-    /// Entry `.mq.md` source text (for agent context injection).
+    /// Entry `.mq.md` source text (for ABI host_query / context injection).
     pub entry_source: Option<String>,
     pub entry_path: Option<PathBuf>,
     /// Active function names (outer → inner) for call-site injection.
     pub call_stack: Vec<String>,
-    /// Per-agent conversation history (id → turns).
-    pub agent_histories: HashMap<String, Vec<Value>>,
-    pub agent_seq: u64,
-    /// Last statement line (updated by interpreters for `host_call_site`).
+    /// Last statement line (updated by interpreters for call-site queries).
     pub current_line: u32,
     /// Entry-file line of each active user call (for writeback anchoring).
     pub call_site_lines: Vec<u32>,
@@ -103,8 +98,6 @@ impl Default for HostContext {
             entry_source: None,
             entry_path: None,
             call_stack: Vec::new(),
-            agent_histories: HashMap::new(),
-            agent_seq: 0,
             current_line: 1,
             call_site_lines: Vec::new(),
             subtasks: HashMap::new(),

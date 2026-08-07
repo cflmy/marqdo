@@ -28,7 +28,7 @@ pub const CATALOG: &[ExtPackage] = &[
         id: "agent",
         description: "Agent development framework (ext/ai/agent)",
         mq_files: &["ai/agent.mq.md", "ai/智能体.mq.md"],
-        native_crate: None,
+        native_crate: Some("marqdo_plugin_agent"),
     },
 ];
 
@@ -151,10 +151,23 @@ fn find_source_file(name: &str) -> Result<PathBuf> {
 fn find_native_plugin() -> Result<PathBuf> {
     let name = native_lib_filename();
     let mut candidates = Vec::new();
+    if let Ok(p) = env::var("MARQDO_AGENT_PLUGIN") {
+        let p = PathBuf::from(p);
+        if p.is_file() {
+            return Ok(p);
+        }
+        candidates.push(p);
+    }
     if let Ok(h) = env::var("MARQDO_EXT_SOURCE") {
         let base = PathBuf::from(h);
         candidates.push(base.join("native").join(name));
         candidates.push(base.join(name));
+    }
+    // Honor CARGO_TARGET_DIR (sandbox / custom target roots) before cwd/target.
+    if let Ok(td) = env::var("CARGO_TARGET_DIR") {
+        let td = PathBuf::from(td);
+        candidates.push(td.join("debug").join(name));
+        candidates.push(td.join("release").join(name));
     }
     if let Ok(cwd) = env::current_dir() {
         candidates.push(cwd.join("target").join("debug").join(name));
@@ -164,19 +177,19 @@ fn find_native_plugin() -> Result<PathBuf> {
     if let Ok(exe) = env::current_exe() {
         if let Some(dir) = exe.parent() {
             candidates.push(dir.join("ext").join("native").join(name));
+            // Same directory as the marqdo binary (typical: target/debug/).
             candidates.push(dir.join(name));
             // target/debug/deps → target/debug
-            candidates.push(dir.join(name));
             candidates.push(dir.join("..").join(name));
         }
     }
-    for p in candidates {
+    for p in &candidates {
         if p.is_file() {
-            return Ok(p);
+            return Ok(p.clone());
         }
     }
     bail!(
-        "cannot find native plugin `{name}` (run `cargo build -p marqdo_plugin_agent`, or place it under MARQDO_EXT_SOURCE/native/)"
+        "cannot find native plugin `{name}` (run `cargo build -p marqdo_plugin_agent`, or `marqdo ext add agent`, or set MARQDO_AGENT_PLUGIN)"
     );
 }
 
@@ -270,6 +283,7 @@ pub fn remove_ext(id: &str) -> Result<()> {
 }
 
 /// Resolve installed native plugin path for `name` (currently only `agent`).
+/// Also falls back to cargo `target/{debug,release}` artifacts for local runs.
 pub fn installed_native_path(name: &str) -> Option<PathBuf> {
     if name != "agent" {
         return None;
@@ -287,7 +301,13 @@ pub fn installed_native_path(name: &str) -> Option<PathBuf> {
             return Some(p);
         }
     }
-    None
+    if let Ok(p) = env::var("MARQDO_AGENT_PLUGIN") {
+        let p = PathBuf::from(p);
+        if p.is_file() {
+            return Some(p);
+        }
+    }
+    find_native_plugin().ok()
 }
 
 pub fn path_is_trusted_plugin(path: &Path) -> bool {
@@ -300,6 +320,19 @@ pub fn path_is_trusted_plugin(path: &Path) -> bool {
         let native = root.join("native");
         let native = native.canonicalize().unwrap_or(native);
         if crate::host::path_under_root(&path, &native) {
+            return true;
+        }
+    }
+    if let Ok(p) = env::var("MARQDO_AGENT_PLUGIN") {
+        let p = PathBuf::from(p);
+        let p = p.canonicalize().unwrap_or(p);
+        if p == path {
+            return true;
+        }
+    }
+    if let Ok(found) = find_native_plugin() {
+        let found = found.canonicalize().unwrap_or(found);
+        if found == path {
             return true;
         }
     }

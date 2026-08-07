@@ -5,6 +5,6 @@ title: json quote
 
 # main
 
-*`q` = > quote text=hi *
+*`q` = > json.quote text=hi *
 
 > print text=`q`

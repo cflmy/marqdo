@@ -6,11 +6,11 @@ title: subtask spawn fn
 
 # main
 
-*`args` = > parse text={"n":21} *
+*`args` = > json.parse text={"n":21} *
 
-*`id` = > spawn fn=worker args=`args` *
+*`id` = > subtask.spawn fn=worker args=`args` *
 
-*`v` = > wait id=`id` *
+*`v` = > subtask.wait id=`id` *
 
 > print text=`v`
 

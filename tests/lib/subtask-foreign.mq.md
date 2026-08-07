@@ -10,8 +10,8 @@ title: subtask foreign spawn
 print(7 + 8)
 ```
 
-*`id` = > spawn code=`py` *
+*`id` = > subtask.spawn code=`py` *
 
-*`out` = > wait id=`id` *
+*`out` = > subtask.wait id=`id` *
 
 > print text=`out`

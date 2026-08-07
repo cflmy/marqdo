@@ -5,8 +5,8 @@ title: subtask spawn join
 
 # main
 
-*`id` = > spawn path=subtask-child.mq.md *
+*`id` = > subtask.spawn path=subtask-child.mq.md *
 
-*`code` = > wait id=`id` *
+*`code` = > subtask.wait id=`id` *
 
 > print text=done

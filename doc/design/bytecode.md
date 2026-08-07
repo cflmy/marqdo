@@ -67,7 +67,8 @@
 | `keywords/bool-logic` | ✅ | ✅ |
 | `structure/nested-call` | ✅ | ✅ |
 | `structure/positional-call` | ✅ | ✅ |
-| `structure/import/*` | ✅ | ✅（load 合并 AST 后编译） |
+| `structure/import/*` | ✅ | ✅（导入模块树后编译） |
+| `structure/ns/*` | ✅ | ✅ |
 | `tests/errors/*` | ✅（非零退出） | 同 tree 语义（编译期/运行期诊断） |
 
 核心金样例双后端已对齐；后续可扩展 Op、优化与更好的调试信息。

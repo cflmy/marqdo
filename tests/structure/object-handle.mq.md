@@ -6,32 +6,32 @@ title: object handle smoke
 # counter
     + `n`
 
-*`t` = > parse text={"p":"{\"n\":","s":"}"} *
+*`t` = > json.parse text={"p":"{\"n\":","s":"}"} *
 *`qn` = > str `n` *
-*`p` = > get value=`t` key=p *
-*`s` = > get value=`t` key=s *
+*`p` = > json.get value=`t` key=p *
+*`s` = > json.get value=`t` key=s *
 *`raw` = `p` + `qn` + `s` *
-**> parse text=`raw`**
+**> json.parse text=`raw`**
 
 ## bump
 
-*`n` = > get value=`self` key=n *
+*`n` = > json.get value=`self` key=n *
 *`n2` = `n` + 1*
-*`t` = > parse text={"p":"{\"n\":","s":"}"} *
+*`t` = > json.parse text={"p":"{\"n\":","s":"}"} *
 *`qn` = > str `n2` *
-*`p` = > get value=`t` key=p *
-*`s` = > get value=`t` key=s *
+*`p` = > json.get value=`t` key=p *
+*`s` = > json.get value=`t` key=s *
 *`raw` = `p` + `qn` + `s` *
-*`m` = > parse text=`raw` *
+*`m` = > json.parse text=`raw` *
 **`m`**
 
 # main
 
 *`c` = > counter n=3 *
-*`ty` = > get value=`c` key=_type *
+*`ty` = > json.get value=`c` key=_type *
 > print text=`ty`
-*`n` = > get value=`c` key=n *
+*`n` = > json.get value=`c` key=n *
 > print text=`n`
 *`c2` = > `c`.bump *
-*`n2` = > get value=`c2` key=n *
+*`n2` = > json.get value=`c2` key=n *
 > print text=`n2`

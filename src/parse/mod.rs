@@ -7,7 +7,7 @@ pub use expr::{parse_call_after_gt, parse_expr, parse_value_or_interp};
 use anyhow::{bail, Result};
 
 use crate::ast::{
-    BranchArm, Expr, Function, Literal, Module, Stmt,
+    BranchArm, Expr, Function, Import, Literal, Module, Stmt, Use,
 };
 use crate::diagnostics::{Diagnostic, Span};
 use crate::lex::{classify_source, ClassifiedLine, LineKind};
@@ -22,7 +22,7 @@ pub fn parse_source(source: &str) -> Result<Module> {
 
 pub fn parse_classified(lines: &[ClassifiedLine]) -> Result<Module> {
     let mut cur = Cursor::new(lines);
-    let imports = cur.parse_frontmatter()?;
+    let (imports, uses) = cur.parse_frontmatter()?;
     let mut functions = Vec::new();
     while cur.skip_noise() {
         let Some(line) = cur.peek() else { break };
@@ -36,7 +36,20 @@ pub fn parse_classified(lines: &[ClassifiedLine]) -> Result<Module> {
             );
         }
     }
-    Ok(Module { imports, functions })
+    for u in &uses {
+        if imports.iter().any(|i| i.bind == u.bind) {
+            bail!("use bind `{}` conflicts with import library name", u.bind);
+        }
+        if functions.iter().any(|f| f.name == u.bind) {
+            bail!("use bind `{}` conflicts with top-level name", u.bind);
+        }
+    }
+    Ok(Module {
+        imports,
+        uses,
+        functions,
+        import_modules: std::collections::HashMap::new(),
+    })
 }
 
 struct Cursor<'a> {
@@ -72,16 +85,17 @@ impl<'a> Cursor<'a> {
         false
     }
 
-    fn parse_frontmatter(&mut self) -> Result<Vec<String>> {
+    fn parse_frontmatter(&mut self) -> Result<(Vec<Import>, Vec<Use>)> {
         let mut imports = Vec::new();
+        let mut uses = Vec::new();
         if !self.skip_noise() {
-            return Ok(imports);
+            return Ok((imports, uses));
         }
         let Some(first) = self.peek() else {
-            return Ok(imports);
+            return Ok((imports, uses));
         };
         if first.text.trim() != "---" {
-            return Ok(imports);
+            return Ok((imports, uses));
         }
         self.bump();
         while let Some(line) = self.peek() {
@@ -91,14 +105,26 @@ impl<'a> Cursor<'a> {
                 break;
             }
             if t.starts_with('>') {
-                let path = t[1..].trim();
-                if path.ends_with(".mq.md") {
-                    imports.push(path.to_string());
+                let rest = t[1..].trim();
+                if let Some(imp) = parse_import_spec(rest) {
+                    if imports.iter().any(|i| i.bind == imp.bind) {
+                        bail!(
+                            "{}:1: duplicate import bind `{}`",
+                            line.line_no,
+                            imp.bind
+                        );
+                    }
+                    imports.push(imp);
+                } else if let Some(u) = parse_use_spec(rest) {
+                    if uses.iter().any(|x| x.bind == u.bind) {
+                        bail!("{}:1: duplicate use bind `{}`", line.line_no, u.bind);
+                    }
+                    uses.push(u);
                 }
             }
             self.bump();
         }
-        Ok(imports)
+        Ok((imports, uses))
     }
 
     fn parse_function(&mut self, min_level: u8) -> Result<Function> {
@@ -692,6 +718,102 @@ fn parse_heading(trimmed: &str) -> Option<(u8, &str)> {
         return None;
     }
     Some((level, name))
+}
+
+/// Parse `lib/time.mq.md` / `lib/time.mq.md as time` / `lib/时间.mq.md 作为 时间`.
+pub fn parse_import_spec(rest: &str) -> Option<Import> {
+    let rest = rest.trim();
+    const SUFFIX: &str = ".mq.md";
+    let idx = rest.find(SUFFIX)?;
+    let path = rest[..idx + SUFFIX.len()].trim().to_string();
+    if !path.ends_with(SUFFIX) {
+        return None;
+    }
+    let after = rest[idx + SUFFIX.len()..].trim();
+    let bind = if after.is_empty() {
+        default_import_bind(&path)
+    } else if let Some(name) = after.strip_prefix("as") {
+        let name = name.trim();
+        if name.is_empty() || name.split_whitespace().count() != 1 {
+            return None;
+        }
+        name.to_string()
+    } else if let Some(name) = after.strip_prefix("作为") {
+        let name = name.trim();
+        if name.is_empty() || name.split_whitespace().count() != 1 {
+            return None;
+        }
+        name.to_string()
+    } else {
+        return None;
+    };
+    Some(Import { path, bind })
+}
+
+fn default_import_bind(path: &str) -> String {
+    let path = path.replace('\\', "/");
+    let file = path.rsplit('/').next().unwrap_or(path.as_str());
+    file.strip_suffix(".mq.md").unwrap_or(file).to_string()
+}
+
+/// Parse `use time.format` / `use time.format as fmt` / `使用 时间.格式化` / `使用 时间.格式化 作为 fmt`.
+pub fn parse_use_spec(rest: &str) -> Option<Use> {
+    let rest = rest.trim();
+    let after = if rest.starts_with("use")
+        && rest
+            .get(3..)
+            .is_some_and(|s| s.starts_with(|c: char| c.is_whitespace()))
+    {
+        rest[3..].trim()
+    } else if let Some(a) = rest.strip_prefix("使用") {
+        let a = a.trim();
+        if a.is_empty() {
+            return None;
+        }
+        a
+    } else {
+        return None;
+    };
+    if after.is_empty() {
+        return None;
+    }
+
+    let (path_str, bind_opt) = if let Some((left, right)) = after.split_once(" as ") {
+        (left.trim(), Some(right.trim()))
+    } else if let Some((left, right)) = after.split_once(" 作为 ") {
+        (left.trim(), Some(right.trim()))
+    } else if let Some((left, right)) = after.split_once("作为") {
+        let left = left.trim();
+        let right = right.trim();
+        if left.is_empty() || right.is_empty() {
+            (after, None)
+        } else {
+            (left, Some(right))
+        }
+    } else {
+        (after, None)
+    };
+
+    if path_str.is_empty() || path_str.contains('`') {
+        return None;
+    }
+    let path: Vec<String> = path_str
+        .split('.')
+        .map(|s| s.trim().to_string())
+        .collect();
+    if path.len() < 2 || path.iter().any(|p| p.is_empty()) {
+        return None;
+    }
+    let bind = match bind_opt {
+        Some(b) => {
+            if b.is_empty() || b.split_whitespace().count() != 1 || b.contains('.') {
+                return None;
+            }
+            b.to_string()
+        }
+        None => path.last()?.clone(),
+    };
+    Some(Use { path, bind })
 }
 
 fn is_heading(trimmed: &str) -> bool {

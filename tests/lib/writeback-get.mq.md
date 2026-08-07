@@ -5,7 +5,7 @@ title: writeback get
 
 # main
 
-*`out` = > get *
+*`out` = > writeback.get *
 
 <!-- marqdo-out
 hello-writeback

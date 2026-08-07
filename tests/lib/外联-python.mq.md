@@ -10,6 +10,6 @@ title: foreign zh
 print("中文外联")
 ```
 
-*`out` = > 运行 代码=`hi` *
+*`out` = > 外联.运行 代码=`hi` *
 
 > print text=`out`

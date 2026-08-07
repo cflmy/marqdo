@@ -117,8 +117,8 @@ pub fn http_post(
     let url = as_text(url, "url")?;
     let body = as_text(body, "body")?;
     let ct = match content_type {
+        None | Some(Value::None) => "application/json; charset=utf-8",
         Some(v) => as_text(v, "content_type")?,
-        None => "application/json; charset=utf-8",
     };
     let hdrs = headers_from_value(headers)?;
     let (status, resp) = http_exchange("POST", url, Some(body), Some(ct), &hdrs)?;

@@ -1,60 +1,117 @@
 ---
 title: ext/ai/agent
-description: Thin agent framework — ctor, run, clear_history only.
+description: Document-driven agent — step / plan; tools via lib/subtask; runtime via ABI v2 agent plugin.
 > ext/ai/llm.mq.md
+> lib/json.mq.md
+> lib/sys.mq.md
+> lib/subtask.mq.md
+> lib/plugin.mq.md
 ---
 
-## build_agent_context
+## build_step_context
     + `agent`
-    + `extra`
+    + `task`
 
-Internal: assemble prompt (user prompt, extra, tool list, source, call site, history, Marqdo skill).
+Assemble a readable prompt: standing, task, tools, call site, source, skill, and the act protocol (human-visible).
 
-*`user_prompt` = > get value=`agent` key=user_prompt *
-1. `user_prompt`
-  *`up` = `user_prompt`*
+*`standing` = > json.get value=`agent` key=standing *
+1. `standing`
+  *`up` = `standing`*
 2. *
   *`up` = None*
 
-*`tools` = > get value=`agent` key=tools *
-*`tools_s` = > host_format_tools_for_llm tools=`tools` *
-*`src` = > host_module_source *
-*`site` = > host_call_site *
-*`site_s` = > stringify value=`site` *
-*`id` = > get value=`agent` key=id *
-*`hist` = > host_agent_history_get id=`id` *
-*`hist_s` = > stringify value=`hist` *
-*`skill` = > host_marqdo_skill *
-*`extra_s` = > stringify value=`extra` *
+*`tools` = > json.get value=`agent` key=tools *
+*`tools_s` = > agent_format_tools tools=`tools` *
+*`src` = > agent_module_source *
+*`site` = > agent_call_site *
+*`site_s` = > json.stringify value=`site` *
+*`skill` = > agent_marqdo_skill *
+*`task_s` = > json.stringify value=`task` *
 
-*`sep` = > parse text={"a":"\n\n--- standing ---\n","b":"\n\n--- extra ---\n","c":"\n\n--- tools ---\n","d":"\n\n--- call site ---\n","e":"\n\n--- source ---\n","f":"\n\n--- history ---\n","g":"\n\n--- marqdo skill ---\n"} *
-*`a` = > get value=`sep` key=a *
-*`b` = > get value=`sep` key=b *
-*`c` = > get value=`sep` key=c *
-*`d` = > get value=`sep` key=d *
-*`e` = > get value=`sep` key=e *
-*`f` = > get value=`sep` key=f *
-*`g` = > get value=`sep` key=g *
+*`esc` = > json.parse text={"a":"\n\n--- standing ---\n","b":"\n\n--- task ---\n","c":"\n\n--- tools ---\n","d":"\n\n--- call site ---\n","e":"\n\n--- source (.mq.md) ---\n","f":"\n\n--- marqdo skill ---\n","g":"\n\n--- how to act ---\nTools are ## functions in the source above. To call one, reply with exactly one line: CALL:<name>\n(Chinese ok: 调用：<name>)\nOtherwise reply with the final answer only.\nTools run via Marqdo subtask (spawn fn / wait).\n"} *
+*`a` = > json.get value=`esc` key=a *
+*`b` = > json.get value=`esc` key=b *
+*`c` = > json.get value=`esc` key=c *
+*`d` = > json.get value=`esc` key=d *
+*`e` = > json.get value=`esc` key=e *
+*`f` = > json.get value=`esc` key=f *
+*`g` = > json.get value=`esc` key=g *
 
-*`tool_proto` = \n\n--- tool protocol ---\nEach tool is a zero-arg Marqdo function in this module (see tools list). To call one, reply with exactly one line: TOOL:<name>. No other text on that line.\nAfter the tool runs you will get its output and should answer the user.\n *
-
-*`p` = You are a Marqdo agent. Follow Marqdo skill rules when reading or writing .mq.md. *
-*`p` = `p` + `a` + `up` + `b` + `extra_s` + `c` + `tool_proto` + `tools_s` + `d` + `site_s` + `e` + `src` + `f` + `hist_s` + `g` + `skill` *
+*`p` = You are a Marqdo agent. The runbook source is your ground truth — code is documentation. *
+*`p` = `p` + `a` + `up` + `b` + `task_s` + `c` + `tools_s` + `g` + `d` + `site_s` + `e` + `src` + `f` + `skill` *
 **`p`**
+
+---
+
+## extract_tool_name
+    + `reply`
+
+Find a human-readable call line: `CALL:<name>` or `调用：<name>` / `调用:<name>`.
+
+*`esc` = > json.parse text={"nl":"\n"} *
+*`nl` = > json.get value=`esc` key=nl *
+*`text` = > trim value=`reply` *
+*`lines` = > split value=`text` sep=`nl` *
+*`found` = None*
+
+- [`line`](`lines`)
+  *`t` = > trim value=`line` *
+  *`parts` = > split value=`t` sep=: *
+  *`n` = > len value=`parts` *
+  1. `n` > 1
+    *`head` = > at value=`parts` index=0 *
+    *`head` = > trim value=`head` *
+    *`rest` = > at value=`parts` index=1 *
+    *`rest` = > trim value=`rest` *
+    1. `head` == CALL
+      *`found` = `rest`*
+    2. `head` == 调用
+      *`found` = `rest`*
+    3. *
+      *`_` = 1*
+  2. *
+    *`_` = 1*
+
+**`found`**
+
+---
+
+## run_tool
+    + `tools`
+    + `name`
+
+Allowlist check, then invoke the runbook `##` via `lib/subtask` (`spawn fn=` → `wait`).
+
+*`allowed` = > agent_tool_allowed tools=`tools` name=`name` *
+1. `allowed`
+  *`id` = > subtask.spawn fn=`name` *
+  **> subtask.wait id=`id`**
+2. *
+  *`msg` = Tool not allowed: *
+  **`msg` + `name`**
 
 # agent
     + `model`
     + `tools`
-    + `user_prompt`
+    + `standing`
 
-*`id` = > host_agent_alloc *
-*`h` = > parse text={"_type":"agent"} *
-*`h` = > map_set map=`h` key=id value=`id` *
-*`h` = > map_set map=`h` key=model value=`model` *
-*`h` = > map_set map=`h` key=tools value=`tools` *
+Load ABI v2 agent plugin once (session bag + context queries).
 
-1. `user_prompt`
-  *`h` = > map_set map=`h` key=user_prompt value=`user_prompt` *
+*`p` = > plugin.native_path name=agent *
+1. `p`
+  > plugin.load path=`p`
+2. *
+  > print text=ext/ai/agent: native agent plugin not found (build marqdo_plugin_agent or marqdo ext add agent)
+  > sys.exit code=1
+
+*`id` = > agent_alloc *
+*`h` = > json.parse text={"_type":"agent"} *
+*`h` = > json.set map=`h` key=id value=`id` *
+*`h` = > json.set map=`h` key=model value=`model` *
+*`h` = > json.set map=`h` key=tools value=`tools` *
+
+1. `standing`
+  *`h` = > json.set map=`h` key=standing value=`standing` *
 2. *
   *`_` = 1*
 
@@ -62,50 +119,70 @@ Internal: assemble prompt (user prompt, extra, tool list, source, call site, his
 
 ## clear_history
 
-*`id` = > get value=`self` key=id *
-> host_agent_history_clear id=`id`
+Clear the plugin session bag for this agent id.
+
+*`id` = > json.get value=`self` key=id *
+> agent_history_clear id=`id`
 ****
 
-## run
-    + `extra`
+## step
+    + `task`
 
-*`ctx` = > build_agent_context agent=`self` extra=`extra` *
-*`id` = > get value=`self` key=id *
+One atomic turn: context → LLM → optional tool via subtask. Returns a **map** (`status`, `task`, `decision`, and on success `result` plus optional `tool` / `tool_result`; on failure `error`). Does **not** write back — call `lib/writeback` yourself if you want persistence.
 
-*`user_turn` = > parse text={"role":"user"} *
-*`user_turn` = > map_set map=`user_turn` key=content value=`extra` *
-> host_agent_history_append id=`id` item=`user_turn`
+*`ctx` = > build_step_context agent=`self` task=`task` *
+*`id` = > json.get value=`self` key=id *
+*`model` = > json.get value=`self` key=model *
+*`tools` = > json.get value=`self` key=tools *
 
-*`model` = > get value=`self` key=model *
+*`user_turn` = > json.parse text={"role":"user"} *
+*`user_turn` = > json.set map=`user_turn` key=content value=`task` *
+> agent_history_append id=`id` item=`user_turn`
+
 *`reply` = > `model`.complete prompt=`ctx` *
-*`tools` = > get value=`self` key=tools *
 *`reply` = > trim value=`reply` *
+*`decision` = `reply`*
+*`tool_name` = > extract_tool_name reply=`reply` *
+*`out` = > json.parse text={"status":"ok"} *
+*`out` = > json.set map=`out` key=task value=`task` *
+*`out` = > json.set map=`out` key=decision value=`decision` *
 
-*`parts` = > split value=`reply` sep=: *
-*`head` = > at value=`parts` index=0 *
-*`tool_name` = > at value=`parts` index=1 *
-*`tool_name` = > trim value=`tool_name` *
-
-1. `head` == TOOL
-  *`allowed` = > host_tool_allowed tools=`tools` name=`tool_name` *
-  1. `allowed`
-    *`tool_out` = > call_fn name=`tool_name` *
-    *`tool_s` = > stringify value=`tool_out` *
-    *`extra_s` = > stringify value=`extra` *
-    *`fp` = The user asked: *
-    *`fp` = `fp` + `extra_s` *
-    *`fp` = `fp` + . You invoked tool *
-    *`fp` = `fp` + `tool_name` *
-    *`fp` = `fp` + which returned: *
-    *`fp` = `fp` + `tool_s` *
-    *`fp` = `fp` + . Reply to the user in one brief sentence. *
-    *`reply` = > `model`.complete prompt=`fp` *
+1. `tool_name`
+  *`tool_out` = > run_tool tools=`tools` name=`tool_name` *
+  *`tool_s` = > json.stringify value=`tool_out` *
+  *`deny` = > split value=`tool_s` sep=Tool not allowed *
+  *`deny_n` = > len value=`deny` *
+  1. `deny_n` > 1
+    *`out` = > json.set map=`out` key=status value=error *
+    *`out` = > json.set map=`out` key=error value=`tool_s` *
+    *`reply` = `tool_s`*
   2. *
-    *`reply` = Tool not allowed: `tool_name` *
+    *`task_s` = > json.stringify value=`task` *
+    *`fp` = The user asked: *
+    *`fp` = `fp` + `task_s` *
+    *`fp` = `fp` + . Tool *
+    *`fp` = `fp` + `tool_name` *
+    *`fp` = `fp` + ran via subtask and returned: *
+    *`fp` = `fp` + `tool_s` *
+    *`fp` = `fp` + . Reply to the user briefly. *
+    *`reply` = > `model`.complete prompt=`fp` *
+    *`out` = > json.set map=`out` key=tool value=`tool_name` *
+    *`out` = > json.set map=`out` key=tool_result value=`tool_s` *
+    *`out` = > json.set map=`out` key=result value=`reply` *
 2. *
-  *`_` = 1*
+  *`out` = > json.set map=`out` key=result value=`reply` *
 
-*`as_turn` = > parse text={"role":"assistant"} *
-*`as_turn` = > map_set map=`as_turn` key=content value=`reply` *
-> host_agent_history_append id=`id` item=`as_turn`
-**`reply`**
+*`as_turn` = > json.parse text={"role":"assistant"} *
+*`as_turn` = > json.set map=`as_turn` key=content value=`reply` *
+> agent_history_append id=`id` item=`as_turn`
+**`out`**
+
+## plan
+    + `goal`
+    + `workbook_dir`
+
+Multi-step workbook (D2) — not implemented yet.
+
+*`_` = `workbook_dir`*
+*`msg` = plan (multi-step workbook) is not implemented yet; goal was: *
+**`msg` + `goal`**

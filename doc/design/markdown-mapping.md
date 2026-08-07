@@ -3,9 +3,9 @@
 | | |
 |---|---|
 | 状态 | 已定论（修订：形参 `+`、分支 `1.`、标识符反引号、`-` 专用于循环） |
-| 日期 | 2026-08-06 |
+| 日期 | 2026-08-07 |
 | 取代 | v0.1 中「函数头 `-` 形参 / 裸名形参与遍历变量 / `+` 分支」 |
-| 相关 | [objects.md](objects.md) · [code-vs-comment.md](code-vs-comment.md) · [return-hr-and-code-surface.md](return-hr-and-code-surface.md) |
+| 相关 | [objects.md](objects.md) · [code-vs-comment.md](code-vs-comment.md) · [return-hr-and-code-surface.md](return-hr-and-code-surface.md) · [module-namespace.md](module-namespace.md) |
 
 Markdown **标记即语法**。输出**不是**语言架构原语，而是内置函数 **`print`**（英文；见 [keywords.md](keywords.md)）。
 
@@ -47,7 +47,9 @@ Markdown **标记即语法**。输出**不是**语言架构原语，而是内置
 | 分支臂头整行恰为 `*`（在 `N.` 后） | else，如 `2. *` |
 | `> 函数 形参=实参` 或 `> 函数 实参` | 调用（具名 / 位置，见 [call-arguments.md](call-arguments.md)） |
 | `` > `对象`.方法 … `` | 方法调用（实例 map 须含 `_type`） |
-| frontmatter `> path.mq.md` | 跨文件导入 |
+| frontmatter `> path.mq.md` [`as` / `作为` name] | 导入（绑定库名；默认 = 文件名茎） |
+| frontmatter `> use lib.member` [`as` name] / `使用` | 将库路径成员绑为本地短名 |
+| `> lib.member …` / `> lib.Type.member …` | 点号路径调用（路径段裸名、无反引号） |
 | `*…*` | **程序语句**（绑定、表达式句、可写的调用句等） |
 | `**…**` | **返回值**（架构级；函数结果） |
 | `****` / `**` + 空白 + `**` | **空返回**（`None`），并结束本函数体 |
@@ -118,7 +120,8 @@ Markdown **标记即语法**。输出**不是**语言架构原语，而是内置
 
 ## 5. Frontmatter 与跨文件
 
-同 v0：文件头 `---` 对为元信息；其中 `> file.mq.md` 为导入。  
+文件头 `---` 对为元信息。其中 `> file.mq.md` 为**导入**（绑定库名，成员不倒进全局）；`> use lib.member` / `> 使用 库.成员` 引入本地短名。调用经裸点号路径（`time.parse`、`agent.agent`）；实例方法须 `` > `var`.method ``。详见 [module-namespace.md](module-namespace.md)。
+
 **函数体内的** `---` / `***` 不解释为 frontmatter（见 §11）。
 
 ---

@@ -446,11 +446,13 @@ impl Interpreter {
         call: &CallExpr,
     ) -> Result<Value> {
         let mut call = call.clone();
-        let callee = crate::aliases::normalize_call_callee_and_args(
-            &call.callee,
-            &mut call.args,
-        );
-        call.callee = callee;
+        if call.path.is_none() {
+            let callee = crate::aliases::normalize_call_callee_and_args(
+                &call.callee,
+                &mut call.args,
+            );
+            call.callee = callee;
+        }
 
         let mut ev_args = Vec::new();
         for arg in &call.args {
@@ -469,6 +471,14 @@ impl Interpreter {
 
         if let Some(recv_name) = &call.receiver {
             return self.eval_method_call(module, fun, env, recv_name, &call.callee, &ev_args);
+        }
+
+        if let Some(path) = &call.path {
+            return self.eval_path_call(module, path, &ev_args);
+        }
+
+        if let Some(u) = module.uses.iter().find(|u| u.bind == call.callee) {
+            return self.eval_path_call(module, &u.path, &ev_args);
         }
 
         match call.callee.as_str() {
@@ -637,6 +647,73 @@ impl Interpreter {
         }
     }
 
+    /// Resolve bare path `lib.member` / `lib.Type.member` (definition-tree addressing).
+    fn eval_path_call(
+        &mut self,
+        module: &Module,
+        path: &[String],
+        ev_args: &[EvArg],
+    ) -> Result<Value> {
+        let display = path.join(".");
+        if path.len() < 2 {
+            return Err(self.err(format!("library path `{display}`: need at least `lib.member`")));
+        }
+        let lib_name = &path[0];
+        let lib = module.import_modules.get(lib_name).ok_or_else(|| {
+            self.err(format!("unknown library `{lib_name}` (import it in frontmatter)"))
+        })?;
+
+        let mut parent_is_object = false;
+        let mut node = lib
+            .functions
+            .iter()
+            .find(|f| f.name == path[1])
+            .ok_or_else(|| self.err(format!("unknown `{display}`")))?;
+        for seg in &path[2..] {
+            parent_is_object = node.is_object();
+            node = node
+                .children
+                .iter()
+                .find(|c| c.name == *seg)
+                .ok_or_else(|| self.err(format!("unknown `{display}`")))?;
+        }
+
+        if parent_is_object && !node.is_object() {
+            return Err(self.err(format!(
+                "`{display}` is an instance method; call it as `var`.{}",
+                node.name
+            )));
+        }
+
+        let bound = {
+            let mut dummy_env = Env::new();
+            bind_function_args(
+                self,
+                lib,
+                node,
+                &mut dummy_env,
+                &node.params,
+                ev_args,
+                false,
+            )
+            .map_err(|m| self.err(m))?
+        };
+        let mut call_env = Env::new();
+        for (k, v) in bound {
+            call_env.set(k, v);
+        }
+
+        self.host.push_call_site_line(self.host.current_line);
+        let result = self.run_function(lib, node, call_env, &[]);
+        self.host.pop_call_site_line();
+        let result = result?;
+        if node.is_object() {
+            Ok(tag_instance(&node.name, result))
+        } else {
+            Ok(result)
+        }
+    }
+
     fn eval_method_call(
         &mut self,
         module: &Module,
@@ -651,8 +728,7 @@ impl Interpreter {
             .cloned()
             .ok_or_else(|| self.err(format!("undefined variable `{recv_name}`")))?;
         let type_name = instance_type_name(&recv).map_err(|m| self.err(m))?;
-        let obj = find_top(module, &type_name)
-            .filter(|f| f.is_object())
+        let (owner, obj) = find_object_type(module, &type_name)
             .ok_or_else(|| self.err(format!("unknown object type `{type_name}`")))?;
         let target = obj
             .children
@@ -668,7 +744,7 @@ impl Interpreter {
         call_env.set("自".into(), recv.clone());
         call_env.set("self".into(), recv);
         self.host.push_call_site_line(self.host.current_line);
-        let result = self.run_function(module, target, call_env, &[]);
+        let result = self.run_function(owner, target, call_env, &[]);
         self.host.pop_call_site_line();
         result
     }
@@ -819,6 +895,23 @@ fn bind_args(
 
 fn find_top<'a>(module: &'a Module, name: &str) -> Option<&'a Function> {
     module.functions.iter().find(|f| f.name == name)
+}
+
+/// Resolve `#` object type by name in the entry module or any imported library.
+fn find_object_type<'a>(module: &'a Module, name: &str) -> Option<(&'a Module, &'a Function)> {
+    module
+        .functions
+        .iter()
+        .find(|f| f.name == name && f.is_object())
+        .map(|f| (module, f))
+        .or_else(|| {
+            module.import_modules.values().find_map(|lib| {
+                lib.functions
+                    .iter()
+                    .find(|f| f.name == name && f.is_object())
+                    .map(|f| (lib, f))
+            })
+        })
 }
 
 fn find_function_anywhere<'a>(module: &'a Module, name: &str) -> Option<&'a Function> {

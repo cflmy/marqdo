@@ -7,9 +7,9 @@ description: Loads demo cdylib; path from MARQDO_TEST_PLUGIN (set by gold harnes
 
 # main
 
-*`p` = > env_get name=MARQDO_TEST_PLUGIN *
+*`p` = > sys.env_get name=MARQDO_TEST_PLUGIN *
 
-> load path=`p`
+> plugin.load path=`p`
 
 *`sum` = > demo_add a=1 b=2 *
 

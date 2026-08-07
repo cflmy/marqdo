@@ -18,7 +18,7 @@
 
 Resolution: `MARQDO_EXT/ai/…`, repo `ext/ai/…`, cwd `ext/ai/…` (see [ext-cli.md](ext-cli.md)).
 
-Other official ext: [ext-agent.md](ext-agent.md) (**agent development framework** — layout shipped; orchestration + LLM composition on roadmap). Installer CLI (planned): [ext-cli.md](ext-cli.md). Native plugins: [ext-abi.md](ext-abi.md).
+Other official ext: [ext-agent.md](ext-agent.md) (**document-driven agent** — step / multi-step workbook + writeback; thin `TOOL:` loop superseded). Installer: [ext-cli.md](ext-cli.md). Native plugins: [ext-abi.md](ext-abi.md).
 
 **Note:** Prefer `marqdo ext add llm`. Import `> ext/ai/llm.mq.md` from repo or install root.
 
@@ -66,5 +66,7 @@ Fallbacks: `MARQDO_LLM_API_KEY`, `MARQDO_LLM_BASE_URL`, `MARQDO_LLM_MODEL`.
 
 - Import smoke: `tests/ext/llm-import.mq.md`
 - Live complete (local): `tests/ext/llm-complete.mq.md` + `tests/ext/.env`
-- Live agent `执行`: `tests/ext/agent-run-live.mq.md` + same `.env` (gold: `ext_agent_run_live`, skips if missing)
-- Offline agent smoke: `tests/ext/agent-smoke.mq.md` (gold: `ext_agent_framework_smoke`)
+- Live agent `## step`: `tests/ext/agent-run-live.mq.md` (DeepSeek; gold: `ext_agent_run_live`)
+- Agent smoke (real `llm` handle): `tests/ext/agent-smoke.mq.md` (gold: `ext_agent_framework_smoke`)
+- Live complete: `tests/ext/llm-complete.mq.md` (gold: `ext_llm_complete_live`)
+

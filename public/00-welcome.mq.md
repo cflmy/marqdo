@@ -41,7 +41,7 @@ $$
 
 Then plot it:
 
-*`_svg` = > plot formula=`f` var=x min=-3 max=3 *
+*`_svg` = > math.plot formula=`f` var=x min=-3 max=3 *
 
 The foreign library lets you call external code, for example:
 

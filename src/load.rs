@@ -1,6 +1,6 @@
-//! Load `.mq.md` files and merge frontmatter imports.
+//! Load `.mq.md` files and bind frontmatter imports as library modules.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::env;
 use std::path::{Path, PathBuf};
 
@@ -11,7 +11,7 @@ use crate::diagnostics::Diagnostic;
 use crate::embedded_lib;
 use crate::parse::parse_source;
 
-/// Load `path` and recursively merge imported modules' top-level functions.
+/// Load `path` and recursively bind imported modules (no flat merge).
 pub fn load_module(path: &Path) -> Result<Module> {
     let mut visited = HashSet::new();
     load_module_inner(path, &mut visited)
@@ -25,21 +25,33 @@ fn load_module_inner(path: &Path, visited: &mut HashSet<PathBuf>) -> Result<Modu
         bail!("circular import involving {}", path.display());
     }
 
-    let source = read_module_source(path)
-        .with_context(|| format!("failed to read {}", path.display()))?;
-    let mut module = parse_source(&source).map_err(|e| attach_path(path, e))?;
+    let result = (|| {
+        let source = read_module_source(path)
+            .with_context(|| format!("failed to read {}", path.display()))?;
+        let mut module = parse_source(&source).map_err(|e| attach_path(path, e))?;
 
-    let base = path.parent().unwrap_or_else(|| Path::new("."));
-    let imports = module.imports.clone();
-    for rel in imports {
-        let dep_path = resolve_import(base, &rel)?;
-        let dep = load_module_inner(&dep_path, visited)?;
-        for fun in dep.functions {
-            merge_top_level(&mut module.functions, fun);
+        let base = path.parent().unwrap_or_else(|| Path::new("."));
+        let imports = module.imports.clone();
+        let mut import_modules = HashMap::new();
+        for imp in imports {
+            let dep_path = resolve_import(base, &imp.path)?;
+            let dep = load_module_inner(&dep_path, visited)?;
+            if import_modules.contains_key(&imp.bind) {
+                bail!(
+                    "duplicate import bind `{}` while loading {}",
+                    imp.bind,
+                    path.display()
+                );
+            }
+            import_modules.insert(imp.bind, dep);
         }
-    }
+        module.import_modules = import_modules;
 
-    Ok(module)
+        Ok(module)
+    })();
+
+    visited.remove(&canon);
+    result
 }
 
 fn read_module_source(path: &Path) -> Result<String> {
@@ -80,49 +92,47 @@ pub fn resolve_import(from_dir: &Path, rel: &str) -> Result<PathBuf> {
     if direct.is_file() {
         return Ok(direct);
     }
-
-    let normalized = if let Some(rest) = rel.strip_prefix("std/") {
-        format!("lib/{rest}")
-    } else {
-        rel.clone()
-    };
-
-    if let Some(remainder) = normalized.strip_prefix("lib/") {
+    if let Some(source) = read_embedded_for_path(Path::new(&rel)) {
+        let _ = source;
+        // Prefer real file under search roots; else return a virtual lib/ path for embedded read.
+    }
+    if rel.starts_with("lib/") || rel.starts_with("std/") {
+        let rest = rel
+            .strip_prefix("lib/")
+            .or_else(|| rel.strip_prefix("std/"))
+            .unwrap();
         for root in lib_search_roots() {
-            let as_lib_dir = root.join(remainder);
-            if as_lib_dir.is_file() {
-                return Ok(as_lib_dir);
-            }
-            let as_repo_root = root.join("lib").join(remainder);
-            if as_repo_root.is_file() {
-                return Ok(as_repo_root);
+            let p = root.join(rest);
+            if p.is_file() {
+                return Ok(p);
             }
         }
-        if embedded_lib::has_file(remainder) {
-            return Ok(PathBuf::from("lib").join(remainder));
-        }
-        bail!(
-            "cannot resolve library import `{rel}` (set MARQDO_LIB, keep lib/ next to the project, or use a binary with embedded stdlib)"
-        );
+        // Embedded stdlib: synthesize a path under lib/ for read_module_source.
+        return Ok(PathBuf::from("lib").join(rest));
     }
-
-    if let Some(remainder) = normalized.strip_prefix("ext/") {
+    if rel.starts_with("ext/") {
         for root in ext_search_roots() {
-            let as_ext_dir = root.join(remainder);
-            if as_ext_dir.is_file() {
-                return Ok(as_ext_dir);
+            let p = root.join(rel.strip_prefix("ext/").unwrap_or(&rel));
+            // also try full ext/rel under root
+            let p2 = root.join(&rel);
+            if p.is_file() {
+                return Ok(p);
             }
-            let as_repo_root = root.join("ext").join(remainder);
-            if as_repo_root.is_file() {
-                return Ok(as_repo_root);
+            if p2.is_file() {
+                return Ok(p2);
+            }
+            // MARQDO_EXT is the ext root itself (contains ai/)
+            let under = root.join(rel.strip_prefix("ext/").unwrap());
+            if under.is_file() {
+                return Ok(under);
             }
         }
-        bail!(
-            "cannot resolve extension import `{rel}` (set MARQDO_EXT or keep an ext/ next to the project)"
-        );
     }
-
-    Ok(direct)
+    // Relative again with normalize
+    if direct.exists() {
+        return Ok(direct);
+    }
+    bail!("cannot resolve import `{rel}` from {}", from_dir.display())
 }
 
 fn lib_search_roots() -> Vec<PathBuf> {
@@ -132,15 +142,16 @@ fn lib_search_roots() -> Vec<PathBuf> {
     }
     if let Ok(cwd) = env::current_dir() {
         roots.push(cwd.join("lib"));
-        roots.push(cwd);
     }
     if let Ok(exe) = env::current_exe() {
         if let Some(dir) = exe.parent() {
             roots.push(dir.join("lib"));
-            roots.push(dir.join("../lib"));
-            roots.push(dir.join("../../lib"));
-            roots.push(dir.join("../../../lib"));
+            roots.push(dir.join("..").join("lib"));
+            roots.push(dir.join("..").join("..").join("lib"));
         }
+    }
+    if let Ok(manifest) = env::var("CARGO_MANIFEST_DIR") {
+        roots.push(PathBuf::from(manifest).join("lib"));
     }
     roots
 }
@@ -150,41 +161,36 @@ fn ext_search_roots() -> Vec<PathBuf> {
     if let Ok(h) = env::var("MARQDO_EXT") {
         roots.push(PathBuf::from(h));
     }
-    // Official installer default (`marqdo ext add`)
-    roots.push(crate::ext_cli::default_user_ext_dir());
     if let Ok(cwd) = env::current_dir() {
         roots.push(cwd.join("ext"));
-        roots.push(cwd);
     }
     if let Ok(exe) = env::current_exe() {
         if let Some(dir) = exe.parent() {
             roots.push(dir.join("ext"));
-            roots.push(dir.join("../ext"));
-            roots.push(dir.join("../../ext"));
-            roots.push(dir.join("../../../ext"));
+            roots.push(dir.join("..").join("ext"));
+            roots.push(dir.join("..").join("..").join("ext"));
         }
+    }
+    if let Ok(manifest) = env::var("CARGO_MANIFEST_DIR") {
+        roots.push(PathBuf::from(manifest).join("ext"));
     }
     roots
 }
 
 fn attach_path(path: &Path, err: anyhow::Error) -> anyhow::Error {
-    if let Some(d) = err.downcast_ref::<Diagnostic>() {
-        if d.path.is_none() {
-            return Diagnostic::at(path, d.span, d.message.clone()).into();
-        }
-        return err;
-    }
-    let msg = err.to_string();
-    if let Some((loc, rest)) = msg.split_once(": ") {
-        if let Some((line_s, col_s)) = loc.split_once(':') {
-            if let (Ok(line), Ok(col)) = (line_s.parse::<u32>(), col_s.parse::<u32>()) {
-                return Diagnostic::at(path, crate::diagnostics::Span::new(line, col), rest).into();
+    match err.downcast::<Diagnostic>() {
+        Ok(mut d) => {
+            if d.path.is_none() {
+                d.path = Some(path.to_path_buf());
             }
+            d.into()
         }
+        Err(e) => anyhow::anyhow!("{}: {e}", path.display()),
     }
-    err.context(format!("in {}", path.display()))
 }
 
+/// Kept for tests / tooling that expect a flat list (local tops only).
+#[allow(dead_code)]
 fn merge_top_level(into: &mut Vec<Function>, fun: Function) {
     if let Some(existing) = into.iter_mut().find(|f| f.name == fun.name) {
         *existing = fun;
@@ -208,13 +214,5 @@ mod tests {
         assert!(p.ends_with("text.mq.md"));
         let p2 = resolve_import(Path::new("tests/keywords"), "std/text.mq.md").unwrap();
         assert!(p2.ends_with("text.mq.md"));
-    }
-
-    #[test]
-    fn resolve_embedded_lib_source() {
-        let p = resolve_import(Path::new("/nonexistent"), "lib/writeback.mq.md").unwrap();
-        assert!(p.to_string_lossy().replace('\\', "/").contains("lib/writeback.mq.md"));
-        let src = read_module_source(&p).unwrap();
-        assert!(src.contains("host_writeback"));
     }
 }

@@ -10,8 +10,8 @@ In the YAML header, `> utils.mq.md` imports a sibling module.
 
 Bind a return value, print it, then call greet:
 
-*`y` = > add_one n=41*
+*`y` = > utils.add_one n=41*
 
 > print text=`y`
 
-> greet who=Marqdo
+> utils.greet who=Marqdo

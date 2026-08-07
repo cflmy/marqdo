@@ -14,14 +14,14 @@ $$
 
 > print text=`ty`
 
-*`df` = > diff formula=`f` var=x *
+*`df` = > math.diff formula=`f` var=x *
 
 > print text=`df`
 
-*`roots` = > solve formula=`f` var=x *
+*`roots` = > math.solve formula=`f` var=x *
 
 > print text=`roots`
 
-*`y` = > eval formula=`f` var=x value=3 *
+*`y` = > math.eval formula=`f` var=x value=3 *
 
 > print text=`y`

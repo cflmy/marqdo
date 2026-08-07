@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | 状态 | 已定 |
-| 日期 | 2026-08-04 |
+| 日期 | 2026-08-07 |
 | 原则 | **夹具即金样例**：`tests/{structure,keywords,errors}/**/*.mq.md` 由 `cargo test` / CI 跑通；`marqdo view tests` 也可浏览 |
 
 ---
@@ -26,10 +26,17 @@ tests/
     import/
       main.mq.md
       utils.mq.md
+    ns/
+      helpers.mq.md
+      path3.mq.md
+      use.mq.md
   keywords/                 # 关键字与内置名
     print.mq.md
     bool-logic.mq.md
+  ext/
+    agent-run-live.mq.md
   errors/                   # 期望失败（诊断文案稳定后再加金样例）
+    ns-instance-method.mq.md
     …
 ```
 
@@ -42,7 +49,7 @@ tests/
 
 | 类别 | 测什么 | 不测什么 |
 |------|--------|----------|
-| **structure** | `#`/`##`、形参 `+`、`1.` 分支、`-` 循环、表、导入、位置/具名实参 | 关键字边角 |
+| **structure** | `#`/`##`、形参 `+`、`1.` 分支、`-` 循环、表、导入、点号路径 / `use`、位置/具名实参 | 关键字边角 |
 | **keywords** | `True`/`False`/`None`、`and`/`or`/`not`、`print`/`input` 约定 | 复杂控制流（可极简） |
 | **errors** | 未定义名、实参错误、语法错误的诊断 | 成功路径 |
 
@@ -51,7 +58,8 @@ tests/
 - **流水线调试**：`--dump-lines` / `--dump-ast` / `--trace-eval`  
 - **CLI**：默认 `index.mq.md`、退出码  
 - **view**：目录扫描、单文件页、执行区（见 [view.md](view.md)）  
-- **模块图**：循环导入拒绝  
+- **模块图**：循环导入拒绝；`errors/ns-instance-method`（实例方法路径）  
+- **ext live**：`ext/agent-run-live`（需 `.env` + `libagent`）
 
 ---
 

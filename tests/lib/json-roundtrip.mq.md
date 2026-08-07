@@ -6,18 +6,18 @@ title: json roundtrip
 
 # main
 
-*`raw` = > read_text path=sample.json *
+*`raw` = > fs.read_text path=sample.json *
 
-*`obj` = > parse text=`raw` *
+*`obj` = > json.parse text=`raw` *
 
 *`ty` = > type `obj` *
 
 > print text=`ty`
 
-*`a` = > get value=`obj` key=a *
+*`a` = > json.get value=`obj` key=a *
 
 > print text=`a`
 
-*`out` = > stringify value=`obj` *
+*`out` = > json.stringify value=`obj` *
 
 > print text=`out`

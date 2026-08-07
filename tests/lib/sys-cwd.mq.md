@@ -5,7 +5,7 @@ title: sys cwd
 
 # main
 
-*`d` = > cwd *
+*`d` = > sys.cwd *
 
 *`n` = > len `d` *
 

@@ -37,7 +37,9 @@ Canonical design (repo): `doc/design/markdown-mapping.md`, `doc/design/keywords.
 | Line `N. *` | Else arm |
 | `> fn args` | Call (named `k=v` or positional) |
 | `` > `obj`.method args `` | Method call (`obj` must be a map with `_type`) |
-| Frontmatter `> path.mq.md` | Import |
+| Frontmatter `> path.mq.md` [`as` / `作为` name] | Import (binds library name) |
+| Frontmatter `> use lib.member` [`as` name] / `使用` | Bind short name to a library path |
+| `> lib.member …` / `> lib.Type.member …` | Call via bare dotted path (instance methods need `` `var`.m ``) |
 | `*…*` | Statement (bind / expr) |
 | `**…**` | Return value |
 | `****` or `**` + spaces + `**` | Return `None` and end function body |
@@ -109,21 +111,27 @@ Chinese builtins (same functions, no import):
 
 ## Frontmatter imports + stdlib
 
+Imports bind a **library name** (default = file stem; optional `as` / `作为`). Members are **not** flattened into the caller. Call with a bare dotted path:
+
 ```markdown
 ---
 title: example
 > lib/text.mq.md
+> lib/time.mq.md as clock
 ---
 
 # main
 
-*`xs` = > split value=a,b,c sep=,*
+*`xs` = > text.split value=a,b,c sep=,*
 > print text=`xs`
+*`t` = > clock.now_unix *
 ```
 
-- Import **English** or **Chinese** library file; call that file’s API names (do not mix).
+- Import **English** or **Chinese** library file; call that file’s API names via `lib.member` (do not mix languages).
+- Instance methods stay `` > `obj`.method `` (backticks on the receiver only).
 - `lib/…` resolves via `MARQDO_LIB`, cwd `lib/`, or `lib/` next to the `marqdo` binary.
-- Official optional extensions (`ext/`, not stdlib): install with `marqdo ext add llm` / `add agent` (see `doc/design/ext-cli.md`). `ext/llm` — chat; `ext/agent` — agent framework (layout + ABI; compose LLM per `doc/design/ext-agent.md`).
+- Design: [module-namespace.md](../../doc/design/module-namespace.md).
+- Official optional extensions (`ext/`, not stdlib): install with `marqdo ext add llm` / `add agent` (see `doc/design/ext-cli.md`). `ext/llm` — chat; `ext/agent` — document-driven agents: **step** / **multi-step workbook** + writeback ([ext-agent.md](../../doc/design/ext-agent.md)).
 - Native plugins: `lib/plugin` — `## load` / `unload` / `list`. C ABI: `include/marqdo_abi.h`.
 - Builtins (no import): `print`/`打印`, `input`/`输入`, `len`/`长度`, `str`/`文本`, `int`/`整数`; literals `True`/`真`, `False`/`假`, `None`/`空`; logic `and`/`且`, `or`/`或`, `not`/`非`.
 
@@ -146,7 +154,8 @@ Stdlib map: [reference.md](reference.md).
 | `if x > 0:` | `1. `x` > 0` |
 | `* > print text=hi *` | `> print text=hi` |
 | Forgetting `---` after nested `##` helper | Add `---` / `***` / `****` |
-| Import `lib/text` then call `拆分` | Match file language |
+| Import `lib/text` then call bare `split` | `> text.split …` (qualified) |
+| Import `lib/text` then call `拆分` | Match file language (`text.split`, not 文本) |
 
 ## Checklist before finishing
 

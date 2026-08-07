@@ -113,6 +113,44 @@ fn structure_import() {
     );
 }
 
+#[test]
+fn structure_ns_path3() {
+    assert_out(
+        "tests/structure/ns/path3.mq.md",
+        "ok
+constructed",
+    );
+}
+
+#[test]
+fn structure_ns_use() {
+    assert_out("tests/structure/ns/use.mq.md", "hi");
+}
+
+#[test]
+fn bytecode_ns_path3() {
+    assert_out_backend(
+        "tests/structure/ns/path3.mq.md",
+        "bytecode",
+        "ok
+constructed",
+    );
+}
+
+#[test]
+fn bytecode_ns_use() {
+    assert_out_backend("tests/structure/ns/use.mq.md", "bytecode", "hi");
+}
+
+#[test]
+fn error_ns_instance_method() {
+    assert_err(
+        "tests/errors/ns-instance-method.mq.md",
+        "8:1",
+        "instance method",
+    );
+}
+
 
 #[test]
 fn structure_fn_end_hr() {
@@ -686,10 +724,12 @@ fn lib_plugin_demo() {
     } else {
         "libdemo.so"
     };
-    let built = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("target")
-        .join("debug")
-        .join(lib_name);
+    let target_dir = std::env::var_os("CARGO_TARGET_DIR")
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|| {
+            std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("target")
+        });
+    let built = target_dir.join("debug").join(lib_name);
     assert!(
         built.is_file(),
         "missing plugin artifact {}",
@@ -775,6 +815,13 @@ fn ext_cli_add_list_remove_llm() {
 
 #[test]
 fn ext_cli_add_agent() {
+    let status = Command::new("cargo")
+        .args(["build", "-p", "marqdo_plugin_agent"])
+        .current_dir(env!("CARGO_MANIFEST_DIR"))
+        .status()
+        .expect("build agent plugin");
+    assert!(status.success(), "failed to build marqdo_plugin_agent");
+
     let tmp = tempfile_dir("marqdo-ext-agent");
     let src = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("ext");
     let bin = env!("CARGO_BIN_EXE_marqdo");
@@ -788,12 +835,32 @@ fn ext_cli_add_agent() {
     assert!(status.success(), "ext add agent failed");
     assert!(tmp.join("ai").join("agent.mq.md").is_file());
     assert!(tmp.join("ai").join("智能体.mq.md").is_file());
+    assert!(
+        tmp.join("native").join(if cfg!(windows) {
+            "agent.dll"
+        } else if cfg!(target_os = "macos") {
+            "libagent.dylib"
+        } else {
+            "libagent.so"
+        })
+        .is_file()
+            || tmp.join("agent.plugin").is_file(),
+        "agent native plugin should be installed"
+    );
 }
 
 #[test]
 fn ext_agent_framework_smoke() {
+    let status = Command::new("cargo")
+        .args(["build", "-p", "marqdo_plugin_agent"])
+        .current_dir(env!("CARGO_MANIFEST_DIR"))
+        .status()
+        .expect("build agent plugin");
+    assert!(status.success(), "failed to build marqdo_plugin_agent");
+
     let output = Command::new(env!("CARGO_BIN_EXE_marqdo"))
         .args(["run", "tests/ext/agent-smoke.mq.md"])
+        .current_dir(env!("CARGO_MANIFEST_DIR"))
         .output()
         .expect("run agent-smoke");
     let code = output.status.code().unwrap_or(1);
@@ -802,21 +869,40 @@ fn ext_agent_framework_smoke() {
     assert_eq!(code, 0, "agent-smoke stderr={stderr}");
     assert_eq!(
         stdout.trim_end(),
-        "skill-ok\ntools-ok\nsource-ok\n2\n0\nmain",
+        "skill-ok\ntools-ok\nsource-ok\nprotocol-ok\n获取时间\n获取时间\nok-time\n2\n0\nmain",
         "agent-smoke"
     );
 }
 
 #[test]
+fn ext_llm_complete_live() {
+    let output = Command::new(env!("CARGO_BIN_EXE_marqdo"))
+        .args(["run", "tests/ext/llm-complete.mq.md"])
+        .output()
+        .expect("run llm-complete");
+    let code = output.status.code().unwrap_or(1);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert_eq!(code, 0, "llm-complete stderr={stderr}");
+    let reply = stdout.trim_end().to_lowercase();
+    assert!(
+        reply.contains("pong"),
+        "expected pong in reply, got {stdout:?}"
+    );
+}
+
+#[test]
 fn ext_agent_run_live() {
-    let env_file = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/ext/.env");
-    if !env_file.is_file() {
-        eprintln!("skip ext_agent_run_live: missing {}", env_file.display());
-        return;
-    }
+    let status = Command::new("cargo")
+        .args(["build", "-p", "marqdo_plugin_agent"])
+        .current_dir(env!("CARGO_MANIFEST_DIR"))
+        .status()
+        .expect("build agent plugin");
+    assert!(status.success(), "failed to build marqdo_plugin_agent");
 
     let output = Command::new(env!("CARGO_BIN_EXE_marqdo"))
         .args(["run", "tests/ext/agent-run-live.mq.md"])
+        .current_dir(env!("CARGO_MANIFEST_DIR"))
         .output()
         .expect("run agent-run-live");
     let code = output.status.code().unwrap_or(1);
@@ -826,14 +912,26 @@ fn ext_agent_run_live() {
     let lines: Vec<&str> = stdout.trim_end().lines().collect();
     assert!(lines.len() >= 3, "agent-run-live stdout={stdout}");
     assert!(
-        lines[0].contains('-') && lines[0].chars().any(|c| c.is_ascii_digit()),
-        "expected time in reply, got {:?}",
+        lines[0].chars().any(|c| c.is_ascii_digit()),
+        "expected date in reply, got {:?}",
         lines[0]
     );
-    assert_eq!(lines[1], "2", "history after run");
+    assert_eq!(lines[1], "2", "history after step");
     assert_eq!(lines[2], "0", "history after clear");
+    // Caller may persist the step map via lib/writeback; agent itself does not write.
+    let src = std::fs::read_to_string(
+        std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/ext/agent-run-live.mq.md"),
+    )
+    .expect("read agent-run-live after run");
+    assert!(
+        src.contains("\"status\"") || src.contains("marqdo-out"),
+        "expected caller writeback of step result map"
+    );
+    assert!(
+        !stdout.contains("marqdo-out"),
+        "writeback must not be printed to stdout"
+    );
 }
-
 #[test]
 fn lib_net_encode() {
     assert_out("tests/lib/net-encode.mq.md", "a+b");

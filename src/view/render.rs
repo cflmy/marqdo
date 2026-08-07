@@ -174,7 +174,16 @@ pub fn render_module_structure_mode(
     if !module.imports.is_empty() {
         out.push_str("<div class=\"card\"><span class=\"badge\">import</span>");
         for imp in &module.imports {
-            out.push_str(&format!("<span class=\"chip\">{}</span>", escape(imp)));
+            let label = format!("{} as {}", imp.path, imp.bind);
+            out.push_str(&format!("<span class=\"chip\">{}</span>", escape(&label)));
+        }
+        out.push_str("</div>");
+    }
+    if !module.uses.is_empty() {
+        out.push_str("<div class=\"card\"><span class=\"badge\">use</span>");
+        for u in &module.uses {
+            let label = format!("{} as {}", u.path.join("."), u.bind);
+            out.push_str(&format!("<span class=\"chip\">{}</span>", escape(&label)));
         }
         out.push_str("</div>");
     }
@@ -606,8 +615,12 @@ fn call_display(call: &CallExpr) -> String {
         s.push_str(recv);
         s.push('`');
         s.push('.');
+        s.push_str(&call.callee);
+    } else if let Some(path) = &call.path {
+        s.push_str(&path.join("."));
+    } else {
+        s.push_str(&call.callee);
     }
-    s.push_str(&call.callee);
     for a in &call.args {
         match a {
             Arg::Positional(e) => {

@@ -19,13 +19,15 @@ struct FlatFun {
     body: Vec<Stmt>,
     children: Vec<usize>,
     span: Span,
+    /// Full path segments (`lib.member` / `lib.Type.method`) → flat index.
+    path_index: HashMap<Vec<String>, usize>,
+    /// Short name from frontmatter `use` → path segments.
+    uses: HashMap<String, Vec<String>>,
 }
 
 pub fn compile_module(path: Option<&Path>, module: &Module) -> Result<Program> {
     let mut flat = Vec::new();
-    for fun in &module.functions {
-        collect_fun(fun, None, &mut flat);
-    }
+    let _exports = collect_module_tree(module, &mut flat);
     if flat.is_empty() {
         bail!("bytecode: no functions to compile");
     }
@@ -78,7 +80,55 @@ pub fn compile_module(path: Option<&Path>, module: &Module) -> Result<Program> {
     })
 }
 
-fn collect_fun(fun: &Function, parent: Option<usize>, flat: &mut Vec<FlatFun>) -> usize {
+/// Collect `module` and its imports into `flat`.
+/// Returns relative export paths within this module (e.g. `["parse"]`, `["agent","step"]`).
+fn collect_module_tree(module: &Module, flat: &mut Vec<FlatFun>) -> HashMap<Vec<String>, usize> {
+    let mut path_index = HashMap::new();
+    for (bind, dep) in &module.import_modules {
+        let dep_exports = collect_module_tree(dep, flat);
+        for (rel, idx) in dep_exports {
+            let mut full = Vec::with_capacity(rel.len() + 1);
+            full.push(bind.clone());
+            full.extend(rel);
+            path_index.insert(full, idx);
+        }
+    }
+
+    let uses: HashMap<String, Vec<String>> = module
+        .uses
+        .iter()
+        .map(|u| (u.bind.clone(), u.path.clone()))
+        .collect();
+
+    let mut exports = HashMap::new();
+    for fun in &module.functions {
+        let id = collect_fun(fun, None, flat, &path_index, &uses);
+        export_tree(&mut exports, &[], id, flat);
+    }
+    exports
+}
+
+fn export_tree(
+    out: &mut HashMap<Vec<String>, usize>,
+    prefix: &[String],
+    id: usize,
+    flat: &[FlatFun],
+) {
+    let mut p = prefix.to_vec();
+    p.push(flat[id].name.clone());
+    out.insert(p.clone(), id);
+    for &cid in &flat[id].children {
+        export_tree(out, &p, cid, flat);
+    }
+}
+
+fn collect_fun(
+    fun: &Function,
+    parent: Option<usize>,
+    flat: &mut Vec<FlatFun>,
+    path_index: &HashMap<Vec<String>, usize>,
+    uses: &HashMap<String, Vec<String>>,
+) -> usize {
     let id = flat.len();
     flat.push(FlatFun {
         name: fun.name.clone(),
@@ -88,10 +138,12 @@ fn collect_fun(fun: &Function, parent: Option<usize>, flat: &mut Vec<FlatFun>) -
         body: fun.body.clone(),
         children: Vec::new(),
         span: fun.span,
+        path_index: path_index.clone(),
+        uses: uses.clone(),
     });
     let mut child_ids = Vec::new();
     for child in &fun.children {
-        child_ids.push(collect_fun(child, Some(id), flat));
+        child_ids.push(collect_fun(child, Some(id), flat, path_index, uses));
     }
     flat[id].children = child_ids;
     id
@@ -365,6 +417,12 @@ impl<'a> FnCompiler<'a> {
 
     fn compile_call(&mut self, call: &CallExpr, as_stmt: bool) -> Result<()> {
         let mut call = call.clone();
+        if let Some(path) = &call.path {
+            return self.compile_path_call(path, &call, as_stmt);
+        }
+        if let Some(path) = self.flat[self.fn_id].uses.get(&call.callee).cloned() {
+            return self.compile_path_call(&path, &call, as_stmt);
+        }
         call.callee =
             crate::aliases::normalize_call_callee_and_args(&call.callee, &mut call.args);
 
@@ -529,49 +587,74 @@ impl<'a> FnCompiler<'a> {
         }
 
         match self.resolve_call(&call.callee) {
-            Ok(fid) => {
-                let params = &self.flat[fid].params;
-                let mut named: HashMap<String, &Expr> = HashMap::new();
-                let mut positionals = Vec::new();
-                for a in &call.args {
-                    match a {
-                        Arg::Positional(e) => positionals.push(e),
-                        Arg::Named { name, value } => {
-                            named.insert(name.clone(), value);
-                        }
-                    }
-                }
-                let mut pos_i = 0;
-                for p in params {
-                    if let Some(e) = named.get(&p.name) {
-                        self.compile_expr(e)?;
-                    } else if pos_i < positionals.len() {
-                        self.compile_expr(positionals[pos_i])?;
-                        pos_i += 1;
-                    } else if let Some(def) = &p.default {
-                        self.compile_expr(def)?;
-                    } else {
-                        return Err(self.err(format!("missing argument for parameter `{}`", p.name)));
-                    }
-                }
-                if pos_i < positionals.len() {
-                    return Err(self.err(format!(
-                        "too many positional arguments ({} extra)",
-                        positionals.len() - pos_i
-                    )));
-                }
-                self.emit(Op::Call(fid as u16, params.len() as u8));
-                if self.flat[fid].parent.is_none() && self.flat[fid].level == 1 {
-                    let ti = self.add_const(Value::Text(self.flat[fid].name.clone()));
-                    self.emit(Op::TagInstance(ti));
-                }
-                if as_stmt {
-                    self.emit(Op::Pop);
-                }
-                Ok(())
-            }
+            Ok(fid) => self.compile_user_call(fid, &call, as_stmt),
             Err(_) => self.compile_plugin_call(&call, as_stmt),
         }
+    }
+
+    fn compile_path_call(&mut self, path: &[String], call: &CallExpr, as_stmt: bool) -> Result<()> {
+        let display = path.join(".");
+        if path.len() < 2 {
+            return Err(self.err(format!(
+                "library path `{display}`: need at least `lib.member`"
+            )));
+        }
+        let fid = *self.flat[self.fn_id]
+            .path_index
+            .get(path)
+            .ok_or_else(|| self.err(format!("unknown `{display}`")))?;
+        if let Some(pid) = self.flat[fid].parent {
+            let parent = &self.flat[pid];
+            if parent.level == 1 && parent.parent.is_none() && !(self.flat[fid].level == 1) {
+                return Err(self.err(format!(
+                    "`{display}` is an instance method; call it as `var`.{}",
+                    self.flat[fid].name
+                )));
+            }
+        }
+        self.compile_user_call(fid, call, as_stmt)
+    }
+
+    fn compile_user_call(&mut self, fid: usize, call: &CallExpr, as_stmt: bool) -> Result<()> {
+        let params = &self.flat[fid].params;
+        let mut named: HashMap<String, &Expr> = HashMap::new();
+        let mut positionals = Vec::new();
+        for a in &call.args {
+            match a {
+                Arg::Positional(e) => positionals.push(e),
+                Arg::Named { name, value } => {
+                    named.insert(name.clone(), value);
+                }
+            }
+        }
+        let mut pos_i = 0;
+        for p in params {
+            if let Some(e) = named.get(&p.name) {
+                self.compile_expr(e)?;
+            } else if pos_i < positionals.len() {
+                self.compile_expr(positionals[pos_i])?;
+                pos_i += 1;
+            } else if let Some(def) = &p.default {
+                self.compile_expr(def)?;
+            } else {
+                return Err(self.err(format!("missing argument for parameter `{}`", p.name)));
+            }
+        }
+        if pos_i < positionals.len() {
+            return Err(self.err(format!(
+                "too many positional arguments ({} extra)",
+                positionals.len() - pos_i
+            )));
+        }
+        self.emit(Op::Call(fid as u16, params.len() as u8));
+        if self.flat[fid].parent.is_none() && self.flat[fid].level == 1 {
+            let ti = self.add_const(Value::Text(self.flat[fid].name.clone()));
+            self.emit(Op::TagInstance(ti));
+        }
+        if as_stmt {
+            self.emit(Op::Pop);
+        }
+        Ok(())
     }
 
     /// Unresolved callee → runtime plugin registry (or unknown-fn error).

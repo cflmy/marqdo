@@ -2,136 +2,372 @@
 
 | | |
 |---|---|
-| Status | Accepted · **thin agent loop locked** |
-| Date | 2026-08-06 |
-| Related | [ext-llm.md](ext-llm.md) · [ext-cli.md](ext-cli.md) · [objects.md](objects.md) |
+| Status | **Accepted · redesign**（取代「thin TOOL: loop」方案） |
+| Date | 2026-08-07 |
+| Related | [ext-llm.md](ext-llm.md) · [ext-cli.md](ext-cli.md) · [ext-abi.md](ext-abi.md) · [module-namespace.md](module-namespace.md) · [objects.md](objects.md) · [stdlib-writeback.md](stdlib-writeback.md) · [stdlib-subtask.md](stdlib-subtask.md) · [markdown-mapping.md](markdown-mapping.md) |
 
-## What we are building
+## 0. 为什么要改掉旧方案
 
-An **agent-development framework** — smallest runtime surface for agents on Marqdo.
+旧版把智能体做成「黑盒对话循环」：隐藏提示拼装、`TOOL:<name>` 协议、host 历史袋、一次（或几次）模型往返。这是对 LangChain 类框架的平移，**背离了 Marqdo 的初衷**。
 
-**Not** task-dispatch, **not** bundled domain tools, **not** layout/match/ticket helpers in official ext.
+Marqdo 的宪法是 **代码即文档、文档即知识库**：
 
-| In scope | Out of scope (your runbook / your code) |
-|----------|-------------------------------------------|
-| `# 智能体` ctor | `## 技能匹配` · `## 分配任务` · `## 创建工单` … |
-| `## 执行` | Anything task-specific in `ext/` |
-| `## 清空历史` | |
-| Auto context: source, position, history, Marqdo skill | |
+| 旧方案的问题 | Marqdo 应有的形态 |
+|--------------|-------------------|
+| 提示词藏在框架字符串里，与编排源码分离 | 提示、工具、任务、结果都在 `.mq.md` 里，人与模型同读同写 |
+| 执行过程是不透明的 chat transcript | 思考与行动写回文档；`view` / `debug` 可跟可审 |
+| 复杂任务与简单任务同一套循环 | **单步**与**多步（工作簿）**两级模型 |
+| 成功经验留在进程内存 | **自写回**做成果缓存与失败知识；同类任务可复用 |
 
-## Repo layout (`ext/`)
+本文件锁定新方向。仓库里现有的 `ext/ai/agent.mq.md` / `智能体.mq.md`（TOOL: 薄循环）视为 **待替换实现**，以本文为准。
 
-Official extensions for LLM + agent live under **`ext/ai/`** only. No flat `.mq.md` at `ext/` root; future domains get their own subdir.
+---
+
+## 1. 我们在建什么
+
+一个 **文档驱动的智能体开发框架**：编排本身就是可读的 `.mq.md`；模型吃的是这份文档与调用位置；写回让思考过程可控、可调试、可沉淀。
+
+**不是** 外挂任务队列、**不是** 官方捆绑领域工具、**不是** 第二套聊天栈（模型 I/O 仍用 `ext/ai/llm`）。
+
+| 在范围内 | 在范围外（应用 / runbook） |
+|----------|---------------------------|
+| `# 智能体` / `# agent` 构造 | 领域工具：`## 查天气`、`## 分配任务` … |
+| `## 单步` / `## step` | 业务表格、队列、工单流程 |
+| `## 多步` / `## plan`（生成并驱动工作簿） | 具体分解策略模板库（可放用户仓） |
+| 上下文：源码、调用位置、工作簿路径、Skill | 第二套 HTTP / 聊天协议 |
+| 与 `lib/writeback`、**`lib/subtask`（工具执行通道）**、**`lib/plugin` + ABI v2 `plugins/agent`** 协作 | 把领域技能塞进官方 `ext/ai/`；在 `ext` 内直调 `host_*` |
+
+---
+
+## 2. 核心理念：编排可读，过程可写回
+
+1. **提示词与代码不分离**  
+   站立提示、工具表、任务叙述都写在 `.mq.md` 里。框架把**当前模块源码**与**调用位置**交给模型，而不是另起一套 system prompt 黑盒。
+
+2. **把 Marqdo 源码交给智能体**  
+   每次推理可注入：入口 / 工作簿 `.mq.md` 全文（或相关切片）、`host_call_site`（路径、函数、行）、`skills/marqdo`（写 / 读 `.mq.md` 的语法纪律）。模型输出应优先是 **可解释的决策** 与 **对文档的结构化改动意图**，而不是私有 JSON 协议。
+
+3. **自写回 = 思考轨迹 + 成果缓存**  
+   成功或失败都写回文档（见 [stdlib-writeback.md](stdlib-writeback.md)）。成功块可被后续同类任务命中，避免重复失败；失败块成为可读的「避坑记录」。`marqdo view` 在语句下展示 output-card，调试面可对齐同一份真相。
+
+4. **相对其他框架的优势**  
+   无需外挂向量库 / 状态机才能「记住」某次子任务已成功：记忆就是仓库里的 Markdown。审计、合规、复盘 = `git log` + 打开工作簿。
+
+---
+
+## 3. 两级执行模型
+
+### 3.1 模式 A — 单步（原子任务）
+
+| | |
+|---|---|
+| **输入** | 小任务描述 + 必要上下文（工具表、站立提示、源码切片） |
+| **过程** | 一次（或有限次）推理；可选调用 **runbook 内** 的工具函数；结果写回 |
+| **输出** | 原子结果（文本 / 表 / 句柄字段） |
+| **适用** | 问答、单一工具、确定性一步 |
+
+公开方法（中 / 英）：`## 单步` / `## step`。
+
+示意（语法外形；实现以落地代码为准）：
+
+```markdown
+---
+> ext/ai/智能体.mq.md
+> ext/ai/大模型.mq.md
+> lib/自写回.mq.md
+> lib/时间.mq.md
+---
+
+## 获取时间
+
+*`u` = > 时间.此刻秒 *
+**> 时间.格式化 秒=`u` 格式=%Y-%m-%d**
+
+# main
+
+*`模型` = > 大模型.大模型 *
+`工具表` =
+| 工具 |
+|------|
+| 获取时间 |
+
+*`助手` = > 智能体 大模型=`模型` 工具=`工具表` 站立提示=你是可调试的 Marqdo 助手。 *
+
+*`结果` = > `助手`.单步 任务=今天日期是什么？请在需要时调用工具。 *
+> 打印 内容=`结果`
+```
+
+单步约定：
+
+- 模型看到的上下文 **包含本文件源码与调用位置**，因此「有哪些 `##` 工具」对模型是可见的；行动约定写在提示里（人可读），例如单独一行 `CALL:<工具名>` / `调用：<工具名>`，最终答案则直接正文回复。
+- 工具仍是 **runbook 里的 `##` 函数**（v1 以零参为主；可经 `args=` 扩展）。
+- **调用工具走 [`lib/subtask`](stdlib-subtask.md)**：白名单校验通过后 `spawn fn=<名>`（中文面 `启动 函数=`）→ `wait` / `等待`，而不是进程内直接 `call_fn`。这样工具与主推理隔离在子任务语义下，并可与并行、超时、探测同一套主机能力对齐。
+- 结束后用自写回记录：任务摘要、选用工具、结果或错误。
+
+### 3.2 模式 B — 多步 / 复杂执行（工作簿）
+
+| | |
+|---|---|
+| **输入** | 复杂目标 |
+| **过程** | 见下方流水线 |
+| **输出** | 汇总结果 + **一份新的 `.mq.md` 工作簿**（完整执行报告） |
+| **适用** | 需分解、多工具、可复用子成果的任务 |
+
+公开方法：`## 多步` / `## plan`（名称可双语并列；中文面以「多步」为准）。
+
+流水线：
+
+1. **创建工作簿** — 在约定目录（默认 `.marqdo/agent-runs/` 或参数指定）生成新的 `.mq.md`：总目标叙述、元信息、子任务表骨架。
+2. **分解** — 主智能体（或 `## 分解`）把目标写成子任务表（可要求人工确认后再跑）。
+3. **子智能体** — 每个子任务实例化一个小的 `# 智能体`（可收窄工具集与站立提示）。
+4. **执行子任务** — 子智能体走 **单步**（默认）；仅当子任务仍过复杂且未触达深度上限时，才允许嵌套多步。
+5. **写回** — 成功或失败都写回该子任务区块（含输入签名、时间戳、结果 / 错误）。
+6. **汇总** — 主智能体收集子结果，写回工作簿末尾，返回汇总。
+
+**缓存命中**：再次遇到签名相同的子任务时，先 `get` / 扫描工作簿中的写回块；命中且策略允许则 **不再调用模型或工具**。
+
+示意（文档级外形）：
+
+```markdown
+# main
+
+*`模型` = > 大模型 *
+*`编排` = > 智能体 大模型=`模型` 工具=`工具表` *
+
+*`报告` = > `编排`.多步 目标=调研并汇总三篇资料的要点 工作簿目录=.marqdo/agent-runs *
+> 打印 内容=`报告`
+```
+
+生成的工作簿（概念形状，非最终模板）：
+
+```markdown
+---
+title: agent-run-…
+goal: 调研并汇总…
+---
+
+# 总目标
+
+（叙述）
+
+`子任务` =
+| 标识 | 描述 | 状态 |
+|------|------|------|
+| t1 | … | pending |
+
+# main
+
+*`子1` = > 智能体 大模型=`模型` 工具=`窄工具表` 站立提示=只做 t1 *
+*`r1` = > `子1`.单步 任务=… *
+> 写回 值=`r1`
+```
+
+---
+
+## 4. 分层与仓库布局
 
 ```text
 ext/
   ai/
-    llm.mq.md
-    大模型.mq.md
-    agent.mq.md
-    智能体.mq.md
+    llm.mq.md / 大模型.mq.md     # 模型 I/O
+    agent.mq.md / 智能体.mq.md   # 本框架（按本文重写）
 ```
 
-Import: `> ext/ai/智能体.mq.md` · `> ext/ai/llm.mq.md`
+| 层 | 职责 |
+|----|------|
+| **应用 runbook** | 领域 `##` 工具、任务表、是否人工确认分解 |
+| **`ext/ai/agent`** | 单步 / 多步、工作簿生成、子智能体编排、写回约定 |
+| **`ext/ai/llm`** | 补全 / 聊天 |
+| **`lib/writeback`** | 持久化输出块 |
+| **`lib/subtask`** | **工具调用与（多步时）子智能体并行的执行通道**；见 [stdlib-subtask.md](stdlib-subtask.md) |
 
-## Layering
+安装：[`ext-cli.md`](ext-cli.md) — `marqdo ext add agent` / `add llm`（`.mq.md` + `native/libagent.so`）。导入：`> ext/ai/智能体.mq.md`。
 
-| Layer | Role |
-|-------|------|
-| **Your runbook** | Tables, loops, **your** tools & logic |
-| **`ext/ai/llm`** | Model I/O |
-| **`ext/ai/agent`** | Framework: ctor + `执行` + `清空历史` |
-| **`lib/*`** | Generic I/O |
+**原生插件（ABI v2）**：`ext/ai/agent` 经 `lib/plugin` 加载；优先 `> plugin.native_path name=agent`，否则按序查找：
 
-```text
-> ext/ai/智能体.mq.md
-    ▼
-# 智能体 (大模型, 工具, 用户提示信息?)
-    ## 执行
-    ## 清空历史
-```
+1. `MARQDO_AGENT_PLUGIN`（显式 `.so` / `.dylib` 路径）  
+2. `CARGO_TARGET_DIR/{debug,release}/libagent.so`（或 `.dylib`）  
+3. cwd `target/{debug,release}/`  
+4. 可执行文件旁 `libagent.*` 或 `target/debug/`  
+5. `MARQDO_EXT/native/libagent.*`（`marqdo ext add agent` 安装）
 
-`工具` = caller-supplied **function catalog** (table of `##` names); framework resolves names via `call_fn` / `调用` and runs the matching zero-arg function in the runbook module.
+本地开发须先 `cargo build -p marqdo_plugin_agent`（或 `ext add agent` / 设 `MARQDO_AGENT_PLUGIN`）。详见 [ext-cli.md](ext-cli.md) · [ext-abi.md](ext-abi.md)。
 
-Install: [`ext-cli.md`](ext-cli.md) — `marqdo ext add agent` / `add llm`.
+**分层纪律**：`ext/*` **禁止** `host_*`；用 `lib/*` 包装或插件注册名。进程退出用 `sys.exit` / `系统.退出`，不用裸 `exit`。
 
-### Tools (v1)
+---
 
-Tools are **not** framework builtins — you define `## 函数名` in your runbook and list names in a table:
+## 5. 公开 API（目标契约）
+
+| 中文 | 英文 | 角色 |
+|------|------|------|
+| `# 智能体` | `# agent` | 构造：`大模型`/`model`，`工具`/`tools`，可选 `站立提示`/`standing` |
+| `## 单步` | `## step` | 原子执行；注入源码 + 位置；可选工具；**返回结构化 map**（不内置写回） |
+| `## 多步` | `## plan` | 建工作簿 → 分解 → 子智能体 → 写回 → 汇总 |
+| `## 分解` | `## decompose` |（可公开或内部）目标 → 子任务表 |
+| `## 清空历史` | `## clear_history` | 若仍保留会话式辅助状态则清空；**不以隐藏 chat 袋为真相源**——真相在文档写回 |
+
+构造参数（v1）：
+
+| 参数 | 说明 |
+|------|------|
+| `大模型` / `model` | `ext/ai/llm` 句柄 |
+| `工具` / `tools` | 工具名表（单列文本，或多列且含 `工具`/`tools`/`name`） |
+| `站立提示` / `standing` | 写在文档里的常驻说明（可空） |
+
+`## 单步` 参数：`任务` / `task`；可选深度、是否强制不用缓存等。  
+`## 多步` 参数：`目标` / `goal`；可选 `工作簿目录`、`最大深度`、`是否确认分解`。
+
+模块内辅助函数（组装上下文、解析模型回复、匹配写回缓存）**不是**稳定对外契约，可随实现调整。
+
+---
+
+## 6. 工具表与子任务调用
+
+工具 **不是** 框架内置能力。在 runbook 定义 `##`，再用表登记名称：
 
 ```markdown
 `工具表` =
 | 工具 |
 |------|
 | 获取时间 |
-| 分配任务 |
+| 读取摘要 |
 ```
 
-- Single-column table → list of function **names** (text).
-- Multi-column table → each row is a map; name from column `工具` / `tools` / `name`.
-- Marqdo has no first-class function values in tables yet; the name must match a `##` in the same module (or imports). `执行` calls it with `call_fn` after the model replies `TOOL:<name>`.
-- Do **not** use `parse text=["fn"]` for the tools list — unquoted identifiers inside `parse` are evaluated as calls.
+- 单列表 → 名称列表。  
+- 多列表 → 从列 `工具` / `tools` / `name` 取名。  
+- 名称须对应当前模块（或导入可见）的 `##`。  
+- **不要** 用 `parse text=["fn"]` 列工具（未加引号的标识符会被当成调用）。
+
+### 6.1 调用路径（锁定）
+
+```text
+模型回复含 CALL:<名> / 调用：<名>
+        ▼
+host_tool_allowed（工具表白名单）
+        ▼
+lib/subtask：spawn fn=<名>  →  wait
+        ▼
+工具返回值写回上下文 / 自写回
+```
+
+| | |
+|---|---|
+| 英文面 | `> spawn fn=`名`` → `> wait id=`…`` |
+| 中文面 | `> 启动 函数=`名`` → `> 等待 id=`…`` |
+| 可选 | `args=` / `参数=` 传给带形参的工具；多工具并行时多次 `spawn` 再 `wait_all` / `等待全部` |
+
+**非目标：** 以裸 `call_fn` 作为框架默认工具通道（应用仍可直接 `call_fn`，但官方智能体走子任务库）。
+
+领域逻辑永远留在应用文件，不进官方 `ext/ai/`。
 
 ---
 
-## Public API (v1)
+## 7. 上下文注入（每次单步 / 子步）
 
-| | Role |
-|--|------|
-| `# 智能体` / `# agent` | **大模型**, **工具**, optional **用户提示信息** |
-| `## 执行` / `## run` | **额外信息**; context + LLM + history append |
-| `## 清空历史` / `## clear_history` | Wipe history on this handle |
+必须可注入（实现可切片，但不得默默丢掉「代码即文档」）：
 
-Module-level `##` helpers (e.g. context assembly) are internal — not public contract.
+| 片段 | 来源 |
+|------|------|
+| 站立提示 | 构造参数 / 文档正文 |
+| 任务 / 目标 | 方法实参 |
+| 工具表（人可读） | 构造参数 |
+| **当前 `.mq.md` 源码** | 插件 `agent_module_source`（经 ABI v2 `host_query`） |
+| **调用位置** | 插件 `agent_call_site` |
+| **Marqdo skill** | 插件 `agent_marqdo_skill` |
+| Marqdo Skill | `skills/marqdo/`（`MARQDO_SKILL` 可覆盖） |
+| 相关写回块 | `lib/writeback` 的 `get` / `list` |
 
-### Auto context (each `执行`)
-
-- `.mq.md` source
-- Call-site / position
-- Conversation history on this handle
-- Marqdo skill (`skills/marqdo/`)
-
-### History (v1)
-
-- Host-backed id per handle
-- Append after each successful `执行`
-- `清空历史` ships with `执行`
+禁止：把整份 Skill + 全文源码藏进不可审查的二进制提示且不在文档中留迹。框架拼装的提示应能在调试时落盘或写回（至少摘要）。
 
 ---
 
-## Example runbook (application — not framework)
+## 8. 自写回与缓存语义
+
+依赖 [stdlib-writeback.md](stdlib-writeback.md)：`record` / `写回` → `<!-- marqdo-out … -->`。
+
+### 8.1 单步返回值（不内置写回）
+
+`单步` / `step` **不再自动写盘**。它返回一张结构化 map，由编排方决定是否、如何写回：
+
+| 字段 | 何时 | 含义 |
+|------|------|------|
+| `status` | 总是 | `ok` / `error` |
+| `task` | 总是 | 本步任务 |
+| `decision` | 总是 | 模型首轮输出（含 CALL 行等） |
+| `tool` / `tool_result` | 成功且调了工具 | 工具名与子任务返回 |
+| `result` | 成功 | 最终答复 |
+| `error` | 失败 | 错误信息 |
 
 ```markdown
----
-> ext/ai/智能体.mq.md
-> ext/ai/大模型.mq.md
----
-
-# main
-
-*`模型` = > 大模型 *
-*`工具名` = | 技能匹配 | 分配任务 | … |
-*`助手` = > 智能体 大模型=`模型` 工具=`工具名` 用户提示信息=… *
-
-- [任务](任务队列)
-  > `助手`.清空历史
-  *`结果` = > `助手`.执行 额外信息=`任务` *
+*`out` = > `助手`.step task=… *
+*`回复` = > json.get value=`out` key=result *
+*`status` = > json.get value=`out` key=status *
+*`body` = > json.stringify value=`out` *
+1. `status` == ok
+  > writeback.record value=`body` key=ok
+2. *
+  > writeback.record value=`body` key=error
 ```
 
-Domain `##` functions live in **this file** or your lib — never in `ext/ai/`.
+命名槽 `ok` / `error` 仍建议互不覆盖；锚点由调用方的 `写回`/`record` 决定。
+
+**命中规则（后续缓存）**：读 `key=ok` 且非占位时可复用。失败知识读 `key=error`。  
+用户可 `clear key=ok` / `clear key=error` 强制重跑。
+
+复杂执行中，写回优先落在 **工作簿** 文件。
+
+### 8.2 Live 金样例
+
+[`tests/ext/agent-run-live.mq.md`](../../tests/ext/agent-run-live.mq.md)：`agent.step` + 子任务工具 + `writeback.record`（`key=ok` / `error`）。凭证：`tests/ext/.env`；`> llm.load_env path=.env` 相对**源文件目录**（`marqdo run` 将 cwd 设为该文件所在目录）。需已构建 agent 原生库（见 §4）。
 
 ---
 
-## Shipped / roadmap
+## 9. 安全与边界
 
-| Item | Status |
-|------|--------|
-| `ext/ai/` + framework + context injection | in progress |
-| Live `执行` test (`tests/ext/agent-run-live.mq.md` + `.env`) | shipped |
-| Tool-call loop in `执行` (`TOOL:<name>` → `call_fn`) | shipped |
+| 风险 | 对策 |
+|------|------|
+| 无限多步递归 | `最大深度`（默认小，如 2）；叶任务强制单步 |
+| 工具越权 | 仅工具表白名单；子智能体可传更窄的表 |
+| 工作簿爆炸 | 统一目录、命名含时间 / id；可选总超时 |
+| 缓存过期 | 签名 + 时间戳；手动清块 |
+| 模型乱改仓库 | 写回 API 约束写入形态；多步生成文件限于工作簿目录 |
 
-### Non-goals
+---
 
-- Domain tools in official ext
-- Flat `ext/*.mq.md` at repo root
-- Second chat stack beside llm
+## 10. 相对旧 API 的迁移
+
+| 旧（废弃方向） | 新 |
+|----------------|----|
+| 唯一的 `## 执行` / `## run` + 隐藏 TOOL: 循环 | `## 单步` / `## 多步` |
+| host 历史袋为真相 | 文档写回 + 工作簿为真相；历史袋至多辅助 |
+| 提示全在框架字符串 | 站立提示与任务在 `.mq.md`；源码注入 |
+| `tests/ext/agent-smoke` 测 TOOL 上下文拼接 | 重写为单步离线 / 写回 / 工作簿骨架测试 |
+
+兼容：可短期保留 `## 执行` 作为 `## 单步` 的别名，但文档与金样例迁到新名后删除别名。
+
+---
+
+## 11. 实现路线（文档锁定后）
+
+| 阶段 | 内容 | 状态 |
+|------|------|------|
+| D0 | 本文 Accepted；废弃 thin TOOL 设计叙述 | **本文件** |
+| D1 | 重写 `ext/ai/agent.mq.md` / `智能体.mq.md`：`单步` + 源码/位置注入 + **子任务调工具** + **结构化返回值**；运行时经 **ABI v2 agent 插件**（禁 ext 直调 host） | **done** |
+| D2 | `多步`：工作簿模板、分解、子智能体（亦可 `spawn`）、缓存命中 | TODO |
+| D3 | 金样例：离线单步 / 写回；**live 单步**（`tests/ext/agent-run-live.mq.md`）；多步骨架（可不打网） | **live done** |
+| D4 | `view` / `debug` 对工作簿与写回块的导航体验 | TODO |
+
+### 非目标
+
+- 在官方 `ext/ai/` 捆绑领域工具或工单技能  
+- 在 `ext/` 根目录摊平 `.mq.md`  
+- 平行再造一套 LLM HTTP 栈  
+- 以不可读的私有二进制协议作为编排主界面  
+
+---
+
+## 12. 一句话
+
+**智能体框架必须让编排看起来像文档、跑起来像程序、留痕像知识库。**  
+单步解决原子问题；多步生成工作簿、拆分子智能体、用自写回记住成功与失败——这才是 Marqdo 相对其它智能体框架的优越性所在。

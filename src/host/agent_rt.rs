@@ -1,4 +1,4 @@
-//! Runtime support for `ext/agent`: module source, call site, skill text, history store.
+//! Runtime helpers for ABI `host_query` and shared map/list ops.
 
 use std::path::{Path, PathBuf};
 
@@ -17,13 +17,6 @@ impl HostContext {
 
     pub fn pop_call_frame(&mut self) {
         self.call_stack.pop();
-    }
-
-    pub fn alloc_agent_id(&mut self) -> String {
-        self.agent_seq = self.agent_seq.wrapping_add(1);
-        let id = format!("agent-{}", self.agent_seq);
-        self.agent_histories.insert(id.clone(), Vec::new());
-        id
     }
 }
 
@@ -110,7 +103,6 @@ fn skill_search_roots(ctx: &HostContext) -> Vec<PathBuf> {
             roots.push(dir.to_path_buf());
             if let Some(parent) = dir.parent() {
                 roots.push(parent.to_path_buf());
-                // target/debug → repo root
                 if let Some(repo) = parent.parent() {
                     roots.push(repo.to_path_buf());
                 }
@@ -121,7 +113,6 @@ fn skill_search_roots(ctx: &HostContext) -> Vec<PathBuf> {
     if let Some(p) = &ctx.entry_path {
         if let Some(parent) = p.parent() {
             roots.push(parent.to_path_buf());
-            // tests/ext → repo
             if let Some(repo) = parent.parent().and_then(|p| p.parent()) {
                 roots.push(repo.to_path_buf());
             }
@@ -131,44 +122,6 @@ fn skill_search_roots(ctx: &HostContext) -> Vec<PathBuf> {
         roots.push(PathBuf::from(manifest));
     }
     roots
-}
-
-pub fn agent_alloc(ctx: &mut HostContext) -> Result<Value, String> {
-    Ok(Value::Text(ctx.alloc_agent_id()))
-}
-
-pub fn agent_history_get(ctx: &HostContext, id: &Value) -> Result<Value, String> {
-    let id = text_id(id)?;
-    Ok(Value::List(
-        ctx.agent_histories
-            .get(&id)
-            .cloned()
-            .unwrap_or_default(),
-    ))
-}
-
-pub fn agent_history_clear(ctx: &mut HostContext, id: &Value) -> Result<Value, String> {
-    let id = text_id(id)?;
-    ctx.agent_histories.insert(id, Vec::new());
-    Ok(Value::None)
-}
-
-pub fn agent_history_append(
-    ctx: &mut HostContext,
-    id: &Value,
-    item: &Value,
-) -> Result<Value, String> {
-    let id = text_id(id)?;
-    let list = ctx.agent_histories.entry(id).or_default();
-    list.push(item.clone());
-    Ok(Value::List(list.clone()))
-}
-
-fn text_id(id: &Value) -> Result<String, String> {
-    match id {
-        Value::Text(s) if !s.is_empty() => Ok(s.clone()),
-        _ => Err("agent history id must be non-empty text".into()),
-    }
 }
 
 pub fn map_set(map: &Value, key: &Value, value: &Value) -> Result<Value, String> {
@@ -203,75 +156,14 @@ pub fn list_append(list: &Value, item: &Value) -> Result<Value, String> {
     }
 }
 
-fn tool_name_from_row(row: &Value) -> Option<String> {
-    match row {
-        Value::Text(s) if !s.is_empty() => Some(s.clone()),
-        Value::Map(entries) => ["工具", "tools", "name"]
-            .iter()
-            .find_map(|key| {
-                entries.iter().find(|(k, _)| k == *key).and_then(|(_, v)| {
-                    if let Value::Text(s) = v {
-                        (!s.is_empty()).then(|| s.clone())
-                    } else {
-                        None
-                    }
-                })
-            }),
-        _ => None,
-    }
-}
-
-pub fn tool_names(tools: &Value) -> Vec<String> {
-    match tools {
-        Value::List(rows) => rows.iter().filter_map(tool_name_from_row).collect(),
-        _ => Vec::new(),
-    }
-}
-
-pub fn format_tools_for_llm(tools: &Value) -> Result<Value, String> {
-    let mut out = String::from("Available tools (invoke via TOOL:<name>):\n");
-    for name in tool_names(tools) {
-        out.push_str("- ");
-        out.push_str(&name);
-        out.push('\n');
-    }
-    Ok(Value::Text(out))
-}
-
-pub fn tool_allowed(tools: &Value, name: &Value) -> Result<Value, String> {
-    let name = match name {
-        Value::Text(s) if !s.is_empty() => s.as_str(),
-        _ => return Ok(Value::Bool(false)),
-    };
-    Ok(Value::Bool(
-        tool_names(tools).iter().any(|n| n == name),
-    ))
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn tool_catalog_from_table() {
-        let tools = Value::List(vec![Value::Text("获取时间".into())]);
-        let text = format_tools_for_llm(&tools).unwrap();
-        assert!(matches!(text, Value::Text(s) if s.contains("获取时间")));
-        assert!(tool_allowed(&tools, &Value::Text("获取时间".into())).unwrap().truthy());
-        assert!(!tool_allowed(&tools, &Value::Text("nope".into())).unwrap().truthy());
-    }
-
-    #[test]
-    fn map_set_and_history() {
-        let mut ctx = HostContext::default();
-        let id = ctx.alloc_agent_id();
-        assert!(id.starts_with("agent-"));
-        agent_history_append(&mut ctx, &Value::Text(id.clone()), &Value::Text("a".into()))
-            .unwrap();
-        let h = agent_history_get(&ctx, &Value::Text(id.clone())).unwrap();
-        assert_eq!(h, Value::List(vec![Value::Text("a".into())]));
-        agent_history_clear(&mut ctx, &Value::Text(id)).unwrap();
-        let h2 = agent_history_get(&ctx, &Value::Text("agent-1".into())).unwrap();
-        assert_eq!(h2, Value::List(vec![]));
+    fn map_set_updates() {
+        let m = Value::Map(vec![("a".into(), Value::Int(1))]);
+        let m2 = map_set(&m, &Value::Text("a".into()), &Value::Int(2)).unwrap();
+        assert_eq!(m2, Value::Map(vec![("a".into(), Value::Int(2))]));
     }
 }

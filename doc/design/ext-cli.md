@@ -3,8 +3,8 @@
 | | |
 |---|---|
 | Status | **Accepted (v0.1)** |
-| Date | 2026-08-06 |
-| Related | [ext-llm.md](ext-llm.md) · [ext-agent.md](ext-agent.md) |
+| Date | 2026-08-07 |
+| Related | [ext-llm.md](ext-llm.md) · [ext-agent.md](ext-agent.md) · [ext-abi.md](ext-abi.md) |
 
 ## Commands
 
@@ -48,11 +48,20 @@ Future optional ext domains get their own subdirs (e.g. `ext/foo/`), not mixed i
 | Id | Installs under `MARQDO_EXT` |
 |----|-----------------------------|
 | `llm` | `ai/llm.mq.md`, `ai/大模型.mq.md` |
-| `agent` | `ai/agent.mq.md`, `ai/智能体.mq.md` |
+| `agent` | `ai/agent.mq.md`, `ai/智能体.mq.md`, **`native/libagent.so`** (or `.dylib`) |
+
+`add agent` copies the built native plugin into `MARQDO_EXT/native/`. Build it first:
+
+```bash
+cargo build -p marqdo_plugin_agent
+marqdo ext add agent
+```
+
+Without install, runtime resolves the plugin via `plugin.native_path name=agent` (see [ext-abi.md](ext-abi.md)): `MARQDO_AGENT_PLUGIN` → `CARGO_TARGET_DIR/{debug,release}/` → cwd `target/…` → beside `marqdo` binary → `MARQDO_EXT/native/`.
 
 ## Tests
 
-`tests/gold.rs`: `ext_cli_add_list_remove_llm`, `ext_cli_add_agent`, `ext_agent_framework_smoke`, `ext_agent_run_live` (needs `tests/ext/.env`).
+`tests/gold.rs`: `ext_cli_add_list_remove_llm`, `ext_cli_add_agent`, `ext_agent_framework_smoke`, `ext_agent_run_live` ([`tests/ext/agent-run-live.mq.md`](../../tests/ext/agent-run-live.mq.md); needs `tests/ext/.env` + built `libagent`).
 
 ## Non-goals
 

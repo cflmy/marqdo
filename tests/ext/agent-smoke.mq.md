@@ -1,22 +1,31 @@
 ---
-title: ext/agent framework smoke (offline)
-description: Ctor, context, clear_history — no network. Gold suite.
+title: ext/agent framework smoke
+description: Real llm handle from tests/ext/.env; context, extract_tool_name, run_tool via subtask.
+> ext/ai/llm.mq.md
+> lib/json.mq.md
 > ext/ai/agent.mq.md
 ---
 
+## 获取时间
+
+*`esc` = > json.parse text={"v":"ok-time"} *
+**> json.get value=`esc` key=v**
+
 # main
+
+> llm.load_env path=.env
 
 `工具表` =
 | 工具 |
 |------|
 | 获取时间 |
 
-*`占位模型` = > parse text={"_type":"llm"} *
-*`助手` = > agent model=`占位模型` tools=`工具表` user_prompt=you are a dispatcher *
+*`模型` = > llm.llm *
+*`助手` = > agent.agent model=`模型` tools=`工具表` standing=you are a readable Marqdo agent *
 
-*`id` = > get value=`助手` key=id *
+*`id` = > json.get value=`助手` key=id *
 
-*`ctx` = > build_agent_context agent=`助手` extra=probe *
+*`ctx` = > agent.build_step_context agent=`助手` task=probe *
 
 *`has_skill` = > split value=`ctx` sep=Marqdo *
 *`sk_n` = > len value=`has_skill` *
@@ -32,29 +41,47 @@ description: Ctor, context, clear_history — no network. Gold suite.
 2. *
   > print text=tools-missing
 
-*`src` = > host_module_source *
-*`has_src` = > split value=`src` sep=probe *
+*`has_src` = > split value=`ctx` sep=probe *
 *`src_n` = > len value=`has_src` *
 1. `src_n` > 1
   > print text=source-ok
 2. *
   > print text=source-missing
 
-*`turn` = > parse text={"role":"user","content":"one"} *
-> host_agent_history_append id=`id` item=`turn`
-*`turn2` = > parse text={"role":"assistant","content":"two"} *
-> host_agent_history_append id=`id` item=`turn2`
+*`has_act` = > split value=`ctx` sep=CALL: *
+*`act_n` = > len value=`has_act` *
+1. `act_n` > 1
+  > print text=protocol-ok
+2. *
+  > print text=protocol-missing
 
-*`h1` = > host_agent_history_get id=`id` *
+*`samples` = > json.parse text={"r":"CALL:获取时间","m":"think\nCALL:获取时间"} *
+*`raw1` = > json.get value=`samples` key=r *
+*`name1` = > agent.extract_tool_name reply=`raw1` *
+> print text=`name1`
+
+*`raw2` = > json.get value=`samples` key=m *
+*`name2` = > agent.extract_tool_name reply=`raw2` *
+> print text=`name2`
+
+*`tool_out` = > agent.run_tool tools=`工具表` name=获取时间 *
+> print text=`tool_out`
+
+*`turn` = > json.parse text={"role":"user","content":"one"} *
+> agent_history_append id=`id` item=`turn`
+*`turn2` = > json.parse text={"role":"assistant","content":"two"} *
+> agent_history_append id=`id` item=`turn2`
+
+*`h1` = > agent_history_get id=`id` *
 *`n1` = > len value=`h1` *
 > print text=`n1`
 
 > `助手`.clear_history
 
-*`h2` = > host_agent_history_get id=`id` *
+*`h2` = > agent_history_get id=`id` *
 *`n2` = > len value=`h2` *
 > print text=`n2`
 
-*`site` = > host_call_site *
-*`fn` = > get value=`site` key=function *
+*`site` = > agent_call_site *
+*`fn` = > json.get value=`site` key=function *
 > print text=`fn`

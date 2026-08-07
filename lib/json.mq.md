@@ -10,8 +10,9 @@ description: JSON parse/stringify (shared EN/ZH import)
 
 ## stringify
     + `value`
+    + `indent`=None
 
-**> host_json_stringify value=`value`**
+**> host_json_stringify value=`value` indent=`indent`**
 
 ## get
     + `value`

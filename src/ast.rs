@@ -1,13 +1,43 @@
 //! Marqdo AST (Phase I).
 
+use std::collections::HashMap;
+
 use crate::diagnostics::Span;
 use crate::formula::Expr as FormulaExpr;
 use crate::value::CodeBlock;
 
+/// Frontmatter import: path + library bind name (see `doc/design/module-namespace.md`).
+#[derive(Debug, Clone)]
+pub struct Import {
+    pub path: String,
+    pub bind: String,
+}
+
+/// Frontmatter `use` / `使用`: bind a short name to a library path (`time.format`).
+#[derive(Debug, Clone)]
+pub struct Use {
+    pub path: Vec<String>,
+    pub bind: String,
+}
+
 #[derive(Debug, Clone)]
 pub struct Module {
-    pub imports: Vec<String>,
+    pub imports: Vec<Import>,
+    pub uses: Vec<Use>,
     pub functions: Vec<Function>,
+    /// Populated by the loader: bind name → imported module (not flattened).
+    pub import_modules: HashMap<String, Module>,
+}
+
+impl Default for Module {
+    fn default() -> Self {
+        Self {
+            imports: Vec::new(),
+            uses: Vec::new(),
+            functions: Vec::new(),
+            import_modules: HashMap::new(),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -78,6 +108,9 @@ pub struct BranchArm {
 #[derive(Debug, Clone)]
 pub struct CallExpr {
     pub callee: String,
+    /// Bare library path segments, e.g. `["time","parse"]` for `time.parse`.
+    /// Mutually exclusive with `receiver` (instance method).
+    pub path: Option<Vec<String>>,
     /// When set, `` `recv`.callee `` method call; receiver is a variable name.
     pub receiver: Option<String>,
     pub args: Vec<Arg>,
@@ -155,7 +188,12 @@ pub fn format_ast_dump(path: &str, module: &Module) -> String {
     let mut out = String::new();
     out.push_str(&format!("=== marqdo: ast ({path}) ===\n"));
     if !module.imports.is_empty() {
-        out.push_str(&format!("(imports {:?})\n", module.imports));
+        let specs: Vec<String> = module
+            .imports
+            .iter()
+            .map(|i| format!("{} as {}", i.path, i.bind))
+            .collect();
+        out.push_str(&format!("(imports {:?})\n", specs));
     }
     for fun in &module.functions {
         dump_fun(&mut out, fun, 0);

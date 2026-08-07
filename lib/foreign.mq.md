@@ -11,14 +11,16 @@ description: Run bound code fences and inline sources via local interpreters
 
 ## run
     + `code`
+    + `stdin`=None
 
-**> host_foreign_run code=`code`**
+**> host_foreign_run code=`code` stdin=`stdin`**
 
 ## run_lang
     + `lang`
     + `source`
+    + `stdin`=None
 
-**> host_foreign_run_lang lang=`lang` source=`source`**
+**> host_foreign_run_lang lang=`lang` source=`source` stdin=`stdin`**
 
 ## langs
 

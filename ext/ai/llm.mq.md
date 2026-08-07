@@ -7,118 +7,119 @@ description: OpenAI-compatible LLM object (English). Import ext/ai/llm.mq.md.
 ---
 
 ## load_env
+    + `path`=None
 
 Load `.env` from cwd (optional named arg `path=`). Does not override existing variables.
 
-**> load_dotenv**
+**> sys.load_dotenv path=`path`**
 
 # llm
 
 Construct an LLM handle from `OPENAI_*` / `MARQDO_LLM_*` (default base OpenAI v1, model `gpt-4o-mini`).
 
-*`d` = > parse text={"base":"https://api.openai.com/v1","model":"gpt-4o-mini","suffix":"/chat/completions","bearer":"Bearer ","p1":"{\"model\":","p2":",\"messages\":[{\"role\":\"user\",\"content\":","p3":"}]}","h1":"{\"Authorization\":","h2":"}","a1":"{\"api_key\":","a2":",\"base_url\":","a3":",\"model\":","a4":",\"suffix\":","a5":",\"bearer\":","a6":",\"p1\":","a7":",\"p2\":","a8":",\"p3\":","a9":",\"h1\":","a10":",\"h2\":","a11":"}"} *
+*`d` = > json.parse text={"base":"https://api.openai.com/v1","model":"gpt-4o-mini","suffix":"/chat/completions","bearer":"Bearer ","p1":"{\"model\":","p2":",\"messages\":[{\"role\":\"user\",\"content\":","p3":"}]}","h1":"{\"Authorization\":","h2":"}","a1":"{\"api_key\":","a2":",\"base_url\":","a3":",\"model\":","a4":",\"suffix\":","a5":",\"bearer\":","a6":",\"p1\":","a7":",\"p2\":","a8":",\"p3\":","a9":",\"h1\":","a10":",\"h2\":","a11":"}"} *
 
-*`api_key` = > env_get name=OPENAI_API_KEY *
+*`api_key` = > sys.env_get name=OPENAI_API_KEY *
 1. `api_key`
   *`_k` = 1*
 2. *
-  *`api_key` = > env_get name=MARQDO_LLM_API_KEY *
+  *`api_key` = > sys.env_get name=MARQDO_LLM_API_KEY *
 3. `api_key`
   *`_k` = 1*
 4. *
   > print text=ext/ai/llm: set OPENAI_API_KEY or MARQDO_LLM_API_KEY
-  > exit code=1
+  > sys.exit code=1
 
-*`base_url` = > env_get name=OPENAI_BASE_URL *
+*`base_url` = > sys.env_get name=OPENAI_BASE_URL *
 1. `base_url`
   *`_k` = 1*
 2. *
-  *`base_url` = > env_get name=MARQDO_LLM_BASE_URL *
+  *`base_url` = > sys.env_get name=MARQDO_LLM_BASE_URL *
 3. `base_url`
   *`_k` = 1*
 4. *
-  *`base_url` = > get value=`d` key=base *
+  *`base_url` = > json.get value=`d` key=base *
 
-*`model` = > env_get name=OPENAI_MODEL *
+*`model` = > sys.env_get name=OPENAI_MODEL *
 1. `model`
   *`_k` = 1*
 2. *
-  *`model` = > env_get name=MARQDO_LLM_MODEL *
+  *`model` = > sys.env_get name=MARQDO_LLM_MODEL *
 3. `model`
   *`_k` = 1*
 4. *
-  *`model` = > get value=`d` key=model *
+  *`model` = > json.get value=`d` key=model *
 
-*`q_key` = > quote text=`api_key` *
-*`q_base` = > quote text=`base_url` *
-*`q_model` = > quote text=`model` *
-*`suffix` = > get value=`d` key=suffix *
-*`bearer` = > get value=`d` key=bearer *
-*`p1` = > get value=`d` key=p1 *
-*`p2` = > get value=`d` key=p2 *
-*`p3` = > get value=`d` key=p3 *
-*`h1` = > get value=`d` key=h1 *
-*`h2` = > get value=`d` key=h2 *
-*`q_suf` = > quote text=`suffix` *
-*`q_br` = > quote text=`bearer` *
-*`q_p1` = > quote text=`p1` *
-*`q_p2` = > quote text=`p2` *
-*`q_p3` = > quote text=`p3` *
-*`q_h1` = > quote text=`h1` *
-*`q_h2` = > quote text=`h2` *
-*`a1` = > get value=`d` key=a1 *
-*`a2` = > get value=`d` key=a2 *
-*`a3` = > get value=`d` key=a3 *
-*`a4` = > get value=`d` key=a4 *
-*`a5` = > get value=`d` key=a5 *
-*`a6` = > get value=`d` key=a6 *
-*`a7` = > get value=`d` key=a7 *
-*`a8` = > get value=`d` key=a8 *
-*`a9` = > get value=`d` key=a9 *
-*`a10` = > get value=`d` key=a10 *
-*`a11` = > get value=`d` key=a11 *
+*`q_key` = > json.quote text=`api_key` *
+*`q_base` = > json.quote text=`base_url` *
+*`q_model` = > json.quote text=`model` *
+*`suffix` = > json.get value=`d` key=suffix *
+*`bearer` = > json.get value=`d` key=bearer *
+*`p1` = > json.get value=`d` key=p1 *
+*`p2` = > json.get value=`d` key=p2 *
+*`p3` = > json.get value=`d` key=p3 *
+*`h1` = > json.get value=`d` key=h1 *
+*`h2` = > json.get value=`d` key=h2 *
+*`q_suf` = > json.quote text=`suffix` *
+*`q_br` = > json.quote text=`bearer` *
+*`q_p1` = > json.quote text=`p1` *
+*`q_p2` = > json.quote text=`p2` *
+*`q_p3` = > json.quote text=`p3` *
+*`q_h1` = > json.quote text=`h1` *
+*`q_h2` = > json.quote text=`h2` *
+*`a1` = > json.get value=`d` key=a1 *
+*`a2` = > json.get value=`d` key=a2 *
+*`a3` = > json.get value=`d` key=a3 *
+*`a4` = > json.get value=`d` key=a4 *
+*`a5` = > json.get value=`d` key=a5 *
+*`a6` = > json.get value=`d` key=a6 *
+*`a7` = > json.get value=`d` key=a7 *
+*`a8` = > json.get value=`d` key=a8 *
+*`a9` = > json.get value=`d` key=a9 *
+*`a10` = > json.get value=`d` key=a10 *
+*`a11` = > json.get value=`d` key=a11 *
 *`raw` = `a1` + `q_key` + `a2` + `q_base` + `a3` + `q_model` + `a4` + `q_suf` + `a5` + `q_br` + `a6` + `q_p1` + `a7` + `q_p2` + `a8` + `q_p3` + `a9` + `q_h1` + `a10` + `q_h2` + `a11` *
-**> parse text=`raw`**
+**> json.parse text=`raw`**
 
 ## complete
     + `prompt`
 
 Chat completion using `self` / `自` handle fields.
 
-*`api_key` = > get value=`self` key=api_key *
-*`base_url` = > get value=`self` key=base_url *
-*`model` = > get value=`self` key=model *
-*`suffix` = > get value=`self` key=suffix *
-*`bearer` = > get value=`self` key=bearer *
-*`p1` = > get value=`self` key=p1 *
-*`p2` = > get value=`self` key=p2 *
-*`p3` = > get value=`self` key=p3 *
-*`h1` = > get value=`self` key=h1 *
-*`h2` = > get value=`self` key=h2 *
+*`api_key` = > json.get value=`self` key=api_key *
+*`base_url` = > json.get value=`self` key=base_url *
+*`model` = > json.get value=`self` key=model *
+*`suffix` = > json.get value=`self` key=suffix *
+*`bearer` = > json.get value=`self` key=bearer *
+*`p1` = > json.get value=`self` key=p1 *
+*`p2` = > json.get value=`self` key=p2 *
+*`p3` = > json.get value=`self` key=p3 *
+*`h1` = > json.get value=`self` key=h1 *
+*`h2` = > json.get value=`self` key=h2 *
 *`url` = `base_url` + `suffix` *
 *`auth` = `bearer` + `api_key` *
-*`q_auth` = > quote text=`auth` *
+*`q_auth` = > json.quote text=`auth` *
 *`hdr_raw` = `h1` + `q_auth` + `h2` *
-*`headers` = > parse text=`hdr_raw` *
-*`q_model` = > quote text=`model` *
-*`q_prompt` = > quote text=`prompt` *
+*`headers` = > json.parse text=`hdr_raw` *
+*`q_model` = > json.quote text=`model` *
+*`q_prompt` = > json.quote text=`prompt` *
 *`body` = `p1` + `q_model` + `p2` + `q_prompt` + `p3` *
-*`resp` = > http_post url=`url` body=`body` headers=`headers` *
-*`status` = > get value=`resp` key=status *
-*`raw` = > get value=`resp` key=body *
+*`resp` = > net.http_post url=`url` body=`body` headers=`headers` *
+*`status` = > json.get value=`resp` key=status *
+*`raw` = > json.get value=`resp` key=body *
 
 1. `status` == 200
-  *`data` = > parse text=`raw` *
-  *`choices` = > get value=`data` key=choices *
+  *`data` = > json.parse text=`raw` *
+  *`choices` = > json.get value=`data` key=choices *
   *`first` = > at value=`choices` index=0 *
-  *`message` = > get value=`first` key=message *
-  *`content` = > get value=`message` key=content *
+  *`message` = > json.get value=`first` key=message *
+  *`content` = > json.get value=`message` key=content *
   **`content`**
 2. *
   > print text=ext/ai/llm: HTTP error
   > print text=`status`
   > print text=`raw`
-  > exit code=1
+  > sys.exit code=1
 
 ---
 

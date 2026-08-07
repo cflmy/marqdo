@@ -15,6 +15,6 @@ print("hello-from-python")
 
 Default command is python (Windows) or python3 (Unix). Override with set_cmd, env MARQDO_FOREIGN_PYTHON, or the command box in live view. Failures ask you to check that configuration.
 
-*`out` = > run code=`hi` *
+*`out` = > foreign.run code=`hi` *
 
 > print text=`out`

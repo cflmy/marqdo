@@ -1,9 +1,9 @@
-# Native plugin ABI (v1)
+# Native plugin ABI (v2)
 
 | | |
 |---|---|
 | Status | Accepted |
-| Date | 2026-08-06 |
+| Date | 2026-08-07 |
 | Header | [`include/marqdo_abi.h`](../../include/marqdo_abi.h) |
 | Related | [ext-agent.md](ext-agent.md) · [stdlib-modules.md](stdlib-modules.md) |
 
@@ -13,20 +13,21 @@
 - **Not** linked into the `marqdo` binary; load at runtime.
 - Stable **C** ABI only (no cross-compiler Rust ABI for plugins).
 - Official / local paths only — **no** third-party package registry.
+- **v2**: allowlisted `host_query` so plugins can read entry source / call site / skill without baking agent logic into the core.
 
 ## Contract
 
-`MARQDO_ABI_VERSION = 1`.
+`MARQDO_ABI_VERSION = 2` (host accepts plugins with version `1..=2`).
 
 Every plugin exports:
 
 | Symbol | Role |
 |--------|------|
-| `marqdo_plugin_abi_version` | Must equal host’s supported version |
+| `marqdo_plugin_abi_version` | `1` or `2` |
 | `marqdo_plugin_init` | Register functions via `MarqdoHostApi` |
 | `marqdo_plugin_shutdown` | Teardown |
 
-Host provides `register_fn(name, params_csv, fn)`, `alloc`, `free`.
+Host provides `register_fn`, `alloc`, `free`, and (v2) `host_query`.
 
 ### Wire format
 
@@ -37,6 +38,16 @@ Arguments and results are **UTF-8 JSON**:
 
 Plugin fn returns `0` + `*out_json` on success; non-zero + optional `*err_msg` on failure. Host frees both strings with the host `free`.
 
+### `host_query` allowlist (v2)
+
+| name | Result JSON | Notes |
+|------|-------------|--------|
+| `module_source` | string | Entry `.mq.md` text |
+| `call_site` | `{path,function,line}` | Active call site |
+| `marqdo_skill` | string | Skill pack text |
+
+Unknown names fail. Queries are only valid during a plugin function call (host sets thread-local context).
+
 ## Marqdo surface (`lib/plugin` / `lib/插件`)
 
 | English | Chinese | Host |
@@ -44,6 +55,7 @@ Plugin fn returns `0` + `*out_json` on success; non-zero + optional `*err_msg` o
 | `## load` (`path`) | `## 加载` (`路径`) | `host_plugin_load` |
 | `## unload` | `## 卸载` | `host_plugin_unload` |
 | `## list` | `## 列出` | `host_plugin_list` |
+| `## native_path` (`name`) | `## 原生路径` (`名`) | `host_ext_native_path` |
 
 ```markdown
 ---
@@ -60,26 +72,29 @@ Plugin fn returns `0` + `*out_json` on success; non-zero + optional `*err_msg` o
 
 After `load`, registered names are callable like other functions (plugin registry lookup after fixed host fns, before user `#`/`##` defs).
 
-**Path sandbox:** `path` resolves under the program’s cwd / `fs_root` (same as `lib/fs`). Absolute paths outside the root are rejected. Prefer a same-directory filename, or pass a path via a variable / env (see gold tests).
+**Path sandbox:** `path` resolves under the program’s cwd / `fs_root` (same as `lib/fs`). Absolute paths outside the root are rejected unless trusted (`MARQDO_EXT` / `MARQDO_AGENT_PLUGIN` / built `libagent.*`). Prefer `native_path name=agent` for the official agent plugin.
 
-## Demo
+## Demo / agent
 
 ```bash
 cargo build -p marqdo_plugin_demo
-# Windows: target/debug/demo.dll
-# Linux:   target/debug/libdemo.so
-# macOS:   target/debug/libdemo.dylib
+cargo build -p marqdo_plugin_agent
 ```
 
-Registers `demo_add(a,b)`, `demo_echo(text)`. Gold: [`tests/lib/plugin-demo.mq.md`](../../tests/lib/plugin-demo.mq.md).
+- Demo (ABI v1): `demo_add`, `demo_echo` — [`tests/lib/plugin-demo.mq.md`](../../tests/lib/plugin-demo.mq.md).
+- Agent (ABI v2): layout + session bag + `agent_module_source` / `agent_format_tools` / … — [`plugins/agent`](../../plugins/agent); used by [`ext/ai/agent.mq.md`](../../ext/ai/agent.mq.md). Lookup: `plugin.native_path name=agent` or [ext-cli.md](ext-cli.md) install / `MARQDO_AGENT_PLUGIN`.
 
-Official agent layout plugin: [`plugins/agent`](../../plugins/agent) — see [ext-agent.md](ext-agent.md).
+## Layering
+
+| Layer | May call `host_*` |
+|-------|-------------------|
+| `lib/*` | Yes (only L1 wrappers) |
+| `ext/*` | **No** — compose `lib/*` or ABI plugin names via `lib/plugin` |
+| Application `.mq.md` | Same as ext |
 
 ## Non-goals
 
 - Embedding plugins in the release exe by default
 - Callbacks from plugin into arbitrary Marqdo evaluation
-- OS sandbox / seccomp
+- Arbitrary HostFn passthrough via `host_query`
 - **Third-party** plugin / package registry
-
-Official install of known extensions (`marqdo ext add …`) is **planned** — see [ext-cli.md](ext-cli.md). That is not a public marketplace.

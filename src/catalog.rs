@@ -156,9 +156,8 @@ fn extract_frontmatter_imports(source: &str) -> Vec<String> {
             break;
         }
         if let Some(rest) = t.strip_prefix('>') {
-            let path = rest.trim();
-            if path.ends_with(".mq.md") {
-                imports.push(path.to_string());
+            if let Some(imp) = crate::parse::parse_import_spec(rest.trim()) {
+                imports.push(format!("{} as {}", imp.path, imp.bind));
             }
         }
     }

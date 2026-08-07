@@ -433,7 +433,7 @@ fn is_word_end(s: &str, len: usize) -> bool {
 }
 
 /// Parse `name key=val …` / positional args; returns call + bytes consumed.
-/// Callee may be a bare name or method form `` `recv`.method ``.
+/// Callee may be a bare name, library path `time.parse`, or method `` `recv`.method ``.
 pub fn parse_call_tail(s: &str) -> Result<(CallExpr, usize)> {
     use crate::ast::Arg;
 
@@ -448,9 +448,14 @@ pub fn parse_call_tail(s: &str) -> Result<(CallExpr, usize)> {
             .to_string()
     };
 
-    let (receiver, callee) = split_method_callee(&callee_tok)
-        .map(|(r, m)| (Some(r), m))
-        .unwrap_or((None, callee_tok.clone()));
+    let (receiver, callee, path) = if let Some((r, m)) = split_method_callee(&callee_tok) {
+        (Some(r), m, None)
+    } else if let Some(segments) = split_lib_path_callee(&callee_tok) {
+        let last = segments.last().cloned().unwrap_or_default();
+        (None, last, Some(segments))
+    } else {
+        (None, callee_tok.clone(), None)
+    };
 
     let after_callee_offset = {
         let idx = s.find(&callee_tok).unwrap();
@@ -486,6 +491,7 @@ pub fn parse_call_tail(s: &str) -> Result<(CallExpr, usize)> {
     Ok((
         CallExpr {
             callee,
+            path,
             receiver,
             args,
         },
@@ -510,6 +516,21 @@ fn split_method_callee(tok: &str) -> Option<(String, String)> {
         return None;
     }
     Some((recv, method.to_string()))
+}
+
+/// Bare `time.parse` / `agent.agent` → path segments (len ≥ 2).
+fn split_lib_path_callee(tok: &str) -> Option<Vec<String>> {
+    if tok.starts_with('`') || !tok.contains('.') {
+        return None;
+    }
+    let parts: Vec<String> = tok.split('.').map(|s| s.to_string()).collect();
+    if parts.len() < 2 {
+        return None;
+    }
+    if parts.iter().any(|p| p.is_empty() || p.contains('`')) {
+        return None;
+    }
+    Some(parts)
 }
 
 /// If `s` begins with `ident=`, return (ident, rest_after_eq).

@@ -3,9 +3,9 @@
 | | |
 |---|---|
 | 状态 | **已落地**：text/table/fs/sys/time/json/net/math/foreign/**plugin** |
-| 日期 | 2026-08-06 |
+| 日期 | 2026-08-07 |
 | 原则 | 全部经 frontmatter **导入**；除 JSON 外中英分文件；内核保持少而精 |
-| 相关 | [stdlib.md](stdlib.md) · [stdlib-i18n.md](stdlib-i18n.md) · [ext-abi.md](ext-abi.md) · [ext-llm.md](ext-llm.md) · [ext-agent.md](ext-agent.md) |
+| 相关 | [stdlib.md](stdlib.md) · [stdlib-i18n.md](stdlib-i18n.md) · [ext-abi.md](ext-abi.md) · [ext-llm.md](ext-llm.md) · [ext-agent.md](ext-agent.md) · [**module-namespace.md**](module-namespace.md)（导入命名空间；**M1/M2 已落地**：`库.成员` / `库.对象.成员` / `use`） |
 
 ---
 
@@ -52,9 +52,23 @@ OS / HTTP / 时钟 / 共享库 …
 | 层 | 谁实现 | 用户是否直接调用 |
 |----|--------|------------------|
 | **L0** | 解释器内置 | 是（`print`/`len`/…） |
-| **L0.5 宿主原语** | Rust（`src/host/`） | **原则上否**；供 L1 包装 |
+| **L0.5 宿主原语** | Rust（`src/host/`） | **原则上否**；供 L1 包装；ABI v2 `host_query` 仅插件可调 |
 | **L1 官方库** | `lib/*.mq.md` | **是** |
-| **官方 ext** | `ext/*.mq.md`（+ 可选 ABI 插件） | **是**（需显式导入 `ext/`） |
+| **官方 ext** | `ext/*.mq.md`（+ 可选 ABI 插件） | **是**（需显式导入 `ext/`）；**禁止** `host_*`，经 `lib/*` 或插件注册名 |
+
+> **已变更（M1+M2）**：[module-namespace.md](module-namespace.md) — 取消跨文件扁平合并；L1/ext 经**裸名点号路径**调用（`time.parse`、`agent.agent`；M2：`库.对象.成员` + `use`），库名不加反引号；实例方法须 `` `var`.method ``；不再靠 import 顺序覆盖同名。
+
+### 2.1 L1 薄包装 → 宿主（命名空间后必读）
+
+点号路径 `net.http_post` / `json.stringify` 等解析到 **`lib/*.mq.md` 的 `##` 函数**，再转发 `host_*`。未在包装形参表声明的可选实参会被**静默丢弃**（曾导致 live agent 401：`Authorization` 等 `headers` 从未到达宿主）。
+
+| 规则 | 说明 |
+|------|------|
+| 每个 `host_*` 包装 | 须在 `+` 形参表声明**全部**宿主可选参数，默认 `None`，并在 `**> host_…**` 中**原样转发** |
+| `http_post` / `提交` | `content_type=None` 时宿主按默认 JSON charset 处理 |
+| 已对齐（2026-08-07） | `net`/`网络`（headers、content_type、body）、`sys`/`系统`（load_dotenv、exec）、`ext/ai/llm`（load_env / 加载环境 path）、`json.stringify` indent、`foreign`/`外联` stdin、`math`/`数学` plot*/solve 可选项 |
+
+**无**扁平合并回退；**无**裸名双轨兼容。
 
 ---
 

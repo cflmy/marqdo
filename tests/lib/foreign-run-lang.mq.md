@@ -5,6 +5,6 @@ title: foreign run_lang
 
 # main
 
-*`out` = > run_lang lang=python source=print(2+2) *
+*`out` = > foreign.run_lang lang=python source=print(2+2) *
 
 > print text=`out`
