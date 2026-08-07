@@ -15,5 +15,5 @@ A Markdown table is a collection; loop to read each row.
 | pear |
 | peach |
 
-- [fruit](basket)
+- [`fruit`](`basket`)
   > print text=`fruit`

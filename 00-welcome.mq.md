@@ -24,7 +24,7 @@ Named args can include spaces:
 > greet who=marqdo user
 
 ## greet
-    - who
+    + `who`
 
 > print text=Welcome, `who`!
 
