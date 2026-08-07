@@ -16,10 +16,17 @@ pub fn parse_expr(input: &str) -> Result<Expr> {
 
 /// Argument / template RHS: prefer a full expression; else interpolated text.
 /// Hyphenated prose (`none-falsy`) is not parsed as subtraction.
+/// Quoted `"..."` always uses the expression parser (never the hyphen short-circuit).
 pub fn parse_value_or_interp(input: &str) -> Result<Expr> {
     let s = input.trim();
     if s.is_empty() {
         return Ok(Expr::Literal(Literal::Text(String::new())));
+    }
+    if s.starts_with('"') {
+        return match parse_expr(s) {
+            Ok(e) => Ok(e),
+            Err(_) => Ok(parse_interp(s)),
+        };
     }
     if has_hyphenated_prose(s) {
         return Ok(parse_interp(s));
@@ -27,6 +34,60 @@ pub fn parse_value_or_interp(input: &str) -> Result<Expr> {
     match parse_expr(s) {
         Ok(e) => Ok(e),
         Err(_) => Ok(parse_interp(s)),
+    }
+}
+
+/// Call-arg / param-default values: like [`parse_value_or_interp`], but also treat a chain of
+/// unspaced `Text / Text` divisions as a single path string (`a/b`, `.marqdo/agent-kb`).
+/// Real math (`1/2`, `` `n` / 2 ``) is unchanged.
+pub fn parse_call_arg_value(input: &str) -> Result<Expr> {
+    let s = input.trim();
+    if s.is_empty() {
+        return Ok(Expr::Literal(Literal::Text(String::new())));
+    }
+    if s.starts_with('"') {
+        return match parse_expr(s) {
+            Ok(e) => Ok(e),
+            Err(_) => Ok(parse_interp(s)),
+        };
+    }
+    if has_hyphenated_prose(s) {
+        return Ok(parse_interp(s));
+    }
+    match parse_expr(s) {
+        Ok(e) => Ok(collapse_text_div_path(e, s)),
+        Err(_) => Ok(parse_interp(s)),
+    }
+}
+
+fn is_text_only_div_chain(e: &Expr) -> bool {
+    match e {
+        Expr::Literal(Literal::Text(_)) => true,
+        Expr::Binary {
+            op: BinaryOp::Div,
+            left,
+            right,
+        } => is_text_only_div_chain(left) && matches!(right.as_ref(), Expr::Literal(Literal::Text(_))),
+        _ => false,
+    }
+}
+
+fn expr_has_div(e: &Expr) -> bool {
+    match e {
+        Expr::Binary {
+            op: BinaryOp::Div, ..
+        } => true,
+        Expr::Binary { left, right, .. } => expr_has_div(left) || expr_has_div(right),
+        Expr::Unary { expr, .. } => expr_has_div(expr),
+        _ => false,
+    }
+}
+
+fn collapse_text_div_path(e: Expr, raw: &str) -> Expr {
+    if expr_has_div(&e) && is_text_only_div_chain(&e) {
+        parse_interp(raw)
+    } else {
+        e
     }
 }
 
@@ -472,7 +533,7 @@ pub fn parse_call_tail(s: &str) -> Result<(CallExpr, usize)> {
             let val_raw = after_eq[..val_end].trim_end();
             args.push(Arg::Named {
                 name: key,
-                value: parse_value_or_interp(val_raw)?,
+                value: parse_call_arg_value(val_raw)?,
             });
             args_str = after_eq[val_end..].trim_start();
         } else {
@@ -483,7 +544,7 @@ pub fn parse_call_tail(s: &str) -> Result<(CallExpr, usize)> {
             if tok.is_empty() {
                 break;
             }
-            args.push(Arg::Positional(parse_value_or_interp(tok)?));
+            args.push(Arg::Positional(parse_call_arg_value(tok)?));
             args_str = rest.trim_start();
         }
     }
@@ -676,6 +737,37 @@ mod tests {
     }
 
     #[test]
+    fn call_arg_quoted_path_keeps_slashes() {
+        let e = parse_call_arg_value("\".marqdo/agent-runs\"").unwrap();
+        assert!(matches!(
+            e,
+            Expr::Literal(Literal::Text(ref s)) if s == ".marqdo/agent-runs"
+        ));
+        let e = parse_value_or_interp("\".marqdo/agent-kb\"").unwrap();
+        assert!(matches!(
+            e,
+            Expr::Literal(Literal::Text(ref s)) if s == ".marqdo/agent-kb"
+        ));
+    }
+
+    #[test]
+    fn call_arg_bare_path_not_division() {
+        let e = parse_call_arg_value("a/b/c").unwrap();
+        assert!(matches!(
+            e,
+            Expr::Literal(Literal::Text(ref s)) if s == "a/b/c"
+        ));
+        let e = parse_call_arg_value("1/2").unwrap();
+        assert!(matches!(
+            e,
+            Expr::Binary {
+                op: BinaryOp::Div,
+                ..
+            }
+        ));
+    }
+
+    #[test]
     fn bare_token_no_escape() {
         let e = parse_expr("a\\nb").unwrap();
         assert!(matches!(
@@ -698,3 +790,5 @@ mod tests {
         ));
     }
 }
+
+

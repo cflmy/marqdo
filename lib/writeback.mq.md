@@ -45,3 +45,10 @@ Create a named slot with `placeholder` if missing. Never overwrites an existing 
 List all output blocks in the entry file (includes `key` when named).
 
 **> host_writeback_list**
+
+## scan_path
+    + `path`
+
+List `<!-- marqdo-out … -->` slots in any file (workbook inspection).
+
+**> host_writeback_scan_path path=`path`**

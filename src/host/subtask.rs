@@ -15,7 +15,7 @@ use crate::value::{CodeBlock, Value};
 
 /// Stored subtask handle (tagged by spawn kind).
 pub(crate) enum Handle {
-    File(Child),
+    File(FileTask),
     Foreign(ForeignTask),
     Function(FunctionTask),
 }
@@ -30,7 +30,12 @@ impl std::fmt::Debug for Handle {
     }
 }
 
-struct ForeignTask {
+pub(crate) struct FileTask {
+    child: Child,
+    result_path: PathBuf,
+}
+
+pub(crate) struct ForeignTask {
     child: Child,
     temp_script: PathBuf,
     stdout: JoinHandle<String>,
@@ -44,7 +49,7 @@ enum FnState {
     Killed,
 }
 
-struct FunctionTask {
+pub(crate) struct FunctionTask {
     state: Arc<Mutex<FnState>>,
     handle: Option<JoinHandle<()>>,
 }
@@ -121,9 +126,10 @@ fn fn_args_from_value(args: Option<&Value>) -> Result<Vec<(String, Value)>, Stri
 pub fn kill_all(ctx: &mut HostContext) {
     for (_, handle) in ctx.subtasks.drain() {
         match handle {
-            Handle::File(mut child) => {
-                let _ = child.kill();
-                let _ = child.wait();
+            Handle::File(mut task) => {
+                let _ = task.child.kill();
+                let _ = task.child.wait();
+                let _ = std::fs::remove_file(&task.result_path);
             }
             Handle::Foreign(mut task) => {
                 let _ = task.child.kill();
@@ -161,6 +167,7 @@ pub fn spawn(ctx: &mut HostContext, bound: &HashMap<String, Value>) -> Result<Va
             ctx,
             require(bound, "path")?,
             bound.get("args"),
+            bound.get("quiet"),
         )
     } else if has_fn {
         spawn_fn(ctx, require(bound, "fn")?, bound.get("args"))
@@ -180,21 +187,51 @@ fn spawn_file(
     ctx: &mut HostContext,
     path: &Value,
     args: Option<&Value>,
+    quiet: Option<&Value>,
 ) -> Result<Value, String> {
     if !ctx.caps.exec {
         return Err("subtask spawn disabled (exec capability off)".into());
     }
     let rel = as_text(path, "path")?;
-    let file = if std::path::Path::new(rel).is_absolute() {
+    let joined = if std::path::Path::new(rel).is_absolute() {
         std::path::PathBuf::from(rel)
     } else {
         ctx.cwd.join(rel)
     };
+    // Absolutize so the child `for_run` cwd/parent resolution does not double-prefix
+    // a relative path like `tests/ext/.marqdo/...` when current_dir is already `tests/ext`.
+    let file = std::fs::canonicalize(&joined).unwrap_or_else(|_| {
+        if joined.is_absolute() {
+            joined.clone()
+        } else {
+            std::env::current_dir()
+                .unwrap_or_else(|_| std::path::PathBuf::from("."))
+                .join(&joined)
+        }
+    });
     let exe = std::env::current_exe().map_err(|e| format!("subtask: current_exe: {e}"))?;
+    let id = next_id(ctx);
+    let result_path = std::env::temp_dir().join(format!(
+        "marqdo-subtask-{}-{}.json",
+        std::process::id(),
+        id
+    ));
     let mut cmd = Command::new(&exe);
     cmd.arg("run").arg(&file);
+    cmd.arg("--emit-result").arg(&result_path);
     cmd.current_dir(&ctx.cwd);
     cmd.stdin(Stdio::null());
+    let quiet = match quiet {
+        None | Some(Value::None) => true,
+        Some(v) => v.truthy(),
+    };
+    if quiet {
+        cmd.stdout(Stdio::null());
+        cmd.stderr(Stdio::null());
+    } else {
+        cmd.stdout(Stdio::inherit());
+        cmd.stderr(Stdio::inherit());
+    }
     if let Some(Value::List(items)) = args {
         for item in items {
             cmd.arg(as_text(item, "arg")?);
@@ -203,8 +240,13 @@ fn spawn_file(
     let child = cmd
         .spawn()
         .map_err(|e| format!("subtask spawn {}: {e}", file.display()))?;
-    let id = next_id(ctx);
-    ctx.subtasks.insert(id, Handle::File(child));
+    ctx.subtasks.insert(
+        id,
+        Handle::File(FileTask {
+            child,
+            result_path,
+        }),
+    );
     Ok(Value::Int(id as i64))
 }
 
@@ -319,7 +361,7 @@ pub fn poll(ctx: &mut HostContext, id: &Value) -> Result<Value, String> {
         .get_mut(&id)
         .ok_or_else(|| format!("subtask: unknown id {id}"))?;
     match handle {
-        Handle::File(child) => poll_child(child),
+        Handle::File(task) => poll_child(&mut task.child),
         Handle::Foreign(task) => poll_child(&mut task.child),
         Handle::Function(task) => poll_function(&task.state),
     }
@@ -364,14 +406,31 @@ pub fn join(ctx: &mut HostContext, id: &Value) -> Result<Value, String> {
         .remove(&id)
         .ok_or_else(|| format!("subtask: unknown id {id}"))?;
     match handle {
-        Handle::File(mut child) => {
-            let status = child
+        Handle::File(mut task) => {
+            let status = task
+                .child
                 .wait()
                 .map_err(|e| format!("subtask join: {e}"))?;
-            Ok(Value::Int(status.code().unwrap_or(-1) as i64))
+            let code = status.code().unwrap_or(-1) as i64;
+            let value = read_emitted_result(&task.result_path);
+            let _ = std::fs::remove_file(&task.result_path);
+            Ok(Value::Map(vec![
+                ("code".into(), Value::Int(code)),
+                ("value".into(), value),
+            ]))
         }
         Handle::Foreign(task) => join_foreign(task),
         Handle::Function(task) => join_function(task),
+    }
+}
+
+fn read_emitted_result(path: &PathBuf) -> Value {
+    match std::fs::read_to_string(path) {
+        Ok(text) => match serde_json::from_str::<serde_json::Value>(text.trim()) {
+            Ok(j) => crate::host::json::json_to_value(&j).unwrap_or(Value::None),
+            Err(_) => Value::None,
+        },
+        Err(_) => Value::None,
     }
 }
 
@@ -428,9 +487,12 @@ pub fn kill(ctx: &mut HostContext, id: &Value) -> Result<Value, String> {
         .remove(&id)
         .ok_or_else(|| format!("subtask: unknown id {id}"))?;
     match handle {
-        Handle::File(mut child) => {
-            child.kill().map_err(|e| format!("subtask kill: {e}"))?;
-            let _ = child.wait();
+        Handle::File(mut task) => {
+            task.child
+                .kill()
+                .map_err(|e| format!("subtask kill: {e}"))?;
+            let _ = task.child.wait();
+            let _ = std::fs::remove_file(&task.result_path);
         }
         Handle::Foreign(mut task) => {
             task.child.kill().map_err(|e| format!("subtask kill: {e}"))?;

@@ -86,6 +86,14 @@ fn structure_branch() {
 }
 
 #[test]
+fn structure_branch_consecutive() {
+    assert_out(
+        "tests/structure/branch-consecutive.mq.md",
+        "A\nB\nelse-ok",
+    );
+}
+
+#[test]
 fn structure_loop() {
     assert_out(
         "tests/structure/loop.mq.md",
@@ -453,6 +461,15 @@ fn bytecode_branch() {
 }
 
 #[test]
+fn bytecode_branch_consecutive() {
+    assert_out_backend(
+        "tests/structure/branch-consecutive.mq.md",
+        "bytecode",
+        "A\nB\nelse-ok",
+    );
+}
+
+#[test]
 fn bytecode_loop() {
     assert_out_backend(
         "tests/structure/loop.mq.md",
@@ -591,10 +608,92 @@ fn catalog_writes_yaml() {
     assert!(yaml.contains("type: Marqdo Catalog"));
     assert!(yaml.contains("structure/hello"));
     assert!(yaml.contains("utils.mq.md"), "{yaml}");
+    assert!(yaml.contains("concepts:"), "{yaml}");
+    let index = std::fs::read_to_string(dir.join("index.md")).unwrap();
+    assert!(index.contains("## Modules"), "{index}");
+    assert!(index.contains("## Agent knowledge"), "{index}");
+    // Import graph: structure/import/main depends on utils — clickable on module page.
+    let import_page = std::fs::read_to_string(
+        dir.join("modules")
+            .join("structure__import__main.md"),
+    )
+    .unwrap();
     assert!(
-        yaml.contains("???????") || yaml.contains("imports:
-      - utils.mq.md"),
-        "{yaml}"
+        import_page.contains("](") && import_page.contains("utils"),
+        "depends should link to utils module: {import_page}"
+    );
+}
+
+#[test]
+fn ext_mq_md_never_calls_host() {
+    // Hard rule: ext/**/*.mq.md must not invoke host_* (use lib/* or plugin names).
+    let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("ext");
+    let mut offenders = Vec::new();
+    fn walk(dir: &std::path::Path, out: &mut Vec<String>) {
+        let Ok(rd) = std::fs::read_dir(dir) else {
+            return;
+        };
+        for ent in rd.flatten() {
+            let p = ent.path();
+            if p.is_dir() {
+                walk(&p, out);
+                continue;
+            }
+            let name = p.file_name().and_then(|n| n.to_str()).unwrap_or("");
+            if !name.ends_with(".mq.md") {
+                continue;
+            }
+            let Ok(src) = std::fs::read_to_string(&p) else {
+                continue;
+            };
+            for (i, line) in src.lines().enumerate() {
+                let t = line.trim_start();
+                // Executable call lines / bindings that invoke host_*.
+                if (t.starts_with('>') || t.starts_with('*')) && t.contains("host_") {
+                    out.push(format!("{}:{}: {line}", p.display(), i + 1));
+                }
+            }
+        }
+    }
+    walk(&root, &mut offenders);
+    assert!(
+        offenders.is_empty(),
+        "ext must not call host_* (use lib/* or agent_* plugin names):\n{}",
+        offenders.join("\n")
+    );
+}
+
+#[test]
+fn catalog_includes_agent_kb_concepts() {
+    let dir = tempfile_dir("mq-cat-kb");
+    // Ensure a concept exists under tests/ext agent-kb (offline reuse test leaves one).
+    let (code, _, stderr) = run(&[
+        "run",
+        "tests/ext/agent-kb-reuse.mq.md",
+    ]);
+    assert_eq!(code, 0, "seed kb via reuse test: {stderr}");
+
+    let (code, _, stderr) = run(&[
+        "catalog",
+        "tests/ext",
+        "-o",
+        dir.to_str().unwrap(),
+    ]);
+    assert_eq!(code, 0, "{stderr}");
+    let yaml = std::fs::read_to_string(dir.join("catalog.yaml")).unwrap();
+    assert!(
+        yaml.contains("Marqdo Task") || yaml.contains("Marqdo Agent Skill"),
+        "expected agent-kb concepts in catalog: {yaml}"
+    );
+    assert!(
+        dir.join("concepts").join("tasks").exists()
+            || dir.join("concepts").join("skills").exists(),
+        "concepts should be copied into catalog out dir"
+    );
+    let index = std::fs::read_to_string(dir.join("index.md")).unwrap();
+    assert!(
+        !index.contains("No `.marqdo/agent-kb` concepts"),
+        "{index}"
     );
 }
 
@@ -687,7 +786,7 @@ fn lib_writeback_get() {
 
 #[test]
 fn lib_subtask_spawn() {
-    assert_out("tests/lib/subtask-spawn.mq.md", "done");
+    assert_out("tests/lib/subtask-spawn.mq.md", "child-ok\ndone\nquiet-ok");
 }
 
 #[test]
@@ -875,6 +974,55 @@ fn ext_agent_framework_smoke() {
 }
 
 #[test]
+fn ext_fs_text_patch() {
+    assert_out(
+        "tests/ext/fs-text-patch.mq.md",
+        "alpha BETA gamma\n2\nALPHA BETA GAMMA",
+    );
+}
+
+#[test]
+fn ext_agent_inspect_workbook() {
+    assert_out(
+        "tests/ext/agent-inspect-fixture.mq.md",
+        "0\nok-slot\npending",
+    );
+}
+
+#[test]
+fn ext_agent_plan_confirm() {
+    let status = Command::new("cargo")
+        .args(["build", "-p", "marqdo_plugin_agent"])
+        .current_dir(env!("CARGO_MANIFEST_DIR"))
+        .status()
+        .expect("build agent plugin");
+    assert!(status.success(), "failed to build marqdo_plugin_agent");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_marqdo"))
+        .args(["run", "tests/ext/agent-plan-confirm.mq.md"])
+        .current_dir(env!("CARGO_MANIFEST_DIR"))
+        .output()
+        .expect("run agent-plan-confirm");
+    let code = output.status.code().unwrap_or(1);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert_eq!(code, 0, "agent-plan-confirm stderr={stderr}");
+    assert_eq!(
+        stdout.trim_end(),
+        "pending\nworkbook-ok\nskeleton-ok",
+        "agent-plan-confirm"
+    );
+}
+
+#[test]
+fn ext_agent_plan_decision() {
+    assert_out(
+        "tests/ext/agent-plan-decision.mq.md",
+        "DONE\nall good\nCONTINUE\nDONE\ndual-ok\nsolidify-ok\n1\nkeep new keep",
+    );
+}
+
+#[test]
 fn ext_llm_complete_live() {
     let output = Command::new(env!("CARGO_BIN_EXE_marqdo"))
         .args(["run", "tests/ext/llm-complete.mq.md"])
@@ -932,6 +1080,61 @@ fn ext_agent_run_live() {
         "writeback must not be printed to stdout"
     );
 }
+
+#[test]
+fn ext_agent_plan_live() {
+    let status = Command::new("cargo")
+        .args(["build", "-p", "marqdo_plugin_agent"])
+        .current_dir(env!("CARGO_MANIFEST_DIR"))
+        .status()
+        .expect("build agent plugin");
+    assert!(status.success(), "failed to build marqdo_plugin_agent");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_marqdo"))
+        .args(["run", "tests/ext/agent-plan-live.mq.md"])
+        .current_dir(env!("CARGO_MANIFEST_DIR"))
+        .output()
+        .expect("run agent-plan-live");
+    let code = output.status.code().unwrap_or(1);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert_eq!(code, 0, "agent-plan-live stderr={stderr}");
+    let lines: Vec<&str> = stdout.trim_end().lines().collect();
+    assert!(
+        lines.iter().any(|l| *l == "ok"),
+        "agent-plan-live missing ok: stdout={stdout}"
+    );
+    assert!(
+        lines.iter().any(|l| *l == "workbook-ok"),
+        "agent-plan-live missing workbook-ok: stdout={stdout}"
+    );
+    assert!(
+        lines.iter().filter(|l| **l == "hit").count() >= 1,
+        "agent-plan-live expected OKF hit: stdout={stdout}"
+    );
+}
+
+#[test]
+fn ext_agent_kb_reuse() {
+    let status = Command::new("cargo")
+        .args(["build", "-p", "marqdo_plugin_agent"])
+        .current_dir(env!("CARGO_MANIFEST_DIR"))
+        .status()
+        .expect("build agent plugin");
+    assert!(status.success(), "failed to build marqdo_plugin_agent");
+
+    let goal = "Reply with exactly the word pong and nothing else.";
+    let mut h: u64 = 5381;
+    for b in goal.as_bytes() {
+        h = h.wrapping_mul(33).wrapping_add(u64::from(*b));
+    }
+    let sig = format!("{h:016x}")[..12].to_string();
+    let slug = "reply-with-exactly-the-word-pong-and-nothing-els";
+    // Default file-subtask quiet: no child print on parent stdout; answer via wait.value.
+    let expect = format!("{sig}\n{slug}\npromoted\nstable\n{slug}\nlookup-ok\n0\npong\nstable-path");
+    assert_out("tests/ext/agent-kb-reuse.mq.md", &expect);
+}
+
 #[test]
 fn lib_net_encode() {
     assert_out("tests/lib/net-encode.mq.md", "a+b");

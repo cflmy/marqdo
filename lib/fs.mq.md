@@ -39,3 +39,20 @@ description: English filesystem wrappers
     + `path`
 
 **> host_remove path=`path`**
+
+## text_patch
+    + `path`
+    + `find`
+    + `replace`
+
+Exact FIND→REPLACE once in a UTF-8 text file. `find` must match exactly once.
+
+**> host_text_patch path=`path` find=`find` replace=`replace`**
+
+## apply_patch_blocks
+    + `path`
+    + `text`
+
+Apply plan-style `<<<` / FIND / === / REPLACE / `>>>` blocks from `text` to `path`.
+
+**> host_apply_patch_blocks path=`path` text=`text`**

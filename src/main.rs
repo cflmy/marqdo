@@ -60,6 +60,10 @@ enum Commands {
         /// Feed `input` from a text file (one line per call), instead of / after the terminal.
         #[arg(long, value_name = "FILE")]
         stdin_file: Option<PathBuf>,
+
+        /// Write `# main` return value as JSON (used by file subtasks).
+        #[arg(long, value_name = "FILE")]
+        emit_result: Option<PathBuf>,
     },
     /// Browse `.mq.md` structure + execution (live server or static output)
     View {
@@ -177,6 +181,7 @@ fn try_main() -> Result<i32> {
             trace_eval,
             dump_all,
             stdin_file,
+            emit_result,
         } => {
             let path = file.unwrap_or_else(|| PathBuf::from("index.mq.md"));
             let stdin_lines = match stdin_file {
@@ -186,6 +191,7 @@ fn try_main() -> Result<i32> {
             let mut opts = if dump_all {
                 RunOptions {
                     stdin_lines: stdin_lines.clone(),
+                    emit_result: emit_result.clone(),
                     ..RunOptions::dump_all()
                 }
             } else {
@@ -198,6 +204,7 @@ fn try_main() -> Result<i32> {
                     trace_eval,
                     backend: backend.into(),
                     stdin_lines,
+                    emit_result,
                     ..RunOptions::default()
                 }
             };

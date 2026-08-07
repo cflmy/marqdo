@@ -4,9 +4,9 @@
 |---|---|
 | 状态 | 草案（已采纳方向；修正「配置文件」误解） |
 | 日期 | 2026-08-04 |
-| 相关 | [OKF 调研](../research/okf-and-marqdo.md) |
+| 相关 | [OKF 调研](../research/okf-and-marqdo.md) · **实现规范 [okf.md](okf.md)** |
 | 取代 | 此前「YAML = 人手写的编译器配置 / frontmatter 契约」的表述 |
-
+| 说明 | 原则仍有效；**类型表、任务知识包、路线图以 [okf.md](okf.md) 为准** |
 ---
 
 ## 决策

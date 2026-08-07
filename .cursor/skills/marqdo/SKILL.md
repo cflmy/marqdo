@@ -22,8 +22,9 @@ Canonical design (repo): `doc/design/markdown-mapping.md`, `doc/design/keywords.
 4. **Do not invent keywords** `if` / `else` / `while` / `for` / `def` / `return`. Control flow is Markdown: **`+` params** (under heading), **`1.` `2.` … branches**, **`-` loops**, arm `N. *` = else, `#` = **object/type**, `##`+ = **function/method**, `**…**` = return.
 5. **Identifiers use backticks** — params `` + `name` ``, bindings `` `x` ``, foreach `` [`item`](`coll`) ``. **Complex text** uses `"..."` with escapes; bare tokens stay literal (no `\n` magic).
 6. **Structure lines are not wrapped in italics.** `#` `>` `+` `-` `|` lines stand alone; use `*…*` only for general statements (bindings / expressions).
-7. **Paths in bare expressions:** `/` is division. Prefer `` `path` `` vars, same-dir names, or call args — not raw `a/b` in expressions.
+7. **Paths:** In bare *expressions* `/` is division. In **call args / param defaults**, unspaced `a/b` and quoted `".marqdo/agent-kb"` are path text — no `json.parse` needed.
 8. Prefer ending side-effect-only function bodies with a lone `---` or `***` line (or `****` empty return) so later siblings are not swallowed.
+9. **`ext/**` never calls `host_*`.** Agent/OKF helpers are plugin names (`agent_kb_*`, …) after `plugin.load`. Do **not** add agent/OKF domain code to `src/host/` (core bloat). See `doc/design/ext-agent.md` §4.
 
 ## Markup → meaning (v0.2)
 
@@ -32,7 +33,7 @@ Canonical design (repo): `doc/design/markdown-mapping.md`, `doc/design/keywords.
 | `#` | **Object / type** (constructor body). `# main` = entry object. |
 | `##` … `######` | **Function / method** (nesting by heading depth). |
 | `` + `name` `` under heading | Parameter (optional `` `name`=default ``) |
-| `1.` `2.` … in body | Branch arm (condition or `N. *` else) |
+| `1.` `2.` … in body | Branch arm (condition or `N. *` else). **Same-indent restart at `1.` = new branch statement** (not more arms of the previous list). |
 | `- …` inside body | Loop (`while` or `` [`item`](`coll`) ``) |
 | Line `N. *` | Else arm |
 | `> fn args` | Call (named `k=v` or positional) |

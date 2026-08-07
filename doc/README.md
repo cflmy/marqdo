@@ -20,7 +20,9 @@
 | [design/ai-skill.md](design/ai-skill.md) | **AI 接入 Skill**（[`skills/marqdo/`](../skills/marqdo/)） |
 | [design/code-vs-comment.md](design/code-vs-comment.md) | 叙述 / 可执行 / 外联 |
 | [design/return-hr-and-code-surface.md](design/return-hr-and-code-surface.md) | 语句/返回/输出决议 |
-| [design/generated-yaml-manifest.md](design/generated-yaml-manifest.md) | 生成式 OKF 清单 |
+| [design/generated-yaml-manifest.md](design/generated-yaml-manifest.md) | 生成式 OKF 清单（早期方向） |
+| [design/okf.md](design/okf.md) | **Marqdo OKF 实现规范**（catalog v0 + 任务知识包） |
+| [design/catalog-cli.md](design/catalog-cli.md) | **`marqdo catalog` / `sync` OKF 清单命令** |
 | [design/tech-stack.md](design/tech-stack.md) | 实现栈对比 |
 | [adr/0001-implementation-language.md](adr/0001-implementation-language.md) | **Accepted：Rust 参考解释器；不用 Flex/Bison** |
 | [design/dependencies.md](design/dependencies.md) | 依赖详单（无 Flex/Bison） |
@@ -41,7 +43,6 @@
 | [design/examples-and-tests.md](design/examples-and-tests.md) | **tests/ 金样例目录布局** |
 | [design/view.md](design/view.md) | **`marqdo view` / `view output` 黑白极简 + 静态文档** |
 | [design/user-site.md](design/user-site.md) | **用户站：`public/` → `gh-pages`** |
-| [design/catalog-cli.md](design/catalog-cli.md) | **`marqdo catalog` / `sync` OKF 清单命令** |
 | [design/view-debug.md](design/view-debug.md) | **`marqdo debug` 独立调试页** |
 | [design/vscode-extension.md](design/vscode-extension.md) | **VS Code 扩展：分支 `vscode-extension`（main 不跟踪源码）** |
 | [design/vscode-extension-commit.md](design/vscode-extension-commit.md) | **扩展提交约定（禁止在 main 提交 `vscode-extension/`）** |

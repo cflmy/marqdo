@@ -94,6 +94,9 @@ pub enum HostFn {
     SubtaskWaitAll = 92,
     WritebackEnsure = 93,
     OuterCallLine = 94,
+    TextPatch = 95,
+    ApplyPatchBlocks = 96,
+    WritebackScanPath = 97,
 }
 
 impl HostFn {
@@ -184,6 +187,9 @@ impl HostFn {
             92 => Self::SubtaskWaitAll,
             93 => Self::WritebackEnsure,
             94 => Self::OuterCallLine,
+            95 => Self::TextPatch,
+            96 => Self::ApplyPatchBlocks,
+            97 => Self::WritebackScanPath,
             _ => return None,
         })
     }
@@ -273,6 +279,9 @@ impl HostFn {
             "host_writeback_list" | "writeback_list" => Self::WritebackList,
             "host_writeback_ensure" | "writeback_ensure" => Self::WritebackEnsure,
             "host_outer_call_line" | "outer_call_line" => Self::OuterCallLine,
+            "host_text_patch" | "text_patch" => Self::TextPatch,
+            "host_apply_patch_blocks" | "apply_patch_blocks" => Self::ApplyPatchBlocks,
+            "host_writeback_scan_path" | "writeback_scan_path" => Self::WritebackScanPath,
             "host_subtask_spawn" | "subtask_spawn" => Self::SubtaskSpawn,
             "host_subtask_poll" | "subtask_poll" => Self::SubtaskPoll,
             "host_subtask_join" | "subtask_join" => Self::SubtaskJoin,
@@ -368,6 +377,9 @@ impl HostFn {
             Self::WritebackList => "host_writeback_list",
             Self::WritebackEnsure => "host_writeback_ensure",
             Self::OuterCallLine => "host_outer_call_line",
+            Self::TextPatch => "host_text_patch",
+            Self::ApplyPatchBlocks => "host_apply_patch_blocks",
+            Self::WritebackScanPath => "host_writeback_scan_path",
             Self::SubtaskSpawn => "host_subtask_spawn",
             Self::SubtaskPoll => "host_subtask_poll",
             Self::SubtaskJoin => "host_subtask_join",
@@ -419,6 +431,9 @@ impl HostFn {
             Self::PluginUnload | Self::PluginList => &[],
             Self::ExtNativePath => &["name"],
             Self::OuterCallLine => &[],
+            Self::TextPatch => &["path", "find", "replace"],
+            Self::ApplyPatchBlocks => &["path", "text"],
+            Self::WritebackScanPath => &["path"],
             Self::MapSet => &["map", "key", "value"],
             Self::ListAppend => &["list", "item"],
             Self::WritebackRecord => &["value"],
@@ -449,7 +464,7 @@ impl HostFn {
                 &["at_end", "key", "line"]
             }
             Self::WritebackEnsure => &["placeholder", "line"],
-            Self::SubtaskSpawn => &["path", "fn", "args", "code", "lang", "source", "stdin"],
+            Self::SubtaskSpawn => &["path", "fn", "args", "code", "lang", "source", "stdin", "quiet"],
             _ => &[],
         }
     }
@@ -634,6 +649,16 @@ pub fn call_host(
                 .copied()
                 .unwrap_or(ctx.current_line) as i64,
         )),
+        HostFn::TextPatch => fs::text_patch(
+            ctx,
+            require(bound, "path")?,
+            require(bound, "find")?,
+            require(bound, "replace")?,
+        ),
+        HostFn::ApplyPatchBlocks => {
+            fs::apply_patch_blocks(ctx, require(bound, "path")?, require(bound, "text")?)
+        }
+        HostFn::WritebackScanPath => writeback::scan_path(ctx, require(bound, "path")?),
         HostFn::WritebackRecord => writeback::record(
             ctx,
             require(bound, "value")?,

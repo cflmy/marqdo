@@ -159,4 +159,13 @@ if x > 0:
 
 # GOOD — ordered list arms
 1. `x` > 0
+  > print text=pos
+2. *
+  > print text=other
+
+# GOOD — another independent branch (restart at 1.)
+1. `y` > 0
+  > print text=y-pos
+2. *
+  > print text=y-other
 ```

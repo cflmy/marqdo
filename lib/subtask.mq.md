@@ -11,8 +11,12 @@ description: Concurrent subtasks — file, function, or foreign code
     + `lang`=None
     + `source`=None
     + `stdin`=None
+    + `quiet`=True
 
-**> host_subtask_spawn path=`path` fn=`fn` args=`args` code=`code` lang=`lang` source=`source` stdin=`stdin`**
+File children are silent by default; set `quiet=False` to inherit parent stdout/stderr.
+File `wait` returns `{code, value}` where `value` is the child's `# main` return (not stdout).
+
+**> host_subtask_spawn path=`path` fn=`fn` args=`args` code=`code` lang=`lang` source=`source` stdin=`stdin` quiet=`quiet`**
 
 ## poll
     + `id`

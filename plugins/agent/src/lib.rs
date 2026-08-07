@@ -1,4 +1,6 @@
-//! Agent plugin (C ABI v2): layout helpers + session bag + context via host_query.
+//! Agent plugin (C ABI v2): layout helpers + session bag + context via host_query + agent-kb.
+
+mod kb;
 
 use std::collections::HashMap;
 use std::ffi::{CStr, CString};
@@ -544,7 +546,7 @@ fn register(host: &MarqdoHostApi, name: &str, params: &str, fn_ptr: PluginFn) ->
     unsafe { register(host.userdata, n.as_ptr(), p.as_ptr(), fn_ptr) }
 }
 
-fn host_query_json(name: &str) -> Result<serde_json::Value, String> {
+pub(crate) fn host_query_json(name: &str) -> Result<serde_json::Value, String> {
     let query = unsafe { HOST_QUERY }.ok_or_else(|| "host_query not available".to_string())?;
     let userdata = unsafe { HOST_USERDATA };
     let c_name = CString::new(name).map_err(|e| e.to_string())?;
@@ -845,6 +847,46 @@ unsafe extern "C" fn agent_tool_allowed(
     0
 }
 
+macro_rules! kb_ffi {
+    ($fn_name:ident, $call:expr, $label:expr) => {
+        unsafe extern "C" fn $fn_name(
+            args_json: *const c_char,
+            out_json: *mut *mut c_char,
+            err_msg: *mut *mut c_char,
+        ) -> c_int {
+            let v = match parse_args(args_json) {
+                Ok(v) => v,
+                Err(e) => {
+                    set_err(err_msg, &format!("{}: {e}", $label));
+                    return 1;
+                }
+            };
+            match $call(&v) {
+                Ok(out) => {
+                    set_out(out_json, &out.to_string());
+                    0
+                }
+                Err(e) => {
+                    set_err(err_msg, &format!("{}: {e}", $label));
+                    1
+                }
+            }
+        }
+    };
+}
+
+kb_ffi!(agent_goal_sig, kb::goal_sig, "agent_goal_sig");
+kb_ffi!(agent_goal_slug, kb::goal_slug, "agent_goal_slug");
+kb_ffi!(agent_kb_lookup, kb::kb_lookup, "agent_kb_lookup");
+kb_ffi!(agent_kb_promote, kb::kb_promote, "agent_kb_promote");
+kb_ffi!(agent_kb_record_hit, kb::kb_record_hit, "agent_kb_record_hit");
+kb_ffi!(
+    agent_workbook_solidify,
+    kb::workbook_solidify,
+    "agent_workbook_solidify"
+);
+kb_ffi!(agent_kb_task_files, kb::kb_task_files, "agent_kb_task_files");
+
 #[no_mangle]
 pub unsafe extern "C" fn marqdo_plugin_abi_version() -> u32 {
     ABI_VERSION
@@ -912,6 +954,33 @@ pub unsafe extern "C" fn marqdo_plugin_init(host: *const MarqdoHostApi) -> c_int
         return 1;
     }
     if register(host, "agent_tool_allowed", "tools,name", agent_tool_allowed) != 0 {
+        return 1;
+    }
+    if register(host, "agent_goal_sig", "goal", agent_goal_sig) != 0 {
+        return 1;
+    }
+    if register(host, "agent_goal_slug", "goal", agent_goal_slug) != 0 {
+        return 1;
+    }
+    if register(host, "agent_kb_lookup", "kb_dir,goal", agent_kb_lookup) != 0 {
+        return 1;
+    }
+    if register(
+        host,
+        "agent_kb_promote",
+        "kb_dir,goal,workbook",
+        agent_kb_promote,
+    ) != 0
+    {
+        return 1;
+    }
+    if register(host, "agent_kb_record_hit", "kb_dir,goal", agent_kb_record_hit) != 0 {
+        return 1;
+    }
+    if register(host, "agent_workbook_solidify", "path", agent_workbook_solidify) != 0 {
+        return 1;
+    }
+    if register(host, "agent_kb_task_files", "kb_dir,goal", agent_kb_task_files) != 0 {
         return 1;
     }
     0

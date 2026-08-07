@@ -45,6 +45,7 @@ Plugin fn returns `0` + `*out_json` on success; non-zero + optional `*err_msg` o
 | `module_source` | string | Entry `.mq.md` text |
 | `call_site` | `{path,function,line}` | Active call site |
 | `marqdo_skill` | string | Skill pack text |
+| `cwd` | string | Host `cwd` (entry file directory) for path resolution |
 
 Unknown names fail. Queries are only valid during a plugin function call (host sets thread-local context).
 
@@ -82,15 +83,17 @@ cargo build -p marqdo_plugin_agent
 ```
 
 - Demo (ABI v1): `demo_add`, `demo_echo` — [`tests/lib/plugin-demo.mq.md`](../../tests/lib/plugin-demo.mq.md).
-- Agent (ABI v2): layout + session bag + `agent_module_source` / `agent_format_tools` / … — [`plugins/agent`](../../plugins/agent); used by [`ext/ai/agent.mq.md`](../../ext/ai/agent.mq.md). Lookup: `plugin.native_path name=agent` or [ext-cli.md](ext-cli.md) install / `MARQDO_AGENT_PLUGIN`.
+- Agent (ABI v2): layout + session bag + context queries + **OKF agent-kb** (`agent_goal_sig`, `agent_goal_slug`, `agent_kb_lookup`, `agent_kb_promote`, `agent_kb_record_hit`, `agent_workbook_solidify`, `agent_kb_task_files`) — [`plugins/agent`](../../plugins/agent); used by [`ext/ai/agent.mq.md`](../../ext/ai/agent.mq.md). Lookup: `plugin.native_path name=agent` or [ext-cli.md](ext-cli.md) install / `MARQDO_AGENT_PLUGIN`.
 
 ## Layering
 
 | Layer | May call `host_*` |
 |-------|-------------------|
-| `lib/*` | Yes (only L1 wrappers) |
+| `lib/*` | Yes (only L1 wrappers of generic L0.5) |
 | `ext/*` | **No** — compose `lib/*` or ABI plugin names via `lib/plugin` |
-| Application `.mq.md` | Same as ext |
+| Application `.mq.md` | Prefer same as ext; do not add agent/OKF originals to `src/host` |
+
+**Hard rule:** agent / OKF domain primitives live in `plugins/agent`, never in `HostFn` / `src/host/kb.rs`.
 
 ## Non-goals
 

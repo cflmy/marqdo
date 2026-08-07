@@ -243,6 +243,9 @@ unsafe extern "C" fn host_query(
         "module_source" => agent_rt::module_source(ctx).and_then(|v| value_to_json(&v)),
         "call_site" => agent_rt::call_site(ctx, Some(ctx.current_line)).and_then(|v| value_to_json(&v)),
         "marqdo_skill" => agent_rt::marqdo_skill(ctx).and_then(|v| value_to_json(&v)),
+        "cwd" => Ok(serde_json::Value::String(
+            ctx.cwd.to_string_lossy().into_owned(),
+        )),
         other => Err(format!("host_query: unknown `{other}`")),
     };
 

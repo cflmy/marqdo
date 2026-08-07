@@ -223,8 +223,10 @@ path_callee ::= ident ('.' ident)+
 | 层 | 影响 |
 |----|------|
 | L0 内置 | 仍为全局短名 |
-| L1 / 官方 ext | 经库路径调用；`ext` 仍禁 `host_*` |
-| ABI 插件 | 仍为插件注册表；不强制并入点号树 v1 |
+| L1 / 官方 ext | 经库路径调用；**`ext/**/*.mq.md` 严禁 `host_*`** |
+| ABI 插件 | 插件注册表；agent/OKF 等领域逻辑放这里，**不得**塞进 `HostFn` |
+
+**硬规则**：不得为「方便」把 `ext/ai` 领域能力写进 `src/host/dispatch.rs` / `src/host/*.rs`。标准库可走 `lib/*` → 薄 `host_*`；智能体专属走 `plugins/agent` 注册名（见 [ext-agent.md](ext-agent.md) §4）。
 
 ---
 

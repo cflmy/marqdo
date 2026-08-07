@@ -4,4 +4,4 @@ title: subtask child
 
 # main
 
-> print text=child-ok
+**child_ok**

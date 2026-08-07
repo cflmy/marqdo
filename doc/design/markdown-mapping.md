@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| 状态 | 已定论（修订：形参 `+`、分支 `1.`、标识符反引号、`-` 专用于循环） |
+| 状态 | 已定论（修订：形参 `+`、分支 `1.`、同级再 `1.` 为新分支、标识符反引号、`-` 专用于循环） |
 | 日期 | 2026-08-07 |
 | 取代 | v0.1 中「函数头 `-` 形参 / 裸名形参与遍历变量 / `+` 分支」 |
 | 相关 | [objects.md](objects.md) · [code-vs-comment.md](code-vs-comment.md) · [return-hr-and-code-surface.md](return-hr-and-code-surface.md) · [module-namespace.md](module-namespace.md) |
@@ -208,6 +208,22 @@ Markdown **标记即语法**。输出**不是**语言架构原语，而是内置
 2. *
   > print text=False
 ```
+
+**一条分支语句 = 从 `1.` 起、序号递增的一段有序列表。** 同级缩进上**再次出现 `1.`**（无论中间有无空行）开启**下一条**独立分支语句，不得并入上一段的臂列表：
+
+```markdown
+1. `a`
+  > print text=A
+2. *
+  > print text=not-A
+
+1. `b`
+  > print text=B
+2. *
+  > print text=not-B
+```
+
+上例为两次独立判断（先 `a` 再 `b`），不是「四个臂的一个分支」。臂序号在同一分支内递增（`1.` → `2.` → `3.` …）；**不要**在同一分支中途把序号重置为 `1.`。
 
 ```markdown
 - [`果`](`篮子`)

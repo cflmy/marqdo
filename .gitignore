@@ -22,6 +22,7 @@
 *.pdb
 .DS_Store
 .marqdo/
+**/.marqdo/
 .env
 
 # Generated HTML beside tracked public/*.mq.md (sources stay in git)

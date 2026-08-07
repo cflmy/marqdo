@@ -15,6 +15,6 @@ description: Spawn file, function, or foreign code in parallel
 | `code=` | foreign ``` fence ``` subprocess | stdout text |
 | `lang=` + `source=` | foreign source subprocess | stdout text |
 
-Also: `poll id=`, `kill id=`, `wait_all`. Parent exit kills file/foreign children.
+File children are silent unless `quiet=False`. Also: `poll id=`, `kill id=`, `wait_all`. Parent exit kills file/foreign children.
 
 > print text=subtask overview ok

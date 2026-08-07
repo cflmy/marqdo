@@ -8,7 +8,7 @@ pub mod agent_rt;
 mod dispatch;
 pub mod foreign;
 mod fs;
-mod json;
+pub(crate) mod json;
 pub mod math;
 mod net;
 pub mod plugin;
@@ -78,7 +78,7 @@ pub struct HostContext {
     /// Entry-file line of each active user call (for writeback anchoring).
     pub call_site_lines: Vec<u32>,
     /// Concurrent subtasks (`lib/subtask`): file / function / foreign.
-    pub subtasks: HashMap<u64, subtask::Handle>,
+    pub(crate) subtasks: HashMap<u64, subtask::Handle>,
     pub subtask_seq: u64,
 }
 

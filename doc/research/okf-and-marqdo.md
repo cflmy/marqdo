@@ -192,7 +192,7 @@ OKF 规范强调：一页纸能讲清 v0.1 的互通面；v0.2 只**加词汇、
 来自本次调研、建议在 `design/` 或 `adr/` 中跟进：
 
 1. **`.mq.md` 的双重解析模型** — Markdown CST 与 Marqdo AST 如何共享同一文本、何处分叉。
-2. **生成式 OKF 清单的落盘与命令** — 路径、是否提交 git、`sync`/`doc` 行为（方向已采纳，见 [design/generated-yaml-manifest.md](../design/generated-yaml-manifest.md)）。
+2. **生成式 OKF 清单的落盘与命令** — 路径、是否提交 git、`sync`/`doc` 行为（方向已采纳；**实现规范见 [okf.md](../design/okf.md)**，命令见 [catalog-cli.md](../design/catalog-cli.md)）。
 3. **正文中的依赖声明语法** — import / 链接如何写出，供工具提取进生成清单。
 4. **Agent 友好但不 Agent 绑定** — 源格式对 LLM 可写，语义对确定性工具可检。
 5. **可渲染结果的 attestation（后期）** — 文档内求值结果的可验证性。

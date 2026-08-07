@@ -32,7 +32,7 @@ Canonical design (repo): `doc/design/markdown-mapping.md`, `doc/design/keywords.
 | `#` | **Object / type** (constructor body). `# main` = entry object. |
 | `##` … `######` | **Function / method** (nesting by heading depth). |
 | `` + `name` `` under heading | Parameter (optional `` `name`=default ``) |
-| `1.` `2.` … in body | Branch arm (condition or `N. *` else) |
+| `1.` `2.` … in body | Branch arm (condition or `N. *` else). **Same-indent restart at `1.` = new branch statement** (not more arms of the previous list). |
 | `- …` inside body | Loop (`while` or `` [`item`](`coll`) ``) |
 | Line `N. *` | Else arm |
 | `> fn args` | Call (named `k=v` or positional) |

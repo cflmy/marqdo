@@ -2,7 +2,7 @@
 
 mod expr;
 
-pub use expr::{parse_call_after_gt, parse_expr, parse_value_or_interp};
+pub use expr::{parse_call_after_gt, parse_call_arg_value, parse_expr, parse_value_or_interp};
 
 use anyhow::{bail, Result};
 
@@ -521,14 +521,17 @@ impl<'a> Cursor<'a> {
                 break;
             }
             let trimmed = l.text.trim();
-            let cond_src = if let Some(rest) = strip_ordered(trimmed) {
-                rest
-            } else {
+            let Some(num) = ordered_item_number(trimmed) else {
                 break;
             };
             if ind != base_indent {
                 break;
             }
+            // Same-indent restart at `1.` begins a new Branch statement.
+            if !arms.is_empty() && num == 1 {
+                break;
+            }
+            let cond_src = strip_ordered(trimmed).unwrap();
             self.bump();
 
             let condition = if cond_src == "*" || cond_src.is_empty() {
@@ -673,7 +676,7 @@ fn parse_param_line(trimmed: &str) -> Option<crate::ast::Param> {
         if def_s.is_empty() {
             return None;
         }
-        Some(parse_value_or_interp(def_s).ok()?)
+        Some(parse_call_arg_value(def_s).ok()?)
     } else if after.is_empty() {
         None
     } else {
@@ -843,6 +846,25 @@ fn is_ordered_branch(trimmed: &str) -> bool {
     strip_ordered(trimmed).is_some()
 }
 
+/// Leading `N` in an ordered-list item `N. …` (1-based Markdown marker).
+fn ordered_item_number(trimmed: &str) -> Option<u32> {
+    let mut chars = trimmed.chars();
+    let mut n: u32 = 0;
+    let mut saw_digit = false;
+    while let Some(c) = chars.next() {
+        if let Some(d) = c.to_digit(10) {
+            saw_digit = true;
+            n = n.saturating_mul(10).saturating_add(d);
+            continue;
+        }
+        if c == '.' && saw_digit {
+            return Some(n);
+        }
+        return None;
+    }
+    None
+}
+
 fn strip_ordered(trimmed: &str) -> Option<&str> {
     let mut chars = trimmed.chars();
     let mut saw_digit = false;
@@ -954,6 +976,58 @@ mod tests {
         let m = parse_source(src).unwrap();
         let main = &m.functions[0];
         assert!(main.body.iter().any(|s| matches!(s, Stmt::Branch { .. })));
+    }
+
+    #[test]
+    fn consecutive_branches_restart_at_one() {
+        let m = parse_source(include_str!(
+            "../../tests/structure/branch-consecutive.mq.md"
+        ))
+        .unwrap();
+        let branches: Vec<_> = m.functions[0]
+            .body
+            .iter()
+            .filter(|s| matches!(s, Stmt::Branch { .. }))
+            .collect();
+        assert_eq!(
+            branches.len(),
+            3,
+            "expected three Branch stmts, got {:?}",
+            m.functions[0].body
+        );
+        for b in &branches {
+            match b {
+                Stmt::Branch { arms, .. } => assert_eq!(arms.len(), 2),
+                _ => unreachable!(),
+            }
+        }
+        // Arm bodies must hold the prints (not leaked as sibling Calls).
+        match branches[0] {
+            Stmt::Branch { arms, .. } => {
+                assert!(
+                    matches!(arms[0].body[0], Stmt::Call { .. }),
+                    "first arm body={:?}",
+                    arms[0].body
+                );
+            }
+            _ => unreachable!(),
+        }
+    }
+
+    #[test]
+    fn consecutive_branches_without_blank_line() {
+        let src = "# main\n\n1. True\n  > print text=A\n2. *\n  > print text=skip\n1. True\n  > print text=B\n";
+        let m = parse_source(src).unwrap();
+        let branches: Vec<_> = m.functions[0]
+            .body
+            .iter()
+            .filter(|s| matches!(s, Stmt::Branch { .. }))
+            .collect();
+        assert_eq!(branches.len(), 2, "got {:?}", m.functions[0].body);
+        match branches[0] {
+            Stmt::Branch { arms, .. } => assert_eq!(arms.len(), 2),
+            _ => unreachable!(),
+        }
     }
 
     #[test]

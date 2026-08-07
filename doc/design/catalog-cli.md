@@ -2,18 +2,18 @@
 
 | | |
 |---|---|
-| 状态 | 已定（v0 命令落地） |
-| 日期 | 2026-08-04 |
+| 状态 | 已定（O1 + O3：工程目录包 + agent-kb 概念并入） |
+| 日期 | 2026-08-07 |
 | 取代 | [generated-yaml-manifest.md](generated-yaml-manifest.md) 中「待决：sync/doc 命令」的命令名部分 |
-| 相关 | [generated-yaml-manifest.md](generated-yaml-manifest.md) · [view.md](view.md) · [okf-and-marqdo.md](../research/okf-and-marqdo.md) |
+| 相关 | [okf.md](okf.md)（**实现规范总览**）· [generated-yaml-manifest.md](generated-yaml-manifest.md) · [view.md](view.md) · [okf-and-marqdo.md](../research/okf-and-marqdo.md) |
 
 ---
 
 ## 1. 决策（重申）
 
-YAML / OKF 风格清单是**从 `.mq.md` 派生的生成物**，不是手写配置。详见 [generated-yaml-manifest.md](generated-yaml-manifest.md)。
+YAML / OKF 风格清单是**从 `.mq.md` 派生的生成物**，不是手写配置。完整词汇、任务知识包与路线图见 [**okf.md**](okf.md)。生成式方向见 [generated-yaml-manifest.md](generated-yaml-manifest.md)。
 
-本文件规定 **CLI 与 v0 落盘格式**。
+本文件规定 **CLI 与工程目录包落盘格式**（含 O3：扫入本地 `agent-kb` 概念，供人与工具同览）。
 
 ---
 
@@ -28,25 +28,30 @@ marqdo sync [PATH] -o OUT_DIR
 | 参数 | 默认 | 说明 |
 |------|------|------|
 | `PATH` | `.` | 工程根或含 `.mq.md` 的目录（递归扫描） |
-| `-o` / `--out` | `.marqdo` | 生成目录（写入前创建；**覆盖**同名生成文件） |
+| `-o` / `--out` | `.marqdo` | 生成目录（写入前创建；**覆盖**同名生成文件；扫描时跳过该目录） |
 
 退出码：成功 0；无可扫描文件或 IO/解析失败非 0（单文件解析失败时写入 `diagnostics` 并继续其余文件，最终若有失败则非 0）。
 
 ---
 
-## 3. 生成物（v0）
+## 3. 生成物
 
 ```
 OUT_DIR/
   catalog.yaml           # 机器向总清单（OKF 风格字段）
-  index.md               # 人/Agent 可读总览（含 YAML frontmatter）
+  index.md               # 人可读总览：Modules + Agent knowledge
   modules/
-    <stem>.md            # 每个 .mq.md 一个概念页（frontmatter + 摘要）
+    <stem>.md            # 每个工程 .mq.md 一个 Module 页
+  concepts/              # 从 **/.marqdo/agent-kb/concepts/ 复制（O3）
+    tasks/…
+    skills/…
 ```
 
 路径中的目录层级拍扁为文件名时用 `__` 连接，例如：
 
 `structure/import/main.mq.md` → `modules/structure__import__main.md`
+
+`.marqdo/agent-kb/` 下的可执行 `.mq.md` **不**进 Module 表（由 Task/Skill 概念页的 `resource` 指向）。
 
 ### 3.1 `catalog.yaml`（示意）
 
@@ -55,12 +60,11 @@ OUT_DIR/
 type: Marqdo Catalog
 title: marqdo-project
 generated:
-  by: marqdo/0.0.1
-  # at: 可选 ISO8601；CI 比对时可忽略
+  by: marqdo/0.1.2
 modules:
   - id: structure/hello
     resource: structure/hello.mq.md
-    title: Hello World          # 来自源 frontmatter title，缺省用文件名
+    title: Hello World
     imports: []
     exports:
       - name: Hello World
@@ -72,35 +76,28 @@ modules:
     exports:
       - name: main
         kind: fn
+concepts: []   # 有 agent-kb 时为 Task/Skill 条目列表
 ```
-
-字段约定（v0 最小集）：
 
 | 字段 | 含义 |
 |------|------|
 | `type` | 固定 `Marqdo Catalog`（OKF：未知 type 可降级） |
 | `modules[].resource` | 相对 `PATH` 的源路径 |
 | `modules[].imports` | 源 frontmatter 中的 `> *.mq.md` |
-| `modules[].exports` | 顶层 `#` 函数名（`kind: fn`）；嵌套 `##` 列入 `children`（可选，v0 可扁平只列顶层） |
+| `modules[].exports` | 顶层 `#` 函数名（`kind: fn`） |
+| `modules[].verified` / `sources` | 源 frontmatter 有则透传（O3） |
+| `concepts[]` | 本地 agent-kb 概念摘要（`id`/`type`/`page`/…） |
 | `generated.by` | `marqdo/<crate version>` |
 
-不在 v0：版本锁定哈希、跨仓 URL、完整符号类型。
+不在现行范围：版本锁定哈希、跨仓 URL、完整符号类型、`log.md`（见 okf O4）。
 
-### 3.2 模块概念页 frontmatter
+### 3.2 模块概念页
 
-```yaml
----
-type: Marqdo Module
-title: …
-resource: structure/hello.mq.md
-depends: []          # imports 列表
-exports: [Hello World]
-generated:
-  by: marqdo/0.0.1
----
-```
+Frontmatter 仍用 `depends` 字符串列表（机器可读）；**正文 Dependencies** 链到同包其它 Module 页（人可点）。源若带 `verified` / `sources` 则写入页头。
 
-正文含「请勿手改」提示、依赖列表、导出列表；可链到同包其它模块页。
+### 3.3 Agent knowledge
+
+`index.md` 的 **Agent knowledge** 节列出扫到的 Task/Skill，链到 `concepts/…`。概念页内容从本地 `agent-kb` **复制**，与 Agent 运行时包同源，便于人审阅晋升结果。
 
 ---
 
@@ -109,7 +106,7 @@ generated:
 | 命令 | 产物 | 受众 |
 |------|------|------|
 | `marqdo view output` | 静态 HTML（结构 + 运行结果） | 人类读程序文档站 |
-| `marqdo catalog` | OKF 风格 YAML + Markdown 索引 | 工具 / Agent / 依赖总览 |
+| `marqdo catalog` | OKF 风格 YAML + Markdown 索引（含 agent-kb） | 人浏览依赖/技能 · 工具 / Agent |
 
 二者都从同一源树生成，互不替代。发布用户文档时可同时：
 
@@ -122,7 +119,9 @@ marqdo catalog tests -o .marqdo
 
 ## 5. 验收
 
-1. `marqdo catalog tests -o /tmp/mq-cat` 写出 `catalog.yaml` 与 `modules/`。  
+1. `marqdo catalog tests -o /tmp/mq-cat` 写出 `catalog.yaml`、`modules/`、`concepts:` 键。  
 2. `catalog.yaml` 含 `structure/hello` 与 import 模块的 `imports: [utils.mq.md]`。  
-3. 文件头或 `generated` 标明 GENERATED；文档声明勿手改。  
-4. `marqdo sync` 与 `catalog` 行为一致。
+3. 模块页 Dependencies 对已解析导入为 Markdown 链接。  
+4. 若扫描根下有 `.marqdo/agent-kb/concepts/`，则复制进 `OUT_DIR/concepts/` 且 `index.md` 有 Agent knowledge 条目。  
+5. 文件头或 `generated` 标明 GENERATED；文档声明勿手改。  
+6. `marqdo sync` 与 `catalog` 行为一致。

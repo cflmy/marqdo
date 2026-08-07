@@ -4,7 +4,7 @@
 |---|---|
 | Status | **Accepted · redesign**（取代「thin TOOL: loop」方案） |
 | Date | 2026-08-07 |
-| Related | [ext-llm.md](ext-llm.md) · [ext-cli.md](ext-cli.md) · [ext-abi.md](ext-abi.md) · [**ext-agent-plan.md**](ext-agent-plan.md)（**多步锁定设计**） · [module-namespace.md](module-namespace.md) · [objects.md](objects.md) · [stdlib-writeback.md](stdlib-writeback.md) · [stdlib-subtask.md](stdlib-subtask.md) · [markdown-mapping.md](markdown-mapping.md) |
+| Related | [ext-llm.md](ext-llm.md) · [ext-cli.md](ext-cli.md) · [ext-abi.md](ext-abi.md) · [**ext-agent-plan.md**](ext-agent-plan.md)（**多步锁定设计**） · [**okf.md**](okf.md)（**OKF / 任务知识包**） · [module-namespace.md](module-namespace.md) · [objects.md](objects.md) · [stdlib-writeback.md](stdlib-writeback.md) · [stdlib-subtask.md](stdlib-subtask.md) · [markdown-mapping.md](markdown-mapping.md) |
 
 ## 0. 为什么要改掉旧方案
 
@@ -112,7 +112,7 @@ Marqdo 的宪法是 **代码即文档、文档即知识库**：
 |---|---|
 | **输入** | 复杂目标 |
 | **过程** | 父智能体**创建（或续跑）一份工作簿 `.mq.md`** → 子文件大模型配置与父一致 → **`lib/subtask` `spawn path=`** 运行该文件 → 读结果与写回 → **改代码 / 改写回后再执行**（有轮次上限） |
-| **输出** | 汇总 map + 磁盘上的工作簿（代码与 `marqdo-out` 均可演化） |
+| **输出** | 汇总 map（含 `result`）+ 磁盘上的工作簿（代码与 `marqdo-out` 均可演化） |
 | **适用** | 需分解、多情形、可固化步骤、可复用子成果的任务 |
 
 公开方法：`## 多步` / `## plan`。
@@ -122,7 +122,7 @@ Marqdo 的宪法是 **代码即文档、文档即知识库**：
 1. **创建工作簿** — 默认 `.marqdo/agent-runs/`；内容为任务的详细可执行步骤（导入、工具、`# main`、子智能体）。  
 2. **模型配置继承父智能体** — 共享 env / 等价 llm 句柄；v1 不静默换模。  
 3. **子任务执行整文件** — 不是父进程内嵌解释。  
-4. **工作簿内推荐多个 `# 智能体`**；也允许一个智能体多次 `单步`；**已确定步骤应固化为普通 `##` 代码**。  
+4. **工作簿内推荐多个 `# 智能体`**；也允许一个智能体多次 `单步`；**已确定步骤应固化为返回答案的普通代码**（多轮 = 多文件接力 + OKF，见 [ext-agent-plan.md §4.2](ext-agent-plan.md)）。  
 5. **持续更新** — 代码修订 + 写回注释刷新（替换不累积空行）。  
 6. **`单步` 默认自动写回**（`写回=` / `writeback=` 可关），父侧再汇总写回。  
 7. **父上下文** — 与单步同级的源码 / Skill / 调用位置 / 历史，外加工作簿全文与子写回。
@@ -164,7 +164,14 @@ ext/
 
 本地开发须先 `cargo build -p marqdo_plugin_agent`（或 `ext add agent` / 设 `MARQDO_AGENT_PLUGIN`）。详见 [ext-cli.md](ext-cli.md) · [ext-abi.md](ext-abi.md)。
 
-**分层纪律**：`ext/*` **禁止** `host_*`；用 `lib/*` 包装或插件注册名。进程退出用 `sys.exit` / `系统.退出`，不用裸 `exit`。
+**分层纪律（硬规则，勿破）**：
+
+1. `ext/**/*.mq.md` **禁止**出现任何 `host_*` / `host_` 调用。  
+2. Agent 专属能力（含 OKF agent-kb：`agent_goal_sig` / `agent_kb_lookup` / `agent_kb_promote` / …）只进 **`plugins/agent` 注册名**，由 `ext/ai/agent` 在 `plugin.load` 后调用。  
+3. **禁止**向 `src/host/`（`HostFn` 表）添加 agent / OKF 领域原语，以免核心包体膨胀。通用 L0.5 仅保留 fs/json/subtask 等标准库底层。  
+4. 进程退出用 `sys.exit` / `系统.退出`，不用裸 `exit`。
+
+官方 `ext/ai/` 用 `lib/*` 包装或插件注册名；见 [module-namespace.md](module-namespace.md) §8 · [ext-abi.md](ext-abi.md)。
 
 ---
 
@@ -320,9 +327,10 @@ lib/subtask：spawn fn=<名>  →  wait
 |------|------|------|
 | D0 | 本文 Accepted；废弃 thin TOOL 设计叙述 | **本文件** |
 | D1 | 重写 `ext/ai/agent.mq.md` / `智能体.mq.md`：`单步` + 源码/位置注入 + **子任务调工具** + **结构化返回值**；运行时经 **ABI v2 agent 插件**（禁 ext 直调 host） | **done** |
-| D2 | `多步`：按 [ext-agent-plan.md](ext-agent-plan.md)（工作簿创建、`spawn path`、修订循环）；**D2a `step` 默认写回已落地** | D2a done；其余 TODO |
+| D2 | `多步`：按 [ext-agent-plan.md](ext-agent-plan.md)（观察→精确补丁；禁止整文件重写）；**D2a–D2f 主路径已落地** | **done** |
 | D3 | 金样例：离线单步 / 写回；**live 单步**（`tests/ext/agent-run-live.mq.md`）；多步骨架（可不打网） | **live done** |
 | D4 | `view` / `debug` 对工作簿与写回块的导航体验 | TODO |
+| O2 | OKF 任务知识包：`plan` reuse/promote（[okf.md §7](okf.md)） | **done** |
 
 ### 非目标
 

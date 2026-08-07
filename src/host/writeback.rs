@@ -528,6 +528,22 @@ pub fn list(ctx: &HostContext) -> Result<Value, String> {
         .entry_source
         .as_deref()
         .ok_or_else(|| "writeback: no entry source".to_string())?;
+    Ok(slots_from_source(source))
+}
+
+/// Scan `path` for `<!-- marqdo-out … -->` slots (any file, not only the entry).
+pub fn scan_path(ctx: &HostContext, path: &Value) -> Result<Value, String> {
+    let rel = match path {
+        Value::Text(s) => s.as_str(),
+        _ => return Err("writeback scan_path: path must be text".into()),
+    };
+    let p = ctx.resolve_path(rel)?;
+    let source = std::fs::read_to_string(&p)
+        .map_err(|e| format!("writeback scan_path {}: {e}", p.display()))?;
+    Ok(slots_from_source(&source))
+}
+
+fn slots_from_source(source: &str) -> Value {
     let items: Vec<Value> = scan_blocks(source)
         .into_iter()
         .map(|b| {
@@ -544,7 +560,7 @@ pub fn list(ctx: &HostContext) -> Result<Value, String> {
             Value::Map(entries)
         })
         .collect();
-    Ok(Value::List(items))
+    Value::List(items)
 }
 
 /// Ensure named slots exist with a placeholder body; **does not** overwrite non-empty bodies.

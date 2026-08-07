@@ -107,12 +107,17 @@ pub fn resolve_import(from_dir: &Path, rel: &str) -> Result<PathBuf> {
                 return Ok(p);
             }
         }
+        // Walk importer ancestors so workbooks under `.marqdo/…` still find repo `lib/`.
+        if let Some(p) = find_in_ancestor_dir(from_dir, "lib", rest) {
+            return Ok(p);
+        }
         // Embedded stdlib: synthesize a path under lib/ for read_module_source.
         return Ok(PathBuf::from("lib").join(rest));
     }
     if rel.starts_with("ext/") {
+        let rest = rel.strip_prefix("ext/").unwrap();
         for root in ext_search_roots() {
-            let p = root.join(rel.strip_prefix("ext/").unwrap_or(&rel));
+            let p = root.join(rest);
             // also try full ext/rel under root
             let p2 = root.join(&rel);
             if p.is_file() {
@@ -122,10 +127,13 @@ pub fn resolve_import(from_dir: &Path, rel: &str) -> Result<PathBuf> {
                 return Ok(p2);
             }
             // MARQDO_EXT is the ext root itself (contains ai/)
-            let under = root.join(rel.strip_prefix("ext/").unwrap());
+            let under = root.join(rest);
             if under.is_file() {
                 return Ok(under);
             }
+        }
+        if let Some(p) = find_in_ancestor_dir(from_dir, "ext", rest) {
+            return Ok(p);
         }
     }
     // Relative again with normalize
@@ -133,6 +141,20 @@ pub fn resolve_import(from_dir: &Path, rel: &str) -> Result<PathBuf> {
         return Ok(direct);
     }
     bail!("cannot resolve import `{rel}` from {}", from_dir.display())
+}
+
+/// Look for `anchor/rest` under `from` or any parent directory (e.g. repo root `ext/ai/…`).
+fn find_in_ancestor_dir(from: &Path, anchor: &str, rest: &str) -> Option<PathBuf> {
+    let mut cur = from.to_path_buf();
+    loop {
+        let candidate = cur.join(anchor).join(rest);
+        if candidate.is_file() {
+            return Some(candidate);
+        }
+        if !cur.pop() {
+            return None;
+        }
+    }
 }
 
 fn lib_search_roots() -> Vec<PathBuf> {

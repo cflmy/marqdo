@@ -4,6 +4,8 @@ description: Document-driven agent — step / plan; tools via lib/subtask; runti
 > ext/ai/llm.mq.md
 > lib/json.mq.md
 > lib/sys.mq.md
+> lib/fs.mq.md
+> lib/time.mq.md
 > lib/writeback.mq.md
 > lib/subtask.mq.md
 > lib/plugin.mq.md
@@ -90,6 +92,255 @@ Allowlist check, then invoke the runbook `##` via `lib/subtask` (`spawn fn=` →
 2. *
   *`msg` = Tool not allowed: *
   **`msg` + `name`**
+
+## render_workbook_skeleton
+    + `goal`
+    + `skeleton`=single
+
+Build a runnable workbook. `skeleton=single` (default): one worker `step`. `skeleton=dual`: research then write agents. Solidify notes remind the parent to replace proven `step` calls with ordinary `##` code.
+
+*`q` = > json.quote text=`goal` *
+*`esc` = > json.parse text={"h":"---\ntitle: agent workbook\n> ext/ai/llm.mq.md\n> ext/ai/agent.mq.md\n> lib/json.mq.md\n> lib/sys.mq.md\n> lib/writeback.mq.md\n> lib/subtask.mq.md\n---\n\n# Goal\n\nParent goal is embedded as JSON in # main.\n\n## Solidify\n\nWhen a step is proven, replace worker.step with ordinary code that returns the answer via **…** (not print). Quiet file subtasks discard stdout; the parent reads wait.value.\n\n# main\n\n> llm.load_env\n\n","s1":"\u002a\u0060model\u0060 = > llm.llm \u002a\n","s2":"\u002a\u0060tools\u0060 = > json.parse text=[] \u002a\n","s3":"\u002a\u0060worker\u0060 = > agent.agent model=\u0060model\u0060 tools=\u0060tools\u0060 standing=You are a workbook worker. Finish the task; do not invent tools. Prefer a direct answer. \u002a\n","s4":"\u002a\u0060wrap\u0060 = > json.parse text={\"task\":","s5":"} \u002a\n","s6":"\u002a\u0060task\u0060 = > json.get value=\u0060wrap\u0060 key=task \u002a\n","s7":"\u002a\u0060out\u0060 = > \u0060worker\u0060.step task=\u0060task\u0060 \u002a\n","s7b":"\u002a\u0060text\u0060 = > json.get value=\u0060out\u0060 key=result \u002a\n","s8":"\u002a\u002a\u0060text\u0060\u002a\u002a\n","d3":"\u002a\u0060research\u0060 = > agent.agent model=\u0060model\u0060 tools=\u0060tools\u0060 standing=You gather facts for the goal. Be concise. Do not invent tools. \u002a\n","d3b":"\u002a\u0060writer\u0060 = > agent.agent model=\u0060model\u0060 tools=\u0060tools\u0060 standing=You write the final answer from research notes. Do not invent tools. \u002a\n","d4":"\u002a\u0060wrap\u0060 = > json.parse text={\"task\":","d5":"} \u002a\n","d6":"\u002a\u0060task\u0060 = > json.get value=\u0060wrap\u0060 key=task \u002a\n","d7":"\u002a\u0060notes\u0060 = > \u0060research\u0060.step task=\u0060task\u0060 \u002a\n","d8":"\u002a\u0060ns\u0060 = > json.stringify value=\u0060notes\u0060 \u002a\n","d9":"\u002a\u0060wt\u0060 = Write the final answer. Research notes: \u002a\n","d10":"\u002a\u0060wt\u0060 = \u0060wt\u0060 + \u0060ns\u0060 \u002a\n","d11":"\u002a\u0060out\u0060 = > \u0060writer\u0060.step task=\u0060wt\u0060 \u002a\n","d11b":"\u002a\u0060text\u0060 = > json.get value=\u0060out\u0060 key=result \u002a\n","d12":"\u002a\u002a\u0060text\u0060\u002a\u002a\n"} *
+*`h` = > json.get value=`esc` key=h *
+*`s1` = > json.get value=`esc` key=s1 *
+*`s2` = > json.get value=`esc` key=s2 *
+
+1. `skeleton` == dual
+  *`s3` = > json.get value=`esc` key=d3 *
+  *`s3b` = > json.get value=`esc` key=d3b *
+  *`s4` = > json.get value=`esc` key=d4 *
+  *`s5` = > json.get value=`esc` key=d5 *
+  *`s6` = > json.get value=`esc` key=d6 *
+  *`s7` = > json.get value=`esc` key=d7 *
+  *`s8` = > json.get value=`esc` key=d8 *
+  *`s9` = > json.get value=`esc` key=d9 *
+  *`s10` = > json.get value=`esc` key=d10 *
+  *`s11` = > json.get value=`esc` key=d11 *
+  *`s11b` = > json.get value=`esc` key=d11b *
+  *`s12` = > json.get value=`esc` key=d12 *
+  **`h` + `s1` + `s2` + `s3` + `s3b` + `s4` + `q` + `s5` + `s6` + `s7` + `s8` + `s9` + `s10` + `s11` + `s11b` + `s12`**
+2. *
+  *`s3` = > json.get value=`esc` key=s3 *
+  *`s4` = > json.get value=`esc` key=s4 *
+  *`s5` = > json.get value=`esc` key=s5 *
+  *`s6` = > json.get value=`esc` key=s6 *
+  *`s7` = > json.get value=`esc` key=s7 *
+  *`s7b` = > json.get value=`esc` key=s7b *
+  *`s8` = > json.get value=`esc` key=s8 *
+  **`h` + `s1` + `s2` + `s3` + `s4` + `q` + `s5` + `s6` + `s7` + `s7b` + `s8`**
+
+---
+
+## inspect_workbook
+    + `path`
+    + `exit_code`=None
+    + `value`=None
+
+Structured observation for the parent developer-agent: source, named writeback slots, exit code, and optional child return value.
+
+*`source` = > fs.read_text path=`path` *
+*`slots` = > writeback.scan_path path=`path` *
+*`obs` = > json.parse text={"path":""} *
+*`obs` = > json.set map=`obs` key=path value=`path` *
+*`obs` = > json.set map=`obs` key=source value=`source` *
+*`obs` = > json.set map=`obs` key=slots value=`slots` *
+*`obs` = > json.set map=`obs` key=exit_code value=`exit_code` *
+1. `value`
+  *`obs` = > json.set map=`obs` key=value value=`value` *
+2. *
+  *`_` = 1*
+
+*`last_ok` = None*
+*`last_error` = None*
+- [`slot`](`slots`)
+  *`k` = > json.get value=`slot` key=key *
+  *`body` = > json.get value=`slot` key=body *
+  1. `k` == ok
+    *`last_ok` = `body`*
+  2. `k` == error
+    *`last_error` = `body`*
+  3. *
+    *`_` = 1*
+
+1. `last_ok`
+  *`obs` = > json.set map=`obs` key=last_ok value=`last_ok` *
+2. *
+  *`_` = 1*
+
+1. `last_error`
+  *`obs` = > json.set map=`obs` key=last_error value=`last_error` *
+2. *
+  *`_` = 1*
+
+**`obs`**
+
+---
+
+## await_workbook
+    + `path`
+
+Spawn a workbook file (quiet by default), wait for `{code,value}`, and inspect. Parent consumes `value` — not child stdout.
+
+*`id` = > subtask.spawn path=`path` *
+*`waited` = > subtask.wait id=`id` *
+*`code` = > json.get value=`waited` key=code *
+*`value` = > json.get value=`waited` key=value *
+*`obs` = > inspect_workbook path=`path` exit_code=`code` value=`value` *
+*`out` = > json.parse text={"code":0} *
+*`out` = > json.set map=`out` key=code value=`code` *
+*`out` = > json.set map=`out` key=value value=`value` *
+*`out` = > json.set map=`out` key=observation value=`obs` *
+**`out`**
+
+---
+
+## extract_plan_decision
+    + `reply`
+
+Parse `DECISION: DONE` / `DECISION: CONTINUE` (Chinese: `决定：完成` / `决定：继续`).
+
+*`esc` = > json.parse text={"nl":"\n","fw":"："} *
+*`nl` = > json.get value=`esc` key=nl *
+*`fw` = > json.get value=`esc` key=fw *
+*`text` = > trim value=`reply` *
+*`lines` = > split value=`text` sep=`nl` *
+*`found` = None*
+
+- [`line`](`lines`)
+  *`t` = > trim value=`line` *
+  *`parts` = > split value=`t` sep=: *
+  *`n` = > len value=`parts` *
+  1. `n` > 1
+    *`head` = > at value=`parts` index=0 *
+    *`head` = > trim value=`head` *
+    *`rest` = > at value=`parts` index=1 *
+    *`rest` = > trim value=`rest` *
+    1. `head` == DECISION
+      *`found` = `rest`*
+    2. `head` == 决定
+      *`found` = `rest`*
+    3. *
+      *`_` = 1*
+  2. *
+    *`parts` = > split value=`t` sep=`fw` *
+    *`n` = > len value=`parts` *
+    1. `n` > 1
+      *`head` = > at value=`parts` index=0 *
+      *`head` = > trim value=`head` *
+      *`rest` = > at value=`parts` index=1 *
+      *`rest` = > trim value=`rest` *
+      1. `head` == 决定
+        *`found` = `rest`*
+      2. `head` == DECISION
+        *`found` = `rest`*
+      3. *
+        *`_` = 1*
+    2. *
+      *`_` = 1*
+
+1. `found` == DONE
+  **DONE**
+2. `found` == CONTINUE
+  **CONTINUE**
+3. `found` == 完成
+  **DONE**
+4. `found` == 继续
+  **CONTINUE**
+5. *
+  **`found`**
+
+---
+
+## extract_plan_summary
+    + `reply`
+
+First `SUMMARY:` / `汇总:` / `汇总：` line body, else trimmed reply.
+
+*`esc` = > json.parse text={"nl":"\n","fw":"："} *
+*`nl` = > json.get value=`esc` key=nl *
+*`fw` = > json.get value=`esc` key=fw *
+*`text` = > trim value=`reply` *
+*`lines` = > split value=`text` sep=`nl` *
+*`found` = None*
+
+- [`line`](`lines`)
+  *`t` = > trim value=`line` *
+  *`parts` = > split value=`t` sep=: *
+  *`n` = > len value=`parts` *
+  1. `n` > 1
+    *`head` = > at value=`parts` index=0 *
+    *`head` = > trim value=`head` *
+    *`rest` = > at value=`parts` index=1 *
+    *`rest` = > trim value=`rest` *
+    1. `head` == SUMMARY
+      *`found` = `rest`*
+    2. `head` == 汇总
+      *`found` = `rest`*
+    3. *
+      *`_` = 1*
+  2. *
+    *`parts` = > split value=`t` sep=`fw` *
+    *`n` = > len value=`parts` *
+    1. `n` > 1
+      *`head` = > at value=`parts` index=0 *
+      *`head` = > trim value=`head` *
+      *`rest` = > at value=`parts` index=1 *
+      *`rest` = > trim value=`rest` *
+      1. `head` == 汇总
+        *`found` = `rest`*
+      2. `head` == SUMMARY
+        *`found` = `rest`*
+      3. *
+        *`_` = 1*
+    2. *
+      *`_` = 1*
+
+1. `found`
+  **`found`**
+2. *
+  **`text`**
+
+---
+
+## build_plan_context
+    + `agent`
+    + `goal`
+    + `observation`
+    + `explore_attempt`=None
+    + `explore_n`=None
+
+Parent developer-agent prompt: observe → decide DONE or CONTINUE with exact FIND/REPLACE patches (never rewrite the whole workbook).
+
+*`standing` = > json.get value=`agent` key=standing *
+1. `standing`
+  *`up` = `standing`*
+2. *
+  *`up` = None*
+
+*`skill` = > agent_marqdo_skill *
+*`obs_s` = > json.stringify value=`observation` *
+*`goal_s` = > json.stringify value=`goal` *
+*`esc` = > json.parse text={"a":"\n\n--- standing ---\n","b":"\n\n--- goal ---\n","c":"\n\n--- workbook observation ---\n","d":"\n\n--- marqdo skill ---\n","e":"\n\n--- how to act ---\nYou are a Marqdo agent-development master.\nPriority order:\n1) Code first: if the goal is a fixed answer, solidify to a **return** (e.g. **pong**) or ordinary ## — no further LLM worker.step. Do not rely on > print; file subtasks are quiet and the parent consumes wait.value.\n2) If exit_code is 0 AND the workbook source still contains worker.step (or .单步), you MUST CONTINUE with a FIND/REPLACE that solidifies to a returned answer. Never DONE while .step remains.\n3) If exit_code is 0 AND already solidified (no worker.step) with a clear main return, DECISION: DONE with a short SUMMARY.\n4) If exploring an alternate path, try a meaningfully DIFFERENT structure than prior attempts (e.g. dual agents, narrower standing, or pure code). Do not merely re-run the same step.\n5) Prefer multiple narrow agents over one giant standing when roles differ.\nNever rewrite the whole .mq.md file.\nReply with EXACTLY one protocol:\nDECISION: DONE\nSUMMARY: <one line>\nOR\nDECISION: CONTINUE\nPATCH:\n<<<\nFIND\n<exact old snippet>\n===\nREPLACE\n<new snippet>\n>>>\n(You may repeat <<< blocks.)\n","f":"\n\n--- explore attempt ---\n"} *
+*`a` = > json.get value=`esc` key=a *
+*`b` = > json.get value=`esc` key=b *
+*`c` = > json.get value=`esc` key=c *
+*`d` = > json.get value=`esc` key=d *
+*`e` = > json.get value=`esc` key=e *
+*`f` = > json.get value=`esc` key=f *
+*`p` = You develop and revise Marqdo workbooks with surgical patches. *
+*`p` = `p` + `a` + `up` + `b` + `goal_s` + `c` + `obs_s` + `d` + `skill` + `e` *
+1. `explore_attempt`
+  *`p` = `p` + `f` *
+  *`p` = `p` + Attempt *
+  *`p` = `p` + `explore_attempt` *
+  *`p` = `p` + of *
+  *`p` = `p` + `explore_n` *
+  *`p` = `p` + . Try a different path; prefer code when the answer is fixed. *
+2. *
+  *`_` = 1*
+**`p`**
+
+---
 
 # agent
     + `model`
@@ -192,10 +443,281 @@ One atomic turn: context → LLM → optional tool via subtask. Returns a **map*
 
 ## plan
     + `goal`
-    + `workbook_dir`
+    + `workbook_dir`=None
+    + `workbook`=None
+    + `max_rounds`=4
+    + `confirm`=False
+    + `writeback`=True
+    + `skeleton`=single
+    + `reuse`=True
+    + `optimize`=False
+    + `force`=False
+    + `promote`=True
+    + `kb_dir`=.marqdo/agent-kb
+    + `improve_every`=3
+    + `explore_n`=3
 
-Multi-step workbook (D2) — not implemented yet.
+Multi-step with OKF agent-kb. Default workbook is `kb_dir/resources/<slug>.mq.md`. While task file count `< explore_n` and skill is not llm_free, force a new explore variant under `kb_dir/explore/<slug>/`. Code-first: llm_free hits skip parent LLM. File children return via `# main`; `plan` exposes that as `result`.
 
-*`_` = `workbook_dir`*
-*`msg` = plan (multi-step workbook) is not implemented yet; goal was: *
-**`msg` + `goal`**
+*`tools` = > json.get value=`self` key=tools *
+*`cache` = miss*
+*`path` = None*
+*`improve` = None*
+*`explore` = None*
+*`explore_attempt` = None*
+*`skel_kind` = `skeleton`*
+
+*`tf` = > agent_kb_task_files kb_dir=`kb_dir` goal=`goal` tools=`tools` *
+*`nfiles` = > json.get value=`tf` key=count *
+
+1. `force`
+  *`_` = 1*
+2. `optimize`
+  *`_` = 1*
+3. `reuse`
+  *`hit` = > agent_kb_lookup kb_dir=`kb_dir` goal=`goal` tools=`tools` *
+  1. `hit`
+    *`lf` = > json.get value=`hit` key=llm_free *
+    1. `lf`
+      *`path` = > json.get value=`hit` key=resource *
+      *`aw` = > await_workbook path=`path` *
+      *`code` = > json.get value=`aw` key=code *
+      *`child_val` = > json.get value=`aw` key=value *
+      *`last_obs` = > json.get value=`aw` key=observation *
+      1. `code` == 0
+        > agent_kb_record_hit kb_dir=`kb_dir` goal=`goal` tools=`tools` improve_every=`improve_every`
+        *`cache` = hit*
+        *`out` = > json.parse text={"status":"ok"} *
+        *`out` = > json.set map=`out` key=status value=ok *
+        *`out` = > json.set map=`out` key=goal value=`goal` *
+        *`out` = > json.set map=`out` key=workbook value=`path` *
+        *`out` = > json.set map=`out` key=rounds value=1 *
+        *`out` = > json.set map=`out` key=cache value=hit *
+        *`sk` = > json.get value=`hit` key=skill *
+        *`out` = > json.set map=`out` key=skill value=`sk` *
+        *`st` = > json.get value=`hit` key=status *
+        *`out` = > json.set map=`out` key=skill_status value=`st` *
+        *`sum` = OKF llm_free skill hit; spawned resource *
+        *`out` = > json.set map=`out` key=summary value=`sum` *
+        *`out` = > json.set map=`out` key=observation value=`last_obs` *
+        *`out` = > json.set map=`out` key=result value=`child_val` *
+        1. `writeback`
+          *`body` = > json.stringify value=`out` *
+          > writeback.record value=`body` key=ok
+        2. *
+          *`_` = 1*
+        **`out`**
+      2. *
+        *`path` = None*
+    2. `nfiles` < `explore_n`
+      *`explore` = 1*
+      *`cache` = explore*
+      *`path` = None*
+      *`explore_attempt` = `nfiles` + 1*
+      1. `explore_attempt` == 2
+        *`skel_kind` = dual*
+      2. *
+        *`skel_kind` = `skeleton`*
+    3. *
+      *`path` = > json.get value=`hit` key=resource *
+      *`aw` = > await_workbook path=`path` *
+      *`code` = > json.get value=`aw` key=code *
+      *`child_val` = > json.get value=`aw` key=value *
+      *`last_obs` = > json.get value=`aw` key=observation *
+      1. `code` == 0
+        *`rec` = > agent_kb_record_hit kb_dir=`kb_dir` goal=`goal` tools=`tools` improve_every=`improve_every` *
+        *`due` = > json.get value=`rec` key=improve_due *
+        1. `due`
+          *`improve` = 1*
+          *`cache` = improve*
+        2. *
+          *`cache` = hit*
+          *`out` = > json.parse text={"status":"ok"} *
+          *`out` = > json.set map=`out` key=status value=ok *
+          *`out` = > json.set map=`out` key=goal value=`goal` *
+          *`out` = > json.set map=`out` key=workbook value=`path` *
+          *`out` = > json.set map=`out` key=rounds value=1 *
+          *`out` = > json.set map=`out` key=cache value=hit *
+          *`sk` = > json.get value=`hit` key=skill *
+          *`out` = > json.set map=`out` key=skill value=`sk` *
+          *`st` = > json.get value=`hit` key=status *
+          *`out` = > json.set map=`out` key=skill_status value=`st` *
+          *`sum` = OKF skill hit; spawned resource *
+          *`out` = > json.set map=`out` key=summary value=`sum` *
+          *`out` = > json.set map=`out` key=observation value=`last_obs` *
+          *`out` = > json.set map=`out` key=result value=`child_val` *
+          1. `writeback`
+            *`body` = > json.stringify value=`out` *
+            > writeback.record value=`body` key=ok
+          2. *
+            *`_` = 1*
+          **`out`**
+      2. *
+        *`path` = None*
+  2. *
+    1. `nfiles` < `explore_n`
+      *`explore` = 1*
+      *`cache` = explore*
+      *`explore_attempt` = `nfiles` + 1*
+      1. `explore_attempt` == 2
+        *`skel_kind` = dual*
+      2. *
+        *`skel_kind` = `skeleton`*
+    2. *
+      *`_` = 1*
+4. *
+  1. `nfiles` < `explore_n`
+    *`explore` = 1*
+    *`cache` = explore*
+    *`explore_attempt` = `nfiles` + 1*
+  2. *
+    *`_` = 1*
+
+*`skel` = > render_workbook_skeleton goal=`goal` skeleton=`skel_kind` *
+
+1. `workbook`
+  *`path` = `workbook`*
+  *`ex` = > fs.exists path=`path` *
+  1. `ex`
+    *`_` = 1*
+  2. *
+    > fs.write_text path=`path` text=`skel`
+2. *
+  1. `path`
+    *`_` = 1*
+  2. *
+    *`slug` = > agent_goal_slug goal=`goal` *
+    1. `workbook_dir`
+      > fs.make_dir path=`workbook_dir`
+      *`ts` = > time.now_ms *
+      *`parts` = > json.parse text={"a":"/workbook-","b":"-","c":".mq.md"} *
+      *`a` = > json.get value=`parts` key=a *
+      *`b` = > json.get value=`parts` key=b *
+      *`c` = > json.get value=`parts` key=c *
+      *`path` = `workbook_dir` + `a` + `slug` + `b` + `ts` + `c` *
+    2. `explore`
+      *`parts` = > json.parse text={"a":"/explore/","b":"/","c":".mq.md"} *
+      *`a` = > json.get value=`parts` key=a *
+      *`b` = > json.get value=`parts` key=b *
+      *`c` = > json.get value=`parts` key=c *
+      *`path` = `kb_dir` + `a` + `slug` + `b` + `explore_attempt` + `c` *
+    3. *
+      *`parts` = > json.parse text={"a":"/resources/","b":".mq.md"} *
+      *`a` = > json.get value=`parts` key=a *
+      *`b` = > json.get value=`parts` key=b *
+      *`path` = `kb_dir` + `a` + `slug` + `b` *
+    > fs.write_text path=`path` text=`skel`
+
+1. `confirm`
+  *`out` = > json.parse text={"status":"pending"} *
+  *`out` = > json.set map=`out` key=goal value=`goal` *
+  *`out` = > json.set map=`out` key=workbook value=`path` *
+  *`out` = > json.set map=`out` key=summary value=workbook created; confirm to run *
+  *`out` = > json.set map=`out` key=cache value=bypass *
+  1. `writeback`
+    *`body` = > json.stringify value=`out` *
+    > writeback.record value=`body` key=ok
+  2. *
+    *`_` = 1*
+  **`out`**
+2. *
+  *`_` = 1*
+
+*`model` = > json.get value=`self` key=model *
+*`round` = 0*
+*`last_obs` = None*
+*`last_reply` = None*
+*`child_val` = None*
+*`done` = None*
+*`summary` = None*
+*`status` = error*
+*`err` = max_rounds exhausted *
+1. `improve`
+  *`left` = 1*
+2. *
+  *`left` = `max_rounds`*
+
+- `left` > 0
+  1. `done`
+    *`left` = 0*
+  2. *
+    *`round` = `round` + 1*
+    *`aw` = > await_workbook path=`path` *
+    *`code` = > json.get value=`aw` key=code *
+    *`child_val` = > json.get value=`aw` key=value *
+    *`last_obs` = > json.get value=`aw` key=observation *
+    *`ctx` = > build_plan_context agent=`self` goal=`goal` observation=`last_obs` explore_attempt=`explore_attempt` explore_n=`explore_n` *
+    *`last_reply` = > `model`.complete prompt=`ctx` *
+    *`last_reply` = > trim value=`last_reply` *
+    *`dec` = > extract_plan_decision reply=`last_reply` *
+    1. `dec` == DONE
+      > agent_workbook_solidify path=`path` observation=`last_obs`
+      *`done` = 1*
+      *`status` = ok*
+      *`summary` = > extract_plan_summary reply=`last_reply` *
+      *`err` = None*
+      *`left` = 0*
+    2. `dec` == CONTINUE
+      *`n` = > fs.apply_patch_blocks path=`path` text=`last_reply` *
+      1. `n`
+        *`left` = `left` - 1*
+      2. *
+        *`done` = 1*
+        *`status` = error*
+        *`err` = no patches applied *
+        *`summary` = > extract_plan_summary reply=`last_reply` *
+        *`left` = 0*
+    3. *
+      *`done` = 1*
+      *`status` = error*
+      *`err` = unrecognized plan decision *
+      *`summary` = `last_reply`*
+      *`left` = 0*
+
+1. `status` == ok
+  1. `promote`
+    *`prom` = > agent_kb_promote kb_dir=`kb_dir` goal=`goal` workbook=`path` tools=`tools` *
+    *`cache` = refreshed*
+  2. *
+    *`cache` = miss*
+2. *
+  *`_` = 1*
+
+*`out` = > json.parse text={"status":"ok"} *
+*`out` = > json.set map=`out` key=status value=`status` *
+*`out` = > json.set map=`out` key=goal value=`goal` *
+*`out` = > json.set map=`out` key=workbook value=`path` *
+*`out` = > json.set map=`out` key=rounds value=`round` *
+*`out` = > json.set map=`out` key=cache value=`cache` *
+1. `summary`
+  *`out` = > json.set map=`out` key=summary value=`summary` *
+2. *
+  *`_` = 1*
+
+1. `err`
+  *`out` = > json.set map=`out` key=error value=`err` *
+2. *
+  *`_` = 1*
+
+1. `last_obs`
+  *`out` = > json.set map=`out` key=observation value=`last_obs` *
+2. *
+  *`_` = 1*
+
+1. `child_val`
+  *`out` = > json.set map=`out` key=result value=`child_val` *
+2. `summary`
+  *`out` = > json.set map=`out` key=result value=`summary` *
+3. *
+  *`_` = 1*
+
+1. `writeback`
+  *`body` = > json.stringify value=`out` *
+  1. `status` == ok
+    > writeback.record value=`body` key=ok
+  2. *
+    > writeback.record value=`body` key=error
+2. *
+  *`_` = 1*
+
+**`out`**

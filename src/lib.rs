@@ -75,6 +75,8 @@ pub struct RunOptions {
     pub fs_root: Option<std::path::PathBuf>,
     /// Sleep clamp when capturing (None = host default; view export uses `Some(0)`).
     pub sleep_limit_ms: Option<u64>,
+    /// When set, write `# main` return value as JSON to this path (file subtasks).
+    pub emit_result: Option<std::path::PathBuf>,
 }
 
 impl Default for RunOptions {
@@ -94,6 +96,7 @@ impl Default for RunOptions {
             argv: Vec::new(),
             fs_root: None,
             sleep_limit_ms: None,
+            emit_result: None,
         }
     }
 }
@@ -181,12 +184,13 @@ pub fn run_file(path: &Path, opts: &RunOptions) -> Result<i32> {
             if opts.trace_eval {
                 eprintln!("=== marqdo: trace-eval ({path_label}) ===");
             }
-            interp.run_module(&module)?;
+            let value = interp.run_module(&module)?;
             if opts.trace_eval {
                 eprintln!("=== marqdo: end trace-eval ===");
             }
             let plots = interp.take_plots();
             flush_auto_plots(Some(path), &plots).map_err(|e| anyhow::anyhow!(e))?;
+            emit_result_file(opts, &value)?;
         }
         Backend::Bytecode => {
             let program = compile_module(Some(path), &module)?;
@@ -202,12 +206,13 @@ pub fn run_file(path: &Path, opts: &RunOptions) -> Result<i32> {
             if opts.trace_eval {
                 eprintln!("=== marqdo: trace-eval ({path_label}) ===");
             }
-            vm.run(&program)?;
+            let value = vm.run(&program)?;
             if opts.trace_eval {
                 eprintln!("=== marqdo: end trace-eval ===");
             }
             let plots = vm.take_plots();
             flush_auto_plots(Some(path), &plots).map_err(|e| anyhow::anyhow!(e))?;
+            emit_result_file(opts, &value)?;
         }
     }
 
@@ -218,6 +223,19 @@ pub fn run_file(path: &Path, opts: &RunOptions) -> Result<i32> {
     }
 
     Ok(0)
+}
+
+fn emit_result_file(opts: &RunOptions, value: &crate::value::Value) -> Result<()> {
+    let Some(path) = &opts.emit_result else {
+        return Ok(());
+    };
+    let json = crate::host::json::value_to_json(value).map_err(|e| anyhow::anyhow!(e))?;
+    let text = serde_json::to_string(&json).map_err(|e| anyhow::anyhow!(e))?;
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent).map_err(|e| anyhow::anyhow!(e))?;
+    }
+    std::fs::write(path, text).map_err(|e| anyhow::anyhow!("emit-result {}: {e}", path.display()))?;
+    Ok(())
 }
 
 /// Run and capture stdout (used by `view` and tests).
