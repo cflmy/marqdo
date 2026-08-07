@@ -28,7 +28,7 @@
 /public/index.html
 /public/pages/
 
-# VS Code extension lives on branch `vscode-extension` only (see doc/design/vscode-extension.md)
+# VS Code extension: source only on branch `vscode-extension` (see doc/design/vscode-extension-commit.md)
 /vscode-extension/
 
 # Python spike venv (local)

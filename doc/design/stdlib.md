@@ -56,7 +56,8 @@ Frontmatter：
 1. 相对当前文件  
 2. `MARQDO_LIB`（可指向 `lib` 目录或仓库根）  
 3. 当前工作目录的 `lib/`  
-4. 可执行文件附近的 `lib/`（含 `cargo run` 的相对路径）
+4. 可执行文件附近的 `lib/`（含 `cargo run` 的相对路径）  
+5. **内嵌 stdlib**（v0.1.2+，编译进二进制；无磁盘 `lib/` 时自动使用）
 
 当前模块（API 多为 `##` 自由函数；见 [objects.md](objects.md)）：
 

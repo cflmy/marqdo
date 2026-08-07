@@ -1,6 +1,6 @@
 [package]
 name = "marqdo"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2021"
 license = "Apache-2.0"
 description = "Marqdo — Markdown markers as an interpreted programming language"
@@ -24,6 +24,7 @@ ureq = { version = "=2.9.7", default-features = false, features = ["tls", "gzip"
 idna_adapter = "=1.1.0"
 zeroize = "=1.8.1"
 libloading = "=0.8.6"
+include_dir = "0.7"
 
 [workspace]
 members = ["plugins/demo", "plugins/agent"]

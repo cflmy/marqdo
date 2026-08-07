@@ -42,6 +42,7 @@
 | [design/catalog-cli.md](design/catalog-cli.md) | **`marqdo catalog` / `sync` OKF 清单命令** |
 | [design/view-debug.md](design/view-debug.md) | **`marqdo debug` 独立调试页** |
 | [design/vscode-extension.md](design/vscode-extension.md) | **VS Code 扩展：分支 `vscode-extension`（main 不跟踪源码）** |
+| [design/vscode-extension-commit.md](design/vscode-extension-commit.md) | **扩展提交约定（禁止在 main 提交 `vscode-extension/`）** |
 | [design/bytecode.md](design/bytecode.md) | **M5 字节码 / 双后端** |
 | [design/pipeline-debug.md](design/pipeline-debug.md) | **流水线 `--dump-*` 可视调试** |
 | [dev-setup.md](dev-setup.md) | 开发环境配置（Rust M0） |

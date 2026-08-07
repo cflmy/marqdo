@@ -11,6 +11,7 @@ pub mod capture;
 pub mod catalog;
 pub mod debug;
 pub mod diagnostics;
+pub mod embedded_lib;
 pub mod ext_cli;
 pub mod foreign;
 pub mod formula;
@@ -21,6 +22,7 @@ pub mod lex;
 pub mod load;
 pub mod parse;
 pub mod value;
+pub mod version_check;
 pub mod view;
 
 use std::path::Path;

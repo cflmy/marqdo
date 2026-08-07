@@ -8,6 +8,7 @@ use anyhow::{bail, Context, Result};
 
 use crate::ast::{Function, Module};
 use crate::diagnostics::Diagnostic;
+use crate::embedded_lib;
 use crate::parse::parse_source;
 
 /// Load `path` and recursively merge imported modules' top-level functions.
@@ -24,7 +25,7 @@ fn load_module_inner(path: &Path, visited: &mut HashSet<PathBuf>) -> Result<Modu
         bail!("circular import involving {}", path.display());
     }
 
-    let source = std::fs::read_to_string(path)
+    let source = read_module_source(path)
         .with_context(|| format!("failed to read {}", path.display()))?;
     let mut module = parse_source(&source).map_err(|e| attach_path(path, e))?;
 
@@ -41,8 +42,38 @@ fn load_module_inner(path: &Path, visited: &mut HashSet<PathBuf>) -> Result<Modu
     Ok(module)
 }
 
+fn read_module_source(path: &Path) -> Result<String> {
+    if path.is_file() {
+        return std::fs::read_to_string(path).map_err(Into::into);
+    }
+    if let Some(source) = read_embedded_for_path(path) {
+        return Ok(source);
+    }
+    std::fs::read_to_string(path).map_err(Into::into)
+}
+
+fn read_embedded_for_path(path: &Path) -> Option<String> {
+    lib_remainder(path).as_deref().and_then(embedded_lib::read_file)
+}
+
+fn lib_remainder(path: &Path) -> Option<String> {
+    let s = path.to_string_lossy().replace('\\', "/");
+    if let Some(rest) = s.strip_prefix("lib/") {
+        return Some(rest.to_string());
+    }
+    // Absolute or relative paths ending in lib/foo.mq.md
+    let parts: Vec<&str> = s.split('/').collect();
+    if let Some(pos) = parts.iter().position(|&p| p == "lib") {
+        if pos + 1 < parts.len() {
+            return Some(parts[pos + 1..].join("/"));
+        }
+    }
+    None
+}
+
 /// Resolve an import path: relative to the importer first; `lib/…` / `std/…`
-/// and `ext/…` also search official roots (`MARQDO_LIB` / `MARQDO_EXT`, cwd, near the binary).
+/// and `ext/…` also search official roots (`MARQDO_LIB` / `MARQDO_EXT`, cwd, near the binary),
+/// then the embedded stdlib baked into the binary.
 pub fn resolve_import(from_dir: &Path, rel: &str) -> Result<PathBuf> {
     let rel = rel.replace('\\', "/");
     let direct = from_dir.join(&rel);
@@ -67,8 +98,11 @@ pub fn resolve_import(from_dir: &Path, rel: &str) -> Result<PathBuf> {
                 return Ok(as_repo_root);
             }
         }
+        if embedded_lib::has_file(remainder) {
+            return Ok(PathBuf::from("lib").join(remainder));
+        }
         bail!(
-            "cannot resolve library import `{rel}` (set MARQDO_LIB or keep a lib/ next to the project)"
+            "cannot resolve library import `{rel}` (set MARQDO_LIB, keep lib/ next to the project, or use a binary with embedded stdlib)"
         );
     }
 
@@ -174,5 +208,13 @@ mod tests {
         assert!(p.ends_with("text.mq.md"));
         let p2 = resolve_import(Path::new("tests/keywords"), "std/text.mq.md").unwrap();
         assert!(p2.ends_with("text.mq.md"));
+    }
+
+    #[test]
+    fn resolve_embedded_lib_source() {
+        let p = resolve_import(Path::new("/nonexistent"), "lib/writeback.mq.md").unwrap();
+        assert!(p.to_string_lossy().replace('\\', "/").contains("lib/writeback.mq.md"));
+        let src = read_module_source(&p).unwrap();
+        assert!(src.contains("host_writeback"));
     }
 }

@@ -14,12 +14,32 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Install Node (VS Code extension)
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
       - name: Build release
         run: cargo build --release
+
+      - name: Checkout extension sources (branch vscode-extension only)
+        run: git fetch origin vscode-extension && git checkout origin/vscode-extension -- vscode-extension
+
+      - name: Build VSIX
+        shell: pwsh
+        run: |
+          $ver = "${{ github.ref_name }}".TrimStart("v")
+          Push-Location vscode-extension
+          npm ci
+          npm run compile
+          npx @vscode/vsce package --no-dependencies -o "../dist/marqdo-$ver.vsix"
+          Pop-Location
 
       - name: Package
         shell: pwsh
@@ -30,6 +50,7 @@ jobs:
           $exe = "marqdo-$ver-$target.exe"
           $zip = "marqdo-$ver-$target.zip"
           $stdlib = "marqdo-$ver-stdlib.zip"
+          $vsix = "marqdo-$ver.vsix"
           Copy-Item target/release/marqdo.exe "dist/$exe"
           $stage = "dist/stage-bundle"
           if (Test-Path $stage) { Remove-Item $stage -Recurse -Force }
@@ -47,24 +68,35 @@ jobs:
           echo "EXE=$exe" >> $env:GITHUB_ENV
           echo "ZIP=$zip" >> $env:GITHUB_ENV
           echo "STDLIB=$stdlib" >> $env:GITHUB_ENV
+          echo "VSIX=$vsix" >> $env:GITHUB_ENV
 
       - name: Upload release assets
         uses: softprops/action-gh-release@v2
         with:
           body: |
-            ## Downloads
+            ## Marqdo ${{ github.ref_name }}
+
+            ### Highlights
+            - **Embedded stdlib** (v0.1.2+): `lib/*.mq.md` built into the binary
+            - **writeback** + **subtask** stdlibs
+            - **`marqdo version --check`**
+            - VSIX built from branch **`vscode-extension`** (not tracked on `main`)
+
+            ### Downloads
 
             | Asset | Contents |
             |-------|----------|
-            | `marqdo-*-windows-msvc.exe` | **Executable only** — does **not** include the standard library |
-            | `marqdo-*-windows-msvc.zip` | **Recommended**: `marqdo.exe` + `lib/` (keep them together) |
-            | `marqdo-*-stdlib.zip` | Standard library only — unpack next to the exe, or set `MARQDO_LIB` |
+            | `marqdo-*-windows-msvc.exe` | CLI with **embedded** official stdlib |
+            | `marqdo-*-windows-msvc.zip` | `marqdo.exe` + `lib/` (optional disk override) |
+            | `marqdo-*-stdlib.zip` | `lib/` only |
+            | `marqdo-*.vsix` | VS Code / Cursor extension |
 
-            > The standalone `.exe` does **not** ship `lib/`. Use the bundle zip or stdlib zip for `lib/…` imports.
+            Extension workflow: [doc/design/vscode-extension-commit.md](https://github.com/cflmy/marqdo/blob/main/doc/design/vscode-extension-commit.md)
           files: |
             dist/${{ env.EXE }}
             dist/${{ env.ZIP }}
             dist/${{ env.STDLIB }}
+            dist/${{ env.VSIX }}
           fail_on_unmatched_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

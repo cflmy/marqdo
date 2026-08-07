@@ -115,6 +115,11 @@ enum Commands {
         #[command(subcommand)]
         action: ExtAction,
     },
+    /// Print version; `--check` compares with the latest GitHub release
+    Version {
+        #[arg(long)]
+        check: bool,
+    },
 }
 
 #[derive(Subcommand, Debug)]
@@ -259,6 +264,14 @@ fn try_main() -> Result<i32> {
                 ExtAction::List => list_ext()?,
                 ExtAction::Add { name } => add_ext(&name)?,
                 ExtAction::Remove { name } => remove_ext(&name)?,
+            }
+            Ok(0)
+        }
+        Commands::Version { check } => {
+            if check {
+                marqdo::version_check::check_latest().map_err(|e| anyhow::anyhow!(e))?;
+            } else {
+                marqdo::version_check::print_version();
             }
             Ok(0)
         }
