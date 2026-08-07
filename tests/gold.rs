@@ -653,6 +653,20 @@ fn lib_subtask_spawn() {
 }
 
 #[test]
+fn lib_subtask_fn() {
+    assert_out("tests/lib/subtask-fn.mq.md", "42");
+}
+
+#[test]
+fn lib_subtask_foreign() {
+    if !python_available() {
+        eprintln!("skip lib_subtask_foreign: no python on PATH");
+        return;
+    }
+    assert_out("tests/lib/subtask-foreign.mq.md", "15");
+}
+
+#[test]
 fn lib_json_quote() {
     assert_out("tests/lib/json-quote.mq.md", "\"hi\"");
 }

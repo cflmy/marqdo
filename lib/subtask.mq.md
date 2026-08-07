@@ -1,12 +1,18 @@
 ---
 title: lib/subtask
-description: OS subprocess subtasks (parent exit kills children)
+description: Concurrent subtasks — file, function, or foreign code
 ---
 
 ## spawn
-    + `path`
+    + `path`=None
+    + `fn`=None
+    + `args`=None
+    + `code`=None
+    + `lang`=None
+    + `source`=None
+    + `stdin`=None
 
-**> host_subtask_spawn path=`path`**
+**> host_subtask_spawn path=`path` fn=`fn` args=`args` code=`code` lang=`lang` source=`source` stdin=`stdin`**
 
 ## poll
     + `id`

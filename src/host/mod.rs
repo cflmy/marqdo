@@ -23,7 +23,6 @@ pub use plugin::PluginState;
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::process::Child;
 
 use crate::value::Value;
 
@@ -83,8 +82,8 @@ pub struct HostContext {
     pub current_line: u32,
     /// Entry-file line of each active user call (for writeback anchoring).
     pub call_site_lines: Vec<u32>,
-    /// OS subprocess subtasks (`lib/subtask`).
-    pub subtasks: HashMap<u64, Child>,
+    /// Concurrent subtasks (`lib/subtask`): file / function / foreign.
+    pub subtasks: HashMap<u64, subtask::Handle>,
     pub subtask_seq: u64,
 }
 

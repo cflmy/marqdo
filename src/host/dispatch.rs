@@ -456,7 +456,7 @@ impl HostFn {
             Self::WritebackRecord => &["value"],
             Self::WritebackGet | Self::WritebackClear => &[],
             Self::WritebackList => &[],
-            Self::SubtaskSpawn => &["path"],
+            Self::SubtaskSpawn => &[],
             Self::SubtaskPoll | Self::SubtaskJoin | Self::SubtaskKill => &["id"],
             Self::SubtaskWaitAll => &[],
         }
@@ -477,7 +477,7 @@ impl HostFn {
             Self::ForeignSetCmd => &["args"],
             Self::ForeignRun | Self::ForeignRunLang => &["stdin"],
             Self::WritebackRecord | Self::WritebackGet | Self::WritebackClear => &["at_end"],
-            Self::SubtaskSpawn => &["args"],
+            Self::SubtaskSpawn => &["path", "fn", "args", "code", "lang", "source", "stdin"],
             _ => &[],
         }
     }
@@ -684,11 +684,7 @@ pub fn call_host(
         HostFn::WritebackGet => writeback::get(ctx, bound.get("at_end")),
         HostFn::WritebackClear => writeback::clear(ctx, bound.get("at_end")),
         HostFn::WritebackList => writeback::list(ctx),
-        HostFn::SubtaskSpawn => subtask::spawn(
-            ctx,
-            require(bound, "path")?,
-            bound.get("args"),
-        ),
+        HostFn::SubtaskSpawn => subtask::spawn(ctx, bound),
         HostFn::SubtaskPoll => subtask::poll(ctx, require(bound, "id")?),
         HostFn::SubtaskJoin => subtask::join(ctx, require(bound, "id")?),
         HostFn::SubtaskKill => subtask::kill(ctx, require(bound, "id")?),

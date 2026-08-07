@@ -126,6 +126,18 @@ impl Interpreter {
         }
     }
 
+    /// Run a function by name anywhere in the module (for `lib/subtask` workers).
+    pub fn invoke_function(
+        &mut self,
+        module: &Module,
+        name: &str,
+        args: &[(String, Value)],
+    ) -> Result<Value> {
+        let fun = find_function_anywhere(module, name)
+            .ok_or_else(|| self.err(format!("unknown function `{name}`")))?;
+        self.run_function(module, fun, Env::new(), args)
+    }
+
     pub fn run_module(&mut self, module: &Module) -> Result<Value> {
         if let Some(main) = find_top(module, "main") {
             return self.run_function(module, main, Env::new(), &[]);
@@ -807,6 +819,18 @@ fn bind_args(
 
 fn find_top<'a>(module: &'a Module, name: &str) -> Option<&'a Function> {
     module.functions.iter().find(|f| f.name == name)
+}
+
+fn find_function_anywhere<'a>(module: &'a Module, name: &str) -> Option<&'a Function> {
+    for f in &module.functions {
+        if f.name == name {
+            return Some(f);
+        }
+        if let Some(child) = find_in_tree(f, name) {
+            return Some(child);
+        }
+    }
+    None
 }
 
 fn lookup_function<'a>(

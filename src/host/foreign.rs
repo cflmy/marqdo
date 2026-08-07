@@ -11,7 +11,7 @@ use crate::host::HostContext;
 use crate::value::{CodeBlock, Value};
 
 const DEFAULT_TIMEOUT: Duration = Duration::from_secs(10);
-const MAX_OUTPUT: usize = 1_048_576;
+pub(crate) const MAX_OUTPUT: usize = 1_048_576;
 
 fn as_text<'a>(v: &'a Value, what: &str) -> Result<&'a str, String> {
     match v {
@@ -195,13 +195,37 @@ fn write_temp_script(lang: &str, source: &str) -> Result<PathBuf, String> {
     Ok(path)
 }
 
-fn run_argv(
+/// Background foreign subprocess (for `lib/subtask`); caller removes `script_path` after join.
+pub struct SpawnedForeign {
+    pub child: std::process::Child,
+    pub script_path: PathBuf,
+    pub stdout: thread::JoinHandle<String>,
+    pub stderr: thread::JoinHandle<String>,
+}
+
+pub fn spawn_source(
+    ctx: &HostContext,
+    lang: &str,
+    source: &str,
+    stdin: Option<&str>,
+) -> Result<SpawnedForeign, String> {
+    let lang_key = lang.to_ascii_lowercase();
+    let argv = resolve_argv(ctx, &lang_key)?;
+    let script_path = write_temp_script(&lang_key, source)?;
+    match spawn_argv(ctx, &argv, &script_path, stdin, &lang_key) {
+        Ok(spawned) => Ok(spawned),
+        Err(e) => {
+            let _ = std::fs::remove_file(&script_path);
+            Err(e)
+        }
+    }
+}
+
+fn build_foreign_command(
     ctx: &HostContext,
     argv: &[String],
     script: &Path,
-    stdin: Option<&str>,
-    lang: &str,
-) -> Result<Value, String> {
+) -> Result<Command, String> {
     if argv.is_empty() {
         return Err("foreign cmd argv is empty — check set_cmd / env".into());
     }
@@ -216,14 +240,25 @@ fn run_argv(
     command.stderr(Stdio::piped());
     command.env("PYTHONIOENCODING", "utf-8");
     command.env("PYTHONUTF8", "1");
+    Ok(command)
+}
 
-    let mut child = command.spawn().map_err(|e| {
-        format!(
-            "foreign run failed (lang={lang}, cmd={}): {e} — check your interpreter / \
-             MARQDO_FOREIGN_* / set_cmd",
-            argv.join(" ")
-        )
-    })?;
+fn spawn_argv(
+    ctx: &HostContext,
+    argv: &[String],
+    script: &Path,
+    stdin: Option<&str>,
+    lang: &str,
+) -> Result<SpawnedForeign, String> {
+    let mut child = build_foreign_command(ctx, argv, script)?
+        .spawn()
+        .map_err(|e| {
+            format!(
+                "foreign spawn failed (lang={lang}, cmd={}): {e} — check your interpreter / \
+                 MARQDO_FOREIGN_* / set_cmd",
+                argv.join(" ")
+            )
+        })?;
 
     if let Some(data) = stdin {
         if let Some(mut pipe) = child.stdin.take() {
@@ -235,20 +270,43 @@ fn run_argv(
 
     let mut stdout_pipe = child.stdout.take();
     let mut stderr_pipe = child.stderr.take();
-    let t_out = thread::spawn(move || {
+    let stdout = thread::spawn(move || {
         let mut buf = Vec::new();
         if let Some(ref mut r) = stdout_pipe {
             let _ = r.read_to_end(&mut buf);
         }
         String::from_utf8_lossy(&buf).into_owned()
     });
-    let t_err = thread::spawn(move || {
+    let stderr = thread::spawn(move || {
         let mut buf = Vec::new();
         if let Some(ref mut r) = stderr_pipe {
             let _ = r.read_to_end(&mut buf);
         }
         String::from_utf8_lossy(&buf).into_owned()
     });
+
+    Ok(SpawnedForeign {
+        child,
+        script_path: script.to_path_buf(),
+        stdout,
+        stderr,
+    })
+}
+
+fn run_argv(
+    ctx: &HostContext,
+    argv: &[String],
+    script: &Path,
+    stdin: Option<&str>,
+    lang: &str,
+) -> Result<Value, String> {
+    let spawned = spawn_argv(ctx, argv, script, stdin, lang)?;
+    let SpawnedForeign {
+        mut child,
+        stdout: t_out,
+        stderr: t_err,
+        ..
+    } = spawned;
 
     let start = Instant::now();
     let status = loop {
