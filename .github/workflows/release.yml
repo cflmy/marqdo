@@ -50,8 +50,13 @@ jobs:
           $exe = "marqdo-$ver-$target.exe"
           $zip = "marqdo-$ver-$target.zip"
           $stdlib = "marqdo-$ver-stdlib.zip"
+          $source = "marqdo-$ver-source.zip"
           $vsix = "marqdo-$ver.vsix"
+          $public = "marqdo-$ver-public.zip"
           Copy-Item target/release/marqdo.exe "dist/$exe"
+          git archive --format=zip -o "dist/$source" HEAD
+          ./target/release/marqdo view output public -o public
+          Compress-Archive -Path public/* -DestinationPath "dist/$public" -Force
           $stage = "dist/stage-bundle"
           if (Test-Path $stage) { Remove-Item $stage -Recurse -Force }
           New-Item -ItemType Directory -Force -Path $stage | Out-Null
@@ -69,6 +74,8 @@ jobs:
           echo "ZIP=$zip" >> $env:GITHUB_ENV
           echo "STDLIB=$stdlib" >> $env:GITHUB_ENV
           echo "VSIX=$vsix" >> $env:GITHUB_ENV
+          echo "SOURCE=$source" >> $env:GITHUB_ENV
+          echo "PUBLIC=$public" >> $env:GITHUB_ENV
 
       - name: Upload release assets
         uses: softprops/action-gh-release@v2
@@ -89,7 +96,9 @@ jobs:
             | `marqdo-*-windows-msvc.exe` | CLI with **embedded** official stdlib |
             | `marqdo-*-windows-msvc.zip` | `marqdo.exe` + `lib/` (optional disk override) |
             | `marqdo-*-stdlib.zip` | `lib/` only |
+            | `marqdo-*-source.zip` | Source snapshot (`git archive`) |
             | `marqdo-*.vsix` | VS Code / Cursor extension |
+            | `marqdo-*-public.zip` | Static user docs site |
 
             Extension workflow: [doc/design/vscode-extension-commit.md](https://github.com/cflmy/marqdo/blob/main/doc/design/vscode-extension-commit.md)
           files: |
@@ -97,6 +106,8 @@ jobs:
             dist/${{ env.ZIP }}
             dist/${{ env.STDLIB }}
             dist/${{ env.VSIX }}
+            dist/${{ env.SOURCE }}
+            dist/${{ env.PUBLIC }}
           fail_on_unmatched_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
