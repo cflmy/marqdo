@@ -54,8 +54,8 @@ cargo clippy --all-targets
 
 ```bash
 # Windows PowerShell 示例
-$env:HTTPS_PROXY="http://127.0.0.1:7897"
-$env:HTTP_PROXY="http://127.0.0.1:7897"
+$env:HTTPS_PROXY="http://127.0.0.1:7890"
+$env:HTTP_PROXY="http://127.0.0.1:7890"
 cargo build
 ```
 
@@ -63,7 +63,7 @@ cargo build
 
 ```toml
 [http]
-proxy = "http://127.0.0.1:7897"
+proxy = "http://127.0.0.1:7890"
 ```
 
 ---
