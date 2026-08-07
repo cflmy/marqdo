@@ -4,7 +4,7 @@
 |---|---|
 | Status | **Accepted · redesign**（取代「thin TOOL: loop」方案） |
 | Date | 2026-08-07 |
-| Related | [ext-llm.md](ext-llm.md) · [ext-cli.md](ext-cli.md) · [ext-abi.md](ext-abi.md) · [module-namespace.md](module-namespace.md) · [objects.md](objects.md) · [stdlib-writeback.md](stdlib-writeback.md) · [stdlib-subtask.md](stdlib-subtask.md) · [markdown-mapping.md](markdown-mapping.md) |
+| Related | [ext-llm.md](ext-llm.md) · [ext-cli.md](ext-cli.md) · [ext-abi.md](ext-abi.md) · [**ext-agent-plan.md**](ext-agent-plan.md)（**多步锁定设计**） · [module-namespace.md](module-namespace.md) · [objects.md](objects.md) · [stdlib-writeback.md](stdlib-writeback.md) · [stdlib-subtask.md](stdlib-subtask.md) · [markdown-mapping.md](markdown-mapping.md) |
 
 ## 0. 为什么要改掉旧方案
 
@@ -106,64 +106,35 @@ Marqdo 的宪法是 **代码即文档、文档即知识库**：
 
 ### 3.2 模式 B — 多步 / 复杂执行（工作簿）
 
+> **完整锁定设计**见 [**ext-agent-plan.md**](ext-agent-plan.md)。以下为摘要。
+
 | | |
 |---|---|
 | **输入** | 复杂目标 |
-| **过程** | 见下方流水线 |
-| **输出** | 汇总结果 + **一份新的 `.mq.md` 工作簿**（完整执行报告） |
-| **适用** | 需分解、多工具、可复用子成果的任务 |
+| **过程** | 父智能体**创建（或续跑）一份工作簿 `.mq.md`** → 子文件大模型配置与父一致 → **`lib/subtask` `spawn path=`** 运行该文件 → 读结果与写回 → **改代码 / 改写回后再执行**（有轮次上限） |
+| **输出** | 汇总 map + 磁盘上的工作簿（代码与 `marqdo-out` 均可演化） |
+| **适用** | 需分解、多情形、可固化步骤、可复用子成果的任务 |
 
-公开方法：`## 多步` / `## plan`（名称可双语并列；中文面以「多步」为准）。
+公开方法：`## 多步` / `## plan`。
 
-流水线：
+流水线要点：
 
-1. **创建工作簿** — 在约定目录（默认 `.marqdo/agent-runs/` 或参数指定）生成新的 `.mq.md`：总目标叙述、元信息、子任务表骨架。
-2. **分解** — 主智能体（或 `## 分解`）把目标写成子任务表（可要求人工确认后再跑）。
-3. **子智能体** — 每个子任务实例化一个小的 `# 智能体`（可收窄工具集与站立提示）。
-4. **执行子任务** — 子智能体走 **单步**（默认）；仅当子任务仍过复杂且未触达深度上限时，才允许嵌套多步。
-5. **写回** — 成功或失败都写回该子任务区块（含输入签名、时间戳、结果 / 错误）。
-6. **汇总** — 主智能体收集子结果，写回工作簿末尾，返回汇总。
+1. **创建工作簿** — 默认 `.marqdo/agent-runs/`；内容为任务的详细可执行步骤（导入、工具、`# main`、子智能体）。  
+2. **模型配置继承父智能体** — 共享 env / 等价 llm 句柄；v1 不静默换模。  
+3. **子任务执行整文件** — 不是父进程内嵌解释。  
+4. **工作簿内推荐多个 `# 智能体`**；也允许一个智能体多次 `单步`；**已确定步骤应固化为普通 `##` 代码**。  
+5. **持续更新** — 代码修订 + 写回注释刷新（替换不累积空行）。  
+6. **`单步` 默认自动写回**（`写回=` / `writeback=` 可关），父侧再汇总写回。  
+7. **父上下文** — 与单步同级的源码 / Skill / 调用位置 / 历史，外加工作簿全文与子写回。
 
-**缓存命中**：再次遇到签名相同的子任务时，先 `get` / 扫描工作簿中的写回块；命中且策略允许则 **不再调用模型或工具**。
-
-示意（文档级外形）：
+示意：
 
 ```markdown
-# main
-
-*`模型` = > 大模型 *
-*`编排` = > 智能体 大模型=`模型` 工具=`工具表` *
-
-*`报告` = > `编排`.多步 目标=调研并汇总三篇资料的要点 工作簿目录=.marqdo/agent-runs *
+*`报告` = > `编排`.多步 目标=调研并汇总三篇资料的要点 *
 > 打印 内容=`报告`
 ```
 
-生成的工作簿（概念形状，非最终模板）：
-
-```markdown
----
-title: agent-run-…
-goal: 调研并汇总…
----
-
-# 总目标
-
-（叙述）
-
-`子任务` =
-| 标识 | 描述 | 状态 |
-|------|------|------|
-| t1 | … | pending |
-
-# main
-
-*`子1` = > 智能体 大模型=`模型` 工具=`窄工具表` 站立提示=只做 t1 *
-*`r1` = > `子1`.单步 任务=… *
-> 写回 值=`r1`
-```
-
----
-
+工作簿概念形状与修订循环细节 → [ext-agent-plan.md](ext-agent-plan.md)。
 ## 4. 分层与仓库布局
 
 ```text
@@ -202,8 +173,8 @@ ext/
 | 中文 | 英文 | 角色 |
 |------|------|------|
 | `# 智能体` | `# agent` | 构造：`大模型`/`model`，`工具`/`tools`，可选 `站立提示`/`standing` |
-| `## 单步` | `## step` | 原子执行；注入源码 + 位置；可选工具；**返回结构化 map**（不内置写回） |
-| `## 多步` | `## plan` | 建工作簿 → 分解 → 子智能体 → 写回 → 汇总 |
+| `## 单步` | `## step` | 原子执行；注入源码 + 位置；可选工具；返回结构化 map；**默认自动写回**（`写回=` / `writeback=` 可关） |
+| `## 多步` | `## plan` | 建/续工作簿 → subtask 跑文件 → 修订循环 → 汇总（见 [ext-agent-plan.md](ext-agent-plan.md)） |
 | `## 分解` | `## decompose` |（可公开或内部）目标 → 子任务表 |
 | `## 清空历史` | `## clear_history` | 若仍保留会话式辅助状态则清空；**不以隐藏 chat 袋为真相源**——真相在文档写回 |
 
@@ -215,8 +186,8 @@ ext/
 | `工具` / `tools` | 工具名表（单列文本，或多列且含 `工具`/`tools`/`name`） |
 | `站立提示` / `standing` | 写在文档里的常驻说明（可空） |
 
-`## 单步` 参数：`任务` / `task`；可选深度、是否强制不用缓存等。  
-`## 多步` 参数：`目标` / `goal`；可选 `工作簿目录`、`最大深度`、`是否确认分解`。
+`## 单步` 参数：`任务` / `task`；可选 `写回` / `writeback`（默认真）、深度、是否强制不用缓存等。  
+`## 多步` 参数：`目标` / `goal`；可选 `工作簿目录`、`工作簿`（续跑路径）、`最大深度`、`最大轮次`、`确认分解` —— 详见 [ext-agent-plan.md §9](ext-agent-plan.md)。
 
 模块内辅助函数（组装上下文、解析模型回复、匹配写回缓存）**不是**稳定对外契约，可随实现调整。
 
@@ -286,9 +257,9 @@ lib/subtask：spawn fn=<名>  →  wait
 
 依赖 [stdlib-writeback.md](stdlib-writeback.md)：`record` / `写回` → `<!-- marqdo-out … -->`。
 
-### 8.1 单步返回值（不内置写回）
+### 8.1 单步返回值与默认写回
 
-`单步` / `step` **不再自动写盘**。它返回一张结构化 map，由编排方决定是否、如何写回：
+`单步` / `step` 返回结构化 map，并在 **`写回` / `writeback` 默认真** 时自动 `record` 到命名槽（成功 `ok` / 失败 `error`）。关闭写回则行为与早期「纯返回值」一致，由编排方自行 `writeback.record`。
 
 | 字段 | 何时 | 含义 |
 |------|------|------|
@@ -302,25 +273,20 @@ lib/subtask：spawn fn=<名>  →  wait
 ```markdown
 *`out` = > `助手`.step task=… *
 *`回复` = > json.get value=`out` key=result *
-*`status` = > json.get value=`out` key=status *
-*`body` = > json.stringify value=`out` *
-1. `status` == ok
-  > writeback.record value=`body` key=ok
-2. *
-  > writeback.record value=`body` key=error
+# 默认已写回；若 writeback=False 则需自行 record：
+# > writeback.record value=`body` key=ok
 ```
 
-命名槽 `ok` / `error` 仍建议互不覆盖；锚点由调用方的 `写回`/`record` 决定。
+命名槽 `ok` / `error` 互不覆盖；锚点为调用行。多步工作簿内依赖此默认写回，避免靠提示词强制落盘 —— 见 [ext-agent-plan.md §7](ext-agent-plan.md)。
 
 **命中规则（后续缓存）**：读 `key=ok` 且非占位时可复用。失败知识读 `key=error`。  
 用户可 `clear key=ok` / `clear key=error` 强制重跑。
 
-复杂执行中，写回优先落在 **工作簿** 文件。
+复杂执行中，子结果写回优先落在 **工作簿** 文件；父 `多步` 维护汇总写回。
 
 ### 8.2 Live 金样例
 
-[`tests/ext/agent-run-live.mq.md`](../../tests/ext/agent-run-live.mq.md)：`agent.step` + 子任务工具 + `writeback.record`（`key=ok` / `error`）。凭证：`tests/ext/.env`；`> llm.load_env path=.env` 相对**源文件目录**（`marqdo run` 将 cwd 设为该文件所在目录）。需已构建 agent 原生库（见 §4）。
-
+[`tests/ext/agent-run-live.mq.md`](../../tests/ext/agent-run-live.mq.md)：`agent.step`（**默认写回** `ok`/`error`）+ 子任务工具。凭证：`tests/ext/.env`；`> llm.load_env path=.env` 相对**源文件目录**。需已构建 agent 原生库（见 §4）。
 ---
 
 ## 9. 安全与边界
@@ -354,7 +320,7 @@ lib/subtask：spawn fn=<名>  →  wait
 |------|------|------|
 | D0 | 本文 Accepted；废弃 thin TOOL 设计叙述 | **本文件** |
 | D1 | 重写 `ext/ai/agent.mq.md` / `智能体.mq.md`：`单步` + 源码/位置注入 + **子任务调工具** + **结构化返回值**；运行时经 **ABI v2 agent 插件**（禁 ext 直调 host） | **done** |
-| D2 | `多步`：工作簿模板、分解、子智能体（亦可 `spawn`）、缓存命中 | TODO |
+| D2 | `多步`：按 [ext-agent-plan.md](ext-agent-plan.md)（工作簿创建、`spawn path`、修订循环）；**D2a `step` 默认写回已落地** | D2a done；其余 TODO |
 | D3 | 金样例：离线单步 / 写回；**live 单步**（`tests/ext/agent-run-live.mq.md`）；多步骨架（可不打网） | **live done** |
 | D4 | `view` / `debug` 对工作簿与写回块的导航体验 | TODO |
 
@@ -370,4 +336,4 @@ lib/subtask：spawn fn=<名>  →  wait
 ## 12. 一句话
 
 **智能体框架必须让编排看起来像文档、跑起来像程序、留痕像知识库。**  
-单步解决原子问题；多步生成工作簿、拆分子智能体、用自写回记住成功与失败——这才是 Marqdo 相对其它智能体框架的优越性所在。
+单步解决原子问题（默认写回）；多步让父智能体编写并修订子 Marqdo 工作簿、经子任务执行、把确定步骤固化为代码——详见 [ext-agent-plan.md](ext-agent-plan.md)。

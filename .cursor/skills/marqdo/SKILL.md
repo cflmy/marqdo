@@ -131,7 +131,7 @@ title: example
 - Instance methods stay `` > `obj`.method `` (backticks on the receiver only).
 - `lib/…` resolves via `MARQDO_LIB`, cwd `lib/`, or `lib/` next to the `marqdo` binary.
 - Design: [module-namespace.md](../../doc/design/module-namespace.md).
-- Official optional extensions (`ext/`, not stdlib): install with `marqdo ext add llm` / `add agent` (see `doc/design/ext-cli.md`). `ext/llm` — chat; `ext/agent` — document-driven agents: **step** / **multi-step workbook** + writeback ([ext-agent.md](../../doc/design/ext-agent.md)).
+- Official optional extensions (`ext/`, not stdlib): install with `marqdo ext add llm` / `add agent` (see `doc/design/ext-cli.md`). `ext/llm` — chat; `ext/agent` — document-driven agents: **step** (default writeback) / **plan** workbook ([ext-agent.md](../../doc/design/ext-agent.md), [ext-agent-plan.md](../../doc/design/ext-agent-plan.md)).
 - Native plugins: `lib/plugin` — `## load` / `unload` / `list`. C ABI: `include/marqdo_abi.h`.
 - Builtins (no import): `print`/`打印`, `input`/`输入`, `len`/`长度`, `str`/`文本`, `int`/`整数`; literals `True`/`真`, `False`/`假`, `None`/`空`; logic `and`/`且`, `or`/`或`, `not`/`非`.
 

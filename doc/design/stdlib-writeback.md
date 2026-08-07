@@ -55,3 +55,5 @@ pending
 可选参数语法：`` + `参数名`=默认值 ``（与现有参数列表兼容）。
 
 Host：`host_writeback_*`（`src/host/writeback.rs`）；智能体侧经 `lib/subtask` 异步调用写回，避免阻塞推理主路径。
+
+**与 `ext/ai/agent`：** `## step` / `## 单步` 在 D2 起 **默认自动** `record` 到 `ok`/`error` 槽（参数 `writeback=` / `写回=` 可关）。多步工作簿依赖此默认，见 [ext-agent-plan.md](ext-agent-plan.md) · [ext-agent.md](ext-agent.md)。

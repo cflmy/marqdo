@@ -4,6 +4,7 @@ description: Document-driven agent — step / plan; tools via lib/subtask; runti
 > ext/ai/llm.mq.md
 > lib/json.mq.md
 > lib/sys.mq.md
+> lib/writeback.mq.md
 > lib/subtask.mq.md
 > lib/plugin.mq.md
 ---
@@ -127,8 +128,9 @@ Clear the plugin session bag for this agent id.
 
 ## step
     + `task`
+    + `writeback`=True
 
-One atomic turn: context → LLM → optional tool via subtask. Returns a **map** (`status`, `task`, `decision`, and on success `result` plus optional `tool` / `tool_result`; on failure `error`). Does **not** write back — call `lib/writeback` yourself if you want persistence.
+One atomic turn: context → LLM → optional tool via subtask. Returns a **map** (`status`, `task`, `decision`, and on success `result` plus optional `tool` / `tool_result`; on failure `error`). By default (`writeback=True`) persists that map under named slots `ok` / `error` at the call site; pass `writeback=False` to skip.
 
 *`ctx` = > build_step_context agent=`self` task=`task` *
 *`id` = > json.get value=`self` key=id *
@@ -175,6 +177,17 @@ One atomic turn: context → LLM → optional tool via subtask. Returns a **map*
 *`as_turn` = > json.parse text={"role":"assistant"} *
 *`as_turn` = > json.set map=`as_turn` key=content value=`reply` *
 > agent_history_append id=`id` item=`as_turn`
+
+1. `writeback`
+  *`body` = > json.stringify value=`out` *
+  *`st` = > json.get value=`out` key=status *
+  1. `st` == ok
+    > writeback.record value=`body` key=ok
+  2. *
+    > writeback.record value=`body` key=error
+2. *
+  *`_` = 1*
+
 **`out`**
 
 ## plan

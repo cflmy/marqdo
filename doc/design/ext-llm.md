@@ -18,7 +18,7 @@
 
 Resolution: `MARQDO_EXT/ai/…`, repo `ext/ai/…`, cwd `ext/ai/…` (see [ext-cli.md](ext-cli.md)).
 
-Other official ext: [ext-agent.md](ext-agent.md) (**document-driven agent** — step / multi-step workbook + writeback; thin `TOOL:` loop superseded). Installer: [ext-cli.md](ext-cli.md). Native plugins: [ext-abi.md](ext-abi.md).
+Other official ext: [ext-agent.md](ext-agent.md) / [ext-agent-plan.md](ext-agent-plan.md) (**document-driven agent** — step with default writeback / plan workbook; thin `TOOL:` loop superseded). Installer: [ext-cli.md](ext-cli.md). Native plugins: [ext-abi.md](ext-abi.md).
 
 **Note:** Prefer `marqdo ext add llm`. Import `> ext/ai/llm.mq.md` from repo or install root.
 
