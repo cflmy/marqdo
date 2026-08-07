@@ -2,7 +2,7 @@
   "name": "marqdo",
   "displayName": "Marqdo",
   "description": "Language support for Marqdo (.mq.md) — code as documentation.",
-  "version": "0.0.5",
+  "version": "0.0.6",
   "publisher": "cflmy",
   "icon": "media/icon.png",
   "repository": {
@@ -12,7 +12,7 @@
   "bugs": {
     "url": "https://github.com/cflmy/marqdo/issues"
   },
-  "homepage": "https://github.com/cflmy/marqdo/tree/vscode-extension/vscode-extension",
+  "homepage": "https://github.com/cflmy/marqdo/tree/main/vscode-extension",
   "engines": {
     "vscode": "^1.85.0"
   },
@@ -179,8 +179,13 @@
         },
         "marqdo.minCliVersion": {
           "type": "string",
-          "default": "0.1.0",
+          "default": "0.1.2",
           "description": "Minimum required Marqdo CLI version (semver). Older installs trigger an upgrade prompt."
+        },
+        "marqdo.autoInstall.checkUpdates": {
+          "type": "boolean",
+          "default": true,
+          "description": "Periodically check GitHub Releases for newer CLI / extension versions."
         },
         "marqdo.diagnoseOnSave": {
           "type": "boolean",

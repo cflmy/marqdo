@@ -13,7 +13,8 @@
     { "include": "#else-arm" },
     { "include": "#return-line" },
     { "include": "#statement-line" },
-    { "include": "#param-or-loop" },
+    { "include": "#param-line" },
+    { "include": "#loop-line" },
     { "include": "#branch" },
     { "include": "#table" },
     { "include": "#inline-code" },
@@ -118,17 +119,25 @@
         "3": { "name": "entity.name.function.call.marqdo" }
       }
     },
-    "param-or-loop": {
-      "name": "meta.list.structure.marqdo",
+    "param-line": {
+      "name": "meta.param.marqdo",
+      "match": "^(\\s*)(\\+)(\\s+)(.+)$",
+      "captures": {
+        "2": { "name": "keyword.other.param.marqdo" },
+        "4": { "name": "variable.parameter.marqdo" }
+      }
+    },
+    "loop-line": {
+      "name": "meta.loop.marqdo",
       "match": "^(\\s*)(-)(\\s+)(.+)$",
       "captures": {
-        "2": { "name": "punctuation.definition.list.marqdo" },
-        "4": { "name": "variable.parameter.marqdo" }
+        "2": { "name": "keyword.control.loop.marqdo" },
+        "4": { "name": "meta.loop.body.marqdo" }
       }
     },
     "branch": {
       "name": "meta.branch.marqdo",
-      "match": "^(\\s*)([+]|\\d+\\.)(\\s+)(.*)$",
+      "match": "^(\\s*)(\\d+\\.)(\\s+)(.*)$",
       "captures": {
         "2": { "name": "keyword.control.conditional.marqdo" },
         "4": { "name": "meta.branch.condition.marqdo" }

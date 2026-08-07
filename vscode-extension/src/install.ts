@@ -8,6 +8,8 @@ import { probeMarqdo } from "./cli";
 const REPO = "cflmy/marqdo";
 const SKIP_KEY = "marqdo.skipInstallPrompt";
 const MANAGED_DIR = "cli";
+/** CLI builds from this version ship stdlib inside the binary. */
+export const EMBEDDED_STDLIB_SINCE = "0.1.2";
 
 export type InstallStatus = {
   cliOk: boolean;
@@ -175,7 +177,14 @@ export function checkInstallStatus(context: vscode.ExtensionContext): InstallSta
   }
   const parsed = parseCliVersion(probe.version ?? "");
   const versionOk = parsed !== undefined && compareSemver(parsed, need) >= 0;
-  const lib = stdlibPresent(cliPath, context);
+  let lib = stdlibPresent(cliPath, context);
+  if (
+    parsed &&
+    compareSemver(parsed, EMBEDDED_STDLIB_SINCE) >= 0 &&
+    !lib.ok
+  ) {
+    lib = { ok: true, root: "(embedded in binary)" };
+  }
 
   let suggestedMode: "bundle" | "stdlib" | undefined;
   if (!versionOk) {

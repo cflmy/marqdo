@@ -9,6 +9,7 @@ import {
   resolveCliPath,
   resolveLibEnv,
 } from "./install";
+import { checkForUpdates } from "./updateCheck";
 
 let output: vscode.OutputChannel;
 let diagnostics: DiagnosticBag;
@@ -51,7 +52,11 @@ export function activate(context: vscode.ExtensionContext): void {
     })
   );
 
-  void promptIfNeeded(context, output);
+  void (async () => {
+    await promptIfNeeded(context, output);
+    const status = checkInstallStatus(context);
+    await checkForUpdates(context, output, status.version);
+  })();
 }
 
 export function deactivate(): void {
