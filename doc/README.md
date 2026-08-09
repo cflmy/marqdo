@@ -51,6 +51,12 @@
 | [dev-setup.md](dev-setup.md) | 开发环境配置（Rust M0） |
 | [roadmap/interpreter.md](roadmap/interpreter.md) | 正经解释器路线图 |
 | [roadmap/next-phase.md](roadmap/next-phase.md) | **下一阶段：input / 诊断 / 标准库 / view 调试** |
+| [roadmap/okf-near-match.md](roadmap/okf-near-match.md) | **规划：OKF 相近任务命中**（精确 sig 之外的可选软复用） |
+| [roadmap/agent-streaming.md](roadmap/agent-streaming.md) | **规划：智能体 / LLM 流式输出**（事件模型 + step/plan 透传） |
+| [roadmap/object-inheritance.md](roadmap/object-inheritance.md) | **规划：对象继承**（`# 子类 = > 父类`） |
+| [roadmap/tables-maps-footnotes.md](roadmap/tables-maps-footnotes.md) | **规划：表格语义**（竖表列表 / 横表字典 / 脚注取元） |
+| [roadmap/ext-web.md](roadmap/ext-web.md) | **规划：`ext/web` 动态网页**（env/DB init·迁移·样式脚手架·ABI） |
+| [roadmap/ext-quantum.md](roadmap/ext-quantum.md) | **规划：`ext/quantum` 量子模拟**（基础门·电路·ABI·`ext add`） |
 | [research/okf-and-marqdo.md](research/okf-and-marqdo.md) | OKF 调研 |
 
 金样例与集成测试：[`tests/`](../tests/)。面向访客的可执行文档：[`public/`](../public/)。Spike 存档：[`spike/`](../spike/)。

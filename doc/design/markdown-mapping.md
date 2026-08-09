@@ -242,7 +242,9 @@ Markdown **标记即语法**。输出**不是**语言架构原语，而是内置
 
 ## 9. 集合（表格）
 
-同 v0。`` `篮子` = `` 后接 GFM 表。
+同 v0。`` `篮子` = `` 后接 GFM 表；**当前落地：单列竖表 → 列表**。
+
+横表字典、多行嵌套、脚注取元属未来规划，见 [tables-maps-footnotes.md](../roadmap/tables-maps-footnotes.md)。
 
 ---
 

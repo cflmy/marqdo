@@ -60,9 +60,9 @@
 
 ## 5. 非目标（本波）
 
-- 继承 / 接口 / 可见性  
+- 继承 / 接口 / 可见性 — **继承语法已单独立项规划**，见 [object-inheritance.md](../roadmap/object-inheritance.md)（提案：`# 子类 = > 父类`）  
 - 无 `_type` 的「鸭子」方法分发  
-- 用表格声明字段 schema（表格仍表示集合）
+- 用表格声明字段 schema（表格仍表示数据集合；几何语义打磨见 [tables-maps-footnotes.md](../roadmap/tables-maps-footnotes.md)）
 
 ## 6. 迁移摘要
 
