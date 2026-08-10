@@ -13,6 +13,24 @@ Load `.env` from cwd (optional named arg `path=`). Does not override existing va
 
 **> sys.load_dotenv path=`path`**
 
+## stream_result
+    + `events`
+
+Reduce a `complete stream=True` event list to the final `done.result` text (or `error.message`).
+
+*`answer` = "" *
+
+- [`ev`](`events`)
+  *`t` = > json.get value=`ev` key=type *
+  1. `t` == "done"
+    *`answer` = > json.get value=`ev` key=result *
+  2. `t` == "error"
+    *`answer` = > json.get value=`ev` key=message *
+  3. *
+    *`_` = 1*
+
+**`answer`**
+
 # llm
 
 Construct an LLM handle from `OPENAI_*` / `MARQDO_LLM_*` (default base OpenAI v1, model `gpt-4o-mini`).
@@ -83,8 +101,12 @@ Construct an LLM handle from `OPENAI_*` / `MARQDO_LLM_*` (default base OpenAI v1
 
 ## complete
     + `prompt`
+    + `stream`=False
+    + `echo`=False
 
 Chat completion using `self` / `自` handle fields.
+
+With `stream=True`, returns a list of event maps (`delta` / `done` / `error`) for foreach; default remains a single answer string. Optional `echo=True` prints deltas to stdout while the SSE body is read.
 
 *`api_key` = > json.get value=`self` key=api_key *
 *`base_url` = > json.get value=`self` key=base_url *
@@ -103,29 +125,44 @@ Chat completion using `self` / `自` handle fields.
 *`headers` = > json.parse text=`hdr_raw` *
 *`q_model` = > json.quote text=`model` *
 *`q_prompt` = > json.quote text=`prompt` *
-*`body` = `p1` + `q_model` + `p2` + `q_prompt` + `p3` *
-*`resp` = > net.http_post url=`url` body=`body` headers=`headers` *
-*`status` = > json.get value=`resp` key=status *
-*`raw` = > json.get value=`resp` key=body *
 
-1. `status` == 200
-  *`data` = > json.parse text=`raw` *
-  *`choices` = > json.get value=`data` key=choices *
-  *`first` = > at value=`choices` index=0 *
-  *`message` = > json.get value=`first` key=message *
-  *`content` = > json.get value=`message` key=content *
-  **`content`**
+1. `stream`
+  *`p3s` = "}],\"stream\":true}" *
+  *`body` = `p1` + `q_model` + `p2` + `q_prompt` + `p3s` *
+  *`resp` = > net.http_post_sse url=`url` body=`body` headers=`headers` echo=`echo` *
+  *`status` = > json.get value=`resp` key=status *
+  *`events` = > json.get value=`resp` key=events *
+  1. `status` == 200
+    **`events`**
+  2. *
+    > print text=ext/ai/llm: HTTP error (stream)
+    > print text=`status`
+    > sys.exit code=1
 2. *
-  > print text=ext/ai/llm: HTTP error
-  > print text=`status`
-  > print text=`raw`
-  > sys.exit code=1
+  *`body` = `p1` + `q_model` + `p2` + `q_prompt` + `p3` *
+  *`resp` = > net.http_post url=`url` body=`body` headers=`headers` *
+  *`status` = > json.get value=`resp` key=status *
+  *`raw` = > json.get value=`resp` key=body *
+  1. `status` == 200
+    *`data` = > json.parse text=`raw` *
+    *`choices` = > json.get value=`data` key=choices *
+    *`first` = > at value=`choices` index=0 *
+    *`message` = > json.get value=`first` key=message *
+    *`content` = > json.get value=`message` key=content *
+    **`content`**
+  2. *
+    > print text=ext/ai/llm: HTTP error
+    > print text=`status`
+    > print text=`raw`
+    > sys.exit code=1
 
 ---
 
 ## chat
     + `prompt`
+    + `stream`=False
+    + `echo`=False
 
 Alias for `complete`.
 
-**> `self`.complete prompt=`prompt`**
+**> `self`.complete prompt=`prompt` stream=`stream` echo=`echo`**

@@ -88,19 +88,33 @@ pub fn canonical_param(builtin: &str, param: &str) -> String {
         ("host_exec" | "exec", "cmd" | "命令") => "cmd".into(),
         ("host_exec" | "exec", "args" | "参数") => "args".into(),
         (
-            "host_http_get" | "http_get" | "host_http_post" | "http_post" | "host_http_request"
-                | "http_request",
+            "host_http_get" | "http_get" | "host_http_post" | "http_post" | "host_http_post_sse"
+                | "http_post_sse" | "host_http_request" | "http_request",
             "headers" | "头",
         ) => "headers".into(),
         (
-            "host_http_post" | "http_post" | "host_http_request" | "http_request",
+            "host_http_post" | "http_post" | "host_http_post_sse" | "http_post_sse"
+                | "host_http_request" | "http_request",
             "content_type" | "类型",
         ) => "content_type".into(),
-        ("host_http_get" | "http_get" | "host_http_post" | "http_post" | "host_http_request"
-            | "http_request", "url" | "地址") => "url".into(),
-        ("host_http_post" | "http_post" | "host_http_request" | "http_request", "body" | "内容") => {
-            "body".into()
-        }
+        (
+            "host_http_get" | "http_get" | "host_http_post" | "http_post" | "host_http_post_sse"
+                | "http_post_sse" | "host_http_request" | "http_request",
+            "url" | "地址",
+        ) => "url".into(),
+        (
+            "host_http_post" | "http_post" | "host_http_post_sse" | "http_post_sse"
+                | "host_http_request" | "http_request",
+            "body" | "内容",
+        ) => "body".into(),
+        (
+            "host_http_post_sse" | "http_post_sse" | "host_openai_sse_parse" | "openai_sse_parse",
+            "echo" | "打印增量" | "print_deltas",
+        ) => "echo".into(),
+        (
+            "host_openai_sse_parse" | "openai_sse_parse",
+            "text" | "内容",
+        ) => "text".into(),
         ("host_json_stringify" | "stringify", "indent" | "缩进") => "indent".into(),
         ("host_plot", "steps" | "步数") => "steps".into(),
         ("host_plot", "derivative" | "导数") => "derivative".into(),

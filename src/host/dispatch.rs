@@ -97,6 +97,8 @@ pub enum HostFn {
     TextPatch = 95,
     ApplyPatchBlocks = 96,
     WritebackScanPath = 97,
+    HttpPostSse = 98,
+    OpenAiSseParse = 99,
 }
 
 impl HostFn {
@@ -190,6 +192,8 @@ impl HostFn {
             95 => Self::TextPatch,
             96 => Self::ApplyPatchBlocks,
             97 => Self::WritebackScanPath,
+            98 => Self::HttpPostSse,
+            99 => Self::OpenAiSseParse,
             _ => return None,
         })
     }
@@ -221,6 +225,8 @@ impl HostFn {
             // Aliases so optional `headers` / `content_type` bind like plot.
             "host_http_get" | "http_get" => Self::HttpGet,
             "host_http_post" | "http_post" => Self::HttpPost,
+            "host_http_post_sse" | "http_post_sse" => Self::HttpPostSse,
+            "host_openai_sse_parse" | "openai_sse_parse" => Self::OpenAiSseParse,
             "host_url_encode" => Self::UrlEncode,
             "host_pi" => Self::Pi,
             "host_e" => Self::EConst,
@@ -321,6 +327,8 @@ impl HostFn {
             Self::JsonKeys => "host_json_keys",
             Self::HttpGet => "host_http_get",
             Self::HttpPost => "host_http_post",
+            Self::HttpPostSse => "host_http_post_sse",
+            Self::OpenAiSseParse => "host_openai_sse_parse",
             Self::UrlEncode => "host_url_encode",
             Self::Pi => "host_pi",
             Self::EConst => "host_e",
@@ -407,6 +415,8 @@ impl HostFn {
             Self::JsonGet => &["value", "key"],
             Self::HttpGet => &["url"],
             Self::HttpPost => &["url", "body"],
+            Self::HttpPostSse => &["url", "body"],
+            Self::OpenAiSseParse => &["text"],
             Self::HttpRequest => &["method", "url"],
             Self::DotenvLoad => &[],
             Self::Pi | Self::EConst | Self::Random => &[],
@@ -451,6 +461,8 @@ impl HostFn {
             Self::JsonStringify => &["indent"],
             Self::HttpGet => &["headers"],
             Self::HttpPost => &["content_type", "headers"],
+            Self::HttpPostSse => &["content_type", "headers", "echo"],
+            Self::OpenAiSseParse => &["echo"],
             Self::HttpRequest => &["body", "content_type", "headers"],
             Self::DotenvLoad => &["path"],
             Self::Exec => &["args"],
@@ -524,6 +536,17 @@ pub fn call_host(
             bound.get("content_type"),
             bound.get("headers"),
         ),
+        HostFn::HttpPostSse => net::http_post_sse(
+            ctx,
+            require(bound, "url")?,
+            require(bound, "body")?,
+            bound.get("content_type"),
+            bound.get("headers"),
+            bound.get("echo"),
+        ),
+        HostFn::OpenAiSseParse => {
+            net::openai_sse_parse(require(bound, "text")?, bound.get("echo"))
+        }
         HostFn::HttpRequest => net::http_request(
             ctx,
             require(bound, "method")?,

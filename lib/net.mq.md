@@ -21,6 +21,25 @@ Default content type is JSON. Optional `content_type=` / `headers=` (map).
 
 **> host_http_post url=`url` body=`body` content_type=`content_type` headers=`headers`**
 
+## http_post_sse
+    + `url`
+    + `body`
+    + `content_type`=None
+    + `headers`=None
+    + `echo`=False
+
+POST and consume OpenAI-compatible SSE. Returns `{status, events}` where `events` is a list of `{type, …}` maps (`delta` / `done` / `error`). Optional `echo=True` prints delta text to stdout as chunks arrive.
+
+**> host_http_post_sse url=`url` body=`body` content_type=`content_type` headers=`headers` echo=`echo`**
+
+## openai_sse_parse
+    + `text`
+    + `echo`=False
+
+Offline: parse an OpenAI chat SSE body into the same event list (no network).
+
+**> host_openai_sse_parse text=`text` echo=`echo`**
+
 ## http_request
     + `method`
     + `url`

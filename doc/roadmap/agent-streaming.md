@@ -2,8 +2,8 @@
 
 | | |
 |---|---|
-| 状态 | **规划 / 未开工** |
-| 日期 | 2026-08-09 |
+| 状态 | **S0–S2 已落地**（S3 view 仍待做） |
+| 日期 | 2026-08-10 |
 | 相关 | [ext-llm.md](../design/ext-llm.md) · [ext-agent.md](../design/ext-agent.md) · [ext-agent-plan.md](../design/ext-agent-plan.md) · [stdlib-subtask.md](../design/stdlib-subtask.md) · [view.md](../design/view.md) |
 | 痛点 | `complete` / `step` / `plan` 均为整段返回；用户看不到思考与中间输出 |
 
@@ -132,11 +132,23 @@ plan 特有：
 ## 5. 推荐落地顺序
 
 ```text
-S0  net/llm：SSE 读 + complete stream=True + 事件 foreach     （基础）
-S1  step stream=True 透传 delta / tool_*                     （单步体验）
-S2  plan stream=True：round + 父 delta；trace 写回可选         （多步体验）
-S3  view 订阅                                                 （可视化）
+S0  net/llm：SSE 读 + complete stream=True + 事件 foreach     ✅
+S1  step stream=True（echo 增量；返回 map 不变）               ✅
+S2  plan stream=True：round + 父 delta；trace 写回可选         ✅
+S3  view 订阅                                                 （待做）
 ```
+
+### 开放点决议（S0）
+
+1. **Eager 事件列表**（非惰性句柄）：`complete stream=True` 返回 `List` of maps，可用今日 foreach。  
+2. **默认不自动 print**：`echo=False`；需要边读边打时传 `echo=True` / `打印增量=真`。  
+3. 中文：`## 运行` 用 `流式=` / `打印增量=`。
+
+### 开放点决议（S2）
+
+1. `plan` / `多步` 增加 `stream` / `echo` / `trace`（中文 `流式` / `打印增量` / `轨迹`）。  
+2. 事件挂在返回 map 的 `events`；父 `complete` 只冒泡 `delta`/`error`（嵌套 `done` 不进列表）。  
+3. `trace=True` → 写回槽 `trace`（与 TTY `echo` 可分立）。
 
 验收：
 
@@ -147,10 +159,12 @@ S3  view 订阅                                                 （可视化）
 
 ---
 
-## 6. 开放点（开工前锁定）
+## 6. 开放点
 
-1. 事件集合是「Eager 列表」还是「惰性迭代句柄」（影响内存与语法）。  
-2. `delta` 默认是否自动 `print`（便利 vs 双份输出）。  
-3. 中文面方法名：`## 运行` 是否共用 `stream=` / `流式=`。
+1. ~~Eager vs 惰性~~ → S0 选 eager；惰性句柄可后补。  
+2. ~~delta 默认 print~~ → 默认关；`echo=True` 可选。  
+3. ~~中文面~~ → `流式=` / `打印增量=`。  
+4. ~~S2~~ → `plan stream=True`：`round` / 父 delta / `decision` / `done`；可选 `trace`。  
+5. **S3**：`marqdo view` 订阅同一事件模型。
 
-本文不排期；S0 可与 [okf-near-match.md](okf-near-match.md) 并行，互不阻塞。
+S0 可与 [okf-near-match.md](okf-near-match.md) 并行，互不阻塞。

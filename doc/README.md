@@ -52,7 +52,7 @@
 | [roadmap/interpreter.md](roadmap/interpreter.md) | 正经解释器路线图 |
 | [roadmap/next-phase.md](roadmap/next-phase.md) | **下一阶段：input / 诊断 / 标准库 / view 调试** |
 | [roadmap/okf-near-match.md](roadmap/okf-near-match.md) | **规划：OKF 相近任务命中**（精确 sig 之外的可选软复用） |
-| [roadmap/agent-streaming.md](roadmap/agent-streaming.md) | **规划：智能体 / LLM 流式输出**（事件模型 + step/plan 透传） |
+| [roadmap/agent-streaming.md](roadmap/agent-streaming.md) | **流式输出**（SSE + `complete`/`step` stream；S0–S1 已落地） |
 | [roadmap/object-inheritance.md](roadmap/object-inheritance.md) | **对象继承**（`# 子类 = > 父类`；I0–I2 已落地） |
 | [roadmap/tables-maps-footnotes.md](roadmap/tables-maps-footnotes.md) | **表格语义**（竖表 / 横表字典 / 脚注取元 / 行向记录；T0–T4 已落地） |
 | [roadmap/ext-web.md](roadmap/ext-web.md) | **规划：`ext/web` 动态网页**（env/DB init·迁移·样式脚手架·ABI） |

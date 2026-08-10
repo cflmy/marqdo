@@ -346,4 +346,4 @@ lib/subtask：spawn fn=<名>  →  wait
 **智能体框架必须让编排看起来像文档、跑起来像程序、留痕像知识库。**  
 单步解决原子问题（默认写回）；多步让父智能体编写并修订子 Marqdo 工作簿、经子任务执行、把确定步骤固化为代码——详见 [ext-agent-plan.md](ext-agent-plan.md)。
 
-流式呈现思考与中间输出（不替代返回值 / 写回）见规划 [agent-streaming.md](../roadmap/agent-streaming.md)。
+流式：`## step` / `## plan` 支持 `stream=True` / `echo=True`（SSE 增量；返回 map 不变；`plan` 另附 `events`，可选 `trace` 写回）。见 [agent-streaming.md](../roadmap/agent-streaming.md)。

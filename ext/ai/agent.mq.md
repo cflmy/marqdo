@@ -342,6 +342,101 @@ Parent developer-agent prompt: observe → decide DONE or CONTINUE with exact FI
 
 ---
 
+## plan_append_round
+    + `events`
+    + `round`
+    + `workbook`
+    + `exit_code`
+    + `stream`=False
+    + `echo`=False
+
+Append a `round` event when `stream=True`. Optional `echo` prints a short TTY marker (not the full workbook path).
+
+1. `stream`
+  *`ev` = > json.parse text={"type":"round"} *
+  *`ev` = > json.set map=`ev` key=round value=`round` *
+  *`ev` = > json.set map=`ev` key=workbook value=`workbook` *
+  *`ev` = > json.set map=`ev` key=exit_code value=`exit_code` *
+  *`events` = > json.append list=`events` item=`ev` *
+  1. `echo`
+    > print text=plan:round
+  2. *
+    *`_` = 1*
+2. *
+  *`_` = 1*
+
+**`events`**
+
+## plan_append_decision
+    + `events`
+    + `decision`
+    + `stream`=False
+    + `summary`=None
+
+1. `stream`
+  *`ev` = > json.parse text={"type":"decision"} *
+  *`ev` = > json.set map=`ev` key=decision value=`decision` *
+  1. `summary`
+    *`ev` = > json.set map=`ev` key=summary value=`summary` *
+  2. *
+    *`_` = 1*
+  *`events` = > json.append list=`events` item=`ev` *
+2. *
+  *`_` = 1*
+
+**`events`**
+
+## plan_merge_deltas
+    + `events`
+    + `from`
+    + `stream`=False
+
+Bubble parent `complete stream=True` deltas (and errors) into the plan event list. Skip nested `done` so plan owns the final `done`.
+
+1. `stream`
+  - [`ev`](`from`)
+    *`t` = > json.get value=`ev` key=type *
+    1. `t` == delta
+      *`events` = > json.append list=`events` item=`ev` *
+    2. `t` == error
+      *`events` = > json.append list=`events` item=`ev` *
+    3. *
+      *`_` = 1*
+2. *
+  *`_` = 1*
+
+**`events`**
+
+## plan_finish_stream
+    + `out`
+    + `events`
+    + `stream`=False
+    + `trace`=False
+    + `result`=None
+
+When `stream=True`, append `done` and attach `events` on the result map. Optional `trace=True` writes the event list to writeback slot `trace`.
+
+1. `stream`
+  *`ev` = > json.parse text={"type":"done"} *
+  1. `result`
+    *`ev` = > json.set map=`ev` key=result value=`result` *
+  2. *
+    *`_` = 1*
+  *`events` = > json.append list=`events` item=`ev` *
+  *`out` = > json.set map=`out` key=events value=`events` *
+2. *
+  *`_` = 1*
+
+1. `trace`
+  *`body` = > json.stringify value=`events` *
+  > writeback.record value=`body` key=trace
+2. *
+  *`_` = 1*
+
+**`out`**
+
+---
+
 # agent
     + `model`
     + `tools`
@@ -380,8 +475,12 @@ Clear the plugin session bag for this agent id.
 ## step
     + `task`
     + `writeback`=True
+    + `stream`=False
+    + `echo`=False
 
 One atomic turn: context → LLM → optional tool via subtask. Returns a **map** (`status`, `task`, `decision`, and on success `result` plus optional `tool` / `tool_result`; on failure `error`). By default (`writeback=True`) persists that map under named slots `ok` / `error` at the call site; pass `writeback=False` to skip.
+
+With `stream=True`, the model call uses SSE; `echo=True` prints delta text to stdout as it arrives. The returned map is unchanged (final `result` string).
 
 *`ctx` = > build_step_context agent=`self` task=`task` *
 *`id` = > json.get value=`self` key=id *
@@ -392,7 +491,12 @@ One atomic turn: context → LLM → optional tool via subtask. Returns a **map*
 *`user_turn` = > json.set map=`user_turn` key=content value=`task` *
 > agent_history_append id=`id` item=`user_turn`
 
-*`reply` = > `model`.complete prompt=`ctx` *
+1. `stream`
+  *`evs` = > `model`.complete prompt=`ctx` stream=True echo=`echo` *
+  *`reply` = > llm.stream_result events=`evs` *
+2. *
+  *`reply` = > `model`.complete prompt=`ctx` *
+
 *`reply` = > trim value=`reply` *
 *`decision` = `reply`*
 *`tool_name` = > extract_tool_name reply=`reply` *
@@ -418,7 +522,11 @@ One atomic turn: context → LLM → optional tool via subtask. Returns a **map*
     *`fp` = `fp` + ran via subtask and returned: *
     *`fp` = `fp` + `tool_s` *
     *`fp` = `fp` + . Reply to the user briefly. *
-    *`reply` = > `model`.complete prompt=`fp` *
+    1. `stream`
+      *`evs2` = > `model`.complete prompt=`fp` stream=True echo=`echo` *
+      *`reply` = > llm.stream_result events=`evs2` *
+    2. *
+      *`reply` = > `model`.complete prompt=`fp` *
     *`out` = > json.set map=`out` key=tool value=`tool_name` *
     *`out` = > json.set map=`out` key=tool_result value=`tool_s` *
     *`out` = > json.set map=`out` key=result value=`reply` *
@@ -456,8 +564,13 @@ One atomic turn: context → LLM → optional tool via subtask. Returns a **map*
     + `kb_dir`=.marqdo/agent-kb
     + `improve_every`=3
     + `explore_n`=3
+    + `stream`=False
+    + `echo`=False
+    + `trace`=False
 
 Multi-step with OKF agent-kb. Default workbook is `kb_dir/resources/<slug>.mq.md`. While task file count `< explore_n` and skill is not llm_free, force a new explore variant under `kb_dir/explore/<slug>/`. Code-first: llm_free hits skip parent LLM. File children return via `# main`; `plan` exposes that as `result`.
+
+With `stream=True`, emit `round` / parent `delta` / `decision` / `done` on the returned map as `events` (final `result` unchanged). `echo=True` prints round markers and parent deltas. `trace=True` writes events to writeback slot `trace`. Quiet child subtasks stay quiet.
 
 *`tools` = > json.get value=`self` key=tools *
 *`cache` = miss*
@@ -466,6 +579,7 @@ Multi-step with OKF agent-kb. Default workbook is `kb_dir/resources/<slug>.mq.md
 *`explore` = None*
 *`explore_attempt` = None*
 *`skel_kind` = `skeleton`*
+*`events` = > json.parse text=[] *
 
 *`tf` = > agent_kb_task_files kb_dir=`kb_dir` goal=`goal` tools=`tools` *
 *`nfiles` = > json.get value=`tf` key=count *
@@ -501,11 +615,13 @@ Multi-step with OKF agent-kb. Default workbook is `kb_dir/resources/<slug>.mq.md
         *`out` = > json.set map=`out` key=summary value=`sum` *
         *`out` = > json.set map=`out` key=observation value=`last_obs` *
         *`out` = > json.set map=`out` key=result value=`child_val` *
+        *`events` = > plan_append_round events=`events` round=1 workbook=`path` exit_code=`code` stream=`stream` echo=`echo` *
         1. `writeback`
           *`body` = > json.stringify value=`out` *
           > writeback.record value=`body` key=ok
         2. *
           *`_` = 1*
+        *`out` = > plan_finish_stream out=`out` events=`events` stream=`stream` trace=`trace` result=`child_val` *
         **`out`**
       2. *
         *`path` = None*
@@ -546,11 +662,13 @@ Multi-step with OKF agent-kb. Default workbook is `kb_dir/resources/<slug>.mq.md
           *`out` = > json.set map=`out` key=summary value=`sum` *
           *`out` = > json.set map=`out` key=observation value=`last_obs` *
           *`out` = > json.set map=`out` key=result value=`child_val` *
+          *`events` = > plan_append_round events=`events` round=1 workbook=`path` exit_code=`code` stream=`stream` echo=`echo` *
           1. `writeback`
             *`body` = > json.stringify value=`out` *
             > writeback.record value=`body` key=ok
           2. *
             *`_` = 1*
+          *`out` = > plan_finish_stream out=`out` events=`events` stream=`stream` trace=`trace` result=`child_val` *
           **`out`**
       2. *
         *`path` = None*
@@ -619,6 +737,7 @@ Multi-step with OKF agent-kb. Default workbook is `kb_dir/resources/<slug>.mq.md
     > writeback.record value=`body` key=ok
   2. *
     *`_` = 1*
+  *`out` = > plan_finish_stream out=`out` events=`events` stream=`stream` trace=`trace` *
   **`out`**
 2. *
   *`_` = 1*
@@ -646,10 +765,17 @@ Multi-step with OKF agent-kb. Default workbook is `kb_dir/resources/<slug>.mq.md
     *`code` = > json.get value=`aw` key=code *
     *`child_val` = > json.get value=`aw` key=value *
     *`last_obs` = > json.get value=`aw` key=observation *
+    *`events` = > plan_append_round events=`events` round=`round` workbook=`path` exit_code=`code` stream=`stream` echo=`echo` *
     *`ctx` = > build_plan_context agent=`self` goal=`goal` observation=`last_obs` explore_attempt=`explore_attempt` explore_n=`explore_n` *
-    *`last_reply` = > `model`.complete prompt=`ctx` *
+    1. `stream`
+      *`evs` = > `model`.complete prompt=`ctx` stream=True echo=`echo` *
+      *`last_reply` = > llm.stream_result events=`evs` *
+      *`events` = > plan_merge_deltas events=`events` from=`evs` stream=`stream` *
+    2. *
+      *`last_reply` = > `model`.complete prompt=`ctx` *
     *`last_reply` = > trim value=`last_reply` *
     *`dec` = > extract_plan_decision reply=`last_reply` *
+    *`events` = > plan_append_decision events=`events` decision=`dec` stream=`stream` *
     1. `dec` == DONE
       > agent_workbook_solidify path=`path` observation=`last_obs`
       *`done` = 1*
@@ -706,10 +832,12 @@ Multi-step with OKF agent-kb. Default workbook is `kb_dir/resources/<slug>.mq.md
 
 1. `child_val`
   *`out` = > json.set map=`out` key=result value=`child_val` *
+  *`plan_result` = `child_val`*
 2. `summary`
   *`out` = > json.set map=`out` key=result value=`summary` *
+  *`plan_result` = `summary`*
 3. *
-  *`_` = 1*
+  *`plan_result` = None*
 
 1. `writeback`
   *`body` = > json.stringify value=`out` *
@@ -720,4 +848,5 @@ Multi-step with OKF agent-kb. Default workbook is `kb_dir/resources/<slug>.mq.md
 2. *
   *`_` = 1*
 
+*`out` = > plan_finish_stream out=`out` events=`events` stream=`stream` trace=`trace` result=`plan_result` *
 **`out`**

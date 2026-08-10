@@ -1364,6 +1364,38 @@ fn lib_net_encode() {
 }
 
 #[test]
+fn lib_net_openai_sse() {
+    assert_out(
+        "tests/lib/net-openai-sse.mq.md",
+        "Hel
+lo
+Hello",
+    );
+}
+
+#[test]
+fn ext_llm_stream_offline() {
+    assert_out("tests/ext/llm-stream-offline.mq.md", "Hi!");
+}
+
+#[test]
+fn ext_agent_plan_stream_offline() {
+    assert_out(
+        "tests/ext/agent-plan-stream-offline.mq.md",
+        "4
+round
+delta
+Hi
+decision
+done
+child
+pending
+1
+done",
+    );
+}
+
+#[test]
 fn lib_math_formula() {
     assert_out(
         "tests/lib/math-formula.mq.md",

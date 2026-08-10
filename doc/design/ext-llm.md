@@ -20,7 +20,7 @@ Resolution: `MARQDO_EXT/ai/…`, repo `ext/ai/…`, cwd `ext/ai/…` (see [ext-c
 
 Other official ext: [ext-agent.md](ext-agent.md) / [ext-agent-plan.md](ext-agent-plan.md) (**document-driven agent** — step with default writeback / plan workbook; thin `TOOL:` loop superseded). Installer: [ext-cli.md](ext-cli.md). Native plugins: [ext-abi.md](ext-abi.md).
 
-Streaming (`complete` / agent process events) is **planned**, not shipped — see [agent-streaming.md](../roadmap/agent-streaming.md).
+Streaming: `complete stream=True` returns an event list (`delta` / `done` / `error`); see [agent-streaming.md](../roadmap/agent-streaming.md). Default (`stream=False`) is unchanged (answer string).
 
 **Note:** Prefer `marqdo ext add llm`. Import `> ext/ai/llm.mq.md` from repo or install root.
 
@@ -37,8 +37,9 @@ Streaming (`complete` / agent process events) is **planned**, not shipped — se
 | English | Chinese | Role |
 |---------|---------|------|
 | `## load_env` | `## 加载环境` | Free function: load `.env` |
+| `## stream_result` | `## 流式结果` | Collapse event list → final text |
 | `# llm` | `# 大模型` | Object ctor → handle map |
-| `## complete` / `## chat` | `## 运行` / `## 聊天` | Methods on the handle |
+| `## complete` / `## chat` | `## 运行` / `## 聊天` | Methods; optional `stream` / `流式`, `echo` / `打印增量` |
 
 ```markdown
 ---
@@ -52,6 +53,15 @@ Streaming (`complete` / agent process events) is **planned**, not shipped — se
 *`model` = > llm *
 *`reply` = > `model`.complete prompt=Say hi in one word *
 > print text=`reply`
+
+*`events` = > `model`.complete prompt=Say hi stream=True *
+- [`ev`](`events`)
+  *`t` = > json.get value=`ev` key=type *
+  1. `t` == "delta"
+    *`chunk` = > json.get value=`ev` key=text *
+    > print text=`chunk`
+  2. *
+    *`_` = 1*
 ```
 
 Environment (create a **project-local** `.env`; do not commit secrets):
@@ -67,6 +77,7 @@ Fallbacks: `MARQDO_LLM_API_KEY`, `MARQDO_LLM_BASE_URL`, `MARQDO_LLM_MODEL`.
 ## Tests
 
 - Import smoke: `tests/ext/llm-import.mq.md`
+- Offline stream: `tests/ext/llm-stream-offline.mq.md` + `tests/lib/net-openai-sse.mq.md`
 - Live complete (local): `tests/ext/llm-complete.mq.md` + `tests/ext/.env`
 - Live agent `## step`: `tests/ext/agent-run-live.mq.md` (DeepSeek; gold: `ext_agent_run_live`)
 - Agent smoke (real `llm` handle): `tests/ext/agent-smoke.mq.md` (gold: `ext_agent_framework_smoke`)

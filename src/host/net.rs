@@ -1,5 +1,6 @@
 //! HTTP host primitives (HTTP and HTTPS via ureq).
 
+use std::io::{BufRead, BufReader, Write};
 use std::time::Duration;
 
 use crate::host::HostContext;
@@ -173,6 +174,275 @@ pub fn url_encode(text: &Value) -> Result<Value, String> {
     ))
 }
 
+fn truthy_flag(v: Option<&Value>) -> bool {
+    match v {
+        None | Some(Value::None) => false,
+        Some(v) => v.truthy(),
+    }
+}
+
+/// Extract `data:` payloads from an SSE body (ignores comments / event: / id:).
+pub fn sse_data_payloads(text: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    let mut cur: Vec<String> = Vec::new();
+    for line in text.split('\n') {
+        let line = line.strip_suffix('\r').unwrap_or(line);
+        if line.is_empty() {
+            if !cur.is_empty() {
+                out.push(cur.join("\n"));
+                cur.clear();
+            }
+            continue;
+        }
+        if let Some(rest) = line.strip_prefix("data:") {
+            let payload = rest.strip_prefix(' ').unwrap_or(rest);
+            cur.push(payload.to_string());
+        }
+        // Other SSE fields ignored for chat-completions wire format.
+    }
+    if !cur.is_empty() {
+        out.push(cur.join("\n"));
+    }
+    out
+}
+
+fn event_map(pairs: Vec<(&str, Value)>) -> Value {
+    Value::Map(
+        pairs
+            .into_iter()
+            .map(|(k, v)| (k.to_string(), v))
+            .collect(),
+    )
+}
+
+/// Map OpenAI-compatible chat SSE payloads → Marqdo stream events
+/// (`delta` / `done` / `error`). Optional `echo` prints delta text to stdout as it arrives.
+pub fn openai_chat_sse_events(text: &str, echo: bool) -> Result<Vec<Value>, String> {
+    let mut events = Vec::new();
+    let mut result = String::new();
+    let mut saw_done = false;
+    for data in sse_data_payloads(text) {
+        let data = data.trim();
+        if data.is_empty() {
+            continue;
+        }
+        if data == "[DONE]" {
+            saw_done = true;
+            break;
+        }
+        let v: serde_json::Value = serde_json::from_str(data)
+            .map_err(|e| format!("openai sse json: {e}"))?;
+        if let Some(msg) = v.get("error").and_then(|e| {
+            e.get("message")
+                .and_then(|m| m.as_str())
+                .or_else(|| e.as_str())
+        }) {
+            events.push(event_map(vec![
+                ("type", Value::Text("error".into())),
+                ("message", Value::Text(msg.into())),
+            ]));
+            return Ok(events);
+        }
+        let content = v
+            .pointer("/choices/0/delta/content")
+            .and_then(|c| c.as_str())
+            .unwrap_or("");
+        if !content.is_empty() {
+            result.push_str(content);
+            if echo {
+                print!("{content}");
+                let _ = std::io::stdout().flush();
+            }
+            events.push(event_map(vec![
+                ("type", Value::Text("delta".into())),
+                ("text", Value::Text(content.into())),
+            ]));
+        }
+    }
+    if echo && !result.is_empty() {
+        println!();
+    }
+    if !saw_done && events.is_empty() && result.is_empty() {
+        // Non-SSE / empty: treat as error for clearer gold diagnostics.
+        events.push(event_map(vec![
+            ("type", Value::Text("error".into())),
+            (
+                "message",
+                Value::Text("openai sse: no data frames".into()),
+            ),
+        ]));
+        return Ok(events);
+    }
+    events.push(event_map(vec![
+        ("type", Value::Text("done".into())),
+        ("result", Value::Text(result)),
+    ]));
+    Ok(events)
+}
+
+/// Offline: parse OpenAI chat SSE text → event list (no network).
+pub fn openai_sse_parse(text: &Value, echo: Option<&Value>) -> Result<Value, String> {
+    let text = as_text(text, "text")?;
+    let echo = truthy_flag(echo);
+    Ok(Value::List(openai_chat_sse_events(text, echo)?))
+}
+
+fn read_sse_body_to_events<R: BufRead>(
+    mut reader: R,
+    echo: bool,
+) -> Result<Vec<Value>, String> {
+    let mut buf = String::new();
+    let mut raw = String::new();
+    let mut events = Vec::new();
+    let mut result = String::new();
+    let mut data_buf: Vec<String> = Vec::new();
+
+    let flush_data = |data_buf: &mut Vec<String>,
+                      events: &mut Vec<Value>,
+                      result: &mut String,
+                      echo: bool|
+     -> Result<bool, String> {
+        if data_buf.is_empty() {
+            return Ok(false);
+        }
+        let data = data_buf.join("\n");
+        data_buf.clear();
+        let data = data.trim();
+        if data.is_empty() {
+            return Ok(false);
+        }
+        if data == "[DONE]" {
+            return Ok(true);
+        }
+        let v: serde_json::Value =
+            serde_json::from_str(data).map_err(|e| format!("openai sse json: {e}"))?;
+        if let Some(msg) = v.get("error").and_then(|e| {
+            e.get("message")
+                .and_then(|m| m.as_str())
+                .or_else(|| e.as_str())
+        }) {
+            events.push(event_map(vec![
+                ("type", Value::Text("error".into())),
+                ("message", Value::Text(msg.into())),
+            ]));
+            return Ok(true);
+        }
+        let content = v
+            .pointer("/choices/0/delta/content")
+            .and_then(|c| c.as_str())
+            .unwrap_or("");
+        if !content.is_empty() {
+            result.push_str(content);
+            if echo {
+                print!("{content}");
+                let _ = std::io::stdout().flush();
+            }
+            events.push(event_map(vec![
+                ("type", Value::Text("delta".into())),
+                ("text", Value::Text(content.into())),
+            ]));
+        }
+        Ok(false)
+    };
+
+    loop {
+        buf.clear();
+        let n = reader
+            .read_line(&mut buf)
+            .map_err(|e| format!("http sse read: {e}"))?;
+        if n == 0 {
+            break;
+        }
+        raw.push_str(&buf);
+        if raw.len() > 8 * 1024 * 1024 {
+            return Err("http sse response exceeds 8MiB limit".into());
+        }
+        let line = buf.strip_suffix('\n').unwrap_or(&buf);
+        let line = line.strip_suffix('\r').unwrap_or(line);
+        if line.is_empty() {
+            if flush_data(&mut data_buf, &mut events, &mut result, echo)? {
+                break;
+            }
+            continue;
+        }
+        if let Some(rest) = line.strip_prefix("data:") {
+            let payload = rest.strip_prefix(' ').unwrap_or(rest);
+            data_buf.push(payload.to_string());
+        }
+    }
+    let _ = flush_data(&mut data_buf, &mut events, &mut result, echo)?;
+    if echo && !result.is_empty() {
+        println!();
+    }
+    if events.iter().any(|e| matches!(e, Value::Map(m) if m.iter().any(|(k,v)| k == "type" && matches!(v, Value::Text(t) if t == "error")))) {
+        return Ok(events);
+    }
+    events.push(event_map(vec![
+        ("type", Value::Text("done".into())),
+        ("result", Value::Text(result)),
+    ]));
+    Ok(events)
+}
+
+/// POST and consume OpenAI-compatible SSE; return `{status, events}` list of stream maps.
+pub fn http_post_sse(
+    ctx: &HostContext,
+    url: &Value,
+    body: &Value,
+    content_type: Option<&Value>,
+    headers: Option<&Value>,
+    echo: Option<&Value>,
+) -> Result<Value, String> {
+    if !ctx.allow_net() {
+        return Err("http_post_sse denied by host policy".into());
+    }
+    let url = as_text(url, "url")?;
+    let body = as_text(body, "body")?;
+    let ct = match content_type {
+        None | Some(Value::None) => "application/json; charset=utf-8",
+        Some(v) => as_text(v, "content_type")?,
+    };
+    let hdrs = headers_from_value(headers)?;
+    let echo = truthy_flag(echo);
+    if !(url.starts_with("http://") || url.starts_with("https://")) {
+        return Err("url must start with http:// or https://".into());
+    }
+    let agent = ureq::AgentBuilder::new()
+        .timeout_connect(Duration::from_secs(15))
+        .timeout_read(Duration::from_secs(120))
+        .build();
+    let mut req = agent.post(url).set("User-Agent", "marqdo").set("Content-Type", ct);
+    req = req.set("Accept", "text/event-stream");
+    for (k, v) in &hdrs {
+        req = req.set(k, v);
+    }
+    match req.send_string(body) {
+        Ok(r) => {
+            let status = r.status();
+            let reader = BufReader::new(r.into_reader());
+            let events = read_sse_body_to_events(reader, echo)?;
+            Ok(Value::Map(vec![
+                ("status".into(), Value::Int(status as i64)),
+                ("events".into(), Value::List(events)),
+            ]))
+        }
+        Err(ureq::Error::Status(code, r)) => {
+            let text = r.into_string().unwrap_or_default();
+            Ok(Value::Map(vec![
+                ("status".into(), Value::Int(code as i64)),
+                (
+                    "events".into(),
+                    Value::List(vec![event_map(vec![
+                        ("type", Value::Text("error".into())),
+                        ("message", Value::Text(text)),
+                    ])]),
+                ),
+            ]))
+        }
+        Err(e) => Err(format!("http POST sse {url}: {e}")),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -188,5 +458,32 @@ mod tests {
         assert!(h
             .iter()
             .any(|(k, v)| k == "Authorization" && v == "Bearer x"));
+    }
+
+    #[test]
+    fn openai_sse_fixture_to_events() {
+        let fixture = "\
+data: {\"choices\":[{\"delta\":{\"content\":\"Hel\"}}]}\n\
+\n\
+data: {\"choices\":[{\"delta\":{\"content\":\"lo\"}}]}\n\
+\n\
+data: [DONE]\n\
+";
+        let ev = openai_chat_sse_events(fixture, false).unwrap();
+        assert_eq!(ev.len(), 3);
+        match &ev[0] {
+            Value::Map(m) => {
+                assert!(m.iter().any(|(k, v)| k == "type" && matches!(v, Value::Text(t) if t == "delta")));
+                assert!(m.iter().any(|(k, v)| k == "text" && matches!(v, Value::Text(t) if t == "Hel")));
+            }
+            _ => panic!("expected map"),
+        }
+        match &ev[2] {
+            Value::Map(m) => {
+                assert!(m.iter().any(|(k, v)| k == "type" && matches!(v, Value::Text(t) if t == "done")));
+                assert!(m.iter().any(|(k, v)| k == "result" && matches!(v, Value::Text(t) if t == "Hello")));
+            }
+            _ => panic!("expected done map"),
+        }
     }
 }
