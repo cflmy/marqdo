@@ -348,18 +348,22 @@ fn read_sse_body_to_events<R: BufRead>(
     echo: bool,
 ) -> Result<Vec<Value>, String> {
     let mut buf = String::new();
-    let mut raw = String::new();
     let mut events = Vec::new();
     let mut result = String::new();
     let mut data_buf: Vec<String> = Vec::new();
     let mut echoed = false;
     let mut saw_reasoning = false;
+    // Soft cap on *stored* event payload (bus still gets every frame). DeepSeek
+    // thinking can exceed tens of MiB; we must not retain the raw wire body.
+    let mut stored_bytes: usize = 0;
+    const STORE_CAP: usize = 2 * 1024 * 1024;
 
     let flush_data = |data_buf: &mut Vec<String>,
                       events: &mut Vec<Value>,
                       result: &mut String,
                       echoed: &mut bool,
                       saw_reasoning: &mut bool,
+                      stored_bytes: &mut usize,
                       echo: bool|
      -> Result<bool, String> {
         if data_buf.is_empty() {
@@ -376,14 +380,38 @@ fn read_sse_body_to_events<R: BufRead>(
         }
         let v: serde_json::Value =
             serde_json::from_str(data).map_err(|e| format!("openai sse json: {e}"))?;
-        Ok(push_openai_delta_events(
+        // Always publish to the view bus; optionally skip retaining huge histories.
+        let before = events.len();
+        let stop = push_openai_delta_events(
             &v,
             events,
             result,
             echoed,
             saw_reasoning,
             echo,
-        ))
+        );
+        // Cap retained history only; EventBus already has every frame for the view.
+        let mut i = before;
+        while i < events.len() {
+            let add = match &events[i] {
+                Value::Map(m) => m
+                    .iter()
+                    .filter(|(k, _)| *k == "text" || *k == "result" || *k == "message")
+                    .filter_map(|(_, val)| match val {
+                        Value::Text(t) => Some(t.len()),
+                        _ => None,
+                    })
+                    .sum::<usize>(),
+                _ => 0,
+            };
+            if stored_bytes.saturating_add(add) > STORE_CAP {
+                events.truncate(i);
+                break;
+            }
+            *stored_bytes = stored_bytes.saturating_add(add);
+            i += 1;
+        }
+        Ok(stop)
     };
 
     loop {
@@ -394,10 +422,6 @@ fn read_sse_body_to_events<R: BufRead>(
         if n == 0 {
             break;
         }
-        raw.push_str(&buf);
-        if raw.len() > 8 * 1024 * 1024 {
-            return Err("http sse response exceeds 8MiB limit".into());
-        }
         let line = buf.strip_suffix('\n').unwrap_or(&buf);
         let line = line.strip_suffix('\r').unwrap_or(line);
         if line.is_empty() {
@@ -407,6 +431,7 @@ fn read_sse_body_to_events<R: BufRead>(
                 &mut result,
                 &mut echoed,
                 &mut saw_reasoning,
+                &mut stored_bytes,
                 echo,
             )? {
                 break;
@@ -424,6 +449,7 @@ fn read_sse_body_to_events<R: BufRead>(
         &mut result,
         &mut echoed,
         &mut saw_reasoning,
+        &mut stored_bytes,
         echo,
     )?;
     if echo && echoed {
@@ -569,5 +595,28 @@ data: [DONE]\n\
             }
             _ => panic!("expected done map"),
         }
+    }
+
+    #[test]
+    fn sse_body_over_8mib_does_not_error() {
+        // Formerly failed with "http sse response exceeds 8MiB limit" because raw
+        // wire bytes were accumulated. Streaming must keep going; store is soft-capped.
+        let frame =
+            "data: {\"choices\":[{\"delta\":{\"reasoning_content\":\"0123456789\"}}]}\n\n";
+        let mut body = String::with_capacity(9 * 1024 * 1024);
+        while body.len() < 8 * 1024 * 1024 + 1024 {
+            body.push_str(frame);
+        }
+        body.push_str("data: {\"choices\":[{\"delta\":{\"content\":\"ok\"}}]}\n\n");
+        body.push_str("data: [DONE]\n\n");
+        let ev = read_sse_body_to_events(std::io::Cursor::new(body), false).unwrap();
+        assert!(
+            ev.iter().any(|e| matches!(
+                e,
+                Value::Map(m) if m.iter().any(|(k, v)| k == "type" && matches!(v, Value::Text(t) if t == "done"))
+                    && m.iter().any(|(k, v)| k == "result" && matches!(v, Value::Text(t) if t == "ok"))
+            )),
+            "expected done with result ok"
+        );
     }
 }

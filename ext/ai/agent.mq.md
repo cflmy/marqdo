@@ -97,10 +97,10 @@ Allowlist check, then invoke the runbook `##` via `lib/subtask` (`spawn fn=` →
     + `goal`
     + `skeleton`=single
 
-Build a runnable workbook. `skeleton=single` (default): one worker `step`. `skeleton=dual`: research then write agents. Solidify notes remind the parent to replace proven `step` calls with ordinary `##` code.
+Build a runnable workbook. `skeleton=single` (default): one worker `step`. `skeleton=dual`: research then write agents. On success the parent chooses DONE; runtime `agent_workbook_solidify` freezes the answer.
 
 *`q` = > json.quote text=`goal` *
-*`esc` = > json.parse text={"h":"---\ntitle: agent workbook\n> ext/ai/llm.mq.md\n> ext/ai/agent.mq.md\n> lib/json.mq.md\n> lib/sys.mq.md\n> lib/writeback.mq.md\n> lib/subtask.mq.md\n---\n\n# Goal\n\nParent goal is embedded as JSON in # main.\n\n## Solidify\n\nWhen a step is proven, replace worker.step with ordinary code that returns the answer via **…** (not print). Quiet file subtasks discard stdout; the parent reads wait.value.\n\n# main\n\n> llm.load_env\n\n","s1":"\u002a\u0060model\u0060 = > llm.llm \u002a\n","s2":"\u002a\u0060tools\u0060 = > json.parse text=[] \u002a\n","s3":"\u002a\u0060worker\u0060 = > agent.agent model=\u0060model\u0060 tools=\u0060tools\u0060 standing=You are a workbook worker. Finish the task; do not invent tools. Prefer a direct answer. \u002a\n","s4":"\u002a\u0060wrap\u0060 = > json.parse text={\"task\":","s5":"} \u002a\n","s6":"\u002a\u0060task\u0060 = > json.get value=\u0060wrap\u0060 key=task \u002a\n","s7":"\u002a\u0060out\u0060 = > \u0060worker\u0060.step task=\u0060task\u0060 \u002a\n","s7b":"\u002a\u0060text\u0060 = > json.get value=\u0060out\u0060 key=result \u002a\n","s8":"\u002a\u002a\u0060text\u0060\u002a\u002a\n","d3":"\u002a\u0060research\u0060 = > agent.agent model=\u0060model\u0060 tools=\u0060tools\u0060 standing=You gather facts for the goal. Be concise. Do not invent tools. \u002a\n","d3b":"\u002a\u0060writer\u0060 = > agent.agent model=\u0060model\u0060 tools=\u0060tools\u0060 standing=You write the final answer from research notes. Do not invent tools. \u002a\n","d4":"\u002a\u0060wrap\u0060 = > json.parse text={\"task\":","d5":"} \u002a\n","d6":"\u002a\u0060task\u0060 = > json.get value=\u0060wrap\u0060 key=task \u002a\n","d7":"\u002a\u0060notes\u0060 = > \u0060research\u0060.step task=\u0060task\u0060 \u002a\n","d8":"\u002a\u0060ns\u0060 = > json.stringify value=\u0060notes\u0060 \u002a\n","d9":"\u002a\u0060wt\u0060 = Write the final answer. Research notes: \u002a\n","d10":"\u002a\u0060wt\u0060 = \u0060wt\u0060 + \u0060ns\u0060 \u002a\n","d11":"\u002a\u0060out\u0060 = > \u0060writer\u0060.step task=\u0060wt\u0060 \u002a\n","d11b":"\u002a\u0060text\u0060 = > json.get value=\u0060out\u0060 key=result \u002a\n","d12":"\u002a\u002a\u0060text\u0060\u002a\u002a\n"} *
+*`esc` = > json.parse text={"h":"---\ntitle: agent workbook\n> ext/ai/llm.mq.md\n> ext/ai/agent.mq.md\n> lib/json.mq.md\n> lib/sys.mq.md\n> lib/writeback.mq.md\n> lib/subtask.mq.md\n---\n\n# Goal\n\nParent goal is embedded as JSON in # main.\n\n## Solidify\n\nWhen the child returns a good value, parent DECISION: DONE — runtime agent_workbook_solidify freezes the answer as **return** (do not invent long FIND/REPLACE).\n\n# main\n\n> llm.load_env\n\n","s1":"\u002a\u0060model\u0060 = > llm.llm \u002a\n","s2":"\u002a\u0060tools\u0060 = > json.parse text=[] \u002a\n","s3":"\u002a\u0060worker\u0060 = > agent.agent model=\u0060model\u0060 tools=\u0060tools\u0060 standing=You are a workbook worker. Finish the task; do not invent tools. Prefer a direct answer. \u002a\n","s4":"\u002a\u0060wrap\u0060 = > json.parse text={\"task\":","s5":"} \u002a\n","s6":"\u002a\u0060task\u0060 = > json.get value=\u0060wrap\u0060 key=task \u002a\n","s7":"\u002a\u0060out\u0060 = > \u0060worker\u0060.step task=\u0060task\u0060 \u002a\n","s7b":"\u002a\u0060text\u0060 = > json.get value=\u0060out\u0060 key=result \u002a\n","s8":"\u002a\u002a\u0060text\u0060\u002a\u002a\n","d3":"\u002a\u0060research\u0060 = > agent.agent model=\u0060model\u0060 tools=\u0060tools\u0060 standing=You gather facts for the goal. Be concise. Do not invent tools. \u002a\n","d3b":"\u002a\u0060writer\u0060 = > agent.agent model=\u0060model\u0060 tools=\u0060tools\u0060 standing=You write the final answer from research notes. Do not invent tools. \u002a\n","d4":"\u002a\u0060wrap\u0060 = > json.parse text={\"task\":","d5":"} \u002a\n","d6":"\u002a\u0060task\u0060 = > json.get value=\u0060wrap\u0060 key=task \u002a\n","d7":"\u002a\u0060notes\u0060 = > \u0060research\u0060.step task=\u0060task\u0060 \u002a\n","d8":"\u002a\u0060ns\u0060 = > json.stringify value=\u0060notes\u0060 \u002a\n","d9":"\u002a\u0060wt\u0060 = Write the final answer. Research notes: \u002a\n","d10":"\u002a\u0060wt\u0060 = \u0060wt\u0060 + \u0060ns\u0060 \u002a\n","d11":"\u002a\u0060out\u0060 = > \u0060writer\u0060.step task=\u0060wt\u0060 \u002a\n","d11b":"\u002a\u0060text\u0060 = > json.get value=\u0060out\u0060 key=result \u002a\n","d12":"\u002a\u002a\u0060text\u0060\u002a\u002a\n"} *
 *`h` = > json.get value=`esc` key=h *
 *`s1` = > json.get value=`esc` key=s1 *
 *`s2` = > json.get value=`esc` key=s2 *
@@ -323,9 +323,89 @@ Parent developer-agent prompt. `phase=decompose`: pre-run (design step ③) befo
   *`up` = None*
 
 *`skill` = > agent_marqdo_skill *
-*`obs_s` = > json.stringify value=`observation` *
+
+Omit full workbook `source` and large slot/value bodies from the parent prompt — they bloat context and invite endless solidify guessing. Runtime `agent_workbook_solidify` runs on DECISION: DONE.
+
+*`obs_path` = > json.get value=`observation` key=path *
+*`obs_code` = > json.get value=`observation` key=exit_code *
+*`obs_val` = > json.get value=`observation` key=value *
+*`obs_slots` = > json.get value=`observation` key=slots *
+*`obs_src` = > json.get value=`observation` key=source *
+*`src_len` = 0*
+*`has_step` = False*
+1. `obs_src`
+  *`src_len` = > len value=`obs_src` *
+  *`step_parts` = > split value=`obs_src` sep=worker.step *
+  *`n_step` = > len value=`step_parts` *
+  1. `n_step` > 1
+    *`has_step` = True*
+  2. *
+    *`_` = 1*
+2. *
+  *`_` = 1*
+
+*`compact` = > json.parse text={"note":"source/slot bodies omitted. If exit_code is 0 and has_value, prefer DECISION: DONE immediately — runtime solidifies worker.step. CONTINUE only to fix failures or redesign structure. Never paste user prose into REPLACE."} *
+*`compact` = > json.set map=`compact` key=path value=`obs_path` *
+*`compact` = > json.set map=`compact` key=exit_code value=`obs_code` *
+*`compact` = > json.set map=`compact` key=source_len value=`src_len` *
+*`compact` = > json.set map=`compact` key=has_worker_step value=`has_step` *
+*`compact` = > json.set map=`compact` key=solidify_on_done value=True *
+
+*`val_txt` = > str value=`obs_val` *
+*`val_len` = > len value=`val_txt` *
+1. `obs_val`
+  *`compact` = > json.set map=`compact` key=has_value value=True *
+  *`compact` = > json.set map=`compact` key=value_len value=`val_len` *
+  1. `val_len` > 200
+    *`_` = 1*
+  2. *
+    *`compact` = > json.set map=`compact` key=value value=`obs_val` *
+2. *
+  *`compact` = > json.set map=`compact` key=has_value value=False *
+
+*`slots_brief` = > json.parse text=[] *
+1. `obs_slots`
+  - [`slot`](`obs_slots`)
+    *`sk` = > json.get value=`slot` key=key *
+    *`sl` = > json.get value=`slot` key=line *
+    *`sb` = > json.get value=`slot` key=body *
+    *`sb_txt` = > str value=`sb` *
+    *`sb_len` = > len value=`sb_txt` *
+    *`brief` = > json.parse text={"key":""} *
+    *`brief` = > json.set map=`brief` key=key value=`sk` *
+    *`brief` = > json.set map=`brief` key=line value=`sl` *
+    *`brief` = > json.set map=`brief` key=body_len value=`sb_len` *
+    *`slots_brief` = > json.append list=`slots_brief` item=`brief` *
+2. *
+  *`_` = 1*
+*`compact` = > json.set map=`compact` key=slots value=`slots_brief` *
+
+*`last_ok` = > json.get value=`observation` key=last_ok *
+*`last_error` = > json.get value=`observation` key=last_error *
+1. `last_ok`
+  *`ok_txt` = > str value=`last_ok` *
+  *`ok_len` = > len value=`ok_txt` *
+  *`compact` = > json.set map=`compact` key=last_ok_len value=`ok_len` *
+  1. `ok_len` > 200
+    *`compact` = > json.set map=`compact` key=last_ok_omitted value=True *
+  2. *
+    *`compact` = > json.set map=`compact` key=last_ok value=`last_ok` *
+2. *
+  *`_` = 1*
+1. `last_error`
+  *`err_txt` = > str value=`last_error` *
+  *`err_len` = > len value=`err_txt` *
+  1. `err_len` > 200
+    *`compact` = > json.set map=`compact` key=last_error_omitted value=True *
+    *`compact` = > json.set map=`compact` key=last_error_len value=`err_len` *
+  2. *
+    *`compact` = > json.set map=`compact` key=last_error value=`last_error` *
+2. *
+  *`_` = 1*
+
+*`obs_s` = > json.stringify value=`compact` *
 *`goal_s` = > json.stringify value=`goal` *
-*`esc` = > json.parse text={"a":"\n\n--- standing ---\n","b":"\n\n--- goal ---\n","c":"\n\n--- workbook observation ---\n","d":"\n\n--- marqdo skill ---\n","e_rev":"\n\n--- how to act ---\nYou are a Marqdo agent-development master.\nPriority order:\n1) Code first: if the goal is a fixed answer, solidify to a **return** (e.g. **pong**) or ordinary ## — no further LLM worker.step. Do not rely on > print; file subtasks are quiet and the parent consumes wait.value.\n2) If exit_code is 0 AND the workbook source still contains worker.step (or .单步), you MUST CONTINUE with a FIND/REPLACE that solidifies to a returned answer. Never DONE while .step remains.\n3) If exit_code is 0 AND already solidified (no worker.step) with a clear main return, DECISION: DONE with a short SUMMARY.\n4) If exploring an alternate path, try a meaningfully DIFFERENT structure than prior attempts (e.g. dual agents, narrower standing, or pure code). Do not merely re-run the same step.\n5) Prefer multiple narrow agents over one giant standing when roles differ.\nNever rewrite the whole .mq.md file.\nReply with EXACTLY one protocol:\nDECISION: DONE\nSUMMARY: <one line>\nOR\nDECISION: CONTINUE\nPATCH:\n<<<\nFIND\n<exact old snippet>\n===\nREPLACE\n<new snippet>\n>>>\n(You may repeat <<< blocks.)\n","e_dec":"\n\n--- how to act ---\nYou are a Marqdo agent-development master. PRE-RUN DECOMPOSE: the workbook has NOT been executed yet.\nPriority order:\n1) Code first: if the goal is a fixed answer, PATCH to a **return** (no worker.step / .单步), then DECISION: RUN (runtime will spawn once) or DECISION: DONE with SUMMARY after solidify.\n2) If the skeleton is fine to execute as-is, reply DECISION: RUN (patches optional; zero patches are OK).\n3) To reshape before the first run, DECISION: CONTINUE with FIND/REPLACE patches; runtime applies them then spawns.\n4) Prefer multiple narrow agents when roles differ. Never rewrite the whole .mq.md file.\nReply with EXACTLY one protocol:\nDECISION: RUN\nOR\nDECISION: DONE\nSUMMARY: <one line>\nOR\nDECISION: CONTINUE\nPATCH:\n<<<\nFIND\n<exact old snippet>\n===\nREPLACE\n<new snippet>\n>>>\n(You may repeat <<< blocks.)\n","f":"\n\n--- explore attempt ---\n"} *
+*`esc` = > json.parse text={"a":"\n\n--- standing ---\n","b":"\n\n--- goal ---\n","c":"\n\n--- workbook observation ---\n","d":"\n\n--- marqdo skill ---\n","e_rev":"\n\n--- how to act ---\nYou are a Marqdo agent-development master.\nPriority order (STOP RULES — follow top-down):\n1) SUCCESS STOP: if exit_code is 0 AND has_value is true, reply DECISION: DONE with a one-line SUMMARY immediately. Do NOT invent FIND/REPLACE. Runtime agent_workbook_solidify removes worker.step on DONE — has_worker_step true is NOT a reason to CONTINUE.\n2) FAILURE ONLY: CONTINUE with short FIND/REPLACE (<20 lines) only when exit_code is non-zero, has_value is false, or the returned value clearly fails the goal. Prefer structure edits; never paste itineraries/schedules/observation prose into REPLACE.\n3) Code-first for fixed answers (e.g. pong): solidify via DONE (runtime) or a tiny structural patch — not by rewriting child prose.\n4) If exploring an alternate path, try a meaningfully DIFFERENT structure than prior attempts. Do not merely re-run the same step.\n5) Prefer multiple narrow agents over one giant standing when roles differ.\nNever rewrite the whole .mq.md file.\nThe moment success is observed, emit DONE and stop — do not keep being helpful.\nReply with EXACTLY one protocol:\nDECISION: DONE\nSUMMARY: <one line>\nOR\nDECISION: CONTINUE\nPATCH:\n<<<\nFIND\n<exact old snippet>\n===\nREPLACE\n<new snippet>\n>>>\n(You may repeat <<< blocks.)\n","e_dec":"\n\n--- how to act ---\nYou are a Marqdo agent-development master. PRE-RUN DECOMPOSE: the workbook has NOT been executed yet.\nPriority order:\n1) If the skeleton is fine to execute as-is, reply DECISION: RUN (zero patches OK). Prefer RUN over inventing user-facing prose.\n2) Code first: if the goal is a fixed answer, PATCH to a **return** (no worker.step / .单步), then DECISION: RUN or DECISION: DONE with SUMMARY after solidify.\n3) To reshape before the first run, DECISION: CONTINUE with short FIND/REPLACE (<20 lines); runtime applies them then spawns.\n4) Prefer multiple narrow agents when roles differ. Never paste long itineraries into REPLACE.\nNever rewrite the whole .mq.md file.\nReply with EXACTLY one protocol:\nDECISION: RUN\nOR\nDECISION: DONE\nSUMMARY: <one line>\nOR\nDECISION: CONTINUE\nPATCH:\n<<<\nFIND\n<exact old snippet>\n===\nREPLACE\n<new snippet>\n>>>\n(You may repeat <<< blocks.)\n","f":"\n\n--- explore attempt ---\n"} *
 *`a` = > json.get value=`esc` key=a *
 *`b` = > json.get value=`esc` key=b *
 *`c` = > json.get value=`esc` key=c *
@@ -409,16 +489,21 @@ True when source still contains `worker.step` or `.单步`.
     + `round`
     + `workbook`
     + `exit_code`
+    + `result`=None
     + `stream`=False
     + `echo`=False
 
-Append a `round` event when `stream=True`. Optional `echo` prints a short TTY marker (not the full workbook path).
+Append a `round` event when `stream=True`. Optional `result` is the child `# main` return (for view Child cards). Optional `echo` prints a short TTY marker (not the full workbook path).
 
 1. `stream`
   *`ev` = > json.parse text={"type":"round"} *
   *`ev` = > json.set map=`ev` key=round value=`round` *
   *`ev` = > json.set map=`ev` key=workbook value=`workbook` *
   *`ev` = > json.set map=`ev` key=exit_code value=`exit_code` *
+  1. `result`
+    *`ev` = > json.set map=`ev` key=result value=`result` *
+  2. *
+    *`_` = 1*
   *`events` = > json.append list=`events` item=`ev` *
   > sys.stream_publish event=`ev`
   1. `echo`
@@ -687,7 +772,7 @@ Non-hit path runs parent **decompose** before the first child spawn (`DECISION: 
         *`out` = > json.set map=`out` key=summary value=`sum` *
         *`out` = > json.set map=`out` key=observation value=`last_obs` *
         *`out` = > json.set map=`out` key=result value=`child_val` *
-        *`events` = > plan_append_round events=`events` round=1 workbook=`path` exit_code=`code` stream=`stream` echo=`echo` *
+        *`events` = > plan_append_round events=`events` round=1 workbook=`path` exit_code=`code` result=`child_val` stream=`stream` echo=`echo` *
         1. `writeback`
           *`body` = > json.stringify value=`out` *
           > writeback.record value=`body` key=ok
@@ -734,7 +819,7 @@ Non-hit path runs parent **decompose** before the first child spawn (`DECISION: 
           *`out` = > json.set map=`out` key=summary value=`sum` *
           *`out` = > json.set map=`out` key=observation value=`last_obs` *
           *`out` = > json.set map=`out` key=result value=`child_val` *
-          *`events` = > plan_append_round events=`events` round=1 workbook=`path` exit_code=`code` stream=`stream` echo=`echo` *
+          *`events` = > plan_append_round events=`events` round=1 workbook=`path` exit_code=`code` result=`child_val` stream=`stream` echo=`echo` *
           1. `writeback`
             *`body` = > json.stringify value=`out` *
             > writeback.record value=`body` key=ok
@@ -854,7 +939,7 @@ Non-hit path runs parent **decompose** before the first child spawn (`DECISION: 
     *`child_val` = > json.get value=`aw` key=value *
     *`last_obs` = > json.get value=`aw` key=observation *
     *`round` = 1*
-    *`events` = > plan_append_round events=`events` round=1 workbook=`path` exit_code=`code` stream=`stream` echo=`echo` *
+    *`events` = > plan_append_round events=`events` round=1 workbook=`path` exit_code=`code` result=`child_val` stream=`stream` echo=`echo` *
     1. `code` == 0
       *`done` = 1*
       *`status` = ok*
@@ -887,42 +972,66 @@ Non-hit path runs parent **decompose** before the first child spawn (`DECISION: 
     *`code` = > json.get value=`aw` key=code *
     *`child_val` = > json.get value=`aw` key=value *
     *`last_obs` = > json.get value=`aw` key=observation *
-    *`events` = > plan_append_round events=`events` round=`round` workbook=`path` exit_code=`code` stream=`stream` echo=`echo` *
-    *`ctx` = > build_plan_context agent=`self` goal=`goal` observation=`last_obs` explore_attempt=`explore_attempt` explore_n=`explore_n` phase=revise *
-    1. `stream`
-      *`evs` = > `model`.complete prompt=`ctx` stream=True echo=`echo` *
-      *`last_reply` = > llm.stream_result events=`evs` *
-      *`events` = > plan_merge_deltas events=`events` from=`evs` stream=`stream` *
+    *`events` = > plan_append_round events=`events` round=`round` workbook=`path` exit_code=`code` result=`child_val` stream=`stream` echo=`echo` *
+
+Deterministic success stop (loop engineering): when the child already returned a value, do not ask the parent LLM to invent solidify patches — DONE + runtime solidify.
+
+    1. `code` == 0
+      1. `child_val`
+        1. `improve`
+          *`auto_done` = None*
+        2. *
+          *`auto_done` = 1*
+      2. *
+        *`auto_done` = None*
     2. *
-      *`last_reply` = > `model`.complete prompt=`ctx` *
-    *`last_reply` = > trim value=`last_reply` *
-    *`dec` = > extract_plan_decision reply=`last_reply` *
-    *`events` = > plan_append_decision events=`events` decision=`dec` stream=`stream` *
-    1. `dec` == DONE
+      *`auto_done` = None*
+
+    1. `auto_done`
       > agent_workbook_solidify path=`path` observation=`last_obs`
       *`done` = 1*
       *`status` = ok*
-      *`summary` = > extract_plan_summary reply=`last_reply` *
+      *`summary` = child returned value; solidified *
       *`err` = None*
+      *`dec` = DONE*
+      *`events` = > plan_append_decision events=`events` decision=`dec` stream=`stream` summary=`summary` *
       *`left` = 0*
-    2. `dec` == CONTINUE
-      *`n` = > fs.apply_patch_blocks path=`path` text=`last_reply` *
-      1. `n`
-        *`left` = `left` - 1*
+    2. *
+      *`ctx` = > build_plan_context agent=`self` goal=`goal` observation=`last_obs` explore_attempt=`explore_attempt` explore_n=`explore_n` phase=revise *
+      1. `stream`
+        *`evs` = > `model`.complete prompt=`ctx` stream=True echo=`echo` *
+        *`last_reply` = > llm.stream_result events=`evs` *
+        *`events` = > plan_merge_deltas events=`events` from=`evs` stream=`stream` *
       2. *
+        *`last_reply` = > `model`.complete prompt=`ctx` *
+      *`last_reply` = > trim value=`last_reply` *
+      *`dec` = > extract_plan_decision reply=`last_reply` *
+      *`events` = > plan_append_decision events=`events` decision=`dec` stream=`stream` *
+      1. `dec` == DONE
+        > agent_workbook_solidify path=`path` observation=`last_obs`
+        *`done` = 1*
+        *`status` = ok*
+        *`summary` = > extract_plan_summary reply=`last_reply` *
+        *`err` = None*
+        *`left` = 0*
+      2. `dec` == CONTINUE
+        *`n` = > fs.apply_patch_blocks path=`path` text=`last_reply` *
+        1. `n`
+          *`left` = `left` - 1*
+        2. *
+          *`done` = 1*
+          *`status` = error*
+          *`err` = no patches applied *
+          *`summary` = > extract_plan_summary reply=`last_reply` *
+          *`left` = 0*
+      3. `dec` == RUN
+        *`left` = `left` - 1*
+      4. *
         *`done` = 1*
         *`status` = error*
-        *`err` = no patches applied *
-        *`summary` = > extract_plan_summary reply=`last_reply` *
+        *`err` = unrecognized plan decision *
+        *`summary` = `last_reply`*
         *`left` = 0*
-    3. `dec` == RUN
-      *`left` = `left` - 1*
-    4. *
-      *`done` = 1*
-      *`status` = error*
-      *`err` = unrecognized plan decision *
-      *`summary` = `last_reply`*
-      *`left` = 0*
 
 1. `status` == ok
   1. `promote`

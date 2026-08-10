@@ -323,13 +323,16 @@ pub(crate) fn build_file_view(
     };
     let effective = effective_stdin(&source, stdin_lines);
     let awaiting_input = awaiting_preset_input(&input_prompts, stdin_lines, &source);
+    // Live + has `input` + stdin ready → stream via client `/api/run` (no page-blocking capture).
+    let auto_stream =
+        live && !input_prompts.is_empty() && !awaiting_input && !stdin_lines.is_empty();
     // Same host caps as `marqdo run`. Soft exit + sleep clamp only.
     let mut opts = RunOptions::default();
     opts.stdin_lines = effective.clone();
     opts.sleep_limit_ms = if live { Some(30_000) } else { Some(0) };
     // Optional: sandbox to the whole view tree so sibling folders are reachable.
     opts.fs_root = Some(root.root.clone());
-    let (stdout, stderr, ok, plots) = if awaiting_input {
+    let (stdout, stderr, ok, plots) = if awaiting_input || auto_stream {
         (String::new(), String::new(), true, Vec::new())
     } else {
         match run_file_capture(abs, &opts) {
@@ -348,7 +351,7 @@ pub(crate) fn build_file_view(
         }
     };
     // Re-read after run so writeback slots / workbook edits show in Structure.
-    if !awaiting_input {
+    if !awaiting_input && !auto_stream {
         if let Ok(next) = fs::read_to_string(abs) {
             source = next;
             if let Ok(module) = crate::parse::parse_source(&source) {
@@ -369,6 +372,7 @@ pub(crate) fn build_file_view(
         preset_stdin: effective.join("\n"),
         input_prompts,
         awaiting_input,
+        auto_stream,
         plots,
     })
 }
@@ -549,26 +553,13 @@ fn api_foreign_run(root: &ViewRoot, mut request: Request) -> Result<()> {
 }
 
 /// SSE: long-lived `text/event-stream` of EventBus JSON maps (`data: …\n\n`).
+/// Kept for debugging; the Stream panel uses `POST /api/run` instead (no page-load spinner).
 fn api_events(request: Request) -> Result<()> {
     let rx = crate::host::event_bus::EventBus::global().subscribe();
-    let body = SseBody::new(rx);
-    let ct = Header::from_bytes(&b"Content-Type"[..], &b"text/event-stream; charset=utf-8"[..])
-        .map_err(|_| anyhow::anyhow!("header"))?;
-    let cc = Header::from_bytes(&b"Cache-Control"[..], &b"no-cache"[..])
-        .map_err(|_| anyhow::anyhow!("header"))?;
-    let conn = Header::from_bytes(&b"Connection"[..], &b"keep-alive"[..])
-        .map_err(|_| anyhow::anyhow!("header"))?;
-    let resp = Response::empty(StatusCode(200))
-        .with_header(ct)
-        .with_header(cc)
-        .with_header(conn)
-        .with_data(body, None)
-        .with_chunked_threshold(0);
-    request.respond(resp).context("respond sse")?;
-    Ok(())
+    respond_sse(request, SseBody::new(rx, false))
 }
 
-/// Background `run_file` for the live Stream panel; events go to the EventBus.
+/// Run a file and stream EventBus events as SSE on this same response (ChatGPT-style fetch stream).
 fn api_run(root: &ViewRoot, mut request: Request) -> Result<()> {
     let mut body = Vec::new();
     std::io::Read::read_to_end(&mut request.as_reader(), &mut body)?;
@@ -578,25 +569,31 @@ fn api_run(root: &ViewRoot, mut request: Request) -> Result<()> {
     let stdin_raw = v.get("stdin").and_then(|x| x.as_str()).unwrap_or("");
     let stdin_lines = split_stdin_text(stdin_raw);
     if rel.is_empty() {
-        return respond_json(
+        return respond_json_status(
             request,
+            StatusCode(400),
             serde_json::json!({ "ok": false, "error": "missing path" }).to_string(),
         );
     }
     let abs = match resolve_rel(root, &rel) {
         Ok(p) => p,
         Err(e) => {
-            return respond_json(
+            return respond_json_status(
                 request,
+                StatusCode(400),
                 serde_json::json!({ "ok": false, "error": format!("{e:#}") }).to_string(),
             );
         }
     };
+    // Subscribe before spawn so early tokens are not lost.
+    let rx = crate::host::event_bus::EventBus::global().subscribe();
+    let run_id = next_run_id();
     let root_path = root.root.clone();
     let rel_clone = rel.clone();
     std::thread::spawn(move || {
         let start = serde_json::json!({
             "type": "run_start",
+            "run_id": run_id,
             "path": rel_clone,
         });
         crate::host::event_bus::EventBus::global().publish_json(&start.to_string());
@@ -608,17 +605,21 @@ fn api_run(root: &ViewRoot, mut request: Request) -> Result<()> {
         opts.fs_root = Some(root_path);
         match run_file_capture(&abs, &opts) {
             Ok(cap) => {
+                // Keep the terminal frame small — tokens already streamed via bus.
+                let preview: String = cap.stdout.chars().take(500).collect();
                 let done = serde_json::json!({
                     "type": "done",
+                    "run_id": run_id,
                     "path": rel_clone,
                     "ok": true,
-                    "result": cap.stdout,
+                    "result": preview,
                 });
                 crate::host::event_bus::EventBus::global().publish_json(&done.to_string());
             }
             Err(e) => {
                 let err = serde_json::json!({
                     "type": "error",
+                    "run_id": run_id,
                     "path": rel_clone,
                     "message": format!("{e:#}"),
                 });
@@ -626,30 +627,80 @@ fn api_run(root: &ViewRoot, mut request: Request) -> Result<()> {
             }
         }
     });
-    respond_json(
-        request,
-        serde_json::json!({ "ok": true, "started": true, "path": rel }).to_string(),
-    )
+    // Only close on this run's terminal frame — ignore nested LLM `done` without run_id.
+    respond_sse(request, SseBody::for_run(rx, run_id))
+}
+
+fn next_run_id() -> u64 {
+    use std::sync::atomic::{AtomicU64, Ordering};
+    static SEQ: AtomicU64 = AtomicU64::new(1);
+    SEQ.fetch_add(1, Ordering::Relaxed)
+}
+
+fn respond_sse(request: Request, body: SseBody) -> Result<()> {
+    let ct = Header::from_bytes(&b"Content-Type"[..], &b"text/event-stream; charset=utf-8"[..])
+        .map_err(|_| anyhow::anyhow!("header"))?;
+    let cc = Header::from_bytes(&b"Cache-Control"[..], &b"no-cache, no-transform"[..])
+        .map_err(|_| anyhow::anyhow!("header"))?;
+    let conn = Header::from_bytes(&b"Connection"[..], &b"keep-alive"[..])
+        .map_err(|_| anyhow::anyhow!("header"))?;
+    let xb = Header::from_bytes(&b"X-Accel-Buffering"[..], &b"no"[..])
+        .map_err(|_| anyhow::anyhow!("header"))?;
+    let resp = Response::empty(StatusCode(200))
+        .with_header(ct)
+        .with_header(cc)
+        .with_header(conn)
+        .with_header(xb)
+        .with_data(body, None)
+        .with_chunked_threshold(0);
+    request.respond(resp).context("respond sse")?;
+    Ok(())
 }
 
 struct SseBody {
     rx: Receiver<String>,
     buf: Vec<u8>,
     pos: usize,
+    /// When set, close after a `done`/`error` frame that carries this `run_id`.
+    stop_run_id: Option<u64>,
+    closed: bool,
 }
 
 impl SseBody {
-    fn new(rx: Receiver<String>) -> Self {
+    fn new(rx: Receiver<String>, _legacy: bool) -> Self {
         Self {
             rx,
             buf: Vec::new(),
             pos: 0,
+            stop_run_id: None,
+            closed: false,
         }
+    }
+
+    fn for_run(rx: Receiver<String>, run_id: u64) -> Self {
+        Self {
+            rx,
+            buf: Vec::new(),
+            pos: 0,
+            stop_run_id: Some(run_id),
+            closed: false,
+        }
+    }
+
+    fn frame_ends_run(json: &str, run_id: u64) -> bool {
+        let id_marker = format!("\"run_id\":{run_id}");
+        if !json.contains(&id_marker) {
+            return false;
+        }
+        json.contains("\"type\":\"done\"") || json.contains("\"type\":\"error\"")
     }
 }
 
 impl Read for SseBody {
     fn read(&mut self, out: &mut [u8]) -> io::Result<usize> {
+        if self.closed && self.pos >= self.buf.len() {
+            return Ok(0);
+        }
         loop {
             if self.pos < self.buf.len() {
                 let n = (self.buf.len() - self.pos).min(out.len());
@@ -657,16 +708,30 @@ impl Read for SseBody {
                 self.pos += n;
                 return Ok(n);
             }
+            if self.closed {
+                return Ok(0);
+            }
             match self.rx.recv_timeout(Duration::from_secs(15)) {
                 Ok(json) => {
+                    let terminal = self
+                        .stop_run_id
+                        .map(|id| Self::frame_ends_run(&json, id))
+                        .unwrap_or(false);
                     self.buf = format!("data: {json}\n\n").into_bytes();
                     self.pos = 0;
+                    if terminal {
+                        self.closed = true;
+                    }
                 }
                 Err(RecvTimeoutError::Timeout) => {
+                    // Comment heartbeat keeps intermediaries from buffering forever.
                     self.buf = b": ping\n\n".to_vec();
                     self.pos = 0;
                 }
-                Err(RecvTimeoutError::Disconnected) => return Ok(0),
+                Err(RecvTimeoutError::Disconnected) => {
+                    self.closed = true;
+                    return Ok(0);
+                }
             }
         }
     }
@@ -681,9 +746,15 @@ fn respond_html(request: Request, body: String) -> Result<()> {
 }
 
 fn respond_json(request: Request, body: String) -> Result<()> {
+    respond_json_status(request, StatusCode(200), body)
+}
+
+fn respond_json_status(request: Request, code: StatusCode, body: String) -> Result<()> {
     let header = Header::from_bytes(&b"Content-Type"[..], &b"application/json; charset=utf-8"[..])
         .map_err(|_| anyhow::anyhow!("header"))?;
-    let resp = Response::from_string(body).with_header(header);
+    let resp = Response::from_string(body)
+        .with_status_code(code)
+        .with_header(header);
     request.respond(resp).context("respond")?;
     Ok(())
 }

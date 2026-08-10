@@ -522,55 +522,168 @@ section.block > h2 {
   margin: 0 0 0.85rem;
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  background: #0f172a;
-  color: #e2e8f0;
+  background: var(--surface);
   overflow: hidden;
+  position: relative;
 }
 .stream-head {
   display: flex;
   align-items: center;
   gap: 0.65rem;
-  padding: 0.55rem 0.75rem;
-  background: #1e293b;
-  border-bottom: 1px solid #334155;
-  font: 0.8rem/1 var(--sans);
+  padding: 0.65rem 0.85rem;
+  background: #fafafa;
+  border-bottom: 1px solid var(--line);
+  font: 0.85rem/1 var(--sans);
+  color: var(--ink);
 }
 .stream-head button {
   font: 0.78rem/1 var(--sans);
-  padding: 0.35rem 0.7rem;
-  border-radius: 6px;
-  border: 1px solid #475569;
-  background: #334155;
-  color: #f8fafc;
+  padding: 0.4rem 0.85rem;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: #1d1d1f;
+  color: #fff;
   cursor: pointer;
 }
 .stream-head button:disabled {
-  opacity: 0.5;
+  opacity: 0.45;
   cursor: not-allowed;
 }
 .stream-status {
   margin-left: auto;
-  color: #94a3b8;
+  color: var(--muted);
   font: 0.72rem/1 var(--mono);
 }
-.stream-log {
-  margin: 0;
-  padding: 0.75rem 0.85rem;
-  min-height: 6rem;
-  max-height: 18rem;
+.stream-head button.stream-stop {
+  background: #fff;
+  color: #1d1d1f;
+  border-color: var(--line);
+}
+.stream-jump {
+  position: absolute;
+  left: 50%;
+  bottom: 0.65rem;
+  transform: translateX(-50%);
+  z-index: 2;
+  font: 0.72rem/1 var(--sans);
+  padding: 0.35rem 0.7rem;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--ink);
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.06);
+}
+.stream-jump[hidden] { display: none; }
+.stream-body {
+  position: relative;
+  padding: 0.85rem 1rem 1rem;
+  min-height: 5rem;
+  max-height: 28rem;
   overflow: auto;
-  font: 0.78rem/1.45 var(--mono);
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+.stream-empty {
+  color: var(--muted);
+  font: 0.85rem/1.4 var(--sans);
+  margin: 0;
+}
+.stream-turn {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+.stream-thinking {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #f5f5f7;
+  padding: 0.35rem 0.65rem 0.55rem;
+}
+.stream-thinking > summary {
+  cursor: pointer;
+  list-style: none;
+  font: 0.78rem/1.4 var(--sans);
+  color: var(--muted);
+  user-select: none;
+  padding: 0.25rem 0;
+}
+.stream-thinking > summary::-webkit-details-marker { display: none; }
+.stream-thinking > summary::before {
+  content: "▸ ";
+  color: #aeaeb2;
+}
+.stream-thinking[open] > summary::before { content: "▾ "; }
+.stream-thinking-body {
+  margin: 0.15rem 0 0;
+  font: 0.82rem/1.5 var(--sans);
+  color: #6e6e73;
   white-space: pre-wrap;
   word-break: break-word;
 }
-.stream-log .ev-mark {
-  color: #93c5fd;
+.stream-answer {
+  font: 0.95rem/1.55 var(--sans);
+  color: var(--ink);
+  white-space: pre-wrap;
+  word-break: break-word;
 }
-.stream-log .ev-reason {
-  color: #c4b5fd;
+.stream-answer:empty { display: none; }
+.stream-decision {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.35rem 0.65rem;
+  font: 0.78rem/1.35 var(--sans);
+  color: var(--muted);
+  padding: 0.15rem 0;
+  border-top: 1px dashed var(--line);
 }
-.stream-log .ev-err {
-  color: #fca5a5;
+.stream-decision strong {
+  font-weight: 600;
+  color: #1d1d1f;
+  letter-spacing: 0.02em;
+}
+.stream-child {
+  border: 1px solid var(--line);
+  border-left: 3px solid #2563eb;
+  border-radius: 10px;
+  background: #f8fafc;
+  padding: 0.65rem 0.85rem;
+}
+.stream-child-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 0.75rem;
+  font: 0.78rem/1.3 var(--sans);
+  color: var(--muted);
+  margin-bottom: 0.35rem;
+}
+.stream-child-head strong {
+  color: #1d1d1f;
+  font-weight: 600;
+}
+.stream-child-head a { color: #1d4ed8; }
+.stream-child-meta {
+  font: 0.72rem/1.3 var(--mono);
+  color: var(--muted);
+}
+.stream-child-body {
+  font: 0.88rem/1.5 var(--sans);
+  color: var(--ink);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.stream-child-body:empty { display: none; }
+.stream-err {
+  font: 0.85rem/1.45 var(--sans);
+  color: #9b1c1c;
+  background: #fff5f5;
+  border: 1px solid #e4c1c1;
+  border-radius: 8px;
+  padding: 0.55rem 0.75rem;
+  white-space: pre-wrap;
 }
 .code-head {
   display: flex;
@@ -856,81 +969,383 @@ pub fn layout(title: &str, nav: &str, main: &str) -> String {
   }}
   function initStreamPanel() {{
     if (!window.MARQDO_VIEW_LIVE) return;
-    var log = document.getElementById("stream-log");
+    var body = document.getElementById("stream-body");
     var status = document.getElementById("stream-status");
     var runBtn = document.getElementById("stream-run");
-    if (!log || !window.EventSource) return;
-    var es = new EventSource("/api/events?path=" + encodeURIComponent(window.MARQDO_FILE_PATH || ""));
-    function appendLine(cls, text) {{
-      var span = document.createElement("span");
-      if (cls) span.className = cls;
-      span.textContent = text;
-      log.appendChild(span);
-      log.appendChild(document.createTextNode("\\n"));
-      log.scrollTop = log.scrollHeight;
+    var stopBtn = document.getElementById("stream-stop");
+    var jumpBtn = document.getElementById("stream-jump");
+    if (!body) return;
+
+    var turn = null;
+    var thinkingEl = null;
+    var thinkingBody = null;
+    var answerEl = null;
+    var reasonNode = null;
+    var answerNode = null;
+    var pinned = true;
+    var ignoreScroll = false;
+    var pendingReason = "";
+    var pendingAnswer = "";
+    var raf = 0;
+    // Drip 1 Unicode scalar per frame (一字一吐). Catch up if backlog grows.
+    var CHARS_PER_TICK = 1;
+    var abortCtrl = null;
+
+    function nearBottom() {{
+      return body.scrollHeight - body.scrollTop - body.clientHeight < 72;
     }}
-    es.onopen = function () {{
-      if (status) status.textContent = "connected";
-    }};
-    es.onerror = function () {{
-      if (status) status.textContent = "reconnecting…";
-    }};
-    es.onmessage = function (msg) {{
-      try {{
-        var ev = JSON.parse(msg.data);
-        var t = ev.type || "?";
-        if (t === "reasoning") {{
-          appendLine("ev-reason", ev.text || "");
-        }} else if (t === "delta") {{
-          appendLine(null, ev.text || "");
-        }} else if (t === "error") {{
-          appendLine("ev-err", "error: " + (ev.message || ""));
-        }} else if (t === "round" || t === "decision" || t === "run_start" || t === "done") {{
-          var mark = t;
-          if (t === "round") mark += " #" + (ev.round != null ? ev.round : "");
-          if (t === "decision") mark += " " + (ev.decision || "");
-          if (t === "done" && ev.path) mark += " " + ev.path;
-          appendLine("ev-mark", "— " + mark + " —");
-          if (t === "done" && typeof ev.result === "string" && ev.result) {{
-            appendLine(null, ev.result.slice(0, 2000));
-          }}
-          if (ev.workbook) {{
-            appendLine("ev-mark", "workbook: " + ev.workbook);
-          }}
-        }} else {{
-          appendLine("ev-mark", JSON.stringify(ev));
-        }}
-      }} catch (e) {{
-        appendLine("ev-err", String(msg.data || e));
+    function updateJump() {{
+      if (!jumpBtn) return;
+      jumpBtn.hidden = pinned;
+    }}
+    function scrollIfPinned() {{
+      if (!pinned) {{
+        updateJump();
+        return;
       }}
-    }};
-    if (runBtn) {{
-      runBtn.addEventListener("click", function () {{
-        runBtn.disabled = true;
-        if (status) status.textContent = "running…";
-        log.textContent = "";
-        var stdinEl = document.getElementById("stdin");
-        fetch("/api/run", {{
-          method: "POST",
-          headers: {{ "Content-Type": "application/json" }},
-          body: JSON.stringify({{
-            path: window.MARQDO_FILE_PATH || "",
-            stdin: stdinEl ? stdinEl.value : ""
-          }})
-        }})
-          .then(function (r) {{ return r.json(); }})
-          .then(function (data) {{
-            if (!data.ok) {{
-              appendLine("ev-err", data.error || "run failed");
-              if (status) status.textContent = "error";
-            }}
-          }})
-          .catch(function (e) {{
-            appendLine("ev-err", String(e));
-            if (status) status.textContent = "error";
-          }})
-          .finally(function () {{ runBtn.disabled = false; }});
+      ignoreScroll = true;
+      body.scrollTop = body.scrollHeight;
+      // Ignore the scroll event our own assignment fires.
+      requestAnimationFrame(function () {{
+        ignoreScroll = false;
       }});
+      updateJump();
+    }}
+    function onUserScrollIntent() {{
+      // Re-evaluate after the browser applies the user scroll.
+      requestAnimationFrame(function () {{
+        if (ignoreScroll) return;
+        pinned = nearBottom();
+        updateJump();
+      }});
+    }}
+    body.addEventListener("scroll", function () {{
+      if (ignoreScroll) return;
+      pinned = nearBottom();
+      updateJump();
+    }}, {{ passive: true }});
+    body.addEventListener("wheel", onUserScrollIntent, {{ passive: true }});
+    body.addEventListener("touchmove", onUserScrollIntent, {{ passive: true }});
+    if (jumpBtn) {{
+      jumpBtn.addEventListener("click", function () {{
+        pinned = true;
+        ignoreScroll = true;
+        body.scrollTop = body.scrollHeight;
+        requestAnimationFrame(function () {{ ignoreScroll = false; }});
+        updateJump();
+      }});
+    }}
+
+    function clearStream() {{
+      body.innerHTML = "";
+      turn = null;
+      thinkingEl = null;
+      thinkingBody = null;
+      answerEl = null;
+      reasonNode = null;
+      answerNode = null;
+      pendingReason = "";
+      pendingAnswer = "";
+      if (raf) {{ cancelAnimationFrame(raf); raf = 0; }}
+      pinned = true;
+      updateJump();
+    }}
+    function ensureTurn() {{
+      if (turn) return;
+      turn = document.createElement("div");
+      turn.className = "stream-turn";
+      body.appendChild(turn);
+    }}
+    function ensureThinking() {{
+      ensureTurn();
+      if (thinkingEl) return;
+      thinkingEl = document.createElement("details");
+      thinkingEl.className = "stream-thinking";
+      thinkingEl.open = true;
+      var sum = document.createElement("summary");
+      sum.textContent = "Thinking";
+      thinkingBody = document.createElement("div");
+      thinkingBody.className = "stream-thinking-body";
+      reasonNode = document.createTextNode("");
+      thinkingBody.appendChild(reasonNode);
+      thinkingEl.appendChild(sum);
+      thinkingEl.appendChild(thinkingBody);
+      turn.appendChild(thinkingEl);
+    }}
+    function ensureAnswer() {{
+      ensureTurn();
+      if (answerEl) return;
+      answerEl = document.createElement("div");
+      answerEl.className = "stream-answer";
+      answerNode = document.createTextNode("");
+      answerEl.appendChild(answerNode);
+      turn.appendChild(answerEl);
+    }}
+    function flushPendingAll() {{
+      if (raf) {{ cancelAnimationFrame(raf); raf = 0; }}
+      if (pendingReason) {{
+        ensureThinking();
+        reasonNode.data += pendingReason;
+        pendingReason = "";
+      }}
+      if (pendingAnswer) {{
+        ensureAnswer();
+        answerNode.data += pendingAnswer;
+        pendingAnswer = "";
+      }}
+      scrollIfPinned();
+    }}
+    function dripPending() {{
+      raf = 0;
+      function take(src, n) {{
+        var chars = Array.from(src);
+        var takeN = Math.min(n, chars.length);
+        return [chars.slice(0, takeN).join(""), chars.slice(takeN).join("")];
+      }}
+      if (pendingReason) {{
+        ensureThinking();
+        var n = pendingReason.length > 240 ? 12 : (pendingReason.length > 80 ? 4 : CHARS_PER_TICK);
+        var r = take(pendingReason, n);
+        reasonNode.data += r[0];
+        pendingReason = r[1];
+      }} else if (pendingAnswer) {{
+        ensureAnswer();
+        var n2 = pendingAnswer.length > 240 ? 12 : (pendingAnswer.length > 80 ? 4 : CHARS_PER_TICK);
+        var a = take(pendingAnswer, n2);
+        answerNode.data += a[0];
+        pendingAnswer = a[1];
+      }}
+      scrollIfPinned();
+      if (pendingReason || pendingAnswer) {{
+        raf = requestAnimationFrame(dripPending);
+      }}
+    }}
+    function queueText(kind, text) {{
+      if (!text) return;
+      if (kind === "reasoning") pendingReason += text;
+      else pendingAnswer += text;
+      if (!raf) raf = requestAnimationFrame(dripPending);
+    }}
+    function formatResult(v) {{
+      if (v == null) return "";
+      if (typeof v === "string") return v;
+      try {{ return JSON.stringify(v, null, 2); }} catch (e) {{ return String(v); }}
+    }}
+    function resetTurnRefs() {{
+      turn = null;
+      thinkingEl = null;
+      thinkingBody = null;
+      answerEl = null;
+      reasonNode = null;
+      answerNode = null;
+    }}
+    function addDecision(ev) {{
+      flushPendingAll();
+      ensureTurn();
+      var row = document.createElement("div");
+      row.className = "stream-decision";
+      var label = document.createElement("strong");
+      label.textContent = "DECISION: " + (ev.decision || "?");
+      row.appendChild(label);
+      if (ev.summary) {{
+        var s = document.createElement("span");
+        s.textContent = ev.summary;
+        row.appendChild(s);
+      }}
+      turn.appendChild(row);
+      resetTurnRefs();
+      scrollIfPinned();
+    }}
+    function addChildCard(ev) {{
+      flushPendingAll();
+      var card = document.createElement("div");
+      card.className = "stream-child";
+      var head = document.createElement("div");
+      head.className = "stream-child-head";
+      var title = document.createElement("strong");
+      title.textContent = "Child workbook";
+      head.appendChild(title);
+      var meta = document.createElement("span");
+      meta.className = "stream-child-meta";
+      var bits = [];
+      if (ev.round != null) bits.push("round " + ev.round);
+      if (ev.exit_code != null) bits.push("exit " + ev.exit_code);
+      meta.textContent = bits.join(" · ");
+      head.appendChild(meta);
+      if (ev.workbook) {{
+        var a = document.createElement("a");
+        a.href = "/file?path=" + encodeURIComponent(ev.workbook);
+        a.textContent = ev.workbook;
+        head.appendChild(a);
+      }}
+      card.appendChild(head);
+      var res = formatResult(ev.result);
+      if (res) {{
+        var out = document.createElement("div");
+        out.className = "stream-child-body";
+        out.textContent = res.length > 8000 ? res.slice(0, 8000) + "…" : res;
+        card.appendChild(out);
+      }}
+      body.appendChild(card);
+      resetTurnRefs();
+      scrollIfPinned();
+    }}
+    function addError(msg) {{
+      flushPendingAll();
+      var err = document.createElement("div");
+      err.className = "stream-err";
+      err.textContent = msg || "error";
+      body.appendChild(err);
+      scrollIfPinned();
+    }}
+    function handleEvent(ev) {{
+      var t = ev.type || "?";
+      if (t === "reasoning") {{
+        queueText("reasoning", ev.text || "");
+      }} else if (t === "delta") {{
+        queueText("answer", ev.text || "");
+      }} else if (t === "error") {{
+        addError(ev.message || "error");
+        if (status) status.textContent = "error";
+      }} else if (t === "decision") {{
+        addDecision(ev);
+      }} else if (t === "round") {{
+        addChildCard(ev);
+      }} else if (t === "run_start") {{
+        if (status) status.textContent = "running…";
+        ensureTurn();
+        var mark = document.createElement("div");
+        mark.className = "stream-decision";
+        var strong = document.createElement("strong");
+        strong.textContent = "RUN";
+        mark.appendChild(strong);
+        if (ev.path) {{
+          var sp = document.createElement("span");
+          sp.textContent = ev.path;
+          mark.appendChild(sp);
+        }}
+        turn.appendChild(mark);
+        scrollIfPinned();
+      }} else if (t === "done") {{
+        flushPendingAll();
+        if (ev.run_id != null && status) status.textContent = "done";
+        var hasAnswer = answerNode && answerNode.data;
+        if (!hasAnswer && typeof ev.result === "string" && ev.result) {{
+          ensureAnswer();
+          answerNode.data += ev.result;
+          scrollIfPinned();
+        }}
+        if (thinkingEl && (answerNode && answerNode.data)) thinkingEl.open = false;
+      }}
+    }}
+    function setRunning(on) {{
+      if (runBtn) runBtn.disabled = on;
+      var formBtn = document.querySelector(".stdin-form button[type='submit']");
+      if (formBtn) formBtn.disabled = on;
+      if (stopBtn) {{
+        stopBtn.disabled = !on;
+        stopBtn.hidden = !on;
+      }}
+    }}
+    async function readSseStream(response) {{
+      var ctype = (response.headers.get("content-type") || "").toLowerCase();
+      if (ctype.indexOf("application/json") !== -1) {{
+        var data = await response.json();
+        throw new Error(data.error || data.message || JSON.stringify(data));
+      }}
+      if (!response.ok) {{
+        var errText = await response.text();
+        throw new Error(errText || ("HTTP " + response.status));
+      }}
+      if (!response.body || !response.body.getReader) {{
+        throw new Error("ReadableStream not supported");
+      }}
+      var reader = response.body.getReader();
+      var decoder = new TextDecoder();
+      var buf = "";
+      while (true) {{
+        var chunk = await reader.read();
+        if (chunk.done) break;
+        buf += decoder.decode(chunk.value, {{ stream: true }});
+        buf = buf.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+        var parts = buf.split("\n\n");
+        buf = parts.pop() || "";
+        for (var i = 0; i < parts.length; i++) {{
+          var block = parts[i];
+          if (!block || block.charAt(0) === ":") continue;
+          var lines = block.split("\n");
+          var dataLines = [];
+          for (var j = 0; j < lines.length; j++) {{
+            var line = lines[j];
+            if (line.indexOf("data:") === 0) {{
+              dataLines.push(line.slice(5).replace(/^ /, ""));
+            }}
+          }}
+          if (!dataLines.length) continue;
+          try {{
+            handleEvent(JSON.parse(dataLines.join("\n")));
+          }} catch (e) {{
+            addError(String(e));
+          }}
+        }}
+      }}
+      flushPendingAll();
+    }}
+    function startRun() {{
+      if (abortCtrl) abortCtrl.abort();
+      abortCtrl = new AbortController();
+      setRunning(true);
+      if (status) status.textContent = "running…";
+      clearStream();
+      pinned = true;
+      var stdinEl = document.getElementById("stdin");
+      fetch("/api/run", {{
+        method: "POST",
+        headers: {{
+          "Content-Type": "application/json",
+          "Accept": "text/event-stream"
+        }},
+        body: JSON.stringify({{
+          path: window.MARQDO_FILE_PATH || "",
+          stdin: stdinEl ? stdinEl.value : ""
+        }}),
+        signal: abortCtrl.signal
+      }})
+        .then(readSseStream)
+        .then(function () {{
+          if (status && status.textContent === "running…") status.textContent = "done";
+        }})
+        .catch(function (e) {{
+          if (e && e.name === "AbortError") {{
+            if (status) status.textContent = "stopped";
+            return;
+          }}
+          addError(String(e && e.message ? e.message : e));
+          if (status) status.textContent = "error";
+        }})
+        .finally(function () {{
+          setRunning(false);
+          abortCtrl = null;
+        }});
+    }}
+    window.marqdoStreamRun = startRun;
+    if (stopBtn) {{
+      stopBtn.addEventListener("click", function () {{
+        if (abortCtrl) abortCtrl.abort();
+      }});
+    }}
+    if (runBtn) {{
+      runBtn.addEventListener("click", function () {{ startRun(); }});
+    }}
+    var form = document.querySelector(".stdin-form");
+    if (form) {{
+      form.addEventListener("submit", function (ev) {{
+        ev.preventDefault();
+        startRun();
+      }});
+    }}
+    if (window.MARQDO_AUTO_STREAM) {{
+      startRun();
     }}
   }}
 
@@ -1157,7 +1572,14 @@ pub fn page_file(files: &[PathBuf], rel: &str, vm: &FileViewModel, links: &LinkM
         (
             "pending",
             "input",
-            "Fill preset input below, then click <strong>Run with input</strong>.".to_string(),
+            "Fill preset input, then <strong>Run with input</strong> — output streams in the panel (no page reload)."
+                .to_string(),
+        )
+    } else if vm.auto_stream {
+        (
+            "pending",
+            "stream",
+            "Streaming in the panel below…".to_string(),
         )
     } else if vm.ok {
         (
@@ -1264,9 +1686,13 @@ pub fn page_file(files: &[PathBuf], rel: &str, vm: &FileViewModel, links: &LinkM
   <div class="stream-head">
     <strong>Stream</strong>
     <button type="button" id="stream-run">Run</button>
+    <button type="button" class="stream-stop" id="stream-stop" hidden disabled>Stop</button>
     <span class="stream-status" id="stream-status">idle</span>
   </div>
-  <pre class="stream-log" id="stream-log"></pre>
+  <div class="stream-body" id="stream-body">
+    <p class="stream-empty">Use <strong>Run with input</strong> or <strong>Run</strong> — thinking and answer stream here.</p>
+  </div>
+  <button type="button" class="stream-jump" id="stream-jump" hidden>↓ Latest</button>
 </div>"#
         .to_string(),
         LinkMode::Static { .. } => String::new(),
@@ -1276,6 +1702,7 @@ pub fn page_file(files: &[PathBuf], rel: &str, vm: &FileViewModel, links: &LinkM
 <script>
 window.MARQDO_VIEW_LIVE = {live};
 window.MARQDO_FILE_PATH = {path_js};
+window.MARQDO_AUTO_STREAM = {auto_stream};
 </script>
 <h1 class="page">{title}<span class="status-pill {status}">{status_label}</span></h1>
 <p class="meta">{rel}</p>
@@ -1298,6 +1725,7 @@ window.MARQDO_FILE_PATH = {path_js};
 "#,
         live = live_flag,
         path_js = escape_js_string(rel),
+        auto_stream = if vm.auto_stream { "true" } else { "false" },
         title = escape(title),
         status = status,
         status_label = status_label,

@@ -37,6 +37,8 @@ pub struct FileViewModel {
     pub input_prompts: Vec<String>,
     /// Live view: program uses `input` but no stdin yet — execution deferred until form submit.
     pub awaiting_input: bool,
+    /// Live view: stdin present — skip blocking page-load run; client auto-starts Stream SSE.
+    pub auto_stream: bool,
     /// SVG plots from math lib (embedded in Execution).
     pub plots: Vec<String>,
 }

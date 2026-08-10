@@ -102,11 +102,39 @@ marqdo view output tests/structure/hello.mq.md -o /tmp/hello-doc
 | `GET` | `/` | 默认打开第一个 `.mq.md`（无文件时为空提示） |
 | `GET` | `/file?path=…` | 单文件页 |
 | `GET` | `/api/tree` | JSON 树（可选） |
-| `GET` | `/api/events?path=…` | SSE（`text/event-stream`）：订阅进程内 EventBus（`reasoning` / `delta` / `round` / `decision` / `done` / `error`） |
-| `POST` | `/api/run` | JSON `{path, stdin?}`：后台 `run_file`；事件进 bus；结束补 `done`/`error`（不替代页内整页 stdout） |
+| `GET` | `/api/events?path=…` | 可选长订 EventBus（调试）；**Stream 面板默认不用**（避免页载常连导致标签页一直转圈） |
+| `POST` | `/api/run` | JSON `{path, stdin?}` → **直接返回** `text/event-stream`（本次 run 的事件）；结束后关流 |
 | `POST` | `/api/foreign-run` | 外联代码块试跑 |
 
-根目录锁死；拒绝 `..` 逃逸。默认页加载仍整页执行；Stream 面板为增强路径（`EventSource` + Run）。
+根目录锁死；拒绝 `..` 逃逸。默认页加载仍可整页执行；Stream 为增强路径。
+
+### 5.1 Stream 面板（对齐主流 LLM 呈现）
+
+参考常见助手产品（思考折叠 + 正文流式、工具/子步骤独立卡片）：**不要**把所有 SSE 事件打成一条混色终端日志。
+
+| 区块 | 事件 | 呈现 |
+|------|------|------|
+| **Thinking** | `reasoning` | 可折叠；流式追加到同一块；默认展开直至本轮 `delta`/`done` 开始，之后可收起 |
+| **Answer** | `delta` | **主文**；token 连续拼进同一段落（禁止每 token 换行）；主色正文 |
+| **Decision** | `decision` | 时间线条目标记（`RUN` / `CONTINUE` / `DONE` + 可选 summary） |
+| **Child / Workbook** | `round` | **独立卡片**：轮次、退出码、workbook 链（`/file?path=`）、可选 `result` 摘要；与父思考/答案视觉分离 |
+| **Status** | `run_start` / `done` / `error` | 顶栏状态 + 错误行；`done.result` 仅在无 Answer 块时作摘要，不与 reasoning 混排 |
+
+**传输与流畅度（对齐 ChatGPT 类产品）：**
+
+1. **Run = 一次 `fetch` POST**，用 `ReadableStream` 读响应体里的 SSE 帧；**不要**页载常驻 `EventSource`。  
+2. **「Run with input」拦截表单**：`preventDefault` 后走同一 Stream `/api/run`，**禁止整页重载**；带 `?stdin=` 进入时 live 页也不再阻塞跑完，改为自动开 Stream。  
+3. **只改 Stream 对话框 DOM**；token **按动画帧合批**写入单一文本节点（避免每 token 触发布局）。  
+4. **Stick-to-bottom**：仅在用户仍贴底时跟随；程序化 `scrollTop` 产生的 scroll 事件忽略；上拉后不抢滚动，可点「↓ Latest」。  
+5. **Stop**：`AbortController` 中止 fetch。
+
+视觉约束（与 §2 一致）：
+
+- 浅色内容面，不用深色「伪终端」底；Thinking 用次要字色 / 浅底。  
+- 一屏只突出 Answer；Thinking 与 Child 是附属。  
+- plan 多轮：每一轮 Child 一张卡；父侧 Thinking/Answer 按 decision 分轮，不清空历史。
+
+事件字段约定（与 [agent-streaming.md](../roadmap/agent-streaming.md) 一致）：`round` 可带 `result`（子 `# main` 返回值摘要）；`reasoning`/`delta` 的 `text` 为增量。
 
 ---
 
@@ -116,4 +144,5 @@ marqdo view output tests/structure/hello.mq.md -o /tmp/hello-doc
 2. `view output public -o public`（或临时目录）生成可点的 `index.html`（首文件）与各 `pages/…`。  
 3. 静态页中执行区与 `marqdo run` 一致（未加 `--no-exec` 时）；失败诊断路径无 `\\?\`。  
 4. 冷启动无明显外网依赖。  
-5. 调试用 `marqdo debug`（默认端口 7430），与 view 页面分离。
+5. 调试用 `marqdo debug`（默认端口 7430），与 view 页面分离。  
+6. Stream：`fetch`+SSE 局部更新；Thinking/Answer 分栏；stick-to-bottom；rAF 合批；页载不常连 EventSource。

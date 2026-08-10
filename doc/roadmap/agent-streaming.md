@@ -65,7 +65,7 @@ ext/ai/agent  step/plan 订阅事件 → 可选透传或写回「过程槽」
 | `reasoning` | 模型思考增量（如 DeepSeek `reasoning_content`） | `text` |
 | `delta` | 模型答案增量文本 | `text` |
 | `tool_start` / `tool_end` | 工具轮 | `name`, `result?` |
-| `round` | plan 轮次边界 | `round`, `workbook`, `exit_code?` |
+| `round` | plan 轮次边界（子工作簿跑完） | `round`, `workbook`, `exit_code?`, `result?`（子返回值摘要） |
 | `decision` | DONE / CONTINUE / RUN | `decision`, `summary?` |
 | `done` | 本调用结束 | `result`（答案正文；不含 thinking） |
 | `error` | 失败 | `message` |
@@ -113,8 +113,16 @@ plan 特有：
 | 面 | 做法 |
 |----|------|
 | CLI | `delta` 直接写 stdout（无额外 JSON 包装）；结构化事件可 `--trace-events` 走 stderr / 旁路文件 |
-| `marqdo view` | 调试/运行面板订阅同一事件（WebSocket 或 SSE） |
+| `marqdo view` | Execution 区 Stream 面板订阅 SSE（见 [view.md](../design/view.md) §5.1）：Thinking / Answer / Child 分栏，非混色日志 |
 | 库调用方 | foreach 事件集合，自行决定 UI |
+
+**view Stream 锁定（S3 UI）：**
+
+1. `reasoning` → 可折叠 Thinking；`delta` → 主文 Answer（连续拼接）。  
+2. `round` → 独立 Child/Workbook 卡（路径链 + 可选 `result`）；不与父 Answer 混排。  
+3. `decision` → 时间线条目标记。  
+4. 视觉跟 view HIG 浅色壳，不用深色终端底。  
+5. **传输**：`POST /api/run` 直接 SSE；前端 `fetch`+`ReadableStream`（非页载 EventSource）；rAF 合批；stick-to-bottom。
 
 ---
 
