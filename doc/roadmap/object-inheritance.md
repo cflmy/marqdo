@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| 状态 | **I0–I2 已落地**（I3 隐式 super 仍可选） |
+| 状态 | **I0–I3 已落地**（显式父构造约定；**不做**隐式 auto-super） |
 | 日期 | 2026-08-10 |
 | 相关 | [objects.md](../design/objects.md) · [markdown-mapping.md](../design/markdown-mapping.md) · [keywords.md](../design/keywords.md) |
 | 提案语法 | `# 子类 = > 父类` |
@@ -139,7 +139,7 @@
 I0  语法 + AST + 金样（解析/循环继承错误）     ✅
 I1  方法解析沿基类链；构造 _type=子类           ✅
 I2  覆盖方法；文档更新 objects.md               ✅
-I3  （可选）子构造约定：显式 > 父类 … 或隐式 super
+I3  显式父构造约定（**不做**隐式 auto-super）              ✅
 ```
 
 验收：
@@ -147,14 +147,13 @@ I3  （可选）子构造约定：显式 > 父类 … 或隐式 super
 1. 无继承文件行为不变。  
 2. 子类实例能调父类 `##`；覆盖后只走子类。  
 3. `` # A = > B `` / `` # B = > A `` 诊断清晰。  
-4. Skill / 金样：`tests/structure/inherit-*.mq.md`。
+4. Skill / 金样：`tests/structure/inherit-*.mq.md`（含显式 `` `self` = > Parent ``）。
 
 ---
 
 ## 7. 开放点
 
-1. **隐式 super**：子类构造体执行前是否自动跑父构造体？  
-   - 建议 v1：**不隐式**；需要时正文写 `` `self` = > 父类 … `` 再改字段，或提供 `` > 父类.构造 … `` 约定。  
+1. ~~**隐式 super**~~ → **不做**：子类构造体不自动跑父构造。需要父初始化时正文写 `` `self` = > 父类 … `` 再改字段后 `**`self`**`；构造完成时 `_type` 仍为最具体子类名。  
 2. 中英基类别名：`> agent` 与 `> 智能体` 是否同一对象（取决于模块导出）。  
 3. 继承是否写入 OKF Module 页（catalog 展示 `extends`）——可随 O3/O4 增强。
 

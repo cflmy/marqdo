@@ -39,3 +39,10 @@ Load `.env` (optional named arg `path=`). Existing process env is not overridden
     + `args`=None
 
 **> host_exec cmd=`cmd` args=`args`**
+
+## stream_publish
+    + `event`
+
+Publish a stream event map onto the process EventBus (`marqdo view` SSE). No-op when nothing is subscribed.
+
+**> host_stream_publish event=`event`**

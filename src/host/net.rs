@@ -232,10 +232,12 @@ fn push_openai_delta_events(
             .and_then(|m| m.as_str())
             .or_else(|| e.as_str())
     }) {
-        events.push(event_map(vec![
+        let ev = event_map(vec![
             ("type", Value::Text("error".into())),
             ("message", Value::Text(msg.into())),
-        ]));
+        ]);
+        crate::host::event_bus::publish(&ev);
+        events.push(ev);
         return true;
     }
     let reasoning = v
@@ -249,10 +251,12 @@ fn push_openai_delta_events(
             let _ = std::io::stdout().flush();
             *echoed = true;
         }
-        events.push(event_map(vec![
+        let ev = event_map(vec![
             ("type", Value::Text("reasoning".into())),
             ("text", Value::Text(reasoning.into())),
-        ]));
+        ]);
+        crate::host::event_bus::publish(&ev);
+        events.push(ev);
     }
     let content = v
         .pointer("/choices/0/delta/content")
@@ -269,10 +273,12 @@ fn push_openai_delta_events(
             let _ = std::io::stdout().flush();
             *echoed = true;
         }
-        events.push(event_map(vec![
+        let ev = event_map(vec![
             ("type", Value::Text("delta".into())),
             ("text", Value::Text(content.into())),
-        ]));
+        ]);
+        crate::host::event_bus::publish(&ev);
+        events.push(ev);
     }
     false
 }
@@ -321,10 +327,12 @@ pub fn openai_chat_sse_events(text: &str, echo: bool) -> Result<Vec<Value>, Stri
         ]));
         return Ok(events);
     }
-    events.push(event_map(vec![
+    let done = event_map(vec![
         ("type", Value::Text("done".into())),
         ("result", Value::Text(result)),
-    ]));
+    ]);
+    crate::host::event_bus::publish(&done);
+    events.push(done);
     Ok(events)
 }
 
@@ -424,10 +432,12 @@ fn read_sse_body_to_events<R: BufRead>(
     if events.iter().any(|e| matches!(e, Value::Map(m) if m.iter().any(|(k,v)| k == "type" && matches!(v, Value::Text(t) if t == "error")))) {
         return Ok(events);
     }
-    events.push(event_map(vec![
+    let done = event_map(vec![
         ("type", Value::Text("done".into())),
         ("result", Value::Text(result)),
-    ]));
+    ]);
+    crate::host::event_bus::publish(&done);
+    events.push(done);
     Ok(events)
 }
 

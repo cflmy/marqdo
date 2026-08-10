@@ -6,6 +6,7 @@
 
 pub mod agent_rt;
 mod dispatch;
+pub mod event_bus;
 pub mod foreign;
 mod fs;
 pub(crate) mod json;

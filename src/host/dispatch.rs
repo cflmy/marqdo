@@ -99,6 +99,7 @@ pub enum HostFn {
     WritebackScanPath = 97,
     HttpPostSse = 98,
     OpenAiSseParse = 99,
+    StreamPublish = 100,
 }
 
 impl HostFn {
@@ -194,6 +195,7 @@ impl HostFn {
             97 => Self::WritebackScanPath,
             98 => Self::HttpPostSse,
             99 => Self::OpenAiSseParse,
+            100 => Self::StreamPublish,
             _ => return None,
         })
     }
@@ -227,6 +229,7 @@ impl HostFn {
             "host_http_post" | "http_post" => Self::HttpPost,
             "host_http_post_sse" | "http_post_sse" => Self::HttpPostSse,
             "host_openai_sse_parse" | "openai_sse_parse" => Self::OpenAiSseParse,
+            "host_stream_publish" | "stream_publish" => Self::StreamPublish,
             "host_url_encode" => Self::UrlEncode,
             "host_pi" => Self::Pi,
             "host_e" => Self::EConst,
@@ -329,6 +332,7 @@ impl HostFn {
             Self::HttpPost => "host_http_post",
             Self::HttpPostSse => "host_http_post_sse",
             Self::OpenAiSseParse => "host_openai_sse_parse",
+            Self::StreamPublish => "host_stream_publish",
             Self::UrlEncode => "host_url_encode",
             Self::Pi => "host_pi",
             Self::EConst => "host_e",
@@ -417,6 +421,7 @@ impl HostFn {
             Self::HttpPost => &["url", "body"],
             Self::HttpPostSse => &["url", "body"],
             Self::OpenAiSseParse => &["text"],
+            Self::StreamPublish => &["event"],
             Self::HttpRequest => &["method", "url"],
             Self::DotenvLoad => &[],
             Self::Pi | Self::EConst | Self::Random => &[],
@@ -546,6 +551,10 @@ pub fn call_host(
         ),
         HostFn::OpenAiSseParse => {
             net::openai_sse_parse(require(bound, "text")?, bound.get("echo"))
+        }
+        HostFn::StreamPublish => {
+            crate::host::event_bus::publish(require(bound, "event")?);
+            Ok(Value::Bool(true))
         }
         HostFn::HttpRequest => net::http_request(
             ctx,

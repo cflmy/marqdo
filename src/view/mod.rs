@@ -10,9 +10,12 @@ mod render;
 pub use output::{write_static, OutputOptions};
 
 use std::fs;
+use std::io::{self, Read};
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::sync::mpsc::{Receiver, RecvTimeoutError};
+use std::time::Duration;
 
 use anyhow::{bail, Context, Result};
 use tiny_http::{Header, Method, Request, Response, Server, StatusCode};
@@ -38,6 +41,7 @@ pub struct DebugOptions {
     pub open_browser: bool,
 }
 
+#[derive(Clone)]
 pub(crate) struct ViewRoot {
     pub root: PathBuf,
     pub only_file: Option<PathBuf>,
@@ -60,10 +64,14 @@ pub fn serve(opts: ViewOptions) -> Result<()> {
         let _ = open_url(&url);
     }
 
+    // Per-request threads so SSE long-poll and `/api/run` do not block each other.
     for request in server.incoming_requests() {
-        if let Err(err) = handle(&root_info, request) {
-            eprintln!("view request error: {err:#}");
-        }
+        let root = root_info.clone();
+        std::thread::spawn(move || {
+            if let Err(err) = handle(&root, request) {
+                eprintln!("view request error: {err:#}");
+            }
+        });
     }
     Ok(())
 }
@@ -156,12 +164,16 @@ fn handle(root: &ViewRoot, request: Request) -> Result<()> {
 
     if method == Method::Post {
         let (path_part, _) = split_url(&url);
-        if path_part == "/api/foreign-run" {
-            return api_foreign_run(root, request);
+        match path_part {
+            "/api/foreign-run" => return api_foreign_run(root, request),
+            "/api/run" => return api_run(root, request),
+            _ => {
+                let resp =
+                    Response::from_string("method not allowed").with_status_code(StatusCode(405));
+                let _ = request.respond(resp);
+                return Ok(());
+            }
         }
-        let resp = Response::from_string("method not allowed").with_status_code(StatusCode(405));
-        let _ = request.respond(resp);
-        return Ok(());
     }
 
     if method != Method::Get {
@@ -197,6 +209,7 @@ fn handle(root: &ViewRoot, request: Request) -> Result<()> {
             let json = files_json(&root.files);
             respond_json(request, json)
         }
+        "/api/events" => api_events(request),
         _ => {
             let resp = Response::from_string("not found").with_status_code(StatusCode(404));
             let _ = request.respond(resp);
@@ -291,9 +304,9 @@ pub(crate) fn build_file_view(
     stdin_lines: &[String],
     live: bool,
 ) -> Result<FileViewModel> {
-    let source = fs::read_to_string(abs).with_context(|| format!("read {}", abs.display()))?;
+    let mut source = fs::read_to_string(abs).with_context(|| format!("read {}", abs.display()))?;
     // Structure shows this file only — do not merge imported lib bodies into the tree.
-    let (structure, outline, input_prompts) = match crate::parse::parse_source(&source) {
+    let (mut structure, mut outline, input_prompts) = match crate::parse::parse_source(&source) {
         Ok(module) => (
             render_module_structure(&module, &source),
             crate::view::render::render_function_outline(&module),
@@ -334,6 +347,17 @@ pub(crate) fn build_file_view(
             ),
         }
     };
+    // Re-read after run so writeback slots / workbook edits show in Structure.
+    if !awaiting_input {
+        if let Ok(next) = fs::read_to_string(abs) {
+            source = next;
+            if let Ok(module) = crate::parse::parse_source(&source) {
+                structure = render_module_structure(&module, &source);
+                outline = crate::view::render::render_function_outline(&module);
+            }
+        }
+    }
+    outline.push_str(&crate::view::render::render_writeback_outline(&source));
     Ok(FileViewModel {
         rel_path: rel.to_string(),
         source,
@@ -522,6 +546,130 @@ fn api_foreign_run(root: &ViewRoot, mut request: Request) -> Result<()> {
         }
     };
     respond_json(request, json)
+}
+
+/// SSE: long-lived `text/event-stream` of EventBus JSON maps (`data: …\n\n`).
+fn api_events(request: Request) -> Result<()> {
+    let rx = crate::host::event_bus::EventBus::global().subscribe();
+    let body = SseBody::new(rx);
+    let ct = Header::from_bytes(&b"Content-Type"[..], &b"text/event-stream; charset=utf-8"[..])
+        .map_err(|_| anyhow::anyhow!("header"))?;
+    let cc = Header::from_bytes(&b"Cache-Control"[..], &b"no-cache"[..])
+        .map_err(|_| anyhow::anyhow!("header"))?;
+    let conn = Header::from_bytes(&b"Connection"[..], &b"keep-alive"[..])
+        .map_err(|_| anyhow::anyhow!("header"))?;
+    let resp = Response::empty(StatusCode(200))
+        .with_header(ct)
+        .with_header(cc)
+        .with_header(conn)
+        .with_data(body, None)
+        .with_chunked_threshold(0);
+    request.respond(resp).context("respond sse")?;
+    Ok(())
+}
+
+/// Background `run_file` for the live Stream panel; events go to the EventBus.
+fn api_run(root: &ViewRoot, mut request: Request) -> Result<()> {
+    let mut body = Vec::new();
+    std::io::Read::read_to_end(&mut request.as_reader(), &mut body)?;
+    let body = String::from_utf8_lossy(&body);
+    let v: serde_json::Value = serde_json::from_str(&body).unwrap_or(serde_json::Value::Null);
+    let rel = v.get("path").and_then(|x| x.as_str()).unwrap_or("").to_string();
+    let stdin_raw = v.get("stdin").and_then(|x| x.as_str()).unwrap_or("");
+    let stdin_lines = split_stdin_text(stdin_raw);
+    if rel.is_empty() {
+        return respond_json(
+            request,
+            serde_json::json!({ "ok": false, "error": "missing path" }).to_string(),
+        );
+    }
+    let abs = match resolve_rel(root, &rel) {
+        Ok(p) => p,
+        Err(e) => {
+            return respond_json(
+                request,
+                serde_json::json!({ "ok": false, "error": format!("{e:#}") }).to_string(),
+            );
+        }
+    };
+    let root_path = root.root.clone();
+    let rel_clone = rel.clone();
+    std::thread::spawn(move || {
+        let start = serde_json::json!({
+            "type": "run_start",
+            "path": rel_clone,
+        });
+        crate::host::event_bus::EventBus::global().publish_json(&start.to_string());
+        let source = fs::read_to_string(&abs).unwrap_or_default();
+        let effective = effective_stdin(&source, &stdin_lines);
+        let mut opts = RunOptions::default();
+        opts.stdin_lines = effective;
+        opts.sleep_limit_ms = Some(30_000);
+        opts.fs_root = Some(root_path);
+        match run_file_capture(&abs, &opts) {
+            Ok(cap) => {
+                let done = serde_json::json!({
+                    "type": "done",
+                    "path": rel_clone,
+                    "ok": true,
+                    "result": cap.stdout,
+                });
+                crate::host::event_bus::EventBus::global().publish_json(&done.to_string());
+            }
+            Err(e) => {
+                let err = serde_json::json!({
+                    "type": "error",
+                    "path": rel_clone,
+                    "message": format!("{e:#}"),
+                });
+                crate::host::event_bus::EventBus::global().publish_json(&err.to_string());
+            }
+        }
+    });
+    respond_json(
+        request,
+        serde_json::json!({ "ok": true, "started": true, "path": rel }).to_string(),
+    )
+}
+
+struct SseBody {
+    rx: Receiver<String>,
+    buf: Vec<u8>,
+    pos: usize,
+}
+
+impl SseBody {
+    fn new(rx: Receiver<String>) -> Self {
+        Self {
+            rx,
+            buf: Vec::new(),
+            pos: 0,
+        }
+    }
+}
+
+impl Read for SseBody {
+    fn read(&mut self, out: &mut [u8]) -> io::Result<usize> {
+        loop {
+            if self.pos < self.buf.len() {
+                let n = (self.buf.len() - self.pos).min(out.len());
+                out[..n].copy_from_slice(&self.buf[self.pos..self.pos + n]);
+                self.pos += n;
+                return Ok(n);
+            }
+            match self.rx.recv_timeout(Duration::from_secs(15)) {
+                Ok(json) => {
+                    self.buf = format!("data: {json}\n\n").into_bytes();
+                    self.pos = 0;
+                }
+                Err(RecvTimeoutError::Timeout) => {
+                    self.buf = b": ping\n\n".to_vec();
+                    self.pos = 0;
+                }
+                Err(RecvTimeoutError::Disconnected) => return Ok(0),
+            }
+        }
+    }
 }
 
 fn respond_html(request: Request, body: String) -> Result<()> {

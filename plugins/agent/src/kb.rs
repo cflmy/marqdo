@@ -164,6 +164,76 @@ fn extract_fm_field(source: &str, key: &str) -> Option<String> {
     None
 }
 
+/// Parse Task FM `aliases:` as inline list `[a, b]`, comma string, or YAML `- item` block.
+fn extract_fm_aliases(source: &str) -> Vec<String> {
+    let source = source.strip_prefix('\u{feff}').unwrap_or(source);
+    let lines: Vec<&str> = source.lines().collect();
+    if lines.first().map(|l| l.trim()) != Some("---") {
+        return Vec::new();
+    }
+    let mut out = Vec::new();
+    let mut i = 1usize;
+    while i < lines.len() {
+        let t = lines[i].trim();
+        if t == "---" {
+            break;
+        }
+        if let Some(rest) = t.strip_prefix("aliases:") {
+            let rest = rest.trim();
+            if rest.is_empty() {
+                i += 1;
+                while i < lines.len() {
+                    let body = lines[i];
+                    let bt = body.trim();
+                    if bt == "---" {
+                        break;
+                    }
+                    if let Some(item) = bt.strip_prefix("- ") {
+                        let a = normalize_goal(item.trim().trim_matches('"'));
+                        if !a.is_empty() {
+                            out.push(a);
+                        }
+                        i += 1;
+                        continue;
+                    }
+                    if bt == "-" {
+                        i += 1;
+                        continue;
+                    }
+                    if !body.starts_with(' ') && !body.starts_with('\t') && !bt.is_empty() {
+                        break;
+                    }
+                    i += 1;
+                }
+                break;
+            }
+            let inline = rest.trim_matches(|c| c == '[' || c == ']');
+            for part in inline.split(',') {
+                let a = normalize_goal(part.trim().trim_matches('"'));
+                if !a.is_empty() {
+                    out.push(a);
+                }
+            }
+            break;
+        }
+        i += 1;
+    }
+    out
+}
+
+fn format_aliases_yaml(aliases: &[String]) -> String {
+    if aliases.is_empty() {
+        return String::new();
+    }
+    let mut s = String::from("aliases:\n");
+    for a in aliases {
+        s.push_str("  - ");
+        s.push_str(&yaml_escape(a));
+        s.push('\n');
+    }
+    s
+}
+
 fn set_fm_field(source: &str, key: &str, value: &str) -> String {
     let source = source.strip_prefix('\u{feff}').unwrap_or(source);
     let lines: Vec<&str> = source.lines().collect();
@@ -258,6 +328,43 @@ fn resolve_skill_paths(
     None
 }
 
+/// Second-pass exact match: `normalize_goal(query)` equals a Task FM alias.
+fn resolve_skill_paths_by_alias(
+    root: &Path,
+    goal_norm: &str,
+) -> Option<(PathBuf, PathBuf, PathBuf, String)> {
+    if goal_norm.is_empty() {
+        return None;
+    }
+    let tasks_dir = root.join("concepts/tasks");
+    let skills_dir = root.join("concepts/skills");
+    let res_dir = root.join("resources");
+    if !tasks_dir.is_dir() {
+        return None;
+    }
+    let rd = fs::read_dir(&tasks_dir).ok()?;
+    for ent in rd.flatten() {
+        let p = ent.path();
+        if p.extension().and_then(|e| e.to_str()) != Some("md") {
+            continue;
+        }
+        let Ok(src) = fs::read_to_string(&p) else {
+            continue;
+        };
+        let aliases = extract_fm_aliases(&src);
+        if !aliases.iter().any(|a| a == goal_norm) {
+            continue;
+        }
+        let stem = p.file_stem()?.to_string_lossy().into_owned();
+        let skill = skills_dir.join(format!("{stem}.md"));
+        let res = res_dir.join(format!("{stem}.mq.md"));
+        if skill.is_file() && res.is_file() {
+            return Some((p, skill, res, stem));
+        }
+    }
+    None
+}
+
 fn unique_slug(root: &Path, base: &str, sig: &str) -> String {
     let tasks = root.join("concepts/tasks");
     let candidate = tasks.join(format!("{base}.md"));
@@ -296,11 +403,32 @@ fn write_task_concept(
     slug: &str,
     goal: &str,
     now: &str,
+    aliases: &[String],
 ) -> Result<(), String> {
     if let Some(p) = path.parent() {
         fs::create_dir_all(p).map_err(|e| format!("mkdir: {e}"))?;
     }
     let title: String = goal.chars().take(48).collect();
+    let mut merged: Vec<String> = Vec::new();
+    if path.is_file() {
+        if let Ok(old) = fs::read_to_string(path) {
+            for a in extract_fm_aliases(&old) {
+                if !merged.iter().any(|x| x == &a) {
+                    merged.push(a);
+                }
+            }
+        }
+    }
+    for a in aliases {
+        let a = normalize_goal(a);
+        if a.is_empty() || a == goal {
+            continue;
+        }
+        if !merged.iter().any(|x| x == &a) {
+            merged.push(a);
+        }
+    }
+    let alias_block = format_aliases_yaml(&merged);
     let body = format!(
         r#"---
 type: Marqdo Task
@@ -310,7 +438,7 @@ sig: {sig}
 status: stable
 tags: [agent-task]
 skill: ../skills/{slug}.md
-generated:
+{alias_block}generated:
   by: marqdo-agent/plan
   at: {now}
 verified:
@@ -326,6 +454,7 @@ See [skill](../skills/{slug}.md).
         goal_e = yaml_escape(goal),
         sig = sig,
         slug = slug,
+        alias_block = alias_block,
         now = now,
     );
     fs::write(path, body).map_err(|e| format!("write task: {e}"))
@@ -435,10 +564,16 @@ pub fn goal_slug(args: &Value) -> Result<Value, String> {
 pub fn kb_lookup(args: &Value) -> Result<Value, String> {
     let kb = arg_text(args, "kb_dir")?;
     let goal = arg_text(args, "goal")?;
-    let sig = goal_sig_hex(&material_for(goal, opt_tools(args)));
+    let goal_n = normalize_goal(goal);
+    let query_sig = goal_sig_hex(&material_for(goal, opt_tools(args)));
     let slug_hint = goal_slug_str(goal);
     let root = resolve_path(kb);
-    let Some((_task, skill_path, _res, slug)) = resolve_skill_paths(&root, &sig, &slug_hint) else {
+    let mut match_kind = "exact";
+    let resolved = resolve_skill_paths(&root, &query_sig, &slug_hint).or_else(|| {
+        match_kind = "alias";
+        resolve_skill_paths_by_alias(&root, &goal_n)
+    });
+    let Some((_task, skill_path, _res, slug)) = resolved else {
         return Ok(Value::Null);
     };
 
@@ -457,6 +592,7 @@ pub fn kb_lookup(args: &Value) -> Result<Value, String> {
     let hits = extract_fm_field(&skill_src, "hits")
         .and_then(|s| s.parse::<i64>().ok())
         .unwrap_or(0);
+    let skill_sig = extract_fm_field(&skill_src, "sig").unwrap_or_else(|| query_sig.clone());
 
     let res_path = root.join("resources").join(format!("{slug}.mq.md"));
     if res_path.is_file() {
@@ -474,7 +610,9 @@ pub fn kb_lookup(args: &Value) -> Result<Value, String> {
 
     Ok(json!({
         "hit": true,
-        "sig": sig,
+        "match": match_kind,
+        "sig": skill_sig,
+        "query_sig": query_sig,
         "slug": slug,
         "status": status,
         "llm_free": llm_free,
@@ -489,10 +627,13 @@ pub fn kb_lookup(args: &Value) -> Result<Value, String> {
 pub fn kb_record_hit(args: &Value) -> Result<Value, String> {
     let kb = arg_text(args, "kb_dir")?;
     let goal = arg_text(args, "goal")?;
+    let goal_n = normalize_goal(goal);
     let sig = goal_sig_hex(&material_for(goal, opt_tools(args)));
     let slug_hint = goal_slug_str(goal);
     let root = resolve_path(kb);
-    let Some((_t, skill_path, _r, slug)) = resolve_skill_paths(&root, &sig, &slug_hint) else {
+    let Some((_t, skill_path, _r, slug)) = resolve_skill_paths(&root, &sig, &slug_hint)
+        .or_else(|| resolve_skill_paths_by_alias(&root, &goal_n))
+    else {
         return Ok(Value::Null);
     };
     let src = fs::read_to_string(&skill_path).map_err(|e| format!("read skill: {e}"))?;
@@ -571,12 +712,24 @@ pub fn kb_promote(args: &Value) -> Result<Value, String> {
     fs::write(&res_path, &src).map_err(|e| format!("write resource: {e}"))?;
 
     let now = now_rfc3339();
+    // Optional extra aliases from caller (JSON array or single string).
+    let mut extra_aliases: Vec<String> = Vec::new();
+    if let Some(Value::Array(items)) = args.get("aliases") {
+        for v in items {
+            if let Some(s) = v.as_str() {
+                extra_aliases.push(s.to_string());
+            }
+        }
+    } else if let Some(Value::String(s)) = args.get("aliases") {
+        extra_aliases.push(s.clone());
+    }
     write_task_concept(
         &root.join("concepts/tasks").join(format!("{slug}.md")),
         &sig,
         &slug,
         &goal_n,
         &now,
+        &extra_aliases,
     )?;
     write_skill_concept(
         &skill_path,

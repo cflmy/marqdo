@@ -420,6 +420,7 @@ Append a `round` event when `stream=True`. Optional `echo` prints a short TTY ma
   *`ev` = > json.set map=`ev` key=workbook value=`workbook` *
   *`ev` = > json.set map=`ev` key=exit_code value=`exit_code` *
   *`events` = > json.append list=`events` item=`ev` *
+  > sys.stream_publish event=`ev`
   1. `echo`
     > print text=plan:round
   2. *
@@ -443,6 +444,7 @@ Append a `round` event when `stream=True`. Optional `echo` prints a short TTY ma
   2. *
     *`_` = 1*
   *`events` = > json.append list=`events` item=`ev` *
+  > sys.stream_publish event=`ev`
 2. *
   *`_` = 1*
 
@@ -487,6 +489,7 @@ When `stream=True`, append `done` and attach `events` on the result map. Optiona
   2. *
     *`_` = 1*
   *`events` = > json.append list=`events` item=`ev` *
+  > sys.stream_publish event=`ev`
   *`out` = > json.set map=`out` key=events value=`events` *
 2. *
   *`_` = 1*
@@ -655,6 +658,11 @@ Non-hit path runs parent **decompose** before the first child spawn (`DECISION: 
 3. `reuse`
   *`hit` = > agent_kb_lookup kb_dir=`kb_dir` goal=`goal` tools=`tools` *
   1. `hit`
+    *`match_kind` = > json.get value=`hit` key=match *
+    1. `match_kind` == alias
+      *`cache_label` = soft-hit*
+    2. *
+      *`cache_label` = hit*
     *`lf` = > json.get value=`hit` key=llm_free *
     1. `lf`
       *`path` = > json.get value=`hit` key=resource *
@@ -664,13 +672,13 @@ Non-hit path runs parent **decompose** before the first child spawn (`DECISION: 
       *`last_obs` = > json.get value=`aw` key=observation *
       1. `code` == 0
         > agent_kb_record_hit kb_dir=`kb_dir` goal=`goal` tools=`tools` improve_every=`improve_every`
-        *`cache` = hit*
+        *`cache` = `cache_label`*
         *`out` = > json.parse text={"status":"ok"} *
         *`out` = > json.set map=`out` key=status value=ok *
         *`out` = > json.set map=`out` key=goal value=`goal` *
         *`out` = > json.set map=`out` key=workbook value=`path` *
         *`out` = > json.set map=`out` key=rounds value=1 *
-        *`out` = > json.set map=`out` key=cache value=hit *
+        *`out` = > json.set map=`out` key=cache value=`cache_label` *
         *`sk` = > json.get value=`hit` key=skill *
         *`out` = > json.set map=`out` key=skill value=`sk` *
         *`st` = > json.get value=`hit` key=status *
@@ -711,13 +719,13 @@ Non-hit path runs parent **decompose** before the first child spawn (`DECISION: 
           *`improve` = 1*
           *`cache` = improve*
         2. *
-          *`cache` = hit*
+          *`cache` = `cache_label`*
           *`out` = > json.parse text={"status":"ok"} *
           *`out` = > json.set map=`out` key=status value=ok *
           *`out` = > json.set map=`out` key=goal value=`goal` *
           *`out` = > json.set map=`out` key=workbook value=`path` *
           *`out` = > json.set map=`out` key=rounds value=1 *
-          *`out` = > json.set map=`out` key=cache value=hit *
+          *`out` = > json.set map=`out` key=cache value=`cache_label` *
           *`sk` = > json.get value=`hit` key=skill *
           *`out` = > json.set map=`out` key=skill value=`sk` *
           *`st` = > json.get value=`hit` key=status *

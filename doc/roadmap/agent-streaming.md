@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| 状态 | **S0–S2 已落地**（S3 view 仍待做） |
+| 状态 | **S0–S3 已落地**（view SSE） |
 | 日期 | 2026-08-10 |
 | 相关 | [ext-llm.md](../design/ext-llm.md) · [ext-agent.md](../design/ext-agent.md) · [ext-agent-plan.md](../design/ext-agent-plan.md) · [stdlib-subtask.md](../design/stdlib-subtask.md) · [view.md](../design/view.md) |
 | 痛点 | `complete` / `step` / `plan` 均为整段返回；用户看不到思考与中间输出 |
@@ -136,7 +136,7 @@ plan 特有：
 S0  net/llm：SSE 读 + complete stream=True + 事件 foreach     ✅
 S1  step stream=True（echo 增量；返回 map 不变）               ✅
 S2  plan stream=True：round + 父 delta；trace 写回可选         ✅
-S3  view 订阅                                                 （待做）
+S3  view 订阅（EventBus + GET /api/events + POST /api/run）   ✅
 ```
 
 ### 开放点决议（S0）
@@ -167,6 +167,6 @@ S3  view 订阅                                                 （待做）
 2. ~~delta 默认 print~~ → 默认关；`echo=True` 可选。  
 3. ~~中文面~~ → `流式=` / `打印增量=`。  
 4. ~~S2~~ → `plan stream=True`：`round` / 父 delta / `decision` / `done`；可选 `trace`。  
-5. **S3**：`marqdo view` 订阅同一事件模型。
+5. ~~**S3**~~ → `marqdo view`：进程内 EventBus；`GET /api/events`（SSE）；`POST /api/run` 后台执行；Execution 区 EventSource 面板。CLI 默认不订阅。
 
 S0 可与 [okf-near-match.md](okf-near-match.md) 并行，互不阻塞。

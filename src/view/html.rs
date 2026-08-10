@@ -474,12 +474,103 @@ section.block > h2 {
   border-left: 3px solid #2563eb;
   background: #f8fafc;
 }
+.output-card .wb-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+.wb-badge.wb-ok { background: #dcfce7; color: #166534; }
+.wb-badge.wb-error { background: #fee2e2; color: #991b1b; }
+.wb-badge.wb-trace { background: #e0e7ff; color: #3730a3; }
 .output-card .output-body {
   margin: 0.35rem 0 0;
   padding: 0.5rem 0.65rem;
   font: 0.85rem/1.45 var(--mono);
   white-space: pre-wrap;
   color: #0f172a;
+}
+.wb-outline {
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--line);
+}
+.wb-outline-title {
+  font: 0.72rem/1.2 var(--sans);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 0.35rem;
+}
+.plan-card {
+  margin: 0 0 0.85rem;
+  padding: 0.75rem 0.9rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #f8fafc;
+  font: 0.88rem/1.45 var(--sans);
+}
+.plan-card .plan-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  margin: 0.35rem 0 0.55rem;
+  color: var(--muted);
+  font: 0.8rem/1.35 var(--mono);
+}
+.plan-card a { color: #1d4ed8; }
+.stream-panel {
+  margin: 0 0 0.85rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #0f172a;
+  color: #e2e8f0;
+  overflow: hidden;
+}
+.stream-head {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.55rem 0.75rem;
+  background: #1e293b;
+  border-bottom: 1px solid #334155;
+  font: 0.8rem/1 var(--sans);
+}
+.stream-head button {
+  font: 0.78rem/1 var(--sans);
+  padding: 0.35rem 0.7rem;
+  border-radius: 6px;
+  border: 1px solid #475569;
+  background: #334155;
+  color: #f8fafc;
+  cursor: pointer;
+}
+.stream-head button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.stream-status {
+  margin-left: auto;
+  color: #94a3b8;
+  font: 0.72rem/1 var(--mono);
+}
+.stream-log {
+  margin: 0;
+  padding: 0.75rem 0.85rem;
+  min-height: 6rem;
+  max-height: 18rem;
+  overflow: auto;
+  font: 0.78rem/1.45 var(--mono);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.stream-log .ev-mark {
+  color: #93c5fd;
+}
+.stream-log .ev-reason {
+  color: #c4b5fd;
+}
+.stream-log .ev-err {
+  color: #fca5a5;
 }
 .code-head {
   display: flex;
@@ -763,14 +854,96 @@ pub fn layout(title: &str, nav: &str, main: &str) -> String {
       }});
     }});
   }}
+  function initStreamPanel() {{
+    if (!window.MARQDO_VIEW_LIVE) return;
+    var log = document.getElementById("stream-log");
+    var status = document.getElementById("stream-status");
+    var runBtn = document.getElementById("stream-run");
+    if (!log || !window.EventSource) return;
+    var es = new EventSource("/api/events?path=" + encodeURIComponent(window.MARQDO_FILE_PATH || ""));
+    function appendLine(cls, text) {{
+      var span = document.createElement("span");
+      if (cls) span.className = cls;
+      span.textContent = text;
+      log.appendChild(span);
+      log.appendChild(document.createTextNode("\\n"));
+      log.scrollTop = log.scrollHeight;
+    }}
+    es.onopen = function () {{
+      if (status) status.textContent = "connected";
+    }};
+    es.onerror = function () {{
+      if (status) status.textContent = "reconnecting…";
+    }};
+    es.onmessage = function (msg) {{
+      try {{
+        var ev = JSON.parse(msg.data);
+        var t = ev.type || "?";
+        if (t === "reasoning") {{
+          appendLine("ev-reason", ev.text || "");
+        }} else if (t === "delta") {{
+          appendLine(null, ev.text || "");
+        }} else if (t === "error") {{
+          appendLine("ev-err", "error: " + (ev.message || ""));
+        }} else if (t === "round" || t === "decision" || t === "run_start" || t === "done") {{
+          var mark = t;
+          if (t === "round") mark += " #" + (ev.round != null ? ev.round : "");
+          if (t === "decision") mark += " " + (ev.decision || "");
+          if (t === "done" && ev.path) mark += " " + ev.path;
+          appendLine("ev-mark", "— " + mark + " —");
+          if (t === "done" && typeof ev.result === "string" && ev.result) {{
+            appendLine(null, ev.result.slice(0, 2000));
+          }}
+          if (ev.workbook) {{
+            appendLine("ev-mark", "workbook: " + ev.workbook);
+          }}
+        }} else {{
+          appendLine("ev-mark", JSON.stringify(ev));
+        }}
+      }} catch (e) {{
+        appendLine("ev-err", String(msg.data || e));
+      }}
+    }};
+    if (runBtn) {{
+      runBtn.addEventListener("click", function () {{
+        runBtn.disabled = true;
+        if (status) status.textContent = "running…";
+        log.textContent = "";
+        var stdinEl = document.getElementById("stdin");
+        fetch("/api/run", {{
+          method: "POST",
+          headers: {{ "Content-Type": "application/json" }},
+          body: JSON.stringify({{
+            path: window.MARQDO_FILE_PATH || "",
+            stdin: stdinEl ? stdinEl.value : ""
+          }})
+        }})
+          .then(function (r) {{ return r.json(); }})
+          .then(function (data) {{
+            if (!data.ok) {{
+              appendLine("ev-err", data.error || "run failed");
+              if (status) status.textContent = "error";
+            }}
+          }})
+          .catch(function (e) {{
+            appendLine("ev-err", String(e));
+            if (status) status.textContent = "error";
+          }})
+          .finally(function () {{ runBtn.disabled = false; }});
+      }});
+    }}
+  }}
+
   if (document.readyState === "loading") {{
     document.addEventListener("DOMContentLoaded", function () {{
       initForeignCards();
       initOutlineSearch();
+      initStreamPanel();
     }});
   }} else {{
     initForeignCards();
     initOutlineSearch();
+    initStreamPanel();
   }}
 
   function initOutlineSearch() {{
@@ -798,7 +971,7 @@ pub fn layout(title: &str, nav: &str, main: &str) -> String {
       }});
     }}
     input.addEventListener("input", applyFilter);
-    tree.querySelectorAll("a[href^='#fn-']").forEach(function (a) {{
+    document.querySelectorAll("a[href^='#fn-'], a[href^='#wb-']").forEach(function (a) {{
       a.addEventListener("click", function (ev) {{
         var id = (a.getAttribute("href") || "").slice(1);
         var el = id ? document.getElementById(id) : null;
@@ -1085,6 +1258,19 @@ pub fn page_file(files: &[PathBuf], rel: &str, vm: &FileViewModel, links: &LinkM
             outline = outline_block,
         )
     };
+    let plan_card = plan_result_card(&vm.stdout, links);
+    let stream_panel = match links {
+        LinkMode::Live => r#"<div class="stream-panel">
+  <div class="stream-head">
+    <strong>Stream</strong>
+    <button type="button" id="stream-run">Run</button>
+    <span class="stream-status" id="stream-status">idle</span>
+  </div>
+  <pre class="stream-log" id="stream-log"></pre>
+</div>"#
+        .to_string(),
+        LinkMode::Static { .. } => String::new(),
+    };
     let main = format!(
         r#"
 <script>
@@ -1100,6 +1286,8 @@ window.MARQDO_FILE_PATH = {path_js};
 <section class="block">
   <h2>Execution</h2>
   {stdin_panel}
+  {stream_panel}
+  {plan_card}
   <div class="out {status}">{out}</div>
   {plots}
 </section>
@@ -1116,11 +1304,80 @@ window.MARQDO_FILE_PATH = {path_js};
         rel = escape(rel),
         structure_block = structure_block,
         stdin_panel = stdin_panel,
+        stream_panel = stream_panel,
+        plan_card = plan_card,
         out = out_text,
         plots = plots_html,
         source = escape(&vm.source),
     );
     layout(rel, &nav, &main)
+}
+
+/// Plan / agent result map → card with workbook link and cache/rounds.
+fn plan_result_card(stdout: &str, links: &LinkMode) -> String {
+    let trimmed = stdout.trim();
+    if trimmed.is_empty() {
+        return String::new();
+    }
+    let candidate = trimmed
+        .lines()
+        .rev()
+        .find(|l| l.trim_start().starts_with('{'))
+        .unwrap_or(trimmed);
+    let Ok(v) = serde_json::from_str::<serde_json::Value>(candidate) else {
+        return String::new();
+    };
+    let workbook = v.get("workbook").and_then(|x| x.as_str());
+    let cache = v.get("cache").and_then(|x| x.as_str());
+    let rounds = v
+        .get("rounds")
+        .and_then(|x| x.as_u64())
+        .or_else(|| v.get("round").and_then(|x| x.as_u64()));
+    let status = v.get("status").and_then(|x| x.as_str());
+    if workbook.is_none() && cache.is_none() && rounds.is_none() {
+        return String::new();
+    }
+    let mut meta = Vec::new();
+    if let Some(s) = status {
+        meta.push(format!("status={}", escape(s)));
+    }
+    if let Some(c) = cache {
+        meta.push(format!("cache={}", escape(c)));
+    }
+    if let Some(r) = rounds {
+        meta.push(format!("rounds={r}"));
+    }
+    let link = match (workbook, links) {
+        (Some(wb), LinkMode::Live) => {
+            let href = format!("/file?path={}", urlencoding_path(wb));
+            format!(
+                r#"<a href="{href}">Open workbook</a> <code>{}</code>"#,
+                escape(wb)
+            )
+        }
+        (Some(wb), LinkMode::Static { .. }) => {
+            format!(r#"workbook <code>{}</code>"#, escape(wb))
+        }
+        _ => String::new(),
+    };
+    format!(
+        r#"<div class="plan-card"><strong>Plan result</strong><div class="plan-meta">{}</div>{}</div>"#,
+        meta.join(" · "),
+        link
+    )
+}
+
+fn urlencoding_path(s: &str) -> String {
+    let mut out = String::new();
+    for b in s.as_bytes() {
+        match *b {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' | b'/' => {
+                out.push(*b as char);
+            }
+            _ => out.push_str(&format!("%{b:02X}")),
+        }
+    }
+    out
 }
 
 fn escape_js_string(s: &str) -> String {

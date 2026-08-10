@@ -342,7 +342,13 @@ Prefer spawning `resource` over re-planning.
 - `concepts/skills/<slug>.md`
 - `resources/<slug>.mq.md`
 
-匹配：先按 slug 试探并核对 frontmatter `sig`，再扫目录按 `sig:`，最后回退旧 hex 文件名。v1 **精确命中**；不做 embedding。相近措辞自动复用属未来规划，见 [okf-near-match.md](../roadmap/okf-near-match.md)。
+匹配顺序：
+
+1. **精确**：slug 试探 + frontmatter `sig` → 扫目录 `sig:` → 旧 hex 文件名。  
+2. **别名（Accepted）**：精确 miss 后，扫 Task FM `aliases:`（YAML 列表或 `[a, b]`）；`normalize_goal(query)` 与某条 alias **精确相等**则命中同一 Skill/resource。lookup 返回 `match: exact|alias`；`plan` 对 alias 写 `cache=soft-hit`。  
+3. **不做**默认 embedding / 编辑距离主路径。父裁决 soft_match 仍见 [okf-near-match.md](../roadmap/okf-near-match.md)。
+
+`agent_kb_promote` 可选 `aliases=`（字符串或列表）写入 Task；再晋升时合并既有 aliases。
 
 ### 7.4 与 `## plan` 的契约
 
@@ -426,7 +432,7 @@ agent-kb 运行时实现归属 **agent 插件**（`agent_goal_sig` / `agent_kb_l
 | **O2** | 本文锁定的任务知识包：`Marqdo Task` / `Agent Skill`；`plan` reuse/promote | **done**（host kb_* + plan 快路径） |
 | **O3** | catalog 增强：`verified`/`sources` 可选；模块页可点击依赖；扫入 `agent-kb` 概念供人浏览 | **done** |
 | **O4** | `log.md` 策展、可选 `kb query`、Attested-style「再现跑通」收据（非 BigQuery） | 远期 |
-| **O5** | 相近任务可选软命中（规范句 / aliases / 父裁决；非默认向量库） | 规划见 [okf-near-match.md](../roadmap/okf-near-match.md) |
+| **O5** | 相近任务软命中：Task `aliases` 第二趟已落地；规范句 / 父裁决 / 向量仍见 [okf-near-match.md](../roadmap/okf-near-match.md) | **aliases done** |
 
 O2 设计落盘后，智能体侧实现文档可薄化为指向本文 §7，避免两套真理。
 

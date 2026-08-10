@@ -329,7 +329,7 @@ lib/subtask：spawn fn=<名>  →  wait
 | D1 | 重写 `ext/ai/agent.mq.md` / `智能体.mq.md`：`单步` + 源码/位置注入 + **子任务调工具** + **结构化返回值**；运行时经 **ABI v2 agent 插件**（禁 ext 直调 host） | **done** |
 | D2 | `多步`：按 [ext-agent-plan.md](ext-agent-plan.md)（观察→精确补丁；禁止整文件重写）；**D2a–D2f 主路径已落地** | **done** |
 | D3 | 金样例：离线单步 / 写回；**live 单步**（`tests/ext/agent-run-live.mq.md`）；多步骨架（可不打网） | **live done** |
-| D4 | `view` / `debug` 对工作簿与写回块的导航体验 | TODO |
+| D4 | `view` / `debug` 对工作簿与写回块的导航体验 | done（workbook 链到 `/file?path=`；写回槽 `ok`/`error`/`trace` 徽章 + `#wb-{line}`；plan 结果卡） |
 | O2 | OKF 任务知识包：`plan` reuse/promote（[okf.md §7](okf.md)） | **done** |
 
 ### 非目标

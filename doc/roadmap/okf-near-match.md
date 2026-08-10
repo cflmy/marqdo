@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| 状态 | **规划 / 未开工** |
+| 状态 | **B aliases 已落地**（A 规范句 / C 父裁决 / E 向量仍待） |
 | 日期 | 2026-08-09 |
 | 相关 | [okf.md](../design/okf.md) §7 · [ext-agent-plan.md](../design/ext-agent-plan.md) §4.2 · [ext-agent.md](../design/ext-agent.md) |
 | 触发观察 | `man-test`：相近 goal 生成两份独立 resource |

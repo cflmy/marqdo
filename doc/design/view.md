@@ -102,8 +102,11 @@ marqdo view output tests/structure/hello.mq.md -o /tmp/hello-doc
 | `GET` | `/` | 默认打开第一个 `.mq.md`（无文件时为空提示） |
 | `GET` | `/file?path=…` | 单文件页 |
 | `GET` | `/api/tree` | JSON 树（可选） |
+| `GET` | `/api/events?path=…` | SSE（`text/event-stream`）：订阅进程内 EventBus（`reasoning` / `delta` / `round` / `decision` / `done` / `error`） |
+| `POST` | `/api/run` | JSON `{path, stdin?}`：后台 `run_file`；事件进 bus；结束补 `done`/`error`（不替代页内整页 stdout） |
+| `POST` | `/api/foreign-run` | 外联代码块试跑 |
 
-根目录锁死；拒绝 `..` 逃逸。
+根目录锁死；拒绝 `..` 逃逸。默认页加载仍整页执行；Stream 面板为增强路径（`EventSource` + Run）。
 
 ---
 

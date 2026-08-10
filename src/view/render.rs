@@ -445,12 +445,79 @@ fn stmt_end_line(stmt: &Stmt) -> u32 {
 
 fn output_card(line: u32, writebacks: &HashMap<u32, String>) -> String {
     match writebacks.get(&line) {
-        Some(body) => format!(
-            r#"<div class="card output-card"><span class="badge">output</span><pre class="output-body">{}</pre></div>"#,
-            escape(body)
-        ),
+        Some(body) => {
+            let badges = writeback_badges(body);
+            format!(
+                r#"<div class="card output-card" id="wb-{line}"><div class="wb-badges">{badges}</div><pre class="output-body">{}</pre></div>"#,
+                escape(body)
+            )
+        }
         None => String::new(),
     }
+}
+
+fn writeback_badges(body: &str) -> String {
+    let mut keys = Vec::new();
+    for line in body.lines() {
+        if let Some(rest) = line.strip_prefix('[') {
+            if let Some(end) = rest.find(']') {
+                let k = &rest[..end];
+                if !k.is_empty() && !keys.iter().any(|x| x == k) {
+                    keys.push(k.to_string());
+                }
+            }
+        }
+    }
+    if keys.is_empty() {
+        return r#"<span class="badge wb-badge">output</span>"#.into();
+    }
+    keys.into_iter()
+        .map(|k| {
+            let cls = match k.as_str() {
+                "ok" => "wb-ok",
+                "error" => "wb-error",
+                "trace" => "wb-trace",
+                _ => "wb-other",
+            };
+            format!(r#"<span class="badge wb-badge {cls}">{k}</span>"#, k = escape(&k))
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+/// Outline links to writeback cards (`#wb-{line}`).
+pub fn render_writeback_outline(source: &str) -> String {
+    let map = writeback::writeback_map(source);
+    if map.is_empty() {
+        return String::new();
+    }
+    let mut lines: Vec<u32> = map.keys().copied().filter(|l| *l > 0).collect();
+    lines.sort_unstable();
+    if lines.is_empty() {
+        return String::new();
+    }
+    let mut out = String::from(
+        r#"<div class="wb-outline" id="wb-outline"><div class="wb-outline-title">Writebacks</div><ul class="outline-tree">"#,
+    );
+    for line in lines {
+        let body = map.get(&line).map(|s| s.as_str()).unwrap_or("");
+        let label = if body.contains("[error]") {
+            "error"
+        } else if body.contains("[ok]") {
+            "ok"
+        } else if body.contains("[trace]") {
+            "trace"
+        } else {
+            "output"
+        };
+        out.push_str(&format!(
+            r##"<li class="outline-item"><a href="#wb-{line}">L{line} · {label}</a></li>"##,
+            line = line,
+            label = label,
+        ));
+    }
+    out.push_str("</ul></div>");
+    out
 }
 
 fn render_stmt(

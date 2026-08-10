@@ -175,7 +175,16 @@ See `tests/structure/object-handle.mq.md` and `ext/llm.mq.md`: `# Type` construc
 **`msg`**
 ```
 
-`_type` stays the most specific name (`Loud`). Methods walk the base chain; same-name `##` on the child overrides. No implicit super in v1.
+`_type` stays the most specific name (`Loud`). Methods walk the base chain; same-name `##` on the child overrides. **No implicit super** — if the child needs parent fields, call the parent explicitly:
+
+```markdown
+# Child = > Parent
+    + `name`
+
+*`self` = > Parent name=`name` *
+*`self` = > json.set map=`self` key=extra value=1 *
+**`self`**
+```
 
 ## 11. Agent layout (ABI)
 

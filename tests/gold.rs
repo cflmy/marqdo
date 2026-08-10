@@ -86,6 +86,16 @@ HELLO, world!",
 }
 
 #[test]
+fn structure_inherit_explicit_super() {
+    assert_out(
+        "tests/structure/inherit-explicit-super.mq.md",
+        "Child
+child
+Ada",
+    );
+}
+
+#[test]
 fn structure_nested_call() {
     assert_out("tests/structure/nested-call.mq.md", "Hello World!");
 }
@@ -1383,6 +1393,25 @@ fn ext_agent_kb_reuse() {
     // Default file-subtask quiet: no child print on parent stdout; answer via wait.value.
     let expect = format!("{sig}\n{slug}\npromoted\nstable\n{slug}\nlookup-ok\n0\npong\nstable-path");
     assert_out("tests/ext/agent-kb-reuse.mq.md", &expect);
+}
+
+#[test]
+fn ext_agent_kb_alias() {
+    let status = Command::new("cargo")
+        .args(["build", "-p", "marqdo_plugin_agent"])
+        .current_dir(env!("CARGO_MANIFEST_DIR"))
+        .status()
+        .expect("build agent plugin");
+    assert!(status.success(), "failed to build marqdo_plugin_agent");
+    assert_out(
+        "tests/ext/agent-kb-alias.mq.md",
+        "promoted
+alias-written
+alias-ok
+alias
+same-slug
+exact",
+    );
 }
 
 #[test]

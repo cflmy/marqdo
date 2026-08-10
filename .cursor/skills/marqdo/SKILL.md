@@ -30,7 +30,7 @@ Canonical design (repo): `doc/design/markdown-mapping.md`, `doc/design/keywords.
 
 | Marker | Meaning |
 |--------|---------|
-| `#` | **Object / type** (constructor body). `# main` = entry object. `# Child = > Parent` = inherit. |
+| `#` | **Object / type** (constructor body). `# main` = entry object. `# Child = > Parent` = inherit (**no** implicit parent constructor; call `` `self` = > Parent … `` explicitly when needed). |
 | `##` … `######` | **Function / method** (nesting by heading depth). |
 | `` + `name` `` under heading | Parameter (optional `` `name`=default ``) |
 | `1.` `2.` … in body | Branch arm (condition or `N. *` else). **Same-indent restart at `1.` = new branch statement** (not more arms of the previous list). |

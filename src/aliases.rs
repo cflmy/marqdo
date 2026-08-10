@@ -88,6 +88,10 @@ pub fn canonical_param(builtin: &str, param: &str) -> String {
         ("host_exec" | "exec", "cmd" | "命令") => "cmd".into(),
         ("host_exec" | "exec", "args" | "参数") => "args".into(),
         (
+            "host_stream_publish" | "stream_publish",
+            "event" | "事件",
+        ) => "event".into(),
+        (
             "host_http_get" | "http_get" | "host_http_post" | "http_post" | "host_http_post_sse"
                 | "http_post_sse" | "host_http_request" | "http_request",
             "headers" | "头",
