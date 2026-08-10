@@ -129,22 +129,25 @@ impl<'a> Cursor<'a> {
 
     fn parse_function(&mut self, min_level: u8) -> Result<Function> {
         let line = self.bump().unwrap();
-        let (level, name) = parse_heading(line.text.trim())
+        let (level, raw_name) = parse_heading(line.text.trim())
             .ok_or_else(|| anyhow::anyhow!("{}:1: expected heading", line.line_no))?;
         if level < min_level {
             bail!("{}:1: heading level {level} < expected {min_level}", line.line_no);
         }
+        let span = Span {
+            line: line.line_no,
+            col: 1,
+        };
+        let (name, base) = parse_object_decl(level, raw_name, span)?;
 
         let mut fun = Function {
-            name: name.to_string(),
+            name,
             level,
-            span: Span {
-                line: line.line_no,
-                col: 1,
-            },
+            span,
             params: Vec::new(),
             body: Vec::new(),
             children: Vec::new(),
+            base,
         };
 
         // Parameter zone: indented `- name` pure identifiers.
@@ -764,6 +767,75 @@ fn parse_heading(trimmed: &str) -> Option<(u8, &str)> {
         return None;
     }
     Some((level, name))
+}
+
+/// `# Child = > Parent` → `(Child, Some(Parent))`; plain `# Child` → `(Child, None)`.
+fn parse_object_decl(level: u8, raw: &str, span: Span) -> Result<(String, Option<String>)> {
+    let raw = raw.trim();
+    if let Some(eq) = raw.find('=') {
+        if level != 1 {
+            return Err(Diagnostic::new(
+                None,
+                span,
+                "inheritance (`= > Base`) is only allowed on `#` object headings",
+            )
+            .into());
+        }
+        let name = raw[..eq].trim();
+        let rhs = raw[eq + 1..].trim();
+        if name.is_empty() {
+            return Err(Diagnostic::new(None, span, "object name missing before `=`").into());
+        }
+        if !is_simple_type_name(name) {
+            return Err(Diagnostic::new(
+                None,
+                span,
+                format!("invalid object name `{name}`"),
+            )
+            .into());
+        }
+        let Some(after_gt) = rhs.strip_prefix('>') else {
+            return Err(Diagnostic::new(
+                None,
+                span,
+                "object inheritance requires `# Name = > Base` (base must follow `>`)",
+            )
+            .into());
+        };
+        let base = after_gt.trim();
+        if base.is_empty() {
+            return Err(Diagnostic::new(None, span, "missing base type after `>`").into());
+        }
+        if base.contains('.') {
+            return Err(Diagnostic::new(
+                None,
+                span,
+                format!("base type must be a simple name, not a path (`{base}`)"),
+            )
+            .into());
+        }
+        if !is_simple_type_name(base) {
+            return Err(Diagnostic::new(
+                None,
+                span,
+                format!("invalid base type name `{base}`"),
+            )
+            .into());
+        }
+        return Ok((name.to_string(), Some(base.to_string())));
+    }
+    Ok((raw.to_string(), None))
+}
+
+fn is_simple_type_name(s: &str) -> bool {
+    let mut chars = s.chars();
+    let Some(first) = chars.next() else {
+        return false;
+    };
+    if !(first.is_alphabetic() || first == '_' || !first.is_ascii()) {
+        return false;
+    }
+    chars.all(|c| c.is_alphanumeric() || c == '_' || !c.is_ascii())
 }
 
 /// Parse `lib/time.mq.md` / `lib/time.mq.md as time` / `lib/时间.mq.md 作为 时间`.

@@ -2,8 +2,8 @@
 
 | | |
 |---|---|
-| 状态 | **规划 / 未开工** |
-| 日期 | 2026-08-09 |
+| 状态 | **I0–I2 已落地**（I3 隐式 super 仍可选） |
+| 日期 | 2026-08-10 |
 | 相关 | [objects.md](../design/objects.md) · [markdown-mapping.md](../design/markdown-mapping.md) · [keywords.md](../design/keywords.md) |
 | 提案语法 | `# 子类 = > 父类` |
 
@@ -136,9 +136,9 @@
 ## 6. 推荐落地顺序
 
 ```text
-I0  语法 + AST + 金样（解析/循环继承错误）
-I1  方法解析沿基类链；构造 _type=子类
-I2  覆盖方法；文档更新 objects.md（移出「非目标」）
+I0  语法 + AST + 金样（解析/循环继承错误）     ✅
+I1  方法解析沿基类链；构造 _type=子类           ✅
+I2  覆盖方法；文档更新 objects.md               ✅
 I3  （可选）子构造约定：显式 > 父类 … 或隐式 super
 ```
 

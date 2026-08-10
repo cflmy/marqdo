@@ -16,6 +16,7 @@ pub mod ext_cli;
 pub mod foreign;
 pub mod formula;
 pub mod host;
+pub mod inherit;
 pub mod input_feed;
 pub mod interp;
 pub mod lex;

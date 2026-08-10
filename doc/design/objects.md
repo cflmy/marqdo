@@ -58,13 +58,44 @@
 官方 `lib/*.mq.md` 以**顶层自由函数**为主：全部为 `##`（不再使用 `#` 冒充类型）。  
 真正的类型化扩展（如 `ext/llm`）使用 `# 类型` + `##` 方法。
 
-## 5. 非目标（本波）
+## 5. 继承（`# 子类 = > 父类`）
 
-- 继承 / 接口 / 可见性 — **继承语法已单独立项规划**，见 [object-inheritance.md](../roadmap/object-inheritance.md)（提案：`# 子类 = > 父类`）  
+```markdown
+# Greeter
+
+## hello
+    + `who`
+
+*`msg` = "Hello, `who`!" *
+**`msg`**
+
+# Loud = > Greeter
+
+## hello
+    + `who`
+
+*`msg` = "HELLO, `who`!" *
+**`msg`**
+```
+
+| 规则 | 说明 |
+|------|------|
+| 语法 | `# Child = > Parent`（右侧必须是 `>` + 简单类型名；无路径） |
+| `_type` | 构造后仍为**最具体子类名** |
+| 方法查找 | 先子类 `##`，未命中再沿基类链；同名则子类覆盖 |
+| 构造 | v1 **不**隐式调用父构造；需要时在子类正文显式 `` `self` = > Parent … `` |
+| 多继承 | 不支持 |
+| 诊断 | 未知基类、循环继承、非法 RHS（如 `# Foo = 1`） |
+
+详见 [object-inheritance.md](../roadmap/object-inheritance.md)。
+
+## 6. 非目标（本波）
+
+- 接口 / 可见性 / 多继承  
 - 无 `_type` 的「鸭子」方法分发  
-- 用表格声明字段 schema（表格仍表示数据集合；几何语义打磨见 [tables-maps-footnotes.md](../roadmap/tables-maps-footnotes.md)）
+- 用表格声明字段 schema（表格仍表示数据集合；见 [tables-maps-footnotes.md](../roadmap/tables-maps-footnotes.md)）
 
-## 6. 迁移摘要
+## 7. 迁移摘要
 
 | 旧 | 新 |
 |----|----|

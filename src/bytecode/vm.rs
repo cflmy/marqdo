@@ -402,25 +402,38 @@ impl Vm {
                     }
                     vals.reverse();
                     let type_name = instance_type_name_bc(&recv).map_err(|m| self.err_at(span, m))?;
-                    let obj_idx = program
+                    let start_oi = program
                         .objects
                         .iter()
-                        .find(|(n, _)| n == &type_name)
-                        .map(|(_, i)| *i)
+                        .position(|(n, _)| n == &type_name)
                         .ok_or_else(|| {
                             self.err_at(span, format!("unknown object type `{type_name}`"))
                         })?;
-                    let method_fid = program
-                        .methods
-                        .iter()
-                        .find(|(o, m, _)| *o == obj_idx && m == &method_name)
-                        .map(|(_, _, i)| *i)
-                        .ok_or_else(|| {
+                    let method_fid = resolve_method_fid(program, start_oi, &method_name).ok_or_else(
+                        || {
+                            let mut chain = Vec::new();
+                            let mut oi = Some(start_oi);
+                            let mut seen = std::collections::HashSet::new();
+                            while let Some(i) = oi {
+                                if !seen.insert(i) {
+                                    break;
+                                }
+                                chain.push(program.objects[i].0.as_str());
+                                oi = program.object_bases.get(i).copied().flatten().and_then(
+                                    |base_flat| {
+                                        program.objects.iter().position(|(_, f)| *f == base_flat)
+                                    },
+                                );
+                            }
                             self.err_at(
                                 span,
-                                format!("unknown method `{type_name}.{method_name}`"),
+                                format!(
+                                    "unknown method `{type_name}.{method_name}` (searched {})",
+                                    chain.join(" → ")
+                                ),
                             )
-                        })?;
+                        },
+                    )?;
                     let callee = &program.functions[method_fid];
                     if callee.params.len() != argc {
                         return Err(self.err_at(span, "method argument count mismatch"));
@@ -544,6 +557,28 @@ impl Vm {
             }
         }
     }
+}
+
+fn resolve_method_fid(program: &Program, start_oi: usize, method_name: &str) -> Option<usize> {
+    let mut oi = Some(start_oi);
+    let mut seen = std::collections::HashSet::new();
+    while let Some(i) = oi {
+        if !seen.insert(i) {
+            break;
+        }
+        let obj_flat = program.objects[i].1;
+        if let Some((_, _, fid)) = program
+            .methods
+            .iter()
+            .find(|(o, m, _)| *o == obj_flat && m == method_name)
+        {
+            return Some(*fid);
+        }
+        oi = program.object_bases.get(i).copied().flatten().and_then(|base_flat| {
+            program.objects.iter().position(|(_, f)| *f == base_flat)
+        });
+    }
+    None
 }
 
 fn pop(stack: &mut Vec<Value>) -> Result<Value, String> {

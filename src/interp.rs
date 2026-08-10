@@ -732,13 +732,20 @@ impl Interpreter {
             .cloned()
             .ok_or_else(|| self.err(format!("undefined variable `{recv_name}`")))?;
         let type_name = instance_type_name(&recv).map_err(|m| self.err(m))?;
-        let (owner, obj) = find_object_type(module, &type_name)
-            .ok_or_else(|| self.err(format!("unknown object type `{type_name}`")))?;
-        let target = obj
-            .children
-            .iter()
-            .find(|c| c.name == method)
-            .ok_or_else(|| self.err(format!("unknown method `{type_name}.{method}`")))?;
+        if find_object_type(module, &type_name).is_none() {
+            return Err(self.err(format!("unknown object type `{type_name}`")));
+        }
+        let (owner, _obj, target) = find_method_along_bases(module, &type_name, method)
+            .ok_or_else(|| {
+                let chain = crate::inherit::inheritance_chain(module, &type_name)
+                    .into_iter()
+                    .map(|o| o.name.as_str())
+                    .collect::<Vec<_>>()
+                    .join(" → ");
+                self.err(format!(
+                    "unknown method `{type_name}.{method}` (searched {chain})"
+                ))
+            })?;
         let bound = bind_function_args(self, module, fun, env, &target.params, ev_args, false)
             .map_err(|m| self.err(m))?;
         let mut call_env = Env::new();
@@ -916,6 +923,27 @@ fn find_object_type<'a>(module: &'a Module, name: &str) -> Option<(&'a Module, &
                     .map(|f| (lib, f))
             })
         })
+}
+
+/// Resolve `` `obj`.method `` along the inheritance chain (`_type` first, then bases).
+fn find_method_along_bases<'a>(
+    module: &'a Module,
+    type_name: &str,
+    method: &str,
+) -> Option<(&'a Module, &'a Function, &'a Function)> {
+    let mut cur = type_name.to_string();
+    let mut seen = std::collections::HashSet::new();
+    while seen.insert(cur.clone()) {
+        let (owner, obj) = find_object_type(module, &cur)?;
+        if let Some(target) = obj.children.iter().find(|c| c.name == method) {
+            return Some((owner, obj, target));
+        }
+        match &obj.base {
+            Some(b) => cur = b.clone(),
+            None => break,
+        }
+    }
+    None
 }
 
 fn find_function_anywhere<'a>(module: &'a Module, name: &str) -> Option<&'a Function> {

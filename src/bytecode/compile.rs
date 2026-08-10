@@ -15,6 +15,8 @@ struct FlatFun {
     name: String,
     level: u8,
     parent: Option<usize>,
+    /// Inheritance base type name (`# Child = > Parent`), objects only.
+    base: Option<String>,
     params: Vec<Param>,
     body: Vec<Stmt>,
     children: Vec<usize>,
@@ -60,6 +62,19 @@ pub fn compile_module(path: Option<&Path>, module: &Module) -> Result<Program> {
             }
         }
     }
+    let name_to_flat: HashMap<&str, usize> = objects
+        .iter()
+        .map(|(n, i)| (n.as_str(), *i))
+        .collect();
+    let mut object_bases = Vec::with_capacity(objects.len());
+    for (name, _) in &objects {
+        let flat_i = name_to_flat[name.as_str()];
+        let base = flat[flat_i]
+            .base
+            .as_deref()
+            .and_then(|b| name_to_flat.get(b).copied());
+        object_bases.push(base);
+    }
 
     let path_buf = path.map(|p| p.to_path_buf());
     let mut functions = Vec::new();
@@ -74,6 +89,7 @@ pub fn compile_module(path: Option<&Path>, module: &Module) -> Result<Program> {
         functions,
         entry,
         objects,
+        object_bases,
         methods,
         parents,
         children,
@@ -134,6 +150,7 @@ fn collect_fun(
         name: fun.name.clone(),
         level: fun.level,
         parent,
+        base: fun.base.clone(),
         params: fun.params.clone(),
         body: fun.body.clone(),
         children: Vec::new(),

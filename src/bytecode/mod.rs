@@ -92,6 +92,8 @@ pub struct Program {
     pub entry: usize,
     /// Top-level object name → function index (level-1).
     pub objects: Vec<(String, usize)>,
+    /// Parallel to `objects`: base object flat index (`# Child = > Parent`).
+    pub object_bases: Vec<Option<usize>>,
     /// (object_fn_idx, method_name) → method fn idx
     pub methods: Vec<(usize, String, usize)>,
     /// Parallel to `functions`: parent fn index for dynamic `call_fn` lookup.

@@ -55,6 +55,8 @@ pub struct Function {
     pub params: Vec<Param>,
     pub body: Vec<Stmt>,
     pub children: Vec<Function>,
+    /// Base type name for `# Child = > Parent` (objects only).
+    pub base: Option<String>,
 }
 
 impl Function {
@@ -211,10 +213,16 @@ pub fn format_ast_dump(path: &str, module: &Module) -> String {
 fn dump_fun(out: &mut String, fun: &Function, depth: usize) {
     let pad = "  ".repeat(depth);
     let kind = if fun.is_object() { "object" } else { "fun" };
-    out.push_str(&format!(
-        "{pad}({kind} level={} {:?} params={:?} @{}\n",
-        fun.level, fun.name, fun.params, fun.span
-    ));
+    match &fun.base {
+        Some(base) => out.push_str(&format!(
+            "{pad}({kind} level={} {:?} extends={base:?} params={:?} @{}\n",
+            fun.level, fun.name, fun.params, fun.span
+        )),
+        None => out.push_str(&format!(
+            "{pad}({kind} level={} {:?} params={:?} @{}\n",
+            fun.level, fun.name, fun.params, fun.span
+        )),
+    }
     for stmt in &fun.body {
         dump_stmt(out, stmt, depth + 1);
     }

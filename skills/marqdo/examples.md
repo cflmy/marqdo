@@ -155,6 +155,28 @@ description: loads math
 
 See `tests/structure/object-handle.mq.md` and `ext/llm.mq.md`: `# Type` constructs a map with `_type`; methods use `` > `obj`.method `` and read `self` / `自`.
 
+## 10b. Object inheritance
+
+```markdown
+# Greeter
+
+## hello
+    + `who`
+
+*`msg` = "Hello, `who`!" *
+**`msg`**
+
+# Loud = > Greeter
+
+## hello
+    + `who`
+
+*`msg` = "HELLO, `who`!" *
+**`msg`**
+```
+
+`_type` stays the most specific name (`Loud`). Methods walk the base chain; same-name `##` on the child overrides. No implicit super in v1.
+
 ## 11. Agent layout (ABI)
 
 ```markdown

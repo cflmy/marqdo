@@ -68,6 +68,24 @@ fn structure_object_handle() {
 }
 
 #[test]
+fn structure_inherit_parent_method() {
+    assert_out(
+        "tests/structure/inherit-parent-method.mq.md",
+        "Loud
+Hello, world!",
+    );
+}
+
+#[test]
+fn structure_inherit_override() {
+    assert_out(
+        "tests/structure/inherit-override.mq.md",
+        "Hello, world!
+HELLO, world!",
+    );
+}
+
+#[test]
 fn structure_nested_call() {
     assert_out("tests/structure/nested-call.mq.md", "Hello World!");
 }
@@ -458,6 +476,33 @@ fn error_table_row_marker_only() {
 }
 
 #[test]
+fn error_inherit_cycle() {
+    assert_err(
+        "tests/errors/inherit-cycle.mq.md",
+        "5:1",
+        "cyclic inheritance",
+    );
+}
+
+#[test]
+fn error_inherit_unknown_base() {
+    assert_err(
+        "tests/errors/inherit-unknown-base.mq.md",
+        "5:1",
+        "unknown base type",
+    );
+}
+
+#[test]
+fn error_inherit_bad_rhs() {
+    assert_err(
+        "tests/errors/inherit-bad-rhs.mq.md",
+        "5:1",
+        "object inheritance requires",
+    );
+}
+
+#[test]
 fn error_bad_int() {
     assert_err(
         "tests/errors/bad-int.mq.md",
@@ -551,6 +596,26 @@ fn bytecode_hello() {
         "tests/structure/hello.mq.md",
         "bytecode",
         "Hello World!",
+    );
+}
+
+#[test]
+fn bytecode_inherit_parent_method() {
+    assert_out_backend(
+        "tests/structure/inherit-parent-method.mq.md",
+        "bytecode",
+        "Loud
+Hello, world!",
+    );
+}
+
+#[test]
+fn bytecode_inherit_override() {
+    assert_out_backend(
+        "tests/structure/inherit-override.mq.md",
+        "bytecode",
+        "Hello, world!
+HELLO, world!",
     );
 }
 

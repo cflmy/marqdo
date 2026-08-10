@@ -46,6 +46,7 @@ fn load_module_inner(path: &Path, visited: &mut HashSet<PathBuf>) -> Result<Modu
             import_modules.insert(imp.bind, dep);
         }
         module.import_modules = import_modules;
+        crate::inherit::validate_inheritance(&module).map_err(|e| attach_path(path, e))?;
 
         Ok(module)
     })();
