@@ -197,7 +197,7 @@ Spawn a workbook file (quiet by default), wait for `{code,value}`, and inspect. 
 ## extract_plan_decision
     + `reply`
 
-Parse `DECISION: DONE` / `DECISION: CONTINUE` (Chinese: `决定：完成` / `决定：继续`).
+Parse `DECISION: DONE` / `CONTINUE` / `RUN` (Chinese: `决定：完成` / `继续` / `运行`).
 
 *`esc` = > json.parse text={"nl":"\n","fw":"："} *
 *`nl` = > json.get value=`esc` key=nl *
@@ -242,11 +242,15 @@ Parse `DECISION: DONE` / `DECISION: CONTINUE` (Chinese: `决定：完成` / `决
   **DONE**
 2. `found` == CONTINUE
   **CONTINUE**
-3. `found` == 完成
+3. `found` == RUN
+  **RUN**
+4. `found` == 完成
   **DONE**
-4. `found` == 继续
+5. `found` == 继续
   **CONTINUE**
-5. *
+6. `found` == 运行
+  **RUN**
+7. *
   **`found`**
 
 ---
@@ -308,8 +312,9 @@ First `SUMMARY:` / `汇总:` / `汇总：` line body, else trimmed reply.
     + `observation`
     + `explore_attempt`=None
     + `explore_n`=None
+    + `phase`=revise
 
-Parent developer-agent prompt: observe → decide DONE or CONTINUE with exact FIND/REPLACE patches (never rewrite the whole workbook).
+Parent developer-agent prompt. `phase=decompose`: pre-run (design step ③) before any spawn. `phase=revise` (default): observe → DONE or CONTINUE with patches.
 
 *`standing` = > json.get value=`agent` key=standing *
 1. `standing`
@@ -320,14 +325,18 @@ Parent developer-agent prompt: observe → decide DONE or CONTINUE with exact FI
 *`skill` = > agent_marqdo_skill *
 *`obs_s` = > json.stringify value=`observation` *
 *`goal_s` = > json.stringify value=`goal` *
-*`esc` = > json.parse text={"a":"\n\n--- standing ---\n","b":"\n\n--- goal ---\n","c":"\n\n--- workbook observation ---\n","d":"\n\n--- marqdo skill ---\n","e":"\n\n--- how to act ---\nYou are a Marqdo agent-development master.\nPriority order:\n1) Code first: if the goal is a fixed answer, solidify to a **return** (e.g. **pong**) or ordinary ## — no further LLM worker.step. Do not rely on > print; file subtasks are quiet and the parent consumes wait.value.\n2) If exit_code is 0 AND the workbook source still contains worker.step (or .单步), you MUST CONTINUE with a FIND/REPLACE that solidifies to a returned answer. Never DONE while .step remains.\n3) If exit_code is 0 AND already solidified (no worker.step) with a clear main return, DECISION: DONE with a short SUMMARY.\n4) If exploring an alternate path, try a meaningfully DIFFERENT structure than prior attempts (e.g. dual agents, narrower standing, or pure code). Do not merely re-run the same step.\n5) Prefer multiple narrow agents over one giant standing when roles differ.\nNever rewrite the whole .mq.md file.\nReply with EXACTLY one protocol:\nDECISION: DONE\nSUMMARY: <one line>\nOR\nDECISION: CONTINUE\nPATCH:\n<<<\nFIND\n<exact old snippet>\n===\nREPLACE\n<new snippet>\n>>>\n(You may repeat <<< blocks.)\n","f":"\n\n--- explore attempt ---\n"} *
+*`esc` = > json.parse text={"a":"\n\n--- standing ---\n","b":"\n\n--- goal ---\n","c":"\n\n--- workbook observation ---\n","d":"\n\n--- marqdo skill ---\n","e_rev":"\n\n--- how to act ---\nYou are a Marqdo agent-development master.\nPriority order:\n1) Code first: if the goal is a fixed answer, solidify to a **return** (e.g. **pong**) or ordinary ## — no further LLM worker.step. Do not rely on > print; file subtasks are quiet and the parent consumes wait.value.\n2) If exit_code is 0 AND the workbook source still contains worker.step (or .单步), you MUST CONTINUE with a FIND/REPLACE that solidifies to a returned answer. Never DONE while .step remains.\n3) If exit_code is 0 AND already solidified (no worker.step) with a clear main return, DECISION: DONE with a short SUMMARY.\n4) If exploring an alternate path, try a meaningfully DIFFERENT structure than prior attempts (e.g. dual agents, narrower standing, or pure code). Do not merely re-run the same step.\n5) Prefer multiple narrow agents over one giant standing when roles differ.\nNever rewrite the whole .mq.md file.\nReply with EXACTLY one protocol:\nDECISION: DONE\nSUMMARY: <one line>\nOR\nDECISION: CONTINUE\nPATCH:\n<<<\nFIND\n<exact old snippet>\n===\nREPLACE\n<new snippet>\n>>>\n(You may repeat <<< blocks.)\n","e_dec":"\n\n--- how to act ---\nYou are a Marqdo agent-development master. PRE-RUN DECOMPOSE: the workbook has NOT been executed yet.\nPriority order:\n1) Code first: if the goal is a fixed answer, PATCH to a **return** (no worker.step / .单步), then DECISION: RUN (runtime will spawn once) or DECISION: DONE with SUMMARY after solidify.\n2) If the skeleton is fine to execute as-is, reply DECISION: RUN (patches optional; zero patches are OK).\n3) To reshape before the first run, DECISION: CONTINUE with FIND/REPLACE patches; runtime applies them then spawns.\n4) Prefer multiple narrow agents when roles differ. Never rewrite the whole .mq.md file.\nReply with EXACTLY one protocol:\nDECISION: RUN\nOR\nDECISION: DONE\nSUMMARY: <one line>\nOR\nDECISION: CONTINUE\nPATCH:\n<<<\nFIND\n<exact old snippet>\n===\nREPLACE\n<new snippet>\n>>>\n(You may repeat <<< blocks.)\n","f":"\n\n--- explore attempt ---\n"} *
 *`a` = > json.get value=`esc` key=a *
 *`b` = > json.get value=`esc` key=b *
 *`c` = > json.get value=`esc` key=c *
 *`d` = > json.get value=`esc` key=d *
-*`e` = > json.get value=`esc` key=e *
 *`f` = > json.get value=`esc` key=f *
-*`p` = You develop and revise Marqdo workbooks with surgical patches. *
+1. `phase` == decompose
+  *`e` = > json.get value=`esc` key=e_dec *
+  *`p` = You decompose the workbook before the first run. *
+2. *
+  *`e` = > json.get value=`esc` key=e_rev *
+  *`p` = You develop and revise Marqdo workbooks with surgical patches. *
 *`p` = `p` + `a` + `up` + `b` + `goal_s` + `c` + `obs_s` + `d` + `skill` + `e` *
 1. `explore_attempt`
   *`p` = `p` + `f` *
@@ -341,6 +350,59 @@ Parent developer-agent prompt: observe → decide DONE or CONTINUE with exact FI
 **`p`**
 
 ---
+
+## plan_echo_decompose
+    + `workbook`
+    + `stream`=False
+    + `echo`=False
+
+TTY marker for pre-run parent decompose (before any child spawn).
+
+1. `stream`
+  1. `echo`
+    > print text=plan:decompose
+  2. *
+    *`_` = 1*
+2. *
+  *`_` = 1*
+
+****
+
+## plan_echo_await
+    + `round`
+    + `workbook`
+    + `stream`=False
+    + `echo`=False
+
+TTY-only marker before `await_workbook` so `stream+echo` is not silent during the (often long) child run.
+
+1. `stream`
+  1. `echo`
+    > print text=plan:await
+    > print text=`round`
+  2. *
+    *`_` = 1*
+2. *
+  *`_` = 1*
+
+****
+
+## workbook_has_worker_step
+    + `path`
+
+True when source still contains `worker.step` or `.单步`.
+
+*`src` = > fs.read_text path=`path` *
+*`a` = > split value=`src` sep=worker.step *
+*`na` = > len value=`a` *
+*`b` = > split value=`src` sep=.单步 *
+*`nb` = > len value=`b` *
+1. `na` > 1
+  **1**
+2. `nb` > 1
+  **1**
+3. *
+  **0**
 
 ## plan_append_round
     + `events`
@@ -391,16 +453,18 @@ Append a `round` event when `stream=True`. Optional `echo` prints a short TTY ma
     + `from`
     + `stream`=False
 
-Bubble parent `complete stream=True` deltas (and errors) into the plan event list. Skip nested `done` so plan owns the final `done`.
+Bubble parent `complete stream=True` reasoning/deltas (and errors) into the plan event list. Skip nested `done` so plan owns the final `done`.
 
 1. `stream`
   - [`ev`](`from`)
     *`t` = > json.get value=`ev` key=type *
     1. `t` == delta
       *`events` = > json.append list=`events` item=`ev` *
-    2. `t` == error
+    2. `t` == reasoning
       *`events` = > json.append list=`events` item=`ev` *
-    3. *
+    3. `t` == error
+      *`events` = > json.append list=`events` item=`ev` *
+    4. *
       *`_` = 1*
 2. *
   *`_` = 1*
@@ -570,7 +634,7 @@ With `stream=True`, the model call uses SSE; `echo=True` prints delta text to st
 
 Multi-step with OKF agent-kb. Default workbook is `kb_dir/resources/<slug>.mq.md`. While task file count `< explore_n` and skill is not llm_free, force a new explore variant under `kb_dir/explore/<slug>/`. Code-first: llm_free hits skip parent LLM. File children return via `# main`; `plan` exposes that as `result`.
 
-With `stream=True`, emit `round` / parent `delta` / `decision` / `done` on the returned map as `events` (final `result` unchanged). `echo=True` prints round markers and parent deltas. `trace=True` writes events to writeback slot `trace`. Quiet child subtasks stay quiet.
+Non-hit path runs parent **decompose** before the first child spawn (`DECISION: RUN` / `CONTINUE`+patch / solidified `DONE`). Then `await` → revise loop. With `stream=True`, emit parent `delta` / `decision` / `round` / `done` on `events`. `echo=True` prints `plan:decompose` / `plan:await` / deltas. `trace=True` writes events to writeback slot `trace`. Quiet child subtasks stay quiet.
 
 *`tools` = > json.get value=`self` key=tools *
 *`cache` = miss*
@@ -751,9 +815,58 @@ With `stream=True`, emit `round` / parent `delta` / `decision` / `done` on the r
 *`summary` = None*
 *`status` = error*
 *`err` = max_rounds exhausted *
-1. `improve`
-  *`left` = 1*
+*`skip_loop` = None*
+
+> plan_echo_decompose workbook=`path` stream=`stream` echo=`echo`
+*`last_obs` = > inspect_workbook path=`path` *
+*`ctx` = > build_plan_context agent=`self` goal=`goal` observation=`last_obs` explore_attempt=`explore_attempt` explore_n=`explore_n` phase=decompose *
+1. `stream`
+  *`evs` = > `model`.complete prompt=`ctx` stream=True echo=`echo` *
+  *`last_reply` = > llm.stream_result events=`evs` *
+  *`events` = > plan_merge_deltas events=`events` from=`evs` stream=`stream` *
 2. *
+  *`last_reply` = > `model`.complete prompt=`ctx` *
+*`last_reply` = > trim value=`last_reply` *
+*`dec` = > extract_plan_decision reply=`last_reply` *
+*`events` = > plan_append_decision events=`events` decision=`dec` stream=`stream` *
+
+1. `dec` == CONTINUE
+  *`n` = > fs.apply_patch_blocks path=`path` text=`last_reply` *
+  *`_` = 1*
+2. `dec` == RUN
+  *`_` = 1*
+3. `dec` == DONE
+  *`has_step` = > workbook_has_worker_step path=`path` *
+  1. `has_step`
+    *`_` = 1*
+  2. *
+    > plan_echo_await round=1 workbook=`path` stream=`stream` echo=`echo`
+    *`aw` = > await_workbook path=`path` *
+    *`code` = > json.get value=`aw` key=code *
+    *`child_val` = > json.get value=`aw` key=value *
+    *`last_obs` = > json.get value=`aw` key=observation *
+    *`round` = 1*
+    *`events` = > plan_append_round events=`events` round=1 workbook=`path` exit_code=`code` stream=`stream` echo=`echo` *
+    1. `code` == 0
+      *`done` = 1*
+      *`status` = ok*
+      *`summary` = > extract_plan_summary reply=`last_reply` *
+      *`err` = None*
+      *`skip_loop` = 1*
+    2. *
+      *`_` = 1*
+4. *
+  *`done` = 1*
+  *`status` = error*
+  *`err` = unrecognized plan decision *
+  *`summary` = `last_reply`*
+  *`skip_loop` = 1*
+
+1. `skip_loop`
+  *`left` = 0*
+2. `improve`
+  *`left` = 1*
+3. *
   *`left` = `max_rounds`*
 
 - `left` > 0
@@ -761,12 +874,13 @@ With `stream=True`, emit `round` / parent `delta` / `decision` / `done` on the r
     *`left` = 0*
   2. *
     *`round` = `round` + 1*
+    > plan_echo_await round=`round` workbook=`path` stream=`stream` echo=`echo`
     *`aw` = > await_workbook path=`path` *
     *`code` = > json.get value=`aw` key=code *
     *`child_val` = > json.get value=`aw` key=value *
     *`last_obs` = > json.get value=`aw` key=observation *
     *`events` = > plan_append_round events=`events` round=`round` workbook=`path` exit_code=`code` stream=`stream` echo=`echo` *
-    *`ctx` = > build_plan_context agent=`self` goal=`goal` observation=`last_obs` explore_attempt=`explore_attempt` explore_n=`explore_n` *
+    *`ctx` = > build_plan_context agent=`self` goal=`goal` observation=`last_obs` explore_attempt=`explore_attempt` explore_n=`explore_n` phase=revise *
     1. `stream`
       *`evs` = > `model`.complete prompt=`ctx` stream=True echo=`echo` *
       *`last_reply` = > llm.stream_result events=`evs` *
@@ -793,7 +907,9 @@ With `stream=True`, emit `round` / parent `delta` / `decision` / `done` on the r
         *`err` = no patches applied *
         *`summary` = > extract_plan_summary reply=`last_reply` *
         *`left` = 0*
-    3. *
+    3. `dec` == RUN
+      *`left` = `left` - 1*
+    4. *
       *`done` = 1*
       *`status` = error*
       *`err` = unrecognized plan decision *

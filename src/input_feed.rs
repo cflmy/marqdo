@@ -1,8 +1,9 @@
 //! Preset stdin lines for `input` (CLI `--stdin-file`, view form, frontmatter, tests).
+//! Interactive TTY path uses Unicode-aware line editing (char backspace + redraw).
 
 use std::collections::VecDeque;
 use std::fs;
-use std::io::{self, BufRead};
+use std::io::{self, BufRead, Read, Write};
 use std::path::Path;
 
 use anyhow::{Context, Result};
@@ -144,6 +145,159 @@ fn strip_block_indent(line: &str) -> String {
     s.trim_end_matches('\r').to_string()
 }
 
+pub fn stdin_is_tty() -> bool {
+    #[cfg(unix)]
+    {
+        unsafe { libc::isatty(libc::STDIN_FILENO) == 1 }
+    }
+    #[cfg(not(unix))]
+    {
+        false
+    }
+}
+
+/// Piped / non-TTY: read raw bytes to newline (avoids mid-frame UTF-8 panic), lossy decode.
+fn read_stdin_line_piped() -> Result<String> {
+    let mut buf = Vec::new();
+    io::stdin().lock().read_until(b'\n', &mut buf)?;
+    if buf.last() == Some(&b'\n') {
+        buf.pop();
+    }
+    if buf.last() == Some(&b'\r') {
+        buf.pop();
+    }
+    Ok(String::from_utf8_lossy(&buf).into_owned())
+}
+
+/// Ensure prompt has a trailing space so typed text does not glue to the last glyph.
+fn normalize_prompt(prompt: &str) -> String {
+    if prompt.is_empty() {
+        return String::new();
+    }
+    if prompt.ends_with(|c: char| c.is_whitespace()) {
+        prompt.to_string()
+    } else {
+        format!("{prompt} ")
+    }
+}
+
+#[cfg(unix)]
+struct TermGuard {
+    fd: i32,
+    original: libc::termios,
+}
+
+#[cfg(unix)]
+impl TermGuard {
+    fn enter_cbreak() -> Result<Self> {
+        let fd = libc::STDIN_FILENO;
+        let mut original = unsafe { std::mem::zeroed::<libc::termios>() };
+        if unsafe { libc::tcgetattr(fd, &mut original) } != 0 {
+            return Err(io::Error::last_os_error()).context("tcgetattr");
+        }
+        let mut raw = original;
+        raw.c_lflag &= !(libc::ICANON | libc::ECHO);
+        raw.c_cc[libc::VMIN] = 1;
+        raw.c_cc[libc::VTIME] = 0;
+        if unsafe { libc::tcsetattr(fd, libc::TCSANOW, &raw) } != 0 {
+            return Err(io::Error::last_os_error()).context("tcsetattr");
+        }
+        Ok(Self { fd, original })
+    }
+}
+
+#[cfg(unix)]
+impl Drop for TermGuard {
+    fn drop(&mut self) {
+        unsafe {
+            libc::tcsetattr(self.fd, libc::TCSANOW, &self.original);
+        }
+    }
+}
+
+fn redraw_line(prompt: &str, buf: &str) -> Result<()> {
+    let mut out = io::stdout().lock();
+    // CR + clear whole line, then reprint (fixes CJK backspace display desync).
+    write!(out, "\r\x1b[2K{prompt}{buf}")?;
+    out.flush()?;
+    Ok(())
+}
+
+/// Interactive line editor: UTF-8 char backspace + full-line redraw.
+#[cfg(unix)]
+fn read_stdin_line_interactive(prompt: &str) -> Result<String> {
+    let prompt = normalize_prompt(prompt);
+    let _guard = TermGuard::enter_cbreak()?;
+    redraw_line(&prompt, "")?;
+
+    let mut buf = String::new();
+    let mut pending = Vec::new();
+    let mut stdin = io::stdin().lock();
+    let mut byte = [0u8; 1];
+
+    loop {
+        let n = stdin.read(&mut byte)?;
+        if n == 0 {
+            // EOF
+            writeln!(io::stdout())?;
+            return Ok(buf);
+        }
+        let b = byte[0];
+        match b {
+            b'\n' | b'\r' => {
+                writeln!(io::stdout())?;
+                return Ok(buf);
+            }
+            0x7f | 0x08 => {
+                // Backspace / BS — delete one Unicode scalar, not one byte.
+                if buf.pop().is_some() {
+                    redraw_line(&prompt, &buf)?;
+                }
+            }
+            0x03 => {
+                // Ctrl-C
+                writeln!(io::stdout())?;
+                anyhow::bail!("interrupted");
+            }
+            0x04 => {
+                // Ctrl-D
+                if buf.is_empty() && pending.is_empty() {
+                    writeln!(io::stdout())?;
+                    return Ok(buf);
+                }
+            }
+            b if b < 0x20 => {
+                // ignore other controls
+            }
+            b => {
+                pending.push(b);
+                match std::str::from_utf8(&pending) {
+                    Ok(s) => {
+                        buf.push_str(s);
+                        pending.clear();
+                        redraw_line(&prompt, &buf)?;
+                    }
+                    Err(e) if e.error_len().is_none() => {
+                        // incomplete UTF-8 sequence — wait for more bytes
+                    }
+                    Err(_) => {
+                        // invalid — drop and continue
+                        pending.clear();
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[cfg(not(unix))]
+fn read_stdin_line_interactive(prompt: &str) -> Result<String> {
+    let prompt = normalize_prompt(prompt);
+    print!("{prompt}");
+    io::stdout().flush()?;
+    read_stdin_line_piped()
+}
+
 #[derive(Debug, Clone, Default)]
 pub struct InputFeed {
     queue: VecDeque<String>,
@@ -159,6 +313,7 @@ impl InputFeed {
     }
 
     /// Next line from the preset queue, or real stdin when not capturing.
+    /// Prefer [`Self::read_line_with_prompt`] for interactive TTY (Unicode backspace).
     pub fn read_line(&mut self) -> Result<String> {
         if let Some(line) = self.queue.pop_front() {
             return Ok(line);
@@ -168,15 +323,23 @@ impl InputFeed {
                 "input needs a line (frontmatter stdin:/输入:, view Preset input, or --stdin-file)"
             );
         }
-        let mut line = String::new();
-        io::stdin().lock().read_line(&mut line)?;
-        if line.ends_with('\n') {
-            line.pop();
-            if line.ends_with('\r') {
-                line.pop();
-            }
+        read_stdin_line_piped()
+    }
+
+    /// Read a line; on a TTY, run Unicode-aware editing and draw `prompt` itself.
+    /// Returns `Ok((line, painted_prompt))` where `painted_prompt` is true when this
+    /// function already printed the prompt (caller must not `emit_prompt` again).
+    pub fn read_line_with_prompt(&mut self, prompt: &str) -> Result<(String, bool)> {
+        if let Some(line) = self.queue.pop_front() {
+            return Ok((line, false));
         }
-        Ok(line)
+        if self.capture {
+            anyhow::bail!(
+                "input needs a line (frontmatter stdin:/输入:, view Preset input, or --stdin-file)"
+            );
+        }
+        let line = read_stdin_line_interactive(prompt)?;
+        Ok((line, true))
     }
 }
 
@@ -231,5 +394,20 @@ mod tests {
             split_stdin_text("a\n\nb\n"),
             vec!["a".to_string(), String::new(), "b".to_string()]
         );
+    }
+
+    #[test]
+    fn normalize_prompt_adds_space() {
+        assert_eq!(normalize_prompt("问？"), "问？ ");
+        assert_eq!(normalize_prompt("问？ "), "问？ ");
+        assert_eq!(normalize_prompt(""), "");
+    }
+
+    #[test]
+    fn utf8_pop_removes_full_char() {
+        let mut s = String::from("帮我规划");
+        assert_eq!(s.pop(), Some('划'));
+        assert_eq!(s.pop(), Some('规'));
+        assert_eq!(s, "帮我");
     }
 }

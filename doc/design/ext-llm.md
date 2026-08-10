@@ -20,7 +20,7 @@ Resolution: `MARQDO_EXT/ai/…`, repo `ext/ai/…`, cwd `ext/ai/…` (see [ext-c
 
 Other official ext: [ext-agent.md](ext-agent.md) / [ext-agent-plan.md](ext-agent-plan.md) (**document-driven agent** — step with default writeback / plan workbook; thin `TOOL:` loop superseded). Installer: [ext-cli.md](ext-cli.md). Native plugins: [ext-abi.md](ext-abi.md).
 
-Streaming: `complete stream=True` returns an event list (`delta` / `done` / `error`); see [agent-streaming.md](../roadmap/agent-streaming.md). Default (`stream=False`) is unchanged (answer string).
+Streaming: `complete stream=True` returns an event list (`reasoning` / `delta` / `done` / `error`); `echo=True` prints thinking (`reasoning_content`) and answer tokens as they arrive. See [agent-streaming.md](../roadmap/agent-streaming.md). Default (`stream=False`) is unchanged (answer string).
 
 **Note:** Prefer `marqdo ext add llm`. Import `> ext/ai/llm.mq.md` from repo or install root.
 

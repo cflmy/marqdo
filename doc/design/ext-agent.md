@@ -111,7 +111,7 @@ Marqdo 的宪法是 **代码即文档、文档即知识库**：
 | | |
 |---|---|
 | **输入** | 复杂目标 |
-| **过程** | 父智能体**创建（或续跑）一份工作簿 `.mq.md`** → 子文件大模型配置与父一致 → **`lib/subtask` `spawn path=`** 运行该文件 → 读结果与写回 → **改代码 / 改写回后再执行**（有轮次上限） |
+| **过程** | 父智能体**创建（或续跑）工作簿** →（非命中）**父先分解** → **`lib/subtask` spawn** 跑子文件 → 观察写回 → **父修订补丁后再执行**（有轮次上限） |
 | **输出** | 汇总 map（含 `result`）+ 磁盘上的工作簿（代码与 `marqdo-out` 均可演化） |
 | **适用** | 需分解、多情形、可固化步骤、可复用子成果的任务 |
 
@@ -346,4 +346,4 @@ lib/subtask：spawn fn=<名>  →  wait
 **智能体框架必须让编排看起来像文档、跑起来像程序、留痕像知识库。**  
 单步解决原子问题（默认写回）；多步让父智能体编写并修订子 Marqdo 工作簿、经子任务执行、把确定步骤固化为代码——详见 [ext-agent-plan.md](ext-agent-plan.md)。
 
-流式：`## step` / `## plan` 支持 `stream=True` / `echo=True`（SSE 增量；返回 map 不变；`plan` 另附 `events`，可选 `trace` 写回）。见 [agent-streaming.md](../roadmap/agent-streaming.md)。
+流式：`## step` / `## plan` 支持 `stream=True` / `echo=True`（SSE 增量；返回 map 不变；`plan` 另附 `events`，可选 `trace` 写回）。非命中时先流式父分解再 spawn 子任务。见 [agent-streaming.md](../roadmap/agent-streaming.md)。

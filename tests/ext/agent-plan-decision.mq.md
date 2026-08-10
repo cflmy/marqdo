@@ -8,7 +8,7 @@ description: extract_plan_decision/summary; dual skeleton contains research+writ
 
 # main
 
-*`samples` = > json.parse text={"done":"DECISION: DONE\nSUMMARY: all good\n","cont":"DECISION: CONTINUE\nPATCH:\n<<<\nFIND\nold\n===\nREPLACE\nnew\n>>>\n","zh":"决定：完成\n汇总：好了\n"} *
+*`samples` = > json.parse text={"done":"DECISION: DONE\nSUMMARY: all good\n","cont":"DECISION: CONTINUE\nPATCH:\n<<<\nFIND\nold\n===\nREPLACE\nnew\n>>>\n","zh":"决定：完成\n汇总：好了\n","run":"DECISION: RUN\n","zh_run":"决定：运行\n"} *
 *`d1` = > json.get value=`samples` key=done *
 *`r1` = > agent.extract_plan_decision reply=`d1` *
 > print text=`r1`
@@ -22,6 +22,14 @@ description: extract_plan_decision/summary; dual skeleton contains research+writ
 *`d3` = > json.get value=`samples` key=zh *
 *`r3` = > agent.extract_plan_decision reply=`d3` *
 > print text=`r3`
+
+*`d4` = > json.get value=`samples` key=run *
+*`r4` = > agent.extract_plan_decision reply=`d4` *
+> print text=`r4`
+
+*`d5` = > json.get value=`samples` key=zh_run *
+*`r5` = > agent.extract_plan_decision reply=`d5` *
+> print text=`r5`
 
 *`dual` = > agent.render_workbook_skeleton goal=demo skeleton=dual *
 *`has_r` = > split value=`dual` sep=research *

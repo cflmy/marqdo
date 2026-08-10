@@ -1241,7 +1241,7 @@ fn ext_agent_plan_confirm() {
 fn ext_agent_plan_decision() {
     assert_out(
         "tests/ext/agent-plan-decision.mq.md",
-        "DONE\nall good\nCONTINUE\nDONE\ndual-ok\nsolidify-ok\n1\nkeep new keep",
+        "DONE\nall good\nCONTINUE\nDONE\nRUN\nRUN\ndual-ok\nsolidify-ok\n1\nkeep new keep",
     );
 }
 
@@ -1260,6 +1260,33 @@ fn ext_llm_complete_live() {
         reply.contains("pong"),
         "expected pong in reply, got {stdout:?}"
     );
+}
+
+#[test]
+fn ext_llm_stream_live() {
+    let output = Command::new(env!("CARGO_BIN_EXE_marqdo"))
+        .args(["run", "tests/ext/llm-stream-live.mq.md"])
+        .current_dir(env!("CARGO_MANIFEST_DIR"))
+        .output()
+        .expect("run llm-stream-live");
+    let code = output.status.code().unwrap_or(1);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert_eq!(code, 0, "llm-stream-live stderr={stderr}");
+    let lines: Vec<&str> = stdout.trim_end().lines().collect();
+    assert!(
+        lines.len() >= 2,
+        "llm-stream-live expected echo line + count + answer, got {stdout:?}"
+    );
+    let answer = lines.last().unwrap().to_lowercase();
+    assert!(
+        answer.contains("pong"),
+        "expected pong in streamed answer, got {stdout:?}"
+    );
+    let n: usize = lines[lines.len() - 2]
+        .parse()
+        .unwrap_or(0);
+    assert!(n >= 2, "expected at least delta+done events, n={n} stdout={stdout:?}");
 }
 
 #[test]
@@ -1370,6 +1397,20 @@ fn lib_net_openai_sse() {
         "Hel
 lo
 Hello",
+    );
+}
+
+#[test]
+fn lib_net_openai_sse_reasoning() {
+    assert_out(
+        "tests/lib/net-openai-sse-reasoning.mq.md",
+        "3
+reasoning
+think
+delta
+Hi
+done
+Hi",
     );
 }
 

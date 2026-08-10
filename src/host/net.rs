@@ -215,12 +215,76 @@ fn event_map(pairs: Vec<(&str, Value)>) -> Value {
     )
 }
 
+/// Push stream events from one OpenAI-compatible SSE JSON object.
+/// DeepSeek (and similar) may stream chain-of-thought in `delta.reasoning_content`
+/// while the final answer arrives later in `delta.content`.
+/// Returns `Err` only on JSON issues handled by caller; `Ok(true)` means stop (error frame).
+fn push_openai_delta_events(
+    v: &serde_json::Value,
+    events: &mut Vec<Value>,
+    result: &mut String,
+    echoed: &mut bool,
+    saw_reasoning: &mut bool,
+    echo: bool,
+) -> bool {
+    if let Some(msg) = v.get("error").and_then(|e| {
+        e.get("message")
+            .and_then(|m| m.as_str())
+            .or_else(|| e.as_str())
+    }) {
+        events.push(event_map(vec![
+            ("type", Value::Text("error".into())),
+            ("message", Value::Text(msg.into())),
+        ]));
+        return true;
+    }
+    let reasoning = v
+        .pointer("/choices/0/delta/reasoning_content")
+        .and_then(|c| c.as_str())
+        .unwrap_or("");
+    if !reasoning.is_empty() {
+        *saw_reasoning = true;
+        if echo {
+            print!("{reasoning}");
+            let _ = std::io::stdout().flush();
+            *echoed = true;
+        }
+        events.push(event_map(vec![
+            ("type", Value::Text("reasoning".into())),
+            ("text", Value::Text(reasoning.into())),
+        ]));
+    }
+    let content = v
+        .pointer("/choices/0/delta/content")
+        .and_then(|c| c.as_str())
+        .unwrap_or("");
+    if !content.is_empty() {
+        if echo && *saw_reasoning && result.is_empty() {
+            println!();
+            *echoed = true;
+        }
+        result.push_str(content);
+        if echo {
+            print!("{content}");
+            let _ = std::io::stdout().flush();
+            *echoed = true;
+        }
+        events.push(event_map(vec![
+            ("type", Value::Text("delta".into())),
+            ("text", Value::Text(content.into())),
+        ]));
+    }
+    false
+}
+
 /// Map OpenAI-compatible chat SSE payloads → Marqdo stream events
-/// (`delta` / `done` / `error`). Optional `echo` prints delta text to stdout as it arrives.
+/// (`reasoning` / `delta` / `done` / `error`). Optional `echo` prints text to stdout as it arrives.
 pub fn openai_chat_sse_events(text: &str, echo: bool) -> Result<Vec<Value>, String> {
     let mut events = Vec::new();
     let mut result = String::new();
     let mut saw_done = false;
+    let mut echoed = false;
+    let mut saw_reasoning = false;
     for data in sse_data_payloads(text) {
         let data = data.trim();
         if data.is_empty() {
@@ -232,34 +296,18 @@ pub fn openai_chat_sse_events(text: &str, echo: bool) -> Result<Vec<Value>, Stri
         }
         let v: serde_json::Value = serde_json::from_str(data)
             .map_err(|e| format!("openai sse json: {e}"))?;
-        if let Some(msg) = v.get("error").and_then(|e| {
-            e.get("message")
-                .and_then(|m| m.as_str())
-                .or_else(|| e.as_str())
-        }) {
-            events.push(event_map(vec![
-                ("type", Value::Text("error".into())),
-                ("message", Value::Text(msg.into())),
-            ]));
+        if push_openai_delta_events(
+            &v,
+            &mut events,
+            &mut result,
+            &mut echoed,
+            &mut saw_reasoning,
+            echo,
+        ) {
             return Ok(events);
         }
-        let content = v
-            .pointer("/choices/0/delta/content")
-            .and_then(|c| c.as_str())
-            .unwrap_or("");
-        if !content.is_empty() {
-            result.push_str(content);
-            if echo {
-                print!("{content}");
-                let _ = std::io::stdout().flush();
-            }
-            events.push(event_map(vec![
-                ("type", Value::Text("delta".into())),
-                ("text", Value::Text(content.into())),
-            ]));
-        }
     }
-    if echo && !result.is_empty() {
+    if echo && echoed {
         println!();
     }
     if !saw_done && events.is_empty() && result.is_empty() {
@@ -296,10 +344,14 @@ fn read_sse_body_to_events<R: BufRead>(
     let mut events = Vec::new();
     let mut result = String::new();
     let mut data_buf: Vec<String> = Vec::new();
+    let mut echoed = false;
+    let mut saw_reasoning = false;
 
     let flush_data = |data_buf: &mut Vec<String>,
                       events: &mut Vec<Value>,
                       result: &mut String,
+                      echoed: &mut bool,
+                      saw_reasoning: &mut bool,
                       echo: bool|
      -> Result<bool, String> {
         if data_buf.is_empty() {
@@ -316,33 +368,14 @@ fn read_sse_body_to_events<R: BufRead>(
         }
         let v: serde_json::Value =
             serde_json::from_str(data).map_err(|e| format!("openai sse json: {e}"))?;
-        if let Some(msg) = v.get("error").and_then(|e| {
-            e.get("message")
-                .and_then(|m| m.as_str())
-                .or_else(|| e.as_str())
-        }) {
-            events.push(event_map(vec![
-                ("type", Value::Text("error".into())),
-                ("message", Value::Text(msg.into())),
-            ]));
-            return Ok(true);
-        }
-        let content = v
-            .pointer("/choices/0/delta/content")
-            .and_then(|c| c.as_str())
-            .unwrap_or("");
-        if !content.is_empty() {
-            result.push_str(content);
-            if echo {
-                print!("{content}");
-                let _ = std::io::stdout().flush();
-            }
-            events.push(event_map(vec![
-                ("type", Value::Text("delta".into())),
-                ("text", Value::Text(content.into())),
-            ]));
-        }
-        Ok(false)
+        Ok(push_openai_delta_events(
+            &v,
+            events,
+            result,
+            echoed,
+            saw_reasoning,
+            echo,
+        ))
     };
 
     loop {
@@ -360,7 +393,14 @@ fn read_sse_body_to_events<R: BufRead>(
         let line = buf.strip_suffix('\n').unwrap_or(&buf);
         let line = line.strip_suffix('\r').unwrap_or(line);
         if line.is_empty() {
-            if flush_data(&mut data_buf, &mut events, &mut result, echo)? {
+            if flush_data(
+                &mut data_buf,
+                &mut events,
+                &mut result,
+                &mut echoed,
+                &mut saw_reasoning,
+                echo,
+            )? {
                 break;
             }
             continue;
@@ -370,8 +410,15 @@ fn read_sse_body_to_events<R: BufRead>(
             data_buf.push(payload.to_string());
         }
     }
-    let _ = flush_data(&mut data_buf, &mut events, &mut result, echo)?;
-    if echo && !result.is_empty() {
+    let _ = flush_data(
+        &mut data_buf,
+        &mut events,
+        &mut result,
+        &mut echoed,
+        &mut saw_reasoning,
+        echo,
+    )?;
+    if echo && echoed {
         println!();
     }
     if events.iter().any(|e| matches!(e, Value::Map(m) if m.iter().any(|(k,v)| k == "type" && matches!(v, Value::Text(t) if t == "error")))) {
@@ -482,6 +529,33 @@ data: [DONE]\n\
             Value::Map(m) => {
                 assert!(m.iter().any(|(k, v)| k == "type" && matches!(v, Value::Text(t) if t == "done")));
                 assert!(m.iter().any(|(k, v)| k == "result" && matches!(v, Value::Text(t) if t == "Hello")));
+            }
+            _ => panic!("expected done map"),
+        }
+    }
+
+    #[test]
+    fn openai_sse_reasoning_then_content() {
+        let fixture = "\
+data: {\"choices\":[{\"delta\":{\"reasoning_content\":\"think\"}}]}\n\
+\n\
+data: {\"choices\":[{\"delta\":{\"content\":\"Hi\"}}]}\n\
+\n\
+data: [DONE]\n\
+";
+        let ev = openai_chat_sse_events(fixture, false).unwrap();
+        assert_eq!(ev.len(), 3);
+        match &ev[0] {
+            Value::Map(m) => {
+                assert!(m.iter().any(|(k, v)| k == "type" && matches!(v, Value::Text(t) if t == "reasoning")));
+                assert!(m.iter().any(|(k, v)| k == "text" && matches!(v, Value::Text(t) if t == "think")));
+            }
+            _ => panic!("expected reasoning map"),
+        }
+        match &ev[2] {
+            Value::Map(m) => {
+                assert!(m.iter().any(|(k, v)| k == "type" && matches!(v, Value::Text(t) if t == "done")));
+                assert!(m.iter().any(|(k, v)| k == "result" && matches!(v, Value::Text(t) if t == "Hi")));
             }
             _ => panic!("expected done map"),
         }

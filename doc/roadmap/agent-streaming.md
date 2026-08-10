@@ -62,11 +62,12 @@ ext/ai/agent  step/plan 订阅事件 → 可选透传或写回「过程槽」
 
 | `type` | 含义 | 主要字段 |
 |--------|------|----------|
-| `delta` | 模型增量文本 | `text` |
+| `reasoning` | 模型思考增量（如 DeepSeek `reasoning_content`） | `text` |
+| `delta` | 模型答案增量文本 | `text` |
 | `tool_start` / `tool_end` | 工具轮 | `name`, `result?` |
 | `round` | plan 轮次边界 | `round`, `workbook`, `exit_code?` |
-| `decision` | DONE / CONTINUE | `decision`, `summary?` |
-| `done` | 本调用结束 | `result`（与今日返回值对齐） |
+| `decision` | DONE / CONTINUE / RUN | `decision`, `summary?` |
+| `done` | 本调用结束 | `result`（答案正文；不含 thinking） |
 | `error` | 失败 | `message` |
 
 中英键名可在 L1 包装层镜像；插件/wire 先用英文 `type`。
@@ -148,7 +149,8 @@ S3  view 订阅                                                 （待做）
 
 1. `plan` / `多步` 增加 `stream` / `echo` / `trace`（中文 `流式` / `打印增量` / `轨迹`）。  
 2. 事件挂在返回 map 的 `events`；父 `complete` 只冒泡 `delta`/`error`（嵌套 `done` 不进列表）。  
-3. `trace=True` → 写回槽 `trace`（与 TTY `echo` 可分立）。
+3. `trace=True` → 写回槽 `trace`（与 TTY `echo` 可分立）。  
+4. **体验（父先子后）**：非命中路径先 `plan:decompose`（父 pre-run 分解，可流式），再 `plan:await`（子 quiet）。修订轮仍是观察后父决策。SSE 本身用 `tests/ext/llm-stream-live.mq.md`。
 
 验收：
 

@@ -237,8 +237,18 @@ impl Vm {
                 Op::Input => {
                     let prompt = pop(&mut stack).map_err(|m| self.err_at(span, m))?;
                     let text = prompt.as_display();
-                    self.emit_prompt(&text);
-                    let line = self.input.read_line().map_err(|e| {
+                    let line = if self.capture {
+                        self.emit_prompt(&text);
+                        self.input.read_line()
+                    } else if crate::input_feed::stdin_is_tty() {
+                        self.input
+                            .read_line_with_prompt(&text)
+                            .map(|(line, _)| line)
+                    } else {
+                        self.emit_prompt(&text);
+                        self.input.read_line()
+                    }
+                    .map_err(|e| {
                         let msg = e.to_string();
                         if msg.contains("input needs a line") {
                             self.err_at(span, msg)

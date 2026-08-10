@@ -503,8 +503,18 @@ impl Interpreter {
                     .get("prompt")
                     .map(|v| v.as_display())
                     .unwrap_or_default();
-                self.emit_prompt(&prompt);
-                let line = self.input.read_line().map_err(|e| {
+                let line = if self.capture {
+                    self.emit_prompt(&prompt);
+                    self.input.read_line()
+                } else if crate::input_feed::stdin_is_tty() {
+                    self.input
+                        .read_line_with_prompt(&prompt)
+                        .map(|(line, _)| line)
+                } else {
+                    self.emit_prompt(&prompt);
+                    self.input.read_line()
+                }
+                .map_err(|e| {
                     let msg = e.to_string();
                     if msg.contains("input needs a line") {
                         self.err(msg)
