@@ -69,12 +69,44 @@ Greeting via a nested function:
 # main
 
 `篮子` =
+
 | 果 |
 |----|
 | 苹果 |
 
 - [`果`](`篮子`)
   > print text=`果`
+```
+
+## 6b. Map table + footnote get
+
+```markdown
+# main
+
+`分类` =
+
+| 苹果 | 黄瓜 |
+|------|------|
+| 水果 | 蔬菜 |
+
+*`种` = `分类`[^苹果] *
+> print text=`种`
+
+*`第一` = `篮子`[^1] *
+```
+
+One column → list; ≥2 columns + one data row → map; ≥2 columns + many rows → map of lists. Footnotes are 1-based on lists; map keys are header text. Foreach on a map walks **keys**.
+
+Row-oriented records (SQL-like): first header `@` / `行` / `row` → list of maps (marker column excluded):
+
+```markdown
+`订单` =
+
+| 行 | 品名 | 数量 |
+|----|------|------|
+| 1 | 苹果 | 2 |
+
+*`名` = `订单`[^1][^品名] *
 ```
 
 ## 7. Import text stdlib

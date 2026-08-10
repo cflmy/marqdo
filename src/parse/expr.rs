@@ -362,7 +362,20 @@ impl<'a> Parser<'a> {
             if !self.eat("`") {
                 bail!("unterminated `name`");
             }
-            return Ok(Expr::Var(name));
+            let mut expr = Expr::Var(name);
+            // Postfix footnotes: `xs`[^1] / `m`[^key] / chained `m`[^k][^1]
+            loop {
+                self.skip_ws();
+                if !self.starts_with("[^") {
+                    break;
+                }
+                let label = self.parse_footnote_label()?;
+                expr = Expr::Index {
+                    base: Box::new(expr),
+                    label,
+                };
+            }
+            return Ok(expr);
         }
         if self.eat(">") {
             // Inline call: `> name k=v`
@@ -483,6 +496,31 @@ impl<'a> Parser<'a> {
             });
         }
         Ok(Expr::Interp(parts))
+    }
+
+    /// Parse `[^label]` after a value; label is text until `]`.
+    fn parse_footnote_label(&mut self) -> Result<String> {
+        if !self.eat("[^") {
+            bail!("expected [^ footnote index");
+        }
+        let start = self.i;
+        while let Some(c) = self.peek_char() {
+            if c == ']' {
+                break;
+            }
+            if c == '\n' || c == '\r' {
+                bail!("unterminated footnote index [^…]");
+            }
+            self.bump_char();
+        }
+        let label = self.src[start..self.i].trim().to_string();
+        if !self.eat("]") {
+            bail!("unterminated footnote index [^…]");
+        }
+        if label.is_empty() {
+            bail!("empty footnote index `[^]`");
+        }
+        Ok(label)
     }
 }
 

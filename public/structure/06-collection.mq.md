@@ -1,11 +1,11 @@
 ---
 title: Collections (tables)
-description: GFM tables are collections
+description: One-column tables are lists
 ---
 
 # main
 
-A Markdown table is a collection; loop to read each row.
+A single-column Markdown table is a list; loop to read each item. Use `basket`[^1] for 1-based index.
 
 `basket` =
 

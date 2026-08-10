@@ -327,13 +327,13 @@ impl<'a> Cursor<'a> {
                 return self.consume_code_fence(span);
             }
             let start_i = self.i;
-            let list = self.consume_table()?;
+            let table = self.consume_table()?;
             let end_line = if self.i > start_i {
                 self.lines[self.i - 1].line_no
             } else {
                 span.line
             };
-            return Ok((Expr::List(list), end_line));
+            return Ok((table, end_line));
         }
         if let Some(expr) = try_parse_inline_formula(rhs)? {
             return Ok((expr, span.line));
@@ -456,10 +456,15 @@ impl<'a> Cursor<'a> {
         Ok((Expr::Formula(expr), end_line))
     }
 
-    fn consume_table(&mut self) -> Result<Vec<Expr>> {
+    /// GFM table after empty RHS:
+    /// - 1-col → List
+    /// - first header `@` / `行` / `row` → List of row Maps (marker col excluded)
+    /// - else ≥2-col → Map (column-oriented)
+    fn consume_table(&mut self) -> Result<Expr> {
         self.skip_noise();
         let mut header: Vec<String> = Vec::new();
-        let mut rows: Vec<Expr> = Vec::new();
+        let mut header_line: u32 = 1;
+        let mut data_rows: Vec<Vec<String>> = Vec::new();
         let mut header_done = false;
         let mut sep_done = false;
         while let Some(l) = self.peek() {
@@ -470,10 +475,12 @@ impl<'a> Cursor<'a> {
             if !t.starts_with('|') {
                 break;
             }
+            let line_no = l.line_no;
             self.bump();
             let cells = split_table_row(t);
             if !header_done {
                 header = cells;
+                header_line = line_no;
                 header_done = true;
                 continue;
             }
@@ -486,23 +493,59 @@ impl<'a> Cursor<'a> {
                 continue;
             }
             sep_done = true;
-            if header.len() <= 1 {
-                if let Some(cell) = cells.first() {
-                    rows.push(Expr::Literal(cell_literal(cell)));
-                }
-            } else {
-                let mut pairs = Vec::new();
-                for (i, key) in header.iter().enumerate() {
-                    let raw = cells.get(i).map(|s| s.as_str()).unwrap_or("");
-                    pairs.push((key.clone(), Expr::Literal(cell_literal(raw))));
-                }
-                rows.push(Expr::Map(pairs));
-            }
+            data_rows.push(cells);
         }
         if !header_done {
             bail!("expected GFM table after empty assignment");
         }
-        Ok(rows)
+        let row_oriented = header
+            .first()
+            .map(|h| is_row_table_marker(h))
+            .unwrap_or(false);
+        if row_oriented {
+            return build_row_oriented_table(header, header_line, data_rows);
+        }
+        if header.len() <= 1 {
+            let mut rows = Vec::new();
+            for cells in data_rows {
+                if let Some(cell) = cells.first() {
+                    rows.push(Expr::Literal(cell_literal(cell)));
+                }
+            }
+            return Ok(Expr::List(rows));
+        }
+        // Duplicate header keys are errors (column identity must be unique).
+        let mut seen = std::collections::HashSet::new();
+        for key in &header {
+            if !seen.insert(key.clone()) {
+                return Err(Diagnostic::new(
+                    None,
+                    Span {
+                        line: header_line,
+                        col: 1,
+                    },
+                    format!("duplicate table header `{key}`"),
+                )
+                .into());
+            }
+        }
+        let n_rows = data_rows.len();
+        let mut pairs = Vec::with_capacity(header.len());
+        for (col, key) in header.iter().enumerate() {
+            if n_rows == 1 {
+                let raw = data_rows[0].get(col).map(|s| s.as_str()).unwrap_or("");
+                pairs.push((key.clone(), Expr::Literal(cell_literal(raw))));
+            } else {
+                // 0 rows → empty lists; ≥2 rows → column lists.
+                let mut col_vals = Vec::with_capacity(n_rows);
+                for cells in &data_rows {
+                    let raw = cells.get(col).map(|s| s.as_str()).unwrap_or("");
+                    col_vals.push(Expr::Literal(cell_literal(raw)));
+                }
+                pairs.push((key.clone(), Expr::List(col_vals)));
+            }
+        }
+        Ok(Expr::Map(pairs))
     }
 
     fn parse_branch(&mut self) -> Result<Stmt> {
@@ -897,6 +940,55 @@ fn cell_literal(raw: &str) -> Literal {
         }
     }
     Literal::Text(t.to_string())
+}
+
+/// First-column header that opts into row-oriented records (`List` of `Map`).
+fn is_row_table_marker(header: &str) -> bool {
+    matches!(header.trim(), "@" | "行" | "row")
+}
+
+fn build_row_oriented_table(
+    header: Vec<String>,
+    header_line: u32,
+    data_rows: Vec<Vec<String>>,
+) -> Result<Expr> {
+    if header.len() < 2 {
+        return Err(Diagnostic::new(
+            None,
+            Span {
+                line: header_line,
+                col: 1,
+            },
+            "row-oriented table needs field columns after `@` / `行` / `row`",
+        )
+        .into());
+    }
+    let fields: Vec<String> = header[1..].to_vec();
+    let mut seen = std::collections::HashSet::new();
+    for key in &fields {
+        if !seen.insert(key.clone()) {
+            return Err(Diagnostic::new(
+                None,
+                Span {
+                    line: header_line,
+                    col: 1,
+                },
+                format!("duplicate table header `{key}`"),
+            )
+            .into());
+        }
+    }
+    let mut rows = Vec::with_capacity(data_rows.len());
+    for cells in data_rows {
+        let mut pairs = Vec::with_capacity(fields.len());
+        for (i, key) in fields.iter().enumerate() {
+            // Skip marker column (index 0); fields start at column 1.
+            let raw = cells.get(i + 1).map(|s| s.as_str()).unwrap_or("");
+            pairs.push((key.clone(), Expr::Literal(cell_literal(raw))));
+        }
+        rows.push(Expr::Map(pairs));
+    }
+    Ok(Expr::List(rows))
 }
 
 fn split_table_row(line: &str) -> Vec<String> {

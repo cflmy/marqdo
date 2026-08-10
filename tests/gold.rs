@@ -113,6 +113,60 @@ fn structure_collection() {
 }
 
 #[test]
+fn structure_collection_map() {
+    assert_out(
+        "tests/structure/collection-map.mq.md",
+        "水果
+蔬菜
+数码用品
+苹果
+黄瓜
+鼠标",
+    );
+}
+
+#[test]
+fn structure_collection_map_list() {
+    assert_out(
+        "tests/structure/collection-map-list.mq.md",
+        "红富士
+[红富士, 嘎啦]
+黄瓜条",
+    );
+}
+
+#[test]
+fn structure_footnote_index() {
+    assert_out(
+        "tests/structure/footnote-index.mq.md",
+        "苹果
+梨
+桃",
+    );
+}
+
+#[test]
+fn structure_collection_records() {
+    assert_out(
+        "tests/structure/collection-records.mq.md",
+        "{品名: 苹果, 数量: 2}
+苹果
+3
+{品名: 苹果, 数量: 2}
+{品名: 梨, 数量: 3}",
+    );
+}
+
+#[test]
+fn structure_collection_records_at() {
+    assert_out(
+        "tests/structure/collection-records-at.mq.md",
+        "apple
+3",
+    );
+}
+
+#[test]
 fn structure_import() {
     assert_out(
         "tests/structure/import/main.mq.md",
@@ -359,6 +413,51 @@ fn error_div_zero() {
 }
 
 #[test]
+fn error_footnote_zero() {
+    assert_err(
+        "tests/errors/footnote-zero.mq.md",
+        "13:1",
+        "`[^0]` is invalid",
+    );
+}
+
+#[test]
+fn error_footnote_oob() {
+    assert_err(
+        "tests/errors/footnote-oob.mq.md",
+        "13:1",
+        "out of range",
+    );
+}
+
+#[test]
+fn error_footnote_missing_key() {
+    assert_err(
+        "tests/errors/footnote-missing-key.mq.md",
+        "13:1",
+        "missing map key",
+    );
+}
+
+#[test]
+fn error_table_dup_header() {
+    assert_err(
+        "tests/errors/table-dup-header.mq.md",
+        "9:1",
+        "duplicate table header",
+    );
+}
+
+#[test]
+fn error_table_row_marker_only() {
+    assert_err(
+        "tests/errors/table-row-marker-only.mq.md",
+        "9:1",
+        "row-oriented table needs field columns",
+    );
+}
+
+#[test]
 fn error_bad_int() {
     assert_err(
         "tests/errors/bad-int.mq.md",
@@ -490,6 +589,65 @@ fn bytecode_collection() {
         "苹果
 梨
 桃",
+    );
+}
+
+#[test]
+fn bytecode_collection_map() {
+    assert_out_backend(
+        "tests/structure/collection-map.mq.md",
+        "bytecode",
+        "水果
+蔬菜
+数码用品
+苹果
+黄瓜
+鼠标",
+    );
+}
+
+#[test]
+fn bytecode_collection_map_list() {
+    assert_out_backend(
+        "tests/structure/collection-map-list.mq.md",
+        "bytecode",
+        "红富士
+[红富士, 嘎啦]
+黄瓜条",
+    );
+}
+
+#[test]
+fn bytecode_footnote_index() {
+    assert_out_backend(
+        "tests/structure/footnote-index.mq.md",
+        "bytecode",
+        "苹果
+梨
+桃",
+    );
+}
+
+#[test]
+fn bytecode_collection_records() {
+    assert_out_backend(
+        "tests/structure/collection-records.mq.md",
+        "bytecode",
+        "{品名: 苹果, 数量: 2}
+苹果
+3
+{品名: 苹果, 数量: 2}
+{品名: 梨, 数量: 3}",
+    );
+}
+
+#[test]
+fn bytecode_collection_records_at() {
+    assert_out_backend(
+        "tests/structure/collection-records-at.mq.md",
+        "bytecode",
+        "apple
+3",
     );
 }
 
@@ -786,7 +944,7 @@ fn lib_writeback_get() {
 
 #[test]
 fn lib_subtask_spawn() {
-    assert_out("tests/lib/subtask-spawn.mq.md", "child-ok\ndone\nquiet-ok");
+    assert_out("tests/lib/subtask-spawn.mq.md", "child_ok\ndone\nquiet-ok");
 }
 
 #[test]

@@ -1,6 +1,6 @@
 ---
 title: lib/table
-description: English table helpers over len / at
+description: English list helpers over len / at (prefer footnote index for one-shots)
 ---
 
 ## rows

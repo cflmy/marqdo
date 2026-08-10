@@ -373,6 +373,7 @@ impl<'a> FnCompiler<'a> {
             } => {
                 self.stmt_span = *span;
                 self.compile_expr(&Expr::Var(collection.clone()))?;
+                self.emit(Op::IterItems);
                 let coll_slot = self.local_slot(&format!("__coll_{collection}"));
                 self.emit(Op::SetLocal(coll_slot));
                 self.emit(Op::Pop);
@@ -902,6 +903,12 @@ impl<'a> FnCompiler<'a> {
                     self.compile_expr(e)?;
                 }
                 self.emit(Op::BuildMap(pairs.len() as u16));
+            }
+            Expr::Index { base, label } => {
+                self.compile_expr(base)?;
+                let li = self.add_const(Value::Text(label.clone()));
+                self.emit(Op::Constant(li));
+                self.emit(Op::FootnoteGet);
             }
             Expr::Formula(e) => {
                 let i = self.add_const(Value::Formula(e.clone()));

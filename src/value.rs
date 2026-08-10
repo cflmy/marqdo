@@ -19,9 +19,9 @@ pub enum Value {
     /// Floating-point number (`type` → `num`).
     Num(f64),
     Text(String),
-    /// Single-column table rows, or list of row maps for multi-column tables.
+    /// Vertical (1-column) table rows, or nested list values in a column map.
     List(Vec<Value>),
-    /// JSON object / string-keyed map (insertion order).
+    /// String-keyed map (insertion order): JSON objects / horizontal tables.
     Map(Vec<(String, Value)>),
     /// Parsed symbolic expression (`type` → `formula`).
     Formula(FormulaExpr),
@@ -56,7 +56,13 @@ impl Value {
                 let parts: Vec<String> = xs.iter().map(|v| v.as_display()).collect();
                 format!("[{}]", parts.join(", "))
             }
-            Value::Map(_) => "<map>".into(),
+            Value::Map(pairs) => {
+                let parts: Vec<String> = pairs
+                    .iter()
+                    .map(|(k, v)| format!("{k}: {}", v.as_display()))
+                    .collect();
+                format!("{{{}}}", parts.join(", "))
+            }
             Value::Formula(e) => e.as_display(),
             Value::Code(c) => format!("```{}\n{}\n```", c.lang, c.source),
         }

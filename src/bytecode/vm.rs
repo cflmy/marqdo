@@ -5,7 +5,8 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 
 use crate::builtin::{
-    builtin_at, builtin_int, builtin_join, builtin_len, builtin_split, builtin_str, builtin_trim,
+    builtin_at, builtin_footnote_get, builtin_int, builtin_iter_items, builtin_join,
+    builtin_len, builtin_split, builtin_str, builtin_trim,
     builtin_type,
 };
 use crate::host::{call_host, HostContext, HostFn};
@@ -309,6 +310,23 @@ impl Vm {
                     let idx = pop(&mut stack).map_err(|m| self.err_at(span, m))?;
                     let list = pop(&mut stack).map_err(|m| self.err_at(span, m))?;
                     stack.push(builtin_at(&list, &idx).map_err(|m| self.err_at(span, m))?);
+                }
+                Op::IterItems => {
+                    let v = pop(&mut stack).map_err(|m| self.err_at(span, m))?;
+                    stack.push(builtin_iter_items(&v).map_err(|m| self.err_at(span, m))?);
+                }
+                Op::FootnoteGet => {
+                    let label = pop(&mut stack).map_err(|m| self.err_at(span, m))?;
+                    let base = pop(&mut stack).map_err(|m| self.err_at(span, m))?;
+                    let label = match label {
+                        Value::Text(s) => s,
+                        _ => {
+                            return Err(self.err_at(span, "footnote label must be text"));
+                        }
+                    };
+                    stack.push(
+                        builtin_footnote_get(&base, &label).map_err(|m| self.err_at(span, m))?,
+                    );
                 }
                 Op::HostCall(id, argc) => {
                     let hf = HostFn::from_u16(id)

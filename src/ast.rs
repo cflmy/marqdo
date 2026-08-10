@@ -139,8 +139,14 @@ pub enum Expr {
     },
     Call(CallExpr),
     List(Vec<Expr>),
-    /// Object literal / table row (`map` value).
+    /// Object literal / horizontal table (`map` value).
     Map(Vec<(String, Expr)>),
+    /// Footnote index: `` `xs`[^1] `` / `` `m`[^key] `` (see tables-maps-footnotes).
+    Index {
+        base: Box<Expr>,
+        /// Label inside `[^…]` (digits → 1-based list index; else map key).
+        label: String,
+    },
     /// Parsed `$$…$$` formula tree (from assignment RHS).
     Formula(FormulaExpr),
     /// Bound ```lang … ``` fence (`code` value).

@@ -54,6 +54,10 @@ pub enum Op {
     /// Pop sep, then list → push joined text.
     Join,
     GetIndex,
+    /// Pop list/map → push list of foreach items (list elements or map keys).
+    IterItems,
+    /// Pop footnote label text, then base → push indexed value (1-based list / map key).
+    FootnoteGet,
     /// Call function by index; argc values are on the stack (param order).
     Call(u16, u8),
     /// Pop function name text → call zero-arg top-level or lexically visible function.

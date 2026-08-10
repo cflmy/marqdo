@@ -6,7 +6,7 @@ description: Row count and index helpers
 
 # main
 
-Import lib/table.mq.md. Functions: rows(xs), row_at(xs, i). Single-column Markdown tables are lists at runtime.
+Import lib/table.mq.md. Functions: rows(xs), row_at(xs, i). Single-column tables are lists; multi-column tables are maps (see structure/07-map). Prefer `` `xs`[^1] `` for 1-based index; `row_at` stays 0-based.
 
 `xs` =
 

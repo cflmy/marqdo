@@ -45,7 +45,7 @@ Canonical design (repo): `doc/design/markdown-mapping.md`, `doc/design/keywords.
 | `**…**` | Return value |
 | `****` or `**` + spaces + `**` | Return `None` and end function body |
 | Lone `---` / `***` in function body | End function body (no value) |
-| GFM table after empty RHS bind | Collection |
+| GFM table after empty RHS bind | Collection (1-col list / ≥2-col map / `@`·`行`·`row` → list of maps); `` `x`[^1] `` / `` `m`[^key] `` |
 | `` ```lang `` | Foreign code block (via `lib/foreign`) |
 | `` `"text"` `` | Quoted string (`\n` `\t` `\\` `\"`; `` `var` `` inside); bare tokens unescaped |
 | Unmarked prose | Comment |

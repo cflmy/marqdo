@@ -26,7 +26,7 @@ title: subtask spawn join
 *`val2` = > json.get value=`waited2` key=value *
 
 1. `code2` == 0
-  1. `val2` == "child-ok"
+  1. `val2` == "child_ok"
     > print text=quiet-ok
   2. *
     > print text=quiet-bad-value

@@ -113,3 +113,57 @@ pub fn builtin_at(value: &Value, index: &Value) -> Result<Value, String> {
     }
     Ok(xs[i as usize].clone())
 }
+
+/// Foreach surface: list items unchanged; map → list of keys (insertion order).
+pub fn builtin_iter_items(value: &Value) -> Result<Value, String> {
+    match value {
+        Value::List(xs) => Ok(Value::List(xs.clone())),
+        Value::Map(pairs) => Ok(Value::List(
+            pairs
+                .iter()
+                .map(|(k, _)| Value::Text(k.clone()))
+                .collect(),
+        )),
+        _ => Err("foreach needs a list or map".into()),
+    }
+}
+
+/// Footnote get: `` `xs`[^1] `` (1-based list) or `` `m`[^key] `` (map key).
+pub fn builtin_footnote_get(base: &Value, label: &str) -> Result<Value, String> {
+    let is_digits = !label.is_empty() && label.bytes().all(|b| b.is_ascii_digit());
+    match base {
+        Value::List(xs) => {
+            if !is_digits {
+                return Err(format!(
+                    "list footnote index must be digits (1-based), got `[^{label}]`"
+                ));
+            }
+            let n: i64 = label
+                .parse()
+                .map_err(|_| format!("invalid list index `[^{label}]`"))?;
+            if n == 0 {
+                return Err("`[^0]` is invalid; list indices are 1-based".into());
+            }
+            if n < 1 || (n as usize) > xs.len() {
+                return Err(format!(
+                    "list index {n} out of range (len {})",
+                    xs.len()
+                ));
+            }
+            Ok(xs[(n as usize) - 1].clone())
+        }
+        Value::Map(pairs) => {
+            if is_digits {
+                return Err(
+                    "map footnote must be a key name, not pure digits (keys are text)".into(),
+                );
+            }
+            pairs
+                .iter()
+                .find(|(k, _)| k == label)
+                .map(|(_, v)| v.clone())
+                .ok_or_else(|| format!("missing map key `{label}`"))
+        }
+        _ => Err("footnote index needs list or map".into()),
+    }
+}

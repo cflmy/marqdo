@@ -8,7 +8,8 @@ use crate::ast::{
     Arg, BinaryOp, CallExpr, Expr, Function, InterpPart, Literal, Module, Param, Stmt, UnaryOp,
 };
 use crate::builtin::{
-    builtin_at, builtin_int, builtin_join, builtin_len, builtin_split, builtin_str, builtin_trim,
+    builtin_at, builtin_footnote_get, builtin_int, builtin_iter_items, builtin_join,
+    builtin_len, builtin_split, builtin_str, builtin_trim,
     builtin_type,
 };
 use crate::debug::{emit_trace, DebugController};
@@ -339,11 +340,10 @@ impl Interpreter {
                 let coll = env.get(collection).cloned().ok_or_else(|| {
                     self.err(format!("undefined collection `{collection}`"))
                 })?;
-                let items = match coll {
-                    Value::List(xs) => xs,
-                    other => {
-                        return Err(self.err(format!("foreach needs a list, got {other:?}")));
-                    }
+                let items = match builtin_iter_items(&coll) {
+                    Ok(Value::List(xs)) => xs,
+                    Ok(_) => unreachable!(),
+                    Err(m) => return Err(self.err(m)),
                 };
                 for val in items {
                     env.set(item.clone(), val);
@@ -432,6 +432,10 @@ impl Interpreter {
                     out.push((k.clone(), self.eval_expr(module, fun, env, e)?));
                 }
                 Ok(Value::Map(out))
+            }
+            Expr::Index { base, label } => {
+                let v = self.eval_expr(module, fun, env, base)?;
+                builtin_footnote_get(&v, label).map_err(|m| self.err(m))
             }
             Expr::Formula(e) => Ok(Value::Formula(e.clone())),
             Expr::Code(c) => Ok(Value::Code(c.clone())),
