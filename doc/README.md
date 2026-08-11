@@ -39,6 +39,7 @@
 | [design/ext-agent.md](design/ext-agent.md) | **官方扩展 `ext/agent`（文档驱动：单步 / 多步工作簿 + 自写回；废弃 thin TOOL 循环）** |
 | [design/ext-agent-plan.md](design/ext-agent-plan.md) | **`## 多步` / `## plan` 锁定设计**（工作簿文件、subtask 执行、修订循环、`step` 默认写回） |
 | [design/ext-cli.md](design/ext-cli.md) | **`marqdo ext list/add/remove` 官方扩展安装器** |
+| [design/ext-web.md](design/ext-web.md) | **官方扩展 `ext/web`（页面/库表/绑定/后台；ABI + CLI；设计锁定）** |
 | [design/call-arguments.md](design/call-arguments.md) | **调用：具名 + 位置实参** |
 | [design/examples-and-tests.md](design/examples-and-tests.md) | **tests/ 金样例目录布局** |
 | [design/view.md](design/view.md) | **`marqdo view` / `view output` 黑白极简 + 静态文档** |
@@ -55,7 +56,7 @@
 | [roadmap/agent-streaming.md](roadmap/agent-streaming.md) | **流式输出**（SSE + `complete`/`step` stream；S0–S1 已落地） |
 | [roadmap/object-inheritance.md](roadmap/object-inheritance.md) | **对象继承**（`# 子类 = > 父类`；I0–I2 已落地） |
 | [roadmap/tables-maps-footnotes.md](roadmap/tables-maps-footnotes.md) | **表格语义**（竖表 / 横表字典 / 脚注取元 / 行向记录；T0–T4 已落地） |
-| [roadmap/ext-web.md](roadmap/ext-web.md) | **规划：`ext/web` 动态网页**（env/DB init·迁移·样式脚手架·ABI） |
+| [roadmap/ext-web.md](roadmap/ext-web.md) | **实现路线：`ext/web`**（W0–W4；设计见 [ext-web.md](../design/ext-web.md)） |
 | [roadmap/ext-quantum.md](roadmap/ext-quantum.md) | **规划：`ext/quantum` 量子模拟**（基础门·电路·ABI·`ext add`） |
 | [research/okf-and-marqdo.md](research/okf-and-marqdo.md) | OKF 调研 |
 

@@ -38,3 +38,8 @@ spike/__pycache__/
 spike/.pytest_cache/
 **/__pycache__/
 *.pyc
+
+# Local sqlite / scratch
+/data/
+/tmp/
+plugins/*/tmp/

@@ -28,7 +28,7 @@ include_dir = "0.7"
 libc = "0.2"
 
 [workspace]
-members = ["plugins/demo", "plugins/agent"]
+members = ["plugins/demo", "plugins/agent", "plugins/web"]
 resolver = "2"
 
 [dev-dependencies]

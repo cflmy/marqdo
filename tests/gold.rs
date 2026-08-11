@@ -1187,6 +1187,62 @@ fn ext_cli_add_agent() {
 }
 
 #[test]
+fn ext_cli_add_web() {
+    let status = Command::new("cargo")
+        .args(["build", "-p", "marqdo_plugin_web"])
+        .current_dir(env!("CARGO_MANIFEST_DIR"))
+        .status()
+        .expect("build web plugin");
+    assert!(status.success(), "failed to build marqdo_plugin_web");
+
+    let tmp = tempfile_dir("marqdo-ext-web");
+    let src = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("ext");
+    let bin = env!("CARGO_BIN_EXE_marqdo");
+    let status = Command::new(bin)
+        .args(["ext", "add", "web"])
+        .env("MARQDO_EXT", &tmp)
+        .env("MARQDO_EXT_SOURCE", &src)
+        .current_dir(env!("CARGO_MANIFEST_DIR"))
+        .status()
+        .expect("ext add web");
+    assert!(status.success(), "ext add web failed");
+    assert!(tmp.join("web").join("web.mq.md").is_file());
+    assert!(tmp.join("web").join("网页.mq.md").is_file());
+    assert!(
+        tmp.join("native").join(if cfg!(windows) {
+            "web.dll"
+        } else if cfg!(target_os = "macos") {
+            "libweb.dylib"
+        } else {
+            "libweb.so"
+        })
+        .is_file()
+            || tmp.join("web.plugin").is_file(),
+        "web native plugin should be installed"
+    );
+}
+
+#[test]
+fn ext_web_smoke() {
+    let status = Command::new("cargo")
+        .args(["build", "-p", "marqdo_plugin_web"])
+        .current_dir(env!("CARGO_MANIFEST_DIR"))
+        .status()
+        .expect("build web plugin");
+    assert!(status.success(), "failed to build marqdo_plugin_web");
+    assert_out(
+        "tests/ext/web-smoke.mq.md",
+        "nav-ok
+首页
+文档
+bind-ok
+render-ok
+live-ok
+follow-ok",
+    );
+}
+
+#[test]
 fn ext_agent_framework_smoke() {
     let status = Command::new("cargo")
         .args(["build", "-p", "marqdo_plugin_agent"])
