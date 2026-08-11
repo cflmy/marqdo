@@ -2,8 +2,8 @@
 
 | | |
 |---|---|
-| 状态 | **B aliases 已落地**（A 规范句 / C 父裁决 / E 向量仍待） |
-| 日期 | 2026-08-09 |
+| 状态 | **A 规范句 + B aliases + C 父裁决（soft_match）已落地**；E 向量仍待 |
+| 日期 | 2026-08-11 |
 | 相关 | [okf.md](../design/okf.md) §7 · [ext-agent-plan.md](../design/ext-agent-plan.md) §4.2 · [ext-agent.md](../design/ext-agent.md) |
 | 触发观察 | `man-test`：相近 goal 生成两份独立 resource |
 
@@ -11,23 +11,20 @@
 
 ## 1. 问题
 
-今日 agent-kb **只做精确命中**：
+v1 agent-kb **默认只做精确命中**（仍是默认快路径）：
 
 1. `normalize_goal`：去首尾空白、合并连续空白（**不做**近义改写）。  
 2. `sig` = 规范化字符串的稳定短哈希；`slug` = 可读路径名。  
-3. `agent_kb_lookup`：按 `sig` / slug 精确对上才复用；否则新建 Task / Skill / `resources/<slug>.mq.md`。
+3. `agent_kb_lookup`：精确 → aliases → **canonicalize 后再精确/别名**；仍 miss 且 `plan soft_match=True` 时父裁决 REUSE/NEW。
 
-因此字面不同、含义相近的两次 `plan` 会被当成**两个任务**。实测例子：
+历史痛点（已由 A/B/C 缓解）：
 
-| goal（调用方输入） | 产物 slug（示意） |
-|--------------------|-------------------|
-| `你是一个智能体，帮我规划明天的行程` | `你是一个智能体-帮我规划明天的行程` |
-| `帮我规划明行程` | `帮我规划明行程` |
+| goal（调用方输入） | 旧行为 |
+|--------------------|--------|
+| `你是一个智能体，帮我规划明天的行程` | 独立 slug，与下方不命中 |
+| `帮我规划明天的行程` | 另一份 resource |
 
-调用方直觉：「这不是同一件事吗？」  
-框架行为：「指纹不同 → 不命中 → 再探索 / 再固化。」
-
-这在 v1 **是合理且有意的**（见 §2），但缺少一层「相近含义」通道时，知识包会碎片化，复用率下降。
+调用方直觉：「这不是同一件事吗？」——现可用 canonicalize（剥站立前缀）或显式 `soft_match` 父裁决。
 
 ---
 
@@ -44,14 +41,14 @@
 
 ---
 
-## 3. 目标（未来能力）
+## 3. 目标
 
-在 **不破坏** 精确 `sig` 契约的前提下，可选地：
+在 **不破坏** 精确 `sig` 契约的前提下：
 
-1. 识别「同一任务意图的不同措辞」→ 复用已有 Skill / resource；或  
-2. 至少提示调用方 / 父智能体：「可能命中已有任务 X，确认后复用」。
+1. **已落地**：A 规范句、B aliases、C `soft_match` 父裁决（默认关）。  
+2. **仍待**：E 向量（仅有证据再开）。
 
-非目标（本规划明确不做为默认）：
+非目标（仍不做为默认）：
 
 - 把 agent-kb 做成通用向量知识库 / RAG 产品。  
 - 用不可审计的静默相似度覆盖精确 `sig`。  
@@ -63,32 +60,26 @@
 
 相近命中 **不等于** 必须上向量检索。按与 Marqdo 契合度排序：
 
-### A. 规范化后再精确命中（首选探索）
+### A. 规范化后再精确命中 — **已落地**
 
 | | |
 |--|--|
-| 做法 | lookup 前把 goal 收成**规范句**（规则表，或一次小模型 / 父 LLM 调用），再算现有 `sig` |
-| 优点 | 索引与今日相同；无 ANN；结果可写回 Task（`canonical` / `aliases`） |
-| 风险 | 规范器不稳会导致漂移；需冻结「规范句」写入 task 页，避免每次改写 |
-| 落地形态 | `agent_kb_canonicalize`（插件）或 `plan` 内可选 `canonicalize=True` |
+| 做法 | `agent_kb_canonicalize`：剥站立前缀、去尾 `？`/`?`/`。`，再 `normalize_goal`；lookup 第三趟 |
+| 落地 | 插件 + `match: canonical`；`cache=soft-hit` |
 
-### B. 别名 / 标签表（文档原生）
+### B. 别名 / 标签表 — **已落地**
 
 | | |
 |--|--|
-| 做法 | Task frontmatter 增加 `aliases: […]` / `tags: […]`；lookup：先 `sig`，再扫别名精确匹配 |
-| 优点 | 完全可读可 git；promote / 人工策展可补别名 |
-| 风险 | 冷启动靠人；自动抽别名仍可能要模型 |
-| 落地形态 | 扩 `concepts/tasks/*.md`；`kb_lookup` 第二趟扫 aliases |
+| 做法 | Task FM `aliases:`；lookup 第二趟精确匹配 |
+| 落地 | `match: alias`；promote / `agent_kb_add_alias` |
 
-### C. 父智能体软裁决（miss 后）
+### C. 父智能体软裁决（miss 后）— **已落地（默认关）**
 
 | | |
 |--|--|
-| 做法 | 精确 miss 时，把 `index.md`（或 task 标题列表）交给父模型：`REUSE:<slug>` / `NEW` |
-| 优点 | 无新基础设施；与「父是开发大师」一致；决策可写回 |
-| 风险 | 多一次 LLM；需严格协议防乱指；`llm_free` 快路径仍走精确命中 |
-| 落地形态 | `plan` 在 reuse miss 且 `soft_match=True` 时分支 |
+| 做法 | `plan soft_match=True`：`agent_kb_list_tasks` → 父 `DECISION: REUSE` + `SLUG:` 或 `DECISION: NEW` |
+| 落地 | REUSE → 现有 hit 分支；可选 append alias |
 
 ### D. 字面近似（弱，仅拼写容错）
 
@@ -110,29 +101,30 @@
 
 ---
 
-## 5. 推荐演进顺序
+## 5. 演进顺序
 
 ```text
-精确 sig（现状，永不删除）
-    → A 规范句 或 B aliases（文档层，可金样）
-    → C soft_match 父裁决（可选，打网）
+精确 sig（永不删除）
+    → A 规范句 + B aliases（已落地）
+    → C soft_match 父裁决（已落地，默认关）
     → E 向量（仅有证据再开）
 ```
 
-验收原则：
+验收原则（仍适用）：
 
-1. 默认行为与今日一致（未开开关 = 仅精确命中）。  
-2. 软命中必须留下可读痕迹（写回 `cache=soft-hit`、选用的 slug、可选置信说明）。  
+1. 默认行为与精确路径一致（`soft_match` 默认 False；canonicalize 无模型、低风险）。  
+2. 软命中留下 `cache=soft-hit` / `match` 痕迹。  
 3. 假阳性可被 `force=True` / 显式 `workbook=` 覆盖。  
 4. 实现仍在 **agent 插件 + `ext/ai`**，不进核心 `src/host`。
 
 ---
 
-## 6. 调用方近期规避（无需等实现）
+## 6. 调用方建议
 
-- 固定规范 goal 字符串（应用层常量），不要把「你是一个智能体」等站立语拼进 goal。  
+- 固定规范 goal 字符串；站立语可由 canonicalize 剥掉，但仍宜少拼。  
 - 续跑同一主题时传 `workbook=` 或已知 resource 路径。  
-- 策展：合并重复 task 页，把次要措辞写入将来的 `aliases`（今日可先记在 task 正文）。
+- 近义但字面差大时显式 `soft_match=True`（多一次父 LLM）。  
+- 策展：合并重复 task，次要措辞写入 `aliases`。
 
 ---
 
@@ -140,8 +132,6 @@
 
 | 条目 | 关系 |
 |------|------|
-| [okf.md](../design/okf.md) O2 | 任务包精确 reuse **已完成**；本文是 O2 之上的软命中延伸 |
-| [okf.md](../design/okf.md) O4 | `kb query` / 策展可与 B（aliases）同批考虑 |
-| [ext-agent-plan.md](../design/ext-agent-plan.md) | 多轮仍只走子文件接力；软命中只影响「选哪个子文件」，不改变模式 C |
-
-本文不锁定实现工期；开工前应先选 A/B/C 之一写一小段 Accepted 补丁进 `okf.md` §7.3，再改插件与金样。
+| [okf.md](../design/okf.md) O2 / O5 | 精确 reuse + A/B/C 软命中；E 向量仍待 |
+| [okf.md](../design/okf.md) O4 | `kb query` / 策展可继续扩 aliases |
+| [ext-agent-plan.md](../design/ext-agent-plan.md) | 多轮仍只走子文件接力；软命中只影响「选哪个子文件」 |

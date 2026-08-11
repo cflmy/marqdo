@@ -23,6 +23,46 @@ pub fn normalize_goal(raw: &str) -> String {
     out
 }
 
+/// Light rule-based canonicalize (no model): strip standing prefixes, trailing `？`/`?`/`。`.
+pub fn canonicalize_goal_str(raw: &str) -> String {
+    let mut s = raw.trim().to_string();
+    const PREFIXES: &[&str] = &[
+        "你是一个智能体，",
+        "你是一个智能体,",
+        "你是一个智能体：",
+        "你是一个智能体:",
+        "你是一个智能体",
+        "作为一个智能体，",
+        "作为一个智能体,",
+        "作为一个智能体：",
+        "作为一个智能体:",
+        "作为一个智能体",
+        "You are an agent, ",
+        "You are an agent,",
+        "You are an agent. ",
+        "You are an agent.",
+        "You are an agent ",
+        "You are an agent",
+        "As an agent, ",
+        "As an agent,",
+        "As an agent ",
+        "As an agent",
+    ];
+    for p in PREFIXES {
+        if let Some(rest) = s.strip_prefix(p) {
+            s = rest.trim_start().to_string();
+            break;
+        }
+    }
+    while s.ends_with('？') || s.ends_with('?') || s.ends_with('。') {
+        s.pop();
+        while s.ends_with(|c: char| c.is_whitespace()) {
+            s.pop();
+        }
+    }
+    normalize_goal(&s)
+}
+
 pub fn goal_sig_hex(material: &str) -> String {
     let mut h: u64 = 5381;
     for b in material.as_bytes() {
@@ -561,24 +601,21 @@ pub fn goal_slug(args: &Value) -> Result<Value, String> {
     Ok(Value::String(goal_slug_str(goal)))
 }
 
-pub fn kb_lookup(args: &Value) -> Result<Value, String> {
-    let kb = arg_text(args, "kb_dir")?;
+pub fn kb_canonicalize(args: &Value) -> Result<Value, String> {
     let goal = arg_text(args, "goal")?;
-    let goal_n = normalize_goal(goal);
-    let query_sig = goal_sig_hex(&material_for(goal, opt_tools(args)));
-    let slug_hint = goal_slug_str(goal);
-    let root = resolve_path(kb);
-    let mut match_kind = "exact";
-    let resolved = resolve_skill_paths(&root, &query_sig, &slug_hint).or_else(|| {
-        match_kind = "alias";
-        resolve_skill_paths_by_alias(&root, &goal_n)
-    });
-    let Some((_task, skill_path, _res, slug)) = resolved else {
-        return Ok(Value::Null);
-    };
+    Ok(Value::String(canonicalize_goal_str(goal)))
+}
 
+fn lookup_hit_payload(
+    kb: &str,
+    root: &Path,
+    skill_path: &Path,
+    slug: &str,
+    match_kind: &str,
+    query_sig: &str,
+) -> Result<Value, String> {
     let skill_src =
-        fs::read_to_string(&skill_path).map_err(|e| format!("kb_lookup read skill: {e}"))?;
+        fs::read_to_string(skill_path).map_err(|e| format!("kb_lookup read skill: {e}"))?;
     let mut status = extract_fm_field(&skill_src, "status").unwrap_or_else(|| "stable".into());
     if status == "deprecated" || status == "draft" {
         return Ok(Value::Null);
@@ -592,7 +629,7 @@ pub fn kb_lookup(args: &Value) -> Result<Value, String> {
     let hits = extract_fm_field(&skill_src, "hits")
         .and_then(|s| s.parse::<i64>().ok())
         .unwrap_or(0);
-    let skill_sig = extract_fm_field(&skill_src, "sig").unwrap_or_else(|| query_sig.clone());
+    let skill_sig = extract_fm_field(&skill_src, "sig").unwrap_or_else(|| query_sig.to_string());
 
     let res_path = root.join("resources").join(format!("{slug}.mq.md"));
     if res_path.is_file() {
@@ -624,15 +661,162 @@ pub fn kb_lookup(args: &Value) -> Result<Value, String> {
     }))
 }
 
+fn resolve_skill_paths_by_slug(
+    root: &Path,
+    slug: &str,
+) -> Option<(PathBuf, PathBuf, PathBuf, String)> {
+    let slug = slug.trim();
+    if slug.is_empty() {
+        return None;
+    }
+    let task = root.join("concepts/tasks").join(format!("{slug}.md"));
+    let skill = root.join("concepts/skills").join(format!("{slug}.md"));
+    let res = root.join("resources").join(format!("{slug}.mq.md"));
+    if task.is_file() && skill.is_file() && res.is_file() {
+        Some((task, skill, res, slug.to_string()))
+    } else {
+        None
+    }
+}
+
+pub fn kb_lookup(args: &Value) -> Result<Value, String> {
+    let kb = arg_text(args, "kb_dir")?;
+    let root = resolve_path(kb);
+    let tools = opt_tools(args);
+
+    // Soft-match REUSE: resolve by explicit slug.
+    if let Some(slug) = args
+        .get("slug")
+        .and_then(|v| v.as_str())
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+    {
+        let Some((_task, skill_path, _res, slug)) = resolve_skill_paths_by_slug(&root, slug) else {
+            return Ok(Value::Null);
+        };
+        let query_sig = args
+            .get("goal")
+            .and_then(|v| v.as_str())
+            .map(|g| goal_sig_hex(&material_for(g, tools)))
+            .unwrap_or_default();
+        return lookup_hit_payload(kb, &root, &skill_path, &slug, "soft", &query_sig);
+    }
+
+    let goal = arg_text(args, "goal")?;
+    let goal_n = normalize_goal(goal);
+    let query_sig = goal_sig_hex(&material_for(goal, tools));
+    let slug_hint = goal_slug_str(goal);
+    let mut match_kind = "exact";
+    let resolved = resolve_skill_paths(&root, &query_sig, &slug_hint)
+        .or_else(|| {
+            match_kind = "alias";
+            resolve_skill_paths_by_alias(&root, &goal_n)
+        })
+        .or_else(|| {
+            let canon = canonicalize_goal_str(goal);
+            if canon.is_empty() || canon == goal_n {
+                return None;
+            }
+            match_kind = "canonical";
+            let sig2 = goal_sig_hex(&material_for(&canon, tools));
+            let slug2 = goal_slug_str(&canon);
+            resolve_skill_paths(&root, &sig2, &slug2)
+                .or_else(|| resolve_skill_paths_by_alias(&root, &canon))
+        });
+    let Some((_task, skill_path, _res, slug)) = resolved else {
+        return Ok(Value::Null);
+    };
+
+    lookup_hit_payload(kb, &root, &skill_path, &slug, match_kind, &query_sig)
+}
+
+pub fn kb_list_tasks(args: &Value) -> Result<Value, String> {
+    let kb = arg_text(args, "kb_dir")?;
+    let limit = match args.get("limit") {
+        None | Some(Value::Null) => 40usize,
+        Some(Value::Number(n)) => n.as_u64().unwrap_or(40) as usize,
+        Some(Value::String(s)) => s.parse().unwrap_or(40),
+        _ => 40,
+    }
+    .clamp(1, 200);
+    let root = resolve_path(kb);
+    let tasks_dir = root.join("concepts/tasks");
+    let mut tasks: Vec<Value> = Vec::new();
+    if tasks_dir.is_dir() {
+        let mut ents: Vec<_> = fs::read_dir(&tasks_dir)
+            .map_err(|e| format!("list tasks: {e}"))?
+            .flatten()
+            .collect();
+        ents.sort_by_key(|e| e.file_name());
+        for ent in ents {
+            if tasks.len() >= limit {
+                break;
+            }
+            let p = ent.path();
+            if p.extension().and_then(|e| e.to_str()) != Some("md") {
+                continue;
+            }
+            let Ok(src) = fs::read_to_string(&p) else {
+                continue;
+            };
+            let slug = p
+                .file_stem()
+                .map(|s| s.to_string_lossy().into_owned())
+                .unwrap_or_default();
+            if slug.is_empty() {
+                continue;
+            }
+            let title = extract_fm_field(&src, "title").unwrap_or_else(|| slug.clone());
+            tasks.push(json!({ "slug": slug, "title": title }));
+        }
+    }
+    let count = tasks.len() as i64;
+    Ok(json!({ "tasks": tasks, "count": count }))
+}
+
+pub fn kb_add_alias(args: &Value) -> Result<Value, String> {
+    let kb = arg_text(args, "kb_dir")?;
+    let slug = arg_text(args, "slug")?;
+    let alias = arg_text(args, "alias")?;
+    let alias_n = normalize_goal(alias);
+    if alias_n.is_empty() {
+        return Ok(json!({ "ok": false, "reason": "empty_alias" }));
+    }
+    let root = resolve_path(kb);
+    let path = root.join("concepts/tasks").join(format!("{slug}.md"));
+    if !path.is_file() {
+        return Ok(json!({ "ok": false, "reason": "missing_task" }));
+    }
+    let src = fs::read_to_string(&path).map_err(|e| format!("read task: {e}"))?;
+    let sig = extract_fm_field(&src, "sig").unwrap_or_default();
+    let goal = extract_fm_field(&src, "description")
+        .or_else(|| extract_fm_field(&src, "title"))
+        .unwrap_or_default();
+    let now = now_rfc3339();
+    write_task_concept(&path, &sig, slug, &goal, &now, &[alias_n.clone()])?;
+    Ok(json!({ "ok": true, "slug": slug, "alias": alias_n }))
+}
+
 pub fn kb_record_hit(args: &Value) -> Result<Value, String> {
     let kb = arg_text(args, "kb_dir")?;
     let goal = arg_text(args, "goal")?;
     let goal_n = normalize_goal(goal);
-    let sig = goal_sig_hex(&material_for(goal, opt_tools(args)));
+    let tools = opt_tools(args);
+    let sig = goal_sig_hex(&material_for(goal, tools));
     let slug_hint = goal_slug_str(goal);
     let root = resolve_path(kb);
     let Some((_t, skill_path, _r, slug)) = resolve_skill_paths(&root, &sig, &slug_hint)
         .or_else(|| resolve_skill_paths_by_alias(&root, &goal_n))
+        .or_else(|| {
+            let canon = canonicalize_goal_str(goal);
+            if canon.is_empty() || canon == goal_n {
+                return None;
+            }
+            let sig2 = goal_sig_hex(&material_for(&canon, tools));
+            let slug2 = goal_slug_str(&canon);
+            resolve_skill_paths(&root, &sig2, &slug2)
+                .or_else(|| resolve_skill_paths_by_alias(&root, &canon))
+        })
     else {
         return Ok(Value::Null);
     };
@@ -909,5 +1093,13 @@ mod tests {
         let a = goal_sig_hex("hello");
         assert_eq!(a, goal_sig_hex("hello"));
         assert_eq!(a.len(), 12);
+    }
+
+    #[test]
+    fn canonicalize_strips_standing_prefix() {
+        let c = canonicalize_goal_str("你是一个智能体，帮我规划明天的行程");
+        assert_eq!(c, "帮我规划明天的行程");
+        let c2 = canonicalize_goal_str("你是一个智能体，帮我规划明天的行程？");
+        assert_eq!(c2, "帮我规划明天的行程");
     }
 }

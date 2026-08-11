@@ -62,3 +62,32 @@ description: Promote resource; patch Task aliases; variant goal hits same resour
 *`exact` = > agent_kb_lookup kb_dir=`kb` goal=`goal` *
 *`mk2` = > json.get value=`exact` key=match *
 > print text=`mk2`
+
+*`g_trip` = 帮我规划明天的行程 *
+*`wb2` = .marqdo/agent-runs/alias-trip.mq.md *
+*`body2` = "---\ntitle: trip\n---\n\n# main\n\n**trip-ok**\n" *
+> fs.write_text path=`wb2` text=`body2`
+*`prom2` = > agent_kb_promote kb_dir=`kb` goal=`g_trip` workbook=`wb2` *
+*`ok2` = > json.get value=`prom2` key=promoted *
+1. `ok2`
+  > print text=trip-promoted
+2. *
+  > print text=trip-promote-fail
+
+*`g_canon` = 你是一个智能体，帮我规划明天的行程 *
+*`c` = > agent_kb_canonicalize goal=`g_canon` *
+> print text=`c`
+*`hit_c` = > agent_kb_lookup kb_dir=`kb` goal=`g_canon` *
+1. `hit_c`
+  > print text=canonical-ok
+2. *
+  > print text=canonical-miss
+*`mk3` = > json.get value=`hit_c` key=match *
+> print text=`mk3`
+
+*`listed` = > agent_kb_list_tasks kb_dir=`kb` *
+*`tc` = > json.get value=`listed` key=count *
+1. `tc` > 1
+  > print text=list-ok
+2. *
+  > print text=list-bad

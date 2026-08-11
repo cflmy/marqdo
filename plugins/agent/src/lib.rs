@@ -877,7 +877,10 @@ macro_rules! kb_ffi {
 
 kb_ffi!(agent_goal_sig, kb::goal_sig, "agent_goal_sig");
 kb_ffi!(agent_goal_slug, kb::goal_slug, "agent_goal_slug");
+kb_ffi!(agent_kb_canonicalize, kb::kb_canonicalize, "agent_kb_canonicalize");
 kb_ffi!(agent_kb_lookup, kb::kb_lookup, "agent_kb_lookup");
+kb_ffi!(agent_kb_list_tasks, kb::kb_list_tasks, "agent_kb_list_tasks");
+kb_ffi!(agent_kb_add_alias, kb::kb_add_alias, "agent_kb_add_alias");
 kb_ffi!(agent_kb_promote, kb::kb_promote, "agent_kb_promote");
 kb_ffi!(agent_kb_record_hit, kb::kb_record_hit, "agent_kb_record_hit");
 kb_ffi!(
@@ -962,7 +965,16 @@ pub unsafe extern "C" fn marqdo_plugin_init(host: *const MarqdoHostApi) -> c_int
     if register(host, "agent_goal_slug", "goal", agent_goal_slug) != 0 {
         return 1;
     }
+    if register(host, "agent_kb_canonicalize", "goal", agent_kb_canonicalize) != 0 {
+        return 1;
+    }
     if register(host, "agent_kb_lookup", "kb_dir,goal", agent_kb_lookup) != 0 {
+        return 1;
+    }
+    if register(host, "agent_kb_list_tasks", "kb_dir", agent_kb_list_tasks) != 0 {
+        return 1;
+    }
+    if register(host, "agent_kb_add_alias", "kb_dir,slug,alias", agent_kb_add_alias) != 0 {
         return 1;
     }
     if register(

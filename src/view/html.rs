@@ -644,6 +644,37 @@ section.block > h2 {
   color: #1d1d1f;
   letter-spacing: 0.02em;
 }
+.stream-tool {
+  border: 1px solid var(--line);
+  border-left: 3px solid #94a3b8;
+  border-radius: 8px;
+  background: #f1f5f9;
+  padding: 0.45rem 0.7rem;
+  margin: 0.25rem 0;
+}
+.stream-tool-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.35rem 0.65rem;
+  font: 0.78rem/1.3 var(--sans);
+  color: var(--muted);
+}
+.stream-tool-head strong {
+  color: #334155;
+  font-weight: 600;
+}
+.stream-tool-meta {
+  font: 0.72rem/1.3 var(--mono);
+  color: #64748b;
+}
+.stream-tool-body {
+  margin-top: 0.3rem;
+  font: 0.78rem/1.4 var(--mono);
+  color: #475569;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
 .stream-child {
   border: 1px solid var(--line);
   border-left: 3px solid #2563eb;
@@ -1156,6 +1187,35 @@ pub fn layout(title: &str, nav: &str, main: &str) -> String {
       resetTurnRefs();
       scrollIfPinned();
     }}
+    function addToolCard(ev) {{
+      flushPendingAll();
+      ensureTurn();
+      var card = document.createElement("div");
+      card.className = "stream-tool";
+      var head = document.createElement("div");
+      head.className = "stream-tool-head";
+      var title = document.createElement("strong");
+      var phase = (ev.type === "tool_end") ? "Tool end" : "Tool start";
+      title.textContent = phase;
+      head.appendChild(title);
+      var meta = document.createElement("span");
+      meta.className = "stream-tool-meta";
+      var bits = [];
+      if (ev.name) bits.push(ev.name);
+      if (ev.kind) bits.push(ev.kind);
+      meta.textContent = bits.join(" · ");
+      head.appendChild(meta);
+      card.appendChild(head);
+      if (ev.type === "tool_end" && ev.result != null && ev.result !== "") {{
+        var body = document.createElement("div");
+        body.className = "stream-tool-body";
+        var res = formatResult(ev.result);
+        body.textContent = res.length > 1024 ? res.slice(0, 1024) + "…" : res;
+        card.appendChild(body);
+      }}
+      turn.appendChild(card);
+      scrollIfPinned();
+    }}
     function addChildCard(ev) {{
       flushPendingAll();
       var card = document.createElement("div");
@@ -1209,6 +1269,8 @@ pub fn layout(title: &str, nav: &str, main: &str) -> String {
         if (status) status.textContent = "error";
       }} else if (t === "decision") {{
         addDecision(ev);
+      }} else if (t === "tool_start" || t === "tool_end") {{
+        addToolCard(ev);
       }} else if (t === "round") {{
         addChildCard(ev);
       }} else if (t === "run_start") {{

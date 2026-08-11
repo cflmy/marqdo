@@ -64,7 +64,7 @@ ext/ai/agent  step/plan 订阅事件 → 可选透传或写回「过程槽」
 |--------|------|----------|
 | `reasoning` | 模型思考增量（如 DeepSeek `reasoning_content`） | `text` |
 | `delta` | 模型答案增量文本 | `text` |
-| `tool_start` / `tool_end` | 工具轮 | `name`, `result?` |
+| `tool_start` / `tool_end` | 工具轮（父 plan CALL/READ 已发；view Tool 卡） | `name`, `kind?`, `result?` |
 | `round` | plan 轮次边界（子工作簿跑完） | `round`, `workbook`, `exit_code?`, `result?`（子返回值摘要） |
 | `decision` | DONE / CONTINUE / RUN | `decision`, `summary?` |
 | `done` | 本调用结束 | `result`（答案正文；不含 thinking） |

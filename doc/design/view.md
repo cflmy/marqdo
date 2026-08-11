@@ -116,7 +116,8 @@ marqdo view output tests/structure/hello.mq.md -o /tmp/hello-doc
 |------|------|------|
 | **Thinking** | `reasoning` | 可折叠；流式追加到同一块；默认展开直至本轮 `delta`/`done` 开始，之后可收起 |
 | **Answer** | `delta` | **主文**；token 连续拼进同一段落（禁止每 token 换行）；主色正文 |
-| **Decision** | `decision` | 时间线条目标记（`RUN` / `CONTINUE` / `DONE` + 可选 summary） |
+| **Decision** | `decision` | 时间线条目标记（`RUN` / `CONTINUE` / `DONE` / `REUSE` / `NEW` + 可选 summary） |
+| **Tool** | `tool_start` / `tool_end` | 父 Plan-and-Move 的 CALL/READ：名称 + kind；`tool_end` 可带截断 `result` |
 | **Child / Workbook** | `round` | **独立卡片**：轮次、退出码、workbook 链（`/file?path=`）、可选 `result` 摘要；与父思考/答案视觉分离 |
 | **Status** | `run_start` / `done` / `error` | 顶栏状态 + 错误行；`done.result` 仅在无 Answer 块时作摘要，不与 reasoning 混排 |
 

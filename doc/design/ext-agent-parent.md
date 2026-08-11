@@ -103,9 +103,11 @@
 
 ### 6.2 标准库与造工具
 
-- **标准库**：父通过 `lib_catalog` 知晓能力；把 `> lib/….mq.md` 与 `##` 写进工作簿（PATCH）或 scratch 工具文件后即可被子任务 / 后续 `CALL` 使用。  
+- **标准库直调（白名单）**：`CALL:lib.fs.read_text`（及 `exists` / `list_dir` / `json.parse` / `json.stringify` / `sys.cwd`）+ 可选 `ARGS:{…}` JSON 行；拒绝 `net.*` / `sys.exec` / 写删类。  
+- **目录**：`lib_catalog` 列出可 CALL 的 dotted 名。  
 - **造工具**：优先 `CONTINUE` + 短 PATCH 在工作簿内新增 `##`；或 `CALL:scratch_tool_write` 沉淀独立工具文件。  
-- **非目标（本阶段）**：把全部 `lib/*` 自动反射成 JSON tools schema；原生 function calling。
+- **流式**：父 CALL/READ 发 `tool_start` / `tool_end`（view Tool 卡）。  
+- **非目标**：全量 `lib/*` JSON schema 反射；OpenAI function calling。
 
 ---
 

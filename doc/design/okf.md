@@ -346,7 +346,9 @@ Prefer spawning `resource` over re-planning.
 
 1. **精确**：slug 试探 + frontmatter `sig` → 扫目录 `sig:` → 旧 hex 文件名。  
 2. **别名（Accepted）**：精确 miss 后，扫 Task FM `aliases:`（YAML 列表或 `[a, b]`）；`normalize_goal(query)` 与某条 alias **精确相等**则命中同一 Skill/resource。lookup 返回 `match: exact|alias`；`plan` 对 alias 写 `cache=soft-hit`。  
-3. **不做**默认 embedding / 编辑距离主路径。父裁决 soft_match 仍见 [okf-near-match.md](../roadmap/okf-near-match.md)。
+3. **规范句（Accepted）**：仍 miss 时对 goal 做轻量 `agent_kb_canonicalize`（剥站立前缀、去尾标点），再精确/别名各试一次；命中返回 `match: canonical`，`cache=soft-hit`。  
+4. **父裁决 soft_match（Accepted，默认关）**：`plan soft_match=True` 且仍 miss 时，把 `agent_kb_list_tasks` 候选交给父模型：`DECISION: REUSE` + `SLUG:` 或 `DECISION: NEW`；REUSE 后可 `agent_kb_add_alias` 把当前 goal 写入别名。  
+5. **不做**默认 embedding / 编辑距离主路径。向量层见 [okf-near-match.md](../roadmap/okf-near-match.md) E。
 
 `agent_kb_promote` 可选 `aliases=`（字符串或列表）写入 Task；再晋升时合并既有 aliases。
 
@@ -357,6 +359,7 @@ Prefer spawning `resource` over re-planning.
 | `reuse` / `复用` | `True` | 允许知识包快路径 |
 | `optimize` / `优化` | `False` | 跳过知识包，强制再规划 |
 | `force` / `强制` | `False` | 忽略知识包 |
+| `soft_match` / `软命中` | `False` | miss 后父裁决 REUSE/NEW（须显式打开） |
 | `promote` / `晋升` | `True` | DONE 后固化并写入/更新概念与 resource |
 | `kb_dir` / `知识库目录` | `.marqdo/agent-kb` | bundle 根 |
 | `workbook_dir` / `工作簿目录` | `None` | 默认直接写 `kb_dir/resources/<slug>.mq.md`；显式传入则用该目录下的临时 `workbook-<slug>-<ts>.mq.md` |
@@ -432,7 +435,7 @@ agent-kb 运行时实现归属 **agent 插件**（`agent_goal_sig` / `agent_kb_l
 | **O2** | 本文锁定的任务知识包：`Marqdo Task` / `Agent Skill`；`plan` reuse/promote | **done**（host kb_* + plan 快路径） |
 | **O3** | catalog 增强：`verified`/`sources` 可选；模块页可点击依赖；扫入 `agent-kb` 概念供人浏览 | **done** |
 | **O4** | `log.md` 策展、可选 `kb query`、Attested-style「再现跑通」收据（非 BigQuery） | 远期 |
-| **O5** | 相近任务软命中：Task `aliases` 第二趟已落地；规范句 / 父裁决 / 向量仍见 [okf-near-match.md](../roadmap/okf-near-match.md) | **aliases done** |
+| **O5** | 相近任务软命中：aliases + canonicalize + `soft_match` 父裁决已落地；向量仍见 [okf-near-match.md](../roadmap/okf-near-match.md) E | **A/B/C done** |
 
 O2 设计落盘后，智能体侧实现文档可薄化为指向本文 §7，避免两套真理。
 

@@ -1423,7 +1423,37 @@ alias-written
 alias-ok
 alias
 same-slug
-exact",
+exact
+trip-promoted
+帮我规划明天的行程
+canonical-ok
+canonical
+list-ok",
+    );
+}
+
+#[test]
+fn ext_agent_soft_match() {
+    assert_out(
+        "tests/ext/agent-soft-match.mq.md",
+        "REUSE
+trip-plan
+NEW
+REUSE
+行程-a
+prompt-ok",
+    );
+}
+
+#[test]
+fn ext_agent_lib_call() {
+    assert_out(
+        "tests/ext/agent-lib-call.mq.md",
+        "call
+lib.fs.exists
+exists-ok
+deny-ok
+callable-ok",
     );
 }
 

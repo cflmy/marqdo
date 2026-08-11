@@ -344,10 +344,128 @@ Drop `<!-- … -->` blocks (including marqdo-out bodies) so parent excerpts stay
 
 ## lib_catalog
 
-Short catalog of English stdlib modules the parent may wire into workbooks or scratch tools.
+Callable dotted names (whitelist for `CALL:lib…`) plus static module file list for workbook imports.
 
-*`out` = > json.parse text={"note":"Import via frontmatter > lib/<file>.mq.md then call ## members. Prefer PATCH workbook or CALL:scratch_tool_write over inventing prose.","files":["fs.mq.md","json.mq.md","subtask.mq.md","sys.mq.md","writeback.mq.md","text.mq.md","time.mq.md","math.mq.md","net.mq.md","table.mq.md","plugin.mq.md","foreign.mq.md"]} *
+*`out` = > json.parse text={"note":"Direct CALL:lib.<mod>.<fn> + optional ARGS:{json} for whitelist only. Or import via frontmatter > lib/<file>.mq.md then PATCH / scratch_tool_write.","files":["fs.mq.md","json.mq.md","subtask.mq.md","sys.mq.md","writeback.mq.md","text.mq.md","time.mq.md","math.mq.md","net.mq.md","table.mq.md","plugin.mq.md","foreign.mq.md"],"callable":[{"name":"lib.fs.read_text","desc":"Read UTF-8 text file"},{"name":"lib.fs.exists","desc":"Path exists?"},{"name":"lib.fs.list_dir","desc":"List directory entries"},{"name":"lib.json.parse","desc":"Parse JSON text"},{"name":"lib.json.stringify","desc":"Serialize JSON"},{"name":"lib.sys.cwd","desc":"Process working directory"}]} *
 **`out`**
+
+---
+
+## extract_call_args
+    + `reply`=None
+
+Parse `ARGS:{…}` JSON line, or a bare `{…}` line after CALL.
+
+*`esc` = > json.parse text={"nl":"\n","mark":"ARGS:","brace":"{"} *
+*`nl` = > json.get value=`esc` key=nl *
+*`mark` = > json.get value=`esc` key=mark *
+*`brace` = > json.get value=`esc` key=brace *
+*`empty` = > json.parse text={} *
+1. `reply`
+  *`text` = > trim value=`reply` *
+  *`lines` = > split value=`text` sep=`nl` *
+  *`found` = None*
+  - [`line`](`lines`)
+    1. `found`
+      *`_` = 1*
+    2. *
+      *`t` = > trim value=`line` *
+      *`chunks` = > split value=`t` sep=`mark` *
+      *`cn` = > len value=`chunks` *
+      1. `cn` > 1
+        *`rest` = > at value=`chunks` index=1 *
+        *`found` = > trim value=`rest` *
+      2. *
+        *`chunks` = > split value=`t` sep=`brace` *
+        *`cn` = > len value=`chunks` *
+        *`prefix` = > at value=`chunks` index=0 *
+        1. `cn` > 1
+          1. `prefix`
+            *`_` = 1*
+          2. *
+            *`found` = `t`*
+        2. *
+          *`_` = 1*
+  1. `found`
+    **> json.parse text=`found`**
+  2. *
+    **`empty`**
+2. *
+  **`empty`**
+
+---
+
+## tool_result_brief
+    + `value`=None
+    + `max_chars`=1024
+
+Truncate a tool result for `tool_end` events (~1KiB).
+
+1. `value`
+  *`s` = > json.stringify value=`value` *
+  **> text_head_lines text=`s` max_lines=40 max_chars=`max_chars`**
+2. *
+  ****
+
+---
+
+## plan_append_tool
+    + `events`
+    + `type`
+    + `name`
+    + `kind`
+    + `result`=None
+    + `stream`=False
+
+Publish `tool_start` / `tool_end` when `stream=True`.
+
+1. `stream`
+  *`ev` = > json.parse text={} *
+  *`ev` = > json.set map=`ev` key=type value=`type` *
+  *`ev` = > json.set map=`ev` key=name value=`name` *
+  *`ev` = > json.set map=`ev` key=kind value=`kind` *
+  1. `result`
+    *`ev` = > json.set map=`ev` key=result value=`result` *
+  2. *
+    *`_` = 1*
+  *`events` = > json.append list=`events` item=`ev` *
+  > sys.stream_publish event=`ev`
+2. *
+  *`_` = 1*
+
+**`events`**
+
+---
+
+## run_lib_call
+    + `name`
+    + `reply`=None
+
+Whitelist `CALL:lib.<mod>.<fn>` (+ ARGS). Rejects net/exec/write/delete.
+
+*`args` = > extract_call_args reply=`reply` *
+*`errs` = > json.parse text={"deny":"Lib CALL not allowed: "} *
+
+1. `name` == lib.fs.exists
+  *`path` = > json.get value=`args` key=path *
+  **> fs.exists path=`path`**
+2. `name` == lib.fs.read_text
+  *`path` = > json.get value=`args` key=path *
+  **> fs.read_text path=`path`**
+3. `name` == lib.fs.list_dir
+  *`path` = > json.get value=`args` key=path *
+  **> fs.list_dir path=`path`**
+4. `name` == lib.json.parse
+  *`text` = > json.get value=`args` key=text *
+  **> json.parse text=`text`**
+5. `name` == lib.json.stringify
+  *`value` = > json.get value=`args` key=value *
+  **> json.stringify value=`value`**
+6. `name` == lib.sys.cwd
+  **> sys.cwd**
+7. *
+  *`deny` = > json.get value=`errs` key=deny *
+  **`deny` + `name`**
 
 ---
 
@@ -510,7 +628,7 @@ Parse NAME: id plus a triple-angle body after CALL:scratch_tool_write.
     + `observation`=None
     + `reply`=None
 
-Parent Plan-and-Move tools (stdlib-aware helpers in this module).
+Parent Plan-and-Move tools (helpers + whitelist `CALL:lib…`).
 
 1. `name` == workbook_read
   **> workbook_read path=`path` depth=deep**
@@ -531,8 +649,13 @@ Parent Plan-and-Move tools (stdlib-aware helpers in this module).
   2. *
     **> json.get value=`errs` key=b**
 5. *
-  *`msg` = Parent tool not allowed: *
-  **`msg` + `name`**
+  *`dots` = > split value=`name` sep=. *
+  *`head` = > at value=`dots` index=0 *
+  1. `head` == lib
+    **> run_lib_call name=`name` reply=`reply`**
+  2. *
+    *`msg` = Parent tool not allowed: *
+    **`msg` + `name`**
 
 ---
 
@@ -742,14 +865,94 @@ Parse `DECISION: DONE` / `CONTINUE` / `RUN` (Chinese: `决定：完成` / `继�
   **CONTINUE**
 3. `found` == RUN
   **RUN**
-4. `found` == 完成
+4. `found` == REUSE
+  **REUSE**
+5. `found` == NEW
+  **NEW**
+6. `found` == 完成
   **DONE**
-5. `found` == 继续
+7. `found` == 继续
   **CONTINUE**
-6. `found` == 运行
+8. `found` == 运行
   **RUN**
-7. *
+9. `found` == 复用
+  **REUSE**
+10. `found` == 新建
+  **NEW**
+11. *
   **`found`**
+
+---
+
+## extract_soft_match_slug
+    + `reply`
+
+Parse `SLUG: …` / `标识：…` after a soft-match REUSE decision.
+
+*`esc` = > json.parse text={"nl":"\n","fw":"："} *
+*`nl` = > json.get value=`esc` key=nl *
+*`fw` = > json.get value=`esc` key=fw *
+*`text` = > trim value=`reply` *
+*`lines` = > split value=`text` sep=`nl` *
+*`found` = None*
+
+- [`line`](`lines`)
+  *`t` = > trim value=`line` *
+  *`parts` = > split value=`t` sep=: *
+  *`n` = > len value=`parts` *
+  1. `n` > 1
+    *`head` = > at value=`parts` index=0 *
+    *`head` = > trim value=`head` *
+    *`rest` = > at value=`parts` index=1 *
+    *`rest` = > trim value=`rest` *
+    1. `head` == SLUG
+      *`found` = `rest`*
+    2. `head` == 标识
+      *`found` = `rest`*
+    3. *
+      *`_` = 1*
+  2. *
+    *`parts` = > split value=`t` sep=`fw` *
+    *`n` = > len value=`parts` *
+    1. `n` > 1
+      *`head` = > at value=`parts` index=0 *
+      *`head` = > trim value=`head` *
+      *`rest` = > at value=`parts` index=1 *
+      *`rest` = > trim value=`rest` *
+      1. `head` == 标识
+        *`found` = `rest`*
+      2. `head` == SLUG
+        *`found` = `rest`*
+      3. *
+        *`_` = 1*
+    2. *
+      *`_` = 1*
+
+**`found`**
+
+---
+
+## build_soft_match_prompt
+    + `goal`
+    + `tasks`
+
+Short parent prompt: REUSE+SLUG or NEW only.
+
+*`esc` = > json.parse text={"a":"\n\n--- goal ---\n","b":"\n\n--- candidate tasks (slug | title) ---\n","c":"\n\n--- how to act ---\nExact reuse miss. Reply with ONE protocol only:\nDECISION: REUSE\nSLUG: <exact-slug-from-list>\nor\nDECISION: NEW\nNo other prose.\n","nl":"\n","sep":" | "} *
+*`a` = > json.get value=`esc` key=a *
+*`b` = > json.get value=`esc` key=b *
+*`c` = > json.get value=`esc` key=c *
+*`nl` = > json.get value=`esc` key=nl *
+*`sep` = > json.get value=`esc` key=sep *
+*`lines` = > json.parse text=[] *
+- [`t`](`tasks`)
+  *`slug` = > json.get value=`t` key=slug *
+  *`title` = > json.get value=`t` key=title *
+  *`row` = `slug` + `sep` + `title` *
+  *`lines` = > json.append list=`lines` item=`row` *
+*`catalog` = > join value=`lines` sep=`nl` *
+*`p` = Soft-match: same task intent? *
+**`p` + `a` + `goal` + `b` + `catalog` + `c`**
 
 ---
 
@@ -824,7 +1027,7 @@ Parent Plan-and-Move prompt. Short protocol only — no long monologues.
 *`compact` = > compact_plan_observation observation=`observation` *
 *`obs_s` = > json.stringify value=`compact` *
 *`goal_s` = > json.stringify value=`goal` *
-*`esc` = > json.parse text={"a":"\n\n--- standing ---\n","b":"\n\n--- goal ---\n","c":"\n\n--- observation ---\n","d":"\n\n--- skill brief ---\n","tools":"\n\n--- parent tools ---\nCALL:workbook_read | workbook_excerpt | lib_catalog | scratch_tool_write\nREAD:source | stderr | stdout | slots\nCreate tools: CONTINUE PATCH add ##, or CALL:scratch_tool_write with NAME line and fenced body.\n","e_rev":"\n\n--- how to act ---\nPlan-and-Move parent. Reply with ONE protocol only (no long reasoning).\n1) exit_code=0 and has_value → DECISION: DONE + one-line SUMMARY. solidify_on_done. Do not CONTINUE just because has_worker_step.\n2) Need more evidence → READ:kind or CALL:tool (then you will be re-prompted).\n3) Failure / wrong value → DECISION: CONTINUE + short PATCH (<20 lines). Never paste user prose into REPLACE.\nProtocols:\nCALL:name\nREAD:kind\nDECISION: DONE\nSUMMARY: one line\nDECISION: CONTINUE\nPATCH with FIND/REPLACE fences\n","e_dec":"\n\n--- how to act ---\nPRE-RUN decompose. Reply with ONE protocol only (no long reasoning).\n1) Skeleton OK → DECISION: RUN.\n2) Need evidence → READ:source or CALL:workbook_read / lib_catalog.\n3) Reshape → DECISION: CONTINUE + short PATCH (<20 lines).\n4) Fixed answer without LLM → PATCH to return, then RUN or DONE.\nProtocols:\nCALL:name\nREAD:kind\nDECISION: RUN\nDECISION: DONE\nSUMMARY: one line\nDECISION: CONTINUE\nPATCH with FIND/REPLACE fences\n","f":"\n\n--- explore ---\n"} *
+*`esc` = > json.parse text={"a":"\n\n--- standing ---\n","b":"\n\n--- goal ---\n","c":"\n\n--- observation ---\n","d":"\n\n--- skill brief ---\n","tools":"\n\n--- parent tools ---\nCALL:workbook_read | workbook_excerpt | lib_catalog | scratch_tool_write\nCALL:lib.fs.read_text|exists|list_dir | lib.json.parse|stringify | lib.sys.cwd (+ ARGS:{json})\nREAD:source | stderr | stdout | slots\nCreate tools: CONTINUE PATCH add ##, or CALL:scratch_tool_write with NAME line and fenced body.\n","e_rev":"\n\n--- how to act ---\nPlan-and-Move parent. Reply with ONE protocol only (no long reasoning).\n1) exit_code=0 and has_value → DECISION: DONE + one-line SUMMARY. solidify_on_done. Do not CONTINUE just because has_worker_step.\n2) Need more evidence → READ:kind or CALL:tool (then you will be re-prompted).\n3) Failure / wrong value → DECISION: CONTINUE + short PATCH (<20 lines). Never paste user prose into REPLACE.\nProtocols:\nCALL:name\nREAD:kind\nDECISION: DONE\nSUMMARY: one line\nDECISION: CONTINUE\nPATCH with FIND/REPLACE fences\n","e_dec":"\n\n--- how to act ---\nPRE-RUN decompose. Reply with ONE protocol only (no long reasoning).\n1) Skeleton OK → DECISION: RUN.\n2) Need evidence → READ:source or CALL:workbook_read / lib_catalog.\n3) Reshape → DECISION: CONTINUE + short PATCH (<20 lines).\n4) Fixed answer without LLM → PATCH to return, then RUN or DONE.\nProtocols:\nCALL:name\nREAD:kind\nDECISION: RUN\nDECISION: DONE\nSUMMARY: one line\nDECISION: CONTINUE\nPATCH with FIND/REPLACE fences\n","f":"\n\n--- explore ---\n"} *
 *`a` = > json.get value=`esc` key=a *
 *`b` = > json.get value=`esc` key=b *
 *`c` = > json.get value=`esc` key=c *
@@ -889,11 +1092,17 @@ LLM Plan → CALL/READ/DECISION loop. Returns `{decision,reply,observation,event
     *`kind` = > json.get value=`act` key=kind *
     *`name` = > json.get value=`act` key=name *
     1. `kind` == call
+      *`evs_all` = > plan_append_tool events=`evs_all` type=tool_start name=`name` kind=call stream=`stream` *
       *`tool_out` = > run_parent_tool name=`name` path=`path` observation=`last_obs` reply=`last_reply` *
+      *`brief` = > tool_result_brief value=`tool_out` *
+      *`evs_all` = > plan_append_tool events=`evs_all` type=tool_end name=`name` kind=call result=`brief` stream=`stream` *
       *`last_obs` = > json.set map=`last_obs` key=tool_result value=`tool_out` *
       *`left` = `left` - 1*
     2. `kind` == read
+      *`evs_all` = > plan_append_tool events=`evs_all` type=tool_start name=`name` kind=read stream=`stream` *
       *`last_obs` = > plan_read_deepen observation=`last_obs` kind=`name` path=`path` *
+      *`brief` = > tool_result_brief value=`last_obs` *
+      *`evs_all` = > plan_append_tool events=`evs_all` type=tool_end name=`name` kind=read result=`brief` stream=`stream` *
       *`left` = `left` - 1*
     3. `kind` == decision
       *`decision` = `name`*
@@ -1193,6 +1402,7 @@ With `stream=True`, the model call uses SSE; `echo=True` prints delta text to st
     + `reuse`=True
     + `optimize`=False
     + `force`=False
+    + `soft_match`=False
     + `promote`=True
     + `kb_dir`=.marqdo/agent-kb
     + `improve_every`=3
@@ -1203,7 +1413,7 @@ With `stream=True`, the model call uses SSE; `echo=True` prints delta text to st
 
 Multi-step with OKF agent-kb. Default workbook is `kb_dir/resources/<slug>.mq.md`. While task file count `< explore_n` and skill is not llm_free, force a new explore variant under `kb_dir/explore/<slug>/`. Code-first: llm_free hits skip parent LLM. File children return via `# main`; `plan` exposes that as `result`.
 
-Non-hit path runs parent **decompose** before the first child spawn (`DECISION: RUN` / `CONTINUE`+patch / solidified `DONE`). Then `await` → revise loop. With `stream=True`, emit parent `delta` / `decision` / `round` / `done` on `events`. `echo=True` prints `plan:decompose` / `plan:await` / deltas. `trace=True` writes events to writeback slot `trace`. Quiet child subtasks stay quiet.
+Non-hit path: optional `soft_match=True` parent REUSE/NEW; else **decompose** before first child spawn (`DECISION: RUN` / `CONTINUE`+patch / solidified `DONE`). Then `await` → revise loop. With `stream=True`, emit parent `delta` / `decision` / `tool_start`/`tool_end` / `round` / `done` on `events`. `echo=True` prints `plan:decompose` / `plan:await` / deltas. `trace=True` writes events to writeback slot `trace`. Quiet child subtasks stay quiet.
 
 *`tools` = > json.get value=`self` key=tools *
 *`cache` = miss*
@@ -1227,7 +1437,13 @@ Non-hit path runs parent **decompose** before the first child spawn (`DECISION: 
     *`match_kind` = > json.get value=`hit` key=match *
     1. `match_kind` == alias
       *`cache_label` = soft-hit*
-    2. *
+    2. `match_kind` == canonical
+      *`cache_label` = soft-hit*
+      *`hit_slug` = > json.get value=`hit` key=slug *
+      > agent_kb_add_alias kb_dir=`kb_dir` slug=`hit_slug` alias=`goal`
+    3. `match_kind` == soft
+      *`cache_label` = soft-hit*
+    4. *
       *`cache_label` = hit*
     *`lf` = > json.get value=`hit` key=llm_free *
     1. `lf`
@@ -1311,6 +1527,71 @@ Non-hit path runs parent **decompose** before the first child spawn (`DECISION: 
       2. *
         *`path` = None*
   2. *
+    1. `soft_match`
+      *`listed` = > agent_kb_list_tasks kb_dir=`kb_dir` *
+      *`tasks` = > json.get value=`listed` key=tasks *
+      *`tn` = > len value=`tasks` *
+      1. `tn` > 0
+        *`soft_prompt` = > build_soft_match_prompt goal=`goal` tasks=`tasks` *
+        *`model` = > json.get value=`self` key=model *
+        1. `stream`
+          *`evs` = > `model`.complete prompt=`soft_prompt` stream=True echo=`echo` *
+          *`soft_reply` = > llm.stream_result events=`evs` *
+          *`events` = > plan_merge_deltas events=`events` from=`evs` stream=`stream` *
+        2. *
+          *`soft_reply` = > `model`.complete prompt=`soft_prompt` *
+        *`soft_reply` = > trim value=`soft_reply` *
+        *`soft_dec` = > extract_plan_decision reply=`soft_reply` *
+        *`events` = > plan_append_decision events=`events` decision=`soft_dec` stream=`stream` *
+        1. `soft_dec` == REUSE
+          *`reuse_slug` = > extract_soft_match_slug reply=`soft_reply` *
+          1. `reuse_slug`
+            *`hit` = > agent_kb_lookup kb_dir=`kb_dir` slug=`reuse_slug` goal=`goal` tools=`tools` *
+            1. `hit`
+              > agent_kb_add_alias kb_dir=`kb_dir` slug=`reuse_slug` alias=`goal`
+              *`cache_label` = soft-hit*
+              *`path` = > json.get value=`hit` key=resource *
+              *`aw` = > await_workbook path=`path` *
+              *`code` = > json.get value=`aw` key=code *
+              *`child_val` = > json.get value=`aw` key=value *
+              *`last_obs` = > json.get value=`aw` key=observation *
+              1. `code` == 0
+                > agent_kb_record_hit kb_dir=`kb_dir` goal=`goal` tools=`tools` improve_every=`improve_every`
+                *`cache` = soft-hit*
+                *`out` = > json.parse text={"status":"ok"} *
+                *`out` = > json.set map=`out` key=status value=ok *
+                *`out` = > json.set map=`out` key=goal value=`goal` *
+                *`out` = > json.set map=`out` key=workbook value=`path` *
+                *`out` = > json.set map=`out` key=rounds value=1 *
+                *`out` = > json.set map=`out` key=cache value=soft-hit *
+                *`sk` = > json.get value=`hit` key=skill *
+                *`out` = > json.set map=`out` key=skill value=`sk` *
+                *`st` = > json.get value=`hit` key=status *
+                *`out` = > json.set map=`out` key=skill_status value=`st` *
+                *`sum` = OKF soft_match REUSE; spawned resource *
+                *`out` = > json.set map=`out` key=summary value=`sum` *
+                *`out` = > json.set map=`out` key=observation value=`last_obs` *
+                *`out` = > json.set map=`out` key=result value=`child_val` *
+                *`events` = > plan_append_round events=`events` round=1 workbook=`path` exit_code=`code` result=`child_val` stream=`stream` echo=`echo` *
+                1. `writeback`
+                  *`body` = > json.stringify value=`out` *
+                  > writeback.record value=`body` key=ok
+                2. *
+                  *`_` = 1*
+                *`out` = > plan_finish_stream out=`out` events=`events` stream=`stream` trace=`trace` result=`child_val` *
+                **`out`**
+              2. *
+                *`path` = None*
+            2. *
+              *`_` = 1*
+          2. *
+            *`_` = 1*
+        2. *
+          *`_` = 1*
+      2. *
+        *`_` = 1*
+    2. *
+      *`_` = 1*
     1. `nfiles` < `explore_n`
       *`explore` = 1*
       *`cache` = explore*
