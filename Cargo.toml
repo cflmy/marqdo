@@ -1,0 +1,10 @@
+[package]
+name = "marqdo"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+
+[[bin]]
+name = "marqdo"
+path = "src/marqdo.rs"
