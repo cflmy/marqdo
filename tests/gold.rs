@@ -1023,6 +1023,11 @@ fn lib_subtask_spawn() {
 }
 
 #[test]
+fn lib_subtask_quiet_io() {
+    assert_out("tests/lib/subtask-quiet-io.mq.md", "quiet-io-ok");
+}
+
+#[test]
 fn lib_subtask_fn() {
     assert_out("tests/lib/subtask-fn.mq.md", "42");
 }
@@ -1251,7 +1256,15 @@ fn ext_agent_plan_confirm() {
 fn ext_agent_plan_decision() {
     assert_out(
         "tests/ext/agent-plan-decision.mq.md",
-        "DONE\nall good\nCONTINUE\nDONE\nRUN\nRUN\ndual-ok\nsolidify-ok\n1\nkeep new keep",
+        "DONE\nall good\nCONTINUE\nDONE\nRUN\nRUN\ncall\nlib_catalog\nread\nstderr\ndecision\ncatalog-ok\ndual-ok\nsolidify-ok\n1\nkeep new keep",
+    );
+}
+
+#[test]
+fn ext_agent_plan_observe() {
+    assert_out(
+        "tests/ext/agent-plan-observe.mq.md",
+        "excerpt-stripped\nhas-value-ok\nread-source-ok",
     );
 }
 

@@ -5,7 +5,7 @@
 | 状态 | **Accepted；D2a 已落地；D2b–D2d（观察→补丁式多步）实现中** |
 | 日期 | 2026-08-07 |
 | 父文档 | [ext-agent.md](ext-agent.md) |
-| 相关 | [stdlib-writeback.md](stdlib-writeback.md) · [stdlib-subtask.md](stdlib-subtask.md) · [module-namespace.md](module-namespace.md) · [ai-skill.md](ai-skill.md) · [objects.md](objects.md) |
+| 相关 | [**ext-agent-parent.md**](ext-agent-parent.md)（**父 Plan-and-Move 行动面**） · [stdlib-writeback.md](stdlib-writeback.md) · [stdlib-subtask.md](stdlib-subtask.md) · [module-namespace.md](module-namespace.md) · [ai-skill.md](ai-skill.md) · [objects.md](objects.md) |
 
 ---
 
@@ -82,22 +82,28 @@
 
 ## 4.1 观察面与补丁（锁定）
 
-父每次二次规划前必须拿到观察 map（`inspect_workbook`）：
+父每次二次规划前必须拿到观察 map（`inspect_workbook` / `await_workbook`）。磁盘可持全文；**注入父 LLM 的默认观察为有界紧凑面**（摘录 + I/O 尾部）。完整语义与 `READ:` / `CALL:` 行动面见 [ext-agent-parent.md](ext-agent-parent.md)。
 
 | 字段 | 含义 |
 |------|------|
 | `path` | 工作簿路径 |
-| `source` | 最新全文 |
+| `source` | 最新全文（磁盘）；prompt 默认用 `source_excerpt` |
 | `exit_code` | 上一轮子任务退出码 |
 | `value` | 子 `# main` 返回值（经 `await_workbook` / `wait.value`） |
+| `stdout` / `stderr` | 子任务捕获（`quiet` 仅静音 TTY，不丢弃数据） |
 | `slots` | 命名写回列表（`key` + `body`） |
 | `last_ok` / `last_error` | 便捷字段 |
 
-二次规划输出协议（机器可解析；**禁止**只输出整份 `.mq.md`）：
+二次规划输出协议（机器可解析；**禁止**只输出整份 `.mq.md`；**禁止**长独白）：
 
 ```text
+CALL:<parent-tool>
+READ:source|stderr|stdout|slots
+
 DECISION: DONE
-SUMMARY: <汇总>
+SUMMARY: <一行>
+
+DECISION: RUN
 
 DECISION: CONTINUE
 PATCH:
@@ -110,7 +116,7 @@ REPLACE
 >>>
 ```
 
-应用器对文件做**精确** FIND→REPLACE；找不到则报错，由父缩小补丁。优先把已验证的 `step` **固化为返回答案的普通代码**（`**…**`，不要只靠 `print`）。
+解析优先级：`CALL` → `READ` → `DECISION`。应用器对文件做**精确** FIND→REPLACE；找不到则报错。`DONE` 时运行时 `agent_workbook_solidify` 固化答案（不必靠长 REPLACE 粘贴子散文）。
 
 ---
 

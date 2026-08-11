@@ -4,7 +4,7 @@
 |---|---|
 | 状态 | **S0–S3 已落地**（view SSE） |
 | 日期 | 2026-08-10 |
-| 相关 | [ext-llm.md](../design/ext-llm.md) · [ext-agent.md](../design/ext-agent.md) · [ext-agent-plan.md](../design/ext-agent-plan.md) · [stdlib-subtask.md](../design/stdlib-subtask.md) · [view.md](../design/view.md) |
+| 相关 | [ext-llm.md](../design/ext-llm.md) · [ext-agent.md](../design/ext-agent.md) · [ext-agent-plan.md](../design/ext-agent-plan.md) · [ext-agent-parent.md](../design/ext-agent-parent.md)（父 Plan-and-Move / CALL·READ） · [stdlib-subtask.md](../design/stdlib-subtask.md) · [view.md](../design/view.md) |
 | 痛点 | `complete` / `step` / `plan` 均为整段返回；用户看不到思考与中间输出 |
 
 ---

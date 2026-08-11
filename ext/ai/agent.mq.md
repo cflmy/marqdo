@@ -135,8 +135,10 @@ Build a runnable workbook. `skeleton=single` (default): one worker `step`. `skel
     + `path`
     + `exit_code`=None
     + `value`=None
+    + `stdout`=None
+    + `stderr`=None
 
-Structured observation for the parent developer-agent: source, named writeback slots, exit code, and optional child return value.
+Structured observation for the parent developer-agent: source, named writeback slots, exit code, optional child return value, and quiet-captured I/O.
 
 *`source` = > fs.read_text path=`path` *
 *`slots` = > writeback.scan_path path=`path` *
@@ -147,6 +149,14 @@ Structured observation for the parent developer-agent: source, named writeback s
 *`obs` = > json.set map=`obs` key=exit_code value=`exit_code` *
 1. `value`
   *`obs` = > json.set map=`obs` key=value value=`value` *
+2. *
+  *`_` = 1*
+1. `stdout`
+  *`obs` = > json.set map=`obs` key=stdout value=`stdout` *
+2. *
+  *`_` = 1*
+1. `stderr`
+  *`obs` = > json.set map=`obs` key=stderr value=`stderr` *
 2. *
   *`_` = 1*
 
@@ -179,18 +189,506 @@ Structured observation for the parent developer-agent: source, named writeback s
 ## await_workbook
     + `path`
 
-Spawn a workbook file (quiet by default), wait for `{code,value}`, and inspect. Parent consumes `value` — not child stdout.
+Spawn a workbook file (quiet by default), wait for `{code,value,stdout?,stderr?}`, and inspect.
 
 *`id` = > subtask.spawn path=`path` *
 *`waited` = > subtask.wait id=`id` *
 *`code` = > json.get value=`waited` key=code *
 *`value` = > json.get value=`waited` key=value *
-*`obs` = > inspect_workbook path=`path` exit_code=`code` value=`value` *
+*`stdout` = > json.get value=`waited` key=stdout *
+*`stderr` = > json.get value=`waited` key=stderr *
+*`obs` = > inspect_workbook path=`path` exit_code=`code` value=`value` stdout=`stdout` stderr=`stderr` *
 *`out` = > json.parse text={"code":0} *
 *`out` = > json.set map=`out` key=code value=`code` *
 *`out` = > json.set map=`out` key=value value=`value` *
 *`out` = > json.set map=`out` key=observation value=`obs` *
 **`out`**
+
+---
+
+## text_head_lines
+    + `text`
+    + `max_lines`=80
+    + `max_chars`=4000
+
+*`esc` = > json.parse text={"nl":"\n"} *
+*`nl` = > json.get value=`esc` key=nl *
+*`raw` = > str value=`text` *
+*`lines` = > split value=`raw` sep=`nl` *
+*`acc` = > json.parse text=[] *
+*`chars` = 0*
+*`count` = 0*
+- [`line`](`lines`)
+  1. `count` < `max_lines`
+    *`ln` = > len value=`line` *
+    *`next` = `chars` + `ln` *
+    1. `next` > `max_chars`
+      *`count` = `max_lines`*
+    2. *
+      *`acc` = > json.append list=`acc` item=`line` *
+      *`chars` = `next`*
+      *`count` = `count` + 1*
+  2. *
+    *`_` = 1*
+**> join value=`acc` sep=`nl`**
+
+---
+
+## text_tail_lines
+    + `text`
+    + `max_lines`=40
+    + `max_chars`=2000
+
+*`esc` = > json.parse text={"nl":"\n"} *
+*`nl` = > json.get value=`esc` key=nl *
+*`raw` = > str value=`text` *
+*`lines` = > split value=`raw` sep=`nl` *
+*`n` = > len value=`lines` *
+*`start` = `n` - `max_lines` *
+1. `start` < 0
+  *`start` = 0*
+2. *
+  *`_` = 1*
+*`acc` = > json.parse text=[] *
+*`i` = 0*
+*`chars` = 0*
+- [`line`](`lines`)
+  1. `i` >= `start`
+    *`ln` = > len value=`line` *
+    *`next` = `chars` + `ln` *
+    1. `next` > `max_chars`
+      *`i` = `n`*
+    2. *
+      *`acc` = > json.append list=`acc` item=`line` *
+      *`chars` = `next`*
+  2. *
+    *`_` = 1*
+  *`i` = `i` + 1*
+**> join value=`acc` sep=`nl`**
+
+---
+
+## strip_html_comments
+    + `text`
+
+Drop `<!-- … -->` blocks (including marqdo-out bodies) so parent excerpts stay structural.
+
+*`esc` = > json.parse text={"nl":"\n"} *
+*`nl` = > json.get value=`esc` key=nl *
+*`raw` = > str value=`text` *
+*`lines` = > split value=`raw` sep=`nl` *
+*`acc` = > json.parse text=[] *
+*`skip` = None*
+- [`line`](`lines`)
+  1. `skip`
+    *`end_parts` = > split value=`line` sep=--> *
+    *`en` = > len value=`end_parts` *
+    1. `en` > 1
+      *`skip` = None*
+    2. *
+      *`_` = 1*
+  2. *
+    *`start_parts` = > split value=`line` sep=<!-- *
+    *`sn` = > len value=`start_parts` *
+    1. `sn` > 1
+      *`before` = > at value=`start_parts` index=0 *
+      *`before` = > trim value=`before` *
+      1. `before`
+        *`acc` = > json.append list=`acc` item=`before` *
+      2. *
+        *`_` = 1*
+      *`tail` = > at value=`start_parts` index=1 *
+      *`end_parts` = > split value=`tail` sep=--> *
+      *`en` = > len value=`end_parts` *
+      1. `en` > 1
+        *`skip` = None*
+      2. *
+        *`skip` = 1*
+    2. *
+      *`acc` = > json.append list=`acc` item=`line` *
+**> join value=`acc` sep=`nl`**
+
+---
+
+## workbook_source_excerpt
+    + `source`
+    + `max_lines`=80
+    + `max_chars`=4000
+
+*`clean` = > strip_html_comments text=`source` *
+**> text_head_lines text=`clean` max_lines=`max_lines` max_chars=`max_chars`**
+
+---
+
+## workbook_excerpt
+    + `path`
+    + `max_lines`=80
+    + `max_chars`=4000
+
+*`src` = > fs.read_text path=`path` *
+**> workbook_source_excerpt source=`src` max_lines=`max_lines` max_chars=`max_chars`**
+
+---
+
+## workbook_read
+    + `path`
+    + `depth`=default
+
+*`src` = > fs.read_text path=`path` *
+1. `depth` == deep
+  **> workbook_source_excerpt source=`src` max_lines=200 max_chars=12000**
+2. *
+  **> workbook_source_excerpt source=`src` max_lines=80 max_chars=4000**
+
+---
+
+## lib_catalog
+
+Short catalog of English stdlib modules the parent may wire into workbooks or scratch tools.
+
+*`out` = > json.parse text={"note":"Import via frontmatter > lib/<file>.mq.md then call ## members. Prefer PATCH workbook or CALL:scratch_tool_write over inventing prose.","files":["fs.mq.md","json.mq.md","subtask.mq.md","sys.mq.md","writeback.mq.md","text.mq.md","time.mq.md","math.mq.md","net.mq.md","table.mq.md","plugin.mq.md","foreign.mq.md"]} *
+**`out`**
+
+---
+
+## scratch_tool_write
+    + `name`
+    + `text`
+
+Write a scratch tool workbook under `.marqdo/agent-runs/tools/<name>.mq.md`.
+
+*`esc` = > json.parse text={"a":".marqdo/agent-runs/tools/","b":".mq.md"} *
+*`a` = > json.get value=`esc` key=a *
+*`b` = > json.get value=`esc` key=b *
+*`dir` = .marqdo/agent-runs/tools *
+> fs.make_dir path=`dir`
+*`path` = `a` + `name` + `b` *
+> fs.write_text path=`path` text=`text`
+*`out` = > json.parse text={"ok":True} *
+*`out` = > json.set map=`out` key=path value=`path` *
+**`out`**
+
+---
+
+## skill_brief
+    + `max_chars`=1200
+
+*`skill` = > agent_marqdo_skill *
+**> text_head_lines text=`skill` max_lines=40 max_chars=`max_chars`**
+
+---
+
+## extract_plan_read
+    + `reply`
+
+Parse READ:source|stderr|stdout|slots (Chinese: 读取：…).
+
+*`esc` = > json.parse text={"nl":"\n","fw":"："} *
+*`nl` = > json.get value=`esc` key=nl *
+*`fw` = > json.get value=`esc` key=fw *
+*`text` = > trim value=`reply` *
+*`lines` = > split value=`text` sep=`nl` *
+*`found` = None*
+- [`line`](`lines`)
+  *`t` = > trim value=`line` *
+  *`parts` = > split value=`t` sep=: *
+  *`n` = > len value=`parts` *
+  1. `n` > 1
+    *`head` = > at value=`parts` index=0 *
+    *`head` = > trim value=`head` *
+    *`rest` = > at value=`parts` index=1 *
+    *`rest` = > trim value=`rest` *
+    1. `head` == READ
+      *`found` = `rest`*
+    2. `head` == 读取
+      *`found` = `rest`*
+    3. *
+      *`_` = 1*
+  2. *
+    *`parts` = > split value=`t` sep=`fw` *
+    *`n` = > len value=`parts` *
+    1. `n` > 1
+      *`head` = > at value=`parts` index=0 *
+      *`head` = > trim value=`head` *
+      *`rest` = > at value=`parts` index=1 *
+      *`rest` = > trim value=`rest` *
+      1. `head` == 读取
+        *`found` = `rest`*
+      2. `head` == READ
+        *`found` = `rest`*
+      3. *
+        *`_` = 1*
+    2. *
+      *`_` = 1*
+**`found`**
+
+---
+
+## extract_plan_act
+    + `reply`
+
+Priority: CALL → READ → DECISION. Returns `{kind,name}`.
+
+*`tool` = > extract_tool_name reply=`reply` *
+1. `tool`
+  *`out` = > json.parse text={"kind":"call"} *
+  *`out` = > json.set map=`out` key=name value=`tool` *
+  **`out`**
+2. *
+  *`_` = 1*
+*`rk` = > extract_plan_read reply=`reply` *
+1. `rk`
+  *`out` = > json.parse text={"kind":"read"} *
+  *`out` = > json.set map=`out` key=name value=`rk` *
+  **`out`**
+2. *
+  *`_` = 1*
+*`dec` = > extract_plan_decision reply=`reply` *
+1. `dec`
+  *`out` = > json.parse text={"kind":"decision"} *
+  *`out` = > json.set map=`out` key=name value=`dec` *
+  **`out`**
+2. *
+  *`out` = > json.parse text={"kind":"unknown"} *
+  **`out`**
+
+---
+
+## extract_scratch_tool
+    + `reply`
+
+Parse NAME: id plus a triple-angle body after CALL:scratch_tool_write.
+
+*`esc` = > json.parse text={"nl":"\n","open":"<<<","close":">>>"} *
+*`nl` = > json.get value=`esc` key=nl *
+*`open` = > json.get value=`esc` key=open *
+*`close` = > json.get value=`esc` key=close *
+*`text` = > trim value=`reply` *
+*`lines` = > split value=`text` sep=`nl` *
+*`name` = None*
+*`body_lines` = > json.parse text=[] *
+*`in_body` = None*
+- [`line`](`lines`)
+  1. `in_body`
+    *`t` = > trim value=`line` *
+    1. `t` == `close`
+      *`in_body` = None*
+    2. *
+      *`body_lines` = > json.append list=`body_lines` item=`line` *
+  2. *
+    *`t` = > trim value=`line` *
+    *`parts` = > split value=`t` sep=: *
+    *`n` = > len value=`parts` *
+    1. `n` > 1
+      *`head` = > at value=`parts` index=0 *
+      *`head` = > trim value=`head` *
+      *`rest` = > at value=`parts` index=1 *
+      *`rest` = > trim value=`rest` *
+      1. `head` == NAME
+        *`name` = `rest`*
+      2. `head` == 名称
+        *`name` = `rest`*
+      3. *
+        *`_` = 1*
+    2. *
+      *`_` = 1*
+    1. `t` == `open`
+      *`in_body` = 1*
+    2. *
+      *`_` = 1*
+*`body` = > join value=`body_lines` sep=`nl` *
+*`out` = > json.parse text={} *
+*`out` = > json.set map=`out` key=name value=`name` *
+*`out` = > json.set map=`out` key=text value=`body` *
+**`out`**
+
+---
+
+## run_parent_tool
+    + `name`
+    + `path`
+    + `observation`=None
+    + `reply`=None
+
+Parent Plan-and-Move tools (stdlib-aware helpers in this module).
+
+1. `name` == workbook_read
+  **> workbook_read path=`path` depth=deep**
+2. `name` == workbook_excerpt
+  **> workbook_excerpt path=`path`**
+3. `name` == lib_catalog
+  **> lib_catalog**
+4. `name` == scratch_tool_write
+  *`parsed` = > extract_scratch_tool reply=`reply` *
+  *`tn` = > json.get value=`parsed` key=name *
+  *`tt` = > json.get value=`parsed` key=text *
+  *`errs` = > json.parse text={"a":"scratch_tool_write needs NAME line and fenced body","b":"scratch_tool_write needs NAME id"} *
+  1. `tn`
+    1. `tt`
+      **> scratch_tool_write name=`tn` text=`tt`**
+    2. *
+      **> json.get value=`errs` key=a**
+  2. *
+    **> json.get value=`errs` key=b**
+5. *
+  *`msg` = Parent tool not allowed: *
+  **`msg` + `name`**
+
+---
+
+## plan_read_deepen
+    + `observation`
+    + `kind`
+    + `path`
+
+*`obs` = `observation` *
+1. `kind` == source
+  *`ex` = > workbook_read path=`path` depth=deep *
+  *`obs` = > json.set map=`obs` key=source_excerpt value=`ex` *
+  *`obs` = > json.set map=`obs` key=read_source value=True *
+2. `kind` == stderr
+  *`err` = > json.get value=`obs` key=stderr *
+  *`tail` = > text_tail_lines text=`err` max_lines=80 max_chars=6000 *
+  *`obs` = > json.set map=`obs` key=stderr_tail value=`tail` *
+  *`obs` = > json.set map=`obs` key=read_stderr value=True *
+3. `kind` == stdout
+  *`out` = > json.get value=`obs` key=stdout *
+  *`tail` = > text_tail_lines text=`out` max_lines=80 max_chars=6000 *
+  *`obs` = > json.set map=`obs` key=stdout_tail value=`tail` *
+  *`obs` = > json.set map=`obs` key=read_stdout value=True *
+4. `kind` == slots
+  *`slots` = > json.get value=`obs` key=slots *
+  *`obs` = > json.set map=`obs` key=slots_detail value=`slots` *
+  *`obs` = > json.set map=`obs` key=read_slots value=True *
+5. *
+  *`_` = 1*
+**`obs`**
+
+---
+
+## compact_plan_observation
+    + `observation`
+
+Bounded observation for the parent prompt (actionable, short).
+
+*`obs_path` = > json.get value=`observation` key=path *
+*`obs_code` = > json.get value=`observation` key=exit_code *
+*`obs_val` = > json.get value=`observation` key=value *
+*`obs_slots` = > json.get value=`observation` key=slots *
+*`obs_src` = > json.get value=`observation` key=source *
+*`obs_stdout` = > json.get value=`observation` key=stdout *
+*`obs_stderr` = > json.get value=`observation` key=stderr *
+*`src_len` = 0*
+*`has_step` = False*
+1. `obs_src`
+  *`src_len` = > len value=`obs_src` *
+  *`step_parts` = > split value=`obs_src` sep=worker.step *
+  *`n_step` = > len value=`step_parts` *
+  1. `n_step` > 1
+    *`has_step` = True*
+  2. *
+    *`_` = 1*
+2. *
+  *`_` = 1*
+
+*`compact` = > json.parse text={"note":"Plan-and-Move: CALL/READ then DECISION. Success (exit 0 + has_value) → DONE. solidify_on_done. No long prose."} *
+*`compact` = > json.set map=`compact` key=path value=`obs_path` *
+*`compact` = > json.set map=`compact` key=exit_code value=`obs_code` *
+*`compact` = > json.set map=`compact` key=source_len value=`src_len` *
+*`compact` = > json.set map=`compact` key=has_worker_step value=`has_step` *
+*`compact` = > json.set map=`compact` key=solidify_on_done value=True *
+
+1. `obs_src`
+  *`ex` = > json.get value=`observation` key=source_excerpt *
+  1. `ex`
+    *`compact` = > json.set map=`compact` key=source_excerpt value=`ex` *
+  2. *
+    *`ex` = > workbook_source_excerpt source=`obs_src` *
+    *`compact` = > json.set map=`compact` key=source_excerpt value=`ex` *
+2. *
+  *`_` = 1*
+
+1. `obs_stderr`
+  *`tail` = > json.get value=`observation` key=stderr_tail *
+  1. `tail`
+    *`compact` = > json.set map=`compact` key=stderr_tail value=`tail` *
+  2. *
+    *`tail` = > text_tail_lines text=`obs_stderr` *
+    *`compact` = > json.set map=`compact` key=stderr_tail value=`tail` *
+2. *
+  *`_` = 1*
+1. `obs_stdout`
+  *`tail` = > json.get value=`observation` key=stdout_tail *
+  1. `tail`
+    *`compact` = > json.set map=`compact` key=stdout_tail value=`tail` *
+  2. *
+    *`tail` = > text_tail_lines text=`obs_stdout` *
+    *`compact` = > json.set map=`compact` key=stdout_tail value=`tail` *
+2. *
+  *`_` = 1*
+
+*`val_txt` = > str value=`obs_val` *
+*`val_len` = > len value=`val_txt` *
+1. `obs_val`
+  *`compact` = > json.set map=`compact` key=has_value value=True *
+  *`compact` = > json.set map=`compact` key=value_len value=`val_len` *
+  1. `val_len` > 200
+    *`preview` = > text_head_lines text=`val_txt` max_lines=4 max_chars=200 *
+    *`compact` = > json.set map=`compact` key=value_preview value=`preview` *
+  2. *
+    *`compact` = > json.set map=`compact` key=value value=`obs_val` *
+2. *
+  *`compact` = > json.set map=`compact` key=has_value value=False *
+
+*`slots_brief` = > json.parse text=[] *
+1. `obs_slots`
+  - [`slot`](`obs_slots`)
+    *`sk` = > json.get value=`slot` key=key *
+    *`sl` = > json.get value=`slot` key=line *
+    *`sb` = > json.get value=`slot` key=body *
+    *`sb_txt` = > str value=`sb` *
+    *`sb_len` = > len value=`sb_txt` *
+    *`brief` = > json.parse text={"key":""} *
+    *`brief` = > json.set map=`brief` key=key value=`sk` *
+    *`brief` = > json.set map=`brief` key=line value=`sl` *
+    *`brief` = > json.set map=`brief` key=body_len value=`sb_len` *
+    1. `sk` == error
+      *`prev` = > text_head_lines text=`sb_txt` max_lines=8 max_chars=400 *
+      *`brief` = > json.set map=`brief` key=body_preview value=`prev` *
+    2. *
+      *`_` = 1*
+    *`slots_brief` = > json.append list=`slots_brief` item=`brief` *
+2. *
+  *`_` = 1*
+*`compact` = > json.set map=`compact` key=slots value=`slots_brief` *
+*`detail` = > json.get value=`observation` key=slots_detail *
+1. `detail`
+  *`compact` = > json.set map=`compact` key=slots_detail value=`detail` *
+2. *
+  *`_` = 1*
+
+*`tool_result` = > json.get value=`observation` key=tool_result *
+1. `tool_result`
+  *`tr` = > str value=`tool_result` *
+  *`tr` = > text_head_lines text=`tr` max_lines=40 max_chars=3000 *
+  *`compact` = > json.set map=`compact` key=tool_result value=`tr` *
+2. *
+  *`_` = 1*
+
+*`last_error` = > json.get value=`observation` key=last_error *
+1. `last_error`
+  *`err_txt` = > str value=`last_error` *
+  *`err_len` = > len value=`err_txt` *
+  1. `err_len` > 200
+    *`prev` = > text_head_lines text=`err_txt` max_lines=8 max_chars=400 *
+    *`compact` = > json.set map=`compact` key=last_error_preview value=`prev` *
+    *`compact` = > json.set map=`compact` key=last_error_len value=`err_len` *
+  2. *
+    *`compact` = > json.set map=`compact` key=last_error value=`last_error` *
+2. *
+  *`_` = 1*
+
+**`compact`**
 
 ---
 
@@ -314,7 +812,7 @@ First `SUMMARY:` / `汇总:` / `汇总：` line body, else trimmed reply.
     + `explore_n`=None
     + `phase`=revise
 
-Parent developer-agent prompt. `phase=decompose`: pre-run (design step ③) before any spawn. `phase=revise` (default): observe → DONE or CONTINUE with patches.
+Parent Plan-and-Move prompt. Short protocol only — no long monologues.
 
 *`standing` = > json.get value=`agent` key=standing *
 1. `standing`
@@ -322,112 +820,95 @@ Parent developer-agent prompt. `phase=decompose`: pre-run (design step ③) befo
 2. *
   *`up` = None*
 
-*`skill` = > agent_marqdo_skill *
-
-Omit full workbook `source` and large slot/value bodies from the parent prompt — they bloat context and invite endless solidify guessing. Runtime `agent_workbook_solidify` runs on DECISION: DONE.
-
-*`obs_path` = > json.get value=`observation` key=path *
-*`obs_code` = > json.get value=`observation` key=exit_code *
-*`obs_val` = > json.get value=`observation` key=value *
-*`obs_slots` = > json.get value=`observation` key=slots *
-*`obs_src` = > json.get value=`observation` key=source *
-*`src_len` = 0*
-*`has_step` = False*
-1. `obs_src`
-  *`src_len` = > len value=`obs_src` *
-  *`step_parts` = > split value=`obs_src` sep=worker.step *
-  *`n_step` = > len value=`step_parts` *
-  1. `n_step` > 1
-    *`has_step` = True*
-  2. *
-    *`_` = 1*
-2. *
-  *`_` = 1*
-
-*`compact` = > json.parse text={"note":"source/slot bodies omitted. If exit_code is 0 and has_value, prefer DECISION: DONE immediately — runtime solidifies worker.step. CONTINUE only to fix failures or redesign structure. Never paste user prose into REPLACE."} *
-*`compact` = > json.set map=`compact` key=path value=`obs_path` *
-*`compact` = > json.set map=`compact` key=exit_code value=`obs_code` *
-*`compact` = > json.set map=`compact` key=source_len value=`src_len` *
-*`compact` = > json.set map=`compact` key=has_worker_step value=`has_step` *
-*`compact` = > json.set map=`compact` key=solidify_on_done value=True *
-
-*`val_txt` = > str value=`obs_val` *
-*`val_len` = > len value=`val_txt` *
-1. `obs_val`
-  *`compact` = > json.set map=`compact` key=has_value value=True *
-  *`compact` = > json.set map=`compact` key=value_len value=`val_len` *
-  1. `val_len` > 200
-    *`_` = 1*
-  2. *
-    *`compact` = > json.set map=`compact` key=value value=`obs_val` *
-2. *
-  *`compact` = > json.set map=`compact` key=has_value value=False *
-
-*`slots_brief` = > json.parse text=[] *
-1. `obs_slots`
-  - [`slot`](`obs_slots`)
-    *`sk` = > json.get value=`slot` key=key *
-    *`sl` = > json.get value=`slot` key=line *
-    *`sb` = > json.get value=`slot` key=body *
-    *`sb_txt` = > str value=`sb` *
-    *`sb_len` = > len value=`sb_txt` *
-    *`brief` = > json.parse text={"key":""} *
-    *`brief` = > json.set map=`brief` key=key value=`sk` *
-    *`brief` = > json.set map=`brief` key=line value=`sl` *
-    *`brief` = > json.set map=`brief` key=body_len value=`sb_len` *
-    *`slots_brief` = > json.append list=`slots_brief` item=`brief` *
-2. *
-  *`_` = 1*
-*`compact` = > json.set map=`compact` key=slots value=`slots_brief` *
-
-*`last_ok` = > json.get value=`observation` key=last_ok *
-*`last_error` = > json.get value=`observation` key=last_error *
-1. `last_ok`
-  *`ok_txt` = > str value=`last_ok` *
-  *`ok_len` = > len value=`ok_txt` *
-  *`compact` = > json.set map=`compact` key=last_ok_len value=`ok_len` *
-  1. `ok_len` > 200
-    *`compact` = > json.set map=`compact` key=last_ok_omitted value=True *
-  2. *
-    *`compact` = > json.set map=`compact` key=last_ok value=`last_ok` *
-2. *
-  *`_` = 1*
-1. `last_error`
-  *`err_txt` = > str value=`last_error` *
-  *`err_len` = > len value=`err_txt` *
-  1. `err_len` > 200
-    *`compact` = > json.set map=`compact` key=last_error_omitted value=True *
-    *`compact` = > json.set map=`compact` key=last_error_len value=`err_len` *
-  2. *
-    *`compact` = > json.set map=`compact` key=last_error value=`last_error` *
-2. *
-  *`_` = 1*
-
+*`skill` = > skill_brief *
+*`compact` = > compact_plan_observation observation=`observation` *
 *`obs_s` = > json.stringify value=`compact` *
 *`goal_s` = > json.stringify value=`goal` *
-*`esc` = > json.parse text={"a":"\n\n--- standing ---\n","b":"\n\n--- goal ---\n","c":"\n\n--- workbook observation ---\n","d":"\n\n--- marqdo skill ---\n","e_rev":"\n\n--- how to act ---\nYou are a Marqdo agent-development master.\nPriority order (STOP RULES — follow top-down):\n1) SUCCESS STOP: if exit_code is 0 AND has_value is true, reply DECISION: DONE with a one-line SUMMARY immediately. Do NOT invent FIND/REPLACE. Runtime agent_workbook_solidify removes worker.step on DONE — has_worker_step true is NOT a reason to CONTINUE.\n2) FAILURE ONLY: CONTINUE with short FIND/REPLACE (<20 lines) only when exit_code is non-zero, has_value is false, or the returned value clearly fails the goal. Prefer structure edits; never paste itineraries/schedules/observation prose into REPLACE.\n3) Code-first for fixed answers (e.g. pong): solidify via DONE (runtime) or a tiny structural patch — not by rewriting child prose.\n4) If exploring an alternate path, try a meaningfully DIFFERENT structure than prior attempts. Do not merely re-run the same step.\n5) Prefer multiple narrow agents over one giant standing when roles differ.\nNever rewrite the whole .mq.md file.\nThe moment success is observed, emit DONE and stop — do not keep being helpful.\nReply with EXACTLY one protocol:\nDECISION: DONE\nSUMMARY: <one line>\nOR\nDECISION: CONTINUE\nPATCH:\n<<<\nFIND\n<exact old snippet>\n===\nREPLACE\n<new snippet>\n>>>\n(You may repeat <<< blocks.)\n","e_dec":"\n\n--- how to act ---\nYou are a Marqdo agent-development master. PRE-RUN DECOMPOSE: the workbook has NOT been executed yet.\nPriority order:\n1) If the skeleton is fine to execute as-is, reply DECISION: RUN (zero patches OK). Prefer RUN over inventing user-facing prose.\n2) Code first: if the goal is a fixed answer, PATCH to a **return** (no worker.step / .单步), then DECISION: RUN or DECISION: DONE with SUMMARY after solidify.\n3) To reshape before the first run, DECISION: CONTINUE with short FIND/REPLACE (<20 lines); runtime applies them then spawns.\n4) Prefer multiple narrow agents when roles differ. Never paste long itineraries into REPLACE.\nNever rewrite the whole .mq.md file.\nReply with EXACTLY one protocol:\nDECISION: RUN\nOR\nDECISION: DONE\nSUMMARY: <one line>\nOR\nDECISION: CONTINUE\nPATCH:\n<<<\nFIND\n<exact old snippet>\n===\nREPLACE\n<new snippet>\n>>>\n(You may repeat <<< blocks.)\n","f":"\n\n--- explore attempt ---\n"} *
+*`esc` = > json.parse text={"a":"\n\n--- standing ---\n","b":"\n\n--- goal ---\n","c":"\n\n--- observation ---\n","d":"\n\n--- skill brief ---\n","tools":"\n\n--- parent tools ---\nCALL:workbook_read | workbook_excerpt | lib_catalog | scratch_tool_write\nREAD:source | stderr | stdout | slots\nCreate tools: CONTINUE PATCH add ##, or CALL:scratch_tool_write with NAME line and fenced body.\n","e_rev":"\n\n--- how to act ---\nPlan-and-Move parent. Reply with ONE protocol only (no long reasoning).\n1) exit_code=0 and has_value → DECISION: DONE + one-line SUMMARY. solidify_on_done. Do not CONTINUE just because has_worker_step.\n2) Need more evidence → READ:kind or CALL:tool (then you will be re-prompted).\n3) Failure / wrong value → DECISION: CONTINUE + short PATCH (<20 lines). Never paste user prose into REPLACE.\nProtocols:\nCALL:name\nREAD:kind\nDECISION: DONE\nSUMMARY: one line\nDECISION: CONTINUE\nPATCH with FIND/REPLACE fences\n","e_dec":"\n\n--- how to act ---\nPRE-RUN decompose. Reply with ONE protocol only (no long reasoning).\n1) Skeleton OK → DECISION: RUN.\n2) Need evidence → READ:source or CALL:workbook_read / lib_catalog.\n3) Reshape → DECISION: CONTINUE + short PATCH (<20 lines).\n4) Fixed answer without LLM → PATCH to return, then RUN or DONE.\nProtocols:\nCALL:name\nREAD:kind\nDECISION: RUN\nDECISION: DONE\nSUMMARY: one line\nDECISION: CONTINUE\nPATCH with FIND/REPLACE fences\n","f":"\n\n--- explore ---\n"} *
 *`a` = > json.get value=`esc` key=a *
 *`b` = > json.get value=`esc` key=b *
 *`c` = > json.get value=`esc` key=c *
 *`d` = > json.get value=`esc` key=d *
+*`tools` = > json.get value=`esc` key=tools *
 *`f` = > json.get value=`esc` key=f *
 1. `phase` == decompose
   *`e` = > json.get value=`esc` key=e_dec *
-  *`p` = You decompose the workbook before the first run. *
+  *`p` = Plan-and-Move: decompose before first run. *
 2. *
   *`e` = > json.get value=`esc` key=e_rev *
-  *`p` = You develop and revise Marqdo workbooks with surgical patches. *
-*`p` = `p` + `a` + `up` + `b` + `goal_s` + `c` + `obs_s` + `d` + `skill` + `e` *
+  *`p` = Plan-and-Move: revise after child run. *
+*`p` = `p` + `a` + `up` + `b` + `goal_s` + `c` + `obs_s` + `tools` + `d` + `skill` + `e` *
 1. `explore_attempt`
   *`p` = `p` + `f` *
   *`p` = `p` + Attempt *
   *`p` = `p` + `explore_attempt` *
   *`p` = `p` + of *
   *`p` = `p` + `explore_n` *
-  *`p` = `p` + . Try a different path; prefer code when the answer is fixed. *
+  *`p` = `p` + . Different path; prefer code when fixed. *
 2. *
   *`_` = 1*
 **`p`**
+
+---
+
+## plan_llm_act_loop
+    + `agent`
+    + `goal`
+    + `path`
+    + `observation`
+    + `phase`=revise
+    + `explore_attempt`=None
+    + `explore_n`=None
+    + `stream`=False
+    + `echo`=False
+    + `events`
+    + `max_acts`=6
+
+LLM Plan → CALL/READ/DECISION loop. Returns `{decision,reply,observation,events}`.
+
+*`model` = > json.get value=`agent` key=model *
+*`last_obs` = `observation` *
+*`left` = `max_acts` *
+*`decision` = None*
+*`last_reply` = None*
+*`evs_all` = `events` *
+
+- `left` > 0
+  1. `decision`
+    *`left` = 0*
+  2. *
+    *`ctx` = > build_plan_context agent=`agent` goal=`goal` observation=`last_obs` explore_attempt=`explore_attempt` explore_n=`explore_n` phase=`phase` *
+    1. `stream`
+      *`evs` = > `model`.complete prompt=`ctx` stream=True echo=`echo` *
+      *`last_reply` = > llm.stream_result events=`evs` *
+      *`evs_all` = > plan_merge_deltas events=`evs_all` from=`evs` stream=`stream` *
+    2. *
+      *`last_reply` = > `model`.complete prompt=`ctx` *
+    *`last_reply` = > trim value=`last_reply` *
+    *`act` = > extract_plan_act reply=`last_reply` *
+    *`kind` = > json.get value=`act` key=kind *
+    *`name` = > json.get value=`act` key=name *
+    1. `kind` == call
+      *`tool_out` = > run_parent_tool name=`name` path=`path` observation=`last_obs` reply=`last_reply` *
+      *`last_obs` = > json.set map=`last_obs` key=tool_result value=`tool_out` *
+      *`left` = `left` - 1*
+    2. `kind` == read
+      *`last_obs` = > plan_read_deepen observation=`last_obs` kind=`name` path=`path` *
+      *`left` = `left` - 1*
+    3. `kind` == decision
+      *`decision` = `name`*
+      *`evs_all` = > plan_append_decision events=`evs_all` decision=`decision` stream=`stream` *
+      *`left` = 0*
+    4. *
+      *`decision` = unknown*
+      *`left` = 0*
+
+*`out` = > json.parse text={} *
+*`out` = > json.set map=`out` key=decision value=`decision` *
+*`out` = > json.set map=`out` key=reply value=`last_reply` *
+*`out` = > json.set map=`out` key=observation value=`last_obs` *
+*`out` = > json.set map=`out` key=events value=`evs_all` *
+**`out`**
 
 ---
 
@@ -912,16 +1393,11 @@ Non-hit path runs parent **decompose** before the first child spawn (`DECISION: 
 
 > plan_echo_decompose workbook=`path` stream=`stream` echo=`echo`
 *`last_obs` = > inspect_workbook path=`path` *
-*`ctx` = > build_plan_context agent=`self` goal=`goal` observation=`last_obs` explore_attempt=`explore_attempt` explore_n=`explore_n` phase=decompose *
-1. `stream`
-  *`evs` = > `model`.complete prompt=`ctx` stream=True echo=`echo` *
-  *`last_reply` = > llm.stream_result events=`evs` *
-  *`events` = > plan_merge_deltas events=`events` from=`evs` stream=`stream` *
-2. *
-  *`last_reply` = > `model`.complete prompt=`ctx` *
-*`last_reply` = > trim value=`last_reply` *
-*`dec` = > extract_plan_decision reply=`last_reply` *
-*`events` = > plan_append_decision events=`events` decision=`dec` stream=`stream` *
+*`turn` = > plan_llm_act_loop agent=`self` goal=`goal` path=`path` observation=`last_obs` phase=decompose explore_attempt=`explore_attempt` explore_n=`explore_n` stream=`stream` echo=`echo` events=`events` *
+*`dec` = > json.get value=`turn` key=decision *
+*`last_reply` = > json.get value=`turn` key=reply *
+*`last_obs` = > json.get value=`turn` key=observation *
+*`events` = > json.get value=`turn` key=events *
 
 1. `dec` == CONTINUE
   *`n` = > fs.apply_patch_blocks path=`path` text=`last_reply` *
@@ -997,16 +1473,11 @@ Deterministic success stop (loop engineering): when the child already returned a
       *`events` = > plan_append_decision events=`events` decision=`dec` stream=`stream` summary=`summary` *
       *`left` = 0*
     2. *
-      *`ctx` = > build_plan_context agent=`self` goal=`goal` observation=`last_obs` explore_attempt=`explore_attempt` explore_n=`explore_n` phase=revise *
-      1. `stream`
-        *`evs` = > `model`.complete prompt=`ctx` stream=True echo=`echo` *
-        *`last_reply` = > llm.stream_result events=`evs` *
-        *`events` = > plan_merge_deltas events=`events` from=`evs` stream=`stream` *
-      2. *
-        *`last_reply` = > `model`.complete prompt=`ctx` *
-      *`last_reply` = > trim value=`last_reply` *
-      *`dec` = > extract_plan_decision reply=`last_reply` *
-      *`events` = > plan_append_decision events=`events` decision=`dec` stream=`stream` *
+      *`turn` = > plan_llm_act_loop agent=`self` goal=`goal` path=`path` observation=`last_obs` phase=revise explore_attempt=`explore_attempt` explore_n=`explore_n` stream=`stream` echo=`echo` events=`events` *
+      *`dec` = > json.get value=`turn` key=decision *
+      *`last_reply` = > json.get value=`turn` key=reply *
+      *`last_obs` = > json.get value=`turn` key=observation *
+      *`events` = > json.get value=`turn` key=events *
       1. `dec` == DONE
         > agent_workbook_solidify path=`path` observation=`last_obs`
         *`done` = 1*

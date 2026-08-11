@@ -2,10 +2,14 @@
 //! Parent `HostContext` drop kills/waits file & foreign children; function threads detach.
 
 use std::collections::HashMap;
+use std::io::Read;
 use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
 use std::sync::{Arc, Mutex};
 use std::thread::{self, JoinHandle};
+
+/// Cap for file-child stdout/stderr returned on `wait` (parent observation).
+const FILE_IO_CAP: usize = 8 * 1024;
 
 use crate::host::foreign;
 use crate::host::HostContext;
@@ -33,6 +37,9 @@ impl std::fmt::Debug for Handle {
 pub(crate) struct FileTask {
     child: Child,
     result_path: PathBuf,
+    /// Present when `quiet=True` (piped capture). Absent when inheriting TTY.
+    stdout: Option<JoinHandle<String>>,
+    stderr: Option<JoinHandle<String>>,
 }
 
 pub(crate) struct ForeignTask {
@@ -129,6 +136,12 @@ pub fn kill_all(ctx: &mut HostContext) {
             Handle::File(mut task) => {
                 let _ = task.child.kill();
                 let _ = task.child.wait();
+                if let Some(h) = task.stdout.take() {
+                    let _ = h.join();
+                }
+                if let Some(h) = task.stderr.take() {
+                    let _ = h.join();
+                }
                 let _ = std::fs::remove_file(&task.result_path);
             }
             Handle::Foreign(mut task) => {
@@ -225,9 +238,11 @@ fn spawn_file(
         None | Some(Value::None) => true,
         Some(v) => v.truthy(),
     };
+    // quiet: pipe-capture for parent observation (no TTY noise).
+    // !quiet: inherit parent TTY; wait map omits stdout/stderr bodies.
     if quiet {
-        cmd.stdout(Stdio::null());
-        cmd.stderr(Stdio::null());
+        cmd.stdout(Stdio::piped());
+        cmd.stderr(Stdio::piped());
     } else {
         cmd.stdout(Stdio::inherit());
         cmd.stderr(Stdio::inherit());
@@ -237,14 +252,37 @@ fn spawn_file(
             cmd.arg(as_text(item, "arg")?);
         }
     }
-    let child = cmd
+    let mut child = cmd
         .spawn()
         .map_err(|e| format!("subtask spawn {}: {e}", file.display()))?;
+    let (stdout, stderr) = if quiet {
+        let mut stdout_pipe = child.stdout.take();
+        let mut stderr_pipe = child.stderr.take();
+        let stdout = thread::spawn(move || {
+            let mut buf = Vec::new();
+            if let Some(ref mut r) = stdout_pipe {
+                let _ = r.read_to_end(&mut buf);
+            }
+            String::from_utf8_lossy(&buf).into_owned()
+        });
+        let stderr = thread::spawn(move || {
+            let mut buf = Vec::new();
+            if let Some(ref mut r) = stderr_pipe {
+                let _ = r.read_to_end(&mut buf);
+            }
+            String::from_utf8_lossy(&buf).into_owned()
+        });
+        (Some(stdout), Some(stderr))
+    } else {
+        (None, None)
+    };
     ctx.subtasks.insert(
         id,
         Handle::File(FileTask {
             child,
             result_path,
+            stdout,
+            stderr,
         }),
     );
     Ok(Value::Int(id as i64))
@@ -414,10 +452,27 @@ pub fn join(ctx: &mut HostContext, id: &Value) -> Result<Value, String> {
             let code = status.code().unwrap_or(-1) as i64;
             let value = read_emitted_result(&task.result_path);
             let _ = std::fs::remove_file(&task.result_path);
-            Ok(Value::Map(vec![
+            let stdout = task
+                .stdout
+                .take()
+                .map(|h| h.join().unwrap_or_default())
+                .unwrap_or_default();
+            let stderr = task
+                .stderr
+                .take()
+                .map(|h| h.join().unwrap_or_default())
+                .unwrap_or_default();
+            let mut pairs = vec![
                 ("code".into(), Value::Int(code)),
                 ("value".into(), value),
-            ]))
+            ];
+            if !stdout.is_empty() {
+                pairs.push(("stdout".into(), Value::Text(clip_io(&stdout))));
+            }
+            if !stderr.is_empty() {
+                pairs.push(("stderr".into(), Value::Text(clip_io(&stderr))));
+            }
+            Ok(Value::Map(pairs))
         }
         Handle::Foreign(task) => join_foreign(task),
         Handle::Function(task) => join_function(task),
@@ -492,6 +547,12 @@ pub fn kill(ctx: &mut HostContext, id: &Value) -> Result<Value, String> {
                 .kill()
                 .map_err(|e| format!("subtask kill: {e}"))?;
             let _ = task.child.wait();
+            if let Some(h) = task.stdout.take() {
+                let _ = h.join();
+            }
+            if let Some(h) = task.stderr.take() {
+                let _ = h.join();
+            }
             let _ = std::fs::remove_file(&task.result_path);
         }
         Handle::Foreign(mut task) => {
@@ -520,6 +581,16 @@ pub fn wait_all(ctx: &mut HostContext) -> Result<Value, String> {
         results.push(join(ctx, &Value::Int(id as i64))?);
     }
     Ok(Value::List(results))
+}
+
+fn clip_io(s: &str) -> String {
+    let mut it = s.chars();
+    let head: String = it.by_ref().take(FILE_IO_CAP).collect();
+    if it.next().is_some() {
+        format!("{head}\n…(truncated)")
+    } else {
+        head
+    }
 }
 
 fn require<'a>(bound: &'a HashMap<String, Value>, key: &str) -> Result<&'a Value, String> {

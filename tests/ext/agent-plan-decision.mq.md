@@ -31,6 +31,33 @@ description: extract_plan_decision/summary; dual skeleton contains research+writ
 *`r5` = > agent.extract_plan_decision reply=`d5` *
 > print text=`r5`
 
+*`act_call` = CALL:lib_catalog *
+*`a1` = > agent.extract_plan_act reply=`act_call` *
+*`a1k` = > json.get value=`a1` key=kind *
+*`a1n` = > json.get value=`a1` key=name *
+> print text=`a1k`
+> print text=`a1n`
+
+*`act_read` = READ:stderr *
+*`a2` = > agent.extract_plan_act reply=`act_read` *
+*`a2k` = > json.get value=`a2` key=kind *
+*`a2n` = > json.get value=`a2` key=name *
+> print text=`a2k`
+> print text=`a2n`
+
+*`act_dec` = > json.get value=`samples` key=done *
+*`a3` = > agent.extract_plan_act reply=`act_dec` *
+*`a3k` = > json.get value=`a3` key=kind *
+> print text=`a3k`
+
+*`cat` = > agent.lib_catalog *
+*`files` = > json.get value=`cat` key=files *
+*`nf` = > len value=`files` *
+1. `nf` > 5
+  > print text=catalog-ok
+2. *
+  > print text=catalog-bad
+
 *`dual` = > agent.render_workbook_skeleton goal=demo skeleton=dual *
 *`has_r` = > split value=`dual` sep=research *
 *`n_r` = > len value=`has_r` *
