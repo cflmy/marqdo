@@ -20,6 +20,8 @@
 
 `quiet=` / `静默=`（默认 `True`）：仅影响 **文件** 子任务的 **TTY**。默认 **piped 捕获** stdout/stderr（父终端不被污染，`wait` map 带截断后的 `stdout`/`stderr` 供父智能体观察）；`False` 时继承父进程 stdout/stderr（map 中 I/O 字段为空）。**答案载荷仍以 `# main` 返回值为主**（经 `--emit-result` 旁路）。外联子任务仍经管道收集 stdout 供 `join` 返回，不受此参数影响。
 
+**事件转发（文件子任务）**：spawn 时设置 `MARQDO_EVENT_FORWARD=<临时 ndjson>`；子进程内 `EventBus.publish` 追加写入该文件；父在 `wait` 阻塞期间 tail 并 republish（加 `source=child`）。这样子 LLM `stream=True` 的 token 能进 `marqdo view` SSE，而不破坏 quiet TTY 契约。函数子任务在同进程内，本来就共享 EventBus。
+
 父进程结束（含 panic）时 **KillOnDrop** 终止所有文件/外联子进程；函数线程标记为 killed 并 detach（无法强杀 OS 线程）。
 
 `poll` → `{ status: running | done | failed, … }`；函数 done 时含 `value`，进程/外联 failed 时含 `code` 或 `error`。

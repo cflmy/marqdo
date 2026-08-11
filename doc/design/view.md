@@ -118,16 +118,18 @@ marqdo view output tests/structure/hello.mq.md -o /tmp/hello-doc
 | **Answer** | `delta` | **主文**；token 连续拼进同一段落（禁止每 token 换行）；主色正文 |
 | **Decision** | `decision` | 时间线条目标记（`RUN` / `CONTINUE` / `DONE` / `REUSE` / `NEW` + 可选 summary） |
 | **Tool** | `tool_start` / `tool_end` | 父 Plan-and-Move 的 CALL/READ：名称 + kind；`tool_end` 可带截断 `result` |
-| **Child / Workbook** | `round` | **独立卡片**：轮次、退出码、workbook 链（`/file?path=`）、可选 `result` 摘要；与父思考/答案视觉分离 |
-| **Status** | `run_start` / `done` / `error` | 顶栏状态 + 错误行；`done.result` 仅在无 Answer 块时作摘要，不与 reasoning 混排 |
+| **Phase** | `decompose` | 父 pre-run 分解开始（workbook 链）；填补「决策后到首 token」空隙 |
+| **Child / Workbook** | `await` → `round` | `await`：Child **running…** 占位卡（quiet 子任务等待中）；`round`：升级为完成卡（退出码 + 可选 `result`） |
+| **Status** | `run_start` / `done` / `error` | 顶栏状态 + 错误行；嵌套 LLM `done`（无 `run_id`）只冲刷 drip，不改顶栏；终态 `done.result` 仅在无 Answer 时作摘要 |
 
 **传输与流畅度（对齐 ChatGPT 类产品）：**
 
 1. **Run = 一次 `fetch` POST**，用 `ReadableStream` 读响应体里的 SSE 帧；**不要**页载常驻 `EventSource`。  
 2. **「Run with input」拦截表单**：`preventDefault` 后走同一 Stream `/api/run`，**禁止整页重载**；带 `?stdin=` 进入时 live 页也不再阻塞跑完，改为自动开 Stream。  
-3. **只改 Stream 对话框 DOM**；token **按动画帧合批**写入单一文本节点（避免每 token 触发布局）。  
+3. **只改 Stream 对话框 DOM**；token **按动画帧合批一次写入**（rAF coalesce，不人为节流；打字感来自网络到达节奏）。  
 4. **Stick-to-bottom**：仅在用户仍贴底时跟随；程序化 `scrollTop` 产生的 scroll 事件忽略；上拉后不抢滚动，可点「↓ Latest」。  
-5. **Stop**：`AbortController` 中止 fetch。
+5. **Stop**：`AbortController` 中止 fetch。  
+6. **子任务并发进度**：`spawn` 立即返回；`wait` 阻塞父循环期间，子进程经 `MARQDO_EVENT_FORWARD` 把 EventBus 帧实时转发到父 SSE；view 把 `source=child` 的 delta 画进 Child 卡。quiet 仍不污染父 TTY。
 
 视觉约束（与 §2 一致）：
 

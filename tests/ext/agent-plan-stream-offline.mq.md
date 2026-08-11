@@ -59,3 +59,13 @@ description: plan_append_*/plan_finish_stream; confirm=True with stream attaches
 *`plast` = > at value=`pevs` index=0 *
 *`pt` = > json.get value=`plast` key=type *
 > print text=`pt`
+
+*`aev` = > agent.plan_echo_await round=2 workbook=wb.mq.md stream=True *
+*`at` = > json.get value=`aev` key=type *
+> print text=`at`
+*`ar` = > json.get value=`aev` key=round *
+> print text=`ar`
+
+*`dev` = > agent.plan_echo_decompose workbook=wb.mq.md stream=True *
+*`dt` = > json.get value=`dev` key=type *
+> print text=`dt`

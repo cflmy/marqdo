@@ -1,12 +1,17 @@
 //! Concurrent subtasks: OS file children, in-process functions, foreign subprocesses.
 //! Parent `HostContext` drop kills/waits file & foreign children; function threads detach.
+//!
+//! Quiet file children get `MARQDO_EVENT_FORWARD` so LLM stream events published in the
+//! child process are tailed into the parent EventBus while `wait` blocks (view SSE).
 
 use std::collections::HashMap;
-use std::io::Read;
+use std::io::{Read, Seek, SeekFrom};
 use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread::{self, JoinHandle};
+use std::time::Duration;
 
 /// Cap for file-child stdout/stderr returned on `wait` (parent observation).
 const FILE_IO_CAP: usize = 8 * 1024;
@@ -37,9 +42,79 @@ impl std::fmt::Debug for Handle {
 pub(crate) struct FileTask {
     child: Child,
     result_path: PathBuf,
+    /// NDJSON path the child appends EventBus frames to (`MARQDO_EVENT_FORWARD`).
+    events_path: Option<PathBuf>,
+    /// Stops the parent-side tailer that republishes child events.
+    forward_stop: Option<Arc<AtomicBool>>,
+    forward: Option<JoinHandle<()>>,
     /// Present when `quiet=True` (piped capture). Absent when inheriting TTY.
     stdout: Option<JoinHandle<String>>,
     stderr: Option<JoinHandle<String>>,
+}
+
+fn stop_event_forward(task: &mut FileTask) {
+    if let Some(stop) = task.forward_stop.take() {
+        stop.store(true, Ordering::SeqCst);
+    }
+    if let Some(h) = task.forward.take() {
+        let _ = h.join();
+    }
+    if let Some(p) = task.events_path.take() {
+        let _ = std::fs::remove_file(p);
+    }
+}
+
+/// Tail `MARQDO_EVENT_FORWARD` NDJSON and republish onto the parent bus with `source=child`.
+fn spawn_event_forwarder(path: PathBuf, stop: Arc<AtomicBool>) -> JoinHandle<()> {
+    thread::spawn(move || {
+        let mut pos: u64 = 0;
+        let mut carry = String::new();
+        loop {
+            let done = stop.load(Ordering::SeqCst);
+            if let Ok(mut f) = std::fs::File::open(&path) {
+                if f.seek(SeekFrom::Start(pos)).is_ok() {
+                    let mut buf = String::new();
+                    if f.read_to_string(&mut buf).is_ok() && !buf.is_empty() {
+                        pos += buf.len() as u64;
+                        carry.push_str(&buf);
+                        while let Some(idx) = carry.find('\n') {
+                            let line = carry[..idx].trim().to_string();
+                            carry.drain(..=idx);
+                            if line.is_empty() {
+                                continue;
+                            }
+                            republish_child_event(&line);
+                        }
+                    }
+                }
+            }
+            if done {
+                if !carry.is_empty() {
+                    let line = carry.trim();
+                    if !line.is_empty() {
+                        republish_child_event(line);
+                    }
+                    carry.clear();
+                }
+                break;
+            }
+            thread::sleep(Duration::from_millis(16));
+        }
+    })
+}
+
+fn republish_child_event(line: &str) {
+    let Ok(mut v) = serde_json::from_str::<serde_json::Value>(line) else {
+        return;
+    };
+    // Skip nested terminal frames — parent owns run lifecycle.
+    if v.get("type").and_then(|t| t.as_str()) == Some("done") && v.get("run_id").is_none() {
+        return;
+    }
+    if let Some(obj) = v.as_object_mut() {
+        obj.insert("source".into(), serde_json::json!("child"));
+    }
+    crate::host::event_bus::EventBus::global().publish_json(&v.to_string());
 }
 
 pub(crate) struct ForeignTask {
@@ -136,6 +211,7 @@ pub fn kill_all(ctx: &mut HostContext) {
             Handle::File(mut task) => {
                 let _ = task.child.kill();
                 let _ = task.child.wait();
+                stop_event_forward(&mut task);
                 if let Some(h) = task.stdout.take() {
                     let _ = h.join();
                 }
@@ -252,6 +328,15 @@ fn spawn_file(
             cmd.arg(as_text(item, "arg")?);
         }
     }
+    // Bridge child EventBus → parent while wait blocks (view SSE / concurrent progress).
+    let events_path = std::env::temp_dir().join(format!(
+        "marqdo-events-{}-{}.ndjson",
+        std::process::id(),
+        id
+    ));
+    let _ = std::fs::write(&events_path, "");
+    cmd.env("MARQDO_EVENT_FORWARD", &events_path);
+
     let mut child = cmd
         .spawn()
         .map_err(|e| format!("subtask spawn {}: {e}", file.display()))?;
@@ -276,11 +361,16 @@ fn spawn_file(
     } else {
         (None, None)
     };
+    let forward_stop = Arc::new(AtomicBool::new(false));
+    let forward = spawn_event_forwarder(events_path.clone(), Arc::clone(&forward_stop));
     ctx.subtasks.insert(
         id,
         Handle::File(FileTask {
             child,
             result_path,
+            events_path: Some(events_path),
+            forward_stop: Some(forward_stop),
+            forward: Some(forward),
             stdout,
             stderr,
         }),
@@ -445,10 +535,12 @@ pub fn join(ctx: &mut HostContext, id: &Value) -> Result<Value, String> {
         .ok_or_else(|| format!("subtask: unknown id {id}"))?;
     match handle {
         Handle::File(mut task) => {
+            // Forwarder runs concurrently while we block on the OS child.
             let status = task
                 .child
                 .wait()
                 .map_err(|e| format!("subtask join: {e}"))?;
+            stop_event_forward(&mut task);
             let code = status.code().unwrap_or(-1) as i64;
             let value = read_emitted_result(&task.result_path);
             let _ = std::fs::remove_file(&task.result_path);
@@ -547,6 +639,7 @@ pub fn kill(ctx: &mut HostContext, id: &Value) -> Result<Value, String> {
                 .kill()
                 .map_err(|e| format!("subtask kill: {e}"))?;
             let _ = task.child.wait();
+            stop_event_forward(&mut task);
             if let Some(h) = task.stdout.take() {
                 let _ = h.join();
             }

@@ -678,9 +678,11 @@ impl SseBody {
     }
 
     fn for_run(rx: Receiver<String>, run_id: u64) -> Self {
+        // Prime with a comment so proxies/browsers flush response headers immediately
+        // (industry SSE practice: first bytes ASAP after Content-Type).
         Self {
             rx,
-            buf: Vec::new(),
+            buf: b": connected\n\n".to_vec(),
             pos: 0,
             stop_run_id: Some(run_id),
             closed: false,
@@ -713,6 +715,8 @@ impl Read for SseBody {
             }
             match self.rx.recv_timeout(Duration::from_secs(15)) {
                 Ok(json) => {
+                    // One event per TCP write — smooth token UX. Do not coalesce large
+                    // batches (that caused jumpy "dump then pause" in the Stream panel).
                     let terminal = self
                         .stop_run_id
                         .map(|id| Self::frame_ends_run(&json, id))

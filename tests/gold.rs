@@ -1504,7 +1504,10 @@ done
 child
 pending
 1
-done",
+done
+await
+2
+decompose",
     );
 }
 

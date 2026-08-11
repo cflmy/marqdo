@@ -682,6 +682,29 @@ section.block > h2 {
   background: #f8fafc;
   padding: 0.65rem 0.85rem;
 }
+.stream-child-await {
+  border-left-color: #94a3b8;
+  background: #f8fafc;
+  opacity: 0.95;
+}
+.stream-child-await .stream-child-head strong {
+  color: #64748b;
+}
+.stream-phase {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.35rem 0.65rem;
+  font: 0.78rem/1.35 var(--sans);
+  color: var(--muted);
+  padding: 0.2rem 0;
+  border-top: 1px dashed var(--line);
+}
+.stream-phase strong {
+  font-weight: 600;
+  color: #475569;
+  letter-spacing: 0.02em;
+}
 .stream-child-head {
   display: flex;
   flex-wrap: wrap;
@@ -1017,9 +1040,11 @@ pub fn layout(title: &str, nav: &str, main: &str) -> String {
     var ignoreScroll = false;
     var pendingReason = "";
     var pendingAnswer = "";
+    var pendingChild = "";
     var raf = 0;
-    // Drip 1 Unicode scalar per frame (一字一吐). Catch up if backlog grows.
-    var CHARS_PER_TICK = 1;
+    // Industry pattern: coalesce tokens to one DOM write per animation frame.
+    // Do NOT artificially drip/hold text — network pacing is the typing effect.
+    var awaitCards = Object.create(null);
     var abortCtrl = null;
 
     function nearBottom() {{
@@ -1077,6 +1102,8 @@ pub fn layout(title: &str, nav: &str, main: &str) -> String {
       answerNode = null;
       pendingReason = "";
       pendingAnswer = "";
+      pendingChild = "";
+      awaitCards = Object.create(null);
       if (raf) {{ cancelAnimationFrame(raf); raf = 0; }}
       pinned = true;
       updateJump();
@@ -1112,6 +1139,25 @@ pub fn layout(title: &str, nav: &str, main: &str) -> String {
       answerEl.appendChild(answerNode);
       turn.appendChild(answerEl);
     }}
+    function flushChildPending() {{
+      if (!pendingChild) return;
+      var keys = Object.keys(awaitCards);
+      var card = keys.length ? awaitCards[keys[keys.length - 1]] : null;
+      if (!card || !card.parentNode) {{
+        pendingAnswer += pendingChild;
+        pendingChild = "";
+        return;
+      }}
+      var out = card.querySelector(".stream-child-body");
+      if (!out) {{
+        out = document.createElement("div");
+        out.className = "stream-child-body";
+        card.appendChild(out);
+      }}
+      out.textContent += pendingChild;
+      pendingChild = "";
+      if (status) status.textContent = "child streaming…";
+    }}
     function flushPendingAll() {{
       if (raf) {{ cancelAnimationFrame(raf); raf = 0; }}
       if (pendingReason) {{
@@ -1124,37 +1170,33 @@ pub fn layout(title: &str, nav: &str, main: &str) -> String {
         answerNode.data += pendingAnswer;
         pendingAnswer = "";
       }}
+      flushChildPending();
       scrollIfPinned();
     }}
     function dripPending() {{
       raf = 0;
-      function take(src, n) {{
-        var chars = Array.from(src);
-        var takeN = Math.min(n, chars.length);
-        return [chars.slice(0, takeN).join(""), chars.slice(takeN).join("")];
-      }}
       if (pendingReason) {{
         ensureThinking();
-        var n = pendingReason.length > 240 ? 12 : (pendingReason.length > 80 ? 4 : CHARS_PER_TICK);
-        var r = take(pendingReason, n);
-        reasonNode.data += r[0];
-        pendingReason = r[1];
-      }} else if (pendingAnswer) {{
+        reasonNode.data += pendingReason;
+        pendingReason = "";
+      }}
+      if (pendingAnswer) {{
         ensureAnswer();
-        var n2 = pendingAnswer.length > 240 ? 12 : (pendingAnswer.length > 80 ? 4 : CHARS_PER_TICK);
-        var a = take(pendingAnswer, n2);
-        answerNode.data += a[0];
-        pendingAnswer = a[1];
+        answerNode.data += pendingAnswer;
+        pendingAnswer = "";
       }}
+      flushChildPending();
       scrollIfPinned();
-      if (pendingReason || pendingAnswer) {{
-        raf = requestAnimationFrame(dripPending);
-      }}
     }}
     function queueText(kind, text) {{
       if (!text) return;
       if (kind === "reasoning") pendingReason += text;
       else pendingAnswer += text;
+      if (!raf) raf = requestAnimationFrame(dripPending);
+    }}
+    function appendChildStream(text) {{
+      if (!text) return;
+      pendingChild += text;
       if (!raf) raf = requestAnimationFrame(dripPending);
     }}
     function formatResult(v) {{
@@ -1216,10 +1258,83 @@ pub fn layout(title: &str, nav: &str, main: &str) -> String {
       turn.appendChild(card);
       scrollIfPinned();
     }}
+    function addPhaseMark(label, ev) {{
+      flushPendingAll();
+      ensureTurn();
+      var row = document.createElement("div");
+      row.className = "stream-phase";
+      var strong = document.createElement("strong");
+      strong.textContent = label;
+      row.appendChild(strong);
+      if (ev && ev.workbook) {{
+        var a = document.createElement("a");
+        a.href = "/file?path=" + encodeURIComponent(ev.workbook);
+        a.textContent = ev.workbook;
+        row.appendChild(a);
+      }}
+      turn.appendChild(row);
+      scrollIfPinned();
+    }}
+    function addAwaitCard(ev) {{
+      flushPendingAll();
+      var key = String(ev.round != null ? ev.round : "?");
+      var existing = awaitCards[key];
+      if (existing && existing.parentNode) {{
+        existing.className = "stream-child stream-child-await";
+        var t0 = existing.querySelector("strong");
+        if (t0) t0.textContent = "Child running…";
+        if (status) status.textContent = "awaiting child…";
+        scrollIfPinned();
+        return;
+      }}
+      var card = document.createElement("div");
+      card.className = "stream-child stream-child-await";
+      card.setAttribute("data-await-round", key);
+      var head = document.createElement("div");
+      head.className = "stream-child-head";
+      var title = document.createElement("strong");
+      title.textContent = "Child running…";
+      head.appendChild(title);
+      var meta = document.createElement("span");
+      meta.className = "stream-child-meta";
+      var bits = [];
+      if (ev.round != null) bits.push("round " + ev.round);
+      bits.push("waiting");
+      meta.textContent = bits.join(" · ");
+      head.appendChild(meta);
+      if (ev.workbook) {{
+        var a = document.createElement("a");
+        a.href = "/file?path=" + encodeURIComponent(ev.workbook);
+        a.textContent = ev.workbook;
+        head.appendChild(a);
+      }}
+      card.appendChild(head);
+      var live = document.createElement("div");
+      live.className = "stream-child-body";
+      card.appendChild(live);
+      body.appendChild(card);
+      awaitCards[key] = card;
+      if (status) status.textContent = "awaiting child…";
+      resetTurnRefs();
+      scrollIfPinned();
+    }}
     function addChildCard(ev) {{
       flushPendingAll();
-      var card = document.createElement("div");
-      card.className = "stream-child";
+      var key = String(ev.round != null ? ev.round : "?");
+      var card = awaitCards[key];
+      var liveText = "";
+      if (card && card.parentNode) {{
+        var live = card.querySelector(".stream-child-body");
+        if (live) liveText = live.textContent || "";
+        delete awaitCards[key];
+        card.className = "stream-child";
+        card.removeAttribute("data-await-round");
+        card.innerHTML = "";
+      }} else {{
+        card = document.createElement("div");
+        card.className = "stream-child";
+        body.appendChild(card);
+      }}
       var head = document.createElement("div");
       head.className = "stream-child-head";
       var title = document.createElement("strong");
@@ -1240,13 +1355,14 @@ pub fn layout(title: &str, nav: &str, main: &str) -> String {
       }}
       card.appendChild(head);
       var res = formatResult(ev.result);
+      if (!res && liveText) res = liveText;
       if (res) {{
         var out = document.createElement("div");
         out.className = "stream-child-body";
         out.textContent = res.length > 8000 ? res.slice(0, 8000) + "…" : res;
         card.appendChild(out);
       }}
-      body.appendChild(card);
+      if (status) status.textContent = "running…";
       resetTurnRefs();
       scrollIfPinned();
     }}
@@ -1261,9 +1377,11 @@ pub fn layout(title: &str, nav: &str, main: &str) -> String {
     function handleEvent(ev) {{
       var t = ev.type || "?";
       if (t === "reasoning") {{
-        queueText("reasoning", ev.text || "");
+        if (ev.source === "child") appendChildStream(ev.text || "");
+        else queueText("reasoning", ev.text || "");
       }} else if (t === "delta") {{
-        queueText("answer", ev.text || "");
+        if (ev.source === "child") appendChildStream(ev.text || "");
+        else queueText("answer", ev.text || "");
       }} else if (t === "error") {{
         addError(ev.message || "error");
         if (status) status.textContent = "error";
@@ -1271,6 +1389,11 @@ pub fn layout(title: &str, nav: &str, main: &str) -> String {
         addDecision(ev);
       }} else if (t === "tool_start" || t === "tool_end") {{
         addToolCard(ev);
+      }} else if (t === "decompose") {{
+        addPhaseMark("DECOMPOSE", ev);
+        if (status) status.textContent = "planning…";
+      }} else if (t === "await") {{
+        addAwaitCard(ev);
       }} else if (t === "round") {{
         addChildCard(ev);
       }} else if (t === "run_start") {{
@@ -1289,15 +1412,18 @@ pub fn layout(title: &str, nav: &str, main: &str) -> String {
         turn.appendChild(mark);
         scrollIfPinned();
       }} else if (t === "done") {{
+        // Nested LLM `done` (no run_id): flush drip only; do not rewrite Answer/status.
         flushPendingAll();
-        if (ev.run_id != null && status) status.textContent = "done";
-        var hasAnswer = answerNode && answerNode.data;
-        if (!hasAnswer && typeof ev.result === "string" && ev.result) {{
-          ensureAnswer();
-          answerNode.data += ev.result;
-          scrollIfPinned();
+        if (ev.run_id != null) {{
+          if (status) status.textContent = "done";
+          var hasAnswer = answerNode && answerNode.data;
+          if (!hasAnswer && typeof ev.result === "string" && ev.result) {{
+            ensureAnswer();
+            answerNode.data += ev.result;
+            scrollIfPinned();
+          }}
+          if (thinkingEl && (answerNode && answerNode.data)) thinkingEl.open = false;
         }}
-        if (thinkingEl && (answerNode && answerNode.data)) thinkingEl.open = false;
       }}
     }}
     function setRunning(on) {{

@@ -104,9 +104,10 @@ ext/ai/agent  step/plan 订阅事件 → 可选透传或写回「过程槽」
 
 plan 特有：
 
-- 每轮 `await_workbook` 前后发 `round`。  
+- `await_workbook` **前**发 `await`（view Child running 占位）；结束后发 `round`。  
+- 父 pre-run 分解发 `decompose`。  
 - 父 LLM 的 `complete` 若 `stream=True`，`delta` 冒泡到 plan 的 stream。  
-- **子文件 quiet 不变**；若需看子内部模型吐字，由子工作簿自己 `stream=True` 并把摘要 **返回** 或写回，而不是继承子 stdout。
+- **子文件 quiet 不变（TTY）**；默认骨架 `step stream=True`，子 EventBus 经 `MARQDO_EVENT_FORWARD` **实时转发**到父 SSE（`source=child`）。答案仍以 `# main` 返回为准。
 
 ### 3.4 呈现面
 
@@ -158,7 +159,7 @@ S3  view 订阅（EventBus + GET /api/events + POST /api/run）   ✅
 1. `plan` / `多步` 增加 `stream` / `echo` / `trace`（中文 `流式` / `打印增量` / `轨迹`）。  
 2. 事件挂在返回 map 的 `events`；父 `complete` 只冒泡 `delta`/`error`（嵌套 `done` 不进列表）。  
 3. `trace=True` → 写回槽 `trace`（与 TTY `echo` 可分立）。  
-4. **体验（父先子后）**：非命中路径先 `plan:decompose`（父 pre-run 分解，可流式），再 `plan:await`（子 quiet）。修订轮仍是观察后父决策。SSE 本身用 `tests/ext/llm-stream-live.mq.md`。
+4. **体验（父先子后）**：非命中路径先 `decompose`（SSE + 可选 TTY `plan:decompose`），再 `await`（SSE 占位 + 可选 TTY `plan:await`），子 quiet。修订轮仍是观察后父决策。SSE 本身用 `tests/ext/llm-stream-live.mq.md`。
 
 验收：
 

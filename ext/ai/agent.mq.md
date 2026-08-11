@@ -100,7 +100,7 @@ Allowlist check, then invoke the runbook `##` via `lib/subtask` (`spawn fn=` →
 Build a runnable workbook. `skeleton=single` (default): one worker `step`. `skeleton=dual`: research then write agents. On success the parent chooses DONE; runtime `agent_workbook_solidify` freezes the answer.
 
 *`q` = > json.quote text=`goal` *
-*`esc` = > json.parse text={"h":"---\ntitle: agent workbook\n> ext/ai/llm.mq.md\n> ext/ai/agent.mq.md\n> lib/json.mq.md\n> lib/sys.mq.md\n> lib/writeback.mq.md\n> lib/subtask.mq.md\n---\n\n# Goal\n\nParent goal is embedded as JSON in # main.\n\n## Solidify\n\nWhen the child returns a good value, parent DECISION: DONE — runtime agent_workbook_solidify freezes the answer as **return** (do not invent long FIND/REPLACE).\n\n# main\n\n> llm.load_env\n\n","s1":"\u002a\u0060model\u0060 = > llm.llm \u002a\n","s2":"\u002a\u0060tools\u0060 = > json.parse text=[] \u002a\n","s3":"\u002a\u0060worker\u0060 = > agent.agent model=\u0060model\u0060 tools=\u0060tools\u0060 standing=You are a workbook worker. Finish the task; do not invent tools. Prefer a direct answer. \u002a\n","s4":"\u002a\u0060wrap\u0060 = > json.parse text={\"task\":","s5":"} \u002a\n","s6":"\u002a\u0060task\u0060 = > json.get value=\u0060wrap\u0060 key=task \u002a\n","s7":"\u002a\u0060out\u0060 = > \u0060worker\u0060.step task=\u0060task\u0060 \u002a\n","s7b":"\u002a\u0060text\u0060 = > json.get value=\u0060out\u0060 key=result \u002a\n","s8":"\u002a\u002a\u0060text\u0060\u002a\u002a\n","d3":"\u002a\u0060research\u0060 = > agent.agent model=\u0060model\u0060 tools=\u0060tools\u0060 standing=You gather facts for the goal. Be concise. Do not invent tools. \u002a\n","d3b":"\u002a\u0060writer\u0060 = > agent.agent model=\u0060model\u0060 tools=\u0060tools\u0060 standing=You write the final answer from research notes. Do not invent tools. \u002a\n","d4":"\u002a\u0060wrap\u0060 = > json.parse text={\"task\":","d5":"} \u002a\n","d6":"\u002a\u0060task\u0060 = > json.get value=\u0060wrap\u0060 key=task \u002a\n","d7":"\u002a\u0060notes\u0060 = > \u0060research\u0060.step task=\u0060task\u0060 \u002a\n","d8":"\u002a\u0060ns\u0060 = > json.stringify value=\u0060notes\u0060 \u002a\n","d9":"\u002a\u0060wt\u0060 = Write the final answer. Research notes: \u002a\n","d10":"\u002a\u0060wt\u0060 = \u0060wt\u0060 + \u0060ns\u0060 \u002a\n","d11":"\u002a\u0060out\u0060 = > \u0060writer\u0060.step task=\u0060wt\u0060 \u002a\n","d11b":"\u002a\u0060text\u0060 = > json.get value=\u0060out\u0060 key=result \u002a\n","d12":"\u002a\u002a\u0060text\u0060\u002a\u002a\n"} *
+*`esc` = > json.parse text={"h":"---\ntitle: agent workbook\n> ext/ai/llm.mq.md\n> ext/ai/agent.mq.md\n> lib/json.mq.md\n> lib/sys.mq.md\n> lib/writeback.mq.md\n> lib/subtask.mq.md\n---\n\n# Goal\n\nParent goal is embedded as JSON in # main.\n\n## Solidify\n\nWhen the child returns a good value, parent DECISION: DONE — runtime agent_workbook_solidify freezes the answer as **return** (do not invent long FIND/REPLACE).\n\n# main\n\n> llm.load_env\n\n","s1":"\u002a\u0060model\u0060 = > llm.llm \u002a\n","s2":"\u002a\u0060tools\u0060 = > json.parse text=[] \u002a\n","s3":"\u002a\u0060worker\u0060 = > agent.agent model=\u0060model\u0060 tools=\u0060tools\u0060 standing=You are a workbook worker. Finish the task; do not invent tools. Prefer a direct answer. \u002a\n","s4":"\u002a\u0060wrap\u0060 = > json.parse text={\"task\":","s5":"} \u002a\n","s6":"\u002a\u0060task\u0060 = > json.get value=\u0060wrap\u0060 key=task \u002a\n","s7":"\u002a\u0060out\u0060 = > \u0060worker\u0060.step task=\u0060task\u0060 stream=True \u002a\n","s7b":"\u002a\u0060text\u0060 = > json.get value=\u0060out\u0060 key=result \u002a\n","s8":"\u002a\u002a\u0060text\u0060\u002a\u002a\n","d3":"\u002a\u0060research\u0060 = > agent.agent model=\u0060model\u0060 tools=\u0060tools\u0060 standing=You gather facts for the goal. Be concise. Do not invent tools. \u002a\n","d3b":"\u002a\u0060writer\u0060 = > agent.agent model=\u0060model\u0060 tools=\u0060tools\u0060 standing=You write the final answer from research notes. Do not invent tools. \u002a\n","d4":"\u002a\u0060wrap\u0060 = > json.parse text={\"task\":","d5":"} \u002a\n","d6":"\u002a\u0060task\u0060 = > json.get value=\u0060wrap\u0060 key=task \u002a\n","d7":"\u002a\u0060notes\u0060 = > \u0060research\u0060.step task=\u0060task\u0060 stream=True \u002a\n","d8":"\u002a\u0060ns\u0060 = > json.stringify value=\u0060notes\u0060 \u002a\n","d9":"\u002a\u0060wt\u0060 = Write the final answer. Research notes: \u002a\n","d10":"\u002a\u0060wt\u0060 = \u0060wt\u0060 + \u0060ns\u0060 \u002a\n","d11":"\u002a\u0060out\u0060 = > \u0060writer\u0060.step task=\u0060wt\u0060 stream=True \u002a\n","d11b":"\u002a\u0060text\u0060 = > json.get value=\u0060out\u0060 key=result \u002a\n","d12":"\u002a\u002a\u0060text\u0060\u002a\u002a\n"} *
 *`h` = > json.get value=`esc` key=h *
 *`s1` = > json.get value=`esc` key=s1 *
 *`s2` = > json.get value=`esc` key=s2 *
@@ -1126,17 +1126,19 @@ LLM Plan → CALL/READ/DECISION loop. Returns `{decision,reply,observation,event
     + `stream`=False
     + `echo`=False
 
-TTY marker for pre-run parent decompose (before any child spawn).
+Pre-run parent decompose marker. With `stream=True`, publish `{type:decompose}` so view is not silent before the first child.
 
 1. `stream`
+  *`ev` = > json.parse text={"type":"decompose"} *
+  *`ev` = > json.set map=`ev` key=workbook value=`workbook` *
+  > sys.stream_publish event=`ev`
   1. `echo`
     > print text=plan:decompose
   2. *
     *`_` = 1*
+  **`ev`**
 2. *
-  *`_` = 1*
-
-****
+  ****
 
 ## plan_echo_await
     + `round`
@@ -1144,18 +1146,21 @@ TTY marker for pre-run parent decompose (before any child spawn).
     + `stream`=False
     + `echo`=False
 
-TTY-only marker before `await_workbook` so `stream+echo` is not silent during the (often long) child run.
+Marker before `await_workbook`. With `stream=True`, publish `{type:await,round,workbook}` so the Stream panel shows progress while the quiet child runs (TTY `echo` optional).
 
 1. `stream`
+  *`ev` = > json.parse text={"type":"await"} *
+  *`ev` = > json.set map=`ev` key=round value=`round` *
+  *`ev` = > json.set map=`ev` key=workbook value=`workbook` *
+  > sys.stream_publish event=`ev`
   1. `echo`
     > print text=plan:await
     > print text=`round`
   2. *
     *`_` = 1*
+  **`ev`**
 2. *
-  *`_` = 1*
-
-****
+  ****
 
 ## workbook_has_worker_step
     + `path`
