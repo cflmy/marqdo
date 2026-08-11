@@ -83,7 +83,7 @@ cargo build -p marqdo_plugin_agent
 ```
 
 - Demo (ABI v1): `demo_add`, `demo_echo` — [`tests/lib/plugin-demo.mq.md`](../../tests/lib/plugin-demo.mq.md).
-- Agent (ABI v2): layout + session bag + context queries + **OKF agent-kb** (`agent_goal_sig`, `agent_goal_slug`, `agent_kb_lookup`, `agent_kb_canonicalize`, `agent_kb_list_tasks`, `agent_kb_add_alias`, `agent_kb_promote`, `agent_kb_record_hit`, `agent_workbook_solidify`, `agent_kb_task_files`) — [`plugins/agent`](../../plugins/agent); used by [`ext/ai/agent.mq.md`](../../ext/ai/agent.mq.md). Lookup: `plugin.native_path name=agent` or [ext-cli.md](ext-cli.md) install / `MARQDO_AGENT_PLUGIN`.
+- Agent (ABI v2): layout + session bag + context queries + **OKF agent-kb** (`agent_goal_sig`, `agent_goal_slug`, `agent_kb_lookup`, `agent_kb_near_match`, `agent_kb_canonicalize`, `agent_kb_list_tasks`, `agent_kb_add_alias`, `agent_kb_promote`, `agent_kb_record_hit`, `agent_workbook_solidify`, `agent_kb_task_files`) — [`plugins/agent`](../../plugins/agent); used by [`ext/ai/agent.mq.md`](../../ext/ai/agent.mq.md). Lookup: `plugin.native_path name=agent` or [ext-cli.md](ext-cli.md) install / `MARQDO_AGENT_PLUGIN`.
 
 ## Layering
 

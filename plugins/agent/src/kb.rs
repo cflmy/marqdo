@@ -1,5 +1,6 @@
 //! OKF agent-kb helpers (plugin-side). No dependency on marqdo `src/host`.
 
+use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -606,6 +607,158 @@ pub fn kb_canonicalize(args: &Value) -> Result<Value, String> {
     Ok(Value::String(canonicalize_goal_str(goal)))
 }
 
+fn arg_bool(args: &Value, key: &str, default: bool) -> bool {
+    match args.get(key) {
+        None | Some(Value::Null) => default,
+        Some(Value::Bool(b)) => *b,
+        Some(Value::Number(n)) => n.as_i64().unwrap_or(0) != 0,
+        Some(Value::String(s)) => matches!(
+            s.trim(),
+            "1" | "true" | "True" | "TRUE" | "yes" | "Yes" | "on" | "ON"
+        ),
+        _ => default,
+    }
+}
+
+fn arg_f64(args: &Value, key: &str, default: f64) -> f64 {
+    match args.get(key) {
+        None | Some(Value::Null) => default,
+        Some(Value::Number(n)) => n.as_f64().unwrap_or(default),
+        Some(Value::String(s)) => s.parse().unwrap_or(default),
+        _ => default,
+    }
+}
+
+/// Character bigram bag (whitespace stripped). Sparse lexical vectorization — not an embedding model.
+pub fn char_bigram_tf(text: &str) -> HashMap<String, f64> {
+    let chars: Vec<char> = text.chars().filter(|c| !c.is_whitespace()).collect();
+    let mut m = HashMap::new();
+    if chars.is_empty() {
+        return m;
+    }
+    if chars.len() == 1 {
+        m.insert(chars[0].to_string(), 1.0);
+        return m;
+    }
+    for w in chars.windows(2) {
+        let key = format!("{}{}", w[0], w[1]);
+        *m.entry(key).or_insert(0.0) += 1.0;
+    }
+    m
+}
+
+pub fn cosine_tf(a: &HashMap<String, f64>, b: &HashMap<String, f64>) -> f64 {
+    let mut na = 0.0;
+    let mut nb = 0.0;
+    for v in a.values() {
+        na += v * v;
+    }
+    for v in b.values() {
+        nb += v * v;
+    }
+    if na == 0.0 || nb == 0.0 {
+        return 0.0;
+    }
+    let mut dot = 0.0;
+    if a.len() <= b.len() {
+        for (k, va) in a {
+            if let Some(vb) = b.get(k) {
+                dot += va * vb;
+            }
+        }
+    } else {
+        for (k, vb) in b {
+            if let Some(va) = a.get(k) {
+                dot += va * vb;
+            }
+        }
+    }
+    dot / (na.sqrt() * nb.sqrt())
+}
+
+#[cfg(test)]
+fn near_score(query: &str, candidate: &str) -> f64 {
+    let q = canonicalize_goal_str(query);
+    let c = canonicalize_goal_str(candidate);
+    if q.is_empty() || c.is_empty() {
+        return 0.0;
+    }
+    cosine_tf(&char_bigram_tf(&q), &char_bigram_tf(&c))
+}
+
+fn task_near_material(src: &str, slug: &str) -> String {
+    let title = extract_fm_field(src, "title").unwrap_or_else(|| slug.to_string());
+    let desc = extract_fm_field(src, "description").unwrap_or_default();
+    let aliases = extract_fm_aliases(src);
+    let mut parts = vec![title, desc];
+    parts.extend(aliases);
+    parts.join(" ")
+}
+
+#[derive(Clone)]
+struct NearCand {
+    slug: String,
+    title: String,
+    score: f64,
+}
+
+fn rank_near_tasks(root: &Path, goal: &str, limit: usize) -> Vec<NearCand> {
+    let tasks_dir = root.join("concepts/tasks");
+    let skills_dir = root.join("concepts/skills");
+    let res_dir = root.join("resources");
+    if !tasks_dir.is_dir() {
+        return Vec::new();
+    }
+    let q = canonicalize_goal_str(goal);
+    let qv = char_bigram_tf(&q);
+    if qv.is_empty() {
+        return Vec::new();
+    }
+    let mut out = Vec::new();
+    let Ok(rd) = fs::read_dir(&tasks_dir) else {
+        return Vec::new();
+    };
+    for ent in rd.flatten() {
+        let p = ent.path();
+        if p.extension().and_then(|e| e.to_str()) != Some("md") {
+            continue;
+        }
+        let Ok(src) = fs::read_to_string(&p) else {
+            continue;
+        };
+        let slug = p
+            .file_stem()
+            .map(|s| s.to_string_lossy().into_owned())
+            .unwrap_or_default();
+        if slug.is_empty() {
+            continue;
+        }
+        if !skills_dir.join(format!("{slug}.md")).is_file()
+            || !res_dir.join(format!("{slug}.mq.md")).is_file()
+        {
+            continue;
+        }
+        let title = extract_fm_field(&src, "title").unwrap_or_else(|| slug.clone());
+        let material = task_near_material(&src, &slug);
+        let score = cosine_tf(&qv, &char_bigram_tf(&canonicalize_goal_str(&material)));
+        if score > 0.0 {
+            out.push(NearCand {
+                slug,
+                title,
+                score,
+            });
+        }
+    }
+    out.sort_by(|a, b| {
+        b.score
+            .partial_cmp(&a.score)
+            .unwrap_or(std::cmp::Ordering::Equal)
+            .then_with(|| a.slug.cmp(&b.slug))
+    });
+    out.truncate(limit.max(1));
+    out
+}
+
 fn lookup_hit_payload(
     kb: &str,
     root: &Path,
@@ -613,6 +766,7 @@ fn lookup_hit_payload(
     slug: &str,
     match_kind: &str,
     query_sig: &str,
+    score: Option<f64>,
 ) -> Result<Value, String> {
     let skill_src =
         fs::read_to_string(skill_path).map_err(|e| format!("kb_lookup read skill: {e}"))?;
@@ -645,7 +799,7 @@ fn lookup_hit_payload(
         }
     }
 
-    Ok(json!({
+    let mut out = json!({
         "hit": true,
         "match": match_kind,
         "sig": skill_sig,
@@ -658,7 +812,13 @@ fn lookup_hit_payload(
         "resource": kb_rel(kb, &format!("resources/{slug}.mq.md")),
         "task": kb_rel(kb, &format!("concepts/tasks/{slug}.md")),
         "skill": kb_rel(kb, &format!("concepts/skills/{slug}.md")),
-    }))
+    });
+    if let Some(s) = score {
+        if let Some(obj) = out.as_object_mut() {
+            obj.insert("score".into(), json!((s * 1000.0).round() / 1000.0));
+        }
+    }
+    Ok(out)
 }
 
 fn resolve_skill_paths_by_slug(
@@ -699,7 +859,7 @@ pub fn kb_lookup(args: &Value) -> Result<Value, String> {
             .and_then(|v| v.as_str())
             .map(|g| goal_sig_hex(&material_for(g, tools)))
             .unwrap_or_default();
-        return lookup_hit_payload(kb, &root, &skill_path, &slug, "soft", &query_sig);
+        return lookup_hit_payload(kb, &root, &skill_path, &slug, "soft", &query_sig, None);
     }
 
     let goal = arg_text(args, "goal")?;
@@ -707,6 +867,7 @@ pub fn kb_lookup(args: &Value) -> Result<Value, String> {
     let query_sig = goal_sig_hex(&material_for(goal, tools));
     let slug_hint = goal_slug_str(goal);
     let mut match_kind = "exact";
+    let mut near_score_hit: Option<f64> = None;
     let resolved = resolve_skill_paths(&root, &query_sig, &slug_hint)
         .or_else(|| {
             match_kind = "alias";
@@ -722,12 +883,72 @@ pub fn kb_lookup(args: &Value) -> Result<Value, String> {
             let slug2 = goal_slug_str(&canon);
             resolve_skill_paths(&root, &sig2, &slug2)
                 .or_else(|| resolve_skill_paths_by_alias(&root, &canon))
+        })
+        .or_else(|| {
+            if !arg_bool(args, "near_match", false) {
+                return None;
+            }
+            let threshold = arg_f64(args, "near_threshold", 0.78);
+            let ranked = rank_near_tasks(&root, goal, 8);
+            let best = ranked.first()?;
+            if best.score < threshold {
+                return None;
+            }
+            match_kind = "near";
+            near_score_hit = Some(best.score);
+            resolve_skill_paths_by_slug(&root, &best.slug)
         });
     let Some((_task, skill_path, _res, slug)) = resolved else {
         return Ok(Value::Null);
     };
 
-    lookup_hit_payload(kb, &root, &skill_path, &slug, match_kind, &query_sig)
+    lookup_hit_payload(
+        kb,
+        &root,
+        &skill_path,
+        &slug,
+        match_kind,
+        &query_sig,
+        near_score_hit,
+    )
+}
+
+pub fn kb_near_match(args: &Value) -> Result<Value, String> {
+    let kb = arg_text(args, "kb_dir")?;
+    let goal = arg_text(args, "goal")?;
+    let limit = match args.get("limit") {
+        None | Some(Value::Null) => 8usize,
+        Some(Value::Number(n)) => n.as_u64().unwrap_or(8) as usize,
+        Some(Value::String(s)) => s.parse().unwrap_or(8),
+        _ => 8,
+    }
+    .clamp(1, 40);
+    let root = resolve_path(kb);
+    let ranked = rank_near_tasks(&root, goal, limit);
+    let candidates: Vec<Value> = ranked
+        .iter()
+        .map(|c| {
+            json!({
+                "slug": c.slug,
+                "title": c.title,
+                "score": (c.score * 1000.0).round() / 1000.0,
+            })
+        })
+        .collect();
+    let best = ranked.first().map(|c| {
+        json!({
+            "slug": c.slug,
+            "title": c.title,
+            "score": (c.score * 1000.0).round() / 1000.0,
+        })
+    });
+    let score = ranked.first().map(|c| (c.score * 1000.0).round() / 1000.0);
+    Ok(json!({
+        "candidates": candidates,
+        "count": ranked.len() as i64,
+        "best": best,
+        "score": score,
+    }))
 }
 
 pub fn kb_list_tasks(args: &Value) -> Result<Value, String> {
@@ -1101,5 +1322,28 @@ mod tests {
         assert_eq!(c, "帮我规划明天的行程");
         let c2 = canonicalize_goal_str("你是一个智能体，帮我规划明天的行程？");
         assert_eq!(c2, "帮我规划明天的行程");
+    }
+
+    #[test]
+    fn near_score_trip_near_dupes_high() {
+        let a = "帮我规划明天行程";
+        let b = "帮我规划明天的行程";
+        let s = near_score(a, b);
+        assert!(s >= 0.78, "expected high near score, got {s}");
+        let c = "帮我完成明天的行程规划";
+        let s2 = near_score(b, c);
+        let unrelated = near_score(b, "明天做什么好");
+        assert!(
+            s2 > unrelated,
+            "paraphrase should beat unrelated: paraphrase={s2} unrelated={unrelated}"
+        );
+    }
+
+    #[test]
+    fn near_score_unrelated_low() {
+        let a = "帮我规划明天的行程";
+        let b = "明天做什么好";
+        let s = near_score(a, b);
+        assert!(s < 0.78, "expected below default threshold, got {s}");
     }
 }

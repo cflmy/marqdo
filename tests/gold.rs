@@ -1433,6 +1433,27 @@ list-ok",
 }
 
 #[test]
+fn ext_agent_kb_near() {
+    let status = Command::new("cargo")
+        .args(["build", "-p", "marqdo_plugin_agent"])
+        .current_dir(env!("CARGO_MANIFEST_DIR"))
+        .status()
+        .expect("build agent plugin");
+    assert!(status.success(), "failed to build marqdo_plugin_agent");
+    assert_out(
+        "tests/ext/agent-kb-near.mq.md",
+        "promoted
+near-ok
+near
+same-slug
+off-miss
+neg-miss
+rank-ok
+prompt-score-ok",
+    );
+}
+
+#[test]
 fn ext_agent_soft_match() {
     assert_out(
         "tests/ext/agent-soft-match.mq.md",

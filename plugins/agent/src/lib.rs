@@ -879,6 +879,7 @@ kb_ffi!(agent_goal_sig, kb::goal_sig, "agent_goal_sig");
 kb_ffi!(agent_goal_slug, kb::goal_slug, "agent_goal_slug");
 kb_ffi!(agent_kb_canonicalize, kb::kb_canonicalize, "agent_kb_canonicalize");
 kb_ffi!(agent_kb_lookup, kb::kb_lookup, "agent_kb_lookup");
+kb_ffi!(agent_kb_near_match, kb::kb_near_match, "agent_kb_near_match");
 kb_ffi!(agent_kb_list_tasks, kb::kb_list_tasks, "agent_kb_list_tasks");
 kb_ffi!(agent_kb_add_alias, kb::kb_add_alias, "agent_kb_add_alias");
 kb_ffi!(agent_kb_promote, kb::kb_promote, "agent_kb_promote");
@@ -969,6 +970,9 @@ pub unsafe extern "C" fn marqdo_plugin_init(host: *const MarqdoHostApi) -> c_int
         return 1;
     }
     if register(host, "agent_kb_lookup", "kb_dir,goal", agent_kb_lookup) != 0 {
+        return 1;
+    }
+    if register(host, "agent_kb_near_match", "kb_dir,goal", agent_kb_near_match) != 0 {
         return 1;
     }
     if register(host, "agent_kb_list_tasks", "kb_dir", agent_kb_list_tasks) != 0 {

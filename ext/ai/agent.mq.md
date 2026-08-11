@@ -936,19 +936,24 @@ Parse `SLUG: …` / `标识：…` after a soft-match REUSE decision.
     + `goal`
     + `tasks`
 
-Short parent prompt: REUSE+SLUG or NEW only.
+Short parent prompt: REUSE+SLUG or NEW only. Candidates may include lexical `score` (prefer higher).
 
-*`esc` = > json.parse text={"a":"\n\n--- goal ---\n","b":"\n\n--- candidate tasks (slug | title) ---\n","c":"\n\n--- how to act ---\nExact reuse miss. Reply with ONE protocol only:\nDECISION: REUSE\nSLUG: <exact-slug-from-list>\nor\nDECISION: NEW\nNo other prose.\n","nl":"\n","sep":" | "} *
+*`esc` = > json.parse text={"a":"\n\n--- goal ---\n","b":"\n\n--- candidate tasks (slug | title | score) ---\n","c":"\n\n--- how to act ---\nExact reuse miss; candidates are ranked by local n-gram score when present. Prefer higher scores. Reply with ONE protocol only:\nDECISION: REUSE\nSLUG: <exact-slug-from-list>\nor\nDECISION: NEW\nNo other prose.\n","nl":"\n","sep":" | ","sp":"score="} *
 *`a` = > json.get value=`esc` key=a *
 *`b` = > json.get value=`esc` key=b *
 *`c` = > json.get value=`esc` key=c *
 *`nl` = > json.get value=`esc` key=nl *
 *`sep` = > json.get value=`esc` key=sep *
+*`sp` = > json.get value=`esc` key=sp *
 *`lines` = > json.parse text=[] *
 - [`t`](`tasks`)
   *`slug` = > json.get value=`t` key=slug *
   *`title` = > json.get value=`t` key=title *
-  *`row` = `slug` + `sep` + `title` *
+  *`score` = > json.get value=`t` key=score *
+  1. `score`
+    *`row` = `slug` + `sep` + `title` + `sep` + `sp` + `score` *
+  2. *
+    *`row` = `slug` + `sep` + `title` *
   *`lines` = > json.append list=`lines` item=`row` *
 *`catalog` = > join value=`lines` sep=`nl` *
 *`p` = Soft-match: same task intent? *
@@ -1408,6 +1413,8 @@ With `stream=True`, the model call uses SSE; `echo=True` prints delta text to st
     + `optimize`=False
     + `force`=False
     + `soft_match`=False
+    + `near_match`=True
+    + `near_threshold`=0.78
     + `promote`=True
     + `kb_dir`=.marqdo/agent-kb
     + `improve_every`=3
@@ -1418,7 +1425,7 @@ With `stream=True`, the model call uses SSE; `echo=True` prints delta text to st
 
 Multi-step with OKF agent-kb. Default workbook is `kb_dir/resources/<slug>.mq.md`. While task file count `< explore_n` and skill is not llm_free, force a new explore variant under `kb_dir/explore/<slug>/`. Code-first: llm_free hits skip parent LLM. File children return via `# main`; `plan` exposes that as `result`.
 
-Non-hit path: optional `soft_match=True` parent REUSE/NEW; else **decompose** before first child spawn (`DECISION: RUN` / `CONTINUE`+patch / solidified `DONE`). Then `await` → revise loop. With `stream=True`, emit parent `delta` / `decision` / `tool_start`/`tool_end` / `round` / `done` on `events`. `echo=True` prints `plan:decompose` / `plan:await` / deltas. `trace=True` writes events to writeback slot `trace`. Quiet child subtasks stay quiet.
+Reuse lookup: exact → alias → canonicalize → optional local n-gram `near` when `near_match=True` and score ≥ `near_threshold`. Non-hit path: optional `soft_match=True` parent REUSE/NEW over ranked `agent_kb_near_match` candidates; else **decompose** before first child spawn (`DECISION: RUN` / `CONTINUE`+patch / solidified `DONE`). Then `await` → revise loop. With `stream=True`, emit parent `delta` / `decision` / `tool_start`/`tool_end` / `round` / `done` on `events`. `echo=True` prints `plan:decompose` / `plan:await` / deltas. `trace=True` writes events to writeback slot `trace`. Quiet child subtasks stay quiet.
 
 *`tools` = > json.get value=`self` key=tools *
 *`cache` = miss*
@@ -1437,7 +1444,7 @@ Non-hit path: optional `soft_match=True` parent REUSE/NEW; else **decompose** be
 2. `optimize`
   *`_` = 1*
 3. `reuse`
-  *`hit` = > agent_kb_lookup kb_dir=`kb_dir` goal=`goal` tools=`tools` *
+  *`hit` = > agent_kb_lookup kb_dir=`kb_dir` goal=`goal` tools=`tools` near_match=`near_match` near_threshold=`near_threshold` *
   1. `hit`
     *`match_kind` = > json.get value=`hit` key=match *
     1. `match_kind` == alias
@@ -1446,9 +1453,13 @@ Non-hit path: optional `soft_match=True` parent REUSE/NEW; else **decompose** be
       *`cache_label` = soft-hit*
       *`hit_slug` = > json.get value=`hit` key=slug *
       > agent_kb_add_alias kb_dir=`kb_dir` slug=`hit_slug` alias=`goal`
-    3. `match_kind` == soft
+    3. `match_kind` == near
       *`cache_label` = soft-hit*
-    4. *
+      *`hit_slug` = > json.get value=`hit` key=slug *
+      > agent_kb_add_alias kb_dir=`kb_dir` slug=`hit_slug` alias=`goal`
+    4. `match_kind` == soft
+      *`cache_label` = soft-hit*
+    5. *
       *`cache_label` = hit*
     *`lf` = > json.get value=`hit` key=llm_free *
     1. `lf`
@@ -1533,9 +1544,15 @@ Non-hit path: optional `soft_match=True` parent REUSE/NEW; else **decompose** be
         *`path` = None*
   2. *
     1. `soft_match`
-      *`listed` = > agent_kb_list_tasks kb_dir=`kb_dir` *
-      *`tasks` = > json.get value=`listed` key=tasks *
+      *`near` = > agent_kb_near_match kb_dir=`kb_dir` goal=`goal` *
+      *`tasks` = > json.get value=`near` key=candidates *
       *`tn` = > len value=`tasks` *
+      1. `tn` < 1
+        *`listed` = > agent_kb_list_tasks kb_dir=`kb_dir` *
+        *`tasks` = > json.get value=`listed` key=tasks *
+        *`tn` = > len value=`tasks` *
+      2. *
+        *`_` = 1*
       1. `tn` > 0
         *`soft_prompt` = > build_soft_match_prompt goal=`goal` tasks=`tasks` *
         *`model` = > json.get value=`self` key=model *
