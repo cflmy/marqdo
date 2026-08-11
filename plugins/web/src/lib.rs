@@ -2,6 +2,7 @@
 
 mod compose;
 mod db;
+mod form;
 mod http;
 mod render;
 mod table;
@@ -330,11 +331,90 @@ web_ffi!(web_app_new, |args: &Value| {
         "host": host,
         "port": port,
         "admin": admin,
+        "forms": {},
     }))
 });
 
+web_ffi!(web_app_mount_form, |args: &Value| {
+    let mut app = args.get("app").cloned().unwrap_or(json!({}));
+    let id = arg_str(args, "id")?.to_string();
+    let form_v = args
+        .get("form")
+        .cloned()
+        .ok_or_else(|| "missing `form`".to_string())?;
+    let obj = app.as_object_mut().ok_or_else(|| "app must be a map".to_string())?;
+    let forms = obj
+        .entry("forms".to_string())
+        .or_insert_with(|| json!({}));
+    let fmap = forms
+        .as_object_mut()
+        .ok_or_else(|| "app.forms must be a map".to_string())?;
+    fmap.insert(id, form_v);
+    Ok(app)
+});
+
+web_ffi!(web_form_new, |args: &Value| {
+    let table = arg_str_opt(args, "table");
+    let action = arg_str_opt(args, "action").unwrap_or("insert");
+    let id = arg_str_opt(args, "id");
+    Ok(form::form_new(table, action, id))
+});
+
+web_ffi!(web_form_fields, |args: &Value| {
+    let form_v = args.get("form").cloned().unwrap_or(json!({}));
+    let fields = args
+        .get("fields")
+        .cloned()
+        .ok_or_else(|| "missing `fields`".to_string())?;
+    Ok(form::set_fields(&form_v, &fields))
+});
+
+web_ffi!(web_form_rules, |args: &Value| {
+    let form_v = args.get("form").cloned().unwrap_or(json!({}));
+    let rules = args
+        .get("rules")
+        .cloned()
+        .ok_or_else(|| "missing `rules`".to_string())?;
+    Ok(form::set_rules(&form_v, &rules))
+});
+
+web_ffi!(web_form_validate, |args: &Value| {
+    let form_v = args.get("form").cloned().unwrap_or(json!({}));
+    let data = args
+        .get("data")
+        .cloned()
+        .ok_or_else(|| "missing `data`".to_string())?;
+    let rules = args.get("rules");
+    Ok(form::validate(&form_v, rules, &data))
+});
+
+web_ffi!(web_form_render, |args: &Value| {
+    let form_v = args.get("form").cloned().unwrap_or(json!({}));
+    let id = arg_str_opt(args, "id").unwrap_or("form");
+    let data = args.get("data");
+    let errors = args.get("errors");
+    Ok(Value::String(form::render(
+        &form_v,
+        id,
+        data,
+        errors,
+    )))
+});
+
+web_ffi!(web_form_submit, |args: &Value| {
+    let form_v = args.get("form").cloned().unwrap_or(json!({}));
+    let data = args
+        .get("data")
+        .cloned()
+        .ok_or_else(|| "missing `data`".to_string())?;
+    let url = db_url_of(args)?;
+    form::submit(&form_v, &data, &url)
+});
+
 web_ffi!(web_listen, |args: &Value| {
-    let (page, db_url, host, port, admin) = if args.get("page").is_some() || args.get("host").is_some()
+    use std::collections::HashMap;
+    let (page, db_url, host, port, admin, forms) = if args.get("page").is_some()
+        || args.get("host").is_some()
     {
         let page = args.get("page").cloned().unwrap_or(json!({}));
         let db_url = db_url_of(args).ok();
@@ -347,7 +427,8 @@ web_ffi!(web_listen, |args: &Value| {
             Some(Value::Bool(b)) => *b,
             _ => false,
         };
-        (page, db_url, host.to_string(), port, admin)
+        let forms = HashMap::new();
+        (page, db_url, host.to_string(), port, admin, forms)
     } else {
         let app = args.get("app").cloned().unwrap_or_else(|| args.clone());
         let page = app.get("page").cloned().unwrap_or(json!({}));
@@ -370,9 +451,15 @@ web_ffi!(web_listen, |args: &Value| {
             .get("admin")
             .and_then(|v| v.as_bool())
             .unwrap_or(false);
-        (page, db_url, host, port, admin)
+        let mut forms = HashMap::new();
+        if let Some(obj) = app.get("forms").and_then(|v| v.as_object()) {
+            for (k, v) in obj {
+                forms.insert(k.clone(), v.clone());
+            }
+        }
+        (page, db_url, host, port, admin, forms)
     };
-    http::listen(&page, db_url.as_deref(), &host, port, admin)
+    http::listen(&page, db_url.as_deref(), &host, port, admin, forms)
 });
 
 fn register(host: &MarqdoHostApi, name: &str, params: &str, fn_ptr: PluginFn) -> c_int {
@@ -430,6 +517,21 @@ pub unsafe extern "C" fn marqdo_plugin_init(host: *const MarqdoHostApi) -> c_int
             "page,db,admin,host,port",
             web_app_new as PluginFn,
         ),
+        (
+            "web_app_mount_form",
+            "app,id,form",
+            web_app_mount_form as PluginFn,
+        ),
+        ("web_form_new", "table,action,id", web_form_new as PluginFn),
+        ("web_form_fields", "form,fields", web_form_fields as PluginFn),
+        ("web_form_rules", "form,rules", web_form_rules as PluginFn),
+        (
+            "web_form_validate",
+            "form,rules,data",
+            web_form_validate as PluginFn,
+        ),
+        ("web_form_render", "form,id", web_form_render as PluginFn),
+        ("web_form_submit", "form,data,url", web_form_submit as PluginFn),
         ("web_listen", "app", web_listen as PluginFn),
     ];
     for (name, params, f) in regs {

@@ -127,30 +127,40 @@ Style tables live as `##` exports in site style modules; compose resolves them b
     + `action`=insert
     + `id`=None
 
-Form API is planned (design §5.5); first trial ships the class shell only.
+Field table + rules table; submit writes through `# db`.
 
-**`self`**
+> ensure_plugin
+**> web_form_new table=`table` action=`action` id=`id`**
 
 ## fields
     + `fields`
 
-**`self`**
+**> web_form_fields form=`self` fields=`fields`**
+
+## rules
+    + `rules`
+
+**> web_form_rules form=`self` rules=`rules`**
 
 ## validate
     + `rules`=None
     + `data`
 
-**`data`**
+**> web_form_validate form=`self` rules=`rules` data=`data`**
 
 ## render
+    + `id`=form
+    + `data`=None
+    + `errors`=None
 
-**""**
+**> web_form_render form=`self` id=`id` data=`data` errors=`errors`**
 
 ## submit
     + `data`
     + `db`
 
-**`data`**
+*`url` = > json.get value=`db` key=url *
+**> web_form_submit form=`self` data=`data` url=`url`**
 
 # app
     + `page`
@@ -168,8 +178,16 @@ Form API is planned (design §5.5); first trial ships the class shell only.
 
 **`self`**
 
+## mount_form
+    + `id`
+    + `form`
+
+Register `GET|POST /_form/{id}` for listen.
+
+**> web_app_mount_form app=`self` id=`id` form=`form`**
+
 ## listen
 
-Serve `/`, `/_part/{id}`, and optional `/admin` from the assembled page.
+Serve `/`, `/_part/{id}`, `/_form/{id}`, and optional `/admin`.
 
 **> web_listen app=`self`**

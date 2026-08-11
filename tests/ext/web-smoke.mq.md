@@ -54,6 +54,12 @@ description: Offline assemble + render markers (no listen).
 2. *
   > print text=compose-nav-fail
 
+*`side` = > json.get value=`page` key=sidebar *
+1. `side`
+  > print text=compose-side-ok
+2. *
+  > print text=compose-side-fail
+
 *`css` = > json.get value=`page` key=styles_css *
 1. `css`
   > print text=styles-ok

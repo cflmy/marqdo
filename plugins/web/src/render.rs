@@ -3,7 +3,7 @@
 use serde_json::{Map, Value};
 
 use crate::db;
-use crate::table::{as_bind, normalize_slot, project_rows};
+use crate::table::{as_bind, normalize_ref, normalize_slot, parse_site_path, project_rows, SitePath};
 
 fn esc(s: &str) -> String {
     s.replace('&', "&amp;")
@@ -30,6 +30,33 @@ fn class_attr(css: &str) -> String {
     }
 }
 
+fn is_simple_ident(s: &str) -> bool {
+    !s.is_empty()
+        && s.chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '_' || !c.is_ascii())
+}
+
+/// True when `back` is a DB field path (`table.col` / `mod.table.col`), not a URL or site path.
+fn is_db_bind_back(back: &str) -> bool {
+    let s = normalize_ref(back);
+    if s.is_empty()
+        || s.contains("://")
+        || s.starts_with('/')
+        || s.starts_with('#')
+        || s.starts_with('?')
+    {
+        return false;
+    }
+    match parse_site_path(&s) {
+        SitePath::DbField { .. } => true,
+        SitePath::LibMember { lib, member } => is_simple_ident(&lib) && is_simple_ident(&member),
+        SitePath::Plain(p) => {
+            let parts: Vec<&str> = p.split('.').filter(|x| !x.is_empty()).collect();
+            parts.len() == 2 && parts.iter().all(|x| is_simple_ident(x))
+        }
+    }
+}
+
 fn resolve_links(raw: Option<&Value>, db_url: Option<&str>) -> Vec<(String, String)> {
     let Some(raw) = raw else {
         return Vec::new();
@@ -39,11 +66,9 @@ fn resolve_links(raw: Option<&Value>, db_url: Option<&str>) -> Vec<(String, Stri
     if arr.is_empty() {
         return Vec::new();
     }
-    let has_db = arr.iter().any(|b| {
-        b.get("back")
-            .and_then(|v| v.as_str())
-            .is_some_and(|s| s.contains('.'))
-    });
+    let has_db = arr
+        .iter()
+        .any(|b| b.get("back").and_then(|v| v.as_str()).is_some_and(is_db_bind_back));
     if has_db {
         let Some(url) = db_url else {
             return Vec::new();
@@ -80,7 +105,7 @@ fn resolve_links(raw: Option<&Value>, db_url: Option<&str>) -> Vec<(String, Stri
         }
         return out;
     }
-    // static: front=label back=href
+    // static: front=label back=href (URLs with `.` must stay here)
     arr.into_iter()
         .map(|b| {
             let label = b.get("front").map(text).unwrap_or_default();
