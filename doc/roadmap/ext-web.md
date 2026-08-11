@@ -14,7 +14,7 @@
 
 ## 1. 目标回顾（一句）
 
-官方模板分钟级拉起带 **后台** 的网站；导航/库表用 **GFM 表**；前后端用 **赋值式绑定**；热路径进 **ABI 插件**；可选 S3 / Redis。
+**表格完成动态站**：页面表拼组件、组件表绑库与样式、样式表定外观；热路径进 ABI 插件；可选 S3 / Redis。人写目标见设计 §0.1 与 `examples/man-write-site/`。
 
 ---
 
@@ -26,6 +26,7 @@
 | **W1** | env 端口；`page` 四栏；nav 表；static | **done** |
 | **W2** | SQLite `define`/`migrate`/`all` | **done** |
 | **W3** | 三列绑定；变量名即表名；`/admin` CRUD+日志+布局 | **done**（登录鉴权仍简） |
+| **W3.5** | 人写面首版：`web.assemble` + `` `表`.`字段` `` + `examples/man-write-site` | **done**（编排袋仍可再瘦） |
 | **W4** | Postgres；Redis / S3 驱动 | pending |
 
 验收金样：`tests/ext/web-smoke.mq.md`、`ext_cli_add_web`。

@@ -1,104 +1,75 @@
 ---
-title: ext/web smoke (offline)
-description: Variable-name tables + page region methods.
+title: web assemble smoke
+description: Offline assemble + render markers (no listen).
 > ext/web/web.mq.md
+> web-fixtures/styles/shell.mq.md as shell
+> web-fixtures/components/nav.mq.md as nav
+> web-fixtures/components/side.mq.md as side
+> web-fixtures/components/foot.mq.md as foot
+> web-fixtures/db/articles.mq.md as articles
+> lib/fs.mq.md
 > lib/json.mq.md
-> lib/sys.mq.md
 ---
 
 # main
 
-> web.ensure_plugin
-
-`nav` =
-
-| 前端变量 | 后端数据库 | 绑定css样式 |
-|----------|------------|-------------|
-| 首页 | / | |
-| 文档 | /docs | |
-
-*`links` = > web.as_links table=`nav` *
-*`ln` = > len value=`links` *
-1. `ln` == 2
-  > print text=nav-ok
-2. *
-  > print text=nav-bad
-
-- [`项`](`links`)
-  *`名` = > json.get value=`项` key=label *
-  > print text=`名`
-
-*`binds` = > web.as_bind table=`nav` *
-*`bn` = > len value=`binds` *
-1. `bn` == 2
-  > print text=bind-ok
-2. *
-  > print text=bind-bad
-
-*`page` = > web.page title=Smoke *
-*`page` = > `page`.nav table=`nav` *
-*`html` = > `page`.render *
-*`parts` = > split value=`html` sep=首页 *
-*`n` = > len value=`parts` *
-1. `n` > 1
-  > print text=render-ok
-2. *
-  > print text=render-bad
-
-*`dir` = > sys.env_get name=TMPDIR *
-1. `dir`
+*`store` = > web.db url="sqlite:web-fixtures/data/smoke.db" *
+*`fields` = > articles.schema *
+> `store`.init name=articles fields=`fields`
+*`rows` = > `store`.select table=articles limit=1 *
+1. `rows`
   *`_` = 1*
 2. *
-  *`dir` = /tmp *
-*`slash` = > json.parse text={"a":"/mq-web-gold-"} *
-*`a` = > json.get value=`slash` key=a *
-*`pid` = > sys.env_get name=USER *
-*`dbpath` = `dir` + `a` + `pid` + ".db" *
-*`url` = "sqlite:" + `dbpath` *
-*`db` = > web.db url=`url` *
+  *`seed` = > articles.seed *
+  > `store`.insert table=articles rows=`seed`
 
-`articles` =
+`home` =
 
-| 字段 | 类型 | 可空 |
-|------|------|------|
-| id | integer | false |
-| title | text | false |
+| 组件 | 样式 |
+|------|------|
+| nav.`nav` | shell.`topnav` |
+| side.`side` | shell.`side_panel` |
+| foot.`foot` | |
 
-*`articles` = > `db`.init name=articles fields=`articles` *
+`index` =
 
-`种子` =
+| 属性 | 值 | 样式 |
+|------|-----|------|
+| `title` | articles.`articles`.title | shell.`card_title` |
+| `body` | articles.`articles`.body | shell.`card_body` |
 
-| @ | title |
-|---|-------|
-| 1 | hello |
+*`page` = > web.page title="smoke" intro="<h1>smoke</h1>" *
+*`page` = > `page`.compose_components components=`home` *
+*`page` = > `page`.compose_main main=`index` *
+*`html` = > `page`.render db=`store` *
 
-> `db`.insert table=`articles` rows=`种子`
-
-`主体` =
-
-| 前端变量 | 后端数据库 | 绑定css样式 |
-|----------|------------|-------------|
-| title | title | card-title |
-
-*`page` = > web.page title=Smoke db_url=`url` *
-*`page` = > `page`.nav table=`nav` *
-*`page` = > `page`.main table=`articles` bind=`主体` intro="<h1>Smoke</h1>" *
-*`html2` = > `page`.render *
-*`parts2` = > split value=`html2` sep=hello *
-*`n2` = > len value=`parts2` *
-1. `n2` > 1
-  > print text=live-ok
+1. `html`
+  > print text=render-ok
 2. *
-  > print text=live-bad
+  > print text=render-fail
 
-*`文章` = > `db`.follow table=`articles` *
-*`page` = > web.page title=Smoke *
-*`page` = > `page`.nav table=`nav` *
-*`page` = > `page`.follow name=main live=`文章` *
-*`html3` = > `page`.render *
-*`parts3` = > split value=`html3` sep=hello *
-*`n3` = > len value=`parts3` *
-1. `n3` > 1
-  > print text=follow-ok
+*`nav` = > json.get value=`page` key=nav *
+1. `nav`
+  > print text=compose-nav-ok
 2. *
-  > print text=follow-bad
+  > print text=compose-nav-fail
+
+*`css` = > json.get value=`page` key=styles_css *
+1. `css`
+  > print text=styles-ok
+2. *
+  > print text=styles-fail
+
+*`parts` = > json.get value=`page` key=parts *
+*`index_part` = > json.get value=`parts` key=index *
+1. `index_part`
+  > print text=compose-ok
+2. *
+  > print text=compose-fail
+
+*`got` = > `store`.get table=articles id=1 *
+*`title` = > json.get value=`got` key=title *
+1. `title` == "Hello Marqdo"
+  > print text=db-ok
+2. *
+  > print text=db-fail

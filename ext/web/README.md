@@ -20,3 +20,5 @@ marqdo ext add web
 ```
 
 Scaffold: `> web.scaffold dest=./myapp`
+
+Multipage site pack (compose + table CSS + `/_part`): see [`examples/web-site/`](../../examples/web-site/).

@@ -28,6 +28,8 @@ pub struct Interpreter {
     input: InputFeed,
     host: HostContext,
     debug: Option<Arc<DebugController>>,
+    /// Entry module pointer for `host_query("call_lib_path")` while plugins run.
+    site_module: Option<*const Module>,
 }
 
 struct Env {
@@ -50,7 +52,7 @@ impl Env {
     }
 }
 
-enum EvArg {
+pub(crate) enum EvArg {
     Positional(Value),
     Named(String, Value),
 }
@@ -66,6 +68,7 @@ impl Interpreter {
             input: InputFeed::new(false, Vec::new()),
             host: HostContext::for_run(path, Default::default(), Vec::new()),
             debug: None,
+            site_module: None,
         }
     }
 
@@ -79,6 +82,7 @@ impl Interpreter {
             input: InputFeed::new(true, Vec::new()),
             host: HostContext::for_capture(path, Default::default()),
             debug: None,
+            site_module: None,
         }
     }
 
@@ -140,19 +144,70 @@ impl Interpreter {
     }
 
     pub fn run_module(&mut self, module: &Module) -> Result<Value> {
-        if let Some(main) = find_top(module, "main") {
-            return self.run_function(module, main, Env::new(), &[]);
-        }
-        // Document-as-entry: sole top-level `#` object with no params (e.g. `# Hello World`).
-        let entries: Vec<&Function> = module
-            .functions
-            .iter()
-            .filter(|f| f.is_object() && f.params.is_empty())
+        let prev = self.site_module;
+        self.site_module = Some(module as *const Module);
+        let result = (|| {
+            if let Some(main) = find_top(module, "main") {
+                return self.run_function(module, main, Env::new(), &[]);
+            }
+            // Document-as-entry: sole top-level `#` object with no params (e.g. `# Hello World`).
+            let entries: Vec<&Function> = module
+                .functions
+                .iter()
+                .filter(|f| f.is_object() && f.params.is_empty())
+                .collect();
+            if entries.len() == 1 {
+                return self.run_function(module, entries[0], Env::new(), &[]);
+            }
+            bail!("no `# main` object to run");
+        })();
+        self.site_module = prev;
+        result
+    }
+
+    /// Resolve `lib.member` on the site (entry) module — used by ABI `call_lib_path`.
+    pub(crate) fn call_site_lib_path(&mut self, path: &str) -> std::result::Result<Value, String> {
+        let site = self
+            .site_module
+            .ok_or_else(|| "call_lib_path: no site module".to_string())?;
+        let site = unsafe { &*site };
+        let parts: Vec<String> = path
+            .split('.')
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
             .collect();
-        if entries.len() == 1 {
-            return self.run_function(module, entries[0], Env::new(), &[]);
+        if parts.len() < 2 {
+            return Err(format!(
+                "call_lib_path: need `lib.member`, got `{path}`"
+            ));
         }
-        bail!("no `# main` object to run");
+        self.eval_path_call(site, &parts, &[])
+            .map_err(|e| e.to_string())
+    }
+
+    fn call_plugin_registered(
+        &mut self,
+        name: &str,
+        bound: &HashMap<String, Value>,
+    ) -> std::result::Result<Value, String> {
+        struct HookData {
+            interp: *mut Interpreter,
+        }
+        fn trampoline(data: *mut (), path: &str) -> std::result::Result<Value, String> {
+            let data = unsafe { &mut *(data as *mut HookData) };
+            let interp = unsafe { &mut *data.interp };
+            interp.call_site_lib_path(path)
+        }
+        let mut data = HookData {
+            interp: self as *mut Interpreter,
+        };
+        let hook = crate::host::plugin::LibPathCall {
+            call: trampoline,
+            data: &mut data as *mut HookData as *mut (),
+        };
+        crate::host::plugin::with_lib_path_call(hook, || {
+            crate::host::plugin::call_registered(&self.host, name, bound)
+        })
     }
 
     fn run_function(
@@ -636,7 +691,8 @@ impl Interpreter {
 
         if let Some(reg) = self.host.plugins.get(&call.callee).cloned() {
             let bound = bind_args(&reg.params, &ev_args, false).map_err(|m| self.err(m))?;
-            return crate::host::plugin::call_registered(&self.host, &call.callee, &bound)
+            return self
+                .call_plugin_registered(&call.callee, &bound)
                 .map_err(|m| self.err(m));
         }
 
@@ -662,7 +718,7 @@ impl Interpreter {
     }
 
     /// Resolve bare path `lib.member` / `lib.Type.member` (definition-tree addressing).
-    fn eval_path_call(
+    pub(crate) fn eval_path_call(
         &mut self,
         module: &Module,
         path: &[String],

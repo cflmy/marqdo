@@ -1,543 +1,600 @@
-# 官方扩展：`ext/web` 便捷网站（锁定设计）
+# 官方扩展：`ext/web` 动态网站
 
 | | |
 |---|---|
-| 状态 | **Accepted（W0–W3 已开工落地；W4 Postgres/Redis/S3 驱动待）** |
+| 状态 | **Accepted · 实现中**（旧实现已清空，按本文从零开发） |
 | 日期 | 2026-08-11 |
-| 相关 | [ext-cli.md](ext-cli.md) · [ext-abi.md](ext-abi.md) · [ext-llm.md](ext-llm.md) · [objects.md](objects.md) · [markdown-mapping.md](markdown-mapping.md) §9 · [user-site.md](user-site.md) · [roadmap/ext-web.md](../roadmap/ext-web.md) · [roadmap/tables-maps-footnotes.md](../roadmap/tables-maps-footnotes.md) |
-| 安装 | `marqdo ext add web`（中英：`web` / `网页`） |
-| 核心目标 | **让用户用官方模板在分钟级拉起带后台的网站**；自定义走表格与赋值绑定，而不是传统路由/REST 堆叠 |
+| 相关 | [markdown-mapping.md](markdown-mapping.md) · [module-namespace.md](module-namespace.md) · [objects.md](objects.md) · [ext-abi.md](ext-abi.md) · [ext-cli.md](ext-cli.md) · [stdlib-i18n.md](stdlib-i18n.md) |
+| 安装（目标） | `marqdo ext add web`（中英：`web` / `网页`） |
+| 本文目的 | 锁定**作者面**与**类 API**；指导实现 |
 
 ---
 
 ## 0. 一句话
 
-`ext/web` 不是「又一个微框架」。它是一组 **Marqdo 对象类**（页面壳、库表、绑定、可选对象存储与 Redis），热路径进 **ABI v2 插件** `plugins/web`，与 llm/agent 一样用 **`marqdo ext`** 安装；用户写的是字典/列表表格与赋值式绑定，插件负责异步 HTTP、SQL、迁移与存储驱动。
+`ext/web` 用 **GFM 表格 + Marqdo 类方法** 描述动态网站：表仍是字典/列表嵌套；类方法把表装配成可渲染页面。  
+**不改 Marqdo 核心语法**；扩展库存在的理由，正是让「文档即代码」在网站场景下成立。
 
 ---
 
-## 1. 动机与原则
+## 1. 为何要做网络扩展库
 
-### 1.1 动机
+### 1.1 问题
 
-今日有静态站（[`public/`](../../public/)、[user-site.md](user-site.md)）与客户端 HTTPS（[`lib/net`](stdlib-modules.md)），但没有一等**动态网站**扩展。用户需要：
+若没有专用扩展，作者只能：
 
-1. 官方模板一键出站（含**后台管理面板**）。  
-2. 导航 / 侧栏 / 页脚用 **GFM 表**改，不用手写组件树。  
-3. 表结构用 **字典 + 列表表**声明，开发中可迁移。  
-4. 前后端数据用 **赋值式绑定**，取消繁复接口层。  
-5. 可选对象存储、Redis；连接信息进 `.env`（与大模型同一套 dotenv 习惯）。  
-6. 网络层允许异步（性能），但对作者保持简洁表面。
+- 手写 JSON 袋、`json.set` 拼装组件/样式；或  
+- 要求改语言（让表格单元格求值、点号取值等）。
 
-### 1.2 设计原则
+二者都破坏 Marqdo 的「代码即文档」。
 
-| 原则 | 含义 |
-|------|------|
-| **模板优先** | 默认路径 = scaffold → 改表 → 跑起来；自定义是覆盖槽位，不是从零搭 |
-| **类驱动** | 能力以 `#` 对象暴露（`page` / `db` / `bind` / `store` / `cache` / `app`），中英双面 |
-| **表即配置** | 导航、路由、schema、后台菜单优先表格几何（见 §5） |
-| **赋值即绑定** | 前端槽位 ← 后端查询，用语句赋值；不强制 REST/OpenAPI |
-| **插件热路径** | listen / SQL / migrate / S3 / Redis 在 `plugins/web`；`ext/web/**` 不调 `host_*` |
-| **dotenv 一致** | `## load_env` → `sys.load_dotenv`；不覆盖已有进程环境；密钥不入库 |
-| **可关可选件** | 对象存储、Redis **非必需**；缺配置则相关对象构造失败信息明确，站点仍可只靠 SQLite 跑 |
+### 1.2 答案
 
-### 1.3 非目标（本设计波次）
+在 **`ext/web/web.mq.md`（英文）** 与 **`ext/web/网页.mq.md`（中文）** 中各提供一套 **`#` 类**：
 
-- 完整 ORM / GraphQL / 微服务治理 / 多租户 SaaS 平台  
-- 在核心 `src/host` 固化 Web 框架（逻辑只进 `ext/` + `plugins/`）  
-- 与 `marqdo view` 调试 UI 合并为同一产品（可日后互链）  
-- 第三方扩展市场  
-- 强制用户提交 `.env`
+- 作者只写**表** + **少量实例方法调用**；  
+- 表单元格保持**字面量**；  
+- **寻址字符串**由类方法解析；  
+- **导入英文文件 → 只用英文 API；导入中文文件 → 只用中文 API**（见 [stdlib-i18n.md](stdlib-i18n.md)）。
+
+### 1.3 硬约束（评审锁定）
+
+| # | 约束 |
+|---|------|
+| C1 | **禁止**为 web 改动 Marqdo 核心：单元格求值、import、点号值读取等保持不变 |
+| C2 | 作者面**禁止** `json.parse` / `json.set` 袋胶水、手写 part JSON、手写 assemble 袋 |
+| C3 | 能力以 **`#` 类 + `##` 方法** 暴露；**英文库文件只用英文名，中文库文件只用中文名**（见 [stdlib-i18n.md](stdlib-i18n.md)）；同一 `.mq.md` 内禁止中英 API 混排 |
+| C4 | 首页在 **`index.mq.md`**：页面表在此；可复用片段进 `components/`；主体可就地写 |
+| C5 | **旧有网络扩展库全部废弃**：`plugins/web`、`ext/web/**`（含现网示例/gold 中依赖旧 API 者）评审通过后**删除或清空后重写**；禁止在旧代码上打补丁演进 |
+| C6 | `# db` / `# 数据库` 必须提供完整**增删改查**；列表查询英文方法名为 **`select`**（中文 **`查询`**）；后台 `/admin` 与表单提交走同一套写库 API |
+| C7 | 用户输入经 `# form` / `# 表单`：字段表 + 校验表；**服务端校验必须在写库前执行**（见 §5.5） |
 
 ---
 
-## 2. 布局、安装与导入
-
-### 2.1 仓库布局
-
-```text
-ext/
-  web/
-    web.mq.md              # 英文 L1
-    网页.mq.md              # 中文 L1
-    templates/
-      starter/             # 官方快速启动模板（含后台）
-        app.mq.md
-        admin.mq.md
-        .env.example
-        migrations/
-        static/
-          theme.css
-    README.md              # 短用法（指向本文）
-plugins/
-  web/
-    Cargo.toml             # marqdo_plugin_web，cdylib name = web
-    src/
-      lib.rs               # ABI init / 注册
-      http.rs              # 异步 HTTP
-      db.rs                # SQL + migrate
-      store.rs             # 对象存储（可选）
-      cache.rs             # Redis（可选）
-      admin.rs             # 后台元数据 → CRUD 页面
-```
-
-### 2.2 CLI（对齐 [ext-cli.md](ext-cli.md)）
-
-```text
-marqdo ext list
-marqdo ext add web
-marqdo ext remove web
-```
-
-实现：在 [`src/ext_cli.rs`](../../src/ext_cli.rs) `CATALOG` 增加：
-
-| 字段 | 值 |
-|------|-----|
-| `id` | `web` |
-| `mq_files` | `web/web.mq.md`, `web/网页.mq.md`（及需要一并安装的 `templates/` 树） |
-| `native_crate` | `Some("marqdo_plugin_web")` |
-
-安装根：`MARQDO_EXT` 或 `~/.marqdo/ext`。产物：
-
-- `{root}/web/*.mq.md` + `templates/`  
-- `{root}/native/libweb.so`（或 `.dylib` / `.dll`）  
-- `{root}/web.plugin` 路径提示  
-
-插件解析顺序同 agent：`web.plugin` → `native/libweb.*` → `MARQDO_WEB_PLUGIN` → `CARGO_TARGET_DIR/{debug,release}/` → …
-
-### 2.3 脚手架（快速启动）
-
-```text
-marqdo web new myapp --theme=starter
-```
-
-或纯 Marqdo：
-
-```markdown
-> web.scaffold dest=./myapp theme=starter
-```
-
-产出目录（锁定）：
+## 2. 作者心智与目录
 
 ```text
 myapp/
-  index.mq.md          # # main → load_env → migrate → listen
-  admin.mq.md          # 后台入口（可被模板页挂进侧栏）
-  .env.example
-  migrations/
-    001_init.sql       # 由声明式 schema 生成或手写起步
-  static/
-    theme.css
-  data/                # gitignore；SQLite 默认路径
+  index.mq.md              # 入口 + 首页：页面表 +（可选）就地主体表 + 类方法 + listen
+  pages/                   # 子页：同形的页面表（导出布局表或由入口再装配）
+  components/              # 可复用组件：导出与路径同名的 ##，体为 |属性|值|样式|
+  styles/                  # 样式模块：每个样式一个 ##，体为 |属性|值|
+  db/                      # 库：schema 表 +（可选）open/种子
+  data/                    # sqlite 等运行时数据（gitignore）
 ```
 
-验收口径：**复制模板、填 `.env`、`marqdo run index.mq.md`，浏览器打开即见前台 + `/admin` 后台。**
+| 表种 | 列 | 一句话 |
+|------|-----|--------|
+| **页面表** | `组件` \| `样式` | 本页用哪些组件、各套哪套样式 |
+| **组件 / 主体表** | `属性` \| `值` \| `样式` | 前端属性 ↔ 取值（库字段或字面量）↔ 样式名 |
+| **样式表** | `属性` \| `值` | CSS 声明 |
+| **库结构表** | `字段` \| `类型` \| `可空` | schema |
 
-### 2.4 导入
+---
+
+## 3. 表内寻址约定（单元格仍是字符串）
+
+单元格**不求值**。下列写法是 **web 扩展约定的路径文本**，由 `# 页面` / `# 样式` / `# 数据库` 的方法解析。
+
+### 3.1 反引号与裸名
+
+| 含义 | 写法 | 例 |
+|------|------|-----|
+| 要「去导入树 / 定义里解析」的名字 | 反引号 `` `名` `` | `` `nav` ``、`` `title` ``、`` `topnav` ``、`` `articles` ``（表名） |
+| 字面量（文案、URL、CSS 属性名/值、SQL 类型、**列名**） | **裸**或 `"…"` | `首页`、`/about`、`font-size`、`integer`、`title`（作为列名时） |
+
+### 3.2 路径形态（锁定）
+
+| 场景 | 形态 | 例 | 方法内语义 |
+|------|------|-----|------------|
+| 引用导入模块的导出 | `模块.`导出`` | `nav.`nav``、`shell.`topnav`` | 在**站点入口模块**的 import 树上调用 `模块.导出`（零参 `##`），取回表 Value |
+| 引用库字段 | `模块.`表`.列` | `articles.`articles`.title` | 模块名 = 命名空间（对应导入的 db 文件）；`` `表` `` = 库表名；**列名裸写**（列不是变量）→ 运行时绑定 `表.列` |
+| 前端属性名 | `` `title` `` | 组件表「属性」列 | 解析为字段名 `title` |
+| 样式引用 | 同「模块.导出」或纯样式名 | `shell.`card-title`` | 取回 `|属性|值|` 表并编译为 CSS 类 |
+
+**刻意不做的事：**
+
+- 不把「组件变量名」魔法等同于「库表名」；  
+- 不要求作者写 `json.set` 才能把 `nav` 放进袋；  
+- 不把 `articles.`articles`.title` 做成语言级表达式。
+
+### 3.3 与模块命名空间的关系
+
+- 库名来自 frontmatter 导入（茎名或 `as`），**裸名**，见 [module-namespace.md](module-namespace.md)。  
+- `nav.`nav`` 中：前段 `nav` = 导入库名；`` `nav` `` = 该库上的 `## nav` 导出。  
+- 组件/样式文件应导出 **与路径第二段同名的 `##`**，直接返回表（不要 `## bag` / `## bind` 袋）。
+
+---
+
+## 4. 规范示例：`index.mq.md`（作者面唯一样板）
+
+**语言与导入绑定（锁定，纠正手写混用）：**
+
+| 导入 | 库名（默认茎） | 类 / 方法 / 形参 |
+|------|----------------|------------------|
+| `> ext/web/web.mq.md` | `web` | **仅英文**：`page` · `compose_components` · `db` · `app` · `components=` … |
+| `> ext/web/网页.mq.md` | `网页` | **仅中文**：`页面` · `组件装配` · `数据库` · `应用` · `组件=` … |
+
+禁止：`> ext/web/web.mq.md` 后写 `web.页面` / `` `页`.组件装配 ``（英文库混中文成员）。  
+禁止：在 `web.mq.md` 文件内定义中文 `## 组件装配` 别名。中英对等靠**两个文件**，不靠同一文件双份导出。
+
+### 4.1 英文面（导入 `web.mq.md`）
 
 ```markdown
 ---
+title: web-site
+description: Home = page table; main may be inline; class methods assemble.
 > ext/web/web.mq.md
----
-```
-
-中文：`> ext/web/网页.mq.md`。
-
-L1 启动时：
-
-```markdown
-*`p` = > plugin.native_path name=web *
-> plugin.load path=`p`
-```
-
-无插件时错误文案与 agent 一致（提示 `cargo build -p marqdo_plugin_web` / `marqdo ext add web`）。
-
+> styles/shell.mq.md
+> components/nav.mq.md
+> components/side.mq.md
+> components/foot.mq.md
+> db/articles.mq.md
+> db/index.mq.md as db
 ---
 
-## 3. 对象模型（类）
-
-全部为 `#` 对象 + `##` 方法；中英成对。英文名稳定进插件注册前缀 `web_*`；中文为 L1 别名面。
-
-| 英文类 | 中文类 | 职责 |
-|--------|--------|------|
-| `# app` | `# 应用` | 组合页面/库/绑定；`listen`；挂静态与后台 |
-| `# page` | `# 页面` | 壳布局：顶栏 / 侧栏 / 主体 / 底栏 |
-| `# db` | `# 数据库` | 连接、声明表、migrate、查询/写入 |
-| `# bind` | `# 绑定` | 记录「前端槽位 ← 后端源」；服务时求值 |
-| `# store` | `# 对象存储` | 可选 S3 兼容上传/下载/URL |
-| `# cache` | `# 缓存` | 可选 Redis get/set/expire |
-
-继承：用户可用 `# MyPage = > page` 覆盖 `## render` 等（见 [objects.md](objects.md) §5）；官方模板示范覆盖主体栏。
-
-```mermaid
-flowchart LR
-  env[".env"] --> app
-  env --> db
-  env --> store
-  env --> cache
-  page --> app
-  db --> bind
-  bind --> page
-  store --> app
-  cache --> app
-  app --> http["plugins/web async HTTP"]
-  db --> sql["plugins/web SQL"]
-  app --> admin["/admin panel"]
-```
-
----
-
-## 4. `.env` 配置（与 LLM 同惯例）
-
-### 4.1 加载
-
-```markdown
-> web.load_env path=.env
-```
-
-实现：`## load_env` → `sys.load_dotenv`（不覆盖已有环境变量）。路径相对**源文件目录**（与 `ext/ai/llm` 一致）。
-
-### 4.2 键名（锁定）
-
-```env
-# —— HTTP（必填意图：有默认）——
-MARQDO_WEB_HOST=127.0.0.1
-MARQDO_WEB_PORT=8080
-# 可选：对外 URL（对象存储签名、后台链接）
-MARQDO_WEB_PUBLIC_URL=http://127.0.0.1:8080
-
-# —— 关系库（默认 SQLite）——
-DATABASE_URL=sqlite:./data/app.db
-# DATABASE_URL=postgres://user:pass@127.0.0.1:5432/mydb
-
-# —— Redis（可选）——
-# REDIS_URL=redis://127.0.0.1:6379/0
-# 或
-# MARQDO_REDIS_URL=redis://127.0.0.1:6379/0
-
-# —— 对象存储 S3 兼容（可选）——
-# MARQDO_S3_ENDPOINT=https://s3.amazonaws.com
-# MARQDO_S3_REGION=us-east-1
-# MARQDO_S3_BUCKET=my-bucket
-# MARQDO_S3_ACCESS_KEY=
-# MARQDO_S3_SECRET_KEY=
-# MARQDO_S3_PUBLIC_BASE=https://cdn.example.com   # 可选公开读基址
-```
-
-规则：
-
-| 类别 | 缺失时 |
-|------|--------|
-| HTTP | 默认 `127.0.0.1:8080` |
-| `DATABASE_URL` | 默认 `sqlite:./data/app.db`（相对项目目录） |
-| Redis / S3 | **不构造**对应对象；`# cache` / `# store` 返回明确 `configured=false`；站点其它部分仍可用 |
-
-前缀：`MARQDO_WEB_*` / `MARQDO_S3_*` / `MARQDO_REDIS_*` 避免与 `OPENAI_*` 冲突；`DATABASE_URL` / `REDIS_URL` 为业界通名别名（读取时优先进程已有值）。
-
----
-
-## 5. 表格即配置（字典 + 列表）
-
-沿用已落地表格几何（[tables-maps-footnotes.md](../roadmap/tables-maps-footnotes.md)）：
-
-| 几何 | 运行时 | 在 web 中的用途 |
-|------|--------|-----------------|
-| 1 列竖表 | `List` | 简单菜单项、角色名 |
-| ≥2 列 + 多行且首列表头为 `@`/`行`/`row` | `List` of `Map` | **导航 / 侧栏 / 底栏 / schema 字段行** |
-| ≥2 列字典表 | `Map` | 主题色、功能开关 |
-
-### 5.1 页面壳与主体：先对象，再方法绑定
-
-```markdown
-`nav` = | 前端变量 | 后端数据库 | 绑定css样式 | …
-
-`articles` = | 字段 | 类型 | 可空 | …
-
-*`db` = > web.db *
-*`articles` = > `db`.init name=articles fields=`articles` *
-
-`主体` = | 前端变量 | 后端数据库 | 绑定css样式 | …
-
-*`page` = > web.page title=Demo *
-*`page` = > `page`.nav table=`nav` *
-*`page` = > `page`.main table=`articles` bind=`主体` layout=cards
-```
-
-**变量名即表名：** `` `articles` `` 先是结构表，再被 `init name=articles fields=`articles`` 收成 `{_type:db_table,name:articles}` 句柄；之后 `` table=`articles` `` 处处可读。框架**无**默认表名。
-
-### 5.2 数据库：表结构 = GFM 表
-
-```markdown
-`帖子结构` =
-
-| 字段 | 类型 | 可空 |
-|------|------|------|
-| id | integer | false |
-| title | text | false |
-| body | text | true |
-
-*`库` = > web.db *
-> `库`.define table=posts fields=`帖子结构` primary=id
-> `库`.migrate
-```
-
-列名别名：`字段`/`name`/`列`；`类型`/`type`；`可空`/`null`；可选 `默认`/`唯一`。
-
-行为锁定：
-
-1. `define` 经 `as_fields` 吃表格，再 `CREATE TABLE IF NOT EXISTS`。  
-2. `migrate`：对照 `_marqdo_migrations`，应用 `migrations/*.sql`。  
-3. 默认 SQLite；Postgres 仍属 W4。
-
-### 5.3 后台菜单
-
-`admin=True` 时自动枚举库中用户表，每张表支持 **增删改查**（列表 / New / Edit / Delete），写入自动记入 `_marqdo_admin_log`（`/admin/log` 可查）。
-
----
-
-## 6. L1 API 外形（锁定草稿）
-
-### 6.1 `# page` / `# 页面`
-
-| 方法 / 参数 | 含义 |
-|------|------|
-| `## nav` / `## sidebar` / `## footer` | `table=` 为三列绑定表 |
-| `## main` | `table=` 为 `db_table` 句柄（或裸名），`bind=` 为列绑定表 |
-| `intro=` / `layout=` | 构造或 `main` 时可设 |
-| `## render` | 求值绑定 + 默认主题 HTML |
-
-### 6.2 `# db` / `# 数据库`
-
-| 方法 | 含义 |
-|------|------|
-| `## init` | `name=` + `fields=`（GFM 结构）；返回 `db_table` 句柄；**变量名应与 name 相同** |
-| `## define` | `init` 别名（`table=` 可为句柄） |
-| `## follow` / `## all` / `## insert` | `table=` 接受句柄或裸名 |
-| `## migrate` / `## query` | 同前 |
-
-### 6.3 绑定 = 变量名即表名 + 三列表
-
-```markdown
-`articles` =
-
-| 字段 | 类型 | 可空 |
-|------|------|------|
-| id | integer | false |
-| title | text | false |
-
-*`db` = > web.db *
-*`articles` = > `db`.init name=articles fields=`articles` *
-
-`主体` =
-
-| 前端变量 | 后端数据库 | 绑定css样式 |
-|----------|------------|-------------|
-| title | title | card-title |
-
-*`页` = > web.page title=站 *
-*`页` = > `页`.main table=`articles` bind=`主体` layout=cards *
-```
-
-插入仍用 GFM 行表：`` > `库`.insert table=`articles` rows=`种子` ``。
-
-### 6.4 `# store` / `# 对象存储`（可选）
-
-| 方法 | 含义 |
-|------|------|
-| 构造 | 读 `MARQDO_S3_*`；未配置 → `ok=false` |
-| `## put` | `key=` `path=` 或 `bytes=` |
-| `## get_url` | 公开基址或预签名 |
-| `## delete` | 删对象 |
-
-后台「媒体」页在配置存在时显示上传；否则隐藏。
-
-### 6.5 `# cache` / `# 缓存`（可选）
-
-| 方法 | 含义 |
-|------|------|
-| 构造 | 读 `REDIS_URL` / `MARQDO_REDIS_URL` |
-| `## get` / `## set` | `key=` `value=` `ttl=` |
-| `## delete` | |
-
-用于绑定结果缓存、会话票（v1 会话可先 cookie + 服务端 map，Redis 为加速路径）。
-
-### 6.6 `# app` / `# 应用`
-
-```markdown
 # main
 
-> web.load_env path=.env
-*`p` = > plugin.native_path name=web *
-> plugin.load path=`p`
+`home` =
 
-*`db` = > web.db *
-> `db`.init
-*`page` = > web.page theme=starter nav=`nav` sidebar=`side` footer=`foot` *
-*`bind` = > web.bind page=`page` db=`db` *
-> `bind`.set slot=main.items source=posts
+| 组件 | 样式 |
+|------|------|
+| nav.`nav` | shell.`topnav` |
+| side.`side` | shell.`side-panel` |
+| foot.`foot` | |
 
-*`app` = > web.app page=`page` bind=`bind` db=`db` admin=True *
-> `app`.static dir=./static
+Main content is not a reusable component, so it is authored here.
+
+`index` =
+
+| 属性 | 值 | 样式 |
+|------|-----|------|
+| `title` | articles.`articles`.title | shell.`card-title` |
+| `body` | articles.`articles`.body | shell.`card-body` |
+
+*`store` = > db.open *
+*`page` = > web.page title="Marqdo Web Site" intro="<h1>Web Site</h1>" *
+*`page` = > `page`.compose_components components=`home` *
+*`page` = > `page`.compose_main main=`index` *
+*`app` = > web.app page=`page` db=`store` admin=True host=127.0.0.1 port=18081 *
 > `app`.listen
 ```
 
-| 方法 | 含义 |
-|------|------|
-| `## static` | 挂静态目录 |
-| `## mount` | `path=` `page=` 额外页面 |
-| `## listen` | 阻塞当前 `# main`：内部跑**异步**运行时直到进程结束 |
-| `## admin` | `True` 时挂载 `/admin`（默认 True 于 starter） |
+说明：表头列名可用中文（`组件`/`样式`/`属性`/`值`）——那是**表约定词汇**，不是库成员名；库成员必须与导入语言一致。
 
-中文：`加载环境` / `应用` / `监听` / `静态` / `绑定` / `数据库` / `页面`。
+### 4.2 中文面（导入 `网页.mq.md`）
 
+```markdown
+---
+title: 站点
+> ext/web/网页.mq.md
+> styles/shell.mq.md
+> components/nav.mq.md
+> components/side.mq.md
+> components/foot.mq.md
+> db/articles.mq.md
+> db/index.mq.md as db
 ---
 
-## 7. 后台管理面板
+# main
 
-### 7.1 目标
+`首页` =
 
-官方模板**默认带后台**：登录后按 schema 对表做列表 / 新建 / 编辑 / 删除；菜单可表覆盖（§5.3）。
-
-### 7.2 路由约定（锁定）
-
-| 路径 | 行为 |
+| 组件 | 样式 |
 |------|------|
-| `/admin` | 仪表盘（表计数、快捷入口） |
-| `/admin/login` | 登录 |
-| `/admin/{table}` | 列表 |
-| `/admin/{table}/new` | 新建 |
-| `/admin/{table}/{id}` | 编辑 |
+| nav.`nav` | shell.`topnav` |
+| side.`side` | shell.`side-panel` |
+| foot.`foot` | |
 
-### 7.3 认证（v1）
+主体不是可复用组件，因此就地撰写。
 
-```env
-MARQDO_WEB_ADMIN_USER=admin
-MARQDO_WEB_ADMIN_PASSWORD=change-me
+`index` =
+
+| 属性 | 值 | 样式 |
+|------|-----|------|
+| `title` | articles.`articles`.title | shell.`card-title` |
+| `body` | articles.`articles`.body | shell.`card-body` |
+
+*`库` = > db.open *
+*`页` = > 网页.页面 标题="站点" 引言="<h1>站点</h1>" *
+*`页` = > `页`.组件装配 组件=`首页` *
+*`页` = > `页`.主体装配 主体=`index` *
+*`应用` = > 网页.应用 页面=`页` 数据库=`库` 后台=True 主机=127.0.0.1 端口=18081 *
+> `应用`.监听
 ```
 
-- 会话：签名 cookie（密钥 `MARQDO_WEB_SECRET`，缺省则由插件首次启动生成并打印警告）。  
-- v1 **不做** OAuth；可后续加。  
-- 未设密码时 starter 仅绑定 `127.0.0.1` 并警告。
-
-### 7.4 与绑定关系
-
-后台写库 → 前台 `bind` 每请求读库 → 用户**无需**自写同步 API。
+**允许出现在 index 的非表内容：** frontmatter 导入、开库一行、构造页面/应用并装配、`listen` / `监听`。  
+**不允许：** `json.*` 袋、手写 `/_part` 注册、中英 API 混用。
 
 ---
 
-## 8. 异步网络（实现细节）
+## 5. 类 API（分文件 · 分语言）
 
-### 8.1 为何异步
+依据 [stdlib-i18n.md](stdlib-i18n.md)：**导入哪个文件，就用哪套名字。**  
+`ext/web/web.mq.md` = 全英文；`ext/web/网页.mq.md` = 全中文。中文实现可委托插件同一套原语，或薄封装英文库，但**对外导出的 `#` / `##` / 形参名必须是中文**。
 
-HTTP + DB + S3/Redis 适合在插件内用异步多路复用；避免一请求一线程撑满。
+### 5.1 页面 · `page` / `页面`
 
-### 8.2 边界
+**英文（`web.mq.md`）：**
 
-| 层 | 模型 |
+```markdown
+# page
+    + `title`=…
+    + `intro`=…
+
+## compose_components
+    + `components`     # page table |组件|样式|
+
+## compose_main
+    + `main`           # bind table |属性|值|样式|
+```
+
+**中文（`网页.mq.md`）：**
+
+```markdown
+# 页面
+    + `标题`=…
+    + `引言`=…
+
+## 组件装配
+    + `组件`
+
+## 主体装配
+    + `主体`
+```
+
+| 行为 | 说明 |
+|------|------|
+| compose_components / 组件装配 | 解析组件·样式路径 → 填 nav/sidebar/footer → CSS → 登记 part |
+| compose_main / 主体装配 | 解析库字段与样式路径 → 填 main → 登记 part（如 id=`index`） |
+
+**槽位推断：** 由组件导出名决定（`nav`→顶栏，`side`→侧栏，`foot`→底栏；其余→main）。
+
+### 5.2 样式 · `style` / `样式`
+
+**英文：** `# style` · `## process` · `+ style=` / `name=` / `path=`  
+**中文：** `# 样式` · `## 样式处理` · `+ 样式=` / `名=` / `路径=`  
+
+页面装配可内部调用；作者一般不必在 index 显式调。
+
+### 5.3 数据库 · `db` / `数据库`
+
+完整**增删改查**；页面绑定、种子、`/admin`、表单提交共用。
+
+**英文（`web.mq.md`）：**
+
+```markdown
+# db
+    + `url`=…
+
+## init
+    + `name`
+    + `fields`       # or table= schema
+
+## insert
+    + `table`
+    + `rows`
+
+## select
+    + `table`
+    + `where`=None   # optional simple filters
+    + `limit`=200
+
+## get
+    + `table`
+    + `id`
+
+## update
+    + `table`
+    + `id`
+    + `row`
+
+## delete
+    + `table`
+    + `id`
+
+## exec
+    + `sql`
+    + `args`=None    # escape hatch: raw SQL (not everyday authoring)
+```
+
+**中文（`网页.mq.md`）：**
+
+```markdown
+# 数据库
+    + `地址`=…
+
+## 初始化
+    + `数据库表`     # 或 名= + 字段=
+
+## 插入
+    + `表`
+    + `行`           # 或 多行=
+
+## 查询
+    + `表`
+    + `条件`=None
+    + `上限`=200
+
+## 获取
+    + `表`
+    + `id`
+
+## 更新
+    + `表`
+    + `id`
+    + `行`
+
+## 删除
+    + `表`
+    + `id`
+
+## 执行
+    + `sql`
+    + `参数`=None
+```
+
+| 中文 | 英文 | 职责 |
+|------|------|------|
+| 初始化 | `init` | 建表；登记表名 |
+| 插入 | `insert` | 增 |
+| 查询 | `select` | 查列表（可带简单条件 / limit） |
+| 获取 | `get` | 按主键一行 |
+| 更新 | `update` | 改 |
+| 删除 | `delete` | 删 |
+| 执行 | `exec` | 可选原始 SQL（进阶） |
+
+`table=` / `表=` 接受表名或句柄；行数据优先 GFM 表。  
+**命名锁定：** 列表查询用 `select` / `查询`，**不用** `all`；原始 SQL 用 `exec` / `执行`，避免与 `select` 混淆。
+
+### 5.4 应用 · `app` / `应用`
+
+**英文：** `# app` · `## route` · `## listen` · 形参 `page` `db` `admin` `host` `port`  
+**中文：** `# 应用` · `## 路由` · `## 监听` · 形参 `页面` `数据库` `后台` `主机` `端口`
+
+`listen` / `监听`：加载插件、注入 `db_url`、按页面 part 提供 `/_part/{id}`、启动 HTTP。作者不必手写 part 注册。
+
+### 5.5 表单 · `form` / `表单`（规划锁定）
+
+用户输入也走「表 + 类方法」，与页面/库同一心智；**提交最终调用 `# db` 的 insert/update**，不另开旁路。
+
+**英文（`web.mq.md`）：**
+
+```markdown
+# form
+    + `table`=None      # bound db table name (optional until submit)
+    + `action`=insert   # insert | update
+    + `id`=None         # required when action=update
+
+## fields
+    + `fields`          # |字段|标签|类型|必填|默认|…
+
+## validate
+    + `rules`=None      # |字段|规则|消息|…  (optional extra rules)
+    + `data`            # submitted row / map
+
+## render
+    # → HTML form (or form descriptor for page slot)
+
+## submit
+    + `data`
+    + `db`              # db handle
+```
+
+**中文（`网页.mq.md`）：**
+
+```markdown
+# 表单
+    + `表`=None
+    + `动作`=插入        # 插入 | 更新
+    + `id`=None
+
+## 字段
+    + `字段`
+
+## 校验
+    + `规则`=None
+    + `数据`
+
+## 渲染
+
+## 提交
+    + `数据`
+    + `数据库`
+```
+
+#### 5.5.1 字段表（作者面）
+
+```markdown
+`文章表单` =
+
+| 字段 | 标签 | 类型 | 必填 | 默认 |
+|------|------|------|------|------|
+| title | 标题 | text | true | |
+| body | 正文 | textarea | false | |
+```
+
+| 列 | 含义 |
 |----|------|
-| Marqdo `# main` | `` > `app`.listen `` **同步阻塞**至停机（作者心智简单） |
-| `plugins/web` | 内部 **tokio**（或同等）异步：accept、handler、连接池 |
-| 绑定 / 页面 render | 在异步 handler 中调用；必要时 `spawn_blocking` 跑短 Marqdo 求值 |
+| `字段` | 对应库列名（裸名或 `` `列` ``，与 schema 对齐） |
+| `标签` | 展示文案（字面量） |
+| `类型` | 控件/值类型：`text` `textarea` `number` `email` `url` `checkbox` `select` … |
+| `必填` | 是否必填 |
+| `默认` | 可选默认值 |
 
-不在本波把「异步」关键词暴露进 Marqdo 语法；性能优化留在插件。
+#### 5.5.2 校验表（作者面）
 
-### 8.3 注册名（ABI 草案）
+```markdown
+`文章校验` =
 
-| 注册名 | 参数（CSV） | 作用 |
-|--------|-------------|------|
-| `web_listen` | `host,port,routes,static_dir` | 启动异步服务器（阻塞至停） |
-| `web_db_open` | `url` | 打开池 |
-| `web_db_migrate` | `dir` | 执行迁移 |
-| `web_db_exec` | `sql,args` | 执行 |
-| `web_db_query` | `sql,args` | 查询 → JSON 行数组 |
-| `web_store_put` | `key,path` | 可选 |
-| `web_store_url` | `key,ttl` | 可选 |
-| `web_cache_get` / `web_cache_set` | `key` / `key,value,ttl` | 可选 |
-| `web_admin_meta` | `schema` | 后台元数据 |
+| 字段 | 规则 | 消息 |
+|------|------|------|
+| title | required | 标题不能为空 |
+| title | max:120 | 标题过长 |
+| body | max:8000 | 正文过长 |
+```
 
-ABI：**v2** + JSON 参数/返回（[ext-abi.md](ext-abi.md)）。`ext/web/**` 只经 `plugin.load` 调上述名。
+| 规则（初版） | 含义 |
+|--------------|------|
+| `required` | 非空 |
+| `min:N` / `max:N` | 字符串长度或数值范围 |
+| `email` / `url` | 格式 |
+| `match:字段` | 与另一字段相等（如确认密码） |
+| `in:a,b,c` | 枚举 |
 
-### 8.4 路由如何从「表 + 绑定」生成
+schema 上的「可空 / 类型」在 **submit 时自动并入校验**（不必重复写 `required`，但校验表可覆盖消息）。
 
-传统写法（**不作为主推**）：
+#### 5.5.3 行为流程
 
 ```text
-GET /api/posts → handler → JSON
+render  → 按字段表出 HTML（或嵌入 page 主区）
+用户填写 → POST /_form/{id} 或同页提交
+validate → 合并 schema + 校验表；失败则带回字段级错误、不写库
+submit  → action=insert → db.insert；action=update → db.update
+        → 成功后刷新槽位或跳转（由 form 选项约定）
 ```
 
-本扩展主推：
-
-1. 顶栏/侧栏 `href` → 服务端渲染的 **页面路由**（HTML）。  
-2. 数据来自 `bind`，不是并行维护一套 `/api/*`。  
-3. 后台 CRUD 由插件按表自动生成 HTML 表单；若用户需要 JSON，可选用 `## api=True` 挂只读导出（非默认）。
-
----
-
-## 9. 官方模板（starter）内容
-
-| 文件 | 作用 |
-|------|------|
-| `index.mq.md` | 前台：nav/side/foot 表 + bind posts + listen |
-| `admin` 挂载 | `app admin=True` |
-| `migrations/001_init.sql` | `posts` 示例表 |
-| `static/theme.css` | 单文件主题；可读、低依赖、非「紫渐变 AI 模板」 |
-| `.env.example` | §4.2 全键注释 |
-
-自定义路径：
-
-1. **改表**：导航/字段/菜单。  
-2. **改绑定**：`bind.set` 换源表或加 `limit`。  
-3. **换主题**：`theme=` 或覆盖 `static/`。  
-4. **继承页面类**：只重写 `## body`。  
-5. **关后台**：`admin=False`。
-
----
-
-## 10. 与静态站 / `lib/net` 的关系
-
-| 能力 | 归属 |
-|------|------|
-| gh-pages 静态文档 | [user-site.md](user-site.md) / `public/` |
-| 出站 HTTPS 客户端 | `lib/net`（llm 已用） |
-| 入站站点 + DB + 后台 | **`ext/web`（本文）** |
-
-三者互补，不合并命令。
-
----
-
-## 11. 落地阶段（实现时遵循）
-
-详见 [roadmap/ext-web.md](../roadmap/ext-web.md)。摘要：
-
-| 阶段 | 内容 | 验收 |
-|------|------|------|
-| **W0** | CATALOG + 空 L1 + 插件 `web_listen` 回固定 HTML | `ext add web`；浏览器见 Hello |
-| **W1** | `.env` 端口；`page` 四栏；nav 表 → 路由；static | 改 nav 表即改链接 |
-| **W2** | SQLite `define`/`migrate`/`all`；金样临时目录 | init 后表存在 |
-| **W3** | `bind.set` + starter 模板 + `/admin` CRUD | 模板一键站 |
-| **W4** | Postgres；可选 Redis / S3；文档与示例 | 可选件缺省不炸 |
-
-金样目录建议：`tests/ext/web-*.mq.md`；live 类需 `.env` 的单独门控。
-
----
-
-## 12. 错误与安全基线
-
-| 项 | 约定 |
+| 层 | 校验 |
 |----|------|
-| 无插件 | L1 打印可操作错误后 `sys.exit` |
-| SQL | 用户 `query` 必须参数化；后台生成语句只用白名单列名（来自 schema） |
-| 上传 | 限制大小与扩展名；默认仅管理员 |
-| CORS | v1 同站 SSR 为主；不默认放开 `*` |
-| 密钥 | `.env` / `.gitignore`；文档强调勿提交 |
+| **服务端（必须）** | `validate` 在写库前执行；唯一可信边界 |
+| **浏览器（可选增强）** | 同源规则可生成 `required`/`maxlength` 等 HTML 属性；**不能**替代服务端 |
+
+`/admin` 的新建/编辑页 = 内置 form：字段来自 schema，校验来自类型/可空；与站点自定义 form **同一套** `validate` + `db.insert`/`update`。
+
+#### 5.5.4 与页面的关系
+
+- 表单可以是独立路由页，或页面表里的一个「组件」导出（仍用 `|属性|值|样式|` 描述展示，提交走 form 类）。  
+- 初版优先：**独立 form 句柄 + `app` 挂载提交端点**；嵌入页面槽位为随后波次。
+
+### 5.6 文件职责
+
+| 文件 | 内容 |
+|------|------|
+| `ext/web/web.mq.md` | 英文 `# page` `# style` `# db` `# form` `# app` |
+| `ext/web/网页.mq.md` | 中文 `# 页面` `# 样式` `# 数据库` `# 表单` `# 应用`（可包装英文实现，**不得**把中文名写进 `web.mq.md`） |
 
 ---
 
-## 13. 文档与索引更新清单（实现前）
+## 6. 模块导出形状（配合寻址）
 
-- 本文：`doc/design/ext-web.md`（锁定设计）  
-- 路线图：`doc/roadmap/ext-web.md`（阶段与开放点收敛）  
-- [ext-cli.md](ext-cli.md) catalog 行指向本文  
-- [doc/README.md](../README.md) 增加 design 链接  
+### 6.1 组件 `components/nav.mq.md`
 
-实现开始时再动：`src/ext_cli.rs`、`plugins/web`、`ext/web/*`、`Cargo.toml` workspace、`tests/gold.rs`。
+```markdown
+## nav
+
+`nav` =
+
+| 属性 | 值 | 样式 |
+|------|-----|------|
+| `title` | `nav`.`title` | |
+| `href` | `nav`.`href` | |
+
+**`nav`**
+```
+
+说明：组件**内部**绑定仍可用 `` `表`.`列` ``（表名+列名皆引用）。与 index 主体里「模块命名空间 + 裸列名」的 `articles.`articles`.title` 分工：
+
+- **跨文件、带导入命名空间** → `模块.`表`.列`；  
+- **组件文件内、表已明确** → `` `表`.`列` `` 即可。
+
+（若评审希望全站统一为一种形态，可在评审意见中二选一；默认允许上述两种。）
+
+### 6.2 样式 `styles/shell.mq.md`
+
+每个样式一个 `##`，**禁止** `## bag` + `json.set`：
+
+```markdown
+## topnav
+… |属性|值| …
+**`topnav`**
+
+## card-title
+…
+```
+
+### 6.3 库 `db/articles.mq.md` / `db/index.mq.md`
+
+- `articles`：`## schema`（或同名导出）返回结构表；  
+- `index`：`## open` → 确保插件、建库、init、幂等种子，返回 `# 数据库` 句柄。
+
+---
+
+## 7. 运行时职责划分
+
+```text
+作者 .mq.md 表（字面量单元格）
+        │
+        ▼
+  ext/web 类方法（Marqdo）
+        │  解析路径；需要时经 ABI host_query
+        │  调用入口模块 import 树上的 lib.member
+        ▼
+  plugins/web（HTTP / SQL / HTML 壳）
+        │
+        ▼
+  浏览器：四区布局 + /_part 局部刷新 + /admin（可选）
+```
+
+| 层 | 做 | 不做 |
+|----|----|------|
+| Marqdo 核心 | 表→Value、类/方法、import | 不识别 web 路径语法 |
+| `ext/web/*.mq.md` | 作者 API、中英面、委托插件 | 不直接 `host_*` |
+| `plugins/web` | 路径解析辅助、装配结果、listen、SQL、渲染 | 不要求作者写袋 |
+
+**实现要点（评审通过后再做）：**
+
+1. ABI `host_query("call_lib_path")`：在**站点入口模块**上执行 `lib.member`；  
+2. 插件函数由类方法调用（如 compose_components / compose_main）；  
+3. `listen` 合并页面内 part，注入 `db_url`。
+
+---
+
+## 8. 全部废弃 · 从头开发（锁定）
+
+**旧有网络扩展库内容一律作废**，包括但不限于：
+
+| 范围 | 处理 |
+|------|------|
+| [`plugins/web/`](../../plugins/web/) | 评审通过后**删除或清空**，按本文重写 cdylib |
+| [`ext/web/`](../../ext/web/)（`web.mq.md` / `网页.mq.md` / templates） | 同上，**不**在旧 L1 上打补丁 |
+| 依赖旧 API 的示例（如当前 `examples/web-site`、`web-demo`、`man-write-site` 可跑胶水版） | 按 §4 规范重写或暂时移除 |
+| 依赖旧 API 的 gold / 单测 | 删除后按新 API 重写 |
+| 本文之前的袋式 / assemble / wire / `## bag` 等作者面 | 永久移出正典 |
+
+**禁止**：在遗留代码上「修到能跑」再文档化。  
+**允许**：实现时参考旧代码中的 HTTP/SQLite 技术经验，但**新树另起**，不以 ABI 表面或作者面兼容为目标。
+
+历史摸索中明确不再回归的作者面模式：
+
+- `json.parse` / `json.set` 拼 components/styles 袋；  
+- 手写 `web.assemble` + 袋参数；  
+- 手写 part JSON + `` `app`.part ``；  
+- `|前端变量|后端数据库|` 填路由；  
+- 「变量名即表名」魔法默认表；  
+- 样式 `## bag`；掏空 index 只留 `wire.boot`。
+
+---
+
+## 9. 非本波次（可记入路线图，不挡作者面评审）
+
+- Postgres / Redis / S3 驱动细节（SQLite 先落地）；  
+- 复杂权限与多租户；  
+- 子页路由糖的更多约定（`# 应用.route` 已够用）；  
+- `/admin` 的视觉与交互细化（CRUD/表单必须走 §5.3–§5.5；UI 可后做）；  
+- 表单嵌入页面槽位的更多版式（§5.5.4 初版先独立挂载）。
+
+---
+
+## 10. 评审清单
+
+请确认或批注：
+
+1. **§3 路径**：`模块.`导出`` 与 `模块.`表`.列`（列裸名）是否定为唯一正典？组件内 `` `表`.`列` `` 是否保留？  
+2. **§4 index**：开库是否允许单独一行 `` db.open ``，还是必须进一步藏进 `web.应用`？  
+3. **§5 分文件**：英文 `web.mq.md` / 中文 `网页.mq.md` 是否严格分语言、禁止混排？  
+4. **§5.3**：列表查询用 `select` / `查询`、原始 SQL 用 `exec` / `执行` 是否认可？  
+5. **§5.5 表单/校验**：字段表、校验表、服务端必校、admin 共用是否认可？  
+6. **§5 槽位**：仅由组件导出名推断，是否足够？  
+7. **§8 废弃**：是否确认**全部推倒重来**、不兼容旧实现？  
+
+评审通过后：冻结本文为 Accepted → **清空旧 web 扩展代码** → 按本文从零实现（骨架 → db CRUD/`select` → form/validate → 页面装配 → app listen → 规范示例 → gold）。

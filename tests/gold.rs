@@ -1232,13 +1232,11 @@ fn ext_web_smoke() {
     assert!(status.success(), "failed to build marqdo_plugin_web");
     assert_out(
         "tests/ext/web-smoke.mq.md",
-        "nav-ok
-首页
-文档
-bind-ok
-render-ok
-live-ok
-follow-ok",
+        "render-ok
+compose-nav-ok
+styles-ok
+compose-ok
+db-ok",
     );
 }
 

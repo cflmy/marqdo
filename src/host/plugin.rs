@@ -1,6 +1,6 @@
 //! Native plugin loader (C ABI v1/v2). Shared libs are not linked into marqdo.
 
-use std::cell::Cell;
+use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
 use std::ffi::{CStr, CString};
 use std::os::raw::{c_char, c_int, c_void};
@@ -54,6 +54,24 @@ struct MarqdoHostApi {
 thread_local! {
     /// Set around plugin calls so `host_query` can read entry source / call site.
     static CURRENT_HOST: Cell<*const HostContext> = const { Cell::new(std::ptr::null()) };
+    /// Optional `lib.member` resolver for `host_query("call_lib_path")` (site entry module).
+    static LIB_PATH_CALL: RefCell<Option<LibPathCall>> = const { RefCell::new(None) };
+}
+
+/// Hook: resolve bare `lib.member` (and longer paths) in the site module's import tree.
+pub struct LibPathCall {
+    pub call: fn(*mut (), &str) -> Result<Value, String>,
+    pub data: *mut (),
+}
+
+/// Run `body` with a temporary lib-path call hook (nested-safe).
+pub fn with_lib_path_call<R>(hook: LibPathCall, body: impl FnOnce() -> R) -> R {
+    LIB_PATH_CALL.with(|slot| {
+        let prev = slot.replace(Some(hook));
+        let out = body();
+        slot.replace(prev);
+        out
+    })
 }
 
 struct RegisterBuf {
@@ -205,7 +223,7 @@ unsafe extern "C" fn host_register(
 unsafe extern "C" fn host_query(
     _userdata: *mut c_void,
     name: *const c_char,
-    _args_json: *const c_char,
+    args_json: *const c_char,
     out_json: *mut *mut c_char,
     err_msg: *mut *mut c_char,
 ) -> c_int {
@@ -239,6 +257,15 @@ unsafe extern "C" fn host_query(
     }
     let ctx = &*ctx_ptr;
 
+    let args_owned: Option<String> = if args_json.is_null() {
+        None
+    } else {
+        CStr::from_ptr(args_json)
+            .to_str()
+            .ok()
+            .map(|s| s.to_string())
+    };
+
     let result = match name {
         "module_source" => agent_rt::module_source(ctx).and_then(|v| value_to_json(&v)),
         "call_site" => agent_rt::call_site(ctx, Some(ctx.current_line)).and_then(|v| value_to_json(&v)),
@@ -246,6 +273,28 @@ unsafe extern "C" fn host_query(
         "cwd" => Ok(serde_json::Value::String(
             ctx.cwd.to_string_lossy().into_owned(),
         )),
+        "call_lib_path" => (|| {
+            let raw = args_owned.as_deref().unwrap_or("{}");
+            let args: serde_json::Value = serde_json::from_str(if raw.trim().is_empty() {
+                "{}"
+            } else {
+                raw
+            })
+            .map_err(|e| format!("call_lib_path args: {e}"))?;
+            let path = args
+                .get("path")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| "call_lib_path requires `path`".to_string())?
+                .to_string();
+            LIB_PATH_CALL.with(|slot| {
+                let hook = slot.borrow();
+                let hook = hook
+                    .as_ref()
+                    .ok_or_else(|| "call_lib_path: no site lib resolver".to_string())?;
+                let v = (hook.call)(hook.data, &path)?;
+                value_to_json(&v)
+            })
+        })(),
         other => Err(format!("host_query: unknown `{other}`")),
     };
 
