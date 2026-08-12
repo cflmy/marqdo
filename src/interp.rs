@@ -24,6 +24,8 @@ pub struct Interpreter {
     pub trace: bool,
     capture: bool,
     pub captured_stdout: String,
+    /// Bindings in the entry (`# main` / sole object) env after it finishes.
+    pub entry_bindings: HashMap<String, Value>,
     current_span: Span,
     input: InputFeed,
     host: HostContext,
@@ -50,6 +52,10 @@ impl Env {
     fn set(&mut self, name: String, value: Value) {
         self.vars.insert(name, value);
     }
+
+    fn vars_clone(&self) -> HashMap<String, Value> {
+        self.vars.clone()
+    }
 }
 
 pub(crate) enum EvArg {
@@ -64,6 +70,7 @@ impl Interpreter {
             trace,
             capture: false,
             captured_stdout: String::new(),
+            entry_bindings: HashMap::new(),
             current_span: Span::new(1, 1),
             input: InputFeed::new(false, Vec::new()),
             host: HostContext::for_run(path, Default::default(), Vec::new()),
@@ -78,6 +85,7 @@ impl Interpreter {
             trace,
             capture: true,
             captured_stdout: String::new(),
+            entry_bindings: HashMap::new(),
             current_span: Span::new(1, 1),
             input: InputFeed::new(true, Vec::new()),
             host: HostContext::for_capture(path, Default::default()),
@@ -140,7 +148,7 @@ impl Interpreter {
     ) -> Result<Value> {
         let fun = find_function_anywhere(module, name)
             .ok_or_else(|| self.err(format!("unknown function `{name}`")))?;
-        self.run_function(module, fun, Env::new(), args)
+        self.run_function(module, fun, Env::new(), args, false)
     }
 
     pub fn run_module(&mut self, module: &Module) -> Result<Value> {
@@ -148,7 +156,7 @@ impl Interpreter {
         self.site_module = Some(module as *const Module);
         let result = (|| {
             if let Some(main) = find_top(module, "main") {
-                return self.run_function(module, main, Env::new(), &[]);
+                return self.run_function(module, main, Env::new(), &[], true);
             }
             // Document-as-entry: sole top-level `#` object with no params (e.g. `# Hello World`).
             let entries: Vec<&Function> = module
@@ -157,7 +165,7 @@ impl Interpreter {
                 .filter(|f| f.is_object() && f.params.is_empty())
                 .collect();
             if entries.len() == 1 {
-                return self.run_function(module, entries[0], Env::new(), &[]);
+                return self.run_function(module, entries[0], Env::new(), &[], true);
             }
             bail!("no `# main` object to run");
         })();
@@ -216,6 +224,7 @@ impl Interpreter {
         fun: &Function,
         mut env: Env,
         args: &[(String, Value)],
+        capture_entry_env: bool,
     ) -> Result<Value> {
         if self.trace {
             emit_trace(
@@ -246,6 +255,9 @@ impl Interpreter {
         })();
         self.host.pop_call_frame();
         let ret = body_result?;
+        if capture_entry_env {
+            self.entry_bindings = env.vars_clone();
+        }
         if self.trace {
             let display = ret.as_display();
             emit_trace(
@@ -669,7 +681,7 @@ impl Interpreter {
                         "call_fn: `{name}` must have no parameters"
                     )));
                 }
-                return self.run_function(module, target, Env::new(), &[]);
+                return self.run_function(module, target, Env::new(), &[], false);
             }
             other if HostFn::from_name(other).is_some() => {
                 let hf = HostFn::from_name(other).unwrap();
@@ -707,7 +719,7 @@ impl Interpreter {
         }
 
         self.host.push_call_site_line(self.host.current_line);
-        let result = self.run_function(module, target, call_env, &[]);
+        let result = self.run_function(module, target, call_env, &[], false);
         self.host.pop_call_site_line();
         let result = result?;
         if target.is_object() {
@@ -774,7 +786,7 @@ impl Interpreter {
         }
 
         self.host.push_call_site_line(self.host.current_line);
-        let result = self.run_function(lib, node, call_env, &[]);
+        let result = self.run_function(lib, node, call_env, &[], false);
         self.host.pop_call_site_line();
         let result = result?;
         if node.is_object() {
@@ -821,7 +833,7 @@ impl Interpreter {
         call_env.set("自".into(), recv.clone());
         call_env.set("self".into(), recv);
         self.host.push_call_site_line(self.host.current_line);
-        let result = self.run_function(owner, target, call_env, &[]);
+        let result = self.run_function(owner, target, call_env, &[], false);
         self.host.pop_call_site_line();
         result
     }

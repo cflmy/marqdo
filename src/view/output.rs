@@ -31,6 +31,13 @@ pub fn write_static(opts: OutputOptions) -> Result<()> {
             vm.stderr = "execution skipped (--no-exec)".into();
             vm.ok = true;
             vm.plots.clear();
+            vm.bindings_html = String::from(r#"<p class="vars-skipped">skipped</p>"#);
+            // Rebuild outline so Variables shows skipped.
+            if let Ok(module) = crate::parse::parse_source(&vm.source) {
+                let wb = crate::view::render::render_writeback_outline(&vm.source);
+                vm.outline_html =
+                    crate::view::render::render_right_rail(&module, &vm.bindings_html, &wb);
+            }
         }
         let links = LinkMode::Static {
             from: Some(rel.clone()),

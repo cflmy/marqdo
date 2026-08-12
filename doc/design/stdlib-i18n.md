@@ -28,7 +28,7 @@
 |------|-------------------|
 | `> lib/text.mq.md` | `trim` · `split` · `join` |
 | `> lib/文本.mq.md` | `去空白` · `拆分` · `拼接` |
-| `> lib/table.mq.md` | `rows` · `row_at` |
+| `> lib/table.mq.md` | `put` · `rows` · `row_at` · list/map（见 [stdlib-table.md](stdlib-table.md)） |
 | `> lib/表.mq.md` | `行数` · `取行` |
 
 示例：

@@ -125,35 +125,11 @@ fn skill_search_roots(ctx: &HostContext) -> Vec<PathBuf> {
 }
 
 pub fn map_set(map: &Value, key: &Value, value: &Value) -> Result<Value, String> {
-    let k = match key {
-        Value::Text(s) => s.clone(),
-        _ => return Err("map_set key must be text".into()),
-    };
-    match map {
-        Value::Map(entries) => {
-            let mut out = entries.clone();
-            if let Some((_, slot)) = out.iter_mut().find(|(kk, _)| *kk == k) {
-                *slot = value.clone();
-            } else {
-                out.push((k, value.clone()));
-            }
-            Ok(Value::Map(out))
-        }
-        Value::None => Ok(Value::Map(vec![(k, value.clone())])),
-        _ => Err("map_set needs map".into()),
-    }
+    crate::host::collection::map_set(map, key, value)
 }
 
 pub fn list_append(list: &Value, item: &Value) -> Result<Value, String> {
-    match list {
-        Value::List(xs) => {
-            let mut out = xs.clone();
-            out.push(item.clone());
-            Ok(Value::List(out))
-        }
-        Value::None => Ok(Value::List(vec![item.clone()])),
-        _ => Err("list_append needs list".into()),
-    }
+    crate::host::collection::list_append(list, item)
 }
 
 #[cfg(test)]

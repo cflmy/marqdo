@@ -1037,6 +1037,19 @@ fn lib_json_roundtrip() {
 }
 
 #[test]
+fn lib_table_collections() {
+    assert_out(
+        "tests/lib/table-collections.mq.md",
+        "Bearer-x\nA\nb\nhi\nTrue\n3\n[Authorization, role, content]\n0",
+    );
+}
+
+#[test]
+fn lib_table_collections_zh() {
+    assert_out("tests/lib/表-集合.mq.md", "Bearer-x\nA\n3");
+}
+
+#[test]
 fn lib_sys_cwd() {
     assert_out("tests/lib/sys-cwd.mq.md", "cwd-ok");
 }

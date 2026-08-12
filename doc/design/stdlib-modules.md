@@ -16,7 +16,7 @@
 | 模块族 | 英文库 | 中文库 | 状态 |
 |--------|--------|--------|------|
 | 文本 | `lib/text.mq.md` | `lib/文本.mq.md` | 已有 |
-| 表 | `lib/table.mq.md` | `lib/表.mq.md` | 已有 |
+| 表 | `lib/table.mq.md` | `lib/表.mq.md` | 已有（`put`/`改` + list/map；见 [stdlib-table.md](stdlib-table.md)） |
 | 文件 | `lib/fs.mq.md` | `lib/文件.mq.md` | 已有 |
 | 系统 | `lib/sys.mq.md` | `lib/系统.mq.md` | 已有（含 `load_dotenv`） |
 | 时间 | `lib/time.mq.md` | `lib/时间.mq.md` | 已有 |

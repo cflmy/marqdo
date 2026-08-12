@@ -1,12 +1,14 @@
 ---
-title: lib/table — lists
-description: Row count and index helpers
+title: lib/table — collections
+description: put, append, and map helpers
 > lib/table.mq.md
 ---
 
 # main
 
-Import lib/table.mq.md. Functions: rows(xs), row_at(xs, i). Single-column tables are lists; multi-column tables are maps (see structure/07-map). Prefer `` `xs`[^1] `` for 1-based index; `row_at` stays 0-based.
+Prefer `table.put` for element updates (`at=` text key, **1-based** int, or list path). Use `json` for parse/stringify only.
+
+*`h` = > table.put in=None at=Authorization value=Bearer-demo*
 
 `xs` =
 
@@ -15,10 +17,9 @@ Import lib/table.mq.md. Functions: rows(xs), row_at(xs, i). Single-column tables
 | a |
 | b |
 
+*`xs` = > table.put in=`xs` at=1 value=A*
 *`n` = > table.rows xs=`xs`*
 
+> print text=`h`[^Authorization]
+> print text=`xs`[^1]
 > print text=`n`
-
-*`r` = > table.row_at xs=`xs` i=0*
-
-> print text=`r`

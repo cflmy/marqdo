@@ -41,6 +41,8 @@ pub struct FileViewModel {
     pub auto_stream: bool,
     /// SVG plots from math lib (embedded in Execution).
     pub plots: Vec<String>,
+    /// HTML for Variables panel (entry bindings after run).
+    pub bindings_html: String,
 }
 
 /// Collect prompt strings from every `input` / `输入` call in the module (pre-order).
@@ -235,6 +237,184 @@ pub fn render_function_outline(module: &Module) -> String {
     }
     out.push_str("</ul></div>");
     out
+}
+
+/// Right rail: collapsible Functions + Variables (+ optional writeback HTML appended by caller).
+pub fn render_right_rail(module: &Module, bindings_html: &str, writeback_html: &str) -> String {
+    let fn_inner = if module.functions.is_empty() {
+        r#"<p class="vars-empty">No functions</p>"#.to_string()
+    } else {
+        let mut tree = String::from(
+            r#"<input type="search" id="fn-search" class="fn-search" placeholder="Search functions…" autocomplete="off" spellcheck="false"/>
+<ul class="outline-tree">"#,
+        );
+        for fun in &module.functions {
+            tree.push_str(&outline_fun(fun, ""));
+        }
+        tree.push_str("</ul>");
+        tree
+    };
+    let vars = if bindings_html.is_empty() {
+        r#"<p class="vars-empty">No bindings</p>"#
+    } else {
+        bindings_html
+    };
+    format!(
+        r#"<div class="outline-rail" id="outline-rail">
+<details class="outline-section" open>
+<summary class="outline-summary">Functions</summary>
+<div class="outline-panel" id="fn-outline">{fn_inner}</div>
+</details>
+<details class="outline-section" open>
+<summary class="outline-summary">Variables</summary>
+<div class="vars-panel" id="vars-panel">{vars}</div>
+</details>
+{wb}
+</div>"#,
+        fn_inner = fn_inner,
+        vars = vars,
+        wb = writeback_html,
+    )
+}
+
+/// Render entry bindings as HTML tables (List / Map / records).
+pub fn render_bindings_html(bindings: &HashMap<String, crate::value::Value>) -> String {
+    if bindings.is_empty() {
+        return String::new();
+    }
+    let mut names: Vec<&String> = bindings.keys().collect();
+    names.sort();
+    let mut out = String::from(r#"<ul class="vars-list">"#);
+    for name in names {
+        let Some(val) = bindings.get(name) else {
+            continue;
+        };
+        out.push_str(&format!(
+            r#"<li class="vars-item"><div class="vars-name">{}</div><div class="vars-value">{}</div></li>"#,
+            escape(name),
+            render_value_html(val, 0)
+        ));
+    }
+    out.push_str("</ul>");
+    out
+}
+
+const BIND_MAX_DEPTH: usize = 2;
+
+fn render_value_html(v: &crate::value::Value, depth: usize) -> String {
+    use crate::value::Value;
+    match v {
+        Value::List(xs) => {
+            if let Some(keys) = record_keys(xs) {
+                return render_records_table(xs, &keys, depth);
+            }
+            let mut s = String::from(r#"<table class="vars-table"><thead><tr><th>#</th><th>value</th></tr></thead><tbody>"#);
+            for (i, item) in xs.iter().enumerate() {
+                s.push_str(&format!(
+                    "<tr><td class=\"vars-idx\">{}</td><td>{}</td></tr>",
+                    i + 1,
+                    cell_html(item, depth)
+                ));
+            }
+            if xs.is_empty() {
+                s.push_str(r#"<tr><td colspan="2" class="vars-empty">∅</td></tr>"#);
+            }
+            s.push_str("</tbody></table>");
+            s
+        }
+        Value::Map(pairs) => {
+            let mut s = String::from(
+                r#"<table class="vars-table"><thead><tr><th>key</th><th>value</th></tr></thead><tbody>"#,
+            );
+            for (k, val) in pairs {
+                s.push_str(&format!(
+                    "<tr><td class=\"vars-key\">{}</td><td>{}</td></tr>",
+                    escape(k),
+                    cell_html(val, depth)
+                ));
+            }
+            if pairs.is_empty() {
+                s.push_str(r#"<tr><td colspan="2" class="vars-empty">∅</td></tr>"#);
+            }
+            s.push_str("</tbody></table>");
+            s
+        }
+        other => format!(r#"<span class="vars-scalar">{}</span>"#, escape(&other.as_display())),
+    }
+}
+
+fn cell_html(v: &crate::value::Value, depth: usize) -> String {
+    use crate::value::Value;
+    match v {
+        Value::List(_) | Value::Map(_) if depth >= BIND_MAX_DEPTH => {
+            format!(
+                r#"<details class="vars-nested"><summary>{}</summary><span class="vars-scalar">{}</span></details>"#,
+                escape(&brief_type(v)),
+                escape(&v.as_display())
+            )
+        }
+        Value::List(_) | Value::Map(_) => render_value_html(v, depth + 1),
+        other => escape(&other.as_display()),
+    }
+}
+
+fn brief_type(v: &crate::value::Value) -> String {
+    use crate::value::Value;
+    match v {
+        Value::List(xs) => format!("List({})", xs.len()),
+        Value::Map(xs) => format!("Map({})", xs.len()),
+        _ => "…".into(),
+    }
+}
+
+fn record_keys(xs: &[crate::value::Value]) -> Option<Vec<String>> {
+    use crate::value::Value;
+    if xs.is_empty() {
+        return None;
+    }
+    let mut keys: Vec<String> = Vec::new();
+    for (i, item) in xs.iter().enumerate() {
+        let Value::Map(pairs) = item else {
+            return None;
+        };
+        if i == 0 {
+            keys = pairs.iter().map(|(k, _)| k.clone()).collect();
+            if keys.is_empty() {
+                return None;
+            }
+        }
+    }
+    Some(keys)
+}
+
+fn render_records_table(
+    xs: &[crate::value::Value],
+    keys: &[String],
+    depth: usize,
+) -> String {
+    use crate::value::Value;
+    let mut s = String::from(r#"<table class="vars-table"><thead><tr><th>#</th>"#);
+    for k in keys {
+        s.push_str(&format!("<th>{}</th>", escape(k)));
+    }
+    s.push_str("</tr></thead><tbody>");
+    for (i, item) in xs.iter().enumerate() {
+        let Value::Map(pairs) = item else {
+            continue;
+        };
+        s.push_str(&format!(r#"<tr><td class="vars-idx">{}</td>"#, i + 1));
+        for k in keys {
+            let cell = pairs
+                .iter()
+                .find(|(kk, _)| kk == k)
+                .map(|(_, v)| cell_html(v, depth))
+                .unwrap_or_else(|| String::from(""));
+            s.push_str(&format!("<td>{cell}</td>"));
+        }
+        s.push_str("</tr>");
+    }
+    s.push_str("</tbody></table>");
+    s
 }
 
 fn outline_fun(fun: &Function, parent_path: &str) -> String {
@@ -997,5 +1177,26 @@ mod tests {
         assert!(outline.contains("data-fn-path=\"main/问候\""), "{outline}");
         assert!(outline.contains("href=\"#fn-"), "{outline}");
         assert!(outline.contains("ol-meta\">h"), "{outline}");
+    }
+
+    #[test]
+    fn right_rail_has_functions_and_variables() {
+        let src = include_str!("../../tests/structure/hello.mq.md");
+        let module = crate::parse::parse_source(src).unwrap();
+        let mut bind = HashMap::new();
+        bind.insert(
+            "xs".into(),
+            crate::value::Value::List(vec![
+                crate::value::Value::Text("a".into()),
+                crate::value::Value::Text("b".into()),
+            ]),
+        );
+        let html = render_right_rail(&module, &render_bindings_html(&bind), "");
+        assert!(html.contains("outline-rail"), "{html}");
+        assert!(html.contains("Functions"), "{html}");
+        assert!(html.contains("Variables"), "{html}");
+        assert!(html.contains("vars-panel"), "{html}");
+        assert!(html.contains("vars-table"), "{html}");
+        assert!(html.contains(">xs<") || html.contains("vars-name\">xs"), "{html}");
     }
 }

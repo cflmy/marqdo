@@ -391,17 +391,89 @@ section.block > h2 {
 }
 @media (max-width: 960px) {
   .struct-wrap { grid-template-columns: 1fr; }
-  .outline-panel { position: static; }
+  .outline-rail, .outline-panel { position: static; }
 }
-.outline-panel {
+.outline-rail {
   position: sticky;
   top: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  min-width: 0;
+}
+.outline-section {
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  padding: 0.55rem 0.6rem 0.65rem;
+  padding: 0.35rem 0.55rem 0.55rem;
   box-shadow: 0 1px 0 rgba(0,0,0,0.02);
 }
+.outline-summary {
+  cursor: pointer;
+  font: 600 0.72rem/1.3 var(--sans);
+  color: var(--muted);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  list-style: none;
+  padding: 0.2rem 0 0.35rem;
+}
+.outline-summary::-webkit-details-marker { display: none; }
+.outline-panel {
+  position: static;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  padding: 0;
+  box-shadow: none;
+}
+.vars-panel {
+  max-height: min(50vh, 28rem);
+  overflow: auto;
+  font: 0.72rem/1.35 var(--mono);
+}
+.vars-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.vars-item {
+  margin: 0 0 0.55rem;
+  padding-bottom: 0.45rem;
+  border-bottom: 1px solid var(--line);
+}
+.vars-item:last-child {
+  margin-bottom: 0;
+  padding-bottom: 0;
+  border-bottom: none;
+}
+.vars-name {
+  font-weight: 600;
+  color: var(--ink);
+  margin-bottom: 0.2rem;
+  word-break: break-all;
+}
+.vars-table {
+  width: 100%;
+  border-collapse: collapse;
+  font: inherit;
+}
+.vars-table th,
+.vars-table td {
+  border: 1px solid var(--line);
+  padding: 0.15rem 0.3rem;
+  text-align: left;
+  vertical-align: top;
+  word-break: break-word;
+}
+.vars-table th {
+  background: #f5f5f7;
+  font-weight: 600;
+  color: var(--muted);
+}
+.vars-idx, .vars-key { color: var(--muted); white-space: nowrap; }
+.vars-scalar { white-space: pre-wrap; }
+.vars-empty, .vars-skipped { color: var(--muted); margin: 0.2rem 0; }
+.vars-nested > summary { cursor: pointer; color: var(--muted); }
 .fn-search {
   width: 100%;
   box-sizing: border-box;
@@ -1423,6 +1495,13 @@ pub fn layout(title: &str, nav: &str, main: &str) -> String {
             scrollIfPinned();
           }}
           if (thinkingEl && (answerNode && answerNode.data)) thinkingEl.open = false;
+          if (typeof ev.bindings_html === "string") {{
+            var vp = document.getElementById("vars-panel");
+            if (vp) {{
+              vp.innerHTML = ev.bindings_html
+                || "<p class=\\"vars-empty\\">No bindings</p>";
+            }}
+          }}
         }}
       }}
     }}

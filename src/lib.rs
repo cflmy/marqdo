@@ -265,6 +265,7 @@ pub fn run_file_capture(path: &Path, opts: &RunOptions) -> Result<RunCapture> {
                 stdout: interp.captured_stdout,
                 value,
                 plots,
+                bindings: interp.entry_bindings,
             })
         }
         Backend::Bytecode => {
@@ -287,6 +288,7 @@ pub fn run_file_capture(path: &Path, opts: &RunOptions) -> Result<RunCapture> {
                 stdout: vm.captured_stdout,
                 value,
                 plots,
+                bindings: Default::default(),
             })
         }
     }

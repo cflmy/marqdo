@@ -43,7 +43,7 @@ Import one file; use **that** file’s function names.
 | EN import | ZH import | Typical APIs (EN / ZH) |
 |-----------|-----------|-------------------------|
 | `lib/text.mq.md` | `lib/文本.mq.md` | text helpers / 去空白·拆分·拼接… |
-| `lib/table.mq.md` | `lib/表.mq.md` | table/rows helpers |
+| `lib/table.mq.md` | `lib/表.mq.md` | `put`/`改` + list/map（见 `doc/design/stdlib-table.md`） |
 | `lib/fs.mq.md` | `lib/文件.mq.md` | filesystem |
 | `lib/sys.mq.md` | `lib/系统.mq.md` | process / cwd / load_dotenv |
 | `lib/plugin.mq.md` | `lib/插件.mq.md` | load native ABI plugins (`doc/design/ext-abi.md`) |

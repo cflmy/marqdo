@@ -77,8 +77,8 @@ Frontmatter 导入**绑定库名**（默认 = 文件名茎；`as` / `作为` 可
 | `lib/subtask.mq.md` / `lib/子任务.mq.md` | `spawn` `poll` `wait` `kill` `wait_all` |
 | `lib/text.mq.md` | `str_trim` `str_split` `str_join` |
 | `lib/文本.mq.md` | `去空白` `拆分` `拼接` |
-| `lib/table.mq.md` | `rows` `row_at` |
-| `lib/表.mq.md` | `行数` `取行` |
+| `lib/table.mq.md` | `put` 为首选写入；`rows`/`row_at` 及完整 list/map API — 见 [stdlib-table.md](stdlib-table.md) |
+| `lib/表.mq.md` | `改` 为首选写入；`行数`/`取行` 及完整 list/map API |
 
 完整清单见 [stdlib-modules.md](stdlib-modules.md)。
 

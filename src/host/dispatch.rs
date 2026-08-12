@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 
-use crate::host::{agent_rt, foreign, fs, json, math, net, plugin, subtask, sys, time, writeback, HostContext};
+use crate::host::{foreign, fs, json, math, net, plugin, subtask, sys, time, writeback, HostContext};
 use crate::value::Value;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -100,7 +100,29 @@ pub enum HostFn {
     HttpPostSse = 98,
     OpenAiSseParse = 99,
     StreamPublish = 100,
+    CollectionPut = 101,
+    ListPrepend = 102,
+    ListConcat = 103,
+    ListInsert = 104,
+    ListSetAt = 105,
+    ListRemoveAt = 106,
+    ListSlice = 107,
+    ListContains = 108,
+    ListIndexOf = 109,
+    ListReverse = 110,
+    ListFirst = 111,
+    ListLast = 112,
+    MapGet = 113,
+    MapDelete = 114,
+    MapHas = 115,
+    MapKeys = 116,
+    MapValues = 117,
+    MapItems = 118,
+    MapMerge = 119,
+    MapSize = 120,
+    CollectionClear = 121,
 }
+
 
 impl HostFn {
     pub fn from_u16(id: u16) -> Option<Self> {
@@ -196,6 +218,27 @@ impl HostFn {
             98 => Self::HttpPostSse,
             99 => Self::OpenAiSseParse,
             100 => Self::StreamPublish,
+            101 => Self::CollectionPut,
+            102 => Self::ListPrepend,
+            103 => Self::ListConcat,
+            104 => Self::ListInsert,
+            105 => Self::ListSetAt,
+            106 => Self::ListRemoveAt,
+            107 => Self::ListSlice,
+            108 => Self::ListContains,
+            109 => Self::ListIndexOf,
+            110 => Self::ListReverse,
+            111 => Self::ListFirst,
+            112 => Self::ListLast,
+            113 => Self::MapGet,
+            114 => Self::MapDelete,
+            115 => Self::MapHas,
+            116 => Self::MapKeys,
+            117 => Self::MapValues,
+            118 => Self::MapItems,
+            119 => Self::MapMerge,
+            120 => Self::MapSize,
+            121 => Self::CollectionClear,
             _ => return None,
         })
     }
@@ -296,6 +339,27 @@ impl HostFn {
             "host_subtask_join" | "subtask_join" => Self::SubtaskJoin,
             "host_subtask_kill" | "subtask_kill" => Self::SubtaskKill,
             "host_subtask_wait_all" | "subtask_wait_all" => Self::SubtaskWaitAll,
+            "host_collection_put" | "collection_put" => Self::CollectionPut,
+            "host_list_prepend" | "list_prepend" => Self::ListPrepend,
+            "host_list_concat" | "list_concat" => Self::ListConcat,
+            "host_list_insert" | "list_insert" => Self::ListInsert,
+            "host_list_set_at" | "list_set_at" => Self::ListSetAt,
+            "host_list_remove_at" | "list_remove_at" => Self::ListRemoveAt,
+            "host_list_slice" | "list_slice" => Self::ListSlice,
+            "host_list_contains" | "list_contains" => Self::ListContains,
+            "host_list_index_of" | "list_index_of" => Self::ListIndexOf,
+            "host_list_reverse" | "list_reverse" => Self::ListReverse,
+            "host_list_first" | "list_first" => Self::ListFirst,
+            "host_list_last" | "list_last" => Self::ListLast,
+            "host_map_get" | "map_get" => Self::MapGet,
+            "host_map_delete" | "map_delete" => Self::MapDelete,
+            "host_map_has" | "map_has" => Self::MapHas,
+            "host_map_keys" | "map_keys" => Self::MapKeys,
+            "host_map_values" | "map_values" => Self::MapValues,
+            "host_map_items" | "map_items" => Self::MapItems,
+            "host_map_merge" | "map_merge" => Self::MapMerge,
+            "host_map_size" | "map_size" => Self::MapSize,
+            "host_collection_clear" | "collection_clear" => Self::CollectionClear,
             _ => return None,
         })
     }
@@ -383,6 +447,27 @@ impl HostFn {
             Self::ExtNativePath => "host_ext_native_path",
             Self::MapSet => "host_map_set",
             Self::ListAppend => "host_list_append",
+            Self::CollectionPut => "host_collection_put",
+            Self::ListPrepend => "host_list_prepend",
+            Self::ListConcat => "host_list_concat",
+            Self::ListInsert => "host_list_insert",
+            Self::ListSetAt => "host_list_set_at",
+            Self::ListRemoveAt => "host_list_remove_at",
+            Self::ListSlice => "host_list_slice",
+            Self::ListContains => "host_list_contains",
+            Self::ListIndexOf => "host_list_index_of",
+            Self::ListReverse => "host_list_reverse",
+            Self::ListFirst => "host_list_first",
+            Self::ListLast => "host_list_last",
+            Self::MapGet => "host_map_get",
+            Self::MapDelete => "host_map_delete",
+            Self::MapHas => "host_map_has",
+            Self::MapKeys => "host_map_keys",
+            Self::MapValues => "host_map_values",
+            Self::MapItems => "host_map_items",
+            Self::MapMerge => "host_map_merge",
+            Self::MapSize => "host_map_size",
+            Self::CollectionClear => "host_collection_clear",
             Self::WritebackRecord => "host_writeback_record",
             Self::WritebackGet => "host_writeback_get",
             Self::WritebackClear => "host_writeback_clear",
@@ -451,6 +536,20 @@ impl HostFn {
             Self::WritebackScanPath => &["path"],
             Self::MapSet => &["map", "key", "value"],
             Self::ListAppend => &["list", "item"],
+            Self::CollectionPut => &["in", "at", "value"],
+            Self::ListPrepend => &["list", "item"],
+            Self::ListConcat => &["a", "b"],
+            Self::ListInsert => &["list", "index", "item"],
+            Self::ListSetAt => &["list", "index", "item"],
+            Self::ListRemoveAt => &["list", "index"],
+            Self::ListSlice => &["list", "start"],
+            Self::ListContains => &["list", "item"],
+            Self::ListIndexOf => &["list", "item"],
+            Self::ListReverse | Self::ListFirst | Self::ListLast => &["list"],
+            Self::MapGet | Self::MapDelete | Self::MapHas => &["map", "key"],
+            Self::MapKeys | Self::MapValues | Self::MapItems | Self::MapSize => &["map"],
+            Self::MapMerge => &["a", "b"],
+            Self::CollectionClear => &["value"],
             Self::WritebackRecord => &["value"],
             Self::WritebackGet | Self::WritebackClear => &[],
             Self::WritebackList => &[],
@@ -482,6 +581,7 @@ impl HostFn {
             }
             Self::WritebackEnsure => &["placeholder", "line"],
             Self::SubtaskSpawn => &["path", "fn", "args", "code", "lang", "source", "stdin", "quiet"],
+            Self::ListSlice => &["end"],
             _ => &[],
         }
     }
@@ -670,11 +770,66 @@ pub fn call_host(
             })
         }
         HostFn::MapSet => {
-            agent_rt::map_set(require(bound, "map")?, require(bound, "key")?, require(bound, "value")?)
+            super::collection::map_set(require(bound, "map")?, require(bound, "key")?, require(bound, "value")?)
         }
         HostFn::ListAppend => {
-            agent_rt::list_append(require(bound, "list")?, require(bound, "item")?)
+            super::collection::list_append(require(bound, "list")?, require(bound, "item")?)
         }
+        HostFn::CollectionPut => super::collection::collection_put(
+            require(bound, "in")?,
+            require(bound, "at")?,
+            require(bound, "value")?,
+        ),
+        HostFn::ListPrepend => {
+            super::collection::list_prepend(require(bound, "list")?, require(bound, "item")?)
+        }
+        HostFn::ListConcat => {
+            super::collection::list_concat(require(bound, "a")?, require(bound, "b")?)
+        }
+        HostFn::ListInsert => {
+            let idx = match require(bound, "index")? {
+                Value::Int(n) => *n,
+                _ => return Err("index must be int".into()),
+            };
+            super::collection::list_insert(require(bound, "list")?, idx, require(bound, "item")?)
+        }
+        HostFn::ListSetAt => {
+            let idx = match require(bound, "index")? {
+                Value::Int(n) => *n,
+                _ => return Err("index must be int".into()),
+            };
+            super::collection::list_set_at(require(bound, "list")?, idx, require(bound, "item")?)
+        }
+        HostFn::ListRemoveAt => {
+            let idx = match require(bound, "index")? {
+                Value::Int(n) => *n,
+                _ => return Err("index must be int".into()),
+            };
+            super::collection::list_remove_at(require(bound, "list")?, idx)
+        }
+        HostFn::ListSlice => super::collection::list_slice_bound(
+            require(bound, "list")?,
+            require(bound, "start")?,
+            bound.get("end"),
+        ),
+        HostFn::ListContains => {
+            super::collection::list_contains(require(bound, "list")?, require(bound, "item")?)
+        }
+        HostFn::ListIndexOf => {
+            super::collection::list_index_of(require(bound, "list")?, require(bound, "item")?)
+        }
+        HostFn::ListReverse => super::collection::list_reverse(require(bound, "list")?),
+        HostFn::ListFirst => super::collection::list_first(require(bound, "list")?),
+        HostFn::ListLast => super::collection::list_last(require(bound, "list")?),
+        HostFn::MapGet => super::collection::map_get(require(bound, "map")?, require(bound, "key")?),
+        HostFn::MapDelete => super::collection::map_delete(require(bound, "map")?, require(bound, "key")?),
+        HostFn::MapHas => super::collection::map_has(require(bound, "map")?, require(bound, "key")?),
+        HostFn::MapKeys => super::collection::map_keys(require(bound, "map")?),
+        HostFn::MapValues => super::collection::map_values(require(bound, "map")?),
+        HostFn::MapItems => super::collection::map_items(require(bound, "map")?),
+        HostFn::MapMerge => super::collection::map_merge(require(bound, "a")?, require(bound, "b")?),
+        HostFn::MapSize => super::collection::map_size(require(bound, "map")?),
+        HostFn::CollectionClear => super::collection::collection_clear(require(bound, "value")?),
         HostFn::OuterCallLine => Ok(Value::Int(
             ctx.call_site_lines
                 .first()

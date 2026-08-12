@@ -5,6 +5,7 @@
 //! Soft side-effects (no process::exit; sleep clamp) apply under view / capture only.
 
 pub mod agent_rt;
+pub mod collection;
 mod dispatch;
 pub mod event_bus;
 pub mod foreign;

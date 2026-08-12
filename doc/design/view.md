@@ -90,8 +90,16 @@ marqdo view output tests/structure/hello.mq.md -o /tmp/hello-doc
 
 ## 4. 信息架构
 
-侧栏文件索引 + 主区：结构（AST+注释；旁侧函数大纲可搜索）· 执行 · 源码。表达式为表面语法。  
-**断点调试**不在 view 内，见 [`marqdo debug`](view-debug.md)。
+侧栏文件索引 + 主区：结构（AST+注释）· 执行 · 源码。结构旁**右侧栏**（现有 outline 槽）为：
+
+| 区块 | 内容 |
+|------|------|
+| **Functions** | 原函数大纲 + 搜索；可折叠（默认展开） |
+| **Variables** | 跑完后的入口（`# main`）顶层绑定只读快照；List/Map/`@` 行向渲成 HTML 表；可折叠（默认展开） |
+
+view Variables ≠ debug Variables：前者是跑后快照，后者是暂停时的 locals。`--no-exec` 时 Variables 显示 skipped。Live `/api/run` 终态帧可带 `bindings_html` 刷新该面板。
+
+表达式为表面语法。**断点调试**不在 view 内，见 [`marqdo debug`](view-debug.md)。
 
 ---
 

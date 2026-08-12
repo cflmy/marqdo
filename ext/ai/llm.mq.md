@@ -4,6 +4,7 @@ description: OpenAI-compatible LLM object (English). Import ext/ai/llm.mq.md.
 > lib/sys.mq.md
 > lib/net.mq.md
 > lib/json.mq.md
+> lib/table.mq.md
 ---
 
 ## load_env
@@ -18,14 +19,14 @@ Load `.env` from cwd (optional named arg `path=`). Does not override existing va
 
 Reduce a `complete stream=True` event list to the final `done.result` text (or `error.message`). Unknown event types abort.
 
-*answer = "" *
+*answer = ""*
 
 - [ev](events)
-  *t = ev[^type] *
+  *t = ev[^type]*
   1. `t` == "done"
-    *answer = ev[^result] *
+    *answer = ev[^result]*
   2. `t` == "error"
-    *answer = ev[^message] *
+    *answer = ev[^message]*
   3. `t` == "delta"
   4. *
     > print text=ext/ai/llm: unexpected SSE event type
@@ -38,25 +39,25 @@ Reduce a `complete stream=True` event list to the final `done.result` text (or `
 
 Construct an LLM handle from `OPENAI_*` / `MARQDO_LLM_*`.
 
-*api_key = > sys.env_get name=OPENAI_API_KEY *
+*api_key = > sys.env_get name=OPENAI_API_KEY*
 1. not `api_key`
-  *api_key = > sys.env_get name=MARQDO_LLM_API_KEY *
+  *api_key = > sys.env_get name=MARQDO_LLM_API_KEY*
 
 1. not `api_key`
   > print text=ext/ai/llm: set OPENAI_API_KEY or MARQDO_LLM_API_KEY
   > sys.exit code=1
 
-*base_url = > sys.env_get name=OPENAI_BASE_URL *
+*base_url = > sys.env_get name=OPENAI_BASE_URL*
 1. not `base_url`
-  *base_url = > sys.env_get name=MARQDO_LLM_BASE_URL *
+  *base_url = > sys.env_get name=MARQDO_LLM_BASE_URL*
 1. not `base_url`
-  *base_url = "https://api.openai.com/v1" *
+  *base_url = "https://api.openai.com/v1"*
 
-*model = > sys.env_get name=OPENAI_MODEL *
+*model = > sys.env_get name=OPENAI_MODEL*
 1. not `model`
-  *model = > sys.env_get name=MARQDO_LLM_MODEL *
+  *model = > sys.env_get name=MARQDO_LLM_MODEL*
 1. not `model`
-  *model = "gpt-4o-mini" *
+  *model = "gpt-4o-mini"*
 
 `h` =
 
@@ -73,19 +74,17 @@ Construct an LLM handle from `OPENAI_*` / `MARQDO_LLM_*`.
 
 Chat completion using `self` handle fields.
 
-Wire body is `{model, messages:[{role,content}], stream?}` — message row is a table; `stream` flag still needs a map set when true. Headers use one `json.set` because a 1-col table is a List, not a Map.
+Wire body is `{model, messages:[{role,content}], stream?}`. Messages are an `@` row table; headers and optional `stream` use `table.put`. `json` is only for stringify/parse.
 
-*url = self[^base_url] + self[^suffix] *
-*auth = self[^bearer] + self[^api_key] *
-*headers = > json.set map=None key=Authorization value=`auth` *
+*url = self[^base_url] + self[^suffix]*
+*auth = self[^bearer] + self[^api_key]*
+*headers = > table.put in=None at=Authorization value=`auth`*
 
-`msg` =
+`messages` =
 
-| role | content |
-|------|---------|
-| user | `prompt` |
-
-*messages = > json.append list=None item=`msg` *
+| @ | role | content |
+|---|------|---------|
+| 1 | user | `prompt` |
 
 `req` =
 
@@ -94,9 +93,9 @@ Wire body is `{model, messages:[{role,content}], stream?}` — message row is a 
 | self[^model] | `messages` |
 
 1. `stream`
-  *req = > json.set map=`req` key=stream value=True *
-  *body = > json.stringify value=`req` *
-  *resp = > net.http_post_sse url=`url` body=`body` headers=`headers` echo=`echo` *
+  *req = > table.put in=`req` at=stream value=True*
+  *body = > json.stringify value=`req`*
+  *resp = > net.http_post_sse url=`url` body=`body` headers=`headers` echo=`echo`*
   1. resp[^status] == 200
     **resp[^events]**
   2. *
@@ -104,10 +103,10 @@ Wire body is `{model, messages:[{role,content}], stream?}` — message row is a 
     > print text=resp[^status]
     > sys.exit code=1
 2. *
-  *body = > json.stringify value=`req` *
-  *resp = > net.http_post url=`url` body=`body` headers=`headers` *
+  *body = > json.stringify value=`req`*
+  *resp = > net.http_post url=`url` body=`body` headers=`headers`*
   1. resp[^status] == 200
-    *data = > json.parse text=resp[^body] *
+    *data = > json.parse text=resp[^body]*
     **data[^choices][^1][^message][^content]**
   2. *
     > print text=ext/ai/llm: HTTP error

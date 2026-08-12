@@ -23,7 +23,10 @@ use tiny_http::{Header, Method, Request, Response, Server, StatusCode};
 use crate::input_feed::{effective_stdin, extract_frontmatter_stdin, split_stdin_text};
 use crate::view::debug_page::{build_debug_model, page_debug};
 use crate::view::html::{escape, page_file, page_index, LinkMode};
-use crate::view::render::{collect_input_prompts, render_module_structure, FileViewModel};
+use crate::view::render::{
+    collect_input_prompts, render_bindings_html, render_module_structure, render_right_rail,
+    FileViewModel,
+};
 use crate::{run_file_capture, RunOptions};
 
 pub struct ViewOptions {
@@ -306,18 +309,21 @@ pub(crate) fn build_file_view(
 ) -> Result<FileViewModel> {
     let mut source = fs::read_to_string(abs).with_context(|| format!("read {}", abs.display()))?;
     // Structure shows this file only — do not merge imported lib bodies into the tree.
-    let (mut structure, mut outline, input_prompts) = match crate::parse::parse_source(&source) {
-        Ok(module) => (
-            render_module_structure(&module, &source),
-            crate::view::render::render_function_outline(&module),
-            collect_input_prompts(&module),
-        ),
+    let (mut structure, mut module_opt, input_prompts) = match crate::parse::parse_source(&source) {
+        Ok(module) => {
+            let prompts = collect_input_prompts(&module);
+            (
+                render_module_structure(&module, &source),
+                Some(module),
+                prompts,
+            )
+        }
         Err(e) => (
             format!(
                 "<div class=\"err\">parse/load error: {}</div>",
                 escape(&tidy_user_error(&format!("{e:#}"), abs, rel))
             ),
-            String::new(),
+            None,
             Vec::new(),
         ),
     };
@@ -332,8 +338,14 @@ pub(crate) fn build_file_view(
     opts.sleep_limit_ms = if live { Some(30_000) } else { Some(0) };
     // Optional: sandbox to the whole view tree so sibling folders are reachable.
     opts.fs_root = Some(root.root.clone());
-    let (stdout, stderr, ok, plots) = if awaiting_input || auto_stream {
-        (String::new(), String::new(), true, Vec::new())
+    let (stdout, stderr, ok, plots, mut bindings_html) = if awaiting_input || auto_stream {
+        (
+            String::new(),
+            String::new(),
+            true,
+            Vec::new(),
+            String::new(),
+        )
     } else {
         match run_file_capture(abs, &opts) {
             Ok(cap) => (
@@ -341,12 +353,14 @@ pub(crate) fn build_file_view(
                 String::new(),
                 true,
                 cap.plots.into_iter().map(|p| p.svg).collect(),
+                render_bindings_html(&cap.bindings),
             ),
             Err(e) => (
                 String::new(),
                 tidy_user_error(&format!("{e:#}"), abs, rel),
                 false,
                 Vec::new(),
+                String::new(),
             ),
         }
     };
@@ -356,11 +370,21 @@ pub(crate) fn build_file_view(
             source = next;
             if let Ok(module) = crate::parse::parse_source(&source) {
                 structure = render_module_structure(&module, &source);
-                outline = crate::view::render::render_function_outline(&module);
+                module_opt = Some(module);
             }
         }
     }
-    outline.push_str(&crate::view::render::render_writeback_outline(&source));
+    let wb = crate::view::render::render_writeback_outline(&source);
+    let outline = match &module_opt {
+        Some(module) => render_right_rail(module, &bindings_html, &wb),
+        None => {
+            if bindings_html.is_empty() && wb.is_empty() {
+                String::new()
+            } else {
+                render_right_rail(&crate::ast::Module::default(), &bindings_html, &wb)
+            }
+        }
+    };
     Ok(FileViewModel {
         rel_path: rel.to_string(),
         source,
@@ -374,6 +398,7 @@ pub(crate) fn build_file_view(
         awaiting_input,
         auto_stream,
         plots,
+        bindings_html: std::mem::take(&mut bindings_html),
     })
 }
 
@@ -607,12 +632,14 @@ fn api_run(root: &ViewRoot, mut request: Request) -> Result<()> {
             Ok(cap) => {
                 // Keep the terminal frame small — tokens already streamed via bus.
                 let preview: String = cap.stdout.chars().take(500).collect();
+                let bindings_html = render_bindings_html(&cap.bindings);
                 let done = serde_json::json!({
                     "type": "done",
                     "run_id": run_id,
                     "path": rel_clone,
                     "ok": true,
                     "result": preview,
+                    "bindings_html": bindings_html,
                 });
                 crate::host::event_bus::EventBus::global().publish_json(&done.to_string());
             }
