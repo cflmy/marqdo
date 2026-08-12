@@ -138,6 +138,19 @@ fn arg_u(v: &Value, key: &str) -> Result<usize, String> {
     }
 }
 
+fn arg_f(v: &Value, key: &str) -> Result<f64, String> {
+    match v.get(key) {
+        Some(Value::Number(n)) => n
+            .as_f64()
+            .ok_or_else(|| format!("bad `{key}`")),
+        Some(Value::String(s)) => s
+            .trim()
+            .parse()
+            .map_err(|_| format!("bad `{key}`")),
+        _ => Err(format!("missing `{key}`")),
+    }
+}
+
 fn circuit_of(args: &Value) -> Result<&Value, String> {
     args.get("circuit")
         .or_else(|| args.get("电路"))
@@ -174,10 +187,55 @@ q_ffi!(quantum_x, |args: &Value| {
     sim::push_op(c, "X", vec![q], None)
 });
 
+q_ffi!(quantum_y, |args: &Value| {
+    let c = circuit_of(args)?;
+    let q = arg_u(args, "qubit").or_else(|_| arg_u(args, "比特"))?;
+    sim::push_op(c, "Y", vec![q], None)
+});
+
+q_ffi!(quantum_z, |args: &Value| {
+    let c = circuit_of(args)?;
+    let q = arg_u(args, "qubit").or_else(|_| arg_u(args, "比特"))?;
+    sim::push_op(c, "Z", vec![q], None)
+});
+
+q_ffi!(quantum_s, |args: &Value| {
+    let c = circuit_of(args)?;
+    let q = arg_u(args, "qubit").or_else(|_| arg_u(args, "比特"))?;
+    sim::push_op(c, "S", vec![q], None)
+});
+
+q_ffi!(quantum_t, |args: &Value| {
+    let c = circuit_of(args)?;
+    let q = arg_u(args, "qubit").or_else(|_| arg_u(args, "比特"))?;
+    sim::push_op(c, "T", vec![q], None)
+});
+
 q_ffi!(quantum_i, |args: &Value| {
     let c = circuit_of(args)?;
     let q = arg_u(args, "qubit").or_else(|_| arg_u(args, "比特"))?;
     sim::push_op(c, "I", vec![q], None)
+});
+
+q_ffi!(quantum_rx, |args: &Value| {
+    let c = circuit_of(args)?;
+    let q = arg_u(args, "qubit").or_else(|_| arg_u(args, "比特"))?;
+    let th = arg_f(args, "theta").or_else(|_| arg_f(args, "参数"))?;
+    sim::push_op(c, "RX", vec![q], Some(th))
+});
+
+q_ffi!(quantum_ry, |args: &Value| {
+    let c = circuit_of(args)?;
+    let q = arg_u(args, "qubit").or_else(|_| arg_u(args, "比特"))?;
+    let th = arg_f(args, "theta").or_else(|_| arg_f(args, "参数"))?;
+    sim::push_op(c, "RY", vec![q], Some(th))
+});
+
+q_ffi!(quantum_rz, |args: &Value| {
+    let c = circuit_of(args)?;
+    let q = arg_u(args, "qubit").or_else(|_| arg_u(args, "比特"))?;
+    let th = arg_f(args, "theta").or_else(|_| arg_f(args, "参数"))?;
+    sim::push_op(c, "RZ", vec![q], Some(th))
 });
 
 q_ffi!(quantum_cx, |args: &Value| {
@@ -185,6 +243,20 @@ q_ffi!(quantum_cx, |args: &Value| {
     let control = arg_u(args, "control").or_else(|_| arg_u(args, "控制"))?;
     let target = arg_u(args, "target").or_else(|_| arg_u(args, "目标"))?;
     sim::push_op(c, "CX", vec![control, target], None)
+});
+
+q_ffi!(quantum_cz, |args: &Value| {
+    let c = circuit_of(args)?;
+    let control = arg_u(args, "control").or_else(|_| arg_u(args, "控制"))?;
+    let target = arg_u(args, "target").or_else(|_| arg_u(args, "目标"))?;
+    sim::push_op(c, "CZ", vec![control, target], None)
+});
+
+q_ffi!(quantum_swap, |args: &Value| {
+    let c = circuit_of(args)?;
+    let a = arg_u(args, "a").or_else(|_| arg_u(args, "比特甲"))?;
+    let b = arg_u(args, "b").or_else(|_| arg_u(args, "比特乙"))?;
+    sim::push_op(c, "SWAP", vec![a, b], None)
 });
 
 q_ffi!(quantum_simulate, |args: &Value| {
@@ -201,6 +273,17 @@ q_ffi!(quantum_probabilities, |args: &Value| {
     let c = circuit_of(args)?;
     let (qubits, amps) = sim::simulate_circuit(c)?;
     Ok(Value::Object(sim::probabilities(&amps, qubits)))
+});
+
+q_ffi!(quantum_run, |args: &Value| {
+    let c = circuit_of(args)?;
+    let shots = arg_u(args, "shots")
+        .or_else(|_| arg_u(args, "次数"))
+        .unwrap_or(1024);
+    let seed = arg_u(args, "seed")
+        .or_else(|_| arg_u(args, "种子"))
+        .unwrap_or(1) as u64;
+    sim::run_circuit(c, shots, seed)
 });
 
 fn register(host: &MarqdoHostApi, name: &str, params: &str, fn_ptr: PluginFn) -> c_int {
@@ -241,12 +324,25 @@ pub unsafe extern "C" fn marqdo_plugin_init(host: *const MarqdoHostApi) -> c_int
         ),
         ("quantum_h", "circuit,qubit", quantum_h as PluginFn),
         ("quantum_x", "circuit,qubit", quantum_x as PluginFn),
+        ("quantum_y", "circuit,qubit", quantum_y as PluginFn),
+        ("quantum_z", "circuit,qubit", quantum_z as PluginFn),
+        ("quantum_s", "circuit,qubit", quantum_s as PluginFn),
+        ("quantum_t", "circuit,qubit", quantum_t as PluginFn),
         ("quantum_i", "circuit,qubit", quantum_i as PluginFn),
+        ("quantum_rx", "circuit,qubit,theta", quantum_rx as PluginFn),
+        ("quantum_ry", "circuit,qubit,theta", quantum_ry as PluginFn),
+        ("quantum_rz", "circuit,qubit,theta", quantum_rz as PluginFn),
         (
             "quantum_cx",
             "circuit,control,target",
             quantum_cx as PluginFn,
         ),
+        (
+            "quantum_cz",
+            "circuit,control,target",
+            quantum_cz as PluginFn,
+        ),
+        ("quantum_swap", "circuit,a,b", quantum_swap as PluginFn),
         (
             "quantum_simulate",
             "circuit",
@@ -257,6 +353,7 @@ pub unsafe extern "C" fn marqdo_plugin_init(host: *const MarqdoHostApi) -> c_int
             "circuit",
             quantum_probabilities as PluginFn,
         ),
+        ("quantum_run", "circuit,shots,seed", quantum_run as PluginFn),
     ];
     for (name, params, f) in regs {
         if register(host, name, params, f) != 0 {

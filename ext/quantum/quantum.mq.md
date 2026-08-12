@@ -36,16 +36,66 @@ State-vector circuit (default |0…0⟩). Methods append gates and return an upd
 
 **> quantum_x circuit=`self` qubit=`qubit`**
 
+## y
+    + `qubit`=0
+
+**> quantum_y circuit=`self` qubit=`qubit`**
+
+## z
+    + `qubit`=0
+
+**> quantum_z circuit=`self` qubit=`qubit`**
+
+## s
+    + `qubit`=0
+
+**> quantum_s circuit=`self` qubit=`qubit`**
+
+## t
+    + `qubit`=0
+
+**> quantum_t circuit=`self` qubit=`qubit`**
+
 ## i
     + `qubit`=0
 
 **> quantum_i circuit=`self` qubit=`qubit`**
+
+## rx
+    + `qubit`=0
+    + `theta`
+
+**> quantum_rx circuit=`self` qubit=`qubit` theta=`theta`**
+
+## ry
+    + `qubit`=0
+    + `theta`
+
+**> quantum_ry circuit=`self` qubit=`qubit` theta=`theta`**
+
+## rz
+    + `qubit`=0
+    + `theta`
+
+**> quantum_rz circuit=`self` qubit=`qubit` theta=`theta`**
 
 ## cx
     + `control`=0
     + `target`=1
 
 **> quantum_cx circuit=`self` control=`control` target=`target`**
+
+## cz
+    + `control`=0
+    + `target`=1
+
+**> quantum_cz circuit=`self` control=`control` target=`target`**
+
+## swap
+    + `a`=0
+    + `b`=1
+
+**> quantum_swap circuit=`self` a=`a` b=`b`**
 
 ## simulate
 
@@ -58,3 +108,11 @@ Return state vector amplitudes `{re,im}`.
 Return map of basis label → probability (qubit 0 = rightmost bit).
 
 **> quantum_probabilities circuit=`self`**
+
+## run
+    + `shots`=1024
+    + `seed`=1
+
+Sample computational-basis shots (deterministic with `seed=`).
+
+**> quantum_run circuit=`self` shots=`shots` seed=`seed`**

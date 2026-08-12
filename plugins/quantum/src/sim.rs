@@ -132,6 +132,121 @@ pub fn apply_cx(amps: &mut [C], control: usize, target: usize) {
     }
 }
 
+pub fn apply_y(amps: &mut [C], q: usize) {
+    // [[0, -i], [i, 0]]
+    apply_u2(
+        amps,
+        q,
+        C::zero(),
+        C::new(0.0, -1.0),
+        C::new(0.0, 1.0),
+        C::zero(),
+    );
+}
+
+pub fn apply_z(amps: &mut [C], q: usize) {
+    apply_u2(
+        amps,
+        q,
+        C::one(),
+        C::zero(),
+        C::zero(),
+        C::new(-1.0, 0.0),
+    );
+}
+
+pub fn apply_s(amps: &mut [C], q: usize) {
+    apply_u2(
+        amps,
+        q,
+        C::one(),
+        C::zero(),
+        C::zero(),
+        C::new(0.0, 1.0),
+    );
+}
+
+pub fn apply_t(amps: &mut [C], q: usize) {
+    let s = std::f64::consts::FRAC_1_SQRT_2;
+    apply_u2(
+        amps,
+        q,
+        C::one(),
+        C::zero(),
+        C::zero(),
+        C::new(s, s),
+    );
+}
+
+pub fn apply_rx(amps: &mut [C], q: usize, theta: f64) {
+    let half = theta / 2.0;
+    let c = half.cos();
+    let s = half.sin();
+    apply_u2(
+        amps,
+        q,
+        C::new(c, 0.0),
+        C::new(0.0, -s),
+        C::new(0.0, -s),
+        C::new(c, 0.0),
+    );
+}
+
+pub fn apply_ry(amps: &mut [C], q: usize, theta: f64) {
+    let half = theta / 2.0;
+    let c = half.cos();
+    let s = half.sin();
+    apply_u2(
+        amps,
+        q,
+        C::new(c, 0.0),
+        C::new(-s, 0.0),
+        C::new(s, 0.0),
+        C::new(c, 0.0),
+    );
+}
+
+pub fn apply_rz(amps: &mut [C], q: usize, theta: f64) {
+    let half = theta / 2.0;
+    apply_u2(
+        amps,
+        q,
+        C::new((-half).cos(), (-half).sin()),
+        C::zero(),
+        C::zero(),
+        C::new(half.cos(), half.sin()),
+    );
+}
+
+pub fn apply_cz(amps: &mut [C], control: usize, target: usize) {
+    if control == target {
+        return;
+    }
+    for (i, a) in amps.iter_mut().enumerate() {
+        if bit(i, control) && bit(i, target) {
+            *a = a.scale(-1.0);
+        }
+    }
+}
+
+pub fn apply_swap(amps: &mut [C], a: usize, b: usize) {
+    if a == b {
+        return;
+    }
+    let n = amps.len();
+    for i in 0..n {
+        let j = if bit(i, a) != bit(i, b) {
+            flip(flip(i, a), b)
+        } else {
+            i
+        };
+        if i < j {
+            amps.swap(i, j);
+        }
+    }
+}
+
+
 pub fn zero_state(qubits: usize) -> Vec<C> {
     let dim = 1usize << qubits;
     let mut amps = vec![C::zero(); dim];
@@ -174,8 +289,7 @@ pub fn amps_to_json(amps: &[C]) -> Value {
 pub struct Op {
     pub gate: String,
     pub qubits: Vec<usize>,
-    #[allow(dead_code)]
-    pub theta: Option<f64>, // reserved for Rx/Ry/Rz (Q2)
+    pub theta: Option<f64>,
 }
 
 pub fn parse_ops(circuit: &Value) -> Result<Vec<Op>, String> {
@@ -263,9 +377,40 @@ pub fn apply_op(amps: &mut [C], qubits: usize, op: &Op) -> Result<(), String> {
             let q = *op.qubits.first().ok_or("X needs qubit")?;
             apply_x(amps, q);
         }
+        "Y" => {
+            let q = *op.qubits.first().ok_or("Y needs qubit")?;
+            apply_y(amps, q);
+        }
+        "Z" => {
+            let q = *op.qubits.first().ok_or("Z needs qubit")?;
+            apply_z(amps, q);
+        }
+        "S" => {
+            let q = *op.qubits.first().ok_or("S needs qubit")?;
+            apply_s(amps, q);
+        }
+        "T" => {
+            let q = *op.qubits.first().ok_or("T needs qubit")?;
+            apply_t(amps, q);
+        }
         "H" | "HADAMARD" => {
             let q = *op.qubits.first().ok_or("H needs qubit")?;
             apply_h(amps, q);
+        }
+        "RX" => {
+            let q = *op.qubits.first().ok_or("Rx needs qubit")?;
+            let th = op.theta.ok_or("Rx needs theta")?;
+            apply_rx(amps, q, th);
+        }
+        "RY" => {
+            let q = *op.qubits.first().ok_or("Ry needs qubit")?;
+            let th = op.theta.ok_or("Ry needs theta")?;
+            apply_ry(amps, q, th);
+        }
+        "RZ" => {
+            let q = *op.qubits.first().ok_or("Rz needs qubit")?;
+            let th = op.theta.ok_or("Rz needs theta")?;
+            apply_rz(amps, q, th);
         }
         "CX" | "CNOT" | "CN" => {
             if op.qubits.len() < 2 {
@@ -273,9 +418,101 @@ pub fn apply_op(amps: &mut [C], qubits: usize, op: &Op) -> Result<(), String> {
             }
             apply_cx(amps, op.qubits[0], op.qubits[1]);
         }
-        other => return Err(format!("unsupported gate `{other}` in Q1 (use I/X/H/CX)")),
+        "CZ" => {
+            if op.qubits.len() < 2 {
+                return Err("CZ needs control and target".into());
+            }
+            apply_cz(amps, op.qubits[0], op.qubits[1]);
+        }
+        "SWAP" => {
+            if op.qubits.len() < 2 {
+                return Err("SWAP needs two qubits".into());
+            }
+            apply_swap(amps, op.qubits[0], op.qubits[1]);
+        }
+        other => {
+            return Err(format!(
+                "unsupported gate `{other}` (I/X/Y/Z/H/S/T/Rx/Ry/Rz/CX/CZ/SWAP)"
+            ));
+        }
     }
     Ok(())
+}
+
+struct Rng {
+    state: u64,
+}
+
+impl Rng {
+    fn new(seed: u64) -> Self {
+        Self {
+            state: if seed == 0 { 0x9e37_79b9_7f4a_7c15 } else { seed },
+        }
+    }
+    fn next_u64(&mut self) -> u64 {
+        // SplitMix64
+        self.state = self.state.wrapping_add(0x9e37_79b9_7f4a_7c15);
+        let mut z = self.state;
+        z = (z ^ (z >> 30)).wrapping_mul(0xbf58_476d_1ce4_e5b9);
+        z = (z ^ (z >> 27)).wrapping_mul(0x94d0_49bb_1331_11eb);
+        z ^ (z >> 31)
+    }
+    fn next_f64(&mut self) -> f64 {
+        (self.next_u64() >> 11) as f64 / ((1u64 << 53) as f64)
+    }
+}
+
+/// Sample computational-basis shots; returns counts map.
+pub fn sample_counts(amps: &[C], qubits: usize, shots: usize, seed: u64) -> Map<String, Value> {
+    let mut cdf = Vec::with_capacity(amps.len());
+    let mut acc = 0.0;
+    for a in amps {
+        acc += a.norm_sq();
+        cdf.push(acc);
+    }
+    if acc <= 0.0 {
+        return Map::new();
+    }
+    // normalize cdf tail to 1
+    let inv = 1.0 / acc;
+    for x in &mut cdf {
+        *x *= inv;
+    }
+    let mut counts: Map<String, Value> = Map::new();
+    let mut rng = Rng::new(seed);
+    for _ in 0..shots {
+        let r = rng.next_f64();
+        let mut idx = 0usize;
+        for (i, &c) in cdf.iter().enumerate() {
+            if r <= c {
+                idx = i;
+                break;
+            }
+            idx = i;
+        }
+        let label = basis_label(idx, qubits);
+        let n = counts
+            .get(&label)
+            .and_then(|v| v.as_u64())
+            .unwrap_or(0)
+            + 1;
+        counts.insert(label, json!(n));
+    }
+    counts
+}
+
+pub fn run_circuit(circuit: &Value, shots: usize, seed: u64) -> Result<Value, String> {
+    if shots == 0 {
+        return Err("shots must be >= 1".into());
+    }
+    let (qubits, amps) = simulate_circuit(circuit)?;
+    let counts = sample_counts(&amps, qubits, shots, seed);
+    Ok(json!({
+        "qubits": qubits,
+        "shots": shots,
+        "seed": seed,
+        "counts": counts,
+    }))
 }
 
 pub fn simulate_circuit(circuit: &Value) -> Result<(usize, Vec<C>), String> {
