@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| 状态 | **Q0–Q5 最小切片已落地**（教学噪声 + 作者面补齐；更大 n / 完整开放系统另文） |
+| 状态 | **Q0–Q5 最小 + Q5.5 振幅阻尼已落地**（更大 n / 完整开放系统另文） |
 | 日期 | 2026-08-12 |
 | **锁定设计** | [design/ext-quantum.md](../design/ext-quantum.md) |
 | 相关 | [ext-cli.md](../design/ext-cli.md) · [ext-abi.md](../design/ext-abi.md) · [stdlib-math.md](../design/stdlib-math.md) · [view.md](../design/view.md) |
@@ -28,8 +28,9 @@
 | **Q3** | `steps=` 电路表；`draw` 轨线 SVG；view `record_plot` 或值识别 | **done** |
 | **Q4** | 概率条 / 布洛赫；`matches_matrix`；examples + 用户文档 | **done** |
 | **Q5** | 教学噪声 + barrier/measure/append/state — [ext-quantum-q5.md](../design/ext-quantum-q5.md) | **done（最小）** |
+| **Q5.5** | `amplitude_damping` 轨迹 — [ext-quantum-q5.5.md](../design/ext-quantum-q5.5.md) | **done** |
 
-验收金样：`tests/ext/quantum-bell-smoke.mq.md`、`quantum-draw-smoke.mq.md`、`quantum-gate-matrix-smoke.mq.md`、`quantum-gate-heatmap-smoke.mq.md`、`quantum-author-api-smoke.mq.md`、`quantum-noise-smoke.mq.md`、中文对称样例（`quantum-author-api-zh-smoke` / `quantum-noise-zh-smoke`）。
+验收金样：`tests/ext/quantum-bell-smoke.mq.md`、`quantum-draw-smoke.mq.md`、`quantum-gate-matrix-smoke.mq.md`、`quantum-gate-heatmap-smoke.mq.md`、`quantum-author-api-smoke.mq.md`、`quantum-noise-smoke.mq.md`、`quantum-amp-damp-smoke.mq.md`、中文对称样例（`quantum-author-api-zh-smoke` / `quantum-noise-zh-smoke` / `quantum-amp-damp-zh-smoke`）。
 
 ---
 

@@ -122,7 +122,7 @@ Append another circuit's ops or a `{gate,qubits}` op map.
     + `kind`
     + `p`
 
-Teaching noise for `run` trajectories (`bitflip` / `depolarizing`). Ignored by `simulate` / `probabilities`.
+Teaching noise for `run` trajectories (`bitflip` / `depolarizing` / `amplitude_damping`). Ignored by `simulate` / `probabilities`.
 
 **> quantum_noise circuit=`self` kind=`kind` p=`p`**
 

@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| 状态 | **Accepted · Q0–Q5 最小切片已落地**（教学噪声 + barrier/measure/append/state；完整开放系统另文） |
+| 状态 | **Accepted · Q0–Q5.5 已落地**（教学噪声含振幅阻尼；完整开放系统另文） |
 | 日期 | 2026-08-12 |
 | 相关 | [stdlib-math.md](stdlib-math.md) · [ext-abi.md](ext-abi.md) · [ext-cli.md](ext-cli.md) · [ext-web.md](ext-web.md) · [view.md](view.md) · [stdlib-i18n.md](stdlib-i18n.md) · [roadmap/ext-quantum.md](../roadmap/ext-quantum.md) |
 | 安装（目标） | `marqdo ext add quantum`（中英：`quantum` / `量子`） |

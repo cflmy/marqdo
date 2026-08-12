@@ -474,8 +474,23 @@ pub fn is_unitary_op(op: &Op) -> bool {
 
 #[derive(Clone, Debug)]
 pub struct NoiseSpec {
-    pub kind: String, // bitflip | depolarizing
+    pub kind: String, // bitflip | depolarizing | amplitude_damping
     pub p: f64,
+}
+
+fn normalize_noise_kind(k: &str) -> Result<&'static str, String> {
+    match k.trim().to_ascii_lowercase().as_str() {
+        "bitflip" | "bit_flip" | "比特翻转" => Ok("bitflip"),
+        "depolarizing" | "depolarise" | "退极化" => Ok("depolarizing"),
+        "amplitude_damping"
+        | "amplitude-damping"
+        | "amp_damp"
+        | "ampdamp"
+        | "振幅阻尼" => Ok("amplitude_damping"),
+        other => Err(format!(
+            "unknown noise kind `{other}` (bitflip|depolarizing|amplitude_damping)"
+        )),
+    }
 }
 
 pub fn parse_noise(circuit: &Value) -> Result<Option<NoiseSpec>, String> {
@@ -494,15 +509,7 @@ pub fn parse_noise(circuit: &Value) -> Result<Option<NoiseSpec>, String> {
             if !(0.0..=1.0).contains(&p) {
                 return Err("noise p must be in [0,1]".into());
             }
-            let kind = match k.as_str() {
-                "bitflip" | "bit_flip" | "比特翻转" => "bitflip".into(),
-                "depolarizing" | "depolarise" | "退极化" => "depolarizing".into(),
-                other => {
-                    return Err(format!(
-                        "unknown noise kind `{other}` (bitflip|depolarizing)"
-                    ));
-                }
-            };
+            let kind = normalize_noise_kind(&k)?.to_string();
             Ok(Some(NoiseSpec { kind, p }))
         }
         _ => Err("noise needs both kind and p".into()),
@@ -513,15 +520,7 @@ pub fn set_noise(circuit: &Value, kind: &str, p: f64) -> Result<Value, String> {
     if !(0.0..=1.0).contains(&p) {
         return Err("noise p must be in [0,1]".into());
     }
-    let k = match kind.trim().to_ascii_lowercase().as_str() {
-        "bitflip" | "bit_flip" | "比特翻转" => "bitflip",
-        "depolarizing" | "depolarise" | "退极化" => "depolarizing",
-        other => {
-            return Err(format!(
-                "unknown noise kind `{other}` (bitflip|depolarizing)"
-            ));
-        }
-    };
+    let k = normalize_noise_kind(kind)?;
     let mut obj = circuit.as_object().cloned().unwrap_or_default();
     obj.insert("noise_kind".into(), json!(k));
     obj.insert("noise_p".into(), json!(p));
@@ -580,6 +579,27 @@ impl Rng {
     }
 }
 
+fn apply_amplitude_damping_jump(amps: &mut [C], q: usize) {
+    // Jump Kraus E1 = |0⟩⟨1| on qubit q, then renormalize.
+    let n = amps.len();
+    let mut out = vec![C::zero(); n];
+    for i in 0..n {
+        if bit(i, q) {
+            let j = flip(i, q);
+            out[j] = out[j].add(amps[i]);
+        }
+    }
+    let norm_sq: f64 = out.iter().map(|c| c.norm_sq()).sum();
+    if norm_sq < 1e-30 {
+        // State had no |1⟩ weight on q — jump is a no-op.
+        return;
+    }
+    let inv = 1.0 / norm_sq.sqrt();
+    for i in 0..n {
+        amps[i] = out[i].scale(inv);
+    }
+}
+
 fn apply_noise_on_qubits(
     amps: &mut [C],
     qs: &[usize],
@@ -600,6 +620,7 @@ fn apply_noise_on_qubits(
                 1 => apply_y(amps, q),
                 _ => apply_z(amps, q),
             },
+            "amplitude_damping" => apply_amplitude_damping_jump(amps, q),
             _ => {}
         }
     }

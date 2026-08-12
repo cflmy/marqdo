@@ -1609,6 +1609,28 @@ fn ext_quantum_noise_zh_smoke() {
 }
 
 #[test]
+fn ext_quantum_amp_damp_smoke() {
+    let status = Command::new("cargo")
+        .args(["build", "-p", "marqdo_plugin_quantum"])
+        .current_dir(env!("CARGO_MANIFEST_DIR"))
+        .status()
+        .expect("build quantum plugin");
+    assert!(status.success(), "failed to build marqdo_plugin_quantum");
+    assert_out("tests/ext/quantum-amp-damp-smoke.mq.md", "amp-ok");
+}
+
+#[test]
+fn ext_quantum_amp_damp_zh_smoke() {
+    let status = Command::new("cargo")
+        .args(["build", "-p", "marqdo_plugin_quantum"])
+        .current_dir(env!("CARGO_MANIFEST_DIR"))
+        .status()
+        .expect("build quantum plugin");
+    assert!(status.success(), "failed to build marqdo_plugin_quantum");
+    assert_out("tests/ext/quantum-amp-damp-zh-smoke.mq.md", "amp-ok");
+}
+
+#[test]
 fn ext_agent_framework_smoke() {
     let status = Command::new("cargo")
         .args(["build", "-p", "marqdo_plugin_agent"])
