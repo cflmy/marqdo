@@ -1375,6 +1375,22 @@ custom-ok",
 }
 
 #[test]
+fn ext_quantum_bell_smoke() {
+    let status = Command::new("cargo")
+        .args(["build", "-p", "marqdo_plugin_quantum"])
+        .current_dir(env!("CARGO_MANIFEST_DIR"))
+        .status()
+        .expect("build quantum plugin");
+    assert!(status.success(), "failed to build marqdo_plugin_quantum");
+    assert_out(
+        "tests/ext/quantum-bell-smoke.mq.md",
+        "p00-ok
+p11-ok
+ping-ok",
+    );
+}
+
+#[test]
 fn ext_agent_framework_smoke() {
     let status = Command::new("cargo")
         .args(["build", "-p", "marqdo_plugin_agent"])

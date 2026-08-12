@@ -36,6 +36,12 @@ pub const CATALOG: &[ExtPackage] = &[
         mq_files: &["web/web.mq.md", "web/网页.mq.md"],
         native_crate: Some("marqdo_plugin_web"),
     },
+    ExtPackage {
+        id: "quantum",
+        description: "Quantum circuit simulator (ext/quantum) — gates/state vector",
+        mq_files: &["quantum/quantum.mq.md", "quantum/量子.mq.md"],
+        native_crate: Some("marqdo_plugin_quantum"),
+    },
 ];
 
 pub fn find_package(id: &str) -> Option<&'static ExtPackage> {
@@ -86,6 +92,7 @@ pub fn native_short_name(crate_or_id: &str) -> &str {
     match crate_or_id {
         "marqdo_plugin_agent" | "agent" => "agent",
         "marqdo_plugin_web" | "web" => "web",
+        "marqdo_plugin_quantum" | "quantum" => "quantum",
         other => other,
     }
 }
@@ -104,6 +111,7 @@ pub fn native_lib_filename(short: &str) -> String {
 pub fn native_env_var(short: &str) -> &'static str {
     match native_short_name(short) {
         "web" => "MARQDO_WEB_PLUGIN",
+        "quantum" => "MARQDO_QUANTUM_PLUGIN",
         _ => "MARQDO_AGENT_PLUGIN",
     }
 }
@@ -314,7 +322,7 @@ pub fn remove_ext(id: &str) -> Result<()> {
 /// Also falls back to cargo `target/{debug,release}` artifacts for local runs.
 pub fn installed_native_path(name: &str) -> Option<PathBuf> {
     let short = native_short_name(name);
-    if !matches!(short, "agent" | "web") {
+    if !matches!(short, "agent" | "web" | "quantum") {
         return None;
     }
     let lib_name = native_lib_filename(short);
@@ -353,7 +361,7 @@ pub fn path_is_trusted_plugin(path: &Path) -> bool {
             return true;
         }
     }
-    for key in ["MARQDO_AGENT_PLUGIN", "MARQDO_WEB_PLUGIN"] {
+    for key in ["MARQDO_AGENT_PLUGIN", "MARQDO_WEB_PLUGIN", "MARQDO_QUANTUM_PLUGIN"] {
         if let Ok(p) = env::var(key) {
             let p = PathBuf::from(p);
             let p = p.canonicalize().unwrap_or(p);
@@ -362,7 +370,7 @@ pub fn path_is_trusted_plugin(path: &Path) -> bool {
             }
         }
     }
-    for short in ["agent", "web"] {
+    for short in ["agent", "web", "quantum"] {
         if let Ok(found) = find_native_plugin(short) {
             let found = found.canonicalize().unwrap_or(found);
             if found == path {
