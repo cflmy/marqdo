@@ -1494,6 +1494,39 @@ fn ext_quantum_steps_smoke() {
 }
 
 #[test]
+fn ext_quantum_draw_smoke() {
+    let status = Command::new("cargo")
+        .args(["build", "-p", "marqdo_plugin_quantum"])
+        .current_dir(env!("CARGO_MANIFEST_DIR"))
+        .status()
+        .expect("build quantum plugin");
+    assert!(status.success(), "failed to build marqdo_plugin_quantum");
+    assert_out("tests/ext/quantum-draw-smoke.mq.md", "probs-ok\nbloch-ok");
+    for p in [
+        "tests/ext/quantum-draw-probs.svg",
+        "tests/ext/quantum-draw-bloch.svg",
+    ] {
+        let svg = std::fs::read_to_string(p).unwrap_or_default();
+        assert!(svg.contains("<svg"), "expected svg at {p}");
+        let _ = std::fs::remove_file(p);
+    }
+}
+
+#[test]
+fn ext_quantum_gate_matrix_smoke() {
+    let status = Command::new("cargo")
+        .args(["build", "-p", "marqdo_plugin_quantum"])
+        .current_dir(env!("CARGO_MANIFEST_DIR"))
+        .status()
+        .expect("build quantum plugin");
+    assert!(status.success(), "failed to build marqdo_plugin_quantum");
+    assert_out(
+        "tests/ext/quantum-gate-matrix-smoke.mq.md",
+        "match-ok\nreject-ok",
+    );
+}
+
+#[test]
 fn ext_agent_framework_smoke() {
     let status = Command::new("cargo")
         .args(["build", "-p", "marqdo_plugin_agent"])

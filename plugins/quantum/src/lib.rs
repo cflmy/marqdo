@@ -345,13 +345,40 @@ q_ffi!(quantum_run, |args: &Value| {
 
 q_ffi!(quantum_draw_circuit, |args: &Value| {
     let c = circuit_of(args)?;
-    let svg = draw::circuit_svg(c)?;
+    let kind = args
+        .get("kind")
+        .or_else(|| args.get("种类"))
+        .and_then(|v| v.as_str())
+        .unwrap_or("circuit")
+        .to_ascii_lowercase();
+    let qubit = arg_u(args, "qubit")
+        .or_else(|_| arg_u(args, "比特"))
+        .unwrap_or(0);
     let path = args
         .get("path")
         .or_else(|| args.get("路径"))
         .and_then(|v| v.as_str())
         .filter(|s| !s.is_empty());
-    // Prefer view/CLI plots channel; still return structured value for authors.
+
+    let (kind_out, svg) = match kind.as_str() {
+        "circuit" | "" => ("circuit", draw::circuit_svg(c)?),
+        "probs" | "probabilities" | "概率" => {
+            let (qubits, amps) = sim::simulate_circuit(c)?;
+            let probs = sim::probabilities(&amps, qubits);
+            ("probs", draw::probs_svg(&probs))
+        }
+        "bloch" | "布洛赫" => {
+            let (qubits, amps) = sim::simulate_circuit(c)?;
+            let (x, y, z) = sim::bloch_vector(&amps, qubits, qubit)?;
+            ("bloch", draw::bloch_svg(x, y, z))
+        }
+        other => {
+            return Err(format!(
+                "unknown draw kind `{other}` (circuit|probs|bloch)"
+            ));
+        }
+    };
+
     record_plot(&svg, path)?;
     let ops_n = c
         .get("ops")
@@ -364,9 +391,96 @@ q_ffi!(quantum_draw_circuit, |args: &Value| {
         .unwrap_or(0);
     Ok(json!({
         "_type": "quantum_svg",
-        "kind": "circuit",
+        "kind": kind_out,
         "qubits": qubits,
         "ops": ops_n,
+        "svg": svg,
+    }))
+});
+
+q_ffi!(quantum_gate_new, |args: &Value| {
+    let name = args
+        .get("name")
+        .or_else(|| args.get("名"))
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| "gate needs `name`".to_string())?;
+    let theta = match args.get("theta").or_else(|| args.get("参数")) {
+        None | Some(Value::Null) => None,
+        Some(v) => Some(
+            v.as_f64()
+                .or_else(|| v.as_str().and_then(|s| s.trim().parse().ok()))
+                .ok_or_else(|| "bad theta".to_string())?,
+        ),
+    };
+    sim::gate_new(name, theta)
+});
+
+q_ffi!(quantum_gate_matrix, |args: &Value| {
+    let gate = args
+        .get("gate")
+        .or_else(|| args.get("门"))
+        .ok_or_else(|| "missing `gate`".to_string())?;
+    let name = gate
+        .get("name")
+        .or_else(|| gate.get("名"))
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| "gate missing name".to_string())?;
+    let theta = gate
+        .get("theta")
+        .or_else(|| gate.get("参数"))
+        .and_then(|v| v.as_f64());
+    let m = sim::named_gate_matrix(name, theta)?;
+    Ok(sim::matrix_to_json(&m))
+});
+
+q_ffi!(quantum_gate_matches_matrix, |args: &Value| {
+    let gate = args
+        .get("gate")
+        .or_else(|| args.get("门"))
+        .ok_or_else(|| "missing `gate`".to_string())?;
+    let name = gate
+        .get("name")
+        .or_else(|| gate.get("名"))
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| "gate missing name".to_string())?;
+    let theta = gate
+        .get("theta")
+        .or_else(|| gate.get("参数"))
+        .and_then(|v| v.as_f64());
+    let matrix = args
+        .get("matrix")
+        .or_else(|| args.get("矩阵"))
+        .ok_or_else(|| "missing `matrix`".to_string())?;
+    let tol = args
+        .get("tol")
+        .or_else(|| args.get("容差"))
+        .and_then(|v| v.as_f64())
+        .unwrap_or(1e-9);
+    let expect = sim::named_gate_matrix(name, theta)?;
+    let got = sim::parse_matrix(matrix)?;
+    Ok(json!(sim::matrices_close(&expect, &got, tol)))
+});
+
+q_ffi!(quantum_gate_draw, |args: &Value| {
+    let gate = args
+        .get("gate")
+        .or_else(|| args.get("门"))
+        .ok_or_else(|| "missing `gate`".to_string())?;
+    let name = gate
+        .get("name")
+        .or_else(|| gate.get("名"))
+        .and_then(|v| v.as_str())
+        .unwrap_or("?");
+    let path = args
+        .get("path")
+        .or_else(|| args.get("路径"))
+        .and_then(|v| v.as_str())
+        .filter(|s| !s.is_empty());
+    let svg = draw::gate_svg(name);
+    record_plot(&svg, path)?;
+    Ok(json!({
+        "_type": "quantum_svg",
+        "kind": "gate",
         "svg": svg,
     }))
 });
@@ -440,8 +554,24 @@ pub unsafe extern "C" fn marqdo_plugin_init(host: *const MarqdoHostApi) -> c_int
         ("quantum_run", "circuit,shots,seed", quantum_run as PluginFn),
         (
             "quantum_draw_circuit",
-            "circuit,path",
+            "circuit,path,kind,qubit",
             quantum_draw_circuit as PluginFn,
+        ),
+        ("quantum_gate_new", "name,theta", quantum_gate_new as PluginFn),
+        (
+            "quantum_gate_matrix",
+            "gate",
+            quantum_gate_matrix as PluginFn,
+        ),
+        (
+            "quantum_gate_matches_matrix",
+            "gate,matrix,tol",
+            quantum_gate_matches_matrix as PluginFn,
+        ),
+        (
+            "quantum_gate_draw",
+            "gate,path",
+            quantum_gate_draw as PluginFn,
         ),
     ];
     for (name, params, f) in regs {

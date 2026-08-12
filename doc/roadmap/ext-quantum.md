@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| 状态 | **Q0–Q3 已落地**（设计 Accepted；Q4+ 待做） |
+| 状态 | **Q0–Q4 已落地**（设计 Accepted；Q5 可选噪声/更大 n 另文） |
 | 日期 | 2026-08-12 |
 | **锁定设计** | [design/ext-quantum.md](../design/ext-quantum.md) |
 | 相关 | [ext-cli.md](../design/ext-cli.md) · [ext-abi.md](../design/ext-abi.md) · [stdlib-math.md](../design/stdlib-math.md) · [view.md](../design/view.md) |
@@ -26,10 +26,10 @@
 | **Q1** | 态向量；I/X/H/CX；`simulate` / `probabilities`；贝尔态 gold | **done** |
 | **Q2** | Y/Z/S/T/R\* /CZ/SWAP；`run seed=`；中英 API | **done** |
 | **Q3** | `steps=` 电路表；`draw` 轨线 SVG；view `record_plot` 或值识别 | **done** |
-| **Q4** | 概率条 / 布洛赫；`matches_matrix`；examples + 用户文档 | pending |
+| **Q4** | 概率条 / 布洛赫；`matches_matrix`；examples + 用户文档 | **done** |
 | **Q5** | （可选）噪声 / 更大 n —— 另文 | pending |
 
-验收金样（目标）：`tests/ext/quantum-bell-smoke.mq.md`、`quantum-draw-smoke.mq.md`、中文对称样例。
+验收金样：`tests/ext/quantum-bell-smoke.mq.md`、`quantum-draw-smoke.mq.md`、`quantum-gate-matrix-smoke.mq.md`、中文对称样例。
 
 ---
 

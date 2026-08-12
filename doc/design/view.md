@@ -118,6 +118,8 @@ view Variables ≠ debug Variables：前者是跑后快照，后者是暂停时�
 
 ### 5.1 Stream 面板（对齐主流 LLM 呈现）
 
+**仅当**当前文件 frontmatter 导入了 `ext/ai/llm` / `大模型` 或 `ext/ai/agent` / `智能体`（及等价路径）时，在 live Execution 区显示；普通脚本页不出现该组件。
+
 参考常见助手产品（思考折叠 + 正文流式、工具/子步骤独立卡片）：**不要**把所有 SSE 事件打成一条混色终端日志。
 
 | 区块 | 事件 | 呈现 |

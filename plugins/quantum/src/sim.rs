@@ -765,3 +765,277 @@ pub fn push_op(circuit: &Value, gate: &str, qubits: Vec<usize>, theta: Option<f6
     obj.insert("ops".into(), Value::Array(ops));
     Ok(Value::Object(obj))
 }
+
+/// Bloch vector (x,y,z) for reduced density of `qubit` (LSB = qubit 0).
+pub fn bloch_vector(amps: &[C], qubits: usize, qubit: usize) -> Result<(f64, f64, f64), String> {
+    if qubit >= qubits {
+        return Err(format!("bloch qubit {qubit} out of range for n={qubits}"));
+    }
+    let mut rho00 = C::zero();
+    let mut rho01 = C::zero();
+    let mut rho11 = C::zero();
+    let dim = amps.len();
+    let mask = 1usize << qubit;
+    for i in 0..dim {
+        if i & mask != 0 {
+            continue;
+        }
+        let i0 = i;
+        let i1 = i | mask;
+        let a0 = amps[i0];
+        let a1 = amps[i1];
+        // ρ00 += |a0|², ρ11 += |a1|², ρ01 += a0 conj(a1)
+        rho00 = rho00.add(C::new(a0.norm_sq(), 0.0));
+        rho11 = rho11.add(C::new(a1.norm_sq(), 0.0));
+        rho01 = rho01.add(a0.mul(C::new(a1.re, -a1.im)));
+    }
+    let x = 2.0 * rho01.re;
+    let y = 2.0 * rho01.im;
+    let z = rho00.re - rho11.re;
+    Ok((x, y, z))
+}
+
+/// Named single-/two-qubit unitary as row-major nested list of `{re,im}`.
+pub fn named_gate_matrix(name: &str, theta: Option<f64>) -> Result<Vec<Vec<C>>, String> {
+    let g = name.trim().to_ascii_uppercase();
+    let s = std::f64::consts::FRAC_1_SQRT_2;
+    let m = match g.as_str() {
+        "I" | "ID" | "IDENTITY" => vec![
+            vec![C::one(), C::zero()],
+            vec![C::zero(), C::one()],
+        ],
+        "X" | "NOT" => vec![
+            vec![C::zero(), C::one()],
+            vec![C::one(), C::zero()],
+        ],
+        "Y" => vec![
+            vec![C::zero(), C::new(0.0, -1.0)],
+            vec![C::new(0.0, 1.0), C::zero()],
+        ],
+        "Z" => vec![
+            vec![C::one(), C::zero()],
+            vec![C::zero(), C::new(-1.0, 0.0)],
+        ],
+        "S" => vec![
+            vec![C::one(), C::zero()],
+            vec![C::zero(), C::new(0.0, 1.0)],
+        ],
+        "T" => vec![
+            vec![C::one(), C::zero()],
+            vec![C::zero(), C::new(s, s)],
+        ],
+        "H" | "HADAMARD" => vec![
+            vec![C::new(s, 0.0), C::new(s, 0.0)],
+            vec![C::new(s, 0.0), C::new(-s, 0.0)],
+        ],
+        "RX" => {
+            let th = theta.ok_or("Rx needs theta")?;
+            let half = th / 2.0;
+            let c = half.cos();
+            let sn = half.sin();
+            vec![
+                vec![C::new(c, 0.0), C::new(0.0, -sn)],
+                vec![C::new(0.0, -sn), C::new(c, 0.0)],
+            ]
+        }
+        "RY" => {
+            let th = theta.ok_or("Ry needs theta")?;
+            let half = th / 2.0;
+            let c = half.cos();
+            let sn = half.sin();
+            vec![
+                vec![C::new(c, 0.0), C::new(-sn, 0.0)],
+                vec![C::new(sn, 0.0), C::new(c, 0.0)],
+            ]
+        }
+        "RZ" => {
+            let th = theta.ok_or("Rz needs theta")?;
+            let half = th / 2.0;
+            vec![
+                vec![C::new((-half).cos(), (-half).sin()), C::zero()],
+                vec![C::zero(), C::new(half.cos(), half.sin())],
+            ]
+        }
+        "CX" | "CNOT" | "CN" => vec![
+            vec![C::one(), C::zero(), C::zero(), C::zero()],
+            vec![C::zero(), C::one(), C::zero(), C::zero()],
+            vec![C::zero(), C::zero(), C::zero(), C::one()],
+            vec![C::zero(), C::zero(), C::one(), C::zero()],
+        ],
+        "CZ" => vec![
+            vec![C::one(), C::zero(), C::zero(), C::zero()],
+            vec![C::zero(), C::one(), C::zero(), C::zero()],
+            vec![C::zero(), C::zero(), C::one(), C::zero()],
+            vec![C::zero(), C::zero(), C::zero(), C::new(-1.0, 0.0)],
+        ],
+        "SWAP" => vec![
+            vec![C::one(), C::zero(), C::zero(), C::zero()],
+            vec![C::zero(), C::zero(), C::one(), C::zero()],
+            vec![C::zero(), C::one(), C::zero(), C::zero()],
+            vec![C::zero(), C::zero(), C::zero(), C::one()],
+        ],
+        other => {
+            return Err(format!(
+                "unknown gate `{other}` (I/X/Y/Z/H/S/T/Rx/Ry/Rz/CX/CZ/SWAP)"
+            ));
+        }
+    };
+    Ok(m)
+}
+
+pub fn matrix_to_json(m: &[Vec<C>]) -> Value {
+    Value::Array(
+        m.iter()
+            .map(|row| Value::Array(row.iter().map(|c| c.to_json()).collect()))
+            .collect(),
+    )
+}
+
+fn parse_complex_cell(v: &Value) -> Result<C, String> {
+    match v {
+        Value::Number(n) => Ok(C::new(
+            n.as_f64().ok_or_else(|| "bad matrix cell".to_string())?,
+            0.0,
+        )),
+        Value::Object(map) => {
+            let re = map
+                .get("re")
+                .and_then(|x| x.as_f64())
+                .ok_or_else(|| "complex cell needs `re`".to_string())?;
+            let im = map.get("im").and_then(|x| x.as_f64()).unwrap_or(0.0);
+            Ok(C::new(re, im))
+        }
+        Value::Array(a) if a.len() == 2 => {
+            let re = a[0]
+                .as_f64()
+                .ok_or_else(|| "complex pair needs numbers".to_string())?;
+            let im = a[1]
+                .as_f64()
+                .ok_or_else(|| "complex pair needs numbers".to_string())?;
+            Ok(C::new(re, im))
+        }
+        _ => Err("matrix cell must be number or {re,im}".into()),
+    }
+}
+
+/// Parse nested list / column-map table into matrix rows.
+pub fn parse_matrix(v: &Value) -> Result<Vec<Vec<C>>, String> {
+    match v {
+        Value::Array(rows) => {
+            let mut out = Vec::with_capacity(rows.len());
+            for (i, row) in rows.iter().enumerate() {
+                match row {
+                    Value::Array(cells) => {
+                        let mut r = Vec::with_capacity(cells.len());
+                        for c in cells {
+                            r.push(parse_complex_cell(c)?);
+                        }
+                        out.push(r);
+                    }
+                    other => {
+                        // Flat list of complexes → treat as single row only if nested fails.
+                        // Prefer: list of row lists.
+                        return Err(format!(
+                            "matrix row {i}: expected list of cells, got {other}"
+                        ));
+                    }
+                }
+            }
+            if out.is_empty() {
+                return Err("matrix is empty".into());
+            }
+            let w = out[0].len();
+            if w == 0 || out.iter().any(|r| r.len() != w) {
+                return Err("matrix rows must be non-empty and equal length".into());
+            }
+            Ok(out)
+        }
+        Value::Object(map) => {
+            // Column-oriented: keys are column names with list values → transpose to rows.
+            // Or single key holding nested arrays.
+            if let Some(Value::Array(rows)) = map.values().next() {
+                if rows.iter().all(|r| r.is_array()) && map.len() == 1 {
+                    return parse_matrix(&Value::Array(rows.clone()));
+                }
+            }
+            // Horizontal 2-col map like | a | b | with list cells → one row per index
+            let cols: Vec<&Vec<Value>> = map
+                .values()
+                .filter_map(|v| v.as_array())
+                .collect();
+            if cols.is_empty() {
+                return Err("matrix map needs list columns".into());
+            }
+            let n = cols[0].len();
+            if cols.iter().any(|c| c.len() != n) {
+                return Err("matrix columns length mismatch".into());
+            }
+            let mut out = Vec::with_capacity(n);
+            for i in 0..n {
+                let mut row = Vec::with_capacity(cols.len());
+                for c in &cols {
+                    row.push(parse_complex_cell(&c[i])?);
+                }
+                out.push(row);
+            }
+            Ok(out)
+        }
+        _ => Err("matrix must be nested list or table".into()),
+    }
+}
+
+pub fn matrices_close(a: &[Vec<C>], b: &[Vec<C>], tol: f64) -> bool {
+    if a.len() != b.len() {
+        return false;
+    }
+    for (ra, rb) in a.iter().zip(b.iter()) {
+        if ra.len() != rb.len() {
+            return false;
+        }
+        for (ca, cb) in ra.iter().zip(rb.iter()) {
+            if (ca.re - cb.re).abs() > tol || (ca.im - cb.im).abs() > tol {
+                return false;
+            }
+        }
+    }
+    true
+}
+
+pub fn gate_new(name: &str, theta: Option<f64>) -> Result<Value, String> {
+    let g = name.trim().to_ascii_uppercase();
+    // Validate known gate.
+    let _ = named_gate_matrix(&g, theta)?;
+    let mut out = json!({ "name": g });
+    if let Some(t) = theta {
+        out.as_object_mut()
+            .unwrap()
+            .insert("theta".into(), json!(t));
+    }
+    Ok(out)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn h_bloch_on_plus() {
+        let mut amps = zero_state(1);
+        apply_h(&mut amps, 0);
+        let (x, y, z) = bloch_vector(&amps, 1, 0).unwrap();
+        assert!((x - 1.0).abs() < 1e-9, "x={x}");
+        assert!(y.abs() < 1e-9, "y={y}");
+        assert!(z.abs() < 1e-9, "z={z}");
+    }
+
+    #[test]
+    fn h_matrix_matches() {
+        let m = named_gate_matrix("H", None).unwrap();
+        let s = std::f64::consts::FRAC_1_SQRT_2;
+        let expect = vec![
+            vec![C::new(s, 0.0), C::new(s, 0.0)],
+            vec![C::new(s, 0.0), C::new(-s, 0.0)],
+        ];
+        assert!(matrices_close(&m, &expect, 1e-12));
+    }
+}

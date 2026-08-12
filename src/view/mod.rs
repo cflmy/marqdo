@@ -25,7 +25,7 @@ use crate::view::debug_page::{build_debug_model, page_debug};
 use crate::view::html::{escape, page_file, page_index, LinkMode};
 use crate::view::render::{
     collect_input_prompts, render_bindings_html, render_module_structure, render_right_rail,
-    FileViewModel,
+    uses_stream_panel, FileViewModel,
 };
 use crate::{run_file_capture, RunOptions};
 
@@ -329,9 +329,16 @@ pub(crate) fn build_file_view(
     };
     let effective = effective_stdin(&source, stdin_lines);
     let awaiting_input = awaiting_preset_input(&input_prompts, stdin_lines, &source);
-    // Live + has `input` + stdin ready → stream via client `/api/run` (no page-blocking capture).
-    let auto_stream =
-        live && !input_prompts.is_empty() && !awaiting_input && !stdin_lines.is_empty();
+    let show_stream = module_opt
+        .as_ref()
+        .map(uses_stream_panel)
+        .unwrap_or(false);
+    // Live + LLM/agent import + has `input` + stdin ready → stream via client `/api/run`.
+    let auto_stream = live
+        && show_stream
+        && !input_prompts.is_empty()
+        && !awaiting_input
+        && !stdin_lines.is_empty();
     // Same host caps as `marqdo run`. Soft exit + sleep clamp only.
     let mut opts = RunOptions::default();
     opts.stdin_lines = effective.clone();
@@ -397,6 +404,7 @@ pub(crate) fn build_file_view(
         input_prompts,
         awaiting_input,
         auto_stream,
+        show_stream,
         plots,
         bindings_html: std::mem::take(&mut bindings_html),
     })

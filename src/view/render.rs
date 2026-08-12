@@ -39,6 +39,8 @@ pub struct FileViewModel {
     pub awaiting_input: bool,
     /// Live view: stdin present — skip blocking page-load run; client auto-starts Stream SSE.
     pub auto_stream: bool,
+    /// Show the LLM/agent Stream panel (live view only; gated on ext llm/agent import).
+    pub show_stream: bool,
     /// SVG plots from math lib (embedded in Execution).
     pub plots: Vec<String>,
     /// HTML for Variables panel (entry bindings after run).
@@ -52,6 +54,28 @@ pub fn collect_input_prompts(module: &Module) -> Vec<String> {
         collect_input_prompts_fun(fun, &mut out);
     }
     out
+}
+
+/// Stream panel is for LLM/agent token streaming — only when those ext packages are imported.
+pub fn uses_stream_panel(module: &Module) -> bool {
+    module.imports.iter().any(|imp| import_enables_stream(&imp.path))
+}
+
+fn import_enables_stream(path: &str) -> bool {
+    let norm = path.replace('\\', "/");
+    let lower = norm.to_ascii_lowercase();
+    lower.contains("ext/ai/llm")
+        || lower.contains("/llm.mq.md")
+        || lower.ends_with("llm.mq.md")
+        || lower.contains("ext/llm")
+        || norm.contains("ext/ai/大模型")
+        || norm.contains("大模型.mq.md")
+        || lower.contains("ext/ai/agent")
+        || lower.contains("/agent.mq.md")
+        || lower.ends_with("agent.mq.md")
+        || lower.contains("ext/agent")
+        || norm.contains("ext/ai/智能体")
+        || norm.contains("智能体.mq.md")
 }
 
 fn collect_input_prompts_fun(fun: &Function, out: &mut Vec<String>) {
@@ -1198,5 +1222,14 @@ mod tests {
         assert!(html.contains("vars-panel"), "{html}");
         assert!(html.contains("vars-table"), "{html}");
         assert!(html.contains(">xs<") || html.contains("vars-name\">xs"), "{html}");
+    }
+
+    #[test]
+    fn stream_panel_gated_on_llm_or_agent_import() {
+        let hello = crate::parse::parse_source(include_str!("../../tests/structure/hello.mq.md"))
+            .unwrap();
+        assert!(!uses_stream_panel(&hello));
+        let llm = crate::parse::parse_source(include_str!("../../tests/ext/llm-import.mq.md")).unwrap();
+        assert!(uses_stream_panel(&llm));
     }
 }

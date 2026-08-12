@@ -120,7 +120,33 @@ Sample computational-basis shots (deterministic with `seed=`).
 
 ## draw
     + `path`=None
+    + `kind`=circuit
+    + `qubit`=0
 
-Circuit rail SVG (`quantum_svg`). Records into view/CLI plots via host `record_plot`.
+Circuit rail / probability bars / Bloch sphere SVG (`kind=circuit|probs|bloch`). Records into view/CLI plots via host `record_plot`.
 
-**> quantum_draw_circuit circuit=`self` path=`path`**
+**> quantum_draw_circuit circuit=`self` path=`path` kind=`kind` qubit=`qubit`**
+
+# gate
+    + `name`
+    + `theta`=None
+
+Named gate handle (built-in unitary). Use `matches_matrix` to check an author-supplied matrix.
+
+> ensure_plugin
+**> quantum_gate_new name=`name` theta=`theta`**
+
+## matrix
+
+**> quantum_gate_matrix gate=`self`**
+
+## matches_matrix
+    + `matrix`
+    + `tol`=0.000000001
+
+**> quantum_gate_matches_matrix gate=`self` matrix=`matrix` tol=`tol`**
+
+## draw
+    + `path`=None
+
+**> quantum_gate_draw gate=`self` path=`path`**

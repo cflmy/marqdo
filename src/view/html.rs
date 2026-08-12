@@ -1839,8 +1839,13 @@ pub fn page_file(files: &[PathBuf], rel: &str, vm: &FileViewModel, links: &LinkM
         (
             "pending",
             "input",
-            "Fill preset input, then <strong>Run with input</strong> — output streams in the panel (no page reload)."
-                .to_string(),
+            if vm.show_stream {
+                "Fill preset input, then <strong>Run with input</strong> — output streams in the panel (no page reload)."
+                    .to_string()
+            } else {
+                "Fill preset input, then <strong>Run with input</strong>."
+                    .to_string()
+            },
         )
     } else if vm.auto_stream {
         (
@@ -1949,7 +1954,7 @@ pub fn page_file(files: &[PathBuf], rel: &str, vm: &FileViewModel, links: &LinkM
     };
     let plan_card = plan_result_card(&vm.stdout, links);
     let stream_panel = match links {
-        LinkMode::Live => r#"<div class="stream-panel">
+        LinkMode::Live if vm.show_stream => r#"<div class="stream-panel">
   <div class="stream-head">
     <strong>Stream</strong>
     <button type="button" id="stream-run">Run</button>
@@ -1962,7 +1967,7 @@ pub fn page_file(files: &[PathBuf], rel: &str, vm: &FileViewModel, links: &LinkM
   <button type="button" class="stream-jump" id="stream-jump" hidden>↓ Latest</button>
 </div>"#
         .to_string(),
-        LinkMode::Static { .. } => String::new(),
+        _ => String::new(),
     };
     let main = format!(
         r#"

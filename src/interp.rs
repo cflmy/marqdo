@@ -517,7 +517,8 @@ impl Interpreter {
         call: &CallExpr,
     ) -> Result<Value> {
         let mut call = call.clone();
-        if call.path.is_none() {
+        // Method callees keep author names (`绘图` on quantum ≠ math `host_plot`).
+        if call.path.is_none() && call.receiver.is_none() {
             let callee = crate::aliases::normalize_call_callee_and_args(
                 &call.callee,
                 &mut call.args,
