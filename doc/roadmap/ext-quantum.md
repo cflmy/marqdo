@@ -29,7 +29,7 @@
 | **Q4** | 概率条 / 布洛赫；`matches_matrix`；examples + 用户文档 | **done** |
 | **Q5** | 教学噪声 + barrier/measure/append/state — [ext-quantum-q5.md](../design/ext-quantum-q5.md) | **done（最小）** |
 
-验收金样：`tests/ext/quantum-bell-smoke.mq.md`、`quantum-draw-smoke.mq.md`、`quantum-gate-matrix-smoke.mq.md`、`quantum-author-api-smoke.mq.md`、`quantum-noise-smoke.mq.md`、中文对称样例。
+验收金样：`tests/ext/quantum-bell-smoke.mq.md`、`quantum-draw-smoke.mq.md`、`quantum-gate-matrix-smoke.mq.md`、`quantum-gate-heatmap-smoke.mq.md`、`quantum-author-api-smoke.mq.md`、`quantum-noise-smoke.mq.md`、中文对称样例（`quantum-author-api-zh-smoke` / `quantum-noise-zh-smoke`）。
 
 ---
 

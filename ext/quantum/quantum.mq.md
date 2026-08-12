@@ -182,5 +182,8 @@ Named gate handle (built-in unitary). Use `matches_matrix` to check an author-su
 
 ## draw
     + `path`=None
+    + `kind`=gate
 
-**> quantum_gate_draw gate=`self` path=`path`**
+Gate glyph or complex-matrix heatmap (`kind=gate|matrix`). Records via host `record_plot`.
+
+**> quantum_gate_draw gate=`self` path=`path` kind=`kind`**

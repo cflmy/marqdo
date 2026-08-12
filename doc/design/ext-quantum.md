@@ -161,7 +161,7 @@ $$
     + `theta`=None         # Rx/Ry/Rz
 
 ## matrix                 # → 振幅表 / 嵌套 list（文档与调试）
-## draw                   # → quantum_svg（单门符号）
+## draw                   # → quantum_svg（`kind=gate|matrix` 符号 / 热力图）
 ## matches_matrix
     + `matrix`
     + `tol`=1e-9
@@ -300,7 +300,7 @@ CLI：`draw path=bell.svg` 写沙箱文件；无 path 时不把整段 SVG 灌 st
 | 电路轨线（qubit 线 + 门盒 + 控点） | **必须** | `circuit.draw` |
 | 测量概率条形图 | **必须** | `probabilities` / `run` 后可 `draw kind=probs` |
 | 单比特布洛赫球（SVG） | 应有 | 仅 n=1 或指定 qubit 约化（纯态投影） |
-| 门矩阵热力图 | 可后 | Q4 |
+| 门矩阵热力图 | **必须** | `gate.draw kind=matrix`（幅值热图 + 小数标注） |
 | 交互拖拽编辑电路 | **不做** | 静态文档足够 |
 
 视觉：内联 CSS；**无外链**字体/CDN（同 view 硬规则）。

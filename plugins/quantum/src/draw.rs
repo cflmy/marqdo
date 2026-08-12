@@ -2,7 +2,7 @@
 
 use serde_json::Value;
 
-use crate::sim::{parse_ops, Op};
+use crate::sim::{parse_ops, C, Op};
 
 const COL_W: f64 = 56.0;
 const ROW_H: f64 = 40.0;
@@ -403,5 +403,96 @@ pub fn gate_svg(name: &str) -> String {
         label = label,
         BOX = BOX,
         STROKE = STROKE,
+    )
+}
+
+fn mag(c: C) -> f64 {
+    (c.re * c.re + c.im * c.im).sqrt()
+}
+
+fn heat_fill(m: f64) -> String {
+    // pale → indigo by |amp|
+    let t = m.clamp(0.0, 1.0);
+    let r = (232.0 + (55.0 - 232.0) * t).round() as i32;
+    let g = (236.0 + (66.0 - 236.0) * t).round() as i32;
+    let b = (241.0 + (250.0 - 241.0) * t).round() as i32;
+    format!("rgb({r},{g},{b})")
+}
+
+/// Complex matrix heatmap (magnitude fill + re/im labels for small dims).
+pub fn matrix_heatmap_svg(m: &[Vec<C>], title: &str) -> String {
+    let n = m.len().max(1);
+    let cell = if n <= 2 {
+        72.0
+    } else if n <= 4 {
+        56.0
+    } else {
+        40.0
+    };
+    let left = 36.0;
+    let top = 28.0;
+    let width = left + cell * n as f64 + 16.0;
+    let height = top + cell * n as f64 + 20.0;
+    let mut body = String::new();
+    body.push_str(&format!(
+        r#"<text x="8" y="18" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="{STROKE}">{title}</text>"#,
+        title = esc(title),
+        STROKE = STROKE,
+    ));
+    for i in 0..n {
+        body.push_str(&format!(
+            r#"<text x="8" y="{y}" font-family="ui-monospace,Menlo,monospace" font-size="10" fill="{muted}">{i}</text>"#,
+            y = top + (i as f64 + 0.55) * cell,
+            i = i,
+            muted = "#666",
+        ));
+        body.push_str(&format!(
+            r#"<text x="{x}" y="{y}" text-anchor="middle" font-family="ui-monospace,Menlo,monospace" font-size="10" fill="{muted}">{i}</text>"#,
+            x = left + (i as f64 + 0.5) * cell,
+            y = top - 6.0,
+            i = i,
+            muted = "#666",
+        ));
+        for j in 0..n {
+            let c = m
+                .get(i)
+                .and_then(|row| row.get(j))
+                .copied()
+                .unwrap_or(C { re: 0.0, im: 0.0 });
+            let x = left + j as f64 * cell;
+            let y = top + i as f64 * cell;
+            let fill = heat_fill(mag(c));
+            body.push_str(&format!(
+                r#"<rect x="{x}" y="{y}" width="{cell}" height="{cell}" fill="{fill}" stroke="{STROKE}" stroke-width="0.8"/>"#,
+                x = x,
+                y = y,
+                cell = cell,
+                fill = fill,
+                STROKE = STROKE,
+            ));
+            if n <= 4 {
+                let label = if c.im.abs() < 1e-9 {
+                    format!("{:.3}", c.re)
+                } else if c.re.abs() < 1e-9 {
+                    format!("{:.3}i", c.im)
+                } else {
+                    format!("{:.2}{:+.2}i", c.re, c.im)
+                };
+                let ink = if mag(c) > 0.55 { "#fff" } else { STROKE };
+                body.push_str(&format!(
+                    r#"<text x="{tx}" y="{ty}" text-anchor="middle" font-family="ui-monospace,Menlo,monospace" font-size="9" fill="{ink}">{lab}</text>"#,
+                    tx = x + cell * 0.5,
+                    ty = y + cell * 0.55,
+                    lab = esc(&label),
+                    ink = ink,
+                ));
+            }
+        }
+    }
+    format!(
+        r#"<svg xmlns="http://www.w3.org/2000/svg" width="{w:.0}" height="{h:.0}" viewBox="0 0 {w:.1} {h:.1}" role="img" aria-label="gate matrix heatmap">{body}</svg>"#,
+        w = width,
+        h = height,
+        body = body,
     )
 }

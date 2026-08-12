@@ -542,16 +542,37 @@ q_ffi!(quantum_gate_draw, |args: &Value| {
         .or_else(|| gate.get("名"))
         .and_then(|v| v.as_str())
         .unwrap_or("?");
+    let theta = gate
+        .get("theta")
+        .or_else(|| gate.get("参数"))
+        .and_then(|v| v.as_f64());
+    let kind = args
+        .get("kind")
+        .or_else(|| args.get("种类"))
+        .or_else(|| args.get("类型"))
+        .and_then(|v| v.as_str())
+        .unwrap_or("gate")
+        .to_ascii_lowercase();
     let path = args
         .get("path")
         .or_else(|| args.get("路径"))
         .and_then(|v| v.as_str())
         .filter(|s| !s.is_empty());
-    let svg = draw::gate_svg(name);
+    let (kind_out, svg) = if matches!(kind.as_str(), "matrix" | "heatmap" | "矩阵") {
+        let m = sim::named_gate_matrix(name, theta)?;
+        (
+            "matrix",
+            draw::matrix_heatmap_svg(&m, &format!("{name} matrix")),
+        )
+    } else if matches!(kind.as_str(), "gate" | "glyph" | "门") {
+        ("gate", draw::gate_svg(name))
+    } else {
+        return Err(format!("unknown gate draw kind `{kind}` (gate|matrix)"));
+    };
     record_plot(&svg, path)?;
     Ok(json!({
         "_type": "quantum_svg",
-        "kind": "gate",
+        "kind": kind_out,
         "svg": svg,
     }))
 });
