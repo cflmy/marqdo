@@ -1,6 +1,6 @@
 ---
 title: web-site
-description: Home = page table; main inline; class methods assemble; form §5.5.
+description: Home + /about route + form §5.5 + admin.
 > ext/web/web.mq.md
 > styles/shell.mq.md
 > components/nav.mq.md
@@ -51,10 +51,16 @@ Article create form (design §5.5): field table + rules table.
 *`page` = > `page`.compose_components components=`home` *
 *`page` = > `page`.compose_main main=`index` *
 
+About page: same shell, different intro (no main bind).
+
+*`about` = > web.page title="About" intro="<h1>About</h1><p>Marqdo web = tables + class methods.</p>" *
+*`about` = > `about`.compose_components components=`home` *
+
 *`article_form` = > web.form table=articles action=insert *
 *`article_form` = > `article_form`.fields fields=`article_fields` *
 *`article_form` = > `article_form`.rules rules=`article_rules` *
 
 *`app` = > web.app page=`page` db=`store` admin=True host=127.0.0.1 port=18081 *
+*`app` = > `app`.route path=/about page=`about` *
 *`app` = > `app`.mount_form id=article form=`article_form` *
 > `app`.listen

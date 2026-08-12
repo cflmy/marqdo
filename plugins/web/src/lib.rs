@@ -332,7 +332,57 @@ web_ffi!(web_app_new, |args: &Value| {
         "port": port,
         "admin": admin,
         "forms": {},
+        "routes": {},
     }))
+});
+
+fn normalize_route_path(raw: &str) -> Result<String, String> {
+    let s = raw.trim();
+    if s.is_empty() {
+        return Err("route path is empty".into());
+    }
+    if s == "/" {
+        return Err("route path `/` is reserved for the home page".into());
+    }
+    let mut path = if s.starts_with('/') {
+        s.to_string()
+    } else {
+        format!("/{s}")
+    };
+    while path.len() > 1 && path.ends_with('/') {
+        path.pop();
+    }
+    // reserved prefixes
+    if path == "/admin"
+        || path.starts_with("/admin/")
+        || path == "/_form"
+        || path.starts_with("/_form/")
+        || path == "/_part"
+        || path.starts_with("/_part/")
+    {
+        return Err(format!("route path `{path}` is reserved"));
+    }
+    Ok(path)
+}
+
+web_ffi!(web_app_route, |args: &Value| {
+    let mut app = args.get("app").cloned().unwrap_or(json!({}));
+    let path = normalize_route_path(arg_str(args, "path")?)?;
+    let page = args
+        .get("page")
+        .cloned()
+        .ok_or_else(|| "missing `page` for route".to_string())?;
+    let obj = app
+        .as_object_mut()
+        .ok_or_else(|| "app must be a map".to_string())?;
+    let routes = obj
+        .entry("routes".to_string())
+        .or_insert_with(|| json!({}));
+    let rmap = routes
+        .as_object_mut()
+        .ok_or_else(|| "app.routes must be a map".to_string())?;
+    rmap.insert(path, page);
+    Ok(app)
 });
 
 web_ffi!(web_app_mount_form, |args: &Value| {
@@ -442,7 +492,7 @@ web_ffi!(web_db_table_info, |args: &Value| {
 
 web_ffi!(web_listen, |args: &Value| {
     use std::collections::HashMap;
-    let (page, db_url, host, port, admin, forms) = if args.get("page").is_some()
+    let (page, db_url, host, port, admin, forms, routes) = if args.get("page").is_some()
         || args.get("host").is_some()
     {
         let page = args.get("page").cloned().unwrap_or(json!({}));
@@ -456,8 +506,15 @@ web_ffi!(web_listen, |args: &Value| {
             Some(Value::Bool(b)) => *b,
             _ => false,
         };
-        let forms = HashMap::new();
-        (page, db_url, host.to_string(), port, admin, forms)
+        (
+            page,
+            db_url,
+            host.to_string(),
+            port,
+            admin,
+            HashMap::new(),
+            HashMap::new(),
+        )
     } else {
         let app = args.get("app").cloned().unwrap_or_else(|| args.clone());
         let page = app.get("page").cloned().unwrap_or(json!({}));
@@ -486,9 +543,23 @@ web_ffi!(web_listen, |args: &Value| {
                 forms.insert(k.clone(), v.clone());
             }
         }
-        (page, db_url, host, port, admin, forms)
+        let mut routes = HashMap::new();
+        if let Some(obj) = app.get("routes").and_then(|v| v.as_object()) {
+            for (k, v) in obj {
+                routes.insert(k.clone(), v.clone());
+            }
+        }
+        (page, db_url, host, port, admin, forms, routes)
     };
-    http::listen(&page, db_url.as_deref(), &host, port, admin, forms)
+    http::listen(
+        &page,
+        db_url.as_deref(),
+        &host,
+        port,
+        admin,
+        forms,
+        routes,
+    )
 });
 
 fn register(host: &MarqdoHostApi, name: &str, params: &str, fn_ptr: PluginFn) -> c_int {
@@ -546,6 +617,7 @@ pub unsafe extern "C" fn marqdo_plugin_init(host: *const MarqdoHostApi) -> c_int
             "page,db,admin,host,port",
             web_app_new as PluginFn,
         ),
+        ("web_app_route", "app,path,page", web_app_route as PluginFn),
         (
             "web_app_mount_form",
             "app,id,form",

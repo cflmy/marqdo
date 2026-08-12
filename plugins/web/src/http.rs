@@ -5,6 +5,7 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 
 use axum::extract::{Form, Path, State};
+use axum::http::Uri;
 use axum::response::{Html, IntoResponse, Redirect, Response};
 use axum::routing::get;
 use axum::Router;
@@ -21,6 +22,7 @@ struct AppState {
     db_url: Option<String>,
     admin: bool,
     forms: HashMap<String, Value>,
+    routes: HashMap<String, Value>,
 }
 
 pub fn listen(
@@ -30,15 +32,17 @@ pub fn listen(
     port: u16,
     admin: bool,
     forms: HashMap<String, Value>,
+    routes: HashMap<String, Value>,
 ) -> Result<Value, String> {
     let state = Arc::new(AppState {
         page: page.clone(),
         db_url: db_url.map(|s| s.to_string()),
         admin,
         forms,
+        routes: routes.clone(),
     });
 
-    let app = Router::new()
+    let mut app = Router::new()
         .route("/", get(home))
         .route("/_part/{id}", get(part))
         .route("/_form/{id}", get(form_get).post(form_post))
@@ -49,8 +53,16 @@ pub fn listen(
             "/admin/{table}/{id}/edit",
             get(admin_edit_get).post(admin_edit_post),
         )
-        .route("/admin/{table}/{id}/delete", get(admin_delete))
-        .with_state(state);
+        .route("/admin/{table}/{id}/delete", get(admin_delete));
+
+    // Register each author route as an exact GET path.
+    let mut paths: Vec<String> = routes.keys().cloned().collect();
+    paths.sort();
+    for path in paths {
+        app = app.route(&path, get(routed_page));
+    }
+
+    let app = app.with_state(state);
 
     let addr: SocketAddr = format!("{host}:{port}")
         .parse()
@@ -72,6 +84,17 @@ pub fn listen(
 async fn home(State(st): State<Arc<AppState>>) -> Html<String> {
     let html = render::render_page(&st.page, st.db_url.as_deref());
     Html(html)
+}
+
+async fn routed_page(State(st): State<Arc<AppState>>, uri: Uri) -> Response {
+    let mut path = uri.path().to_string();
+    while path.len() > 1 && path.ends_with('/') {
+        path.pop();
+    }
+    let Some(page) = st.routes.get(&path) else {
+        return Html(format!("<p>404 not found: {}</p>", esc(&path))).into_response();
+    };
+    Html(render::render_page(page, st.db_url.as_deref())).into_response()
 }
 
 async fn part(State(st): State<Arc<AppState>>, Path(id): Path<String>) -> Response {

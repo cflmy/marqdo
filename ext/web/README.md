@@ -28,3 +28,4 @@ Offline smokes: `tests/ext/web-smoke.mq.md`, `web-form-smoke.mq.md`, `web-admin-
 |---------|--------|
 | Form §5.5 | field/rules tables · `validate` · `submit` · `mount_form` → `GET\|POST /_form/{id}` |
 | Admin CRUD | `admin=True` · schema → same form path · new/edit/delete under `/admin/{table}` |
+| Route | `` `app`.route path=/about page=`about` `` → `GET /about` |

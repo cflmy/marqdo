@@ -7,6 +7,7 @@ Static top links for the shell.
 | 属性 | 值 | 样式 |
 |------|-----|------|
 | Home | / | |
+| About | /about | |
 | New | /_form/article | |
 | Admin | /admin | |
 

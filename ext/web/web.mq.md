@@ -174,9 +174,11 @@ Field table + rules table; submit writes through `# db`.
 
 ## route
     + `path`
-    + `page`=None
+    + `page`
 
-**`self`**
+Mount an assembled page at `path` (e.g. `/about`). `/` is the home `page=`.
+
+**> web_app_route app=`self` path=`path` page=`page`**
 
 ## mount_form
     + `id`
@@ -188,6 +190,6 @@ Register `GET|POST /_form/{id}` for listen.
 
 ## listen
 
-Serve `/`, `/_part/{id}`, `/_form/{id}`, and optional `/admin`.
+Serve `/`, routed pages, `/_part/{id}`, `/_form/{id}`, and optional `/admin`.
 
 **> web_listen app=`self`**
