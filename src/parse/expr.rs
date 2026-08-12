@@ -5,7 +5,16 @@ use anyhow::{bail, Result};
 use crate::ast::{BinaryOp, CallExpr, Expr, InterpPart, Literal, UnaryOp};
 
 pub fn parse_expr(input: &str) -> Result<Expr> {
-    let mut p = Parser::new(input.trim());
+    parse_expr_mode(input, false)
+}
+
+/// Italic / bold value syntax: bare words are variables; text needs `"…"` / `'…'`.
+pub fn parse_expr_prefer_var(input: &str) -> Result<Expr> {
+    parse_expr_mode(input, true)
+}
+
+fn parse_expr_mode(input: &str, prefer_var: bool) -> Result<Expr> {
+    let mut p = Parser::new(input.trim(), prefer_var);
     let e = p.parse_or()?;
     p.skip_ws();
     if !p.rest().is_empty() {
@@ -22,7 +31,7 @@ pub fn parse_value_or_interp(input: &str) -> Result<Expr> {
     if s.is_empty() {
         return Ok(Expr::Literal(Literal::Text(String::new())));
     }
-    if s.starts_with('"') {
+    if s.starts_with('"') || s.starts_with('\'') {
         return match parse_expr(s) {
             Ok(e) => Ok(e),
             Err(_) => Ok(parse_interp(s)),
@@ -45,7 +54,7 @@ pub fn parse_call_arg_value(input: &str) -> Result<Expr> {
     if s.is_empty() {
         return Ok(Expr::Literal(Literal::Text(String::new())));
     }
-    if s.starts_with('"') {
+    if s.starts_with('"') || s.starts_with('\'') {
         return match parse_expr(s) {
             Ok(e) => Ok(e),
             Err(_) => Ok(parse_interp(s)),
@@ -56,7 +65,15 @@ pub fn parse_call_arg_value(input: &str) -> Result<Expr> {
     }
     match parse_expr(s) {
         Ok(e) => Ok(collapse_text_div_path(e, s)),
-        Err(_) => Ok(parse_interp(s)),
+        Err(_) => {
+            // ext/web paths: `nav.`nav``, `articles.`articles`.title` — ticks are path
+            // punctuation, not interpolation.
+            if s.contains(".`") {
+                Ok(Expr::Literal(Literal::Text(s.to_string())))
+            } else {
+                Ok(parse_interp(s))
+            }
+        }
     }
 }
 
@@ -145,11 +162,17 @@ pub fn parse_interp(s: &str) -> Expr {
 struct Parser<'a> {
     src: &'a str,
     i: usize,
+    /// When true (italic/bold), bare words are variables, not text literals.
+    prefer_var: bool,
 }
 
 impl<'a> Parser<'a> {
-    fn new(src: &'a str) -> Self {
-        Self { src, i: 0 }
+    fn new(src: &'a str, prefer_var: bool) -> Self {
+        Self {
+            src,
+            i: 0,
+            prefer_var,
+        }
     }
 
     fn rest(&self) -> &str {
@@ -348,7 +371,10 @@ impl<'a> Parser<'a> {
             return Ok(e);
         }
         if self.eat("\"") {
-            return self.parse_quoted_string();
+            return self.parse_quoted_string('"');
+        }
+        if self.eat("'") {
+            return self.parse_quoted_string('\'');
         }
         if self.eat("`") {
             let start = self.i;
@@ -362,20 +388,7 @@ impl<'a> Parser<'a> {
             if !self.eat("`") {
                 bail!("unterminated `name`");
             }
-            let mut expr = Expr::Var(name);
-            // Postfix footnotes: `xs`[^1] / `m`[^key] / chained `m`[^k][^1]
-            loop {
-                self.skip_ws();
-                if !self.starts_with("[^") {
-                    break;
-                }
-                let label = self.parse_footnote_label()?;
-                expr = Expr::Index {
-                    base: Box::new(expr),
-                    label,
-                };
-            }
-            return Ok(expr);
+            return self.parse_index_chain(Expr::Var(name));
         }
         if self.eat(">") {
             // Inline call: `> name k=v`
@@ -417,39 +430,83 @@ impl<'a> Parser<'a> {
             let n: i64 = self.src[start..self.i].parse()?;
             return Ok(Expr::Literal(Literal::Int(n)));
         }
-        // Bare identifier / text word
+        // Bare identifier / text word. If immediately followed by `[^…]`, treat as
+        // variable + footnote index (exemption: ticks optional when `[^` marks the slot).
         if self.peek_char().map(|c| c.is_alphanumeric() || c == '_' || !c.is_ascii()).unwrap_or(false)
         {
             let start = self.i;
             while let Some(c) = self.peek_char() {
-                if c.is_whitespace() || matches!(c, '=' | '+' | '-' | '*' | '/' | '<' | '>' | '(' | ')' | '`' | '|' | ',' | '"')
+                if c.is_whitespace()
+                    || matches!(
+                        c,
+                        '=' | '+'
+                            | '-'
+                            | '*'
+                            | '/'
+                            | '<'
+                            | '>'
+                            | '('
+                            | ')'
+                            | '`'
+                            | '|'
+                            | ','
+                            | '"'
+                            | '\''
+                            | '['
+                            | ']'
+                    )
                 {
                     break;
                 }
                 self.bump_char();
             }
-            let word = &self.src[start..self.i];
-            return Ok(Expr::Literal(Literal::Text(word.to_string())));
+            let word = self.src[start..self.i].to_string();
+            self.skip_ws();
+            if self.starts_with("[^") {
+                return self.parse_index_chain(Expr::Var(word));
+            }
+            if self.prefer_var {
+                return Ok(Expr::Var(word));
+            }
+            return Ok(Expr::Literal(Literal::Text(word)));
         }
         bail!("unexpected expression input: {:?}", self.rest());
     }
 
-    /// `"..."` string with `\n` `\t` `\r` `\\` `\"` and `` `var` `` interpolation.
-    fn parse_quoted_string(&mut self) -> Result<Expr> {
+    /// `` `xs`[^1] `` / `m[^key]` / chained `m[^k][^1]` (base already parsed).
+    fn parse_index_chain(&mut self, mut expr: Expr) -> Result<Expr> {
+        loop {
+            self.skip_ws();
+            if !self.starts_with("[^") {
+                break;
+            }
+            let label = self.parse_footnote_label()?;
+            expr = Expr::Index {
+                base: Box::new(expr),
+                label,
+            };
+        }
+        Ok(expr)
+    }
+
+    /// `"..."` or `'...'` with escapes and `` `var` `` interpolation.
+    fn parse_quoted_string(&mut self, quote: char) -> Result<Expr> {
         use crate::ast::InterpPart;
         let mut parts: Vec<InterpPart> = Vec::new();
         let mut lit = String::new();
         loop {
             let Some(c) = self.peek_char() else {
-                bail!("unterminated \" string");
+                bail!("unterminated {quote} string");
             };
-            if c == '"' {
+            if c == quote {
                 self.bump_char();
                 break;
             }
             if c == '\\' {
                 self.bump_char();
-                let esc = self.peek_char().ok_or_else(|| anyhow::anyhow!("dangling \\ in string"))?;
+                let esc = self
+                    .peek_char()
+                    .ok_or_else(|| anyhow::anyhow!("dangling \\ in string"))?;
                 self.bump_char();
                 lit.push(match esc {
                     'n' => '\n',
@@ -457,6 +514,7 @@ impl<'a> Parser<'a> {
                     'r' => '\r',
                     '\\' => '\\',
                     '"' => '"',
+                    '\'' => '\'',
                     other => bail!("unknown escape \\{other} in string"),
                 });
                 continue;
@@ -756,11 +814,51 @@ mod tests {
     use super::*;
 
     #[test]
-    fn cmp_and_arith() {
-        let e = parse_expr("`x` > 0").unwrap();
-        assert!(matches!(e, Expr::Binary { op: BinaryOp::Gt, .. }));
-        let e = parse_expr("`n` + 1").unwrap();
+    fn bare_var_footnote_index() {
+        let e = parse_expr("ev[^result]").unwrap();
+        match e {
+            Expr::Index { base, label } => {
+                assert!(matches!(base.as_ref(), Expr::Var(n) if n == "ev"));
+                assert_eq!(label, "result");
+            }
+            other => panic!("expected Index, got {other:?}"),
+        }
+        let e = parse_expr("data[^choices][^1][^message]").unwrap();
+        assert!(matches!(e, Expr::Index { .. }));
+        // Without `[^`, bare word stays text literal.
+        let e = parse_expr("ev").unwrap();
+        assert!(matches!(e, Expr::Literal(Literal::Text(ref s)) if s == "ev"));
+        // Ticked form still works.
+        let e = parse_expr("`ev`[^result]").unwrap();
+        assert!(matches!(e, Expr::Index { .. }));
+    }
+
+    #[test]
+    fn prefer_var_bare_id_and_quotes() {
+        let e = parse_expr_prefer_var("answer").unwrap();
+        assert!(matches!(e, Expr::Var(ref n) if n == "answer"));
+        let e = parse_expr_prefer_var("n + 1").unwrap();
         assert!(matches!(e, Expr::Binary { op: BinaryOp::Add, .. }));
+        let e = parse_expr_prefer_var("\"ok\"").unwrap();
+        assert!(matches!(e, Expr::Literal(Literal::Text(ref s)) if s == "ok"));
+        let e = parse_expr_prefer_var("'hi'").unwrap();
+        assert!(matches!(e, Expr::Literal(Literal::Text(ref s)) if s == "hi"));
+        let e = parse_expr_prefer_var("`answer`").unwrap();
+        assert!(matches!(e, Expr::Var(ref n) if n == "answer"));
+    }
+
+    #[test]
+    fn call_arg_module_path_stays_text() {
+        let e = parse_call_arg_value("nav.`nav`").unwrap();
+        assert!(matches!(
+            e,
+            Expr::Literal(Literal::Text(ref s)) if s == "nav.`nav`"
+        ));
+        let e = parse_call_arg_value("articles.`articles`.title").unwrap();
+        assert!(matches!(
+            e,
+            Expr::Literal(Literal::Text(ref s)) if s == "articles.`articles`.title"
+        ));
     }
 
     #[test]

@@ -2,7 +2,10 @@
 
 mod expr;
 
-pub use expr::{parse_call_after_gt, parse_call_arg_value, parse_expr, parse_value_or_interp};
+pub use expr::{
+    parse_call_after_gt, parse_call_arg_value, parse_expr, parse_expr_prefer_var,
+    parse_value_or_interp,
+};
 
 use anyhow::{bail, Result};
 
@@ -248,7 +251,7 @@ impl<'a> Cursor<'a> {
             let value = if inner.trim().is_empty() {
                 Expr::Literal(Literal::None)
             } else {
-                parse_expr_str(inner)?
+                parse_expr_prefer_var(inner)?
             };
             return Ok(Stmt::Return { value, span });
         }
@@ -277,12 +280,12 @@ impl<'a> Cursor<'a> {
 
     fn parse_italic_assign(&mut self, inner: &str, span: Span) -> Result<Stmt> {
         let Some((name, rhs)) = split_assign_inner(inner) else {
-            bail!("{span}: italic statement must be an assignment (`name` = …)");
+            bail!("{span}: italic statement must be an assignment (name = …)");
         };
         if crate::aliases::is_reserved_keyword(&name) {
             bail!("{span}: `{name}` is a reserved keyword");
         }
-        let (value, end_line) = self.resolve_assign_rhs(&rhs, span)?;
+        let (value, end_line) = self.resolve_assign_rhs(&rhs, span, true)?;
         Ok(Stmt::Assign {
             name,
             value,
@@ -308,7 +311,7 @@ impl<'a> Cursor<'a> {
             return Ok(None);
         }
         let rhs = after[1..].trim().to_string();
-        let (value, end_line) = self.resolve_assign_rhs(&rhs, span)?;
+        let (value, end_line) = self.resolve_assign_rhs(&rhs, span, false)?;
         Ok(Some(Stmt::Assign {
             name,
             value,
@@ -319,7 +322,13 @@ impl<'a> Cursor<'a> {
 
     /// RHS on the same line, or empty RHS → following `$$` / ```lang fence or table.
     /// Returns `(expr, inclusive end_line)`.
-    fn resolve_assign_rhs(&mut self, rhs: &str, span: Span) -> Result<(Expr, u32)> {
+    /// `prefer_var`: italic RHS uses variable-preferring expression syntax.
+    fn resolve_assign_rhs(
+        &mut self,
+        rhs: &str,
+        span: Span,
+        prefer_var: bool,
+    ) -> Result<(Expr, u32)> {
         let rhs = rhs.trim();
         if rhs.is_empty() {
             self.skip_blanks();
@@ -344,7 +353,12 @@ impl<'a> Cursor<'a> {
         if rhs.starts_with('>') {
             return Ok((Expr::Call(call_after_gt(rhs[1..].trim())?), span.line));
         }
-        Ok((parse_value_or_interp(rhs)?, span.line))
+        let value = if prefer_var {
+            parse_expr_prefer_var(rhs)?
+        } else {
+            parse_value_or_interp(rhs)?
+        };
+        Ok((value, span.line))
     }
 
     fn skip_blanks(&mut self) {
@@ -463,11 +477,13 @@ impl<'a> Cursor<'a> {
     /// - 1-col → List
     /// - first header `@` / `行` / `row` → List of row Maps (marker col excluded)
     /// - else ≥2-col → Map (column-oriented)
+    ///
+    /// Data cells are expressions ([`parse_call_arg_value`]); headers stay key text.
     fn consume_table(&mut self) -> Result<Expr> {
         self.skip_noise();
         let mut header: Vec<String> = Vec::new();
         let mut header_line: u32 = 1;
-        let mut data_rows: Vec<Vec<String>> = Vec::new();
+        let mut data_rows: Vec<(u32, Vec<String>)> = Vec::new();
         let mut header_done = false;
         let mut sep_done = false;
         while let Some(l) = self.peek() {
@@ -496,7 +512,7 @@ impl<'a> Cursor<'a> {
                 continue;
             }
             sep_done = true;
-            data_rows.push(cells);
+            data_rows.push((line_no, cells));
         }
         if !header_done {
             bail!("expected GFM table after empty assignment");
@@ -510,9 +526,9 @@ impl<'a> Cursor<'a> {
         }
         if header.len() <= 1 {
             let mut rows = Vec::new();
-            for cells in data_rows {
+            for (line_no, cells) in data_rows {
                 if let Some(cell) = cells.first() {
-                    rows.push(Expr::Literal(cell_literal(cell)));
+                    rows.push(parse_table_cell(cell, line_no)?);
                 }
             }
             return Ok(Expr::List(rows));
@@ -536,14 +552,15 @@ impl<'a> Cursor<'a> {
         let mut pairs = Vec::with_capacity(header.len());
         for (col, key) in header.iter().enumerate() {
             if n_rows == 1 {
-                let raw = data_rows[0].get(col).map(|s| s.as_str()).unwrap_or("");
-                pairs.push((key.clone(), Expr::Literal(cell_literal(raw))));
+                let (line_no, cells) = &data_rows[0];
+                let raw = cells.get(col).map(|s| s.as_str()).unwrap_or("");
+                pairs.push((key.clone(), parse_table_cell(raw, *line_no)?));
             } else {
                 // 0 rows → empty lists; ≥2 rows → column lists.
                 let mut col_vals = Vec::with_capacity(n_rows);
-                for cells in &data_rows {
+                for (line_no, cells) in &data_rows {
                     let raw = cells.get(col).map(|s| s.as_str()).unwrap_or("");
-                    col_vals.push(Expr::Literal(cell_literal(raw)));
+                    col_vals.push(parse_table_cell(raw, *line_no)?);
                 }
                 pairs.push((key.clone(), Expr::List(col_vals)));
             }
@@ -661,12 +678,38 @@ impl<'a> Cursor<'a> {
 
 fn split_assign_inner(inner: &str) -> Option<(String, String)> {
     let inner = inner.trim();
-    let rest = inner.strip_prefix('`')?;
-    let end = rest.find('`')?;
-    let name = rest[..end].to_string();
-    let after = rest[end + 1..].trim_start();
-    let rhs = after.strip_prefix('=')?.trim().to_string();
-    Some((name, rhs))
+    if let Some(rest) = inner.strip_prefix('`') {
+        let end = rest.find('`')?;
+        let name = rest[..end].to_string();
+        if name.is_empty() {
+            return None;
+        }
+        let after = rest[end + 1..].trim_start();
+        let rhs = after.strip_prefix('=')?.trim().to_string();
+        return Some((name, rhs));
+    }
+    // Bare LHS: `answer = …` (italic exemption).
+    let eq = inner.find('=')?;
+    let name = inner[..eq].trim();
+    if !is_bare_assign_ident(name) {
+        return None;
+    }
+    let rhs = inner[eq + 1..].trim().to_string();
+    Some((name.to_string(), rhs))
+}
+
+fn is_bare_assign_ident(s: &str) -> bool {
+    if s.is_empty() || s.contains('`') || s.chars().any(char::is_whitespace) {
+        return false;
+    }
+    let mut chars = s.chars();
+    let Some(first) = chars.next() else {
+        return false;
+    };
+    if !(first.is_alphanumeric() || first == '_' || !first.is_ascii()) {
+        return false;
+    }
+    true
 }
 
 /// Same-line `$$body$$` → Formula; otherwise None (caller parses normally).
@@ -731,19 +774,39 @@ fn parse_param_line(trimmed: &str) -> Option<crate::ast::Param> {
     Some(Param { name, default })
 }
 
+fn parse_foreach_ident(s: &str) -> Option<String> {
+    let s = s.trim();
+    if s.starts_with('`') {
+        return parse_backtick_ident(s);
+    }
+    if s.is_empty() {
+        return None;
+    }
+    // Bare name exemption: `[item](list)` without ticks (foreach only).
+    if s.chars().any(|c| c.is_whitespace() || c == '`' || c == '[' || c == ']') {
+        return None;
+    }
+    let mut chars = s.chars();
+    let first = chars.next()?;
+    if !(first.is_alphanumeric() || first == '_' || !first.is_ascii()) {
+        return None;
+    }
+    Some(s.to_string())
+}
+
 fn parse_foreach_header(rest: &str) -> Option<(String, String)> {
-    // [`item`](`collection`)
+    // [`item`](`collection`) or bare [item](collection); sides may mix.
     let rest = rest.trim();
     if !rest.starts_with('[') {
         return None;
     }
     let end_item = rest.find(']')?;
-    let item = parse_backtick_ident(&rest[1..end_item])?;
+    let item = parse_foreach_ident(&rest[1..end_item])?;
     let after = rest[end_item + 1..].trim_start();
     if !after.starts_with('(') || !after.ends_with(')') {
         return None;
     }
-    let coll = parse_backtick_ident(&after[1..after.len() - 1])?;
+    let coll = parse_foreach_ident(&after[1..after.len() - 1])?;
     Some((item, coll))
 }
 
@@ -1003,15 +1066,15 @@ fn indent_of(text: &str) -> usize {
         .sum()
 }
 
-fn cell_literal(raw: &str) -> Literal {
-    let t = raw.trim();
-    let digits = |s: &str| !s.is_empty() && s.bytes().all(|b| b.is_ascii_digit());
-    if digits(t) || t.strip_prefix('-').is_some_and(digits) {
-        if let Ok(n) = t.parse::<i64>() {
-            return Literal::Int(n);
-        }
-    }
-    Literal::Text(t.to_string())
+fn parse_table_cell(raw: &str, line: u32) -> Result<Expr> {
+    parse_call_arg_value(raw).map_err(|e| {
+        Diagnostic::new(
+            None,
+            Span { line, col: 1 },
+            format!("table cell: {e}"),
+        )
+        .into()
+    })
 }
 
 /// First-column header that opts into row-oriented records (`List` of `Map`).
@@ -1022,7 +1085,7 @@ fn is_row_table_marker(header: &str) -> bool {
 fn build_row_oriented_table(
     header: Vec<String>,
     header_line: u32,
-    data_rows: Vec<Vec<String>>,
+    data_rows: Vec<(u32, Vec<String>)>,
 ) -> Result<Expr> {
     if header.len() < 2 {
         return Err(Diagnostic::new(
@@ -1051,12 +1114,12 @@ fn build_row_oriented_table(
         }
     }
     let mut rows = Vec::with_capacity(data_rows.len());
-    for cells in data_rows {
+    for (line_no, cells) in data_rows {
         let mut pairs = Vec::with_capacity(fields.len());
         for (i, key) in fields.iter().enumerate() {
             // Skip marker column (index 0); fields start at column 1.
             let raw = cells.get(i + 1).map(|s| s.as_str()).unwrap_or("");
-            pairs.push((key.clone(), Expr::Literal(cell_literal(raw))));
+            pairs.push((key.clone(), parse_table_cell(raw, line_no)?));
         }
         rows.push(Expr::Map(pairs));
     }
@@ -1120,6 +1183,51 @@ mod tests {
                 assert_eq!(collection, "xs");
             }
             other => panic!("expected foreach, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn parse_foreach_bare_ids() {
+        let src = "# main\n\n- [x](xs)\n  > print text=`x`\n";
+        let m = parse_source(src).unwrap();
+        match &m.functions[0].body[0] {
+            Stmt::ForEach { item, collection, .. } => {
+                assert_eq!(item, "x");
+                assert_eq!(collection, "xs");
+            }
+            other => panic!("expected foreach, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn parse_foreach_mixed_ticks() {
+        let src = "# main\n\n- [果](`篮子`)\n  > print text=`果`\n";
+        let m = parse_source(src).unwrap();
+        match &m.functions[0].body[0] {
+            Stmt::ForEach { item, collection, .. } => {
+                assert_eq!(item, "果");
+                assert_eq!(collection, "篮子");
+            }
+            other => panic!("expected foreach, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn parse_italic_bare_lhs_prefer_var() {
+        let src = "# main\n\n*answer = 1*\n**answer**\n";
+        let m = parse_source(src).unwrap();
+        match &m.functions[0].body[0] {
+            Stmt::Assign { name, value, .. } => {
+                assert_eq!(name, "answer");
+                assert!(matches!(value, Expr::Literal(Literal::Int(1))));
+            }
+            other => panic!("expected assign, got {other:?}"),
+        }
+        match &m.functions[0].body[1] {
+            Stmt::Return { value, .. } => {
+                assert!(matches!(value, Expr::Var(n) if n == "answer"));
+            }
+            other => panic!("expected return, got {other:?}"),
         }
     }
 

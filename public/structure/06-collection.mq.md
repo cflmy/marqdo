@@ -15,5 +15,5 @@ A single-column Markdown table is a list; loop to read each item. Use `basket`[^
 | pear |
 | peach |
 
-- [`fruit`](`basket`)
+- [fruit](basket)
   > print text=`fruit`

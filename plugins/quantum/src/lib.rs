@@ -1,5 +1,6 @@
 //! Marqdo quantum plugin (C ABI v2): state-vector circuit simulation.
 
+mod draw;
 mod sim;
 
 use std::ffi::{CStr, CString};
@@ -42,6 +43,8 @@ pub struct MarqdoHostApi {
 
 static mut HOST_FREE: Option<unsafe extern "C" fn(*mut c_void)> = None;
 static mut HOST_ALLOC: Option<unsafe extern "C" fn(usize) -> *mut c_void> = None;
+static mut HOST_QUERY: Option<HostQueryFn> = None;
+static mut HOST_USERDATA: *mut c_void = ptr::null_mut();
 
 unsafe fn host_strdup(s: &str) -> *mut c_char {
     let alloc = HOST_ALLOC.expect("host alloc");
@@ -157,6 +160,60 @@ fn circuit_of(args: &Value) -> Result<&Value, String> {
         .ok_or_else(|| "missing `circuit`".to_string())
 }
 
+fn take_host_string(p: *mut c_char) -> Option<String> {
+    if p.is_null() {
+        return None;
+    }
+    let s = unsafe { CStr::from_ptr(p) }
+        .to_str()
+        .ok()
+        .map(|s| s.to_string());
+    unsafe {
+        if let Some(free) = HOST_FREE {
+            free(p as *mut c_void);
+        }
+    }
+    s
+}
+
+fn host_query_json(name: &str, args: &Value) -> Result<Value, String> {
+    let query = unsafe { HOST_QUERY }.ok_or_else(|| "host_query not available".to_string())?;
+    let userdata = unsafe { HOST_USERDATA };
+    let c_name = CString::new(name).map_err(|e| e.to_string())?;
+    let c_args = CString::new(args.to_string()).map_err(|e| e.to_string())?;
+    let mut out_ptr: *mut c_char = ptr::null_mut();
+    let mut err_ptr: *mut c_char = ptr::null_mut();
+    let rc = unsafe {
+        query(
+            userdata,
+            c_name.as_ptr(),
+            c_args.as_ptr(),
+            &mut out_ptr,
+            &mut err_ptr,
+        )
+    };
+    let err = take_host_string(err_ptr);
+    let out = take_host_string(out_ptr);
+    if rc != 0 {
+        return Err(err.unwrap_or_else(|| format!("host_query `{name}` failed")));
+    }
+    let out = out.unwrap_or_else(|| "null".into());
+    serde_json::from_str(&out).map_err(|e| format!("host_query `{name}` bad JSON: {e}"))
+}
+
+fn record_plot(svg: &str, path: Option<&str>) -> Result<(), String> {
+    let mut args = json!({ "svg": svg });
+    if let Some(p) = path {
+        if !p.is_empty() {
+            args.as_object_mut()
+                .unwrap()
+                .insert("path".into(), json!(p));
+        }
+    }
+    host_query_json("record_plot", &args)?;
+    Ok(())
+}
+
 q_ffi!(quantum_ping, |_args: &Value| {
     Ok(json!({
         "ok": true,
@@ -168,11 +225,11 @@ q_ffi!(quantum_ping, |_args: &Value| {
 
 q_ffi!(quantum_circuit_new, |args: &Value| {
     let qubits = arg_u(args, "qubits").or_else(|_| arg_u(args, "比特数"))?;
-    sim::check_qubits(qubits)?;
-    Ok(json!({
-        "qubits": qubits,
-        "ops": [],
-    }))
+    let steps = args
+        .get("steps")
+        .or_else(|| args.get("步骤"))
+        .filter(|v| !v.is_null());
+    sim::circuit_new(qubits, steps)
 });
 
 q_ffi!(quantum_h, |args: &Value| {
@@ -286,6 +343,34 @@ q_ffi!(quantum_run, |args: &Value| {
     sim::run_circuit(c, shots, seed)
 });
 
+q_ffi!(quantum_draw_circuit, |args: &Value| {
+    let c = circuit_of(args)?;
+    let svg = draw::circuit_svg(c)?;
+    let path = args
+        .get("path")
+        .or_else(|| args.get("路径"))
+        .and_then(|v| v.as_str())
+        .filter(|s| !s.is_empty());
+    // Prefer view/CLI plots channel; still return structured value for authors.
+    record_plot(&svg, path)?;
+    let ops_n = c
+        .get("ops")
+        .and_then(|v| v.as_array())
+        .map(|a| a.len())
+        .unwrap_or(0);
+    let qubits = c
+        .get("qubits")
+        .and_then(|v| v.as_u64())
+        .unwrap_or(0);
+    Ok(json!({
+        "_type": "quantum_svg",
+        "kind": "circuit",
+        "qubits": qubits,
+        "ops": ops_n,
+        "svg": svg,
+    }))
+});
+
 fn register(host: &MarqdoHostApi, name: &str, params: &str, fn_ptr: PluginFn) -> c_int {
     let register = match host.register_fn {
         Some(f) => f,
@@ -312,14 +397,13 @@ pub unsafe extern "C" fn marqdo_plugin_init(host: *const MarqdoHostApi) -> c_int
     let host = &*host;
     HOST_ALLOC = host.alloc;
     HOST_FREE = host.free;
-    if host.host_query.is_none() {
-        // v2 preferred; still allow init if only register is present
-    }
+    HOST_QUERY = host.host_query;
+    HOST_USERDATA = host.userdata;
     let regs = [
         ("quantum_ping", "", quantum_ping as PluginFn),
         (
             "quantum_circuit_new",
-            "qubits",
+            "qubits,steps",
             quantum_circuit_new as PluginFn,
         ),
         ("quantum_h", "circuit,qubit", quantum_h as PluginFn),
@@ -354,6 +438,11 @@ pub unsafe extern "C" fn marqdo_plugin_init(host: *const MarqdoHostApi) -> c_int
             quantum_probabilities as PluginFn,
         ),
         ("quantum_run", "circuit,shots,seed", quantum_run as PluginFn),
+        (
+            "quantum_draw_circuit",
+            "circuit,path",
+            quantum_draw_circuit as PluginFn,
+        ),
     ];
     for (name, params, f) in regs {
         if register(host, name, params, f) != 0 {

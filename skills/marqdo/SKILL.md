@@ -20,7 +20,7 @@ Canonical design (repo): `doc/design/markdown-mapping.md`, `doc/design/keywords.
 2. **Output is not `**bold**`.** Print with `> print text=…` (or `> 打印 内容=…`). Bold `**…**` is **return value only**.
 3. **Prose vs code:** after a blank line, an unmarked first line starts a **comment paragraph**; every following non-blank line stays comment until the next blank line. Put a **blank line** between narration and executable lines.
 4. **Do not invent keywords** `if` / `else` / `while` / `for` / `def` / `return`. Control flow is Markdown: **`+` params** (under heading), **`1.` `2.` … branches**, **`-` loops**, arm `N. *` = else, `#` = **object/type**, `##`+ = **function/method**, `**…**` = return.
-5. **Identifiers use backticks** — params `` + `name` ``, bindings `` `x` ``, foreach `` [`item`](`coll`) ``. **Complex text** uses `"..."` with escapes; bare tokens stay literal (no `\n` magic).
+5. **Identifiers use backticks** — params `` + `name` ``. **Exemptions:** foreach `` - [item](coll) ``; footnote `` name[^key] ``; **inside italic `*…*` / bold `**…**`**, bare ids are variables (strings need `"…"` / `'…'`; ticks still ok).
 6. **Structure lines are not wrapped in italics.** `#` `>` `+` `-` `|` lines stand alone; use `*…*` only for general statements (bindings / expressions).
 7. **Paths in bare expressions:** `/` is division. Prefer `` `path` `` vars, same-dir names, or call args — not raw `a/b` in expressions.
 8. Prefer ending side-effect-only function bodies with a lone `---` or `***` line (or `****` empty return) so later siblings are not swallowed.
@@ -33,7 +33,7 @@ Canonical design (repo): `doc/design/markdown-mapping.md`, `doc/design/keywords.
 | `##` … `######` | **Function / method** (nesting by heading depth). |
 | `` + `name` `` under heading | Parameter (optional `` `name`=default ``) |
 | `1.` `2.` … in body | Branch arm (condition or `N. *` else). **Same-indent restart at `1.` = new branch statement** (not more arms of the previous list). |
-| `- …` inside body | Loop (`while` or `` [`item`](`coll`) ``) |
+| `- …` inside body | Loop (`while` or `` [item](coll) `` / `` [`item`](`coll`) ``) |
 | Line `N. *` | Else arm |
 | `> fn args` | Call (named `k=v` or positional) |
 | `` > `obj`.method args `` | Method call (`obj` must be a map with `_type`) |

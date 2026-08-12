@@ -7,7 +7,7 @@ description: Host builtins for strings and tables
 
 Length and type:
 
-*`s` = hello*
+*`s` = "hello"*
 
 *`n` = > len `s`*
 

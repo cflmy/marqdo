@@ -74,7 +74,7 @@ Greeting via a nested function:
 |----|
 | 苹果 |
 
-- [`果`](`篮子`)
+- [果](篮子)
   > print text=`果`
 ```
 
@@ -89,13 +89,13 @@ Greeting via a nested function:
 |------|------|
 | 水果 | 蔬菜 |
 
-*`种` = `分类`[^苹果] *
+*`种` = 分类[^苹果] *
 > print text=`种`
 
-*`第一` = `篮子`[^1] *
+*`第一` = 篮子[^1] *
 ```
 
-One column → list; ≥2 columns + one data row → map; ≥2 columns + many rows → map of lists. Footnotes are 1-based on lists; map keys are header text. Foreach on a map walks **keys**.
+One column → list; ≥2 columns + one data row → map; ≥2 columns + many rows → map of lists. Data cells are expressions (same as call-arg values): bare words, numbers, `` `var` ``, quoted strings; URLs and `gpt-4o-mini` stay text via path/hyphen folding. Footnotes: lists use 1-based digit indices; maps use key text (including digit keys like `[^00]`). Foreach on a map walks **keys**.
 
 Row-oriented records (SQL-like): first header `@` / `行` / `row` → list of maps (marker column excluded):
 

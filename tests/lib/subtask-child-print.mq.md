@@ -6,4 +6,4 @@ title: subtask child that prints
 
 > print text=hello-from-child
 
-**child_ok**
+**"child_ok"**

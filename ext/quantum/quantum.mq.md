@@ -20,11 +20,12 @@ Load the ABI v2 `quantum` plugin once.
 
 # circuit
     + `qubits`=1
+    + `steps`=None
 
-State-vector circuit (default |0…0⟩). Methods append gates and return an updated handle.
+State-vector circuit (default |0…0⟩). Optional `steps=` gate table (column or row records). Methods append gates and return an updated handle.
 
 > ensure_plugin
-**> quantum_circuit_new qubits=`qubits`**
+**> quantum_circuit_new qubits=`qubits` steps=`steps`**
 
 ## h
     + `qubit`=0
@@ -116,3 +117,10 @@ Return map of basis label → probability (qubit 0 = rightmost bit).
 Sample computational-basis shots (deterministic with `seed=`).
 
 **> quantum_run circuit=`self` shots=`shots` seed=`seed`**
+
+## draw
+    + `path`=None
+
+Circuit rail SVG (`quantum_svg`). Records into view/CLI plots via host `record_plot`.
+
+**> quantum_draw_circuit circuit=`self` path=`path`**

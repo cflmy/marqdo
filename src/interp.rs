@@ -206,7 +206,7 @@ impl Interpreter {
             data: &mut data as *mut HookData as *mut (),
         };
         crate::host::plugin::with_lib_path_call(hook, || {
-            crate::host::plugin::call_registered(&self.host, name, bound)
+            crate::host::plugin::call_registered(&mut self.host, name, bound)
         })
     }
 

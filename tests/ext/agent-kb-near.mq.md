@@ -17,10 +17,10 @@ description: Promote trip resource; near-dupe goals hit match=near; unrelated mi
   > print text=no-agent-plugin
   > sys.exit code=1
 
-*`kb` = .marqdo/agent-kb-near-test *
-*`wb` = .marqdo/agent-runs/near-trip.mq.md *
-*`goal` = 帮我规划明天的行程 *
-*`body` = "---\ntitle: trip\n---\n\n# main\n\n**trip-ok**\n" *
+*`kb` = ".marqdo/agent-kb-near-test" *
+*`wb` = ".marqdo/agent-runs/near-trip.mq.md" *
+*`goal` = "帮我规划明天的行程" *
+*`body` = "---\ntitle: trip\n---\n\n# main\n\n*msg = \"trip-ok\"*\n\n**msg**\n" *
 
 > fs.write_text path=`wb` text=`body`
 *`prom` = > agent_kb_promote kb_dir=`kb` goal=`goal` workbook=`wb` *
@@ -32,7 +32,7 @@ description: Promote trip resource; near-dupe goals hit match=near; unrelated mi
 
 *`slug` = > json.get value=`prom` key=slug *
 
-*`g1` = 帮我规划明天行程 *
+*`g1` = "帮我规划明天行程" *
 *`hit1` = > agent_kb_lookup kb_dir=`kb` goal=`g1` near_match=True near_threshold=0.78 *
 1. `hit1`
   > print text=near-ok
@@ -52,7 +52,7 @@ description: Promote trip resource; near-dupe goals hit match=near; unrelated mi
 2. *
   > print text=off-miss
 
-*`g2` = 明天做什么好 *
+*`g2` = "明天做什么好" *
 *`hit2` = > agent_kb_lookup kb_dir=`kb` goal=`g2` near_match=True near_threshold=0.78 *
 1. `hit2`
   > print text=neg-hit

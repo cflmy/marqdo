@@ -146,7 +146,7 @@ pub enum Expr {
     /// Footnote index: `` `xs`[^1] `` / `` `m`[^key] `` (see tables-maps-footnotes).
     Index {
         base: Box<Expr>,
-        /// Label inside `[^…]` (digits → 1-based list index; else map key).
+        /// Label inside `[^…]` (digits → 1-based list index, or map key text including digit keys).
         label: String,
     },
     /// Parsed `$$…$$` formula tree (from assignment RHS).

@@ -5,7 +5,7 @@ description: trim split join at type + lib imports
 
 # main
 
-*`raw` =   hi  *
+*`raw` = "  hi  " *
 
 *`t` = > trim `raw`*
 

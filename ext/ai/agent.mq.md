@@ -40,7 +40,7 @@ Assemble a readable prompt: standing, task, tools, call site, source, skill, and
 *`f` = > json.get value=`esc` key=f *
 *`g` = > json.get value=`esc` key=g *
 
-*`p` = You are a Marqdo agent. The runbook source is your ground truth — code is documentation. *
+*`p` = "You are a Marqdo agent. The runbook source is your ground truth — code is documentation." *
 *`p` = `p` + `a` + `up` + `b` + `task_s` + `c` + `tools_s` + `g` + `d` + `site_s` + `e` + `src` + `f` + `skill` *
 **`p`**
 
@@ -90,7 +90,7 @@ Allowlist check, then invoke the runbook `##` via `lib/subtask` (`spawn fn=` →
   *`id` = > subtask.spawn fn=`name` *
   **> subtask.wait id=`id`**
 2. *
-  *`msg` = Tool not allowed: *
+  *`msg` = "Tool not allowed:" *
   **`msg` + `name`**
 
 ## render_workbook_skeleton
@@ -478,7 +478,7 @@ Write a scratch tool workbook under `.marqdo/agent-runs/tools/<name>.mq.md`.
 *`esc` = > json.parse text={"a":".marqdo/agent-runs/tools/","b":".mq.md"} *
 *`a` = > json.get value=`esc` key=a *
 *`b` = > json.get value=`esc` key=b *
-*`dir` = .marqdo/agent-runs/tools *
+*`dir` = ".marqdo/agent-runs/tools" *
 > fs.make_dir path=`dir`
 *`path` = `a` + `name` + `b` *
 > fs.write_text path=`path` text=`text`
@@ -654,7 +654,7 @@ Parent Plan-and-Move tools (helpers + whitelist `CALL:lib…`).
   1. `head` == lib
     **> run_lib_call name=`name` reply=`reply`**
   2. *
-    *`msg` = Parent tool not allowed: *
+    *`msg` = "Parent tool not allowed:" *
     **`msg` + `name`**
 
 ---
@@ -860,25 +860,25 @@ Parse `DECISION: DONE` / `CONTINUE` / `RUN` (Chinese: `决定：完成` / `继�
       *`_` = 1*
 
 1. `found` == DONE
-  **DONE**
+  **"DONE"**
 2. `found` == CONTINUE
-  **CONTINUE**
+  **"CONTINUE"**
 3. `found` == RUN
-  **RUN**
+  **"RUN"**
 4. `found` == REUSE
-  **REUSE**
+  **"REUSE"**
 5. `found` == NEW
-  **NEW**
+  **"NEW"**
 6. `found` == 完成
-  **DONE**
+  **"DONE"**
 7. `found` == 继续
-  **CONTINUE**
+  **"CONTINUE"**
 8. `found` == 运行
-  **RUN**
+  **"RUN"**
 9. `found` == 复用
-  **REUSE**
+  **"REUSE"**
 10. `found` == 新建
-  **NEW**
+  **"NEW"**
 11. *
   **`found`**
 
@@ -956,7 +956,7 @@ Short parent prompt: REUSE+SLUG or NEW only. Candidates may include lexical `sco
     *`row` = `slug` + `sep` + `title` *
   *`lines` = > json.append list=`lines` item=`row` *
 *`catalog` = > join value=`lines` sep=`nl` *
-*`p` = Soft-match: same task intent? *
+*`p` = "Soft-match: same task intent?" *
 **`p` + `a` + `goal` + `b` + `catalog` + `c`**
 
 ---
@@ -1041,10 +1041,10 @@ Parent Plan-and-Move prompt. Short protocol only — no long monologues.
 *`f` = > json.get value=`esc` key=f *
 1. `phase` == decompose
   *`e` = > json.get value=`esc` key=e_dec *
-  *`p` = Plan-and-Move: decompose before first run. *
+  *`p` = "Plan-and-Move: decompose before first run." *
 2. *
   *`e` = > json.get value=`esc` key=e_rev *
-  *`p` = Plan-and-Move: revise after child run. *
+  *`p` = "Plan-and-Move: revise after child run." *
 *`p` = `p` + `a` + `up` + `b` + `goal_s` + `c` + `obs_s` + `tools` + `d` + `skill` + `e` *
 1. `explore_attempt`
   *`p` = `p` + `f` *
@@ -1052,7 +1052,7 @@ Parent Plan-and-Move prompt. Short protocol only — no long monologues.
   *`p` = `p` + `explore_attempt` *
   *`p` = `p` + of *
   *`p` = `p` + `explore_n` *
-  *`p` = `p` + . Different path; prefer code when fixed. *
+  *`p` = `p` + ". Different path; prefer code when fixed." *
 2. *
   *`_` = 1*
 **`p`**
@@ -1114,7 +1114,7 @@ LLM Plan → CALL/READ/DECISION loop. Returns `{decision,reply,observation,event
       *`evs_all` = > plan_append_decision events=`evs_all` decision=`decision` stream=`stream` *
       *`left` = 0*
     4. *
-      *`decision` = unknown*
+      *`decision` = "unknown"*
       *`left` = 0*
 
 *`out` = > json.parse text={} *
@@ -1367,13 +1367,13 @@ With `stream=True`, the model call uses SSE; `echo=True` prints delta text to st
     *`reply` = `tool_s`*
   2. *
     *`task_s` = > json.stringify value=`task` *
-    *`fp` = The user asked: *
+    *`fp` = "The user asked:" *
     *`fp` = `fp` + `task_s` *
-    *`fp` = `fp` + . Tool *
+    *`fp` = `fp` + ". Tool" *
     *`fp` = `fp` + `tool_name` *
-    *`fp` = `fp` + ran via subtask and returned: *
+    *`fp` = `fp` + "ran via subtask and returned:" *
     *`fp` = `fp` + `tool_s` *
-    *`fp` = `fp` + . Reply to the user briefly. *
+    *`fp` = `fp` + ". Reply to the user briefly." *
     1. `stream`
       *`evs2` = > `model`.complete prompt=`fp` stream=True echo=`echo` *
       *`reply` = > llm.stream_result events=`evs2` *
@@ -1428,7 +1428,7 @@ Multi-step with OKF agent-kb. Default workbook is `kb_dir/resources/<slug>.mq.md
 Reuse lookup: exact → alias → canonicalize → optional local n-gram `near` when `near_match=True` and score ≥ `near_threshold`. Non-hit path: optional `soft_match=True` parent REUSE/NEW over ranked `agent_kb_near_match` candidates; else **decompose** before first child spawn (`DECISION: RUN` / `CONTINUE`+patch / solidified `DONE`). Then `await` → revise loop. With `stream=True`, emit parent `delta` / `decision` / `tool_start`/`tool_end` / `round` / `done` on `events`. `echo=True` prints `plan:decompose` / `plan:await` / deltas. `trace=True` writes events to writeback slot `trace`. Quiet child subtasks stay quiet.
 
 *`tools` = > json.get value=`self` key=tools *
-*`cache` = miss*
+*`cache` = "miss"*
 *`path` = None*
 *`improve` = None*
 *`explore` = None*
@@ -1448,19 +1448,19 @@ Reuse lookup: exact → alias → canonicalize → optional local n-gram `near` 
   1. `hit`
     *`match_kind` = > json.get value=`hit` key=match *
     1. `match_kind` == alias
-      *`cache_label` = soft-hit*
+      *`cache_label` = "soft-hit"*
     2. `match_kind` == canonical
-      *`cache_label` = soft-hit*
+      *`cache_label` = "soft-hit"*
       *`hit_slug` = > json.get value=`hit` key=slug *
       > agent_kb_add_alias kb_dir=`kb_dir` slug=`hit_slug` alias=`goal`
     3. `match_kind` == near
-      *`cache_label` = soft-hit*
+      *`cache_label` = "soft-hit"*
       *`hit_slug` = > json.get value=`hit` key=slug *
       > agent_kb_add_alias kb_dir=`kb_dir` slug=`hit_slug` alias=`goal`
     4. `match_kind` == soft
-      *`cache_label` = soft-hit*
+      *`cache_label` = "soft-hit"*
     5. *
-      *`cache_label` = hit*
+      *`cache_label` = "hit"*
     *`lf` = > json.get value=`hit` key=llm_free *
     1. `lf`
       *`path` = > json.get value=`hit` key=resource *
@@ -1481,7 +1481,7 @@ Reuse lookup: exact → alias → canonicalize → optional local n-gram `near` 
         *`out` = > json.set map=`out` key=skill value=`sk` *
         *`st` = > json.get value=`hit` key=status *
         *`out` = > json.set map=`out` key=skill_status value=`st` *
-        *`sum` = OKF llm_free skill hit; spawned resource *
+        *`sum` = "OKF llm_free skill hit; spawned resource" *
         *`out` = > json.set map=`out` key=summary value=`sum` *
         *`out` = > json.set map=`out` key=observation value=`last_obs` *
         *`out` = > json.set map=`out` key=result value=`child_val` *
@@ -1497,11 +1497,11 @@ Reuse lookup: exact → alias → canonicalize → optional local n-gram `near` 
         *`path` = None*
     2. `nfiles` < `explore_n`
       *`explore` = 1*
-      *`cache` = explore*
+      *`cache` = "explore"*
       *`path` = None*
       *`explore_attempt` = `nfiles` + 1*
       1. `explore_attempt` == 2
-        *`skel_kind` = dual*
+        *`skel_kind` = "dual"*
       2. *
         *`skel_kind` = `skeleton`*
     3. *
@@ -1515,7 +1515,7 @@ Reuse lookup: exact → alias → canonicalize → optional local n-gram `near` 
         *`due` = > json.get value=`rec` key=improve_due *
         1. `due`
           *`improve` = 1*
-          *`cache` = improve*
+          *`cache` = "improve"*
         2. *
           *`cache` = `cache_label`*
           *`out` = > json.parse text={"status":"ok"} *
@@ -1528,7 +1528,7 @@ Reuse lookup: exact → alias → canonicalize → optional local n-gram `near` 
           *`out` = > json.set map=`out` key=skill value=`sk` *
           *`st` = > json.get value=`hit` key=status *
           *`out` = > json.set map=`out` key=skill_status value=`st` *
-          *`sum` = OKF skill hit; spawned resource *
+          *`sum` = "OKF skill hit; spawned resource" *
           *`out` = > json.set map=`out` key=summary value=`sum` *
           *`out` = > json.set map=`out` key=observation value=`last_obs` *
           *`out` = > json.set map=`out` key=result value=`child_val` *
@@ -1571,7 +1571,7 @@ Reuse lookup: exact → alias → canonicalize → optional local n-gram `near` 
             *`hit` = > agent_kb_lookup kb_dir=`kb_dir` slug=`reuse_slug` goal=`goal` tools=`tools` *
             1. `hit`
               > agent_kb_add_alias kb_dir=`kb_dir` slug=`reuse_slug` alias=`goal`
-              *`cache_label` = soft-hit*
+              *`cache_label` = "soft-hit"*
               *`path` = > json.get value=`hit` key=resource *
               *`aw` = > await_workbook path=`path` *
               *`code` = > json.get value=`aw` key=code *
@@ -1579,7 +1579,7 @@ Reuse lookup: exact → alias → canonicalize → optional local n-gram `near` 
               *`last_obs` = > json.get value=`aw` key=observation *
               1. `code` == 0
                 > agent_kb_record_hit kb_dir=`kb_dir` goal=`goal` tools=`tools` improve_every=`improve_every`
-                *`cache` = soft-hit*
+                *`cache` = "soft-hit"*
                 *`out` = > json.parse text={"status":"ok"} *
                 *`out` = > json.set map=`out` key=status value=ok *
                 *`out` = > json.set map=`out` key=goal value=`goal` *
@@ -1590,7 +1590,7 @@ Reuse lookup: exact → alias → canonicalize → optional local n-gram `near` 
                 *`out` = > json.set map=`out` key=skill value=`sk` *
                 *`st` = > json.get value=`hit` key=status *
                 *`out` = > json.set map=`out` key=skill_status value=`st` *
-                *`sum` = OKF soft_match REUSE; spawned resource *
+                *`sum` = "OKF soft_match REUSE; spawned resource" *
                 *`out` = > json.set map=`out` key=summary value=`sum` *
                 *`out` = > json.set map=`out` key=observation value=`last_obs` *
                 *`out` = > json.set map=`out` key=result value=`child_val` *
@@ -1616,10 +1616,10 @@ Reuse lookup: exact → alias → canonicalize → optional local n-gram `near` 
       *`_` = 1*
     1. `nfiles` < `explore_n`
       *`explore` = 1*
-      *`cache` = explore*
+      *`cache` = "explore"*
       *`explore_attempt` = `nfiles` + 1*
       1. `explore_attempt` == 2
-        *`skel_kind` = dual*
+        *`skel_kind` = "dual"*
       2. *
         *`skel_kind` = `skeleton`*
     2. *
@@ -1627,7 +1627,7 @@ Reuse lookup: exact → alias → canonicalize → optional local n-gram `near` 
 4. *
   1. `nfiles` < `explore_n`
     *`explore` = 1*
-    *`cache` = explore*
+    *`cache` = "explore"*
     *`explore_attempt` = `nfiles` + 1*
   2. *
     *`_` = 1*
@@ -1690,8 +1690,8 @@ Reuse lookup: exact → alias → canonicalize → optional local n-gram `near` 
 *`child_val` = None*
 *`done` = None*
 *`summary` = None*
-*`status` = error*
-*`err` = max_rounds exhausted *
+*`status` = "error"*
+*`err` = "max_rounds exhausted" *
 *`skip_loop` = None*
 
 > plan_echo_decompose workbook=`path` stream=`stream` echo=`echo`
@@ -1721,7 +1721,7 @@ Reuse lookup: exact → alias → canonicalize → optional local n-gram `near` 
     *`events` = > plan_append_round events=`events` round=1 workbook=`path` exit_code=`code` result=`child_val` stream=`stream` echo=`echo` *
     1. `code` == 0
       *`done` = 1*
-      *`status` = ok*
+      *`status` = "ok"*
       *`summary` = > extract_plan_summary reply=`last_reply` *
       *`err` = None*
       *`skip_loop` = 1*
@@ -1729,8 +1729,8 @@ Reuse lookup: exact → alias → canonicalize → optional local n-gram `near` 
       *`_` = 1*
 4. *
   *`done` = 1*
-  *`status` = error*
-  *`err` = unrecognized plan decision *
+  *`status` = "error"*
+  *`err` = "unrecognized plan decision" *
   *`summary` = `last_reply`*
   *`skip_loop` = 1*
 
@@ -1769,10 +1769,10 @@ Deterministic success stop (loop engineering): when the child already returned a
     1. `auto_done`
       > agent_workbook_solidify path=`path` observation=`last_obs`
       *`done` = 1*
-      *`status` = ok*
-      *`summary` = child returned value; solidified *
+      *`status` = "ok"*
+      *`summary` = "child returned value; solidified" *
       *`err` = None*
-      *`dec` = DONE*
+      *`dec` = "DONE"*
       *`events` = > plan_append_decision events=`events` decision=`dec` stream=`stream` summary=`summary` *
       *`left` = 0*
     2. *
@@ -1784,7 +1784,7 @@ Deterministic success stop (loop engineering): when the child already returned a
       1. `dec` == DONE
         > agent_workbook_solidify path=`path` observation=`last_obs`
         *`done` = 1*
-        *`status` = ok*
+        *`status` = "ok"*
         *`summary` = > extract_plan_summary reply=`last_reply` *
         *`err` = None*
         *`left` = 0*
@@ -1794,25 +1794,25 @@ Deterministic success stop (loop engineering): when the child already returned a
           *`left` = `left` - 1*
         2. *
           *`done` = 1*
-          *`status` = error*
-          *`err` = no patches applied *
+          *`status` = "error"*
+          *`err` = "no patches applied" *
           *`summary` = > extract_plan_summary reply=`last_reply` *
           *`left` = 0*
       3. `dec` == RUN
         *`left` = `left` - 1*
       4. *
         *`done` = 1*
-        *`status` = error*
-        *`err` = unrecognized plan decision *
+        *`status` = "error"*
+        *`err` = "unrecognized plan decision" *
         *`summary` = `last_reply`*
         *`left` = 0*
 
 1. `status` == ok
   1. `promote`
     *`prom` = > agent_kb_promote kb_dir=`kb_dir` goal=`goal` workbook=`path` tools=`tools` *
-    *`cache` = refreshed*
+    *`cache` = "refreshed"*
   2. *
-    *`cache` = miss*
+    *`cache` = "miss"*
 2. *
   *`_` = 1*
 

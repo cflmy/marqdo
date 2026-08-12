@@ -164,12 +164,46 @@ fn structure_collection_map_list() {
 }
 
 #[test]
+fn structure_collection_cell_expr() {
+    assert_out(
+        "tests/structure/collection-cell-expr.mq.md",
+        "sk-live
+gpt-4o-mini
+https://api.openai.com/v1
+/chat/completions
+sk-live",
+    );
+}
+
+#[test]
+fn structure_bare_id_italic_bold() {
+    assert_out(
+        "tests/structure/bare-id-italic-bold.mq.md",
+        "2
+2
+quoted
+7
+ok
+hi",
+    );
+}
+
+#[test]
 fn structure_footnote_index() {
     assert_out(
         "tests/structure/footnote-index.mq.md",
         "苹果
 梨
 桃",
+    );
+}
+
+#[test]
+fn structure_footnote_map_digits() {
+    assert_out(
+        "tests/structure/footnote-map-digits.mq.md",
+        "half
+other",
     );
 }
 
@@ -1419,6 +1453,34 @@ fn ext_quantum_zh_smoke() {
 }
 
 #[test]
+fn ext_quantum_steps_smoke() {
+    let status = Command::new("cargo")
+        .args(["build", "-p", "marqdo_plugin_quantum"])
+        .current_dir(env!("CARGO_MANIFEST_DIR"))
+        .status()
+        .expect("build quantum plugin");
+    assert!(status.success(), "failed to build marqdo_plugin_quantum");
+    let path = "tests/ext/quantum-steps-smoke.mq.md";
+    let (code, stdout, stderr) = run(&["run", path]);
+    assert_eq!(code, 0, "{path} stderr={stderr}");
+    assert!(
+        stdout.contains("steps-ok"),
+        "{path} missing steps-ok in {stdout}"
+    );
+    assert!(
+        stdout.contains("draw-ok"),
+        "{path} missing draw-ok in {stdout}"
+    );
+    let svg_path = "tests/ext/quantum-steps-draw.svg";
+    let svg = std::fs::read_to_string(svg_path).unwrap_or_default();
+    assert!(
+        svg.contains("<svg") && svg.contains("q0"),
+        "{path} bad svg at {svg_path}: {svg}"
+    );
+    let _ = std::fs::remove_file(svg_path);
+}
+
+#[test]
 fn ext_agent_framework_smoke() {
     let status = Command::new("cargo")
         .args(["build", "-p", "marqdo_plugin_agent"])
@@ -1742,6 +1804,26 @@ Hi",
 #[test]
 fn ext_llm_stream_offline() {
     assert_out("tests/ext/llm-stream-offline.mq.md", "Hi!");
+}
+
+#[test]
+fn ext_llm_ctor_offline() {
+    let output = Command::new(env!("CARGO_BIN_EXE_marqdo"))
+        .args(["run", "tests/ext/llm-ctor-offline.mq.md"])
+        .env("OPENAI_API_KEY", "sk-test")
+        .env_remove("OPENAI_MODEL")
+        .env_remove("MARQDO_LLM_MODEL")
+        .output()
+        .expect("run llm-ctor-offline");
+    let code = output.status.code().unwrap_or(1);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert_eq!(code, 0, "llm-ctor-offline stderr={stderr}");
+    assert_eq!(
+        stdout.trim_end(),
+        "gpt-4o-mini\n/chat/completions",
+        "stdout={stdout}"
+    );
 }
 
 #[test]

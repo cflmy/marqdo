@@ -52,8 +52,8 @@ struct MarqdoHostApi {
 }
 
 thread_local! {
-    /// Set around plugin calls so `host_query` can read entry source / call site.
-    static CURRENT_HOST: Cell<*const HostContext> = const { Cell::new(std::ptr::null()) };
+    /// Set around plugin calls so `host_query` can read/write host context (plots, etc.).
+    static CURRENT_HOST: Cell<*mut HostContext> = const { Cell::new(std::ptr::null_mut()) };
     /// Optional `lib.member` resolver for `host_query("call_lib_path")` (site entry module).
     static LIB_PATH_CALL: RefCell<Option<LibPathCall>> = const { RefCell::new(None) };
 }
@@ -255,7 +255,7 @@ unsafe extern "C" fn host_query(
         set_err("host_query: no active host context (call during plugin fn)");
         return 1;
     }
-    let ctx = &*ctx_ptr;
+    let ctx = &mut *ctx_ptr;
 
     let args_owned: Option<String> = if args_json.is_null() {
         None
@@ -294,6 +294,37 @@ unsafe extern "C" fn host_query(
                 let v = (hook.call)(hook.data, &path)?;
                 value_to_json(&v)
             })
+        })(),
+        "record_plot" => (|| {
+            let raw = args_owned.as_deref().unwrap_or("{}");
+            let args: serde_json::Value = serde_json::from_str(if raw.trim().is_empty() {
+                "{}"
+            } else {
+                raw
+            })
+            .map_err(|e| format!("record_plot args: {e}"))?;
+            let svg = args
+                .get("svg")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| "record_plot requires `svg`".to_string())?
+                .to_string();
+            let path_s = args
+                .get("path")
+                .and_then(|v| v.as_str())
+                .filter(|s| !s.is_empty())
+                .map(|s| s.to_string());
+            if let Some(ref p) = path_s {
+                crate::host::fs::write_text(
+                    ctx,
+                    &Value::Text(p.clone()),
+                    &Value::Text(svg.clone()),
+                )?;
+            }
+            ctx.plots.push(crate::host::PlotArtifact {
+                path: path_s,
+                svg,
+            });
+            Ok(serde_json::json!({ "ok": true }))
         })(),
         other => Err(format!("host_query: unknown `{other}`")),
     };
@@ -420,7 +451,7 @@ pub fn list(ctx: &HostContext) -> Result<Value, String> {
 
 /// Call a registered plugin function with already-bound args (param name → Value).
 pub fn call_registered(
-    ctx: &HostContext,
+    ctx: &mut HostContext,
     name: &str,
     bound: &HashMap<String, Value>,
 ) -> Result<Value, String> {
@@ -449,9 +480,9 @@ pub fn call_registered(
     let mut out_ptr: *mut c_char = std::ptr::null_mut();
     let mut err_ptr: *mut c_char = std::ptr::null_mut();
 
-    CURRENT_HOST.with(|c| c.set(ctx as *const HostContext));
+    CURRENT_HOST.with(|c| c.set(ctx as *mut HostContext));
     let rc = unsafe { (reg.fn_ptr)(c_args.as_ptr(), &mut out_ptr, &mut err_ptr) };
-    CURRENT_HOST.with(|c| c.set(std::ptr::null()));
+    CURRENT_HOST.with(|c| c.set(std::ptr::null_mut()));
 
     let err_s = take_c_string(err_ptr);
     let out_s = take_c_string(out_ptr);

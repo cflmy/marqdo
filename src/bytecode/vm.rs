@@ -492,8 +492,9 @@ impl Vm {
                             };
                             bound.insert(ks, v);
                         }
-                        let result = crate::host::plugin::call_registered(&self.host, name, &bound)
-                            .map_err(|m| self.err_at(span, m))?;
+                        let result =
+                            crate::host::plugin::call_registered(&mut self.host, name, &bound)
+                                .map_err(|m| self.err_at(span, m))?;
                         stack.push(result);
                     } else {
                         let mut vals = Vec::with_capacity(argc);
@@ -523,7 +524,7 @@ impl Vm {
                             bound.insert(p.clone(), v);
                         }
                         let result =
-                            crate::host::plugin::call_registered(&self.host, &raw_name, &bound)
+                            crate::host::plugin::call_registered(&mut self.host, &raw_name, &bound)
                                 .map_err(|m| self.err_at(span, m))?;
                         stack.push(result);
                     }

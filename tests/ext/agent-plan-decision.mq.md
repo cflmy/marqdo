@@ -31,14 +31,14 @@ description: extract_plan_decision/summary; dual skeleton contains research+writ
 *`r5` = > agent.extract_plan_decision reply=`d5` *
 > print text=`r5`
 
-*`act_call` = CALL:lib_catalog *
+*`act_call` = "CALL:lib_catalog" *
 *`a1` = > agent.extract_plan_act reply=`act_call` *
 *`a1k` = > json.get value=`a1` key=kind *
 *`a1n` = > json.get value=`a1` key=name *
 > print text=`a1k`
 > print text=`a1n`
 
-*`act_read` = READ:stderr *
+*`act_read` = "READ:stderr" *
 *`a2` = > agent.extract_plan_act reply=`act_read` *
 *`a2k` = > json.get value=`a2` key=kind *
 *`a2n` = > json.get value=`a2` key=name *

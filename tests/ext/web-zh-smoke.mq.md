@@ -29,8 +29,8 @@ description: Offline Chinese 网页.mq.md assemble (no listen).
 
 | 属性 | 值 | 样式 |
 |------|-----|------|
-| `title` | articles.`articles`.title | |
-| `body` | articles.`articles`.body | |
+| title | articles.`articles`.title | |
+| body | articles.`articles`.body | |
 
 `seed` =
 

@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| 状态 | **Accepted · 实现中**（Q0–Q2：门集 + `run`；Q3+ 电路表/绘图见路线图） |
+| 状态 | **Accepted · 实现中**（Q0–Q3：门集 + `run` + `steps=`/`draw`；Q4+ 见路线图） |
 | 日期 | 2026-08-12 |
 | 相关 | [stdlib-math.md](stdlib-math.md) · [ext-abi.md](ext-abi.md) · [ext-cli.md](ext-cli.md) · [ext-web.md](ext-web.md) · [view.md](view.md) · [stdlib-i18n.md](stdlib-i18n.md) · [roadmap/ext-quantum.md](../roadmap/ext-quantum.md) |
 | 安装（目标） | `marqdo ext add quantum`（中英：`quantum` / `量子`） |

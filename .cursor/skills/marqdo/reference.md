@@ -18,7 +18,7 @@ marqdo ext remove llm|agent
 
 Diagnostics look like `path:line:col: message` (1-based line/col).
 
-**v0.2 surface:** parameters `` + `name` ``; branches `` 1. `cond` `` / `` 2. * `` (same-indent restart at `1.` = **new** branch statement); loops `` - [`item`](`coll`) ``; identifiers in backticks. See `doc/design/markdown-mapping.md`.
+**v0.2 surface:** parameters `` + `name` ``; branches `` 1. `cond` `` / `` 2. * `` (same-indent restart at `1.` = **new** branch statement); loops `` - [item](coll) `` or `` - [`item`](`coll`) ``; identifiers in backticks (foreach header may omit ticks). See `doc/design/markdown-mapping.md`.
 
 Stdlib search order for `lib/…` imports: `MARQDO_LIB`, `./lib`, directory of the `marqdo` executable (and a few parents). Prefer the **bundle zip** (`marqdo.exe` + `lib/`) over a bare exe.
 

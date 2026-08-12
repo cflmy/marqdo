@@ -5,7 +5,7 @@ description: Built-in conversions and length
 
 # main
 
-*`s` = hello*
+*`s` = "hello"*
 
 *`n` = > len `s`*
 

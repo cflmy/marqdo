@@ -17,11 +17,11 @@ description: Promote resource; patch Task aliases; variant goal hits same resour
   > print text=no-agent-plugin
   > sys.exit code=1
 
-*`kb` = .marqdo/agent-kb-alias-test *
-*`wb` = .marqdo/agent-runs/alias-pong.mq.md *
-*`goal` = Reply with exactly the word pong and nothing else. *
-*`alias` = say pong only *
-*`body` = "---\ntitle: pong skill\n---\n\n# main\n\n**pong**\n" *
+*`kb` = ".marqdo/agent-kb-alias-test" *
+*`wb` = ".marqdo/agent-runs/alias-pong.mq.md" *
+*`goal` = "Reply with exactly the word pong and nothing else." *
+*`alias` = "say pong only" *
+*`body` = "---\ntitle: pong skill\n---\n\n# main\n\n*msg = \"pong\"*\n\n**msg**\n" *
 
 > fs.write_text path=`wb` text=`body`
 *`prom` = > agent_kb_promote kb_dir=`kb` goal=`goal` workbook=`wb` aliases=`alias` *
@@ -63,9 +63,9 @@ description: Promote resource; patch Task aliases; variant goal hits same resour
 *`mk2` = > json.get value=`exact` key=match *
 > print text=`mk2`
 
-*`g_trip` = 帮我规划明天的行程 *
-*`wb2` = .marqdo/agent-runs/alias-trip.mq.md *
-*`body2` = "---\ntitle: trip\n---\n\n# main\n\n**trip-ok**\n" *
+*`g_trip` = "帮我规划明天的行程" *
+*`wb2` = ".marqdo/agent-runs/alias-trip.mq.md" *
+*`body2` = "---\ntitle: trip\n---\n\n# main\n\n*msg = \"trip-ok\"*\n\n**msg**\n" *
 > fs.write_text path=`wb2` text=`body2`
 *`prom2` = > agent_kb_promote kb_dir=`kb` goal=`g_trip` workbook=`wb2` *
 *`ok2` = > json.get value=`prom2` key=promoted *
@@ -74,7 +74,7 @@ description: Promote resource; patch Task aliases; variant goal hits same resour
 2. *
   > print text=trip-promote-fail
 
-*`g_canon` = 你是一个智能体，帮我规划明天的行程 *
+*`g_canon` = "你是一个智能体，帮我规划明天的行程" *
 *`c` = > agent_kb_canonicalize goal=`g_canon` *
 > print text=`c`
 *`hit_c` = > agent_kb_lookup kb_dir=`kb` goal=`g_canon` *

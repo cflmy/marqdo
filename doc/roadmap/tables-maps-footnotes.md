@@ -2,9 +2,9 @@
 
 | | |
 |---|---|
-| 状态 | **T0–T4 已落地** |
-| 日期 | 2026-08-10 |
-| 相关 | [markdown-mapping.md](../design/markdown-mapping.md) §9 · [objects.md](../design/objects.md) · [stdlib.md](../design/stdlib.md)（`lib/table`） · [keywords.md](../design/keywords.md) |
+| 状态 | **T0–T5 已落地**（单元格表达式见 [table-cell-expressions.md](../design/table-cell-expressions.md)） |
+| 日期 | 2026-08-12 |
+| 相关 | [markdown-mapping.md](../design/markdown-mapping.md) §9 · [table-cell-expressions.md](../design/table-cell-expressions.md) · [objects.md](../design/objects.md) · [stdlib.md](../design/stdlib.md)（`lib/table`） · [keywords.md](../design/keywords.md) |
 | 现状金样 | [tests/structure/collection.mq.md](../../tests/structure/collection.mq.md) |
 
 ---
@@ -190,16 +190,18 @@
 
 ### 4.3 字典：按键
 
-键为合法脚注标签（推荐与表头一致）：
+键为脚注标签文本（推荐与表头一致；**允许纯数字键**，如基矢标签 `00`）。基名可写 `` `概率`[^00] `` 或 `` 概率[^00] ``（紧跟 `[^` 时可省略反引号）：
 
 ```markdown
 *`种` = `分类`[^苹果] *
+*`p00` = `概率`[^00] *
 > print text=`种`
 ```
 
 | 规则 | 说明 |
 |------|------|
 | `[^苹果]` | 键文本 `苹果` |
+| `[^00]` / `[^1]` | 键文本 `00` / `1`（**不是**「第 n 个 map 条目」） |
 | 含空格的键 | 允许 `[^数码用品]`；极端键用引号策略开工前定 |
 | 缺失键 | 报错或 `None`——建议 v1 **报错**（少静默） |
 
@@ -213,7 +215,7 @@
 ```
 
 从左到右：先键、再下标。  
-类型不对（对 List 用键名脚注、对 Map 用纯数字脚注）→ 诊断。
+类型不对（对 List 用非数字键名脚注）→ 诊断。Map 上的纯数字标签按**键名**解析。
 
 ### 4.5 与 GFM「定义脚注」正文
 
@@ -236,7 +238,7 @@
 
 ## 5. foreach 与字典
 
-今日：`` [`果`](`篮子`) `` 遍历列表。
+今日：`` [果](篮子) `` / `` [`果`](`篮子`) `` 遍历列表（裸名与反引号均可）。
 
 扩展草案：
 
@@ -255,8 +257,9 @@
 T0  横表单行 → Map；金样；竖表回归          ✅
 T1  横表多行 → Map of List（列向）；嵌套金样  ✅
 T2  脚注取元：List [^n]、Map [^键]、链式      ✅
-T3  文档：markdown-mapping §9；Skill / examples；table 库  ✅（本批）
+T3  文档：markdown-mapping §9；Skill / examples；table 库  ✅
 T4  行向记录表：首列 `@` / `行` / `row`     ✅
+T5  数据单元格 = 表达式（同调用实参值语法）  ✅
 ```
 
 验收：
@@ -264,7 +267,8 @@ T4  行向记录表：首列 `@` / `行` / `row`     ✅
 1. `tests/structure/collection.mq.md` 行为不变。  
 2. 新金样：`collection-map.mq.md`、`collection-map-list.mq.md`、`footnote-index.mq.md`。  
 3. 错误下标 / 缺键带 `line:col`。  
-4. 双后端（tree / bytecode）一致。
+4. 双后端（tree / bytecode）一致。  
+5. **T5：** 单元格 `` `var` `` / 算术；URL 与 `gpt-4o-mini` 仍为文本；设计见 [table-cell-expressions.md](../design/table-cell-expressions.md)。
 
 ---
 

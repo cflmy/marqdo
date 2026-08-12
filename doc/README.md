@@ -55,7 +55,8 @@
 | [roadmap/okf-near-match.md](roadmap/okf-near-match.md) | **规划：OKF 相近任务命中**（精确 sig 之外的可选软复用） |
 | [roadmap/agent-streaming.md](roadmap/agent-streaming.md) | **流式输出**（SSE + `complete`/`step` stream；S0–S1 已落地） |
 | [roadmap/object-inheritance.md](roadmap/object-inheritance.md) | **对象继承**（`# 子类 = > 父类`；I0–I2 已落地） |
-| [roadmap/tables-maps-footnotes.md](roadmap/tables-maps-footnotes.md) | **表格语义**（竖表 / 横表字典 / 脚注取元 / 行向记录；T0–T4 已落地） |
+| [roadmap/tables-maps-footnotes.md](roadmap/tables-maps-footnotes.md) | **表格语义**（竖表 / 横表字典 / 脚注取元 / 行向记录 / **单元格表达式 T5**） |
+| [design/table-cell-expressions.md](design/table-cell-expressions.md) | **表数据单元格 = 表达式**（同调用实参值语法；Accepted） |
 | [roadmap/ext-web.md](roadmap/ext-web.md) | **实现路线：`ext/web`**（W0–W4；设计见 [ext-web.md](../design/ext-web.md)） |
 | [roadmap/ext-quantum.md](roadmap/ext-quantum.md) | **规划：`ext/quantum` 量子模拟**（基础门·电路·ABI·`ext add`） |
 | [research/okf-and-marqdo.md](research/okf-and-marqdo.md) | OKF 调研 |

@@ -5,7 +5,7 @@ description: 打印 / 长度 / 文本 / 整数（与英文别名等价）
 
 # main
 
-*`s` = hello*
+*`s` = "hello"*
 
 *`n` = > 长度 值=`s`*
 

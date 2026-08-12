@@ -46,6 +46,7 @@ Plugin fn returns `0` + `*out_json` on success; non-zero + optional `*err_msg` o
 | `call_site` | `{path,function,line}` | Active call site |
 | `marqdo_skill` | string | Skill pack text |
 | `cwd` | string | Host `cwd` (entry file directory) for path resolution |
+| `record_plot` | `{ok:true}` | Args `{svg}` + optional `path`; push SVG into host plots (view embed / CLI auto-write), same channel as math plots |
 
 Unknown names fail. Queries are only valid during a plugin function call (host sets thread-local context).
 

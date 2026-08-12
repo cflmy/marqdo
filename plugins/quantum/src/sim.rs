@@ -345,7 +345,8 @@ pub fn parse_ops(circuit: &Value) -> Result<Vec<Op>, String> {
         let theta = row
             .get("theta")
             .or_else(|| row.get("参数"))
-            .and_then(|v| v.as_f64());
+            .or_else(|| row.get("params"))
+            .and_then(|v| parse_theta_value(v).ok().flatten());
         out.push(Op { gate, qubits, theta });
     }
     Ok(out)
@@ -529,6 +530,211 @@ pub fn simulate_circuit(circuit: &Value) -> Result<(usize, Vec<C>), String> {
     }
     renormalize(&mut amps);
     Ok((qubits, amps))
+}
+
+/// Build a circuit from `qubits` + optional `steps=` table (column map or row list).
+pub fn circuit_new(qubits: usize, steps: Option<&Value>) -> Result<Value, String> {
+    check_qubits(qubits)?;
+    let ops = match steps {
+        None | Some(Value::Null) => Vec::new(),
+        Some(v) => ops_from_steps(v)?,
+    };
+    for op in &ops {
+        for &q in &op.qubits {
+            if q >= qubits {
+                return Err(format!("qubit {q} out of range for n={qubits}"));
+            }
+        }
+    }
+    let ops_json: Vec<Value> = ops
+        .into_iter()
+        .map(|op| {
+            let mut m = json!({
+                "gate": op.gate,
+                "qubits": op.qubits,
+            });
+            if let Some(t) = op.theta {
+                m.as_object_mut()
+                    .unwrap()
+                    .insert("theta".into(), json!(t));
+            }
+            m
+        })
+        .collect();
+    Ok(json!({
+        "qubits": qubits,
+        "ops": ops_json,
+    }))
+}
+
+/// Parse GFM `steps=` into ops.
+///
+/// Accepts:
+/// - list of row maps (`@` / `行` / `row` tables)
+/// - column-oriented map (`gate`/`门` + `qubits`/`比特` lists or scalars)
+pub fn ops_from_steps(steps: &Value) -> Result<Vec<Op>, String> {
+    match steps {
+        Value::Array(rows) => {
+            let mut out = Vec::with_capacity(rows.len());
+            for row in rows {
+                out.push(op_from_step_row(row)?);
+            }
+            Ok(out)
+        }
+        Value::Object(map) => {
+            let gate_col = map
+                .get("gate")
+                .or_else(|| map.get("门"))
+                .ok_or_else(|| "steps table needs `gate` / `门` column".to_string())?;
+            let qubit_col = map
+                .get("qubits")
+                .or_else(|| map.get("qubit"))
+                .or_else(|| map.get("比特"))
+                .ok_or_else(|| "steps table needs `qubits` / `比特` column".to_string())?;
+            let theta_col = map
+                .get("theta")
+                .or_else(|| map.get("参数"))
+                .or_else(|| map.get("params"));
+
+            let gates = as_col_list(gate_col)?;
+            let qubits = as_col_list(qubit_col)?;
+            let thetas = match theta_col {
+                Some(v) => as_col_list(v)?,
+                None => vec![Value::Null; gates.len()],
+            };
+            if qubits.len() != gates.len() {
+                return Err(format!(
+                    "steps column length mismatch: gate={} qubits={}",
+                    gates.len(),
+                    qubits.len()
+                ));
+            }
+            if thetas.len() != gates.len() && theta_col.is_some() {
+                return Err("steps `theta`/`参数` column length mismatch".into());
+            }
+            let mut out = Vec::with_capacity(gates.len());
+            for i in 0..gates.len() {
+                let gate = gates[i]
+                    .as_str()
+                    .ok_or_else(|| format!("steps gate row {i} must be text"))?
+                    .to_ascii_uppercase();
+                let qs = qubits_from_cell(&qubits[i])?;
+                let theta = thetas
+                    .get(i)
+                    .map(parse_theta_value)
+                    .transpose()?
+                    .flatten();
+                out.push(Op {
+                    gate,
+                    qubits: qs,
+                    theta,
+                });
+            }
+            Ok(out)
+        }
+        _ => Err("steps must be a table (map or list of rows)".into()),
+    }
+}
+
+fn as_col_list(v: &Value) -> Result<Vec<Value>, String> {
+    match v {
+        Value::Array(a) => Ok(a.clone()),
+        other => Ok(vec![other.clone()]),
+    }
+}
+
+fn op_from_step_row(row: &Value) -> Result<Op, String> {
+    let gate = row
+        .get("gate")
+        .or_else(|| row.get("门"))
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| "step row missing `gate` / `门`".to_string())?
+        .to_ascii_uppercase();
+    let qs = row
+        .get("qubits")
+        .or_else(|| row.get("qubit"))
+        .or_else(|| row.get("比特"))
+        .ok_or_else(|| "step row missing `qubits` / `比特`".to_string())?;
+    let qubits = qubits_from_cell(qs)?;
+    let theta = row
+        .get("theta")
+        .or_else(|| row.get("参数"))
+        .or_else(|| row.get("params"))
+        .map(parse_theta_value)
+        .transpose()?
+        .flatten();
+    Ok(Op {
+        gate,
+        qubits,
+        theta,
+    })
+}
+
+fn qubits_from_cell(v: &Value) -> Result<Vec<usize>, String> {
+    match v {
+        Value::Array(a) => a
+            .iter()
+            .map(|x| {
+                x.as_u64()
+                    .or_else(|| x.as_i64().map(|i| i as u64))
+                    .ok_or_else(|| "bad qubit index".to_string())
+                    .map(|u| u as usize)
+            })
+            .collect(),
+        Value::Number(n) => {
+            let u = n
+                .as_u64()
+                .or_else(|| n.as_i64().map(|i| i as u64))
+                .ok_or_else(|| "bad qubit index".to_string())? as usize;
+            Ok(vec![u])
+        }
+        Value::String(s) => parse_qubit_list(s),
+        _ => Err("bad qubits cell".into()),
+    }
+}
+
+fn parse_theta_value(v: &Value) -> Result<Option<f64>, String> {
+    match v {
+        Value::Null => Ok(None),
+        Value::Number(n) => n
+            .as_f64()
+            .ok_or_else(|| "bad theta".to_string())
+            .map(Some),
+        Value::String(s) => {
+            let t = s.trim();
+            if t.is_empty() {
+                return Ok(None);
+            }
+            parse_theta_str(t).map(Some)
+        }
+        _ => Err("bad theta".into()),
+    }
+}
+
+fn parse_theta_str(s: &str) -> Result<f64, String> {
+    let t = s.trim().to_ascii_lowercase().replace('π', "pi");
+    if t == "pi" {
+        return Ok(std::f64::consts::PI);
+    }
+    if let Some(rest) = t.strip_prefix("pi/") {
+        let d: f64 = rest
+            .trim()
+            .parse()
+            .map_err(|_| format!("bad theta `{s}`"))?;
+        if d == 0.0 {
+            return Err(format!("bad theta `{s}`"));
+        }
+        return Ok(std::f64::consts::PI / d);
+    }
+    if let Some(rest) = t.strip_suffix("*pi") {
+        let n: f64 = rest
+            .trim()
+            .parse()
+            .map_err(|_| format!("bad theta `{s}`"))?;
+        return Ok(n * std::f64::consts::PI);
+    }
+    t.parse::<f64>()
+        .map_err(|_| format!("bad theta `{s}`"))
 }
 
 pub fn push_op(circuit: &Value, gate: &str, qubits: Vec<usize>, theta: Option<f64>) -> Result<Value, String> {

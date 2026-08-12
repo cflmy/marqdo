@@ -35,8 +35,8 @@ description: Offline assemble + render markers (no listen).
 
 | 属性 | 值 | 样式 |
 |------|-----|------|
-| `title` | articles.`articles`.title | shell.`card_title` |
-| `body` | articles.`articles`.body | shell.`card_body` |
+| title | articles.`articles`.title | shell.`card_title` |
+| body | articles.`articles`.body | shell.`card_body` |
 
 *`page` = > web.page title="smoke" intro="<h1>smoke</h1>" *
 *`page` = > `page`.compose_components components=`home` *

@@ -9,7 +9,7 @@ title: parent observation excerpt + deepen (offline)
 
 *`paths` = > json.parse text={"p":".marqdo/agent-runs/observe-fixture.mq.md"} *
 *`path` = > json.get value=`paths` key=p *
-*`seed` = > json.parse text={"t":"---\ntitle: fixture\n---\n\n# main\n\n<!-- marqdo-out ok\nHUGE_BODY_SHOULD_BE_STRIPPED\n-->\n\n**ok**\n"} *
+*`seed` = > json.parse text={"t":"---\ntitle: fixture\n---\n\n# main\n\n<!-- marqdo-out ok\nHUGE_BODY_SHOULD_BE_STRIPPED\n-->\n\n*msg = \"ok\"*\n\n**msg**\n"} *
 *`text` = > json.get value=`seed` key=t *
 > fs.write_text path=`path` text=`text`
 

@@ -152,18 +152,11 @@ pub fn builtin_footnote_get(base: &Value, label: &str) -> Result<Value, String> 
             }
             Ok(xs[(n as usize) - 1].clone())
         }
-        Value::Map(pairs) => {
-            if is_digits {
-                return Err(
-                    "map footnote must be a key name, not pure digits (keys are text)".into(),
-                );
-            }
-            pairs
-                .iter()
-                .find(|(k, _)| k == label)
-                .map(|(_, v)| v.clone())
-                .ok_or_else(|| format!("missing map key `{label}`"))
-        }
+        Value::Map(pairs) => pairs
+            .iter()
+            .find(|(k, _)| k == label)
+            .map(|(_, v)| v.clone())
+            .ok_or_else(|| format!("missing map key `{label}`")),
         _ => Err("footnote index needs list or map".into()),
     }
 }

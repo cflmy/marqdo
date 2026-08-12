@@ -3,7 +3,6 @@ title: quantum bell smoke
 description: H+CX Bell state probabilities ≈ 1/2 each.
 > ext/quantum/quantum.mq.md
 > lib/math.mq.md
-> lib/json.mq.md
 ---
 
 # main
@@ -13,8 +12,8 @@ description: H+CX Bell state probabilities ≈ 1/2 each.
 *`qc` = > `qc`.cx control=0 target=1 *
 *`p` = > `qc`.probabilities *
 
-*`p00` = > json.get value=`p` key="00" *
-*`p11` = > json.get value=`p` key="11" *
+*`p00` = `p`[^00] *
+*`p11` = `p`[^11] *
 *`lo` = > math.div a=2 b=5 *
 *`hi` = > math.div a=3 b=5 *
 
@@ -35,7 +34,7 @@ description: H+CX Bell state probabilities ≈ 1/2 each.
   > print text=p11-fail
 
 *`ping` = > quantum_ping *
-*`ok` = > json.get value=`ping` key=ok *
+*`ok` = `ping`[^ok] *
 1. `ok`
   > print text=ping-ok
 2. *

@@ -18,7 +18,7 @@ description: Promote a solidified workbook, lookup by goal, spawn without parent
   > print text=no-agent-plugin
   > sys.exit code=1
 
-*`paths` = > json.parse text={"kb":".marqdo/agent-kb","wb":".marqdo/agent-runs/pong-solid.mq.md","goal":"Reply with exactly the word pong and nothing else.","body":"---\ntitle: pong skill\n---\n\n# main\n\n**pong**\n"} *
+*`paths` = > json.parse text={"kb":".marqdo/agent-kb","wb":".marqdo/agent-runs/pong-solid.mq.md","goal":"Reply with exactly the word pong and nothing else.","body":"---\ntitle: pong skill\n---\n\n# main\n\n*msg = \"pong\"*\n\n**msg**\n"} *
 *`kb` = > json.get value=`paths` key=kb *
 *`wb` = > json.get value=`paths` key=wb *
 *`goal` = > json.get value=`paths` key=goal *
