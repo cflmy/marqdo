@@ -320,11 +320,20 @@ pub fn parse_ops(circuit: &Value) -> Result<Vec<Op>, String> {
                 let u = n.as_u64().or_else(|| n.as_i64().map(|i| i as u64)).unwrap() as usize;
                 vec![u]
             }
-            Some(Value::String(s)) => parse_qubit_list(s)?,
-            _ => {
-                if let Some(q) = row
+            Some(Value::String(s)) => {
+                let t = s.trim();
+                if t.is_empty() {
+                    vec![]
+                } else {
+                    parse_qubit_list(s)?
+                }
+            }
+            Some(Value::Null) => vec![],
+            None => {
+                if is_meta_gate(&gate) {
+                    vec![]
+                } else if let Some(q) = row
                     .get("qubit")
-                    .or_else(|| row.get("比特"))
                     .and_then(|v| v.as_u64().or_else(|| v.as_i64().map(|i| i as u64)))
                 {
                     vec![q as usize]
@@ -341,6 +350,7 @@ pub fn parse_ops(circuit: &Value) -> Result<Vec<Op>, String> {
                     return Err(format!("op `{gate}` missing qubits"));
                 }
             }
+            _ => return Err(format!("op `{gate}` bad qubits")),
         };
         let theta = row
             .get("theta")
@@ -370,74 +380,177 @@ pub fn apply_op(amps: &mut [C], qubits: usize, op: &Op) -> Result<(), String> {
         }
     }
     match op.gate.as_str() {
+        "BARRIER" | "MEASURE" | "M" => Ok(()),
         "I" | "ID" | "IDENTITY" => {
             let q = *op.qubits.first().ok_or("I needs qubit")?;
             apply_i(amps, q);
+            Ok(())
         }
         "X" | "NOT" => {
             let q = *op.qubits.first().ok_or("X needs qubit")?;
             apply_x(amps, q);
+            Ok(())
         }
         "Y" => {
             let q = *op.qubits.first().ok_or("Y needs qubit")?;
             apply_y(amps, q);
+            Ok(())
         }
         "Z" => {
             let q = *op.qubits.first().ok_or("Z needs qubit")?;
             apply_z(amps, q);
+            Ok(())
         }
         "S" => {
             let q = *op.qubits.first().ok_or("S needs qubit")?;
             apply_s(amps, q);
+            Ok(())
         }
         "T" => {
             let q = *op.qubits.first().ok_or("T needs qubit")?;
             apply_t(amps, q);
+            Ok(())
         }
         "H" | "HADAMARD" => {
             let q = *op.qubits.first().ok_or("H needs qubit")?;
             apply_h(amps, q);
+            Ok(())
         }
         "RX" => {
             let q = *op.qubits.first().ok_or("Rx needs qubit")?;
             let th = op.theta.ok_or("Rx needs theta")?;
             apply_rx(amps, q, th);
+            Ok(())
         }
         "RY" => {
             let q = *op.qubits.first().ok_or("Ry needs qubit")?;
             let th = op.theta.ok_or("Ry needs theta")?;
             apply_ry(amps, q, th);
+            Ok(())
         }
         "RZ" => {
             let q = *op.qubits.first().ok_or("Rz needs qubit")?;
             let th = op.theta.ok_or("Rz needs theta")?;
             apply_rz(amps, q, th);
+            Ok(())
         }
         "CX" | "CNOT" | "CN" => {
             if op.qubits.len() < 2 {
                 return Err("CX needs control and target".into());
             }
             apply_cx(amps, op.qubits[0], op.qubits[1]);
+            Ok(())
         }
         "CZ" => {
             if op.qubits.len() < 2 {
                 return Err("CZ needs control and target".into());
             }
             apply_cz(amps, op.qubits[0], op.qubits[1]);
+            Ok(())
         }
         "SWAP" => {
             if op.qubits.len() < 2 {
                 return Err("SWAP needs two qubits".into());
             }
             apply_swap(amps, op.qubits[0], op.qubits[1]);
+            Ok(())
         }
+        other => Err(format!(
+            "unsupported gate `{other}` (I/X/Y/Z/H/S/T/Rx/Ry/Rz/CX/CZ/SWAP/BARRIER/MEASURE)"
+        )),
+    }
+}
+
+pub fn is_meta_gate(gate: &str) -> bool {
+    matches!(
+        gate.to_ascii_uppercase().as_str(),
+        "BARRIER" | "MEASURE" | "M"
+    )
+}
+
+pub fn is_unitary_op(op: &Op) -> bool {
+    !is_meta_gate(&op.gate)
+}
+
+#[derive(Clone, Debug)]
+pub struct NoiseSpec {
+    pub kind: String, // bitflip | depolarizing
+    pub p: f64,
+}
+
+pub fn parse_noise(circuit: &Value) -> Result<Option<NoiseSpec>, String> {
+    let kind = circuit
+        .get("noise_kind")
+        .or_else(|| circuit.get("噪声种类"))
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_ascii_lowercase());
+    let p = circuit
+        .get("noise_p")
+        .or_else(|| circuit.get("噪声概率"))
+        .and_then(|v| v.as_f64());
+    match (kind, p) {
+        (None, None) => Ok(None),
+        (Some(k), Some(p)) => {
+            if !(0.0..=1.0).contains(&p) {
+                return Err("noise p must be in [0,1]".into());
+            }
+            let kind = match k.as_str() {
+                "bitflip" | "bit_flip" | "比特翻转" => "bitflip".into(),
+                "depolarizing" | "depolarise" | "退极化" => "depolarizing".into(),
+                other => {
+                    return Err(format!(
+                        "unknown noise kind `{other}` (bitflip|depolarizing)"
+                    ));
+                }
+            };
+            Ok(Some(NoiseSpec { kind, p }))
+        }
+        _ => Err("noise needs both kind and p".into()),
+    }
+}
+
+pub fn set_noise(circuit: &Value, kind: &str, p: f64) -> Result<Value, String> {
+    if !(0.0..=1.0).contains(&p) {
+        return Err("noise p must be in [0,1]".into());
+    }
+    let k = match kind.trim().to_ascii_lowercase().as_str() {
+        "bitflip" | "bit_flip" | "比特翻转" => "bitflip",
+        "depolarizing" | "depolarise" | "退极化" => "depolarizing",
         other => {
             return Err(format!(
-                "unsupported gate `{other}` (I/X/Y/Z/H/S/T/Rx/Ry/Rz/CX/CZ/SWAP)"
+                "unknown noise kind `{other}` (bitflip|depolarizing)"
             ));
         }
+    };
+    let mut obj = circuit.as_object().cloned().unwrap_or_default();
+    obj.insert("noise_kind".into(), json!(k));
+    obj.insert("noise_p".into(), json!(p));
+    Ok(Value::Object(obj))
+}
+
+/// Qubits to read out: union of MEASURE ops; empty MEASURE list = all qubits; no MEASURE = all.
+pub fn measure_targets(ops: &[Op], n: usize) -> Vec<usize> {
+    let mut measured = Vec::new();
+    let mut any = false;
+    for op in ops {
+        let g = op.gate.to_ascii_uppercase();
+        if g == "MEASURE" || g == "M" {
+            any = true;
+            if op.qubits.is_empty() {
+                return (0..n).collect();
+            }
+            for &q in &op.qubits {
+                if !measured.contains(&q) {
+                    measured.push(q);
+                }
+            }
+        }
     }
-    Ok(())
+    if !any {
+        return (0..n).collect();
+    }
+    measured.sort_unstable();
+    measured
 }
 
 struct Rng {
@@ -447,7 +560,11 @@ struct Rng {
 impl Rng {
     fn new(seed: u64) -> Self {
         Self {
-            state: if seed == 0 { 0x9e37_79b9_7f4a_7c15 } else { seed },
+            state: if seed == 0 {
+                0x9e37_79b9_7f4a_7c15
+            } else {
+                seed
+            },
         }
     }
     fn next_u64(&mut self) -> u64 {
@@ -463,8 +580,33 @@ impl Rng {
     }
 }
 
-/// Sample computational-basis shots; returns counts map.
-pub fn sample_counts(amps: &[C], qubits: usize, shots: usize, seed: u64) -> Map<String, Value> {
+fn apply_noise_on_qubits(
+    amps: &mut [C],
+    qs: &[usize],
+    noise: &NoiseSpec,
+    rng: &mut Rng,
+) {
+    if noise.p <= 0.0 {
+        return;
+    }
+    for &q in qs {
+        if rng.next_f64() >= noise.p {
+            continue;
+        }
+        match noise.kind.as_str() {
+            "bitflip" => apply_x(amps, q),
+            "depolarizing" => match rng.next_u64() % 3 {
+                0 => apply_x(amps, q),
+                1 => apply_y(amps, q),
+                _ => apply_z(amps, q),
+            },
+            _ => {}
+        }
+    }
+}
+
+fn sample_label(amps: &[C], n: usize, targets: &[usize], rng: &mut Rng) -> String {
+    // Build CDF over full basis, then project bits onto targets (ascending, LSB = targets[0]).
     let mut cdf = Vec::with_capacity(amps.len());
     let mut acc = 0.0;
     for a in amps {
@@ -472,31 +614,41 @@ pub fn sample_counts(amps: &[C], qubits: usize, shots: usize, seed: u64) -> Map<
         cdf.push(acc);
     }
     if acc <= 0.0 {
-        return Map::new();
+        return "0".repeat(targets.len().max(1));
     }
-    // normalize cdf tail to 1
     let inv = 1.0 / acc;
     for x in &mut cdf {
         *x *= inv;
     }
+    let r = rng.next_f64();
+    let mut idx = 0usize;
+    for (i, &c) in cdf.iter().enumerate() {
+        if r <= c {
+            idx = i;
+            break;
+        }
+        idx = i;
+    }
+    if targets.len() == n {
+        return basis_label(idx, n);
+    }
+    let mut bits = String::with_capacity(targets.len());
+    // label: targets[0] is rightmost (LSB of the label string)
+    for &q in targets.iter().rev() {
+        bits.push(if bit(idx, q) { '1' } else { '0' });
+    }
+    bits
+}
+
+/// Sample computational-basis shots; returns counts map.
+#[allow(dead_code)]
+pub fn sample_counts(amps: &[C], qubits: usize, shots: usize, seed: u64) -> Map<String, Value> {
+    let targets: Vec<usize> = (0..qubits).collect();
     let mut counts: Map<String, Value> = Map::new();
     let mut rng = Rng::new(seed);
     for _ in 0..shots {
-        let r = rng.next_f64();
-        let mut idx = 0usize;
-        for (i, &c) in cdf.iter().enumerate() {
-            if r <= c {
-                idx = i;
-                break;
-            }
-            idx = i;
-        }
-        let label = basis_label(idx, qubits);
-        let n = counts
-            .get(&label)
-            .and_then(|v| v.as_u64())
-            .unwrap_or(0)
-            + 1;
+        let label = sample_label(amps, qubits, &targets, &mut rng);
+        let n = counts.get(&label).and_then(|v| v.as_u64()).unwrap_or(0) + 1;
         counts.insert(label, json!(n));
     }
     counts
@@ -506,14 +658,51 @@ pub fn run_circuit(circuit: &Value, shots: usize, seed: u64) -> Result<Value, St
     if shots == 0 {
         return Err("shots must be >= 1".into());
     }
-    let (qubits, amps) = simulate_circuit(circuit)?;
-    let counts = sample_counts(&amps, qubits, shots, seed);
-    Ok(json!({
+    let qubits = circuit
+        .get("qubits")
+        .or_else(|| circuit.get("比特数"))
+        .and_then(|v| v.as_u64().or_else(|| v.as_i64().map(|i| i as u64)))
+        .ok_or_else(|| "circuit missing qubits".to_string())? as usize;
+    check_qubits(qubits)?;
+    let ops = parse_ops(circuit)?;
+    let noise = parse_noise(circuit)?;
+    let targets = measure_targets(&ops, qubits);
+    let mut counts: Map<String, Value> = Map::new();
+    let mut rng = Rng::new(seed);
+
+    for _ in 0..shots {
+        let mut amps = zero_state(qubits);
+        for op in &ops {
+            if !is_unitary_op(op) {
+                continue;
+            }
+            apply_op(&mut amps, qubits, op)?;
+            if let Some(ref nspec) = noise {
+                if nspec.p > 0.0 {
+                    apply_noise_on_qubits(&mut amps, &op.qubits, nspec, &mut rng);
+                }
+            }
+        }
+        renormalize(&mut amps);
+        let label = sample_label(&amps, qubits, &targets, &mut rng);
+        let c = counts.get(&label).and_then(|v| v.as_u64()).unwrap_or(0) + 1;
+        counts.insert(label, json!(c));
+    }
+
+    let mut out = json!({
         "qubits": qubits,
         "shots": shots,
         "seed": seed,
         "counts": counts,
-    }))
+        "measure": targets,
+    });
+    if let Some(nspec) = noise {
+        out.as_object_mut().unwrap().insert(
+            "noise".into(),
+            json!({ "kind": nspec.kind, "p": nspec.p }),
+        );
+    }
+    Ok(out)
 }
 
 pub fn simulate_circuit(circuit: &Value) -> Result<(usize, Vec<C>), String> {
@@ -650,12 +839,17 @@ fn op_from_step_row(row: &Value) -> Result<Op, String> {
         .and_then(|v| v.as_str())
         .ok_or_else(|| "step row missing `gate` / `门`".to_string())?
         .to_ascii_uppercase();
-    let qs = row
+    let qubits = match row
         .get("qubits")
         .or_else(|| row.get("qubit"))
         .or_else(|| row.get("比特"))
-        .ok_or_else(|| "step row missing `qubits` / `比特`".to_string())?;
-    let qubits = qubits_from_cell(qs)?;
+    {
+        None if is_meta_gate(&gate) => vec![],
+        None => {
+            return Err("step row missing `qubits` / `比特`".into());
+        }
+        Some(v) => qubits_from_cell(v)?,
+    };
     let theta = row
         .get("theta")
         .or_else(|| row.get("参数"))
@@ -672,6 +866,7 @@ fn op_from_step_row(row: &Value) -> Result<Op, String> {
 
 fn qubits_from_cell(v: &Value) -> Result<Vec<usize>, String> {
     match v {
+        Value::Null => Ok(vec![]),
         Value::Array(a) => a
             .iter()
             .map(|x| {
@@ -688,7 +883,13 @@ fn qubits_from_cell(v: &Value) -> Result<Vec<usize>, String> {
                 .ok_or_else(|| "bad qubit index".to_string())? as usize;
             Ok(vec![u])
         }
-        Value::String(s) => parse_qubit_list(s),
+        Value::String(s) => {
+            if s.trim().is_empty() {
+                Ok(vec![])
+            } else {
+                parse_qubit_list(s)
+            }
+        }
         _ => Err("bad qubits cell".into()),
     }
 }
@@ -743,10 +944,18 @@ pub fn push_op(circuit: &Value, gate: &str, qubits: Vec<usize>, theta: Option<f6
         .and_then(|v| v.as_u64().or_else(|| v.as_i64().map(|i| i as u64)))
         .ok_or_else(|| "circuit missing qubits".to_string())? as usize;
     check_qubits(n)?;
-    for &q in &qubits {
-        if q >= n {
-            return Err(format!("qubit {q} out of range for n={n}"));
+    let g = gate.to_ascii_uppercase();
+    if !is_meta_gate(&g) || !qubits.is_empty() {
+        for &q in &qubits {
+            if q >= n {
+                return Err(format!("qubit {q} out of range for n={n}"));
+            }
         }
+    }
+    if is_meta_gate(&g) {
+        // ok with empty qubits (barrier / measure-all)
+    } else if qubits.is_empty() {
+        return Err(format!("gate `{g}` needs qubits"));
     }
     let mut obj = circuit.as_object().cloned().unwrap_or_default();
     let mut ops = obj
@@ -755,13 +964,65 @@ pub fn push_op(circuit: &Value, gate: &str, qubits: Vec<usize>, theta: Option<f6
         .cloned()
         .unwrap_or_default();
     let mut op = json!({
-        "gate": gate.to_ascii_uppercase(),
+        "gate": g,
         "qubits": qubits,
     });
     if let Some(t) = theta {
         op.as_object_mut().unwrap().insert("theta".into(), json!(t));
     }
     ops.push(op);
+    obj.insert("ops".into(), Value::Array(ops));
+    Ok(Value::Object(obj))
+}
+
+/// Append another circuit's ops, a single op map, or reject bare gate handles without qubits.
+pub fn append(circuit: &Value, op: &Value) -> Result<Value, String> {
+    let n = circuit
+        .get("qubits")
+        .and_then(|v| v.as_u64().or_else(|| v.as_i64().map(|i| i as u64)))
+        .ok_or_else(|| "circuit missing qubits".to_string())? as usize;
+    let mut obj = circuit.as_object().cloned().unwrap_or_default();
+    let mut ops = obj
+        .get("ops")
+        .and_then(|v| v.as_array())
+        .cloned()
+        .unwrap_or_default();
+
+    if let Some(arr) = op.get("ops").and_then(|v| v.as_array()) {
+        let other_n = op
+            .get("qubits")
+            .and_then(|v| v.as_u64())
+            .unwrap_or(n as u64) as usize;
+        if other_n > n {
+            return Err(format!(
+                "append: other circuit qubits={other_n} exceeds this n={n}"
+            ));
+        }
+        for row in arr {
+            ops.push(row.clone());
+        }
+    } else if op.get("gate").or_else(|| op.get("门")).is_some() {
+        let parsed = parse_ops(&json!({ "ops": [op] }))?;
+        for p in parsed {
+            for &q in &p.qubits {
+                if q >= n {
+                    return Err(format!("append qubit {q} out of range for n={n}"));
+                }
+            }
+            let mut row = json!({ "gate": p.gate, "qubits": p.qubits });
+            if let Some(t) = p.theta {
+                row.as_object_mut()
+                    .unwrap()
+                    .insert("theta".into(), json!(t));
+            }
+            ops.push(row);
+        }
+    } else if op.get("name").or_else(|| op.get("名")).is_some() {
+        return Err("append gate handle needs an op with qubits; pass a circuit or {{gate,qubits}}".into());
+    } else {
+        return Err("append needs a circuit (ops) or op {{gate,qubits}}".into());
+    }
+
     obj.insert("ops".into(), Value::Array(ops));
     Ok(Value::Object(obj))
 }

@@ -79,6 +79,19 @@ pub fn circuit_svg(circuit: &Value) -> Result<String, String> {
     for (col, op) in ops.iter().enumerate() {
         let x = x_of(col);
         match op.gate.as_str() {
+            "BARRIER" => {
+                draw_barrier(&mut body, x, qubits);
+            }
+            "MEASURE" | "M" => {
+                let qs = if op.qubits.is_empty() {
+                    (0..qubits).collect::<Vec<_>>()
+                } else {
+                    op.qubits.clone()
+                };
+                for q in qs {
+                    draw_measure(&mut body, x, q);
+                }
+            }
             "CX" | "CNOT" | "CN" if op.qubits.len() >= 2 => {
                 draw_cx(&mut body, x, op.qubits[0], op.qubits[1]);
             }
@@ -116,6 +129,38 @@ fn draw_box(out: &mut String, x: f64, q: usize, label: &str) {
         r#"<text x="{x}" y="{ty}" text-anchor="middle" font-family="ui-monospace,Menlo,monospace" font-size="11" fill="{STROKE}">{label}</text>"#,
         ty = y + 4.0,
         label = esc(label),
+    ));
+}
+
+fn draw_barrier(out: &mut String, x: f64, qubits: usize) {
+    let y0 = y_of(0) - 14.0;
+    let y1 = y_of(qubits.saturating_sub(1)) + 14.0;
+    out.push_str(&format!(
+        r#"<line x1="{x}" y1="{y0}" x2="{x}" y2="{y1}" stroke="{STROKE}" stroke-width="1.5" stroke-dasharray="4 3"/>"#
+    ));
+}
+
+fn draw_measure(out: &mut String, x: f64, q: usize) {
+    let y = y_of(q);
+    let w = 28.0;
+    let h = 28.0;
+    out.push_str(&format!(
+        r#"<rect x="{rx}" y="{ry}" width="{w}" height="{h}" rx="3" fill="{BOX}" stroke="{STROKE}" stroke-width="1.5"/>"#,
+        rx = x - w / 2.0,
+        ry = y - h / 2.0,
+    ));
+    // meter arc + dial
+    out.push_str(&format!(
+        r#"<path d="M {x0},{y0} A 8,8 0 0 1 {x1},{y0}" fill="none" stroke="{STROKE}" stroke-width="1.5"/>"#,
+        x0 = x - 8.0,
+        y0 = y + 2.0,
+        x1 = x + 8.0,
+    ));
+    out.push_str(&format!(
+        r#"<line x1="{x}" y1="{y1}" x2="{x2}" y2="{y2}" stroke="{STROKE}" stroke-width="1.5"/>"#,
+        y1 = y + 2.0,
+        x2 = x + 6.0,
+        y2 = y - 6.0,
     ));
 }
 

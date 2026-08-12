@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| 状态 | **Accepted · Q0–Q4 已落地**（概率/布洛赫/`matches_matrix`/用户文档；Q5+ 见路线图） |
+| 状态 | **Accepted · Q0–Q5 最小切片已落地**（教学噪声 + barrier/measure/append/state；完整开放系统另文） |
 | 日期 | 2026-08-12 |
 | 相关 | [stdlib-math.md](stdlib-math.md) · [ext-abi.md](ext-abi.md) · [ext-cli.md](ext-cli.md) · [ext-web.md](ext-web.md) · [view.md](view.md) · [stdlib-i18n.md](stdlib-i18n.md) · [roadmap/ext-quantum.md](../roadmap/ext-quantum.md) |
 | 安装（目标） | `marqdo ext add quantum`（中英：`quantum` / `量子`） |
@@ -314,8 +314,7 @@ Q0  脚手架：CATALOG + plugins/quantum Hello + L1 ensure_plugin
 Q1  态向量 + I/X/H/CX + simulate/probabilities；贝尔态 gold
 Q2  Y/Z/S/T/Rx/Ry/Rz/CZ/SWAP + run(seed) + 中英 API 对齐
 Q3  电路表 steps= + draw 电路 SVG + view record_plot/识别；examples/
-Q4  概率/布洛赫图；matches_matrix；文档站 public/features   ← **done**
-Q5  （可选，另文）噪声/密度矩阵；>12 qubits 张量网络——不挡 Accepted
+Q5  教学噪声 + barrier/measure/append/state — 见 [ext-quantum-q5.md](ext-quantum-q5.md)  ← **done（最小）**
 ```
 
 | 阶段 | 交付物 | 验收 |
@@ -325,6 +324,7 @@ Q5  （可选，另文）噪声/密度矩阵；>12 qubits 张量网络——不�
 | **Q2** | 旋转门 + `run seed=` 计数稳定 | 中英双金样 |
 | **Q3** | `steps=` 表；`draw` SVG 在 `view` HTML 含 `<svg` | 与 math-plot 同级断言 |
 | **Q4** | 概率图 + 布洛赫；`matches_matrix`；用户文档页 | `quantum-draw-smoke` / `quantum-gate-matrix-smoke`；`view output` 可浏览示例 |
+| **Q5** | `noise` 轨迹；`barrier`/`measure`/`append`/`state` | `quantum-noise-smoke` / `quantum-author-api-smoke` |
 
 实现路线图跟踪见 [roadmap/ext-quantum.md](../roadmap/ext-quantum.md)。
 

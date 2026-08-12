@@ -343,6 +343,77 @@ q_ffi!(quantum_run, |args: &Value| {
     sim::run_circuit(c, shots, seed)
 });
 
+q_ffi!(quantum_barrier, |args: &Value| {
+    let c = circuit_of(args)?;
+    sim::push_op(c, "BARRIER", vec![], None)
+});
+
+q_ffi!(quantum_measure, |args: &Value| {
+    let c = circuit_of(args)?;
+    let qs = match args.get("qubits").or_else(|| args.get("比特")) {
+        None | Some(Value::Null) => vec![],
+        Some(Value::Array(a)) => a
+            .iter()
+            .map(|v| {
+                v.as_u64()
+                    .or_else(|| v.as_i64().map(|i| i as u64))
+                    .ok_or_else(|| "bad qubit".to_string())
+                    .map(|u| u as usize)
+            })
+            .collect::<Result<Vec<_>, _>>()?,
+        Some(Value::Number(n)) => {
+            vec![n.as_u64().or_else(|| n.as_i64().map(|i| i as u64)).unwrap() as usize]
+        }
+        Some(Value::String(s)) => {
+            if s.trim().is_empty() {
+                vec![]
+            } else {
+                s.split(|c| c == ',' || c == ' ' || c == '，')
+                    .filter(|t| !t.is_empty())
+                    .map(|t| {
+                        t.trim()
+                            .parse::<usize>()
+                            .map_err(|_| format!("bad qubit `{t}`"))
+                    })
+                    .collect::<Result<Vec<_>, _>>()?
+            }
+        }
+        _ => return Err("bad qubits for measure".into()),
+    };
+    sim::push_op(c, "MEASURE", qs, None)
+});
+
+q_ffi!(quantum_append, |args: &Value| {
+    let c = circuit_of(args)?;
+    let op = args
+        .get("op")
+        .or_else(|| args.get("操作"))
+        .ok_or_else(|| "append needs `op`".to_string())?;
+    sim::append(c, op)
+});
+
+q_ffi!(quantum_noise, |args: &Value| {
+    let c = circuit_of(args)?;
+    let kind = args
+        .get("kind")
+        .or_else(|| args.get("种类"))
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| "noise needs `kind`".to_string())?;
+    let p = arg_f(args, "p").or_else(|_| arg_f(args, "概率"))?;
+    sim::set_noise(c, kind, p)
+});
+
+q_ffi!(quantum_state, |args: &Value| {
+    let c = circuit_of(args)?;
+    let (qubits, amps) = sim::simulate_circuit(c)?;
+    Ok(json!({
+        "_type": "quantum_state",
+        "qubits": qubits,
+        "dim": amps.len(),
+        "amplitudes": sim::amps_to_json(&amps),
+    }))
+});
+
 q_ffi!(quantum_draw_circuit, |args: &Value| {
     let c = circuit_of(args)?;
     let kind = args
@@ -552,6 +623,15 @@ pub unsafe extern "C" fn marqdo_plugin_init(host: *const MarqdoHostApi) -> c_int
             quantum_probabilities as PluginFn,
         ),
         ("quantum_run", "circuit,shots,seed", quantum_run as PluginFn),
+        ("quantum_barrier", "circuit", quantum_barrier as PluginFn),
+        (
+            "quantum_measure",
+            "circuit,qubits",
+            quantum_measure as PluginFn,
+        ),
+        ("quantum_append", "circuit,op", quantum_append as PluginFn),
+        ("quantum_noise", "circuit,kind,p", quantum_noise as PluginFn),
+        ("quantum_state", "circuit", quantum_state as PluginFn),
         (
             "quantum_draw_circuit",
             "circuit,path,kind,qubit",

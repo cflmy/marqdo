@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| 状态 | **Q0–Q4 已落地**（设计 Accepted；Q5 可选噪声/更大 n 另文） |
+| 状态 | **Q0–Q5 最小切片已落地**（教学噪声 + 作者面补齐；更大 n / 完整开放系统另文） |
 | 日期 | 2026-08-12 |
 | **锁定设计** | [design/ext-quantum.md](../design/ext-quantum.md) |
 | 相关 | [ext-cli.md](../design/ext-cli.md) · [ext-abi.md](../design/ext-abi.md) · [stdlib-math.md](../design/stdlib-math.md) · [view.md](../design/view.md) |
@@ -27,9 +27,9 @@
 | **Q2** | Y/Z/S/T/R\* /CZ/SWAP；`run seed=`；中英 API | **done** |
 | **Q3** | `steps=` 电路表；`draw` 轨线 SVG；view `record_plot` 或值识别 | **done** |
 | **Q4** | 概率条 / 布洛赫；`matches_matrix`；examples + 用户文档 | **done** |
-| **Q5** | （可选）噪声 / 更大 n —— 另文 | pending |
+| **Q5** | 教学噪声 + barrier/measure/append/state — [ext-quantum-q5.md](../design/ext-quantum-q5.md) | **done（最小）** |
 
-验收金样：`tests/ext/quantum-bell-smoke.mq.md`、`quantum-draw-smoke.mq.md`、`quantum-gate-matrix-smoke.mq.md`、中文对称样例。
+验收金样：`tests/ext/quantum-bell-smoke.mq.md`、`quantum-draw-smoke.mq.md`、`quantum-gate-matrix-smoke.mq.md`、`quantum-author-api-smoke.mq.md`、`quantum-noise-smoke.mq.md`、中文对称样例。
 
 ---
 

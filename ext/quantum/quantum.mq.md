@@ -98,15 +98,49 @@ State-vector circuit (default |0…0⟩). Optional `steps=` gate table (column o
 
 **> quantum_swap circuit=`self` a=`a` b=`b`**
 
+## barrier
+
+Visual separator only (no state change).
+
+**> quantum_barrier circuit=`self`**
+
+## measure
+    + `qubits`=None
+
+Mark computational-basis readout (`None` / empty = all qubits). Affects which bits `run` reports.
+
+**> quantum_measure circuit=`self` qubits=`qubits`**
+
+## append
+    + `op`
+
+Append another circuit's ops or a `{gate,qubits}` op map.
+
+**> quantum_append circuit=`self` op=`op`**
+
+## noise
+    + `kind`
+    + `p`
+
+Teaching noise for `run` trajectories (`bitflip` / `depolarizing`). Ignored by `simulate` / `probabilities`.
+
+**> quantum_noise circuit=`self` kind=`kind` p=`p`**
+
 ## simulate
 
-Return state vector amplitudes `{re,im}`.
+Return state vector amplitudes `{re,im}` (ideal; no noise).
 
 **> quantum_simulate circuit=`self`**
 
+## state
+
+Ideal state vector (same amplitudes as `simulate`).
+
+**> quantum_state circuit=`self`**
+
 ## probabilities
 
-Return map of basis label → probability (qubit 0 = rightmost bit).
+Return map of basis label → probability (qubit 0 = rightmost bit). Ideal; ignores noise.
 
 **> quantum_probabilities circuit=`self`**
 
@@ -114,7 +148,7 @@ Return map of basis label → probability (qubit 0 = rightmost bit).
     + `shots`=1024
     + `seed`=1
 
-Sample computational-basis shots (deterministic with `seed=`).
+Sample computational-basis shots (deterministic with `seed=`). Applies circuit `noise` if set.
 
 **> quantum_run circuit=`self` shots=`shots` seed=`seed`**
 

@@ -1527,6 +1527,38 @@ fn ext_quantum_gate_matrix_smoke() {
 }
 
 #[test]
+fn ext_quantum_author_api_smoke() {
+    let status = Command::new("cargo")
+        .args(["build", "-p", "marqdo_plugin_quantum"])
+        .current_dir(env!("CARGO_MANIFEST_DIR"))
+        .status()
+        .expect("build quantum plugin");
+    assert!(status.success(), "failed to build marqdo_plugin_quantum");
+    assert_out(
+        "tests/ext/quantum-author-api-smoke.mq.md",
+        "state-ok\ndraw-ok\nappend-ok",
+    );
+    let svg_path = "tests/ext/quantum-author-draw.svg";
+    let svg = std::fs::read_to_string(svg_path).unwrap_or_default();
+    assert!(
+        svg.contains("<svg") && svg.contains("stroke-dasharray"),
+        "expected barrier dashes in {svg_path}"
+    );
+    let _ = std::fs::remove_file(svg_path);
+}
+
+#[test]
+fn ext_quantum_noise_smoke() {
+    let status = Command::new("cargo")
+        .args(["build", "-p", "marqdo_plugin_quantum"])
+        .current_dir(env!("CARGO_MANIFEST_DIR"))
+        .status()
+        .expect("build quantum plugin");
+    assert!(status.success(), "failed to build marqdo_plugin_quantum");
+    assert_out("tests/ext/quantum-noise-smoke.mq.md", "noise-ok");
+}
+
+#[test]
 fn ext_agent_framework_smoke() {
     let status = Command::new("cargo")
         .args(["build", "-p", "marqdo_plugin_agent"])
