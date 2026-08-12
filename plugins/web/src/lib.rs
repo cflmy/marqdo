@@ -411,6 +411,35 @@ web_ffi!(web_form_submit, |args: &Value| {
     form::submit(&form_v, &data, &url)
 });
 
+web_ffi!(web_form_from_schema, |args: &Value| {
+    let url = db_url_of(args)?;
+    let table = arg_str(args, "table")?.to_string();
+    let action = arg_str_opt(args, "action").unwrap_or("insert");
+    let id = match args.get("id") {
+        None | Some(Value::Null) => None,
+        Some(_) => Some(arg_text(args, "id")?),
+    };
+    form::from_schema(&url, &table, action, id.as_deref())
+});
+
+web_ffi!(web_db_table_info, |args: &Value| {
+    let url = db_url_of(args)?;
+    let table = arg_str(args, "table")?.to_string();
+    let cols = db::table_info(&url, &table)?;
+    let arr: Vec<Value> = cols
+        .into_iter()
+        .map(|c| {
+            json!({
+                "name": c.name,
+                "type": c.sql_type,
+                "notnull": c.notnull,
+                "pk": c.pk,
+            })
+        })
+        .collect();
+    Ok(json!({ "columns": arr }))
+});
+
 web_ffi!(web_listen, |args: &Value| {
     use std::collections::HashMap;
     let (page, db_url, host, port, admin, forms) = if args.get("page").is_some()
@@ -532,6 +561,12 @@ pub unsafe extern "C" fn marqdo_plugin_init(host: *const MarqdoHostApi) -> c_int
         ),
         ("web_form_render", "form,id", web_form_render as PluginFn),
         ("web_form_submit", "form,data,url", web_form_submit as PluginFn),
+        (
+            "web_form_from_schema",
+            "url,table,action",
+            web_form_from_schema as PluginFn,
+        ),
+        ("web_db_table_info", "url,table", web_db_table_info as PluginFn),
         ("web_listen", "app", web_listen as PluginFn),
     ];
     for (name, params, f) in regs {

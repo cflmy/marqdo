@@ -175,6 +175,74 @@ pub fn form_new(table: Option<&str>, action: &str, id: Option<&str>) -> Value {
     Value::Object(m)
 }
 
+fn sql_type_to_input(sql_type: &str, name: &str) -> &'static str {
+    let t = sql_type.to_ascii_uppercase();
+    if t.contains("INT") || t.contains("REAL") || t.contains("FLOAT") || t.contains("DOUBLE") {
+        return "number";
+    }
+    if name == "body" || name.ends_with("_body") || name.ends_with("_text") {
+        return "textarea";
+    }
+    if name.contains("email") {
+        return "email";
+    }
+    if name.contains("url") || name == "href" {
+        return "url";
+    }
+    "text"
+}
+
+/// Build a form handle from live SQLite schema (admin new/edit).
+pub fn from_schema(
+    db_url: &str,
+    table: &str,
+    action: &str,
+    id: Option<&str>,
+) -> Result<Value, String> {
+    let action = match action {
+        "update" | "更新" => "update",
+        _ => "insert",
+    };
+    let cols = db::table_info(db_url, table)?;
+    if cols.is_empty() {
+        return Err(format!("unknown table `{table}`"));
+    }
+    let mut fields = Vec::new();
+    for c in &cols {
+        if action == "insert" && c.pk && c.name == "id" {
+            continue; // SERIAL / AUTOINCREMENT
+        }
+        let input = sql_type_to_input(&c.sql_type, &c.name);
+        let required = c.notnull || (action == "update" && c.pk);
+        fields.push(json!({
+            "name": c.name,
+            "label": c.name,
+            "type": input,
+            "required": required,
+            "default": "",
+            "pk": c.pk,
+        }));
+    }
+    let mut form = form_new(Some(table), action, id);
+    if let Some(obj) = form.as_object_mut() {
+        obj.insert("fields".into(), Value::Array(fields));
+        obj.insert("redirect".into(), json!(format!("/admin/{table}")));
+        if action == "insert" {
+            obj.insert("action_url".into(), json!(format!("/admin/{table}/new")));
+            obj.insert("title".into(), json!(format!("New {table}")));
+        } else if let Some(i) = id {
+            obj.insert(
+                "action_url".into(),
+                json!(format!("/admin/{table}/{i}/edit")),
+            );
+            obj.insert("title".into(), json!(format!("Edit {table} #{i}")));
+            obj.insert("id".into(), json!(i));
+        }
+        obj.insert("cancel_href".into(), json!(format!("/admin/{table}")));
+    }
+    Ok(form)
+}
+
 pub fn set_fields(form: &Value, fields: &Value) -> Value {
     let mut obj = form.as_object().cloned().unwrap_or_default();
     obj.insert("fields".into(), as_form_fields(fields));
@@ -384,44 +452,82 @@ pub fn render(form: &Value, form_id: &str, data: Option<&Value>, errors: Option<
         .get("table")
         .and_then(|v| v.as_str())
         .unwrap_or("");
+    let heading = form
+        .get("title")
+        .and_then(|v| v.as_str())
+        .unwrap_or(form_id);
+    let post_to = form
+        .get("action_url")
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string())
+        .unwrap_or_else(|| format!("/_form/{form_id}"));
+    let cancel = form
+        .get("cancel_href")
+        .and_then(|v| v.as_str())
+        .unwrap_or("/");
+    let row_id = form.get("id").map(cell_str).unwrap_or_default();
 
     let mut body = String::from(
         r#"<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>"#,
     );
-    body.push_str(&format!("<title>form {id}</title>", id = esc(form_id)));
+    body.push_str(&format!("<title>{}</title>", esc(heading)));
     body.push_str(
         r#"<style>
 body{font-family:"IBM Plex Sans","Noto Sans SC",sans-serif;margin:1.5rem;background:#fafaf9;color:#1c1917}
 form{max-width:28rem;display:grid;gap:.85rem}
 label{display:grid;gap:.25rem;font-size:.9rem}
 input,textarea{padding:.5rem .6rem;border:1px solid #e7e5e4;border-radius:4px;font:inherit}
+input[readonly]{background:#f5f5f4;color:#57534e}
 .err{color:#b91c1c;font-size:.85rem}
-.actions{display:flex;gap:.75rem;align-items:center}
+.actions{display:flex;gap:.75rem;align-items:center;flex-wrap:wrap}
 button{background:#0f766e;color:#fff;border:0;padding:.55rem 1rem;border-radius:4px;cursor:pointer}
 a{color:#0f766e}
+.meta{color:#57534e;font-size:.9rem}
 </style></head><body>"#,
     );
     body.push_str(&format!(
         "<h1>{}</h1><p class=\"meta\">table=<code>{}</code> · action=<code>{}</code></p>",
-        esc(form_id),
+        esc(heading),
         esc(table),
         esc(action)
     ));
     body.push_str(&format!(
-        "<form method=\"post\" action=\"/_form/{}\">",
-        esc(form_id)
+        "<form method=\"post\" action=\"{}\">",
+        esc(&post_to)
     ));
+    if action == "update" && !row_id.is_empty() {
+        body.push_str(&format!(
+            "<input type=\"hidden\" name=\"id\" value=\"{}\"/>",
+            esc(&row_id)
+        ));
+    }
     for f in &fields {
         let name = f.get("name").and_then(|v| v.as_str()).unwrap_or("");
+        if name.is_empty() {
+            continue;
+        }
         let label = f.get("label").and_then(|v| v.as_str()).unwrap_or(name);
         let ty = f.get("type").and_then(|v| v.as_str()).unwrap_or("text");
         let required = f.get("required").and_then(|v| v.as_bool()).unwrap_or(false);
         let default = f.get("default").and_then(|v| v.as_str()).unwrap_or("");
+        let pk = f.get("pk").and_then(|v| v.as_bool()).unwrap_or(false);
         let value = if data.contains_key(name) {
             field_text(&data, name)
+        } else if name == "id" && !row_id.is_empty() {
+            row_id.clone()
         } else {
             default.to_string()
         };
+        let readonly = action == "update" && pk && name == "id";
+        if readonly {
+            // already emitted as hidden; show read-only label
+            body.push_str(&format!(
+                "<label>{}<input type=\"text\" value=\"{}\" readonly/></label>",
+                esc(label),
+                esc(&value)
+            ));
+            continue;
+        }
         let req_attr = if required { " required" } else { "" };
         body.push_str("<label>");
         body.push_str(&esc(label));
@@ -460,15 +566,29 @@ a{color:#0f766e}
         }
         body.push_str("</label>");
     }
-    body.push_str(
-        "<div class=\"actions\"><button type=\"submit\">Submit</button><a href=\"/\">home</a></div>",
-    );
+    body.push_str(&format!(
+        "<div class=\"actions\"><button type=\"submit\">Submit</button><a href=\"{}\">cancel</a></div>",
+        esc(cancel)
+    ));
     body.push_str("</form></body></html>");
     body
 }
 
 pub fn submit(form: &Value, data: &Value, db_url: &str) -> Result<Value, String> {
-    let v = validate(form, None, data);
+    let action = form
+        .get("action")
+        .and_then(|v| v.as_str())
+        .unwrap_or("insert");
+    let mut row_map = data_map(data);
+    if action == "update" {
+        if let Some(fid) = form.get("id").map(cell_str).filter(|s| !s.is_empty()) {
+            if !row_map.contains_key("id") {
+                row_map.insert("id".to_string(), json!(fid));
+            }
+        }
+    }
+    let data = Value::Object(row_map.clone());
+    let v = validate(form, None, &data);
     if !v.get("ok").and_then(|x| x.as_bool()).unwrap_or(false) {
         return Ok(json!({
             "ok": false,
@@ -479,17 +599,13 @@ pub fn submit(form: &Value, data: &Value, db_url: &str) -> Result<Value, String>
         .get("table")
         .and_then(|v| v.as_str())
         .ok_or_else(|| "form missing `table`".to_string())?;
-    let action = form
-        .get("action")
-        .and_then(|v| v.as_str())
-        .unwrap_or("insert");
-    let row = Value::Object(data_map(data));
+    let row = Value::Object(row_map);
     let result = if action == "update" {
         let id = form
             .get("id")
             .map(cell_str)
             .filter(|s| !s.is_empty())
-            .or_else(|| data_map(data).get("id").map(cell_str))
+            .or_else(|| data_map(&data).get("id").map(cell_str))
             .ok_or_else(|| "update requires `id`".to_string())?;
         db::update(db_url, table, &id, &row)?
     } else {

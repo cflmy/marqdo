@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| 状态 | **Accepted · 实现中**（旧实现已清空，按本文从零开发） |
+| 状态 | **Accepted · 实现中**（页面装配 / db CRUD / form §5.5 / admin schema 表单已落地） |
 | 日期 | 2026-08-11 |
 | 相关 | [markdown-mapping.md](markdown-mapping.md) · [module-namespace.md](module-namespace.md) · [objects.md](objects.md) · [ext-abi.md](ext-abi.md) · [ext-cli.md](ext-cli.md) · [stdlib-i18n.md](stdlib-i18n.md) |
 | 安装（目标） | `marqdo ext add web`（中英：`web` / `网页`） |

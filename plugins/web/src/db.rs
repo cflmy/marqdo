@@ -286,3 +286,32 @@ pub fn list_tables(url: &str) -> Result<Vec<String>, String> {
         .map_err(|e| e.to_string())?;
     Ok(rows)
 }
+
+#[derive(Debug, Clone)]
+pub struct ColumnInfo {
+    pub name: String,
+    pub sql_type: String,
+    pub notnull: bool,
+    pub pk: bool,
+}
+
+/// `PRAGMA table_info` → column metadata for admin forms.
+pub fn table_info(url: &str, table: &str) -> Result<Vec<ColumnInfo>, String> {
+    let table = ident(table)?;
+    let conn = open(url)?;
+    let sql = format!("PRAGMA table_info(\"{table}\")");
+    let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
+    let rows = stmt
+        .query_map([], |r| {
+            Ok(ColumnInfo {
+                name: r.get::<_, String>(1)?,
+                sql_type: r.get::<_, String>(2).unwrap_or_else(|_| "TEXT".into()),
+                notnull: r.get::<_, i64>(3).unwrap_or(0) != 0,
+                pk: r.get::<_, i64>(5).unwrap_or(0) != 0,
+            })
+        })
+        .map_err(|e| e.to_string())?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| e.to_string())?;
+    Ok(rows)
+}

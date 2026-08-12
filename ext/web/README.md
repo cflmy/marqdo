@@ -18,9 +18,13 @@ Canonical sample (design §4): [`examples/web-site/`](../../examples/web-site/).
 
 ```bash
 cargo run -- run examples/web-site/index.mq.md
-# http://127.0.0.1:18081/  ·  /admin
+# http://127.0.0.1:18081/
+# /_form/article  ·  /admin  ·  /admin/articles/new
 ```
 
-Offline assemble smoke: `tests/ext/web-smoke.mq.md`.
+Offline smokes: `tests/ext/web-smoke.mq.md`, `web-form-smoke.mq.md`, `web-admin-smoke.mq.md`.
 
-**Form / validate / submit** (§5.5): field table + rules + `mount_form` → `GET|POST /_form/{id}`.
+| Feature | Notes |
+|---------|--------|
+| Form §5.5 | field/rules tables · `validate` · `submit` · `mount_form` → `GET\|POST /_form/{id}` |
+| Admin CRUD | `admin=True` · schema → same form path · new/edit/delete under `/admin/{table}` |
