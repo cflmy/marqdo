@@ -1,16 +1,19 @@
-//! Blocking HTTP listen: page shell, `/_part/{id}`, `/_form/{id}`, `/admin` CRUD.
+//! Blocking HTTP listen: page shell, `/_part`, `/_form`, `/admin`, optional static dir.
 
 use std::collections::HashMap;
 use std::net::SocketAddr;
+use std::path::PathBuf;
 use std::sync::Arc;
 
-use axum::extract::{Form, Path, State};
+use axum::extract::{Form, Path, Query, State};
 use axum::http::Uri;
 use axum::response::{Html, IntoResponse, Redirect, Response};
 use axum::routing::get;
 use axum::Router;
+use serde::Deserialize;
 use serde_json::{json, Map, Value};
 use tokio::runtime::Runtime;
+use tower_http::services::ServeDir;
 
 use crate::db;
 use crate::form;
@@ -57,6 +60,8 @@ pub fn listen(
     admin: bool,
     mut forms: HashMap<String, Value>,
     routes: HashMap<String, Value>,
+    static_dir: Option<PathBuf>,
+    static_mount: &str,
 ) -> Result<Value, String> {
     let mut form_owners = HashMap::new();
     collect_page_forms(page, &mut forms, &mut form_owners);
@@ -94,6 +99,23 @@ pub fn listen(
         app = app.route(&part_path, get(routed_part));
     }
 
+    let mount = normalize_static_mount(static_mount);
+    if let Some(dir) = static_dir {
+        if !dir.is_dir() {
+            return Err(format!(
+                "static dir `{}` is not a directory",
+                dir.display()
+            ));
+        }
+        eprintln!(
+            "marqdo web static: {} → {}",
+            mount,
+            dir.display()
+        );
+        let svc = ServeDir::new(dir);
+        app = app.nest_service(&mount, svc);
+    }
+
     let app = app.with_state(state);
 
     let addr: SocketAddr = format!("{host}:{port}")
@@ -111,6 +133,22 @@ pub fn listen(
             .map_err(|e| format!("serve: {e}"))
     })?;
     Ok(json!({ "ok": true }))
+}
+
+pub fn normalize_static_mount(raw: &str) -> String {
+    let s = raw.trim();
+    if s.is_empty() {
+        return "/static".into();
+    }
+    let mut m = if s.starts_with('/') {
+        s.to_string()
+    } else {
+        format!("/{s}")
+    };
+    while m.len() > 1 && m.ends_with('/') {
+        m.pop();
+    }
+    m
 }
 
 async fn home(State(st): State<Arc<AppState>>) -> Html<String> {
@@ -181,7 +219,7 @@ async fn form_post(
     let Some(url) = st.db_url.as_deref() else {
         return Html(String::from("<p>no database</p>")).into_response();
     };
-    submit_and_respond(&st, frm, &id, url, posted)
+    submit_and_respond(&st, frm, &id, url, posted, None)
 }
 
 fn posted_to_value(posted: HashMap<String, String>) -> Value {
@@ -192,25 +230,55 @@ fn posted_to_value(posted: HashMap<String, String>) -> Value {
     Value::Object(data)
 }
 
+fn with_flash(redirect: &str, flash: &str) -> String {
+    if redirect.contains('?') {
+        format!("{redirect}&flash={flash}")
+    } else {
+        format!("{redirect}?flash={flash}")
+    }
+}
+
 fn submit_and_respond(
     st: &AppState,
     frm: &Value,
     form_id: &str,
     url: &str,
     posted: HashMap<String, String>,
+    admin_table: Option<&str>,
 ) -> Response {
     let data_v = posted_to_value(posted);
     match form::submit(frm, &data_v, url) {
         Ok(res) if res.get("ok").and_then(|v| v.as_bool()).unwrap_or(false) => {
-            let redirect = res
+            let mut redirect = res
                 .get("redirect")
                 .and_then(|v| v.as_str())
-                .unwrap_or("/");
-            Redirect::to(redirect).into_response()
+                .unwrap_or("/")
+                .to_string();
+            if form_id.contains("-new") {
+                redirect = with_flash(&redirect, "created");
+            } else if form_id.contains("-edit") {
+                redirect = with_flash(&redirect, "updated");
+            }
+            Redirect::to(&redirect).into_response()
         }
         Ok(res) => {
             let errors = res.get("errors");
-            if let Some(page) = st.form_owners.get(form_id) {
+            if let Some(table) = admin_table {
+                Html(admin_form_page(
+                    st,
+                    table,
+                    if form_id.contains("-edit") {
+                        "Edit"
+                    } else {
+                        "New"
+                    },
+                    frm,
+                    form_id,
+                    Some(&data_v),
+                    errors,
+                ))
+                .into_response()
+            } else if let Some(page) = st.form_owners.get(form_id) {
                 Html(render::render_page_ex(
                     page,
                     st.db_url.as_deref(),
@@ -228,59 +296,205 @@ fn submit_and_respond(
 
 fn admin_gate(st: &AppState) -> Option<Response> {
     if !st.admin {
-        return Some(Html(String::from("<p>admin disabled</p>")).into_response());
+        return Some(Html(admin_shell(st, "Admin", None, "<p class=\"flash err\">Admin is disabled for this app.</p>")).into_response());
     }
     if st.db_url.is_none() {
-        return Some(Html(String::from("<p>no database</p>")).into_response());
+        return Some(Html(admin_shell(st, "Admin", None, "<p class=\"flash err\">No database bound to this app.</p>")).into_response());
     }
     None
 }
 
-fn admin_shell(title: &str, inner: &str) -> String {
+fn flash_html(flash: Option<&str>) -> String {
+    match flash {
+        Some("created") => "<div class=\"flash ok\">Row created.</div>".into(),
+        Some("updated") => "<div class=\"flash ok\">Row updated.</div>".into(),
+        Some("deleted") => "<div class=\"flash ok\">Row deleted.</div>".into(),
+        Some(other) if !other.is_empty() => {
+            format!("<div class=\"flash ok\">{}</div>", esc(other))
+        }
+        _ => String::new(),
+    }
+}
+
+fn truncate_cell(s: &str, max: usize) -> String {
+    let mut it = s.chars();
+    let head: String = it.by_ref().take(max).collect();
+    if it.next().is_some() {
+        format!("{head}…")
+    } else {
+        head
+    }
+}
+
+fn admin_shell(st: &AppState, title: &str, active: Option<&str>, inner: &str) -> String {
+    let tables = st
+        .db_url
+        .as_deref()
+        .and_then(|u| db::list_tables(u).ok())
+        .unwrap_or_default();
+    let mut side = String::from("<nav class=\"admin-nav\"><a class=\"brand\" href=\"/admin\">Admin</a>");
+    if tables.is_empty() {
+        side.push_str("<p class=\"muted\">No tables yet.</p>");
+    } else {
+        side.push_str("<ul>");
+        for t in &tables {
+            let cls = if active == Some(t.as_str()) {
+                " class=\"active\""
+            } else {
+                ""
+            };
+            side.push_str(&format!(
+                "<li><a{cls} href=\"/admin/{}\">{}</a></li>",
+                esc(t),
+                esc(t)
+            ));
+        }
+        side.push_str("</ul>");
+    }
+    if !st.forms.is_empty() {
+        side.push_str("<p class=\"nav-label\">Forms</p><ul>");
+        let mut ids: Vec<_> = st.forms.keys().cloned().collect();
+        ids.sort();
+        for id in ids {
+            side.push_str(&format!(
+                "<li><a href=\"/_form/{}\">{}</a></li>",
+                esc(&id),
+                esc(&id)
+            ));
+        }
+        side.push_str("</ul>");
+    }
+    side.push_str("<div class=\"nav-foot\"><a href=\"/\">← Site</a></div></nav>");
+
     format!(
-        r#"<!DOCTYPE html><html><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><title>{title}</title>
+        r#"<!DOCTYPE html>
+<html lang="zh-CN"><head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>{title} · Admin</title>
 <style>
-body{{font-family:"IBM Plex Sans","Noto Sans SC",sans-serif;margin:1.5rem;background:#fafaf9;color:#1c1917}}
-a{{color:#0f766e;text-decoration:none}} a:hover{{text-decoration:underline}}
-table{{border-collapse:collapse;background:#fff}} th,td{{border:1px solid #e7e5e4;padding:.45rem .65rem;text-align:left}}
-.toolbar{{display:flex;gap:1rem;align-items:center;margin:.75rem 0 1.25rem;flex-wrap:wrap}}
-.btn{{display:inline-block;background:#0f766e;color:#fff!important;padding:.4rem .75rem;border-radius:4px}}
-.btn-muted{{background:#78716c}}
-.danger{{color:#b91c1c}}
-</style></head><body>{inner}</body></html>"#,
+:root {{ --ink:#1c1917; --muted:#78716c; --paper:#fafaf9; --line:#e7e5e4; --accent:#0f766e; --ok:#166534; --err:#b91c1c; --side:#f5f5f4; }}
+* {{ box-sizing:border-box; }}
+body {{ margin:0; font-family:"IBM Plex Sans","Noto Sans SC",sans-serif; background:var(--paper); color:var(--ink); min-height:100vh; display:grid; grid-template-columns:14rem 1fr; }}
+@media (max-width:720px) {{ body {{ grid-template-columns:1fr; }} .admin-nav {{ border-right:0; border-bottom:1px solid var(--line); }} }}
+.admin-nav {{ background:var(--side); border-right:1px solid var(--line); padding:1.1rem 1rem 1.5rem; }}
+.admin-nav .brand {{ display:block; font-weight:600; font-size:1.05rem; margin-bottom:1rem; color:var(--ink); }}
+.admin-nav ul {{ list-style:none; margin:0; padding:0; display:grid; gap:.2rem; }}
+.admin-nav a {{ color:var(--ink); text-decoration:none; display:block; padding:.35rem .5rem; border-radius:4px; }}
+.admin-nav a:hover,.admin-nav a.active {{ background:#fff; color:var(--accent); }}
+.admin-nav .nav-label {{ margin:1.1rem 0 .35rem; font-size:.75rem; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); }}
+.admin-nav .nav-foot {{ margin-top:1.5rem; font-size:.9rem; }}
+.admin-nav .muted {{ color:var(--muted); font-size:.9rem; }}
+.admin-main {{ padding:1.25rem 1.5rem 2rem; max-width:56rem; }}
+.admin-main h1 {{ margin:0 0 .35rem; font-size:1.65rem; }}
+.crumbs {{ color:var(--muted); font-size:.85rem; margin-bottom:1rem; }}
+.crumbs a {{ color:var(--muted); }}
+.toolbar {{ display:flex; gap:.75rem; align-items:center; margin:0 0 1.1rem; flex-wrap:wrap; }}
+.meta {{ color:var(--muted); font-size:.9rem; margin:0 0 1rem; }}
+.btn {{ display:inline-block; background:var(--accent); color:#fff!important; padding:.45rem .85rem; border-radius:4px; text-decoration:none; border:0; font:inherit; cursor:pointer; }}
+.btn:hover {{ filter:brightness(1.05); }}
+.btn-muted {{ background:#78716c; }}
+.btn-ghost {{ background:transparent; color:var(--accent)!important; border:1px solid var(--line); }}
+table.data {{ width:100%; border-collapse:collapse; background:#fff; border:1px solid var(--line); border-radius:6px; overflow:hidden; }}
+table.data th,table.data td {{ border-bottom:1px solid var(--line); padding:.55rem .7rem; text-align:left; vertical-align:top; font-size:.92rem; }}
+table.data th {{ background:#f5f5f4; font-weight:600; }}
+table.data tr:last-child td {{ border-bottom:0; }}
+table.data .actions {{ white-space:nowrap; }}
+.empty {{ background:#fff; border:1px dashed var(--line); border-radius:6px; padding:2rem 1.25rem; text-align:center; color:var(--muted); }}
+.empty strong {{ display:block; color:var(--ink); margin-bottom:.35rem; font-size:1.05rem; }}
+.flash {{ padding:.65rem .85rem; border-radius:4px; margin:0 0 1rem; }}
+.flash.ok {{ background:#ecfdf5; color:var(--ok); border:1px solid #a7f3d0; }}
+.flash.err {{ background:#fef2f2; color:var(--err); border:1px solid #fecaca; }}
+.danger {{ color:var(--err); }}
+.site-form {{ max-width:28rem; margin-top:.5rem; }}
+.site-form form {{ display:grid; gap:.85rem; }}
+.site-form label {{ display:grid; gap:.25rem; font-size:.9rem; }}
+.site-form input,.site-form textarea {{ padding:.5rem .6rem; border:1px solid var(--line); border-radius:4px; font:inherit; background:#fff; }}
+.site-form input[readonly] {{ background:#f5f5f4; color:var(--muted); }}
+.site-form .err {{ color:var(--err); font-size:.85rem; }}
+.site-form .actions {{ display:flex; gap:.75rem; align-items:center; flex-wrap:wrap; }}
+.site-form button {{ background:var(--accent); color:#fff; border:0; padding:.55rem 1rem; border-radius:4px; cursor:pointer; font:inherit; }}
+.site-form .meta {{ color:var(--muted); font-size:.9rem; }}
+</style>
+</head>
+<body>
+{side}
+<main class="admin-main">{inner}</main>
+</body></html>"#,
         title = esc(title),
+        side = side,
         inner = inner
     )
 }
 
-async fn admin_home(State(st): State<Arc<AppState>>) -> Response {
+fn admin_form_page(
+    st: &AppState,
+    table: &str,
+    kind: &str,
+    frm: &Value,
+    form_id: &str,
+    data: Option<&Value>,
+    errors: Option<&Value>,
+) -> String {
+    let mut body = format!(
+        "<p class=\"crumbs\"><a href=\"/admin\">Admin</a> / <a href=\"/admin/{t}\">{t}</a> / {kind}</p><h1>{kind} {t}</h1>",
+        t = esc(table),
+        kind = esc(kind),
+    );
+    body.push_str(&form::render_body(frm, form_id, data, errors));
+    admin_shell(st, &format!("{kind} {table}"), Some(table), &body)
+}
+
+#[derive(Deserialize)]
+struct FlashQuery {
+    flash: Option<String>,
+}
+
+async fn admin_home(
+    State(st): State<Arc<AppState>>,
+    Query(q): Query<FlashQuery>,
+) -> Response {
     if let Some(r) = admin_gate(&st) {
         return r;
     }
     let url = st.db_url.as_deref().unwrap();
     let tables = db::list_tables(url).unwrap_or_default();
-    let mut inner = String::from("<h1>admin</h1><div class=\"toolbar\"><a href=\"/\">home</a></div><h2>tables</h2><ul>");
-    for t in &tables {
-        inner.push_str(&format!("<li><a href=\"/admin/{t}\">{t}</a></li>"));
-    }
-    inner.push_str("</ul>");
-    if !st.forms.is_empty() {
-        inner.push_str("<h2>mounted forms</h2><ul>");
-        for id in st.forms.keys() {
-            inner.push_str(&format!("<li><a href=\"/_form/{id}\">{id}</a></li>"));
+    let mut inner = String::from("<h1>Admin</h1><p class=\"meta\">SQLite tables for this site.</p>");
+    inner.push_str(&flash_html(q.flash.as_deref()));
+    if tables.is_empty() {
+        inner.push_str(
+            "<div class=\"empty\"><strong>No tables</strong>Initialize a table via <code>db.init</code> / <code>数据库.初始化</code>.</div>",
+        );
+    } else {
+        inner.push_str("<table class=\"data\"><thead><tr><th>Table</th><th></th></tr></thead><tbody>");
+        for t in &tables {
+            inner.push_str(&format!(
+                "<tr><td><a href=\"/admin/{t}\">{t}</a></td><td class=\"actions\"><a class=\"btn\" href=\"/admin/{t}/new\">New</a></td></tr>",
+                t = esc(t)
+            ));
         }
-        inner.push_str("</ul>");
+        inner.push_str("</tbody></table>");
     }
-    Html(admin_shell("admin", &inner)).into_response()
+    Html(admin_shell(&st, "Admin", None, &inner)).into_response()
 }
 
-async fn admin_table(State(st): State<Arc<AppState>>, Path(table): Path<String>) -> Response {
+async fn admin_table(
+    State(st): State<Arc<AppState>>,
+    Path(table): Path<String>,
+    Query(q): Query<FlashQuery>,
+) -> Response {
     if let Some(r) = admin_gate(&st) {
         return r;
     }
     let url = st.db_url.as_deref().unwrap();
     let Ok(data) = db::select(url, &table, 200, None) else {
-        return Html(format!("<p>cannot read {table}</p>")).into_response();
+        return Html(admin_shell(
+            &st,
+            &table,
+            Some(&table),
+            &format!("<p class=\"flash err\">Cannot read table {}.</p>", esc(&table)),
+        ))
+        .into_response();
     };
     let rows = data
         .get("rows")
@@ -297,56 +511,68 @@ async fn admin_table(State(st): State<Arc<AppState>>, Path(table): Path<String>)
             cols = info.into_iter().map(|c| c.name).collect();
         }
     }
-    // prefer id first
     if let Some(i) = cols.iter().position(|c| c == "id") {
         let idc = cols.remove(i);
         cols.insert(0, idc);
     }
 
-    let mut inner = format!("<h1>{table}</h1>");
+    let mut inner = format!(
+        "<p class=\"crumbs\"><a href=\"/admin\">Admin</a> / {t}</p><h1>{t}</h1>",
+        t = esc(&table)
+    );
+    inner.push_str(&flash_html(q.flash.as_deref()));
     inner.push_str(&format!(
-        "<div class=\"toolbar\"><a class=\"btn\" href=\"/admin/{table}/new\">New</a><a href=\"/admin\">back</a><a href=\"/\">home</a></div>"
+        "<div class=\"toolbar\"><a class=\"btn\" href=\"/admin/{}/new\">New row</a><span class=\"meta\">{} row{}</span></div>",
+        esc(&table),
+        rows.len(),
+        if rows.len() == 1 { "" } else { "s" }
     ));
-    inner.push_str("<table><thead><tr>");
-    for c in &cols {
-        inner.push_str(&format!("<th>{}</th>", esc(c)));
-    }
-    inner.push_str("<th></th></tr></thead><tbody>");
-    for row in &rows {
-        let m = row.as_object().cloned().unwrap_or_else(Map::new);
-        inner.push_str("<tr>");
+
+    if rows.is_empty() {
+        inner.push_str(&format!(
+            "<div class=\"empty\"><strong>No rows in {}</strong><a class=\"btn\" href=\"/admin/{}/new\">Create the first row</a></div>",
+            esc(&table),
+            esc(&table)
+        ));
+    } else {
+        inner.push_str("<table class=\"data\"><thead><tr>");
         for c in &cols {
-            let cell = m
-                .get(c)
+            inner.push_str(&format!("<th>{}</th>", esc(c)));
+        }
+        inner.push_str("<th></th></tr></thead><tbody>");
+        for row in &rows {
+            let m = row.as_object().cloned().unwrap_or_else(Map::new);
+            inner.push_str("<tr>");
+            for c in &cols {
+                let cell = m
+                    .get(c)
+                    .map(|v| match v {
+                        Value::String(s) => s.clone(),
+                        Value::Null => String::new(),
+                        other => other.to_string(),
+                    })
+                    .unwrap_or_default();
+                inner.push_str(&format!("<td>{}</td>", esc(&truncate_cell(&cell, 80))));
+            }
+            let id = m
+                .get("id")
                 .map(|v| match v {
                     Value::String(s) => s.clone(),
-                    Value::Null => String::new(),
                     other => other.to_string(),
                 })
                 .unwrap_or_default();
-            inner.push_str(&format!("<td>{}</td>", esc(&cell)));
+            if !id.is_empty() {
+                inner.push_str(&format!(
+                    "<td class=\"actions\"><a href=\"/admin/{table}/{id}/edit\">Edit</a> · <a class=\"danger\" href=\"/admin/{table}/{id}/delete\" onclick=\"return confirm('Delete row #{id}?')\">Delete</a></td>"
+                ));
+            } else {
+                inner.push_str("<td></td>");
+            }
+            inner.push_str("</tr>");
         }
-        let id = m
-            .get("id")
-            .map(|v| match v {
-                Value::String(s) => s.clone(),
-                other => other.to_string(),
-            })
-            .unwrap_or_default();
-        if !id.is_empty() {
-            inner.push_str(&format!(
-                "<td><a href=\"/admin/{table}/{id}/edit\">edit</a> · <a class=\"danger\" href=\"/admin/{table}/{id}/delete\" onclick=\"return confirm('Delete #{id}?')\">delete</a></td>"
-            ));
-        } else {
-            inner.push_str("<td></td>");
-        }
-        inner.push_str("</tr>");
+        inner.push_str("</tbody></table>");
     }
-    if rows.is_empty() {
-        inner.push_str("<tr><td colspan=\"99\">(empty)</td></tr>");
-    }
-    inner.push_str("</tbody></table>");
-    Html(admin_shell(&table, &inner)).into_response()
+    Html(admin_shell(&st, &table, Some(&table), &inner)).into_response()
 }
 
 async fn admin_new_get(State(st): State<Arc<AppState>>, Path(table): Path<String>) -> Response {
@@ -355,9 +581,23 @@ async fn admin_new_get(State(st): State<Arc<AppState>>, Path(table): Path<String
     }
     let url = st.db_url.as_deref().unwrap();
     match form::from_schema(url, &table, "insert", None) {
-        Ok(frm) => Html(form::render(&frm, &format!("admin-{table}-new"), None, None))
-            .into_response(),
-        Err(e) => Html(format!("<p>{}</p>", esc(&e))).into_response(),
+        Ok(frm) => Html(admin_form_page(
+            &st,
+            &table,
+            "New",
+            &frm,
+            &format!("admin-{table}-new"),
+            None,
+            None,
+        ))
+        .into_response(),
+        Err(e) => Html(admin_shell(
+            &st,
+            &table,
+            Some(&table),
+            &format!("<p class=\"flash err\">{}</p>", esc(&e)),
+        ))
+        .into_response(),
     }
 }
 
@@ -371,8 +611,21 @@ async fn admin_new_post(
     }
     let url = st.db_url.as_deref().unwrap();
     match form::from_schema(url, &table, "insert", None) {
-        Ok(frm) => submit_and_respond(&st, &frm, &format!("admin-{table}-new"), url, posted),
-        Err(e) => Html(format!("<p>{}</p>", esc(&e))).into_response(),
+        Ok(frm) => submit_and_respond(
+            &st,
+            &frm,
+            &format!("admin-{table}-new"),
+            url,
+            posted,
+            Some(&table),
+        ),
+        Err(e) => Html(admin_shell(
+            &st,
+            &table,
+            Some(&table),
+            &format!("<p class=\"flash err\">{}</p>", esc(&e)),
+        ))
+        .into_response(),
     }
 }
 
@@ -386,20 +639,43 @@ async fn admin_edit_get(
     let url = st.db_url.as_deref().unwrap();
     let row = match db::get(url, &table, &id) {
         Ok(Value::Null) => {
-            return Html(format!("<p>row {id} not found</p>")).into_response();
+            return Html(admin_shell(
+                &st,
+                &table,
+                Some(&table),
+                &format!("<p class=\"flash err\">Row {id} not found.</p>"),
+            ))
+            .into_response();
         }
         Ok(v) => v,
-        Err(e) => return Html(format!("<p>{}</p>", esc(&e))).into_response(),
+        Err(e) => {
+            return Html(admin_shell(
+                &st,
+                &table,
+                Some(&table),
+                &format!("<p class=\"flash err\">{}</p>", esc(&e)),
+            ))
+            .into_response();
+        }
     };
     match form::from_schema(url, &table, "update", Some(&id)) {
-        Ok(frm) => Html(form::render(
+        Ok(frm) => Html(admin_form_page(
+            &st,
+            &table,
+            "Edit",
             &frm,
             &format!("admin-{table}-edit"),
             Some(&row),
             None,
         ))
         .into_response(),
-        Err(e) => Html(format!("<p>{}</p>", esc(&e))).into_response(),
+        Err(e) => Html(admin_shell(
+            &st,
+            &table,
+            Some(&table),
+            &format!("<p class=\"flash err\">{}</p>", esc(&e)),
+        ))
+        .into_response(),
     }
 }
 
@@ -413,8 +689,21 @@ async fn admin_edit_post(
     }
     let url = st.db_url.as_deref().unwrap();
     match form::from_schema(url, &table, "update", Some(&id)) {
-        Ok(frm) => submit_and_respond(&st, &frm, &format!("admin-{table}-edit"), url, posted),
-        Err(e) => Html(format!("<p>{}</p>", esc(&e))).into_response(),
+        Ok(frm) => submit_and_respond(
+            &st,
+            &frm,
+            &format!("admin-{table}-edit"),
+            url,
+            posted,
+            Some(&table),
+        ),
+        Err(e) => Html(admin_shell(
+            &st,
+            &table,
+            Some(&table),
+            &format!("<p class=\"flash err\">{}</p>", esc(&e)),
+        ))
+        .into_response(),
     }
 }
 
@@ -427,9 +716,15 @@ async fn admin_delete(
     }
     let url = st.db_url.as_deref().unwrap();
     if let Err(e) = db::delete(url, &table, &id) {
-        return Html(format!("<p>delete failed: {}</p>", esc(&e))).into_response();
+        return Html(admin_shell(
+            &st,
+            &table,
+            Some(&table),
+            &format!("<p class=\"flash err\">Delete failed: {}</p>", esc(&e)),
+        ))
+        .into_response();
     }
-    Redirect::to(&format!("/admin/{table}")).into_response()
+    Redirect::to(&with_flash(&format!("/admin/{table}"), "deleted")).into_response()
 }
 
 fn esc(s: &str) -> String {

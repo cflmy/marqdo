@@ -1,0 +1,5 @@
+/* 可选站点样式 — /static/site.css */
+body.site-hint::before {
+  content: "static ok";
+  display: none;
+}

@@ -69,4 +69,5 @@ New article: form embedded in the page main slot (design §5.5.4).
 *`app` = > web.app page=`page` db=`store` admin=True host=127.0.0.1 port=18081 *
 *`app` = > `app`.route path=/about page=`about` *
 *`app` = > `app`.route path=/new page=`new` *
+*`app` = > `app`.static dir=public mount=/static *
 > `app`.listen

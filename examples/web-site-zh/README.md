@@ -7,4 +7,4 @@ cargo build -p marqdo_plugin_web
 cargo run -- examples/web-site-zh/index.mq.md
 ```
 
-打开 http://127.0.0.1:18082/ — `/about`、`/new`、`/admin`。
+打开 http://127.0.0.1:18082/ — `/about`、`/new`、`/admin`、`/static/site.css`。

@@ -7,4 +7,4 @@ cargo build -p marqdo_plugin_web
 cargo run -- examples/web-site/index.mq.md
 ```
 
-Then open http://127.0.0.1:18081/ — `/about`, `/new` (form in page slot), `/admin`.
+Then open http://127.0.0.1:18081/ — `/about`, `/new` (form in page slot), `/admin`, `/static/site.css`.

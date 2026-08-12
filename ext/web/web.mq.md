@@ -198,8 +198,16 @@ Register `GET|POST /_form/{id}` for listen when the form is not already embedded
 
 **> web_app_mount_form app=`self` id=`id` form=`form`**
 
+## static
+    + `dir`
+    + `mount`=/static
+
+Serve files from `dir` under `mount` (default `/static`). Path is resolved from the process working directory at listen time.
+
+**> web_app_static app=`self` dir=`dir` mount=`mount`**
+
 ## listen
 
-Serve `/`, routed pages, `/_part/{id}` (home) and `{path}/_part/{id}` (routes), `/_form/{id}` (from mounts + page embeds), and optional `/admin`.
+Serve `/`, routed pages, `/_part/{id}` (home) and `{path}/_part/{id}` (routes), `/_form/{id}` (from mounts + page embeds), optional `/static` (or custom mount), and optional `/admin`.
 
 **> web_listen app=`self`**

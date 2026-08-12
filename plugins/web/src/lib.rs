@@ -354,6 +354,8 @@ web_ffi!(web_app_new, |args: &Value| {
         "admin": admin,
         "forms": {},
         "routes": {},
+        "static_dir": null,
+        "static_mount": "/static",
     }))
 });
 
@@ -380,6 +382,8 @@ fn normalize_route_path(raw: &str) -> Result<String, String> {
         || path.starts_with("/_form/")
         || path == "/_part"
         || path.starts_with("/_part/")
+        || path == "/static"
+        || path.starts_with("/static/")
     {
         return Err(format!("route path `{path}` is reserved"));
     }
@@ -425,6 +429,32 @@ web_ffi!(web_app_mount_form, |args: &Value| {
         .as_object_mut()
         .ok_or_else(|| "app.forms must be a map".to_string())?;
     fmap.insert(id, form_v);
+    Ok(app)
+});
+
+web_ffi!(web_app_static, |args: &Value| {
+    let mut app = args.get("app").cloned().unwrap_or(json!({}));
+    let dir = arg_str(args, "dir")?.to_string();
+    if dir.trim().is_empty() {
+        return Err("static `dir` is empty".into());
+    }
+    let mount = arg_str_opt(args, "mount").unwrap_or("/static");
+    let mount = http::normalize_static_mount(mount);
+    // Also reserve custom mounts against later routes.
+    if mount == "/admin"
+        || mount.starts_with("/admin/")
+        || mount == "/_form"
+        || mount.starts_with("/_form/")
+        || mount == "/_part"
+        || mount.starts_with("/_part/")
+    {
+        return Err(format!("static mount `{mount}` is reserved"));
+    }
+    let obj = app
+        .as_object_mut()
+        .ok_or_else(|| "app must be a map".to_string())?;
+    obj.insert("static_dir".into(), json!(dir));
+    obj.insert("static_mount".into(), json!(mount));
     Ok(app)
 });
 
@@ -517,7 +547,10 @@ web_ffi!(web_db_table_info, |args: &Value| {
 
 web_ffi!(web_listen, |args: &Value| {
     use std::collections::HashMap;
-    let (page, db_url, host, port, admin, forms, routes) = if args.get("page").is_some()
+    use std::path::PathBuf;
+    let (page, db_url, host, port, admin, forms, routes, static_dir, static_mount) = if args
+        .get("page")
+        .is_some()
         || args.get("host").is_some()
     {
         let page = args.get("page").cloned().unwrap_or(json!({}));
@@ -531,6 +564,10 @@ web_ffi!(web_listen, |args: &Value| {
             Some(Value::Bool(b)) => *b,
             _ => false,
         };
+        let static_dir = arg_str_opt(args, "static_dir").map(PathBuf::from);
+        let static_mount = arg_str_opt(args, "static_mount")
+            .unwrap_or("/static")
+            .to_string();
         (
             page,
             db_url,
@@ -539,6 +576,8 @@ web_ffi!(web_listen, |args: &Value| {
             admin,
             HashMap::new(),
             HashMap::new(),
+            static_dir,
+            static_mount,
         )
     } else {
         let app = args.get("app").cloned().unwrap_or_else(|| args.clone());
@@ -574,8 +613,37 @@ web_ffi!(web_listen, |args: &Value| {
                 routes.insert(k.clone(), v.clone());
             }
         }
-        (page, db_url, host, port, admin, forms, routes)
+        let static_dir = app
+            .get("static_dir")
+            .and_then(|v| v.as_str())
+            .filter(|s| !s.is_empty())
+            .map(PathBuf::from);
+        let static_mount = app
+            .get("static_mount")
+            .and_then(|v| v.as_str())
+            .unwrap_or("/static")
+            .to_string();
+        (
+            page,
+            db_url,
+            host,
+            port,
+            admin,
+            forms,
+            routes,
+            static_dir,
+            static_mount,
+        )
     };
+    let static_dir = static_dir.map(|p| {
+        if p.is_absolute() {
+            p
+        } else {
+            std::env::current_dir()
+                .unwrap_or_else(|_| PathBuf::from("."))
+                .join(p)
+        }
+    });
     http::listen(
         &page,
         db_url.as_deref(),
@@ -584,6 +652,8 @@ web_ffi!(web_listen, |args: &Value| {
         admin,
         forms,
         routes,
+        static_dir,
+        &static_mount,
     )
 });
 
@@ -656,6 +726,11 @@ pub unsafe extern "C" fn marqdo_plugin_init(host: *const MarqdoHostApi) -> c_int
             "web_app_mount_form",
             "app,id,form",
             web_app_mount_form as PluginFn,
+        ),
+        (
+            "web_app_static",
+            "app,dir,mount",
+            web_app_static as PluginFn,
         ),
         ("web_form_new", "table,action,id", web_form_new as PluginFn),
         ("web_form_fields", "form,fields", web_form_fields as PluginFn),

@@ -61,4 +61,5 @@ description: Home + /about + /new（表单嵌入）+ 后台；只用 ext/web/网
 *`app` = > 网页.应用 页面=`page` 数据库=`store` 后台=True 主机=127.0.0.1 端口=18082 *
 *`app` = > `app`.路由 路径=/about 页面=`about` *
 *`app` = > `app`.路由 路径=/new 页面=`new` *
+*`app` = > `app`.静态 目录=public 挂载=/static *
 > `app`.监听

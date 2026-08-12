@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| 状态 | **Accepted · 实现中**（页面装配 / db CRUD+`select where` / form §5.5 / 表单嵌入 / admin / `app.route` / 路由 `/_part` 已落地） |
+| 状态 | **Accepted · 完成**（SQLite 作者面：页面装配 / db CRUD+`where` / form / 嵌入主区 / `app.route` / 路由 `/_part` / admin UI / `app.static`；Postgres 等见 §9） |
 | 日期 | 2026-08-11 |
 | 相关 | [markdown-mapping.md](markdown-mapping.md) · [module-namespace.md](module-namespace.md) · [objects.md](objects.md) · [ext-abi.md](ext-abi.md) · [ext-cli.md](ext-cli.md) · [stdlib-i18n.md](stdlib-i18n.md) |
 | 安装（目标） | `marqdo ext add web`（中英：`web` / `网页`） |
@@ -349,10 +349,12 @@ title: 站点
 
 ### 5.4 应用 · `app` / `应用`
 
-**英文：** `# app` · `## route` · `## listen` · 形参 `page` `db` `admin` `host` `port`  
-**中文：** `# 应用` · `## 路由` · `## 监听` · 形参 `页面` `数据库` `后台` `主机` `端口`
+**英文：** `# app` · `## route` · `## static` · `## listen` · 形参 `page` `db` `admin` `host` `port`  
+**中文：** `# 应用` · `## 路由` · `## 静态` · `## 监听` · 形参 `页面` `数据库` `后台` `主机` `端口`
 
-`listen` / `监听`：加载插件、注入 `db_url`、按页面 part 提供 `/_part/{id}`（首页）与 `{path}/_part/{id}`（`app.route` 页）、启动 HTTP。作者不必手写 part 注册。
+`listen` / `监听`：加载插件、注入 `db_url`、按页面 part 提供 `/_part/{id}`（首页）与 `{path}/_part/{id}`（`app.route` 页）、可选 `static` 目录挂载、启动 HTTP。作者不必手写 part 注册。
+
+`static` / `静态`：`dir=`（或 `目录=`）+ 可选 `mount=`（默认 `/static`）；`listen` 时用 `tower-http` 提供只读文件服务。
 
 ### 5.5 表单 · `form` / `表单`（规划锁定）
 
@@ -575,12 +577,11 @@ submit  → action=insert → db.insert；action=update → db.update
 
 ---
 
-## 9. 非本波次（可记入路线图，不挡作者面评审）
+## 9. 非本波次（可记入路线图）
 
-- Postgres / Redis / S3 驱动细节（SQLite 先落地）；  
+- Postgres / Redis / S3 驱动细节（SQLite 已落地）；  
 - 复杂权限与多租户；  
-- 子页路由糖的更多约定（`# 应用.route` 已够用）；  
-- `/admin` 的视觉与交互细化（CRUD/表单必须走 §5.3–§5.5；UI 可后做）。
+- 子页路由糖的更多约定（`# 应用.route` 已够用）。
 
 ---
 

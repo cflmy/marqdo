@@ -1,0 +1,1 @@
+Marqdo web static fixture.

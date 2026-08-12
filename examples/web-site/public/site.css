@@ -1,0 +1,5 @@
+/* Optional site stylesheet — served at /static/site.css */
+body.site-hint::before {
+  content: "static ok";
+  display: none;
+}
