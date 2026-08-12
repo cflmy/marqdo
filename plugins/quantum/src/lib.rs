@@ -668,10 +668,11 @@ pub unsafe extern "C" fn marqdo_plugin_init(host: *const MarqdoHostApi) -> c_int
             "circuit,path,kind,qubit",
             quantum_draw_circuit as PluginFn,
         ),
-        ("quantum_gate_new", "name,theta,matrix", quantum_gate_new as PluginFn),
+        // `matrix` is optional (custom unitary); omit from required bind list.
+        ("quantum_gate_new", "name,theta", quantum_gate_new as PluginFn),
         (
             "quantum_gate_from_matrix",
-            "matrix,name",
+            "matrix",
             quantum_gate_from_matrix as PluginFn,
         ),
         (

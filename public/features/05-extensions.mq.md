@@ -28,11 +28,18 @@ marqdo ext add web
 marqdo ext add quantum
 ```
 
-- ext/llm — OpenAI-compatible chat. Design: doc/design/ext-llm.md
-- ext/agent — agent framework + native plugin. Design: doc/design/ext-agent.md
-- ext/web — HTTP / SQLite site helpers + native plugin. Design: doc/design/ext-web.md
-- ext/quantum — circuits, draw, noise, formula `matrix=` custom gates. Design: doc/design/ext-quantum.md
-- Installer: marqdo ext list / add / remove — doc/design/ext-cli.md
-- Native plugins: lib/plugin + include/marqdo_abi.h — doc/design/ext-abi.md
+Packages (not Markdown list markers — those are loops in Marqdo):
+
+ext/llm — OpenAI-compatible chat. Design: doc/design/ext-llm.md
+
+ext/agent — agent framework + native plugin. Design: doc/design/ext-agent.md
+
+ext/web — HTTP / SQLite site helpers + native plugin. Design: doc/design/ext-web.md
+
+ext/quantum — circuits, draw, noise, formula matrix custom gates. Design: doc/design/ext-quantum.md
+
+Installer: marqdo ext list / add / remove — doc/design/ext-cli.md
+
+Native plugins: lib/plugin + include/marqdo_abi.h — doc/design/ext-abi.md
 
 > print text=ext-ok

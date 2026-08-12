@@ -174,13 +174,10 @@ Circuit rail / probability bars / Bloch sphere SVG (`kind=circuit|probs|bloch`).
     + `theta`=None
     + `matrix`=None
 
-Named built-in gate (`name=H`) or custom unitary from `matrix=` (nested list / `$$` matrix fence). Optional `name=` label for custom gates (default `U`).
+Named built-in gate (`name=H`) or custom unitary from `matrix=` (nested list or formula matrix fence). Optional `name=` label for custom gates (default `U`).
 
 > ensure_plugin
-1. `matrix`
-  **> quantum_gate_from_matrix matrix=`matrix` name=`name`**
-2. *
-  **> quantum_gate_new name=`name` theta=`theta`**
+**> quantum_gate_new name=`name` theta=`theta` matrix=`matrix`**
 
 ## matrix
 

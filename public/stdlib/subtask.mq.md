@@ -6,15 +6,15 @@ description: Spawn file, function, or foreign code in parallel
 
 # main
 
-`spawn` picks **one** mode (others default to `None`):
+spawn picks one mode (others default to None):
 
-| Argument | Runs | `wait` returns |
+| Argument | Runs | wait returns |
 |----------|------|----------------|
-| `path=` | `marqdo run` child process | exit code |
-| `fn=` + optional `args=` | function in a thread (entry module) | return value |
-| `code=` | foreign ``` fence ``` subprocess | stdout text |
-| `lang=` + `source=` | foreign source subprocess | stdout text |
+| path= | marqdo run child process | exit code |
+| fn= + optional args= | function in a thread (entry module) | return value |
+| code= | foreign fence subprocess | stdout text |
+| lang= + source= | foreign source subprocess | stdout text |
 
-File children are silent unless `quiet=False`. Also: `poll id=`, `kill id=`, `wait_all`. Parent exit kills file/foreign children.
+File children are silent unless quiet=False. Also: poll id=, kill id=, wait_all. Parent exit kills file/foreign children.
 
 > print text=subtask overview ok
