@@ -43,3 +43,8 @@ spike/.pytest_cache/
 /data/
 /tmp/
 plugins/*/tmp/
+# web smoke/example DBs (cwd-relative or fixture data dirs)
+/web-fixtures/
+/tests/ext/web-fixtures/data/
+/examples/web-site/data/
+/examples/web-site-zh/data/
