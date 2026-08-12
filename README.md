@@ -97,17 +97,17 @@ marqdo catalog public -o .marqdo
 
 ---
 
-## 现状（v0.1.2）
+## 现状（v0.2.0）
 
 - 映射与解释器：Phase I 树遍历 + 字节码后端可用；金样例在 `tests/`  
 - **对象**：`#` = 类型/构造，`##`+ = 函数/方法；见 [objects.md](doc/design/objects.md)  
-- **`marqdo view`**：文档浏览器（Structure + 函数大纲/搜索 + Execution + Source）  
+- **`marqdo view`**：文档浏览器（Structure + 函数大纲/搜索 + Execution + Variables 浮窗）  
 - **`marqdo debug`**：独立调试页（断点 / 单步 / locals；默认端口 7430；页面 favicon / 品牌使用官方 Logo）  
 - **`marqdo catalog` / `sync`**：OKF 风格 YAML + 模块概念页  
 - **`marqdo version --check`**：与 GitHub 最新 release 对比  
 - 标准库：**内置于二进制**（v0.1.2+）；磁盘 `lib/` 或 `MARQDO_LIB` 可覆盖。模块含文本、文件、系统、时间、JSON、网络、数学、外联、插件、**自写回**、**子任务**  
-- **官方扩展 `ext/`**（非 stdlib）：[`ext/llm`](doc/design/ext-llm.md)；[`ext/agent`](doc/design/ext-agent.md) 智能体开发框架。安装：`marqdo ext list` / `add llm|agent` / `remove`（见 [ext-cli.md](doc/design/ext-cli.md)；默认 `~/.marqdo/ext` 或 `MARQDO_EXT`）  
-- **原生插件 ABI v1**：[`include/marqdo_abi.h`](include/marqdo_abi.h) · [ext-abi.md](doc/design/ext-abi.md)；demo `plugins/demo`  
+- **官方扩展库 `ext/`**（本版重点，**非** stdlib）：`llm` · `agent` · `web` · `quantum`。安装：`marqdo ext list` / `add …` / `remove`（见 [ext-cli.md](doc/design/ext-cli.md)；默认 `~/.marqdo/ext` 或 `MARQDO_EXT`）。原生插件先 `cargo build -p marqdo_plugin_*` 再 `ext add`。设计：[ext-llm](doc/design/ext-llm.md) · [ext-agent](doc/design/ext-agent.md) · [ext-web](doc/design/ext-web.md) · [ext-quantum](doc/design/ext-quantum.md)  
+- **原生插件 ABI**：[`include/marqdo_abi.h`](include/marqdo_abi.h) · [ext-abi.md](doc/design/ext-abi.md)；`plugins/{demo,agent,web,quantum}`  
 - **用户静态站**：`public/` → `view output` → CI 发布 [gh-pages](https://cflmy.github.io/marqdo/)  
 - **VS Code 扩展**：分支 **`vscode-extension`**（`main` 不跟踪源码；见 [vscode-extension-commit.md](doc/design/vscode-extension-commit.md)）；Release 附带 `.vsix`  
 - 选型：[ADR 0001 — Rust](doc/adr/0001-implementation-language.md)
@@ -122,7 +122,7 @@ cargo run -- view output public -o public
 powershell -File ./scripts/build-public.ps1
 ```
 
-**发布包（GitHub Releases）**：自 **v0.1.2** 起，单独 `.exe` **已内置**官方 `lib/`（`> lib/…` 可直接导入）。仍提供带 `lib/` 的 zip 便于覆盖或离线分发；`ext/` 与原生插件 `.dll` 仍须单独安装。`marqdo version --check` 可查看是否有新版本。OpenAI 兼容聊天见 [ext-llm.md](doc/design/ext-llm.md)。智能体布局见 [ext-agent.md](doc/design/ext-agent.md)。
+**发布包（GitHub Releases）**：单独二进制 **已内置**官方 `lib/`（`> lib/…` 可直接导入）。仍提供带 `lib/` 的 zip 便于覆盖或离线分发。**扩展库**用 `marqdo ext add llm|agent|web|quantum` 安装（见 [CHANGELOG](CHANGELOG.md) 与 [ext-cli.md](doc/design/ext-cli.md)）；原生 `.so`/`.dll` 需本地编译或从带 `native/` 的安装目录解析。`marqdo version --check` 可查看是否有新版本。
 
 文档：用户站 [public/](public/) · 设计 [doc/](doc/) · OKF / catalog [catalog-cli.md](doc/design/catalog-cli.md) · 调试 [view-debug.md](doc/design/view-debug.md)
 

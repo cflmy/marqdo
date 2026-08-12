@@ -7,9 +7,31 @@ description: Optional packages — not stdlib
 
 ext/ holds official optional extensions. They are not part of lib/. Resolve via MARQDO_EXT, ./ext, or ext/ next to the binary.
 
-- ext/llm — OpenAI-compatible chat object. Design: doc/design/ext-llm.md
-- ext/agent — agent development framework (layout helpers today; compose with ext/llm for model-backed orchestration). Design: doc/design/ext-agent.md
-- ext/quantum — state-vector circuits, `steps=` tables, `draw kind=circuit|probs|bloch`, named `gate` + `matches_matrix`, teaching `noise`, `barrier`/`measure`/`append`/`state`. Design: doc/design/ext-quantum.md · Q5: doc/design/ext-quantum-q5.md
+Install (v0.2+):
+
+```text
+marqdo ext list
+marqdo ext add llm
+marqdo ext add agent
+marqdo ext add web
+marqdo ext add quantum
+```
+
+For packages with a native plugin, build first then add:
+
+```text
+cargo build --release -p marqdo_plugin_agent
+cargo build --release -p marqdo_plugin_web
+cargo build --release -p marqdo_plugin_quantum
+marqdo ext add agent
+marqdo ext add web
+marqdo ext add quantum
+```
+
+- ext/llm — OpenAI-compatible chat. Design: doc/design/ext-llm.md
+- ext/agent — agent framework + native plugin. Design: doc/design/ext-agent.md
+- ext/web — HTTP / SQLite site helpers + native plugin. Design: doc/design/ext-web.md
+- ext/quantum — circuits, draw, noise, formula `matrix=` custom gates. Design: doc/design/ext-quantum.md
 - Installer: marqdo ext list / add / remove — doc/design/ext-cli.md
 - Native plugins: lib/plugin + include/marqdo_abi.h — doc/design/ext-abi.md
 

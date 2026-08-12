@@ -53,10 +53,17 @@ jobs:
           $source = "marqdo-$ver-source.zip"
           $vsix = "marqdo-$ver.vsix"
           $public = "marqdo-$ver-public.zip"
+          $extZip = "marqdo-$ver-ext.zip"
           Copy-Item target/release/marqdo.exe "dist/$exe"
           git archive --format=zip -o "dist/$source" HEAD
           ./target/release/marqdo view output public -o public
           Compress-Archive -Path public/* -DestinationPath "dist/$public" -Force
+          $stageExt = "dist/stage-ext"
+          if (Test-Path $stageExt) { Remove-Item $stageExt -Recurse -Force }
+          New-Item -ItemType Directory -Force -Path $stageExt | Out-Null
+          Copy-Item ext "$stageExt/ext" -Recurse
+          if (Test-Path "dist/$extZip") { Remove-Item "dist/$extZip" -Force }
+          Compress-Archive -Path "$stageExt/*" -DestinationPath "dist/$extZip" -Force
           $stage = "dist/stage-bundle"
           if (Test-Path $stage) { Remove-Item $stage -Recurse -Force }
           New-Item -ItemType Directory -Force -Path $stage | Out-Null
@@ -76,6 +83,7 @@ jobs:
           echo "VSIX=$vsix" >> $env:GITHUB_ENV
           echo "SOURCE=$source" >> $env:GITHUB_ENV
           echo "PUBLIC=$public" >> $env:GITHUB_ENV
+          echo "EXT=$extZip" >> $env:GITHUB_ENV
 
       - name: Upload release assets
         uses: softprops/action-gh-release@v2
@@ -83,11 +91,13 @@ jobs:
           body: |
             ## Marqdo ${{ github.ref_name }}
 
-            ### Highlights
-            - **Embedded stdlib** (v0.1.2+): `lib/*.mq.md` built into the binary
-            - **writeback** + **subtask** stdlibs
-            - **`marqdo version --check`**
-            - VSIX built from branch **`vscode-extension`** (not tracked on `main`)
+            ### Highlights — extension libraries
+            - Official **`ext/`** packages: `llm`, `agent`, `web`, `quantum` (not stdlib)
+            - Install: `marqdo ext list` / `marqdo ext add llm|agent|web|quantum`
+            - Native plugins: `cargo build --release -p marqdo_plugin_*` then `ext add`
+            - Details: [CHANGELOG](https://github.com/cflmy/marqdo/blob/main/CHANGELOG.md) · [ext-cli.md](https://github.com/cflmy/marqdo/blob/main/doc/design/ext-cli.md)
+
+            Also: embedded stdlib, writeback/subtask, Variables modal in `view`, VSIX from branch **`vscode-extension`**.
 
             ### Downloads
 
@@ -96,15 +106,17 @@ jobs:
             | `marqdo-*-windows-msvc.exe` | CLI with **embedded** official stdlib |
             | `marqdo-*-windows-msvc.zip` | `marqdo.exe` + `lib/` (optional disk override) |
             | `marqdo-*-stdlib.zip` | `lib/` only |
+            | `marqdo-*-ext.zip` | Official `ext/` L1 sources (for `MARQDO_EXT_SOURCE` / local `./ext`) |
             | `marqdo-*-source.zip` | Source snapshot (`git archive`) |
             | `marqdo-*.vsix` | VS Code / Cursor extension |
             | `marqdo-*-public.zip` | Static user docs site |
 
-            Extension workflow: [doc/design/vscode-extension-commit.md](https://github.com/cflmy/marqdo/blob/main/doc/design/vscode-extension-commit.md)
+            Extension workflow: [vscode-extension-commit.md](https://github.com/cflmy/marqdo/blob/main/doc/design/vscode-extension-commit.md)
           files: |
             dist/${{ env.EXE }}
             dist/${{ env.ZIP }}
             dist/${{ env.STDLIB }}
+            dist/${{ env.EXT }}
             dist/${{ env.VSIX }}
             dist/${{ env.SOURCE }}
             dist/${{ env.PUBLIC }}
