@@ -179,17 +179,117 @@ pub fn insert(url: &str, table: &str, rows: &Value) -> Result<Value, String> {
     Ok(json!({ "ok": true, "inserted": n }))
 }
 
-pub fn select(url: &str, table: &str, limit: i64) -> Result<Value, String> {
+fn skip_where_key(k: &str) -> bool {
+    matches!(k, "@" | "行" | "row") || k.starts_with('_')
+}
+
+fn where_op(raw: &str) -> Result<&'static str, String> {
+    match raw.trim().to_ascii_lowercase().as_str() {
+        "" | "=" | "eq" | "==" | "等于" => Ok("="),
+        "!=" | "<>" | "ne" | "不等于" => Ok("!="),
+        ">" | "gt" | "大于" => Ok(">"),
+        ">=" | "gte" | "大于等于" => Ok(">="),
+        "<" | "lt" | "小于" => Ok("<"),
+        "<=" | "lte" | "小于等于" => Ok("<="),
+        "like" | "contains" | "包含" | "匹配" => Ok("LIKE"),
+        other => Err(format!("unsupported where op `{other}`")),
+    }
+}
+
+/// Parse simple filters: map of column→value (AND `=`), or rows
+/// `{field|字段, op|操作|=, value|值}` / `{列, 值}`.
+fn parse_where(where_v: Option<&Value>) -> Result<(Vec<String>, Vec<rusqlite::types::Value>), String> {
+    let mut clauses = Vec::new();
+    let mut vals = Vec::new();
+    let Some(w) = where_v else {
+        return Ok((clauses, vals));
+    };
+    match w {
+        Value::Null => {}
+        Value::Object(m) => {
+            // Filter-row shape vs column→value map.
+            let field = m
+                .get("field")
+                .or_else(|| m.get("字段"))
+                .or_else(|| m.get("列"))
+                .map(cell_str)
+                .unwrap_or_default();
+            if !field.is_empty()
+                && (m.contains_key("value")
+                    || m.contains_key("值")
+                    || m.contains_key("op")
+                    || m.contains_key("操作"))
+            {
+                let col = ident(&field)?;
+                let op = where_op(
+                    &m.get("op")
+                        .or_else(|| m.get("操作"))
+                        .map(cell_str)
+                        .unwrap_or_default(),
+                )?;
+                let val = m
+                    .get("value")
+                    .or_else(|| m.get("值"))
+                    .cloned()
+                    .unwrap_or(Value::Null);
+                clauses.push(format!("\"{col}\" {op} ?"));
+                vals.push(to_sql(&val));
+            } else {
+                for (k, v) in m {
+                    if skip_where_key(k) {
+                        continue;
+                    }
+                    let col = ident(k)?;
+                    clauses.push(format!("\"{col}\" = ?"));
+                    vals.push(to_sql(v));
+                }
+            }
+        }
+        Value::Array(arr) => {
+            for item in arr {
+                let (c, v) = parse_where(Some(item))?;
+                clauses.extend(c);
+                vals.extend(v);
+            }
+        }
+        other => {
+            return Err(format!(
+                "where must be a map or filter table, got {}",
+                match other {
+                    Value::String(_) => "string",
+                    Value::Number(_) => "number",
+                    Value::Bool(_) => "bool",
+                    _ => "value",
+                }
+            ));
+        }
+    }
+    Ok((clauses, vals))
+}
+
+pub fn select(
+    url: &str,
+    table: &str,
+    limit: i64,
+    where_v: Option<&Value>,
+) -> Result<Value, String> {
     let table = ident(table)?;
+    let (clauses, mut vals) = parse_where(where_v)?;
     let conn = open(url)?;
-    let sql = format!("SELECT * FROM \"{table}\" LIMIT ?1");
+    let mut sql = format!("SELECT * FROM \"{table}\"");
+    if !clauses.is_empty() {
+        sql.push_str(" WHERE ");
+        sql.push_str(&clauses.join(" AND "));
+    }
+    sql.push_str(&format!(" LIMIT ?{}", vals.len() + 1));
+    vals.push(rusqlite::types::Value::Integer(limit));
     let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
     let names: Vec<String> = (0..stmt.column_count())
         .map(|i| stmt.column_name(i).unwrap_or("?").to_string())
         .collect();
     let mut rows = Vec::new();
     let mut rows_iter = stmt
-        .query(rusqlite::params![limit])
+        .query(params_from_iter(vals.iter().cloned()))
         .map_err(|e| e.to_string())?;
     while let Some(r) = rows_iter.next().map_err(|e| e.to_string())? {
         let mut m = Map::new();

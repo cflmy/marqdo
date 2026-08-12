@@ -97,8 +97,10 @@ Style tables live as `##` exports in site style modules; compose resolves them b
     + `where`=None
     + `limit`=200
 
+Simple filters: one-row map of column→value (AND `=`), or rows `|字段|操作|值|` (`=` `!=` `>` `>=` `<` `<=` `like`).
+
 *`url` = > json.get value=`self` key=url *
-*`r` = > web_db_select url=`url` table=`table` limit=`limit` *
+*`r` = > web_db_select url=`url` table=`table` where=`where` limit=`limit` *
 **> json.get value=`r` key=rows**
 
 ## get

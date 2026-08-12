@@ -77,7 +77,7 @@ fn resolve_links(raw: Option<&Value>, db_url: Option<&str>) -> Vec<(String, Stri
         let Some(table) = table else {
             return Vec::new();
         };
-        let Ok(data) = db::select(url, &table, 200) else {
+        let Ok(data) = db::select(url, &table, 200, None) else {
             return Vec::new();
         };
         let rows = data
@@ -149,7 +149,7 @@ fn resolve_main(args: &Value, db_url: Option<&str>) -> (String, Vec<Map<String, 
     let Some(table) = crate::table::bind_table_name(&arr) else {
         return (intro, Vec::new());
     };
-    let Ok(data) = db::select(url, &table, 200) else {
+    let Ok(data) = db::select(url, &table, 200, None) else {
         return (intro, Vec::new());
     };
     let rows = data

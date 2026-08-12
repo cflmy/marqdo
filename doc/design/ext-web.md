@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| 状态 | **Accepted · 实现中**（页面装配 / db CRUD / form §5.5 / 表单嵌入主区 / admin / `app.route` 已落地） |
+| 状态 | **Accepted · 实现中**（页面装配 / db CRUD+`select where` / form §5.5 / 表单嵌入 / admin / `app.route` / 路由 `/_part` 已落地） |
 | 日期 | 2026-08-11 |
 | 相关 | [markdown-mapping.md](markdown-mapping.md) · [module-namespace.md](module-namespace.md) · [objects.md](objects.md) · [ext-abi.md](ext-abi.md) · [ext-cli.md](ext-cli.md) · [stdlib-i18n.md](stdlib-i18n.md) |
 | 安装（目标） | `marqdo ext add web`（中英：`web` / `网页`） |
@@ -580,8 +580,7 @@ submit  → action=insert → db.insert；action=update → db.update
 - Postgres / Redis / S3 驱动细节（SQLite 先落地）；  
 - 复杂权限与多租户；  
 - 子页路由糖的更多约定（`# 应用.route` 已够用）；  
-- `/admin` 的视觉与交互细化（CRUD/表单必须走 §5.3–§5.5；UI 可后做）；  
-- 表单嵌入页面槽位的更多版式（§5.5.4 初版先独立挂载）。
+- `/admin` 的视觉与交互细化（CRUD/表单必须走 §5.3–§5.5；UI 可后做）。
 
 ---
 

@@ -279,7 +279,7 @@ async fn admin_table(State(st): State<Arc<AppState>>, Path(table): Path<String>)
         return r;
     }
     let url = st.db_url.as_deref().unwrap();
-    let Ok(data) = db::select(url, &table, 200) else {
+    let Ok(data) = db::select(url, &table, 200, None) else {
         return Html(format!("<p>cannot read {table}</p>")).into_response();
     };
     let rows = data

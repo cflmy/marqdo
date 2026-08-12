@@ -11,6 +11,8 @@ description: Schema-derived admin forms share validate/submit (offline).
 *`store` = > web.db url="sqlite:web-fixtures/data/admin-smoke.db" *
 *`schema` = > articles.schema *
 > `store`.init name=articles fields=`schema`
+> `store`.exec sql="DELETE FROM articles"
+> `store`.exec sql="DELETE FROM sqlite_sequence WHERE name='articles'"
 *`url` = > json.get value=`store` key=url *
 
 *`info` = > web_db_table_info url=`url` table=articles *

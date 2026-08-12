@@ -283,7 +283,18 @@ web_ffi!(web_db_select, |args: &Value| {
         .get("limit")
         .and_then(|v| v.as_i64())
         .unwrap_or(200);
-    db::select(&url, &table, limit)
+    let where_v = match args.get("where") {
+        None | Some(Value::Null) => None,
+        Some(Value::String(s))
+            if s.is_empty()
+                || s.eq_ignore_ascii_case("none")
+                || s.eq_ignore_ascii_case("null") =>
+        {
+            None
+        }
+        Some(v) => Some(v),
+    };
+    db::select(&url, &table, limit, where_v)
 });
 
 web_ffi!(web_db_get, |args: &Value| {
@@ -625,7 +636,11 @@ pub unsafe extern "C" fn marqdo_plugin_init(host: *const MarqdoHostApi) -> c_int
         ("web_db_new", "url", web_db_new as PluginFn),
         ("web_db_init", "url,name,fields", web_db_init as PluginFn),
         ("web_db_insert", "url,table,rows", web_db_insert as PluginFn),
-        ("web_db_select", "url,table,limit", web_db_select as PluginFn),
+        (
+            "web_db_select",
+            "url,table,where,limit",
+            web_db_select as PluginFn,
+        ),
         ("web_db_get", "url,table,id", web_db_get as PluginFn),
         ("web_db_update", "url,table,id,row", web_db_update as PluginFn),
         ("web_db_delete", "url,table,id", web_db_delete as PluginFn),
