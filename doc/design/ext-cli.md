@@ -50,7 +50,7 @@ Future optional ext domains get their own subdirs (e.g. `ext/web/`, `ext/quantum
 | `llm` | `ai/llm.mq.md`, `ai/大模型.mq.md` |
 | `agent` | `ai/agent.mq.md`, `ai/智能体.mq.md`, **`native/libagent.so`** (or `.dylib`) |
 | `web` | `web/web.mq.md`, `web/网页.mq.md`, **`native/libweb.so`** — 见 [ext-web.md](ext-web.md) · [roadmap](../roadmap/ext-web.md) |
-| `quantum`（规划） | `quantum/quantum.mq.md`, `quantum/量子.mq.md`, **`native/libquantum.so`** — 见 [ext-quantum.md](../roadmap/ext-quantum.md) |
+| `quantum`（规划） | `quantum/quantum.mq.md`, `quantum/量子.mq.md`, **`native/libquantum.so`** — 见 [ext-quantum.md](ext-quantum.md) · [roadmap](../roadmap/ext-quantum.md) |
 
 `add agent` copies the built native plugin into `MARQDO_EXT/native/`. Build it first:
 
