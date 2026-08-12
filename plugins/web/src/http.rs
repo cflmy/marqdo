@@ -74,7 +74,7 @@ pub fn listen(
 
     let mut app = Router::new()
         .route("/", get(home))
-        .route("/_part/{id}", get(part))
+        .route("/_part/{id}", get(home_part))
         .route("/_form/{id}", get(form_get).post(form_post))
         .route("/admin", get(admin_home))
         .route("/admin/{table}", get(admin_table))
@@ -85,11 +85,13 @@ pub fn listen(
         )
         .route("/admin/{table}/{id}/delete", get(admin_delete));
 
-    // Register each author route as an exact GET path.
+    // Register each author route as an exact GET path + `{path}/_part/{id}`.
     let mut paths: Vec<String> = routes.keys().cloned().collect();
     paths.sort();
     for path in paths {
         app = app.route(&path, get(routed_page));
+        let part_path = format!("{path}/_part/{{id}}");
+        app = app.route(&part_path, get(routed_part));
     }
 
     let app = app.with_state(state);
@@ -127,15 +129,38 @@ async fn routed_page(State(st): State<Arc<AppState>>, uri: Uri) -> Response {
     Html(render::render_page(page, st.db_url.as_deref())).into_response()
 }
 
-async fn part(State(st): State<Arc<AppState>>, Path(id): Path<String>) -> Response {
-    let Some(parts) = st.page.get("parts").and_then(|v| v.as_object()) else {
+fn render_part_from_page(page: &Value, id: &str, db_url: Option<&str>) -> Response {
+    let Some(parts) = page.get("parts").and_then(|v| v.as_object()) else {
         return Html(String::from("<p>no parts</p>")).into_response();
     };
-    let Some(cfg) = parts.get(&id) else {
+    let Some(cfg) = parts.get(id) else {
         return Html(format!("<p>unknown part {id}</p>")).into_response();
     };
-    let html = render::render_fragment(cfg, st.db_url.as_deref());
-    Html(html).into_response()
+    Html(render::render_fragment(cfg, db_url)).into_response()
+}
+
+async fn home_part(State(st): State<Arc<AppState>>, Path(id): Path<String>) -> Response {
+    render_part_from_page(&st.page, &id, st.db_url.as_deref())
+}
+
+/// `{route}/_part/{id}` — resolve part against the page mounted at `route`.
+async fn routed_part(
+    State(st): State<Arc<AppState>>,
+    uri: Uri,
+    Path(id): Path<String>,
+) -> Response {
+    let full = uri.path();
+    let marker = format!("/_part/{id}");
+    let Some(page_path) = full.strip_suffix(&marker) else {
+        return Html(format!("<p>bad part path {}</p>", esc(full))).into_response();
+    };
+    if page_path.is_empty() || page_path == "/" {
+        return render_part_from_page(&st.page, &id, st.db_url.as_deref());
+    }
+    let Some(page) = st.routes.get(page_path) else {
+        return Html(format!("<p>404 not found: {}</p>", esc(page_path))).into_response();
+    };
+    render_part_from_page(page, &id, st.db_url.as_deref())
 }
 
 async fn form_get(State(st): State<Arc<AppState>>, Path(id): Path<String>) -> Response {

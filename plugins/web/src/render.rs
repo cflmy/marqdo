@@ -177,7 +177,25 @@ fn field_css(obj: &Map<String, Value>, field: &str) -> String {
         .to_string()
 }
 
-fn slot_attrs(slot: &str, parts: &Map<String, Value>) -> String {
+fn part_src_prefix(args: &Value) -> String {
+    match args.get("_route").and_then(|v| v.as_str()) {
+        Some(r) if !r.is_empty() && r != "/" => {
+            let mut p = r.to_string();
+            while p.len() > 1 && p.ends_with('/') {
+                p.pop();
+            }
+            if p.starts_with('/') {
+                p
+            } else {
+                format!("/{p}")
+            }
+        }
+        _ => String::new(),
+    }
+}
+
+fn slot_attrs(slot: &str, parts: &Map<String, Value>, page: &Value) -> String {
+    let prefix = part_src_prefix(page);
     let mut a = format!(" data-slot=\"{}\"", esc(slot));
     for (id, cfg) in parts {
         let s = cfg
@@ -186,7 +204,11 @@ fn slot_attrs(slot: &str, parts: &Map<String, Value>) -> String {
             .and_then(|v| v.as_str())
             .unwrap_or("");
         if s == slot || (slot == "sidebar" && id == "side") || (slot == "main" && id == "index") {
-            a.push_str(&format!(" data-slot-src=\"/_part/{}\"", esc(id)));
+            a.push_str(&format!(
+                " data-slot-src=\"{}/_part/{}\"",
+                esc(&prefix),
+                esc(id)
+            ));
             break;
         }
     }
@@ -324,22 +346,22 @@ pub fn render_page_ex(
 </body></html>"#,
         title = esc(title),
         nav_class = slot_class(args, "nav", "topnav"),
-        nav_attrs = slot_attrs("nav", &parts),
+        nav_attrs = slot_attrs("nav", &parts, args),
         nav_ul = render_ul(&nav, "nav"),
         side_html = if has_side {
             format!(
                 "<aside class=\"{}\"{}><span class=\"side-label\">侧栏</span>{}</aside>",
                 slot_class(args, "sidebar", "side"),
-                slot_attrs("sidebar", &parts),
+                slot_attrs("sidebar", &parts, args),
                 render_ul(&side, "side-nav")
             )
         } else {
             String::new()
         },
         main_class = slot_class(args, "main", "main"),
-        main_attrs = slot_attrs("main", &parts),
+        main_attrs = slot_attrs("main", &parts, args),
         foot_class = slot_class(args, "footer", "foot"),
-        foot_attrs = slot_attrs("footer", &parts),
+        foot_attrs = slot_attrs("footer", &parts, args),
         foot_ul = render_ul(&foot, "foot-nav"),
     )
 }

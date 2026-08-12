@@ -198,6 +198,6 @@ Register `GET|POST /_form/{id}` for listen when the form is not already embedded
 
 ## listen
 
-Serve `/`, routed pages, `/_part/{id}`, `/_form/{id}` (from mounts + page embeds), and optional `/admin`.
+Serve `/`, routed pages, `/_part/{id}` (home) and `{path}/_part/{id}` (routes), `/_form/{id}` (from mounts + page embeds), and optional `/admin`.
 
 **> web_listen app=`self`**

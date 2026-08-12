@@ -378,10 +378,14 @@ fn normalize_route_path(raw: &str) -> Result<String, String> {
 web_ffi!(web_app_route, |args: &Value| {
     let mut app = args.get("app").cloned().unwrap_or(json!({}));
     let path = normalize_route_path(arg_str(args, "path")?)?;
-    let page = args
+    let mut page = args
         .get("page")
         .cloned()
         .ok_or_else(|| "missing `page` for route".to_string())?;
+    // Stamp mount path so render can emit `{path}/_part/{id}` slot sources.
+    if let Some(obj) = page.as_object_mut() {
+        obj.insert("_route".into(), json!(&path));
+    }
     let obj = app
         .as_object_mut()
         .ok_or_else(|| "app must be a map".to_string())?;

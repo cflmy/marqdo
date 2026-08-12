@@ -1310,6 +1310,22 @@ render-ok",
 }
 
 #[test]
+fn ext_web_part_smoke() {
+    let status = Command::new("cargo")
+        .args(["build", "-p", "marqdo_plugin_web"])
+        .current_dir(env!("CARGO_MANIFEST_DIR"))
+        .status()
+        .expect("build web plugin");
+    assert!(status.success(), "failed to build marqdo_plugin_web");
+    assert_out(
+        "tests/ext/web-part-smoke.mq.md",
+        "route-stamp-ok
+home-part-ok
+route-part-ok",
+    );
+}
+
+#[test]
 fn ext_agent_framework_smoke() {
     let status = Command::new("cargo")
         .args(["build", "-p", "marqdo_plugin_agent"])

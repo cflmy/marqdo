@@ -352,7 +352,7 @@ title: 站点
 **英文：** `# app` · `## route` · `## listen` · 形参 `page` `db` `admin` `host` `port`  
 **中文：** `# 应用` · `## 路由` · `## 监听` · 形参 `页面` `数据库` `后台` `主机` `端口`
 
-`listen` / `监听`：加载插件、注入 `db_url`、按页面 part 提供 `/_part/{id}`、启动 HTTP。作者不必手写 part 注册。
+`listen` / `监听`：加载插件、注入 `db_url`、按页面 part 提供 `/_part/{id}`（首页）与 `{path}/_part/{id}`（`app.route` 页）、启动 HTTP。作者不必手写 part 注册。
 
 ### 5.5 表单 · `form` / `表单`（规划锁定）
 
