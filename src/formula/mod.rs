@@ -22,6 +22,11 @@ pub enum Expr {
         name: String,
         args: Vec<Expr>,
     },
+    /// Matrix from a `$$` fence (LaTeX / `[[…]]`). `source` is for display; `rows` for eval/JSON.
+    Matrix {
+        source: String,
+        rows: Vec<Vec<f64>>,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -80,6 +85,7 @@ impl Expr {
                 let joined: Vec<String> = args.iter().map(|a| a.as_display()).collect();
                 format!("{name}({})", joined.join(", "))
             }
+            Expr::Matrix { source, .. } => source.clone(),
         }
     }
 }
@@ -383,6 +389,10 @@ pub fn simplify(e: &Expr) -> Expr {
                 args,
             }
         }
+        Expr::Matrix { source, rows } => Expr::Matrix {
+            source: source.clone(),
+            rows: rows.clone(),
+        },
     }
 }
 
@@ -671,6 +681,7 @@ fn diff_raw(e: &Expr, var: &str) -> Expr {
                 _ => Expr::Num(0.0),
             }
         }
+        Expr::Matrix { .. } => Expr::Num(0.0),
     }
 }
 
@@ -697,6 +708,10 @@ fn subs_raw(e: &Expr, var: &str, value: &Expr) -> Expr {
         Expr::Call { name, args } => Expr::Call {
             name: name.clone(),
             args: args.iter().map(|a| subs_raw(a, var, value)).collect(),
+        },
+        Expr::Matrix { source, rows } => Expr::Matrix {
+            source: source.clone(),
+            rows: rows.clone(),
         },
     }
 }
@@ -732,6 +747,7 @@ pub fn eval_f64(e: &Expr, env: &HashMap<String, f64>) -> Result<f64, String> {
             }
             eval_call_f64(name, &xs).ok_or_else(|| format!("unknown or arity-mismatch function `{name}`"))
         }
+        Expr::Matrix { .. } => Err("cannot evaluate matrix as a scalar".into()),
     }
 }
 
@@ -936,6 +952,318 @@ fn push_unique(xs: &mut Vec<f64>, x: f64) {
     xs.push(x);
 }
 
+/// True if `$$` body looks like a matrix (ASCII `[[` or LaTeX pmatrix/bmatrix).
+pub fn looks_like_matrix(input: &str) -> bool {
+    let t = input.trim();
+    t.contains("[[")
+        || t.contains("\\begin{pmatrix}")
+        || t.contains("\\begin{bmatrix}")
+        || t.contains("\\begin{matrix}")
+}
+
+fn replace_latex_cmd(s: &str, cmd: &str, open: char, close: char) -> Result<String, String> {
+    let needle = format!("\\{cmd}");
+    let mut out = String::new();
+    let mut i = 0;
+    let bytes = s.as_bytes();
+    while i < s.len() {
+        if s[i..].starts_with(&needle) {
+            i += needle.len();
+            while i < s.len() && bytes[i].is_ascii_whitespace() {
+                i += 1;
+            }
+            if i >= s.len() || s[i..].chars().next() != Some(open) {
+                return Err(format!("\\{cmd} needs `{{{open}…{close}}}`"));
+            }
+            i += open.len_utf8();
+            let start = i;
+            let mut depth = 1;
+            while i < s.len() {
+                let c = s[i..].chars().next().unwrap();
+                if c == open {
+                    depth += 1;
+                } else if c == close {
+                    depth -= 1;
+                    if depth == 0 {
+                        break;
+                    }
+                }
+                i += c.len_utf8();
+            }
+            if depth != 0 {
+                return Err(format!("unclosed \\{cmd}{{…}}"));
+            }
+            let inner = &s[start..i];
+            i += close.len_utf8();
+            let inner_norm = normalize_latex_math(inner)?;
+            match cmd {
+                "frac" => {
+                    // frac has two braced args — this helper only got first; handled separately
+                    out.push_str(&inner_norm);
+                }
+                "sqrt" => {
+                    out.push_str("sqrt(");
+                    out.push_str(&inner_norm);
+                    out.push(')');
+                }
+                _ => out.push_str(&inner_norm),
+            }
+        } else {
+            let c = s[i..].chars().next().unwrap();
+            out.push(c);
+            i += c.len_utf8();
+        }
+    }
+    Ok(out)
+}
+
+fn normalize_frac(s: &str) -> Result<String, String> {
+    let mut out = String::new();
+    let mut i = 0;
+    while i < s.len() {
+        if s[i..].starts_with("\\frac") {
+            i += "\\frac".len();
+            while i < s.len() && s.as_bytes()[i].is_ascii_whitespace() {
+                i += 1;
+            }
+            let (num, ni) = read_brace_group(s, i)?;
+            i = ni;
+            while i < s.len() && s.as_bytes()[i].is_ascii_whitespace() {
+                i += 1;
+            }
+            let (den, di) = read_brace_group(s, i)?;
+            i = di;
+            let num = normalize_latex_math(&num)?;
+            let den = normalize_latex_math(&den)?;
+            out.push_str(&format!("(({num})/({den}))"));
+        } else {
+            let c = s[i..].chars().next().unwrap();
+            out.push(c);
+            i += c.len_utf8();
+        }
+    }
+    Ok(out)
+}
+
+fn read_brace_group(s: &str, mut i: usize) -> Result<(String, usize), String> {
+    if i >= s.len() || !s[i..].starts_with('{') {
+        return Err("expected `{` group".into());
+    }
+    i += 1;
+    let start = i;
+    let mut depth = 1;
+    while i < s.len() {
+        let c = s[i..].chars().next().unwrap();
+        if c == '{' {
+            depth += 1;
+        } else if c == '}' {
+            depth -= 1;
+            if depth == 0 {
+                let inner = s[start..i].to_string();
+                return Ok((inner, i + 1));
+            }
+        }
+        i += c.len_utf8();
+    }
+    Err("unclosed `{`".into())
+}
+
+fn normalize_begin_matrix(s: &str) -> Result<String, String> {
+    let envs = ["pmatrix", "bmatrix", "matrix"];
+    let mut out = String::new();
+    let mut i = 0;
+    while i < s.len() {
+        let mut matched = false;
+        for env in envs {
+            let open = format!("\\begin{{{env}}}");
+            let close = format!("\\end{{{env}}}");
+            if s[i..].starts_with(&open) {
+                i += open.len();
+                let start = i;
+                let Some(rel) = s[i..].find(&close) else {
+                    return Err(format!("missing \\end{{{env}}}"));
+                };
+                let body = s[start..start + rel].trim();
+                i = start + rel + close.len();
+                let body = normalize_latex_math(body)?;
+                let rows: Vec<&str> = body
+                    .split("\\\\")
+                    .map(|r| r.trim())
+                    .filter(|r| !r.is_empty())
+                    .collect();
+                let mut mat = String::from("[[");
+                for (ri, row) in rows.iter().enumerate() {
+                    if ri > 0 {
+                        mat.push_str("],[");
+                    }
+                    let cells: Vec<&str> = row.split('&').map(|c| c.trim()).collect();
+                    for (ci, cell) in cells.iter().enumerate() {
+                        if ci > 0 {
+                            mat.push(',');
+                        }
+                        mat.push_str(cell);
+                    }
+                }
+                mat.push_str("]]");
+                // Implicit multiply if previous token is `)` / digit / `}`
+                if out
+                    .chars()
+                    .rev()
+                    .find(|c| !c.is_whitespace())
+                    .is_some_and(|c| c.is_ascii_alphanumeric() || c == ')' || c == '}')
+                {
+                    out.push('*');
+                }
+                out.push_str(&mat);
+                matched = true;
+                break;
+            }
+        }
+        if !matched {
+            let c = s[i..].chars().next().unwrap();
+            out.push(c);
+            i += c.len_utf8();
+        }
+    }
+    Ok(out)
+}
+
+fn normalize_latex_math(s: &str) -> Result<String, String> {
+    let s = s.replace('\n', " ");
+    let s = normalize_frac(&s)?;
+    let s = replace_latex_cmd(&s, "sqrt", '{', '}')?;
+    let s = normalize_begin_matrix(&s)?;
+    // leftover common no-ops
+    let s = s.replace("\\left", "").replace("\\right", "");
+    Ok(s)
+}
+
+fn eval_cell(expr: &str) -> Result<f64, String> {
+    let e = parse(expr.trim())?;
+    eval_f64(&simplify(&e), &HashMap::new())
+}
+
+fn parse_bracket_matrix(s: &str) -> Result<Vec<Vec<f64>>, String> {
+    let t = s.trim();
+    if !t.starts_with("[[") || !t.ends_with("]]") {
+        return Err("matrix must look like [[…],[…]]".into());
+    }
+    let inner = &t[2..t.len() - 2];
+    // Split rows on "],[" at top level
+    let mut rows_s: Vec<String> = Vec::new();
+    let mut cur = String::new();
+    let mut depth = 0i32;
+    let chars: Vec<char> = inner.chars().collect();
+    let mut i = 0;
+    while i < chars.len() {
+        if chars[i] == ']'
+            && depth == 0
+            && i + 2 < chars.len()
+            && chars[i + 1] == ','
+            && chars[i + 2] == '['
+        {
+            rows_s.push(cur.clone());
+            cur.clear();
+            i += 3;
+            continue;
+        }
+        let c = chars[i];
+        if c == '[' {
+            depth += 1;
+        } else if c == ']' {
+            depth -= 1;
+        }
+        cur.push(c);
+        i += 1;
+    }
+    rows_s.push(cur);
+    let mut rows = Vec::new();
+    for row in rows_s {
+        let row = row.trim().trim_matches(|c| c == '[' || c == ']');
+        let mut cells = Vec::new();
+        let mut cell = String::new();
+        let mut depth = 0i32;
+        for c in row.chars() {
+            match c {
+                '(' | '[' => {
+                    depth += 1;
+                    cell.push(c);
+                }
+                ')' | ']' => {
+                    depth -= 1;
+                    cell.push(c);
+                }
+                ',' if depth == 0 => {
+                    cells.push(eval_cell(&cell)?);
+                    cell.clear();
+                }
+                _ => cell.push(c),
+            }
+        }
+        if !cell.trim().is_empty() {
+            cells.push(eval_cell(&cell)?);
+        }
+        if cells.is_empty() {
+            return Err("empty matrix row".into());
+        }
+        rows.push(cells);
+    }
+    if rows.is_empty() {
+        return Err("empty matrix".into());
+    }
+    let w = rows[0].len();
+    if rows.iter().any(|r| r.len() != w) {
+        return Err("matrix rows must have equal length".into());
+    }
+    Ok(rows)
+}
+
+fn scale_matrix(m: &[Vec<f64>], s: f64) -> Vec<Vec<f64>> {
+    m.iter()
+        .map(|row| row.iter().map(|x| x * s).collect())
+        .collect()
+}
+
+/// Parse ASCII / LaTeX matrix source into numeric rows (constant-fold cells).
+pub fn parse_eval_matrix(input: &str) -> Result<Vec<Vec<f64>>, String> {
+    let norm = normalize_latex_math(input)?.trim().to_string();
+    // scalar * [[…]] or [[…]] * scalar or bare [[…]]
+    if let Some(idx) = norm.find("[[") {
+        let before = norm[..idx].trim();
+        let rest = &norm[idx..];
+        let end = rest
+            .rfind("]]")
+            .ok_or_else(|| "unclosed [[ matrix".to_string())?;
+        let mat_s = &rest[..=end + 1];
+        let after = rest[end + 2..].trim();
+        let mat = parse_bracket_matrix(mat_s)?;
+        let mut scale = 1.0;
+        if before.ends_with('*') {
+            let expr = before.trim_end_matches('*').trim();
+            if !expr.is_empty() {
+                scale *= eval_cell(expr)?;
+            }
+        } else if !before.is_empty() {
+            return Err(format!("unexpected prefix before matrix: `{before}`"));
+        }
+        if after.starts_with('*') {
+            let expr = after.trim_start_matches('*').trim();
+            if !expr.is_empty() {
+                scale *= eval_cell(expr)?;
+            }
+        } else if !after.is_empty() {
+            return Err(format!("unexpected suffix after matrix: `{after}`"));
+        }
+        Ok(if (scale - 1.0).abs() < 1e-15 {
+            mat
+        } else {
+            scale_matrix(&mat, scale)
+        })
+    } else {
+        Err("no [[…]] matrix found after LaTeX normalize".into())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -957,5 +1285,25 @@ mod tests {
         let mut env = HashMap::new();
         env.insert("x".into(), 0.0);
         assert!((eval_f64(&e, &env).unwrap()).abs() < 1e-12);
+    }
+
+    #[test]
+    fn latex_hadamard_matrix() {
+        let m = parse_eval_matrix(
+            r"\frac{1}{\sqrt{2}}\begin{pmatrix}1&1\\1&-1\end{pmatrix}",
+        )
+        .unwrap();
+        let s = std::f64::consts::FRAC_1_SQRT_2;
+        assert_eq!(m.len(), 2);
+        assert!((m[0][0] - s).abs() < 1e-12);
+        assert!((m[0][1] - s).abs() < 1e-12);
+        assert!((m[1][0] - s).abs() < 1e-12);
+        assert!((m[1][1] + s).abs() < 1e-12);
+    }
+
+    #[test]
+    fn ascii_pauli_z() {
+        let m = parse_eval_matrix("[[1,0],[0,-1]]").unwrap();
+        assert_eq!(m, vec![vec![1.0, 0.0], vec![0.0, -1.0]]);
     }
 }

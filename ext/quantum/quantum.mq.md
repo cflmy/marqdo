@@ -118,6 +118,14 @@ Append another circuit's ops or a `{gate,qubits}` op map.
 
 **> quantum_append circuit=`self` op=`op`**
 
+## apply
+    + `gate`
+    + `qubits`=0
+
+Apply a gate handle (named or custom `matrix=`) on `qubits` (int or list).
+
+**> quantum_apply circuit=`self` gate=`gate` qubits=`qubits`**
+
 ## noise
     + `kind`
     + `p`
@@ -162,13 +170,17 @@ Circuit rail / probability bars / Bloch sphere SVG (`kind=circuit|probs|bloch`).
 **> quantum_draw_circuit circuit=`self` path=`path` kind=`kind` qubit=`qubit`**
 
 # gate
-    + `name`
+    + `name`=None
     + `theta`=None
+    + `matrix`=None
 
-Named gate handle (built-in unitary). Use `matches_matrix` to check an author-supplied matrix.
+Named built-in gate (`name=H`) or custom unitary from `matrix=` (nested list / `$$` matrix fence). Optional `name=` label for custom gates (default `U`).
 
 > ensure_plugin
-**> quantum_gate_new name=`name` theta=`theta`**
+1. `matrix`
+  **> quantum_gate_from_matrix matrix=`matrix` name=`name`**
+2. *
+  **> quantum_gate_new name=`name` theta=`theta`**
 
 ## matrix
 

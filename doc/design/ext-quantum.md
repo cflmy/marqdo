@@ -131,7 +131,7 @@ marqdo ext add quantum
 
 ### 4.3 公式面（对齐 math 精神，不抢 math 实现）
 
-允许用 `` `G` = `` + `$$…$$` 书写门矩阵或态（**展示 + 教学核对**）：
+允许用 `` `G` = `` + `$$…$$` 书写门矩阵（**可执行**，见 [ext-quantum-custom-gate.md](ext-quantum-custom-gate.md)）：
 
 ````markdown
 `H_matrix` =
@@ -139,16 +139,14 @@ $$
 \frac{1}{\sqrt{2}}\begin{pmatrix}1&1\\1&-1\end{pmatrix}
 $$
 
-*`H` = > quantum.gate name=H *
+*`U` = > quantum.gate matrix=`H_matrix` *
+*`qc` = > `qc`.apply gate=`U` qubits=0 *
 *`ok` = > `H`.matches_matrix matrix=`H_matrix` *
 ````
 
-- v1：**具名门**以插件内置酉矩阵为准；`matches_matrix` 为可选数值核对（容差）。  
-- 叙述区无名 `$$` 仍只是注释（同 [stdlib-math.md](stdlib-math.md) §2.4）。  
-- **不**要求核心 `Value::Formula` 理解量子；矩阵核对可走「公式 ASCII/LaTeX → 插件解析子集」或作者显式 `matrix=` 表。
-
-**v1 优先路径：** 电路用**表 + 方法**；`$$` 作文档展示；矩阵核对可放 **Q3**。
-
+- v1：**具名门**以插件内置酉矩阵为准；`matrix=` 可从嵌套 list / `$$` 矩阵围栏构造自定义门。  
+- `$$` 含 `[[…]]` 或 `\begin{pmatrix}` 时解析期求值为数值 list；标量公式仍为 `Formula`。  
+- `matches_matrix` 仍可用于核对。
 ---
 
 ## 5. 作者面 API（锁定草图）

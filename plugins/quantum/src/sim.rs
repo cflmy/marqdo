@@ -290,6 +290,96 @@ pub struct Op {
     pub gate: String,
     pub qubits: Vec<usize>,
     pub theta: Option<f64>,
+    /// Custom unitary (row-major). When set, overrides named-gate dispatch.
+    pub matrix: Option<Vec<Vec<C>>>,
+}
+
+pub fn op_to_json(op: &Op) -> Value {
+    let mut m = json!({
+        "gate": op.gate,
+        "qubits": op.qubits,
+    });
+    if let Some(t) = op.theta {
+        m.as_object_mut()
+            .unwrap()
+            .insert("theta".into(), json!(t));
+    }
+    if let Some(ref mat) = op.matrix {
+        m.as_object_mut()
+            .unwrap()
+            .insert("matrix".into(), matrix_to_json(mat));
+    }
+    m
+}
+
+fn parse_op_row(row: &Value) -> Result<Op, String> {
+    let gate = row
+        .get("gate")
+        .or_else(|| row.get("门"))
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| "op missing gate".to_string())?
+        .to_ascii_uppercase();
+    let qubits = match row.get("qubits").or_else(|| row.get("比特")) {
+        Some(Value::Array(a)) => a
+            .iter()
+            .map(|v| {
+                v.as_u64()
+                    .or_else(|| v.as_i64().map(|i| i as u64))
+                    .ok_or_else(|| "bad qubit index".to_string())
+                    .map(|u| u as usize)
+            })
+            .collect::<Result<Vec<_>, _>>()?,
+        Some(Value::Number(n)) => {
+            let u = n.as_u64().or_else(|| n.as_i64().map(|i| i as u64)).unwrap() as usize;
+            vec![u]
+        }
+        Some(Value::String(s)) => {
+            let t = s.trim();
+            if t.is_empty() {
+                vec![]
+            } else {
+                parse_qubit_list(s)?
+            }
+        }
+        Some(Value::Null) => vec![],
+        None => {
+            if is_meta_gate(&gate) {
+                vec![]
+            } else if let Some(q) = row
+                .get("qubit")
+                .and_then(|v| v.as_u64().or_else(|| v.as_i64().map(|i| i as u64)))
+            {
+                vec![q as usize]
+            } else if let (Some(c), Some(t)) = (
+                row.get("control")
+                    .or_else(|| row.get("控制"))
+                    .and_then(|v| v.as_u64().or_else(|| v.as_i64().map(|i| i as u64))),
+                row.get("target")
+                    .or_else(|| row.get("目标"))
+                    .and_then(|v| v.as_u64().or_else(|| v.as_i64().map(|i| i as u64))),
+            ) {
+                vec![c as usize, t as usize]
+            } else {
+                return Err(format!("op `{gate}` missing qubits"));
+            }
+        }
+        _ => return Err(format!("op `{gate}` bad qubits")),
+    };
+    let theta = row
+        .get("theta")
+        .or_else(|| row.get("参数"))
+        .or_else(|| row.get("params"))
+        .and_then(|v| parse_theta_value(v).ok().flatten());
+    let matrix = match row.get("matrix").or_else(|| row.get("矩阵")) {
+        None | Some(Value::Null) => None,
+        Some(v) => Some(parse_matrix(v)?),
+    };
+    Ok(Op {
+        gate,
+        qubits,
+        theta,
+        matrix,
+    })
 }
 
 pub fn parse_ops(circuit: &Value) -> Result<Vec<Op>, String> {
@@ -300,64 +390,7 @@ pub fn parse_ops(circuit: &Value) -> Result<Vec<Op>, String> {
         .unwrap_or_default();
     let mut out = Vec::new();
     for row in arr {
-        let gate = row
-            .get("gate")
-            .or_else(|| row.get("门"))
-            .and_then(|v| v.as_str())
-            .ok_or_else(|| "op missing gate".to_string())?
-            .to_ascii_uppercase();
-        let qubits = match row.get("qubits").or_else(|| row.get("比特")) {
-            Some(Value::Array(a)) => a
-                .iter()
-                .map(|v| {
-                    v.as_u64()
-                        .or_else(|| v.as_i64().map(|i| i as u64))
-                        .ok_or_else(|| "bad qubit index".to_string())
-                        .map(|u| u as usize)
-                })
-                .collect::<Result<Vec<_>, _>>()?,
-            Some(Value::Number(n)) => {
-                let u = n.as_u64().or_else(|| n.as_i64().map(|i| i as u64)).unwrap() as usize;
-                vec![u]
-            }
-            Some(Value::String(s)) => {
-                let t = s.trim();
-                if t.is_empty() {
-                    vec![]
-                } else {
-                    parse_qubit_list(s)?
-                }
-            }
-            Some(Value::Null) => vec![],
-            None => {
-                if is_meta_gate(&gate) {
-                    vec![]
-                } else if let Some(q) = row
-                    .get("qubit")
-                    .and_then(|v| v.as_u64().or_else(|| v.as_i64().map(|i| i as u64)))
-                {
-                    vec![q as usize]
-                } else if let (Some(c), Some(t)) = (
-                    row.get("control")
-                        .or_else(|| row.get("控制"))
-                        .and_then(|v| v.as_u64().or_else(|| v.as_i64().map(|i| i as u64))),
-                    row.get("target")
-                        .or_else(|| row.get("目标"))
-                        .and_then(|v| v.as_u64().or_else(|| v.as_i64().map(|i| i as u64))),
-                ) {
-                    vec![c as usize, t as usize]
-                } else {
-                    return Err(format!("op `{gate}` missing qubits"));
-                }
-            }
-            _ => return Err(format!("op `{gate}` bad qubits")),
-        };
-        let theta = row
-            .get("theta")
-            .or_else(|| row.get("参数"))
-            .or_else(|| row.get("params"))
-            .and_then(|v| parse_theta_value(v).ok().flatten());
-        out.push(Op { gate, qubits, theta });
+        out.push(parse_op_row(&row)?);
     }
     Ok(out)
 }
@@ -378,6 +411,9 @@ pub fn apply_op(amps: &mut [C], qubits: usize, op: &Op) -> Result<(), String> {
         if q >= qubits {
             return Err(format!("qubit {q} out of range for n={qubits}"));
         }
+    }
+    if let Some(ref mat) = op.matrix {
+        return apply_unitary(amps, &op.qubits, mat);
     }
     match op.gate.as_str() {
         "BARRIER" | "MEASURE" | "M" => Ok(()),
@@ -456,9 +492,67 @@ pub fn apply_op(amps: &mut [C], qubits: usize, op: &Op) -> Result<(), String> {
             Ok(())
         }
         other => Err(format!(
-            "unsupported gate `{other}` (I/X/Y/Z/H/S/T/Rx/Ry/Rz/CX/CZ/SWAP/BARRIER/MEASURE)"
+            "unsupported gate `{other}` (I/X/Y/Z/H/S/T/Rx/Ry/Rz/CX/CZ/SWAP/BARRIER/MEASURE or custom matrix)"
         )),
     }
+}
+
+/// Apply a `2^k × 2^k` unitary on `targets` (targets[0] = LSB of matrix index).
+pub fn apply_unitary(amps: &mut [C], targets: &[usize], u: &[Vec<C>]) -> Result<(), String> {
+    let k = targets.len();
+    if k == 0 {
+        return Err("unitary needs at least one qubit".into());
+    }
+    let mut seen = Vec::new();
+    for &q in targets {
+        if seen.contains(&q) {
+            return Err("unitary qubits must be unique".into());
+        }
+        seen.push(q);
+    }
+    let dim = 1usize << k;
+    if u.len() != dim || u.iter().any(|r| r.len() != dim) {
+        return Err(format!(
+            "unitary matrix must be {dim}x{dim} for {} qubit(s)",
+            k
+        ));
+    }
+    let n = amps.len();
+    for i in 0..n {
+        let mut sub = 0usize;
+        for (b, &q) in targets.iter().enumerate() {
+            if bit(i, q) {
+                sub |= 1 << b;
+            }
+        }
+        if sub != 0 {
+            continue;
+        }
+        let mut idxs = vec![0usize; dim];
+        let mut vin = vec![C::zero(); dim];
+        for s in 0..dim {
+            let mut idx = i;
+            for (b, &q) in targets.iter().enumerate() {
+                if (s >> b) & 1 == 1 {
+                    idx = flip(idx, q);
+                }
+            }
+            idxs[s] = idx;
+            vin[s] = amps[idx];
+        }
+        let mut vout = vec![C::zero(); dim];
+        for r in 0..dim {
+            let mut sum = C::zero();
+            for c in 0..dim {
+                sum = sum.add(u[r][c].mul(vin[c]));
+            }
+            vout[r] = sum;
+        }
+        for s in 0..dim {
+            amps[idxs[s]] = vout[s];
+        }
+    }
+    Ok(())
 }
 
 pub fn is_meta_gate(gate: &str) -> bool {
@@ -756,21 +850,7 @@ pub fn circuit_new(qubits: usize, steps: Option<&Value>) -> Result<Value, String
             }
         }
     }
-    let ops_json: Vec<Value> = ops
-        .into_iter()
-        .map(|op| {
-            let mut m = json!({
-                "gate": op.gate,
-                "qubits": op.qubits,
-            });
-            if let Some(t) = op.theta {
-                m.as_object_mut()
-                    .unwrap()
-                    .insert("theta".into(), json!(t));
-            }
-            m
-        })
-        .collect();
+    let ops_json: Vec<Value> = ops.into_iter().map(|op| op_to_json(&op)).collect();
     Ok(json!({
         "qubits": qubits,
         "ops": ops_json,
@@ -838,6 +918,7 @@ pub fn ops_from_steps(steps: &Value) -> Result<Vec<Op>, String> {
                     gate,
                     qubits: qs,
                     theta,
+                    matrix: None,
                 });
             }
             Ok(out)
@@ -882,6 +963,7 @@ fn op_from_step_row(row: &Value) -> Result<Op, String> {
         gate,
         qubits,
         theta,
+        matrix: None,
     })
 }
 
@@ -1030,13 +1112,7 @@ pub fn append(circuit: &Value, op: &Value) -> Result<Value, String> {
                     return Err(format!("append qubit {q} out of range for n={n}"));
                 }
             }
-            let mut row = json!({ "gate": p.gate, "qubits": p.qubits });
-            if let Some(t) = p.theta {
-                row.as_object_mut()
-                    .unwrap()
-                    .insert("theta".into(), json!(t));
-            }
-            ops.push(row);
+            ops.push(op_to_json(&p));
         }
     } else if op.get("name").or_else(|| op.get("名")).is_some() {
         return Err("append gate handle needs an op with qubits; pass a circuit or {{gate,qubits}}".into());
@@ -1179,6 +1255,12 @@ fn parse_complex_cell(v: &Value) -> Result<C, String> {
             n.as_f64().ok_or_else(|| "bad matrix cell".to_string())?,
             0.0,
         )),
+        Value::String(s) => {
+            let t = s.trim();
+            t.parse::<f64>()
+                .map(|f| C::new(f, 0.0))
+                .map_err(|_| format!("matrix cell string not a number: `{s}`"))
+        }
         Value::Object(map) => {
             let re = map
                 .get("re")
@@ -1296,6 +1378,176 @@ pub fn gate_new(name: &str, theta: Option<f64>) -> Result<Value, String> {
     Ok(out)
 }
 
+fn is_power_of_two(n: usize) -> bool {
+    n > 0 && (n & (n - 1)) == 0
+}
+
+pub fn check_unitary(m: &[Vec<C>], tol: f64) -> Result<(), String> {
+    let n = m.len();
+    if n == 0 || m.iter().any(|r| r.len() != n) {
+        return Err("matrix must be square".into());
+    }
+    // U† U ≈ I
+    for i in 0..n {
+        for j in 0..n {
+            let mut re = 0.0;
+            let mut im = 0.0;
+            for k in 0..n {
+                // (U†)_{ik} = conj(U_ki); sum_k conj(U_ki)*U_kj
+                let a = m[k][i];
+                let b = m[k][j];
+                re += a.re * b.re + a.im * b.im;
+                im += a.re * b.im - a.im * b.re;
+            }
+            let expect = if i == j { 1.0 } else { 0.0 };
+            if (re - expect).abs() > tol || im.abs() > tol {
+                return Err(format!(
+                    "matrix not unitary within tol={tol} (U†U[{i},{j}]≈{re}+{im}i)"
+                ));
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Build a custom gate handle from a nested matrix (or table).
+pub fn gate_from_matrix(matrix: &Value, name: Option<&str>) -> Result<Value, String> {
+    let m = parse_matrix(matrix)?;
+    let n = m.len();
+    if !is_power_of_two(n) {
+        return Err(format!(
+            "gate matrix size {n} must be a power of two (2^k × 2^k)"
+        ));
+    }
+    check_unitary(&m, 1e-6)?;
+    let label = name
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty())
+        .unwrap_or("U")
+        .to_string();
+    Ok(json!({
+        "name": label,
+        "custom": true,
+        "matrix": matrix_to_json(&m),
+    }))
+}
+
+pub fn gate_matrix_of(gate: &Value) -> Result<Vec<Vec<C>>, String> {
+    if let Some(m) = gate.get("matrix").or_else(|| gate.get("矩阵")) {
+        if !m.is_null() {
+            return parse_matrix(m);
+        }
+    }
+    let name = gate
+        .get("name")
+        .or_else(|| gate.get("名"))
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| "gate missing name".to_string())?;
+    let theta = gate
+        .get("theta")
+        .or_else(|| gate.get("参数"))
+        .and_then(|v| v.as_f64());
+    named_gate_matrix(name, theta)
+}
+
+fn parse_qubits_arg(v: Option<&Value>) -> Result<Vec<usize>, String> {
+    match v {
+        None | Some(Value::Null) => Ok(vec![0]),
+        Some(Value::Number(n)) => {
+            let u = n
+                .as_u64()
+                .or_else(|| n.as_i64().map(|i| i as u64))
+                .ok_or_else(|| "bad qubits".to_string())? as usize;
+            Ok(vec![u])
+        }
+        Some(Value::Array(a)) => a
+            .iter()
+            .map(|x| {
+                x.as_u64()
+                    .or_else(|| x.as_i64().map(|i| i as u64))
+                    .ok_or_else(|| "bad qubit index".to_string())
+                    .map(|u| u as usize)
+            })
+            .collect(),
+        Some(Value::String(s)) => parse_qubit_list(s),
+        _ => Err("qubits must be int or list".into()),
+    }
+}
+
+/// Apply a gate handle (named or custom matrix) onto a circuit.
+pub fn apply_gate(circuit: &Value, gate: &Value, qubits: Option<&Value>) -> Result<Value, String> {
+    let qs = parse_qubits_arg(qubits)?;
+    let name = gate
+        .get("name")
+        .or_else(|| gate.get("名"))
+        .and_then(|v| v.as_str())
+        .unwrap_or("U");
+    let custom = gate
+        .get("custom")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false)
+        || gate.get("matrix").or_else(|| gate.get("矩阵")).is_some_and(|m| !m.is_null());
+    if custom {
+        let mat = gate_matrix_of(gate)?;
+        let dim = mat.len();
+        let k = (dim as f64).log2() as usize;
+        if 1usize << k != dim {
+            return Err("custom gate matrix size must be 2^k".into());
+        }
+        if qs.len() != k {
+            return Err(format!(
+                "custom gate is {k}-qubit (matrix {dim}x{dim}); got {} qubit index(es)",
+                qs.len()
+            ));
+        }
+        let n = circuit
+            .get("qubits")
+            .and_then(|v| v.as_u64())
+            .ok_or_else(|| "circuit missing qubits".to_string())? as usize;
+        for &q in &qs {
+            if q >= n {
+                return Err(format!("qubit {q} out of range for n={n}"));
+            }
+        }
+        let mut obj = circuit.as_object().cloned().unwrap_or_default();
+        let mut ops = obj
+            .get("ops")
+            .and_then(|v| v.as_array())
+            .cloned()
+            .unwrap_or_default();
+        ops.push(op_to_json(&Op {
+            gate: name.to_ascii_uppercase(),
+            qubits: qs,
+            theta: None,
+            matrix: Some(mat),
+        }));
+        obj.insert("ops".into(), Value::Array(ops));
+        return Ok(Value::Object(obj));
+    }
+    let theta = gate
+        .get("theta")
+        .or_else(|| gate.get("参数"))
+        .and_then(|v| v.as_f64());
+    let g = name.trim().to_ascii_uppercase();
+    let mat = named_gate_matrix(&g, theta)?;
+    let k = {
+        let mut k = 0usize;
+        let mut d = mat.len();
+        while d > 1 {
+            if d % 2 != 0 {
+                return Err(format!("gate `{g}` matrix size not power of two"));
+            }
+            d /= 2;
+            k += 1;
+        }
+        k
+    };
+    if qs.len() != k {
+        return Err(format!("gate `{g}` needs {k} qubit(s), got {}", qs.len()));
+    }
+    push_op(circuit, &g, qs, theta)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1319,5 +1571,18 @@ mod tests {
             vec![C::new(s, 0.0), C::new(-s, 0.0)],
         ];
         assert!(matrices_close(&m, &expect, 1e-12));
+    }
+
+    #[test]
+    fn custom_h_unitary_on_zero() {
+        let s = std::f64::consts::FRAC_1_SQRT_2;
+        let u = vec![
+            vec![C::new(s, 0.0), C::new(s, 0.0)],
+            vec![C::new(s, 0.0), C::new(-s, 0.0)],
+        ];
+        let mut amps = zero_state(1);
+        apply_unitary(&mut amps, &[0], &u).unwrap();
+        assert!((amps[0].norm_sq() - 0.5).abs() < 1e-12);
+        assert!((amps[1].norm_sq() - 0.5).abs() < 1e-12);
     }
 }

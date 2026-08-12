@@ -118,7 +118,33 @@ pub(crate) fn value_to_json(v: &Value) -> Result<serde_json::Value, String> {
             }
             serde_json::Value::Object(map)
         }
-        Value::Formula(e) => serde_json::Value::String(e.as_display()),
+        Value::Formula(e) => match e {
+            crate::formula::Expr::Matrix { rows, .. } => {
+                let mut arr = Vec::with_capacity(rows.len());
+                for row in rows {
+                    let mut cells = Vec::with_capacity(row.len());
+                    for &n in row {
+                        cells.push(
+                            serde_json::Number::from_f64(n)
+                                .map(serde_json::Value::Number)
+                                .unwrap_or(serde_json::Value::Null),
+                        );
+                    }
+                    arr.push(serde_json::Value::Array(cells));
+                }
+                serde_json::Value::Array(arr)
+            }
+            other => {
+                let s = crate::formula::simplify(other);
+                if let crate::formula::Expr::Num(n) = s {
+                    serde_json::Number::from_f64(n)
+                        .map(serde_json::Value::Number)
+                        .unwrap_or(serde_json::Value::Null)
+                } else {
+                    serde_json::Value::String(e.as_display())
+                }
+            }
+        },
         Value::Code(c) => serde_json::Value::String(c.source.clone()),
     })
 }

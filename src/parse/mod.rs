@@ -439,9 +439,11 @@ impl<'a> Cursor<'a> {
             if body.is_empty() {
                 bail!("{open_line}:1: empty formula");
             }
-            let expr = crate::formula::parse(body)
-                .map_err(|e| anyhow::anyhow!("{open_line}:1: formula: {e}"))?;
-            return Ok((Expr::Formula(expr), open_line));
+            return Ok((
+                formula_fence_to_expr(body)
+                    .map_err(|e| anyhow::anyhow!("{open_line}:1: formula: {e}"))?,
+                open_line,
+            ));
         }
         if trimmed != "$$" {
             bail!(
@@ -468,9 +470,9 @@ impl<'a> Cursor<'a> {
         if text.is_empty() {
             bail!("{open_line}:1: empty formula");
         }
-        let expr = crate::formula::parse(&text)
+        let expr = formula_fence_to_expr(&text)
             .map_err(|e| anyhow::anyhow!("{open_line}:1: formula: {e}"))?;
-        Ok((Expr::Formula(expr), end_line))
+        Ok((expr, end_line))
     }
 
     /// GFM table after empty RHS:
@@ -712,7 +714,7 @@ fn is_bare_assign_ident(s: &str) -> bool {
     true
 }
 
-/// Same-line `$$body$$` → Formula; otherwise None (caller parses normally).
+/// Same-line `$$body$$` → Formula or numeric matrix List; otherwise None.
 fn try_parse_inline_formula(rhs: &str) -> Result<Option<Expr>> {
     let rhs = rhs.trim();
     if !rhs.starts_with("$$") {
@@ -728,10 +730,22 @@ fn try_parse_inline_formula(rhs: &str) -> Result<Option<Expr>> {
         if body.is_empty() {
             bail!("empty formula");
         }
-        let expr = crate::formula::parse(body).map_err(|e| anyhow::anyhow!("formula: {e}"))?;
-        return Ok(Some(Expr::Formula(expr)));
+        let expr = formula_fence_to_expr(body).map_err(|e| anyhow::anyhow!("formula: {e}"))?;
+        return Ok(Some(expr));
     }
     bail!("incomplete inline formula (expected `$$…$$` on one line)");
+}
+
+fn formula_fence_to_expr(body: &str) -> Result<Expr, String> {
+    if crate::formula::looks_like_matrix(body) {
+        let rows = crate::formula::parse_eval_matrix(body)?;
+        return Ok(Expr::Formula(crate::formula::Expr::Matrix {
+            source: body.trim().to_string(),
+            rows,
+        }));
+    }
+    let expr = crate::formula::parse(body)?;
+    Ok(Expr::Formula(expr))
 }
 
 fn parse_backtick_ident(s: &str) -> Option<String> {

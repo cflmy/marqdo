@@ -427,35 +427,89 @@ section.block > h2 {
   box-shadow: none;
 }
 .vars-panel {
-  max-height: min(50vh, 28rem);
+  max-height: min(52vh, 30rem);
   overflow: auto;
-  font: 0.72rem/1.35 var(--mono);
+  font: 0.72rem/1.35 var(--sans);
+  padding-right: 0.1rem;
 }
 .vars-list {
   list-style: none;
   margin: 0;
   padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
 }
-.vars-item {
-  margin: 0 0 0.55rem;
-  padding-bottom: 0.45rem;
-  border-bottom: 1px solid var(--line);
+.vars-card {
+  display: block;
+  margin: 0;
+  padding: 0.45rem 0.5rem 0.5rem;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+  cursor: pointer;
+  transition: border-color 0.12s ease, box-shadow 0.12s ease;
 }
-.vars-item:last-child {
-  margin-bottom: 0;
-  padding-bottom: 0;
-  border-bottom: none;
+.vars-card:hover {
+  border-color: #a1a1a6;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.06);
+}
+.vars-card:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+.vars-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.25rem 0.55rem;
+  margin-bottom: 0.35rem;
 }
 .vars-name {
-  font-weight: 600;
+  font: 600 0.8rem/1.25 var(--mono);
   color: var(--ink);
-  margin-bottom: 0.2rem;
   word-break: break-all;
 }
+.vars-kind {
+  font: 500 0.65rem/1.2 var(--sans);
+  color: var(--muted);
+}
+.vars-preview {
+  max-height: 7.5rem;
+  overflow: hidden;
+  position: relative;
+  border-radius: 8px;
+  background: #fafafa;
+  border: 1px solid var(--line);
+  padding: 0.35rem;
+  pointer-events: none;
+}
+.vars-preview::after {
+  content: "";
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  height: 1.6rem;
+  background: linear-gradient(transparent, #fafafa);
+  pointer-events: none;
+}
+.vars-preview .matrix-wrap {
+  border: none;
+  padding: 0.25rem;
+  background: transparent;
+}
+.vars-preview .matrix-cell {
+  min-width: 2.4rem;
+  padding: 0.28rem 0.35rem;
+  font-size: 0.68rem;
+}
+.vars-muted { color: var(--muted); }
+.vars-peek { font-size: 0.68rem; }
+.math-sm .katex-display { font-size: 0.92em; margin: 0.1rem 0; }
 .vars-table {
   width: 100%;
   border-collapse: collapse;
-  font: inherit;
+  font: 0.72rem/1.35 var(--mono);
 }
 .vars-table th,
 .vars-table td {
@@ -474,6 +528,120 @@ section.block > h2 {
 .vars-scalar { white-space: pre-wrap; }
 .vars-empty, .vars-skipped { color: var(--muted); margin: 0.2rem 0; }
 .vars-nested > summary { cursor: pointer; color: var(--muted); }
+.var-dialog {
+  border: none;
+  padding: 0;
+  max-width: min(920px, 94vw);
+  max-height: min(88vh, 900px);
+  width: min(920px, 94vw);
+  border-radius: 18px;
+  background: transparent;
+  box-shadow: none;
+}
+.var-dialog::backdrop {
+  background: rgba(29, 29, 31, 0.42);
+  backdrop-filter: blur(6px);
+}
+.var-dialog-sheet {
+  background: linear-gradient(180deg, #fffef9 0%, #ffffff 42%);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  box-shadow: 0 24px 80px rgba(0,0,0,0.22);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  max-height: min(88vh, 900px);
+}
+.var-dialog-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.15rem;
+  border-bottom: 1px solid var(--line);
+  background: rgba(255,255,255,0.85);
+}
+.var-dialog-head h2 {
+  margin: 0;
+  font: 650 1.05rem/1.25 var(--mono);
+  color: var(--ink);
+  word-break: break-all;
+}
+.var-dialog-close {
+  appearance: none;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: #f5f5f7;
+  color: var(--ink);
+  font-size: 1.15rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.var-dialog-close:hover { background: var(--hover); }
+.var-dialog-body {
+  padding: 1.15rem 1.25rem 1.4rem;
+  overflow: auto;
+  font: 0.85rem/1.45 var(--sans);
+}
+.var-rich-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0 0 0.85rem;
+}
+.var-chip {
+  display: inline-block;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  background: #1d1d1f;
+  color: #fff;
+  font: 600 0.68rem/1.2 var(--sans);
+}
+.var-chip.muted {
+  background: #e8e8ed;
+  color: var(--muted);
+}
+.var-rich-more {
+  margin-top: 1rem;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+.matrix-wrap {
+  overflow: auto;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background:
+    radial-gradient(120% 80% at 0% 0%, rgba(0,113,227,0.06), transparent 55%),
+    #fff;
+  padding: 0.75rem;
+}
+.matrix-cap {
+  caption-side: top;
+  text-align: left;
+  font: 500 0.7rem/1.2 var(--sans);
+  color: var(--muted);
+  margin-bottom: 0.45rem;
+}
+.matrix-grid {
+  border-collapse: separate;
+  border-spacing: 0.35rem;
+  margin: 0 auto;
+  font: 0.78rem/1.2 var(--mono);
+}
+.matrix-cell {
+  min-width: 3.6rem;
+  padding: 0.55rem 0.65rem;
+  text-align: center;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: #f7f8fa;
+  color: var(--ink);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.65);
+}
+.matrix-cell span { font-variant-numeric: tabular-nums; }
+.math-lg .katex-display { font-size: 1.15em; }
 .fn-search {
   width: 100%;
   box-sizing: border-box;
@@ -529,14 +697,16 @@ section.block > h2 {
   font-weight: 500;
 }
 .formula-card .math-block {
-  display: inline-block;
-  margin: 0.25rem 0 0.1rem 0.25rem;
-  vertical-align: middle;
-  overflow-x: auto;
+  display: block;
+  margin: 0.35rem 0 0.1rem;
+  overflow: visible;
   max-width: 100%;
 }
 .formula-card .katex-display {
   margin: 0.2rem 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 0.15rem;
 }
 .code-card {
   padding: 0;
@@ -1008,7 +1178,7 @@ pub fn layout(title: &str, nav: &str, main: &str) -> String {
 <link rel="shortcut icon" href="https://s3.cflmy.cn/logo/Logo.ico" type="image/x-icon"/>
 <link rel="apple-touch-icon" href="https://s3.cflmy.cn/logo/Logo.png"/>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" crossorigin="anonymous"/>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/github-dark.min.css" crossorigin="anonymous"/>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github-dark.min.css" crossorigin="anonymous"/>
 <style>{css}</style>
 </head>
 <body>
@@ -1040,10 +1210,19 @@ pub fn layout(title: &str, nav: &str, main: &str) -> String {
 </main>
 </div>
 </div>
+<dialog class="var-dialog" id="var-dialog" aria-labelledby="var-dialog-title">
+  <div class="var-dialog-sheet">
+    <div class="var-dialog-head">
+      <h2 id="var-dialog-title">Variable</h2>
+      <button type="button" class="var-dialog-close" id="var-dialog-close" aria-label="Close">×</button>
+    </div>
+    <div class="var-dialog-body" id="var-dialog-body"></div>
+  </div>
+</dialog>
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js" crossorigin="anonymous"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js" crossorigin="anonymous"
   onload="renderMathInElement(document.body,{{delimiters:[{{left:'$$',right:'$$',display:true}},{{left:'\\(',right:'\\)',display:false}}],ignoredTags:['script','noscript','style','textarea','pre','code','kbd']}});"></script>
-<script defer src="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/highlight.min.js" crossorigin="anonymous"
+<script defer src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js" crossorigin="anonymous"
   onload="document.querySelectorAll('pre.code-body code').forEach(function(el){{hljs.highlightElement(el);}});"></script>
 <script>
 (function () {{
@@ -1499,7 +1678,8 @@ pub fn layout(title: &str, nav: &str, main: &str) -> String {
             var vp = document.getElementById("vars-panel");
             if (vp) {{
               vp.innerHTML = ev.bindings_html
-                || "<p class=\\"vars-empty\\">No bindings</p>";
+                || '<p class="vars-empty">No bindings</p>';
+              initVarsPanel();
             }}
           }}
         }}
@@ -1616,16 +1796,102 @@ pub fn layout(title: &str, nav: &str, main: &str) -> String {
     }}
   }}
 
+  function initVarsPanel() {{
+    var panel = document.getElementById("vars-panel");
+    var dialog = document.getElementById("var-dialog");
+    var title = document.getElementById("var-dialog-title");
+    var body = document.getElementById("var-dialog-body");
+    var closeBtn = document.getElementById("var-dialog-close");
+    if (!panel || !dialog || !title || !body) return;
+
+    function renderMath(root) {{
+      if (window.renderMathInElement) {{
+        try {{
+          window.renderMathInElement(root, {{
+            delimiters: [
+              {{ left: "$$", right: "$$", display: true }},
+              {{ left: "\\(", right: "\\)", display: false }}
+            ],
+            ignoredTags: ["script", "noscript", "style", "textarea", "pre", "code", "kbd", "button"]
+          }});
+        }} catch (e) {{}}
+      }}
+    }}
+
+    function openVar(id) {{
+      var store = document.getElementById("var-full-" + id);
+      if (!store) return;
+      var name = store.getAttribute("data-var-name") || ("#" + id);
+      title.textContent = name;
+      body.innerHTML = store.innerHTML;
+      renderMath(body);
+      try {{
+        if (typeof dialog.showModal === "function") dialog.showModal();
+        else dialog.setAttribute("open", "");
+      }} catch (e) {{
+        dialog.setAttribute("open", "");
+      }}
+    }}
+
+    function closeVar() {{
+      try {{
+        if (typeof dialog.close === "function") dialog.close();
+        else dialog.removeAttribute("open");
+      }} catch (e) {{
+        dialog.removeAttribute("open");
+      }}
+    }}
+
+    // Event delegation: survives vars-panel innerHTML refresh after runs.
+    if (panel.dataset.varsBound !== "1") {{
+      panel.dataset.varsBound = "1";
+      panel.addEventListener("click", function (ev) {{
+        var card = ev.target.closest(".vars-card");
+        if (!card || !panel.contains(card)) return;
+        ev.preventDefault();
+        openVar(card.getAttribute("data-var-id"));
+      }});
+      panel.addEventListener("keydown", function (ev) {{
+        if (ev.key !== "Enter" && ev.key !== " ") return;
+        var card = ev.target.closest(".vars-card");
+        if (!card || !panel.contains(card)) return;
+        ev.preventDefault();
+        openVar(card.getAttribute("data-var-id"));
+      }});
+    }}
+
+    if (closeBtn && closeBtn.dataset.bound !== "1") {{
+      closeBtn.dataset.bound = "1";
+      closeBtn.addEventListener("click", function (ev) {{
+        ev.preventDefault();
+        closeVar();
+      }});
+    }}
+    if (dialog.dataset.bound !== "1") {{
+      dialog.dataset.bound = "1";
+      dialog.addEventListener("click", function (ev) {{
+        if (ev.target === dialog) closeVar();
+      }});
+      document.addEventListener("keydown", function (ev) {{
+        if (ev.key === "Escape" && dialog.open) closeVar();
+      }});
+    }}
+
+    renderMath(panel);
+  }}
+
   if (document.readyState === "loading") {{
     document.addEventListener("DOMContentLoaded", function () {{
       initForeignCards();
       initOutlineSearch();
       initStreamPanel();
+      initVarsPanel();
     }});
   }} else {{
     initForeignCards();
     initOutlineSearch();
     initStreamPanel();
+    initVarsPanel();
   }}
 
   function initOutlineSearch() {{

@@ -301,7 +301,7 @@ pub fn render_right_rail(module: &Module, bindings_html: &str, writeback_html: &
     )
 }
 
-/// Render entry bindings as HTML tables (List / Map / records).
+/// Render entry bindings: visible preview in the rail; click card → inspect dialog.
 pub fn render_bindings_html(bindings: &HashMap<String, crate::value::Value>) -> String {
     if bindings.is_empty() {
         return String::new();
@@ -309,26 +309,376 @@ pub fn render_bindings_html(bindings: &HashMap<String, crate::value::Value>) -> 
     let mut names: Vec<&String> = bindings.keys().collect();
     names.sort();
     let mut out = String::from(r#"<ul class="vars-list">"#);
-    for name in names {
+    for (i, name) in names.into_iter().enumerate() {
         let Some(val) = bindings.get(name) else {
             continue;
         };
+        let kind = value_kind_label(val);
+        let preview = render_value_preview_html(val);
+        let full = render_value_rich(val, 0);
         out.push_str(&format!(
-            r#"<li class="vars-item"><div class="vars-name">{}</div><div class="vars-value">{}</div></li>"#,
-            escape(name),
-            render_value_html(val, 0)
+            r#"<li class="vars-item vars-card" data-var-id="{id}" role="button" tabindex="0" title="Click to inspect">
+<div class="vars-head">
+<span class="vars-name">{name}</span>
+<span class="vars-kind">{kind}</span>
+</div>
+<div class="vars-preview">{preview}</div>
+<div class="vars-full" id="var-full-{id}" data-var-name="{name}" hidden>{full}</div>
+</li>"#,
+            name = escape(name),
+            kind = escape(&kind),
+            preview = preview,
+            id = i,
+            full = full,
         ));
     }
     out.push_str("</ul>");
     out
 }
 
-const BIND_MAX_DEPTH: usize = 2;
+/// Compact inline preview (may truncate visually via CSS).
+fn render_value_preview_html(v: &crate::value::Value) -> String {
+    use crate::value::Value;
+    match v {
+        Value::Formula(e) => {
+            let tex = match e {
+                crate::formula::Expr::Matrix { source, .. } => escape(source),
+                _ => escape(&formula_ascii_to_tex(&e.as_display())),
+            };
+            format!(r#"<div class="math-block math-sm">$${}$$</div>"#, tex)
+        }
+        Value::List(xs) => {
+            if let Some((_, _, complex)) = detect_matrix(xs) {
+                return render_matrix_grid(xs, complex);
+            }
+            render_value_html(v, 0)
+        }
+        Value::Map(pairs) => {
+            if let Some(Value::List(rows)) = pairs
+                .iter()
+                .find(|(k, _)| k == "matrix" || k == "矩阵")
+                .map(|(_, v)| v)
+            {
+                if let Some((_, _, complex)) = detect_matrix(rows) {
+                    return render_matrix_grid(rows, complex);
+                }
+            }
+            // Prefer a short key/value peek for objects.
+            let mut s = String::from(r#"<table class="vars-table vars-peek"><tbody>"#);
+            for (k, val) in pairs.iter().take(6) {
+                if k == "matrix" || k == "矩阵" || k == "ops" {
+                    s.push_str(&format!(
+                        "<tr><td class=\"vars-key\">{}</td><td class=\"vars-muted\">…</td></tr>",
+                        escape(k)
+                    ));
+                    continue;
+                }
+                s.push_str(&format!(
+                    "<tr><td class=\"vars-key\">{}</td><td>{}</td></tr>",
+                    escape(k),
+                    escape(&brief_preview_cell(val))
+                ));
+            }
+            if pairs.len() > 6 {
+                s.push_str(
+                    r#"<tr><td colspan="2" class="vars-muted">…</td></tr>"#,
+                );
+            }
+            s.push_str("</tbody></table>");
+            s
+        }
+        other => format!(
+            r#"<span class="vars-scalar">{}</span>"#,
+            escape(&other.as_display())
+        ),
+    }
+}
+
+fn brief_preview_cell(v: &crate::value::Value) -> String {
+    use crate::value::Value;
+    match v {
+        Value::List(xs) => format!("List({})", xs.len()),
+        Value::Map(xs) => format!("Map({})", xs.len()),
+        Value::Formula(_) => "formula".into(),
+        other => {
+            let s = other.as_display();
+            if s.chars().count() > 36 {
+                format!("{}…", s.chars().take(36).collect::<String>())
+            } else {
+                s
+            }
+        }
+    }
+}
+
+fn value_kind_label(v: &crate::value::Value) -> String {
+    use crate::value::Value;
+    match v {
+        Value::None => "none".into(),
+        Value::Bool(_) => "bool".into(),
+        Value::Int(_) => "int".into(),
+        Value::Num(_) => "num".into(),
+        Value::Text(_) => "text".into(),
+        Value::Formula(crate::formula::Expr::Matrix { rows, .. }) => {
+            format!("formula · {}×{}", rows.len(), rows.first().map(|r| r.len()).unwrap_or(0))
+        }
+        Value::Formula(_) => "formula".into(),
+        Value::Code(c) => format!("code · {}", c.lang),
+        Value::List(xs) => {
+            if let Some((r, c, _)) = detect_matrix(xs) {
+                format!("matrix · {r}×{c}")
+            } else {
+                format!("list · {}", xs.len())
+            }
+        }
+        Value::Map(pairs) => {
+            if let Some(t) = pairs.iter().find(|(k, _)| k == "_type").and_then(|(_, v)| match v {
+                Value::Text(s) => Some(s.as_str()),
+                _ => None,
+            }) {
+                if let Some(Value::List(rows)) = pairs
+                    .iter()
+                    .find(|(k, _)| k == "matrix" || k == "矩阵")
+                    .map(|(_, v)| v)
+                {
+                    if let Some((r, c, _)) = detect_matrix(rows) {
+                        return format!("{t} · {r}×{c}");
+                    }
+                }
+                t.to_string()
+            } else {
+                format!("map · {}", pairs.len())
+            }
+        }
+    }
+}
+
+/// Complex or real matrix: rows × cols, and whether cells are complex maps.
+fn detect_matrix(xs: &[crate::value::Value]) -> Option<(usize, usize, bool)> {
+    use crate::value::Value;
+    if xs.is_empty() {
+        return None;
+    }
+    let mut cols = None;
+    let mut complex = false;
+    for row in xs {
+        let Value::List(cells) = row else {
+            return None;
+        };
+        if cells.is_empty() {
+            return None;
+        }
+        match cols {
+            None => cols = Some(cells.len()),
+            Some(c) if c != cells.len() => return None,
+            _ => {}
+        }
+        for c in cells {
+            match c {
+                Value::Num(_) | Value::Int(_) => {}
+                Value::Map(m)
+                    if m.iter().any(|(k, _)| k == "re")
+                        && m.iter().any(|(k, _)| k == "im") =>
+                {
+                    complex = true;
+                }
+                _ => return None,
+            }
+        }
+    }
+    Some((xs.len(), cols.unwrap_or(0), complex))
+}
+
+fn format_complex_cell(v: &crate::value::Value) -> String {
+    use crate::value::Value;
+    match v {
+        Value::Num(n) => format_matrix_num(*n),
+        Value::Int(i) => i.to_string(),
+        Value::Map(m) => {
+            let re = m
+                .iter()
+                .find(|(k, _)| k == "re")
+                .and_then(|(_, v)| match v {
+                    Value::Num(n) => Some(*n),
+                    Value::Int(i) => Some(*i as f64),
+                    _ => None,
+                })
+                .unwrap_or(0.0);
+            let im = m
+                .iter()
+                .find(|(k, _)| k == "im")
+                .and_then(|(_, v)| match v {
+                    Value::Num(n) => Some(*n),
+                    Value::Int(i) => Some(*i as f64),
+                    _ => None,
+                })
+                .unwrap_or(0.0);
+            if im.abs() < 1e-12 {
+                format_matrix_num(re)
+            } else if re.abs() < 1e-12 {
+                format!("{}i", format_matrix_num(im))
+            } else {
+                format!("{}{:+}i", format_matrix_num(re), im)
+            }
+        }
+        other => other.as_display(),
+    }
+}
+
+fn format_matrix_num(n: f64) -> String {
+    if n.fract().abs() < 1e-12 && n.abs() < 1e15 {
+        format!("{}", n as i64)
+    } else {
+        let s = format!("{n:.6}");
+        s.trim_end_matches('0').trim_end_matches('.').to_string()
+    }
+}
+
+fn render_matrix_grid(xs: &[crate::value::Value], complex: bool) -> String {
+    let mut s = String::from(r#"<div class="matrix-wrap"><table class="matrix-grid">"#);
+    if complex {
+        s.push_str(r#"<caption class="matrix-cap">complex amplitudes</caption>"#);
+    }
+    s.push_str("<tbody>");
+    for row in xs {
+        let crate::value::Value::List(cells) = row else {
+            continue;
+        };
+        s.push_str("<tr>");
+        for c in cells {
+            let label = escape(&format_complex_cell(c));
+            let mag = match c {
+                crate::value::Value::Num(n) => n.abs(),
+                crate::value::Value::Int(i) => (*i as f64).abs(),
+                crate::value::Value::Map(m) => {
+                    let re = m
+                        .iter()
+                        .find(|(k, _)| k == "re")
+                        .and_then(|(_, v)| match v {
+                            crate::value::Value::Num(n) => Some(*n),
+                            _ => None,
+                        })
+                        .unwrap_or(0.0);
+                    let im = m
+                        .iter()
+                        .find(|(k, _)| k == "im")
+                        .and_then(|(_, v)| match v {
+                            crate::value::Value::Num(n) => Some(*n),
+                            _ => None,
+                        })
+                        .unwrap_or(0.0);
+                    (re * re + im * im).sqrt()
+                }
+                _ => 0.0,
+            };
+            let heat = mag.clamp(0.0, 1.0);
+            let bg = format!(
+                "rgba(74, 111, 165, {:.3})",
+                0.06 + heat * 0.42
+            );
+            s.push_str(&format!(
+                r#"<td class="matrix-cell" style="background:{bg}"><span>{label}</span></td>"#
+            ));
+        }
+        s.push_str("</tr>");
+    }
+    s.push_str("</tbody></table></div>");
+    s
+}
+
+const BIND_MAX_DEPTH: usize = 3;
+
+/// Full rich HTML for the inspect dialog (matrices get a dedicated grid).
+fn render_value_rich(v: &crate::value::Value, depth: usize) -> String {
+    use crate::value::Value;
+    match v {
+        Value::List(xs) => {
+            if let Some((_, _, complex)) = detect_matrix(xs) {
+                return render_matrix_grid(xs, complex);
+            }
+            if let Some(keys) = record_keys(xs) {
+                return render_records_table(xs, &keys, depth);
+            }
+            render_value_html(v, depth)
+        }
+        Value::Map(pairs) => {
+            // Prefer pretty matrix when object carries `matrix` / `矩阵`.
+            if let Some(Value::List(rows)) = pairs
+                .iter()
+                .find(|(k, _)| k == "matrix" || k == "矩阵")
+                .map(|(_, v)| v)
+            {
+                if let Some((_, _, complex)) = detect_matrix(rows) {
+                    let mut s = String::from(r#"<div class="var-rich">"#);
+                    if let Some(Value::Text(t)) =
+                        pairs.iter().find(|(k, _)| k == "_type").map(|(_, v)| v)
+                    {
+                        s.push_str(&format!(
+                            r#"<p class="var-rich-meta"><span class="var-chip">{}</span>"#,
+                            escape(t)
+                        ));
+                        if let Some(Value::Text(n)) =
+                            pairs.iter().find(|(k, _)| k == "name" || k == "名").map(|(_, v)| v)
+                        {
+                            s.push_str(&format!(
+                                r#" <span class="var-chip muted">{}</span>"#,
+                                escape(n)
+                            ));
+                        }
+                        s.push_str("</p>");
+                    }
+                    s.push_str(&render_matrix_grid(rows, complex));
+                    // Other keys (skip matrix / _type / name noise)
+                    let rest: Vec<_> = pairs
+                        .iter()
+                        .filter(|(k, _)| {
+                            k != "matrix"
+                                && k != "矩阵"
+                                && k != "_type"
+                                && k != "name"
+                                && k != "名"
+                                && k != "custom"
+                        })
+                        .collect();
+                    if !rest.is_empty() {
+                        s.push_str(r#"<details class="var-rich-more"><summary>Other fields</summary>"#);
+                        s.push_str(r#"<table class="vars-table"><tbody>"#);
+                        for (k, val) in rest {
+                            s.push_str(&format!(
+                                "<tr><td class=\"vars-key\">{}</td><td>{}</td></tr>",
+                                escape(k),
+                                cell_html(val, depth)
+                            ));
+                        }
+                        s.push_str("</tbody></table></details>");
+                    }
+                    s.push_str("</div>");
+                    return s;
+                }
+            }
+            render_value_html(v, depth)
+        }
+        Value::Formula(e) => {
+            let tex = match e {
+                crate::formula::Expr::Matrix { source, .. } => escape(source),
+                _ => escape(&formula_ascii_to_tex(&e.as_display())),
+            };
+            format!(
+                r#"<div class="var-rich"><div class="math-block math-lg">$${}$$</div></div>"#,
+                tex
+            )
+        }
+        other => render_value_html(other, depth),
+    }
+}
 
 fn render_value_html(v: &crate::value::Value, depth: usize) -> String {
     use crate::value::Value;
     match v {
         Value::List(xs) => {
+            if let Some((_, _, complex)) = detect_matrix(xs) {
+                return render_matrix_grid(xs, complex);
+            }
             if let Some(keys) = record_keys(xs) {
                 return render_records_table(xs, &keys, depth);
             }
@@ -363,6 +713,13 @@ fn render_value_html(v: &crate::value::Value, depth: usize) -> String {
             s.push_str("</tbody></table>");
             s
         }
+        Value::Formula(e) => {
+            let tex = match e {
+                crate::formula::Expr::Matrix { source, .. } => escape(source),
+                _ => escape(&formula_ascii_to_tex(&e.as_display())),
+            };
+            format!(r#"<div class="math-block">$${}$$</div>"#, tex)
+        }
         other => format!(r#"<span class="vars-scalar">{}</span>"#, escape(&other.as_display())),
     }
 }
@@ -378,6 +735,13 @@ fn cell_html(v: &crate::value::Value, depth: usize) -> String {
             )
         }
         Value::List(_) | Value::Map(_) => render_value_html(v, depth + 1),
+        Value::Formula(e) => {
+            let tex = match e {
+                crate::formula::Expr::Matrix { source, .. } => escape(source),
+                _ => escape(&formula_ascii_to_tex(&e.as_display())),
+            };
+            format!(r#"<div class="math-block">$${}$$</div>"#, tex)
+        }
         other => escape(&other.as_display()),
     }
 }
@@ -740,7 +1104,12 @@ fn render_stmt(
                 value: Expr::Formula(e),
                 ..
             } => {
-                let tex = escape(&formula_ascii_to_tex(&e.as_display()));
+                // Matrix fences keep original LaTeX/`[[…]]` source — feed KaTeX as-is.
+                // Scalar ASCII formulas go through formula_ascii_to_tex.
+                let tex = match e {
+                    crate::formula::Expr::Matrix { source, .. } => escape(source),
+                    _ => escape(&formula_ascii_to_tex(&e.as_display())),
+                };
                 format!(
                     "<div class=\"card formula-card\"><span class=\"badge\">formula</span> \
                      <code class=\"expr\">`{}` =</code> \
@@ -1220,7 +1589,7 @@ mod tests {
         assert!(html.contains("Functions"), "{html}");
         assert!(html.contains("Variables"), "{html}");
         assert!(html.contains("vars-panel"), "{html}");
-        assert!(html.contains("vars-table"), "{html}");
+        assert!(html.contains("vars-card"), "{html}");
         assert!(html.contains(">xs<") || html.contains("vars-name\">xs"), "{html}");
     }
 

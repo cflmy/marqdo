@@ -470,11 +470,21 @@ q_ffi!(quantum_draw_circuit, |args: &Value| {
 });
 
 q_ffi!(quantum_gate_new, |args: &Value| {
+    let matrix = args.get("matrix").or_else(|| args.get("矩阵"));
+    if let Some(m) = matrix {
+        if !m.is_null() {
+            let name = args
+                .get("name")
+                .or_else(|| args.get("名"))
+                .and_then(|v| v.as_str());
+            return sim::gate_from_matrix(m, name);
+        }
+    }
     let name = args
         .get("name")
         .or_else(|| args.get("名"))
         .and_then(|v| v.as_str())
-        .ok_or_else(|| "gate needs `name`".to_string())?;
+        .ok_or_else(|| "gate needs `name` or `matrix`".to_string())?;
     let theta = match args.get("theta").or_else(|| args.get("参数")) {
         None | Some(Value::Null) => None,
         Some(v) => Some(
@@ -486,21 +496,24 @@ q_ffi!(quantum_gate_new, |args: &Value| {
     sim::gate_new(name, theta)
 });
 
+q_ffi!(quantum_gate_from_matrix, |args: &Value| {
+    let matrix = args
+        .get("matrix")
+        .or_else(|| args.get("矩阵"))
+        .ok_or_else(|| "missing `matrix`".to_string())?;
+    let name = args
+        .get("name")
+        .or_else(|| args.get("名"))
+        .and_then(|v| v.as_str());
+    sim::gate_from_matrix(matrix, name)
+});
+
 q_ffi!(quantum_gate_matrix, |args: &Value| {
     let gate = args
         .get("gate")
         .or_else(|| args.get("门"))
         .ok_or_else(|| "missing `gate`".to_string())?;
-    let name = gate
-        .get("name")
-        .or_else(|| gate.get("名"))
-        .and_then(|v| v.as_str())
-        .ok_or_else(|| "gate missing name".to_string())?;
-    let theta = gate
-        .get("theta")
-        .or_else(|| gate.get("参数"))
-        .and_then(|v| v.as_f64());
-    let m = sim::named_gate_matrix(name, theta)?;
+    let m = sim::gate_matrix_of(gate)?;
     Ok(sim::matrix_to_json(&m))
 });
 
@@ -509,15 +522,6 @@ q_ffi!(quantum_gate_matches_matrix, |args: &Value| {
         .get("gate")
         .or_else(|| args.get("门"))
         .ok_or_else(|| "missing `gate`".to_string())?;
-    let name = gate
-        .get("name")
-        .or_else(|| gate.get("名"))
-        .and_then(|v| v.as_str())
-        .ok_or_else(|| "gate missing name".to_string())?;
-    let theta = gate
-        .get("theta")
-        .or_else(|| gate.get("参数"))
-        .and_then(|v| v.as_f64());
     let matrix = args
         .get("matrix")
         .or_else(|| args.get("矩阵"))
@@ -527,7 +531,7 @@ q_ffi!(quantum_gate_matches_matrix, |args: &Value| {
         .or_else(|| args.get("容差"))
         .and_then(|v| v.as_f64())
         .unwrap_or(1e-9);
-    let expect = sim::named_gate_matrix(name, theta)?;
+    let expect = sim::gate_matrix_of(gate)?;
     let got = sim::parse_matrix(matrix)?;
     Ok(json!(sim::matrices_close(&expect, &got, tol)))
 });
@@ -542,10 +546,6 @@ q_ffi!(quantum_gate_draw, |args: &Value| {
         .or_else(|| gate.get("名"))
         .and_then(|v| v.as_str())
         .unwrap_or("?");
-    let theta = gate
-        .get("theta")
-        .or_else(|| gate.get("参数"))
-        .and_then(|v| v.as_f64());
     let kind = args
         .get("kind")
         .or_else(|| args.get("种类"))
@@ -559,7 +559,7 @@ q_ffi!(quantum_gate_draw, |args: &Value| {
         .and_then(|v| v.as_str())
         .filter(|s| !s.is_empty());
     let (kind_out, svg) = if matches!(kind.as_str(), "matrix" | "heatmap" | "矩阵") {
-        let m = sim::named_gate_matrix(name, theta)?;
+        let m = sim::gate_matrix_of(gate)?;
         (
             "matrix",
             draw::matrix_heatmap_svg(&m, &format!("{name} matrix")),
@@ -575,6 +575,16 @@ q_ffi!(quantum_gate_draw, |args: &Value| {
         "kind": kind_out,
         "svg": svg,
     }))
+});
+
+q_ffi!(quantum_apply, |args: &Value| {
+    let c = circuit_of(args)?;
+    let gate = args
+        .get("gate")
+        .or_else(|| args.get("门"))
+        .ok_or_else(|| "missing `gate`".to_string())?;
+    let qubits = args.get("qubits").or_else(|| args.get("比特"));
+    sim::apply_gate(c, gate, qubits)
 });
 
 fn register(host: &MarqdoHostApi, name: &str, params: &str, fn_ptr: PluginFn) -> c_int {
@@ -658,7 +668,12 @@ pub unsafe extern "C" fn marqdo_plugin_init(host: *const MarqdoHostApi) -> c_int
             "circuit,path,kind,qubit",
             quantum_draw_circuit as PluginFn,
         ),
-        ("quantum_gate_new", "name,theta", quantum_gate_new as PluginFn),
+        ("quantum_gate_new", "name,theta,matrix", quantum_gate_new as PluginFn),
+        (
+            "quantum_gate_from_matrix",
+            "matrix,name",
+            quantum_gate_from_matrix as PluginFn,
+        ),
         (
             "quantum_gate_matrix",
             "gate",
@@ -671,8 +686,13 @@ pub unsafe extern "C" fn marqdo_plugin_init(host: *const MarqdoHostApi) -> c_int
         ),
         (
             "quantum_gate_draw",
-            "gate,path",
+            "gate,path,kind",
             quantum_gate_draw as PluginFn,
+        ),
+        (
+            "quantum_apply",
+            "circuit,gate,qubits",
+            quantum_apply as PluginFn,
         ),
     ];
     for (name, params, f) in regs {
