@@ -423,7 +423,13 @@ pub fn validate(form: &Value, extra_rules: Option<&Value>, data: &Value) -> Valu
     })
 }
 
-pub fn render(form: &Value, form_id: &str, data: Option<&Value>, errors: Option<&Value>) -> String {
+/// Form markup only (no document shell) — for page main-slot embed and `/_form`.
+pub fn render_body(
+    form: &Value,
+    form_id: &str,
+    data: Option<&Value>,
+    errors: Option<&Value>,
+) -> String {
     let fields = form
         .get("fields")
         .and_then(|v| v.as_array())
@@ -466,31 +472,20 @@ pub fn render(form: &Value, form_id: &str, data: Option<&Value>, errors: Option<
         .and_then(|v| v.as_str())
         .unwrap_or("/");
     let row_id = form.get("id").map(cell_str).unwrap_or_default();
+    let show_meta = form
+        .get("show_meta")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(true);
 
-    let mut body = String::from(
-        r#"<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>"#,
-    );
-    body.push_str(&format!("<title>{}</title>", esc(heading)));
-    body.push_str(
-        r#"<style>
-body{font-family:"IBM Plex Sans","Noto Sans SC",sans-serif;margin:1.5rem;background:#fafaf9;color:#1c1917}
-form{max-width:28rem;display:grid;gap:.85rem}
-label{display:grid;gap:.25rem;font-size:.9rem}
-input,textarea{padding:.5rem .6rem;border:1px solid #e7e5e4;border-radius:4px;font:inherit}
-input[readonly]{background:#f5f5f4;color:#57534e}
-.err{color:#b91c1c;font-size:.85rem}
-.actions{display:flex;gap:.75rem;align-items:center;flex-wrap:wrap}
-button{background:#0f766e;color:#fff;border:0;padding:.55rem 1rem;border-radius:4px;cursor:pointer}
-a{color:#0f766e}
-.meta{color:#57534e;font-size:.9rem}
-</style></head><body>"#,
-    );
-    body.push_str(&format!(
-        "<h1>{}</h1><p class=\"meta\">table=<code>{}</code> · action=<code>{}</code></p>",
-        esc(heading),
-        esc(table),
-        esc(action)
-    ));
+    let mut body = String::from("<div class=\"site-form\">");
+    if show_meta {
+        body.push_str(&format!(
+            "<p class=\"meta\">table=<code>{}</code> · action=<code>{}</code> · id=<code>{}</code></p>",
+            esc(table),
+            esc(action),
+            esc(heading)
+        ));
+    }
     body.push_str(&format!(
         "<form method=\"post\" action=\"{}\">",
         esc(&post_to)
@@ -520,7 +515,6 @@ a{color:#0f766e}
         };
         let readonly = action == "update" && pk && name == "id";
         if readonly {
-            // already emitted as hidden; show read-only label
             body.push_str(&format!(
                 "<label>{}<input type=\"text\" value=\"{}\" readonly/></label>",
                 esc(label),
@@ -570,7 +564,37 @@ a{color:#0f766e}
         "<div class=\"actions\"><button type=\"submit\">Submit</button><a href=\"{}\">cancel</a></div>",
         esc(cancel)
     ));
-    body.push_str("</form></body></html>");
+    body.push_str("</form></div>");
+    body
+}
+
+/// Standalone form document (`GET|POST /_form/{id}`).
+pub fn render(form: &Value, form_id: &str, data: Option<&Value>, errors: Option<&Value>) -> String {
+    let heading = form
+        .get("title")
+        .and_then(|v| v.as_str())
+        .unwrap_or(form_id);
+    let mut body = String::from(
+        r#"<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>"#,
+    );
+    body.push_str(&format!("<title>{}</title>", esc(heading)));
+    body.push_str(
+        r#"<style>
+body{font-family:"IBM Plex Sans","Noto Sans SC",sans-serif;margin:1.5rem;background:#fafaf9;color:#1c1917}
+.site-form form{max-width:28rem;display:grid;gap:.85rem}
+.site-form label{display:grid;gap:.25rem;font-size:.9rem}
+.site-form input,.site-form textarea{padding:.5rem .6rem;border:1px solid #e7e5e4;border-radius:4px;font:inherit}
+.site-form input[readonly]{background:#f5f5f4;color:#57534e}
+.site-form .err{color:#b91c1c;font-size:.85rem}
+.site-form .actions{display:flex;gap:.75rem;align-items:center;flex-wrap:wrap}
+.site-form button{background:#0f766e;color:#fff;border:0;padding:.55rem 1rem;border-radius:4px;cursor:pointer}
+.site-form a{color:#0f766e}
+.site-form .meta{color:#57534e;font-size:.9rem}
+</style></head><body>"#,
+    );
+    body.push_str(&format!("<h1>{}</h1>", esc(heading)));
+    body.push_str(&render_body(form, form_id, data, errors));
+    body.push_str("</body></html>");
     body
 }
 

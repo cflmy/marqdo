@@ -224,9 +224,28 @@ a:hover { color:var(--accent); }
 .content.cards article { background:#fff; border:1px solid var(--line); border-radius:6px; padding:1rem; }
 .main-intro h1 { margin:0 0 .75rem; font-size:2rem; }
 .main-intro p { color:var(--muted); }
+.site-form { margin-top:1.25rem; max-width:28rem; }
+.site-form form { display:grid; gap:.85rem; }
+.site-form label { display:grid; gap:.25rem; font-size:.9rem; }
+.site-form input, .site-form textarea { padding:.5rem .6rem; border:1px solid var(--line); border-radius:4px; font:inherit; background:#fff; }
+.site-form input[readonly] { background:#f5f5f4; color:var(--muted); }
+.site-form .err { color:#b91c1c; font-size:.85rem; }
+.site-form .actions { display:flex; gap:.75rem; align-items:center; flex-wrap:wrap; }
+.site-form button { background:var(--accent); color:#fff; border:0; padding:.55rem 1rem; border-radius:4px; cursor:pointer; }
+.site-form .meta { color:var(--muted); font-size:.9rem; }
 "#;
 
 pub fn render_page(args: &Value, db_url: Option<&str>) -> String {
+    render_page_ex(args, db_url, None, None)
+}
+
+/// Like `render_page`, optionally replaying form POST data/errors into the embedded form.
+pub fn render_page_ex(
+    args: &Value,
+    db_url: Option<&str>,
+    form_data: Option<&Value>,
+    form_errors: Option<&Value>,
+) -> String {
     let title = args
         .get("title")
         .and_then(|v| v.as_str())
@@ -256,6 +275,18 @@ pub fn render_page(args: &Value, db_url: Option<&str>) -> String {
     let mut main_html = String::new();
     if !intro.is_empty() {
         main_html.push_str(&format!("<div class=\"main-intro\">{intro}</div>"));
+    }
+    if let Some(form) = args.get("form") {
+        let form_id = args
+            .get("form_id")
+            .and_then(|v| v.as_str())
+            .unwrap_or("form");
+        main_html.push_str(&crate::form::render_body(
+            form,
+            form_id,
+            form_data,
+            form_errors,
+        ));
     }
     if !items.is_empty() {
         main_html.push_str("<section class=\"content cards\">");
@@ -347,6 +378,13 @@ pub fn render_fragment(args: &Value, db_url: Option<&str>) -> String {
             let mut body = String::new();
             if !intro.is_empty() {
                 body.push_str(&format!("<div class=\"main-intro\">{intro}</div>"));
+            }
+            if let Some(form) = args.get("form") {
+                let form_id = args
+                    .get("form_id")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("form");
+                body.push_str(&crate::form::render_body(form, form_id, None, None));
             }
             if !items.is_empty() {
                 body.push_str("<section class=\"content cards\">");

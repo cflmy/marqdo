@@ -8,7 +8,7 @@ Static top links for the shell.
 |------|-----|------|
 | Home | / | |
 | About | /about | |
-| New | /_form/article | |
+| New | /new | |
 | Admin | /admin | |
 
 **`nav`**

@@ -1,6 +1,6 @@
 ---
 title: web-site
-description: Home + /about route + form §5.5 + admin.
+description: Home + /about + /new (form in page slot) + admin.
 > ext/web/web.mq.md
 > styles/shell.mq.md
 > components/nav.mq.md
@@ -60,7 +60,13 @@ About page: same shell, different intro (no main bind).
 *`article_form` = > `article_form`.fields fields=`article_fields` *
 *`article_form` = > `article_form`.rules rules=`article_rules` *
 
+New article: form embedded in the page main slot (design §5.5.4).
+
+*`new` = > web.page title="New article" intro="<h1>New article</h1><p>Form lives in the main slot.</p>" *
+*`new` = > `new`.compose_components components=`home` *
+*`new` = > `new`.compose_form id=article form=`article_form` *
+
 *`app` = > web.app page=`page` db=`store` admin=True host=127.0.0.1 port=18081 *
 *`app` = > `app`.route path=/about page=`about` *
-*`app` = > `app`.mount_form id=article form=`article_form` *
+*`app` = > `app`.route path=/new page=`new` *
 > `app`.listen

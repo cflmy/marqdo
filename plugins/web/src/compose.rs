@@ -178,3 +178,47 @@ pub fn compose_main(
     obj.insert("parts".into(), Value::Object(parts));
     Ok(Value::Object(obj))
 }
+
+/// Embed a form into the page main slot (`form_id` → POST `/_form/{id}`).
+pub fn compose_form(page: &Value, form: &Value, form_id: &str) -> Result<Value, String> {
+    let id = form_id.trim();
+    if id.is_empty() {
+        return Err("compose_form requires non-empty `id`".into());
+    }
+    let mut obj = page.as_object().cloned().unwrap_or_default();
+    let mut frm = form.clone();
+    if let Some(m) = frm.as_object_mut() {
+        // Quieter meta when sitting inside a page shell.
+        m.entry("show_meta".to_string()).or_insert(json!(false));
+        if !m.contains_key("title") {
+            m.insert("title".into(), json!(id));
+        }
+    }
+    obj.insert("form_id".into(), json!(id));
+    obj.insert("form".into(), frm.clone());
+    let mut forms = obj
+        .get("forms")
+        .and_then(|v| v.as_object())
+        .cloned()
+        .unwrap_or_default();
+    forms.insert(id.to_string(), frm.clone());
+    obj.insert("forms".into(), Value::Object(forms));
+
+    let mut parts = obj
+        .get("parts")
+        .and_then(|v| v.as_object())
+        .cloned()
+        .unwrap_or_default();
+    let mut part = Map::new();
+    part.insert("_type".into(), json!("page"));
+    part.insert("slot".into(), json!("main"));
+    part.insert("fragment".into(), json!("main"));
+    part.insert("form_id".into(), json!(id));
+    part.insert("form".into(), frm);
+    if let Some(intro) = obj.get("intro") {
+        part.insert("intro".into(), intro.clone());
+    }
+    parts.insert(format!("form_{id}"), Value::Object(part));
+    obj.insert("parts".into(), Value::Object(parts));
+    Ok(Value::Object(obj))
+}

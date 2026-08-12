@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| 状态 | **Accepted · 实现中**（页面装配 / db CRUD / form §5.5 / admin schema 表单已落地） |
+| 状态 | **Accepted · 实现中**（页面装配 / db CRUD / form §5.5 / 表单嵌入主区 / admin / `app.route` 已落地） |
 | 日期 | 2026-08-11 |
 | 相关 | [markdown-mapping.md](markdown-mapping.md) · [module-namespace.md](module-namespace.md) · [objects.md](objects.md) · [ext-abi.md](ext-abi.md) · [ext-cli.md](ext-cli.md) · [stdlib-i18n.md](stdlib-i18n.md) |
 | 安装（目标） | `marqdo ext add web`（中英：`web` / `网页`） |
@@ -464,7 +464,7 @@ submit  → action=insert → db.insert；action=update → db.update
 #### 5.5.4 与页面的关系
 
 - 表单可以是独立路由页，或页面表里的一个「组件」导出（仍用 `|属性|值|样式|` 描述展示，提交走 form 类）。  
-- 初版优先：**独立 form 句柄 + `app` 挂载提交端点**；嵌入页面槽位为随后波次。
+- **`page.compose_form id=… form=…`**：把 form 嵌入该页主区；`listen` 从首页与路由页收集表单并挂载 `/_form/{id}`（`app.mount_form` 仍可用）。校验失败时若表单有所属页，则带回该页壳重渲染。
 
 ### 5.6 文件职责
 

@@ -39,6 +39,14 @@ Assemble main from a bind table (`|属性|值|样式|` or `|front|back|css|`).
 
 **> web_compose_main page=`self` main=`main`**
 
+## compose_form
+    + `form`
+    + `id`
+
+Embed a form into the page main slot. `listen` auto-registers `GET|POST /_form/{id}` from page/route forms (optional `app.mount_form`).
+
+**> web_compose_form page=`self` form=`form` id=`id`**
+
 ## render
     + `db`=None
 
@@ -184,12 +192,12 @@ Mount an assembled page at `path` (e.g. `/about`). `/` is the home `page=`.
     + `id`
     + `form`
 
-Register `GET|POST /_form/{id}` for listen.
+Register `GET|POST /_form/{id}` for listen when the form is not already embedded via `page.compose_form`.
 
 **> web_app_mount_form app=`self` id=`id` form=`form`**
 
 ## listen
 
-Serve `/`, routed pages, `/_part/{id}`, `/_form/{id}`, and optional `/admin`.
+Serve `/`, routed pages, `/_part/{id}`, `/_form/{id}` (from mounts + page embeds), and optional `/admin`.
 
 **> web_listen app=`self`**

@@ -22,7 +22,31 @@ struct AppState {
     db_url: Option<String>,
     admin: bool,
     forms: HashMap<String, Value>,
+    /// Page that owns an embedded form (for re-render on validation errors).
+    form_owners: HashMap<String, Value>,
     routes: HashMap<String, Value>,
+}
+
+fn collect_page_forms(
+    page: &Value,
+    forms: &mut HashMap<String, Value>,
+    owners: &mut HashMap<String, Value>,
+) {
+    if let Some(obj) = page.get("forms").and_then(|v| v.as_object()) {
+        for (k, v) in obj {
+            forms.insert(k.clone(), v.clone());
+            owners.insert(k.clone(), page.clone());
+        }
+    }
+    if let (Some(id), Some(f)) = (
+        page.get("form_id").and_then(|v| v.as_str()),
+        page.get("form"),
+    ) {
+        if !id.is_empty() {
+            forms.insert(id.to_string(), f.clone());
+            owners.insert(id.to_string(), page.clone());
+        }
+    }
 }
 
 pub fn listen(
@@ -31,14 +55,20 @@ pub fn listen(
     host: &str,
     port: u16,
     admin: bool,
-    forms: HashMap<String, Value>,
+    mut forms: HashMap<String, Value>,
     routes: HashMap<String, Value>,
 ) -> Result<Value, String> {
+    let mut form_owners = HashMap::new();
+    collect_page_forms(page, &mut forms, &mut form_owners);
+    for p in routes.values() {
+        collect_page_forms(p, &mut forms, &mut form_owners);
+    }
     let state = Arc::new(AppState {
         page: page.clone(),
         db_url: db_url.map(|s| s.to_string()),
         admin,
         forms,
+        form_owners,
         routes: routes.clone(),
     });
 
@@ -126,7 +156,7 @@ async fn form_post(
     let Some(url) = st.db_url.as_deref() else {
         return Html(String::from("<p>no database</p>")).into_response();
     };
-    submit_and_respond(frm, &id, url, posted)
+    submit_and_respond(&st, frm, &id, url, posted)
 }
 
 fn posted_to_value(posted: HashMap<String, String>) -> Value {
@@ -138,6 +168,7 @@ fn posted_to_value(posted: HashMap<String, String>) -> Value {
 }
 
 fn submit_and_respond(
+    st: &AppState,
     frm: &Value,
     form_id: &str,
     url: &str,
@@ -154,7 +185,17 @@ fn submit_and_respond(
         }
         Ok(res) => {
             let errors = res.get("errors");
-            Html(form::render(frm, form_id, Some(&data_v), errors)).into_response()
+            if let Some(page) = st.form_owners.get(form_id) {
+                Html(render::render_page_ex(
+                    page,
+                    st.db_url.as_deref(),
+                    Some(&data_v),
+                    errors,
+                ))
+                .into_response()
+            } else {
+                Html(form::render(frm, form_id, Some(&data_v), errors)).into_response()
+            }
         }
         Err(e) => Html(format!("<p>submit error: {}</p>", esc(&e))).into_response(),
     }
@@ -305,7 +346,7 @@ async fn admin_new_post(
     }
     let url = st.db_url.as_deref().unwrap();
     match form::from_schema(url, &table, "insert", None) {
-        Ok(frm) => submit_and_respond(&frm, &format!("admin-{table}-new"), url, posted),
+        Ok(frm) => submit_and_respond(&st, &frm, &format!("admin-{table}-new"), url, posted),
         Err(e) => Html(format!("<p>{}</p>", esc(&e))).into_response(),
     }
 }
@@ -347,7 +388,7 @@ async fn admin_edit_post(
     }
     let url = st.db_url.as_deref().unwrap();
     match form::from_schema(url, &table, "update", Some(&id)) {
-        Ok(frm) => submit_and_respond(&frm, &format!("admin-{table}-edit"), url, posted),
+        Ok(frm) => submit_and_respond(&st, &frm, &format!("admin-{table}-edit"), url, posted),
         Err(e) => Html(format!("<p>{}</p>", esc(&e))).into_response(),
     }
 }

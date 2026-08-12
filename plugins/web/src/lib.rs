@@ -234,6 +234,16 @@ web_ffi!(web_compose_main, |args: &Value| {
     compose::compose_main(&page, &main, |path| call_lib(path))
 });
 
+web_ffi!(web_compose_form, |args: &Value| {
+    let page = args.get("page").cloned().unwrap_or(json!({}));
+    let form = args
+        .get("form")
+        .cloned()
+        .ok_or_else(|| "missing `form`".to_string())?;
+    let id = arg_str(args, "id")?.to_string();
+    compose::compose_form(&page, &form, &id)
+});
+
 web_ffi!(web_render, |args: &Value| {
     let page = args.get("page").cloned().unwrap_or_else(|| args.clone());
     let db_url = db_url_of(args).ok();
@@ -602,6 +612,11 @@ pub unsafe extern "C" fn marqdo_plugin_init(host: *const MarqdoHostApi) -> c_int
             web_compose_components as PluginFn,
         ),
         ("web_compose_main", "page,main", web_compose_main as PluginFn),
+        (
+            "web_compose_form",
+            "page,form,id",
+            web_compose_form as PluginFn,
+        ),
         ("web_render", "page", web_render as PluginFn),
         ("web_db_new", "url", web_db_new as PluginFn),
         ("web_db_init", "url,name,fields", web_db_init as PluginFn),
