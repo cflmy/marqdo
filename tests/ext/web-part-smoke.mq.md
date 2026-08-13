@@ -1,11 +1,11 @@
 ---
 title: web part smoke
 description: Routed pages stamp _route and emit {path}/_part/{id} slot sources.
-> ext/web/web.mq.md
-> web-fixtures/components/nav.mq.md
-> web-fixtures/components/side.mq.md
-> web-fixtures/components/foot.mq.md
-> lib/json.mq.md
+import web:ext/web/web.mq.md
+import nav:web-fixtures/components/nav.mq.md
+import side:web-fixtures/components/side.mq.md
+import foot:web-fixtures/components/foot.mq.md
+import json:lib/json.mq.md
 ---
 
 # main

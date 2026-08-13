@@ -122,7 +122,7 @@ cargo run -- view output public -o public
 powershell -File ./scripts/build-public.ps1
 ```
 
-**发布包（GitHub Releases）**：单独二进制 **已内置**官方 `lib/`（`> lib/…` 可直接导入）。仍提供带 `lib/` 的 zip 便于覆盖或离线分发。**扩展库**用 `marqdo ext add llm|agent|web|quantum` 安装（见 [CHANGELOG](CHANGELOG.md) 与 [ext-cli.md](doc/design/ext-cli.md)）；原生 `.so`/`.dll` 需本地编译或从带 `native/` 的安装目录解析。`marqdo version --check` 可查看是否有新版本。
+**发布包（GitHub Releases）**：单独二进制 **已内置**官方 `lib/`（`import …:lib/…` 可直接导入）。仍提供带 `lib/` 的 zip 便于覆盖或离线分发。**扩展库**用 `marqdo ext add llm|agent|web|quantum` 安装（见 [CHANGELOG](CHANGELOG.md) 与 [ext-cli.md](doc/design/ext-cli.md)）；原生 `.so`/`.dll` 需本地编译或从带 `native/` 的安装目录解析。`marqdo version --check` 可查看是否有新版本。
 
 文档：用户站 [public/](public/) · 设计 [doc/](doc/) · OKF / catalog [catalog-cli.md](doc/design/catalog-cli.md) · 调试 [view-debug.md](doc/design/view-debug.md)
 

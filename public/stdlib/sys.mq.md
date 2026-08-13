@@ -1,7 +1,7 @@
 ---
 title: lib/sys — process
 description: Env, dotenv, cwd, args, exit, exec
-> lib/sys.mq.md
+import sys:lib/sys.mq.md
 ---
 
 # main

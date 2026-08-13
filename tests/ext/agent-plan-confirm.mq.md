@@ -1,10 +1,10 @@
 ---
 title: agent plan confirm (offline)
 description: Create workbook skeleton with confirm=True; no LLM spawn loop.
-> ext/ai/llm.mq.md
-> ext/ai/agent.mq.md
-> lib/json.mq.md
-> lib/fs.mq.md
+import llm:ext/ai/llm.mq.md
+import agent:ext/ai/agent.mq.md
+import json:lib/json.mq.md
+import fs:lib/fs.mq.md
 ---
 
 # main

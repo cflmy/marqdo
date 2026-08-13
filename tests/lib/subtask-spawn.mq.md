@@ -1,7 +1,7 @@
 ---
 title: subtask spawn join
-> lib/subtask.mq.md
-> lib/json.mq.md
+import subtask:lib/subtask.mq.md
+import json:lib/json.mq.md
 ---
 
 # main

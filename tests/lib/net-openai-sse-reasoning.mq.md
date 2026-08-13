@@ -1,8 +1,8 @@
 ---
 title: openai SSE reasoning_content offline
 description: DeepSeek-style thinking streams as type=reasoning; answer stays delta/done.result.
-> lib/net.mq.md
-> lib/json.mq.md
+import net:lib/net.mq.md
+import json:lib/json.mq.md
 ---
 
 # main

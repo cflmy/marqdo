@@ -1,6 +1,6 @@
 ---
 title: json quote
-> lib/json.mq.md
+import json:lib/json.mq.md
 ---
 
 # main

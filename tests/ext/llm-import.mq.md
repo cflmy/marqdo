@@ -1,6 +1,6 @@
 ---
 title: ext llm import
-> ext/ai/llm.mq.md
+import llm:ext/ai/llm.mq.md
 ---
 
 # main

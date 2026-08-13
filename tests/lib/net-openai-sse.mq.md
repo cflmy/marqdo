@@ -1,7 +1,7 @@
 ---
 title: openai SSE parse offline
-> lib/net.mq.md
-> lib/json.mq.md
+import net:lib/net.mq.md
+import json:lib/json.mq.md
 ---
 
 # main

@@ -301,10 +301,14 @@ fn extract_frontmatter_imports(source: &str) -> Vec<String> {
         if t == "---" {
             break;
         }
-        if let Some(rest) = t.strip_prefix('>') {
-            if let Some(imp) = crate::parse::parse_import_spec(rest.trim()) {
-                imports.push(format!("{} as {}", imp.path, imp.bind));
-            }
+        if let Ok(Some(crate::parse::ImportLine::File(imp))) =
+            crate::parse::parse_import_line(t)
+        {
+            imports.push(format!("import {}:{}", imp.bind, imp.path));
+        } else if let Ok(Some(crate::parse::ImportLine::Member(u))) =
+            crate::parse::parse_import_line(t)
+        {
+            imports.push(format!("import {}:{}", u.bind, u.path.join(".")));
         }
     }
     imports

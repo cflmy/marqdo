@@ -1,7 +1,7 @@
 ---
 title: frontmatter use short name
-> lib/text.mq.md
-> use text.str_trim as trim_text
+import text:lib/text.mq.md
+import trim_text:text.str_trim
 ---
 
 # main

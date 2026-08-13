@@ -1,11 +1,11 @@
 ---
 title: OKF agent-kb alias lookup (offline)
 description: Promote resource; patch Task aliases; variant goal hits same resource.
-> ext/ai/agent.mq.md
-> lib/fs.mq.md
-> lib/json.mq.md
-> lib/plugin.mq.md
-> lib/sys.mq.md
+import agent:ext/ai/agent.mq.md
+import fs:lib/fs.mq.md
+import json:lib/json.mq.md
+import plugin:lib/plugin.mq.md
+import sys:lib/sys.mq.md
 ---
 
 # main

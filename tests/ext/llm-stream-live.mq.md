@@ -1,8 +1,8 @@
 ---
 title: ext llm DeepSeek stream live
 description: Live SSE complete with echo; credentials from tests/ext/.env.
-> ext/ai/llm.mq.md
-> lib/json.mq.md
+import llm:ext/ai/llm.mq.md
+import json:lib/json.mq.md
 ---
 
 # main

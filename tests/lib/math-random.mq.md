@@ -1,6 +1,6 @@
 ---
 title: math random seed
-> lib/math.mq.md
+import math:lib/math.mq.md
 ---
 
 # main

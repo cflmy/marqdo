@@ -38,7 +38,7 @@
 
 ```text
 用户 .mq.md
-    │  > lib/fs.mq.md  /  > ext/llm.mq.md
+    │  import fs:lib/fs.mq.md  /  import llm:ext/llm.mq.md
     ▼
 L1 官方库 / 官方 ext（.mq.md）
     │

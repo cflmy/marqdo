@@ -1,7 +1,7 @@
 ---
 title: lib/plugin — native ABI
 description: Load optional shared libraries (.dll / .so / .dylib)
-> lib/plugin.mq.md
+import plugin:lib/plugin.mq.md
 ---
 
 # main

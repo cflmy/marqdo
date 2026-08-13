@@ -1,6 +1,6 @@
 ---
 title: foreign zh
-> lib/外联.mq.md
+导入 外联:lib/外联.mq.md
 ---
 
 # main

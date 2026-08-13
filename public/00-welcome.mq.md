@@ -1,8 +1,8 @@
 ---
 title: Welcome to Marqdo
 description: User docs home — code is documentation (English)
-> lib/math.mq.md
-> lib/foreign.mq.md
+import math:lib/math.mq.md
+import foreign:lib/foreign.mq.md
 ---
 
 # main

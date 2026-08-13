@@ -1,7 +1,7 @@
 ---
 title: lib/fs — files
 description: Read and write text under the sandbox
-> lib/fs.mq.md
+import fs:lib/fs.mq.md
 ---
 
 # main

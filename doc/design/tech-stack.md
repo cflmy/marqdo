@@ -130,7 +130,7 @@
    - 候选 A：TS + remark-gfm — 能否区分 `-`/`+` bullet、解析单列表格、读 strong/emphasis。  
    - 候选 B：Rust + comrak/pulldown — 同上。  
    - （可选）C 或 D 若团队有偏好再做。  
-2. **对照验收用例**（固定）：`tests/structure/hello.mq.md`、`branch.mq.md`（`+`）、`collection.mq.md`（表）、含 `> x.mq.md` 的 frontmatter 行。  
+2. **对照验收用例**（固定）：`tests/structure/hello.mq.md`、`branch.mq.md`（`+`）、`collection.mq.md`（表）、含 `import x:x.mq.md` 的 frontmatter 行。  
 3. **出 ADR**：选定「验证期实现」与（可选）「生产目标实现」是否同一语言。  
 4. **再**建仓库脚手架与测试——禁止在 ADR 前默认生成 `package.json` / `Cargo.toml` 当既成事实。
 

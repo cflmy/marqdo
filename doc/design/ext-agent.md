@@ -72,10 +72,10 @@ Marqdo 的宪法是 **代码即文档、文档即知识库**：
 
 ```markdown
 ---
-> ext/ai/智能体.mq.md
-> ext/ai/大模型.mq.md
-> lib/自写回.mq.md
-> lib/时间.mq.md
+导入 智能体:ext/ai/智能体.mq.md
+导入 大模型:ext/ai/大模型.mq.md
+导入 自写回:lib/自写回.mq.md
+导入 时间:lib/时间.mq.md
 ---
 
 ## 获取时间
@@ -152,7 +152,7 @@ ext/
 | **`lib/writeback`** | 持久化输出块 |
 | **`lib/subtask`** | **工具调用与（多步时）子智能体并行的执行通道**；见 [stdlib-subtask.md](stdlib-subtask.md) |
 
-安装：[`ext-cli.md`](ext-cli.md) — `marqdo ext add agent` / `add llm`（`.mq.md` + `native/libagent.so`）。导入：`> ext/ai/智能体.mq.md`。
+安装：[`ext-cli.md`](ext-cli.md) — `marqdo ext add agent` / `add llm`（`.mq.md` + `native/libagent.so`）。导入：`导入 智能体:ext/ai/智能体.mq.md`。
 
 **原生插件（ABI v2）**：`ext/ai/agent` 经 `lib/plugin` 加载；优先 `> plugin.native_path name=agent`，否则按序查找：
 

@@ -1,7 +1,7 @@
 ---
 title: quantum noise zh smoke
 description: 噪声 bitflip p=1 后 I 使全部射中 |1⟩.
-> ext/quantum/量子.mq.md
+导入 量子:ext/quantum/量子.mq.md
 ---
 
 # main

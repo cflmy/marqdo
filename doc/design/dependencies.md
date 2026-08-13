@@ -41,7 +41,7 @@ Marqdo 换 **Rust 或 C++** 都不改变「主前端不该是 Flex/Bison」这�
   │
   ├─① 行分类（自研）        无标记 → 注释；有标记 → 代码行
   ├─② GFM 块/行内（库）     标题、表、强调、列表结构
-  ├─③ 行扫描补强（自研）    保留 '-' / '+'；frontmatter `> file.mq.md`
+  ├─③ 行扫描补强（自研）    保留 '-' / '+'；frontmatter `import file:file.mq.md`
   └─④ Marqdo 语法（自研）   递归下降：Module/Fun/Stmt/Expr → AST
          └─ 表达式子语言     可手写，或仅对 Expr 用 pest/nom
 ```
@@ -80,7 +80,7 @@ Marqdo 换 **Rust 或 C++** 都不改变「主前端不该是 Flex/Bison」这�
 | **pulldown-cmark** *或* **comrak** | GFM 事件/AST | 标题、列表、表格、emphasis/strong；Spike 已证明「库 + 行扫描」可行。二选一做 Spike 对比后钉死 |
 | **thiserror** / **anyhow** | 错误类型 | 诊断与 CLI 报错 |
 | **clap** | CLI | `marqdo run [path]` |
-| **serde** + **serde_yaml** | 元信息 | 仅解析 frontmatter 中的 YAML **键值**；`> x.mq.md` 仍按**行**抽取（见 Spike） |
+| **serde** + **serde_yaml** | 元信息 | 仅解析 frontmatter 中的 YAML **键值**；`import x:x.mq.md` 仍按**行**抽取（见 Spike） |
 | **ureq** (=2.9.7) | HTTP(S) | `lib/net`；为 Cargo 1.81 另钉 `idna_adapter`/`zeroize`（见根 `Cargo.toml`） |
 
 #### 强烈建议

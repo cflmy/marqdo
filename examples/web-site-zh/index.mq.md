@@ -1,13 +1,13 @@
 ---
 title: 中文站点示例
 description: Home + /about + /new（表单嵌入）+ 后台；只用 ext/web/网页.mq.md。
-> ext/web/网页.mq.md
-> styles/shell.mq.md
-> components/nav.mq.md
-> components/side.mq.md
-> components/foot.mq.md
-> db/articles.mq.md
-> db/index.mq.md as db
+导入 网页:ext/web/网页.mq.md
+import shell:styles/shell.mq.md
+import nav:components/nav.mq.md
+import side:components/side.mq.md
+import foot:components/foot.mq.md
+import articles:db/articles.mq.md
+import db:db/index.mq.md
 ---
 
 # main

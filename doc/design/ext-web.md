@@ -112,10 +112,10 @@ myapp/
 
 | 导入 | 库名（默认茎） | 类 / 方法 / 形参 |
 |------|----------------|------------------|
-| `> ext/web/web.mq.md` | `web` | **仅英文**：`page` · `compose_components` · `db` · `app` · `components=` … |
-| `> ext/web/网页.mq.md` | `网页` | **仅中文**：`页面` · `组件装配` · `数据库` · `应用` · `组件=` … |
+| `import web:ext/web/web.mq.md` | `web` | **仅英文**：`page` · `compose_components` · `db` · `app` · `components=` … |
+| `导入 网页:ext/web/网页.mq.md` | `网页` | **仅中文**：`页面` · `组件装配` · `数据库` · `应用` · `组件=` … |
 
-禁止：`> ext/web/web.mq.md` 后写 `web.页面` / `` `页`.组件装配 ``（英文库混中文成员）。  
+禁止：`import web:ext/web/web.mq.md` 后写 `web.页面` / `` `页`.组件装配 ``（英文库混中文成员）。  
 禁止：在 `web.mq.md` 文件内定义中文 `## 组件装配` 别名。中英对等靠**两个文件**，不靠同一文件双份导出。
 
 ### 4.1 英文面（导入 `web.mq.md`）
@@ -124,13 +124,13 @@ myapp/
 ---
 title: web-site
 description: Home = page table; main may be inline; class methods assemble.
-> ext/web/web.mq.md
-> styles/shell.mq.md
-> components/nav.mq.md
-> components/side.mq.md
-> components/foot.mq.md
-> db/articles.mq.md
-> db/index.mq.md as db
+import web:ext/web/web.mq.md
+import shell:styles/shell.mq.md
+import nav:components/nav.mq.md
+import side:components/side.mq.md
+import foot:components/foot.mq.md
+import articles:db/articles.mq.md
+import db:db/index.mq.md
 ---
 
 # main
@@ -167,13 +167,13 @@ Main content is not a reusable component, so it is authored here.
 ```markdown
 ---
 title: 站点
-> ext/web/网页.mq.md
-> styles/shell.mq.md
-> components/nav.mq.md
-> components/side.mq.md
-> components/foot.mq.md
-> db/articles.mq.md
-> db/index.mq.md as db
+导入 网页:ext/web/网页.mq.md
+import shell:styles/shell.mq.md
+import nav:components/nav.mq.md
+import side:components/side.mq.md
+import foot:components/foot.mq.md
+import articles:db/articles.mq.md
+import db:db/index.mq.md
 ---
 
 # main

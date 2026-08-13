@@ -22,7 +22,7 @@ Diagnostics look like `path:line:col: message` (1-based line/col).
 
 Stdlib search order for `lib/…` imports: `MARQDO_LIB`, `./lib`, directory of the `marqdo` executable (and a few parents). Prefer the **bundle zip** (`marqdo.exe` + `lib/`) over a bare exe.
 
-官方扩展（`ext/…`，非 stdlib）：`marqdo ext add` 装到 `MARQDO_EXT` 或 `~/.marqdo/ext`；导入仍写 `> ext/llm.mq.md`。解析还含 cwd `ext/`、二进制旁 `ext/`。对象：`doc/design/objects.md`。Agent：`doc/design/ext-agent.md` · 安装器：`doc/design/ext-cli.md`。
+官方扩展（`ext/…`，非 stdlib）：`marqdo ext add` 装到 `MARQDO_EXT` 或 `~/.marqdo/ext`；导入仍写 `import llm:ext/llm.mq.md`。解析还含 cwd `ext/`、二进制旁 `ext/`。对象：`doc/design/objects.md`。Agent：`doc/design/ext-agent.md` · 安装器：`doc/design/ext-cli.md`。
 
 ## Builtins (no import)
 
@@ -61,7 +61,7 @@ Open the imported `.mq.md` under `lib/` or `ext/` to see exact `##` / `#` names 
 
 ```markdown
 ---
-> lib/math.mq.md
+import math:lib/math.mq.md
 ---
 
 # main
@@ -80,7 +80,7 @@ Empty RHS assignment + following `$$…$$` binds a formula value. Narrative-only
 
 ```markdown
 ---
-> lib/foreign.mq.md
+import foreign:lib/foreign.mq.md
 ---
 
 # main

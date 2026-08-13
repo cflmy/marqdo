@@ -1,12 +1,12 @@
 ---
 title: web zh API smoke
 description: Offline Chinese 网页.mq.md assemble (no listen).
-> ext/web/网页.mq.md
-> web-fixtures/components/nav.mq.md
-> web-fixtures/components/side.mq.md
-> web-fixtures/components/foot.mq.md
-> web-fixtures/db/articles.mq.md as articles
-> lib/json.mq.md
+导入 网页:ext/web/网页.mq.md
+import nav:web-fixtures/components/nav.mq.md
+import side:web-fixtures/components/side.mq.md
+import foot:web-fixtures/components/foot.mq.md
+import articles:web-fixtures/db/articles.mq.md
+import json:lib/json.mq.md
 ---
 
 # main

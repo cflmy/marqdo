@@ -1,8 +1,8 @@
 ---
 title: web static smoke
 description: Offline app.static registration (no listen).
-> ext/web/web.mq.md
-> lib/json.mq.md
+import web:ext/web/web.mq.md
+import json:lib/json.mq.md
 ---
 
 # main

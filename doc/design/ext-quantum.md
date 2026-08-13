@@ -101,11 +101,11 @@ marqdo ext add quantum
 
 ```markdown
 ---
-> ext/quantum/quantum.mq.md
+import quantum:ext/quantum/quantum.mq.md
 ---
 ```
 
-或中文：`> ext/quantum/量子.mq.md`。
+或中文：`导入 量子:ext/quantum/量子.mq.md`。
 
 ---
 
@@ -333,7 +333,7 @@ Q5  教学噪声 + barrier/measure/append/state — 见 [ext-quantum-q5.md](ext-
 ```markdown
 ---
 title: Bell state
-> ext/quantum/quantum.mq.md
+import quantum:ext/quantum/quantum.mq.md
 ---
 
 # Bell |Φ+⟩

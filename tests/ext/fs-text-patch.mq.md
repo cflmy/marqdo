@@ -1,7 +1,7 @@
 ---
 title: fs text_patch / apply_patch_blocks (offline)
-> lib/fs.mq.md
-> lib/json.mq.md
+import fs:lib/fs.mq.md
+import json:lib/json.mq.md
 ---
 
 # main

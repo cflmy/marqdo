@@ -1,4 +1,4 @@
-﻿---
+---
 title: Hello World
 description: Recommended entry — nested fn; print builtin; bold return
 ---

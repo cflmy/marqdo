@@ -1,7 +1,7 @@
 ---
 title: sys dotenv
-> lib/sys.mq.md
-> lib/fs.mq.md
+import sys:lib/sys.mq.md
+import fs:lib/fs.mq.md
 ---
 
 # main

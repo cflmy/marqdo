@@ -6,14 +6,14 @@ use crate::diagnostics::Span;
 use crate::formula::Expr as FormulaExpr;
 use crate::value::CodeBlock;
 
-/// Frontmatter import: path + library bind name (see `doc/design/module-namespace.md`).
+/// Frontmatter file import: `import bind:path.mq.md` (see `doc/design/module-namespace.md`).
 #[derive(Debug, Clone)]
 pub struct Import {
     pub path: String,
     pub bind: String,
 }
 
-/// Frontmatter `use` / `使用`: bind a short name to a library path (`time.format`).
+/// Frontmatter short-name bind: `import bind:lib.member` (same keyword as file import).
 #[derive(Debug, Clone)]
 pub struct Use {
     pub path: Vec<String>,
@@ -199,7 +199,7 @@ pub fn format_ast_dump(path: &str, module: &Module) -> String {
         let specs: Vec<String> = module
             .imports
             .iter()
-            .map(|i| format!("{} as {}", i.path, i.bind))
+            .map(|i| format!("import {}:{}", i.bind, i.path))
             .collect();
         out.push_str(&format!("(imports {:?})\n", specs));
     }

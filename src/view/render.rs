@@ -200,18 +200,14 @@ pub fn render_module_structure_mode(
     let writebacks = writeback::writeback_map(source);
     let mut out = String::new();
 
-    if !module.imports.is_empty() {
+    if !module.imports.is_empty() || !module.uses.is_empty() {
         out.push_str("<div class=\"card\"><span class=\"badge\">import</span>");
         for imp in &module.imports {
-            let label = format!("{} as {}", imp.path, imp.bind);
+            let label = format!("{}:{}", imp.bind, imp.path);
             out.push_str(&format!("<span class=\"chip\">{}</span>", escape(&label)));
         }
-        out.push_str("</div>");
-    }
-    if !module.uses.is_empty() {
-        out.push_str("<div class=\"card\"><span class=\"badge\">use</span>");
         for u in &module.uses {
-            let label = format!("{} as {}", u.path.join("."), u.bind);
+            let label = format!("{}:{}", u.bind, u.path.join("."));
             out.push_str(&format!("<span class=\"chip\">{}</span>", escape(&label)));
         }
         out.push_str("</div>");
@@ -1502,7 +1498,7 @@ mod tests {
 
     #[test]
     fn structure_omits_imported_lib_bodies() {
-        let src = "---\ntitle: t\n> lib/text.mq.md\n---\n\n# main\n\n> print text=hi\n";
+        let src = "---\ntitle: t\nimport text:lib/text.mq.md\n---\n\n# main\n\n> print text=hi\n";
         let local = crate::parse::parse_source(src).unwrap();
         let html = render_module_structure(&local, src);
         assert!(html.contains("badge\">import"), "{html}");

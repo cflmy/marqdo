@@ -1,9 +1,9 @@
 ---
 title: agent plan decision + dual skeleton (offline)
 description: extract_plan_decision/summary; dual skeleton contains research+writer; patch apply on fixture.
-> ext/ai/agent.mq.md
-> lib/json.mq.md
-> lib/fs.mq.md
+import agent:ext/ai/agent.mq.md
+import json:lib/json.mq.md
+import fs:lib/fs.mq.md
 ---
 
 # main

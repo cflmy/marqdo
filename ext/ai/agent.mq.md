@@ -1,14 +1,14 @@
 ---
 title: ext/ai/agent
 description: Document-driven agent — step / plan; tools via lib/subtask; runtime via ABI v2 agent plugin.
-> ext/ai/llm.mq.md
-> lib/json.mq.md
-> lib/sys.mq.md
-> lib/fs.mq.md
-> lib/time.mq.md
-> lib/writeback.mq.md
-> lib/subtask.mq.md
-> lib/plugin.mq.md
+import llm:ext/ai/llm.mq.md
+import json:lib/json.mq.md
+import sys:lib/sys.mq.md
+import fs:lib/fs.mq.md
+import time:lib/time.mq.md
+import writeback:lib/writeback.mq.md
+import subtask:lib/subtask.mq.md
+import plugin:lib/plugin.mq.md
 ---
 
 ## build_step_context

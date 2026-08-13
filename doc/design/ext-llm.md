@@ -12,7 +12,7 @@
 
 ```markdown
 ---
-> ext/ai/llm.mq.md
+import llm:ext/ai/llm.mq.md
 ---
 ```
 
@@ -22,7 +22,7 @@ Other official ext: [ext-agent.md](ext-agent.md) / [ext-agent-plan.md](ext-agent
 
 Streaming: `complete stream=True` returns an event list (`reasoning` / `delta` / `done` / `error`); `echo=True` prints thinking (`reasoning_content`) and answer tokens as they arrive. See [agent-streaming.md](../roadmap/agent-streaming.md). Default (`stream=False`) is unchanged (answer string).
 
-**Note:** Prefer `marqdo ext add llm`. Import `> ext/ai/llm.mq.md` from repo or install root.
+**Note:** Prefer `marqdo ext add llm`. Import `import llm:ext/ai/llm.mq.md` from repo or install root.
 
 ## Platform prerequisites
 
@@ -43,7 +43,7 @@ Streaming: `complete stream=True` returns an event list (`reasoning` / `delta` /
 
 ```markdown
 ---
-> ext/ai/llm.mq.md
+import llm:ext/ai/llm.mq.md
 ---
 
 # main

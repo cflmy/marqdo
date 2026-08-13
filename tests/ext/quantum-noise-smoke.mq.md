@@ -1,7 +1,7 @@
 ---
 title: quantum noise smoke
 description: bitflip p=1 after I flips |0> to |1| for all shots.
-> ext/quantum/quantum.mq.md
+import quantum:ext/quantum/quantum.mq.md
 ---
 
 # main

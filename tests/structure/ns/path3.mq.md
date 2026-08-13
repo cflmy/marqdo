@@ -1,6 +1,6 @@
 ---
 title: three-segment library path
-> helpers.mq.md
+import helpers:helpers.mq.md
 ---
 
 # main

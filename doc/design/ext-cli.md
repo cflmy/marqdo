@@ -21,7 +21,7 @@ marqdo ext remove agent
 1. `MARQDO_EXT` if set  
 2. Else `~/.marqdo/ext`
 
-Imports use paths like `> ext/ai/llm.mq.md` (see [`load.rs`](../../src/load.rs)).
+Imports use paths like `import llm:ext/ai/llm.mq.md` (see [`load.rs`](../../src/load.rs)).
 
 ## Source for `add`
 

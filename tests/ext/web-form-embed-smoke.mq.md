@@ -1,8 +1,8 @@
 ---
 title: web form embed smoke
 description: Offline page.compose_form embeds form in main HTML (no listen).
-> ext/web/web.mq.md
-> lib/json.mq.md
+import web:ext/web/web.mq.md
+import json:lib/json.mq.md
 ---
 
 # main

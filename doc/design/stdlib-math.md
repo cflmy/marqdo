@@ -198,8 +198,7 @@ src/host/math.rs      # 数值、随机、对 formula 的 host 入口
 src/host/plot.rs      # SVG
 lex/parse：空 RHS 赋值 + $$ 围栏 → Expr::Formula
 Value::Num / Value::Formula
-Interpreter.plots: Vec<String>
-lib/math.mq.md · lib/数学.mq.md
+Interpreter.plots: Vec<Stringimport math:lib/math.mq.md · lib/数学.mq.md
 ```
 
 依赖：纯 Rust；不绑 SymPy。公式复杂度、采样点、SVG 大小设硬上限。

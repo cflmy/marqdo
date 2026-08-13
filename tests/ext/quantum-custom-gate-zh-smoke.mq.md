@@ -1,8 +1,8 @@
 ---
 title: quantum custom gate zh from formula
 description: $$ 矩阵 $$ → 门 矩阵= → 施加.
-> ext/quantum/量子.mq.md
-> lib/math.mq.md
+导入 量子:ext/quantum/量子.mq.md
+import math:lib/math.mq.md
 ---
 
 # main

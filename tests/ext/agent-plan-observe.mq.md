@@ -1,8 +1,8 @@
 ---
 title: parent observation excerpt + deepen (offline)
-> ext/ai/agent.mq.md
-> lib/json.mq.md
-> lib/fs.mq.md
+import agent:ext/ai/agent.mq.md
+import json:lib/json.mq.md
+import fs:lib/fs.mq.md
 ---
 
 # main

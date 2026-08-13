@@ -1,9 +1,9 @@
 ---
 title: web db.select where smoke
 description: Offline select with map and filter-table where (no listen).
-> ext/web/web.mq.md
-> web-fixtures/db/articles.mq.md as articles
-> lib/json.mq.md
+import web:ext/web/web.mq.md
+import articles:web-fixtures/db/articles.mq.md
+import json:lib/json.mq.md
 ---
 
 # main

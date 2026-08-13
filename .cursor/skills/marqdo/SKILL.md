@@ -38,8 +38,8 @@ Canonical design (repo): `doc/design/markdown-mapping.md`, `doc/design/keywords.
 | Line `N. *` | Else arm |
 | `> fn args` | Call (named `k=v` or positional) |
 | `` > `obj`.method args `` | Method call (`obj` must be a map with `_type`) |
-| Frontmatter `> path.mq.md` [`as` / `作为` name] | Import (binds library name) |
-| Frontmatter `> use lib.member` [`as` name] / `使用` | Bind short name to a library path |
+| Frontmatter `import bind:path.mq.md` / `导入` | Import file (bind library name) |
+| Frontmatter `import bind:lib.member` / `导入` | Short name for a library member (same keyword; no separate `use`) |
 | `> lib.member …` / `> lib.Type.member …` | Call via bare dotted path (instance methods need `` `var`.m ``) |
 | `*…*` | Statement (bind / expr) |
 | `**…**` | Return value |
@@ -112,13 +112,13 @@ Chinese builtins (same functions, no import):
 
 ## Frontmatter imports + stdlib
 
-Imports bind a **library name** (default = file stem; optional `as` / `作为`). Members are **not** flattened into the caller. Call with a bare dotted path:
+Imports use `import bind:target` (`导入` equivalent): file (`.mq.md`) or short name (`lib.member`). Members are **not** flattened into the caller. Call with a bare dotted path:
 
 ```markdown
 ---
 title: example
-> lib/text.mq.md
-> lib/time.mq.md as clock
+import text:lib/text.mq.md
+import clock:lib/time.mq.md
 ---
 
 # main

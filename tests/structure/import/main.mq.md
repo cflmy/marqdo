@@ -1,6 +1,6 @@
-﻿---
+---
 title: 跨文件导入示例
-> utils.mq.md
+import utils:utils.mq.md
 ---
 
 # main

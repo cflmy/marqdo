@@ -1,6 +1,6 @@
 ---
 title: path to instance method needs receiver
-> ../structure/ns/helpers.mq.md
+import helpers:../structure/ns/helpers.mq.md
 ---
 
 # main

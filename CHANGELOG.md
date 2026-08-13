@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+- **Frontmatter import syntax**: `import bind:target` / `导入 bind:target` (file `.mq.md` or short name `lib.member`). Removed legacy `> path.mq.md` / `> use` imports. See [module-namespace.md](doc/design/module-namespace.md).
+
 ## v0.2.0 — 2026-08-12
 
 ### Highlights — official extension libraries

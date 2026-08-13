@@ -1,6 +1,6 @@
 ---
 title: time format/parse
-> lib/time.mq.md
+import time:lib/time.mq.md
 ---
 
 # main

@@ -275,6 +275,15 @@ fn error_ns_instance_method() {
     );
 }
 
+#[test]
+fn error_legacy_gt_import() {
+    assert_err(
+        "tests/errors/legacy-gt-import.mq.md",
+        "3:1",
+        "legacy frontmatter import",
+    );
+}
+
 
 #[test]
 fn structure_fn_end_hr() {
@@ -1169,7 +1178,7 @@ fn ext_cli_add_list_remove_llm() {
     let mq = tmp.join("smoke.mq.md");
     std::fs::write(
         &mq,
-        "---\n> ext/ai/llm.mq.md\n---\n\n# main\n\n> print text=ext-cli-ok\n",
+        "---\nimport llm:ext/ai/llm.mq.md\n---\n\n# main\n\n> print text=ext-cli-ok\n",
     )
     .unwrap();
     let run = Command::new(bin)

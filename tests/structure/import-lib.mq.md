@@ -1,7 +1,7 @@
 ---
 title: import official lib (Chinese)
-> lib/文本.mq.md
-> lib/表.mq.md
+导入 文本:lib/文本.mq.md
+导入 表:lib/表.mq.md
 ---
 
 # main

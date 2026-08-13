@@ -1,9 +1,9 @@
 ---
 title: ext/agent framework smoke
 description: Real llm handle from tests/ext/.env; context, extract_tool_name, run_tool via subtask.
-> ext/ai/llm.mq.md
-> lib/json.mq.md
-> ext/ai/agent.mq.md
+import llm:ext/ai/llm.mq.md
+import json:lib/json.mq.md
+import agent:ext/ai/agent.mq.md
 ---
 
 ## 获取时间

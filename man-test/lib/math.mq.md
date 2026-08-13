@@ -1,7 +1,7 @@
 ---
 title: 手工构造的测试样例
 description: AI禁止更改
-> lib/math.mq.md
+import math:lib/math.mq.md
 ---
 
 # main

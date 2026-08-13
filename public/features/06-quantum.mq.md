@@ -1,7 +1,7 @@
 ---
 title: Quantum circuits (ext/quantum)
 description: Official quantum simulator — tables, gates, probs/Bloch/matrix SVG
-> ext/quantum/quantum.mq.md
+import quantum:ext/quantum/quantum.mq.md
 ---
 
 # main

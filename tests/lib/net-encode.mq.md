@@ -1,6 +1,6 @@
 ---
 title: net url_encode
-> lib/net.mq.md
+import net:lib/net.mq.md
 ---
 
 # main

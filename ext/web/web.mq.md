@@ -1,9 +1,9 @@
 ---
 title: ext/web/web
 description: Official web site classes (English). Tables + methods; no bag glue.
-> lib/plugin.mq.md
-> lib/sys.mq.md
-> lib/json.mq.md
+import plugin:lib/plugin.mq.md
+import sys:lib/sys.mq.md
+import json:lib/json.mq.md
 ---
 
 ## ensure_plugin

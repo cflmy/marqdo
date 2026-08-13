@@ -12,7 +12,7 @@ use anyhow::{bail, Result};
 use crate::ast::{
     BranchArm, Expr, Function, Import, Literal, Module, Stmt, Use,
 };
-use crate::diagnostics::{Diagnostic, Span};
+use crate::diagnostics::{bail_at, Diagnostic, Span};
 use crate::lex::{classify_source, ClassifiedLine, LineKind};
 use crate::parse::expr::parse_call_after_gt as call_after_gt;
 use crate::parse::expr::parse_expr as parse_expr_str;
@@ -41,10 +41,10 @@ pub fn parse_classified(lines: &[ClassifiedLine]) -> Result<Module> {
     }
     for u in &uses {
         if imports.iter().any(|i| i.bind == u.bind) {
-            bail!("use bind `{}` conflicts with import library name", u.bind);
+            bail!("import bind `{}` conflicts with file import library name", u.bind);
         }
         if functions.iter().any(|f| f.name == u.bind) {
-            bail!("use bind `{}` conflicts with top-level name", u.bind);
+            bail!("import bind `{}` conflicts with top-level name", u.bind);
         }
     }
     Ok(Module {
@@ -107,23 +107,37 @@ impl<'a> Cursor<'a> {
                 self.bump();
                 break;
             }
-            if t.starts_with('>') {
-                let rest = t[1..].trim();
-                if let Some(imp) = parse_import_spec(rest) {
-                    if imports.iter().any(|i| i.bind == imp.bind) {
-                        bail!(
-                            "{}:1: duplicate import bind `{}`",
-                            line.line_no,
-                            imp.bind
-                        );
+            let span = Span::new(line.line_no, 1);
+            if let Some(msg) = legacy_frontmatter_import_hint(t) {
+                return Err(bail_at(None, span, msg));
+            }
+            match parse_import_line(t) {
+                Ok(Some(ImportLine::File(imp))) => {
+                    if imports.iter().any(|i| i.bind == imp.bind)
+                        || uses.iter().any(|u| u.bind == imp.bind)
+                    {
+                        return Err(bail_at(
+                            None,
+                            span,
+                            format!("duplicate import bind `{}`", imp.bind),
+                        ));
                     }
                     imports.push(imp);
-                } else if let Some(u) = parse_use_spec(rest) {
-                    if uses.iter().any(|x| x.bind == u.bind) {
-                        bail!("{}:1: duplicate use bind `{}`", line.line_no, u.bind);
+                }
+                Ok(Some(ImportLine::Member(u))) => {
+                    if imports.iter().any(|i| i.bind == u.bind)
+                        || uses.iter().any(|x| x.bind == u.bind)
+                    {
+                        return Err(bail_at(
+                            None,
+                            span,
+                            format!("duplicate import bind `{}`", u.bind),
+                        ));
                     }
                     uses.push(u);
                 }
+                Ok(None) => {}
+                Err(e) => return Err(bail_at(None, span, e.to_string())),
             }
             self.bump();
         }
@@ -915,100 +929,98 @@ fn is_simple_type_name(s: &str) -> bool {
     chars.all(|c| c.is_alphanumeric() || c == '_' || !c.is_ascii())
 }
 
-/// Parse `lib/time.mq.md` / `lib/time.mq.md as time` / `lib/时间.mq.md 作为 时间`.
-pub fn parse_import_spec(rest: &str) -> Option<Import> {
-    let rest = rest.trim();
-    const SUFFIX: &str = ".mq.md";
-    let idx = rest.find(SUFFIX)?;
-    let path = rest[..idx + SUFFIX.len()].trim().to_string();
-    if !path.ends_with(SUFFIX) {
+/// Result of parsing one frontmatter `import` / `导入` line.
+#[derive(Debug, Clone)]
+pub enum ImportLine {
+    File(Import),
+    Member(Use),
+}
+
+fn legacy_frontmatter_import_hint(trimmed: &str) -> Option<String> {
+    let t = trimmed.trim();
+    if !t.starts_with('>') {
         return None;
     }
-    let after = rest[idx + SUFFIX.len()..].trim();
-    let bind = if after.is_empty() {
-        default_import_bind(&path)
-    } else if let Some(name) = after.strip_prefix("as") {
-        let name = name.trim();
-        if name.is_empty() || name.split_whitespace().count() != 1 {
-            return None;
-        }
-        name.to_string()
-    } else if let Some(name) = after.strip_prefix("作为") {
-        let name = name.trim();
-        if name.is_empty() || name.split_whitespace().count() != 1 {
-            return None;
-        }
-        name.to_string()
-    } else {
-        return None;
-    };
-    Some(Import { path, bind })
+    let rest = t[1..].trim();
+    let looks_file = rest.contains(".mq.md");
+    let looks_use = rest.starts_with("use")
+        || rest.starts_with("使用")
+        || rest.starts_with("use ")
+        || rest.starts_with("使用 ");
+    if looks_file || looks_use {
+        return Some(
+            "legacy frontmatter import `> …` is removed; use `import bind:path.mq.md` \
+             or `import bind:lib.member` (Chinese: `导入`)"
+                .into(),
+        );
+    }
+    None
 }
 
-fn default_import_bind(path: &str) -> String {
-    let path = path.replace('\\', "/");
-    let file = path.rsplit('/').next().unwrap_or(path.as_str());
-    file.strip_suffix(".mq.md").unwrap_or(file).to_string()
-}
-
-/// Parse `use time.format` / `use time.format as fmt` / `使用 时间.格式化` / `使用 时间.格式化 作为 fmt`.
-pub fn parse_use_spec(rest: &str) -> Option<Use> {
-    let rest = rest.trim();
-    let after = if rest.starts_with("use")
-        && rest
-            .get(3..)
+/// Parse `import json:lib/json.mq.md` / `导入 fmt:time.format`.
+/// Returns `Ok(None)` for non-import frontmatter lines (e.g. `title:`).
+pub fn parse_import_line(trimmed: &str) -> Result<Option<ImportLine>> {
+    let t = trimmed.trim();
+    let after = if t.starts_with("import")
+        && t.get(6..)
             .is_some_and(|s| s.starts_with(|c: char| c.is_whitespace()))
     {
-        rest[3..].trim()
-    } else if let Some(a) = rest.strip_prefix("使用") {
+        t[6..].trim()
+    } else if let Some(a) = t.strip_prefix("导入") {
         let a = a.trim();
         if a.is_empty() {
-            return None;
+            bail!("expected `导入 bind:target`");
         }
         a
     } else {
-        return None;
-    };
-    if after.is_empty() {
-        return None;
-    }
-
-    let (path_str, bind_opt) = if let Some((left, right)) = after.split_once(" as ") {
-        (left.trim(), Some(right.trim()))
-    } else if let Some((left, right)) = after.split_once(" 作为 ") {
-        (left.trim(), Some(right.trim()))
-    } else if let Some((left, right)) = after.split_once("作为") {
-        let left = left.trim();
-        let right = right.trim();
-        if left.is_empty() || right.is_empty() {
-            (after, None)
-        } else {
-            (left, Some(right))
-        }
-    } else {
-        (after, None)
+        return Ok(None);
     };
 
-    if path_str.is_empty() || path_str.contains('`') {
-        return None;
+    let Some((bind_raw, target_raw)) = after.split_once(':') else {
+        bail!("expected `import bind:target` (file `.mq.md` or `lib.member`)");
+    };
+    let bind = bind_raw.trim();
+    let target = target_raw.trim();
+    if bind.is_empty() || !is_simple_bind_name(bind) {
+        bail!("invalid import bind `{bind}`");
     }
-    let path: Vec<String> = path_str
+    if target.is_empty() || target.contains('`') || target.contains(char::is_whitespace) {
+        bail!("invalid import target `{target}`");
+    }
+
+    if target.ends_with(".mq.md") {
+        return Ok(Some(ImportLine::File(Import {
+            path: target.to_string(),
+            bind: bind.to_string(),
+        })));
+    }
+
+    let path: Vec<String> = target
         .split('.')
         .map(|s| s.trim().to_string())
         .collect();
-    if path.len() < 2 || path.iter().any(|p| p.is_empty()) {
-        return None;
+    if path.len() < 2 || path.iter().any(|p| p.is_empty() || !is_simple_bind_name(p)) {
+        bail!(
+            "import target `{target}` must be a `.mq.md` path or dotted member path (e.g. `time.format`)"
+        );
     }
-    let bind = match bind_opt {
-        Some(b) => {
-            if b.is_empty() || b.split_whitespace().count() != 1 || b.contains('.') {
-                return None;
-            }
-            b.to_string()
-        }
-        None => path.last()?.clone(),
-    };
-    Some(Use { path, bind })
+    Ok(Some(ImportLine::Member(Use {
+        path,
+        bind: bind.to_string(),
+    })))
+}
+
+fn is_simple_bind_name(s: &str) -> bool {
+    is_simple_type_name(s)
+}
+
+/// Parse a file import line body for catalog / tooling (`bind:path.mq.md` after keyword stripped),
+/// or the full `import bind:path` / legacy-free form via [`parse_import_line`].
+pub fn parse_import_spec(line: &str) -> Option<Import> {
+    match parse_import_line(line).ok()? {
+        Some(ImportLine::File(imp)) => Some(imp),
+        _ => None,
+    }
 }
 
 fn is_heading(trimmed: &str) -> bool {

@@ -114,7 +114,7 @@ Row-oriented records (SQL-like): first header `@` / `行` / `row` → list of ma
 ```markdown
 ---
 title: split demo
-> lib/text.mq.md
+import text:lib/text.mq.md
 ---
 
 # main
@@ -142,7 +142,7 @@ After a blank line, code runs:
 ```markdown
 ---
 description: loads math
-> lib/math.mq.md
+import math:lib/math.mq.md
 ---
 
 # main
@@ -181,7 +181,7 @@ See `tests/structure/object-handle.mq.md` and `ext/llm.mq.md`: `# Type` construc
 
 ```markdown
 ---
-> ext/agent.mq.md
+import agent:ext/agent.mq.md
 ---
 
 # main

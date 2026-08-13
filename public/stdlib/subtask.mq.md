@@ -1,7 +1,7 @@
 ---
 title: lib/subtask — concurrent tasks
 description: Spawn file, function, or foreign code in parallel
-> lib/subtask.mq.md
+import subtask:lib/subtask.mq.md
 ---
 
 # main

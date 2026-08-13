@@ -1,8 +1,8 @@
 ---
 title: quantum zh API smoke
 description: Chinese 量子.电路 泡利Z sandwich.
-> ext/quantum/量子.mq.md
-> lib/math.mq.md
+导入 量子:ext/quantum/量子.mq.md
+import math:lib/math.mq.md
 ---
 
 # main

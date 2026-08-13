@@ -1,7 +1,7 @@
 ---
 title: lib/text — strings
 description: Trim, split, join wrappers
-> lib/text.mq.md
+import text:lib/text.mq.md
 ---
 
 # main

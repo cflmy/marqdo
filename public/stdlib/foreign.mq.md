@@ -1,7 +1,7 @@
 ---
 title: lib/foreign — external languages
 description: Run local interpreters from Marqdo (English)
-> lib/foreign.mq.md
+import foreign:lib/foreign.mq.md
 ---
 
 # main

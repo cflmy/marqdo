@@ -1,10 +1,10 @@
 ---
 title: ext/ai/llm
 description: OpenAI-compatible LLM object (English). Import ext/ai/llm.mq.md.
-> lib/sys.mq.md
-> lib/net.mq.md
-> lib/json.mq.md
-> lib/table.mq.md
+import sys:lib/sys.mq.md
+import net:lib/net.mq.md
+import json:lib/json.mq.md
+import table:lib/table.mq.md
 ---
 
 ## load_env

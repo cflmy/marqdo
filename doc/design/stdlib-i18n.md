@@ -26,16 +26,16 @@
 
 | 导入 | 库内函数名（示例） |
 |------|-------------------|
-| `> lib/text.mq.md` | `trim` · `split` · `join` |
-| `> lib/文本.mq.md` | `去空白` · `拆分` · `拼接` |
-| `> lib/table.mq.md` | `put` · `rows` · `row_at` · list/map（见 [stdlib-table.md](stdlib-table.md)） |
-| `> lib/表.mq.md` | `行数` · `取行` |
+| `import text:lib/text.mq.md` | `trim` · `split` · `join` |
+| `导入 文本:lib/文本.mq.md` | `去空白` · `拆分` · `拼接` |
+| `import table:lib/table.mq.md` | `put` · `rows` · `row_at` · list/map（见 [stdlib-table.md](stdlib-table.md)） |
+| `导入 表:lib/表.mq.md` | `行数` · `取行` |
 
 示例：
 
 ```markdown
 ---
-> lib/text.mq.md
+import text:lib/text.mq.md
 ---
 
 # main
@@ -44,7 +44,7 @@
 
 ```markdown
 ---
-> lib/文本.mq.md
+导入 文本:lib/文本.mq.md
 ---
 
 # main
@@ -59,8 +59,8 @@
 
 | 导入 | 含义 |
 |------|------|
-| `> lib/text-en.mq.md` | 英文 API |
-| `> lib/text-zh.mq.md` | 中文 API |
+| `import text-en:lib/text-en.mq.md` | 英文 API |
+| `import text-zh:lib/text-zh.mq.md` | 中文 API |
 
 这与 §2.1 **等价可选**，不是第二套解析器：仍然是「写哪个路径就加载哪个文件」。  
 **优先推荐 §2.1**（`text` / `文本`），后缀形式留给需要 ASCII-only 路径的环境。
@@ -81,7 +81,7 @@
 `JSON` 为专有缩写，**不强求**中文库名或中文 API 翻译。官方只提供：
 
 ```text
-lib/json.mq.md    # 中英文档均 `> lib/json.mq.md`；函数 parse / stringify / get / keys
+lib/json.mq.md    # 中英文档均 `import json:lib/json.mq.md`；函数 parse / stringify / get / keys
 ```
 
 不设 `lib/数据.mq.md` 等平行文件。其余模块仍遵守 §2.1。详见 [stdlib-modules.md](stdlib-modules.md) §3.4。
@@ -93,7 +93,7 @@ lib/json.mq.md    # 中英文档均 `> lib/json.mq.md`；函数 parse / stringif
 | 层 | 内容 | 如何获得 |
 |----|------|----------|
 | **内置（L0）** | 极少：`print` `input` `len` `str` `int`（及语言字面量关键字） | 直接调用，无需导入 |
-| **标准库（L1）** | 文本/表等扩展 API；**通常**中英各一套文件、各一套函数名（**JSON 例外**：仅 `lib/json.mq.md`） | frontmatter `> lib/…` |
+| **标准库（L1）** | 文本/表等扩展 API；**通常**中英各一套文件、各一套函数名（**JSON 例外**：仅 `lib/json.mq.md`） | frontmatter `import …:lib/…` |
 | **宿主原语（实现细节）** | 若 `trim`/`split` 等暂由解释器实现 | 仅供标准库包装调用；**文档与用户站引导走 L1**，不鼓励当「关键字」堆砌 |
 
 日后若某能力足够「核心」，可再升格为 L0；升格前先留在 L1。

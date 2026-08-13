@@ -37,7 +37,7 @@ Canonical design (repo): `doc/design/markdown-mapping.md`, `doc/design/keywords.
 | Line `N. *` | Else arm |
 | `> fn args` | Call (named `k=v` or positional) |
 | `` > `obj`.method args `` | Method call (`obj` must be a map with `_type`) |
-| Frontmatter `> path.mq.md` | Import |
+| Frontmatter `import bind:path.mq.md` / `import bind:lib.member` / `导入` | Import file or short-name member |
 | `*…*` | Statement (bind / expr) |
 | `**…**` | Return value |
 | `****` or `**` + spaces + `**` | Return `None` and end function body |
@@ -109,19 +109,22 @@ Chinese builtins (same functions, no import):
 
 ## Frontmatter imports + stdlib
 
+Use `import bind:target` (`导入` equivalent). Target is a `.mq.md` file or a dotted member short name.
+
 ```markdown
 ---
 title: example
-> lib/text.mq.md
+import text:lib/text.mq.md
+import trim_text:text.str_trim
 ---
 
 # main
 
-*`xs` = > split value=a,b,c sep=,*
+*`xs` = > text.split value=a,b,c sep=,*
 > print text=`xs`
 ```
 
-- Import **English** or **Chinese** library file; call that file’s API names (do not mix).
+- Import **English** or **Chinese** library file; call that file’s API names via `lib.member` (do not mix).
 - `lib/…` resolves via `MARQDO_LIB`, cwd `lib/`, or `lib/` next to the `marqdo` binary.
 - Official optional extensions (`ext/`, not stdlib): install with `marqdo ext add llm` / `add agent` (see `doc/design/ext-cli.md`). `ext/llm` — chat; `ext/agent` — agent framework (layout + ABI; compose LLM per `doc/design/ext-agent.md`).
 - Native plugins: `lib/plugin` — `## load` / `unload` / `list`. C ABI: `include/marqdo_abi.h`.

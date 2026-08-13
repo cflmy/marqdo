@@ -51,8 +51,8 @@ Markdown **标记即语法**。输出**不是**语言架构原语，而是内置
 | 分支臂头整行恰为 `*`（在 `N.` 后） | else，如 `2. *` |
 | `> 函数 形参=实参` 或 `> 函数 实参` | 调用（具名 / 位置，见 [call-arguments.md](call-arguments.md)） |
 | `` > `对象`.方法 … `` | 方法调用（实例 map 须含 `_type`） |
-| frontmatter `> path.mq.md` [`as` / `作为` name] | 导入（绑定库名；默认 = 文件名茎） |
-| frontmatter `> use lib.member` [`as` name] / `使用` | 将库路径成员绑为本地短名 |
+| frontmatter `import bind:path.mq.md` / `导入` | 导入文件并绑定库名 |
+| frontmatter `import bind:lib.member` / `导入` | 将库路径成员绑为本地短名（与文件导入同形） |
 | `> lib.member …` / `> lib.Type.member …` | 点号路径调用（路径段裸名、无反引号） |
 | `*…*` | **程序语句**（绑定、表达式句、可写的调用句等） |
 | `**…**` | **返回值**（架构级；函数结果） |
@@ -129,7 +129,7 @@ Markdown **标记即语法**。输出**不是**语言架构原语，而是内置
 
 ## 5. Frontmatter 与跨文件
 
-文件头 `---` 对为元信息。其中 `> file.mq.md` 为**导入**（绑定库名，成员不倒进全局）；`> use lib.member` / `> 使用 库.成员` 引入本地短名。调用经裸点号路径（`time.parse`、`agent.agent`）；实例方法须 `` > `var`.method ``。详见 [module-namespace.md](module-namespace.md)。
+文件头 `---` 对为元信息。其中 `import bind:path.mq.md` / `导入` 为**文件导入**；`import bind:lib.member` 为**短名**（废除独立 `use` 与 frontmatter `>` 导入）。调用经裸点号路径（`time.parse`、`agent.agent`）；实例方法须 `` > `var`.method ``。详见 [module-namespace.md](module-namespace.md)。
 
 **函数体内的** `---` / `***` 不解释为 frontmatter（见 §11）。
 

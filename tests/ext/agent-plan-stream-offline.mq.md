@@ -1,10 +1,10 @@
 ---
 title: agent plan stream helpers + confirm (offline)
 description: plan_append_*/plan_finish_stream; confirm=True with stream attaches done event.
-> ext/ai/llm.mq.md
-> ext/ai/agent.mq.md
-> lib/json.mq.md
-> lib/fs.mq.md
+import llm:ext/ai/llm.mq.md
+import agent:ext/ai/agent.mq.md
+import json:lib/json.mq.md
+import fs:lib/fs.mq.md
 ---
 
 # main

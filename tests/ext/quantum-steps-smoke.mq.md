@@ -1,8 +1,8 @@
 ---
 title: quantum steps + draw smoke
 description: steps= Bell table + draw SVG via record_plot.
-> ext/quantum/quantum.mq.md
-> lib/math.mq.md
+import quantum:ext/quantum/quantum.mq.md
+import math:lib/math.mq.md
 ---
 
 # main

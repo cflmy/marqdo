@@ -1,12 +1,12 @@
 ---
 title: OKF agent-kb promote + lookup + spawn (offline)
 description: Promote a solidified workbook, lookup by goal, spawn without parent LLM.
-> ext/ai/agent.mq.md
-> lib/fs.mq.md
-> lib/json.mq.md
-> lib/subtask.mq.md
-> lib/plugin.mq.md
-> lib/sys.mq.md
+import agent:ext/ai/agent.mq.md
+import fs:lib/fs.mq.md
+import json:lib/json.mq.md
+import subtask:lib/subtask.mq.md
+import plugin:lib/plugin.mq.md
+import sys:lib/sys.mq.md
 ---
 
 # main

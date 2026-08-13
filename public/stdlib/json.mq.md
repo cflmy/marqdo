@@ -1,7 +1,7 @@
 ---
 title: lib/json — JSON
 description: Shared EN/ZH path; parse and stringify
-> lib/json.mq.md
+import json:lib/json.mq.md
 ---
 
 # main

@@ -1,7 +1,7 @@
 ---
 title: lib/time — clock
 description: Unix time, format, parse, sleep
-> lib/time.mq.md
+import time:lib/time.mq.md
 ---
 
 # main

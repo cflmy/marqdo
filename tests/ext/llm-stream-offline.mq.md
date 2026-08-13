@@ -1,8 +1,8 @@
 ---
 title: llm stream_result offline
 description: No network — SSE fixture via net.openai_sse_parse + llm.stream_result
-> ext/ai/llm.mq.md
-> lib/net.mq.md
+import llm:ext/ai/llm.mq.md
+import net:lib/net.mq.md
 ---
 
 # main

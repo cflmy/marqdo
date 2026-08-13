@@ -1,6 +1,6 @@
 ---
 title: subtask foreign spawn
-> lib/subtask.mq.md
+import subtask:lib/subtask.mq.md
 ---
 
 # main

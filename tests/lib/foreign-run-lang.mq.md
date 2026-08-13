@@ -1,6 +1,6 @@
 ---
 title: foreign run_lang
-> lib/foreign.mq.md
+import foreign:lib/foreign.mq.md
 ---
 
 # main

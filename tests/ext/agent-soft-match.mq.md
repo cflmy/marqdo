@@ -1,8 +1,8 @@
 ---
 title: OKF soft_match protocol parse (offline)
 description: REUSE/NEW + SLUG extractors; no network.
-> ext/ai/agent.mq.md
-> lib/json.mq.md
+import agent:ext/ai/agent.mq.md
+import json:lib/json.mq.md
 ---
 
 # main

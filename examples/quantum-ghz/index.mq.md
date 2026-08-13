@@ -1,7 +1,7 @@
 ---
 title: GHZ state
 description: 3-qubit GHZ; |000⟩/|111⟩ ≈ 1/2; probs + H matrix heatmap.
-> ext/quantum/quantum.mq.md
+import quantum:ext/quantum/quantum.mq.md
 ---
 
 # GHZ

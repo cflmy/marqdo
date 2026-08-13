@@ -131,7 +131,7 @@ L2  生态约定                 catalog 收录；用户站专章
 |------|------|------|
 | **S0** | `len`（文本/表）、`str`、`int` | keywords.md 已列候选；字节码已有闲置 `Op::Len` 可接线 |
 | **S1** | 表工具：取列、行数；字符串 trim/split（先内置或纯 mq 实现二选一） | 文档型语言高频 |
-| **S2** | 官方 `lib/` 或 `std/` + 导入约定（仍可用 frontmatter；或日后 `> std/text.mq.md`） | 可生长而不破现有导入 |
+| **S2** | 官方 `lib/` 或 `std/` + 导入约定（仍可用 frontmatter；或日后 `import text:std/text.mq.md`） | 可生长而不破现有导入 |
 | **S3** | 错误类型约定（如非法 `int` 文本 → 诊断） | 依赖 P0 |
 
 ### 完成定义（S0）

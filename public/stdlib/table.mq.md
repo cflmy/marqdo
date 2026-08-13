@@ -1,7 +1,7 @@
 ---
 title: lib/table — collections
 description: put, append, and map helpers
-> lib/table.mq.md
+import table:lib/table.mq.md
 ---
 
 # main

@@ -1,7 +1,7 @@
 ---
 title: quantum author API smoke
 description: barrier, measure, append, state, draw meters.
-> ext/quantum/quantum.mq.md
+import quantum:ext/quantum/quantum.mq.md
 ---
 
 # main

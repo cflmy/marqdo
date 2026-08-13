@@ -46,12 +46,12 @@ Frontmatter 导入**绑定库名**（默认 = 文件名茎；`as` / `作为` 可
 
 ```markdown
 ---
-> lib/text.mq.md
-> lib/table.mq.md
+import text:lib/text.mq.md
+import table:lib/table.mq.md
 ---
 ```
 
-调用示例：`> time.now_unix`、`> json.parse text=…`。需要本地短名时用 `> use time.format`（冲突 → 硬错误）。
+调用示例：`> time.now_unix`、`> json.parse text=…`。需要本地短名时用 `导入 format`（冲突:time.format`（冲突 → 硬错误）。
 
 `std/text.mq.md` 等价于 `lib/text.mq.md`。解析顺序：
 

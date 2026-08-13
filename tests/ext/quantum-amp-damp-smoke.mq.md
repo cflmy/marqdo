@@ -1,7 +1,7 @@
 ---
 title: quantum amplitude damping smoke
 description: X then amplitude_damping p=1 returns all shots to |0>.
-> ext/quantum/quantum.mq.md
+import quantum:ext/quantum/quantum.mq.md
 ---
 
 # main

@@ -1,14 +1,14 @@
 ---
 title: web assemble smoke
 description: Offline assemble + render markers (no listen).
-> ext/web/web.mq.md
-> web-fixtures/styles/shell.mq.md as shell
-> web-fixtures/components/nav.mq.md as nav
-> web-fixtures/components/side.mq.md as side
-> web-fixtures/components/foot.mq.md as foot
-> web-fixtures/db/articles.mq.md as articles
-> lib/fs.mq.md
-> lib/json.mq.md
+import web:ext/web/web.mq.md
+import shell:web-fixtures/styles/shell.mq.md
+import nav:web-fixtures/components/nav.mq.md
+import side:web-fixtures/components/side.mq.md
+import foot:web-fixtures/components/foot.mq.md
+import articles:web-fixtures/db/articles.mq.md
+import fs:lib/fs.mq.md
+import json:lib/json.mq.md
 ---
 
 # main

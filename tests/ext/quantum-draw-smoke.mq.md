@@ -1,7 +1,7 @@
 ---
 title: quantum draw probs/bloch smoke
 description: draw kind=probs and kind=bloch return matching kind tags.
-> ext/quantum/quantum.mq.md
+import quantum:ext/quantum/quantum.mq.md
 ---
 
 # main
