@@ -31,7 +31,7 @@ Assemble a readable prompt: standing, task, tools, call site, source, skill, and
 *`skill` = > agent_marqdo_skill *
 *`task_s` = > json.stringify value=`task` *
 
-*`esc` = > json.parse text={"a":"\n\n--- standing ---\n","b":"\n\n--- task ---\n","c":"\n\n--- tools ---\n","d":"\n\n--- call site ---\n","e":"\n\n--- source (.mq.md) ---\n","f":"\n\n--- marqdo skill ---\n","g":"\n\n--- how to act ---\nTools are ## functions in the source above. To call one, reply with exactly one line: CALL:<name>\n(Chinese ok: 调用：<name>)\nOtherwise reply with the final answer only.\nTools run via Marqdo subtask (spawn fn / wait).\n"} *
+*`esc` = > json.parse text={"a":"\n\n--- standing ---\n","b":"\n\n--- task ---\n","c":"\n\n--- tools ---\n","d":"\n\n--- call site ---\n","e":"\n\n--- source (.mq.md) ---\n","f":"\n\n--- marqdo skill ---\n","g":"\n\n--- how to act ---\nCall ONLY names listed under --- tools --- (whitelist). If that section is empty or says none, do NOT emit CALL / 调用 — reply with the final answer only.\nNever CALL internal framework helpers (build_step_context, plan, inspect_workbook, etc.).\nWhen calling an allowed tool, reply with exactly one line: CALL:<name>\n(Chinese ok: 调用：<name>)\nOtherwise reply with the final answer only.\nTools run via Marqdo subtask (spawn fn / wait).\n"} *
 *`a` = > json.get value=`esc` key=a *
 *`b` = > json.get value=`esc` key=b *
 *`c` = > json.get value=`esc` key=c *
@@ -100,7 +100,7 @@ Allowlist check, then invoke the runbook `##` via `lib/subtask` (`spawn fn=` →
 Build a runnable workbook. `skeleton=single` (default): one worker `step`. `skeleton=dual`: research then write agents. On success the parent chooses DONE; runtime `agent_workbook_solidify` freezes the answer.
 
 *`q` = > json.quote text=`goal` *
-*`esc` = > json.parse text={"h":"---\ntitle: agent workbook\n> ext/ai/llm.mq.md\n> ext/ai/agent.mq.md\n> lib/json.mq.md\n> lib/sys.mq.md\n> lib/writeback.mq.md\n> lib/subtask.mq.md\n---\n\n# Goal\n\nParent goal is embedded as JSON in # main.\n\n## Solidify\n\nWhen the child returns a good value, parent DECISION: DONE — runtime agent_workbook_solidify freezes the answer as **return** (do not invent long FIND/REPLACE).\n\n# main\n\n> llm.load_env\n\n","s1":"\u002a\u0060model\u0060 = > llm.llm \u002a\n","s2":"\u002a\u0060tools\u0060 = > json.parse text=[] \u002a\n","s3":"\u002a\u0060worker\u0060 = > agent.agent model=\u0060model\u0060 tools=\u0060tools\u0060 standing=You are a workbook worker. Finish the task; do not invent tools. Prefer a direct answer. \u002a\n","s4":"\u002a\u0060wrap\u0060 = > json.parse text={\"task\":","s5":"} \u002a\n","s6":"\u002a\u0060task\u0060 = > json.get value=\u0060wrap\u0060 key=task \u002a\n","s7":"\u002a\u0060out\u0060 = > \u0060worker\u0060.step task=\u0060task\u0060 stream=True \u002a\n","s7b":"\u002a\u0060text\u0060 = > json.get value=\u0060out\u0060 key=result \u002a\n","s8":"\u002a\u002a\u0060text\u0060\u002a\u002a\n","d3":"\u002a\u0060research\u0060 = > agent.agent model=\u0060model\u0060 tools=\u0060tools\u0060 standing=You gather facts for the goal. Be concise. Do not invent tools. \u002a\n","d3b":"\u002a\u0060writer\u0060 = > agent.agent model=\u0060model\u0060 tools=\u0060tools\u0060 standing=You write the final answer from research notes. Do not invent tools. \u002a\n","d4":"\u002a\u0060wrap\u0060 = > json.parse text={\"task\":","d5":"} \u002a\n","d6":"\u002a\u0060task\u0060 = > json.get value=\u0060wrap\u0060 key=task \u002a\n","d7":"\u002a\u0060notes\u0060 = > \u0060research\u0060.step task=\u0060task\u0060 stream=True \u002a\n","d8":"\u002a\u0060ns\u0060 = > json.stringify value=\u0060notes\u0060 \u002a\n","d9":"\u002a\u0060wt\u0060 = Write the final answer. Research notes: \u002a\n","d10":"\u002a\u0060wt\u0060 = \u0060wt\u0060 + \u0060ns\u0060 \u002a\n","d11":"\u002a\u0060out\u0060 = > \u0060writer\u0060.step task=\u0060wt\u0060 stream=True \u002a\n","d11b":"\u002a\u0060text\u0060 = > json.get value=\u0060out\u0060 key=result \u002a\n","d12":"\u002a\u002a\u0060text\u0060\u002a\u002a\n"} *
+*`esc` = > json.parse text={"h":"---\ntitle: agent workbook\nimport llm:ext/ai/llm.mq.md\nimport agent:ext/ai/agent.mq.md\nimport json:lib/json.mq.md\nimport sys:lib/sys.mq.md\nimport writeback:lib/writeback.mq.md\nimport subtask:lib/subtask.mq.md\n---\n\n# Goal\n\nParent goal is embedded as JSON in # main.\n\n## Solidify\n\nWhen the child returns a good value, parent DECISION: DONE — runtime agent_workbook_solidify freezes the answer as **return** (do not invent long FIND/REPLACE).\n\n# main\n\n> llm.load_env\n\n","s1":"\u002a\u0060model\u0060 = > llm.llm \u002a\n","s2":"\u002a\u0060tools\u0060 = > json.parse text=[] \u002a\n","s3":"\u002a\u0060worker\u0060 = > agent.agent model=\u0060model\u0060 tools=\u0060tools\u0060 standing=You are a workbook worker. tools=[] means never CALL. Finish the task with a direct final answer; do not invent tools. \u002a\n","s4":"\u002a\u0060wrap\u0060 = > json.parse text={\"task\":","s5":"} \u002a\n","s6":"\u002a\u0060task\u0060 = > json.get value=\u0060wrap\u0060 key=task \u002a\n","s7":"\u002a\u0060out\u0060 = > \u0060worker\u0060.step task=\u0060task\u0060 stream=True \u002a\n","s7b":"\u002a\u0060text\u0060 = > json.get value=\u0060out\u0060 key=result \u002a\n","s8":"\u002a\u002a\u0060text\u0060\u002a\u002a\n","d3":"\u002a\u0060research\u0060 = > agent.agent model=\u0060model\u0060 tools=\u0060tools\u0060 standing=You gather facts for the goal. Be concise. Do not invent tools. \u002a\n","d3b":"\u002a\u0060writer\u0060 = > agent.agent model=\u0060model\u0060 tools=\u0060tools\u0060 standing=You write the final answer from research notes. Do not invent tools. \u002a\n","d4":"\u002a\u0060wrap\u0060 = > json.parse text={\"task\":","d5":"} \u002a\n","d6":"\u002a\u0060task\u0060 = > json.get value=\u0060wrap\u0060 key=task \u002a\n","d7":"\u002a\u0060notes\u0060 = > \u0060research\u0060.step task=\u0060task\u0060 stream=True \u002a\n","d8":"\u002a\u0060ns\u0060 = > json.stringify value=\u0060notes\u0060 \u002a\n","d9":"\u002a\u0060wt\u0060 = Write the final answer. Research notes: \u002a\n","d10":"\u002a\u0060wt\u0060 = \u0060wt\u0060 + \u0060ns\u0060 \u002a\n","d11":"\u002a\u0060out\u0060 = > \u0060writer\u0060.step task=\u0060wt\u0060 stream=True \u002a\n","d11b":"\u002a\u0060text\u0060 = > json.get value=\u0060out\u0060 key=result \u002a\n","d12":"\u002a\u002a\u0060text\u0060\u002a\u002a\n"} *
 *`h` = > json.get value=`esc` key=h *
 *`s1` = > json.get value=`esc` key=s1 *
 *`s2` = > json.get value=`esc` key=s2 *
@@ -819,6 +819,7 @@ Bounded observation for the parent prompt (actionable, short).
     + `reply`
 
 Parse `DECISION: DONE` / `CONTINUE` / `RUN` (Chinese: `决定：完成` / `继续` / `运行`).
+**First** matching DECISION / 决定 line wins (ignore later conflicting decisions in the same reply).
 
 *`esc` = > json.parse text={"nl":"\n","fw":"："} *
 *`nl` = > json.get value=`esc` key=nl *
@@ -828,36 +829,39 @@ Parse `DECISION: DONE` / `CONTINUE` / `RUN` (Chinese: `决定：完成` / `继�
 *`found` = None*
 
 - [`line`](`lines`)
-  *`t` = > trim value=`line` *
-  *`parts` = > split value=`t` sep=: *
-  *`n` = > len value=`parts` *
-  1. `n` > 1
-    *`head` = > at value=`parts` index=0 *
-    *`head` = > trim value=`head` *
-    *`rest` = > at value=`parts` index=1 *
-    *`rest` = > trim value=`rest` *
-    1. `head` == DECISION
-      *`found` = `rest`*
-    2. `head` == 决定
-      *`found` = `rest`*
-    3. *
-      *`_` = 1*
+  1. `found`
+    *`_` = 1*
   2. *
-    *`parts` = > split value=`t` sep=`fw` *
+    *`t` = > trim value=`line` *
+    *`parts` = > split value=`t` sep=: *
     *`n` = > len value=`parts` *
     1. `n` > 1
       *`head` = > at value=`parts` index=0 *
       *`head` = > trim value=`head` *
       *`rest` = > at value=`parts` index=1 *
       *`rest` = > trim value=`rest` *
-      1. `head` == 决定
+      1. `head` == DECISION
         *`found` = `rest`*
-      2. `head` == DECISION
+      2. `head` == 决定
         *`found` = `rest`*
       3. *
         *`_` = 1*
     2. *
-      *`_` = 1*
+      *`parts` = > split value=`t` sep=`fw` *
+      *`n` = > len value=`parts` *
+      1. `n` > 1
+        *`head` = > at value=`parts` index=0 *
+        *`head` = > trim value=`head` *
+        *`rest` = > at value=`parts` index=1 *
+        *`rest` = > trim value=`rest` *
+        1. `head` == 决定
+          *`found` = `rest`*
+        2. `head` == DECISION
+          *`found` = `rest`*
+        3. *
+          *`_` = 1*
+      2. *
+        *`_` = 1*
 
 1. `found` == DONE
   **"DONE"**
@@ -1032,7 +1036,7 @@ Parent Plan-and-Move prompt. Short protocol only — no long monologues.
 *`compact` = > compact_plan_observation observation=`observation` *
 *`obs_s` = > json.stringify value=`compact` *
 *`goal_s` = > json.stringify value=`goal` *
-*`esc` = > json.parse text={"a":"\n\n--- standing ---\n","b":"\n\n--- goal ---\n","c":"\n\n--- observation ---\n","d":"\n\n--- skill brief ---\n","tools":"\n\n--- parent tools ---\nCALL:workbook_read | workbook_excerpt | lib_catalog | scratch_tool_write\nCALL:lib.fs.read_text|exists|list_dir | lib.json.parse|stringify | lib.sys.cwd (+ ARGS:{json})\nREAD:source | stderr | stdout | slots\nCreate tools: CONTINUE PATCH add ##, or CALL:scratch_tool_write with NAME line and fenced body.\n","e_rev":"\n\n--- how to act ---\nPlan-and-Move parent. Reply with ONE protocol only (no long reasoning).\n1) exit_code=0 and has_value → DECISION: DONE + one-line SUMMARY. solidify_on_done. Do not CONTINUE just because has_worker_step.\n2) Need more evidence → READ:kind or CALL:tool (then you will be re-prompted).\n3) Failure / wrong value → DECISION: CONTINUE + short PATCH (<20 lines). Never paste user prose into REPLACE.\nProtocols:\nCALL:name\nREAD:kind\nDECISION: DONE\nSUMMARY: one line\nDECISION: CONTINUE\nPATCH with FIND/REPLACE fences\n","e_dec":"\n\n--- how to act ---\nPRE-RUN decompose. Reply with ONE protocol only (no long reasoning).\n1) Skeleton OK → DECISION: RUN.\n2) Need evidence → READ:source or CALL:workbook_read / lib_catalog.\n3) Reshape → DECISION: CONTINUE + short PATCH (<20 lines).\n4) Fixed answer without LLM → PATCH to return, then RUN or DONE.\nProtocols:\nCALL:name\nREAD:kind\nDECISION: RUN\nDECISION: DONE\nSUMMARY: one line\nDECISION: CONTINUE\nPATCH with FIND/REPLACE fences\n","f":"\n\n--- explore ---\n"} *
+*`esc` = > json.parse text={"a":"\n\n--- standing ---\n","b":"\n\n--- goal ---\n","c":"\n\n--- observation ---\n","d":"\n\n--- skill brief ---\n","tools":"\n\n--- parent tools ---\nCALL:workbook_read | workbook_excerpt | lib_catalog | scratch_tool_write\nCALL:lib.fs.read_text|exists|list_dir | lib.json.parse|stringify | lib.sys.cwd (+ ARGS:{json})\nREAD:source | stderr | stdout | slots\nCreate tools: CONTINUE PATCH add ##, or CALL:scratch_tool_write with NAME line and fenced body.\n","e_rev":"\n\n--- how to act ---\nPlan-and-Move parent. Reply with ONE protocol only (no long reasoning). Exactly one DECISION line.\n1) exit_code=0 and has_value → DECISION: DONE + one-line SUMMARY. solidify_on_done. Do not CONTINUE just because has_worker_step.\n2) Need more evidence → READ:kind or CALL:tool (then you will be re-prompted).\n3) Failure / wrong value → DECISION: CONTINUE + short PATCH (<20 lines). Never paste user prose into REPLACE.\n4) Do NOT CONTINUE only to rewrite frontmatter imports; skeleton already uses import llm:/agent:/json:….\nPATCH must use triple-angle blocks only:\n<<<\nFIND\n<exact old>\n===\nREPLACE\n<new>\n>>>\nDo not use \u0060\u0060\u0060find, \u0060\u0060\u0060replace, or *** Begin Patch ***.\nProtocols:\nCALL:name\nREAD:kind\nDECISION: DONE\nSUMMARY: one line\nDECISION: CONTINUE\n","e_dec":"\n\n--- how to act ---\nPRE-RUN decompose. Reply with ONE protocol only (no long reasoning). Exactly one DECISION line.\n1) Skeleton OK → DECISION: RUN (preferred). Do not rewrite imports; they are already import llm:/agent:/….\n2) Need evidence → READ:source or CALL:workbook_read / lib_catalog.\n3) Reshape body/logic only → DECISION: CONTINUE + short PATCH (<20 lines).\n4) Fixed answer without LLM → PATCH to return, then RUN or DONE.\nPATCH must use <<< FIND === REPLACE >>> only (no \u0060\u0060\u0060find / Begin Patch).\nProtocols:\nCALL:name\nREAD:kind\nDECISION: RUN\nDECISION: DONE\nSUMMARY: one line\nDECISION: CONTINUE\n","f":"\n\n--- explore ---\n"} *
 *`a` = > json.get value=`esc` key=a *
 *`b` = > json.get value=`esc` key=b *
 *`c` = > json.get value=`esc` key=c *
@@ -1362,9 +1366,18 @@ With `stream=True`, the model call uses SSE; `echo=True` prints delta text to st
   *`deny` = > split value=`tool_s` sep=Tool not allowed *
   *`deny_n` = > len value=`deny` *
   1. `deny_n` > 1
-    *`out` = > json.set map=`out` key=status value=error *
-    *`out` = > json.set map=`out` key=error value=`tool_s` *
-    *`reply` = `tool_s`*
+    *`task_s` = > json.stringify value=`task` *
+    *`fp` = "Tool CALL was rejected (not on the tools whitelist). Do NOT emit CALL. Answer the user task directly with the final answer only.\n\nUser task:\n" *
+    *`fp` = `fp` + `task_s` *
+    1. `stream`
+      *`evs_retry` = > `model`.complete prompt=`fp` stream=True echo=`echo` *
+      *`reply` = > llm.stream_result events=`evs_retry` *
+    2. *
+      *`reply` = > `model`.complete prompt=`fp` *
+    *`out` = > json.set map=`out` key=status value=ok *
+    *`out` = > json.set map=`out` key=decision value=`decision` *
+    *`out` = > json.set map=`out` key=denied_tool value=`tool_name` *
+    *`out` = > json.set map=`out` key=result value=`reply` *
   2. *
     *`task_s` = > json.stringify value=`task` *
     *`fp` = "The user asked:" *
@@ -1703,7 +1716,7 @@ Reuse lookup: exact → alias → canonicalize → optional local n-gram `near` 
 *`events` = > json.get value=`turn` key=events *
 
 1. `dec` == CONTINUE
-  *`n` = > fs.apply_patch_blocks path=`path` text=`last_reply` *
+  *`n` = > fs.apply_patch_blocks path=`path` text=`last_reply` soft=True *
   *`_` = 1*
 2. `dec` == RUN
   *`_` = 1*
@@ -1789,7 +1802,7 @@ Deterministic success stop (loop engineering): when the child already returned a
         *`err` = None*
         *`left` = 0*
       2. `dec` == CONTINUE
-        *`n` = > fs.apply_patch_blocks path=`path` text=`last_reply` *
+        *`n` = > fs.apply_patch_blocks path=`path` text=`last_reply` soft=True *
         1. `n`
           *`left` = `left` - 1*
         2. *

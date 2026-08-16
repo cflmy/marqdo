@@ -1731,7 +1731,7 @@ fn ext_agent_plan_confirm() {
 fn ext_agent_plan_decision() {
     assert_out(
         "tests/ext/agent-plan-decision.mq.md",
-        "DONE\nall good\nCONTINUE\nDONE\nRUN\nRUN\ncall\nlib_catalog\nread\nstderr\ndecision\ncatalog-ok\ndual-ok\nsolidify-ok\n1\nkeep new keep",
+        "DONE\nall good\nCONTINUE\nDONE\nRUN\nRUN\nDONE\ncall\nlib_catalog\nread\nstderr\ndecision\ncatalog-ok\ndual-ok\nsolidify-ok\nimport-ok\n1\nkeep new keep\n1\nALPHA beta",
     );
 }
 

@@ -31,6 +31,10 @@ import fs:lib/fs.mq.md
 *`r5` = > agent.extract_plan_decision reply=`d5` *
 > print text=`r5`
 
+*`d6` = "DECISION: DONE\nSUMMARY: first wins\nDECISION: CONTINUE\nPATCH:\nbogus\n" *
+*`r6` = > agent.extract_plan_decision reply=`d6` *
+> print text=`r6`
+
 *`act_call` = "CALL:lib_catalog" *
 *`a1` = > agent.extract_plan_act reply=`act_call` *
 *`a1k` = > json.get value=`a1` key=kind *
@@ -73,7 +77,14 @@ import fs:lib/fs.mq.md
 2. *
   > print text=solidify-missing
 
-*`paths` = > json.parse text={"p":".marqdo/agent-runs/decision-patch.md","t":"keep old keep"} *
+*`has_imp` = > split value=`dual` sep=import llm:ext/ai/llm.mq.md *
+*`n_imp` = > len value=`has_imp` *
+1. `n_imp` > 1
+  > print text=import-ok
+2. *
+  > print text=import-missing
+
+*`paths` = > json.parse text={"p":".marqdo/agent-runs/decision-patch.md","t":"keep old keep","fence":"alpha beta","p2":".marqdo/agent-runs/decision-fence.md"} *
 *`path` = > json.get value=`paths` key=p *
 *`seed` = > json.get value=`paths` key=t *
 > fs.write_text path=`path` text=`seed`
@@ -81,3 +92,13 @@ import fs:lib/fs.mq.md
 > print text=`n`
 *`out` = > fs.read_text path=`path` *
 > print text=`out`
+
+*`path2` = > json.get value=`paths` key=p2 *
+*`seed2` = > json.get value=`paths` key=fence *
+> fs.write_text path=`path2` text=`seed2`
+*`fence_pack` = > json.parse text={"t":"DECISION: CONTINUE\n\u0060\u0060\u0060find\nalpha\n\u0060\u0060\u0060\n\u0060\u0060\u0060replace\nALPHA\n\u0060\u0060\u0060\n"} *
+*`fence_reply` = > json.get value=`fence_pack` key=t *
+*`n2` = > fs.apply_patch_blocks path=`path2` text=`fence_reply` *
+> print text=`n2`
+*`out2` = > fs.read_text path=`path2` *
+> print text=`out2`

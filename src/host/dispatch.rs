@@ -532,7 +532,7 @@ impl HostFn {
             Self::ExtNativePath => &["name"],
             Self::OuterCallLine => &[],
             Self::TextPatch => &["path", "find", "replace"],
-            Self::ApplyPatchBlocks => &["path", "text"],
+            Self::ApplyPatchBlocks => &["path", "text", "soft"],
             Self::WritebackScanPath => &["path"],
             Self::MapSet => &["map", "key", "value"],
             Self::ListAppend => &["list", "item"],
@@ -842,9 +842,12 @@ pub fn call_host(
             require(bound, "find")?,
             require(bound, "replace")?,
         ),
-        HostFn::ApplyPatchBlocks => {
-            fs::apply_patch_blocks(ctx, require(bound, "path")?, require(bound, "text")?)
-        }
+        HostFn::ApplyPatchBlocks => fs::apply_patch_blocks(
+            ctx,
+            require(bound, "path")?,
+            require(bound, "text")?,
+            bound.get("soft"),
+        ),
         HostFn::WritebackScanPath => writeback::scan_path(ctx, require(bound, "path")?),
         HostFn::WritebackRecord => writeback::record(
             ctx,
