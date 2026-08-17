@@ -8,8 +8,8 @@ import llm:ext/ai/llm.mq.md
 
 > llm.load_env path=.env
 
-*`model` = > llm.llm *
+*model = > llm.llm*
 
-*`reply` = > `model`.complete prompt=Reply with exactly one English word: pong *
+*reply = > `model`.complete prompt=Reply with exactly one English word: pong*
 
 > print text=`reply`

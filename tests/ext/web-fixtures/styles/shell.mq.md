@@ -6,7 +6,7 @@
 |------|-----|
 | background | #fff |
 
-**`topnav`**
+**topnav**
 
 ## side_panel
 
@@ -16,7 +16,7 @@
 |------|-----|
 | background | #f5f5f4 |
 
-**`side_panel`**
+**side_panel**
 
 ## card_title
 
@@ -26,7 +26,7 @@
 |------|-----|
 | font-weight | 600 |
 
-**`card_title`**
+**card_title**
 
 ## card_body
 
@@ -36,4 +36,4 @@
 |------|-----|
 | color | #57534e |
 
-**`card_body`**
+**card_body**

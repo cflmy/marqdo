@@ -10,6 +10,6 @@ title: footnote missing map key
 |------|------|
 | 水果 | 蔬菜 |
 
-*`x` = `分类`[^香蕉] *
+*x = 分类[^香蕉]*
 
 > print text=`x`

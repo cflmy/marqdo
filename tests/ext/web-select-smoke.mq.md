@@ -8,8 +8,8 @@ import json:lib/json.mq.md
 
 # main
 
-*`store` = > web.db url="sqlite:web-fixtures/data/select-smoke.db" *
-*`schema` = > articles.schema *
+*store = > web.db url="sqlite:web-fixtures/data/select-smoke.db"*
+*schema = > articles.schema*
 > `store`.init name=articles fields=`schema`
 > `store`.exec sql="DELETE FROM articles"
 
@@ -29,8 +29,8 @@ import json:lib/json.mq.md
 |-------|------|
 | Alpha | first |
 
-*`hit` = > `store`.select table=articles where=`eq` limit=50 *
-*`n` = > len value=`hit` *
+*hit = > `store`.select table=articles where=`eq` limit=50*
+*n = > len value=`hit`*
 1. `n` == 1
   > print text=map-where-ok
 2. *
@@ -42,15 +42,15 @@ import json:lib/json.mq.md
 |------|------|-----|
 | title | like | %Alpha% |
 
-*`like_rows` = > `store`.select table=articles where=`filt` limit=50 *
-*`ln` = > len value=`like_rows` *
+*like_rows = > `store`.select table=articles where=`filt` limit=50*
+*ln = > len value=`like_rows`*
 1. `ln` == 2
   > print text=like-ok
 2. *
   > print text=like-fail
 
-*`all` = > `store`.select table=articles limit=50 *
-*`an` = > len value=`all` *
+*all = > `store`.select table=articles limit=50*
+*an = > len value=`all`*
 1. `an` == 3
   > print text=all-ok
 2. *

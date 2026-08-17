@@ -11,8 +11,8 @@ description: Pure-digit labels are map keys (text), not list indices. Bare base 
 |----|----|
 | half | other |
 
-*`a` = p[^00] *
-*`b` = `p`[^11] *
+*a = p[^00]*
+*b = p[^11]*
 
 > print text=`a`
 > print text=`b`

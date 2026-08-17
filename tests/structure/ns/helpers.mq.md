@@ -9,11 +9,11 @@ Nested free function (not an object method) for `helpers.pack.label`.
 ### label
     + `s`
 
-**`s`**
+**s**
 
 # Box
 
 ## tag
     + `s`
 
-**`s`**
+**s**

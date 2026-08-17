@@ -10,6 +10,6 @@ import fs:lib/fs.mq.md
 
 > sys.load_dotenv path=dotenv-fixture.env
 
-*`v` = > sys.env_get name=MARQDO_DOTENV_FIXTURE *
+*v = > sys.env_get name=MARQDO_DOTENV_FIXTURE*
 
 > print text=`v`

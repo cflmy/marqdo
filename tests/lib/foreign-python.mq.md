@@ -10,6 +10,6 @@ import foreign:lib/foreign.mq.md
 print("hello-from-python")
 ```
 
-*`out` = > foreign.run code=`hi` *
+*out = > foreign.run code=`hi`*
 
 > print text=`out`

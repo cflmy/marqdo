@@ -6,6 +6,6 @@ import llm:ext/ai/llm.mq.md
 
 # main
 
-*`model` = > llm.llm *
+*model = > llm.llm*
 > print text=`model`[^model]
 > print text=`model`[^suffix]

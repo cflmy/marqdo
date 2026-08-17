@@ -10,8 +10,8 @@ import subtask:lib/subtask.mq.md
 print(7 + 8)
 ```
 
-*`id` = > subtask.spawn code=`py` *
+*id = > subtask.spawn code=`py`*
 
-*`out` = > subtask.wait id=`id` *
+*out = > subtask.wait id=`id`*
 
 > print text=`out`

@@ -6,11 +6,11 @@ import json:lib/json.mq.md
 
 # main
 
-*`args` = > json.parse text={"n":21} *
+*args = > json.parse text={"n":21}*
 
-*`id` = > subtask.spawn fn=worker args=`args` *
+*id = > subtask.spawn fn=worker args=`args`*
 
-*`v` = > subtask.wait id=`id` *
+*v = > subtask.wait id=`id`*
 
 > print text=`v`
 
@@ -19,4 +19,4 @@ import json:lib/json.mq.md
 ## worker
     + `n`
 
-**`n` * 2**
+**n * 2**

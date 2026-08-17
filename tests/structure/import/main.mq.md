@@ -7,7 +7,7 @@ import utils:utils.mq.md
 
 导入 `utils.mq.md` 后：用返回值绑定，再输出；并直接调用问候。
 
-*`y` = > utils.加一 n=41*
+*y = > utils.加一 n=41*
 
 > print text=`y`
 

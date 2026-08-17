@@ -5,7 +5,7 @@ import writeback:lib/writeback.mq.md
 
 # main
 
-*`out` = > writeback.get *
+*out = > writeback.get*
 
 <!-- marqdo-out
 hello-writeback

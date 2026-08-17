@@ -7,8 +7,8 @@ import net:lib/net.mq.md
 
 # main
 
-*`fixture` = "data: {\"choices\":[{\"delta\":{\"content\":\"Hi\"}}]}\n\ndata: {\"choices\":[{\"delta\":{\"content\":\"!\"}}]}\n\ndata: [DONE]\n" *
+*fixture = "data: {\"choices\":[{\"delta\":{\"content\":\"Hi\"}}]}\n\ndata: {\"choices\":[{\"delta\":{\"content\":\"!\"}}]}\n\ndata: [DONE]\n"*
 
-*`events` = > net.openai_sse_parse text=`fixture` *
-*`answer` = > llm.stream_result events=`events` *
+*events = > net.openai_sse_parse text=`fixture`*
+*answer = > llm.stream_result events=`events`*
 > print text=`answer`

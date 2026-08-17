@@ -4,7 +4,7 @@ title: 分支示例
 
 # main
 
-*`x` = 0*
+*x = 0*
 
 1. `x` > 0
   > print text=正数

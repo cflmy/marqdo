@@ -5,6 +5,6 @@ stdin: Ada
 
 # main
 
-*`name` = > input prompt="Name:\n"*
+*name = > input prompt="Name:\n"*
 
 > print text=Hello `name`!

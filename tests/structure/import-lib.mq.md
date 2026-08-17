@@ -6,7 +6,7 @@ title: import official lib (Chinese)
 
 # main
 
-*`t` = > 文本.去空白 s=  x  *
+*t = > 文本.去空白 s=  x*
 
 > 打印 内容=`t`
 
@@ -17,10 +17,10 @@ title: import official lib (Chinese)
 | a |
 | b |
 
-*`n` = > 表.行数 xs=`xs`*
+*n = > 表.行数 xs=`xs`*
 
 > 打印 内容=`n`
 
-*`row` = > 表.取行 xs=`xs` i=0*
+*row = > 表.取行 xs=`xs` i=0*
 
 > 打印 内容=`row`

@@ -7,14 +7,14 @@ import sys:lib/sys.mq.md
 
 # main
 
-*`p` = > sys.env_get name=MARQDO_TEST_PLUGIN *
+*p = > sys.env_get name=MARQDO_TEST_PLUGIN*
 
 > plugin.load path=`p`
 
-*`sum` = > demo_add a=1 b=2 *
+*sum = > demo_add a=1 b=2*
 
 > print text=`sum`
 
-*`echo` = > demo_echo text=ok *
+*echo = > demo_echo text=ok*
 
 > print text=`echo`

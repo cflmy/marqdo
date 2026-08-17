@@ -71,7 +71,7 @@ $$
 x^2 - 2
 $$
 
-*`_svg` = > plot formula=`f` var=x min=-3 max=3 *
+*_svg = > plot formula=`f` var=x min=-3 max=3*
 ```
 
 Empty RHS assignment + following `$$…$$` binds a formula value. Narrative-only `$$` without binding is display, not assignment.

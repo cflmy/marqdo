@@ -6,9 +6,9 @@ import quantum:ext/quantum/quantum.mq.md
 
 # main
 
-*`H` = > quantum.gate name=H *
-*`img` = > `H`.draw kind=matrix path=quantum-gate-heatmap.svg *
-*`kind` = `img`[^kind] *
+*H = > quantum.gate name=H*
+*img = > `H`.draw kind=matrix path=quantum-gate-heatmap.svg*
+*kind = img[^kind]*
 
 1. `kind` == matrix
   > print text=heatmap-ok

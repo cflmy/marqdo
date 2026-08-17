@@ -38,14 +38,14 @@ Greeting via a nested function:
 ```markdown
 # main
 
-*`a` = 2*
-*`b` = > add_one n=`a`*
+*a = 2*
+*b = > add_one n=`a`*
 > print text=`b`
 
 ## add_one
     + `n`
 
-**`n` + 1**
+**n + 1**
 ```
 
 ## 5. Branch with else
@@ -53,7 +53,7 @@ Greeting via a nested function:
 ```markdown
 # main
 
-*`n` = 0*
+*n = 0*
 
 1. `n` > 0
   > print text=positive
@@ -89,10 +89,10 @@ Greeting via a nested function:
 |------|------|
 | 水果 | 蔬菜 |
 
-*`种` = 分类[^苹果] *
+*种 = 分类[^苹果]*
 > print text=`种`
 
-*`第一` = 篮子[^1] *
+*第一 = 篮子[^1]*
 ```
 
 One column → list; ≥2 columns + one data row → map; ≥2 columns + many rows → map of lists. Data cells are expressions (same as call-arg values): bare words, numbers, `` `var` ``, quoted strings; URLs and `gpt-4o-mini` stay text via path/hyphen folding. Footnotes: lists use 1-based digit indices; maps use key text (including digit keys like `[^00]`). Foreach on a map walks **keys**.
@@ -106,7 +106,7 @@ Row-oriented records (SQL-like): first header `@` / `行` / `row` → list of ma
 |----|------|------|
 | 1 | 苹果 | 2 |
 
-*`名` = `订单`[^1][^品名] *
+*名 = 订单[^1][^品名]*
 ```
 
 ## 7. Import text stdlib
@@ -119,7 +119,7 @@ import text:lib/text.mq.md
 
 # main
 
-*`parts` = > split value=a,b,c sep=,*
+*parts = > split value=a,b,c sep=,*
 > print text=`parts`
 ```
 
@@ -129,7 +129,7 @@ import text:lib/text.mq.md
 # main
 
 This whole paragraph is a comment, including lines that look like code:
-*`not_executed` = 1*
+*not_executed = 1*
 > print text=also still comment
 
 After a blank line, code runs:
@@ -147,7 +147,7 @@ import math:lib/math.mq.md
 
 # main
 
-*`t` = > num value=3.5*
+*t = > num value=3.5*
 > print text=`t`
 ```
 
@@ -163,16 +163,16 @@ See `tests/structure/object-handle.mq.md` and `ext/llm.mq.md`: `# Type` construc
 ## hello
     + `who`
 
-*`msg` = "Hello, `who`!" *
-**`msg`**
+*msg = "Hello, `who`!"*
+**msg**
 
 # Loud = > Greeter
 
 ## hello
     + `who`
 
-*`msg` = "HELLO, `who`!" *
-**`msg`**
+*msg = "HELLO, `who`!"*
+**msg**
 ```
 
 `_type` stays the most specific name (`Loud`). Methods walk the base chain; same-name `##` on the child overrides. **No implicit super** — if the child needs parent fields, call the parent explicitly:
@@ -181,9 +181,9 @@ See `tests/structure/object-handle.mq.md` and `ext/llm.mq.md`: `# Type` construc
 # Child = > Parent
     + `name`
 
-*`self` = > Parent name=`name` *
-*`self` = > json.set map=`self` key=extra value=1 *
-**`self`**
+*self = > Parent name=`name`*
+*self = > json.set map=`self` key=extra value=1*
+**self**
 ```
 
 ## 11. Agent layout (ABI)
@@ -197,8 +197,8 @@ import agent:ext/agent.mq.md
 
 > load_native
 
-*`ws` = > agent *
-*`n` = > `ws`.ensure_layout *
+*ws = > agent*
+*n = > `ws`.ensure_layout*
 > print text=`n`
 ```
 

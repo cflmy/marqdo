@@ -10,6 +10,6 @@ title: footnote list out of range
 |----|
 | 苹果 |
 
-*`x` = `篮子`[^2] *
+*x = 篮子[^2]*
 
 > print text=`x`

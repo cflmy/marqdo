@@ -5,8 +5,8 @@ description: Data cells evaluate like call-arg values (`var`, paths, hyphen pros
 
 # main
 
-*`secret` = "sk-live" *
-*`name` = "gpt-4o-mini" *
+*secret = "sk-live"*
+*name = "gpt-4o-mini"*
 
 `cfg` =
 

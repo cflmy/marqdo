@@ -4,4 +4,4 @@ title: bad int
 
 # main
 
-*`x` = > int not-a-number*
+*x = > int not-a-number*

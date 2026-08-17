@@ -8,7 +8,7 @@
 | title | text | false |
 | body | text | true |
 
-**`fields`**
+**fields**
 
 ## seed
 
@@ -19,4 +19,4 @@
 | 1 | Hello Marqdo | First article from a GFM table. |
 | 2 | Code as docs | The page table is the program. |
 
-**`rows`**
+**rows**

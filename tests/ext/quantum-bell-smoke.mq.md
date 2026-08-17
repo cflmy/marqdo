@@ -7,15 +7,15 @@ import math:lib/math.mq.md
 
 # main
 
-*`qc` = > quantum.circuit qubits=2 *
-*`qc` = > `qc`.h qubit=0 *
-*`qc` = > `qc`.cx control=0 target=1 *
-*`p` = > `qc`.probabilities *
+*qc = > quantum.circuit qubits=2*
+*qc = > `qc`.h qubit=0*
+*qc = > `qc`.cx control=0 target=1*
+*p = > `qc`.probabilities*
 
-*`p00` = `p`[^00] *
-*`p11` = `p`[^11] *
-*`lo` = > math.div a=2 b=5 *
-*`hi` = > math.div a=3 b=5 *
+*p00 = p[^00]*
+*p11 = p[^11]*
+*lo = > math.div a=2 b=5*
+*hi = > math.div a=3 b=5*
 
 1. `p00` > `lo`
   1. `p00` < `hi`
@@ -33,8 +33,8 @@ import math:lib/math.mq.md
 2. *
   > print text=p11-fail
 
-*`ping` = > quantum_ping *
-*`ok` = `ping`[^ok] *
+*ping = > quantum_ping*
+*ok = ping[^ok]*
 1. `ok`
   > print text=ping-ok
 2. *

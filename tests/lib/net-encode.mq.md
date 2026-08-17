@@ -5,6 +5,6 @@ import net:lib/net.mq.md
 
 # main
 
-*`e` = > net.url_encode text=a b *
+*e = > net.url_encode text=a b*
 
 > print text=`e`

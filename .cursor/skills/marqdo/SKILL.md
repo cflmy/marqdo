@@ -20,7 +20,7 @@ Canonical design (repo): `doc/design/markdown-mapping.md`, `doc/design/keywords.
 2. **Output is not `**bold**`.** Print with `> print text=…` (or `> 打印 内容=…`). Bold `**…**` is **return value only**.
 3. **Prose vs code:** after a blank line, an unmarked first line starts a **comment paragraph**; every following non-blank line stays comment until the next blank line. Put a **blank line** between narration and executable lines.
 4. **Do not invent keywords** `if` / `else` / `while` / `for` / `def` / `return`. Control flow is Markdown: **`+` params** (under heading), **`1.` `2.` … branches**, **`-` loops**, arm `N. *` = else, `#` = **object/type**, `##`+ = **function/method**, `**…**` = return.
-5. **Identifiers use backticks** — params `` + `name` ``. **Exemptions:** foreach `` - [item](coll) ``; footnote `` name[^key] ``; **inside italic `*…*` / bold `**…**`**, bare ids are variables (strings need `"…"` / `'…'`; ticks still ok).
+5. **Identifiers use backticks** — params `` + `name` ``. **Exemptions:** foreach `` - [item](coll) ``; footnote `` name[^key] ``; **inside italic `*…*` / bold `**…**`**, bare ids are variables (strings need `"…"` / `'…'`; ticks still ok). **Drop the backticks on value-expression variable names inside `*…*` / `**…**`** — they are redundant once the `*…*`/`**…**` markers mark the segment as code: `*分类 = 分类[^苹果]*`, `**n * 2**`. **Still required** where a bare word is *not* a variable: inside `"…"` / `'…'` interpolation (`` "Hello, `who`!" ``), inside `> call args` (`` > str `n` ``), and on method-call receivers (`` > `obj`.method ``). **No trailing space** inside `*…*` / `**…**` wrapped code: the closing marker must touch the last token directly (`*`a` = 1*`, `**n**`), never `` *`a` = 1 * ``.
 6. **Structure lines are not wrapped in italics.** `#` `>` `+` `-` `|` lines stand alone; use `*…*` only for general statements (bindings / expressions).
 7. **Paths:** In bare *expressions* `/` is division. In **call args / param defaults**, unspaced `a/b` and quoted `".marqdo/agent-kb"` are path text — no `json.parse` needed.
 8. Prefer ending side-effect-only function bodies with a lone `---` or `***` line (or `****` empty return) so later siblings are not swallowed.
@@ -41,8 +41,8 @@ Canonical design (repo): `doc/design/markdown-mapping.md`, `doc/design/keywords.
 | Frontmatter `import bind:path.mq.md` / `导入` | Import file (bind library name) |
 | Frontmatter `import bind:lib.member` / `导入` | Short name for a library member (same keyword; no separate `use`) |
 | `> lib.member …` / `> lib.Type.member …` | Call via bare dotted path (instance methods need `` `var`.m ``) |
-| `*…*` | Statement (bind / expr) |
-| `**…**` | Return value |
+| `*…*` | Statement (bind / expr) — closing `*` touches last token, **no trailing space**; bare ids are variables |
+| `**…**` | Return value — closing `**` touches last token, **no trailing space**; bare ids are variables |
 | `****` or `**` + spaces + `**` | Return `None` and end function body |
 | Lone `---` / `***` in function body | End function body (no value) |
 | GFM table after empty RHS bind | Collection (1-col list / ≥2-col map / `@`·`行`·`row` → list of maps); `` `x`[^1] `` / `` `m`[^key] `` |
@@ -90,17 +90,17 @@ Chinese builtins (same functions, no import):
 ## Statements, returns, branches
 
 ```markdown
-*`x` = 1*
-*`y` = `x` + 2*
+*x = 1*
+*y = x + 2*
 
 ## add_one
     + `n`
 
-**`n` + 1**
+**n + 1**
 ```
 
 ```markdown
-*`n` = 0*
+*n = 0*
 
 1. `n` > 0
   > print text=positive
@@ -123,9 +123,9 @@ import clock:lib/time.mq.md
 
 # main
 
-*`xs` = > text.split value=a,b,c sep=,*
+*xs = > text.split value=a,b,c sep=,*
 > print text=`xs`
-*`t` = > clock.now_unix *
+*t = > clock.now_unix*
 ```
 
 - Import **English** or **Chinese** library file; call that file’s API names via `lib.member` (do not mix languages).
@@ -155,6 +155,7 @@ Stdlib map: [reference.md](reference.md).
 | `# main` then prose then code with no blank line | Blank line before code |
 | `if x > 0:` | `1. `x` > 0` |
 | `* > print text=hi *` | `> print text=hi` |
+| `` *`a` = 1 * `` (trailing space) | `` *`a` = 1* `` — no trailing space before `*` / `**` |
 | Forgetting `---` after nested `##` helper | Add `---` / `***` / `****` |
 | Import `lib/text` then call bare `split` | `> text.split …` (qualified) |
 | Import `lib/text` then call `拆分` | Match file language (`text.split`, not 文本) |

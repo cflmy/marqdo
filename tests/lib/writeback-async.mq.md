@@ -18,7 +18,7 @@ import json:lib/json.mq.md
 
 # main
 
-*`anchor` = > host_outer_call_line *
+*anchor = > host_outer_call_line*
 <!-- marqdo-out ok
 async-ok
 -->
@@ -30,8 +30,8 @@ async-ok
 pending
 -->
 
-*`wb` = > json.parse text={"key":"ok","value":"async-ok"} *
-*`wb` = > json.set map=`wb` key=line value=`anchor` *
+*wb = > json.parse text={"key":"ok","value":"async-ok"}*
+*wb = > json.set map=`wb` key=line value=`anchor`*
 > subtask.spawn fn=persist_slot args=`wb`
 
 > print text=spawned

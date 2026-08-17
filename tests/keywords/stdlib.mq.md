@@ -5,9 +5,9 @@ description: Built-in conversions and length
 
 # main
 
-*`s` = "hello"*
+*s = "hello"*
 
-*`n` = > len `s`*
+*n = > len `s`*
 
 > print text=`n`
 
@@ -19,18 +19,18 @@ description: Built-in conversions and length
 | b |
 | c |
 
-*`m` = > len `xs`*
+*m = > len `xs`*
 
 > print text=`m`
 
-*`t` = > str 42*
+*t = > str 42*
 
 > print text=`t`
 
-*`i` = > int `t`*
+*i = > int `t`*
 
 > print text=`i`
 
-*`j` = > int True*
+*j = > int True*
 
 > print text=`j`

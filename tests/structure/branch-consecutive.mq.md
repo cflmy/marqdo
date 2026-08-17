@@ -5,8 +5,8 @@ description: Same-indent `1.` after a completed list is a new Branch, not more a
 
 # main
 
-*`a` = True*
-*`b` = True*
+*a = True*
+*b = True*
 
 1. `a`
   > print text=A

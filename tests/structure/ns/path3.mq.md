@@ -5,10 +5,10 @@ import helpers:helpers.mq.md
 
 # main
 
-*`v` = > helpers.pack.label s=ok*
+*v = > helpers.pack.label s=ok*
 
 > print text=`v`
 
-*`b` = > helpers.Box *
+*b = > helpers.Box*
 
 > print text=constructed
