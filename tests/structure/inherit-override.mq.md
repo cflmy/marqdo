@@ -21,8 +21,8 @@ title: inherit method override
 # main
 
 *g = > Greeter*
-*m = > `g`.hello who=world*
+*m = > `g`.hello who="world"*
 > print text=`m`
 *l = > Loud*
-*m2 = > `l`.hello who=world*
+*m2 = > `l`.hello who="world"*
 > print text=`m2`

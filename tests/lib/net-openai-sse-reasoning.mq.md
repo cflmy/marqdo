@@ -14,19 +14,19 @@ import json:lib/json.mq.md
 > print text=`n`
 
 *e0 = > at value=`events` index=0*
-*t0 = > json.get value=`e0` key=type*
-*x0 = > json.get value=`e0` key=text*
+*t0 = > json.get value=`e0` key="type"*
+*x0 = > json.get value=`e0` key="text"*
 > print text=`t0`
 > print text=`x0`
 
 *e1 = > at value=`events` index=1*
-*t1 = > json.get value=`e1` key=type*
-*x1 = > json.get value=`e1` key=text*
+*t1 = > json.get value=`e1` key="type"*
+*x1 = > json.get value=`e1` key="text"*
 > print text=`t1`
 > print text=`x1`
 
 *e2 = > at value=`events` index=2*
-*t2 = > json.get value=`e2` key=type*
-*r2 = > json.get value=`e2` key=result*
+*t2 = > json.get value=`e2` key="type"*
+*r2 = > json.get value=`e2` key="result"*
 > print text=`t2`
 > print text=`r2`

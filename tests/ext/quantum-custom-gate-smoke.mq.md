@@ -12,7 +12,7 @@ $$
 \frac{1}{\sqrt{2}}\begin{pmatrix}1&1\\1&-1\end{pmatrix}
 $$
 
-*U = > quantum.gate matrix=`H_matrix` name=U*
+*U = > quantum.gate matrix=`H_matrix` name="U"*
 *qc = > quantum.circuit qubits=1*
 *qc = > `qc`.apply gate=`U` qubits=0*
 *p = > `qc`.probabilities*

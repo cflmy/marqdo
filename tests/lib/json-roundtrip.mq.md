@@ -6,7 +6,7 @@ import json:lib/json.mq.md
 
 # main
 
-*raw = > fs.read_text path=sample.json*
+*raw = > fs.read_text path="sample.json"*
 
 *obj = > json.parse text=`raw`*
 
@@ -14,7 +14,7 @@ import json:lib/json.mq.md
 
 > print text=`ty`
 
-*a = > json.get value=`obj` key=a*
+*a = > json.get value=`obj` key="a"*
 
 > print text=`a`
 

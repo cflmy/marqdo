@@ -20,7 +20,7 @@ Canonical design (repo): `doc/design/markdown-mapping.md`, `doc/design/keywords.
 2. **Output is not `**bold**`.** Print with `> print text=…` (or `> 打印 内容=…`). Bold `**…**` is **return value only**.
 3. **Prose vs code:** after a blank line, an unmarked first line starts a **comment paragraph**; every following non-blank line stays comment until the next blank line. Put a **blank line** between narration and executable lines.
 4. **Do not invent keywords** `if` / `else` / `while` / `for` / `def` / `return`. Control flow is Markdown: **`+` params** (under heading), **`1.` `2.` … branches**, **`-` loops**, arm `N. *` = else, `#` = **object/type**, `##`+ = **function/method**, `**…**` = return.
-5. **Identifiers use backticks** — params `` + `name` ``. **Exemptions:** foreach `` - [item](coll) ``; footnote `` name[^key] ``; **inside italic `*…*` / bold `**…**`**, bare ids are variables (strings need `"…"` / `'…'`; ticks still ok). **Drop the backticks on value-expression variable names inside `*…*` / `**…**`** — they are redundant once the `*…*`/`**…**` markers mark the segment as code: `*分类 = 分类[^苹果]*`, `**n * 2**`. **Still required** where a bare word is *not* a variable: inside `"…"` / `'…'` interpolation (`` "Hello, `who`!" ``), inside `> call args` (`` > str `n` ``), and on method-call receivers (`` > `obj`.method ``). **No trailing space** inside `*…*` / `**…**` wrapped code: the closing marker must touch the last token directly (`*`a` = 1*`, `**n**`), never `` *`a` = 1 * ``.
+5. **Identifiers use backticks** — params `` + `name` ``. **Exemptions:** foreach `` - [item](coll) ``; footnote `` name[^key] ``; **inside italic `*…*` / bold `**…**`**, bare ids are **variables** (Python-style unified namespace) and method-call receivers are bare too. **Drop the backticks on value-expression variable names and method receivers inside `*…*` / `**…**`** — they are redundant once the `*…*`/`**…**` markers mark the segment as code: `*分类 = 分类[^苹果]*`, `**n * 2**`, `*p = > page.主体装配 组件=home*`. **Text literals must be quoted**: `*a = > text.split value=src sep=","*`. Backticks **still required** where a bare word is *not* a variable in **standalone `>` calls** (bare = text there): `` > str `n` ``, `` > `obj`.method ``. **No trailing space** inside `*…*` / `**…**` wrapped code: the closing marker must touch the last token directly (`*a = 1*`, `**n**`), never `` *a = 1 * ``.
 6. **Structure lines are not wrapped in italics.** `#` `>` `+` `-` `|` lines stand alone; use `*…*` only for general statements (bindings / expressions).
 7. **Paths:** In bare *expressions* `/` is division. In **call args / param defaults**, unspaced `a/b` and quoted `".marqdo/agent-kb"` are path text — no `json.parse` needed.
 8. Prefer ending side-effect-only function bodies with a lone `---` or `***` line (or `****` empty return) so later siblings are not swallowed.
@@ -123,7 +123,7 @@ import clock:lib/time.mq.md
 
 # main
 
-*xs = > text.split value=a,b,c sep=,*
+*xs = > text.split value="a,b,c" sep=","*
 > print text=`xs`
 *t = > clock.now_unix*
 ```
@@ -155,7 +155,8 @@ Stdlib map: [reference.md](reference.md).
 | `# main` then prose then code with no blank line | Blank line before code |
 | `if x > 0:` | `1. `x` > 0` |
 | `* > print text=hi *` | `> print text=hi` |
-| `` *`a` = 1 * `` (trailing space) | `` *`a` = 1* `` — no trailing space before `*` / `**` |
+| `` *`a` = 1 * `` (trailing space + backticks) | `*a = 1*` — bare bind, no trailing space before `*` / `**` |
+| `*xs = > text.split value=a,b sep=,*` (bare text args) | `*xs = > text.split value="a,b" sep=","*` — quote text literals; bare words are variables |
 | Forgetting `---` after nested `##` helper | Add `---` / `***` / `****` |
 | Import `lib/text` then call bare `split` | `> text.split …` (qualified) |
 | Import `lib/text` then call `拆分` | Match file language (`text.split`, not 文本) |

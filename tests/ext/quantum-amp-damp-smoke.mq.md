@@ -8,7 +8,7 @@ import quantum:ext/quantum/quantum.mq.md
 
 *qc = > quantum.circuit qubits=1*
 *qc = > `qc`.x qubit=0*
-*qc = > `qc`.noise kind=amplitude_damping p=1*
+*qc = > `qc`.noise kind="amplitude_damping" p=1*
 *r = > `qc`.run shots=32 seed=7*
 *c0 = r[^counts][^0]*
 

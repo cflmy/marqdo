@@ -28,7 +28,7 @@ import math:lib/math.mq.md
 2. *
   > print text=steps-fail
 
-*img = > `qc`.draw path=quantum-steps-draw.svg*
+*img = > `qc`.draw path="quantum-steps-draw.svg"*
 *kind = img[^kind]*
 
 1. `kind` == circuit

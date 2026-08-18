@@ -11,12 +11,12 @@ import json:lib/json.mq.md
 *events = > net.openai_sse_parse text=`fixture`*
 
 - [`ev`](`events`)
-  *t = > json.get value=`ev` key=type*
+  *t = > json.get value=`ev` key="type"*
   1. `t` == "delta"
-    *chunk = > json.get value=`ev` key=text*
+    *chunk = > json.get value=`ev` key="text"*
     > print text=`chunk`
   2. `t` == "done"
-    *answer = > json.get value=`ev` key=result*
+    *answer = > json.get value=`ev` key="result"*
     > print text=`answer`
   3. *
     > print text=bad

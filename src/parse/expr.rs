@@ -77,6 +77,36 @@ pub fn parse_call_arg_value(input: &str) -> Result<Expr> {
     }
 }
 
+/// Like [`parse_call_arg_value`], but for call args inside `*…*` / `**…**`
+/// value-expression segments: a bare word is a **variable** (not a text literal).
+/// Quoted strings, hyphenated prose, and `/path` prose stay text; `` `x` `` still works.
+pub fn parse_call_arg_value_prefer_var(input: &str) -> Result<Expr> {
+    let s = input.trim();
+    if s.is_empty() {
+        return Ok(Expr::Literal(Literal::Text(String::new())));
+    }
+    if s.starts_with('"') || s.starts_with('\'') {
+        return match parse_expr(s) {
+            Ok(e) => Ok(e),
+            Err(_) => Ok(parse_interp(s)),
+        };
+    }
+    if has_hyphenated_prose(s) {
+        return Ok(parse_interp(s));
+    }
+    match parse_expr_prefer_var(s) {
+        Ok(e) => Ok(e),
+        Err(_) => {
+            // `/about`, `.marqdo/x`, `nav.`nav`` etc. → prose text, not variables.
+            if s.starts_with('/') || s.contains(".`") {
+                Ok(Expr::Literal(Literal::Text(s.to_string())))
+            } else {
+                Ok(parse_interp(s))
+            }
+        }
+    }
+}
+
 fn is_text_only_div_chain(e: &Expr) -> bool {
     match e {
         Expr::Literal(Literal::Text(_)) => true,
@@ -393,10 +423,13 @@ impl<'a> Parser<'a> {
         if self.eat(">") {
             // Inline call: `> name k=v`
             self.skip_ws();
-            return Ok(Expr::Call(parse_call_tail(self.rest()).map(|(c, consumed)| {
-                self.i += consumed;
-                c
-            })?));
+            let prefer_var = self.prefer_var;
+            return Ok(Expr::Call(parse_call_tail(self.rest(), prefer_var).map(
+                |(c, consumed)| {
+                    self.i += consumed;
+                    c
+                },
+            )?));
         }
         if self.starts_with("True") && is_word_end(self.rest(), 4) {
             self.i += 4;
@@ -591,7 +624,9 @@ fn is_word_end(s: &str, len: usize) -> bool {
 
 /// Parse `name key=val …` / positional args; returns call + bytes consumed.
 /// Callee may be a bare name, library path `time.parse`, or method `` `recv`.method ``.
-pub fn parse_call_tail(s: &str) -> Result<(CallExpr, usize)> {
+/// When `prefer_var`, bare call-arg words parse as variables and bare dotted
+/// callees are allowed to be method receivers.
+pub fn parse_call_tail(s: &str, prefer_var: bool) -> Result<(CallExpr, usize)> {
     use crate::ast::Arg;
 
     let s = s.trim_start();
@@ -627,9 +662,14 @@ pub fn parse_call_tail(s: &str) -> Result<(CallExpr, usize)> {
             seen_named = true;
             let val_end = find_next_arg_boundary(after_eq);
             let val_raw = after_eq[..val_end].trim_end();
+            let value = if prefer_var {
+                parse_call_arg_value_prefer_var(val_raw)?
+            } else {
+                parse_call_arg_value(val_raw)?
+            };
             args.push(Arg::Named {
                 name: key,
-                value: parse_call_arg_value(val_raw)?,
+                value,
             });
             args_str = after_eq[val_end..].trim_start();
         } else {
@@ -640,7 +680,12 @@ pub fn parse_call_tail(s: &str) -> Result<(CallExpr, usize)> {
             if tok.is_empty() {
                 break;
             }
-            args.push(Arg::Positional(parse_call_arg_value(tok)?));
+            let value = if prefer_var {
+                parse_call_arg_value_prefer_var(tok)?
+            } else {
+                parse_call_arg_value(tok)?
+            };
+            args.push(Arg::Positional(value));
             args_str = rest.trim_start();
         }
     }
@@ -804,8 +849,10 @@ fn end_of_quoted_string(s: &str) -> Option<usize> {
 }
 
 /// Parse `> callee args` call expression/statement text (without leading `>`).
-pub fn parse_call_after_gt(after_gt: &str) -> Result<CallExpr> {
-    let (call, _) = parse_call_tail(after_gt.trim())?;
+/// When `prefer_var` (inside `*…*` / `**…**`), bare call-arg words are variables
+/// and a bare dotted callee may be a method receiver (resolved at eval/compile).
+pub fn parse_call_after_gt(after_gt: &str, prefer_var: bool) -> Result<CallExpr> {
+    let (call, _) = parse_call_tail(after_gt.trim(), prefer_var)?;
     Ok(call)
 }
 

@@ -18,11 +18,11 @@ H on qubit 0, CX(0→1), CX(0→2). Ideal: |000⟩ and |111⟩ each with probabi
 | 2 | CX | 0,1 |
 | 3 | CX | 0,2 |
 
-*`qc` = > quantum.circuit qubits=3 steps=`steps` *
-*`p` = > `qc`.probabilities *
-*`_` = > `qc`.draw path=ghz.svg *
-*`_` = > `qc`.draw kind=probs path=ghz-probs.svg *
-*`H` = > quantum.gate name=H *
-*`_` = > `H`.draw kind=matrix path=ghz-h-matrix.svg *
+*qc = > quantum.circuit qubits=3 steps=`steps`*
+*p = > qc.probabilities*
+*_ = > qc.draw path="ghz.svg"*
+*_ = > qc.draw kind="probs" path="ghz-probs.svg"*
+*H = > quantum.gate name="H"*
+*_ = > H.draw kind="matrix" path="ghz-h-matrix.svg"*
 
 > print text=`p`

@@ -278,7 +278,7 @@ impl<'a> Cursor<'a> {
 
         // Call >
         if trimmed.starts_with('>') {
-            let call = call_after_gt(trimmed[1..].trim())?;
+            let call = call_after_gt(trimmed[1..].trim(), false)?;
             return Ok(Stmt::Call { call, span });
         }
 
@@ -365,7 +365,10 @@ impl<'a> Cursor<'a> {
             return Ok((expr, span.line));
         }
         if rhs.starts_with('>') {
-            return Ok((Expr::Call(call_after_gt(rhs[1..].trim())?), span.line));
+            return Ok((
+                Expr::Call(call_after_gt(rhs[1..].trim(), prefer_var)?),
+                span.line,
+            ));
         }
         let value = if prefer_var {
             parse_expr_prefer_var(rhs)?

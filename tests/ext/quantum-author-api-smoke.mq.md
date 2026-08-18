@@ -19,7 +19,7 @@ import quantum:ext/quantum/quantum.mq.md
 2. *
   > print text=state-fail
 
-*img = > `qc`.draw path=quantum-author-draw.svg*
+*img = > `qc`.draw path="quantum-author-draw.svg"*
 *kind = img[^kind]*
 1. `kind` == circuit
   > print text=draw-ok

@@ -25,18 +25,18 @@ import json:lib/json.mq.md
 *about = > `about`.compose_components components=`layout`*
 
 *app = > web.app page=`home` host=127.0.0.1 port=18081*
-*app = > `app`.route path=/about page=`about`*
+*app = > `app`.route path="/about" page=`about`*
 
-*routes = > json.get value=`app` key=routes*
+*routes = > json.get value=`app` key="routes"*
 *routed = > json.get value=`routes` key="/about"*
-*route = > json.get value=`routed` key=_route*
+*route = > json.get value=`routed` key="_route"*
 1. `route` == "/about"
   > print text=route-stamp-ok
 2. *
   > print text=route-stamp-fail
 
 *home_html = > `home`.render*
-*home_chunks = > split value=`home_html` sep=/_part/*
+*home_chunks = > split value=`home_html` sep="/_part/"*
 *hn = > len value=`home_chunks`*
 1. `hn` >= 2
   > print text=home-part-ok
@@ -44,7 +44,7 @@ import json:lib/json.mq.md
   > print text=home-part-fail
 
 *about_html = > `routed`.render*
-*about_chunks = > split value=`about_html` sep=/about/_part/*
+*about_chunks = > split value=`about_html` sep="/about/_part/"*
 *an = > len value=`about_chunks`*
 1. `an` >= 2
   > print text=route-part-ok

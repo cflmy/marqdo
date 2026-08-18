@@ -19,7 +19,7 @@ description: 屏障 / 测量 / 追加 / 态 / 绘图.
 2. *
   > print text=state-fail
 
-*img = > `qc`.绘图 路径=quantum-author-zh-draw.svg*
+*img = > `qc`.绘图 路径="quantum-author-zh-draw.svg"*
 *kind = img[^kind]*
 1. `kind` == circuit
   > print text=draw-ok

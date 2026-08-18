@@ -10,7 +10,7 @@ import sys:lib/sys.mq.md
 
 # main
 
-*p = > plugin.native_path name=agent*
+*p = > plugin.native_path name="agent"*
 1. `p`
   > plugin.load path=`p`
 2. *
@@ -24,13 +24,13 @@ import sys:lib/sys.mq.md
 
 > fs.write_text path=`wb` text=`body`
 *prom = > agent_kb_promote kb_dir=`kb` goal=`goal` workbook=`wb`*
-*okp = > json.get value=`prom` key=promoted*
+*okp = > json.get value=`prom` key="promoted"*
 1. `okp`
   > print text=promoted
 2. *
   > print text=promote-fail
 
-*slug = > json.get value=`prom` key=slug*
+*slug = > json.get value=`prom` key="slug"*
 
 *g1 = "帮我规划明天行程"*
 *hit1 = > agent_kb_lookup kb_dir=`kb` goal=`g1` near_match=True near_threshold=0.78*
@@ -38,9 +38,9 @@ import sys:lib/sys.mq.md
   > print text=near-ok
 2. *
   > print text=near-miss
-*mk1 = > json.get value=`hit1` key=match*
+*mk1 = > json.get value=`hit1` key="match"*
 > print text=`mk1`
-*slug1 = > json.get value=`hit1` key=slug*
+*slug1 = > json.get value=`hit1` key="slug"*
 1. `slug` == `slug1`
   > print text=same-slug
 2. *
@@ -60,16 +60,16 @@ import sys:lib/sys.mq.md
   > print text=neg-miss
 
 *ranked = > agent_kb_near_match kb_dir=`kb` goal=`g1`*
-*best = > json.get value=`ranked` key=best*
-*bs = > json.get value=`best` key=slug*
+*best = > json.get value=`ranked` key="best"*
+*bs = > json.get value=`best` key="slug"*
 1. `bs` == `slug`
   > print text=rank-ok
 2. *
   > print text=rank-bad
 
-*tasks = > json.get value=`ranked` key=candidates*
+*tasks = > json.get value=`ranked` key="candidates"*
 *prompt = > agent.build_soft_match_prompt goal=`g1` tasks=`tasks`*
-*has = > split value=`prompt` sep=score=*
+*has = > split value=`prompt` sep="score="*
 *hn = > len value=`has`*
 1. `hn` > 1
   > print text=prompt-score-ok

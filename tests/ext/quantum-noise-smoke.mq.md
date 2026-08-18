@@ -8,7 +8,7 @@ import quantum:ext/quantum/quantum.mq.md
 
 *qc = > quantum.circuit qubits=1*
 *qc = > `qc`.i qubit=0*
-*qc = > `qc`.noise kind=bitflip p=1*
+*qc = > `qc`.noise kind="bitflip" p=1*
 *r = > `qc`.run shots=32 seed=3*
 *c1 = r[^counts][^1]*
 

@@ -7,13 +7,13 @@ import articles:articles.mq.md
 
 ## open
 
-*`store` = > 网页.数据库 地址="sqlite:data/site-zh.db" *
-*`fields` = > articles.schema *
+*store = > 网页.数据库 地址="sqlite:data/site-zh.db"*
+*fields = > articles.schema*
 > `store`.初始化 名=articles 字段=`fields`
-*`rows` = > `store`.查询 表=articles 上限=1 *
+*rows = > store.查询 表="articles" 上限=1*
 1. `rows`
-  **`store`**
+  **store**
 2. *
-  *`seed` = > articles.seed *
+  *seed = > articles.seed*
   > `store`.插入 表=articles 行=`seed`
-  **`store`**
+  **store**

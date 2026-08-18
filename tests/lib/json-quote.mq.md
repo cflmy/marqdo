@@ -5,6 +5,6 @@ import json:lib/json.mq.md
 
 # main
 
-*q = > json.quote text=hi*
+*q = > json.quote text="hi"*
 
 > print text=`q`

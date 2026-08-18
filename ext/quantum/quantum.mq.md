@@ -10,7 +10,7 @@ import json:lib/json.mq.md
 
 Load the ABI v2 `quantum` plugin once.
 
-*`p` = > plugin.native_path name=quantum *
+*p = > plugin.native_path name="quantum"*
 1. `p`
   > plugin.load path=`p`
 2. *

@@ -10,7 +10,7 @@ import sys:lib/sys.mq.md
 
 # main
 
-*p = > plugin.native_path name=agent*
+*p = > plugin.native_path name="agent"*
 1. `p`
   > plugin.load path=`p`
 2. *
@@ -25,19 +25,19 @@ import sys:lib/sys.mq.md
 
 > fs.write_text path=`wb` text=`body`
 *prom = > agent_kb_promote kb_dir=`kb` goal=`goal` workbook=`wb` aliases=`alias`*
-*okp = > json.get value=`prom` key=promoted*
+*okp = > json.get value=`prom` key="promoted"*
 1. `okp`
   > print text=promoted
 2. *
   > print text=promote-fail
 
-*slug = > json.get value=`prom` key=slug*
+*slug = > json.get value=`prom` key="slug"*
 *parts = > json.parse text={"a":"/concepts/tasks/","b":".md"}*
-*a = > json.get value=`parts` key=a*
-*b = > json.get value=`parts` key=b*
+*a = > json.get value=`parts` key="a"*
+*b = > json.get value=`parts` key="b"*
 *task = kb + a + slug + b*
 *src = > fs.read_text path=`task`*
-*has = > split value=`src` sep=say pong only*
+*has = > split value=`src` sep="say pong only"*
 *hn = > len value=`has`*
 1. `hn` > 1
   > print text=alias-written
@@ -50,17 +50,17 @@ import sys:lib/sys.mq.md
 2. *
   > print text=alias-miss
 
-*mk = > json.get value=`hit` key=match*
+*mk = > json.get value=`hit` key="match"*
 > print text=`mk`
 
-*slug_hit = > json.get value=`hit` key=slug*
+*slug_hit = > json.get value=`hit` key="slug"*
 1. `slug` == `slug_hit`
   > print text=same-slug
 2. *
   > print text=slug-drift
 
 *exact = > agent_kb_lookup kb_dir=`kb` goal=`goal`*
-*mk2 = > json.get value=`exact` key=match*
+*mk2 = > json.get value=`exact` key="match"*
 > print text=`mk2`
 
 *g_trip = "帮我规划明天的行程"*
@@ -68,7 +68,7 @@ import sys:lib/sys.mq.md
 *body2 = "---\ntitle: trip\n---\n\n# main\n\n*msg = \"trip-ok\"*\n\n**msg**\n"*
 > fs.write_text path=`wb2` text=`body2`
 *prom2 = > agent_kb_promote kb_dir=`kb` goal=`g_trip` workbook=`wb2`*
-*ok2 = > json.get value=`prom2` key=promoted*
+*ok2 = > json.get value=`prom2` key="promoted"*
 1. `ok2`
   > print text=trip-promoted
 2. *
@@ -82,11 +82,11 @@ import sys:lib/sys.mq.md
   > print text=canonical-ok
 2. *
   > print text=canonical-miss
-*mk3 = > json.get value=`hit_c` key=match*
+*mk3 = > json.get value=`hit_c` key="match"*
 > print text=`mk3`
 
 *listed = > agent_kb_list_tasks kb_dir=`kb`*
-*tc = > json.get value=`listed` key=count*
+*tc = > json.get value=`listed` key="count"*
 1. `tc` > 1
   > print text=list-ok
 2. *

@@ -546,6 +546,13 @@ impl Interpreter {
         }
 
         if let Some(path) = &call.path {
+            // Bare dotted callee `a.b`: if `a` is a local variable, it is a method
+            // receiver (Python-style unified namespace); otherwise it's a library path.
+            if path.len() == 2 && env.get(&path[0]).is_some() {
+                let recv = path[0].clone();
+                let method = path[1].clone();
+                return self.eval_method_call(module, fun, env, &recv, &method, &ev_args);
+            }
             return self.eval_path_call(module, path, &ev_args);
         }
 

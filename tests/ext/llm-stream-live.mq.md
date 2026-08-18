@@ -11,7 +11,7 @@ import json:lib/json.mq.md
 
 *model = > llm.llm*
 
-*events = > `model`.complete prompt=Reply with exactly one English word: pong stream=True echo=True*
+*events = > `model`.complete prompt="Reply with exactly one English word: pong" stream=True echo=True*
 *n = > len value=`events`*
 > print text=`n`
 

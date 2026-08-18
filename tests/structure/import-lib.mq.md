@@ -6,7 +6,7 @@ title: import official lib (Chinese)
 
 # main
 
-*t = > 文本.去空白 s=  x*
+*t = > 文本.去空白 s="  x"*
 
 > 打印 内容=`t`
 

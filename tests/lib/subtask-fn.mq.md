@@ -8,7 +8,7 @@ import json:lib/json.mq.md
 
 *args = > json.parse text={"n":21}*
 
-*id = > subtask.spawn fn=worker args=`args`*
+*id = > subtask.spawn fn="worker" args=`args`*
 
 *v = > subtask.wait id=`id`*
 

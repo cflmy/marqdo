@@ -107,10 +107,10 @@ import json:lib/json.mq.md
 
 # main
 
-*`t` = > time.now_unix *
-*`s` = > time.format unix=`t` pattern=%Y-%m-%d *
-*`obj` = > json.parse text={"a":1} *
-*`a` = > json.get value=`obj` key=a *
+*t = > time.now_unix*
+*s = > time.format unix=`t` pattern="%Y-%m-%d"*
+*obj = > json.parse text={"a":1}*
+*a = > json.get value=`obj` key="a"*
 > print text=`s`
 ```
 
@@ -122,12 +122,18 @@ import json:lib/json.mq.md
 
 实例方法须 `` > `var`.method ``；无接收者的 `库.类型.方法` → 硬错误。
 
-### 4.4 变量 / 实例 vs 库路径
+### 4.4 变量 / 实例 vs 库路径（Python 统一命名空间）
 
 | 写法 | 含义 |
 |------|------|
-| `time.parse` | 库路径（裸名） |
-| `` > `助手`.step `` | 实例方法（接收者反引号） |
+| `time.parse` | 库路径（裸名，第一段非变量） |
+| `` > `助手`.step `` | 独立 `>` 调用：实例方法（接收者反引号） |
+| `*回复 = > 助手.step …*` | `*…*` 段内：若 `助手` 是变量 → 实例方法；否则 → 库路径 |
+
+**统一规则**（与 Python 一致）：对裸点号 `a.b`，当 `a` 是当前作用域**局部变量**时解释为**方法调用**（`a` 为接收者）；否则解释为**库路径**（`lib.a.b`）。此规则同时应用于树遍历与字节码两后端。
+
+- 在**独立 `>` 调用**中裸词 = 文本，故方法接收者仍须反引号：`` > `助手`.step ``。
+- 在 **`*…*` / `**…**` 段内**裸词 = 变量，接收者不加反引号：`*回复 = 助手.step …*`。
 
 ### 4.5 短名示例
 
@@ -139,8 +145,8 @@ import fmt:time.format
 
 # main
 
-*`t` = > time.now_unix *
-*`s` = > fmt unix=`t` pattern=%Y-%m-%d *
+*t = > time.now_unix*
+*s = > fmt unix=`t` pattern="%Y-%m-%d"*
 ```
 
 ### 4.6 应用侧完整示例
@@ -210,5 +216,5 @@ import json:lib/json.mq.md
 
 1. 导入 = `import bind:target`（`导入` 等价）。  
 2. target = `.mq.md` 文件 **或** `库.成员` 点号路径。  
-3. 调用以裸名点号路径寻址；实例方法用反引号接收者。  
-4. 废除 frontmatter `>` 导入与独立 `use`。
+3. 调用以裸名点号路径寻址；实例方法用反引号接收者（仅独立 `>` 调用；`*…*`/`**…**` 段内接收者不加反引号）。  
+4. 裸点号 `a.b`：`a` 为局部变量 → 方法调用，否则 → 库路径（Python 统一命名空间）。

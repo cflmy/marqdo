@@ -436,6 +436,12 @@ impl<'a> FnCompiler<'a> {
     fn compile_call(&mut self, call: &CallExpr, as_stmt: bool) -> Result<()> {
         let mut call = call.clone();
         if let Some(path) = &call.path {
+            // Bare dotted callee `a.b`: if `a` is a local variable, it is a method
+            // receiver (Python-style unified namespace); otherwise it's a library path.
+            if path.len() == 2 && self.locals.contains_key(&path[0]) {
+                let recv = path[0].clone();
+                return self.compile_method_call(&recv, &call, as_stmt);
+            }
             return self.compile_path_call(path, &call, as_stmt);
         }
         if let Some(path) = self.flat[self.fn_id].uses.get(&call.callee).cloned() {

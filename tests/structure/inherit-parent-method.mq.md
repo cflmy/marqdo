@@ -16,7 +16,7 @@ import json:lib/json.mq.md
 # main
 
 *l = > Loud*
-*ty = > json.get value=`l` key=_type*
+*ty = > json.get value=`l` key="_type"*
 > print text=`ty`
-*m = > `l`.hello who=world*
+*m = > `l`.hello who="world"*
 > print text=`m`

@@ -11,7 +11,7 @@ import sys:lib/sys.mq.md
 
 # main
 
-*p = > plugin.native_path name=agent*
+*p = > plugin.native_path name="agent"*
 1. `p`
   > plugin.load path=`p`
 2. *
@@ -19,10 +19,10 @@ import sys:lib/sys.mq.md
   > sys.exit code=1
 
 *paths = > json.parse text={"kb":".marqdo/agent-kb","wb":".marqdo/agent-runs/pong-solid.mq.md","goal":"Reply with exactly the word pong and nothing else.","body":"---\ntitle: pong skill\n---\n\n# main\n\n*msg = \"pong\"*\n\n**msg**\n"}*
-*kb = > json.get value=`paths` key=kb*
-*wb = > json.get value=`paths` key=wb*
-*goal = > json.get value=`paths` key=goal*
-*body = > json.get value=`paths` key=body*
+*kb = > json.get value=`paths` key="kb"*
+*wb = > json.get value=`paths` key="wb"*
+*goal = > json.get value=`paths` key="goal"*
+*body = > json.get value=`paths` key="body"*
 
 > fs.write_text path=`wb` text=`body`
 
@@ -33,16 +33,16 @@ import sys:lib/sys.mq.md
 > print text=`slug0`
 
 *prom = > agent_kb_promote kb_dir=`kb` goal=`goal` workbook=`wb`*
-*okp = > json.get value=`prom` key=promoted*
+*okp = > json.get value=`prom` key="promoted"*
 1. `okp`
   > print text=promoted
 2. *
   > print text=promote-fail
 
-*st = > json.get value=`prom` key=status*
+*st = > json.get value=`prom` key="status"*
 > print text=`st`
 
-*slug = > json.get value=`prom` key=slug*
+*slug = > json.get value=`prom` key="slug"*
 > print text=`slug`
 
 *hit = > agent_kb_lookup kb_dir=`kb` goal=`goal`*
@@ -51,16 +51,16 @@ import sys:lib/sys.mq.md
 2. *
   > print text=lookup-miss
 
-*res = > json.get value=`hit` key=resource*
+*res = > json.get value=`hit` key="resource"*
 *id = > subtask.spawn path=`res`*
 *waited = > subtask.wait id=`id`*
-*code = > json.get value=`waited` key=code*
-*val = > json.get value=`waited` key=value*
+*code = > json.get value=`waited` key="code"*
+*val = > json.get value=`waited` key="value"*
 > print text=`code`
 > print text=`val`
 
 *hit2 = > agent_kb_lookup kb_dir=`kb` goal=`goal`*
-*res2 = > json.get value=`hit2` key=resource*
+*res2 = > json.get value=`hit2` key="resource"*
 1. `res` == `res2`
   > print text=stable-path
 2. *

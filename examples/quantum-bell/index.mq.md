@@ -19,9 +19,9 @@ H on qubit 0, then CNOT(0→1). Ideal measurement: |00⟩ and |11⟩ each with p
 | 1 | H | 0 |
 | 2 | CX | 0,1 |
 
-*`qc` = > quantum.circuit qubits=2 steps=`steps` *
-*`p` = > `qc`.probabilities *
-*`_` = > `qc`.draw path=bell.svg *
-*`_` = > `qc`.draw kind=probs path=bell-probs.svg *
+*qc = > quantum.circuit qubits=2 steps=`steps`*
+*p = > qc.probabilities*
+*_ = > qc.draw path="bell.svg"*
+*_ = > qc.draw kind="probs" path="bell-probs.svg"*
 
 > print text=`p`

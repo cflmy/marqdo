@@ -39,23 +39,23 @@ Reduce a `complete stream=True` event list to the final `done.result` text (or `
 
 Construct an LLM handle from `OPENAI_*` / `MARQDO_LLM_*`.
 
-*api_key = > sys.env_get name=OPENAI_API_KEY*
+*api_key = > sys.env_get name="OPENAI_API_KEY"*
 1. not `api_key`
-  *api_key = > sys.env_get name=MARQDO_LLM_API_KEY*
+  *api_key = > sys.env_get name="MARQDO_LLM_API_KEY"*
 
 1. not `api_key`
   > print text=ext/ai/llm: set OPENAI_API_KEY or MARQDO_LLM_API_KEY
   > sys.exit code=1
 
-*base_url = > sys.env_get name=OPENAI_BASE_URL*
+*base_url = > sys.env_get name="OPENAI_BASE_URL"*
 1. not `base_url`
-  *base_url = > sys.env_get name=MARQDO_LLM_BASE_URL*
+  *base_url = > sys.env_get name="MARQDO_LLM_BASE_URL"*
 1. not `base_url`
   *base_url = "https://api.openai.com/v1"*
 
-*model = > sys.env_get name=OPENAI_MODEL*
+*model = > sys.env_get name="OPENAI_MODEL"*
 1. not `model`
-  *model = > sys.env_get name=MARQDO_LLM_MODEL*
+  *model = > sys.env_get name="MARQDO_LLM_MODEL"*
 1. not `model`
   *model = "gpt-4o-mini"*
 
@@ -78,7 +78,7 @@ Wire body is `{model, messages:[{role,content}], stream?}`. Messages are an `@` 
 
 *url = self[^base_url] + self[^suffix]*
 *auth = self[^bearer] + self[^api_key]*
-*headers = > table.put in=None at=Authorization value=`auth`*
+*headers = > table.put in=None at="Authorization" value=`auth`*
 
 `messages` =
 
@@ -93,7 +93,7 @@ Wire body is `{model, messages:[{role,content}], stream?}`. Messages are an `@` 
 | self[^model] | `messages` |
 
 1. `stream`
-  *req = > table.put in=`req` at=stream value=True*
+  *req = > table.put in=`req` at="stream" value=True*
   *body = > json.stringify value=`req`*
   *resp = > net.http_post_sse url=`url` body=`body` headers=`headers` echo=`echo`*
   1. resp[^status] == 200
@@ -123,4 +123,4 @@ Wire body is `{model, messages:[{role,content}], stream?}`. Messages are an `@` 
 
 Alias for `complete`.
 
-**> `self`.complete prompt=`prompt` stream=`stream` echo=`echo`**
+**> self.complete prompt=`prompt` stream=`stream` echo=`echo`**

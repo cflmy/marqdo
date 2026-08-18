@@ -8,7 +8,7 @@ import json:lib/json.mq.md
 # main
 
 *H_matrix = > json.parse text=[[0.7071067811865475,0.7071067811865475],[0.7071067811865475,-0.7071067811865475]]*
-*H = > quantum.gate name=H*
+*H = > quantum.gate name="H"*
 *ok = > `H`.matches_matrix matrix=`H_matrix`*
 
 1. `ok`

@@ -10,6 +10,6 @@ import llm:ext/ai/llm.mq.md
 
 *model = > llm.llm*
 
-*reply = > `model`.complete prompt=Reply with exactly one English word: pong*
+*reply = > `model`.complete prompt="Reply with exactly one English word: pong"*
 
 > print text=`reply`

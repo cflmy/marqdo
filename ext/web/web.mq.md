@@ -10,7 +10,7 @@ import json:lib/json.mq.md
 
 Load the ABI v2 `web` plugin once.
 
-*`p` = > plugin.native_path name=web *
+*p = > plugin.native_path name="web"*
 1. `p`
   > plugin.load path=`p`
 2. *
@@ -53,7 +53,7 @@ Embed a form into the page main slot. `listen` auto-registers `GET|POST /_form/{
 Offline HTML for tests / previews.
 
 1. `db`
-  *`url` = > json.get value=`db` key=url *
+  *url = > json.get value=`db` key="url"*
   **> web_render page=`self` url=`url`**
 2. *
   **> web_render page=`self`**
@@ -63,14 +63,14 @@ Offline HTML for tests / previews.
 
 Style tables live as `##` exports in site style modules; compose resolves them by path.
 
-**`self`**
+**self**
 
 ## process
     + `style`=None
     + `name`=None
     + `path`=None
 
-**`self`**
+**self**
 
 # db
     + `url`="sqlite:site.db"
@@ -82,14 +82,14 @@ Style tables live as `##` exports in site style modules; compose resolves them b
     + `name`
     + `fields`
 
-*`url` = > json.get value=`self` key=url *
+*url = > json.get value=`self` key="url"*
 **> web_db_init url=`url` name=`name` fields=`fields`**
 
 ## insert
     + `table`
     + `rows`
 
-*`url` = > json.get value=`self` key=url *
+*url = > json.get value=`self` key="url"*
 **> web_db_insert url=`url` table=`table` rows=`rows`**
 
 ## select
@@ -99,15 +99,15 @@ Style tables live as `##` exports in site style modules; compose resolves them b
 
 Simple filters: one-row map of column→value (AND `=`), or rows `|字段|操作|值|` (`=` `!=` `>` `>=` `<` `<=` `like`).
 
-*`url` = > json.get value=`self` key=url *
-*`r` = > web_db_select url=`url` table=`table` where=`where` limit=`limit` *
-**> json.get value=`r` key=rows**
+*url = > json.get value=`self` key="url"*
+*r = > web_db_select url=`url` table=`table` where=`where` limit=`limit`*
+**> json.get value=`r` key="rows"**
 
 ## get
     + `table`
     + `id`
 
-*`url` = > json.get value=`self` key=url *
+*url = > json.get value=`self` key="url"*
 **> web_db_get url=`url` table=`table` id=`id`**
 
 ## update
@@ -115,21 +115,21 @@ Simple filters: one-row map of column→value (AND `=`), or rows `|字段|操作
     + `id`
     + `row`
 
-*`url` = > json.get value=`self` key=url *
+*url = > json.get value=`self` key="url"*
 **> web_db_update url=`url` table=`table` id=`id` row=`row`**
 
 ## delete
     + `table`
     + `id`
 
-*`url` = > json.get value=`self` key=url *
+*url = > json.get value=`self` key="url"*
 **> web_db_delete url=`url` table=`table` id=`id`**
 
 ## exec
     + `sql`
     + `args`=None
 
-*`url` = > json.get value=`self` key=url *
+*url = > json.get value=`self` key="url"*
 **> web_db_exec url=`url` sql=`sql` args=`args`**
 
 # form
@@ -169,7 +169,7 @@ Field table + rules table; submit writes through `# db`.
     + `data`
     + `db`
 
-*`url` = > json.get value=`db` key=url *
+*url = > json.get value=`db` key="url"*
 **> web_form_submit form=`self` data=`data` url=`url`**
 
 # app
