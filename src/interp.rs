@@ -449,6 +449,15 @@ impl Interpreter {
                                 .ok_or_else(|| self.err(format!("undefined variable `{n}`")))?;
                             s.push_str(&v.as_display());
                         }
+                        InterpPart::Index { base, labels } => {
+                            let mut v = env.get(base).cloned().ok_or_else(|| {
+                                self.err(format!("undefined variable `{base}`"))
+                            })?;
+                            for label in labels {
+                                v = builtin_footnote_get(&v, label).map_err(|m| self.err(m))?;
+                            }
+                            s.push_str(&v.as_display());
+                        }
                     }
                 }
                 Ok(Value::Text(s))

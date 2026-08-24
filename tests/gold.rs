@@ -96,6 +96,17 @@ Ada",
 }
 
 #[test]
+fn bytecode_inherit_explicit_super() {
+    assert_out_backend(
+        "tests/structure/inherit-explicit-super.mq.md",
+        "bytecode",
+        "Child
+child
+Ada",
+    );
+}
+
+#[test]
 fn structure_nested_call() {
     assert_out("tests/structure/nested-call.mq.md", "Hello World!");
 }
@@ -204,6 +215,29 @@ fn structure_footnote_map_digits() {
         "tests/structure/footnote-map-digits.mq.md",
         "half
 other",
+    );
+}
+
+#[test]
+fn structure_interp_footnote_index() {
+    assert_out(
+        "tests/structure/interp-footnote-index.mq.md",
+        "苹果单价：5
+第一种：红富士 结尾
+引号内：\"价 3 元\"
+梨 × 3",
+    );
+}
+
+#[test]
+fn bytecode_interp_footnote_index() {
+    assert_out_backend(
+        "tests/structure/interp-footnote-index.mq.md",
+        "bytecode",
+        "苹果单价：5
+第一种：红富士 结尾
+引号内：\"价 3 元\"
+梨 × 3",
     );
 }
 

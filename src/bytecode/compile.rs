@@ -830,6 +830,19 @@ impl<'a> FnCompiler<'a> {
                                 .ok_or_else(|| self.err(format!("undefined variable `{n}`")))?;
                             self.emit(Op::GetLocal(slot));
                         }
+                        InterpPart::Index { base, labels } => {
+                            let slot = self
+                                .locals
+                                .get(base)
+                                .copied()
+                                .ok_or_else(|| self.err(format!("undefined variable `{base}`")))?;
+                            self.emit(Op::GetLocal(slot));
+                            for label in labels {
+                                let li = self.add_const(Value::Text(label.clone()));
+                                self.emit(Op::Constant(li));
+                                self.emit(Op::FootnoteGet);
+                            }
+                        }
                     }
                     if idx > 0 {
                         self.emit(Op::Add);

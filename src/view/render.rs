@@ -1296,6 +1296,16 @@ fn expr_prec(expr: &Expr, parent_prec: u8) -> String {
                         s.push_str(n);
                         s.push('`');
                     }
+                    InterpPart::Index { base, labels } => {
+                        s.push('`');
+                        s.push_str(base);
+                        s.push('`');
+                        for label in labels {
+                            s.push_str("[^");
+                            s.push_str(label);
+                            s.push(']');
+                        }
+                    }
                 }
             }
             s

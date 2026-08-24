@@ -169,8 +169,14 @@ pub fn parse_interp(s: &str) -> Expr {
             let after = &rest[start + 1..];
             if let Some(end) = after.find('`') {
                 let name = after[..end].to_string();
-                parts.push(InterpPart::Var(name));
-                rest = &after[end + 1..];
+                let mut tail = &after[end + 1..];
+                // `` `name`[^a][^b] `` → Index part (chained labels fold).
+                if let Some(labels) = take_index_chain(&mut tail) {
+                    parts.push(InterpPart::Index { base: name, labels });
+                } else {
+                    parts.push(InterpPart::Var(name));
+                }
+                rest = tail;
             } else {
                 parts.push(InterpPart::Lit(format!("`{after}")));
                 break;
@@ -184,9 +190,44 @@ pub fn parse_interp(s: &str) -> Expr {
         match &parts[0] {
             InterpPart::Lit(t) => return Expr::Literal(Literal::Text(t.clone())),
             InterpPart::Var(n) => return Expr::Var(n.clone()),
+            InterpPart::Index { base, labels } => {
+                let mut e = Expr::Var(base.clone());
+                for label in labels {
+                    e = Expr::Index {
+                        base: Box::new(e),
+                        label: label.clone(),
+                    };
+                }
+                return e;
+            }
         }
     }
     Expr::Interp(parts)
+}
+
+/// If `s` starts with one or more `[^label]` (no whitespace), consume them.
+fn take_index_chain(s: &mut &str) -> Option<Vec<String>> {
+    let mut labels = Vec::new();
+    loop {
+        if !s.starts_with("[^") {
+            break;
+        }
+        let after_open = &s[2..];
+        let Some(close) = after_open.find(']') else {
+            break;
+        };
+        let label = after_open[..close].trim().to_string();
+        if label.is_empty() {
+            break;
+        }
+        labels.push(label);
+        *s = &after_open[close + 1..];
+    }
+    if labels.is_empty() {
+        None
+    } else {
+        Some(labels)
+    }
 }
 
 struct Parser<'a> {
@@ -568,7 +609,12 @@ impl<'a> Parser<'a> {
                 if !self.eat("`") {
                     bail!("unterminated `name` in string");
                 }
-                parts.push(InterpPart::Var(name));
+                // `` `name`[^a][^b] `` inside a quoted string → footnote index parts.
+                if let Some(labels) = self.take_index_chain_in_string()? {
+                    parts.push(InterpPart::Index { base: name, labels });
+                } else {
+                    parts.push(InterpPart::Var(name));
+                }
                 continue;
             }
             lit.push(c);
@@ -584,9 +630,54 @@ impl<'a> Parser<'a> {
             return Ok(match parts.remove(0) {
                 InterpPart::Lit(t) => Expr::Literal(Literal::Text(t)),
                 InterpPart::Var(n) => Expr::Var(n),
+                InterpPart::Index { base, labels } => {
+                    let mut e = Expr::Var(base);
+                    for label in labels {
+                        e = Expr::Index {
+                            base: Box::new(e),
+                            label,
+                        };
+                    }
+                    e
+                }
             });
         }
         Ok(Expr::Interp(parts))
+    }
+
+    /// In quoted strings, consume `[^label]` chains following `` `var` ``.
+    fn take_index_chain_in_string(&mut self) -> Result<Option<Vec<String>>> {
+        let mut labels = Vec::new();
+        loop {
+            if !self.starts_with("[^") {
+                break;
+            }
+            self.bump_char();
+            self.bump_char(); // consume `[^`
+            let start = self.i;
+            while let Some(ch) = self.peek_char() {
+                if ch == ']' {
+                    break;
+                }
+                if ch == '\n' || ch == '\r' {
+                    bail!("unterminated footnote index [^…] in string");
+                }
+                self.bump_char();
+            }
+            let label = self.src[start..self.i].trim().to_string();
+            if !self.eat("]") {
+                bail!("unterminated footnote index [^…] in string");
+            }
+            if label.is_empty() {
+                bail!("empty footnote index `[^]` in string");
+            }
+            labels.push(label);
+        }
+        if labels.is_empty() {
+            Ok(None)
+        } else {
+            Ok(Some(labels))
+        }
     }
 
     /// Parse `[^label]` after a value; label is text until `]`.
@@ -971,6 +1062,50 @@ mod tests {
             parse_expr("空").unwrap(),
             Expr::Literal(Literal::None)
         ));
+    }
+
+    #[test]
+    fn interp_footnote_index_after_var() {
+        // `前缀`x`[^key]` → Interp([Lit, Index])
+        let e = parse_interp("前缀`m`[^苹果]");
+        match &e {
+            Expr::Interp(parts) => {
+                assert!(matches!(&parts[0], InterpPart::Lit(t) if t == "前缀"));
+                assert!(matches!(
+                    &parts[1],
+                    InterpPart::Index { base, labels } if base == "m" && labels == &["苹果".to_string()]
+                ));
+            }
+            other => panic!("expected Interp, got {other:?}"),
+        }
+        // Bare `m`[^key] with no prefix → Expr::Index
+        let e = parse_interp("`m`[^苹果]");
+        assert!(matches!(e, Expr::Index { label, .. } if label == "苹果"));
+        // Chained labels fold into one Index part with multiple labels.
+        let e = parse_interp("`m`[^a][^b]");
+        match &e {
+            Expr::Index { base, label } => {
+                assert!(matches!(base.as_ref(), Expr::Index { label: l, .. } if l == "a"));
+                assert_eq!(label, "b");
+            }
+            other => panic!("expected chained Index, got {other:?}"),
+        }
+        // `x`[^key] with plain Var text when no `[^` follows.
+        let e = parse_interp("`m` 和 `n`");
+        assert!(matches!(e, Expr::Interp(_)));
+    }
+
+    #[test]
+    fn interp_footnote_index_keeps_text_between() {
+        // `x` followed by whitespace then [^...] → [^...] stays literal text.
+        let e = parse_interp("`m` [^苹果]");
+        match &e {
+            Expr::Interp(parts) => {
+                assert!(matches!(&parts[0], InterpPart::Var(n) if n == "m"));
+                assert!(matches!(&parts[1], InterpPart::Lit(t) if t == " [^苹果]"));
+            }
+            other => panic!("expected Interp, got {other:?}"),
+        }
     }
 }
 

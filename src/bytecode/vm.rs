@@ -658,9 +658,10 @@ fn instance_type_name_bc(v: &Value) -> Result<String, String> {
 fn tag_instance_value(type_name: &str, value: Value) -> Value {
     match value {
         Value::Map(mut entries) => {
-            if !entries.iter().any(|(k, _)| k == "_type") {
-                entries.insert(0, ("_type".into(), Value::Text(type_name.into())));
-            }
+            // Always stamp the constructed type so an explicit `` `self` = > Parent ``
+            // inside a child constructor still yields the most specific `_type`.
+            entries.retain(|(k, _)| k != "_type");
+            entries.insert(0, ("_type".into(), Value::Text(type_name.into())));
             Value::Map(entries)
         }
         Value::None => Value::Map(vec![("_type".into(), Value::Text(type_name.into()))]),

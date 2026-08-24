@@ -159,6 +159,9 @@ pub enum Expr {
 pub enum InterpPart {
     Lit(String),
     Var(String),
+    /// `` `base`[^label] `` — variable followed by footnote index inside interpolated
+    /// text (chained labels fold into one part, e.g. `` `x`[^a][^b] `` → two labels).
+    Index { base: String, labels: Vec<String> },
 }
 
 #[derive(Debug, Clone)]
