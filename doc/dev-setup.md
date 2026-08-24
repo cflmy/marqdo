@@ -68,6 +68,28 @@ proxy = "http://127.0.0.1:7890"
 
 ---
 
+## 3.5 Git 推送（遇网络失败时使用代理）
+
+直连 `git push` 偶尔会报 `RPC failed; curl 35 Recv failure: Connection reset by peer` 或 `curl 56`（远端挂断，常见于数据包稍大时）。此时**通过本机代理 7890 推送**：
+
+```bash
+# Linux/macOS（本机 clash 监听 127.0.0.1:7890）
+git -c http.proxy=http://127.0.0.1:7890 -c http.postBuffer=524288000 push origin main
+```
+
+要点：
+
+- 代理可用性先探测：`curl -x http://127.0.0.1:7890 -o /dev/null -w "%{http_code}\n" https://github.com`，返回 `200` 再推。
+- `http.postBuffer=524288000`（500 MB）用于规避推送大包被断开（`curl 56`）；两个 `-c` 可叠加。
+- 该命令**一次性生效**，不写死仓库配置。若想长期默认走代理，可执行：
+  ```bash
+  git config http.proxy http://127.0.0.1:7890
+  git config http.postBuffer 524288000
+  ```
+- 若是别的代理端口，把 `7890` 换成实际端口（如 Windows 示例里 `$env:HTTPS_PROXY` 的同款端口）。
+
+---
+
 ## 4. 目录约定
 
 | 路径 | 含义 |
