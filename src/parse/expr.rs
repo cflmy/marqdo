@@ -297,6 +297,26 @@ impl<'a> Parser<'a> {
         false
     }
 
+    /// Consume up to `max` hex digits; fewer (even zero) are allowed.
+    /// Returns the parsed value, or an error if a digit exceeds the limit
+    /// would overflow (`\xHH` requires exactly 2, `\u{...}` up to 6).
+    fn take_hex_digits(&mut self, max: usize) -> Result<u64> {
+        let mut value: u64 = 0;
+        let mut count = 0;
+        while count < max {
+            let Some(c) = self.peek_char() else {
+                break;
+            };
+            let Some(d) = c.to_digit(16) else {
+                break;
+            };
+            value = value * 16 + u64::from(d);
+            self.bump_char();
+            count += 1;
+        }
+        Ok(value)
+    }
+
     fn parse_or(&mut self) -> Result<Expr> {
         let mut left = self.parse_and()?;
         loop {
@@ -582,15 +602,51 @@ impl<'a> Parser<'a> {
                     .peek_char()
                     .ok_or_else(|| anyhow::anyhow!("dangling \\ in string"))?;
                 self.bump_char();
-                lit.push(match esc {
-                    'n' => '\n',
-                    't' => '\t',
-                    'r' => '\r',
-                    '\\' => '\\',
-                    '"' => '"',
-                    '\'' => '\'',
-                    other => bail!("unknown escape \\{other} in string"),
-                });
+                match esc {
+                    'n' => lit.push('\n'),
+                    't' => lit.push('\t'),
+                    'r' => lit.push('\r'),
+                    '\\' => lit.push('\\'),
+                    '"' => lit.push('"'),
+                    '\'' => lit.push('\''),
+                    'x' => {
+                        let start = self.i;
+                        let cp = self.take_hex_digits(2)?;
+                        if self.i - start == 2 {
+                            lit.push(
+                                char::from_u32(cp as u32)
+                                    .ok_or_else(|| anyhow::anyhow!("invalid \\x escape"))?,
+                            );
+                        } else {
+                            // `\x` with fewer than two hex digits is not a valid
+                            // escape: keep it verbatim.
+                            self.i = start;
+                            lit.push('\\');
+                            lit.push('x');
+                        }
+                    }
+                    'u' => {
+                        if self.eat("{") {
+                            let digits = self.take_hex_digits(6)?;
+                            if !self.eat("}") {
+                                bail!("unterminated \\u{{...}} escape in string");
+                            }
+                            lit.push(
+                                char::from_u32(digits as u32)
+                                    .ok_or_else(|| anyhow::anyhow!("invalid \\u escape"))?,
+                            );
+                        } else {
+                            // `\u` without `{…}` is not a valid escape: keep it verbatim.
+                            lit.push('\\');
+                            lit.push('u');
+                        }
+                    }
+                    // Unknown escapes are kept verbatim (`\q` → `\q`).
+                    other => {
+                        lit.push('\\');
+                        lit.push(other);
+                    }
+                }
                 continue;
             }
             if c == '`' {
@@ -1008,6 +1064,59 @@ mod tests {
         ));
         let e = parse_expr("\"hi `x`!\"").unwrap();
         assert!(matches!(e, Expr::Interp(_)));
+    }
+
+    #[test]
+    fn quoted_string_hex_unicode_escapes() {
+        // `\x22` → `"` (hex escape)
+        let e = parse_expr("\"a\\x22b\"").unwrap();
+        assert!(matches!(
+            e,
+            Expr::Literal(Literal::Text(ref s)) if s == "a\"b"
+        ));
+        // `\x1F` → control char
+        let e = parse_expr("\"\\x1F\"").unwrap();
+        assert!(matches!(
+            e,
+            Expr::Literal(Literal::Text(ref s)) if s == "\u{1f}"
+        ));
+        // `\u{4e2d}` → 中
+        let e = parse_expr("\"\\u{4e2d}\"").unwrap();
+        assert!(matches!(
+            e,
+            Expr::Literal(Literal::Text(ref s)) if s == "中"
+        ));
+        // `\u{1F600}` → 😀
+        let e = parse_expr("\"\\u{1F600}\"").unwrap();
+        assert!(matches!(
+            e,
+            Expr::Literal(Literal::Text(ref s)) if s == "😀"
+        ));
+        // `\x22` inside a string that also interpolates
+        let e = parse_expr("\"x=\\x22`v`\\x22\"").unwrap();
+        assert!(matches!(e, Expr::Interp(_)));
+        // `\x` without two hex digits is kept verbatim (`\x` → `\x`)
+        let e = parse_expr("\"a\\xb\"").unwrap();
+        assert!(matches!(
+            e,
+            Expr::Literal(Literal::Text(ref s)) if s == "a\\xb"
+        ));
+        // `\u` without braces is kept verbatim (`\u` → `\u`)
+        let e = parse_expr("\"a\\ub\"").unwrap();
+        assert!(matches!(
+            e,
+            Expr::Literal(Literal::Text(ref s)) if s == "a\\ub"
+        ));
+    }
+
+    #[test]
+    fn quoted_string_unknown_escape_kept_verbatim() {
+        // Unknown escapes like `\q` are kept as-is rather than failing.
+        let e = parse_expr("\"a\\qb\"").unwrap();
+        assert!(matches!(
+            e,
+            Expr::Literal(Literal::Text(ref s)) if s == "a\\qb"
+        ));
     }
 
     #[test]

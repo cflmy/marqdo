@@ -253,19 +253,19 @@ pub fn as_compose(table: &Value) -> Value {
 fn infer_slot(src: &str) -> String {
     let base = src.rsplit('.').next().unwrap_or(src);
     match base {
-        "nav" | "links" => "nav".into(),
-        "side" | "sidebar" => "sidebar".into(),
-        "foot" | "footer" => "footer".into(),
+        "nav" | "links" | "导航" => "nav".into(),
+        "side" | "sidebar" | "侧栏" => "sidebar".into(),
+        "foot" | "footer" | "页脚" => "footer".into(),
         other => other.to_string(),
     }
 }
 
 pub fn normalize_slot(name: &str) -> String {
     match name {
-        "nav" | "links" => "nav".into(),
-        "side" | "sidebar" => "sidebar".into(),
-        "foot" | "footer" => "footer".into(),
-        "main" | "index" | "" => "main".into(),
+        "nav" | "links" | "导航" => "nav".into(),
+        "side" | "sidebar" | "侧栏" => "sidebar".into(),
+        "foot" | "footer" | "页脚" => "footer".into(),
+        "main" | "index" | "" | "主体" => "main".into(),
         other => other.to_string(),
     }
 }

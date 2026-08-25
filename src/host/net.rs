@@ -181,6 +181,273 @@ fn truthy_flag(v: Option<&Value>) -> bool {
     }
 }
 
+/// Split a Cookie / Set-Cookie header value into individual cookie attribute tokens.
+/// `Set-Cookie` may contain multiple `name=value` cookies plus attributes per cookie;
+/// a single request `Cookie` header is a flat `name=value; name=value` list.
+fn split_cookie_tokens(header: &str, is_set_cookie: bool) -> Vec<Vec<(String, String)>> {
+    // Set-Cookie: each cookie block is separated by ", " only when a next cookie begins.
+    // We split on ',' that is NOT preceded by an Expires/Max-Age value (contains '-' or ':')
+    // — heuristic good enough for common cases; value may contain ';' (e.g. quoted).
+    if !is_set_cookie {
+        let mut cookies = Vec::new();
+        for seg in header.split(';') {
+            let seg = seg.trim();
+            if seg.is_empty() {
+                continue;
+            }
+            let mut cur = Vec::new();
+            if let Some((k, v)) = seg.split_once('=') {
+                cur.push((k.trim().to_string(), v.trim().trim_matches('"').to_string()));
+            } else {
+                cur.push((seg.to_string(), String::new()));
+            }
+            cookies.push(cur);
+        }
+        return cookies;
+    }
+
+    let mut cookies: Vec<Vec<(String, String)>> = Vec::new();
+    let mut cur: Vec<(String, String)> = Vec::new();
+    let mut i = 0;
+    let chars: Vec<char> = header.chars().collect();
+    while i < chars.len() {
+        let c = chars[i];
+        if c == ',' {
+            // A comma is part of an `Expires` date value (e.g. "Wed, 21 Oct 2026")
+            // only when the previous attribute is `Expires`; otherwise it separates
+            // one Set-Cookie block from the next.
+            let in_expires_date = cur
+                .last()
+                .map(|(k, _)| k.eq_ignore_ascii_case("expires"))
+                .unwrap_or(false);
+            if in_expires_date {
+                if let Some((_, v)) = cur.last_mut() {
+                    v.push(',');
+                }
+                i += 1;
+                continue;
+            }
+            // A real cookie separator: flush current block and start a new one.
+            cookies.push(std::mem::take(&mut cur));
+            i += 1;
+            continue;
+        }
+        if c == ';' {
+            // Cookie request header: `;` separates independent cookies.
+            // Set-Cookie: `;` separates attributes *within* the same cookie block.
+            if !is_set_cookie || cur.is_empty() {
+                if !cur.is_empty() {
+                    cookies.push(std::mem::take(&mut cur));
+                }
+            }
+            i += 1;
+            continue;
+        }
+        // Accumulate a token: name=value until ; or ,
+        let mut j = i;
+        while j < chars.len() && chars[j] != ';' && chars[j] != ',' {
+            j += 1;
+        }
+        let token: String = chars[i..j].iter().collect();
+        let token = token.trim();
+        if !token.is_empty() {
+            if let Some((k, v)) = token.split_once('=') {
+                cur.push((
+                    k.trim().to_string(),
+                    v.trim().trim_matches('"').to_string(),
+                ));
+            } else {
+                cur.push((token.to_string(), String::new()));
+            }
+        }
+        i = j;
+    }
+    if !cur.is_empty() {
+        cookies.push(cur);
+    }
+    cookies
+}
+
+fn normalized_key(s: &str) -> String {
+    s.chars()
+        .filter(|c| *c != '_' && *c != '-')
+        .collect::<String>()
+        .to_ascii_lowercase()
+}
+
+fn cookie_attr_value<'a>(pairs: &'a [(String, String)], key: &str) -> Option<&'a str> {
+    let want = normalized_key(key);
+    pairs
+        .iter()
+        .find(|(k, _)| normalized_key(k) == want)
+        .map(|(_, v)| v.as_str())
+}
+
+fn bool_attr(pairs: &[(String, String)], key: &str) -> Option<bool> {
+    let want = normalized_key(key);
+    pairs
+        .iter()
+        .find(|(k, _)| normalized_key(k) == want)
+        .map(|(_, v)| {
+            if v.is_empty() {
+                // Present-without-value boolean flag (e.g. `Secure` / `HttpOnly`).
+                true
+            } else {
+                !(v.eq_ignore_ascii_case("false")
+                    || v.eq_ignore_ascii_case("0")
+                    || v.eq_ignore_ascii_case("no"))
+            }
+        })
+}
+
+/// Parse a Cookie request header or Set-Cookie response header (RFC 6265 subset)
+/// into a list of `{name, value, path, domain, expires, max_age, secure, http_only, same_site}`.
+/// `is_response=true` treats the input as one or more `Set-Cookie` blocks.
+pub fn cookie_parse(text: &Value, is_response: Option<&Value>) -> Result<Value, String> {
+    let header = as_text(text, "text")?;
+    let is_response = truthy_flag(is_response);
+    let blocks = split_cookie_tokens(header, is_response);
+    let mut out = Vec::new();
+    for block in blocks {
+        let name = block
+            .first()
+            .map(|(k, _)| k.clone())
+            .unwrap_or_default();
+        if name.is_empty() {
+            continue;
+        }
+        let value = block.first().map(|(_, v)| v.clone()).unwrap_or_default();
+        let mut entry: Vec<(String, Value)> = vec![
+            ("name".into(), Value::Text(name)),
+            ("value".into(), Value::Text(value)),
+        ];
+        // Attribute with optional value -> Text or None.
+        let text_attrs = [
+            ("path", "path"),
+            ("domain", "domain"),
+            ("expires", "expires"),
+            ("max_age", "max_age"),
+            ("sameSite", "same_site"),
+        ];
+        for (attr, key) in text_attrs {
+            let v = cookie_attr_value(&block, attr);
+            entry.push((
+                key.to_string(),
+                match v {
+                    Some(s) => Value::Text(s.to_string()),
+                    None => Value::None,
+                },
+            ));
+        }
+        // Boolean flags (Secure / HttpOnly are present-without-value).
+        for attr in ["secure", "http_only"] {
+            let present = bool_attr(&block, attr);
+            entry.push((
+                attr.to_string(),
+                match present {
+                    Some(b) => Value::Bool(b),
+                    None => Value::None,
+                },
+            ));
+        }
+        out.push(Value::Map(entry));
+    }
+    Ok(Value::List(out))
+}
+
+/// Parse a `multipart/form-data` body (given its boundary) into
+/// `[{name, filename?, content_type?, value}]`. Field values are decoded as text.
+pub fn multipart_parse(body: &Value, boundary: &Value) -> Result<Value, String> {
+    let body = as_text(body, "body")?;
+    let boundary = as_text(boundary, "boundary")?;
+    let boundary = boundary.trim();
+    if boundary.is_empty() {
+        return Err("multipart boundary is empty".into());
+    }
+    let delim = format!("--{boundary}");
+    let mut parts = Vec::new();
+    let mut rest = body;
+    loop {
+        let Some(pos) = rest.find(&delim) else {
+            break;
+        };
+        rest = &rest[pos + delim.len()..];
+        // After boundary: either `--` (end) or CRLF + headers
+        if rest.strip_prefix("--").is_some() {
+            break;
+        }
+        let rest_trim = rest.strip_prefix("\r\n").or_else(|| rest.strip_prefix('\n'));
+        let Some(after) = rest_trim else {
+            break;
+        };
+        rest = after;
+        // Headers until blank line
+        let Some(header_end) = rest.find("\r\n\r\n").or_else(|| rest.find("\n\n")) else {
+            break;
+        };
+        let header_block = &rest[..header_end];
+        let header_len = if rest[header_end..].starts_with("\r\n\r\n") {
+            4
+        } else {
+            2
+        };
+        let body_start = header_end + header_len;
+        // Part body until next boundary
+        let body_end = rest[body_start..]
+            .find(&delim)
+            .map(|p| body_start + p)
+            .unwrap_or(rest.len());
+        let part_body = &rest[body_start..body_end];
+        // Trim trailing CRLF before boundary
+        let part_body = part_body
+            .strip_suffix("\r\n")
+            .or_else(|| part_body.strip_suffix('\n'))
+            .unwrap_or(part_body);
+
+        let mut name = String::new();
+        let mut filename = None;
+        let mut content_type = None;
+        for line in header_block.split('\n') {
+            let line = line.strip_suffix('\r').unwrap_or(line);
+            let lk = line.to_ascii_lowercase();
+            if let Some(v) = lk.strip_prefix("content-disposition:") {
+                // form-data; name="x"; filename="y.txt"
+                for seg in v.split(';') {
+                    let seg = seg.trim();
+                    if let Some(val) = seg.strip_prefix("name=") {
+                        name = val.trim_matches('"').to_string();
+                    } else if let Some(val) = seg.strip_prefix("filename=") {
+                        filename = Some(val.trim_matches('"').to_string());
+                    }
+                }
+            } else if let Some(v) = lk.strip_prefix("content-type:") {
+                content_type = Some(v.trim().to_string());
+            }
+        }
+        let mut entry = vec![("name".to_string(), Value::Text(name))];
+        match filename {
+            Some(f) if !f.is_empty() => {
+                entry.push(("filename".to_string(), Value::Text(f)));
+                entry.push((
+                    "content_type".to_string(),
+                    Value::Text(content_type.unwrap_or_default()),
+                ));
+                entry.push(("value".to_string(), Value::Text(part_body.to_string())));
+            }
+            _ => {
+                entry.push(("value".to_string(), Value::Text(part_body.to_string())));
+            }
+        }
+        parts.push(Value::Map(entry));
+        rest = &rest[body_end..];
+        if rest.starts_with(&delim) {
+            continue;
+        }
+        break;
+    }
+    Ok(Value::List(parts))
+}
+
 /// Extract `data:` payloads from an SSE body (ignores comments / event: / id:).
 pub fn sse_data_payloads(text: &str) -> Vec<String> {
     let mut out = Vec::new();
@@ -618,5 +885,100 @@ data: [DONE]\n\
             )),
             "expected done with result ok"
         );
+    }
+
+    #[test]
+    fn cookie_request_header_parse() {
+        let v = cookie_parse(
+            &Value::Text("session=abc123; theme=dark; lang=zh-CN".into()),
+            Some(&Value::Bool(false)),
+        )
+        .unwrap();
+        let Value::List(items) = v else {
+            panic!("expected list");
+        };
+        assert_eq!(items.len(), 3);
+        let Value::Map(first) = &items[0] else {
+            panic!("expected map");
+        };
+        assert!(first
+            .iter()
+            .any(|(k, v)| k == "name" && matches!(v, Value::Text(t) if t == "session")));
+        assert!(first
+            .iter()
+            .any(|(k, v)| k == "value" && matches!(v, Value::Text(t) if t == "abc123")));
+    }
+
+    #[test]
+    fn set_cookie_response_parse() {
+        let header = "id=42; Path=/; HttpOnly; Secure; SameSite=Lax, theme=light; Expires=Wed, 21 Oct 2026 07:28:00 GMT; Max-Age=3600";
+        let blocks = split_cookie_tokens(header, true);
+        eprintln!("blocks = {blocks:?}");
+        let v = cookie_parse(
+            &Value::Text(header.into()),
+            Some(&Value::Bool(true)),
+        )
+        .unwrap();
+        let Value::List(items) = v else {
+            panic!("expected list");
+        };
+        assert_eq!(items.len(), 2, "two Set-Cookie blocks");
+        let Value::Map(first) = &items[0] else {
+            panic!("expected map");
+        };
+        assert!(first
+            .iter()
+            .any(|(k, v)| k == "path" && matches!(v, Value::Text(t) if t == "/")));
+        assert!(first
+            .iter()
+            .any(|(k, v)| k == "http_only" && matches!(v, Value::Bool(true))));
+        assert!(first
+            .iter()
+            .any(|(k, v)| k == "secure" && matches!(v, Value::Bool(true))));
+        assert!(first
+            .iter()
+            .any(|(k, v)| k == "same_site" && matches!(v, Value::Text(t) if t == "Lax")));
+        let Value::Map(second) = &items[1] else {
+            panic!("expected map");
+        };
+        assert!(second
+            .iter()
+            .any(|(k, v)| k == "name" && matches!(v, Value::Text(t) if t == "theme")));
+        assert!(second.iter().any(|(k, v)| k == "max_age"
+            && matches!(v, Value::Text(t) if t == "3600")));
+    }
+
+    #[test]
+    fn multipart_form_parse() {
+        let boundary = "----WebKitFormBoundary7MA4YWxkTrZu0gW";
+        let body = format!(
+            "--{boundary}\r\nContent-Disposition: form-data; name=\"title\"\r\n\r\nHello\r\n--{boundary}\r\nContent-Disposition: form-data; name=\"file\"; filename=\"a.txt\"\r\nContent-Type: text/plain\r\n\r\nfile body\r\n--{boundary}--\r\n"
+        );
+        let v = multipart_parse(&Value::Text(body.into()), &Value::Text(boundary.into())).unwrap();
+        let Value::List(items) = v else {
+            panic!("expected list");
+        };
+        assert_eq!(items.len(), 2);
+        let Value::Map(f0) = &items[0] else {
+            panic!("expected map");
+        };
+        assert!(f0
+            .iter()
+            .any(|(k, v)| k == "name" && matches!(v, Value::Text(t) if t == "title")));
+        assert!(f0
+            .iter()
+            .any(|(k, v)| k == "value" && matches!(v, Value::Text(t) if t == "Hello")));
+        let Value::Map(f1) = &items[1] else {
+            panic!("expected map");
+        };
+        assert!(f1
+            .iter()
+            .any(|(k, v)| k == "name" && matches!(v, Value::Text(t) if t == "file")));
+        assert!(f1
+            .iter()
+            .any(|(k, v)| k == "filename" && matches!(v, Value::Text(t) if t == "a.txt")));
+        assert!(f1
+            .iter()
+            .any(|(k, v)| k == "value" && matches!(v, Value::Text(t) if t == "file body")));
     }
 }

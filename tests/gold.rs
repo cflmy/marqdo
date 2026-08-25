@@ -652,7 +652,10 @@ fn keywords_input_escape() {
 
 #[test]
 fn keywords_quoted_string() {
-    assert_out("tests/keywords/quoted-string.mq.md", "a\nb");
+    assert_out(
+        "tests/keywords/quoted-string.mq.md",
+        "a\nb\nhex \" quote' single\n中文\nkeep \\q verbatim\nABC",
+    );
 }
 
 #[test]
@@ -1332,6 +1335,52 @@ db-ok",
 }
 
 #[test]
+fn ext_web_entrydir_smoke() {
+    // Relative db paths must resolve against the *entry script* directory,
+    // not the process cwd (host_query("entry_dir")). We run from the repo
+    // root while the script lives in tests/ext, so the sqlite file must
+    // land under tests/ext/entrydir-fixtures/data/ and NOT repo-root/.
+    let status = Command::new("cargo")
+        .args(["build", "-p", "marqdo_plugin_web"])
+        .current_dir(env!("CARGO_MANIFEST_DIR"))
+        .status()
+        .expect("build web plugin");
+    assert!(status.success(), "failed to build marqdo_plugin_web");
+
+    let script = "tests/ext/web-entrydir-smoke.mq.md";
+    let fixture_data = std::path::Path::new("tests/ext/entrydir-fixtures/data");
+    let db_path = fixture_data.join("entrydir.db");
+    let _ = std::fs::remove_dir_all(fixture_data);
+    let stale_root = std::path::Path::new("entrydir-fixtures");
+    let _ = std::fs::remove_dir_all(stale_root);
+
+    // cwd = repo root (CARGO_MANIFEST_DIR), script in tests/ext.
+    let output = Command::new(env!("CARGO_BIN_EXE_marqdo"))
+        .args(["run", script])
+        .current_dir(env!("CARGO_MANIFEST_DIR"))
+        .output()
+        .expect("run web-entrydir-smoke");
+    let code = output.status.code().unwrap_or(1);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert_eq!(code, 0, "{script} stderr={stderr}");
+    assert!(
+        stdout.contains("entrydir-db-ok"),
+        "{script} stdout={stdout}"
+    );
+    assert!(
+        db_path.is_file(),
+        "expected db at {} (script dir), stdout={stdout} stderr={stderr}",
+        db_path.display()
+    );
+    assert!(
+        !stale_root.exists(),
+        "db must not resolve against cwd (repo root): {} exists",
+        stale_root.display()
+    );
+}
+
+#[test]
 fn ext_web_form_smoke() {
     let status = Command::new("cargo")
         .args(["build", "-p", "marqdo_plugin_web"])
@@ -1364,7 +1413,36 @@ insert-ok
 get-ok
 update-ok
 edit-ok
-required-ok",
+required-ok
+errors-echoed-ok",
+    );
+}
+
+#[test]
+fn ext_web_net_smoke() {
+    let status = Command::new("cargo")
+        .args(["build", "-p", "marqdo_plugin_web"])
+        .current_dir(env!("CARGO_MANIFEST_DIR"))
+        .status()
+        .expect("build web plugin");
+    assert!(status.success(), "failed to build marqdo_plugin_web");
+    assert_out(
+        "tests/ext/web-net-smoke.mq.md",
+        "session-new-ok
+session-set-ok
+session-get-ok
+session-del-ok
+session-del-confirm
+auth-login-ok
+auth-check-ok
+auth-bad-ok
+auth-zh-ok
+auth-logout-ok
+auth-logout-confirm
+ws-route-ok
+app-auth-ok
+ext-auth-ok
+ws-connect-error-ok",
     );
 }
 
@@ -1990,6 +2068,22 @@ callable-ok",
 #[test]
 fn lib_net_encode() {
     assert_out("tests/lib/net-encode.mq.md", "a+b");
+}
+
+#[test]
+fn lib_net_cookie_parse() {
+    assert_out(
+        "tests/lib/net-cookie.mq.md",
+        "session\nabc123\nTrue\nTrue\nLax\n3600",
+    );
+}
+
+#[test]
+fn lib_net_multipart_parse() {
+    assert_out(
+        "tests/lib/net-multipart.mq.md",
+        "title\nHello\nfile\na.txt\ntext/plain\nfile body",
+    );
 }
 
 #[test]

@@ -55,3 +55,19 @@ Optional `body=` / `content_type=` / `headers=`.
     + `text`
 
 **> host_url_encode text=`text`**
+
+## cookie_parse
+    + `text`
+    + `is_response`=False
+
+Parse a `Cookie` request header (default) or one or more `Set-Cookie` response headers (`is_response=True`) into a list of `{name, value, path, domain, expires, max_age, secure, http_only, same_site}`.
+
+**> host_cookie_parse text=`text` is_response=`is_response`**
+
+## multipart_parse
+    + `body`
+    + `boundary`
+
+Parse a `multipart/form-data` request body (given its `boundary`) into a list of `{name, filename?, content_type?, value}` parts.
+
+**> host_multipart_parse body=`body` boundary=`boundary`**

@@ -273,6 +273,20 @@ unsafe extern "C" fn host_query(
         "cwd" => Ok(serde_json::Value::String(
             ctx.cwd.to_string_lossy().into_owned(),
         )),
+        "entry_dir" => Ok(serde_json::Value::String(
+            ctx.entry_path
+                .as_ref()
+                .map(|p| {
+                    if p.is_dir() {
+                        p.clone()
+                    } else {
+                        p.parent().unwrap_or(p).to_path_buf()
+                    }
+                })
+                .unwrap_or_else(|| ctx.cwd.clone())
+                .to_string_lossy()
+                .into_owned(),
+        )),
         "call_lib_path" => (|| {
             let raw = args_owned.as_deref().unwrap_or("{}");
             let args: serde_json::Value = serde_json::from_str(if raw.trim().is_empty() {

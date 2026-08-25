@@ -121,6 +121,8 @@ pub enum HostFn {
     MapMerge = 119,
     MapSize = 120,
     CollectionClear = 121,
+    CookieParse = 122,
+    MultipartParse = 123,
 }
 
 
@@ -239,6 +241,8 @@ impl HostFn {
             119 => Self::MapMerge,
             120 => Self::MapSize,
             121 => Self::CollectionClear,
+            122 => Self::CookieParse,
+            123 => Self::MultipartParse,
             _ => return None,
         })
     }
@@ -360,6 +364,8 @@ impl HostFn {
             "host_map_merge" | "map_merge" => Self::MapMerge,
             "host_map_size" | "map_size" => Self::MapSize,
             "host_collection_clear" | "collection_clear" => Self::CollectionClear,
+            "host_cookie_parse" | "cookie_parse" => Self::CookieParse,
+            "host_multipart_parse" | "multipart_parse" => Self::MultipartParse,
             _ => return None,
         })
     }
@@ -468,6 +474,8 @@ impl HostFn {
             Self::MapMerge => "host_map_merge",
             Self::MapSize => "host_map_size",
             Self::CollectionClear => "host_collection_clear",
+            Self::CookieParse => "host_cookie_parse",
+            Self::MultipartParse => "host_multipart_parse",
             Self::WritebackRecord => "host_writeback_record",
             Self::WritebackGet => "host_writeback_get",
             Self::WritebackClear => "host_writeback_clear",
@@ -550,6 +558,8 @@ impl HostFn {
             Self::MapKeys | Self::MapValues | Self::MapItems | Self::MapSize => &["map"],
             Self::MapMerge => &["a", "b"],
             Self::CollectionClear => &["value"],
+            Self::CookieParse => &["text", "is_response"],
+            Self::MultipartParse => &["body", "boundary"],
             Self::WritebackRecord => &["value"],
             Self::WritebackGet | Self::WritebackClear => &[],
             Self::WritebackList => &[],
@@ -830,6 +840,8 @@ pub fn call_host(
         HostFn::MapMerge => super::collection::map_merge(require(bound, "a")?, require(bound, "b")?),
         HostFn::MapSize => super::collection::map_size(require(bound, "map")?),
         HostFn::CollectionClear => super::collection::collection_clear(require(bound, "value")?),
+        HostFn::CookieParse => net::cookie_parse(require(bound, "text")?, bound.get("is_response")),
+        HostFn::MultipartParse => net::multipart_parse(require(bound, "body")?, require(bound, "boundary")?),
         HostFn::OuterCallLine => Ok(Value::Int(
             ctx.call_site_lines
                 .first()

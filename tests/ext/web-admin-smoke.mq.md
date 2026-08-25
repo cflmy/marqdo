@@ -84,3 +84,10 @@ import json:lib/json.mq.md
   > print text=required-should-fail
 2. *
   > print text=required-ok
+
+*errs = > json.get value=`bad` key="errors"*
+*nerr = > len value=`errs`*
+1. `nerr` >= 1
+  > print text=errors-echoed-ok
+2. *
+  > print text=errors-echoed-fail

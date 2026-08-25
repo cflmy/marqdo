@@ -5,10 +5,13 @@ mod db;
 mod form;
 mod http;
 mod render;
+mod session;
 mod table;
+mod ws;
 
 use std::ffi::{CStr, CString};
 use std::os::raw::{c_char, c_int, c_void};
+use std::path::PathBuf;
 use std::ptr;
 
 use serde_json::{json, Value};
@@ -138,6 +141,37 @@ fn call_lib(path: &str) -> Result<Value, String> {
     host_query_json("call_lib_path", &json!({ "path": path }))
 }
 
+/// Absolute directory of the entry `.mq.md` (falls back to process cwd).
+fn entry_dir() -> PathBuf {
+    host_query_json("entry_dir", &json!({}))
+        .ok()
+        .and_then(|v| v.as_str().map(|s| PathBuf::from(s)))
+        .unwrap_or_else(|| {
+            std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."))
+        })
+}
+
+/// `sqlite:` URL with a relative path → absolute against `entry_dir()`.
+fn resolve_db_url(url: &str) -> String {
+    let stripped = url
+        .strip_prefix("sqlite:")
+        .or_else(|| url.strip_prefix("SQLITE:"))
+        .unwrap_or(url);
+    let abs = PathBuf::from(stripped);
+    let abs = if abs.is_absolute() {
+        abs
+    } else {
+        entry_dir().join(abs)
+    };
+    if stripped.len() == url.len() {
+        abs.to_string_lossy().into_owned()
+    } else if url.starts_with("sqlite:") {
+        format!("sqlite:{}", abs.to_string_lossy())
+    } else {
+        format!("SQLITE:{}", abs.to_string_lossy())
+    }
+}
+
 fn arg_text(v: &Value, key: &str) -> Result<String, String> {
     match v.get(key) {
         None | Some(Value::Null) => Err(format!("missing `{key}`")),
@@ -159,15 +193,22 @@ fn arg_str_opt<'a>(v: &'a Value, key: &str) -> Option<&'a str> {
 }
 
 fn db_url_of(args: &Value) -> Result<String, String> {
-    if let Some(s) = arg_str_opt(args, "url").or_else(|| arg_str_opt(args, "db_url")) {
-        return Ok(s.to_string());
-    }
-    if let Some(db) = args.get("db") {
+    let raw = if let Some(s) = arg_str_opt(args, "url").or_else(|| arg_str_opt(args, "db_url"))
+    {
+        Some(s.to_string())
+    } else if let Some(db) = args.get("db") {
         if let Some(s) = db.get("url").and_then(|v| v.as_str()) {
-            return Ok(s.to_string());
+            Some(s.to_string())
+        } else {
+            None
         }
+    } else {
+        None
+    };
+    match raw {
+        Some(s) => Ok(resolve_db_url(&s)),
+        None => Err("missing db url".into()),
     }
-    Err("missing db url".into())
 }
 
 fn reply(out_json: *mut *mut c_char, err_msg: *mut *mut c_char, r: Result<Value, String>) -> c_int {
@@ -354,6 +395,7 @@ web_ffi!(web_app_new, |args: &Value| {
         "admin": admin,
         "forms": {},
         "routes": {},
+        "ws_routes": {},
         "static_dir": null,
         "static_mount": "/static",
     }))
@@ -411,6 +453,101 @@ web_ffi!(web_app_route, |args: &Value| {
         .as_object_mut()
         .ok_or_else(|| "app.routes must be a map".to_string())?;
     rmap.insert(path, page);
+    Ok(app)
+});
+
+web_ffi!(web_app_route_ws, |args: &Value| {
+    let mut app = args.get("app").cloned().unwrap_or(json!({}));
+    let path = normalize_route_path(arg_str(args, "path")?)?;
+    let echo = match args.get("echo") {
+        None | Some(Value::Null) => true,
+        Some(Value::Bool(b)) => *b,
+        Some(Value::String(s)) => matches!(s.as_str(), "true" | "True" | "1" | "yes"),
+        Some(Value::Number(n)) => n.as_i64().unwrap_or(0) != 0,
+        Some(_) => true,
+    };
+    let obj = app
+        .as_object_mut()
+        .ok_or_else(|| "app must be a map".to_string())?;
+    let ws_routes = obj
+        .entry("ws_routes".to_string())
+        .or_insert_with(|| json!({}));
+    let wmap = ws_routes
+        .as_object_mut()
+        .ok_or_else(|| "app.ws_routes must be a map".to_string())?;
+    wmap.insert(path, json!(echo));
+    Ok(app)
+});
+
+web_ffi!(web_ws_connect, |args: &Value| {
+    let url = arg_str(args, "url")?.to_string();
+    let message = arg_str_opt(args, "message").unwrap_or("");
+    let headers = args.get("headers");
+    let timeout_sec = args
+        .get("timeout_sec")
+        .and_then(|v| v.as_u64().or_else(|| v.as_i64().map(|i| i as u64)))
+        .unwrap_or(30);
+    match crate::ws::connect(&url, message, headers, timeout_sec) {
+        Ok(v) => Ok(v),
+        Err(e) => Ok(json!({ "ok": false, "error": e })),
+    }
+});
+
+web_ffi!(web_session_new, |args: &Value| {
+    session::abi_session_new(args)
+});
+
+web_ffi!(web_session_set, |args: &Value| {
+    session::abi_session_set(args)
+});
+
+web_ffi!(web_session_get, |args: &Value| {
+    session::abi_session_get(args)
+});
+
+web_ffi!(web_session_del, |args: &Value| {
+    session::abi_session_del(args)
+});
+
+web_ffi!(web_session_destroy, |args: &Value| {
+    session::abi_session_destroy(args)
+});
+
+web_ffi!(web_auth_login, |args: &Value| {
+    session::abi_auth_login(args)
+});
+
+web_ffi!(web_auth_check, |args: &Value| {
+    session::abi_auth_check(args)
+});
+
+web_ffi!(web_auth_logout, |args: &Value| {
+    session::abi_auth_logout(args)
+});
+
+web_ffi!(web_auth_new, |args: &Value| {
+    let users = args.get("users").cloned().unwrap_or(Value::Null);
+    let session_ttl = args
+        .get("session_ttl")
+        .and_then(|v| v.as_u64().or_else(|| v.as_i64().map(|i| i as u64)))
+        .unwrap_or(3600);
+    Ok(json!({ "users": users, "session_ttl": session_ttl }))
+});
+
+web_ffi!(web_app_auth, |args: &Value| {
+    let mut app = args.get("app").cloned().unwrap_or(json!({}));
+    let users = args.get("users").cloned().unwrap_or(Value::Null);
+    let session_ttl = args
+        .get("session_ttl")
+        .and_then(|v| v.as_u64().or_else(|| v.as_i64().map(|i| i as u64)))
+        .unwrap_or(3600);
+    let obj = app
+        .as_object_mut()
+        .ok_or_else(|| "app must be a map".to_string())?;
+    obj.insert(
+        "auth".to_string(),
+        json!({ "users": users, "session_ttl": session_ttl }),
+    );
     Ok(app)
 });
 
@@ -548,11 +685,20 @@ web_ffi!(web_db_table_info, |args: &Value| {
 web_ffi!(web_listen, |args: &Value| {
     use std::collections::HashMap;
     use std::path::PathBuf;
-    let (page, db_url, host, port, admin, forms, routes, static_dir, static_mount) = if args
-        .get("page")
-        .is_some()
-        || args.get("host").is_some()
-    {
+    let (
+        page,
+        db_url,
+        host,
+        port,
+        admin,
+        forms,
+        routes,
+        static_dir,
+        static_mount,
+        auth_users,
+        session_ttl,
+        ws_routes,
+    ) = if args.get("page").is_some() || args.get("host").is_some() {
         let page = args.get("page").cloned().unwrap_or(json!({}));
         let db_url = db_url_of(args).ok();
         let host = arg_str_opt(args, "host").unwrap_or("127.0.0.1");
@@ -568,6 +714,15 @@ web_ffi!(web_listen, |args: &Value| {
         let static_mount = arg_str_opt(args, "static_mount")
             .unwrap_or("/static")
             .to_string();
+        let auth_users = args
+            .get("auth")
+            .or_else(|| args.get("users"))
+            .cloned()
+            .filter(|v| !matches!(v, Value::Null));
+        let session_ttl = args
+            .get("session_ttl")
+            .and_then(|v| v.as_u64().or_else(|| v.as_i64().map(|i| i as u64)))
+            .unwrap_or(3600);
         (
             page,
             db_url,
@@ -578,6 +733,9 @@ web_ffi!(web_listen, |args: &Value| {
             HashMap::new(),
             static_dir,
             static_mount,
+            auth_users,
+            session_ttl,
+            HashMap::new(),
         )
     } else {
         let app = args.get("app").cloned().unwrap_or_else(|| args.clone());
@@ -587,7 +745,8 @@ web_ffi!(web_listen, |args: &Value| {
             .and_then(|d| d.get("url"))
             .and_then(|v| v.as_str())
             .map(|s| s.to_string())
-            .or_else(|| arg_str_opt(&app, "db_url").map(|s| s.to_string()));
+            .or_else(|| arg_str_opt(&app, "db_url").map(|s| s.to_string()))
+            .map(|s| resolve_db_url(&s));
         let host = app
             .get("host")
             .and_then(|v| v.as_str())
@@ -613,6 +772,17 @@ web_ffi!(web_listen, |args: &Value| {
                 routes.insert(k.clone(), v.clone());
             }
         }
+        let mut ws_routes = HashMap::new();
+        if let Some(obj) = app.get("ws_routes").and_then(|v| v.as_object()) {
+            for (k, v) in obj {
+                let echo = match v {
+                    Value::Bool(b) => *b,
+                    Value::String(s) => matches!(s.as_str(), "true" | "True" | "1" | "yes"),
+                    _ => true,
+                };
+                ws_routes.insert(k.clone(), echo);
+            }
+        }
         let static_dir = app
             .get("static_dir")
             .and_then(|v| v.as_str())
@@ -623,6 +793,28 @@ web_ffi!(web_listen, |args: &Value| {
             .and_then(|v| v.as_str())
             .unwrap_or("/static")
             .to_string();
+        // `auth` may hold the users table directly or `{users:…, ttl:…}`.
+        let (auth_users, session_ttl) = match app.get("auth") {
+            Some(Value::Object(m)) if m.contains_key("users") => (
+                m.get("users").cloned(),
+                m.get("ttl")
+                    .or_else(|| m.get("session_ttl"))
+                    .and_then(|v| v.as_u64().or_else(|| v.as_i64().map(|i| i as u64)))
+                    .unwrap_or(3600),
+            ),
+            Some(other) if !matches!(other, Value::Null) => (
+                Some(other.clone()),
+                app.get("session_ttl")
+                    .and_then(|v| v.as_u64().or_else(|| v.as_i64().map(|i| i as u64)))
+                    .unwrap_or(3600),
+            ),
+            _ => (
+                None,
+                app.get("session_ttl")
+                    .and_then(|v| v.as_u64().or_else(|| v.as_i64().map(|i| i as u64)))
+                    .unwrap_or(3600),
+            ),
+        };
         (
             page,
             db_url,
@@ -633,15 +825,16 @@ web_ffi!(web_listen, |args: &Value| {
             routes,
             static_dir,
             static_mount,
+            auth_users,
+            session_ttl,
+            ws_routes,
         )
     };
     let static_dir = static_dir.map(|p| {
         if p.is_absolute() {
             p
         } else {
-            std::env::current_dir()
-                .unwrap_or_else(|_| PathBuf::from("."))
-                .join(p)
+            entry_dir().join(p)
         }
     });
     http::listen(
@@ -654,6 +847,9 @@ web_ffi!(web_listen, |args: &Value| {
         routes,
         static_dir,
         &static_mount,
+        auth_users,
+        session_ttl,
+        ws_routes,
     )
 });
 
@@ -748,6 +944,30 @@ pub unsafe extern "C" fn marqdo_plugin_init(host: *const MarqdoHostApi) -> c_int
             web_form_from_schema as PluginFn,
         ),
         ("web_db_table_info", "url,table", web_db_table_info as PluginFn),
+        ("web_session_new", "ttl_sec", web_session_new as PluginFn),
+        ("web_session_set", "id,key,value", web_session_set as PluginFn),
+        ("web_session_get", "id,key", web_session_get as PluginFn),
+        ("web_session_del", "id,key", web_session_del as PluginFn),
+        ("web_session_destroy", "id", web_session_destroy as PluginFn),
+        (
+            "web_auth_login",
+            "username,password,users,session_ttl",
+            web_auth_login as PluginFn,
+        ),
+        ("web_auth_check", "session_id", web_auth_check as PluginFn),
+        ("web_auth_logout", "session_id", web_auth_logout as PluginFn),
+        ("web_auth_new", "users,session_ttl", web_auth_new as PluginFn),
+        ("web_app_auth", "app,users,session_ttl", web_app_auth as PluginFn),
+        (
+            "web_app_route_ws",
+            "app,path,echo",
+            web_app_route_ws as PluginFn,
+        ),
+        (
+            "web_ws_connect",
+            "url,message,headers,timeout_sec",
+            web_ws_connect as PluginFn,
+        ),
         ("web_listen", "app", web_listen as PluginFn),
     ];
     for (name, params, f) in regs {

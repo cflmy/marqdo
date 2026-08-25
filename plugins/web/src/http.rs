@@ -18,6 +18,7 @@ use tower_http::services::ServeDir;
 use crate::db;
 use crate::form;
 use crate::render;
+use crate::session;
 
 #[derive(Clone)]
 struct AppState {
@@ -28,6 +29,9 @@ struct AppState {
     /// Page that owns an embedded form (for re-render on validation errors).
     form_owners: HashMap<String, Value>,
     routes: HashMap<String, Value>,
+    /// Admin users table (`|用户名|密码|`) when login-gated admin is configured.
+    auth_users: Option<Value>,
+    session_ttl: u64,
 }
 
 fn collect_page_forms(
@@ -62,12 +66,16 @@ pub fn listen(
     routes: HashMap<String, Value>,
     static_dir: Option<PathBuf>,
     static_mount: &str,
+    auth_users: Option<Value>,
+    session_ttl: u64,
+    ws_routes: HashMap<String, bool>,
 ) -> Result<Value, String> {
     let mut form_owners = HashMap::new();
     collect_page_forms(page, &mut forms, &mut form_owners);
     for p in routes.values() {
         collect_page_forms(p, &mut forms, &mut form_owners);
     }
+    session::reset(session_ttl);
     let state = Arc::new(AppState {
         page: page.clone(),
         db_url: db_url.map(|s| s.to_string()),
@@ -75,6 +83,8 @@ pub fn listen(
         forms,
         form_owners,
         routes: routes.clone(),
+        auth_users,
+        session_ttl,
     });
 
     let mut app = Router::new()
@@ -82,6 +92,8 @@ pub fn listen(
         .route("/_part/{id}", get(home_part))
         .route("/_form/{id}", get(form_get).post(form_post))
         .route("/admin", get(admin_home))
+        .route("/admin/login", get(admin_login_get).post(admin_login_post))
+        .route("/admin/logout", get(admin_logout))
         .route("/admin/{table}", get(admin_table))
         .route("/admin/{table}/new", get(admin_new_get).post(admin_new_post))
         .route(
@@ -97,6 +109,19 @@ pub fn listen(
         app = app.route(&path, get(routed_page));
         let part_path = format!("{path}/_part/{{id}}");
         app = app.route(&part_path, get(routed_part));
+    }
+
+    // WebSocket endpoints (`ws://…/{path}`), echo-mode by default.
+    let mut ws_paths: Vec<String> = ws_routes.keys().cloned().collect();
+    ws_paths.sort();
+    for path in ws_paths {
+        let echo = ws_routes.get(&path).copied().unwrap_or(true);
+        app = app.route(
+            &path,
+            axum::routing::get(move |ws: axum::extract::WebSocketUpgrade| {
+                ws_upgrade(ws, echo)
+            }),
+        );
     }
 
     let mount = normalize_static_mount(static_mount);
@@ -294,14 +319,140 @@ fn submit_and_respond(
     }
 }
 
-fn admin_gate(st: &AppState) -> Option<Response> {
+fn cookie_from_headers(headers: &axum::http::HeaderMap) -> Option<&str> {
+    headers
+        .get(axum::http::header::COOKIE)
+        .and_then(|v| v.to_str().ok())
+}
+
+fn admin_gate(st: &AppState, cookie_header: Option<&str>) -> Option<Response> {
     if !st.admin {
         return Some(Html(admin_shell(st, "Admin", None, "<p class=\"flash err\">Admin is disabled for this app.</p>")).into_response());
     }
     if st.db_url.is_none() {
         return Some(Html(admin_shell(st, "Admin", None, "<p class=\"flash err\">No database bound to this app.</p>")).into_response());
     }
+    // Login-gated admin: require a valid session cookie.
+    if st.auth_users.is_some() && !admin_authed(st, cookie_header) {
+        return Some(
+            Redirect::to("/admin/login")
+                .into_response(),
+        );
+    }
     None
+}
+
+/// True when a valid admin session cookie is present.
+fn admin_authed(_st: &AppState, cookie_header: Option<&str>) -> bool {
+    let Some(sid) = session::session_id_from_cookie(cookie_header) else {
+        return false;
+    };
+    session::session_get(&sid, "username").is_some()
+}
+
+#[derive(Deserialize)]
+struct LoginForm {
+    username: Option<String>,
+    password: Option<String>,
+}
+
+async fn admin_login_get(State(st): State<Arc<AppState>>) -> Response {
+    // Already logged in → straight to admin home.
+    if st.auth_users.is_none() {
+        return Redirect::to("/admin").into_response();
+    }
+    Html(login_page(&st, None)).into_response()
+}
+
+async fn admin_login_post(
+    State(st): State<Arc<AppState>>,
+    Form(posted): Form<LoginForm>,
+) -> Response {
+    let Some(users) = &st.auth_users else {
+        return Redirect::to("/admin").into_response();
+    };
+    let username = posted.username.unwrap_or_default();
+    let password = posted.password.unwrap_or_default();
+    if session::check_credentials(users, &username, &password).is_none() {
+        return Html(login_page(&st, Some("Invalid username or password."))).into_response();
+    }
+    let sid = session::session_new(Some(st.session_ttl));
+    session::session_set(&sid, "username", json!(username));
+    let mut resp = Redirect::to("/admin").into_response();
+    if let Ok(h) = resp.headers_mut().try_append(
+        axum::http::header::SET_COOKIE,
+        session::session_cookie(&sid, st.session_ttl)
+            .parse()
+            .unwrap(),
+    ) {
+        let _ = h;
+    }
+    resp
+}
+
+fn login_page(_st: &AppState, error: Option<&str>) -> String {
+    let err = match error {
+        Some(e) => format!("<p class=\"flash err\">{}</p>", esc(e)),
+        None => String::new(),
+    };
+    format!(
+        r#"<!DOCTYPE html>
+<html lang="zh-CN"><head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Admin Login</title>
+<style>
+:root {{ --ink:#1c1917; --muted:#78716c; --paper:#fafaf9; --line:#e7e5e4; --accent:#0f766e; --err:#b91c1c; }}
+* {{ box-sizing:border-box; }}
+body {{ margin:0; min-height:100vh; display:grid; place-items:center; background:var(--paper); color:var(--ink); font-family:"IBM Plex Sans","Noto Sans SC",sans-serif; }}
+.login {{ background:#fff; border:1px solid var(--line); border-radius:10px; padding:2rem 2.25rem; width:min(92vw,22rem); box-shadow:0 8px 24px rgba(0,0,0,.05); }}
+.login h1 {{ margin:0 0 .25rem; font-size:1.4rem; }}
+.login .sub {{ color:var(--muted); margin:0 0 1.25rem; font-size:.9rem; }}
+.login form {{ display:grid; gap:.9rem; }}
+.login label {{ display:grid; gap:.25rem; font-size:.9rem; }}
+.login input {{ padding:.55rem .65rem; border:1px solid var(--line); border-radius:6px; font:inherit; }}
+.login button {{ background:var(--accent); color:#fff; border:0; padding:.6rem 1rem; border-radius:6px; cursor:pointer; font:inherit; }}
+.login button:hover {{ filter:brightness(1.05); }}
+.flash.err {{ background:#fef2f2; color:var(--err); border:1px solid #fecaca; padding:.6rem .8rem; border-radius:6px; margin:0 0 .9rem; font-size:.9rem; }}
+</style>
+</head>
+<body>
+<div class="login">
+<h1>Admin</h1>
+<p class="sub">Sign in to manage this site.</p>
+{err}
+<form method="post" action="/admin/login">
+<label>Username<input name="username" autocomplete="username" required autofocus/></label>
+<label>Password<input name="password" type="password" autocomplete="current-password" required/></label>
+<button type="submit">Sign in</button>
+</form>
+</div>
+</body></html>"#,
+        err = err,
+    )
+}
+
+async fn admin_logout(
+    State(_st): State<Arc<AppState>>,
+    headers: axum::http::HeaderMap,
+) -> Response {
+    if let Some(sid) = session::session_id_from_cookie(
+        headers
+            .get(axum::http::header::COOKIE)
+            .and_then(|v| v.to_str().ok()),
+    ) {
+        session::session_destroy(&sid);
+    }
+    let mut resp = Redirect::to("/admin/login").into_response();
+    if let Ok(h) = resp.headers_mut().try_append(
+        axum::http::header::SET_COOKIE,
+        "marqdo_sid=; HttpOnly; Path=/; Max-Age=0; SameSite=Lax"
+            .parse()
+            .unwrap(),
+    ) {
+        let _ = h;
+    }
+    resp
 }
 
 fn flash_html(flash: Option<&str>) -> String {
@@ -452,9 +603,10 @@ struct FlashQuery {
 
 async fn admin_home(
     State(st): State<Arc<AppState>>,
+    headers: axum::http::HeaderMap,
     Query(q): Query<FlashQuery>,
 ) -> Response {
-    if let Some(r) = admin_gate(&st) {
+    if let Some(r) = admin_gate(&st, cookie_from_headers(&headers)) {
         return r;
     }
     let url = st.db_url.as_deref().unwrap();
@@ -480,10 +632,11 @@ async fn admin_home(
 
 async fn admin_table(
     State(st): State<Arc<AppState>>,
+    headers: axum::http::HeaderMap,
     Path(table): Path<String>,
     Query(q): Query<FlashQuery>,
 ) -> Response {
-    if let Some(r) = admin_gate(&st) {
+    if let Some(r) = admin_gate(&st, cookie_from_headers(&headers)) {
         return r;
     }
     let url = st.db_url.as_deref().unwrap();
@@ -575,8 +728,12 @@ async fn admin_table(
     Html(admin_shell(&st, &table, Some(&table), &inner)).into_response()
 }
 
-async fn admin_new_get(State(st): State<Arc<AppState>>, Path(table): Path<String>) -> Response {
-    if let Some(r) = admin_gate(&st) {
+async fn admin_new_get(
+    State(st): State<Arc<AppState>>,
+    headers: axum::http::HeaderMap,
+    Path(table): Path<String>,
+) -> Response {
+    if let Some(r) = admin_gate(&st, cookie_from_headers(&headers)) {
         return r;
     }
     let url = st.db_url.as_deref().unwrap();
@@ -603,10 +760,11 @@ async fn admin_new_get(State(st): State<Arc<AppState>>, Path(table): Path<String
 
 async fn admin_new_post(
     State(st): State<Arc<AppState>>,
+    headers: axum::http::HeaderMap,
     Path(table): Path<String>,
     Form(posted): Form<HashMap<String, String>>,
 ) -> Response {
-    if let Some(r) = admin_gate(&st) {
+    if let Some(r) = admin_gate(&st, cookie_from_headers(&headers)) {
         return r;
     }
     let url = st.db_url.as_deref().unwrap();
@@ -631,9 +789,10 @@ async fn admin_new_post(
 
 async fn admin_edit_get(
     State(st): State<Arc<AppState>>,
+    headers: axum::http::HeaderMap,
     Path((table, id)): Path<(String, String)>,
 ) -> Response {
-    if let Some(r) = admin_gate(&st) {
+    if let Some(r) = admin_gate(&st, cookie_from_headers(&headers)) {
         return r;
     }
     let url = st.db_url.as_deref().unwrap();
@@ -681,10 +840,11 @@ async fn admin_edit_get(
 
 async fn admin_edit_post(
     State(st): State<Arc<AppState>>,
+    headers: axum::http::HeaderMap,
     Path((table, id)): Path<(String, String)>,
     Form(posted): Form<HashMap<String, String>>,
 ) -> Response {
-    if let Some(r) = admin_gate(&st) {
+    if let Some(r) = admin_gate(&st, cookie_from_headers(&headers)) {
         return r;
     }
     let url = st.db_url.as_deref().unwrap();
@@ -709,9 +869,10 @@ async fn admin_edit_post(
 
 async fn admin_delete(
     State(st): State<Arc<AppState>>,
+    headers: axum::http::HeaderMap,
     Path((table, id)): Path<(String, String)>,
 ) -> Response {
-    if let Some(r) = admin_gate(&st) {
+    if let Some(r) = admin_gate(&st, cookie_from_headers(&headers)) {
         return r;
     }
     let url = st.db_url.as_deref().unwrap();
@@ -731,4 +892,30 @@ fn esc(s: &str) -> String {
     s.replace('&', "&amp;")
         .replace('<', "&lt;")
         .replace('>', "&gt;")
+}
+
+/// WebSocket server endpoint: `echo=true` replies with each received text frame;
+/// otherwise it just drains frames (extension point for custom logic).
+async fn ws_upgrade(
+    ws: axum::extract::WebSocketUpgrade,
+    echo: bool,
+) -> Response {
+    ws.on_upgrade(move |socket| ws_echo_loop(socket, echo))
+}
+
+async fn ws_echo_loop(mut socket: axum::extract::ws::WebSocket, echo: bool) {
+    use axum::extract::ws::Message;
+    while let Some(Ok(msg)) = socket.recv().await {
+        match msg {
+            Message::Text(text) => {
+                if echo {
+                    if socket.send(Message::Text(text)).await.is_err() {
+                        break;
+                    }
+                }
+            }
+            Message::Close(_) => break,
+            _ => {}
+        }
+    }
 }

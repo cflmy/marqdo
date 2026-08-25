@@ -3,7 +3,6 @@ title: ext/web/web
 description: Official web site classes (English). Tables + methods; no bag glue.
 import plugin:lib/plugin.mq.md
 import sys:lib/sys.mq.md
-import json:lib/json.mq.md
 ---
 
 ## ensure_plugin
@@ -53,7 +52,7 @@ Embed a form into the page main slot. `listen` auto-registers `GET|POST /_form/{
 Offline HTML for tests / previews.
 
 1. `db`
-  *url = > json.get value=`db` key="url"*
+  *url = db[^url]*
   **> web_render page=`self` url=`url`**
 2. *
   **> web_render page=`self`**
@@ -82,14 +81,14 @@ Style tables live as `##` exports in site style modules; compose resolves them b
     + `name`
     + `fields`
 
-*url = > json.get value=`self` key="url"*
+*url = self[^url]*
 **> web_db_init url=`url` name=`name` fields=`fields`**
 
 ## insert
     + `table`
     + `rows`
 
-*url = > json.get value=`self` key="url"*
+*url = self[^url]*
 **> web_db_insert url=`url` table=`table` rows=`rows`**
 
 ## select
@@ -99,15 +98,15 @@ Style tables live as `##` exports in site style modules; compose resolves them b
 
 Simple filters: one-row map of column→value (AND `=`), or rows `|字段|操作|值|` (`=` `!=` `>` `>=` `<` `<=` `like`).
 
-*url = > json.get value=`self` key="url"*
+*url = self[^url]*
 *r = > web_db_select url=`url` table=`table` where=`where` limit=`limit`*
-**> json.get value=`r` key="rows"**
+**r[^rows]**
 
 ## get
     + `table`
     + `id`
 
-*url = > json.get value=`self` key="url"*
+*url = self[^url]*
 **> web_db_get url=`url` table=`table` id=`id`**
 
 ## update
@@ -115,21 +114,21 @@ Simple filters: one-row map of column→value (AND `=`), or rows `|字段|操作
     + `id`
     + `row`
 
-*url = > json.get value=`self` key="url"*
+*url = self[^url]*
 **> web_db_update url=`url` table=`table` id=`id` row=`row`**
 
 ## delete
     + `table`
     + `id`
 
-*url = > json.get value=`self` key="url"*
+*url = self[^url]*
 **> web_db_delete url=`url` table=`table` id=`id`**
 
 ## exec
     + `sql`
     + `args`=None
 
-*url = > json.get value=`self` key="url"*
+*url = self[^url]*
 **> web_db_exec url=`url` sql=`sql` args=`args`**
 
 # form
@@ -169,7 +168,7 @@ Field table + rules table; submit writes through `# db`.
     + `data`
     + `db`
 
-*url = > json.get value=`db` key="url"*
+*url = db[^url]*
 **> web_form_submit form=`self` data=`data` url=`url`**
 
 # app
@@ -211,3 +210,76 @@ Serve files from `dir` under `mount` (default `/static`). Path is resolved from 
 Serve `/`, routed pages, `/_part/{id}` (home) and `{path}/_part/{id}` (routes), `/_form/{id}` (from mounts + page embeds), optional `/static` (or custom mount), and optional `/admin`.
 
 **> web_listen app=`self`**
+
+## route_ws
+    + `path`
+    + `echo`=True
+
+Register a WebSocket endpoint at `path` (e.g. `/live`). With `echo=True` (default) the server replies to each received text frame; otherwise frames are drained. Connect from a client with `web.ws.connect`.
+
+**> web_app_route_ws app=`self` path=`path` echo=`echo`**
+
+## auth
+    + `users`
+    + `session_ttl`=3600
+
+Keep the app's `admin=True`, and gate `/admin*` behind a login page. `users` is an admin-users table (`|username|password|` / `|用户名|密码|`); unauthenticated requests redirect to `/admin/login`.
+
+**> web_app_auth app=`self` users=`users` session_ttl=`session_ttl`**
+
+# auth
+    + `users`
+    + `session_ttl`=3600
+
+Session/auth helper. Constructs a config object; `login` validates against the users table. To gate `/admin` on this app, use `app.auth users=…` instead.
+
+> ensure_plugin
+**> web_auth_new users=`users` session_ttl=`session_ttl`**
+
+## login
+    + `username`
+    + `password`
+
+Validate credentials against the users table and create a session. Returns `{ok, session_id, username}`.
+
+*users = self[^users]*
+*ttl = self[^session_ttl]*
+**> web_auth_login username=`username` password=`password` users=`users` session_ttl=`ttl`**
+
+## check
+    + `session_id`
+
+Returns `{ok, username}` when the session is valid.
+
+**> web_auth_check session_id=`session_id`**
+
+## logout
+    + `session_id`
+
+Destroy the session.
+
+**> web_auth_logout session_id=`session_id`**
+
+# ws
+    + `timeout_sec`=30
+
+WebSocket client helper.
+
+> ensure_plugin
+`out` =
+
+| timeout_sec | _type |
+|-------------|-------|
+| `timeout_sec` | ws |
+
+**out**
+
+## connect
+    + `url`
+    + `message`=""
+    + `headers`=None
+
+Single request–response: connect to `url`, send `message`, collect all server text replies, close. Returns `{ok, messages}`.
+
+*timeout = self[^timeout_sec]*
+**> web_ws_connect url=`url` message=`message` headers=`headers` timeout_sec=`timeout`**
