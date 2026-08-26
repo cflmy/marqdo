@@ -1,6 +1,6 @@
 //! Minimal HTML shell for assembled pages / parts.
 
-use serde_json::{Map, Value};
+use serde_json::{json, Map, Value};
 
 use crate::db;
 use crate::table::{as_bind, normalize_ref, normalize_slot, parse_site_path, project_rows, SitePath};
@@ -77,9 +77,7 @@ fn resolve_links(raw: Option<&Value>, db_url: Option<&str>) -> Vec<(String, Stri
         let Some(table) = table else {
             return Vec::new();
         };
-        let Ok(data) = db::select(url, &table, 200, None) else {
-            return Vec::new();
-        };
+        let data = select_page_data(url, &table, raw, 200);
         let rows = data
             .get("rows")
             .and_then(|v| v.as_array())
@@ -149,9 +147,7 @@ fn resolve_main(args: &Value, db_url: Option<&str>) -> (String, Vec<Map<String, 
     let Some(table) = crate::table::bind_table_name(&arr) else {
         return (intro, Vec::new());
     };
-    let Ok(data) = db::select(url, &table, 200, None) else {
-        return (intro, Vec::new());
-    };
+    let data = select_page_data(url, &table, args, 200);
     let rows = data
         .get("rows")
         .and_then(|v| v.as_array())
@@ -166,6 +162,66 @@ fn resolve_main(args: &Value, db_url: Option<&str>) -> (String, Vec<Map<String, 
         .filter_map(|v| v.as_object().cloned())
         .collect();
     (intro, items)
+}
+
+/// Run the page's DB query: `where` (with `{param}` placeholders resolved from
+/// `params`) and optional `order`, then project through the bind table.
+fn select_page_data(
+    url: &str,
+    table: &str,
+    args: &Value,
+    limit: i64,
+) -> Value {
+    let mut where_v = args.get("query").cloned();
+    if let Some(m) = where_v.as_ref().and_then(|v| v.as_object()) {
+        if m.iter().any(|(_, v)| v.as_str().is_some_and(|s| s.contains('{'))) {
+            let mut resolved = Map::new();
+            for (k, v) in m {
+                let v = match v {
+                    Value::String(s) => Value::String(resolve_params(s.as_str(), args)),
+                    other => other.clone(),
+                };
+                resolved.insert(k.clone(), v);
+            }
+            where_v = Some(Value::Object(resolved));
+        }
+    }
+    let order = args.get("order").and_then(|v| v.as_str());
+    if order.is_some_and(|s| !s.trim().is_empty()) {
+        db::select_order(url, table, limit, where_v.as_ref(), order)
+    } else {
+        db::select(url, table, limit, where_v.as_ref())
+    }
+    .unwrap_or(json!({ "rows": [] }))
+}
+
+/// Replace `{param}` placeholders with values from `args["params"]` (a map).
+fn resolve_params(s: &str, args: &Value) -> String {
+    let params = args
+        .get("params")
+        .and_then(|v| v.as_object())
+        .cloned()
+        .unwrap_or_default();
+    let mut out = String::new();
+    let mut rest = s;
+    while let Some(start) = rest.find('{') {
+        out.push_str(&rest[..start]);
+        rest = &rest[start + 1..];
+        if let Some(end) = rest.find('}') {
+            let key = &rest[..end];
+            let val = params
+                .get(key)
+                .map(text)
+                .unwrap_or_else(|| format!("{{{key}}}"));
+            out.push_str(&val);
+            rest = &rest[end + 1..];
+        } else {
+            out.push('{');
+            break;
+        }
+    }
+    out.push_str(rest);
+    out
 }
 
 fn field_css(obj: &Map<String, Value>, field: &str) -> String {
@@ -255,6 +311,14 @@ a:hover { color:var(--accent); }
 .site-form .actions { display:flex; gap:.75rem; align-items:center; flex-wrap:wrap; }
 .site-form button { background:var(--accent); color:#fff; border:0; padding:.55rem 1rem; border-radius:4px; cursor:pointer; }
 .site-form .meta { color:var(--muted); font-size:.9rem; }
+.article { background:#fff; border:1px solid var(--line); border-radius:8px; padding:2rem; margin-top:1.5rem; }
+.article-meta { color:var(--muted); font-size:.85rem; }
+.article-title { margin:0 0 .75rem; font-size:2rem; }
+.article-tags { margin-bottom:1rem; }
+.article-body { line-height:1.75; color:var(--ink); }
+.article-p { margin:0 0 1rem; white-space:pre-line; }
+.article-h2 { margin:1.5rem 0 .75rem; }
+.article-code { background:#f5f5f4; border:1px solid var(--line); border-radius:6px; padding:1rem; overflow-x:auto; font-size:.9rem; }
 "#;
 
 pub fn render_page(args: &Value, db_url: Option<&str>) -> String {
@@ -311,23 +375,19 @@ pub fn render_page_ex(
         ));
     }
     if !items.is_empty() {
-        main_html.push_str("<section class=\"content cards\">");
-        for it in &items {
-            let title = it
-                .get("title")
-                .map(text)
-                .unwrap_or_else(|| "item".into());
-            let body = it.get("body").map(text).unwrap_or_default();
-            let tc = class_attr(&field_css(it, "title"));
-            let bc = class_attr(&field_css(it, "body"));
-            main_html.push_str("<article>");
-            main_html.push_str(&format!("<h2{tc}>{}</h2>", esc(&title)));
-            if !body.is_empty() {
-                main_html.push_str(&format!("<p{bc}>{}</p>", esc(&body)));
+        let is_detail = args
+            .get("detail")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
+        if is_detail {
+            main_html.push_str(&render_article(&items[0]));
+        } else {
+            main_html.push_str("<section class=\"content cards\">");
+            for it in &items {
+                main_html.push_str(&render_card(args, it));
             }
-            main_html.push_str("</article>");
+            main_html.push_str("</section>");
         }
-        main_html.push_str("</section>");
     }
 
     format!(
@@ -409,21 +469,130 @@ pub fn render_fragment(args: &Value, db_url: Option<&str>) -> String {
                 body.push_str(&crate::form::render_body(form, form_id, None, None));
             }
             if !items.is_empty() {
-                body.push_str("<section class=\"content cards\">");
-                for it in &items {
-                    let title = it.get("title").map(text).unwrap_or_default();
-                    let b = it.get("body").map(text).unwrap_or_default();
-                    let tc = class_attr(&field_css(it, "title"));
-                    let bc = class_attr(&field_css(it, "body"));
-                    body.push_str(&format!(
-                        "<article><h2{tc}>{}</h2><p{bc}>{}</p></article>",
-                        esc(&title),
-                        esc(&b)
-                    ));
+                let is_detail = args
+                    .get("detail")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(false);
+                if is_detail {
+                    body.push_str(&render_article(&items[0]));
+                } else {
+                    body.push_str("<section class=\"content cards\">");
+                    for it in &items {
+                        body.push_str(&render_card(args, it));
+                    }
+                    body.push_str("</section>");
                 }
-                body.push_str("</section>");
             }
             format!("<main class=\"main\" data-slot=\"main\">{body}</main>")
         }
     }
+}
+
+/// Render a single list card from a projected DB row.
+fn render_card(args: &Value, it: &Map<String, Value>) -> String {
+    let title = it.get("title").map(text).unwrap_or_default();
+    let body = it.get("body").map(text).unwrap_or_default();
+    let href = it.get("href").map(text).unwrap_or_default();
+    let meta = it.get("meta").map(text).unwrap_or_default();
+    let tag = it.get("tag").map(text).unwrap_or_default();
+    let tc = class_attr(&field_css(it, "title"));
+    let bc = class_attr(&field_css(it, "body"));
+    let mut card = String::from("<article class=\"card\">");
+    if !href.is_empty() {
+        let prefix = args
+            .get("link_prefix")
+            .and_then(|v| v.as_str())
+            .unwrap_or("/post/");
+        card.push_str(&format!(
+            "<a class=\"card-link\" href=\"{}\">",
+            esc(&format!("{prefix}{href}"))
+        ));
+    }
+    if !meta.is_empty() {
+        card.push_str(&format!(
+            "<div class=\"card-meta\">{}</div>",
+            esc(&meta)
+        ));
+    }
+    card.push_str(&format!("<h2{tc}>{}</h2>", esc(&title)));
+    if !tag.is_empty() {
+        card.push_str(&format!(
+            "<div class=\"card-tag\">{}</div>",
+            esc(&tag)
+        ));
+    }
+    if !body.is_empty() {
+        card.push_str(&format!("<p{bc}>{}</p>", esc(&body)));
+    }
+    if !href.is_empty() {
+        card.push_str("</a>");
+    }
+    card.push_str("</article>");
+    card
+}
+
+/// Render a single article (detail page) from a projected DB row.
+fn render_article(it: &Map<String, Value>) -> String {
+    let title = it.get("title").map(text).unwrap_or_default();
+    let body = it.get("body").map(text).unwrap_or_default();
+    let meta = it.get("meta").map(text).unwrap_or_default();
+    let tag = it.get("tag").map(text).unwrap_or_default();
+    let mut s = String::from("<article class=\"article\">");
+    if !meta.is_empty() {
+        s.push_str(&format!(
+            "<div class=\"article-meta\">{}</div>",
+            esc(&meta)
+        ));
+    }
+    s.push_str(&format!("<h1 class=\"article-title\">{}</h1>", esc(&title)));
+    if !tag.is_empty() {
+        s.push_str(&format!(
+            "<div class=\"article-tags\">{}</div>",
+            esc(&tag)
+        ));
+    }
+    if !body.is_empty() {
+        s.push_str(&render_article_body(&body));
+    }
+    s.push_str("</article>");
+    s
+}
+
+/// Split a Markdown-ish article body into block elements.
+fn render_article_body(body: &str) -> String {
+    let mut s = String::from("<div class=\"article-body\">");
+    for para in body.split("\n\n") {
+        let para = para.trim();
+        if para.is_empty() {
+            continue;
+        }
+        if let Some(code) = para.strip_prefix("```") {
+            let code = code.strip_suffix("```").unwrap_or(code);
+            s.push_str(&format!(
+                "<pre class=\"article-code\">{}</pre>",
+                esc(code)
+            ));
+            continue;
+        }
+        if let Some(h) = para.strip_prefix("## ") {
+            s.push_str(&format!(
+                "<h2 class=\"article-h2\">{}</h2>",
+                esc(h.trim())
+            ));
+            continue;
+        }
+        if let Some(h) = para.strip_prefix("# ") {
+            s.push_str(&format!(
+                "<h2 class=\"article-h2\">{}</h2>",
+                esc(h.trim())
+            ));
+            continue;
+        }
+        s.push_str(&format!(
+            "<p class=\"article-p\">{}</p>",
+            esc(para).replace('\n', "<br/>")
+        ));
+    }
+    s.push_str("</div>");
+    s
 }

@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### Added
+- **`ext/web` 样式装配（`web_style` / `网页.样式装配`）**: 样式即数据表格 —— GFM 样式表（`|选择器|属性|值|`，可用 `|媒体|` 列分组进 `@media` 块）经 `样式装配` 函数转成 CSS 文本，再拼装成完整主题。替代"整段手写 CSS 字符串"的写法，贯彻 文档即代码。见 [marqdo-blog](examples/marqdo-blog/styles/theme.mq.md)。
+
 ### Changed
 - **Frontmatter import syntax**: `import bind:target` / `导入 bind:target` (file `.mq.md` or short name `lib.member`). Removed legacy `> path.mq.md` / `> use` imports. See [module-namespace.md](doc/design/module-namespace.md).
 

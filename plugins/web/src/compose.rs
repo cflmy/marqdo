@@ -134,10 +134,14 @@ pub fn compose_main(
             SitePath::DbField { table, field } => format!("{table}.{field}"),
             SitePath::Plain(s) => s,
             SitePath::LibMember { lib, member } => {
-                let v = call_lib(&format!("{lib}.{member}"))?;
-                match v {
-                    Value::String(s) => s,
-                    other => other.to_string(),
+                // Try a module member (e.g. `theme.hero`); if the lib is unknown,
+                // treat `a.b` as a DB field `a.b` (table `a`, column `b`).
+                match call_lib(&format!("{lib}.{member}")) {
+                    Ok(v) => match v {
+                        Value::String(s) => s,
+                        other => other.to_string(),
+                    },
+                    Err(_) => format!("{lib}.{member}"),
                 }
             }
         };

@@ -273,6 +273,20 @@ pub fn select(
     limit: i64,
     where_v: Option<&Value>,
 ) -> Result<Value, String> {
+    select_order(url, table, limit, where_v, None)
+}
+
+/// Like `select`, with an optional `ORDER BY`.
+///
+/// `order` is a column name, optionally prefixed with `-` for descending
+/// (`"created_at"`, `"-created_at"`). Comma-separated lists are allowed.
+pub fn select_order(
+    url: &str,
+    table: &str,
+    limit: i64,
+    where_v: Option<&Value>,
+    order: Option<&str>,
+) -> Result<Value, String> {
     let table = ident(table)?;
     let (clauses, mut vals) = parse_where(where_v)?;
     let conn = open(url)?;
@@ -280,6 +294,28 @@ pub fn select(
     if !clauses.is_empty() {
         sql.push_str(" WHERE ");
         sql.push_str(&clauses.join(" AND "));
+    }
+    if let Some(order) = order {
+        let order = order.trim();
+        if !order.is_empty() {
+            let parts: Vec<&str> = order
+                .split(',')
+                .map(|p| p.trim())
+                .filter(|p| !p.is_empty())
+                .collect();
+            let mut exprs = Vec::new();
+            for part in parts {
+                let (col, dir) = match part.strip_prefix('-') {
+                    Some(col) => (col, " DESC"),
+                    None => (part, ""),
+                };
+                exprs.push(format!("\"{}\"{}", ident(col)?, dir));
+            }
+            if !exprs.is_empty() {
+                sql.push_str(" ORDER BY ");
+                sql.push_str(&exprs.join(", "));
+            }
+        }
     }
     sql.push_str(&format!(" LIMIT ?{}", vals.len() + 1));
     vals.push(rusqlite::types::Value::Integer(limit));

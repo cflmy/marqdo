@@ -12,6 +12,8 @@ const SRC_KEYS: &[&str] = &["组件", "导入的页面", "src", "page"];
 const STYLE_KEYS: &[&str] = &["样式", "style", "class"];
 const PROP_KEYS: &[&str] = &["属性", "property", "prop", "名", "name"];
 const VAL_KEYS: &[&str] = &["值", "value"];
+const SEL_KEYS: &[&str] = &["选择器", "selector", "sel"];
+const MEDIA_KEYS: &[&str] = &["媒体", "media", "mq", "@media"];
 
 pub fn normalize_ref(s: &str) -> String {
     let s = s.trim();
@@ -270,42 +272,178 @@ pub fn normalize_slot(name: &str) -> String {
     }
 }
 
-/// Style table → CSS text for `.name { … }`
+/// Style table → CSS text.
+///
+/// Three table shapes are supported:
+/// 1. Rule rows `|媒体|选择器|属性|值|` — rows grouped by `媒体` emit
+///    `@media { … }` blocks; rows sharing a selector are merged into one rule.
+/// 2. Rule rows `|选择器|属性|值|` — each row emits `selector { prop: value; }`,
+///    rows sharing a selector are merged into one rule. `selector` may be any
+///    CSS selector (`aside.side`, `ul.side-nav a:hover`).
+/// 3. Plain property rows `|属性|值|` — emitted as `.name { prop: value; }`.
+///
+/// Examples (rule shape):
+/// ```text
+/// | 媒体 | 选择器 | 属性 | 值 |
+/// |------|--------|------|-----|
+/// | (max-width: 860px) | aside.side | padding | 1rem 2rem |
+///
+/// | 选择器 | 属性 | 值 |
+/// |--------|------|-----|
+/// | aside.side | padding | 2rem 1.25rem |
+/// | aside.side | background | #f5f5f4 |
+/// | ul.side-nav a:hover | color | var(--accent) |
+/// ```
 pub fn as_css_named(name: &str, table: &Value) -> String {
     let name = normalize_ref(name);
     if name.is_empty() {
         return String::new();
     }
-    let mut rules = Vec::new();
+    let mut out = String::new();
     match table {
         Value::Object(m) => {
+            // Column-first table object: `{选择器:[…], 属性:[…], 值:[…], 媒体:[…]}`
+            // (how GFM tables reach the plugin). Row-major maps (one rule per map)
+            // are handled too: if 选择器 is a scalar, treat it as a single row.
+            let sels = pick(m, SEL_KEYS).map(as_str_list).unwrap_or_default();
             let props = pick(m, PROP_KEYS).map(as_str_list).unwrap_or_default();
             let vals = pick(m, VAL_KEYS).map(as_str_list).unwrap_or_default();
-            for (i, p) in props.iter().enumerate() {
+            let medias = pick(m, MEDIA_KEYS).map(as_str_list).unwrap_or_default();
+            let n = props.len().max(sels.len()).max(vals.len());
+            if n == 0 {
+                return String::new();
+            }
+            let rows: Vec<(String, String, String, String)> = (0..n)
+                .map(|i| {
+                    (
+                        medias.get(i).cloned().unwrap_or_default(),
+                        sels.get(i).cloned().unwrap_or_default(),
+                        props.get(i).cloned().unwrap_or_default(),
+                        vals.get(i).cloned().unwrap_or_default(),
+                    )
+                })
+                .collect();
+            // Group by media then selector; or plain `.name { … }` when no selectors.
+            let mut by_media: Vec<(String, Vec<(String, Vec<String>)>)> = Vec::new();
+            let mut plain: Vec<String> = Vec::new();
+            for (media, sel, p, v) in rows {
                 if p.is_empty() {
                     continue;
                 }
-                let v = vals.get(i).cloned().unwrap_or_default();
-                rules.push(format!("  {p}: {v};"));
+                let decl = format!("  {p}: {v};");
+                if !media.is_empty() {
+                    let group = match by_media.iter_mut().find(|(mq, _)| *mq == media) {
+                        Some((_, g)) => g,
+                        None => {
+                            by_media.push((media.clone(), Vec::new()));
+                            let (_, g) = by_media.last_mut().unwrap();
+                            g
+                        }
+                    };
+                    push_rule(group, &sel, decl);
+                } else if !sel.is_empty() {
+                    let group = match by_media.iter_mut().find(|(mq, _)| mq.is_empty()) {
+                        Some((_, g)) => g,
+                        None => {
+                            by_media.push((String::new(), Vec::new()));
+                            let (_, g) = by_media.last_mut().unwrap();
+                            g
+                        }
+                    };
+                    push_rule(group, &sel, decl);
+                } else {
+                    plain.push(decl);
+                }
+            }
+            for (media, rules) in by_media {
+                if media.is_empty() {
+                    for (sel, decls) in rules {
+                        out.push_str(&format!("{} {{\n{}\n}}\n", sel, decls.join("\n")));
+                    }
+                } else {
+                    let inner = rules
+                        .iter()
+                        .map(|(sel, decls)| format!("{} {{\n{}\n}}", sel, decls.join("\n")))
+                        .collect::<Vec<_>>()
+                        .join("\n");
+                    out.push_str(&format!("@media {} {{\n{}\n}}\n", media, inner));
+                }
+            }
+            if !plain.is_empty() {
+                out.push_str(&format!(".{} {{\n{}\n}}\n", name, plain.join("\n")));
             }
         }
         Value::Array(rows) => {
+            // Group rule rows by media query and selector; plain rows as `.name { … }`.
+            let mut by_media: Vec<(String, Vec<(String, Vec<String>)>)> = Vec::new();
+            let mut plain: Vec<String> = Vec::new();
             for row in rows {
-                if let Some(m) = row.as_object() {
-                    let p = pick(m, PROP_KEYS).map(cell_str).unwrap_or_default();
-                    let v = pick(m, VAL_KEYS).map(cell_str).unwrap_or_default();
-                    if !p.is_empty() {
-                        rules.push(format!("  {p}: {v};"));
-                    }
+                let Some(m) = row.as_object() else { continue };
+                let media = pick(m, MEDIA_KEYS).map(cell_str).unwrap_or_default();
+                let sel = pick(m, SEL_KEYS).map(cell_str).unwrap_or_default();
+                let p = pick(m, PROP_KEYS).map(cell_str).unwrap_or_default();
+                let v = pick(m, VAL_KEYS).map(cell_str).unwrap_or_default();
+                if p.is_empty() {
+                    continue;
                 }
+                let decl = format!("  {p}: {v};");
+                if !media.is_empty() {
+                    let group = match by_media.iter_mut().find(|(mq, _)| *mq == media) {
+                        Some((_, g)) => g,
+                        None => {
+                            by_media.push((media.clone(), Vec::new()));
+                            let (_, g) = by_media.last_mut().unwrap();
+                            g
+                        }
+                    };
+                    push_rule(group, &sel, decl);
+                } else if !sel.is_empty() {
+                    let group = match by_media.iter_mut().find(|(mq, _)| mq.is_empty()) {
+                        Some((_, g)) => g,
+                        None => {
+                            by_media.push((String::new(), Vec::new()));
+                            let (_, g) = by_media.last_mut().unwrap();
+                            g
+                        }
+                    };
+                    push_rule(group, &sel, decl);
+                } else {
+                    plain.push(decl);
+                }
+            }
+            for (media, rules) in by_media {
+                if media.is_empty() {
+                    for (sel, decls) in rules {
+                        out.push_str(&format!("{} {{\n{}\n}}\n", sel, decls.join("\n")));
+                    }
+                } else {
+                    let inner = rules
+                        .iter()
+                        .map(|(sel, decls)| format!("{} {{\n{}\n}}", sel, decls.join("\n")))
+                        .collect::<Vec<_>>()
+                        .join("\n");
+                    out.push_str(&format!("@media {} {{\n{}\n}}\n", media, inner));
+                }
+            }
+            if !plain.is_empty() {
+                out.push_str(&format!(".{} {{\n{}\n}}\n", name, plain.join("\n")));
             }
         }
         _ => {}
     }
-    if rules.is_empty() {
-        return String::new();
+    out
+}
+
+/// Push `decl` under `sel` into a `(selector, declarations)` group list,
+/// merging declarations when the selector already exists.
+fn push_rule(groups: &mut Vec<(String, Vec<String>)>, sel: &str, decl: String) {
+    if sel.is_empty() {
+        return;
     }
-    format!(".{} {{\n{}\n}}\n", name, rules.join("\n"))
+    match groups.iter_mut().find(|(s, _)| s == sel) {
+        Some((_, decls)) => decls.push(decl),
+        None => groups.push((sel.to_string(), vec![decl])),
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -370,11 +508,11 @@ pub fn project_rows(binds: &[Value], rows: &[Value]) -> Value {
             let class = b.get("css").and_then(|v| v.as_str()).unwrap_or("");
             let col = match parse_site_path(back) {
                 SitePath::DbField { field, .. } => field,
+                SitePath::LibMember { member, .. } => member,
                 SitePath::Plain(s) if s.contains('.') => {
                     s.split('.').next_back().unwrap_or(&s).to_string()
                 }
                 SitePath::Plain(s) => s,
-                SitePath::LibMember { .. } => back.to_string(),
             };
             if let Some(v) = obj.get(&col).or_else(|| obj.get(front)) {
                 m.insert(front.to_string(), v.clone());

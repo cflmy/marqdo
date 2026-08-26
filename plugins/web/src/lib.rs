@@ -9,6 +9,8 @@ mod session;
 mod table;
 mod ws;
 
+use crate::table::as_css_named;
+
 use std::ffi::{CStr, CString};
 use std::os::raw::{c_char, c_int, c_void};
 use std::path::PathBuf;
@@ -275,6 +277,71 @@ web_ffi!(web_compose_main, |args: &Value| {
     compose::compose_main(&page, &main, |path| call_lib(path))
 });
 
+web_ffi!(web_page_query, |args: &Value| {
+    let page = args.get("page").cloned().unwrap_or(json!({}));
+    let query = args.get("query").cloned().unwrap_or(json!({}));
+    let mut obj = page.as_object().cloned().unwrap_or_default();
+    obj.insert("query".into(), query);
+    Ok(Value::Object(obj))
+});
+
+web_ffi!(web_page_order, |args: &Value| {
+    let page = args.get("page").cloned().unwrap_or(json!({}));
+    let order = arg_str(args, "order")?.to_string();
+    let mut obj = page.as_object().cloned().unwrap_or_default();
+    obj.insert("order".into(), json!(order));
+    Ok(Value::Object(obj))
+});
+
+web_ffi!(web_page_link_prefix, |args: &Value| {
+    let page = args.get("page").cloned().unwrap_or(json!({}));
+    let prefix = arg_str(args, "prefix")?.to_string();
+    let mut obj = page.as_object().cloned().unwrap_or_default();
+    obj.insert("link_prefix".into(), json!(prefix));
+    Ok(Value::Object(obj))
+});
+
+web_ffi!(web_page_css, |args: &Value| {
+    let page = args.get("page").cloned().unwrap_or(json!({}));
+    let css = arg_str_opt(args, "css").unwrap_or("").to_string();
+    let mut obj = page.as_object().cloned().unwrap_or_default();
+    if !css.trim().is_empty() {
+        let prev = obj
+            .get("styles_css")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string();
+        obj.insert("styles_css".into(), json!(format!("{prev}\n{css}")));
+    }
+    Ok(Value::Object(obj))
+});
+
+// Assemble a GFM style table into CSS text.
+//
+// Two shapes are accepted:
+// 1. Rule rows `|选择器|属性|值|` → `selector { prop: value; }`
+// 2. Property rows `|属性|值|` → `.name { prop: value; }`
+//
+// The `name` argument names the CSS class for shape 2, and is ignored for
+// shape 1. This is how Marqdo-side theme modules turn style tables into a
+// stylesheet with 文档即代码 — styles are data, assembly is a function.
+web_ffi!(web_style, |args: &Value| {
+    let name = arg_str_opt(args, "name").unwrap_or("").to_string();
+    let table = args.get("table").cloned().unwrap_or(json!([]));
+    Ok(Value::String(as_css_named(&name, &table)))
+});
+
+web_ffi!(web_page_detail, |args: &Value| {
+    let page = args.get("page").cloned().unwrap_or(json!({}));
+    let on = args
+        .get("detail")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(true);
+    let mut obj = page.as_object().cloned().unwrap_or_default();
+    obj.insert("detail".into(), json!(on));
+    Ok(Value::Object(obj))
+});
+
 web_ffi!(web_compose_form, |args: &Value| {
     let page = args.get("page").cloned().unwrap_or(json!({}));
     let form = args
@@ -335,7 +402,12 @@ web_ffi!(web_db_select, |args: &Value| {
         }
         Some(v) => Some(v),
     };
-    db::select(&url, &table, limit, where_v)
+    let order = args.get("order").and_then(|v| v.as_str());
+    if order.is_some_and(|s| !s.trim().is_empty()) {
+        db::select_order(&url, &table, limit, where_v, order)
+    } else {
+        db::select(&url, &table, limit, where_v)
+    }
 });
 
 web_ffi!(web_db_get, |args: &Value| {
@@ -894,6 +966,36 @@ pub unsafe extern "C" fn marqdo_plugin_init(host: *const MarqdoHostApi) -> c_int
         ),
         ("web_compose_main", "page,main", web_compose_main as PluginFn),
         (
+            "web_page_query",
+            "page,query",
+            web_page_query as PluginFn,
+        ),
+        (
+            "web_page_order",
+            "page,order",
+            web_page_order as PluginFn,
+        ),
+        (
+            "web_page_link_prefix",
+            "page,prefix",
+            web_page_link_prefix as PluginFn,
+        ),
+        (
+            "web_page_css",
+            "page,css",
+            web_page_css as PluginFn,
+        ),
+        (
+            "web_page_detail",
+            "page,detail",
+            web_page_detail as PluginFn,
+        ),
+        (
+            "web_style",
+            "name,table",
+            web_style as PluginFn,
+        ),
+        (
             "web_compose_form",
             "page,form,id",
             web_compose_form as PluginFn,
@@ -904,7 +1006,7 @@ pub unsafe extern "C" fn marqdo_plugin_init(host: *const MarqdoHostApi) -> c_int
         ("web_db_insert", "url,table,rows", web_db_insert as PluginFn),
         (
             "web_db_select",
-            "url,table,where,limit",
+            "url,table,where,limit,order",
             web_db_select as PluginFn,
         ),
         ("web_db_get", "url,table,id", web_db_get as PluginFn),

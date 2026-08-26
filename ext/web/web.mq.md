@@ -17,6 +17,19 @@ Load the ABI v2 `web` plugin once.
   > sys.exit code=1
 ****
 
+## make_style
+    + `name`=""
+    + `table`
+
+Assemble a GFM style table into a CSS string. Two shapes are accepted:
+`|选择器|属性|值|` rule rows (arbitrary selectors; rows sharing a selector are
+merged, and a leading `|媒体|` column groups rows into `@media` blocks), or
+`|属性|值|` property rows wrapped as `.name { … }`. Styles stay as data tables,
+`make_style` turns them into CSS — 样式即数据、装配即函数.
+
+> ensure_plugin
+**> web_style name=`name` table=`table`**
+
 # page
     + `title`="Marqdo Web"
     + `intro`=""
@@ -37,6 +50,45 @@ Assemble nav / sidebar / footer from a page table (`|组件|样式|` or `|src|st
 Assemble main from a bind table (`|属性|值|样式|` or `|front|back|css|`).
 
 **> web_compose_main page=`self` main=`main`**
+
+## query
+    + `query`
+
+Attach a DB where-condition map for the main bind. Values may contain `{param}`
+placeholders that are resolved from dynamic-route params (e.g. `/post/{slug}`).
+
+**> web_page_query page=`self` query=`query`**
+
+## order
+    + `order`
+
+Set a default `ORDER BY` for the main bind (e.g. `-created_at` for newest first).
+
+**> web_page_order page=`self` order=`order`**
+
+## link_prefix
+    + `prefix`
+
+Prefix for card links in the main bind (default `/post/`). Cards whose bind has
+an `href`/`链接` field become `<a href="{prefix}{href}">`.
+
+**> web_page_link_prefix page=`self` prefix=`prefix`**
+
+## css
+    + `css`
+
+Append a raw CSS string to the page's stylesheet (`styles_css`). Use it to ship
+a hand-written theme alongside the assembled shell.
+
+**> web_page_css page=`self` css=`css`**
+
+## detail
+    + `detail`=True
+
+Render the main bind's first row as a full article (title/meta/tags/body) instead
+of a list of cards. Set on the dynamic post page so `/post/{slug}` shows one post.
+
+**> web_page_detail page=`self` detail=`detail`**
 
 ## compose_form
     + `form`
@@ -95,11 +147,12 @@ Style tables live as `##` exports in site style modules; compose resolves them b
     + `table`
     + `where`=None
     + `limit`=200
+    + `order`=None
 
-Simple filters: one-row map of column→value (AND `=`), or rows `|字段|操作|值|` (`=` `!=` `>` `>=` `<` `<=` `like`).
+Simple filters: one-row map of column→value (AND `=`), or rows `|字段|操作|值|` (`=` `!=` `>` `>=` `<` `<=` `like`). `order` is a column name with optional `-` prefix for descending (`"created_at"`, `"-created_at"`), comma-separated for multiple keys.
 
 *url = self[^url]*
-*r = > web_db_select url=`url` table=`table` where=`where` limit=`limit`*
+**> web_db_select url=`url` table=`table` where=`where` limit=`limit` order=`order`**
 **r[^rows]**
 
 ## get

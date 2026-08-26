@@ -6,7 +6,6 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use axum::extract::{Form, Path, Query, State};
-use axum::http::Uri;
 use axum::response::{Html, IntoResponse, Redirect, Response};
 use axum::routing::get;
 use axum::Router;
@@ -28,7 +27,6 @@ struct AppState {
     forms: HashMap<String, Value>,
     /// Page that owns an embedded form (for re-render on validation errors).
     form_owners: HashMap<String, Value>,
-    routes: HashMap<String, Value>,
     /// Admin users table (`|用户名|密码|`) when login-gated admin is configured.
     auth_users: Option<Value>,
     session_ttl: u64,
@@ -82,7 +80,6 @@ pub fn listen(
         admin,
         forms,
         form_owners,
-        routes: routes.clone(),
         auth_users,
         session_ttl,
     });
@@ -103,12 +100,52 @@ pub fn listen(
         .route("/admin/{table}/{id}/delete", get(admin_delete));
 
     // Register each author route as an exact GET path + `{path}/_part/{id}`.
+    // Paths containing `{param}` become dynamic routes (e.g. `/post/{slug}`);
+    // the captured params are injected into the page before rendering.
     let mut paths: Vec<String> = routes.keys().cloned().collect();
     paths.sort();
     for path in paths {
-        app = app.route(&path, get(routed_page));
-        let part_path = format!("{path}/_part/{{id}}");
-        app = app.route(&part_path, get(routed_part));
+        let page = routes.get(&path).cloned().unwrap_or_default();
+        let dynamic = path.contains('{');
+        if dynamic {
+            let page_for_render = page.clone();
+            app = app.route(
+                &path,
+                get(async move |State(st): State<Arc<AppState>>, Path(params): Path<HashMap<String, String>>| {
+                    let mut p = page_for_render.clone();
+                    inject_params(&mut p, &params);
+                    Html(render::render_page(&p, st.db_url.as_deref())).into_response()
+                }),
+            );
+            // Dynamic `{path}/_part/{id}` with the same path params.
+            let part_path = format!("{path}/_part/{{id}}");
+            let page_for_part = page.clone();
+            app = app.route(
+                &part_path,
+                get(async move |State(st): State<Arc<AppState>>, Path((params, id)): Path<(HashMap<String, String>, String)>| {
+                    let mut p = page_for_part.clone();
+                    inject_params(&mut p, &params);
+                    render_part_from_page(&p, &id, st.db_url.as_deref())
+                }),
+            );
+        } else {
+            let page_for_render = page.clone();
+            app = app.route(
+                &path,
+                get(async move |State(st): State<Arc<AppState>>| {
+                    Html(render::render_page(&page_for_render, st.db_url.as_deref()))
+                        .into_response()
+                }),
+            );
+            let part_path = format!("{path}/_part/{{id}}");
+            let page_for_part = page.clone();
+            app = app.route(
+                &part_path,
+                get(async move |State(st): State<Arc<AppState>>, Path(id): Path<String>| {
+                    render_part_from_page(&page_for_part, &id, st.db_url.as_deref())
+                }),
+            );
+        }
     }
 
     // WebSocket endpoints (`ws://…/{path}`), echo-mode by default.
@@ -181,15 +218,28 @@ async fn home(State(st): State<Arc<AppState>>) -> Html<String> {
     Html(html)
 }
 
-async fn routed_page(State(st): State<Arc<AppState>>, uri: Uri) -> Response {
-    let mut path = uri.path().to_string();
-    while path.len() > 1 && path.ends_with('/') {
-        path.pop();
+/// Inject captured dynamic-route params into a page copy as `params` (a map),
+/// so render can resolve `{param}` placeholders in `query`/`intro`.
+fn inject_params(page: &mut Value, params: &HashMap<String, String>) {
+    if let Some(obj) = page.as_object_mut() {
+        let mut map = Map::new();
+        for (k, v) in params {
+            map.insert(k.clone(), json!(v));
+        }
+        obj.insert("params".into(), Value::Object(map));
+        // Propagate into every part (fragments render independently).
+        if let Some(parts) = obj.get_mut("parts").and_then(|p| p.as_object_mut()) {
+            for cfg in parts.values_mut() {
+                if let Some(m) = cfg.as_object_mut() {
+                    let mut pmap = Map::new();
+                    for (k, v) in params {
+                        pmap.insert(k.clone(), json!(v));
+                    }
+                    m.insert("params".into(), Value::Object(pmap));
+                }
+            }
+        }
     }
-    let Some(page) = st.routes.get(&path) else {
-        return Html(format!("<p>404 not found: {}</p>", esc(&path))).into_response();
-    };
-    Html(render::render_page(page, st.db_url.as_deref())).into_response()
 }
 
 fn render_part_from_page(page: &Value, id: &str, db_url: Option<&str>) -> Response {
@@ -204,26 +254,6 @@ fn render_part_from_page(page: &Value, id: &str, db_url: Option<&str>) -> Respon
 
 async fn home_part(State(st): State<Arc<AppState>>, Path(id): Path<String>) -> Response {
     render_part_from_page(&st.page, &id, st.db_url.as_deref())
-}
-
-/// `{route}/_part/{id}` — resolve part against the page mounted at `route`.
-async fn routed_part(
-    State(st): State<Arc<AppState>>,
-    uri: Uri,
-    Path(id): Path<String>,
-) -> Response {
-    let full = uri.path();
-    let marker = format!("/_part/{id}");
-    let Some(page_path) = full.strip_suffix(&marker) else {
-        return Html(format!("<p>bad part path {}</p>", esc(full))).into_response();
-    };
-    if page_path.is_empty() || page_path == "/" {
-        return render_part_from_page(&st.page, &id, st.db_url.as_deref());
-    }
-    let Some(page) = st.routes.get(page_path) else {
-        return Html(format!("<p>404 not found: {}</p>", esc(page_path))).into_response();
-    };
-    render_part_from_page(page, &id, st.db_url.as_deref())
 }
 
 async fn form_get(State(st): State<Arc<AppState>>, Path(id): Path<String>) -> Response {
