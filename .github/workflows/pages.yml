@@ -29,7 +29,7 @@ jobs:
         run: |
           cargo build --release
           # Skip import helpers (no `# main`); exclude both EN/ZH names.
-          find public -name '*.mq.md' ! -name 'utils.mq.md' ! -name '工具.mq.md' -print0 \
+          find public -name '*.mq.md' ! -path '*/structure/import/utils.mq.md' ! -path '*/structure/import/??.mq.md' -print0 \
             | xargs -0 -n1 ./target/release/marqdo run
           ./target/release/marqdo view output public -o public
 
