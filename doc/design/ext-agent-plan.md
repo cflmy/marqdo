@@ -5,7 +5,7 @@
 | 状态 | **Accepted；D2a–D2f 已落地；父 Plan-and-Move / OKF 软命中见配套文档** |
 | 日期 | 2026-08-11 |
 | 父文档 | [ext-agent.md](ext-agent.md) |
-| 相关 | [**ext-agent-parent.md**](ext-agent-parent.md)（**父 Plan-and-Move 行动面**） · [stdlib-writeback.md](stdlib-writeback.md) · [stdlib-subtask.md](stdlib-subtask.md) · [module-namespace.md](module-namespace.md) · [ai-skill.md](ai-skill.md) · [objects.md](objects.md) |
+| 相关 | [**ext-agent-parent.md**](ext-agent-parent.md)（**父 Plan-and-Move 行动面**） · [stdlib-writeback.md](stdlib-writeback.md) · [stdlib-subtask.md](stdlib-subtask.md) · [module-namespace.md](module-namespace.md) · [ai-skill.md](ai-skill.md) · [objects.md](objects.md) · [调研：主流框架与 Marqdo](../research/agent-frameworks-and-marqdo.md) |
 
 ---
 

@@ -4,7 +4,7 @@
 |---|---|
 | Status | **Accepted · redesign**（取代「thin TOOL: loop」方案） |
 | Date | 2026-08-07 |
-| Related | [ext-llm.md](ext-llm.md) · [ext-cli.md](ext-cli.md) · [ext-abi.md](ext-abi.md) · [**ext-agent-plan.md**](ext-agent-plan.md)（**多步锁定设计**） · [**ext-agent-parent.md**](ext-agent-parent.md)（**父 Plan-and-Move**） · [**okf.md**](okf.md)（**OKF / 任务知识包**） · [module-namespace.md](module-namespace.md) · [objects.md](objects.md) · [stdlib-writeback.md](stdlib-writeback.md) · [stdlib-subtask.md](stdlib-subtask.md) · [markdown-mapping.md](markdown-mapping.md) |
+| Related | [ext-llm.md](ext-llm.md) · [ext-cli.md](ext-cli.md) · [ext-abi.md](ext-abi.md) · [**ext-agent-plan.md**](ext-agent-plan.md)（**多步锁定设计**） · [**ext-agent-parent.md**](ext-agent-parent.md)（**父 Plan-and-Move**） · [**okf.md**](okf.md)（**OKF / 任务知识包**） · [**调研：主流框架与 Marqdo 优势**](../research/agent-frameworks-and-marqdo.md) · [module-namespace.md](module-namespace.md) · [objects.md](objects.md) · [stdlib-writeback.md](stdlib-writeback.md) · [stdlib-subtask.md](stdlib-subtask.md) · [markdown-mapping.md](markdown-mapping.md) |
 
 ## 0. 为什么要改掉旧方案
 

@@ -89,6 +89,8 @@ marqdo sync [PATH] -o OUT_DIR          # catalog 的别名
 
 产物示例：`catalog.yaml`、`index.md`、`modules/*.md`（`type: Marqdo Module` 等）。设计见 [generated-yaml-manifest.md](doc/design/generated-yaml-manifest.md) · 调研 [okf-and-marqdo.md](doc/research/okf-and-marqdo.md)。
 
+智能体框架横向调研（LangGraph / CrewAI / 厂商 SDK 等 vs Marqdo 文档驱动优势）：[agent-frameworks-and-marqdo.md](doc/research/agent-frameworks-and-marqdo.md) · 优化路线 [ext-agent-optimize.md](doc/roadmap/ext-agent-optimize.md)。
+
 ```bash
 cargo run -- catalog public -o .marqdo
 # 或已安装二进制时：
