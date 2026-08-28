@@ -2717,6 +2717,20 @@ fn ext_agent_plan_decision() {
 }
 
 #[test]
+fn ext_agent_workbook_patch_a0() {
+    let status = Command::new("cargo")
+        .args(["build", "-p", "marqdo_plugin_agent"])
+        .current_dir(env!("CARGO_MANIFEST_DIR"))
+        .status()
+        .expect("build agent plugin");
+    assert!(status.success(), "failed to build marqdo_plugin_agent");
+    assert_out(
+        "tests/ext/agent-workbook-patch-a0.mq.md",
+        "1\n1\ncontinue-ok\nsolidify-ok\nstep-gone\nanswer-ok",
+    );
+}
+
+#[test]
 fn ext_agent_plan_observe() {
     assert_out(
         "tests/ext/agent-plan-observe.mq.md",

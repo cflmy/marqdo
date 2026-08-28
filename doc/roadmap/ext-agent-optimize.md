@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| 状态 | **进行中 · A0 开工**（整文件补丁护栏 + soft 收紧 + solidify 单测） |
+| 状态 | **进行中 · A0 大部完成**（护栏 + soft + solidify 单测/金样；多轮 CONTINUE 离线金样） |
 | 日期 | 2026-08-28 |
 | 调研 | [agent-frameworks-and-marqdo.md](../research/agent-frameworks-and-marqdo.md) |
 | 设计 | [ext-agent.md](../design/ext-agent.md) · [ext-agent-plan.md](../design/ext-agent-plan.md) · [ext-agent-parent.md](../design/ext-agent-parent.md) · [okf.md](../design/okf.md) |
@@ -24,7 +24,7 @@
 
 | 波次 | 主题 | 验收线索 |
 |------|------|----------|
-| **A0** | 工作簿补丁 / 固化可靠性 | **in progress** — `apply_patch_blocks` 禁整文件 FIND；`soft` 仅吞「FIND not found」；decompose CONTINUE 检查 `n`；`workbook_solidify` 单测 |
+| **A0** | 工作簿补丁 / 固化可靠性 | **mostly done** — 整文件 FIND 护栏；`soft` 仅 miss；decompose `n` 检查；`workbook_solidify` 单测；金样 `agent-workbook-patch-a0`（双 CONTINUE + solidify） |
 | **A1** | OKF 复用飞轮（lookup / near / soft_match UX） | 二次同类 `plan` 走快路径；策展可读 |
 | **A2** | 过程可见（stream + view 过程卡） | 对齐 [agent-streaming.md](agent-streaming.md)；真相仍可写回 |
 | **A3** | 上下文预算（源码/Skill 渐进披露） | 长 runbook 不爆窗，仍保持「源码即提示」 |
