@@ -232,3 +232,42 @@ if x > 0:
 2. *
   > print text=y-other
 ```
+
+## 13. Dynamic site (ext/web, minimal)
+
+```markdown
+---
+title: hello-site
+import web:ext/web/web.mq.md
+import db:db/index.mq.md
+---
+
+# main
+
+`shell` =
+
+| 组件 | 样式 |
+|------|------|
+| nav | |
+
+`main` =
+
+| 属性 | 值 | 样式 |
+|------|-----|------|
+| title | posts.title | |
+| body | posts.summary | |
+
+*store = > db.open*
+*css = "body{font-family:sans-serif}"*
+*page = > web.page title="Hello"*
+*page = > page.compose_components components=`shell`*
+*page = > page.compose_main main=`main`*
+*page = > page.css css=`css`*
+*app = > web.app page=`page` port=8080*
+*app = > app.static prefix="/static" dir="static"*
+> listen app=`app`
+```
+
+- Import `ext/web/web.mq.md` **or** `ext/web/网页.mq.md` — not both; match API language to the file.
+- Full blog/CMS patterns: `examples/marqdo-blog/` (routes, SEO, RSS, auth, upload, WS).
+- Run after `marqdo ext add web` and building `marqdo_plugin_web`.

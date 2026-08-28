@@ -3,22 +3,22 @@
 | | |
 |---|---|
 | 状态 | 已提供 |
-| 日期 | 2026-08-05 |
+| 日期 | 2026-08-05（初版）· 2026-08-28（ext/web 完结复核） |
 | 路径 | [`skills/marqdo/`](../../skills/marqdo/)（权威）；Cursor 镜像 [`.cursor/skills/marqdo/`](../../.cursor/skills/marqdo/) |
 
 ---
 
 ## 目的
 
-让接入方（Cursor Agent、其它支持 Agent Skills 的模型宿主）在**加载本 skill 后**即可按 v0.1 语法正确编写 / 修改 `.mq.md`，而不把 Markdown 习惯或 Python 控制流误套到 Marqdo。
+让接入方（Cursor Agent、其它支持 Agent Skills 的模型宿主）在**加载本 skill 后**即可按 v0.2 语法正确编写 / 修改 `.mq.md`，并在使用 **`ext/web` 动态站** 时遵循 GFM 表 + 类方法作者面（不混中英 API、不写 JSON 袋胶水）。
 
 ## 内容
 
 | 文件 | 用途 |
 |------|------|
-| `SKILL.md` | 必读：硬规则、标记表、工作流、反模式 |
-| `reference.md` | 按需：CLI、stdlib 索引、边界 |
-| `examples.md` | 按需：可复制样例 |
+| `SKILL.md` | 必读：硬规则、标记表、**ext/web 动态站**、工作流、反模式 |
+| `reference.md` | 按需：CLI、stdlib/ext 索引、**ext/web API 摘要** |
+| `examples.md` | 按需：可复制样例（含 §13 最小站点） |
 
 ## 使用
 

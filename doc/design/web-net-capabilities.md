@@ -2,8 +2,8 @@
 
 | | |
 |---|---|
-| 状态 | **调研结论（Draft）** |
-| 日期 | 2026-08-26 |
+| 状态 | **Accepted · W0–W7 + P3 完结**（2026-08-28 复核） |
+| 日期 | 2026-08-26（初稿）· 2026-08-28（完结复核） |
 | 相关 | [ext-web.md](ext-web.md) · [ext-web-net.md](ext-web-net.md) · [ext-abi.md](ext-abi.md) · [stdlib-modules.md](stdlib-modules.md) |
 | 目标 | 盘点 `ext/web` + `plugins/web` + `lib/net` 现状，对照主流语言网络栈，给出「开发一个完整 Web 项目」所需能力的差距清单与补强路线 |
 
@@ -11,7 +11,7 @@
 
 ## 0. 一句话结论
 
-**当前 `plugins/web` 已覆盖「单页渲染 + SQLite 表单 CRUD + 简易 admin 门禁 + echo WebSocket + 中间件管道（CORS/安全头/gzip/请求体限制）+ JSON API + 数据层深化（连接池/事务/分页/查询表达力）」，足以支撑中小型内容站点与前后端分离 API；但距「完整项目」（博客/CMS/社区）仍缺四类能力：③ 安全硬化（密码哈希 / CSRF / 限流 / 会话持久化）；④ 内容站点标配（SEO / 搜索 / RSS / 分页导航）；① 中余下上传下载 / HTTPS / 日志 / 错误页。** 全部按「基础设施进 `lib/net`，领域能力进 `plugins/web` + `ext/web`」的既有边界补强。
+**`ext/web` + `plugins/web` 已完成 W0–W7 + P3 路线图**：中间件/JSON API、数据层（连接池/事务/分页/FTS/迁移/外键/审计时间戳）、安全硬化（argon2/CSRF/会话持久化/限速/RBAC）、内容站点标配（SEO/RSS/Markdown/分页 UI）、上传下载/相册/ETag、sitemap/robots/错误页/重定向、WebSocket 广播与访问日志。足以在 Marqdo 上实现博客/CMS/中小型 API 站点；**未内置**的仅剩标签页模板（D6，可用路由+`db.count` 自建）与应用层反垃圾。边界不变：**纯解析进 `lib/net`，HTTP 服务器与领域能力进 `plugins/web` + `ext/web` 作者面**。
 
 
 ---
@@ -30,8 +30,9 @@
 | `url_encode` / `编码地址` | host `net.rs` | ✅ URL 编码 |
 | `cookie_parse` / `解析Cookie` | host `net.rs` | ✅ RFC6265 子集（请求头/响应头） |
 | `multipart_parse` / `解析多部分` | host `net.rs` | ✅ multipart/form-data 解析 |
+| `markdown_parse` / `解析Markdown` | host `net.rs` | ✅ GFM/Markdown → HTML（纯解析，W4c） |
 
-**标准库网络原语已比较齐备**：客户端 GET/POST/SSE、URL 编码、cookie、multipart 都有。缺的是**响应元信息（响应头/Set-Cookie 取出）、上传（multipart 文件）与下载（二进制）**。
+**标准库网络原语已齐备**：客户端 GET/POST/SSE、URL 编码、cookie、multipart、Markdown 解析。服务器侧上传/下载/ETag 在 `plugins/web`（A5/P3）。
 
 ### 1.2 `plugins/web`（ABI v2，领域能力）
 
@@ -48,17 +49,15 @@
 | 鉴权 | `web_auth_login/check/logout/new` · `web_app_auth` | `/admin` 登录门禁 |
 | WebSocket | `web_ws_connect`（客户端）· `web_app_route_ws`（服务器） | 单请求-响应式客户端 + echo 服务器 |
 
-**关键实现事实（决定差距）：**
+**关键实现事实（2026-08-28 W7+P3 后）：**
 
-- **中间件层已落地**（W1）：`app.configure`/`应用.装配` 通过 GFM 表装配 CORS、安全响应头、gzip 压缩、请求体上限、JSON API 路由，`监听` 时统一挂到 axum `Router`（`middleware.rs`）。「配置即数据、装配即函数」。
-- **JSON API 已落地**（W1）：`|路径|方法|表|条件|排序|上限|` 表声明端点，响应 `application/json`，支持 DB 查询 + 排序 + 上限。
-- **数据层深化已落地**（W2）：进程级**连接池**（WAL + `busy_timeout` + `foreign_keys`）+ **事务** API（`db.事务` → `txn.insert/提交/回滚`，`txn` 句柄带 `_type` 走 Marqdo 类分发）+ **结果集裸查询**（`db.query` 返回 `{rows, count}`）+ **分页**（`select`/`paginate` 支持 `offset`，返回 `{rows, total}`）+ **查询表达力**（where 支持 OR 组 / `in` / `between` / `is null` / `like`）+ **聚合计数**（`db.count`）。
-- **无文件上传**：无 multipart extractor，`multipart_parse` 只在标准库侧做了纯解析，服务器没接收。
-- **会话为进程内内存**：重启即失效、多 worker 不共享；session id 非加密强度；密码明文存储比对。
-- **无 HTTPS**：仅 `TcpListener::bind` HTTP。
-- **无迁移机制**：schema 版本表 + 迁移脚本缺失；索引/唯一/外键声明待增强（init 表增强）。
-- **WebSocket 仅 echo**：无广播/房间/多客户端/业务分发。
-- **尚无自定义 404/500 错误页、无访问日志、无 ETag/Cache-Control 缓存头、无重定向增强。**
+- **中间件 + JSON API**（W1）：`app.configure` 装配 CORS、安全头、gzip、请求体上限、JSON 端点。
+- **数据层**（W2/W6/W7/P3）：连接池、事务、分页、OR/IN/BETWEEN、`db.count`、迁移、FTS5 搜索、init 唯一/索引/外键、审计时间戳。
+- **安全**（W3s/P3）：argon2、CSRF、SQLite 会话、CSPRNG session id、登录限速、RBAC（`app.gate` + 用户 `role`）。
+- **内容站点**（W4c/W7）：SEO `page.meta`、RSS、Markdown 正文、`page.paginate`、sitemap/robots。
+- **媒体**（W5/P3）：multipart 上传、下载、`app.gallery`、ETag/Cache-Control。
+- **运维向**（W6/W7）：访问日志、自定义 404/500、301/307 重定向、WS 广播；HTTPS 由反代终止 + `cookie_secure`。
+- **仍属应用层约定**：标签聚合页模板（D6）、评论反垃圾、草稿/定时发布（表+where 即可）。
 
 ---
 
@@ -82,27 +81,29 @@
 
 ### 2.2 「完整 Web 框架」能力清单（FastAPI / Express / Flask / axum 共通项）
 
-| 能力 | FastAPI | Express | Flask | axum | 说明 |
+> **marqdo 列**反映 **2026-08-28 W7+P3 完结** 后状态（见 §3 差距表）。
+
+| 能力 | FastAPI | Express | Flask | axum | marqdo |
 |---|---|---|---|---|---|
-| 路由（含动态参数） | ✅ | ✅ | ✅ | ✅ | 三框架全支持；marqdo 已有动态路由 `/post/{slug}` |
-| 中间件管道 | ✅ | ✅ | ✅ | ✅（tower） | **marqdo 缺失** — 最根本缺口 |
-| CORS | ✅ 内置 | ✅ 中间件 | ✅ flask-cors | ✅ tower-http | 缺失 |
-| JSON 请求/响应 | ✅ 原生 | ✅ | ✅ | ✅ | 缺失 |
-| 校验（schema/字段） | ✅ Pydantic | 手动(zod) | 手动 | ✅ extractor | marqdo 有 form 校验表（够用） |
-| 静态文件 | ✅ Starlette | ✅ | ✅ | ✅ | ✅ 已有 |
-| 模板/渲染 | ✅ Jinja | ✅ | ✅ | ✅ | marqdo 用 GFM 表装配（自研） |
-| 会话 | ✅ | ✅ express-session | ✅ | ✅ | 有（内存，待持久化） |
-| 鉴权 | ✅ OAuth2/APIKey | ✅ | ✅ | ✅ | 有（admin 门禁，待硬化） |
-| 文件上传 | ✅ | ✅ multer | ✅ | ✅ | 缺失 |
-| WebSocket | ✅ | ✅ ws | ✅ Flask-SocketIO | ✅ | 有（echo，待广播） |
-| 安全头 | ✅ | ✅ helmet | ✅ | ✅ tower-http | 缺失 |
-| 限流 | ✅ | ✅ | ✅ | ✅ | 缺失 |
-| 日志 | ✅ | ✅ morgan | ✅ | ✅ | 缺失 |
-| gzip 压缩 | ✅ | ✅ | ✅ | ✅ | 缺失 |
-| 分页 | 手动 | 手动 | ✅ paginate | ✅ | marqdo 缺失（db 层无 offset） |
-| 迁移 | ✅ alembic | ✅ | ✅ | ✅ sqlx | 缺失 |
-| 测试工具 | ✅ TestClient | ✅ supertest | ✅ | ✅ | 缺失（依赖 gold 测试） |
-| HTTPS/TLS | 反代 | 反代 | 反代 | ✅ rustls | 缺失（通常反代承担） |
+| 路由（含动态参数） | ✅ | ✅ | ✅ | ✅ | ✅ 动态路由 `/post/{slug}` |
+| 中间件管道 | ✅ | ✅ | ✅ | ✅（tower） | ✅ W1 `app.configure` |
+| CORS | ✅ 内置 | ✅ 中间件 | ✅ flask-cors | ✅ tower-http | ✅ W1 |
+| JSON 请求/响应 | ✅ 原生 | ✅ | ✅ | ✅ | ✅ W1 JSON API 表 |
+| 校验（schema/字段） | ✅ Pydantic | 手动(zod) | 手动 | ✅ extractor | ✅ form 校验表 |
+| 静态文件 | ✅ Starlette | ✅ | ✅ | ✅ | ✅ `app.static` |
+| 模板/渲染 | ✅ Jinja | ✅ | ✅ | ✅ | ✅ GFM 表装配 |
+| 会话 | ✅ | ✅ express-session | ✅ | ✅ | ✅ SQLite 持久化（W3s） |
+| 鉴权 | ✅ OAuth2/APIKey | ✅ | ✅ | ✅ | ✅ admin + RBAC（P3） |
+| 文件上传 | ✅ | ✅ multer | ✅ | ✅ | ✅ W5 upload |
+| WebSocket | ✅ | ✅ ws | ✅ Flask-SocketIO | ✅ | ✅ echo + 广播（W6） |
+| 安全头 | ✅ | ✅ helmet | ✅ | ✅ tower-http | ✅ W1 |
+| 限流 | ✅ | ✅ | ✅ | ✅ | ✅ 登录限速（W3s） |
+| 日志 | ✅ | ✅ morgan | ✅ | ✅ | ✅ access_log（W6） |
+| gzip 压缩 | ✅ | ✅ | ✅ | ✅ | ✅ W1 |
+| 分页 | 手动 | 手动 | ✅ paginate | ✅ | ✅ db + page UI（W2/W4c） |
+| 迁移 | ✅ alembic | ✅ | ✅ | ✅ sqlx | ✅ W6 `db.migrate` |
+| 测试工具 | ✅ TestClient | ✅ supertest | ✅ | ✅ | gold 测试（`tests/ext/web-*`） |
+| HTTPS/TLS | 反代 | 反代 | 反代 | ✅ rustls | 反代 + `cookie_secure`（W7 文档锁定） |
 
 ---
 
@@ -177,22 +178,22 @@
 |---|---|---|---|
 | **W1** | 服务器基础设施 | 中间件管道（CORS/安全头/压缩/请求体限制）+ JSON API（`application/json` 响应 + DB 查询端点） | A1 A2 A3 A4 A7 ✅ **已完成** |
 | **W2** | 数据层深化 | 连接池/busy_timeout/WAL + 事务 API + 结果集裸查询 + 分页(offset) + OR/IN/BETWEEN + 聚合 count | B1 B2 B3 B4 B5 B8 ✅ **已完成** |
-| **W3** | 安全硬化 | 密码哈希 + CSRF + 会话持久化 + CSPRNG session id + cookie 增强 + 登录限速/锁定 | C1–C7 |
-| **W4** | 内容站点标配 | SEO 元数据 + sitemap/robots + RSS + Markdown 渲染 + 分页导航 UI + 标签/分类 | D1–D6 |
-| **W5** | 上传与媒体 | multipart 文件上传接收 + 落盘 + 下载 + 图片库 | A5 D9 ✅ **A5 done**（D9 相册 UI 后续） |
-| **W6** | 进阶 | 全文搜索(FTS5) + 迁移机制 + 评论系统 + 草稿/发布 + WS 广播 | B6 B9 ✅；WS 广播 + access_log ✅；D7/D8 用表+where |
+| **W3** | 安全硬化 | 密码哈希 + CSRF + 会话持久化 + CSPRNG session id + cookie 增强 + 登录限速/锁定 | C1–C7 ✅ |
+| **W4** | 内容站点标配 | SEO 元数据 + sitemap/robots + RSS + Markdown 渲染 + 分页导航 UI + 标签/分类 | D1–D5 ✅；D6 约定 |
+| **W5** | 上传与媒体 | multipart 文件上传接收 + 落盘 + 下载 + 图片库 | A5 ✅；D9 相册 P3 ✅ |
+| **W6** | 进阶 | 全文搜索(FTS5) + 迁移机制 + 评论系统 + 草稿/发布 + WS 广播 | B6 B9 ✅；WS 广播 + access_log ✅；D7/D8 用表+where ✅ |
 | **W7** | 完结打磨 | Cache-Control、自定义 404/500、301 重定向、sitemap/robots、init 唯一/索引、HTTPS 反代文档 | A6 A7 A9 A10 B7 D2 ✅ |
 | **P3** | 真·网络扩展补齐 | 审计时间戳、外键、RBAC 门禁、媒体相册、下载 ETag | B10 C8 D9 + ETag/FK ✅ |
 
 ### 4.2 边界判定要点（严格遵守既有约束）
 
 1. **进标准库 `lib/net`**（纯解析、无网络 I/O、支持扩展库开发）：
-   - `markdown_parse`（GFM/Markdown → HTML，纯解析）→ D5。
-   - `xml_escape` / RSS/Atom 纯文本装配辅助（如需）→ D3。
+   - `markdown_parse`（GFM/Markdown → HTML，纯解析）→ D5 ✅。
+   - `xml_escape` / RSS/Atom 纯文本装配辅助（如需）→ D3（作者面 `route_rss` 已够用）。
    - **不得**放进标准库：JSON API、中间件、上传接收、事务、会话（均涉 I/O 或领域语义）。
-2. **进 `plugins/web`（ABI）**：A1–A10、B1–B10、C1–C8、D7–D8 的插件侧；tower-http 已提供 CORS/压缩/安全头/Trace 等现成 layer，`axum` 提供 `Json`/`Multipart`/`Nest` 等 extractor，**均不新增核心运行时依赖**（已锁定 rustc 1.81）。
-3. **进 `ext/web` 作者面（Marqdo）**：D1–D4 中纯装配/元数据/分页 UI 部分，以及所有插件能力的 GFM 表包装（中英双面）。
-4. **已具备、无需新增**：动态路由、静态文件、表单校验/回显、session 增删查、admin 门禁、WebSocket 单连接 echo、SSE 客户端、cookie/multipart 解析。
+2. **进 `plugins/web`（ABI）**：A1–A10、B1–B10、C1–C8、D7–D8 的插件侧 — **均已落地**（2026-08-28）。
+3. **进 `ext/web` 作者面（Marqdo）**：D1–D4、A5/D2/D9 等 GFM 表包装 — **均已落地**（中英 `web.mq.md` / `网页.mq.md`）。
+4. **已具备、无需新增**：动态路由、静态文件、表单校验/回显、session、admin/RBAC、WebSocket、SSE 客户端、cookie/multipart/Markdown 解析。
 
 ### 4.3 作者面示例（示 W4 落地形态，保持「代码即文档」）
 
@@ -221,44 +222,42 @@
 
 ---
 
-## 5. 结论与建议顺序
+## 5. 结论
 
-1. **W1（中间件 + JSON）已落地**：`app.configure`/`应用.装配` 用 GFM 表装配 CORS/安全头/gzip/请求体限制/JSON API，经 gold 测试（离线 smoke + 在线 live + curl 实测）与 blog 示例回归验证。
-2. **W2（数据层）已落地**：连接池/事务/分页/查询表达力/计数经 `ext_web_db_w2_smoke` gold 测试（离线）全绿——事务提交/回滚后 `count` 正确、`IN/BETWEEN/OR` 过滤、`paginate` 返回 `{rows,total}`、裸 SQL 结果集。`database is locked` 与无法分页的实际痛点已解决。
-3. **W3 安全硬化**：上线前必须完成密码哈希 + CSRF + 会话持久化，否则「完整项目」仅能演示。
-4. **W4 内容标配**：让博客示例真正「完整」——SEO/Markdown/分页/RSS 是博客系统的门面。
-5. **W5/W6**：按项目实际需要取舍（上传、搜索、评论、迁移）。
+**W0–W7 + P3 已全部落地**（路线图见 [roadmap/ext-web.md](../roadmap/ext-web.md)）。验收覆盖：
 
-**一句话：W1（中间件 + JSON）+ W2（事务 + 分页 + 查询表达力）已补齐；离「完整项目」最近的敲门砖变成「密码哈希 + CSRF」和「SEO/Markdown/RSS」两块。这两块补齐后，博客/CMS/社区类站点即可在 `ext/web` 上完整实现；其余为锦上添花。**
+- 离线/在线 gold：`tests/ext/web-*-smoke.mq.md`（含 security、drivers、upload、w6、w7、p3）
+- 完整示例：`examples/marqdo-blog/`（列表/详情/标签/RSS/后台/上传/WS）
+- 作者面：`ext/web/web.mq.md` · `ext/web/网页.mq.md`
+- AI 编写指引：`skills/marqdo/`（§ ext/web）
 
----
+**后续可选（非阻塞）**：标签页内置模板（D6）、cookie 签名、会话条数硬上限、应用层反垃圾、进程内 TLS（仍建议反代）。
 
-## 6. 附：现有能力自测对照表（对博客示例逐项）
-
-| 博客功能 | 现状 | 需要的补强 |
-|---|---|---|
-| 文章列表（首页） | ✅ 已实现 | — |
-| 文章详情（动态路由） | ✅ 已实现 | — |
-| 标签/分类 | ⚠️ 可做（db where） | 计数聚合（B8 ✅ 已有 `db.count`） |
-| 分页 | ✅ db 层（`paginate` 返回 `{rows,total}`） | 页面导航 UI（D4） |
-| 搜索 | ❌ | B9（FTS5） |
-| SEO 元数据 | ⚠️ 可手写 | D1 系统化 |
-| RSS | ❌ | D3 |
-| 评论 | ⚠️ 表单可做 | 审核/反垃圾 |
-| 后台写文章 | ✅ admin CRUD | 草稿/发布（D8） |
-| 上传配图 | ❌ | A5 + D9 |
-| 用户登录 | ⚠️ admin 门禁 | 密码哈希/CSRF/限流（W3） |
-
+**一句话：`ext/web` 已是可上线级别的 Marqdo 动态站扩展；博客/CMS/中小型 API 可在表格 + 类方法作者面上完整实现。**
 
 ---
 
-## 7. 附：正文渲染现状（决定 D5 的必要性）
+## 6. 附：博客示例能力对照（`examples/marqdo-blog`）
 
-博客详情页正文由 `plugins/web/src/render.rs` 的 `render_article_body` 渲染，但它是**「Markdown-ish」极简子集**，仅支持：
+| 博客功能 | 现状 |
+|---|---|
+| 文章列表（首页） | ✅ |
+| 文章详情（动态路由） | ✅ |
+| 标签/分类 | ✅ 路由 + `db.where` + `db.count` |
+| 分页 | ✅ `db.paginate` + `page.paginate` |
+| 搜索 | ✅ FTS5 `db.search` |
+| SEO 元数据 | ✅ `page.meta` |
+| RSS | ✅ `app.route_rss` |
+| 评论 | ✅ 表 + form + where（反垃圾属应用层） |
+| 后台写文章 | ✅ admin CRUD + RBAC |
+| 草稿/发布 | ✅ `status` 字段 + where |
+| 上传配图 | ✅ `app.upload` + `app.gallery` |
+| 用户登录 | ✅ argon2 + CSRF + SQLite 会话 + 限速 |
+| sitemap / robots | ✅ W7 |
+| 实时终端（WS） | ✅ W6 广播 |
 
-- 段落（`\n\n` 分段）
-- `# ` / `## ` 标题（统一渲染为 `<h2>`）
-- ` ``` ` 围栏代码块（转义后进 `<pre>`）
+---
 
-**不支持**：有序/无序列表、行内代码、粗体/斜体、链接、图片、表格、引用块、代码高亮。  
-**结论**：博客正文的 Markdown 渲染是真实缺口 → D5（`markdown_parse` 纯解析原语进 `lib/net` 标准库，与 `cookie_parse`/`multipart_parse` 同模式，由 `plugins/web` 渲染层或 `ext/web` 作者面调用）优先级 **P0**。
+## 7. 附：Markdown 正文渲染（D5，已落地）
+
+博客详情页正文经 `lib/net.markdown_parse`（`host_markdown_parse`）解析为 HTML，由 `plugins/web` 渲染层在页面装配时调用（W4c）。作者存储 Markdown 字符串于 DB，展示侧自动渲染 GFM 子集（标题、列表、链接、代码块等）。纯解析留在标准库；**不得**在 `ext/web` 作者面直接调 `host_*`。

@@ -12,8 +12,8 @@ marqdo view PATH          # docs browser, default port 7429
 marqdo debug PATH         # debugger UI, default port 7430
 marqdo catalog PATH -o .marqdo
 marqdo ext list
-marqdo ext add llm|agent
-marqdo ext remove llm|agent
+marqdo ext add llm|agent|web|quantum
+marqdo ext remove llm|agent|web|quantum
 ```
 
 Diagnostics look like `path:line:col: message` (1-based line/col).
@@ -54,8 +54,28 @@ Import one file; use **that** file’s function names.
 | `lib/foreign.mq.md` | `lib/外联.mq.md` | run foreign fenced blocks |
 | `ext/llm.mq.md` | `ext/大模型.mq.md` | `# llm` / `# 大模型` object + chat methods |
 | `ext/agent.mq.md` | `ext/智能体.mq.md` | agent **framework** (layout now; LLM orchestration roadmap in `ext-agent.md`) |
+| `ext/web/web.mq.md` | `ext/web/网页.mq.md` | dynamic sites — see **ext/web** section below |
 
 Open the imported `.mq.md` under `lib/` or `ext/` to see exact `##` / `#` names and parameters. Gold tests: `tests/lib/`, `tests/structure/`, `tests/ext/`.
+
+## ext/web (dynamic sites)
+
+Install: `marqdo ext add web` (`网页`). Native: `cargo build --release -p marqdo_plugin_web`.
+
+| EN import | ZH import | Core types |
+|-----------|-----------|------------|
+| `ext/web/web.mq.md` | `ext/web/网页.mq.md` | `# page` `# style` `# db` `# form` `# app` `# auth` `# cache` `# storage` |
+
+| Area | EN methods (representative) | Notes |
+|------|----------------------------|-------|
+| Page | `compose_components`, `compose_main`, `render`, `meta`, `paginate` | GFM tables; cells are literal path strings |
+| DB | `init`, `insert`, `select`, `paginate`, `get`, `update`, `delete`, `migrate`, `fts`, `search`, `count`, `事务`/`txn` | init supports `unique`/`index`/`fk`; auto `created_at`/`updated_at` |
+| App | `route`, `static`, `configure`, `listen`, `auth`, `gate`, `upload`, `download`, `gallery`, `route_rss`, `redirect`, `error_page`, `sitemap`, `robots` | W0–W7 + P3 complete |
+| Auth | `login`, `check`, `logout`, `hash_password` | argon2 + CSRF + SQLite sessions; `role` for RBAC |
+
+Drivers (Postgres / Redis / S3): `db url=postgres://…`, `cache url=memory:`, `storage url=file:…` — see `doc/design/ext-web-drivers.md`.
+
+Example project: `examples/marqdo-blog/`. Capability matrix: `doc/design/web-net-capabilities.md`.
 
 ## Formula + plot (math)
 
@@ -132,4 +152,6 @@ See `doc/design/call-arguments.md`.
 | `doc/design/ext-llm.md` | `ext/llm` |
 | `doc/design/ext-agent.md` | `ext/agent` agent **framework** (layout shipped; LLM orchestration roadmap) |
 | `doc/design/ext-cli.md` | `marqdo ext list/add/remove` |
+| `doc/design/ext-web.md` | `ext/web` dynamic sites (author API) |
+| `doc/design/web-net-capabilities.md` | ext/web capability matrix (W0–W7 + P3) |
 | `doc/design/view-debug.md` | view / debug hosts |

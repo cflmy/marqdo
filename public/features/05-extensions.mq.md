@@ -34,7 +34,7 @@ ext/llm — OpenAI-compatible chat. Design: doc/design/ext-llm.md
 
 ext/agent — agent framework + native plugin. Design: doc/design/ext-agent.md
 
-ext/web — HTTP / SQLite site helpers + native plugin. Design: doc/design/ext-web.md
+ext/web — HTTP / SQLite·Postgres site helpers + native plugin. **W0–W7 + P3 complete** (middleware, CRUD+FTS, security, SEO/RSS, upload/gallery, RBAC, sitemap). Design: doc/design/ext-web.md · capabilities: doc/design/web-net-capabilities.md · example: examples/marqdo-blog/
 
 ext/quantum — circuits, draw, noise, formula matrix custom gates. Design: doc/design/ext-quantum.md
 

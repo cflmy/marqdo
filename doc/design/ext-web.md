@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| 状态 | **Accepted · 完成**（SQLite 作者面：页面装配 / db CRUD+`where` / form / 嵌入主区 / `app.route` / 路由 `/_part` / admin UI / `app.static`；Postgres 等见 §9） |
+| 状态 | **Accepted · W0–W7 + P3 完结**（SQLite/Postgres 作者面：页面装配 / db CRUD+`where` / form / 嵌入主区 / `app.route` / 路由 `/_part` / admin UI / RBAC / 上传相册 / SEO·RSS·sitemap；Postgres 等见 §9） |
 | 日期 | 2026-08-11 |
 | 相关 | [markdown-mapping.md](markdown-mapping.md) · [module-namespace.md](module-namespace.md) · [objects.md](objects.md) · [ext-abi.md](ext-abi.md) · [ext-cli.md](ext-cli.md) · [stdlib-i18n.md](stdlib-i18n.md) |
 | 安装（目标） | `marqdo ext add web`（中英：`web` / `网页`） |

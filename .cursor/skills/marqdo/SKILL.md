@@ -4,8 +4,9 @@ description: >-
   Author and edit Marqdo programs (.mq.md): Markdown markers are executable
   syntax (functions, calls, statements, returns, control flow). Use when writing
   or modifying .mq.md files, teaching Marqdo, generating Marqdo from prose,
-  importing lib/*, running marqdo CLI, or when the user mentions Marqdo,
-  mq.md, markup-as-syntax, or code-as-documentation.
+  importing lib/* or ext/web, running marqdo CLI, building dynamic sites with
+  ext/web, or when the user mentions Marqdo, mq.md, markup-as-syntax,
+  code-as-documentation, or web/网页 extension.
 ---
 
 # Marqdo development
@@ -132,12 +133,49 @@ import clock:lib/time.mq.md
 - Instance methods stay `` > `obj`.method `` (backticks on the receiver only).
 - `lib/…` resolves via `MARQDO_LIB`, cwd `lib/`, or `lib/` next to the `marqdo` binary.
 - Design: [module-namespace.md](../../doc/design/module-namespace.md).
-- Official optional extensions (`ext/`, not stdlib): install with `marqdo ext add llm` / `add agent` (see `doc/design/ext-cli.md`). `ext/llm` — chat; `ext/agent` — document-driven agents: **step** (default writeback) / **plan** workbook ([ext-agent.md](../../doc/design/ext-agent.md), [ext-agent-plan.md](../../doc/design/ext-agent-plan.md)).
+- Official optional extensions (`ext/`, not stdlib): install with `marqdo ext add llm|agent|web|quantum` (see `doc/design/ext-cli.md`). `ext/llm` — chat; `ext/agent` — document-driven agents: **step** (default writeback) / **plan** workbook ([ext-agent.md](../../doc/design/ext-agent.md), [ext-agent-plan.md](../../doc/design/ext-agent-plan.md)); **`ext/web`** — dynamic sites (W0–W7 + P3 complete; see below).
 - Native plugins: `lib/plugin` — `## load` / `unload` / `list`. C ABI: `include/marqdo_abi.h`.
 - Prefer `table.put` / `表.改` for list/map element updates; keep `json` for parse/stringify/quote (see `doc/design/stdlib-table.md`).
 - Builtins (no import): `print`/`打印`, `input`/`输入`, `len`/`长度`, `str`/`文本`, `int`/`整数`; literals `True`/`真`, `False`/`假`, `None`/`空`; logic `and`/`且`, `or`/`或`, `not`/`非`.
 
 Stdlib map: [reference.md](reference.md).
+
+## Official extension: `ext/web` (dynamic sites)
+
+Install: `marqdo ext add web` (ZH id: `网页`). Build native plugin first: `cargo build --release -p marqdo_plugin_web`.
+
+Import **one language file** — never mix EN/ZH API names in the same `.mq.md`:
+
+- EN: `import web:ext/web/web.mq.md`
+- ZH: `导入 网页:ext/web/网页.mq.md`
+
+**Hard rules (web):**
+
+- Authors use **GFM tables + `#` classes** — no `json.parse` / `json.set` glue, no hand-built part JSON.
+- Table cells stay **literal strings**; path text like `` `posts`.`title` `` is resolved by web classes.
+- **`ext/**` never calls `host_*`** — hot path is native `plugins/web` ABI.
+- HTTPS: terminate at reverse proxy; set `cookie_secure=True` on auth (no in-process TLS).
+
+**Typical layout:**
+
+```text
+index.mq.md          # entry + home page table + listen
+pages/               # sub-pages
+components/          # reusable |属性|值|样式| tables
+styles/              # CSS modules
+db/                  # schema + open/init
+data/                # sqlite runtime (gitignore)
+```
+
+**Core objects (EN / ZH):** `# page`/`页面`, `# style`/`样式`, `# db`/`数据库`, `# form`/`表单`, `# app`/`应用`, `# auth`/`鉴权`, `# cache`/`缓存`, `# storage`/`存储`.
+
+**Typical flow:** `db.init` → `page.compose_components` + `page.compose_main` → `page.render` → `app` with `route` / `static` / `configure` / `listen`.
+
+**Shipped surface (W0–W7 + P3):** middleware + JSON API (`app.configure`); transactions, pagination, FTS search (`db.migrate`, `db.fts`, `db.search`); security (argon2, CSRF, SQLite sessions, login rate limit); SEO / RSS / Markdown (`page.meta`, `route_rss`, `lib/net.markdown_parse`); upload / download / gallery; sitemap / robots / error pages / redirects; RBAC (`app.gate`, user `role`); audit timestamps + FK in `db.init`; ETag on downloads.
+
+Design: [ext-web.md](../../doc/design/ext-web.md) · capability matrix: [web-net-capabilities.md](../../doc/design/web-net-capabilities.md) · example: [examples/marqdo-blog/](../../examples/marqdo-blog/).
+
+Web patterns: [examples.md](examples.md) §13 · API index: [reference.md](reference.md).
 
 ## AI authoring workflow
 
@@ -160,6 +198,9 @@ Stdlib map: [reference.md](reference.md).
 | Forgetting `---` after nested `##` helper | Add `---` / `***` / `****` |
 | Import `lib/text` then call bare `split` | `> text.split …` (qualified) |
 | Import `lib/text` then call `拆分` | Match file language (`text.split`, not 文本) |
+| `json.set` to build page parts | GFM tables + `page.compose_*` / `web.page` methods |
+| Mix `web.page` and `网页.页面` in one file | One import language per `.mq.md` |
+| Call `host_web_*` from `ext/web` | Use `# app` / `# db` methods; plugin ABI only |
 
 ## Checklist before finishing
 
@@ -169,4 +210,5 @@ Stdlib map: [reference.md](reference.md).
 - [ ] `# main` exists when the file is an entry program
 - [ ] Nested functions ended with `---` / `***` / `****` when needed
 - [ ] Imports and call names share the same language file
+- [ ] Web sites: tables + web classes only (no JSON glue); `data/` gitignored
 - [ ] `marqdo run` succeeds (or errors addressed)

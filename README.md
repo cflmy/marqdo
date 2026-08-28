@@ -106,7 +106,7 @@ marqdo catalog public -o .marqdo
 - **`marqdo catalog` / `sync`**：OKF 风格 YAML + 模块概念页  
 - **`marqdo version --check`**：与 GitHub 最新 release 对比  
 - 标准库：**内置于二进制**（v0.1.2+）；磁盘 `lib/` 或 `MARQDO_LIB` 可覆盖。模块含文本、文件、系统、时间、JSON、网络、数学、外联、插件、**自写回**、**子任务**  
-- **官方扩展库 `ext/`**（本版重点，**非** stdlib）：`llm` · `agent` · `web` · `quantum`。安装：`marqdo ext list` / `add …` / `remove`（见 [ext-cli.md](doc/design/ext-cli.md)；默认 `~/.marqdo/ext` 或 `MARQDO_EXT`）。原生插件先 `cargo build -p marqdo_plugin_*` 再 `ext add`。设计：[ext-llm](doc/design/ext-llm.md) · [ext-agent](doc/design/ext-agent.md) · [ext-web](doc/design/ext-web.md) · [ext-quantum](doc/design/ext-quantum.md)  
+- **官方扩展库 `ext/`**（本版重点，**非** stdlib）：`llm` · `agent` · **`web`（W0–W7 + P3 完结，见 [marqdo-blog](examples/marqdo-blog/)）** · `quantum`。安装：`marqdo ext list` / `add …` / `remove`（见 [ext-cli.md](doc/design/ext-cli.md)；默认 `~/.marqdo/ext` 或 `MARQDO_EXT`）。原生插件先 `cargo build -p marqdo_plugin_*` 再 `ext add`。设计：[ext-llm](doc/design/ext-llm.md) · [ext-agent](doc/design/ext-agent.md) · [ext-web](doc/design/ext-web.md) · [web-net-capabilities](doc/design/web-net-capabilities.md) · [ext-quantum](doc/design/ext-quantum.md)  
 - **原生插件 ABI**：[`include/marqdo_abi.h`](include/marqdo_abi.h) · [ext-abi.md](doc/design/ext-abi.md)；`plugins/{demo,agent,web,quantum}`  
 - **用户静态站**：`public/` → `view output` → CI 发布 [gh-pages](https://cflmy.github.io/marqdo/)  
 - **VS Code 扩展**：分支 **`vscode-extension`**（`main` 不跟踪源码；见 [vscode-extension-commit.md](doc/design/vscode-extension-commit.md)）；Release 附带 `.vsix`  
