@@ -82,7 +82,10 @@
 | `stderr_tail` / `stdout_tail` | 子任务捕获尾部 ~2KiB | `READ:stderr` / `READ:stdout` |
 | `value` | ≤200 字；否则 `value_preview` + `value_len` | （一般不必加深） |
 | `slots` | `{key,line,body_len}`；`error` 槽可带短预览 | `READ:slots` |
+| `skill_brief`（父 / 子） | ~1.2KiB（`skill_brief`） | `READ:skill` → ~4KiB |
 | `has_worker_step` / `solidify_on_done` | 布尔提示 | — |
+
+`## step` 同样默认注入 **预算后的** `source_brief` + `skill_brief`（非全文）；截断处带 `[truncated …; emit READ:…]` 标记，子轮最多 `max_reads` 次加深后再 CALL/作答。
 
 `quiet=True` **只表示不污染父 TTY**；file `wait` 仍返回截断后的 `stdout` / `stderr` 供父观察。
 

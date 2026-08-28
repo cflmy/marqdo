@@ -2745,6 +2745,20 @@ fn ext_agent_kb_plan_hit() {
 }
 
 #[test]
+fn ext_agent_context_budget_a3() {
+    let status = Command::new("cargo")
+        .args(["build", "-p", "marqdo_plugin_agent"])
+        .current_dir(env!("CARGO_MANIFEST_DIR"))
+        .status()
+        .expect("build agent plugin");
+    assert!(status.success(), "failed to build marqdo_plugin_agent");
+    assert_out(
+        "tests/ext/agent-context-budget-a3.mq.md",
+        "source-trunc\ndeep-still-trunc\nskill-ok\nread-skill-parse\nread-skill-ok\nctx-trunc\nctx-protocol",
+    );
+}
+
+#[test]
 fn ext_agent_plan_observe() {
     assert_out(
         "tests/ext/agent-plan-observe.mq.md",

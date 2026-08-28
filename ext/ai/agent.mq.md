@@ -14,8 +14,11 @@ import plugin:lib/plugin.mq.md
 ## build_step_context
     + `agent`
     + `task`
+    + `source_depth`=default
+    + `skill_depth`=default
 
-Assemble a readable prompt: standing, task, tools, call site, source, skill, and the act protocol (human-visible).
+Assemble a readable prompt: standing, task, tools, call site, **budgeted** source + skill, and the act protocol.
+Default budgets keep long runbooks from exploding the window; emit `READ:source` / `READ:skill` (Chinese `读取：`) to deepen, then answer or `CALL:`.
 
 *standing = > json.get value=`agent` key="standing"*
 1. `standing`
@@ -25,13 +28,13 @@ Assemble a readable prompt: standing, task, tools, call site, source, skill, and
 
 *tools = > json.get value=`agent` key="tools"*
 *tools_s = > agent_format_tools tools=`tools`*
-*src = > agent_module_source*
+*src = > source_brief depth=`source_depth`*
 *site = > agent_call_site*
 *site_s = > json.stringify value=`site`*
-*skill = > agent_marqdo_skill*
+*skill = > skill_brief depth=`skill_depth`*
 *task_s = > json.stringify value=`task`*
 
-*esc = > json.parse text={"a":"\n\n--- standing ---\n","b":"\n\n--- task ---\n","c":"\n\n--- tools ---\n","d":"\n\n--- call site ---\n","e":"\n\n--- source (.mq.md) ---\n","f":"\n\n--- marqdo skill ---\n","g":"\n\n--- how to act ---\nCall ONLY names listed under --- tools --- (whitelist). If that section is empty or says none, do NOT emit CALL / 调用 — reply with the final answer only.\nNever CALL internal framework helpers (build_step_context, plan, inspect_workbook, etc.).\nWhen calling an allowed tool, reply with exactly one line: CALL:<name>\n(Chinese ok: 调用：<name>)\nOtherwise reply with the final answer only.\nTools run via Marqdo subtask (spawn fn / wait).\n"}*
+*esc = > json.parse text={"a":"\n\n--- standing ---\n","b":"\n\n--- task ---\n","c":"\n\n--- tools ---\n","d":"\n\n--- call site ---\n","e":"\n\n--- source (.mq.md) ---\n","f":"\n\n--- marqdo skill ---\n","g":"\n\n--- how to act ---\nCall ONLY names listed under --- tools --- (whitelist). If that section is empty or says none, do NOT emit CALL / 调用 — reply with the final answer only.\nNever CALL internal framework helpers (build_step_context, plan, inspect_workbook, etc.).\nContext is budgeted: if you see a [truncated …] marker, you may first emit exactly one line READ:source or READ:skill (Chinese: 读取：source|skill) to deepen, then you will be re-prompted.\nWhen calling an allowed tool, reply with exactly one line: CALL:<name>\n(Chinese ok: 调用：<name>)\nOtherwise reply with the final answer only.\nTools run via Marqdo subtask (spawn fn / wait).\n"}*
 *a = > json.get value=`esc` key="a"*
 *b = > json.get value=`esc` key="b"*
 *c = > json.get value=`esc` key="c"*
@@ -490,16 +493,58 @@ Write a scratch tool workbook under `.marqdo/agent-runs/tools/<name>.mq.md`.
 
 ## skill_brief
     + `max_chars`=1200
+    + `depth`=default
 
+Budgeted marqdo skill text for prompts. `depth=deep` raises the char budget.
+
+1. `depth` == deep
+  *budget = 4000*
+2. *
+  *budget = max_chars*
 *skill = > agent_marqdo_skill*
-**> text_head_lines text=`skill` max_lines=40 max_chars=`max_chars`**
+*full = > len value=`skill`*
+*ex = > text_head_lines text=`skill` max_lines=80 max_chars=`budget`*
+*used = > len value=`ex`*
+1. `used` < `full`
+  *esc = > json.parse text={"a":"\n…[truncated skill_len=","b":" budget_chars=","c":"; emit READ:skill to deepen]"}*
+  *a = > json.get value=`esc` key="a"*
+  *b = > json.get value=`esc` key="b"*
+  *c = > json.get value=`esc` key="c"*
+  **ex + a + full + b + budget + c**
+2. *
+  **ex**
+
+---
+
+## source_brief
+    + `depth`=default
+
+Budgeted current-module `.mq.md` source for `step` prompts. Default ~80 lines / 4KiB; `depth=deep` ~200 / 12KiB.
+
+*src = > agent_module_source*
+*full = > len value=`src`*
+1. `depth` == deep
+  *ex = > workbook_source_excerpt source=`src` max_lines=200 max_chars=12000*
+  *budget = 12000*
+2. *
+  *ex = > workbook_source_excerpt source=`src` max_lines=80 max_chars=4000*
+  *budget = 4000*
+*used = > len value=`ex`*
+1. `used` < `full`
+  *esc = > json.parse text={"a":"\n…[truncated source_len=","b":" budget_chars=","c":"; emit READ:source to deepen]"}*
+  *a = > json.get value=`esc` key="a"*
+  *b = > json.get value=`esc` key="b"*
+  *c = > json.get value=`esc` key="c"*
+  **ex + a + full + b + budget + c**
+2. *
+  **ex**
 
 ---
 
 ## extract_plan_read
     + `reply`
 
-Parse READ:source|stderr|stdout|slots (Chinese: 读取：…).
+Parse READ:source|stderr|stdout|slots|skill (Chinese: 读取：…).
 
 *esc = > json.parse text={"nl":"\n","fw":"："}*
 *nl = > json.get value=`esc` key="nl"*
@@ -683,7 +728,11 @@ Parent Plan-and-Move tools (helpers + whitelist `CALL:lib…`).
   *slots = > json.get value=`obs` key="slots"*
   *obs = > json.set map=`obs` key="slots_detail" value=`slots`*
   *obs = > json.set map=`obs` key="read_slots" value=True*
-5. *
+5. `kind` == skill
+  *brief = > skill_brief depth="deep"*
+  *obs = > json.set map=`obs` key="skill_brief" value=`brief`*
+  *obs = > json.set map=`obs` key="read_skill" value=True*
+6. *
   *_ = 1*
 **obs**
 
@@ -1056,11 +1105,15 @@ Parent Plan-and-Move prompt. Short protocol only — no long monologues.
 2. *
   *up = None*
 
-*skill = > skill_brief*
+*skill_from_obs = > json.get value=`observation` key="skill_brief"*
+1. `skill_from_obs`
+  *skill = skill_from_obs*
+2. *
+  *skill = > skill_brief*
 *compact = > compact_plan_observation observation=`observation`*
 *obs_s = > json.stringify value=`compact`*
 *goal_s = > json.stringify value=`goal`*
-*esc = > json.parse text={"a":"\n\n--- standing ---\n","b":"\n\n--- goal ---\n","c":"\n\n--- observation ---\n","d":"\n\n--- skill brief ---\n","tools":"\n\n--- parent tools ---\nCALL:workbook_read | workbook_excerpt | lib_catalog | scratch_tool_write\nCALL:lib.fs.read_text|exists|list_dir | lib.json.parse|stringify | lib.sys.cwd (+ ARGS:{json})\nREAD:source | stderr | stdout | slots\nCreate tools: CONTINUE PATCH add ##, or CALL:scratch_tool_write with NAME line and fenced body.\n","e_rev":"\n\n--- how to act ---\nPlan-and-Move parent. Reply with ONE protocol only (no long reasoning). Exactly one DECISION line.\n1) exit_code=0 and has_value → DECISION: DONE + one-line SUMMARY. solidify_on_done. Do not CONTINUE just because has_worker_step.\n2) Need more evidence → READ:kind or CALL:tool (then you will be re-prompted).\n3) Failure / wrong value → DECISION: CONTINUE + short PATCH (<20 lines). Never paste user prose into REPLACE.\n4) Do NOT CONTINUE only to rewrite frontmatter imports; skeleton already uses import llm:/agent:/json:….\nPATCH must use triple-angle blocks only:\n<<<\nFIND\n<exact old>\n===\nREPLACE\n<new>\n>>>\nDo not use \u0060\u0060\u0060find, \u0060\u0060\u0060replace, or *** Begin Patch ***.\nProtocols:\nCALL:name\nREAD:kind\nDECISION: DONE\nSUMMARY: one line\nDECISION: CONTINUE\n","e_dec":"\n\n--- how to act ---\nPRE-RUN decompose. Reply with ONE protocol only (no long reasoning). Exactly one DECISION line.\n1) Skeleton OK → DECISION: RUN (preferred). Do not rewrite imports; they are already import llm:/agent:/….\n2) Need evidence → READ:source or CALL:workbook_read / lib_catalog.\n3) Reshape body/logic only → DECISION: CONTINUE + short PATCH (<20 lines).\n4) Fixed answer without LLM → PATCH to return, then RUN or DONE.\nPATCH must use <<< FIND === REPLACE >>> only (no \u0060\u0060\u0060find / Begin Patch).\nProtocols:\nCALL:name\nREAD:kind\nDECISION: RUN\nDECISION: DONE\nSUMMARY: one line\nDECISION: CONTINUE\n","f":"\n\n--- explore ---\n"}*
+*esc = > json.parse text={"a":"\n\n--- standing ---\n","b":"\n\n--- goal ---\n","c":"\n\n--- observation ---\n","d":"\n\n--- skill brief ---\n","tools":"\n\n--- parent tools ---\nCALL:workbook_read | workbook_excerpt | lib_catalog | scratch_tool_write\nCALL:lib.fs.read_text|exists|list_dir | lib.json.parse|stringify | lib.sys.cwd (+ ARGS:{json})\nREAD:source | stderr | stdout | slots | skill\nCreate tools: CONTINUE PATCH add ##, or CALL:scratch_tool_write with NAME line and fenced body.\n","e_rev":"\n\n--- how to act ---\nPlan-and-Move parent. Reply with ONE protocol only (no long reasoning). Exactly one DECISION line.\n1) exit_code=0 and has_value → DECISION: DONE + one-line SUMMARY. solidify_on_done. Do not CONTINUE just because has_worker_step.\n2) Need more evidence → READ:kind or CALL:tool (then you will be re-prompted).\n3) Failure / wrong value → DECISION: CONTINUE + short PATCH (<20 lines). Never paste user prose into REPLACE.\n4) Do NOT CONTINUE only to rewrite frontmatter imports; skeleton already uses import llm:/agent:/json:….\nPATCH must use triple-angle blocks only:\n<<<\nFIND\n<exact old>\n===\nREPLACE\n<new>\n>>>\nDo not use \u0060\u0060\u0060find, \u0060\u0060\u0060replace, or *** Begin Patch ***.\nProtocols:\nCALL:name\nREAD:kind\nDECISION: DONE\nSUMMARY: one line\nDECISION: CONTINUE\n","e_dec":"\n\n--- how to act ---\nPRE-RUN decompose. Reply with ONE protocol only (no long reasoning). Exactly one DECISION line.\n1) Skeleton OK → DECISION: RUN (preferred). Do not rewrite imports; they are already import llm:/agent:/….\n2) Need evidence → READ:source or READ:skill or CALL:workbook_read / lib_catalog.\n3) Reshape body/logic only → DECISION: CONTINUE + short PATCH (<20 lines).\n4) Fixed answer without LLM → PATCH to return, then RUN or DONE.\nPATCH must use <<< FIND === REPLACE >>> only (no \u0060\u0060\u0060find / Begin Patch).\nProtocols:\nCALL:name\nREAD:kind\nDECISION: RUN\nDECISION: DONE\nSUMMARY: one line\nDECISION: CONTINUE\n","f":"\n\n--- explore ---\n"}*
 *a = > json.get value=`esc` key="a"*
 *b = > json.get value=`esc` key="b"*
 *c = > json.get value=`esc` key="c"*
@@ -1356,12 +1409,12 @@ Clear the plugin session bag for this agent id.
     + `writeback`=True
     + `stream`=False
     + `echo`=False
+    + `max_reads`=2
 
-One atomic turn: context → LLM → optional tool via subtask. Returns a **map** (`status`, `task`, `decision`, and on success `result` plus optional `tool` / `tool_result`; on failure `error`). By default (`writeback=True`) persists that map under named slots `ok` / `error` at the call site; pass `writeback=False` to skip.
+One atomic turn: budgeted context → LLM → optional `READ:` deepen → optional tool via subtask. Returns a **map** (`status`, `task`, `decision`, and on success `result` plus optional `tool` / `tool_result`; on failure `error`). By default (`writeback=True`) persists that map under named slots `ok` / `error` at the call site; pass `writeback=False` to skip.
 
-With `stream=True`, the model call uses SSE; `echo=True` prints delta text to stdout as it arrives. The returned map is unchanged (final `result` string).
+With `stream=True`, the model call uses SSE; `echo=True` prints delta text to stdout as it arrives. The returned map is unchanged (final `result` string). Context source/skill start at default budget; up to `max_reads` of `READ:source` / `READ:skill` deepen before CALL/answer.
 
-*ctx = > build_step_context agent=`self` task=`task`*
 *id = > json.get value=`self` key="id"*
 *model = > json.get value=`self` key="model"*
 *tools = > json.get value=`self` key="tools"*
@@ -1370,11 +1423,33 @@ With `stream=True`, the model call uses SSE; `echo=True` prints delta text to st
 *user_turn = > json.set map=`user_turn` key="content" value=`task`*
 > agent_history_append id=`id` item=`user_turn`
 
-1. `stream`
-  *evs = > model.complete prompt=`ctx` stream=True echo=`echo`*
-  *reply = > llm.stream_result events=`evs`*
-2. *
-  *reply = > model.complete prompt=`ctx`*
+*source_depth = "default"*
+*skill_depth = "default"*
+*reads_left = max_reads*
+*reply = None*
+*decision = None*
+
+- `reads_left` > 0
+  1. `decision`
+    *reads_left = 0*
+  2. *
+    *ctx = > build_step_context agent=`self` task=`task` source_depth=`source_depth` skill_depth=`skill_depth`*
+    1. `stream`
+      *evs = > model.complete prompt=`ctx` stream=True echo=`echo`*
+      *reply = > llm.stream_result events=`evs`*
+    2. *
+      *reply = > model.complete prompt=`ctx`*
+    *reply = > trim value=`reply`*
+    *rk = > extract_plan_read reply=`reply`*
+    1. `rk` == source
+      *source_depth = "deep"*
+      *reads_left = reads_left - 1*
+    2. `rk` == skill
+      *skill_depth = "deep"*
+      *reads_left = reads_left - 1*
+    3. *
+      *decision = reply*
+      *reads_left = 0*
 
 *reply = > trim value=`reply`*
 *decision = reply*
