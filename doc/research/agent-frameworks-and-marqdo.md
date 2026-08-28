@@ -6,7 +6,7 @@
 | 日期 | 2026-08-28 |
 | 范围 | 2025–2026 开源/厂商智能体框架形态；对照 Marqdo `ext/ai/agent` 设计 |
 | 相关设计 | [ext-agent.md](../design/ext-agent.md) · [ext-agent-plan.md](../design/ext-agent-plan.md) · [ext-agent-parent.md](../design/ext-agent-parent.md) · [okf.md](../design/okf.md) · [stdlib-writeback.md](../design/stdlib-writeback.md) · [stdlib-subtask.md](../design/stdlib-subtask.md) |
-| 姊妹调研 | [okf-and-marqdo.md](okf-and-marqdo.md) |
+| 姊妹调研 | [okf-and-marqdo.md](okf-and-marqdo.md) · **A0–A4 后缺口** [agent-framework-gaps-after-a4.md](agent-framework-gaps-after-a4.md) |
 | 外部对照（抽样） | [Langfuse 框架对比（2026-07）](https://langfuse.com/blog/2025-03-19-ai-agent-comparison) · [LangGraph persistence](https://docs.langchain.com/oss/python/langgraph/persistence) · [Microsoft Agent Framework / AutoGen 维护模式](https://github.com/microsoft/autogen) · CrewAI / OpenAI Agents SDK / Claude Agent SDK / Google ADK / LlamaIndex 公开文档 |
 
 ---
@@ -520,7 +520,8 @@ Marqdo 用「代码即文档、文档即知识库」把 Agent 开发收束到 **
 - [ext-agent-parent.md](../design/ext-agent-parent.md) — 父 Plan-and-Move  
 - [okf.md](../design/okf.md) · [okf-and-marqdo.md](okf-and-marqdo.md)  
 - [stdlib-writeback.md](../design/stdlib-writeback.md) · [stdlib-subtask.md](../design/stdlib-subtask.md)  
-- [roadmap/agent-streaming.md](../roadmap/agent-streaming.md) · [roadmap/okf-near-match.md](../roadmap/okf-near-match.md)
+- [roadmap/agent-streaming.md](../roadmap/agent-streaming.md) · [roadmap/okf-near-match.md](../roadmap/okf-near-match.md) · [roadmap/ext-agent-optimize.md](../roadmap/ext-agent-optimize.md)  
+- [agent-framework-gaps-after-a4.md](agent-framework-gaps-after-a4.md) — A0–A4 之后还差什么  
 
 ### 外部（抽样，2025–2026）
 

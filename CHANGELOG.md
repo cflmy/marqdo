@@ -3,6 +3,7 @@
 ## Unreleased
 
 ### Added
+- **调研：`ext/agent` A0–A4 之后缺口** ([agent-framework-gaps-after-a4.md](doc/research/agent-framework-gaps-after-a4.md))：产品化示例、评测 harness、真 MCP、plan resume/HITL、飞轮指标与建议分期 B0–B5；挂到 [ext-agent-optimize.md](doc/roadmap/ext-agent-optimize.md) 与 [doc/README.md](doc/README.md)。
 - **`ext/agent` A4（RAG/MCP 证据工具）**: `corpus_search` 本地语料关键词检索；`mcp_list_tools` / `mcp_call` 读 JSON fixture；返回 `authority=workbook`。金样 `agent-tools-rag-a4`。
 - **`ext/agent` A3（上下文预算）**: `source_brief` / 加深版 `skill_brief`；`build_step_context` 默认截断并提示 `READ:source|skill`；`step` 支持最多 `max_reads` 次加深；父 `READ:skill`。金样 `agent-context-budget-a3`。
 - **`ext/agent` A2（过程可见）**: `plan` 过程事件默认写入返回 map 的 `events`（SSE 仍仅 `stream=True`）；OKF 命中记 `REUSE` decision；view plan 卡渲染过程时间线。对齐 [agent-streaming.md](doc/roadmap/agent-streaming.md)。

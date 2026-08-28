@@ -60,6 +60,9 @@
 | [roadmap/ext-web.md](roadmap/ext-web.md) | **实现路线：`ext/web`**（W0–W4；设计见 [ext-web.md](../design/ext-web.md)） |
 | [roadmap/ext-quantum.md](roadmap/ext-quantum.md) | **规划：`ext/quantum` 量子模拟**（基础门·电路·ABI·`ext add`） |
 | [research/okf-and-marqdo.md](research/okf-and-marqdo.md) | OKF 调研 |
+| [research/agent-frameworks-and-marqdo.md](research/agent-frameworks-and-marqdo.md) | 主流智能体框架 vs Marqdo 优势 |
+| [research/agent-framework-gaps-after-a4.md](research/agent-framework-gaps-after-a4.md) | **`ext/agent` A0–A4 之后缺口盘点**（产品化 / 评测 / MCP / resume） |
+| [roadmap/ext-agent-optimize.md](roadmap/ext-agent-optimize.md) | **`ext/agent` 深入优化 A0–A4**（已完成） |
 
 金样例与集成测试：[`tests/`](../tests/)。面向访客的可执行文档：[`public/`](../public/)。Spike 存档：[`spike/`](../spike/)。
 
