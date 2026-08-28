@@ -56,6 +56,6 @@ Exact FIND→REPLACE once in a UTF-8 text file. `find` must match exactly once.
 
 Apply plan-style triple-angle FIND/REPLACE blocks from `text` to `path`.
 Also accepts fenced find/replace pairs and minimal Begin Patch hunks.
-When `soft=True`, FIND failures return `0` instead of aborting the run.
+When `soft=True`, **only** “FIND not found” returns `0` (run continues). Empty FIND, multi-match, parse errors, and whole-file FIND still abort — whole-file rewrite is forbidden.
 
 **> host_apply_patch_blocks path=`path` text=`text` soft=`soft`**

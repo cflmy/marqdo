@@ -174,9 +174,28 @@ pub fn apply_patch_blocks(
     };
     match apply_patch_blocks_inner(ctx, path, text) {
         Ok(n) => Ok(n),
-        Err(_e) if soft => Ok(Value::Int(0)),
+        // soft only swallows unique-FIND miss — never parse / multi-match / whole-file.
+        Err(e) if soft && e.contains("FIND not found") => Ok(Value::Int(0)),
         Err(e) => Err(e),
     }
+}
+
+/// Reject FIND that rewrites a non-trivial file wholesale (exact or ≥90% span).
+/// Tiny files may be replaced entirely (e.g. two-line import rewrites).
+fn find_spans_whole_file(src: &str, find: &str) -> bool {
+    const MIN_BYTES: usize = 800;
+    let st = src.trim();
+    let ft = find.trim();
+    if ft.is_empty() || src.len() < MIN_BYTES {
+        return false;
+    }
+    if st == ft {
+        return true;
+    }
+    if !src.contains(find) {
+        return false;
+    }
+    find.len().saturating_mul(10) >= src.len().saturating_mul(9)
 }
 
 fn apply_patch_blocks_inner(
@@ -194,6 +213,12 @@ fn apply_patch_blocks_inner(
     for (find, replace) in blocks {
         if find.is_empty() {
             return Err("apply_patch_blocks: empty FIND".into());
+        }
+        if find_spans_whole_file(&src, &find) {
+            return Err(
+                "apply_patch_blocks: FIND spans entire file (whole-file rewrite forbidden)"
+                    .into(),
+            );
         }
         let count = src.matches(&find).count();
         if count == 0 {
@@ -525,6 +550,64 @@ PATCH:
         .unwrap();
         assert_eq!(n, Value::Int(0));
         assert_eq!(fs::read_to_string(&path).unwrap(), "hello");
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn apply_patch_blocks_rejects_whole_file_find() {
+        let dir = temp_workspace("whole");
+        let path = dir.join("a.md");
+        let body = format!(
+            "---\ntitle: workbook\n---\n\n# main\n\n{}",
+            "line padding for size threshold\n".repeat(40)
+        );
+        assert!(body.len() >= 800, "fixture too small: {}", body.len());
+        fs::write(&path, &body).unwrap();
+        let ctx = write_ctx(&dir);
+        let reply = format!(
+            "<<<\nFIND\n{body}===\nREPLACE\n# main\n\n> print text=bye\n>>>\n"
+        );
+        let err = apply_patch_blocks(
+            &ctx,
+            &Value::Text("a.md".into()),
+            &Value::Text(reply),
+            None,
+        )
+        .unwrap_err();
+        assert!(
+            err.contains("whole-file rewrite forbidden"),
+            "unexpected err={err}"
+        );
+        assert_eq!(fs::read_to_string(&path).unwrap(), body);
+        let soft_err = apply_patch_blocks(
+            &ctx,
+            &Value::Text("a.md".into()),
+            &Value::Text(format!(
+                "<<<\nFIND\n{body}===\nREPLACE\nx\n>>>\n"
+            )),
+            Some(&Value::Bool(true)),
+        )
+        .unwrap_err();
+        assert!(soft_err.contains("whole-file rewrite forbidden"));
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn apply_patch_blocks_soft_keeps_multi_match_hard() {
+        let dir = temp_workspace("multisoft");
+        let path = dir.join("a.md");
+        fs::write(&path, "xx xx").unwrap();
+        let ctx = write_ctx(&dir);
+        let reply = "<<<\nFIND\nxx\n===\nREPLACE\nYY\n>>>\n";
+        let err = apply_patch_blocks(
+            &ctx,
+            &Value::Text("a.md".into()),
+            &Value::Text(reply.into()),
+            Some(&Value::Bool(true)),
+        )
+        .unwrap_err();
+        assert!(err.contains("matched 2 times"), "unexpected err={err}");
+        assert_eq!(fs::read_to_string(&path).unwrap(), "xx xx");
         let _ = fs::remove_dir_all(&dir);
     }
 }

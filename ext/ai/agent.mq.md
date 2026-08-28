@@ -1717,7 +1717,14 @@ Reuse lookup: exact → alias → canonicalize → optional local n-gram `near` 
 
 1. `dec` == CONTINUE
   *n = > fs.apply_patch_blocks path=`path` text=`last_reply` soft=True*
-  *_ = 1*
+  1. `n`
+    *_ = 1*
+  2. *
+    *done = 1*
+    *status = "error"*
+    *err = "no patches applied"*
+    *summary = > extract_plan_summary reply=`last_reply`*
+    *skip_loop = 1*
 2. `dec` == RUN
   *_ = 1*
 3. `dec` == DONE

@@ -1346,4 +1346,54 @@ mod tests {
         let s = near_score(a, b);
         assert!(s < 0.78, "expected below default threshold, got {s}");
     }
+
+    #[test]
+    fn workbook_solidify_rewrites_step_workbook() {
+        let dir = std::env::temp_dir().join(format!(
+            "marqdo-solidify-{}",
+            std::process::id()
+        ));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("wb.mq.md");
+        fs::write(
+            &path,
+            "---\ntitle: t\n---\n\n# main\n\n*`r` = > `worker`.step task=hi *\n**`r`**\n",
+        )
+        .unwrap();
+        let path_s = path.to_string_lossy().into_owned();
+        let args = json!({
+            "path": path_s,
+            "observation": { "value": "pong" }
+        });
+        let out = workbook_solidify(&args).unwrap();
+        assert_eq!(out.get("solidified").and_then(|v| v.as_bool()), Some(true));
+        let src = fs::read_to_string(&path).unwrap();
+        assert!(!needs_step_solidify(&src), "still has step: {src}");
+        assert!(src.contains("pong"), "{src}");
+        let again = workbook_solidify(&args).unwrap();
+        assert_eq!(
+            again.get("reason").and_then(|v| v.as_str()),
+            Some("already_solid")
+        );
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn workbook_solidify_no_result() {
+        let dir = std::env::temp_dir().join(format!(
+            "marqdo-solidify-nr-{}",
+            std::process::id()
+        ));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("wb.mq.md");
+        fs::write(&path, "*`r` = > `worker`.step task=hi *\n").unwrap();
+        let path_s = path.to_string_lossy().into_owned();
+        let args = json!({ "path": path_s });
+        let out = workbook_solidify(&args).unwrap();
+        assert_eq!(out.get("solidified").and_then(|v| v.as_bool()), Some(false));
+        assert_eq!(out.get("reason").and_then(|v| v.as_str()), Some("no_result"));
+        let _ = fs::remove_dir_all(&dir);
+    }
 }

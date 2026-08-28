@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| 状态 | **规划中**（以调研结论为输入） |
+| 状态 | **进行中 · A0 开工**（整文件补丁护栏 + soft 收紧 + solidify 单测） |
 | 日期 | 2026-08-28 |
 | 调研 | [agent-frameworks-and-marqdo.md](../research/agent-frameworks-and-marqdo.md) |
 | 设计 | [ext-agent.md](../design/ext-agent.md) · [ext-agent-plan.md](../design/ext-agent-plan.md) · [ext-agent-parent.md](../design/ext-agent-parent.md) · [okf.md](../design/okf.md) |
@@ -24,7 +24,7 @@
 
 | 波次 | 主题 | 验收线索 |
 |------|------|----------|
-| **A0** | 工作簿补丁 / 固化可靠性 | 金样：多轮 CONTINUE 后源码可跑；禁止整文件重写 |
+| **A0** | 工作簿补丁 / 固化可靠性 | **in progress** — `apply_patch_blocks` 禁整文件 FIND；`soft` 仅吞「FIND not found」；decompose CONTINUE 检查 `n`；`workbook_solidify` 单测 |
 | **A1** | OKF 复用飞轮（lookup / near / soft_match UX） | 二次同类 `plan` 走快路径；策展可读 |
 | **A2** | 过程可见（stream + view 过程卡） | 对齐 [agent-streaming.md](agent-streaming.md)；真相仍可写回 |
 | **A3** | 上下文预算（源码/Skill 渐进披露） | 长 runbook 不爆窗，仍保持「源码即提示」 |
