@@ -133,10 +133,10 @@
 | B3 | **结果集型裸查询**（exec 返回 rows） | count / join / group / 子查询完全不可用 | `plugins/web` | P1 ✅ |
 | B4 | **分页**（db 层 `limit`+`offset`；页面层上一页/下一页） | 列表页只能限量 | `plugins/web` + `ext/web` | P1 ✅（db 层；页面 UI 属 D4） |
 | B5 | **查询表达力**：OR / IN / BETWEEN / IS NULL / LIKE 转义 / 括号组合 | where 只能 AND | `plugins/web` | P1 ✅ |
-| B6 | **迁移机制**（schema 版本表 + 迁移脚本） | 无法演进表结构 | `plugins/web` + `ext/web` | P2 |
+| B6 | **迁移机制**（schema 版本表 + 迁移脚本） | ✅ **已实现（W6）**：`db.migrate` + `_marqdo_migrations`（SQLite） | `plugins/web` + `ext/web` | P2 ✅ |
 | B7 | **索引 / 唯一 / 外键声明**（init 表增强） | 完整性、查询性能 | `plugins/web` | P2 |
 | B8 | **聚合辅助**：count / group 便捷 API | 统计面板、标签计数 | `plugins/web` | P2 ✅（`db.count`） |
-| B9 | **全文搜索**（SQLite FTS5） | 站内搜索刚需 | `plugins/web`（FTS5 现成） | P2 |
+| B9 | **全文搜索**（SQLite FTS5） | ✅ **已实现（W6）**：`db.fts` + `db.search`（bm25） | `plugins/web`（FTS5 现成） | P2 ✅ |
 | B10 | **时间戳 / 审计字段自动维护** | 博客发布日期、更新时间 | `plugins/web` | P3 |
 
 ### 3.3 类 C：安全硬化（能上线的前提）
@@ -180,7 +180,7 @@
 | **W3** | 安全硬化 | 密码哈希 + CSRF + 会话持久化 + CSPRNG session id + cookie 增强 + 登录限速/锁定 | C1–C7 |
 | **W4** | 内容站点标配 | SEO 元数据 + sitemap/robots + RSS + Markdown 渲染 + 分页导航 UI + 标签/分类 | D1–D6 |
 | **W5** | 上传与媒体 | multipart 文件上传接收 + 落盘 + 下载 + 图片库 | A5 D9 ✅ **A5 done**（D9 相册 UI 后续） |
-| **W6** | 进阶 | 全文搜索(FTS5) + 迁移机制 + 评论系统 + 草稿/发布 + WS 广播 | B6 B9 D7 D8 + WS 增强 |
+| **W6** | 进阶 | 全文搜索(FTS5) + 迁移机制 + 评论系统 + 草稿/发布 + WS 广播 | B6 B9 ✅；D7/D8 用表+where；WS 广播后续 |
 
 ### 4.2 边界判定要点（严格遵守既有约束）
 

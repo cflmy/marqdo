@@ -242,6 +242,35 @@ Count rows matching a `where` filter (same syntax as `select`). Returns a number
 *r = > web_db_count url=`url` table=`table` where=`where` txn=`txn`*
 **r[^count]**
 
+## migrate
+    + `steps`
+
+Apply versioned SQL migrations. `steps` is a `|version|sql|` / `|版本|SQL|` table. Applied versions are recorded in `_marqdo_migrations`. Re-running is a no-op for already-applied versions. SQLite only.
+
+*url = self[^url]*
+**> web_db_migrate url=`url` steps=`steps`**
+
+## fts
+    + `table`
+    + `columns`
+    + `name`=None
+
+Create an FTS5 index on `table` for the listed content columns (CSV string or list). Default FTS name is `{table}_fts`. Keeps the index in sync via triggers. Requires integer `id` PK. SQLite only.
+
+*url = self[^url]*
+**> web_db_fts_create url=`url` table=`table` columns=`columns` name=`name`**
+
+## search
+    + `table`
+    + `q`
+    + `limit`=20
+    + `name`=None
+
+Full-text search (`MATCH`) against the FTS5 index from `fts`. Returns `{ rows, count }` with a `rank` column (bm25). SQLite only.
+
+*url = self[^url]*
+**> web_db_search url=`url` table=`table` q=`q` limit=`limit` name=`name`**
+
 ## 事务
 
 Begin a transaction: borrows the pooled connection exclusively and returns a

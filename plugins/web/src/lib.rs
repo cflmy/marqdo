@@ -727,6 +727,39 @@ web_ffi!(web_db_count, |args: &Value| {
     db::count(&url, &table, where_v, txn)
 });
 
+web_ffi!(web_db_migrate, |args: &Value| {
+    let url = db_url_of(args)?;
+    let steps = args
+        .get("steps")
+        .ok_or_else(|| "missing `steps`".to_string())?;
+    db::migrate(&url, steps)
+});
+
+web_ffi!(web_db_fts_create, |args: &Value| {
+    let url = db_url_of(args)?;
+    let table = arg_str(args, "table")?.to_string();
+    let columns = args
+        .get("columns")
+        .ok_or_else(|| "missing `columns`".to_string())?;
+    let name = arg_str_opt(args, "name");
+    db::fts_create(&url, &table, columns, name)
+});
+
+web_ffi!(web_db_search, |args: &Value| {
+    let url = db_url_of(args)?;
+    let table = arg_str(args, "table")?.to_string();
+    let q = arg_str(args, "q")
+        .or_else(|_| arg_str(args, "query"))
+        .or_else(|_| arg_str(args, "关键词"))?
+        .to_string();
+    let limit = args
+        .get("limit")
+        .and_then(|v| v.as_i64().or_else(|| v.as_u64().map(|u| u as i64)))
+        .unwrap_or(20);
+    let name = arg_str_opt(args, "name");
+    db::search(&url, &table, &q, limit, name)
+});
+
 web_ffi!(web_db_begin, |args: &Value| {
     let url = db_url_of(args)?;
     db::begin(&url)
@@ -1574,6 +1607,17 @@ pub unsafe extern "C" fn marqdo_plugin_init(host: *const MarqdoHostApi) -> c_int
             "web_db_count",
             "url,table,where,txn",
             web_db_count as PluginFn,
+        ),
+        ("web_db_migrate", "url,steps", web_db_migrate as PluginFn),
+        (
+            "web_db_fts_create",
+            "url,table,columns,name",
+            web_db_fts_create as PluginFn,
+        ),
+        (
+            "web_db_search",
+            "url,table,q,limit,name",
+            web_db_search as PluginFn,
         ),
         ("web_db_begin", "url", web_db_begin as PluginFn),
         ("web_db_commit", "txn", web_db_commit as PluginFn),

@@ -1938,6 +1938,32 @@ fn ext_web_upload_live() {
 }
 
 #[test]
+fn ext_web_db_w6_smoke() {
+    // W6: versioned migrate, FTS5 search, published filter + comments table.
+    let status = Command::new("cargo")
+        .args(["build", "-p", "marqdo_plugin_web"])
+        .current_dir(env!("CARGO_MANIFEST_DIR"))
+        .status()
+        .expect("build web plugin");
+    assert!(status.success(), "failed to build marqdo_plugin_web");
+
+    let db = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/ext/web-fixtures/data/w6-smoke.db");
+    for suffix in ["", "-wal", "-shm"] {
+        let _ = std::fs::remove_file(format!("{}{}", db.display(), suffix));
+    }
+    assert_out(
+        "tests/ext/web-db-w6-smoke.mq.md",
+        "migrate-ok
+migrate-idempotent-ok
+published-filter-ok
+comments-ok
+fts-ok
+fts-row-ok",
+    );
+}
+
+#[test]
 fn ext_web_db_w2_smoke() {
     // W2 data layer: transactions, connection pooling, pagination, query
     // expressiveness (IN/BETWEEN/OR), and row counting.

@@ -832,3 +832,284 @@ pub fn table_info(url: &str, table: &str) -> Result<Vec<ColumnInfo>, String> {
         .map_err(|e| e.to_string())?;
     Ok(rows)
 }
+
+/// Apply versioned SQL steps. Table `_marqdo_migrations` tracks applied versions.
+///
+/// `steps` is a list of `{version|版本, sql|SQL}` (GFM columnar tables ok via `as_rows`).
+pub fn migrate(url: &str, steps: &Value) -> Result<Value, String> {
+    if crate::db_pg::is_postgres(url) {
+        return Err(
+            "db.migrate is SQLite-only in this wave (use postgres migration tooling)".into(),
+        );
+    }
+    let rows = crate::table::as_rows(steps);
+    let arr = rows.as_array().ok_or("migrate steps must be a list")?;
+    let mut parsed: Vec<(i64, String)> = Vec::new();
+    for row in arr {
+        let obj = row.as_object().ok_or("migrate step must be a map")?;
+        let ver = obj
+            .get("version")
+            .or_else(|| obj.get("版本"))
+            .or_else(|| obj.get("ver"))
+            .ok_or("migrate step missing `version`/`版本`")?;
+        let version = match ver {
+            Value::Number(n) => n
+                .as_i64()
+                .ok_or_else(|| "migrate version must be an integer".to_string())?,
+            Value::String(s) => s
+                .trim()
+                .parse::<i64>()
+                .map_err(|_| format!("bad migrate version `{s}`"))?,
+            _ => return Err("migrate version must be an integer".into()),
+        };
+        if version <= 0 {
+            return Err(format!("migrate version must be positive, got {version}"));
+        }
+        let sql = obj
+            .get("sql")
+            .or_else(|| obj.get("SQL"))
+            .or_else(|| obj.get("Sql"))
+            .map(cell_str)
+            .unwrap_or_default();
+        if sql.trim().is_empty() {
+            return Err(format!("migrate version {version} has empty SQL"));
+        }
+        parsed.push((version, sql));
+    }
+    parsed.sort_by_key(|(v, _)| *v);
+    for w in parsed.windows(2) {
+        if w[0].0 == w[1].0 {
+            return Err(format!("duplicate migrate version {}", w[0].0));
+        }
+    }
+
+    let conn = pooled(url)?;
+    let c = conn.lock().unwrap_or_else(|e| e.into_inner());
+    c.execute_batch(
+        "CREATE TABLE IF NOT EXISTS \"_marqdo_migrations\" (
+            version INTEGER PRIMARY KEY,
+            applied_at TEXT NOT NULL
+        )",
+    )
+    .map_err(|e| e.to_string())?;
+    let current: i64 = c
+        .query_row(
+            "SELECT COALESCE(MAX(version), 0) FROM \"_marqdo_migrations\"",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap_or(0);
+    let mut applied = Vec::new();
+    for (version, sql) in parsed {
+        if version <= current {
+            continue;
+        }
+        c.execute_batch("BEGIN IMMEDIATE")
+            .map_err(|e| e.to_string())?;
+        match c.execute_batch(&sql) {
+            Ok(()) => {
+                if let Err(e) = c.execute(
+                    "INSERT INTO \"_marqdo_migrations\" (version, applied_at) VALUES (?1, datetime('now'))",
+                    rusqlite::params![version],
+                ) {
+                    let _ = c.execute_batch("ROLLBACK");
+                    return Err(e.to_string());
+                }
+                c.execute_batch("COMMIT").map_err(|e| e.to_string())?;
+                applied.push(version);
+            }
+            Err(e) => {
+                let _ = c.execute_batch("ROLLBACK");
+                return Err(format!("migrate version {version} failed: {e}"));
+            }
+        }
+    }
+    let to = applied.last().copied().unwrap_or(current);
+    Ok(json!({
+        "ok": true,
+        "from": current,
+        "to": to,
+        "applied": applied,
+    }))
+}
+
+fn parse_column_list(columns: &Value) -> Result<Vec<String>, String> {
+    match columns {
+        Value::String(s) => {
+            let cols: Vec<String> = s
+                .split(',')
+                .map(|p| p.trim().to_string())
+                .filter(|p| !p.is_empty())
+                .collect();
+            if cols.is_empty() {
+                return Err("fts columns is empty".into());
+            }
+            for c in &cols {
+                let _ = ident(c)?;
+            }
+            Ok(cols)
+        }
+        Value::Array(a) => {
+            let mut cols = Vec::new();
+            for v in a {
+                let name = cell_str(v);
+                let _ = ident(&name)?;
+                cols.push(name);
+            }
+            if cols.is_empty() {
+                return Err("fts columns is empty".into());
+            }
+            Ok(cols)
+        }
+        Value::Object(_) => {
+            let rows = crate::table::as_rows(columns);
+            if let Some(arr) = rows.as_array() {
+                let mut cols = Vec::new();
+                for row in arr {
+                    if let Some(obj) = row.as_object() {
+                        let name = obj
+                            .get("name")
+                            .or_else(|| obj.get("字段"))
+                            .or_else(|| obj.get("column"))
+                            .or_else(|| obj.values().next())
+                            .map(cell_str)
+                            .unwrap_or_default();
+                        if !name.is_empty() {
+                            let _ = ident(&name)?;
+                            cols.push(name);
+                        }
+                    } else {
+                        let name = cell_str(row);
+                        if !name.is_empty() {
+                            let _ = ident(&name)?;
+                            cols.push(name);
+                        }
+                    }
+                }
+                if cols.is_empty() {
+                    return Err("fts columns is empty".into());
+                }
+                return Ok(cols);
+            }
+            Err("fts columns must be a list or CSV string".into())
+        }
+        _ => Err("fts columns must be a list or CSV string".into()),
+    }
+}
+
+/// Create an FTS5 virtual table synced to `table` via content= + triggers.
+pub fn fts_create(
+    url: &str,
+    table: &str,
+    columns: &Value,
+    name: Option<&str>,
+) -> Result<Value, String> {
+    if crate::db_pg::is_postgres(url) {
+        return Err("db.fts is SQLite-only in this wave".into());
+    }
+    let table = ident(table)?;
+    let cols = parse_column_list(columns)?;
+    let fts = match name {
+        Some(n) if !n.trim().is_empty() => ident(n.trim())?.to_string(),
+        _ => format!("{table}_fts"),
+    };
+    let col_sql = cols
+        .iter()
+        .map(|c| format!("\"{c}\""))
+        .collect::<Vec<_>>()
+        .join(", ");
+    let conn = pooled(url)?;
+    let c = conn.lock().unwrap_or_else(|e| e.into_inner());
+
+    let create = format!(
+        "CREATE VIRTUAL TABLE IF NOT EXISTS \"{fts}\" USING fts5({col_sql}, content=\"{table}\", content_rowid=\"id\")"
+    );
+    c.execute_batch(&create).map_err(|e| e.to_string())?;
+
+    let ai = format!("{fts}_ai");
+    let ad = format!("{fts}_ad");
+    let au = format!("{fts}_au");
+    c.execute_batch(&format!(
+        "DROP TRIGGER IF EXISTS \"{ai}\";
+         DROP TRIGGER IF EXISTS \"{ad}\";
+         DROP TRIGGER IF EXISTS \"{au}\";"
+    ))
+    .map_err(|e| e.to_string())?;
+
+    let new_cols = cols
+        .iter()
+        .map(|c| format!("new.\"{c}\""))
+        .collect::<Vec<_>>()
+        .join(", ");
+    let old_cols = cols
+        .iter()
+        .map(|c| format!("old.\"{c}\""))
+        .collect::<Vec<_>>()
+        .join(", ");
+
+    c.execute_batch(&format!(
+        "CREATE TRIGGER \"{ai}\" AFTER INSERT ON \"{table}\" BEGIN
+            INSERT INTO \"{fts}\"(rowid, {col_sql}) VALUES (new.id, {new_cols});
+         END;
+         CREATE TRIGGER \"{ad}\" AFTER DELETE ON \"{table}\" BEGIN
+            INSERT INTO \"{fts}\"(\"{fts}\", rowid, {col_sql}) VALUES('delete', old.id, {old_cols});
+         END;
+         CREATE TRIGGER \"{au}\" AFTER UPDATE ON \"{table}\" BEGIN
+            INSERT INTO \"{fts}\"(\"{fts}\", rowid, {col_sql}) VALUES('delete', old.id, {old_cols});
+            INSERT INTO \"{fts}\"(rowid, {col_sql}) VALUES (new.id, {new_cols});
+         END;"
+    ))
+    .map_err(|e| e.to_string())?;
+
+    c.execute(
+        &format!("INSERT INTO \"{fts}\"(\"{fts}\") VALUES('rebuild')"),
+        [],
+    )
+    .map_err(|e| e.to_string())?;
+
+    Ok(json!({
+        "ok": true,
+        "table": table,
+        "fts": fts,
+        "columns": cols,
+    }))
+}
+
+/// Full-text search against an FTS5 table created by `fts_create`.
+pub fn search(
+    url: &str,
+    table: &str,
+    q: &str,
+    limit: i64,
+    name: Option<&str>,
+) -> Result<Value, String> {
+    if crate::db_pg::is_postgres(url) {
+        return Err("db.search is SQLite-only in this wave".into());
+    }
+    let table = ident(table)?;
+    let fts = match name {
+        Some(n) if !n.trim().is_empty() => ident(n.trim())?.to_string(),
+        _ => format!("{table}_fts"),
+    };
+    let q = q.trim();
+    if q.is_empty() {
+        return Ok(json!({ "rows": [], "count": 0 }));
+    }
+    let limit = if limit <= 0 { 20 } else { limit.min(500) };
+    let sql = format!(
+        "SELECT t.*, bm25(\"{fts}\") AS rank
+         FROM \"{fts}\"
+         JOIN \"{table}\" t ON t.id = \"{fts}\".rowid
+         WHERE \"{fts}\" MATCH ?1
+         ORDER BY rank
+         LIMIT ?2"
+    );
+    let conn = pooled(url)?;
+    let c = conn.lock().unwrap_or_else(|e| e.into_inner());
+    let vals = vec![
+        rusqlite::types::Value::Text(q.to_string()),
+        rusqlite::types::Value::Integer(limit),
+    ];
+    let rows = query_rows(&c, &sql, &vals)?;
+    Ok(json!({ "rows": rows, "count": rows.len() }))
+}
