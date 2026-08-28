@@ -2430,8 +2430,13 @@ fn ext_quantum_steps_smoke() {
     let svg_path = "tests/ext/quantum-steps-draw.svg";
     let svg = std::fs::read_to_string(svg_path).unwrap_or_default();
     assert!(
-        svg.contains("<svg") && svg.contains("q0"),
-        "{path} bad svg at {svg_path}: {svg}"
+        svg.contains("<svg")
+            && svg.contains("q0")
+            && svg.contains(r#"data-theme="dark""#)
+            && svg.contains("#0a0e14")
+            && svg.contains("data-gate-family")
+            && svg.contains("url(#mq-bg)"),
+        "{path} bad themed svg at {svg_path}: {svg}"
     );
     let _ = std::fs::remove_file(svg_path);
 }
@@ -2450,7 +2455,10 @@ fn ext_quantum_draw_smoke() {
         "tests/ext/quantum-draw-bloch.svg",
     ] {
         let svg = std::fs::read_to_string(p).unwrap_or_default();
-        assert!(svg.contains("<svg"), "expected svg at {p}");
+        assert!(
+            svg.contains("<svg") && svg.contains(r#"data-theme="dark""#),
+            "expected themed svg at {p}"
+        );
         let _ = std::fs::remove_file(p);
     }
 }

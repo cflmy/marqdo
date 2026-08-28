@@ -191,9 +191,9 @@ Install: `marqdo ext add quantum` (ZH id: `量子`). Build: `cargo build --relea
 
 **Q7 linear algebra:** `density`, `partial_trace`, `eig`, `expect` (Pauli string, left=high bit), `purity`, `kron`, `schmidt`, `fidelity`.
 
-**Q7 draw kinds:** `circuit|probs|bloch|hinton|city|density|paulivec|qsphere|multibloch` (quote string args: `kind="hinton"`).
+**Q7 draw kinds:** `circuit|probs|bloch|hinton|city|density|paulivec|qsphere|multibloch` (quote string args: `kind="hinton"`). Optional `theme="dark"|"light"|"bw"` (default dark tech lab; fixes label/wire overlap).
 
-Design: [ext-quantum.md](../../doc/design/ext-quantum.md) · Q7: [ext-quantum-q7.md](../../doc/design/ext-quantum-q7.md) · examples: [quantum-bell](../../examples/quantum-bell/) · [quantum-entanglement](../../examples/quantum-entanglement/).
+Design: [ext-quantum.md](../../doc/design/ext-quantum.md) · Q7: [ext-quantum-q7.md](../../doc/design/ext-quantum-q7.md) · viz style: [ext-quantum-viz-style.md](../../doc/design/ext-quantum-viz-style.md) · examples: [quantum-bell](../../examples/quantum-bell/) · [quantum-entanglement](../../examples/quantum-entanglement/).
 
 ## AI authoring workflow
 

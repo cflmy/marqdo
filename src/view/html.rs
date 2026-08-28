@@ -1074,11 +1074,22 @@ section.block > h2 {
   display: flex;
   justify-content: center;
 }
+.plot:has(svg[data-theme="dark"]) {
+  background: #070b10;
+  border-color: #1c2838;
+  padding: 1.1rem 1.25rem;
+}
+.plot:has(svg[data-theme="light"]),
+.plot:has(svg[data-theme="bw"]) {
+  background: #f7f9fc;
+  border-color: #d5dde8;
+}
 .plot svg {
   display: block;
   max-width: 100%;
   height: auto;
   margin-inline: auto;
+  min-width: min(100%, 28rem);
 }
 .comment-text {
   color: var(--muted);

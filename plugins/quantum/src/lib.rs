@@ -415,6 +415,17 @@ q_ffi!(quantum_state, |args: &Value| {
     }))
 });
 
+fn draw_theme_of(args: &Value) -> Result<draw::ThemeName, String> {
+    match args
+        .get("theme")
+        .or_else(|| args.get("主题"))
+        .and_then(|v| v.as_str())
+    {
+        None => Ok(draw::ThemeName::Dark),
+        Some(s) => draw::ThemeName::parse(s),
+    }
+}
+
 q_ffi!(quantum_draw_circuit, |args: &Value| {
     let c = circuit_of(args)?;
     let kind = args
@@ -423,6 +434,7 @@ q_ffi!(quantum_draw_circuit, |args: &Value| {
         .and_then(|v| v.as_str())
         .unwrap_or("circuit")
         .to_ascii_lowercase();
+    let theme = draw_theme_of(args)?;
     let qubit = arg_u(args, "qubit")
         .or_else(|_| arg_u(args, "比特"))
         .unwrap_or(0);
@@ -433,16 +445,16 @@ q_ffi!(quantum_draw_circuit, |args: &Value| {
         .filter(|s| !s.is_empty());
 
     let (kind_out, svg) = match kind.as_str() {
-        "circuit" | "" => ("circuit", draw::circuit_svg(c)?),
+        "circuit" | "" => ("circuit", draw::circuit_svg(c, theme)?),
         "probs" | "probabilities" | "概率" => {
             let (qubits, amps) = sim::simulate_circuit(c)?;
             let probs = sim::probabilities(&amps, qubits);
-            ("probs", draw::probs_svg(&probs))
+            ("probs", draw::probs_svg(&probs, theme))
         }
         "bloch" | "布洛赫" => {
             let (qubits, amps) = sim::simulate_circuit(c)?;
             let (x, y, z) = sim::bloch_vector(&amps, qubits, qubit)?;
-            ("bloch", draw::bloch_svg(x, y, z))
+            ("bloch", draw::bloch_svg(x, y, z, theme))
         }
         "hinton" | "欣顿" => {
             let (n, amps) = sim::simulate_circuit(c)?;

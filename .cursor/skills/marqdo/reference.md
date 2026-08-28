@@ -175,4 +175,5 @@ See `doc/design/call-arguments.md`.
 | `doc/design/web-net-capabilities.md` | ext/web capability matrix (W0–W7 + P3) |
 | `doc/design/ext-quantum.md` | `ext/quantum` circuits |
 | `doc/design/ext-quantum-q7.md` | Q7 density linear algebra + advanced SVG |
+| `doc/design/ext-quantum-viz-style.md` | Q8 circuit/plot themes (`dark`/`light`/`bw`) |
 | `doc/design/view-debug.md` | view / debug hosts |

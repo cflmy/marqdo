@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| 状态 | **Q0–Q7 完结**（高阶线性代数 + 高级可视化 + 纠缠示例） |
+| 状态 | **Q0–Q7 完结 · Q8a/Q8b 完结 · Q8c 待做** |
 | 日期 | 2026-08-28 |
 | **锁定设计** | [design/ext-quantum.md](../design/ext-quantum.md) |
 | 相关 | [ext-cli.md](../design/ext-cli.md) · [ext-abi.md](../design/ext-abi.md) · [stdlib-math.md](../design/stdlib-math.md) · [view.md](../design/view.md) |
@@ -33,6 +33,9 @@
 | **Q7a** | 密度矩阵 / Kronecker / 部分迹 / Hermitian 谱 / Schmidt / Pauli 期望 / 纯度·保真度 — [ext-quantum-q7.md](../design/ext-quantum-q7.md) | **done** |
 | **Q7b** | 高级 SVG：hinton / city / density / paulivec / qsphere / multibloch | **done** |
 | **Q7c** | 纠缠示例 + 用户文档 / skill 摘要 | **done** |
+| **Q8a** | 电路 SVG：标签 gutter + dark/light/bw 门族分色 — [ext-quantum-viz-style.md](../design/ext-quantum-viz-style.md) | **done** |
+| **Q8b** | probs / bloch / heatmap 共用令牌 | **done** (probs/bloch；heatmap → Q8c) |
+| **Q8c** | 高级态图（hinton/city/…）换肤 | **pending** |
 
 验收金样：既有 `tests/ext/quantum-*-smoke.mq.md`；Q7：`quantum-linalg-smoke`、`quantum-viz-advanced-smoke`。示例：`examples/quantum-bell/`、`examples/quantum-entanglement/`。
 

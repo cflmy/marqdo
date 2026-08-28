@@ -191,10 +191,11 @@ Sample computational-basis shots (deterministic with `seed=`). Applies circuit `
     + `path`=None
     + `kind`=circuit
     + `qubit`=0
+    + `theme`=dark
 
-Circuit rail / probability bars / Bloch / advanced state plots (`kind=circuit|probs|bloch|hinton|city|density|paulivec|qsphere|multibloch`). Records into view/CLI plots via host `record_plot`.
+Circuit rail / probability bars / Bloch / advanced state plots (`kind=circuit|probs|bloch|hinton|city|density|paulivec|qsphere|multibloch`). Theme `dark` (default tech lab) / `light` / `bw`. Records into view/CLI plots via host `record_plot`.
 
-**> quantum_draw_circuit circuit=`self` path=`path` kind=`kind` qubit=`qubit`**
+**> quantum_draw_circuit circuit=`self` path=`path` kind=`kind` qubit=`qubit` theme=`theme`**
 
 ## density
 
