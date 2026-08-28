@@ -2,8 +2,8 @@
 
 | | |
 |---|---|
-| 状态 | **Accepted · Q0–Q5.5 已落地**（教学噪声含振幅阻尼；完整开放系统另文） |
-| 日期 | 2026-08-12 |
+| 状态 | **Accepted · Q0–Q6 已落地 · Q7 进行中**（[ext-quantum-q7.md](ext-quantum-q7.md)：高阶线性代数 + 高级可视化） |
+| 日期 | 2026-08-12（初版）· 2026-08-28（Q7） |
 | 相关 | [stdlib-math.md](stdlib-math.md) · [ext-abi.md](ext-abi.md) · [ext-cli.md](ext-cli.md) · [ext-web.md](ext-web.md) · [view.md](view.md) · [stdlib-i18n.md](stdlib-i18n.md) · [roadmap/ext-quantum.md](../roadmap/ext-quantum.md) |
 | 安装（目标） | `marqdo ext add quantum`（中英：`quantum` / `量子`） |
 | 本文目的 | 锁定**作者面**、**模拟语义**、**view 可视化**与**分期**；指导 ABI 插件实现 |
@@ -323,6 +323,8 @@ Q5  教学噪声 + barrier/measure/append/state — 见 [ext-quantum-q5.md](ext-
 | **Q3** | `steps=` 表；`draw` SVG 在 `view` HTML 含 `<svg` | 与 math-plot 同级断言 |
 | **Q4** | 概率图 + 布洛赫；`matches_matrix`；用户文档页 | `quantum-draw-smoke` / `quantum-gate-matrix-smoke`；`view output` 可浏览示例 |
 | **Q5** | `noise` 轨迹；`barrier`/`measure`/`append`/`state` | `quantum-noise-smoke` / `quantum-author-api-smoke` |
+| **Q6** | 公式/`matrix=` 自定义门 | [ext-quantum-custom-gate.md](ext-quantum-custom-gate.md) |
+| **Q7** | 密度矩阵线性代数 + Hinton/City/QSphere 等 SVG | [ext-quantum-q7.md](ext-quantum-q7.md) |
 
 实现路线图跟踪见 [roadmap/ext-quantum.md](../roadmap/ext-quantum.md)。
 

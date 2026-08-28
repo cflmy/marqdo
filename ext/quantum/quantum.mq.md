@@ -18,6 +18,33 @@ Load the ABI v2 `quantum` plugin once.
   > sys.exit code=1
 ****
 
+## kron
+    + `a`
+    + `b`
+
+Tensor product of two states or square matrices.
+
+> ensure_plugin
+**> quantum_kron a=`a` b=`b`**
+
+## schmidt
+    + `state`
+    + `cut`=1
+
+Schmidt decomposition of a pure state / circuit across `cut` (subsystem A = low qubits).
+
+> ensure_plugin
+**> quantum_schmidt state=`state` cut=`cut`**
+
+## fidelity
+    + `a`
+    + `b`
+
+Pure-state fidelity |⟨a|b⟩|².
+
+> ensure_plugin
+**> quantum_fidelity a=`a` b=`b`**
+
 # circuit
     + `qubits`=1
     + `steps`=None
@@ -165,9 +192,29 @@ Sample computational-basis shots (deterministic with `seed=`). Applies circuit `
     + `kind`=circuit
     + `qubit`=0
 
-Circuit rail / probability bars / Bloch sphere SVG (`kind=circuit|probs|bloch`). Records into view/CLI plots via host `record_plot`.
+Circuit rail / probability bars / Bloch / advanced state plots (`kind=circuit|probs|bloch|hinton|city|density|paulivec|qsphere|multibloch`). Records into view/CLI plots via host `record_plot`.
 
 **> quantum_draw_circuit circuit=`self` path=`path` kind=`kind` qubit=`qubit`**
+
+## density
+
+Pure-state density matrix ρ=|ψ⟩⟨ψ| after ideal simulate.
+
+**> density state=`self`**
+
+## expect
+    + `obs`
+
+Pauli string (left = high bit) or matrix expectation on the ideal state.
+
+**> quantum_density_expect density=`self` obs=`obs`**
+
+## schmidt
+    + `cut`=1
+
+Schmidt / singular values across a bipartition (`cut` = qubits in subsystem A, low bits).
+
+**> quantum_schmidt state=`self` cut=`cut`**
 
 # gate
     + `name`=None
@@ -196,3 +243,51 @@ Named built-in gate (`name=H`) or custom unitary from `matrix=` (nested list or 
 Gate glyph or complex-matrix heatmap (`kind=gate|matrix`). Records via host `record_plot`.
 
 **> quantum_gate_draw gate=`self` path=`path` kind=`kind`**
+
+# density
+    + `state`=None
+    + `matrix`=None
+
+Density matrix from a state/circuit (`state=`) or an explicit Hermitian `matrix=` (≤6 qubits).
+
+> ensure_plugin
+1. `matrix`
+  **> quantum_density_from_matrix matrix=`matrix`**
+2. *
+  **> quantum_density_from_state state=`state`**
+
+## matrix
+
+**> quantum_density_matrix density=`self`**
+
+## purity
+
+Tr(ρ²).
+
+**> quantum_density_purity density=`self`**
+
+## partial_trace
+    + `keep`
+
+Keep listed qubits (LSB=0); trace out the rest.
+
+**> quantum_density_partial_trace density=`self` keep=`keep`**
+
+## eig
+
+Hermitian spectrum → `{eigenvalues, eigenvectors}`.
+
+**> quantum_density_eig density=`self`**
+
+## expect
+    + `obs`
+
+**> quantum_density_expect density=`self` obs=`obs`**
+
+## draw
+    + `path`=None
+    + `kind`=hinton
+
+Hinton / city / density-cells / Pauli vector SVG (`kind=hinton` or city or density or paulivec).
+
+**> quantum_density_draw density=`self` path=`path` kind=`kind`**

@@ -42,6 +42,18 @@ impl C {
             im: self.im * s,
         }
     }
+    pub fn conj(self) -> C {
+        C {
+            re: self.re,
+            im: -self.im,
+        }
+    }
+    pub fn sub(self, o: C) -> C {
+        C {
+            re: self.re - o.re,
+            im: self.im - o.im,
+        }
+    }
     pub fn to_json(self) -> Value {
         json!({ "re": self.re, "im": self.im })
     }

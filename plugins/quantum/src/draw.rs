@@ -496,3 +496,357 @@ pub fn matrix_heatmap_svg(m: &[Vec<C>], title: &str) -> String {
         body = body,
     )
 }
+
+fn phase_hue(arg: f64) -> String {
+    // map [-π,π] → hue degrees
+    let h = ((arg + std::f64::consts::PI) / (2.0 * std::f64::consts::PI) * 360.0) % 360.0;
+    format!("hsl({h:.0},70%,45%)")
+}
+
+/// Hinton diagram for density matrix (Q7b).
+pub fn hinton_svg(m: &[Vec<C>], title: &str) -> String {
+    let n = m.len().max(1);
+    let cell = if n <= 2 { 56.0 } else if n <= 4 { 44.0 } else { 32.0 };
+    let left = 40.0;
+    let top = 28.0;
+    let width = left + cell * n as f64 + 16.0;
+    let height = top + cell * n as f64 + 24.0;
+    let mut max_a: f64 = 1e-12;
+    for row in m {
+        for c in row {
+            max_a = max_a.max(mag(*c));
+        }
+    }
+    let mut body = String::new();
+    body.push_str(&format!(
+        r#"<text x="8" y="18" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="{STROKE}">{title}</text>"#,
+        title = esc(title),
+        STROKE = STROKE,
+    ));
+    body.push_str(&format!(
+        r##"<rect x="{left}" y="{top}" width="{w}" height="{h}" fill="#f0eee8" stroke="{STROKE}" stroke-width="1"/>"##,
+        left = left,
+        top = top,
+        w = cell * n as f64,
+        h = cell * n as f64,
+        STROKE = STROKE,
+    ));
+    for i in 0..n {
+        for j in 0..n {
+            let c = m.get(i).and_then(|r| r.get(j)).copied().unwrap_or(C::zero());
+            let a = mag(c) / max_a;
+            let side = (cell * 0.85 * a.sqrt()).max(1.0);
+            let cx = left + (j as f64 + 0.5) * cell;
+            let cy = top + (i as f64 + 0.5) * cell;
+            let fill = if c.re >= 0.0 { "#f5f5f5" } else { "#1a1a1a" };
+            let stroke = if c.re >= 0.0 { STROKE } else { "#f5f5f5" };
+            body.push_str(&format!(
+                r#"<rect x="{x}" y="{y}" width="{side}" height="{side}" fill="{fill}" stroke="{stroke}" stroke-width="0.8" data-hinton="1"/>"#,
+                x = cx - side * 0.5,
+                y = cy - side * 0.5,
+                side = side,
+                fill = fill,
+                stroke = stroke,
+            ));
+        }
+    }
+    format!(
+        r#"<svg xmlns="http://www.w3.org/2000/svg" width="{w:.0}" height="{h:.0}" viewBox="0 0 {w:.1} {h:.1}" role="img" aria-label="hinton">{body}</svg>"#,
+        w = width,
+        h = height,
+        body = body,
+    )
+}
+
+/// Cirq-inspired density: magnitude disk + phase needle; diagonal probability bars.
+pub fn density_cells_svg(m: &[Vec<C>], title: &str) -> String {
+    let n = m.len().max(1);
+    let cell = if n <= 2 { 64.0 } else if n <= 4 { 48.0 } else { 36.0 };
+    let left = 36.0;
+    let top = 28.0;
+    let width = left + cell * n as f64 + 16.0;
+    let height = top + cell * n as f64 + 20.0;
+    let mut max_a: f64 = 1e-12;
+    for row in m {
+        for c in row {
+            max_a = max_a.max(mag(*c));
+        }
+    }
+    let mut body = String::new();
+    body.push_str(&format!(
+        r#"<text x="8" y="18" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="{STROKE}">{title}</text>"#,
+        title = esc(title),
+        STROKE = STROKE,
+    ));
+    for i in 0..n {
+        for j in 0..n {
+            let c = m.get(i).and_then(|r| r.get(j)).copied().unwrap_or(C::zero());
+            let x0 = left + j as f64 * cell;
+            let y0 = top + i as f64 * cell;
+            body.push_str(&format!(
+                r##"<rect x="{x0}" y="{y0}" width="{cell}" height="{cell}" fill="#eeeeee" stroke="#ccc" stroke-width="0.5"/>"##,
+                x0 = x0,
+                y0 = y0,
+                cell = cell,
+            ));
+            let cx = x0 + cell * 0.5;
+            let cy = y0 + cell * 0.5;
+            if i == n - 1 - j || i == j {
+                // soft diagonal highlight for probability (i==j)
+            }
+            if i == j {
+                let p = c.re.clamp(0.0, 1.0);
+                let bw = cell * 0.7 * p;
+                body.push_str(&format!(
+                    r##"<rect x="{x}" y="{y}" width="{bw}" height="6" fill="#3a6ea5" data-density-diag="1"/>"##,
+                    x = cx - cell * 0.35,
+                    y = y0 + cell - 10.0,
+                    bw = bw,
+                ));
+            }
+            let r = cell * 0.35 * (mag(c) / max_a).sqrt();
+            let arg = c.im.atan2(c.re);
+            body.push_str(&format!(
+                r#"<circle cx="{cx}" cy="{cy}" r="{r}" fill="{fill}" fill-opacity="0.35" stroke="{fill}" stroke-width="1.2" data-density="1"/>"#,
+                cx = cx,
+                cy = cy,
+                r = r.max(0.5),
+                fill = phase_hue(arg),
+            ));
+            let nx = cx + r * arg.cos();
+            let ny = cy - r * arg.sin();
+            body.push_str(&format!(
+                r#"<line x1="{cx}" y1="{cy}" x2="{nx}" y2="{ny}" stroke="{STROKE}" stroke-width="1.2"/>"#,
+                cx = cx,
+                cy = cy,
+                nx = nx,
+                ny = ny,
+                STROKE = STROKE,
+            ));
+        }
+    }
+    format!(
+        r#"<svg xmlns="http://www.w3.org/2000/svg" width="{w:.0}" height="{h:.0}" viewBox="0 0 {w:.1} {h:.1}" role="img" aria-label="density">{body}</svg>"#,
+        w = width,
+        h = height,
+        body = body,
+    )
+}
+
+/// 2.5D cityscape: Re (left) and Im (right) bar grids.
+pub fn city_svg(m: &[Vec<C>], title: &str) -> String {
+    let n = m.len().max(1);
+    let cell = 28.0;
+    let left = 40.0;
+    let top = 40.0;
+    let gap = 24.0;
+    let grid_w = cell * n as f64;
+    let width = left + grid_w * 2.0 + gap + 24.0;
+    let max_h = 80.0;
+    let mut max_re: f64 = 1e-12;
+    let mut max_im: f64 = 1e-12;
+    for row in m {
+        for c in row {
+            max_re = max_re.max(c.re.abs());
+            max_im = max_im.max(c.im.abs());
+        }
+    }
+    let height = top + max_h + cell * n as f64 * 0.35 + 40.0;
+    let mut body = String::new();
+    body.push_str(&format!(
+        r#"<text x="8" y="18" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="{STROKE}">{title} (city)</text>"#,
+        title = esc(title),
+        STROKE = STROKE,
+    ));
+    body.push_str(r##"<text x="40" y="34" font-family="ui-monospace,Menlo,monospace" font-size="10" fill="#666">Re</text>"##);
+    body.push_str(&format!(
+        r##"<text x="{x}" y="34" font-family="ui-monospace,Menlo,monospace" font-size="10" fill="#666">Im</text>"##,
+        x = left + grid_w + gap,
+    ));
+    let draw_city = |body: &mut String, origin_x: f64, use_re: bool| {
+        for i in 0..n {
+            for j in 0..n {
+                let c = m.get(i).and_then(|r| r.get(j)).copied().unwrap_or(C::zero());
+                let val = if use_re { c.re } else { c.im };
+                let denom = if use_re { max_re } else { max_im };
+                let h = (val.abs() / denom) * max_h;
+                let iso_x = origin_x + (j as f64 - i as f64) * cell * 0.5;
+                let iso_y = top + (i as f64 + j as f64) * cell * 0.28 + (max_h - h);
+                let fill = if use_re { "#3a6ea5" } else { "#c45c26" };
+                body.push_str(&format!(
+                    r#"<rect x="{iso_x}" y="{iso_y}" width="{w}" height="{h}" fill="{fill}" fill-opacity="0.85" stroke="{STROKE}" stroke-width="0.4" data-city="1"/>"#,
+                    iso_x = iso_x,
+                    iso_y = iso_y,
+                    w = cell * 0.45,
+                    h = h.max(0.5),
+                    fill = fill,
+                    STROKE = STROKE,
+                ));
+            }
+        }
+    };
+    draw_city(&mut body, left + grid_w * 0.35, true);
+    draw_city(&mut body, left + grid_w + gap + grid_w * 0.35, false);
+    format!(
+        r#"<svg xmlns="http://www.w3.org/2000/svg" width="{w:.0}" height="{h:.0}" viewBox="0 0 {w:.1} {h:.1}" role="img" aria-label="city">{body}</svg>"#,
+        w = width,
+        h = height,
+        body = body,
+    )
+}
+
+/// Pauli expectation bar chart.
+pub fn paulivec_svg(labels: &[String], values: &[f64], title: &str) -> String {
+    let n = labels.len().max(1);
+    let bar_w = 28.0;
+    let gap = 8.0;
+    let left = 48.0;
+    let top = 28.0;
+    let chart_h = 120.0;
+    let width = left + n as f64 * (bar_w + gap) + 16.0;
+    let height = top + chart_h + 40.0;
+    let mid_y = top + chart_h * 0.5;
+    let mut body = String::new();
+    body.push_str(&format!(
+        r#"<text x="8" y="18" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="{STROKE}">{title}</text>"#,
+        title = esc(title),
+        STROKE = STROKE,
+    ));
+    body.push_str(&format!(
+        r##"<line x1="{left}" y1="{mid_y}" x2="{x2}" y2="{mid_y}" stroke="#888" stroke-width="1"/>"##,
+        left = left,
+        mid_y = mid_y,
+        x2 = width - 8.0,
+    ));
+    for (i, (lab, val)) in labels.iter().zip(values.iter()).enumerate() {
+        let x = left + i as f64 * (bar_w + gap);
+        let h = val.abs().clamp(0.0, 1.0) * (chart_h * 0.45);
+        let y = if *val >= 0.0 { mid_y - h } else { mid_y };
+        body.push_str(&format!(
+            r##"<rect x="{x}" y="{y}" width="{bar_w}" height="{h}" fill="#2f6f4e" data-paulivec="1"/>"##,
+            x = x,
+            y = y,
+            bar_w = bar_w,
+            h = h.max(0.5),
+        ));
+        body.push_str(&format!(
+            r#"<text x="{tx}" y="{ty}" text-anchor="middle" font-family="ui-monospace,Menlo,monospace" font-size="9" fill="{STROKE}">{lab}</text>"#,
+            tx = x + bar_w * 0.5,
+            ty = top + chart_h + 14.0,
+            lab = esc(lab),
+            STROKE = STROKE,
+        ));
+    }
+    format!(
+        r#"<svg xmlns="http://www.w3.org/2000/svg" width="{w:.0}" height="{h:.0}" viewBox="0 0 {w:.1} {h:.1}" role="img" aria-label="paulivec">{body}</svg>"#,
+        w = width,
+        h = height,
+        body = body,
+    )
+}
+
+/// QSphere-style: amplitudes on a circle (phase→angle, amp→radius of marker).
+pub fn qsphere_svg(amps: &[C], qubits: usize) -> String {
+    let dim = amps.len();
+    let cx = 160.0;
+    let cy = 160.0;
+    let r = 110.0;
+    let width = 320.0;
+    let height = 320.0;
+    let mut body = String::new();
+    body.push_str(&format!(
+        r#"<circle cx="{cx}" cy="{cy}" r="{r}" fill="none" stroke="{STROKE}" stroke-width="1.5"/>"#,
+        cx = cx,
+        cy = cy,
+        r = r,
+        STROKE = STROKE,
+    ));
+    body.push_str(r##"<text x="12" y="20" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#1a1a1a">qsphere</text>"##);
+    for (i, a) in amps.iter().enumerate() {
+        let amp = mag(*a);
+        if amp < 1e-9 {
+            continue;
+        }
+        // latitude from Hamming weight, longitude from index
+        let wt = (i as u32).count_ones() as f64;
+        let lat = if qubits == 0 {
+            0.0
+        } else {
+            std::f64::consts::PI * (wt / qubits as f64 - 0.5)
+        };
+        let lon = 2.0 * std::f64::consts::PI * (i as f64) / (dim as f64);
+        let rr = r * lat.cos();
+        let x = cx + rr * lon.cos();
+        let y = cy - r * lat.sin();
+        let rad = 4.0 + 14.0 * amp;
+        let arg = a.im.atan2(a.re);
+        body.push_str(&format!(
+            r#"<circle cx="{x}" cy="{y}" r="{rad}" fill="{fill}" stroke="{STROKE}" stroke-width="1" data-qsphere="1"/>"#,
+            x = x,
+            y = y,
+            rad = rad,
+            fill = phase_hue(arg),
+            STROKE = STROKE,
+        ));
+    }
+    format!(
+        r#"<svg xmlns="http://www.w3.org/2000/svg" width="{w:.0}" height="{h:.0}" viewBox="0 0 {w:.1} {h:.1}" role="img" aria-label="qsphere">{body}</svg>"#,
+        w = width,
+        h = height,
+        body = body,
+    )
+}
+
+/// Side-by-side Bloch spheres for each qubit.
+pub fn multibloch_svg(amps: &[C], qubits: usize) -> Result<String, String> {
+    let sphere_w = 140.0;
+    let width = 16.0 + qubits as f64 * sphere_w;
+    let height = 160.0;
+    let mut body = String::new();
+    body.push_str(r##"<text x="8" y="16" font-family="ui-monospace,Menlo,monospace" font-size="12" fill="#1a1a1a">multibloch</text>"##);
+    for q in 0..qubits {
+        let (x, y, z) = crate::sim::bloch_vector(amps, qubits, q)?;
+        let svg = bloch_svg(x, y, z);
+        // extract inner content roughly by offsetting — simpler: draw mini sphere
+        let ox = 8.0 + q as f64 * sphere_w;
+        let cx = ox + 60.0;
+        let cy = 90.0;
+        let r = 40.0;
+        body.push_str(&format!(
+            r##"<text x="{ox}" y="32" font-family="ui-monospace,Menlo,monospace" font-size="11" fill="#1a1a1a">q{q}</text>"##,
+            ox = ox + 8.0,
+            q = q,
+        ));
+        body.push_str(&format!(
+            r##"<ellipse cx="{cx}" cy="{cy}" rx="{r}" ry="{ry}" fill="#f7f4ef" stroke="{STROKE}" stroke-width="1.2"/>"##,
+            cx = cx,
+            cy = cy,
+            r = r,
+            ry = r * 0.55,
+            STROKE = STROKE,
+        ));
+        body.push_str(&format!(
+            r#"<circle cx="{cx}" cy="{cy}" r="{r}" fill="none" stroke="{STROKE}" stroke-width="1.2"/>"#,
+            cx = cx,
+            cy = cy,
+            r = r,
+            STROKE = STROKE,
+        ));
+        let px = cx + x * r;
+        let py = cy - z * r * 0.85;
+        body.push_str(&format!(
+            r##"<line x1="{cx}" y1="{cy}" x2="{px}" y2="{py}" stroke="#c45c26" stroke-width="2" data-multibloch="1"/>"##,
+            cx = cx,
+            cy = cy,
+            px = px,
+            py = py,
+        ));
+        let _ = (y, svg);
+    }
+    Ok(format!(
+        r#"<svg xmlns="http://www.w3.org/2000/svg" width="{w:.0}" height="{h:.0}" viewBox="0 0 {w:.1} {h:.1}" role="img" aria-label="multibloch">{body}</svg>"#,
+        w = width,
+        h = height,
+        body = body,
+    ))
+}

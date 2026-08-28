@@ -1,6 +1,7 @@
 //! Marqdo quantum plugin (C ABI v2): state-vector circuit simulation.
 
 mod draw;
+mod linalg;
 mod sim;
 
 use std::ffi::{CStr, CString};
@@ -443,9 +444,46 @@ q_ffi!(quantum_draw_circuit, |args: &Value| {
             let (x, y, z) = sim::bloch_vector(&amps, qubits, qubit)?;
             ("bloch", draw::bloch_svg(x, y, z))
         }
+        "hinton" | "欣顿" => {
+            let (n, amps) = sim::simulate_circuit(c)?;
+            let (_, rho) = linalg::density_from_amps(&amps, n)?;
+            let nested = linalg::flat_to_nested(&rho, 1 << n);
+            ("hinton", draw::hinton_svg(&nested, "ρ hinton"))
+        }
+        "city" | "城市" => {
+            let (n, amps) = sim::simulate_circuit(c)?;
+            let (_, rho) = linalg::density_from_amps(&amps, n)?;
+            let nested = linalg::flat_to_nested(&rho, 1 << n);
+            ("city", draw::city_svg(&nested, "ρ"))
+        }
+        "density" | "密度图" => {
+            let (n, amps) = sim::simulate_circuit(c)?;
+            let (_, rho) = linalg::density_from_amps(&amps, n)?;
+            let nested = linalg::flat_to_nested(&rho, 1 << n);
+            ("density", draw::density_cells_svg(&nested, "ρ"))
+        }
+        "paulivec" | "泡利向量" => {
+            let (n, amps) = sim::simulate_circuit(c)?;
+            let (_, rho) = linalg::density_from_amps(&amps, n)?;
+            let dim = 1 << n;
+            let labels = linalg::all_pauli_labels(n)?;
+            let mut vals = Vec::with_capacity(labels.len());
+            for lab in &labels {
+                vals.push(linalg::expect_pauli(&rho, dim, n, lab)?);
+            }
+            ("paulivec", draw::paulivec_svg(&labels, &vals, "Pauli"))
+        }
+        "qsphere" | "球" => {
+            let (n, amps) = sim::simulate_circuit(c)?;
+            ("qsphere", draw::qsphere_svg(&amps, n))
+        }
+        "multibloch" | "多布洛赫" => {
+            let (n, amps) = sim::simulate_circuit(c)?;
+            ("multibloch", draw::multibloch_svg(&amps, n)?)
+        }
         other => {
             return Err(format!(
-                "unknown draw kind `{other}` (circuit|probs|bloch)"
+                "unknown draw kind `{other}` (circuit|probs|bloch|hinton|city|density|paulivec|qsphere|multibloch)"
             ));
         }
     };
@@ -587,6 +625,249 @@ q_ffi!(quantum_apply, |args: &Value| {
     sim::apply_gate(c, gate, qubits)
 });
 
+q_ffi!(quantum_density_from_state, |args: &Value| {
+    let src = args
+        .get("state")
+        .or_else(|| args.get("态"))
+        .or_else(|| args.get("circuit"))
+        .or_else(|| args.get("电路"))
+        .ok_or_else(|| "density needs `state` or `circuit`".to_string())?;
+    let (n, amps) = linalg::amps_from_state_or_circuit(src)?;
+    let (_, rho) = linalg::density_from_amps(&amps, n)?;
+    Ok(linalg::density_handle(n, &rho))
+});
+
+q_ffi!(quantum_density_from_matrix, |args: &Value| {
+    let matrix = args
+        .get("matrix")
+        .or_else(|| args.get("矩阵"))
+        .ok_or_else(|| "missing `matrix`".to_string())?;
+    let bag = json!({ "matrix": matrix });
+    let (n, rho) = linalg::parse_density(&bag)?;
+    Ok(linalg::density_handle(n, &rho))
+});
+
+q_ffi!(quantum_density_matrix, |args: &Value| {
+    let d = args
+        .get("density")
+        .or_else(|| args.get("密度"))
+        .ok_or_else(|| "missing `density`".to_string())?;
+    let (n, rho) = linalg::parse_density(d)?;
+    let dim = 1 << n;
+    Ok(sim::matrix_to_json(&linalg::flat_to_nested(&rho, dim)))
+});
+
+q_ffi!(quantum_density_purity, |args: &Value| {
+    let d = args
+        .get("density")
+        .or_else(|| args.get("密度"))
+        .ok_or_else(|| "missing `density`".to_string())?;
+    let (n, rho) = linalg::parse_density(d)?;
+    let dim = 1 << n;
+    Ok(json!(linalg::purity(&rho, dim)))
+});
+
+q_ffi!(quantum_density_partial_trace, |args: &Value| {
+    let d = args
+        .get("density")
+        .or_else(|| args.get("密度"))
+        .ok_or_else(|| "missing `density`".to_string())?;
+    let keep_v = args
+        .get("keep")
+        .or_else(|| args.get("保留"))
+        .ok_or_else(|| "missing `keep`".to_string())?;
+    let keep = parse_usize_list(keep_v)?;
+    let (n, rho) = linalg::parse_density(d)?;
+    let (k, out) = linalg::partial_trace(&rho, n, &keep)?;
+    Ok(linalg::density_handle(k, &out))
+});
+
+q_ffi!(quantum_density_eig, |args: &Value| {
+    let d = args
+        .get("density")
+        .or_else(|| args.get("密度"))
+        .ok_or_else(|| "missing `density`".to_string())?;
+    let (n, rho) = linalg::parse_density(d)?;
+    let dim = 1 << n;
+    let (evals, evecs) = linalg::hermite_eig(&rho, dim)?;
+    Ok(linalg::spectrum_handle(&evals, &evecs))
+});
+
+q_ffi!(quantum_density_expect, |args: &Value| {
+    let d = args
+        .get("density")
+        .or_else(|| args.get("密度"))
+        .or_else(|| args.get("state"))
+        .or_else(|| args.get("态"))
+        .or_else(|| args.get("circuit"))
+        .or_else(|| args.get("电路"))
+        .ok_or_else(|| "expect needs density/state/circuit".to_string())?;
+    let (n, rho) = if d.get("amplitudes").is_some()
+        || d.get("_type").and_then(|t| t.as_str()) == Some("quantum_state")
+        || d.get("ops").is_some()
+    {
+        let (qn, amps) = linalg::amps_from_state_or_circuit(d)?;
+        let (_, r) = linalg::density_from_amps(&amps, qn)?;
+        (qn, r)
+    } else {
+        linalg::parse_density(d)?
+    };
+    let dim = 1 << n;
+    let obs = args
+        .get("obs")
+        .or_else(|| args.get("可观测量"))
+        .ok_or_else(|| "missing `obs`".to_string())?;
+    let val = if let Some(s) = obs.as_str() {
+        linalg::expect_pauli(&rho, dim, n, s)?
+    } else {
+        let (_od, om) = linalg::value_as_matrix(obs)?;
+        linalg::expect_matrix(&rho, dim, &om, dim)?
+    };
+    Ok(json!(val))
+});
+
+q_ffi!(quantum_density_draw, |args: &Value| {
+    let d = args
+        .get("density")
+        .or_else(|| args.get("密度"))
+        .ok_or_else(|| "missing `density`".to_string())?;
+    let kind = args
+        .get("kind")
+        .or_else(|| args.get("种类"))
+        .and_then(|v| v.as_str())
+        .unwrap_or("hinton")
+        .to_ascii_lowercase();
+    let path = args
+        .get("path")
+        .or_else(|| args.get("路径"))
+        .and_then(|v| v.as_str())
+        .filter(|s| !s.is_empty());
+    let (n, rho) = linalg::parse_density(d)?;
+    let dim = 1 << n;
+    let nested = linalg::flat_to_nested(&rho, dim);
+    let (kind_out, svg) = match kind.as_str() {
+        "hinton" | "欣顿" => ("hinton", draw::hinton_svg(&nested, "ρ hinton")),
+        "city" | "城市" => ("city", draw::city_svg(&nested, "ρ")),
+        "density" | "密度图" => ("density", draw::density_cells_svg(&nested, "ρ")),
+        "paulivec" | "泡利向量" => {
+            let labels = linalg::all_pauli_labels(n)?;
+            let mut vals = Vec::with_capacity(labels.len());
+            for lab in &labels {
+                vals.push(linalg::expect_pauli(&rho, dim, n, lab)?);
+            }
+            ("paulivec", draw::paulivec_svg(&labels, &vals, "Pauli"))
+        }
+        other => {
+            return Err(format!(
+                "unknown density draw kind `{other}` (hinton|city|density|paulivec)"
+            ));
+        }
+    };
+    record_plot(&svg, path)?;
+    Ok(json!({
+        "_type": "quantum_svg",
+        "kind": kind_out,
+        "qubits": n,
+        "svg": svg,
+    }))
+});
+
+q_ffi!(quantum_kron, |args: &Value| {
+    let a = args
+        .get("a")
+        .or_else(|| args.get("左"))
+        .ok_or_else(|| "kron needs `a`".to_string())?;
+    let b = args
+        .get("b")
+        .or_else(|| args.get("右"))
+        .ok_or_else(|| "kron needs `b`".to_string())?;
+    if (a.get("amplitudes").is_some()
+        || a.get("_type").and_then(|t| t.as_str()) == Some("quantum_state"))
+        && (b.get("amplitudes").is_some()
+            || b.get("_type").and_then(|t| t.as_str()) == Some("quantum_state"))
+    {
+        let (na, aa) = linalg::amps_from_state_or_circuit(a)?;
+        let (nb, bb) = linalg::amps_from_state_or_circuit(b)?;
+        let out = linalg::kronecker_amps(&aa, &bb);
+        return Ok(json!({
+            "_type": "quantum_state",
+            "qubits": na + nb,
+            "dim": out.len(),
+            "amplitudes": sim::amps_to_json(&out),
+        }));
+    }
+    let (_na, ma) = linalg::value_as_matrix(a)?;
+    let (_nb, mb) = linalg::value_as_matrix(b)?;
+    let da = (ma.len() as f64).sqrt() as usize;
+    let db = (mb.len() as f64).sqrt() as usize;
+    if da * da != ma.len() || db * db != mb.len() {
+        return Err("kron: matrices must be square".into());
+    }
+    let out = linalg::kronecker(&ma, da, &mb, db);
+    let dim = da * db;
+    let qubits_f = (dim as f64).log2();
+    if (qubits_f - qubits_f.round()).abs() < 1e-9 {
+        let qubits = qubits_f.round() as usize;
+        Ok(linalg::density_handle(qubits, &out))
+    } else {
+        Ok(json!({
+            "_type": "quantum_density",
+            "dim": dim,
+            "matrix": sim::matrix_to_json(&linalg::flat_to_nested(&out, dim)),
+        }))
+    }
+});
+
+q_ffi!(quantum_schmidt, |args: &Value| {
+    let src = args
+        .get("state")
+        .or_else(|| args.get("态"))
+        .or_else(|| args.get("circuit"))
+        .or_else(|| args.get("电路"))
+        .ok_or_else(|| "schmidt needs `state` or `circuit`".to_string())?;
+    let cut = arg_u(args, "cut")
+        .or_else(|_| arg_u(args, "分割"))
+        .unwrap_or(1);
+    let (n, amps) = linalg::amps_from_state_or_circuit(src)?;
+    linalg::schmidt_decompose(&amps, n, cut)
+});
+
+q_ffi!(quantum_fidelity, |args: &Value| {
+    let a = args
+        .get("a")
+        .or_else(|| args.get("左"))
+        .ok_or_else(|| "fidelity needs `a`".to_string())?;
+    let b = args
+        .get("b")
+        .or_else(|| args.get("右"))
+        .ok_or_else(|| "fidelity needs `b`".to_string())?;
+    let (_, aa) = linalg::amps_from_state_or_circuit(a)?;
+    let (_, bb) = linalg::amps_from_state_or_circuit(b)?;
+    Ok(json!(linalg::fidelity_pure(&aa, &bb)?))
+});
+
+fn parse_usize_list(v: &Value) -> Result<Vec<usize>, String> {
+    match v {
+        Value::Array(a) => a
+            .iter()
+            .map(|x| {
+                x.as_u64()
+                    .or_else(|| x.as_i64().map(|i| i as u64))
+                    .or_else(|| x.as_str().and_then(|s| s.trim().parse().ok()))
+                    .map(|u| u as usize)
+                    .ok_or_else(|| "bad keep list entry".to_string())
+            })
+            .collect(),
+        Value::Number(n) => Ok(vec![n.as_u64().unwrap_or(0) as usize]),
+        Value::String(s) => s
+            .split(|c| c == ',' || c == ' ')
+            .filter(|t| !t.is_empty())
+            .map(|t| t.parse().map_err(|_| format!("bad keep `{t}`")))
+            .collect(),
+        _ => Err("keep must be list, number, or comma string".into()),
+    }
+}
+
 fn register(host: &MarqdoHostApi, name: &str, params: &str, fn_ptr: PluginFn) -> c_int {
     let register = match host.register_fn {
         Some(f) => f,
@@ -695,6 +976,53 @@ pub unsafe extern "C" fn marqdo_plugin_init(host: *const MarqdoHostApi) -> c_int
             "circuit,gate,qubits",
             quantum_apply as PluginFn,
         ),
+        (
+            "quantum_density_from_state",
+            "state",
+            quantum_density_from_state as PluginFn,
+        ),
+        (
+            "quantum_density_from_matrix",
+            "matrix",
+            quantum_density_from_matrix as PluginFn,
+        ),
+        (
+            "quantum_density_matrix",
+            "density",
+            quantum_density_matrix as PluginFn,
+        ),
+        (
+            "quantum_density_purity",
+            "density",
+            quantum_density_purity as PluginFn,
+        ),
+        (
+            "quantum_density_partial_trace",
+            "density,keep",
+            quantum_density_partial_trace as PluginFn,
+        ),
+        (
+            "quantum_density_eig",
+            "density",
+            quantum_density_eig as PluginFn,
+        ),
+        (
+            "quantum_density_expect",
+            "density,obs",
+            quantum_density_expect as PluginFn,
+        ),
+        (
+            "quantum_density_draw",
+            "density,path,kind",
+            quantum_density_draw as PluginFn,
+        ),
+        ("quantum_kron", "a,b", quantum_kron as PluginFn),
+        (
+            "quantum_schmidt",
+            "state,cut",
+            quantum_schmidt as PluginFn,
+        ),
+        ("quantum_fidelity", "a,b", quantum_fidelity as PluginFn),
     ];
     for (name, params, f) in regs {
         if register(host, name, params, f) != 0 {

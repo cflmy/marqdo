@@ -2,8 +2,8 @@
 
 | | |
 |---|---|
-| 状态 | **Q0–Q6 已落地**（含公式自定义门；更大 n / 完整开放系统另文） |
-| 日期 | 2026-08-12 |
+| 状态 | **Q0–Q7b 已落地 · Q7c 待补**（高阶线性代数 + 高级可视化） |
+| 日期 | 2026-08-28 |
 | **锁定设计** | [design/ext-quantum.md](../design/ext-quantum.md) |
 | 相关 | [ext-cli.md](../design/ext-cli.md) · [ext-abi.md](../design/ext-abi.md) · [stdlib-math.md](../design/stdlib-math.md) · [view.md](../design/view.md) |
 | 安装 | `marqdo ext add quantum`（`quantum` / `量子`） |
@@ -30,8 +30,11 @@
 | **Q5** | 教学噪声 + barrier/measure/append/state — [ext-quantum-q5.md](../design/ext-quantum-q5.md) | **done（最小）** |
 | **Q5.5** | `amplitude_damping` 轨迹 — [ext-quantum-q5.5.md](../design/ext-quantum-q5.5.md) | **done** |
 | **Q6** | 公式/`matrix=` 自定义门 + `apply` — [ext-quantum-custom-gate.md](../design/ext-quantum-custom-gate.md) | **done** |
+| **Q7a** | 密度矩阵 / Kronecker / 部分迹 / Hermitian 谱 / Schmidt / Pauli 期望 / 纯度·保真度 — [ext-quantum-q7.md](../design/ext-quantum-q7.md) | **done** |
+| **Q7b** | 高级 SVG：hinton / city / density / paulivec / qsphere / multibloch | **done** |
+| **Q7c** | 纠缠示例 + 用户文档 / skill 摘要 | **pending** |
 
-验收金样：`tests/ext/quantum-bell-smoke.mq.md`、`quantum-draw-smoke.mq.md`、`quantum-gate-matrix-smoke.mq.md`、`quantum-gate-heatmap-smoke.mq.md`、`quantum-author-api-smoke.mq.md`、`quantum-noise-smoke.mq.md`、`quantum-amp-damp-smoke.mq.md`、`quantum-custom-gate-smoke.mq.md`、中文对称样例。
+验收金样：既有 `tests/ext/quantum-*-smoke.mq.md`；Q7 新增 `quantum-linalg-smoke`、`quantum-viz-advanced-smoke`（及中文对称）。
 
 ---
 

@@ -2596,6 +2596,45 @@ fn ext_quantum_custom_gate_zh_smoke() {
 }
 
 #[test]
+fn ext_quantum_linalg_smoke() {
+    let status = Command::new("cargo")
+        .args(["build", "-p", "marqdo_plugin_quantum"])
+        .current_dir(env!("CARGO_MANIFEST_DIR"))
+        .status()
+        .expect("build quantum plugin");
+    assert!(status.success(), "failed to build marqdo_plugin_quantum");
+    assert_out(
+        "tests/ext/quantum-linalg-smoke.mq.md",
+        "purity-ok\nreduce-ok\nexpect-ok\nschmidt-ok",
+    );
+}
+
+#[test]
+fn ext_quantum_viz_advanced_smoke() {
+    let status = Command::new("cargo")
+        .args(["build", "-p", "marqdo_plugin_quantum"])
+        .current_dir(env!("CARGO_MANIFEST_DIR"))
+        .status()
+        .expect("build quantum plugin");
+    assert!(status.success(), "failed to build marqdo_plugin_quantum");
+    assert_out("tests/ext/quantum-viz-advanced-smoke.mq.md", "viz-ok");
+    for (p, marker) in [
+        ("tests/ext/quantum-viz-hinton.svg", "data-hinton"),
+        ("tests/ext/quantum-viz-qsphere.svg", "data-qsphere"),
+        ("tests/ext/quantum-viz-multibloch.svg", "data-multibloch"),
+        ("tests/ext/quantum-viz-city.svg", "data-city"),
+    ] {
+        let svg = std::fs::read_to_string(p).unwrap_or_default();
+        assert!(
+            svg.contains("<svg") && svg.contains(marker),
+            "expected {marker} in {p}, got {} bytes",
+            svg.len()
+        );
+        let _ = std::fs::remove_file(p);
+    }
+}
+
+#[test]
 fn ext_agent_framework_smoke() {
     let status = Command::new("cargo")
         .args(["build", "-p", "marqdo_plugin_agent"])
