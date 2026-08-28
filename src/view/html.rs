@@ -2306,6 +2306,7 @@ fn plan_result_card(stdout: &str, links: &LinkMode) -> String {
     };
     let workbook = v.get("workbook").and_then(|x| x.as_str());
     let cache = v.get("cache").and_then(|x| x.as_str());
+    let match_kind = v.get("match").and_then(|x| x.as_str());
     let rounds = v
         .get("rounds")
         .and_then(|x| x.as_u64())
@@ -2320,6 +2321,9 @@ fn plan_result_card(stdout: &str, links: &LinkMode) -> String {
     }
     if let Some(c) = cache {
         meta.push(format!("cache={}", escape(c)));
+    }
+    if let Some(m) = match_kind {
+        meta.push(format!("match={}", escape(m)));
     }
     if let Some(r) = rounds {
         meta.push(format!("rounds={r}"));

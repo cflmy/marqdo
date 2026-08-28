@@ -3,6 +3,7 @@
 ## Unreleased
 
 ### Added
+- **`ext/agent` A1（OKF 复用飞轮）**: `agent_kb_list_tasks` 返回 description/aliases/status/llm_free/hits；`plan` 命中路径暴露 `match`/`score`（summary 含 match kind）；soft_match 策展提示带 status/llm_free/description；view plan 卡显示 match。金样 `agent-kb-plan-hit`。路线 [ext-agent-optimize.md](doc/roadmap/ext-agent-optimize.md)。
 - **`ext/web` 样式装配（`web_style` / `网页.样式装配`）**: 样式即数据表格 —— GFM 样式表（`|选择器|属性|值|`，可用 `|媒体|` 列分组进 `@media` 块）经 `样式装配` 函数转成 CSS 文本，再拼装成完整主题。替代"整段手写 CSS 字符串"的写法，贯彻 文档即代码。见 [marqdo-blog](examples/marqdo-blog/styles/theme.mq.md)。
 - **网络能力调研（`doc/design/web-net-capabilities.md`）**: 盘点 `ext/web` + `plugins/web` + `lib/net` 现状，对照主流语言网络栈（FastAPI / Express / Flask / axum），给出「开发一个完整 Web 项目」所需能力的差距清单与分波次补强路线（W1–W7 + P3，**2026-08-28 已全部落地**）。
 - **AI Skill + 文档（ext/web 完结复核）**: `skills/marqdo/` 与 `.cursor/skills/marqdo/` 增加 **ext/web 动态站** 专节（硬规则、API 摘要、§13 最小站点样例）；`doc/design/web-net-capabilities.md` 结论/对照表与 W7+P3 实现对齐；`doc/design/ai-skill.md` 更新用途说明。

@@ -962,6 +962,7 @@ pub fn kb_list_tasks(args: &Value) -> Result<Value, String> {
     .clamp(1, 200);
     let root = resolve_path(kb);
     let tasks_dir = root.join("concepts/tasks");
+    let skills_dir = root.join("concepts/skills");
     let mut tasks: Vec<Value> = Vec::new();
     if tasks_dir.is_dir() {
         let mut ents: Vec<_> = fs::read_dir(&tasks_dir)
@@ -988,7 +989,38 @@ pub fn kb_list_tasks(args: &Value) -> Result<Value, String> {
                 continue;
             }
             let title = extract_fm_field(&src, "title").unwrap_or_else(|| slug.clone());
-            tasks.push(json!({ "slug": slug, "title": title }));
+            let description = extract_fm_field(&src, "description").unwrap_or_default();
+            let aliases = extract_fm_aliases(&src);
+            let alias_count = aliases.len() as i64;
+            let skill_path = skills_dir.join(format!("{slug}.md"));
+            let (status, llm_free, hits) = if skill_path.is_file() {
+                match fs::read_to_string(&skill_path) {
+                    Ok(sk) => {
+                        let status =
+                            extract_fm_field(&sk, "status").unwrap_or_else(|| "stable".into());
+                        let llm_free = extract_fm_field(&sk, "llm_free")
+                            .map(|s| s == "true" || s == "True")
+                            .unwrap_or(false);
+                        let hits = extract_fm_field(&sk, "hits")
+                            .and_then(|s| s.parse::<i64>().ok())
+                            .unwrap_or(0);
+                        (status, llm_free, hits)
+                    }
+                    Err(_) => ("unreadable".into(), false, 0),
+                }
+            } else {
+                ("missing_skill".into(), false, 0)
+            };
+            tasks.push(json!({
+                "slug": slug,
+                "title": title,
+                "description": description,
+                "aliases": aliases,
+                "alias_count": alias_count,
+                "status": status,
+                "llm_free": llm_free,
+                "hits": hits,
+            }));
         }
     }
     let count = tasks.len() as i64;

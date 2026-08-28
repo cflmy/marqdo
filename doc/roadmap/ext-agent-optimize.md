@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| 状态 | **进行中 · A0 大部完成**（护栏 + soft + solidify 单测/金样；多轮 CONTINUE 离线金样） |
+| 状态 | **进行中 · A0/A1 完成**（A1：list_tasks 策展字段；plan hit 暴露 match/score；金样 `agent-kb-plan-hit`） |
 | 日期 | 2026-08-28 |
 | 调研 | [agent-frameworks-and-marqdo.md](../research/agent-frameworks-and-marqdo.md) |
 | 设计 | [ext-agent.md](../design/ext-agent.md) · [ext-agent-plan.md](../design/ext-agent-plan.md) · [ext-agent-parent.md](../design/ext-agent-parent.md) · [okf.md](../design/okf.md) |
@@ -24,8 +24,8 @@
 
 | 波次 | 主题 | 验收线索 |
 |------|------|----------|
-| **A0** | 工作簿补丁 / 固化可靠性 | **mostly done** — 整文件 FIND 护栏；`soft` 仅 miss；decompose `n` 检查；`workbook_solidify` 单测；金样 `agent-workbook-patch-a0`（双 CONTINUE + solidify） |
-| **A1** | OKF 复用飞轮（lookup / near / soft_match UX） | 二次同类 `plan` 走快路径；策展可读 |
+| **A0** | 工作簿补丁 / 固化可靠性 | **done** — 整文件 FIND 护栏；`soft` 仅 miss；decompose `n` 检查；`workbook_solidify` 单测；金样 `agent-workbook-patch-a0`（双 CONTINUE + solidify） |
+| **A1** | OKF 复用飞轮（lookup / near / soft_match UX） | **done** — `list_tasks` 含 description/aliases/status/llm_free/hits；`plan` 命中路径暴露 `match`/`score`；soft_match 策展行含 meta；view plan 卡显示 match；金样 `agent-kb-plan-hit`（exact hit + near soft-hit） |
 | **A2** | 过程可见（stream + view 过程卡） | 对齐 [agent-streaming.md](agent-streaming.md)；真相仍可写回 |
 | **A3** | 上下文预算（源码/Skill 渐进披露） | 长 runbook 不爆窗，仍保持「源码即提示」 |
 | **A4** | 可选：RAG/MCP 工具适配器 | 金样调用外置检索，权威仍是 `.mq.md` |

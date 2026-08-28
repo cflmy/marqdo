@@ -2731,6 +2731,20 @@ fn ext_agent_workbook_patch_a0() {
 }
 
 #[test]
+fn ext_agent_kb_plan_hit() {
+    let status = Command::new("cargo")
+        .args(["build", "-p", "marqdo_plugin_agent"])
+        .current_dir(env!("CARGO_MANIFEST_DIR"))
+        .status()
+        .expect("build agent plugin");
+    assert!(status.success(), "failed to build marqdo_plugin_agent");
+    assert_out(
+        "tests/ext/agent-kb-plan-hit.mq.md",
+        "promoted\nlist-ok\nlist-free\nstable\nlist-desc\nhit\nexact\npong\nsum-exact\nsoft-hit\nnear\npong",
+    );
+}
+
+#[test]
 fn ext_agent_plan_observe() {
     assert_out(
         "tests/ext/agent-plan-observe.mq.md",

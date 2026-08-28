@@ -940,24 +940,48 @@ Parse `SLUG: …` / `标识：…` after a soft-match REUSE decision.
     + `goal`
     + `tasks`
 
-Short parent prompt: REUSE+SLUG or NEW only. Candidates may include lexical `score` (prefer higher).
+Short parent prompt: REUSE+SLUG or NEW only. Candidates may include lexical `score` (prefer higher). `list_tasks` rows may also carry `description` / `status` / `llm_free`.
 
-*esc = > json.parse text={"a":"\n\n--- goal ---\n","b":"\n\n--- candidate tasks (slug | title | score) ---\n","c":"\n\n--- how to act ---\nExact reuse miss; candidates are ranked by local n-gram score when present. Prefer higher scores. Reply with ONE protocol only:\nDECISION: REUSE\nSLUG: <exact-slug-from-list>\nor\nDECISION: NEW\nNo other prose.\n","nl":"\n","sep":" | ","sp":"score="}*
+*esc = > json.parse text={"a":"\n\n--- goal ---\n","b":"\n\n--- candidate tasks (slug | title | meta) ---\n","c":"\n\n--- how to act ---\nExact reuse miss; candidates are ranked by local n-gram score when present. Prefer higher scores and llm_free=true skills. Reply with ONE protocol only:\nDECISION: REUSE\nSLUG: <exact-slug-from-list>\nor\nDECISION: NEW\nNo other prose.\n","nl":"\n","sep":" | ","sp":"score=","st":"status=","lf":"llm_free="}*
 *a = > json.get value=`esc` key="a"*
 *b = > json.get value=`esc` key="b"*
 *c = > json.get value=`esc` key="c"*
 *nl = > json.get value=`esc` key="nl"*
 *sep = > json.get value=`esc` key="sep"*
 *sp = > json.get value=`esc` key="sp"*
+*st = > json.get value=`esc` key="st"*
+*lf = > json.get value=`esc` key="lf"*
 *lines = > json.parse text=[]*
 - [`t`](`tasks`)
   *slug = > json.get value=`t` key="slug"*
   *title = > json.get value=`t` key="title"*
+  *row = slug + sep + title*
   *score = > json.get value=`t` key="score"*
   1. `score`
-    *row = slug + sep + title + sep + sp + score*
+    *row = row + sep + sp + score*
   2. *
-    *row = slug + sep + title*
+    *_ = 1*
+  *status = > json.get value=`t` key="status"*
+  1. `status`
+    *row = row + sep + st + status*
+  2. *
+    *_ = 1*
+  *free = > json.get value=`t` key="llm_free"*
+  1. `free` == True
+    *row = row + sep + lf + "true"*
+  2. `free` == true
+    *row = row + sep + lf + "true"*
+  3. `free` == False
+    *row = row + sep + lf + "false"*
+  4. `free` == false
+    *row = row + sep + lf + "false"*
+  5. *
+    *_ = 1*
+  *desc = > json.get value=`t` key="description"*
+  1. `desc`
+    *row = row + sep + desc*
+  2. *
+    *_ = 1*
   *lines = > json.append list=`lines` item=`row`*
 *catalog = > join value=`lines` sep=`nl`*
 *p = "Soft-match: same task intent?"*
@@ -1490,11 +1514,20 @@ Reuse lookup: exact → alias → canonicalize → optional local n-gram `near` 
         *out = > json.set map=`out` key="workbook" value=`path`*
         *out = > json.set map=`out` key="rounds" value=1*
         *out = > json.set map=`out` key="cache" value=`cache_label`*
+        *out = > json.set map=`out` key="match" value=`match_kind`*
+        *hit_score = > json.get value=`hit` key="score"*
+        1. `hit_score`
+          *out = > json.set map=`out` key="score" value=`hit_score`*
+        2. *
+          *_ = 1*
         *sk = > json.get value=`hit` key="skill"*
         *out = > json.set map=`out` key="skill" value=`sk`*
         *st = > json.get value=`hit` key="status"*
         *out = > json.set map=`out` key="skill_status" value=`st`*
-        *sum = "OKF llm_free skill hit; spawned resource"*
+        *sum = > json.parse text={"a":"OKF llm_free skill hit (","b":"); spawned resource"}*
+        *suma = > json.get value=`sum` key="a"*
+        *sumb = > json.get value=`sum` key="b"*
+        *sum = suma + match_kind + sumb*
         *out = > json.set map=`out` key="summary" value=`sum`*
         *out = > json.set map=`out` key="observation" value=`last_obs`*
         *out = > json.set map=`out` key="result" value=`child_val`*
@@ -1537,11 +1570,20 @@ Reuse lookup: exact → alias → canonicalize → optional local n-gram `near` 
           *out = > json.set map=`out` key="workbook" value=`path`*
           *out = > json.set map=`out` key="rounds" value=1*
           *out = > json.set map=`out` key="cache" value=`cache_label`*
+          *out = > json.set map=`out` key="match" value=`match_kind`*
+          *hit_score = > json.get value=`hit` key="score"*
+          1. `hit_score`
+            *out = > json.set map=`out` key="score" value=`hit_score`*
+          2. *
+            *_ = 1*
           *sk = > json.get value=`hit` key="skill"*
           *out = > json.set map=`out` key="skill" value=`sk`*
           *st = > json.get value=`hit` key="status"*
           *out = > json.set map=`out` key="skill_status" value=`st`*
-          *sum = "OKF skill hit; spawned resource"*
+          *sum = > json.parse text={"a":"OKF skill hit (","b":"); spawned resource"}*
+          *suma = > json.get value=`sum` key="a"*
+          *sumb = > json.get value=`sum` key="b"*
+          *sum = suma + match_kind + sumb*
           *out = > json.set map=`out` key="summary" value=`sum`*
           *out = > json.set map=`out` key="observation" value=`last_obs`*
           *out = > json.set map=`out` key="result" value=`child_val`*
