@@ -7,6 +7,7 @@
 - **网络能力调研（`doc/design/web-net-capabilities.md`）**: 盘点 `ext/web` + `plugins/web` + `lib/net` 现状，对照主流语言网络栈（FastAPI / Express / Flask / axum），给出「开发一个完整 Web 项目」所需能力的差距清单与分波次补强路线（W1–W7 + P3，**2026-08-28 已全部落地**）。
 - **AI Skill + 文档（ext/web 完结复核）**: `skills/marqdo/` 与 `.cursor/skills/marqdo/` 增加 **ext/web 动态站** 专节（硬规则、API 摘要、§13 最小站点样例）；`doc/design/web-net-capabilities.md` 结论/对照表与 W7+P3 实现对齐；`doc/design/ai-skill.md` 更新用途说明。
 - **`ext/quantum` Q7（高阶线性代数 + 高级可视化）**: 密度矩阵 / 部分迹 / Hermitian 谱 / Schmidt / Pauli 期望 / 纯度；SVG：hinton、city、density、paulivec、qsphere、multibloch。全部经 `plugins/quantum` ABI。设计 [ext-quantum-q7.md](doc/design/ext-quantum-q7.md)；金样 `quantum-linalg-smoke`、`quantum-viz-advanced-smoke`；示例 [quantum-entanglement](examples/quantum-entanglement/)。
+- **`ext/quantum` Q8a/Q8b（可视化美学）**: `draw theme=dark|light|bw`（默认 dark）；标签芯片 + gutter 消除线穿字；门族分色；probs/bloch 共用令牌；view 对 `data-theme` 换图框。设计 [ext-quantum-viz-style.md](doc/design/ext-quantum-viz-style.md)。改插件后须 `marqdo ext add quantum` 再开 view。
 
 ### Changed
 - **Frontmatter import syntax**: `import bind:target` / `导入 bind:target` (file `.mq.md` or short name `lib.member`). Removed legacy `> path.mq.md` / `> use` imports. See [module-namespace.md](doc/design/module-namespace.md).

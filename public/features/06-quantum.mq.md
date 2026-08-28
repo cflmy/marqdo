@@ -1,6 +1,6 @@
 ---
 title: Quantum circuits (ext/quantum)
-description: Official quantum simulator — tables, gates, Q7 density and advanced SVG
+description: Official quantum simulator — tables, gates, Q7 density, Q8 themed SVG
 import quantum:ext/quantum/quantum.mq.md
 ---
 
@@ -10,7 +10,9 @@ Optional package (not stdlib). Install: `marqdo ext add quantum` (or build `marq
 
 GHZ (3 qubits): H on q0, then CX 0→1 and 0→2. Ideal |000⟩ / |111⟩ each ≈ 1/2.
 
-Q7: Bell density, partial trace (mixed reduced state), Schmidt entropy, and `draw kind=hinton` / qsphere. See `examples/quantum-entanglement/`.
+Q7: Bell density, partial trace, Schmidt, `draw kind=hinton` / qsphere — `examples/quantum-entanglement/`.
+
+Q8: `draw theme="dark"|"light"|"bw"` (default dark lab look) on circuit / probs / bloch. Rebuild plugin then `ext add` so view loads the new native lib.
 
 `steps` =
 
@@ -22,7 +24,7 @@ Q7: Bell density, partial trace (mixed reduced state), Schmidt entropy, and `dra
 
 *`qc` = > quantum.circuit qubits=3 steps=`steps`*
 *`p` = > `qc`.probabilities*
-*`_` = > `qc`.draw kind="probs"*
+*`_` = > `qc`.draw kind="probs" theme="dark"*
 *`H` = > quantum.gate name="H"*
 *`__` = > `H`.draw kind="matrix"*
 

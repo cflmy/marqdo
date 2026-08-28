@@ -134,7 +134,7 @@ import clock:lib/time.mq.md
 - Instance methods stay `` > `obj`.method `` (backticks on the receiver only).
 - `lib/…` resolves via `MARQDO_LIB`, cwd `lib/`, or `lib/` next to the `marqdo` binary.
 - Design: [module-namespace.md](../../doc/design/module-namespace.md).
-- Official optional extensions (`ext/`, not stdlib): install with `marqdo ext add llm|agent|web|quantum` (see `doc/design/ext-cli.md`). `ext/llm` — chat; `ext/agent` — document-driven agents: **step** (default writeback) / **plan** workbook ([ext-agent.md](../../doc/design/ext-agent.md), [ext-agent-plan.md](../../doc/design/ext-agent-plan.md)); **`ext/web`** — dynamic sites (W0–W7 + P3 complete; see below); **`ext/quantum`** — circuits + Q7 density/viz (see below).
+- Official optional extensions (`ext/`, not stdlib): install with `marqdo ext add llm|agent|web|quantum` (see `doc/design/ext-cli.md`). `ext/llm` — chat; `ext/agent` — document-driven agents: **step** (default writeback) / **plan** workbook ([ext-agent.md](../../doc/design/ext-agent.md), [ext-agent-plan.md](../../doc/design/ext-agent-plan.md)); **`ext/web`** — dynamic sites (W0–W7 + P3 complete; see below); **`ext/quantum`** — circuits + Q7 density/viz + Q8 themed SVG (see below).
 - Native plugins: `lib/plugin` — `## load` / `unload` / `list`. C ABI: `include/marqdo_abi.h`.
 - Prefer `table.put` / `表.改` for list/map element updates; keep `json` for parse/stringify/quote (see `doc/design/stdlib-table.md`).
 - Builtins (no import): `print`/`打印`, `input`/`输入`, `len`/`长度`, `str`/`文本`, `int`/`整数`; literals `True`/`真`, `False`/`假`, `None`/`空`; logic `and`/`且`, `or`/`或`, `not`/`非`.
@@ -178,22 +178,29 @@ Design: [ext-web.md](../../doc/design/ext-web.md) · capability matrix: [web-net
 
 Web patterns: [examples.md](examples.md) §13 · API index: [reference.md](reference.md).
 
-## Official extension: `ext/quantum` (circuits + Q7)
+## Official extension: `ext/quantum` (circuits + Q7/Q8)
 
-Install: `marqdo ext add quantum` (ZH id: `量子`). Build: `cargo build --release -p marqdo_plugin_quantum`.
+Install: `marqdo ext add quantum` (ZH id: `量子`). Build: `cargo build --release -p marqdo_plugin_quantum`, then **`marqdo ext add quantum` again** so view loads the new `libquantum.so` (stale plugin = old black/white circuits).
 
 - EN: `import quantum:ext/quantum/quantum.mq.md`
 - ZH: `导入 量子:ext/quantum/量子.mq.md`
 
-**Hard rules:** `ext/**` never calls `host_*`; hot path is ABI plugin; ≤12 qubits for statevector; density-matrix ops ≤6 qubits; one language file per program.
+**Hard rules:** `ext/**` never calls `host_*`; hot path is ABI plugin; ≤12 qubits for statevector; density-matrix ops ≤6 qubits; one language file per program; quote draw string args (`kind="…"`, `theme="…"`).
 
 **Core:** `# circuit` / `# gate` / `# density` — table `steps=` or method chain; `simulate` / `probabilities` / `run` / `draw`.
 
 **Q7 linear algebra:** `density`, `partial_trace`, `eig`, `expect` (Pauli string, left=high bit), `purity`, `kron`, `schmidt`, `fidelity`.
 
-**Q7 draw kinds:** `circuit|probs|bloch|hinton|city|density|paulivec|qsphere|multibloch` (quote string args: `kind="hinton"`).
+**Draw kinds:** `circuit|probs|bloch|hinton|city|density|paulivec|qsphere|multibloch`.
 
-Design: [ext-quantum.md](../../doc/design/ext-quantum.md) · Q7: [ext-quantum-q7.md](../../doc/design/ext-quantum-q7.md) · examples: [quantum-bell](../../examples/quantum-bell/) · [quantum-entanglement](../../examples/quantum-entanglement/).
+**Q8 themes (circuit / probs / bloch):** `theme="dark"|"light"|"bw"` (ZH `主题=`; **default `dark`** — slate lab look, gate-family colors, label chips so wires never cross `q0` text). View plot chrome follows `data-theme` on the SVG. Advanced kinds (hinton/…) still Q8c pending full re-skin.
+
+```markdown
+*_ = > `qc`.draw kind="circuit" theme="dark"*
+*_ = > `qc`.draw kind="probs" theme="light"*
+```
+
+Design: [ext-quantum.md](../../doc/design/ext-quantum.md) · Q7: [ext-quantum-q7.md](../../doc/design/ext-quantum-q7.md) · Q8 viz: [ext-quantum-viz-style.md](../../doc/design/ext-quantum-viz-style.md) · examples: [quantum-bell](../../examples/quantum-bell/) · [quantum-entanglement](../../examples/quantum-entanglement/).
 
 ## AI authoring workflow
 
@@ -221,6 +228,8 @@ Design: [ext-quantum.md](../../doc/design/ext-quantum.md) · Q7: [ext-quantum-q7
 | Call `host_web_*` from `ext/web` | Use `# app` / `# db` methods; plugin ABI only |
 | Call `host_*` from `ext/quantum` | Use `# circuit` / `# density` methods; plugin ABI only |
 | Bare `kind=hinton` inside `*…*` | `kind="hinton"` — quote text literals |
+| Bare `theme=dark` inside `*…*` | `theme="dark"` — quote; ZH `主题="dark"` |
+| Rebuild plugin but skip `ext add` | `cargo build -p marqdo_plugin_quantum` then `marqdo ext add quantum` (or set `MARQDO_QUANTUM_PLUGIN`) |
 
 ## Checklist before finishing
 
@@ -231,4 +240,5 @@ Design: [ext-quantum.md](../../doc/design/ext-quantum.md) · Q7: [ext-quantum-q7
 - [ ] Nested functions ended with `---` / `***` / `****` when needed
 - [ ] Imports and call names share the same language file
 - [ ] Web sites: tables + web classes only (no JSON glue); `data/` gitignored
+- [ ] Quantum draw: quote `kind=` / `theme=`; rebuild plugin → `ext add quantum` before view
 - [ ] `marqdo run` succeeds (or errors addressed)

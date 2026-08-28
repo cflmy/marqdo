@@ -1,6 +1,6 @@
 ---
 title: Entanglement lab
-description: Bell state — density, partial trace, Schmidt, advanced SVG (Q7).
+description: Bell state — density, partial trace, Schmidt, themed SVG (Q7/Q8).
 import quantum:ext/quantum/quantum.mq.md
 import math:lib/math.mq.md
 ---
@@ -32,7 +32,7 @@ Build |Φ⁺⟩ with H then CX. Full-state purity stays 1; tracing out one qubit
 *sch = > `qc`.schmidt cut=1*
 *ent = sch[^entropy]*
 
-*_ = > `qc`.draw path="entangle-circuit.svg"*
+*_ = > `qc`.draw path="entangle-circuit.svg" theme="dark"*
 *_ = > `qc`.draw kind="hinton" path="entangle-hinton.svg"*
 *_ = > `qc`.draw kind="qsphere" path="entangle-qsphere.svg"*
 *_ = > `qc`.draw kind="multibloch" path="entangle-multibloch.svg"*

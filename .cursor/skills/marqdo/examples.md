@@ -272,7 +272,7 @@ import db:db/index.mq.md
 - Full blog/CMS patterns: `examples/marqdo-blog/` (routes, SEO, RSS, auth, upload, WS).
 - Run after `marqdo ext add web` and building `marqdo_plugin_web`.
 
-## 14. Quantum entanglement lab (ext/quantum Q7)
+## 14. Quantum entanglement lab (ext/quantum Q7/Q8)
 
 ```markdown
 ---
@@ -292,9 +292,11 @@ import quantum:ext/quantum/quantum.mq.md
 *rho = > `qc`.density*
 *red = > `rho`.partial_trace keep=0*
 *sch = > `qc`.schmidt cut=1*
+*_ = > `qc`.draw kind="circuit" theme="dark"*
 *_ = > `qc`.draw kind="hinton"*
 > print text=`red`
 ```
 
 - Full lab: `examples/quantum-entanglement/`. Bell-only: `examples/quantum-bell/`.
-- Build `marqdo_plugin_quantum` then `marqdo ext add quantum`.
+- `theme="dark"|"light"|"bw"` (default dark) on `circuit` / `probs` / `bloch`. Quote `kind=` / `theme=`.
+- After rebuilding the plugin: `marqdo ext add quantum` so view loads the new native lib.

@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| 状态 | **Accepted · Q8a/Q8b done · Q8c pending** |
+| 状态 | **Accepted · Q8a/Q8b landed · Q8c pending** |
 | 日期 | 2026-08-28 |
 | 父设计 | [ext-quantum.md](ext-quantum.md) · [ext-quantum-q7.md](ext-quantum-q7.md) |
 | 路线图 | [roadmap/ext-quantum.md](../roadmap/ext-quantum.md) |
@@ -52,7 +52,20 @@
 | `light` | 浅底文档打印 |
 | `bw` | 无彩色、高对比 |
 
-作者面：`draw theme=dark|light|bw`（中文 `主题=`）；缺省 `dark`。
+作者面：
+
+```markdown
+*`svg` = > `qc`.draw kind="circuit" theme="dark"*
+*`svg` = > `qc`.draw kind="probs" theme="light"*
+```
+
+| 参数 | 默认 | 说明 |
+|------|------|------|
+| `kind` | `circuit` | 既有枚举不变 |
+| `theme` | `dark` | 新增；非法值报错 |
+| `path` | — | 既有 |
+
+中文：`主题=dark|light|bw`。ABI：`quantum_draw_circuit` 增可选 `theme`（circuit/probs/bloch 已生效；gate/density 高级图见 Q8c）。
 
 ### 3.2 Dark 色板（默认）
 
@@ -74,20 +87,20 @@ Light / bw 在实现里各给一套平行表；金样以 dark 主断言（SVG �
 
 ```text
 | pad | label_col | gutter | col0 | … | colN | pad |
-      ^q0 文字居中    ^导线从此开始（不穿过文字）
+      ^q0 芯片标签    ^导线从此开始（不穿过文字）
 ```
 
-| 常量 | 建议值 |
+| 常量 | 实现值 |
 |------|--------|
-| `LABEL_W` | 36 |
-| `GUTTER` | 10（标签区右缘 → 第一门中心前的空档） |
-| `PAD_X` / `PAD_Y` | 16 / 20 |
-| `COL_W` | 64 |
-| `ROW_H` | 48 |
-| 门盒 | 32×32，`rx=6` |
-| 线宽 | 导线 1.75；门描边 1.25；控制竖线 2 |
+| `LABEL_W` | 52 |
+| `GUTTER` | 20 |
+| `PAD_X` / `PAD_Y` | 24 / 36 |
+| `COL_W` | 80 |
+| `ROW_H` | 64 |
+| 门盒 | 40×40，`rx=8` |
+| 线宽 | 导线双层 3.2+1.8；门描边 ~1.1；控制竖线 2.25 |
 
-标签：`text-anchor="end"`，落在标签列右缘内侧；`dominant-baseline="middle"`；导线 `x1 = LABEL_W + GUTTER`。
+标签：圆角芯片 + 居中文字；导线 `x1 = PAD_X + LABEL_W + GUTTER`。
 
 ### 3.4 门族映射
 
@@ -104,18 +117,7 @@ Light / bw 在实现里各给一套平行表；金样以 dark 主断言（SVG �
 
 ## 4. 作者面（增量，向后兼容）
 
-```markdown
-*`svg` = > `qc`.draw kind="circuit" theme="dark" *
-*`svg` = > `qc`.draw kind="probs" theme="light" *
-```
-
-| 参数 | 默认 | 说明 |
-|------|------|------|
-| `kind` | `circuit` | 既有枚举不变 |
-| `theme` | `dark` | 新增；非法值报错 |
-| `path` | — | 既有 |
-
-中文：`主题=dark|light|bw`。ABI：`quantum_draw_circuit` 增可选 `theme`；`quantum_density_draw` / `quantum_gate_draw` 同步。
+见 §3.1。字符串参数须加引号：`kind="circuit"`、`theme="dark"`（中文 `种类=` / `主题=`）。改插件后须 `marqdo ext add quantum` 再开 view，否则仍加载旧 `.so`。
 
 ---
 

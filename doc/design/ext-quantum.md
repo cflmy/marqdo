@@ -2,8 +2,8 @@
 
 | | |
 |---|---|
-| 状态 | **Accepted · Q0–Q6 已落地 · Q7 进行中**（[ext-quantum-q7.md](ext-quantum-q7.md)：高阶线性代数 + 高级可视化） |
-| 日期 | 2026-08-12（初版）· 2026-08-28（Q7） |
+| 状态 | **Accepted · Q0–Q7 完结 · Q8a/Q8b 完结**（[ext-quantum-q7.md](ext-quantum-q7.md) · [ext-quantum-viz-style.md](ext-quantum-viz-style.md)；Q8c 高级态图换肤待做） |
+| 日期 | 2026-08-12（初版）· 2026-08-28（Q7 · Q8 viz） |
 | 相关 | [stdlib-math.md](stdlib-math.md) · [ext-abi.md](ext-abi.md) · [ext-cli.md](ext-cli.md) · [ext-web.md](ext-web.md) · [view.md](view.md) · [stdlib-i18n.md](stdlib-i18n.md) · [roadmap/ext-quantum.md](../roadmap/ext-quantum.md) |
 | 安装（目标） | `marqdo ext add quantum`（中英：`quantum` / `量子`） |
 | 本文目的 | 锁定**作者面**、**模拟语义**、**view 可视化**与**分期**；指导 ABI 插件实现 |
@@ -191,6 +191,8 @@ $$
     + `seed`=None          # → quantum_result（计数直方图）
 ## draw
     + `path`=None          # SVG；无 path 时仍可进 view 产物
+    + `kind`=circuit       # circuit|probs|bloch|hinton|…（见 Q7）
+    + `theme`=dark         # dark|light|bw（Q8；电路/概率/布洛赫）
 ## state                   # 当前缓存态（若已 simulate）
 ```
 
@@ -211,6 +213,8 @@ $$
 | `probabilities` | `概率` |
 | `run` | `运行` |
 | `draw` | `绘图` |
+| `kind` | `种类` |
+| `theme` | `主题` |
 | `measure` | `测量` |
 | `qubits` | `比特数` |
 | `steps` | `步骤` |
@@ -295,13 +299,14 @@ CLI：`draw path=bell.svg` 写沙箱文件；无 path 时不把整段 SVG 灌 st
 
 | 图 | v1 | 说明 |
 |----|----|------|
-| 电路轨线（qubit 线 + 门盒 + 控点） | **必须** | `circuit.draw` |
+| 电路轨线（qubit 线 + 门盒 + 控点） | **必须** | `circuit.draw`；Q8 默认 `theme=dark`（标签芯片 + 门族分色） |
 | 测量概率条形图 | **必须** | `probabilities` / `run` 后可 `draw kind=probs` |
 | 单比特布洛赫球（SVG） | 应有 | 仅 n=1 或指定 qubit 约化（纯态投影） |
 | 门矩阵热力图 | **必须** | `gate.draw kind=matrix`（幅值热图 + 小数标注） |
+| 高级态图（hinton/city/…） | Q7 | 见 [ext-quantum-q7.md](ext-quantum-q7.md)；换肤见 Q8c |
 | 交互拖拽编辑电路 | **不做** | 静态文档足够 |
 
-视觉：内联 CSS；**无外链**字体/CDN（同 view 硬规则）。
+视觉：内联 SVG 色与字体栈；**无外链**字体/CDN（同 view 硬规则）。主题令牌与布局：[ext-quantum-viz-style.md](ext-quantum-viz-style.md)。view 对 `svg[data-theme=dark]` 使用深色图框。
 
 ---
 
@@ -325,6 +330,7 @@ Q5  教学噪声 + barrier/measure/append/state — 见 [ext-quantum-q5.md](ext-
 | **Q5** | `noise` 轨迹；`barrier`/`measure`/`append`/`state` | `quantum-noise-smoke` / `quantum-author-api-smoke` |
 | **Q6** | 公式/`matrix=` 自定义门 | [ext-quantum-custom-gate.md](ext-quantum-custom-gate.md) |
 | **Q7** | 密度矩阵线性代数 + Hinton/City/QSphere 等 SVG + 纠缠示例 | [ext-quantum-q7.md](ext-quantum-q7.md) ✅ |
+| **Q8** | 可视化美学：`theme` + 标签 gutter + 门族分色 | [ext-quantum-viz-style.md](ext-quantum-viz-style.md) · Q8a/Q8b ✅ · Q8c 待做 |
 
 实现路线图跟踪见 [roadmap/ext-quantum.md](../roadmap/ext-quantum.md)。
 
