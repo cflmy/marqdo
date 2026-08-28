@@ -1741,6 +1741,31 @@ rss-ok",
 }
 
 #[test]
+fn ext_web_drivers_smoke() {
+    // W4 drivers: memory cache, file storage, postgres/s3 URL shape (offline).
+    let status = Command::new("cargo")
+        .args(["build", "-p", "marqdo_plugin_web"])
+        .current_dir(env!("CARGO_MANIFEST_DIR"))
+        .status()
+        .expect("build web plugin");
+    assert!(status.success(), "failed to build marqdo_plugin_web");
+
+    let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/ext/web-fixtures/data/drivers-blobs");
+    let _ = std::fs::remove_dir_all(&root);
+
+    assert_out(
+        "tests/ext/web-drivers-smoke.mq.md",
+        "cache-ok
+cache-del-ok
+storage-ok
+storage-list-ok
+postgres-url-ok
+s3-open-ok",
+    );
+}
+
+#[test]
 fn ext_web_db_w2_smoke() {
     // W2 data layer: transactions, connection pooling, pagination, query
     // expressiveness (IN/BETWEEN/OR), and row counting.

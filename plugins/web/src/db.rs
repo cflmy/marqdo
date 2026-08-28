@@ -172,6 +172,9 @@ fn from_sql(v: ValueRef<'_>) -> Value {
 
 /// `fields` = list of {name,type,nullable?} or columnar schema table already normalized.
 pub fn init(url: &str, table: &str, fields: &Value) -> Result<Value, String> {
+    if crate::db_pg::is_postgres(url) {
+        return crate::db_pg::init(url, table, fields);
+    }
     let table = ident(table)?;
     let cols = crate::table::as_fields(fields);
     let arr = cols.as_array().ok_or("fields must be a list")?;
@@ -224,6 +227,9 @@ pub fn init(url: &str, table: &str, fields: &Value) -> Result<Value, String> {
 }
 
 pub fn insert(url: &str, table: &str, rows: &Value, txn_id: Option<&str>) -> Result<Value, String> {
+    if crate::db_pg::is_postgres(url) {
+        return crate::db_pg::insert(url, table, rows, txn_id);
+    }
     let table = ident(table)?;
     let rows = crate::table::as_rows(rows);
     let arr = rows.as_array().ok_or("rows must be a list")?;
@@ -489,6 +495,9 @@ pub fn select_order(
     offset: Option<i64>,
     txn_id: Option<&str>,
 ) -> Result<Value, String> {
+    if crate::db_pg::is_postgres(url) {
+        return crate::db_pg::select_order(url, table, limit, where_v, order, offset, txn_id);
+    }
     let table = ident(table)?;
     let (exprs, mut vals) = parse_where(where_v)?;
     let conn = conn_for(url, txn_id)?;
@@ -584,6 +593,10 @@ fn count_rows(
 }
 
 pub fn get(url: &str, table: &str, id: &str, txn_id: Option<&str>) -> Result<Value, String> {
+    if crate::db_pg::is_postgres(url) {
+        return crate::db_pg::get(url, table, id, txn_id);
+    }
+
     let table = ident(table)?;
     let conn = conn_for(url, txn_id)?;
     let c = conn.lock().unwrap_or_else(|e| e.into_inner());
@@ -612,6 +625,10 @@ pub fn update(
     row: &Value,
     txn_id: Option<&str>,
 ) -> Result<Value, String> {
+    if crate::db_pg::is_postgres(url) {
+        return crate::db_pg::update(url, table, id, row, txn_id);
+    }
+
     let table = ident(table)?;
     let obj = row.as_object().ok_or("row must be a map")?;
     let mut sets = Vec::new();
@@ -641,6 +658,10 @@ pub fn update(
 }
 
 pub fn delete(url: &str, table: &str, id: &str, txn_id: Option<&str>) -> Result<Value, String> {
+    if crate::db_pg::is_postgres(url) {
+        return crate::db_pg::delete(url, table, id, txn_id);
+    }
+
     let table = ident(table)?;
     let conn = conn_for(url, txn_id)?;
     let c = conn.lock().unwrap_or_else(|e| e.into_inner());
@@ -652,6 +673,10 @@ pub fn delete(url: &str, table: &str, id: &str, txn_id: Option<&str>) -> Result<
 }
 
 pub fn exec(url: &str, sql: &str, args: Option<&Value>, txn_id: Option<&str>) -> Result<Value, String> {
+    if crate::db_pg::is_postgres(url) {
+        return crate::db_pg::exec(url, sql, args, txn_id);
+    }
+
     let conn = conn_for(url, txn_id)?;
     let c = conn.lock().unwrap_or_else(|e| e.into_inner());
     let vals: Vec<rusqlite::types::Value> = match args {
@@ -667,6 +692,10 @@ pub fn exec(url: &str, sql: &str, args: Option<&Value>, txn_id: Option<&str>) ->
 /// Run a `SELECT …` and return the result set (count / join / group / subquery).
 /// Bare SQL — the result carries `{ rows, count }`.
 pub fn query(url: &str, sql: &str, args: Option<&Value>, txn_id: Option<&str>) -> Result<Value, String> {
+    if crate::db_pg::is_postgres(url) {
+        return crate::db_pg::query(url, sql, args, txn_id);
+    }
+
     let conn = conn_for(url, txn_id)?;
     let c = conn.lock().unwrap_or_else(|e| e.into_inner());
     let vals: Vec<rusqlite::types::Value> = match args {
@@ -679,6 +708,10 @@ pub fn query(url: &str, sql: &str, args: Option<&Value>, txn_id: Option<&str>) -
 
 /// Count rows matching a `where` filter (aggregation helper).
 pub fn count(url: &str, table: &str, where_v: Option<&Value>, txn_id: Option<&str>) -> Result<Value, String> {
+    if crate::db_pg::is_postgres(url) {
+        return crate::db_pg::count(url, table, where_v, txn_id);
+    }
+
     let table = ident(table)?;
     let (exprs, vals) = parse_where(where_v)?;
     let conn = conn_for(url, txn_id)?;
@@ -694,6 +727,10 @@ pub fn count(url: &str, table: &str, where_v: Option<&Value>, txn_id: Option<&st
 /// Begin a transaction. Borrows the pooled connection exclusively and records
 /// it under a fresh txn id; returns `{ txn, url }` for `commit` / `rollback`.
 pub fn begin(url: &str) -> Result<Value, String> {
+    if crate::db_pg::is_postgres(url) {
+        return crate::db_pg::begin(url);
+    }
+
     let conn = pooled(url)?;
     {
         let c = conn.lock().unwrap_or_else(|e| e.into_inner());
@@ -711,6 +748,10 @@ pub fn begin(url: &str) -> Result<Value, String> {
 
 /// Commit a transaction and return its connection to the pool.
 pub fn commit(txn_id: &str) -> Result<Value, String> {
+    if txn_id.starts_with("pg-txn-") {
+        return crate::db_pg::commit(txn_id);
+    }
+
     let (_, conn) = take_txn(txn_id)?;
     let c = conn.lock().unwrap_or_else(|e| e.into_inner());
     c.execute_batch("COMMIT").map_err(|e| e.to_string())?;
@@ -719,6 +760,10 @@ pub fn commit(txn_id: &str) -> Result<Value, String> {
 
 /// Roll back a transaction and return its connection to the pool.
 pub fn rollback(txn_id: &str) -> Result<Value, String> {
+    if txn_id.starts_with("pg-txn-") {
+        return crate::db_pg::rollback(txn_id);
+    }
+
     let (_, conn) = take_txn(txn_id)?;
     let c = conn.lock().unwrap_or_else(|e| e.into_inner());
     c.execute_batch("ROLLBACK").map_err(|e| e.to_string())?;
@@ -735,6 +780,10 @@ fn take_txn(txn_id: &str) -> Result<(String, Arc<Mutex<Connection>>), String> {
 }
 
 pub fn list_tables(url: &str) -> Result<Vec<String>, String> {
+    if crate::db_pg::is_postgres(url) {
+        return crate::db_pg::list_tables(url);
+    }
+
     let conn = pooled(url)?;
     let c = conn.lock().unwrap_or_else(|e| e.into_inner());
     let mut stmt = c
@@ -760,6 +809,10 @@ pub struct ColumnInfo {
 
 /// `PRAGMA table_info` → column metadata for admin forms.
 pub fn table_info(url: &str, table: &str) -> Result<Vec<ColumnInfo>, String> {
+    if crate::db_pg::is_postgres(url) {
+        return crate::db_pg::table_info(url, table);
+    }
+
     let table = ident(table)?;
     let conn = pooled(url)?;
     let c = conn.lock().unwrap_or_else(|e| e.into_inner());

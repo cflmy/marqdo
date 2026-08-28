@@ -2,8 +2,11 @@
 
 mod compose;
 mod db;
+mod db_pg;
+mod driver;
 mod form;
 mod http;
+mod cache;
 mod markdown;
 mod middleware;
 mod password;
@@ -11,6 +14,7 @@ mod rate_limit;
 mod render;
 mod rss;
 mod session;
+mod storage;
 mod table;
 mod ws;
 
@@ -158,8 +162,15 @@ fn entry_dir() -> PathBuf {
         })
 }
 
-/// `sqlite:` URL with a relative path → absolute against `entry_dir()`.
+/// Resolve a DB URL for the plugin.
+///
+/// - `postgres://` / `postgresql://` — passed through unchanged.
+/// - `sqlite:` / bare relative path — made absolute against `entry_dir()`.
 fn resolve_db_url(url: &str) -> String {
+    let lower = url.to_ascii_lowercase();
+    if lower.starts_with("postgres://") || lower.starts_with("postgresql://") {
+        return url.to_string();
+    }
     let stripped = url
         .strip_prefix("sqlite:")
         .or_else(|| url.strip_prefix("SQLITE:"))
@@ -452,7 +463,78 @@ web_ffi!(web_render, |args: &Value| {
 
 web_ffi!(web_db_new, |args: &Value| {
     let url = arg_str_opt(args, "url").unwrap_or("sqlite:site.db");
-    Ok(json!({ "url": url }))
+    Ok(json!({ "url": resolve_db_url(url), "_type": "db" }))
+});
+
+web_ffi!(web_cache_new, |args: &Value| {
+    let url = arg_str_opt(args, "url").unwrap_or("memory:");
+    cache::open(url)
+});
+
+web_ffi!(web_cache_get, |args: &Value| {
+    let url = arg_str(args, "url")?;
+    let key = arg_str(args, "key")?;
+    cache::get(url, key)
+});
+
+web_ffi!(web_cache_set, |args: &Value| {
+    let url = arg_str(args, "url")?;
+    let key = arg_str(args, "key")?;
+    let value = arg_text(args, "value")?;
+    let ttl = args
+        .get("ttl")
+        .and_then(|v| v.as_u64().or_else(|| v.as_i64().map(|i| i as u64)));
+    cache::set(url, key, &value, ttl)
+});
+
+web_ffi!(web_cache_del, |args: &Value| {
+    let url = arg_str(args, "url")?;
+    let key = arg_str(args, "key")?;
+    cache::del(url, key)
+});
+
+web_ffi!(web_cache_exists, |args: &Value| {
+    let url = arg_str(args, "url")?;
+    let key = arg_str(args, "key")?;
+    cache::exists(url, key)
+});
+
+web_ffi!(web_cache_ttl, |args: &Value| {
+    let url = arg_str(args, "url")?;
+    let key = arg_str(args, "key")?;
+    cache::ttl(url, key)
+});
+
+web_ffi!(web_storage_new, |args: &Value| {
+    let url = arg_str(args, "url").unwrap_or("file:data/blobs");
+    storage::open(url)
+});
+
+web_ffi!(web_storage_put, |args: &Value| {
+    let url = arg_str(args, "url")?;
+    let key = arg_str(args, "key")?;
+    let body = arg_str_opt(args, "body");
+    let path = arg_str_opt(args, "path");
+    let content_type = arg_str_opt(args, "content_type");
+    storage::put(url, key, body, path, content_type)
+});
+
+web_ffi!(web_storage_get, |args: &Value| {
+    let url = arg_str(args, "url")?;
+    let key = arg_str(args, "key")?;
+    storage::get(url, key)
+});
+
+web_ffi!(web_storage_delete, |args: &Value| {
+    let url = arg_str(args, "url")?;
+    let key = arg_str(args, "key")?;
+    storage::delete(url, key)
+});
+
+web_ffi!(web_storage_list, |args: &Value| {
+    let url = arg_str(args, "url")?;
+    let prefix = arg_str_opt(args, "prefix");
+    storage::list(url, prefix)
 });
 
 web_ffi!(web_db_init, |args: &Value| {
@@ -1249,6 +1331,21 @@ pub unsafe extern "C" fn marqdo_plugin_init(host: *const MarqdoHostApi) -> c_int
         ),
         ("web_render", "page", web_render as PluginFn),
         ("web_db_new", "url", web_db_new as PluginFn),
+        ("web_cache_new", "url", web_cache_new as PluginFn),
+        ("web_cache_get", "url,key", web_cache_get as PluginFn),
+        ("web_cache_set", "url,key,value,ttl", web_cache_set as PluginFn),
+        ("web_cache_del", "url,key", web_cache_del as PluginFn),
+        ("web_cache_exists", "url,key", web_cache_exists as PluginFn),
+        ("web_cache_ttl", "url,key", web_cache_ttl as PluginFn),
+        ("web_storage_new", "url", web_storage_new as PluginFn),
+        (
+            "web_storage_put",
+            "url,key,body,path,content_type",
+            web_storage_put as PluginFn,
+        ),
+        ("web_storage_get", "url,key", web_storage_get as PluginFn),
+        ("web_storage_delete", "url,key", web_storage_delete as PluginFn),
+        ("web_storage_list", "url,prefix", web_storage_list as PluginFn),
         ("web_db_init", "url,name,fields", web_db_init as PluginFn),
         ("web_db_insert", "url,table,rows,txn", web_db_insert as PluginFn),
         (

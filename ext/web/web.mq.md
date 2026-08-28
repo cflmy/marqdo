@@ -142,6 +142,8 @@ Style tables live as `##` exports in site style modules; compose resolves them b
 # db
     + `url`="sqlite:site.db"
 
+Open a database handle. URL schemes: `sqlite:path` (default), `postgres://…` / `postgresql://…` (same CRUD methods).
+
 > ensure_plugin
 **> web_db_new url=`url`**
 
@@ -487,6 +489,85 @@ Destroy the session.
 Hash a plaintext password for storage in admin user tables (argon2id). Store the returned `hash` in the `password` column; login verifies automatically.
 
 **> web_password_hash password=`password`**
+
+# cache
+    + `url`="memory:"
+
+Key–value cache. Use `memory:` for in-process (tests / single process) or `redis://host:6379/0` for Redis.
+
+> ensure_plugin
+**> web_cache_new url=`url`**
+
+## get
+    + `key`
+
+*url = self[^url]*
+**> web_cache_get url=`url` key=`key`**
+
+## set
+    + `key`
+    + `value`
+    + `ttl`=None
+
+Optional `ttl` is seconds until expiry.
+
+*url = self[^url]*
+**> web_cache_set url=`url` key=`key` value=`value` ttl=`ttl`**
+
+## del
+    + `key`
+
+*url = self[^url]*
+**> web_cache_del url=`url` key=`key`**
+
+## exists
+    + `key`
+
+*url = self[^url]*
+**> web_cache_exists url=`url` key=`key`**
+
+## ttl
+    + `key`
+
+*url = self[^url]*
+**> web_cache_ttl url=`url` key=`key`**
+
+# storage
+    + `url`="file:data/blobs"
+
+Object storage. `file:dir` stores blobs on disk (offline / gold). `s3://bucket?endpoint=http://127.0.0.1:9000&access_key=…&secret_key=…` talks to MinIO / S3.
+
+> ensure_plugin
+**> web_storage_new url=`url`**
+
+## put
+    + `key`
+    + `body`=None
+    + `path`=None
+    + `content_type`="application/octet-stream"
+
+Provide either `body` (text) or `path` (local file to upload).
+
+*url = self[^url]*
+**> web_storage_put url=`url` key=`key` body=`body` path=`path` content_type=`content_type`**
+
+## get
+    + `key`
+
+*url = self[^url]*
+**> web_storage_get url=`url` key=`key`**
+
+## delete
+    + `key`
+
+*url = self[^url]*
+**> web_storage_delete url=`url` key=`key`**
+
+## list
+    + `prefix`=""
+
+*url = self[^url]*
+**> web_storage_list url=`url` prefix=`prefix`**
 
 # ws
     + `timeout_sec`=30

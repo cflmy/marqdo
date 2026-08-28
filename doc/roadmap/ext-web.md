@@ -2,8 +2,8 @@
 
 | | |
 |---|---|
-| 状态 | **W0–W3.5 + 安全硬化 + 内容标配 W4c 已落地；Postgres/Redis W4 待** |
-| 日期 | 2026-08-11 |
+| 状态 | **W0–W4 + 安全硬化 + 内容标配 W4c 已落地** |
+| 日期 | 2026-08-28 |
 | **锁定设计** | [design/ext-web.md](../design/ext-web.md) |
 | 相关 | [ext-cli.md](../design/ext-cli.md) · [ext-abi.md](../design/ext-abi.md) · [ext-llm.md](../design/ext-llm.md) |
 | 安装 | `marqdo ext add web`（`web` / `网页`） |
@@ -28,10 +28,10 @@
 | **W3** | 三列绑定；变量名即表名；`/admin` CRUD+日志+布局 | **done** |
 | **W3s** | 安全硬化：argon2 密码哈希、CSRF、SQLite 会话持久化、CSPRNG、登录限速 | **done** |
 | **W3.5** | 人写面首版：`web.assemble` + `` `表`.`字段` `` + `examples/man-write-site` | **done**（编排袋仍可再瘦） |
-| **W4** | Postgres；Redis / S3 驱动 | pending |
+| **W4** | Postgres；Redis / S3 驱动（见 [ext-web-drivers.md](../design/ext-web-drivers.md)） | **done** |
 | **W4c** | 内容标配：SEO / Markdown / RSS / 分页 UI（见 [web-net-capabilities.md](../design/web-net-capabilities.md)） | **done** |
 
-验收金样：`tests/ext/web-smoke.mq.md`、`tests/ext/web-security-smoke.mq.md`、`ext_cli_add_web`。
+验收金样：`tests/ext/web-smoke.mq.md`、`tests/ext/web-security-smoke.mq.md`、`tests/ext/web-drivers-smoke.mq.md`、`ext_cli_add_web`。
 
 ---
 
