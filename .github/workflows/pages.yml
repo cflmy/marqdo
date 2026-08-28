@@ -11,6 +11,7 @@ on:
       - "Cargo.lock"
       - ".github/workflows/pages.yml"
       - "scripts/build-public.*"
+      - "scripts/run-public-pages.sh"
   workflow_dispatch:
 
 permissions:
@@ -26,15 +27,8 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - name: Build & export site
-        run: |
-          cargo build --release
-          # Skip import helpers and any demo without `# main` (locale-safe; no UTF-8 names in find).
-          set -e
-          while IFS= read -r -d '' f; do
-            grep -q '^# main' "$f" || continue
-            ./target/release/marqdo run "$f"
-          done < <(find public -name '*.mq.md' -print0)
-          ./target/release/marqdo view output public -o public
+        shell: bash
+        run: bash scripts/run-public-pages.sh
 
       - name: Verify site shape
         run: |
