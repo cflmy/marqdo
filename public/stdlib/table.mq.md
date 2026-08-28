@@ -8,7 +8,7 @@ import table:lib/table.mq.md
 
 Prefer `table.put` for element updates (`at=` text key, **1-based** int, or list path). Use `json` for parse/stringify only.
 
-*`h` = > table.put in=None at=Authorization value=Bearer-demo*
+*`h` = > table.put in=None at="Authorization" value="Bearer-demo"*
 
 `xs` =
 
@@ -17,7 +17,7 @@ Prefer `table.put` for element updates (`at=` text key, **1-based** int, or list
 | a |
 | b |
 
-*`xs` = > table.put in=`xs` at=1 value=A*
+*`xs` = > table.put in=`xs` at=1 value="A"*
 *`n` = > table.rows xs=`xs`*
 
 > print text=`h`[^Authorization]

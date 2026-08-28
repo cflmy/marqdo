@@ -10,7 +10,7 @@ Import lib/fs.mq.md. Functions: read_text, write_text, append_text, exists, list
 
 Bare path words must not contain a slash character (parsed as division). Prefer a same-folder name or a variable.
 
-*`ok` = > fs.exists path=demo.txt *
+*`ok` = > fs.exists path="demo.txt"*
 
 1. `ok`
   > print text=demo-present
