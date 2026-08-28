@@ -1,6 +1,6 @@
 ---
 title: Quantum circuits (ext/quantum)
-description: Official quantum simulator — tables, gates, probs/Bloch/matrix SVG
+description: Official quantum simulator — tables, gates, Q7 density and advanced SVG
 import quantum:ext/quantum/quantum.mq.md
 ---
 
@@ -8,7 +8,9 @@ import quantum:ext/quantum/quantum.mq.md
 
 Optional package (not stdlib). Install: `marqdo ext add quantum` (or build `marqdo_plugin_quantum`).
 
-GHZ (3 qubits): H on q0, then CX 0→1 and 0→2. Ideal |000⟩ / |111⟩ each ≈ 1/2. `draw kind=probs` embeds probability bars; `gate.draw kind=matrix` shows a heatmap.
+GHZ (3 qubits): H on q0, then CX 0→1 and 0→2. Ideal |000⟩ / |111⟩ each ≈ 1/2.
+
+Q7: Bell density, partial trace (mixed reduced state), Schmidt entropy, and `draw kind=hinton` / qsphere. See `examples/quantum-entanglement/`.
 
 `steps` =
 

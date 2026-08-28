@@ -324,7 +324,7 @@ Q5  教学噪声 + barrier/measure/append/state — 见 [ext-quantum-q5.md](ext-
 | **Q4** | 概率图 + 布洛赫；`matches_matrix`；用户文档页 | `quantum-draw-smoke` / `quantum-gate-matrix-smoke`；`view output` 可浏览示例 |
 | **Q5** | `noise` 轨迹；`barrier`/`measure`/`append`/`state` | `quantum-noise-smoke` / `quantum-author-api-smoke` |
 | **Q6** | 公式/`matrix=` 自定义门 | [ext-quantum-custom-gate.md](ext-quantum-custom-gate.md) |
-| **Q7** | 密度矩阵线性代数 + Hinton/City/QSphere 等 SVG | [ext-quantum-q7.md](ext-quantum-q7.md) |
+| **Q7** | 密度矩阵线性代数 + Hinton/City/QSphere 等 SVG + 纠缠示例 | [ext-quantum-q7.md](ext-quantum-q7.md) ✅ |
 
 实现路线图跟踪见 [roadmap/ext-quantum.md](../roadmap/ext-quantum.md)。
 

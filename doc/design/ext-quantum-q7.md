@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| 状态 | **Accepted · Q7a/Q7b 已落地**（Q7c 示例/文档摘要可跟进） |
+| 状态 | **Accepted · Q7a/Q7b/Q7c 已落地** |
 | 日期 | 2026-08-28 |
 | 父设计 | [ext-quantum.md](ext-quantum.md) |
 | 路线图 | [roadmap/ext-quantum.md](../roadmap/ext-quantum.md) |

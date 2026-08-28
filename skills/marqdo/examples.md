@@ -271,3 +271,30 @@ import db:db/index.mq.md
 - Import `ext/web/web.mq.md` **or** `ext/web/网页.mq.md` — not both; match API language to the file.
 - Full blog/CMS patterns: `examples/marqdo-blog/` (routes, SEO, RSS, auth, upload, WS).
 - Run after `marqdo ext add web` and building `marqdo_plugin_web`.
+
+## 14. Quantum entanglement lab (ext/quantum Q7)
+
+```markdown
+---
+import quantum:ext/quantum/quantum.mq.md
+---
+
+# main
+
+`steps` =
+
+| step | gate | qubits |
+|------|------|--------|
+| 1 | H | 0 |
+| 2 | CX | 0,1 |
+
+*qc = > quantum.circuit qubits=2 steps=`steps`*
+*rho = > `qc`.density*
+*red = > `rho`.partial_trace keep=0*
+*sch = > `qc`.schmidt cut=1*
+*_ = > `qc`.draw kind="hinton"*
+> print text=`red`
+```
+
+- Full lab: `examples/quantum-entanglement/`. Bell-only: `examples/quantum-bell/`.
+- Build `marqdo_plugin_quantum` then `marqdo ext add quantum`.

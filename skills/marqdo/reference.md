@@ -55,6 +55,7 @@ Import one file; use **that** file’s function names.
 | `ext/llm.mq.md` | `ext/大模型.mq.md` | `# llm` / `# 大模型` object + chat methods |
 | `ext/agent.mq.md` | `ext/智能体.mq.md` | agent **framework** (layout now; LLM orchestration roadmap in `ext-agent.md`) |
 | `ext/web/web.mq.md` | `ext/web/网页.mq.md` | dynamic sites — see **ext/web** section below |
+| `ext/quantum/quantum.mq.md` | `ext/quantum/量子.mq.md` | circuits + Q7 density/viz — see **ext/quantum** below |
 
 Open the imported `.mq.md` under `lib/` or `ext/` to see exact `##` / `#` names and parameters. Gold tests: `tests/lib/`, `tests/structure/`, `tests/ext/`.
 
@@ -76,6 +77,24 @@ Install: `marqdo ext add web` (`网页`). Native: `cargo build --release -p marq
 Drivers (Postgres / Redis / S3): `db url=postgres://…`, `cache url=memory:`, `storage url=file:…` — see `doc/design/ext-web-drivers.md`.
 
 Example project: `examples/marqdo-blog/`. Capability matrix: `doc/design/web-net-capabilities.md`.
+
+## ext/quantum (circuits + Q7)
+
+Install: `marqdo ext add quantum` (`量子`). Native: `cargo build --release -p marqdo_plugin_quantum`.
+
+| EN import | ZH import | Core types |
+|-----------|-----------|------------|
+| `ext/quantum/quantum.mq.md` | `ext/quantum/量子.mq.md` | `# circuit` `# gate` `# density` |
+
+| Area | EN APIs | Notes |
+|------|---------|-------|
+| Circuit | `h`/`cx`/…, `simulate`, `probabilities`, `run`, `draw`, `noise` | `steps=` GFM table; ≤12 qubits |
+| Gate | `matrix`, `matches_matrix`, `draw` | named or `matrix=` custom unitary |
+| Density (Q7) | `purity`, `partial_trace`, `eig`, `expect`, `draw` | ≤6 qubits for dense ρ |
+| Free (Q7) | `kron`, `schmidt`, `fidelity` | top-level on import bind |
+| Draw kinds | `circuit\|probs\|bloch\|hinton\|city\|density\|paulivec\|qsphere\|multibloch` | quote `kind="…"` |
+
+Examples: `examples/quantum-bell/`, `examples/quantum-entanglement/`. Design: `doc/design/ext-quantum-q7.md`.
 
 ## Formula + plot (math)
 
@@ -154,4 +173,6 @@ See `doc/design/call-arguments.md`.
 | `doc/design/ext-cli.md` | `marqdo ext list/add/remove` |
 | `doc/design/ext-web.md` | `ext/web` dynamic sites (author API) |
 | `doc/design/web-net-capabilities.md` | ext/web capability matrix (W0–W7 + P3) |
+| `doc/design/ext-quantum.md` | `ext/quantum` circuits |
+| `doc/design/ext-quantum-q7.md` | Q7 density linear algebra + advanced SVG |
 | `doc/design/view-debug.md` | view / debug hosts |

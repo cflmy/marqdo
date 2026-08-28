@@ -4,9 +4,10 @@ description: >-
   Author and edit Marqdo programs (.mq.md): Markdown markers are executable
   syntax (functions, calls, statements, returns, control flow). Use when writing
   or modifying .mq.md files, teaching Marqdo, generating Marqdo from prose,
-  importing lib/* or ext/web, running marqdo CLI, building dynamic sites with
-  ext/web, or when the user mentions Marqdo, mq.md, markup-as-syntax,
-  code-as-documentation, or web/网页 extension.
+  importing lib/* or ext/web or ext/quantum, running marqdo CLI, building dynamic
+  sites with ext/web, quantum circuits with ext/quantum, or when the user
+  mentions Marqdo, mq.md, markup-as-syntax, code-as-documentation, web/网页, or
+  quantum/量子 extension.
 ---
 
 # Marqdo development
@@ -133,7 +134,7 @@ import clock:lib/time.mq.md
 - Instance methods stay `` > `obj`.method `` (backticks on the receiver only).
 - `lib/…` resolves via `MARQDO_LIB`, cwd `lib/`, or `lib/` next to the `marqdo` binary.
 - Design: [module-namespace.md](../../doc/design/module-namespace.md).
-- Official optional extensions (`ext/`, not stdlib): install with `marqdo ext add llm|agent|web|quantum` (see `doc/design/ext-cli.md`). `ext/llm` — chat; `ext/agent` — document-driven agents: **step** (default writeback) / **plan** workbook ([ext-agent.md](../../doc/design/ext-agent.md), [ext-agent-plan.md](../../doc/design/ext-agent-plan.md)); **`ext/web`** — dynamic sites (W0–W7 + P3 complete; see below).
+- Official optional extensions (`ext/`, not stdlib): install with `marqdo ext add llm|agent|web|quantum` (see `doc/design/ext-cli.md`). `ext/llm` — chat; `ext/agent` — document-driven agents: **step** (default writeback) / **plan** workbook ([ext-agent.md](../../doc/design/ext-agent.md), [ext-agent-plan.md](../../doc/design/ext-agent-plan.md)); **`ext/web`** — dynamic sites (W0–W7 + P3 complete; see below); **`ext/quantum`** — circuits + Q7 density/viz (see below).
 - Native plugins: `lib/plugin` — `## load` / `unload` / `list`. C ABI: `include/marqdo_abi.h`.
 - Prefer `table.put` / `表.改` for list/map element updates; keep `json` for parse/stringify/quote (see `doc/design/stdlib-table.md`).
 - Builtins (no import): `print`/`打印`, `input`/`输入`, `len`/`长度`, `str`/`文本`, `int`/`整数`; literals `True`/`真`, `False`/`假`, `None`/`空`; logic `and`/`且`, `or`/`或`, `not`/`非`.
@@ -177,6 +178,23 @@ Design: [ext-web.md](../../doc/design/ext-web.md) · capability matrix: [web-net
 
 Web patterns: [examples.md](examples.md) §13 · API index: [reference.md](reference.md).
 
+## Official extension: `ext/quantum` (circuits + Q7)
+
+Install: `marqdo ext add quantum` (ZH id: `量子`). Build: `cargo build --release -p marqdo_plugin_quantum`.
+
+- EN: `import quantum:ext/quantum/quantum.mq.md`
+- ZH: `导入 量子:ext/quantum/量子.mq.md`
+
+**Hard rules:** `ext/**` never calls `host_*`; hot path is ABI plugin; ≤12 qubits for statevector; density-matrix ops ≤6 qubits; one language file per program.
+
+**Core:** `# circuit` / `# gate` / `# density` — table `steps=` or method chain; `simulate` / `probabilities` / `run` / `draw`.
+
+**Q7 linear algebra:** `density`, `partial_trace`, `eig`, `expect` (Pauli string, left=high bit), `purity`, `kron`, `schmidt`, `fidelity`.
+
+**Q7 draw kinds:** `circuit|probs|bloch|hinton|city|density|paulivec|qsphere|multibloch` (quote string args: `kind="hinton"`).
+
+Design: [ext-quantum.md](../../doc/design/ext-quantum.md) · Q7: [ext-quantum-q7.md](../../doc/design/ext-quantum-q7.md) · examples: [quantum-bell](../../examples/quantum-bell/) · [quantum-entanglement](../../examples/quantum-entanglement/).
+
 ## AI authoring workflow
 
 1. Decide language surface (English builtins + `lib/text.mq.md`, or Chinese + `lib/文本.mq.md`).
@@ -201,6 +219,8 @@ Web patterns: [examples.md](examples.md) §13 · API index: [reference.md](refer
 | `json.set` to build page parts | GFM tables + `page.compose_*` / `web.page` methods |
 | Mix `web.page` and `网页.页面` in one file | One import language per `.mq.md` |
 | Call `host_web_*` from `ext/web` | Use `# app` / `# db` methods; plugin ABI only |
+| Call `host_*` from `ext/quantum` | Use `# circuit` / `# density` methods; plugin ABI only |
+| Bare `kind=hinton` inside `*…*` | `kind="hinton"` — quote text literals |
 
 ## Checklist before finishing
 
