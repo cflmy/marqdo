@@ -117,7 +117,7 @@
 | A2 | **中间件管道**（`app.configure` / `应用.装配`：CORS、安全头、压缩、请求体限制统一挂载） | ✅ **已实现（W1）**：`middleware.rs` 装配 GFM 表并 `app.layer` 挂到 axum | `plugins/web` | **P0 ✅** |
 | A3 | **CORS 支持**（`Access-Control-Allow-Origin` 可配） | ✅ **已实现（W1）**：`跨域` 表 `|允许来源|方法|头|暴露头|凭证|` | `plugins/web` | P1 ✅ |
 | A4 | **安全响应头**（CSP / X-Frame-Options / X-Content-Type-Options / HSTS / Referrer-Policy / 去 `X-Powered-By`） | ✅ **已实现（W1）**：`安全` 表 `|头|值|` | `plugins/web` | P1 ✅ |
-| A5 | **文件上传接收**（multipart extractor → 校验类型/大小 → 落盘）与**下载**（`Content-Disposition`） | 头像/附件/图片上传是博客/CMS 刚需 | `plugins/web` | P1 |
+| A5 | **文件上传接收**（multipart extractor → 校验类型/大小 → 落盘）与**下载**（`Content-Disposition`） | ✅ **已实现（W5）**：`app.upload` / `app.download`；`file:` storage；离线 + curl live 金样 | `plugins/web` | P1 ✅ |
 | A6 | **HTTPS / TLS**（rustls 终止或反代提示） | 生产部署安全 | `plugins/web`（或文档指引反代） | P2 |
 | A7 | **gzip / br 压缩** + **ETag / Cache-Control 缓存头** | gzip ✅ **已实现（W1，`压缩=真`）**；ETag/Cache-Control 待补 | `plugins/web`（tower-http 现成） | P2 |
 | A8 | **访问日志**（请求方法/路径/状态/耗时） | 排障、审计 | `plugins/web`（tower-http TraceLayer） | P2 |
@@ -179,7 +179,7 @@
 | **W2** | 数据层深化 | 连接池/busy_timeout/WAL + 事务 API + 结果集裸查询 + 分页(offset) + OR/IN/BETWEEN + 聚合 count | B1 B2 B3 B4 B5 B8 ✅ **已完成** |
 | **W3** | 安全硬化 | 密码哈希 + CSRF + 会话持久化 + CSPRNG session id + cookie 增强 + 登录限速/锁定 | C1–C7 |
 | **W4** | 内容站点标配 | SEO 元数据 + sitemap/robots + RSS + Markdown 渲染 + 分页导航 UI + 标签/分类 | D1–D6 |
-| **W5** | 上传与媒体 | multipart 文件上传接收 + 落盘 + 下载 + 图片库 | A5 D9 |
+| **W5** | 上传与媒体 | multipart 文件上传接收 + 落盘 + 下载 + 图片库 | A5 D9 ✅ **A5 done**（D9 相册 UI 后续） |
 | **W6** | 进阶 | 全文搜索(FTS5) + 迁移机制 + 评论系统 + 草稿/发布 + WS 广播 | B6 B9 D7 D8 + WS 增强 |
 
 ### 4.2 边界判定要点（严格遵守既有约束）

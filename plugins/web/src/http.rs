@@ -5,9 +5,10 @@ use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use axum::extract::{Form, Path, Query, State};
+use axum::extract::{Form, Multipart, Path, Query, State};
+use axum::http::{header, HeaderValue, StatusCode};
 use axum::response::{Html, IntoResponse, Redirect, Response};
-use axum::routing::get;
+use axum::routing::{get, post};
 use axum::Router;
 use serde::Deserialize;
 use serde_json::{json, Map, Value};
@@ -21,6 +22,23 @@ use crate::rate_limit;
 use crate::render;
 use crate::rss;
 use crate::session;
+use crate::storage;
+use crate::upload;
+
+#[derive(Clone)]
+pub struct UploadRoute {
+    pub field: String,
+    pub storage_url: String,
+    pub prefix: String,
+    pub max_bytes: u64,
+    pub types: Option<Value>,
+}
+
+#[derive(Clone)]
+pub struct DownloadRoute {
+    pub storage_url: String,
+    pub disposition: String,
+}
 
 #[derive(Clone)]
 pub struct AppState {
@@ -34,6 +52,8 @@ pub struct AppState {
     auth_users: Option<Value>,
     session_ttl: u64,
     cookie_secure: bool,
+    upload_routes: HashMap<String, UploadRoute>,
+    download_routes: HashMap<String, DownloadRoute>,
 }
 
 fn collect_page_forms(
@@ -73,6 +93,8 @@ pub fn listen(
     cookie_secure: bool,
     ws_routes: HashMap<String, bool>,
     rss_routes: HashMap<String, Value>,
+    upload_routes: HashMap<String, UploadRoute>,
+    download_routes: HashMap<String, DownloadRoute>,
     middleware: &Middleware,
 ) -> Result<Value, String> {
     let mut form_owners = HashMap::new();
@@ -96,6 +118,8 @@ pub fn listen(
         auth_users,
         session_ttl,
         cookie_secure,
+        upload_routes: upload_routes.clone(),
+        download_routes: download_routes.clone(),
     });
 
     let mut app = Router::new()
@@ -192,6 +216,32 @@ pub fn listen(
                 let cfg = cfg.clone();
                 let route_path = route_path.clone();
                 async move { rss_feed(&st, &route_path, &cfg) }
+            }),
+        );
+    }
+
+    let mut upload_paths: Vec<String> = upload_routes.keys().cloned().collect();
+    upload_paths.sort();
+    for path in upload_paths {
+        let route_path = path.clone();
+        app = app.route(
+            &path,
+            post(move |State(st): State<Arc<AppState>>, headers: axum::http::HeaderMap, multipart: Multipart| {
+                let route_path = route_path.clone();
+                async move { upload_post(st, headers, route_path, multipart).await }
+            }),
+        );
+    }
+
+    let mut download_paths: Vec<String> = download_routes.keys().cloned().collect();
+    download_paths.sort();
+    for path in download_paths {
+        let route_path = path.clone();
+        app = app.route(
+            &path,
+            get(move |State(st): State<Arc<AppState>>, Path(params): Path<HashMap<String, String>>| {
+                let route_path = route_path.clone();
+                async move { download_get(st, &route_path, params) }
             }),
         );
     }
@@ -487,6 +537,165 @@ fn validate_csrf_post(
     let mut posted = posted;
     posted.remove("_csrf");
     Ok((sid, csrf, set_cookie, posted))
+}
+
+fn json_err(status: StatusCode, msg: &str) -> Response {
+    let body = json!({ "ok": false, "error": msg });
+    (status, axum::Json(body)).into_response()
+}
+
+async fn upload_post(
+    st: Arc<AppState>,
+    headers: axum::http::HeaderMap,
+    route_path: String,
+    mut multipart: Multipart,
+) -> Response {
+    let cfg = match st.upload_routes.get(&route_path) {
+        Some(c) => c.clone(),
+        None => return json_err(StatusCode::NOT_FOUND, "upload route not found"),
+    };
+
+    let had_cookie = cookie_from_headers(&headers).is_some();
+    let (sid, _csrf, set_cookie) = resolve_session(&headers);
+
+    let mut csrf_token = String::new();
+    let mut file_name = String::new();
+    let mut file_ct = String::from("application/octet-stream");
+    let mut file_bytes: Option<Vec<u8>> = None;
+
+    loop {
+        let field = match multipart.next_field().await {
+            Ok(Some(f)) => f,
+            Ok(None) => break,
+            Err(e) => return json_err(StatusCode::BAD_REQUEST, &format!("multipart: {e}")),
+        };
+        let name = field.name().unwrap_or("").to_string();
+        if name == "_csrf" {
+            csrf_token = field.text().await.unwrap_or_default();
+            continue;
+        }
+        if name != cfg.field {
+            // Drain unrelated fields.
+            let _ = field.bytes().await;
+            continue;
+        }
+        file_name = field
+            .file_name()
+            .map(|s| s.to_string())
+            .unwrap_or_default();
+        if let Some(ct) = field.content_type() {
+            file_ct = ct.to_string();
+        }
+        match field.bytes().await {
+            Ok(b) => file_bytes = Some(b.to_vec()),
+            Err(e) => return json_err(StatusCode::BAD_REQUEST, &format!("read file: {e}")),
+        }
+    }
+
+    // Existing session cookie → require CSRF; brand-new anonymous upload → open.
+    if had_cookie && !session::validate_csrf(&sid, &csrf_token) {
+        return json_err(StatusCode::FORBIDDEN, "Invalid or missing CSRF token");
+    }
+
+    let bytes = match file_bytes {
+        Some(b) if !b.is_empty() => b,
+        _ => return json_err(StatusCode::BAD_REQUEST, "missing file field"),
+    };
+    let size = bytes.len() as u64;
+    let check = match upload::validate(
+        &file_name,
+        &file_ct,
+        size,
+        cfg.max_bytes,
+        cfg.types.as_ref(),
+    ) {
+        Ok(v) => v,
+        Err(e) => return json_err(StatusCode::BAD_REQUEST, &e),
+    };
+    if check.get("ok").and_then(|v| v.as_bool()) != Some(true) {
+        let err = check
+            .get("error")
+            .and_then(|v| v.as_str())
+            .unwrap_or("validation failed");
+        return json_err(StatusCode::BAD_REQUEST, err);
+    }
+    let ct = check
+        .get("content_type")
+        .and_then(|v| v.as_str())
+        .unwrap_or(&file_ct);
+
+    let key = match upload::make_key(&cfg.prefix, &file_name) {
+        Ok(k) => k,
+        Err(e) => return json_err(StatusCode::BAD_REQUEST, &e),
+    };
+    let saved = match storage::put_bytes(&cfg.storage_url, &key, &bytes, ct) {
+        Ok(v) => v,
+        Err(e) => return json_err(StatusCode::INTERNAL_SERVER_ERROR, &e),
+    };
+    let mut body = json!({
+        "ok": true,
+        "key": key,
+        "size": size,
+        "content_type": ct,
+    });
+    if let Some(obj) = body.as_object_mut() {
+        if let Some(sz) = saved.get("size") {
+            obj.insert("size".into(), sz.clone());
+        }
+    }
+    let mut resp = (StatusCode::OK, axum::Json(body)).into_response();
+    append_set_cookie(&mut resp, set_cookie);
+    resp
+}
+
+fn download_get(
+    st: Arc<AppState>,
+    route_path: &str,
+    params: HashMap<String, String>,
+) -> Response {
+    let cfg = match st.download_routes.get(route_path) {
+        Some(c) => c.clone(),
+        None => return json_err(StatusCode::NOT_FOUND, "download route not found"),
+    };
+    let key = params
+        .get("key")
+        .or_else(|| params.values().next())
+        .map(|s| s.trim_start_matches('/').to_string())
+        .unwrap_or_default();
+    if key.is_empty() {
+        return json_err(StatusCode::BAD_REQUEST, "missing key");
+    }
+    let got = match storage::read_bytes(&cfg.storage_url, &key) {
+        Ok(Some(v)) => v,
+        Ok(None) => return json_err(StatusCode::NOT_FOUND, "not found"),
+        Err(e) => return json_err(StatusCode::INTERNAL_SERVER_ERROR, &e),
+    };
+    let (bytes, content_type, filename) = got;
+    let disp = if cfg.disposition.eq_ignore_ascii_case("inline") {
+        "inline"
+    } else {
+        "attachment"
+    };
+    let safe_name = filename.replace('"', "_");
+    let mut resp = (
+        StatusCode::OK,
+        [
+            (
+                header::CONTENT_TYPE,
+                HeaderValue::from_str(&content_type)
+                    .unwrap_or_else(|_| HeaderValue::from_static("application/octet-stream")),
+            ),
+            (
+                header::CONTENT_DISPOSITION,
+                HeaderValue::from_str(&format!("{disp}; filename=\"{safe_name}\""))
+                    .unwrap_or_else(|_| HeaderValue::from_static("attachment")),
+            ),
+        ],
+        bytes,
+    )
+        .into_response();
+    let _ = &mut resp;
+    resp
 }
 
 fn admin_gate(st: &AppState, cookie_header: Option<&str>) -> Option<Response> {

@@ -16,6 +16,7 @@ mod rss;
 mod session;
 mod storage;
 mod table;
+mod upload;
 mod ws;
 
 use crate::table::as_css_named;
@@ -442,6 +443,131 @@ web_ffi!(web_app_route_rss, |args: &Value| {
     );
     obj.insert("rss_routes".into(), Value::Object(rss_routes));
     Ok(app)
+});
+
+fn storage_url_arg(args: &Value, key: &str) -> Result<String, String> {
+    if let Some(s) = arg_str_opt(args, key) {
+        return Ok(s.to_string());
+    }
+    let v = args
+        .get(key)
+        .ok_or_else(|| format!("missing `{key}`"))?;
+    if let Some(u) = v.get("url").and_then(|x| x.as_str()) {
+        return Ok(u.to_string());
+    }
+    Err(format!("`{key}` must be a storage url string or storage handle"))
+}
+
+web_ffi!(web_app_upload, |args: &Value| {
+    let mut app = args.get("app").cloned().unwrap_or(json!({}));
+    let path = normalize_route_path(arg_str(args, "path").unwrap_or("/_upload"))?;
+    let field = arg_str_opt(args, "field").unwrap_or("file").to_string();
+    let storage_url = storage_url_arg(args, "storage")?;
+    let prefix = arg_str_opt(args, "prefix").unwrap_or("uploads/").to_string();
+    let max_bytes = args
+        .get("max_bytes")
+        .and_then(|v| v.as_u64().or_else(|| v.as_i64().map(|i| i as u64)))
+        .unwrap_or(5_242_880);
+    let types = args.get("types").cloned().filter(|v| !matches!(v, Value::Null));
+    let obj = app
+        .as_object_mut()
+        .ok_or_else(|| "app must be a map".to_string())?;
+    let mut upload_routes = obj
+        .get("upload_routes")
+        .and_then(|v| v.as_object())
+        .cloned()
+        .unwrap_or_default();
+    upload_routes.insert(
+        path,
+        json!({
+            "field": field,
+            "storage_url": storage_url,
+            "prefix": prefix,
+            "max_bytes": max_bytes,
+            "types": types,
+        }),
+    );
+    obj.insert("upload_routes".into(), Value::Object(upload_routes));
+    Ok(app)
+});
+
+web_ffi!(web_app_download, |args: &Value| {
+    let mut app = args.get("app").cloned().unwrap_or(json!({}));
+    let path = arg_str(args, "path").unwrap_or("/_media/{*key}");
+    let path = {
+        let s = path.trim();
+        if s.is_empty() {
+            return Err("download path is empty".into());
+        }
+        let mut p = if s.starts_with('/') {
+            s.to_string()
+        } else {
+            format!("/{s}")
+        };
+        while p.len() > 1 && p.ends_with('/') {
+            p.pop();
+        }
+        p
+    };
+    if !path.contains('{') {
+        return Err("download path must include a `{key}` or `{*key}` capture".into());
+    }
+    let storage_url = storage_url_arg(args, "storage")?;
+    let disposition = arg_str_opt(args, "disposition")
+        .unwrap_or("attachment")
+        .to_string();
+    let obj = app
+        .as_object_mut()
+        .ok_or_else(|| "app must be a map".to_string())?;
+    let mut download_routes = obj
+        .get("download_routes")
+        .and_then(|v| v.as_object())
+        .cloned()
+        .unwrap_or_default();
+    download_routes.insert(
+        path,
+        json!({
+            "storage_url": storage_url,
+            "disposition": disposition,
+        }),
+    );
+    obj.insert("download_routes".into(), Value::Object(download_routes));
+    Ok(app)
+});
+
+web_ffi!(web_upload_validate, |args: &Value| {
+    let filename = arg_str(args, "filename")?;
+    let content_type = arg_str_opt(args, "content_type").unwrap_or("application/octet-stream");
+    let size = args
+        .get("size")
+        .and_then(|v| v.as_u64().or_else(|| v.as_i64().map(|i| i as u64)))
+        .ok_or_else(|| "missing `size`".to_string())?;
+    let max_bytes = args
+        .get("max_bytes")
+        .and_then(|v| v.as_u64().or_else(|| v.as_i64().map(|i| i as u64)))
+        .unwrap_or(5_242_880);
+    let types = args.get("types");
+    upload::validate(filename, content_type, size, max_bytes, types)
+});
+
+web_ffi!(web_upload_save, |args: &Value| {
+    let storage_url = if let Ok(u) = storage_url_arg(args, "storage") {
+        u
+    } else if let Ok(u) = storage_url_arg(args, "url") {
+        u
+    } else {
+        arg_str(args, "storage_url")?.to_string()
+    };
+    let path = arg_str(args, "path")?;
+    let key = arg_str_opt(args, "key");
+    let content_type = arg_str_opt(args, "content_type");
+    let prefix = arg_str_opt(args, "prefix");
+    upload::save(&storage_url, key, path, content_type, prefix)
+});
+
+web_ffi!(web_media_new, |args: &Value| {
+    let storage = args.get("storage").cloned().unwrap_or(Value::Null);
+    Ok(json!({ "_type": "media", "storage": storage }))
 });
 
 web_ffi!(web_compose_form, |args: &Value| {
@@ -1049,6 +1175,8 @@ web_ffi!(web_listen, |args: &Value| {
         session_ttl,
         ws_routes,
         rss_routes,
+        upload_routes,
+        download_routes,
         middleware,
         cookie_secure,
     ) = if args.get("page").is_some() || args.get("host").is_some() {
@@ -1092,6 +1220,8 @@ web_ffi!(web_listen, |args: &Value| {
             static_mount,
             auth_users,
             session_ttl,
+            HashMap::new(),
+            HashMap::new(),
             HashMap::new(),
             HashMap::new(),
             middleware::Middleware::default(),
@@ -1149,6 +1279,63 @@ web_ffi!(web_listen, |args: &Value| {
                 rss_routes.insert(k.clone(), v.clone());
             }
         }
+        let mut upload_routes = HashMap::new();
+        if let Some(obj) = app.get("upload_routes").and_then(|v| v.as_object()) {
+            for (k, v) in obj {
+                let field = v
+                    .get("field")
+                    .and_then(|x| x.as_str())
+                    .unwrap_or("file")
+                    .to_string();
+                let storage_url = v
+                    .get("storage_url")
+                    .and_then(|x| x.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                let prefix = v
+                    .get("prefix")
+                    .and_then(|x| x.as_str())
+                    .unwrap_or("uploads/")
+                    .to_string();
+                let max_bytes = v
+                    .get("max_bytes")
+                    .and_then(|x| x.as_u64().or_else(|| x.as_i64().map(|i| i as u64)))
+                    .unwrap_or(5_242_880);
+                let types = v.get("types").cloned().filter(|t| !matches!(t, Value::Null));
+                upload_routes.insert(
+                    k.clone(),
+                    http::UploadRoute {
+                        field,
+                        storage_url,
+                        prefix,
+                        max_bytes,
+                        types,
+                    },
+                );
+            }
+        }
+        let mut download_routes = HashMap::new();
+        if let Some(obj) = app.get("download_routes").and_then(|v| v.as_object()) {
+            for (k, v) in obj {
+                let storage_url = v
+                    .get("storage_url")
+                    .and_then(|x| x.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                let disposition = v
+                    .get("disposition")
+                    .and_then(|x| x.as_str())
+                    .unwrap_or("attachment")
+                    .to_string();
+                download_routes.insert(
+                    k.clone(),
+                    http::DownloadRoute {
+                        storage_url,
+                        disposition,
+                    },
+                );
+            }
+        }
         let static_dir = app
             .get("static_dir")
             .and_then(|v| v.as_str())
@@ -1204,6 +1391,8 @@ web_ffi!(web_listen, |args: &Value| {
             session_ttl,
             ws_routes,
             rss_routes,
+            upload_routes,
+            download_routes,
             middleware,
             cookie_secure,
         )
@@ -1230,6 +1419,8 @@ web_ffi!(web_listen, |args: &Value| {
         cookie_secure,
         ws_routes,
         rss_routes,
+        upload_routes,
+        download_routes,
         &middleware,
     )
 });
@@ -1319,6 +1510,27 @@ pub unsafe extern "C" fn marqdo_plugin_init(host: *const MarqdoHostApi) -> c_int
             "app,path,table,limit,order,title,link,description",
             web_app_route_rss as PluginFn,
         ),
+        (
+            "web_app_upload",
+            "app,path,field,storage,prefix,max_bytes,types",
+            web_app_upload as PluginFn,
+        ),
+        (
+            "web_app_download",
+            "app,path,storage,disposition",
+            web_app_download as PluginFn,
+        ),
+        (
+            "web_upload_validate",
+            "filename,content_type,size,max_bytes,types",
+            web_upload_validate as PluginFn,
+        ),
+        (
+            "web_upload_save",
+            "storage,path,key,content_type,prefix",
+            web_upload_save as PluginFn,
+        ),
+        ("web_media_new", "storage", web_media_new as PluginFn),
         (
             "web_style",
             "name,table",

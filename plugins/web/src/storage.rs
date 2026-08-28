@@ -84,17 +84,71 @@ pub fn put(
 ) -> Result<Value, String> {
     let bytes = load_bytes(body, path)?;
     let ct = content_type.unwrap_or("application/octet-stream");
+    put_bytes(url, key, &bytes, ct)
+}
+
+/// Persist raw bytes (multipart upload / binary save).
+pub fn put_bytes(
+    url: &str,
+    key: &str,
+    bytes: &[u8],
+    content_type: &str,
+) -> Result<Value, String> {
+    let ct = if content_type.trim().is_empty() {
+        "application/octet-stream"
+    } else {
+        content_type.trim()
+    };
     if is_file(url) {
         let root = file_root(url)?;
         let dest = path_for(&root, key)?;
         if let Some(parent) = dest.parent() {
             fs::create_dir_all(parent).map_err(|e| e.to_string())?;
         }
-        fs::write(&dest, &bytes).map_err(|e| e.to_string())?;
+        fs::write(&dest, bytes).map_err(|e| e.to_string())?;
         let _ = fs::write(ctype_path(&dest), ct);
-        Ok(json!({ "ok": true, "key": key, "size": bytes.len() }))
+        Ok(json!({ "ok": true, "key": key, "size": bytes.len(), "content_type": ct }))
     } else if is_s3(url) {
-        s3_put_http(url, key, &bytes, ct)
+        s3_put_http(url, key, bytes, ct)
+    } else {
+        Err("unknown storage backend".into())
+    }
+}
+
+/// Read object bytes for HTTP download. Returns `(bytes, content_type, filename)`.
+pub fn read_bytes(url: &str, key: &str) -> Result<Option<(Vec<u8>, String, String)>, String> {
+    let filename = key
+        .rsplit('/')
+        .next()
+        .filter(|s| !s.is_empty())
+        .unwrap_or("download")
+        .to_string();
+    if is_file(url) {
+        let root = file_root(url)?;
+        let dest = path_for(&root, key)?;
+        if !dest.is_file() {
+            return Ok(None);
+        }
+        let bytes = fs::read(&dest).map_err(|e| e.to_string())?;
+        let ct = fs::read_to_string(ctype_path(&dest))
+            .unwrap_or_else(|_| "application/octet-stream".into());
+        Ok(Some((bytes, ct, filename)))
+    } else if is_s3(url) {
+        let cfg = S3Conf::parse(url)?;
+        let target = cfg.object_url(key)?;
+        let (status, ct, body) = cfg.request_bytes("GET", &target)?;
+        if status == 404 {
+            return Ok(None);
+        }
+        if !(200..300).contains(&status) {
+            return Err(format!("s3 get HTTP {status}"));
+        }
+        let content_type = if ct.trim().is_empty() {
+            "application/octet-stream".into()
+        } else {
+            ct
+        };
+        Ok(Some((body, content_type, filename)))
     } else {
         Err("unknown storage backend".into())
     }

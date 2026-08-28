@@ -488,8 +488,17 @@ pub fn render_body(
         ));
     }
     body.push_str(&format!(
-        "<form method=\"post\" action=\"{}\">",
-        esc(&post_to)
+        "<form method=\"post\" action=\"{}\"{}>",
+        esc(&post_to),
+        if fields.iter().any(|f| {
+            f.get("type")
+                .and_then(|v| v.as_str())
+                .is_some_and(|t| t.eq_ignore_ascii_case("file"))
+        }) {
+            " enctype=\"multipart/form-data\""
+        } else {
+            ""
+        }
     ));
     if let Some(token) = csrf.filter(|s| !s.is_empty()) {
         body.push_str(&format!(
@@ -541,7 +550,7 @@ pub fn render_body(
             ));
         } else {
             let input_type = match ty {
-                "number" | "email" | "url" | "checkbox" => ty,
+                "number" | "email" | "url" | "checkbox" | "file" => ty,
                 _ => "text",
             };
             if ty == "checkbox" {
@@ -550,6 +559,12 @@ pub fn render_body(
                     "<input type=\"checkbox\" name=\"{}\" value=\"1\"{}{}/>",
                     esc(name),
                     if checked { " checked" } else { "" },
+                    req_attr
+                ));
+            } else if ty == "file" {
+                body.push_str(&format!(
+                    "<input type=\"file\" name=\"{}\"{}/>",
+                    esc(name),
                     req_attr
                 ));
             } else {
@@ -658,3 +673,25 @@ pub fn submit(form: &Value, data: &Value, db_url: &str) -> Result<Value, String>
         "redirect": redirect,
     }))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn file_field_adds_multipart_enctype() {
+        let form = json!({
+            "table": "x",
+            "fields": [
+                {"name": "title", "label": "Title", "type": "text"},
+                {"name": "file", "label": "File", "type": "file"},
+            ]
+        });
+        let html = render(&form, "up", None, None, None);
+        assert!(html.contains("enctype=\"multipart/form-data\""), "{html}");
+        assert!(html.contains("type=\"file\""), "{html}");
+        assert!(html.contains("name=\"file\""), "{html}");
+    }
+}
+

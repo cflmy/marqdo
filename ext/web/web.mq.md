@@ -417,7 +417,7 @@ Tables stay as data; `configure` assembles them. 配置即数据、装配即函�
 
 ## listen
 
-Serve `/`, routed pages, `/_part/{id}` (home) and `{path}/_part/{id}` (routes), `/_form/{id}` (from mounts + page embeds), optional `/static` (or custom mount), and optional `/admin`.
+Serve `/`, routed pages, `/_part/{id}` (home) and `{path}/_part/{id}` (routes), `/_form/{id}` (from mounts + page embeds), optional `/static` (or custom mount), optional `/admin`, and any `upload` / `download` routes.
 
 **> web_listen app=`self`**
 
@@ -449,6 +449,27 @@ Keep the app's `admin=True`, and gate `/admin*` behind a login page. `users` is 
 Register an RSS 2.0 feed at `path` (e.g. `/feed.xml`) backed by a DB table.
 
 **> web_app_route_rss app=`self` path=`path` table=`table` limit=`limit` order=`order` title=`title` link=`link` description=`description`**
+
+## upload
+    + `path`=/_upload
+    + `field`=file
+    + `storage`
+    + `prefix`=uploads/
+    + `max_bytes`=5242880
+    + `types`=None
+
+Mount `POST path` for multipart file upload. `storage` is a `# storage` handle or `file:…` / `s3://…` URL. Optional `types` is a `|type|ext|` / `|类型|扩展名|` allowlist (or a MIME CSV string). Success returns JSON `{ok,key,size,content_type}`.
+
+**> web_app_upload app=`self` path=`path` field=`field` storage=`storage` prefix=`prefix` max_bytes=`max_bytes` types=`types`**
+
+## download
+    + `path`=/_media/{*key}
+    + `storage`
+    + `disposition`=attachment
+
+Mount `GET path` to stream an object. Path must capture `key` (use `{*key}` for nested keys). `disposition` is `attachment` or `inline`.
+
+**> web_app_download app=`self` path=`path` storage=`storage` disposition=`disposition`**
 
 # auth
     + `users`
@@ -568,6 +589,37 @@ Provide either `body` (text) or `path` (local file to upload).
 
 *url = self[^url]*
 **> web_storage_list url=`url` prefix=`prefix`**
+
+# media
+    + `storage`=None
+
+Offline helpers for upload validation and saving into `# storage` (also used by HTTP `app.upload`).
+
+> ensure_plugin
+**> web_media_new storage=`storage`**
+
+## validate
+    + `filename`
+    + `content_type`="application/octet-stream"
+    + `size`
+    + `max_bytes`=5242880
+    + `types`=None
+
+**> web_upload_validate filename=`filename` content_type=`content_type` size=`size` max_bytes=`max_bytes` types=`types`**
+
+## save
+    + `path`
+    + `key`=None
+    + `content_type`="application/octet-stream"
+    + `prefix`=uploads/
+    + `storage`=None
+
+*st = storage*
+1. `st` == None
+  *st = self[^storage]*
+2. *
+
+**> web_upload_save storage=`st` path=`path` key=`key` content_type=`content_type` prefix=`prefix`**
 
 # ws
     + `timeout_sec`=30
