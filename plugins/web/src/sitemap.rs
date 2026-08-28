@@ -136,6 +136,11 @@ pub fn build_robots(sitemap_url: Option<&str>) -> String {
     out
 }
 
+/// ABI helper returning `{ xml }`.
+pub fn sitemap_json(base: &str, items: &Value) -> Value {
+    json!({ "xml": build_sitemap(base, items) })
+}
+
 /// ABI helper returning `{ body }`.
 #[allow(dead_code)]
 pub fn robots_json(sitemap_url: Option<&str>, body: Option<&str>) -> Value {
