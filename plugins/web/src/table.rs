@@ -531,3 +531,50 @@ pub fn project_rows(binds: &[Value], rows: &[Value]) -> Value {
     }
     Value::Array(out)
 }
+
+const META_KEY_KEYS: &[&str] = &["键", "key", "name"];
+const META_VAL_KEYS: &[&str] = &["值", "value"];
+
+/// SEO / OpenGraph meta table → `{title, description, og:…, canonical, …}`.
+pub fn as_meta_map(table: &Value) -> Map<String, Value> {
+    let mut out = Map::new();
+    match table {
+        Value::Array(rows) => {
+            for row in rows {
+                let Some(obj) = row.as_object() else {
+                    continue;
+                };
+                let key = META_KEY_KEYS
+                    .iter()
+                    .find_map(|k| obj.get(*k))
+                    .map(|v| normalize_ref(&meta_text(v)))
+                    .unwrap_or_default();
+                let val = META_VAL_KEYS
+                    .iter()
+                    .find_map(|k| obj.get(*k))
+                    .map(|v| meta_text(v))
+                    .unwrap_or_default();
+                if !key.is_empty() {
+                    out.insert(key, json!(val));
+                }
+            }
+        }
+        Value::Object(m) => {
+            for (k, v) in m {
+                out.insert(k.clone(), json!(meta_text(v)));
+            }
+        }
+        _ => {}
+    }
+    out
+}
+
+fn meta_text(v: &Value) -> String {
+    match v {
+        Value::Null => String::new(),
+        Value::String(s) => s.clone(),
+        Value::Bool(b) => b.to_string(),
+        Value::Number(n) => n.to_string(),
+        other => other.to_string(),
+    }
+}

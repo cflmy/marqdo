@@ -90,6 +90,22 @@ of a list of cards. Set on the dynamic post page so `/post/{slug}` shows one pos
 
 **> web_page_detail page=`self` detail=`detail`**
 
+## meta
+    + `meta`
+
+SEO / OpenGraph metadata as a data table (`|key|value|`). Keys such as `title`, `description`, `canonical`, `og:type` become `<head>` tags at render time.
+
+**> web_page_meta page=`self` meta=`meta`**
+
+## paginate
+    + `offset`=0
+    + `limit`=10
+    + `path`=/
+
+List pagination for the main bind: sets DB `limit`/`offset` and renders previous/next navigation.
+
+**> web_page_paginate page=`self` offset=`offset` limit=`limit` path=`path`**
+
 ## compose_form
     + `form`
     + `id`
@@ -418,6 +434,19 @@ Register a WebSocket endpoint at `path` (e.g. `/live`). With `echo=True` (defaul
 Keep the app's `admin=True`, and gate `/admin*` behind a login page. `users` is an admin-users table (`|username|password|` / `|用户名|密码|`); unauthenticated requests redirect to `/admin/login`.
 
 **> web_app_auth app=`self` users=`users` session_ttl=`session_ttl`**
+
+## route_rss
+    + `path`
+    + `table`
+    + `limit`=20
+    + `order`=-created_at
+    + `title`=Feed
+    + `link`=/
+    + `description`=""
+
+Register an RSS 2.0 feed at `path` (e.g. `/feed.xml`) backed by a DB table.
+
+**> web_app_route_rss app=`self` path=`path` table=`table` limit=`limit` order=`order` title=`title` link=`link` description=`description`**
 
 # auth
     + `users`

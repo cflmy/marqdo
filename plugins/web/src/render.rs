@@ -3,6 +3,7 @@
 use serde_json::{json, Map, Value};
 
 use crate::db;
+use crate::markdown;
 use crate::table::{as_bind, normalize_ref, normalize_slot, parse_site_path, project_rows, SitePath};
 
 fn esc(s: &str) -> String {
@@ -77,7 +78,7 @@ fn resolve_links(raw: Option<&Value>, db_url: Option<&str>) -> Vec<(String, Stri
         let Some(table) = table else {
             return Vec::new();
         };
-        let data = select_page_data(url, &table, raw, 200);
+        let data = select_page_data(url, &table, raw, 200, 0);
         let rows = data
             .get("rows")
             .and_then(|v| v.as_array())
@@ -127,27 +128,38 @@ fn render_ul(links: &[(String, String)], class: &str) -> String {
     s
 }
 
-fn resolve_main(args: &Value, db_url: Option<&str>) -> (String, Vec<Map<String, Value>>) {
+fn resolve_main(args: &Value, db_url: Option<&str>) -> (String, Vec<Map<String, Value>>, Option<i64>) {
     let intro = args
         .get("intro")
         .and_then(|v| v.as_str())
         .unwrap_or("")
         .to_string();
     let Some(main) = args.get("main") else {
-        return (intro, Vec::new());
+        return (intro, Vec::new(), None);
     };
     let binds = as_bind(main);
     let arr = binds.as_array().cloned().unwrap_or_default();
     if arr.is_empty() {
-        return (intro, Vec::new());
+        return (intro, Vec::new(), None);
     }
     let Some(url) = db_url else {
-        return (intro, Vec::new());
+        return (intro, Vec::new(), None);
     };
     let Some(table) = crate::table::bind_table_name(&arr) else {
-        return (intro, Vec::new());
+        return (intro, Vec::new(), None);
     };
-    let data = select_page_data(url, &table, args, 200);
+    let limit = args
+        .get("paginate")
+        .and_then(|p| p.get("limit"))
+        .and_then(|v| v.as_i64())
+        .unwrap_or(200);
+    let offset = args
+        .get("paginate")
+        .and_then(|p| p.get("offset"))
+        .and_then(|v| v.as_i64())
+        .unwrap_or(0);
+    let data = select_page_data(url, &table, args, limit, offset);
+    let total = data.get("total").and_then(|v| v.as_i64());
     let rows = data
         .get("rows")
         .and_then(|v| v.as_array())
@@ -161,7 +173,7 @@ fn resolve_main(args: &Value, db_url: Option<&str>) -> (String, Vec<Map<String, 
         .into_iter()
         .filter_map(|v| v.as_object().cloned())
         .collect();
-    (intro, items)
+    (intro, items, total)
 }
 
 /// Run the page's DB query: `where` (with `{param}` placeholders resolved from
@@ -171,6 +183,7 @@ fn select_page_data(
     table: &str,
     args: &Value,
     limit: i64,
+    offset: i64,
 ) -> Value {
     let mut where_v = args.get("query").cloned();
     if let Some(m) = where_v.as_ref().and_then(|v| v.as_object()) {
@@ -187,11 +200,20 @@ fn select_page_data(
         }
     }
     let order = args.get("order").and_then(|v| v.as_str());
-    if order.is_some_and(|s| !s.trim().is_empty()) {
-        db::select_order(url, table, limit, where_v.as_ref(), order, None, None)
-    } else {
-        db::select(url, table, limit, where_v.as_ref())
-    }
+    let paginate = args.get("paginate").is_some();
+    db::select_order(
+        url,
+        table,
+        limit,
+        where_v.as_ref(),
+        order.filter(|s| !s.trim().is_empty()),
+        if paginate || offset > 0 {
+            Some(offset)
+        } else {
+            None
+        },
+        None,
+    )
     .unwrap_or(json!({ "rows": [] }))
 }
 
@@ -318,8 +340,102 @@ a:hover { color:var(--accent); }
 .article-body { line-height:1.75; color:var(--ink); }
 .article-p { margin:0 0 1rem; white-space:pre-line; }
 .article-h2 { margin:1.5rem 0 .75rem; }
-.article-code { background:#f5f5f4; border:1px solid var(--line); border-radius:6px; padding:1rem; overflow-x:auto; font-size:.9rem; }
+.article-body.md { line-height: 1.75; }
+.article-body.md pre { background:#f5f5f4; border:1px solid var(--line); border-radius:6px; padding:1rem; overflow-x:auto; }
+.article-body.md code { font-size:.9em; }
+.pagination { display:flex; gap:1rem; align-items:center; margin:1.5rem 0; font-size:.95rem; }
+.pagination a { color:var(--accent); text-decoration:none; }
+.pagination a:hover { text-decoration:underline; }
+.pagination .page-status { color:var(--muted); }
 "#;
+
+fn head_html(args: &Value, default_title: &str) -> String {
+    let meta = args.get("meta").and_then(|v| v.as_object());
+    let page_title = meta
+        .and_then(|m| m.get("title"))
+        .map(text)
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| default_title.to_string());
+    let mut s = format!("<title>{}</title>", esc(&page_title));
+    if let Some(m) = meta {
+        for (k, v) in m {
+            if k == "title" {
+                continue;
+            }
+            let val = text(v);
+            if val.is_empty() {
+                continue;
+            }
+            match k.as_str() {
+                "description" => {
+                    s.push_str(&format!(
+                        "<meta name=\"description\" content=\"{}\"/>",
+                        esc(&val)
+                    ));
+                }
+                "canonical" => {
+                    s.push_str(&format!("<link rel=\"canonical\" href=\"{}\"/>", esc(&val)));
+                }
+                k if k.starts_with("og:") => {
+                    s.push_str(&format!(
+                        "<meta property=\"{}\" content=\"{}\"/>",
+                        esc(k),
+                        esc(&val)
+                    ));
+                }
+                other => {
+                    s.push_str(&format!(
+                        "<meta name=\"{}\" content=\"{}\"/>",
+                        esc(other),
+                        esc(&val)
+                    ));
+                }
+            }
+        }
+    }
+    s
+}
+
+fn render_pagination(args: &Value, total: i64, item_count: usize) -> String {
+    let Some(p) = args.get("paginate") else {
+        return String::new();
+    };
+    let offset = p.get("offset").and_then(|v| v.as_i64()).unwrap_or(0);
+    let limit = p.get("limit").and_then(|v| v.as_i64()).unwrap_or(10);
+    if limit <= 0 {
+        return String::new();
+    }
+    let path = p
+        .get("path")
+        .and_then(|v| v.as_str())
+        .unwrap_or("/")
+        .to_string();
+    let mut s = String::from("<nav class=\"pagination\" aria-label=\"Pagination\">");
+    if offset > 0 {
+        let prev = offset.saturating_sub(limit);
+        s.push_str(&format!(
+            "<a class=\"page-prev\" href=\"{}?offset={}\">← Previous</a> ",
+            esc(&path),
+            prev
+        ));
+    }
+    let end = offset + item_count as i64;
+    s.push_str(&format!(
+        "<span class=\"page-status\">{}–{} of {}</span> ",
+        offset + 1,
+        end.min(total),
+        total
+    ));
+    if end < total {
+        s.push_str(&format!(
+            "<a class=\"page-next\" href=\"{}?offset={}\">Next →</a>",
+            esc(&path),
+            end
+        ));
+    }
+    s.push_str("</nav>");
+    s
+}
 
 pub fn render_page(args: &Value, db_url: Option<&str>, csrf: Option<&str>) -> String {
     render_page_ex(args, db_url, None, None, csrf)
@@ -350,7 +466,7 @@ pub fn render_page_ex(
     let nav = resolve_links(args.get("nav"), db_url);
     let side = resolve_links(args.get("sidebar"), db_url);
     let foot = resolve_links(args.get("footer"), db_url);
-    let (intro, items) = resolve_main(args, db_url);
+    let (intro, items, total) = resolve_main(args, db_url);
 
     let has_side = args.get("sidebar").is_some() || !side.is_empty();
     let body_class = if has_side {
@@ -390,6 +506,9 @@ pub fn render_page_ex(
             }
             main_html.push_str("</section>");
         }
+        if let Some(t) = total {
+            main_html.push_str(&render_pagination(args, t, items.len()));
+        }
     }
 
     format!(
@@ -397,7 +516,7 @@ pub fn render_page_ex(
 <html lang="zh-CN"><head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>{title}</title>
+{head}
 <style>{SHELL_CSS}{extra}</style>
 </head>
 <body class="{body_class}">
@@ -406,7 +525,7 @@ pub fn render_page_ex(
 <main class="{main_class}"{main_attrs}>{main_html}</main>
 <footer class="{foot_class}"{foot_attrs}>{foot_ul}</footer>
 </body></html>"#,
-        title = esc(title),
+        head = head_html(args, title),
         nav_class = slot_class(args, "nav", "topnav"),
         nav_attrs = slot_attrs("nav", &parts, args),
         nav_ul = render_ul(&nav, "nav"),
@@ -458,7 +577,7 @@ pub fn render_fragment(args: &Value, db_url: Option<&str>) -> String {
             )
         }
         _ => {
-            let (intro, items) = resolve_main(args, db_url);
+            let (intro, items, _total) = resolve_main(args, db_url);
             let mut body = String::new();
             if !intro.is_empty() {
                 body.push_str(&format!("<div class=\"main-intro\">{intro}</div>"));
@@ -554,47 +673,8 @@ fn render_article(it: &Map<String, Value>) -> String {
         ));
     }
     if !body.is_empty() {
-        s.push_str(&render_article_body(&body));
+        s.push_str(&markdown::to_html(&body));
     }
     s.push_str("</article>");
-    s
-}
-
-/// Split a Markdown-ish article body into block elements.
-fn render_article_body(body: &str) -> String {
-    let mut s = String::from("<div class=\"article-body\">");
-    for para in body.split("\n\n") {
-        let para = para.trim();
-        if para.is_empty() {
-            continue;
-        }
-        if let Some(code) = para.strip_prefix("```") {
-            let code = code.strip_suffix("```").unwrap_or(code);
-            s.push_str(&format!(
-                "<pre class=\"article-code\">{}</pre>",
-                esc(code)
-            ));
-            continue;
-        }
-        if let Some(h) = para.strip_prefix("## ") {
-            s.push_str(&format!(
-                "<h2 class=\"article-h2\">{}</h2>",
-                esc(h.trim())
-            ));
-            continue;
-        }
-        if let Some(h) = para.strip_prefix("# ") {
-            s.push_str(&format!(
-                "<h2 class=\"article-h2\">{}</h2>",
-                esc(h.trim())
-            ));
-            continue;
-        }
-        s.push_str(&format!(
-            "<p class=\"article-p\">{}</p>",
-            esc(para).replace('\n', "<br/>")
-        ));
-    }
-    s.push_str("</div>");
     s
 }

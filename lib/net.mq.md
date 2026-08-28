@@ -71,3 +71,10 @@ Parse a `Cookie` request header (default) or one or more `Set-Cookie` response h
 Parse a `multipart/form-data` request body (given its `boundary`) into a list of `{name, filename?, content_type?, value}` parts.
 
 **> host_multipart_parse body=`body` boundary=`boundary`**
+
+## markdown_parse
+    + `text`
+
+Parse Markdown / GFM into HTML (pure transform, no network I/O).
+
+**> host_markdown_parse text=`text`**

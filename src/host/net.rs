@@ -448,6 +448,26 @@ pub fn multipart_parse(body: &Value, boundary: &Value) -> Result<Value, String> 
     Ok(Value::List(parts))
 }
 
+/// Parse Markdown / GFM into HTML (pure transform, no network I/O).
+pub fn markdown_parse(text: &Value) -> Result<Value, String> {
+    let md = as_text(text, "text")?;
+    Ok(Value::Text(markdown_to_html(md)))
+}
+
+fn markdown_to_html(md: &str) -> String {
+    use pulldown_cmark::{html, Options, Parser};
+    let mut opts = Options::empty();
+    opts.insert(
+        Options::ENABLE_STRIKETHROUGH
+            | Options::ENABLE_TABLES
+            | Options::ENABLE_TASKLISTS,
+    );
+    let parser = Parser::new_ext(md, opts);
+    let mut html_out = String::new();
+    html::push_html(&mut html_out, parser);
+    html_out
+}
+
 /// Extract `data:` payloads from an SSE body (ignores comments / event: / id:).
 pub fn sse_data_payloads(text: &str) -> Vec<String> {
     let mut out = Vec::new();
@@ -980,5 +1000,16 @@ data: [DONE]\n\
         assert!(f1
             .iter()
             .any(|(k, v)| k == "value" && matches!(v, Value::Text(t) if t == "file body")));
+    }
+
+    #[test]
+    fn markdown_parse_basic() {
+        let md = Value::Text("# Hello\n\nA **bold** word.".into());
+        let out = markdown_parse(&md).unwrap();
+        let Value::Text(html) = out else {
+            panic!("expected text html");
+        };
+        assert!(html.contains("<h1"));
+        assert!(html.contains("<strong>bold</strong>"));
     }
 }

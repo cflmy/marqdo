@@ -123,6 +123,7 @@ pub enum HostFn {
     CollectionClear = 121,
     CookieParse = 122,
     MultipartParse = 123,
+    MarkdownParse = 124,
 }
 
 
@@ -243,6 +244,7 @@ impl HostFn {
             121 => Self::CollectionClear,
             122 => Self::CookieParse,
             123 => Self::MultipartParse,
+            124 => Self::MarkdownParse,
             _ => return None,
         })
     }
@@ -366,6 +368,7 @@ impl HostFn {
             "host_collection_clear" | "collection_clear" => Self::CollectionClear,
             "host_cookie_parse" | "cookie_parse" => Self::CookieParse,
             "host_multipart_parse" | "multipart_parse" => Self::MultipartParse,
+            "host_markdown_parse" | "markdown_parse" => Self::MarkdownParse,
             _ => return None,
         })
     }
@@ -476,6 +479,7 @@ impl HostFn {
             Self::CollectionClear => "host_collection_clear",
             Self::CookieParse => "host_cookie_parse",
             Self::MultipartParse => "host_multipart_parse",
+            Self::MarkdownParse => "host_markdown_parse",
             Self::WritebackRecord => "host_writeback_record",
             Self::WritebackGet => "host_writeback_get",
             Self::WritebackClear => "host_writeback_clear",
@@ -560,6 +564,7 @@ impl HostFn {
             Self::CollectionClear => &["value"],
             Self::CookieParse => &["text", "is_response"],
             Self::MultipartParse => &["body", "boundary"],
+            Self::MarkdownParse => &["text"],
             Self::WritebackRecord => &["value"],
             Self::WritebackGet | Self::WritebackClear => &[],
             Self::WritebackList => &[],
@@ -842,6 +847,7 @@ pub fn call_host(
         HostFn::CollectionClear => super::collection::collection_clear(require(bound, "value")?),
         HostFn::CookieParse => net::cookie_parse(require(bound, "text")?, bound.get("is_response")),
         HostFn::MultipartParse => net::multipart_parse(require(bound, "body")?, require(bound, "boundary")?),
+        HostFn::MarkdownParse => net::markdown_parse(require(bound, "text")?),
         HostFn::OuterCallLine => Ok(Value::Int(
             ctx.call_site_lines
                 .first()

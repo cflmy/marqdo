@@ -19,6 +19,7 @@ use crate::form;
 use crate::middleware::Middleware;
 use crate::rate_limit;
 use crate::render;
+use crate::rss;
 use crate::session;
 
 #[derive(Clone)]
@@ -71,6 +72,7 @@ pub fn listen(
     session_ttl: u64,
     cookie_secure: bool,
     ws_routes: HashMap<String, bool>,
+    rss_routes: HashMap<String, Value>,
     middleware: &Middleware,
 ) -> Result<Value, String> {
     let mut form_owners = HashMap::new();
@@ -179,6 +181,21 @@ pub fn listen(
         );
     }
 
+    let mut rss_paths: Vec<String> = rss_routes.keys().cloned().collect();
+    rss_paths.sort();
+    for path in rss_paths {
+        let cfg = rss_routes.get(&path).cloned().unwrap_or_default();
+        let route_path = path.clone();
+        app = app.route(
+            &path,
+            get(move |State(st): State<Arc<AppState>>| {
+                let cfg = cfg.clone();
+                let route_path = route_path.clone();
+                async move { rss_feed(&st, &route_path, &cfg) }
+            }),
+        );
+    }
+
     let mount = normalize_static_mount(static_mount);
     if let Some(dir) = static_dir {
         if !dir.is_dir() {
@@ -230,6 +247,40 @@ pub fn normalize_static_mount(raw: &str) -> String {
         m.pop();
     }
     m
+}
+
+fn rss_feed(st: &AppState, _path: &str, cfg: &Value) -> Response {
+    let Some(url) = st.db_url.as_deref() else {
+        return Html(String::from("<p>no database</p>")).into_response();
+    };
+    let table = cfg
+        .get("table")
+        .and_then(|v| v.as_str())
+        .unwrap_or("posts");
+    let limit = cfg
+        .get("limit")
+        .and_then(|v| v.as_i64())
+        .unwrap_or(20);
+    let order = cfg.get("order").and_then(|v| v.as_str());
+    let title = cfg
+        .get("title")
+        .and_then(|v| v.as_str())
+        .unwrap_or("Feed");
+    let link = cfg.get("link").and_then(|v| v.as_str()).unwrap_or("/");
+    let description = cfg
+        .get("description")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+    let rows = db::select_order(url, table, limit, None, order, None, None)
+        .ok()
+        .and_then(|v| v.get("rows").and_then(|r| r.as_array()).cloned())
+        .unwrap_or_default();
+    let xml = rss::build_rss(title, link, description, &rows);
+    (
+        [(axum::http::header::CONTENT_TYPE, "application/rss+xml; charset=utf-8")],
+        xml,
+    )
+        .into_response()
 }
 
 async fn home(State(st): State<Arc<AppState>>, headers: axum::http::HeaderMap) -> Response {

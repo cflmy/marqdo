@@ -4,10 +4,12 @@ mod compose;
 mod db;
 mod form;
 mod http;
+mod markdown;
 mod middleware;
 mod password;
 mod rate_limit;
 mod render;
+mod rss;
 mod session;
 mod table;
 mod ws;
@@ -343,6 +345,92 @@ web_ffi!(web_page_detail, |args: &Value| {
     let mut obj = page.as_object().cloned().unwrap_or_default();
     obj.insert("detail".into(), json!(on));
     Ok(Value::Object(obj))
+});
+
+web_ffi!(web_page_meta, |args: &Value| {
+    let page = args.get("page").cloned().unwrap_or(json!({}));
+    let meta = args
+        .get("meta")
+        .or_else(|| args.get("table"))
+        .cloned()
+        .unwrap_or(json!({}));
+    let mut obj = page.as_object().cloned().unwrap_or_default();
+    obj.insert("meta".into(), Value::Object(crate::table::as_meta_map(&meta)));
+    Ok(Value::Object(obj))
+});
+
+web_ffi!(web_page_paginate, |args: &Value| {
+    let page = args.get("page").cloned().unwrap_or(json!({}));
+    let offset = args
+        .get("offset")
+        .and_then(|v| v.as_i64().or_else(|| v.as_u64().map(|u| u as i64)))
+        .unwrap_or(0);
+    let limit = args
+        .get("limit")
+        .and_then(|v| v.as_i64().or_else(|| v.as_u64().map(|u| u as i64)))
+        .unwrap_or(10);
+    let path = arg_str_opt(args, "path").unwrap_or("/").to_string();
+    let mut obj = page.as_object().cloned().unwrap_or_default();
+    obj.insert(
+        "paginate".into(),
+        json!({ "offset": offset, "limit": limit, "path": path }),
+    );
+    Ok(Value::Object(obj))
+});
+
+web_ffi!(web_rss_build, |args: &Value| {
+    let title = arg_str_opt(args, "title").unwrap_or("Feed");
+    let link = arg_str_opt(args, "link").unwrap_or("/");
+    let description = arg_str_opt(args, "description").unwrap_or("");
+    let items = args
+        .get("items")
+        .or_else(|| args.get("rows"))
+        .and_then(|v| v.as_array())
+        .cloned()
+        .unwrap_or_default();
+    Ok(Value::String(rss::build_rss(
+        title,
+        link,
+        description,
+        &items,
+    )))
+});
+
+web_ffi!(web_app_route_rss, |args: &Value| {
+    let mut app = args.get("app").cloned().unwrap_or(json!({}));
+    let path = normalize_route_path(arg_str(args, "path")?)?;
+    let table = arg_str(args, "table")?.to_string();
+    let limit = args
+        .get("limit")
+        .and_then(|v| v.as_i64().or_else(|| v.as_u64().map(|u| u as i64)))
+        .unwrap_or(20);
+    let order = arg_str_opt(args, "order").unwrap_or("-created_at").to_string();
+    let title = arg_str_opt(args, "title").unwrap_or("Feed").to_string();
+    let link = arg_str_opt(args, "link").unwrap_or("/").to_string();
+    let description = arg_str_opt(args, "description")
+        .unwrap_or("")
+        .to_string();
+    let obj = app
+        .as_object_mut()
+        .ok_or_else(|| "app must be a map".to_string())?;
+    let mut rss_routes = obj
+        .get("rss_routes")
+        .and_then(|v| v.as_object())
+        .cloned()
+        .unwrap_or_default();
+    rss_routes.insert(
+        path,
+        json!({
+            "table": table,
+            "limit": limit,
+            "order": order,
+            "title": title,
+            "link": link,
+            "description": description,
+        }),
+    );
+    obj.insert("rss_routes".into(), Value::Object(rss_routes));
+    Ok(app)
 });
 
 web_ffi!(web_compose_form, |args: &Value| {
@@ -878,6 +966,7 @@ web_ffi!(web_listen, |args: &Value| {
         auth_users,
         session_ttl,
         ws_routes,
+        rss_routes,
         middleware,
         cookie_secure,
     ) = if args.get("page").is_some() || args.get("host").is_some() {
@@ -921,6 +1010,7 @@ web_ffi!(web_listen, |args: &Value| {
             static_mount,
             auth_users,
             session_ttl,
+            HashMap::new(),
             HashMap::new(),
             middleware::Middleware::default(),
             cookie_secure,
@@ -969,6 +1059,12 @@ web_ffi!(web_listen, |args: &Value| {
                     _ => true,
                 };
                 ws_routes.insert(k.clone(), echo);
+            }
+        }
+        let mut rss_routes = HashMap::new();
+        if let Some(obj) = app.get("rss_routes").and_then(|v| v.as_object()) {
+            for (k, v) in obj {
+                rss_routes.insert(k.clone(), v.clone());
             }
         }
         let static_dir = app
@@ -1025,6 +1121,7 @@ web_ffi!(web_listen, |args: &Value| {
             auth_users,
             session_ttl,
             ws_routes,
+            rss_routes,
             middleware,
             cookie_secure,
         )
@@ -1050,6 +1147,7 @@ web_ffi!(web_listen, |args: &Value| {
         session_ttl,
         cookie_secure,
         ws_routes,
+        rss_routes,
         &middleware,
     )
 });
@@ -1118,6 +1216,26 @@ pub unsafe extern "C" fn marqdo_plugin_init(host: *const MarqdoHostApi) -> c_int
             "web_page_detail",
             "page,detail",
             web_page_detail as PluginFn,
+        ),
+        (
+            "web_page_meta",
+            "page,meta",
+            web_page_meta as PluginFn,
+        ),
+        (
+            "web_page_paginate",
+            "page,offset,limit,path",
+            web_page_paginate as PluginFn,
+        ),
+        (
+            "web_rss_build",
+            "title,link,description,items",
+            web_rss_build as PluginFn,
+        ),
+        (
+            "web_app_route_rss",
+            "app,path,table,limit,order,title,link,description",
+            web_app_route_rss as PluginFn,
         ),
         (
             "web_style",

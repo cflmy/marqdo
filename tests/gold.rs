@@ -1725,6 +1725,22 @@ auth-bad-reject-ok",
 }
 
 #[test]
+fn ext_web_content_smoke() {
+    let status = Command::new("cargo")
+        .args(["build", "-p", "marqdo_plugin_web"])
+        .current_dir(env!("CARGO_MANIFEST_DIR"))
+        .status()
+        .expect("build web plugin");
+    assert!(status.success(), "failed to build marqdo_plugin_web");
+    assert_out(
+        "tests/ext/web-content-smoke.mq.md",
+        "meta-ok
+paginate-ok
+rss-ok",
+    );
+}
+
+#[test]
 fn ext_web_db_w2_smoke() {
     // W2 data layer: transactions, connection pooling, pagination, query
     // expressiveness (IN/BETWEEN/OR), and row counting.
@@ -2296,6 +2312,14 @@ fn lib_net_multipart_parse() {
     assert_out(
         "tests/lib/net-multipart.mq.md",
         "title\nHello\nfile\na.txt\ntext/plain\nfile body",
+    );
+}
+
+#[test]
+fn lib_net_markdown_parse() {
+    assert_out(
+        "tests/lib/net-markdown.mq.md",
+        "markdown-ok",
     );
 }
 
