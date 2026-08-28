@@ -151,7 +151,7 @@ Open a database handle. URL schemes: `sqlite:path` (default), `postgres://…` /
     + `name`
     + `fields`
 
-Create a table from a schema table. Optional columns: `唯一`/`unique`, `索引`/`index` (creates UNIQUE / INDEX).
+Create a table from a schema table. Optional columns: `唯一`/`unique`, `索引`/`index` (creates UNIQUE / INDEX), `外键`/`fk`/`references` (e.g. `posts.id` or `posts(id)`). Columns named `created_at` / `updated_at` are filled automatically on insert/update when present.
 
 *url = self[^url]*
 **> web_db_init url=`url` name=`name` fields=`fields`**
@@ -467,9 +467,28 @@ Register a WebSocket endpoint at `path` (e.g. `/live`). `mode` is `echo` (defaul
     + `users`
     + `session_ttl`=3600
 
-Keep the app's `admin=True`, and gate `/admin*` behind a login page. `users` is an admin-users table (`|username|password|` / `|用户名|密码|`); unauthenticated requests redirect to `/admin/login`.
+Keep the app's `admin=True`, and gate `/admin*` behind a login page. `users` is an admin-users table (`|username|password|` / `|用户名|密码|`); optional `role` / `角色` column (`admin` / `author` / `visitor`). Unauthenticated requests redirect to `/admin/login`. Registers a default gate `/admin*` → `admin`.
 
 **> web_app_auth app=`self` users=`users` session_ttl=`session_ttl`**
+
+## gate
+    + `path`
+    + `roles`=admin
+
+Require one of `roles` (CSV) for `path` (prefix or `path*`). Anonymous sessions count as `visitor`.
+
+**> web_app_gate app=`self` path=`path` roles=`roles`**
+
+## gallery
+    + `path`=/gallery
+    + `storage`
+    + `prefix`=uploads/
+    + `title`=Gallery
+    + `download_base`=/_media
+
+Serve an HTML media gallery listing objects under `prefix` in `storage`, linking through `download_base`.
+
+**> web_app_gallery app=`self` path=`path` storage=`storage` prefix=`prefix` title=`title` download_base=`download_base`**
 
 ## route_rss
     + `path`
@@ -555,7 +574,7 @@ Session/auth helper. Constructs a config object; `login` validates against the u
     + `username`
     + `password`
 
-Validate credentials against the users table and create a session. Returns `{ok, session_id, username}`.
+Validate credentials against the users table and create a session. Returns `{ok, session_id, username, role}`.
 
 *users = self[^users]*
 *ttl = self[^session_ttl]*
@@ -564,7 +583,7 @@ Validate credentials against the users table and create a session. Returns `{ok,
 ## check
     + `session_id`
 
-Returns `{ok, username}` when the session is valid.
+Returns `{ok, username, role}` when the session is valid.
 
 **> web_auth_check session_id=`session_id`**
 

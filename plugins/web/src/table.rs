@@ -68,8 +68,9 @@ fn boolish(v: &Value) -> bool {
 
 const UNIQUE_KEYS: &[&str] = &["唯一", "unique", "uniq"];
 const INDEX_KEYS: &[&str] = &["索引", "index", "idx"];
+const FK_KEYS: &[&str] = &["外键", "fk", "references", "ref", "引用"];
 
-/// Schema table → `[{name,type,nullable,unique,index}, …]`
+/// Schema table → `[{name,type,nullable,unique,index,fk}, …]`
 pub fn as_fields(table: &Value) -> Value {
     match table {
         Value::Array(rows) => {
@@ -86,12 +87,17 @@ pub fn as_fields(table: &Value) -> Value {
                     let nullable = pick(m, NULL_KEYS).map(boolish).unwrap_or(true);
                     let unique = pick(m, UNIQUE_KEYS).map(boolish).unwrap_or(false);
                     let index = pick(m, INDEX_KEYS).map(boolish).unwrap_or(false);
+                    let fk = pick(m, FK_KEYS)
+                        .map(cell_str)
+                        .filter(|s| !s.is_empty())
+                        .unwrap_or_default();
                     out.push(json!({
                         "name": name,
                         "type": ty,
                         "nullable": nullable,
                         "unique": unique,
                         "index": index,
+                        "fk": fk,
                     }));
                 }
             }
@@ -103,6 +109,7 @@ pub fn as_fields(table: &Value) -> Value {
             let nulls = pick(m, NULL_KEYS).map(as_str_list).unwrap_or_default();
             let uniques = pick(m, UNIQUE_KEYS).map(as_str_list).unwrap_or_default();
             let indexes = pick(m, INDEX_KEYS).map(as_str_list).unwrap_or_default();
+            let fks = pick(m, FK_KEYS).map(as_str_list).unwrap_or_default();
             let mut out = Vec::new();
             for (i, name) in names.iter().enumerate() {
                 if name.is_empty() {
@@ -121,12 +128,14 @@ pub fn as_fields(table: &Value) -> Value {
                     .get(i)
                     .map(|s| boolish(&Value::String(s.clone())))
                     .unwrap_or(false);
+                let fk = fks.get(i).cloned().unwrap_or_default();
                 out.push(json!({
                     "name": name,
                     "type": ty,
                     "nullable": nullable,
                     "unique": unique,
                     "index": index,
+                    "fk": fk,
                 }));
             }
             Value::Array(out)

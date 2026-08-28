@@ -115,8 +115,74 @@ fn sql_type(t: &str) -> &'static str {
         "int" | "integer" => "INTEGER",
         "real" | "float" | "double" => "REAL",
         "blob" => "BLOB",
+        "timestamp" | "datetime" | "timestamptz" | "审计" => "TEXT",
         _ => "TEXT",
     }
+}
+
+/// Parse `posts.id` / `posts(id)` / `posts` → (`posts`, `id`).
+fn parse_fk(raw: &str) -> Result<(String, String), String> {
+    let s = raw.trim();
+    if s.is_empty() {
+        return Err("empty foreign key".into());
+    }
+    if let Some((t, rest)) = s.split_once('(') {
+        let col = rest.trim().trim_end_matches(')').trim();
+        let t = ident(t)?.to_string();
+        let col = if col.is_empty() {
+            "id".into()
+        } else {
+            ident(col)?.to_string()
+        };
+        return Ok((t, col));
+    }
+    if let Some((t, c)) = s.split_once('.') {
+        return Ok((ident(t)?.to_string(), ident(c)?.to_string()));
+    }
+    Ok((ident(s)?.to_string(), "id".into()))
+}
+
+fn utc_now_iso() -> String {
+    use std::time::{SystemTime, UNIX_EPOCH};
+    let secs = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    // Keep it SQL-friendly ISO without extra deps.
+    let days = secs / 86400;
+    let tod = secs % 86400;
+    let h = tod / 3600;
+    let m = (tod % 3600) / 60;
+    let s = tod % 60;
+    // Civil date from days since 1970-01-01 (Howard Hinnant algorithm).
+    let z = days as i64 + 719468;
+    let era = if z >= 0 { z } else { z - 146096 } / 146097;
+    let doe = (z - era * 146097) as u64;
+    let yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
+    let y = yoe as i64 + era * 400;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let d = doy - (153 * mp + 2) / 5 + 1;
+    let mo = if mp < 10 { mp + 3 } else { mp - 9 };
+    let y = if mo <= 2 { y + 1 } else { y };
+    format!("{y:04}-{mo:02}-{d:02}T{h:02}:{m:02}:{s:02}Z")
+}
+
+/// Column names present on `table` (SQLite).
+fn column_names(url: &str, table: &str, txn_id: Option<&str>) -> Result<Vec<String>, String> {
+    let table = ident(table)?;
+    let conn = conn_for(url, txn_id)?;
+    let c = conn.lock().unwrap_or_else(|e| e.into_inner());
+    let sql = format!("PRAGMA table_info(\"{table}\")");
+    let mut stmt = c.prepare(&sql).map_err(|e| e.to_string())?;
+    let rows = stmt
+        .query_map([], |row| row.get::<_, String>(1))
+        .map_err(|e| e.to_string())?;
+    let mut out = Vec::new();
+    for r in rows {
+        out.push(r.map_err(|e| e.to_string())?);
+    }
+    Ok(out)
 }
 
 fn cell_str(v: &Value) -> String {
@@ -240,6 +306,15 @@ pub fn init(url: &str, table: &str, fields: &Value) -> Result<Value, String> {
         if unique && name != "id" {
             col.push_str(" UNIQUE");
         }
+        let fk_raw = c
+            .get("fk")
+            .or_else(|| c.get("外键"))
+            .map(cell_str)
+            .unwrap_or_default();
+        if !fk_raw.is_empty() {
+            let (ref_table, ref_col) = parse_fk(&fk_raw)?;
+            col.push_str(&format!(" REFERENCES \"{ref_table}\"(\"{ref_col}\")"));
+        }
         parts.push(col);
         if (index || unique) && name != "id" {
             let kind = if unique { "UNIQUE " } else { "" };
@@ -266,24 +341,46 @@ pub fn insert(url: &str, table: &str, rows: &Value, txn_id: Option<&str>) -> Res
         return crate::db_pg::insert(url, table, rows, txn_id);
     }
     let table = ident(table)?;
+    let cols_present = column_names(url, table, txn_id)?;
+    let has_created = cols_present.iter().any(|c| c == "created_at");
+    let has_updated = cols_present.iter().any(|c| c == "updated_at");
     let rows = crate::table::as_rows(rows);
     let arr = rows.as_array().ok_or("rows must be a list")?;
     let conn = conn_for(url, txn_id)?;
     let c = conn.lock().unwrap_or_else(|e| e.into_inner());
     let mut n = 0i64;
+    let now = utc_now_iso();
     for row in arr {
         let obj = row.as_object().ok_or("row must be a map")?;
         let mut cols = Vec::new();
         let mut placeholders = Vec::new();
         let mut vals = Vec::new();
+        let mut seen_created = false;
+        let mut seen_updated = false;
         for (k, v) in obj {
             if k == "@" || k == "行" || k == "row" {
                 continue;
             }
             let _ = ident(k)?;
+            if k == "created_at" {
+                seen_created = true;
+            }
+            if k == "updated_at" {
+                seen_updated = true;
+            }
             cols.push(format!("\"{k}\""));
             placeholders.push("?");
             vals.push(to_sql(v));
+        }
+        if has_created && !seen_created {
+            cols.push("\"created_at\"".into());
+            placeholders.push("?");
+            vals.push(rusqlite::types::Value::Text(now.clone()));
+        }
+        if has_updated && !seen_updated {
+            cols.push("\"updated_at\"".into());
+            placeholders.push("?");
+            vals.push(rusqlite::types::Value::Text(now.clone()));
         }
         if cols.is_empty() {
             continue;
@@ -665,16 +762,26 @@ pub fn update(
     }
 
     let table = ident(table)?;
+    let cols_present = column_names(url, table, txn_id)?;
+    let has_updated = cols_present.iter().any(|c| c == "updated_at");
     let obj = row.as_object().ok_or("row must be a map")?;
     let mut sets = Vec::new();
     let mut vals = Vec::new();
+    let mut seen_updated = false;
     for (k, v) in obj {
         if k == "id" {
             continue;
         }
         let _ = ident(k)?;
+        if k == "updated_at" {
+            seen_updated = true;
+        }
         sets.push(format!("\"{k}\" = ?"));
         vals.push(to_sql(v));
+    }
+    if has_updated && !seen_updated {
+        sets.push("\"updated_at\" = ?".into());
+        vals.push(rusqlite::types::Value::Text(utc_now_iso()));
     }
     if sets.is_empty() {
         return Err("nothing to update".into());

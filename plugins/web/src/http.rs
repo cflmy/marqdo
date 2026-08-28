@@ -104,6 +104,8 @@ pub fn listen(
     robots_body: Option<String>,
     page_404: Option<Value>,
     page_500: Option<Value>,
+    gates: Vec<(String, Vec<String>)>,
+    gallery_routes: HashMap<String, Value>,
     middleware: &Middleware,
 ) -> Result<Value, String> {
     let mut form_owners = HashMap::new();
@@ -254,9 +256,22 @@ pub fn listen(
         let route_path = path.clone();
         app = app.route(
             &path,
-            get(move |State(st): State<Arc<AppState>>, Path(params): Path<HashMap<String, String>>| {
+            get(move |State(st): State<Arc<AppState>>, headers: axum::http::HeaderMap, Path(params): Path<HashMap<String, String>>| {
                 let route_path = route_path.clone();
-                async move { download_get(st, &route_path, params) }
+                async move { download_get(st, &route_path, params, &headers) }
+            }),
+        );
+    }
+
+    let mut gallery_paths: Vec<String> = gallery_routes.keys().cloned().collect();
+    gallery_paths.sort();
+    for path in gallery_paths {
+        let cfg = gallery_routes.get(&path).cloned().unwrap_or_default();
+        app = app.route(
+            &path,
+            get(move |State(st): State<Arc<AppState>>| {
+                let cfg = cfg.clone();
+                async move { gallery_page(&st, &cfg) }
             }),
         );
     }
@@ -338,6 +353,17 @@ pub fn listen(
     app = app.fallback(get(fallback_404));
 
     let app = crate::middleware::apply(app, middleware);
+    let app = if !gates.is_empty() {
+        let gates_for_mw = gates.clone();
+        app.layer(axum::middleware::from_fn(
+            move |req: axum::http::Request<axum::body::Body>, next: axum::middleware::Next| {
+                let gates = gates_for_mw.clone();
+                async move { rbac_middleware(gates, req, next).await }
+            },
+        ))
+    } else {
+        app
+    };
     let app = app.with_state(state);
 
     let addr: SocketAddr = format!("{host}:{port}")
@@ -726,6 +752,7 @@ fn download_get(
     st: Arc<AppState>,
     route_path: &str,
     params: HashMap<String, String>,
+    headers: &axum::http::HeaderMap,
 ) -> Response {
     let cfg = match st.download_routes.get(route_path) {
         Some(c) => c.clone(),
@@ -745,13 +772,25 @@ fn download_get(
         Err(e) => return json_err(StatusCode::INTERNAL_SERVER_ERROR, &e),
     };
     let (bytes, content_type, filename) = got;
+    let etag = weak_etag(&bytes);
+    if let Some(inm) = headers
+        .get(header::IF_NONE_MATCH)
+        .and_then(|v| v.to_str().ok())
+    {
+        if inm
+            .split(',')
+            .any(|t| t.trim().eq_ignore_ascii_case(&etag))
+        {
+            return StatusCode::NOT_MODIFIED.into_response();
+        }
+    }
     let disp = if cfg.disposition.eq_ignore_ascii_case("inline") {
         "inline"
     } else {
         "attachment"
     };
     let safe_name = filename.replace('"', "_");
-    let mut resp = (
+    (
         StatusCode::OK,
         [
             (
@@ -764,12 +803,164 @@ fn download_get(
                 HeaderValue::from_str(&format!("{disp}; filename=\"{safe_name}\""))
                     .unwrap_or_else(|_| HeaderValue::from_static("attachment")),
             ),
+            (
+                header::ETAG,
+                HeaderValue::from_str(&etag).unwrap_or_else(|_| HeaderValue::from_static("W/\"0\"")),
+            ),
         ],
         bytes,
     )
-        .into_response();
-    let _ = &mut resp;
-    resp
+        .into_response()
+}
+
+fn weak_etag(bytes: &[u8]) -> String {
+    let mut h: u64 = 0xcbf2_9ce4_8422_2325;
+    for b in bytes {
+        h ^= u64::from(*b);
+        h = h.wrapping_mul(0x0100_0000_01b3);
+    }
+    format!("W/\"{h:x}-{}\"", bytes.len())
+}
+
+fn path_matches(path: &str, pattern: &str) -> bool {
+    let pat = pattern.trim_end_matches('*');
+    if pattern.ends_with('*') {
+        path == pat.trim_end_matches('/') || path.starts_with(pat)
+    } else {
+        path == pattern || path.starts_with(&format!("{pattern}/"))
+    }
+}
+
+async fn rbac_middleware(
+    gates: Vec<(String, Vec<String>)>,
+    req: axum::http::Request<axum::body::Body>,
+    next: axum::middleware::Next,
+) -> Response {
+    let path = req.uri().path().to_string();
+    let cookie = req
+        .headers()
+        .get(header::COOKIE)
+        .and_then(|v| v.to_str().ok())
+        .map(|s| s.to_string());
+    for (prefix, roles) in &gates {
+        if !path_matches(&path, prefix) {
+            continue;
+        }
+        // Login page itself must stay reachable.
+        if path == "/admin/login" || path.starts_with("/admin/login?") {
+            break;
+        }
+        let role = session::session_role(cookie.as_deref());
+        if !session::role_allowed(&role, roles) {
+            if role == "visitor" && path.starts_with("/admin") {
+                return Redirect::to("/admin/login").into_response();
+            }
+            return (
+                StatusCode::FORBIDDEN,
+                Html(format!(
+                    "<!doctype html><html><body><h1>403 Forbidden</h1><p>Role `{role}` cannot access `{path}`.</p></body></html>"
+                )),
+            )
+                .into_response();
+        }
+        break;
+    }
+    next.run(req).await
+}
+
+fn gallery_page(_st: &AppState, cfg: &Value) -> Response {
+    let storage_url = cfg
+        .get("storage")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+    let prefix = cfg
+        .get("prefix")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+    let title = cfg
+        .get("title")
+        .and_then(|v| v.as_str())
+        .unwrap_or("Gallery");
+    let download_base = cfg
+        .get("download_base")
+        .and_then(|v| v.as_str())
+        .unwrap_or("/_media");
+    let listed = storage::list(storage_url, Some(prefix)).unwrap_or_else(|_| json!({ "keys": [] }));
+    let keys = listed
+        .get("keys")
+        .and_then(|v| v.as_array())
+        .cloned()
+        .unwrap_or_default();
+    let mut items = String::new();
+    for k in &keys {
+        let key = k.as_str().unwrap_or("");
+        if key.is_empty() {
+            continue;
+        }
+        let href = format!(
+            "{}/{}",
+            download_base.trim_end_matches('/'),
+            key.trim_start_matches('/')
+        );
+        let name = key.rsplit('/').next().unwrap_or(key);
+        let lower = name.to_ascii_lowercase();
+        let is_img = lower.ends_with(".png")
+            || lower.ends_with(".jpg")
+            || lower.ends_with(".jpeg")
+            || lower.ends_with(".gif")
+            || lower.ends_with(".webp")
+            || lower.ends_with(".svg");
+        if is_img {
+            items.push_str(&format!(
+                "<figure class=\"gal-item\"><a href=\"{h}\"><img src=\"{h}\" alt=\"{n}\"/></a><figcaption>{n}</figcaption></figure>",
+                h = esc(&href),
+                n = esc(name)
+            ));
+        } else {
+            items.push_str(&format!(
+                "<figure class=\"gal-item\"><a class=\"gal-file\" href=\"{h}\">{n}</a></figure>",
+                h = esc(&href),
+                n = esc(name)
+            ));
+        }
+    }
+    if items.is_empty() {
+        items = "<p class=\"gal-empty\">No media yet.</p>".into();
+    }
+    let html = format!(
+        r#"<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>{title}</title>
+<style>
+body{{font-family:system-ui,sans-serif;margin:0;padding:1.5rem;background:#f6f4ef;color:#1a1a1a}}
+h1{{margin:0 0 1rem;font-size:1.5rem}}
+.gal{{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:1rem}}
+.gal-item{{margin:0;background:#fff;border:1px solid #ddd;border-radius:6px;overflow:hidden}}
+.gal-item img{{display:block;width:100%;height:120px;object-fit:cover}}
+.gal-item figcaption,.gal-file{{display:block;padding:.5rem;font-size:.85rem;word-break:break-all}}
+.gal-empty{{color:#666}}
+</style></head>
+<body><h1>{title}</h1><div class="gal">{items}</div></body></html>"#,
+        title = esc(title),
+        items = items
+    );
+    let etag = weak_etag(html.as_bytes());
+    (
+        StatusCode::OK,
+        [
+            (
+                header::CONTENT_TYPE,
+                HeaderValue::from_static("text/html; charset=utf-8"),
+            ),
+            (
+                header::ETAG,
+                HeaderValue::from_str(&etag).unwrap_or_else(|_| HeaderValue::from_static("W/\"0\"")),
+            ),
+        ],
+        html,
+    )
+        .into_response()
 }
 
 fn admin_gate(st: &AppState, cookie_header: Option<&str>) -> Option<Response> {
@@ -779,7 +970,7 @@ fn admin_gate(st: &AppState, cookie_header: Option<&str>) -> Option<Response> {
     if st.db_url.is_none() {
         return Some(Html(admin_shell(st, "Admin", None, "<p class=\"flash err\">No database bound to this app.</p>")).into_response());
     }
-    // Login-gated admin: require a valid session cookie.
+    // Login-gated admin: require a valid admin-role session.
     if st.auth_users.is_some() && !admin_authed(st, cookie_header) {
         return Some(
             Redirect::to("/admin/login")
@@ -789,12 +980,16 @@ fn admin_gate(st: &AppState, cookie_header: Option<&str>) -> Option<Response> {
     None
 }
 
-/// True when a valid admin session cookie is present.
+/// True when a session with role `admin` is present (legacy users without role → admin).
 fn admin_authed(_st: &AppState, cookie_header: Option<&str>) -> bool {
     let Some(sid) = session::session_id_from_cookie(cookie_header) else {
         return false;
     };
-    session::session_get(&sid, "username").is_some()
+    if session::session_get(&sid, "username").is_none() {
+        return false;
+    }
+    let role = session::session_role(cookie_header);
+    session::role_allowed(&role, &["admin".into()])
 }
 
 async fn admin_login_get(State(st): State<Arc<AppState>>, headers: axum::http::HeaderMap) -> Response {
@@ -830,17 +1025,18 @@ async fn admin_login_post(
         append_set_cookie(&mut resp, set_cookie);
         return resp;
     }
-    if session::check_credentials(users, &username, &password).is_none() {
+    let Some((user, role)) = session::check_credentials(users, &username, &password) else {
         rate_limit::record_failure(&ip, &username);
         let mut resp =
             Html(login_page(&st, Some("Invalid username or password."), Some(&csrf)))
                 .into_response();
         append_set_cookie(&mut resp, set_cookie);
         return resp;
-    }
+    };
     rate_limit::clear_success(&ip, &username);
     let sid = session::session_new(Some(st.session_ttl));
-    session::session_set(&sid, "username", json!(username));
+    session::session_set(&sid, "username", json!(user));
+    session::session_set(&sid, "role", json!(role));
     let mut resp = Redirect::to("/admin").into_response();
     let _ = resp.headers_mut().try_append(
         axum::http::header::SET_COOKIE,

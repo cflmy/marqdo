@@ -2114,6 +2114,121 @@ fn ext_web_w7_live() {
 }
 
 #[test]
+fn ext_web_p3_smoke() {
+    let status = Command::new("cargo")
+        .args(["build", "-p", "marqdo_plugin_web"])
+        .current_dir(env!("CARGO_MANIFEST_DIR"))
+        .status()
+        .expect("build web plugin");
+    assert!(status.success(), "failed to build marqdo_plugin_web");
+    assert_out(
+        "tests/ext/web-p3-smoke.mq.md",
+        "audit-insert-ok
+audit-update-ok
+fk-ok
+rbac-login-ok
+rbac-gate-ok
+gallery-ok",
+    );
+}
+
+#[test]
+fn ext_web_p3_live() {
+    let status = Command::new("cargo")
+        .args(["build", "-p", "marqdo_plugin_web"])
+        .current_dir(env!("CARGO_MANIFEST_DIR"))
+        .status()
+        .expect("build web plugin");
+    assert!(status.success(), "failed to build marqdo_plugin_web");
+
+    let script = "tests/ext/web-p3-live-server.mq.md";
+    let bin = env!("CARGO_BIN_EXE_marqdo");
+    let mut child = Command::new(bin)
+        .args(["run", script])
+        .current_dir(env!("CARGO_MANIFEST_DIR"))
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("spawn p3 live server");
+
+    let base = "http://127.0.0.1:18131";
+    let ready = std::time::Instant::now();
+    loop {
+        if ready.elapsed().as_secs() > 10 {
+            let _ = child.kill();
+            panic!("p3 live server did not start in time");
+        }
+        let out = Command::new("curl")
+            .args([
+                "-s",
+                "-o",
+                "/dev/null",
+                "-w",
+                "%{http_code}",
+                &format!("{base}/"),
+            ])
+            .output()
+            .expect("curl probe");
+        if String::from_utf8_lossy(&out.stdout) == "200" {
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(300));
+    }
+
+    let out = Command::new("curl")
+        .args(["-s", &format!("{base}/gallery")])
+        .output()
+        .expect("curl gallery");
+    let gal = String::from_utf8_lossy(&out.stdout);
+    assert!(
+        gal.contains("P3 Gallery") && gal.contains("hello.txt"),
+        "gallery={gal}"
+    );
+
+    let out = Command::new("curl")
+        .args([
+            "-s",
+            "-D",
+            "-",
+            "-o",
+            "/dev/null",
+            &format!("{base}/_media/uploads/hello.txt"),
+        ])
+        .output()
+        .expect("curl media");
+    let headers_raw = String::from_utf8_lossy(&out.stdout);
+    let headers = headers_raw.to_ascii_lowercase();
+    assert!(headers.contains("etag:"), "media headers={headers}");
+    let etag = headers_raw
+        .lines()
+        .find(|l| l.to_ascii_lowercase().starts_with("etag:"))
+        .map(|l| l.split_once(':').map(|(_, v)| v.trim().trim_matches('\r').to_string()).unwrap_or_default())
+        .expect("etag line");
+
+    let out = Command::new("curl")
+        .args([
+            "-s",
+            "-o",
+            "/dev/null",
+            "-w",
+            "%{http_code}",
+            "-H",
+            &format!("If-None-Match: {etag}"),
+            &format!("{base}/_media/uploads/hello.txt"),
+        ])
+        .output()
+        .expect("curl 304");
+    assert_eq!(
+        String::from_utf8_lossy(&out.stdout),
+        "304",
+        "expected 304 for If-None-Match"
+    );
+
+    let _ = child.kill();
+    let _ = child.wait();
+}
+
+#[test]
 fn ext_web_ws_broadcast_live() {
     use futures_util::{SinkExt, StreamExt};
     use tokio_tungstenite::tungstenite::Message;

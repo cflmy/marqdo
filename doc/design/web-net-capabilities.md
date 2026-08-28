@@ -119,7 +119,7 @@
 | A4 | **安全响应头**（CSP / X-Frame-Options / X-Content-Type-Options / HSTS / Referrer-Policy / 去 `X-Powered-By`） | ✅ **已实现（W1）**：`安全` 表 `|头|值|` | `plugins/web` | P1 ✅ |
 | A5 | **文件上传接收**（multipart extractor → 校验类型/大小 → 落盘）与**下载**（`Content-Disposition`） | ✅ **已实现（W5）**：`app.upload` / `app.download`；`file:` storage；离线 + curl live 金样 | `plugins/web` | P1 ✅ |
 | A6 | **HTTPS / TLS**（rustls 终止或反代提示） | ✅ **文档锁定（W7）**：进程内 TLS 不启用；反代终止 HTTPS，并设 `cookie_secure=True` | 文档 + `cookie_secure` | P2 ✅ |
-| A7 | **gzip / br 压缩** + **ETag / Cache-Control 缓存头** | gzip ✅（W1）；Cache-Control ✅ **已实现（W7，`装配 缓存控制=`）**；ETag 未做（可后续） | `plugins/web` | P2 ✅ |
+| A7 | **gzip / br 压缩** + **ETag / Cache-Control 缓存头** | gzip ✅（W1）；Cache-Control ✅（W7）；ETag ✅ **已实现（P3，下载/相册 + If-None-Match→304）** | `plugins/web` | P2 ✅ |
 | A8 | **访问日志**（请求方法/路径/状态/耗时） | ✅ **已实现（W6b）**：`configure access_log=True` → stderr | `plugins/web` | P2 ✅ |
 | A9 | **自定义 404/500 错误页** | ✅ **已实现（W7）**：`app.error_page` / `应用.错误页`；404 fallback + 500 页袋 | `plugins/web` | P2 ✅ |
 | A10 | **重定向增强**（permanent/自定义状态码） | ✅ **已实现（W7）**：`app.redirect` → 301/307 | `plugins/web` | P3 ✅ |
@@ -134,10 +134,10 @@
 | B4 | **分页**（db 层 `limit`+`offset`；页面层上一页/下一页） | 列表页只能限量 | `plugins/web` + `ext/web` | P1 ✅（db 层；页面 UI 属 D4） |
 | B5 | **查询表达力**：OR / IN / BETWEEN / IS NULL / LIKE 转义 / 括号组合 | where 只能 AND | `plugins/web` | P1 ✅ |
 | B6 | **迁移机制**（schema 版本表 + 迁移脚本） | ✅ **已实现（W6）**：`db.migrate` + `_marqdo_migrations`（SQLite） | `plugins/web` + `ext/web` | P2 ✅ |
-| B7 | **索引 / 唯一 / 外键声明**（init 表增强） | ✅ **已实现（W7）**：`唯一`/`unique`、`索引`/`index`（外键声明仍可后续） | `plugins/web` | P2 ✅ |
+| B7 | **索引 / 唯一 / 外键声明**（init 表增强） | ✅ **已实现（W7+P3）**：`唯一`/`索引`/`外键`（`posts.id` / `posts`） | `plugins/web` | P2 ✅ |
 | B8 | **聚合辅助**：count / group 便捷 API | 统计面板、标签计数 | `plugins/web` | P2 ✅（`db.count`） |
 | B9 | **全文搜索**（SQLite FTS5） | ✅ **已实现（W6）**：`db.fts` + `db.search`（bm25） | `plugins/web`（FTS5 现成） | P2 ✅ |
-| B10 | **时间戳 / 审计字段自动维护** | 博客发布日期、更新时间 | `plugins/web` | P3 |
+| B10 | **时间戳 / 审计字段自动维护** | ✅ **已实现（P3）**：表含 `created_at`/`updated_at` 时 insert/update 自动写入 | `plugins/web` | P3 ✅ |
 
 ### 3.3 类 C：安全硬化（能上线的前提）
 
@@ -150,7 +150,7 @@
 | C5 | **加密安全 session id**（CSPRNG + 碰撞重试） | ✅ **已实现（W3s）** | `plugins/web` | P1 ✅ |
 | C6 | **cookie 增强**：`Secure` 标志、签名、滑动过期 | ✅ **已实现**：`cookie_secure` + 滑动 TTL（touch）；cookie 签名未单独做 | `plugins/web` | P2 ✅ |
 | C7 | **防暴力破解 / 会话上限 / 后台过期清理** | ✅ 限速 + prune；会话条数硬上限可后续 | `plugins/web` | P2 ✅ |
-| C8 | **RBAC / 多角色**（作者/管理员/访客） | 多作者站点（P3，非完结阻塞） | `plugins/web` + `ext/web` | P3 |
+| C8 | **RBAC / 多角色**（作者/管理员/访客） | ✅ **已实现（P3）**：用户表 `role`/`角色`；`app.gate`；`/admin*` 默认需 `admin` | `plugins/web` + `ext/web` | P3 ✅ |
 
 ### 3.4 类 D：内容站点标配（博客/CMS 特有）
 
@@ -164,7 +164,7 @@
 | D6 | **标签/分类聚合页**（`/tag/{slug}` 动态路由 + 计数） | 可用路由+`db.count` 自建（未内置模板） | `ext/web` | P2 |
 | D7 | **评论系统**（表单 + 审核 + 反垃圾） | ✅ 约定：表+表单+where（W6）；反垃圾属应用层 | `ext/web` | P2 ✅ |
 | D8 | **草稿/发布/定时**（状态字段 + 过滤查询） | ✅ 约定：`status` + where（W6） | `ext/web` + db where | P2 ✅ |
-| D9 | **图片/附件库**（依赖 A5 上传 + 相册页） | A5 ✅；相册 UI 属 P3 | `ext/web` | P3 |
+| D9 | **图片/附件库**（依赖 A5 上传 + 相册页） | ✅ **已实现（P3）**：`app.gallery` HTML 相册 + A5 上传/下载 | `ext/web` + `plugins/web` | P3 ✅ |
 
 ---
 
@@ -181,7 +181,8 @@
 | **W4** | 内容站点标配 | SEO 元数据 + sitemap/robots + RSS + Markdown 渲染 + 分页导航 UI + 标签/分类 | D1–D6 |
 | **W5** | 上传与媒体 | multipart 文件上传接收 + 落盘 + 下载 + 图片库 | A5 D9 ✅ **A5 done**（D9 相册 UI 后续） |
 | **W6** | 进阶 | 全文搜索(FTS5) + 迁移机制 + 评论系统 + 草稿/发布 + WS 广播 | B6 B9 ✅；WS 广播 + access_log ✅；D7/D8 用表+where |
-| **W7** | 完结打磨 | Cache-Control、自定义 404/500、301 重定向、sitemap/robots、init 唯一/索引、HTTPS 反代文档 | A6 A7 A9 A10 B7 D2 ✅；P3（RBAC/相册/ETag/外键）非阻塞 |
+| **W7** | 完结打磨 | Cache-Control、自定义 404/500、301 重定向、sitemap/robots、init 唯一/索引、HTTPS 反代文档 | A6 A7 A9 A10 B7 D2 ✅ |
+| **P3** | 真·网络扩展补齐 | 审计时间戳、外键、RBAC 门禁、媒体相册、下载 ETag | B10 C8 D9 + ETag/FK ✅ |
 
 ### 4.2 边界判定要点（严格遵守既有约束）
 

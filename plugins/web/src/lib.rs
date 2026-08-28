@@ -1098,6 +1098,84 @@ web_ffi!(web_app_auth, |args: &Value| {
         "auth".to_string(),
         json!({ "users": users, "session_ttl": session_ttl }),
     );
+    // Default RBAC: `/admin*` requires role `admin` when auth is configured.
+    let mut gates = obj
+        .get("gates")
+        .and_then(|v| v.as_array())
+        .cloned()
+        .unwrap_or_default();
+    let has_admin_gate = gates.iter().any(|g| {
+        g.get("path")
+            .and_then(|v| v.as_str())
+            .is_some_and(|p| p == "/admin" || p == "/admin*")
+    });
+    if !has_admin_gate {
+        gates.push(json!({ "path": "/admin*", "roles": ["admin"] }));
+        obj.insert("gates".into(), Value::Array(gates));
+    }
+    Ok(app)
+});
+
+web_ffi!(web_app_gate, |args: &Value| {
+    let mut app = args.get("app").cloned().unwrap_or(json!({}));
+    let path = arg_str(args, "path")?.to_string();
+    let roles_raw = arg_str_opt(args, "roles")
+        .or_else(|| arg_str_opt(args, "角色"))
+        .unwrap_or("admin");
+    let roles: Vec<String> = session::parse_roles_csv(roles_raw);
+    let obj = app
+        .as_object_mut()
+        .ok_or_else(|| "app must be a map".to_string())?;
+    let mut gates = obj
+        .get("gates")
+        .and_then(|v| v.as_array())
+        .cloned()
+        .unwrap_or_default();
+    gates.push(json!({ "path": path, "roles": roles }));
+    obj.insert("gates".into(), Value::Array(gates));
+    Ok(app)
+});
+
+web_ffi!(web_app_gallery, |args: &Value| {
+    let mut app = args.get("app").cloned().unwrap_or(json!({}));
+    let path = normalize_route_path(
+        arg_str(args, "path")
+            .or_else(|_| arg_str(args, "路径"))
+            .unwrap_or("/gallery"),
+    )?;
+    let storage_url = storage_url_arg(args, "storage")
+        .or_else(|_| storage_url_arg(args, "存储"))?;
+    let prefix = arg_str_opt(args, "prefix")
+        .or_else(|| arg_str_opt(args, "前缀"))
+        .unwrap_or("uploads/")
+        .to_string();
+    let title = arg_str_opt(args, "title")
+        .or_else(|| arg_str_opt(args, "标题"))
+        .unwrap_or("Gallery")
+        .to_string();
+    let download_base = arg_str_opt(args, "download_base")
+        .or_else(|| arg_str_opt(args, "media"))
+        .or_else(|| arg_str_opt(args, "下载基址"))
+        .unwrap_or("/_media")
+        .to_string();
+    let obj = app
+        .as_object_mut()
+        .ok_or_else(|| "app must be a map".to_string())?;
+    let mut routes = obj
+        .get("gallery_routes")
+        .and_then(|v| v.as_object())
+        .cloned()
+        .unwrap_or_default();
+    routes.insert(
+        path,
+        json!({
+            "storage": storage_url,
+            "prefix": prefix,
+            "title": title,
+            "download_base": download_base,
+        }),
+    );
+    obj.insert("gallery_routes".into(), Value::Object(routes));
     Ok(app)
 });
 
@@ -1342,6 +1420,8 @@ web_ffi!(web_listen, |args: &Value| {
         robots_body,
         page_404,
         page_500,
+        gates,
+        gallery_routes,
         middleware,
         cookie_secure,
     ) = if args.get("page").is_some() || args.get("host").is_some() {
@@ -1394,6 +1474,8 @@ web_ffi!(web_listen, |args: &Value| {
             None,
             None,
             None,
+            Vec::<(String, Vec<String>)>::new(),
+            HashMap::new(),
             middleware::Middleware::default(),
             cookie_secure,
         )
@@ -1528,6 +1610,34 @@ web_ffi!(web_listen, |args: &Value| {
             .map(|s| s.to_string());
         let page_404 = app.get("page_404").cloned().filter(|v| !v.is_null());
         let page_500 = app.get("page_500").cloned().filter(|v| !v.is_null());
+        let mut gates: Vec<(String, Vec<String>)> = Vec::new();
+        if let Some(arr) = app.get("gates").and_then(|v| v.as_array()) {
+            for g in arr {
+                let path = g
+                    .get("path")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                if path.is_empty() {
+                    continue;
+                }
+                let roles = match g.get("roles") {
+                    Some(Value::Array(a)) => a
+                        .iter()
+                        .filter_map(|v| v.as_str().map(|s| s.to_ascii_lowercase()))
+                        .collect(),
+                    Some(Value::String(s)) => session::parse_roles_csv(s),
+                    _ => vec!["admin".into()],
+                };
+                gates.push((path, roles));
+            }
+        }
+        let mut gallery_routes = HashMap::new();
+        if let Some(obj) = app.get("gallery_routes").and_then(|v| v.as_object()) {
+            for (k, v) in obj {
+                gallery_routes.insert(k.clone(), v.clone());
+            }
+        }
         if app.get("tls_cert").is_some() || app.get("tls_key").is_some() {
             eprintln!(
                 "marqdo web: in-process TLS is not enabled; terminate HTTPS at a reverse proxy (nginx/caddy) and set cookie_secure=True"
@@ -1595,6 +1705,8 @@ web_ffi!(web_listen, |args: &Value| {
             robots_body,
             page_404,
             page_500,
+            gates,
+            gallery_routes,
             middleware,
             cookie_secure,
         )
@@ -1628,6 +1740,8 @@ web_ffi!(web_listen, |args: &Value| {
         robots_body,
         page_404,
         page_500,
+        gates,
+        gallery_routes,
         &middleware,
     )
 });
@@ -1870,6 +1984,12 @@ pub unsafe extern "C" fn marqdo_plugin_init(host: *const MarqdoHostApi) -> c_int
         ("web_password_hash", "password", web_password_hash as PluginFn),
         ("web_auth_new", "users,session_ttl", web_auth_new as PluginFn),
         ("web_app_auth", "app,users,session_ttl", web_app_auth as PluginFn),
+        ("web_app_gate", "app,path,roles", web_app_gate as PluginFn),
+        (
+            "web_app_gallery",
+            "app,path,storage,prefix,title,download_base",
+            web_app_gallery as PluginFn,
+        ),
         (
             "web_app_route_ws",
             "app,path,echo,mode",

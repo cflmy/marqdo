@@ -75,6 +75,7 @@ fn pg_type(t: &str) -> &'static str {
         "real" | "float" | "double" => "DOUBLE PRECISION",
         "blob" | "bytea" => "BYTEA",
         "bool" | "boolean" => "BOOLEAN",
+        "timestamp" | "datetime" | "timestamptz" | "审计" => "TIMESTAMPTZ",
         _ => "TEXT",
     }
 }
@@ -203,6 +204,71 @@ fn parse_where_simple(where_v: Option<&Value>) -> Result<(Vec<String>, Vec<Value
     Ok((exprs, vals))
 }
 
+fn parse_fk(raw: &str) -> Result<(String, String), String> {
+    let s = raw.trim();
+    if s.is_empty() {
+        return Err("empty foreign key".into());
+    }
+    if let Some((t, rest)) = s.split_once('(') {
+        let col = rest.trim().trim_end_matches(')').trim();
+        let t = ident(t)?.to_string();
+        let col = if col.is_empty() {
+            "id".into()
+        } else {
+            ident(col)?.to_string()
+        };
+        return Ok((t, col));
+    }
+    if let Some((t, c)) = s.split_once('.') {
+        return Ok((ident(t)?.to_string(), ident(c)?.to_string()));
+    }
+    Ok((ident(s)?.to_string(), "id".into()))
+}
+
+fn utc_now_iso() -> String {
+    use std::time::{SystemTime, UNIX_EPOCH};
+    let secs = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    let days = secs / 86400;
+    let tod = secs % 86400;
+    let h = tod / 3600;
+    let m = (tod % 3600) / 60;
+    let s = tod % 60;
+    let z = days as i64 + 719468;
+    let era = if z >= 0 { z } else { z - 146096 } / 146097;
+    let doe = (z - era * 146097) as u64;
+    let yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
+    let y = yoe as i64 + era * 400;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let d = doy - (153 * mp + 2) / 5 + 1;
+    let mo = if mp < 10 { mp + 3 } else { mp - 9 };
+    let y = if mo <= 2 { y + 1 } else { y };
+    format!("{y:04}-{mo:02}-{d:02}T{h:02}:{m:02}:{s:02}Z")
+}
+
+fn column_names(url: &str, table: &str, txn_id: Option<&str>) -> Result<Vec<String>, String> {
+    let table = ident(table)?;
+    let conn = conn_for(url, txn_id)?;
+    let mut c = conn.lock().unwrap_or_else(|e| e.into_inner());
+    let rows = query_sql(
+        &mut c,
+        "SELECT column_name FROM information_schema.columns WHERE table_name = ? ORDER BY ordinal_position",
+        &[json!(table)],
+    )?;
+    Ok(rows
+        .into_iter()
+        .filter_map(|r| {
+            r.get("column_name")
+                .or_else(|| r.get("COLUMN_NAME"))
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string())
+        })
+        .collect())
+}
+
 pub fn init(url: &str, table: &str, fields: &Value) -> Result<Value, String> {
     let table = ident(table)?;
     let cols = crate::table::as_fields(fields);
@@ -212,6 +278,7 @@ pub fn init(url: &str, table: &str, fields: &Value) -> Result<Value, String> {
     }
     let mut parts = Vec::new();
     let mut has_pk = false;
+    let mut index_sql = Vec::new();
     for c in arr {
         let name = c
             .get("name")
@@ -235,6 +302,28 @@ pub fn init(url: &str, table: &str, fields: &Value) -> Result<Value, String> {
                 _ => None,
             })
             .unwrap_or(true);
+        let unique = c
+            .get("unique")
+            .or_else(|| c.get("唯一"))
+            .and_then(|v| match v {
+                Value::Bool(b) => Some(*b),
+                Value::String(s) => {
+                    Some(matches!(s.as_str(), "true" | "True" | "1" | "yes" | "是" | "唯一"))
+                }
+                _ => None,
+            })
+            .unwrap_or(false);
+        let index = c
+            .get("index")
+            .or_else(|| c.get("索引"))
+            .and_then(|v| match v {
+                Value::Bool(b) => Some(*b),
+                Value::String(s) => {
+                    Some(matches!(s.as_str(), "true" | "True" | "1" | "yes" | "是" | "索引"))
+                }
+                _ => None,
+            })
+            .unwrap_or(false);
         let part = if name == "id" && !has_pk && pg_type(&ty) == "INTEGER" {
             has_pk = true;
             format!("\"{name}\" SERIAL PRIMARY KEY")
@@ -246,9 +335,27 @@ pub fn init(url: &str, table: &str, fields: &Value) -> Result<Value, String> {
             if !nullable {
                 col.push_str(" NOT NULL");
             }
+            if unique {
+                col.push_str(" UNIQUE");
+            }
+            let fk_raw = c
+                .get("fk")
+                .or_else(|| c.get("外键"))
+                .map(cell_str)
+                .unwrap_or_default();
+            if !fk_raw.is_empty() {
+                let (ref_table, ref_col) = parse_fk(&fk_raw)?;
+                col.push_str(&format!(" REFERENCES \"{ref_table}\"(\"{ref_col}\")"));
+            }
             col
         };
         parts.push(part);
+        if (index || unique) && name != "id" {
+            let kind = if unique { "UNIQUE " } else { "" };
+            index_sql.push(format!(
+                "CREATE {kind}INDEX IF NOT EXISTS \"idx_{table}_{name}\" ON \"{table}\" (\"{name}\")"
+            ));
+        }
     }
     let sql = format!(
         "CREATE TABLE IF NOT EXISTS \"{table}\" ({})",
@@ -257,29 +364,54 @@ pub fn init(url: &str, table: &str, fields: &Value) -> Result<Value, String> {
     let conn = pooled(url)?;
     let mut c = conn.lock().unwrap_or_else(|e| e.into_inner());
     c.batch_execute(&sql).map_err(|e| e.to_string())?;
+    for stmt in index_sql {
+        let _ = c.batch_execute(&stmt);
+    }
     Ok(json!({ "_type": "db_table", "name": table, "url": url }))
 }
 
 pub fn insert(url: &str, table: &str, rows: &Value, txn_id: Option<&str>) -> Result<Value, String> {
     let table = ident(table)?;
+    let cols_present = column_names(url, table, txn_id).unwrap_or_default();
+    let has_created = cols_present.iter().any(|c| c == "created_at");
+    let has_updated = cols_present.iter().any(|c| c == "updated_at");
     let rows = crate::table::as_rows(rows);
     let arr = rows.as_array().ok_or("rows must be a list")?;
     let conn = conn_for(url, txn_id)?;
     let mut c = conn.lock().unwrap_or_else(|e| e.into_inner());
     let mut n = 0i64;
+    let now = utc_now_iso();
     for row in arr {
         let obj = row.as_object().ok_or("row must be a map")?;
         let mut cols = Vec::new();
         let mut ph = Vec::new();
         let mut vals = Vec::new();
+        let mut seen_created = false;
+        let mut seen_updated = false;
         for (k, v) in obj {
             if k == "@" || k == "行" || k == "row" {
                 continue;
             }
             let _ = ident(k)?;
+            if k == "created_at" {
+                seen_created = true;
+            }
+            if k == "updated_at" {
+                seen_updated = true;
+            }
             cols.push(format!("\"{k}\""));
             ph.push("?");
             vals.push(v.clone());
+        }
+        if has_created && !seen_created {
+            cols.push("\"created_at\"".into());
+            ph.push("?");
+            vals.push(json!(now.clone()));
+        }
+        if has_updated && !seen_updated {
+            cols.push("\"updated_at\"".into());
+            ph.push("?");
+            vals.push(json!(now.clone()));
         }
         if cols.is_empty() {
             continue;
@@ -374,16 +506,26 @@ pub fn update(
     txn_id: Option<&str>,
 ) -> Result<Value, String> {
     let table = ident(table)?;
+    let cols_present = column_names(url, table, txn_id).unwrap_or_default();
+    let has_updated = cols_present.iter().any(|c| c == "updated_at");
     let obj = row.as_object().ok_or("row must be a map")?;
     let mut sets = Vec::new();
     let mut vals = Vec::new();
+    let mut seen_updated = false;
     for (k, v) in obj {
         if k == "id" || k == "@" || k == "行" || k == "row" {
             continue;
         }
         let _ = ident(k)?;
+        if k == "updated_at" {
+            seen_updated = true;
+        }
         sets.push(format!("\"{k}\" = ?"));
         vals.push(v.clone());
+    }
+    if has_updated && !seen_updated {
+        sets.push("\"updated_at\" = ?".into());
+        vals.push(json!(utc_now_iso()));
     }
     if sets.is_empty() {
         return Ok(json!({ "ok": true, "updated": 0 }));

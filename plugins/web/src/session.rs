@@ -376,12 +376,14 @@ pub fn session_cookie(id: &str, ttl_sec: u64, secure: bool) -> String {
 }
 
 /// Validate credentials; supports argon2 hashes or legacy plaintext in the password column.
-pub fn check_credentials(users: &Value, username: &str, password: &str) -> Option<String> {
-    let rows = match users {
+/// Returns `(username, role)`. Missing role column defaults to `admin` (legacy admin tables).
+pub fn check_credentials(users: &Value, username: &str, password: &str) -> Option<(String, String)> {
+    let rows = crate::table::as_rows(users);
+    let rows = match rows {
         Value::Array(a) => a,
         _ => return None,
     };
-    for row in rows {
+    for row in &rows {
         let m = match row {
             Value::Object(m) => m,
             _ => continue,
@@ -393,10 +395,46 @@ pub fn check_credentials(users: &Value, username: &str, password: &str) -> Optio
             .map(cell_str)
             .unwrap_or_default();
         if u == username && password::verify_password(password, &p) {
-            return Some(u);
+            let role = pick_cell(m, &["角色", "role", "roles"])
+                .map(cell_str)
+                .filter(|s| !s.is_empty())
+                .unwrap_or_else(|| "admin".into());
+            return Some((u, role.to_ascii_lowercase()));
         }
     }
     None
+}
+
+/// Session role (defaults to `visitor` when anonymous / missing).
+pub fn session_role(cookie_header: Option<&str>) -> String {
+    let Some(sid) = session_id_from_cookie(cookie_header) else {
+        return "visitor".into();
+    };
+    match session_get(&sid, "role") {
+        Some(Value::String(r)) if !r.is_empty() => r.to_ascii_lowercase(),
+        _ => {
+            if session_get(&sid, "username").is_some() {
+                "admin".into()
+            } else {
+                "visitor".into()
+            }
+        }
+    }
+}
+
+pub fn role_allowed(role: &str, allowed: &[String]) -> bool {
+    if allowed.is_empty() {
+        return true;
+    }
+    let role = role.to_ascii_lowercase();
+    allowed.iter().any(|a| a.eq_ignore_ascii_case(&role))
+}
+
+pub fn parse_roles_csv(raw: &str) -> Vec<String> {
+    raw.split(',')
+        .map(|s| s.trim().to_ascii_lowercase())
+        .filter(|s| !s.is_empty())
+        .collect()
 }
 
 fn pick_cell<'a>(m: &'a Map<String, Value>, keys: &[&str]) -> Option<&'a Value> {
@@ -456,10 +494,11 @@ pub fn abi_auth_login(args: &Value) -> Result<Value, String> {
         .get("session_ttl")
         .and_then(|v| v.as_u64().or_else(|| v.as_i64().map(|i| i as u64)));
     match check_credentials(&users, username, password) {
-        Some(_) => {
+        Some((u, role)) => {
             let id = session_new(ttl);
-            session_set(&id, "username", json!(username));
-            Ok(json!({ "ok": true, "session_id": id, "username": username }))
+            session_set(&id, "username", json!(u));
+            session_set(&id, "role", json!(role));
+            Ok(json!({ "ok": true, "session_id": id, "username": u, "role": role }))
         }
         None => Ok(json!({ "ok": false })),
     }
@@ -468,7 +507,13 @@ pub fn abi_auth_login(args: &Value) -> Result<Value, String> {
 pub fn abi_auth_check(args: &Value) -> Result<Value, String> {
     let id = arg_str(args, "session_id")?;
     match session_get(id, "username") {
-        Some(Value::String(u)) => Ok(json!({ "ok": true, "username": u })),
+        Some(Value::String(u)) => {
+            let role = match session_get(id, "role") {
+                Some(Value::String(r)) => r,
+                _ => "admin".into(),
+            };
+            Ok(json!({ "ok": true, "username": u, "role": role }))
+        }
         _ => Ok(json!({ "ok": false })),
     }
 }

@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| 状态 | **W0–W7 网络扩展库完结**（P3 项如 RBAC/相册 UI 可选后续） |
+| 状态 | **W0–W7 + P3 完结**（审计/RBAC/相册/ETag/外键已落地） |
 | 日期 | 2026-08-28 |
 | **锁定设计** | [design/ext-web.md](../design/ext-web.md) |
 | 相关 | [ext-cli.md](../design/ext-cli.md) · [ext-abi.md](../design/ext-abi.md) · [ext-llm.md](../design/ext-llm.md) |
@@ -33,8 +33,9 @@
 | **W5** | 上传与媒体：multipart 接收 + 落盘 + 下载（见 [web-net-capabilities.md](../design/web-net-capabilities.md) A5） | **done** |
 | **W6** | 迁移 + FTS5 搜索；草稿/评论用既有 where/表；WS 广播 + 访问日志 | **done** |
 | **W7** | Cache-Control / 404·500 / 重定向 / sitemap·robots / init 唯一·索引 / HTTPS 反代说明 | **done** |
+| **P3** | 审计时间戳 / 外键 / RBAC / 相册 / ETag | **done** |
 
-验收金样：`tests/ext/web-smoke.mq.md`、`tests/ext/web-security-smoke.mq.md`、`tests/ext/web-drivers-smoke.mq.md`、`tests/ext/web-upload-smoke.mq.md`、`tests/ext/web-db-w6-smoke.mq.md`、`tests/ext/web-w7-finish-smoke.mq.md`、`ext_cli_add_web`。
+验收金样：`tests/ext/web-smoke.mq.md`、`tests/ext/web-security-smoke.mq.md`、`tests/ext/web-drivers-smoke.mq.md`、`tests/ext/web-upload-smoke.mq.md`、`tests/ext/web-db-w6-smoke.mq.md`、`tests/ext/web-w7-finish-smoke.mq.md`、`tests/ext/web-p3-smoke.mq.md`、`ext_cli_add_web`。
 
 ---
 
