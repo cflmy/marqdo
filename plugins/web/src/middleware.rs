@@ -43,6 +43,8 @@ pub struct Middleware {
     pub body_limit: Option<u64>,
     /// Log `METHOD path status duration_ms` to stderr for each request.
     pub access_log: bool,
+    /// Global `Cache-Control` response header (e.g. `public, max-age=3600`).
+    pub cache_control: Option<String>,
     /// JSON API routes: `path -> { method, table, where?, order?, limit? }`.
     pub json_routes: Vec<(String, JsonRoute)>,
 }
@@ -89,6 +91,11 @@ pub fn parse(app: &Value) -> Middleware {
         .get("access_log")
         .and_then(|v| v.as_bool())
         .unwrap_or(false);
+    mw.cache_control = obj
+        .get("cache_control")
+        .and_then(|v| v.as_str())
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty());
     mw.body_limit = obj
         .get("body_limit")
         .and_then(|v| v.as_u64().or_else(|| v.as_i64().map(|i| i as u64)))
@@ -224,6 +231,15 @@ pub fn apply(
     // Compression
     if mw.compress {
         app = app.layer(CompressionLayer::new());
+    }
+
+    if let Some(ref cc) = mw.cache_control {
+        if let Ok(v) = HeaderValue::from_str(cc) {
+            app = app.layer(SetResponseHeaderLayer::overriding(
+                header::CACHE_CONTROL,
+                v,
+            ));
+        }
     }
 
     // Request body limit
@@ -456,6 +472,9 @@ pub fn summary(app: &Value) -> String {
     }
     if mw.access_log {
         parts.push("access_log".to_string());
+    }
+    if mw.cache_control.is_some() {
+        parts.push("cache_control".to_string());
     }
     if !mw.json_routes.is_empty() {
         parts.push(format!("json:{}", mw.json_routes.len()));

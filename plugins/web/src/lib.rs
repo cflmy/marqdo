@@ -14,6 +14,7 @@ mod rate_limit;
 mod render;
 mod rss;
 mod session;
+mod sitemap;
 mod storage;
 mod table;
 mod upload;
@@ -444,6 +445,111 @@ web_ffi!(web_app_route_rss, |args: &Value| {
     );
     obj.insert("rss_routes".into(), Value::Object(rss_routes));
     Ok(app)
+});
+
+web_ffi!(web_app_redirect, |args: &Value| {
+    let mut app = args.get("app").cloned().unwrap_or(json!({}));
+    let from = normalize_route_path(arg_str(args, "from").or_else(|_| arg_str(args, "path"))?)?;
+    let to = arg_str(args, "to")?.to_string();
+    let permanent = match args
+        .get("permanent")
+        .or_else(|| args.get("永久"))
+        .cloned()
+        .unwrap_or(json!(false))
+    {
+        Value::Bool(b) => b,
+        Value::String(s) => matches!(s.as_str(), "true" | "True" | "1" | "yes" | "真"),
+        Value::Number(n) => n.as_i64().unwrap_or(0) != 0,
+        _ => false,
+    };
+    let obj = app
+        .as_object_mut()
+        .ok_or_else(|| "app must be a map".to_string())?;
+    let mut redirects = obj
+        .get("redirects")
+        .and_then(|v| v.as_object())
+        .cloned()
+        .unwrap_or_default();
+    redirects.insert(from, json!({ "to": to, "permanent": permanent }));
+    obj.insert("redirects".into(), Value::Object(redirects));
+    Ok(app)
+});
+
+web_ffi!(web_app_error_page, |args: &Value| {
+    let mut app = args.get("app").cloned().unwrap_or(json!({}));
+    let status = args
+        .get("status")
+        .or_else(|| args.get("状态"))
+        .and_then(|v| v.as_u64().or_else(|| v.as_i64().map(|i| i as u64)))
+        .unwrap_or(404) as u16;
+    let page = args
+        .get("page")
+        .or_else(|| args.get("页面"))
+        .cloned()
+        .ok_or_else(|| "missing `page`".to_string())?;
+    let obj = app
+        .as_object_mut()
+        .ok_or_else(|| "app must be a map".to_string())?;
+    let key = match status {
+        500 => "page_500",
+        _ => "page_404",
+    };
+    obj.insert(key.into(), page);
+    Ok(app)
+});
+
+web_ffi!(web_app_sitemap, |args: &Value| {
+    let mut app = args.get("app").cloned().unwrap_or(json!({}));
+    let path = normalize_route_path(arg_str(args, "path").unwrap_or("/sitemap.xml"))?;
+    let base = arg_str_opt(args, "base").unwrap_or("").to_string();
+    let table = arg_str_opt(args, "table").map(|s| s.to_string());
+    let loc = arg_str_opt(args, "loc").unwrap_or("path").to_string();
+    let limit = args
+        .get("limit")
+        .and_then(|v| v.as_i64())
+        .unwrap_or(1000);
+    let items = args.get("items").cloned().unwrap_or(json!([]));
+    let obj = app
+        .as_object_mut()
+        .ok_or_else(|| "app must be a map".to_string())?;
+    let mut routes = obj
+        .get("sitemap_routes")
+        .and_then(|v| v.as_object())
+        .cloned()
+        .unwrap_or_default();
+    routes.insert(
+        path,
+        json!({
+            "base": base,
+            "table": table,
+            "loc": loc,
+            "limit": limit,
+            "items": items,
+        }),
+    );
+    obj.insert("sitemap_routes".into(), Value::Object(routes));
+    Ok(app)
+});
+
+web_ffi!(web_app_robots, |args: &Value| {
+    let mut app = args.get("app").cloned().unwrap_or(json!({}));
+    let body = arg_str_opt(args, "body").map(|s| s.to_string());
+    let sitemap_url = arg_str_opt(args, "sitemap").map(|s| s.to_string());
+    let text = match body.filter(|s| !s.is_empty()) {
+        Some(b) => b,
+        None => crate::sitemap::build_robots(sitemap_url.as_deref()),
+    };
+    let obj = app
+        .as_object_mut()
+        .ok_or_else(|| "app must be a map".to_string())?;
+    obj.insert("robots_body".into(), json!(text));
+    Ok(app)
+});
+
+web_ffi!(web_sitemap_build, |args: &Value| {
+    let base = arg_str_opt(args, "base").unwrap_or("");
+    let items = args.get("items").cloned().unwrap_or(json!([]));
+    Ok(crate::sitemap::sitemap_json(base, &items))
 });
 
 fn storage_url_arg(args: &Value, key: &str) -> Result<String, String> {
@@ -1096,6 +1202,16 @@ web_ffi!(web_app_middleware, |args: &Value| {
         };
         m.insert("access_log".into(), json!(on));
     }
+    if let Some(cc) = args
+        .get("cache_control")
+        .or_else(|| args.get("缓存控制"))
+        .and_then(|v| v.as_str())
+    {
+        let s = cc.trim();
+        if !s.is_empty() {
+            m.insert("cache_control".into(), json!(s));
+        }
+    }
     if let Some(bl) = args.get("body_limit") {
         let n = bl
             .as_u64()
@@ -1221,6 +1337,11 @@ web_ffi!(web_listen, |args: &Value| {
         rss_routes,
         upload_routes,
         download_routes,
+        redirects,
+        sitemap_routes,
+        robots_body,
+        page_404,
+        page_500,
         middleware,
         cookie_secure,
     ) = if args.get("page").is_some() || args.get("host").is_some() {
@@ -1268,6 +1389,11 @@ web_ffi!(web_listen, |args: &Value| {
             HashMap::new(),
             HashMap::new(),
             HashMap::new(),
+            HashMap::new(),
+            HashMap::new(),
+            None,
+            None,
+            None,
             middleware::Middleware::default(),
             cookie_secure,
         )
@@ -1375,6 +1501,38 @@ web_ffi!(web_listen, |args: &Value| {
                 );
             }
         }
+        let mut redirects = HashMap::new();
+        if let Some(obj) = app.get("redirects").and_then(|v| v.as_object()) {
+            for (k, v) in obj {
+                let to = v
+                    .get("to")
+                    .and_then(|x| x.as_str())
+                    .unwrap_or("/")
+                    .to_string();
+                let permanent = v
+                    .get("permanent")
+                    .and_then(|x| x.as_bool())
+                    .unwrap_or(false);
+                redirects.insert(k.clone(), (to, permanent));
+            }
+        }
+        let mut sitemap_routes = HashMap::new();
+        if let Some(obj) = app.get("sitemap_routes").and_then(|v| v.as_object()) {
+            for (k, v) in obj {
+                sitemap_routes.insert(k.clone(), v.clone());
+            }
+        }
+        let robots_body = app
+            .get("robots_body")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string());
+        let page_404 = app.get("page_404").cloned().filter(|v| !v.is_null());
+        let page_500 = app.get("page_500").cloned().filter(|v| !v.is_null());
+        if app.get("tls_cert").is_some() || app.get("tls_key").is_some() {
+            eprintln!(
+                "marqdo web: in-process TLS is not enabled; terminate HTTPS at a reverse proxy (nginx/caddy) and set cookie_secure=True"
+            );
+        }
         let static_dir = app
             .get("static_dir")
             .and_then(|v| v.as_str())
@@ -1432,6 +1590,11 @@ web_ffi!(web_listen, |args: &Value| {
             rss_routes,
             upload_routes,
             download_routes,
+            redirects,
+            sitemap_routes,
+            robots_body,
+            page_404,
+            page_500,
             middleware,
             cookie_secure,
         )
@@ -1460,6 +1623,11 @@ web_ffi!(web_listen, |args: &Value| {
         rss_routes,
         upload_routes,
         download_routes,
+        redirects,
+        sitemap_routes,
+        robots_body,
+        page_404,
+        page_500,
         &middleware,
     )
 });
@@ -1549,6 +1717,23 @@ pub unsafe extern "C" fn marqdo_plugin_init(host: *const MarqdoHostApi) -> c_int
             "app,path,table,limit,order,title,link,description",
             web_app_route_rss as PluginFn,
         ),
+        (
+            "web_app_redirect",
+            "app,from,to,permanent",
+            web_app_redirect as PluginFn,
+        ),
+        (
+            "web_app_error_page",
+            "app,status,page",
+            web_app_error_page as PluginFn,
+        ),
+        (
+            "web_app_sitemap",
+            "app,path,base,table,loc,limit,items",
+            web_app_sitemap as PluginFn,
+        ),
+        ("web_app_robots", "app,body,sitemap", web_app_robots as PluginFn),
+        ("web_sitemap_build", "base,items", web_sitemap_build as PluginFn),
         (
             "web_app_upload",
             "app,path,field,storage,prefix,max_bytes,types",
@@ -1651,7 +1836,7 @@ pub unsafe extern "C" fn marqdo_plugin_init(host: *const MarqdoHostApi) -> c_int
         ),
         (
             "web_app_middleware",
-            "app,cors,security,compress,body_limit,json_routes,access_log",
+            "app,cors,security,compress,body_limit,json_routes,access_log,cache_control",
             web_app_middleware as PluginFn,
         ),
         ("web_form_new", "table,action,id", web_form_new as PluginFn),

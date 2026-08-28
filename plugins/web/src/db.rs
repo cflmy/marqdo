@@ -183,6 +183,7 @@ pub fn init(url: &str, table: &str, fields: &Value) -> Result<Value, String> {
     }
     let mut parts = Vec::new();
     let mut has_pk = false;
+    let mut index_sql = Vec::new();
     for c in arr {
         let name = c
             .get("name")
@@ -204,6 +205,28 @@ pub fn init(url: &str, table: &str, fields: &Value) -> Result<Value, String> {
                 _ => None,
             })
             .unwrap_or(true);
+        let unique = c
+            .get("unique")
+            .or_else(|| c.get("唯一"))
+            .and_then(|v| match v {
+                Value::Bool(b) => Some(*b),
+                Value::String(s) => {
+                    Some(matches!(s.as_str(), "true" | "True" | "1" | "yes" | "是" | "唯一"))
+                }
+                _ => None,
+            })
+            .unwrap_or(false);
+        let index = c
+            .get("index")
+            .or_else(|| c.get("索引"))
+            .and_then(|v| match v {
+                Value::Bool(b) => Some(*b),
+                Value::String(s) => {
+                    Some(matches!(s.as_str(), "true" | "True" | "1" | "yes" | "是" | "索引"))
+                }
+                _ => None,
+            })
+            .unwrap_or(false);
         let mut col = format!("\"{name}\" {}", sql_type(&ty));
         if name == "id" && !has_pk {
             col.push_str(" PRIMARY KEY");
@@ -214,7 +237,16 @@ pub fn init(url: &str, table: &str, fields: &Value) -> Result<Value, String> {
         } else if !nullable {
             col.push_str(" NOT NULL");
         }
+        if unique && name != "id" {
+            col.push_str(" UNIQUE");
+        }
         parts.push(col);
+        if (index || unique) && name != "id" {
+            let kind = if unique { "UNIQUE " } else { "" };
+            index_sql.push(format!(
+                "CREATE {kind}INDEX IF NOT EXISTS \"idx_{table}_{name}\" ON \"{table}\" (\"{name}\")"
+            ));
+        }
     }
     let sql = format!(
         "CREATE TABLE IF NOT EXISTS \"{table}\" ({})",
@@ -223,6 +255,9 @@ pub fn init(url: &str, table: &str, fields: &Value) -> Result<Value, String> {
     let conn = pooled(url)?;
     let c = conn.lock().unwrap_or_else(|e| e.into_inner());
     c.execute_batch(&sql).map_err(|e| e.to_string())?;
+    for stmt in index_sql {
+        c.execute_batch(&stmt).map_err(|e| e.to_string())?;
+    }
     Ok(json!({ "_type": "db_table", "name": table, "url": url }))
 }
 

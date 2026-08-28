@@ -22,6 +22,7 @@ use crate::rate_limit;
 use crate::render;
 use crate::rss;
 use crate::session;
+use crate::sitemap;
 use crate::storage;
 use crate::upload;
 
@@ -54,6 +55,9 @@ pub struct AppState {
     cookie_secure: bool,
     upload_routes: HashMap<String, UploadRoute>,
     download_routes: HashMap<String, DownloadRoute>,
+    /// Optional assembled pages for 404 / 500.
+    page_404: Option<Value>,
+    page_500: Option<Value>,
 }
 
 fn collect_page_forms(
@@ -95,6 +99,11 @@ pub fn listen(
     rss_routes: HashMap<String, Value>,
     upload_routes: HashMap<String, UploadRoute>,
     download_routes: HashMap<String, DownloadRoute>,
+    redirects: HashMap<String, (String, bool)>,
+    sitemap_routes: HashMap<String, Value>,
+    robots_body: Option<String>,
+    page_404: Option<Value>,
+    page_500: Option<Value>,
     middleware: &Middleware,
 ) -> Result<Value, String> {
     let mut form_owners = HashMap::new();
@@ -120,6 +129,8 @@ pub fn listen(
         cookie_secure,
         upload_routes: upload_routes.clone(),
         download_routes: download_routes.clone(),
+        page_404: page_404.clone(),
+        page_500: page_500.clone(),
     });
 
     let mut app = Router::new()
@@ -266,6 +277,65 @@ pub fn listen(
         let svc = ServeDir::new(dir);
         app = app.nest_service(&mount, svc);
     }
+
+    let mut redir_paths: Vec<String> = redirects.keys().cloned().collect();
+    redir_paths.sort();
+    for path in redir_paths {
+        let (to, permanent) = redirects.get(&path).cloned().unwrap_or_default();
+        app = app.route(
+            &path,
+            get(move || {
+                let to = to.clone();
+                let permanent = permanent;
+                async move {
+                    // 301 for permanent (SEO), 307 for temporary — not axum's 308/307 defaults.
+                    let status = if permanent {
+                        StatusCode::MOVED_PERMANENTLY
+                    } else {
+                        StatusCode::TEMPORARY_REDIRECT
+                    };
+                    match HeaderValue::from_str(&to) {
+                        Ok(loc) => (status, [(header::LOCATION, loc)]).into_response(),
+                        Err(_) => Redirect::to(&to).into_response(),
+                    }
+                }
+            }),
+        );
+    }
+
+    let mut sm_paths: Vec<String> = sitemap_routes.keys().cloned().collect();
+    sm_paths.sort();
+    for path in sm_paths {
+        let cfg = sitemap_routes.get(&path).cloned().unwrap_or_default();
+        app = app.route(
+            &path,
+            get(move |State(st): State<Arc<AppState>>| {
+                let cfg = cfg.clone();
+                async move { sitemap_response(&st, &cfg) }
+            }),
+        );
+    }
+
+    if let Some(body) = robots_body {
+        app = app.route(
+            "/robots.txt",
+            get(move || {
+                let body = body.clone();
+                async move {
+                    (
+                        [(
+                            header::CONTENT_TYPE,
+                            HeaderValue::from_static("text/plain; charset=utf-8"),
+                        )],
+                        body,
+                    )
+                        .into_response()
+                }
+            }),
+        );
+    }
+
+    app = app.fallback(get(fallback_404));
 
     let app = crate::middleware::apply(app, middleware);
     let app = app.with_state(state);
@@ -1321,6 +1391,79 @@ fn esc(s: &str) -> String {
     s.replace('&', "&amp;")
         .replace('<', "&lt;")
         .replace('>', "&gt;")
+}
+
+fn sitemap_response(st: &AppState, cfg: &Value) -> Response {
+    let base = cfg
+        .get("base")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+    let table = cfg.get("table").and_then(|v| v.as_str());
+    let loc_col = cfg
+        .get("loc")
+        .and_then(|v| v.as_str())
+        .unwrap_or("path");
+    let limit = cfg
+        .get("limit")
+        .and_then(|v| v.as_i64())
+        .unwrap_or(1000);
+    let mut items = cfg.get("items").cloned().unwrap_or(json!([]));
+    if let (Some(url), Some(table)) = (st.db_url.as_deref(), table) {
+        if let Ok(rows) = db::select_order(url, table, limit, None, None, None, None) {
+            if let Some(arr) = rows.get("rows").cloned() {
+                // Normalize loc column → loc
+                if let Some(list) = arr.as_array() {
+                    let mut out = Vec::new();
+                    for row in list {
+                        let mut m = row.as_object().cloned().unwrap_or_default();
+                        if !m.contains_key("loc") {
+                            if let Some(v) = m.get(loc_col).cloned() {
+                                m.insert("loc".into(), v);
+                            }
+                        }
+                        out.push(Value::Object(m));
+                    }
+                    items = Value::Array(out);
+                }
+            }
+        }
+    }
+    let xml = sitemap::build_sitemap(base, &items);
+    (
+        [(
+            header::CONTENT_TYPE,
+            HeaderValue::from_static("application/xml; charset=utf-8"),
+        )],
+        xml,
+    )
+        .into_response()
+}
+
+async fn fallback_404(State(st): State<Arc<AppState>>, headers: axum::http::HeaderMap) -> Response {
+    let (_, csrf, set_cookie) = resolve_session(&headers);
+    let html = if let Some(ref page) = st.page_404 {
+        render::render_page(page, st.db_url.as_deref(), Some(&csrf))
+    } else {
+        "<!doctype html><html><head><title>404</title></head><body><h1>404 Not Found</h1></body></html>"
+            .to_string()
+    };
+    let mut resp = (StatusCode::NOT_FOUND, Html(html)).into_response();
+    append_set_cookie(&mut resp, set_cookie);
+    resp
+}
+
+/// Render a custom 500 page when configured.
+#[allow(dead_code)]
+fn error_500(st: &AppState, csrf: Option<&str>, msg: &str) -> Response {
+    let html = if let Some(ref page) = st.page_500 {
+        render::render_page(page, st.db_url.as_deref(), csrf)
+    } else {
+        format!(
+            "<!doctype html><html><head><title>500</title></head><body><h1>500</h1><p>{}</p></body></html>",
+            esc(msg)
+        )
+    };
+    (StatusCode::INTERNAL_SERVER_ERROR, Html(html)).into_response()
 }
 
 /// WebSocket server endpoint.

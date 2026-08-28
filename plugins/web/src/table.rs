@@ -66,7 +66,10 @@ fn boolish(v: &Value) -> bool {
     }
 }
 
-/// Schema table → `[{name,type,nullable}, …]`
+const UNIQUE_KEYS: &[&str] = &["唯一", "unique", "uniq"];
+const INDEX_KEYS: &[&str] = &["索引", "index", "idx"];
+
+/// Schema table → `[{name,type,nullable,unique,index}, …]`
 pub fn as_fields(table: &Value) -> Value {
     match table {
         Value::Array(rows) => {
@@ -81,7 +84,15 @@ pub fn as_fields(table: &Value) -> Value {
                         .map(cell_str)
                         .unwrap_or_else(|| "text".into());
                     let nullable = pick(m, NULL_KEYS).map(boolish).unwrap_or(true);
-                    out.push(json!({ "name": name, "type": ty, "nullable": nullable }));
+                    let unique = pick(m, UNIQUE_KEYS).map(boolish).unwrap_or(false);
+                    let index = pick(m, INDEX_KEYS).map(boolish).unwrap_or(false);
+                    out.push(json!({
+                        "name": name,
+                        "type": ty,
+                        "nullable": nullable,
+                        "unique": unique,
+                        "index": index,
+                    }));
                 }
             }
             Value::Array(out)
@@ -90,6 +101,8 @@ pub fn as_fields(table: &Value) -> Value {
             let names = pick(m, FIELD_KEYS).map(as_str_list).unwrap_or_default();
             let types = pick(m, TYPE_KEYS).map(as_str_list).unwrap_or_default();
             let nulls = pick(m, NULL_KEYS).map(as_str_list).unwrap_or_default();
+            let uniques = pick(m, UNIQUE_KEYS).map(as_str_list).unwrap_or_default();
+            let indexes = pick(m, INDEX_KEYS).map(as_str_list).unwrap_or_default();
             let mut out = Vec::new();
             for (i, name) in names.iter().enumerate() {
                 if name.is_empty() {
@@ -100,7 +113,21 @@ pub fn as_fields(table: &Value) -> Value {
                     .get(i)
                     .map(|s| boolish(&Value::String(s.clone())))
                     .unwrap_or(true);
-                out.push(json!({ "name": name, "type": ty, "nullable": nullable }));
+                let unique = uniques
+                    .get(i)
+                    .map(|s| boolish(&Value::String(s.clone())))
+                    .unwrap_or(false);
+                let index = indexes
+                    .get(i)
+                    .map(|s| boolish(&Value::String(s.clone())))
+                    .unwrap_or(false);
+                out.push(json!({
+                    "name": name,
+                    "type": ty,
+                    "nullable": nullable,
+                    "unique": unique,
+                    "index": index,
+                }));
             }
             Value::Array(out)
         }

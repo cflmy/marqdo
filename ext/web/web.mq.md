@@ -151,6 +151,8 @@ Open a database handle. URL schemes: `sqlite:path` (default), `postgres://…` /
     + `name`
     + `fields`
 
+Create a table from a schema table. Optional columns: `唯一`/`unique`, `索引`/`index` (creates UNIQUE / INDEX).
+
 *url = self[^url]*
 **> web_db_init url=`url` name=`name` fields=`fields`**
 
@@ -438,16 +440,17 @@ Serve files from `dir` under `mount` (default `/static`). Path is resolved from 
     + `body_limit`=None
     + `json`=None
     + `access_log`=None
+    + `cache_control`=None
 
-Each capability is declared as a data table and assembled at listen time. The `cors` parameter takes a `|允许来源|方法|头|暴露头|凭证|` table (one row per origin; an empty `允许来源` column means any origin). The `security` parameter takes a `|头|值|` response-header table (e.g. `X-Frame-Options`, `Content-Security-Policy`, `X-Content-Type-Options`, `Referrer-Policy`, `Strict-Transport-Security`). Set `compress` to `True` to gzip response bodies. `body_limit` is the max request body bytes (e.g. `1048576`). The `json` parameter takes a `|路径|方法|表|条件|排序|上限|` table of JSON API endpoints backed by DB queries (each returns `application/json`). Set `access_log` to `True` to log `METHOD path status duration_ms` on stderr.
+Each capability is declared as a data table and assembled at listen time. The `cors` parameter takes a `|允许来源|方法|头|暴露头|凭证|` table (one row per origin; an empty `允许来源` column means any origin). The `security` parameter takes a `|头|值|` response-header table (e.g. `X-Frame-Options`, `Content-Security-Policy`, `X-Content-Type-Options`, `Referrer-Policy`, `Strict-Transport-Security`). Set `compress` to `True` to gzip response bodies. `body_limit` is the max request body bytes (e.g. `1048576`). The `json` parameter takes a `|路径|方法|表|条件|排序|上限|` table of JSON API endpoints backed by DB queries (each returns `application/json`). Set `access_log` to `True` to log `METHOD path status duration_ms` on stderr. `cache_control` sets a global `Cache-Control` header (e.g. `public, max-age=3600`).
 
 Tables stay as data; `configure` assembles them. 配置即数据、装配即函数.
 
-**> web_app_middleware app=`self` cors=`cors` security=`security` compress=`compress` body_limit=`body_limit` json_routes=`json` access_log=`access_log`**
+**> web_app_middleware app=`self` cors=`cors` security=`security` compress=`compress` body_limit=`body_limit` json_routes=`json` access_log=`access_log` cache_control=`cache_control`**
 
 ## listen
 
-Serve `/`, routed pages, `/_part/{id}` (home) and `{path}/_part/{id}` (routes), `/_form/{id}` (from mounts + page embeds), optional `/static` (or custom mount), optional `/admin`, and any `upload` / `download` / WebSocket routes.
+Serve `/`, routed pages, `/_part/{id}` (home) and `{path}/_part/{id}` (routes), `/_form/{id}` (from mounts + page embeds), optional `/static` (or custom mount), optional `/admin`, upload/download/WebSocket/RSS/sitemap/robots routes, redirects, and a custom 404 fallback. Production HTTPS should terminate at a reverse proxy; set `cookie_secure=True` when serving over TLS.
 
 **> web_listen app=`self`**
 
@@ -480,6 +483,43 @@ Keep the app's `admin=True`, and gate `/admin*` behind a login page. `users` is 
 Register an RSS 2.0 feed at `path` (e.g. `/feed.xml`) backed by a DB table.
 
 **> web_app_route_rss app=`self` path=`path` table=`table` limit=`limit` order=`order` title=`title` link=`link` description=`description`**
+
+## redirect
+    + `from`
+    + `to`
+    + `permanent`=False
+
+Register a redirect from `from` to `to`. `permanent=True` issues HTTP 301; otherwise 307.
+
+**> web_app_redirect app=`self` from=`from` to=`to` permanent=`permanent`**
+
+## error_page
+    + `status`=404
+    + `page`
+
+Bind an assembled page for HTTP `404` or `500` responses.
+
+**> web_app_error_page app=`self` status=`status` page=`page`**
+
+## sitemap
+    + `path`=/sitemap.xml
+    + `base`=""
+    + `table`=None
+    + `loc`=path
+    + `limit`=1000
+    + `items`=None
+
+Serve `sitemap.xml`. Prefer `table` + `loc` column from the DB, or pass an `items` table with `loc`/`路径` rows.
+
+**> web_app_sitemap app=`self` path=`path` base=`base` table=`table` loc=`loc` limit=`limit` items=`items`**
+
+## robots
+    + `body`=None
+    + `sitemap`=None
+
+Serve `/robots.txt`. Omit `body` to emit a default Allow-all file, optionally with a `Sitemap:` line.
+
+**> web_app_robots app=`self` body=`body` sitemap=`sitemap`**
 
 ## upload
     + `path`=/_upload

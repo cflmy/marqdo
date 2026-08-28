@@ -1979,6 +1979,141 @@ access-log-ok",
 }
 
 #[test]
+fn ext_web_w7_finish_smoke() {
+    let status = Command::new("cargo")
+        .args(["build", "-p", "marqdo_plugin_web"])
+        .current_dir(env!("CARGO_MANIFEST_DIR"))
+        .status()
+        .expect("build web plugin");
+    assert!(status.success(), "failed to build marqdo_plugin_web");
+    assert_out(
+        "tests/ext/web-w7-finish-smoke.mq.md",
+        "unique-ok
+sitemap-ok
+redirect-ok
+robots-ok
+cache-control-ok
+error-page-ok",
+    );
+}
+
+#[test]
+fn ext_web_w7_live() {
+    let status = Command::new("cargo")
+        .args(["build", "-p", "marqdo_plugin_web"])
+        .current_dir(env!("CARGO_MANIFEST_DIR"))
+        .status()
+        .expect("build web plugin");
+    assert!(status.success(), "failed to build marqdo_plugin_web");
+
+    let script = "tests/ext/web-w7-live-server.mq.md";
+    let bin = env!("CARGO_BIN_EXE_marqdo");
+    let mut child = Command::new(bin)
+        .args(["run", script])
+        .current_dir(env!("CARGO_MANIFEST_DIR"))
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("spawn w7 live server");
+
+    let base = "http://127.0.0.1:18121";
+    let ready = std::time::Instant::now();
+    loop {
+        if ready.elapsed().as_secs() > 10 {
+            let _ = child.kill();
+            panic!("w7 live server did not start in time");
+        }
+        let out = Command::new("curl")
+            .args([
+                "-s",
+                "-o",
+                "/dev/null",
+                "-w",
+                "%{http_code}",
+                &format!("{base}/"),
+            ])
+            .output()
+            .expect("curl probe");
+        if String::from_utf8_lossy(&out.stdout) == "200" {
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(300));
+    }
+
+    // Permanent redirect
+    let out = Command::new("curl")
+        .args([
+            "-s",
+            "-o",
+            "/dev/null",
+            "-w",
+            "%{http_code}|%{redirect_url}",
+            &format!("{base}/legacy"),
+        ])
+        .output()
+        .expect("curl redirect");
+    let redir = String::from_utf8_lossy(&out.stdout);
+    assert!(
+        redir.starts_with("301|") && redir.contains("/"),
+        "redirect got {redir}"
+    );
+
+    // Custom 404
+    let out = Command::new("curl")
+        .args(["-s", "-w", "\n%{http_code}", &format!("{base}/no-such")])
+        .output()
+        .expect("curl 404");
+    let body = String::from_utf8_lossy(&out.stdout);
+    assert!(
+        body.contains("Not Found Page") && body.trim_end().ends_with("404"),
+        "404 body={body}"
+    );
+
+    // Sitemap
+    let out = Command::new("curl")
+        .args(["-s", &format!("{base}/sitemap.xml")])
+        .output()
+        .expect("curl sitemap");
+    let sm = String::from_utf8_lossy(&out.stdout);
+    assert!(
+        sm.contains("<urlset") && sm.contains("/about"),
+        "sitemap={sm}"
+    );
+
+    // robots.txt
+    let out = Command::new("curl")
+        .args(["-s", &format!("{base}/robots.txt")])
+        .output()
+        .expect("curl robots");
+    let rb = String::from_utf8_lossy(&out.stdout);
+    assert!(
+        rb.contains("User-agent:") && rb.contains("Sitemap:"),
+        "robots={rb}"
+    );
+
+    // Cache-Control
+    let out = Command::new("curl")
+        .args([
+            "-s",
+            "-D",
+            "-",
+            "-o",
+            "/dev/null",
+            &format!("{base}/"),
+        ])
+        .output()
+        .expect("curl headers");
+    let headers = String::from_utf8_lossy(&out.stdout).to_ascii_lowercase();
+    assert!(
+        headers.contains("cache-control: public, max-age=120"),
+        "headers={headers}"
+    );
+
+    let _ = child.kill();
+    let _ = child.wait();
+}
+
+#[test]
 fn ext_web_ws_broadcast_live() {
     use futures_util::{SinkExt, StreamExt};
     use tokio_tungstenite::tungstenite::Message;
