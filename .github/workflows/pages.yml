@@ -28,9 +28,12 @@ jobs:
       - name: Build & export site
         run: |
           cargo build --release
-          # Skip import helpers (no `# main`); exclude both EN/ZH names.
-          find public -name '*.mq.md' ! -path '*/structure/import/utils.mq.md' ! -path '*/structure/import/??.mq.md' -print0 \
-            | xargs -0 -n1 ./target/release/marqdo run
+          # Skip import helpers and any demo without `# main` (locale-safe; no UTF-8 names in find).
+          set -e
+          while IFS= read -r -d '' f; do
+            grep -q '^# main' "$f" || continue
+            ./target/release/marqdo run "$f"
+          done < <(find public -name '*.mq.md' -print0)
           ./target/release/marqdo view output public -o public
 
       - name: Verify site shape
