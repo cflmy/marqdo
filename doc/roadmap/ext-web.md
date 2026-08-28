@@ -31,7 +31,7 @@
 | **W4** | Postgres；Redis / S3 驱动（见 [ext-web-drivers.md](../design/ext-web-drivers.md)） | **done** |
 | **W4c** | 内容标配：SEO / Markdown / RSS / 分页 UI（见 [web-net-capabilities.md](../design/web-net-capabilities.md)） | **done** |
 | **W5** | 上传与媒体：multipart 接收 + 落盘 + 下载（见 [web-net-capabilities.md](../design/web-net-capabilities.md) A5） | **done** |
-| **W6** | 迁移 + FTS5 搜索；草稿/评论用既有 where/表（WS 广播后续） | **done**（核心） |
+| **W6** | 迁移 + FTS5 搜索；草稿/评论用既有 where/表；WS 广播 + 访问日志 | **done** |
 
 验收金样：`tests/ext/web-smoke.mq.md`、`tests/ext/web-security-smoke.mq.md`、`tests/ext/web-drivers-smoke.mq.md`、`tests/ext/web-upload-smoke.mq.md`、`tests/ext/web-db-w6-smoke.mq.md`、`ext_cli_add_web`。
 

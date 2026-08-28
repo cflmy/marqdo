@@ -10,7 +10,8 @@ use std::sync::Arc;
 
 use axum::body::Body;
 use axum::extract::State;
-use axum::http::{header, HeaderValue, Method, StatusCode};
+use axum::http::{header, HeaderValue, Method, Request, StatusCode};
+use axum::middleware::{self as axum_mw, Next};
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use axum::Router;
@@ -40,6 +41,8 @@ pub struct Middleware {
     pub security: Vec<(String, String)>,
     pub compress: bool,
     pub body_limit: Option<u64>,
+    /// Log `METHOD path status duration_ms` to stderr for each request.
+    pub access_log: bool,
     /// JSON API routes: `path -> { method, table, where?, order?, limit? }`.
     pub json_routes: Vec<(String, JsonRoute)>,
 }
@@ -80,6 +83,10 @@ pub fn parse(app: &Value) -> Middleware {
     }
     mw.compress = obj
         .get("compress")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
+    mw.access_log = obj
+        .get("access_log")
         .and_then(|v| v.as_bool())
         .unwrap_or(false);
     mw.body_limit = obj
@@ -224,7 +231,27 @@ pub fn apply(
         app = app.layer(RequestBodyLimitLayer::new(bytes as usize));
     }
 
+    // Access log (outermost so status/duration include other layers).
+    if mw.access_log {
+        app = app.layer(axum_mw::from_fn(access_log_mw));
+    }
+
     app
+}
+
+async fn access_log_mw(req: Request<Body>, next: Next) -> Response {
+    let method = req.method().clone();
+    let path = req.uri().path().to_string();
+    let start = std::time::Instant::now();
+    let resp = next.run(req).await;
+    eprintln!(
+        "marqdo web {} {} {} {}ms",
+        method,
+        path,
+        resp.status().as_u16(),
+        start.elapsed().as_millis()
+    );
+    resp
 }
 
 fn header_name_from(name: &str) -> Option<axum::http::HeaderName> {
@@ -426,6 +453,9 @@ pub fn summary(app: &Value) -> String {
     }
     if mw.body_limit.is_some() {
         parts.push("body_limit".to_string());
+    }
+    if mw.access_log {
+        parts.push("access_log".to_string());
     }
     if !mw.json_routes.is_empty() {
         parts.push(format!("json:{}", mw.json_routes.len()));

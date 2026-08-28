@@ -437,26 +437,28 @@ Serve files from `dir` under `mount` (default `/static`). Path is resolved from 
     + `compress`=None
     + `body_limit`=None
     + `json`=None
+    + `access_log`=None
 
-Each capability is declared as a data table and assembled at listen time. The `cors` parameter takes a `|允许来源|方法|头|暴露头|凭证|` table (one row per origin; an empty `允许来源` column means any origin). The `security` parameter takes a `|头|值|` response-header table (e.g. `X-Frame-Options`, `Content-Security-Policy`, `X-Content-Type-Options`, `Referrer-Policy`, `Strict-Transport-Security`). Set `compress` to `True` to gzip response bodies. `body_limit` is the max request body bytes (e.g. `1048576`). The `json` parameter takes a `|路径|方法|表|条件|排序|上限|` table of JSON API endpoints backed by DB queries (each returns `application/json`).
+Each capability is declared as a data table and assembled at listen time. The `cors` parameter takes a `|允许来源|方法|头|暴露头|凭证|` table (one row per origin; an empty `允许来源` column means any origin). The `security` parameter takes a `|头|值|` response-header table (e.g. `X-Frame-Options`, `Content-Security-Policy`, `X-Content-Type-Options`, `Referrer-Policy`, `Strict-Transport-Security`). Set `compress` to `True` to gzip response bodies. `body_limit` is the max request body bytes (e.g. `1048576`). The `json` parameter takes a `|路径|方法|表|条件|排序|上限|` table of JSON API endpoints backed by DB queries (each returns `application/json`). Set `access_log` to `True` to log `METHOD path status duration_ms` on stderr.
 
 Tables stay as data; `configure` assembles them. 配置即数据、装配即函数.
 
-**> web_app_middleware app=`self` cors=`cors` security=`security` compress=`compress` body_limit=`body_limit` json_routes=`json`**
+**> web_app_middleware app=`self` cors=`cors` security=`security` compress=`compress` body_limit=`body_limit` json_routes=`json` access_log=`access_log`**
 
 ## listen
 
-Serve `/`, routed pages, `/_part/{id}` (home) and `{path}/_part/{id}` (routes), `/_form/{id}` (from mounts + page embeds), optional `/static` (or custom mount), optional `/admin`, and any `upload` / `download` routes.
+Serve `/`, routed pages, `/_part/{id}` (home) and `{path}/_part/{id}` (routes), `/_form/{id}` (from mounts + page embeds), optional `/static` (or custom mount), optional `/admin`, and any `upload` / `download` / WebSocket routes.
 
 **> web_listen app=`self`**
 
 ## route_ws
     + `path`
     + `echo`=True
+    + `mode`=None
 
-Register a WebSocket endpoint at `path` (e.g. `/live`). With `echo=True` (default) the server replies to each received text frame; otherwise frames are drained. Connect from a client with `web.ws.connect`.
+Register a WebSocket endpoint at `path` (e.g. `/live`). `mode` is `echo` (default), `broadcast` (fan-out text to all sockets on this path), or `drain`. Legacy `echo=False` maps to `drain`. Connect from a client with `web.ws.connect`.
 
-**> web_app_route_ws app=`self` path=`path` echo=`echo`**
+**> web_app_route_ws app=`self` path=`path` echo=`echo` mode=`mode`**
 
 ## auth
     + `users`

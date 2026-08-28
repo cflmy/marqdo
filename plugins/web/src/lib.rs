@@ -18,6 +18,7 @@ mod storage;
 mod table;
 mod upload;
 mod ws;
+mod ws_hub;
 
 use crate::table::as_css_named;
 
@@ -900,12 +901,10 @@ web_ffi!(web_app_route, |args: &Value| {
 web_ffi!(web_app_route_ws, |args: &Value| {
     let mut app = args.get("app").cloned().unwrap_or(json!({}));
     let path = normalize_route_path(arg_str(args, "path")?)?;
-    let echo = match args.get("echo") {
-        None | Some(Value::Null) => true,
-        Some(Value::Bool(b)) => *b,
-        Some(Value::String(s)) => matches!(s.as_str(), "true" | "True" | "1" | "yes"),
-        Some(Value::Number(n)) => n.as_i64().unwrap_or(0) != 0,
-        Some(_) => true,
+    let mode = if let Some(m) = args.get("mode").or_else(|| args.get("模式")) {
+        crate::ws_hub::WsMode::parse(m)
+    } else {
+        crate::ws_hub::WsMode::parse(&args.get("echo").cloned().unwrap_or(json!(true)))
     };
     let obj = app
         .as_object_mut()
@@ -916,7 +915,7 @@ web_ffi!(web_app_route_ws, |args: &Value| {
     let wmap = ws_routes
         .as_object_mut()
         .ok_or_else(|| "app.ws_routes must be a map".to_string())?;
-    wmap.insert(path, json!(echo));
+    wmap.insert(path, json!({ "mode": mode.as_str() }));
     Ok(app)
 });
 
@@ -1084,6 +1083,18 @@ web_ffi!(web_app_middleware, |args: &Value| {
             _ => false,
         };
         m.insert("compress".into(), json!(on));
+    }
+    if let Some(al) = args
+        .get("access_log")
+        .or_else(|| args.get("访问日志"))
+    {
+        let on = match al {
+            Value::Bool(b) => *b,
+            Value::String(s) => matches!(s.as_str(), "true" | "True" | "1" | "yes" | "on" | "真"),
+            Value::Number(n) => n.as_i64().unwrap_or(0) != 0,
+            _ => false,
+        };
+        m.insert("access_log".into(), json!(on));
     }
     if let Some(bl) = args.get("body_limit") {
         let n = bl
@@ -1253,7 +1264,7 @@ web_ffi!(web_listen, |args: &Value| {
             static_mount,
             auth_users,
             session_ttl,
-            HashMap::new(),
+            HashMap::<String, crate::ws_hub::WsMode>::new(),
             HashMap::new(),
             HashMap::new(),
             HashMap::new(),
@@ -1298,12 +1309,7 @@ web_ffi!(web_listen, |args: &Value| {
         let mut ws_routes = HashMap::new();
         if let Some(obj) = app.get("ws_routes").and_then(|v| v.as_object()) {
             for (k, v) in obj {
-                let echo = match v {
-                    Value::Bool(b) => *b,
-                    Value::String(s) => matches!(s.as_str(), "true" | "True" | "1" | "yes"),
-                    _ => true,
-                };
-                ws_routes.insert(k.clone(), echo);
+                ws_routes.insert(k.clone(), crate::ws_hub::WsMode::parse(v));
             }
         }
         let mut rss_routes = HashMap::new();
@@ -1645,7 +1651,7 @@ pub unsafe extern "C" fn marqdo_plugin_init(host: *const MarqdoHostApi) -> c_int
         ),
         (
             "web_app_middleware",
-            "app,cors,security,compress,body_limit,json_routes",
+            "app,cors,security,compress,body_limit,json_routes,access_log",
             web_app_middleware as PluginFn,
         ),
         ("web_form_new", "table,action,id", web_form_new as PluginFn),
@@ -1681,7 +1687,7 @@ pub unsafe extern "C" fn marqdo_plugin_init(host: *const MarqdoHostApi) -> c_int
         ("web_app_auth", "app,users,session_ttl", web_app_auth as PluginFn),
         (
             "web_app_route_ws",
-            "app,path,echo",
+            "app,path,echo,mode",
             web_app_route_ws as PluginFn,
         ),
         (

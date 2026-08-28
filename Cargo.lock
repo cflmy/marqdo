@@ -1024,6 +1024,7 @@ dependencies = [
  "assert_cmd",
  "chrono",
  "clap",
+ "futures-util",
  "idna_adapter",
  "include_dir",
  "libc",
@@ -1033,6 +1034,8 @@ dependencies = [
  "serde_json",
  "thiserror 1.0.69",
  "tiny_http",
+ "tokio",
+ "tokio-tungstenite 0.24.0",
  "ureq",
  "zeroize",
 ]

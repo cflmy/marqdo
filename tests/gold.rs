@@ -1964,6 +1964,126 @@ fts-row-ok",
 }
 
 #[test]
+fn ext_web_ws_broadcast_smoke() {
+    let status = Command::new("cargo")
+        .args(["build", "-p", "marqdo_plugin_web"])
+        .current_dir(env!("CARGO_MANIFEST_DIR"))
+        .status()
+        .expect("build web plugin");
+    assert!(status.success(), "failed to build marqdo_plugin_web");
+    assert_out(
+        "tests/ext/web-ws-broadcast-smoke.mq.md",
+        "ws-broadcast-route-ok
+access-log-ok",
+    );
+}
+
+#[test]
+fn ext_web_ws_broadcast_live() {
+    use futures_util::{SinkExt, StreamExt};
+    use tokio_tungstenite::tungstenite::Message;
+
+    let status = Command::new("cargo")
+        .args(["build", "-p", "marqdo_plugin_web"])
+        .current_dir(env!("CARGO_MANIFEST_DIR"))
+        .status()
+        .expect("build web plugin");
+    assert!(status.success(), "failed to build marqdo_plugin_web");
+
+    let script = "tests/ext/web-ws-broadcast-live-server.mq.md";
+    let bin = env!("CARGO_BIN_EXE_marqdo");
+    let mut child = Command::new(bin)
+        .args(["run", script])
+        .current_dir(env!("CARGO_MANIFEST_DIR"))
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("spawn ws live server");
+
+    let base = "http://127.0.0.1:18112";
+    let ready = std::time::Instant::now();
+    loop {
+        if ready.elapsed().as_secs() > 10 {
+            let _ = child.kill();
+            panic!("ws live server did not start in time");
+        }
+        let out = Command::new("curl")
+            .args([
+                "-s",
+                "-o",
+                "/dev/null",
+                "-w",
+                "%{http_code}",
+                &format!("{base}/"),
+            ])
+            .output()
+            .expect("curl probe");
+        if String::from_utf8_lossy(&out.stdout) == "200" {
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(300));
+    }
+
+    let rt = tokio::runtime::Runtime::new().expect("rt");
+    rt.block_on(async {
+        let (a, _) = tokio_tungstenite::connect_async("ws://127.0.0.1:18112/room")
+            .await
+            .expect("connect a");
+        let (b, _) = tokio_tungstenite::connect_async("ws://127.0.0.1:18112/room")
+            .await
+            .expect("connect b");
+        let (mut a_sink, mut a_src) = a.split();
+        let (mut b_sink, mut b_src) = b.split();
+
+        // Give subscriptions a moment to register.
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+
+        b_sink
+            .send(Message::Text("ping-from-b".into()))
+            .await
+            .expect("send b");
+
+        let got_a = tokio::time::timeout(
+            std::time::Duration::from_secs(3),
+            a_src.next(),
+        )
+        .await
+        .expect("a timeout")
+        .expect("a closed")
+        .expect("a err");
+        let got_b = tokio::time::timeout(
+            std::time::Duration::from_secs(3),
+            b_src.next(),
+        )
+        .await
+        .expect("b timeout")
+        .expect("b closed")
+        .expect("b err");
+
+        match got_a {
+            Message::Text(t) => assert_eq!(t, "ping-from-b"),
+            other => panic!("a unexpected {other:?}"),
+        }
+        match got_b {
+            Message::Text(t) => assert_eq!(t, "ping-from-b"),
+            other => panic!("b unexpected {other:?}"),
+        }
+
+        let _ = a_sink.close().await;
+        let _ = b_sink.close().await;
+    });
+
+    // Access log should have recorded the probe GET /.
+    let _ = child.kill();
+    let out = child.wait_with_output().expect("wait");
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        stderr.contains("marqdo web GET / 200"),
+        "access log missing in stderr={stderr}"
+    );
+}
+
+#[test]
 fn ext_web_db_w2_smoke() {
     // W2 data layer: transactions, connection pooling, pagination, query
     // expressiveness (IN/BETWEEN/OR), and row counting.

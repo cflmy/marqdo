@@ -91,7 +91,7 @@ pub fn listen(
     auth_users: Option<Value>,
     session_ttl: u64,
     cookie_secure: bool,
-    ws_routes: HashMap<String, bool>,
+    ws_routes: HashMap<String, crate::ws_hub::WsMode>,
     rss_routes: HashMap<String, Value>,
     upload_routes: HashMap<String, UploadRoute>,
     download_routes: HashMap<String, DownloadRoute>,
@@ -192,15 +192,19 @@ pub fn listen(
         }
     }
 
-    // WebSocket endpoints (`ws://…/{path}`), echo-mode by default.
+    // WebSocket endpoints (`ws://…/{path}`).
     let mut ws_paths: Vec<String> = ws_routes.keys().cloned().collect();
     ws_paths.sort();
     for path in ws_paths {
-        let echo = ws_routes.get(&path).copied().unwrap_or(true);
+        let mode = ws_routes
+            .get(&path)
+            .copied()
+            .unwrap_or(crate::ws_hub::WsMode::Echo);
+        let route_path = path.clone();
         app = app.route(
             &path,
             axum::routing::get(move |ws: axum::extract::WebSocketUpgrade| {
-                ws_upgrade(ws, echo)
+                ws_upgrade(ws, mode, route_path.clone())
             }),
         );
     }
@@ -1319,28 +1323,75 @@ fn esc(s: &str) -> String {
         .replace('>', "&gt;")
 }
 
-/// WebSocket server endpoint: `echo=true` replies with each received text frame;
-/// otherwise it just drains frames (extension point for custom logic).
+/// WebSocket server endpoint.
+/// - `echo`: reply each text frame to the same socket
+/// - `broadcast`: fan-out text frames to all sockets on this path
+/// - `drain`: read and discard frames
 async fn ws_upgrade(
     ws: axum::extract::WebSocketUpgrade,
-    echo: bool,
+    mode: crate::ws_hub::WsMode,
+    path: String,
 ) -> Response {
-    ws.on_upgrade(move |socket| ws_echo_loop(socket, echo))
+    ws.on_upgrade(move |socket| ws_socket_loop(socket, mode, path))
 }
 
-async fn ws_echo_loop(mut socket: axum::extract::ws::WebSocket, echo: bool) {
+async fn ws_socket_loop(
+    mut socket: axum::extract::ws::WebSocket,
+    mode: crate::ws_hub::WsMode,
+    path: String,
+) {
     use axum::extract::ws::Message;
-    while let Some(Ok(msg)) = socket.recv().await {
-        match msg {
-            Message::Text(text) => {
-                if echo {
-                    if socket.send(Message::Text(text)).await.is_err() {
-                        break;
+    use futures_util::{SinkExt, StreamExt};
+
+    match mode {
+        crate::ws_hub::WsMode::Echo => {
+            while let Some(Ok(msg)) = socket.recv().await {
+                match msg {
+                    Message::Text(text) => {
+                        if socket.send(Message::Text(text)).await.is_err() {
+                            break;
+                        }
+                    }
+                    Message::Close(_) => break,
+                    _ => {}
+                }
+            }
+        }
+        crate::ws_hub::WsMode::Drain => {
+            while let Some(Ok(msg)) = socket.recv().await {
+                if matches!(msg, Message::Close(_)) {
+                    break;
+                }
+            }
+        }
+        crate::ws_hub::WsMode::Broadcast => {
+            let mut rx = crate::ws_hub::subscribe(&path);
+            let (mut sink, mut stream) = socket.split();
+            loop {
+                tokio::select! {
+                    incoming = stream.next() => {
+                        match incoming {
+                            Some(Ok(Message::Text(text))) => {
+                                crate::ws_hub::publish(&path, text.to_string());
+                            }
+                            Some(Ok(Message::Close(_))) | None => break,
+                            Some(Ok(_)) => {}
+                            Some(Err(_)) => break,
+                        }
+                    }
+                    out = rx.recv() => {
+                        match out {
+                            Ok(text) => {
+                                if sink.send(Message::Text(text.into())).await.is_err() {
+                                    break;
+                                }
+                            }
+                            Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => continue,
+                            Err(_) => break,
+                        }
                     }
                 }
             }
-            Message::Close(_) => break,
-            _ => {}
         }
     }
 }

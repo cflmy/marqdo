@@ -120,7 +120,7 @@
 | A5 | **文件上传接收**（multipart extractor → 校验类型/大小 → 落盘）与**下载**（`Content-Disposition`） | ✅ **已实现（W5）**：`app.upload` / `app.download`；`file:` storage；离线 + curl live 金样 | `plugins/web` | P1 ✅ |
 | A6 | **HTTPS / TLS**（rustls 终止或反代提示） | 生产部署安全 | `plugins/web`（或文档指引反代） | P2 |
 | A7 | **gzip / br 压缩** + **ETag / Cache-Control 缓存头** | gzip ✅ **已实现（W1，`压缩=真`）**；ETag/Cache-Control 待补 | `plugins/web`（tower-http 现成） | P2 |
-| A8 | **访问日志**（请求方法/路径/状态/耗时） | 排障、审计 | `plugins/web`（tower-http TraceLayer） | P2 |
+| A8 | **访问日志**（请求方法/路径/状态/耗时） | ✅ **已实现（W6b）**：`configure access_log=True` → stderr | `plugins/web` | P2 ✅ |
 | A9 | **自定义 404/500 错误页** | 用户体感 | `plugins/web` | P2 |
 | A10 | **重定向增强**（permanent/自定义状态码） | 301 SEO | `plugins/web` | P3 |
 
@@ -180,7 +180,7 @@
 | **W3** | 安全硬化 | 密码哈希 + CSRF + 会话持久化 + CSPRNG session id + cookie 增强 + 登录限速/锁定 | C1–C7 |
 | **W4** | 内容站点标配 | SEO 元数据 + sitemap/robots + RSS + Markdown 渲染 + 分页导航 UI + 标签/分类 | D1–D6 |
 | **W5** | 上传与媒体 | multipart 文件上传接收 + 落盘 + 下载 + 图片库 | A5 D9 ✅ **A5 done**（D9 相册 UI 后续） |
-| **W6** | 进阶 | 全文搜索(FTS5) + 迁移机制 + 评论系统 + 草稿/发布 + WS 广播 | B6 B9 ✅；D7/D8 用表+where；WS 广播后续 |
+| **W6** | 进阶 | 全文搜索(FTS5) + 迁移机制 + 评论系统 + 草稿/发布 + WS 广播 | B6 B9 ✅；WS 广播 + access_log ✅；D7/D8 用表+where |
 
 ### 4.2 边界判定要点（严格遵守既有约束）
 
