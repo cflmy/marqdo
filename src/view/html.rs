@@ -760,6 +760,34 @@ section.block > h2 {
   font: 0.8rem/1.35 var(--mono);
 }
 .plan-card a { color: #1d4ed8; }
+.plan-card .plan-process {
+  list-style: none;
+  margin: 0.45rem 0 0;
+  padding: 0;
+  border-top: 1px solid var(--line);
+}
+.plan-card .plan-process li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.65rem;
+  padding: 0.4rem 0;
+  border-bottom: 1px solid #eef2f7;
+  font: 0.8rem/1.35 var(--sans);
+  color: var(--ink);
+}
+.plan-card .plan-process li:last-child { border-bottom: none; }
+.plan-card .plan-process .pp-type {
+  font: 0.72rem/1.2 var(--mono);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #475569;
+  min-width: 4.5rem;
+}
+.plan-card .plan-process .pp-detail {
+  color: var(--muted);
+  font: 0.78rem/1.35 var(--mono);
+  word-break: break-word;
+}
 .stream-panel {
   margin: 0 0 0.85rem;
   border: 1px solid var(--line);
@@ -2290,7 +2318,7 @@ window.MARQDO_AUTO_STREAM = {auto_stream};
     layout(rel, &nav, &main)
 }
 
-/// Plan / agent result map → card with workbook link and cache/rounds.
+/// Plan / agent result map → card with workbook link, cache/rounds, and process events.
 fn plan_result_card(stdout: &str, links: &LinkMode) -> String {
     let trimmed = stdout.trim();
     if trimmed.is_empty() {
@@ -2312,7 +2340,8 @@ fn plan_result_card(stdout: &str, links: &LinkMode) -> String {
         .and_then(|x| x.as_u64())
         .or_else(|| v.get("round").and_then(|x| x.as_u64()));
     let status = v.get("status").and_then(|x| x.as_str());
-    if workbook.is_none() && cache.is_none() && rounds.is_none() {
+    let events = v.get("events").and_then(|x| x.as_array());
+    if workbook.is_none() && cache.is_none() && rounds.is_none() && events.is_none() {
         return String::new();
     }
     let mut meta = Vec::new();
@@ -2341,11 +2370,86 @@ fn plan_result_card(stdout: &str, links: &LinkMode) -> String {
         }
         _ => String::new(),
     };
+    let process = plan_process_list(events);
     format!(
-        r#"<div class="plan-card"><strong>Plan result</strong><div class="plan-meta">{}</div>{}</div>"#,
+        r#"<div class="plan-card"><strong>Plan result</strong><div class="plan-meta">{}</div>{}{}</div>"#,
         meta.join(" · "),
-        link
+        link,
+        process
     )
+}
+
+fn plan_process_list(events: Option<&Vec<serde_json::Value>>) -> String {
+    let Some(events) = events else {
+        return String::new();
+    };
+    if events.is_empty() {
+        return String::new();
+    }
+    let mut items = Vec::new();
+    for ev in events {
+        let t = ev.get("type").and_then(|x| x.as_str()).unwrap_or("event");
+        // Skip raw token deltas in the static card — live Stream panel owns those.
+        if matches!(t, "delta" | "reasoning") {
+            continue;
+        }
+        let detail = match t {
+            "decision" => {
+                let d = ev.get("decision").and_then(|x| x.as_str()).unwrap_or("?");
+                let sum = ev.get("summary").and_then(|x| x.as_str()).unwrap_or("");
+                if sum.is_empty() {
+                    escape(d)
+                } else {
+                    format!("{} — {}", escape(d), escape(sum))
+                }
+            }
+            "round" => {
+                let mut bits = Vec::new();
+                if let Some(r) = ev.get("round") {
+                    bits.push(format!("round={r}"));
+                }
+                if let Some(wb) = ev.get("workbook").and_then(|x| x.as_str()) {
+                    bits.push(format!("workbook={}", escape(wb)));
+                }
+                if let Some(c) = ev.get("exit_code") {
+                    bits.push(format!("exit={c}"));
+                }
+                if let Some(res) = ev.get("result").and_then(|x| x.as_str()) {
+                    let brief: String = res.chars().take(80).collect();
+                    bits.push(format!("result={}", escape(&brief)));
+                }
+                bits.join(" · ")
+            }
+            "tool_start" | "tool_end" => {
+                let name = ev.get("name").and_then(|x| x.as_str()).unwrap_or("?");
+                let kind = ev.get("kind").and_then(|x| x.as_str()).unwrap_or("");
+                if kind.is_empty() {
+                    escape(name)
+                } else {
+                    format!("{} ({})", escape(name), escape(kind))
+                }
+            }
+            "done" => {
+                if let Some(res) = ev.get("result").and_then(|x| x.as_str()) {
+                    let brief: String = res.chars().take(80).collect();
+                    escape(&brief)
+                } else {
+                    String::new()
+                }
+            }
+            "error" => escape(ev.get("message").and_then(|x| x.as_str()).unwrap_or("error")),
+            _ => String::new(),
+        };
+        items.push(format!(
+            r#"<li><span class="pp-type">{}</span><span class="pp-detail">{}</span></li>"#,
+            escape(t),
+            detail
+        ));
+    }
+    if items.is_empty() {
+        return String::new();
+    }
+    format!(r#"<ul class="plan-process">{}</ul>"#, items.join(""))
 }
 
 fn urlencoding_path(s: &str) -> String {
@@ -2377,4 +2481,22 @@ fn escape_js_string(s: &str) -> String {
     }
     out.push('"');
     out
+}
+
+#[cfg(test)]
+mod plan_card_tests {
+    use super::{plan_result_card, LinkMode};
+
+    #[test]
+    fn plan_card_renders_process_events() {
+        let stdout = r#"{"status":"ok","cache":"hit","match":"exact","rounds":1,"workbook":"wb.mq.md","events":[{"type":"decision","decision":"REUSE","summary":"OKF hit"},{"type":"round","round":1,"workbook":"wb.mq.md","exit_code":0,"result":"pong"},{"type":"delta","text":"skip"},{"type":"done","result":"pong"}]}"#;
+        let html = plan_result_card(stdout, &LinkMode::Static { from: None });
+        assert!(html.contains("plan-card"), "{html}");
+        assert!(html.contains("cache=hit"), "{html}");
+        assert!(html.contains("match=exact"), "{html}");
+        assert!(html.contains("plan-process"), "{html}");
+        assert!(html.contains("REUSE"), "{html}");
+        assert!(html.contains("pp-type\">round"), "{html}");
+        assert!(!html.contains("pp-type\">delta"), "{html}");
+    }
 }

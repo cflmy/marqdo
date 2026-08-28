@@ -417,18 +417,18 @@ Truncate a tool result for `tool_end` events (~1KiB).
     + `result`=None
     + `stream`=False
 
-Publish `tool_start` / `tool_end` when `stream=True`.
+Always append `tool_start` / `tool_end` to `events` for audit / view process cards. SSE publish only when `stream=True`.
 
+*ev = > json.parse text={}*
+*ev = > json.set map=`ev` key="type" value=`type`*
+*ev = > json.set map=`ev` key="name" value=`name`*
+*ev = > json.set map=`ev` key="kind" value=`kind`*
+1. `result`
+  *ev = > json.set map=`ev` key="result" value=`result`*
+2. *
+  *_ = 1*
+*events = > json.append list=`events` item=`ev`*
 1. `stream`
-  *ev = > json.parse text={}*
-  *ev = > json.set map=`ev` key="type" value=`type`*
-  *ev = > json.set map=`ev` key="name" value=`name`*
-  *ev = > json.set map=`ev` key="kind" value=`kind`*
-  1. `result`
-    *ev = > json.set map=`ev` key="result" value=`result`*
-  2. *
-    *_ = 1*
-  *events = > json.append list=`events` item=`ev`*
   > sys.stream_publish event=`ev`
 2. *
   *_ = 1*
@@ -1221,23 +1221,23 @@ True when source still contains `worker.step` or `.单步`.
     + `stream`=False
     + `echo`=False
 
-Append a `round` event when `stream=True`. Optional `result` is the child `# main` return (for view Child cards). Optional `echo` prints a short TTY marker (not the full workbook path).
+Always append a `round` event (child workbook finished) for audit / view. Optional `result` is the child `# main` return. SSE + optional TTY `plan:round` only when `stream` / `echo`.
 
+*ev = > json.parse text={"type":"round"}*
+*ev = > json.set map=`ev` key="round" value=`round`*
+*ev = > json.set map=`ev` key="workbook" value=`workbook`*
+*ev = > json.set map=`ev` key="exit_code" value=`exit_code`*
+1. `result`
+  *ev = > json.set map=`ev` key="result" value=`result`*
+2. *
+  *_ = 1*
+*events = > json.append list=`events` item=`ev`*
 1. `stream`
-  *ev = > json.parse text={"type":"round"}*
-  *ev = > json.set map=`ev` key="round" value=`round`*
-  *ev = > json.set map=`ev` key="workbook" value=`workbook`*
-  *ev = > json.set map=`ev` key="exit_code" value=`exit_code`*
-  1. `result`
-    *ev = > json.set map=`ev` key="result" value=`result`*
-  2. *
-    *_ = 1*
-  *events = > json.append list=`events` item=`ev`*
   > sys.stream_publish event=`ev`
-  1. `echo`
-    > print text=plan:round
-  2. *
-    *_ = 1*
+2. *
+  *_ = 1*
+1. `echo`
+  > print text=plan:round
 2. *
   *_ = 1*
 
@@ -1249,14 +1249,16 @@ Append a `round` event when `stream=True`. Optional `result` is the child `# mai
     + `stream`=False
     + `summary`=None
 
+Always append a `decision` event. SSE publish only when `stream=True`.
+
+*ev = > json.parse text={"type":"decision"}*
+*ev = > json.set map=`ev` key="decision" value=`decision`*
+1. `summary`
+  *ev = > json.set map=`ev` key="summary" value=`summary`*
+2. *
+  *_ = 1*
+*events = > json.append list=`events` item=`ev`*
 1. `stream`
-  *ev = > json.parse text={"type":"decision"}*
-  *ev = > json.set map=`ev` key="decision" value=`decision`*
-  1. `summary`
-    *ev = > json.set map=`ev` key="summary" value=`summary`*
-  2. *
-    *_ = 1*
-  *events = > json.append list=`events` item=`ev`*
   > sys.stream_publish event=`ev`
 2. *
   *_ = 1*
@@ -1268,21 +1270,18 @@ Append a `round` event when `stream=True`. Optional `result` is the child `# mai
     + `from`
     + `stream`=False
 
-Bubble parent `complete stream=True` reasoning/deltas (and errors) into the plan event list. Skip nested `done` so plan owns the final `done`.
+Bubble parent `complete stream=True` reasoning/deltas (and errors) into the plan event list. Skip nested `done` so plan owns the final `done`. Always merge into `events` when present; `stream` reserved for callers that also SSE-publish upstream.
 
-1. `stream`
-  - [`ev`](`from`)
-    *t = > json.get value=`ev` key="type"*
-    1. `t` == delta
-      *events = > json.append list=`events` item=`ev`*
-    2. `t` == reasoning
-      *events = > json.append list=`events` item=`ev`*
-    3. `t` == error
-      *events = > json.append list=`events` item=`ev`*
-    4. *
-      *_ = 1*
-2. *
-  *_ = 1*
+- [`ev`](`from`)
+  *t = > json.get value=`ev` key="type"*
+  1. `t` == delta
+    *events = > json.append list=`events` item=`ev`*
+  2. `t` == reasoning
+    *events = > json.append list=`events` item=`ev`*
+  3. `t` == error
+    *events = > json.append list=`events` item=`ev`*
+  4. *
+    *_ = 1*
 
 **events**
 
@@ -1293,19 +1292,19 @@ Bubble parent `complete stream=True` reasoning/deltas (and errors) into the plan
     + `trace`=False
     + `result`=None
 
-When `stream=True`, append `done` and attach `events` on the result map. Optional `trace=True` writes the event list to writeback slot `trace`.
+Always append `done` and attach `events` on the result map (process audit even when not streaming). SSE publish of `done` only when `stream=True`. Optional `trace=True` writes the event list to writeback slot `trace`.
 
-1. `stream`
-  *ev = > json.parse text={"type":"done"}*
-  1. `result`
-    *ev = > json.set map=`ev` key="result" value=`result`*
-  2. *
-    *_ = 1*
-  *events = > json.append list=`events` item=`ev`*
-  > sys.stream_publish event=`ev`
-  *out = > json.set map=`out` key="events" value=`events`*
+*ev = > json.parse text={"type":"done"}*
+1. `result`
+  *ev = > json.set map=`ev` key="result" value=`result`*
 2. *
   *_ = 1*
+*events = > json.append list=`events` item=`ev`*
+1. `stream`
+  > sys.stream_publish event=`ev`
+2. *
+  *_ = 1*
+*out = > json.set map=`out` key="events" value=`events`*
 
 1. `trace`
   *body = > json.stringify value=`events`*
@@ -1462,7 +1461,7 @@ With `stream=True`, the model call uses SSE; `echo=True` prints delta text to st
 
 Multi-step with OKF agent-kb. Default workbook is `kb_dir/resources/<slug>.mq.md`. While task file count `< explore_n` and skill is not llm_free, force a new explore variant under `kb_dir/explore/<slug>/`. Code-first: llm_free hits skip parent LLM. File children return via `# main`; `plan` exposes that as `result`.
 
-Reuse lookup: exact → alias → canonicalize → optional local n-gram `near` when `near_match=True` and score ≥ `near_threshold`. Non-hit path: optional `soft_match=True` parent REUSE/NEW over ranked `agent_kb_near_match` candidates; else **decompose** before first child spawn (`DECISION: RUN` / `CONTINUE`+patch / solidified `DONE`). Then `await` → revise loop. With `stream=True`, emit parent `delta` / `decision` / `tool_start`/`tool_end` / `round` / `done` on `events`. `echo=True` prints `plan:decompose` / `plan:await` / deltas. `trace=True` writes events to writeback slot `trace`. Quiet child subtasks stay quiet.
+Reuse lookup: exact → alias → canonicalize → optional local n-gram `near` when `near_match=True` and score ≥ `near_threshold`. Non-hit path: optional `soft_match=True` parent REUSE/NEW over ranked `agent_kb_near_match` candidates; else **decompose** before first child spawn (`DECISION: RUN` / `CONTINUE`+patch / solidified `DONE`). Then `await` → revise loop. Process events (`decision` / `round` / `done` / tools) are **always** attached on the result map for audit and view process cards; `stream=True` additionally SSE-publishes them (and parent `delta`). `echo=True` prints `plan:decompose` / `plan:await` / deltas. `trace=True` writes events to writeback slot `trace`. Quiet child subtasks stay quiet.
 
 *tools = > json.get value=`self` key="tools"*
 *cache = "miss"*
@@ -1531,6 +1530,7 @@ Reuse lookup: exact → alias → canonicalize → optional local n-gram `near` 
         *out = > json.set map=`out` key="summary" value=`sum`*
         *out = > json.set map=`out` key="observation" value=`last_obs`*
         *out = > json.set map=`out` key="result" value=`child_val`*
+        *events = > plan_append_decision events=`events` decision="REUSE" stream=`stream` summary=`sum`*
         *events = > plan_append_round events=`events` round=1 workbook=`path` exit_code=`code` result=`child_val` stream=`stream` echo=`echo`*
         1. `writeback`
           *body = > json.stringify value=`out`*
@@ -1587,6 +1587,7 @@ Reuse lookup: exact → alias → canonicalize → optional local n-gram `near` 
           *out = > json.set map=`out` key="summary" value=`sum`*
           *out = > json.set map=`out` key="observation" value=`last_obs`*
           *out = > json.set map=`out` key="result" value=`child_val`*
+          *events = > plan_append_decision events=`events` decision="REUSE" stream=`stream` summary=`sum`*
           *events = > plan_append_round events=`events` round=1 workbook=`path` exit_code=`code` result=`child_val` stream=`stream` echo=`echo`*
           1. `writeback`
             *body = > json.stringify value=`out`*
@@ -1641,6 +1642,7 @@ Reuse lookup: exact → alias → canonicalize → optional local n-gram `near` 
                 *out = > json.set map=`out` key="workbook" value=`path`*
                 *out = > json.set map=`out` key="rounds" value=1*
                 *out = > json.set map=`out` key="cache" value="soft-hit"*
+                *out = > json.set map=`out` key="match" value="soft"*
                 *sk = > json.get value=`hit` key="skill"*
                 *out = > json.set map=`out` key="skill" value=`sk`*
                 *st = > json.get value=`hit` key="status"*
@@ -1649,6 +1651,7 @@ Reuse lookup: exact → alias → canonicalize → optional local n-gram `near` 
                 *out = > json.set map=`out` key="summary" value=`sum`*
                 *out = > json.set map=`out` key="observation" value=`last_obs`*
                 *out = > json.set map=`out` key="result" value=`child_val`*
+                *events = > plan_append_decision events=`events` decision="REUSE" stream=`stream` summary=`sum`*
                 *events = > plan_append_round events=`events` round=1 workbook=`path` exit_code=`code` result=`child_val` stream=`stream` echo=`echo`*
                 1. `writeback`
                   *body = > json.stringify value=`out`*

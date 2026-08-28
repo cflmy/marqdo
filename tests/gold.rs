@@ -2740,7 +2740,7 @@ fn ext_agent_kb_plan_hit() {
     assert!(status.success(), "failed to build marqdo_plugin_agent");
     assert_out(
         "tests/ext/agent-kb-plan-hit.mq.md",
-        "promoted\nlist-ok\nlist-free\nstable\nlist-desc\nhit\nexact\npong\nsum-exact\nsoft-hit\nnear\npong",
+        "promoted\nlist-ok\nlist-free\nstable\nlist-desc\nhit\nexact\npong\nsum-exact\nevents-ok\ndecision\nREUSE\nsoft-hit\nnear\npong",
     );
 }
 

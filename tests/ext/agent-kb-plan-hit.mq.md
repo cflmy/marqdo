@@ -30,6 +30,11 @@ import sys:lib/sys.mq.md
 *near_g = > json.get value=`paths` key="near"*
 *body = > json.get value=`paths` key="body"*
 
+1. > fs.exists path=`kb`
+  > fs.remove path=`kb`
+2. *
+  *_ = 1*
+
 > fs.write_text path=`wb` text=`body`
 
 *prom = > agent_kb_promote kb_dir=`kb` goal=`goal` workbook=`wb`*
@@ -77,6 +82,18 @@ import sys:lib/sys.mq.md
   > print text=sum-exact
 2. *
   > print text=sum-bad
+
+*evs = > json.get value=`out` key="events"*
+*en = > len value=`evs`*
+1. `en` > 2
+  > print text=events-ok
+2. *
+  > print text=events-bad
+*e0 = > at value=`evs` index=0*
+*t0 = > json.get value=`e0` key="type"*
+> print text=`t0`
+*d0 = > json.get value=`e0` key="decision"*
+> print text=`d0`
 
 *out2 = > `助手`.plan goal=`near_g` max_rounds=2 writeback=False kb_dir=`kb` explore_n=0 promote=False*
 *cache2 = > json.get value=`out2` key="cache"*
