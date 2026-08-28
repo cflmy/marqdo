@@ -2759,6 +2759,20 @@ fn ext_agent_context_budget_a3() {
 }
 
 #[test]
+fn ext_agent_tools_rag_a4() {
+    let status = Command::new("cargo")
+        .args(["build", "-p", "marqdo_plugin_agent"])
+        .current_dir(env!("CARGO_MANIFEST_DIR"))
+        .status()
+        .expect("build agent plugin");
+    assert!(status.success(), "failed to build marqdo_plugin_agent");
+    assert_out(
+        "tests/ext/agent-tools-rag-a4.mq.md",
+        "auth-ok\ncorpus-hit\ntop-refunds\nmcp-list-ok\nmcp-call-ok\nmcp-auth-ok\nparent-corpus-ok",
+    );
+}
+
+#[test]
 fn ext_agent_plan_observe() {
     assert_out(
         "tests/ext/agent-plan-observe.mq.md",

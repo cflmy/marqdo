@@ -103,6 +103,10 @@
 | `workbook_excerpt` | 结构摘录（默认观察同源） |
 | `lib_catalog` | 枚举 `lib/*.mq.md` 能力摘要 |
 | `scratch_tool_write` | 写入 `.marqdo/agent-runs/tools/<name>.mq.md` |
+| `corpus_search` | 本地语料关键词检索（RAG-lite；`ARGS.query` / `root`） |
+| `mcp_list_tools` / `mcp_call` | MCP 形 JSON fixture 列工具 / 调用（离线证据） |
+
+以上 **corpus / mcp** 返回一律带 `authority=workbook`：检索与外置工具只是证据，**可跑的 `.mq.md` 工作簿 / OKF 技能仍是权威真相**。
 
 ### 6.2 标准库与造工具
 

@@ -1,5 +1,6 @@
 //! Agent plugin (C ABI v2): layout helpers + session bag + context via host_query + agent-kb.
 
+mod corpus;
 mod kb;
 
 use std::collections::HashMap;
@@ -881,6 +882,8 @@ kb_ffi!(agent_kb_canonicalize, kb::kb_canonicalize, "agent_kb_canonicalize");
 kb_ffi!(agent_kb_lookup, kb::kb_lookup, "agent_kb_lookup");
 kb_ffi!(agent_kb_near_match, kb::kb_near_match, "agent_kb_near_match");
 kb_ffi!(agent_kb_list_tasks, kb::kb_list_tasks, "agent_kb_list_tasks");
+kb_ffi!(agent_corpus_search, corpus::corpus_search, "agent_corpus_search");
+kb_ffi!(agent_mcp_fixture, corpus::mcp_fixture, "agent_mcp_fixture");
 kb_ffi!(agent_kb_add_alias, kb::kb_add_alias, "agent_kb_add_alias");
 kb_ffi!(agent_kb_promote, kb::kb_promote, "agent_kb_promote");
 kb_ffi!(agent_kb_record_hit, kb::kb_record_hit, "agent_kb_record_hit");
@@ -976,6 +979,12 @@ pub unsafe extern "C" fn marqdo_plugin_init(host: *const MarqdoHostApi) -> c_int
         return 1;
     }
     if register(host, "agent_kb_list_tasks", "kb_dir", agent_kb_list_tasks) != 0 {
+        return 1;
+    }
+    if register(host, "agent_corpus_search", "query", agent_corpus_search) != 0 {
+        return 1;
+    }
+    if register(host, "agent_mcp_fixture", "action,fixture", agent_mcp_fixture) != 0 {
         return 1;
     }
     if register(host, "agent_kb_add_alias", "kb_dir,slug,alias", agent_kb_add_alias) != 0 {

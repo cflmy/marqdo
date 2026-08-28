@@ -3,6 +3,7 @@
 ## Unreleased
 
 ### Added
+- **`ext/agent` A4（RAG/MCP 证据工具）**: `corpus_search` 本地语料关键词检索；`mcp_list_tools` / `mcp_call` 读 JSON fixture；返回 `authority=workbook`。金样 `agent-tools-rag-a4`。
 - **`ext/agent` A3（上下文预算）**: `source_brief` / 加深版 `skill_brief`；`build_step_context` 默认截断并提示 `READ:source|skill`；`step` 支持最多 `max_reads` 次加深；父 `READ:skill`。金样 `agent-context-budget-a3`。
 - **`ext/agent` A2（过程可见）**: `plan` 过程事件默认写入返回 map 的 `events`（SSE 仍仅 `stream=True`）；OKF 命中记 `REUSE` decision；view plan 卡渲染过程时间线。对齐 [agent-streaming.md](doc/roadmap/agent-streaming.md)。
 - **`ext/agent` A1（OKF 复用飞轮）**: `agent_kb_list_tasks` 返回 description/aliases/status/llm_free/hits；`plan` 命中路径暴露 `match`/`score`（summary 含 match kind）；soft_match 策展提示带 status/llm_free/description；view plan 卡显示 match。金样 `agent-kb-plan-hit`。路线 [ext-agent-optimize.md](doc/roadmap/ext-agent-optimize.md)。

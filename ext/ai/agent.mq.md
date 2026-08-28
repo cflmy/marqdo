@@ -347,10 +347,44 @@ Drop `<!-- … -->` blocks (including marqdo-out bodies) so parent excerpts stay
 
 ## lib_catalog
 
-Callable dotted names (whitelist for `CALL:lib…`) plus static module file list for workbook imports.
+Callable dotted names (whitelist for `CALL:lib…`) plus static module file list for workbook imports. Parent also exposes evidence tools `corpus_search` / `mcp_list_tools` / `mcp_call` (not authority).
 
-*out = > json.parse text={"note":"Direct CALL:lib.<mod>.<fn> + optional ARGS:{json} for whitelist only. Or import via frontmatter > lib/<file>.mq.md then PATCH / scratch_tool_write.","files":["fs.mq.md","json.mq.md","subtask.mq.md","sys.mq.md","writeback.mq.md","text.mq.md","time.mq.md","math.mq.md","net.mq.md","table.mq.md","plugin.mq.md","foreign.mq.md"],"callable":[{"name":"lib.fs.read_text","desc":"Read UTF-8 text file"},{"name":"lib.fs.exists","desc":"Path exists?"},{"name":"lib.fs.list_dir","desc":"List directory entries"},{"name":"lib.json.parse","desc":"Parse JSON text"},{"name":"lib.json.stringify","desc":"Serialize JSON"},{"name":"lib.sys.cwd","desc":"Process working directory"}]}*
+*out = > json.parse text={"note":"Direct CALL:lib.<mod>.<fn> + optional ARGS:{json} for whitelist only. Or import via frontmatter > lib/<file>.mq.md then PATCH / scratch_tool_write. Evidence tools: CALL:corpus_search | mcp_list_tools | mcp_call (fixture RAG/MCP) — workbook .mq.md remains authority.","files":["fs.mq.md","json.mq.md","subtask.mq.md","sys.mq.md","writeback.mq.md","text.mq.md","time.mq.md","math.mq.md","net.mq.md","table.mq.md","plugin.mq.md","foreign.mq.md"],"callable":[{"name":"lib.fs.read_text","desc":"Read UTF-8 text file"},{"name":"lib.fs.exists","desc":"Path exists?"},{"name":"lib.fs.list_dir","desc":"List directory entries"},{"name":"lib.json.parse","desc":"Parse JSON text"},{"name":"lib.json.stringify","desc":"Serialize JSON"},{"name":"lib.sys.cwd","desc":"Process working directory"},{"name":"corpus_search","desc":"Local markdown/text keyword search (evidence)"},{"name":"mcp_list_tools","desc":"List tools from MCP JSON fixture"},{"name":"mcp_call","desc":"Call a tool from MCP JSON fixture"}]}*
 **out**
+
+---
+
+## corpus_search
+    + `query`
+    + `root`=.marqdo/agent-corpus
+    + `limit`=6
+
+Local keyword search over `.md` / `.mq.md` / `.txt` under `root`. Returns ranked excerpts. **Evidence only** — runnable workbook / OKF skill stays authority (`authority=workbook`).
+
+**> agent_corpus_search query=`query` root=`root` limit=`limit`**
+
+---
+
+## mcp_list_tools
+    + `fixture`
+
+List tools from an offline MCP-shaped JSON fixture (`tools` array). Evidence only.
+
+**> agent_mcp_fixture action="list" fixture=`fixture`**
+
+---
+
+## mcp_call
+    + `name`
+    + `fixture`
+    + `arguments`=None
+
+Call a named tool from a MCP-shaped fixture (`results` / `calls` map). Optional `arguments` echoed; fixture results are keyed by name. Evidence only.
+
+1. `arguments`
+  **> agent_mcp_fixture action="call" fixture=`fixture` name=`name` arguments=`arguments`**
+2. *
+  **> agent_mcp_fixture action="call" fixture=`fixture` name=`name`**
 
 ---
 
@@ -693,7 +727,48 @@ Parent Plan-and-Move tools (helpers + whitelist `CALL:lib…`).
       **> json.get value=`errs` key="a"**
   2. *
     **> json.get value=`errs` key="b"**
-5. *
+5. `name` == corpus_search
+  *args = > extract_call_args reply=`reply`*
+  *q = > json.get value=`args` key="query"*
+  *root = > json.get value=`args` key="root"*
+  *limit = > json.get value=`args` key="limit"*
+  *cerrs = > json.parse text={"q":"corpus_search needs ARGS.query"}*
+  1. not `q`
+    **> json.get value=`cerrs` key="q"**
+  2. `root`
+    1. `limit`
+      **> corpus_search query=`q` root=`root` limit=`limit`**
+    2. *
+      **> corpus_search query=`q` root=`root`**
+  3. `limit`
+    **> corpus_search query=`q` limit=`limit`**
+  4. *
+    **> corpus_search query=`q`**
+6. `name` == mcp_list_tools
+  *args = > extract_call_args reply=`reply`*
+  *fx = > json.get value=`args` key="fixture"*
+  *merrs = > json.parse text={"f":"mcp_list_tools needs ARGS.fixture"}*
+  1. `fx`
+    **> mcp_list_tools fixture=`fx`**
+  2. *
+    **> json.get value=`merrs` key="f"**
+7. `name` == mcp_call
+  *args = > extract_call_args reply=`reply`*
+  *fx = > json.get value=`args` key="fixture"*
+  *tn = > json.get value=`args` key="name"*
+  *targ = > json.get value=`args` key="arguments"*
+  *xerrs = > json.parse text={"f":"mcp_call needs ARGS.fixture","n":"mcp_call needs ARGS.name"}*
+  1. `fx`
+    1. `tn`
+      1. `targ`
+        **> mcp_call name=`tn` fixture=`fx` arguments=`targ`**
+      2. *
+        **> mcp_call name=`tn` fixture=`fx`**
+    2. *
+      **> json.get value=`xerrs` key="n"**
+  2. *
+    **> json.get value=`xerrs` key="f"**
+8. *
   *dots = > split value=`name` sep=".*"*
   *head = > at value=`dots` index=0*
   1. `head` == lib
@@ -1113,7 +1188,7 @@ Parent Plan-and-Move prompt. Short protocol only — no long monologues.
 *compact = > compact_plan_observation observation=`observation`*
 *obs_s = > json.stringify value=`compact`*
 *goal_s = > json.stringify value=`goal`*
-*esc = > json.parse text={"a":"\n\n--- standing ---\n","b":"\n\n--- goal ---\n","c":"\n\n--- observation ---\n","d":"\n\n--- skill brief ---\n","tools":"\n\n--- parent tools ---\nCALL:workbook_read | workbook_excerpt | lib_catalog | scratch_tool_write\nCALL:lib.fs.read_text|exists|list_dir | lib.json.parse|stringify | lib.sys.cwd (+ ARGS:{json})\nREAD:source | stderr | stdout | slots | skill\nCreate tools: CONTINUE PATCH add ##, or CALL:scratch_tool_write with NAME line and fenced body.\n","e_rev":"\n\n--- how to act ---\nPlan-and-Move parent. Reply with ONE protocol only (no long reasoning). Exactly one DECISION line.\n1) exit_code=0 and has_value → DECISION: DONE + one-line SUMMARY. solidify_on_done. Do not CONTINUE just because has_worker_step.\n2) Need more evidence → READ:kind or CALL:tool (then you will be re-prompted).\n3) Failure / wrong value → DECISION: CONTINUE + short PATCH (<20 lines). Never paste user prose into REPLACE.\n4) Do NOT CONTINUE only to rewrite frontmatter imports; skeleton already uses import llm:/agent:/json:….\nPATCH must use triple-angle blocks only:\n<<<\nFIND\n<exact old>\n===\nREPLACE\n<new>\n>>>\nDo not use \u0060\u0060\u0060find, \u0060\u0060\u0060replace, or *** Begin Patch ***.\nProtocols:\nCALL:name\nREAD:kind\nDECISION: DONE\nSUMMARY: one line\nDECISION: CONTINUE\n","e_dec":"\n\n--- how to act ---\nPRE-RUN decompose. Reply with ONE protocol only (no long reasoning). Exactly one DECISION line.\n1) Skeleton OK → DECISION: RUN (preferred). Do not rewrite imports; they are already import llm:/agent:/….\n2) Need evidence → READ:source or READ:skill or CALL:workbook_read / lib_catalog.\n3) Reshape body/logic only → DECISION: CONTINUE + short PATCH (<20 lines).\n4) Fixed answer without LLM → PATCH to return, then RUN or DONE.\nPATCH must use <<< FIND === REPLACE >>> only (no \u0060\u0060\u0060find / Begin Patch).\nProtocols:\nCALL:name\nREAD:kind\nDECISION: RUN\nDECISION: DONE\nSUMMARY: one line\nDECISION: CONTINUE\n","f":"\n\n--- explore ---\n"}*
+*esc = > json.parse text={"a":"\n\n--- standing ---\n","b":"\n\n--- goal ---\n","c":"\n\n--- observation ---\n","d":"\n\n--- skill brief ---\n","tools":"\n\n--- parent tools ---\nCALL:workbook_read | workbook_excerpt | lib_catalog | scratch_tool_write\nCALL:corpus_search | mcp_list_tools | mcp_call  (ARGS:{…}; evidence only — workbook authority)\nCALL:lib.fs.read_text|exists|list_dir | lib.json.parse|stringify | lib.sys.cwd (+ ARGS:{json})\nREAD:source | stderr | stdout | slots | skill\nCreate tools: CONTINUE PATCH add ##, or CALL:scratch_tool_write with NAME line and fenced body.\n","e_rev":"\n\n--- how to act ---\nPlan-and-Move parent. Reply with ONE protocol only (no long reasoning). Exactly one DECISION line.\n1) exit_code=0 and has_value → DECISION: DONE + one-line SUMMARY. solidify_on_done. Do not CONTINUE just because has_worker_step.\n2) Need more evidence → READ:kind or CALL:tool (then you will be re-prompted).\n3) Failure / wrong value → DECISION: CONTINUE + short PATCH (<20 lines). Never paste user prose into REPLACE.\n4) Do NOT CONTINUE only to rewrite frontmatter imports; skeleton already uses import llm:/agent:/json:….\nPATCH must use triple-angle blocks only:\n<<<\nFIND\n<exact old>\n===\nREPLACE\n<new>\n>>>\nDo not use \u0060\u0060\u0060find, \u0060\u0060\u0060replace, or *** Begin Patch ***.\nProtocols:\nCALL:name\nREAD:kind\nDECISION: DONE\nSUMMARY: one line\nDECISION: CONTINUE\n","e_dec":"\n\n--- how to act ---\nPRE-RUN decompose. Reply with ONE protocol only (no long reasoning). Exactly one DECISION line.\n1) Skeleton OK → DECISION: RUN (preferred). Do not rewrite imports; they are already import llm:/agent:/….\n2) Need evidence → READ:source or READ:skill or CALL:workbook_read / lib_catalog / corpus_search / mcp_call.\n3) Reshape body/logic only → DECISION: CONTINUE + short PATCH (<20 lines).\n4) Fixed answer without LLM → PATCH to return, then RUN or DONE.\nPATCH must use <<< FIND === REPLACE >>> only (no \u0060\u0060\u0060find / Begin Patch).\nProtocols:\nCALL:name\nREAD:kind\nDECISION: RUN\nDECISION: DONE\nSUMMARY: one line\nDECISION: CONTINUE\n","f":"\n\n--- explore ---\n"}*
 *a = > json.get value=`esc` key="a"*
 *b = > json.get value=`esc` key="b"*
 *c = > json.get value=`esc` key="c"*

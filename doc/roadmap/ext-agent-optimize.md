@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| 状态 | **进行中 · A0–A3 完成**（A3：step/plan 源码·Skill 预算 + READ 渐进披露） |
+| 状态 | **A0–A4 完成**（调研驱动优化闭环；A4：corpus/MCP 证据工具，权威仍是 `.mq.md`） |
 | 日期 | 2026-08-28 |
 | 调研 | [agent-frameworks-and-marqdo.md](../research/agent-frameworks-and-marqdo.md) |
 | 设计 | [ext-agent.md](../design/ext-agent.md) · [ext-agent-plan.md](../design/ext-agent-plan.md) · [ext-agent-parent.md](../design/ext-agent-parent.md) · [okf.md](../design/okf.md) |
@@ -28,6 +28,6 @@
 | **A1** | OKF 复用飞轮（lookup / near / soft_match UX） | **done** — `list_tasks` 含 description/aliases/status/llm_free/hits；`plan` 命中路径暴露 `match`/`score`；soft_match 策展行含 meta；view plan 卡显示 match；金样 `agent-kb-plan-hit`（exact hit + near soft-hit） |
 | **A2** | 过程可见（stream + view 过程卡） | **done** — `plan_append_*` / `plan_finish_stream` 始终写入 `events`（SSE 仍仅 `stream=True`）；OKF REUSE 记 `decision`；view `plan-card` 渲染过程时间线（跳过 delta）；金样断言 `events-ok`；对齐 [agent-streaming.md](agent-streaming.md) |
 | **A3** | 上下文预算（源码/Skill 渐进披露） | **done** — `source_brief` / 加深 `skill_brief`；`build_step_context` 默认预算 + `READ:source|skill`；`step max_reads`；父 `READ:skill`；金样 `agent-context-budget-a3` |
-| **A4** | 可选：RAG/MCP 工具适配器 | 金样调用外置检索，权威仍是 `.mq.md` |
+| **A4** | 可选：RAG/MCP 工具适配器 | **done** — `corpus_search`（本地语料关键词）；`mcp_list_tools` / `mcp_call`（JSON fixture）；`authority=workbook`；金样 `agent-tools-rag-a4` |
 
 细节与行业对照以调研正文为准；本文件只跟踪实现分期。
