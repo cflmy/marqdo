@@ -3,7 +3,10 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
-cargo build --release
+
+# CLI + native plugins used by public demos (ext/quantum).
+cargo build --release -p marqdo -p marqdo_plugin_quantum
+
 BIN=./target/release/marqdo
 while IFS= read -r -d '' f; do
   if grep -q '^# main' "$f"; then
@@ -13,4 +16,5 @@ while IFS= read -r -d '' f; do
     echo "- skip (no # main): $f"
   fi
 done < <(find public -name '*.mq.md' -print0)
+
 "$BIN" view output public -o public
