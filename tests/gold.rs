@@ -1543,6 +1543,219 @@ custom-ok",
 }
 
 #[test]
+fn ext_web_middleware_smoke() {
+    let status = Command::new("cargo")
+        .args(["build", "-p", "marqdo_plugin_web"])
+        .current_dir(env!("CARGO_MANIFEST_DIR"))
+        .status()
+        .expect("build web plugin");
+    assert!(status.success(), "failed to build marqdo_plugin_web");
+    assert_out(
+        "tests/ext/web-middleware-smoke.mq.md",
+        "cors-origin-ok
+cors-method-ok
+cors-expose-ok
+cors-cred-ok
+security-frame-ok
+security-csp-ok
+compress-ok
+body-limit-ok
+json-get-ok
+json-table-ok
+json-order-ok
+json-limit-ok
+json-post-ok",
+    );
+}
+
+#[test]
+fn ext_web_middleware_live() {
+    // Boots a real HTTP server and verifies CORS / security headers /
+    // gzip / JSON API / body limit over the wire.
+    let status = Command::new("cargo")
+        .args(["build", "-p", "marqdo_plugin_web"])
+        .current_dir(env!("CARGO_MANIFEST_DIR"))
+        .status()
+        .expect("build web plugin");
+    assert!(status.success(), "failed to build marqdo_plugin_web");
+
+    let script = "tests/ext/web-middleware-live-server.mq.md";
+    let bin = env!("CARGO_BIN_EXE_marqdo");
+    let mut child = Command::new(bin)
+        .args(["run", script])
+        .current_dir(env!("CARGO_MANIFEST_DIR"))
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("spawn live server");
+
+    // Wait for the listener to accept connections (up to ~10s).
+    let base = "http://127.0.0.1:18099";
+    let ready = std::time::Instant::now();
+    loop {
+        if ready.elapsed().as_secs() > 10 {
+            let _ = child.kill();
+            panic!("live server did not start in time");
+        }
+        let out = Command::new("curl")
+            .args(["-s", "-o", "/dev/null", "-w", "%{http_code}", &format!("{base}/")])
+            .output()
+            .expect("curl probe");
+        if String::from_utf8_lossy(&out.stdout) == "200" {
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(300));
+    }
+
+    let code = |args: &[&str]| {
+        Command::new("curl")
+            .args(args)
+            .output()
+            .expect("curl")
+    };
+
+    // JSON API: rows are served as application/json.
+    let out = code(&["-s", &format!("{base}/api/posts")]);
+    let body = String::from_utf8_lossy(&out.stdout);
+    assert!(
+        body.contains("\"title\":\"Hello\"") && body.contains("\"rows\""),
+        "json api body={body}"
+    );
+
+    // CORS on the JSON endpoint (matching origin → allow headers).
+    let out = code(&[
+        "-s", "-D", "-", "-o", "/dev/null", &format!("{base}/api/posts"),
+        "-H", "Origin: https://a.example",
+    ]);
+    let headers = String::from_utf8_lossy(&out.stdout);
+    assert!(
+        headers.contains("access-control-allow-origin: https://a.example"),
+        "cors allow-origin headers={headers}"
+    );
+    assert!(
+        headers.contains("access-control-allow-credentials: true"),
+        "cors credentials headers={headers}"
+    );
+    assert!(
+        headers.contains("access-control-expose-headers: x-total"),
+        "cors expose headers={headers}"
+    );
+
+    // OPTIONS preflight.
+    let out = code(&[
+        "-s", "-D", "-", "-o", "/dev/null", "-X", "OPTIONS",
+        &format!("{base}/api/posts"),
+        "-H", "Origin: https://a.example",
+        "-H", "Access-Control-Request-Method: GET",
+    ]);
+    let headers = String::from_utf8_lossy(&out.stdout);
+    assert!(
+        headers.contains("access-control-allow-methods: GET"),
+        "cors preflight headers={headers}"
+    );
+    assert!(
+        headers.contains("access-control-allow-origin"),
+        "cors preflight origin headers={headers}"
+    );
+
+    // Security response headers on a page render.
+    let out = code(&["-s", "-D", "-", "-o", "/dev/null", &format!("{base}/")]);
+    let headers = String::from_utf8_lossy(&out.stdout);
+    assert!(
+        headers.contains("x-frame-options: DENY"),
+        "security headers={headers}"
+    );
+    assert!(
+        headers.contains("x-content-type-options: nosniff"),
+        "security headers={headers}"
+    );
+
+    // gzip compression.
+    let out = code(&[
+        "-s", "-D", "-", "-o", "/dev/null", &format!("{base}/api/posts"),
+        "-H", "Accept-Encoding: gzip",
+    ]);
+    let headers = String::from_utf8_lossy(&out.stdout);
+    assert!(
+        headers.contains("content-encoding: gzip"),
+        "gzip headers={headers}"
+    );
+
+    // Body limit: small POST ok, large POST → 413.
+    let out = code(&[
+        "-s", "-o", "/dev/null", "-w", "%{http_code}", "-X", "POST",
+        &format!("{base}/api/publish"), "-H", "Content-Type: application/json",
+        "-d", r#"{"title":"t1","body":"b1"}"#,
+    ]);
+    assert_eq!(
+        String::from_utf8_lossy(&out.stdout).trim(),
+        "200",
+        "small POST should pass body limit"
+    );
+    let big = "x".repeat(2000);
+    let out = code(&[
+        "-s", "-o", "/dev/null", "-w", "%{http_code}", "-X", "POST",
+        &format!("{base}/api/publish"), "-H", "Content-Type: application/json",
+        "-d", &big,
+    ]);
+    assert_eq!(
+        String::from_utf8_lossy(&out.stdout).trim(),
+        "413",
+        "large POST should exceed body limit"
+    );
+
+    let _ = child.kill();
+    let _ = child.wait();
+}
+
+#[test]
+fn ext_web_security_smoke() {
+    let status = Command::new("cargo")
+        .args(["build", "-p", "marqdo_plugin_web"])
+        .current_dir(env!("CARGO_MANIFEST_DIR"))
+        .status()
+        .expect("build web plugin");
+    assert!(status.success(), "failed to build marqdo_plugin_web");
+    assert_out(
+        "tests/ext/web-security-smoke.mq.md",
+        "hash-ok
+auth-login-ok
+auth-bad-reject-ok",
+    );
+}
+
+#[test]
+fn ext_web_db_w2_smoke() {
+    // W2 data layer: transactions, connection pooling, pagination, query
+    // expressiveness (IN/BETWEEN/OR), and row counting.
+    let status = Command::new("cargo")
+        .args(["build", "-p", "marqdo_plugin_web"])
+        .current_dir(env!("CARGO_MANIFEST_DIR"))
+        .status()
+        .expect("build web plugin");
+    assert!(status.success(), "failed to build marqdo_plugin_web");
+
+    let db = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/ext/web-fixtures/data/w2-smoke.db");
+    for suffix in ["", "-wal", "-shm"] {
+        let _ = std::fs::remove_file(format!("{}{}", db.display(), suffix));
+    }
+    assert_out(
+        "tests/ext/web-db-w2-smoke.mq.md",
+        "count-ok
+count-where-ok
+page-ok
+page2-ok
+in-ok
+between-ok
+or-ok
+query-ok
+txn-commit-ok
+txn-rollback-ok",
+    );
+}
+
+#[test]
 fn ext_quantum_bell_smoke() {
     let status = Command::new("cargo")
         .args(["build", "-p", "marqdo_plugin_quantum"])

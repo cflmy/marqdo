@@ -188,7 +188,7 @@ fn select_page_data(
     }
     let order = args.get("order").and_then(|v| v.as_str());
     if order.is_some_and(|s| !s.trim().is_empty()) {
-        db::select_order(url, table, limit, where_v.as_ref(), order)
+        db::select_order(url, table, limit, where_v.as_ref(), order, None, None)
     } else {
         db::select(url, table, limit, where_v.as_ref())
     }
@@ -321,8 +321,8 @@ a:hover { color:var(--accent); }
 .article-code { background:#f5f5f4; border:1px solid var(--line); border-radius:6px; padding:1rem; overflow-x:auto; font-size:.9rem; }
 "#;
 
-pub fn render_page(args: &Value, db_url: Option<&str>) -> String {
-    render_page_ex(args, db_url, None, None)
+pub fn render_page(args: &Value, db_url: Option<&str>, csrf: Option<&str>) -> String {
+    render_page_ex(args, db_url, None, None, csrf)
 }
 
 /// Like `render_page`, optionally replaying form POST data/errors into the embedded form.
@@ -331,6 +331,7 @@ pub fn render_page_ex(
     db_url: Option<&str>,
     form_data: Option<&Value>,
     form_errors: Option<&Value>,
+    csrf: Option<&str>,
 ) -> String {
     let title = args
         .get("title")
@@ -372,6 +373,7 @@ pub fn render_page_ex(
             form_id,
             form_data,
             form_errors,
+            csrf,
         ));
     }
     if !items.is_empty() {
@@ -466,7 +468,7 @@ pub fn render_fragment(args: &Value, db_url: Option<&str>) -> String {
                     .get("form_id")
                     .and_then(|v| v.as_str())
                     .unwrap_or("form");
-                body.push_str(&crate::form::render_body(form, form_id, None, None));
+                body.push_str(&crate::form::render_body(form, form_id, None, None, None));
             }
             if !items.is_empty() {
                 let is_detail = args

@@ -4,6 +4,9 @@ mod compose;
 mod db;
 mod form;
 mod http;
+mod middleware;
+mod password;
+mod rate_limit;
 mod render;
 mod session;
 mod table;
@@ -355,7 +358,7 @@ web_ffi!(web_compose_form, |args: &Value| {
 web_ffi!(web_render, |args: &Value| {
     let page = args.get("page").cloned().unwrap_or_else(|| args.clone());
     let db_url = db_url_of(args).ok();
-    let html = render::render_page(&page, db_url.as_deref());
+    let html = render::render_page(&page, db_url.as_deref(), None);
     Ok(Value::String(html))
 });
 
@@ -381,7 +384,8 @@ web_ffi!(web_db_insert, |args: &Value| {
         .or_else(|| args.get("row"))
         .cloned()
         .unwrap_or(json!([]));
-    db::insert(&url, &table, &rows)
+    let txn = args.get("txn").and_then(|v| v.as_str());
+    db::insert(&url, &table, &rows, txn)
 });
 
 web_ffi!(web_db_select, |args: &Value| {
@@ -403,18 +407,51 @@ web_ffi!(web_db_select, |args: &Value| {
         Some(v) => Some(v),
     };
     let order = args.get("order").and_then(|v| v.as_str());
-    if order.is_some_and(|s| !s.trim().is_empty()) {
-        db::select_order(&url, &table, limit, where_v, order)
-    } else {
-        db::select(&url, &table, limit, where_v)
-    }
+    let offset = args
+        .get("offset")
+        .or_else(|| args.get("跳过"))
+        .and_then(|v| v.as_i64());
+    let txn = args.get("txn").and_then(|v| v.as_str());
+    db::select_order(&url, &table, limit, where_v, order, offset, txn)
+});
+
+web_ffi!(web_db_query, |args: &Value| {
+    let url = db_url_of(args)?;
+    let sql = arg_str(args, "sql")?.to_string();
+    let args_v = args.get("args");
+    let txn = args.get("txn").and_then(|v| v.as_str());
+    db::query(&url, &sql, args_v, txn)
+});
+
+web_ffi!(web_db_count, |args: &Value| {
+    let url = db_url_of(args)?;
+    let table = arg_str(args, "table")?.to_string();
+    let where_v = args.get("where").filter(|v| !v.is_null());
+    let txn = args.get("txn").and_then(|v| v.as_str());
+    db::count(&url, &table, where_v, txn)
+});
+
+web_ffi!(web_db_begin, |args: &Value| {
+    let url = db_url_of(args)?;
+    db::begin(&url)
+});
+
+web_ffi!(web_db_commit, |args: &Value| {
+    let txn = arg_str(args, "txn")?.to_string();
+    db::commit(&txn)
+});
+
+web_ffi!(web_db_rollback, |args: &Value| {
+    let txn = arg_str(args, "txn")?.to_string();
+    db::rollback(&txn)
 });
 
 web_ffi!(web_db_get, |args: &Value| {
     let url = db_url_of(args)?;
     let table = arg_str(args, "table")?.to_string();
     let id = arg_text(args, "id")?;
-    db::get(&url, &table, &id)
+    let txn = args.get("txn").and_then(|v| v.as_str());
+    db::get(&url, &table, &id, txn)
 });
 
 web_ffi!(web_db_update, |args: &Value| {
@@ -422,21 +459,24 @@ web_ffi!(web_db_update, |args: &Value| {
     let table = arg_str(args, "table")?.to_string();
     let id = arg_text(args, "id")?;
     let row = args.get("row").cloned().unwrap_or(json!({}));
-    db::update(&url, &table, &id, &row)
+    let txn = args.get("txn").and_then(|v| v.as_str());
+    db::update(&url, &table, &id, &row, txn)
 });
 
 web_ffi!(web_db_delete, |args: &Value| {
     let url = db_url_of(args)?;
     let table = arg_str(args, "table")?.to_string();
     let id = arg_text(args, "id")?;
-    db::delete(&url, &table, &id)
+    let txn = args.get("txn").and_then(|v| v.as_str());
+    db::delete(&url, &table, &id, txn)
 });
 
 web_ffi!(web_db_exec, |args: &Value| {
     let url = db_url_of(args)?;
     let sql = arg_str(args, "sql")?.to_string();
     let args_v = args.get("args");
-    db::exec(&url, &sql, args_v)
+    let txn = args.get("txn").and_then(|v| v.as_str());
+    db::exec(&url, &sql, args_v, txn)
 });
 
 web_ffi!(web_db_list_tables, |args: &Value| {
@@ -597,6 +637,10 @@ web_ffi!(web_auth_logout, |args: &Value| {
     session::abi_auth_logout(args)
 });
 
+web_ffi!(web_password_hash, |args: &Value| {
+    session::abi_password_hash(args)
+});
+
 web_ffi!(web_auth_new, |args: &Value| {
     let users = args.get("users").cloned().unwrap_or(Value::Null);
     let session_ttl = args
@@ -667,6 +711,69 @@ web_ffi!(web_app_static, |args: &Value| {
     Ok(app)
 });
 
+// Configure cross-cutting HTTP middleware on an app: CORS, security response
+// headers, gzip compression, request-body limits, and JSON API routes.
+//
+// Every capability is passed in as *data* (GFM tables from the Marqdo side,
+// normalized here into the `middleware` map): 配置即数据、装配即函数.
+//
+// - `cors`       : `|允许来源|方法|头|暴露头|凭证|` table (one row per origin).
+// - `security`   : `|头|值|` table of response headers (e.g. `X-Frame-Options`).
+// - `compress`   : bool — enable gzip response compression.
+// - `body_limit` : number — max request body bytes (e.g. `1048576`).
+// - `json_routes`: `|路径|方法|表|条件|排序|上限|` table of JSON API endpoints
+//                  backed by db queries (method GET/POST, `表`=table name).
+web_ffi!(web_app_middleware, |args: &Value| {
+    let mut app = args.get("app").cloned().unwrap_or(json!({}));
+    let obj = app
+        .as_object_mut()
+        .ok_or_else(|| "app must be a map".to_string())?;
+    let mw = obj
+        .entry("middleware".to_string())
+        .or_insert_with(|| json!({}));
+    let m = mw
+        .as_object_mut()
+        .ok_or_else(|| "app.middleware must be a map".to_string())?;
+
+    if let Some(cors) = args.get("cors") {
+        m.insert(
+            "cors".into(),
+            middleware::cors_from_table(cors),
+        );
+    }
+    if let Some(security) = args.get("security") {
+        m.insert(
+            "security".into(),
+            middleware::security_from_table(security),
+        );
+    }
+    if let Some(compress) = args.get("compress") {
+        let on = match compress {
+            Value::Bool(b) => *b,
+            Value::String(s) => matches!(s.as_str(), "true" | "True" | "1" | "yes" | "on"),
+            Value::Number(n) => n.as_i64().unwrap_or(0) != 0,
+            _ => false,
+        };
+        m.insert("compress".into(), json!(on));
+    }
+    if let Some(bl) = args.get("body_limit") {
+        let n = bl
+            .as_u64()
+            .or_else(|| bl.as_i64().map(|i| i as u64))
+            .unwrap_or(0);
+        if n > 0 {
+            m.insert("body_limit".into(), json!(n));
+        }
+    }
+    if let Some(routes) = args.get("json_routes") {
+        m.insert(
+            "json_routes".into(),
+            middleware::json_routes_from_table(routes),
+        );
+    }
+    Ok(app)
+});
+
 web_ffi!(web_form_new, |args: &Value| {
     let table = arg_str_opt(args, "table");
     let action = arg_str_opt(args, "action").unwrap_or("insert");
@@ -712,6 +819,7 @@ web_ffi!(web_form_render, |args: &Value| {
         id,
         data,
         errors,
+        arg_str_opt(args, "csrf"),
     )))
 });
 
@@ -770,6 +878,8 @@ web_ffi!(web_listen, |args: &Value| {
         auth_users,
         session_ttl,
         ws_routes,
+        middleware,
+        cookie_secure,
     ) = if args.get("page").is_some() || args.get("host").is_some() {
         let page = args.get("page").cloned().unwrap_or(json!({}));
         let db_url = db_url_of(args).ok();
@@ -795,6 +905,10 @@ web_ffi!(web_listen, |args: &Value| {
             .get("session_ttl")
             .and_then(|v| v.as_u64().or_else(|| v.as_i64().map(|i| i as u64)))
             .unwrap_or(3600);
+        let cookie_secure = args
+            .get("cookie_secure")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
         (
             page,
             db_url,
@@ -808,6 +922,8 @@ web_ffi!(web_listen, |args: &Value| {
             auth_users,
             session_ttl,
             HashMap::new(),
+            middleware::Middleware::default(),
+            cookie_secure,
         )
     } else {
         let app = args.get("app").cloned().unwrap_or_else(|| args.clone());
@@ -887,6 +1003,15 @@ web_ffi!(web_listen, |args: &Value| {
                     .unwrap_or(3600),
             ),
         };
+        let middleware = middleware::parse(&app);
+        let mw_summary = middleware::summary(&app);
+        if !mw_summary.is_empty() {
+            eprintln!("marqdo web middleware: {mw_summary}");
+        }
+        let cookie_secure = app
+            .get("cookie_secure")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
         (
             page,
             db_url,
@@ -900,6 +1025,8 @@ web_ffi!(web_listen, |args: &Value| {
             auth_users,
             session_ttl,
             ws_routes,
+            middleware,
+            cookie_secure,
         )
     };
     let static_dir = static_dir.map(|p| {
@@ -921,7 +1048,9 @@ web_ffi!(web_listen, |args: &Value| {
         &static_mount,
         auth_users,
         session_ttl,
+        cookie_secure,
         ws_routes,
+        &middleware,
     )
 });
 
@@ -1003,16 +1132,29 @@ pub unsafe extern "C" fn marqdo_plugin_init(host: *const MarqdoHostApi) -> c_int
         ("web_render", "page", web_render as PluginFn),
         ("web_db_new", "url", web_db_new as PluginFn),
         ("web_db_init", "url,name,fields", web_db_init as PluginFn),
-        ("web_db_insert", "url,table,rows", web_db_insert as PluginFn),
+        ("web_db_insert", "url,table,rows,txn", web_db_insert as PluginFn),
         (
             "web_db_select",
-            "url,table,where,limit,order",
+            "url,table,where,limit,order,offset,txn",
             web_db_select as PluginFn,
         ),
-        ("web_db_get", "url,table,id", web_db_get as PluginFn),
-        ("web_db_update", "url,table,id,row", web_db_update as PluginFn),
-        ("web_db_delete", "url,table,id", web_db_delete as PluginFn),
-        ("web_db_exec", "url,sql,args", web_db_exec as PluginFn),
+        (
+            "web_db_query",
+            "url,sql,args,txn",
+            web_db_query as PluginFn,
+        ),
+        (
+            "web_db_count",
+            "url,table,where,txn",
+            web_db_count as PluginFn,
+        ),
+        ("web_db_begin", "url", web_db_begin as PluginFn),
+        ("web_db_commit", "txn", web_db_commit as PluginFn),
+        ("web_db_rollback", "txn", web_db_rollback as PluginFn),
+        ("web_db_get", "url,table,id,txn", web_db_get as PluginFn),
+        ("web_db_update", "url,table,id,row,txn", web_db_update as PluginFn),
+        ("web_db_delete", "url,table,id,txn", web_db_delete as PluginFn),
+        ("web_db_exec", "url,sql,args,txn", web_db_exec as PluginFn),
         ("web_db_list_tables", "url", web_db_list_tables as PluginFn),
         (
             "web_app_new",
@@ -1029,6 +1171,11 @@ pub unsafe extern "C" fn marqdo_plugin_init(host: *const MarqdoHostApi) -> c_int
             "web_app_static",
             "app,dir,mount",
             web_app_static as PluginFn,
+        ),
+        (
+            "web_app_middleware",
+            "app,cors,security,compress,body_limit,json_routes",
+            web_app_middleware as PluginFn,
         ),
         ("web_form_new", "table,action,id", web_form_new as PluginFn),
         ("web_form_fields", "form,fields", web_form_fields as PluginFn),
@@ -1058,6 +1205,7 @@ pub unsafe extern "C" fn marqdo_plugin_init(host: *const MarqdoHostApi) -> c_int
         ),
         ("web_auth_check", "session_id", web_auth_check as PluginFn),
         ("web_auth_logout", "session_id", web_auth_logout as PluginFn),
+        ("web_password_hash", "password", web_password_hash as PluginFn),
         ("web_auth_new", "users,session_ttl", web_auth_new as PluginFn),
         ("web_app_auth", "app,users,session_ttl", web_app_auth as PluginFn),
         (

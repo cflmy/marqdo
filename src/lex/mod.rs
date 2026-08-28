@@ -293,4 +293,30 @@ mod tests {
             "expected fence body as Code, got {lines:?}"
         );
     }
+
+    #[test]
+    fn star_line_classification_is_star_terminated() {
+        // A `*…*` Marqdo statement line must END with `*` to be treated as code.
+        // If it accidentally ends with a backtick (e.g. `table="t"`), the line
+        // falls back to narrative Comment and swallows the following paragraph.
+        // Regression: `store.count` calls after a blank line were being dropped.
+        let star_term = "*c = > `store`.count table=\"t\"*";
+        assert!(
+            is_marqdo_star_line(star_term),
+            "star-terminated assignment must be code"
+        );
+        assert_eq!(classify_line(star_term), LineKind::Code);
+
+        let backtick_term = "*c = > `store`.count table=\"t\"`";
+        assert!(
+            !is_marqdo_star_line(backtick_term),
+            "backtick-terminated assignment must NOT be marqdo star line"
+        );
+        assert_eq!(classify_line(backtick_term), LineKind::Comment);
+
+        // In paragraph context the misplaced line must not stay Code.
+        let src = "> `store`.insert table=t rows=`数据`\n\n*c = > `store`.count table=\"t\"`\n> print text=count1-done\n";
+        let lines = classify_source(src);
+        assert_eq!(lines[2].kind, LineKind::Comment, "bad terminator → comment");
+    }
 }

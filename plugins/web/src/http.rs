@@ -16,13 +16,15 @@ use tower_http::services::ServeDir;
 
 use crate::db;
 use crate::form;
+use crate::middleware::Middleware;
+use crate::rate_limit;
 use crate::render;
 use crate::session;
 
 #[derive(Clone)]
-struct AppState {
+pub struct AppState {
     page: Value,
-    db_url: Option<String>,
+    pub db_url: Option<String>,
     admin: bool,
     forms: HashMap<String, Value>,
     /// Page that owns an embedded form (for re-render on validation errors).
@@ -30,6 +32,7 @@ struct AppState {
     /// Admin users table (`|用户名|密码|`) when login-gated admin is configured.
     auth_users: Option<Value>,
     session_ttl: u64,
+    cookie_secure: bool,
 }
 
 fn collect_page_forms(
@@ -66,14 +69,22 @@ pub fn listen(
     static_mount: &str,
     auth_users: Option<Value>,
     session_ttl: u64,
+    cookie_secure: bool,
     ws_routes: HashMap<String, bool>,
+    middleware: &Middleware,
 ) -> Result<Value, String> {
     let mut form_owners = HashMap::new();
     collect_page_forms(page, &mut forms, &mut form_owners);
     for p in routes.values() {
         collect_page_forms(p, &mut forms, &mut form_owners);
     }
+    session::configure(session::Config {
+        db_url: db_url.map(|s| s.to_string()),
+        ttl_sec: session_ttl,
+        cookie_secure,
+    });
     session::reset(session_ttl);
+    rate_limit::reset();
     let state = Arc::new(AppState {
         page: page.clone(),
         db_url: db_url.map(|s| s.to_string()),
@@ -82,6 +93,7 @@ pub fn listen(
         form_owners,
         auth_users,
         session_ttl,
+        cookie_secure,
     });
 
     let mut app = Router::new()
@@ -111,10 +123,13 @@ pub fn listen(
             let page_for_render = page.clone();
             app = app.route(
                 &path,
-                get(async move |State(st): State<Arc<AppState>>, Path(params): Path<HashMap<String, String>>| {
+                get(async move |State(st): State<Arc<AppState>>, headers: axum::http::HeaderMap, Path(params): Path<HashMap<String, String>>| {
                     let mut p = page_for_render.clone();
                     inject_params(&mut p, &params);
-                    Html(render::render_page(&p, st.db_url.as_deref())).into_response()
+                    let (_, csrf, set_cookie) = resolve_session(&headers);
+                    let mut resp = Html(render::render_page(&p, st.db_url.as_deref(), Some(&csrf))).into_response();
+                    append_set_cookie(&mut resp, set_cookie);
+                    resp
                 }),
             );
             // Dynamic `{path}/_part/{id}` with the same path params.
@@ -132,9 +147,12 @@ pub fn listen(
             let page_for_render = page.clone();
             app = app.route(
                 &path,
-                get(async move |State(st): State<Arc<AppState>>| {
-                    Html(render::render_page(&page_for_render, st.db_url.as_deref()))
-                        .into_response()
+                get(async move |State(st): State<Arc<AppState>>, headers: axum::http::HeaderMap| {
+                    let (_, csrf, set_cookie) = resolve_session(&headers);
+                    let mut resp = Html(render::render_page(&page_for_render, st.db_url.as_deref(), Some(&csrf)))
+                        .into_response();
+                    append_set_cookie(&mut resp, set_cookie);
+                    resp
                 }),
             );
             let part_path = format!("{path}/_part/{{id}}");
@@ -178,6 +196,7 @@ pub fn listen(
         app = app.nest_service(&mount, svc);
     }
 
+    let app = crate::middleware::apply(app, middleware);
     let app = app.with_state(state);
 
     let addr: SocketAddr = format!("{host}:{port}")
@@ -213,9 +232,12 @@ pub fn normalize_static_mount(raw: &str) -> String {
     m
 }
 
-async fn home(State(st): State<Arc<AppState>>) -> Html<String> {
-    let html = render::render_page(&st.page, st.db_url.as_deref());
-    Html(html)
+async fn home(State(st): State<Arc<AppState>>, headers: axum::http::HeaderMap) -> Response {
+    let (_, csrf, set_cookie) = resolve_session(&headers);
+    let html = render::render_page(&st.page, st.db_url.as_deref(), Some(&csrf));
+    let mut resp = Html(html).into_response();
+    append_set_cookie(&mut resp, set_cookie);
+    resp
 }
 
 /// Inject captured dynamic-route params into a page copy as `params` (a map),
@@ -256,15 +278,23 @@ async fn home_part(State(st): State<Arc<AppState>>, Path(id): Path<String>) -> R
     render_part_from_page(&st.page, &id, st.db_url.as_deref())
 }
 
-async fn form_get(State(st): State<Arc<AppState>>, Path(id): Path<String>) -> Response {
+async fn form_get(
+    State(st): State<Arc<AppState>>,
+    headers: axum::http::HeaderMap,
+    Path(id): Path<String>,
+) -> Response {
     let Some(frm) = st.forms.get(&id) else {
         return Html(format!("<p>unknown form {id}</p>")).into_response();
     };
-    Html(form::render(frm, &id, None, None)).into_response()
+    let (_, csrf, set_cookie) = resolve_session(&headers);
+    let mut resp = Html(form::render(frm, &id, None, None, Some(&csrf))).into_response();
+    append_set_cookie(&mut resp, set_cookie);
+    resp
 }
 
 async fn form_post(
     State(st): State<Arc<AppState>>,
+    headers: axum::http::HeaderMap,
     Path(id): Path<String>,
     Form(posted): Form<HashMap<String, String>>,
 ) -> Response {
@@ -274,7 +304,13 @@ async fn form_post(
     let Some(url) = st.db_url.as_deref() else {
         return Html(String::from("<p>no database</p>")).into_response();
     };
-    submit_and_respond(&st, frm, &id, url, posted, None)
+    let (_, csrf, set_cookie, posted) = match validate_csrf_post(&headers, posted) {
+        Ok(v) => v,
+        Err(r) => return r,
+    };
+    let mut resp = submit_and_respond(&st, frm, &id, url, posted, None, Some(&csrf));
+    append_set_cookie(&mut resp, set_cookie);
+    resp
 }
 
 fn posted_to_value(posted: HashMap<String, String>) -> Value {
@@ -300,6 +336,7 @@ fn submit_and_respond(
     url: &str,
     posted: HashMap<String, String>,
     admin_table: Option<&str>,
+    csrf: Option<&str>,
 ) -> Response {
     let data_v = posted_to_value(posted);
     match form::submit(frm, &data_v, url) {
@@ -331,6 +368,7 @@ fn submit_and_respond(
                     form_id,
                     Some(&data_v),
                     errors,
+                    csrf,
                 ))
                 .into_response()
             } else if let Some(page) = st.form_owners.get(form_id) {
@@ -339,10 +377,11 @@ fn submit_and_respond(
                     st.db_url.as_deref(),
                     Some(&data_v),
                     errors,
+                    csrf,
                 ))
                 .into_response()
             } else {
-                Html(form::render(frm, form_id, Some(&data_v), errors)).into_response()
+                Html(form::render(frm, form_id, Some(&data_v), errors, csrf)).into_response()
             }
         }
         Err(e) => Html(format!("<p>submit error: {}</p>", esc(&e))).into_response(),
@@ -353,6 +392,50 @@ fn cookie_from_headers(headers: &axum::http::HeaderMap) -> Option<&str> {
     headers
         .get(axum::http::header::COOKIE)
         .and_then(|v| v.to_str().ok())
+}
+
+fn client_ip(headers: &axum::http::HeaderMap) -> String {
+    headers
+        .get("x-forwarded-for")
+        .and_then(|v| v.to_str().ok())
+        .and_then(|s| s.split(',').next())
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| "127.0.0.1".into())
+}
+
+fn resolve_session(headers: &axum::http::HeaderMap) -> (String, String, Option<String>) {
+    let cookie = cookie_from_headers(headers);
+    let (id, set_cookie) = session::ensure_from_cookie(cookie);
+    let csrf = session::csrf_for(&id).unwrap_or_default();
+    (id, csrf, set_cookie)
+}
+
+fn append_set_cookie(resp: &mut Response, set_cookie: Option<String>) {
+    if let Some(c) = set_cookie {
+        let _ = resp.headers_mut().try_append(
+            axum::http::header::SET_COOKIE,
+            c.parse().unwrap(),
+        );
+    }
+}
+
+fn validate_csrf_post(
+    headers: &axum::http::HeaderMap,
+    posted: HashMap<String, String>,
+) -> Result<(String, String, Option<String>, HashMap<String, String>), Response> {
+    let (sid, csrf, set_cookie) = resolve_session(headers);
+    let token = posted.get("_csrf").map(|s| s.as_str()).unwrap_or("");
+    if !session::validate_csrf(&sid, token) {
+        return Err(Html(
+            "<p class=\"flash err\">Invalid or missing CSRF token. Refresh and try again.</p>"
+                .to_string(),
+        )
+        .into_response());
+    }
+    let mut posted = posted;
+    posted.remove("_csrf");
+    Ok((sid, csrf, set_cookie, posted))
 }
 
 fn admin_gate(st: &AppState, cookie_header: Option<&str>) -> Option<Response> {
@@ -380,51 +463,70 @@ fn admin_authed(_st: &AppState, cookie_header: Option<&str>) -> bool {
     session::session_get(&sid, "username").is_some()
 }
 
-#[derive(Deserialize)]
-struct LoginForm {
-    username: Option<String>,
-    password: Option<String>,
-}
-
-async fn admin_login_get(State(st): State<Arc<AppState>>) -> Response {
-    // Already logged in → straight to admin home.
+async fn admin_login_get(State(st): State<Arc<AppState>>, headers: axum::http::HeaderMap) -> Response {
     if st.auth_users.is_none() {
         return Redirect::to("/admin").into_response();
     }
-    Html(login_page(&st, None)).into_response()
+    if admin_authed(&st, cookie_from_headers(&headers)) {
+        return Redirect::to("/admin").into_response();
+    }
+    let (_, csrf, set_cookie) = resolve_session(&headers);
+    let mut resp = Html(login_page(&st, None, Some(&csrf))).into_response();
+    append_set_cookie(&mut resp, set_cookie);
+    resp
 }
 
 async fn admin_login_post(
     State(st): State<Arc<AppState>>,
-    Form(posted): Form<LoginForm>,
+    headers: axum::http::HeaderMap,
+    Form(posted): Form<HashMap<String, String>>,
 ) -> Response {
     let Some(users) = &st.auth_users else {
         return Redirect::to("/admin").into_response();
     };
-    let username = posted.username.unwrap_or_default();
-    let password = posted.password.unwrap_or_default();
-    if session::check_credentials(users, &username, &password).is_none() {
-        return Html(login_page(&st, Some("Invalid username or password."))).into_response();
+    let (_, csrf, set_cookie, posted) = match validate_csrf_post(&headers, posted) {
+        Ok(v) => v,
+        Err(r) => return r,
+    };
+    let username = posted.get("username").cloned().unwrap_or_default();
+    let password = posted.get("password").cloned().unwrap_or_default();
+    let ip = client_ip(&headers);
+    if let Err(msg) = rate_limit::check(&ip, &username) {
+        let mut resp = Html(login_page(&st, Some(&msg), Some(&csrf))).into_response();
+        append_set_cookie(&mut resp, set_cookie);
+        return resp;
     }
+    if session::check_credentials(users, &username, &password).is_none() {
+        rate_limit::record_failure(&ip, &username);
+        let mut resp =
+            Html(login_page(&st, Some("Invalid username or password."), Some(&csrf)))
+                .into_response();
+        append_set_cookie(&mut resp, set_cookie);
+        return resp;
+    }
+    rate_limit::clear_success(&ip, &username);
     let sid = session::session_new(Some(st.session_ttl));
     session::session_set(&sid, "username", json!(username));
     let mut resp = Redirect::to("/admin").into_response();
-    if let Ok(h) = resp.headers_mut().try_append(
+    let _ = resp.headers_mut().try_append(
         axum::http::header::SET_COOKIE,
-        session::session_cookie(&sid, st.session_ttl)
+        session::session_cookie(&sid, st.session_ttl, st.cookie_secure)
             .parse()
             .unwrap(),
-    ) {
-        let _ = h;
-    }
+    );
+    append_set_cookie(&mut resp, set_cookie);
     resp
 }
 
-fn login_page(_st: &AppState, error: Option<&str>) -> String {
+fn login_page(_st: &AppState, error: Option<&str>, csrf: Option<&str>) -> String {
     let err = match error {
         Some(e) => format!("<p class=\"flash err\">{}</p>", esc(e)),
         None => String::new(),
     };
+    let csrf_field = csrf
+        .filter(|s| !s.is_empty())
+        .map(|t| format!("<input type=\"hidden\" name=\"_csrf\" value=\"{}\"/>", esc(t)))
+        .unwrap_or_default();
     format!(
         r#"<!DOCTYPE html>
 <html lang="zh-CN"><head>
@@ -452,6 +554,7 @@ body {{ margin:0; min-height:100vh; display:grid; place-items:center; background
 <p class="sub">Sign in to manage this site.</p>
 {err}
 <form method="post" action="/admin/login">
+{csrf_field}
 <label>Username<input name="username" autocomplete="username" required autofocus/></label>
 <label>Password<input name="password" type="password" autocomplete="current-password" required/></label>
 <button type="submit">Sign in</button>
@@ -459,6 +562,7 @@ body {{ margin:0; min-height:100vh; display:grid; place-items:center; background
 </div>
 </body></html>"#,
         err = err,
+        csrf_field = csrf_field,
     )
 }
 
@@ -616,13 +720,14 @@ fn admin_form_page(
     form_id: &str,
     data: Option<&Value>,
     errors: Option<&Value>,
+    csrf: Option<&str>,
 ) -> String {
     let mut body = format!(
         "<p class=\"crumbs\"><a href=\"/admin\">Admin</a> / <a href=\"/admin/{t}\">{t}</a> / {kind}</p><h1>{kind} {t}</h1>",
         t = esc(table),
         kind = esc(kind),
     );
-    body.push_str(&form::render_body(frm, form_id, data, errors));
+    body.push_str(&form::render_body(frm, form_id, data, errors, csrf));
     admin_shell(st, &format!("{kind} {table}"), Some(table), &body)
 }
 
@@ -767,17 +872,23 @@ async fn admin_new_get(
         return r;
     }
     let url = st.db_url.as_deref().unwrap();
+    let (_, csrf, set_cookie) = resolve_session(&headers);
     match form::from_schema(url, &table, "insert", None) {
-        Ok(frm) => Html(admin_form_page(
-            &st,
-            &table,
-            "New",
-            &frm,
-            &format!("admin-{table}-new"),
-            None,
-            None,
-        ))
-        .into_response(),
+        Ok(frm) => {
+            let mut resp = Html(admin_form_page(
+                &st,
+                &table,
+                "New",
+                &frm,
+                &format!("admin-{table}-new"),
+                None,
+                None,
+                Some(&csrf),
+            ))
+            .into_response();
+            append_set_cookie(&mut resp, set_cookie);
+            resp
+        }
         Err(e) => Html(admin_shell(
             &st,
             &table,
@@ -798,15 +909,24 @@ async fn admin_new_post(
         return r;
     }
     let url = st.db_url.as_deref().unwrap();
+    let (_, csrf, set_cookie, posted) = match validate_csrf_post(&headers, posted) {
+        Ok(v) => v,
+        Err(r) => return r,
+    };
     match form::from_schema(url, &table, "insert", None) {
-        Ok(frm) => submit_and_respond(
-            &st,
-            &frm,
-            &format!("admin-{table}-new"),
-            url,
-            posted,
-            Some(&table),
-        ),
+        Ok(frm) => {
+            let mut resp = submit_and_respond(
+                &st,
+                &frm,
+                &format!("admin-{table}-new"),
+                url,
+                posted,
+                Some(&table),
+                Some(&csrf),
+            );
+            append_set_cookie(&mut resp, set_cookie);
+            resp
+        }
         Err(e) => Html(admin_shell(
             &st,
             &table,
@@ -826,7 +946,7 @@ async fn admin_edit_get(
         return r;
     }
     let url = st.db_url.as_deref().unwrap();
-    let row = match db::get(url, &table, &id) {
+    let row = match db::get(url, &table, &id, None) {
         Ok(Value::Null) => {
             return Html(admin_shell(
                 &st,
@@ -847,17 +967,23 @@ async fn admin_edit_get(
             .into_response();
         }
     };
+    let (_, csrf, set_cookie) = resolve_session(&headers);
     match form::from_schema(url, &table, "update", Some(&id)) {
-        Ok(frm) => Html(admin_form_page(
-            &st,
-            &table,
-            "Edit",
-            &frm,
-            &format!("admin-{table}-edit"),
-            Some(&row),
-            None,
-        ))
-        .into_response(),
+        Ok(frm) => {
+            let mut resp = Html(admin_form_page(
+                &st,
+                &table,
+                "Edit",
+                &frm,
+                &format!("admin-{table}-edit"),
+                Some(&row),
+                None,
+                Some(&csrf),
+            ))
+            .into_response();
+            append_set_cookie(&mut resp, set_cookie);
+            resp
+        }
         Err(e) => Html(admin_shell(
             &st,
             &table,
@@ -878,15 +1004,24 @@ async fn admin_edit_post(
         return r;
     }
     let url = st.db_url.as_deref().unwrap();
+    let (_, csrf, set_cookie, posted) = match validate_csrf_post(&headers, posted) {
+        Ok(v) => v,
+        Err(r) => return r,
+    };
     match form::from_schema(url, &table, "update", Some(&id)) {
-        Ok(frm) => submit_and_respond(
-            &st,
-            &frm,
-            &format!("admin-{table}-edit"),
-            url,
-            posted,
-            Some(&table),
-        ),
+        Ok(frm) => {
+            let mut resp = submit_and_respond(
+                &st,
+                &frm,
+                &format!("admin-{table}-edit"),
+                url,
+                posted,
+                Some(&table),
+                Some(&csrf),
+            );
+            append_set_cookie(&mut resp, set_cookie);
+            resp
+        }
         Err(e) => Html(admin_shell(
             &st,
             &table,
@@ -906,7 +1041,7 @@ async fn admin_delete(
         return r;
     }
     let url = st.db_url.as_deref().unwrap();
-    if let Err(e) = db::delete(url, &table, &id) {
+    if let Err(e) = db::delete(url, &table, &id, None) {
         return Html(admin_shell(
             &st,
             &table,

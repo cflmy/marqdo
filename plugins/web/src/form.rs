@@ -429,6 +429,7 @@ pub fn render_body(
     form_id: &str,
     data: Option<&Value>,
     errors: Option<&Value>,
+    csrf: Option<&str>,
 ) -> String {
     let fields = form
         .get("fields")
@@ -490,6 +491,12 @@ pub fn render_body(
         "<form method=\"post\" action=\"{}\">",
         esc(&post_to)
     ));
+    if let Some(token) = csrf.filter(|s| !s.is_empty()) {
+        body.push_str(&format!(
+            "<input type=\"hidden\" name=\"_csrf\" value=\"{}\"/>",
+            esc(token)
+        ));
+    }
     if action == "update" && !row_id.is_empty() {
         body.push_str(&format!(
             "<input type=\"hidden\" name=\"id\" value=\"{}\"/>",
@@ -569,7 +576,13 @@ pub fn render_body(
 }
 
 /// Standalone form document (`GET|POST /_form/{id}`).
-pub fn render(form: &Value, form_id: &str, data: Option<&Value>, errors: Option<&Value>) -> String {
+pub fn render(
+    form: &Value,
+    form_id: &str,
+    data: Option<&Value>,
+    errors: Option<&Value>,
+    csrf: Option<&str>,
+) -> String {
     let heading = form
         .get("title")
         .and_then(|v| v.as_str())
@@ -593,7 +606,7 @@ body{font-family:"IBM Plex Sans","Noto Sans SC",sans-serif;margin:1.5rem;backgro
 </style></head><body>"#,
     );
     body.push_str(&format!("<h1>{}</h1>", esc(heading)));
-    body.push_str(&render_body(form, form_id, data, errors));
+    body.push_str(&render_body(form, form_id, data, errors, csrf));
     body.push_str("</body></html>");
     body
 }
@@ -631,9 +644,9 @@ pub fn submit(form: &Value, data: &Value, db_url: &str) -> Result<Value, String>
             .filter(|s| !s.is_empty())
             .or_else(|| data_map(&data).get("id").map(cell_str))
             .ok_or_else(|| "update requires `id`".to_string())?;
-        db::update(db_url, table, &id, &row)?
+        db::update(db_url, table, &id, &row, None)?
     } else {
-        db::insert(db_url, table, &json!([row]))?
+        db::insert(db_url, table, &json!([row]), None)?
     };
     let redirect = form
         .get("redirect")
