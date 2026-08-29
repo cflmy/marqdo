@@ -2,6 +2,24 @@
 
 ## Unreleased
 
+## v0.3.1 — 2026-08-29
+
+### Highlights
+
+**W8 站点资源**：favicon / Head 资源表 / 图片装配一次补齐；并修复相对入口路径下 `entry_dir` 双重拼接导致的嵌套目录问题。
+
+```bash
+git checkout v0.3.1
+cargo build --release
+marqdo ext add web   # 改插件后请重新 add
+```
+
+### Added
+- **`ext/web` W8（站点图标 / Head / 图片装配）** ([web-assets-and-images.md](doc/design/web-assets-and-images.md))：`app.icons` / `应用.图标` 挂 `GET /favicon.ico`；`page.head` / `头装配`；`make_images` / `图片装配`；`meta` 认 `icon`/`favicon`/`apple-touch-icon`；`static` 约定 `favicon.*`；金样 `web-assets-smoke` / `web-assets-live`；[marqdo-blog](examples/marqdo-blog/) 接入。
+
+### Fixed
+- **`host_query("entry_dir")`**：相对入口脚本（如 `tests/ext/….mq.md`）时对进程 cwd 绝对化，避免与 `for_run` 已设的脚本目录 cwd 再次拼接成 `tests/ext/tests/ext/…`。
+
 ## v0.3.0 — 2026-08-29
 
 ### Highlights

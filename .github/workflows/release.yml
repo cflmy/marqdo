@@ -92,10 +92,10 @@ jobs:
           body: |
             ## Marqdo ${{ github.ref_name }}
 
-            ### Highlights — v0.3
-            - **`ext/web`**: W0–W7 + P3 complete (sessions, cache, upload, WebSocket, style assembly); see marqdo-blog
-            - **`ext/quantum`**: Q7 linalg + Q8 themed SVG viz
-            - **`ext/agent`**: A1–A4 (OKF reuse, events, context budget, RAG/MCP fixtures)
+            ### Highlights — v0.3.1
+            - **W8**: favicon / head assets / image assembly (`app.icons`, `page.head`, `make_images`)
+            - Fix: absolute `entry_dir` for relative entry scripts (no nested `tests/ext/tests/ext`)
+            - **`ext/web`**: W0–W7 + P3 + W8; **`ext/quantum`** Q7/Q8; **`ext/agent`** A1–A4
             - Install: `marqdo ext list` / `marqdo ext add llm|agent|web|quantum`
             - Native plugins: `cargo build --release -p marqdo_plugin_*` then `ext add`
             - Details: [CHANGELOG](https://github.com/cflmy/marqdo/blob/main/CHANGELOG.md) · [README](https://github.com/cflmy/marqdo/blob/main/README.md)

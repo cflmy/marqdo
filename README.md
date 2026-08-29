@@ -99,7 +99,7 @@ marqdo catalog public -o .marqdo
 
 ---
 
-## 现状（v0.3.0）
+## 现状（v0.3.1）
 
 - 映射与解释器：Phase I 树遍历 + 字节码后端可用；金样例在 `tests/`  
 - **对象**：`#` = 类型/构造，`##`+ = 函数/方法；见 [objects.md](doc/design/objects.md)  
@@ -109,7 +109,7 @@ marqdo catalog public -o .marqdo
 - **`marqdo version --check`**：与 GitHub 最新 release 对比  
 - 标准库：**内置于二进制**（v0.1.2+）；磁盘 `lib/` 或 `MARQDO_LIB` 可覆盖。模块含文本、文件、系统、时间、JSON、网络、数学、外联、插件、**自写回**、**子任务**  
 - **官方扩展库 `ext/`**（**非** stdlib，本版收口）：
-  - **`web`**：W0–W7 + P3 完结（会话 / 缓存 / 上传 / WebSocket / 样式装配等）；示例 [marqdo-blog](examples/marqdo-blog/)；生产路径见 [web-asgi-servers-and-marqdo.md](doc/design/web-asgi-servers-and-marqdo.md)（反向代理 → 嵌入式 `listen`，非 Daphne/Uvicorn）
+  - **`web`**：W0–W7 + P3 + **W8**（favicon / Head 资源 / 图片装配，见 [web-assets-and-images.md](doc/design/web-assets-and-images.md)）；示例 [marqdo-blog](examples/marqdo-blog/)；生产路径见 [web-asgi-servers-and-marqdo.md](doc/design/web-asgi-servers-and-marqdo.md)（反向代理 → 嵌入式 `listen`，非 Daphne/Uvicorn）
   - **`quantum`**：Q0–Q7 + Q8a/b 主题 SVG；示例 [quantum-entanglement](examples/quantum-entanglement/)
   - **`agent`**：A1–A4（OKF 复用、过程事件、上下文预算、RAG/MCP fixture）；下一波缺口 [agent-framework-gaps-after-a4.md](doc/research/agent-framework-gaps-after-a4.md)
   - **`llm`**：OpenAI 兼容对话
@@ -119,12 +119,12 @@ marqdo catalog public -o .marqdo
 - **VS Code 扩展**：分支 **`vscode-extension`**（`main` 不跟踪源码；见 [vscode-extension-commit.md](doc/design/vscode-extension-commit.md)）；Release 附带 `.vsix`  
 - 选型：[ADR 0001 — Rust](doc/adr/0001-implementation-language.md)
 
-### 如何使用最新 Marqdo（v0.3.0）
+### 如何使用最新 Marqdo（v0.3.1）
 
 ```bash
 # 1) 源码安装（跟 tag 或 main）
 git clone https://github.com/cflmy/marqdo.git && cd marqdo
-git checkout v0.3.0   # 或留在 main
+git checkout v0.3.1   # 或留在 main
 cargo build --release
 export PATH="$PWD/target/release:$PATH"
 marqdo version
@@ -146,10 +146,10 @@ marqdo ext add llm      # 或：大模型
 
 # 4) 动态站示例（扩展装好后）
 marqdo run examples/marqdo-blog/index.mq.md
-# 浏览器打开终端打印的 listen 地址
+# 浏览器打开终端打印的 listen 地址；/favicon.ico 与 logo 装配见 W8
 
 # 5) Windows：也可从 GitHub Releases 下载 exe / zip / vsix
-#    https://github.com/cflmy/marqdo/releases/tag/v0.3.0
+#    https://github.com/cflmy/marqdo/releases/tag/v0.3.1
 ```
 
 开发期也可用 `cargo run -- …` 代替已安装的 `marqdo`：

@@ -18,6 +18,10 @@ curl -s "$BASE/" | grep -q '@media (max-width: 860px)' && ok "响应式媒体查
 echo "== 静态 =="
 code=$(curl -s -o /dev/null -w "%{http_code}" "$BASE/static/live.js")
 [ "$code" = "200" ] && ok "GET /static/live.js -> $code" || bad "static -> $code"
+code=$(curl -s -o /dev/null -w "%{http_code}" "$BASE/favicon.ico")
+[ "$code" = "200" ] && ok "GET /favicon.ico -> $code" || bad "favicon -> $code"
+curl -s "$BASE/" | grep -q 'rel="icon"' && ok "head icon link" || bad "head icon 缺失"
+curl -s "$BASE/" | grep -q 'mq-images' && ok "图片装配 logo" || bad "mq-images 缺失"
 
 echo "== 动态路由 =="
 code=$(curl -s -o /dev/null -w "%{http_code}" "$BASE/post/hello-marqdo")

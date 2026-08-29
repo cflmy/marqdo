@@ -166,6 +166,9 @@
 | D7 | **评论系统**（表单 + 审核 + 反垃圾） | ✅ 约定：表+表单+where（W6）；反垃圾属应用层 | `ext/web` | P2 ✅ |
 | D8 | **草稿/发布/定时**（状态字段 + 过滤查询） | ✅ 约定：`status` + where（W6） | `ext/web` + db where | P2 ✅ |
 | D9 | **图片/附件库**（依赖 A5 上传 + 相册页） | ✅ **已实现（P3）**：`app.gallery` HTML 相册 + A5 上传/下载 | `ext/web` + `plugins/web` | P3 ✅ |
+| **D10** | **站点图标 / favicon**（`/favicon.ico` + apple-touch-icon） | ✅ **已实现（W8）**：`app.icons` / `应用.图标`；`static` 约定 `favicon.*`；设计 [web-assets-and-images.md](web-assets-and-images.md) | `plugins/web` + `ext/web` | W8 ✅ |
+| **D11** | **Head 资源表**（link / script / preload / manifest） | ✅ **已实现（W8）**：`page.head` / `页面.头装配`；`meta` 认 `icon`/`favicon` | `plugins/web` + `ext/web` | W8 ✅ |
+| **D12** | **图片装配**（GFM → figure/img + 主区注入） | ✅ **已实现（W8）**：`make_images` / `网页.图片装配`；`page.images` | `plugins/web` + `ext/web` | W8 ✅ |
 
 ---
 
@@ -184,6 +187,7 @@
 | **W6** | 进阶 | 全文搜索(FTS5) + 迁移机制 + 评论系统 + 草稿/发布 + WS 广播 | B6 B9 ✅；WS 广播 + access_log ✅；D7/D8 用表+where ✅ |
 | **W7** | 完结打磨 | Cache-Control、自定义 404/500、301 重定向、sitemap/robots、init 唯一/索引、HTTPS 反代文档 | A6 A7 A9 A10 B7 D2 ✅ |
 | **P3** | 真·网络扩展补齐 | 审计时间戳、外键、RBAC 门禁、媒体相册、下载 ETag | B10 C8 D9 + ETag/FK ✅ |
+| **W8** | 站点资源与图片装配 | favicon 根路由、Head 资源表、图片装配、meta 图标键 | D10 D11 D12 ✅ |
 
 ### 4.2 边界判定要点（严格遵守既有约束）
 

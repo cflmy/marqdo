@@ -26,6 +26,34 @@ use crate::sitemap;
 use crate::storage;
 use crate::upload;
 
+fn with_site_head(base: &Value, site_head: &[crate::assets::HeadLink]) -> Value {
+    let mut page = base.clone();
+    crate::assets::merge_site_head(&mut page, site_head);
+    page
+}
+
+fn serve_icon_file(path: PathBuf, content_type: String) -> Response {
+    match std::fs::read(&path) {
+        Ok(bytes) => {
+            let ct = HeaderValue::from_str(&content_type)
+                .unwrap_or_else(|_| HeaderValue::from_static("application/octet-stream"));
+            (
+                StatusCode::OK,
+                [
+                    (header::CONTENT_TYPE, ct),
+                    (
+                        header::CACHE_CONTROL,
+                        HeaderValue::from_static("public, max-age=86400"),
+                    ),
+                ],
+                bytes,
+            )
+                .into_response()
+        }
+        Err(_) => StatusCode::NOT_FOUND.into_response(),
+    }
+}
+
 #[derive(Clone)]
 pub struct UploadRoute {
     pub field: String,
@@ -58,6 +86,8 @@ pub struct AppState {
     /// Optional assembled pages for 404 / 500.
     page_404: Option<Value>,
     page_500: Option<Value>,
+    /// Default `<head>` links from `app.icons` / static favicon convention.
+    site_head: Vec<crate::assets::HeadLink>,
 }
 
 fn collect_page_forms(
@@ -107,6 +137,8 @@ pub fn listen(
     gates: Vec<(String, Vec<String>)>,
     gallery_routes: HashMap<String, Value>,
     middleware: &Middleware,
+    mut site_head: Vec<crate::assets::HeadLink>,
+    mut icon_routes: Vec<crate::assets::IconRoute>,
 ) -> Result<Value, String> {
     let mut form_owners = HashMap::new();
     collect_page_forms(page, &mut forms, &mut form_owners);
@@ -120,6 +152,20 @@ pub fn listen(
     });
     session::reset(session_ttl);
     rate_limit::reset();
+
+    // Convention: static_dir/favicon.* → /favicon.ico when no explicit icons.
+    if icon_routes.is_empty() {
+        if let Some(dir) = static_dir.as_ref() {
+            if let Some((head, routes)) = crate::assets::convention_favicon(dir) {
+                site_head = head;
+                icon_routes = routes;
+            }
+        }
+    }
+
+    // Resolve relative icon paths: try as-is absolute, else leave for entry_dir resolve in lib.
+    // (Absolute paths preferred; relative already joined in web_listen.)
+
     let state = Arc::new(AppState {
         page: page.clone(),
         db_url: db_url.map(|s| s.to_string()),
@@ -133,6 +179,7 @@ pub fn listen(
         download_routes: download_routes.clone(),
         page_404: page_404.clone(),
         page_500: page_500.clone(),
+        site_head: site_head.clone(),
     });
 
     let mut app = Router::new()
@@ -165,6 +212,7 @@ pub fn listen(
                 get(async move |State(st): State<Arc<AppState>>, headers: axum::http::HeaderMap, Path(params): Path<HashMap<String, String>>| {
                     let mut p = page_for_render.clone();
                     inject_params(&mut p, &params);
+                    let p = with_site_head(&p, &st.site_head);
                     let (_, csrf, set_cookie) = resolve_session(&headers);
                     let mut resp = Html(render::render_page(&p, st.db_url.as_deref(), Some(&csrf))).into_response();
                     append_set_cookie(&mut resp, set_cookie);
@@ -188,7 +236,8 @@ pub fn listen(
                 &path,
                 get(async move |State(st): State<Arc<AppState>>, headers: axum::http::HeaderMap| {
                     let (_, csrf, set_cookie) = resolve_session(&headers);
-                    let mut resp = Html(render::render_page(&page_for_render, st.db_url.as_deref(), Some(&csrf)))
+                    let p = with_site_head(&page_for_render, &st.site_head);
+                    let mut resp = Html(render::render_page(&p, st.db_url.as_deref(), Some(&csrf)))
                         .into_response();
                     append_set_cookie(&mut resp, set_cookie);
                     resp
@@ -291,6 +340,36 @@ pub fn listen(
         );
         let svc = ServeDir::new(dir);
         app = app.nest_service(&mount, svc);
+    }
+
+    // Root / custom icon file routes (favicon.ico, /icons/…).
+    for ir in icon_routes {
+        let url = ir.url.clone();
+        if !url.starts_with('/') {
+            return Err(format!("icon url `{url}` must start with /"));
+        }
+        if !ir.path.is_file() {
+            return Err(format!(
+                "icon file `{}` not found for `{url}`",
+                ir.path.display()
+            ));
+        }
+        eprintln!(
+            "marqdo web icon: {} → {} ({})",
+            url,
+            ir.path.display(),
+            ir.content_type
+        );
+        let path = ir.path.clone();
+        let ct = ir.content_type.clone();
+        app = app.route(
+            &url,
+            get(move || {
+                let path = path.clone();
+                let ct = ct.clone();
+                async move { serve_icon_file(path, ct) }
+            }),
+        );
     }
 
     let mut redir_paths: Vec<String> = redirects.keys().cloned().collect();
@@ -435,7 +514,8 @@ fn rss_feed(st: &AppState, _path: &str, cfg: &Value) -> Response {
 
 async fn home(State(st): State<Arc<AppState>>, headers: axum::http::HeaderMap) -> Response {
     let (_, csrf, set_cookie) = resolve_session(&headers);
-    let html = render::render_page(&st.page, st.db_url.as_deref(), Some(&csrf));
+    let page = with_site_head(&st.page, &st.site_head);
+    let html = render::render_page(&page, st.db_url.as_deref(), Some(&csrf));
     let mut resp = Html(html).into_response();
     append_set_cookie(&mut resp, set_cookie);
     resp
@@ -1638,7 +1718,8 @@ fn sitemap_response(st: &AppState, cfg: &Value) -> Response {
 async fn fallback_404(State(st): State<Arc<AppState>>, headers: axum::http::HeaderMap) -> Response {
     let (_, csrf, set_cookie) = resolve_session(&headers);
     let html = if let Some(ref page) = st.page_404 {
-        render::render_page(page, st.db_url.as_deref(), Some(&csrf))
+        let page = with_site_head(page, &st.site_head);
+        render::render_page(&page, st.db_url.as_deref(), Some(&csrf))
     } else {
         "<!doctype html><html><head><title>404</title></head><body><h1>404 Not Found</h1></body></html>"
             .to_string()
@@ -1652,7 +1733,8 @@ async fn fallback_404(State(st): State<Arc<AppState>>, headers: axum::http::Head
 #[allow(dead_code)]
 fn error_500(st: &AppState, csrf: Option<&str>, msg: &str) -> Response {
     let html = if let Some(ref page) = st.page_500 {
-        render::render_page(page, st.db_url.as_deref(), csrf)
+        let page = with_site_head(page, &st.site_head);
+        render::render_page(&page, st.db_url.as_deref(), csrf)
     } else {
         format!(
             "<!doctype html><html><head><title>500</title></head><body><h1>500</h1><p>{}</p></body></html>",

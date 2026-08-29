@@ -4,6 +4,7 @@ use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
 use std::ffi::{CStr, CString};
 use std::os::raw::{c_char, c_int, c_void};
+use std::path::PathBuf;
 
 use libloading::{Library, Symbol};
 
@@ -273,8 +274,10 @@ unsafe extern "C" fn host_query(
         "cwd" => Ok(serde_json::Value::String(
             ctx.cwd.to_string_lossy().into_owned(),
         )),
-        "entry_dir" => Ok(serde_json::Value::String(
-            ctx.entry_path
+        "entry_dir" => {
+            // Script directory: parent of entry file (for_run also sets ctx.cwd to this).
+            let dir = ctx
+                .entry_path
                 .as_ref()
                 .map(|p| {
                     if p.is_dir() {
@@ -283,10 +286,21 @@ unsafe extern "C" fn host_query(
                         p.parent().unwrap_or(p).to_path_buf()
                     }
                 })
-                .unwrap_or_else(|| ctx.cwd.clone())
-                .to_string_lossy()
-                .into_owned(),
-        )),
+                .unwrap_or_else(|| ctx.cwd.clone());
+            // Absolutize against the *process* cwd — not ctx.cwd. For a relative
+            // entry like `tests/ext/foo.mq.md`, for_run sets ctx.cwd = `tests/ext`;
+            // joining that again would yield `tests/ext/tests/ext/...`.
+            let abs = if dir.is_absolute() {
+                dir
+            } else {
+                std::env::current_dir()
+                    .unwrap_or_else(|_| PathBuf::from("."))
+                    .join(dir)
+            };
+            Ok(serde_json::Value::String(
+                abs.to_string_lossy().into_owned(),
+            ))
+        }
         "call_lib_path" => (|| {
             let raw = args_owned.as_deref().unwrap_or("{}");
             let args: serde_json::Value = serde_json::from_str(if raw.trim().is_empty() {

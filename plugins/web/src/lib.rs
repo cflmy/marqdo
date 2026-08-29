@@ -1,5 +1,6 @@
 //! Marqdo web plugin (C ABI v2): SQLite, page assemble, HTTP listen.
 
+mod assets;
 mod compose;
 mod db;
 mod db_pg;
@@ -371,6 +372,93 @@ web_ffi!(web_page_meta, |args: &Value| {
     let mut obj = page.as_object().cloned().unwrap_or_default();
     obj.insert("meta".into(), Value::Object(crate::table::as_meta_map(&meta)));
     Ok(Value::Object(obj))
+});
+
+web_ffi!(web_page_head, |args: &Value| {
+    let page = args.get("page").cloned().unwrap_or(json!({}));
+    let table = args
+        .get("table")
+        .or_else(|| args.get("head"))
+        .cloned()
+        .unwrap_or(json!([]));
+    let links = crate::assets::as_head_links(&table);
+    let mut obj = page.as_object().cloned().unwrap_or_default();
+    let mut existing = obj
+        .get("head")
+        .map(crate::assets::head_links_from_json)
+        .unwrap_or_default();
+    for link in links {
+        let dup = existing
+            .iter()
+            .any(|e| e.href == link.href && e.rel.eq_ignore_ascii_case(&link.rel));
+        if !dup {
+            existing.push(link);
+        }
+    }
+    obj.insert("head".into(), crate::assets::head_links_to_json(&existing));
+    Ok(Value::Object(obj))
+});
+
+web_ffi!(web_head, |args: &Value| {
+    let table = args
+        .get("table")
+        .or_else(|| args.get("head"))
+        .cloned()
+        .unwrap_or(json!([]));
+    Ok(Value::String(crate::assets::make_head_html(&table)))
+});
+
+web_ffi!(web_images, |args: &Value| {
+    let table = args
+        .get("table")
+        .or_else(|| args.get("images"))
+        .cloned()
+        .unwrap_or(json!([]));
+    Ok(Value::String(crate::assets::make_images_html(&table)))
+});
+
+web_ffi!(web_page_images, |args: &Value| {
+    let page = args.get("page").cloned().unwrap_or(json!({}));
+    let table = args
+        .get("table")
+        .or_else(|| args.get("images"))
+        .cloned()
+        .unwrap_or(json!([]));
+    let html = crate::assets::make_images_html(&table);
+    let mut obj = page.as_object().cloned().unwrap_or_default();
+    let prev = obj
+        .get("images_html")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string();
+    let combined = if prev.is_empty() {
+        html
+    } else if html.is_empty() {
+        prev
+    } else {
+        format!("{prev}{html}")
+    };
+    obj.insert("images_html".into(), json!(combined));
+    Ok(Value::Object(obj))
+});
+
+web_ffi!(web_app_icons, |args: &Value| {
+    let mut app = args.get("app").cloned().unwrap_or(json!({}));
+    let table = args
+        .get("table")
+        .or_else(|| args.get("icons"))
+        .cloned()
+        .unwrap_or(json!([]));
+    let (icons, site_head, _routes) = crate::assets::normalize_icons(&table);
+    let obj = app
+        .as_object_mut()
+        .ok_or_else(|| "app must be a map".to_string())?;
+    obj.insert("icons".into(), icons);
+    obj.insert(
+        "site_head".into(),
+        crate::assets::head_links_to_json(&site_head),
+    );
+    Ok(app)
 });
 
 web_ffi!(web_page_paginate, |args: &Value| {
@@ -1424,6 +1512,8 @@ web_ffi!(web_listen, |args: &Value| {
         gallery_routes,
         middleware,
         cookie_secure,
+        site_head,
+        icon_routes,
     ) = if args.get("page").is_some() || args.get("host").is_some() {
         let page = args.get("page").cloned().unwrap_or(json!({}));
         let db_url = db_url_of(args).ok();
@@ -1478,6 +1568,8 @@ web_ffi!(web_listen, |args: &Value| {
             HashMap::new(),
             middleware::Middleware::default(),
             cookie_secure,
+            Vec::<crate::assets::HeadLink>::new(),
+            Vec::<crate::assets::IconRoute>::new(),
         )
     } else {
         let app = args.get("app").cloned().unwrap_or_else(|| args.clone());
@@ -1684,6 +1776,20 @@ web_ffi!(web_listen, |args: &Value| {
             .get("cookie_secure")
             .and_then(|v| v.as_bool())
             .unwrap_or(false);
+        let (site_head, icon_routes) = if let Some(icons) = app.get("icons") {
+            let (_icons_json, head, routes) = crate::assets::normalize_icons(icons);
+            // Prefer precomputed site_head if present (same content).
+            let head = app
+                .get("site_head")
+                .map(crate::assets::head_links_from_json)
+                .filter(|h| !h.is_empty())
+                .unwrap_or(head);
+            (head, routes)
+        } else if let Some(sh) = app.get("site_head") {
+            (crate::assets::head_links_from_json(sh), Vec::new())
+        } else {
+            (Vec::new(), Vec::new())
+        };
         (
             page,
             db_url,
@@ -1709,6 +1815,8 @@ web_ffi!(web_listen, |args: &Value| {
             gallery_routes,
             middleware,
             cookie_secure,
+            site_head,
+            icon_routes,
         )
     };
     let static_dir = static_dir.map(|p| {
@@ -1718,6 +1826,32 @@ web_ffi!(web_listen, |args: &Value| {
             entry_dir().join(p)
         }
     });
+    let icon_routes: Vec<crate::assets::IconRoute> = icon_routes
+        .into_iter()
+        .map(|mut r| {
+            if !r.path.is_absolute() {
+                let joined = entry_dir().join(&r.path);
+                if joined.is_file() {
+                    r.path = joined;
+                } else if let Some(ref sd) = static_dir {
+                    let name = r
+                        .path
+                        .file_name()
+                        .map(PathBuf::from)
+                        .unwrap_or_else(|| r.path.clone());
+                    let in_static = sd.join(&name);
+                    if in_static.is_file() {
+                        r.path = in_static;
+                    } else {
+                        r.path = joined;
+                    }
+                } else {
+                    r.path = joined;
+                }
+            }
+            r
+        })
+        .collect();
     http::listen(
         &page,
         db_url.as_deref(),
@@ -1743,6 +1877,8 @@ web_ffi!(web_listen, |args: &Value| {
         gates,
         gallery_routes,
         &middleware,
+        site_head,
+        icon_routes,
     )
 });
 
@@ -1815,6 +1951,23 @@ pub unsafe extern "C" fn marqdo_plugin_init(host: *const MarqdoHostApi) -> c_int
             "web_page_meta",
             "page,meta",
             web_page_meta as PluginFn,
+        ),
+        (
+            "web_page_head",
+            "page,table",
+            web_page_head as PluginFn,
+        ),
+        (
+            "web_page_images",
+            "page,table",
+            web_page_images as PluginFn,
+        ),
+        ("web_head", "table", web_head as PluginFn),
+        ("web_images", "table", web_images as PluginFn),
+        (
+            "web_app_icons",
+            "app,table",
+            web_app_icons as PluginFn,
         ),
         (
             "web_page_paginate",

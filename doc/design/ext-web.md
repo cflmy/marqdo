@@ -2,9 +2,9 @@
 
 | | |
 |---|---|
-| 状态 | **Accepted · W0–W7 + P3 完结**（SQLite/Postgres 作者面：页面装配 / db CRUD+`where` / form / 嵌入主区 / `app.route` / 路由 `/_part` / admin UI / RBAC / 上传相册 / SEO·RSS·sitemap；Postgres 等见 §9） |
-| 日期 | 2026-08-11 |
-| 相关 | [markdown-mapping.md](markdown-mapping.md) · [module-namespace.md](module-namespace.md) · [objects.md](objects.md) · [ext-abi.md](ext-abi.md) · [ext-cli.md](ext-cli.md) · [stdlib-i18n.md](stdlib-i18n.md) |
+| 状态 | **Accepted · W0–W7 + P3 + W8（站点图标/Head/图片装配）完结**（SQLite/Postgres 作者面：页面装配 / db CRUD+`where` / form / 嵌入主区 / `app.route` / 路由 `/_part` / admin UI / RBAC / 上传相册 / SEO·RSS·sitemap / **favicon·头资源·图片装配**；Postgres 等见 §9） |
+| 日期 | 2026-08-11（W8：2026-08-29） |
+| 相关 | [markdown-mapping.md](markdown-mapping.md) · [module-namespace.md](module-namespace.md) · [objects.md](objects.md) · [ext-abi.md](ext-abi.md) · [ext-cli.md](ext-cli.md) · [stdlib-i18n.md](stdlib-i18n.md) · [web-assets-and-images.md](web-assets-and-images.md) |
 | 安装（目标） | `marqdo ext add web`（中英：`web` / `网页`） |
 | 本文目的 | 锁定**作者面**与**类 API**；指导实现 |
 

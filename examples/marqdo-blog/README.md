@@ -18,7 +18,8 @@ cargo run -- examples/marqdo-blog/index.mq.md
 - `/about` — 关于页
 - `/admin` — 会话门禁后台，登录 `admin` / `marqdo`，可增删改文章与标签
 - `/live` — WebSocket 回显端点
-- `/static/*` — 静态资源（`public/` 下的 `live.js`）
+- `/static/*` — 静态资源（`public/` 下的 `live.js`、favicon、logo）
+- `/favicon.ico` — 站点图标（`应用.图标` 表装配）
 
 ## 设计亮点（文档即代码）
 
@@ -29,6 +30,9 @@ cargo run -- examples/marqdo-blog/index.mq.md
   每个 `## 段`（基础/顶栏/侧栏/主体/卡片/页脚/表单/响应式）导出一张样式表，
   `## 全局` 用 `网页.样式装配` 函数把每张表装配成 CSS 文本，再 `text.str_join` 拼成完整样式表，
   最后经 `页面.样式` 注入页面。样式保持可读的数据表格，不写胶水代码。
+- **图标 / 头资源 / 图片装配**（W8）：`应用.图标` 表挂 `/favicon.ico` 与 SVG；
+  `页面.头装配` 写 apple-touch-icon；`页面.图片装配` 把 logo 表注入主区（`mq-images`）。
+  含 `/` 的路径与 MIME 单元格需加引号（如 `"/static/logo.svg"`、`"image/png"`）。
 - **页面 = 组件装配 + 主体绑定**（`index.mq.md`）：
   导航/侧栏/页脚用 `|组件|样式|` 表装配，文章列表用 `|属性|值|` 绑定 SQLite 字段。
 - **动态路由**：`/post/{slug}` 的 `slug` 注入查询条件，`页面.详情` 把首行渲染成文章。

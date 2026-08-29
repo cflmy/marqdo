@@ -30,6 +30,26 @@ merged, and a leading `|媒体|` column groups rows into `@media` blocks), or
 > ensure_plugin
 **> web_style name=`name` table=`table`**
 
+## make_images
+    + `table`
+
+Assemble a GFM image table into an HTML fragment (`div.mq-images` of
+`<figure class="mq-img">` / `<img>`). Columns: `src`/`alt`/`title`/`class`/
+`href`/`width`/`height`/`loading`/`caption` (ZH: `源`/`替代`/`标题`/`类`/
+`链接`/`宽度`/`高度`/`加载`/`图注`). Images stay as data — 图片即数据、装配即函数.
+
+> ensure_plugin
+**> web_images table=`table`**
+
+## make_head
+    + `table`
+
+Assemble a Head resource table into HTML (`<link>` / `<script>`). Useful for
+preview; prefer `page.head` to attach resources to a page.
+
+> ensure_plugin
+**> web_head table=`table`**
+
 # page
     + `title`="Marqdo Web"
     + `intro`=""
@@ -93,9 +113,23 @@ of a list of cards. Set on the dynamic post page so `/post/{slug}` shows one pos
 ## meta
     + `meta`
 
-SEO / OpenGraph metadata as a data table (`|key|value|`). Keys such as `title`, `description`, `canonical`, `og:type` become `<head>` tags at render time.
+SEO / OpenGraph metadata as a data table (`|key|value|`). Keys such as `title`, `description`, `canonical`, `og:type` become `<head>` tags at render time. Special keys `icon` / `favicon` / `apple-touch-icon` emit `<link rel="…">` (not `<meta name>`).
 
 **> web_page_meta page=`self` meta=`meta`**
+
+## head
+    + `table`
+
+Assemble `<head>` resources from a GFM table (`|rel|href|type|sizes|media|as|crossorigin|` or ZH `|关系|地址|类型|…|`). `rel=script` / `module` become `<script>`; other rows become `<link>`. Merges with any existing `head` on the page.
+
+**> web_page_head page=`self` table=`table`**
+
+## images
+    + `table`
+
+Assemble an image table (`|src|alt|title|class|href|width|height|loading|caption|`) into HTML and attach it as `images_html` (rendered in main before intro). Same table shape as module-level `make_images`.
+
+**> web_page_images page=`self` table=`table`**
 
 ## paginate
     + `offset`=0
@@ -429,9 +463,19 @@ Register `GET|POST /_form/{id}` for listen when the form is not already embedded
     + `dir`
     + `mount`=/static
 
-Serve files from `dir` under `mount` (default `/static`). Path is resolved from the process working directory at listen time.
+Serve files from `dir` under `mount` (default `/static`). Path is resolved from the process working directory at listen time. If `dir` contains `favicon.ico` / `favicon.png` / `favicon.svg` and `icons` was not set, listen also serves `GET /favicon.ico` and injects a default `<link rel="icon">` on every page.
 
 **> web_app_static app=`self` dir=`dir` mount=`mount`**
+
+## icons
+    + `table`
+
+Register site icons from a GFM table (`|path|rel|type|sizes|url|` or ZH
+`|路径|关系|类型|尺寸|地址|`). Listen serves each file at `url` (default
+`/favicon.ico` for `.ico` icons, else `/icons/{filename}`), and injects matching
+`<link>` tags into every page via `site_head`. See [web-assets-and-images.md](../../doc/design/web-assets-and-images.md).
+
+**> web_app_icons app=`self` table=`table`**
 
 ## configure
     + `cors`=None

@@ -1543,6 +1543,102 @@ custom-ok",
 }
 
 #[test]
+fn ext_web_assets_smoke() {
+    let status = Command::new("cargo")
+        .args(["build", "-p", "marqdo_plugin_web"])
+        .current_dir(env!("CARGO_MANIFEST_DIR"))
+        .status()
+        .expect("build web plugin");
+    assert!(status.success(), "failed to build marqdo_plugin_web");
+    assert_out(
+        "tests/ext/web-assets-smoke.mq.md",
+        "images-ok
+head-ok
+meta-icon-ok
+icons-ok
+site-head-ok
+make-images-ok
+make-head-ok",
+    );
+}
+
+#[test]
+fn ext_web_assets_live() {
+    let status = Command::new("cargo")
+        .args(["build", "-p", "marqdo_plugin_web"])
+        .current_dir(env!("CARGO_MANIFEST_DIR"))
+        .status()
+        .expect("build web plugin");
+    assert!(status.success(), "failed to build marqdo_plugin_web");
+
+    let script = "tests/ext/web-assets-live-server.mq.md";
+    let bin = env!("CARGO_BIN_EXE_marqdo");
+    let mut child = Command::new(bin)
+        .args(["run", script])
+        .current_dir(env!("CARGO_MANIFEST_DIR"))
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("spawn assets live server");
+
+    let base = "http://127.0.0.1:18092";
+    let ready = std::time::Instant::now();
+    loop {
+        if ready.elapsed().as_secs() > 10 {
+            let _ = child.kill();
+            panic!("assets live server did not start in time");
+        }
+        let out = Command::new("curl")
+            .args([
+                "-s",
+                "-o",
+                "/dev/null",
+                "-w",
+                "%{http_code}",
+                &format!("{base}/"),
+            ])
+            .output()
+            .expect("curl probe");
+        if String::from_utf8_lossy(&out.stdout) == "200" {
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(300));
+    }
+
+    let out = Command::new("curl")
+        .args([
+            "-s",
+            "-D",
+            "-",
+            "-o",
+            "/tmp/marqdo-favicon.bin",
+            "-w",
+            "\n%{http_code}",
+            &format!("{base}/favicon.ico"),
+        ])
+        .output()
+        .expect("curl favicon");
+    let body = String::from_utf8_lossy(&out.stdout);
+    assert!(
+        body.contains("200") && body.to_ascii_lowercase().contains("image/"),
+        "favicon headers={body}"
+    );
+
+    let out = Command::new("curl")
+        .args(["-s", &format!("{base}/")])
+        .output()
+        .expect("curl home");
+    let html = String::from_utf8_lossy(&out.stdout);
+    assert!(
+        html.contains("rel=\"icon\"") && html.contains("mq-images") && html.contains("apple-touch-icon"),
+        "home html missing assets markers: {}",
+        &html[..html.len().min(500)]
+    );
+
+    let _ = child.kill();
+}
+
+#[test]
 fn ext_web_middleware_smoke() {
     let status = Command::new("cargo")
         .args(["build", "-p", "marqdo_plugin_web"])

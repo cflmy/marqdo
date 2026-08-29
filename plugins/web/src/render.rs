@@ -376,6 +376,18 @@ fn head_html(args: &Value, default_title: &str) -> String {
                 "canonical" => {
                     s.push_str(&format!("<link rel=\"canonical\" href=\"{}\"/>", esc(&val)));
                 }
+                "icon" | "favicon" => {
+                    s.push_str(&format!(
+                        "<link rel=\"icon\" href=\"{}\"/>",
+                        esc(&val)
+                    ));
+                }
+                "apple-touch-icon" | "apple_touch_icon" => {
+                    s.push_str(&format!(
+                        "<link rel=\"apple-touch-icon\" href=\"{}\"/>",
+                        esc(&val)
+                    ));
+                }
                 k if k.starts_with("og:") => {
                     s.push_str(&format!(
                         "<meta property=\"{}\" content=\"{}\"/>",
@@ -392,6 +404,10 @@ fn head_html(args: &Value, default_title: &str) -> String {
                 }
             }
         }
+    }
+    if let Some(head) = args.get("head") {
+        let links = crate::assets::head_links_from_json(head);
+        s.push_str(&crate::assets::render_head_links(&links));
     }
     s
 }
@@ -476,6 +492,11 @@ pub fn render_page_ex(
     };
 
     let mut main_html = String::new();
+    if let Some(images) = args.get("images_html").and_then(|v| v.as_str()) {
+        if !images.is_empty() {
+            main_html.push_str(images);
+        }
+    }
     if !intro.is_empty() {
         main_html.push_str(&format!("<div class=\"main-intro\">{intro}</div>"));
     }
@@ -579,6 +600,11 @@ pub fn render_fragment(args: &Value, db_url: Option<&str>) -> String {
         _ => {
             let (intro, items, _total) = resolve_main(args, db_url);
             let mut body = String::new();
+            if let Some(images) = args.get("images_html").and_then(|v| v.as_str()) {
+                if !images.is_empty() {
+                    body.push_str(images);
+                }
+            }
             if !intro.is_empty() {
                 body.push_str(&format!("<div class=\"main-intro\">{intro}</div>"));
             }

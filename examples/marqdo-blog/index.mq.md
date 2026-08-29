@@ -64,6 +64,25 @@ import db:db/index.mq.md
 |----|--------|------|
 | 1 | admin | marqdo |
 
+`站点图标` =
+
+| 路径 | 关系 | 类型 | 尺寸 | 地址 |
+|------|------|------|------|------|
+| "public/favicon.png" | icon | "image/png" | 32x32 | "/favicon.ico" |
+| "public/favicon.svg" | icon | "image/svg+xml" | any | "/static/favicon.svg" |
+
+`头资源` =
+
+| 关系 | 地址 | 类型 |
+|------|------|------|
+| apple-touch-icon | "/static/favicon.png" | "image/png" |
+
+`品牌图` =
+
+| 源 | 替代 | 类 | 链接 | 宽度 | 加载 |
+|----|------|----|------|------|------|
+| "/static/logo.svg" | Marqdo | brand-logo | "/" | 40 | eager |
+
 *store = > db.打开*
 
 *首页CSS = > theme.全局*
@@ -73,6 +92,8 @@ import db:db/index.mq.md
 *page = > page.主体装配 主体=`列表`*
 *page = > page.排序 排序="-created_at"*
 *page = > page.样式 样式=`首页CSS`*
+*page = > page.头装配 表=`头资源`*
+*page = > page.图片装配 表=`品牌图`*
 
 *about = > 网页.页面 标题="关于" 引言="<h1>关于本站</h1><p>一个用 Marqdo 的 web 扩展库（ext/web）写成的博客系统。</p><p>它演示了：GFM 表格装配导航与侧栏、SQLite 驱动的主体绑定、动态路由 /post/{slug}、标签归档、以及受 session 保护的后台 CRUD。</p>"*
 *about = > about.组件装配 组件=`首页`*
@@ -104,6 +125,7 @@ import db:db/index.mq.md
 *app = > app.路由 路径="/tags" 页面=tags*
 *app = > app.路由 路径="/tag/{slug}" 页面=tagged*
 *app = > app.静态 目录="public" 挂载="/static"*
+*app = > app.图标 表=`站点图标`*
 *app = > app.路由实时 路径="/live" 回显=True*
 *app = > app.鉴权 用户表=`管理员` 会话时长=3600*
 > `app`.监听

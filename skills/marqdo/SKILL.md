@@ -154,6 +154,7 @@ Import **one language file** — never mix EN/ZH API names in the same `.mq.md`:
 
 - Authors use **GFM tables + `#` classes** — no `json.parse` / `json.set` glue, no hand-built part JSON.
 - Table cells stay **literal strings**; path text like `` `posts`.`title` `` is resolved by web classes.
+- **Quote path/MIME cells** that contain `/` (T5 cell expressions treat bare `/` as division): `"/static/logo.svg"`, `"image/png"`.
 - **`ext/**` never calls `host_*`** — hot path is native `plugins/web` ABI.
 - HTTPS: terminate at reverse proxy; set `cookie_secure=True` on auth (no in-process TLS).
 
@@ -164,17 +165,18 @@ index.mq.md          # entry + home page table + listen
 pages/               # sub-pages
 components/          # reusable |属性|值|样式| tables
 styles/              # CSS modules
+public/              # static + favicon.ico|png|svg
 db/                  # schema + open/init
 data/                # sqlite runtime (gitignore)
 ```
 
 **Core objects (EN / ZH):** `# page`/`页面`, `# style`/`样式`, `# db`/`数据库`, `# form`/`表单`, `# app`/`应用`, `# auth`/`鉴权`, `# cache`/`缓存`, `# storage`/`存储`.
 
-**Typical flow:** `db.init` → `page.compose_components` + `page.compose_main` → `page.render` → `app` with `route` / `static` / `configure` / `listen`.
+**Typical flow:** `db.init` → `page.compose_components` + `page.compose_main` → `page.head` / `page.images` / `page.meta` → `app` with `route` / `static` / `icons` / `configure` / `listen`.
 
-**Shipped surface (W0–W7 + P3):** middleware + JSON API (`app.configure`); transactions, pagination, FTS search (`db.migrate`, `db.fts`, `db.search`); security (argon2, CSRF, SQLite sessions, login rate limit); SEO / RSS / Markdown (`page.meta`, `route_rss`, `lib/net.markdown_parse`); upload / download / gallery; sitemap / robots / error pages / redirects; RBAC (`app.gate`, user `role`); audit timestamps + FK in `db.init`; ETag on downloads.
+**Shipped surface (W0–W7 + P3 + W8):** middleware + JSON API (`app.configure`); transactions, pagination, FTS search (`db.migrate`, `db.fts`, `db.search`); security (argon2, CSRF, SQLite sessions, login rate limit); SEO / RSS / Markdown (`page.meta`, `route_rss`, `lib/net.markdown_parse`); upload / download / gallery; sitemap / robots / error pages / redirects; RBAC (`app.gate`, user `role`); audit timestamps + FK in `db.init`; ETag on downloads; **W8** site icons (`app.icons` → `/favicon.ico`), head resource tables (`page.head`), image assembly (`make_images` / `page.images`).
 
-Design: [ext-web.md](../../doc/design/ext-web.md) · capability matrix: [web-net-capabilities.md](../../doc/design/web-net-capabilities.md) · example: [examples/marqdo-blog/](../../examples/marqdo-blog/).
+Design: [ext-web.md](../../doc/design/ext-web.md) · assets: [web-assets-and-images.md](../../doc/design/web-assets-and-images.md) · capability matrix: [web-net-capabilities.md](../../doc/design/web-net-capabilities.md) · example: [examples/marqdo-blog/](../../examples/marqdo-blog/).
 
 Web patterns: [examples.md](examples.md) §13 · API index: [reference.md](reference.md).
 
