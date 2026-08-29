@@ -99,7 +99,7 @@ marqdo catalog public -o .marqdo
 
 ---
 
-## 现状（v0.2.0）
+## 现状（v0.3.0）
 
 - 映射与解释器：Phase I 树遍历 + 字节码后端可用；金样例在 `tests/`  
 - **对象**：`#` = 类型/构造，`##`+ = 函数/方法；见 [objects.md](doc/design/objects.md)  
@@ -108,26 +108,62 @@ marqdo catalog public -o .marqdo
 - **`marqdo catalog` / `sync`**：OKF 风格 YAML + 模块概念页  
 - **`marqdo version --check`**：与 GitHub 最新 release 对比  
 - 标准库：**内置于二进制**（v0.1.2+）；磁盘 `lib/` 或 `MARQDO_LIB` 可覆盖。模块含文本、文件、系统、时间、JSON、网络、数学、外联、插件、**自写回**、**子任务**  
-- **官方扩展库 `ext/`**（本版重点，**非** stdlib）：`llm` · `agent` · **`web`（W0–W7 + P3 完结，见 [marqdo-blog](examples/marqdo-blog/)）** · **`quantum`（Q0–Q7 + Q8a/b 主题 SVG，见 [quantum-entanglement](examples/quantum-entanglement/)）**。安装：`marqdo ext list` / `add …` / `remove`（见 [ext-cli.md](doc/design/ext-cli.md)；默认 `~/.marqdo/ext` 或 `MARQDO_EXT`）。原生插件先 `cargo build -p marqdo_plugin_*` 再 `ext add`。设计：[ext-llm](doc/design/ext-llm.md) · [ext-agent](doc/design/ext-agent.md) · [ext-web](doc/design/ext-web.md) · [web-net-capabilities](doc/design/web-net-capabilities.md) · [ext-quantum](doc/design/ext-quantum.md) · [ext-quantum-viz-style](doc/design/ext-quantum-viz-style.md)
+- **官方扩展库 `ext/`**（**非** stdlib，本版收口）：
+  - **`web`**：W0–W7 + P3 完结（会话 / 缓存 / 上传 / WebSocket / 样式装配等）；示例 [marqdo-blog](examples/marqdo-blog/)；生产路径见 [web-asgi-servers-and-marqdo.md](doc/design/web-asgi-servers-and-marqdo.md)（反向代理 → 嵌入式 `listen`，非 Daphne/Uvicorn）
+  - **`quantum`**：Q0–Q7 + Q8a/b 主题 SVG；示例 [quantum-entanglement](examples/quantum-entanglement/)
+  - **`agent`**：A1–A4（OKF 复用、过程事件、上下文预算、RAG/MCP fixture）；下一波缺口 [agent-framework-gaps-after-a4.md](doc/research/agent-framework-gaps-after-a4.md)
+  - **`llm`**：OpenAI 兼容对话
+  - 安装：`marqdo ext list` / `add …` / `remove`（[ext-cli.md](doc/design/ext-cli.md)；默认 `~/.marqdo/ext`）。原生插件先 `cargo build -p marqdo_plugin_*` 再 `ext add`
 - **原生插件 ABI**：[`include/marqdo_abi.h`](include/marqdo_abi.h) · [ext-abi.md](doc/design/ext-abi.md)；`plugins/{demo,agent,web,quantum}`  
 - **用户静态站**：`public/` → `view output` → CI 发布 [gh-pages](https://cflmy.github.io/marqdo/)  
 - **VS Code 扩展**：分支 **`vscode-extension`**（`main` 不跟踪源码；见 [vscode-extension-commit.md](doc/design/vscode-extension-commit.md)）；Release 附带 `.vsix`  
 - 选型：[ADR 0001 — Rust](doc/adr/0001-implementation-language.md)
 
+### 如何使用最新 Marqdo（v0.3.0）
+
+```bash
+# 1) 源码安装（跟 tag 或 main）
+git clone https://github.com/cflmy/marqdo.git && cd marqdo
+git checkout v0.3.0   # 或留在 main
+cargo build --release
+export PATH="$PWD/target/release:$PATH"
+marqdo version
+marqdo version --check
+
+# 2) 跑解释器 / 文档站 / catalog
+marqdo run tests/structure/hello.mq.md
+marqdo run tests/structure/hello.mq.md --backend bytecode
+marqdo view public --no-open
+marqdo debug public --no-open
+marqdo catalog public -o .marqdo
+
+# 3) 安装官方扩展（需先编原生插件）
+cargo build --release -p marqdo_plugin_web -p marqdo_plugin_agent -p marqdo_plugin_quantum
+marqdo ext add web      # 或：网页
+marqdo ext add agent    # 或：智能体
+marqdo ext add quantum  # 或：量子
+marqdo ext add llm      # 或：大模型
+
+# 4) 动态站示例（扩展装好后）
+marqdo run examples/marqdo-blog/index.mq.md
+# 浏览器打开终端打印的 listen 地址
+
+# 5) Windows：也可从 GitHub Releases 下载 exe / zip / vsix
+#    https://github.com/cflmy/marqdo/releases/tag/v0.3.0
+```
+
+开发期也可用 `cargo run -- …` 代替已安装的 `marqdo`：
+
 ```bash
 cargo run -- run tests/structure/hello.mq.md
-cargo run -- run tests/structure/hello.mq.md --backend bytecode
 cargo run -- view public --no-open
-cargo run -- debug public --no-open
-cargo run -- catalog public -o .marqdo
 cargo run -- view output public -o public
 powershell -File ./scripts/build-public.ps1
 ```
 
-**发布包（GitHub Releases）**：单独二进制 **已内置**官方 `lib/`（`import …:lib/…` 可直接导入）。仍提供带 `lib/` 的 zip 便于覆盖或离线分发。**扩展库**用 `marqdo ext add llm|agent|web|quantum` 安装（见 [CHANGELOG](CHANGELOG.md) 与 [ext-cli.md](doc/design/ext-cli.md)）；原生 `.so`/`.dll` 需本地编译或从带 `native/` 的安装目录解析。`marqdo version --check` 可查看是否有新版本。
+**发布包（GitHub Releases）**：单独二进制 **已内置**官方 `lib/`（`import …:lib/…` 可直接导入）。仍提供带 `lib/` 的 zip 便于覆盖或离线分发。**扩展库**用 `marqdo ext add …` 安装（见 [CHANGELOG](CHANGELOG.md) 与 [ext-cli.md](doc/design/ext-cli.md)）；原生 `.so`/`.dll` 需本地编译或从带 `native/` 的安装目录解析。
 
-文档：用户站 [public/](public/) · 设计 [doc/](doc/) · OKF / catalog [catalog-cli.md](doc/design/catalog-cli.md) · 调试 [view-debug.md](doc/design/view-debug.md)
-
+文档：用户站 [public/](public/) · 设计 [doc/](doc/) · OKF / catalog [catalog-cli.md](doc/design/catalog-cli.md) · 调试 [view-debug.md](doc/design/view-debug.md) · 变更 [CHANGELOG.md](CHANGELOG.md)
 ---
 
 ## 命名

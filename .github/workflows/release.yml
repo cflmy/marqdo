@@ -92,11 +92,13 @@ jobs:
           body: |
             ## Marqdo ${{ github.ref_name }}
 
-            ### Highlights — extension libraries
-            - Official **`ext/`** packages: `llm`, `agent`, `web`, `quantum` (not stdlib)
+            ### Highlights — v0.3
+            - **`ext/web`**: W0–W7 + P3 complete (sessions, cache, upload, WebSocket, style assembly); see marqdo-blog
+            - **`ext/quantum`**: Q7 linalg + Q8 themed SVG viz
+            - **`ext/agent`**: A1–A4 (OKF reuse, events, context budget, RAG/MCP fixtures)
             - Install: `marqdo ext list` / `marqdo ext add llm|agent|web|quantum`
             - Native plugins: `cargo build --release -p marqdo_plugin_*` then `ext add`
-            - Details: [CHANGELOG](https://github.com/cflmy/marqdo/blob/main/CHANGELOG.md) · [ext-cli.md](https://github.com/cflmy/marqdo/blob/main/doc/design/ext-cli.md)
+            - Details: [CHANGELOG](https://github.com/cflmy/marqdo/blob/main/CHANGELOG.md) · [README](https://github.com/cflmy/marqdo/blob/main/README.md)
 
             Also: embedded stdlib, writeback/subtask, Variables modal in `view`, VSIX from branch **`vscode-extension`**.
 

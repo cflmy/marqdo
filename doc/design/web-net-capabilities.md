@@ -233,6 +233,8 @@
 
 **后续可选（非阻塞）**：标签页内置模板（D6）、cookie 签名、会话条数硬上限、应用层反垃圾、进程内 TLS（仍建议反代）。
 
+**部署对照（Daphne / Uvicorn / 反代）：** 见 [web-asgi-servers-and-marqdo.md](web-asgi-servers-and-marqdo.md) — Marqdo **不能**被 Daphne 托管；生产等价路径是 **反代 → 内嵌 axum `listen`**。
+
 **一句话：`ext/web` 已是可上线级别的 Marqdo 动态站扩展；博客/CMS/中小型 API 可在表格 + 类方法作者面上完整实现。**
 
 ---

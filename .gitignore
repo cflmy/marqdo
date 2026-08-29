@@ -51,6 +51,7 @@ plugins/*/tmp/
 /examples/web-site-zh/data/
 /examples/web-net-site/data/
 /examples/web-net-site-zh/data/
+/examples/marqdo-blog/data/
 
 # Quantum draw/SVG runtime outputs (sources & gold .mq.md stay tracked)
 /tests/ext/quantum-*.svg

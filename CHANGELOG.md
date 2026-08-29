@@ -2,8 +2,36 @@
 
 ## Unreleased
 
+## v0.3.0 — 2026-08-29
+
+### Highlights
+
+本版把 **`ext/web` 网络能力（W0–W7 + P3）**、**`ext/quantum` Q7/Q8**、**`ext/agent` A1–A4** 一并收口到正式发布；并修了网页扩展叙述行误解析、补充 ASGI/生产部署说明与 agent 下一波（B0–B5）缺口调研。
+
+**如何拿到本版**
+
+```bash
+# 从源码（推荐跟 main / 本 tag）
+git clone https://github.com/cflmy/marqdo.git && cd marqdo
+git checkout v0.3.0
+cargo build --release
+./target/release/marqdo version
+
+# 或从 GitHub Releases 下载 Windows 包 / 源码 zip（见 Release 资产）
+marqdo version --check
+```
+
+**扩展（非 stdlib）**
+
+```bash
+cargo build --release -p marqdo_plugin_web -p marqdo_plugin_agent -p marqdo_plugin_quantum
+marqdo ext add web && marqdo ext add agent && marqdo ext add quantum
+# 中文 id：网页 / 智能体 / 量子 / 大模型
+```
+
 ### Added
 - **调研：`ext/agent` A0–A4 之后缺口** ([agent-framework-gaps-after-a4.md](doc/research/agent-framework-gaps-after-a4.md))：产品化示例、评测 harness、真 MCP、plan resume/HITL、飞轮指标与建议分期 B0–B5；挂到 [ext-agent-optimize.md](doc/roadmap/ext-agent-optimize.md) 与 [doc/README.md](doc/README.md)。
+- **生产部署调研（ASGI）** ([web-asgi-servers-and-marqdo.md](doc/design/web-asgi-servers-and-marqdo.md))：不能挂 Daphne/Uvicorn；路径为反向代理 → 嵌入式 `listen`（axum）。
 - **`ext/agent` A4（RAG/MCP 证据工具）**: `corpus_search` 本地语料关键词检索；`mcp_list_tools` / `mcp_call` 读 JSON fixture；返回 `authority=workbook`。金样 `agent-tools-rag-a4`。
 - **`ext/agent` A3（上下文预算）**: `source_brief` / 加深版 `skill_brief`；`build_step_context` 默认截断并提示 `READ:source|skill`；`step` 支持最多 `max_reads` 次加深；父 `READ:skill`。金样 `agent-context-budget-a3`。
 - **`ext/agent` A2（过程可见）**: `plan` 过程事件默认写入返回 map 的 `events`（SSE 仍仅 `stream=True`）；OKF 命中记 `REUSE` decision；view plan 卡渲染过程时间线。对齐 [agent-streaming.md](doc/roadmap/agent-streaming.md)。
@@ -13,6 +41,9 @@
 - **AI Skill + 文档（ext/web 完结复核）**: `skills/marqdo/` 与 `.cursor/skills/marqdo/` 增加 **ext/web 动态站** 专节（硬规则、API 摘要、§13 最小站点样例）；`doc/design/web-net-capabilities.md` 结论/对照表与 W7+P3 实现对齐；`doc/design/ai-skill.md` 更新用途说明。
 - **`ext/quantum` Q7（高阶线性代数 + 高级可视化）**: 密度矩阵 / 部分迹 / Hermitian 谱 / Schmidt / Pauli 期望 / 纯度；SVG：hinton、city、density、paulivec、qsphere、multibloch。全部经 `plugins/quantum` ABI。设计 [ext-quantum-q7.md](doc/design/ext-quantum-q7.md)；金样 `quantum-linalg-smoke`、`quantum-viz-advanced-smoke`；示例 [quantum-entanglement](examples/quantum-entanglement/)。
 - **`ext/quantum` Q8a/Q8b（可视化美学）**: `draw theme=dark|light|bw`（默认 dark）；标签芯片 + gutter 消除线穿字；门族分色；probs/bloch 共用令牌；view 对 `data-theme` 换图框。设计 [ext-quantum-viz-style.md](doc/design/ext-quantum-viz-style.md)。改插件后须 `marqdo ext add quantum` 再开 view。
+
+### Fixed
+- **`ext/web` / `网页.mq.md`**：叙述行勿以反引号开头，避免被解析为语句（`examples/marqdo-blog` 可正常 `listen`）。
 
 ### Changed
 - **Frontmatter import syntax**: `import bind:target` / `导入 bind:target` (file `.mq.md` or short name `lib.member`). Removed legacy `> path.mq.md` / `> use` imports. See [module-namespace.md](doc/design/module-namespace.md).
