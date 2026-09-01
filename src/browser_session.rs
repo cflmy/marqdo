@@ -8,8 +8,12 @@ use crate::host::{HostCaps, HostContext};
 use crate::interp::Interpreter;
 use crate::load::load_module_from_source;
 use crate::value::Value;
+use crate::Backend;
 
 /// Persistent Marqdo program for the browser host bridge.
+///
+/// Session calls (`call`) use the **tree** interpreter so entry bindings persist
+/// across handlers (C3). One-shot [`crate::run_source`] may still use bytecode.
 pub struct BrowserSession {
     module: Module,
     interp: Interpreter,
@@ -18,8 +22,16 @@ pub struct BrowserSession {
 impl BrowserSession {
     /// Parse source, run `# main`, keep entry bindings for later [`Self::call`].
     pub fn boot(source: &str) -> Result<(Self, Value)> {
+        Self::boot_with(source, Backend::Tree)
+    }
+
+    /// Like [`Self::boot`]. `Backend::Bytecode` is rejected for sessions (no shared entry env yet).
+    pub fn boot_with(source: &str, backend: Backend) -> Result<(Self, Value)> {
         if source.trim().is_empty() {
             bail!("source is empty");
+        }
+        if backend != Backend::Tree {
+            bail!("browser session requires tree backend (bytecode has no entry-env invoke yet)");
         }
         let module = load_module_from_source(source)?;
         let caps = HostCaps {
@@ -128,5 +140,13 @@ import json:lib/json.mq.md
             .expect("on_uuid");
         let jd = value_as_json(&done).unwrap();
         assert!(jd["set_text"]["#status"].as_str().unwrap().contains("uuid"));
+    }
+
+    #[test]
+    fn session_rejects_bytecode_backend() {
+        let err = BrowserSession::boot_with("# main\n\n> print text=x\n", Backend::Bytecode)
+            .err()
+            .expect("err");
+        assert!(err.to_string().contains("tree backend"));
     }
 }

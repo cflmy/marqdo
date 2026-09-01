@@ -60,3 +60,12 @@ predicates = "=3.1.0"
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "time", "net"] }
 tokio-tungstenite = "0.24"
 futures-util = "0.3"
+
+# Size-oriented profile for `marqdo-wasm` (C5). Use: cargo build -p marqdo-wasm --profile release-wasm --target wasm32-unknown-unknown
+[profile.release-wasm]
+inherits = "release"
+lto = true
+codegen-units = 1
+opt-level = "z"
+strip = true
+panic = "abort"

@@ -369,4 +369,12 @@ mod tests {
             .expect("run_source");
         assert_eq!(cap.stdout, "Hello World!\n");
     }
+
+    #[test]
+    fn run_source_hello_bytecode() {
+        let mut opts = RunOptions::default();
+        opts.backend = Backend::Bytecode;
+        let cap = run_source("# main\n\n> print text=Hello World!\n", &opts).expect("bc");
+        assert_eq!(cap.stdout, "Hello World!\n");
+    }
 }

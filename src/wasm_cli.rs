@@ -5,7 +5,7 @@ use std::process::Command;
 
 use anyhow::{bail, Context, Result};
 
-/// Build release wasm32 artifact and copy `marqdo_wasm.wasm` into `out_dir`.
+/// Build size-optimized wasm32 artifact and copy `marqdo_wasm.wasm` into `out_dir`.
 pub fn build_wasm(out_dir: &Path) -> Result<()> {
     let status = Command::new("cargo")
         .args([
@@ -14,18 +14,24 @@ pub fn build_wasm(out_dir: &Path) -> Result<()> {
             "marqdo-wasm",
             "--target",
             "wasm32-unknown-unknown",
-            "--release",
+            "--profile",
+            "release-wasm",
         ])
         .status()
         .context("failed to spawn cargo (is it on PATH?)")?;
     if !status.success() {
-        bail!("cargo build -p marqdo-wasm failed with {status}");
+        bail!("cargo build -p marqdo-wasm --profile release-wasm failed with {status}");
     }
 
-    let artifact = find_wasm_artifact()?;
+    let mut artifact = find_wasm_artifact()?;
     std::fs::create_dir_all(out_dir)
         .with_context(|| format!("create {}", out_dir.display()))?;
     let dest = out_dir.join("marqdo_wasm.wasm");
+
+    if let Some(optimized) = try_wasm_opt(&artifact)? {
+        artifact = optimized;
+    }
+
     std::fs::copy(&artifact, &dest).with_context(|| {
         format!(
             "copy {} → {}",
@@ -33,22 +39,68 @@ pub fn build_wasm(out_dir: &Path) -> Result<()> {
             dest.display()
         )
     })?;
-    println!("wrote {}", dest.display());
+    let bytes = std::fs::metadata(&dest)
+        .map(|m| m.len())
+        .unwrap_or(0);
+    println!(
+        "wrote {} ({:.1} KiB)",
+        dest.display(),
+        bytes as f64 / 1024.0
+    );
     Ok(())
+}
+
+/// Run `wasm-opt -Oz` when Binaryen is installed; returns path to optimized file.
+fn try_wasm_opt(input: &Path) -> Result<Option<PathBuf>> {
+    let which = Command::new("wasm-opt").arg("--version").output();
+    let Ok(out) = which else {
+        return Ok(None);
+    };
+    if !out.status.success() {
+        return Ok(None);
+    }
+    let tmp = input.with_extension("opt.wasm");
+    let status = Command::new("wasm-opt")
+        .args(["-Oz", "--enable-bulk-memory"])
+        .arg(input)
+        .arg("-o")
+        .arg(&tmp)
+        .status()
+        .context("wasm-opt spawn failed")?;
+    if !status.success() {
+        // Retry without bulk-memory flag for older binaryen.
+        let status2 = Command::new("wasm-opt")
+            .args(["-Oz"])
+            .arg(input)
+            .arg("-o")
+            .arg(&tmp)
+            .status()
+            .context("wasm-opt spawn failed")?;
+        if !status2.success() {
+            eprintln!("warning: wasm-opt failed; keeping cargo artifact");
+            return Ok(None);
+        }
+    }
+    println!("wasm-opt: {}", tmp.display());
+    Ok(Some(tmp))
 }
 
 fn find_wasm_artifact() -> Result<PathBuf> {
     let mut candidates = Vec::new();
     if let Ok(td) = std::env::var("CARGO_TARGET_DIR") {
         candidates.push(
-            PathBuf::from(td)
-                .join("wasm32-unknown-unknown/release/marqdo_wasm.wasm"),
+            PathBuf::from(&td).join("wasm32-unknown-unknown/release-wasm/marqdo_wasm.wasm"),
+        );
+        candidates.push(
+            PathBuf::from(td).join("wasm32-unknown-unknown/release/marqdo_wasm.wasm"),
         );
     }
     candidates.push(PathBuf::from(
+        "target/wasm32-unknown-unknown/release-wasm/marqdo_wasm.wasm",
+    ));
+    candidates.push(PathBuf::from(
         "target/wasm32-unknown-unknown/release/marqdo_wasm.wasm",
     ));
-    // Workspace may place target next to crates when invoked oddly — still try root.
     for c in &candidates {
         if c.is_file() {
             return Ok(c.clone());

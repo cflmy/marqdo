@@ -260,14 +260,28 @@ W8 资源表可增加「挂 wasm / module」行（既有 `page.head` / `头装�
 
 | 风险 | 缓解 |
 |------|------|
-| wasm 体积过大 | 裁剪 feature；后期 `wasm-opt`；bytecode 路径评估 |
-| 异步拖垮语言 | C4 单独立项；此前不承诺同步 `fetch` |
+| wasm 体积过大 | `release-wasm` profile（`opt-level=z` + LTO + strip）；`marqdo wasm build` 打印 KiB，有则跑 `wasm-opt -Oz` |
+| 异步拖垮语言 | ADR 0003 效应表；不阻塞 WASM |
 | Feature-gate 伤 native | 默认 features = 今日行为；CI 全绿再合 |
 | 作者误以浏览器替代服务器安全 | 文档强调鉴权在服务端 |
+| 会话要 bytecode | **未做**：`BrowserSession` 固定 tree（缺 entry-env invoke）；`run_source` 已支持 bytecode |
 
 ---
 
-## 13. 决策摘要
+## 14. C5 硬化（已落地子集）
+
+| 项 | 状态 |
+|----|------|
+| `profile.release-wasm` + `marqdo wasm build` 体积报告 | done |
+| 可选 `wasm-opt` | done（Binaryen 在 PATH 时） |
+| `run_source` bytecode 金样 | done（单元测） |
+| 会话 bytecode / view 断点复用同一 wasm | **后续** |
+
+预算：`release-wasm` 实测约 **0.9 MiB** 未压缩（嵌入 `lib/` 后）；gzip/CDN 另计。目标维持 **≤ ~1.2 MiB**。
+
+---
+
+## 15. 决策摘要
 
 | 问题 | 答案 |
 |------|------|
