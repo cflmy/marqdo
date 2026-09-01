@@ -92,10 +92,10 @@ jobs:
           body: |
             ## Marqdo ${{ github.ref_name }}
 
-            ### Highlights — v0.3.1
-            - **W8**: favicon / head assets / image assembly (`app.icons`, `page.head`, `make_images`)
-            - Fix: absolute `entry_dir` for relative entry scripts (no nested `tests/ext/tests/ext`)
-            - **`ext/web`**: W0–W7 + P3 + W8; **`ext/quantum`** Q7/Q8; **`ext/agent`** A1–A4
+            ### 亮点 / Highlights — v0.3.2
+            - **浏览器 Marqdo（路线 C）**：`marqdo wasm build`、官方 bridge、会话 ABI、`fetch`/`after` 效应；示例 `examples/browser-hello/`
+            - **Browser Marqdo (route C)**: WASM build, official bridge, session ABI, async effects; see CHANGELOG
+            - Fix: Admin 长内容布局 · `ext add` 原生插件预检 · `@keyframes` / 样式表比率引号约定
             - Install: `marqdo ext list` / `marqdo ext add llm|agent|web|quantum`
             - Native plugins: `cargo build --release -p marqdo_plugin_*` then `ext add`
             - Details: [CHANGELOG](https://github.com/cflmy/marqdo/blob/main/CHANGELOG.md) · [README](https://github.com/cflmy/marqdo/blob/main/README.md)

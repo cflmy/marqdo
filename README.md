@@ -99,7 +99,7 @@ marqdo catalog public -o .marqdo
 
 ---
 
-## 现状（v0.3.1）
+## 现状（v0.3.2）
 
 - 映射与解释器：Phase I 树遍历 + 字节码后端可用；金样例在 `tests/`  
 - **对象**：`#` = 类型/构造，`##`+ = 函数/方法；见 [objects.md](doc/design/objects.md)  
@@ -117,14 +117,15 @@ marqdo catalog public -o .marqdo
 - **原生插件 ABI**：[`include/marqdo_abi.h`](include/marqdo_abi.h) · [ext-abi.md](doc/design/ext-abi.md)；`plugins/{demo,agent,web,quantum}`  
 - **用户静态站**：`public/` → `view output` → CI 发布 [gh-pages](https://cflmy.github.io/marqdo/)  
 - **VS Code 扩展**：分支 **`vscode-extension`**（`main` 不跟踪源码；见 [vscode-extension-commit.md](doc/design/vscode-extension-commit.md)）；Release 附带 `.vsix`  
+- **浏览器 Marqdo（WASM）**：`marqdo wasm build` + 官方 bridge；示例 [browser-hello](examples/browser-hello/)；站点挂载 `web.client_embed` / `网页.客户端挂载`（[ADR 0002](doc/adr/0002-browser-marqdo-wasm.md) · [ADR 0003](doc/adr/0003-browser-async-effects.md)）
 - 选型：[ADR 0001 — Rust](doc/adr/0001-implementation-language.md) · [ADR 0002 — 浏览器 WASM](doc/adr/0002-browser-marqdo-wasm.md)（C0–C5 完结，见 [roadmap/browser-wasm.md](doc/roadmap/browser-wasm.md)）· [ADR 0003 — 异步效应](doc/adr/0003-browser-async-effects.md)
 
-### 如何使用最新 Marqdo（v0.3.1）
+### 如何使用最新 Marqdo（v0.3.2）
 
 ```bash
 # 1) 源码安装（跟 tag 或 main）
 git clone https://github.com/cflmy/marqdo.git && cd marqdo
-git checkout v0.3.1   # 或留在 main
+git checkout v0.3.2   # 或留在 main
 cargo build --release
 export PATH="$PWD/target/release:$PATH"
 marqdo version
@@ -148,8 +149,12 @@ marqdo ext add llm      # 或：大模型
 marqdo run examples/marqdo-blog/index.mq.md
 # 浏览器打开终端打印的 listen 地址；/favicon.ico 与 logo 装配见 W8
 
-# 5) Windows：也可从 GitHub Releases 下载 exe / zip / vsix
-#    https://github.com/cflmy/marqdo/releases/tag/v0.3.1
+# 5) 浏览器 WASM（可选）
+marqdo wasm build
+# → dist/wasm/ … 见 examples/browser-hello/
+
+# 6) Windows：也可从 GitHub Releases 下载 exe / zip / vsix
+#    https://github.com/cflmy/marqdo/releases/tag/v0.3.2
 ```
 
 开发期也可用 `cargo run -- …` 代替已安装的 `marqdo`：

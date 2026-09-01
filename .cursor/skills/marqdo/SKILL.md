@@ -16,6 +16,8 @@ Marqdo = **Markdown markers as syntax**. A `.mq.md` file is both documentation a
 
 Canonical design (repo): `doc/design/markdown-mapping.md`, `doc/design/keywords.md`. Deeper tables: [reference.md](reference.md). Copy-paste patterns: [examples.md](examples.md).
 
+**Product release** (tag, CHANGELOG, README, public docs, VSIX, GitHub assets): use [marqdo-release](../marqdo-release/SKILL.md) — detect latest version, **ask the user for the next SemVer**, then follow that playbook. Do not invent a version number.
+
 ## Hard rules (do not violate)
 
 1. **File suffix** must be `.mq.md` (never plain `.md` for executable sources).

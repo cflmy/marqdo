@@ -3,12 +3,32 @@
 ## Unreleased
 
 ### Added
+
+### Fixed
+
+### Changed
+
+## v0.3.2 — 2026-09-01
+
+### Highlights
+
+**浏览器 Marqdo（路线 C）首版完备**：`wasm-core`、`marqdo wasm build`、会话 ABI、DOM/`fetch`/`after` 效应、官方 bridge、体积与冒烟；并修 Admin 长内容布局、`ext add` 原生插件预检、`@keyframes` 与样式表 `/` 比率约定。
+
+```bash
+git checkout v0.3.2
+cargo build --release
+marqdo wasm build
+marqdo ext add web   # 改插件后请重新 add
+```
+
+### Added
 - **浏览器 Marqdo（路线 C）**： [ADR 0002](doc/adr/0002-browser-marqdo-wasm.md) · [design](doc/design/browser-marqdo-wasm.md) · [roadmap C0–C5](doc/roadmap/browser-wasm.md)。
 - **C0/C1**：`wasm-core` feature 门控；`run_source`；crate `crates/marqdo-wasm`（`mq_run` ABI）；示例 [examples/browser-hello](examples/browser-hello/)。
 - **C2/C3**：`marqdo wasm build`；会话 `mq_boot`/`mq_call`；GFM wire 表 + `set_text` DOM 回写；[interact.html](examples/browser-hello/interact.html) 计数器示例。
 - **C4**：[ADR 0003](doc/adr/0003-browser-async-effects.md) 效应表（`fetch` / `after`）+ bridge 续体；[fetch.html](examples/browser-hello/fetch.html)。
 - **C5**：`release-wasm` 体积配置；`marqdo wasm build` 报告 KiB 并可选 `wasm-opt`；`run_source` bytecode 单测；会话仍为 tree。
 - **WASM 收口**：规范 `crates/marqdo-wasm/js/marqdo-bridge.js`；`wasm build` 同时拷贝 bridge；Node 冒烟 `tests/wasm`；`web.client_embed` / `网页.客户端挂载`；路线图标 Completed。
+- **发版 Skill**：`.cursor/skills/marqdo-release/`（探测版本 → 用户确认 → 文档/资产/扩展/Release 说明）。
 
 ### Fixed
 - **Admin UI**：主区取消 `max-width:56rem` 限制，表格外包可横向滚动的 `.table-wrap`，单元格完整展示并自动换行；表单加宽且 textarea 可随内容增高。
