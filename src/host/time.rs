@@ -1,7 +1,8 @@
 //! Time host primitives.
 
-use std::thread;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::Duration;
+#[cfg(not(target_arch = "wasm32"))]
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use chrono::{DateTime, NaiveDateTime, Utc};
 
@@ -9,19 +10,34 @@ use crate::host::HostContext;
 use crate::value::Value;
 
 pub fn now_unix() -> Result<Value, String> {
-    let secs = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map_err(|e| format!("now_unix: {e}"))?
-        .as_secs();
-    Ok(Value::Int(secs as i64))
+    #[cfg(target_arch = "wasm32")]
+    {
+        // No wall clock on wasm32-unknown-unknown without JS bridge (C4).
+        return Err("now_unix unavailable in browser wasm (no clock bridge yet)".into());
+    }
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        let secs = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map_err(|e| format!("now_unix: {e}"))?
+            .as_secs();
+        Ok(Value::Int(secs as i64))
+    }
 }
 
 pub fn now_ms() -> Result<Value, String> {
-    let ms = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map_err(|e| format!("now_ms: {e}"))?
-        .as_millis();
-    Ok(Value::Int(ms as i64))
+    #[cfg(target_arch = "wasm32")]
+    {
+        return Err("now_ms unavailable in browser wasm (no clock bridge yet)".into());
+    }
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        let ms = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map_err(|e| format!("now_ms: {e}"))?
+            .as_millis();
+        Ok(Value::Int(ms as i64))
+    }
 }
 
 fn as_i64(v: &Value, label: &str) -> Result<i64, String> {
@@ -65,7 +81,15 @@ pub fn sleep_ms(ctx: &HostContext, ms: &Value) -> Result<Value, String> {
         }
     }
     if n > 0 {
-        thread::sleep(Duration::from_millis(n));
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            std::thread::sleep(Duration::from_millis(n));
+        }
+        #[cfg(target_arch = "wasm32")]
+        {
+            let _ = Duration::from_millis(n);
+            // Browser wasm has no blocking sleep; ignore (C0/C1).
+        }
     }
     Ok(Value::None)
 }

@@ -10,25 +10,48 @@ repository = "https://github.com/cflmy/marqdo"
 [[bin]]
 name = "marqdo"
 path = "src/main.rs"
+required-features = ["cli"]
+
+[features]
+default = ["native"]
+native = ["cli", "view", "net-host", "plugin-host", "exec-host", "fs-host", "tty"]
+cli = ["dep:clap"]
+view = ["dep:tiny_http"]
+net-host = ["dep:ureq", "dep:idna_adapter", "dep:zeroize"]
+plugin-host = ["dep:libloading"]
+exec-host = []
+fs-host = []
+tty = ["dep:libc"]
+wasm-core = []
 
 [dependencies]
 anyhow = "1"
 chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
-clap = { version = "=4.4.18", features = ["derive"] }
+clap = { version = "=4.4.18", features = ["derive"], optional = true }
 pulldown-cmark = "0.12"
 serde_json = "1"
 thiserror = "1"
-tiny_http = "0.12"
+tiny_http = { version = "0.12", optional = true }
 # Pin for Cargo/rustc 1.81 (newer rustls/idna/zeroize need edition2024).
-ureq = { version = "=2.9.7", default-features = false, features = ["tls", "gzip"] }
-idna_adapter = "=1.1.0"
-zeroize = "=1.8.1"
-libloading = "=0.8.6"
+ureq = { version = "=2.9.7", default-features = false, features = ["tls", "gzip"], optional = true }
+idna_adapter = { version = "=1.1.0", optional = true }
+zeroize = { version = "=1.8.1", optional = true }
+libloading = { version = "=0.8.6", optional = true }
 include_dir = "0.7"
-libc = "0.2"
+libc = { version = "0.2", optional = true }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+# No `wasmbind`: keeps cdylib free of wasm-bindgen imports (raw mq_* ABI).
+chrono = { version = "0.4", default-features = false, features = ["alloc", "std"] }
 
 [workspace]
-members = ["plugins/demo", "plugins/agent", "plugins/web", "plugins/quantum"]
+members = [
+    "plugins/demo",
+    "plugins/agent",
+    "plugins/web",
+    "plugins/quantum",
+    "crates/marqdo-wasm",
+]
 resolver = "2"
 
 [dev-dependencies]

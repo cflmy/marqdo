@@ -8,10 +8,12 @@ pub mod ast;
 pub mod builtin;
 pub mod bytecode;
 pub mod capture;
+#[cfg(feature = "cli")]
 pub mod catalog;
 pub mod debug;
 pub mod diagnostics;
 pub mod embedded_lib;
+#[cfg(feature = "cli")]
 pub mod ext_cli;
 pub mod foreign;
 pub mod formula;
@@ -23,7 +25,9 @@ pub mod lex;
 pub mod load;
 pub mod parse;
 pub mod value;
+#[cfg(feature = "net-host")]
 pub mod version_check;
+#[cfg(feature = "view")]
 pub mod view;
 
 use std::path::Path;
@@ -36,7 +40,7 @@ use crate::bytecode::{compile_module, Vm};
 use crate::capture::RunCapture;
 use crate::interp::Interpreter;
 use crate::lex::{classify_source, format_lines_dump};
-use crate::load::load_module;
+use crate::load::{load_module, load_module_from_source};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum Backend {
@@ -291,5 +295,73 @@ pub fn run_file_capture(path: &Path, opts: &RunOptions) -> Result<RunCapture> {
                 bindings: Default::default(),
             })
         }
+    }
+}
+
+/// Run source text in-memory (browser wasm / tests). Imports resolve via embedded `lib/` only.
+pub fn run_source(source: &str, opts: &RunOptions) -> Result<RunCapture> {
+    if source.trim().is_empty() {
+        bail!("source is empty");
+    }
+    let stdin_lines = crate::input_feed::effective_stdin(source, &opts.stdin_lines);
+    let module = load_module_from_source(source)?;
+    match opts.backend {
+        Backend::Tree => {
+            let mut host = HostContext::for_capture(None, opts.host_caps());
+            host.set_entry_source(None, source);
+            host.argv = opts.argv.clone();
+            if let Some(root) = &opts.fs_root {
+                host.fs_root = Some(root.clone());
+            }
+            if let Some(lim) = opts.sleep_limit_ms {
+                host.sleep_limit_ms = Some(lim);
+            }
+            let mut interp = Interpreter::with_capture(None, false)
+                .with_stdin(stdin_lines)
+                .with_host(host);
+            let value = interp.run_module(&module)?;
+            let plots = interp.take_plots();
+            Ok(RunCapture {
+                stdout: interp.captured_stdout,
+                value,
+                plots,
+                bindings: interp.entry_bindings,
+            })
+        }
+        Backend::Bytecode => {
+            let program = compile_module(None, &module)?;
+            let mut host = HostContext::for_capture(None, opts.host_caps());
+            host.set_entry_source(None, source);
+            host.argv = opts.argv.clone();
+            if let Some(root) = &opts.fs_root {
+                host.fs_root = Some(root.clone());
+            }
+            if let Some(lim) = opts.sleep_limit_ms {
+                host.sleep_limit_ms = Some(lim);
+            }
+            let mut vm = Vm::with_capture(None)
+                .with_stdin(stdin_lines)
+                .with_host(host);
+            let value = vm.run(&program)?;
+            let plots = vm.take_plots();
+            Ok(RunCapture {
+                stdout: vm.captured_stdout,
+                value,
+                plots,
+                bindings: Default::default(),
+            })
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn run_source_hello() {
+        let cap = run_source("# main\n\n> print text=Hello World!\n", &RunOptions::default())
+            .expect("run_source");
+        assert_eq!(cap.stdout, "Hello World!\n");
     }
 }

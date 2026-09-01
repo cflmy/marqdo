@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="zh-Hans">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Marqdo browser hello (WASM C1)</title>
+  <style>
+    :root {
+      --ink: #1a1f1c;
+      --paper: #e8efe6;
+      --accent: #2f6f4e;
+      --muted: #5a6b60;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "IBM Plex Sans", "Noto Sans SC", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(1200px 600px at 10% -10%, #c5dcc8 0%, transparent 55%),
+        linear-gradient(165deg, #f3f7f2, var(--paper));
+      padding: 2rem clamp(1rem, 4vw, 3rem);
+    }
+    h1 {
+      font-family: "IBM Plex Serif", "Noto Serif SC", serif;
+      font-weight: 600;
+      font-size: clamp(1.6rem, 3vw, 2.2rem);
+      margin: 0 0 0.35rem;
+      letter-spacing: -0.02em;
+    }
+    .lead { color: var(--muted); margin: 0 0 1.5rem; max-width: 36rem; }
+    label { display: block; font-size: 0.85rem; color: var(--muted); margin-bottom: 0.35rem; }
+    textarea {
+      width: min(40rem, 100%);
+      min-height: 10rem;
+      padding: 0.75rem 0.9rem;
+      border: 1px solid #b7c7bb;
+      border-radius: 2px;
+      background: rgba(255,255,255,0.7);
+      font-family: "IBM Plex Mono", ui-monospace, monospace;
+      font-size: 0.9rem;
+      line-height: 1.45;
+    }
+    button {
+      margin-top: 0.85rem;
+      padding: 0.55rem 1.1rem;
+      border: 0;
+      background: var(--accent);
+      color: #f5faf6;
+      font: inherit;
+      cursor: pointer;
+    }
+    button:disabled { opacity: 0.5; cursor: wait; }
+    pre {
+      margin-top: 1.25rem;
+      width: min(40rem, 100%);
+      padding: 0.9rem 1rem;
+      background: #122018;
+      color: #d7eadc;
+      overflow: auto;
+      font-size: 0.85rem;
+      line-height: 1.4;
+    }
+    .err { color: #ffb4a8; }
+  </style>
+</head>
+<body>
+  <h1>Marqdo</h1>
+  <p class="lead">浏览器内 WASM 解释器（路线 C / C1）：源码是 <code>.mq.md</code>，无业务手写 JS。</p>
+  <label for="src">程序</label>
+  <textarea id="src"># main
+
+> print text=Hello from browser WASM!
+</textarea>
+  <div>
+    <button id="run" disabled>运行</button>
+  </div>
+  <pre id="out">loading wasm…</pre>
+  <script type="module" src="./loader.js"></script>
+</body>
+</html>

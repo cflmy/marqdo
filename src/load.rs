@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{bail, Context, Result};
 
-use crate::ast::{Function, Module};
+use crate::ast::Module;
 use crate::diagnostics::Diagnostic;
 use crate::embedded_lib;
 use crate::parse::parse_source;
@@ -212,14 +212,63 @@ fn attach_path(path: &Path, err: anyhow::Error) -> anyhow::Error {
     }
 }
 
-/// Kept for tests / tooling that expect a flat list (local tops only).
-#[allow(dead_code)]
-fn merge_top_level(into: &mut Vec<Function>, fun: Function) {
-    if let Some(existing) = into.iter_mut().find(|f| f.name == fun.name) {
-        *existing = fun;
-    } else {
-        into.push(fun);
+/// Load a module from source text. Imports may only resolve to the embedded
+/// `lib/…` stdlib (no filesystem / `ext/` for this MVP path).
+pub fn load_module_from_source(source: &str) -> Result<Module> {
+    let mut visited = HashSet::new();
+    load_module_from_source_inner(source, "<memory>", &mut visited)
+}
+
+fn load_module_from_source_inner(
+    source: &str,
+    label: &str,
+    visited: &mut HashSet<PathBuf>,
+) -> Result<Module> {
+    let key = PathBuf::from(label);
+    if !visited.insert(key.clone()) {
+        bail!("circular import involving {label}");
     }
+
+    let result = (|| {
+        let mut module = parse_source(source).map_err(|e| anyhow::anyhow!("{label}: {e}"))?;
+        let imports = module.imports.clone();
+        let mut import_modules = HashMap::new();
+        for imp in imports {
+            let dep = load_embedded_import(&imp.path, visited)?;
+            if import_modules.contains_key(&imp.bind) {
+                bail!("duplicate import bind `{}` while loading {label}", imp.bind);
+            }
+            import_modules.insert(imp.bind, dep);
+        }
+        module.import_modules = import_modules;
+        crate::inherit::validate_inheritance(&module)
+            .map_err(|e| anyhow::anyhow!("{label}: {e}"))?;
+        Ok(module)
+    })();
+
+    visited.remove(&key);
+    result
+}
+
+fn load_embedded_import(rel: &str, visited: &mut HashSet<PathBuf>) -> Result<Module> {
+    let rel = rel.replace('\\', "/");
+    let rest = if let Some(r) = rel.strip_prefix("lib/") {
+        r.to_string()
+    } else if let Some(r) = rel.strip_prefix("std/") {
+        r.to_string()
+    } else if embedded_lib::read_file(&rel).is_some() {
+        rel.clone()
+    } else {
+        bail!(
+            "import `{rel}` is not an embedded lib/ path — \
+             run_source only resolves embedded stdlib (lib/…); filesystem and ext/ imports are unsupported"
+        );
+    };
+    let Some(dep_source) = embedded_lib::read_file(&rest) else {
+        bail!("embedded lib not found: lib/{rest}");
+    };
+    let label = format!("lib/{rest}");
+    load_module_from_source_inner(&dep_source, &label, visited)
 }
 
 #[cfg(test)]

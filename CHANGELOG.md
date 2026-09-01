@@ -3,7 +3,8 @@
 ## Unreleased
 
 ### Added
-- **浏览器 Marqdo（路线 C）设计锁定**：[ADR 0002](doc/adr/0002-browser-marqdo-wasm.md) · [design/browser-marqdo-wasm.md](doc/design/browser-marqdo-wasm.md) · [roadmap/browser-wasm.md](doc/roadmap/browser-wasm.md)（WASM 解释器，非编译到 JS）。
+- **浏览器 Marqdo（路线 C）**： [ADR 0002](doc/adr/0002-browser-marqdo-wasm.md) · [design](doc/design/browser-marqdo-wasm.md) · [roadmap C0–C5](doc/roadmap/browser-wasm.md)。
+- **C0/C1**：`wasm-core` feature 门控；`run_source`；crate `crates/marqdo-wasm`（`mq_run` ABI）；示例 [examples/browser-hello](examples/browser-hello/)。
 
 ### Fixed
 - **Admin UI**：主区取消 `max-width:56rem` 限制，表格外包可横向滚动的 `.table-wrap`，单元格完整展示并自动换行；表单加宽且 textarea 可随内容增高。

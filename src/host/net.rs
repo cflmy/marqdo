@@ -1,10 +1,14 @@
 //! HTTP host primitives (HTTP and HTTPS via ureq).
 
-use std::io::{BufRead, BufReader, Write};
+use std::io::Write;
+#[cfg(feature = "net-host")]
+use std::io::{BufRead, BufReader};
+#[cfg(feature = "net-host")]
 use std::time::Duration;
 
-use crate::host::HostContext;
 use crate::value::Value;
+#[cfg(feature = "net-host")]
+use crate::host::HostContext;
 
 fn as_text<'a>(v: &'a Value, label: &str) -> Result<&'a str, String> {
     match v {
@@ -13,6 +17,7 @@ fn as_text<'a>(v: &'a Value, label: &str) -> Result<&'a str, String> {
     }
 }
 
+#[cfg(feature = "net-host")]
 fn headers_from_value(headers: Option<&Value>) -> Result<Vec<(String, String)>, String> {
     let Some(h) = headers else {
         return Ok(Vec::new());
@@ -27,6 +32,7 @@ fn headers_from_value(headers: Option<&Value>) -> Result<Vec<(String, String)>, 
     }
 }
 
+#[cfg(feature = "net-host")]
 fn http_exchange(
     method: &str,
     url: &str,
@@ -84,6 +90,7 @@ fn http_exchange(
     }
 }
 
+#[cfg(feature = "net-host")]
 fn response_map(status: u16, body: String) -> Value {
     Value::Map(vec![
         ("status".into(), Value::Int(status as i64)),
@@ -91,6 +98,7 @@ fn response_map(status: u16, body: String) -> Value {
     ])
 }
 
+#[cfg(feature = "net-host")]
 pub fn http_get(
     ctx: &HostContext,
     url: &Value,
@@ -105,6 +113,7 @@ pub fn http_get(
     Ok(response_map(status, body))
 }
 
+#[cfg(feature = "net-host")]
 pub fn http_post(
     ctx: &HostContext,
     url: &Value,
@@ -127,6 +136,7 @@ pub fn http_post(
 }
 
 /// Generic request: method + url + optional body / content_type / headers.
+#[cfg(feature = "net-host")]
 pub fn http_request(
     ctx: &HostContext,
     method: &Value,
@@ -630,6 +640,7 @@ pub fn openai_sse_parse(text: &Value, echo: Option<&Value>) -> Result<Value, Str
     Ok(Value::List(openai_chat_sse_events(text, echo)?))
 }
 
+#[cfg(feature = "net-host")]
 fn read_sse_body_to_events<R: BufRead>(
     mut reader: R,
     echo: bool,
@@ -755,6 +766,7 @@ fn read_sse_body_to_events<R: BufRead>(
 }
 
 /// POST and consume OpenAI-compatible SSE; return `{status, events}` list of stream maps.
+#[cfg(feature = "net-host")]
 pub fn http_post_sse(
     ctx: &HostContext,
     url: &Value,

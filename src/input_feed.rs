@@ -3,7 +3,9 @@
 
 use std::collections::VecDeque;
 use std::fs;
-use std::io::{self, BufRead, Read, Write};
+use std::io::{self, BufRead, Write};
+#[cfg(all(unix, feature = "tty"))]
+use std::io::Read;
 use std::path::Path;
 
 use anyhow::{Context, Result};
@@ -146,11 +148,11 @@ fn strip_block_indent(line: &str) -> String {
 }
 
 pub fn stdin_is_tty() -> bool {
-    #[cfg(unix)]
+    #[cfg(all(unix, feature = "tty"))]
     {
         unsafe { libc::isatty(libc::STDIN_FILENO) == 1 }
     }
-    #[cfg(not(unix))]
+    #[cfg(not(all(unix, feature = "tty")))]
     {
         false
     }
@@ -181,13 +183,13 @@ fn normalize_prompt(prompt: &str) -> String {
     }
 }
 
-#[cfg(unix)]
+#[cfg(all(unix, feature = "tty"))]
 struct TermGuard {
     fd: i32,
     original: libc::termios,
 }
 
-#[cfg(unix)]
+#[cfg(all(unix, feature = "tty"))]
 impl TermGuard {
     fn enter_cbreak() -> Result<Self> {
         let fd = libc::STDIN_FILENO;
@@ -206,7 +208,7 @@ impl TermGuard {
     }
 }
 
-#[cfg(unix)]
+#[cfg(all(unix, feature = "tty"))]
 impl Drop for TermGuard {
     fn drop(&mut self) {
         unsafe {
@@ -215,6 +217,7 @@ impl Drop for TermGuard {
     }
 }
 
+#[cfg(all(unix, feature = "tty"))]
 fn redraw_line(prompt: &str, buf: &str) -> Result<()> {
     let mut out = io::stdout().lock();
     // CR + clear whole line, then reprint (fixes CJK backspace display desync).
@@ -224,7 +227,7 @@ fn redraw_line(prompt: &str, buf: &str) -> Result<()> {
 }
 
 /// Interactive line editor: UTF-8 char backspace + full-line redraw.
-#[cfg(unix)]
+#[cfg(all(unix, feature = "tty"))]
 fn read_stdin_line_interactive(prompt: &str) -> Result<String> {
     let prompt = normalize_prompt(prompt);
     let _guard = TermGuard::enter_cbreak()?;
@@ -290,7 +293,7 @@ fn read_stdin_line_interactive(prompt: &str) -> Result<String> {
     }
 }
 
-#[cfg(not(unix))]
+#[cfg(not(all(unix, feature = "tty")))]
 fn read_stdin_line_interactive(prompt: &str) -> Result<String> {
     let prompt = normalize_prompt(prompt);
     print!("{prompt}");

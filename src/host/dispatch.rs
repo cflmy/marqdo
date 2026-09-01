@@ -2,7 +2,11 @@
 
 use std::collections::HashMap;
 
-use crate::host::{foreign, fs, json, math, net, plugin, subtask, sys, time, writeback, HostContext};
+use crate::host::{fs, json, math, net, sys, time, writeback, HostContext};
+#[cfg(feature = "exec-host")]
+use crate::host::{foreign, subtask};
+#[cfg(feature = "plugin-host")]
+use crate::host::plugin;
 use crate::value::Value;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -648,22 +652,52 @@ pub fn call_host(
         HostFn::JsonGet => json::get(require(bound, "value")?, require(bound, "key")?),
         HostFn::JsonKeys => json::keys(require(bound, "value")?),
         HostFn::JsonQuote => json::quote(require(bound, "text")?),
-        HostFn::HttpGet => net::http_get(ctx, require(bound, "url")?, bound.get("headers")),
-        HostFn::HttpPost => net::http_post(
-            ctx,
-            require(bound, "url")?,
-            require(bound, "body")?,
-            bound.get("content_type"),
-            bound.get("headers"),
-        ),
-        HostFn::HttpPostSse => net::http_post_sse(
-            ctx,
-            require(bound, "url")?,
-            require(bound, "body")?,
-            bound.get("content_type"),
-            bound.get("headers"),
-            bound.get("echo"),
-        ),
+        HostFn::HttpGet => {
+            #[cfg(feature = "net-host")]
+            {
+                net::http_get(ctx, require(bound, "url")?, bound.get("headers"))
+            }
+            #[cfg(not(feature = "net-host"))]
+            {
+                let _ = (ctx, bound);
+                Err("http_get unavailable in browser wasm".into())
+            }
+        }
+        HostFn::HttpPost => {
+            #[cfg(feature = "net-host")]
+            {
+                net::http_post(
+                    ctx,
+                    require(bound, "url")?,
+                    require(bound, "body")?,
+                    bound.get("content_type"),
+                    bound.get("headers"),
+                )
+            }
+            #[cfg(not(feature = "net-host"))]
+            {
+                let _ = (ctx, bound);
+                Err("http_post unavailable in browser wasm".into())
+            }
+        }
+        HostFn::HttpPostSse => {
+            #[cfg(feature = "net-host")]
+            {
+                net::http_post_sse(
+                    ctx,
+                    require(bound, "url")?,
+                    require(bound, "body")?,
+                    bound.get("content_type"),
+                    bound.get("headers"),
+                    bound.get("echo"),
+                )
+            }
+            #[cfg(not(feature = "net-host"))]
+            {
+                let _ = (ctx, bound);
+                Err("http_post_sse unavailable in browser wasm".into())
+            }
+        }
         HostFn::OpenAiSseParse => {
             net::openai_sse_parse(require(bound, "text")?, bound.get("echo"))
         }
@@ -671,14 +705,24 @@ pub fn call_host(
             crate::host::event_bus::publish(require(bound, "event")?);
             Ok(Value::Bool(true))
         }
-        HostFn::HttpRequest => net::http_request(
-            ctx,
-            require(bound, "method")?,
-            require(bound, "url")?,
-            bound.get("body"),
-            bound.get("content_type"),
-            bound.get("headers"),
-        ),
+        HostFn::HttpRequest => {
+            #[cfg(feature = "net-host")]
+            {
+                net::http_request(
+                    ctx,
+                    require(bound, "method")?,
+                    require(bound, "url")?,
+                    bound.get("body"),
+                    bound.get("content_type"),
+                    bound.get("headers"),
+                )
+            }
+            #[cfg(not(feature = "net-host"))]
+            {
+                let _ = (ctx, bound);
+                Err("http_request unavailable in browser wasm".into())
+            }
+        }
         HostFn::UrlEncode => net::url_encode(require(bound, "text")?),
         HostFn::Pi => math::pi(),
         HostFn::EConst => math::e_const(),
@@ -756,33 +800,111 @@ pub fn call_host(
             bound.get("path"),
             bound.get("grid"),
         ),
-        HostFn::ForeignSetCmd => foreign::set_cmd(
-            ctx,
-            require(bound, "lang")?,
-            require(bound, "cmd")?,
-            bound.get("args"),
-        ),
-        HostFn::ForeignRun => foreign::run(ctx, require(bound, "code")?, bound.get("stdin")),
-        HostFn::ForeignRunLang => foreign::run_lang(
-            ctx,
-            require(bound, "lang")?,
-            require(bound, "source")?,
-            bound.get("stdin"),
-        ),
-        HostFn::ForeignLangs => foreign::langs(ctx),
-        HostFn::PluginLoad => plugin::load(ctx, require(bound, "path")?),
-        HostFn::PluginUnload => plugin::unload(ctx),
-        HostFn::PluginList => plugin::list(ctx),
+        HostFn::ForeignSetCmd => {
+            #[cfg(feature = "exec-host")]
+            {
+                foreign::set_cmd(
+                    ctx,
+                    require(bound, "lang")?,
+                    require(bound, "cmd")?,
+                    bound.get("args"),
+                )
+            }
+            #[cfg(not(feature = "exec-host"))]
+            {
+                let _ = (ctx, bound);
+                Err("foreign unavailable in browser wasm".into())
+            }
+        }
+        HostFn::ForeignRun => {
+            #[cfg(feature = "exec-host")]
+            {
+                foreign::run(ctx, require(bound, "code")?, bound.get("stdin"))
+            }
+            #[cfg(not(feature = "exec-host"))]
+            {
+                let _ = (ctx, bound);
+                Err("foreign unavailable in browser wasm".into())
+            }
+        }
+        HostFn::ForeignRunLang => {
+            #[cfg(feature = "exec-host")]
+            {
+                foreign::run_lang(
+                    ctx,
+                    require(bound, "lang")?,
+                    require(bound, "source")?,
+                    bound.get("stdin"),
+                )
+            }
+            #[cfg(not(feature = "exec-host"))]
+            {
+                let _ = (ctx, bound);
+                Err("foreign unavailable in browser wasm".into())
+            }
+        }
+        HostFn::ForeignLangs => {
+            #[cfg(feature = "exec-host")]
+            {
+                foreign::langs(ctx)
+            }
+            #[cfg(not(feature = "exec-host"))]
+            {
+                let _ = ctx;
+                Ok(Value::List(Vec::new()))
+            }
+        }
+        HostFn::PluginLoad => {
+            #[cfg(feature = "plugin-host")]
+            {
+                plugin::load(ctx, require(bound, "path")?)
+            }
+            #[cfg(not(feature = "plugin-host"))]
+            {
+                let _ = (ctx, bound);
+                Err("plugin.load unavailable in browser wasm".into())
+            }
+        }
+        HostFn::PluginUnload => {
+            #[cfg(feature = "plugin-host")]
+            {
+                plugin::unload(ctx)
+            }
+            #[cfg(not(feature = "plugin-host"))]
+            {
+                let _ = ctx;
+                Err("plugin.unload unavailable in browser wasm".into())
+            }
+        }
+        HostFn::PluginList => {
+            #[cfg(feature = "plugin-host")]
+            {
+                plugin::list(ctx)
+            }
+            #[cfg(not(feature = "plugin-host"))]
+            {
+                let _ = ctx;
+                Ok(Value::List(Vec::new()))
+            }
+        }
         HostFn::ExtNativePath => {
             let name = require(bound, "name")?;
             let s = match name {
                 Value::Text(t) => t.as_str(),
                 _ => return Err("name must be text".into()),
             };
-            Ok(match crate::ext_cli::installed_native_path(s) {
-                Some(p) => Value::Text(p.to_string_lossy().into_owned()),
-                None => Value::None,
-            })
+            #[cfg(feature = "cli")]
+            {
+                Ok(match crate::ext_cli::installed_native_path(s) {
+                    Some(p) => Value::Text(p.to_string_lossy().into_owned()),
+                    None => Value::None,
+                })
+            }
+            #[cfg(not(feature = "cli"))]
+            {
+                let _ = s;
+                Ok(Value::None)
+            }
         }
         HostFn::MapSet => {
             super::collection::map_set(require(bound, "map")?, require(bound, "key")?, require(bound, "value")?)
@@ -899,11 +1021,61 @@ pub fn call_host(
                 bound.get("line"),
             )
         }
-        HostFn::SubtaskSpawn => subtask::spawn(ctx, bound),
-        HostFn::SubtaskPoll => subtask::poll(ctx, require(bound, "id")?),
-        HostFn::SubtaskJoin => subtask::join(ctx, require(bound, "id")?),
-        HostFn::SubtaskKill => subtask::kill(ctx, require(bound, "id")?),
-        HostFn::SubtaskWaitAll => subtask::wait_all(ctx),
+        HostFn::SubtaskSpawn => {
+            #[cfg(feature = "exec-host")]
+            {
+                subtask::spawn(ctx, bound)
+            }
+            #[cfg(not(feature = "exec-host"))]
+            {
+                let _ = (ctx, bound);
+                Err("subtask unavailable in browser wasm".into())
+            }
+        }
+        HostFn::SubtaskPoll => {
+            #[cfg(feature = "exec-host")]
+            {
+                subtask::poll(ctx, require(bound, "id")?)
+            }
+            #[cfg(not(feature = "exec-host"))]
+            {
+                let _ = (ctx, bound);
+                Err("subtask unavailable in browser wasm".into())
+            }
+        }
+        HostFn::SubtaskJoin => {
+            #[cfg(feature = "exec-host")]
+            {
+                subtask::join(ctx, require(bound, "id")?)
+            }
+            #[cfg(not(feature = "exec-host"))]
+            {
+                let _ = (ctx, bound);
+                Err("subtask unavailable in browser wasm".into())
+            }
+        }
+        HostFn::SubtaskKill => {
+            #[cfg(feature = "exec-host")]
+            {
+                subtask::kill(ctx, require(bound, "id")?)
+            }
+            #[cfg(not(feature = "exec-host"))]
+            {
+                let _ = (ctx, bound);
+                Err("subtask unavailable in browser wasm".into())
+            }
+        }
+        HostFn::SubtaskWaitAll => {
+            #[cfg(feature = "exec-host")]
+            {
+                subtask::wait_all(ctx)
+            }
+            #[cfg(not(feature = "exec-host"))]
+            {
+                let _ = ctx;
+                Err("subtask unavailable in browser wasm".into())
+            }
+        }
     }
 }
 

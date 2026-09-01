@@ -39,6 +39,10 @@ spike/.pytest_cache/
 **/__pycache__/
 *.pyc
 
+# Built browser WASM (rebuild via crates/marqdo-wasm README)
+/examples/browser-hello/marqdo_wasm.wasm
+/examples/browser-hello/pkg/
+
 # Local sqlite / scratch
 /data/
 /tmp/

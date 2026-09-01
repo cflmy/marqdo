@@ -1,5 +1,6 @@
 //! System / process host primitives.
 
+#[cfg(feature = "exec-host")]
 use std::process::Command;
 
 use crate::host::HostContext;
@@ -97,10 +98,24 @@ pub fn exit(ctx: &HostContext, code: &Value) -> Result<Value, String> {
     if ctx.soft_side_effects {
         return Err(format!("exit {c} (soft mode does not terminate process)"));
     }
-    std::process::exit(c as i32);
+    #[cfg(target_arch = "wasm32")]
+    {
+        return Err(format!("exit {c} unavailable in browser wasm"));
+    }
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        std::process::exit(c as i32);
+    }
 }
 
 pub fn exec(ctx: &HostContext, cmd: &Value, args: Option<&Value>) -> Result<Value, String> {
+    #[cfg(not(feature = "exec-host"))]
+    {
+        let _ = (ctx, cmd, args);
+        return Err("exec unavailable in browser wasm".into());
+    }
+    #[cfg(feature = "exec-host")]
+    {
     if !ctx.allow_exec() {
         return Err("exec denied by host policy".into());
     }
@@ -123,6 +138,7 @@ pub fn exec(ctx: &HostContext, cmd: &Value, args: Option<&Value>) -> Result<Valu
         .status()
         .map_err(|e| format!("exec `{cmd}`: {e}"))?;
     Ok(Value::Int(status.code().unwrap_or(1) as i64))
+    }
 }
 
 #[cfg(test)]

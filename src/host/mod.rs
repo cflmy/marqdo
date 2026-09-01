@@ -8,12 +8,21 @@ pub mod agent_rt;
 pub mod collection;
 mod dispatch;
 pub mod event_bus;
+#[cfg(feature = "exec-host")]
 pub mod foreign;
 mod fs;
 pub(crate) mod json;
 pub mod math;
 mod net;
+#[cfg(feature = "plugin-host")]
 pub mod plugin;
+#[cfg(not(feature = "plugin-host"))]
+#[path = "plugin_stub.rs"]
+pub mod plugin;
+#[cfg(feature = "exec-host")]
+pub mod subtask;
+#[cfg(not(feature = "exec-host"))]
+#[path = "subtask_stub.rs"]
 pub mod subtask;
 mod sys;
 mod time;
@@ -80,6 +89,7 @@ pub struct HostContext {
     /// Entry-file line of each active user call (for writeback anchoring).
     pub call_site_lines: Vec<u32>,
     /// Concurrent subtasks (`lib/subtask`): file / function / foreign.
+    #[cfg_attr(not(feature = "exec-host"), allow(dead_code))]
     pub(crate) subtasks: HashMap<u64, subtask::Handle>,
     pub subtask_seq: u64,
 }
