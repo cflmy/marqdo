@@ -64,7 +64,7 @@ export async function loadWasm(url = "./marqdo_wasm.wasm") {
   return instance.exports;
 }
 
-/** Apply C3 return patches: { set_text: { "#id": "…" } } */
+/** Apply C3/C4 return effects: set_text, fetch, after */
 export function applyDomPatch(value) {
   if (!value || typeof value !== "object") return;
   const setText = value.set_text || value.setText;
@@ -74,6 +74,96 @@ export function applyDomPatch(value) {
       if (el) el.textContent = String(text);
     }
   }
+}
+
+/**
+ * Run sync DOM patches then schedule async effects (ADR 0003).
+ * Returns a Promise that settles when immediate scheduling is done
+ * (not when fetch/after callbacks finish).
+ */
+export function applyEffects(exports, value, { onError } = {}) {
+  applyDomPatch(value);
+  if (!value || typeof value !== "object") return Promise.resolve();
+
+  const tasks = [];
+
+  const fetchSpec = value.fetch;
+  if (fetchSpec && typeof fetchSpec === "object" && fetchSpec.url && fetchSpec.then) {
+    tasks.push(runFetchEffect(exports, fetchSpec, onError));
+  }
+
+  const afterSpec = value.after;
+  if (afterSpec && typeof afterSpec === "object" && afterSpec.then) {
+    tasks.push(runAfterEffect(exports, afterSpec, onError));
+  }
+
+  return Promise.all(tasks);
+}
+
+async function runFetchEffect(exports, spec, onError) {
+  const thenFn = spec.then;
+  const method = (spec.method || "GET").toUpperCase();
+  const init = { method };
+  if (spec.headers && typeof spec.headers === "object") {
+    init.headers = spec.headers;
+  }
+  if (spec.body != null && method !== "GET" && method !== "HEAD") {
+    init.body = typeof spec.body === "string" ? spec.body : JSON.stringify(spec.body);
+  }
+  try {
+    const res = await fetch(String(spec.url), init);
+    const body = await res.text();
+    const result = call(exports, thenFn, {
+      ok: res.ok,
+      status: res.status,
+      body,
+    });
+    if (!result.ok) {
+      if (onError) onError(result.error);
+      else console.error(result.error);
+      return;
+    }
+    await applyEffects(exports, result.value, { onError });
+    if (result.stdout) console.log(result.stdout);
+  } catch (e) {
+    try {
+      const result = call(exports, thenFn, {
+        ok: false,
+        status: 0,
+        body: "",
+        error: String(e),
+      });
+      if (result.ok) await applyEffects(exports, result.value, { onError });
+      else if (onError) onError(result.error);
+    } catch (e2) {
+      if (onError) onError(String(e2));
+      else console.error(e2);
+    }
+  }
+}
+
+function runAfterEffect(exports, spec, onError) {
+  const ms = Math.max(0, Number(spec.ms) || 0);
+  const thenFn = spec.then;
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      try {
+        const result = call(exports, thenFn, { ok: true });
+        if (!result.ok) {
+          if (onError) onError(result.error);
+          else console.error(result.error);
+          resolve();
+          return;
+        }
+        Promise.resolve(applyEffects(exports, result.value, { onError })).then(resolve);
+        if (result.stdout) console.log(result.stdout);
+      } catch (e) {
+        if (onError) onError(String(e));
+        else console.error(e);
+        resolve();
+      }
+    }, ms);
+  });
 }
 
 /**
@@ -101,7 +191,7 @@ export function wireEvents(exports, bootValue, { onError } = {}) {
             else console.error(result.error);
             return;
           }
-          applyDomPatch(result.value);
+          applyEffects(exports, result.value, { onError });
           if (result.stdout) console.log(result.stdout);
         } catch (e) {
           if (onError) onError(String(e));

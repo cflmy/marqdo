@@ -108,4 +108,25 @@ import json:lib/json.mq.md
         let j2 = value_as_json(&v2).unwrap();
         assert_eq!(j2["set_text"]["#out"], "2");
     }
+
+    #[test]
+    fn fetch_mq_load_returns_fetch_effect() {
+        let src = std::fs::read_to_string("examples/browser-hello/fetch.mq.md")
+            .expect("fetch.mq.md");
+        let (mut sess, wire) = BrowserSession::boot(&src).expect("boot");
+        assert!(matches!(wire, Value::List(_)));
+        let v = sess.call("load", "{}").expect("load");
+        let j = value_as_json(&v).unwrap();
+        assert_eq!(j["set_text"]["#status"], "loading…");
+        assert_eq!(j["fetch"]["then"], "on_uuid");
+        assert!(j["fetch"]["url"].as_str().unwrap().contains("httpbin"));
+        let done = sess
+            .call(
+                "on_uuid",
+                r#"{"ok":true,"status":200,"body":"{\"uuid\":\"x\"}"}"#,
+            )
+            .expect("on_uuid");
+        let jd = value_as_json(&done).unwrap();
+        assert!(jd["set_text"]["#status"].as_str().unwrap().contains("uuid"));
+    }
 }

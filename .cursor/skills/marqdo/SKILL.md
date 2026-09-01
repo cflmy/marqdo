@@ -27,7 +27,7 @@ Canonical design (repo): `doc/design/markdown-mapping.md`, `doc/design/keywords.
 7. **Paths:** In bare *expressions* `/` is division. In **call args / param defaults / table cells**, unspaced `a/b` and quoted `".marqdo/agent-kb"` are path text — no `json.parse` needed. Numeric ratios that must stay text use quotes (`"1/5"`, `"16/9"`); bare `1/5` is division.
 8. Prefer ending side-effect-only function bodies with a lone `---` or `***` line (or `****` empty return) so later siblings are not swallowed.
 9. **`ext/**` never calls `host_*`.** Agent/OKF helpers are plugin names (`agent_kb_*`, …) after `plugin.load`. Do **not** add agent/OKF domain code to `src/host/` (core bloat). See `doc/design/ext-agent.md` §4.
-10. **Browser (route C):** client logic is Marqdo on WASM ([ADR 0002](../../../doc/adr/0002-browser-marqdo-wasm.md)); official `loader.js` is host glue only — do not invent a second JS app language for product code.
+10. **Browser (route C):** client logic is Marqdo on WASM ([ADR 0002](../../../doc/adr/0002-browser-marqdo-wasm.md)); async I/O via return effects `fetch`/`after` ([ADR 0003](../../../doc/adr/0003-browser-async-effects.md)); official bridge is host glue only.
 
 ## Markup → meaning (v0.2)
 

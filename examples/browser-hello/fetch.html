@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Marqdo · 交互装配 (C3)</title>
+  <title>Marqdo · fetch / after (C4)</title>
   <style>
     :root {
       --ink: #1a1f1c;
@@ -18,7 +18,7 @@
       font-family: "IBM Plex Sans", "Noto Sans SC", sans-serif;
       color: var(--ink);
       background:
-        radial-gradient(900px 500px at 90% 0%, #cfe0d2 0%, transparent 50%),
+        radial-gradient(800px 420px at 0% 100%, #d5e4d8 0%, transparent 55%),
         linear-gradient(165deg, #f3f7f2, var(--paper));
       padding: 2rem clamp(1rem, 4vw, 3rem);
     }
@@ -28,16 +28,22 @@
       font-size: clamp(1.6rem, 3vw, 2.2rem);
       margin: 0 0 0.35rem;
     }
-    .lead { color: var(--muted); margin: 0 0 1.5rem; max-width: 36rem; }
-    #count {
-      font-family: "IBM Plex Serif", serif;
-      font-size: 4rem;
-      line-height: 1;
+    .lead { color: var(--muted); margin: 0 0 1.25rem; max-width: 38rem; }
+    #status {
+      font-family: "IBM Plex Mono", ui-monospace, monospace;
+      font-size: 0.95rem;
+      line-height: 1.45;
+      white-space: pre-wrap;
+      word-break: break-all;
+      min-height: 4rem;
       margin: 1rem 0 1.25rem;
-      letter-spacing: -0.04em;
+      padding: 0.85rem 1rem;
+      background: rgba(255,255,255,0.55);
+      border: 1px solid #b7c7bb;
     }
     button {
       margin-right: 0.5rem;
+      margin-bottom: 0.4rem;
       padding: 0.55rem 1.1rem;
       border: 0;
       background: var(--accent);
@@ -46,9 +52,10 @@
       cursor: pointer;
     }
     button.secondary { background: #3a4740; }
+    button:disabled { opacity: 0.5; cursor: wait; }
     pre {
       margin-top: 1.5rem;
-      width: min(40rem, 100%);
+      width: min(42rem, 100%);
       padding: 0.9rem 1rem;
       background: #122018;
       color: #d7eadc;
@@ -62,11 +69,11 @@
 </head>
 <body>
   <h1>Marqdo</h1>
-  <p class="lead">C3：GFM 交互表装配事件；点击由 WASM 会话里的 Marqdo 函数处理并回写 DOM。<a href="./fetch.html">fetch (C4)</a> · <a href="./">打印示例</a></p>
-  <div id="count">0</div>
-  <button id="bump" type="button" disabled>加一</button>
-  <button id="reset" class="secondary" type="button" disabled>清零</button>
+  <p class="lead">C4：返回 <code>fetch</code> / <code>after</code> 效应，由官方 bridge 续体回调（ADR 0003）。业务只在 <code>fetch.mq.md</code>。<a href="./interact.html">计数器</a> · <a href="./">打印</a></p>
+  <div id="status">idle</div>
+  <button id="load" type="button" disabled>请求 UUID</button>
+  <button id="ping" class="secondary" type="button" disabled>延迟 pong</button>
   <pre id="log">loading…</pre>
-  <script type="module" src="./interact.js"></script>
+  <script type="module" src="./fetch.js"></script>
 </body>
 </html>

@@ -196,16 +196,20 @@ L1 `浏览器.交互装配`（ext）可后置；C3 以 bridge + 返回 wire 表�
 
 ---
 
-## 7. 异步模型（C4 才深化）
+## 7. 异步模型（C4）
 
-Marqdo 今日调用多为**同步**。浏览器 `fetch` / 定时器是异步的。
+锁定：[ADR 0003](../adr/0003-browser-async-effects.md)。
 
-C1–C3 约定：
+处理器返回 Map 可含（与 `set_text` 并列）：
 
-- 同步子集先完整。  
-- `fetch`：C4 引入 **宿主 Promise → 续体** 或 **显式 `> 浏览器.请求` 返回 future 句柄 + 轮询/回调表**；需短 ADR 补丁，不在 C1 假装同步阻塞整个页面。
+| 字段 | 含义 | 完成后 `mq_call` 实参 |
+|------|------|----------------------|
+| `fetch` | `{ url, method?, then, headers?, body? }` | `{ ok, status, body, error? }` |
+| `after` | `{ ms, then }` | `{ ok: true }` |
 
-在续体方案落地前：网络仍以**服务端** `ext/web` / `lib/net`（native）为主。
+Bridge：`applyEffects(exports, value)` — 先 DOM，再调度异步；**不**在 WASM 内阻塞。
+
+示例见 `examples/browser-hello/fetch.mq.md`。
 
 ---
 

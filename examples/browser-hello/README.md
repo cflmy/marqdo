@@ -15,7 +15,7 @@ python3 -m http.server 8765
 |----|------|
 | [/](http://127.0.0.1:8765/) | C1：编辑源码 → `mq_run` 打印 |
 | [/interact.html](http://127.0.0.1:8765/interact.html) | C3：`counter.mq.md` 交互表 → 点击改 DOM |
+| [/fetch.html](http://127.0.0.1:8765/fetch.html) | C4：`fetch` / `after` 效应续体 |
 
-- `marqdo-bridge.js`：官方宿主桥（`boot` / `call` / `wireEvents` / `applyDomPatch`）
-- `counter.mq.md`：作者面只有 `.mq.md`（业务逻辑）
-- 设计：[browser-marqdo-wasm.md](../../doc/design/browser-marqdo-wasm.md)
+- `marqdo-bridge.js`：官方宿主桥（`boot` / `call` / `wireEvents` / `applyEffects`）
+- 业务源码只有 `.mq.md`；异步见 [ADR 0003](../../doc/adr/0003-browser-async-effects.md)
