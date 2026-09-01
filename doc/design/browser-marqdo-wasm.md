@@ -122,7 +122,7 @@ source: &str (+ optional import map)
 | 路径 | 角色 |
 |------|------|
 | `marqdo`（根） | 核心；feature-gate |
-| `crates/marqdo-wasm` | `cdylib` + `wasm-bindgen` 导出 |
+| `crates/marqdo-wasm` | `cdylib`：`mq_alloc` / `mq_dealloc` / `mq_run` / `mq_version`（长度前缀 JSON；**无** wasm-bindgen CLI） |
 | `ext/web` 或 `web/browser` | L1：`浏览器.运行` / `交互装配`（C3+） |
 | `examples/browser-hello/` | 静态页 + wasm 冒烟 |
 | `tests/browser/` 或金样脚本 | Node/wasmtime 跑 `run_source` 对齐 |
