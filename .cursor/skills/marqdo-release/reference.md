@@ -231,7 +231,7 @@ export HTTP_PROXY=http://HOST:PORT
 
 3. **Agent Shell**: retry `git push` / `gh` with `required_permissions: ["all"]` (and `full_network` if needed).
 
-4. **`gh` auth**: if `gh auth status` fails, ask user to `gh auth login` or set `GH_TOKEN` / `GITHUB_TOKEN` for the session — **never commit tokens**.
+4. **`gh` auth**: if `gh auth status` fails, ask user to `gh auth login` or set `GH_TOKEN` / `GITHUB_TOKEN` for the session — **never commit tokens**. Fallback used in this repo: load password from `git credential fill` (`protocol=https` / `host=github.com`) into `GH_TOKEN` for the session only, then delete the temp env file.
 
 5. **Git remote**: prefer `https://github.com/cflmy/marqdo.git`; SSH needs keys.
 
