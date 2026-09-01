@@ -122,7 +122,7 @@ source: &str (+ optional import map)
 | 路径 | 角色 |
 |------|------|
 | `marqdo`（根） | 核心；feature-gate |
-| `crates/marqdo-wasm` | `cdylib`：`mq_alloc` / `mq_dealloc` / `mq_run` / `mq_version`（长度前缀 JSON；**无** wasm-bindgen CLI） |
+| `crates/marqdo-wasm` | `cdylib`：`mq_*` ABI + `js/marqdo-bridge.js` |
 | `ext/web` 或 `web/browser` | L1：`浏览器.运行` / `交互装配`（C3+） |
 | `examples/browser-hello/` | 静态页 + wasm 冒烟 |
 | `tests/browser/` 或金样脚本 | Node/wasmtime 跑 `run_source` 对齐 |
@@ -229,11 +229,28 @@ Bridge：`applyEffects(exports, value)` — 先 DOM，再调度异步；**不**�
 | 层 | 负责 |
 |----|------|
 | 服务端 `plugins/web` | 路由、DB、会话、SSR HTML、样式/头/图装配 |
-| 页面壳 | 输出时可选嵌入 `<script type="module" src="marqdo-loader.js">` + wasm |
-| 浏览器 L1 | `运行` / `交互装配` /（后）`请求` |
-| 核心 | 可移植 VM + `run_source` + browser `HostFn` 子集 |
+| 页面壳 | `头装配` 挂 `module` → `marqdo-bridge.js`；`static` 提供 `.wasm` |
+| 浏览器 L1 | `客户端挂载` / `client_embed`；效应约定见 ADR 0003 |
+| 核心 / crate | `run_source`、`BrowserSession`、`marqdo-wasm` ABI |
 
-W8 资源表可增加「挂 wasm / module」行（既有 `page.head` / `头装配`），属 C2/C3 集成，不阻塞 C1。
+挂载示例：
+
+```markdown
+`头` =
+
+| 关系 | 地址 |
+|------|------|
+| module | /static/marqdo-bridge.js |
+
+*p = > page.头装配 表=头*
+```
+
+```bash
+marqdo wasm build -o static   # marqdo_wasm.wasm + marqdo-bridge.js
+# app.static dir=static
+```
+
+业务页再 `boot` 自己的 `.mq.md`（见 `examples/browser-hello/`）。
 
 ---
 
@@ -268,16 +285,17 @@ W8 资源表可增加「挂 wasm / module」行（既有 `page.head` / `头装�
 
 ---
 
-## 14. C5 硬化（已落地子集）
+## 14. C5 硬化（已落地）
 
 | 项 | 状态 |
 |----|------|
-| `profile.release-wasm` + `marqdo wasm build` 体积报告 | done |
-| 可选 `wasm-opt` | done（Binaryen 在 PATH 时） |
-| `run_source` bytecode 金样 | done（单元测） |
-| 会话 bytecode / view 断点复用同一 wasm | **后续** |
-
-预算：`release-wasm` 实测约 **0.9 MiB** 未压缩（嵌入 `lib/` 后）；gzip/CDN 另计。目标维持 **≤ ~1.2 MiB**。
+| `profile.release-wasm` + `marqdo wasm build` 体积报告 | done（~0.9 MiB） |
+| 可选 `wasm-opt` | done |
+| `run_source` bytecode 金样 | done |
+| 规范 bridge + 构建拷贝 | done（`crates/marqdo-wasm/js/`） |
+| Node ABI 冒烟 | done（`tests/wasm`） |
+| 站点 `头装配` / L1 `client_embed` | done |
+| 会话 bytecode / view 断点复用 | **非本版目标** |
 
 ---
 

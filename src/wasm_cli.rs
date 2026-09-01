@@ -1,11 +1,13 @@
-//! `marqdo wasm build` — compile `marqdo-wasm` and copy the `.wasm` artifact.
+//! `marqdo wasm build` — compile `marqdo-wasm` and copy artifacts for the browser host.
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use anyhow::{bail, Context, Result};
 
-/// Build size-optimized wasm32 artifact and copy `marqdo_wasm.wasm` into `out_dir`.
+/// Build size-optimized wasm32 artifact and copy into `out_dir`:
+/// - `marqdo_wasm.wasm`
+/// - `marqdo-bridge.js` (canonical host glue)
 pub fn build_wasm(out_dir: &Path) -> Result<()> {
     let status = Command::new("cargo")
         .args([
@@ -26,31 +28,70 @@ pub fn build_wasm(out_dir: &Path) -> Result<()> {
     let mut artifact = find_wasm_artifact()?;
     std::fs::create_dir_all(out_dir)
         .with_context(|| format!("create {}", out_dir.display()))?;
-    let dest = out_dir.join("marqdo_wasm.wasm");
 
     if let Some(optimized) = try_wasm_opt(&artifact)? {
         artifact = optimized;
     }
 
-    std::fs::copy(&artifact, &dest).with_context(|| {
+    let dest_wasm = out_dir.join("marqdo_wasm.wasm");
+    std::fs::copy(&artifact, &dest_wasm).with_context(|| {
         format!(
             "copy {} → {}",
             artifact.display(),
-            dest.display()
+            dest_wasm.display()
         )
     })?;
-    let bytes = std::fs::metadata(&dest)
+    let bytes = std::fs::metadata(&dest_wasm)
         .map(|m| m.len())
         .unwrap_or(0);
     println!(
         "wrote {} ({:.1} KiB)",
-        dest.display(),
+        dest_wasm.display(),
         bytes as f64 / 1024.0
     );
+
+    let bridge_src = find_bridge_js()?;
+    let dest_bridge = out_dir.join("marqdo-bridge.js");
+    std::fs::copy(&bridge_src, &dest_bridge).with_context(|| {
+        format!(
+            "copy {} → {}",
+            bridge_src.display(),
+            dest_bridge.display()
+        )
+    })?;
+    println!("wrote {}", dest_bridge.display());
     Ok(())
 }
 
-/// Run `wasm-opt -Oz` when Binaryen is installed; returns path to optimized file.
+fn find_bridge_js() -> Result<PathBuf> {
+    let mut candidates = Vec::new();
+    if let Ok(manifest) = std::env::var("CARGO_MANIFEST_DIR") {
+        candidates.push(
+            PathBuf::from(manifest).join("crates/marqdo-wasm/js/marqdo-bridge.js"),
+        );
+    }
+    candidates.push(PathBuf::from("crates/marqdo-wasm/js/marqdo-bridge.js"));
+    // When running from installed binary, try next to current_exe ../../…
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(root) = exe.parent().and_then(|p| p.parent()).and_then(|p| p.parent()) {
+            candidates.push(root.join("crates/marqdo-wasm/js/marqdo-bridge.js"));
+        }
+    }
+    for c in &candidates {
+        if c.is_file() {
+            return Ok(c.clone());
+        }
+    }
+    bail!(
+        "marqdo-bridge.js not found; tried: {}",
+        candidates
+            .iter()
+            .map(|p| p.display().to_string())
+            .collect::<Vec<_>>()
+            .join(", ")
+    )
+}
+
 fn try_wasm_opt(input: &Path) -> Result<Option<PathBuf>> {
     let which = Command::new("wasm-opt").arg("--version").output();
     let Ok(out) = which else {
@@ -68,7 +109,6 @@ fn try_wasm_opt(input: &Path) -> Result<Option<PathBuf>> {
         .status()
         .context("wasm-opt spawn failed")?;
     if !status.success() {
-        // Retry without bulk-memory flag for older binaryen.
         let status2 = Command::new("wasm-opt")
             .args(["-Oz"])
             .arg(input)

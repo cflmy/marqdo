@@ -127,6 +127,15 @@ Assemble `<head>` resources from a GFM table (`|rel|href|type|sizes|media|as|cro
 
 **> web_page_head page=`self` table=`table`**
 
+## client_embed
+    + `bridge`="/static/marqdo-bridge.js"
+
+Return an HTML snippet that loads the official browser Marqdo bridge (`marqdo-bridge.js`, route C).
+Run `marqdo wasm build -o static` first, and prefer a `head` table row with `rel=module`.
+Author `.mq.md` wire/`fetch` effects: [browser-marqdo-wasm.md](../../doc/design/browser-marqdo-wasm.md).
+
+**"<script type=\"module\" src=\"" + bridge + "\"></script>"**
+
 ## images
     + `table`
 
