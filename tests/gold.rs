@@ -182,7 +182,9 @@ fn structure_collection_cell_expr() {
 gpt-4o-mini
 https://api.openai.com/v1
 /chat/completions
-sk-live",
+sk-live
+1/5
+16/9",
     );
 }
 

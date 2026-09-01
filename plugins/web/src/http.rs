@@ -1211,16 +1211,6 @@ fn flash_html(flash: Option<&str>) -> String {
     }
 }
 
-fn truncate_cell(s: &str, max: usize) -> String {
-    let mut it = s.chars();
-    let head: String = it.by_ref().take(max).collect();
-    if it.next().is_some() {
-        format!("{head}…")
-    } else {
-        head
-    }
-}
-
 fn admin_shell(st: &AppState, title: &str, active: Option<&str>, inner: &str) -> String {
     let tables = st
         .db_url
@@ -1270,7 +1260,7 @@ fn admin_shell(st: &AppState, title: &str, active: Option<&str>, inner: &str) ->
 <style>
 :root {{ --ink:#1c1917; --muted:#78716c; --paper:#fafaf9; --line:#e7e5e4; --accent:#0f766e; --ok:#166534; --err:#b91c1c; --side:#f5f5f4; }}
 * {{ box-sizing:border-box; }}
-body {{ margin:0; font-family:"IBM Plex Sans","Noto Sans SC",sans-serif; background:var(--paper); color:var(--ink); min-height:100vh; display:grid; grid-template-columns:14rem 1fr; }}
+body {{ margin:0; font-family:"IBM Plex Sans","Noto Sans SC",sans-serif; background:var(--paper); color:var(--ink); min-height:100vh; display:grid; grid-template-columns:14rem minmax(0,1fr); }}
 @media (max-width:720px) {{ body {{ grid-template-columns:1fr; }} .admin-nav {{ border-right:0; border-bottom:1px solid var(--line); }} }}
 .admin-nav {{ background:var(--side); border-right:1px solid var(--line); padding:1.1rem 1rem 1.5rem; }}
 .admin-nav .brand {{ display:block; font-weight:600; font-size:1.05rem; margin-bottom:1rem; color:var(--ink); }}
@@ -1280,7 +1270,7 @@ body {{ margin:0; font-family:"IBM Plex Sans","Noto Sans SC",sans-serif; backgro
 .admin-nav .nav-label {{ margin:1.1rem 0 .35rem; font-size:.75rem; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); }}
 .admin-nav .nav-foot {{ margin-top:1.5rem; font-size:.9rem; }}
 .admin-nav .muted {{ color:var(--muted); font-size:.9rem; }}
-.admin-main {{ padding:1.25rem 1.5rem 2rem; max-width:56rem; }}
+.admin-main {{ padding:1.25rem 1.5rem 2rem; min-width:0; width:100%; max-width:none; overflow-x:auto; }}
 .admin-main h1 {{ margin:0 0 .35rem; font-size:1.65rem; }}
 .crumbs {{ color:var(--muted); font-size:.85rem; margin-bottom:1rem; }}
 .crumbs a {{ color:var(--muted); }}
@@ -1290,21 +1280,23 @@ body {{ margin:0; font-family:"IBM Plex Sans","Noto Sans SC",sans-serif; backgro
 .btn:hover {{ filter:brightness(1.05); }}
 .btn-muted {{ background:#78716c; }}
 .btn-ghost {{ background:transparent; color:var(--accent)!important; border:1px solid var(--line); }}
-table.data {{ width:100%; border-collapse:collapse; background:#fff; border:1px solid var(--line); border-radius:6px; overflow:hidden; }}
-table.data th,table.data td {{ border-bottom:1px solid var(--line); padding:.55rem .7rem; text-align:left; vertical-align:top; font-size:.92rem; }}
-table.data th {{ background:#f5f5f4; font-weight:600; }}
+.table-wrap {{ width:100%; overflow-x:auto; -webkit-overflow-scrolling:touch; border:1px solid var(--line); border-radius:6px; background:#fff; }}
+table.data {{ width:100%; min-width:100%; border-collapse:collapse; background:#fff; }}
+table.data th,table.data td {{ border-bottom:1px solid var(--line); padding:.55rem .7rem; text-align:left; vertical-align:top; font-size:.92rem; word-break:break-word; overflow-wrap:anywhere; white-space:pre-wrap; }}
+table.data th {{ background:#f5f5f4; font-weight:600; white-space:nowrap; }}
 table.data tr:last-child td {{ border-bottom:0; }}
-table.data .actions {{ white-space:nowrap; }}
+table.data .actions {{ white-space:nowrap; overflow-wrap:normal; word-break:normal; }}
 .empty {{ background:#fff; border:1px dashed var(--line); border-radius:6px; padding:2rem 1.25rem; text-align:center; color:var(--muted); }}
 .empty strong {{ display:block; color:var(--ink); margin-bottom:.35rem; font-size:1.05rem; }}
 .flash {{ padding:.65rem .85rem; border-radius:4px; margin:0 0 1rem; }}
 .flash.ok {{ background:#ecfdf5; color:var(--ok); border:1px solid #a7f3d0; }}
 .flash.err {{ background:#fef2f2; color:var(--err); border:1px solid #fecaca; }}
 .danger {{ color:var(--err); }}
-.site-form {{ max-width:28rem; margin-top:.5rem; }}
+.site-form {{ max-width:min(48rem,100%); width:100%; margin-top:.5rem; }}
 .site-form form {{ display:grid; gap:.85rem; }}
 .site-form label {{ display:grid; gap:.25rem; font-size:.9rem; }}
-.site-form input,.site-form textarea {{ padding:.5rem .6rem; border:1px solid var(--line); border-radius:4px; font:inherit; background:#fff; }}
+.site-form input,.site-form textarea {{ padding:.5rem .6rem; border:1px solid var(--line); border-radius:4px; font:inherit; background:#fff; width:100%; box-sizing:border-box; }}
+.site-form textarea {{ min-height:8rem; resize:vertical; field-sizing:content; }}
 .site-form input[readonly] {{ background:#f5f5f4; color:var(--muted); }}
 .site-form .err {{ color:var(--err); font-size:.85rem; }}
 .site-form .actions {{ display:flex; gap:.75rem; align-items:center; flex-wrap:wrap; }}
@@ -1363,14 +1355,14 @@ async fn admin_home(
             "<div class=\"empty\"><strong>No tables</strong>Initialize a table via <code>db.init</code> / <code>数据库.初始化</code>.</div>",
         );
     } else {
-        inner.push_str("<table class=\"data\"><thead><tr><th>Table</th><th></th></tr></thead><tbody>");
+        inner.push_str("<div class=\"table-wrap\"><table class=\"data\"><thead><tr><th>Table</th><th></th></tr></thead><tbody>");
         for t in &tables {
             inner.push_str(&format!(
                 "<tr><td><a href=\"/admin/{t}\">{t}</a></td><td class=\"actions\"><a class=\"btn\" href=\"/admin/{t}/new\">New</a></td></tr>",
                 t = esc(t)
             ));
         }
-        inner.push_str("</tbody></table>");
+        inner.push_str("</tbody></table></div>");
     }
     Html(admin_shell(&st, "Admin", None, &inner)).into_response()
 }
@@ -1433,7 +1425,7 @@ async fn admin_table(
             esc(&table)
         ));
     } else {
-        inner.push_str("<table class=\"data\"><thead><tr>");
+        inner.push_str("<div class=\"table-wrap\"><table class=\"data\"><thead><tr>");
         for c in &cols {
             inner.push_str(&format!("<th>{}</th>", esc(c)));
         }
@@ -1450,7 +1442,8 @@ async fn admin_table(
                         other => other.to_string(),
                     })
                     .unwrap_or_default();
-                inner.push_str(&format!("<td>{}</td>", esc(&truncate_cell(&cell, 80))));
+                // Show full cell text; CSS wraps / table-wrap scrolls when needed.
+                inner.push_str(&format!("<td>{}</td>", esc(&cell)));
             }
             let id = m
                 .get("id")
@@ -1468,7 +1461,7 @@ async fn admin_table(
             }
             inner.push_str("</tr>");
         }
-        inner.push_str("</tbody></table>");
+        inner.push_str("</tbody></table></div>");
     }
     Html(admin_shell(&st, &table, Some(&table), &inner)).into_response()
 }

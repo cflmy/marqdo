@@ -268,7 +268,7 @@ Markdown **标记即语法**。输出**不是**语言架构原语，而是内置
 | **首列表头 `@` / `行` / `row`** | **行向** `List` of `Map`（标记列不进入字段；任意数据行数） |
 | 重复表头 | 诊断错误 |
 
-**数据单元格是表达式**（与调用实参值语法相同：裸词、数字、`` `var` ``、算术、引号串；URL / `gpt-4o-mini` 等按路径·连字符折叠为文本）。表头仍是键名文本。细则：[table-cell-expressions.md](table-cell-expressions.md)。
+**数据单元格是表达式**（与调用实参值语法相同：裸词、数字、`` `var` ``、算术、引号串；URL / `gpt-4o-mini` 等按路径·连字符折叠为文本；含 `/` 的 CSS 比率等请用引号 `"1/5"`，裸 `1/5` 为除法）。表头仍是键名文本。细则：[table-cell-expressions.md](table-cell-expressions.md)。
 
 ```markdown
 *`k` = secret *

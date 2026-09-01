@@ -33,3 +33,13 @@ description: Data cells evaluate like call-arg values (`var`, paths, hyphen pros
 | 1 | user | `secret` |
 
 > print text=`rec`[^1][^content]
+
+`ratios` =
+
+| r |
+|---|
+| "1/5" |
+| "16/9" |
+
+> print text=`ratios`[^1]
+> print text=`ratios`[^2]

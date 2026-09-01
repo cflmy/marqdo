@@ -24,8 +24,11 @@ Load the ABI v2 `web` plugin once.
 Assemble a GFM style table into a CSS string. Two shapes are accepted:
 `|选择器|属性|值|` rule rows (arbitrary selectors; rows sharing a selector are
 merged, and a leading `|媒体|` column groups rows into `@media` blocks), or
-`|属性|值|` property rows wrapped as `.name { … }`. Styles stay as data tables,
-`make_style` turns them into CSS — 样式即数据、装配即函数.
+`|属性|值|` property rows wrapped as `.name { … }`. Selectors starting with
+`@keyframes name` emit keyframe blocks (`属性` = stop `from`/`to`/`N%`,
+`值` = `prop: val` or use `@keyframes name from` + normal 属性/值). Quote CSS
+values that contain `/` (e.g. `"16/9"`, `"1/5"`); bare `1/5` is integer division.
+Styles stay as data tables, `make_style` turns them into CSS — 样式即数据、装配即函数.
 
 > ensure_plugin
 **> web_style name=`name` table=`table`**

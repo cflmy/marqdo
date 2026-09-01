@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Fixed
+- **Admin UI**：主区取消 `max-width:56rem` 限制，表格外包可横向滚动的 `.table-wrap`，单元格完整展示并自动换行；表单加宽且 textarea 可随内容增高。
+- **`marqdo ext add`**：安装含原生插件的扩展时**先**定位/自动 `cargo build` 再拷贝 `.mq.md`，避免只装上文稿、运行时报 `native plugin not found`；扩大 `.so` 搜索路径。
+- **`web_style` / 样式装配**：正确输出 `@keyframes` 块（停点为嵌套规则，不再写成 `0%: opacity: 0`）。
+- **样式表含 `/` 的值**：文档明确**引号优先**（`"16/9"`、`"1/5"`）；不引入靠空格消歧的表单元格比率折叠。
+
 ## v0.3.1 — 2026-08-29
 
 ### Highlights

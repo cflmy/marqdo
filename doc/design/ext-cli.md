@@ -52,14 +52,21 @@ Future optional ext domains get their own subdirs (e.g. `ext/web/`, `ext/quantum
 | `web` | `web/web.mq.md`, `web/网页.mq.md`, **`native/libweb.so`** — 见 [ext-web.md](ext-web.md) · [roadmap](../roadmap/ext-web.md) |
 | `quantum` | `quantum/quantum.mq.md`, `quantum/量子.mq.md`, **`native/libquantum.so`** — 见 [ext-quantum.md](ext-quantum.md) · [roadmap](../roadmap/ext-quantum.md) |
 
-`add agent` copies the built native plugin into `MARQDO_EXT/native/`. Build it first:
+`add agent` / `add web` / `add quantum` **先定位原生插件**，再复制 `.mq.md`：
+
+1. 在 `CARGO_TARGET_DIR`、`target/{debug,release}`、源码 `ext` 旁的 `target/`、可执行文件旁等路径查找 `lib{name}.so`（或 `.dll` / `.dylib`）
+2. 找不到则自动执行 `cargo build -p marqdo_plugin_{name}`，再安装到 `MARQDO_EXT/native/`
+3. 写入 `{name}.plugin` 绝对路径提示，供 `plugin.native_path` 解析
+
+这样不会出现「只装了 `.mq.md`、运行时报 native plugin not found」的半安装状态。
 
 ```bash
-cargo build -p marqdo_plugin_agent
-marqdo ext add agent
+# 推荐：在仓库根目录
+marqdo ext add web
+# 等价于找到或编好 libweb.so 后拷入 ~/.marqdo/ext/native/
 ```
 
-Without install, runtime resolves the plugin via `plugin.native_path name=agent` (see [ext-abi.md](ext-abi.md)): `MARQDO_AGENT_PLUGIN` → `CARGO_TARGET_DIR/{debug,release}/` → cwd `target/…` → beside `marqdo` binary → `MARQDO_EXT/native/`.
+Without a prior install, runtime still resolves via `plugin.native_path name=web` (see [ext-abi.md](ext-abi.md)): `MARQDO_WEB_PLUGIN` → `CARGO_TARGET_DIR/{debug,release}/` → cwd `target/…` → beside `marqdo` binary → `MARQDO_EXT/native/`.
 
 ## Tests
 

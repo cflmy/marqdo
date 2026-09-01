@@ -310,13 +310,16 @@ pub fn normalize_slot(name: &str) -> String {
 
 /// Style table → CSS text.
 ///
-/// Three table shapes are supported:
+/// Table shapes:
 /// 1. Rule rows `|媒体|选择器|属性|值|` — rows grouped by `媒体` emit
 ///    `@media { … }` blocks; rows sharing a selector are merged into one rule.
 /// 2. Rule rows `|选择器|属性|值|` — each row emits `selector { prop: value; }`,
 ///    rows sharing a selector are merged into one rule. `selector` may be any
 ///    CSS selector (`aside.side`, `ul.side-nav a:hover`).
 /// 3. Plain property rows `|属性|值|` — emitted as `.name { prop: value; }`.
+/// 4. **`@keyframes`** — selector `@keyframes name` (optional stop in the
+///    selector: `@keyframes name from`) or stop in the `属性` column:
+///    `|@keyframes fade|from|opacity: 0|` → nested keyframe rules.
 ///
 /// Examples (rule shape):
 /// ```text
@@ -327,8 +330,9 @@ pub fn normalize_slot(name: &str) -> String {
 /// | 选择器 | 属性 | 值 |
 /// |--------|------|-----|
 /// | aside.side | padding | 2rem 1.25rem |
-/// | aside.side | background | #f5f5f4 |
-/// | ul.side-nav a:hover | color | var(--accent) |
+/// | @keyframes pulse | 0% | opacity: 0 |
+/// | @keyframes pulse | 100% | opacity: 1 |
+/// | @keyframes pulse from | opacity | 0 |
 /// ```
 pub fn as_css_named(name: &str, table: &Value) -> String {
     let name = normalize_ref(name);
@@ -338,9 +342,6 @@ pub fn as_css_named(name: &str, table: &Value) -> String {
     let mut out = String::new();
     match table {
         Value::Object(m) => {
-            // Column-first table object: `{选择器:[…], 属性:[…], 值:[…], 媒体:[…]}`
-            // (how GFM tables reach the plugin). Row-major maps (one rule per map)
-            // are handled too: if 选择器 is a scalar, treat it as a single row.
             let sels = pick(m, SEL_KEYS).map(as_str_list).unwrap_or_default();
             let props = pick(m, PROP_KEYS).map(as_str_list).unwrap_or_default();
             let vals = pick(m, VAL_KEYS).map(as_str_list).unwrap_or_default();
@@ -359,115 +360,199 @@ pub fn as_css_named(name: &str, table: &Value) -> String {
                     )
                 })
                 .collect();
-            // Group by media then selector; or plain `.name { … }` when no selectors.
-            let mut by_media: Vec<(String, Vec<(String, Vec<String>)>)> = Vec::new();
-            let mut plain: Vec<String> = Vec::new();
-            for (media, sel, p, v) in rows {
-                if p.is_empty() {
-                    continue;
-                }
-                let decl = format!("  {p}: {v};");
-                if !media.is_empty() {
-                    let group = match by_media.iter_mut().find(|(mq, _)| *mq == media) {
-                        Some((_, g)) => g,
-                        None => {
-                            by_media.push((media.clone(), Vec::new()));
-                            let (_, g) = by_media.last_mut().unwrap();
-                            g
-                        }
-                    };
-                    push_rule(group, &sel, decl);
-                } else if !sel.is_empty() {
-                    let group = match by_media.iter_mut().find(|(mq, _)| mq.is_empty()) {
-                        Some((_, g)) => g,
-                        None => {
-                            by_media.push((String::new(), Vec::new()));
-                            let (_, g) = by_media.last_mut().unwrap();
-                            g
-                        }
-                    };
-                    push_rule(group, &sel, decl);
-                } else {
-                    plain.push(decl);
-                }
-            }
-            for (media, rules) in by_media {
-                if media.is_empty() {
-                    for (sel, decls) in rules {
-                        out.push_str(&format!("{} {{\n{}\n}}\n", sel, decls.join("\n")));
-                    }
-                } else {
-                    let inner = rules
-                        .iter()
-                        .map(|(sel, decls)| format!("{} {{\n{}\n}}", sel, decls.join("\n")))
-                        .collect::<Vec<_>>()
-                        .join("\n");
-                    out.push_str(&format!("@media {} {{\n{}\n}}\n", media, inner));
-                }
-            }
-            if !plain.is_empty() {
-                out.push_str(&format!(".{} {{\n{}\n}}\n", name, plain.join("\n")));
-            }
+            emit_css_rows(&rows, &name, &mut out);
         }
         Value::Array(rows) => {
-            // Group rule rows by media query and selector; plain rows as `.name { … }`.
-            let mut by_media: Vec<(String, Vec<(String, Vec<String>)>)> = Vec::new();
-            let mut plain: Vec<String> = Vec::new();
-            for row in rows {
-                let Some(m) = row.as_object() else { continue };
-                let media = pick(m, MEDIA_KEYS).map(cell_str).unwrap_or_default();
-                let sel = pick(m, SEL_KEYS).map(cell_str).unwrap_or_default();
-                let p = pick(m, PROP_KEYS).map(cell_str).unwrap_or_default();
-                let v = pick(m, VAL_KEYS).map(cell_str).unwrap_or_default();
-                if p.is_empty() {
-                    continue;
-                }
-                let decl = format!("  {p}: {v};");
-                if !media.is_empty() {
-                    let group = match by_media.iter_mut().find(|(mq, _)| *mq == media) {
-                        Some((_, g)) => g,
-                        None => {
-                            by_media.push((media.clone(), Vec::new()));
-                            let (_, g) = by_media.last_mut().unwrap();
-                            g
-                        }
-                    };
-                    push_rule(group, &sel, decl);
-                } else if !sel.is_empty() {
-                    let group = match by_media.iter_mut().find(|(mq, _)| mq.is_empty()) {
-                        Some((_, g)) => g,
-                        None => {
-                            by_media.push((String::new(), Vec::new()));
-                            let (_, g) = by_media.last_mut().unwrap();
-                            g
-                        }
-                    };
-                    push_rule(group, &sel, decl);
-                } else {
-                    plain.push(decl);
-                }
-            }
-            for (media, rules) in by_media {
-                if media.is_empty() {
-                    for (sel, decls) in rules {
-                        out.push_str(&format!("{} {{\n{}\n}}\n", sel, decls.join("\n")));
-                    }
-                } else {
-                    let inner = rules
-                        .iter()
-                        .map(|(sel, decls)| format!("{} {{\n{}\n}}", sel, decls.join("\n")))
-                        .collect::<Vec<_>>()
-                        .join("\n");
-                    out.push_str(&format!("@media {} {{\n{}\n}}\n", media, inner));
-                }
-            }
-            if !plain.is_empty() {
-                out.push_str(&format!(".{} {{\n{}\n}}\n", name, plain.join("\n")));
-            }
+            let rows: Vec<(String, String, String, String)> = rows
+                .iter()
+                .filter_map(|row| {
+                    let m = row.as_object()?;
+                    Some((
+                        pick(m, MEDIA_KEYS).map(cell_str).unwrap_or_default(),
+                        pick(m, SEL_KEYS).map(cell_str).unwrap_or_default(),
+                        pick(m, PROP_KEYS).map(cell_str).unwrap_or_default(),
+                        pick(m, VAL_KEYS).map(cell_str).unwrap_or_default(),
+                    ))
+                })
+                .collect();
+            emit_css_rows(&rows, &name, &mut out);
         }
         _ => {}
     }
     out
+}
+
+/// Parse `@keyframes name` or `@keyframes name stop` from a selector cell.
+fn parse_keyframes_sel(sel: &str) -> Option<(String, Option<String>)> {
+    let t = sel.trim();
+    if t.len() < 10 || !t[..10].eq_ignore_ascii_case("@keyframes") {
+        return None;
+    }
+    let rest = t[10..].trim();
+    if rest.is_empty() {
+        return None;
+    }
+    // First token = animation name; optional second = keyframe stop.
+    let mut parts = rest.split_whitespace();
+    let anim = parts.next()?.to_string();
+    let stop = parts.next().map(|s| s.to_string());
+    Some((anim, stop))
+}
+
+fn is_keyframe_stop(s: &str) -> bool {
+    let t = s.trim();
+    if t.is_empty() {
+        return false;
+    }
+    if t.eq_ignore_ascii_case("from") || t.eq_ignore_ascii_case("to") {
+        return true;
+    }
+    // 0%, 50%, 100.5%, etc.
+    let stripped = t.trim_end_matches('%');
+    !stripped.is_empty()
+        && stripped
+            .chars()
+            .all(|c| c.is_ascii_digit() || c == '.')
+        && t.ends_with('%')
+}
+
+fn keyframe_decl_lines(css_prop: &str, value: &str) -> Vec<String> {
+    // Value may be a full declaration (`opacity: 0`) or bare value when the
+    // CSS property lived in the selector form `@keyframes name from` + 属性.
+    let v = value.trim().trim_end_matches(';').trim();
+    if v.is_empty() {
+        return Vec::new();
+    }
+    if v.contains(':') {
+        v.split(';')
+            .map(|p| p.trim())
+            .filter(|p| !p.is_empty())
+            .map(|p| format!("    {p};"))
+            .collect()
+    } else if !css_prop.is_empty() && !is_keyframe_stop(css_prop) {
+        // `@keyframes name from` + 属性=opacity + 值=0
+        vec![format!("    {css_prop}: {v};")]
+    } else {
+        // Bare value — prefer `opacity: 0` in the 值 column.
+        vec![format!("    {v};")]
+    }
+}
+
+fn push_keyframe(
+    groups: &mut Vec<(String, Vec<(String, Vec<String>)>)>,
+    anim: &str,
+    stop: &str,
+    decls: Vec<String>,
+) {
+    if anim.is_empty() || stop.is_empty() || decls.is_empty() {
+        return;
+    }
+    let anim_group = match groups.iter_mut().find(|(n, _)| n == anim) {
+        Some((_, g)) => g,
+        None => {
+            groups.push((anim.to_string(), Vec::new()));
+            &mut groups.last_mut().unwrap().1
+        }
+    };
+    match anim_group.iter_mut().find(|(s, _)| s == stop) {
+        Some((_, d)) => d.extend(decls),
+        None => anim_group.push((stop.to_string(), decls)),
+    }
+}
+
+fn emit_css_rows(rows: &[(String, String, String, String)], class_name: &str, out: &mut String) {
+    let mut by_media: Vec<(String, Vec<(String, Vec<String>)>)> = Vec::new();
+    let mut by_keyframes: Vec<(String, Vec<(String, Vec<String>)>)> = Vec::new();
+    let mut plain: Vec<String> = Vec::new();
+
+    for (media, sel, p, v) in rows {
+        let media = media.trim();
+        let sel = sel.trim();
+        let p = p.trim();
+        let v = v.trim();
+
+        if let Some((anim, stop_in_sel)) = parse_keyframes_sel(sel) {
+            let stop_from_sel = stop_in_sel.is_some();
+            let (stop, prop_for_decl) = match stop_in_sel {
+                Some(s) => (s, p.to_string()),
+                None => {
+                    // 属性 = keyframe stop (from / to / N%); 值 = declaration(s)
+                    if !is_keyframe_stop(p) {
+                        continue;
+                    }
+                    (p.to_string(), String::new())
+                }
+            };
+            let decls = if stop_from_sel {
+                keyframe_decl_lines(&prop_for_decl, v)
+            } else {
+                keyframe_decl_lines("", v)
+            };
+            let decls = if decls.is_empty() && !v.is_empty() && !prop_for_decl.is_empty() {
+                keyframe_decl_lines(&prop_for_decl, v)
+            } else {
+                decls
+            };
+            push_keyframe(&mut by_keyframes, &anim, &stop, decls);
+            continue;
+        }
+
+        if p.is_empty() {
+            continue;
+        }
+        let decl = format!("  {p}: {v};");
+        if !media.is_empty() {
+            let group = match by_media.iter_mut().find(|(mq, _)| *mq == media) {
+                Some((_, g)) => g,
+                None => {
+                    by_media.push((media.to_string(), Vec::new()));
+                    let (_, g) = by_media.last_mut().unwrap();
+                    g
+                }
+            };
+            push_rule(group, sel, decl);
+        } else if !sel.is_empty() {
+            let group = match by_media.iter_mut().find(|(mq, _)| mq.is_empty()) {
+                Some((_, g)) => g,
+                None => {
+                    by_media.push((String::new(), Vec::new()));
+                    let (_, g) = by_media.last_mut().unwrap();
+                    g
+                }
+            };
+            push_rule(group, sel, decl);
+        } else {
+            plain.push(decl);
+        }
+    }
+
+    for (media, rules) in by_media {
+        if media.is_empty() {
+            for (sel, decls) in rules {
+                out.push_str(&format!("{} {{\n{}\n}}\n", sel, decls.join("\n")));
+            }
+        } else {
+            let inner = rules
+                .iter()
+                .map(|(sel, decls)| format!("{} {{\n{}\n}}", sel, decls.join("\n")))
+                .collect::<Vec<_>>()
+                .join("\n");
+            out.push_str(&format!("@media {} {{\n{}\n}}\n", media, inner));
+        }
+    }
+    for (anim, stops) in by_keyframes {
+        out.push_str(&format!("@keyframes {} {{\n", anim));
+        for (stop, decls) in stops {
+            out.push_str(&format!("  {} {{\n", stop));
+            out.push_str(&decls.join("\n"));
+            out.push('\n');
+            out.push_str("  }\n");
+        }
+        out.push_str("}\n");
+    }
+    if !plain.is_empty() {
+        out.push_str(&format!(".{} {{\n{}\n}}\n", class_name, plain.join("\n")));
+    }
 }
 
 /// Push `decl` under `sel` into a `(selector, declarations)` group list,
@@ -612,5 +697,49 @@ fn meta_text(v: &Value) -> String {
         Value::Bool(b) => b.to_string(),
         Value::Number(n) => n.to_string(),
         other => other.to_string(),
+    }
+}
+
+#[cfg(test)]
+mod css_tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn keyframes_stop_in_prop() {
+        let t = json!([
+            {"选择器": "@keyframes pulse", "属性": "0%", "值": "opacity: 0"},
+            {"选择器": "@keyframes pulse", "属性": "100%", "值": "opacity: 1"},
+        ]);
+        let css = as_css_named("anim", &t);
+        assert!(css.contains("@keyframes pulse {"), "{css}");
+        assert!(css.contains("0% {"), "{css}");
+        assert!(css.contains("opacity: 0;"), "{css}");
+        assert!(css.contains("100% {"), "{css}");
+        assert!(!css.contains("0%: opacity"), "{css}");
+    }
+
+    #[test]
+    fn keyframes_stop_in_selector() {
+        let t = json!([
+            {"选择器": "@keyframes fade from", "属性": "opacity", "值": "0"},
+            {"选择器": "@keyframes fade to", "属性": "opacity", "值": "1"},
+        ]);
+        let css = as_css_named("anim", &t);
+        assert!(css.contains("@keyframes fade {"), "{css}");
+        assert!(css.contains("from {"), "{css}");
+        assert!(css.contains("opacity: 0;"), "{css}");
+        assert!(css.contains("to {"), "{css}");
+    }
+
+    #[test]
+    fn media_still_works() {
+        let t = json!([
+            {"媒体": "(max-width: 800px)", "选择器": ".x", "属性": "color", "值": "red"},
+        ]);
+        let css = as_css_named("x", &t);
+        assert!(css.contains("@media (max-width: 800px)"), "{css}");
+        assert!(css.contains(".x {"), "{css}");
+        assert!(css.contains("color: red;"), "{css}");
     }
 }

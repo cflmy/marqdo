@@ -194,6 +194,11 @@ fn find_native_plugin(short: &str) -> Result<PathBuf> {
         let base = PathBuf::from(h);
         candidates.push(base.join("native").join(&name));
         candidates.push(base.join(&name));
+        // MARQDO_EXT_SOURCE often points at repo `ext/`; native libs live in sibling target/.
+        if let Some(repo) = base.parent() {
+            candidates.push(repo.join("target").join("debug").join(&name));
+            candidates.push(repo.join("target").join("release").join(&name));
+        }
     }
     // Honor CARGO_TARGET_DIR (sandbox / custom target roots) before cwd/target.
     if let Ok(td) = env::var("CARGO_TARGET_DIR") {
@@ -205,6 +210,15 @@ fn find_native_plugin(short: &str) -> Result<PathBuf> {
         candidates.push(cwd.join("target").join("debug").join(&name));
         candidates.push(cwd.join("target").join("release").join(&name));
         candidates.push(cwd.join("ext").join("native").join(&name));
+        // Walk up looking for a Cargo workspace target/ (run from a subdir).
+        let mut dir = cwd.clone();
+        for _ in 0..6 {
+            candidates.push(dir.join("target").join("debug").join(&name));
+            candidates.push(dir.join("target").join("release").join(&name));
+            if !dir.pop() {
+                break;
+            }
+        }
     }
     if let Ok(exe) = env::current_exe() {
         if let Some(dir) = exe.parent() {
@@ -213,6 +227,7 @@ fn find_native_plugin(short: &str) -> Result<PathBuf> {
             candidates.push(dir.join(&name));
             // target/debug/deps → target/debug
             candidates.push(dir.join("..").join(&name));
+            candidates.push(dir.join("..").join("release").join(&name));
         }
     }
     for p in &candidates {
@@ -221,8 +236,35 @@ fn find_native_plugin(short: &str) -> Result<PathBuf> {
         }
     }
     bail!(
-        "cannot find native plugin `{name}` (run `cargo build -p marqdo_plugin_{short}`, or `marqdo ext add {short}`, or set {env_key})"
+        "cannot find native plugin `{name}` (run `cargo build -p marqdo_plugin_{short}`, or set {env_key})"
+    )
+}
+
+/// Locate a built native plugin, or `cargo build -p …` once then look again.
+fn ensure_native_plugin(crate_name: &str) -> Result<PathBuf> {
+    let short = native_short_name(crate_name);
+    if let Ok(p) = find_native_plugin(short) {
+        return Ok(p);
+    }
+    println!(
+        "native plugin for `{short}` not found; building `{crate_name}` (debug)…"
     );
+    let status = std::process::Command::new("cargo")
+        .args(["build", "-p", crate_name])
+        .status()
+        .with_context(|| format!("spawn cargo build -p {crate_name}"))?;
+    if !status.success() {
+        bail!(
+            "cargo build -p {crate_name} failed (status {status}); build the plugin then re-run `marqdo ext add {short}`"
+        );
+    }
+    find_native_plugin(short).with_context(|| {
+        format!(
+            "built `{crate_name}` but still cannot find {}; set {} to the .so/.dll path",
+            native_lib_filename(short),
+            native_env_var(short)
+        )
+    })
 }
 
 pub fn add_ext(id: &str) -> Result<()> {
@@ -240,6 +282,14 @@ pub fn add_ext(id: &str) -> Result<()> {
     fs::create_dir_all(&root)
         .with_context(|| format!("create install root {}", root.display()))?;
 
+    // Preflight native binary *before* copying .mq.md so a missing .so does not
+    // leave a half-installed tree that fails at `plugin.native_path` / load time.
+    let native_src = if let Some(crate_name) = pkg.native_crate {
+        Some(ensure_native_plugin(crate_name)?)
+    } else {
+        None
+    };
+
     for f in pkg.mq_files {
         let src = find_source_file(f)?;
         let dest = root.join(f);
@@ -252,10 +302,9 @@ pub fn add_ext(id: &str) -> Result<()> {
         println!("installed {}", dest.display());
     }
 
-    if let Some(crate_name) = pkg.native_crate {
+    if let (Some(crate_name), Some(src)) = (pkg.native_crate, native_src) {
         let short = native_short_name(crate_name);
         let lib_name = native_lib_filename(short);
-        let src = find_native_plugin(short)?;
         let native_dir = root.join("native");
         fs::create_dir_all(&native_dir)?;
         let dest = native_dir.join(&lib_name);
@@ -270,7 +319,8 @@ pub fn add_ext(id: &str) -> Result<()> {
         fs::write(&hint, abs.to_string_lossy().as_bytes())?;
         println!("wrote {}", hint.display());
         println!(
-            "hint: import works via install root; set {}={} if load_native needs it",
+            "hint: `plugin.native_path name={short}` resolves via {}; or set {}={}",
+            dest.display(),
             native_env_var(short),
             abs.display()
         );
