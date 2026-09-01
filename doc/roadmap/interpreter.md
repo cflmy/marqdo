@@ -109,7 +109,8 @@ Phase I 对齐 Crafting Interpreters 的 **jlox（树遍历）**；Phase II 对�
 
 - 更完整表达式文法、错误模型、外联围栏 FFI  
 - 生成 OKF 依赖目录  
-- （可选）另一后端：编译到 Python/WASM——**另开 ADR**，不替代自研语义
+- （可选）另一后端：编译到 Python/WASM——**另开 ADR**，不替代自研语义  
+- **浏览器内运行（路线 C）**：解释器/VM 上 WASM（**非**把 `.mq.md` 译成 JS）——已锁定 [ADR 0002](../adr/0002-browser-marqdo-wasm.md) · [browser-marqdo-wasm.md](../design/browser-marqdo-wasm.md) · [roadmap/browser-wasm.md](browser-wasm.md)
 
 ---
 

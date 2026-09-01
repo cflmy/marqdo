@@ -117,7 +117,7 @@ marqdo catalog public -o .marqdo
 - **原生插件 ABI**：[`include/marqdo_abi.h`](include/marqdo_abi.h) · [ext-abi.md](doc/design/ext-abi.md)；`plugins/{demo,agent,web,quantum}`  
 - **用户静态站**：`public/` → `view output` → CI 发布 [gh-pages](https://cflmy.github.io/marqdo/)  
 - **VS Code 扩展**：分支 **`vscode-extension`**（`main` 不跟踪源码；见 [vscode-extension-commit.md](doc/design/vscode-extension-commit.md)）；Release 附带 `.vsix`  
-- 选型：[ADR 0001 — Rust](doc/adr/0001-implementation-language.md)
+- 选型：[ADR 0001 — Rust](doc/adr/0001-implementation-language.md) · [ADR 0002 — 浏览器 WASM 解释器](doc/adr/0002-browser-marqdo-wasm.md)（路线 C，实现中见 [roadmap/browser-wasm.md](doc/roadmap/browser-wasm.md)）
 
 ### 如何使用最新 Marqdo（v0.3.1）
 

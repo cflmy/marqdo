@@ -174,7 +174,7 @@ flowchart LR
 
 ### 风险与边界
 
-- 静态 `gh-pages` **无法**真断点（无常驻 VM）；调试仅 **live view**（或未来 WASM 解释器）。  
+- 静态 `gh-pages` **无法**真断点（无常驻 VM）；调试仅 **live view**（或 [浏览器 WASM 解释器](browser-wasm.md) C5）。  
 - 字节码调试可晚于树遍历一个迭代。
 
 ---
