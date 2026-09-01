@@ -2,12 +2,18 @@
 
 Raw `cdylib` exports — no `wasm-bindgen` CLI required.
 
+| Export | Role |
+|--------|------|
+| `mq_alloc` / `mq_dealloc` | linear memory |
+| `mq_run` | one-shot `# main` (C1) |
+| `mq_boot` / `mq_call` | session + handlers (C3) |
+| `mq_version` | version C string |
+
 ```bash
 # from repo root
+marqdo wasm build -o examples/browser-hello
+# or:
 cargo build -p marqdo-wasm --target wasm32-unknown-unknown --release
-cp target/wasm32-unknown-unknown/release/marqdo_wasm.wasm examples/browser-hello/
 ```
-
-Open `examples/browser-hello/index.html` via a local static server (ES modules / fetch need http).
 
 See [doc/design/browser-marqdo-wasm.md](../../doc/design/browser-marqdo-wasm.md).

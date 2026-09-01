@@ -5,6 +5,7 @@
 
 pub mod aliases;
 pub mod ast;
+pub mod browser_session;
 pub mod builtin;
 pub mod bytecode;
 pub mod capture;
@@ -29,6 +30,8 @@ pub mod value;
 pub mod version_check;
 #[cfg(feature = "view")]
 pub mod view;
+#[cfg(feature = "cli")]
+pub mod wasm_cli;
 
 use std::path::Path;
 
@@ -41,6 +44,8 @@ use crate::capture::RunCapture;
 use crate::interp::Interpreter;
 use crate::lex::{classify_source, format_lines_dump};
 use crate::load::{load_module, load_module_from_source};
+
+pub use browser_session::{value_as_json, BrowserSession};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum Backend {

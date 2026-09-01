@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| 状态 | **进行中**（C0–C1 已落地；C2 示例页已有） |
+| 状态 | **进行中**（C0–C3 已落地） |
 | 日期 | 2026-09-01 |
 | ADR | [0002-browser-marqdo-wasm.md](../adr/0002-browser-marqdo-wasm.md) |
 | 设计 | [browser-marqdo-wasm.md](../design/browser-marqdo-wasm.md) |
@@ -16,90 +16,38 @@
 
 | 阶段 | 内容 | 状态 |
 |------|------|------|
-| **C0** | 设计锁定；Cargo feature 骨架；`wasm32` **check** 通过 | **done** |
-| **C1** | `run_source` + `crates/marqdo-wasm`（`mq_run` ABI）；hello 打印 | **done** |
-| **C2** | 官方 loader + `examples/browser-hello`；可选 CLI 糖；head 挂载约定 | **partial**（示例+loader 已有） |
-| **C3** | 交互装配（事件表 → 回调）；最小 DOM 读写宿主 | pending |
-| **C4** | `fetch`/定时器异步模型 ADR + 首版桥 | pending |
-| **C5** | bytecode 后端可选；体积优化；与 view 调试对齐 | pending |
-
----
-
-## C0 — 可移植骨架
-
-**目标：** native 默认行为不变；存在 `--features wasm-core --no-default-features` 使核心在 `wasm32-unknown-unknown` 上 `cargo check`。
-
-**已落地：**
-
-- Features：`native`（默认）、`wasm-core`、`view`/`net-host`/`plugin-host`/`exec-host`/`fs-host`/`tty`/`cli`
-- 可选依赖：`ureq`、`libloading`、`tiny_http`、`libc`、`clap`
-- `run_source` / `load_module_from_source`（embedded `lib/`）
-
-**验收：**
-
-```bash
-cargo check -p marqdo --target wasm32-unknown-unknown --no-default-features --features wasm-core
-cargo test --test gold structure_hello
-```
-
----
-
-## C1 — 内存执行闭环
-
-**目标：** 浏览器/测试调用 `run_source`，跑 `# main` + `> print`，拿回 stdout。
-
-**已落地：**
-
-- `pub fn run_source`（tree + bytecode）
-- crate `crates/marqdo-wasm`：`mq_alloc` / `mq_dealloc` / `mq_run` / `mq_version`（长度前缀 JSON，无需 wasm-bindgen CLI）
-- 浏览器默认关 fs 写 / exec / net
-
-**验收：**
-
-```bash
-cargo test -p marqdo-wasm
-cargo test --lib run_source_hello
-cargo build -p marqdo-wasm --target wasm32-unknown-unknown --release
-```
+| **C0** | Cargo feature 骨架；`wasm32` check | **done** |
+| **C1** | `run_source` + `mq_run` | **done** |
+| **C2** | loader + `examples/browser-hello` + `marqdo wasm build` | **done** |
+| **C3** | 会话 `mq_boot`/`mq_call`；wire 表；`set_text` DOM 回写 | **done** |
+| **C4** | `fetch`/定时器异步模型 | pending |
+| **C5** | bytecode / 体积 / view 调试 | pending |
 
 ---
 
 ## C2 — 示例页与挂载
 
-**目标：** 静态 HTML 打开即可跑 Marqdo。
-
-**已有：** `examples/browser-hello/`（`index.html` + `loader.js` + README）。  
-**仍缺：** `marqdo wasm build` CLI 糖；`page.head` 文档示例挂载。
+```bash
+marqdo wasm build -o examples/browser-hello
+cd examples/browser-hello && python3 -m http.server 8765
+```
 
 ---
 
 ## C3 — 交互装配
 
-**目标：** 无手写业务 JS 的点击 → Marqdo 函数 → 改页面。
+- `BrowserSession` + `Interpreter::invoke_in_entry`
+- ABI：`mq_boot` / `mq_call`
+- 示例：`interact.html` + `counter.mq.md`
+- Bridge：`wireEvents` / `applyDomPatch`
 
-（见设计 §6）
-
----
-
-## C4 — 异步 I/O
-
-**目标：** 受控 `fetch`（及 sleep）不阻塞语言谎言。
+**验收：** 打开 interact 页，点「加一」计数递增；源码仅为 `.mq.md` + 官方 bridge。
 
 ---
 
-## C5 — 硬化
+## C4 / C5
 
-**目标：** bytecode、体积、`view` 调试对齐。
-
----
-
-## 依赖关系
-
-```
-C0 ──► C1 ──► C2 ──► C3 ──► C4
-                │              │
-                └──── C5 ◄─────┘
-```
+见设计文 §7 / §12。
 
 ---
 
@@ -107,4 +55,5 @@ C0 ──► C1 ──► C2 ──► C3 ──► C4
 
 | 日期 | 记录 |
 |------|------|
-| 2026-09-01 | ADR 0002 + 设计锁定；C0 feature-gate；C1 `run_source` + `marqdo-wasm` + browser-hello |
+| 2026-09-01 | ADR 0002；C0–C1 |
+| 2026-09-01 | C2 `wasm build`；C3 session + interact 示例 |

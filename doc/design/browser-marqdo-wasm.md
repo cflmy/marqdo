@@ -152,27 +152,47 @@ source: &str (+ optional import map)
 
 ## 6. 交互装配（C3，对称样式装配）
 
-作者面（示意，关键字以落地时 `ext` 双语名为准；**不在核心发明 `if`/`on` 关键字**）：
+### 6.1 作者面（示例）
 
 ```markdown
-`交互` =
+---
+import json:lib/json.mq.md
+---
 
-| 选择器 | 事件 | 调用 |
-|--------|------|------|
-| "#btn" | click | handle_click |
-| ".item" | click | select_item |
+# main
 
-*`_`` = > 浏览器.交互装配 表=`交互` *
+*`count` = 0*
+
+`wire` =
+
+| @ | 选择器 | 事件 | 调用 |
+|---|--------|------|------|
+| 1 | "#bump" | click | bump |
+
+**`wire`**
+
+## bump
+*`count` = count + 1*
+*`label` = > str count*
+*`patch` = > json.set map=None key="#count" value=label*
+**> json.set map=None key="set_text" value=patch**
 ```
 
-语义：
+`# main` 的返回值是 **wire 表**（`@` 行向记录列表）。Loader 调用 `mq_boot`，再 `wireEvents`。
 
-1. 装配函数把表登记到 WASM 侧 registry。  
-2. Loader 在 DOM 上 `addEventListener`；触发时调用导出 `marqdo_dispatch(event_id, payload_json)`。  
-3. 调用解析为 Marqdo 函数（同页已 `load` 的模块内 `## handle_click`）。  
-4. 返回值约定（C3 最小）：`None` / 文本 / Map（如 `{dom:…}` 指令列表）由桥执行，**避免在核心写死 React**。
+### 6.2 桥约定
 
-值列含 `/` 的 CSS 等仍遵守 [table-cell-expressions.md](table-cell-expressions.md)：**引号优先**（`"16/9"`）。
+| 步骤 | API |
+|------|-----|
+| 启动 | `mq_boot(source)` → `{ ok, value }`；`value` = wire 列表或 `{ wire: [...] }` |
+| 事件 | Loader `addEventListener` → `mq_call(fn, {"event":"click"})` |
+| 回写 | 返回 Map 可含 `set_text`: `{ "#sel": "text" }`（仅 `textContent`） |
+
+行键名认：`选择器`/`selector`、`事件`/`event`、`调用`/`call`。
+
+含 `/` 的 CSS 等单元格仍 **引号优先**（见 [table-cell-expressions.md](table-cell-expressions.md)）。
+
+L1 `浏览器.交互装配`（ext）可后置；C3 以 bridge + 返回 wire 表即可验收。
 
 ---
 

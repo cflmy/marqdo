@@ -151,6 +151,27 @@ impl Interpreter {
         self.run_function(module, fun, Env::new(), args, false)
     }
 
+    /// Call a function using (and updating) [`Self::entry_bindings`] from `# main`.
+    /// Used by browser WASM sessions so handlers share state with the entry object.
+    pub fn invoke_in_entry(
+        &mut self,
+        module: &Module,
+        name: &str,
+        args: &[(String, Value)],
+    ) -> Result<Value> {
+        let fun = find_function_anywhere(module, name)
+            .ok_or_else(|| self.err(format!("unknown function `{name}`")))?;
+        let mut env = Env::new();
+        for (k, v) in &self.entry_bindings {
+            env.set(k.clone(), v.clone());
+        }
+        let prev = self.site_module;
+        self.site_module = Some(module as *const Module);
+        let result = self.run_function(module, fun, env, args, true);
+        self.site_module = prev;
+        result
+    }
+
     pub fn run_module(&mut self, module: &Module) -> Result<Value> {
         let prev = self.site_module;
         self.site_module = Some(module as *const Module);

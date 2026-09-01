@@ -124,6 +124,11 @@ enum Commands {
         #[arg(long)]
         check: bool,
     },
+    /// Build browser WASM artifact (route C)
+    Wasm {
+        #[command(subcommand)]
+        action: WasmAction,
+    },
 }
 
 #[derive(Subcommand, Debug)]
@@ -139,6 +144,16 @@ enum ExtAction {
     Remove {
         #[arg(value_name = "NAME")]
         name: String,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+enum WasmAction {
+    /// `cargo build -p marqdo-wasm --target wasm32-unknown-unknown --release` and copy `.wasm`
+    Build {
+        /// Destination directory (default: examples/browser-hello)
+        #[arg(short = 'o', long = "out", default_value = "examples/browser-hello")]
+        out: PathBuf,
     },
 }
 
@@ -282,5 +297,11 @@ fn try_main() -> Result<i32> {
             }
             Ok(0)
         }
+        Commands::Wasm { action } => match action {
+            WasmAction::Build { out } => {
+                marqdo::wasm_cli::build_wasm(&out)?;
+                Ok(0)
+            }
+        },
     }
 }
