@@ -3,6 +3,26 @@
 ## Unreleased
 
 ### Added
+
+### Fixed
+
+### Changed
+
+## v0.3.4 — 2026-09-04
+
+### Highlights
+
+**`ext/web` 定制波次 C0–C4 收口**：可配置 admin 前缀与登录回跳、段边界 gates、shell/layout、样式单元格 strict、脚本 defer/version/`asset_version`、条件导航 when/media。附智能体 Wave B0 示例与写回遮蔽修复。
+
+```bash
+git checkout v0.3.4
+cargo build --release
+cargo build --release -p marqdo_plugin_web
+marqdo ext add web
+# golds: tests/ext/web-c0-admin-prefix … web-c4-nav-when
+```
+
+### Added
 - **智能体 Wave B0**：宪法优先示例 [agent-pong](examples/agent-pong/)（call_site/源码注入）· [agent-okf-flywheel](examples/agent-okf-flywheel/)（OKF `cache=hit`）；调研 [agent-framework-2026-09.md](doc/research/agent-framework-2026-09.md)；离线 harness [`scripts/agent-harness.sh`](scripts/agent-harness.sh)；金样 `agent-constitution-b0`。
 - **`.env.example`**：开发期 OpenAI 兼容网关变量模板（密钥仅本地 `.env`）。
 
@@ -18,7 +38,6 @@
 - `build_step_context`：call site 提前到 task 之后；开场白强调 code-as-documentation。
 - 中文 `构建单步上下文` 委托英文版（含预算 / READ）；新增 `dump_step_context`；live 用例改用仓库根 `.env`。
 - 文档：[ext-web 定制限制](doc/research/ext-web-customization-limits.md) + [解决设计 C0–C4](doc/design/ext-web-customization/)。
-
 ## v0.3.3 — 2026-09-04
 
 ### Highlights

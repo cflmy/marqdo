@@ -92,10 +92,10 @@ jobs:
           body: |
             ## Marqdo ${{ github.ref_name }}
 
-            ### 亮点 / Highlights — v0.3.3
-            - **浏览器作者零业务 JS（D/E/F）**：bridge 自启；DOM/路由/storage/ws/文件/Canvas/音频/Observer/拖放；`lib/browser` + GFM
-            - **Browser author-zero-JS (routes D/E/F)**: host effects + `lib/browser`; examples `browser-hello` / `browser-app` / `browser-media`
-            - Skill: `marqdo-dev`（代码即文档 / 禁止 json.set 胶水）
+            ### 亮点 / Highlights — v0.3.4
+            - **`ext/web` 定制 C0–C4**：admin 前缀可让出、段边界 gates、shell/layout、样式 strict、脚本 defer/version、条件导航 when/media
+            - **ext/web customization C0–C4**: configurable admin/gates/shell/layout/CSS strict/script lifecycle/conditional nav
+            - Agent Wave B0 demos + writeback shadow fix
             - Install: `marqdo ext list` / `marqdo ext add llm|agent|web|quantum`
             - Native plugins: `cargo build --release -p marqdo_plugin_*` then `ext add`
             - Details: [CHANGELOG](https://github.com/cflmy/marqdo/blob/main/CHANGELOG.md) · [README](https://github.com/cflmy/marqdo/blob/main/README.md)
