@@ -54,7 +54,7 @@ import sys:lib/sys.mq.md
 1. `prefix4` == "/desk"
   1. `login4` == "/desk"
     1. `logout4` == "/desk/login"
-      1. `gpath` == "/desk*"
+      1. `gpath` == "/desk"
         > print text=auth-prefix-ok
       2. *
         > print text=auth-gate-fail

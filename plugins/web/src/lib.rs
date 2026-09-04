@@ -1276,28 +1276,46 @@ web_ffi!(web_app_auth, |args: &Value| {
             .ok_or_else(|| "app must be a map".to_string())?
             .insert("logout_redirect".into(), json!(v));
     }
+    if let Some(v) = arg_str_opt(args, "login_path").or_else(|| arg_str_opt(args, "登录路径")) {
+        app.as_object_mut()
+            .ok_or_else(|| "app must be a map".to_string())?
+            .insert("login_path".into(), json!(v));
+    }
     let prefix = app_admin_prefix(&app);
+    let login_path = app
+        .get("login_path")
+        .and_then(|v| v.as_str())
+        .filter(|s| !s.is_empty())
+        .map(|s| s.to_string())
+        .unwrap_or_else(|| format!("{prefix}/login"));
     let obj = app
         .as_object_mut()
         .ok_or_else(|| "app must be a map".to_string())?;
+    obj.insert("login_path".into(), json!(&login_path));
     obj.insert(
         "auth".to_string(),
         json!({ "users": users, "session_ttl": session_ttl }),
     );
-    // Default RBAC: `{admin_prefix}*` requires role `admin` when auth is configured.
+    // Default RBAC: segment-boundary prefix on admin_prefix; redirect visitors to login.
     let mut gates = obj
         .get("gates")
         .and_then(|v| v.as_array())
         .cloned()
         .unwrap_or_default();
-    let gate_star = format!("{prefix}*");
     let has_admin_gate = gates.iter().any(|g| {
-        g.get("path")
-            .and_then(|v| v.as_str())
-            .is_some_and(|p| p == prefix || p == gate_star)
+        g.get("path").and_then(|v| v.as_str()).is_some_and(|p| {
+            let cleaned = p.trim_end_matches('*').trim_end_matches('/');
+            cleaned == prefix.trim_end_matches('/')
+        })
     });
     if !has_admin_gate {
-        gates.push(json!({ "path": gate_star, "roles": ["admin"] }));
+        gates.push(json!({
+            "path": prefix,
+            "roles": ["admin"],
+            "match": "prefix",
+            "on_deny": "redirect",
+            "exclude": [login_path],
+        }));
         obj.insert("gates".into(), Value::Array(gates));
     }
     Ok(app)
@@ -1310,6 +1328,17 @@ web_ffi!(web_app_gate, |args: &Value| {
         .or_else(|| arg_str_opt(args, "角色"))
         .unwrap_or("admin");
     let roles: Vec<String> = session::parse_roles_csv(roles_raw);
+    let match_mode = arg_str_opt(args, "match")
+        .or_else(|| arg_str_opt(args, "匹配"))
+        .unwrap_or("prefix");
+    let on_deny = arg_str_opt(args, "on_deny")
+        .or_else(|| arg_str_opt(args, "拒绝"))
+        .unwrap_or("forbid");
+    let exclude = args
+        .get("exclude")
+        .or_else(|| args.get("排除"))
+        .cloned()
+        .unwrap_or(Value::Null);
     let obj = app
         .as_object_mut()
         .ok_or_else(|| "app must be a map".to_string())?;
@@ -1318,7 +1347,19 @@ web_ffi!(web_app_gate, |args: &Value| {
         .and_then(|v| v.as_array())
         .cloned()
         .unwrap_or_default();
-    gates.push(json!({ "path": path, "roles": roles }));
+    let mut entry = json!({
+        "path": path,
+        "roles": roles,
+        "match": match_mode,
+        "on_deny": on_deny,
+    });
+    if !matches!(exclude, Value::Null) {
+        entry
+            .as_object_mut()
+            .unwrap()
+            .insert("exclude".into(), exclude);
+    }
+    gates.push(entry);
     obj.insert("gates".into(), Value::Array(gates));
     Ok(app)
 });
@@ -1667,7 +1708,7 @@ web_ffi!(web_listen, |args: &Value| {
             None,
             None,
             None,
-            Vec::<(String, Vec<String>)>::new(),
+            Vec::<http::Gate>::new(),
             HashMap::new(),
             middleware::Middleware::default(),
             cookie_secure,
@@ -1805,26 +1846,12 @@ web_ffi!(web_listen, |args: &Value| {
             .map(|s| s.to_string());
         let page_404 = app.get("page_404").cloned().filter(|v| !v.is_null());
         let page_500 = app.get("page_500").cloned().filter(|v| !v.is_null());
-        let mut gates: Vec<(String, Vec<String>)> = Vec::new();
+        let mut gates: Vec<http::Gate> = Vec::new();
         if let Some(arr) = app.get("gates").and_then(|v| v.as_array()) {
             for g in arr {
-                let path = g
-                    .get("path")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("")
-                    .to_string();
-                if path.is_empty() {
-                    continue;
+                if let Some(gate) = http::Gate::from_json(g) {
+                    gates.push(gate);
                 }
-                let roles = match g.get("roles") {
-                    Some(Value::Array(a)) => a
-                        .iter()
-                        .filter_map(|v| v.as_str().map(|s| s.to_ascii_lowercase()))
-                        .collect(),
-                    Some(Value::String(s)) => session::parse_roles_csv(s),
-                    _ => vec!["admin".into()],
-                };
-                gates.push((path, roles));
             }
         }
         let mut gallery_routes = HashMap::new();
@@ -1964,6 +1991,12 @@ web_ffi!(web_listen, |args: &Value| {
         })
     });
     let admin_prefix = app_admin_prefix(&admin_cfg_app);
+    let login_path = admin_cfg_app
+        .get("login_path")
+        .and_then(|v| v.as_str())
+        .filter(|s| !s.is_empty())
+        .map(|s| s.to_string())
+        .unwrap_or_else(|| format!("{admin_prefix}/login"));
     let login_redirect = admin_cfg_app
         .get("login_redirect")
         .and_then(|v| v.as_str())
@@ -1975,7 +2008,7 @@ web_ffi!(web_listen, |args: &Value| {
         .and_then(|v| v.as_str())
         .filter(|s| !s.is_empty())
         .map(|s| s.to_string())
-        .unwrap_or_else(|| format!("{admin_prefix}/login"));
+        .unwrap_or_else(|| login_path.clone());
     http::listen(
         &page,
         db_url.as_deref(),
@@ -1983,6 +2016,7 @@ web_ffi!(web_listen, |args: &Value| {
         port,
         admin,
         &admin_prefix,
+        &login_path,
         &login_redirect,
         &logout_redirect,
         forms,
@@ -2263,8 +2297,8 @@ pub unsafe extern "C" fn marqdo_plugin_init(host: *const MarqdoHostApi) -> c_int
         ("web_auth_logout", "session_id", web_auth_logout as PluginFn),
         ("web_password_hash", "password", web_password_hash as PluginFn),
         ("web_auth_new", "users,session_ttl", web_auth_new as PluginFn),
-        ("web_app_auth", "app,users,session_ttl,admin_prefix,login_redirect,logout_redirect", web_app_auth as PluginFn),
-        ("web_app_gate", "app,path,roles", web_app_gate as PluginFn),
+        ("web_app_auth", "app,users,session_ttl,admin_prefix,login_redirect,logout_redirect,login_path", web_app_auth as PluginFn),
+        ("web_app_gate", "app,path,roles,match,on_deny,exclude", web_app_gate as PluginFn),
         (
             "web_app_gallery",
             "app,path,storage,prefix,title,download_base",

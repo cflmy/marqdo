@@ -644,18 +644,22 @@ Register a WebSocket endpoint at `path` (e.g. `/live`). `mode` is `echo` (defaul
     + `admin_prefix`=None
     + `login_redirect`=None
     + `logout_redirect`=None
+    + `login_path`=None
 
-Keep the app's `admin=True`, and gate `{admin_prefix}*` behind a login page (default prefix `/admin`). `users` is an admin-users table (`|username|password|` / `|用户名|密码|`); optional `role` / `角色` column (`admin` / `author` / `visitor`). Unauthenticated requests under the prefix redirect to `{admin_prefix}/login`. Registers a default gate `{admin_prefix}*` → `admin`. Optional args override `admin_prefix` / `login_redirect` / `logout_redirect` on the app.
+Keep the app's `admin=True`, and gate `{admin_prefix}` (segment-boundary prefix) behind a login page (default `/admin`). Unauthenticated requests **redirect** to `login_path` (default `{admin_prefix}/login`, auto-excluded). Does **not** match `/admin-publish`-style siblings.
 
-**> web_app_auth app=`self` users=`users` session_ttl=`session_ttl` admin_prefix=`admin_prefix` login_redirect=`login_redirect` logout_redirect=`logout_redirect`**
+**> web_app_auth app=`self` users=`users` session_ttl=`session_ttl` admin_prefix=`admin_prefix` login_redirect=`login_redirect` logout_redirect=`logout_redirect` login_path=`login_path`**
 
 ## gate
     + `path`
     + `roles`=admin
+    + `match`=prefix
+    + `on_deny`=forbid
+    + `exclude`=None
 
-Require one of `roles` (CSV) for `path` (prefix or `path*`). Anonymous sessions count as `visitor`.
+Require one of `roles` (CSV) for `path`. `match=prefix` uses segment boundaries; `exact` is equality. Trailing `*` on `path` means prefix. `on_deny=redirect` sends visitors to `login_path` (with `?next=`); `forbid` returns 403. `exclude` is CSV or list of open paths.
 
-**> web_app_gate app=`self` path=`path` roles=`roles`**
+**> web_app_gate app=`self` path=`path` roles=`roles` match=`match` on_deny=`on_deny` exclude=`exclude`**
 
 ## gallery
     + `path`=/gallery

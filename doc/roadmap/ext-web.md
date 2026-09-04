@@ -42,7 +42,7 @@
 | 波次 | 内容 | 状态 |
 |------|------|------|
 | **C0** | `admin` 关则不占路径；`admin_prefix` / 登录回跳可配 | **done** |
-| **C1** | gate 匹配与未登录策略一致；段边界默认 admin gate | **planned** |
+| **C1** | gate 匹配与未登录策略一致；段边界默认 admin gate | **done** |
 | **C2** | `shell_css` + `layout` 松绑 | **planned** |
 | **C3** | 样式 strict / 脚本 defer·version | **planned** |
 | **C4** | 壳预设收口与条件导航（后续） | **planned** |

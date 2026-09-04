@@ -69,6 +69,104 @@ pub struct DownloadRoute {
     pub disposition: String,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum GateMatch {
+    Exact,
+    /// Segment-boundary prefix: `/desk` matches `/desk` and `/desk/…`, not `/desk-x`.
+    Prefix,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum OnDeny {
+    Redirect,
+    Forbid,
+}
+
+#[derive(Clone, Debug)]
+pub struct Gate {
+    pub path: String,
+    pub roles: Vec<String>,
+    pub match_mode: GateMatch,
+    pub on_deny: OnDeny,
+    pub exclude: Vec<String>,
+}
+
+impl Gate {
+    pub fn from_json(g: &Value) -> Option<Self> {
+        let raw = g.get("path").and_then(|v| v.as_str())?.trim();
+        if raw.is_empty() {
+            return None;
+        }
+        let starred = raw.ends_with('*');
+        let mut path = raw.trim_end_matches('*').trim_end_matches('/').to_string();
+        if path.is_empty() {
+            path = "/".into();
+        } else if !path.starts_with('/') {
+            path = format!("/{path}");
+        }
+        let roles = match g.get("roles") {
+            Some(Value::Array(a)) => a
+                .iter()
+                .filter_map(|v| v.as_str().map(|s| s.to_ascii_lowercase()))
+                .collect(),
+            Some(Value::String(s)) => session::parse_roles_csv(s),
+            _ => vec!["admin".into()],
+        };
+        let match_s = g
+            .get("match")
+            .or_else(|| g.get("匹配"))
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_ascii_lowercase();
+        let match_mode = match match_s.as_str() {
+            "exact" | "精确" => GateMatch::Exact,
+            "prefix" | "前缀" => GateMatch::Prefix,
+            _ if starred => GateMatch::Prefix,
+            _ => GateMatch::Prefix,
+        };
+        let deny_s = g
+            .get("on_deny")
+            .or_else(|| g.get("拒绝"))
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_ascii_lowercase();
+        let on_deny = match deny_s.as_str() {
+            "redirect" | "重定向" | "login" => OnDeny::Redirect,
+            "forbid" | "禁止" | "403" => OnDeny::Forbid,
+            _ => OnDeny::Forbid,
+        };
+        let mut exclude = Vec::new();
+        if let Some(Value::Array(a)) = g.get("exclude").or_else(|| g.get("排除")) {
+            for v in a {
+                if let Some(s) = v.as_str() {
+                    let s = s.trim();
+                    if !s.is_empty() {
+                        exclude.push(s.to_string());
+                    }
+                }
+            }
+        } else if let Some(s) = g
+            .get("exclude")
+            .or_else(|| g.get("排除"))
+            .and_then(|v| v.as_str())
+        {
+            for part in s.split(',') {
+                let part = part.trim();
+                if !part.is_empty() {
+                    exclude.push(part.to_string());
+                }
+            }
+        }
+        Some(Gate {
+            path,
+            roles,
+            match_mode,
+            on_deny,
+            exclude,
+        })
+    }
+}
+
 #[derive(Clone)]
 pub struct AppState {
     page: Value,
@@ -76,6 +174,8 @@ pub struct AppState {
     admin: bool,
     /// Built-in admin mount root (e.g. `/admin` or `/desk`); unused when `admin` is false.
     admin_prefix: String,
+    /// Login form URL (GET/POST); may differ from `{admin_prefix}/login`.
+    login_path: String,
     login_redirect: String,
     logout_redirect: String,
     forms: HashMap<String, Value>,
@@ -108,10 +208,6 @@ impl AppState {
             format!("{p}/{rest}")
         }
     }
-
-    fn login_path(&self) -> String {
-        self.admin_href("login")
-    }
 }
 
 fn collect_page_forms(
@@ -143,6 +239,7 @@ pub fn listen(
     port: u16,
     admin: bool,
     admin_prefix: &str,
+    login_path: &str,
     login_redirect: &str,
     logout_redirect: &str,
     mut forms: HashMap<String, Value>,
@@ -161,7 +258,7 @@ pub fn listen(
     robots_body: Option<String>,
     page_404: Option<Value>,
     page_500: Option<Value>,
-    gates: Vec<(String, Vec<String>)>,
+    gates: Vec<Gate>,
     gallery_routes: HashMap<String, Value>,
     middleware: &Middleware,
     mut site_head: Vec<crate::assets::HeadLink>,
@@ -208,6 +305,14 @@ pub fn listen(
         db_url: db_url.map(|s| s.to_string()),
         admin,
         admin_prefix: admin_prefix.clone(),
+        login_path: {
+            let lp = login_path.trim();
+            if lp.is_empty() {
+                format!("{}/login", admin_prefix.trim_end_matches('/'))
+            } else {
+                lp.to_string()
+            }
+        },
         login_redirect: login_redirect.to_string(),
         logout_redirect: logout_redirect.to_string(),
         forms,
@@ -480,14 +585,12 @@ pub fn listen(
     let app = crate::middleware::apply(app, middleware);
     let app = if !gates.is_empty() {
         let gates_for_mw = gates.clone();
-        let login_path_for_mw = state.login_path();
-        let admin_prefix_for_mw = state.admin_prefix.clone();
+        let login_path_for_mw = state.login_path.clone();
         app.layer(axum::middleware::from_fn(
             move |req: axum::http::Request<axum::body::Body>, next: axum::middleware::Next| {
                 let gates = gates_for_mw.clone();
                 let login_path = login_path_for_mw.clone();
-                let admin_prefix = admin_prefix_for_mw.clone();
-                async move { rbac_middleware(gates, login_path, admin_prefix, req, next).await }
+                async move { rbac_middleware(gates, login_path, req, next).await }
             },
         ))
     } else {
@@ -952,23 +1055,34 @@ fn weak_etag(bytes: &[u8]) -> String {
     format!("W/\"{h:x}-{}\"", bytes.len())
 }
 
-fn path_matches(path: &str, pattern: &str) -> bool {
-    let pat = pattern.trim_end_matches('*');
-    if pattern.ends_with('*') {
-        path == pat.trim_end_matches('/') || path.starts_with(pat)
-    } else {
-        path == pattern || path.starts_with(&format!("{pattern}/"))
+fn gate_matches(path: &str, gate: &Gate) -> bool {
+    let pat = gate.path.trim_end_matches('*').trim_end_matches('/');
+    let pat = if pat.is_empty() { "/" } else { pat };
+    match gate.match_mode {
+        GateMatch::Exact => path == pat || path == gate.path,
+        GateMatch::Prefix => path == pat || path.starts_with(&format!("{pat}/")),
     }
 }
 
-fn path_under_admin_prefix(path: &str, prefix: &str) -> bool {
-    path == prefix || path.starts_with(&format!("{prefix}/"))
+fn path_excluded(path: &str, exclude: &[String], login_path: &str) -> bool {
+    if path == login_path || path.starts_with(&format!("{login_path}?")) {
+        return true;
+    }
+    for ex in exclude {
+        let ex = ex.trim_end_matches('*').trim_end_matches('/');
+        if ex.is_empty() {
+            continue;
+        }
+        if path == ex || path.starts_with(&format!("{ex}/")) {
+            return true;
+        }
+    }
+    false
 }
 
 async fn rbac_middleware(
-    gates: Vec<(String, Vec<String>)>,
+    gates: Vec<Gate>,
     login_path: String,
-    admin_prefix: String,
     req: axum::http::Request<axum::body::Body>,
     next: axum::middleware::Next,
 ) -> Response {
@@ -978,18 +1092,23 @@ async fn rbac_middleware(
         .get(header::COOKIE)
         .and_then(|v| v.to_str().ok())
         .map(|s| s.to_string());
-    for (prefix, roles) in &gates {
-        if !path_matches(&path, prefix) {
+    for gate in &gates {
+        if !gate_matches(&path, gate) {
             continue;
         }
-        // Login page itself must stay reachable.
-        if path == login_path || path.starts_with(&format!("{login_path}?")) {
+        if path_excluded(&path, &gate.exclude, &login_path) {
             break;
         }
         let role = session::session_role(cookie.as_deref());
-        if !session::role_allowed(&role, roles) {
-            if role == "visitor" && path_under_admin_prefix(&path, &admin_prefix) {
-                return Redirect::to(&login_path).into_response();
+        if !session::role_allowed(&role, &gate.roles) {
+            if role == "visitor" && gate.on_deny == OnDeny::Redirect {
+                let next_q = urlencoding_path(&path);
+                let dest = if next_q.is_empty() || path == login_path {
+                    login_path.clone()
+                } else {
+                    format!("{login_path}?next={next_q}")
+                };
+                return Redirect::to(&dest).into_response();
             }
             return (
                 StatusCode::FORBIDDEN,
@@ -1002,6 +1121,19 @@ async fn rbac_middleware(
         break;
     }
     next.run(req).await
+}
+
+fn urlencoding_path(path: &str) -> String {
+    let mut out = String::new();
+    for b in path.bytes() {
+        match b {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' | b'/' => {
+                out.push(b as char)
+            }
+            _ => out.push_str(&format!("%{b:02X}")),
+        }
+    }
+    out
 }
 
 fn gallery_page(_st: &AppState, cfg: &Value) -> Response {
@@ -1108,7 +1240,7 @@ fn admin_gate(st: &AppState, cookie_header: Option<&str>) -> Option<Response> {
         return Some(Html(admin_shell(st, "Admin", None, "<p class=\"flash err\">No database bound to this app.</p>")).into_response());
     }
     if st.auth_users.is_some() && !admin_authed(st, cookie_header) {
-        return Some(Redirect::to(&st.login_path()).into_response());
+        return Some(Redirect::to(&st.login_path).into_response());
     }
     None
 }
@@ -1226,7 +1358,7 @@ body {{ margin:0; min-height:100vh; display:grid; place-items:center; background
 </body></html>"#,
         err = err,
         csrf_field = csrf_field,
-        login_action = esc(&st.login_path()),
+        login_action = esc(&st.login_path),
     )
 }
 
@@ -1869,5 +2001,47 @@ async fn ws_socket_loop(
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod gate_tests {
+    use super::*;
+
+    fn g(path: &str, mode: GateMatch) -> Gate {
+        Gate {
+            path: path.into(),
+            roles: vec!["admin".into()],
+            match_mode: mode,
+            on_deny: OnDeny::Forbid,
+            exclude: vec![],
+        }
+    }
+
+    #[test]
+    fn prefix_segment_boundary() {
+        let gate = g("/admin", GateMatch::Prefix);
+        assert!(gate_matches("/admin", &gate));
+        assert!(gate_matches("/admin/news", &gate));
+        assert!(!gate_matches("/admin-publish", &gate));
+        assert!(!gate_matches("/administrator", &gate));
+    }
+
+    #[test]
+    fn starred_json_becomes_prefix() {
+        let gate = Gate::from_json(&json!({"path": "/admin*", "roles": ["admin"]})).unwrap();
+        assert_eq!(gate.match_mode, GateMatch::Prefix);
+        assert!(gate_matches("/admin/x", &gate));
+        assert!(!gate_matches("/admin-publish", &gate));
+    }
+
+    #[test]
+    fn exclude_login() {
+        assert!(path_excluded(
+            "/desk/login",
+            &["/desk/login".into()],
+            "/desk/login"
+        ));
+        assert!(!path_excluded("/desk", &["/desk/login".into()], "/desk/login"));
     }
 }
