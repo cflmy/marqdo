@@ -10,6 +10,7 @@
 - **`agent.step` / `plan` 写回**：参数名 `writeback` 遮蔽 `lib/writeback` import，导致 `writeback=True` 时 `method receiver must be an object map`；改为 `host_writeback_record`。金样 `agent-writeback-shadow`。
 - **`ext/web` C0**：`admin=False` 不再挂载/保留 `/admin*`；可配 `admin_prefix` / `login_redirect` / `logout_redirect`；金样 `web-c0-admin-prefix`。
 - **`ext/web` C1**：门禁段边界匹配（不再误伤 `/admin-publish`）；`gate` 支持 `match` / `on_deny` / `exclude`；`auth` 默认 `on_deny=redirect` + `login_path`；金样 `web-c1-gates`。
+- **`ext/web` C2**：`shell_css=full|minimal|off`；`layout=sidebar|stacked|bare|rail`；full 壳含小屏单列 media；金样 `web-c2-shell-layout`。
 
 ### Changed
 - `build_step_context`：call site 提前到 task 之后；开场白强调 code-as-documentation。

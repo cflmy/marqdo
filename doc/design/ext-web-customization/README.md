@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| 状态 | **C0–C1 done · C2–C4 planned** |
+| 状态 | **C0–C2 done · C3–C4 planned** |
 | 日期 | 2026-09-04 |
 | 问题盘点 | [../../research/ext-web-customization-limits.md](../../research/ext-web-customization-limits.md) |
 | 相关 | [../ext-web.md](../ext-web.md) · [../ext-web-net.md](../ext-web-net.md) · [../../roadmap/ext-web.md](../../roadmap/ext-web.md) |

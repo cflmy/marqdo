@@ -62,6 +62,6 @@
 
 ---
 
-## 6. 过渡期 workaround
+## 6. 过渡期 → 已落地
 
-`shell_css=off`（实现后）或强力覆盖 `body.has-sidebar`；条件导航暂用 CSS `display` + 双份链接，或轻量 `theme.js`。
+**C2 已落地（2026-09）：** `layout=sidebar|stacked|bare|rail`；有 side 时 `stacked`/`bare` 不再强制 `has-sidebar`。金样同上。

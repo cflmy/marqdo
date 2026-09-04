@@ -307,19 +307,35 @@ fn slot_class(args: &Value, slot: &str, base: &str) -> String {
     }
 }
 
-const SHELL_CSS: &str = r#"
+const SHELL_VARS: &str = r#"
 :root { --ink:#1c1917; --muted:#57534e; --paper:#fafaf9; --line:#e7e5e4; --accent:#0f766e; }
-body { margin:0; font-family: "IBM Plex Sans", "Noto Sans SC", sans-serif; background:var(--paper); color:var(--ink); display:grid; min-height:100vh; grid-template-rows:auto 1fr auto; }
+body { margin:0; font-family: "IBM Plex Sans", "Noto Sans SC", sans-serif; background:var(--paper); color:var(--ink); }
+a { color:var(--ink); text-decoration:none; }
+a:hover { color:var(--accent); }
+"#;
+
+const SHELL_LAYOUT: &str = r#"
+body { display:grid; min-height:100vh; grid-template-rows:auto 1fr auto; }
 body.has-sidebar { grid-template-columns:14rem 1fr; grid-template-areas:"top top" "side main" "foot foot"; }
 body.no-sidebar { grid-template-areas:"top" "main" "foot"; }
+@media (max-width:720px) {
+  body.has-sidebar { grid-template-columns:1fr; grid-template-areas:"top" "main" "foot" "side"; }
+  body.has-sidebar aside.side { border-right:0; border-top:1px solid var(--line); }
+}
+body.layout-stacked { display:flex; flex-direction:column; min-height:100vh; }
+body.layout-stacked header.topnav, body.layout-stacked aside.side, body.layout-stacked main.main, body.layout-stacked footer.foot { width:100%; }
+body.layout-stacked aside.side { border-right:0; border-bottom:1px solid var(--line); }
+body.layout-bare { display:block; min-height:100vh; }
+body.layout-bare main.main { padding:1.5rem 1.25rem 2rem; }
 header.topnav { grid-area:top; border-bottom:1px solid var(--line); padding:.85rem 1.25rem; background:#fff; }
 aside.side { grid-area:side; border-right:1px solid var(--line); padding:1.25rem 1rem; background:#f5f5f4; }
 main.main { grid-area:main; padding:1.5rem 1.25rem 2rem; }
 footer.foot { grid-area:foot; border-top:1px solid var(--line); padding:.85rem 1.25rem; color:var(--muted); background:#fff; }
 ul.nav, ul.side-nav, ul.foot-nav { list-style:none; margin:0; padding:0; display:flex; flex-wrap:wrap; gap:.35rem 1rem; }
 ul.side-nav { flex-direction:column; }
-a { color:var(--ink); text-decoration:none; }
-a:hover { color:var(--accent); }
+"#;
+
+const SHELL_WIDGETS: &str = r#"
 .content.cards { display:grid; gap:1rem; margin-top:1.25rem; grid-template-columns:repeat(auto-fill,minmax(16rem,1fr)); }
 .content.cards article { background:#fff; border:1px solid var(--line); border-radius:6px; padding:1rem; }
 .main-intro h1 { margin:0 0 .75rem; font-size:2rem; }
@@ -348,6 +364,52 @@ a:hover { color:var(--accent); }
 .pagination a:hover { text-decoration:underline; }
 .pagination .page-status { color:var(--muted); }
 "#;
+
+fn normalize_shell_css(raw: &str) -> &'static str {
+    match raw.trim().to_ascii_lowercase().as_str() {
+        "" | "full" | "default" => "full",
+        "minimal" | "min" | "vars" => "minimal",
+        "off" | "none" | "false" | "0" => "off",
+        _ => "full",
+    }
+}
+
+fn shell_css_for(mode: &str) -> String {
+    match normalize_shell_css(mode) {
+        "off" => String::new(),
+        "minimal" => SHELL_VARS.to_string(),
+        _ => format!("{SHELL_VARS}{SHELL_LAYOUT}{SHELL_WIDGETS}"),
+    }
+}
+
+fn normalize_layout(raw: &str) -> String {
+    match raw.trim().to_ascii_lowercase().as_str() {
+        "" | "auto" | "default" => String::new(),
+        "sidebar" | "side" => "sidebar".into(),
+        "stacked" | "stack" | "column" => "stacked".into(),
+        "bare" | "main" | "none" => "bare".into(),
+        "rail" => "rail".into(),
+        other => other.to_string(),
+    }
+}
+
+fn resolve_shell_css(args: &Value) -> String {
+    let raw = args
+        .get("shell_css")
+        .or_else(|| args.get("壳样式"))
+        .and_then(|v| v.as_str())
+        .unwrap_or("full");
+    shell_css_for(raw)
+}
+
+fn resolve_layout(args: &Value) -> String {
+    let raw = args
+        .get("layout")
+        .or_else(|| args.get("布局"))
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+    normalize_layout(raw)
+}
 
 fn head_html(args: &Value, default_title: &str) -> String {
     let meta = args.get("meta").and_then(|v| v.as_object());
@@ -473,6 +535,8 @@ pub fn render_page_ex(
         .get("styles_css")
         .and_then(|v| v.as_str())
         .unwrap_or("");
+    let shell = resolve_shell_css(args);
+    let layout = resolve_layout(args);
     let parts = args
         .get("parts")
         .and_then(|v| v.as_object())
@@ -485,10 +549,32 @@ pub fn render_page_ex(
     let (intro, items, total) = resolve_main(args, db_url);
 
     let has_side = args.get("sidebar").is_some() || !side.is_empty();
-    let body_class = if has_side {
-        "has-sidebar"
-    } else {
-        "no-sidebar"
+    let bare = layout == "bare";
+    let body_class = match layout.as_str() {
+        "bare" => "layout-bare".to_string(),
+        "stacked" => "layout-stacked".to_string(),
+        "rail" => {
+            if has_side {
+                "has-rail has-sidebar".into()
+            } else {
+                "has-rail no-sidebar".into()
+            }
+        }
+        "sidebar" => {
+            if has_side {
+                "has-sidebar".into()
+            } else {
+                "no-sidebar".into()
+            }
+        }
+        "" => {
+            if has_side {
+                "has-sidebar".into()
+            } else {
+                "no-sidebar".into()
+            }
+        }
+        other => other.to_string(),
     };
 
     let mut main_html = String::new();
@@ -532,39 +618,61 @@ pub fn render_page_ex(
         }
     }
 
+    let style_block = if shell.is_empty() && extra.is_empty() {
+        String::new()
+    } else {
+        format!("<style>{shell}{extra}</style>")
+    };
+
+    let show_chrome = !bare;
+    let side_html = if show_chrome && has_side {
+        format!(
+            "<aside class=\"{}\"{}><span class=\"side-label\">侧栏</span>{}</aside>",
+            slot_class(args, "sidebar", "side"),
+            slot_attrs("sidebar", &parts, args),
+            render_ul(&side, "side-nav")
+        )
+    } else {
+        String::new()
+    };
+    let header_html = if show_chrome {
+        format!(
+            "<header class=\"{}\"{}>{}</header>",
+            slot_class(args, "nav", "topnav"),
+            slot_attrs("nav", &parts, args),
+            render_ul(&nav, "nav")
+        )
+    } else {
+        String::new()
+    };
+    let footer_html = if show_chrome {
+        format!(
+            "<footer class=\"{}\"{}>{}</footer>",
+            slot_class(args, "footer", "foot"),
+            slot_attrs("footer", &parts, args),
+            render_ul(&foot, "foot-nav")
+        )
+    } else {
+        String::new()
+    };
+
     format!(
         r#"<!DOCTYPE html>
 <html lang="zh-CN"><head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 {head}
-<style>{SHELL_CSS}{extra}</style>
+{style_block}
 </head>
 <body class="{body_class}">
-<header class="{nav_class}"{nav_attrs}>{nav_ul}</header>
+{header_html}
 {side_html}
 <main class="{main_class}"{main_attrs}>{main_html}</main>
-<footer class="{foot_class}"{foot_attrs}>{foot_ul}</footer>
+{footer_html}
 </body></html>"#,
         head = head_html(args, title),
-        nav_class = slot_class(args, "nav", "topnav"),
-        nav_attrs = slot_attrs("nav", &parts, args),
-        nav_ul = render_ul(&nav, "nav"),
-        side_html = if has_side {
-            format!(
-                "<aside class=\"{}\"{}><span class=\"side-label\">侧栏</span>{}</aside>",
-                slot_class(args, "sidebar", "side"),
-                slot_attrs("sidebar", &parts, args),
-                render_ul(&side, "side-nav")
-            )
-        } else {
-            String::new()
-        },
         main_class = slot_class(args, "main", "main"),
         main_attrs = slot_attrs("main", &parts, args),
-        foot_class = slot_class(args, "footer", "foot"),
-        foot_attrs = slot_attrs("footer", &parts, args),
-        foot_ul = render_ul(&foot, "foot-nav"),
     )
 }
 
@@ -703,4 +811,58 @@ fn render_article(it: &Map<String, Value>) -> String {
     }
     s.push_str("</article>");
     s
+}
+
+#[cfg(test)]
+mod shell_tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn shell_off_omits_sidebar_grid() {
+        let page = json!({
+            "title": "t",
+            "shell_css": "off",
+            "layout": "stacked",
+            "sidebar": [{"label": "A", "href": "/a"}],
+        });
+        let html = render_page(&page, None, None);
+        assert!(html.contains("layout-stacked"));
+        assert!(!html.contains("has-sidebar"));
+        assert!(!html.contains("grid-template-columns:14rem"));
+    }
+
+    #[test]
+    fn shell_minimal_keeps_vars_not_cards() {
+        let page = json!({ "title": "t", "shell_css": "minimal" });
+        let html = render_page(&page, None, None);
+        assert!(html.contains("--ink:"));
+        assert!(!html.contains(".content.cards article"));
+        assert!(!html.contains("grid-template-columns:14rem"));
+    }
+
+    #[test]
+    fn layout_bare_skips_aside() {
+        let page = json!({
+            "title": "t",
+            "layout": "bare",
+            "sidebar": [{"label": "A", "href": "/a"}],
+            "nav": [{"label": "Home", "href": "/"}],
+        });
+        let html = render_page(&page, None, None);
+        assert!(html.contains("layout-bare"));
+        assert!(!html.contains("<aside"));
+        assert!(!html.contains("<header"));
+    }
+
+    #[test]
+    fn default_full_keeps_sidebar_grid() {
+        let page = json!({
+            "title": "t",
+            "sidebar": [{"label": "A", "href": "/a"}],
+        });
+        let html = render_page(&page, None, None);
+        assert!(html.contains("has-sidebar"));
+        assert!(html.contains("grid-template-columns:14rem"));
+    }
 }

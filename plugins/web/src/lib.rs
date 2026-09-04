@@ -273,10 +273,17 @@ macro_rules! web_ffi {
 web_ffi!(web_page_new, |args: &Value| {
     let title = arg_str_opt(args, "title").unwrap_or("Marqdo Web");
     let intro = arg_str_opt(args, "intro").unwrap_or("");
-    Ok(json!({
+    let mut out = json!({
         "title": title,
         "intro": intro,
-    }))
+    });
+    if let Some(s) = arg_str_opt(args, "shell_css").or_else(|| arg_str_opt(args, "壳样式")) {
+        out.as_object_mut().unwrap().insert("shell_css".into(), json!(s));
+    }
+    if let Some(s) = arg_str_opt(args, "layout").or_else(|| arg_str_opt(args, "布局")) {
+        out.as_object_mut().unwrap().insert("layout".into(), json!(s));
+    }
+    Ok(out)
 });
 
 web_ffi!(web_compose_components, |args: &Value| {
@@ -1053,6 +1060,12 @@ web_ffi!(web_app_new, |args: &Value| {
     if let Some(v) = logout_redirect {
         out.as_object_mut().unwrap().insert("logout_redirect".into(), json!(v));
     }
+    if let Some(s) = arg_str_opt(args, "shell_css").or_else(|| arg_str_opt(args, "壳样式")) {
+        out.as_object_mut().unwrap().insert("shell_css".into(), json!(s));
+    }
+    if let Some(s) = arg_str_opt(args, "layout").or_else(|| arg_str_opt(args, "布局")) {
+        out.as_object_mut().unwrap().insert("layout".into(), json!(s));
+    }
     Ok(out)
 });
 
@@ -1628,6 +1641,33 @@ web_ffi!(web_db_table_info, |args: &Value| {
     Ok(json!({ "columns": arr }))
 });
 
+
+fn stamp_page_shell(page: &mut Value, shell_css: Option<&str>, layout: Option<&str>) {
+    let Some(obj) = page.as_object_mut() else {
+        return;
+    };
+    if let Some(s) = shell_css {
+        let empty = obj
+            .get("shell_css")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .is_empty();
+        if empty {
+            obj.insert("shell_css".into(), json!(s));
+        }
+    }
+    if let Some(s) = layout {
+        let empty = obj
+            .get("layout")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .is_empty();
+        if empty {
+            obj.insert("layout".into(), json!(s));
+        }
+    }
+}
+
 web_ffi!(web_listen, |args: &Value| {
     use std::collections::HashMap;
     use std::path::PathBuf;
@@ -2009,6 +2049,20 @@ web_ffi!(web_listen, |args: &Value| {
         .filter(|s| !s.is_empty())
         .map(|s| s.to_string())
         .unwrap_or_else(|| login_path.clone());
+    let app_shell = admin_cfg_app
+        .get("shell_css")
+        .or_else(|| admin_cfg_app.get("壳样式"))
+        .and_then(|v| v.as_str());
+    let app_layout = admin_cfg_app
+        .get("layout")
+        .or_else(|| admin_cfg_app.get("布局"))
+        .and_then(|v| v.as_str());
+    let mut page = page;
+    let mut routes = routes;
+    stamp_page_shell(&mut page, app_shell, app_layout);
+    for (_k, p) in routes.iter_mut() {
+        stamp_page_shell(p, app_shell, app_layout);
+    }
     http::listen(
         &page,
         db_url.as_deref(),
@@ -2076,7 +2130,7 @@ pub unsafe extern "C" fn marqdo_plugin_init(host: *const MarqdoHostApi) -> c_int
     }
 
     let regs = [
-        ("web_page_new", "title,intro", web_page_new as PluginFn),
+        ("web_page_new", "title,intro,shell_css,layout", web_page_new as PluginFn),
         (
             "web_compose_components",
             "page,components",
@@ -2248,7 +2302,7 @@ pub unsafe extern "C" fn marqdo_plugin_init(host: *const MarqdoHostApi) -> c_int
         ("web_db_list_tables", "url", web_db_list_tables as PluginFn),
         (
             "web_app_new",
-            "page,db,admin,host,port,admin_prefix,login_redirect,logout_redirect",
+            "page,db,admin,host,port,admin_prefix,login_redirect,logout_redirect,shell_css,layout",
             web_app_new as PluginFn,
         ),
         ("web_app_route", "app,path,page", web_app_route as PluginFn),

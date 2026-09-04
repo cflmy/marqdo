@@ -179,9 +179,27 @@ Build a `render_list` effect: `{ render_list: { sel: { tag, items } } }`.
 # page
     + `title`="Marqdo Web"
     + `intro`=""
+    + `shell_css`=None
+    + `layout`=None
 
 > ensure_plugin
-**> web_page_new title=`title` intro=`intro`**
+**> web_page_new title=`title` intro=`intro` shell_css=`shell_css` layout=`layout`**
+
+## shell_css
+    + `mode`=full
+
+Framework shell CSS mode for this page: `full` (default), `minimal` (vars only), or `off`/`none`.
+
+*`out` = > table.put in=`self` at="shell_css" value=mode*
+**out**
+
+## layout
+    + `layout`=sidebar
+
+Page chrome layout: `sidebar` (default when a side slot exists), `stacked` (single column; no `has-sidebar` grid), `bare` (main only), or `rail`.
+
+*`out` = > table.put in=`self` at="layout" value=layout*
+**out**
 
 ## compose_components
     + `components`
@@ -568,11 +586,13 @@ Field table + rules table; submit writes through `# db`.
     + `admin_prefix`=/admin
     + `login_redirect`=None
     + `logout_redirect`=None
+    + `shell_css`=None
+    + `layout`=None
 
-Construct an app. `admin=True` mounts the built-in CRUD UI under `admin_prefix` (default `/admin`). When `admin=False`, that prefix is **not** reserved — you may `route` your own pages there. Optional `login_redirect` / `logout_redirect` override post-auth landing (defaults: `{admin_prefix}` and `{admin_prefix}/login`).
+Construct an app. `admin=True` mounts the built-in CRUD UI under `admin_prefix` (default `/admin`). When `admin=False`, that prefix is **not** reserved — you may `route` your own pages there. Optional `login_redirect` / `logout_redirect` override post-auth landing. Optional `shell_css` / `layout` become defaults for pages that do not set their own (see `page.shell_css` / `page.layout`).
 
 > ensure_plugin
-**> web_app_new page=`page` db=`db` admin=`admin` host=`host` port=`port` admin_prefix=`admin_prefix` login_redirect=`login_redirect` logout_redirect=`logout_redirect`**
+**> web_app_new page=`page` db=`db` admin=`admin` host=`host` port=`port` admin_prefix=`admin_prefix` login_redirect=`login_redirect` logout_redirect=`logout_redirect` shell_css=`shell_css` layout=`layout`**
 
 ## route
     + `path`

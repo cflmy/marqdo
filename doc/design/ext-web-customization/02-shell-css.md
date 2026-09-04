@@ -67,6 +67,6 @@
 
 ---
 
-## 6. 过渡期 workaround
+## 6. 过渡期 → 已落地
 
-继续用更高特异性 + `!important`；实现后主题应删除这类补丁，并在回归里断言壳字符串不出现。
+**C2 已落地（2026-09）：** `shell_css=full|minimal|off`；页面/应用可设；`full` 含 `@media (max-width:720px)` 单列。金样 `tests/ext/web-c2-shell-layout.mq.md`。
