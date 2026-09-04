@@ -74,6 +74,10 @@ pub struct AppState {
     page: Value,
     pub db_url: Option<String>,
     admin: bool,
+    /// Built-in admin mount root (e.g. `/admin` or `/desk`); unused when `admin` is false.
+    admin_prefix: String,
+    login_redirect: String,
+    logout_redirect: String,
     forms: HashMap<String, Value>,
     /// Page that owns an embedded form (for re-render on validation errors).
     form_owners: HashMap<String, Value>,
@@ -88,6 +92,26 @@ pub struct AppState {
     page_500: Option<Value>,
     /// Default `<head>` links from `app.icons` / static favicon convention.
     site_head: Vec<crate::assets::HeadLink>,
+}
+
+impl AppState {
+    fn ap(&self) -> &str {
+        self.admin_prefix.trim_end_matches('/')
+    }
+
+    fn admin_href(&self, rest: &str) -> String {
+        let p = self.ap();
+        let rest = rest.trim().trim_start_matches('/');
+        if rest.is_empty() {
+            p.to_string()
+        } else {
+            format!("{p}/{rest}")
+        }
+    }
+
+    fn login_path(&self) -> String {
+        self.admin_href("login")
+    }
 }
 
 fn collect_page_forms(
@@ -118,6 +142,9 @@ pub fn listen(
     host: &str,
     port: u16,
     admin: bool,
+    admin_prefix: &str,
+    login_redirect: &str,
+    logout_redirect: &str,
     mut forms: HashMap<String, Value>,
     routes: HashMap<String, Value>,
     static_dir: Option<PathBuf>,
@@ -166,10 +193,23 @@ pub fn listen(
     // Resolve relative icon paths: try as-is absolute, else leave for entry_dir resolve in lib.
     // (Absolute paths preferred; relative already joined in web_listen.)
 
+    let admin_prefix = {
+        let mut p = admin_prefix.trim().to_string();
+        if !p.starts_with('/') {
+            p = format!("/{p}");
+        }
+        while p.len() > 1 && p.ends_with('/') {
+            p.pop();
+        }
+        p
+    };
     let state = Arc::new(AppState {
         page: page.clone(),
         db_url: db_url.map(|s| s.to_string()),
         admin,
+        admin_prefix: admin_prefix.clone(),
+        login_redirect: login_redirect.to_string(),
+        logout_redirect: logout_redirect.to_string(),
         forms,
         form_owners,
         auth_users,
@@ -185,17 +225,23 @@ pub fn listen(
     let mut app = Router::new()
         .route("/", get(home))
         .route("/_part/{id}", get(home_part))
-        .route("/_form/{id}", get(form_get).post(form_post))
-        .route("/admin", get(admin_home))
-        .route("/admin/login", get(admin_login_get).post(admin_login_post))
-        .route("/admin/logout", get(admin_logout))
-        .route("/admin/{table}", get(admin_table))
-        .route("/admin/{table}/new", get(admin_new_get).post(admin_new_post))
-        .route(
-            "/admin/{table}/{id}/edit",
-            get(admin_edit_get).post(admin_edit_post),
-        )
-        .route("/admin/{table}/{id}/delete", get(admin_delete));
+        .route("/_form/{id}", get(form_get).post(form_post));
+
+    // Built-in admin only when enabled — otherwise `/admin…` is free for author routes.
+    if admin {
+        let admin_routes = Router::new()
+            .route("/", get(admin_home))
+            .route("/login", get(admin_login_get).post(admin_login_post))
+            .route("/logout", get(admin_logout))
+            .route("/{table}", get(admin_table))
+            .route("/{table}/new", get(admin_new_get).post(admin_new_post))
+            .route(
+                "/{table}/{id}/edit",
+                get(admin_edit_get).post(admin_edit_post),
+            )
+            .route("/{table}/{id}/delete", get(admin_delete));
+        app = app.nest(&admin_prefix, admin_routes);
+    }
 
     // Register each author route as an exact GET path + `{path}/_part/{id}`.
     // Paths containing `{param}` become dynamic routes (e.g. `/post/{slug}`);
@@ -434,10 +480,14 @@ pub fn listen(
     let app = crate::middleware::apply(app, middleware);
     let app = if !gates.is_empty() {
         let gates_for_mw = gates.clone();
+        let login_path_for_mw = state.login_path();
+        let admin_prefix_for_mw = state.admin_prefix.clone();
         app.layer(axum::middleware::from_fn(
             move |req: axum::http::Request<axum::body::Body>, next: axum::middleware::Next| {
                 let gates = gates_for_mw.clone();
-                async move { rbac_middleware(gates, req, next).await }
+                let login_path = login_path_for_mw.clone();
+                let admin_prefix = admin_prefix_for_mw.clone();
+                async move { rbac_middleware(gates, login_path, admin_prefix, req, next).await }
             },
         ))
     } else {
@@ -911,8 +961,14 @@ fn path_matches(path: &str, pattern: &str) -> bool {
     }
 }
 
+fn path_under_admin_prefix(path: &str, prefix: &str) -> bool {
+    path == prefix || path.starts_with(&format!("{prefix}/"))
+}
+
 async fn rbac_middleware(
     gates: Vec<(String, Vec<String>)>,
+    login_path: String,
+    admin_prefix: String,
     req: axum::http::Request<axum::body::Body>,
     next: axum::middleware::Next,
 ) -> Response {
@@ -927,13 +983,13 @@ async fn rbac_middleware(
             continue;
         }
         // Login page itself must stay reachable.
-        if path == "/admin/login" || path.starts_with("/admin/login?") {
+        if path == login_path || path.starts_with(&format!("{login_path}?")) {
             break;
         }
         let role = session::session_role(cookie.as_deref());
         if !session::role_allowed(&role, roles) {
-            if role == "visitor" && path.starts_with("/admin") {
-                return Redirect::to("/admin/login").into_response();
+            if role == "visitor" && path_under_admin_prefix(&path, &admin_prefix) {
+                return Redirect::to(&login_path).into_response();
             }
             return (
                 StatusCode::FORBIDDEN,
@@ -1044,18 +1100,15 @@ h1{{margin:0 0 1rem;font-size:1.5rem}}
 }
 
 fn admin_gate(st: &AppState, cookie_header: Option<&str>) -> Option<Response> {
+    // When admin=false the built-in routes are not mounted; defense-in-depth only.
     if !st.admin {
-        return Some(Html(admin_shell(st, "Admin", None, "<p class=\"flash err\">Admin is disabled for this app.</p>")).into_response());
+        return Some((StatusCode::NOT_FOUND, "Not Found").into_response());
     }
     if st.db_url.is_none() {
         return Some(Html(admin_shell(st, "Admin", None, "<p class=\"flash err\">No database bound to this app.</p>")).into_response());
     }
-    // Login-gated admin: require a valid admin-role session.
     if st.auth_users.is_some() && !admin_authed(st, cookie_header) {
-        return Some(
-            Redirect::to("/admin/login")
-                .into_response(),
-        );
+        return Some(Redirect::to(&st.login_path()).into_response());
     }
     None
 }
@@ -1074,10 +1127,10 @@ fn admin_authed(_st: &AppState, cookie_header: Option<&str>) -> bool {
 
 async fn admin_login_get(State(st): State<Arc<AppState>>, headers: axum::http::HeaderMap) -> Response {
     if st.auth_users.is_none() {
-        return Redirect::to("/admin").into_response();
+        return Redirect::to(&st.login_redirect).into_response();
     }
     if admin_authed(&st, cookie_from_headers(&headers)) {
-        return Redirect::to("/admin").into_response();
+        return Redirect::to(&st.login_redirect).into_response();
     }
     let (_, csrf, set_cookie) = resolve_session(&headers);
     let mut resp = Html(login_page(&st, None, Some(&csrf))).into_response();
@@ -1091,7 +1144,7 @@ async fn admin_login_post(
     Form(posted): Form<HashMap<String, String>>,
 ) -> Response {
     let Some(users) = &st.auth_users else {
-        return Redirect::to("/admin").into_response();
+        return Redirect::to(&st.login_redirect).into_response();
     };
     let (_, csrf, set_cookie, posted) = match validate_csrf_post(&headers, posted) {
         Ok(v) => v,
@@ -1117,7 +1170,7 @@ async fn admin_login_post(
     let sid = session::session_new(Some(st.session_ttl));
     session::session_set(&sid, "username", json!(user));
     session::session_set(&sid, "role", json!(role));
-    let mut resp = Redirect::to("/admin").into_response();
+    let mut resp = Redirect::to(&st.login_redirect).into_response();
     let _ = resp.headers_mut().try_append(
         axum::http::header::SET_COOKIE,
         session::session_cookie(&sid, st.session_ttl, st.cookie_secure)
@@ -1128,7 +1181,7 @@ async fn admin_login_post(
     resp
 }
 
-fn login_page(_st: &AppState, error: Option<&str>, csrf: Option<&str>) -> String {
+fn login_page(st: &AppState, error: Option<&str>, csrf: Option<&str>) -> String {
     let err = match error {
         Some(e) => format!("<p class=\"flash err\">{}</p>", esc(e)),
         None => String::new(),
@@ -1163,7 +1216,7 @@ body {{ margin:0; min-height:100vh; display:grid; place-items:center; background
 <h1>Admin</h1>
 <p class="sub">Sign in to manage this site.</p>
 {err}
-<form method="post" action="/admin/login">
+<form method="post" action="{login_action}">
 {csrf_field}
 <label>Username<input name="username" autocomplete="username" required autofocus/></label>
 <label>Password<input name="password" type="password" autocomplete="current-password" required/></label>
@@ -1173,11 +1226,12 @@ body {{ margin:0; min-height:100vh; display:grid; place-items:center; background
 </body></html>"#,
         err = err,
         csrf_field = csrf_field,
+        login_action = esc(&st.login_path()),
     )
 }
 
 async fn admin_logout(
-    State(_st): State<Arc<AppState>>,
+    State(st): State<Arc<AppState>>,
     headers: axum::http::HeaderMap,
 ) -> Response {
     if let Some(sid) = session::session_id_from_cookie(
@@ -1187,7 +1241,7 @@ async fn admin_logout(
     ) {
         session::session_destroy(&sid);
     }
-    let mut resp = Redirect::to("/admin/login").into_response();
+    let mut resp = Redirect::to(&st.logout_redirect).into_response();
     if let Ok(h) = resp.headers_mut().try_append(
         axum::http::header::SET_COOKIE,
         "marqdo_sid=; HttpOnly; Path=/; Max-Age=0; SameSite=Lax"
@@ -1217,7 +1271,7 @@ fn admin_shell(st: &AppState, title: &str, active: Option<&str>, inner: &str) ->
         .as_deref()
         .and_then(|u| db::list_tables(u).ok())
         .unwrap_or_default();
-    let mut side = String::from("<nav class=\"admin-nav\"><a class=\"brand\" href=\"/admin\">Admin</a>");
+    let mut side = format!("<nav class=\"admin-nav\"><a class=\"brand\" href=\"{}\">Admin</a>", esc(st.ap()));
     if tables.is_empty() {
         side.push_str("<p class=\"muted\">No tables yet.</p>");
     } else {
@@ -1229,8 +1283,8 @@ fn admin_shell(st: &AppState, title: &str, active: Option<&str>, inner: &str) ->
                 ""
             };
             side.push_str(&format!(
-                "<li><a{cls} href=\"/admin/{}\">{}</a></li>",
-                esc(t),
+                "<li><a{cls} href=\"{}\">{}</a></li>",
+                esc(&st.admin_href(t)),
                 esc(t)
             ));
         }
@@ -1325,7 +1379,9 @@ fn admin_form_page(
     csrf: Option<&str>,
 ) -> String {
     let mut body = format!(
-        "<p class=\"crumbs\"><a href=\"/admin\">Admin</a> / <a href=\"/admin/{t}\">{t}</a> / {kind}</p><h1>{kind} {t}</h1>",
+        "<p class=\"crumbs\"><a href=\"{home}\">Admin</a> / <a href=\"{table_href}\">{t}</a> / {kind}</p><h1>{kind} {t}</h1>",
+        home = esc(st.ap()),
+        table_href = esc(&st.admin_href(table)),
         t = esc(table),
         kind = esc(kind),
     );
@@ -1358,7 +1414,9 @@ async fn admin_home(
         inner.push_str("<div class=\"table-wrap\"><table class=\"data\"><thead><tr><th>Table</th><th></th></tr></thead><tbody>");
         for t in &tables {
             inner.push_str(&format!(
-                "<tr><td><a href=\"/admin/{t}\">{t}</a></td><td class=\"actions\"><a class=\"btn\" href=\"/admin/{t}/new\">New</a></td></tr>",
+                "<tr><td><a href=\"{href}\">{t}</a></td><td class=\"actions\"><a class=\"btn\" href=\"{new_href}\">New</a></td></tr>",
+                href = esc(&st.admin_href(t)),
+                new_href = esc(&st.admin_href(&format!("{t}/new"))),
                 t = esc(t)
             ));
         }
@@ -1407,22 +1465,23 @@ async fn admin_table(
     }
 
     let mut inner = format!(
-        "<p class=\"crumbs\"><a href=\"/admin\">Admin</a> / {t}</p><h1>{t}</h1>",
+        "<p class=\"crumbs\"><a href=\"{home}\">Admin</a> / {t}</p><h1>{t}</h1>",
+        home = esc(st.ap()),
         t = esc(&table)
     );
     inner.push_str(&flash_html(q.flash.as_deref()));
     inner.push_str(&format!(
-        "<div class=\"toolbar\"><a class=\"btn\" href=\"/admin/{}/new\">New row</a><span class=\"meta\">{} row{}</span></div>",
-        esc(&table),
+        "<div class=\"toolbar\"><a class=\"btn\" href=\"{new_href}\">New row</a><span class=\"meta\">{} row{}</span></div>",
         rows.len(),
-        if rows.len() == 1 { "" } else { "s" }
+        if rows.len() == 1 { "" } else { "s" },
+        new_href = esc(&st.admin_href(&format!("{table}/new"))),
     ));
 
     if rows.is_empty() {
         inner.push_str(&format!(
-            "<div class=\"empty\"><strong>No rows in {}</strong><a class=\"btn\" href=\"/admin/{}/new\">Create the first row</a></div>",
+            "<div class=\"empty\"><strong>No rows in {}</strong><a class=\"btn\" href=\"{new_href}\">Create the first row</a></div>",
             esc(&table),
-            esc(&table)
+            new_href = esc(&st.admin_href(&format!("{table}/new"))),
         ));
     } else {
         inner.push_str("<div class=\"table-wrap\"><table class=\"data\"><thead><tr>");
@@ -1454,7 +1513,10 @@ async fn admin_table(
                 .unwrap_or_default();
             if !id.is_empty() {
                 inner.push_str(&format!(
-                    "<td class=\"actions\"><a href=\"/admin/{table}/{id}/edit\">Edit</a> · <a class=\"danger\" href=\"/admin/{table}/{id}/delete\" onclick=\"return confirm('Delete row #{id}?')\">Delete</a></td>"
+                    "<td class=\"actions\"><a href=\"{edit}\">Edit</a> · <a class=\"danger\" href=\"{del}\" onclick=\"return confirm('Delete row #{id}?')\">Delete</a></td>",
+                    edit = esc(&st.admin_href(&format!("{table}/{id}/edit"))),
+                    del = esc(&st.admin_href(&format!("{table}/{id}/delete"))),
+                    id = esc(&id),
                 ));
             } else {
                 inner.push_str("<td></td>");
@@ -1476,7 +1538,7 @@ async fn admin_new_get(
     }
     let url = st.db_url.as_deref().unwrap();
     let (_, csrf, set_cookie) = resolve_session(&headers);
-    match form::from_schema(url, &table, "insert", None) {
+    match form::from_schema(url, &table, "insert", None, st.ap()) {
         Ok(frm) => {
             let mut resp = Html(admin_form_page(
                 &st,
@@ -1516,7 +1578,7 @@ async fn admin_new_post(
         Ok(v) => v,
         Err(r) => return r,
     };
-    match form::from_schema(url, &table, "insert", None) {
+    match form::from_schema(url, &table, "insert", None, st.ap()) {
         Ok(frm) => {
             let mut resp = submit_and_respond(
                 &st,
@@ -1571,7 +1633,7 @@ async fn admin_edit_get(
         }
     };
     let (_, csrf, set_cookie) = resolve_session(&headers);
-    match form::from_schema(url, &table, "update", Some(&id)) {
+    match form::from_schema(url, &table, "update", Some(&id), st.ap()) {
         Ok(frm) => {
             let mut resp = Html(admin_form_page(
                 &st,
@@ -1611,7 +1673,7 @@ async fn admin_edit_post(
         Ok(v) => v,
         Err(r) => return r,
     };
-    match form::from_schema(url, &table, "update", Some(&id)) {
+    match form::from_schema(url, &table, "update", Some(&id), st.ap()) {
         Ok(frm) => {
             let mut resp = submit_and_respond(
                 &st,
@@ -1653,7 +1715,7 @@ async fn admin_delete(
         ))
         .into_response();
     }
-    Redirect::to(&with_flash(&format!("/admin/{table}"), "deleted")).into_response()
+    Redirect::to(&with_flash(&st.admin_href(&table), "deleted")).into_response()
 }
 
 fn esc(s: &str) -> String {

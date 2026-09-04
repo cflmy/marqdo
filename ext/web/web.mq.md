@@ -565,9 +565,14 @@ Field table + rules table; submit writes through `# db`.
     + `admin`=False
     + `host`=127.0.0.1
     + `port`=18081
+    + `admin_prefix`=/admin
+    + `login_redirect`=None
+    + `logout_redirect`=None
+
+Construct an app. `admin=True` mounts the built-in CRUD UI under `admin_prefix` (default `/admin`). When `admin=False`, that prefix is **not** reserved — you may `route` your own pages there. Optional `login_redirect` / `logout_redirect` override post-auth landing (defaults: `{admin_prefix}` and `{admin_prefix}/login`).
 
 > ensure_plugin
-**> web_app_new page=`page` db=`db` admin=`admin` host=`host` port=`port`**
+**> web_app_new page=`page` db=`db` admin=`admin` host=`host` port=`port` admin_prefix=`admin_prefix` login_redirect=`login_redirect` logout_redirect=`logout_redirect`**
 
 ## route
     + `path`
@@ -636,10 +641,13 @@ Register a WebSocket endpoint at `path` (e.g. `/live`). `mode` is `echo` (defaul
 ## auth
     + `users`
     + `session_ttl`=3600
+    + `admin_prefix`=None
+    + `login_redirect`=None
+    + `logout_redirect`=None
 
-Keep the app's `admin=True`, and gate `/admin*` behind a login page. `users` is an admin-users table (`|username|password|` / `|用户名|密码|`); optional `role` / `角色` column (`admin` / `author` / `visitor`). Unauthenticated requests redirect to `/admin/login`. Registers a default gate `/admin*` → `admin`.
+Keep the app's `admin=True`, and gate `{admin_prefix}*` behind a login page (default prefix `/admin`). `users` is an admin-users table (`|username|password|` / `|用户名|密码|`); optional `role` / `角色` column (`admin` / `author` / `visitor`). Unauthenticated requests under the prefix redirect to `{admin_prefix}/login`. Registers a default gate `{admin_prefix}*` → `admin`. Optional args override `admin_prefix` / `login_redirect` / `logout_redirect` on the app.
 
-**> web_app_auth app=`self` users=`users` session_ttl=`session_ttl`**
+**> web_app_auth app=`self` users=`users` session_ttl=`session_ttl` admin_prefix=`admin_prefix` login_redirect=`login_redirect` logout_redirect=`logout_redirect`**
 
 ## gate
     + `path`

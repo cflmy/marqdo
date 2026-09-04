@@ -193,11 +193,13 @@ fn sql_type_to_input(sql_type: &str, name: &str) -> &'static str {
 }
 
 /// Build a form handle from live SQLite schema (admin new/edit).
+/// `admin_prefix` is the mount root (default `/admin`), without trailing slash.
 pub fn from_schema(
     db_url: &str,
     table: &str,
     action: &str,
     id: Option<&str>,
+    admin_prefix: &str,
 ) -> Result<Value, String> {
     let action = match action {
         "update" | "更新" => "update",
@@ -223,22 +225,24 @@ pub fn from_schema(
             "pk": c.pk,
         }));
     }
+    let base = admin_prefix.trim_end_matches('/');
+    let table_href = format!("{base}/{table}");
     let mut form = form_new(Some(table), action, id);
     if let Some(obj) = form.as_object_mut() {
         obj.insert("fields".into(), Value::Array(fields));
-        obj.insert("redirect".into(), json!(format!("/admin/{table}")));
+        obj.insert("redirect".into(), json!(&table_href));
         if action == "insert" {
-            obj.insert("action_url".into(), json!(format!("/admin/{table}/new")));
+            obj.insert("action_url".into(), json!(format!("{table_href}/new")));
             obj.insert("title".into(), json!(format!("New {table}")));
         } else if let Some(i) = id {
             obj.insert(
                 "action_url".into(),
-                json!(format!("/admin/{table}/{i}/edit")),
+                json!(format!("{table_href}/{i}/edit")),
             );
             obj.insert("title".into(), json!(format!("Edit {table} #{i}")));
             obj.insert("id".into(), json!(i));
         }
-        obj.insert("cancel_href".into(), json!(format!("/admin/{table}")));
+        obj.insert("cancel_href".into(), json!(&table_href));
     }
     Ok(form)
 }

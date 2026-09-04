@@ -8,10 +8,12 @@
 
 ### Fixed
 - **`agent.step` / `plan` 写回**：参数名 `writeback` 遮蔽 `lib/writeback` import，导致 `writeback=True` 时 `method receiver must be an object map`；改为 `host_writeback_record`。金样 `agent-writeback-shadow`。
+- **`ext/web` C0**：`admin=False` 不再挂载/保留 `/admin*`；可配 `admin_prefix` / `login_redirect` / `logout_redirect`；金样 `web-c0-admin-prefix`。
 
 ### Changed
 - `build_step_context`：call site 提前到 task 之后；开场白强调 code-as-documentation。
 - 中文 `构建单步上下文` 委托英文版（含预算 / READ）；新增 `dump_step_context`；live 用例改用仓库根 `.env`。
+- 文档：[ext-web 定制限制](doc/research/ext-web-customization-limits.md) + [解决设计 C0–C4](doc/design/ext-web-customization/)。
 
 ## v0.3.3 — 2026-09-04
 

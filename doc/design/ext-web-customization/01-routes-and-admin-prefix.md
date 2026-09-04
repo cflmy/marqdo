@@ -67,6 +67,8 @@
 
 ---
 
-## 6. 过渡期作者 workaround（实现前）
+## 6. 过渡期 → 已落地
 
-继续用 `/desk` 旁路 + JS 调 `/admin/login`；**实现 C0 后应删除该兜底**，避免双入口长期并存。
+~~继续用 `/desk` 旁路 + JS 调 `/admin/login`。~~
+
+**C0 已落地（2026-09）：** `admin=False` 可直接 `route path="/admin/…"`；或 `admin=True` + `admin_prefix="/desk"` + `login_redirect` / `logout_redirect`。见金样 `tests/ext/web-c0-admin-prefix.mq.md`。

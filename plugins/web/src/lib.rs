@@ -500,7 +500,7 @@ web_ffi!(web_rss_build, |args: &Value| {
 
 web_ffi!(web_app_route_rss, |args: &Value| {
     let mut app = args.get("app").cloned().unwrap_or(json!({}));
-    let path = normalize_route_path(arg_str(args, "path")?)?;
+    let path = normalize_route_path_in_app(arg_str(args, "path")?, &app)?;
     let table = arg_str(args, "table")?.to_string();
     let limit = args
         .get("limit")
@@ -537,7 +537,7 @@ web_ffi!(web_app_route_rss, |args: &Value| {
 
 web_ffi!(web_app_redirect, |args: &Value| {
     let mut app = args.get("app").cloned().unwrap_or(json!({}));
-    let from = normalize_route_path(arg_str(args, "from").or_else(|_| arg_str(args, "path"))?)?;
+    let from = normalize_route_path_in_app(arg_str(args, "from").or_else(|_| arg_str(args, "path"))?, &app)?;
     let to = arg_str(args, "to")?.to_string();
     let permanent = match args
         .get("permanent")
@@ -588,7 +588,7 @@ web_ffi!(web_app_error_page, |args: &Value| {
 
 web_ffi!(web_app_sitemap, |args: &Value| {
     let mut app = args.get("app").cloned().unwrap_or(json!({}));
-    let path = normalize_route_path(arg_str(args, "path").unwrap_or("/sitemap.xml"))?;
+    let path = normalize_route_path_in_app(arg_str(args, "path").unwrap_or("/sitemap.xml"), &app)?;
     let base = arg_str_opt(args, "base").unwrap_or("").to_string();
     let table = arg_str_opt(args, "table").map(|s| s.to_string());
     let loc = arg_str_opt(args, "loc").unwrap_or("path").to_string();
@@ -655,7 +655,7 @@ fn storage_url_arg(args: &Value, key: &str) -> Result<String, String> {
 
 web_ffi!(web_app_upload, |args: &Value| {
     let mut app = args.get("app").cloned().unwrap_or(json!({}));
-    let path = normalize_route_path(arg_str(args, "path").unwrap_or("/_upload"))?;
+    let path = normalize_route_path_in_app(arg_str(args, "path").unwrap_or("/_upload"), &app)?;
     let field = arg_str_opt(args, "field").unwrap_or("file").to_string();
     let storage_url = storage_url_arg(args, "storage")?;
     let prefix = arg_str_opt(args, "prefix").unwrap_or("uploads/").to_string();
@@ -1023,27 +1023,44 @@ web_ffi!(web_app_new, |args: &Value| {
         Some(Value::Number(n)) => n.as_i64().unwrap_or(0) != 0,
         _ => false,
     };
-    Ok(json!({
+    let admin_prefix = arg_str_opt(args, "admin_prefix")
+        .or_else(|| arg_str_opt(args, "后台前缀"))
+        .map(normalize_admin_prefix)
+        .transpose()?
+        .unwrap_or_else(|| "/admin".into());
+    let login_redirect = arg_str_opt(args, "login_redirect")
+        .or_else(|| arg_str_opt(args, "登录回跳"))
+        .map(|s| s.to_string());
+    let logout_redirect = arg_str_opt(args, "logout_redirect")
+        .or_else(|| arg_str_opt(args, "登出回跳"))
+        .map(|s| s.to_string());
+    let mut out = json!({
         "page": page,
         "db": db,
         "host": host,
         "port": port,
         "admin": admin,
+        "admin_prefix": admin_prefix,
         "forms": {},
         "routes": {},
         "ws_routes": {},
         "static_dir": null,
         "static_mount": "/static",
-    }))
+    });
+    if let Some(v) = login_redirect {
+        out.as_object_mut().unwrap().insert("login_redirect".into(), json!(v));
+    }
+    if let Some(v) = logout_redirect {
+        out.as_object_mut().unwrap().insert("logout_redirect".into(), json!(v));
+    }
+    Ok(out)
 });
 
-fn normalize_route_path(raw: &str) -> Result<String, String> {
+/// Normalize a URL path: leading slash, no trailing slash (except never `/` here).
+fn clean_mount_path(raw: &str) -> Result<String, String> {
     let s = raw.trim();
     if s.is_empty() {
-        return Err("route path is empty".into());
-    }
-    if s == "/" {
-        return Err("route path `/` is reserved for the home page".into());
+        return Err("path is empty".into());
     }
     let mut path = if s.starts_with('/') {
         s.to_string()
@@ -1053,24 +1070,88 @@ fn normalize_route_path(raw: &str) -> Result<String, String> {
     while path.len() > 1 && path.ends_with('/') {
         path.pop();
     }
-    // reserved prefixes
-    if path == "/admin"
-        || path.starts_with("/admin/")
-        || path == "/_form"
+    Ok(path)
+}
+
+fn normalize_admin_prefix(raw: &str) -> Result<String, String> {
+    let path = clean_mount_path(raw)?;
+    if path == "/" {
+        return Err("admin_prefix cannot be `/`".into());
+    }
+    if path == "/_form"
         || path.starts_with("/_form/")
         || path == "/_part"
         || path.starts_with("/_part/")
-        || path == "/static"
-        || path.starts_with("/static/")
     {
+        return Err(format!("admin_prefix `{path}` collides with framework paths"));
+    }
+    Ok(path)
+}
+
+fn path_under_prefix(path: &str, prefix: &str) -> bool {
+    path == prefix || path.starts_with(&format!("{prefix}/"))
+}
+
+fn is_framework_reserved(path: &str, static_mount: &str) -> bool {
+    path == "/_form"
+        || path.starts_with("/_form/")
+        || path == "/_part"
+        || path.starts_with("/_part/")
+        || path_under_prefix(path, static_mount)
+}
+
+/// Reserved only while built-in admin is enabled, for the active prefix.
+fn normalize_route_path_for(
+    raw: &str,
+    admin: bool,
+    admin_prefix: &str,
+    static_mount: &str,
+) -> Result<String, String> {
+    let path = clean_mount_path(raw)?;
+    if path == "/" {
+        return Err("route path `/` is reserved for the home page".into());
+    }
+    if is_framework_reserved(&path, static_mount) {
+        return Err(format!("route path `{path}` is reserved"));
+    }
+    if admin && path_under_prefix(&path, admin_prefix) {
         return Err(format!("route path `{path}` is reserved"));
     }
     Ok(path)
 }
 
+fn app_admin_flag(app: &Value) -> bool {
+    app.get("admin")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false)
+}
+
+fn app_admin_prefix(app: &Value) -> String {
+    app.get("admin_prefix")
+        .and_then(|v| v.as_str())
+        .and_then(|s| normalize_admin_prefix(s).ok())
+        .unwrap_or_else(|| "/admin".into())
+}
+
+fn app_static_mount(app: &Value) -> String {
+    app.get("static_mount")
+        .and_then(|v| v.as_str())
+        .map(http::normalize_static_mount)
+        .unwrap_or_else(|| "/static".into())
+}
+
+fn normalize_route_path_in_app(raw: &str, app: &Value) -> Result<String, String> {
+    normalize_route_path_for(
+        raw,
+        app_admin_flag(app),
+        &app_admin_prefix(app),
+        &app_static_mount(app),
+    )
+}
+
 web_ffi!(web_app_route, |args: &Value| {
     let mut app = args.get("app").cloned().unwrap_or(json!({}));
-    let path = normalize_route_path(arg_str(args, "path")?)?;
+    let path = normalize_route_path_in_app(arg_str(args, "path")?, &app)?;
     let mut page = args
         .get("page")
         .cloned()
@@ -1094,7 +1175,7 @@ web_ffi!(web_app_route, |args: &Value| {
 
 web_ffi!(web_app_route_ws, |args: &Value| {
     let mut app = args.get("app").cloned().unwrap_or(json!({}));
-    let path = normalize_route_path(arg_str(args, "path")?)?;
+    let path = normalize_route_path_in_app(arg_str(args, "path")?, &app)?;
     let mode = if let Some(m) = args.get("mode").or_else(|| args.get("模式")) {
         crate::ws_hub::WsMode::parse(m)
     } else {
@@ -1179,6 +1260,23 @@ web_ffi!(web_app_auth, |args: &Value| {
         .get("session_ttl")
         .and_then(|v| v.as_u64().or_else(|| v.as_i64().map(|i| i as u64)))
         .unwrap_or(3600);
+    if let Some(p) = arg_str_opt(args, "admin_prefix").or_else(|| arg_str_opt(args, "后台前缀")) {
+        let p = normalize_admin_prefix(p)?;
+        app.as_object_mut()
+            .ok_or_else(|| "app must be a map".to_string())?
+            .insert("admin_prefix".into(), json!(p));
+    }
+    if let Some(v) = arg_str_opt(args, "login_redirect").or_else(|| arg_str_opt(args, "登录回跳")) {
+        app.as_object_mut()
+            .ok_or_else(|| "app must be a map".to_string())?
+            .insert("login_redirect".into(), json!(v));
+    }
+    if let Some(v) = arg_str_opt(args, "logout_redirect").or_else(|| arg_str_opt(args, "登出回跳")) {
+        app.as_object_mut()
+            .ok_or_else(|| "app must be a map".to_string())?
+            .insert("logout_redirect".into(), json!(v));
+    }
+    let prefix = app_admin_prefix(&app);
     let obj = app
         .as_object_mut()
         .ok_or_else(|| "app must be a map".to_string())?;
@@ -1186,19 +1284,20 @@ web_ffi!(web_app_auth, |args: &Value| {
         "auth".to_string(),
         json!({ "users": users, "session_ttl": session_ttl }),
     );
-    // Default RBAC: `/admin*` requires role `admin` when auth is configured.
+    // Default RBAC: `{admin_prefix}*` requires role `admin` when auth is configured.
     let mut gates = obj
         .get("gates")
         .and_then(|v| v.as_array())
         .cloned()
         .unwrap_or_default();
+    let gate_star = format!("{prefix}*");
     let has_admin_gate = gates.iter().any(|g| {
         g.get("path")
             .and_then(|v| v.as_str())
-            .is_some_and(|p| p == "/admin" || p == "/admin*")
+            .is_some_and(|p| p == prefix || p == gate_star)
     });
     if !has_admin_gate {
-        gates.push(json!({ "path": "/admin*", "roles": ["admin"] }));
+        gates.push(json!({ "path": gate_star, "roles": ["admin"] }));
         obj.insert("gates".into(), Value::Array(gates));
     }
     Ok(app)
@@ -1226,10 +1325,11 @@ web_ffi!(web_app_gate, |args: &Value| {
 
 web_ffi!(web_app_gallery, |args: &Value| {
     let mut app = args.get("app").cloned().unwrap_or(json!({}));
-    let path = normalize_route_path(
+    let path = normalize_route_path_in_app(
         arg_str(args, "path")
             .or_else(|_| arg_str(args, "路径"))
             .unwrap_or("/gallery"),
+        &app,
     )?;
     let storage_url = storage_url_arg(args, "storage")
         .or_else(|_| storage_url_arg(args, "存储"))?;
@@ -1293,14 +1393,14 @@ web_ffi!(web_app_static, |args: &Value| {
     }
     let mount = arg_str_opt(args, "mount").unwrap_or("/static");
     let mount = http::normalize_static_mount(mount);
-    // Also reserve custom mounts against later routes.
-    if mount == "/admin"
-        || mount.starts_with("/admin/")
-        || mount == "/_form"
+    if mount == "/_form"
         || mount.starts_with("/_form/")
         || mount == "/_part"
         || mount.starts_with("/_part/")
     {
+        return Err(format!("static mount `{mount}` is reserved"));
+    }
+    if app_admin_flag(&app) && path_under_prefix(&mount, &app_admin_prefix(&app)) {
         return Err(format!("static mount `{mount}` is reserved"));
     }
     let obj = app
@@ -1463,7 +1563,10 @@ web_ffi!(web_form_from_schema, |args: &Value| {
         None | Some(Value::Null) => None,
         Some(_) => Some(arg_text(args, "id")?),
     };
-    form::from_schema(&url, &table, action, id.as_deref())
+    let admin_prefix = arg_str_opt(args, "admin_prefix")
+        .or_else(|| arg_str_opt(args, "后台前缀"))
+        .unwrap_or("/admin");
+    form::from_schema(&url, &table, action, id.as_deref(), admin_prefix)
 });
 
 web_ffi!(web_db_table_info, |args: &Value| {
@@ -1852,12 +1955,36 @@ web_ffi!(web_listen, |args: &Value| {
             r
         })
         .collect();
+    let admin_cfg_app = args.get("app").cloned().unwrap_or_else(|| {
+        json!({
+            "admin": admin,
+            "admin_prefix": arg_str_opt(args, "admin_prefix").unwrap_or("/admin"),
+            "login_redirect": args.get("login_redirect").cloned().unwrap_or(Value::Null),
+            "logout_redirect": args.get("logout_redirect").cloned().unwrap_or(Value::Null),
+        })
+    });
+    let admin_prefix = app_admin_prefix(&admin_cfg_app);
+    let login_redirect = admin_cfg_app
+        .get("login_redirect")
+        .and_then(|v| v.as_str())
+        .filter(|s| !s.is_empty())
+        .map(|s| s.to_string())
+        .unwrap_or_else(|| admin_prefix.clone());
+    let logout_redirect = admin_cfg_app
+        .get("logout_redirect")
+        .and_then(|v| v.as_str())
+        .filter(|s| !s.is_empty())
+        .map(|s| s.to_string())
+        .unwrap_or_else(|| format!("{admin_prefix}/login"));
     http::listen(
         &page,
         db_url.as_deref(),
         &host,
         port,
         admin,
+        &admin_prefix,
+        &login_redirect,
+        &logout_redirect,
         forms,
         routes,
         static_dir,
@@ -2087,7 +2214,7 @@ pub unsafe extern "C" fn marqdo_plugin_init(host: *const MarqdoHostApi) -> c_int
         ("web_db_list_tables", "url", web_db_list_tables as PluginFn),
         (
             "web_app_new",
-            "page,db,admin,host,port",
+            "page,db,admin,host,port,admin_prefix,login_redirect,logout_redirect",
             web_app_new as PluginFn,
         ),
         ("web_app_route", "app,path,page", web_app_route as PluginFn),
@@ -2136,7 +2263,7 @@ pub unsafe extern "C" fn marqdo_plugin_init(host: *const MarqdoHostApi) -> c_int
         ("web_auth_logout", "session_id", web_auth_logout as PluginFn),
         ("web_password_hash", "password", web_password_hash as PluginFn),
         ("web_auth_new", "users,session_ttl", web_auth_new as PluginFn),
-        ("web_app_auth", "app,users,session_ttl", web_app_auth as PluginFn),
+        ("web_app_auth", "app,users,session_ttl,admin_prefix,login_redirect,logout_redirect", web_app_auth as PluginFn),
         ("web_app_gate", "app,path,roles", web_app_gate as PluginFn),
         (
             "web_app_gallery",
