@@ -78,6 +78,7 @@ Greeting via a nested function:
   > print text=`果`
 ```
 
+
 ## 6b. Map table + footnote get
 
 ```markdown
@@ -108,6 +109,31 @@ Row-oriented records (SQL-like): first header `@` / `行` / `row` → list of ma
 
 *名 = 订单[^1][^品名]*
 ```
+
+## 6c. Browser effects — tables + lib/browser (not json.set)
+
+```markdown
+---
+import browser:lib/browser.mq.md
+---
+
+# main
+
+`wire` =
+
+| @ | 选择器 | 事件 | 调用 |
+|---|--------|------|------|
+| 1 | "#bump" | click | bump |
+
+**`wire`**
+
+## bump
+*`count` = count + 1*
+*`label` = > str count*
+**> browser.set_text sel="#count" text=label**
+```
+
+Do **not** build effect maps with `json.set` chains. See [marqdo-dev](../marqdo-dev/SKILL.md).
 
 ## 7. Import text stdlib
 

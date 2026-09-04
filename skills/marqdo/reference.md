@@ -44,12 +44,13 @@ Import one file; use **that** file’s function names.
 |-----------|-----------|-------------------------|
 | `lib/text.mq.md` | `lib/文本.mq.md` | text helpers / 去空白·拆分·拼接… |
 | `lib/table.mq.md` | `lib/表.mq.md` | `put`/`改` + list/map（见 `doc/design/stdlib-table.md`） |
+| `lib/browser.mq.md` | `lib/浏览器.mq.md` | WASM client effect helpers（GFM + `set_text`/`canvas`/…；见 marqdo-dev） |
 | `lib/fs.mq.md` | `lib/文件.mq.md` | filesystem |
 | `lib/sys.mq.md` | `lib/系统.mq.md` | process / cwd / load_dotenv |
 | `lib/plugin.mq.md` | `lib/插件.mq.md` | load native ABI plugins (`doc/design/ext-abi.md`) |
 | `lib/time.mq.md` | `lib/时间.mq.md` | time/format |
 | `lib/net.mq.md` | `lib/网络.mq.md` | HTTP(S) helpers (+ optional headers) |
-| `lib/json.mq.md` | (see design) | JSON (+ `quote`) |
+| `lib/json.mq.md` | (see design) | **parse / stringify / quote only** — not a dict builder |
 | `lib/math.mq.md` | `lib/数学.mq.md` | num, trig, random, formula, plot |
 | `lib/foreign.mq.md` | `lib/外联.mq.md` | run foreign fenced blocks |
 | `ext/llm.mq.md` | `ext/大模型.mq.md` | `# llm` / `# 大模型` object + chat methods |

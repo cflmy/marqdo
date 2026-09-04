@@ -1,6 +1,6 @@
 # browser-app（路线 E）
 
-作者**零业务 JS**：官方 bridge 自启；逻辑在 `app.mq.md`。
+作者**零业务 JS**；逻辑用 **GFM 表格 + `lib/browser`**（无 `json.set` 链）。
 
 | 能力 | 演示 |
 |------|------|
@@ -18,4 +18,4 @@ cargo build -p marqdo --release
 cd examples/browser-app && python3 -m http.server 8766
 ```
 
-见 [browser-wasm-e.md](../../doc/roadmap/browser-wasm-e.md)。
+写法：[marqdo-dev](../../.cursor/skills/marqdo-dev/SKILL.md) · 路线图：[browser-wasm-e.md](../../doc/roadmap/browser-wasm-e.md)。

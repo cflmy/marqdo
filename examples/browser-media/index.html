@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="zh-Hans">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Marqdo · browser-media (route F)</title>
+  <style>
+    :root { --ink: #1a1f1c; --paper: #e8efe6; --accent: #2f6f4e; --muted: #5a6b60; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; min-height: 100vh; font-family: "IBM Plex Sans", "Noto Sans SC", sans-serif;
+      color: var(--ink);
+      background: linear-gradient(165deg, #f3f7f2, var(--paper));
+      padding: 2rem clamp(1rem, 4vw, 3rem);
+    }
+    h1 { font-family: "IBM Plex Serif", "Noto Serif SC", serif; margin: 0 0 0.35rem; }
+    .lead { color: var(--muted); max-width: 42rem; }
+    section { margin: 1.5rem 0; padding: 1rem 0; border-top: 1px solid #c5d4c9; }
+    button {
+      padding: 0.45rem 0.9rem; border: 0; background: var(--accent); color: #f5faf6;
+      font: inherit; cursor: pointer; margin: 0.2rem 0.35rem 0.2rem 0;
+    }
+    button.secondary { background: #3a4740; }
+    #pad {
+      display: block; background: #fff; border: 1px solid #b7c7bb;
+      margin-top: 0.75rem;
+    }
+    #chips { display: flex; gap: 0.5rem; flex-wrap: wrap; margin: 0.75rem 0; }
+    #chips span {
+      padding: 0.45rem 0.75rem; background: rgba(255,255,255,0.75);
+      border: 1px dashed #2f6f4e; cursor: grab; user-select: none;
+    }
+    #dropzone {
+      min-height: 3.5rem; padding: 0.85rem; border: 2px dashed #7a9584;
+      background: rgba(255,255,255,0.45); color: var(--muted);
+    }
+    #beacon {
+      margin-top: 8rem; padding: 2rem; background: #2f6f4e; color: #f5faf6;
+      text-align: center;
+    }
+    #preview { margin-top: 0.5rem; min-height: 1rem; }
+    pre {
+      margin-top: 1rem; padding: 0.85rem 1rem; background: #122018; color: #d7eadc;
+      font-size: 0.8rem; overflow: auto; max-width: 42rem;
+    }
+    .err { color: #ffb4a8; }
+  </style>
+</head>
+<body>
+  <h1>Marqdo browser-media</h1>
+  <p class="lead">路线 F：文件 / Canvas / Audio / Observer / 拖放 — <strong>无作者业务 JS</strong>。</p>
+
+  <section>
+    <h2>F1 文件</h2>
+    <input id="file" type="file" accept="image/*,text/*,.txt,.md" disabled />
+    <button id="read-text" type="button" disabled>读文本</button>
+    <button id="read-dataurl" type="button" disabled>读 DataURL</button>
+    <div id="preview"></div>
+  </section>
+
+  <section>
+    <h2>F2 Canvas · F3 Audio</h2>
+    <button id="draw" type="button" disabled>绘制</button>
+    <button id="play" type="button" disabled>蜂鸣</button>
+    <canvas id="pad" width="280" height="120"></canvas>
+  </section>
+
+  <section>
+    <h2>F4 Observer</h2>
+    <button id="watch" type="button" disabled>开始观察</button>
+    <button id="unwatch" class="secondary" type="button" disabled>停止</button>
+    <p id="obs">idle</p>
+    <p>向下滚动可触发 Intersection；改窗口大小触发 Resize。</p>
+  </section>
+
+  <section>
+    <h2>F5 拖放</h2>
+    <div id="chips">
+      <span draggable="true" data-drag="alpha">alpha</span>
+      <span draggable="true" data-drag="beta">beta</span>
+      <span draggable="true" data-drag="gamma">gamma</span>
+    </div>
+    <div id="dropzone">拖到这里</div>
+  </section>
+
+  <div id="beacon">beacon（滚到可见）</div>
+
+  <pre id="log">loading…</pre>
+  <script
+    type="module"
+    src="./marqdo-bridge.js"
+    data-mq-wasm="./marqdo_wasm.wasm"
+    data-mq-source-url="./media.mq.md"
+    data-mq-ready="#log"
+    data-mq-enable="#file,#read-text,#read-dataurl,#draw,#play,#watch,#unwatch"
+  ></script>
+</body>
+</html>

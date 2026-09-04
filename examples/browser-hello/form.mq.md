@@ -1,7 +1,8 @@
 ---
 title: browser form (D3)
-description: input wire passes value; set_text / set_class / set_attr effects
-import json:lib/json.mq.md
+description: input wire passes value; effects via lib/browser
+import browser:lib/browser.mq.md
+import table:lib/table.mq.md
 ---
 
 # main
@@ -20,15 +21,13 @@ import json:lib/json.mq.md
 
 1. `value` != ""
     *`label` = "你好，" + value*
-    *`t` = > json.set map=None key="#echo" value=label*
-    *`ret` = > json.set map=None key="set_text" value=t*
-    *`c` = > json.set map=None key="#echo" value="hi"*
-    *`ret` = > json.set map=ret key="set_class" value=c*
-    *`attrs` = > json.set map=None key="data-name" value=value*
-    *`a` = > json.set map=None key="#echo" value=attrs*
-    **> json.set map=ret key="set_attr" value=a**
+    *`ret` = > browser.set_text sel="#echo" text=label*
+    *`cls` = > browser.set_class sel="#echo" class="hi"*
+    *`ret` = > browser.merge a=ret b=cls*
+    *`attrs` = > table.put in=None at="data-name" value=value*
+    *`attr` = > browser.set_attr sel="#echo" attrs=attrs*
+    **> browser.merge a=ret b=attr**
 2. *
-    *`t` = > json.set map=None key="#echo" value="（等待输入）"*
-    *`ret` = > json.set map=None key="set_text" value=t*
-    *`c` = > json.set map=None key="#echo" value=""*
-    **> json.set map=ret key="set_class" value=c**
+    *`ret` = > browser.set_text sel="#echo" text="（等待输入）"*
+    *`cls` = > browser.set_class sel="#echo" class=""*
+    **> browser.merge a=ret b=cls**

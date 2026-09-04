@@ -16,6 +16,8 @@ Marqdo = **Markdown markers as syntax**. A `.mq.md` file is both documentation a
 
 Canonical design (repo): `doc/design/markdown-mapping.md`, `doc/design/keywords.md`. Deeper tables: [reference.md](reference.md). Copy-paste patterns: [examples.md](examples.md).
 
+**Authoring / library craft** (GFM-first, no json glue, how to develop Marqdo): use **[`.cursor/skills/marqdo-dev/SKILL.md`](../../.cursor/skills/marqdo-dev/SKILL.md)** whenever writing or refactoring `.mq.md`, `lib/*`, or `ext/*`.
+
 **Product release** (tag, CHANGELOG, README, public docs, VSIX, GitHub assets): use [`.cursor/skills/marqdo-release/SKILL.md`](../../.cursor/skills/marqdo-release/SKILL.md) — detect latest version, **ask the user for the next SemVer**, then follow that playbook. Do not invent a version number.
 
 ## Hard rules (do not violate)
@@ -29,7 +31,8 @@ Canonical design (repo): `doc/design/markdown-mapping.md`, `doc/design/keywords.
 7. **Paths:** In bare *expressions* `/` is division. In **call args / param defaults / table cells**, unspaced `a/b` and quoted `".marqdo/agent-kb"` are path text — no `json.parse` needed. Numeric ratios that must stay text use quotes (`"1/5"`, `"16/9"`); bare `1/5` is division.
 8. Prefer ending side-effect-only function bodies with a lone `---` or `***` line (or `****` empty return) so later siblings are not swallowed.
 9. **`ext/**` never calls `host_*`.** Agent/OKF helpers are plugin names (`agent_kb_*`, …) after `plugin.load`. Do **not** add agent/OKF domain code to `src/host/` (core bloat). See `doc/design/ext-agent.md` §4.
-10. **Browser (route C/D/E):** client logic is Marqdo on WASM; official bridge is host glue and **may** implement lists, routing, storage, WebSocket, internal templates — authors **must not hand-write business JS**. Use `web.client_embed` / `data-mq-source-url` auto-mount ([roadmap D](../../../doc/roadmap/browser-wasm-d.md) · [E](../../../doc/roadmap/browser-wasm-e.md)). Effects: DOM patches, `render_list`, `navigate`, `storage`, `ws`, `fetch`/`fetch_all`, `interval`.
+10. **Browser (route C/D/E/F):** client logic is Marqdo on WASM; official bridge is host glue and **may** implement lists, routing, storage, WebSocket, canvas, file read, observers — authors **must not hand-write business JS**. Use `web.client_embed` / `data-mq-source-url` auto-mount. Client effects: prefer **GFM tables + `lib/browser`** ([`.cursor/skills/marqdo-dev/SKILL.md`](../../.cursor/skills/marqdo-dev/SKILL.md)).
+11. **Code-as-documentation / no bag glue:** Prefer **GFM tables** for maps, lists, wire, commands. Prefer **`table.put` / named helpers** over `json.set` / `json.append` chains. `lib/json` is for parse/stringify/quote only — not a dict builder. Unreadable json pipelines are a style bug.
 
 
 ## Markup → meaning (v0.2)
@@ -229,7 +232,9 @@ Design: [ext-quantum.md](../../doc/design/ext-quantum.md) · Q7: [ext-quantum-q7
 | Forgetting `---` after nested `##` helper | Add `---` / `***` / `****` |
 | Import `lib/text` then call bare `split` | `> text.split …` (qualified) |
 | Import `lib/text` then call `拆分` | Match file language (`text.split`, not 文本) |
+| `json.set` / `json.append` to build maps or lists | GFM tables; sparse `table.put`; named helpers (`browser.*`, `web.*`) |
 | `json.set` to build page parts | GFM tables + `page.compose_*` / `web.page` methods |
+| Import `json` for every browser handler | `import browser:lib/browser.mq.md` + tables ([`.cursor/skills/marqdo-dev/SKILL.md`](../../.cursor/skills/marqdo-dev/SKILL.md)) |
 | Mix `web.page` and `网页.页面` in one file | One import language per `.mq.md` |
 | Call `host_web_*` from `ext/web` | Use `# app` / `# db` methods; plugin ABI only |
 | Call `host_*` from `ext/quantum` | Use `# circuit` / `# density` methods; plugin ABI only |
@@ -245,6 +250,8 @@ Design: [ext-quantum.md](../../doc/design/ext-quantum.md) · Q7: [ext-quantum-q7
 - [ ] `# main` exists when the file is an entry program
 - [ ] Nested functions ended with `---` / `***` / `****` when needed
 - [ ] Imports and call names share the same language file
+- [ ] Data shaped as **GFM tables** (or short helpers) — no `json.set` / `json.append` glue
 - [ ] Web sites: tables + web classes only (no JSON glue); `data/` gitignored
+- [ ] Browser client: `lib/browser` + tables when returning effects
 - [ ] Quantum draw: quote `kind=` / `theme=`; rebuild plugin → `ext add quantum` before view
 - [ ] `marqdo run` succeeds (or errors addressed)

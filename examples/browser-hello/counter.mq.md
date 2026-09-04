@@ -1,7 +1,7 @@
 ---
 title: browser counter (C3)
-description: wire table + shared entry env; click updates DOM via set_text
-import json:lib/json.mq.md
+description: wire table + browser.set_text — no json glue
+import browser:lib/browser.mq.md
 ---
 
 # main
@@ -20,10 +20,8 @@ import json:lib/json.mq.md
 ## bump
 *`count` = count + 1*
 *`label` = > str count*
-*`patch` = > json.set map=None key="#count" value=label*
-**> json.set map=None key="set_text" value=patch**
+**> browser.set_text sel="#count" text=label**
 
 ## reset
 *`count` = 0*
-*`patch` = > json.set map=None key="#count" value="0"*
-**> json.set map=None key="set_text" value=patch**
+**> browser.set_text sel="#count" text="0"**

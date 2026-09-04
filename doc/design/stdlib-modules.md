@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| 状态 | **已落地**：text/table/fs/sys/time/json/net/math/foreign/**plugin** |
+| 状态 | **已落地**：text/table/fs/sys/time/json/net/math/foreign/**plugin**/browser |
 | 日期 | 2026-08-07 |
 | 原则 | 全部经 frontmatter **导入**；除 JSON 外中英分文件；内核保持少而精 |
 | 相关 | [stdlib.md](stdlib.md) · [stdlib-i18n.md](stdlib-i18n.md) · [ext-abi.md](ext-abi.md) · [ext-llm.md](ext-llm.md) · [ext-agent.md](ext-agent.md) · [**module-namespace.md**](module-namespace.md)（导入命名空间；**M1/M2 已落地**：`库.成员` / `库.对象.成员` / `use`） |
@@ -17,10 +17,11 @@
 |--------|--------|--------|------|
 | 文本 | `lib/text.mq.md` | `lib/文本.mq.md` | 已有 |
 | 表 | `lib/table.mq.md` | `lib/表.mq.md` | 已有（`put`/`改` + list/map；见 [stdlib-table.md](stdlib-table.md)） |
+| 浏览器效应 | `lib/browser.mq.md` | `lib/浏览器.mq.md` | WASM 客户端效应助手（GFM + helpers；勿用 `json.set` 链） |
 | 文件 | `lib/fs.mq.md` | `lib/文件.mq.md` | 已有 |
 | 系统 | `lib/sys.mq.md` | `lib/系统.mq.md` | 已有（含 `load_dotenv`） |
 | 时间 | `lib/time.mq.md` | `lib/时间.mq.md` | 已有 |
-| JSON | `lib/json.mq.md` | **同文件** | 已有（含 `quote`） |
+| JSON | `lib/json.mq.md` | **同文件** | **仅** parse / stringify / quote；集合请用 table / GFM |
 | 网络 | `lib/net.mq.md` | `lib/网络.mq.md` | 已有（HTTPS + headers） |
 | 数学 | `lib/math.mq.md` | `lib/数学.mq.md` | 已有 |
 | 外联 | `lib/foreign.mq.md` | `lib/外联.mq.md` | 已有 |

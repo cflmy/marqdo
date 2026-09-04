@@ -1,6 +1,6 @@
 # browser-hello（WASM C1–C4 / 路线 D）
 
-浏览器内跑 Marqdo。**无作者业务 JS**——只保留官方 `marqdo-bridge.js`（`marqdo wasm build` 拷贝）。
+浏览器内跑 Marqdo。**无作者业务 JS**——只保留官方 `marqdo-bridge.js`（`marqdo wasm build` 拷贝）。客户端 `.mq.md` 用 **GFM 表格 + `lib/browser`**。
 
 ```bash
 # 仓库根目录

@@ -1,7 +1,8 @@
 ---
 title: client counter (route D)
-description: wired by client_embed auto-mount
-import json:lib/json.mq.md
+description: wired by client_embed auto-mount; GFM + lib/browser
+import browser:lib/browser.mq.md
+import table:lib/table.mq.md
 ---
 
 # main
@@ -15,22 +16,15 @@ import json:lib/json.mq.md
 | 1 | "#bump" | click | bump |
 | 2 | "#reset" | click | reset |
 
-*`ready` = > json.set map=None key="#log" value="client.mq.md ready"*
-*`enable_bump` = > json.set map=None key="disabled" value=False*
-*`enable_reset` = > json.set map=None key="disabled" value=False*
-*`attrs` = > json.set map=None key="#bump" value=enable_bump*
-*`attrs` = > json.set map=attrs key="#reset" value=enable_reset*
-*`boot` = > json.set map=None key="wire" value=wire*
-*`boot` = > json.set map=boot key="set_text" value=ready*
-**> json.set map=boot key="set_attr" value=attrs**
+*`ready` = > browser.set_text sel="#log" text="client.mq.md ready"*
+*`boot` = > table.put in=None at="wire" value=wire*
+**> browser.merge a=boot b=ready**
 
 ## bump
 *`count` = count + 1*
 *`label` = > str count*
-*`patch` = > json.set map=None key="#count" value=label*
-**> json.set map=None key="set_text" value=patch**
+**> browser.set_text sel="#count" text=label**
 
 ## reset
 *`count` = 0*
-*`patch` = > json.set map=None key="#count" value="0"*
-**> json.set map=None key="set_text" value=patch**
+**> browser.set_text sel="#count" text="0"**

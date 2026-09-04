@@ -142,28 +142,45 @@ export function eventArgsFromDom(ev, valueFromSel) {
   const t = ev && ev.target;
   const args = { event: ev && ev.type ? ev.type : "click" };
   if (t && typeof t === "object") {
-    if ("value" in t && t.value != null) args.value = String(t.value);
+    if ("value" in t && t.value != null && t.type !== "file") args.value = String(t.value);
     if ("checked" in t) args.checked = !!t.checked;
     if (t.id) args.id = String(t.id);
     if (t.getAttribute) {
       const did = t.getAttribute("data-id");
       if (did != null) args.data_id = did;
+      const drag = t.getAttribute("data-drag");
+      if (drag != null) args.drag = drag;
     }
     if (typeof t.textContent === "string" && !("value" in t)) {
       args.text = t.textContent;
     }
     if (ev.key != null) args.key = String(ev.key);
     if (ev.code != null) args.code = String(ev.code);
+    if (t.files && t.files.length) {
+      const f = t.files[0];
+      args.file_name = f.name;
+      args.file_size = f.size;
+      args.file_type = f.type || "";
+      args.file_count = t.files.length;
+    }
   }
   if (ev && ev.type === "popstate") {
     args.url = typeof location !== "undefined" ? location.href : "";
     args.path = typeof location !== "undefined" ? location.pathname + location.search : "";
     args.state = ev.state;
   }
+  if (ev && ev.dataTransfer) {
+    try {
+      const txt = ev.dataTransfer.getData("text") || ev.dataTransfer.getData("text/plain");
+      if (txt) args.drop_text = txt;
+    } catch (_) {
+      /* ignore */
+    }
+  }
   if (valueFromSel && typeof document !== "undefined") {
     const src = document.querySelector(valueFromSel);
     if (src) {
-      if ("value" in src) args.value = String(src.value);
+      if ("value" in src && src.type !== "file") args.value = String(src.value);
       else args.value = src.textContent != null ? String(src.textContent) : "";
     }
   }
@@ -395,11 +412,173 @@ export function applyDomPatch(value) {
     a.click();
     URL.revokeObjectURL(url);
   }
+
+  const canvasSpec = value.canvas;
+  if (isPlainObject(canvasSpec) && canvasSpec.sel) {
+    runCanvasCommands(canvasSpec);
+  }
+
+  const audioSpec = value.audio;
+  if (isPlainObject(audioSpec) && audioSpec.op) {
+    runAudioEffect(audioSpec);
+  }
 }
 
 const intervalHandles = new Map();
 const wsHandles = new Map();
+const audioHandles = new Map();
+const observeHandles = new Map();
 let wsSeq = 0;
+let observeSeq = 0;
+
+/** @param {{ sel: string, commands?: object[], clear?: boolean }} spec */
+export function runCanvasCommands(spec) {
+  if (typeof document === "undefined") return;
+  const el = qsOne(String(spec.sel));
+  if (!el || typeof el.getContext !== "function") return;
+  const ctx = el.getContext("2d");
+  if (!ctx) return;
+  if (spec.clear) ctx.clearRect(0, 0, el.width || 0, el.height || 0);
+  const cmds = Array.isArray(spec.commands)
+    ? spec.commands
+    : isPlainObject(spec.commands)
+      ? Object.keys(spec.commands)
+          .sort()
+          .map((k) => spec.commands[k])
+      : [];
+  for (const raw of cmds) {
+    if (!isPlainObject(raw)) continue;
+    const op = String(raw.op || raw.cmd || "").toLowerCase();
+    try {
+      if (op === "clear" || op === "clearrect") {
+        ctx.clearRect(
+          Number(raw.x) || 0,
+          Number(raw.y) || 0,
+          Number(raw.w ?? raw.width ?? el.width) || 0,
+          Number(raw.h ?? raw.height ?? el.height) || 0,
+        );
+      } else if (op === "fillstyle") {
+        ctx.fillStyle = String(raw.value ?? raw.color ?? "#000");
+      } else if (op === "strokestyle") {
+        ctx.strokeStyle = String(raw.value ?? raw.color ?? "#000");
+      } else if (op === "linewidth") {
+        ctx.lineWidth = Number(raw.value ?? raw.width) || 1;
+      } else if (op === "font") {
+        ctx.font = String(raw.value || "16px sans-serif");
+      } else if (op === "fillrect") {
+        if (raw.fill != null) ctx.fillStyle = String(raw.fill);
+        ctx.fillRect(Number(raw.x) || 0, Number(raw.y) || 0, Number(raw.w ?? raw.width) || 0, Number(raw.h ?? raw.height) || 0);
+      } else if (op === "strokerect") {
+        if (raw.stroke != null) ctx.strokeStyle = String(raw.stroke);
+        ctx.strokeRect(Number(raw.x) || 0, Number(raw.y) || 0, Number(raw.w ?? raw.width) || 0, Number(raw.h ?? raw.height) || 0);
+      } else if (op === "beginpath") {
+        ctx.beginPath();
+      } else if (op === "closepath") {
+        ctx.closePath();
+      } else if (op === "moveto") {
+        ctx.moveTo(Number(raw.x) || 0, Number(raw.y) || 0);
+      } else if (op === "lineto") {
+        ctx.lineTo(Number(raw.x) || 0, Number(raw.y) || 0);
+      } else if (op === "arc") {
+        ctx.arc(
+          Number(raw.x) || 0,
+          Number(raw.y) || 0,
+          Number(raw.r ?? raw.radius) || 0,
+          Number(raw.start ?? 0),
+          Number(raw.end ?? Math.PI * 2),
+          !!raw.ccw,
+        );
+      } else if (op === "stroke") {
+        if (raw.stroke != null) ctx.strokeStyle = String(raw.stroke);
+        ctx.stroke();
+      } else if (op === "fill") {
+        if (raw.fill != null) ctx.fillStyle = String(raw.fill);
+        ctx.fill();
+      } else if (op === "filltext") {
+        if (raw.fill != null) ctx.fillStyle = String(raw.fill);
+        ctx.fillText(String(raw.text ?? ""), Number(raw.x) || 0, Number(raw.y) || 0);
+      } else if (op === "drawimage" && raw.src) {
+        const img = new Image();
+        img.src = String(raw.src);
+        // sync only if already loaded; else fire-and-forget draw on load
+        const draw = () => {
+          ctx.drawImage(
+            img,
+            Number(raw.x) || 0,
+            Number(raw.y) || 0,
+            Number(raw.w ?? raw.width ?? img.width) || img.width,
+            Number(raw.h ?? raw.height ?? img.height) || img.height,
+          );
+        };
+        if (img.complete) draw();
+        else img.onload = draw;
+      }
+    } catch (_) {
+      /* skip bad cmd */
+    }
+  }
+}
+
+function runAudioEffect(spec) {
+  const op = String(spec.op || "").toLowerCase();
+  const id = String(spec.id || spec.sel || "default");
+  try {
+    if (op === "play") {
+      // Optional beep via Web Audio (no external file).
+      if (spec.freq != null || spec.frequency != null || String(spec.src || "") === "beep") {
+        const AC = window.AudioContext || window.webkitAudioContext;
+        if (!AC) return;
+        let ctx = audioHandles.get(`${id}:ctx`);
+        if (!ctx) {
+          ctx = new AC();
+          audioHandles.set(`${id}:ctx`, ctx);
+        }
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = String(spec.wave || "sine");
+        osc.frequency.value = Number(spec.freq ?? spec.frequency ?? 440);
+        const vol = spec.volume != null ? Math.min(1, Math.max(0, Number(spec.volume))) : 0.15;
+        gain.gain.value = vol;
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        const dur = Number(spec.ms ?? spec.duration ?? 280) / 1000;
+        osc.start();
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + Math.max(0.05, dur));
+        osc.stop(ctx.currentTime + Math.max(0.05, dur) + 0.02);
+        return;
+      }
+      let audio = audioHandles.get(id);
+      if (spec.sel) {
+        const el = qsOne(String(spec.sel));
+        if (el && el.tagName === "AUDIO") audio = el;
+      }
+      if (!audio) {
+        audio = new Audio(spec.src != null ? String(spec.src) : undefined);
+        audioHandles.set(id, audio);
+      } else if (spec.src != null) {
+        audio.src = String(spec.src);
+      }
+      if (spec.volume != null) audio.volume = Math.min(1, Math.max(0, Number(spec.volume)));
+      if (spec.loop != null) audio.loop = !!spec.loop;
+      const p = audio.play();
+      if (p && p.catch) p.catch(() => {});
+      return;
+    }
+    const audio = spec.sel ? qsOne(String(spec.sel)) : audioHandles.get(id);
+    if (!audio) return;
+    if (op === "pause") audio.pause();
+    else if (op === "stop") {
+      audio.pause();
+      try {
+        audio.currentTime = 0;
+      } catch (_) {
+        /* ignore */
+      }
+    }
+  } catch (_) {
+    /* ignore */
+  }
+}
 
 /**
  * Run sync DOM patches then schedule async effects.
@@ -450,7 +629,167 @@ export function applyEffects(exports, value, { onError } = {}) {
     tasks.push(runWsEffect(exports, wsSpec, onError));
   }
 
+  const readFile = value.read_file || value.readFile;
+  if (readFile && typeof readFile === "object" && readFile.then) {
+    tasks.push(runReadFileEffect(exports, readFile, onError));
+  }
+
+  const observe = value.observe;
+  if (observe) {
+    const specs = Array.isArray(observe)
+      ? observe
+      : observe && typeof observe === "object" && observe.then
+        ? [observe]
+        : [];
+    for (const spec of specs) runObserveEffect(exports, spec, onError);
+  }
+
+  const unobserve = value.unobserve;
+  if (unobserve) {
+    const specs = Array.isArray(unobserve)
+      ? unobserve
+      : unobserve && typeof unobserve === "object"
+        ? [unobserve]
+        : [];
+    for (const spec of specs) {
+      const id = String(spec.id || "");
+      const h = observeHandles.get(id);
+      if (h) {
+        try {
+          h.disconnect();
+        } catch (_) {
+          /* ignore */
+        }
+        observeHandles.delete(id);
+      }
+    }
+  }
+
   return Promise.all(tasks);
+}
+
+async function runReadFileEffect(exports, spec, onError) {
+  const thenFn = spec.then;
+  const sel = String(spec.sel || "");
+  const as = String(spec.as || "text").toLowerCase();
+  const input = qsOne(sel);
+  if (!input || !input.files || !input.files.length) {
+    const result = call(exports, thenFn, { ok: false, error: "no file", sel });
+    if (result.ok) await applyEffects(exports, result.value, { onError });
+    return;
+  }
+  const file = input.files[Number(spec.index) || 0];
+  try {
+    let body = "";
+    let data_url = "";
+    if (as === "data_url" || as === "dataurl") {
+      data_url = await new Promise((resolve, reject) => {
+        const r = new FileReader();
+        r.onload = () => resolve(String(r.result || ""));
+        r.onerror = () => reject(r.error || new Error("read failed"));
+        r.readAsDataURL(file);
+      });
+    } else {
+      body = await file.text();
+    }
+    const result = call(exports, thenFn, {
+      ok: true,
+      name: file.name,
+      size: file.size,
+      type: file.type || "",
+      body,
+      data_url,
+      as,
+    });
+    if (!result.ok) {
+      if (onError) onError(result.error);
+      return;
+    }
+    await applyEffects(exports, result.value, { onError });
+  } catch (e) {
+    try {
+      const result = call(exports, thenFn, { ok: false, error: String(e), name: file.name });
+      if (result.ok) await applyEffects(exports, result.value, { onError });
+      else if (onError) onError(result.error);
+    } catch (e2) {
+      if (onError) onError(String(e2));
+    }
+  }
+}
+
+function runObserveEffect(exports, spec, onError) {
+  const kind = String(spec.kind || spec.type || "intersect").toLowerCase();
+  const sel = String(spec.sel || "");
+  const thenFn = spec.then;
+  const id = String(spec.id || `obs${++observeSeq}`);
+  const el = qsOne(sel);
+  if (!el || !thenFn) return;
+
+  const prev = observeHandles.get(id);
+  if (prev) {
+    try {
+      prev.disconnect();
+    } catch (_) {
+      /* ignore */
+    }
+  }
+
+  const fire = (payload) => {
+    try {
+      const result = call(exports, thenFn, payload);
+      if (!result.ok) {
+        if (onError) onError(result.error);
+        return;
+      }
+      applyEffects(exports, result.value, { onError });
+    } catch (e) {
+      if (onError) onError(String(e));
+    }
+  };
+
+  if (kind === "resize" && typeof ResizeObserver !== "undefined") {
+    const ro = new ResizeObserver((entries) => {
+      const en = entries[0];
+      const cr = en?.contentRect;
+      fire({
+        ok: true,
+        kind: "resize",
+        id,
+        width: cr ? cr.width : 0,
+        height: cr ? cr.height : 0,
+      });
+    });
+    ro.observe(el);
+    observeHandles.set(id, ro);
+    return;
+  }
+
+  if (typeof IntersectionObserver !== "undefined") {
+    const io = new IntersectionObserver(
+      (entries) => {
+        const en = entries[0];
+        if (!en) return;
+        fire({
+          ok: true,
+          kind: "intersect",
+          id,
+          intersecting: !!en.isIntersecting,
+          ratio: en.intersectionRatio,
+        });
+        if (spec.once && en.isIntersecting) {
+          try {
+            io.disconnect();
+          } catch (_) {
+            /* ignore */
+          }
+          observeHandles.delete(id);
+        }
+      },
+      { threshold: spec.threshold != null ? Number(spec.threshold) : 0.1 },
+    );
+    io.observe(el);
+    observeHandles.set(id, io);
+  }
 }
 
 function buildFetchInit(spec) {
@@ -825,6 +1164,38 @@ export function wireEvents(exports, bootValue, { onError } = {}) {
                 : null;
             if (!hit || (node.contains && !node.contains(hit))) return;
           }
+          // Drag/drop hosts need preventDefault on dragover/drop; dragstart can set payload.
+          if (
+            ev === "dragover" ||
+            ev === "dragenter" ||
+            ev === "drop" ||
+            ev === "dragstart"
+          ) {
+            try {
+              domEv.preventDefault();
+            } catch (_) {
+              /* ignore */
+            }
+          }
+          if (ev === "dragstart" && domEv.dataTransfer) {
+            try {
+              const payload =
+                (domEv.target &&
+                  typeof domEv.target.getAttribute === "function" &&
+                  domEv.target.getAttribute("data-drag")) ||
+                (typeof domEv.target?.textContent === "string"
+                  ? domEv.target.textContent.trim()
+                  : "") ||
+                "";
+              if (payload) {
+                domEv.dataTransfer.setData("text/plain", payload);
+                domEv.dataTransfer.setData("text", payload);
+                domEv.dataTransfer.effectAllowed = "copyMove";
+              }
+            } catch (_) {
+              /* ignore */
+            }
+          }
           if (
             ev === "click" &&
             typeof domEv.target?.closest === "function" &&
@@ -843,6 +1214,8 @@ export function wireEvents(exports, bootValue, { onError } = {}) {
               const did = hit.getAttribute("data-id");
               if (did != null) args.data_id = did;
               if (hit.id) args.id = hit.id;
+              const drag = hit.getAttribute("data-drag");
+              if (drag != null) args.drag = drag;
             }
           }
           const result = call(exports, fn, args);
