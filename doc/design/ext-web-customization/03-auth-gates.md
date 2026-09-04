@@ -67,6 +67,6 @@
 
 ---
 
-## 6. 过渡期 workaround
+## 6. 过渡期 → 已落地
 
-JS `fetch` 打 `/admin/login` 再 `location.replace('/desk')`；C0+C1 落地后改为同前缀登录并删除 JS 兜底。
+**C1 已落地（2026-09）：** `auth` 默认段边界 prefix + `on_deny=redirect` + 排除 `login_path`；自定义 `gate` 可设 `match` / `on_deny` / `exclude`。金样 `tests/ext/web-c1-gates.mq.md`；单元测试 `http::gate_tests`。
