@@ -3,12 +3,32 @@
 ## Unreleased
 
 ### Added
-- **`marqdo ext add` 预编译原生插件**：Release 发布 `marqdo-*-native-{windows,linux}.zip`；Windows 便携 zip 内含 `ext/native/*.dll`；无本地 `target/` 时自动从 GitHub Release 下载 L1（`*-ext.zip`）与 native（可用 `MARQDO_EXT_NO_DOWNLOAD=1` 关闭）。
 
 ### Fixed
 
 ### Changed
-- 文档：[ext-cli.md](doc/design/ext-cli.md) 以「无需本机 Rust」为默认安装路径；[08-ext-deploy-coupling](doc/design/ext-web-customization/08-ext-deploy-coupling.md) 对齐发布资产。
+
+## v0.3.5 — 2026-09-04
+
+### Highlights
+
+**`marqdo ext add` 无需本机 Rust**：Release 发布预编译 native 插件；CLI 可自动下载 L1（`*-ext.zip`）与 `*-native-*.zip`。Windows 便携包内含 `ext/native/*.dll`。
+
+```bash
+git checkout v0.3.5
+# 或下载 Release 的 exe / zip
+marqdo ext add web
+marqdo ext add agent
+marqdo ext add quantum
+```
+
+### Added
+- **预编译原生插件资产**：`marqdo-*-native-x86_64-pc-windows-msvc.zip`、`marqdo-*-native-x86_64-unknown-linux-gnu.zip`；Windows zip 捆绑 `ext/` + native DLL。
+- **`ext add` 下载回退**：本地无 `target/` 时从 GitHub Release 拉取；`MARQDO_EXT_NO_DOWNLOAD=1` / `MARQDO_EXT_VERSION` 可配置。
+
+### Changed
+- 文档：[ext-cli.md](doc/design/ext-cli.md)、[08-ext-deploy-coupling](doc/design/ext-web-customization/08-ext-deploy-coupling.md)、README 安装步骤以预编译为默认路径。
+- Release workflow：Windows 编插件并上传 native zip；新增 Linux native job。
 
 ## v0.3.4 — 2026-09-04
 

@@ -99,7 +99,7 @@ marqdo catalog public -o .marqdo
 
 ---
 
-## 现状（v0.3.4）
+## 现状（v0.3.5）
 
 - 映射与解释器：Phase I 树遍历 + 字节码后端可用；金样例在 `tests/`  
 - **对象**：`#` = 类型/构造，`##`+ = 函数/方法；见 [objects.md](doc/design/objects.md)  
@@ -120,12 +120,12 @@ marqdo catalog public -o .marqdo
 - **浏览器 Marqdo（WASM）**：`marqdo wasm build` + 官方 bridge 自启（作者零业务 JS；桥内可含列表/路由/storage/ws/文件/Canvas/音频/Observer/拖放）；`lib/browser` + GFM；`web.client_embed`；示例 [browser-hello](examples/browser-hello/) · [browser-app](examples/browser-app/) · [browser-media](examples/browser-media/) · [web-client-site](examples/web-client-site/)（[ADR 0002](doc/adr/0002-browser-marqdo-wasm.md) · [D](doc/roadmap/browser-wasm-d.md) · [E](doc/roadmap/browser-wasm-e.md) · [F](doc/roadmap/browser-wasm-f.md)）
 - 选型：[ADR 0001 — Rust](doc/adr/0001-implementation-language.md) · [ADR 0002 — 浏览器 WASM](doc/adr/0002-browser-marqdo-wasm.md)（C0–C5 完结，见 [roadmap/browser-wasm.md](doc/roadmap/browser-wasm.md)）· [ADR 0003 — 异步效应](doc/adr/0003-browser-async-effects.md)
 
-### 如何使用最新 Marqdo（v0.3.4）
+### 如何使用最新 Marqdo（v0.3.5）
 
 ```bash
 # 1) 源码安装（跟 tag 或 main）
 git clone https://github.com/cflmy/marqdo.git && cd marqdo
-git checkout v0.3.4   # 或留在 main
+git checkout v0.3.5   # 或留在 main
 cargo build --release
 export PATH="$PWD/target/release:$PATH"
 marqdo version
@@ -155,7 +155,7 @@ marqdo wasm build
 # → dist/wasm/ … 见 examples/browser-hello/
 
 # 6) Windows：也可从 GitHub Releases 下载 exe / zip / vsix
-#    https://github.com/cflmy/marqdo/releases/tag/v0.3.4
+#    https://github.com/cflmy/marqdo/releases/tag/v0.3.5
 ```
 
 开发期也可用 `cargo run -- …` 代替已安装的 `marqdo`：
