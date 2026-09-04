@@ -3,6 +3,7 @@ title: ext/web/web
 description: Official web site classes (English). Tables + methods; no bag glue.
 import plugin:lib/plugin.mq.md
 import sys:lib/sys.mq.md
+import json:lib/json.mq.md
 ---
 
 ## ensure_plugin
@@ -52,6 +53,61 @@ preview; prefer `page.head` to attach resources to a page.
 
 > ensure_plugin
 **> web_head table=`table`**
+
+## client_embed
+    + `bridge`="/static/marqdo-bridge.js"
+    + `wasm`="/static/marqdo_wasm.wasm"
+    + `source`=""
+    + `boot`=True
+
+Return an HTML snippet that loads the official browser Marqdo bridge (route C/D).
+With `boot` and non-empty `source` (URL path to `.mq.md`), emits `data-mq-wasm` / `data-mq-source-url` so the bridge **auto-mounts** (author zero JS).
+Run `marqdo wasm build -o static` and `app.static dir=static`. Design: [browser-marqdo-wasm.md](../../doc/design/browser-marqdo-wasm.md) §16.
+
+1. `boot`
+    1. `source` != ""
+        **"<script type=\"module\" src=\"" + bridge + "\" data-mq-wasm=\"" + wasm + "\" data-mq-source-url=\"" + source + "\"></script>"**
+    2. *
+        **"<script type=\"module\" src=\"" + bridge + "\"></script>"**
+2. *
+    **"<script type=\"module\" src=\"" + bridge + "\" data-mq-no-boot=\"1\"></script>"**
+
+## text_patch
+    + `sel`
+    + `text`
+
+Shortcut: build a `set_text` effects map `{ set_text: { sel: text } }` for browser return values.
+
+*`m` = > json.set map=None key=sel value=text*
+**> json.set map=None key="set_text" value=m**
+
+## dom_patch
+    + `set_text`=None
+    + `set_value`=None
+    + `set_attr`=None
+    + `set_class`=None
+    + `toggle_class`=None
+    + `fetch`=None
+    + `after`=None
+
+Merge browser DOM/async effect keys into one return map (omit `None` keys). Prefer over hand-rolled nested `json.set` chains.
+
+*`out` = > json.set map=None key="_mq" value=True*
+1. `set_text` != None
+    *`out` = > json.set map=out key="set_text" value=set_text*
+1. `set_value` != None
+    *`out` = > json.set map=out key="set_value" value=set_value*
+1. `set_attr` != None
+    *`out` = > json.set map=out key="set_attr" value=set_attr*
+1. `set_class` != None
+    *`out` = > json.set map=out key="set_class" value=set_class*
+1. `toggle_class` != None
+    *`out` = > json.set map=out key="toggle_class" value=toggle_class*
+1. `fetch` != None
+    *`out` = > json.set map=out key="fetch" value=fetch*
+1. `after` != None
+    *`out` = > json.set map=out key="after" value=after*
+**out**
 
 # page
     + `title`="Marqdo Web"
@@ -126,15 +182,6 @@ SEO / OpenGraph metadata as a data table (`|key|value|`). Keys such as `title`, 
 Assemble `<head>` resources from a GFM table (`|rel|href|type|sizes|media|as|crossorigin|` or ZH `|关系|地址|类型|…|`). `rel=script` / `module` become `<script>`; other rows become `<link>`. Merges with any existing `head` on the page.
 
 **> web_page_head page=`self` table=`table`**
-
-## client_embed
-    + `bridge`="/static/marqdo-bridge.js"
-
-Return an HTML snippet that loads the official browser Marqdo bridge (`marqdo-bridge.js`, route C).
-Run `marqdo wasm build -o static` first, and prefer a `head` table row with `rel=module`.
-Author `.mq.md` wire/`fetch` effects: [browser-marqdo-wasm.md](../../doc/design/browser-marqdo-wasm.md).
-
-**"<script type=\"module\" src=\"" + bridge + "\"></script>"**
 
 ## images
     + `table`

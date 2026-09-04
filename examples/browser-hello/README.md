@@ -1,6 +1,6 @@
-# browser-hello（WASM C1–C3）
+# browser-hello（WASM C1–C4 / 路线 D）
 
-浏览器内跑 Marqdo（路线 C）。
+浏览器内跑 Marqdo。**无作者业务 JS**——只保留官方 `marqdo-bridge.js`（`marqdo wasm build` 拷贝）。
 
 ```bash
 # 仓库根目录
@@ -13,9 +13,9 @@ python3 -m http.server 8765
 
 | 页 | 说明 |
 |----|------|
-| [/](http://127.0.0.1:8765/) | C1：编辑源码 → `mq_run` 打印 |
-| [/interact.html](http://127.0.0.1:8765/interact.html) | C3：`counter.mq.md` 交互表 → 点击改 DOM |
-| [/fetch.html](http://127.0.0.1:8765/fetch.html) | C4：`fetch` / `after` 效应续体 |
+| [/](http://127.0.0.1:8765/) | playground：`data-mq-playground` + textarea → `mq_run` |
+| [/interact.html](http://127.0.0.1:8765/interact.html) | `counter.mq.md` wire → 点击改 DOM |
+| [/fetch.html](http://127.0.0.1:8765/fetch.html) | `fetch` / `after` 效应 |
+| [/form.html](http://127.0.0.1:8765/form.html) | `input` + `value` / `set_class`（D3） |
 
-- `marqdo-bridge.js`：官方宿主桥（`boot` / `call` / `wireEvents` / `applyEffects`）
-- 业务源码只有 `.mq.md`；异步见 [ADR 0003](../../doc/adr/0003-browser-async-effects.md)
+自启方式：脚本上的 `data-mq-source-url` / `data-mq-playground`，或 `#marqdo-boot` JSON。详见 [browser-wasm-d.md](../../doc/roadmap/browser-wasm-d.md)。

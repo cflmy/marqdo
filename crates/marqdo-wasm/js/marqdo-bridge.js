@@ -1,11 +1,13 @@
 /**
- * Canonical Marqdo browser bridge (route C). Host glue only — not app logic.
+ * Canonical Marqdo browser bridge (route C/D). Host glue only — not app logic.
  * Copied to site dirs by `marqdo wasm build`.
  *
  * ABI: mq_alloc, mq_dealloc, mq_run, mq_boot, mq_call, mq_version
  * Packed results: u32le length + UTF-8 JSON { ok, stdout, error, value }
  *
- * Effects (ADR 0003): set_text, fetch, after
+ * Effects (ADR 0003 + route D): set_text, set_value, set_attr, set_class,
+ * toggle_class, set_html (#trusted* only), fetch, after
+ * Mount: mount() / data-mq-* / #marqdo-boot auto-start (author zero JS)
  */
 
 export function readCString(memory, ptr) {
@@ -67,14 +69,194 @@ export async function loadWasm(url = "./marqdo_wasm.wasm") {
   return instance.exports;
 }
 
-/** Apply C3/C4 return effects: set_text, fetch, after */
+function isPlainObject(v) {
+  return v != null && typeof v === "object" && !Array.isArray(v);
+}
+
+/** Normalize mount options from plain object or DOM dataset. */
+export function normalizeMountOptions(raw = {}) {
+  const o = raw && typeof raw === "object" ? raw : {};
+  const dataset = o.dataset || {};
+  const wasmUrl =
+    o.wasmUrl ||
+    o.wasm ||
+    dataset.mqWasm ||
+    dataset.wasm ||
+    "./marqdo_wasm.wasm";
+  const sourceUrl =
+    o.sourceUrl ||
+    o.source_url ||
+    dataset.mqSourceUrl ||
+    dataset.sourceUrl ||
+    "";
+  let source = o.source != null ? o.source : dataset.mqSource || "";
+  if (!source && typeof o.sourceInline === "string") source = o.sourceInline;
+  const playground =
+    o.playground ||
+    dataset.mqPlayground ||
+    dataset.playground ||
+    "";
+  const ready =
+    o.ready ||
+    o.readySel ||
+    dataset.mqReady ||
+    "";
+  const enable =
+    o.enable ||
+    dataset.mqEnable ||
+    "";
+  const noBoot =
+    o.noBoot === true ||
+    dataset.mqNoBoot === "1" ||
+    dataset.mqNoBoot === "true";
+  return {
+    wasmUrl: String(wasmUrl),
+    sourceUrl: sourceUrl ? String(sourceUrl) : "",
+    source: source ? String(source) : "",
+    playground: playground ? String(playground) : "",
+    ready: ready ? String(ready) : "",
+    enable: enable ? String(enable) : "",
+    noBoot,
+    onError: typeof o.onError === "function" ? o.onError : null,
+  };
+}
+
+/**
+ * Collect mount configs from `#marqdo-boot` JSON and `script[data-mq-*]`.
+ * Pure DOM scan — safe to call once after DOM ready.
+ */
+export function collectMountConfigs(doc = typeof document !== "undefined" ? document : null) {
+  if (!doc) return [];
+  const out = [];
+  const bootEl = doc.getElementById("marqdo-boot");
+  if (bootEl) {
+    try {
+      const json = JSON.parse(bootEl.textContent || "{}");
+      out.push(normalizeMountOptions(json));
+    } catch (e) {
+      console.error("marqdo-boot JSON:", e);
+    }
+  }
+  const scripts = doc.querySelectorAll(
+    "script[data-mq-source-url], script[data-mq-source], script[data-mq-playground], script[data-mq-wasm]",
+  );
+  for (const el of scripts) {
+    if (el.dataset.mqNoBoot === "1" || el.dataset.mqNoBoot === "true") continue;
+    const hasWork =
+      el.dataset.mqSourceUrl ||
+      el.dataset.mqSource ||
+      el.dataset.mqPlayground;
+    if (!hasWork && !el.dataset.mqWasm) continue;
+    if (!hasWork) continue;
+    out.push(
+      normalizeMountOptions({
+        dataset: el.dataset,
+        wasmUrl: el.dataset.mqWasm,
+        sourceUrl: el.dataset.mqSourceUrl,
+        source: el.dataset.mqSource,
+        playground: el.dataset.mqPlayground,
+        ready: el.dataset.mqReady,
+        enable: el.dataset.mqEnable,
+      }),
+    );
+  }
+  return out;
+}
+
+/** Build mq_call args from a DOM event + optional value_from selector. */
+export function eventArgsFromDom(ev, valueFromSel) {
+  const t = ev && ev.target;
+  const args = {
+    event: ev && ev.type ? ev.type : "click",
+  };
+  if (t && typeof t === "object") {
+    if ("value" in t && t.value != null) args.value = String(t.value);
+    if ("checked" in t) args.checked = !!t.checked;
+    if (t.id) args.id = String(t.id);
+    if (typeof t.textContent === "string" && !("value" in t)) {
+      args.text = t.textContent;
+    }
+  }
+  if (valueFromSel && typeof document !== "undefined") {
+    const src = document.querySelector(valueFromSel);
+    if (src) {
+      if ("value" in src) args.value = String(src.value);
+      else args.value = src.textContent != null ? String(src.textContent) : "";
+    }
+  }
+  if (ev && ev.type === "submit" && t) {
+    const form = typeof t.closest === "function" ? t.closest("form") : t;
+    if (form && typeof FormData !== "undefined") {
+      try {
+        ev.preventDefault();
+      } catch (_) {
+        /* ignore */
+      }
+      const fields = {};
+      for (const [k, v] of new FormData(form)) {
+        fields[k] = String(v);
+      }
+      args.fields = fields;
+    }
+  }
+  return args;
+}
+
+/** Apply C3/C4/D3 return effects: DOM patches then fetch/after. */
 export function applyDomPatch(value) {
   if (!value || typeof value !== "object") return;
+  if (typeof document === "undefined") return;
+
   const setText = value.set_text || value.setText;
-  if (setText && typeof setText === "object") {
+  if (isPlainObject(setText)) {
     for (const [sel, text] of Object.entries(setText)) {
       const el = document.querySelector(sel);
       if (el) el.textContent = String(text);
+    }
+  }
+
+  const setValue = value.set_value || value.setValue;
+  if (isPlainObject(setValue)) {
+    for (const [sel, v] of Object.entries(setValue)) {
+      const el = document.querySelector(sel);
+      if (el && "value" in el) el.value = String(v);
+    }
+  }
+
+  const setAttr = value.set_attr || value.setAttr;
+  if (isPlainObject(setAttr)) {
+    for (const [sel, attrs] of Object.entries(setAttr)) {
+      const el = document.querySelector(sel);
+      if (!el || !isPlainObject(attrs)) continue;
+      for (const [name, raw] of Object.entries(attrs)) {
+        if (raw === null || raw === false) el.removeAttribute(name);
+        else el.setAttribute(name, String(raw));
+      }
+    }
+  }
+
+  const setClass = value.set_class || value.setClass;
+  if (isPlainObject(setClass)) {
+    for (const [sel, cls] of Object.entries(setClass)) {
+      const el = document.querySelector(sel);
+      if (el) el.className = String(cls);
+    }
+  }
+
+  const toggleClass = value.toggle_class || value.toggleClass;
+  if (isPlainObject(toggleClass)) {
+    for (const [sel, cls] of Object.entries(toggleClass)) {
+      const el = document.querySelector(sel);
+      if (el && cls) el.classList.toggle(String(cls));
+    }
+  }
+
+  const setHtml = value.set_html || value.setHtml;
+  if (isPlainObject(setHtml)) {
+    for (const [sel, html] of Object.entries(setHtml)) {
+      if (!String(sel).startsWith("#trusted")) continue;
+      const el = document.querySelector(sel);
+      if (el) el.innerHTML = String(html);
     }
   }
 }
@@ -180,12 +362,15 @@ export function wireEvents(exports, bootValue, { onError } = {}) {
     const sel = row["选择器"] || row.selector || row.sel;
     const ev = row["事件"] || row.event || "click";
     const fn = row["调用"] || row.call || row.fn;
+    const valueFrom =
+      row["值选择器"] || row.value_from || row.valueFrom || row.from || "";
     if (!sel || !fn) continue;
     const nodes = document.querySelectorAll(sel);
     nodes.forEach((node) => {
-      node.addEventListener(ev, () => {
+      node.addEventListener(ev, (domEv) => {
         try {
-          const result = call(exports, fn, { event: ev });
+          const args = eventArgsFromDom(domEv, valueFrom);
+          const result = call(exports, fn, args);
           if (!result.ok) {
             if (onError) onError(result.error);
             else console.error(result.error);
@@ -201,4 +386,155 @@ export function wireEvents(exports, bootValue, { onError } = {}) {
     });
   }
   return rows.length;
+}
+
+function markReady(opts, message) {
+  if (opts.ready && typeof document !== "undefined") {
+    const el = document.querySelector(opts.ready);
+    if (el) {
+      el.classList?.remove?.("err");
+      el.textContent = message;
+    }
+  }
+  if (opts.enable && typeof document !== "undefined") {
+    for (const sel of String(opts.enable).split(",")) {
+      const s = sel.trim();
+      if (!s) continue;
+      document.querySelectorAll(s).forEach((n) => {
+        n.disabled = false;
+        n.removeAttribute("disabled");
+      });
+    }
+  }
+}
+
+function markError(opts, err) {
+  const msg = String(err);
+  if (opts.onError) opts.onError(msg);
+  if (opts.ready && typeof document !== "undefined") {
+    const el = document.querySelector(opts.ready);
+    if (el) {
+      el.classList?.add?.("err");
+      el.textContent = msg;
+    }
+  } else {
+    console.error(msg);
+  }
+}
+
+function wirePlayground(exports, playgroundSpec, { onError } = {}) {
+  const parts = String(playgroundSpec)
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const sourceSel = parts[0] || "#src";
+  const runSel = parts[1] || "#run";
+  const outSel = parts[2] || "#out";
+  const runBtn = document.querySelector(runSel);
+  const src = document.querySelector(sourceSel);
+  const out = document.querySelector(outSel);
+  if (!runBtn || !src) return 0;
+  runBtn.disabled = false;
+  runBtn.removeAttribute("disabled");
+  runBtn.addEventListener("click", () => {
+    try {
+      const result = runSource(exports, src.value || "");
+      if (out) {
+        out.classList?.toggle?.("err", !result.ok);
+        out.textContent = result.ok
+          ? (result.stdout || "(empty stdout)") +
+            (result.value != null && result.value !== "None"
+              ? `\n[return] ${typeof result.value === "string" ? result.value : JSON.stringify(result.value)}`
+              : "")
+          : result.error || "error";
+      }
+    } catch (e) {
+      if (onError) onError(String(e));
+      else if (out) {
+        out.classList?.add?.("err");
+        out.textContent = String(e);
+      }
+    }
+  });
+  return 1;
+}
+
+/**
+ * One-shot: load wasm, boot session (or playground), wire events.
+ * @returns {{ exports, boot, wired }}
+ */
+export async function mount(rawOpts = {}) {
+  const opts = normalizeMountOptions(rawOpts);
+  const onError = (err) => markError(opts, err);
+
+  let exports;
+  try {
+    exports = await loadWasm(opts.wasmUrl);
+  } catch (e) {
+    onError(e);
+    throw e;
+  }
+
+  const ver = readCString(exports.memory, exports.mq_version());
+
+  if (opts.playground) {
+    const n = wirePlayground(exports, opts.playground, { onError });
+    markReady(opts, `marqdo-wasm ${ver} · playground ready`);
+    return { exports, boot: null, wired: n };
+  }
+
+  let source = opts.source;
+  if (!source && opts.sourceUrl) {
+    const res = await fetch(opts.sourceUrl);
+    if (!res.ok) {
+      const err = `failed to load ${opts.sourceUrl} (${res.status})`;
+      onError(err);
+      throw new Error(err);
+    }
+    source = await res.text();
+  }
+  if (!source) {
+    const err = "mount: need source, sourceUrl, or playground";
+    onError(err);
+    throw new Error(err);
+  }
+
+  const result = boot(exports, source);
+  if (!result.ok) {
+    onError(result.error || "boot failed");
+    throw new Error(result.error || "boot failed");
+  }
+
+  // If boot value is a map with effects alongside wire, apply them.
+  if (result.value && !Array.isArray(result.value)) {
+    await applyEffects(exports, result.value, { onError });
+  }
+
+  const n = wireEvents(exports, result.value, { onError });
+  const srcLabel = opts.sourceUrl || "(inline)";
+  markReady(opts, `marqdo-wasm ${ver} · wired ${n} handler(s)\nsource: ${srcLabel}`);
+  return { exports, boot: result, wired: n };
+}
+
+/** Auto-mount from DOM configs (route D). */
+export async function autoMount(doc) {
+  const configs = collectMountConfigs(doc);
+  const results = [];
+  for (const cfg of configs) {
+    if (cfg.noBoot) continue;
+    results.push(await mount(cfg));
+  }
+  return results;
+}
+
+const g = typeof globalThis !== "undefined" ? globalThis : undefined;
+if (g && g.document) {
+  const start = () => {
+    autoMount(g.document).catch((e) => console.error("marqdo autoMount:", e));
+  };
+  if (g.document.readyState === "loading") {
+    g.document.addEventListener("DOMContentLoaded", start);
+  } else {
+    queueMicrotask(start);
+  }
 }

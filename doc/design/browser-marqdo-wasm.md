@@ -299,6 +299,74 @@ marqdo wasm build -o static   # marqdo_wasm.wasm + marqdo-bridge.js
 
 ---
 
+## 16. 路线 D — 作者零 JS（Active）
+
+路线图：[browser-wasm-d.md](../roadmap/browser-wasm-d.md)。
+
+**原则：** 业务与交互 100% `.mq.md`；`marqdo-bridge.js` 仅宿主胶。作者仓库可不含自写 `.js`。
+
+### 16.1 一键挂载
+
+| API | 含义 |
+|-----|------|
+| `mount({ wasmUrl, source \| sourceUrl, … })` | `loadWasm` → `boot` → `wireEvents` → 初始效应 |
+| `script[data-mq-source-url]` / `data-mq-wasm` | 模块脚本属性自启 |
+| `#marqdo-boot` | `application/json` 配置块 |
+| `data-mq-playground` | 官方 playground（`#src,#run,#out`），仍非业务 JS |
+
+`ext/web`：`client_embed` / `客户端挂载` 参数 `bridge`、`wasm`、`source`、`boot`（默认 true）。
+
+```bash
+marqdo wasm build -o static   # marqdo_wasm.wasm + marqdo-bridge.js
+# app.static dir=static
+# intro 或主区嵌入 > web.client_embed source="/static/client.mq.md"
+```
+
+### 16.2 DOM / 表单效应（D3）
+
+与 `set_text` / `fetch` / `after` 并列（白名单；**默认无**任意脚本注入）：
+
+| 字段 | 作用 |
+|------|------|
+| `set_text` | `textContent` |
+| `set_value` | input/textarea/select 的 `value` |
+| `set_attr` | 属性；值为 `null`/`false` 则 `removeAttribute` |
+| `set_class` | `className` 字符串 |
+| `toggle_class` | `{ "#sel": "cls" }` 切换 class |
+| `set_html` | **仅**键前缀 `#trusted` 的选择器才写 `innerHTML`；其它键忽略 |
+
+Wire 行可选 `值选择器` / `value_from`：事件触发时把该节点内容写入实参 `value`。  
+事件实参默认含：`event`、`value`、`checked`、`id`（来自 event.target）；`submit` 另含 `fields` 表单字典。
+
+L1：`web.dom_patch` / `网页.DOM补丁` 合并效应键；`web.text_patch` / `网页.文本补丁` 快捷 `set_text`。
+
+### 16.3 非目标（D）
+
+| # | 非目标 |
+|---|--------|
+| D-N1 | 用 Marqdo 重写 bridge 自身 |
+| D-N2 | 通用 VDOM / 客户端路由框架 |
+| D-N3 | 开放无前缀的 `set_html` |
+
+---
+
+## 17. 路线 E — 前端能力补齐（Planned）
+
+路线图：[browser-wasm-e.md](../roadmap/browser-wasm-e.md)。
+
+**审视结论：** C+D 胜任中小型交互（挂载、wire、表单、单次 fetch）；**不能**替代大部分前端 JS，直到 E 波补齐路由、存储、列表片段、WebSocket、更细 DOM/定时。
+
+| 波 | 要点 |
+|----|------|
+| E1 | `set_style` / `focus` / 委托事件 / 键盘 |
+| E2 | 受信列表/片段装配 L1 |
+| E3 | `navigate` + `popstate` |
+| E4 | `storage` 效应 |
+| E5 | 浏览器 `ws` 效应 |
+| E6 | 并行 fetch / interval / FormData |
+
+---
+
 ## 15. 决策摘要
 
 | 问题 | 答案 |

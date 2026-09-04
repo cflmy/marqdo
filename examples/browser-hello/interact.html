@@ -62,11 +62,18 @@
 </head>
 <body>
   <h1>Marqdo</h1>
-  <p class="lead">C3：GFM 交互表装配事件；点击由 WASM 会话里的 Marqdo 函数处理并回写 DOM。<a href="./fetch.html">fetch (C4)</a> · <a href="./">打印示例</a></p>
+  <p class="lead">C3/D：GFM 交互表装配事件；官方 <code>mount</code> 自启，业务只在 <code>counter.mq.md</code>。<a href="./fetch.html">fetch</a> · <a href="./form.html">表单</a> · <a href="./">打印</a></p>
   <div id="count">0</div>
   <button id="bump" type="button" disabled>加一</button>
   <button id="reset" class="secondary" type="button" disabled>清零</button>
   <pre id="log">loading…</pre>
-  <script type="module" src="./interact.js"></script>
+  <script
+    type="module"
+    src="./marqdo-bridge.js"
+    data-mq-wasm="./marqdo_wasm.wasm"
+    data-mq-source-url="./counter.mq.md"
+    data-mq-ready="#log"
+    data-mq-enable="#bump,#reset"
+  ></script>
 </body>
 </html>

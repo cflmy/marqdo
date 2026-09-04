@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| 状态 | **Completed**（路线 C 首版功能完备） |
+| 状态 | **Completed**（路线 C 首版功能完备；续作见 [browser-wasm-d.md](browser-wasm-d.md)） |
 | 日期 | 2026-09-01 |
 | ADR | [0002](../adr/0002-browser-marqdo-wasm.md) · [0003](../adr/0003-browser-async-effects.md) |
 | 设计 | [browser-marqdo-wasm.md](../design/browser-marqdo-wasm.md) |

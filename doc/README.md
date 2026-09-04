@@ -59,7 +59,10 @@
 | [roadmap/object-inheritance.md](roadmap/object-inheritance.md) | **对象继承**（`# 子类 = > 父类`；I0–I2 已落地） |
 | [roadmap/tables-maps-footnotes.md](roadmap/tables-maps-footnotes.md) | **表格语义**（竖表 / 横表字典 / 脚注取元 / 行向记录 / **单元格表达式 T5**） |
 | [design/table-cell-expressions.md](design/table-cell-expressions.md) | **表数据单元格 = 表达式**（同调用实参值语法；Accepted） |
-| [roadmap/ext-web.md](roadmap/ext-web.md) | **实现路线：`ext/web`**（W0–W4；设计见 [ext-web.md](../design/ext-web.md)） |
+| [roadmap/browser-wasm.md](roadmap/browser-wasm.md) | **浏览器 WASM 路线 C（C0–C5 Completed）** |
+| [roadmap/browser-wasm-d.md](roadmap/browser-wasm-d.md) | **路线 D：作者零 JS 前端（Completed）** |
+| [roadmap/browser-wasm-e.md](roadmap/browser-wasm-e.md) | **路线 E：前端能力补齐（Planned）** |
+| [design/browser-marqdo-wasm.md](design/browser-marqdo-wasm.md) | **浏览器 Marqdo（WASM）设计** |
 | [roadmap/ext-quantum.md](roadmap/ext-quantum.md) | **规划：`ext/quantum` 量子模拟**（基础门·电路·ABI·`ext add`） |
 | [research/okf-and-marqdo.md](research/okf-and-marqdo.md) | OKF 调研 |
 | [research/agent-frameworks-and-marqdo.md](research/agent-frameworks-and-marqdo.md) | 主流智能体框架 vs Marqdo 优势 |

@@ -117,7 +117,7 @@ marqdo catalog public -o .marqdo
 - **原生插件 ABI**：[`include/marqdo_abi.h`](include/marqdo_abi.h) · [ext-abi.md](doc/design/ext-abi.md)；`plugins/{demo,agent,web,quantum}`  
 - **用户静态站**：`public/` → `view output` → CI 发布 [gh-pages](https://cflmy.github.io/marqdo/)  
 - **VS Code 扩展**：分支 **`vscode-extension`**（`main` 不跟踪源码；见 [vscode-extension-commit.md](doc/design/vscode-extension-commit.md)）；Release 附带 `.vsix`  
-- **浏览器 Marqdo（WASM）**：`marqdo wasm build` + 官方 bridge；示例 [browser-hello](examples/browser-hello/)；站点挂载 `web.client_embed` / `网页.客户端挂载`（[ADR 0002](doc/adr/0002-browser-marqdo-wasm.md) · [ADR 0003](doc/adr/0003-browser-async-effects.md)）
+- **浏览器 Marqdo（WASM）**：`marqdo wasm build` + 官方 bridge **自启**（路线 D 作者零业务 JS）；`web.client_embed` / `网页.客户端挂载`；示例 [browser-hello](examples/browser-hello/) · [web-client-site](examples/web-client-site/)（[ADR 0002](doc/adr/0002-browser-marqdo-wasm.md) · [ADR 0003](doc/adr/0003-browser-async-effects.md) · [路线 D](doc/roadmap/browser-wasm-d.md)）
 - 选型：[ADR 0001 — Rust](doc/adr/0001-implementation-language.md) · [ADR 0002 — 浏览器 WASM](doc/adr/0002-browser-marqdo-wasm.md)（C0–C5 完结，见 [roadmap/browser-wasm.md](doc/roadmap/browser-wasm.md)）· [ADR 0003 — 异步效应](doc/adr/0003-browser-async-effects.md)
 
 ### 如何使用最新 Marqdo（v0.3.2）

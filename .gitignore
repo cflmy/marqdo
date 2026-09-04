@@ -42,6 +42,7 @@ spike/.pytest_cache/
 # Built browser WASM (rebuild via crates/marqdo-wasm README)
 /examples/browser-hello/marqdo_wasm.wasm
 /examples/browser-hello/pkg/
+/examples/web-client-site/static/marqdo_wasm.wasm
 
 # Local sqlite / scratch
 /data/

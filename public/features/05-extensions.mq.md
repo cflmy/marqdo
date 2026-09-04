@@ -34,7 +34,7 @@ ext/llm — OpenAI-compatible chat. Design: doc/design/ext-llm.md
 
 ext/agent — agent framework + native plugin. Design: doc/design/ext-agent.md
 
-ext/web — HTTP / SQLite·Postgres site helpers + native plugin. **W0–W7 + P3 + W8** (middleware, CRUD+FTS, security, SEO/RSS, upload/gallery, RBAC, sitemap, favicon/head/images). **Browser embed (v0.3.2+)**: `web.client_embed` mounts WASM client scripts — build with `marqdo wasm build`; examples: examples/browser-hello/. Design: doc/design/ext-web.md · capabilities: doc/design/web-net-capabilities.md · WASM: doc/adr/0002-browser-marqdo-wasm.md · example: examples/marqdo-blog/
+ext/web — HTTP / SQLite·Postgres site helpers + native plugin. **W0–W7 + P3 + W8** (middleware, CRUD+FTS, security, SEO/RSS, upload/gallery, RBAC, sitemap, favicon/head/images). **Browser embed (route D)**: `web.client_embed` auto-mounts WASM (`wasm` + `source` + `boot`) — zero author JS; build with `marqdo wasm build`; examples: examples/browser-hello/ · examples/web-client-site/. Design: doc/design/ext-web.md · capabilities: doc/design/web-net-capabilities.md · WASM: doc/adr/0002-browser-marqdo-wasm.md · roadmap D: doc/roadmap/browser-wasm-d.md · example: examples/marqdo-blog/
 
 ext/quantum — circuits, draw, noise, formula matrix custom gates, Q7 density/viz, Q8 themed SVG (`theme=dark|light|bw`). Design: doc/design/ext-quantum.md · doc/design/ext-quantum-viz-style.md
 

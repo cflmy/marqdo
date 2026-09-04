@@ -67,7 +67,7 @@
 </head>
 <body>
   <h1>Marqdo</h1>
-  <p class="lead">浏览器内 WASM 解释器（路线 C / C1）：源码是 <code>.mq.md</code>，无业务手写 JS。<a href="./interact.html">交互示例 (C3)</a></p>
+  <p class="lead">浏览器内 WASM（路线 C/D）：源码是 <code>.mq.md</code>，官方 bridge 自启 playground，无作者业务 JS。<a href="./interact.html">交互</a> · <a href="./fetch.html">fetch</a> · <a href="./form.html">表单</a></p>
   <label for="src">程序</label>
   <textarea id="src"># main
 
@@ -77,6 +77,12 @@
     <button id="run" disabled>运行</button>
   </div>
   <pre id="out">loading wasm…</pre>
-  <script type="module" src="./loader.js"></script>
+  <script
+    type="module"
+    src="./marqdo-bridge.js"
+    data-mq-wasm="./marqdo_wasm.wasm"
+    data-mq-playground="#src,#run,#out"
+    data-mq-ready="#out"
+  ></script>
 </body>
 </html>
