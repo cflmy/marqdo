@@ -38,6 +38,7 @@ marqdo ext add web
 - `build_step_context`：call site 提前到 task 之后；开场白强调 code-as-documentation。
 - 中文 `构建单步上下文` 委托英文版（含预算 / READ）；新增 `dump_step_context`；live 用例改用仓库根 `.env`。
 - 文档：[ext-web 定制限制](doc/research/ext-web-customization-limits.md) + [解决设计 C0–C4](doc/design/ext-web-customization/)。
+
 ## v0.3.3 — 2026-09-04
 
 ### Highlights
