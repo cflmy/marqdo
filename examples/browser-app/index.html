@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="zh-Hans">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Marqdo · browser-app (route E)</title>
+  <style>
+    :root { --ink: #1a1f1c; --paper: #e8efe6; --accent: #2f6f4e; --muted: #5a6b60; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; min-height: 100vh; font-family: "IBM Plex Sans", "Noto Sans SC", sans-serif;
+      color: var(--ink);
+      background: linear-gradient(165deg, #f3f7f2, var(--paper));
+      padding: 2rem clamp(1rem, 4vw, 3rem);
+    }
+    h1 { font-family: "IBM Plex Serif", "Noto Serif SC", serif; margin: 0 0 0.35rem; }
+    .lead { color: var(--muted); max-width: 40rem; }
+    nav a { margin-right: 0.75rem; color: var(--accent); }
+    section { margin: 1.5rem 0; padding: 1rem 0; border-top: 1px solid #c5d4c9; }
+    #path { font-family: ui-monospace, monospace; color: var(--muted); }
+    #items { list-style: none; padding: 0; margin: 0.75rem 0; }
+    #items li {
+      display: flex; align-items: center; gap: 0.5rem;
+      padding: 0.4rem 0.6rem; margin-bottom: 0.35rem;
+      background: rgba(255,255,255,0.65); border: 1px solid #b7c7bb;
+    }
+    #items button { margin-left: auto; }
+    input[type="text"] { padding: 0.45rem 0.65rem; border: 1px solid #b7c7bb; width: min(16rem, 70%); }
+    button {
+      padding: 0.45rem 0.9rem; border: 0; background: var(--accent); color: #f5faf6;
+      font: inherit; cursor: pointer;
+    }
+    button.secondary { background: #3a4740; }
+    #tick { font-variant-numeric: tabular-nums; }
+    pre {
+      margin-top: 1rem; padding: 0.85rem 1rem; background: #122018; color: #d7eadc;
+      font-size: 0.8rem; overflow: auto; max-width: 42rem;
+    }
+    .err { color: #ffb4a8; }
+  </style>
+</head>
+<body>
+  <h1>Marqdo browser-app</h1>
+  <p class="lead">路线 E：列表 / storage / navigate / interval — <strong>无作者业务 JS</strong>，逻辑在 <code>app.mq.md</code>。</p>
+  <p id="path">path: /</p>
+  <nav>
+    <a href="#/" id="nav-home" data-path="/">首页</a>
+    <a href="#/about" id="nav-about" data-path="/about">关于</a>
+  </nav>
+
+  <section id="panel-home">
+    <h2>待办</h2>
+    <input id="draft" type="text" placeholder="新项…" disabled />
+    <button id="add" type="button" disabled>添加</button>
+    <button id="save" class="secondary" type="button" disabled>存草稿</button>
+    <button id="load" class="secondary" type="button" disabled>读草稿</button>
+    <ul id="items"></ul>
+    <p>计时：<span id="tick">0</span>s
+      <button id="start-tick" type="button" disabled>开始</button>
+      <button id="stop-tick" class="secondary" type="button" disabled>停止</button>
+    </p>
+  </section>
+
+  <section id="panel-about" hidden>
+    <h2>关于</h2>
+    <p>客户端路由用 <code>navigate</code> + <code>popstate</code>；列表用官方桥 <code>render_list</code>。</p>
+  </section>
+
+  <pre id="log">loading…</pre>
+  <script
+    type="module"
+    src="./marqdo-bridge.js"
+    data-mq-wasm="./marqdo_wasm.wasm"
+    data-mq-source-url="./app.mq.md"
+    data-mq-ready="#log"
+    data-mq-enable="#draft,#add,#save,#load,#start-tick,#stop-tick"
+  ></script>
+</body>
+</html>

@@ -10,6 +10,7 @@ import {
   normalizeMountOptions,
   eventArgsFromDom,
   applyDomPatch,
+  renderListItems,
 } from "../../crates/marqdo-wasm/js/marqdo-bridge.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -105,10 +106,22 @@ if (args.value !== "Ada" || args.event !== "input") {
   process.exit(1);
 }
 
+const html = renderListItems({
+  tag: "li",
+  items: ["a", { text: "b", attrs: { "data-id": "2" } }],
+});
+if (!html.includes("<li>a</li>") || !html.includes('data-id="2"')) {
+  console.error("renderListItems failed", html);
+  process.exit(1);
+}
+
 // DOM patch without document should no-op
-applyDomPatch({ set_text: { "#x": "y" }, set_value: { "#i": "1" } });
+applyDomPatch({
+  set_text: { "#x": "y" },
+  set_style: { "#x": { color: "red" } },
+  navigate: { url: "/x" },
+});
 
 console.log("wasm smoke ok");
 console.log("bridge helpers ok");
-// silence unused
 void pathToFileURL;

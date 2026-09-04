@@ -3,8 +3,8 @@
 ## Unreleased
 
 ### Added
-- **路线 D（作者零 JS）**：[roadmap](doc/roadmap/browser-wasm-d.md) · 设计 §16。官方 bridge `mount` / `data-mq-*` 自启；`client_embed` 带 `wasm`/`source`/`boot`；DOM 效应 `set_value`/`set_attr`/`set_class`/`toggle_class`/`set_html(#trusted…)`；wire 传 `value`/`fields`；示例去业务 JS；`examples/web-client-site/`。
-- **路线 E（规划）**：[browser-wasm-e.md](doc/roadmap/browser-wasm-e.md) — 路由 / 存储 / 列表片段 / WebSocket / DOM·定时补齐；C+D **尚不能**替代大部分前端 JS。
+- **路线 D（作者零 JS）**：[roadmap](doc/roadmap/browser-wasm-d.md) · 设计 §16。官方 bridge `mount` / `data-mq-*` 自启；`client_embed` 带 `wasm`/`source`/`boot`；DOM 效应；`examples/web-client-site/`。
+- **路线 E（前端补齐）**：[browser-wasm-e.md](doc/roadmap/browser-wasm-e.md) · 设计 §17。原则：仅禁作者手写业务 JS；桥内可做列表/路由/storage/ws/定时。效应含 `set_style`/`render_list`/`navigate`/`storage`/`ws`/`fetch_all`/`interval`；示例 [browser-app](examples/browser-app/)。
 
 ### Fixed
 

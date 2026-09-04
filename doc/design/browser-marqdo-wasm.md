@@ -345,27 +345,43 @@ L1：`web.dom_patch` / `网页.DOM补丁` 合并效应键；`web.text_patch` / `
 | # | 非目标 |
 |---|--------|
 | D-N1 | 用 Marqdo 重写 bridge 自身 |
-| D-N2 | 通用 VDOM / 客户端路由框架 |
-| D-N3 | 开放无前缀的 `set_html` |
+| D-N2 | 作者手写业务 JS / TS（官方桥内机制允许） |
+| D-N3 | ~~开放无前缀的 set_html~~（E 已允许任意选择器；内容由 MQ 产出） |
 
 ---
 
-## 17. 路线 E — 前端能力补齐（Planned）
+## 17. 路线 E — 前端能力补齐（Active）
 
 路线图：[browser-wasm-e.md](../roadmap/browser-wasm-e.md)。
 
-**审视结论：** C+D 胜任中小型交互（挂载、wire、表单、单次 fetch）；**不能**替代大部分前端 JS，直到 E 波补齐路由、存储、列表片段、WebSocket、更细 DOM/定时。
+**原则：** 唯一硬禁是**作者手写业务 JS**。官方 bridge 可实现列表装配、路由、storage、WebSocket、内部模板/轻量 VDOM 等；作者只写 `.mq.md` + 效应表。
 
 | 波 | 要点 |
 |----|------|
-| E1 | `set_style` / `focus` / 委托事件 / 键盘 |
-| E2 | 受信列表/片段装配 L1 |
-| E3 | `navigate` + `popstate` |
-| E4 | `storage` 效应 |
-| E5 | 浏览器 `ws` 效应 |
-| E6 | 并行 fetch / interval / FormData |
+| E1 | `set_style` / `focus` / `blur` / `scroll_into`；wire `委托`；键盘事件 |
+| E2 | `set_html` / `replace_children` / `render_list` |
+| E3 | `navigate` + `popstate`（选择器 `window`） |
+| E4 | `storage` `{ op, key, value?, scope?, then? }` |
+| E5 | `ws` `{ op: open\|send\|close, … }` |
+| E6 | `fetch_all` / `interval` / `clear_interval` / fetch `fields` |
 
----
+### 17.1 效应速查（E）
+
+| 字段 | 含义 |
+|------|------|
+| `set_style` | `{ "#sel": { color: "red" } }` 或 `{ "#sel": "color:red" }` |
+| `focus` / `blur` | `"#sel"` 或选择器数组 |
+| `scroll_into` | `"#sel"` |
+| `set_html` / `replace_children` | `{ "#sel": "<b>…</b>" }`（内容由 MQ 产出；XSS 由作者保证） |
+| `render_list` | `{ "#sel": { tag: "li", items: ["a", { text, class, attrs }] } }` |
+| `navigate` | `{ url, replace?: bool }` |
+| `storage` | `{ op: get\|set\|remove, key, value?, scope?: local\|session, then? }` |
+| `ws` | `{ op: open\|send\|close, url?, data?, id?, then_message?, then_open?, … }` |
+| `fetch_all` | `{ requests: [fetchSpec…], then }` → `mq_call` 得 `{ results: [...] }` |
+| `interval` | `{ ms, then, id? }`；`clear_interval: { id }` |
+| `fetch.fields` | 对象 → `FormData` body |
+
+Wire 列：`委托` / `delegate` = 在容器上监听，目标须 `closest(delegate)`；选择器 `window` 绑 `window`。
 
 ## 15. 决策摘要
 

@@ -87,10 +87,22 @@ Shortcut: build a `set_text` effects map `{ set_text: { sel: text } }` for brows
     + `set_attr`=None
     + `set_class`=None
     + `toggle_class`=None
+    + `set_style`=None
+    + `set_html`=None
+    + `render_list`=None
+    + `navigate`=None
+    + `storage`=None
+    + `ws`=None
     + `fetch`=None
+    + `fetch_all`=None
     + `after`=None
+    + `interval`=None
+    + `clear_interval`=None
+    + `focus`=None
+    + `blur`=None
+    + `scroll_into`=None
 
-Merge browser DOM/async effect keys into one return map (omit `None` keys). Prefer over hand-rolled nested `json.set` chains.
+Merge browser effect keys into one return map (omit `None`). Route E effects included.
 
 *`out` = > json.set map=None key="_mq" value=True*
 1. `set_text` != None
@@ -103,11 +115,47 @@ Merge browser DOM/async effect keys into one return map (omit `None` keys). Pref
     *`out` = > json.set map=out key="set_class" value=set_class*
 1. `toggle_class` != None
     *`out` = > json.set map=out key="toggle_class" value=toggle_class*
+1. `set_style` != None
+    *`out` = > json.set map=out key="set_style" value=set_style*
+1. `set_html` != None
+    *`out` = > json.set map=out key="set_html" value=set_html*
+1. `render_list` != None
+    *`out` = > json.set map=out key="render_list" value=render_list*
+1. `navigate` != None
+    *`out` = > json.set map=out key="navigate" value=navigate*
+1. `storage` != None
+    *`out` = > json.set map=out key="storage" value=storage*
+1. `ws` != None
+    *`out` = > json.set map=out key="ws" value=ws*
 1. `fetch` != None
     *`out` = > json.set map=out key="fetch" value=fetch*
+1. `fetch_all` != None
+    *`out` = > json.set map=out key="fetch_all" value=fetch_all*
 1. `after` != None
     *`out` = > json.set map=out key="after" value=after*
+1. `interval` != None
+    *`out` = > json.set map=out key="interval" value=interval*
+1. `clear_interval` != None
+    *`out` = > json.set map=out key="clear_interval" value=clear_interval*
+1. `focus` != None
+    *`out` = > json.set map=out key="focus" value=focus*
+1. `blur` != None
+    *`out` = > json.set map=out key="blur" value=blur*
+1. `scroll_into` != None
+    *`out` = > json.set map=out key="scroll_into" value=scroll_into*
 **out**
+
+## list_html
+    + `sel`
+    + `tag`="li"
+    + `items`
+
+Build a `render_list` effect: `{ render_list: { sel: { tag, items } } }`.
+
+*`spec` = > json.set map=None key="tag" value=tag*
+*`spec` = > json.set map=spec key="items" value=items*
+*`m` = > json.set map=None key=sel value=spec*
+**> json.set map=None key="render_list" value=m**
 
 # page
     + `title`="Marqdo Web"

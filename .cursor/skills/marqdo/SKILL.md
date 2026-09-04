@@ -29,7 +29,8 @@ Canonical design (repo): `doc/design/markdown-mapping.md`, `doc/design/keywords.
 7. **Paths:** In bare *expressions* `/` is division. In **call args / param defaults / table cells**, unspaced `a/b` and quoted `".marqdo/agent-kb"` are path text — no `json.parse` needed. Numeric ratios that must stay text use quotes (`"1/5"`, `"16/9"`); bare `1/5` is division.
 8. Prefer ending side-effect-only function bodies with a lone `---` or `***` line (or `****` empty return) so later siblings are not swallowed.
 9. **`ext/**` never calls `host_*`.** Agent/OKF helpers are plugin names (`agent_kb_*`, …) after `plugin.load`. Do **not** add agent/OKF domain code to `src/host/` (core bloat). See `doc/design/ext-agent.md` §4.
-10. **Browser (route C/D):** client logic is Marqdo on WASM ([ADR 0002](../../../doc/adr/0002-browser-marqdo-wasm.md)); async I/O via return effects `fetch`/`after` ([ADR 0003](../../../doc/adr/0003-browser-async-effects.md)); official bridge is **host glue only**. **Author zero business JS** — use `web.client_embed` / `网页.客户端挂载` (`wasm` + `source` + `boot`) or `data-mq-source-url` so bridge `mount`s automatically ([roadmap D](../../../doc/roadmap/browser-wasm-d.md)). DOM effects: `set_text` / `set_value` / `set_attr` / `set_class` / `toggle_class` / `set_html` only on `#trusted*` selectors.
+10. **Browser (route C/D/E):** client logic is Marqdo on WASM; official bridge is host glue and **may** implement lists, routing, storage, WebSocket, internal templates — authors **must not hand-write business JS**. Use `web.client_embed` / `data-mq-source-url` auto-mount ([roadmap D](../../../doc/roadmap/browser-wasm-d.md) · [E](../../../doc/roadmap/browser-wasm-e.md)). Effects: DOM patches, `render_list`, `navigate`, `storage`, `ws`, `fetch`/`fetch_all`, `interval`.
+
 
 ## Markup → meaning (v0.2)
 
@@ -175,7 +176,7 @@ data/                # sqlite runtime (gitignore)
 
 **Core objects (EN / ZH):** `# page`/`页面`, `# style`/`样式`, `# db`/`数据库`, `# form`/`表单`, `# app`/`应用`, `# auth`/`鉴权`, `# cache`/`缓存`, `# storage`/`存储`.
 
-**Typical flow:** `db.init` → `page.compose_components` + `page.compose_main` → `page.head` / `page.images` / `page.meta` → `app` with `route` / `static` / `icons` / `configure` / `listen`. For client interactivity: `marqdo wasm build -o static`, then `web.client_embed source="/static/client.mq.md"` (or ZH `网页.客户端挂载`) in page HTML — **no author JS** ([browser-wasm-d.md](../../doc/roadmap/browser-wasm-d.md) · [web-client-site](../../examples/web-client-site/)).
+**Typical flow:** `db.init` → `page.compose_*` → `app` + `static` / `listen`. Client: `marqdo wasm build -o static` + `web.client_embed source="/static/client.mq.md"` — **no author JS**; bridge may implement rich host effects ([browser-wasm-e.md](../../doc/roadmap/browser-wasm-e.md) · [browser-app](../../examples/browser-app/)).
 
 **Shipped surface (W0–W7 + P3 + W8 + route D mount):** middleware + JSON API (`app.configure`); transactions, pagination, FTS search (`db.migrate`, `db.fts`, `db.search`); security (argon2, CSRF, SQLite sessions, login rate limit); SEO / RSS / Markdown (`page.meta`, `route_rss`, `lib/net.markdown_parse`); upload / download / gallery; sitemap / robots / error pages / redirects; RBAC (`app.gate`, user `role`); audit timestamps + FK in `db.init`; ETag on downloads; **W8** site icons (`app.icons` → `/favicon.ico`), head resource tables (`page.head`), image assembly (`make_images` / `page.images`); **D** `client_embed` auto-mount + DOM effect helpers (`text_patch` / `dom_patch`).
 
