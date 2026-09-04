@@ -25,8 +25,10 @@ jobs:
         with:
           node-version: "20"
 
-      - name: Build release
-        run: cargo build --release
+      - name: Build release CLI + official plugins
+        run: |
+          cargo build --release
+          cargo build --release -p marqdo_plugin_web -p marqdo_plugin_agent -p marqdo_plugin_quantum
 
       - name: Checkout extension sources (branch vscode-extension only)
         run: git fetch origin vscode-extension && git checkout origin/vscode-extension -- vscode-extension
@@ -55,6 +57,7 @@ jobs:
           $vsix = "marqdo-$ver.vsix"
           $public = "marqdo-$ver-public.zip"
           $extZip = "marqdo-$ver-ext.zip"
+          $nativeZip = "marqdo-$ver-native-$target.zip"
           Copy-Item target/release/marqdo.exe "dist/$exe"
           git archive --format=zip -o "dist/$source" HEAD
           ./target/release/marqdo view output public -o public
@@ -65,11 +68,25 @@ jobs:
           Copy-Item ext "$stageExt/ext" -Recurse
           if (Test-Path "dist/$extZip") { Remove-Item "dist/$extZip" -Force }
           Compress-Archive -Path "$stageExt/*" -DestinationPath "dist/$extZip" -Force
+          # Prebuilt native plugins (no Rust required for `marqdo ext add`)
+          $stageNative = "dist/stage-native"
+          if (Test-Path $stageNative) { Remove-Item $stageNative -Recurse -Force }
+          New-Item -ItemType Directory -Force -Path "$stageNative/native" | Out-Null
+          Copy-Item target/release/web.dll "$stageNative/native/web.dll"
+          Copy-Item target/release/agent.dll "$stageNative/native/agent.dll"
+          Copy-Item target/release/quantum.dll "$stageNative/native/quantum.dll"
+          if (Test-Path "dist/$nativeZip") { Remove-Item "dist/$nativeZip" -Force }
+          Compress-Archive -Path "$stageNative/*" -DestinationPath "dist/$nativeZip" -Force
           $stage = "dist/stage-bundle"
           if (Test-Path $stage) { Remove-Item $stage -Recurse -Force }
           New-Item -ItemType Directory -Force -Path $stage | Out-Null
           Copy-Item target/release/marqdo.exe "$stage/marqdo.exe"
           Copy-Item lib "$stage/lib" -Recurse
+          Copy-Item ext "$stage/ext" -Recurse
+          New-Item -ItemType Directory -Force -Path "$stage/ext/native" | Out-Null
+          Copy-Item target/release/web.dll "$stage/ext/native/web.dll"
+          Copy-Item target/release/agent.dll "$stage/ext/native/agent.dll"
+          Copy-Item target/release/quantum.dll "$stage/ext/native/quantum.dll"
           if (Test-Path "dist/$zip") { Remove-Item "dist/$zip" -Force }
           Compress-Archive -Path "$stage/*" -DestinationPath "dist/$zip" -Force
           $stageLib = "dist/stage-stdlib"
@@ -85,6 +102,7 @@ jobs:
           echo "SOURCE=$source" >> $env:GITHUB_ENV
           echo "PUBLIC=$public" >> $env:GITHUB_ENV
           echo "EXT=$extZip" >> $env:GITHUB_ENV
+          echo "NATIVE=$nativeZip" >> $env:GITHUB_ENV
 
       - name: Upload release assets
         uses: softprops/action-gh-release@v2
@@ -92,24 +110,21 @@ jobs:
           body: |
             ## Marqdo ${{ github.ref_name }}
 
-            ### 亮点 / Highlights — v0.3.4
-            - **`ext/web` 定制 C0–C4**：admin 前缀可让出、段边界 gates、shell/layout、样式 strict、脚本 defer/version、条件导航 when/media
-            - **ext/web customization C0–C4**: configurable admin/gates/shell/layout/CSS strict/script lifecycle/conditional nav
-            - Agent Wave B0 demos + writeback shadow fix
-            - Install: `marqdo ext list` / `marqdo ext add llm|agent|web|quantum`
-            - Native plugins: `cargo build --release -p marqdo_plugin_*` then `ext add`
-            - Details: [CHANGELOG](https://github.com/cflmy/marqdo/blob/main/CHANGELOG.md) · [README](https://github.com/cflmy/marqdo/blob/main/README.md)
-
-            Also: embedded stdlib, writeback/subtask, Variables modal in `view`, VSIX from branch **`vscode-extension`**.
+            ### 亮点 / Highlights
+            - **`marqdo ext add` 无需本机 Rust**：发布附带预编译 native 插件；`ext add` 可自动下载
+            - **Prebuilt native plugins**: `marqdo-*-native-*.zip`; Windows zip includes `ext/native/`
+            - Install: `marqdo ext add web|agent|quantum|llm`（零源码编译）
+            - Details: [CHANGELOG](https://github.com/cflmy/marqdo/blob/main/CHANGELOG.md) · [ext-cli.md](https://github.com/cflmy/marqdo/blob/main/doc/design/ext-cli.md)
 
             ### Downloads
 
             | Asset | Contents |
             |-------|----------|
             | `marqdo-*-windows-msvc.exe` | CLI with **embedded** official stdlib |
-            | `marqdo-*-windows-msvc.zip` | `marqdo.exe` + `lib/` (optional disk override) |
+            | `marqdo-*-windows-msvc.zip` | `marqdo.exe` + `lib/` + `ext/`（含 native DLL） |
+            | `marqdo-*-native-*.zip` | 预编译 `web`/`agent`/`quantum` 插件 |
             | `marqdo-*-stdlib.zip` | `lib/` only |
-            | `marqdo-*-ext.zip` | Official `ext/` L1 sources (for `MARQDO_EXT_SOURCE` / local `./ext`) |
+            | `marqdo-*-ext.zip` | Official `ext/` L1 sources |
             | `marqdo-*-source.zip` | Source snapshot (`git archive`) |
             | `marqdo-*.vsix` | VS Code / Cursor extension |
             | `marqdo-*-public.zip` | Static user docs site |
@@ -120,9 +135,41 @@ jobs:
             dist/${{ env.ZIP }}
             dist/${{ env.STDLIB }}
             dist/${{ env.EXT }}
+            dist/${{ env.NATIVE }}
             dist/${{ env.VSIX }}
             dist/${{ env.SOURCE }}
             dist/${{ env.PUBLIC }}
+          fail_on_unmatched_files: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  linux-native:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build official plugins (release)
+        run: cargo build --release -p marqdo_plugin_web -p marqdo_plugin_agent -p marqdo_plugin_quantum
+
+      - name: Package native zip
+        run: |
+          set -euo pipefail
+          VER="${GITHUB_REF_NAME#v}"
+          TARGET="x86_64-unknown-linux-gnu"
+          mkdir -p dist/stage-native/native
+          cp target/release/libweb.so dist/stage-native/native/libweb.so
+          cp target/release/libagent.so dist/stage-native/native/libagent.so
+          cp target/release/libquantum.so dist/stage-native/native/libquantum.so
+          (cd dist/stage-native && zip -r "../marqdo-${VER}-native-${TARGET}.zip" .)
+          echo "NATIVE=marqdo-${VER}-native-${TARGET}.zip" >> "$GITHUB_ENV"
+
+      - name: Upload Linux native plugins
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/${{ env.NATIVE }}
           fail_on_unmatched_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

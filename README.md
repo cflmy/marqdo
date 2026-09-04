@@ -138,12 +138,13 @@ marqdo view public --no-open
 marqdo debug public --no-open
 marqdo catalog public -o .marqdo
 
-# 3) 安装官方扩展（需先编原生插件）
-cargo build --release -p marqdo_plugin_web -p marqdo_plugin_agent -p marqdo_plugin_quantum
-marqdo ext add web      # 或：网页
+# 3) 安装官方扩展（Release 用户：无需本机 Rust）
+marqdo ext add web      # 或：网页 — 自动下载 L1 + 预编译 native
 marqdo ext add agent    # 或：智能体
 marqdo ext add quantum  # 或：量子
-marqdo ext add llm      # 或：大模型
+marqdo ext add llm      # 或：大模型（纯 .mq.md）
+# 开发者也可：cargo build --release -p marqdo_plugin_* 后在本机 target/ 安装
+# 离线：解压 Windows zip（已含 ext/native）或手动放下 native zip；MARQDO_EXT_NO_DOWNLOAD=1
 
 # 4) 动态站示例（扩展装好后）
 marqdo run examples/marqdo-blog/index.mq.md

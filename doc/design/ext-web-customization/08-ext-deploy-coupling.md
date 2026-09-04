@@ -55,6 +55,14 @@
 
 ---
 
-## 6. 过渡期 workaround
+## 6. 过渡期 → 预编译路径（进行中）
 
-锁定 Marqdo 与插件同版本镜像；本地 `MARQDO_EXT` 指向仓库构建产物；定制需求提 issue 对照本目录解决文，避免沉默 fork 漂移。
+**目标：** 用户 `marqdo ext add web` **不必**本机 Rust。
+
+| 交付 | 说明 |
+|------|------|
+| Release `marqdo-*-native-*.zip` | Windows / Linux 预编译 `web`/`agent`/`quantum` |
+| Windows portable zip | 内含 `ext/` + `ext/native/*.dll` |
+| `ext add` 下载回退 | 本地无 `.so`/`.dll` 时从 GitHub Release 拉取（`MARQDO_EXT_NO_DOWNLOAD=1` 可关） |
+
+仍保留开发者 `cargo build -p marqdo_plugin_*` 路径。详见 [ext-cli.md](../ext-cli.md)。

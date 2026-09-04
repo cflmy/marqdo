@@ -173,8 +173,24 @@ fn find_source_file(name: &str) -> Result<PathBuf> {
             return Ok(p);
         }
     }
+    #[cfg(feature = "net-host")]
+    {
+        if crate::ext_fetch::downloads_enabled() {
+            match crate::ext_fetch::ensure_ext_source_tree() {
+                Ok(root) => {
+                    let p = root.join(name);
+                    if p.is_file() {
+                        return Ok(p);
+                    }
+                }
+                Err(e) => {
+                    eprintln!("note: could not download ext sources: {e:#}");
+                }
+            }
+        }
+    }
     bail!(
-        "cannot find source `{name}` for install (set MARQDO_EXT_SOURCE to an ext/ directory, or run from the Marqdo repo)"
+        "cannot find source `{name}` for install (set MARQDO_EXT_SOURCE to an ext/ directory, run from the Marqdo repo, or use a release that publishes marqdo-*-ext.zip)"
     );
 }
 
@@ -240,31 +256,58 @@ fn find_native_plugin(short: &str) -> Result<PathBuf> {
     )
 }
 
-/// Locate a built native plugin, or `cargo build -p …` once then look again.
+/// Locate a built native plugin: local artifact → GitHub Release prebuild → optional cargo build.
 fn ensure_native_plugin(crate_name: &str) -> Result<PathBuf> {
     let short = native_short_name(crate_name);
     if let Ok(p) = find_native_plugin(short) {
         return Ok(p);
     }
-    println!(
-        "native plugin for `{short}` not found; building `{crate_name}` (debug)…"
-    );
-    let status = std::process::Command::new("cargo")
-        .args(["build", "-p", crate_name])
-        .status()
-        .with_context(|| format!("spawn cargo build -p {crate_name}"))?;
-    if !status.success() {
-        bail!(
-            "cargo build -p {crate_name} failed (status {status}); build the plugin then re-run `marqdo ext add {short}`"
-        );
+    let lib_name = native_lib_filename(short);
+
+    #[cfg(feature = "net-host")]
+    {
+        match crate::ext_fetch::download_native_plugin(short, &lib_name) {
+            Ok(p) => return Ok(p),
+            Err(e) => {
+                eprintln!("note: prebuilt native download skipped/failed: {e:#}");
+            }
+        }
     }
-    find_native_plugin(short).with_context(|| {
-        format!(
-            "built `{crate_name}` but still cannot find {}; set {} to the .so/.dll path",
-            native_lib_filename(short),
-            native_env_var(short)
-        )
-    })
+
+    #[cfg(feature = "net-host")]
+    let have_cargo = crate::ext_fetch::cargo_available();
+    #[cfg(not(feature = "net-host"))]
+    let have_cargo = true;
+
+    if have_cargo {
+        println!(
+            "native plugin for `{short}` not found; building `{crate_name}` (debug)…"
+        );
+        let status = std::process::Command::new("cargo")
+            .args(["build", "-p", crate_name])
+            .status()
+            .with_context(|| format!("spawn cargo build -p {crate_name}"))?;
+        if !status.success() {
+            bail!(
+                "cargo build -p {crate_name} failed (status {status}); \
+                 install a prebuilt release asset or build the plugin then re-run `marqdo ext add {short}`"
+            );
+        }
+        return find_native_plugin(short).with_context(|| {
+            format!(
+                "built `{crate_name}` but still cannot find {}; set {} to the .so/.dll path",
+                lib_name,
+                native_env_var(short)
+            )
+        });
+    }
+
+    bail!(
+        "cannot find native plugin `{lib_name}` and Rust/cargo is not available. \
+         Install Marqdo from a GitHub Release that includes `marqdo-*-native-*.zip`, \
+         or set {} to a built plugin path.",
+        native_env_var(short)
+    )
 }
 
 pub fn add_ext(id: &str) -> Result<()> {

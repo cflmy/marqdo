@@ -1261,6 +1261,7 @@ fn ext_cli_add_agent() {
         .args(["ext", "add", "agent"])
         .env("MARQDO_EXT", &tmp)
         .env("MARQDO_EXT_SOURCE", &src)
+        .env("MARQDO_EXT_NO_DOWNLOAD", "1")
         .current_dir(env!("CARGO_MANIFEST_DIR"))
         .status()
         .expect("ext add agent");
@@ -1297,6 +1298,7 @@ fn ext_cli_add_web() {
         .args(["ext", "add", "web"])
         .env("MARQDO_EXT", &tmp)
         .env("MARQDO_EXT_SOURCE", &src)
+        .env("MARQDO_EXT_NO_DOWNLOAD", "1")
         .current_dir(env!("CARGO_MANIFEST_DIR"))
         .status()
         .expect("ext add web");

@@ -16,6 +16,8 @@ pub mod diagnostics;
 pub mod embedded_lib;
 #[cfg(feature = "cli")]
 pub mod ext_cli;
+#[cfg(all(feature = "cli", feature = "net-host"))]
+pub mod ext_fetch;
 pub mod foreign;
 pub mod formula;
 pub mod host;

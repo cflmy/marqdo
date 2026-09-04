@@ -33,6 +33,8 @@ Produced by `.github/workflows/release.yml` on **windows-latest**:
 | `marqdo-VER-x86_64-pc-windows-msvc.zip` | `marqdo.exe` + `lib/` |
 | `marqdo-VER-stdlib.zip` | `lib/` only |
 | `marqdo-VER-ext.zip` | Official `ext/` L1 |
+| `marqdo-VER-native-x86_64-pc-windows-msvc.zip` | Prebuilt Windows plugins (`native/*.dll`) |
+| `marqdo-VER-native-x86_64-unknown-linux-gnu.zip` | Prebuilt Linux plugins (`native/lib*.so`) |
 | `marqdo-VER-source.zip` | `git archive` of tagged commit |
 | `marqdo-VER.vsix` | VS Code / Cursor (from branch `vscode-extension`) |
 | `marqdo-VER-public.zip` | Static user docs (`marqdo view output public`) |
