@@ -11,8 +11,8 @@ import json:lib/json.mq.md
     + `value`
     + `line`
 
-> writeback.ensure key=ok placeholder=pending line=`line`
-> writeback.ensure key=error placeholder=pending line=`line`
+> writeback.ensure key="ok" placeholder="pending" line=`line`
+> writeback.ensure key="error" placeholder="pending" line=`line`
 > writeback.record value=`value` key=`key` line=`line`
 ****
 

@@ -49,6 +49,33 @@ The runbook `.mq.md` is ground truth (code as documentation). Default budgets ke
 
 ---
 
+## dump_step_context
+    + `agent`
+    + `task`=""
+    + `source_depth`=default
+    + `skill_depth`=default
+
+Inspect what `build_step_context` would send — no LLM. Returns a map: `prompt`, `call_site`, `prompt_chars`, `truncated` (true when budget markers appear). Use for harness / debugging the code-as-doc pipeline.
+
+*prompt = > build_step_context agent=`agent` task=`task` source_depth=`source_depth` skill_depth=`skill_depth`*
+*site = > agent_call_site*
+*chars = > len value=`prompt`*
+*parts = > split value=`prompt` sep="[truncated"*
+*n = > len value=`parts`*
+*truncated = False*
+1. `n` > 1
+  *truncated = True*
+2. *
+  *_ = 1*
+*out = > json.parse text={}*
+*out = > json.set map=`out` key="prompt" value=`prompt`*
+*out = > json.set map=`out` key="call_site" value=`site`*
+*out = > json.set map=`out` key="prompt_chars" value=`chars`*
+*out = > json.set map=`out` key="truncated" value=`truncated`*
+**out**
+
+---
+
 ## extract_tool_name
     + `reply`
 
@@ -168,9 +195,9 @@ Structured observation for the parent developer-agent: source, named writeback s
 - [`slot`](`slots`)
   *k = > json.get value=`slot` key="key"*
   *body = > json.get value=`slot` key="body"*
-  1. `k` == ok
+  1. `k` == "ok"
     *last_ok = body*
-  2. `k` == error
+  2. `k` == "error"
     *last_error = body*
   3. *
     *_ = 1*
@@ -1436,7 +1463,7 @@ Always append `done` and attach `events` on the result map (process audit even w
 
 1. `trace`
   *body = > json.stringify value=`events`*
-  > writeback.record value=`body` key=trace
+  > host_writeback_record value=`body` key="trace"
 2. *
   *_ = 1*
 
@@ -1578,10 +1605,10 @@ With `stream=True`, the model call uses SSE; `echo=True` prints delta text to st
 1. `writeback`
   *body = > json.stringify value=`out`*
   *st = > json.get value=`out` key="status"*
-  1. `st` == ok
-    > writeback.record value=`body` key=ok
+  1. `st` == "ok"
+    > host_writeback_record value=`body` key="ok"
   2. *
-    > writeback.record value=`body` key=error
+    > host_writeback_record value=`body` key="error"
 2. *
   *_ = 1*
 
@@ -1684,7 +1711,7 @@ Reuse lookup: exact → alias → canonicalize → optional local n-gram `near` 
         *events = > plan_append_round events=`events` round=1 workbook=`path` exit_code=`code` result=`child_val` stream=`stream` echo=`echo`*
         1. `writeback`
           *body = > json.stringify value=`out`*
-          > writeback.record value=`body` key=ok
+          > host_writeback_record value=`body` key="ok"
         2. *
           *_ = 1*
         *out = > plan_finish_stream out=`out` events=`events` stream=`stream` trace=`trace` result=`child_val`*
@@ -1741,7 +1768,7 @@ Reuse lookup: exact → alias → canonicalize → optional local n-gram `near` 
           *events = > plan_append_round events=`events` round=1 workbook=`path` exit_code=`code` result=`child_val` stream=`stream` echo=`echo`*
           1. `writeback`
             *body = > json.stringify value=`out`*
-            > writeback.record value=`body` key=ok
+            > host_writeback_record value=`body` key="ok"
           2. *
             *_ = 1*
           *out = > plan_finish_stream out=`out` events=`events` stream=`stream` trace=`trace` result=`child_val`*
@@ -1805,7 +1832,7 @@ Reuse lookup: exact → alias → canonicalize → optional local n-gram `near` 
                 *events = > plan_append_round events=`events` round=1 workbook=`path` exit_code=`code` result=`child_val` stream=`stream` echo=`echo`*
                 1. `writeback`
                   *body = > json.stringify value=`out`*
-                  > writeback.record value=`body` key=ok
+                  > host_writeback_record value=`body` key="ok"
                 2. *
                   *_ = 1*
                 *out = > plan_finish_stream out=`out` events=`events` stream=`stream` trace=`trace` result=`child_val`*
@@ -1883,7 +1910,7 @@ Reuse lookup: exact → alias → canonicalize → optional local n-gram `near` 
   *out = > json.set map=`out` key="cache" value="bypass"*
   1. `writeback`
     *body = > json.stringify value=`out`*
-    > writeback.record value=`body` key=ok
+    > host_writeback_record value=`body` key="ok"
   2. *
     *_ = 1*
   *out = > plan_finish_stream out=`out` events=`events` stream=`stream` trace=`trace`*
@@ -2022,7 +2049,7 @@ Deterministic success stop (loop engineering): when the child already returned a
         *summary = last_reply*
         *left = 0*
 
-1. `status` == ok
+1. `status` == "ok"
   1. `promote`
     *prom = > agent_kb_promote kb_dir=`kb_dir` goal=`goal` workbook=`path` tools=`tools`*
     *cache = "refreshed"*
@@ -2063,10 +2090,10 @@ Deterministic success stop (loop engineering): when the child already returned a
 
 1. `writeback`
   *body = > json.stringify value=`out`*
-  1. `status` == ok
-    > writeback.record value=`body` key=ok
+  1. `status` == "ok"
+    > host_writeback_record value=`body` key="ok"
   2. *
-    > writeback.record value=`body` key=error
+    > host_writeback_record value=`body` key="error"
 2. *
   *_ = 1*
 

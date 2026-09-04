@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| 状态 | **Wave B 锁定（宪法优先）** |
+| 状态 | **Wave B1 Active**（B0/B0.5 已完成；宪法优先） |
 | 日期 | 2026-09-04 |
 | 前置 | [agent-frameworks-and-marqdo.md](agent-frameworks-and-marqdo.md) · [agent-framework-gaps-after-a4.md](agent-framework-gaps-after-a4.md) |
 | 路线 | [ext-agent-optimize.md](../roadmap/ext-agent-optimize.md) |

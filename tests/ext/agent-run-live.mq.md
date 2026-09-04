@@ -16,7 +16,7 @@ import agent:ext/ai/agent.mq.md
 
 # main
 
-> llm.load_env path=.env
+> llm.load_env path="../../.env"
 
 *模型 = > llm.llm*
 

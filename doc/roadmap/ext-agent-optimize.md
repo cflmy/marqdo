@@ -36,9 +36,9 @@
 
 | 波次 | 主题 | 状态 |
 |------|------|------|
-| **B0** | 官方示例演示 call_site/源码/OKF；Skill/文档；上下文管道可读 | **Active** |
-| **B0.5** | 本机 live（`.env` → 开发模型）验证「模型用上了文档」 | **Active** |
-| **B1** | 评测 harness 锁差异化指标 | **Planned** |
+| **B0** | 官方示例演示 call_site/源码/OKF；Skill/文档；上下文管道可读 | **done** |
+| **B0.5** | 本机 live（`.env` → 开发模型）验证「模型用上了文档」 | **done**（`AGENT_LIVE` / `AGENT_HARNESS_LIVE`） |
+| **B1** | 评测 harness 锁差异化指标（constitution / dump / writeback 遮蔽） | **Active** |
 | **B2–B5** | 真 MCP / resume+HITL / stats / 并行 | 暂缓 |
 
 示例：`examples/agent-pong/` · `examples/agent-okf-flywheel/`。

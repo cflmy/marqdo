@@ -158,7 +158,7 @@ Install: `marqdo ext add agent` (ZH: `智能体`). Native: `cargo build --releas
 2. **Call site is first-class** — `build_step_context` injects path/function/line so the model knows where it is in the program.
 3. **Document is the knowledge base (OKF)** — writeback → promote/solidify → reuse / `llm_free`; MCP/corpus are evidence only.
 
-APIs: `# agent` / `# 智能体` → `## step` / `## plan`. Context: standing + task + **call site** + tools + budgeted source/skill + act protocol (`CALL:` / `READ:`).
+APIs: `# agent` / `# 智能体` → `## step` / `## plan`. Context: standing + task + **call site** + tools + budgeted source/skill + act protocol (`CALL:` / `READ:`). Inspect without LLM: `dump_step_context`. Inside `writeback=` / `写回=` branches use `host_writeback_record` (param name shadows the writeback import).
 
 Examples: [agent-pong](../../examples/agent-pong/) · [agent-okf-flywheel](../../examples/agent-okf-flywheel/). Harness: `scripts/agent-harness.sh`. Design: [ext-agent.md](../../doc/design/ext-agent.md) · Wave B: [agent-framework-2026-09.md](../../doc/research/agent-framework-2026-09.md). Dev LLM: copy [.env.example](../../.env.example) → `.env` (gitignored).
 

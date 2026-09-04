@@ -23,6 +23,8 @@ run() {
 }
 
 run tests/ext/agent-constitution-b0.mq.md
+run tests/ext/agent-dump-context.mq.md
+run tests/ext/agent-writeback-shadow.mq.md
 run tests/ext/agent-kb-plan-hit.mq.md
 run tests/ext/agent-context-budget-a3.mq.md
 run tests/ext/agent-workbook-patch-a0.mq.md
@@ -31,6 +33,10 @@ run examples/agent-pong/index.mq.md
 
 if [[ "${AGENT_HARNESS_LIVE:-}" == "1" ]]; then
   export AGENT_LIVE=1
+  if [[ ! -f "$ROOT/.env" ]]; then
+    echo "AGENT_HARNESS_LIVE=1 needs repo-root .env (see .env.example)" >&2
+    exit 1
+  fi
   run examples/agent-pong/index.mq.md
   run tests/ext/agent-run-live.mq.md
 fi

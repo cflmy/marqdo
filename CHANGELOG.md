@@ -7,9 +7,11 @@
 - **`.env.example`**：开发期 OpenAI 兼容网关变量模板（密钥仅本地 `.env`）。
 
 ### Fixed
+- **`agent.step` / `plan` 写回**：参数名 `writeback` 遮蔽 `lib/writeback` import，导致 `writeback=True` 时 `method receiver must be an object map`；改为 `host_writeback_record`。金样 `agent-writeback-shadow`。
 
 ### Changed
 - `build_step_context`：call site 提前到 task 之后；开场白强调 code-as-documentation。
+- 中文 `构建单步上下文` 委托英文版（含预算 / READ）；新增 `dump_step_context`；live 用例改用仓库根 `.env`。
 
 ## v0.3.3 — 2026-09-04
 
