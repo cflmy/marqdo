@@ -54,7 +54,7 @@ Import one file; use **that** file’s function names.
 | `lib/math.mq.md` | `lib/数学.mq.md` | num, trig, random, formula, plot |
 | `lib/foreign.mq.md` | `lib/外联.mq.md` | run foreign fenced blocks |
 | `ext/llm.mq.md` | `ext/大模型.mq.md` | `# llm` / `# 大模型` object + chat methods |
-| `ext/agent.mq.md` | `ext/智能体.mq.md` | agent **framework** (layout now; LLM orchestration roadmap in `ext-agent.md`) |
+| `ext/agent.mq.md` | `ext/智能体.mq.md` | document-driven **step** / **plan** + OKF；示例 `examples/agent-pong` · `agent-okf-flywheel`；Wave B：[agent-framework-2026-09.md](../../doc/research/agent-framework-2026-09.md) |
 | `ext/web/web.mq.md` | `ext/web/网页.mq.md` | dynamic sites — see **ext/web** section below |
 | `ext/quantum/quantum.mq.md` | `ext/quantum/量子.mq.md` | circuits + Q7 density/viz + Q8 themes — see **ext/quantum** below |
 

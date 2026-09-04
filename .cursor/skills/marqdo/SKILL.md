@@ -141,12 +141,26 @@ import clock:lib/time.mq.md
 - Instance methods stay `` > `obj`.method `` (backticks on the receiver only).
 - `lib/…` resolves via `MARQDO_LIB`, cwd `lib/`, or `lib/` next to the `marqdo` binary.
 - Design: [module-namespace.md](../../doc/design/module-namespace.md).
-- Official optional extensions (`ext/`, not stdlib): install with `marqdo ext add llm|agent|web|quantum` (see `doc/design/ext-cli.md`). `ext/llm` — chat; `ext/agent` — document-driven agents: **step** (default writeback) / **plan** workbook ([ext-agent.md](../../doc/design/ext-agent.md), [ext-agent-plan.md](../../doc/design/ext-agent-plan.md)); **`ext/web`** — dynamic sites (W0–W7 + P3 complete; see below); **`ext/quantum`** — circuits + Q7 density/viz + Q8 themed SVG (see below).
+- Official optional extensions (`ext/`, not stdlib): install with `marqdo ext add llm|agent|web|quantum` (see `doc/design/ext-cli.md`). `ext/llm` — chat; **`ext/agent`** — document-driven agents (see **ext/agent** below); **`ext/web`** — dynamic sites (see below); **`ext/quantum`** — circuits + Q7/Q8 (see below).
 - Native plugins: `lib/plugin` — `## load` / `unload` / `list`. C ABI: `include/marqdo_abi.h`.
 - Prefer `table.put` / `表.改` for list/map element updates; keep `json` for parse/stringify/quote (see `doc/design/stdlib-table.md`).
 - Builtins (no import): `print`/`打印`, `input`/`输入`, `len`/`长度`, `str`/`文本`, `int`/`整数`; literals `True`/`真`, `False`/`假`, `None`/`空`; logic `and`/`且`, `or`/`或`, `not`/`非`.
 
 Stdlib map: [reference.md](reference.md).
+
+## Official extension: `ext/agent` (document-driven)
+
+Install: `marqdo ext add agent` (ZH: `智能体`). Native: `cargo build --release -p marqdo_plugin_agent`.
+
+**Constitution (do not dilute):**
+
+1. **Code is documentation** — the runbook `.mq.md` is the model’s ground truth, not a hidden system prompt bag.
+2. **Call site is first-class** — `build_step_context` injects path/function/line so the model knows where it is in the program.
+3. **Document is the knowledge base (OKF)** — writeback → promote/solidify → reuse / `llm_free`; MCP/corpus are evidence only.
+
+APIs: `# agent` / `# 智能体` → `## step` / `## plan`. Context: standing + task + **call site** + tools + budgeted source/skill + act protocol (`CALL:` / `READ:`).
+
+Examples: [agent-pong](../../examples/agent-pong/) · [agent-okf-flywheel](../../examples/agent-okf-flywheel/). Harness: `scripts/agent-harness.sh`. Design: [ext-agent.md](../../doc/design/ext-agent.md) · Wave B: [agent-framework-2026-09.md](../../doc/research/agent-framework-2026-09.md). Dev LLM: copy [.env.example](../../.env.example) → `.env` (gitignored).
 
 ## Official extension: `ext/web` (dynamic sites)
 

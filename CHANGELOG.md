@@ -3,10 +3,13 @@
 ## Unreleased
 
 ### Added
+- **智能体 Wave B0**：宪法优先示例 [agent-pong](examples/agent-pong/)（call_site/源码注入）· [agent-okf-flywheel](examples/agent-okf-flywheel/)（OKF `cache=hit`）；调研 [agent-framework-2026-09.md](doc/research/agent-framework-2026-09.md)；离线 harness [`scripts/agent-harness.sh`](scripts/agent-harness.sh)；金样 `agent-constitution-b0`。
+- **`.env.example`**：开发期 OpenAI 兼容网关变量模板（密钥仅本地 `.env`）。
 
 ### Fixed
 
 ### Changed
+- `build_step_context`：call site 提前到 task 之后；开场白强调 code-as-documentation。
 
 ## v0.3.3 — 2026-09-04
 

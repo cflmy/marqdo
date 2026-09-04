@@ -17,8 +17,8 @@ import plugin:lib/plugin.mq.md
     + `source_depth`=default
     + `skill_depth`=default
 
-Assemble a readable prompt: standing, task, tools, call site, **budgeted** source + skill, and the act protocol.
-Default budgets keep long runbooks from exploding the window; emit `READ:source` / `READ:skill` (Chinese `读取：`) to deepen, then answer or `CALL:`.
+Assemble a readable prompt: standing, task, **call site**, tools, **budgeted** source + skill, and the act protocol.
+The runbook `.mq.md` is ground truth (code as documentation). Default budgets keep long files from exploding the window; emit `READ:source` / `READ:skill` (Chinese `读取：`) to deepen, then answer or `CALL:`.
 
 *standing = > json.get value=`agent` key="standing"*
 1. `standing`
@@ -43,8 +43,8 @@ Default budgets keep long runbooks from exploding the window; emit `READ:source`
 *f = > json.get value=`esc` key="f"*
 *g = > json.get value=`esc` key="g"*
 
-*p = "You are a Marqdo agent. The runbook source is your ground truth — code is documentation."*
-*p = p + a + up + b + task_s + c + tools_s + g + d + site_s + e + src + f + skill*
+*p = "You are a Marqdo agent. Code is documentation: this runbook source and call site are your ground truth — not a hidden system prompt."*
+*p = p + a + up + b + task_s + d + site_s + c + tools_s + e + src + f + skill + g*
 **p**
 
 ---
