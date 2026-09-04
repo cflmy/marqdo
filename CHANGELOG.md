@@ -3,13 +3,34 @@
 ## Unreleased
 
 ### Added
-- **路线 D（作者零 JS）**：[roadmap](doc/roadmap/browser-wasm-d.md) · 设计 §16。官方 bridge `mount` / `data-mq-*` 自启；`client_embed` 带 `wasm`/`source`/`boot`；DOM 效应；`examples/web-client-site/`。
-- **路线 E（前端补齐，Completed）**：[browser-wasm-e.md](doc/roadmap/browser-wasm-e.md)。多节点 DOM、`add_class`/`remove_class`、cookie、clipboard/download；示例 [browser-app](examples/browser-app/) 含列表 CRUD / fetch_all / ws。
-- **路线 F（规划）**：[browser-wasm-f.md](doc/roadmap/browser-wasm-f.md) — 文件选择、Canvas、Audio、Observer、拖放等。
 
 ### Fixed
 
 ### Changed
+
+## v0.3.3 — 2026-09-04
+
+### Highlights
+
+**浏览器作者零业务 JS（路线 D/E/F）**：官方 bridge 自启 + 宿主效应补齐（DOM/路由/storage/ws/文件/Canvas/音频/Observer/拖放）；`lib/browser` + GFM 表格写法；新增 [marqdo-dev](.cursor/skills/marqdo-dev/SKILL.md) 开发约定。
+
+```bash
+git checkout v0.3.3
+cargo build --release
+marqdo wasm build
+# examples: browser-hello / browser-app / browser-media / web-client-site
+```
+
+### Added
+- **路线 D（作者零 JS）**：[roadmap](doc/roadmap/browser-wasm-d.md) · 设计 §16。官方 bridge `mount` / `data-mq-*` 自启；`client_embed` 带 `wasm`/`source`/`boot`；DOM 效应；`examples/web-client-site/`。
+- **路线 E（前端补齐）**：[browser-wasm-e.md](doc/roadmap/browser-wasm-e.md)。多节点 DOM、`add_class`/`remove_class`、cookie、clipboard/download、`fetch_all`/`ws`/`interval`；示例 [browser-app](examples/browser-app/)。
+- **路线 F（媒体/文件，F1–F5）**：[browser-wasm-f.md](doc/roadmap/browser-wasm-f.md)。`read_file`、Canvas 2D、Audio beep、Intersection/ResizeObserver、drag/drop；示例 [browser-media](examples/browser-media/)。
+- **`lib/browser` / `lib/浏览器`**：WASM 客户端效应助手（GFM 表格 + named helpers；勿用 `json.set` 链）。
+- **Skill `marqdo-dev`**：代码即文档 / GFM-first / 库开发约定。
+
+### Changed
+- 浏览器示例（hello / app / media / web-client）改为表格 + `lib/browser`；`ext/web` 效应助手改用 `table.put`。
+- 标准库模块表收录 `browser`；路线 F 收口 F1–F5（F6 Service Worker 仍可选）。
 
 ## v0.3.2 — 2026-09-01
 

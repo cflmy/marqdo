@@ -62,7 +62,7 @@
 | [roadmap/browser-wasm.md](roadmap/browser-wasm.md) | **浏览器 WASM 路线 C（C0–C5 Completed）** |
 | [roadmap/browser-wasm-d.md](roadmap/browser-wasm-d.md) | **路线 D：作者零 JS 前端（Completed）** |
 | [roadmap/browser-wasm-e.md](roadmap/browser-wasm-e.md) | **路线 E：前端能力补齐（Completed）** |
-| [roadmap/browser-wasm-f.md](roadmap/browser-wasm-f.md) | **路线 F：媒体/文件/Canvas 等（Active，F1–F5）** |
+| [roadmap/browser-wasm-f.md](roadmap/browser-wasm-f.md) | **路线 F：媒体/文件/Canvas 等（Completed，F1–F5；v0.3.3）** |
 | [design/browser-marqdo-wasm.md](design/browser-marqdo-wasm.md) | **浏览器 Marqdo（WASM）设计** |
 | [roadmap/ext-quantum.md](roadmap/ext-quantum.md) | **规划：`ext/quantum` 量子模拟**（基础门·电路·ABI·`ext add`） |
 | [research/okf-and-marqdo.md](research/okf-and-marqdo.md) | OKF 调研 |

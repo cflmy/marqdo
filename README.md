@@ -99,7 +99,7 @@ marqdo catalog public -o .marqdo
 
 ---
 
-## 现状（v0.3.2）
+## 现状（v0.3.3）
 
 - 映射与解释器：Phase I 树遍历 + 字节码后端可用；金样例在 `tests/`  
 - **对象**：`#` = 类型/构造，`##`+ = 函数/方法；见 [objects.md](doc/design/objects.md)  
@@ -107,7 +107,7 @@ marqdo catalog public -o .marqdo
 - **`marqdo debug`**：独立调试页（断点 / 单步 / locals；默认端口 7430；页面 favicon / 品牌使用官方 Logo）  
 - **`marqdo catalog` / `sync`**：OKF 风格 YAML + 模块概念页  
 - **`marqdo version --check`**：与 GitHub 最新 release 对比  
-- 标准库：**内置于二进制**（v0.1.2+）；磁盘 `lib/` 或 `MARQDO_LIB` 可覆盖。模块含文本、文件、系统、时间、JSON、网络、数学、外联、插件、**自写回**、**子任务**  
+- 标准库：**内置于二进制**（v0.1.2+）；磁盘 `lib/` 或 `MARQDO_LIB` 可覆盖。模块含文本、表、**浏览器效应**、文件、系统、时间、JSON、网络、数学、外联、插件、**自写回**、**子任务**  
 - **官方扩展库 `ext/`**（**非** stdlib，本版收口）：
   - **`web`**：W0–W7 + P3 + **W8**（favicon / Head 资源 / 图片装配，见 [web-assets-and-images.md](doc/design/web-assets-and-images.md)）；示例 [marqdo-blog](examples/marqdo-blog/)；生产路径见 [web-asgi-servers-and-marqdo.md](doc/design/web-asgi-servers-and-marqdo.md)（反向代理 → 嵌入式 `listen`，非 Daphne/Uvicorn）
   - **`quantum`**：Q0–Q7 + Q8a/b 主题 SVG；示例 [quantum-entanglement](examples/quantum-entanglement/)
@@ -117,15 +117,15 @@ marqdo catalog public -o .marqdo
 - **原生插件 ABI**：[`include/marqdo_abi.h`](include/marqdo_abi.h) · [ext-abi.md](doc/design/ext-abi.md)；`plugins/{demo,agent,web,quantum}`  
 - **用户静态站**：`public/` → `view output` → CI 发布 [gh-pages](https://cflmy.github.io/marqdo/)  
 - **VS Code 扩展**：分支 **`vscode-extension`**（`main` 不跟踪源码；见 [vscode-extension-commit.md](doc/design/vscode-extension-commit.md)）；Release 附带 `.vsix`  
-- **浏览器 Marqdo（WASM）**：`marqdo wasm build` + 官方 bridge 自启（作者零业务 JS；桥内可含列表/路由/storage/ws）；`web.client_embed`；示例 [browser-hello](examples/browser-hello/) · [browser-app](examples/browser-app/) · [web-client-site](examples/web-client-site/)（[ADR 0002](doc/adr/0002-browser-marqdo-wasm.md) · [路线 D](doc/roadmap/browser-wasm-d.md) · [路线 E](doc/roadmap/browser-wasm-e.md)）
+- **浏览器 Marqdo（WASM）**：`marqdo wasm build` + 官方 bridge 自启（作者零业务 JS；桥内可含列表/路由/storage/ws/文件/Canvas/音频/Observer/拖放）；`lib/browser` + GFM；`web.client_embed`；示例 [browser-hello](examples/browser-hello/) · [browser-app](examples/browser-app/) · [browser-media](examples/browser-media/) · [web-client-site](examples/web-client-site/)（[ADR 0002](doc/adr/0002-browser-marqdo-wasm.md) · [D](doc/roadmap/browser-wasm-d.md) · [E](doc/roadmap/browser-wasm-e.md) · [F](doc/roadmap/browser-wasm-f.md)）
 - 选型：[ADR 0001 — Rust](doc/adr/0001-implementation-language.md) · [ADR 0002 — 浏览器 WASM](doc/adr/0002-browser-marqdo-wasm.md)（C0–C5 完结，见 [roadmap/browser-wasm.md](doc/roadmap/browser-wasm.md)）· [ADR 0003 — 异步效应](doc/adr/0003-browser-async-effects.md)
 
-### 如何使用最新 Marqdo（v0.3.2）
+### 如何使用最新 Marqdo（v0.3.3）
 
 ```bash
 # 1) 源码安装（跟 tag 或 main）
 git clone https://github.com/cflmy/marqdo.git && cd marqdo
-git checkout v0.3.2   # 或留在 main
+git checkout v0.3.3   # 或留在 main
 cargo build --release
 export PATH="$PWD/target/release:$PATH"
 marqdo version
@@ -154,7 +154,7 @@ marqdo wasm build
 # → dist/wasm/ … 见 examples/browser-hello/
 
 # 6) Windows：也可从 GitHub Releases 下载 exe / zip / vsix
-#    https://github.com/cflmy/marqdo/releases/tag/v0.3.2
+#    https://github.com/cflmy/marqdo/releases/tag/v0.3.3
 ```
 
 开发期也可用 `cargo run -- …` 代替已安装的 `marqdo`：

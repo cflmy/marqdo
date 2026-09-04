@@ -92,10 +92,10 @@ jobs:
           body: |
             ## Marqdo ${{ github.ref_name }}
 
-            ### 亮点 / Highlights — v0.3.2
-            - **浏览器 Marqdo（路线 C）**：`marqdo wasm build`、官方 bridge、会话 ABI、`fetch`/`after` 效应；示例 `examples/browser-hello/`
-            - **Browser Marqdo (route C)**: WASM build, official bridge, session ABI, async effects; see CHANGELOG
-            - Fix: Admin 长内容布局 · `ext add` 原生插件预检 · `@keyframes` / 样式表比率引号约定
+            ### 亮点 / Highlights — v0.3.3
+            - **浏览器作者零业务 JS（D/E/F）**：bridge 自启；DOM/路由/storage/ws/文件/Canvas/音频/Observer/拖放；`lib/browser` + GFM
+            - **Browser author-zero-JS (routes D/E/F)**: host effects + `lib/browser`; examples `browser-hello` / `browser-app` / `browser-media`
+            - Skill: `marqdo-dev`（代码即文档 / 禁止 json.set 胶水）
             - Install: `marqdo ext list` / `marqdo ext add llm|agent|web|quantum`
             - Native plugins: `cargo build --release -p marqdo_plugin_*` then `ext add`
             - Details: [CHANGELOG](https://github.com/cflmy/marqdo/blob/main/CHANGELOG.md) · [README](https://github.com/cflmy/marqdo/blob/main/README.md)
