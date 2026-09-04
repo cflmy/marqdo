@@ -40,6 +40,8 @@
 | [design/ext-agent-plan.md](design/ext-agent-plan.md) | **`## 多步` / `## plan` 锁定设计**（工作簿文件、subtask 执行、修订循环、`step` 默认写回） |
 | [design/ext-cli.md](design/ext-cli.md) | **`marqdo ext list/add/remove` 官方扩展安装器** |
 | [design/ext-web.md](design/ext-web.md) | **官方扩展 `ext/web`（页面/库表/绑定/后台；ABI + CLI；设计锁定）** |
+| [research/ext-web-customization-limits.md](research/ext-web-customization-limits.md) | **`ext/web` 定制限制踩坑盘点**（路由/壳 CSS/鉴权/样式/部署） |
+| [design/ext-web-customization/](design/ext-web-customization/) | **对应解决设计**（C0–C4：前缀可让出、shell_css、gate、布局…） |
 | [design/web-assets-and-images.md](design/web-assets-and-images.md) | **W8：favicon / Head 资源表 / 图片装配**（一次补齐） |
 | [design/web-asgi-servers-and-marqdo.md](design/web-asgi-servers-and-marqdo.md) | **Daphne/Uvicorn 等 vs Marqdo**：不能直接托管；反代 + axum `listen` |
 | [design/call-arguments.md](design/call-arguments.md) | **调用：具名 + 位置实参** |

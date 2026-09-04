@@ -35,6 +35,18 @@
 | **W7** | Cache-Control / 404·500 / 重定向 / sitemap·robots / init 唯一·索引 / HTTPS 反代说明 | **done** |
 | **P3** | 审计时间戳 / 外键 / RBAC / 相册 / ETag | **done** |
 
+### 定制波次（规划中）
+
+自研后台 / 主题 / 响应式踩坑见 [ext-web-customization-limits.md](../research/ext-web-customization-limits.md)；解法索引 [ext-web-customization/](../design/ext-web-customization/)。
+
+| 波次 | 内容 | 状态 |
+|------|------|------|
+| **C0** | `admin` 关则不占路径；`admin_prefix` / 登录回跳可配 | **planned** |
+| **C1** | gate 匹配与未登录策略一致；段边界默认 admin gate | **planned** |
+| **C2** | `shell_css` + `layout` 松绑 | **planned** |
+| **C3** | 样式 strict / 脚本 defer·version | **planned** |
+| **C4** | 壳预设收口与条件导航（后续） | **planned** |
+
 验收金样：`tests/ext/web-smoke.mq.md`、`tests/ext/web-security-smoke.mq.md`、`tests/ext/web-drivers-smoke.mq.md`、`tests/ext/web-upload-smoke.mq.md`、`tests/ext/web-db-w6-smoke.mq.md`、`tests/ext/web-w7-finish-smoke.mq.md`、`tests/ext/web-p3-smoke.mq.md`、`ext_cli_add_web`。
 
 ---
