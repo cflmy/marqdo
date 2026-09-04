@@ -14,6 +14,10 @@ const PROP_KEYS: &[&str] = &["属性", "property", "prop", "名", "name"];
 const VAL_KEYS: &[&str] = &["值", "value"];
 const SEL_KEYS: &[&str] = &["选择器", "selector", "sel"];
 const MEDIA_KEYS: &[&str] = &["媒体", "media", "mq", "@media"];
+const WHEN_KEYS: &[&str] = &["当", "when", "if", "条件", "visible"];
+const NAV_LABEL_KEYS: &[&str] = &["标签", "label", "title", "text", "名"];
+const NAV_HREF_KEYS: &[&str] = &["链接", "href", "url", "path", "地址"];
+
 
 pub fn normalize_ref(s: &str) -> String {
     let s = s.trim();
@@ -214,7 +218,7 @@ pub fn as_rows(table: &Value) -> Value {
     }
 }
 
-/// Bind table → `[{front,back,css}, …]`
+/// Bind table → `[{front,back,css,media,when}, …]`
 pub fn as_bind(table: &Value) -> Value {
     match table {
         Value::Array(rows) => {
@@ -224,8 +228,17 @@ pub fn as_bind(table: &Value) -> Value {
                     let front = normalize_ref(&pick(m, FRONT_KEYS).map(cell_str).unwrap_or_default());
                     let back = normalize_ref(&pick(m, BACK_KEYS).map(cell_str).unwrap_or_default());
                     let css = normalize_ref(&pick(m, CSS_KEYS).map(cell_str).unwrap_or_default());
+                    let media =
+                        normalize_ref(&pick(m, MEDIA_KEYS).map(cell_str).unwrap_or_default());
+                    let when = normalize_ref(&pick(m, WHEN_KEYS).map(cell_str).unwrap_or_default());
                     if !front.is_empty() || !back.is_empty() {
-                        out.push(json!({ "front": front, "back": back, "css": css }));
+                        out.push(json!({
+                            "front": front,
+                            "back": back,
+                            "css": css,
+                            "media": media,
+                            "when": when,
+                        }));
                     }
                 }
             }
@@ -235,20 +248,85 @@ pub fn as_bind(table: &Value) -> Value {
             let fronts = pick(m, FRONT_KEYS).map(as_str_list).unwrap_or_default();
             let backs = pick(m, BACK_KEYS).map(as_str_list).unwrap_or_default();
             let csses = pick(m, CSS_KEYS).map(as_str_list).unwrap_or_default();
+            let medias = pick(m, MEDIA_KEYS).map(as_str_list).unwrap_or_default();
+            let whens = pick(m, WHEN_KEYS).map(as_str_list).unwrap_or_default();
             let n = fronts.len().max(backs.len());
             let mut out = Vec::new();
             for i in 0..n {
                 let front = normalize_ref(&fronts.get(i).cloned().unwrap_or_default());
                 let back = normalize_ref(&backs.get(i).cloned().unwrap_or_default());
                 let css = normalize_ref(&csses.get(i).cloned().unwrap_or_default());
+                let media = normalize_ref(&medias.get(i).cloned().unwrap_or_default());
+                let when = normalize_ref(&whens.get(i).cloned().unwrap_or_default());
                 if !front.is_empty() || !back.is_empty() {
-                    out.push(json!({ "front": front, "back": back, "css": css }));
+                    out.push(json!({
+                        "front": front,
+                        "back": back,
+                        "css": css,
+                        "media": media,
+                        "when": when,
+                    }));
                 }
             }
             Value::Array(out)
         }
         _ => json!([]),
     }
+}
+
+/// Nav / link table → row maps with label/href (and optional media/when/class).
+/// Accepts bind rows (`front`/`back`) or author tables (`标签`/`链接`).
+pub fn as_nav_rows(table: &Value) -> Vec<Map<String, Value>> {
+    let binds = as_bind(table);
+    let bind_arr = binds.as_array().cloned().unwrap_or_default();
+    if !bind_arr.is_empty() {
+        return bind_arr
+            .into_iter()
+            .filter_map(|v| v.as_object().cloned())
+            .collect();
+    }
+    as_rows(table)
+        .as_array()
+        .cloned()
+        .unwrap_or_default()
+        .into_iter()
+        .filter_map(|v| v.as_object().cloned())
+        .collect()
+}
+
+/// Pick label/href from a nav row (bind or 标签/链接 shape).
+pub fn nav_label_href(m: &Map<String, Value>) -> (String, String) {
+    let label = pick(m, NAV_LABEL_KEYS)
+        .or_else(|| m.get("front"))
+        .map(cell_str)
+        .map(|s| normalize_ref(&s))
+        .unwrap_or_default();
+    let href = pick(m, NAV_HREF_KEYS)
+        .or_else(|| m.get("back"))
+        .map(cell_str)
+        .map(|s| normalize_ref(&s))
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| "#".into());
+    (label, href)
+}
+
+pub fn nav_media_when_class(m: &Map<String, Value>) -> (String, String, String) {
+    let media = pick(m, MEDIA_KEYS)
+        .or_else(|| m.get("media"))
+        .map(cell_str)
+        .map(|s| normalize_ref(&s))
+        .unwrap_or_default();
+    let when = pick(m, WHEN_KEYS)
+        .or_else(|| m.get("when"))
+        .map(cell_str)
+        .map(|s| normalize_ref(&s))
+        .unwrap_or_default();
+    let class = pick(m, CSS_KEYS)
+        .or_else(|| m.get("css"))
+        .map(cell_str)
+        .map(|s| normalize_ref(&s))
+        .unwrap_or_default();
+    (media, when, class)
 }
 
 /// Page table → `[{src,style,slot}, …]`

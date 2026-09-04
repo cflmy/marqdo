@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| 状态 | **C0–C3 done · C4 planned** |
+| 状态 | **C0–C4 done** |
 | 日期 | 2026-09-04 |
 | 问题盘点 | [../../research/ext-web-customization-limits.md](../../research/ext-web-customization-limits.md) |
 | 相关 | [../ext-web.md](../ext-web.md) · [../ext-web-net.md](../ext-web-net.md) · [../../roadmap/ext-web.md](../../roadmap/ext-web.md) |
@@ -36,7 +36,7 @@
 | **C1** | gate：统一未登录策略；精确/前缀匹配；登录页自动放行；默认 gate 不再误伤 `/admin-*` | C0 |
 | **C2** | `shell_css=off\|minimal\|full`；主题在壳前或隔离层；可选 `layout=bare` | — |
 | **C3** | 样式：校验警告 / `strict`；`page.css` raw；脚本 `defer`/`async`/`version` + `asset_version` | **done** |
-| **C4** | 壳：`layout` 预设（sidebar / stacked / bare）；条件导航钩子（后续） | C2 |
+| **C4** | 壳：`layout` 预设（C2）；条件导航 `when` / `media` | **done** |
 
 路线图入口可在 [ext-web.md](../../roadmap/ext-web.md) 增补「定制波次 C0–C4」行，落地后再改状态。
 

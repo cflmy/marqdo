@@ -12,6 +12,7 @@
 - **`ext/web` C1**：门禁段边界匹配（不再误伤 `/admin-publish`）；`gate` 支持 `match` / `on_deny` / `exclude`；`auth` 默认 `on_deny=redirect` + `login_path`；金样 `web-c1-gates`。
 - **`ext/web` C2**：`shell_css=full|minimal|off`；`layout=sidebar|stacked|bare|rail`；full 壳含小屏单列 media；金样 `web-c2-shell-layout`。
 - **`ext/web` C3**：样式装配对数字/布尔值单元格告警，`strict`/`strict_css_cells` 硬错误；`page.css` 作 raw CSS；head 表支持 `defer`/`async`/`version`，`asset_version` 统一 `?v=`；金样 `web-c3-style-head`。
+- **`ext/web` C4**：导航表 `当`/`when`（`auth`/`guest`/`hide`）与 `媒体`/`media`（响应式显隐）；listen 注入 `_logged_in`；金样 `web-c4-nav-when`。
 
 ### Changed
 - `build_step_context`：call site 提前到 task 之后；开场白强调 code-as-documentation。

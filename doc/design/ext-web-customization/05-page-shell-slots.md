@@ -64,4 +64,22 @@
 
 ## 6. 过渡期 → 已落地
 
-**C2 已落地（2026-09）：** `layout=sidebar|stacked|bare|rail`；有 side 时 `stacked`/`bare` 不再强制 `has-sidebar`。金样同上。
+**C2 已落地（2026-09）：** `layout=sidebar|stacked|bare|rail`；有 side 时 `stacked`/`bare` 不再强制 `has-sidebar`。金样 `web-c2-shell-layout`。
+
+**C4 已落地（2026-09）：** 导航 / 侧栏 / 页脚绑定表可选列：
+
+| 列 | 说明 |
+|----|------|
+| `媒体` / `media` | CSS media；不匹配时 `display:none`（生成 `nav-mq-*` + `@media not …`） |
+| `当` / `when` | `hide` 省略；`auth` / `guest` 按登录态过滤；空 = 总是显示 |
+
+```markdown
+| 属性 | 值 | 样式 | 媒体 | 当 |
+|------|-----|------|------|-----|
+| Home | / | | | |
+| Menu | /m | | (max-width: 720px) | |
+| Admin | /admin | | | auth |
+| Login | /login | | | guest |
+```
+
+Listen 渲染时写入 `_logged_in` / `_nav_user`（来自 session）。离线 `page.render` 可自行 `table.put` `_logged_in`。金样 `web-c4-nav-when`。

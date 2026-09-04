@@ -218,6 +218,8 @@ Default `?v=` bump for head scripts/styles that omit a per-row `version` column.
     + `components`
 
 Assemble nav / sidebar / footer from a page table (`|组件|样式|` or `|src|style|`).
+Nav bind tables may include optional `媒体`/`media` (responsive show) and `当`/`when`
+(`auth` / `guest` / `hide`) columns — see C4 conditional nav.
 
 **> web_compose_components page=`self` components=`components`**
 

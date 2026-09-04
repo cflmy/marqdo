@@ -4,7 +4,10 @@ use serde_json::{json, Map, Value};
 
 use crate::db;
 use crate::markdown;
-use crate::table::{as_bind, normalize_ref, normalize_slot, parse_site_path, project_rows, SitePath};
+use crate::table::{
+    as_bind, as_nav_rows, nav_label_href, nav_media_when_class, normalize_ref, normalize_slot,
+    parse_site_path, project_rows, SitePath,
+};
 
 fn esc(s: &str) -> String {
     s.replace('&', "&amp;")
@@ -58,71 +61,244 @@ fn is_db_bind_back(back: &str) -> bool {
     }
 }
 
-fn resolve_links(raw: Option<&Value>, db_url: Option<&str>) -> Vec<(String, String)> {
+#[derive(Clone, Debug)]
+struct NavLink {
+    label: String,
+    href: String,
+    class: String,
+    media: String,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum NavWhen {
+    Always,
+    Hide,
+    Auth,
+    Guest,
+}
+
+fn parse_nav_when(raw: &str) -> NavWhen {
+    let t = raw.trim();
+    if t.is_empty()
+        || matches!(
+            t,
+            "*" | "always" | "Always" | "真" | "yes" | "on" | "show" | "all"
+        )
+    {
+        return NavWhen::Always;
+    }
+    if matches!(
+        t,
+        "hide" | "never" | "off" | "no" | "假" | "否" | "0" | "false" | "False"
+    ) {
+        return NavWhen::Hide;
+    }
+    if matches!(
+        t,
+        "auth" | "user" | "登录" | "已登录" | "logged_in" | "logged-in"
+    ) {
+        return NavWhen::Auth;
+    }
+    if matches!(
+        t,
+        "guest" | "anon" | "anonymous" | "访客" | "匿名" | "未登录"
+    ) {
+        return NavWhen::Guest;
+    }
+    // Unknown token: keep visible (forward-compatible).
+    NavWhen::Always
+}
+
+/// `Some(true)` logged in, `Some(false)` guest, `None` unknown (do not filter auth/guest).
+fn page_auth_state(page: Option<&Value>) -> Option<bool> {
+    let page = page?;
+    if let Some(v) = page
+        .get("_nav_user")
+        .or_else(|| page.get("user"))
+        .or_else(|| page.get("username"))
+        .or_else(|| page.get("_user"))
+    {
+        match v {
+            Value::Null => Some(false),
+            Value::Bool(b) => Some(*b),
+            Value::String(s) => Some(!s.trim().is_empty()),
+            Value::Number(n) => Some(n.as_i64().unwrap_or(0) != 0),
+            _ => Some(true),
+        }
+    } else if let Some(v) = page.get("_logged_in").or_else(|| page.get("logged_in")) {
+        match v {
+            Value::Bool(b) => Some(*b),
+            Value::String(s) => Some(matches!(
+                s.trim(),
+                "1" | "true" | "True" | "yes" | "on" | "真" | "是"
+            )),
+            Value::Number(n) => Some(n.as_i64().unwrap_or(0) != 0),
+            _ => None,
+        }
+    } else {
+        None
+    }
+}
+
+fn nav_when_visible(when: NavWhen, auth: Option<bool>) -> bool {
+    match when {
+        NavWhen::Always => true,
+        NavWhen::Hide => false,
+        NavWhen::Auth => auth.unwrap_or(true), // unknown → keep (compat)
+        NavWhen::Guest => match auth {
+            Some(logged_in) => !logged_in,
+            None => true,
+        },
+    }
+}
+
+fn resolve_links(raw: Option<&Value>, db_url: Option<&str>, page: Option<&Value>) -> Vec<NavLink> {
     let Some(raw) = raw else {
         return Vec::new();
     };
+    let auth = page_auth_state(page);
     let binds = as_bind(raw);
     let arr = binds.as_array().cloned().unwrap_or_default();
-    if arr.is_empty() {
-        return Vec::new();
-    }
-    let has_db = arr
-        .iter()
-        .any(|b| b.get("back").and_then(|v| v.as_str()).is_some_and(is_db_bind_back));
-    if has_db {
-        let Some(url) = db_url else {
-            return Vec::new();
-        };
-        let table = crate::table::bind_table_name(&arr);
-        let Some(table) = table else {
-            return Vec::new();
-        };
-        let data = select_page_data(url, &table, raw, 200, 0);
-        let rows = data
-            .get("rows")
-            .and_then(|v| v.as_array())
-            .cloned()
-            .unwrap_or_default();
-        let projected = project_rows(&arr, &rows);
-        let mut out = Vec::new();
-        for it in projected.as_array().cloned().unwrap_or_default() {
-            let m = it.as_object().cloned().unwrap_or_default();
-            let label = m
-                .get("title")
-                .or_else(|| m.get("label"))
-                .map(text)
-                .unwrap_or_default();
-            let href = m
-                .get("href")
-                .or_else(|| m.get("path"))
-                .map(text)
-                .unwrap_or_else(|| "#".into());
-            if !label.is_empty() {
-                out.push((label, href));
-            }
+    let rows: Vec<Map<String, Value>> = if !arr.is_empty() {
+        let has_db = arr
+            .iter()
+            .any(|b| b.get("back").and_then(|v| v.as_str()).is_some_and(is_db_bind_back));
+        if has_db {
+            let Some(url) = db_url else {
+                return Vec::new();
+            };
+            let table = crate::table::bind_table_name(&arr);
+            let Some(table) = table else {
+                return Vec::new();
+            };
+            let data = select_page_data(url, &table, raw, 200, 0);
+            let projected = project_rows(
+                &arr,
+                &data
+                    .get("rows")
+                    .and_then(|v| v.as_array())
+                    .cloned()
+                    .unwrap_or_default(),
+            );
+            projected
+                .as_array()
+                .cloned()
+                .unwrap_or_default()
+                .into_iter()
+                .filter_map(|it| it.as_object().cloned())
+                .collect()
+        } else {
+            arr.into_iter()
+                .filter_map(|b| b.as_object().cloned())
+                .collect()
         }
-        return out;
+    } else {
+        as_nav_rows(raw)
+    };
+
+    let mut out = Vec::new();
+    for m in rows {
+        let (label, href) = nav_label_href(&m);
+        if label.is_empty() {
+            continue;
+        }
+        let (media, when_raw, class) = nav_media_when_class(&m);
+        // DB-projected rows may use title/href without media keys on bind.
+        let when_raw = if when_raw.is_empty() {
+            m.get("when")
+                .or_else(|| m.get("当"))
+                .map(text)
+                .unwrap_or_default()
+        } else {
+            when_raw
+        };
+        let media = if media.is_empty() {
+            m.get("media")
+                .or_else(|| m.get("媒体"))
+                .map(text)
+                .unwrap_or_default()
+        } else {
+            media
+        };
+        let when = parse_nav_when(&when_raw);
+        if !nav_when_visible(when, auth) {
+            continue;
+        }
+        out.push(NavLink {
+            label,
+            href,
+            class,
+            media,
+        });
     }
-    // static: front=label back=href (URLs with `.` must stay here)
-    arr.into_iter()
-        .map(|b| {
-            let label = b.get("front").map(text).unwrap_or_default();
-            let href = b.get("back").map(text).unwrap_or_else(|| "#".into());
-            (label, href)
-        })
-        .filter(|(l, _)| !l.is_empty())
-        .collect()
+    out
 }
 
-fn render_ul(links: &[(String, String)], class: &str) -> String {
+fn nav_media_class_map(links: &[NavLink]) -> (String, Vec<(String, String)>) {
+    nav_media_class_map_many(&[links])
+}
+
+fn nav_media_class_map_many(groups: &[&[NavLink]]) -> (String, Vec<(String, String)>) {
+    let mut pairs: Vec<(String, String)> = Vec::new();
+    let mut css = String::new();
+    for links in groups {
+        for link in *links {
+            let media = link.media.trim();
+            if media.is_empty() || pairs.iter().any(|(m, _)| m == media) {
+                continue;
+            }
+            let class = format!("nav-mq-{}", pairs.len());
+            css.push_str(&format!(
+                "@media not {media} {{ li.{class} {{ display:none !important; }} }}\n"
+            ));
+            pairs.push((media.to_string(), class));
+        }
+    }
+    (css, pairs)
+}
+
+fn render_ul(links: &[NavLink], class: &str) -> String {
+    let (_css, mq_pairs) = nav_media_class_map(links);
+    render_ul_with_mq(links, class, &mq_pairs)
+}
+
+fn render_ul_with_mq(links: &[NavLink], class: &str, mq_pairs: &[(String, String)]) -> String {
     let mut s = format!("<ul class=\"{}\">", esc(class));
-    for (label, href) in links {
-        s.push_str(&format!(
-            "<li><a href=\"{}\">{}</a></li>",
-            esc(href),
-            esc(label)
-        ));
+    for link in links {
+        let mq = link.media.trim();
+        let mq_class = if mq.is_empty() {
+            ""
+        } else {
+            mq_pairs
+                .iter()
+                .find(|(m, _)| m == mq)
+                .map(|(_, c)| c.as_str())
+                .unwrap_or("")
+        };
+        let mut li_class = String::new();
+        if !link.class.is_empty() {
+            li_class.push_str(&link.class);
+        }
+        if !mq_class.is_empty() {
+            if !li_class.is_empty() {
+                li_class.push(' ');
+            }
+            li_class.push_str(mq_class);
+        }
+        if li_class.is_empty() {
+            s.push_str(&format!(
+                "<li><a href=\"{}\">{}</a></li>",
+                esc(&link.href),
+                esc(&link.label)
+            ));
+        } else {
+            s.push_str(&format!(
+                "<li class=\"{}\"><a href=\"{}\">{}</a></li>",
+                esc(&li_class),
+                esc(&link.href),
+                esc(&link.label)
+            ));
+        }
     }
     s.push_str("</ul>");
     s
@@ -539,10 +715,6 @@ pub fn render_page_ex(
         .get("title")
         .and_then(|v| v.as_str())
         .unwrap_or("Marqdo Web");
-    let extra = args
-        .get("styles_css")
-        .and_then(|v| v.as_str())
-        .unwrap_or("");
     let shell = resolve_shell_css(args);
     let layout = resolve_layout(args);
     let parts = args
@@ -550,11 +722,23 @@ pub fn render_page_ex(
         .and_then(|v| v.as_object())
         .cloned()
         .unwrap_or_default();
-
-    let nav = resolve_links(args.get("nav"), db_url);
-    let side = resolve_links(args.get("sidebar"), db_url);
-    let foot = resolve_links(args.get("footer"), db_url);
+    let nav = resolve_links(args.get("nav"), db_url, Some(args));
+    let side = resolve_links(args.get("sidebar"), db_url, Some(args));
+    let foot = resolve_links(args.get("footer"), db_url, Some(args));
     let (intro, items, total) = resolve_main(args, db_url);
+    let (nav_css, mq_pairs) = nav_media_class_map_many(&[&nav, &side, &foot]);
+    let extra_owned = {
+        let base = args
+            .get("styles_css")
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
+        if nav_css.is_empty() {
+            base.to_string()
+        } else {
+            format!("{base}\n{nav_css}")
+        }
+    };
+    let extra = extra_owned.as_str();
 
     let has_side = args.get("sidebar").is_some() || !side.is_empty();
     let bare = layout == "bare";
@@ -638,7 +822,7 @@ pub fn render_page_ex(
             "<aside class=\"{}\"{}><span class=\"side-label\">侧栏</span>{}</aside>",
             slot_class(args, "sidebar", "side"),
             slot_attrs("sidebar", &parts, args),
-            render_ul(&side, "side-nav")
+            render_ul_with_mq(&side, "side-nav", &mq_pairs)
         )
     } else {
         String::new()
@@ -648,7 +832,7 @@ pub fn render_page_ex(
             "<header class=\"{}\"{}>{}</header>",
             slot_class(args, "nav", "topnav"),
             slot_attrs("nav", &parts, args),
-            render_ul(&nav, "nav")
+            render_ul_with_mq(&nav, "nav", &mq_pairs)
         )
     } else {
         String::new()
@@ -658,7 +842,7 @@ pub fn render_page_ex(
             "<footer class=\"{}\"{}>{}</footer>",
             slot_class(args, "footer", "foot"),
             slot_attrs("footer", &parts, args),
-            render_ul(&foot, "foot-nav")
+            render_ul_with_mq(&foot, "foot-nav", &mq_pairs)
         )
     } else {
         String::new()
@@ -693,21 +877,21 @@ pub fn render_fragment(args: &Value, db_url: Option<&str>) -> String {
         .unwrap_or_else(|| "main".into());
     match slot.as_str() {
         "nav" => {
-            let links = resolve_links(args.get("nav"), db_url);
+            let links = resolve_links(args.get("nav"), db_url, Some(args));
             format!(
                 "<header class=\"topnav\" data-slot=\"nav\">{}</header>",
                 render_ul(&links, "nav")
             )
         }
         "sidebar" => {
-            let links = resolve_links(args.get("sidebar"), db_url);
+            let links = resolve_links(args.get("sidebar"), db_url, Some(args));
             format!(
                 "<aside class=\"side\" data-slot=\"sidebar\"><span class=\"side-label\">侧栏</span>{}</aside>",
                 render_ul(&links, "side-nav")
             )
         }
         "footer" => {
-            let links = resolve_links(args.get("footer"), db_url);
+            let links = resolve_links(args.get("footer"), db_url, Some(args));
             format!(
                 "<footer class=\"foot\" data-slot=\"footer\">{}</footer>",
                 render_ul(&links, "foot-nav")
@@ -872,5 +1056,71 @@ mod shell_tests {
         let html = render_page(&page, None, None);
         assert!(html.contains("has-sidebar"));
         assert!(html.contains("grid-template-columns:14rem"));
+    }
+}
+
+#[cfg(test)]
+mod nav_tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn when_hide_omits_item() {
+        let page = json!({
+            "title": "t",
+            "shell_css": "off",
+            "nav": [
+                {"label": "Home", "href": "/"},
+                {"label": "Secret", "href": "/x", "when": "hide"},
+            ],
+        });
+        let html = render_page(&page, None, None);
+        assert!(html.contains(">Home<"), "{html}");
+        assert!(!html.contains("/x"), "{html}");
+    }
+
+    #[test]
+    fn when_auth_guest_respects_logged_in() {
+        let nav = json!([
+            {"front": "Public", "back": "/"},
+            {"front": "Admin", "back": "/admin", "when": "auth"},
+            {"front": "Login", "back": "/login", "when": "guest"},
+        ]);
+        let guest = json!({
+            "title": "t",
+            "shell_css": "off",
+            "_logged_in": false,
+            "nav": nav,
+        });
+        let g = render_page(&guest, None, None);
+        assert!(g.contains("/login"), "{g}");
+        assert!(!g.contains("/admin"), "{g}");
+
+        let user = json!({
+            "title": "t",
+            "shell_css": "off",
+            "_logged_in": true,
+            "_nav_user": "alice",
+            "nav": nav,
+        });
+        let u = render_page(&user, None, None);
+        assert!(u.contains("/admin"), "{u}");
+        assert!(!u.contains("/login"), "{u}");
+    }
+
+    #[test]
+    fn media_emits_class_and_css() {
+        let page = json!({
+            "title": "t",
+            "shell_css": "off",
+            "nav": [
+                {"label": "Wide", "href": "/w", "media": "(min-width: 900px)"},
+                {"label": "Home", "href": "/"},
+            ],
+        });
+        let html = render_page(&page, None, None);
+        assert!(html.contains("nav-mq-0"), "{html}");
+        assert!(html.contains("@media not (min-width: 900px)"), "{html}");
+        assert!(html.contains(">Home<"), "{html}");
     }
 }

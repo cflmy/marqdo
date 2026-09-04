@@ -32,6 +32,24 @@ fn with_site_head(base: &Value, site_head: &[crate::assets::HeadLink]) -> Value 
     page
 }
 
+/// Stamp session login state so nav `when=auth|guest` can filter at render time.
+fn with_nav_auth(base: &Value, cookie: Option<&str>) -> Value {
+    let mut page = base.clone();
+    let Some(obj) = page.as_object_mut() else {
+        return page;
+    };
+    let user = session::session_id_from_cookie(cookie)
+        .and_then(|sid| session::session_get(&sid, "username"));
+    let logged_in = user.is_some();
+    obj.insert("_logged_in".into(), json!(logged_in));
+    if let Some(u) = user {
+        obj.insert("_nav_user".into(), u);
+    } else {
+        obj.remove("_nav_user");
+    }
+    page
+}
+
 fn serve_icon_file(path: PathBuf, content_type: String) -> Response {
     match std::fs::read(&path) {
         Ok(bytes) => {
@@ -365,6 +383,8 @@ pub fn listen(
                     inject_params(&mut p, &params);
                     let p = with_site_head(&p, &st.site_head);
                     let (_, csrf, set_cookie) = resolve_session(&headers);
+                    let cookie = cookie_from_headers(&headers);
+                    let p = with_nav_auth(&p, cookie);
                     let mut resp = Html(render::render_page(&p, st.db_url.as_deref(), Some(&csrf))).into_response();
                     append_set_cookie(&mut resp, set_cookie);
                     resp
@@ -388,6 +408,7 @@ pub fn listen(
                 get(async move |State(st): State<Arc<AppState>>, headers: axum::http::HeaderMap| {
                     let (_, csrf, set_cookie) = resolve_session(&headers);
                     let p = with_site_head(&page_for_render, &st.site_head);
+                    let p = with_nav_auth(&p, cookie_from_headers(&headers));
                     let mut resp = Html(render::render_page(&p, st.db_url.as_deref(), Some(&csrf)))
                         .into_response();
                     append_set_cookie(&mut resp, set_cookie);
@@ -668,6 +689,7 @@ fn rss_feed(st: &AppState, _path: &str, cfg: &Value) -> Response {
 async fn home(State(st): State<Arc<AppState>>, headers: axum::http::HeaderMap) -> Response {
     let (_, csrf, set_cookie) = resolve_session(&headers);
     let page = with_site_head(&st.page, &st.site_head);
+    let page = with_nav_auth(&page, cookie_from_headers(&headers));
     let html = render::render_page(&page, st.db_url.as_deref(), Some(&csrf));
     let mut resp = Html(html).into_response();
     append_set_cookie(&mut resp, set_cookie);
