@@ -121,13 +121,16 @@ url  = /favicon.ico
 | `媒体` | `media` | CSS media |
 | `作为` | `as` | preload `as` |
 | `跨域` | `crossorigin` | 空 / `anonymous` / `use-credentials` |
+| `推迟` | `defer` | 经典 `script` 为真时输出 `defer`（缺省同步，兼容旧站） |
+| `异步` | `async` | 为真时输出 `async` |
+| `版本` | `version` / `v` | 非空则自动追加 `?v=`；否则用页面/应用 `asset_version` |
 
 **渲染规则**
 
 | `rel` | 输出 |
 |-------|------|
-| `script` | `<script src="…"></script>`（`type` 非空则写出） |
-| `module` | `<script type="module" src="…"></script>` |
+| `script` | `<script … src="…"></script>`（可选 `defer`/`async`；`type` 非空则写出） |
+| `module` | `<script type="module" src="…"></script>`（浏览器默认 defer 语义） |
 | 其他 | `<link rel="…" href="…" …>`（按列附加 `type`/`sizes`/`media`/`as`/`crossorigin`） |
 
 空 `地址` 的行跳过。

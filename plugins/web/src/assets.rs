@@ -15,6 +15,11 @@ pub struct HeadLink {
     pub media: String,
     pub as_: String,
     pub crossorigin: String,
+    /// When `Some(true)`, emit `defer` on classic scripts (not modules).
+    pub defer: Option<bool>,
+    pub async_: bool,
+    /// Query `?v=` bump for cache busting.
+    pub version: String,
 }
 
 #[derive(Clone, Debug)]
@@ -38,12 +43,56 @@ fn pick<'a>(m: &'a Map<String, Value>, keys: &[&str]) -> Option<&'a Value> {
     keys.iter().find_map(|k| m.get(*k))
 }
 
+fn cell_boolish(v: &Value) -> Option<bool> {
+    match v {
+        Value::Bool(b) => Some(*b),
+        Value::Number(n) => Some(n.as_i64().unwrap_or(0) != 0),
+        Value::String(s) => {
+            let s = s.trim();
+            if s.is_empty() {
+                return None;
+            }
+            if matches!(
+                s,
+                "1" | "true" | "True" | "yes" | "on" | "真" | "是"
+            ) {
+                Some(true)
+            } else if matches!(
+                s,
+                "0" | "false" | "False" | "no" | "off" | "假" | "否"
+            ) {
+                Some(false)
+            } else {
+                None
+            }
+        }
+        _ => None,
+    }
+}
+
+fn row_bool(m: &Map<String, Value>, keys: &[&str]) -> Option<bool> {
+    pick(m, keys).and_then(cell_boolish)
+}
+
 fn row_str(m: &Map<String, Value>, keys: &[&str]) -> String {
     pick(m, keys)
         .map(|v| normalize_ref(&cell_str(v)))
         .unwrap_or_default()
         .trim()
         .to_string()
+}
+
+/// Append `?v=` / `&v=` for cache busting.
+pub fn href_with_version(href: &str, version: &str) -> String {
+    let version = version.trim();
+    if version.is_empty() {
+        return href.to_string();
+    }
+    if href.contains('?') {
+        format!("{href}&v={version}")
+    } else {
+        format!("{href}?v={version}")
+    }
 }
 
 fn esc(s: &str) -> String {
@@ -142,6 +191,9 @@ pub fn as_head_links(table: &Value) -> Vec<HeadLink> {
             media: row_str(&m, &["媒体", "media", "Media"]),
             as_: row_str(&m, &["作为", "as", "As"]),
             crossorigin: row_str(&m, &["跨域", "crossorigin", "crossOrigin"]),
+            defer: row_bool(&m, &["推迟", "defer", "Defer"]),
+            async_: row_bool(&m, &["异步", "async", "Async"]).unwrap_or(false),
+            version: row_str(&m, &["版本", "version", "Version", "v"]),
         });
     }
     out
@@ -152,7 +204,7 @@ pub fn head_links_to_json(links: &[HeadLink]) -> Value {
         links
             .iter()
             .map(|l| {
-                json!({
+                let mut o = json!({
                     "rel": l.rel,
                     "href": l.href,
                     "type": l.type_,
@@ -160,7 +212,15 @@ pub fn head_links_to_json(links: &[HeadLink]) -> Value {
                     "media": l.media,
                     "as": l.as_,
                     "crossorigin": l.crossorigin,
-                })
+                    "async": l.async_,
+                    "version": l.version,
+                });
+                if let Some(d) = l.defer {
+                    o.as_object_mut()
+                        .unwrap()
+                        .insert("defer".into(), json!(d));
+                }
+                o
             })
             .collect(),
     )
@@ -187,6 +247,9 @@ pub fn head_links_from_json(v: &Value) -> Vec<HeadLink> {
             media: row_str(m, &["media", "媒体"]),
             as_: row_str(m, &["as", "作为"]),
             crossorigin: row_str(m, &["crossorigin", "跨域"]),
+            defer: row_bool(m, &["defer", "推迟"]),
+            async_: row_bool(m, &["async", "异步"]).unwrap_or(false),
+            version: row_str(m, &["version", "版本", "v"]),
         });
     }
     out
@@ -194,24 +257,42 @@ pub fn head_links_from_json(v: &Value) -> Vec<HeadLink> {
 
 /// Render HeadLink list to HTML (link / script tags).
 pub fn render_head_links(links: &[HeadLink]) -> String {
+    render_head_links_with_version(links, "")
+}
+
+pub fn render_head_links_with_version(links: &[HeadLink], asset_version: &str) -> String {
     let mut s = String::new();
     for l in links {
         let rel = l.rel.trim().to_ascii_lowercase();
+        let ver = if !l.version.trim().is_empty() {
+            l.version.as_str()
+        } else {
+            asset_version
+        };
+        let href = href_with_version(&l.href, ver);
         if rel == "script" || rel == "module" {
             let mut tag = String::from("<script");
-            if rel == "module" || l.type_ == "module" {
+            let is_module = rel == "module" || l.type_ == "module";
+            if is_module {
                 tag.push_str(" type=\"module\"");
             } else if !l.type_.is_empty() {
                 tag.push_str(&format!(" type=\"{}\"", esc(&l.type_)));
             }
+            // Modules are deferred by browsers; classic scripts honor explicit defer.
+            if !is_module && l.defer == Some(true) {
+                tag.push_str(" defer");
+            }
+            if l.async_ {
+                tag.push_str(" async");
+            }
             if !l.crossorigin.is_empty() {
                 tag.push_str(&format!(" crossorigin=\"{}\"", esc(&l.crossorigin)));
             }
-            tag.push_str(&format!(" src=\"{}\"></script>", esc(&l.href)));
+            tag.push_str(&format!(" src=\"{}\"></script>", esc(&href)));
             s.push_str(&tag);
             continue;
         }
-        let mut tag = format!("<link rel=\"{}\" href=\"{}\"", esc(&l.rel), esc(&l.href));
+        let mut tag = format!("<link rel=\"{}\" href=\"{}\"", esc(&l.rel), esc(&href));
         if !l.type_.is_empty() {
             tag.push_str(&format!(" type=\"{}\"", esc(&l.type_)));
         }
@@ -295,6 +376,9 @@ pub fn normalize_icons(table: &Value) -> (Value, Vec<HeadLink>, Vec<IconRoute>) 
                 media: String::new(),
                 as_: String::new(),
                 crossorigin: String::new(),
+                defer: None,
+                async_: false,
+                version: String::new(),
             });
         }
 
@@ -347,6 +431,9 @@ pub fn normalize_icons(table: &Value) -> (Value, Vec<HeadLink>, Vec<IconRoute>) 
                     media: String::new(),
                     as_: String::new(),
                     crossorigin: String::new(),
+                    defer: None,
+                    async_: false,
+                    version: String::new(),
                 },
             );
         }
@@ -369,6 +456,9 @@ pub fn convention_favicon(static_dir: &Path) -> Option<(Vec<HeadLink>, Vec<IconR
                 media: String::new(),
                 as_: String::new(),
                 crossorigin: String::new(),
+                defer: None,
+                async_: false,
+                version: String::new(),
             }];
             let routes = vec![IconRoute {
                 url: "/favicon.ico".into(),
@@ -486,5 +576,32 @@ mod tests {
         let h = make_head_html(&t);
         assert!(h.contains("rel=\"icon\""));
         assert!(h.contains("<script src=\"/static/a.js\"></script>"));
+        assert!(!h.contains(" defer"), "{h}");
+    }
+
+    #[test]
+    fn head_script_defer_async_version() {
+        let t = json!([
+            {"关系": "script", "地址": "/static/a.js", "推迟": true, "版本": "3"},
+            {"关系": "module", "地址": "/static/b.js", "版本": "9"},
+            {"关系": "stylesheet", "地址": "/static/t.css", "版本": "1"},
+        ]);
+        let h = make_head_html(&t);
+        assert!(h.contains("<script defer src=\"/static/a.js?v=3\"></script>"), "{h}");
+        assert!(h.contains("type=\"module\""), "{h}");
+        assert!(h.contains("src=\"/static/b.js?v=9\""), "{h}");
+        assert!(h.contains("href=\"/static/t.css?v=1\""), "{h}");
+    }
+
+    #[test]
+    fn head_asset_version_fallback() {
+        let links = as_head_links(&json!([
+            {"关系": "script", "地址": "/static/a.js", "推迟": "真"},
+        ]));
+        let h = render_head_links_with_version(&links, "2026-09-04");
+        assert!(
+            h.contains("<script defer src=\"/static/a.js?v=2026-09-04\"></script>"),
+            "{h}"
+        );
     }
 }

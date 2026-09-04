@@ -21,6 +21,7 @@ Load the ABI v2 `web` plugin once.
 ## make_style
     + `name`=""
     + `table`
+    + `strict`=False
 
 Assemble a GFM style table into a CSS string. Two shapes are accepted:
 `|选择器|属性|值|` rule rows (arbitrary selectors; rows sharing a selector are
@@ -28,11 +29,14 @@ merged, and a leading `|媒体|` column groups rows into `@media` blocks), or
 `|属性|值|` property rows wrapped as `.name { … }`. Selectors starting with
 `@keyframes name` emit keyframe blocks (`属性` = stop `from`/`to`/`N%`,
 `值` = `prop: val` or use `@keyframes name from` + normal 属性/值). Quote CSS
-values that contain `/` (e.g. `"16/9"`, `"1/5"`); bare `1/5` is integer division.
-Styles stay as data tables, `make_style` turns them into CSS — 样式即数据、装配即函数.
+values that contain `/` (e.g. `"16/9"`, `"1 / 5"`); bare `1 / 5` is integer
+division and becomes a numeric cell — default mode warns, `strict=True` errors.
+For complex themes prefer `page.css` (raw string, no table eval) or an external
+`static/*.css` via `page.head`. Styles stay as data tables, `make_style` turns
+them into CSS — 样式即数据、装配即函数.
 
 > ensure_plugin
-**> web_style name=`name` table=`table`**
+**> web_style name=`name` table=`table` strict=`strict`**
 
 ## make_images
     + `table`
@@ -181,9 +185,10 @@ Build a `render_list` effect: `{ render_list: { sel: { tag, items } } }`.
     + `intro`=""
     + `shell_css`=None
     + `layout`=None
+    + `asset_version`=None
 
 > ensure_plugin
-**> web_page_new title=`title` intro=`intro` shell_css=`shell_css` layout=`layout`**
+**> web_page_new title=`title` intro=`intro` shell_css=`shell_css` layout=`layout` asset_version=`asset_version`**
 
 ## shell_css
     + `mode`=full
@@ -199,6 +204,14 @@ Framework shell CSS mode for this page: `full` (default), `minimal` (vars only),
 Page chrome layout: `sidebar` (default when a side slot exists), `stacked` (single column; no `has-sidebar` grid), `bare` (main only), or `rail`.
 
 *`out` = > table.put in=`self` at="layout" value=layout*
+**out**
+
+## asset_version
+    + `version`=""
+
+Default `?v=` bump for head scripts/styles that omit a per-row `version` column.
+
+*`out` = > table.put in=`self` at="asset_version" value=version*
 **out**
 
 ## compose_components
@@ -241,8 +254,9 @@ an `href`/`链接` field become `<a href="{prefix}{href}">`.
 ## css
     + `css`
 
-Append a raw CSS string to the page's stylesheet (`styles_css`). Use it to ship
-a hand-written theme alongside the assembled shell.
+Append a **raw** CSS string to the page's stylesheet (`styles_css`). Skips table-cell
+expression evaluation — use for themes with `/`, `@keyframes`, or long media queries.
+Hand-written theme alongside the assembled shell; or link `static/theme.css` via `head`.
 
 **> web_page_css page=`self` css=`css`**
 
@@ -264,7 +278,7 @@ SEO / OpenGraph metadata as a data table (`|key|value|`). Keys such as `title`, 
 ## head
     + `table`
 
-Assemble `<head>` resources from a GFM table (`|rel|href|type|sizes|media|as|crossorigin|` or ZH `|关系|地址|类型|…|`). `rel=script` / `module` become `<script>`; other rows become `<link>`. Merges with any existing `head` on the page.
+Assemble `<head>` resources from a GFM table (`|rel|href|type|sizes|media|as|crossorigin|defer|async|version|` or ZH `|关系|地址|…|推迟|异步|版本|`). `rel=script` / `module` become `<script>`; other rows become `<link>`. Classic scripts emit `defer` / `async` only when those columns are true (compat: missing `defer` stays synchronous). Non-empty `version` appends `?v=`; else page/app `asset_version` is used. Merges with any existing `head` on the page.
 
 **> web_page_head page=`self` table=`table`**
 
@@ -588,11 +602,12 @@ Field table + rules table; submit writes through `# db`.
     + `logout_redirect`=None
     + `shell_css`=None
     + `layout`=None
+    + `asset_version`=None
 
-Construct an app. `admin=True` mounts the built-in CRUD UI under `admin_prefix` (default `/admin`). When `admin=False`, that prefix is **not** reserved — you may `route` your own pages there. Optional `login_redirect` / `logout_redirect` override post-auth landing. Optional `shell_css` / `layout` become defaults for pages that do not set their own (see `page.shell_css` / `page.layout`).
+Construct an app. `admin=True` mounts the built-in CRUD UI under `admin_prefix` (default `/admin`). When `admin=False`, that prefix is **not** reserved — you may `route` your own pages there. Optional `login_redirect` / `logout_redirect` override post-auth landing. Optional `shell_css` / `layout` / `asset_version` become defaults for pages that do not set their own (see `page.shell_css` / `page.layout` / `page.asset_version`).
 
 > ensure_plugin
-**> web_app_new page=`page` db=`db` admin=`admin` host=`host` port=`port` admin_prefix=`admin_prefix` login_redirect=`login_redirect` logout_redirect=`logout_redirect` shell_css=`shell_css` layout=`layout`**
+**> web_app_new page=`page` db=`db` admin=`admin` host=`host` port=`port` admin_prefix=`admin_prefix` login_redirect=`login_redirect` logout_redirect=`logout_redirect` shell_css=`shell_css` layout=`layout` asset_version=`asset_version`**
 
 ## route
     + `path`

@@ -335,20 +335,30 @@ pub fn normalize_slot(name: &str) -> String {
 /// | @keyframes pulse from | opacity | 0 |
 /// ```
 pub fn as_css_named(name: &str, table: &Value) -> String {
+    as_css_named_checked(name, table, false).unwrap_or_default()
+}
+
+/// Like [`as_css_named`], but when `strict` is true, reject cells that look like
+/// T5 evaluated a bare `/` (numeric/bool CSS values). Default mode warns on stderr.
+pub fn as_css_named_checked(name: &str, table: &Value, strict: bool) -> Result<String, String> {
     let name = normalize_ref(name);
     if name.is_empty() {
-        return String::new();
+        return Ok(String::new());
     }
     let mut out = String::new();
     match table {
         Value::Object(m) => {
             let sels = pick(m, SEL_KEYS).map(as_str_list).unwrap_or_default();
             let props = pick(m, PROP_KEYS).map(as_str_list).unwrap_or_default();
-            let vals = pick(m, VAL_KEYS).map(as_str_list).unwrap_or_default();
+            let vals_raw = pick(m, VAL_KEYS);
+            let vals = vals_raw.map(as_str_list).unwrap_or_default();
             let medias = pick(m, MEDIA_KEYS).map(as_str_list).unwrap_or_default();
             let n = props.len().max(sels.len()).max(vals.len());
             if n == 0 {
-                return String::new();
+                return Ok(String::new());
+            }
+            if let Some(raw) = vals_raw {
+                check_css_value_cells(raw, &props, strict)?;
             }
             let rows: Vec<(String, String, String, String)> = (0..n)
                 .map(|i| {
@@ -363,23 +373,68 @@ pub fn as_css_named(name: &str, table: &Value) -> String {
             emit_css_rows(&rows, &name, &mut out);
         }
         Value::Array(rows) => {
-            let rows: Vec<(String, String, String, String)> = rows
-                .iter()
-                .filter_map(|row| {
-                    let m = row.as_object()?;
-                    Some((
-                        pick(m, MEDIA_KEYS).map(cell_str).unwrap_or_default(),
-                        pick(m, SEL_KEYS).map(cell_str).unwrap_or_default(),
-                        pick(m, PROP_KEYS).map(cell_str).unwrap_or_default(),
-                        pick(m, VAL_KEYS).map(cell_str).unwrap_or_default(),
-                    ))
-                })
-                .collect();
-            emit_css_rows(&rows, &name, &mut out);
+            let mut collected = Vec::new();
+            for row in rows {
+                let Some(m) = row.as_object() else {
+                    continue;
+                };
+                let prop = pick(m, PROP_KEYS).map(cell_str).unwrap_or_default();
+                if let Some(v) = pick(m, VAL_KEYS) {
+                    note_css_value_cell(&prop, v, strict)?;
+                }
+                collected.push((
+                    pick(m, MEDIA_KEYS).map(cell_str).unwrap_or_default(),
+                    pick(m, SEL_KEYS).map(cell_str).unwrap_or_default(),
+                    prop,
+                    pick(m, VAL_KEYS).map(cell_str).unwrap_or_default(),
+                ));
+            }
+            emit_css_rows(&collected, &name, &mut out);
         }
         _ => {}
     }
-    out
+    Ok(out)
+}
+
+fn css_value_suspicious(v: &Value) -> Option<&'static str> {
+    match v {
+        Value::Number(_) => Some(
+            "numeric CSS value (likely bare `/` division such as `1 / 5`; quote the cell, e.g. `\"1 / 5\"`)",
+        ),
+        Value::Bool(_) => Some("boolean CSS value (quote the cell if intentional)"),
+        _ => None,
+    }
+}
+
+fn note_css_value_cell(prop: &str, val: &Value, strict: bool) -> Result<(), String> {
+    let Some(why) = css_value_suspicious(val) else {
+        return Ok(());
+    };
+    let prop = if prop.trim().is_empty() {
+        "(value)"
+    } else {
+        prop.trim()
+    };
+    let msg = format!("ext/web style: suspicious cell for `{prop}`: {why}");
+    if strict {
+        Err(msg)
+    } else {
+        eprintln!("warning: {msg}");
+        Ok(())
+    }
+}
+
+fn check_css_value_cells(vals: &Value, props: &[String], strict: bool) -> Result<(), String> {
+    match vals {
+        Value::Array(a) => {
+            for (i, v) in a.iter().enumerate() {
+                let prop = props.get(i).map(|s| s.as_str()).unwrap_or("");
+                note_css_value_cell(prop, v, strict)?;
+            }
+        }
+        other => note_css_value_cell(props.first().map(|s| s.as_str()).unwrap_or(""), other, strict)?,
+    }
+    Ok(())
 }
 
 /// Parse `@keyframes name` or `@keyframes name stop` from a selector cell.
@@ -741,5 +796,26 @@ mod css_tests {
         assert!(css.contains("@media (max-width: 800px)"), "{css}");
         assert!(css.contains(".x {"), "{css}");
         assert!(css.contains("color: red;"), "{css}");
+    }
+
+    #[test]
+    fn strict_rejects_numeric_css_value() {
+        let t = json!([
+            {"选择器": ".x", "属性": "grid-column", "值": 0},
+        ]);
+        let err = as_css_named_checked("x", &t, true).unwrap_err();
+        assert!(err.contains("suspicious"), "{err}");
+        // Non-strict still emits (with warning on stderr).
+        let css = as_css_named_checked("x", &t, false).unwrap();
+        assert!(css.contains("grid-column: 0;"), "{css}");
+    }
+
+    #[test]
+    fn quoted_string_ok_in_strict() {
+        let t = json!([
+            {"选择器": ".x", "属性": "grid-column", "值": "1 / 5"},
+        ]);
+        let css = as_css_named_checked("x", &t, true).unwrap();
+        assert!(css.contains("grid-column: 1 / 5;"), "{css}");
     }
 }

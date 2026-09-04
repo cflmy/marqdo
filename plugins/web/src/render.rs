@@ -469,7 +469,15 @@ fn head_html(args: &Value, default_title: &str) -> String {
     }
     if let Some(head) = args.get("head") {
         let links = crate::assets::head_links_from_json(head);
-        s.push_str(&crate::assets::render_head_links(&links));
+        let asset_version = args
+            .get("asset_version")
+            .or_else(|| args.get("资源版本"))
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
+        s.push_str(&crate::assets::render_head_links_with_version(
+            &links,
+            asset_version,
+        ));
     }
     s
 }

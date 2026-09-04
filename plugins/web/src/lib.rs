@@ -22,7 +22,7 @@ mod upload;
 mod ws;
 mod ws_hub;
 
-use crate::table::as_css_named;
+use crate::table::as_css_named_checked;
 
 use std::ffi::{CStr, CString};
 use std::os::raw::{c_char, c_int, c_void};
@@ -283,6 +283,13 @@ web_ffi!(web_page_new, |args: &Value| {
     if let Some(s) = arg_str_opt(args, "layout").or_else(|| arg_str_opt(args, "布局")) {
         out.as_object_mut().unwrap().insert("layout".into(), json!(s));
     }
+    if let Some(s) = arg_str_opt(args, "asset_version")
+        .or_else(|| arg_str_opt(args, "资源版本"))
+    {
+        out.as_object_mut()
+            .unwrap()
+            .insert("asset_version".into(), json!(s));
+    }
     Ok(out)
 });
 
@@ -355,7 +362,21 @@ web_ffi!(web_page_css, |args: &Value| {
 web_ffi!(web_style, |args: &Value| {
     let name = arg_str_opt(args, "name").unwrap_or("").to_string();
     let table = args.get("table").cloned().unwrap_or(json!([]));
-    Ok(Value::String(as_css_named(&name, &table)))
+    let strict = args
+        .get("strict")
+        .or_else(|| args.get("strict_css_cells"))
+        .or_else(|| args.get("严格"))
+        .map(|v| match v {
+            Value::Bool(b) => *b,
+            Value::Number(n) => n.as_i64().unwrap_or(0) != 0,
+            Value::String(s) => matches!(
+                s.trim(),
+                "1" | "true" | "True" | "yes" | "on" | "真" | "是"
+            ),
+            _ => false,
+        })
+        .unwrap_or(false);
+    as_css_named_checked(&name, &table, strict).map(Value::String)
 });
 
 web_ffi!(web_page_detail, |args: &Value| {
@@ -1066,6 +1087,13 @@ web_ffi!(web_app_new, |args: &Value| {
     if let Some(s) = arg_str_opt(args, "layout").or_else(|| arg_str_opt(args, "布局")) {
         out.as_object_mut().unwrap().insert("layout".into(), json!(s));
     }
+    if let Some(s) = arg_str_opt(args, "asset_version")
+        .or_else(|| arg_str_opt(args, "资源版本"))
+    {
+        out.as_object_mut()
+            .unwrap()
+            .insert("asset_version".into(), json!(s));
+    }
     Ok(out)
 });
 
@@ -1642,7 +1670,12 @@ web_ffi!(web_db_table_info, |args: &Value| {
 });
 
 
-fn stamp_page_shell(page: &mut Value, shell_css: Option<&str>, layout: Option<&str>) {
+fn stamp_page_shell(
+    page: &mut Value,
+    shell_css: Option<&str>,
+    layout: Option<&str>,
+    asset_version: Option<&str>,
+) {
     let Some(obj) = page.as_object_mut() else {
         return;
     };
@@ -1664,6 +1697,16 @@ fn stamp_page_shell(page: &mut Value, shell_css: Option<&str>, layout: Option<&s
             .is_empty();
         if empty {
             obj.insert("layout".into(), json!(s));
+        }
+    }
+    if let Some(s) = asset_version {
+        let empty = obj
+            .get("asset_version")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .is_empty();
+        if empty {
+            obj.insert("asset_version".into(), json!(s));
         }
     }
 }
@@ -2057,11 +2100,15 @@ web_ffi!(web_listen, |args: &Value| {
         .get("layout")
         .or_else(|| admin_cfg_app.get("布局"))
         .and_then(|v| v.as_str());
+    let app_asset_version = admin_cfg_app
+        .get("asset_version")
+        .or_else(|| admin_cfg_app.get("资源版本"))
+        .and_then(|v| v.as_str());
     let mut page = page;
     let mut routes = routes;
-    stamp_page_shell(&mut page, app_shell, app_layout);
+    stamp_page_shell(&mut page, app_shell, app_layout, app_asset_version);
     for (_k, p) in routes.iter_mut() {
-        stamp_page_shell(p, app_shell, app_layout);
+        stamp_page_shell(p, app_shell, app_layout, app_asset_version);
     }
     http::listen(
         &page,
@@ -2130,7 +2177,11 @@ pub unsafe extern "C" fn marqdo_plugin_init(host: *const MarqdoHostApi) -> c_int
     }
 
     let regs = [
-        ("web_page_new", "title,intro,shell_css,layout", web_page_new as PluginFn),
+        (
+            "web_page_new",
+            "title,intro,shell_css,layout,asset_version",
+            web_page_new as PluginFn,
+        ),
         (
             "web_compose_components",
             "page,components",
@@ -2239,7 +2290,7 @@ pub unsafe extern "C" fn marqdo_plugin_init(host: *const MarqdoHostApi) -> c_int
         ("web_media_new", "storage", web_media_new as PluginFn),
         (
             "web_style",
-            "name,table",
+            "name,table,strict",
             web_style as PluginFn,
         ),
         (
@@ -2302,7 +2353,7 @@ pub unsafe extern "C" fn marqdo_plugin_init(host: *const MarqdoHostApi) -> c_int
         ("web_db_list_tables", "url", web_db_list_tables as PluginFn),
         (
             "web_app_new",
-            "page,db,admin,host,port,admin_prefix,login_redirect,logout_redirect,shell_css,layout",
+            "page,db,admin,host,port,admin_prefix,login_redirect,logout_redirect,shell_css,layout,asset_version",
             web_app_new as PluginFn,
         ),
         ("web_app_route", "app,path,page", web_app_route as PluginFn),
