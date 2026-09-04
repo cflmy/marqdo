@@ -2,7 +2,7 @@
   "name": "marqdo",
   "displayName": "Marqdo",
   "description": "Language support for Marqdo (.mq.md) — code as documentation.",
-  "version": "0.3.3",
+  "version": "0.3.4",
   "publisher": "cflmy",
   "icon": "media/icon.png",
   "repository": {
