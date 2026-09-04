@@ -4,7 +4,8 @@
 
 ### Added
 - **路线 D（作者零 JS）**：[roadmap](doc/roadmap/browser-wasm-d.md) · 设计 §16。官方 bridge `mount` / `data-mq-*` 自启；`client_embed` 带 `wasm`/`source`/`boot`；DOM 效应；`examples/web-client-site/`。
-- **路线 E（前端补齐）**：[browser-wasm-e.md](doc/roadmap/browser-wasm-e.md) · 设计 §17。原则：仅禁作者手写业务 JS；桥内可做列表/路由/storage/ws/定时。效应含 `set_style`/`render_list`/`navigate`/`storage`/`ws`/`fetch_all`/`interval`；示例 [browser-app](examples/browser-app/)。
+- **路线 E（前端补齐，Completed）**：[browser-wasm-e.md](doc/roadmap/browser-wasm-e.md)。多节点 DOM、`add_class`/`remove_class`、cookie、clipboard/download；示例 [browser-app](examples/browser-app/) 含列表 CRUD / fetch_all / ws。
+- **路线 F（规划）**：[browser-wasm-f.md](doc/roadmap/browser-wasm-f.md) — 文件选择、Canvas、Audio、Observer、拖放等。
 
 ### Fixed
 

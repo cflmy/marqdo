@@ -233,6 +233,20 @@ function escapeAttr(s) {
   return escapeHtml(s).replace(/'/g, "&#39;");
 }
 
+function qsAll(sel) {
+  if (typeof document === "undefined") return [];
+  try {
+    return [...document.querySelectorAll(sel)];
+  } catch (_) {
+    return [];
+  }
+}
+
+function qsOne(sel) {
+  const all = qsAll(sel);
+  return all[0] || null;
+}
+
 /** Sync DOM patches (E1/E2/E3 navigate is sync too). */
 export function applyDomPatch(value) {
   if (!value || typeof value !== "object") return;
@@ -241,27 +255,28 @@ export function applyDomPatch(value) {
   const setText = value.set_text || value.setText;
   if (isPlainObject(setText)) {
     for (const [sel, text] of Object.entries(setText)) {
-      const el = document.querySelector(sel);
-      if (el) el.textContent = String(text);
+      for (const el of qsAll(sel)) el.textContent = String(text);
     }
   }
 
   const setValue = value.set_value || value.setValue;
   if (isPlainObject(setValue)) {
     for (const [sel, v] of Object.entries(setValue)) {
-      const el = document.querySelector(sel);
-      if (el && "value" in el) el.value = String(v);
+      for (const el of qsAll(sel)) {
+        if ("value" in el) el.value = String(v);
+      }
     }
   }
 
   const setAttr = value.set_attr || value.setAttr;
   if (isPlainObject(setAttr)) {
     for (const [sel, attrs] of Object.entries(setAttr)) {
-      const el = document.querySelector(sel);
-      if (!el || !isPlainObject(attrs)) continue;
-      for (const [name, raw] of Object.entries(attrs)) {
-        if (raw === null || raw === false) el.removeAttribute(name);
-        else el.setAttribute(name, String(raw));
+      if (!isPlainObject(attrs)) continue;
+      for (const el of qsAll(sel)) {
+        for (const [name, raw] of Object.entries(attrs)) {
+          if (raw === null || raw === false) el.removeAttribute(name);
+          else el.setAttribute(name, String(raw));
+        }
       }
     }
   }
@@ -269,62 +284,89 @@ export function applyDomPatch(value) {
   const setClass = value.set_class || value.setClass;
   if (isPlainObject(setClass)) {
     for (const [sel, cls] of Object.entries(setClass)) {
-      const el = document.querySelector(sel);
-      if (el) el.className = String(cls);
+      for (const el of qsAll(sel)) el.className = String(cls);
+    }
+  }
+
+  const addClass = value.add_class || value.addClass;
+  if (isPlainObject(addClass)) {
+    for (const [sel, cls] of Object.entries(addClass)) {
+      const names = String(cls).split(/\s+/).filter(Boolean);
+      for (const el of qsAll(sel)) for (const c of names) el.classList.add(c);
+    }
+  }
+
+  const removeClass = value.remove_class || value.removeClass;
+  if (isPlainObject(removeClass)) {
+    for (const [sel, cls] of Object.entries(removeClass)) {
+      const names = String(cls).split(/\s+/).filter(Boolean);
+      for (const el of qsAll(sel)) for (const c of names) el.classList.remove(c);
     }
   }
 
   const toggleClass = value.toggle_class || value.toggleClass;
   if (isPlainObject(toggleClass)) {
     for (const [sel, cls] of Object.entries(toggleClass)) {
-      const el = document.querySelector(sel);
-      if (el && cls) el.classList.toggle(String(cls));
+      for (const el of qsAll(sel)) {
+        if (cls) el.classList.toggle(String(cls));
+      }
     }
   }
 
   const setStyle = value.set_style || value.setStyle;
   if (isPlainObject(setStyle)) {
     for (const [sel, st] of Object.entries(setStyle)) {
-      const el = document.querySelector(sel);
-      if (el) applyStyle(el, st);
+      for (const el of qsAll(sel)) applyStyle(el, st);
     }
   }
 
   for (const sel of asSelList(value.focus)) {
-    const el = document.querySelector(sel);
+    const el = qsOne(sel);
     if (el && el.focus) el.focus();
   }
   for (const sel of asSelList(value.blur)) {
-    const el = document.querySelector(sel);
+    const el = qsOne(sel);
     if (el && el.blur) el.blur();
   }
   for (const sel of asSelList(value.scroll_into || value.scrollInto)) {
-    const el = document.querySelector(sel);
+    const el = qsOne(sel);
     if (el && el.scrollIntoView) el.scrollIntoView({ block: "nearest", behavior: "smooth" });
   }
 
   const setHtml = value.set_html || value.setHtml;
   if (isPlainObject(setHtml)) {
     for (const [sel, html] of Object.entries(setHtml)) {
-      const el = document.querySelector(sel);
-      if (el) el.innerHTML = String(html);
+      for (const el of qsAll(sel)) el.innerHTML = String(html);
+    }
+  }
+
+  const appendHtml = value.append_html || value.appendHtml;
+  if (isPlainObject(appendHtml)) {
+    for (const [sel, html] of Object.entries(appendHtml)) {
+      for (const el of qsAll(sel)) el.insertAdjacentHTML("beforeend", String(html));
     }
   }
 
   const replaceChildren = value.replace_children || value.replaceChildren;
   if (isPlainObject(replaceChildren)) {
     for (const [sel, html] of Object.entries(replaceChildren)) {
-      const el = document.querySelector(sel);
-      if (el) el.innerHTML = String(html);
+      for (const el of qsAll(sel)) el.innerHTML = String(html);
     }
   }
 
   const renderList = value.render_list || value.renderList;
   if (isPlainObject(renderList)) {
     for (const [sel, spec] of Object.entries(renderList)) {
-      const el = document.querySelector(sel);
-      if (!el || !isPlainObject(spec)) continue;
-      el.innerHTML = renderListItems(spec);
+      if (!isPlainObject(spec)) continue;
+      const html = renderListItems(spec);
+      for (const el of qsAll(sel)) el.innerHTML = html;
+    }
+  }
+
+  const removeSel = value.remove || value.remove_nodes || value.removeNodes;
+  if (removeSel) {
+    for (const sel of asSelList(removeSel)) {
+      for (const el of qsAll(sel)) el.remove();
     }
   }
 
@@ -333,6 +375,25 @@ export function applyDomPatch(value) {
     const url = String(nav.url);
     if (nav.replace) history.replaceState(nav.state ?? null, "", url);
     else history.pushState(nav.state ?? null, "", url);
+  }
+
+  const clip = value.clipboard || value.copy;
+  if (clip != null && typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+    const text = isPlainObject(clip) ? String(clip.text ?? "") : String(clip);
+    navigator.clipboard.writeText(text).catch(() => {});
+  }
+
+  const dl = value.download;
+  if (isPlainObject(dl) && dl.body != null) {
+    const mime = String(dl.mime || "text/plain;charset=utf-8");
+    const name = String(dl.filename || "download.txt");
+    const blob = new Blob([String(dl.body)], { type: mime });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = name;
+    a.click();
+    URL.revokeObjectURL(url);
   }
 }
 
@@ -438,7 +499,14 @@ async function runFetchEffect(exports, spec, onError) {
 
 async function runFetchAllEffect(exports, spec, onError) {
   const thenFn = spec.then;
-  const reqs = Array.isArray(spec.requests) ? spec.requests : [];
+  const reqs = Array.isArray(spec.requests)
+    ? spec.requests
+    : isPlainObject(spec.requests)
+      ? Object.keys(spec.requests)
+          .sort()
+          .map((k) => spec.requests[k])
+          .filter((r) => r && typeof r === "object")
+      : [];
   try {
     const results = await Promise.all(
       reqs.map(async (r) => {
@@ -515,23 +583,82 @@ function runIntervalEffect(exports, spec, onError) {
 }
 
 function storageStore(scope) {
+  if (scope === "cookie") return null;
   if (typeof localStorage === "undefined") return null;
   return scope === "session" ? sessionStorage : localStorage;
+}
+
+function cookieGet(key) {
+  if (typeof document === "undefined") return null;
+  const prefix = encodeURIComponent(key) + "=";
+  for (const part of document.cookie.split(";")) {
+    const s = part.trim();
+    if (s.startsWith(prefix)) return decodeURIComponent(s.slice(prefix.length));
+  }
+  return null;
+}
+
+function cookieSet(key, value, days) {
+  if (typeof document === "undefined") return;
+  let extra = "; path=/";
+  if (days != null && Number(days) > 0) {
+    const d = new Date();
+    d.setTime(d.getTime() + Number(days) * 864e5);
+    extra += "; expires=" + d.toUTCString();
+  }
+  document.cookie = encodeURIComponent(key) + "=" + encodeURIComponent(value) + extra;
+}
+
+function cookieRemove(key) {
+  if (typeof document === "undefined") return;
+  document.cookie = encodeURIComponent(key) + "=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
 }
 
 async function runStorageEffect(exports, spec, onError) {
   const op = String(spec.op || "").toLowerCase();
   const key = String(spec.key || "");
-  const store = storageStore(spec.scope || "local");
-  if (!store) {
-    if (onError) onError("storage unavailable");
-    return;
-  }
+  const scope = String(spec.scope || "local");
   try {
+    if (scope === "cookie") {
+      if (op === "set") {
+        cookieSet(key, spec.value != null ? String(spec.value) : "", spec.days);
+      } else if (op === "remove" || op === "delete") {
+        cookieRemove(key);
+      } else if (op === "get") {
+        const value = cookieGet(key);
+        if (spec.then) {
+          const result = call(exports, spec.then, {
+            ok: true,
+            op,
+            key,
+            value: value == null ? "" : value,
+            found: value != null,
+            scope,
+          });
+          if (!result.ok) {
+            if (onError) onError(result.error);
+            return;
+          }
+          await applyEffects(exports, result.value, { onError });
+        }
+        return;
+      }
+      if (spec.then && op !== "get") {
+        const result = call(exports, spec.then, { ok: true, op, key, scope });
+        if (result.ok) await applyEffects(exports, result.value, { onError });
+      }
+      return;
+    }
+
+    const store = storageStore(scope);
+    if (!store) {
+      if (onError) onError("storage unavailable");
+      return;
+    }
     if (op === "set") {
       store.setItem(key, spec.value != null ? String(spec.value) : "");
       if (spec.then) {
-        const result = call(exports, spec.then, { ok: true, op, key });
+        const result = call(exports, spec.then, { ok: true, op, key, scope });
         if (result.ok) await applyEffects(exports, result.value, { onError });
       }
       return;
@@ -539,7 +666,7 @@ async function runStorageEffect(exports, spec, onError) {
     if (op === "remove" || op === "delete") {
       store.removeItem(key);
       if (spec.then) {
-        const result = call(exports, spec.then, { ok: true, op, key });
+        const result = call(exports, spec.then, { ok: true, op, key, scope });
         if (result.ok) await applyEffects(exports, result.value, { onError });
       }
       return;
@@ -553,6 +680,7 @@ async function runStorageEffect(exports, spec, onError) {
           key,
           value: value == null ? "" : value,
           found: value != null,
+          scope,
         });
         if (!result.ok) {
           if (onError) onError(result.error);

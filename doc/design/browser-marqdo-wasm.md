@@ -372,14 +372,17 @@ L1：`web.dom_patch` / `网页.DOM补丁` 合并效应键；`web.text_patch` / `
 | `set_style` | `{ "#sel": { color: "red" } }` 或 `{ "#sel": "color:red" }` |
 | `focus` / `blur` | `"#sel"` 或选择器数组 |
 | `scroll_into` | `"#sel"` |
-| `set_html` / `replace_children` | `{ "#sel": "<b>…</b>" }`（内容由 MQ 产出；XSS 由作者保证） |
-| `render_list` | `{ "#sel": { tag: "li", items: ["a", { text, class, attrs }] } }` |
+| `set_html` / `append_html` / `replace_children` | 写/追加 HTML（MQ 产出；XSS 自负） |
+| `render_list` | `{ "#sel": { tag, items } }` |
+| `remove` | 选择器或数组，删除节点 |
+| `add_class` / `remove_class` | classList |
 | `navigate` | `{ url, replace?: bool }` |
-| `storage` | `{ op: get\|set\|remove, key, value?, scope?: local\|session, then? }` |
-| `ws` | `{ op: open\|send\|close, url?, data?, id?, then_message?, then_open?, … }` |
-| `fetch_all` | `{ requests: [fetchSpec…], then }` → `mq_call` 得 `{ results: [...] }` |
-| `interval` | `{ ms, then, id? }`；`clear_interval: { id }` |
-| `fetch.fields` | 对象 → `FormData` body |
+| `storage` | `{ op, key, value?, scope?: local\|session\|cookie, days?, then? }` |
+| `ws` | `{ op: open\|send\|close, … }` |
+| `fetch_all` | `{ requests: []\|map, then }` |
+| `interval` / `clear_interval` | 定时 |
+| `clipboard` / `download` | 剪贴板 / 触发下载 |
+| `fetch.fields` | → FormData |
 
 Wire 列：`委托` / `delegate` = 在容器上监听，目标须 `closest(delegate)`；选择器 `window` 绑 `window`。
 

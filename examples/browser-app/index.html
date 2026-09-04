@@ -14,7 +14,7 @@
       padding: 2rem clamp(1rem, 4vw, 3rem);
     }
     h1 { font-family: "IBM Plex Serif", "Noto Serif SC", serif; margin: 0 0 0.35rem; }
-    .lead { color: var(--muted); max-width: 40rem; }
+    .lead { color: var(--muted); max-width: 42rem; }
     nav a { margin-right: 0.75rem; color: var(--accent); }
     section { margin: 1.5rem 0; padding: 1rem 0; border-top: 1px solid #c5d4c9; }
     #path { font-family: ui-monospace, monospace; color: var(--muted); }
@@ -28,10 +28,14 @@
     input[type="text"] { padding: 0.45rem 0.65rem; border: 1px solid #b7c7bb; width: min(16rem, 70%); }
     button {
       padding: 0.45rem 0.9rem; border: 0; background: var(--accent); color: #f5faf6;
-      font: inherit; cursor: pointer;
+      font: inherit; cursor: pointer; margin: 0.2rem 0.35rem 0.2rem 0;
     }
     button.secondary { background: #3a4740; }
-    #tick { font-variant-numeric: tabular-nums; }
+    #tick, #net-out { font-variant-numeric: tabular-nums; }
+    #net-out {
+      min-height: 2.5rem; padding: 0.6rem 0.75rem; background: rgba(255,255,255,0.55);
+      border: 1px solid #b7c7bb; white-space: pre-wrap; word-break: break-all;
+    }
     pre {
       margin-top: 1rem; padding: 0.85rem 1rem; background: #122018; color: #d7eadc;
       font-size: 0.8rem; overflow: auto; max-width: 42rem;
@@ -41,11 +45,12 @@
 </head>
 <body>
   <h1>Marqdo browser-app</h1>
-  <p class="lead">路线 E：列表 / storage / navigate / interval — <strong>无作者业务 JS</strong>，逻辑在 <code>app.mq.md</code>。</p>
+  <p class="lead">路线 E：列表 CRUD / storage / navigate / interval / fetch_all / ws / clipboard / download — <strong>无作者业务 JS</strong>。</p>
   <p id="path">path: /</p>
   <nav>
-    <a href="#/" id="nav-home" data-path="/">首页</a>
-    <a href="#/about" id="nav-about" data-path="/about">关于</a>
+    <a href="#/" id="nav-home">首页</a>
+    <a href="#/about" id="nav-about">关于</a>
+    <a href="#/net" id="nav-net">网络</a>
   </nav>
 
   <section id="panel-home">
@@ -54,6 +59,8 @@
     <button id="add" type="button" disabled>添加</button>
     <button id="save" class="secondary" type="button" disabled>存草稿</button>
     <button id="load" class="secondary" type="button" disabled>读草稿</button>
+    <button id="copy-log" class="secondary" type="button" disabled>复制列表</button>
+    <button id="dl-list" class="secondary" type="button" disabled>下载列表</button>
     <ul id="items"></ul>
     <p>计时：<span id="tick">0</span>s
       <button id="start-tick" type="button" disabled>开始</button>
@@ -63,7 +70,17 @@
 
   <section id="panel-about" hidden>
     <h2>关于</h2>
-    <p>客户端路由用 <code>navigate</code> + <code>popstate</code>；列表用官方桥 <code>render_list</code>。</p>
+    <p>作者只写 <code>app.mq.md</code>。官方 bridge 提供 DOM / 路由 / storage / ws / fetch_all 等宿主能力。</p>
+  </section>
+
+  <section id="panel-net" hidden>
+    <h2>网络</h2>
+    <p id="net-out">idle</p>
+    <button id="fetch-all" type="button" disabled>fetch_all ×2 uuid</button>
+    <button id="ws-open" type="button" disabled>WS 打开</button>
+    <input id="ws-msg" type="text" placeholder="ws 消息" disabled />
+    <button id="ws-send" type="button" disabled>WS 发送</button>
+    <button id="ws-close" class="secondary" type="button" disabled>WS 关闭</button>
   </section>
 
   <pre id="log">loading…</pre>
@@ -73,7 +90,7 @@
     data-mq-wasm="./marqdo_wasm.wasm"
     data-mq-source-url="./app.mq.md"
     data-mq-ready="#log"
-    data-mq-enable="#draft,#add,#save,#load,#start-tick,#stop-tick"
+    data-mq-enable="#draft,#add,#save,#load,#start-tick,#stop-tick,#fetch-all,#ws-open,#ws-msg,#ws-send,#ws-close,#copy-log,#dl-list"
   ></script>
 </body>
 </html>
