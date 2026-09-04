@@ -44,6 +44,7 @@ spike/.pytest_cache/
 /examples/browser-hello/pkg/
 /examples/web-client-site/static/marqdo_wasm.wasm
 /examples/browser-app/marqdo_wasm.wasm
+/examples/browser-media/marqdo_wasm.wasm
 
 # Local sqlite / scratch
 /data/
