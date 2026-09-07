@@ -3,8 +3,11 @@
 ## Unreleased
 
 ### Added
+- **宿主集成 H1–H4**：`ext/web` `app.proxy`（同域 SSE/HTTP 流式中继）与 `app.invoke`（HTTP→`lib.member`）；跨模块 `#` 对象方法查找；`agent.corpus_search` 自动加载插件；`agent.mcp_server` stdio。金样 `web-proxy-invoke-smoke` · `web-hosting-live` · `web-db-cross-module-smoke` · `agent-mcp-server-smoke`。设计 [ext-hosting-fill.md](doc/design/ext-hosting-fill.md)。
+- **文档**：宿主集成缺口盘点与补齐设计——[ext-hosting-gaps.md](doc/research/ext-hosting-gaps.md) · [ext-hosting.md](doc/roadmap/ext-hosting.md)。
 
 ### Fixed
+- **方法分发**：`find_object_type` 沿导入树传递查找，跨模块拿到的 `web.db` 等句柄可再调方法。
 
 ### Changed
 

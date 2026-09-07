@@ -70,6 +70,7 @@
 | **高** | 官方端到端示例 + 文档新鲜度 | 无独立 `examples/agent-*`；Skill/参考里仍有「layout / roadmap」陈旧表述；外人难「照抄即跑通 plan→固化→二次命中」 | `examples/agent-pong`（或同类）+ README；Skill 专节与 A0–A4 对齐 |
 | **高** | Agent 评测 / 回归 harness | 有离线金样，缺成本·恢复·命中率·补丁质量的系统评测；业界强调 evaluation 先于上线 | `tests/` 或脚本：命中率、llm_free 占比、失败恢复、可选 live 预算 |
 | **高** | 真 MCP（HTTP/SSE）与凭证 | A4 仅 JSON fixture；缺 streamable HTTP、鉴权、resources/prompts | 金样打 mock MCP server；返回仍带 `authority=workbook` |
+| **高** | **MCP Server 宿主**（stdio / HTTP） | Agent 只能当客户端 fixture；IDE 无法把 `.mq.md` `##` 暴露为 MCP 工具 | 见 [ext-hosting-gaps.md](ext-hosting-gaps.md) GAP-03 · [ext-hosting-fill.md](../design/ext-hosting-fill.md) |
 | **中** | Plan 断点续跑 | 工作簿在盘上，缺显式 checkpoint / resume（对标 LangGraph checkpointer） | `plan resume=` 从第 N 轮 DECISION 继续；进程崩溃可恢复 |
 | **中** | 人机协同（HITL）加深 | 仅有 `confirm=True` 建簿即停；缺审批卡、拒绝重开、view 一键继续 | view 审批控件 + 金样 |
 | **中** | 飞轮可观测指标 | `hits` / `improve_every` / `llm_free` 有字段，缺汇总与 CLI/view 报表 | `agent_kb_stats` 或 view 面板：命中率、探索浪费 |

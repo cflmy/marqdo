@@ -71,6 +71,9 @@
 | [research/agent-frameworks-and-marqdo.md](research/agent-frameworks-and-marqdo.md) | 主流智能体框架 vs Marqdo 优势 |
 | [research/agent-framework-gaps-after-a4.md](research/agent-framework-gaps-after-a4.md) | **`ext/agent` A0–A4 之后缺口盘点** |
 | [research/agent-framework-2026-09.md](research/agent-framework-2026-09.md) | **2026-09 刷新：宪法优先 Wave B** |
+| [research/ext-hosting-gaps.md](research/ext-hosting-gaps.md) | **宿主集成缺口**：同域 SSE 中继 · HTTP→`##` · MCP Server · 副端口 · 跨模块 db/corpus |
+| [design/ext-hosting-fill.md](design/ext-hosting-fill.md) | **宿主缺口补齐设计**（`ext/web` proxy/invoke · `ext/ai` mcp_server） |
+| [roadmap/ext-hosting.md](roadmap/ext-hosting.md) | **宿主集成 H0–H4**（规划） |
 | [roadmap/ext-agent-optimize.md](roadmap/ext-agent-optimize.md) | **`ext/agent` A0–A4 done · Wave B Active** |
 
 金样例与集成测试：[`tests/`](../tests/)。面向访客的可执行文档：[`public/`](../public/)。Spike 存档：[`spike/`](../spike/)。

@@ -5,6 +5,7 @@ use std::collections::HashMap;
 use std::ffi::{CStr, CString};
 use std::os::raw::{c_char, c_int, c_void};
 use std::path::PathBuf;
+use std::sync::{Mutex, OnceLock};
 
 use libloading::{Library, Symbol};
 
@@ -59,9 +60,38 @@ thread_local! {
     static LIB_PATH_CALL: RefCell<Option<LibPathCall>> = const { RefCell::new(None) };
 }
 
+/// Process-wide host pointer while a long-lived plugin call (e.g. `web_listen`) is active.
+/// Lets Tokio worker threads invoke `host_query` during HTTP handlers.
+struct SendPtr<T>(*mut T);
+unsafe impl<T> Send for SendPtr<T> {}
+unsafe impl<T> Sync for SendPtr<T> {}
+
+struct SendLibPath(Option<LibPathCall>);
+unsafe impl Send for SendLibPath {}
+unsafe impl Sync for SendLibPath {}
+
+static GLOBAL_HOST: OnceLock<Mutex<SendPtr<HostContext>>> = OnceLock::new();
+/// Process-wide lib-path hook (same lifetime as GLOBAL_HOST).
+static GLOBAL_LIB_PATH: OnceLock<Mutex<SendLibPath>> = OnceLock::new();
+/// Serialize interpreter re-entry from HTTP worker threads.
+static INVOKE_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+
+fn global_host_slot() -> &'static Mutex<SendPtr<HostContext>> {
+    GLOBAL_HOST.get_or_init(|| Mutex::new(SendPtr(std::ptr::null_mut())))
+}
+
+fn global_lib_slot() -> &'static Mutex<SendLibPath> {
+    GLOBAL_LIB_PATH.get_or_init(|| Mutex::new(SendLibPath(None)))
+}
+
+fn invoke_lock() -> &'static Mutex<()> {
+    INVOKE_LOCK.get_or_init(|| Mutex::new(()))
+}
+
 /// Hook: resolve bare `lib.member` (and longer paths) in the site module's import tree.
+#[derive(Clone, Copy)]
 pub struct LibPathCall {
-    pub call: fn(*mut (), &str) -> Result<Value, String>,
+    pub call: fn(*mut (), &str, Option<&Value>) -> Result<Value, String>,
     pub data: *mut (),
 }
 
@@ -69,7 +99,15 @@ pub struct LibPathCall {
 pub fn with_lib_path_call<R>(hook: LibPathCall, body: impl FnOnce() -> R) -> R {
     LIB_PATH_CALL.with(|slot| {
         let prev = slot.replace(Some(hook));
+        let prev_g = {
+            let mut g = global_lib_slot().lock().unwrap_or_else(|e| e.into_inner());
+            std::mem::replace(&mut g.0, Some(hook))
+        };
         let out = body();
+        {
+            let mut g = global_lib_slot().lock().unwrap_or_else(|e| e.into_inner());
+            g.0 = prev_g;
+        }
         slot.replace(prev);
         out
     })
@@ -252,9 +290,22 @@ unsafe extern "C" fn host_query(
     };
 
     let ctx_ptr = CURRENT_HOST.with(|c| c.get());
+    let ctx_ptr = if ctx_ptr.is_null() {
+        global_host_slot()
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .0
+    } else {
+        ctx_ptr
+    };
     if ctx_ptr.is_null() {
         set_err("host_query: no active host context (call during plugin fn)");
         return 1;
+    }
+    let _invoke_guard;
+    let from_worker = CURRENT_HOST.with(|c| c.get().is_null());
+    if from_worker {
+        _invoke_guard = invoke_lock().lock().unwrap_or_else(|e| e.into_inner());
     }
     let ctx = &mut *ctx_ptr;
 
@@ -314,14 +365,26 @@ unsafe extern "C" fn host_query(
                 .and_then(|v| v.as_str())
                 .ok_or_else(|| "call_lib_path requires `path`".to_string())?
                 .to_string();
-            LIB_PATH_CALL.with(|slot| {
-                let hook = slot.borrow();
-                let hook = hook
-                    .as_ref()
-                    .ok_or_else(|| "call_lib_path: no site lib resolver".to_string())?;
-                let v = (hook.call)(hook.data, &path)?;
-                value_to_json(&v)
-            })
+            let call_args = args.get("args").and_then(|v| {
+                if v.is_null() {
+                    None
+                } else {
+                    json_to_value(v).ok()
+                }
+            });
+            let call_args_ref = call_args.as_ref();
+            let from_tls = LIB_PATH_CALL.with(|slot| slot.borrow().clone());
+            let hook = if let Some(h) = from_tls {
+                h
+            } else {
+                global_lib_slot()
+                    .lock()
+                    .unwrap_or_else(|e| e.into_inner())
+                    .0
+                    .ok_or_else(|| "call_lib_path: no site lib resolver".to_string())?
+            };
+            let v = (hook.call)(hook.data, &path, call_args_ref)?;
+            value_to_json(&v)
         })(),
         "record_plot" => (|| {
             let raw = args_owned.as_deref().unwrap_or("{}");
@@ -509,7 +572,15 @@ pub fn call_registered(
     let mut err_ptr: *mut c_char = std::ptr::null_mut();
 
     CURRENT_HOST.with(|c| c.set(ctx as *mut HostContext));
+    {
+        let mut g = global_host_slot().lock().unwrap_or_else(|e| e.into_inner());
+        g.0 = ctx as *mut HostContext;
+    }
     let rc = unsafe { (reg.fn_ptr)(c_args.as_ptr(), &mut out_ptr, &mut err_ptr) };
+    {
+        let mut g = global_host_slot().lock().unwrap_or_else(|e| e.into_inner());
+        g.0 = std::ptr::null_mut();
+    }
     CURRENT_HOST.with(|c| c.set(std::ptr::null_mut()));
 
     let err_s = take_c_string(err_ptr);

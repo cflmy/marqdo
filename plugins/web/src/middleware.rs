@@ -24,7 +24,7 @@ use tower_http::set_header::SetResponseHeaderLayer;
 use crate::db;
 
 /// Render a cell value as text (strings stay, numbers/bools stringify).
-fn cell_text(v: &Value) -> String {
+pub fn cell_text(v: &Value) -> String {
     match v {
         Value::Null => String::new(),
         Value::String(s) => s.clone(),

@@ -281,6 +281,8 @@ pub fn listen(
     middleware: &Middleware,
     mut site_head: Vec<crate::assets::HeadLink>,
     mut icon_routes: Vec<crate::assets::IconRoute>,
+    proxy_routes: Vec<(String, crate::proxy::ProxyRoute)>,
+    invoke_routes: Vec<(String, crate::invoke::InvokeRoute)>,
 ) -> Result<Value, String> {
     let mut form_owners = HashMap::new();
     collect_page_forms(page, &mut forms, &mut form_owners);
@@ -600,6 +602,10 @@ pub fn listen(
             }),
         );
     }
+
+    // Streaming proxy + HTTP→## invoke (before fallback so paths are explicit).
+    app = crate::proxy::mount_all(app, &proxy_routes);
+    app = crate::invoke::mount_all(app, &invoke_routes);
 
     app = app.fallback(get(fallback_404));
 

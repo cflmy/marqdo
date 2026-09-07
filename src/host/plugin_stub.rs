@@ -9,8 +9,9 @@ pub const ABI_VERSION: u32 = 2;
 pub const ABI_VERSION_MIN: u32 = 1;
 
 /// Hook: resolve bare `lib.member` (unused without native plugins).
+#[derive(Clone, Copy)]
 pub struct LibPathCall {
-    pub call: fn(*mut (), &str) -> Result<Value, String>,
+    pub call: fn(*mut (), &str, Option<&Value>) -> Result<Value, String>,
     pub data: *mut (),
 }
 

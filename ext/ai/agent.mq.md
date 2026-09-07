@@ -388,6 +388,15 @@ Callable dotted names (whitelist for `CALL:lib…`) plus static module file list
 
 Local keyword search over `.md` / `.mq.md` / `.txt` under `root`. Returns ranked excerpts. **Evidence only** — runnable workbook / OKF skill stays authority (`authority=workbook`).
 
+Ensures the native agent plugin is loaded so plain `marqdo run` (without constructing `# agent`) can call this.
+
+*p = > plugin.native_path name="agent"*
+1. `p`
+  > plugin.load path=`p`
+2. *
+  > print text=ext/ai/agent: native agent plugin not found (build marqdo_plugin_agent or marqdo ext add agent)
+  > sys.exit code=1
+
 **> agent_corpus_search query=`query` root=`root` limit=`limit`**
 
 ---
@@ -2099,3 +2108,46 @@ Deterministic success stop (loop engineering): when the child already returned a
 
 *out = > plan_finish_stream out=`out` events=`events` stream=`stream` trace=`trace` result=`plan_result`*
 **out**
+
+---
+
+# mcp_server
+    + `name`=marqdo
+
+Minimal MCP **Server** host (stdio JSON-RPC). Tools point at entry-module `lib.member` functions (same bridge as `ext/web` invoke). Evidence/results may carry `authority=workbook`.
+
+*p = > plugin.native_path name="agent"*
+1. `p`
+  > plugin.load path=`p`
+2. *
+  > print text=ext/ai/agent: native agent plugin not found (build marqdo_plugin_agent or marqdo ext add agent)
+  > sys.exit code=1
+
+*h = > json.parse text={"_type":"mcp_server","tools":[]}*
+*h = > json.set map=`h` key="name" value=`name`*
+**h**
+
+## tool
+    + `name`
+    + `fn`
+    + `description`=""
+
+Register one tool. `fn` must be `lib.member` imported on the entry workbook.
+
+*tools = > json.get value=`self` key="tools"*
+*row = > json.parse text={"name":"","fn":"","description":""}*
+*row = > json.set map=`row` key="name" value=`name`*
+*row = > json.set map=`row` key="fn" value=`fn`*
+*row = > json.set map=`row` key="description" value=`description`*
+*tools = > json.append list=`tools` item=`row`*
+*h = > json.set map=`self` key="tools" value=`tools`*
+**h**
+
+## serve
+    + `transport`=stdio
+
+Block on stdio MCP (`initialize` / `tools/list` / `tools/call`). HTTP transport is H4b.
+
+*name = > json.get value=`self` key="name"*
+*tools = > json.get value=`self` key="tools"*
+**> agent_mcp_serve name=`name` tools=`tools` transport=`transport`**

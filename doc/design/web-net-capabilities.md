@@ -13,6 +13,8 @@
 
 **`ext/web` + `plugins/web` 已完成 W0–W7 + P3 路线图**：中间件/JSON API、数据层（连接池/事务/分页/FTS/迁移/外键/审计时间戳）、安全硬化（argon2/CSRF/会话持久化/限速/RBAC）、内容站点标配（SEO/RSS/Markdown/分页 UI）、上传下载/相册/ETag、sitemap/robots/错误页/重定向、WebSocket 广播与访问日志。足以在 Marqdo 上实现博客/CMS/中小型 API 站点；**未内置**的仅剩标签页模板（D6，可用路由+`db.count` 自建）与应用层反垃圾。边界不变：**纯解析进 `lib/net`，HTTP 服务器与领域能力进 `plugins/web` + `ext/web` 作者面**。
 
+**宿主集成下一刀**（同域 LLM SSE 中继、HTTP→用户 `##`、与 MCP Server 协作）不在本 W 表内，见 [ext-hosting-gaps.md](../research/ext-hosting-gaps.md) · [ext-hosting-fill.md](ext-hosting-fill.md) · [ext-hosting.md](../roadmap/ext-hosting.md)。
+
 
 ---
 

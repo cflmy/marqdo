@@ -653,16 +653,42 @@ Register site icons from a GFM table (`|path|rel|type|sizes|url|` or ZH
     + `json`=None
     + `access_log`=None
     + `cache_control`=None
+    + `proxy`=None
+    + `invoke`=None
 
-Each capability is declared as a data table and assembled at listen time. The `cors` parameter takes a `|允许来源|方法|头|暴露头|凭证|` table (one row per origin; an empty `允许来源` column means any origin). The `security` parameter takes a `|头|值|` response-header table (e.g. `X-Frame-Options`, `Content-Security-Policy`, `X-Content-Type-Options`, `Referrer-Policy`, `Strict-Transport-Security`). Set `compress` to `True` to gzip response bodies. `body_limit` is the max request body bytes (e.g. `1048576`). The `json` parameter takes a `|路径|方法|表|条件|排序|上限|` table of JSON API endpoints backed by DB queries (each returns `application/json`). Set `access_log` to `True` to log `METHOD path status duration_ms` on stderr. `cache_control` sets a global `Cache-Control` header (e.g. `public, max-age=3600`).
+Each capability is declared as a data table and assembled at listen time. The `cors` parameter takes a `|允许来源|方法|头|暴露头|凭证|` table (one row per origin; an empty `允许来源` column means any origin). The `security` parameter takes a `|头|值|` response-header table (e.g. `X-Frame-Options`, `Content-Security-Policy`, `X-Content-Type-Options`, `Referrer-Policy`, `Strict-Transport-Security`). Set `compress` to `True` to gzip response bodies. `body_limit` is the max request body bytes (e.g. `1048576`). The `json` parameter takes a `|路径|方法|表|条件|排序|上限|` table of JSON API endpoints backed by DB queries (each returns `application/json`). Set `access_log` to `True` to log `METHOD path status duration_ms` on stderr. `cache_control` sets a global `Cache-Control` header (e.g. `public, max-age=3600`). `proxy` takes a `|路径|上游|流式|去前缀|方法|环境头|超时|` table of streaming reverse-proxy routes. `invoke` takes a `|路径|方法|函数|正文|返回|` table that calls entry-module `lib.member` handlers per request.
 
 Tables stay as data; `configure` assembles them. 配置即数据、装配即函数.
 
-**> web_app_middleware app=`self` cors=`cors` security=`security` compress=`compress` body_limit=`body_limit` json_routes=`json` access_log=`access_log` cache_control=`cache_control`**
+**> web_app_middleware app=`self` cors=`cors` security=`security` compress=`compress` body_limit=`body_limit` json_routes=`json` access_log=`access_log` cache_control=`cache_control` proxy=`proxy` invoke=`invoke`**
+
+## proxy
+    + `path`
+    + `upstream`
+    + `stream`=True
+    + `strip_prefix`=None
+    + `methods`=None
+    + `headers_from_env`=None
+    + `timeout_ms`=120000
+
+Same-origin reverse proxy to an upstream HTTP(S) URL. When `stream` is True (default), the response body — including `text/event-stream` SSE — is piped without buffering the full payload. `upstream` may contain `$ENV` / `${ENV}`. `headers_from_env` is `ENV=Header-Name` (comma-separated); secrets stay on the server. Prefer this over a side Python LLM proxy.
+
+**> web_app_proxy app=`self` path=`path` upstream=`upstream` stream=`stream` strip_prefix=`strip_prefix` methods=`methods` headers_from_env=`headers_from_env` timeout_ms=`timeout_ms`**
+
+## invoke
+    + `path`
+    + `fn`
+    + `method`=POST
+    + `body`=json
+    + `return`=json
+
+Call a user `##` on each HTTP request. `fn` must be `lib.member` imported on the entry module. `body` is `json` / `form` / `query` / `raw`; object keys map to named params (plus `payload`). Returns JSON by default.
+
+**> web_app_invoke app=`self` path=`path` method=`method` fn=`fn` body=`body` return=`return`**
 
 ## listen
 
-Serve `/`, routed pages, `/_part/{id}` (home) and `{path}/_part/{id}` (routes), `/_form/{id}` (from mounts + page embeds), optional `/static` (or custom mount), optional `/admin`, upload/download/WebSocket/RSS/sitemap/robots routes, redirects, and a custom 404 fallback. Production HTTPS should terminate at a reverse proxy; set `cookie_secure=True` when serving over TLS.
+Serve `/`, routed pages, `/_part/{id}` (home) and `{path}/_part/{id}` (routes), `/_form/{id}` (from mounts + page embeds), optional `/static` (or custom mount), optional `/admin`, upload/download/WebSocket/RSS/sitemap/robots routes, redirects, proxy/invoke routes, and a custom 404 fallback. Production HTTPS should terminate at a reverse proxy; set `cookie_secure=True` when serving over TLS.
 
 **> web_listen app=`self`**
 

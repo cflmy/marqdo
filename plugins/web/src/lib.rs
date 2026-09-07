@@ -8,9 +8,11 @@ mod driver;
 mod form;
 mod http;
 mod cache;
+mod invoke;
 mod markdown;
 mod middleware;
 mod password;
+mod proxy;
 mod rate_limit;
 mod render;
 mod rss;
@@ -154,6 +156,17 @@ fn host_query_json(name: &str, args: &Value) -> Result<Value, String> {
 
 fn call_lib(path: &str) -> Result<Value, String> {
     host_query_json("call_lib_path", &json!({ "path": path }))
+}
+
+/// Call `lib.member` with a JSON object of named arguments (for HTTP invoke).
+pub(crate) fn call_lib_with_args(path: &str, args: &Value) -> Result<Value, String> {
+    host_query_json(
+        "call_lib_path",
+        &json!({
+            "path": path,
+            "args": args,
+        }),
+    )
 }
 
 /// Absolute directory of the entry `.mq.md` (falls back to process cwd).
@@ -1507,74 +1520,245 @@ web_ffi!(web_app_static, |args: &Value| {
 //                  backed by db queries (method GET/POST, `表`=table name).
 web_ffi!(web_app_middleware, |args: &Value| {
     let mut app = args.get("app").cloned().unwrap_or(json!({}));
+    {
+        let obj = app
+            .as_object_mut()
+            .ok_or_else(|| "app must be a map".to_string())?;
+        let mw = obj
+            .entry("middleware".to_string())
+            .or_insert_with(|| json!({}));
+        let m = mw
+            .as_object_mut()
+            .ok_or_else(|| "app.middleware must be a map".to_string())?;
+
+        if let Some(cors) = args.get("cors") {
+            m.insert("cors".into(), middleware::cors_from_table(cors));
+        }
+        if let Some(security) = args.get("security") {
+            m.insert(
+                "security".into(),
+                middleware::security_from_table(security),
+            );
+        }
+        if let Some(compress) = args.get("compress") {
+            let on = match compress {
+                Value::Bool(b) => *b,
+                Value::String(s) => matches!(s.as_str(), "true" | "True" | "1" | "yes" | "on"),
+                Value::Number(n) => n.as_i64().unwrap_or(0) != 0,
+                _ => false,
+            };
+            m.insert("compress".into(), json!(on));
+        }
+        if let Some(al) = args.get("access_log").or_else(|| args.get("访问日志")) {
+            let on = match al {
+                Value::Bool(b) => *b,
+                Value::String(s) => {
+                    matches!(s.as_str(), "true" | "True" | "1" | "yes" | "on" | "真")
+                }
+                Value::Number(n) => n.as_i64().unwrap_or(0) != 0,
+                _ => false,
+            };
+            m.insert("access_log".into(), json!(on));
+        }
+        if let Some(cc) = args
+            .get("cache_control")
+            .or_else(|| args.get("缓存控制"))
+            .and_then(|v| v.as_str())
+        {
+            let s = cc.trim();
+            if !s.is_empty() {
+                m.insert("cache_control".into(), json!(s));
+            }
+        }
+        if let Some(bl) = args.get("body_limit") {
+            let n = bl
+                .as_u64()
+                .or_else(|| bl.as_i64().map(|i| i as u64))
+                .unwrap_or(0);
+            if n > 0 {
+                m.insert("body_limit".into(), json!(n));
+            }
+        }
+        if let Some(routes) = args.get("json_routes") {
+            m.insert(
+                "json_routes".into(),
+                middleware::json_routes_from_table(routes),
+            );
+        }
+    }
+
+    if let Some(proxy) = args
+        .get("proxy")
+        .or_else(|| args.get("proxy_routes"))
+        .or_else(|| args.get("代理"))
+        .filter(|v| !v.is_null())
+    {
+        let incoming = proxy::proxy_routes_from_table(proxy);
+        let obj_app = app
+            .as_object_mut()
+            .ok_or_else(|| "app must be a map".to_string())?;
+        let mut existing = obj_app
+            .get("proxy_routes")
+            .and_then(|v| v.as_object())
+            .cloned()
+            .unwrap_or_default();
+        if let Some(map) = incoming.as_object() {
+            for (k, v) in map {
+                existing.insert(k.clone(), v.clone());
+            }
+        }
+        obj_app.insert("proxy_routes".into(), Value::Object(existing));
+    }
+    if let Some(inv) = args
+        .get("invoke")
+        .or_else(|| args.get("invoke_routes"))
+        .or_else(|| args.get("调用"))
+        .filter(|v| !v.is_null())
+    {
+        let incoming = invoke::invoke_routes_from_table(inv);
+        let obj_app = app
+            .as_object_mut()
+            .ok_or_else(|| "app must be a map".to_string())?;
+        let mut existing = obj_app
+            .get("invoke_routes")
+            .and_then(|v| v.as_object())
+            .cloned()
+            .unwrap_or_default();
+        if let Some(map) = incoming.as_object() {
+            for (k, v) in map {
+                existing.insert(k.clone(), v.clone());
+            }
+        }
+        obj_app.insert("invoke_routes".into(), Value::Object(existing));
+    }
+    Ok(app)
+});
+
+web_ffi!(web_app_proxy, |args: &Value| {
+    let mut app = args.get("app").cloned().unwrap_or(json!({}));
+    let path = normalize_route_path_in_app(
+        arg_str(args, "path").or_else(|_| arg_str(args, "路径"))?,
+        &app,
+    )?;
+    let upstream = arg_str(args, "upstream")
+        .or_else(|_| arg_str(args, "上游"))?
+        .to_string();
+    if upstream.trim().is_empty() {
+        return Err("proxy requires `upstream`".into());
+    }
+    let stream = match args
+        .get("stream")
+        .or_else(|| args.get("流式"))
+        .cloned()
+        .unwrap_or(json!(true))
+    {
+        Value::Bool(b) => b,
+        Value::String(s) => matches!(
+            s.as_str(),
+            "true" | "True" | "1" | "yes" | "on" | "真"
+        ),
+        Value::Number(n) => n.as_i64().unwrap_or(0) != 0,
+        _ => true,
+    };
+    let strip_prefix = arg_str_opt(args, "strip_prefix")
+        .or_else(|| arg_str_opt(args, "去前缀"))
+        .unwrap_or("")
+        .to_string();
+    let methods = match args.get("methods").or_else(|| args.get("方法")) {
+        Some(Value::Array(arr)) => arr
+            .iter()
+            .filter_map(|v| v.as_str().map(|s| s.to_uppercase()))
+            .collect::<Vec<_>>(),
+        Some(Value::String(s)) => s
+            .split(',')
+            .map(|m| m.trim().to_uppercase())
+            .filter(|m| !m.is_empty())
+            .collect(),
+        _ => vec!["POST".into()],
+    };
+    let headers_from_env = arg_str_opt(args, "headers_from_env")
+        .or_else(|| arg_str_opt(args, "环境头"))
+        .unwrap_or("")
+        .to_string();
+    let timeout_ms = args
+        .get("timeout_ms")
+        .or_else(|| args.get("超时"))
+        .and_then(|v| v.as_u64().or_else(|| v.as_i64().map(|i| i as u64)))
+        .unwrap_or(120_000);
     let obj = app
         .as_object_mut()
         .ok_or_else(|| "app must be a map".to_string())?;
-    let mw = obj
-        .entry("middleware".to_string())
-        .or_insert_with(|| json!({}));
-    let m = mw
-        .as_object_mut()
-        .ok_or_else(|| "app.middleware must be a map".to_string())?;
+    let mut routes = obj
+        .get("proxy_routes")
+        .and_then(|v| v.as_object())
+        .cloned()
+        .unwrap_or_default();
+    let key = path.trim_start_matches('/').to_string();
+    routes.insert(
+        key,
+        json!({
+            "upstream": upstream,
+            "stream": stream,
+            "strip_prefix": strip_prefix,
+            "methods": methods,
+            "headers_from_env": headers_from_env,
+            "timeout_ms": timeout_ms,
+        }),
+    );
+    obj.insert("proxy_routes".into(), Value::Object(routes));
+    Ok(app)
+});
 
-    if let Some(cors) = args.get("cors") {
-        m.insert(
-            "cors".into(),
-            middleware::cors_from_table(cors),
+web_ffi!(web_app_invoke, |args: &Value| {
+    let mut app = args.get("app").cloned().unwrap_or(json!({}));
+    let path = normalize_route_path_in_app(
+        arg_str(args, "path").or_else(|_| arg_str(args, "路径"))?,
+        &app,
+    )?;
+    let fn_path = arg_str(args, "fn")
+        .or_else(|_| arg_str(args, "function"))
+        .or_else(|_| arg_str(args, "函数"))?
+        .to_string();
+    if fn_path.trim().is_empty() {
+        return Err("invoke requires `fn`".into());
+    }
+    // Optional allowlist: only `lib.member` form for now (no arbitrary file paths).
+    if !fn_path.contains('.') || fn_path.contains('/') || fn_path.contains('#') {
+        return Err(
+            "invoke `fn` must be `lib.member` (imported on the entry module)".into(),
         );
     }
-    if let Some(security) = args.get("security") {
-        m.insert(
-            "security".into(),
-            middleware::security_from_table(security),
-        );
-    }
-    if let Some(compress) = args.get("compress") {
-        let on = match compress {
-            Value::Bool(b) => *b,
-            Value::String(s) => matches!(s.as_str(), "true" | "True" | "1" | "yes" | "on"),
-            Value::Number(n) => n.as_i64().unwrap_or(0) != 0,
-            _ => false,
-        };
-        m.insert("compress".into(), json!(on));
-    }
-    if let Some(al) = args
-        .get("access_log")
-        .or_else(|| args.get("访问日志"))
-    {
-        let on = match al {
-            Value::Bool(b) => *b,
-            Value::String(s) => matches!(s.as_str(), "true" | "True" | "1" | "yes" | "on" | "真"),
-            Value::Number(n) => n.as_i64().unwrap_or(0) != 0,
-            _ => false,
-        };
-        m.insert("access_log".into(), json!(on));
-    }
-    if let Some(cc) = args
-        .get("cache_control")
-        .or_else(|| args.get("缓存控制"))
-        .and_then(|v| v.as_str())
-    {
-        let s = cc.trim();
-        if !s.is_empty() {
-            m.insert("cache_control".into(), json!(s));
-        }
-    }
-    if let Some(bl) = args.get("body_limit") {
-        let n = bl
-            .as_u64()
-            .or_else(|| bl.as_i64().map(|i| i as u64))
-            .unwrap_or(0);
-        if n > 0 {
-            m.insert("body_limit".into(), json!(n));
-        }
-    }
-    if let Some(routes) = args.get("json_routes") {
-        m.insert(
-            "json_routes".into(),
-            middleware::json_routes_from_table(routes),
-        );
-    }
+    let method = arg_str_opt(args, "method")
+        .or_else(|| arg_str_opt(args, "方法"))
+        .unwrap_or("POST")
+        .to_uppercase();
+    let body = arg_str_opt(args, "body")
+        .or_else(|| arg_str_opt(args, "正文"))
+        .unwrap_or("json")
+        .to_ascii_lowercase();
+    let ret = arg_str_opt(args, "return")
+        .or_else(|| arg_str_opt(args, "返回"))
+        .unwrap_or("json")
+        .to_ascii_lowercase();
+    let obj = app
+        .as_object_mut()
+        .ok_or_else(|| "app must be a map".to_string())?;
+    let mut routes = obj
+        .get("invoke_routes")
+        .and_then(|v| v.as_object())
+        .cloned()
+        .unwrap_or_default();
+    let key = path.trim_start_matches('/').to_string();
+    routes.insert(
+        key,
+        json!({
+            "method": method,
+            "fn": fn_path,
+            "body": body,
+            "return": ret,
+        }),
+    );
+    obj.insert("invoke_routes".into(), Value::Object(routes));
     Ok(app)
 });
 
@@ -1737,6 +1921,8 @@ web_ffi!(web_listen, |args: &Value| {
         page_500,
         gates,
         gallery_routes,
+        proxy_routes,
+        invoke_routes,
         middleware,
         cookie_secure,
         site_head,
@@ -1793,6 +1979,8 @@ web_ffi!(web_listen, |args: &Value| {
             None,
             Vec::<http::Gate>::new(),
             HashMap::new(),
+            Vec::<(String, crate::proxy::ProxyRoute)>::new(),
+            Vec::<(String, crate::invoke::InvokeRoute)>::new(),
             middleware::Middleware::default(),
             cookie_secure,
             Vec::<crate::assets::HeadLink>::new(),
@@ -1943,6 +2131,34 @@ web_ffi!(web_listen, |args: &Value| {
                 gallery_routes.insert(k.clone(), v.clone());
             }
         }
+        let mut proxy_routes: Vec<(String, proxy::ProxyRoute)> = Vec::new();
+        if let Some(obj) = app.get("proxy_routes").and_then(|v| v.as_object()) {
+            for (k, v) in obj {
+                if let Some(r) = proxy::ProxyRoute::from_json(v) {
+                    let path = if k.starts_with('/') {
+                        k.clone()
+                    } else {
+                        format!("/{k}")
+                    };
+                    proxy_routes.push((path, r));
+                }
+            }
+            proxy_routes.sort_by(|a, b| a.0.cmp(&b.0));
+        }
+        let mut invoke_routes: Vec<(String, invoke::InvokeRoute)> = Vec::new();
+        if let Some(obj) = app.get("invoke_routes").and_then(|v| v.as_object()) {
+            for (k, v) in obj {
+                if let Some(r) = invoke::InvokeRoute::from_json(v) {
+                    let path = if k.starts_with('/') {
+                        k.clone()
+                    } else {
+                        format!("/{k}")
+                    };
+                    invoke_routes.push((path, r));
+                }
+            }
+            invoke_routes.sort_by(|a, b| a.0.cmp(&b.0));
+        }
         if app.get("tls_cert").is_some() || app.get("tls_key").is_some() {
             eprintln!(
                 "marqdo web: in-process TLS is not enabled; terminate HTTPS at a reverse proxy (nginx/caddy) and set cookie_secure=True"
@@ -2026,6 +2242,8 @@ web_ffi!(web_listen, |args: &Value| {
             page_500,
             gates,
             gallery_routes,
+            proxy_routes,
+            invoke_routes,
             middleware,
             cookie_secure,
             site_head,
@@ -2141,6 +2359,8 @@ web_ffi!(web_listen, |args: &Value| {
         &middleware,
         site_head,
         icon_routes,
+        proxy_routes,
+        invoke_routes,
     )
 });
 
@@ -2369,8 +2589,18 @@ pub unsafe extern "C" fn marqdo_plugin_init(host: *const MarqdoHostApi) -> c_int
         ),
         (
             "web_app_middleware",
-            "app,cors,security,compress,body_limit,json_routes,access_log,cache_control",
+            "app,cors,security,compress,body_limit,json_routes,access_log,cache_control,proxy,invoke",
             web_app_middleware as PluginFn,
+        ),
+        (
+            "web_app_proxy",
+            "app,path,upstream,stream,strip_prefix,methods,headers_from_env,timeout_ms",
+            web_app_proxy as PluginFn,
+        ),
+        (
+            "web_app_invoke",
+            "app,path,method,fn,body,return",
+            web_app_invoke as PluginFn,
         ),
         ("web_form_new", "table,action,id", web_form_new as PluginFn),
         ("web_form_fields", "form,fields", web_form_fields as PluginFn),

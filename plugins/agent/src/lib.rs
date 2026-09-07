@@ -2,6 +2,7 @@
 
 mod corpus;
 mod kb;
+mod mcp_server;
 
 use std::collections::HashMap;
 use std::ffi::{CStr, CString};
@@ -548,10 +549,18 @@ fn register(host: &MarqdoHostApi, name: &str, params: &str, fn_ptr: PluginFn) ->
 }
 
 pub(crate) fn host_query_json(name: &str) -> Result<serde_json::Value, String> {
+    host_query_json_args(name, &serde_json::json!({}))
+}
+
+pub(crate) fn host_query_json_args(
+    name: &str,
+    args: &serde_json::Value,
+) -> Result<serde_json::Value, String> {
     let query = unsafe { HOST_QUERY }.ok_or_else(|| "host_query not available".to_string())?;
     let userdata = unsafe { HOST_USERDATA };
     let c_name = CString::new(name).map_err(|e| e.to_string())?;
-    let c_args = CString::new("{}").unwrap();
+    let args_s = serde_json::to_string(args).map_err(|e| e.to_string())?;
+    let c_args = CString::new(args_s).map_err(|e| e.to_string())?;
     let mut out_ptr: *mut c_char = ptr::null_mut();
     let mut err_ptr: *mut c_char = ptr::null_mut();
     let rc = unsafe {
@@ -985,6 +994,11 @@ pub unsafe extern "C" fn marqdo_plugin_init(host: *const MarqdoHostApi) -> c_int
         return 1;
     }
     if register(host, "agent_mcp_fixture", "action,fixture", agent_mcp_fixture) != 0 {
+        return 1;
+    }
+    if register(host, "agent_mcp_serve", "name,tools,transport", mcp_server::agent_mcp_serve)
+        != 0
+    {
         return 1;
     }
     if register(host, "agent_kb_add_alias", "kb_dir,slug,alias", agent_kb_add_alias) != 0 {

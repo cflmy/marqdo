@@ -1953,6 +1953,167 @@ fn ext_web_middleware_live() {
 }
 
 #[test]
+fn ext_web_proxy_invoke_smoke() {
+    let status = Command::new("cargo")
+        .args(["build", "-p", "marqdo_plugin_web"])
+        .current_dir(env!("CARGO_MANIFEST_DIR"))
+        .status()
+        .expect("build web plugin");
+    assert!(status.success(), "failed to build marqdo_plugin_web");
+    assert_out(
+        "tests/ext/web-proxy-invoke-smoke.mq.md",
+        "proxy-table-ok
+proxy-stream-ok
+proxy-env-ok
+proxy-method-ok
+invoke-table-ok
+invoke-method-ok",
+    );
+}
+
+#[test]
+fn ext_web_hosting_live() {
+    // Mock upstream SSE on 18142 + Marqdo web proxy/invoke on 18141.
+    let status = Command::new("cargo")
+        .args(["build", "-p", "marqdo_plugin_web"])
+        .current_dir(env!("CARGO_MANIFEST_DIR"))
+        .status()
+        .expect("build web plugin");
+    assert!(status.success(), "failed to build marqdo_plugin_web");
+
+    use std::io::{Read, Write};
+    use std::net::TcpListener;
+
+    let upstream = TcpListener::bind("127.0.0.1:18142").expect("bind mock upstream");
+    upstream.set_nonblocking(true).ok();
+    let upstream_thread = std::thread::spawn(move || {
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(20);
+        loop {
+            if std::time::Instant::now() > deadline {
+                break;
+            }
+            match upstream.accept() {
+                Ok((mut sock, _)) => {
+                    let mut buf = [0u8; 4096];
+                    let _ = sock.set_read_timeout(Some(std::time::Duration::from_secs(2)));
+                    let _ = sock.read(&mut buf);
+                    let body = "data: {\"id\":1}\n\ndata: {\"id\":2}\n\n";
+                    let resp = format!(
+                        "HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+                        body.len(),
+                        body
+                    );
+                    let _ = sock.write_all(resp.as_bytes());
+                    let _ = sock.flush();
+                }
+                Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                    std::thread::sleep(std::time::Duration::from_millis(50));
+                }
+                Err(_) => break,
+            }
+        }
+    });
+
+    let script = "tests/ext/web-hosting-live-server.mq.md";
+    let bin = env!("CARGO_BIN_EXE_marqdo");
+    let mut child = Command::new(bin)
+        .args(["run", script])
+        .current_dir(env!("CARGO_MANIFEST_DIR"))
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("spawn hosting live server");
+
+    let base = "http://127.0.0.1:18141";
+    let ready = std::time::Instant::now();
+    loop {
+        if ready.elapsed().as_secs() > 15 {
+            let _ = child.kill();
+            panic!("hosting live server did not start in time");
+        }
+        let out = Command::new("curl")
+            .args(["-s", "-o", "/dev/null", "-w", "%{http_code}", &format!("{base}/")])
+            .output()
+            .expect("curl probe");
+        if String::from_utf8_lossy(&out.stdout) == "200" {
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(300));
+    }
+
+    // Proxy SSE: expect both data frames.
+    let out = Command::new("curl")
+        .args([
+            "-s",
+            "-N",
+            "-X",
+            "POST",
+            &format!("{base}/proxy/sse"),
+            "-H",
+            "Content-Type: application/json",
+            "-d",
+            "{}",
+        ])
+        .output()
+        .expect("curl proxy");
+    let body = String::from_utf8_lossy(&out.stdout);
+    assert!(
+        body.contains("data: {\"id\":1}") && body.contains("data: {\"id\":2}"),
+        "proxy sse body={body}"
+    );
+
+    // Invoke: POST JSON → demo.echo
+    let out = Command::new("curl")
+        .args([
+            "-s",
+            "-X",
+            "POST",
+            &format!("{base}/api/echo"),
+            "-H",
+            "Content-Type: application/json",
+            "-d",
+            r#"{"msg":"hi"}"#,
+        ])
+        .output()
+        .expect("curl invoke");
+    let body = String::from_utf8_lossy(&out.stdout);
+    assert!(
+        body.contains("\"ok\"") && body.contains("\"msg\":\"hi\""),
+        "invoke body={body}"
+    );
+
+    let _ = child.kill();
+    let _ = child.wait();
+    let _ = upstream_thread.join();
+}
+
+#[test]
+fn ext_web_db_cross_module_smoke() {
+    let status = Command::new("cargo")
+        .args(["build", "-p", "marqdo_plugin_web"])
+        .current_dir(env!("CARGO_MANIFEST_DIR"))
+        .status()
+        .expect("build web plugin");
+    assert!(status.success(), "failed to build marqdo_plugin_web");
+    assert_out("tests/ext/web-db-cross-module-smoke.mq.md", "cross-db-ok");
+}
+
+#[test]
+fn ext_agent_mcp_server_smoke() {
+    let status = Command::new("cargo")
+        .args(["build", "-p", "marqdo_plugin_agent"])
+        .current_dir(env!("CARGO_MANIFEST_DIR"))
+        .status()
+        .expect("build agent plugin");
+    assert!(status.success(), "failed to build marqdo_plugin_agent");
+    assert_out(
+        "tests/ext/agent-mcp-server-smoke.mq.md",
+        "mcp-tool-ok
+mcp-fn-ok",
+    );
+}
+
+#[test]
 fn ext_web_security_smoke() {
     let status = Command::new("cargo")
         .args(["build", "-p", "marqdo_plugin_web"])

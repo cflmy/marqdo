@@ -195,7 +195,11 @@ impl Interpreter {
     }
 
     /// Resolve `lib.member` on the site (entry) module — used by ABI `call_lib_path`.
-    pub(crate) fn call_site_lib_path(&mut self, path: &str) -> std::result::Result<Value, String> {
+    pub(crate) fn call_site_lib_path(
+        &mut self,
+        path: &str,
+        args: Option<&Value>,
+    ) -> std::result::Result<Value, String> {
         let site = self
             .site_module
             .ok_or_else(|| "call_lib_path: no site module".to_string())?;
@@ -210,7 +214,13 @@ impl Interpreter {
                 "call_lib_path: need `lib.member`, got `{path}`"
             ));
         }
-        self.eval_path_call(site, &parts, &[])
+        let mut ev_args: Vec<EvArg> = Vec::new();
+        if let Some(Value::Map(pairs)) = args {
+            for (k, v) in pairs {
+                ev_args.push(EvArg::Named(k.clone(), v.clone()));
+            }
+        }
+        self.eval_path_call(site, &parts, &ev_args)
             .map_err(|e| e.to_string())
     }
 
@@ -222,10 +232,14 @@ impl Interpreter {
         struct HookData {
             interp: *mut Interpreter,
         }
-        fn trampoline(data: *mut (), path: &str) -> std::result::Result<Value, String> {
+        fn trampoline(
+            data: *mut (),
+            path: &str,
+            args: Option<&Value>,
+        ) -> std::result::Result<Value, String> {
             let data = unsafe { &mut *(data as *mut HookData) };
             let interp = unsafe { &mut *data.interp };
-            interp.call_site_lib_path(path)
+            interp.call_site_lib_path(path, args)
         }
         let mut data = HookData {
             interp: self as *mut Interpreter,
@@ -1042,19 +1056,31 @@ fn find_top<'a>(module: &'a Module, name: &str) -> Option<&'a Function> {
 
 /// Resolve `#` object type by name in the entry module or any imported library.
 fn find_object_type<'a>(module: &'a Module, name: &str) -> Option<(&'a Module, &'a Function)> {
-    module
-        .functions
-        .iter()
-        .find(|f| f.name == name && f.is_object())
-        .map(|f| (module, f))
-        .or_else(|| {
-            module.import_modules.values().find_map(|lib| {
-                lib.functions
-                    .iter()
-                    .find(|f| f.name == name && f.is_object())
-                    .map(|f| (lib, f))
-            })
-        })
+    fn search<'a>(
+        module: &'a Module,
+        name: &str,
+        seen: &mut std::collections::HashSet<*const Module>,
+    ) -> Option<(&'a Module, &'a Function)> {
+        let key = module as *const Module;
+        if !seen.insert(key) {
+            return None;
+        }
+        if let Some(f) = module
+            .functions
+            .iter()
+            .find(|f| f.name == name && f.is_object())
+        {
+            return Some((module, f));
+        }
+        for lib in module.import_modules.values() {
+            if let Some(hit) = search(lib, name, seen) {
+                return Some(hit);
+            }
+        }
+        None
+    }
+    let mut seen = std::collections::HashSet::new();
+    search(module, name, &mut seen)
 }
 
 /// Resolve `` `obj`.method `` along the inheritance chain (`_type` first, then bases).

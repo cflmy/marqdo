@@ -69,3 +69,4 @@
 | [design/ext-web.md](../design/ext-web.md) | **真理** |
 | [user-site.md](../design/user-site.md) | 静态站互补 |
 | [ext-quantum.md](ext-quantum.md) | 同属官方 ext + ABI + `ext add` |
+| [ext-hosting.md](ext-hosting.md) · [ext-hosting-gaps.md](../research/ext-hosting-gaps.md) | **W/C 之后**：同域 SSE 中继、HTTP→`##`（不重开本表 W0–W7） |
