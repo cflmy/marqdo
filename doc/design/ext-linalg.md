@@ -2,9 +2,10 @@
 
 | | |
 |---|---|
-| 状态 | **Draft · L0–L6 + 中缀/方法面 v1** |
+| 状态 | **Draft · L0–L6 + 中缀 v1 · 公式文档面见专文** |
 | 日期 | 2026-09-07 |
 | 调研 | [research/ext-linalg-formula.md](../research/ext-linalg-formula.md) |
+| **公式文档面** | [ext-linalg-formula-doc.md](ext-linalg-formula-doc.md)（跑通即正确 · 代数面/计算面） |
 | 路线图 | [roadmap/ext-linalg.md](../roadmap/ext-linalg.md) |
 | 相关 | [stdlib-math.md](stdlib-math.md) · [ext-abi.md](ext-abi.md) · [ext-cli.md](ext-cli.md) · [view.md](view.md) · [ext-quantum-q7.md](ext-quantum-q7.md) |
 | 安装（规划） | `marqdo ext add linalg`（`linalg` / `线性代数`） |
@@ -14,6 +15,8 @@
 ## 0. 一句话
 
 **经典线性代数以「矩阵公式」为一等公民**：抽象表达式可化简、可展示、可选求值；稠密数值与分解图走 ABI 插件——**不**并入 `lib/math`，**不**挂在 `ext/quantum` 作者面。
+
+作者面北极星见 **[ext-linalg-formula-doc.md](ext-linalg-formula-doc.md)**：跑通即正确；代数面像讲义，计算面是显式步骤。
 
 ---
 

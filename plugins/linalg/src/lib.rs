@@ -305,13 +305,32 @@ la_ffi!(linalg_simplify, |args: &Value| {
     wrap(matexpr::simplify(e)?)
 });
 
+fn display_expr(args: &Value, e: matexpr::Expr) -> Result<matexpr::Expr, String> {
+    let raw = args
+        .get("raw")
+        .or_else(|| args.get("原始"))
+        .and_then(|v| match v {
+            Value::Bool(b) => Some(*b),
+            Value::String(s) => Some(matches!(s.to_ascii_lowercase().as_str(), "true" | "1" | "yes")),
+            _ => v.as_bool(),
+        })
+        .unwrap_or(false);
+    if raw {
+        Ok(e)
+    } else {
+        matexpr::simplify(e)
+    }
+}
+
 la_ffi!(linalg_ascii, |args: &Value| {
     let e = arg_expr_opt(args, &["expr", "a", "式"])?;
+    let e = display_expr(args, e)?;
     Ok(json!(e.ascii()))
 });
 
 la_ffi!(linalg_latex, |args: &Value| {
     let e = arg_expr_opt(args, &["expr", "a", "式"])?;
+    let e = display_expr(args, e)?;
     Ok(json!(e.latex()))
 });
 
@@ -323,6 +342,7 @@ la_ffi!(linalg_shape, |args: &Value| {
 
 la_ffi!(linalg_show, |args: &Value| {
     let e = arg_expr_opt(args, &["expr", "a", "式"])?;
+    let e = display_expr(args, e)?;
     let latex = e.latex();
     let ascii = e.ascii();
     let path = args
@@ -588,10 +608,10 @@ pub unsafe extern "C" fn marqdo_plugin_init(host: *const MarqdoHostApi) -> c_int
         ("linalg_transpose", "expr", linalg_transpose as PluginFn),
         ("linalg_inv", "expr", linalg_inv as PluginFn),
         ("linalg_simplify", "expr", linalg_simplify as PluginFn),
-        ("linalg_ascii", "expr", linalg_ascii as PluginFn),
-        ("linalg_latex", "expr", linalg_latex as PluginFn),
+        ("linalg_ascii", "expr,raw", linalg_ascii as PluginFn),
+        ("linalg_latex", "expr,raw", linalg_latex as PluginFn),
         ("linalg_shape", "expr", linalg_shape as PluginFn),
-        ("linalg_show", "expr,path", linalg_show as PluginFn),
+        ("linalg_show", "expr,path,raw", linalg_show as PluginFn),
         ("linalg_explicit", "expr", linalg_explicit as PluginFn),
         ("linalg_det", "expr", linalg_det as PluginFn),
         ("linalg_trace", "expr", linalg_trace as PluginFn),

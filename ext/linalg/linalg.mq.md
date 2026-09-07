@@ -69,15 +69,19 @@ Apply MatExpr rewrite rules (R1–R5).
 
 ## ascii
     + `expr`
+    + `raw`=False
+
+Display ASCII (default **simplify** first). Pass `raw=True` to keep the written tree.
 
 > ensure_plugin
-**> linalg_ascii expr=`expr`**
+**> linalg_ascii expr=`expr` raw=`raw`**
 
 ## latex
     + `expr`
+    + `raw`=False
 
 > ensure_plugin
-**> linalg_latex expr=`expr`**
+**> linalg_latex expr=`expr` raw=`raw`**
 
 ## shape
     + `expr`
@@ -88,11 +92,12 @@ Apply MatExpr rewrite rules (R1–R5).
 ## show
     + `expr`
     + `path`=None
+    + `raw`=False
 
-Record a formula SVG via host plot channel; returns the expr map.
+Record a formula SVG via host plot channel (default simplify). Returns the expr map.
 
 > ensure_plugin
-**> linalg_show expr=`expr` path=`path`**
+**> linalg_show expr=`expr` path=`path` raw=`raw`**
 
 ## eye
     + `n`
@@ -305,11 +310,11 @@ Matrix value (`_type=matrix`). Prefer infix `A + B` / `A * B`, or methods `` `A`
 
 ## ascii
 
-**> linalg_ascii expr=`self`**
+**> linalg_ascii expr=`self` raw=False**
 
 ## latex
 
-**> linalg_latex expr=`self`**
+**> linalg_latex expr=`self` raw=False**
 
 ## explicit
 
@@ -325,8 +330,9 @@ Matrix value (`_type=matrix`). Prefer infix `A + B` / `A * B`, or methods `` `A`
 
 ## show
     + `path`=None
+    + `raw`=False
 
-**> linalg_show expr=`self` path=`path`**
+**> linalg_show expr=`self` path=`path` raw=`raw`**
 
 ## eye
     + `n`

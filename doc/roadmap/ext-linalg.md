@@ -2,9 +2,9 @@
 
 | | |
 |---|---|
-| 状态 | **L0–L6 已落地 · L7+ 远期** |
+| 状态 | **L0–L6 + 中缀 v1 已落地 · F1–F3 公式文档面进行中** |
 | 日期 | 2026-09-07 |
-| **锁定设计** | [design/ext-linalg.md](../design/ext-linalg.md) |
+| **锁定设计** | [design/ext-linalg.md](../design/ext-linalg.md) · [design/ext-linalg-formula-doc.md](../design/ext-linalg-formula-doc.md) |
 | 调研 | [research/ext-linalg-formula.md](../research/ext-linalg-formula.md) |
 | 相关 | [ext-cli.md](../design/ext-cli.md) · [ext-abi.md](../design/ext-abi.md) · [stdlib-math.md](../design/stdlib-math.md) · [view.md](../design/view.md) · [ext-quantum-q7.md](../design/ext-quantum-q7.md) |
 | 安装（规划） | `marqdo ext add linalg`（`linalg` / `线性代数`） |
@@ -15,7 +15,7 @@
 
 ## 1. 目标回顾（一句）
 
-**可运行的线性代数文档**：矩阵公式可化简、可 KaTeX 展示；需要时再稠密求值与分解，并内嵌结构 SVG。
+**可运行的线性代数公式文档**：矩阵公式可化简、可 KaTeX 展示；跑通即在规则集内正确；需要时再稠密求值与分解，并内嵌结构 SVG。
 
 ---
 
@@ -30,6 +30,9 @@
 | **L4** | `factorize` LU/QR/SVD/eig（+ 可选 chol）；结构 SVG `svd|qr|ge|eig`；金样 `linalg-factor-smoke` | **done** |
 | **L5** | `heatmap`/`hinton`；examples（最小二乘 / SVD 示意）；public + skill 摘要 | **done** |
 | **L6** | 复数 dtype；`lstsq`；`norm`/`cond`；主题令牌对齐 | **done** |
+| **F1** | 展示路径默认 simplify；公式文档金样 | **done** |
+| **F2** | 符号引入降噪；examples 讲义化 | **pending** |
+| **F3** | 紧凑糖 + public「如何写公式文档」 | **pending** |
 | **L7+** | 矩阵微积分 / 更大 BLAS 依赖（仅当用户明确要求） | **deferred** |
 
 验收金样（规划路径）：`tests/ext/linalg-*-smoke.mq.md`；示例：`examples/linalg-least-squares/`、`examples/linalg-svd/`。
@@ -80,6 +83,17 @@
 - [x] `dtype=complex` 基线（Frobenius；分解仍为实数）  
 - [x] `draw theme=light|dark|bw` 与 quantum Q8 令牌对齐（`data-theme`）
 
+### F1
+
+- [x] `ascii` / `latex` / `show` 默认 simplify  
+- [x] 金样：`.T` 后直接 `ascii` 得 `B^T*A^T`（无需显式 simplify）  
+- [x] 设计文 [ext-linalg-formula-doc.md](../design/ext-linalg-formula-doc.md) 落地  
+
+### F2
+
+- [ ] 符号引入降噪（选定候选）  
+- [ ] 至少 1 个 example 以代数面为主叙述  
+
 ---
 
 ## 4. 依赖与并行
@@ -97,13 +111,13 @@
 
 ## 5. 建议开发顺序（下一手）
 
-1. 实现 **L0 + L1**（公式树与展示）——兑现「公式类」承诺，无需完整数值栈。  
-2. 再 **L2** 打通验算闭环。  
-3. **L3–L4** 教学冲击力（分块 / SVD 图）。  
-4. **L5** 文档与示例收口。
+1. **F1** 展示默认化简（公式文档面）。  
+2. **F2** 符号引入与 examples 讲义化。  
+3. **F3** public / skill 收口。  
+4. **L7+** 仅当用户明确要求更深符号（微积分等）。
 
 ---
 
 ## 6. 一句话
 
-**先公式与展示，后稠密与分解图；每阶段都有可跑金样，避免一次性巨插件。**
+**代数面像讲义、计算面是步骤；跑通即在规则集内正确；每阶段都有可跑金样。**

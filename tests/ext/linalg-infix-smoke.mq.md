@@ -1,6 +1,6 @@
 ---
 title: linalg infix and matrix methods
-description: A+B / A*B dispatch; `A`.T method chain.
+description: A+B / A*B dispatch; `A`.T method chain; display auto-simplify.
 import la:ext/linalg/linalg.mq.md
 ---
 
@@ -14,8 +14,7 @@ import la:ext/linalg/linalg.mq.md
 
 *`P` = `A` * `B`*
 *`Pt` = > `P`.T*
-*`s` = > `Pt`.simplify*
-*`st` = > `s`.ascii*
+*`st` = > `Pt`.ascii*
 > print text=`st`
 
 *`ty` = C[^_type]*

@@ -3,7 +3,7 @@
 ## Unreleased
 
 ### Added
-- **`ext/linalg` L0–L6 + 作者面中缀**：公式 MatExpr；`lstsq`/`norm`/`cond`/`rank`；复数基线；`draw theme`；**`A + B` / `A * B` / `A - B` 运行时分派** + `# matrix` 方法（``.T`` / ``.simplify`` …）。金样含 `linalg-infix-smoke`。设计：[ext-linalg.md](doc/design/ext-linalg.md)。
+- **`ext/linalg`**：L0–L6 + 中缀/`# matrix`；**公式文档面** [ext-linalg-formula-doc.md](doc/design/ext-linalg-formula-doc.md)（跑通即正确）；F1 展示默认 simplify（`raw=` 可关）；金样含 `linalg-doc-smoke` · `linalg-infix-smoke`。设计：[ext-linalg.md](doc/design/ext-linalg.md)。
 
 ### Fixed
 

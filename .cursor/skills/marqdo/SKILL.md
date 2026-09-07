@@ -237,7 +237,7 @@ Install: `marqdo ext add linalg` (ZH id: `线性代数`). Build: `cargo build --
 
 APIs (EN): `symbol` → `# matrix`；中缀 `+`/`-`/`*`；方法 `` `A`.T `` / ``.simplify`` / ``.ascii`` · `from_formula` / `explicit` / `factorize` / `draw` · `lstsq` / `norm` / `cond` / `rank`.
 
-Examples: [linalg-svd](../../examples/linalg-svd/) · [linalg-least-squares](../../examples/linalg-least-squares/). Design: [ext-linalg.md](../../doc/design/ext-linalg.md).
+Examples: [linalg-svd](../../examples/linalg-svd/) · [linalg-least-squares](../../examples/linalg-least-squares/). Design: [ext-linalg.md](../../doc/design/ext-linalg.md) · formula-doc: [ext-linalg-formula-doc.md](../../doc/design/ext-linalg-formula-doc.md).
 
 ## AI authoring workflow
 
