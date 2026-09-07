@@ -113,10 +113,10 @@ jobs:
             ## Marqdo ${{ github.ref_name }}
 
             ### 亮点 / Highlights
-            - **`marqdo ext add` 无需本机 Rust**：发布附带预编译 native 插件；`ext add` 可自动下载
-            - **Prebuilt native plugins**: `marqdo-*-native-*.zip`; Windows zip includes `ext/native/`
-            - Install: `marqdo ext add web|agent|quantum|llm`（零源码编译）
-            - Details: [CHANGELOG](https://github.com/cflmy/marqdo/blob/main/CHANGELOG.md) · [ext-cli.md](https://github.com/cflmy/marqdo/blob/main/doc/design/ext-cli.md)
+            - **中层标准库 Mid M1–M6**：`re`/`encoding`/`path`/`hash`/`secrets`/`csv`/`text++`/`cli`/`log`/`uuid`（中英对称，零插件）
+            - **Mid stdlib M1–M6**: regex, encoding, path, hash, secrets, csv, thickened text/lists, cli, log, uuid
+            - **`ext/linalg` 公式文档面 F1–F3**；agent/llm 写回与 SSE 稳健性修复
+            - Details: [CHANGELOG](https://github.com/cflmy/marqdo/blob/main/CHANGELOG.md) · [stdlib-mid.md](https://github.com/cflmy/marqdo/blob/main/doc/design/stdlib-mid.md)
 
             ### Downloads
 

@@ -3,6 +3,26 @@
 ## Unreleased
 
 ### Added
+
+### Fixed
+
+### Changed
+
+## v0.3.6 — 2026-09-07
+
+### Highlights
+
+**中层标准库 Mid M1–M6 收口**：通用原语沉入 `lib/`（正则、编解码、路径、哈希、机密、CSV、加厚文本/集合、CLI、日志、UUID），写日常脚本与多数扩展库不再需要原生插件。另含 `ext/linalg` 公式文档面与 agent/llm 稳健性修复。
+
+```bash
+git checkout v0.3.6
+# 或下载 Release 的 exe / zip
+marqdo run public/features/13-log-uuid.mq.md
+marqdo ext add linalg   # 可选：公式文档 / 线性代数
+```
+
+
+### Added
 - **中层标准库 M6**：`lib/log` / `日志`（级别过滤的一行日志）与 `lib/uuid` / `标识`（v4）；金样与 public `13-log-uuid`。设计 [stdlib-log-uuid.md](doc/design/stdlib-log-uuid.md)。**Mid M1–M6 收口。**
 - **中层标准库 M5**：`table`/`表` 加厚（sort/sort_by/unique/chunk/zip/flatten）与 `lib/cli`/`命令行`（parse）；金样与 public `12-list-cli`。设计 [stdlib-list-cli.md](doc/design/stdlib-list-cli.md)。
 - **中层标准库 M4**：`lib/csv` / `逗号表`（parse/stringify）与 `lib/text` / `文本` 加厚（contains/replace/case/pad/…）；金样与 public `11-csv-text`。设计 [stdlib-csv.md](doc/design/stdlib-csv.md) · [stdlib-text-mid.md](doc/design/stdlib-text-mid.md)。
