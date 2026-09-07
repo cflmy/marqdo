@@ -115,6 +115,52 @@ Dense leaf from nested list.
 > ensure_plugin
 **> linalg_from_list data=`data`**
 
+## from_formula
+    + `formula`
+
+Absorb a `$$` numeric matrix formula (or nested list / dense map) as a dense leaf.
+
+> ensure_plugin
+**> linalg_from_formula formula=`formula`**
+
+## explicit
+    + `expr`
+
+Evaluate a MatExpr tree of dense/eye/zero ops to `linalg_dense` (symbols rejected).
+
+> ensure_plugin
+**> linalg_explicit expr=`expr`**
+
+## det
+    + `expr`
+
+> ensure_plugin
+**> linalg_det expr=`expr`**
+
+## trace
+    + `expr`
+
+> ensure_plugin
+**> linalg_trace expr=`expr`**
+
+## solve
+    + `a`
+    + `b`
+
+Solve `a x = b` (Gaussian elimination). Returns `linalg_solve`.
+
+> ensure_plugin
+**> linalg_solve a=`a` b=`b`**
+
+## matmul
+    + `a`
+    + `b`
+
+Dense matrix product → `linalg_dense`.
+
+> ensure_plugin
+**> linalg_matmul a=`a` b=`b`**
+
 ## symbol
     + `name`
     + `rows`

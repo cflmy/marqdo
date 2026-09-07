@@ -1,5 +1,6 @@
 //! Marqdo linalg plugin (C ABI v2): formula-first matrix expressions.
 
+mod dense;
 mod matexpr;
 
 use std::ffi::{CStr, CString};
@@ -205,7 +206,7 @@ la_ffi!(linalg_ping, |_args: &Value| {
         "ok": true,
         "name": "linalg",
         "abi": ABI_VERSION,
-        "features": ["matexpr", "simplify"],
+        "features": ["matexpr", "simplify", "dense", "solve"],
     }))
 });
 
@@ -337,6 +338,74 @@ la_ffi!(linalg_show, |args: &Value| {
     Ok(out)
 });
 
+fn coerce_expr(v: &Value) -> Result<Expr, String> {
+    if let Ok(e) = Expr::from_value(v) {
+        return Ok(e);
+    }
+    // Formula Matrix / nested list / linalg_dense → dense leaf
+    let data = dense::from_value(v)?;
+    Ok(Expr::Dense { data })
+}
+
+la_ffi!(linalg_from_formula, |args: &Value| {
+    let f = args
+        .get("formula")
+        .or_else(|| args.get("公式"))
+        .or_else(|| args.get("expr"))
+        .or_else(|| args.get("式"))
+        .ok_or_else(|| "missing `formula`".to_string())?;
+    wrap(coerce_expr(f)?)
+});
+
+la_ffi!(linalg_explicit, |args: &Value| {
+    let e = arg_expr_opt(args, &["expr", "a", "式"]).or_else(|_| {
+        let f = args
+            .get("formula")
+            .or_else(|| args.get("公式"))
+            .ok_or_else(|| "missing `expr`".to_string())?;
+        coerce_expr(f)
+    })?;
+    let m = dense::explicit(&e)?;
+    dense::to_dense_value(&m)
+});
+
+la_ffi!(linalg_det, |args: &Value| {
+    let m = dense_arg(args, &["expr", "a", "matrix", "式", "矩阵"])?;
+    Ok(json!(dense::det(&m)?))
+});
+
+la_ffi!(linalg_trace, |args: &Value| {
+    let m = dense_arg(args, &["expr", "a", "matrix", "式", "矩阵"])?;
+    Ok(json!(dense::trace(&m)?))
+});
+
+la_ffi!(linalg_solve, |args: &Value| {
+    let a = dense_arg(args, &["a", "A", "matrix", "矩阵", "左"])?;
+    let b = dense_arg(args, &["b", "B", "rhs", "右"])?;
+    dense::solve_result(&a, &b)
+});
+
+la_ffi!(linalg_matmul, |args: &Value| {
+    let a = dense_arg(args, &["a", "左"])?;
+    let b = dense_arg(args, &["b", "右"])?;
+    dense::to_dense_value(&dense::matmul(&a, &b)?)
+});
+
+fn dense_arg(args: &Value, keys: &[&str]) -> Result<dense::Mat, String> {
+    for k in keys {
+        if let Some(v) = args.get(*k) {
+            if v.is_null() {
+                continue;
+            }
+            if let Ok(e) = Expr::from_value(v) {
+                return dense::explicit(&e);
+            }
+            return dense::from_value(v);
+        }
+    }
+    Err(format!("missing dense matrix among {:?}", keys))
+}
+
 #[no_mangle]
 pub unsafe extern "C" fn marqdo_plugin_abi_version() -> u32 {
     ABI_VERSION
@@ -365,6 +434,7 @@ pub unsafe extern "C" fn marqdo_plugin_init(host: *const MarqdoHostApi) -> c_int
         ("linalg_eye", "n", linalg_eye as PluginFn),
         ("linalg_zeros", "rows,cols", linalg_zeros as PluginFn),
         ("linalg_from_list", "data", linalg_from_list as PluginFn),
+        ("linalg_from_formula", "formula", linalg_from_formula as PluginFn),
         ("linalg_mul", "a,b", linalg_mul as PluginFn),
         ("linalg_add", "a,b", linalg_add as PluginFn),
         ("linalg_sub", "a,b", linalg_sub as PluginFn),
@@ -375,6 +445,11 @@ pub unsafe extern "C" fn marqdo_plugin_init(host: *const MarqdoHostApi) -> c_int
         ("linalg_latex", "expr", linalg_latex as PluginFn),
         ("linalg_shape", "expr", linalg_shape as PluginFn),
         ("linalg_show", "expr,path", linalg_show as PluginFn),
+        ("linalg_explicit", "expr", linalg_explicit as PluginFn),
+        ("linalg_det", "expr", linalg_det as PluginFn),
+        ("linalg_trace", "expr", linalg_trace as PluginFn),
+        ("linalg_solve", "a,b", linalg_solve as PluginFn),
+        ("linalg_matmul", "a,b", linalg_matmul as PluginFn),
     ];
     for (name, params, f) in regs {
         let c_name = CString::new(name).unwrap();

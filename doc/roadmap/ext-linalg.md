@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| 状态 | **L0–L1 已落地 · L2+ 待做** |
+| 状态 | **L0–L2 已落地 · L3+ 待做** |
 | 日期 | 2026-09-07 |
 | **锁定设计** | [design/ext-linalg.md](../design/ext-linalg.md) |
 | 调研 | [research/ext-linalg-formula.md](../research/ext-linalg-formula.md) |
@@ -25,7 +25,7 @@
 |------|------|------|
 | **L0** | CATALOG + `plugins/linalg` ping + L1 `ensure_plugin`；`ext add` 条目 | **done** |
 | **L1** | MatExpr：`symbol` / 稠密叶子 / `mul`·`add`·`T`·`inv`；`simplify` R1–R5；`latex`·`ascii`·`show` | **done** |
-| **L2** | `explicit` / 小阵 gemm·解系·`det`·`trace`；维数护栏；金样 `linalg-basic-smoke` | **pending** |
+| **L2** | `explicit` / 小阵 gemm·解系·`det`·`trace`；维数护栏；金样 `linalg-basic-smoke` | **done** |
 | **L3** | `block` + `collapse`；`kron` 惰性 + R7；金样 `linalg-block-kron` | **pending** |
 | **L4** | `factorize` LU/QR/SVD/eig（+ 可选 chol）；结构 SVG `svd|qr|ge|eig`；金样 `linalg-factor-smoke` | **pending** |
 | **L5** | `heatmap`/`hinton`；examples（最小二乘 / SVD 示意）；public + skill 摘要 | **pending** |
@@ -53,9 +53,9 @@
 
 ### L2
 
-- [ ] `from_formula` 吸收 `$$` 数值阵  
-- [ ] `solve` 与手算 2×2 一致  
-- [ ] 超维 `explicit` 硬错误
+- [x] `from_formula` 吸收 `$$` 数值阵  
+- [x] `solve` 与手算 2×2 一致  
+- [x] 超维 `explicit` 硬错误（单元测护栏）
 
 ### L3
 

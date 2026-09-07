@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| 状态 | **Draft · L0–L1 已落地** |
+| 状态 | **Draft · L0–L2 已落地** |
 | 日期 | 2026-09-07 |
 | 调研 | [research/ext-linalg-formula.md](../research/ext-linalg-formula.md) |
 | 路线图 | [roadmap/ext-linalg.md](../roadmap/ext-linalg.md) |
