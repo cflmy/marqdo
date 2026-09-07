@@ -199,7 +199,97 @@ pub fn explicit(expr: &Expr) -> Result<Mat, String> {
         Expr::Sub { left, right } => mat_sub(&explicit(left)?, &explicit(right)?),
         Expr::Transpose { arg } => Ok(transpose(&explicit(arg)?)),
         Expr::Inv { arg } => invert(&explicit(arg)?),
+        Expr::Kron { factors } => {
+            if factors.is_empty() {
+                return Err("empty Kronecker product".into());
+            }
+            let mut acc = explicit(&factors[0])?;
+            for f in &factors[1..] {
+                acc = kronecker(&acc, &explicit(f)?)?;
+            }
+            Ok(acc)
+        }
+        Expr::Block { blocks } => explicit_block(blocks),
     }
+}
+
+fn explicit_block(blocks: &[Vec<Expr>]) -> Result<Mat, String> {
+    if blocks.is_empty() || blocks[0].is_empty() {
+        return Err("empty block matrix".into());
+    }
+    let br = blocks.len();
+    let bc = blocks[0].len();
+    let mut tiles: Vec<Vec<Mat>> = Vec::with_capacity(br);
+    for i in 0..br {
+        let mut row = Vec::with_capacity(bc);
+        for j in 0..bc {
+            row.push(explicit(&blocks[i][j])?);
+        }
+        tiles.push(row);
+    }
+    // Validate and assemble
+    let mut row_heights = Vec::with_capacity(br);
+    for i in 0..br {
+        let (h, _) = shape(&tiles[i][0])?;
+        for j in 1..bc {
+            let (h2, _) = shape(&tiles[i][j])?;
+            if h != h2 {
+                return Err("block row height mismatch when explicit".into());
+            }
+        }
+        row_heights.push(h);
+    }
+    let mut col_widths = Vec::with_capacity(bc);
+    for j in 0..bc {
+        let (_, w) = shape(&tiles[0][j])?;
+        for i in 1..br {
+            let (_, w2) = shape(&tiles[i][j])?;
+            if w != w2 {
+                return Err("block col width mismatch when explicit".into());
+            }
+        }
+        col_widths.push(w);
+    }
+    let total_r: usize = row_heights.iter().sum();
+    let total_c: usize = col_widths.iter().sum();
+    check_elems(total_r, total_c)?;
+    let mut out = zeros(total_r, total_c);
+    let mut r0 = 0;
+    for i in 0..br {
+        let mut c0 = 0;
+        for j in 0..bc {
+            let tile = &tiles[i][j];
+            let (h, w) = shape(tile)?;
+            for ii in 0..h {
+                for jj in 0..w {
+                    out[r0 + ii][c0 + jj] = tile[ii][jj];
+                }
+            }
+            c0 += w;
+        }
+        r0 += row_heights[i];
+    }
+    Ok(out)
+}
+
+pub fn kronecker(a: &Mat, b: &Mat) -> Result<Mat, String> {
+    let (ar, ac) = shape(a)?;
+    let (br, bc) = shape(b)?;
+    let rows = ar.saturating_mul(br);
+    let cols = ac.saturating_mul(bc);
+    check_elems(rows, cols)?;
+    let mut out = zeros(rows, cols);
+    for i in 0..ar {
+        for j in 0..ac {
+            let aij = a[i][j];
+            for ii in 0..br {
+                for jj in 0..bc {
+                    out[i * br + ii][j * bc + jj] = aij * b[ii][jj];
+                }
+            }
+        }
+    }
+    Ok(out)
 }
 
 pub fn matmul(a: &Mat, b: &Mat) -> Result<Mat, String> {

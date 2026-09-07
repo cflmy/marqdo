@@ -206,7 +206,7 @@ la_ffi!(linalg_ping, |_args: &Value| {
         "ok": true,
         "name": "linalg",
         "abi": ABI_VERSION,
-        "features": ["matexpr", "simplify", "dense", "solve"],
+        "features": ["matexpr", "simplify", "dense", "solve", "block", "kron"],
     }))
 });
 
@@ -391,6 +391,39 @@ la_ffi!(linalg_matmul, |args: &Value| {
     dense::to_dense_value(&dense::matmul(&a, &b)?)
 });
 
+la_ffi!(linalg_kron, |args: &Value| {
+    let a = arg_expr_opt(args, &["a", "左"])?;
+    let b = arg_expr_opt(args, &["b", "右"])?;
+    wrap(matexpr::kron(a, b)?)
+});
+
+la_ffi!(linalg_block, |args: &Value| {
+    let blocks_v = args
+        .get("blocks")
+        .or_else(|| args.get("块"))
+        .ok_or_else(|| "missing `blocks`".to_string())?;
+    let grid = blocks_v
+        .as_array()
+        .ok_or_else(|| "`blocks` must be a list of rows".to_string())?;
+    let mut blocks = Vec::new();
+    for row in grid {
+        let cells = row
+            .as_array()
+            .ok_or_else(|| "each block row must be a list".to_string())?;
+        let mut r = Vec::new();
+        for c in cells {
+            r.push(coerce_expr(c)?);
+        }
+        blocks.push(r);
+    }
+    wrap(matexpr::block(blocks)?)
+});
+
+la_ffi!(linalg_collapse, |args: &Value| {
+    let e = arg_expr_opt(args, &["expr", "a", "式"])?;
+    wrap(matexpr::collapse(e)?)
+});
+
 fn dense_arg(args: &Value, keys: &[&str]) -> Result<dense::Mat, String> {
     for k in keys {
         if let Some(v) = args.get(*k) {
@@ -450,6 +483,9 @@ pub unsafe extern "C" fn marqdo_plugin_init(host: *const MarqdoHostApi) -> c_int
         ("linalg_trace", "expr", linalg_trace as PluginFn),
         ("linalg_solve", "a,b", linalg_solve as PluginFn),
         ("linalg_matmul", "a,b", linalg_matmul as PluginFn),
+        ("linalg_kron", "a,b", linalg_kron as PluginFn),
+        ("linalg_block", "blocks", linalg_block as PluginFn),
+        ("linalg_collapse", "expr", linalg_collapse as PluginFn),
     ];
     for (name, params, f) in regs {
         let c_name = CString::new(name).unwrap();

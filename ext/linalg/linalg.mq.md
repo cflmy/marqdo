@@ -161,6 +161,31 @@ Dense matrix product → `linalg_dense`.
 > ensure_plugin
 **> linalg_matmul a=`a` b=`b`**
 
+## kron
+    + `a`
+    + `b`
+
+Lazy Kronecker product (does not expand).
+
+> ensure_plugin
+**> linalg_kron a=`a` b=`b`**
+
+## block
+    + `blocks`
+
+Block matrix from a nested list of expressions.
+
+> ensure_plugin
+**> linalg_block blocks=`blocks`**
+
+## collapse
+    + `expr`
+
+Block-level collapse (`Block*Block` → block of products).
+
+> ensure_plugin
+**> linalg_collapse expr=`expr`**
+
 ## symbol
     + `name`
     + `rows`

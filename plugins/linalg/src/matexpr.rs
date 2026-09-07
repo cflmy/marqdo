@@ -84,6 +84,14 @@ pub enum Expr {
     Inv {
         arg: Box<Expr>,
     },
+    /// Block matrix grid (rows of block rows).
+    Block {
+        blocks: Vec<Vec<Expr>>,
+    },
+    /// Kronecker product (lazy; do not expand by default).
+    Kron {
+        factors: Vec<Expr>,
+    },
 }
 
 impl Expr {
@@ -167,6 +175,19 @@ impl Expr {
                 }
                 Ok((r, c))
             }
+            Expr::Block { blocks } => block_shape(blocks),
+            Expr::Kron { factors } => {
+                if factors.is_empty() {
+                    return Err("empty Kronecker product".into());
+                }
+                let (mut rows, mut cols) = factors[0].shape()?;
+                for f in &factors[1..] {
+                    let (r, c) = f.shape()?;
+                    rows = dim_mul(&rows, &r)?;
+                    cols = dim_mul(&cols, &c)?;
+                }
+                Ok((rows, cols))
+            }
         }
     }
 
@@ -216,6 +237,31 @@ impl Expr {
                     format!("({inner})^-1")
                 }
             }
+            Expr::Block { blocks } => {
+                let rows: Vec<String> = blocks
+                    .iter()
+                    .map(|row| {
+                        let cells: Vec<String> = row.iter().map(|b| b.ascii()).collect();
+                        format!("[{}]", cells.join(", "))
+                    })
+                    .collect();
+                format!("Block[{}]", rows.join("; "))
+            }
+            Expr::Kron { factors } => factors
+                .iter()
+                .map(|f| {
+                    let s = f.ascii();
+                    if matches!(
+                        f,
+                        Expr::Add { .. } | Expr::Sub { .. } | Expr::Mul { .. } | Expr::Block { .. }
+                    ) {
+                        format!("({s})")
+                    } else {
+                        s
+                    }
+                })
+                .collect::<Vec<_>>()
+                .join("⊗"),
         }
     }
 
@@ -267,6 +313,36 @@ impl Expr {
                     format!("\\left({inner}\\right)^{{-1}}")
                 }
             }
+            Expr::Block { blocks } => {
+                let body: Vec<String> = blocks
+                    .iter()
+                    .map(|row| {
+                        row.iter()
+                            .map(|b| b.latex())
+                            .collect::<Vec<_>>()
+                            .join(" & ")
+                    })
+                    .collect();
+                format!(
+                    "\\begin{{bmatrix}}{}\\end{{bmatrix}}",
+                    body.join(" \\\\ ")
+                )
+            }
+            Expr::Kron { factors } => factors
+                .iter()
+                .map(|f| {
+                    let s = f.latex();
+                    if matches!(
+                        f,
+                        Expr::Add { .. } | Expr::Sub { .. } | Expr::Mul { .. } | Expr::Block { .. }
+                    ) {
+                        format!("\\left({s}\\right)")
+                    } else {
+                        s
+                    }
+                })
+                .collect::<Vec<_>>()
+                .join(" \\otimes "),
         }
     }
 
@@ -320,6 +396,23 @@ impl Expr {
             Expr::Inv { arg } => {
                 obj.insert("kind".into(), json!("inv"));
                 obj.insert("arg".into(), arg.to_value()?);
+            }
+            Expr::Block { blocks } => {
+                obj.insert("kind".into(), json!("block"));
+                let mut grid = Vec::new();
+                for row in blocks {
+                    let mut r = Vec::new();
+                    for b in row {
+                        r.push(b.to_value()?);
+                    }
+                    grid.push(Value::Array(r));
+                }
+                obj.insert("blocks".into(), Value::Array(grid));
+            }
+            Expr::Kron { factors } => {
+                obj.insert("kind".into(), json!("kron"));
+                let kids: Result<Vec<_>, _> = factors.iter().map(|f| f.to_value()).collect();
+                obj.insert("factors".into(), Value::Array(kids?));
             }
         }
         Ok(Value::Object(obj))
@@ -389,6 +482,35 @@ impl Expr {
             "inv" => Ok(Expr::Inv {
                 arg: Box::new(Expr::from_value(obj.get("arg").ok_or("inv missing arg")?)?),
             }),
+            "block" => {
+                let grid = obj
+                    .get("blocks")
+                    .and_then(|x| x.as_array())
+                    .ok_or("block missing blocks")?;
+                let mut blocks = Vec::new();
+                for row in grid {
+                    let cells = row
+                        .as_array()
+                        .ok_or("block row must be a list")?;
+                    let row: Result<Vec<_>, _> =
+                        cells.iter().map(Expr::from_value).collect();
+                    blocks.push(row?);
+                }
+                let expr = Expr::Block { blocks };
+                let _ = expr.shape()?;
+                Ok(expr)
+            }
+            "kron" => {
+                let factors = obj
+                    .get("factors")
+                    .and_then(|x| x.as_array())
+                    .ok_or("kron missing factors")?;
+                let factors: Result<Vec<_>, _> =
+                    factors.iter().map(Expr::from_value).collect();
+                Ok(Expr::Kron {
+                    factors: flatten_kron(factors?),
+                })
+            },
             other => Err(format!("unknown linalg_expr kind `{other}`")),
         }
     }
@@ -402,6 +524,76 @@ fn dims_eq(a: &Dim, b: &Dim) -> bool {
         // for teaching formulas like n×n with concrete later; strict mode would reject.
         (Dim::Int(_), Dim::Sym(_)) | (Dim::Sym(_), Dim::Int(_)) => true,
     }
+}
+
+fn dim_add(a: &Dim, b: &Dim) -> Result<Dim, String> {
+    match (a, b) {
+        (Dim::Int(x), Dim::Int(y)) => Ok(Dim::Int(x + y)),
+        (Dim::Sym(x), Dim::Sym(y)) => Ok(Dim::Sym(format!("({x}+{y})"))),
+        (Dim::Int(x), Dim::Sym(y)) => Ok(Dim::Sym(format!("({x}+{y})"))),
+        (Dim::Sym(x), Dim::Int(y)) => Ok(Dim::Sym(format!("({x}+{y})"))),
+    }
+}
+
+fn dim_mul(a: &Dim, b: &Dim) -> Result<Dim, String> {
+    match (a, b) {
+        (Dim::Int(x), Dim::Int(y)) => Ok(Dim::Int(x.saturating_mul(*y))),
+        (Dim::Sym(x), Dim::Sym(y)) => Ok(Dim::Sym(format!("({x}*{y})"))),
+        (Dim::Int(x), Dim::Sym(y)) => Ok(Dim::Sym(format!("({x}*{y})"))),
+        (Dim::Sym(x), Dim::Int(y)) => Ok(Dim::Sym(format!("({x}*{y})"))),
+    }
+}
+
+fn block_shape(blocks: &[Vec<Expr>]) -> Result<(Dim, Dim), String> {
+    if blocks.is_empty() || blocks[0].is_empty() {
+        return Err("empty block matrix".into());
+    }
+    let br = blocks.len();
+    let bc = blocks[0].len();
+    if blocks.iter().any(|row| row.len() != bc) {
+        return Err("block matrix rows must have equal width".into());
+    }
+    // Row heights: from column 0
+    let mut row_heights = Vec::with_capacity(br);
+    for i in 0..br {
+        let (h, _) = blocks[i][0].shape()?;
+        for j in 1..bc {
+            let (h2, _) = blocks[i][j].shape()?;
+            if !dims_eq(&h, &h2) {
+                return Err(format!(
+                    "block row {i}: incompatible heights {} vs {}",
+                    h.ascii(),
+                    h2.ascii()
+                ));
+            }
+        }
+        row_heights.push(h);
+    }
+    // Col widths: from row 0
+    let mut col_widths = Vec::with_capacity(bc);
+    for j in 0..bc {
+        let (_, w) = blocks[0][j].shape()?;
+        for i in 1..br {
+            let (_, w2) = blocks[i][j].shape()?;
+            if !dims_eq(&w, &w2) {
+                return Err(format!(
+                    "block col {j}: incompatible widths {} vs {}",
+                    w.ascii(),
+                    w2.ascii()
+                ));
+            }
+        }
+        col_widths.push(w);
+    }
+    let mut rows = row_heights[0].clone();
+    for h in &row_heights[1..] {
+        rows = dim_add(&rows, h)?;
+    }
+    let mut cols = col_widths[0].clone();
+    for w in &col_widths[1..] {
+        cols = dim_add(&cols, w)?;
+    }
+    Ok((rows, cols))
 }
 
 fn parse_dense(v: &Value) -> Result<Vec<Vec<f64>>, String> {
@@ -541,12 +733,14 @@ fn simplify_once(expr: Expr) -> Result<Expr, String> {
         Expr::Add { terms } => {
             let terms: Result<Vec<_>, _> = terms.into_iter().map(simplify_once).collect();
             let mut terms = terms?;
+            let zero_shape = terms.iter().find_map(|t| match t {
+                Expr::Zero { rows, cols } => Some((rows.clone(), cols.clone())),
+                _ => None,
+            });
             terms.retain(|t| !is_zero(t));
             if terms.is_empty() {
-                return Ok(Expr::Zero {
-                    rows: Dim::Int(0),
-                    cols: Dim::Int(0),
-                });
+                let (rows, cols) = zero_shape.unwrap_or((Dim::Int(0), Dim::Int(0)));
+                return Ok(Expr::Zero { rows, cols });
             }
             if terms.len() == 1 {
                 return Ok(terms.pop().unwrap());
@@ -603,6 +797,34 @@ fn simplify_once(expr: Expr) -> Result<Expr, String> {
                     rows: cols,
                     cols: rows,
                 }),
+                // Block^T → block of transposed tiles, swapped indices
+                Expr::Block { blocks } => {
+                    if blocks.is_empty() {
+                        return Ok(Expr::Block { blocks });
+                    }
+                    let br = blocks.len();
+                    let bc = blocks[0].len();
+                    let mut out = vec![vec![]; bc];
+                    for j in 0..bc {
+                        out[j] = Vec::with_capacity(br);
+                        for i in 0..br {
+                            out[j].push(Expr::Transpose {
+                                arg: Box::new(blocks[i][j].clone()),
+                            });
+                        }
+                    }
+                    simplify_once(Expr::Block { blocks: out })
+                }
+                // (A⊗B)^T → A^T ⊗ B^T
+                Expr::Kron { factors } => {
+                    let factors = factors
+                        .into_iter()
+                        .map(|f| Expr::Transpose {
+                            arg: Box::new(f),
+                        })
+                        .collect();
+                    simplify_once(Expr::Kron { factors })
+                }
                 other => Ok(Expr::Transpose {
                     arg: Box::new(other),
                 }),
@@ -620,7 +842,133 @@ fn simplify_once(expr: Expr) -> Result<Expr, String> {
                 }),
             }
         }
+        Expr::Block { blocks } => {
+            let mut out = Vec::new();
+            for row in blocks {
+                let mut r = Vec::new();
+                for b in row {
+                    r.push(simplify_once(b)?);
+                }
+                out.push(r);
+            }
+            Ok(Expr::Block { blocks: out })
+        }
+        Expr::Kron { factors } => {
+            // R7: flatten nested Kronecker
+            let factors: Result<Vec<_>, _> = flatten_kron(factors)
+                .into_iter()
+                .map(simplify_once)
+                .collect();
+            let mut factors = factors?;
+            if factors.len() == 1 {
+                return Ok(factors.pop().unwrap());
+            }
+            Ok(Expr::Kron { factors })
+        }
         Expr::Symbol { .. } | Expr::Eye { .. } | Expr::Zero { .. } | Expr::Dense { .. } => {
+            Ok(expr)
+        }
+    }
+}
+
+fn flatten_kron(factors: Vec<Expr>) -> Vec<Expr> {
+    let mut out = Vec::new();
+    for f in factors {
+        match f {
+            Expr::Kron { factors: inner } => out.extend(flatten_kron(inner)),
+            other => out.push(other),
+        }
+    }
+    out
+}
+
+/// Block-level collapse (R6 subset): `Block * Block` → block of products.
+pub fn collapse(expr: Expr) -> Result<Expr, String> {
+    let expr = simplify(expr)?;
+    collapse_once(expr)
+}
+
+fn collapse_once(expr: Expr) -> Result<Expr, String> {
+    match expr {
+        Expr::Mul { factors } => {
+            let factors: Result<Vec<_>, _> =
+                flatten_mul(factors).into_iter().map(collapse_once).collect();
+            let factors = factors?;
+            let mut acc = factors[0].clone();
+            for f in factors.into_iter().skip(1) {
+                acc = collapse_mul_pair(acc, f)?;
+            }
+            Ok(acc)
+        }
+        Expr::Block { blocks } => {
+            let mut out = Vec::new();
+            for row in blocks {
+                let mut r = Vec::new();
+                for b in row {
+                    r.push(collapse_once(b)?);
+                }
+                out.push(r);
+            }
+            Ok(Expr::Block { blocks: out })
+        }
+        Expr::Add { terms } => {
+            let terms: Result<Vec<_>, _> = terms.into_iter().map(collapse_once).collect();
+            Ok(Expr::Add { terms: terms? })
+        }
+        Expr::Sub { left, right } => Ok(Expr::Sub {
+            left: Box::new(collapse_once(*left)?),
+            right: Box::new(collapse_once(*right)?),
+        }),
+        Expr::Transpose { arg } => Ok(Expr::Transpose {
+            arg: Box::new(collapse_once(*arg)?),
+        }),
+        Expr::Inv { arg } => Ok(Expr::Inv {
+            arg: Box::new(collapse_once(*arg)?),
+        }),
+        Expr::Kron { factors } => {
+            let factors: Result<Vec<_>, _> = factors.into_iter().map(collapse_once).collect();
+            Ok(Expr::Kron {
+                factors: flatten_kron(factors?),
+            })
+        }
+        other => Ok(other),
+    }
+}
+
+fn collapse_mul_pair(a: Expr, b: Expr) -> Result<Expr, String> {
+    match (a, b) {
+        (Expr::Block { blocks: left }, Expr::Block { blocks: right }) => {
+            let lr = left.len();
+            let lc = left[0].len();
+            let rr = right.len();
+            let rc = right[0].len();
+            if lc != rr {
+                return Err(format!(
+                    "block mul: left cols {lc} != right rows {rr}"
+                ));
+            }
+            let mut out = Vec::with_capacity(lr);
+            for i in 0..lr {
+                let mut row = Vec::with_capacity(rc);
+                for j in 0..rc {
+                    let mut term = mul(left[i][0].clone(), right[0][j].clone())?;
+                    for k in 1..lc {
+                        let p = mul(left[i][k].clone(), right[k][j].clone())?;
+                        term = add(term, p)?;
+                    }
+                    row.push(simplify(term)?);
+                }
+                out.push(row);
+            }
+            let expr = Expr::Block { blocks: out };
+            let _ = expr.shape()?;
+            Ok(expr)
+        }
+        (a, b) => {
+            let expr = Expr::Mul {
+                factors: flatten_mul(vec![a, b]),
+            };
+            let _ = expr.shape()?;
             Ok(expr)
         }
     }
@@ -694,6 +1042,20 @@ pub fn from_list(data: Vec<Vec<f64>>) -> Result<Expr, String> {
     Ok(Expr::Dense { data })
 }
 
+pub fn block(blocks: Vec<Vec<Expr>>) -> Result<Expr, String> {
+    let expr = Expr::Block { blocks };
+    let _ = expr.shape()?;
+    Ok(expr)
+}
+
+pub fn kron(a: Expr, b: Expr) -> Result<Expr, String> {
+    let expr = Expr::Kron {
+        factors: flatten_kron(vec![a, b]),
+    };
+    let _ = expr.shape()?;
+    Ok(expr)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -721,5 +1083,56 @@ mod tests {
         let a = symbol("A", Dim::Int(2), Dim::Int(2));
         let b = symbol("B", Dim::Int(3), Dim::Int(3));
         assert!(mul(a, b).is_err());
+    }
+
+    #[test]
+    fn kron_lazy_ascii() {
+        let a = symbol("A", Dim::Int(2), Dim::Int(2));
+        let b = symbol("B", Dim::Int(2), Dim::Int(2));
+        let k = kron(a, b).unwrap();
+        assert_eq!(k.ascii(), "A⊗B");
+        let (r, c) = k.shape().unwrap();
+        assert_eq!(r, Dim::Int(4));
+        assert_eq!(c, Dim::Int(4));
+    }
+
+    #[test]
+    fn block_collapse_mul() {
+        let a = symbol("A", Dim::Int(2), Dim::Int(2));
+        let b = symbol("B", Dim::Int(2), Dim::Int(2));
+        let z = zeros(Dim::Int(2), Dim::Int(2));
+        let left = block(vec![
+            vec![a.clone(), b.clone()],
+            vec![z.clone(), a.clone()],
+        ])
+        .unwrap();
+        let right = block(vec![
+            vec![a.clone(), z.clone()],
+            vec![z.clone(), b.clone()],
+        ])
+        .unwrap();
+        let p = mul(left, right).unwrap();
+        let c = collapse(p).unwrap();
+        // [[A,B],[0,A]] * [[A,0],[0,B]] → [[A*A, B*B],[0, A*B]]
+        assert!(matches!(c, Expr::Block { .. }));
+        assert_eq!(c.ascii(), "Block[[A*A, B*B]; [0(2×2), A*B]]");
+    }
+
+    #[test]
+    fn block_collapse_same_blocks() {
+        let a = symbol("A", Dim::Int(2), Dim::Int(2));
+        let b = symbol("B", Dim::Int(2), Dim::Int(2));
+        let z = zeros(Dim::Int(2), Dim::Int(2));
+        let m = block(vec![
+            vec![a.clone(), b.clone()],
+            vec![z.clone(), a.clone()],
+        ])
+        .unwrap();
+        let p = mul(m.clone(), m).unwrap();
+        let c = collapse(p).unwrap();
+        assert_eq!(
+            c.ascii(),
+            "Block[[A*A, A*B + B*A]; [0(2×2), A*A]]"
+        );
     }
 }
