@@ -2465,6 +2465,25 @@ txn-rollback-ok",
 }
 
 #[test]
+fn ext_linalg_factor_smoke() {
+    let status = Command::new("cargo")
+        .args(["build", "-p", "marqdo_plugin_linalg"])
+        .current_dir(env!("CARGO_MANIFEST_DIR"))
+        .status()
+        .expect("build linalg plugin");
+    assert!(status.success(), "failed to build marqdo_plugin_linalg");
+    assert_out(
+        "tests/ext/linalg-factor-smoke.mq.md",
+        "eig-kind-ok\neig-val-ok\ndraw-kind-ok\ndraw-mark-ok\nlu-solve-ok\nsvd-ok",
+    );
+    let svg = std::fs::read_to_string("tests/ext/linalg-factor-eig.svg").unwrap_or_default();
+    assert!(
+        svg.contains("<svg") && svg.contains(r#"data-linalg="eig""#),
+        "expected eig structure svg"
+    );
+}
+
+#[test]
 fn ext_linalg_block_kron() {
     let status = Command::new("cargo")
         .args(["build", "-p", "marqdo_plugin_linalg"])

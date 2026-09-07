@@ -63,6 +63,7 @@ plugins/*/tmp/
 
 # Quantum draw/SVG runtime outputs (sources & gold .mq.md stay tracked)
 /tests/ext/quantum-*.svg
+/tests/ext/linalg-*.svg
 /examples/quantum-*/**/*.svg
 /examples/quantum-*/*.svg
 

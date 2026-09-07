@@ -144,13 +144,14 @@ Evaluate a MatExpr tree of dense/eye/zero ops to `linalg_dense` (symbols rejecte
 **> linalg_trace expr=`expr`**
 
 ## solve
-    + `a`
+    + `a`=None
     + `b`
+    + `factor`=None
 
-Solve `a x = b` (Gaussian elimination). Returns `linalg_solve`.
+Solve `a x = b` (Gaussian elimination), or reuse `factorize kind=lu` via `factor` + `b`.
 
 > ensure_plugin
-**> linalg_solve a=`a` b=`b`**
+**> linalg_solve a=`a` b=`b` factor=`factor`**
 
 ## matmul
     + `a`
@@ -185,6 +186,25 @@ Block-level collapse (`Block*Block` → block of products).
 
 > ensure_plugin
 **> linalg_collapse expr=`expr`**
+
+## factorize
+    + `matrix`
+    + `kind`="lu"
+
+Dense factorization → `linalg_factor` (`kind` = `lu` | `qr` | `svd` | `eig` | `chol`).
+
+> ensure_plugin
+**> linalg_factorize matrix=`matrix` kind=`kind`**
+
+## draw
+    + `factor`
+    + `kind`=None
+    + `path`=None
+
+Structure SVG for a factor or dense matrix (`eig` | `svd` | `qr` | `lu` | `ge` | `chol` | `structure` | `heatmap` | `hinton`).
+
+> ensure_plugin
+**> linalg_draw factor=`factor` kind=`kind` path=`path`**
 
 ## symbol
     + `name`

@@ -1,6 +1,8 @@
 //! Marqdo linalg plugin (C ABI v2): formula-first matrix expressions.
 
 mod dense;
+mod draw;
+mod factor;
 mod matexpr;
 
 use std::ffi::{CStr, CString};
@@ -206,7 +208,16 @@ la_ffi!(linalg_ping, |_args: &Value| {
         "ok": true,
         "name": "linalg",
         "abi": ABI_VERSION,
-        "features": ["matexpr", "simplify", "dense", "solve", "block", "kron"],
+        "features": [
+            "matexpr",
+            "simplify",
+            "dense",
+            "solve",
+            "block",
+            "kron",
+            "factorize",
+            "draw",
+        ],
     }))
 });
 
@@ -380,8 +391,22 @@ la_ffi!(linalg_trace, |args: &Value| {
 });
 
 la_ffi!(linalg_solve, |args: &Value| {
-    let a = dense_arg(args, &["a", "A", "matrix", "矩阵", "左"])?;
     let b = dense_arg(args, &["b", "B", "rhs", "右"])?;
+    if let Some(f) = args
+        .get("factor")
+        .or_else(|| args.get("分解"))
+        .filter(|v| !v.is_null())
+    {
+        let x = factor::solve_lu_factor(f, &b)?;
+        return dense::to_dense_value(&x).map(|xv| {
+            json!({
+                "_type": "linalg_solve",
+                "method": "lu",
+                "x": xv,
+            })
+        });
+    }
+    let a = dense_arg(args, &["a", "A", "matrix", "矩阵", "左"])?;
     dense::solve_result(&a, &b)
 });
 
@@ -422,6 +447,45 @@ la_ffi!(linalg_block, |args: &Value| {
 la_ffi!(linalg_collapse, |args: &Value| {
     let e = arg_expr_opt(args, &["expr", "a", "式"])?;
     wrap(matexpr::collapse(e)?)
+});
+
+la_ffi!(linalg_factorize, |args: &Value| {
+    let m = dense_arg(args, &["matrix", "expr", "a", "矩阵", "式"])?;
+    let kind = args
+        .get("kind")
+        .or_else(|| args.get("类型"))
+        .and_then(|x| x.as_str())
+        .unwrap_or("lu");
+    factor::factorize(&m, kind)
+});
+
+la_ffi!(linalg_draw, |args: &Value| {
+    let factor_v = args
+        .get("factor")
+        .or_else(|| args.get("分解"))
+        .or_else(|| args.get("expr"))
+        .or_else(|| args.get("matrix"))
+        .or_else(|| args.get("式"))
+        .or_else(|| args.get("矩阵"))
+        .ok_or_else(|| "missing `factor`".to_string())?;
+    let kind = args
+        .get("kind")
+        .or_else(|| args.get("类型"))
+        .and_then(|x| x.as_str());
+    let path = args
+        .get("path")
+        .or_else(|| args.get("路径"))
+        .and_then(|x| x.as_str())
+        .filter(|s| !s.is_empty());
+    let svg = draw::draw_factor(factor_v, kind, path)?;
+    let _ = record_plot(&svg, path);
+    Ok(json!({
+        "_type": "linalg_svg",
+        "kind": kind
+            .or_else(|| factor_v.get("kind").and_then(|k| k.as_str()))
+            .unwrap_or("structure"),
+        "svg": svg,
+    }))
 });
 
 fn dense_arg(args: &Value, keys: &[&str]) -> Result<dense::Mat, String> {
@@ -481,11 +545,13 @@ pub unsafe extern "C" fn marqdo_plugin_init(host: *const MarqdoHostApi) -> c_int
         ("linalg_explicit", "expr", linalg_explicit as PluginFn),
         ("linalg_det", "expr", linalg_det as PluginFn),
         ("linalg_trace", "expr", linalg_trace as PluginFn),
-        ("linalg_solve", "a,b", linalg_solve as PluginFn),
+        ("linalg_solve", "a,b,factor", linalg_solve as PluginFn),
         ("linalg_matmul", "a,b", linalg_matmul as PluginFn),
         ("linalg_kron", "a,b", linalg_kron as PluginFn),
         ("linalg_block", "blocks", linalg_block as PluginFn),
         ("linalg_collapse", "expr", linalg_collapse as PluginFn),
+        ("linalg_factorize", "matrix,kind", linalg_factorize as PluginFn),
+        ("linalg_draw", "factor,kind,path", linalg_draw as PluginFn),
     ];
     for (name, params, f) in regs {
         let c_name = CString::new(name).unwrap();
