@@ -1096,6 +1096,32 @@ fn lib_fs_copy_zh() {
 }
 
 #[test]
+fn lib_hash_smoke() {
+    assert_out(
+        "tests/lib/hash-smoke.mq.md",
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\nba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad\n5d41402abc4b2a76b9719d911017c592\nf7bc83f430538424b13298e6aa6fb143ef4d59a14946175997479dbc2d1a3cd8",
+    );
+}
+
+#[test]
+fn lib_hash_smoke_zh() {
+    assert_out(
+        "tests/lib/哈希-烟测.mq.md",
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\n5d41402abc4b2a76b9719d911017c592",
+    );
+}
+
+#[test]
+fn lib_secrets_smoke() {
+    assert_out("tests/lib/secrets-smoke.mq.md", "16\n12");
+}
+
+#[test]
+fn lib_secrets_smoke_zh() {
+    assert_out("tests/lib/机密-烟测.mq.md", "16");
+}
+
+#[test]
 fn lib_re_smoke() {
     assert_out(
         "tests/lib/re-smoke.mq.md",

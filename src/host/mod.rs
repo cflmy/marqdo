@@ -12,11 +12,13 @@ pub mod event_bus;
 #[cfg(feature = "exec-host")]
 pub mod foreign;
 mod fs;
+mod hash;
 pub(crate) mod json;
 pub mod math;
 mod net;
 mod path;
 mod re;
+mod secrets;
 #[cfg(feature = "plugin-host")]
 pub mod plugin;
 #[cfg(not(feature = "plugin-host"))]

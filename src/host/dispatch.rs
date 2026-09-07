@@ -2,7 +2,9 @@
 
 use std::collections::HashMap;
 
-use crate::host::{encoding, fs, json, math, net, path, re, sys, time, writeback, HostContext};
+use crate::host::{
+    encoding, fs, hash, json, math, net, path, re, secrets, sys, time, writeback, HostContext,
+};
 #[cfg(feature = "exec-host")]
 use crate::host::{foreign, subtask};
 #[cfg(feature = "plugin-host")]
@@ -147,6 +149,12 @@ pub enum HostFn {
     FsCopyFile = 141,
     FsMove = 142,
     FsMakeTemp = 143,
+    HashSha256 = 144,
+    HashSha1 = 145,
+    HashMd5 = 146,
+    HashHmacSha256 = 147,
+    SecretsTokenHex = 148,
+    SecretsTokenUrlsafe = 149,
 }
 
 
@@ -287,6 +295,12 @@ impl HostFn {
             141 => Self::FsCopyFile,
             142 => Self::FsMove,
             143 => Self::FsMakeTemp,
+            144 => Self::HashSha256,
+            145 => Self::HashSha1,
+            146 => Self::HashMd5,
+            147 => Self::HashHmacSha256,
+            148 => Self::SecretsTokenHex,
+            149 => Self::SecretsTokenUrlsafe,
             _ => return None,
         })
     }
@@ -430,6 +444,12 @@ impl HostFn {
             "host_copy_file" | "copy_file" => Self::FsCopyFile,
             "host_move" | "move_path" => Self::FsMove,
             "host_make_temp" | "make_temp" => Self::FsMakeTemp,
+            "host_hash_sha256" | "hash_sha256" => Self::HashSha256,
+            "host_hash_sha1" | "hash_sha1" => Self::HashSha1,
+            "host_hash_md5" | "hash_md5" => Self::HashMd5,
+            "host_hash_hmac_sha256" | "hash_hmac_sha256" => Self::HashHmacSha256,
+            "host_secrets_token_hex" | "secrets_token_hex" => Self::SecretsTokenHex,
+            "host_secrets_token_urlsafe" | "secrets_token_urlsafe" => Self::SecretsTokenUrlsafe,
             _ => return None,
         })
     }
@@ -560,6 +580,12 @@ impl HostFn {
             Self::FsCopyFile => "host_copy_file",
             Self::FsMove => "host_move",
             Self::FsMakeTemp => "host_make_temp",
+            Self::HashSha256 => "host_hash_sha256",
+            Self::HashSha1 => "host_hash_sha1",
+            Self::HashMd5 => "host_hash_md5",
+            Self::HashHmacSha256 => "host_hash_hmac_sha256",
+            Self::SecretsTokenHex => "host_secrets_token_hex",
+            Self::SecretsTokenUrlsafe => "host_secrets_token_urlsafe",
             Self::WritebackRecord => "host_writeback_record",
             Self::WritebackGet => "host_writeback_get",
             Self::WritebackClear => "host_writeback_clear",
@@ -662,6 +688,9 @@ impl HostFn {
             | Self::PathIsAbsolute => &["path"],
             Self::FsCopyFile | Self::FsMove => &["src", "dest"],
             Self::FsMakeTemp => &[],
+            Self::HashSha256 | Self::HashSha1 | Self::HashMd5 => &["text"],
+            Self::HashHmacSha256 => &["key", "text"],
+            Self::SecretsTokenHex | Self::SecretsTokenUrlsafe => &[],
             Self::WritebackRecord => &["value"],
             Self::WritebackGet | Self::WritebackClear => &[],
             Self::WritebackList => &[],
@@ -696,6 +725,7 @@ impl HostFn {
             Self::ListSlice => &["end"],
             Self::ReReplace => &["count"],
             Self::FsMakeTemp => &["prefix"],
+            Self::SecretsTokenHex | Self::SecretsTokenUrlsafe => &["n"],
             _ => &[],
         }
     }
@@ -1091,6 +1121,14 @@ pub fn call_host(
         }
         HostFn::FsMove => fs::move_path(ctx, require(bound, "src")?, require(bound, "dest")?),
         HostFn::FsMakeTemp => fs::make_temp(ctx, bound.get("prefix")),
+        HostFn::HashSha256 => hash::sha256(require(bound, "text")?),
+        HostFn::HashSha1 => hash::sha1(require(bound, "text")?),
+        HostFn::HashMd5 => hash::md5(require(bound, "text")?),
+        HostFn::HashHmacSha256 => {
+            hash::hmac_sha256(require(bound, "key")?, require(bound, "text")?)
+        }
+        HostFn::SecretsTokenHex => secrets::token_hex(bound.get("n")),
+        HostFn::SecretsTokenUrlsafe => secrets::token_urlsafe(bound.get("n")),
         HostFn::OuterCallLine => Ok(Value::Int(
             ctx.call_site_lines
                 .first()

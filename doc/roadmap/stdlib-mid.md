@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| 状态 | **M1–M2 已落地 · M3–M6 规划中** |
+| 状态 | **M1–M3 已落地 · M4–M6 规划中** |
 | 日期 | 2026-09-07 |
 | 设计 | [stdlib-mid.md](../design/stdlib-mid.md) |
 | 相关 | [stdlib-modules.md](../design/stdlib-modules.md) · [next-phase.md](next-phase.md) · [ext-cli.md](../design/ext-cli.md) |
@@ -80,13 +80,16 @@ M6  可观测与标识         log + uuid（+ 可选 yaml）
 
 ---
 
-### M3 — 哈希与机密
+### M3 — 哈希与机密 — **done**
 
 | 交付 | 说明 |
 |------|------|
-| `lib/hash.mq.md` / `lib/哈希.mq.md` | `sha256` / `sha1` / `md5`（文档标明「完整性标识，非密码存储」）/ `hmac_sha256` |
-| `lib/secrets.mq.md` / `lib/机密.mq.md` | `token_hex` / `token_urlsafe`；**禁止**与 `math.random` 混用文档 |
-| 验收 | 已知向量金样；agent/web 若有手写摘要可改为依赖本库（可选跟进） |
+| `lib/hash.mq.md` / `lib/哈希.mq.md` | `sha256` / `sha1` / `md5` / `hmac_sha256` |
+| `lib/secrets.mq.md` / `lib/机密.mq.md` | `token_hex` / `token_urlsafe` |
+| Host | `host_hash_*`、`host_secrets_*`（`sha2`/`sha1`/`md-5`/`hmac`/`getrandom`） |
+| 金样 | `hash-smoke` · `哈希-烟测` · `secrets-smoke` · `机密-烟测` |
+| 文档 | [stdlib-hash.md](../design/stdlib-hash.md) · [stdlib-secrets.md](../design/stdlib-secrets.md) · public `10-hash-secrets` |
+| 验收 | 已知向量 + 令牌长度 |
 
 **刻意不做：** 密码哈希（Argon2/bcrypt）、完整 TLS、证书管理——仍属服务端/安全产品。
 

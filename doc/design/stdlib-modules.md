@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| 状态 | **核心已落地**；**中层 Mid：M1–M2 已落地** · [stdlib-mid.md](stdlib-mid.md) / [roadmap/stdlib-mid.md](../roadmap/stdlib-mid.md) |
+| 状态 | **核心已落地**；**中层 Mid：M1–M3 已落地** · [stdlib-mid.md](stdlib-mid.md) / [roadmap/stdlib-mid.md](../roadmap/stdlib-mid.md) |
 | 日期 | 2026-09-07 |
 | 原则 | 全部经 frontmatter **导入**；除 JSON 外中英分文件；内核保持少而精；**通用能力优先 Mid，插件留给领域核** |
 | 相关 | [stdlib.md](stdlib.md) · [stdlib-i18n.md](stdlib-i18n.md) · [stdlib-mid.md](stdlib-mid.md) · [ext-abi.md](ext-abi.md) · [ext-llm.md](ext-llm.md) · [ext-agent.md](ext-agent.md) · [**module-namespace.md**](module-namespace.md)（导入命名空间；**M1/M2 已落地**：`库.成员` / `库.对象.成员` / `use`） |
@@ -19,6 +19,8 @@
 | **正则** | `lib/re.mq.md` | `lib/正则.mq.md` | **Mid M1** |
 | **编解码** | `lib/encoding.mq.md` | `lib/编码.mq.md` | **Mid M1** |
 | **路径** | `lib/path.mq.md` | `lib/路径.mq.md` | **Mid M2** |
+| **哈希** | `lib/hash.mq.md` | `lib/哈希.mq.md` | **Mid M3** |
+| **机密** | `lib/secrets.mq.md` | `lib/机密.mq.md` | **Mid M3** |
 | 表 | `lib/table.mq.md` | `lib/表.mq.md` | 已有（`put`/`改` + list/map；见 [stdlib-table.md](stdlib-table.md)） |
 | 浏览器效应 | `lib/browser.mq.md` | `lib/浏览器.mq.md` | WASM 客户端效应助手（GFM + helpers；勿用 `json.set` 链） |
 | 文件 | `lib/fs.mq.md` | `lib/文件.mq.md` | 已有 + Mid M2：`copy_file` / `move` / `make_temp` |
@@ -34,7 +36,7 @@
 
 官方可选扩展（**非** stdlib）：`ext/llm` · `ext/agent` · `ext/web` · `ext/quantum` · `ext/linalg` — 见各 `ext-*.md`。
 
-**中层下一波候选（未落地）：** `hash` / `secrets` / `csv` / … — 见 [stdlib-mid.md](stdlib-mid.md)。**已落地：** M1 `re`/`encoding` · M2 `path` + `fs` 加厚。
+**中层下一波候选（未落地）：** `csv` / text 加厚 / … — 见 [stdlib-mid.md](stdlib-mid.md)。**已落地：** M1–M3（`re`/`encoding`/`path`/`fs+`/`hash`/`secrets`）。
 
 设计细节：[stdlib-writeback.md](stdlib-writeback.md) · [stdlib-subtask.md](stdlib-subtask.md)。
 
