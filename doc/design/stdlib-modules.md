@@ -2,10 +2,10 @@
 
 | | |
 |---|---|
-| 状态 | **已落地**：text/table/fs/sys/time/json/net/math/foreign/**plugin**/browser |
-| 日期 | 2026-08-07 |
-| 原则 | 全部经 frontmatter **导入**；除 JSON 外中英分文件；内核保持少而精 |
-| 相关 | [stdlib.md](stdlib.md) · [stdlib-i18n.md](stdlib-i18n.md) · [ext-abi.md](ext-abi.md) · [ext-llm.md](ext-llm.md) · [ext-agent.md](ext-agent.md) · [**module-namespace.md**](module-namespace.md)（导入命名空间；**M1/M2 已落地**：`库.成员` / `库.对象.成员` / `use`） |
+| 状态 | **核心已落地**；**中层 Mid 见** [stdlib-mid.md](stdlib-mid.md) / [roadmap/stdlib-mid.md](../roadmap/stdlib-mid.md) |
+| 日期 | 2026-09-07 |
+| 原则 | 全部经 frontmatter **导入**；除 JSON 外中英分文件；内核保持少而精；**通用能力优先 Mid，插件留给领域核** |
+| 相关 | [stdlib.md](stdlib.md) · [stdlib-i18n.md](stdlib-i18n.md) · [stdlib-mid.md](stdlib-mid.md) · [ext-abi.md](ext-abi.md) · [ext-llm.md](ext-llm.md) · [ext-agent.md](ext-agent.md) · [**module-namespace.md**](module-namespace.md)（导入命名空间；**M1/M2 已落地**：`库.成员` / `库.对象.成员` / `use`） |
 
 ---
 
@@ -29,7 +29,9 @@
 | **自写回** | `lib/writeback.mq.md` | `lib/自写回.mq.md` | **已有**（Jupyter 式输出写回） |
 | **子任务** | `lib/subtask.mq.md` | `lib/子任务.mq.md` | **已有**（OS 子进程 + KillOnDrop） |
 
-官方可选扩展（**非** stdlib）：`ext/llm` · `ext/agent` — 见 [ext-llm.md](ext-llm.md) / [ext-agent.md](ext-agent.md)。
+官方可选扩展（**非** stdlib）：`ext/llm` · `ext/agent` · `ext/web` · `ext/quantum` · `ext/linalg` — 见各 `ext-*.md`。
+
+**中层下一波候选（未落地）：** `re` / `encoding` / `path` / `hash` / `secrets` / `csv` / … — 准入与波次见 [stdlib-mid.md](stdlib-mid.md)。
 
 设计细节：[stdlib-writeback.md](stdlib-writeback.md) · [stdlib-subtask.md](stdlib-subtask.md)。
 

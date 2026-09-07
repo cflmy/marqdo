@@ -2,12 +2,13 @@
 
 | | |
 |---|---|
-| 状态 | **S0–S3 + L1 全模块落地** |
-| 日期 | 2026-08-07 |
-| 相关 | [keywords.md](keywords.md) · [objects.md](objects.md) · [call-arguments.md](call-arguments.md) · [stdlib-i18n.md](stdlib-i18n.md) · [stdlib-modules.md](stdlib-modules.md) · [module-namespace.md](module-namespace.md) · [ext-abi.md](ext-abi.md) |
+| 状态 | **S0–S3 + 核心 L1 已落地 · 中层 L1（Mid）规划中** |
+| 日期 | 2026-09-07 |
+| 相关 | [keywords.md](keywords.md) · [objects.md](objects.md) · [call-arguments.md](call-arguments.md) · [stdlib-i18n.md](stdlib-i18n.md) · [stdlib-modules.md](stdlib-modules.md) · [**stdlib-mid.md**](stdlib-mid.md) · [module-namespace.md](module-namespace.md) · [ext-abi.md](ext-abi.md) |
 
 > **多语言库命名**：见 [stdlib-i18n.md](stdlib-i18n.md)（不设 `lang:`；中英分文件）。  
 > **L1 模块清单**（含 math/foreign/plugin）：见 [stdlib-modules.md](stdlib-modules.md)。  
+> **中层标准库（数个版本）**：通用原语沉 `lib/`、减少「事事插件」——设计 [stdlib-mid.md](stdlib-mid.md) · 路线 [roadmap/stdlib-mid.md](../roadmap/stdlib-mid.md)。  
 > **`ext/` 不是 stdlib**：官方可选扩展见 [ext-llm.md](ext-llm.md) / [ext-agent.md](ext-agent.md)。
 
 ---
@@ -17,9 +18,10 @@
 | 层 | 内容 |
 |----|------|
 | **L0 内置** | 解释器内：`print` `input` `len` `str` `int` `type` `trim` `split` `join` `at`（`type` 可含 `map`） |
-| **L1 官方库** | 仓库根目录 [`lib/`](../../lib/)（`.mq.md`）；可用 `lib/…` 或别名 `std/…` 导入 |
-| **官方 ext** | [`ext/`](../../ext/)（`.mq.md` + 可选原生插件）；`MARQDO_EXT`；**不属于** L1 |
-| **L2** | catalog / 用户站收录（随发版） |
+| **L1 核心** | 已有 [`lib/`](../../lib/)：fs/sys/time/json/net/math/foreign/plugin/table/text/… |
+| **L1 中层（Mid）** | 规划中：re / encoding / path / hash / csv / … — 仍在 `lib/`，见 [stdlib-mid.md](stdlib-mid.md) |
+| **官方 ext** | [`ext/`](../../ext/)（`.mq.md` + 可选原生插件）；`MARQDO_EXT`；**不属于** L1；插件仅领域热路径 |
+| **L2** | catalog / 用户站收录（随发版）；应主要靠核心+中层、默认无插件 |
 
 ---
 

@@ -18,7 +18,7 @@
 | **诊断** | 语句级 `path:line:col: message`；字节码指令带 `spans`；errors 金样例双后端断言位置 | **P0 完成** |
 | **view** | 结构 + 执行 + 源码 + 函数大纲/搜索；无断点 | 文档浏览器 |
 | **debug** | 独立 `marqdo debug`：断点 / 单步 / locals（树遍历） | **P3-D3 v1** |
-| **标准库** | S0–S3 完成；本波扩展 = 文件/系统/时间/JSON/网络（[stdlib-modules.md](../design/stdlib-modules.md)）；数学/外联暂缓 | **P2 完成；五库扩展设计中** |
+| **标准库** | 核心 L1 已完成（[stdlib-modules.md](../design/stdlib-modules.md)）；下一主线 = **中层 Mid**（[stdlib-mid.md](../design/stdlib-mid.md) · [stdlib-mid 路线](stdlib-mid.md)） | **P2 完成；Mid M1–M6 规划中** |
 | **模块** | [module-namespace.md](../design/module-namespace.md)：**M1+M2 已落地**（库名绑定、`库.成员` / `use`；无扁平合并） | — |
 
 用户点名的三件事都对，但**不能并行硬开**：断点调试依赖「可信位置 + 可暂停执行」；标准库依赖稳定运行时与 I/O；`input` 在 CLI 与 view 是两条路径。
