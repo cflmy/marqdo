@@ -12,8 +12,8 @@ marqdo view PATH          # docs browser, default port 7429
 marqdo debug PATH         # debugger UI, default port 7430
 marqdo catalog PATH -o .marqdo
 marqdo ext list
-marqdo ext add llm|agent|web|quantum
-marqdo ext remove llm|agent|web|quantum
+marqdo ext add llm|agent|web|quantum|linalg
+marqdo ext remove llm|agent|web|quantum|linalg
 ```
 
 Diagnostics look like `path:line:col: message` (1-based line/col).
@@ -57,6 +57,7 @@ Import one file; use **that** file’s function names.
 | `ext/agent.mq.md` | `ext/智能体.mq.md` | document-driven **step** / **plan** + OKF；示例 `examples/agent-pong` · `agent-okf-flywheel`；Wave B：[agent-framework-2026-09.md](../../doc/research/agent-framework-2026-09.md) |
 | `ext/web/web.mq.md` | `ext/web/网页.mq.md` | dynamic sites — see **ext/web** section below |
 | `ext/quantum/quantum.mq.md` | `ext/quantum/量子.mq.md` | circuits + Q7 density/viz + Q8 themes — see **ext/quantum** below |
+| `ext/linalg/linalg.mq.md` | `ext/linalg/线性代数.mq.md` | formula MatExpr + factorize/draw — see **ext/linalg** below |
 
 Open the imported `.mq.md` under `lib/` or `ext/` to see exact `##` / `#` names and parameters. Gold tests: `tests/lib/`, `tests/structure/`, `tests/ext/`.
 
@@ -97,6 +98,16 @@ Install: `marqdo ext add quantum` (`量子`). Native: `cargo build --release -p 
 | Themes (Q8) | `theme="dark"\|"light"\|"bw"` (ZH `主题=`) | default **dark**; circuit/probs/bloch themed; SVG `data-theme` |
 
 Examples: `examples/quantum-bell/`, `examples/quantum-entanglement/`. Design: `doc/design/ext-quantum.md` · Q7: `doc/design/ext-quantum-q7.md` · Q8: `doc/design/ext-quantum-viz-style.md`.
+
+## ext/linalg (formula-first linear algebra)
+
+Install: `marqdo ext add linalg` (`线性代数`). Native: `cargo build --release -p marqdo_plugin_linalg`, then re-run `ext add`.
+
+| EN import | ZH import | Notes |
+|-----------|-----------|-------|
+| `ext/linalg/linalg.mq.md` | `ext/linalg/线性代数.mq.md` | Top-level `symbol`/`mul`/`factorize`/`draw` |
+
+Examples: `examples/linalg-svd/`, `examples/linalg-least-squares/`. Design: `doc/design/ext-linalg.md` · roadmap: `doc/roadmap/ext-linalg.md`.
 
 ## Formula + plot (math)
 
@@ -178,4 +189,5 @@ See `doc/design/call-arguments.md`.
 | `doc/design/ext-quantum.md` | `ext/quantum` circuits |
 | `doc/design/ext-quantum-q7.md` | Q7 density linear algebra + advanced SVG |
 | `doc/design/ext-quantum-viz-style.md` | Q8 themed SVG (`dark`/`light`/`bw`; circuit/probs/bloch) |
+| `doc/design/ext-linalg.md` | `ext/linalg` formula MatExpr + factorize/draw |
 | `doc/design/view-debug.md` | view / debug hosts |

@@ -66,6 +66,9 @@ plugins/*/tmp/
 /tests/ext/linalg-*.svg
 /examples/quantum-*/**/*.svg
 /examples/quantum-*/*.svg
+/examples/linalg-*/**/*.svg
+/examples/linalg-*/*.svg
+/examples/linalg-*.svg
 
 # Local ABI plugin copies (use `marqdo ext add quantum` / cargo build)
 /ext/native/

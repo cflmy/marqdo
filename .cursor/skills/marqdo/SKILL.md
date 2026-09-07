@@ -4,10 +4,11 @@ description: >-
   Author and edit Marqdo programs (.mq.md): Markdown markers are executable
   syntax (functions, calls, statements, returns, control flow). Use when writing
   or modifying .mq.md files, teaching Marqdo, generating Marqdo from prose,
-  importing lib/* or ext/web or ext/quantum, running marqdo CLI, building dynamic
-  sites with ext/web, quantum circuits with ext/quantum, or when the user
-  mentions Marqdo, mq.md, markup-as-syntax, code-as-documentation, web/网页, or
-  quantum/量子 extension.
+  importing lib/* or ext/web or ext/quantum or ext/linalg, running marqdo CLI,
+  building dynamic sites with ext/web, quantum circuits with ext/quantum,
+  formula-first linear algebra with ext/linalg, or when the user mentions
+  Marqdo, mq.md, markup-as-syntax, code-as-documentation, web/网页, quantum/量子,
+  or linalg/线性代数 extension.
 ---
 
 # Marqdo development
@@ -141,7 +142,7 @@ import clock:lib/time.mq.md
 - Instance methods stay `` > `obj`.method `` (backticks on the receiver only).
 - `lib/…` resolves via `MARQDO_LIB`, cwd `lib/`, or `lib/` next to the `marqdo` binary.
 - Design: [module-namespace.md](../../doc/design/module-namespace.md).
-- Official optional extensions (`ext/`, not stdlib): install with `marqdo ext add llm|agent|web|quantum` (see `doc/design/ext-cli.md`). `ext/llm` — chat; **`ext/agent`** — document-driven agents (see **ext/agent** below); **`ext/web`** — dynamic sites (see below); **`ext/quantum`** — circuits + Q7/Q8 (see below).
+- Official optional extensions (`ext/`, not stdlib): install with `marqdo ext add llm|agent|web|quantum|linalg` (see `doc/design/ext-cli.md`). `ext/llm` — chat; **`ext/agent`** — document-driven agents (see **ext/agent** below); **`ext/web`** — dynamic sites (see below); **`ext/quantum`** — circuits + Q7/Q8 (see below); **`ext/linalg`** — formula-first linear algebra (see below).
 - Native plugins: `lib/plugin` — `## load` / `unload` / `list`. C ABI: `include/marqdo_abi.h`.
 - Prefer `table.put` / `表.改` for list/map element updates; keep `json` for parse/stringify/quote (see `doc/design/stdlib-table.md`).
 - Builtins (no import): `print`/`打印`, `input`/`输入`, `len`/`长度`, `str`/`文本`, `int`/`整数`; literals `True`/`真`, `False`/`假`, `None`/`空`; logic `and`/`且`, `or`/`或`, `not`/`非`.
@@ -225,6 +226,19 @@ Install: `marqdo ext add quantum` (ZH id: `量子`). Build: `cargo build --relea
 
 Design: [ext-quantum.md](../../doc/design/ext-quantum.md) · Q7: [ext-quantum-q7.md](../../doc/design/ext-quantum-q7.md) · Q8 viz: [ext-quantum-viz-style.md](../../doc/design/ext-quantum-viz-style.md) · examples: [quantum-bell](../../examples/quantum-bell/) · [quantum-entanglement](../../examples/quantum-entanglement/).
 
+## Official extension: `ext/linalg` (formula-first LA)
+
+Install: `marqdo ext add linalg` (ZH id: `线性代数`). Build: `cargo build --release -p marqdo_plugin_linalg`, then **`marqdo ext add linalg` again** so view loads the new native lib.
+
+- EN: `import la:ext/linalg/linalg.mq.md`
+- ZH: `导入 la:ext/linalg/线性代数.mq.md`
+
+**Hard rules:** `ext/**` never calls `host_*`; hot path is ABI plugin; prefer top-level `la.symbol` (not `matrix.symbol` without a receiver); quote `kind=` strings; dense `explicit` / factorize obey size guards.
+
+APIs (EN): `symbol` / `mul` / `simplify` / `ascii` / `show` · `from_formula` / `explicit` / `det` / `solve` · `block` / `kron` / `collapse` · `factorize` / `draw` (`eig|svd|qr|lu|heatmap|hinton`).
+
+Examples: [linalg-svd](../../examples/linalg-svd/) · [linalg-least-squares](../../examples/linalg-least-squares/). Design: [ext-linalg.md](../../doc/design/ext-linalg.md).
+
 ## AI authoring workflow
 
 1. Decide language surface (English builtins + `lib/text.mq.md`, or Chinese + `lib/文本.mq.md`).
@@ -252,7 +266,8 @@ Design: [ext-quantum.md](../../doc/design/ext-quantum.md) · Q7: [ext-quantum-q7
 | Mix `web.page` and `网页.页面` in one file | One import language per `.mq.md` |
 | Call `host_web_*` from `ext/web` | Use `# app` / `# db` methods; plugin ABI only |
 | Call `host_*` from `ext/quantum` | Use `# circuit` / `# density` methods; plugin ABI only |
-| Bare `kind=hinton` inside `*…*` | `kind="hinton"` — quote text literals |
+| Call `host_*` from `ext/linalg` | Use `la.*` L1 wrappers; plugin ABI only |
+| Bare `kind=eig` inside `*…*` | `kind="eig"` — quote text literals |
 | Bare `theme=dark` inside `*…*` | `theme="dark"` — quote; ZH `主题="dark"` |
 | Rebuild plugin but skip `ext add` | `cargo build -p marqdo_plugin_quantum` then `marqdo ext add quantum` (or set `MARQDO_QUANTUM_PLUGIN`) |
 

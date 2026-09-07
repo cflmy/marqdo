@@ -111,10 +111,11 @@ marqdo catalog public -o .marqdo
 - **官方扩展库 `ext/`**（**非** stdlib，本版收口）：
   - **`web`**：W0–W7 + P3 + **W8**；**定制 C0–C4**（admin 前缀/gates/`shell_css`/`layout`/样式 strict/脚本 defer·version/条件导航，见 [ext-web-customization](doc/design/ext-web-customization/)）；示例 [marqdo-blog](examples/marqdo-blog/)；生产路径见 [web-asgi-servers-and-marqdo.md](doc/design/web-asgi-servers-and-marqdo.md)
   - **`quantum`**：Q0–Q7 + Q8a/b 主题 SVG；示例 [quantum-entanglement](examples/quantum-entanglement/)
+  - **`linalg`**：L0–L5 公式 MatExpr + 稠密/`factorize`/`draw`；示例 [linalg-svd](examples/linalg-svd/) · [linalg-least-squares](examples/linalg-least-squares/)
   - **`agent`**：A1–A4（OKF 复用、过程事件、上下文预算、RAG/MCP fixture）；下一波缺口 [agent-framework-gaps-after-a4.md](doc/research/agent-framework-gaps-after-a4.md)
   - **`llm`**：OpenAI 兼容对话
   - 安装：`marqdo ext list` / `add …` / `remove`（[ext-cli.md](doc/design/ext-cli.md)；默认 `~/.marqdo/ext`）。原生插件先 `cargo build -p marqdo_plugin_*` 再 `ext add`
-- **原生插件 ABI**：[`include/marqdo_abi.h`](include/marqdo_abi.h) · [ext-abi.md](doc/design/ext-abi.md)；`plugins/{demo,agent,web,quantum}`  
+- **原生插件 ABI**：[`include/marqdo_abi.h`](include/marqdo_abi.h) · [ext-abi.md](doc/design/ext-abi.md)；`plugins/{demo,agent,web,quantum,linalg}`  
 - **用户静态站**：`public/` → `view output` → CI 发布 [gh-pages](https://cflmy.github.io/marqdo/)  
 - **VS Code 扩展**：分支 **`vscode-extension`**（`main` 不跟踪源码；见 [vscode-extension-commit.md](doc/design/vscode-extension-commit.md)）；Release 附带 `.vsix`  
 - **浏览器 Marqdo（WASM）**：`marqdo wasm build` + 官方 bridge 自启（作者零业务 JS；桥内可含列表/路由/storage/ws/文件/Canvas/音频/Observer/拖放）；`lib/browser` + GFM；`web.client_embed`；示例 [browser-hello](examples/browser-hello/) · [browser-app](examples/browser-app/) · [browser-media](examples/browser-media/) · [web-client-site](examples/web-client-site/)（[ADR 0002](doc/adr/0002-browser-marqdo-wasm.md) · [D](doc/roadmap/browser-wasm-d.md) · [E](doc/roadmap/browser-wasm-e.md) · [F](doc/roadmap/browser-wasm-f.md)）
@@ -142,6 +143,7 @@ marqdo catalog public -o .marqdo
 marqdo ext add web      # 或：网页 — 自动下载 L1 + 预编译 native
 marqdo ext add agent    # 或：智能体
 marqdo ext add quantum  # 或：量子
+marqdo ext add linalg   # 或：线性代数
 marqdo ext add llm      # 或：大模型（纯 .mq.md）
 # 开发者也可：cargo build --release -p marqdo_plugin_* 后在本机 target/ 安装
 # 离线：解压 Windows zip（已含 ext/native）或手动放下 native zip；MARQDO_EXT_NO_DOWNLOAD=1

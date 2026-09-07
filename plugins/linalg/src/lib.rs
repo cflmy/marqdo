@@ -192,11 +192,19 @@ fn arg_expr_opt(v: &Value, keys: &[&str]) -> Result<Expr, String> {
     for k in keys {
         if let Some(e) = v.get(*k) {
             if !e.is_null() {
-                return Expr::from_value(e);
+                return coerce_expr(e);
             }
         }
     }
     Err(format!("missing one of {:?}", keys))
+}
+
+fn coerce_expr(v: &Value) -> Result<Expr, String> {
+    if let Ok(e) = Expr::from_value(v) {
+        return Ok(e);
+    }
+    let data = dense::from_value(v)?;
+    Ok(Expr::Dense { data })
 }
 
 fn wrap(expr: Expr) -> Result<Value, String> {
@@ -348,15 +356,6 @@ la_ffi!(linalg_show, |args: &Value| {
     }
     Ok(out)
 });
-
-fn coerce_expr(v: &Value) -> Result<Expr, String> {
-    if let Ok(e) = Expr::from_value(v) {
-        return Ok(e);
-    }
-    // Formula Matrix / nested list / linalg_dense → dense leaf
-    let data = dense::from_value(v)?;
-    Ok(Expr::Dense { data })
-}
 
 la_ffi!(linalg_from_formula, |args: &Value| {
     let f = args

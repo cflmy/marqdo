@@ -326,3 +326,26 @@ import quantum:ext/quantum/quantum.mq.md
 - Full lab: `examples/quantum-entanglement/`. Bell-only: `examples/quantum-bell/`.
 - `theme="dark"|"light"|"bw"` (default dark) on `circuit` / `probs` / `bloch`. Quote `kind=` / `theme=`.
 - After rebuilding the plugin: `marqdo ext add quantum` so view loads the new native lib.
+
+## 15. Linear algebra (ext/linalg)
+
+```markdown
+---
+import la:ext/linalg/linalg.mq.md
+---
+
+# main
+
+`M` =
+$$
+\begin{bmatrix}2&0\\0&3\end{bmatrix}
+$$
+
+*`M` = > la.from_formula formula=`M`*
+*`f` = > la.factorize matrix=`M` kind="eig"*
+*_ = > la.draw factor=`f` kind="eig" path="eig.svg"*
+> print text=ok
+```
+
+- Examples: `examples/linalg-svd/`, `examples/linalg-least-squares/`.
+- After rebuilding: `marqdo ext add linalg` (or `MARQDO_LINALG_PLUGIN`).
