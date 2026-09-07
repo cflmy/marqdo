@@ -129,6 +129,49 @@ Zero-based index or `None`.
 
 **> host_list_reverse list=`list`**
 
+## sort
+    + `list`
+
+Ascending sort (int/num/text preferred).
+
+**> host_list_sort list=`list`**
+
+## sort_by
+    + `list`
+    + `key`
+
+Sort a list of maps by `key`.
+
+**> host_list_sort_by list=`list` key=`key`**
+
+## unique
+    + `list`
+
+Stable unique (first wins).
+
+**> host_list_unique list=`list`**
+
+## chunk
+    + `list`
+    + `size`
+
+**> host_list_chunk list=`list` size=`size`**
+
+## zip
+    + `a`
+    + `b`
+
+Pairs until the shorter list ends.
+
+**> host_list_zip a=`a` b=`b`**
+
+## flatten
+    + `list`
+
+One-level flatten.
+
+**> host_list_flatten list=`list`**
+
 ## clear
     + `value`
 

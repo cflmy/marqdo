@@ -7,6 +7,7 @@
 pub mod agent_rt;
 pub mod collection;
 mod dispatch;
+mod cli;
 mod csv;
 mod encoding;
 pub mod event_bus;

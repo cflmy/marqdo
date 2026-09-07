@@ -3,8 +3,8 @@
 use std::collections::HashMap;
 
 use crate::host::{
-    csv, encoding, fs, hash, json, math, net, path, re, secrets, sys, text_ops, time, writeback,
-    HostContext,
+    cli, csv, encoding, fs, hash, json, math, net, path, re, secrets, sys, text_ops, time,
+    writeback, HostContext,
 };
 #[cfg(feature = "exec-host")]
 use crate::host::{foreign, subtask};
@@ -166,6 +166,13 @@ pub enum HostFn {
     TextPad = 157,
     CsvParse = 158,
     CsvStringify = 159,
+    ListSort = 160,
+    ListSortBy = 161,
+    ListUnique = 162,
+    ListChunk = 163,
+    ListZip = 164,
+    ListFlatten = 165,
+    CliParse = 166,
 }
 
 
@@ -322,6 +329,13 @@ impl HostFn {
             157 => Self::TextPad,
             158 => Self::CsvParse,
             159 => Self::CsvStringify,
+            160 => Self::ListSort,
+            161 => Self::ListSortBy,
+            162 => Self::ListUnique,
+            163 => Self::ListChunk,
+            164 => Self::ListZip,
+            165 => Self::ListFlatten,
+            166 => Self::CliParse,
             _ => return None,
         })
     }
@@ -481,6 +495,13 @@ impl HostFn {
             "host_text_pad" | "text_pad" => Self::TextPad,
             "host_csv_parse" | "csv_parse" => Self::CsvParse,
             "host_csv_stringify" | "csv_stringify" => Self::CsvStringify,
+            "host_list_sort" | "list_sort" => Self::ListSort,
+            "host_list_sort_by" | "list_sort_by" => Self::ListSortBy,
+            "host_list_unique" | "list_unique" => Self::ListUnique,
+            "host_list_chunk" | "list_chunk" => Self::ListChunk,
+            "host_list_zip" | "list_zip" => Self::ListZip,
+            "host_list_flatten" | "list_flatten" => Self::ListFlatten,
+            "host_cli_parse" | "cli_parse" => Self::CliParse,
             _ => return None,
         })
     }
@@ -627,6 +648,13 @@ impl HostFn {
             Self::TextPad => "host_text_pad",
             Self::CsvParse => "host_csv_parse",
             Self::CsvStringify => "host_csv_stringify",
+            Self::ListSort => "host_list_sort",
+            Self::ListSortBy => "host_list_sort_by",
+            Self::ListUnique => "host_list_unique",
+            Self::ListChunk => "host_list_chunk",
+            Self::ListZip => "host_list_zip",
+            Self::ListFlatten => "host_list_flatten",
+            Self::CliParse => "host_cli_parse",
             Self::WritebackRecord => "host_writeback_record",
             Self::WritebackGet => "host_writeback_get",
             Self::WritebackClear => "host_writeback_clear",
@@ -741,6 +769,11 @@ impl HostFn {
             Self::TextPad => &["text", "width"],
             Self::CsvParse => &["text"],
             Self::CsvStringify => &["rows"],
+            Self::ListSort | Self::ListUnique | Self::ListFlatten => &["list"],
+            Self::ListSortBy => &["list", "key"],
+            Self::ListChunk => &["list", "size"],
+            Self::ListZip => &["a", "b"],
+            Self::CliParse => &[],
             Self::WritebackRecord => &["value"],
             Self::WritebackGet | Self::WritebackClear => &[],
             Self::WritebackList => &[],
@@ -778,6 +811,7 @@ impl HostFn {
             Self::SecretsTokenHex | Self::SecretsTokenUrlsafe => &["n"],
             Self::TextReplace => &["count"],
             Self::TextPad => &["fill", "align"],
+            Self::CliParse => &["args"],
             _ => &[],
         }
     }
@@ -1207,6 +1241,19 @@ pub fn call_host(
         ),
         HostFn::CsvParse => csv::parse(require(bound, "text")?),
         HostFn::CsvStringify => csv::stringify(require(bound, "rows")?),
+        HostFn::ListSort => super::collection::list_sort(require(bound, "list")?),
+        HostFn::ListSortBy => {
+            super::collection::list_sort_by(require(bound, "list")?, require(bound, "key")?)
+        }
+        HostFn::ListUnique => super::collection::list_unique(require(bound, "list")?),
+        HostFn::ListChunk => {
+            super::collection::list_chunk(require(bound, "list")?, require(bound, "size")?)
+        }
+        HostFn::ListZip => {
+            super::collection::list_zip(require(bound, "a")?, require(bound, "b")?)
+        }
+        HostFn::ListFlatten => super::collection::list_flatten(require(bound, "list")?),
+        HostFn::CliParse => cli::parse(ctx, bound.get("args")),
         HostFn::OuterCallLine => Ok(Value::Int(
             ctx.call_site_lines
                 .first()

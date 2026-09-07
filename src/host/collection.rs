@@ -385,6 +385,136 @@ pub fn list_last(list: &Value) -> Result<Value, String> {
     }
 }
 
+fn cmp_value(a: &Value, b: &Value) -> std::cmp::Ordering {
+    use std::cmp::Ordering;
+    match (a, b) {
+        (Value::Int(x), Value::Int(y)) => x.cmp(y),
+        (Value::Num(x), Value::Num(y)) => x.partial_cmp(y).unwrap_or(Ordering::Equal),
+        (Value::Int(x), Value::Num(y)) => (*x as f64).partial_cmp(y).unwrap_or(Ordering::Equal),
+        (Value::Num(x), Value::Int(y)) => x.partial_cmp(&(*y as f64)).unwrap_or(Ordering::Equal),
+        (Value::Text(x), Value::Text(y)) => x.cmp(y),
+        (Value::Bool(x), Value::Bool(y)) => x.cmp(y),
+        _ => a.as_display().cmp(&b.as_display()),
+    }
+}
+
+pub fn list_sort(list: &Value) -> Result<Value, String> {
+    match list {
+        Value::List(xs) => {
+            let mut out = xs.clone();
+            out.sort_by(cmp_value);
+            Ok(Value::List(out))
+        }
+        Value::None => Ok(Value::List(vec![])),
+        _ => Err("list_sort needs list".into()),
+    }
+}
+
+pub fn list_sort_by(list: &Value, key: &Value) -> Result<Value, String> {
+    let key = match key {
+        Value::Text(s) => s.as_str(),
+        _ => return Err("sort_by key needs text".into()),
+    };
+    match list {
+        Value::List(xs) => {
+            let mut out = xs.clone();
+            out.sort_by(|a, b| {
+                let ka = match a {
+                    Value::Map(m) => m
+                        .iter()
+                        .find(|(k, _)| k == key)
+                        .map(|(_, v)| v)
+                        .unwrap_or(&Value::None),
+                    _ => &Value::None,
+                };
+                let kb = match b {
+                    Value::Map(m) => m
+                        .iter()
+                        .find(|(k, _)| k == key)
+                        .map(|(_, v)| v)
+                        .unwrap_or(&Value::None),
+                    _ => &Value::None,
+                };
+                cmp_value(ka, kb)
+            });
+            Ok(Value::List(out))
+        }
+        Value::None => Ok(Value::List(vec![])),
+        _ => Err("list_sort_by needs list".into()),
+    }
+}
+
+pub fn list_unique(list: &Value) -> Result<Value, String> {
+    match list {
+        Value::List(xs) => {
+            let mut out = Vec::new();
+            for x in xs {
+                if !out.iter().any(|y| y == x) {
+                    out.push(x.clone());
+                }
+            }
+            Ok(Value::List(out))
+        }
+        Value::None => Ok(Value::List(vec![])),
+        _ => Err("list_unique needs list".into()),
+    }
+}
+
+pub fn list_chunk(list: &Value, size: &Value) -> Result<Value, String> {
+    let n = match size {
+        Value::Int(i) if *i > 0 => *i as usize,
+        Value::Int(_) => return Err("chunk size must be positive".into()),
+        _ => return Err("chunk size needs int".into()),
+    };
+    match list {
+        Value::List(xs) => {
+            let mut out = Vec::new();
+            let mut i = 0;
+            while i < xs.len() {
+                let end = (i + n).min(xs.len());
+                out.push(Value::List(xs[i..end].to_vec()));
+                i = end;
+            }
+            Ok(Value::List(out))
+        }
+        Value::None => Ok(Value::List(vec![])),
+        _ => Err("list_chunk needs list".into()),
+    }
+}
+
+pub fn list_zip(a: &Value, b: &Value) -> Result<Value, String> {
+    let (aa, bb) = match (a, b) {
+        (Value::List(x), Value::List(y)) => (x, y),
+        (Value::None, Value::List(y)) => (&Vec::new(), y),
+        (Value::List(x), Value::None) => (x, &Vec::new()),
+        (Value::None, Value::None) => return Ok(Value::List(vec![])),
+        _ => return Err("list_zip needs two lists".into()),
+    };
+    let n = aa.len().min(bb.len());
+    let mut out = Vec::with_capacity(n);
+    for i in 0..n {
+        out.push(Value::List(vec![aa[i].clone(), bb[i].clone()]));
+    }
+    Ok(Value::List(out))
+}
+
+pub fn list_flatten(list: &Value) -> Result<Value, String> {
+    match list {
+        Value::List(xs) => {
+            let mut out = Vec::new();
+            for x in xs {
+                match x {
+                    Value::List(inner) => out.extend(inner.iter().cloned()),
+                    other => out.push(other.clone()),
+                }
+            }
+            Ok(Value::List(out))
+        }
+        Value::None => Ok(Value::List(vec![])),
+        _ => Err("list_flatten needs list".into()),
+    }
+}
+
 pub fn collection_clear(value: &Value) -> Result<Value, String> {
     match value {
         Value::List(_) | Value::None => Ok(Value::List(vec![])),

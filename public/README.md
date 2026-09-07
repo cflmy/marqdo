@@ -14,7 +14,7 @@
 
 官方扩展（非 stdlib）：`ext/llm`、`ext/agent`、`ext/web`、`ext/quantum`、`ext/linalg` — 见 `features/05-*.mq.md`、`06-*.mq.md`、`07-linalg.mq.md` / `07-线性代数.mq.md` 与 `doc/design/ext-*.md`。
 
-中层标准库（Mid）：`08-re-encoding` · `09-path-fs` · `10-hash-secrets` · `11-csv-text`（及对应中文页）。
+中层标准库（Mid）：`08`–`12`（re/encoding · path/fs · hash/secrets · csv/text · list/cli；及对应中文页）。
 
 **不放** `errors/`：失败样例只在 `tests/errors/`。
 

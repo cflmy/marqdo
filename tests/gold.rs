@@ -1148,6 +1148,27 @@ fn lib_csv_smoke_zh() {
 }
 
 #[test]
+fn lib_table_list_mid() {
+    assert_out(
+        "tests/lib/table-list-mid.mq.md",
+        "1,1,2,3\n1,2,3\n2\n2\na,b,1,2,3",
+    );
+}
+
+#[test]
+fn lib_cli_sort_smoke() {
+    assert_out(
+        "tests/lib/cli-sort-smoke.mq.md",
+        "alice\ndata.csv\nTrue\nrest",
+    );
+}
+
+#[test]
+fn lib_cli_zh_smoke() {
+    assert_out("tests/lib/表-命令行-烟测.mq.md", "a,b,c\n1\nTrue");
+}
+
+#[test]
 fn lib_re_smoke() {
     assert_out(
         "tests/lib/re-smoke.mq.md",

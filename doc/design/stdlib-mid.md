@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| 状态 | **规划中 · M1–M4 已实现** |
+| 状态 | **规划中 · M1–M5 已实现** |
 | 日期 | 2026-09-07 |
 | 相关 | [stdlib.md](stdlib.md) · [stdlib-modules.md](stdlib-modules.md) · [ext-abi.md](ext-abi.md) · [roadmap/stdlib-mid.md](../roadmap/stdlib-mid.md) |
 | 目标 | 在接下来数个发版周期内，把「通用编程」能力沉到 **L0.5 宿主 + L1 `.mq.md`**，减少「凡是稍有能力就必须 ABI 插件」的路径依赖 |
@@ -122,7 +122,7 @@ OS / 算法库（精选 crate，默认 features 最小化）
 | **M2** | `path` / `路径` · `fs` 加厚 | join / normalize；copy / move / temp | **done** |
 | **M3** | `hash` / `哈希` · `secrets` / `机密` | sha256 / hmac；token | **done** |
 | **M4** | `csv` / `逗号表` · `text` 加厚 | parse / stringify；contains / replace | **done** |
-| **M5** | `listx` 或 `table` 加厚 · `cli` | sort / zip；flags | 优先纯 mq |
+| **M5** | `table` 加厚 · `cli` / `命令行` | sort / zip；flags | **done** |
 | **M6** | `log` / `日志` · `uuid` / `标识` | level 日志；v4 | 薄 host 或纯 mq |
 | **可选** | `yaml` / `Toml` | 仅当 public/catalog 强需求 | 慎入 |
 

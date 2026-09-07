@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| 状态 | **M1–M4 已落地 · M5–M6 规划中** |
+| 状态 | **M1–M5 已落地 · M6 规划中** |
 | 日期 | 2026-09-07 |
 | 设计 | [stdlib-mid.md](../design/stdlib-mid.md) |
 | 相关 | [stdlib-modules.md](../design/stdlib-modules.md) · [next-phase.md](next-phase.md) · [ext-cli.md](../design/ext-cli.md) |
@@ -110,13 +110,16 @@ M6  可观测与标识         log + uuid（+ 可选 yaml）
 
 ---
 
-### M5 — 集合算法与 CLI
+### M5 — 集合算法与 CLI — **done**
 
 | 交付 | 说明 |
 |------|------|
-| `table` 或 `listx` | `sort` / `sort_by` / `unique` / `reverse`（已有 host 则接线）/ `chunk` / `zip` / `flatten` |
-| `lib/cli.mq.md` / `lib/命令行.mq.md` | 从 `sys.args` 解析 `--key value` / `--flag`；纯 mq 优先 |
-| 验收 | 一个「过滤 CSV + 排序 + 打印」脚本零插件；一个带 `--input` 的 CLI 例 |
+| `lib/table` / `表` 加厚 | `sort` / `sort_by` / `unique` / `chunk` / `zip` / `flatten`（`reverse` 已有） |
+| `lib/cli.mq.md` / `lib/命令行.mq.md` | `parse`（`--k v` / `--k=v` / `--flag`；位置参 `_`） |
+| Host | `host_list_sort*` / `unique` / `chunk` / `zip` / `flatten`、`host_cli_parse` |
+| 金样 | `table-list-mid` · `cli-sort-smoke` · `表-命令行-烟测` |
+| 文档 | [stdlib-list-cli.md](../design/stdlib-list-cli.md) · public `12-list-cli` |
+| 验收 | CSV 按键排序 + 参数解析 |
 
 **刻意不做：** 泛型迭代器协议、惰性流、完整 argparse 互斥组。
 
