@@ -44,6 +44,15 @@ Import one file; use **that** file’s function names.
 |-----------|-----------|-------------------------|
 | `lib/text.mq.md` | `lib/文本.mq.md` | text helpers / 去空白·拆分·拼接… |
 | `lib/table.mq.md` | `lib/表.mq.md` | `put`/`改` + list/map（见 `doc/design/stdlib-table.md`） |
+| `lib/re.mq.md` | `lib/正则.mq.md` | Mid：`is_match`/`find`/`replace`/… |
+| `lib/encoding.mq.md` | `lib/编码.mq.md` | Mid：base64/hex |
+| `lib/path.mq.md` | `lib/路径.mq.md` | Mid：join/normalize/… |
+| `lib/hash.mq.md` | `lib/哈希.mq.md` | Mid：sha256/hmac/… |
+| `lib/secrets.mq.md` | `lib/机密.mq.md` | Mid：token_hex/urlsafe |
+| `lib/csv.mq.md` | `lib/逗号表.mq.md` | Mid：parse/stringify |
+| `lib/cli.mq.md` | `lib/命令行.mq.md` | Mid：`parse` flags |
+| `lib/log.mq.md` | `lib/日志.mq.md` | Mid：level-filtered one-line logs |
+| `lib/uuid.mq.md` | `lib/标识.mq.md` | Mid：UUID v4 |
 | `lib/browser.mq.md` | `lib/浏览器.mq.md` | WASM client effect helpers（GFM + `set_text`/`canvas`/…；见 marqdo-dev） |
 | `lib/fs.mq.md` | `lib/文件.mq.md` | filesystem |
 | `lib/sys.mq.md` | `lib/系统.mq.md` | process / cwd / load_dotenv |

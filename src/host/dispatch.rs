@@ -3,8 +3,8 @@
 use std::collections::HashMap;
 
 use crate::host::{
-    cli, csv, encoding, fs, hash, json, math, net, path, re, secrets, sys, text_ops, time,
-    writeback, HostContext,
+    cli, csv, encoding, fs, hash, json, log, math, net, path, re, secrets, sys, text_ops, time,
+    uuid_ops, writeback, HostContext,
 };
 #[cfg(feature = "exec-host")]
 use crate::host::{foreign, subtask};
@@ -173,6 +173,9 @@ pub enum HostFn {
     ListZip = 164,
     ListFlatten = 165,
     CliParse = 166,
+    LogSetLevel = 167,
+    LogLine = 168,
+    UuidV4 = 169,
 }
 
 
@@ -336,6 +339,9 @@ impl HostFn {
             164 => Self::ListZip,
             165 => Self::ListFlatten,
             166 => Self::CliParse,
+            167 => Self::LogSetLevel,
+            168 => Self::LogLine,
+            169 => Self::UuidV4,
             _ => return None,
         })
     }
@@ -502,6 +508,9 @@ impl HostFn {
             "host_list_zip" | "list_zip" => Self::ListZip,
             "host_list_flatten" | "list_flatten" => Self::ListFlatten,
             "host_cli_parse" | "cli_parse" => Self::CliParse,
+            "host_log_set_level" | "log_set_level" => Self::LogSetLevel,
+            "host_log_line" | "log_line" => Self::LogLine,
+            "host_uuid_v4" | "uuid_v4" => Self::UuidV4,
             _ => return None,
         })
     }
@@ -655,6 +664,9 @@ impl HostFn {
             Self::ListZip => "host_list_zip",
             Self::ListFlatten => "host_list_flatten",
             Self::CliParse => "host_cli_parse",
+            Self::LogSetLevel => "host_log_set_level",
+            Self::LogLine => "host_log_line",
+            Self::UuidV4 => "host_uuid_v4",
             Self::WritebackRecord => "host_writeback_record",
             Self::WritebackGet => "host_writeback_get",
             Self::WritebackClear => "host_writeback_clear",
@@ -774,6 +786,9 @@ impl HostFn {
             Self::ListChunk => &["list", "size"],
             Self::ListZip => &["a", "b"],
             Self::CliParse => &[],
+            Self::LogSetLevel => &["level"],
+            Self::LogLine => &["level", "text"],
+            Self::UuidV4 => &[],
             Self::WritebackRecord => &["value"],
             Self::WritebackGet | Self::WritebackClear => &[],
             Self::WritebackList => &[],
@@ -1254,6 +1269,9 @@ pub fn call_host(
         }
         HostFn::ListFlatten => super::collection::list_flatten(require(bound, "list")?),
         HostFn::CliParse => cli::parse(ctx, bound.get("args")),
+        HostFn::LogSetLevel => log::set_level(ctx, require(bound, "level")?),
+        HostFn::LogLine => log::line(ctx, require(bound, "level")?, require(bound, "text")?),
+        HostFn::UuidV4 => uuid_ops::v4(),
         HostFn::OuterCallLine => Ok(Value::Int(
             ctx.call_site_lines
                 .first()

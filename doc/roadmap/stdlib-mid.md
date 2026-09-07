@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| 状态 | **M1–M5 已落地 · M6 规划中** |
+| 状态 | **M1–M6 已落地** |
 | 日期 | 2026-09-07 |
 | 设计 | [stdlib-mid.md](../design/stdlib-mid.md) |
 | 相关 | [stdlib-modules.md](../design/stdlib-modules.md) · [next-phase.md](next-phase.md) · [ext-cli.md](../design/ext-cli.md) |
@@ -125,14 +125,17 @@ M6  可观测与标识         log + uuid（+ 可选 yaml）
 
 ---
 
-### M6 — 日志、UUID、收口
+### M6 — 日志、UUID、收口 — **done**
 
 | 交付 | 说明 |
 |------|------|
-| `lib/log.mq.md` / `lib/日志.mq.md` | `debug`/`info`/`warn`/`error`；level 过滤；一行文本（可选 JSON 一行） |
+| `lib/log.mq.md` / `lib/日志.mq.md` | `debug`/`info`/`warn`/`error`；level 过滤；一行文本 |
 | `lib/uuid.mq.md` / `lib/标识.mq.md` | `v4` |
-| 文档收口 | 更新 `stdlib-modules.md` 总表；设计文状态 → **M1–M6 已落地**（按实际） |
-| 可选 | `yaml` 只读子集——**默认不做**，除非 catalog 强需求且依赖可接受 |
+| Host | `host_log_set_level` / `host_log_line`、`host_uuid_v4` |
+| 金样 | `log-uuid-smoke` · `日志-标识-烟测` |
+| 文档 | [stdlib-log-uuid.md](../design/stdlib-log-uuid.md) · public `13-log-uuid` |
+| 文档收口 | `stdlib-modules.md` 总表；设计文状态 → **M1–M6 已落地** |
+| 可选未做 | `yaml` 只读子集（默认不做） |
 
 ---
 
@@ -184,12 +187,10 @@ M6  可观测与标识         log + uuid（+ 可选 yaml）
 
 ## 6. 完成定义（整条 Mid 叙事）
 
-当 M1–M5 完成时，对外可宣称：
+当 M1–M6 完成时，对外可宣称：
 
-> Marqdo 自带中层标准库：正则、编解码、路径、哈希、CSV、加厚文本与集合/CLI 糖；**写通用脚本与多数扩展库不再需要原生插件。**  
+> Marqdo 自带中层标准库：正则、编解码、路径、哈希、CSV、加厚文本与集合/CLI 糖，以及日志与 UUID；**写通用脚本与多数扩展库不再需要原生插件。**  
 > 插件保留给 web 运行时、智能体、量子与线性代数等**领域引擎**。
-
-M6 为体验与可观测收口，不阻塞上述宣称。
 
 ---
 

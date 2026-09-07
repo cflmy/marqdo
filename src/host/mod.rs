@@ -16,12 +16,14 @@ pub mod foreign;
 mod fs;
 mod hash;
 pub(crate) mod json;
+mod log;
 pub mod math;
 mod net;
 mod path;
 mod re;
 mod secrets;
 mod text_ops;
+mod uuid_ops;
 #[cfg(feature = "plugin-host")]
 pub mod plugin;
 #[cfg(not(feature = "plugin-host"))]
@@ -100,6 +102,8 @@ pub struct HostContext {
     #[cfg_attr(not(feature = "exec-host"), allow(dead_code))]
     pub(crate) subtasks: HashMap<u64, subtask::Handle>,
     pub subtask_seq: u64,
+    /// Minimum log level (`lib/log`); default Info (20). See `host::log::Level`.
+    pub log_min_level: u8,
 }
 
 impl Default for HostContext {
@@ -122,6 +126,7 @@ impl Default for HostContext {
             call_site_lines: Vec::new(),
             subtasks: HashMap::new(),
             subtask_seq: 0,
+            log_min_level: 20, // Info
         }
     }
 }

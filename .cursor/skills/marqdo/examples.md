@@ -165,6 +165,23 @@ import enc:lib/encoding.mq.md
 > print text=`b64`
 ```
 
+## 7c. Mid M6 — log + uuid
+
+```markdown
+---
+import log:lib/log.mq.md
+import uuid:lib/uuid.mq.md
+---
+
+# main
+
+> log.info text="start"
+> log.set_level level="debug"
+> log.debug text="detail"
+*id = > uuid.v4*
+> print text=`id`
+```
+
 ## 8. Comment paragraphs (blank-line rule)
 
 ```markdown

@@ -1169,6 +1169,19 @@ fn lib_cli_zh_smoke() {
 }
 
 #[test]
+fn lib_log_uuid_smoke() {
+    assert_out(
+        "tests/lib/log-uuid-smoke.mq.md",
+        "INFO hello-info\nDEBUG shown-debug\n36\nTrue",
+    );
+}
+
+#[test]
+fn lib_log_uuid_zh_smoke() {
+    assert_out("tests/lib/日志-标识-烟测.mq.md", "INFO 中文信息\n36");
+}
+
+#[test]
 fn lib_re_smoke() {
     assert_out(
         "tests/lib/re-smoke.mq.md",
