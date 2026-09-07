@@ -166,7 +166,7 @@ git checkout vVER
 cargo build --release
 ./target/release/marqdo version
 
-cargo build --release -p marqdo_plugin_web -p marqdo_plugin_agent -p marqdo_plugin_quantum
+cargo build --release -p marqdo_plugin_web -p marqdo_plugin_agent -p marqdo_plugin_quantum -p marqdo_plugin_linalg
 marqdo ext add web && marqdo ext add agent && marqdo ext add quantum
 # 中文 id：网页 / 智能体 / 量子
 ```

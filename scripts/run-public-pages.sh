@@ -4,8 +4,8 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
-# CLI + native plugins used by public demos (ext/quantum).
-cargo build --release -p marqdo -p marqdo_plugin_quantum
+# CLI + native plugins used by public demos (ext/quantum, ext/linalg).
+cargo build --release -p marqdo -p marqdo_plugin_quantum -p marqdo_plugin_linalg
 
 BIN=./target/release/marqdo
 while IFS= read -r -d '' f; do
