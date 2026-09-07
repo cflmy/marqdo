@@ -1067,6 +1067,35 @@ fn lib_fs_read() {
 }
 
 #[test]
+fn lib_path_smoke() {
+    assert_out(
+        "tests/lib/path-smoke.mq.md",
+        "dir/sub/f.txt\nf.txt\ntxt\ndir/sub\na/c\nTrue\na|b|c",
+    );
+}
+
+#[test]
+fn lib_path_smoke_zh() {
+    assert_out(
+        "tests/lib/路径-烟测.mq.md",
+        "dir/sub/f.txt\nf.txt\ntxt\na/c",
+    );
+}
+
+#[test]
+fn lib_fs_copy_move() {
+    assert_out(
+        "tests/lib/fs-copy-move.mq.md",
+        "m2-body\nmoved\ntemp-ok",
+    );
+}
+
+#[test]
+fn lib_fs_copy_zh() {
+    assert_out("tests/lib/文件-复制.mq.md", "zh-body");
+}
+
+#[test]
 fn lib_re_smoke() {
     assert_out(
         "tests/lib/re-smoke.mq.md",

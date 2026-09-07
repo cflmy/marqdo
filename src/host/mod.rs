@@ -15,6 +15,7 @@ mod fs;
 pub(crate) mod json;
 pub mod math;
 mod net;
+mod path;
 mod re;
 #[cfg(feature = "plugin-host")]
 pub mod plugin;

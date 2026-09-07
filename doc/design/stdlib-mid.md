@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| 状态 | **规划中 · M1（re + encoding）已实现** |
+| 状态 | **规划中 · M1–M2 已实现** |
 | 日期 | 2026-09-07 |
 | 相关 | [stdlib.md](stdlib.md) · [stdlib-modules.md](stdlib-modules.md) · [ext-abi.md](ext-abi.md) · [roadmap/stdlib-mid.md](../roadmap/stdlib-mid.md) |
 | 目标 | 在接下来数个发版周期内，把「通用编程」能力沉到 **L0.5 宿主 + L1 `.mq.md`**，减少「凡是稍有能力就必须 ABI 插件」的路径依赖 |
@@ -118,19 +118,13 @@ OS / 算法库（精选 crate，默认 features 最小化）
 
 | 波次 | 模块（英 / 中） | 典型能力 | 主要形态 |
 |------|-----------------|----------|----------|
-| **M1** | `re` / `正则` | match / find / replace / split | host + L1 |
-| **M1** | `encoding` / `编码` | base64 / hex / url 组件（与 `net.url_encode` 协调） | host + L1 |
-| **M2** | `path` / `路径` | join / split / normalize / stem / 相对化 | host + L1 |
-| **M2** | `fs` 加厚 | copy / move / read_bytes 边界 / tempfile | 扩展现有 |
-| **M3** | `hash` / `哈希` | sha256 / sha1 / md5（标识用）/ hmac | host + L1 |
-| **M3** | `secrets` / `机密` | token_hex / 安全随机（与 `math.random` 分流） | host + L1 |
-| **M4** | `csv` / `逗号表` | parse / stringify ↔ list-of-maps | host 或纯 mq |
-| **M4** | `text` 加厚 | upper/lower/starts_with/replace/pad/format | 多可纯 mq + 少量 host |
-| **M5** | `listx` 或 `table` 加厚 | sort / unique / zip / chunk / group | 优先纯 mq；慢再 host |
-| **M5** | `cli` / `命令行` | 简单 flags 解析（基于 `sys.args`） | 纯 mq 优先 |
-| **M6** | `log` / `日志` | level + 结构化一行（stdout/stderr） | 薄 host 或纯 mq |
-| **M6** | `uuid` / `标识` | v4 | host + L1 |
-| **可选** | `yaml` / `Toml` | 仅当 public/catalog 强需求；注意依赖体积 | 慎入 |
+| **M1** | `re` / `正则` · `encoding` / `编码` | match / find / replace；base64 / hex | **done** |
+| **M2** | `path` / `路径` · `fs` 加厚 | join / normalize；copy / move / temp | **done** |
+| **M3** | `hash` / `哈希` · `secrets` / `机密` | sha256 / hmac；token | host + L1 |
+| **M4** | `csv` / `逗号表` · `text` 加厚 | parse / stringify；contains / replace | host 或纯 mq |
+| **M5** | `listx` 或 `table` 加厚 · `cli` | sort / zip；flags | 优先纯 mq |
+| **M6** | `log` / `日志` · `uuid` / `标识` | level 日志；v4 | 薄 host 或纯 mq |
+| **可选** | `yaml` / `Toml` | 仅当 public/catalog 强需求 | 慎入 |
 
 **刻意延后：** 完整 `datetime` 时区库、连接池、异步 runtime、模板引擎、完整 `collections` 类型系统——等中层前几波用起来再议。
 

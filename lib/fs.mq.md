@@ -40,6 +40,29 @@ description: English filesystem wrappers
 
 **> host_remove path=`path`**
 
+## copy_file
+    + `src`
+    + `dest`
+
+Copy a file (overwrites `dest` if it exists). Paths are sandboxed like other fs ops.
+
+**> host_copy_file src=`src` dest=`dest`**
+
+## move
+    + `src`
+    + `dest`
+
+Rename / move within the sandbox.
+
+**> host_move src=`src` dest=`dest`**
+
+## make_temp
+    + `prefix`=None
+
+Create an empty temp file under the program directory; return its relative path.
+
+**> host_make_temp prefix=`prefix`**
+
 ## text_patch
     + `path`
     + `find`

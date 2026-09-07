@@ -107,6 +107,61 @@ pub fn remove(ctx: &HostContext, path: &Value) -> Result<Value, String> {
     Ok(Value::None)
 }
 
+pub fn copy_file(ctx: &HostContext, src: &Value, dest: &Value) -> Result<Value, String> {
+    if !ctx.allow_fs_write() {
+        return Err("copy_file denied by host policy".into());
+    }
+    let from = ctx.resolve_path(text_path(src)?)?;
+    let to = ctx.resolve_path(text_path(dest)?)?;
+    if let Some(parent) = to.parent() {
+        fs::create_dir_all(parent).map_err(|e| format!("copy_file mkdir: {e}"))?;
+    }
+    fs::copy(&from, &to).map_err(|e| format!("copy_file {} -> {}: {e}", from.display(), to.display()))?;
+    Ok(Value::None)
+}
+
+pub fn move_path(ctx: &HostContext, src: &Value, dest: &Value) -> Result<Value, String> {
+    if !ctx.allow_fs_write() {
+        return Err("move denied by host policy".into());
+    }
+    let from = ctx.resolve_path(text_path(src)?)?;
+    let to = ctx.resolve_path(text_path(dest)?)?;
+    if let Some(parent) = to.parent() {
+        fs::create_dir_all(parent).map_err(|e| format!("move mkdir: {e}"))?;
+    }
+    fs::rename(&from, &to).map_err(|e| format!("move {} -> {}: {e}", from.display(), to.display()))?;
+    Ok(Value::None)
+}
+
+/// Create an empty temp file under the program cwd / fs_root; return relative path text.
+pub fn make_temp(ctx: &HostContext, prefix: Option<&Value>) -> Result<Value, String> {
+    if !ctx.allow_fs_write() {
+        return Err("make_temp denied by host policy".into());
+    }
+    let pref = match prefix {
+        None | Some(Value::None) => "mqtmp".to_string(),
+        Some(v) => text_path(v)?.to_string(),
+    };
+    if pref.contains('/') || pref.contains('\\') || pref.contains("..") {
+        return Err("make_temp: prefix must be a simple name".into());
+    }
+    let stamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_nanos())
+        .unwrap_or(0);
+    let name = format!("{pref}-{stamp}");
+    let p = ctx.resolve_path(&name)?;
+    if let Some(parent) = p.parent() {
+        fs::create_dir_all(parent).map_err(|e| format!("make_temp mkdir: {e}"))?;
+    }
+    fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&p)
+        .map_err(|e| format!("make_temp {}: {e}", p.display()))?;
+    Ok(Value::Text(name))
+}
+
 /// Exact UTF-8 FIND→REPLACE on a file. `find` must occur exactly once.
 pub fn text_patch(ctx: &HostContext, path: &Value, find: &Value, replace: &Value) -> Result<Value, String> {
     if !ctx.allow_fs_write() {

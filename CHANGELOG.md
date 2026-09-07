@@ -3,8 +3,9 @@
 ## Unreleased
 
 ### Added
+- **中层标准库 M2**：`lib/path` / `lib/路径`（join/split/normalize/…）与 `fs`/`文件` 加厚（`copy_file`/`move`/`make_temp`）；金样与 public `09-path-fs`。设计 [stdlib-path.md](doc/design/stdlib-path.md) · [stdlib-fs-mid.md](doc/design/stdlib-fs-mid.md)。
 - **中层标准库 M1**：`lib/re` / `lib/正则`（`is_match`/`find`/`find_all`/`replace`/`split`）与 `lib/encoding` / `lib/编码`（base64/hex）；host `host_re_*` + `host_encoding_*`；金样与 public `08-re-encoding`。设计 [stdlib-mid.md](doc/design/stdlib-mid.md) · [stdlib-re.md](doc/design/stdlib-re.md) · [stdlib-encoding.md](doc/design/stdlib-encoding.md)。
-- **中层标准库（规划）**：通用原语沉 `lib/`（path / hash / csv …），减少「事事 ABI 插件」。路线 [stdlib-mid.md](doc/roadmap/stdlib-mid.md)。
+- **中层标准库（规划）**：通用原语沉 `lib/`（hash / csv …），减少「事事 ABI 插件」。路线 [stdlib-mid.md](doc/roadmap/stdlib-mid.md)。
 - **`ext/linalg`**：L0–L6 + 公式文档面 **F1–F3**（中缀、`declare`、展示/`explicit` 默认化简、`T_ascii`、public「如何写公式文档」）；示例 `linalg-transpose` · `linalg-svd` · `linalg-least-squares`。设计：[ext-linalg-formula-doc.md](doc/design/ext-linalg-formula-doc.md)。
 
 ### Fixed

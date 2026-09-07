@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| 状态 | **M1 已落地（re + encoding）· M2–M6 规划中** |
+| 状态 | **M1–M2 已落地 · M3–M6 规划中** |
 | 日期 | 2026-09-07 |
 | 设计 | [stdlib-mid.md](../design/stdlib-mid.md) |
 | 相关 | [stdlib-modules.md](../design/stdlib-modules.md) · [next-phase.md](next-phase.md) · [ext-cli.md](../design/ext-cli.md) |
@@ -65,14 +65,16 @@ M6  可观测与标识         log + uuid（+ 可选 yaml）
 
 ---
 
-### M2 — 路径与文件中层
+### M2 — 路径与文件中层 — **done**
 
 | 交付 | 说明 |
 |------|------|
 | `lib/path.mq.md` / `lib/路径.mq.md` | `join` / `split` / `file_name` / `parent` / `extension` / `normalize` / `is_absolute` |
-| `lib/fs` 加厚 | `copy_file` / `move` / `read_bytes` 或明确「仅文本」边界；`temp_dir` / `make_temp`（若沙箱允许） |
-| Host | 路径用 Rust `Path`/`PathBuf`；保持现有 cwd/fs_root 沙箱 |
-| 验收 | 跨 `\`/`/` 行为有金样；相对路径不逃逸 `fs_root` |
+| `lib/fs` 加厚 | `copy_file` / `move` / `make_temp`（文本边界；无 `read_bytes`） |
+| Host | `host_path_*`、`host_copy_file` / `host_move` / `host_make_temp` |
+| 金样 | `path-smoke` · `路径-烟测` · `fs-copy-move` · `文件-复制` |
+| 文档 | [stdlib-path.md](../design/stdlib-path.md) · [stdlib-fs-mid.md](../design/stdlib-fs-mid.md) · public `09-path-fs` |
+| 验收 | 规范化 + 沙箱内复制/移动 |
 
 **刻意不做：** 完整 `shutil`、监视 `inotify`、权限 ACL 全家桶。
 

@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 
-use crate::host::{encoding, fs, json, math, net, re, sys, time, writeback, HostContext};
+use crate::host::{encoding, fs, json, math, net, path, re, sys, time, writeback, HostContext};
 #[cfg(feature = "exec-host")]
 use crate::host::{foreign, subtask};
 #[cfg(feature = "plugin-host")]
@@ -137,6 +137,16 @@ pub enum HostFn {
     EncodingBase64Decode = 131,
     EncodingHexEncode = 132,
     EncodingHexDecode = 133,
+    PathJoin = 134,
+    PathSplit = 135,
+    PathFileName = 136,
+    PathParent = 137,
+    PathExtension = 138,
+    PathNormalize = 139,
+    PathIsAbsolute = 140,
+    FsCopyFile = 141,
+    FsMove = 142,
+    FsMakeTemp = 143,
 }
 
 
@@ -267,6 +277,16 @@ impl HostFn {
             131 => Self::EncodingBase64Decode,
             132 => Self::EncodingHexEncode,
             133 => Self::EncodingHexDecode,
+            134 => Self::PathJoin,
+            135 => Self::PathSplit,
+            136 => Self::PathFileName,
+            137 => Self::PathParent,
+            138 => Self::PathExtension,
+            139 => Self::PathNormalize,
+            140 => Self::PathIsAbsolute,
+            141 => Self::FsCopyFile,
+            142 => Self::FsMove,
+            143 => Self::FsMakeTemp,
             _ => return None,
         })
     }
@@ -400,6 +420,16 @@ impl HostFn {
             "host_encoding_base64_decode" | "encoding_base64_decode" => Self::EncodingBase64Decode,
             "host_encoding_hex_encode" | "encoding_hex_encode" => Self::EncodingHexEncode,
             "host_encoding_hex_decode" | "encoding_hex_decode" => Self::EncodingHexDecode,
+            "host_path_join" | "path_join" => Self::PathJoin,
+            "host_path_split" | "path_split" => Self::PathSplit,
+            "host_path_file_name" | "path_file_name" => Self::PathFileName,
+            "host_path_parent" | "path_parent" => Self::PathParent,
+            "host_path_extension" | "path_extension" => Self::PathExtension,
+            "host_path_normalize" | "path_normalize" => Self::PathNormalize,
+            "host_path_is_absolute" | "path_is_absolute" => Self::PathIsAbsolute,
+            "host_copy_file" | "copy_file" => Self::FsCopyFile,
+            "host_move" | "move_path" => Self::FsMove,
+            "host_make_temp" | "make_temp" => Self::FsMakeTemp,
             _ => return None,
         })
     }
@@ -520,6 +550,16 @@ impl HostFn {
             Self::EncodingBase64Decode => "host_encoding_base64_decode",
             Self::EncodingHexEncode => "host_encoding_hex_encode",
             Self::EncodingHexDecode => "host_encoding_hex_decode",
+            Self::PathJoin => "host_path_join",
+            Self::PathSplit => "host_path_split",
+            Self::PathFileName => "host_path_file_name",
+            Self::PathParent => "host_path_parent",
+            Self::PathExtension => "host_path_extension",
+            Self::PathNormalize => "host_path_normalize",
+            Self::PathIsAbsolute => "host_path_is_absolute",
+            Self::FsCopyFile => "host_copy_file",
+            Self::FsMove => "host_move",
+            Self::FsMakeTemp => "host_make_temp",
             Self::WritebackRecord => "host_writeback_record",
             Self::WritebackGet => "host_writeback_get",
             Self::WritebackClear => "host_writeback_clear",
@@ -613,6 +653,15 @@ impl HostFn {
             | Self::EncodingBase64Decode
             | Self::EncodingHexEncode
             | Self::EncodingHexDecode => &["text"],
+            Self::PathJoin => &["a", "b"],
+            Self::PathSplit
+            | Self::PathFileName
+            | Self::PathParent
+            | Self::PathExtension
+            | Self::PathNormalize
+            | Self::PathIsAbsolute => &["path"],
+            Self::FsCopyFile | Self::FsMove => &["src", "dest"],
+            Self::FsMakeTemp => &[],
             Self::WritebackRecord => &["value"],
             Self::WritebackGet | Self::WritebackClear => &[],
             Self::WritebackList => &[],
@@ -646,6 +695,7 @@ impl HostFn {
             Self::SubtaskSpawn => &["path", "fn", "args", "code", "lang", "source", "stdin", "quiet"],
             Self::ListSlice => &["end"],
             Self::ReReplace => &["count"],
+            Self::FsMakeTemp => &["prefix"],
             _ => &[],
         }
     }
@@ -1029,6 +1079,18 @@ pub fn call_host(
         HostFn::EncodingBase64Decode => encoding::base64_decode(require(bound, "text")?),
         HostFn::EncodingHexEncode => encoding::hex_encode(require(bound, "text")?),
         HostFn::EncodingHexDecode => encoding::hex_decode(require(bound, "text")?),
+        HostFn::PathJoin => path::join(require(bound, "a")?, require(bound, "b")?),
+        HostFn::PathSplit => path::split(require(bound, "path")?),
+        HostFn::PathFileName => path::file_name(require(bound, "path")?),
+        HostFn::PathParent => path::parent(require(bound, "path")?),
+        HostFn::PathExtension => path::extension(require(bound, "path")?),
+        HostFn::PathNormalize => path::normalize(require(bound, "path")?),
+        HostFn::PathIsAbsolute => path::is_absolute(require(bound, "path")?),
+        HostFn::FsCopyFile => {
+            fs::copy_file(ctx, require(bound, "src")?, require(bound, "dest")?)
+        }
+        HostFn::FsMove => fs::move_path(ctx, require(bound, "src")?, require(bound, "dest")?),
+        HostFn::FsMakeTemp => fs::make_temp(ctx, bound.get("prefix")),
         HostFn::OuterCallLine => Ok(Value::Int(
             ctx.call_site_lines
                 .first()
