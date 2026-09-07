@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| 状态 | **L0–L6 规划中 · 未开工** |
+| 状态 | **L0–L1 已落地 · L2+ 待做** |
 | 日期 | 2026-09-07 |
 | **锁定设计** | [design/ext-linalg.md](../design/ext-linalg.md) |
 | 调研 | [research/ext-linalg-formula.md](../research/ext-linalg-formula.md) |
@@ -23,8 +23,8 @@
 
 | 阶段 | 内容 | 状态 |
 |------|------|------|
-| **L0** | CATALOG + `plugins/linalg` ping + L1 `ensure_plugin`；`ext add` 条目 | **pending** |
-| **L1** | MatExpr：`symbol` / 稠密叶子 / `mul`·`add`·`T`·`inv`；`simplify` R1–R5；`latex`·`ascii`·`show` | **pending** |
+| **L0** | CATALOG + `plugins/linalg` ping + L1 `ensure_plugin`；`ext add` 条目 | **done** |
+| **L1** | MatExpr：`symbol` / 稠密叶子 / `mul`·`add`·`T`·`inv`；`simplify` R1–R5；`latex`·`ascii`·`show` | **done** |
 | **L2** | `explicit` / 小阵 gemm·解系·`det`·`trace`；维数护栏；金样 `linalg-basic-smoke` | **pending** |
 | **L3** | `block` + `collapse`；`kron` 惰性 + R7；金样 `linalg-block-kron` | **pending** |
 | **L4** | `factorize` LU/QR/SVD/eig（+ 可选 chol）；结构 SVG `svd|qr|ge|eig`；金样 `linalg-factor-smoke` | **pending** |
@@ -40,16 +40,16 @@
 
 ### L0
 
-- [ ] `ext/linalg/CATALOG`（或既有 catalog 机制）含 `linalg` / `线性代数`  
-- [ ] 插件 `ping` → ok  
-- [ ] 文档：`marqdo ext add linalg`
+- [x] `ext/linalg` CATALOG 含 `linalg`  
+- [x] 插件 `ping` → ok  
+- [x] 文档：`marqdo ext add linalg`
 
 ### L1
 
-- [ ] `(AB)^\top` → `simplify` → `B^\top A^\top`（无 dense）  
-- [ ] 形状错误含行列信息  
-- [ ] view 或 CLI 可见 latex/ascii  
-- [ ] 中英 L1 各一 smoke
+- [x] `(AB)^\top` → `simplify` → `B^T*A^T`（无 dense）  
+- [x] 形状错误含行列信息  
+- [x] CLI `ascii` / `show` SVG 通道  
+- [x] 中英 L1 各一 smoke
 
 ### L2
 

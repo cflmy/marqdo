@@ -52,6 +52,7 @@ members = [
     "plugins/agent",
     "plugins/web",
     "plugins/quantum",
+    "plugins/linalg",
     "crates/marqdo-wasm",
 ]
 resolver = "2"

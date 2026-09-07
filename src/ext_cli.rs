@@ -42,6 +42,12 @@ pub const CATALOG: &[ExtPackage] = &[
         mq_files: &["quantum/quantum.mq.md", "quantum/量子.mq.md"],
         native_crate: Some("marqdo_plugin_quantum"),
     },
+    ExtPackage {
+        id: "linalg",
+        description: "Formula-first linear algebra (ext/linalg) — MatExpr simplify/display",
+        mq_files: &["linalg/linalg.mq.md", "linalg/线性代数.mq.md"],
+        native_crate: Some("marqdo_plugin_linalg"),
+    },
 ];
 
 pub fn find_package(id: &str) -> Option<&'static ExtPackage> {
@@ -93,6 +99,7 @@ pub fn native_short_name(crate_or_id: &str) -> &str {
         "marqdo_plugin_agent" | "agent" => "agent",
         "marqdo_plugin_web" | "web" => "web",
         "marqdo_plugin_quantum" | "quantum" => "quantum",
+        "marqdo_plugin_linalg" | "linalg" => "linalg",
         other => other,
     }
 }
@@ -112,6 +119,7 @@ pub fn native_env_var(short: &str) -> &'static str {
     match native_short_name(short) {
         "web" => "MARQDO_WEB_PLUGIN",
         "quantum" => "MARQDO_QUANTUM_PLUGIN",
+        "linalg" => "MARQDO_LINALG_PLUGIN",
         _ => "MARQDO_AGENT_PLUGIN",
     }
 }
@@ -415,7 +423,7 @@ pub fn remove_ext(id: &str) -> Result<()> {
 /// Also falls back to cargo `target/{debug,release}` artifacts for local runs.
 pub fn installed_native_path(name: &str) -> Option<PathBuf> {
     let short = native_short_name(name);
-    if !matches!(short, "agent" | "web" | "quantum") {
+    if !matches!(short, "agent" | "web" | "quantum" | "linalg") {
         return None;
     }
     let lib_name = native_lib_filename(short);
@@ -454,7 +462,12 @@ pub fn path_is_trusted_plugin(path: &Path) -> bool {
             return true;
         }
     }
-    for key in ["MARQDO_AGENT_PLUGIN", "MARQDO_WEB_PLUGIN", "MARQDO_QUANTUM_PLUGIN"] {
+    for key in [
+        "MARQDO_AGENT_PLUGIN",
+        "MARQDO_WEB_PLUGIN",
+        "MARQDO_QUANTUM_PLUGIN",
+        "MARQDO_LINALG_PLUGIN",
+    ] {
         if let Ok(p) = env::var(key) {
             let p = PathBuf::from(p);
             let p = p.canonicalize().unwrap_or(p);
@@ -463,7 +476,7 @@ pub fn path_is_trusted_plugin(path: &Path) -> bool {
             }
         }
     }
-    for short in ["agent", "web", "quantum"] {
+    for short in ["agent", "web", "quantum", "linalg"] {
         if let Ok(found) = find_native_plugin(short) {
             let found = found.canonicalize().unwrap_or(found);
             if found == path {

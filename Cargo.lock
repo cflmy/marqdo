@@ -1071,6 +1071,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "marqdo_plugin_linalg"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "marqdo_plugin_quantum"
 version = "0.1.0"
 dependencies = [

@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| 状态 | **Draft · 待实现** |
+| 状态 | **Draft · L0–L1 已落地** |
 | 日期 | 2026-09-07 |
 | 调研 | [research/ext-linalg-formula.md](../research/ext-linalg-formula.md) |
 | 路线图 | [roadmap/ext-linalg.md](../roadmap/ext-linalg.md) |
@@ -126,16 +126,17 @@ plugins/linalg（ABI v2）
 文档写法偏好：
 
 ````markdown
-`A` = > la.matrix.symbol name=A rows=n cols=n
+`A` = > la.symbol name=A rows=n cols=n
 
 `b` =
 $$
 \begin{pmatrix}1\\0\\0\end{pmatrix}
 $$
 
-*`b` = > la.matrix.from_formula formula=`b` *
+*`b` = > la.from_formula formula=`b` *
 ````
 
+作者面优先顶层 `la.symbol` / `la.mul`（`la.matrix.symbol` 无接收者会硬错误，见 [module-namespace.md](module-namespace.md) §4.3）。
 ### 4.2 公式代数（返回 `linalg_expr`，惰性）
 
 | 英文 | 中文 | 语义 |
@@ -201,8 +202,8 @@ import table:lib/table.mq.md
 
 # main
 
-*`A` = > la.matrix.symbol name=A rows=3 cols=3 *
-*`x` = > la.matrix.symbol name=x rows=3 cols=1 *
+*`A` = > la.symbol name=A rows=3 cols=3 *
+*`x` = > la.symbol name=x rows=3 cols=1 *
 *`b` = > la.mul a=`A` b=`x` *
 
 *`s` = > la.simplify expr=`b` *
@@ -213,11 +214,10 @@ $$
 \begin{bmatrix}2&0\\0&3\end{bmatrix}
 $$
 
-*`M` = > la.matrix.from_formula formula=`M` *
+*`M` = > la.from_list data=[[2,0],[0,3]] *
 *`f` = > la.factorize matrix=`M` kind=eig *
 > la.draw factor=`f` kind=eig path=eig.svg
 ````
-
 ---
 
 ## 5. 公式重写与「大规模优化」（核心）

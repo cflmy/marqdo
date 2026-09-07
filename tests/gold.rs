@@ -2465,6 +2465,31 @@ txn-rollback-ok",
 }
 
 #[test]
+fn ext_linalg_formula_smoke() {
+    let status = Command::new("cargo")
+        .args(["build", "-p", "marqdo_plugin_linalg"])
+        .current_dir(env!("CARGO_MANIFEST_DIR"))
+        .status()
+        .expect("build linalg plugin");
+    assert!(status.success(), "failed to build marqdo_plugin_linalg");
+    assert_out(
+        "tests/ext/linalg-formula-smoke.mq.md",
+        "B^T*A^T\nping-ok",
+    );
+}
+
+#[test]
+fn ext_linalg_zh_smoke() {
+    let status = Command::new("cargo")
+        .args(["build", "-p", "marqdo_plugin_linalg"])
+        .current_dir(env!("CARGO_MANIFEST_DIR"))
+        .status()
+        .expect("build linalg plugin");
+    assert!(status.success(), "failed to build marqdo_plugin_linalg");
+    assert_out("tests/ext/linalg-zh-smoke.mq.md", "B^T*A^T\n探测-ok");
+}
+
+#[test]
 fn ext_quantum_bell_smoke() {
     let status = Command::new("cargo")
         .args(["build", "-p", "marqdo_plugin_quantum"])

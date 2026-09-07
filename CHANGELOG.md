@@ -3,6 +3,7 @@
 ## Unreleased
 
 ### Added
+- **`ext/linalg` L0–L1（公式优先）**：`MatrixSymbol` / 乘加转置逆、R1–R5 `simplify`、`ascii`/`latex`/`show`；`marqdo ext add linalg`；金样 `linalg-formula-smoke` · `linalg-zh-smoke`。设计：[ext-linalg.md](doc/design/ext-linalg.md)。
 
 ### Fixed
 

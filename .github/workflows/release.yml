@@ -28,7 +28,7 @@ jobs:
       - name: Build release CLI + official plugins
         run: |
           cargo build --release
-          cargo build --release -p marqdo_plugin_web -p marqdo_plugin_agent -p marqdo_plugin_quantum
+          cargo build --release -p marqdo_plugin_web -p marqdo_plugin_agent -p marqdo_plugin_quantum -p marqdo_plugin_linalg
 
       - name: Checkout extension sources (branch vscode-extension only)
         run: git fetch origin vscode-extension && git checkout origin/vscode-extension -- vscode-extension
@@ -75,6 +75,7 @@ jobs:
           Copy-Item target/release/web.dll "$stageNative/native/web.dll"
           Copy-Item target/release/agent.dll "$stageNative/native/agent.dll"
           Copy-Item target/release/quantum.dll "$stageNative/native/quantum.dll"
+          Copy-Item target/release/linalg.dll "$stageNative/native/linalg.dll"
           if (Test-Path "dist/$nativeZip") { Remove-Item "dist/$nativeZip" -Force }
           Compress-Archive -Path "$stageNative/*" -DestinationPath "dist/$nativeZip" -Force
           $stage = "dist/stage-bundle"
@@ -87,6 +88,7 @@ jobs:
           Copy-Item target/release/web.dll "$stage/ext/native/web.dll"
           Copy-Item target/release/agent.dll "$stage/ext/native/agent.dll"
           Copy-Item target/release/quantum.dll "$stage/ext/native/quantum.dll"
+          Copy-Item target/release/linalg.dll "$stage/ext/native/linalg.dll"
           if (Test-Path "dist/$zip") { Remove-Item "dist/$zip" -Force }
           Compress-Archive -Path "$stage/*" -DestinationPath "dist/$zip" -Force
           $stageLib = "dist/stage-stdlib"
@@ -152,7 +154,7 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - name: Build official plugins (release)
-        run: cargo build --release -p marqdo_plugin_web -p marqdo_plugin_agent -p marqdo_plugin_quantum
+        run: cargo build --release -p marqdo_plugin_web -p marqdo_plugin_agent -p marqdo_plugin_quantum -p marqdo_plugin_linalg
 
       - name: Package native zip
         run: |
@@ -163,6 +165,7 @@ jobs:
           cp target/release/libweb.so dist/stage-native/native/libweb.so
           cp target/release/libagent.so dist/stage-native/native/libagent.so
           cp target/release/libquantum.so dist/stage-native/native/libquantum.so
+          cp target/release/liblinalg.so dist/stage-native/native/liblinalg.so
           (cd dist/stage-native && zip -r "../marqdo-${VER}-native-${TARGET}.zip" .)
           echo "NATIVE=marqdo-${VER}-native-${TARGET}.zip" >> "$GITHUB_ENV"
 
