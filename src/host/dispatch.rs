@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 
-use crate::host::{fs, json, math, net, sys, time, writeback, HostContext};
+use crate::host::{encoding, fs, json, math, net, re, sys, time, writeback, HostContext};
 #[cfg(feature = "exec-host")]
 use crate::host::{foreign, subtask};
 #[cfg(feature = "plugin-host")]
@@ -128,6 +128,15 @@ pub enum HostFn {
     CookieParse = 122,
     MultipartParse = 123,
     MarkdownParse = 124,
+    ReIsMatch = 125,
+    ReFind = 126,
+    ReFindAll = 127,
+    ReReplace = 128,
+    ReSplit = 129,
+    EncodingBase64Encode = 130,
+    EncodingBase64Decode = 131,
+    EncodingHexEncode = 132,
+    EncodingHexDecode = 133,
 }
 
 
@@ -249,6 +258,15 @@ impl HostFn {
             122 => Self::CookieParse,
             123 => Self::MultipartParse,
             124 => Self::MarkdownParse,
+            125 => Self::ReIsMatch,
+            126 => Self::ReFind,
+            127 => Self::ReFindAll,
+            128 => Self::ReReplace,
+            129 => Self::ReSplit,
+            130 => Self::EncodingBase64Encode,
+            131 => Self::EncodingBase64Decode,
+            132 => Self::EncodingHexEncode,
+            133 => Self::EncodingHexDecode,
             _ => return None,
         })
     }
@@ -373,6 +391,15 @@ impl HostFn {
             "host_cookie_parse" | "cookie_parse" => Self::CookieParse,
             "host_multipart_parse" | "multipart_parse" => Self::MultipartParse,
             "host_markdown_parse" | "markdown_parse" => Self::MarkdownParse,
+            "host_re_is_match" | "re_is_match" => Self::ReIsMatch,
+            "host_re_find" | "re_find" => Self::ReFind,
+            "host_re_find_all" | "re_find_all" => Self::ReFindAll,
+            "host_re_replace" | "re_replace" => Self::ReReplace,
+            "host_re_split" | "re_split" => Self::ReSplit,
+            "host_encoding_base64_encode" | "encoding_base64_encode" => Self::EncodingBase64Encode,
+            "host_encoding_base64_decode" | "encoding_base64_decode" => Self::EncodingBase64Decode,
+            "host_encoding_hex_encode" | "encoding_hex_encode" => Self::EncodingHexEncode,
+            "host_encoding_hex_decode" | "encoding_hex_decode" => Self::EncodingHexDecode,
             _ => return None,
         })
     }
@@ -484,6 +511,15 @@ impl HostFn {
             Self::CookieParse => "host_cookie_parse",
             Self::MultipartParse => "host_multipart_parse",
             Self::MarkdownParse => "host_markdown_parse",
+            Self::ReIsMatch => "host_re_is_match",
+            Self::ReFind => "host_re_find",
+            Self::ReFindAll => "host_re_find_all",
+            Self::ReReplace => "host_re_replace",
+            Self::ReSplit => "host_re_split",
+            Self::EncodingBase64Encode => "host_encoding_base64_encode",
+            Self::EncodingBase64Decode => "host_encoding_base64_decode",
+            Self::EncodingHexEncode => "host_encoding_hex_encode",
+            Self::EncodingHexDecode => "host_encoding_hex_decode",
             Self::WritebackRecord => "host_writeback_record",
             Self::WritebackGet => "host_writeback_get",
             Self::WritebackClear => "host_writeback_clear",
@@ -569,6 +605,14 @@ impl HostFn {
             Self::CookieParse => &["text", "is_response"],
             Self::MultipartParse => &["body", "boundary"],
             Self::MarkdownParse => &["text"],
+            Self::ReIsMatch | Self::ReFind | Self::ReFindAll | Self::ReSplit => {
+                &["text", "pattern"]
+            }
+            Self::ReReplace => &["text", "pattern", "with"],
+            Self::EncodingBase64Encode
+            | Self::EncodingBase64Decode
+            | Self::EncodingHexEncode
+            | Self::EncodingHexDecode => &["text"],
             Self::WritebackRecord => &["value"],
             Self::WritebackGet | Self::WritebackClear => &[],
             Self::WritebackList => &[],
@@ -601,6 +645,7 @@ impl HostFn {
             Self::WritebackEnsure => &["placeholder", "line"],
             Self::SubtaskSpawn => &["path", "fn", "args", "code", "lang", "source", "stdin", "quiet"],
             Self::ListSlice => &["end"],
+            Self::ReReplace => &["count"],
             _ => &[],
         }
     }
@@ -970,6 +1015,20 @@ pub fn call_host(
         HostFn::CookieParse => net::cookie_parse(require(bound, "text")?, bound.get("is_response")),
         HostFn::MultipartParse => net::multipart_parse(require(bound, "body")?, require(bound, "boundary")?),
         HostFn::MarkdownParse => net::markdown_parse(require(bound, "text")?),
+        HostFn::ReIsMatch => re::is_match(require(bound, "text")?, require(bound, "pattern")?),
+        HostFn::ReFind => re::find(require(bound, "text")?, require(bound, "pattern")?),
+        HostFn::ReFindAll => re::find_all(require(bound, "text")?, require(bound, "pattern")?),
+        HostFn::ReReplace => re::replace(
+            require(bound, "text")?,
+            require(bound, "pattern")?,
+            require(bound, "with")?,
+            bound.get("count"),
+        ),
+        HostFn::ReSplit => re::split(require(bound, "text")?, require(bound, "pattern")?),
+        HostFn::EncodingBase64Encode => encoding::base64_encode(require(bound, "text")?),
+        HostFn::EncodingBase64Decode => encoding::base64_decode(require(bound, "text")?),
+        HostFn::EncodingHexEncode => encoding::hex_encode(require(bound, "text")?),
+        HostFn::EncodingHexDecode => encoding::hex_decode(require(bound, "text")?),
         HostFn::OuterCallLine => Ok(Value::Int(
             ctx.call_site_lines
                 .first()

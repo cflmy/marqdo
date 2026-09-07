@@ -1067,6 +1067,35 @@ fn lib_fs_read() {
 }
 
 #[test]
+fn lib_re_smoke() {
+    assert_out(
+        "tests/lib/re-smoke.mq.md",
+        "True\n12\n1,22,333\naXbXc3\na|b|c",
+    );
+}
+
+#[test]
+fn lib_re_smoke_zh() {
+    assert_out("tests/lib/正则-烟测.mq.md", "True\n12\n1,22,333");
+}
+
+#[test]
+fn lib_encoding_smoke() {
+    assert_out(
+        "tests/lib/encoding-smoke.mq.md",
+        "aGVsbG8=\nhello\n6869\nhi",
+    );
+}
+
+#[test]
+fn lib_encoding_smoke_zh() {
+    assert_out(
+        "tests/lib/编码-烟测.mq.md",
+        "aGVsbG8=\nhello\n6869\nhi",
+    );
+}
+
+#[test]
 fn lib_fs_read_zh() {
     assert_out("tests/lib/文件-读.mq.md", "存在\nhello-lib");
 }

@@ -7,6 +7,7 @@
 pub mod agent_rt;
 pub mod collection;
 mod dispatch;
+mod encoding;
 pub mod event_bus;
 #[cfg(feature = "exec-host")]
 pub mod foreign;
@@ -14,6 +15,7 @@ mod fs;
 pub(crate) mod json;
 pub mod math;
 mod net;
+mod re;
 #[cfg(feature = "plugin-host")]
 pub mod plugin;
 #[cfg(not(feature = "plugin-host"))]

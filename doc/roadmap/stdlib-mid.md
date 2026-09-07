@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| 状态 | **规划 · 待按波次开工** |
+| 状态 | **M1 已落地（re + encoding）· M2–M6 规划中** |
 | 日期 | 2026-09-07 |
 | 设计 | [stdlib-mid.md](../design/stdlib-mid.md) |
 | 相关 | [stdlib-modules.md](../design/stdlib-modules.md) · [next-phase.md](next-phase.md) · [ext-cli.md](../design/ext-cli.md) |
@@ -50,16 +50,16 @@ M6  可观测与标识         log + uuid（+ 可选 yaml）
 
 ## 2. 波次明细
 
-### M1 — 正则与编解码（最高优先）
+### M1 — 正则与编解码（最高优先） — **done**
 
 | 交付 | 说明 |
 |------|------|
-| `lib/re.mq.md` / `lib/正则.mq.md` | `is_match` / `find` / `find_all` / `replace` / `split`（命名可微调，冻前写短设计） |
-| `lib/encoding.mq.md` / `lib/编码.mq.md` | `base64_encode`/`decode`、`hex_encode`/`decode`；与 `net.url_encode` 的职责表 |
-| Host | `host_re_*`（建议 `regex` crate）、`host_encoding_*` |
-| 金样 | `tests/lib/re-*.mq.md`、`encoding-*.mq.md` |
-| 文档 | `doc/design/stdlib-re.md`、`stdlib-encoding.md`；`public/features` 各一页 |
-| 验收 | 无插件下完成：邮箱/路径片段校验、配置里的 base64 往返 |
+| `lib/re.mq.md` / `lib/正则.mq.md` | `is_match` / `find` / `find_all` / `replace` / `split` |
+| `lib/encoding.mq.md` / `lib/编码.mq.md` | `base64_*` / `hex_*` |
+| Host | `host_re_*`（`regex`）、`host_encoding_*`（无第三方编解码 crate） |
+| 金样 | `tests/lib/re-smoke` · `正则-烟测` · `encoding-smoke` · `编码-烟测` |
+| 文档 | [stdlib-re.md](../design/stdlib-re.md) · [stdlib-encoding.md](../design/stdlib-encoding.md) · public `08-re-encoding` |
+| 验收 | 无插件：邮箱式校验 + base64/hex 往返 |
 
 **刻意不做：** 回溯引用极致兼容、替换回调、完整 PCRE 方言文档化——先 RE2/ Rust `regex` 语义并写清。
 

@@ -14,6 +14,8 @@
 
 官方扩展（非 stdlib）：`ext/llm`、`ext/agent`、`ext/web`、`ext/quantum`、`ext/linalg` — 见 `features/05-*.mq.md`、`06-*.mq.md`、`07-linalg.mq.md` / `07-线性代数.mq.md` 与 `doc/design/ext-*.md`。
 
+中层标准库（Mid）：`features/08-re-encoding.mq.md` / `08-正则编解码.mq.md`（`lib/re` · `lib/encoding`）。
+
 **不放** `errors/`：失败样例只在 `tests/errors/`。
 
 开发文档在 [`doc/`](../doc/)。

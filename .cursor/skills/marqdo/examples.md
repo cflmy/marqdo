@@ -149,6 +149,22 @@ import text:lib/text.mq.md
 > print text=`parts`
 ```
 
+## 7b. Mid M1 — regex + encoding (no plugin)
+
+```markdown
+---
+import re:lib/re.mq.md
+import enc:lib/encoding.mq.md
+---
+
+# main
+
+*`ok` = > re.is_match text="a@b.c" pattern="@"*
+*`b64` = > enc.base64_encode text="hi"*
+> print text=`ok`
+> print text=`b64`
+```
+
 ## 8. Comment paragraphs (blank-line rule)
 
 ```markdown

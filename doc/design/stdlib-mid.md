@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| 状态 | **规划中（设计定稿 · 实现未开）** |
+| 状态 | **规划中 · M1（re + encoding）已实现** |
 | 日期 | 2026-09-07 |
 | 相关 | [stdlib.md](stdlib.md) · [stdlib-modules.md](stdlib-modules.md) · [ext-abi.md](ext-abi.md) · [roadmap/stdlib-mid.md](../roadmap/stdlib-mid.md) |
 | 目标 | 在接下来数个发版周期内，把「通用编程」能力沉到 **L0.5 宿主 + L1 `.mq.md`**，减少「凡是稍有能力就必须 ABI 插件」的路径依赖 |
