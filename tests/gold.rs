@@ -1122,6 +1122,32 @@ fn lib_secrets_smoke_zh() {
 }
 
 #[test]
+fn lib_text_mid_smoke() {
+    assert_out(
+        "tests/lib/text-mid-smoke.mq.md",
+        "True\nAB\na_a_a\n...x\nababab",
+    );
+}
+
+#[test]
+fn lib_text_mid_smoke_zh() {
+    assert_out("tests/lib/文本-加厚-烟测.mq.md", "True\nAB\na_a-a");
+}
+
+#[test]
+fn lib_csv_smoke() {
+    assert_out(
+        "tests/lib/csv-smoke.mq.md",
+        "2\nalice\nhi, there\n2",
+    );
+}
+
+#[test]
+fn lib_csv_smoke_zh() {
+    assert_out("tests/lib/逗号表-烟测.mq.md", "1\n1");
+}
+
+#[test]
 fn lib_re_smoke() {
     assert_out(
         "tests/lib/re-smoke.mq.md",

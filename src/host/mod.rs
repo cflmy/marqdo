@@ -7,6 +7,7 @@
 pub mod agent_rt;
 pub mod collection;
 mod dispatch;
+mod csv;
 mod encoding;
 pub mod event_bus;
 #[cfg(feature = "exec-host")]
@@ -19,6 +20,7 @@ mod net;
 mod path;
 mod re;
 mod secrets;
+mod text_ops;
 #[cfg(feature = "plugin-host")]
 pub mod plugin;
 #[cfg(not(feature = "plugin-host"))]

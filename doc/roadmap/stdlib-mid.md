@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| 状态 | **M1–M3 已落地 · M4–M6 规划中** |
+| 状态 | **M1–M4 已落地 · M5–M6 规划中** |
 | 日期 | 2026-09-07 |
 | 设计 | [stdlib-mid.md](../design/stdlib-mid.md) |
 | 相关 | [stdlib-modules.md](../design/stdlib-modules.md) · [next-phase.md](next-phase.md) · [ext-cli.md](../design/ext-cli.md) |
@@ -95,13 +95,16 @@ M6  可观测与标识         log + uuid（+ 可选 yaml）
 
 ---
 
-### M4 — CSV 与文本加厚
+### M4 — CSV 与文本加厚 — **done**
 
 | 交付 | 说明 |
 |------|------|
-| `lib/csv.mq.md` / `lib/逗号表.mq.md` | `parse` → list of maps；`stringify`；方言先 RFC4180 最小集 |
-| `lib/text` / `文本` 加厚 | `contains` / `starts_with` / `ends_with` / `replace` / `to_upper`/`to_lower` / `repeat` / `pad`（Unicode 规则写清） |
-| 验收 | public 数据清洗小例；与 `table.put` 管线可读（禁 json 袋胶水） |
+| `lib/csv.mq.md` / `lib/逗号表.mq.md` | `parse` / `stringify`（首行表头 → list of maps） |
+| `lib/text` / `文本` 加厚 | `contains` / `starts_with` / `ends_with` / `replace` / `to_upper`/`to_lower` / `repeat` / `pad` |
+| Host | `host_csv_*`、`host_text_*` |
+| 金样 | `csv-smoke` · `逗号表-烟测` · `text-mid-smoke` · `文本-加厚-烟测` |
+| 文档 | [stdlib-csv.md](../design/stdlib-csv.md) · [stdlib-text-mid.md](../design/stdlib-text-mid.md) · public `11-csv-text` |
+| 验收 | CSV 往返 + 文本清洗小例 |
 
 **可选同波：** 极简 `format`（`{name}` 替换），若与引用语法冲突则延后。
 

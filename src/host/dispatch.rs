@@ -3,7 +3,8 @@
 use std::collections::HashMap;
 
 use crate::host::{
-    encoding, fs, hash, json, math, net, path, re, secrets, sys, time, writeback, HostContext,
+    csv, encoding, fs, hash, json, math, net, path, re, secrets, sys, text_ops, time, writeback,
+    HostContext,
 };
 #[cfg(feature = "exec-host")]
 use crate::host::{foreign, subtask};
@@ -155,6 +156,16 @@ pub enum HostFn {
     HashHmacSha256 = 147,
     SecretsTokenHex = 148,
     SecretsTokenUrlsafe = 149,
+    TextContains = 150,
+    TextStartsWith = 151,
+    TextEndsWith = 152,
+    TextReplace = 153,
+    TextToUpper = 154,
+    TextToLower = 155,
+    TextRepeat = 156,
+    TextPad = 157,
+    CsvParse = 158,
+    CsvStringify = 159,
 }
 
 
@@ -301,6 +312,16 @@ impl HostFn {
             147 => Self::HashHmacSha256,
             148 => Self::SecretsTokenHex,
             149 => Self::SecretsTokenUrlsafe,
+            150 => Self::TextContains,
+            151 => Self::TextStartsWith,
+            152 => Self::TextEndsWith,
+            153 => Self::TextReplace,
+            154 => Self::TextToUpper,
+            155 => Self::TextToLower,
+            156 => Self::TextRepeat,
+            157 => Self::TextPad,
+            158 => Self::CsvParse,
+            159 => Self::CsvStringify,
             _ => return None,
         })
     }
@@ -450,6 +471,16 @@ impl HostFn {
             "host_hash_hmac_sha256" | "hash_hmac_sha256" => Self::HashHmacSha256,
             "host_secrets_token_hex" | "secrets_token_hex" => Self::SecretsTokenHex,
             "host_secrets_token_urlsafe" | "secrets_token_urlsafe" => Self::SecretsTokenUrlsafe,
+            "host_text_contains" | "text_contains" => Self::TextContains,
+            "host_text_starts_with" | "text_starts_with" => Self::TextStartsWith,
+            "host_text_ends_with" | "text_ends_with" => Self::TextEndsWith,
+            "host_text_replace" | "text_replace" => Self::TextReplace,
+            "host_text_to_upper" | "text_to_upper" => Self::TextToUpper,
+            "host_text_to_lower" | "text_to_lower" => Self::TextToLower,
+            "host_text_repeat" | "text_repeat" => Self::TextRepeat,
+            "host_text_pad" | "text_pad" => Self::TextPad,
+            "host_csv_parse" | "csv_parse" => Self::CsvParse,
+            "host_csv_stringify" | "csv_stringify" => Self::CsvStringify,
             _ => return None,
         })
     }
@@ -586,6 +617,16 @@ impl HostFn {
             Self::HashHmacSha256 => "host_hash_hmac_sha256",
             Self::SecretsTokenHex => "host_secrets_token_hex",
             Self::SecretsTokenUrlsafe => "host_secrets_token_urlsafe",
+            Self::TextContains => "host_text_contains",
+            Self::TextStartsWith => "host_text_starts_with",
+            Self::TextEndsWith => "host_text_ends_with",
+            Self::TextReplace => "host_text_replace",
+            Self::TextToUpper => "host_text_to_upper",
+            Self::TextToLower => "host_text_to_lower",
+            Self::TextRepeat => "host_text_repeat",
+            Self::TextPad => "host_text_pad",
+            Self::CsvParse => "host_csv_parse",
+            Self::CsvStringify => "host_csv_stringify",
             Self::WritebackRecord => "host_writeback_record",
             Self::WritebackGet => "host_writeback_get",
             Self::WritebackClear => "host_writeback_clear",
@@ -691,6 +732,15 @@ impl HostFn {
             Self::HashSha256 | Self::HashSha1 | Self::HashMd5 => &["text"],
             Self::HashHmacSha256 => &["key", "text"],
             Self::SecretsTokenHex | Self::SecretsTokenUrlsafe => &[],
+            Self::TextContains => &["text", "sub"],
+            Self::TextStartsWith => &["text", "prefix"],
+            Self::TextEndsWith => &["text", "suffix"],
+            Self::TextReplace => &["text", "old", "new"],
+            Self::TextToUpper | Self::TextToLower => &["text"],
+            Self::TextRepeat => &["text", "n"],
+            Self::TextPad => &["text", "width"],
+            Self::CsvParse => &["text"],
+            Self::CsvStringify => &["rows"],
             Self::WritebackRecord => &["value"],
             Self::WritebackGet | Self::WritebackClear => &[],
             Self::WritebackList => &[],
@@ -726,6 +776,8 @@ impl HostFn {
             Self::ReReplace => &["count"],
             Self::FsMakeTemp => &["prefix"],
             Self::SecretsTokenHex | Self::SecretsTokenUrlsafe => &["n"],
+            Self::TextReplace => &["count"],
+            Self::TextPad => &["fill", "align"],
             _ => &[],
         }
     }
@@ -1129,6 +1181,32 @@ pub fn call_host(
         }
         HostFn::SecretsTokenHex => secrets::token_hex(bound.get("n")),
         HostFn::SecretsTokenUrlsafe => secrets::token_urlsafe(bound.get("n")),
+        HostFn::TextContains => {
+            text_ops::contains(require(bound, "text")?, require(bound, "sub")?)
+        }
+        HostFn::TextStartsWith => {
+            text_ops::starts_with(require(bound, "text")?, require(bound, "prefix")?)
+        }
+        HostFn::TextEndsWith => {
+            text_ops::ends_with(require(bound, "text")?, require(bound, "suffix")?)
+        }
+        HostFn::TextReplace => text_ops::replace(
+            require(bound, "text")?,
+            require(bound, "old")?,
+            require(bound, "new")?,
+            bound.get("count"),
+        ),
+        HostFn::TextToUpper => text_ops::to_upper(require(bound, "text")?),
+        HostFn::TextToLower => text_ops::to_lower(require(bound, "text")?),
+        HostFn::TextRepeat => text_ops::repeat(require(bound, "text")?, require(bound, "n")?),
+        HostFn::TextPad => text_ops::pad(
+            require(bound, "text")?,
+            require(bound, "width")?,
+            bound.get("fill"),
+            bound.get("align"),
+        ),
+        HostFn::CsvParse => csv::parse(require(bound, "text")?),
+        HostFn::CsvStringify => csv::stringify(require(bound, "rows")?),
         HostFn::OuterCallLine => Ok(Value::Int(
             ctx.call_site_lines
                 .first()
