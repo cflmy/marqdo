@@ -4,7 +4,7 @@
 |---|---|
 | 状态 | **已实现（M1–M4）** |
 | 日期 | 2026-08-05 |
-| 相关 | [stdlib-modules.md](stdlib-modules.md) · [stdlib-i18n.md](stdlib-i18n.md) · [markdown-mapping.md](markdown-mapping.md) · [view.md](view.md) |
+| 相关 | [stdlib-modules.md](stdlib-modules.md) · [stdlib-i18n.md](stdlib-i18n.md) · [markdown-mapping.md](markdown-mapping.md) · [view.md](view.md) · 大学线性代数见规划 [ext-linalg.md](ext-linalg.md) |
 | 导入 | `lib/math.mq.md`（英）· `lib/数学.mq.md`（中） |
 | 范围 | **高中数学**（初等函数、导数、圆锥曲线、简单方程）；非大学 CAS |
 
@@ -92,7 +92,7 @@ $$
 | 代入求值 | `subs` → `num` 或公式 |
 | 求解 | 一元一次 / 二次闭式；其它用数值求根并标明 |
 
-**不做（本波）：** 多元方程组、极限 ε-δ、级数、积分保证、矩阵、复数完备、任意证明。
+**不做（本波）：** 多元方程组、极限 ε-δ、级数、积分保证、**大学线性代数**（符号矩阵表达式 / 分解 —— 见 [ext-linalg.md](ext-linalg.md)）、复数完备、任意证明。数值小矩阵字面量可在 `$$` 中解析为 `formula::Matrix`，但符号 MatExpr 与分解不在 `lib/math`。
 
 ### 3.2 作图（P）
 
@@ -210,6 +210,7 @@ Interpreter.plots: Vec<Stringimport math:lib/math.mq.md · lib/数学.mq.md
 - `$$:name` 模块级具名绑定（已废除）。  
 - 无名 `$$` 自动进运行时。  
 - 大学级数 / 完备积分 / 定理证明。  
+- **大学线性代数扩展**（见 [ext-linalg.md](ext-linalg.md)；不在本库做符号 MatExpr）。  
 - 通用隐函数作图引擎。  
 - 3D、交互式图表库。
 

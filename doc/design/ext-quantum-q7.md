@@ -210,7 +210,7 @@
 - >6 qubit 稠密 ρ 的谱 / Hinton（请用态向量 API）  
 - Matplotlib / WebGL / 交互拖拽  
 - 量子线性系统算法（HHL）、QSVT 电路构造  
-- 把线性代数并入 `lib/math`
+- 把线性代数并入 `lib/math`（经典公式优先的 LA 见规划 [ext-linalg.md](ext-linalg.md)，作者面与 quantum 分离）
 
 ---
 
