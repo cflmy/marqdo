@@ -3,7 +3,7 @@
 ## Unreleased
 
 ### Added
-- **`ext/linalg` L0–L5**：公式 MatExpr（含分块/`kron`）+ 稠密 `explicit`/`det`/`trace`/`solve`；`collapse` 分块乘；`factorize`（LU/QR/SVD/eig/chol）+ 结构/`heatmap`/`hinton` SVG；示例 `linalg-svd` · `linalg-least-squares`；金样 `linalg-formula-smoke` · `linalg-zh-smoke` · `linalg-basic-smoke` · `linalg-block-kron` · `linalg-factor-smoke`。设计：[ext-linalg.md](doc/design/ext-linalg.md)。
+- **`ext/linalg` L0–L6**：公式 MatExpr（含分块/`kron`）+ 稠密 `explicit`/`det`/`trace`/`solve`；`collapse`；`factorize` + 结构/`heatmap` SVG；`lstsq`/`norm`/`cond`/`rank`；`dtype=complex` 基线；`draw theme=light|dark|bw`；示例 `linalg-svd` · `linalg-least-squares`；金样至 `linalg-metrics-smoke`。设计：[ext-linalg.md](doc/design/ext-linalg.md)。
 
 ### Fixed
 

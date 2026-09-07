@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| 状态 | **L0–L5 已落地 · L6+ 待做** |
+| 状态 | **L0–L6 已落地 · L7+ 远期** |
 | 日期 | 2026-09-07 |
 | **锁定设计** | [design/ext-linalg.md](../design/ext-linalg.md) |
 | 调研 | [research/ext-linalg-formula.md](../research/ext-linalg-formula.md) |
@@ -29,7 +29,7 @@
 | **L3** | `block` + `collapse`；`kron` 惰性 + R7；金样 `linalg-block-kron` | **done** |
 | **L4** | `factorize` LU/QR/SVD/eig（+ 可选 chol）；结构 SVG `svd|qr|ge|eig`；金样 `linalg-factor-smoke` | **done** |
 | **L5** | `heatmap`/`hinton`；examples（最小二乘 / SVD 示意）；public + skill 摘要 | **done** |
-| **L6** | 复数 dtype；`lstsq`；`norm`/`cond`；主题令牌对齐 | **pending** |
+| **L6** | 复数 dtype；`lstsq`；`norm`/`cond`；主题令牌对齐 | **done** |
 | **L7+** | 矩阵微积分 / 更大 BLAS 依赖（仅当用户明确要求） | **deferred** |
 
 验收金样（规划路径）：`tests/ext/linalg-*-smoke.mq.md`；示例：`examples/linalg-least-squares/`、`examples/linalg-svd/`。
@@ -73,6 +73,12 @@
 - [x] 至少 1 个 examples 可 `marqdo run`  
 - [x] public/features 或 tutorial 短页  
 - [x] skill / CHANGELOG Unreleased 条目
+
+### L6
+
+- [x] `lstsq` / `norm` / `cond` / `rank` 金样  
+- [x] `dtype=complex` 基线（Frobenius；分解仍为实数）  
+- [x] `draw theme=light|dark|bw` 与 quantum Q8 令牌对齐（`data-theme`）
 
 ---
 

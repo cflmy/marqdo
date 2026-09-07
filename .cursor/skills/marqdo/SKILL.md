@@ -235,7 +235,7 @@ Install: `marqdo ext add linalg` (ZH id: `线性代数`). Build: `cargo build --
 
 **Hard rules:** `ext/**` never calls `host_*`; hot path is ABI plugin; prefer top-level `la.symbol` (not `matrix.symbol` without a receiver); quote `kind=` strings; dense `explicit` / factorize obey size guards.
 
-APIs (EN): `symbol` / `mul` / `simplify` / `ascii` / `show` · `from_formula` / `explicit` / `det` / `solve` · `block` / `kron` / `collapse` · `factorize` / `draw` (`eig|svd|qr|lu|heatmap|hinton`).
+APIs (EN): `symbol` / `mul` / `simplify` / `ascii` / `show` · `from_formula` / `explicit` / `det` / `solve` · `block` / `kron` / `collapse` · `factorize` / `draw` (`theme=light|dark|bw`) · `lstsq` / `norm` / `cond` / `rank`.
 
 Examples: [linalg-svd](../../examples/linalg-svd/) · [linalg-least-squares](../../examples/linalg-least-squares/). Design: [ext-linalg.md](../../doc/design/ext-linalg.md).
 

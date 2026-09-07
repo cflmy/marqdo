@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| 状态 | **Draft · L0–L5 已落地** |
+| 状态 | **Draft · L0–L6 已落地** |
 | 日期 | 2026-09-07 |
 | 调研 | [research/ext-linalg-formula.md](../research/ext-linalg-formula.md) |
 | 路线图 | [roadmap/ext-linalg.md](../roadmap/ext-linalg.md) |
@@ -285,7 +285,7 @@ $$
 | `eig` | \(A=PDP^{-1}\) 或谱列表 + 对角 |
 | `heatmap` | 单元填色（实数蓝红；复数幅值） |
 
-主题：复用文档站浅色；可选 `theme=light|dark|bw`（与 quantum Q8 令牌对齐时可后置）。
+主题：`theme=light|dark|bw`（与 quantum Q8 令牌对齐；默认 `light`）。
 
 ---
 
@@ -309,7 +309,7 @@ $$
 | **L3** | 分块 + `collapse`；Kronecker 惰性 |
 | **L4** | `factorize` LU/QR/SVD/eig + 结构 SVG |
 | **L5** | heatmap/hinton；examples + public 文档 + skill 摘要 |
-| **L6+** | 复数、lstsq、条件数、矩阵微积分（远期） |
+| **L6+** | 矩阵微积分 / 更大 BLAS（仅当用户明确要求）；复数全路径算子 |
 
 ---
 

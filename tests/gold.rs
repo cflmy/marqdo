@@ -2465,6 +2465,25 @@ txn-rollback-ok",
 }
 
 #[test]
+fn ext_linalg_metrics_smoke() {
+    let status = Command::new("cargo")
+        .args(["build", "-p", "marqdo_plugin_linalg"])
+        .current_dir(env!("CARGO_MANIFEST_DIR"))
+        .status()
+        .expect("build linalg plugin");
+    assert!(status.success(), "failed to build marqdo_plugin_linalg");
+    assert_out(
+        "tests/ext/linalg-metrics-smoke.mq.md",
+        "lstsq-ok\nnorm-ok\ncond-ok\nrank-ok\ncomplex-dtype-ok\ncomplex-norm-ok\ntheme-ok\ntheme-mark-ok",
+    );
+    let svg = std::fs::read_to_string("tests/ext/linalg-metrics-heat.svg").unwrap_or_default();
+    assert!(
+        svg.contains(r#"data-theme="dark""#) && svg.contains(r#"data-linalg="heatmap""#),
+        "expected themed heatmap svg"
+    );
+}
+
+#[test]
 fn ext_linalg_factor_smoke() {
     let status = Command::new("cargo")
         .args(["build", "-p", "marqdo_plugin_linalg"])

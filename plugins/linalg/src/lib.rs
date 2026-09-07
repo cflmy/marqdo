@@ -1,9 +1,11 @@
 //! Marqdo linalg plugin (C ABI v2): formula-first matrix expressions.
 
+mod complex;
 mod dense;
 mod draw;
 mod factor;
 mod matexpr;
+mod metrics;
 
 use std::ffi::{CStr, CString};
 use std::os::raw::{c_char, c_int, c_void};
@@ -225,6 +227,11 @@ la_ffi!(linalg_ping, |_args: &Value| {
             "kron",
             "factorize",
             "draw",
+            "lstsq",
+            "norm",
+            "cond",
+            "rank",
+            "complex",
         ],
     }))
 });
@@ -258,26 +265,11 @@ la_ffi!(linalg_from_list, |args: &Value| {
         .get("data")
         .or_else(|| args.get("数据"))
         .ok_or_else(|| "missing `data`".to_string())?;
-    let rows = data
-        .as_array()
-        .ok_or_else(|| "`data` must be list of rows".to_string())?;
-    let mut mat = Vec::new();
-    for row in rows {
-        let cells = row
-            .as_array()
-            .ok_or_else(|| "each row must be a list".to_string())?;
-        let mut r = Vec::new();
-        for c in cells {
-            let n = c
-                .as_f64()
-                .or_else(|| c.as_i64().map(|i| i as f64))
-                .or_else(|| c.as_u64().map(|u| u as f64))
-                .ok_or_else(|| "cell must be a number".to_string())?;
-            r.push(n);
-        }
-        mat.push(r);
+    if complex::data_has_complex(data) {
+        return complex::to_dense_value(&complex::from_data(data)?);
     }
-    wrap(matexpr::from_list(mat)?)
+    let m = dense::from_value(data)?;
+    wrap(matexpr::from_list(m)?)
 });
 
 la_ffi!(linalg_mul, |args: &Value| {
@@ -476,15 +468,71 @@ la_ffi!(linalg_draw, |args: &Value| {
         .or_else(|| args.get("路径"))
         .and_then(|x| x.as_str())
         .filter(|s| !s.is_empty());
-    let svg = draw::draw_factor(factor_v, kind, path)?;
+    let theme = args
+        .get("theme")
+        .or_else(|| args.get("主题"))
+        .and_then(|x| x.as_str())
+        .map(draw::ThemeName::parse)
+        .transpose()?
+        .unwrap_or(draw::ThemeName::Light);
+    let svg = draw::draw_factor(factor_v, kind, path, theme)?;
     let _ = record_plot(&svg, path);
     Ok(json!({
         "_type": "linalg_svg",
         "kind": kind
             .or_else(|| factor_v.get("kind").and_then(|k| k.as_str()))
             .unwrap_or("structure"),
+        "theme": theme.as_str(),
         "svg": svg,
     }))
+});
+
+la_ffi!(linalg_lstsq, |args: &Value| {
+    let a = dense_arg(args, &["a", "A", "matrix", "矩阵", "左"])?;
+    let b = dense_arg(args, &["b", "B", "rhs", "右"])?;
+    metrics::lstsq(&a, &b)
+});
+
+la_ffi!(linalg_norm, |args: &Value| {
+    let ord = args
+        .get("ord")
+        .or_else(|| args.get("order"))
+        .or_else(|| args.get("范数"))
+        .and_then(|x| x.as_str())
+        .unwrap_or("fro");
+    if let Some(v) = args
+        .get("expr")
+        .or_else(|| args.get("a"))
+        .or_else(|| args.get("matrix"))
+        .or_else(|| args.get("式"))
+        .or_else(|| args.get("矩阵"))
+    {
+        if v.get("dtype").and_then(|d| d.as_str()) == Some("complex")
+            || complex::from_value(v).is_ok()
+        {
+            if !matches!(ord, "fro" | "frobenius" | "f" | "") {
+                return Err("complex norm only supports fro for now".into());
+            }
+            let cm = complex::from_value(v).or_else(|_| {
+                v.get("data")
+                    .ok_or_else(|| "missing complex data".to_string())
+                    .and_then(complex::from_data)
+            })?;
+            return Ok(json!(complex::frobenius_norm(&cm)?));
+        }
+    }
+    let m = dense_arg(args, &["expr", "a", "matrix", "式", "矩阵"])?;
+    Ok(json!(metrics::norm(&m, ord)?))
+});
+
+la_ffi!(linalg_cond, |args: &Value| {
+    let m = dense_arg(args, &["expr", "a", "matrix", "式", "矩阵"])?;
+    metrics::cond(&m)
+});
+
+la_ffi!(linalg_rank, |args: &Value| {
+    let m = dense_arg(args, &["expr", "a", "matrix", "式", "矩阵"])?;
+    Ok(json!(metrics::rank(&m)?))
 });
 
 fn dense_arg(args: &Value, keys: &[&str]) -> Result<dense::Mat, String> {
@@ -492,6 +540,9 @@ fn dense_arg(args: &Value, keys: &[&str]) -> Result<dense::Mat, String> {
         if let Some(v) = args.get(*k) {
             if v.is_null() {
                 continue;
+            }
+            if v.get("dtype").and_then(|d| d.as_str()) == Some("complex") {
+                return Err("real dense op got dtype=complex (use norm fro on complex; factorize/solve stay real)".into());
             }
             if let Ok(e) = Expr::from_value(v) {
                 return dense::explicit(&e);
@@ -550,7 +601,11 @@ pub unsafe extern "C" fn marqdo_plugin_init(host: *const MarqdoHostApi) -> c_int
         ("linalg_block", "blocks", linalg_block as PluginFn),
         ("linalg_collapse", "expr", linalg_collapse as PluginFn),
         ("linalg_factorize", "matrix,kind", linalg_factorize as PluginFn),
-        ("linalg_draw", "factor,kind,path", linalg_draw as PluginFn),
+        ("linalg_draw", "factor,kind,path,theme", linalg_draw as PluginFn),
+        ("linalg_lstsq", "a,b", linalg_lstsq as PluginFn),
+        ("linalg_norm", "expr,ord", linalg_norm as PluginFn),
+        ("linalg_cond", "expr", linalg_cond as PluginFn),
+        ("linalg_rank", "expr", linalg_rank as PluginFn),
     ];
     for (name, params, f) in regs {
         let c_name = CString::new(name).unwrap();

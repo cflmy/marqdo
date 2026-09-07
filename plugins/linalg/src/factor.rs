@@ -15,6 +15,10 @@ fn check_side(n: usize, label: &str) -> Result<(), String> {
     Ok(())
 }
 
+pub fn check_side_limit(n: usize, label: &str) -> Result<(), String> {
+    check_side(n, label)
+}
+
 fn check_mat(m: &Mat) -> Result<(usize, usize), String> {
     let (r, c) = dense::shape(m)?;
     dense::check_elems(r, c)?;

@@ -200,11 +200,46 @@ Dense factorization → `linalg_factor` (`kind` = `lu` | `qr` | `svd` | `eig` | 
     + `factor`
     + `kind`=None
     + `path`=None
+    + `theme`="light"
 
-Structure SVG for a factor or dense matrix (`eig` | `svd` | `qr` | `lu` | `ge` | `chol` | `structure` | `heatmap` | `hinton`).
+Structure SVG (`eig` | `svd` | `qr` | `lu` | `ge` | `chol` | `structure` | `heatmap` | `hinton`). Theme tokens match quantum Q8: `light` | `dark` | `bw`.
 
 > ensure_plugin
-**> linalg_draw factor=`factor` kind=`kind` path=`path`**
+**> linalg_draw factor=`factor` kind=`kind` path=`path` theme=`theme`**
+
+## lstsq
+    + `a`
+    + `b`
+
+Least squares `min ||a x - b||` (QR if tall, SVD if wide).
+
+> ensure_plugin
+**> linalg_lstsq a=`a` b=`b`**
+
+## norm
+    + `expr`
+    + `ord`="fro"
+
+Matrix norm: `fro` | `1` | `inf` | `2`. Complex dense supports `fro` only.
+
+> ensure_plugin
+**> linalg_norm expr=`expr` ord=`ord`**
+
+## cond
+    + `expr`
+
+Spectral condition number via SVD (`ord=2`).
+
+> ensure_plugin
+**> linalg_cond expr=`expr`**
+
+## rank
+    + `expr`
+
+Numerical rank (SVD).
+
+> ensure_plugin
+**> linalg_rank expr=`expr`**
 
 ## symbol
     + `name`
