@@ -113,10 +113,9 @@ jobs:
             ## Marqdo ${{ github.ref_name }}
 
             ### 亮点 / Highlights
-            - **中层标准库 Mid M1–M6**：`re`/`encoding`/`path`/`hash`/`secrets`/`csv`/`text++`/`cli`/`log`/`uuid`（中英对称，零插件）
-            - **Mid stdlib M1–M6**: regex, encoding, path, hash, secrets, csv, thickened text/lists, cli, log, uuid
-            - **`ext/linalg` 公式文档面 F1–F3**；agent/llm 写回与 SSE 稳健性修复
-            - Details: [CHANGELOG](https://github.com/cflmy/marqdo/blob/main/CHANGELOG.md) · [stdlib-mid.md](https://github.com/cflmy/marqdo/blob/main/doc/design/stdlib-mid.md)
+            - **宿主 H1–H4**：`app.proxy` 同域 SSE 中继 · `app.invoke` HTTP→`##` · MCP Server stdio · 跨模块 db
+            - **Hosting H1–H4**: same-origin SSE proxy, HTTP→user `##`, MCP stdio server, cross-module db methods
+            - Details: [CHANGELOG](https://github.com/cflmy/marqdo/blob/main/CHANGELOG.md) · [ext-hosting.md](https://github.com/cflmy/marqdo/blob/main/doc/roadmap/ext-hosting.md)
 
             ### Downloads
 

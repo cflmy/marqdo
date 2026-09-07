@@ -99,7 +99,7 @@ marqdo catalog public -o .marqdo
 
 ---
 
-## 现状（v0.3.6）
+## 现状（v0.3.7）
 
 - 映射与解释器：Phase I 树遍历 + 字节码后端可用；金样例在 `tests/`  
 - **对象**：`#` = 类型/构造，`##`+ = 函数/方法；见 [objects.md](doc/design/objects.md)  
@@ -109,10 +109,10 @@ marqdo catalog public -o .marqdo
 - **`marqdo version --check`**：与 GitHub 最新 release 对比  
 - 标准库：**内置于二进制**（v0.1.2+）；磁盘 `lib/` 或 `MARQDO_LIB` 可覆盖。模块含文本、表、**浏览器效应**、文件、系统、时间、JSON、网络、数学、外联、插件、**自写回**、**子任务**；**中层 Mid M1–M6**（`re`/`encoding`/`path`/`hash`/`secrets`/`csv`/`cli`/`log`/`uuid` 及中英对称库，见 [stdlib-mid.md](doc/design/stdlib-mid.md)）  
 - **官方扩展库 `ext/`**（**非** stdlib，本版收口）：
-  - **`web`**：W0–W7 + P3 + **W8**；**定制 C0–C4**（admin 前缀/gates/`shell_css`/`layout`/样式 strict/脚本 defer·version/条件导航，见 [ext-web-customization](doc/design/ext-web-customization/)）；示例 [marqdo-blog](examples/marqdo-blog/)；生产路径见 [web-asgi-servers-and-marqdo.md](doc/design/web-asgi-servers-and-marqdo.md)
+  - **`web`**：W0–W7 + P3 + **W8**；**定制 C0–C4**；**宿主 H1–H2**（`proxy`/`invoke`，见 [ext-hosting.md](doc/roadmap/ext-hosting.md)）；示例 [marqdo-blog](examples/marqdo-blog/)；生产路径见 [web-asgi-servers-and-marqdo.md](doc/design/web-asgi-servers-and-marqdo.md)
   - **`quantum`**：Q0–Q7 + Q8a/b 主题 SVG；示例 [quantum-entanglement](examples/quantum-entanglement/)
   - **`linalg`**：L0–L6 + 公式文档面（中缀 / `declare` / 展示化简）；示例 [linalg-transpose](examples/linalg-transpose/) · [linalg-svd](examples/linalg-svd/) · [linalg-least-squares](examples/linalg-least-squares/)
-  - **`agent`**：A1–A4（OKF 复用、过程事件、上下文预算、RAG/MCP fixture）；下一波缺口 [agent-framework-gaps-after-a4.md](doc/research/agent-framework-gaps-after-a4.md)
+  - **`agent`**：A1–A4 + **MCP Server stdio**（`mcp_server`）；宿主缺口见 [ext-hosting.md](doc/roadmap/ext-hosting.md) · [agent-framework-gaps-after-a4.md](doc/research/agent-framework-gaps-after-a4.md)
   - **`llm`**：OpenAI 兼容对话
   - 安装：`marqdo ext list` / `add …` / `remove`（[ext-cli.md](doc/design/ext-cli.md)；默认 `~/.marqdo/ext`）。原生插件先 `cargo build -p marqdo_plugin_*` 再 `ext add`
 - **原生插件 ABI**：[`include/marqdo_abi.h`](include/marqdo_abi.h) · [ext-abi.md](doc/design/ext-abi.md)；`plugins/{demo,agent,web,quantum,linalg}`  
@@ -121,12 +121,12 @@ marqdo catalog public -o .marqdo
 - **浏览器 Marqdo（WASM）**：`marqdo wasm build` + 官方 bridge 自启（作者零业务 JS；桥内可含列表/路由/storage/ws/文件/Canvas/音频/Observer/拖放）；`lib/browser` + GFM；`web.client_embed`；示例 [browser-hello](examples/browser-hello/) · [browser-app](examples/browser-app/) · [browser-media](examples/browser-media/) · [web-client-site](examples/web-client-site/)（[ADR 0002](doc/adr/0002-browser-marqdo-wasm.md) · [D](doc/roadmap/browser-wasm-d.md) · [E](doc/roadmap/browser-wasm-e.md) · [F](doc/roadmap/browser-wasm-f.md)）
 - 选型：[ADR 0001 — Rust](doc/adr/0001-implementation-language.md) · [ADR 0002 — 浏览器 WASM](doc/adr/0002-browser-marqdo-wasm.md)（C0–C5 完结，见 [roadmap/browser-wasm.md](doc/roadmap/browser-wasm.md)）· [ADR 0003 — 异步效应](doc/adr/0003-browser-async-effects.md)
 
-### 如何使用最新 Marqdo（v0.3.6）
+### 如何使用最新 Marqdo（v0.3.7）
 
 ```bash
 # 1) 源码安装（跟 tag 或 main）
 git clone https://github.com/cflmy/marqdo.git && cd marqdo
-git checkout v0.3.6   # 或留在 main
+git checkout v0.3.7   # 或留在 main
 cargo build --release
 export PATH="$PWD/target/release:$PATH"
 marqdo version
@@ -157,7 +157,7 @@ marqdo wasm build
 # → dist/wasm/ … 见 examples/browser-hello/
 
 # 6) Windows：也可从 GitHub Releases 下载 exe / zip / vsix
-#    https://github.com/cflmy/marqdo/releases/tag/v0.3.6
+#    https://github.com/cflmy/marqdo/releases/tag/v0.3.7
 ```
 
 开发期也可用 `cargo run -- …` 代替已安装的 `marqdo`：
