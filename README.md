@@ -111,7 +111,7 @@ marqdo catalog public -o .marqdo
 - **官方扩展库 `ext/`**（**非** stdlib，本版收口）：
   - **`web`**：W0–W7 + P3 + **W8**；**定制 C0–C4**（admin 前缀/gates/`shell_css`/`layout`/样式 strict/脚本 defer·version/条件导航，见 [ext-web-customization](doc/design/ext-web-customization/)）；示例 [marqdo-blog](examples/marqdo-blog/)；生产路径见 [web-asgi-servers-and-marqdo.md](doc/design/web-asgi-servers-and-marqdo.md)
   - **`quantum`**：Q0–Q7 + Q8a/b 主题 SVG；示例 [quantum-entanglement](examples/quantum-entanglement/)
-  - **`linalg`**：L0–L6 公式 MatExpr + 稠密/`factorize`/`lstsq`/`draw theme`；示例 [linalg-svd](examples/linalg-svd/) · [linalg-least-squares](examples/linalg-least-squares/)
+  - **`linalg`**：L0–L6 + 公式文档面（中缀 / `declare` / 展示化简）；示例 [linalg-transpose](examples/linalg-transpose/) · [linalg-svd](examples/linalg-svd/) · [linalg-least-squares](examples/linalg-least-squares/)
   - **`agent`**：A1–A4（OKF 复用、过程事件、上下文预算、RAG/MCP fixture）；下一波缺口 [agent-framework-gaps-after-a4.md](doc/research/agent-framework-gaps-after-a4.md)
   - **`llm`**：OpenAI 兼容对话
   - 安装：`marqdo ext list` / `add …` / `remove`（[ext-cli.md](doc/design/ext-cli.md)；默认 `~/.marqdo/ext`）。原生插件先 `cargo build -p marqdo_plugin_*` 再 `ext add`

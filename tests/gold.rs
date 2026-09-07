@@ -2474,7 +2474,7 @@ fn ext_linalg_doc_smoke() {
     assert!(status.success(), "failed to build marqdo_plugin_linalg");
     assert_out(
         "tests/ext/linalg-doc-smoke.mq.md",
-        "B^T*A^T\nidentity-ok\nraw-ok",
+        "B^T*A^T\nidentity-ok\ndeclare-ok\nraw-ok",
     );
 }
 

@@ -21,6 +21,23 @@ Narration: \((AB)^\top = B^\top A^\top\). The identity is checked by running thi
 2. *
   > print text=identity-fail
 
+`shapes` =
+
+| @ | name | rows | cols |
+|---|------|------|------|
+| 1 | X | 2 | 2 |
+| 2 | Y | 2 | 2 |
+
+*`env` = > la.declare table=`shapes`*
+*`X` = env[^X]*
+*`Y` = env[^Y]*
+*`S` = `X` + `Y`*
+*`st` = > la.ascii expr=`S`*
+1. `st` == "X + Y"
+  > print text=declare-ok
+2. *
+  > print text=declare-fail
+
 *`raw` = > la.ascii expr=`Pt` raw=True*
 1. `raw` == "(A*B)^T"
   > print text=raw-ok

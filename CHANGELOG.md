@@ -3,7 +3,7 @@
 ## Unreleased
 
 ### Added
-- **`ext/linalg`**：L0–L6 + 中缀/`# matrix`；**公式文档面** [ext-linalg-formula-doc.md](doc/design/ext-linalg-formula-doc.md)（跑通即正确）；F1 展示默认 simplify（`raw=` 可关）；金样含 `linalg-doc-smoke` · `linalg-infix-smoke`。设计：[ext-linalg.md](doc/design/ext-linalg.md)。
+- **`ext/linalg`**：L0–L6 + 中缀/`# matrix`；公式文档面 [ext-linalg-formula-doc.md](doc/design/ext-linalg-formula-doc.md)；F1 展示默认 simplify；F2 `declare`（GFM 表声明符号）+ 示例 `linalg-transpose`；金样 `linalg-doc-smoke` · `linalg-infix-smoke`。设计：[ext-linalg.md](doc/design/ext-linalg.md)。
 
 ### Fixed
 

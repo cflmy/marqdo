@@ -31,7 +31,7 @@
 | **L5** | `heatmap`/`hinton`；examples（最小二乘 / SVD 示意）；public + skill 摘要 | **done** |
 | **L6** | 复数 dtype；`lstsq`；`norm`/`cond`；主题令牌对齐 | **done** |
 | **F1** | 展示路径默认 simplify；公式文档金样 | **done** |
-| **F2** | 符号引入降噪；examples 讲义化 | **pending** |
+| **F2** | 符号引入降噪；examples 讲义化 | **done** |
 | **F3** | 紧凑糖 + public「如何写公式文档」 | **pending** |
 | **L7+** | 矩阵微积分 / 更大 BLAS 依赖（仅当用户明确要求） | **deferred** |
 
@@ -91,8 +91,8 @@
 
 ### F2
 
-- [ ] 符号引入降噪（选定候选）  
-- [ ] 至少 1 个 example 以代数面为主叙述  
+- [x] 符号引入降噪（选定候选） — GFM `@` 表 + `la.declare`  
+- [x] 至少 1 个 example 以代数面为主叙述 — `examples/linalg-transpose/`  
 
 ---
 

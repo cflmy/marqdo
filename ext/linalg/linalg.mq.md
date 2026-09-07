@@ -246,6 +246,14 @@ Numerical rank (SVD).
 > ensure_plugin
 **> linalg_rank expr=`expr`**
 
+## declare
+    + `table`
+
+Declare several matrix symbols from an `@` record table (`name` / `rows` / `cols`). Returns a map env.
+
+> ensure_plugin
+**> linalg_declare table=`table`**
+
 ## symbol
     + `name`
     + `rows`

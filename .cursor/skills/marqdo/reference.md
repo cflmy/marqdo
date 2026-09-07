@@ -107,7 +107,7 @@ Install: `marqdo ext add linalg` (`线性代数`). Native: `cargo build --releas
 |-----------|-----------|-------|
 | `ext/linalg/linalg.mq.md` | `ext/linalg/线性代数.mq.md` | Top-level `symbol`/`mul`/`factorize`/`draw` |
 
-Examples: `examples/linalg-svd/`, `examples/linalg-least-squares/`. Design: `doc/design/ext-linalg.md` · roadmap: `doc/roadmap/ext-linalg.md`.
+Examples: `examples/linalg-svd/`, `examples/linalg-least-squares/`. Design: `doc/design/ext-linalg.md` · formula-doc: `doc/design/ext-linalg-formula-doc.md` · roadmap: `doc/roadmap/ext-linalg.md`.
 
 ## Formula + plot (math)
 
@@ -190,4 +190,5 @@ See `doc/design/call-arguments.md`.
 | `doc/design/ext-quantum-q7.md` | Q7 density linear algebra + advanced SVG |
 | `doc/design/ext-quantum-viz-style.md` | Q8 themed SVG (`dark`/`light`/`bw`; circuit/probs/bloch) |
 | `doc/design/ext-linalg.md` | `ext/linalg` formula MatExpr + factorize/draw |
+| `doc/design/ext-linalg-formula-doc.md` | 公式文档面：跑通即正确 · 代数/计算两面 |
 | `doc/design/view-debug.md` | view / debug hosts |

@@ -174,7 +174,7 @@
 | 稠密 / 分解 / 度量 / draw theme | done（L2–L6） |
 | 中缀 `+` `-` `*` + `# matrix` 方法 | done（v1） |
 | `ascii`/`latex`/`show` 默认 simplify | **done（F1）** |
-| 更少噪音的符号引入 | F2 |
+| 更少噪音的符号引入 | **done（F2：`declare` + 表）** |
 | 更紧凑转置 / 混合公式书写 | F3 |
 | 矩阵微积分等 | L7+ / 规则表扩展 |
 

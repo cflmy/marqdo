@@ -232,6 +232,7 @@ la_ffi!(linalg_ping, |_args: &Value| {
             "cond",
             "rank",
             "complex",
+            "declare",
         ],
     }))
 });
@@ -270,6 +271,44 @@ la_ffi!(linalg_from_list, |args: &Value| {
     }
     let m = dense::from_value(data)?;
     wrap(matexpr::from_list(m)?)
+});
+
+la_ffi!(linalg_declare, |args: &Value| {
+    let table = args
+        .get("table")
+        .or_else(|| args.get("rows"))
+        .or_else(|| args.get("表"))
+        .or_else(|| args.get("行"))
+        .ok_or_else(|| "missing `table` (list of {name,rows,cols})".to_string())?;
+    let rows = table
+        .as_array()
+        .ok_or_else(|| "`table` must be a list of row maps".to_string())?;
+    let mut out = serde_json::Map::new();
+    out.insert("_type".into(), json!("matrix_env"));
+    for (i, row) in rows.iter().enumerate() {
+        let obj = row
+            .as_object()
+            .ok_or_else(|| format!("declare row {i} must be a map"))?;
+        let name = obj
+            .get("name")
+            .or_else(|| obj.get("名"))
+            .and_then(|x| x.as_str())
+            .ok_or_else(|| format!("declare row {i} missing name"))?
+            .to_string();
+        let r = Dim::from_json(
+            obj.get("rows")
+                .or_else(|| obj.get("行"))
+                .ok_or_else(|| format!("declare `{name}` missing rows"))?,
+        )?;
+        let c = Dim::from_json(
+            obj.get("cols")
+                .or_else(|| obj.get("列"))
+                .ok_or_else(|| format!("declare `{name}` missing cols"))?,
+        )?;
+        let expr = matexpr::symbol(&name, r, c);
+        out.insert(name, expr.to_value()?);
+    }
+    Ok(Value::Object(out))
 });
 
 la_ffi!(linalg_mul, |args: &Value| {
@@ -601,6 +640,7 @@ pub unsafe extern "C" fn marqdo_plugin_init(host: *const MarqdoHostApi) -> c_int
         ("linalg_eye", "n", linalg_eye as PluginFn),
         ("linalg_zeros", "rows,cols", linalg_zeros as PluginFn),
         ("linalg_from_list", "data", linalg_from_list as PluginFn),
+        ("linalg_declare", "table", linalg_declare as PluginFn),
         ("linalg_from_formula", "formula", linalg_from_formula as PluginFn),
         ("linalg_mul", "a,b", linalg_mul as PluginFn),
         ("linalg_add", "a,b", linalg_add as PluginFn),
