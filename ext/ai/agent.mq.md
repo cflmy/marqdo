@@ -1463,7 +1463,7 @@ Always append `done` and attach `events` on the result map (process audit even w
 
 1. `trace`
   *body = > json.stringify value=`events`*
-  > host_writeback_record value=`body` key="trace"
+  > writeback.record value=`body` key="trace"
 2. *
   *_ = 1*
 
@@ -1606,9 +1606,9 @@ With `stream=True`, the model call uses SSE; `echo=True` prints delta text to st
   *body = > json.stringify value=`out`*
   *st = > json.get value=`out` key="status"*
   1. `st` == "ok"
-    > host_writeback_record value=`body` key="ok"
+    > writeback.record value=`body` key="ok"
   2. *
-    > host_writeback_record value=`body` key="error"
+    > writeback.record value=`body` key="error"
 2. *
   *_ = 1*
 
@@ -1711,7 +1711,7 @@ Reuse lookup: exact → alias → canonicalize → optional local n-gram `near` 
         *events = > plan_append_round events=`events` round=1 workbook=`path` exit_code=`code` result=`child_val` stream=`stream` echo=`echo`*
         1. `writeback`
           *body = > json.stringify value=`out`*
-          > host_writeback_record value=`body` key="ok"
+          > writeback.record value=`body` key="ok"
         2. *
           *_ = 1*
         *out = > plan_finish_stream out=`out` events=`events` stream=`stream` trace=`trace` result=`child_val`*
@@ -1768,7 +1768,7 @@ Reuse lookup: exact → alias → canonicalize → optional local n-gram `near` 
           *events = > plan_append_round events=`events` round=1 workbook=`path` exit_code=`code` result=`child_val` stream=`stream` echo=`echo`*
           1. `writeback`
             *body = > json.stringify value=`out`*
-            > host_writeback_record value=`body` key="ok"
+            > writeback.record value=`body` key="ok"
           2. *
             *_ = 1*
           *out = > plan_finish_stream out=`out` events=`events` stream=`stream` trace=`trace` result=`child_val`*
@@ -1832,7 +1832,7 @@ Reuse lookup: exact → alias → canonicalize → optional local n-gram `near` 
                 *events = > plan_append_round events=`events` round=1 workbook=`path` exit_code=`code` result=`child_val` stream=`stream` echo=`echo`*
                 1. `writeback`
                   *body = > json.stringify value=`out`*
-                  > host_writeback_record value=`body` key="ok"
+                  > writeback.record value=`body` key="ok"
                 2. *
                   *_ = 1*
                 *out = > plan_finish_stream out=`out` events=`events` stream=`stream` trace=`trace` result=`child_val`*
@@ -1910,7 +1910,7 @@ Reuse lookup: exact → alias → canonicalize → optional local n-gram `near` 
   *out = > json.set map=`out` key="cache" value="bypass"*
   1. `writeback`
     *body = > json.stringify value=`out`*
-    > host_writeback_record value=`body` key="ok"
+    > writeback.record value=`body` key="ok"
   2. *
     *_ = 1*
   *out = > plan_finish_stream out=`out` events=`events` stream=`stream` trace=`trace`*
@@ -2091,9 +2091,9 @@ Deterministic success stop (loop engineering): when the child already returned a
 1. `writeback`
   *body = > json.stringify value=`out`*
   1. `status` == "ok"
-    > host_writeback_record value=`body` key="ok"
+    > writeback.record value=`body` key="ok"
   2. *
-    > host_writeback_record value=`body` key="error"
+    > writeback.record value=`body` key="error"
 2. *
   *_ = 1*
 
