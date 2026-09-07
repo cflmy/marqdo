@@ -21,8 +21,7 @@ Declare shapes in a table, form \(P = AB\), then check \((AB)^\top = B^\top A^\t
 *`A` = env[^A]*
 *`B` = env[^B]*
 *`P` = `A` * `B`*
-*`Pt` = > `P`.T*
-*`t` = > `Pt`.ascii*
+*`t` = > `P`.T_ascii*
 > print text=`t`
 1. `t` == "B^T*A^T"
   > print text=identity-ok

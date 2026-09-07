@@ -346,15 +346,11 @@ import la:ext/linalg/linalg.mq.md
 Prefer:
 
 ```markdown
-*`A` = > la.symbol name="A" rows=2 cols=2*
-*`B` = > la.symbol name="B" rows=2 cols=2*
-*`P` = `A` * `B`*
-*`Pt` = > `P`.T*
-*`s` = > `Pt`.simplify*
-*`t` = > `s`.ascii*
-> print text=`t`
+*`env` = > la.declare table=`shapes`*
+*`P` = env[^A] * env[^B]*
+*`t` = > `P`.T_ascii*
 ```
 
-- Infix `+` / `-` / `*` dispatch when both sides are matrices (needs linalg plugin loaded).
-- `# matrix` methods: `T`, `add`, `mul`, `simplify`, `ascii`, …
-- Examples: `examples/linalg-svd/`, `examples/linalg-least-squares/`.
+- Infix `+` / `-` / `*`；`ascii` / `T_ascii` 默认化简（`raw=True` 可关）。
+- Formula-doc design: [ext-linalg-formula-doc.md](../../doc/design/ext-linalg-formula-doc.md).
+- Examples: `examples/linalg-transpose/`, `examples/linalg-svd/`, `examples/linalg-least-squares/`.

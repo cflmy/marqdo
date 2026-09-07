@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| 状态 | **L0–L6 + 中缀 v1 已落地 · F1–F3 公式文档面进行中** |
+| 状态 | **L0–L6 + 公式文档面 F1–F3 已落地 · L7+ 远期** |
 | 日期 | 2026-09-07 |
 | **锁定设计** | [design/ext-linalg.md](../design/ext-linalg.md) · [design/ext-linalg-formula-doc.md](../design/ext-linalg-formula-doc.md) |
 | 调研 | [research/ext-linalg-formula.md](../research/ext-linalg-formula.md) |
@@ -32,7 +32,7 @@
 | **L6** | 复数 dtype；`lstsq`；`norm`/`cond`；主题令牌对齐 | **done** |
 | **F1** | 展示路径默认 simplify；公式文档金样 | **done** |
 | **F2** | 符号引入降噪；examples 讲义化 | **done** |
-| **F3** | 紧凑糖 + public「如何写公式文档」 | **pending** |
+| **F3** | 紧凑糖 + public「如何写公式文档」 | **done** |
 | **L7+** | 矩阵微积分 / 更大 BLAS 依赖（仅当用户明确要求） | **deferred** |
 
 验收金样（规划路径）：`tests/ext/linalg-*-smoke.mq.md`；示例：`examples/linalg-least-squares/`、`examples/linalg-svd/`。
@@ -94,6 +94,12 @@
 - [x] 符号引入降噪（选定候选） — GFM `@` 表 + `la.declare`  
 - [x] 至少 1 个 example 以代数面为主叙述 — `examples/linalg-transpose/`  
 
+### F3
+
+- [x] `T_ascii` / `转置文本` 一步展示糖  
+- [x] `explicit` 默认先 simplify（`raw=` 可关）  
+- [x] public `07-linalg` / `07-线性代数`「如何写公式文档」  
+
 ---
 
 ## 4. 依赖与并行
@@ -111,10 +117,7 @@
 
 ## 5. 建议开发顺序（下一手）
 
-1. **F1** 展示默认化简（公式文档面）。  
-2. **F2** 符号引入与 examples 讲义化。  
-3. **F3** public / skill 收口。  
-4. **L7+** 仅当用户明确要求更深符号（微积分等）。
+1. **L7+** 仅当用户明确要求更深符号（微积分等）。公式文档面 F1–F3 已收口。
 
 ---
 

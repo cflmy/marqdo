@@ -12,7 +12,7 @@
 | [`stdlib/`](stdlib/) | **标准库**（导入方式 + text/表/文件/时间/系统/json/网络/数学/外联/插件/**自写回**/**子任务**；v0.1.2+ 内置于 CLI） |
 | [`features/`](features/) | 特性迭代（含对象、官方 `ext/`） |
 
-官方扩展（非 stdlib）：`ext/llm`、`ext/agent` — 见 `features/05-extensions.mq.md` / `05-扩展.mq.md` 与 `doc/design/ext-*.md`。
+官方扩展（非 stdlib）：`ext/llm`、`ext/agent`、`ext/web`、`ext/quantum`、`ext/linalg` — 见 `features/05-*.mq.md`、`06-*.mq.md`、`07-linalg.mq.md` / `07-线性代数.mq.md` 与 `doc/design/ext-*.md`。
 
 **不放** `errors/`：失败样例只在 `tests/errors/`。
 

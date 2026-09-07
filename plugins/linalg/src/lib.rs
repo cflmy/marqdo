@@ -283,6 +283,11 @@ la_ffi!(linalg_declare, |args: &Value| {
     let rows = table
         .as_array()
         .ok_or_else(|| "`table` must be a list of row maps".to_string())?;
+    let tag = args
+        .get("type_tag")
+        .or_else(|| args.get("类型标签"))
+        .and_then(|x| x.as_str())
+        .unwrap_or("matrix");
     let mut out = serde_json::Map::new();
     out.insert("_type".into(), json!("matrix_env"));
     for (i, row) in rows.iter().enumerate() {
@@ -306,7 +311,11 @@ la_ffi!(linalg_declare, |args: &Value| {
                 .ok_or_else(|| format!("declare `{name}` missing cols"))?,
         )?;
         let expr = matexpr::symbol(&name, r, c);
-        out.insert(name, expr.to_value()?);
+        let mut v = expr.to_value()?;
+        if let Some(m) = v.as_object_mut() {
+            m.insert("_type".into(), json!(tag));
+        }
+        out.insert(name, v);
     }
     Ok(Value::Object(out))
 });
@@ -426,6 +435,7 @@ la_ffi!(linalg_explicit, |args: &Value| {
             .ok_or_else(|| "missing `expr`".to_string())?;
         coerce_expr(f)
     })?;
+    let e = display_expr(args, e)?;
     let m = dense::explicit(&e)?;
     dense::to_dense_value(&m)
 });
@@ -640,7 +650,7 @@ pub unsafe extern "C" fn marqdo_plugin_init(host: *const MarqdoHostApi) -> c_int
         ("linalg_eye", "n", linalg_eye as PluginFn),
         ("linalg_zeros", "rows,cols", linalg_zeros as PluginFn),
         ("linalg_from_list", "data", linalg_from_list as PluginFn),
-        ("linalg_declare", "table", linalg_declare as PluginFn),
+        ("linalg_declare", "table,type_tag", linalg_declare as PluginFn),
         ("linalg_from_formula", "formula", linalg_from_formula as PluginFn),
         ("linalg_mul", "a,b", linalg_mul as PluginFn),
         ("linalg_add", "a,b", linalg_add as PluginFn),
@@ -652,7 +662,7 @@ pub unsafe extern "C" fn marqdo_plugin_init(host: *const MarqdoHostApi) -> c_int
         ("linalg_latex", "expr,raw", linalg_latex as PluginFn),
         ("linalg_shape", "expr", linalg_shape as PluginFn),
         ("linalg_show", "expr,path,raw", linalg_show as PluginFn),
-        ("linalg_explicit", "expr", linalg_explicit as PluginFn),
+        ("linalg_explicit", "expr,raw", linalg_explicit as PluginFn),
         ("linalg_det", "expr", linalg_det as PluginFn),
         ("linalg_trace", "expr", linalg_trace as PluginFn),
         ("linalg_solve", "a,b,factor", linalg_solve as PluginFn),

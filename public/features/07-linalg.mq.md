@@ -1,32 +1,35 @@
 ---
-title: Linear algebra (ext/linalg)
-description: Formula MatExpr, dense eval, factorize, structure SVG
+title: How to write a linear-algebra formula document
+description: ext/linalg formula-doc — declare, infix, run-implies-correct
 import la:ext/linalg/linalg.mq.md
 ---
 
+# Formula documents with ext/linalg
+
+Not stdlib. Install: `marqdo ext add linalg` (or build `marqdo_plugin_linalg`).
+
+**Idea:** if the `.mq.md` runs and the asserted form matches, the identity holds under the library rules. Algebra reads like a lecture; `factorize` / `lstsq` / `draw` stay explicit calculation steps.
+
 # main
 
-Optional package (not stdlib). Install: `marqdo ext add linalg` (or build `marqdo_plugin_linalg`).
+Declare symbols in a table, multiply, transpose — `T_ascii` is one-step display (auto-simplify).
 
-Formula-first: symbols stay symbolic until `explicit` / `factorize`. `(AB)^T` simplifies to `B^T*A^T` without dense data.
+`shapes` =
 
-L4–L5: `factorize kind=eig|svd|qr|lu|chol`, `draw kind=eig|svd|heatmap|hinton`, examples `examples/linalg-svd/` · `examples/linalg-least-squares/`.
+| @ | name | rows | cols |
+|---|------|------|------|
+| 1 | A | 2 | 3 |
+| 2 | B | 3 | 2 |
 
-*`A` = > la.symbol name="A" rows=2 cols=2*
-*`B` = > la.symbol name="B" rows=2 cols=2*
-*`P` = > la.mul a=`A` b=`B`*
-*`Pt` = > la.transpose expr=`P`*
-*`s` = > la.simplify expr=`Pt`*
-*`t` = > la.ascii expr=`s`*
-
-`M` =
-$$
-\begin{bmatrix}2&0\\0&3\end{bmatrix}
-$$
-
-*`M` = > la.from_formula formula=`M`*
-*`f` = > la.factorize matrix=`M` kind="eig"*
-*`_` = > la.draw factor=`f` kind="eig"*
-
+*`env` = > la.declare table=`shapes`*
+*`A` = env[^A]*
+*`B` = env[^B]*
+*`P` = `A` * `B`*
+*`t` = > `P`.T_ascii*
 > print text=`t`
-> print text=linalg-feature-ok
+1. `t` == "B^T*A^T"
+  > print text=formula-doc-ok
+2. *
+  > print text=formula-doc-fail
+
+> print text=see-examples-linalg-transpose

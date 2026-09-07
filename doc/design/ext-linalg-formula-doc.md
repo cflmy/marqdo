@@ -120,7 +120,7 @@
 | C. `$$` 符号方言 | `$$A_{m\times n}$$` → MatExpr | 最像讲义 | 解析歧义；勿污染标量 formula |
 | D. 保持 `symbol` + 短别名 | `` `A` = > la.A rows=m cols=n `` | 实现便宜 | 文档感一般 |
 
-**锁定倾向：** 短期 **A + 默认化简（F1）**；中期评估 **B 或受限 C**（C 必须留在 ext 吸收层，**不**扩展核心 `formula::Expr` 符号矩阵）。
+**锁定倾向：** 短期 **A + 默认化简（F1）**；**F2 采用 B（GFM `@` 表 + `la.declare`）**；受限 C（`$$` 符号方言）仍待评估且不得污染核心 formula。
 
 ### 3.3 明确不做（本波语法）
 
@@ -175,7 +175,9 @@
 | 中缀 `+` `-` `*` + `# matrix` 方法 | done（v1） |
 | `ascii`/`latex`/`show` 默认 simplify | **done（F1）** |
 | 更少噪音的符号引入 | **done（F2：`declare` + 表）** |
-| 更紧凑转置 / 混合公式书写 | F3 |
+| 更紧凑转置 / 混合公式书写 | **done（F3：`T_ascii`）** |
+| `explicit` 前可选 auto-simplify | **done（F3，默认开）** |
+| public「如何写公式文档」 | **done（F3）** |
 | 矩阵微积分等 | L7+ / 规则表扩展 |
 
 ---
@@ -185,8 +187,8 @@
 | 阶段 | 内容 | 出口 |
 |------|------|------|
 | **F1** | 展示路径默认 simplify；金样「`.T` + `ascii` → 规范形」；设计本文落地 | **done** |
-| **F2** | 符号引入降噪（选定 §3.2 候选）；更新 examples 使其读起来像讲义 | 至少 1 个 example 少 `la.mul` |
-| **F3** | 可选 postfix / 链式糖；`explicit` 前可选 auto-simplify；public 短文「如何写公式文档」 | skill + public 同步 |
+| **F2** | 符号引入降噪（选定 §3.2 候选）；更新 examples 使其读起来像讲义 | **done**（`declare` + `linalg-transpose`） |
+| **F3** | 可选 postfix / 链式糖；`explicit` 前可选 auto-simplify；public 短文「如何写公式文档」 | **done** |
 | **F4+** | 新规则（伴随、多项式矩阵…）；矩阵微积分仅当明确需要 | 规则表可测 |
 
 ---

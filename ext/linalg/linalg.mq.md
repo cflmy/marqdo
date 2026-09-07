@@ -130,11 +130,12 @@ Absorb a `$$` numeric matrix formula (or nested list / dense map) as a dense lea
 
 ## explicit
     + `expr`
+    + `raw`=False
 
-Evaluate a MatExpr tree of dense/eye/zero ops to `linalg_dense` (symbols rejected).
+Evaluate to dense (default **simplify** first).
 
 > ensure_plugin
-**> linalg_explicit expr=`expr`**
+**> linalg_explicit expr=`expr` raw=`raw`**
 
 ## det
     + `expr`
@@ -252,7 +253,7 @@ Numerical rank (SVD).
 Declare several matrix symbols from an `@` record table (`name` / `rows` / `cols`). Returns a map env.
 
 > ensure_plugin
-**> linalg_declare table=`table`**
+**> linalg_declare table=`table` type_tag="matrix"**
 
 ## symbol
     + `name`
@@ -293,6 +294,13 @@ Matrix value (`_type=matrix`). Prefer infix `A + B` / `A * B`, or methods `` `A`
 
 **> linalg_transpose expr=`self`**
 
+## T_ascii
+
+Transpose then display ASCII (auto-simplified). Handy for lecture identities.
+
+*`Pt` = > linalg_transpose expr=`self`*
+**> linalg_ascii expr=`Pt` raw=False**
+
 ## add
     + `b`
 
@@ -326,7 +334,7 @@ Matrix value (`_type=matrix`). Prefer infix `A + B` / `A * B`, or methods `` `A`
 
 ## explicit
 
-**> linalg_explicit expr=`self`**
+**> linalg_explicit expr=`self` raw=False**
 
 ## det
 

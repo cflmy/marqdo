@@ -13,8 +13,7 @@ Narration: \((AB)^\top = B^\top A^\top\). The identity is checked by running thi
 *`A` = > la.symbol name="A" rows=2 cols=3*
 *`B` = > la.symbol name="B" rows=3 cols=2*
 *`P` = `A` * `B`*
-*`Pt` = > `P`.T*
-*`t` = > `Pt`.ascii*
+*`t` = > `P`.T_ascii*
 > print text=`t`
 1. `t` == "B^T*A^T"
   > print text=identity-ok
@@ -38,6 +37,7 @@ Narration: \((AB)^\top = B^\top A^\top\). The identity is checked by running thi
 2. *
   > print text=declare-fail
 
+*`Pt` = > `P`.T*
 *`raw` = > la.ascii expr=`Pt` raw=True*
 1. `raw` == "(A*B)^T"
   > print text=raw-ok
