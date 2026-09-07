@@ -47,7 +47,8 @@ pub fn to_dense_value(m: &Mat) -> Result<Value, String> {
     let (rows, cols) = shape(m)?;
     check_elems(rows, cols)?;
     Ok(json!({
-        "_type": "linalg_dense",
+        "_type": "matrix",
+        "kind": "dense",
         "rows": rows,
         "cols": cols,
         "data": m,
@@ -108,7 +109,7 @@ pub fn from_value(v: &Value) -> Result<Mat, String> {
     if v.is_array() {
         return parse_data(v);
     }
-    Err("expected linalg_dense, dense expr, or nested list".into())
+    Err("expected matrix dense, dense expr, or nested list".into())
 }
 
 fn parse_data(v: &Value) -> Result<Mat, String> {

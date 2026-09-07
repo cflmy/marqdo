@@ -171,7 +171,8 @@ pub fn to_dense_value(m: &CMat) -> Result<Value, String> {
         })
         .collect();
     Ok(json!({
-        "_type": "linalg_dense",
+        "_type": "matrix",
+        "kind": "dense",
         "rows": rows,
         "cols": cols,
         "data": data,

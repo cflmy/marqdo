@@ -2465,6 +2465,20 @@ txn-rollback-ok",
 }
 
 #[test]
+fn ext_linalg_infix_smoke() {
+    let status = Command::new("cargo")
+        .args(["build", "-p", "marqdo_plugin_linalg"])
+        .current_dir(env!("CARGO_MANIFEST_DIR"))
+        .status()
+        .expect("build linalg plugin");
+    assert!(status.success(), "failed to build marqdo_plugin_linalg");
+    assert_out(
+        "tests/ext/linalg-infix-smoke.mq.md",
+        "A + B\nB^T*A^T\ntype-ok\nformula-add-ok",
+    );
+}
+
+#[test]
 fn ext_linalg_metrics_smoke() {
     let status = Command::new("cargo")
         .args(["build", "-p", "marqdo_plugin_linalg"])

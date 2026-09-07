@@ -336,16 +336,25 @@ import la:ext/linalg/linalg.mq.md
 
 # main
 
-`M` =
-$$
-\begin{bmatrix}2&0\\0&3\end{bmatrix}
-$$
-
-*`M` = > la.from_formula formula=`M`*
-*`f` = > la.factorize matrix=`M` kind="eig"*
-*_ = > la.draw factor=`f` kind="eig" path="eig.svg"*
-> print text=ok
+*`A` = > la.symbol name="A" rows=2 cols=2*
+*`B` = > la.symbol name="B" rows=2 cols=2*
+*`C` = `A` + `B`*
+*`P` = `A` * `B`*
+*`s` = > `P`.T.simplify*   <!-- prefer: *`Pt` = > `P`.T* then simplify -->
 ```
 
+Prefer:
+
+```markdown
+*`A` = > la.symbol name="A" rows=2 cols=2*
+*`B` = > la.symbol name="B" rows=2 cols=2*
+*`P` = `A` * `B`*
+*`Pt` = > `P`.T*
+*`s` = > `Pt`.simplify*
+*`t` = > `s`.ascii*
+> print text=`t`
+```
+
+- Infix `+` / `-` / `*` dispatch when both sides are matrices (needs linalg plugin loaded).
+- `# matrix` methods: `T`, `add`, `mul`, `simplify`, `ascii`, …
 - Examples: `examples/linalg-svd/`, `examples/linalg-least-squares/`.
-- After rebuilding: `marqdo ext add linalg` (or `MARQDO_LINALG_PLUGIN`).

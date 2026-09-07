@@ -30,6 +30,8 @@ struct Frame {
     fn_idx: usize,
     ip: usize,
     slots: Vec<Value>,
+    /// When set, retag matrix-like return to this `_type` (method chaining).
+    retag_matrix: Option<String>,
 }
 
 impl Vm {
@@ -115,6 +117,7 @@ impl Vm {
             fn_idx: entry,
             ip: 0,
             slots: vec![Value::None; program.functions[entry].locals.len().max(1)],
+            retag_matrix: None,
         }];
         self.host
             .push_call_frame(&program.functions[entry].name.clone());
@@ -182,10 +185,57 @@ impl Vm {
                 Op::Add => {
                     let b = pop(&mut stack).map_err(|m| self.err_at(span, m))?;
                     let a = pop(&mut stack).map_err(|m| self.err_at(span, m))?;
-                    stack.push(add(a, b).map_err(|m| self.err_at(span, m))?);
+                    if let Some(v) = crate::linalg_ops::try_matrix_binary(
+                        &mut self.host,
+                        crate::ast::BinaryOp::Add,
+                        &a,
+                        &b,
+                    )
+                    .map_err(|m| self.err_at(span, m))?
+                    {
+                        stack.push(v);
+                    } else {
+                        stack.push(add(a, b).map_err(|m| self.err_at(span, m))?);
+                    }
                 }
-                Op::Sub => bin_int(&mut stack, |a, b| a - b).map_err(|m| self.err_at(span, m))?,
-                Op::Mul => bin_int(&mut stack, |a, b| a * b).map_err(|m| self.err_at(span, m))?,
+                Op::Sub => {
+                    let b = pop(&mut stack).map_err(|m| self.err_at(span, m))?;
+                    let a = pop(&mut stack).map_err(|m| self.err_at(span, m))?;
+                    if let Some(v) = crate::linalg_ops::try_matrix_binary(
+                        &mut self.host,
+                        crate::ast::BinaryOp::Sub,
+                        &a,
+                        &b,
+                    )
+                    .map_err(|m| self.err_at(span, m))?
+                    {
+                        stack.push(v);
+                    } else {
+                        match (a, b) {
+                            (Value::Int(x), Value::Int(y)) => stack.push(Value::Int(x - y)),
+                            _ => return Err(self.err_at(span, "`-` needs ints")),
+                        }
+                    }
+                }
+                Op::Mul => {
+                    let b = pop(&mut stack).map_err(|m| self.err_at(span, m))?;
+                    let a = pop(&mut stack).map_err(|m| self.err_at(span, m))?;
+                    if let Some(v) = crate::linalg_ops::try_matrix_binary(
+                        &mut self.host,
+                        crate::ast::BinaryOp::Mul,
+                        &a,
+                        &b,
+                    )
+                    .map_err(|m| self.err_at(span, m))?
+                    {
+                        stack.push(v);
+                    } else {
+                        match (a, b) {
+                            (Value::Int(x), Value::Int(y)) => stack.push(Value::Int(x * y)),
+                            _ => return Err(self.err_at(span, "`*` needs ints")),
+                        }
+                    }
+                }
                 Op::Div => {
                     let b = pop(&mut stack).map_err(|m| self.err_at(span, m))?;
                     let a = pop(&mut stack).map_err(|m| self.err_at(span, m))?;
@@ -383,6 +433,7 @@ impl Vm {
                         fn_idx: fid,
                         ip: 0,
                         slots,
+                        retag_matrix: None,
                     });
                     self.host.push_call_frame(&fname);
                     self.host.push_call_site_line(span.line);
@@ -457,11 +508,17 @@ impl Vm {
                             slots[i] = recv.clone();
                         }
                     }
+                    let retag_matrix = if crate::linalg_ops::is_matrix_value(&recv) {
+                        Some(type_name.clone())
+                    } else {
+                        None
+                    };
                     let fname = callee.name.clone();
                     frames.push(Frame {
                         fn_idx: method_fid,
                         ip: 0,
                         slots,
+                        retag_matrix,
                     });
                     self.host.push_call_frame(&fname);
                     self.host.push_call_site_line(span.line);
@@ -551,15 +608,20 @@ impl Vm {
                         fn_idx: fid,
                         ip: 0,
                         slots,
+                        retag_matrix: None,
                     });
                     self.host.push_call_frame(&fname);
                     self.host.push_call_site_line(span.line);
                 }
                 Op::Return => {
                     let ret = pop(&mut stack).unwrap_or(Value::None);
-                    frames.pop();
+                    let frame = frames.pop();
                     self.host.pop_call_frame();
                     self.host.pop_call_site_line();
+                    let ret = match frame.and_then(|f| f.retag_matrix) {
+                        Some(ty) => crate::linalg_ops::retag_matrix_like(&ty, ret),
+                        None => ret,
+                    };
                     if frames.is_empty() {
                         return Ok(ret);
                     }
@@ -610,17 +672,6 @@ fn add(a: Value, b: Value) -> Result<Value, String> {
     }
 }
 
-fn bin_int(stack: &mut Vec<Value>, f: impl Fn(i64, i64) -> i64) -> Result<(), String> {
-    let b = pop(stack)?;
-    let a = pop(stack)?;
-    match (a, b) {
-        (Value::Int(x), Value::Int(y)) => {
-            stack.push(Value::Int(f(x, y)));
-            Ok(())
-        }
-        _ => Err("binary op needs ints".into()),
-    }
-}
 
 fn cmp(stack: &mut Vec<Value>, pred: impl Fn(std::cmp::Ordering) -> bool) -> Result<(), String> {
     let b = pop(stack)?;

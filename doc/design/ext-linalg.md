@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| 状态 | **Draft · L0–L6 已落地** |
+| 状态 | **Draft · L0–L6 + 中缀/方法面 v1** |
 | 日期 | 2026-09-07 |
 | 调研 | [research/ext-linalg-formula.md](../research/ext-linalg-formula.md) |
 | 路线图 | [roadmap/ext-linalg.md](../roadmap/ext-linalg.md) |
@@ -55,7 +55,7 @@ plugins/linalg（ABI v2）
     │
     ▼（可选）
 核心 Value::Formula 仅保留「数值矩阵字面量」现状；
-符号 MatExpr 以 **map `_type=linalg_expr`**（或插件句柄）承载，避免撑爆高中 formula AST。
+符号 MatExpr 以 **map `_type=matrix`（中文构造为 `矩阵`）** 承载，避免撑爆高中 formula AST；遗留标签 `linalg_expr` / `linalg_dense` 仍可解析。
 ```
 
 ### 2.1 为何 MatExpr 不直接塞进 `formula::Expr`
@@ -152,14 +152,16 @@ $$
 | `latex` / `ascii` | `乳胶` / `文本` | 展示字符串 |
 | `shape` | `形状` | |
 
-链式风格（L1 对象方法，可选）：
+链式 / 中缀（v1 已落地）：
 
 ```markdown
-*`AtA` = > `A`.T *
-*`AtA` = > la.mul a=`AtA` b=`A` *
-*`s` = > la.simplify expr=`AtA` *
+*`C` = `A` + `B`*
+*`P` = `A` * `B`*
+*`Pt` = > `P`.T*
+*`s` = > `Pt`.simplify*
 ```
 
+运行时对双方为 `matrix` / `矩阵` / 数值 `$$` 矩阵 / 遗留 `linalg_expr` 的 `+` `-` `*` 分派到插件；结果保留左操作数 `_type` 以便中英方法链。
 ### 4.3 求值与分解（热路径 → 稠密）
 
 | 英文 | 说明 |

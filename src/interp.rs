@@ -513,6 +513,16 @@ impl Interpreter {
                     _ => {}
                 }
                 let r = self.eval_expr(module, fun, env, right)?;
+                if let Some(v) = crate::linalg_ops::try_matrix_binary(
+                    &mut self.host,
+                    *op,
+                    &l,
+                    &r,
+                )
+                .map_err(|e| self.err(e))?
+                {
+                    return Ok(v);
+                }
                 eval_binary(*op, &l, &r).map_err(|e| self.err(e.to_string()))
             }
             Expr::Call(call) => self.eval_call(module, fun, env, call),
@@ -869,11 +879,16 @@ impl Interpreter {
             call_env.set(k, v);
         }
         call_env.set("自".into(), recv.clone());
-        call_env.set("self".into(), recv);
+        call_env.set("self".into(), recv.clone());
         self.host.push_call_site_line(self.host.current_line);
         let result = self.run_function(owner, target, call_env, &[], false);
         self.host.pop_call_site_line();
-        result
+        let result = result?;
+        if crate::linalg_ops::is_matrix_value(&recv) {
+            Ok(crate::linalg_ops::retag_matrix_like(&type_name, result))
+        } else {
+            Ok(result)
+        }
     }
 }
 

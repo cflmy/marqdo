@@ -25,6 +25,7 @@ pub mod inherit;
 pub mod input_feed;
 pub mod interp;
 pub mod lex;
+pub mod linalg_ops;
 pub mod load;
 pub mod parse;
 pub mod value;

@@ -246,21 +246,87 @@ Numerical rank (SVD).
     + `rows`
     + `cols`
 
-Abstract `MatrixSymbol` (`linalg_expr`). Prefer this over `matrix.symbol` (needs a receiver).
+Abstract matrix symbol. Returns a `# matrix` instance (supports `+` / `*` and methods).
 
 > ensure_plugin
-**> linalg_symbol name=`name` rows=`rows` cols=`cols`**
+**> matrix name=`name` rows=`rows` cols=`cols`**
 
 # matrix
+    + `name`=None
+    + `rows`=None
+    + `cols`=None
+    + `data`=None
+    + `formula`=None
+    + `n`=None
 
-Constructor-style helpers (call after `> la.matrix` if you hold an instance; prefer top-level `symbol` / `eye` / `zeros` / `from_list`).
+Matrix value (`_type=matrix`). Prefer infix `A + B` / `A * B`, or methods `` `A`.T ``.
 
-## symbol
-    + `name`
-    + `rows`
-    + `cols`
+> ensure_plugin
+1. `formula`
+  **> linalg_from_formula formula=`formula`**
+2. `data`
+  **> linalg_from_list data=`data`**
+3. `name`
+  **> linalg_symbol name=`name` rows=`rows` cols=`cols`**
+4. `n`
+  **> linalg_eye n=`n`**
+5. `rows`
+  **> linalg_zeros rows=`rows` cols=`cols`**
+6. *
+  > print text=ext/linalg: matrix needs name= / data= / formula= / n= / rows=
+  **None**
 
-**> linalg_symbol name=`name` rows=`rows` cols=`cols`**
+## T
+
+**> linalg_transpose expr=`self`**
+
+## add
+    + `b`
+
+**> linalg_add a=`self` b=`b`**
+
+## sub
+    + `b`
+
+**> linalg_sub a=`self` b=`b`**
+
+## mul
+    + `b`
+
+**> linalg_mul a=`self` b=`b`**
+
+## inv
+
+**> linalg_inv expr=`self`**
+
+## simplify
+
+**> linalg_simplify expr=`self`**
+
+## ascii
+
+**> linalg_ascii expr=`self`**
+
+## latex
+
+**> linalg_latex expr=`self`**
+
+## explicit
+
+**> linalg_explicit expr=`self`**
+
+## det
+
+**> linalg_det expr=`self`**
+
+## trace
+
+**> linalg_trace expr=`self`**
+
+## show
+    + `path`=None
+
+**> linalg_show expr=`self` path=`path`**
 
 ## eye
     + `n`
@@ -277,3 +343,8 @@ Constructor-style helpers (call after `> la.matrix` if you hold an instance; pre
     + `data`
 
 **> linalg_from_list data=`data`**
+
+## from_formula
+    + `formula`
+
+**> linalg_from_formula formula=`formula`**

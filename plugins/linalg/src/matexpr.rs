@@ -349,7 +349,7 @@ impl Expr {
     pub fn to_value(&self) -> Result<Value, String> {
         let (rows, cols) = self.shape()?;
         let mut obj = serde_json::Map::new();
-        obj.insert("_type".into(), json!("linalg_expr"));
+        obj.insert("_type".into(), json!("matrix"));
         obj.insert("shape".into(), json!([rows.to_json(), cols.to_json()]));
         obj.insert("ascii".into(), json!(self.ascii()));
         obj.insert("latex".into(), json!(self.latex()));
@@ -421,7 +421,13 @@ impl Expr {
     pub fn from_value(v: &Value) -> Result<Self, String> {
         let obj = v
             .as_object()
-            .ok_or_else(|| "linalg_expr must be a map".to_string())?;
+            .ok_or_else(|| "matrix expr must be a map".to_string())?;
+        // Accept legacy `linalg_expr` and author types `matrix` / `矩阵`.
+        if let Some(t) = obj.get("_type").and_then(|x| x.as_str()) {
+            if !matches!(t, "matrix" | "矩阵" | "linalg_expr" | "linalg_dense") {
+                // still allow untyped maps that have `kind`
+            }
+        }
         let kind = obj
             .get("kind")
             .and_then(|x| x.as_str())
