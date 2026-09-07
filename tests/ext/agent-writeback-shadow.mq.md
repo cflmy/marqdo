@@ -1,6 +1,7 @@
 ---
-title: writeback param must not shadow host_writeback_record
-description: Regression — step/plan param writeback=True used to break > writeback.record (bool is not a map).
+title: writeback param must not shadow writeback module
+description: Regression — step/plan param writeback=True used to break > writeback.record (bool is not a map). Use a non-colliding import alias.
+import wb:lib/writeback.mq.md
 import writeback:lib/writeback.mq.md
 import json:lib/json.mq.md
 import sys:lib/sys.mq.md
@@ -12,16 +13,16 @@ import sys:lib/sys.mq.md
 ## go
     + `writeback`=False
 
-Mimic agent.step: branch on param named writeback, then persist via host (not import bind).
+Mimic agent.step: branch on param named writeback, then persist via aliased lib import.
 
 *out = > json.parse text={"status":"ok","note":"shadow-probe"}*
 1. `writeback`
   *body = > json.stringify value=`out`*
   *st = > json.get value=`out` key="status"*
   1. `st` == "ok"
-    > host_writeback_record value=`body` key="ok"
+    > wb.record value=`body` key="ok"
   2. *
-    > host_writeback_record value=`body` key="error"
+    > wb.record value=`body` key="error"
 2. *
   *_ = 1*
 ****

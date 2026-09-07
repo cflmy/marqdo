@@ -6,7 +6,7 @@ import json:lib/json.mq.md
 import sys:lib/sys.mq.md
 import fs:lib/fs.mq.md
 import time:lib/time.mq.md
-import writeback:lib/writeback.mq.md
+import wb:lib/writeback.mq.md
 import subtask:lib/subtask.mq.md
 import plugin:lib/plugin.mq.md
 ---
@@ -130,7 +130,7 @@ Allowlist check, then invoke the runbook `##` via `lib/subtask` (`spawn fn=` →
 Build a runnable workbook. `skeleton=single` (default): one worker `step`. `skeleton=dual`: research then write agents. On success the parent chooses DONE; runtime `agent_workbook_solidify` freezes the answer.
 
 *q = > json.quote text=`goal`*
-*esc = > json.parse text={"h":"---\ntitle: agent workbook\nimport llm:ext/ai/llm.mq.md\nimport agent:ext/ai/agent.mq.md\nimport json:lib/json.mq.md\nimport sys:lib/sys.mq.md\nimport writeback:lib/writeback.mq.md\nimport subtask:lib/subtask.mq.md\n---\n\n# Goal\n\nParent goal is embedded as JSON in # main.\n\n## Solidify\n\nWhen the child returns a good value, parent DECISION: DONE — runtime agent_workbook_solidify freezes the answer as **return** (do not invent long FIND/REPLACE).\n\n# main\n\n> llm.load_env\n\n","s1":"\u002a\u0060model\u0060 = > llm.llm \u002a\n","s2":"\u002a\u0060tools\u0060 = > json.parse text=[] \u002a\n","s3":"\u002a\u0060worker\u0060 = > agent.agent model=\u0060model\u0060 tools=\u0060tools\u0060 standing=You are a workbook worker. tools=[] means never CALL. Finish the task with a direct final answer; do not invent tools. \u002a\n","s4":"\u002a\u0060wrap\u0060 = > json.parse text={\"task\":","s5":"} \u002a\n","s6":"\u002a\u0060task\u0060 = > json.get value=\u0060wrap\u0060 key=task \u002a\n","s7":"\u002a\u0060out\u0060 = > \u0060worker\u0060.step task=\u0060task\u0060 stream=True \u002a\n","s7b":"\u002a\u0060text\u0060 = > json.get value=\u0060out\u0060 key=result \u002a\n","s8":"\u002a\u002a\u0060text\u0060\u002a\u002a\n","d3":"\u002a\u0060research\u0060 = > agent.agent model=\u0060model\u0060 tools=\u0060tools\u0060 standing=You gather facts for the goal. Be concise. Do not invent tools. \u002a\n","d3b":"\u002a\u0060writer\u0060 = > agent.agent model=\u0060model\u0060 tools=\u0060tools\u0060 standing=You write the final answer from research notes. Do not invent tools. \u002a\n","d4":"\u002a\u0060wrap\u0060 = > json.parse text={\"task\":","d5":"} \u002a\n","d6":"\u002a\u0060task\u0060 = > json.get value=\u0060wrap\u0060 key=task \u002a\n","d7":"\u002a\u0060notes\u0060 = > \u0060research\u0060.step task=\u0060task\u0060 stream=True \u002a\n","d8":"\u002a\u0060ns\u0060 = > json.stringify value=\u0060notes\u0060 \u002a\n","d9":"\u002a\u0060wt\u0060 = Write the final answer. Research notes: \u002a\n","d10":"\u002a\u0060wt\u0060 = \u0060wt\u0060 + \u0060ns\u0060 \u002a\n","d11":"\u002a\u0060out\u0060 = > \u0060writer\u0060.step task=\u0060wt\u0060 stream=True \u002a\n","d11b":"\u002a\u0060text\u0060 = > json.get value=\u0060out\u0060 key=result \u002a\n","d12":"\u002a\u002a\u0060text\u0060\u002a\u002a\n"}*
+*esc = > json.parse text={"h":"---\ntitle: agent workbook\nimport llm:ext/ai/llm.mq.md\nimport agent:ext/ai/agent.mq.md\nimport json:lib/json.mq.md\nimport sys:lib/sys.mq.md\nimport wb:lib/writeback.mq.md\nimport subtask:lib/subtask.mq.md\n---\n\n# Goal\n\nParent goal is embedded as JSON in # main.\n\n## Solidify\n\nWhen the child returns a good value, parent DECISION: DONE — runtime agent_workbook_solidify freezes the answer as **return** (do not invent long FIND/REPLACE).\n\n# main\n\n> llm.load_env\n\n","s1":"\u002a\u0060model\u0060 = > llm.llm \u002a\n","s2":"\u002a\u0060tools\u0060 = > json.parse text=[] \u002a\n","s3":"\u002a\u0060worker\u0060 = > agent.agent model=\u0060model\u0060 tools=\u0060tools\u0060 standing=You are a workbook worker. tools=[] means never CALL. Finish the task with a direct final answer; do not invent tools. \u002a\n","s4":"\u002a\u0060wrap\u0060 = > json.parse text={\"task\":","s5":"} \u002a\n","s6":"\u002a\u0060task\u0060 = > json.get value=\u0060wrap\u0060 key=task \u002a\n","s7":"\u002a\u0060out\u0060 = > \u0060worker\u0060.step task=\u0060task\u0060 stream=True \u002a\n","s7b":"\u002a\u0060text\u0060 = > json.get value=\u0060out\u0060 key=result \u002a\n","s8":"\u002a\u002a\u0060text\u0060\u002a\u002a\n","d3":"\u002a\u0060research\u0060 = > agent.agent model=\u0060model\u0060 tools=\u0060tools\u0060 standing=You gather facts for the goal. Be concise. Do not invent tools. \u002a\n","d3b":"\u002a\u0060writer\u0060 = > agent.agent model=\u0060model\u0060 tools=\u0060tools\u0060 standing=You write the final answer from research notes. Do not invent tools. \u002a\n","d4":"\u002a\u0060wrap\u0060 = > json.parse text={\"task\":","d5":"} \u002a\n","d6":"\u002a\u0060task\u0060 = > json.get value=\u0060wrap\u0060 key=task \u002a\n","d7":"\u002a\u0060notes\u0060 = > \u0060research\u0060.step task=\u0060task\u0060 stream=True \u002a\n","d8":"\u002a\u0060ns\u0060 = > json.stringify value=\u0060notes\u0060 \u002a\n","d9":"\u002a\u0060wt\u0060 = Write the final answer. Research notes: \u002a\n","d10":"\u002a\u0060wt\u0060 = \u0060wt\u0060 + \u0060ns\u0060 \u002a\n","d11":"\u002a\u0060out\u0060 = > \u0060writer\u0060.step task=\u0060wt\u0060 stream=True \u002a\n","d11b":"\u002a\u0060text\u0060 = > json.get value=\u0060out\u0060 key=result \u002a\n","d12":"\u002a\u002a\u0060text\u0060\u002a\u002a\n"}*
 *h = > json.get value=`esc` key="h"*
 *s1 = > json.get value=`esc` key="s1"*
 *s2 = > json.get value=`esc` key="s2"*
@@ -171,7 +171,7 @@ Build a runnable workbook. `skeleton=single` (default): one worker `step`. `skel
 Structured observation for the parent developer-agent: source, named writeback slots, exit code, optional child return value, and quiet-captured I/O.
 
 *source = > fs.read_text path=`path`*
-*slots = > writeback.scan_path path=`path`*
+*slots = > wb.scan_path path=`path`*
 *obs = > json.parse text={"path":""}*
 *obs = > json.set map=`obs` key="path" value=`path`*
 *obs = > json.set map=`obs` key="source" value=`source`*
@@ -1463,7 +1463,7 @@ Always append `done` and attach `events` on the result map (process audit even w
 
 1. `trace`
   *body = > json.stringify value=`events`*
-  > writeback.record value=`body` key="trace"
+  > wb.record value=`body` key="trace"
 2. *
   *_ = 1*
 
@@ -1606,9 +1606,9 @@ With `stream=True`, the model call uses SSE; `echo=True` prints delta text to st
   *body = > json.stringify value=`out`*
   *st = > json.get value=`out` key="status"*
   1. `st` == "ok"
-    > writeback.record value=`body` key="ok"
+    > wb.record value=`body` key="ok"
   2. *
-    > writeback.record value=`body` key="error"
+    > wb.record value=`body` key="error"
 2. *
   *_ = 1*
 
@@ -1711,7 +1711,7 @@ Reuse lookup: exact → alias → canonicalize → optional local n-gram `near` 
         *events = > plan_append_round events=`events` round=1 workbook=`path` exit_code=`code` result=`child_val` stream=`stream` echo=`echo`*
         1. `writeback`
           *body = > json.stringify value=`out`*
-          > writeback.record value=`body` key="ok"
+          > wb.record value=`body` key="ok"
         2. *
           *_ = 1*
         *out = > plan_finish_stream out=`out` events=`events` stream=`stream` trace=`trace` result=`child_val`*
@@ -1768,7 +1768,7 @@ Reuse lookup: exact → alias → canonicalize → optional local n-gram `near` 
           *events = > plan_append_round events=`events` round=1 workbook=`path` exit_code=`code` result=`child_val` stream=`stream` echo=`echo`*
           1. `writeback`
             *body = > json.stringify value=`out`*
-            > writeback.record value=`body` key="ok"
+            > wb.record value=`body` key="ok"
           2. *
             *_ = 1*
           *out = > plan_finish_stream out=`out` events=`events` stream=`stream` trace=`trace` result=`child_val`*
@@ -1832,7 +1832,7 @@ Reuse lookup: exact → alias → canonicalize → optional local n-gram `near` 
                 *events = > plan_append_round events=`events` round=1 workbook=`path` exit_code=`code` result=`child_val` stream=`stream` echo=`echo`*
                 1. `writeback`
                   *body = > json.stringify value=`out`*
-                  > writeback.record value=`body` key="ok"
+                  > wb.record value=`body` key="ok"
                 2. *
                   *_ = 1*
                 *out = > plan_finish_stream out=`out` events=`events` stream=`stream` trace=`trace` result=`child_val`*
@@ -1910,7 +1910,7 @@ Reuse lookup: exact → alias → canonicalize → optional local n-gram `near` 
   *out = > json.set map=`out` key="cache" value="bypass"*
   1. `writeback`
     *body = > json.stringify value=`out`*
-    > writeback.record value=`body` key="ok"
+    > wb.record value=`body` key="ok"
   2. *
     *_ = 1*
   *out = > plan_finish_stream out=`out` events=`events` stream=`stream` trace=`trace`*
@@ -2091,9 +2091,9 @@ Deterministic success stop (loop engineering): when the child already returned a
 1. `writeback`
   *body = > json.stringify value=`out`*
   1. `status` == "ok"
-    > writeback.record value=`body` key="ok"
+    > wb.record value=`body` key="ok"
   2. *
-    > writeback.record value=`body` key="error"
+    > wb.record value=`body` key="error"
 2. *
   *_ = 1*
 

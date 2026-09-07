@@ -3206,22 +3206,23 @@ fn ext_agent_run_live() {
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert_eq!(code, 0, "agent-run-live stderr={stderr}");
     let lines: Vec<&str> = stdout.trim_end().lines().collect();
-    assert!(lines.len() >= 3, "agent-run-live stdout={stdout}");
+    assert!(lines.len() >= 4, "agent-run-live stdout={stdout}");
     assert!(
         lines[0].chars().any(|c| c.is_ascii_digit()),
         "expected date in reply, got {:?}",
         lines[0]
     );
-    assert_eq!(lines[1], "2", "history after step");
-    assert_eq!(lines[2], "0", "history after clear");
-    // Caller may persist the step map via lib/writeback; agent itself does not write.
+    assert_eq!(lines[1], "writeback-ok", "named ok slot after step");
+    assert_eq!(lines[2], "2", "history after step");
+    assert_eq!(lines[3], "0", "history after clear");
+    // Default step writeback persists the result map under the ok/error slots.
     let src = std::fs::read_to_string(
         std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/ext/agent-run-live.mq.md"),
     )
     .expect("read agent-run-live after run");
     assert!(
         src.contains("\"status\"") || src.contains("marqdo-out"),
-        "expected caller writeback of step result map"
+        "expected writeback of step result map"
     );
     assert!(
         !stdout.contains("marqdo-out"),

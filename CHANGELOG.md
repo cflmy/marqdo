@@ -12,6 +12,8 @@
 - **`ext/linalg`**：L0–L6 + 公式文档面 **F1–F3**（中缀、`declare`、展示/`explicit` 默认化简、`T_ascii`、public「如何写公式文档」）；示例 `linalg-transpose` · `linalg-svd` · `linalg-least-squares`。设计：[ext-linalg-formula-doc.md](doc/design/ext-linalg-formula-doc.md)。
 
 ### Fixed
+- **`ext/agent`**：写回改走 `wb.record`（避免 `writeback` 形参遮蔽模块名），不再直调 `host_*`。
+- **`ext/llm`**：`stream_result` 忽略未知 SSE 类型（如 `reasoning`），不再因此退出。
 
 ### Changed
 

@@ -17,7 +17,7 @@ Load `.env` from cwd (optional named arg `path=`). Does not override existing va
 ## stream_result
     + `events`
 
-Reduce a `complete stream=True` event list to the final `done.result` text (or `error.message`). Unknown event types abort.
+Reduce a `complete stream=True` event list to the final `done.result` text (or `error.message`). Unknown types (e.g. `reasoning`) are ignored.
 
 *answer = ""*
 
@@ -29,9 +29,7 @@ Reduce a `complete stream=True` event list to the final `done.result` text (or `
     *answer = ev[^message]*
   3. `t` == "delta"
   4. *
-    > print text=ext/ai/llm: unexpected SSE event type
-    > print text=`t`
-    > sys.exit code=1
+    *_ = 1*
 
 **answer**
 
