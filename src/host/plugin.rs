@@ -571,17 +571,26 @@ pub fn call_registered(
     let mut out_ptr: *mut c_char = std::ptr::null_mut();
     let mut err_ptr: *mut c_char = std::ptr::null_mut();
 
-    CURRENT_HOST.with(|c| c.set(ctx as *mut HostContext));
-    {
+    // Nesting-safe: restore previous host pointers after this call. Clearing to
+    // null would break a long-lived outer call (e.g. `web_listen`) so later
+    // HTTP `invoke` / `host_query` on worker threads see no active context.
+    let prev_tls = CURRENT_HOST.with(|c| {
+        let prev = c.get();
+        c.set(ctx as *mut HostContext);
+        prev
+    });
+    let prev_global = {
         let mut g = global_host_slot().lock().unwrap_or_else(|e| e.into_inner());
+        let prev = g.0;
         g.0 = ctx as *mut HostContext;
-    }
+        prev
+    };
     let rc = unsafe { (reg.fn_ptr)(c_args.as_ptr(), &mut out_ptr, &mut err_ptr) };
     {
         let mut g = global_host_slot().lock().unwrap_or_else(|e| e.into_inner());
-        g.0 = std::ptr::null_mut();
+        g.0 = prev_global;
     }
-    CURRENT_HOST.with(|c| c.set(std::ptr::null_mut()));
+    CURRENT_HOST.with(|c| c.set(prev_tls));
 
     let err_s = take_c_string(err_ptr);
     let out_s = take_c_string(out_ptr);

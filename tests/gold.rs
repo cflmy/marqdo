@@ -2062,25 +2062,30 @@ fn ext_web_hosting_live() {
         "proxy sse body={body}"
     );
 
-    // Invoke: POST JSON → demo.echo
-    let out = Command::new("curl")
-        .args([
-            "-s",
-            "-X",
-            "POST",
-            &format!("{base}/api/echo"),
-            "-H",
-            "Content-Type: application/json",
-            "-d",
-            r#"{"msg":"hi"}"#,
-        ])
-        .output()
-        .expect("curl invoke");
-    let body = String::from_utf8_lossy(&out.stdout);
-    assert!(
-        body.contains("\"ok\"") && body.contains("\"msg\":\"hi\""),
-        "invoke body={body}"
-    );
+    // Invoke twice: demo.echo nests a web.page plugin call; the second request
+    // must still see GLOBAL_HOST (listen outer frame) — regression for 0.3.7.
+    for (msg, label) in [("hi", "first"), ("again", "second")] {
+        let out = Command::new("curl")
+            .args([
+                "-s",
+                "-X",
+                "POST",
+                &format!("{base}/api/echo"),
+                "-H",
+                "Content-Type: application/json",
+                "-d",
+                &format!(r#"{{"msg":"{msg}"}}"#),
+            ])
+            .output()
+            .expect("curl invoke");
+        let body = String::from_utf8_lossy(&out.stdout);
+        assert!(
+            body.contains("\"ok\"")
+                && body.contains(&format!("\"msg\":\"{msg}\""))
+                && !body.contains("no active host context"),
+            "invoke {label} body={body}"
+        );
+    }
 
     let _ = child.kill();
     let _ = child.wait();

@@ -5,6 +5,7 @@
 ### Added
 
 ### Fixed
+- **`host_query` / GLOBAL_HOST**：嵌套 `call_registered` 结束后恢复外层宿主指针，不再清空；`web_listen` 多轮 `invoke`（中间再调插件）不再报 `no active host context`。
 
 ### Changed
 
