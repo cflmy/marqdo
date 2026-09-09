@@ -3,8 +3,10 @@
 ## Unreleased
 
 ### Added
+- **GAP-11**：`compose_form` / `表单装配` 支持 `target` / `表单插槽`（如 `#id`），把表单注入引言 HTML 内的挂载点，而不是始终作为 `.main-intro` 的兄弟节点。
 
 ### Fixed
+- **GAP-12**：`ext/…` import 解析失败且未设置 `MARQDO_EXT` 时，错误附带 `hint: set MARQDO_EXT to the directory that contains web/`。
 
 ### Changed
 

@@ -136,6 +136,16 @@ pub fn resolve_import(from_dir: &Path, rel: &str) -> Result<PathBuf> {
         if let Some(p) = find_in_ancestor_dir(from_dir, "ext", rest) {
             return Ok(p);
         }
+        let mut msg = format!(
+            "cannot resolve import `{rel}` from {}",
+            from_dir.display()
+        );
+        if env::var_os("MARQDO_EXT").is_none() {
+            msg.push_str(
+                "\nhint: set MARQDO_EXT to the directory that contains web/ (or run `marqdo ext add web`)",
+            );
+        }
+        bail!("{msg}");
     }
     // Relative again with normalize
     if direct.exists() {
@@ -286,5 +296,30 @@ mod tests {
         assert!(p.ends_with("text.mq.md"));
         let p2 = resolve_import(Path::new("tests/keywords"), "std/text.mq.md").unwrap();
         assert!(p2.ends_with("text.mq.md"));
+    }
+
+    #[test]
+    fn resolve_ext_missing_hints_marqdo_ext() {
+        let prev = env::var_os("MARQDO_EXT");
+        env::remove_var("MARQDO_EXT");
+        // Unique path so cwd/ext cannot satisfy the import.
+        let err = resolve_import(
+            Path::new("/tmp"),
+            "ext/__gap12_missing__/nope.mq.md",
+        )
+        .unwrap_err();
+        let msg = format!("{err:#}");
+        match prev {
+            Some(v) => env::set_var("MARQDO_EXT", v),
+            None => env::remove_var("MARQDO_EXT"),
+        }
+        assert!(
+            msg.contains("cannot resolve import `ext/__gap12_missing__/nope.mq.md`"),
+            "{msg}"
+        );
+        assert!(
+            msg.contains("hint: set MARQDO_EXT to the directory that contains web/"),
+            "{msg}"
+        );
     }
 }

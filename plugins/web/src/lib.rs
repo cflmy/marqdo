@@ -813,7 +813,11 @@ web_ffi!(web_compose_form, |args: &Value| {
         .cloned()
         .ok_or_else(|| "missing `form`".to_string())?;
     let id = arg_str(args, "id")?.to_string();
-    compose::compose_form(&page, &form, &id)
+    let target = arg_str_opt(args, "target")
+        .or_else(|| arg_str_opt(args, "form_target"))
+        .or_else(|| arg_str_opt(args, "form_slot"))
+        .or_else(|| arg_str_opt(args, "表单插槽"));
+    compose::compose_form(&page, &form, &id, target)
 });
 
 web_ffi!(web_render, |args: &Value| {
@@ -2515,7 +2519,7 @@ pub unsafe extern "C" fn marqdo_plugin_init(host: *const MarqdoHostApi) -> c_int
         ),
         (
             "web_compose_form",
-            "page,form,id",
+            "page,form,id,target",
             web_compose_form as PluginFn,
         ),
         ("web_render", "page", web_render as PluginFn),

@@ -184,7 +184,15 @@ pub fn compose_main(
 }
 
 /// Embed a form into the page main slot (`form_id` → POST `/_form/{id}`).
-pub fn compose_form(page: &Value, form: &Value, form_id: &str) -> Result<Value, String> {
+///
+/// Optional `form_target` (CSS id / `#id`) mounts the form **inside** intro HTML
+/// at that element instead of appending a sibling `.site-form` (GAP-11).
+pub fn compose_form(
+    page: &Value,
+    form: &Value,
+    form_id: &str,
+    form_target: Option<&str>,
+) -> Result<Value, String> {
     let id = form_id.trim();
     if id.is_empty() {
         return Err("compose_form requires non-empty `id`".into());
@@ -200,6 +208,15 @@ pub fn compose_form(page: &Value, form: &Value, form_id: &str) -> Result<Value, 
     }
     obj.insert("form_id".into(), json!(id));
     obj.insert("form".into(), frm.clone());
+    let target = form_target
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(|s| s.to_string());
+    if let Some(ref t) = target {
+        obj.insert("form_target".into(), json!(t));
+    } else {
+        obj.remove("form_target");
+    }
     let mut forms = obj
         .get("forms")
         .and_then(|v| v.as_object())
@@ -219,6 +236,9 @@ pub fn compose_form(page: &Value, form: &Value, form_id: &str) -> Result<Value, 
     part.insert("fragment".into(), json!("main"));
     part.insert("form_id".into(), json!(id));
     part.insert("form".into(), frm);
+    if let Some(ref t) = target {
+        part.insert("form_target".into(), json!(t));
+    }
     if let Some(intro) = obj.get("intro") {
         part.insert("intro".into(), intro.clone());
     }

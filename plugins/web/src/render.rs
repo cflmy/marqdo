@@ -40,6 +40,106 @@ fn is_simple_ident(s: &str) -> bool {
             .all(|c| c.is_ascii_alphanumeric() || c == '_' || !c.is_ascii())
 }
 
+/// Normalize a form mount selector to a bare HTML id (`#foo` → `foo`).
+fn form_mount_id(target: &str) -> Option<&str> {
+    let t = target.trim().trim_start_matches('#');
+    if t.is_empty() {
+        return None;
+    }
+    // Keep injection conservative: id must be a simple token (no spaces / quotes).
+    if t.chars().any(|c| c.is_whitespace() || c == '"' || c == '\'' || c == '<' || c == '>') {
+        return None;
+    }
+    Some(t)
+}
+
+/// Inject `payload` as the inner HTML of the first element with `id="…"` / `id='…'`.
+/// Returns `None` if no matching open+close pair is found (caller falls back to sibling form).
+pub(crate) fn inject_html_into_id(haystack: &str, id: &str, payload: &str) -> Option<String> {
+    let id = form_mount_id(id)?;
+    let patterns = [format!("id=\"{id}\""), format!("id='{id}'")];
+    for pat in &patterns {
+        let Some(idx) = haystack.find(pat.as_str()) else {
+            continue;
+        };
+        let tag_start = haystack[..idx].rfind('<')?;
+        // Reject closing tags / comments accidentally matching.
+        let after_lt = haystack.as_bytes().get(tag_start + 1).copied()?;
+        if after_lt == b'/' || after_lt == b'!' {
+            continue;
+        }
+        let name_end = haystack[tag_start + 1..]
+            .find(|c: char| c.is_whitespace() || c == '>' || c == '/')
+            .map(|i| tag_start + 1 + i)
+            .unwrap_or(idx);
+        let tag_name = haystack[tag_start + 1..name_end].trim();
+        if tag_name.is_empty() {
+            continue;
+        }
+        let after_id = idx + pat.len();
+        let open_gt = haystack[after_id..].find('>')? + after_id;
+        // Skip self-closing `<div id="x" />`.
+        if haystack.as_bytes().get(open_gt.saturating_sub(1)) == Some(&b'/') {
+            continue;
+        }
+        let close = format!("</{tag_name}>");
+        // Case-insensitive close search for HTML friendliness.
+        let rest = &haystack[open_gt + 1..];
+        let close_rel = rest
+            .to_ascii_lowercase()
+            .find(&close.to_ascii_lowercase())?;
+        let close_idx = open_gt + 1 + close_rel;
+        let mut out = String::with_capacity(haystack.len() + payload.len());
+        out.push_str(&haystack[..open_gt + 1]);
+        out.push_str(payload);
+        out.push_str(&haystack[close_idx..]);
+        return Some(out);
+    }
+    None
+}
+
+/// Append intro + optional form: either inject into `form_target` mount inside intro, or sibling.
+fn push_intro_and_form(
+    buf: &mut String,
+    intro: &str,
+    args: &Value,
+    form_data: Option<&Value>,
+    form_errors: Option<&Value>,
+    csrf: Option<&str>,
+) {
+    let form = args.get("form");
+    let form_id = args
+        .get("form_id")
+        .and_then(|v| v.as_str())
+        .unwrap_or("form");
+    let target = args
+        .get("form_target")
+        .or_else(|| args.get("target"))
+        .or_else(|| args.get("form_slot"))
+        .or_else(|| args.get("表单插槽"))
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+    let form_html = form.map(|f| {
+        crate::form::render_body(f, form_id, form_data, form_errors, csrf)
+    });
+
+    if let Some(ref html) = form_html {
+        if !target.is_empty() && !intro.is_empty() {
+            if let Some(injected) = inject_html_into_id(intro, target, html) {
+                buf.push_str(&format!("<div class=\"main-intro\">{injected}</div>"));
+                return;
+            }
+        }
+    }
+
+    if !intro.is_empty() {
+        buf.push_str(&format!("<div class=\"main-intro\">{intro}</div>"));
+    }
+    if let Some(html) = form_html {
+        buf.push_str(&html);
+    }
+}
+
 /// True when `back` is a DB field path (`table.col` / `mod.table.col`), not a URL or site path.
 fn is_db_bind_back(back: &str) -> bool {
     let s = normalize_ref(back);
@@ -775,22 +875,14 @@ pub fn render_page_ex(
             main_html.push_str(images);
         }
     }
-    if !intro.is_empty() {
-        main_html.push_str(&format!("<div class=\"main-intro\">{intro}</div>"));
-    }
-    if let Some(form) = args.get("form") {
-        let form_id = args
-            .get("form_id")
-            .and_then(|v| v.as_str())
-            .unwrap_or("form");
-        main_html.push_str(&crate::form::render_body(
-            form,
-            form_id,
-            form_data,
-            form_errors,
-            csrf,
-        ));
-    }
+    push_intro_and_form(
+        &mut main_html,
+        &intro,
+        args,
+        form_data,
+        form_errors,
+        csrf,
+    );
     if !items.is_empty() {
         let is_detail = args
             .get("detail")
@@ -905,16 +997,7 @@ pub fn render_fragment(args: &Value, db_url: Option<&str>) -> String {
                     body.push_str(images);
                 }
             }
-            if !intro.is_empty() {
-                body.push_str(&format!("<div class=\"main-intro\">{intro}</div>"));
-            }
-            if let Some(form) = args.get("form") {
-                let form_id = args
-                    .get("form_id")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("form");
-                body.push_str(&crate::form::render_body(form, form_id, None, None, None));
-            }
+            push_intro_and_form(&mut body, &intro, args, None, None, None);
             if !items.is_empty() {
                 let is_detail = args
                     .get("detail")
@@ -1122,5 +1205,46 @@ mod nav_tests {
         assert!(html.contains("nav-mq-0"), "{html}");
         assert!(html.contains("@media not (min-width: 900px)"), "{html}");
         assert!(html.contains(">Home<"), "{html}");
+    }
+
+    #[test]
+    fn inject_html_into_id_replaces_inner() {
+        let intro = r#"<div class="cols"><div id="left">L</div><div id="form-mount"></div></div>"#;
+        let out = inject_html_into_id(intro, "#form-mount", "<form class=\"site-form\">x</form>")
+            .expect("inject");
+        assert!(out.contains(r#"<div id="form-mount"><form class="site-form">x</form></div>"#), "{out}");
+        assert!(out.contains(r#"<div id="left">L</div>"#), "{out}");
+    }
+
+    #[test]
+    fn form_target_mounts_inside_intro() {
+        let page = json!({
+            "title": "Compose",
+            "shell_css": "off",
+            "intro": "<div class=\"cols\"><div id=\"a\">A</div><div id=\"qd-note-form-mount\"></div></div>",
+            "form_id": "note",
+            "form_target": "#qd-note-form-mount",
+            "form": {
+                "title": "note",
+                "show_meta": false,
+                "fields": [{"name": "title", "label": "Title", "type": "text"}]
+            }
+        });
+        let html = render_page(&page, None, None);
+        assert_eq!(html.matches("class=\"site-form\"").count(), 1, "{html}");
+        let mount_at = html.find("id=\"qd-note-form-mount\"").expect("mount");
+        let form_at = html.find("class=\"site-form\"").expect("form");
+        assert!(form_at > mount_at, "{html}");
+        assert!(
+            html.contains("qd-note-form-mount\"><div class=\"site-form\""),
+            "{html}"
+        );
+        // Sibling fallback would place site-form after </div></div> of main-intro.
+        let intro_end = html.find("class=\"main-intro\"").expect("intro")
+            + html[html.find("class=\"main-intro\"").unwrap()..]
+                .find("</div>")
+                .expect("intro close");
+        // With injection, site-form is before the outer main-intro close — already asserted by adjacency.
+        let _ = intro_end;
     }
 }

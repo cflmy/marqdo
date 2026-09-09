@@ -303,10 +303,11 @@ List pagination for the main bind: sets DB `limit`/`offset` and renders previous
 ## compose_form
     + `form`
     + `id`
+    + `target`=None
 
-Embed a form into the page main slot. `listen` auto-registers `GET|POST /_form/{id}` from page/route forms (optional `app.mount_form`).
+Embed a form into the page main slot. Optional `target` / `form_slot` (CSS id, e.g. `#qd-note-form-mount`) injects the form **inside** that element in `intro` HTML instead of a sibling `.site-form` after `.main-intro` (GAP-11). Missing mount falls back to sibling. `listen` auto-registers `GET|POST /_form/{id}` from page/route forms (optional `app.mount_form`).
 
-**> web_compose_form page=`self` form=`form` id=`id`**
+**> web_compose_form page=`self` form=`form` id=`id` target=`target`**
 
 ## render
     + `db`=None

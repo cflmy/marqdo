@@ -1711,6 +1711,21 @@ render-ok",
 }
 
 #[test]
+fn ext_web_form_slot_smoke() {
+    let status = Command::new("cargo")
+        .args(["build", "-p", "marqdo_plugin_web"])
+        .current_dir(env!("CARGO_MANIFEST_DIR"))
+        .status()
+        .expect("build web plugin");
+    assert!(status.success(), "failed to build marqdo_plugin_web");
+    assert_out(
+        "tests/ext/web-form-slot-smoke.mq.md",
+        "target-ok
+slot-ok",
+    );
+}
+
+#[test]
 fn ext_web_part_smoke() {
     let status = Command::new("cargo")
         .args(["build", "-p", "marqdo_plugin_web"])
