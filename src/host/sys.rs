@@ -108,18 +108,28 @@ pub fn exit(ctx: &HostContext, code: &Value) -> Result<Value, String> {
     }
 }
 
-pub fn exec(ctx: &HostContext, cmd: &Value, args: Option<&Value>) -> Result<Value, String> {
+pub fn exec(
+    ctx: &HostContext,
+    cmd: &Value,
+    args: Option<&Value>,
+    capture: Option<&Value>,
+) -> Result<Value, String> {
     #[cfg(not(feature = "exec-host"))]
     {
-        let _ = (ctx, cmd, args);
+        let _ = (ctx, cmd, args, capture);
         return Err("exec unavailable in browser wasm".into());
     }
     #[cfg(feature = "exec-host")]
     {
+    use std::process::Stdio;
     if !ctx.allow_exec() {
         return Err("exec denied by host policy".into());
     }
     let cmd = as_text(cmd, "cmd")?;
+    let capture = match capture {
+        None | Some(Value::None) => false,
+        Some(v) => crate::host::math::as_bool(v),
+    };
     let mut command = Command::new(cmd);
     command.current_dir(&ctx.cwd);
     match args {
@@ -134,10 +144,38 @@ pub fn exec(ctx: &HostContext, cmd: &Value, args: Option<&Value>) -> Result<Valu
         }
         Some(_) => return Err("exec args must be list or text".into()),
     }
-    let status = command
-        .status()
-        .map_err(|e| format!("exec `{cmd}`: {e}"))?;
-    Ok(Value::Int(status.code().unwrap_or(1) as i64))
+    if capture {
+        command.stdout(Stdio::piped());
+        command.stderr(Stdio::piped());
+        let output = command
+            .output()
+            .map_err(|e| format!("exec `{cmd}`: {e}"))?;
+        let code = output.status.code().unwrap_or(1) as i64;
+        let stdout = String::from_utf8_lossy(&output.stdout).into_owned();
+        let stderr = String::from_utf8_lossy(&output.stderr).into_owned();
+        Ok(Value::Map(vec![
+            ("code".into(), Value::Int(code)),
+            ("stdout".into(), Value::Text(clip_exec_io(&stdout))),
+            ("stderr".into(), Value::Text(clip_exec_io(&stderr))),
+        ]))
+    } else {
+        let status = command
+            .status()
+            .map_err(|e| format!("exec `{cmd}`: {e}"))?;
+        Ok(Value::Int(status.code().unwrap_or(1) as i64))
+    }
+    }
+}
+
+const EXEC_IO_CAP: usize = 256 * 1024;
+
+fn clip_exec_io(s: &str) -> String {
+    let mut it = s.chars();
+    let head: String = it.by_ref().take(EXEC_IO_CAP).collect();
+    if it.next().is_some() {
+        format!("{head}\n…(truncated)")
+    } else {
+        head
     }
 }
 

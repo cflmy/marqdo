@@ -189,17 +189,15 @@ sk-live
 }
 
 #[test]
-fn structure_bare_id_italic_bold() {
+fn structure_gap_star_json_body() {
     assert_out(
-        "tests/structure/bare-id-italic-bold.mq.md",
-        "2
-2
-quoted
-7
-ok
-hi",
+        "tests/structure/gap-star-json-body.mq.md",
+        "1
+1
+7",
     );
 }
+
 
 #[test]
 fn structure_footnote_index() {
@@ -1321,6 +1319,16 @@ fn lib_table_collections_zh() {
 #[test]
 fn lib_sys_cwd() {
     assert_out("tests/lib/sys-cwd.mq.md", "cwd-ok");
+}
+
+#[test]
+fn lib_sys_exec_capture() {
+    assert_out(
+        "tests/lib/sys-exec-capture.mq.md",
+        "exec-code-ok
+capture-code-ok
+capture-stdout-ok",
+    );
 }
 
 #[test]

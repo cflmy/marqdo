@@ -3,8 +3,12 @@
 ## Unreleased
 
 ### Added
+- **`sys.exec` / `系统.执行`**：可选 `capture=` / `捕获=`；为真时返回 `{code, stdout, stderr}`（GAP-09）。
 
 ### Fixed
+- **GAP-06/07**：`*…*` 分类对反引号/字符串内的 `*` 不再误判；错误收尾的赋值行不再吞掉后续 `##` 体（`>` / 合法 `*…*` 可脱出注释段）；命名参数边界尊重 `[…]`/`{…}`。
+- **GAP-08**：`app.invoke` 对 `Null`/`None` 返回不再伪装成 `{"ok":true}`，改为 500 + `{"ok":false,"error":"null result"}`。
+- **GAP-10**：`app.proxy` `stream=true` 响应补齐 `Cache-Control: no-cache, no-transform` 与 `X-Accel-Buffering: no`。
 
 ### Changed
 

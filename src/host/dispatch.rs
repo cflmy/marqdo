@@ -910,7 +910,7 @@ impl HostFn {
             Self::OpenAiSseParse => &["echo"],
             Self::HttpRequest => &["body", "content_type", "headers"],
             Self::DotenvLoad => &["path"],
-            Self::Exec => &["args"],
+            Self::Exec => &["args", "capture"],
             Self::Solve => &["min", "max"],
             Self::Plot => &["steps", "path", "derivative", "grid"],
             Self::PlotPoints => &["path", "grid"],
@@ -981,7 +981,12 @@ pub fn call_host(
         HostFn::Args => sys::args(ctx),
         HostFn::Cwd => sys::cwd(ctx),
         HostFn::Exit => sys::exit(ctx, require(bound, "code")?),
-        HostFn::Exec => sys::exec(ctx, require(bound, "cmd")?, bound.get("args")),
+        HostFn::Exec => sys::exec(
+            ctx,
+            require(bound, "cmd")?,
+            bound.get("args"),
+            bound.get("capture"),
+        ),
         HostFn::JsonParse => json::parse(require(bound, "text")?),
         HostFn::JsonStringify => {
             json::stringify(require(bound, "value")?, bound.get("indent"))

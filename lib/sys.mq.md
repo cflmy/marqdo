@@ -37,8 +37,15 @@ Load `.env` (optional named arg `path=`). Existing process env is not overridden
 ## exec
     + `cmd`
     + `args`=None
+    + `capture`=False
 
-**> host_exec cmd=`cmd` args=`args`**
+Run a process. Default return is the exit code (int).
+
+With `capture=True`, return a map `{code, stdout, stderr}` (stdout/stderr may be truncated for huge output).
+
+Inside `*…*` prefer bare `args=args` (variable); `` args=`args` `` is also accepted.
+
+**> host_exec cmd=`cmd` args=`args` capture=`capture`**
 
 ## stream_publish
     + `event`

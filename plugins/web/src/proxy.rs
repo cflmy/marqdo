@@ -364,6 +364,15 @@ async fn proxy_handler(route: ProxyRoute, req: Request) -> Response {
     }
 
     if route.stream {
+        // Industry SSE / reverse-proxy practice: disable buffering at CDN/Nginx.
+        out_headers.insert(
+            header::CACHE_CONTROL,
+            HeaderValue::from_static("no-cache, no-transform"),
+        );
+        out_headers.insert(
+            HeaderName::from_static("x-accel-buffering"),
+            HeaderValue::from_static("no"),
+        );
         let stream = upstream.bytes_stream().map_err(|e| {
             std::io::Error::new(std::io::ErrorKind::Other, e)
         });

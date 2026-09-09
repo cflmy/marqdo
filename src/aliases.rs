@@ -87,6 +87,7 @@ pub fn canonical_param(builtin: &str, param: &str) -> String {
         ("host_dotenv_load" | "load_dotenv", "path" | "路径") => "path".into(),
         ("host_exec" | "exec", "cmd" | "命令") => "cmd".into(),
         ("host_exec" | "exec", "args" | "参数") => "args".into(),
+        ("host_exec" | "exec", "capture" | "捕获") => "capture".into(),
         (
             "host_stream_publish" | "stream_publish",
             "event" | "事件",

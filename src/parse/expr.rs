@@ -924,9 +924,12 @@ fn split_first_token(s: &str) -> (&str, &str) {
 }
 
 fn find_next_arg_boundary(after_eq: &str) -> usize {
-    // Look for ` <ident>=` pattern not inside backticks or quoted strings.
+    // Look for ` <ident>=` pattern not inside backticks, quoted strings, or
+    // JSON-ish `[…]` / `{…}` (GAP-07: `text=["a"] other=…`).
     let mut in_bt = false;
     let mut in_str = false;
+    let mut bracket_depth: i32 = 0;
+    let mut brace_depth: i32 = 0;
     let mut chars = after_eq.char_indices().peekable();
     while let Some((i, c)) = chars.next() {
         if in_str {
@@ -945,12 +948,34 @@ fn find_next_arg_boundary(after_eq: &str) -> usize {
             }
             continue;
         }
-        if c == '`' {
-            in_bt = true;
-            continue;
+        match c {
+            '`' => {
+                in_bt = true;
+                continue;
+            }
+            '"' => {
+                in_str = true;
+                continue;
+            }
+            '[' => {
+                bracket_depth += 1;
+                continue;
+            }
+            ']' => {
+                bracket_depth = bracket_depth.saturating_sub(1);
+                continue;
+            }
+            '{' => {
+                brace_depth += 1;
+                continue;
+            }
+            '}' => {
+                brace_depth = brace_depth.saturating_sub(1);
+                continue;
+            }
+            _ => {}
         }
-        if c == '"' {
-            in_str = true;
+        if bracket_depth > 0 || brace_depth > 0 {
             continue;
         }
         if c.is_whitespace() {

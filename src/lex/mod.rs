@@ -44,6 +44,8 @@ fn is_code_starter(c: char) -> bool {
 }
 
 /// `*` / `**` lines that are Marqdo executable (statement / return / else), not narrative Markdown.
+///
+/// Closing `*` / `**` must not be taken from inside `` `…` `` or `"…"` (GAP-06/07 nested markers).
 fn is_marqdo_star_line(trimmed: &str) -> bool {
     if trimmed == "*" || trimmed == "****" {
         return true;
@@ -52,14 +54,126 @@ fn is_marqdo_star_line(trimmed: &str) -> bool {
         if trimmed.trim() == "** **" {
             return true;
         }
-        if let Some(rest) = trimmed.strip_prefix("**") {
-            if let Some(pos) = rest.find("**") {
-                return rest[pos + 2..].trim().is_empty();
-            }
-        }
+        return matching_bold_close(trimmed).is_some();
+    }
+    if !trimmed.starts_with('*') || trimmed.len() < 2 {
         return false;
     }
-    trimmed.starts_with('*') && trimmed.ends_with('*') && trimmed.len() >= 2
+    matching_italic_close(trimmed).is_some()
+}
+
+/// Index of the closing `*` for a single-star statement, skipping strings and backticks.
+fn matching_italic_close(trimmed: &str) -> Option<usize> {
+    if trimmed.starts_with("**") {
+        return None;
+    }
+    let bytes = trimmed.as_bytes();
+    let mut i = 1usize; // skip opening *
+    let mut in_bt = false;
+    let mut in_str = false;
+    while i < bytes.len() {
+        let c = bytes[i];
+        if in_str {
+            if c == b'\\' && i + 1 < bytes.len() {
+                i += 2;
+                continue;
+            }
+            if c == b'"' {
+                in_str = false;
+            }
+            i += 1;
+            continue;
+        }
+        if in_bt {
+            if c == b'`' {
+                in_bt = false;
+            }
+            i += 1;
+            continue;
+        }
+        match c {
+            b'`' => {
+                in_bt = true;
+                i += 1;
+            }
+            b'"' => {
+                in_str = true;
+                i += 1;
+            }
+            b'*' => {
+                // Closing * must be the last non-ws on the line.
+                if trimmed[i + 1..].trim().is_empty() {
+                    return Some(i);
+                }
+                i += 1;
+            }
+            _ => i += 1,
+        }
+    }
+    None
+}
+
+/// Closing `**` for a bold return, skipping strings and backticks.
+fn matching_bold_close(trimmed: &str) -> Option<usize> {
+    let Some(rest) = trimmed.strip_prefix("**") else {
+        return None;
+    };
+    let bytes = rest.as_bytes();
+    let mut i = 0usize;
+    let mut in_bt = false;
+    let mut in_str = false;
+    while i + 1 < bytes.len() {
+        let c = bytes[i];
+        if in_str {
+            if c == b'\\' && i + 1 < bytes.len() {
+                i += 2;
+                continue;
+            }
+            if c == b'"' {
+                in_str = false;
+            }
+            i += 1;
+            continue;
+        }
+        if in_bt {
+            if c == b'`' {
+                in_bt = false;
+            }
+            i += 1;
+            continue;
+        }
+        match c {
+            b'`' => {
+                in_bt = true;
+                i += 1;
+            }
+            b'"' => {
+                in_str = true;
+                i += 1;
+            }
+            b'*' if bytes[i + 1] == b'*' => {
+                let after = i + 2;
+                if rest[after..].trim().is_empty() {
+                    // Position relative to full `trimmed` (after opening `**`).
+                    return Some(2 + i);
+                }
+                i += 2;
+            }
+            _ => i += 1,
+        }
+    }
+    None
+}
+
+/// Headings / calls / finished star lines should escape a narrative paragraph (GAP-06/07 recovery).
+fn breaks_comment_paragraph(trimmed: &str) -> bool {
+    if is_structural_code_line(trimmed) {
+        return true;
+    }
+    if trimmed.starts_with('#') || trimmed.starts_with('>') {
+        return true;
+    }
+    is_marqdo_star_line(trimmed)
 }
 
 /// Classify a single logical line (no trailing newline required).
@@ -141,7 +255,7 @@ pub fn classify_source(source: &str) -> Vec<ClassifiedLine> {
                     in_comment_paragraph = true;
                     LineKind::Comment
                 }
-                LineKind::Code if structural => {
+                LineKind::Code if structural || breaks_comment_paragraph(trimmed) => {
                     in_comment_paragraph = false;
                     LineKind::Code
                 }
@@ -298,14 +412,29 @@ mod tests {
     fn star_line_classification_is_star_terminated() {
         // A `*…*` Marqdo statement line must END with `*` to be treated as code.
         // If it accidentally ends with a backtick (e.g. `table="t"`), the line
-        // falls back to narrative Comment and swallows the following paragraph.
-        // Regression: `store.count` calls after a blank line were being dropped.
+        // falls back to narrative Comment — but later executable lines recover
+        // (GAP-06/07: do not swallow the rest of a `##` body).
         let star_term = "*c = > `store`.count table=\"t\"*";
         assert!(
             is_marqdo_star_line(star_term),
             "star-terminated assignment must be code"
         );
         assert_eq!(classify_line(star_term), LineKind::Code);
+
+        let nested_bt = "*code = > sys.exec cmd=\"python3\" args=`args`*";
+        assert!(
+            is_marqdo_star_line(nested_bt),
+            "args=`args`* must still be a star line"
+        );
+        let nested_json = "*args = > json.parse text=[\"scripts/legacy/web_search.py\"]*";
+        assert!(
+            is_marqdo_star_line(nested_json),
+            "text=[…] * must still be a star line"
+        );
+        assert!(
+            is_marqdo_star_line("*x = > f text=`a*b`*"),
+            "* inside backticks must not steal the closer"
+        );
 
         let backtick_term = "*c = > `store`.count table=\"t\"`";
         assert!(
@@ -314,9 +443,11 @@ mod tests {
         );
         assert_eq!(classify_line(backtick_term), LineKind::Comment);
 
-        // In paragraph context the misplaced line must not stay Code.
-        let src = "> `store`.insert table=t rows=`数据`\n\n*c = > `store`.count table=\"t\"`\n> print text=count1-done\n";
+        // Bad terminator → comment, but following `>` / `*…*` escape the paragraph.
+        let src = "> `store`.insert table=t rows=`数据`\n\n*c = > `store`.count table=\"t\"`\n> print text=count1-done\n*y = 1*\n";
         let lines = classify_source(src);
         assert_eq!(lines[2].kind, LineKind::Comment, "bad terminator → comment");
+        assert_eq!(lines[3].kind, LineKind::Code, "call recovers after bad line");
+        assert_eq!(lines[4].kind, LineKind::Code, "assign recovers after bad line");
     }
 }

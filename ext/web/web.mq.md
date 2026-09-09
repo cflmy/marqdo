@@ -671,7 +671,7 @@ Tables stay as data; `configure` assembles them. 配置即数据、装配即函�
     + `headers_from_env`=None
     + `timeout_ms`=120000
 
-Same-origin reverse proxy to an upstream HTTP(S) URL. When `stream` is True (default), the response body — including `text/event-stream` SSE — is piped without buffering the full payload. `upstream` may contain `$ENV` / `${ENV}`. `headers_from_env` is `ENV=Header-Name` (comma-separated); secrets stay on the server. Prefer this over a side Python LLM proxy.
+Same-origin reverse proxy to an upstream HTTP(S) URL. When `stream` is True (default), the response body — including `text/event-stream` SSE — is piped without buffering the full payload, and responses include `Cache-Control: no-cache, no-transform` plus `X-Accel-Buffering: no` for Nginx/CDN. `upstream` may contain `$ENV` / `${ENV}`. `headers_from_env` is `ENV=Header-Name` (comma-separated); secrets stay on the server. Prefer this over a side Python LLM proxy.
 
 **> web_app_proxy app=`self` path=`path` upstream=`upstream` stream=`stream` strip_prefix=`strip_prefix` methods=`methods` headers_from_env=`headers_from_env` timeout_ms=`timeout_ms`**
 

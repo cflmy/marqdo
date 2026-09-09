@@ -243,6 +243,9 @@ async fn invoke_handler(
 
     match route.return_mode.as_str() {
         "text" => {
+            if matches!(value, Value::Null) {
+                return err_json(StatusCode::INTERNAL_SERVER_ERROR, "null result");
+            }
             let text = match &value {
                 Value::String(s) => s.clone(),
                 other => other.to_string(),
@@ -257,16 +260,37 @@ async fn invoke_handler(
             )
                 .into_response()
         }
-        "status" => StatusCode::NO_CONTENT.into_response(),
-        _ => {
-            // Wrap non-objects so clients always get JSON object when possible.
-            let body = match value {
-                Value::Null => json!({ "ok": true }),
-                Value::Object(_) => value,
-                other => json!({ "ok": true, "result": other }),
-            };
-            JsonBody(body).into_response()
+        "status" => {
+            if matches!(value, Value::Null) {
+                return err_json(StatusCode::INTERNAL_SERVER_ERROR, "null result");
+            }
+            StatusCode::NO_CONTENT.into_response()
         }
+        _ => {
+            let body = match json_wrap_invoke_value(value) {
+                Ok((status, body)) => {
+                    let mut resp = JsonBody(body).into_response();
+                    *resp.status_mut() = status;
+                    resp
+                }
+                Err(resp) => resp,
+            };
+            body
+        }
+    }
+}
+
+/// Map host return value to invoke JSON. `Null` must not look like success (GAP-08).
+pub(crate) fn json_wrap_invoke_value(
+    value: Value,
+) -> Result<(StatusCode, Value), Response> {
+    match value {
+        Value::Null => Err(err_json(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "null result",
+        )),
+        Value::Object(_) => Ok((StatusCode::OK, value)),
+        other => Ok((StatusCode::OK, json!({ "ok": true, "result": other }))),
     }
 }
 
@@ -329,4 +353,21 @@ fn err_json(status: StatusCode, msg: &str) -> Response {
         JsonBody(json!({ "ok": false, "error": msg })),
     )
         .into_response()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn null_result_is_not_fake_ok() {
+        let err = json_wrap_invoke_value(Value::Null).expect_err("null must fail");
+        assert_eq!(err.status(), StatusCode::INTERNAL_SERVER_ERROR);
+        let ok = json_wrap_invoke_value(json!({ "hits": [] })).expect("object ok");
+        assert_eq!(ok.0, StatusCode::OK);
+        let wrap = json_wrap_invoke_value(json!(1)).expect("scalar wrap");
+        assert_eq!(wrap.0, StatusCode::OK);
+        assert_eq!(wrap.1["ok"], true);
+        assert_eq!(wrap.1["result"], 1);
+    }
 }
