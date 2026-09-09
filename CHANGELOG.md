@@ -3,6 +3,7 @@
 ## Unreleased
 
 ### Added
+- **中层标准库 Mid2 M8**：`lib/toml` / `配置表`（只读子集）、`lib/html` / `超文本`（escape/unescape）、`encoding` base32；金样与 public `15-toml-html-encoding`。设计 [stdlib-toml.md](doc/design/stdlib-toml.md) · [stdlib-html.md](doc/design/stdlib-html.md)。
 - **中层标准库 Mid2 M7**：`lib/datetime` / `日期时间`（`{unix,zone,iso}` · parse/format/add/in_zone）与 `lib/url` / `地址`（parse · query_parse/stringify）；金样与 public `14-datetime-url`。设计 [stdlib-datetime.md](doc/design/stdlib-datetime.md) · [stdlib-url.md](doc/design/stdlib-url.md)。
 - **文档**：中层标准库 Mid 之后缺口盘点与 Mid2（M7–M10）设计/路线——[stdlib-gaps-after-mid.md](doc/research/stdlib-gaps-after-mid.md) · [stdlib-mid2.md](doc/design/stdlib-mid2.md) · [stdlib-mid2.md](doc/roadmap/stdlib-mid2.md)。
 

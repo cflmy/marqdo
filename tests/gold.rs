@@ -1214,6 +1214,22 @@ fn lib_url_smoke_zh() {
 }
 
 #[test]
+fn lib_toml_html_encoding_smoke() {
+    assert_out(
+        "tests/lib/toml-html-encoding-smoke.mq.md",
+        "marqdo\n2\n1\na&lt;b&gt;&amp;&quot;c&#x27;\na<b>&\"c'\nNBSWY3DP\nhello",
+    );
+}
+
+#[test]
+fn lib_toml_html_encoding_smoke_zh() {
+    assert_out(
+        "tests/lib/配置表-超文本-编码-烟测.mq.md",
+        "中文\nTrue\na&lt;b&gt;\nNBUQ====",
+    );
+}
+
+#[test]
 fn lib_re_smoke() {
     assert_out(
         "tests/lib/re-smoke.mq.md",

@@ -53,6 +53,74 @@ pub fn hex_decode(text: &Value) -> Result<Value, String> {
     Ok(Value::Text(out))
 }
 
+const B32: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+
+pub fn base32_encode(text: &Value) -> Result<Value, String> {
+    let s = as_text(text, "text")?;
+    Ok(Value::Text(encode_base32(s.as_bytes())))
+}
+
+pub fn base32_decode(text: &Value) -> Result<Value, String> {
+    let s = as_text(text, "text")?;
+    let bytes = decode_base32(s)?;
+    let out = String::from_utf8(bytes).map_err(|e| format!("base32_decode: invalid utf-8: {e}"))?;
+    Ok(Value::Text(out))
+}
+
+fn encode_base32(input: &[u8]) -> String {
+    let mut out = String::new();
+    let mut buffer: u64 = 0;
+    let mut bits = 0u32;
+    for &b in input {
+        buffer = (buffer << 8) | (b as u64);
+        bits += 8;
+        while bits >= 5 {
+            bits -= 5;
+            let idx = ((buffer >> bits) & 31) as usize;
+            out.push(B32[idx] as char);
+        }
+    }
+    if bits > 0 {
+        let idx = ((buffer << (5 - bits)) & 31) as usize;
+        out.push(B32[idx] as char);
+    }
+    while out.len() % 8 != 0 {
+        out.push('=');
+    }
+    out
+}
+
+fn decode_base32(input: &str) -> Result<Vec<u8>, String> {
+    let cleaned: String = input
+        .chars()
+        .filter(|c| !c.is_whitespace())
+        .map(|c| c.to_ascii_uppercase())
+        .collect();
+    if cleaned.len() % 8 != 0 {
+        return Err("base32_decode: length must be multiple of 8".into());
+    }
+    let mut out = Vec::new();
+    let mut buffer: u64 = 0;
+    let mut bits = 0u32;
+    for c in cleaned.bytes() {
+        if c == b'=' {
+            break;
+        }
+        let v = match c {
+            b'A'..=b'Z' => c - b'A',
+            b'2'..=b'7' => c - b'2' + 26,
+            _ => return Err(format!("base32_decode: invalid character {:?}", c as char)),
+        } as u64;
+        buffer = (buffer << 5) | v;
+        bits += 5;
+        if bits >= 8 {
+            bits -= 8;
+            out.push(((buffer >> bits) & 0xff) as u8);
+        }
+    }
+    Ok(out)
+}
+
 fn from_hex(b: u8) -> Result<u8, String> {
     match b {
         b'0'..=b'9' => Ok(b - b'0'),
@@ -153,5 +221,8 @@ mod tests {
         let hx = hex_encode(&Value::Text("hi".into())).unwrap();
         assert_eq!(hx, Value::Text("6869".into()));
         assert_eq!(hex_decode(&hx).unwrap(), Value::Text("hi".into()));
+        let b32 = base32_encode(&Value::Text("hello".into())).unwrap();
+        assert_eq!(b32, Value::Text("NBSWY3DP".into()));
+        assert_eq!(base32_decode(&b32).unwrap(), Value::Text("hello".into()));
     }
 }

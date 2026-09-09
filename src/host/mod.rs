@@ -16,6 +16,7 @@ pub mod event_bus;
 pub mod foreign;
 mod fs;
 mod hash;
+mod html_ops;
 pub(crate) mod json;
 mod log;
 pub mod math;
@@ -24,6 +25,8 @@ mod path;
 mod re;
 mod secrets;
 mod text_ops;
+mod time;
+mod toml_ops;
 mod url_ops;
 mod uuid_ops;
 #[cfg(feature = "plugin-host")]
@@ -37,7 +40,6 @@ pub mod subtask;
 #[path = "subtask_stub.rs"]
 pub mod subtask;
 mod sys;
-mod time;
 pub mod writeback;
 
 pub use dispatch::{call_host, HostFn};

@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| 状态 | **Active · M7 已落地 · M8–M10 规划** |
+| 状态 | **Active · M7–M8 已落地 · M9–M10 规划** |
 | 日期 | 2026-09-09 |
 | 设计 | [stdlib-mid2.md](../design/stdlib-mid2.md) |
 | 缺口 | [stdlib-gaps-after-mid.md](../research/stdlib-gaps-after-mid.md) |
@@ -43,16 +43,16 @@ M10 收口糖（可选）    stats 薄 · log 字段 · （zip 默认跳过）
 | public | `14-datetime-url` · `14-日期时间地址` |
 | 设计 | [stdlib-datetime.md](../design/stdlib-datetime.md) · [stdlib-url.md](../design/stdlib-url.md) |
 
-### M8 — toml + html + encoding — **todo**
+### M8 — toml + html + encoding — **done**
 
 | 交付 | 说明 |
 |------|------|
-| `lib/toml` 只读 `parse` | 配置引导 |
-| `lib/html` `escape`/`unescape` | XSS 底线 |
+| `lib/toml` · `配置表` | 只读子集 `parse` |
+| `lib/html` · `超文本` | `escape` / `unescape` |
 | `encoding` base32 | RFC 4648 |
-| 金样 | `toml-smoke` · `html-escape-smoke` · `encoding-base32` |
-
-**刻意不做：** YAML；TOML stringify（可后期）。
+| 金样 | `toml-html-encoding-smoke`（中英） |
+| public | `15-toml-html-encoding` · `15-配置表超文本编码` |
+| 设计 | [stdlib-toml.md](../design/stdlib-toml.md) · [stdlib-html.md](../design/stdlib-html.md) |
 
 ### M9 — fs 加厚 — **todo**
 
@@ -74,7 +74,7 @@ M10 收口糖（可选）    stats 薄 · log 字段 · （zip 默认跳过）
 ## 2. 进度勾选
 
 - [x] M7 datetime + url  
-- [ ] M8 toml + html + base32  
+- [x] M8 toml + html + base32  
 - [ ] M9 fs 加厚  
 - [ ] M10 可选  
 - [ ] 研究文高优先级缺口 → closed  

@@ -3,8 +3,8 @@
 use std::collections::HashMap;
 
 use crate::host::{
-    cli, csv, datetime, encoding, fs, hash, json, log, math, net, path, re, secrets, sys, text_ops,
-    time, url_ops, uuid_ops, writeback, HostContext,
+    cli, csv, datetime, encoding, fs, hash, html_ops, json, log, math, net, path, re, secrets, sys,
+    text_ops, time, toml_ops, url_ops, uuid_ops, writeback, HostContext,
 };
 #[cfg(feature = "exec-host")]
 use crate::host::{foreign, subtask};
@@ -186,6 +186,11 @@ pub enum HostFn {
     UrlParse = 177,
     UrlQueryParse = 178,
     UrlQueryStringify = 179,
+    TomlParse = 180,
+    HtmlEscape = 181,
+    HtmlUnescape = 182,
+    EncodingBase32Encode = 183,
+    EncodingBase32Decode = 184,
 }
 
 
@@ -362,6 +367,11 @@ impl HostFn {
             177 => Self::UrlParse,
             178 => Self::UrlQueryParse,
             179 => Self::UrlQueryStringify,
+            180 => Self::TomlParse,
+            181 => Self::HtmlEscape,
+            182 => Self::HtmlUnescape,
+            183 => Self::EncodingBase32Encode,
+            184 => Self::EncodingBase32Decode,
             _ => return None,
         })
     }
@@ -541,6 +551,11 @@ impl HostFn {
             "host_url_parse" | "url_parse" => Self::UrlParse,
             "host_url_query_parse" | "url_query_parse" => Self::UrlQueryParse,
             "host_url_query_stringify" | "url_query_stringify" => Self::UrlQueryStringify,
+            "host_toml_parse" | "toml_parse" => Self::TomlParse,
+            "host_html_escape" | "html_escape" => Self::HtmlEscape,
+            "host_html_unescape" | "html_unescape" => Self::HtmlUnescape,
+            "host_encoding_base32_encode" | "encoding_base32_encode" => Self::EncodingBase32Encode,
+            "host_encoding_base32_decode" | "encoding_base32_decode" => Self::EncodingBase32Decode,
             _ => return None,
         })
     }
@@ -707,6 +722,11 @@ impl HostFn {
             Self::UrlParse => "host_url_parse",
             Self::UrlQueryParse => "host_url_query_parse",
             Self::UrlQueryStringify => "host_url_query_stringify",
+            Self::TomlParse => "host_toml_parse",
+            Self::HtmlEscape => "host_html_escape",
+            Self::HtmlUnescape => "host_html_unescape",
+            Self::EncodingBase32Encode => "host_encoding_base32_encode",
+            Self::EncodingBase32Decode => "host_encoding_base32_decode",
             Self::WritebackRecord => "host_writeback_record",
             Self::WritebackGet => "host_writeback_get",
             Self::WritebackClear => "host_writeback_clear",
@@ -799,7 +819,9 @@ impl HostFn {
             Self::EncodingBase64Encode
             | Self::EncodingBase64Decode
             | Self::EncodingHexEncode
-            | Self::EncodingHexDecode => &["text"],
+            | Self::EncodingHexDecode
+            | Self::EncodingBase32Encode
+            | Self::EncodingBase32Decode => &["text"],
             Self::PathJoin => &["a", "b"],
             Self::PathSplit
             | Self::PathFileName
@@ -838,6 +860,7 @@ impl HostFn {
             Self::DatetimeInZone => &["dt", "zone"],
             Self::UrlParse | Self::UrlQueryParse => &["text"],
             Self::UrlQueryStringify => &["map"],
+            Self::TomlParse | Self::HtmlEscape | Self::HtmlUnescape => &["text"],
             Self::WritebackRecord => &["value"],
             Self::WritebackGet | Self::WritebackClear => &[],
             Self::WritebackList => &[],
@@ -1263,6 +1286,11 @@ pub fn call_host(
         HostFn::EncodingBase64Decode => encoding::base64_decode(require(bound, "text")?),
         HostFn::EncodingHexEncode => encoding::hex_encode(require(bound, "text")?),
         HostFn::EncodingHexDecode => encoding::hex_decode(require(bound, "text")?),
+        HostFn::EncodingBase32Encode => encoding::base32_encode(require(bound, "text")?),
+        HostFn::EncodingBase32Decode => encoding::base32_decode(require(bound, "text")?),
+        HostFn::TomlParse => toml_ops::parse(require(bound, "text")?),
+        HostFn::HtmlEscape => html_ops::escape(require(bound, "text")?),
+        HostFn::HtmlUnescape => html_ops::unescape(require(bound, "text")?),
         HostFn::PathJoin => path::join(require(bound, "a")?, require(bound, "b")?),
         HostFn::PathSplit => path::split(require(bound, "path")?),
         HostFn::PathFileName => path::file_name(require(bound, "path")?),

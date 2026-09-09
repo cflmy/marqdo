@@ -17,7 +17,7 @@
 |--------|--------|--------|------|
 | 文本 | `lib/text.mq.md` | `lib/文本.mq.md` | 已有 + **Mid M4** 加厚 |
 | **正则** | `lib/re.mq.md` | `lib/正则.mq.md` | **Mid M1** |
-| **编解码** | `lib/encoding.mq.md` | `lib/编码.mq.md` | **Mid M1** |
+| **编解码** | `lib/encoding.mq.md` | `lib/编码.mq.md` | **Mid M1** + Mid2 M8 base32 |
 | **路径** | `lib/path.mq.md` | `lib/路径.mq.md` | **Mid M2** |
 | **哈希** | `lib/hash.mq.md` | `lib/哈希.mq.md` | **Mid M3** |
 | **机密** | `lib/secrets.mq.md` | `lib/机密.mq.md` | **Mid M3** |
@@ -28,6 +28,8 @@
 | **标识** | `lib/uuid.mq.md` | `lib/标识.mq.md` | **Mid M6** |
 | **日期时间** | `lib/datetime.mq.md` | `lib/日期时间.mq.md` | **Mid2 M7** |
 | **地址** | `lib/url.mq.md` | `lib/地址.mq.md` | **Mid2 M7** |
+| **配置表** | `lib/toml.mq.md` | `lib/配置表.mq.md` | **Mid2 M8** |
+| **超文本** | `lib/html.mq.md` | `lib/超文本.mq.md` | **Mid2 M8** |
 | 浏览器效应 | `lib/browser.mq.md` | `lib/浏览器.mq.md` | WASM 客户端效应助手（GFM + helpers；勿用 `json.set` 链） |
 | 文件 | `lib/fs.mq.md` | `lib/文件.mq.md` | 已有 + Mid M2：`copy_file` / `move` / `make_temp` |
 | 系统 | `lib/sys.mq.md` | `lib/系统.mq.md` | 已有（含 `load_dotenv`） |
@@ -44,7 +46,7 @@
 
 **中层已落地：** M1–M6（含 log / uuid）— 见 [stdlib-mid.md](stdlib-mid.md) · [stdlib-log-uuid.md](stdlib-log-uuid.md)。
 
-**Mid2：** **M7 done**（`datetime` · `url`）— [stdlib-datetime.md](stdlib-datetime.md) · [stdlib-url.md](stdlib-url.md)；M8+ 见 [stdlib-mid2.md](stdlib-mid2.md) · [stdlib-gaps-after-mid.md](../research/stdlib-gaps-after-mid.md)。
+**Mid2：** **M7–M8 done**（`datetime` · `url` · `toml` · `html` · base32）— [stdlib-datetime.md](stdlib-datetime.md) · [stdlib-url.md](stdlib-url.md) · [stdlib-toml.md](stdlib-toml.md) · [stdlib-html.md](stdlib-html.md)；M9+ 见 [stdlib-mid2.md](stdlib-mid2.md)。
 
 设计细节：[stdlib-writeback.md](stdlib-writeback.md) · [stdlib-subtask.md](stdlib-subtask.md)。
 
