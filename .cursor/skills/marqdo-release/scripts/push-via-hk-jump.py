@@ -182,14 +182,11 @@ def run_with_proxy(proxy: str, argv: list[str]) -> int:
         "all_proxy",
     ):
         env.pop(k, None)
-    env["http_proxy"] = proxy
-    env["https_proxy"] = proxy
-    env["HTTP_PROXY"] = proxy
-    env["HTTPS_PROXY"] = proxy
 
     cmd = list(argv)
     if cmd and cmd[0] == "git":
         # Prefer http.extraHeader over GIT_ASKPASS (askpass has hung under agent/no TTY).
+        # Do not also set env http_proxy for git — only -c (avoids double-proxy quirks).
         auth = github_basic_auth_header()
         cmd = [
             "git",
@@ -207,16 +204,20 @@ def run_with_proxy(proxy: str, argv: list[str]) -> int:
             "http.postBuffer=524288000",
             *cmd[1:],
         ]
-        # Do not print the Authorization header.
         print(
             "+",
             " ".join(
-                c if not c.startswith("http.extraHeader=") else "http.extraHeader=<redacted>"
+                c if not str(c).startswith("http.extraHeader=") else "http.extraHeader=<redacted>"
                 for c in cmd
             ),
             flush=True,
         )
         return subprocess.call(cmd, cwd=ROOT, env=env)
+
+    env["http_proxy"] = proxy
+    env["https_proxy"] = proxy
+    env["HTTP_PROXY"] = proxy
+    env["HTTPS_PROXY"] = proxy
 
     if cmd and cmd[0] == "gh" and not env.get("GH_TOKEN"):
         tok = github_token()
