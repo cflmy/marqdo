@@ -3,6 +3,25 @@
 ## Unreleased
 
 ### Added
+
+### Fixed
+
+### Changed
+
+## v0.3.8 — 2026-09-09
+
+### Highlights
+
+**中层标准库 Mid2（M7–M10）收口**：日历/时区、URL、TOML、HTML 转义、base32、实用 fs、薄统计与日志字段——日常脚本与工具配置不再依赖外联或插件。另修复嵌套插件调用后 `GLOBAL_HOST` 被清空导致 `invoke` 失败。
+
+```bash
+git checkout v0.3.8
+# 或下载 Release 的 exe / zip
+marqdo run public/features/14-datetime-url.mq.md
+marqdo run public/features/17-stats-log.mq.md
+```
+
+### Added
 - **中层标准库 Mid2 M10**：`lib/stats` / `统计`（mean/median/stdev）与 `log`/`日志` 可选 `fields=`；金样与 public `17-stats-log`。**Mid2 M7–M10 收口**（zip 跳过）。设计 [stdlib-stats-log.md](doc/design/stdlib-stats-log.md)。
 - **中层标准库 Mid2 M9**：`fs.make_dirs` / `remove_tree` / `stat` / `walk`（中英）；金样与 public `16-fs-mid2`。设计 [stdlib-fs-mid2.md](doc/design/stdlib-fs-mid2.md)。
 - **中层标准库 Mid2 M8**：`lib/toml` / `配置表`（只读子集）、`lib/html` / `超文本`（escape/unescape）、`encoding` base32；金样与 public `15-toml-html-encoding`。设计 [stdlib-toml.md](doc/design/stdlib-toml.md) · [stdlib-html.md](doc/design/stdlib-html.md)。
@@ -13,6 +32,7 @@
 - **`host_query` / GLOBAL_HOST**：嵌套 `call_registered` 结束后恢复外层宿主指针，不再清空；`web_listen` 多轮 `invoke`（中间再调插件）不再报 `no active host context`。
 
 ### Changed
+
 
 ## v0.3.7 — 2026-09-07
 

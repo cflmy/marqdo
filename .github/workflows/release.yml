@@ -113,9 +113,10 @@ jobs:
             ## Marqdo ${{ github.ref_name }}
 
             ### 亮点 / Highlights
-            - **宿主 H1–H4**：`app.proxy` 同域 SSE 中继 · `app.invoke` HTTP→`##` · MCP Server stdio · 跨模块 db
-            - **Hosting H1–H4**: same-origin SSE proxy, HTTP→user `##`, MCP stdio server, cross-module db methods
-            - Details: [CHANGELOG](https://github.com/cflmy/marqdo/blob/main/CHANGELOG.md) · [ext-hosting.md](https://github.com/cflmy/marqdo/blob/main/doc/roadmap/ext-hosting.md)
+            - **中层标准库 Mid2**：datetime/url · toml/html/base32 · fs++ · stats/log.fields（M7–M10）
+            - **Mid2 stdlib**: calendar/URL, TOML/HTML/base32, thicker fs, thin stats + log fields
+            - **修复**：嵌套插件调用后恢复 `GLOBAL_HOST`（listen/invoke）
+            - Details: [CHANGELOG](https://github.com/cflmy/marqdo/blob/main/CHANGELOG.md) · [stdlib-mid2.md](https://github.com/cflmy/marqdo/blob/main/doc/roadmap/stdlib-mid2.md)
 
             ### Downloads
 
