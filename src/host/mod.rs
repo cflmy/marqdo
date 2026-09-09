@@ -24,6 +24,7 @@ mod net;
 mod path;
 mod re;
 mod secrets;
+mod stats;
 mod text_ops;
 mod time;
 mod toml_ops;

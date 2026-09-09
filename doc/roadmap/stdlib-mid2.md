@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| 状态 | **Active · M7–M9 已落地 · M10 可选** |
+| 状态 | **Completed · M7–M10 已落地（zip 跳过）** |
 | 日期 | 2026-09-09 |
 | 设计 | [stdlib-mid2.md](../design/stdlib-mid2.md) |
 | 缺口 | [stdlib-gaps-after-mid.md](../research/stdlib-gaps-after-mid.md) |
@@ -62,13 +62,16 @@ M10 收口糖（可选）    stats 薄 · log 字段 · （zip 默认跳过）
 | 金样 | `fs-mid2-smoke`（中英） |
 | public | `16-fs-mid2` · `16-文件mid2` |
 
-### M10 — 可选收口 — **todo**
+### M10 — 可选收口 — **done**（zip 跳过）
 
 | 交付 | 说明 |
 |------|------|
-| `stats` 或 `math` 均值/中位数 | 薄 |
-| `log` 可选 `fields=` | 非远程 sink |
-| zip | **默认跳过** |
+| `lib/stats` · `统计` | mean / median / sample stdev |
+| `log` `fields=` | 行尾 `key=val` |
+| zip | **跳过** |
+| 金样 | `stats-log-smoke`（中英） |
+| public | `17-stats-log` · `17-统计日志` |
+| 设计 | [stdlib-stats-log.md](../design/stdlib-stats-log.md) |
 
 ---
 
@@ -77,9 +80,9 @@ M10 收口糖（可选）    stats 薄 · log 字段 · （zip 默认跳过）
 - [x] M7 datetime + url  
 - [x] M8 toml + html + base32  
 - [x] M9 fs 加厚  
-- [ ] M10 可选  
-- [ ] 研究文高优先级缺口 → closed  
-- [ ] `stdlib-modules.md` / `stdlib.md` 状态同步  
+- [x] M10 可选（zip 跳过）  
+- [x] 研究文高优先级缺口 → closed（M7–M9；M10 为收口糖）  
+- [x] `stdlib-modules.md` / `stdlib.md` 状态同步  
 
 ---
 

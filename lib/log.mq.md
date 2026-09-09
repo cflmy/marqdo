@@ -1,6 +1,6 @@
 ---
 title: lib/log
-description: Level-filtered one-line logs (Mid M6). Default level info.
+description: Level-filtered one-line logs (Mid M6 + Mid2 M10 fields). Default level info.
 ---
 
 ## set_level
@@ -12,8 +12,9 @@ level is debug / info / warn / error.
 
 ## debug
     + `text`
+    + `fields`=None
 
-*line = > host_log_line level="debug" text=`text`*
+*line = > host_log_line level="debug" text=`text` fields=`fields`*
 1. `line`
   > print text=`line`
 2. *
@@ -21,8 +22,9 @@ level is debug / info / warn / error.
 
 ## info
     + `text`
+    + `fields`=None
 
-*line = > host_log_line level="info" text=`text`*
+*line = > host_log_line level="info" text=`text` fields=`fields`*
 1. `line`
   > print text=`line`
 2. *
@@ -30,8 +32,9 @@ level is debug / info / warn / error.
 
 ## warn
     + `text`
+    + `fields`=None
 
-*line = > host_log_line level="warn" text=`text`*
+*line = > host_log_line level="warn" text=`text` fields=`fields`*
 1. `line`
   > print text=`line`
 2. *
@@ -39,8 +42,9 @@ level is debug / info / warn / error.
 
 ## error
     + `text`
+    + `fields`=None
 
-*line = > host_log_line level="error" text=`text`*
+*line = > host_log_line level="error" text=`text` fields=`fields`*
 1. `line`
   > print text=`line`
 2. *

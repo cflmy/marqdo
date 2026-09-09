@@ -24,12 +24,13 @@
 | **逗号表** | `lib/csv.mq.md` | `lib/逗号表.mq.md` | **Mid M4** |
 | 表 | `lib/table.mq.md` | `lib/表.mq.md` | 已有 + Mid M4/M5：`sort`/`unique`/`zip`/… |
 | **命令行** | `lib/cli.mq.md` | `lib/命令行.mq.md` | **Mid M5** |
-| **日志** | `lib/log.mq.md` | `lib/日志.mq.md` | **Mid M6** |
+| **日志** | `lib/log.mq.md` | `lib/日志.mq.md` | **Mid M6** + Mid2 M10 `fields=` |
 | **标识** | `lib/uuid.mq.md` | `lib/标识.mq.md` | **Mid M6** |
 | **日期时间** | `lib/datetime.mq.md` | `lib/日期时间.mq.md` | **Mid2 M7** |
 | **地址** | `lib/url.mq.md` | `lib/地址.mq.md` | **Mid2 M7** |
 | **配置表** | `lib/toml.mq.md` | `lib/配置表.mq.md` | **Mid2 M8** |
 | **超文本** | `lib/html.mq.md` | `lib/超文本.mq.md` | **Mid2 M8** |
+| **统计** | `lib/stats.mq.md` | `lib/统计.mq.md` | **Mid2 M10** |
 | 浏览器效应 | `lib/browser.mq.md` | `lib/浏览器.mq.md` | WASM 客户端效应助手（GFM + helpers；勿用 `json.set` 链） |
 | 文件 | `lib/fs.mq.md` | `lib/文件.mq.md` | 已有 + Mid M2 + **Mid2 M9**：`make_dirs` / `remove_tree` / `stat` / `walk` |
 | 系统 | `lib/sys.mq.md` | `lib/系统.mq.md` | 已有（含 `load_dotenv`） |
@@ -46,7 +47,7 @@
 
 **中层已落地：** M1–M6（含 log / uuid）— 见 [stdlib-mid.md](stdlib-mid.md) · [stdlib-log-uuid.md](stdlib-log-uuid.md)。
 
-**Mid2：** **M7–M9 done**（datetime / url / toml / html / base32 / fs++）— [stdlib-datetime.md](stdlib-datetime.md) · [stdlib-url.md](stdlib-url.md) · [stdlib-toml.md](stdlib-toml.md) · [stdlib-html.md](stdlib-html.md) · [stdlib-fs-mid2.md](stdlib-fs-mid2.md)；M10 见 [stdlib-mid2.md](stdlib-mid2.md)。
+**Mid2：** **M7–M10 done**（datetime / url / toml / html / base32 / fs++ / stats / log.fields；zip 跳过）— [stdlib-mid2.md](stdlib-mid2.md) · [stdlib-stats-log.md](stdlib-stats-log.md)。
 
 设计细节：[stdlib-writeback.md](stdlib-writeback.md) · [stdlib-subtask.md](stdlib-subtask.md)。
 

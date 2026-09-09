@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| 状态 | **Draft · M7–M9 已落地；M10 可选** |
+| 状态 | **Accepted · M7–M10 已落地（zip 跳过）** |
 | 日期 | 2026-09-09 |
 | 缺口盘点 | [stdlib-gaps-after-mid.md](../research/stdlib-gaps-after-mid.md) |
 | 路线图 | [stdlib-mid2.md](../roadmap/stdlib-mid2.md) |

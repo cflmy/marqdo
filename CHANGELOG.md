@@ -3,6 +3,7 @@
 ## Unreleased
 
 ### Added
+- **中层标准库 Mid2 M10**：`lib/stats` / `统计`（mean/median/stdev）与 `log`/`日志` 可选 `fields=`；金样与 public `17-stats-log`。**Mid2 M7–M10 收口**（zip 跳过）。设计 [stdlib-stats-log.md](doc/design/stdlib-stats-log.md)。
 - **中层标准库 Mid2 M9**：`fs.make_dirs` / `remove_tree` / `stat` / `walk`（中英）；金样与 public `16-fs-mid2`。设计 [stdlib-fs-mid2.md](doc/design/stdlib-fs-mid2.md)。
 - **中层标准库 Mid2 M8**：`lib/toml` / `配置表`（只读子集）、`lib/html` / `超文本`（escape/unescape）、`encoding` base32；金样与 public `15-toml-html-encoding`。设计 [stdlib-toml.md](doc/design/stdlib-toml.md) · [stdlib-html.md](doc/design/stdlib-html.md)。
 - **中层标准库 Mid2 M7**：`lib/datetime` / `日期时间`（`{unix,zone,iso}` · parse/format/add/in_zone）与 `lib/url` / `地址`（parse · query_parse/stringify）；金样与 public `14-datetime-url`。设计 [stdlib-datetime.md](doc/design/stdlib-datetime.md) · [stdlib-url.md](doc/design/stdlib-url.md)。

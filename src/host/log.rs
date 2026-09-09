@@ -46,13 +46,32 @@ pub fn set_level(ctx: &mut HostContext, level: &Value) -> Result<Value, String> 
 }
 
 /// Return a ready-to-print line, or `None` if filtered out.
-pub fn line(ctx: &HostContext, level: &Value, text: &Value) -> Result<Value, String> {
+/// Optional `fields` map is appended as `key=value` pairs (stable map order).
+pub fn line(
+    ctx: &HostContext,
+    level: &Value,
+    text: &Value,
+    fields: Option<&Value>,
+) -> Result<Value, String> {
     let lvl = Level::parse(as_text(level, "level")?)?;
     let msg = as_text(text, "text")?;
     if (lvl as u8) < ctx.log_min_level {
         return Ok(Value::None);
     }
-    Ok(Value::Text(format!("{} {}", lvl.label(), msg)))
+    let mut out = format!("{} {}", lvl.label(), msg);
+    match fields {
+        None | Some(Value::None) => {}
+        Some(Value::Map(entries)) => {
+            for (k, v) in entries {
+                out.push(' ');
+                out.push_str(k);
+                out.push('=');
+                out.push_str(&v.as_display());
+            }
+        }
+        Some(_) => return Err("log: fields must be a map".into()),
+    }
+    Ok(Value::Text(out))
 }
 
 #[cfg(test)]
@@ -67,6 +86,7 @@ mod tests {
             &ctx,
             &Value::Text("debug".into()),
             &Value::Text("x".into()),
+            None,
         )
         .unwrap();
         assert_eq!(filtered, Value::None);
@@ -75,8 +95,20 @@ mod tests {
             &ctx,
             &Value::Text("debug".into()),
             &Value::Text("x".into()),
+            None,
         )
         .unwrap();
         assert_eq!(shown, Value::Text("DEBUG x".into()));
+        let with = line(
+            &ctx,
+            &Value::Text("info".into()),
+            &Value::Text("hi".into()),
+            Some(&Value::Map(vec![
+                ("user".into(), Value::Text("a".into())),
+                ("n".into(), Value::Int(1)),
+            ])),
+        )
+        .unwrap();
+        assert_eq!(with, Value::Text("INFO hi user=a n=1".into()));
     }
 }

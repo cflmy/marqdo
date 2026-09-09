@@ -1243,6 +1243,22 @@ fn lib_fs_mid2_smoke_zh() {
 }
 
 #[test]
+fn lib_stats_log_smoke() {
+    assert_out(
+        "tests/lib/stats-log-smoke.mq.md",
+        "2.5\n2.5\n1.2909944487\nINFO hi user=alice n=3",
+    );
+}
+
+#[test]
+fn lib_stats_log_smoke_zh() {
+    assert_out(
+        "tests/lib/统计-日志-烟测.mq.md",
+        "3\nINFO 你好 谁=甲 n=1",
+    );
+}
+
+#[test]
 fn lib_re_smoke() {
     assert_out(
         "tests/lib/re-smoke.mq.md",

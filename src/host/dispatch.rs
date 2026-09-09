@@ -3,8 +3,8 @@
 use std::collections::HashMap;
 
 use crate::host::{
-    cli, csv, datetime, encoding, fs, hash, html_ops, json, log, math, net, path, re, secrets, sys,
-    text_ops, time, toml_ops, url_ops, uuid_ops, writeback, HostContext,
+    cli, csv, datetime, encoding, fs, hash, html_ops, json, log, math, net, path, re, secrets, stats,
+    sys, text_ops, time, toml_ops, url_ops, uuid_ops, writeback, HostContext,
 };
 #[cfg(feature = "exec-host")]
 use crate::host::{foreign, subtask};
@@ -195,6 +195,9 @@ pub enum HostFn {
     FsRemoveTree = 186,
     FsStat = 187,
     FsWalk = 188,
+    StatsMean = 189,
+    StatsMedian = 190,
+    StatsStdev = 191,
 }
 
 
@@ -380,6 +383,9 @@ impl HostFn {
             186 => Self::FsRemoveTree,
             187 => Self::FsStat,
             188 => Self::FsWalk,
+            189 => Self::StatsMean,
+            190 => Self::StatsMedian,
+            191 => Self::StatsStdev,
             _ => return None,
         })
     }
@@ -568,6 +574,9 @@ impl HostFn {
             "host_remove_tree" | "remove_tree" => Self::FsRemoveTree,
             "host_stat" | "stat" => Self::FsStat,
             "host_walk" | "walk" => Self::FsWalk,
+            "host_stats_mean" | "stats_mean" => Self::StatsMean,
+            "host_stats_median" | "stats_median" => Self::StatsMedian,
+            "host_stats_stdev" | "stats_stdev" => Self::StatsStdev,
             _ => return None,
         })
     }
@@ -743,6 +752,9 @@ impl HostFn {
             Self::FsRemoveTree => "host_remove_tree",
             Self::FsStat => "host_stat",
             Self::FsWalk => "host_walk",
+            Self::StatsMean => "host_stats_mean",
+            Self::StatsMedian => "host_stats_median",
+            Self::StatsStdev => "host_stats_stdev",
             Self::WritebackRecord => "host_writeback_record",
             Self::WritebackGet => "host_writeback_get",
             Self::WritebackClear => "host_writeback_clear",
@@ -867,6 +879,7 @@ impl HostFn {
             Self::LogSetLevel => &["level"],
             Self::LogLine => &["level", "text"],
             Self::UuidV4 => &[],
+            Self::StatsMean | Self::StatsMedian | Self::StatsStdev => &["list"],
             Self::DatetimeNow => &[],
             Self::DatetimeFromUnix => &["unix"],
             Self::DatetimeToUnix => &["dt"],
@@ -920,6 +933,7 @@ impl HostFn {
             Self::DatetimeParse => &["pattern"],
             Self::DatetimeFormat => &["style"],
             Self::DatetimeAdd => &["days", "hours", "minutes", "seconds"],
+            Self::LogLine => &["fields"],
             _ => &[],
         }
     }
@@ -1372,7 +1386,15 @@ pub fn call_host(
         HostFn::ListFlatten => super::collection::list_flatten(require(bound, "list")?),
         HostFn::CliParse => cli::parse(ctx, bound.get("args")),
         HostFn::LogSetLevel => log::set_level(ctx, require(bound, "level")?),
-        HostFn::LogLine => log::line(ctx, require(bound, "level")?, require(bound, "text")?),
+        HostFn::LogLine => log::line(
+            ctx,
+            require(bound, "level")?,
+            require(bound, "text")?,
+            bound.get("fields"),
+        ),
+        HostFn::StatsMean => stats::mean(require(bound, "list")?),
+        HostFn::StatsMedian => stats::median(require(bound, "list")?),
+        HostFn::StatsStdev => stats::stdev(require(bound, "list")?),
         HostFn::UuidV4 => uuid_ops::v4(),
         HostFn::DatetimeNow => datetime::now(),
         HostFn::DatetimeFromUnix => {
