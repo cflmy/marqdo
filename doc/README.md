@@ -32,6 +32,11 @@
 | [design/stdlib.md](design/stdlib.md) | **标准库：内置 + `lib/` + 错误约定** |
 | [design/stdlib-i18n.md](design/stdlib-i18n.md) | **标准库中英命名：靠库文件名区分，无 lang 开关** |
 | [design/stdlib-modules.md](design/stdlib-modules.md) | **L1：文件/系统/时间/JSON/网络/数学/外联/插件** |
+| [design/stdlib-mid.md](design/stdlib-mid.md) | **中层 Mid M1–M6（已落地）** |
+| [design/stdlib-mid2.md](design/stdlib-mid2.md) | **中层 Mid2：datetime / url / toml / html / fs++** |
+| [research/stdlib-gaps-after-mid.md](research/stdlib-gaps-after-mid.md) | **Mid 之后缺口盘点**（对照 Python/Go） |
+| [roadmap/stdlib-mid.md](roadmap/stdlib-mid.md) | **Mid M1–M6 路线（done）** |
+| [roadmap/stdlib-mid2.md](roadmap/stdlib-mid2.md) | **Mid2 M7–M10 路线（规划）** |
 | [design/stdlib-math.md](design/stdlib-math.md) | **数学库（数值/随机/作图/轻量求解）** |
 | [design/stdlib-foreign.md](design/stdlib-foreign.md) | **外联胶水（\`\`\`lang 具名块）— 已落地** |
 | [design/ext-abi.md](design/ext-abi.md) | **原生插件 C ABI v1**（`lib/plugin`） |

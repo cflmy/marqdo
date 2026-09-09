@@ -4,7 +4,7 @@
 |---|---|
 | 状态 | **M1–M6 已落地** |
 | 日期 | 2026-09-07 |
-| 相关 | [stdlib.md](stdlib.md) · [stdlib-modules.md](stdlib-modules.md) · [ext-abi.md](ext-abi.md) · [roadmap/stdlib-mid.md](../roadmap/stdlib-mid.md) |
+| 相关 | [stdlib.md](stdlib.md) · [stdlib-modules.md](stdlib-modules.md) · [ext-abi.md](ext-abi.md) · [roadmap/stdlib-mid.md](../roadmap/stdlib-mid.md) · **后续** [stdlib-mid2.md](stdlib-mid2.md) · [stdlib-gaps-after-mid.md](../research/stdlib-gaps-after-mid.md) |
 | 目标 | 在接下来数个发版周期内，把「通用编程」能力沉到 **L0.5 宿主 + L1 `.mq.md`**，减少「凡是稍有能力就必须 ABI 插件」的路径依赖 |
 
 ---
@@ -123,10 +123,12 @@ OS / 算法库（精选 crate，默认 features 最小化）
 | **M3** | `hash` / `哈希` · `secrets` / `机密` | sha256 / hmac；token | **done** |
 | **M4** | `csv` / `逗号表` · `text` 加厚 | parse / stringify；contains / replace | **done** |
 | **M5** | `table` 加厚 · `cli` / `命令行` | sort / zip；flags | **done** |
-| **M6** | `log` / `日志` · `uuid` / `标识` | level 日志；v4 | 薄 host 或纯 mq |
-| **可选** | `yaml` / `Toml` | 仅当 public/catalog 强需求 | 慎入 |
+| **M6** | `log` / `日志` · `uuid` / `标识` | level 日志；v4 | **done** |
+| **可选（Mid1）** | `yaml` | 默认 **不做** | 见 Mid2：优先 TOML |
 
-**刻意延后：** 完整 `datetime` 时区库、连接池、异步 runtime、模板引擎、完整 `collections` 类型系统——等中层前几波用起来再议。
+**Mid1 刻意延后、现已升格到 Mid2：** 日历/时区、URL 解析 —— 见 [stdlib-mid2.md](stdlib-mid2.md) · [stdlib-gaps-after-mid.md](../research/stdlib-gaps-after-mid.md)。
+
+**仍不准入 Mid：** 连接池、异步 runtime、模板引擎、完整 `collections` 类型系统、HTTP 服务端 / SQLite（`ext/`）。
 
 ---
 

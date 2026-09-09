@@ -2,9 +2,10 @@
 
 | | |
 |---|---|
-| 状态 | **M1–M6 已落地** |
+| 状态 | **M1–M6 已落地**（收口） |
 | 日期 | 2026-09-07 |
 | 设计 | [stdlib-mid.md](../design/stdlib-mid.md) |
+| 后续 | [stdlib-mid2.md](stdlib-mid2.md) · [stdlib-gaps-after-mid.md](../research/stdlib-gaps-after-mid.md) |
 | 相关 | [stdlib-modules.md](../design/stdlib-modules.md) · [next-phase.md](next-phase.md) · [ext-cli.md](../design/ext-cli.md) |
 
 > **不预标 SemVer。** 每一波随当时产品发版合入；下文用 **M1…M6** 波次名。每波须可单独演示、可回滚。

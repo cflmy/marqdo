@@ -2,10 +2,10 @@
 
 | | |
 |---|---|
-| 状态 | **核心已落地**；**中层 Mid：M1–M6 已落地** · [stdlib-mid.md](stdlib-mid.md) / [roadmap/stdlib-mid.md](../roadmap/stdlib-mid.md) |
-| 日期 | 2026-09-07 |
+| 状态 | **核心已落地**；**Mid M1–M6 已落地**；**Mid2 规划中** · [stdlib-mid2.md](stdlib-mid2.md) / [roadmap/stdlib-mid2.md](../roadmap/stdlib-mid2.md) |
+| 日期 | 2026-09-08 |
 | 原则 | 全部经 frontmatter **导入**；除 JSON 外中英分文件；内核保持少而精；**通用能力优先 Mid，插件留给领域核** |
-| 相关 | [stdlib.md](stdlib.md) · [stdlib-i18n.md](stdlib-i18n.md) · [stdlib-mid.md](stdlib-mid.md) · [ext-abi.md](ext-abi.md) · [ext-llm.md](ext-llm.md) · [ext-agent.md](ext-agent.md) · [**module-namespace.md**](module-namespace.md)（导入命名空间；**M1/M2 已落地**：`库.成员` / `库.对象.成员` / `use`） |
+| 相关 | [stdlib.md](stdlib.md) · [stdlib-i18n.md](stdlib-i18n.md) · [stdlib-mid.md](stdlib-mid.md) · [stdlib-mid2.md](stdlib-mid2.md) · [stdlib-gaps-after-mid.md](../research/stdlib-gaps-after-mid.md) · [ext-abi.md](ext-abi.md) · [ext-llm.md](ext-llm.md) · [ext-agent.md](ext-agent.md) · [**module-namespace.md**](module-namespace.md)（导入命名空间；**M1/M2 已落地**：`库.成员` / `库.对象.成员` / `use`） |
 
 ---
 
@@ -41,6 +41,8 @@
 官方可选扩展（**非** stdlib）：`ext/llm` · `ext/agent` · `ext/web` · `ext/quantum` · `ext/linalg` — 见各 `ext-*.md`。
 
 **中层已落地：** M1–M6（含 log / uuid）— 见 [stdlib-mid.md](stdlib-mid.md) · [stdlib-log-uuid.md](stdlib-log-uuid.md)。
+
+**下一波 Mid2（规划，未进表）：** `datetime` · `url` · `toml`（只读）· `html.escape` · `fs` 再厚 — [stdlib-mid2.md](stdlib-mid2.md) · [stdlib-gaps-after-mid.md](../research/stdlib-gaps-after-mid.md)。
 
 设计细节：[stdlib-writeback.md](stdlib-writeback.md) · [stdlib-subtask.md](stdlib-subtask.md)。
 

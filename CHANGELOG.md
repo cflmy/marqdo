@@ -3,6 +3,7 @@
 ## Unreleased
 
 ### Added
+- **文档**：中层标准库 Mid 之后缺口盘点与 Mid2（M7–M10）设计/路线——[stdlib-gaps-after-mid.md](doc/research/stdlib-gaps-after-mid.md) · [stdlib-mid2.md](doc/design/stdlib-mid2.md) · [stdlib-mid2.md](doc/roadmap/stdlib-mid2.md)。
 
 ### Fixed
 - **`host_query` / GLOBAL_HOST**：嵌套 `call_registered` 结束后恢复外层宿主指针，不再清空；`web_listen` 多轮 `invoke`（中间再调插件）不再报 `no active host context`。
