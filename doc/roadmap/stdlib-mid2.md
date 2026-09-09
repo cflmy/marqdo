@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| 状态 | **Active · M7–M8 已落地 · M9–M10 规划** |
+| 状态 | **Active · M7–M9 已落地 · M10 可选** |
 | 日期 | 2026-09-09 |
 | 设计 | [stdlib-mid2.md](../design/stdlib-mid2.md) |
 | 缺口 | [stdlib-gaps-after-mid.md](../research/stdlib-gaps-after-mid.md) |
@@ -54,12 +54,13 @@ M10 收口糖（可选）    stats 薄 · log 字段 · （zip 默认跳过）
 | public | `15-toml-html-encoding` · `15-配置表超文本编码` |
 | 设计 | [stdlib-toml.md](../design/stdlib-toml.md) · [stdlib-html.md](../design/stdlib-html.md) |
 
-### M9 — fs 加厚 — **todo**
+### M9 — fs 加厚 — **done**
 
 | 交付 | 说明 |
 |------|------|
-| `make_dirs` / `remove_tree` / `stat` / `walk` | 见设计文 |
-| 金样 | `fs-mid2-smoke` |
+| `make_dirs` / `remove_tree` / `stat` / `walk` | 见 [stdlib-fs-mid2.md](../design/stdlib-fs-mid2.md) |
+| 金样 | `fs-mid2-smoke`（中英） |
+| public | `16-fs-mid2` · `16-文件mid2` |
 
 ### M10 — 可选收口 — **todo**
 
@@ -75,7 +76,7 @@ M10 收口糖（可选）    stats 薄 · log 字段 · （zip 默认跳过）
 
 - [x] M7 datetime + url  
 - [x] M8 toml + html + base32  
-- [ ] M9 fs 加厚  
+- [x] M9 fs 加厚  
 - [ ] M10 可选  
 - [ ] 研究文高优先级缺口 → closed  
 - [ ] `stdlib-modules.md` / `stdlib.md` 状态同步  

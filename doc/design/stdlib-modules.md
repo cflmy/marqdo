@@ -31,7 +31,7 @@
 | **配置表** | `lib/toml.mq.md` | `lib/配置表.mq.md` | **Mid2 M8** |
 | **超文本** | `lib/html.mq.md` | `lib/超文本.mq.md` | **Mid2 M8** |
 | 浏览器效应 | `lib/browser.mq.md` | `lib/浏览器.mq.md` | WASM 客户端效应助手（GFM + helpers；勿用 `json.set` 链） |
-| 文件 | `lib/fs.mq.md` | `lib/文件.mq.md` | 已有 + Mid M2：`copy_file` / `move` / `make_temp` |
+| 文件 | `lib/fs.mq.md` | `lib/文件.mq.md` | 已有 + Mid M2 + **Mid2 M9**：`make_dirs` / `remove_tree` / `stat` / `walk` |
 | 系统 | `lib/sys.mq.md` | `lib/系统.mq.md` | 已有（含 `load_dotenv`） |
 | 时间 | `lib/time.mq.md` | `lib/时间.mq.md` | 已有 |
 | JSON | `lib/json.mq.md` | **同文件** | **仅** parse / stringify / quote；集合请用 table / GFM |
@@ -46,7 +46,7 @@
 
 **中层已落地：** M1–M6（含 log / uuid）— 见 [stdlib-mid.md](stdlib-mid.md) · [stdlib-log-uuid.md](stdlib-log-uuid.md)。
 
-**Mid2：** **M7–M8 done**（`datetime` · `url` · `toml` · `html` · base32）— [stdlib-datetime.md](stdlib-datetime.md) · [stdlib-url.md](stdlib-url.md) · [stdlib-toml.md](stdlib-toml.md) · [stdlib-html.md](stdlib-html.md)；M9+ 见 [stdlib-mid2.md](stdlib-mid2.md)。
+**Mid2：** **M7–M9 done**（datetime / url / toml / html / base32 / fs++）— [stdlib-datetime.md](stdlib-datetime.md) · [stdlib-url.md](stdlib-url.md) · [stdlib-toml.md](stdlib-toml.md) · [stdlib-html.md](stdlib-html.md) · [stdlib-fs-mid2.md](stdlib-fs-mid2.md)；M10 见 [stdlib-mid2.md](stdlib-mid2.md)。
 
 设计细节：[stdlib-writeback.md](stdlib-writeback.md) · [stdlib-subtask.md](stdlib-subtask.md)。
 

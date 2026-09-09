@@ -38,6 +38,7 @@
 | [design/stdlib-url.md](design/stdlib-url.md) | **`lib/url`（Mid2 M7）** |
 | [design/stdlib-toml.md](design/stdlib-toml.md) | **`lib/toml`（Mid2 M8）** |
 | [design/stdlib-html.md](design/stdlib-html.md) | **`lib/html`（Mid2 M8）** |
+| [design/stdlib-fs-mid2.md](design/stdlib-fs-mid2.md) | **`lib/fs` Mid2 M9 加厚** |
 | [research/stdlib-gaps-after-mid.md](research/stdlib-gaps-after-mid.md) | **Mid 之后缺口盘点**（对照 Python/Go） |
 | [roadmap/stdlib-mid.md](roadmap/stdlib-mid.md) | **Mid M1–M6 路线（done）** |
 | [roadmap/stdlib-mid2.md](roadmap/stdlib-mid2.md) | **Mid2 M7–M10 路线（规划）** |

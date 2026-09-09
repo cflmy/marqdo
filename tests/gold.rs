@@ -1230,6 +1230,19 @@ fn lib_toml_html_encoding_smoke_zh() {
 }
 
 #[test]
+fn lib_fs_mid2_smoke() {
+    assert_out(
+        "tests/lib/fs-mid2-smoke.mq.md",
+        "1\nTrue\nFalse\n3\na.txt\nnested\nnested/b.txt\nFalse",
+    );
+}
+
+#[test]
+fn lib_fs_mid2_smoke_zh() {
+    assert_out("tests/lib/文件-mid2-烟测.mq.md", "True\n2\nFalse");
+}
+
+#[test]
 fn lib_re_smoke() {
     assert_out(
         "tests/lib/re-smoke.mq.md",

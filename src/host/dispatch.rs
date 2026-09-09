@@ -191,6 +191,10 @@ pub enum HostFn {
     HtmlUnescape = 182,
     EncodingBase32Encode = 183,
     EncodingBase32Decode = 184,
+    FsMakeDirs = 185,
+    FsRemoveTree = 186,
+    FsStat = 187,
+    FsWalk = 188,
 }
 
 
@@ -372,6 +376,10 @@ impl HostFn {
             182 => Self::HtmlUnescape,
             183 => Self::EncodingBase32Encode,
             184 => Self::EncodingBase32Decode,
+            185 => Self::FsMakeDirs,
+            186 => Self::FsRemoveTree,
+            187 => Self::FsStat,
+            188 => Self::FsWalk,
             _ => return None,
         })
     }
@@ -556,6 +564,10 @@ impl HostFn {
             "host_html_unescape" | "html_unescape" => Self::HtmlUnescape,
             "host_encoding_base32_encode" | "encoding_base32_encode" => Self::EncodingBase32Encode,
             "host_encoding_base32_decode" | "encoding_base32_decode" => Self::EncodingBase32Decode,
+            "host_make_dirs" | "make_dirs" => Self::FsMakeDirs,
+            "host_remove_tree" | "remove_tree" => Self::FsRemoveTree,
+            "host_stat" | "stat" => Self::FsStat,
+            "host_walk" | "walk" => Self::FsWalk,
             _ => return None,
         })
     }
@@ -727,6 +739,10 @@ impl HostFn {
             Self::HtmlUnescape => "host_html_unescape",
             Self::EncodingBase32Encode => "host_encoding_base32_encode",
             Self::EncodingBase32Decode => "host_encoding_base32_decode",
+            Self::FsMakeDirs => "host_make_dirs",
+            Self::FsRemoveTree => "host_remove_tree",
+            Self::FsStat => "host_stat",
+            Self::FsWalk => "host_walk",
             Self::WritebackRecord => "host_writeback_record",
             Self::WritebackGet => "host_writeback_get",
             Self::WritebackClear => "host_writeback_clear",
@@ -861,6 +877,7 @@ impl HostFn {
             Self::UrlParse | Self::UrlQueryParse => &["text"],
             Self::UrlQueryStringify => &["map"],
             Self::TomlParse | Self::HtmlEscape | Self::HtmlUnescape => &["text"],
+            Self::FsMakeDirs | Self::FsRemoveTree | Self::FsStat | Self::FsWalk => &["path"],
             Self::WritebackRecord => &["value"],
             Self::WritebackGet | Self::WritebackClear => &[],
             Self::WritebackList => &[],
@@ -931,6 +948,10 @@ pub fn call_host(
         HostFn::ListDir => fs::list_dir(ctx, require(bound, "path")?),
         HostFn::MakeDir => fs::make_dir(ctx, require(bound, "path")?),
         HostFn::Remove => fs::remove(ctx, require(bound, "path")?),
+        HostFn::FsMakeDirs => fs::make_dirs(ctx, require(bound, "path")?),
+        HostFn::FsRemoveTree => fs::remove_tree(ctx, require(bound, "path")?),
+        HostFn::FsStat => fs::stat(ctx, require(bound, "path")?),
+        HostFn::FsWalk => fs::walk(ctx, require(bound, "path")?),
         HostFn::NowUnix => time::now_unix(),
         HostFn::NowMs => time::now_ms(),
         HostFn::FormatTime => {

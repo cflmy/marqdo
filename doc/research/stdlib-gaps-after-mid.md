@@ -128,7 +128,7 @@ catalog / 工具配置若走向 TOML，只读 `toml.parse` 性价比高。YAML�
 |--------|----------|------|
 | **高** | **M7** | `datetime` + `url` — **done** |
 | **高** | **M8** | `toml` 只读 + `html.escape` + `encoding` base32 — **done** |
-| **中** | **M9** | `fs` 加厚（dirs/stat/walk） |
+| **中** | **M9** | `fs` 加厚（dirs/stat/walk） — **done** |
 | **低** | **M10** | `stats` 薄 · 可选 zip · 结构化 log 字段 |
 | **won't** | — | 完整 YAML · 模板引擎 · sqlite 进 `lib/` |
 

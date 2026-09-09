@@ -35,10 +35,38 @@ description: English filesystem wrappers
 
 **> host_make_dir path=`path`**
 
+## make_dirs
+    + `path`
+
+Create directories recursively (`mkdir -p`).
+
+**> host_make_dirs path=`path`**
+
 ## remove
     + `path`
 
 **> host_remove path=`path`**
+
+## remove_tree
+    + `path`
+
+Remove a directory recursively. Errors if `path` is a file.
+
+**> host_remove_tree path=`path`**
+
+## stat
+    + `path`
+
+Returns `{size, mtime_unix, is_file, is_dir}`.
+
+**> host_stat path=`path`**
+
+## walk
+    + `path`
+
+Depth-first listing of relative paths under `path` (forward slashes).
+
+**> host_walk path=`path`**
 
 ## copy_file
     + `src`

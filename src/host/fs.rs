@@ -94,6 +94,16 @@ pub fn make_dir(ctx: &HostContext, path: &Value) -> Result<Value, String> {
     Ok(Value::None)
 }
 
+/// Explicit recursive mkdir (same host behavior as `make_dir`).
+pub fn make_dirs(ctx: &HostContext, path: &Value) -> Result<Value, String> {
+    if !ctx.allow_fs_write() {
+        return Err("make_dirs denied by host policy".into());
+    }
+    let p = ctx.resolve_path(text_path(path)?)?;
+    fs::create_dir_all(&p).map_err(|e| format!("make_dirs {}: {e}", p.display()))?;
+    Ok(Value::None)
+}
+
 pub fn remove(ctx: &HostContext, path: &Value) -> Result<Value, String> {
     if !ctx.allow_fs_write() {
         return Err("remove denied by host policy".into());
@@ -105,6 +115,80 @@ pub fn remove(ctx: &HostContext, path: &Value) -> Result<Value, String> {
         fs::remove_file(&p).map_err(|e| format!("remove {}: {e}", p.display()))?;
     }
     Ok(Value::None)
+}
+
+/// Remove a directory tree. Errors if `path` is a file.
+pub fn remove_tree(ctx: &HostContext, path: &Value) -> Result<Value, String> {
+    if !ctx.allow_fs_write() {
+        return Err("remove_tree denied by host policy".into());
+    }
+    let p = ctx.resolve_path(text_path(path)?)?;
+    if !p.exists() {
+        return Err(format!("remove_tree: not found: {}", p.display()));
+    }
+    if !p.is_dir() {
+        return Err(format!("remove_tree: not a directory: {}", p.display()));
+    }
+    fs::remove_dir_all(&p).map_err(|e| format!("remove_tree {}: {e}", p.display()))?;
+    Ok(Value::None)
+}
+
+/// `{size, mtime_unix, is_file, is_dir}` for a path.
+pub fn stat(ctx: &HostContext, path: &Value) -> Result<Value, String> {
+    let p = ctx.resolve_path(text_path(path)?)?;
+    let meta = fs::metadata(&p).map_err(|e| format!("stat {}: {e}", p.display()))?;
+    let mtime = meta
+        .modified()
+        .ok()
+        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+        .map(|d| d.as_secs() as i64)
+        .unwrap_or(0);
+    Ok(Value::Map(vec![
+        ("size".into(), Value::Int(meta.len() as i64)),
+        ("mtime_unix".into(), Value::Int(mtime)),
+        ("is_file".into(), Value::Bool(meta.is_file())),
+        ("is_dir".into(), Value::Bool(meta.is_dir())),
+    ]))
+}
+
+/// Depth-first walk; returns path texts relative to `path` (forward slashes), sorted per directory.
+pub fn walk(ctx: &HostContext, path: &Value) -> Result<Value, String> {
+    let root = ctx.resolve_path(text_path(path)?)?;
+    if !root.is_dir() {
+        return Err(format!("walk: not a directory: {}", root.display()));
+    }
+    let mut out: Vec<Value> = Vec::new();
+    walk_dfs(&root, Path::new(""), &mut out)?;
+    Ok(Value::List(out))
+}
+
+fn walk_dfs(abs: &Path, rel: &Path, out: &mut Vec<Value>) -> Result<(), String> {
+    let mut entries: Vec<_> = fs::read_dir(abs)
+        .map_err(|e| format!("walk {}: {e}", abs.display()))?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| format!("walk: {e}"))?;
+    entries.sort_by_key(|e| e.file_name());
+    for ent in entries {
+        let name = ent.file_name();
+        let child_rel = if rel.as_os_str().is_empty() {
+            Path::new(&name).to_path_buf()
+        } else {
+            rel.join(&name)
+        };
+        let rel_text = child_rel
+            .components()
+            .map(|c| c.as_os_str().to_string_lossy())
+            .collect::<Vec<_>>()
+            .join("/");
+        out.push(Value::Text(rel_text));
+        let ft = ent
+            .file_type()
+            .map_err(|e| format!("walk file_type: {e}"))?;
+        if ft.is_dir() {
+            walk_dfs(&ent.path(), &child_rel, out)?;
+        }
+    }
+    Ok(())
 }
 
 pub fn copy_file(ctx: &HostContext, src: &Value, dest: &Value) -> Result<Value, String> {
