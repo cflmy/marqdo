@@ -290,7 +290,7 @@ python3 "$SCRIPT" --serve   # then: export https_proxy=http://127.0.0.1:18081
 rm -f /tmp/.hk_ssh_pw
 ```
 
-Script behavior: SSH to HK → local `http://127.0.0.1:$HK_JUMP_PORT` HTTP CONNECT via `direct-tcpip` → run `git`/`gh`/`curl` with that proxy. GitHub HTTPS credentials still come from the **local** `git credential` store (askpass), not from the jump host.
+Script behavior: SSH to HK → local `http://127.0.0.1:$HK_JUMP_PORT` HTTP CONNECT via `direct-tcpip` → run `git`/`gh`/`curl` with that proxy. Git auth uses local `git credential` via `http.extraHeader` (Basic) — **not** `GIT_ASKPASS` (askpass has hung under agent/no TTY). Tokens never go to the jump host disk.
 
 Optional path reverse-proxy (`https://proxy.cflmy.top/github.com/…` `insteadOf`) may work for short GETs; treat long `git push` failures as a signal to use the HK jump instead of retrying Clash forever.
 ## Local Windows fallback

@@ -145,8 +145,10 @@ def make_proxy(transport: paramiko.Transport, port: int) -> _Server:
     return _Server(("127.0.0.1", port), Handler)
 
 
-def github_askpass() -> Path:
-    """Write a one-shot GIT_ASKPASS that answers with github.com store creds."""
+def github_basic_auth_header() -> str:
+    """Authorization: Basic … from local git credential store (no askpass; askpass can hang)."""
+    import base64
+
     out = subprocess.check_output(
         ["git", "credential", "fill"],
         input=b"protocol=https\nhost=github.com\n\n",
@@ -156,16 +158,17 @@ def github_askpass() -> Path:
     password = data.get("password") or ""
     if not password:
         raise SystemExit("no github.com credential in git credential store")
-    ask = Path("/tmp/marqdo-git-askpass-hk.py")
-    ask.write_text(
-        "#!/usr/bin/env python3\n"
-        "import sys\n"
-        f"u={user!r}; p={password!r}\n"
-        "print(u if 'username' in sys.argv[-1].lower() else p)\n",
-        encoding="utf-8",
-    )
-    ask.chmod(0o700)
-    return ask
+    token = base64.b64encode(f"{user}:{password}".encode()).decode()
+    return f"Authorization: Basic {token}"
+
+
+def github_token() -> str | None:
+    out = subprocess.check_output(
+        ["git", "credential", "fill"],
+        input=b"protocol=https\nhost=github.com\n\n",
+    ).decode()
+    data = dict(line.split("=", 1) for line in out.splitlines() if "=" in line)
+    return data.get("password") or None
 
 
 def run_with_proxy(proxy: str, argv: list[str]) -> int:
@@ -186,10 +189,8 @@ def run_with_proxy(proxy: str, argv: list[str]) -> int:
 
     cmd = list(argv)
     if cmd and cmd[0] == "git":
-        ask = github_askpass()
-        env["GIT_ASKPASS"] = str(ask)
-        env["GIT_TERMINAL_PROMPT"] = "0"
-        # Force this CONNECT proxy; clear gitconfig Clash 7890 for the session.
+        # Prefer http.extraHeader over GIT_ASKPASS (askpass has hung under agent/no TTY).
+        auth = github_basic_auth_header()
         cmd = [
             "git",
             "-c",
@@ -199,26 +200,28 @@ def run_with_proxy(proxy: str, argv: list[str]) -> int:
             "-c",
             "credential.helper=",
             "-c",
+            f"http.extraHeader={auth}",
+            "-c",
             "http.version=HTTP/1.1",
             "-c",
             "http.postBuffer=524288000",
             *cmd[1:],
         ]
-        try:
-            print("+", " ".join(cmd), flush=True)
-            return subprocess.call(cmd, cwd=ROOT, env=env)
-        finally:
-            ask.unlink(missing_ok=True)
+        # Do not print the Authorization header.
+        print(
+            "+",
+            " ".join(
+                c if not c.startswith("http.extraHeader=") else "http.extraHeader=<redacted>"
+                for c in cmd
+            ),
+            flush=True,
+        )
+        return subprocess.call(cmd, cwd=ROOT, env=env)
 
     if cmd and cmd[0] == "gh" and not env.get("GH_TOKEN"):
-        # session token from git credential store
-        out = subprocess.check_output(
-            ["git", "credential", "fill"],
-            input=b"protocol=https\nhost=github.com\n\n",
-        ).decode()
-        data = dict(line.split("=", 1) for line in out.splitlines() if "=" in line)
-        if data.get("password"):
-            env["GH_TOKEN"] = data["password"]
+        tok = github_token()
+        if tok:
+            env["GH_TOKEN"] = tok
 
     print("+", " ".join(cmd), flush=True)
     return subprocess.call(cmd, cwd=ROOT, env=env)
