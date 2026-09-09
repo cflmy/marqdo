@@ -2,8 +2,8 @@
 
 | | |
 |---|---|
-| 状态 | **Active · 规划** |
-| 日期 | 2026-09-08 |
+| 状态 | **Active · M7 已落地 · M8–M10 规划** |
+| 日期 | 2026-09-09 |
 | 设计 | [stdlib-mid2.md](../design/stdlib-mid2.md) |
 | 缺口 | [stdlib-gaps-after-mid.md](../research/stdlib-gaps-after-mid.md) |
 | 前序 | [stdlib-mid.md](stdlib-mid.md)（**M1–M6 done**） |
@@ -32,17 +32,16 @@ M10 收口糖（可选）    stats 薄 · log 字段 · （zip 默认跳过）
 
 ## 1. 波次明细
 
-### M7 — datetime + url — **todo**
+### M7 — datetime + url — **done**
 
 | 交付 | 说明 |
 |------|------|
 | `lib/datetime` · `日期时间` | now/parse/format/add/unix/zone 子集 |
-| `lib/url` · `地址`（或 `net` 加厚） | parse · query_parse/stringify |
+| `lib/url` · `地址` | parse · query_parse/stringify（手写；无 `url` crate） |
 | Host | `host_datetime_*` · `host_url_*` |
-| 金样 | `tests/lib/datetime-smoke` · `url-smoke` |
-| public | 短页「解析带时区的时间戳 / 拆 query」 |
-
-**刻意不做：** 农历、完整 tz 管理 UI、URL 规范化全部 WHATWG 边角。
+| 金样 | `tests/lib/datetime-smoke` · `url-smoke`（中英） |
+| public | `14-datetime-url` · `14-日期时间地址` |
+| 设计 | [stdlib-datetime.md](../design/stdlib-datetime.md) · [stdlib-url.md](../design/stdlib-url.md) |
 
 ### M8 — toml + html + encoding — **todo**
 
@@ -74,7 +73,7 @@ M10 收口糖（可选）    stats 薄 · log 字段 · （zip 默认跳过）
 
 ## 2. 进度勾选
 
-- [ ] M7 datetime + url  
+- [x] M7 datetime + url  
 - [ ] M8 toml + html + base32  
 - [ ] M9 fs 加厚  
 - [ ] M10 可选  

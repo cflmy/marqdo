@@ -26,6 +26,8 @@
 | **命令行** | `lib/cli.mq.md` | `lib/命令行.mq.md` | **Mid M5** |
 | **日志** | `lib/log.mq.md` | `lib/日志.mq.md` | **Mid M6** |
 | **标识** | `lib/uuid.mq.md` | `lib/标识.mq.md` | **Mid M6** |
+| **日期时间** | `lib/datetime.mq.md` | `lib/日期时间.mq.md` | **Mid2 M7** |
+| **地址** | `lib/url.mq.md` | `lib/地址.mq.md` | **Mid2 M7** |
 | 浏览器效应 | `lib/browser.mq.md` | `lib/浏览器.mq.md` | WASM 客户端效应助手（GFM + helpers；勿用 `json.set` 链） |
 | 文件 | `lib/fs.mq.md` | `lib/文件.mq.md` | 已有 + Mid M2：`copy_file` / `move` / `make_temp` |
 | 系统 | `lib/sys.mq.md` | `lib/系统.mq.md` | 已有（含 `load_dotenv`） |
@@ -42,7 +44,7 @@
 
 **中层已落地：** M1–M6（含 log / uuid）— 见 [stdlib-mid.md](stdlib-mid.md) · [stdlib-log-uuid.md](stdlib-log-uuid.md)。
 
-**下一波 Mid2（规划，未进表）：** `datetime` · `url` · `toml`（只读）· `html.escape` · `fs` 再厚 — [stdlib-mid2.md](stdlib-mid2.md) · [stdlib-gaps-after-mid.md](../research/stdlib-gaps-after-mid.md)。
+**Mid2：** **M7 done**（`datetime` · `url`）— [stdlib-datetime.md](stdlib-datetime.md) · [stdlib-url.md](stdlib-url.md)；M8+ 见 [stdlib-mid2.md](stdlib-mid2.md) · [stdlib-gaps-after-mid.md](../research/stdlib-gaps-after-mid.md)。
 
 设计细节：[stdlib-writeback.md](stdlib-writeback.md) · [stdlib-subtask.md](stdlib-subtask.md)。
 

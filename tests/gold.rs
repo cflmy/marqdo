@@ -1182,6 +1182,38 @@ fn lib_log_uuid_zh_smoke() {
 }
 
 #[test]
+fn lib_datetime_smoke() {
+    assert_out(
+        "tests/lib/datetime-smoke.mq.md",
+        "1970-01-01T00:00:00Z\n1970-01-01T08:00:00+08:00\n1577905445\n86400\n1970-01-01",
+    );
+}
+
+#[test]
+fn lib_datetime_smoke_zh() {
+    assert_out(
+        "tests/lib/日期时间-烟测.mq.md",
+        "1970-01-01T00:00:00Z\n1970-01-01T08:00:00+08:00\n1577905445",
+    );
+}
+
+#[test]
+fn lib_url_smoke() {
+    assert_out(
+        "tests/lib/url-smoke.mq.md",
+        "https\nexample.com\n8443\n/a/b\nx=1&y=2\nfrag\nhi x\n1\n2\na=1&a=2&b=hi%20x",
+    );
+}
+
+#[test]
+fn lib_url_smoke_zh() {
+    assert_out(
+        "tests/lib/地址-烟测.mq.md",
+        "https\nexample.com\n/a\nx=1",
+    );
+}
+
+#[test]
 fn lib_re_smoke() {
     assert_out(
         "tests/lib/re-smoke.mq.md",

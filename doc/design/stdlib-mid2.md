@@ -2,8 +2,8 @@
 
 | | |
 |---|---|
-| 状态 | **Draft · 锁定方向** |
-| 日期 | 2026-09-08 |
+| 状态 | **Draft · M7 已落地；M8–M10 锁定方向** |
+| 日期 | 2026-09-09 |
 | 缺口盘点 | [stdlib-gaps-after-mid.md](../research/stdlib-gaps-after-mid.md) |
 | 路线图 | [stdlib-mid2.md](../roadmap/stdlib-mid2.md) |
 | 宪法 | [stdlib-mid.md](stdlib-mid.md) §3（准入 / 不准入 **不变**） |

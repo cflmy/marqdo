@@ -9,6 +9,7 @@ pub mod collection;
 mod dispatch;
 mod cli;
 mod csv;
+mod datetime;
 mod encoding;
 pub mod event_bus;
 #[cfg(feature = "exec-host")]
@@ -23,6 +24,7 @@ mod path;
 mod re;
 mod secrets;
 mod text_ops;
+mod url_ops;
 mod uuid_ops;
 #[cfg(feature = "plugin-host")]
 pub mod plugin;

@@ -3,8 +3,8 @@
 use std::collections::HashMap;
 
 use crate::host::{
-    cli, csv, encoding, fs, hash, json, log, math, net, path, re, secrets, sys, text_ops, time,
-    uuid_ops, writeback, HostContext,
+    cli, csv, datetime, encoding, fs, hash, json, log, math, net, path, re, secrets, sys, text_ops,
+    time, url_ops, uuid_ops, writeback, HostContext,
 };
 #[cfg(feature = "exec-host")]
 use crate::host::{foreign, subtask};
@@ -176,6 +176,16 @@ pub enum HostFn {
     LogSetLevel = 167,
     LogLine = 168,
     UuidV4 = 169,
+    DatetimeNow = 170,
+    DatetimeFromUnix = 171,
+    DatetimeToUnix = 172,
+    DatetimeParse = 173,
+    DatetimeFormat = 174,
+    DatetimeAdd = 175,
+    DatetimeInZone = 176,
+    UrlParse = 177,
+    UrlQueryParse = 178,
+    UrlQueryStringify = 179,
 }
 
 
@@ -342,6 +352,16 @@ impl HostFn {
             167 => Self::LogSetLevel,
             168 => Self::LogLine,
             169 => Self::UuidV4,
+            170 => Self::DatetimeNow,
+            171 => Self::DatetimeFromUnix,
+            172 => Self::DatetimeToUnix,
+            173 => Self::DatetimeParse,
+            174 => Self::DatetimeFormat,
+            175 => Self::DatetimeAdd,
+            176 => Self::DatetimeInZone,
+            177 => Self::UrlParse,
+            178 => Self::UrlQueryParse,
+            179 => Self::UrlQueryStringify,
             _ => return None,
         })
     }
@@ -511,6 +531,16 @@ impl HostFn {
             "host_log_set_level" | "log_set_level" => Self::LogSetLevel,
             "host_log_line" | "log_line" => Self::LogLine,
             "host_uuid_v4" | "uuid_v4" => Self::UuidV4,
+            "host_datetime_now" | "datetime_now" => Self::DatetimeNow,
+            "host_datetime_from_unix" | "datetime_from_unix" => Self::DatetimeFromUnix,
+            "host_datetime_to_unix" | "datetime_to_unix" => Self::DatetimeToUnix,
+            "host_datetime_parse" | "datetime_parse" => Self::DatetimeParse,
+            "host_datetime_format" | "datetime_format" => Self::DatetimeFormat,
+            "host_datetime_add" | "datetime_add" => Self::DatetimeAdd,
+            "host_datetime_in_zone" | "datetime_in_zone" => Self::DatetimeInZone,
+            "host_url_parse" | "url_parse" => Self::UrlParse,
+            "host_url_query_parse" | "url_query_parse" => Self::UrlQueryParse,
+            "host_url_query_stringify" | "url_query_stringify" => Self::UrlQueryStringify,
             _ => return None,
         })
     }
@@ -667,6 +697,16 @@ impl HostFn {
             Self::LogSetLevel => "host_log_set_level",
             Self::LogLine => "host_log_line",
             Self::UuidV4 => "host_uuid_v4",
+            Self::DatetimeNow => "host_datetime_now",
+            Self::DatetimeFromUnix => "host_datetime_from_unix",
+            Self::DatetimeToUnix => "host_datetime_to_unix",
+            Self::DatetimeParse => "host_datetime_parse",
+            Self::DatetimeFormat => "host_datetime_format",
+            Self::DatetimeAdd => "host_datetime_add",
+            Self::DatetimeInZone => "host_datetime_in_zone",
+            Self::UrlParse => "host_url_parse",
+            Self::UrlQueryParse => "host_url_query_parse",
+            Self::UrlQueryStringify => "host_url_query_stringify",
             Self::WritebackRecord => "host_writeback_record",
             Self::WritebackGet => "host_writeback_get",
             Self::WritebackClear => "host_writeback_clear",
@@ -789,6 +829,15 @@ impl HostFn {
             Self::LogSetLevel => &["level"],
             Self::LogLine => &["level", "text"],
             Self::UuidV4 => &[],
+            Self::DatetimeNow => &[],
+            Self::DatetimeFromUnix => &["unix"],
+            Self::DatetimeToUnix => &["dt"],
+            Self::DatetimeParse => &["text"],
+            Self::DatetimeFormat => &["dt"],
+            Self::DatetimeAdd => &["dt"],
+            Self::DatetimeInZone => &["dt", "zone"],
+            Self::UrlParse | Self::UrlQueryParse => &["text"],
+            Self::UrlQueryStringify => &["map"],
             Self::WritebackRecord => &["value"],
             Self::WritebackGet | Self::WritebackClear => &[],
             Self::WritebackList => &[],
@@ -827,6 +876,10 @@ impl HostFn {
             Self::TextReplace => &["count"],
             Self::TextPad => &["fill", "align"],
             Self::CliParse => &["args"],
+            Self::DatetimeFromUnix => &["zone"],
+            Self::DatetimeParse => &["pattern"],
+            Self::DatetimeFormat => &["style"],
+            Self::DatetimeAdd => &["days", "hours", "minutes", "seconds"],
             _ => &[],
         }
     }
@@ -1272,6 +1325,26 @@ pub fn call_host(
         HostFn::LogSetLevel => log::set_level(ctx, require(bound, "level")?),
         HostFn::LogLine => log::line(ctx, require(bound, "level")?, require(bound, "text")?),
         HostFn::UuidV4 => uuid_ops::v4(),
+        HostFn::DatetimeNow => datetime::now(),
+        HostFn::DatetimeFromUnix => {
+            datetime::from_unix(require(bound, "unix")?, bound.get("zone"))
+        }
+        HostFn::DatetimeToUnix => datetime::to_unix(require(bound, "dt")?),
+        HostFn::DatetimeParse => datetime::parse(require(bound, "text")?, bound.get("pattern")),
+        HostFn::DatetimeFormat => datetime::format(require(bound, "dt")?, bound.get("style")),
+        HostFn::DatetimeAdd => datetime::add(
+            require(bound, "dt")?,
+            bound.get("days"),
+            bound.get("hours"),
+            bound.get("minutes"),
+            bound.get("seconds"),
+        ),
+        HostFn::DatetimeInZone => {
+            datetime::in_zone(require(bound, "dt")?, require(bound, "zone")?)
+        }
+        HostFn::UrlParse => url_ops::parse(require(bound, "text")?),
+        HostFn::UrlQueryParse => url_ops::query_parse(require(bound, "text")?),
+        HostFn::UrlQueryStringify => url_ops::query_stringify(require(bound, "map")?),
         HostFn::OuterCallLine => Ok(Value::Int(
             ctx.call_site_lines
                 .first()

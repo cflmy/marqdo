@@ -126,7 +126,7 @@ catalog / 工具配置若走向 TOML，只读 `toml.parse` 性价比高。YAML�
 
 | 优先级 | 波次草案 | 内容 |
 |--------|----------|------|
-| **高** | **M7** | `datetime`（日历/时区子集）+ `url`（parse/query） |
+| **高** | **M7** | `datetime` + `url` — **done** |
 | **高** | **M8** | `toml` 只读 + `html.escape` + `encoding` base32 |
 | **中** | **M9** | `fs` 加厚（dirs/stat/walk） |
 | **低** | **M10** | `stats` 薄 · 可选 zip · 结构化 log 字段 |
