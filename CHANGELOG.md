@@ -3,6 +3,22 @@
 ## Unreleased
 
 ### Added
+
+### Fixed
+
+### Changed
+
+## v0.3.9 — 2026-09-09
+
+### Highlights
+
+**业务联调缺口 GAP-06–10**：解析器不再吞掉嵌套反引号/`text=[…]` 后的函数体；`invoke` 的 `Null` 不再伪装成功；`sys.exec capture=` 可取 stdout；流式 proxy 反缓冲头。
+
+```bash
+git checkout v0.3.9
+```
+
+### Added
 - **`sys.exec` / `系统.执行`**：可选 `capture=` / `捕获=`；为真时返回 `{code, stdout, stderr}`（GAP-09）。
 
 ### Fixed

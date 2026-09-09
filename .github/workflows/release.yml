@@ -113,8 +113,8 @@ jobs:
             ## Marqdo ${{ github.ref_name }}
 
             ### 亮点 / Highlights
-            - **中层标准库 Mid2**：datetime/url · toml/html/base32 · fs++ · stats/log.fields（M7–M10）
-            - **Mid2 stdlib**: calendar/URL, TOML/HTML/base32, thicker fs, thin stats + log fields
+            - **GAP-06–10**：解析恢复 · invoke Null · exec capture · SSE 反缓冲头
+            - **GAP-06–10**: parser recovery, invoke Null, exec capture, SSE anti-buffer headers
             - **修复**：嵌套插件调用后恢复 `GLOBAL_HOST`（listen/invoke）
             - Details: [CHANGELOG](https://github.com/cflmy/marqdo/blob/main/CHANGELOG.md) · [stdlib-mid2.md](https://github.com/cflmy/marqdo/blob/main/doc/roadmap/stdlib-mid2.md)
 
