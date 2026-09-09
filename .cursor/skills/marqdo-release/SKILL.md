@@ -6,8 +6,9 @@ description: >-
   sync VS Code extension on branch vscode-extension when needed, build or
   trigger install assets (CLI, stdlib, ext, public zip, VSIX, wasm notes), push
   tag, publish GitHub Release with detailed notes, and recover from network
-  failures via proxy. Use when the user asks to release, cut a version, publish
-  vX.Y.Z, ship a GitHub release, 发版, 发布新版本, or tag marqdo.
+  failures via proxy or HK SSH jump (scripts/push-via-hk-jump.py). Use when the
+  user asks to release, cut a version, publish vX.Y.Z, ship a GitHub release,
+  发版, 发布新版本, or tag marqdo.
 ---
 
 # Marqdo release
@@ -22,7 +23,7 @@ Canonical release playbook for **cflmy/marqdo**. Read this skill **before** tagg
 4. **Do not release from a dirty tree** (except intentional release commits you create in this flow).
 5. **Tag format** is always `vX.Y.Z` matching root `Cargo.toml` `version = "X.Y.Z"`.
 6. Prefer **tag push → GitHub Actions** (`.github/workflows/release.yml`) for Windows CLI + VSIX + zips. Local packaging is fallback / verification.
-7. After network errors: apply [reference.md § Proxy](reference.md); retry; do not silently skip uploads.
+7. After network errors: apply [reference.md § Proxy](reference.md); retry; do not silently skip uploads. If GitHub stays unreachable but **HK jump** (`hk.cflmy.de`) works, use `scripts/push-via-hk-jump.py` (Paramiko CONNECT) — see reference § **HK SSH jump**.
 
 ## Defaults (after version is confirmed)
 
@@ -105,7 +106,7 @@ release: vVER — <one-line highlight>
 EOF
 ```
 
-Push `main`: `git push origin main` (with proxy/`all` perms if needed).
+Push `main`: `git push origin main` (with proxy/`all` perms if needed; on persistent GitHub failure use [reference § HK SSH jump](reference.md)).
 
 ## Phase 3 — VS Code / Cursor extension
 
@@ -152,7 +153,8 @@ Local Windows fallback: `scripts/release-full.ps1 -Tag TAG -Upload` (see script 
 
 | Failure | Action |
 |---------|--------|
-| `gh` / git TLS or proxy `7890` refused | Unset bad proxy; use working `HTTP(S)_PROXY` or `required_permissions: ["all"]`; see reference |
+| `gh` / git TLS or Clash `7890` refused | Unset bad proxy; `required_permissions: ["all"]`; see [reference § Proxy](reference.md) |
+| GitHub blocked / `proxy.cflmy.top` push timeout | **HK SSH jump**: `scripts/push-via-hk-jump.py` (ask user for HK password/key; never commit). See reference § **HK SSH jump** |
 | Tag exists | Stop; ask user to bump or delete tag (no force on shared tags without explicit order) |
 | CI red | Fix on main, move tag only if user explicitly allows delete+re-push tag |
 | VSIX missing | Fetch `vscode-extension`, build locally, `gh release upload TAG dist/*.vsix` |

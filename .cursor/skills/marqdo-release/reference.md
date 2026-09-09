@@ -206,14 +206,16 @@ marqdo wasm build
 
 ## Proxy & auth (network recovery)
 
-Symptoms seen in this project: broken local proxy on `127.0.0.1:7890`, TLS failures, `gh` needing token, Cursor sandbox blocking git/gh.
+Symptoms seen in this project: broken local Clash on `127.0.0.1:7890`, flaky `proxy.cflmy.top` HTTPS (short GET OK, long `git push` / connect timeouts), TLS failures, `gh` needing token, Cursor agent sandbox with only `lo`.
 
 ### Diagnose
 
 ```bash
 env | grep -iE 'proxy|PROXY' || true
-curl -sI https://github.com | head -5
+curl -sI --max-time 15 https://github.com | head -5
+curl -sS --max-time 15 -o /dev/null -w 'proxy=%{http_code}\n' https://proxy.cflmy.top/ || true
 gh auth status
+ip -br addr | head -5   # agent may lack enp*; use required_permissions: ["all"]
 ```
 
 ### Fix order
@@ -222,6 +224,7 @@ gh auth status
 
 ```bash
 unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY ALL_PROXY all_proxy
+# also clear for one git call: git -c http.proxy= -c https.proxy= …
 ```
 
 2. **Set a working proxy** only if the user provides one (or known working):
@@ -237,13 +240,15 @@ export HTTP_PROXY=http://HOST:PORT
 
 5. **Git remote**: prefer `https://github.com/cflmy/marqdo.git`; SSH needs keys.
 
-6. **Partial upload**:
+6. **HK SSH jump (preferred when GitHub is blocked but HK is reachable)** — see next subsection.
+
+7. **Partial upload**:
 
 ```bash
 gh release upload "vVER" dist/FILE --clobber
 ```
 
-7. **Re-run CI** without retagging (if tag already correct):
+8. **Re-run CI** without retagging (if tag already correct):
 
 ```bash
 gh workflow run Release --ref "vVER"  # only if workflow_dispatch exists; else fix + new patch tag
@@ -251,6 +256,43 @@ gh workflow run Release --ref "vVER"  # only if workflow_dispatch exists; else f
 
 Current Release workflow is **tag-push only**. Red CI after tag → fix on `main`, then either new patch tag or **user-approved** delete+recreate tag (dangerous; prefer patch).
 
+### HK SSH jump (Paramiko CONNECT)
+
+**When to use:** local → GitHub fails (timeout / TLS / Clash flaky / reverse-proxy `proxy.cflmy.top` connect drops), but this host can reach an overseas box that has stable GitHub (default `hk.cflmy.de`). Proven path for v0.3.9 push/tag/`gh`.
+
+**Do not** rely on OpenSSH + `sshpass` here — password auth has hung; use **Paramiko** (`python3-paramiko`).
+
+**Never** commit the HK root password or tokens. Ask the user for the password (or a key), put it in env / a `600` temp file, scrub after.
+
+```bash
+# one-shot password file (example — use the secret the user gave this session)
+printf '%s' "$HK_PASSWORD_FROM_USER" > /tmp/.hk_ssh_pw && chmod 600 /tmp/.hk_ssh_pw
+
+export HK_SSH_HOST=hk.cflmy.de   # or 83.229.126.119
+export HK_SSH_USER=root
+export HK_SSH_PASSWORD_FILE=/tmp/.hk_ssh_pw
+# optional: HK_JUMP_PORT=18081
+
+SCRIPT=.cursor/skills/marqdo-release/scripts/push-via-hk-jump.py
+
+# push / tag / extension (git gets CONNECT proxy + github.com askpass)
+python3 "$SCRIPT" -- git push origin main
+python3 "$SCRIPT" -- git push origin vscode-extension
+python3 "$SCRIPT" -- git push origin vVER
+
+# gh (sets GH_TOKEN from git credential fill if unset)
+python3 "$SCRIPT" -- gh release edit vVER --notes-file /tmp/notes.md
+python3 "$SCRIPT" -- gh run list --workflow=Release --limit 3
+
+# leave proxy up for manual commands
+python3 "$SCRIPT" --serve   # then: export https_proxy=http://127.0.0.1:18081
+
+rm -f /tmp/.hk_ssh_pw
+```
+
+Script behavior: SSH to HK → local `http://127.0.0.1:$HK_JUMP_PORT` HTTP CONNECT via `direct-tcpip` → run `git`/`gh`/`curl` with that proxy. GitHub HTTPS credentials still come from the **local** `git credential` store (askpass), not from the jump host.
+
+Optional path reverse-proxy (`https://proxy.cflmy.top/github.com/…` `insteadOf`) may work for short GETs; treat long `git push` failures as a signal to use the HK jump instead of retrying Clash forever.
 ## Local Windows fallback
 
 ```powershell
