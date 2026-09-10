@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| 状态 | **Accepted · 实现进行中（W-G0 完成）** |
+| 状态 | **Accepted · 实现进行中（W-G0✅ · W-G1✅ · W-G2 部分）** |
 | 日期 | 2026-09-10 |
 | 相关 | [ext-web.md](ext-web.md) · [ext-web-net.md](ext-web-net.md) · [web-net-capabilities.md](web-net-capabilities.md) · [ext-web-drivers.md](ext-web-drivers.md) · [web-assets-and-images.md](web-assets-and-images.md) · [ext-hosting-fill.md](ext-hosting-fill.md) · [ext-abi.md](ext-abi.md) · [ext-cli.md](ext-cli.md) · [web-asgi-servers-and-marqdo.md](web-asgi-servers-and-marqdo.md) |
 | 实现目录 | `plugins/web/`（**Go module**；产物仍为 `libweb.so` / `web.dll` / `libweb.dylib`） |
@@ -386,8 +386,8 @@ scripts/build-web-plugin.sh   # go build -buildmode=c-shared -o …/libweb.so
 | 波次 | 内容 | 退出条件 |
 |------|------|----------|
 | **W-G0** | 文档（本文）+ ADR + 目录骨架 + ABI bridge 能 `plugin.load` + `demo` 注册探测 | ✅ `tests/ext/web-go-abi-smoke.mq.md`；`web_go_ready` + `web_page_new`；`scripts/build-web-plugin.sh` → `libweb.so` |
-| **W-G1** | table 辅助 + `web_style` + page new/compose/render（无 listen） | `web-smoke` / `web-zh-smoke` |
-| **W-G2** | SQLite db CRUD + where + txn + init | `web-select-smoke` / `web-db-w2-smoke` |
+| **W-G1** | table 辅助 + `web_style` + page new/compose/render（无 listen） | ✅ `web-smoke` / `web-zh-smoke`（含 compose_form / app_new / app_route 袋） |
+| **W-G2** | SQLite db CRUD + where + txn + init | 进行中：`new/init/insert/select/get/exec` 已通 smoke；缺 update/delete/txn/migrate/FTS |
 | **W-G3** | form + mount_form + CSRF 基础 | `web-form-*` |
 | **W-G4** | `web_listen` + route + static + part + middleware + JSON API | `web-route` / `web-middleware` / live |
 | **W-G5** | session/auth/password/rate limit/gate/admin | `web-security` / `web-c0` / `web-c1` |

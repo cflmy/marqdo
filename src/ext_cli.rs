@@ -435,12 +435,21 @@ pub fn remove_ext(id: &str) -> Result<()> {
 
 /// Resolve installed native plugin path for `name` (`agent`, `web`, …).
 /// Also falls back to cargo `target/{debug,release}` artifacts for local runs.
+///
+/// `MARQDO_*_PLUGIN` env overrides installed `~/.marqdo/ext` so developers can
+/// point at a freshly built Go `libweb.so` during the web rewrite.
 pub fn installed_native_path(name: &str) -> Option<PathBuf> {
     let short = native_short_name(name);
     if !matches!(short, "agent" | "web" | "quantum" | "linalg") {
         return None;
     }
     let lib_name = native_lib_filename(short);
+    if let Ok(p) = env::var(native_env_var(short)) {
+        let p = PathBuf::from(p);
+        if p.is_file() {
+            return Some(p);
+        }
+    }
     for root in trusted_plugin_roots() {
         let hint = root.join(format!("{short}.plugin"));
         if let Ok(s) = fs::read_to_string(&hint) {
@@ -450,12 +459,6 @@ pub fn installed_native_path(name: &str) -> Option<PathBuf> {
             }
         }
         let p = root.join("native").join(&lib_name);
-        if p.is_file() {
-            return Some(p);
-        }
-    }
-    if let Ok(p) = env::var(native_env_var(short)) {
-        let p = PathBuf::from(p);
         if p.is_file() {
             return Some(p);
         }
