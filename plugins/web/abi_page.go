@@ -9,6 +9,7 @@ extern int web_page_order(char *args_json, char **out_json, char **err_msg);
 extern int web_page_link_prefix(char *args_json, char **out_json, char **err_msg);
 extern int web_page_css(char *args_json, char **out_json, char **err_msg);
 extern int web_page_detail(char *args_json, char **out_json, char **err_msg);
+extern int web_page_chrome(char *args_json, char **out_json, char **err_msg);
 */
 import "C"
 
@@ -73,5 +74,18 @@ func web_page_detail(argsJSON *C.char, outJSON **C.char, errMsg **C.char) C.int 
 		on = page.AsBool(v, on)
 	}
 	out := page.SetDetail(asPageMap(args["page"]), on)
+	return replyJSON(outJSON, errMsg, out, nil)
+}
+
+//export web_page_chrome
+func web_page_chrome(argsJSON *C.char, outJSON **C.char, errMsg **C.char) C.int {
+	args, err := parseArgs(argsJSON)
+	if err != nil {
+		return replyJSON(outJSON, errMsg, nil, err)
+	}
+	nav, _ := argStr(args, "nav_html", "导航")
+	foot, _ := argStr(args, "footer_html", "页脚")
+	body, _ := argStr(args, "body_class", "体类")
+	out := page.SetChromeHTML(asPageMap(args["page"]), nav, foot, body)
 	return replyJSON(outJSON, errMsg, out, nil)
 }

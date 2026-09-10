@@ -56,6 +56,7 @@ extern int web_page_order(char *args_json, char **out_json, char **err_msg);
 extern int web_page_link_prefix(char *args_json, char **out_json, char **err_msg);
 extern int web_page_css(char *args_json, char **out_json, char **err_msg);
 extern int web_page_detail(char *args_json, char **out_json, char **err_msg);
+extern int web_page_chrome(char *args_json, char **out_json, char **err_msg);
 extern int web_style(char *args_json, char **out_json, char **err_msg);
 extern int web_compose_components(char *args_json, char **out_json, char **err_msg);
 extern int web_compose_main(char *args_json, char **out_json, char **err_msg);
@@ -148,6 +149,7 @@ static int register_core(void) {
 	if (host_register((char *)"web_page_link_prefix", (char *)"page,prefix", web_page_link_prefix) != 0) return 1;
 	if (host_register((char *)"web_page_css", (char *)"page,css", web_page_css) != 0) return 1;
 	if (host_register((char *)"web_page_detail", (char *)"page,detail", web_page_detail) != 0) return 1;
+	if (host_register((char *)"web_page_chrome", (char *)"page,nav_html,footer_html,body_class", web_page_chrome) != 0) return 1;
 	if (host_register((char *)"web_style", (char *)"name,table,strict", web_style) != 0) return 1;
 	if (host_register((char *)"web_compose_components", (char *)"page,components", web_compose_components) != 0) return 1;
 	if (host_register((char *)"web_compose_main", (char *)"page,main", web_compose_main) != 0) return 1;

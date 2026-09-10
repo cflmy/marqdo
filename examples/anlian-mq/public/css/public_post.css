@@ -1,0 +1,27 @@
+/* 发帖 / 发新闻编辑页 */
+
+.anlian-publish-page {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 1.5rem 1rem 2.5rem;
+  box-sizing: border-box;
+}
+
+.anlian-publish-page .anlian-page-title {
+  margin-bottom: 1.25rem;
+}
+
+.anlian-publish-page .anlian-form-card {
+  padding: 2rem 1.75rem;
+}
+
+.anlian-publish-page .anlian-editor-wrap {
+  margin-top: 0.25rem;
+  min-height: 360px;
+}
+
+@media (max-width: 576px) {
+  .anlian-publish-page .anlian-form-card {
+    padding: 1.35rem 1.15rem;
+  }
+}

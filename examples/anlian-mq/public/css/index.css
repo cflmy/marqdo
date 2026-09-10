@@ -1,0 +1,180 @@
+/* ========== 原有基础样式保留（略作优化） ========== */
+/* 针对section的css样式 */
+section,
+.right,
+.left,
+.social,
+.social .anlian-icon {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+section {
+  height: 100vh;
+  /* 新增：确保小屏幕也能完整显示内容，避免溢出 */
+  min-height: 600px;
+  padding: 20px 0;
+  box-sizing: border-box;
+}
+
+.section-wrap {
+  background-color: rgba(255, 255, 255, 0.2);
+  height: 80vh;
+  min-height: 500px; /* 新增：最小高度，避免小屏幕塌陷 */
+  width: 90%;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: inset 0 0 5px rgba(255, 255, 255, 0.1);
+  border-radius: 30px;
+  backdrop-filter: blur(12px);
+  padding: 50px 100px;
+  overflow: hidden;
+  box-sizing: border-box; /* 新增：内边距计入宽度 */
+}
+
+@media (max-width: 992px) {
+  .section-wrap {
+    padding: 30px 50px; /* 减小内边距 */
+    height: 85vh; /* 增加高度占比，容纳内容 */
+  }
+}
+
+@media (max-width: 768px) {
+  section {
+    height: auto; /* 取消固定高度，自适应内容 */
+    min-height: 100vh; /* 确保至少占满视窗 */
+    padding: 40px 0;
+  }
+
+  .section-wrap {
+    height: auto; /* 取消固定高度 */
+    /* min-height: auto; */
+    padding: 20px 30px;
+    width: 95%; /* 增加宽度占比 */
+    border-radius: 20px; /* 减小圆角，适配小屏 */
+  }
+}
+
+@media (max-width: 576px) {
+  .section-wrap {
+    padding: 15px 20px;
+    width: 98%;
+  }
+}
+
+/* 内容型区块：取消 100vh + flex 居中，避免列表被压扁裁切（桌面端亦生效） */
+section.feed-list-page,
+.page-home section.home-posts,
+.page-home section.home-news {
+  height: auto;
+  min-height: 0;
+  align-items: stretch;
+  justify-content: flex-start;
+}
+
+/* 公告 / 新闻 / 帖子 / 列表页：统一宽度 */
+.page-home section.notice > .section-wrap,
+.page-home section.home-news > .section-wrap,
+.page-home section.home-posts > .section-wrap,
+section.feed-list-page > .section-wrap.feed-list-stage {
+  width: 90%;
+  max-width: none;
+  margin-left: auto;
+  margin-right: auto;
+  box-sizing: border-box;
+}
+
+/* 公告：保留轮播区高度（勿用 min-height:0，否则绝对定位容器坍塌） */
+.page-home section.notice > .section-wrap {
+  position: relative;
+  min-height: clamp(380px, 52vh, 560px);
+  overflow: hidden;
+}
+
+/* 新闻 / 帖子 / 列表：高度随内容，覆盖全局 80vh + overflow:hidden */
+.page-home section.home-news > .section-wrap,
+.page-home section.home-posts > .section-wrap,
+section.feed-list-page > .section-wrap.feed-list-stage {
+  height: auto;
+  min-height: 0;
+  max-height: none;
+  overflow: visible;
+}
+
+/* 首页 Hero：全屏感 + 与其它区块统一宽度 */
+.page-home section.hero {
+  height: auto;
+  min-height: 100vh;
+  align-items: stretch;
+  padding: 20px 0;
+}
+
+.page-home section.hero > .section-wrap {
+  width: 90%;
+  max-width: none;
+  margin-left: auto;
+  margin-right: auto;
+  height: auto;
+  min-height: clamp(520px, 82vh, 760px);
+  overflow: visible;
+  box-sizing: border-box;
+}
+
+@media (max-width: 1024px) {
+  .page-home section.hero {
+    min-height: auto;
+    padding: 16px 0;
+  }
+
+  .page-home section.hero > .section-wrap {
+    min-height: clamp(460px, 75vh, 680px);
+    padding: 28px 40px;
+  }
+}
+
+@media (max-width: 768px) {
+  .page-home section.hero,
+  .page-home section.home-posts,
+  .page-home section.home-news,
+  .page-home section.notice,
+  section.feed-list-page {
+    min-height: auto;
+    padding: 16px 0;
+  }
+
+  .page-home section.notice > .section-wrap,
+  .page-home section.home-news > .section-wrap,
+  .page-home section.home-posts > .section-wrap,
+  section.feed-list-page > .section-wrap.feed-list-stage,
+  .page-home section.hero > .section-wrap {
+    width: 95%;
+  }
+
+  .page-home section.hero > .section-wrap {
+    min-height: auto;
+    padding: 20px 24px;
+  }
+
+  .page-home section.notice > .section-wrap {
+    min-height: clamp(340px, 58vh, 480px);
+  }
+}
+
+@media (max-width: 576px) {
+  .page-home section.notice > .section-wrap,
+  .page-home section.home-news > .section-wrap,
+  .page-home section.home-posts > .section-wrap,
+  section.feed-list-page > .section-wrap.feed-list-stage,
+  .page-home section.hero > .section-wrap {
+    width: 98%;
+  }
+
+  .page-home section.hero > .section-wrap {
+    padding: 16px 18px;
+    border-radius: 20px;
+  }
+
+  .page-home section.notice > .section-wrap {
+    min-height: clamp(300px, 62vh, 420px);
+  }
+}

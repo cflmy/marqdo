@@ -1,0 +1,349 @@
+/* ========== 原有基础样式保留（略作优化） ========== */
+/* 公告标题样式 */
+.notice-title {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin-bottom: 1.5rem;
+  color: #212529;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.3);
+  padding-bottom: 0.5rem;
+  text-align: center;
+  /* 新增：确保标题在小屏不溢出 */
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* 公告内容article样式 - 居中显示 */
+.notice-item>article {
+  text-align: center;
+  padding: 1.5rem;
+  background-color: rgba(255, 255, 255, 0.1);
+  border-radius: 0.5rem;
+  word-wrap: break-word;
+  min-height: 100px;
+  display: block;
+  position: relative;
+  width: 100%;
+  margin-bottom: 0;
+  box-sizing: border-box; /* 新增：内边距计入宽度 */
+}
+
+/* 确保article内部HTML内容正常显示 */
+.notice-item>article * {
+  text-align: center;
+  margin: 0.5rem 0;
+  max-width: 100%;
+  word-wrap: break-word;
+}
+
+/* 为article内部元素添加基础样式 */
+.notice-item>article p {
+  line-height: 1.6;
+  margin-bottom: 1rem;
+}
+
+.notice-item>article h1,
+.notice-item>article h2,
+.notice-item>article h3 {
+  font-weight: 600;
+  margin-top: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.notice-item>article ul,
+.notice-item>article ol {
+  padding-left: 1.5rem;
+  margin-bottom: 1rem;
+}
+
+.notice-item>article li {
+  margin-bottom: 0.5rem;
+}
+
+/* 公告时间样式 - 放在右下角 */
+.notice-item>.notice-create-time {
+  font-size: 0.85rem;
+  color: #6c757d;
+  margin-bottom: 0;
+  position: absolute;
+  bottom: 1rem;
+  right: 1rem;
+  white-space: nowrap;
+  /* 新增：小屏时调整位置，避免溢出 */
+  z-index: 2;
+}
+
+/* 定义外层容器样式 */
+.notice-content-container {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  /* 初始尺寸（大屏） */
+  width: 60vw;
+  height: 50vw;
+  margin: 0;
+  color: rgb(0, 0, 0);
+  perspective: 1000px;
+  transform-origin: center;
+  /* 新增：确保容器不会溢出父元素 */
+  max-width: 600px;
+  max-height: 500px;
+  box-sizing: border-box;
+}
+
+/* 定义内容容器样式 */
+.notice-list {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  transform-origin: center;
+  transform-style: preserve-3d;
+  transform: translateZ(-30vw) rotateY(0);
+  animation: carousel 9s infinite cubic-bezier(0.77, 0, 0.175, 1) forwards;
+}
+
+/* 定义项目样式 */
+.notice-item {
+  position: absolute;
+  /* 初始尺寸（大屏） */
+  width: 60vw;
+  height: 40vw;
+  max-width: 380px;
+  max-height: 250px;
+  box-shadow: 0 5px 20px rgba(0, 0, 0, 0.3);
+  border-radius: 6px;
+  background-size: cover;
+  -webkit-box-reflect: below 25px -webkit-linear-gradient(transparent 50%, rgba(255, 255, 255, 0.3));
+  /* 新增：小屏时调整倒影，避免遮挡 */
+  box-sizing: border-box;
+}
+
+/* 第一个项目样式 */
+.notice-item:nth-child(1) {
+  transform: rotateY(0) translateZ(35vw);
+}
+
+/* 第二个项目样式 */
+.notice-item:nth-child(2) {
+  transform: rotateY(120deg) translateZ(35vw);
+}
+
+/* 第三个项目样式 */
+.notice-item:nth-child(3) {
+  transform: rotateY(240deg) translateZ(35vw);
+}
+
+/* 定义动画 */
+@keyframes carousel {
+  0%,
+  17.5% {
+    transform: translateZ(-35vw) rotateY(0);
+  }
+  27.5%,
+  45% {
+    transform: translateZ(-35vw) rotateY(-120deg);
+  }
+  55%,
+  72.5% {
+    transform: translateZ(-35vw) rotateY(-240deg);
+  }
+  82.5%,
+  100% {
+    transform: translateZ(-35vw) rotateY(-360deg);
+  }
+}
+
+/* ========== 新增响应式设计（核心） ========== */
+/* 1. 平板横向/大屏手机 (≤ 992px) */
+@media (max-width: 992px) {
+  /* 调整公告容器尺寸 */
+  .notice-content-container {
+    width: 70vw;
+    height: 60vw;
+    max-width: 500px;
+    max-height: 400px;
+  }
+
+  /* 调整轮播项尺寸 */
+  .notice-item {
+    width: 70vw;
+    height: 45vw;
+    max-width: 350px;
+    max-height: 220px;
+  }
+
+  /* 调整3D平移距离，适配尺寸 */
+  .notice-list {
+    transform: translateZ(-35vw) rotateY(0);
+  }
+  .notice-item:nth-child(1),
+  .notice-item:nth-child(2),
+  .notice-item:nth-child(3) {
+    transform: rotateY(var(--rotate-deg)) translateZ(40vw);
+  }
+  @keyframes carousel {
+    0%, 17.5% { transform: translateZ(-40vw) rotateY(0); }
+    27.5%, 45% { transform: translateZ(-40vw) rotateY(-120deg); }
+    55%, 72.5% { transform: translateZ(-40vw) rotateY(-240deg); }
+    82.5%, 100% { transform: translateZ(-40vw) rotateY(-360deg); }
+  }
+
+  /* 调整标题和内容字体 */
+  .notice-title {
+    font-size: 1.3rem;
+    margin-bottom: 1rem;
+  }
+  .notice-item>article {
+    padding: 1.2rem;
+    min-height: 80px;
+  }
+  .notice-item>article p {
+    font-size: 0.95rem;
+    line-height: 1.5;
+  }
+  .notice-create-time {
+    font-size: 0.8rem;
+    bottom: 0.8rem;
+    right: 0.8rem;
+  }
+}
+
+/* 2. 平板竖向/中屏手机 (≤ 768px) */
+@media (max-width: 768px) {
+  /* 进一步调整容器尺寸 */
+  .notice-content-container {
+    width: 80vw;
+    height: 70vw;
+    max-width: 400px;
+    max-height: 350px;
+    /* 小屏时微调定位，避免偏上 */
+    top: 55%;
+  }
+
+  /* 调整轮播项尺寸 */
+  .notice-item {
+    width: 80vw;
+    height: 50vw;
+    max-width: 320px;
+    max-height: 200px;
+    /* 减小阴影，适配小屏 */
+    box-shadow: 0 3px 15px rgba(0, 0, 0, 0.2);
+    /* 减小倒影高度，避免遮挡 */
+    -webkit-box-reflect: below 15px -webkit-linear-gradient(transparent 60%, rgba(255, 255, 255, 0.2));
+  }
+
+  /* 调整3D平移距离 */
+  .notice-list {
+    transform: translateZ(-40vw) rotateY(0);
+  }
+  .notice-item:nth-child(1),
+  .notice-item:nth-child(2),
+  .notice-item:nth-child(3) {
+    transform: rotateY(var(--rotate-deg)) translateZ(45vw);
+  }
+  @keyframes carousel {
+    0%, 17.5% { transform: translateZ(-45vw) rotateY(0); }
+    27.5%, 45% { transform: translateZ(-45vw) rotateY(-120deg); }
+    55%, 72.5% { transform: translateZ(-45vw) rotateY(-240deg); }
+    82.5%, 100% { transform: translateZ(-45vw) rotateY(-360deg); }
+  }
+
+  /* 调整文字样式 */
+  .notice-title {
+    font-size: 1.2rem;
+    padding-bottom: 0.4rem;
+  }
+  .notice-item>article {
+    padding: 1rem;
+    min-height: 70px;
+  }
+  .notice-item>article h1,
+  .notice-item>article h2,
+  .notice-item>article h3 {
+    font-size: 1.1rem;
+    margin-top: 0.8rem;
+  }
+}
+
+/* 3. 小屏手机 (≤ 576px) */
+@media (max-width: 576px) {
+  /* 极致适配小屏 */
+  .notice-content-container {
+    width: 90vw;
+    height: 80vw;
+    max-width: 350px;
+    max-height: 300px;
+    top: 55%;
+    /* 减小透视距离，避免轮播项超出屏幕 */
+    perspective: 800px;
+  }
+
+  /* 轮播项适配 */
+  .notice-item {
+    width: 90vw;
+    height: 55vw;
+    max-width: 300px;
+    max-height: 180px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
+    -webkit-box-reflect: below 10px -webkit-linear-gradient(transparent 70%, rgba(255, 255, 255, 0.1));
+  }
+
+  /* 调整3D平移距离（关键：避免轮播项出屏） */
+  .notice-list {
+    transform: translateZ(-45vw) rotateY(0);
+  }
+  .notice-item:nth-child(1) {
+    transform: rotateY(0) translateZ(50vw);
+  }
+  .notice-item:nth-child(2) {
+    transform: rotateY(120deg) translateZ(50vw);
+  }
+  .notice-item:nth-child(3) {
+    transform: rotateY(240deg) translateZ(50vw);
+  }
+  @keyframes carousel {
+    0%, 17.5% { transform: translateZ(-50vw) rotateY(0); }
+    27.5%, 45% { transform: translateZ(-50vw) rotateY(-120deg); }
+    55%, 72.5% { transform: translateZ(-50vw) rotateY(-240deg); }
+    82.5%, 100% { transform: translateZ(-50vw) rotateY(-360deg); }
+  }
+
+  /* 文字极致适配 */
+  .notice-title {
+    font-size: 1.1rem;
+    margin-bottom: 0.8rem;
+  }
+  .notice-item>article {
+    padding: 0.8rem;
+    min-height: 60px;
+    border-radius: 0.3rem;
+  }
+  .notice-item>article p {
+    font-size: 0.85rem;
+    line-height: 1.4;
+    margin-bottom: 0.8rem;
+  }
+  .notice-create-time {
+    font-size: 0.75rem;
+    bottom: 0.5rem;
+    right: 0.5rem;
+    /* 小屏时背景半透，避免文字看不清 */
+    background-color: rgba(255, 255, 255, 0.2);
+    padding: 0.2rem 0.4rem;
+    border-radius: 0.2rem;
+  }
+  /* 隐藏过长的列表项符号，避免溢出 */
+  .notice-item>article ul,
+  .notice-item>article ol {
+    padding-left: 1rem;
+  }
+}
+
+/* 补充：修复CSS变量（可选，增强兼容性） */
+.notice-item:nth-child(1) { --rotate-deg: 0deg; }
+.notice-item:nth-child(2) { --rotate-deg: 120deg; }
+.notice-item:nth-child(3) { --rotate-deg: 240deg; }

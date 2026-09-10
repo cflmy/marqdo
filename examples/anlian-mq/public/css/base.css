@@ -1,0 +1,393 @@
+/*
+ * @File: base.css
+ * @Description: 网站全局基础样式文件，本次更新重点优化了导航栏的布局和美观度。
+ * @Author: Your Name
+ * @Date: 2023-10-27
+ * @Update: 2023-10-28 - 优化导航栏颜色方案，并为Logo添加动画效果；新增左右留白容器的响应式样式；修复导航栏与主内容容器重叠问题。
+ */
+
+/* --- 1. 全局盒模型与颜色变量设置 --- */
+* {
+  box-sizing: border-box;
+  padding: 0;
+  margin: 0;
+}
+
+:root {
+  --custom-primary: #ffffff;      /* 主色调：柔和的蓝色 */
+  --custom-primary-rgb: 93, 127, 229; /* 主色调的RGB值，用于透明度 */
+  --custom-bg: rgba(255, 255, 255, 0.2); /* 导航栏背景色：半透明白色 */
+  --custom-text: #333333;         /* 主要文字颜色：深灰色，保证可读性 */
+  --custom-link-hover: #fdbbdb;   /* 链接悬停颜色：柔和的紫色 */
+  --custom-btn-hover-bg: #fdbbdb; /* 按钮悬停背景色：柔和的蓝色 */
+  /* 新增：宽屏时左右留白的宽度（可根据需求调整） */
+  --side-gap-width: 120px;
+}
+
+/* --- 2. 页面主体样式 --- */
+body {
+  /* ========== 背景图：960w 优化版，避免全尺寸 1232px 浪费带宽 ========== */
+  background-image: url("/static/img/bg-body-960.webp");
+  background-repeat: no-repeat;
+  background-size: cover;
+  background-position: center center;
+  background-attachment: fixed;
+  background-color: #f8f9fa;
+
+  /* ========== 核心修改：重构布局流 ========== */
+  /* 从row改为column，让导航栏+内容区垂直排列 */
+  display: flex;
+  flex-direction: column; /* 关键修改1：垂直布局 */
+  overflow-x: hidden;
+  overflow-y: auto;
+  min-height: 100vh;
+  margin: 0;
+  position: relative;
+  z-index: 1;
+  width: 100vw;
+}
+
+/* ========== 毛玻璃效果遮罩层（保留） ========== */
+/* body::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  /* backdrop-filter: blur(1px); */
+  /*background-color: rgba(255, 255, 255, 0.2);
+  z-index: -1;
+  background-attachment: fixed;
+} */
+
+/* --- 3. 导航栏 (Navbar) 核心美化 --- */
+.navbar {
+  background-color: var(--custom-bg) !important;
+  backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: inset 0 0 5px rgba(255, 255, 255, 0.1);
+  padding-top: 0.75rem;
+  padding-bottom: 0.75rem;
+  position: relative;
+  z-index: 1000;
+  width: 100%;
+}
+
+.navbar-shell {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  width: 100%;
+  padding-left: 0.5rem;
+  padding-right: 0.75rem;
+}
+
+.navbar-start {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.navbar .navbar-collapse {
+  flex-grow: 1;
+}
+
+@media (min-width: 992px) {
+  .navbar .navbar-collapse {
+    display: flex !important;
+    flex-wrap: nowrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+}
+
+.navbar-nav-main {
+  flex-wrap: wrap;
+}
+
+.navbar-end {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.75rem;
+  width: 100%;
+}
+
+@media (min-width: 992px) {
+  .navbar-end {
+    flex-direction: row;
+    align-items: center;
+    flex-shrink: 0;
+    width: auto;
+    margin-left: auto;
+    gap: 0.75rem;
+  }
+}
+
+.navbar-search {
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.navbar-search .form-control {
+  min-width: 120px;
+  max-width: 180px;
+}
+
+.navbar-auth {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.25rem;
+  flex-wrap: nowrap;
+}
+
+.navbar-auth .nav-link-auth,
+.navbar-auth .nav-link-btn {
+  padding: 0.35rem 0.85rem !important;
+  border-radius: 999px;
+  border: 1px solid rgba(var(--custom-primary-rgb), 0.45);
+  background: rgba(var(--custom-primary-rgb), 0.12);
+  font-weight: 600;
+}
+
+.navbar-auth .nav-link-auth:hover,
+.navbar-auth .nav-link-btn:hover {
+  background: rgba(var(--custom-primary-rgb), 0.22);
+  transform: none;
+}
+
+.navbar-brand {
+  color: var(--custom-primary) !important;
+  font-weight: 700;
+  margin-right: 2rem;
+}
+
+@keyframes pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+  100% { transform: scale(1); }
+}
+
+.navbar-logo {
+  padding-top: 0.3125rem;
+  padding-bottom: 0.3125rem;
+  padding-left: 0.75rem;
+  padding-right: 0.25rem;
+  animation: pulse 3s ease-in-out infinite;
+}
+
+.navbar-dark .nav-link {
+  color: var(--custom-text) !important;
+  margin-left: 0.5rem;
+  margin-right: 0.5rem;
+  transition: color 0.2s ease-in-out, transform 0.2s ease-in-out;
+}
+
+.navbar-dark .nav-link:hover {
+  color: var(--custom-link-hover) !important;
+  transform: translateY(-2px);
+}
+
+.navbar-search .form-control {
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
+  border-radius: 0.375rem;
+  outline: none;
+  transition: box-shadow 0.2s ease-in-out, border-color 0.2s ease-in-out;
+}
+
+.navbar-search .form-control:focus {
+  border-color: rgba(var(--custom-primary-rgb), 0.5);
+  box-shadow: 0 0 0 0.2rem rgba(var(--custom-primary-rgb), 0.25);
+}
+
+.navbar-search .btn-outline-success {
+  color: var(--custom-primary);
+  border-color: var(--custom-primary);
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
+  white-space: nowrap;
+  transition: all 0.2s ease-in-out;
+}
+
+.navbar-search .btn-outline-success:hover {
+  background-color: var(--custom-btn-hover-bg);
+  border-color: var(--custom-btn-hover-bg);
+  color: #fff;
+}
+
+@media (max-width: 991.98px) {
+  .navbar-search {
+    width: 100%;
+  }
+
+  .navbar-search .form-control {
+    flex: 1;
+    max-width: none;
+  }
+
+  .navbar-auth {
+    justify-content: flex-start;
+    padding-top: 0.25rem;
+  }
+}
+
+/* --- 6. 主要内容区域样式 --- */
+/* .main-container {
+  /* 调整：主内容容器在横向flex中占剩余空间 */
+  /*flex: 1;
+  /* 关键修改3：移除多余的padding-top，因为导航栏已回归文档流，无需遮挡补偿 */
+  /*padding-bottom: 4rem;
+  /* 限制主内容最大宽度，保证阅读体验 */
+  /*max-width: 1200px;*/
+  /* 让主内容在content-wrapper中居中（配合左右留白） */
+  /*margin: 0 auto;
+  /* 左右内边距，适配窄屏 */
+  /* padding-left: 1rem;
+  padding-right: 1rem;
+  /* 毛玻璃效果（保留） */
+  /* background-color: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(0px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: inset 0 0 5px rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  padding: 50px 100px; */
+  /* 新增：给主内容容器添加顶部外边距，增加与导航栏的间距 */
+  /*margin-top: 2rem; */
+/*} */
+
+/* --- 7. 左右留白容器样式 (核心需求，适配新布局) ---
+.left-container, .right-container {
+  /* 窄屏时宽度为0，不显示留白 */
+  /*width: 0;
+  /* 不占用空间 */
+  /*flex-shrink: 0;
+  /* 背景色和页面主体一致，视觉上是留白 */
+  /*background-color: transparent;
+} */
+
+/* 宽屏断点（和Bootstrap lg断点一致：992px） */
+/* @media (min-width: 992px) {
+  /* 宽屏时显示左右留白 */
+  /* .left-container, .right-container {
+    /* 使用自定义变量设置留白宽度，可灵活调整 */
+    /*width: var(--side-gap-width);
+    background-color: transparent;
+    /* 可选：添加轻微阴影，增强层次感 */
+    /*box-shadow: inset 0 0 8px rgba(0, 0, 0, 0.02);*/
+  /*} */
+  
+  /* 可选：超宽屏（比如1600px以上）时，限制留白最大宽度 */
+  /*@media (min-width: 1600px) {
+    .left-container, .right-container {
+      width: calc((100vw - 1200px) / 2);
+      max-width: 200px;
+      background-color: transparent;
+    }
+  }
+} */
+
+/* 2. 主体容器样式：确保和footer分隔 */
+.main-container {
+  /* 主体容器宽度自适应，可根据需求调整最大宽度 */
+  width: 100%;
+  /* 居中显示（可选） */
+  margin: 0 auto;
+  /* 关键：给主体底部加间距，和footer分开 */
+  margin-bottom: 1rem;
+  /* 主体内边距，防止内容贴边 */
+  padding: 1rem;
+}
+
+/* --- 页脚 (Footer) 样式 - 毛玻璃效果 + 适配新增内容 --- */
+.footer {
+  /* 核心毛玻璃效果 */
+  background-color: rgba(255, 255, 255, 0.3);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px); /* 兼容webkit内核浏览器 */
+  border: 1px solid rgba(255, 255, 255, 0.1); /* 浅白色边框增强质感 */
+  box-shadow: inset 0 0 10px rgba(255, 255, 255, 0.05); /* 内阴影提升层次 */
+  
+  /* 布局样式 - 回归文档流，不脱离 */
+  position: static;
+  width: 100%;
+  padding: 1.5rem 1rem; /* 上下内边距充足，容纳多行内容 */
+  margin-top: 2rem; /* 与上方内容分隔 */
+  height: auto; /* 高度自适应内容，不挤压 */
+  
+  /* 内容排版 - 垂直分布，居中对齐 */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem; /* 各子元素之间的间距 */
+  
+  /* 文字基础样式 */
+  color: #ffffff !important;
+  font-size: 14px;
+}
+
+/* footer logo样式 */
+.footer-logo {
+  margin-bottom: 0.25rem; /* 与版权信息轻微分隔 */
+}
+
+.footer-logo img {
+  border-radius: 50%; /* logo圆形化（可选） */
+  transition: transform 0.2s ease-in-out;
+}
+
+.footer-logo img:hover {
+  transform: scale(1.1); /* logo悬浮轻微放大 */
+}
+
+/* 版权信息容器 */
+.footer-container {
+  text-align: center;
+  color: rgba(255, 255, 255, 0.9); /* 文字半透，更柔和 */
+}
+
+/* 联系我们链接 */
+.footer-contact a {
+  color: rgba(255, 255, 255, 0.9) !important;
+  text-decoration: none;
+  padding: 0.25rem 0.75rem;
+  border-radius: 4px;
+  transition: all 0.2s ease-in-out;
+}
+
+.footer-contact a:hover {
+  color: #ffffff !important;
+  background-color: rgba(255, 255, 255, 0.15);
+  text-decoration: underline;
+}
+
+/* 作者信息样式 */
+.footer-author {
+  color: rgba(255, 255, 255, 0.7); /* 作者信息稍淡，突出层级 */
+  font-size: 13px;
+}
+
+.footer-author a {
+  color: rgba(255, 255, 255, 0.85) !important;
+  text-decoration: none;
+  transition: color 0.2s ease-in-out;
+}
+
+.footer-author a:hover {
+  color: #ffffff !important;
+  text-decoration: underline;
+}
+
+/* 响应式适配 - 小屏幕优化 */
+@media (max-width: 575.98px) {
+  .footer {
+    padding: 1rem 0.5rem;
+    gap: 0.5rem;
+  }
+  
+  .footer-author {
+    font-size: 12px;
+  }
+}

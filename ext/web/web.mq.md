@@ -270,6 +270,15 @@ of a list of cards. Set on the dynamic post page so `/post/{slug}` shows one pos
 
 **> web_page_detail page=`self` detail=`detail`**
 
+## chrome
+    + `nav_html`=""
+    + `footer_html`=""
+    + `body_class`=""
+
+Override default header/footer list chrome with raw HTML (site navbar / footer). Optional `body_class` is appended to `<body class>`.
+
+**> web_page_chrome page=`self` nav_html=`nav_html` footer_html=`footer_html` body_class=`body_class`**
+
 ## meta
     + `meta`
 

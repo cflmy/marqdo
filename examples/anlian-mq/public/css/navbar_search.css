@@ -1,0 +1,80 @@
+/**
+ * 导航栏搜索框 — 粉色主题
+ */
+
+.navbar-search {
+  gap: 0.45rem;
+  align-items: stretch;
+  flex-shrink: 1;
+  min-width: 0;
+}
+
+.navbar-search .form-control {
+  min-width: 8.5rem;
+  max-width: 11.5rem;
+  padding: 0.45rem 0.85rem;
+  font-size: 0.875rem;
+  line-height: 1.35;
+  color: #f5f5f5;
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(253, 189, 219, 0.45);
+  border-radius: 999px;
+  transition: background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.navbar-search .form-control::placeholder {
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.navbar-search .form-control:focus {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.22);
+  border-color: rgba(253, 189, 219, 0.75);
+  box-shadow: 0 0 0 2px rgba(253, 189, 219, 0.28);
+  outline: none;
+}
+
+.navbar-search .btn-search-submit {
+  flex-shrink: 0;
+  padding: 0.45rem 0.95rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  line-height: 1.35;
+  color: #a85878;
+  white-space: nowrap;
+  background: linear-gradient(135deg, rgba(253, 189, 219, 0.92), rgba(240, 168, 196, 0.95));
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 999px;
+  transition: box-shadow 0.2s ease, transform 0.2s ease, filter 0.2s ease;
+}
+
+.navbar-search .btn-search-submit:hover {
+  color: #8a4560;
+  background: linear-gradient(135deg, rgba(253, 189, 219, 1), rgba(240, 168, 196, 1));
+  border-color: rgba(255, 255, 255, 0.5);
+  box-shadow: 0 3px 14px rgba(253, 189, 219, 0.35);
+  transform: translateY(-1px);
+}
+
+@media (max-width: 991.98px) {
+  .navbar-search {
+    width: 100%;
+    margin: 0.5rem 0;
+  }
+
+  .navbar-search .form-control {
+    flex: 1;
+    max-width: none;
+    min-width: 0;
+  }
+
+  .navbar-search .btn-search-submit {
+    padding: 0.45rem 1.1rem;
+  }
+}
+
+@media (max-width: 576px) {
+  .navbar-search .btn-search-submit {
+    flex: 1;
+  }
+}

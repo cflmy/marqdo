@@ -1,0 +1,276 @@
+/**
+ * 首页 Hero（暗恋见君）
+ * 断点：台式 ≥1025px | 平板 768–1024px | 手机 ≤767px
+ */
+
+@keyframes heroImageFloat {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.04);
+  }
+}
+
+/* ---------- 区块与容器 ---------- */
+section.hero {
+  align-items: stretch;
+  justify-content: center;
+}
+
+.hero .section-wrap {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 1.25rem;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* ---------- 顶栏 Logo ---------- */
+.hero header {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.65rem;
+  width: 100%;
+  padding-bottom: 0.75rem;
+  flex-shrink: 0;
+}
+
+.hero header img {
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  object-fit: contain;
+}
+
+.head-logo {
+  font-size: 2rem;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  cursor: pointer;
+  text-decoration: none;
+  color: #000;
+  white-space: nowrap;
+}
+
+.head-logo span {
+  color: #ffd0d0;
+}
+
+/* ---------- 主内容区 ---------- */
+.hero-content {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: center;
+  gap: 2rem;
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+}
+
+.hero .left {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  min-width: 0;
+  width: 100%;
+}
+
+.hero .right {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  width: 100%;
+}
+
+.main-text {
+  margin: 0 0 1.875rem;
+  font-size: 6rem;
+  font-weight: 800;
+  line-height: 1.2;
+  text-transform: uppercase;
+  color: #111;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  width: 100%;
+}
+
+.main-text span {
+  color: #ffd0d0;
+}
+
+.sub-text {
+  margin: 0 0 3.125rem;
+  font-size: 1.2rem;
+  letter-spacing: 1px;
+  font-weight: 400;
+  color: rgba(60, 60, 60, 0.85);
+  line-height: 1.5;
+  max-width: none;
+}
+
+.hero .right img {
+  display: block;
+  width: 85%;
+  max-width: 100%;
+  height: auto;
+  filter: drop-shadow(0 0 20px rgba(255, 208, 208, 0.45));
+  animation: heroImageFloat 30s linear infinite;
+  pointer-events: none;
+}
+
+/* ---------- 社交链接 ---------- */
+.hero .social {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.5rem;
+  width: 100%;
+  flex-shrink: 0;
+  padding-top: 0.25rem;
+}
+
+.hero .social a {
+  display: inline-flex;
+  text-decoration: none;
+}
+
+.hero .social .anlian-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  font-size: 1.1rem;
+  border: 1px solid rgba(241, 248, 233, 0.9);
+  border-radius: 50%;
+  margin: 0;
+  cursor: pointer;
+  transition: border-color 0.25s, box-shadow 0.25s, transform 0.25s, color 0.25s;
+}
+
+.hero .social .anlian-icon:hover {
+  border-color: #ffd0d0;
+  box-shadow: 0 0 20px rgba(255, 208, 208, 0.45);
+  color: #ffd0d0;
+  transform: rotate(360deg);
+}
+
+/* ========== 平板（768px–1024px） ========== */
+@media (max-width: 1024px) {
+  .head-logo {
+    font-size: 1.8rem;
+    letter-spacing: 0.08em;
+  }
+
+  .hero-content {
+    grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+    gap: 1.25rem;
+  }
+
+  .main-text {
+    font-size: clamp(2.5rem, 4.5vw, 4rem);
+    margin-bottom: 1.25rem;
+    line-height: 1.15;
+  }
+
+  .sub-text {
+    font-size: 1rem;
+    margin-bottom: 2rem;
+  }
+
+  .hero .right img {
+    width: min(90%, 340px);
+  }
+}
+
+/* ========== 手机（≤767px） ========== */
+@media (max-width: 767px) {
+  .hero .section-wrap {
+    gap: 1rem;
+  }
+
+  .hero header {
+    justify-content: center;
+  }
+
+  .hero-content {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto;
+    gap: 1.5rem;
+  }
+
+  .hero .left {
+    align-items: center;
+    text-align: center;
+    order: 1;
+  }
+
+  .hero .right {
+    order: 2;
+  }
+
+  .main-text {
+    font-size: clamp(1.85rem, 8vw, 2.75rem);
+    text-align: center;
+  }
+
+  .sub-text {
+    text-align: center;
+    padding: 0 0.5rem;
+  }
+
+  .hero .right img {
+    width: min(72%, 280px);
+    margin: 0 auto;
+  }
+
+  .hero .social {
+    justify-content: center;
+    padding-top: 0.5rem;
+  }
+
+  .hero .social .anlian-icon {
+    width: 36px;
+    height: 36px;
+    font-size: 1rem;
+  }
+}
+
+@media (max-width: 576px) {
+  .hero header img {
+    width: 26px;
+    height: 26px;
+  }
+
+  .main-text {
+    font-size: clamp(1.65rem, 9vw, 2.2rem);
+  }
+
+  .sub-text {
+    font-size: 0.875rem;
+  }
+
+  .hero .right img {
+    width: min(78%, 240px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero .right img {
+    animation: none;
+  }
+
+  .hero .social .anlian-icon:hover {
+    transform: none;
+  }
+}

@@ -119,7 +119,7 @@ func (st *state) handleInvoke(w http.ResponseWriter, r *http.Request, route invo
 	}
 
 	switch route.ReturnMode {
-	case "text":
+	case "text", "html", "text/html":
 		if value == nil {
 			jsonErr(w, http.StatusInternalServerError, "null result")
 			return
@@ -128,7 +128,11 @@ func (st *state) handleInvoke(w http.ResponseWriter, r *http.Request, route invo
 		if s, ok := value.(string); ok {
 			text = s
 		}
-		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		ct := "text/plain; charset=utf-8"
+		if route.ReturnMode == "html" || route.ReturnMode == "text/html" {
+			ct = "text/html; charset=utf-8"
+		}
+		w.Header().Set("Content-Type", ct)
 		w.WriteHeader(http.StatusOK)
 		_, _ = io.WriteString(w, text)
 	case "status":

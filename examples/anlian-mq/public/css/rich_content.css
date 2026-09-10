@@ -1,0 +1,131 @@
+/**
+ * 富文本正文 — 编辑器与详情页共用，保证 Enter 换行所见即所得
+ */
+
+:root {
+  --anlian-rich-font-size: 1.2rem;
+  --anlian-rich-line-height: 1.85;
+  --anlian-rich-color: #000;
+  --anlian-rich-weight: 450;
+  /* Enter 新段落：约半行间距，接近自然换行 */
+  --anlian-rich-p-gap: 0.28em;
+  /* 空行（<p><br></p>）：略大于段内换行 */
+  --anlian-rich-blank-gap: 0.55em;
+}
+
+/* 详情页正文 + wangEditor 编辑区 */
+.anlian-rich-content,
+.anlian-editor-wrap .w-e-text-container .w-e-text {
+  display: block;
+  font-size: var(--anlian-rich-font-size) !important;
+  line-height: var(--anlian-rich-line-height) !important;
+  color: var(--anlian-rich-color) !important;
+  font-weight: var(--anlian-rich-weight);
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+.anlian-rich-content p,
+.anlian-editor-wrap .w-e-text-container .w-e-text p {
+  display: block;
+  margin: 0 0 var(--anlian-rich-p-gap);
+  padding: 0;
+}
+
+.anlian-rich-content p:last-child,
+.anlian-editor-wrap .w-e-text-container .w-e-text p:last-child {
+  margin-bottom: 0;
+}
+
+/* 连按 Enter 产生的空行 */
+.anlian-rich-content p:empty,
+.anlian-rich-content p:has(> br:only-child),
+.anlian-editor-wrap .w-e-text-container .w-e-text p:empty,
+.anlian-editor-wrap .w-e-text-container .w-e-text p:has(> br:only-child) {
+  margin: 0 0 var(--anlian-rich-blank-gap);
+  min-height: var(--anlian-rich-blank-gap);
+  line-height: var(--anlian-rich-blank-gap);
+}
+
+.anlian-rich-content h1,
+.anlian-rich-content h2,
+.anlian-rich-content h3,
+.anlian-rich-content h4,
+.anlian-editor-wrap .w-e-text-container .w-e-text h1,
+.anlian-editor-wrap .w-e-text-container .w-e-text h2,
+.anlian-editor-wrap .w-e-text-container .w-e-text h3,
+.anlian-editor-wrap .w-e-text-container .w-e-text h4 {
+  display: block;
+  margin: 0.75em 0 0.35em;
+  font-weight: 700;
+  line-height: 1.4;
+  color: var(--anlian-rich-color);
+}
+
+.anlian-rich-content h1:first-child,
+.anlian-rich-content h2:first-child,
+.anlian-editor-wrap .w-e-text-container .w-e-text h1:first-child,
+.anlian-editor-wrap .w-e-text-container .w-e-text h2:first-child {
+  margin-top: 0;
+}
+
+.anlian-rich-content a,
+.anlian-editor-wrap .w-e-text-container .w-e-text a {
+  color: #a85878;
+  text-decoration: underline;
+}
+
+.anlian-rich-content blockquote,
+.anlian-editor-wrap .w-e-text-container .w-e-text blockquote {
+  margin: 0.5em 0;
+  padding: 0.35em 0 0.35em 1em;
+  border-left: 3px solid rgba(253, 189, 219, 0.85);
+  color: #333;
+}
+
+.anlian-rich-content ul,
+.anlian-rich-content ol,
+.anlian-editor-wrap .w-e-text-container .w-e-text ul,
+.anlian-editor-wrap .w-e-text-container .w-e-text ol {
+  margin: 0.35em 0;
+  padding-left: 1.5em;
+}
+
+.anlian-rich-content li,
+.anlian-editor-wrap .w-e-text-container .w-e-text li {
+  margin: 0.15em 0;
+}
+
+.anlian-rich-content img,
+.anlian-editor-wrap .w-e-text-container .w-e-text img {
+  max-width: 80%;
+  max-height: 600px;
+  height: auto;
+  display: block;
+  margin: 1em auto;
+  border-radius: 0.8rem;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+/* 编辑区内边距，接近详情页正文卡片 */
+.anlian-editor-wrap .w-e-text-container .w-e-text {
+  padding: 1.25rem 1.5rem !important;
+  min-height: 280px;
+  box-sizing: border-box;
+}
+
+@media (max-width: 767.98px) {
+  :root {
+    --anlian-rich-font-size: 1.15rem;
+  }
+
+  .anlian-rich-content img,
+  .anlian-editor-wrap .w-e-text-container .w-e-text img {
+    max-width: 95%;
+  }
+
+  .anlian-editor-wrap .w-e-text-container .w-e-text {
+    padding: 1rem 1.1rem !important;
+    min-height: 240px;
+  }
+}

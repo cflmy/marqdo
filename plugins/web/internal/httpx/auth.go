@@ -435,21 +435,21 @@ func loginPageHTML(loginAction string, errMsg *string, csrf string, next string)
 :root { --ink:#1c1917; --muted:#78716c; --paper:#fafaf9; --line:#e7e5e4; --accent:#0f766e; --err:#b91c1c; }
 * { box-sizing:border-box; }
 body { margin:0; min-height:100vh; display:grid; place-items:center; background:var(--paper); color:var(--ink); font-family:"IBM Plex Sans","Noto Sans SC",sans-serif; }
-.login { background:#fff; border:1px solid var(--line); border-radius:10px; padding:2rem 2.25rem; width:min(92vw,22rem); box-shadow:0 8px 24px rgba(0,0,0,.05); }
-.login h1 { margin:0 0 .25rem; font-size:1.4rem; }
-.login .sub { color:var(--muted); margin:0 0 1.25rem; font-size:.9rem; }
+.login { background:rgba(255,255,255,.45); border:1px solid rgba(255,255,255,.5); border-radius:14px; padding:2rem 2.25rem; width:min(92vw,22rem); box-shadow:0 8px 24px rgba(253,189,219,.18); backdrop-filter:blur(14px); }
+.login h1 { margin:0 0 .25rem; font-size:1.4rem; color:#a85878; }
+.login .sub { color:#666; margin:0 0 1.25rem; font-size:.9rem; }
 .login form { display:grid; gap:.9rem; }
 .login label { display:grid; gap:.25rem; font-size:.9rem; }
-.login input { padding:.55rem .65rem; border:1px solid var(--line); border-radius:6px; font:inherit; }
-.login button { background:var(--accent); color:#fff; border:0; padding:.6rem 1rem; border-radius:6px; cursor:pointer; font:inherit; }
+.login input { padding:.55rem .65rem; border:1px solid rgba(253,189,219,.55); border-radius:999px; font:inherit; background:rgba(255,255,255,.7); }
+.login button { background:linear-gradient(120deg,#f0a8c4,#fdbbdb); color:#a85878; border:0; padding:.6rem 1rem; border-radius:999px; cursor:pointer; font:inherit; font-weight:600; }
 .login button:hover { filter:brightness(1.05); }
-.flash.err { background:#fef2f2; color:var(--err); border:1px solid #fecaca; padding:.6rem .8rem; border-radius:6px; margin:0 0 .9rem; font-size:.9rem; }
+.flash.err { background:#fef2f2; color:#b91c1c; border:1px solid #fecaca; padding:.6rem .8rem; border-radius:6px; margin:0 0 .9rem; font-size:.9rem; }
 </style>
 </head>
-<body>
+<body style="background:#f8f9fa url('/static/img/bg-body-960.webp') center/cover fixed;">
 <div class="login">
-<h1>Admin</h1>
-<p class="sub">Sign in to manage this site.</p>
+<h1>暗恋见君</h1>
+<p class="sub">登录后发帖与管理。</p>
 %s
 <form method="post" action="%s">
 %s%s

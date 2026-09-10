@@ -86,6 +86,21 @@ func SetDetail(page map[string]any, on bool) map[string]any {
 	return out
 }
 
+// SetChromeHTML sets raw nav_html / footer_html / body_class overrides.
+func SetChromeHTML(page map[string]any, navHTML, footerHTML, bodyClass string) map[string]any {
+	out := clone(page)
+	if strings.TrimSpace(navHTML) != "" {
+		out["nav_html"] = navHTML
+	}
+	if strings.TrimSpace(footerHTML) != "" {
+		out["footer_html"] = footerHTML
+	}
+	if strings.TrimSpace(bodyClass) != "" {
+		out["body_class"] = bodyClass
+	}
+	return out
+}
+
 func clone(page map[string]any) map[string]any {
 	out := map[string]any{}
 	for k, v := range page {

@@ -1,0 +1,459 @@
+/**
+ * 帖子/新闻列表共用：粉色毛玻璃分段板块 + 横向卡片
+ * 用于首页 .home-posts 与独立列表页 .feed-list-page
+ */
+
+.home-posts,
+.feed-list-page {
+  --post-accent: #fdbbdb;
+  --post-accent-deep: #f0a8c4;
+  --post-accent-text: #a85878;
+  --post-accent-muted: #c97a96;
+  --post-accent-bg: rgba(253, 189, 219, 0.48);
+}
+
+/* ---------- 板块栏（强制单行：左箭头 | 可滚动 Tab | 右箭头） ---------- */
+.home-posts-board-bar,
+.feed-list-page .feed-board-bar {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.5rem;
+  margin-bottom: 1.25rem;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.home-posts-segment-outer,
+.feed-list-page .feed-segment-outer {
+  flex: 1 1 0%;
+  min-width: 0;
+  width: 0;
+  display: block;
+  overflow: hidden;
+}
+
+.home-posts-segment,
+.feed-list-page .feed-segment {
+  position: relative;
+  display: flex;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: 4px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.28);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  box-shadow:
+    0 4px 20px rgba(253, 189, 219, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.35);
+}
+
+.home-posts-spotlight,
+.feed-list-page .feed-spotlight {
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  left: 0;
+  width: var(--spot-w, 4rem);
+  border-radius: 999px;
+  background: var(--post-accent-bg);
+  border: 1px solid rgba(240, 168, 196, 0.55);
+  box-shadow: 0 2px 14px rgba(253, 189, 219, 0.35);
+  transform: translateX(var(--spot-l, 0));
+  transition:
+    transform 0.28s cubic-bezier(0.34, 1.2, 0.64, 1),
+    width 0.28s cubic-bezier(0.34, 1.2, 0.64, 1);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.home-posts-tabs-scroll,
+.feed-list-page .feed-tabs-scroll {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  max-width: 100%;
+  scroll-behavior: smooth;
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+  mask-image: linear-gradient(
+    to right,
+    transparent,
+    #000 12px,
+    #000 calc(100% - 12px),
+    transparent
+  );
+}
+
+.home-posts-tabs-scroll::-webkit-scrollbar,
+.feed-list-page .feed-tabs-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.home-posts-tabs,
+.feed-list-page .feed-tabs {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 2px;
+  padding: 0 2px;
+}
+
+.home-posts-tab,
+.feed-list-page .feed-tab {
+  flex-shrink: 0;
+  padding: 0.4rem 1rem;
+  border-radius: 999px;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  text-decoration: none;
+  color: #555;
+  background: transparent;
+  border: 1px solid transparent;
+  transition: color 0.2s ease;
+  white-space: nowrap;
+}
+
+.home-posts-tab:hover,
+.feed-list-page .feed-tab:hover {
+  color: var(--post-accent-text);
+}
+
+.home-posts-tab.active,
+.feed-list-page .feed-tab.active {
+  color: var(--post-accent-text);
+  font-weight: 600;
+}
+
+.home-posts-tab-more {
+  background: rgba(253, 189, 219, 0.32);
+  border-color: rgba(253, 189, 219, 0.45);
+  color: var(--post-accent-text);
+}
+
+.home-posts-tab-more:hover {
+  background: rgba(253, 189, 219, 0.48);
+  color: var(--post-accent-text);
+}
+
+.home-posts-scroll,
+.feed-list-page .feed-scroll {
+  flex: 0 0 32px;
+  width: 32px;
+  min-width: 32px;
+  max-width: 32px;
+  height: 32px;
+  padding: 0;
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.35);
+  backdrop-filter: blur(10px);
+  color: var(--post-accent-text);
+  cursor: pointer;
+  transition: background 0.2s, transform 0.2s, opacity 0.2s;
+  box-sizing: border-box;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.home-posts-scroll:hover,
+.feed-list-page .feed-scroll:hover {
+  background: rgba(253, 189, 219, 0.35);
+  transform: scale(1.05);
+}
+
+.home-posts-scroll:disabled,
+.home-posts-scroll.is-hidden,
+.feed-list-page .feed-scroll.is-hidden {
+  opacity: 0.3;
+  pointer-events: none;
+  transform: none;
+  /* 仍占位，避免板块栏折行 */
+  visibility: visible;
+  flex: 0 0 32px;
+  width: 32px;
+  min-width: 32px;
+}
+
+/* ---------- 帖子卡片列表 ---------- */
+.home-posts-list,
+.feed-list-page .feed-posts-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.home-post-card,
+.feed-list-page .feed-post-card {
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.32);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.42);
+  box-shadow: 0 4px 16px rgba(253, 189, 219, 0.08);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+.home-post-card:hover,
+.feed-list-page .feed-post-card:hover {
+  transform: translateY(-2px);
+  background: rgba(255, 255, 255, 0.42);
+  box-shadow: 0 8px 24px rgba(253, 189, 219, 0.18);
+}
+
+.home-post-card-link,
+.feed-list-page .feed-post-card-link {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 0.75rem 1rem;
+  padding: 0.75rem 1rem;
+  text-decoration: none;
+  color: inherit;
+}
+
+.home-post-board,
+.feed-list-page .feed-post-board {
+  flex-shrink: 0;
+  padding: 0.2rem 0.55rem;
+  border-radius: 6px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--post-accent-text);
+  background: rgba(253, 189, 219, 0.28);
+  white-space: nowrap;
+  max-width: 5rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.home-post-body,
+.feed-list-page .feed-post-body {
+  min-width: 0;
+}
+
+.home-post-title,
+.feed-list-page .feed-post-title {
+  margin: 0 0 0.3rem;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: #222;
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 1;
+  overflow: hidden;
+}
+
+.home-post-meta,
+.feed-list-page .feed-post-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.85rem;
+  font-size: 0.75rem;
+  color: #666;
+}
+
+.home-post-meta-item,
+.feed-list-page .feed-post-meta-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.home-post-meta i,
+.feed-list-page .feed-post-meta i {
+  font-size: 0.7rem;
+  opacity: 0.75;
+}
+
+.home-post-meta time,
+.feed-list-page .feed-post-meta time {
+  color: var(--post-accent-muted);
+}
+
+.home-post-arrow,
+.feed-list-page .feed-post-arrow {
+  color: rgba(253, 189, 219, 0.9);
+  font-size: 0.75rem;
+  opacity: 0.7;
+  transition: opacity 0.2s, transform 0.2s;
+}
+
+.home-post-card:hover .home-post-arrow,
+.feed-list-page .feed-post-card:hover .feed-post-arrow {
+  opacity: 1;
+  transform: translateX(2px);
+}
+
+.home-posts-empty,
+.feed-list-page .feed-empty {
+  text-align: center;
+  padding: 2rem;
+  color: #666;
+}
+
+.home-posts-more-link {
+  display: block;
+  width: fit-content;
+  margin: 1rem auto 0;
+  padding: 0.45rem 1.25rem;
+  border-radius: 999px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  text-decoration: none;
+  color: var(--post-accent-text);
+  background: rgba(253, 189, 219, 0.35);
+  border: 1px solid rgba(253, 189, 219, 0.55);
+  transition: background 0.2s, box-shadow 0.2s;
+}
+
+.home-posts-more-link:hover {
+  background: rgba(253, 189, 219, 0.5);
+  box-shadow: 0 4px 14px rgba(253, 189, 219, 0.25);
+}
+
+/* ---------- 新闻列表卡片（横向胶囊风格，静态列表） ---------- */
+.feed-list-page .feed-news-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.feed-list-page .feed-news-card {
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.32);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.42);
+  box-shadow: 0 4px 16px rgba(253, 189, 219, 0.08);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+.feed-list-page .feed-news-card:hover {
+  transform: translateY(-2px);
+  background: rgba(255, 255, 255, 0.42);
+  box-shadow: 0 8px 24px rgba(253, 189, 219, 0.18);
+}
+
+.feed-list-page .feed-news-card-link {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 0.75rem 1rem;
+  padding: 0.75rem 1rem;
+  text-decoration: none;
+  color: inherit;
+}
+
+.feed-list-page .feed-news-side {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.15rem;
+  padding-right: 0.65rem;
+  border-right: 1px solid rgba(253, 189, 219, 0.35);
+  min-width: 4.5rem;
+}
+
+.feed-list-page .feed-news-date {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  color: var(--post-accent-muted);
+  white-space: nowrap;
+}
+
+.feed-list-page .feed-news-board {
+  font-size: 0.625rem;
+  font-weight: 600;
+  color: var(--post-accent-text);
+  background: rgba(253, 189, 219, 0.22);
+  padding: 0.12rem 0.35rem;
+  border-radius: 3px;
+  max-width: 5.5rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 576px) {
+  .home-posts-board-bar,
+  .feed-list-page .feed-board-bar {
+    gap: 0.35rem;
+  }
+
+  .home-posts-scroll,
+  .feed-list-page .feed-scroll {
+    flex: 0 0 28px;
+    width: 28px;
+    min-width: 28px;
+    max-width: 28px;
+    height: 28px;
+    font-size: 0.7rem;
+  }
+
+  .home-posts-scroll.is-hidden,
+  .feed-list-page .feed-scroll.is-hidden {
+    flex: 0 0 28px;
+    width: 28px;
+    min-width: 28px;
+  }
+
+  .home-posts-tab,
+  .feed-list-page .feed-tab {
+    padding: 0.35rem 0.7rem;
+    font-size: 0.75rem;
+  }
+
+  .home-post-card-link,
+  .feed-list-page .feed-post-card-link,
+  .feed-list-page .feed-news-card-link {
+    grid-template-columns: 1fr auto;
+    grid-template-rows: auto auto;
+  }
+
+  .home-post-board,
+  .feed-list-page .feed-post-board,
+  .feed-list-page .feed-news-side {
+    grid-column: 1;
+    justify-self: start;
+    border-right: none;
+    padding-right: 0;
+    flex-direction: row;
+    gap: 0.35rem;
+  }
+
+  .home-post-body,
+  .feed-list-page .feed-post-body {
+    grid-column: 1;
+  }
+
+  .home-post-arrow,
+  .feed-list-page .feed-post-arrow {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    align-self: center;
+  }
+}

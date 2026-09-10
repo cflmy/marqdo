@@ -849,21 +849,37 @@ func RenderPage(page map[string]any, dbURL string, partID string) string {
 	}
 	headerHTML := ""
 	if showChrome {
-		headerHTML = fmt.Sprintf(
-			`<header class="%s"%s>%s</header>`,
-			slotClass(page, "nav", "topnav"),
-			slotAttrs("nav", parts, page),
-			renderULWithMQ(nav, "nav", mqPairs),
-		)
+		if raw, ok := page["nav_html"].(string); ok && strings.TrimSpace(raw) != "" {
+			headerHTML = raw
+		} else {
+			headerHTML = fmt.Sprintf(
+				`<header class="%s"%s>%s</header>`,
+				slotClass(page, "nav", "topnav"),
+				slotAttrs("nav", parts, page),
+				renderULWithMQ(nav, "nav", mqPairs),
+			)
+		}
 	}
 	footerHTML := ""
 	if showChrome {
-		footerHTML = fmt.Sprintf(
-			`<footer class="%s"%s>%s</footer>`,
-			slotClass(page, "footer", "foot"),
-			slotAttrs("footer", parts, page),
-			renderULWithMQ(foot, "foot-nav", mqPairs),
-		)
+		if raw, ok := page["footer_html"].(string); ok && strings.TrimSpace(raw) != "" {
+			footerHTML = raw
+		} else {
+			footerHTML = fmt.Sprintf(
+				`<footer class="%s"%s>%s</footer>`,
+				slotClass(page, "footer", "foot"),
+				slotAttrs("footer", parts, page),
+				renderULWithMQ(foot, "foot-nav", mqPairs),
+			)
+		}
+	}
+
+	if extraBody, ok := page["body_class"].(string); ok && strings.TrimSpace(extraBody) != "" {
+		if bodyClass == "" {
+			bodyClass = strings.TrimSpace(extraBody)
+		} else {
+			bodyClass = bodyClass + " " + strings.TrimSpace(extraBody)
+		}
 	}
 
 	return fmt.Sprintf(`<!DOCTYPE html>

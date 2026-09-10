@@ -1,0 +1,46 @@
+/**
+ * 首页「论坛交流」区块（共用样式见 feed_common.css，由模板单独引入）
+ */
+
+/* 覆盖 index.css 的 100vh / 80vh，使 10 条帖子完整展示 */
+section.home-posts {
+  height: auto;
+  min-height: 0;
+  align-items: stretch;
+}
+
+.home-posts {
+  padding: 20px 0 28px;
+}
+
+.home-posts .section-wrap.home-posts-stage {
+  display: block;
+  background-color: rgba(255, 255, 255, 0.14);
+  height: auto;
+  min-height: 0;
+  max-height: none;
+  overflow: visible;
+}
+
+.home-posts-panel,
+#tenPostContainer {
+  overflow: visible;
+}
+
+.home-posts-title {
+  margin: 0 0 1.25rem;
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #111;
+  text-align: center;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.45);
+  padding-bottom: 0.65rem;
+}
+
+.home-posts-board-bar {
+  margin-bottom: 1.25rem;
+}
+
+.home-posts-panel {
+  contain: layout style;
+}
