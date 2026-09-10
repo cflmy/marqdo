@@ -124,6 +124,12 @@ extern int web_app_robots(char *args_json, char **out_json, char **err_msg);
 extern int web_sitemap_build(char *args_json, char **out_json, char **err_msg);
 extern int web_app_route_ws(char *args_json, char **out_json, char **err_msg);
 extern int web_ws_connect(char *args_json, char **out_json, char **err_msg);
+extern int web_cache_new(char *args_json, char **out_json, char **err_msg);
+extern int web_cache_get(char *args_json, char **out_json, char **err_msg);
+extern int web_cache_set(char *args_json, char **out_json, char **err_msg);
+extern int web_cache_del(char *args_json, char **out_json, char **err_msg);
+extern int web_cache_exists(char *args_json, char **out_json, char **err_msg);
+extern int web_cache_ttl(char *args_json, char **out_json, char **err_msg);
 
 static int register_core(void) {
 	if (host_register((char *)"web_go_ready", (char *)"", web_go_ready) != 0) return 1;
@@ -201,6 +207,12 @@ static int register_core(void) {
 	if (host_register((char *)"web_sitemap_build", (char *)"base,items", web_sitemap_build) != 0) return 1;
 	if (host_register((char *)"web_app_route_ws", (char *)"app,path,echo,mode", web_app_route_ws) != 0) return 1;
 	if (host_register((char *)"web_ws_connect", (char *)"url,message,headers,timeout_sec", web_ws_connect) != 0) return 1;
+	if (host_register((char *)"web_cache_new", (char *)"url", web_cache_new) != 0) return 1;
+	if (host_register((char *)"web_cache_get", (char *)"url,key", web_cache_get) != 0) return 1;
+	if (host_register((char *)"web_cache_set", (char *)"url,key,value,ttl", web_cache_set) != 0) return 1;
+	if (host_register((char *)"web_cache_del", (char *)"url,key", web_cache_del) != 0) return 1;
+	if (host_register((char *)"web_cache_exists", (char *)"url,key", web_cache_exists) != 0) return 1;
+	if (host_register((char *)"web_cache_ttl", (char *)"url,key", web_cache_ttl) != 0) return 1;
 	return 0;
 }
 */
