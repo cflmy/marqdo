@@ -85,7 +85,7 @@ cargo build -p marqdo_plugin_agent
 
 - Demo (ABI v1): `demo_add`, `demo_echo` — [`tests/lib/plugin-demo.mq.md`](../../tests/lib/plugin-demo.mq.md).
 - Agent (ABI v2): … **OKF agent-kb** …  
-- Web (ABI v2): HTTP listen + SQLite + page render (`web_listen`, `web_render`, `web_db_*`) — [`plugins/web`](../../plugins/web); used by [`ext/web/web.mq.md`](../../ext/web/web.mq.md). Lookup: `plugin.native_path name=web` / `MARQDO_WEB_PLUGIN` / `marqdo ext add web`.
+- Web (ABI v2): HTTP listen + SQLite/Postgres + page render (`web_listen`, `web_render`, `web_db_*`, …) — [`plugins/web`](../../plugins/web)（**Go 全量重写**，见 [ext-web-go-rewrite.md](ext-web-go-rewrite.md) · [ADR 0004](../adr/0004-web-plugin-go.md)）；作者面 [`ext/web/web.mq.md`](../../ext/web/web.mq.md)。Lookup: `plugin.native_path name=web` / `MARQDO_WEB_PLUGIN` / `marqdo ext add web`.
 
 ## Layering
 

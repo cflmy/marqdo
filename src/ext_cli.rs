@@ -231,6 +231,17 @@ fn find_native_plugin(short: &str) -> Result<PathBuf> {
         candidates.push(td.join("release").join(&name));
     }
     if let Ok(cwd) = env::current_dir() {
+        // Go web plugin (ext-web-go-rewrite): prefer plugins/web/build over cargo target/
+        // so `cargo build -p marqdo_plugin_web` (rust archive) does not mask the Go .so.
+        if short == "web" {
+            let mut dir = cwd.clone();
+            for _ in 0..6 {
+                candidates.push(dir.join("plugins").join("web").join("build").join(&name));
+                if !dir.pop() {
+                    break;
+                }
+            }
+        }
         candidates.push(cwd.join("target").join("debug").join(&name));
         candidates.push(cwd.join("target").join("release").join(&name));
         candidates.push(cwd.join("ext").join("native").join(&name));
@@ -239,6 +250,9 @@ fn find_native_plugin(short: &str) -> Result<PathBuf> {
         for _ in 0..6 {
             candidates.push(dir.join("target").join("debug").join(&name));
             candidates.push(dir.join("target").join("release").join(&name));
+            if short == "web" {
+                candidates.push(dir.join("plugins").join("web").join("build").join(&name));
+            }
             if !dir.pop() {
                 break;
             }
