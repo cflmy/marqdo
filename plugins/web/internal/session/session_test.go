@@ -3,6 +3,7 @@ package session_test
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/alicebob/miniredis/v2"
@@ -56,6 +57,13 @@ func TestCSRFAndCookie(t *testing.T) {
 	got, ok := session.IDFromCookie("theme=light; " + cookie)
 	if !ok || got != id {
 		t.Fatalf("cookie parse %q != %q", got, id)
+	}
+	zero := session.SessionCookie(id, 0, false)
+	if strings.Contains(zero, "Max-Age=0") {
+		t.Fatalf("ttl 0 must not clear cookie: %s", zero)
+	}
+	if !strings.Contains(session.ClearCookie(), "Max-Age=0") {
+		t.Fatal("ClearCookie should expire")
 	}
 }
 

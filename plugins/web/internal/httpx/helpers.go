@@ -79,7 +79,9 @@ func resolveSession(r *http.Request) (sid, csrf string, setCookie *string) {
 	}
 	sid = session.NewID(0)
 	tok, _ := session.CSRFFor(sid)
-	c := session.SessionCookie(sid, 0, false)
+	// Use configured session TTL (never Max-Age=0): browsers drop Max-Age=0
+	// immediately, so CSRF cookies from GET /login would never stick.
+	c := session.IssueCookie(sid)
 	return sid, tok, &c
 }
 

@@ -51,6 +51,11 @@ static int host_query(char *name, char *args_json, char **out_json, char **err_m
 
 extern int web_go_ready(char *args_json, char **out_json, char **err_msg);
 extern int web_page_new(char *args_json, char **out_json, char **err_msg);
+extern int web_page_query(char *args_json, char **out_json, char **err_msg);
+extern int web_page_order(char *args_json, char **out_json, char **err_msg);
+extern int web_page_link_prefix(char *args_json, char **out_json, char **err_msg);
+extern int web_page_css(char *args_json, char **out_json, char **err_msg);
+extern int web_page_detail(char *args_json, char **out_json, char **err_msg);
 extern int web_style(char *args_json, char **out_json, char **err_msg);
 extern int web_compose_components(char *args_json, char **out_json, char **err_msg);
 extern int web_compose_main(char *args_json, char **out_json, char **err_msg);
@@ -138,6 +143,11 @@ extern int web_api_key_check(char *args_json, char **out_json, char **err_msg);
 static int register_core(void) {
 	if (host_register((char *)"web_go_ready", (char *)"", web_go_ready) != 0) return 1;
 	if (host_register((char *)"web_page_new", (char *)"title,intro,shell_css,layout,asset_version", web_page_new) != 0) return 1;
+	if (host_register((char *)"web_page_query", (char *)"page,query", web_page_query) != 0) return 1;
+	if (host_register((char *)"web_page_order", (char *)"page,order", web_page_order) != 0) return 1;
+	if (host_register((char *)"web_page_link_prefix", (char *)"page,prefix", web_page_link_prefix) != 0) return 1;
+	if (host_register((char *)"web_page_css", (char *)"page,css", web_page_css) != 0) return 1;
+	if (host_register((char *)"web_page_detail", (char *)"page,detail", web_page_detail) != 0) return 1;
 	if (host_register((char *)"web_style", (char *)"name,table,strict", web_style) != 0) return 1;
 	if (host_register((char *)"web_compose_components", (char *)"page,components", web_compose_components) != 0) return 1;
 	if (host_register((char *)"web_compose_main", (char *)"page,main", web_compose_main) != 0) return 1;

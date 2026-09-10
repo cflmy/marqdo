@@ -537,12 +537,31 @@ func ValidateCSRF(id, token string) bool {
 }
 
 // SessionCookie builds Set-Cookie for marqdo_sid.
+// ttlSec 0 means the configured default (never Max-Age=0 — that clears cookies;
+// use ClearCookie for logout).
 func SessionCookie(id string, ttlSec uint64, secure bool) string {
+	if ttlSec == 0 {
+		ttlSec = getCfg().TTLSec
+		if ttlSec == 0 {
+			ttlSec = defaultTTL
+		}
+	}
 	s := fmt.Sprintf("marqdo_sid=%s; HttpOnly; Path=/; SameSite=Lax; Max-Age=%d", id, ttlSec)
 	if secure {
 		s += "; Secure"
 	}
 	return s
+}
+
+// IssueCookie builds Set-Cookie using Configure'd TTL and CookieSecure.
+func IssueCookie(id string) string {
+	c := getCfg()
+	return SessionCookie(id, c.TTLSec, c.CookieSecure)
+}
+
+// ClearCookie is the Set-Cookie value that expires marqdo_sid immediately.
+func ClearCookie() string {
+	return "marqdo_sid=; HttpOnly; Path=/; Max-Age=0; SameSite=Lax"
 }
 
 // IDFromCookie parses marqdo_sid from a Cookie header.
@@ -572,6 +591,25 @@ func ParseRolesCSV(raw string) []string {
 		}
 	}
 	return out
+}
+
+// RoleFromCookie returns session role (visitor when anonymous or missing).
+func RoleFromCookie(cookieHeader string) string {
+	sid, ok := IDFromCookie(cookieHeader)
+	if !ok {
+		return "visitor"
+	}
+	if v, ok := GetValue(sid, "role"); ok {
+		if s, ok := v.(string); ok && s != "" {
+			return strings.ToLower(s)
+		}
+	}
+	if v, ok := GetValue(sid, "username"); ok {
+		if s, ok := v.(string); ok && s != "" {
+			return "admin"
+		}
+	}
+	return "visitor"
 }
 
 // RoleAllowed reports whether role is in allowed (empty allowed = all).

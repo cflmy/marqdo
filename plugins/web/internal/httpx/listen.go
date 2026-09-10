@@ -21,7 +21,9 @@ import (
 	"github.com/marqdo/marqdo/plugins/web/internal/db"
 	"github.com/marqdo/marqdo/plugins/web/internal/form"
 	"github.com/marqdo/marqdo/plugins/web/internal/middleware"
+	"github.com/marqdo/marqdo/plugins/web/internal/ratelimit"
 	"github.com/marqdo/marqdo/plugins/web/internal/render"
+	"github.com/marqdo/marqdo/plugins/web/internal/session"
 	"github.com/marqdo/marqdo/plugins/web/internal/sitemap"
 )
 
@@ -31,11 +33,20 @@ func NewHandler(appBag map[string]any, entryDir string) (http.Handler, error) {
 	if appBag == nil {
 		appBag = map[string]any{}
 	}
+	authCfg := authConfigOf(appBag)
+	dbURL := dbURLOf(appBag)
+	session.Configure(session.Config{
+		DBURL:        dbURL,
+		TTLSec:       authCfg.sessionTTL,
+		CookieSecure: authCfg.cookieSecure,
+	})
+	session.Reset(authCfg.sessionTTL)
+	ratelimit.Reset()
+
 	page, _ := appBag["page"].(map[string]any)
 	if page == nil {
 		page = map[string]any{}
 	}
-	dbURL := dbURLOf(appBag)
 	routes := map[string]any{}
 	if r, ok := appBag["routes"].(map[string]any); ok {
 		routes = r
@@ -87,6 +98,7 @@ func NewHandler(appBag map[string]any, entryDir string) (http.Handler, error) {
 		galleryRoutes:  routeMapOf(appBag, "gallery_routes"),
 		proxyRoutes:    routeMapOf(appBag, "proxy_routes"),
 		invokeRoutes:   routeMapOf(appBag, "invoke_routes"),
+		auth:           authCfg,
 	}
 
 	mux := http.NewServeMux()
@@ -108,10 +120,10 @@ func NewHandler(appBag map[string]any, entryDir string) (http.Handler, error) {
 		} else {
 			pv := pageV
 			mux.HandleFunc("GET "+routePath, func(w http.ResponseWriter, r *http.Request) {
-				st.writePage(w, pv)
+				st.writePage(w, r, pv)
 			})
 			mux.HandleFunc("GET "+routePath+"/_part/{id}", func(w http.ResponseWriter, r *http.Request) {
-				st.writePart(w, pv, r.PathValue("id"))
+				st.writePart(w, r, pv, r.PathValue("id"))
 			})
 		}
 	}
@@ -180,10 +192,13 @@ func NewHandler(appBag map[string]any, entryDir string) (http.Handler, error) {
 	st.mountGalleryRoutes(mux)
 	st.mountProxyRoutes(mux)
 	st.mountInvokeRoutes(mux)
+	st.mountAuthRoutes(mux)
 
 	mux.HandleFunc("/{path...}", st.handleNotFound)
 
-	return withMiddleware(mux, mw), nil
+	handler := withMiddleware(mux, mw)
+	handler = withRBAC(handler, authCfg.gates, authCfg.loginPath)
+	return handler, nil
 }
 
 // Listen binds host:port from the app bag and serves until interrupt/kill.
@@ -245,30 +260,34 @@ type state struct {
 	galleryRoutes  map[string]any
 	proxyRoutes    map[string]any
 	invokeRoutes   map[string]any
+	auth           authConfig
 }
 
 func (st *state) handleHome(w http.ResponseWriter, r *http.Request) {
-	st.writePage(w, st.page)
+	st.writePage(w, r, st.page)
 }
 
 func (st *state) handleHomePart(w http.ResponseWriter, r *http.Request) {
-	st.writePart(w, st.page, r.PathValue("id"))
+	st.writePart(w, r, st.page, r.PathValue("id"))
 }
 
-func (st *state) preparePage(page map[string]any) map[string]any {
+func (st *state) preparePage(page map[string]any, r *http.Request) map[string]any {
 	p := cloneMap(page)
 	assets.MergeSiteHead(p, st.siteHead)
+	if r != nil {
+		withNavAuth(p, r.Header.Get("Cookie"))
+	}
 	return p
 }
 
-func (st *state) writePage(w http.ResponseWriter, page map[string]any) {
-	html := render.RenderPage(st.preparePage(page), st.dbURL, "")
+func (st *state) writePage(w http.ResponseWriter, r *http.Request, page map[string]any) {
+	html := render.RenderPage(st.preparePage(page, r), st.dbURL, "")
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	_, _ = io.WriteString(w, html)
 }
 
-func (st *state) writePart(w http.ResponseWriter, page map[string]any, id string) {
-	html := render.RenderPage(st.preparePage(page), st.dbURL, id)
+func (st *state) writePart(w http.ResponseWriter, r *http.Request, page map[string]any, id string) {
+	html := render.RenderPage(st.preparePage(page, r), st.dbURL, id)
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	_, _ = io.WriteString(w, html)
 }
@@ -323,7 +342,7 @@ func (st *state) writeSitemap(w http.ResponseWriter, cfg map[string]any) {
 
 func (st *state) handleNotFound(w http.ResponseWriter, r *http.Request) {
 	if st.page404 != nil {
-		html := render.RenderPage(st.preparePage(st.page404), st.dbURL, "")
+		html := render.RenderPage(st.preparePage(st.page404, r), st.dbURL, "")
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		w.WriteHeader(http.StatusNotFound)
 		_, _ = io.WriteString(w, html)
@@ -341,7 +360,7 @@ func (st *state) makeDynamicPage(page map[string]any, pattern string) http.Handl
 			params[name] = r.PathValue(name)
 		}
 		injectParams(p, params)
-		st.writePage(w, p)
+		st.writePage(w, r, p)
 	}
 }
 
@@ -354,7 +373,7 @@ func (st *state) makeDynamicPart(page map[string]any, pattern string) http.Handl
 			params[name] = r.PathValue(name)
 		}
 		injectParams(p, params)
-		st.writePart(w, p, r.PathValue("id"))
+		st.writePart(w, r, p, r.PathValue("id"))
 	}
 }
 
