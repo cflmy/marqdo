@@ -100,6 +100,11 @@ func RouteSpecOf(appBag map[string]any, path string) (RouteSpec, error) {
 	return parseRouteSpec(spec), nil
 }
 
+// ParseRouteSpec reads mode and room_key from a ws_routes value.
+func ParseRouteSpec(spec any) RouteSpec {
+	return parseRouteSpec(spec)
+}
+
 func parseRouteSpec(spec any) RouteSpec {
 	out := RouteSpec{Mode: ModeEcho}
 	switch t := spec.(type) {

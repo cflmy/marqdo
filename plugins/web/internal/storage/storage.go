@@ -227,6 +227,49 @@ func Delete(url, key string) (map[string]any, error) {
 	return nil, fmt.Errorf("unknown storage backend")
 }
 
+// ReadBytes loads raw object bytes for HTTP download.
+// Returns found=false when the object is missing.
+func ReadBytes(url, key string) ([]byte, string, string, bool, error) {
+	k, err := safeKey(key)
+	if err != nil {
+		return nil, "", "", false, err
+	}
+	filename := k
+	if i := strings.LastIndexByte(k, '/'); i >= 0 && i < len(k)-1 {
+		filename = k[i+1:]
+	}
+	if filename == "" {
+		filename = "download"
+	}
+	if isFile(url) {
+		root, err := fileRoot(url)
+		if err != nil {
+			return nil, "", "", false, err
+		}
+		dest, err := pathFor(root, k)
+		if err != nil {
+			return nil, "", "", false, err
+		}
+		info, err := os.Stat(dest)
+		if err != nil || info.IsDir() {
+			return nil, "", "", false, nil
+		}
+		bytes, err := os.ReadFile(dest)
+		if err != nil {
+			return nil, "", "", false, err
+		}
+		ct := "application/octet-stream"
+		if ctBytes, err := os.ReadFile(ctypePath(dest)); err == nil {
+			ct = string(ctBytes)
+		}
+		return bytes, ct, filename, true, nil
+	}
+	if isS3(url) {
+		return nil, "", "", false, fmt.Errorf("s3 read not implemented in Go plugin yet")
+	}
+	return nil, "", "", false, fmt.Errorf("unknown storage backend")
+}
+
 // List returns keys under optional prefix.
 func List(url, prefix string) (map[string]any, error) {
 	prefix = strings.TrimPrefix(strings.TrimSpace(prefix), "/")

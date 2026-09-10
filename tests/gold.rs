@@ -38,6 +38,8 @@ fn assert_out(path: &str, expect: &str) {
 }
 
 /// Build Go `plugins/web/build/libweb.so` once per test process (W-G13).
+/// Also sets `MARQDO_WEB_PLUGIN` so child `marqdo` processes do not pick up a
+/// stale Rust `libweb.so` from `~/.marqdo/ext`.
 fn ensure_web_plugin_built() {
     use std::sync::Once;
     static ONCE: Once = Once::new();
@@ -53,6 +55,22 @@ fn ensure_web_plugin_built() {
             status.success(),
             "failed to build Go libweb via scripts/build-web-plugin.sh"
         );
+        let lib = if cfg!(windows) {
+            root.join("plugins").join("web").join("build").join("web.dll")
+        } else if cfg!(target_os = "macos") {
+            root.join("plugins")
+                .join("web")
+                .join("build")
+                .join("libweb.dylib")
+        } else {
+            root.join("plugins")
+                .join("web")
+                .join("build")
+                .join("libweb.so")
+        };
+        assert!(lib.is_file(), "missing Go web plugin at {}", lib.display());
+        // SAFETY: single-threaded Once; children inherit for the rest of the test process.
+        std::env::set_var("MARQDO_WEB_PLUGIN", &lib);
     });
 }
 
@@ -1902,21 +1920,25 @@ fn ext_web_middleware_live() {
     );
 
     // CORS on the JSON endpoint (matching origin → allow headers).
+    // Compare case-insensitively: Go net/http canonicalizes header names.
+    let header_has = |headers: &str, needle: &str| -> bool {
+        headers.to_ascii_lowercase().contains(&needle.to_ascii_lowercase())
+    };
     let out = code(&[
         "-s", "-D", "-", "-o", "/dev/null", &format!("{base}/api/posts"),
         "-H", "Origin: https://a.example",
     ]);
     let headers = String::from_utf8_lossy(&out.stdout);
     assert!(
-        headers.contains("access-control-allow-origin: https://a.example"),
+        header_has(&headers, "access-control-allow-origin: https://a.example"),
         "cors allow-origin headers={headers}"
     );
     assert!(
-        headers.contains("access-control-allow-credentials: true"),
+        header_has(&headers, "access-control-allow-credentials: true"),
         "cors credentials headers={headers}"
     );
     assert!(
-        headers.contains("access-control-expose-headers: x-total"),
+        header_has(&headers, "access-control-expose-headers: x-total"),
         "cors expose headers={headers}"
     );
 
@@ -1929,11 +1951,11 @@ fn ext_web_middleware_live() {
     ]);
     let headers = String::from_utf8_lossy(&out.stdout);
     assert!(
-        headers.contains("access-control-allow-methods: GET"),
+        header_has(&headers, "access-control-allow-methods: GET"),
         "cors preflight headers={headers}"
     );
     assert!(
-        headers.contains("access-control-allow-origin"),
+        header_has(&headers, "access-control-allow-origin"),
         "cors preflight origin headers={headers}"
     );
 
@@ -1941,11 +1963,11 @@ fn ext_web_middleware_live() {
     let out = code(&["-s", "-D", "-", "-o", "/dev/null", &format!("{base}/")]);
     let headers = String::from_utf8_lossy(&out.stdout);
     assert!(
-        headers.contains("x-frame-options: DENY"),
+        header_has(&headers, "x-frame-options: DENY"),
         "security headers={headers}"
     );
     assert!(
-        headers.contains("x-content-type-options: nosniff"),
+        header_has(&headers, "x-content-type-options: nosniff"),
         "security headers={headers}"
     );
 
@@ -1956,7 +1978,7 @@ fn ext_web_middleware_live() {
     ]);
     let headers = String::from_utf8_lossy(&out.stdout);
     assert!(
-        headers.contains("content-encoding: gzip"),
+        header_has(&headers, "content-encoding: gzip"),
         "gzip headers={headers}"
     );
 

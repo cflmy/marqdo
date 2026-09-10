@@ -11,6 +11,7 @@ import (
 
 	"github.com/marqdo/marqdo/plugins/web/internal/app"
 	"github.com/marqdo/marqdo/plugins/web/internal/httpx"
+	"github.com/marqdo/marqdo/plugins/web/internal/middleware"
 )
 
 func TestNewHandlerHomeRoutesStatic(t *testing.T) {
@@ -63,5 +64,88 @@ func TestNewHandlerHomeRoutesStatic(t *testing.T) {
 		if rec.Body.String() != "hello-static" {
 			t.Fatalf("static body=%q", rec.Body.String())
 		}
+	}
+}
+
+func TestNewHandlerIconsRedirectSitemap404(t *testing.T) {
+	dir := t.TempDir()
+	iconPath := filepath.Join(dir, "favicon.png")
+	if err := os.WriteFile(iconPath, []byte("PNG"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	page := map[string]any{"title": "W7", "intro": "<p>home</p>"}
+	nf := map[string]any{"title": "Not Found Page", "intro": "<p>missing</p>"}
+	a := app.New(map[string]any{"page": page})
+	a, err := app.Icons(a, []any{
+		map[string]any{"path": iconPath, "rel": "icon", "type": "image/png", "url": "/favicon.ico"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	a, err = app.Redirect(a, "/legacy", "/", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	a, err = app.ErrorPage(a, 404, nf)
+	if err != nil {
+		t.Fatal(err)
+	}
+	items := []any{map[string]any{"loc": "/"}, map[string]any{"loc": "/about"}}
+	a, err = app.Sitemap(a, "/sitemap.xml", "http://example.com", "", "path", 100, items)
+	if err != nil {
+		t.Fatal(err)
+	}
+	a, err = app.Robots(a, "", "http://example.com/sitemap.xml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	a, err = middleware.Configure(a, map[string]any{"cache_control": "public, max-age=120"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	h, err := httpx.NewHandler(a, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/favicon.ico", nil))
+	if rec.Code != 200 || !strings.Contains(rec.Header().Get("Content-Type"), "image/") {
+		t.Fatalf("favicon code=%d ct=%q", rec.Code, rec.Header().Get("Content-Type"))
+	}
+
+	rec = httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/legacy", nil))
+	if rec.Code != http.StatusMovedPermanently {
+		t.Fatalf("redirect code=%d", rec.Code)
+	}
+
+	rec = httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/sitemap.xml", nil))
+	if rec.Code != 200 || !strings.Contains(rec.Body.String(), "<urlset") {
+		t.Fatalf("sitemap code=%d body=%q", rec.Code, rec.Body.String())
+	}
+
+	rec = httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/robots.txt", nil))
+	if rec.Code != 200 || !strings.Contains(rec.Body.String(), "Sitemap:") {
+		t.Fatalf("robots code=%d body=%q", rec.Code, rec.Body.String())
+	}
+
+	rec = httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/missing", nil))
+	if rec.Code != 404 || !strings.Contains(rec.Body.String(), "Not Found Page") {
+		t.Fatalf("404 code=%d body=%q", rec.Code, rec.Body.String())
+	}
+
+	rec = httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/", nil))
+	if !strings.Contains(rec.Header().Get("Cache-Control"), "max-age=120") {
+		t.Fatalf("cache-control=%q", rec.Header().Get("Cache-Control"))
+	}
+	if !strings.Contains(rec.Body.String(), `rel="icon"`) {
+		t.Fatalf("home missing icon link: %s", rec.Body.String())
 	}
 }

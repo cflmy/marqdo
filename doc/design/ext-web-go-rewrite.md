@@ -366,12 +366,10 @@ scripts/build-web-plugin.sh   # go build -buildmode=c-shared -o …/libweb.so
 
 | 组件 | 变更 |
 |------|------|
-| 根 `Cargo.toml` workspace | 移除 `plugins/web` Rust member |
+| 根 `Cargo.toml` workspace | 移除 `plugins/web` / `web-rust-archive` Rust member |
 | `tests/gold.rs` | `ensure_web_plugin_built()` → `scripts/build-web-plugin.sh` |
+| `marqdo ext add web` | 构建回退：`scripts/build-web-plugin.sh`（Go）；Release 仍下发预编译 native zip |
 | Release 脚本 | Go：`scripts/build-web-plugin.sh`；其它插件仍 `cargo build -p …` |
-
-| `marqdo ext add web` | 构建回退：有 Go 则 `go build`；Release 仍下发预编译 native zip |
-| Release 脚本 | 增加 Go 交叉/本机编译 `libweb` 打包步骤 |
 | [ext-cli.md](ext-cli.md) / [ext-abi.md](ext-abi.md) | 注明 web 插件实现语言为 Go |
 
 ### 9.4 cgo / runtime 注意
@@ -400,7 +398,7 @@ scripts/build-web-plugin.sh   # go build -buildmode=c-shared -o …/libweb.so
 | **W-G10** | proxy + invoke + nested plugin | ✅ `web-proxy-invoke` / hosting live |
 | **W-G11** | 定制 C2–C4 shell/layout/style/nav | ✅ `web-c2`–`c4` |
 | **W-G12** | G 增强 WS rooms + Redis session/pubsub + API key 原语 | ✅ 单测 + `web-g12-api-key-smoke` |
-| **W-G13** | 默认切换 Go `libweb`；归档 Rust；更新发版与 ext CLI | ✅ 离线 `tests/ext/web-*`（有 `# main`）全绿；`ext add`/`gold`/`release` 走 `scripts/build-web-plugin.sh`；Rust 移出 workspace |
+| **W-G13** | 默认切换 Go `libweb`；归档 Rust；更新发版与 ext CLI | ✅ 离线+live gold（7 个 `*_live`）对 Go 全绿；`ext add`/`gold`/`release` 走 `scripts/build-web-plugin.sh`；Rust 移出 workspace；gold 强制 `MARQDO_WEB_PLUGIN` 避免 `~/.marqdo` 旧 so |
 | **W-G14** | anlian Marqdo 重写主路径（可分仓或 `examples/anlian-mq/`） | §8 矩阵主路径可演示 |
 
 每波次：**先补 Go 实现 → 跑对应 gold → 再进入下一波**。禁止跨波次留下「注册了但返回 stub 错误」的 ABI（除 W-G0 明确的未实现探测）。

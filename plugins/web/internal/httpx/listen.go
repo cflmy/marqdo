@@ -2,6 +2,7 @@
 package httpx
 
 import (
+	"bufio"
 	"compress/gzip"
 	"encoding/json"
 	"fmt"
@@ -16,10 +17,12 @@ import (
 	"time"
 
 	"github.com/marqdo/marqdo/plugins/web/internal/app"
+	"github.com/marqdo/marqdo/plugins/web/internal/assets"
 	"github.com/marqdo/marqdo/plugins/web/internal/db"
 	"github.com/marqdo/marqdo/plugins/web/internal/form"
 	"github.com/marqdo/marqdo/plugins/web/internal/middleware"
 	"github.com/marqdo/marqdo/plugins/web/internal/render"
+	"github.com/marqdo/marqdo/plugins/web/internal/sitemap"
 )
 
 // NewHandler builds the HTTP handler for an app bag (no listen).
@@ -59,13 +62,31 @@ func NewHandler(appBag map[string]any, entryDir string) (http.Handler, error) {
 	}
 
 	mw := middleware.Parse(appBag)
+	siteHead := assets.HeadLinksFromJSON(appBag["site_head"])
+	iconRoutes, err := iconRoutesFromBag(appBag, entryDir, staticDir)
+	if err != nil {
+		return nil, err
+	}
 	st := &state{
-		page:     page,
-		dbURL:    dbURL,
-		routes:   routes,
-		forms:    forms,
-		mw:       mw,
-		entryDir: entryDir,
+		page:           page,
+		dbURL:          dbURL,
+		routes:         routes,
+		forms:          forms,
+		mw:             mw,
+		entryDir:       entryDir,
+		siteHead:       siteHead,
+		iconRoutes:     iconRoutes,
+		redirects:      redirectsOf(appBag),
+		sitemapRoutes:  sitemapRoutesOf(appBag),
+		robotsBody:     robotsBodyOf(appBag),
+		page404:        pageOf(appBag, "page_404"),
+		page500:        pageOf(appBag, "page_500"),
+		uploadRoutes:   routeMapOf(appBag, "upload_routes"),
+		downloadRoutes: routeMapOf(appBag, "download_routes"),
+		wsRoutes:       routeMapOf(appBag, "ws_routes"),
+		galleryRoutes:  routeMapOf(appBag, "gallery_routes"),
+		proxyRoutes:    routeMapOf(appBag, "proxy_routes"),
+		invokeRoutes:   routeMapOf(appBag, "invoke_routes"),
 	}
 
 	mux := http.NewServeMux()
@@ -82,8 +103,8 @@ func NewHandler(appBag map[string]any, entryDir string) (http.Handler, error) {
 			pageV = map[string]any{}
 		}
 		if strings.Contains(routePath, "{") {
-			mux.HandleFunc("GET "+routePath, st.makeDynamicPage(pageV, routePath))
-			mux.HandleFunc("GET "+routePath+"/_part/{id}", st.makeDynamicPart(pageV, routePath))
+			mux.HandleFunc("GET "+goMuxPattern(routePath), st.makeDynamicPage(pageV, routePath))
+			mux.HandleFunc("GET "+goMuxPattern(routePath)+"/_part/{id}", st.makeDynamicPart(pageV, routePath))
 		} else {
 			pv := pageV
 			mux.HandleFunc("GET "+routePath, func(w http.ResponseWriter, r *http.Request) {
@@ -111,6 +132,56 @@ func NewHandler(appBag map[string]any, entryDir string) (http.Handler, error) {
 		mux.Handle("GET "+staticMount, fs)
 		mux.Handle("HEAD "+staticMount, fs)
 	}
+
+	for _, ir := range iconRoutes {
+		url := ir.URL
+		path := ir.Path
+		ct := ir.ContentType
+		fmt.Fprintf(os.Stderr, "marqdo web icon: %s → %s (%s)\n", url, path, ct)
+		mux.HandleFunc("GET "+url, func(w http.ResponseWriter, r *http.Request) {
+			st.serveIcon(w, path, ct)
+		})
+		mux.HandleFunc("HEAD "+url, func(w http.ResponseWriter, r *http.Request) {
+			st.serveIcon(w, path, ct)
+		})
+	}
+
+	for _, from := range sortedKeys(st.redirects) {
+		spec, _ := st.redirects[from].(map[string]any)
+		to := strOpt(spec, "to", "/")
+		permanent := boolish(spec["permanent"])
+		mux.HandleFunc("GET "+from, func(w http.ResponseWriter, r *http.Request) {
+			code := http.StatusTemporaryRedirect
+			if permanent {
+				code = http.StatusMovedPermanently
+			}
+			http.Redirect(w, r, to, code)
+		})
+	}
+
+	for _, path := range sortedKeys(st.sitemapRoutes) {
+		cfg, _ := st.sitemapRoutes[path].(map[string]any)
+		mux.HandleFunc("GET "+path, func(w http.ResponseWriter, r *http.Request) {
+			st.writeSitemap(w, cfg)
+		})
+	}
+
+	if st.robotsBody != "" {
+		body := st.robotsBody
+		mux.HandleFunc("GET /robots.txt", func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+			_, _ = io.WriteString(w, body)
+		})
+	}
+
+	st.mountWSRoutes(mux)
+	st.mountUploadRoutes(mux)
+	st.mountDownloadRoutes(mux)
+	st.mountGalleryRoutes(mux)
+	st.mountProxyRoutes(mux)
+	st.mountInvokeRoutes(mux)
+
+	mux.HandleFunc("/{path...}", st.handleNotFound)
 
 	return withMiddleware(mux, mw), nil
 }
@@ -155,12 +226,25 @@ func Listen(appBag map[string]any, entryDir string) (map[string]any, error) {
 }
 
 type state struct {
-	page     map[string]any
-	dbURL    string
-	routes   map[string]any
-	forms    map[string]any
-	mw       middleware.Config
-	entryDir string
+	page           map[string]any
+	dbURL          string
+	routes         map[string]any
+	forms          map[string]any
+	mw             middleware.Config
+	entryDir       string
+	siteHead       []assets.HeadLink
+	iconRoutes     []assets.IconRoute
+	redirects      map[string]any
+	sitemapRoutes  map[string]any
+	robotsBody     string
+	page404        map[string]any
+	page500        map[string]any
+	uploadRoutes   map[string]any
+	downloadRoutes map[string]any
+	wsRoutes       map[string]any
+	galleryRoutes  map[string]any
+	proxyRoutes    map[string]any
+	invokeRoutes   map[string]any
 }
 
 func (st *state) handleHome(w http.ResponseWriter, r *http.Request) {
@@ -171,16 +255,81 @@ func (st *state) handleHomePart(w http.ResponseWriter, r *http.Request) {
 	st.writePart(w, st.page, r.PathValue("id"))
 }
 
+func (st *state) preparePage(page map[string]any) map[string]any {
+	p := cloneMap(page)
+	assets.MergeSiteHead(p, st.siteHead)
+	return p
+}
+
 func (st *state) writePage(w http.ResponseWriter, page map[string]any) {
-	html := render.RenderPage(page, st.dbURL, "")
+	html := render.RenderPage(st.preparePage(page), st.dbURL, "")
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	_, _ = io.WriteString(w, html)
 }
 
 func (st *state) writePart(w http.ResponseWriter, page map[string]any, id string) {
-	html := render.RenderPage(page, st.dbURL, id)
+	html := render.RenderPage(st.preparePage(page), st.dbURL, id)
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	_, _ = io.WriteString(w, html)
+}
+
+func (st *state) serveIcon(w http.ResponseWriter, path, contentType string) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		http.NotFound(w, nil)
+		return
+	}
+	w.Header().Set("Content-Type", contentType)
+	w.Header().Set("Cache-Control", "public, max-age=86400")
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write(data)
+}
+
+func (st *state) writeSitemap(w http.ResponseWriter, cfg map[string]any) {
+	base := strOpt(cfg, "base", "")
+	items := cfg["items"]
+	if tbl, ok := cfg["table"].(string); ok && tbl != "" && st.dbURL != "" {
+		locCol := strOpt(cfg, "loc", "path")
+		limit := int64(1000)
+		if n, ok := cfg["limit"].(float64); ok && n > 0 {
+			limit = int64(n)
+		}
+		opts := db.SelectOpts{}
+		out, err := db.Select(st.dbURL, tbl, limit, opts)
+		if err == nil {
+			if rows, ok := out["rows"].([]any); ok {
+				norm := make([]any, 0, len(rows))
+				for _, row := range rows {
+					m, ok := row.(map[string]any)
+					if !ok {
+						continue
+					}
+					cp := cloneMap(m)
+					if _, has := cp["loc"]; !has {
+						if v, ok := cp[locCol]; ok {
+							cp["loc"] = v
+						}
+					}
+					norm = append(norm, cp)
+				}
+				items = norm
+			}
+		}
+	}
+	xml := sitemap.BuildSitemap(base, items)
+	w.Header().Set("Content-Type", "application/xml; charset=utf-8")
+	_, _ = io.WriteString(w, xml)
+}
+
+func (st *state) handleNotFound(w http.ResponseWriter, r *http.Request) {
+	if st.page404 != nil {
+		html := render.RenderPage(st.preparePage(st.page404), st.dbURL, "")
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.WriteHeader(http.StatusNotFound)
+		_, _ = io.WriteString(w, html)
+		return
+	}
+	http.NotFound(w, r)
 }
 
 func (st *state) makeDynamicPage(page map[string]any, pattern string) http.HandlerFunc {
@@ -280,6 +429,10 @@ func withMiddleware(next http.Handler, mw middleware.Config) http.Handler {
 		limit := int64(*mw.BodyLimit)
 		inner := h
 		h = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.ContentLength > limit {
+				http.Error(w, "request body too large", http.StatusRequestEntityTooLarge)
+				return
+			}
 			r.Body = http.MaxBytesReader(w, r.Body, limit)
 			inner.ServeHTTP(w, r)
 		})
@@ -299,7 +452,7 @@ func withMiddleware(next http.Handler, mw middleware.Config) http.Handler {
 				inner.ServeHTTP(w, r)
 				return
 			}
-			w.Header().Set("Content-Encoding", "gzip")
+			setHeader(w, "content-encoding", "gzip")
 			w.Header().Add("Vary", "Accept-Encoding")
 			gz := gzip.NewWriter(w)
 			defer gz.Close()
@@ -314,7 +467,7 @@ func withMiddleware(next http.Handler, mw middleware.Config) http.Handler {
 		val := hv[1]
 		inner := h
 		h = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.Header().Set(name, val)
+			setHeader(w, strings.ToLower(name), val)
 			inner.ServeHTTP(w, r)
 		})
 	}
@@ -346,31 +499,36 @@ func withMiddleware(next http.Handler, mw middleware.Config) http.Handler {
 func applyCORS(w http.ResponseWriter, r *http.Request, c *middleware.CORSConfig) {
 	origin := r.Header.Get("Origin")
 	if len(c.AllowOrigins) == 0 {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
+		setHeader(w, "access-control-allow-origin", "*")
 	} else if origin != "" {
 		for _, o := range c.AllowOrigins {
 			if o == origin {
-				w.Header().Set("Access-Control-Allow-Origin", origin)
+				setHeader(w, "access-control-allow-origin", origin)
 				break
 			}
 		}
 	}
 	if len(c.Methods) == 0 {
-		w.Header().Set("Access-Control-Allow-Methods", "*")
+		setHeader(w, "access-control-allow-methods", "*")
 	} else {
-		w.Header().Set("Access-Control-Allow-Methods", strings.Join(unique(c.Methods), ", "))
+		setHeader(w, "access-control-allow-methods", strings.Join(unique(c.Methods), ", "))
 	}
 	if len(c.Headers) == 0 {
-		w.Header().Set("Access-Control-Allow-Headers", "*")
+		setHeader(w, "access-control-allow-headers", "*")
 	} else {
-		w.Header().Set("Access-Control-Allow-Headers", strings.Join(unique(c.Headers), ", "))
+		setHeader(w, "access-control-allow-headers", strings.Join(unique(c.Headers), ", "))
 	}
 	if len(c.ExposeHeaders) > 0 {
-		w.Header().Set("Access-Control-Expose-Headers", strings.Join(unique(c.ExposeHeaders), ", "))
+		expose := strings.ToLower(strings.Join(unique(c.ExposeHeaders), ", "))
+		setHeader(w, "access-control-expose-headers", expose)
 	}
 	if c.Credentials {
-		w.Header().Set("Access-Control-Allow-Credentials", "true")
+		setHeader(w, "access-control-allow-credentials", "true")
 	}
+}
+
+func setHeader(w http.ResponseWriter, name, value string) {
+	w.Header()[name] = []string{value}
 }
 
 func securityHeaderName(raw string) (string, bool) {
@@ -400,6 +558,13 @@ type gzipResponseWriter struct {
 
 func (g *gzipResponseWriter) Write(b []byte) (int, error) { return g.w.Write(b) }
 
+func (g *gzipResponseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	if h, ok := g.ResponseWriter.(http.Hijacker); ok {
+		return h.Hijack()
+	}
+	return nil, nil, fmt.Errorf("underlying ResponseWriter does not support hijacking")
+}
+
 type statusRecorder struct {
 	http.ResponseWriter
 	status int
@@ -408,6 +573,13 @@ type statusRecorder struct {
 func (s *statusRecorder) WriteHeader(code int) {
 	s.status = code
 	s.ResponseWriter.WriteHeader(code)
+}
+
+func (s *statusRecorder) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	if h, ok := s.ResponseWriter.(http.Hijacker); ok {
+		return h.Hijack()
+	}
+	return nil, nil, fmt.Errorf("underlying ResponseWriter does not support hijacking")
 }
 
 func writeJSON(w http.ResponseWriter, code int, v any) {
@@ -539,4 +711,91 @@ func unique(ss []string) []string {
 		}
 	}
 	return out
+}
+
+func boolish(v any) bool {
+	switch t := v.(type) {
+	case bool:
+		return t
+	case string:
+		return t == "true" || t == "True" || t == "1" || t == "yes"
+	case float64:
+		return t != 0
+	}
+	return false
+}
+
+func redirectsOf(appBag map[string]any) map[string]any {
+	if r, ok := appBag["redirects"].(map[string]any); ok {
+		return r
+	}
+	return map[string]any{}
+}
+
+func sitemapRoutesOf(appBag map[string]any) map[string]any {
+	if r, ok := appBag["sitemap_routes"].(map[string]any); ok {
+		return r
+	}
+	return map[string]any{}
+}
+
+func robotsBodyOf(appBag map[string]any) string {
+	if s, ok := appBag["robots_body"].(string); ok {
+		return s
+	}
+	return ""
+}
+
+func pageOf(appBag map[string]any, key string) map[string]any {
+	if p, ok := appBag[key].(map[string]any); ok {
+		return p
+	}
+	return nil
+}
+
+func iconRoutesFromBag(appBag map[string]any, entryDir, staticDir string) ([]assets.IconRoute, error) {
+	var routes []assets.IconRoute
+	if icons, ok := appBag["icons"].([]any); ok {
+		for _, ic := range icons {
+			m, ok := ic.(map[string]any)
+			if !ok {
+				continue
+			}
+			p := strOpt(m, "path", "")
+			url := strOpt(m, "url", "")
+			if p == "" || url == "" {
+				continue
+			}
+			if !strings.HasPrefix(url, "/") {
+				return nil, fmt.Errorf("icon url `%s` must start with /", url)
+			}
+			abs := resolvePath(p, entryDir)
+			fi, err := os.Stat(abs)
+			if err != nil || fi.IsDir() {
+				return nil, fmt.Errorf("icon file `%s` not found for `%s`", abs, url)
+			}
+			ct := strOpt(m, "type", "")
+			if ct == "" {
+				ct = assets.MimeForPath(p)
+			}
+			routes = append(routes, assets.IconRoute{
+				URL: url, Path: abs, ContentType: ct,
+			})
+		}
+	}
+	if len(routes) == 0 && staticDir != "" {
+		for _, name := range []string{"favicon.ico", "favicon.png", "favicon.svg"} {
+			p := filepath.Join(staticDir, name)
+			fi, err := os.Stat(p)
+			if err == nil && !fi.IsDir() {
+				routes = append(routes, assets.IconRoute{
+					URL:         "/favicon.ico",
+					Path:        p,
+					ContentType: assets.MimeForPath(name),
+				})
+				break
+			}
+		}
+	}
+	return routes, nil
 }
