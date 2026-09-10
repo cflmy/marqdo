@@ -11,6 +11,10 @@ echo "== 首页 / 列表 =="
 code=$(curl -s -o /dev/null -w "%{http_code}" "$BASE/")
 [ "$code" = "200" ] && ok "GET /" || bad "GET / -> $code"
 curl -s "$BASE/" | grep -q '暗恋见君' && ok "品牌标题" || bad "品牌标题"
+curl -s "$BASE/" | grep -q 'class="hero"' && ok "Hero 区" || bad "Hero 区"
+curl -s "$BASE/" | grep -q 'bg-hero-640\|heroImageFloat\|hero-art' && ok "Hero 主图/动效类" || bad "Hero 主图/动效类"
+curl -s -o /dev/null -w "%{http_code}" "$BASE/static/bg-body-960.webp" | grep -q 200 && ok "背景图静态资源" || bad "背景图静态资源"
+curl -s "$BASE/" | grep -q '@keyframes pulse\|animation: pulse\|animation:pulse' && ok "pulse 动效 CSS" || bad "pulse 动效 CSS"
 curl -s "$BASE/posts" | grep -q 'welcome\|欢迎' && ok "帖子列表" || bad "帖子列表"
 code=$(curl -s -o /dev/null -w "%{http_code}" "$BASE/post/welcome")
 [ "$code" = "200" ] && ok "帖子详情" || bad "帖子详情 -> $code"

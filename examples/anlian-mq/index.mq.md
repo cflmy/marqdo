@@ -5,6 +5,7 @@ description: 用表格装配的论坛验收站点：帖子、新闻、发帖门�
 import shell:styles/shell.mq.md
 import nav:components/nav.mq.md
 import foot:components/foot.mq.md
+import hero:components/hero.mq.md
 import db:db/index.mq.md
 ---
 
@@ -110,16 +111,24 @@ import db:db/index.mq.md
 | /chat | 2026-09-10 |
 | /search | 2026-09-10 |
 
+`图标` =
+
+| 路径 | 关系 | 类型 | 尺寸 | 地址 |
+|------|------|------|------|------|
+| "public/favicon-32.png" | icon | "image/png" | 32x32 | "/favicon.ico" |
+
 *store = > db.打开*
 *壳CSS = > shell.全局*
+*首页引言 = > hero.首页引言*
 
-*首页 = > 网页.页面 标题="暗恋见君" 引言="<h1>暗恋见君</h1><p>期待人们能够继续相信爱情。——本站用 Marqdo 表格装配，验收 web 拓展库。</p>"*
+*首页 = > 网页.页面 标题="暗恋见君" 引言=`首页引言`*
 *首页 = > 首页.组件装配 组件=`壳`*
 *首页 = > 首页.主体装配 主体=`帖子卡片`*
 *首页 = > 首页.排序 排序="-created_at"*
+*首页 = > 首页.链接前缀 前缀="/post/"*
 *首页 = > 首页.样式 样式=`壳CSS`*
 
-*帖子列表 = > 网页.页面 标题="帖子" 引言="<h1>帖子</h1>"*
+*帖子列表 = > 网页.页面 标题="帖子" 引言="<div class=\"page-stage\"><h1>帖子</h1><p>粉色毛玻璃卡片 · 对照原站 feed</p></div>"*
 *帖子列表 = > 帖子列表.组件装配 组件=`壳`*
 *帖子列表 = > 帖子列表.主体装配 主体=`帖子卡片`*
 *帖子列表 = > 帖子列表.链接前缀 前缀="/post/"*
@@ -133,7 +142,7 @@ import db:db/index.mq.md
 *帖子页 = > 帖子页.详情 详情=True*
 *帖子页 = > 帖子页.样式 样式=`壳CSS`*
 
-*新闻列表 = > 网页.页面 标题="新闻" 引言="<h1>新闻</h1>"*
+*新闻列表 = > 网页.页面 标题="新闻" 引言="<div class=\"page-stage\"><h1>新闻</h1><p>站务与迁移动态</p></div>"*
 *新闻列表 = > 新闻列表.组件装配 组件=`壳`*
 *新闻列表 = > 新闻列表.主体装配 主体=`新闻卡片`*
 *新闻列表 = > 新闻列表.链接前缀 前缀="/news/"*
@@ -151,16 +160,16 @@ import db:db/index.mq.md
 *发帖表 = > 发帖表.字段 字段=`发帖字段`*
 *发帖表 = > 发帖表.规则 规则=`发帖规则`*
 
-*发帖页 = > 网页.页面 标题="发帖" 引言="<h1>发帖</h1><p>需登录（admin / anlian）。</p>"*
+*发帖页 = > 网页.页面 标题="发帖" 引言="<div class=\"page-stage\"><h1>发帖</h1><p>需登录（admin / anlian）</p></div>"*
 *发帖页 = > 发帖页.组件装配 组件=`壳`*
 *发帖页 = > 发帖页.表单装配 id="post" 表单=`发帖表`*
 *发帖页 = > 发帖页.样式 样式=`壳CSS`*
 
-*搜索页 = > 网页.页面 标题="搜索" 引言="<h1>搜索</h1><p>在地址栏加 <code>?q=关键词</code>，或从后台全文工具验证 FTS。验收切片先提供入口页。</p><form method=\"get\" action=\"/search\"><input name=\"q\" placeholder=\"关键词\"><button type=\"submit\">搜</button></form>"*
+*搜索页 = > 网页.页面 标题="搜索" 引言="<div class=\"page-stage\"><h1>搜索</h1><p>全文检索入口（SQLite FTS）</p><form class=\"search-bar\" method=\"get\" action=\"/search\"><input name=\"q\" placeholder=\"关键词\" aria-label=\"关键词\"><button type=\"submit\">搜</button></form></div>"*
 *搜索页 = > 搜索页.组件装配 组件=`壳`*
 *搜索页 = > 搜索页.样式 样式=`壳CSS`*
 
-*聊天页 = > 网页.页面 标题="公聊" 引言="<h1>公聊室</h1><div class=\"chat-box\"><div id=\"chat-log\" class=\"chat-log\"></div><p><input id=\"chat-msg\" placeholder=\"说点什么…\" style=\"width:70%\"> <button id=\"chat-send\" type=\"button\">发送</button></p></div><script src=\"/static/chat.js\"></script>"*
+*聊天页 = > 网页.页面 标题="公聊" 引言="<div class=\"page-stage\"><h1>公聊室</h1><p>WebSocket 广播 · /chat/ws</p></div><div class=\"chat-box\"><div id=\"chat-log\" class=\"chat-log\"></div><p class=\"search-bar\"><input id=\"chat-msg\" placeholder=\"说点什么…\" aria-label=\"消息\"><button id=\"chat-send\" type=\"button\">发送</button></p></div><script src=\"/static/chat.js\"></script>"*
 *聊天页 = > 聊天页.组件装配 组件=`壳`*
 *聊天页 = > 聊天页.样式 样式=`壳CSS`*
 
@@ -173,6 +182,7 @@ import db:db/index.mq.md
 *应用 = > 应用.路由 路径="/search" 页面=`搜索页`*
 *应用 = > 应用.路由 路径="/chat" 页面=`聊天页`*
 *应用 = > 应用.静态 目录="public" 挂载="/static"*
+*应用 = > 应用.图标 表=`图标`*
 *应用 = > 应用.鉴权 用户表=`用户表` 会话时长=7200 登录回跳="/write" 登出回跳="/"*
 *应用 = > 应用.门禁 路径="/write" 角色="admin" 匹配="prefix" 拒绝="redirect" 排除="/admin/login"*
 *应用 = > 应用.路由实时 路径="/chat/ws" 模式="broadcast"*

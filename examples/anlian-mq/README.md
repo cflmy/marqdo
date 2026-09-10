@@ -11,8 +11,11 @@
 | GFM 表装配导航、样式、库表、种子、表单、门禁 | `json.set` 链拼页面 |
 | `网页.*` / `table.put` 命名方法 | 手写业务 JS 袋 |
 | 分文件：`db/`、`components/`、`styles/` | 单文件堆全部 HTML |
+| 对照原站迁粉玻璃、Hero 动效、卡片悬停 | 另起一套「暖纸模板」糊弄验收 |
 
 对照原站 [anlian](../../../anlian/)（Django）与施工图 [ext-web-go-rewrite.md](../../doc/design/ext-web-go-rewrite.md) §8。
+
+视觉资源在 `public/`（`bg-body-960.webp`、`bg-hero-640.webp`、`logo.svg`），样式表在 `styles/shell.mq.md`（变量 / `@keyframes` / 顶栏 / Hero / 卡片 / 响应式均为 GFM 表）。
 
 ## 已覆盖主路径
 
