@@ -20,15 +20,26 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Install Go (web plugin)
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.23.x"
+
       - name: Install Node (VS Code extension)
         uses: actions/setup-node@v4
         with:
           node-version: "20"
 
+      - name: Install MinGW for cgo (web.dll)
+        run: choco install mingw -y
+
       - name: Build release CLI + official plugins
+        shell: bash
         run: |
+          export PATH="/c/ProgramData/mingw64/mingw64/bin:/c/ProgramData/chocolatey/lib/mingw/tools/install/mingw64/bin:$PATH"
           cargo build --release
-          cargo build --release -p marqdo_plugin_web -p marqdo_plugin_agent -p marqdo_plugin_quantum -p marqdo_plugin_linalg
+          cargo build --release -p marqdo_plugin_agent -p marqdo_plugin_quantum -p marqdo_plugin_linalg
+          bash ./scripts/build-web-plugin.sh
 
       - name: Checkout extension sources (branch vscode-extension only)
         run: git fetch origin vscode-extension && git checkout origin/vscode-extension -- vscode-extension
@@ -153,8 +164,15 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Install Go (web plugin)
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.23.x"
+
       - name: Build official plugins (release)
-        run: cargo build --release -p marqdo_plugin_web -p marqdo_plugin_agent -p marqdo_plugin_quantum -p marqdo_plugin_linalg
+        run: |
+          cargo build --release -p marqdo_plugin_agent -p marqdo_plugin_quantum -p marqdo_plugin_linalg
+          bash ./scripts/build-web-plugin.sh
 
       - name: Package native zip
         run: |

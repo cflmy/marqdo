@@ -541,7 +541,7 @@ submit  → action=insert → db.insert；action=update → db.update
 |----|----|------|
 | Marqdo 核心 | 表→Value、类/方法、import | 不识别 web 路径语法 |
 | `ext/web/*.mq.md` | 作者 API、中英面、委托插件 | 不直接 `host_*` |
-| `plugins/web` | 路径解析辅助、装配结果、listen、SQL、渲染 | 不要求作者写袋 |
+| `plugins/web` | **Go** `libweb`（HTTP / SQL / HTML 壳；见 [ext-web-go-rewrite.md](ext-web-go-rewrite.md)） | 不要求作者写袋 |
 
 **实现要点（评审通过后再做）：**
 

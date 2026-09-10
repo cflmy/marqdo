@@ -32,7 +32,7 @@ pub const CATALOG: &[ExtPackage] = &[
     },
     ExtPackage {
         id: "web",
-        description: "Dynamic website toolkit (ext/web) — page/db/bind/admin",
+        description: "Dynamic website toolkit (ext/web) — Go libweb (page/db/bind/admin)",
         mq_files: &["web/web.mq.md", "web/网页.mq.md"],
         native_crate: Some("marqdo_plugin_web"),
     },
@@ -274,11 +274,73 @@ fn find_native_plugin(short: &str) -> Result<PathBuf> {
         }
     }
     bail!(
-        "cannot find native plugin `{name}` (run `cargo build -p marqdo_plugin_{short}`, or set {env_key})"
+        "cannot find native plugin `{name}` (for `web`: `./scripts/build-web-plugin.sh`; \
+         else `cargo build -p marqdo_plugin_{short}`; or set {env_key})"
     )
 }
 
-/// Locate a built native plugin: local artifact → GitHub Release prebuild → optional cargo build.
+/// Walk from cwd (and common anchors) to find the Marqdo repo root that contains
+/// `scripts/build-web-plugin.sh`.
+fn find_web_plugin_build_script() -> Option<PathBuf> {
+    let mut starts = Vec::new();
+    if let Ok(cwd) = env::current_dir() {
+        starts.push(cwd);
+    }
+    if let Ok(exe) = env::current_exe() {
+        if let Some(dir) = exe.parent() {
+            starts.push(dir.to_path_buf());
+        }
+    }
+    for start in starts {
+        let mut dir = start;
+        for _ in 0..8 {
+            let script = dir.join("scripts").join("build-web-plugin.sh");
+            if script.is_file() {
+                return Some(script);
+            }
+            if !dir.pop() {
+                break;
+            }
+        }
+    }
+    None
+}
+
+fn build_go_web_plugin() -> Result<PathBuf> {
+    let script = find_web_plugin_build_script().ok_or_else(|| {
+        anyhow::anyhow!(
+            "cannot locate scripts/build-web-plugin.sh (run from the Marqdo repo, \
+             or set {} to a built libweb path)",
+            native_env_var("web")
+        )
+    })?;
+    let root = script
+        .parent()
+        .and_then(|p| p.parent())
+        .ok_or_else(|| anyhow::anyhow!("invalid build-web-plugin.sh path"))?;
+    println!("native plugin for `web` not found; building Go libweb via scripts/build-web-plugin.sh…");
+    let status = std::process::Command::new("bash")
+        .arg(&script)
+        .current_dir(root)
+        .status()
+        .with_context(|| format!("spawn {}", script.display()))?;
+    if !status.success() {
+        bail!(
+            "scripts/build-web-plugin.sh failed (status {status}); \
+             install Go 1.22+ with cgo, or set {} to a built libweb path",
+            native_env_var("web")
+        );
+    }
+    find_native_plugin("web").with_context(|| {
+        format!(
+            "built Go libweb but still cannot find {}; set {} to the .so/.dll path",
+            native_lib_filename("web"),
+            native_env_var("web")
+        )
+    })
+}
+
+/// Locate a built native plugin: local artifact → GitHub Release prebuild → optional build.
 fn ensure_native_plugin(crate_name: &str) -> Result<PathBuf> {
     let short = native_short_name(crate_name);
     if let Ok(p) = find_native_plugin(short) {
@@ -294,6 +356,11 @@ fn ensure_native_plugin(crate_name: &str) -> Result<PathBuf> {
                 eprintln!("note: prebuilt native download skipped/failed: {e:#}");
             }
         }
+    }
+
+    // Official web plugin is Go (W-G13); do not cargo-build the Rust archive.
+    if short == "web" {
+        return build_go_web_plugin();
     }
 
     #[cfg(feature = "net-host")]
@@ -434,10 +501,10 @@ pub fn remove_ext(id: &str) -> Result<()> {
 }
 
 /// Resolve installed native plugin path for `name` (`agent`, `web`, …).
-/// Also falls back to cargo `target/{debug,release}` artifacts for local runs.
+/// Also falls back to cargo `target/{debug,release}` and Go `plugins/web/build`.
 ///
 /// `MARQDO_*_PLUGIN` env overrides installed `~/.marqdo/ext` so developers can
-/// point at a freshly built Go `libweb.so` during the web rewrite.
+/// point at a freshly built plugin path.
 pub fn installed_native_path(name: &str) -> Option<PathBuf> {
     let short = native_short_name(name);
     if !matches!(short, "agent" | "web" | "quantum" | "linalg") {

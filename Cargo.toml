@@ -57,11 +57,12 @@ chrono = { version = "0.4", default-features = false, features = ["alloc", "std"
 members = [
     "plugins/demo",
     "plugins/agent",
-    "plugins/web-rust-archive",
     "plugins/quantum",
     "plugins/linalg",
     "crates/marqdo-wasm",
 ]
+# Official web plugin is Go (`plugins/web/`); Rust sources kept as
+# `plugins/web-rust-archive/` for reference (not a workspace member).
 resolver = "2"
 
 [dev-dependencies]

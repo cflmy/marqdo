@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Build Marqdo web plugin (Go → C shared library).
-# Output: plugins/web/build/libweb.so (Linux) / libweb.dylib / web.dll
+# Canonical output: plugins/web/build/libweb.so (Linux) / libweb.dylib / web.dll
+# Also copies into target/{debug,release}/ for ext CLI and release packaging.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT/plugins/web"
@@ -17,8 +18,12 @@ case "$(uname -s)" in
 esac
 echo "building $OUT (go $(go version | awk '{print $3}'))…"
 CGO_ENABLED=1 go build -buildmode=c-shared -o "$OUT" .
-# Do NOT copy over target/{debug,release}/libweb.so — rust archive crate still
-# builds there during migration. Canonical Go artifact is plugins/web/build/.
-echo "ok: $ROOT/plugins/web/$OUT"
-echo "hint: export MARQDO_WEB_PLUGIN=$ROOT/plugins/web/$OUT"
-echo "      (or use plugins/web/build before ~/.marqdo/ext/native in resolution)"
+ABS="$ROOT/plugins/web/$OUT"
+BASE="$(basename "$OUT")"
+for dir in "$ROOT/target/debug" "$ROOT/target/release"; do
+  mkdir -p "$dir"
+  cp -f "$ABS" "$dir/$BASE"
+done
+echo "ok: $ABS"
+echo "also: $ROOT/target/debug/$BASE  $ROOT/target/release/$BASE"
+echo "hint: plugin.native_path name=web resolves these; override with MARQDO_WEB_PLUGIN=$ABS"

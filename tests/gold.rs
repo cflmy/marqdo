@@ -37,6 +37,26 @@ fn assert_out(path: &str, expect: &str) {
     assert_eq!(stdout.trim_end(), expect.trim_end(), "{path}");
 }
 
+/// Build Go `plugins/web/build/libweb.so` once per test process (W-G13).
+fn ensure_web_plugin_built() {
+    use std::sync::Once;
+    static ONCE: Once = Once::new();
+    ONCE.call_once(|| {
+        let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let script = root.join("scripts").join("build-web-plugin.sh");
+        let status = Command::new("bash")
+            .arg(&script)
+            .current_dir(&root)
+            .status()
+            .expect("run scripts/build-web-plugin.sh");
+        assert!(
+            status.success(),
+            "failed to build Go libweb via scripts/build-web-plugin.sh"
+        );
+    });
+}
+
+
 /// Assert failure with `path:line:col:` prefix and message substring (both backends).
 fn assert_err(path: &str, line_col: &str, substr: &str) {
     for backend in ["tree", "bytecode"] {
@@ -1513,12 +1533,7 @@ fn ext_cli_add_agent() {
 
 #[test]
 fn ext_cli_add_web() {
-    let status = Command::new("cargo")
-        .args(["build", "-p", "marqdo_plugin_web"])
-        .current_dir(env!("CARGO_MANIFEST_DIR"))
-        .status()
-        .expect("build web plugin");
-    assert!(status.success(), "failed to build marqdo_plugin_web");
+    ensure_web_plugin_built();
 
     let tmp = tempfile_dir("marqdo-ext-web");
     let src = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("ext");
@@ -1550,12 +1565,7 @@ fn ext_cli_add_web() {
 
 #[test]
 fn ext_web_smoke() {
-    let status = Command::new("cargo")
-        .args(["build", "-p", "marqdo_plugin_web"])
-        .current_dir(env!("CARGO_MANIFEST_DIR"))
-        .status()
-        .expect("build web plugin");
-    assert!(status.success(), "failed to build marqdo_plugin_web");
+    ensure_web_plugin_built();
     assert_out(
         "tests/ext/web-smoke.mq.md",
         "render-ok
@@ -1573,12 +1583,7 @@ fn ext_web_entrydir_smoke() {
     // not the process cwd (host_query("entry_dir")). We run from the repo
     // root while the script lives in tests/ext, so the sqlite file must
     // land under tests/ext/entrydir-fixtures/data/ and NOT repo-root/.
-    let status = Command::new("cargo")
-        .args(["build", "-p", "marqdo_plugin_web"])
-        .current_dir(env!("CARGO_MANIFEST_DIR"))
-        .status()
-        .expect("build web plugin");
-    assert!(status.success(), "failed to build marqdo_plugin_web");
+    ensure_web_plugin_built();
 
     let script = "tests/ext/web-entrydir-smoke.mq.md";
     let fixture_data = std::path::Path::new("tests/ext/entrydir-fixtures/data");
@@ -1615,12 +1620,7 @@ fn ext_web_entrydir_smoke() {
 
 #[test]
 fn ext_web_form_smoke() {
-    let status = Command::new("cargo")
-        .args(["build", "-p", "marqdo_plugin_web"])
-        .current_dir(env!("CARGO_MANIFEST_DIR"))
-        .status()
-        .expect("build web plugin");
-    assert!(status.success(), "failed to build marqdo_plugin_web");
+    ensure_web_plugin_built();
     assert_out(
         "tests/ext/web-form-smoke.mq.md",
         "validate-ok
@@ -1632,12 +1632,7 @@ render-ok",
 
 #[test]
 fn ext_web_admin_smoke() {
-    let status = Command::new("cargo")
-        .args(["build", "-p", "marqdo_plugin_web"])
-        .current_dir(env!("CARGO_MANIFEST_DIR"))
-        .status()
-        .expect("build web plugin");
-    assert!(status.success(), "failed to build marqdo_plugin_web");
+    ensure_web_plugin_built();
     assert_out(
         "tests/ext/web-admin-smoke.mq.md",
         "schema-ok
@@ -1653,12 +1648,7 @@ errors-echoed-ok",
 
 #[test]
 fn ext_web_net_smoke() {
-    let status = Command::new("cargo")
-        .args(["build", "-p", "marqdo_plugin_web"])
-        .current_dir(env!("CARGO_MANIFEST_DIR"))
-        .status()
-        .expect("build web plugin");
-    assert!(status.success(), "failed to build marqdo_plugin_web");
+    ensure_web_plugin_built();
     assert_out(
         "tests/ext/web-net-smoke.mq.md",
         "session-new-ok
@@ -1681,12 +1671,7 @@ ws-connect-error-ok",
 
 #[test]
 fn ext_web_route_smoke() {
-    let status = Command::new("cargo")
-        .args(["build", "-p", "marqdo_plugin_web"])
-        .current_dir(env!("CARGO_MANIFEST_DIR"))
-        .status()
-        .expect("build web plugin");
-    assert!(status.success(), "failed to build marqdo_plugin_web");
+    ensure_web_plugin_built();
     assert_out(
         "tests/ext/web-route-smoke.mq.md",
         "about-ok
@@ -1697,12 +1682,7 @@ render-ok",
 
 #[test]
 fn ext_web_form_embed_smoke() {
-    let status = Command::new("cargo")
-        .args(["build", "-p", "marqdo_plugin_web"])
-        .current_dir(env!("CARGO_MANIFEST_DIR"))
-        .status()
-        .expect("build web plugin");
-    assert!(status.success(), "failed to build marqdo_plugin_web");
+    ensure_web_plugin_built();
     assert_out(
         "tests/ext/web-form-embed-smoke.mq.md",
         "form-id-ok
@@ -1712,12 +1692,7 @@ render-ok",
 
 #[test]
 fn ext_web_form_slot_smoke() {
-    let status = Command::new("cargo")
-        .args(["build", "-p", "marqdo_plugin_web"])
-        .current_dir(env!("CARGO_MANIFEST_DIR"))
-        .status()
-        .expect("build web plugin");
-    assert!(status.success(), "failed to build marqdo_plugin_web");
+    ensure_web_plugin_built();
     assert_out(
         "tests/ext/web-form-slot-smoke.mq.md",
         "target-ok
@@ -1727,12 +1702,7 @@ slot-ok",
 
 #[test]
 fn ext_web_part_smoke() {
-    let status = Command::new("cargo")
-        .args(["build", "-p", "marqdo_plugin_web"])
-        .current_dir(env!("CARGO_MANIFEST_DIR"))
-        .status()
-        .expect("build web plugin");
-    assert!(status.success(), "failed to build marqdo_plugin_web");
+    ensure_web_plugin_built();
     assert_out(
         "tests/ext/web-part-smoke.mq.md",
         "route-stamp-ok
@@ -1743,12 +1713,7 @@ route-part-ok",
 
 #[test]
 fn ext_web_select_smoke() {
-    let status = Command::new("cargo")
-        .args(["build", "-p", "marqdo_plugin_web"])
-        .current_dir(env!("CARGO_MANIFEST_DIR"))
-        .status()
-        .expect("build web plugin");
-    assert!(status.success(), "failed to build marqdo_plugin_web");
+    ensure_web_plugin_built();
     assert_out(
         "tests/ext/web-select-smoke.mq.md",
         "map-where-ok
@@ -1759,12 +1724,7 @@ all-ok",
 
 #[test]
 fn ext_web_zh_smoke() {
-    let status = Command::new("cargo")
-        .args(["build", "-p", "marqdo_plugin_web"])
-        .current_dir(env!("CARGO_MANIFEST_DIR"))
-        .status()
-        .expect("build web plugin");
-    assert!(status.success(), "failed to build marqdo_plugin_web");
+    ensure_web_plugin_built();
     assert_out(
         "tests/ext/web-zh-smoke.mq.md",
         "render-ok
@@ -1776,12 +1736,7 @@ route-ok",
 
 #[test]
 fn ext_web_static_smoke() {
-    let status = Command::new("cargo")
-        .args(["build", "-p", "marqdo_plugin_web"])
-        .current_dir(env!("CARGO_MANIFEST_DIR"))
-        .status()
-        .expect("build web plugin");
-    assert!(status.success(), "failed to build marqdo_plugin_web");
+    ensure_web_plugin_built();
     assert_out(
         "tests/ext/web-static-smoke.mq.md",
         "dir-ok
@@ -1792,12 +1747,7 @@ custom-ok",
 
 #[test]
 fn ext_web_assets_smoke() {
-    let status = Command::new("cargo")
-        .args(["build", "-p", "marqdo_plugin_web"])
-        .current_dir(env!("CARGO_MANIFEST_DIR"))
-        .status()
-        .expect("build web plugin");
-    assert!(status.success(), "failed to build marqdo_plugin_web");
+    ensure_web_plugin_built();
     assert_out(
         "tests/ext/web-assets-smoke.mq.md",
         "images-ok
@@ -1812,12 +1762,7 @@ make-head-ok",
 
 #[test]
 fn ext_web_assets_live() {
-    let status = Command::new("cargo")
-        .args(["build", "-p", "marqdo_plugin_web"])
-        .current_dir(env!("CARGO_MANIFEST_DIR"))
-        .status()
-        .expect("build web plugin");
-    assert!(status.success(), "failed to build marqdo_plugin_web");
+    ensure_web_plugin_built();
 
     let script = "tests/ext/web-assets-live-server.mq.md";
     let bin = env!("CARGO_BIN_EXE_marqdo");
@@ -1888,12 +1833,7 @@ fn ext_web_assets_live() {
 
 #[test]
 fn ext_web_middleware_smoke() {
-    let status = Command::new("cargo")
-        .args(["build", "-p", "marqdo_plugin_web"])
-        .current_dir(env!("CARGO_MANIFEST_DIR"))
-        .status()
-        .expect("build web plugin");
-    assert!(status.success(), "failed to build marqdo_plugin_web");
+    ensure_web_plugin_built();
     assert_out(
         "tests/ext/web-middleware-smoke.mq.md",
         "cors-origin-ok
@@ -1916,12 +1856,7 @@ json-post-ok",
 fn ext_web_middleware_live() {
     // Boots a real HTTP server and verifies CORS / security headers /
     // gzip / JSON API / body limit over the wire.
-    let status = Command::new("cargo")
-        .args(["build", "-p", "marqdo_plugin_web"])
-        .current_dir(env!("CARGO_MANIFEST_DIR"))
-        .status()
-        .expect("build web plugin");
-    assert!(status.success(), "failed to build marqdo_plugin_web");
+    ensure_web_plugin_built();
 
     let script = "tests/ext/web-middleware-live-server.mq.md";
     let bin = env!("CARGO_BIN_EXE_marqdo");
@@ -2054,12 +1989,7 @@ fn ext_web_middleware_live() {
 
 #[test]
 fn ext_web_proxy_invoke_smoke() {
-    let status = Command::new("cargo")
-        .args(["build", "-p", "marqdo_plugin_web"])
-        .current_dir(env!("CARGO_MANIFEST_DIR"))
-        .status()
-        .expect("build web plugin");
-    assert!(status.success(), "failed to build marqdo_plugin_web");
+    ensure_web_plugin_built();
     assert_out(
         "tests/ext/web-proxy-invoke-smoke.mq.md",
         "proxy-table-ok
@@ -2074,12 +2004,7 @@ invoke-method-ok",
 #[test]
 fn ext_web_hosting_live() {
     // Mock upstream SSE on 18142 + Marqdo web proxy/invoke on 18141.
-    let status = Command::new("cargo")
-        .args(["build", "-p", "marqdo_plugin_web"])
-        .current_dir(env!("CARGO_MANIFEST_DIR"))
-        .status()
-        .expect("build web plugin");
-    assert!(status.success(), "failed to build marqdo_plugin_web");
+    ensure_web_plugin_built();
 
     use std::io::{Read, Write};
     use std::net::TcpListener;
@@ -2194,12 +2119,7 @@ fn ext_web_hosting_live() {
 
 #[test]
 fn ext_web_db_cross_module_smoke() {
-    let status = Command::new("cargo")
-        .args(["build", "-p", "marqdo_plugin_web"])
-        .current_dir(env!("CARGO_MANIFEST_DIR"))
-        .status()
-        .expect("build web plugin");
-    assert!(status.success(), "failed to build marqdo_plugin_web");
+    ensure_web_plugin_built();
     assert_out("tests/ext/web-db-cross-module-smoke.mq.md", "cross-db-ok");
 }
 
@@ -2220,12 +2140,7 @@ mcp-fn-ok",
 
 #[test]
 fn ext_web_security_smoke() {
-    let status = Command::new("cargo")
-        .args(["build", "-p", "marqdo_plugin_web"])
-        .current_dir(env!("CARGO_MANIFEST_DIR"))
-        .status()
-        .expect("build web plugin");
-    assert!(status.success(), "failed to build marqdo_plugin_web");
+    ensure_web_plugin_built();
     assert_out(
         "tests/ext/web-security-smoke.mq.md",
         "hash-ok
@@ -2236,12 +2151,7 @@ auth-bad-reject-ok",
 
 #[test]
 fn ext_web_content_smoke() {
-    let status = Command::new("cargo")
-        .args(["build", "-p", "marqdo_plugin_web"])
-        .current_dir(env!("CARGO_MANIFEST_DIR"))
-        .status()
-        .expect("build web plugin");
-    assert!(status.success(), "failed to build marqdo_plugin_web");
+    ensure_web_plugin_built();
     assert_out(
         "tests/ext/web-content-smoke.mq.md",
         "meta-ok
@@ -2253,12 +2163,7 @@ rss-ok",
 #[test]
 fn ext_web_drivers_smoke() {
     // W4 drivers: memory cache, file storage, postgres/s3 URL shape (offline).
-    let status = Command::new("cargo")
-        .args(["build", "-p", "marqdo_plugin_web"])
-        .current_dir(env!("CARGO_MANIFEST_DIR"))
-        .status()
-        .expect("build web plugin");
-    assert!(status.success(), "failed to build marqdo_plugin_web");
+    ensure_web_plugin_built();
 
     let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("tests/ext/web-fixtures/data/drivers-blobs");
@@ -2277,12 +2182,7 @@ s3-open-ok",
 
 #[test]
 fn ext_web_upload_smoke() {
-    let status = Command::new("cargo")
-        .args(["build", "-p", "marqdo_plugin_web"])
-        .current_dir(env!("CARGO_MANIFEST_DIR"))
-        .status()
-        .expect("build web plugin");
-    assert!(status.success(), "failed to build marqdo_plugin_web");
+    ensure_web_plugin_built();
 
     let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("tests/ext/web-fixtures/data/upload-blobs");
@@ -2301,12 +2201,7 @@ form-file-ok",
 
 #[test]
 fn ext_web_upload_live() {
-    let status = Command::new("cargo")
-        .args(["build", "-p", "marqdo_plugin_web"])
-        .current_dir(env!("CARGO_MANIFEST_DIR"))
-        .status()
-        .expect("build web plugin");
-    assert!(status.success(), "failed to build marqdo_plugin_web");
+    ensure_web_plugin_built();
 
     let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("tests/ext/web-fixtures/data/upload-live-blobs");
@@ -2450,12 +2345,7 @@ fn ext_web_upload_live() {
 #[test]
 fn ext_web_db_w6_smoke() {
     // W6: versioned migrate, FTS5 search, published filter + comments table.
-    let status = Command::new("cargo")
-        .args(["build", "-p", "marqdo_plugin_web"])
-        .current_dir(env!("CARGO_MANIFEST_DIR"))
-        .status()
-        .expect("build web plugin");
-    assert!(status.success(), "failed to build marqdo_plugin_web");
+    ensure_web_plugin_built();
 
     let db = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("tests/ext/web-fixtures/data/w6-smoke.db");
@@ -2475,12 +2365,7 @@ fts-row-ok",
 
 #[test]
 fn ext_web_ws_broadcast_smoke() {
-    let status = Command::new("cargo")
-        .args(["build", "-p", "marqdo_plugin_web"])
-        .current_dir(env!("CARGO_MANIFEST_DIR"))
-        .status()
-        .expect("build web plugin");
-    assert!(status.success(), "failed to build marqdo_plugin_web");
+    ensure_web_plugin_built();
     assert_out(
         "tests/ext/web-ws-broadcast-smoke.mq.md",
         "ws-broadcast-route-ok
@@ -2490,12 +2375,7 @@ access-log-ok",
 
 #[test]
 fn ext_web_w7_finish_smoke() {
-    let status = Command::new("cargo")
-        .args(["build", "-p", "marqdo_plugin_web"])
-        .current_dir(env!("CARGO_MANIFEST_DIR"))
-        .status()
-        .expect("build web plugin");
-    assert!(status.success(), "failed to build marqdo_plugin_web");
+    ensure_web_plugin_built();
     assert_out(
         "tests/ext/web-w7-finish-smoke.mq.md",
         "unique-ok
@@ -2509,12 +2389,7 @@ error-page-ok",
 
 #[test]
 fn ext_web_w7_live() {
-    let status = Command::new("cargo")
-        .args(["build", "-p", "marqdo_plugin_web"])
-        .current_dir(env!("CARGO_MANIFEST_DIR"))
-        .status()
-        .expect("build web plugin");
-    assert!(status.success(), "failed to build marqdo_plugin_web");
+    ensure_web_plugin_built();
 
     let script = "tests/ext/web-w7-live-server.mq.md";
     let bin = env!("CARGO_BIN_EXE_marqdo");
@@ -2625,12 +2500,7 @@ fn ext_web_w7_live() {
 
 #[test]
 fn ext_web_p3_smoke() {
-    let status = Command::new("cargo")
-        .args(["build", "-p", "marqdo_plugin_web"])
-        .current_dir(env!("CARGO_MANIFEST_DIR"))
-        .status()
-        .expect("build web plugin");
-    assert!(status.success(), "failed to build marqdo_plugin_web");
+    ensure_web_plugin_built();
     assert_out(
         "tests/ext/web-p3-smoke.mq.md",
         "audit-insert-ok
@@ -2644,12 +2514,7 @@ gallery-ok",
 
 #[test]
 fn ext_web_p3_live() {
-    let status = Command::new("cargo")
-        .args(["build", "-p", "marqdo_plugin_web"])
-        .current_dir(env!("CARGO_MANIFEST_DIR"))
-        .status()
-        .expect("build web plugin");
-    assert!(status.success(), "failed to build marqdo_plugin_web");
+    ensure_web_plugin_built();
 
     let script = "tests/ext/web-p3-live-server.mq.md";
     let bin = env!("CARGO_BIN_EXE_marqdo");
@@ -2743,12 +2608,7 @@ fn ext_web_ws_broadcast_live() {
     use futures_util::{SinkExt, StreamExt};
     use tokio_tungstenite::tungstenite::Message;
 
-    let status = Command::new("cargo")
-        .args(["build", "-p", "marqdo_plugin_web"])
-        .current_dir(env!("CARGO_MANIFEST_DIR"))
-        .status()
-        .expect("build web plugin");
-    assert!(status.success(), "failed to build marqdo_plugin_web");
+    ensure_web_plugin_built();
 
     let script = "tests/ext/web-ws-broadcast-live-server.mq.md";
     let bin = env!("CARGO_BIN_EXE_marqdo");
@@ -2847,12 +2707,7 @@ fn ext_web_ws_broadcast_live() {
 fn ext_web_db_w2_smoke() {
     // W2 data layer: transactions, connection pooling, pagination, query
     // expressiveness (IN/BETWEEN/OR), and row counting.
-    let status = Command::new("cargo")
-        .args(["build", "-p", "marqdo_plugin_web"])
-        .current_dir(env!("CARGO_MANIFEST_DIR"))
-        .status()
-        .expect("build web plugin");
-    assert!(status.success(), "failed to build marqdo_plugin_web");
+    ensure_web_plugin_built();
 
     let db = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("tests/ext/web-fixtures/data/w2-smoke.db");

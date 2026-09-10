@@ -35,9 +35,11 @@ and get both L1 `.mq.md` **and** the matching native plugin (`.dll` / `.so`) **w
 
 ### Resolution order (`add` with native crate)
 
-1. Local artifact (`MARQDO_*_PLUGIN`, `target/{debug,release}`, beside `marqdo`, `MARQDO_EXT_SOURCE/native`, …)
+1. Local artifact (`MARQDO_*_PLUGIN`, `plugins/web/build` for **web**, `target/{debug,release}`, beside `marqdo`, `MARQDO_EXT_SOURCE/native`, …)
 2. **Download** `marqdo-{VER}-native-{target}.zip` from the GitHub Release for this CLI version → cache under `~/.marqdo/cache/`
-3. If Rust/`cargo` is available → `cargo build -p marqdo_plugin_*` (developers)
+3. Local rebuild fallback:
+   - **web** → `./scripts/build-web-plugin.sh` (Go c-shared `libweb`; requires Go 1.22+ / cgo)
+   - other plugins → `cargo build -p marqdo_plugin_*` when Rust/`cargo` is available
 4. Else fail with a clear message pointing at the Release assets
 
 L1 sources:
