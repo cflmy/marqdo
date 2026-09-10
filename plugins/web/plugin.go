@@ -85,6 +85,18 @@ extern int web_app_mount_form(char *args_json, char **out_json, char **err_msg);
 extern int web_app_static(char *args_json, char **out_json, char **err_msg);
 extern int web_app_middleware(char *args_json, char **out_json, char **err_msg);
 extern int web_listen(char *args_json, char **out_json, char **err_msg);
+extern int web_password_hash(char *args_json, char **out_json, char **err_msg);
+extern int web_session_new(char *args_json, char **out_json, char **err_msg);
+extern int web_session_set(char *args_json, char **out_json, char **err_msg);
+extern int web_session_get(char *args_json, char **out_json, char **err_msg);
+extern int web_session_del(char *args_json, char **out_json, char **err_msg);
+extern int web_session_destroy(char *args_json, char **out_json, char **err_msg);
+extern int web_auth_login(char *args_json, char **out_json, char **err_msg);
+extern int web_auth_check(char *args_json, char **out_json, char **err_msg);
+extern int web_auth_logout(char *args_json, char **out_json, char **err_msg);
+extern int web_auth_new(char *args_json, char **out_json, char **err_msg);
+extern int web_app_auth(char *args_json, char **out_json, char **err_msg);
+extern int web_app_gate(char *args_json, char **out_json, char **err_msg);
 
 static int register_core(void) {
 	if (host_register((char *)"web_go_ready", (char *)"", web_go_ready) != 0) return 1;
@@ -123,6 +135,18 @@ static int register_core(void) {
 	if (host_register((char *)"web_app_static", (char *)"app,dir,mount", web_app_static) != 0) return 1;
 	if (host_register((char *)"web_app_middleware", (char *)"app,cors,security,compress,body_limit,json_routes,access_log,cache_control,proxy,invoke", web_app_middleware) != 0) return 1;
 	if (host_register((char *)"web_listen", (char *)"app", web_listen) != 0) return 1;
+	if (host_register((char *)"web_password_hash", (char *)"password", web_password_hash) != 0) return 1;
+	if (host_register((char *)"web_session_new", (char *)"ttl_sec", web_session_new) != 0) return 1;
+	if (host_register((char *)"web_session_set", (char *)"id,key,value", web_session_set) != 0) return 1;
+	if (host_register((char *)"web_session_get", (char *)"id,key", web_session_get) != 0) return 1;
+	if (host_register((char *)"web_session_del", (char *)"id,key", web_session_del) != 0) return 1;
+	if (host_register((char *)"web_session_destroy", (char *)"id", web_session_destroy) != 0) return 1;
+	if (host_register((char *)"web_auth_login", (char *)"username,password,users,session_ttl", web_auth_login) != 0) return 1;
+	if (host_register((char *)"web_auth_check", (char *)"session_id", web_auth_check) != 0) return 1;
+	if (host_register((char *)"web_auth_logout", (char *)"session_id", web_auth_logout) != 0) return 1;
+	if (host_register((char *)"web_auth_new", (char *)"users,session_ttl", web_auth_new) != 0) return 1;
+	if (host_register((char *)"web_app_auth", (char *)"app,users,session_ttl,admin_prefix,login_redirect,logout_redirect,login_path", web_app_auth) != 0) return 1;
+	if (host_register((char *)"web_app_gate", (char *)"app,path,roles,match,on_deny,exclude", web_app_gate) != 0) return 1;
 	return 0;
 }
 */

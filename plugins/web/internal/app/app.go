@@ -1,9 +1,11 @@
-// Package app ports minimal app bag helpers (new + route) for offline smoke.
+// Package app ports minimal app bag helpers (new + route + auth + gate) for offline smoke.
 package app
 
 import (
 	"fmt"
 	"strings"
+
+	"github.com/marqdo/marqdo/plugins/web/internal/session"
 )
 
 // New builds an app bag matching Rust web_app_new defaults used by zh-smoke.
@@ -28,6 +30,9 @@ func New(args map[string]any) map[string]any {
 	adminPrefix := strOpt(args, "admin_prefix", "/admin")
 	if s := strOpt(args, "后台前缀", ""); s != "" {
 		adminPrefix = s
+	}
+	if p, err := NormalizeAdminPrefix(adminPrefix); err == nil {
+		adminPrefix = p
 	}
 	out := map[string]any{
 		"page":         page,
@@ -70,8 +75,9 @@ func New(args map[string]any) map[string]any {
 }
 
 // Route registers path → page on app.routes and stamps page._route.
+// When admin=true, paths under admin_prefix are reserved (c0 frees /admin when admin=false).
 func Route(appBag map[string]any, path string, page any) (map[string]any, error) {
-	path, err := normalizeRoutePath(path)
+	path, err := NormalizeRoutePath(path, appBag)
 	if err != nil {
 		return nil, err
 	}
@@ -140,9 +146,8 @@ func Static(appBag map[string]any, dir, mount string) (map[string]any, error) {
 		return nil, fmt.Errorf("static mount `%s` is reserved", mount)
 	}
 	if boolish(appBag["admin"]) {
-		prefix := strOpt(appBag, "admin_prefix", "/admin")
-		prefix = NormalizeStaticMount(prefix)
-		if mount == prefix || strings.HasPrefix(mount, prefix+"/") {
+		prefix := AdminPrefix(appBag)
+		if pathUnderPrefix(mount, prefix) {
 			return nil, fmt.Errorf("static mount `%s` is reserved", mount)
 		}
 	}
@@ -152,18 +157,238 @@ func Static(appBag map[string]any, dir, mount string) (map[string]any, error) {
 	return out, nil
 }
 
-func normalizeRoutePath(raw string) (string, error) {
+// Auth wires users + default admin gate (Rust web_app_auth).
+// opts may include session_ttl, admin_prefix/后台前缀, login_redirect/登录回跳,
+// logout_redirect/登出回跳, login_path/登录路径.
+func Auth(appBag map[string]any, users any, opts map[string]any) (map[string]any, error) {
+	if opts == nil {
+		opts = map[string]any{}
+	}
+	out := clone(appBag)
+	sessionTTL := uint64(3600)
+	if v, ok := opts["session_ttl"]; ok {
+		if n, ok := asUint64(v); ok && n > 0 {
+			sessionTTL = n
+		}
+	}
+	if p := firstStr(opts, "admin_prefix", "后台前缀"); p != "" {
+		np, err := NormalizeAdminPrefix(p)
+		if err != nil {
+			return nil, err
+		}
+		out["admin_prefix"] = np
+	}
+	if v := firstStr(opts, "login_redirect", "登录回跳"); v != "" {
+		out["login_redirect"] = v
+	}
+	if v := firstStr(opts, "logout_redirect", "登出回跳"); v != "" {
+		out["logout_redirect"] = v
+	}
+	if v := firstStr(opts, "login_path", "登录路径"); v != "" {
+		out["login_path"] = v
+	}
+	prefix := AdminPrefix(out)
+	loginPath := strOpt(out, "login_path", "")
+	if loginPath == "" {
+		loginPath = prefix + "/login"
+	}
+	out["login_path"] = loginPath
+	out["auth"] = map[string]any{
+		"users":       users,
+		"session_ttl": float64(sessionTTL),
+	}
+	gates := gatesOf(out)
+	if !hasAdminGate(gates, prefix) {
+		gates = append(gates, map[string]any{
+			"path":    prefix,
+			"roles":   []any{"admin"},
+			"match":   "prefix",
+			"on_deny": "redirect",
+			"exclude": []any{loginPath},
+		})
+		out["gates"] = gates
+	} else {
+		out["gates"] = gates
+	}
+	return out, nil
+}
+
+// Gate appends an RBAC gate (Rust web_app_gate).
+// opts: roles/角色, match/匹配, on_deny/拒绝, exclude/排除.
+func Gate(appBag map[string]any, path string, opts map[string]any) (map[string]any, error) {
+	if opts == nil {
+		opts = map[string]any{}
+	}
+	path = strings.TrimSpace(path)
+	if path == "" {
+		return nil, fmt.Errorf("missing `path`")
+	}
+	rolesRaw := firstStr(opts, "roles", "角色")
+	if rolesRaw == "" {
+		rolesRaw = "admin"
+	}
+	roles := session.ParseRolesCSV(rolesRaw)
+	roleAny := make([]any, len(roles))
+	for i, r := range roles {
+		roleAny[i] = r
+	}
+	matchMode := firstStr(opts, "match", "匹配")
+	if matchMode == "" {
+		matchMode = "prefix"
+	}
+	onDeny := firstStr(opts, "on_deny", "拒绝")
+	if onDeny == "" {
+		onDeny = "forbid"
+	}
+	entry := map[string]any{
+		"path":    path,
+		"roles":   roleAny,
+		"match":   matchMode,
+		"on_deny": onDeny,
+	}
+	if v, ok := first(opts, "exclude", "排除"); ok && v != nil {
+		entry["exclude"] = v
+	}
+	out := clone(appBag)
+	gates := gatesOf(out)
+	gates = append(gates, entry)
+	out["gates"] = gates
+	return out, nil
+}
+
+// NormalizeAdminPrefix cleans and validates admin_prefix.
+func NormalizeAdminPrefix(raw string) (string, error) {
+	path, err := cleanMountPath(raw)
+	if err != nil {
+		return "", err
+	}
+	if path == "/" {
+		return "", fmt.Errorf("admin_prefix cannot be `/`")
+	}
+	if path == "/_form" || strings.HasPrefix(path, "/_form/") ||
+		path == "/_part" || strings.HasPrefix(path, "/_part/") {
+		return "", fmt.Errorf("admin_prefix `%s` collides with framework paths", path)
+	}
+	return path, nil
+}
+
+// AdminPrefix returns the active admin mount from an app bag.
+func AdminPrefix(appBag map[string]any) string {
+	s := strOpt(appBag, "admin_prefix", "/admin")
+	if p, err := NormalizeAdminPrefix(s); err == nil {
+		return p
+	}
+	return "/admin"
+}
+
+// NormalizeRoutePath applies Rust reserved-path rules for the app bag.
+func NormalizeRoutePath(raw string, appBag map[string]any) (string, error) {
+	path, err := cleanMountPath(raw)
+	if err != nil {
+		return "", err
+	}
+	if path == "/" {
+		return "", fmt.Errorf("route path `/` is reserved for the home page")
+	}
+	staticMount := NormalizeStaticMount(strOpt(appBag, "static_mount", "/static"))
+	if isFrameworkReserved(path, staticMount) {
+		return "", fmt.Errorf("route path `%s` is reserved", path)
+	}
+	if boolish(appBag["admin"]) && pathUnderPrefix(path, AdminPrefix(appBag)) {
+		return "", fmt.Errorf("route path `%s` is reserved", path)
+	}
+	return path, nil
+}
+
+func cleanMountPath(raw string) (string, error) {
 	s := strings.TrimSpace(raw)
 	if s == "" {
-		return "", fmt.Errorf("empty route path")
+		return "", fmt.Errorf("path is empty")
 	}
 	if !strings.HasPrefix(s, "/") {
 		s = "/" + s
 	}
-	if s != "/" {
-		s = strings.TrimRight(s, "/")
+	for len(s) > 1 && strings.HasSuffix(s, "/") {
+		s = strings.TrimSuffix(s, "/")
 	}
 	return s, nil
+}
+
+func pathUnderPrefix(path, prefix string) bool {
+	return path == prefix || strings.HasPrefix(path, prefix+"/")
+}
+
+func isFrameworkReserved(path, staticMount string) bool {
+	return path == "/_form" || strings.HasPrefix(path, "/_form/") ||
+		path == "/_part" || strings.HasPrefix(path, "/_part/") ||
+		pathUnderPrefix(path, staticMount)
+}
+
+func gatesOf(appBag map[string]any) []any {
+	if g, ok := appBag["gates"].([]any); ok {
+		out := make([]any, len(g))
+		copy(out, g)
+		return out
+	}
+	return []any{}
+}
+
+func hasAdminGate(gates []any, prefix string) bool {
+	want := strings.TrimSuffix(prefix, "/")
+	for _, g := range gates {
+		m, ok := g.(map[string]any)
+		if !ok {
+			continue
+		}
+		p, _ := m["path"].(string)
+		cleaned := strings.TrimSuffix(strings.TrimSuffix(p, "*"), "/")
+		if cleaned == want {
+			return true
+		}
+	}
+	return false
+}
+
+func first(m map[string]any, keys ...string) (any, bool) {
+	for _, k := range keys {
+		if v, ok := m[k]; ok && v != nil {
+			return v, true
+		}
+	}
+	return nil, false
+}
+
+func firstStr(m map[string]any, keys ...string) string {
+	v, ok := first(m, keys...)
+	if !ok {
+		return ""
+	}
+	s, _ := v.(string)
+	return strings.TrimSpace(s)
+}
+
+func asUint64(v any) (uint64, bool) {
+	switch t := v.(type) {
+	case uint64:
+		return t, true
+	case int:
+		if t < 0 {
+			return 0, false
+		}
+		return uint64(t), true
+	case int64:
+		if t < 0 {
+			return 0, false
+		}
+		return uint64(t), true
+	case float64:
+		if t < 0 {
+			return 0, false
+		}
+		return uint64(t), true
+	default:
+		return 0, false
+	}
 }
 
 func clone(m map[string]any) map[string]any {

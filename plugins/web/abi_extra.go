@@ -8,13 +8,49 @@ import "C"
 
 import (
 	"fmt"
+	"strconv"
 
 	"github.com/marqdo/marqdo/plugins/web/internal/app"
+	"github.com/marqdo/marqdo/plugins/web/internal/auth"
 	"github.com/marqdo/marqdo/plugins/web/internal/db"
 	"github.com/marqdo/marqdo/plugins/web/internal/form"
 	"github.com/marqdo/marqdo/plugins/web/internal/httpx"
 	"github.com/marqdo/marqdo/plugins/web/internal/middleware"
+	"github.com/marqdo/marqdo/plugins/web/internal/password"
+	"github.com/marqdo/marqdo/plugins/web/internal/session"
 )
+
+func argUint64(args map[string]any, def uint64, keys ...string) uint64 {
+	for _, k := range keys {
+		v, ok := args[k]
+		if !ok || v == nil {
+			continue
+		}
+		switch t := v.(type) {
+		case float64:
+			if t > 0 {
+				return uint64(t)
+			}
+		case int:
+			if t > 0 {
+				return uint64(t)
+			}
+		case int64:
+			if t > 0 {
+				return uint64(t)
+			}
+		case uint64:
+			if t > 0 {
+				return t
+			}
+		case string:
+			if n, e := strconv.ParseUint(t, 10, 64); e == nil && n > 0 {
+				return n
+			}
+		}
+	}
+	return def
+}
 
 func txnOpt(args map[string]any) string {
 	s, _ := argStr(args, "txn", "事务")
@@ -258,5 +294,172 @@ func web_listen(argsJSON *C.char, outJSON **C.char, errMsg **C.char) C.int {
 		appBag = args
 	}
 	out, err := httpx.Listen(appBag, entryDir())
+	return replyJSON(outJSON, errMsg, out, err)
+}
+
+//export web_password_hash
+func web_password_hash(argsJSON *C.char, outJSON **C.char, errMsg **C.char) C.int {
+	args, err := parseArgs(argsJSON)
+	if err != nil {
+		return replyJSON(outJSON, errMsg, nil, err)
+	}
+	pw, err := argStrReq(args, "password", "密码")
+	if err != nil {
+		return replyJSON(outJSON, errMsg, nil, err)
+	}
+	out, err := password.HashResult(pw)
+	return replyJSON(outJSON, errMsg, out, err)
+}
+
+//export web_session_new
+func web_session_new(argsJSON *C.char, outJSON **C.char, errMsg **C.char) C.int {
+	args, err := parseArgs(argsJSON)
+	if err != nil {
+		return replyJSON(outJSON, errMsg, nil, err)
+	}
+	ttl := argUint64(args, 3600, "ttl_sec", "ttl", "session_ttl")
+	return replyJSON(outJSON, errMsg, session.New(ttl), nil)
+}
+
+//export web_session_set
+func web_session_set(argsJSON *C.char, outJSON **C.char, errMsg **C.char) C.int {
+	args, err := parseArgs(argsJSON)
+	if err != nil {
+		return replyJSON(outJSON, errMsg, nil, err)
+	}
+	id, err := argStrReq(args, "id", "session_id")
+	if err != nil {
+		return replyJSON(outJSON, errMsg, nil, err)
+	}
+	key, err := argStrReq(args, "key")
+	if err != nil {
+		return replyJSON(outJSON, errMsg, nil, err)
+	}
+	return replyJSON(outJSON, errMsg, session.Set(id, key, args["value"]), nil)
+}
+
+//export web_session_get
+func web_session_get(argsJSON *C.char, outJSON **C.char, errMsg **C.char) C.int {
+	args, err := parseArgs(argsJSON)
+	if err != nil {
+		return replyJSON(outJSON, errMsg, nil, err)
+	}
+	id, err := argStrReq(args, "id", "session_id")
+	if err != nil {
+		return replyJSON(outJSON, errMsg, nil, err)
+	}
+	key, err := argStrReq(args, "key")
+	if err != nil {
+		return replyJSON(outJSON, errMsg, nil, err)
+	}
+	return replyJSON(outJSON, errMsg, session.Get(id, key), nil)
+}
+
+//export web_session_del
+func web_session_del(argsJSON *C.char, outJSON **C.char, errMsg **C.char) C.int {
+	args, err := parseArgs(argsJSON)
+	if err != nil {
+		return replyJSON(outJSON, errMsg, nil, err)
+	}
+	id, err := argStrReq(args, "id", "session_id")
+	if err != nil {
+		return replyJSON(outJSON, errMsg, nil, err)
+	}
+	key, err := argStrReq(args, "key")
+	if err != nil {
+		return replyJSON(outJSON, errMsg, nil, err)
+	}
+	return replyJSON(outJSON, errMsg, session.Del(id, key), nil)
+}
+
+//export web_session_destroy
+func web_session_destroy(argsJSON *C.char, outJSON **C.char, errMsg **C.char) C.int {
+	args, err := parseArgs(argsJSON)
+	if err != nil {
+		return replyJSON(outJSON, errMsg, nil, err)
+	}
+	id, err := argStrReq(args, "id", "session_id")
+	if err != nil {
+		return replyJSON(outJSON, errMsg, nil, err)
+	}
+	return replyJSON(outJSON, errMsg, session.Destroy(id), nil)
+}
+
+//export web_auth_login
+func web_auth_login(argsJSON *C.char, outJSON **C.char, errMsg **C.char) C.int {
+	args, err := parseArgs(argsJSON)
+	if err != nil {
+		return replyJSON(outJSON, errMsg, nil, err)
+	}
+	username, err := argStrReq(args, "username", "用户名", "用户")
+	if err != nil {
+		return replyJSON(outJSON, errMsg, nil, err)
+	}
+	pw, err := argStrReq(args, "password", "密码")
+	if err != nil {
+		return replyJSON(outJSON, errMsg, nil, err)
+	}
+	ttl := argUint64(args, 3600, "session_ttl", "ttl_sec", "ttl")
+	out := auth.Login(username, pw, args["users"], ttl)
+	return replyJSON(outJSON, errMsg, out, nil)
+}
+
+//export web_auth_check
+func web_auth_check(argsJSON *C.char, outJSON **C.char, errMsg **C.char) C.int {
+	args, err := parseArgs(argsJSON)
+	if err != nil {
+		return replyJSON(outJSON, errMsg, nil, err)
+	}
+	id, err := argStrReq(args, "session_id", "id")
+	if err != nil {
+		return replyJSON(outJSON, errMsg, nil, err)
+	}
+	return replyJSON(outJSON, errMsg, auth.Check(id), nil)
+}
+
+//export web_auth_logout
+func web_auth_logout(argsJSON *C.char, outJSON **C.char, errMsg **C.char) C.int {
+	args, err := parseArgs(argsJSON)
+	if err != nil {
+		return replyJSON(outJSON, errMsg, nil, err)
+	}
+	id, err := argStrReq(args, "session_id", "id")
+	if err != nil {
+		return replyJSON(outJSON, errMsg, nil, err)
+	}
+	return replyJSON(outJSON, errMsg, auth.Logout(id), nil)
+}
+
+//export web_auth_new
+func web_auth_new(argsJSON *C.char, outJSON **C.char, errMsg **C.char) C.int {
+	args, err := parseArgs(argsJSON)
+	if err != nil {
+		return replyJSON(outJSON, errMsg, nil, err)
+	}
+	ttl := argUint64(args, 3600, "session_ttl", "ttl_sec", "ttl")
+	return replyJSON(outJSON, errMsg, auth.New(args["users"], ttl), nil)
+}
+
+//export web_app_auth
+func web_app_auth(argsJSON *C.char, outJSON **C.char, errMsg **C.char) C.int {
+	args, err := parseArgs(argsJSON)
+	if err != nil {
+		return replyJSON(outJSON, errMsg, nil, err)
+	}
+	out, err := app.Auth(asPageMap(args["app"]), args["users"], args)
+	return replyJSON(outJSON, errMsg, out, err)
+}
+
+//export web_app_gate
+func web_app_gate(argsJSON *C.char, outJSON **C.char, errMsg **C.char) C.int {
+	args, err := parseArgs(argsJSON)
+	if err != nil {
+		return replyJSON(outJSON, errMsg, nil, err)
+	}
+	path, err := argStrReq(args, "path", "路径")
+	if err != nil {
+		return replyJSON(outJSON, errMsg, nil, err)
+	}
+	out, err := app.Gate(asPageMap(args["app"]), path, args)
 	return replyJSON(outJSON, errMsg, out, err)
 }

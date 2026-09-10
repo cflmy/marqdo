@@ -2,7 +2,10 @@ module github.com/marqdo/marqdo/plugins/web
 
 go 1.25.0
 
-require modernc.org/sqlite v1.34.5
+require (
+	golang.org/x/crypto v0.41.0
+	modernc.org/sqlite v1.34.5
+)
 
 require (
 	github.com/dustin/go-humanize v1.0.1 // indirect
