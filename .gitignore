@@ -72,3 +72,6 @@ plugins/*/tmp/
 
 # Local ABI plugin copies (use `marqdo ext add quantum` / cargo build)
 /ext/native/
+
+# Go web plugin c-shared build output (./scripts/build-web-plugin.sh)
+/plugins/web/build/
