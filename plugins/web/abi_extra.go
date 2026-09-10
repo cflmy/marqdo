@@ -217,6 +217,36 @@ func web_form_submit(argsJSON *C.char, outJSON **C.char, errMsg **C.char) C.int 
 	return replyJSON(outJSON, errMsg, out, err)
 }
 
+//export web_db_table_info
+func web_db_table_info(argsJSON *C.char, outJSON **C.char, errMsg **C.char) C.int {
+	args, err := parseArgs(argsJSON)
+	if err != nil {
+		return replyJSON(outJSON, errMsg, nil, err)
+	}
+	url, err := dbURLOf(args)
+	if err != nil {
+		return replyJSON(outJSON, errMsg, nil, err)
+	}
+	tableName, err := argStrReq(args, "table")
+	if err != nil {
+		return replyJSON(outJSON, errMsg, nil, err)
+	}
+	cols, err := db.TableInfo(url, tableName)
+	if err != nil {
+		return replyJSON(outJSON, errMsg, nil, err)
+	}
+	arr := make([]any, len(cols))
+	for i, c := range cols {
+		arr[i] = map[string]any{
+			"name":    c.Name,
+			"type":    c.SQLType,
+			"notnull": c.NotNull,
+			"pk":      c.PK,
+		}
+	}
+	return replyJSON(outJSON, errMsg, map[string]any{"columns": arr}, nil)
+}
+
 //export web_form_from_schema
 func web_form_from_schema(argsJSON *C.char, outJSON **C.char, errMsg **C.char) C.int {
 	args, err := parseArgs(argsJSON)

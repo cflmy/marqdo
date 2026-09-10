@@ -76,6 +76,7 @@ extern int web_db_rollback(char *args_json, char **out_json, char **err_msg);
 extern int web_db_migrate(char *args_json, char **out_json, char **err_msg);
 extern int web_db_fts_create(char *args_json, char **out_json, char **err_msg);
 extern int web_db_search(char *args_json, char **out_json, char **err_msg);
+extern int web_db_table_info(char *args_json, char **out_json, char **err_msg);
 extern int web_form_rules(char *args_json, char **out_json, char **err_msg);
 extern int web_form_validate(char *args_json, char **out_json, char **err_msg);
 extern int web_form_render(char *args_json, char **out_json, char **err_msg);
@@ -158,6 +159,7 @@ static int register_core(void) {
 	if (host_register((char *)"web_db_migrate", (char *)"url,steps", web_db_migrate) != 0) return 1;
 	if (host_register((char *)"web_db_fts_create", (char *)"url,table,columns,name", web_db_fts_create) != 0) return 1;
 	if (host_register((char *)"web_db_search", (char *)"url,table,q,limit,name", web_db_search) != 0) return 1;
+	if (host_register((char *)"web_db_table_info", (char *)"url,table", web_db_table_info) != 0) return 1;
 	if (host_register((char *)"web_form_new", (char *)"table,action,id", web_form_new) != 0) return 1;
 	if (host_register((char *)"web_form_fields", (char *)"form,fields", web_form_fields) != 0) return 1;
 	if (host_register((char *)"web_form_rules", (char *)"form,rules", web_form_rules) != 0) return 1;
