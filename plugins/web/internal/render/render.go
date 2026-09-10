@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/marqdo/marqdo/plugins/web/internal/assets"
 	"github.com/marqdo/marqdo/plugins/web/internal/db"
 	"github.com/marqdo/marqdo/plugins/web/internal/table"
 )
@@ -559,6 +560,16 @@ func headHTML(page map[string]any, defaultTitle string) string {
 				s.WriteString(fmt.Sprintf(`<meta name="%s" content="%s"/>`, esc(k), esc(val)))
 			}
 		}
+	}
+	if head, ok := page["head"]; ok {
+		links := assets.HeadLinksFromJSON(head)
+		assetVersion := ""
+		if v, ok := page["asset_version"].(string); ok {
+			assetVersion = v
+		} else if v, ok := page["资源版本"].(string); ok {
+			assetVersion = v
+		}
+		s.WriteString(assets.RenderHeadLinksWithVersion(links, assetVersion))
 	}
 	return s.String()
 }

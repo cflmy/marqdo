@@ -22,6 +22,22 @@ func TestStyleSimple(t *testing.T) {
 	}
 }
 
+func TestStyleStrictKeepsQuotedSlash(t *testing.T) {
+	css, err := style.Style(map[string]any{
+		"name":   "t",
+		"strict": true,
+		"table": []any{
+			map[string]any{"选择器": ".box", "属性": "grid-column", "值": "1 / 5"},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(css, "1 / 5") {
+		t.Fatalf("missing quoted value: %q", css)
+	}
+}
+
 func TestStyleStrictRejectsNumeric(t *testing.T) {
 	_, err := style.Style(map[string]any{
 		"name":   "x",
