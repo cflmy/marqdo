@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/marqdo/marqdo/plugins/web/internal/assets"
 	"github.com/marqdo/marqdo/plugins/web/internal/session"
 )
 
@@ -420,4 +421,135 @@ func boolish(v any) bool {
 		return t != 0
 	}
 	return false
+}
+
+// StorageURL extracts a storage url string or handle map.
+func StorageURL(v any) (string, error) {
+	if v == nil {
+		return "", fmt.Errorf("missing storage")
+	}
+	if s, ok := v.(string); ok && strings.TrimSpace(s) != "" {
+		return strings.TrimSpace(s), nil
+	}
+	if m, ok := v.(map[string]any); ok {
+		if s, ok := m["url"].(string); ok && strings.TrimSpace(s) != "" {
+			return strings.TrimSpace(s), nil
+		}
+	}
+	return "", fmt.Errorf("storage must be a url string or storage handle")
+}
+
+// Upload registers an upload route on the app bag (offline stub; live HTTP in listen).
+func Upload(appBag map[string]any, path, field, storageURL, prefix string, maxBytes uint64, types any) (map[string]any, error) {
+	out := clone(appBag)
+	if path == "" {
+		path = "/_upload"
+	}
+	path, err := NormalizeRoutePath(path, out)
+	if err != nil {
+		return nil, err
+	}
+	if field == "" {
+		field = "file"
+	}
+	if prefix == "" {
+		prefix = "uploads/"
+	}
+	routes := map[string]any{}
+	if r, ok := out["upload_routes"].(map[string]any); ok {
+		routes = clone(r)
+	}
+	entry := map[string]any{
+		"field":       field,
+		"storage_url": storageURL,
+		"prefix":      prefix,
+		"max_bytes":   float64(maxBytes),
+	}
+	if types != nil {
+		entry["types"] = types
+	}
+	routes[path] = entry
+	out["upload_routes"] = routes
+	return out, nil
+}
+
+// Download registers a media download route with {key} capture.
+func Download(appBag map[string]any, path, storageURL, disposition string) (map[string]any, error) {
+	path = strings.TrimSpace(path)
+	if path == "" {
+		path = "/_media/{*key}"
+	}
+	if !strings.HasPrefix(path, "/") {
+		path = "/" + path
+	}
+	for len(path) > 1 && strings.HasSuffix(path, "/") {
+		path = strings.TrimSuffix(path, "/")
+	}
+	if !strings.Contains(path, "{") {
+		return nil, fmt.Errorf("download path must include a `{key}` or `{*key}` capture")
+	}
+	if disposition == "" {
+		disposition = "attachment"
+	}
+	if strings.TrimSpace(storageURL) == "" {
+		return nil, fmt.Errorf("missing storage")
+	}
+	out := clone(appBag)
+	routes := map[string]any{}
+	if r, ok := out["download_routes"].(map[string]any); ok {
+		routes = clone(r)
+	}
+	routes[path] = map[string]any{
+		"storage_url": storageURL,
+		"disposition": disposition,
+	}
+	out["download_routes"] = routes
+	return out, nil
+}
+
+// Gallery registers a gallery page route (offline bag; live HTML in listen).
+func Gallery(appBag map[string]any, path, storageURL, prefix, title, downloadBase string) (map[string]any, error) {
+	out := clone(appBag)
+	if path == "" {
+		path = "/gallery"
+	}
+	var err error
+	path, err = NormalizeRoutePath(path, out)
+	if err != nil {
+		return nil, err
+	}
+	if prefix == "" {
+		prefix = "uploads/"
+	}
+	if title == "" {
+		title = "Gallery"
+	}
+	if downloadBase == "" {
+		downloadBase = "/_media"
+	}
+	storageURL, err = StorageURL(storageURL)
+	if err != nil {
+		return nil, err
+	}
+	routes := map[string]any{}
+	if r, ok := out["gallery_routes"].(map[string]any); ok {
+		routes = clone(r)
+	}
+	routes[path] = map[string]any{
+		"storage":       storageURL,
+		"prefix":        prefix,
+		"title":         title,
+		"download_base": downloadBase,
+	}
+	out["gallery_routes"] = routes
+	return out, nil
+}
+
+// Icons normalizes icons table → app.icons + app.site_head.
+func Icons(appBag map[string]any, table any) (map[string]any, error) {
+	out := clone(appBag)
+	icons, siteHead, _ := assets.NormalizeIcons(table)
+	out["icons"] = icons
+	out["site_head"] = assets.HeadLinksToJSON(siteHead)
+	return out, nil
 }

@@ -97,6 +97,23 @@ extern int web_auth_logout(char *args_json, char **out_json, char **err_msg);
 extern int web_auth_new(char *args_json, char **out_json, char **err_msg);
 extern int web_app_auth(char *args_json, char **out_json, char **err_msg);
 extern int web_app_gate(char *args_json, char **out_json, char **err_msg);
+extern int web_storage_new(char *args_json, char **out_json, char **err_msg);
+extern int web_storage_put(char *args_json, char **out_json, char **err_msg);
+extern int web_storage_get(char *args_json, char **out_json, char **err_msg);
+extern int web_storage_delete(char *args_json, char **out_json, char **err_msg);
+extern int web_storage_list(char *args_json, char **out_json, char **err_msg);
+extern int web_media_new(char *args_json, char **out_json, char **err_msg);
+extern int web_upload_validate(char *args_json, char **out_json, char **err_msg);
+extern int web_upload_save(char *args_json, char **out_json, char **err_msg);
+extern int web_app_upload(char *args_json, char **out_json, char **err_msg);
+extern int web_app_download(char *args_json, char **out_json, char **err_msg);
+extern int web_app_gallery(char *args_json, char **out_json, char **err_msg);
+extern int web_page_meta(char *args_json, char **out_json, char **err_msg);
+extern int web_page_head(char *args_json, char **out_json, char **err_msg);
+extern int web_page_images(char *args_json, char **out_json, char **err_msg);
+extern int web_head(char *args_json, char **out_json, char **err_msg);
+extern int web_images(char *args_json, char **out_json, char **err_msg);
+extern int web_app_icons(char *args_json, char **out_json, char **err_msg);
 
 static int register_core(void) {
 	if (host_register((char *)"web_go_ready", (char *)"", web_go_ready) != 0) return 1;
@@ -147,6 +164,23 @@ static int register_core(void) {
 	if (host_register((char *)"web_auth_new", (char *)"users,session_ttl", web_auth_new) != 0) return 1;
 	if (host_register((char *)"web_app_auth", (char *)"app,users,session_ttl,admin_prefix,login_redirect,logout_redirect,login_path", web_app_auth) != 0) return 1;
 	if (host_register((char *)"web_app_gate", (char *)"app,path,roles,match,on_deny,exclude", web_app_gate) != 0) return 1;
+	if (host_register((char *)"web_storage_new", (char *)"url", web_storage_new) != 0) return 1;
+	if (host_register((char *)"web_storage_put", (char *)"url,key,body,path,content_type", web_storage_put) != 0) return 1;
+	if (host_register((char *)"web_storage_get", (char *)"url,key", web_storage_get) != 0) return 1;
+	if (host_register((char *)"web_storage_delete", (char *)"url,key", web_storage_delete) != 0) return 1;
+	if (host_register((char *)"web_storage_list", (char *)"url,prefix", web_storage_list) != 0) return 1;
+	if (host_register((char *)"web_media_new", (char *)"storage", web_media_new) != 0) return 1;
+	if (host_register((char *)"web_upload_validate", (char *)"filename,content_type,size,max_bytes,types", web_upload_validate) != 0) return 1;
+	if (host_register((char *)"web_upload_save", (char *)"storage,path,key,content_type,prefix", web_upload_save) != 0) return 1;
+	if (host_register((char *)"web_app_upload", (char *)"app,path,field,storage,prefix,max_bytes,types", web_app_upload) != 0) return 1;
+	if (host_register((char *)"web_app_download", (char *)"app,path,storage,disposition", web_app_download) != 0) return 1;
+	if (host_register((char *)"web_app_gallery", (char *)"app,path,storage,prefix,title,download_base", web_app_gallery) != 0) return 1;
+	if (host_register((char *)"web_page_meta", (char *)"page,meta", web_page_meta) != 0) return 1;
+	if (host_register((char *)"web_page_head", (char *)"page,table", web_page_head) != 0) return 1;
+	if (host_register((char *)"web_page_images", (char *)"page,table", web_page_images) != 0) return 1;
+	if (host_register((char *)"web_head", (char *)"table", web_head) != 0) return 1;
+	if (host_register((char *)"web_images", (char *)"table", web_images) != 0) return 1;
+	if (host_register((char *)"web_app_icons", (char *)"app,table", web_app_icons) != 0) return 1;
 	return 0;
 }
 */
