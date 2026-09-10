@@ -130,6 +130,8 @@ extern int web_cache_set(char *args_json, char **out_json, char **err_msg);
 extern int web_cache_del(char *args_json, char **out_json, char **err_msg);
 extern int web_cache_exists(char *args_json, char **out_json, char **err_msg);
 extern int web_cache_ttl(char *args_json, char **out_json, char **err_msg);
+extern int web_app_proxy(char *args_json, char **out_json, char **err_msg);
+extern int web_app_invoke(char *args_json, char **out_json, char **err_msg);
 
 static int register_core(void) {
 	if (host_register((char *)"web_go_ready", (char *)"", web_go_ready) != 0) return 1;
@@ -213,6 +215,8 @@ static int register_core(void) {
 	if (host_register((char *)"web_cache_del", (char *)"url,key", web_cache_del) != 0) return 1;
 	if (host_register((char *)"web_cache_exists", (char *)"url,key", web_cache_exists) != 0) return 1;
 	if (host_register((char *)"web_cache_ttl", (char *)"url,key", web_cache_ttl) != 0) return 1;
+	if (host_register((char *)"web_app_proxy", (char *)"app,path,upstream,stream,strip_prefix,methods,headers_from_env,timeout_ms", web_app_proxy) != 0) return 1;
+	if (host_register((char *)"web_app_invoke", (char *)"app,path,method,fn,body,return", web_app_invoke) != 0) return 1;
 	return 0;
 }
 */

@@ -7,6 +7,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/marqdo/marqdo/plugins/web/internal/invoke"
+	"github.com/marqdo/marqdo/plugins/web/internal/proxy"
 	"github.com/marqdo/marqdo/plugins/web/internal/table"
 )
 
@@ -76,7 +78,28 @@ func Configure(appBag map[string]any, args map[string]any) (map[string]any, erro
 		mw["json_routes"] = JSONRoutesFromTable(v)
 	}
 	out["middleware"] = mw
+
+	if v, ok := first(args, "proxy", "proxy_routes", "代理"); ok && v != nil {
+		mergeRouteMap(out, "proxy_routes", proxy.RoutesFromTable(v))
+	}
+	if v, ok := first(args, "invoke", "invoke_routes", "调用"); ok && v != nil {
+		mergeRouteMap(out, "invoke_routes", invoke.RoutesFromTable(v))
+	}
 	return out, nil
+}
+
+func mergeRouteMap(appBag map[string]any, key string, incoming map[string]any) {
+	if len(incoming) == 0 {
+		return
+	}
+	existing := map[string]any{}
+	if r, ok := appBag[key].(map[string]any); ok {
+		existing = clone(r)
+	}
+	for k, v := range incoming {
+		existing[k] = v
+	}
+	appBag[key] = existing
 }
 
 // Parse reads app["middleware"] into Config (Rust middleware::parse).
