@@ -68,12 +68,48 @@ func TestParseModeVariants(t *testing.T) {
 		{"broadcast", ws.ModeBroadcast},
 		{"广播", ws.ModeBroadcast},
 		{"drain", ws.ModeDrain},
+		{"room", ws.ModeRoom},
+		{"房间", ws.ModeRoom},
 		{"nope", ws.ModeEcho},
 	}
 	for _, c := range cases {
 		if got := ws.ParseMode(c.in); got != c.want {
 			t.Fatalf("ParseMode(%#v)=%q want %q", c.in, got, c.want)
 		}
+	}
+}
+
+func TestRouteWSRoomModeWithKey(t *testing.T) {
+	a := app.New(nil)
+	out, err := ws.RouteWS(a, "/chat", map[string]any{
+		"mode":     "room",
+		"room_key": "chat.room.{id}",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	spec, err := ws.RouteSpecOf(out, "/chat")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if spec.Mode != ws.ModeRoom {
+		t.Fatalf("mode=%q want room", spec.Mode)
+	}
+	if spec.RoomKey != "chat.room.{id}" {
+		t.Fatalf("room_key=%q", spec.RoomKey)
+	}
+	routes := out["ws_routes"].(map[string]any)
+	room := routes["/chat"].(map[string]any)
+	if room["mode"] != "room" || room["room_key"] != "chat.room.{id}" {
+		t.Fatalf("bag=%v", room)
+	}
+}
+
+func TestRouteWSRoomRequiresKey(t *testing.T) {
+	a := app.New(nil)
+	_, err := ws.RouteWS(a, "/chat", map[string]any{"mode": "room"})
+	if err == nil {
+		t.Fatal("expected error without room_key")
 	}
 }
 

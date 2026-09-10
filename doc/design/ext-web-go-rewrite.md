@@ -397,7 +397,7 @@ scripts/build-web-plugin.sh   # go build -buildmode=c-shared -o …/libweb.so
 | **W-G9** | Postgres + Redis cache + file/S3 storage | ✅ `web-drivers-smoke` |
 | **W-G10** | proxy + invoke + nested plugin | ✅ `web-proxy-invoke` / hosting live |
 | **W-G11** | 定制 C2–C4 shell/layout/style/nav | ✅ `web-c2`–`c4` |
-| **W-G12** | G 增强 WS rooms + Redis session/pubsub + API key 原语 | 单测 + anlian chat 切片 |
+| **W-G12** | G 增强 WS rooms + Redis session/pubsub + API key 原语 | ✅ 单测 + `web-g12-api-key-smoke` |
 | **W-G13** | 默认切换 Go `libweb`；归档 Rust；更新发版与 ext CLI | 全量 `tests/ext/web-*` 绿 |
 | **W-G14** | anlian Marqdo 重写主路径（可分仓或 `examples/anlian-mq/`） | §8 矩阵主路径可演示 |
 

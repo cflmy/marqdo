@@ -2,6 +2,7 @@
 package session
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
@@ -11,6 +12,7 @@ import (
 	"time"
 
 	"github.com/marqdo/marqdo/plugins/web/internal/db"
+	"github.com/redis/go-redis/v9"
 )
 
 const (
@@ -21,7 +23,8 @@ const (
 
 // Config controls session backend.
 type Config struct {
-	DBURL        string
+	DBURL        string // sqlite:… or legacy SQL session table
+	RedisURL     string // redis:// or rediss:// (G-SESS1)
 	TTLSec       uint64
 	CookieSecure bool
 }
@@ -33,6 +36,10 @@ var (
 	memMu sync.Mutex
 	mem   = map[string]memRec{}
 	memTTL uint64 = defaultTTL
+
+	redisMu     sync.Mutex
+	redisClient *redis.Client
+	redisURL    string
 )
 
 type memRec struct {
@@ -52,19 +59,140 @@ func cloneData(m map[string]any) map[string]any {
 	return out
 }
 
+func isRedisURL(url string) bool {
+	u := strings.ToLower(strings.TrimSpace(url))
+	return strings.HasPrefix(u, "redis://") || strings.HasPrefix(u, "rediss://")
+}
+
+func isSQLiteURL(url string) bool {
+	u := strings.TrimSpace(url)
+	return u != "" && !isRedisURL(u)
+}
+
 // Configure sets session backend before listen or offline ABI calls.
+// RedisURL or a redis:// DBURL selects the Redis backend; sqlite DBURL keeps SQL table storage.
 func Configure(c Config) {
 	ttl := c.TTLSec
 	if ttl == 0 {
 		ttl = defaultTTL
 	}
 	c.TTLSec = ttl
-	if c.DBURL != "" {
+	if c.RedisURL == "" && isRedisURL(c.DBURL) {
+		c.RedisURL = strings.TrimSpace(c.DBURL)
+		c.DBURL = ""
+	}
+	if isSQLiteURL(c.DBURL) {
 		_ = ensureSessionTable(c.DBURL)
+	}
+	if c.RedisURL != "" {
+		_ = openRedis(c.RedisURL)
+	} else {
+		closeRedis()
 	}
 	cfgMu.Lock()
 	cfg = c
 	cfgMu.Unlock()
+}
+
+func openRedis(url string) error {
+	redisMu.Lock()
+	defer redisMu.Unlock()
+	if redisClient != nil && redisURL == url {
+		return nil
+	}
+	if redisClient != nil {
+		_ = redisClient.Close()
+		redisClient = nil
+	}
+	opts, err := redis.ParseURL(url)
+	if err != nil {
+		return err
+	}
+	redisClient = redis.NewClient(opts)
+	redisURL = url
+	return nil
+}
+
+func closeRedis() {
+	redisMu.Lock()
+	defer redisMu.Unlock()
+	if redisClient != nil {
+		_ = redisClient.Close()
+		redisClient = nil
+		redisURL = ""
+	}
+}
+
+// CloseRedis releases the Redis client (plugin shutdown / tests).
+func CloseRedis() {
+	closeRedis()
+}
+
+func redisKey(id string) string {
+	return "marqdo:session:" + id
+}
+
+type redisBlob struct {
+	Data map[string]any `json:"data"`
+}
+
+func loadRedis(id string) (map[string]any, bool) {
+	client := redisClientForRead()
+	if client == nil {
+		return nil, false
+	}
+	ctx := context.Background()
+	raw, err := client.Get(ctx, redisKey(id)).Result()
+	if err == redis.Nil || err != nil {
+		return nil, false
+	}
+	var blob redisBlob
+	if err := json.Unmarshal([]byte(raw), &blob); err != nil {
+		return nil, false
+	}
+	if blob.Data == nil {
+		blob.Data = map[string]any{}
+	}
+	return blob.Data, true
+}
+
+func saveRedis(id string, ttl uint64, data map[string]any) bool {
+	client := redisClientForRead()
+	if client == nil {
+		return false
+	}
+	raw, err := json.Marshal(redisBlob{Data: cloneData(data)})
+	if err != nil {
+		return false
+	}
+	ctx := context.Background()
+	if ttl == 0 {
+		ttl = defaultTTL
+	}
+	if err := client.SetEx(ctx, redisKey(id), raw, time.Duration(ttl)*time.Second).Err(); err != nil {
+		return false
+	}
+	return true
+}
+
+func deleteRedis(id string) {
+	client := redisClientForRead()
+	if client == nil {
+		return
+	}
+	ctx := context.Background()
+	_, _ = client.Del(ctx, redisKey(id)).Result()
+}
+
+func redisClientForRead() *redis.Client {
+	redisMu.Lock()
+	defer redisMu.Unlock()
+	return redisClient
+}
+
+func usingRedis() bool {
+	c := getCfg()
+	return c.RedisURL != ""
 }
 
 func getCfg() Config {
@@ -203,6 +331,13 @@ func touchExpiry(ttl uint64) uint64 {
 func getRecord(id string) (map[string]any, bool) {
 	c := getCfg()
 	now := nowSecs()
+	if usingRedis() {
+		data, ok := loadRedis(id)
+		if !ok {
+			return nil, false
+		}
+		return cloneData(data), true
+	}
 	if c.DBURL != "" {
 		pruneSQL(c.DBURL)
 		exp, data, ok := loadSQL(c.DBURL, id)
@@ -231,6 +366,16 @@ func getRecord(id string) (map[string]any, bool) {
 
 func putRecord(id string, exp uint64, data map[string]any) bool {
 	c := getCfg()
+	if usingRedis() {
+		ttl := c.TTLSec
+		if ttl == 0 {
+			ttl = defaultTTL
+		}
+		if exp > nowSecs() {
+			ttl = exp - nowSecs()
+		}
+		return saveRedis(id, ttl, data)
+	}
 	if c.DBURL != "" {
 		return saveSQL(c.DBURL, id, exp, data) == nil
 	}
@@ -262,7 +407,10 @@ func NewID(ttlSec uint64) string {
 	data := map[string]any{}
 	_, _ = ensureCSRF(data)
 	exp := touchExpiry(ttl)
-	if c.DBURL != "" {
+	if usingRedis() {
+		ttl := ttl
+		_ = saveRedis(id, ttl, data)
+	} else if c.DBURL != "" {
 		pruneSQL(c.DBURL)
 		_ = saveSQL(c.DBURL, id, exp, data)
 	} else {
@@ -344,6 +492,10 @@ func Destroy(id string) map[string]any {
 // DestroyID is the low-level destroyer.
 func DestroyID(id string) bool {
 	c := getCfg()
+	if usingRedis() {
+		deleteRedis(id)
+		return true
+	}
 	if c.DBURL != "" {
 		deleteSQL(c.DBURL, id)
 		return true

@@ -12,6 +12,7 @@ const (
 	ModeEcho      Mode = "echo"
 	ModeBroadcast Mode = "broadcast"
 	ModeDrain     Mode = "drain"
+	ModeRoom      Mode = "room"
 )
 
 // ParseMode mirrors Rust ws_hub::WsMode::parse.
@@ -26,6 +27,8 @@ func ParseMode(v any) Mode {
 		switch strings.TrimSpace(strings.ToLower(t)) {
 		case "broadcast", "广播":
 			return ModeBroadcast
+		case "room", "房间":
+			return ModeRoom
 		case "drain", "false", "0", "no", "drain_only":
 			return ModeDrain
 		default:

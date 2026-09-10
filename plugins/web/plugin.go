@@ -132,6 +132,7 @@ extern int web_cache_exists(char *args_json, char **out_json, char **err_msg);
 extern int web_cache_ttl(char *args_json, char **out_json, char **err_msg);
 extern int web_app_proxy(char *args_json, char **out_json, char **err_msg);
 extern int web_app_invoke(char *args_json, char **out_json, char **err_msg);
+extern int web_api_key_check(char *args_json, char **out_json, char **err_msg);
 
 static int register_core(void) {
 	if (host_register((char *)"web_go_ready", (char *)"", web_go_ready) != 0) return 1;
@@ -217,6 +218,7 @@ static int register_core(void) {
 	if (host_register((char *)"web_cache_ttl", (char *)"url,key", web_cache_ttl) != 0) return 1;
 	if (host_register((char *)"web_app_proxy", (char *)"app,path,upstream,stream,strip_prefix,methods,headers_from_env,timeout_ms", web_app_proxy) != 0) return 1;
 	if (host_register((char *)"web_app_invoke", (char *)"app,path,method,fn,body,return", web_app_invoke) != 0) return 1;
+	if (host_register((char *)"web_api_key_check", (char *)"key,authorization,pepper,keys", web_api_key_check) != 0) return 1;
 	return 0;
 }
 */
@@ -237,6 +239,7 @@ import (
 	"github.com/marqdo/marqdo/plugins/web/internal/page"
 	"github.com/marqdo/marqdo/plugins/web/internal/plugin"
 	"github.com/marqdo/marqdo/plugins/web/internal/render"
+	"github.com/marqdo/marqdo/plugins/web/internal/session"
 	"github.com/marqdo/marqdo/plugins/web/internal/style"
 )
 
@@ -257,6 +260,7 @@ func marqdo_plugin_init(host *C.MarqdoHostApi) C.int {
 
 //export marqdo_plugin_shutdown
 func marqdo_plugin_shutdown() {
+	session.CloseRedis()
 	db.ResetPool()
 	plugin.Shutdown()
 }

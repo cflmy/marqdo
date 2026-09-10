@@ -45,6 +45,21 @@ func unsubscribe(path string, ch chan string) {
 	room.mu.Unlock()
 }
 
+// JoinRoom subscribes to a named room (G-WS1). Same backing store as path broadcast.
+func JoinRoom(room string) chan string {
+	return subscribe(room)
+}
+
+// LeaveRoom unsubscribes from a named room (G-WS1).
+func LeaveRoom(room string, ch chan string) {
+	unsubscribe(room, ch)
+}
+
+// PublishRoom fans out text to all subscribers in a named room (G-WS1).
+func PublishRoom(room string, text string) {
+	Publish(room, text)
+}
+
 // Publish fans out text to all subscribers on path (Rust ws_hub::publish).
 func Publish(path string, text string) {
 	globalHub.mu.Lock()

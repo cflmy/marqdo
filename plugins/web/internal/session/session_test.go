@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/alicebob/miniredis/v2"
 	"github.com/marqdo/marqdo/plugins/web/internal/db"
 	"github.com/marqdo/marqdo/plugins/web/internal/session"
 )
@@ -83,4 +84,39 @@ func TestNewABI(t *testing.T) {
 	if id == "" {
 		t.Fatal(out)
 	}
+}
+
+func TestConfigureRedisURLNoPanic(t *testing.T) {
+	session.CloseRedis()
+	session.Configure(session.Config{RedisURL: "redis://127.0.0.1:16379/0", TTLSec: 60})
+	session.CloseRedis()
+}
+
+func TestConfigureRedisViaDBURL(t *testing.T) {
+	session.CloseRedis()
+	session.Configure(session.Config{DBURL: "redis://127.0.0.1:16379/1", TTLSec: 60})
+	session.CloseRedis()
+}
+
+func TestSessionPersistsInRedis(t *testing.T) {
+	mr, err := miniredis.Run()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mr.Close()
+	url := "redis://" + mr.Addr() + "/0"
+	session.CloseRedis()
+	session.Configure(session.Config{RedisURL: url, TTLSec: 3600})
+	session.Reset(3600)
+	id := session.NewID(0)
+	if !session.SetValue(id, "lang", "zh") {
+		t.Fatal("set")
+	}
+	session.CloseRedis()
+	session.Configure(session.Config{RedisURL: url, TTLSec: 3600})
+	v, ok := session.GetValue(id, "lang")
+	if !ok || v != "zh" {
+		t.Fatalf("persist get=%v ok=%v", v, ok)
+	}
+	session.CloseRedis()
 }
