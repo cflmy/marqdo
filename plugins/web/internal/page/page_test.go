@@ -27,3 +27,15 @@ func TestNewZhAliases(t *testing.T) {
 		t.Fatalf("%v", p)
 	}
 }
+
+func TestPaginateBag(t *testing.T) {
+	p := page.New(map[string]any{"title": "List"})
+	out := page.Paginate(p, 0, 5, "/")
+	pg, ok := out["paginate"].(map[string]any)
+	if !ok {
+		t.Fatalf("paginate=%v", out["paginate"])
+	}
+	if pg["offset"] != int64(0) || pg["limit"] != int64(5) || pg["path"] != "/" {
+		t.Fatalf("%v", pg)
+	}
+}

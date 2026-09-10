@@ -114,6 +114,14 @@ extern int web_page_images(char *args_json, char **out_json, char **err_msg);
 extern int web_head(char *args_json, char **out_json, char **err_msg);
 extern int web_images(char *args_json, char **out_json, char **err_msg);
 extern int web_app_icons(char *args_json, char **out_json, char **err_msg);
+extern int web_page_paginate(char *args_json, char **out_json, char **err_msg);
+extern int web_rss_build(char *args_json, char **out_json, char **err_msg);
+extern int web_app_route_rss(char *args_json, char **out_json, char **err_msg);
+extern int web_app_redirect(char *args_json, char **out_json, char **err_msg);
+extern int web_app_error_page(char *args_json, char **out_json, char **err_msg);
+extern int web_app_sitemap(char *args_json, char **out_json, char **err_msg);
+extern int web_app_robots(char *args_json, char **out_json, char **err_msg);
+extern int web_sitemap_build(char *args_json, char **out_json, char **err_msg);
 
 static int register_core(void) {
 	if (host_register((char *)"web_go_ready", (char *)"", web_go_ready) != 0) return 1;
@@ -181,6 +189,14 @@ static int register_core(void) {
 	if (host_register((char *)"web_head", (char *)"table", web_head) != 0) return 1;
 	if (host_register((char *)"web_images", (char *)"table", web_images) != 0) return 1;
 	if (host_register((char *)"web_app_icons", (char *)"app,table", web_app_icons) != 0) return 1;
+	if (host_register((char *)"web_page_paginate", (char *)"page,offset,limit,path", web_page_paginate) != 0) return 1;
+	if (host_register((char *)"web_rss_build", (char *)"title,link,description,items", web_rss_build) != 0) return 1;
+	if (host_register((char *)"web_app_route_rss", (char *)"app,path,table,limit,order,title,link,description", web_app_route_rss) != 0) return 1;
+	if (host_register((char *)"web_app_redirect", (char *)"app,from,to,permanent", web_app_redirect) != 0) return 1;
+	if (host_register((char *)"web_app_error_page", (char *)"app,status,page", web_app_error_page) != 0) return 1;
+	if (host_register((char *)"web_app_sitemap", (char *)"app,path,base,table,loc,limit,items", web_app_sitemap) != 0) return 1;
+	if (host_register((char *)"web_app_robots", (char *)"app,body,sitemap", web_app_robots) != 0) return 1;
+	if (host_register((char *)"web_sitemap_build", (char *)"base,items", web_sitemap_build) != 0) return 1;
 	return 0;
 }
 */

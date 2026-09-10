@@ -22,6 +22,23 @@ func New(args map[string]any) map[string]any {
 	return out
 }
 
+// Paginate stamps page.paginate with offset/limit/path (Rust web_page_paginate).
+func Paginate(page map[string]any, offset, limit int64, path string) map[string]any {
+	out := map[string]any{}
+	for k, v := range page {
+		out[k] = v
+	}
+	if path == "" {
+		path = "/"
+	}
+	out["paginate"] = map[string]any{
+		"offset": offset,
+		"limit":  limit,
+		"path":   path,
+	}
+	return out
+}
+
 func strOpt(args map[string]any, key, def string) string {
 	if s, ok := strAny(args, key); ok {
 		return s

@@ -545,6 +545,124 @@ func Gallery(appBag map[string]any, path, storageURL, prefix, title, downloadBas
 	return out, nil
 }
 
+// Redirect registers a redirect from → to on app.redirects.
+func Redirect(appBag map[string]any, from, to string, permanent bool) (map[string]any, error) {
+	out := clone(appBag)
+	from, err := NormalizeRoutePath(from, out)
+	if err != nil {
+		return nil, err
+	}
+	redirects := map[string]any{}
+	if r, ok := out["redirects"].(map[string]any); ok {
+		redirects = clone(r)
+	}
+	redirects[from] = map[string]any{
+		"to":        to,
+		"permanent": permanent,
+	}
+	out["redirects"] = redirects
+	return out, nil
+}
+
+// ErrorPage stores a custom page for HTTP 404 or 500.
+func ErrorPage(appBag map[string]any, status uint16, page any) (map[string]any, error) {
+	if page == nil {
+		return nil, fmt.Errorf("missing `page`")
+	}
+	out := clone(appBag)
+	key := "page_404"
+	if status == 500 {
+		key = "page_500"
+	}
+	out[key] = page
+	return out, nil
+}
+
+// Sitemap registers a sitemap route bag on app.sitemap_routes.
+func Sitemap(appBag map[string]any, path, base string, table, loc string, limit int64, items any) (map[string]any, error) {
+	out := clone(appBag)
+	if path == "" {
+		path = "/sitemap.xml"
+	}
+	path, err := NormalizeRoutePath(path, out)
+	if err != nil {
+		return nil, err
+	}
+	if loc == "" {
+		loc = "path"
+	}
+	if items == nil {
+		items = []any{}
+	}
+	routes := map[string]any{}
+	if r, ok := out["sitemap_routes"].(map[string]any); ok {
+		routes = clone(r)
+	}
+	entry := map[string]any{
+		"base":  base,
+		"loc":   loc,
+		"limit": float64(limit),
+		"items": items,
+	}
+	if table != "" {
+		entry["table"] = table
+	}
+	routes[path] = entry
+	out["sitemap_routes"] = routes
+	return out, nil
+}
+
+// Robots sets app.robots_body from body or a default Allow-all robots.txt.
+func Robots(appBag map[string]any, body, sitemapURL string) (map[string]any, error) {
+	out := clone(appBag)
+	text := strings.TrimSpace(body)
+	if text == "" {
+		text = defaultRobotsBody(sitemapURL)
+	}
+	out["robots_body"] = text
+	return out, nil
+}
+
+func defaultRobotsBody(sitemapURL string) string {
+	out := "User-agent: *\nAllow: /\n"
+	if strings.TrimSpace(sitemapURL) != "" {
+		out += "Sitemap: " + strings.TrimSpace(sitemapURL) + "\n"
+	}
+	return out
+}
+
+// RouteRSS registers an RSS feed route on app.rss_routes.
+func RouteRSS(appBag map[string]any, path, table, order, title, link, description string, limit int64) (map[string]any, error) {
+	out := clone(appBag)
+	path, err := NormalizeRoutePath(path, out)
+	if err != nil {
+		return nil, err
+	}
+	if order == "" {
+		order = "-created_at"
+	}
+	if title == "" {
+		title = "Feed"
+	}
+	if link == "" {
+		link = "/"
+	}
+	routes := map[string]any{}
+	if r, ok := out["rss_routes"].(map[string]any); ok {
+		routes = clone(r)
+	}
+	routes[path] = map[string]any{
+		"table":       table,
+		"limit":       float64(limit),
+		"order":       order,
+		"title":       title,
+		"link":        link,
+		"description": description,
+	}
+	out["rss_routes"] = routes
+	return out, nil
+}
+
 // Icons normalizes icons table → app.icons + app.site_head.
 func Icons(appBag map[string]any, table any) (map[string]any, error) {
 	out := clone(appBag)

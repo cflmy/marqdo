@@ -161,3 +161,61 @@ func TestGateCustomFields(t *testing.T) {
 		t.Fatalf("%v", g1)
 	}
 }
+
+func TestRedirectStoresMap(t *testing.T) {
+	a := app.New(map[string]any{"page": map[string]any{"title": "Home"}})
+	out, err := app.Redirect(a, "/old", "/new", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rd, ok := out["redirects"].(map[string]any)
+	if !ok {
+		t.Fatalf("redirects=%v", out["redirects"])
+	}
+	entry, ok := rd["/old"].(map[string]any)
+	if !ok || entry["to"] != "/new" || entry["permanent"] != true {
+		t.Fatalf("entry=%v", entry)
+	}
+}
+
+func TestErrorPage404(t *testing.T) {
+	a := app.New(nil)
+	p := map[string]any{"title": "Missing"}
+	out, err := app.ErrorPage(a, 404, p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, ok := out["page_404"].(map[string]any)
+	if !ok || got["title"] != "Missing" {
+		t.Fatalf("page_404=%v", out["page_404"])
+	}
+}
+
+func TestRobotsDefaultBody(t *testing.T) {
+	a := app.New(nil)
+	out, err := app.Robots(a, "", "https://example.com/sitemap.xml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	rb, ok := out["robots_body"].(string)
+	if !ok || !strings.Contains(rb, "Sitemap: https://example.com/sitemap.xml") {
+		t.Fatalf("robots_body=%v", out["robots_body"])
+	}
+}
+
+func TestSitemapRouteBag(t *testing.T) {
+	a := app.New(nil)
+	items := []any{map[string]any{"loc": "/"}}
+	out, err := app.Sitemap(a, "/sitemap.xml", "https://example.com", "", "path", 1000, items)
+	if err != nil {
+		t.Fatal(err)
+	}
+	routes, ok := out["sitemap_routes"].(map[string]any)
+	if !ok {
+		t.Fatalf("sitemap_routes=%v", out["sitemap_routes"])
+	}
+	entry, ok := routes["/sitemap.xml"].(map[string]any)
+	if !ok || entry["base"] != "https://example.com" {
+		t.Fatalf("entry=%v", entry)
+	}
+}
