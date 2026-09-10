@@ -82,6 +82,9 @@ extern int web_form_render(char *args_json, char **out_json, char **err_msg);
 extern int web_form_submit(char *args_json, char **out_json, char **err_msg);
 extern int web_form_from_schema(char *args_json, char **out_json, char **err_msg);
 extern int web_app_mount_form(char *args_json, char **out_json, char **err_msg);
+extern int web_app_static(char *args_json, char **out_json, char **err_msg);
+extern int web_app_middleware(char *args_json, char **out_json, char **err_msg);
+extern int web_listen(char *args_json, char **out_json, char **err_msg);
 
 static int register_core(void) {
 	if (host_register((char *)"web_go_ready", (char *)"", web_go_ready) != 0) return 1;
@@ -117,6 +120,9 @@ static int register_core(void) {
 	if (host_register((char *)"web_app_new", (char *)"page,db,admin,host,port,admin_prefix,login_redirect,logout_redirect,shell_css,layout,asset_version", web_app_new) != 0) return 1;
 	if (host_register((char *)"web_app_route", (char *)"app,path,page", web_app_route) != 0) return 1;
 	if (host_register((char *)"web_app_mount_form", (char *)"app,id,form", web_app_mount_form) != 0) return 1;
+	if (host_register((char *)"web_app_static", (char *)"app,dir,mount", web_app_static) != 0) return 1;
+	if (host_register((char *)"web_app_middleware", (char *)"app,cors,security,compress,body_limit,json_routes,access_log,cache_control,proxy,invoke", web_app_middleware) != 0) return 1;
+	if (host_register((char *)"web_listen", (char *)"app", web_listen) != 0) return 1;
 	return 0;
 }
 */

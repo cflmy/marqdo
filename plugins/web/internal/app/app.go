@@ -109,6 +109,49 @@ func MountForm(appBag map[string]any, id string, form any) (map[string]any, erro
 	return out, nil
 }
 
+// NormalizeStaticMount mirrors Rust http::normalize_static_mount.
+func NormalizeStaticMount(raw string) string {
+	s := strings.TrimSpace(raw)
+	if s == "" {
+		return "/static"
+	}
+	m := s
+	if !strings.HasPrefix(m, "/") {
+		m = "/" + m
+	}
+	for len(m) > 1 && strings.HasSuffix(m, "/") {
+		m = strings.TrimSuffix(m, "/")
+	}
+	return m
+}
+
+// Static sets static_dir + static_mount (Rust web_app_static).
+func Static(appBag map[string]any, dir, mount string) (map[string]any, error) {
+	dir = strings.TrimSpace(dir)
+	if dir == "" {
+		return nil, fmt.Errorf("static `dir` is empty")
+	}
+	if mount == "" {
+		mount = "/static"
+	}
+	mount = NormalizeStaticMount(mount)
+	if mount == "/_form" || strings.HasPrefix(mount, "/_form/") ||
+		mount == "/_part" || strings.HasPrefix(mount, "/_part/") {
+		return nil, fmt.Errorf("static mount `%s` is reserved", mount)
+	}
+	if boolish(appBag["admin"]) {
+		prefix := strOpt(appBag, "admin_prefix", "/admin")
+		prefix = NormalizeStaticMount(prefix)
+		if mount == prefix || strings.HasPrefix(mount, prefix+"/") {
+			return nil, fmt.Errorf("static mount `%s` is reserved", mount)
+		}
+	}
+	out := clone(appBag)
+	out["static_dir"] = dir
+	out["static_mount"] = mount
+	return out, nil
+}
+
 func normalizeRoutePath(raw string) (string, error) {
 	s := strings.TrimSpace(raw)
 	if s == "" {

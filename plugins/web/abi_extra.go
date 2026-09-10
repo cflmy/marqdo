@@ -12,6 +12,8 @@ import (
 	"github.com/marqdo/marqdo/plugins/web/internal/app"
 	"github.com/marqdo/marqdo/plugins/web/internal/db"
 	"github.com/marqdo/marqdo/plugins/web/internal/form"
+	"github.com/marqdo/marqdo/plugins/web/internal/httpx"
+	"github.com/marqdo/marqdo/plugins/web/internal/middleware"
 )
 
 func txnOpt(args map[string]any) string {
@@ -217,5 +219,44 @@ func web_app_mount_form(argsJSON *C.char, outJSON **C.char, errMsg **C.char) C.i
 		return replyJSON(outJSON, errMsg, nil, fmt.Errorf("missing `form`"))
 	}
 	out, err := app.MountForm(asPageMap(args["app"]), id, args["form"])
+	return replyJSON(outJSON, errMsg, out, err)
+}
+
+//export web_app_static
+func web_app_static(argsJSON *C.char, outJSON **C.char, errMsg **C.char) C.int {
+	args, err := parseArgs(argsJSON)
+	if err != nil {
+		return replyJSON(outJSON, errMsg, nil, err)
+	}
+	dir, err := argStrReq(args, "dir")
+	if err != nil {
+		return replyJSON(outJSON, errMsg, nil, err)
+	}
+	mount, _ := argStr(args, "mount")
+	out, err := app.Static(asPageMap(args["app"]), dir, mount)
+	return replyJSON(outJSON, errMsg, out, err)
+}
+
+//export web_app_middleware
+func web_app_middleware(argsJSON *C.char, outJSON **C.char, errMsg **C.char) C.int {
+	args, err := parseArgs(argsJSON)
+	if err != nil {
+		return replyJSON(outJSON, errMsg, nil, err)
+	}
+	out, err := middleware.Configure(asPageMap(args["app"]), args)
+	return replyJSON(outJSON, errMsg, out, err)
+}
+
+//export web_listen
+func web_listen(argsJSON *C.char, outJSON **C.char, errMsg **C.char) C.int {
+	args, err := parseArgs(argsJSON)
+	if err != nil {
+		return replyJSON(outJSON, errMsg, nil, err)
+	}
+	appBag := asPageMap(args["app"])
+	if len(appBag) == 0 {
+		appBag = args
+	}
+	out, err := httpx.Listen(appBag, entryDir())
 	return replyJSON(outJSON, errMsg, out, err)
 }
