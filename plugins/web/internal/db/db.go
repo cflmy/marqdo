@@ -78,8 +78,9 @@ func open(url string) (*sql.DB, error) {
 	return db, nil
 }
 
-// ResetPool closes pooled connections (tests).
+// ResetPool closes pooled connections and open transactions (tests).
 func ResetPool() {
+	resetTxns()
 	poolMu.Lock()
 	defer poolMu.Unlock()
 	for k, db := range pool {
@@ -291,8 +292,8 @@ func Init(url, name string, fields any) (map[string]any, error) {
 	}, nil
 }
 
-func columnNames(db *sql.DB, tableName string) ([]string, error) {
-	rows, err := db.Query(fmt.Sprintf(`PRAGMA table_info("%s")`, tableName))
+func columnNames(c dbConn, tableName string) ([]string, error) {
+	rows, err := c.Query(fmt.Sprintf(`PRAGMA table_info("%s")`, tableName))
 	if err != nil {
 		return nil, err
 	}
@@ -363,25 +364,26 @@ func fromSQL(v any) any {
 }
 
 // Insert inserts row maps. Returns {"ok":true,"inserted":n}.
-func Insert(url, tableName string, rows any) (map[string]any, error) {
+// Optional txnID routes through an open Begin transaction.
+func Insert(url, tableName string, rows any, txnID ...string) (map[string]any, error) {
 	tn, err := ident(tableName)
 	if err != nil {
 		return nil, err
 	}
-	db, err := open(url)
+	c, err := connFor(url, optTxn(txnID))
 	if err != nil {
 		return nil, err
 	}
-	colsPresent, err := columnNames(db, tn)
+	colsPresent, err := columnNames(c, tn)
 	if err != nil {
 		return nil, err
 	}
 	hasCreated, hasUpdated := false, false
-	for _, c := range colsPresent {
-		if c == "created_at" {
+	for _, col := range colsPresent {
+		if col == "created_at" {
 			hasCreated = true
 		}
-		if c == "updated_at" {
+		if col == "updated_at" {
 			hasUpdated = true
 		}
 	}
@@ -434,7 +436,7 @@ func Insert(url, tableName string, rows any) (map[string]any, error) {
 			`INSERT INTO "%s" (%s) VALUES (%s)`,
 			tn, strings.Join(cols, ", "), strings.Join(placeholders, ", "),
 		)
-		if _, err := db.Exec(sqlStmt, vals...); err != nil {
+		if _, err := c.Exec(sqlStmt, vals...); err != nil {
 			return nil, err
 		}
 		n++
@@ -719,7 +721,8 @@ type SelectOpts struct {
 
 // Select runs SELECT * FROM table with optional where/order/offset.
 // Without offset: {"rows":[…]}; with offset: {"rows":[…],"total":N}.
-func Select(url, tableName string, limit int64, opts SelectOpts) (map[string]any, error) {
+// Optional txnID routes through an open Begin transaction.
+func Select(url, tableName string, limit int64, opts SelectOpts, txnID ...string) (map[string]any, error) {
 	tn, err := ident(tableName)
 	if err != nil {
 		return nil, err
@@ -728,7 +731,7 @@ func Select(url, tableName string, limit int64, opts SelectOpts) (map[string]any
 	if err != nil {
 		return nil, err
 	}
-	db, err := open(url)
+	c, err := connFor(url, optTxn(txnID))
 	if err != nil {
 		return nil, err
 	}
@@ -752,11 +755,11 @@ func Select(url, tableName string, limit int64, opts SelectOpts) (map[string]any
 				col = part[1:]
 				dir = " DESC"
 			}
-			c, err := ident(col)
+			cname, err := ident(col)
 			if err != nil {
 				return nil, err
 			}
-			orderExprs = append(orderExprs, fmt.Sprintf(`"%s"%s`, c, dir))
+			orderExprs = append(orderExprs, fmt.Sprintf(`"%s"%s`, cname, dir))
 		}
 		if len(orderExprs) > 0 {
 			sqlStmt += " ORDER BY " + strings.Join(orderExprs, ", ")
@@ -768,7 +771,7 @@ func Select(url, tableName string, limit int64, opts SelectOpts) (map[string]any
 		sqlStmt += " OFFSET ?"
 		vals = append(vals, *opts.Offset)
 	}
-	rows, err := db.Query(sqlStmt, vals...)
+	rows, err := c.Query(sqlStmt, vals...)
 	if err != nil {
 		return nil, err
 	}
@@ -784,7 +787,7 @@ func Select(url, tableName string, limit int64, opts SelectOpts) (map[string]any
 		countSQL := fmt.Sprintf(`SELECT COUNT(*) FROM "%s"%s`, tn, whereSQL)
 		_, whereOnly, _ := parseWhere(opts.Where)
 		var total int64
-		if err := db.QueryRow(countSQL, whereOnly...).Scan(&total); err != nil {
+		if err := c.QueryRow(countSQL, whereOnly...).Scan(&total); err != nil {
 			total = int64(len(list))
 		}
 		return map[string]any{"rows": list, "total": float64(total)}, nil
@@ -793,17 +796,18 @@ func Select(url, tableName string, limit int64, opts SelectOpts) (map[string]any
 }
 
 // Get returns one row by id, or nil (JSON null).
-func Get(url, tableName, id string) (any, error) {
+// Optional txnID routes through an open Begin transaction.
+func Get(url, tableName, id string, txnID ...string) (any, error) {
 	tn, err := ident(tableName)
 	if err != nil {
 		return nil, err
 	}
-	db, err := open(url)
+	c, err := connFor(url, optTxn(txnID))
 	if err != nil {
 		return nil, err
 	}
 	sqlStmt := fmt.Sprintf(`SELECT * FROM "%s" WHERE "id" = ? LIMIT 1`, tn)
-	rows, err := db.Query(sqlStmt, toSQLArg(id))
+	rows, err := c.Query(sqlStmt, toSQLArg(id))
 	if err != nil {
 		return nil, err
 	}
@@ -834,13 +838,14 @@ func sqlArgs(args any) []any {
 }
 
 // Exec runs a non-SELECT statement. Returns {"ok":true,"changes":N}.
-func Exec(url, sqlStmt string, args any) (map[string]any, error) {
-	db, err := open(url)
+// Optional txnID routes through an open Begin transaction.
+func Exec(url, sqlStmt string, args any, txnID ...string) (map[string]any, error) {
+	c, err := connFor(url, optTxn(txnID))
 	if err != nil {
 		return nil, err
 	}
 	vals := sqlArgs(args)
-	res, err := db.Exec(sqlStmt, vals...)
+	res, err := c.Exec(sqlStmt, vals...)
 	if err != nil {
 		return nil, err
 	}
@@ -850,7 +855,8 @@ func Exec(url, sqlStmt string, args any) (map[string]any, error) {
 
 // Update sets columns from row (skips id). Auto-sets updated_at when present.
 // Returns {"ok":true,"updated":N}.
-func Update(url, tableName, id string, row any) (map[string]any, error) {
+// Optional txnID routes through an open Begin transaction.
+func Update(url, tableName, id string, row any, txnID ...string) (map[string]any, error) {
 	tn, err := ident(tableName)
 	if err != nil {
 		return nil, err
@@ -859,17 +865,17 @@ func Update(url, tableName, id string, row any) (map[string]any, error) {
 	if !ok {
 		return nil, fmt.Errorf("row must be a map")
 	}
-	db, err := open(url)
+	c, err := connFor(url, optTxn(txnID))
 	if err != nil {
 		return nil, err
 	}
-	colsPresent, err := columnNames(db, tn)
+	colsPresent, err := columnNames(c, tn)
 	if err != nil {
 		return nil, err
 	}
 	hasUpdated := false
-	for _, c := range colsPresent {
-		if c == "updated_at" {
+	for _, col := range colsPresent {
+		if col == "updated_at" {
 			hasUpdated = true
 			break
 		}
@@ -899,7 +905,7 @@ func Update(url, tableName, id string, row any) (map[string]any, error) {
 	}
 	vals = append(vals, id) // Rust binds id as text; SQLite coerces
 	sqlStmt := fmt.Sprintf(`UPDATE "%s" SET %s WHERE "id" = ?`, tn, strings.Join(sets, ", "))
-	res, err := db.Exec(sqlStmt, vals...)
+	res, err := c.Exec(sqlStmt, vals...)
 	if err != nil {
 		return nil, err
 	}
@@ -908,17 +914,18 @@ func Update(url, tableName, id string, row any) (map[string]any, error) {
 }
 
 // Delete removes a row by id. Returns {"ok":true,"deleted":N}.
-func Delete(url, tableName, id string) (map[string]any, error) {
+// Optional txnID routes through an open Begin transaction.
+func Delete(url, tableName, id string, txnID ...string) (map[string]any, error) {
 	tn, err := ident(tableName)
 	if err != nil {
 		return nil, err
 	}
-	db, err := open(url)
+	c, err := connFor(url, optTxn(txnID))
 	if err != nil {
 		return nil, err
 	}
 	sqlStmt := fmt.Sprintf(`DELETE FROM "%s" WHERE "id" = ?`, tn)
-	res, err := db.Exec(sqlStmt, id)
+	res, err := c.Exec(sqlStmt, id)
 	if err != nil {
 		return nil, err
 	}
@@ -927,13 +934,14 @@ func Delete(url, tableName, id string) (map[string]any, error) {
 }
 
 // Query runs a SELECT (or any result-set SQL). Returns {"rows":[…],"count":N}.
-func Query(url, sqlStmt string, args any) (map[string]any, error) {
-	db, err := open(url)
+// Optional txnID routes through an open Begin transaction.
+func Query(url, sqlStmt string, args any, txnID ...string) (map[string]any, error) {
+	c, err := connFor(url, optTxn(txnID))
 	if err != nil {
 		return nil, err
 	}
 	vals := sqlArgs(args)
-	rows, err := db.Query(sqlStmt, vals...)
+	rows, err := c.Query(sqlStmt, vals...)
 	if err != nil {
 		return nil, err
 	}
@@ -949,7 +957,8 @@ func Query(url, sqlStmt string, args any) (map[string]any, error) {
 }
 
 // Count returns {"count":N} for rows matching where (nil where → all).
-func Count(url, tableName string, where any) (map[string]any, error) {
+// Optional txnID routes through an open Begin transaction.
+func Count(url, tableName string, where any, txnID ...string) (map[string]any, error) {
 	tn, err := ident(tableName)
 	if err != nil {
 		return nil, err
@@ -958,7 +967,7 @@ func Count(url, tableName string, where any) (map[string]any, error) {
 	if err != nil {
 		return nil, err
 	}
-	db, err := open(url)
+	c, err := connFor(url, optTxn(txnID))
 	if err != nil {
 		return nil, err
 	}
@@ -967,8 +976,53 @@ func Count(url, tableName string, where any) (map[string]any, error) {
 		sqlStmt += " WHERE " + strings.Join(exprs, " AND ")
 	}
 	var n int64
-	if err := db.QueryRow(sqlStmt, vals...).Scan(&n); err != nil {
+	if err := c.QueryRow(sqlStmt, vals...).Scan(&n); err != nil {
 		return nil, err
 	}
 	return map[string]any{"count": float64(n)}, nil
+}
+
+// ColumnInfo is one PRAGMA table_info row (admin forms / schema introspection).
+type ColumnInfo struct {
+	Name    string
+	SQLType string
+	NotNull bool
+	PK      bool
+}
+
+// TableInfo returns column metadata for a SQLite table.
+func TableInfo(url, tableName string) ([]ColumnInfo, error) {
+	tn, err := ident(tableName)
+	if err != nil {
+		return nil, err
+	}
+	db, err := open(url)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := db.Query(fmt.Sprintf(`PRAGMA table_info("%s")`, tn))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []ColumnInfo
+	for rows.Next() {
+		var cid int
+		var name, ctype string
+		var notnull, pk int
+		var dflt any
+		if err := rows.Scan(&cid, &name, &ctype, &notnull, &dflt, &pk); err != nil {
+			return nil, err
+		}
+		if ctype == "" {
+			ctype = "TEXT"
+		}
+		out = append(out, ColumnInfo{
+			Name:    name,
+			SQLType: ctype,
+			NotNull: notnull != 0,
+			PK:      pk != 0,
+		})
+	}
+	return out, rows.Err()
 }

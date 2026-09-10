@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| 状态 | **Accepted · 实现进行中（W-G0✅ · W-G1✅ · W-G2 部分）** |
+| 状态 | **Accepted · 实现进行中（W-G0…W-G3 ✅）** |
 | 日期 | 2026-09-10 |
 | 相关 | [ext-web.md](ext-web.md) · [ext-web-net.md](ext-web-net.md) · [web-net-capabilities.md](web-net-capabilities.md) · [ext-web-drivers.md](ext-web-drivers.md) · [web-assets-and-images.md](web-assets-and-images.md) · [ext-hosting-fill.md](ext-hosting-fill.md) · [ext-abi.md](ext-abi.md) · [ext-cli.md](ext-cli.md) · [web-asgi-servers-and-marqdo.md](web-asgi-servers-and-marqdo.md) |
 | 实现目录 | `plugins/web/`（**Go module**；产物仍为 `libweb.so` / `web.dll` / `libweb.dylib`） |

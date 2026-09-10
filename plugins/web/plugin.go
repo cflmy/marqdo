@@ -70,6 +70,18 @@ extern int web_db_update(char *args_json, char **out_json, char **err_msg);
 extern int web_db_delete(char *args_json, char **out_json, char **err_msg);
 extern int web_db_query(char *args_json, char **out_json, char **err_msg);
 extern int web_db_count(char *args_json, char **out_json, char **err_msg);
+extern int web_db_begin(char *args_json, char **out_json, char **err_msg);
+extern int web_db_commit(char *args_json, char **out_json, char **err_msg);
+extern int web_db_rollback(char *args_json, char **out_json, char **err_msg);
+extern int web_db_migrate(char *args_json, char **out_json, char **err_msg);
+extern int web_db_fts_create(char *args_json, char **out_json, char **err_msg);
+extern int web_db_search(char *args_json, char **out_json, char **err_msg);
+extern int web_form_rules(char *args_json, char **out_json, char **err_msg);
+extern int web_form_validate(char *args_json, char **out_json, char **err_msg);
+extern int web_form_render(char *args_json, char **out_json, char **err_msg);
+extern int web_form_submit(char *args_json, char **out_json, char **err_msg);
+extern int web_form_from_schema(char *args_json, char **out_json, char **err_msg);
+extern int web_app_mount_form(char *args_json, char **out_json, char **err_msg);
 
 static int register_core(void) {
 	if (host_register((char *)"web_go_ready", (char *)"", web_go_ready) != 0) return 1;
@@ -89,10 +101,22 @@ static int register_core(void) {
 	if (host_register((char *)"web_db_exec", (char *)"url,sql,args,txn", web_db_exec) != 0) return 1;
 	if (host_register((char *)"web_db_query", (char *)"url,sql,args,txn", web_db_query) != 0) return 1;
 	if (host_register((char *)"web_db_count", (char *)"url,table,where,txn", web_db_count) != 0) return 1;
+	if (host_register((char *)"web_db_begin", (char *)"url", web_db_begin) != 0) return 1;
+	if (host_register((char *)"web_db_commit", (char *)"txn", web_db_commit) != 0) return 1;
+	if (host_register((char *)"web_db_rollback", (char *)"txn", web_db_rollback) != 0) return 1;
+	if (host_register((char *)"web_db_migrate", (char *)"url,steps", web_db_migrate) != 0) return 1;
+	if (host_register((char *)"web_db_fts_create", (char *)"url,table,columns,name", web_db_fts_create) != 0) return 1;
+	if (host_register((char *)"web_db_search", (char *)"url,table,q,limit,name", web_db_search) != 0) return 1;
 	if (host_register((char *)"web_form_new", (char *)"table,action,id", web_form_new) != 0) return 1;
 	if (host_register((char *)"web_form_fields", (char *)"form,fields", web_form_fields) != 0) return 1;
+	if (host_register((char *)"web_form_rules", (char *)"form,rules", web_form_rules) != 0) return 1;
+	if (host_register((char *)"web_form_validate", (char *)"form,rules,data", web_form_validate) != 0) return 1;
+	if (host_register((char *)"web_form_render", (char *)"form,id", web_form_render) != 0) return 1;
+	if (host_register((char *)"web_form_submit", (char *)"form,data,url", web_form_submit) != 0) return 1;
+	if (host_register((char *)"web_form_from_schema", (char *)"url,table,action", web_form_from_schema) != 0) return 1;
 	if (host_register((char *)"web_app_new", (char *)"page,db,admin,host,port,admin_prefix,login_redirect,logout_redirect,shell_css,layout,asset_version", web_app_new) != 0) return 1;
 	if (host_register((char *)"web_app_route", (char *)"app,path,page", web_app_route) != 0) return 1;
+	if (host_register((char *)"web_app_mount_form", (char *)"app,id,form", web_app_mount_form) != 0) return 1;
 	return 0;
 }
 */
@@ -441,7 +465,7 @@ func web_db_insert(argsJSON *C.char, outJSON **C.char, errMsg **C.char) C.int {
 	if rows == nil {
 		rows = []any{}
 	}
-	out, err := db.Insert(url, tableName, rows)
+	out, err := db.Insert(url, tableName, rows, txnOpt(args))
 	return replyJSON(outJSON, errMsg, out, err)
 }
 
@@ -499,7 +523,7 @@ func web_db_select(argsJSON *C.char, outJSON **C.char, errMsg **C.char) C.int {
 			opts.Offset = &n
 		}
 	}
-	out, err := db.Select(url, tableName, limit, opts)
+	out, err := db.Select(url, tableName, limit, opts, txnOpt(args))
 	return replyJSON(outJSON, errMsg, out, err)
 }
 
@@ -521,7 +545,7 @@ func web_db_get(argsJSON *C.char, outJSON **C.char, errMsg **C.char) C.int {
 	if err != nil {
 		return replyJSON(outJSON, errMsg, nil, err)
 	}
-	out, err := db.Get(url, tableName, id)
+	out, err := db.Get(url, tableName, id, txnOpt(args))
 	return replyJSON(outJSON, errMsg, out, err)
 }
 
@@ -539,7 +563,7 @@ func web_db_exec(argsJSON *C.char, outJSON **C.char, errMsg **C.char) C.int {
 	if err != nil {
 		return replyJSON(outJSON, errMsg, nil, err)
 	}
-	out, err := db.Exec(url, sqlStmt, args["args"])
+	out, err := db.Exec(url, sqlStmt, args["args"], txnOpt(args))
 	return replyJSON(outJSON, errMsg, out, err)
 }
 
@@ -636,7 +660,7 @@ func web_db_update(argsJSON *C.char, outJSON **C.char, errMsg **C.char) C.int {
 	if row == nil {
 		row = map[string]any{}
 	}
-	out, err := db.Update(url, tableName, id, row)
+	out, err := db.Update(url, tableName, id, row, txnOpt(args))
 	return replyJSON(outJSON, errMsg, out, err)
 }
 
@@ -658,7 +682,7 @@ func web_db_delete(argsJSON *C.char, outJSON **C.char, errMsg **C.char) C.int {
 	if err != nil {
 		return replyJSON(outJSON, errMsg, nil, err)
 	}
-	out, err := db.Delete(url, tableName, id)
+	out, err := db.Delete(url, tableName, id, txnOpt(args))
 	return replyJSON(outJSON, errMsg, out, err)
 }
 
@@ -676,7 +700,7 @@ func web_db_query(argsJSON *C.char, outJSON **C.char, errMsg **C.char) C.int {
 	if err != nil {
 		return replyJSON(outJSON, errMsg, nil, err)
 	}
-	out, err := db.Query(url, sqlStmt, args["args"])
+	out, err := db.Query(url, sqlStmt, args["args"], txnOpt(args))
 	return replyJSON(outJSON, errMsg, out, err)
 }
 
@@ -694,6 +718,6 @@ func web_db_count(argsJSON *C.char, outJSON **C.char, errMsg **C.char) C.int {
 	if err != nil {
 		return replyJSON(outJSON, errMsg, nil, err)
 	}
-	out, err := db.Count(url, tableName, args["where"])
+	out, err := db.Count(url, tableName, args["where"], txnOpt(args))
 	return replyJSON(outJSON, errMsg, out, err)
 }

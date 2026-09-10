@@ -90,6 +90,25 @@ func Route(appBag map[string]any, path string, page any) (map[string]any, error)
 	return out, nil
 }
 
+// MountForm stores form under app.forms[id].
+func MountForm(appBag map[string]any, id string, form any) (map[string]any, error) {
+	id = strings.TrimSpace(id)
+	if id == "" {
+		return nil, fmt.Errorf("missing form id")
+	}
+	if form == nil {
+		return nil, fmt.Errorf("missing `form`")
+	}
+	out := clone(appBag)
+	forms := map[string]any{}
+	if f, ok := out["forms"].(map[string]any); ok {
+		forms = clone(f)
+	}
+	forms[id] = form
+	out["forms"] = forms
+	return out, nil
+}
+
 func normalizeRoutePath(raw string) (string, error) {
 	s := strings.TrimSpace(raw)
 	if s == "" {

@@ -191,3 +191,156 @@ func TestQueryAndCount(t *testing.T) {
 		t.Fatalf("like=%v", like)
 	}
 }
+
+func TestTxnCommitRollback(t *testing.T) {
+	url := setupArticles(t)
+
+	begin, err := db.Begin(url)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if begin["_type"] != "txn" {
+		t.Fatalf("begin=%v", begin)
+	}
+	tid, _ := begin["txn"].(string)
+	if tid == "" {
+		t.Fatalf("missing txn id: %v", begin)
+	}
+	if begin["事务"] != tid || begin["地址"] != begin["url"] {
+		t.Fatalf("bilingual keys: %v", begin)
+	}
+
+	if _, err := db.Insert(url, "articles", []any{
+		map[string]any{"id": float64(99), "title": "TxnRow", "body": "in-txn"},
+	}, tid); err != nil {
+		t.Fatal(err)
+	}
+	// Visible inside the transaction.
+	inside, err := db.Count(url, "articles", nil, tid)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if inside["count"] != float64(4) {
+		t.Fatalf("in-txn count=%v", inside)
+	}
+	if _, err := db.Commit(tid); err != nil {
+		t.Fatal(err)
+	}
+	after, err := db.Count(url, "articles", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if after["count"] != float64(4) {
+		t.Fatalf("after commit count=%v", after)
+	}
+
+	begin2, err := db.Begin(url)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tid2 := begin2["txn"].(string)
+	if _, err := db.Insert(url, "articles", []any{
+		map[string]any{"id": float64(100), "title": "Zeta", "body": "rolled"},
+	}, tid2); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Rollback(tid2); err != nil {
+		t.Fatal(err)
+	}
+	final, err := db.Count(url, "articles", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if final["count"] != float64(4) {
+		t.Fatalf("after rollback count=%v", final)
+	}
+	miss, err := db.Get(url, "articles", "100")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if miss != nil {
+		t.Fatalf("expected rolled-back row absent, got %v", miss)
+	}
+}
+
+func TestMigrate(t *testing.T) {
+	dir := t.TempDir()
+	url := "sqlite:" + filepath.Join(dir, "m.db")
+	defer db.ResetPool()
+
+	steps := []any{
+		map[string]any{
+			"版本": float64(1),
+			"SQL":  `CREATE TABLE IF NOT EXISTS posts (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL, body TEXT, status TEXT NOT NULL DEFAULT 'draft')`,
+		},
+		map[string]any{
+			"版本": float64(2),
+			"SQL":  `CREATE TABLE IF NOT EXISTS comments (id INTEGER PRIMARY KEY AUTOINCREMENT, post_id INTEGER NOT NULL, body TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'pending')`,
+		},
+	}
+	m1, err := db.Migrate(url, steps)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if m1["ok"] != true || m1["from"] != float64(0) || m1["to"] != float64(2) {
+		t.Fatalf("migrate1=%v", m1)
+	}
+	applied, ok := m1["applied"].([]any)
+	if !ok || len(applied) != 2 {
+		t.Fatalf("applied=%v", m1["applied"])
+	}
+
+	m2, err := db.Migrate(url, steps)
+	if err != nil {
+		t.Fatal(err)
+	}
+	applied2 := m2["applied"].([]any)
+	if len(applied2) != 0 || m2["from"] != float64(2) || m2["to"] != float64(2) {
+		t.Fatalf("idempotent migrate=%v", m2)
+	}
+}
+
+func TestFtsCreateSearch(t *testing.T) {
+	dir := t.TempDir()
+	url := "sqlite:" + filepath.Join(dir, "fts.db")
+	defer db.ResetPool()
+
+	steps := []any{
+		map[string]any{
+			"version": float64(1),
+			"sql":     `CREATE TABLE IF NOT EXISTS posts (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL, body TEXT, status TEXT NOT NULL DEFAULT 'draft')`,
+		},
+	}
+	if _, err := db.Migrate(url, steps); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Insert(url, "posts", []any{
+		map[string]any{"title": "Alpha note", "body": "hello world search", "status": "published"},
+		map[string]any{"title": "Beta draft", "body": "secret draft body", "status": "draft"},
+		map[string]any{"title": "Gamma published", "body": "another hello", "status": "published"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	fts, err := db.FtsCreate(url, "posts", "title,body", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fts["ok"] != true || fts["fts"] != "posts_fts" {
+		t.Fatalf("fts=%v", fts)
+	}
+
+	hit, err := db.Search(url, "posts", "hello", 10, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	n, _ := hit["count"].(float64)
+	if n < 1 {
+		t.Fatalf("search=%v", hit)
+	}
+	rows := hit["rows"].([]any)
+	first := rows[0].(map[string]any)
+	if cell, _ := first["title"].(string); cell == "" {
+		t.Fatalf("expected title on FTS row: %v", first)
+	}
+}
