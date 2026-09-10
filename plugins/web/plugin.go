@@ -122,6 +122,8 @@ extern int web_app_error_page(char *args_json, char **out_json, char **err_msg);
 extern int web_app_sitemap(char *args_json, char **out_json, char **err_msg);
 extern int web_app_robots(char *args_json, char **out_json, char **err_msg);
 extern int web_sitemap_build(char *args_json, char **out_json, char **err_msg);
+extern int web_app_route_ws(char *args_json, char **out_json, char **err_msg);
+extern int web_ws_connect(char *args_json, char **out_json, char **err_msg);
 
 static int register_core(void) {
 	if (host_register((char *)"web_go_ready", (char *)"", web_go_ready) != 0) return 1;
@@ -197,6 +199,8 @@ static int register_core(void) {
 	if (host_register((char *)"web_app_sitemap", (char *)"app,path,base,table,loc,limit,items", web_app_sitemap) != 0) return 1;
 	if (host_register((char *)"web_app_robots", (char *)"app,body,sitemap", web_app_robots) != 0) return 1;
 	if (host_register((char *)"web_sitemap_build", (char *)"base,items", web_sitemap_build) != 0) return 1;
+	if (host_register((char *)"web_app_route_ws", (char *)"app,path,echo,mode", web_app_route_ws) != 0) return 1;
+	if (host_register((char *)"web_ws_connect", (char *)"url,message,headers,timeout_sec", web_ws_connect) != 0) return 1;
 	return 0;
 }
 */

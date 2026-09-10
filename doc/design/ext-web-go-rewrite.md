@@ -393,7 +393,7 @@ scripts/build-web-plugin.sh   # go build -buildmode=c-shared -o …/libweb.so
 | **W-G5** | session/auth/password/rate limit/gate/admin | ✅ offline：`web-security` / `web-c0` / `web-c1`；login rate limit 包已就位（HTTP 接线随 listen hardening） |
 | **W-G6** | upload/download/gallery/ETag + assets W8 | ✅ `web-upload` / `web-assets` / `web-p3` |
 | **W-G7** | SEO RSS sitemap robots redirect error paginate markdown | ✅ `web-content` / `web-w7-*` |
-| **W-G8** | WS echo/broadcast + access_log | `web-ws-broadcast-*` |
+| **W-G8** | WS echo/broadcast + access_log | ✅ `web-ws-broadcast-*` |
 | **W-G9** | Postgres + Redis cache + file/S3 storage | `web-drivers-smoke` |
 | **W-G10** | proxy + invoke + nested plugin | `web-proxy-invoke` / hosting live |
 | **W-G11** | 定制 C2–C4 shell/layout/style/nav | `web-c2`–`c4` |
