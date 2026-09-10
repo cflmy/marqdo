@@ -462,11 +462,150 @@ func whereOp(raw string) (string, error) {
 		return "<=", nil
 	case "like", "contains", "包含", "匹配":
 		return "LIKE", nil
+	case "in", "在":
+		return "IN", nil
+	case "between", "介于", "在之间":
+		return "BETWEEN", nil
+	case "is null", "isnull", "为空", "空":
+		return "IS NULL", nil
 	default:
 		return "", fmt.Errorf("unsupported where op `%s`", raw)
 	}
 }
 
+type whereClause struct {
+	expr string
+	vals []any
+	or   bool
+}
+
+func inValues(v any) []any {
+	switch t := v.(type) {
+	case []any:
+		out := make([]any, len(t))
+		for i, x := range t {
+			out[i] = toSQLArg(x)
+		}
+		return out
+	case string:
+		parts := strings.Split(t, ",")
+		out := make([]any, 0, len(parts))
+		for _, p := range parts {
+			out = append(out, toSQLArg(strings.TrimSpace(p)))
+		}
+		return out
+	default:
+		return []any{toSQLArg(v)}
+	}
+}
+
+func betweenValues(v any) ([]any, error) {
+	switch t := v.(type) {
+	case []any:
+		if len(t) != 2 {
+			return nil, fmt.Errorf(`between expects two bounds ("lo,hi" or [lo,hi])`)
+		}
+		return []any{toSQLArg(t[0]), toSQLArg(t[1])}, nil
+	case string:
+		parts := strings.SplitN(t, ",", 2)
+		lo, hi := "", ""
+		if len(parts) > 0 {
+			lo = strings.TrimSpace(parts[0])
+		}
+		if len(parts) > 1 {
+			hi = strings.TrimSpace(parts[1])
+		}
+		return []any{toSQLArg(lo), toSQLArg(hi)}, nil
+	default:
+		return nil, fmt.Errorf(`between expects two bounds ("lo,hi" or [lo,hi])`)
+	}
+}
+
+func boolOrFlag(v any) bool {
+	switch t := v.(type) {
+	case bool:
+		return t
+	case string:
+		switch strings.ToLower(strings.TrimSpace(t)) {
+		case "1", "true", "是", "or", "或者":
+			return true
+		}
+	case float64:
+		return int64(t) != 0
+	}
+	return false
+}
+
+func clauseFromRow(m map[string]any) (*whereClause, error) {
+	field := ""
+	for _, k := range []string{"field", "字段", "列"} {
+		if v, ok := m[k]; ok {
+			field = cellStr(v)
+			break
+		}
+	}
+	if field == "" {
+		return nil, nil
+	}
+	col, err := ident(field)
+	if err != nil {
+		return nil, err
+	}
+	opRaw := ""
+	if v, ok := m["op"]; ok {
+		opRaw = cellStr(v)
+	} else if v, ok := m["操作"]; ok {
+		opRaw = cellStr(v)
+	}
+	op, err := whereOp(opRaw)
+	if err != nil {
+		return nil, err
+	}
+	var val any
+	if v, ok := m["value"]; ok {
+		val = v
+	} else if v, ok := m["值"]; ok {
+		val = v
+	}
+	or := false
+	if v, ok := m["or"]; ok {
+		or = boolOrFlag(v)
+	} else if v, ok := m["或"]; ok {
+		or = boolOrFlag(v)
+	}
+	var expr string
+	var vals []any
+	switch op {
+	case "IS NULL":
+		expr = fmt.Sprintf(`"%s" IS NULL`, col)
+	case "IN":
+		vs := inValues(val)
+		ph := make([]string, len(vs))
+		for i := range vs {
+			ph[i] = "?"
+		}
+		expr = fmt.Sprintf(`"%s" IN (%s)`, col, strings.Join(ph, ", "))
+		vals = vs
+	case "BETWEEN":
+		vs, err := betweenValues(val)
+		if err != nil {
+			return nil, err
+		}
+		expr = fmt.Sprintf(`"%s" BETWEEN ? AND ?`, col)
+		vals = vs
+	default:
+		expr = fmt.Sprintf(`"%s" %s ?`, col, op)
+		vals = []any{toSQLArg(val)}
+	}
+	return &whereClause{expr: expr, vals: vals, or: or}, nil
+}
+
+// parseWhere builds AND/OR filter clauses.
+// Supports:
+//   - equality map `{title:"Alpha", body:"first"}` → col = ?
+//   - filter rows `{field|字段|列, op|操作, value|值, or|或?}`
+//   - ops: = != > >= < <= LIKE IN BETWEEN IS NULL (+ Chinese aliases)
+//   - GFM columnar tables via table.AsRows
 func parseWhere(where any) (exprs []string, vals []any, err error) {
 	if where == nil {
 		return nil, nil, nil
@@ -475,12 +614,14 @@ func parseWhere(where any) (exprs []string, vals []any, err error) {
 		if s == "" || strings.EqualFold(s, "none") || strings.EqualFold(s, "null") {
 			return nil, nil, nil
 		}
+		// Non-empty bare strings: AsRows yields []; treat as no filter (Rust parity).
 	}
 	w := table.AsRows(where)
 	arr, ok := w.([]any)
 	if !ok {
 		return nil, nil, fmt.Errorf("where must be a map or filter table")
 	}
+	var clauses []whereClause
 	for _, item := range arr {
 		m, ok := item.(map[string]any)
 		if !ok {
@@ -502,28 +643,13 @@ func parseWhere(where any) (exprs []string, vals []any, err error) {
 			_, hasOp = m["操作"]
 		}
 		if field != "" && (hasVal || hasOp) {
-			col, err := ident(field)
+			cl, err := clauseFromRow(m)
 			if err != nil {
 				return nil, nil, err
 			}
-			opRaw := ""
-			if v, ok := m["op"]; ok {
-				opRaw = cellStr(v)
-			} else if v, ok := m["操作"]; ok {
-				opRaw = cellStr(v)
+			if cl != nil {
+				clauses = append(clauses, *cl)
 			}
-			op, err := whereOp(opRaw)
-			if err != nil {
-				return nil, nil, err
-			}
-			var val any
-			if v, ok := m["value"]; ok {
-				val = v
-			} else if v, ok := m["值"]; ok {
-				val = v
-			}
-			exprs = append(exprs, fmt.Sprintf(`"%s" %s ?`, col, op))
-			vals = append(vals, toSQLArg(val))
 			continue
 		}
 		for k, v := range m {
@@ -534,9 +660,28 @@ func parseWhere(where any) (exprs []string, vals []any, err error) {
 			if err != nil {
 				return nil, nil, err
 			}
-			exprs = append(exprs, fmt.Sprintf(`"%s" = ?`, col))
-			vals = append(vals, toSQLArg(v))
+			clauses = append(clauses, whereClause{
+				expr: fmt.Sprintf(`"%s" = ?`, col),
+				vals: []any{toSQLArg(v)},
+			})
 		}
+	}
+	// Assemble: AND by default; OR-marked clauses join the current group.
+	var group []string
+	for _, cl := range clauses {
+		if cl.or {
+			group = append(group, cl.expr)
+		} else {
+			if len(group) > 0 {
+				exprs = append(exprs, "("+strings.Join(group, " OR ")+")")
+				group = group[:0]
+			}
+			group = append(group, cl.expr)
+		}
+		vals = append(vals, cl.vals...)
+	}
+	if len(group) > 0 {
+		exprs = append(exprs, "("+strings.Join(group, " OR ")+")")
 	}
 	return exprs, vals, nil
 }
@@ -673,27 +818,157 @@ func Get(url, tableName, id string) (any, error) {
 	return list[0], nil
 }
 
+func sqlArgs(args any) []any {
+	switch t := args.(type) {
+	case []any:
+		out := make([]any, len(t))
+		for i, v := range t {
+			out[i] = toSQLArg(v)
+		}
+		return out
+	case nil:
+		return nil
+	default:
+		return []any{toSQLArg(t)}
+	}
+}
+
 // Exec runs a non-SELECT statement. Returns {"ok":true,"changes":N}.
 func Exec(url, sqlStmt string, args any) (map[string]any, error) {
 	db, err := open(url)
 	if err != nil {
 		return nil, err
 	}
-	var vals []any
-	switch t := args.(type) {
-	case []any:
-		for _, v := range t {
-			vals = append(vals, toSQLArg(v))
-		}
-	case nil:
-		// none
-	default:
-		vals = append(vals, toSQLArg(t))
-	}
+	vals := sqlArgs(args)
 	res, err := db.Exec(sqlStmt, vals...)
 	if err != nil {
 		return nil, err
 	}
 	n, _ := res.RowsAffected()
 	return map[string]any{"ok": true, "changes": float64(n)}, nil
+}
+
+// Update sets columns from row (skips id). Auto-sets updated_at when present.
+// Returns {"ok":true,"updated":N}.
+func Update(url, tableName, id string, row any) (map[string]any, error) {
+	tn, err := ident(tableName)
+	if err != nil {
+		return nil, err
+	}
+	obj, ok := row.(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("row must be a map")
+	}
+	db, err := open(url)
+	if err != nil {
+		return nil, err
+	}
+	colsPresent, err := columnNames(db, tn)
+	if err != nil {
+		return nil, err
+	}
+	hasUpdated := false
+	for _, c := range colsPresent {
+		if c == "updated_at" {
+			hasUpdated = true
+			break
+		}
+	}
+	var sets []string
+	var vals []any
+	seenUpdated := false
+	for k, v := range obj {
+		if k == "id" {
+			continue
+		}
+		if _, err := ident(k); err != nil {
+			return nil, err
+		}
+		if k == "updated_at" {
+			seenUpdated = true
+		}
+		sets = append(sets, fmt.Sprintf(`"%s" = ?`, k))
+		vals = append(vals, toSQLArg(v))
+	}
+	if hasUpdated && !seenUpdated {
+		sets = append(sets, `"updated_at" = ?`)
+		vals = append(vals, utcNowISO())
+	}
+	if len(sets) == 0 {
+		return nil, fmt.Errorf("nothing to update")
+	}
+	vals = append(vals, id) // Rust binds id as text; SQLite coerces
+	sqlStmt := fmt.Sprintf(`UPDATE "%s" SET %s WHERE "id" = ?`, tn, strings.Join(sets, ", "))
+	res, err := db.Exec(sqlStmt, vals...)
+	if err != nil {
+		return nil, err
+	}
+	n, _ := res.RowsAffected()
+	return map[string]any{"ok": true, "updated": float64(n)}, nil
+}
+
+// Delete removes a row by id. Returns {"ok":true,"deleted":N}.
+func Delete(url, tableName, id string) (map[string]any, error) {
+	tn, err := ident(tableName)
+	if err != nil {
+		return nil, err
+	}
+	db, err := open(url)
+	if err != nil {
+		return nil, err
+	}
+	sqlStmt := fmt.Sprintf(`DELETE FROM "%s" WHERE "id" = ?`, tn)
+	res, err := db.Exec(sqlStmt, id)
+	if err != nil {
+		return nil, err
+	}
+	n, _ := res.RowsAffected()
+	return map[string]any{"ok": true, "deleted": float64(n)}, nil
+}
+
+// Query runs a SELECT (or any result-set SQL). Returns {"rows":[…],"count":N}.
+func Query(url, sqlStmt string, args any) (map[string]any, error) {
+	db, err := open(url)
+	if err != nil {
+		return nil, err
+	}
+	vals := sqlArgs(args)
+	rows, err := db.Query(sqlStmt, vals...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	list, err := scanRows(rows)
+	if err != nil {
+		return nil, err
+	}
+	if list == nil {
+		list = []any{}
+	}
+	return map[string]any{"rows": list, "count": float64(len(list))}, nil
+}
+
+// Count returns {"count":N} for rows matching where (nil where → all).
+func Count(url, tableName string, where any) (map[string]any, error) {
+	tn, err := ident(tableName)
+	if err != nil {
+		return nil, err
+	}
+	exprs, vals, err := parseWhere(where)
+	if err != nil {
+		return nil, err
+	}
+	db, err := open(url)
+	if err != nil {
+		return nil, err
+	}
+	sqlStmt := fmt.Sprintf(`SELECT COUNT(*) FROM "%s"`, tn)
+	if len(exprs) > 0 {
+		sqlStmt += " WHERE " + strings.Join(exprs, " AND ")
+	}
+	var n int64
+	if err := db.QueryRow(sqlStmt, vals...).Scan(&n); err != nil {
+		return nil, err
+	}
+	return map[string]any{"count": float64(n)}, nil
 }

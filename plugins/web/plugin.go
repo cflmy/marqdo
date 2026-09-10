@@ -66,6 +66,10 @@ extern int web_form_fields(char *args_json, char **out_json, char **err_msg);
 extern int web_compose_form(char *args_json, char **out_json, char **err_msg);
 extern int web_app_new(char *args_json, char **out_json, char **err_msg);
 extern int web_app_route(char *args_json, char **out_json, char **err_msg);
+extern int web_db_update(char *args_json, char **out_json, char **err_msg);
+extern int web_db_delete(char *args_json, char **out_json, char **err_msg);
+extern int web_db_query(char *args_json, char **out_json, char **err_msg);
+extern int web_db_count(char *args_json, char **out_json, char **err_msg);
 
 static int register_core(void) {
 	if (host_register((char *)"web_go_ready", (char *)"", web_go_ready) != 0) return 1;
@@ -80,7 +84,11 @@ static int register_core(void) {
 	if (host_register((char *)"web_db_insert", (char *)"url,table,rows,txn", web_db_insert) != 0) return 1;
 	if (host_register((char *)"web_db_select", (char *)"url,table,where,limit,order,offset,txn", web_db_select) != 0) return 1;
 	if (host_register((char *)"web_db_get", (char *)"url,table,id,txn", web_db_get) != 0) return 1;
+	if (host_register((char *)"web_db_update", (char *)"url,table,id,row,txn", web_db_update) != 0) return 1;
+	if (host_register((char *)"web_db_delete", (char *)"url,table,id,txn", web_db_delete) != 0) return 1;
 	if (host_register((char *)"web_db_exec", (char *)"url,sql,args,txn", web_db_exec) != 0) return 1;
+	if (host_register((char *)"web_db_query", (char *)"url,sql,args,txn", web_db_query) != 0) return 1;
+	if (host_register((char *)"web_db_count", (char *)"url,table,where,txn", web_db_count) != 0) return 1;
 	if (host_register((char *)"web_form_new", (char *)"table,action,id", web_form_new) != 0) return 1;
 	if (host_register((char *)"web_form_fields", (char *)"form,fields", web_form_fields) != 0) return 1;
 	if (host_register((char *)"web_app_new", (char *)"page,db,admin,host,port,admin_prefix,login_redirect,logout_redirect,shell_css,layout,asset_version", web_app_new) != 0) return 1;
@@ -603,5 +611,89 @@ func web_app_route(argsJSON *C.char, outJSON **C.char, errMsg **C.char) C.int {
 		return replyJSON(outJSON, errMsg, nil, fmt.Errorf("missing `page` for route"))
 	}
 	out, err := app.Route(appBag, path, pageV)
+	return replyJSON(outJSON, errMsg, out, err)
+}
+
+//export web_db_update
+func web_db_update(argsJSON *C.char, outJSON **C.char, errMsg **C.char) C.int {
+	args, err := parseArgs(argsJSON)
+	if err != nil {
+		return replyJSON(outJSON, errMsg, nil, err)
+	}
+	url, err := dbURLOf(args)
+	if err != nil {
+		return replyJSON(outJSON, errMsg, nil, err)
+	}
+	tableName, err := argStrReq(args, "table")
+	if err != nil {
+		return replyJSON(outJSON, errMsg, nil, err)
+	}
+	id, err := argStrReq(args, "id")
+	if err != nil {
+		return replyJSON(outJSON, errMsg, nil, err)
+	}
+	row := args["row"]
+	if row == nil {
+		row = map[string]any{}
+	}
+	out, err := db.Update(url, tableName, id, row)
+	return replyJSON(outJSON, errMsg, out, err)
+}
+
+//export web_db_delete
+func web_db_delete(argsJSON *C.char, outJSON **C.char, errMsg **C.char) C.int {
+	args, err := parseArgs(argsJSON)
+	if err != nil {
+		return replyJSON(outJSON, errMsg, nil, err)
+	}
+	url, err := dbURLOf(args)
+	if err != nil {
+		return replyJSON(outJSON, errMsg, nil, err)
+	}
+	tableName, err := argStrReq(args, "table")
+	if err != nil {
+		return replyJSON(outJSON, errMsg, nil, err)
+	}
+	id, err := argStrReq(args, "id")
+	if err != nil {
+		return replyJSON(outJSON, errMsg, nil, err)
+	}
+	out, err := db.Delete(url, tableName, id)
+	return replyJSON(outJSON, errMsg, out, err)
+}
+
+//export web_db_query
+func web_db_query(argsJSON *C.char, outJSON **C.char, errMsg **C.char) C.int {
+	args, err := parseArgs(argsJSON)
+	if err != nil {
+		return replyJSON(outJSON, errMsg, nil, err)
+	}
+	url, err := dbURLOf(args)
+	if err != nil {
+		return replyJSON(outJSON, errMsg, nil, err)
+	}
+	sqlStmt, err := argStrReq(args, "sql")
+	if err != nil {
+		return replyJSON(outJSON, errMsg, nil, err)
+	}
+	out, err := db.Query(url, sqlStmt, args["args"])
+	return replyJSON(outJSON, errMsg, out, err)
+}
+
+//export web_db_count
+func web_db_count(argsJSON *C.char, outJSON **C.char, errMsg **C.char) C.int {
+	args, err := parseArgs(argsJSON)
+	if err != nil {
+		return replyJSON(outJSON, errMsg, nil, err)
+	}
+	url, err := dbURLOf(args)
+	if err != nil {
+		return replyJSON(outJSON, errMsg, nil, err)
+	}
+	tableName, err := argStrReq(args, "table")
+	if err != nil {
+		return replyJSON(outJSON, errMsg, nil, err)
+	}
+	out, err := db.Count(url, tableName, args["where"])
 	return replyJSON(outJSON, errMsg, out, err)
 }
