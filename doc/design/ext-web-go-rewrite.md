@@ -387,8 +387,8 @@ scripts/build-web-plugin.sh   # go build -buildmode=c-shared -o …/libweb.so
 |------|------|----------|
 | **W-G0** | 文档（本文）+ ADR + 目录骨架 + ABI bridge 能 `plugin.load` + `demo` 注册探测 | ✅ `tests/ext/web-go-abi-smoke.mq.md`；`web_go_ready` + `web_page_new`；`scripts/build-web-plugin.sh` → `libweb.so` |
 | **W-G1** | table 辅助 + `web_style` + page new/compose/render（无 listen） | ✅ `web-smoke` / `web-zh-smoke`（含 compose_form / app_new / app_route 袋） |
-| **W-G2** | SQLite db CRUD + where + txn + init | 进行中：CRUD+where+query+count ✅（`web-select-smoke`）；缺 txn/migrate/FTS |
-| **W-G3** | form + mount_form + CSRF 基础 | `web-form-*` |
+| **W-G2** | SQLite db CRUD + where + txn + init | ✅ `web-db-w2-smoke` / `web-db-w6-smoke`（txn·migrate·FTS） |
+| **W-G3** | form + mount_form + CSRF 基础 | ✅ `web-form-smoke`（validate/submit/render；CSRF 字段已接，listen 侧硬化见 W-G4/G5） |
 | **W-G4** | `web_listen` + route + static + part + middleware + JSON API | `web-route` / `web-middleware` / live |
 | **W-G5** | session/auth/password/rate limit/gate/admin | `web-security` / `web-c0` / `web-c1` |
 | **W-G6** | upload/download/gallery/ETag + assets W8 | `web-upload` / `web-assets` / `web-p3` |
