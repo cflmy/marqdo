@@ -18,23 +18,23 @@ Set `quiet=False` to inherit parent stdout/stderr.
 File `wait` returns `{code, value}` plus optional `stdout`/`stderr` tails when quiet-captured.
 `value` is the child's `# main` return (not stdout).
 
-**> host_subtask_spawn path=`path` fn=`fn` args=`args` code=`code` lang=`lang` source=`source` stdin=`stdin` quiet=`quiet`**
+*> host_subtask_spawn path=`path` fn=`fn` args=`args` code=`code` lang=`lang` source=`source` stdin=`stdin` quiet=`quiet`*
 
 ## poll
     + `id`
 
-**> host_subtask_poll id=`id`**
+*> host_subtask_poll id=`id`*
 
 ## wait
     + `id`
 
-**> host_subtask_join id=`id`**
+*> host_subtask_join id=`id`*
 
 ## kill
     + `id`
 
-**> host_subtask_kill id=`id`**
+*> host_subtask_kill id=`id`*
 
 ## wait_all
 
-**> host_subtask_wait_all**
+*> host_subtask_wait_all*

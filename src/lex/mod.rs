@@ -47,7 +47,8 @@ fn is_code_starter(c: char) -> bool {
 ///
 /// Closing `*` / `**` must not be taken from inside `` `…` `` or `"…"` (GAP-06/07 nested markers).
 fn is_marqdo_star_line(trimmed: &str) -> bool {
-    if trimmed == "*" || trimmed == "****" {
+    // Empty italic return (v0.3) or else `*` / empty returns.
+    if trimmed == "*" || trimmed == "**" || trimmed == "****" {
         return true;
     }
     if trimmed.starts_with("**") {
@@ -62,59 +63,19 @@ fn is_marqdo_star_line(trimmed: &str) -> bool {
     matching_italic_close(trimmed).is_some()
 }
 
-/// Index of the closing `*` for a single-star statement, skipping strings and backticks.
-fn matching_italic_close(trimmed: &str) -> Option<usize> {
-    if trimmed.starts_with("**") {
-        return None;
-    }
-    let bytes = trimmed.as_bytes();
-    let mut i = 1usize; // skip opening *
-    let mut in_bt = false;
-    let mut in_str = false;
-    while i < bytes.len() {
-        let c = bytes[i];
-        if in_str {
-            if c == b'\\' && i + 1 < bytes.len() {
-                i += 2;
-                continue;
-            }
-            if c == b'"' {
-                in_str = false;
-            }
-            i += 1;
-            continue;
-        }
-        if in_bt {
-            if c == b'`' {
-                in_bt = false;
-            }
-            i += 1;
-            continue;
-        }
-        match c {
-            b'`' => {
-                in_bt = true;
-                i += 1;
-            }
-            b'"' => {
-                in_str = true;
-                i += 1;
-            }
-            b'*' => {
-                // Closing * must be the last non-ws on the line.
-                if trimmed[i + 1..].trim().is_empty() {
-                    return Some(i);
-                }
-                i += 1;
-            }
-            _ => i += 1,
-        }
-    }
-    None
+/// Closing `**` for a bold segment, skipping strings and backticks.
+/// Returns the index within `trimmed` of the first `*` of the closing `**`.
+/// When `require_eol`, the closing `**` must be the last non-ws on the line (whole-line code).
+pub fn matching_bold_close(trimmed: &str) -> Option<usize> {
+    matching_bold_close_opts(trimmed, true)
 }
 
-/// Closing `**` for a bold return, skipping strings and backticks.
-fn matching_bold_close(trimmed: &str) -> Option<usize> {
+/// Like [`matching_bold_close`] but allows trailing text after the close (inline prose).
+pub fn matching_bold_close_inline(trimmed: &str) -> Option<usize> {
+    matching_bold_close_opts(trimmed, false)
+}
+
+fn matching_bold_close_opts(trimmed: &str, require_eol: bool) -> Option<usize> {
     let Some(rest) = trimmed.strip_prefix("**") else {
         return None;
     };
@@ -153,11 +114,73 @@ fn matching_bold_close(trimmed: &str) -> Option<usize> {
             }
             b'*' if bytes[i + 1] == b'*' => {
                 let after = i + 2;
-                if rest[after..].trim().is_empty() {
-                    // Position relative to full `trimmed` (after opening `**`).
+                if !require_eol || rest[after..].trim().is_empty() {
                     return Some(2 + i);
                 }
                 i += 2;
+            }
+            _ => i += 1,
+        }
+    }
+    // Empty bold `****` handled by caller; `**` alone has no close inside rest.
+    if !require_eol && rest.is_empty() {
+        return None;
+    }
+    None
+}
+
+/// Index of the closing `*` for a single-star segment.
+pub fn matching_italic_close(trimmed: &str) -> Option<usize> {
+    matching_italic_close_opts(trimmed, true)
+}
+
+/// Italic close allowing trailing prose after the closing `*`.
+pub fn matching_italic_close_inline(trimmed: &str) -> Option<usize> {
+    matching_italic_close_opts(trimmed, false)
+}
+
+fn matching_italic_close_opts(trimmed: &str, require_eol: bool) -> Option<usize> {
+    if trimmed.starts_with("**") {
+        return None;
+    }
+    let bytes = trimmed.as_bytes();
+    let mut i = 1usize; // skip opening *
+    let mut in_bt = false;
+    let mut in_str = false;
+    while i < bytes.len() {
+        let c = bytes[i];
+        if in_str {
+            if c == b'\\' && i + 1 < bytes.len() {
+                i += 2;
+                continue;
+            }
+            if c == b'"' {
+                in_str = false;
+            }
+            i += 1;
+            continue;
+        }
+        if in_bt {
+            if c == b'`' {
+                in_bt = false;
+            }
+            i += 1;
+            continue;
+        }
+        match c {
+            b'`' => {
+                in_bt = true;
+                i += 1;
+            }
+            b'"' => {
+                in_str = true;
+                i += 1;
+            }
+            b'*' => {
+                if !require_eol || trimmed[i + 1..].trim().is_empty() {
+                    return Some(i);
+                }
+                i += 1;
             }
             _ => i += 1,
         }

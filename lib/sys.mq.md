@@ -6,33 +6,33 @@ description: English system wrappers (load_dotenv accepts optional path via host
 ## env_get
     + `name`
 
-**> host_env_get name=`name`**
+*> host_env_get name=`name`*
 
 ## env_set
     + `name`
     + `value`
 
-**> host_env_set name=`name` value=`value`**
+*> host_env_set name=`name` value=`value`*
 
 ## load_dotenv
     + `path`=None
 
 Load `.env` (optional named arg `path=`). Existing process env is not overridden.
 
-**> host_dotenv_load path=`path`**
+*> host_dotenv_load path=`path`*
 
 ## args
 
-**> host_args**
+*> host_args*
 
 ## cwd
 
-**> host_cwd**
+*> host_cwd*
 
 ## exit
     + `code`
 
-**> host_exit code=`code`**
+*> host_exit code=`code`*
 
 ## exec
     + `cmd`
@@ -43,13 +43,13 @@ Run a process. Default return is the exit code (int).
 
 With `capture=True`, return a map `{code, stdout, stderr}` (stdout/stderr may be truncated for huge output).
 
-Inside `*…*` prefer bare `args=args` (variable); `` args=`args` `` is also accepted.
+Inside `**…**` prefer bare `args=args` (variable); `` args=`args` `` is also accepted.
 
-**> host_exec cmd=`cmd` args=`args` capture=`capture`**
+*> host_exec cmd=`cmd` args=`args` capture=`capture`*
 
 ## stream_publish
     + `event`
 
 Publish a stream event map onto the process EventBus (`marqdo view` SSE). No-op when nothing is subscribed.
 
-**> host_stream_publish event=`event`**
+*> host_stream_publish event=`event`*

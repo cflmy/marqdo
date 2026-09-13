@@ -3708,3 +3708,69 @@ fn tempfile_dir(prefix: &str) -> std::path::PathBuf {
     std::fs::create_dir_all(&dir).unwrap();
     dir
 }
+
+// ---------------------------------------------------------------------------
+// Markup mapping v0.3 — fixtures under tests/markup-v03/
+// ---------------------------------------------------------------------------
+
+fn assert_out_v03(path: &str, expect: &str) {
+    assert_out(path, expect);
+}
+
+#[test]
+fn markup_v03_inc_prose() {
+    assert_out_v03("tests/markup-v03/inc-prose.mq.md", "38");
+}
+
+#[test]
+fn markup_v03_bold_call() {
+    assert_out_v03("tests/markup-v03/bold-call.mq.md", "38");
+}
+
+#[test]
+fn markup_v03_dual_call() {
+    assert_out_v03("tests/markup-v03/dual-call.mq.md", "38\n38");
+}
+
+#[test]
+fn markup_v03_greet_default() {
+    assert_out_v03(
+        "tests/markup-v03/greet-default.mq.md",
+        "您好，\nMarqdo\n嗨，\nWorld",
+    );
+}
+
+#[test]
+fn markup_v03_dead_bind() {
+    assert_out_v03("tests/markup-v03/dead-bind.mq.md", "你好");
+}
+
+#[test]
+fn markup_v03_empty_return_hr() {
+    assert_out_v03("tests/markup-v03/empty-return-hr.mq.md", "hi\ndone");
+}
+
+#[test]
+fn markup_v03_empty_return_none() {
+    assert_out_v03("tests/markup-v03/empty-return-none.mq.md", "hi\ndone");
+}
+
+#[test]
+fn markup_v03_empty_return_stars() {
+    assert_out_v03("tests/markup-v03/empty-return-stars.mq.md", "hi\ndone");
+}
+
+#[test]
+fn markup_v03_empty_return_compat() {
+    assert_out_v03("tests/markup-v03/empty-return-compat.mq.md", "hi\ndone");
+}
+
+#[test]
+fn markup_v03_multi_bold() {
+    assert_out_v03("tests/markup-v03/multi-bold.mq.md", "a\nb");
+}
+
+#[test]
+fn markup_v03_print_bold() {
+    assert_out_v03("tests/markup-v03/print-bold.mq.md", "Hello");
+}

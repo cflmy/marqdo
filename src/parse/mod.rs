@@ -1,20 +1,23 @@
 //! Line-oriented recursive descent → AST (no Bison).
 
 mod expr;
+mod prose;
 
 pub use expr::{
     parse_call_after_gt, parse_call_arg_value, parse_expr, parse_expr_prefer_var,
     parse_value_or_interp,
 };
+pub use prose::{scan_prose_line, ProseBit};
 
 use anyhow::{bail, Result};
 
 use crate::ast::{
-    BranchArm, Expr, Function, Import, Literal, Module, Stmt, Use,
+    BranchArm, Expr, Function, Import, Literal, Module, Param, Stmt, Use,
 };
 use crate::diagnostics::{bail_at, Diagnostic, Span};
 use crate::lex::{classify_source, ClassifiedLine, LineKind};
 use crate::parse::expr::parse_call_after_gt as call_after_gt;
+use crate::parse::expr::parse_call_tail;
 use crate::parse::expr::parse_expr as parse_expr_str;
 
 /// Parse full source (with optional frontmatter) into a module AST.
@@ -75,17 +78,50 @@ impl<'a> Cursor<'a> {
         Some(l)
     }
 
-    /// Skip blank + comment; return true if a line remains.
+    /// Skip blank + writeback; stop on Code **or** Comment that has v0.3 inline bits.
     fn skip_noise(&mut self) -> bool {
         while let Some(l) = self.peek() {
             match l.kind {
-                LineKind::Blank | LineKind::Comment | LineKind::Writeback => {
+                LineKind::Blank | LineKind::Writeback => {
+                    self.i += 1;
+                }
+                LineKind::Comment => {
+                    let bits = scan_prose_line(l.text.trim_end_matches(['\r', '\n']));
+                    if bits.iter().any(|b| {
+                        matches!(
+                            b,
+                            ProseBit::BoldCode { .. }
+                                | ProseBit::ItalicReturn { .. }
+                                | ProseBit::Decl { .. }
+                        )
+                    }) {
+                        return true;
+                    }
                     self.i += 1;
                 }
                 LineKind::Code => return true,
             }
         }
         false
+    }
+
+    /// True if peek is a Comment line with executable/decl prose bits.
+    fn peek_is_prose(&self) -> bool {
+        let Some(l) = self.peek() else {
+            return false;
+        };
+        if l.kind != LineKind::Comment {
+            return false;
+        }
+        let bits = scan_prose_line(l.text.trim_end_matches(['\r', '\n']));
+        bits.iter().any(|b| {
+            matches!(
+                b,
+                ProseBit::BoldCode { .. }
+                    | ProseBit::ItalicReturn { .. }
+                    | ProseBit::Decl { .. }
+            )
+        })
     }
 
     fn parse_frontmatter(&mut self) -> Result<(Vec<Import>, Vec<Use>)> {
@@ -166,8 +202,10 @@ impl<'a> Cursor<'a> {
             children: Vec::new(),
             base,
         };
+        // Prose decls pending promotion (name → optional default text).
+        let mut prose_decls: Vec<(String, Option<String>)> = Vec::new();
 
-        // Parameter zone: indented `- name` pure identifiers.
+        // Parameter zone: explicit `+` lines (legacy / optional).
         while self.skip_noise() {
             let Some(l) = self.peek() else { break };
             let trimmed = l.text.trim();
@@ -179,8 +217,10 @@ impl<'a> Cursor<'a> {
                 }
                 break;
             }
+            if self.peek_is_prose() {
+                break;
+            }
             if let Some(param) = parse_param_line(trimmed) {
-                // Only accept as param before any body stmt (params first).
                 if fun.body.is_empty() {
                     fun.params.push(param);
                     self.bump();
@@ -190,13 +230,13 @@ impl<'a> Cursor<'a> {
             break;
         }
 
-        // Body until next heading at level <= ours, or explicit end (--- / *** / empty **).
+        // Body until next heading at level <= ours, or explicit end.
         while self.skip_noise() {
             let Some(l) = self.peek() else { break };
             let trimmed = l.text.trim();
 
-            // Empty bold return ends the function body.
-            if is_empty_bold_return(trimmed) {
+            // Empty return: whole-line `**`, `****`, `** **`
+            if is_empty_return_marker(trimmed) {
                 let span = Span {
                     line: l.line_no,
                     col: 1,
@@ -224,7 +264,32 @@ impl<'a> Cursor<'a> {
                 break;
             }
 
-            // Nested params mid-body shouldn't happen; treat `-` as control flow.
+            if self.peek_is_prose() {
+                let line = self.bump().unwrap();
+                let span = Span {
+                    line: line.line_no,
+                    col: 1,
+                };
+                let bits = scan_prose_line(line.text.trim_end_matches(['\r', '\n']));
+                for bit in bits {
+                    match bit {
+                        ProseBit::Decl { name, default, .. } => {
+                            if !prose_decls.iter().any(|(n, _)| n == &name) {
+                                prose_decls.push((name, default));
+                            }
+                        }
+                        ProseBit::BoldCode { inner, .. } => {
+                            fun.body
+                                .push(self.stmt_from_bold_inner(&inner, span.clone())?);
+                        }
+                        ProseBit::ItalicReturn { inner, .. } => {
+                            fun.body.push(stmt_from_italic_return(&inner, span.clone())?);
+                        }
+                    }
+                }
+                continue;
+            }
+
             if is_ordered_branch(trimmed) {
                 fun.body.push(self.parse_branch()?);
                 continue;
@@ -237,6 +302,7 @@ impl<'a> Cursor<'a> {
             fun.body.push(self.parse_simple_stmt()?);
         }
 
+        merge_inferred_params(&mut fun, &prose_decls)?;
         Ok(fun)
     }
 
@@ -259,21 +325,24 @@ impl<'a> Cursor<'a> {
             );
         }
 
-        // Bold return **…** (empty inner → None)
-        if trimmed.starts_with("**") && trimmed.ends_with("**") && trimmed.len() >= 4 {
-            let inner = &trimmed[2..trimmed.len() - 2];
-            let value = if inner.trim().is_empty() {
-                Expr::Literal(Literal::None)
-            } else {
-                parse_expr_prefer_var(inner)?
-            };
-            return Ok(Stmt::Return { value, span });
+        // v0.3: whole-line empty return `**` / `****`
+        if is_empty_return_marker(trimmed) {
+            return Ok(Stmt::Return {
+                value: Expr::Literal(Literal::None),
+                span,
+            });
         }
 
-        // Italic statement *…*
+        // v0.3: **…** = code segment (assign / call / expr)
+        if trimmed.starts_with("**") && trimmed.ends_with("**") && trimmed.len() >= 4 {
+            let inner = &trimmed[2..trimmed.len() - 2];
+            return self.stmt_from_bold_inner(inner, span);
+        }
+
+        // v0.3: *…* = return
         if trimmed.starts_with('*') && trimmed.ends_with('*') && !trimmed.starts_with("**") {
             let inner = &trimmed[1..trimmed.len() - 1];
-            return self.parse_italic_assign(inner, span);
+            return stmt_from_italic_return(inner, span);
         }
 
         // Call >
@@ -282,19 +351,90 @@ impl<'a> Cursor<'a> {
             return Ok(Stmt::Call { call, span });
         }
 
-        // Bare assign `` `x` = … `` possibly followed by formula fence or table
+        // Bare assign `` `x` = … ``
         if trimmed.starts_with('`') {
             if let Some(stmt) = self.parse_backtick_assign(trimmed, span.clone())? {
                 return Ok(stmt);
             }
         }
 
+        // Mid-line prose on a Code-classified line: scan inlines
+        let bits = scan_prose_line(line.text.trim_end_matches(['\r', '\n']));
+        if bits.iter().any(|b| {
+            matches!(
+                b,
+                ProseBit::BoldCode { .. } | ProseBit::ItalicReturn { .. }
+            )
+        }) {
+            // Expand to multiple stmts — caller only expects one; push extras via...
+            // For whole-line Code that's actually "先写**…**再写**…**", classify is Comment
+            // and handled in prose path. If we get here, emit first executable bit only
+            // and require callers to use prose path for multi — but multi-bold is Comment.
+            let mut stmts = Vec::new();
+            for bit in bits {
+                match bit {
+                    ProseBit::BoldCode { inner, .. } => {
+                        stmts.push(self.stmt_from_bold_inner(&inner, span.clone())?);
+                    }
+                    ProseBit::ItalicReturn { inner, .. } => {
+                        stmts.push(stmt_from_italic_return(&inner, span.clone())?);
+                    }
+                    ProseBit::Decl { .. } => {}
+                }
+            }
+            if stmts.len() == 1 {
+                return Ok(stmts.pop().unwrap());
+            }
+            if stmts.len() > 1 {
+                // Represent as a synthetic block: execute by chaining — use first and
+                // stash is awkward. Prefer: return error asking for prose classification.
+                // Simpler: fold into a Branch with one arm? No.
+                // Use Stmt::Call sequence — add by making parse_function handle this.
+                bail!("{span}: multiple inline code segments on one code line; use narrative line");
+            }
+        }
+
         Err(Diagnostic::new(None, span, format!("unrecognized statement: {trimmed}")).into())
     }
 
+    /// Parse bold-code inner into Assign / Call.
+    fn stmt_from_bold_inner(&mut self, inner: &str, span: Span) -> Result<Stmt> {
+        let inner = inner.trim();
+        if inner.is_empty() {
+            return Ok(Stmt::Return {
+                value: Expr::Literal(Literal::None),
+                span,
+            });
+        }
+        if let Some((name, rhs)) = split_assign_inner(inner) {
+            if crate::aliases::is_reserved_keyword(&name) {
+                bail!("{span}: `{name}` is a reserved keyword");
+            }
+            let (value, end_line) = self.resolve_assign_rhs(&rhs, span, true)?;
+            return Ok(Stmt::Assign {
+                name,
+                value,
+                span,
+                end_line,
+            });
+        }
+        // Call without `>`: `print text="hi"` / `加一函数 37`
+        let multi = inner.split_whitespace().count() >= 2 || inner.contains('=');
+        if multi {
+            let call = parse_call_tail(inner, true)
+                .map(|(c, _)| c)
+                .map_err(|e| anyhow::anyhow!("{span}: bold code: {e}"))?;
+            return Ok(Stmt::Call { call, span });
+        }
+        // Single token: treat as expression discarded via assign to `_`? Prefer error.
+        bail!("{span}: bold code must be assignment or call (got `{inner}`)");
+    }
+
+    #[allow(dead_code)]
     fn parse_italic_assign(&mut self, inner: &str, span: Span) -> Result<Stmt> {
+        // Kept for unit tests migrating; v0.3 uses bold for assign.
         let Some((name, rhs)) = split_assign_inner(inner) else {
-            bail!("{span}: italic statement must be an assignment (name = …)");
+            bail!("{span}: assignment must be name = …");
         };
         if crate::aliases::is_reserved_keyword(&name) {
             bail!("{span}: `{name}` is a reserved keyword");
@@ -369,6 +509,21 @@ impl<'a> Cursor<'a> {
                 Expr::Call(call_after_gt(rhs[1..].trim(), prefer_var)?),
                 span.line,
             ));
+        }
+        // v0.3 prefer_var RHS: expression first (`p + qn`), else bare call (`加一 37`).
+        if prefer_var {
+            if let Ok(e) = parse_expr_prefer_var(rhs) {
+                return Ok((e, span.line));
+            }
+            let multi = rhs.split_whitespace().count() >= 2 || rhs.contains('=');
+            if multi {
+                if let Ok((call, consumed)) = parse_call_tail(rhs, true) {
+                    let rest = rhs.get(consumed..).unwrap_or("").trim();
+                    if rest.is_empty() {
+                        return Ok((Expr::Call(call), span.line));
+                    }
+                }
+            }
         }
         let value = if prefer_var {
             parse_expr_prefer_var(rhs)?
@@ -802,7 +957,11 @@ fn parse_param_line(trimmed: &str) -> Option<crate::ast::Param> {
     } else {
         return None;
     };
-    Some(Param { name, default })
+    Some(Param {
+        name,
+        default,
+        inferred: false,
+    })
 }
 
 fn parse_foreach_ident(s: &str) -> Option<String> {
@@ -1034,11 +1193,19 @@ fn is_frame(trimmed: &str) -> bool {
     if trimmed.len() < 3 {
         return false;
     }
-    // Empty bold return `****` is handled separately; frames are --- or *** (etc.).
-    if is_empty_bold_return(trimmed) {
+    // Empty returns `**` / `****` are not frames.
+    if is_empty_return_marker(trimmed) {
         return false;
     }
     trimmed.chars().all(|c| c == '-') || trimmed.chars().all(|c| c == '*')
+}
+
+/// `****` or `**` + whitespace only + `**`, or whole-line `**` (v0.3 empty italic).
+fn is_empty_return_marker(trimmed: &str) -> bool {
+    if trimmed == "**" {
+        return true;
+    }
+    is_empty_bold_return(trimmed)
 }
 
 /// `****` or `**` + whitespace only + `**`.
@@ -1047,6 +1214,148 @@ fn is_empty_bold_return(trimmed: &str) -> bool {
         return false;
     }
     trimmed[2..trimmed.len() - 2].trim().is_empty()
+}
+
+fn stmt_from_italic_return(inner: &str, span: Span) -> Result<Stmt> {
+    let inner = inner.trim();
+    let value = if inner.is_empty()
+        || inner == "None"
+        || inner == "无"
+        || inner == "空"
+    {
+        Expr::Literal(Literal::None)
+    } else {
+        parse_expr_prefer_var(inner)?
+    };
+    Ok(Stmt::Return { value, span })
+}
+
+/// Merge prose decls into params: promote names that are read in the body (or have defaults).
+fn merge_inferred_params(
+    fun: &mut Function,
+    prose_decls: &[(String, Option<String>)],
+) -> Result<()> {
+    use std::collections::HashSet;
+
+    let mut read_names = HashSet::new();
+    let mut assigned_names = HashSet::new();
+    collect_reads_assigns(&fun.body, &mut read_names, &mut assigned_names);
+
+    for (name, default_txt) in prose_decls {
+        if name == "self" || name == "自" {
+            continue;
+        }
+        if fun.params.iter().any(|p| &p.name == name) {
+            continue;
+        }
+        let has_default = default_txt.is_some();
+        let is_read = read_names.contains(name);
+        // Elevate: defaulted always; or read in executable body (required input).
+        if !has_default && !is_read {
+            continue; // dead bind
+        }
+        let default = if let Some(txt) = default_txt {
+            Some(parse_expr_prefer_var(txt).or_else(|_| parse_value_or_interp(txt))?)
+        } else {
+            None
+        };
+        fun.params.push(Param {
+            name: name.clone(),
+            default,
+            inferred: true,
+        });
+    }
+    Ok(())
+}
+
+fn collect_reads_assigns(
+    stmts: &[Stmt],
+    reads: &mut std::collections::HashSet<String>,
+    assigns: &mut std::collections::HashSet<String>,
+) {
+    for s in stmts {
+        match s {
+            Stmt::Assign { name, value, .. } => {
+                assigns.insert(name.clone());
+                collect_reads_expr(value, reads);
+            }
+            Stmt::Return { value, .. } => collect_reads_expr(value, reads),
+            Stmt::Call { call, .. } => collect_reads_call(call, reads),
+            Stmt::Branch { arms, .. } => {
+                for a in arms {
+                    if let Some(c) = &a.condition {
+                        collect_reads_expr(c, reads);
+                    }
+                    collect_reads_assigns(&a.body, reads, assigns);
+                }
+            }
+            Stmt::While {
+                condition, body, ..
+            } => {
+                collect_reads_expr(condition, reads);
+                collect_reads_assigns(body, reads, assigns);
+            }
+            Stmt::ForEach {
+                collection, body, ..
+            } => {
+                reads.insert(collection.clone());
+                collect_reads_assigns(body, reads, assigns);
+            }
+        }
+    }
+}
+
+fn collect_reads_call(call: &crate::ast::CallExpr, reads: &mut std::collections::HashSet<String>) {
+    if let Some(recv) = &call.receiver {
+        reads.insert(recv.clone());
+    }
+    // Callee name itself is not a variable read.
+    for a in &call.args {
+        match a {
+            crate::ast::Arg::Positional(e) | crate::ast::Arg::Named { value: e, .. } => {
+                collect_reads_expr(e, reads);
+            }
+        }
+    }
+}
+
+fn collect_reads_expr(expr: &Expr, reads: &mut std::collections::HashSet<String>) {
+    match expr {
+        Expr::Var(n) => {
+            reads.insert(n.clone());
+        }
+        Expr::Call(c) => collect_reads_call(c, reads),
+        Expr::Binary { left, right, .. } => {
+            collect_reads_expr(left, reads);
+            collect_reads_expr(right, reads);
+        }
+        Expr::Unary { expr, .. } => collect_reads_expr(expr, reads),
+        Expr::Index { base, .. } => collect_reads_expr(base, reads),
+        Expr::List(xs) => {
+            for x in xs {
+                collect_reads_expr(x, reads);
+            }
+        }
+        Expr::Map(entries) => {
+            for (_, v) in entries {
+                collect_reads_expr(v, reads);
+            }
+        }
+        Expr::Interp(parts) => {
+            for p in parts {
+                match p {
+                    crate::ast::InterpPart::Var(n) => {
+                        reads.insert(n.clone());
+                    }
+                    crate::ast::InterpPart::Index { base, .. } => {
+                        reads.insert(base.clone());
+                    }
+                    crate::ast::InterpPart::Lit(_) => {}
+                }
+            }
+        }
+        Expr::Literal(_) | Expr::Formula(_) | Expr::Code(_) => {}
+    }
 }
 
 fn is_ordered_branch(trimmed: &str) -> bool {
@@ -1242,8 +1551,8 @@ mod tests {
     }
 
     #[test]
-    fn parse_italic_bare_lhs_prefer_var() {
-        let src = "# main\n\n*answer = 1*\n**answer**\n";
+    fn parse_bold_assign_italic_return() {
+        let src = "# main\n\n**answer = 1**\n*answer*\n";
         let m = parse_source(src).unwrap();
         match &m.functions[0].body[0] {
             Stmt::Assign { name, value, .. } => {
@@ -1258,6 +1567,16 @@ mod tests {
             }
             other => panic!("expected return, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn parse_prose_inc() {
+        let src = "## 加一\n\n输入`n`。**n=n+1**返回*n*。\n\n# main\n\n**r = 加一 1**\n**print text=r**\n";
+        let m = parse_source(src).unwrap();
+        let add = m.functions.iter().find(|f| f.name == "加一").unwrap();
+        assert_eq!(add.params.len(), 1);
+        assert_eq!(add.params[0].name, "n");
+        assert!(add.params[0].inferred);
     }
 
     #[test]

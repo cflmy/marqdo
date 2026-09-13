@@ -6,6 +6,7 @@
 |------|------|
 | [`structure/`](structure/) | 函数、调用、分支、循环、表、导入、位置实参 |
 | [`keywords/`](keywords/) | `print`、布尔与 `and`/`or`/`not` |
+| [`markup-v03/`](markup-v03/) | **Markup v0.3 草案金样例**（`#[ignore]` 至旗标落地；见目录 README） |
 | [`errors/`](errors/) | 期望失败（诊断文案） |
 | [`gold.rs`](gold.rs) | 集成测试：跑上述夹具并比对 stdout / stderr |
 

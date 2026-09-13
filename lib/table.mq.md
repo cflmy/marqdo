@@ -10,19 +10,19 @@ description: >-
     + `at`
     + `value`
 
-Directly update one element. `at=` is a text key, a **1-based** list index, or a list path of keys/indices (same nesting as footnotes).
+Directly update one element. `at=` is a text key, a *1-based* list index, or a list path of keys/indices (same nesting as footnotes).
 
-**> host_collection_put in=`in` at=`at` value=`value`**
+*> host_collection_put in=`in` at=`at` value=`value`*
 
 ## len
     + `xs`
 
-**> len `xs`**
+*> len `xs`*
 
 ## rows
     + `xs`
 
-**> len `xs`**
+*> len `xs`*
 
 ## at
     + `xs`
@@ -30,31 +30,31 @@ Directly update one element. `at=` is a text key, a **1-based** list index, or a
 
 Index is zero-based (same as builtin `at`). Out of range → `None`.
 
-**> at value=`xs` index=`i`**
+*> at value=`xs` index=`i`*
 
 ## row_at
     + `xs`
     + `i`
 
-**> at value=`xs` index=`i`**
+*> at value=`xs` index=`i`*
 
 ## append
     + `list`
     + `item`
 
-**> host_list_append list=`list` item=`item`**
+*> host_list_append list=`list` item=`item`*
 
 ## prepend
     + `list`
     + `item`
 
-**> host_list_prepend list=`list` item=`item`**
+*> host_list_prepend list=`list` item=`item`*
 
 ## concat
     + `a`
     + `b`
 
-**> host_list_concat a=`a` b=`b`**
+*> host_list_concat a=`a` b=`b`*
 
 ## insert
     + `list`
@@ -63,7 +63,7 @@ Index is zero-based (same as builtin `at`). Out of range → `None`.
 
 Index is zero-based (may insert at `len` to append).
 
-**> host_list_insert list=`list` index=`index` item=`item`**
+*> host_list_insert list=`list` index=`index` item=`item`*
 
 ## set_at
     + `list`
@@ -72,34 +72,34 @@ Index is zero-based (may insert at `len` to append).
 
 Zero-based replace. Prefer `put` with 1-based index for author-facing edits.
 
-**> host_list_set_at list=`list` index=`index` item=`item`**
+*> host_list_set_at list=`list` index=`index` item=`item`*
 
 ## remove_at
     + `list`
     + `index`
 
-**> host_list_remove_at list=`list` index=`index`**
+*> host_list_remove_at list=`list` index=`index`*
 
 ## pop
     + `list`
 
 Drop the last item (errors if empty). Use `last` first when you need the removed value.
 
-*`n` = > len `list`*
+**`n` = > len `list`**
 1. `n` > 0
-  **> host_list_remove_at list=`list` index=`n` - 1**
+  *> host_list_remove_at list=`list` index=`n` - 1*
 2. *
-  **> host_list_remove_at list=`list` index=0**
+  *> host_list_remove_at list=`list` index=0*
 
 ## first
     + `list`
 
-**> host_list_first list=`list`**
+*> host_list_first list=`list`*
 
 ## last
     + `list`
 
-**> host_list_last list=`list`**
+*> host_list_last list=`list`*
 
 ## slice
     + `list`
@@ -108,13 +108,13 @@ Drop the last item (errors if empty). Use `last` first when you need the removed
 
 Zero-based half-open range from `start` to `end`.
 
-**> host_list_slice list=`list` start=`start` end=`end`**
+*> host_list_slice list=`list` start=`start` end=`end`*
 
 ## contains
     + `list`
     + `item`
 
-**> host_list_contains list=`list` item=`item`**
+*> host_list_contains list=`list` item=`item`*
 
 ## index_of
     + `list`
@@ -122,19 +122,19 @@ Zero-based half-open range from `start` to `end`.
 
 Zero-based index or `None`.
 
-**> host_list_index_of list=`list` item=`item`**
+*> host_list_index_of list=`list` item=`item`*
 
 ## reverse
     + `list`
 
-**> host_list_reverse list=`list`**
+*> host_list_reverse list=`list`*
 
 ## sort
     + `list`
 
 Ascending sort (int/num/text preferred).
 
-**> host_list_sort list=`list`**
+*> host_list_sort list=`list`*
 
 ## sort_by
     + `list`
@@ -142,20 +142,20 @@ Ascending sort (int/num/text preferred).
 
 Sort a list of maps by `key`.
 
-**> host_list_sort_by list=`list` key=`key`**
+*> host_list_sort_by list=`list` key=`key`*
 
 ## unique
     + `list`
 
 Stable unique (first wins).
 
-**> host_list_unique list=`list`**
+*> host_list_unique list=`list`*
 
 ## chunk
     + `list`
     + `size`
 
-**> host_list_chunk list=`list` size=`size`**
+*> host_list_chunk list=`list` size=`size`*
 
 ## zip
     + `a`
@@ -163,21 +163,21 @@ Stable unique (first wins).
 
 Pairs until the shorter list ends.
 
-**> host_list_zip a=`a` b=`b`**
+*> host_list_zip a=`a` b=`b`*
 
 ## flatten
     + `list`
 
 One-level flatten.
 
-**> host_list_flatten list=`list`**
+*> host_list_flatten list=`list`*
 
 ## clear
     + `value`
 
 Empty list or empty map (by type).
 
-**> host_collection_clear value=`value`**
+*> host_collection_clear value=`value`*
 
 ## get
     + `map`
@@ -185,7 +185,7 @@ Empty list or empty map (by type).
 
 Missing key → `None`.
 
-**> host_map_get map=`map` key=`key`**
+*> host_map_get map=`map` key=`key`*
 
 ## set
     + `map`
@@ -194,36 +194,36 @@ Missing key → `None`.
 
 Shallow map update. Prefer `put` for nested paths.
 
-**> host_map_set map=`map` key=`key` value=`value`**
+*> host_map_set map=`map` key=`key` value=`value`*
 
 ## delete
     + `map`
     + `key`
 
-**> host_map_delete map=`map` key=`key`**
+*> host_map_delete map=`map` key=`key`*
 
 ## has
     + `map`
     + `key`
 
-**> host_map_has map=`map` key=`key`**
+*> host_map_has map=`map` key=`key`*
 
 ## keys
     + `map`
 
-**> host_map_keys map=`map`**
+*> host_map_keys map=`map`*
 
 ## values
     + `map`
 
-**> host_map_values map=`map`**
+*> host_map_values map=`map`*
 
 ## items
     + `map`
 
 Rows shaped as key/value maps.
 
-**> host_map_items map=`map`**
+*> host_map_items map=`map`*
 
 ## merge
     + `a`
@@ -231,17 +231,17 @@ Rows shaped as key/value maps.
 
 Right-hand keys win.
 
-**> host_map_merge a=`a` b=`b`**
+*> host_map_merge a=`a` b=`b`*
 
 ## size
     + `map`
 
-**> host_map_size map=`map`**
+*> host_map_size map=`map`*
 
 ## empty_list
 
-**> host_list_concat a=None b=None**
+*> host_list_concat a=None b=None*
 
 ## empty_map
 
-**> host_map_merge a=None b=None**
+*> host_map_merge a=None b=None*

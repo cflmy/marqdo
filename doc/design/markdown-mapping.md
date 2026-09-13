@@ -2,9 +2,10 @@
 
 | | |
 |---|---|
-| 状态 | 已定论（修订：形参 `+`、分支 `1.`、同级再 `1.` 为新分支、标识符反引号、`-` 专用于循环） |
+| 状态 | **历史文档（v0.2 · 已废止为运行时）** — 现行见 **[markdown-mapping-v0.3.md](markdown-mapping-v0.3.md)** |
 | 日期 | 2026-08-07 |
 | 取代 | v0.1 中「函数头 `-` 形参 / 裸名形参与遍历变量 / `+` 分支」 |
+| 被取代 | **[markdown-mapping-v0.3.md](markdown-mapping-v0.3.md)**（粗体即代码 · 斜体即返回 · 无双模式兼容） |
 | 相关 | [objects.md](objects.md) · [code-vs-comment.md](code-vs-comment.md) · [return-hr-and-code-surface.md](return-hr-and-code-surface.md) · [module-namespace.md](module-namespace.md) |
 
 Markdown **标记即语法**。输出**不是**语言架构原语，而是内置函数 **`print`**（英文；见 [keywords.md](keywords.md)）。

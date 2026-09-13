@@ -16,27 +16,17 @@
 tests/
   README.md
   gold.rs                   # 集成测试入口
-  structure/                # 代码基础结构（Markup 架构）
-    hello.mq.md
-    nested-call.mq.md
-    positional-call.mq.md
-    branch.mq.md
-    loop.mq.md
-    collection.mq.md
-    import/
-      main.mq.md
-      utils.mq.md
-    ns/
-      helpers.mq.md
-      path3.mq.md
-      use.mq.md
+  structure/                # 代码基础结构（Markup 架构 · v0.2）
+    …
   keywords/                 # 关键字与内置名
-    print.mq.md
-    bool-logic.mq.md
+    …
+  markup-v03/               # Markup 映射 v0.3 草案金样例（实现前 ignore）
+    README.md
+    inc-prose.mq.md
+    …
   ext/
-    agent-run-live.mq.md
+    …
   errors/                   # 期望失败（诊断文案稳定后再加金样例）
-    ns-instance-method.mq.md
     …
 ```
 
@@ -51,6 +41,7 @@ tests/
 |------|--------|----------|
 | **structure** | `#`/`##`、形参 `+`、`1.` 分支、`-` 循环、表、导入、点号路径 / `use`、位置/具名实参 | 关键字边角 |
 | **keywords** | `True`/`False`/`None`、`and`/`or`/`not`、`print`/`input` 约定 | 复杂控制流（可极简） |
+| **markup-v03** | v0.3：叙述声明、粗体代码、斜体返回、升参、空返回、双调用面（见 [markdown-mapping-v0.3.md](markdown-mapping-v0.3.md)） | 在 `--markup v0.3` 落地前 `#[ignore]` |
 | **errors** | 未定义名、实参错误、语法错误的诊断 | 成功路径 |
 
 未单独建夹、但应覆盖的其它测试（`src/**` 单测或日后 `tests/runtime/`）：

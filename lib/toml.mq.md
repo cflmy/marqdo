@@ -6,4 +6,4 @@ description: Read-only TOML subset parse (Mid2 M8). Tables, scalars, arrays; no 
 ## parse
     + `text`
 
-**> host_toml_parse text=`text`**
+*> host_toml_parse text=`text`*

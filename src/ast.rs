@@ -44,6 +44,8 @@ impl Default for Module {
 pub struct Param {
     pub name: String,
     pub default: Option<Expr>,
+    /// True when collected by v0.3 body/prose inference (not an explicit `+` line).
+    pub inferred: bool,
 }
 
 #[derive(Debug, Clone)]

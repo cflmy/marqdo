@@ -15,7 +15,10 @@
 
 | 文档 | 摘要 |
 |------|------|
-| [design/markdown-mapping.md](design/markdown-mapping.md) | **v0.1 语法宪法** |
+| [design/markdown-mapping.md](design/markdown-mapping.md) | **v0.2 语法宪法（现行运行时）** |
+| [design/markdown-mapping-v0.3.md](design/markdown-mapping-v0.3.md) | **v0.3 草案：叙述统一 · 粗体代码 · 斜体返回 · 形参体推断** |
+| [adr/0005-prose-unified-markup.md](adr/0005-prose-unified-markup.md) | **Proposed：采纳 mapping v0.3** |
+| [roadmap/markup-v0.3.md](roadmap/markup-v0.3.md) | **Markup v0.3 实现路线（M0–M5）** |
 | [design/objects.md](design/objects.md) | **`#` 对象 / `##` 函数与方法** |
 | [design/ai-skill.md](design/ai-skill.md) | **AI 接入 Skill**（[`skills/marqdo/`](../skills/marqdo/)） |
 | [design/code-vs-comment.md](design/code-vs-comment.md) | 叙述 / 可执行 / 外联 |

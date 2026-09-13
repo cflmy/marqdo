@@ -15,7 +15,7 @@ description: >-
 
 Marqdo = **Markdown markers as syntax**. A `.mq.md` file is both documentation and a runnable program. Read this skill **before** inventing syntax from Markdown habits or Python.
 
-Canonical design (repo): `doc/design/markdown-mapping.md`, `doc/design/keywords.md`. Deeper tables: [reference.md](reference.md). Copy-paste patterns: [examples.md](examples.md).
+Canonical design (repo): [`markdown-mapping-v0.3.md`](../../doc/design/markdown-mapping-v0.3.md) (**v0.3 · runtime**), `doc/design/keywords.md`. Legacy v0.2 notes: `doc/design/markdown-mapping.md` (historical). Deeper tables: [reference.md](reference.md). Copy-paste patterns: [examples.md](examples.md).
 
 **Authoring / library craft** (GFM-first, no json glue, how to develop Marqdo): use **[marqdo-dev](../marqdo-dev/SKILL.md)** whenever writing or refactoring `.mq.md`, `lib/*`, or `ext/*`.
 
@@ -24,19 +24,18 @@ Canonical design (repo): `doc/design/markdown-mapping.md`, `doc/design/keywords.
 ## Hard rules (do not violate)
 
 1. **File suffix** must be `.mq.md` (never plain `.md` for executable sources).
-2. **Output is not `**bold**`.** Print with `> print text=…` (or `> 打印 内容=…`). Bold `**…**` is **return value only**.
-3. **Prose vs code:** after a blank line, an unmarked first line starts a **comment paragraph**; every following non-blank line stays comment until the next blank line. Put a **blank line** between narration and executable lines.
-4. **Do not invent keywords** `if` / `else` / `while` / `for` / `def` / `return`. Control flow is Markdown: **`+` params** (under heading), **`1.` `2.` … branches**, **`-` loops**, arm `N. *` = else, `#` = **object/type**, `##`+ = **function/method**, `**…**` = return.
-5. **Identifiers use backticks** — params `` + `name` ``. **Exemptions:** foreach `` - [item](coll) ``; footnote `` name[^key] ``; **inside italic `*…*` / bold `**…**`**, bare ids are **variables** (Python-style unified namespace) and method-call receivers are bare too. **Drop the backticks on value-expression variable names and method receivers inside `*…*` / `**…**`** — they are redundant once the `*…*`/`**…**` markers mark the segment as code: `*分类 = 分类[^苹果]*`, `**n * 2**`, `*p = > page.主体装配 组件=home*`. **Text literals must be quoted**: `*a = > text.split value=src sep=","*`. Backticks **still required** where a bare word is *not* a variable in **standalone `>` calls** (bare = text there): `` > str `n` ``, `` > `obj`.method ``. **No trailing space** inside `*…*` / `**…**` wrapped code: the closing marker must touch the last token directly (`*a = 1*`, `**n**`), never `` *a = 1 * ``.
-6. **Structure lines are not wrapped in italics.** `#` `>` `+` `-` `|` lines stand alone; use `*…*` only for general statements (bindings / expressions).
-7. **Paths:** In bare *expressions* `/` is division. In **call args / param defaults / table cells**, unspaced `a/b` and quoted `".marqdo/agent-kb"` are path text — no `json.parse` needed. Numeric ratios that must stay text use quotes (`"1/5"`, `"16/9"`); bare `1/5` is division.
-8. Prefer ending side-effect-only function bodies with a lone `---` or `***` line (or `****` empty return) so later siblings are not swallowed.
+2. **`**…**` = code** (assign / call). **`*…*` = return value**. Output is **not** either marker — use `> print text=…` / `**print text="…"**` / `> 打印 内容=…`.
+3. **Prose:** unmarked narrative may contain `` `名` `` (declare/ref), inline `**code**`, and `*return*`. Do **not** use `*`/`**` for Markdown emphasis in program files. Dead `` `名` `` (never read) is OK and does not become a param.
+4. **Do not invent keywords** `if` / `else` / `while` / `for` / `def` / `return`. Control flow is Markdown: **`1.` `2.` … branches**, **`-` loops**, arm `N. *` = else, `#` = **object/type**, `##`+ = **function/method**. Params: prefer prose `` `名` `` / `` `名`=默认 `` (inferred); `` + `名` `` still accepted.
+5. **Identifiers:** `` `名` `` in prose; inside `*…*` / `**…**`, bare ids are **variables**. **Text literals must be quoted** in bold/italic: `**print text="hi"**`. Standalone `>` calls: bare words = text; vars need ticks: `` > str `n` ``.
+6. **Structure lines** (`#` `>` `+` `-` `|` `1.`) need not be wrapped in bold.
+7. **Paths:** In bare expressions `/` is division. In call args / defaults / table cells, unspaced `a/b` and quoted paths are text.
+8. Prefer ending side-effect-only bodies with `---` / `***` (or `*None*` / whole-line `**` / `****`).
 9. **`ext/**` never calls `host_*`.** Agent/OKF helpers are plugin names (`agent_kb_*`, …) after `plugin.load`. Do **not** add agent/OKF domain code to `src/host/` (core bloat). See `doc/design/ext-agent.md` §4.
 10. **Browser (route C/D/E/F):** client logic is Marqdo on WASM; official bridge is host glue and **may** implement lists, routing, storage, WebSocket, canvas, file read, observers — authors **must not hand-write business JS**. Use `web.client_embed` / `data-mq-source-url` auto-mount. Client effects: prefer **GFM tables + `lib/browser`** ([marqdo-dev](../marqdo-dev/SKILL.md)).
 11. **Code-as-documentation / no bag glue:** Prefer **GFM tables** for maps, lists, wire, commands. Prefer **`table.put` / named helpers** over `json.set` / `json.append` chains. `lib/json` is for parse/stringify/quote only — not a dict builder. Unreadable json pipelines are a style bug.
 
-
-## Markup → meaning (v0.2)
+## Markup → meaning (v0.3)
 
 | Marker | Meaning |
 |--------|---------|
@@ -51,9 +50,9 @@ Canonical design (repo): `doc/design/markdown-mapping.md`, `doc/design/keywords.
 | Frontmatter `import bind:path.mq.md` / `导入` | Import file (bind library name) |
 | Frontmatter `import bind:lib.member` / `导入` | Short name for a library member (same keyword; no separate `use`) |
 | `> lib.member …` / `> lib.Type.member …` | Call via bare dotted path (instance methods need `` `var`.m ``) |
-| `*…*` | Statement (bind / expr) — closing `*` touches last token, **no trailing space**; bare ids are variables |
-| `**…**` | Return value — closing `**` touches last token, **no trailing space**; bare ids are variables |
-| `****` or `**` + spaces + `**` | Return `None` and end function body |
+| `**…**` | **Code** (assign / call) — closing `**` touches last token; bare ids are variables; quote text literals |
+| `*…*` | **Return value** — closing `*` touches last token; bare ids are variables |
+| `****` / whole-line `**` / `*None*` | Return `None` and end function body |
 | Lone `---` / `***` in function body | End function body (no value) |
 | GFM table after empty RHS bind | Collection (1-col list / ≥2-col map / `@`·`行`·`row` → list of maps); `` `x`[^1] `` / `` `m`[^key] `` |
 | `` ```lang `` | Foreign code block (via `lib/foreign`) |
