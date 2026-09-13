@@ -10,7 +10,7 @@ import sys:lib/sys.mq.md
 
 <!-- load web plugin -->
 
-*p = > plugin.native_path name="web"*
+**p = > plugin.native_path name="web"**
 1. `p`
   > plugin.load path=`p`
 2. *
@@ -18,8 +18,8 @@ import sys:lib/sys.mq.md
 
 <!-- argon2 hash must be non-empty PHC string -->
 
-*hash = > web_password_hash password="secret"*
-*h = hash[^hash]*
+**hash = > web_password_hash password="secret"**
+**h = hash[^hash]**
 1. `h` != ""
   > print text=hash-ok
 2. *
@@ -33,15 +33,15 @@ import sys:lib/sys.mq.md
 |----|------|------|
 | 1 | admin | secret |
 
-*login = > web_auth_login username="admin" password="secret" users=`users` session_ttl=120*
-*lok = login[^ok]*
+**login = > web_auth_login username="admin" password="secret" users=`users` session_ttl=120**
+**lok = login[^ok]**
 1. `lok`
   > print text=auth-login-ok
 2. *
   > print text=auth-login-fail
 
-*bad = > web_auth_login username="admin" password="wrong" users=`users` session_ttl=120*
-*bok = bad[^ok]*
+**bad = > web_auth_login username="admin" password="wrong" users=`users` session_ttl=120**
+**bok = bad[^ok]**
 1. `bok`
   > print text=auth-bad-should-fail
 2. *

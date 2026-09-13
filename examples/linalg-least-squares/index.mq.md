@@ -21,14 +21,14 @@ $$
 \begin{pmatrix}1\\2\\2\end{pmatrix}
 $$
 
-*`A` = > la.from_formula formula=`A`*
-*`b` = > la.from_formula formula=`b`*
+**`A` = > la.from_formula formula=`A`**
+**`b` = > la.from_formula formula=`b`**
 
-*`_` = > la.draw factor=`A` kind="heatmap" theme="light" path="ls-heatmap.svg"*
+**`_` = > la.draw factor=`A` kind="heatmap" theme="light" path="ls-heatmap.svg"**
 
-*`ls` = > la.lstsq a=`A` b=`b`*
-*`x` = ls[^x]*
-*`resid` = ls[^residual_fro]*
+**`ls` = > la.lstsq a=`A` b=`b`**
+**`x` = ls[^x]**
+**`resid` = ls[^residual_fro]**
 
 > print text=`x`
 > print text=`resid`

@@ -7,7 +7,7 @@ description: `+` arms; a lone `*` arm is else
 
 Italic lines are statements. Branches use `+`; a head that is only `*` is the else arm.
 
-*`x` = 0*
+**`x` = 0**
 
 1. `x` > 0
   > print text=positive

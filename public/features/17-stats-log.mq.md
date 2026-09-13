@@ -19,7 +19,7 @@ Light statistics and optional `fields=` on log lines — no remote sinks, no dat
 | 20 |
 | 30 |
 
-*m = > stats.mean list=`xs`*
+**m = > stats.mean list=`xs`**
 > print text=`m`
 
 `fld` =

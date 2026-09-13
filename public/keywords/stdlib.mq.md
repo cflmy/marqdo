@@ -7,25 +7,25 @@ description: Host builtins for strings and tables
 
 Length and type:
 
-*`s` = "hello"*
+**`s` = "hello"**
 
-*`n` = > len `s`*
+**`n` = > len `s`**
 
 > print text=`n`
 
-*`ty` = > type `s`*
+**`ty` = > type `s`**
 
 > print text=`ty`
 
 Trim, split, join, and index:
 
-*`t` = > trim value="  hi  "*
+**`t` = > trim value="  hi  "**
 
-*`parts` = > split value="a,b" sep=","*
+**`parts` = > split value="a,b" sep=","**
 
-*`mid` = > at value=`parts` index=0*
+**`mid` = > at value=`parts` index=0**
 
-*`j` = > join value=`parts` sep="-"*
+**`j` = > join value=`parts` sep="-"**
 
 > print text=`t`
 

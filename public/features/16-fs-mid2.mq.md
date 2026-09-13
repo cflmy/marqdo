@@ -14,11 +14,11 @@ import fs:lib/fs.mq.md
 
 > fs.write_text path="m9-demo/readme.txt" text="ok"
 
-*st = > fs.stat path="m9-demo/readme.txt"*
+**st = > fs.stat path="m9-demo/readme.txt"**
 > print text=`st`[^size]
 
-*w = > fs.walk path="m9-demo"*
-*n = > len `w`*
+**w = > fs.walk path="m9-demo"**
+**n = > len `w`**
 > print text=`n`
 
 > fs.remove_tree path="m9-demo"

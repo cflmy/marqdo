@@ -10,7 +10,7 @@ import sys:lib/sys.mq.md
 
 <!-- load web plugin so ABI primitives are registered -->
 
-*p = > plugin.native_path name="web"*
+**p = > plugin.native_path name="web"**
 1. `p`
   > plugin.load path=`p`
 2. *
@@ -23,7 +23,7 @@ import sys:lib/sys.mq.md
 | title | text |
 | body | text |
 
-*store = > web.db url="sqlite:web-fixtures/data/mw-live.db"*
+**store = > web.db url="sqlite:web-fixtures/data/mw-live.db"**
 > `store`.init name=articles fields=`schema`
 > `store`.exec sql="DELETE FROM articles"
 
@@ -35,8 +35,8 @@ import sys:lib/sys.mq.md
 
 > `store`.insert table=articles rows=`rows`
 
-*pg = > web.page title="live"*
-*app = > web.app page=`pg` db=`store` port=18099*
+**pg = > web.page title="live"**
+**app = > web.app page=`pg` db=`store` port=18099**
 
 `cors` =
 
@@ -58,5 +58,5 @@ import sys:lib/sys.mq.md
 | /api/posts | GET | articles |  |  | 10 |
 | /api/publish | POST | articles |  |  | 10 |
 
-*app = > `app`.configure cors=`cors` security=`sec` compress=True body_limit=1000 json=`api`*
+**app = > `app`.configure cors=`cors` security=`sec` compress=True body_limit=1000 json=`api`**
 > `app`.listen

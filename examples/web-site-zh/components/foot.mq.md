@@ -6,4 +6,4 @@
 |------|-----|------|
 | Marqdo | https://github.com | |
 
-**`foot`**
+*`foot`*

@@ -6,7 +6,7 @@ import browser:lib/browser.mq.md
 
 # main
 
-*`count` = 0*
+**`count` = 0**
 
 `wire` =
 
@@ -15,13 +15,13 @@ import browser:lib/browser.mq.md
 | 1 | "#bump" | click | bump |
 | 2 | "#reset" | click | reset |
 
-**`wire`**
+*`wire`*
 
 ## bump
-*`count` = count + 1*
-*`label` = > str count*
-**> browser.set_text sel="#count" text=label**
+**`count` = count + 1**
+**`label` = > str count**
+*> browser.set_text sel="#count" text=label*
 
 ## reset
-*`count` = 0*
-**> browser.set_text sel="#count" text="0"**
+**`count` = 0**
+*> browser.set_text sel="#count" text="0"*

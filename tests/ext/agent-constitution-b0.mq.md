@@ -10,11 +10,11 @@ import sys:lib/sys.mq.md
 
 ## probe_tool
 
-**"probe-ok"**
+*"probe-ok"*
 
 # main
 
-*p = > plugin.native_path name="agent"*
+**p = > plugin.native_path name="agent"**
 1. `p`
   > plugin.load path=`p`
 2. *
@@ -22,7 +22,7 @@ import sys:lib/sys.mq.md
   > sys.exit code=1
 
 > sys.env_set name="OPENAI_API_KEY" value="offline-constitution-dummy"
-*model = > llm.llm*
+**model = > llm.llm**
 
 `工具表` =
 
@@ -30,17 +30,17 @@ import sys:lib/sys.mq.md
 |------|
 | probe_tool |
 
-*助手 = > agent.agent model=`model` tools=`工具表` standing="constitution probe"*
-*ctx = > agent.build_step_context agent=`助手` task="constitution-probe-task"*
+**助手 = > agent.agent model=`model` tools=`工具表` standing="constitution probe"**
+**ctx = > agent.build_step_context agent=`助手` task="constitution-probe-task"**
 
-*a = > split value=`ctx` sep="--- call site ---"*
-*b = > split value=`ctx` sep="--- source (.mq.md) ---"*
-*c = > split value=`ctx` sep="--- how to act ---"*
-*d = > split value=`ctx` sep="Code is documentation"*
-*na = > len value=`a`*
-*nb = > len value=`b`*
-*nc = > len value=`c`*
-*nd = > len value=`d`*
+**a = > split value=`ctx` sep="--- call site ---"**
+**b = > split value=`ctx` sep="--- source (.mq.md) ---"**
+**c = > split value=`ctx` sep="--- how to act ---"**
+**d = > split value=`ctx` sep="Code is documentation"**
+**na = > len value=`a`**
+**nb = > len value=`b`**
+**nc = > len value=`c`**
+**nd = > len value=`d`**
 1. `na` > 1
   1. `nb` > 1
     1. `nc` > 1
@@ -59,8 +59,8 @@ import sys:lib/sys.mq.md
   > print text=call-site-missing
   > sys.exit code=1
 
-*site = > agent_call_site*
-*path = > json.get value=`site` key="path"*
+**site = > agent_call_site**
+**path = > json.get value=`site` key="path"**
 1. `path`
   > print text=site-path-ok
 2. *

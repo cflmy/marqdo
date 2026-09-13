@@ -12,4 +12,4 @@ Sidebar index of what this example demonstrates.
 | Forms | /new | |
 | net lib | /tools | |
 
-**`side`**
+*`side`*

@@ -13,10 +13,10 @@ A multi-column table with one data row is a map. Read values with footnote keys.
 |-------|----------|
 | fruit | vegetable |
 
-*`k` = `kinds`[^apple] *
+**`k` = `kinds`[^apple] **
 
 > print text=`k`
 
-*`k` = `kinds`[^cucumber] *
+**`k` = `kinds`[^cucumber] **
 
 > print text=`k`

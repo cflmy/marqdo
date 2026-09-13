@@ -11,9 +11,9 @@ Mid-tier stdlib: everyday primitives stay in `lib/`, not ABI plugins.
 
 # main
 
-*`ok` = > re.is_match text="user@example.com" pattern="^[^@]+@[^@]+$"*
-*`tok` = > enc.base64_encode text="marqdo"*
-*`hex` = > enc.hex_encode text="ok"*
+**`ok` = > re.is_match text="user@example.com" pattern="^[^@]+@[^@]+$"**
+**`tok` = > enc.base64_encode text="marqdo"**
+**`hex` = > enc.hex_encode text="ok"**
 > print text=`ok`
 > print text=`tok`
 > print text=`hex`

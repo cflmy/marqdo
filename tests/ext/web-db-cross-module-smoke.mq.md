@@ -9,15 +9,15 @@ import storemod:web-db-cross-module-lib.mq.md
 
 # main
 
-*p = > plugin.native_path name="web"*
+**p = > plugin.native_path name="web"**
 1. `p`
   > plugin.load path=`p`
 2. *
   > sys.exit code=1
 
-*store = > storemod.open*
-*rows = > `store`.select table="items" limit=10*
-*n = > len value=`rows`*
+**store = > storemod.open**
+**rows = > `store`.select table="items" limit=10**
+**n = > len value=`rows`**
 1. `n` >= 1
   > print text=cross-db-ok
 2. *

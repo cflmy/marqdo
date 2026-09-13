@@ -8,7 +8,7 @@ import writeback:lib/writeback.mq.md
 
 测试写回库
 
-*`name`=>input "你叫什么名字？\n"*
+**`name`=>input "你叫什么名字？\n"**
 
 > writeback.record `name`
 <!-- marqdo-out

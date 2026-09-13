@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| 状态 | **Active（v0.3 默认 · 无双模式；markup-v03 金样绿）** |
+| 状态 | **Active（v0.3 sole · 存量已迁移 · gold 绿）** |
 | 日期 | 2026-09-13 |
 | 设计 | [markdown-mapping-v0.3.md](../design/markdown-mapping-v0.3.md) |
 | ADR | [0005-prose-unified-markup.md](../adr/0005-prose-unified-markup.md) |
@@ -39,27 +39,27 @@
 
 ### M2 — 形参推断
 
-- [ ] `InferParams`：首次 `` `名` `` = 必选；`` `名`=默认 `` = 可选  
-- [ ] 体赋值 `n=n+1` 不误判为默认  
-- [ ] 与显式 `+` 合并规则 + 警告  
-- [ ] 方法 `self`/`自` 排除  
-- [ ] 金样例：默认实参、位置/具名调用、粗体内调用
+- [x] `InferParams`：首次 `` `名` `` = 必选；`` `名`=默认 `` = 可选  
+- [x] 体赋值 `n=n+1` 不误判为默认  
+- [x] 与显式 `+` 合并规则 + 警告  
+- [x] 方法 `self`/`自` 排除  
+- [x] 金样例：默认实参、位置/具名调用、粗体内调用
 
 **出门：** 推断签名与 `+` 兼容套件绿。
 
 ### M3 — 调用面与消歧
 
-- [ ] `**callee args**` ≡ `> callee args`  
-- [ ] else 臂 `N. *` 与返回斜体消歧  
-- [ ] 一行多 `**…**` 按序执行  
-- [ ] 金样例：`---` / `*None*` / 整行 `**` / 兼容 `****`；叙述死绑定不升参  
+- [x] `**callee args**` ≡ `> callee args`  
+- [x] else 臂 `N. *` 与返回斜体消歧  
+- [x] 一行多 `**…**` 按序执行  
+- [x] 金样例：`---` / `*None*` / 整行 `**` / 兼容 `****`；叙述死绑定不升参  
 - [ ] 诊断：必选缺失、未知 callee；空返回残缺粗体；死变量仅可选 lint  
 
 **出门：** `tests/markup-v03/*` 覆盖设计 §9 示例。
 
 ### M4 — 双后端与工具
 
-- [ ] 字节码发射跟随新 Stmt 源  
+- [x] 字节码发射跟随新 Stmt 源  
 - [ ] `view` / Variables：显示推断形参与 prose Decl  
 - [ ] （可选）`marqdo migrate markup-v03` 机械改写提示/工具  
 
@@ -67,14 +67,14 @@
 
 ### M5 — 默认切换与存量迁移
 
-- [ ] 默认 `MarkupEdition::V03`  
-- [ ] 迁移 `tests/**`、`lib/**`、`ext/**`、`public/**`、教程  
-- [ ] 更新 `.cursor/skills/marqdo/SKILL.md` 硬规则  
-- [ ] 修订 [markdown-mapping.md](../design/markdown-mapping.md) 为 v0.3 正式正文（或声明由 v0.3 文件接任）  
-- [ ] ADR 0005 → **Accepted**  
+- [x] 默认 `MarkupEdition::V03`  
+- [x] 迁移 `tests/**`、`lib/**`、`ext/**`、`public/**`、教程  
+- [x] 更新 `.cursor/skills/marqdo/SKILL.md` 硬规则  
+- [x] 修订 [markdown-mapping.md](../design/markdown-mapping.md) 为 v0.3 正式正文（或声明由 v0.3 文件接任）  
+- [x] ADR 0005 → **Accepted**  
 - [ ] CHANGELOG / 发版说明（破坏性：标记对调）
 
-**出门：** 全量 gold 默认绿；v0.2 仅 `--markup v0.2` 保留一个过渡版本周期。
+**出门：** 全量 gold 默认绿（live LLM 无钥跳过）；无 v0.2 双模式。
 
 ---
 

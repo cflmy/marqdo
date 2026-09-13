@@ -19,6 +19,6 @@ Default log level is info; raise to debug when you need more. Mint ids with uuid
 
 > log.debug text="now-visible"
 
-*id = > uuid.v4*
-*n = > len `id`*
+**id = > uuid.v4**
+**n = > len `id`**
 > print text=`n`

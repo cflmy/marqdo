@@ -10,7 +10,7 @@ description: >-
     + `at`
     + `value`
 
-Directly update one element. `at=` is a text key, a *1-based* list index, or a list path of keys/indices (same nesting as footnotes).
+Directly update one element. `at=` is a text key, a 1-based list index, or a list path of keys/indices (same nesting as footnotes).
 
 *> host_collection_put in=`in` at=`at` value=`value`*
 

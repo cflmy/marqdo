@@ -12,9 +12,9 @@ import sys:lib/sys.mq.md
 |--------|------|-----|
 | .box | grid-column | "1 / 5" |
 
-*css = > web.make_style name="t" table=`好` strict=True*
-*a = > split value=`css` sep="1 / 5"*
-*na = > len value=`a`*
+**css = > web.make_style name="t" table=`好` strict=True**
+**a = > split value=`css` sep="1 / 5"**
+**na = > len value=`a`**
 1. `na` > 1
   > print text=quoted-css-ok
 2. *
@@ -27,15 +27,15 @@ import sys:lib/sys.mq.md
 | script | /static/a.js | 真 | 3 |
 | stylesheet | /static/t.css | | 1 |
 
-*页 = > web.page title="c3" asset_version="appv"*
-*页 = > `页`.head table=`头`*
-*html = > `页`.render*
-*b = > split value=`html` sep="a.js?v=3"*
-*nb = > len value=`b`*
-*c = > split value=`html` sep="t.css?v=1"*
-*nc = > len value=`c`*
-*d0 = > split value=`html` sep="script defer"*
-*nd0 = > len value=`d0`*
+**页 = > web.page title="c3" asset_version="appv"**
+**页 = > `页`.head table=`头`**
+**html = > `页`.render**
+**b = > split value=`html` sep="a.js?v=3"**
+**nb = > len value=`b`**
+**c = > split value=`html` sep="t.css?v=1"**
+**nc = > len value=`c`**
+**d0 = > split value=`html` sep="script defer"**
+**nd0 = > len value=`d0`**
 1. `nb` > 1
   1. `nc` > 1
     1. `nd0` > 1
@@ -55,11 +55,11 @@ import sys:lib/sys.mq.md
 |------|------|------|
 | script | /static/b.js | 真 |
 
-*页2 = > web.page title="c3b" asset_version="2026-09-04"*
-*页2 = > `页2`.head table=`头2`*
-*h2 = > `页2`.render*
-*d = > split value=`h2` sep="b.js?v=2026-09-04"*
-*nd = > len value=`d`*
+**页2 = > web.page title="c3b" asset_version="2026-09-04"**
+**页2 = > `页2`.head table=`头2`**
+**h2 = > `页2`.render**
+**d = > split value=`h2` sep="b.js?v=2026-09-04"**
+**nd = > len value=`d`**
 1. `nd` > 1
   > print text=asset-version-ok
 2. *
@@ -71,13 +71,13 @@ import sys:lib/sys.mq.md
 |------|------|
 | script | /static/sync.js |
 
-*页3 = > web.page title="c3c"*
-*页3 = > `页3`.head table=`头3`*
-*h3 = > `页3`.render*
-*e = > split value=`h3` sep="sync.js"*
-*ne = > len value=`e`*
-*f = > split value=`h3` sep="script defer"*
-*nf = > len value=`f`*
+**页3 = > web.page title="c3c"**
+**页3 = > `页3`.head table=`头3`**
+**h3 = > `页3`.render**
+**e = > split value=`h3` sep="sync.js"**
+**ne = > len value=`e`**
+**f = > split value=`h3` sep="script defer"**
+**nf = > len value=`f`**
 1. `ne` > 1
   1. `nf` == 1
     > print text=sync-compat-ok

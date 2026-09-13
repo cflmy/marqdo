@@ -7,6 +7,7 @@ import (
 
 	"github.com/marqdo/marqdo/plugins/web/internal/assets"
 	"github.com/marqdo/marqdo/plugins/web/internal/db"
+	"github.com/marqdo/marqdo/plugins/web/internal/form"
 	"github.com/marqdo/marqdo/plugins/web/internal/table"
 )
 
@@ -681,9 +682,127 @@ func renderPagination(page map[string]any, total int64, itemCount int) string {
 	return s.String()
 }
 
+func formMountID(target string) string {
+	t := strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(target), "#"))
+	if t == "" {
+		return ""
+	}
+	for _, c := range t {
+		if c == ' ' || c == '\t' || c == '\n' || c == '"' || c == '\'' || c == '<' || c == '>' {
+			return ""
+		}
+	}
+	return t
+}
+
+// injectHTMLIntoID puts payload inside the first element with id="…" / id='…'.
+func injectHTMLIntoID(haystack, id, payload string) (string, bool) {
+	id = formMountID(id)
+	if id == "" {
+		return "", false
+	}
+	patterns := []string{`id="` + id + `"`, `id='` + id + `'`}
+	for _, pat := range patterns {
+		idx := strings.Index(haystack, pat)
+		if idx < 0 {
+			continue
+		}
+		tagStart := strings.LastIndex(haystack[:idx], "<")
+		if tagStart < 0 {
+			continue
+		}
+		if tagStart+1 >= len(haystack) {
+			continue
+		}
+		afterLt := haystack[tagStart+1]
+		if afterLt == '/' || afterLt == '!' {
+			continue
+		}
+		nameEnd := tagStart + 1
+		for nameEnd < len(haystack) {
+			c := haystack[nameEnd]
+			if c == ' ' || c == '\t' || c == '\n' || c == '>' || c == '/' {
+				break
+			}
+			nameEnd++
+		}
+		tagName := strings.TrimSpace(haystack[tagStart+1 : nameEnd])
+		if tagName == "" {
+			continue
+		}
+		afterID := idx + len(pat)
+		rel := strings.IndexByte(haystack[afterID:], '>')
+		if rel < 0 {
+			continue
+		}
+		openGt := afterID + rel
+		if openGt > 0 && haystack[openGt-1] == '/' {
+			continue
+		}
+		close := "</" + tagName + ">"
+		rest := haystack[openGt+1:]
+		closeRel := strings.Index(strings.ToLower(rest), strings.ToLower(close))
+		if closeRel < 0 {
+			continue
+		}
+		closeIdx := openGt + 1 + closeRel
+		var out strings.Builder
+		out.Grow(len(haystack) + len(payload))
+		out.WriteString(haystack[:openGt+1])
+		out.WriteString(payload)
+		out.WriteString(haystack[closeIdx:])
+		return out.String(), true
+	}
+	return "", false
+}
+
+func pageFormHTML(page map[string]any) (formID string, html string) {
+	if page == nil {
+		return "", ""
+	}
+	id, _ := page["form_id"].(string)
+	id = strings.TrimSpace(id)
+	if id == "" {
+		return "", ""
+	}
+	frm, ok := page["form"].(map[string]any)
+	if !ok || frm == nil {
+		return "", ""
+	}
+	return id, form.RenderBody(frm, id, nil, nil, "")
+}
+
 func pushIntro(buf *strings.Builder, intro string) {
+	pushIntroAndForm(buf, intro, nil)
+}
+
+// pushIntroAndForm writes intro and optional composed form (GAP-11 form_target inject).
+func pushIntroAndForm(buf *strings.Builder, intro string, page map[string]any) {
+	formID, formHTML := pageFormHTML(page)
+	target := ""
+	if page != nil {
+		if t, ok := page["form_target"].(string); ok {
+			target = t
+		} else if t, ok := page["target"].(string); ok {
+			target = t
+		} else if t, ok := page["form_slot"].(string); ok {
+			target = t
+		} else if t, ok := page["表单插槽"].(string); ok {
+			target = t
+		}
+	}
+	if formHTML != "" && target != "" && intro != "" {
+		if injected, ok := injectHTMLIntoID(intro, target, formHTML); ok {
+			buf.WriteString(fmt.Sprintf(`<div class="main-intro">%s</div>`, injected))
+			return
+		}
+	}
 	if intro != "" {
 		buf.WriteString(fmt.Sprintf(`<div class="main-intro">%s</div>`, intro))
+	}
+	if formHTML != "" {
+		buf.WriteString(formHTML)
+		_ = formID
 	}
 }
 
@@ -711,7 +830,7 @@ func renderFragment(page map[string]any, dbURL, slot string) string {
 	default:
 		intro, items, _ := resolveMain(page, dbURL)
 		var body strings.Builder
-		pushIntro(&body, intro)
+		pushIntroAndForm(&body, intro, page)
 		if len(items) > 0 {
 			isDetail, _ := page["detail"].(bool)
 			if isDetail {
@@ -815,7 +934,7 @@ func RenderPage(page map[string]any, dbURL string, partID string) string {
 	if images, ok := page["images_html"].(string); ok && images != "" {
 		mainHTML.WriteString(images)
 	}
-	pushIntro(&mainHTML, intro)
+	pushIntroAndForm(&mainHTML, intro, page)
 	if len(items) > 0 {
 		isDetail, _ := page["detail"].(bool)
 		if isDetail {

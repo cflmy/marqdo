@@ -12,4 +12,4 @@ description: Tool target for MCP server smoke.
 |----|-----|
 | true | mcp |
 
-**out**
+*out*

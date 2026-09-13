@@ -35,7 +35,7 @@ description: 暗恋见君壳层 — head 资源表、导航 HTML、页脚 HTML�
 | script | "/static/js/feed_board.js" | 真 |
 | script | "/static/js/index.js" | 真 |
 
-**`头`**
+*`头`*
 
 ## 导航HTML
 

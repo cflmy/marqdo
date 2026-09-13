@@ -7,4 +7,4 @@
 | Notes | / | |
 | Docs | https://github.com | |
 
-**`side`**
+*`side`*

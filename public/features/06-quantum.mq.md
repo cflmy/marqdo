@@ -22,11 +22,11 @@ Q8: `draw theme="dark"|"light"|"bw"` (default dark lab look) on circuit / probs 
 | 2 | CX | 0,1 |
 | 3 | CX | 0,2 |
 
-*`qc` = > quantum.circuit qubits=3 steps=`steps`*
-*`p` = > `qc`.probabilities*
-*`_` = > `qc`.draw kind="probs" theme="dark"*
-*`H` = > quantum.gate name="H"*
-*`__` = > `H`.draw kind="matrix"*
+**`qc` = > quantum.circuit qubits=3 steps=`steps`**
+**`p` = > `qc`.probabilities**
+**`_` = > `qc`.draw kind="probs" theme="dark"**
+**`H` = > quantum.gate name="H"**
+**`__` = > `H`.draw kind="matrix"**
 
 > print text=`p`
 > print text=quantum-feature-ok

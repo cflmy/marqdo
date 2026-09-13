@@ -10,11 +10,11 @@ import sys:lib/sys.mq.md
 
 ## probe_tool
 
-**"probe-ok"**
+*"probe-ok"*
 
 # main
 
-*p = > plugin.native_path name="agent"*
+**p = > plugin.native_path name="agent"**
 1. `p`
   > plugin.load path=`p`
 2. *
@@ -22,25 +22,25 @@ import sys:lib/sys.mq.md
   > sys.exit code=1
 
 > sys.env_set name="OPENAI_API_KEY" value="offline-dump-dummy"
-*model = > llm.llm*
+**model = > llm.llm**
 
 `工具表` =
 | 工具 |
 |------|
 | probe_tool |
 
-*助手 = > agent.agent model=`model` tools=`工具表` standing="dump probe"*
-*dump = > agent.dump_step_context agent=`助手` task="dump-probe-task"*
+**助手 = > agent.agent model=`model` tools=`工具表` standing="dump probe"**
+**dump = > agent.dump_step_context agent=`助手` task="dump-probe-task"**
 
-*site = > json.get value=`dump` key="call_site"*
-*path = > json.get value=`site` key="path"*
-*chars = > json.get value=`dump` key="prompt_chars"*
-*prompt = > json.get value=`dump` key="prompt"*
+**site = > json.get value=`dump` key="call_site"**
+**path = > json.get value=`site` key="path"**
+**chars = > json.get value=`dump` key="prompt_chars"**
+**prompt = > json.get value=`dump` key="prompt"**
 
 1. `path`
   1. `chars` > 100
-    *parts = > split value=`prompt` sep="--- call site ---"*
-    *n = > len value=`parts`*
+    **parts = > split value=`prompt` sep="--- call site ---"**
+    **n = > len value=`parts`**
     1. `n` > 1
       > print text=dump-context-ok
     2. *

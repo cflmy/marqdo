@@ -10,10 +10,10 @@ Narration: \((AB)^\top = B^\top A^\top\). The identity is checked by running thi
 
 # main
 
-*`A` = > la.symbol name="A" rows=2 cols=3*
-*`B` = > la.symbol name="B" rows=3 cols=2*
-*`P` = `A` * `B`*
-*`t` = > `P`.T_ascii*
+**`A` = > la.symbol name="A" rows=2 cols=3**
+**`B` = > la.symbol name="B" rows=3 cols=2**
+**`P` = `A` * `B`**
+**`t` = > `P`.T_ascii**
 > print text=`t`
 1. `t` == "B^T*A^T"
   > print text=identity-ok
@@ -27,18 +27,18 @@ Narration: \((AB)^\top = B^\top A^\top\). The identity is checked by running thi
 | 1 | X | 2 | 2 |
 | 2 | Y | 2 | 2 |
 
-*`env` = > la.declare table=`shapes`*
-*`X` = env[^X]*
-*`Y` = env[^Y]*
-*`S` = `X` + `Y`*
-*`st` = > la.ascii expr=`S`*
+**`env` = > la.declare table=`shapes`**
+**`X` = env[^X]**
+**`Y` = env[^Y]**
+**`S` = `X` + `Y`**
+**`st` = > la.ascii expr=`S`**
 1. `st` == "X + Y"
   > print text=declare-ok
 2. *
   > print text=declare-fail
 
-*`Pt` = > `P`.T*
-*`raw` = > la.ascii expr=`Pt` raw=True*
+**`Pt` = > `P`.T**
+**`raw` = > la.ascii expr=`Pt` raw=True**
 1. `raw` == "(A*B)^T"
   > print text=raw-ok
 2. *

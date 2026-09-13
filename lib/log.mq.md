@@ -17,7 +17,7 @@ level is debug / info / warn / error.
 **line = > host_log_line level="debug" text=`text` fields=`fields`**
 1. `line`
   > print text=`line`
-2. **
+2. *
   ****
 
 ## info
@@ -27,7 +27,7 @@ level is debug / info / warn / error.
 **line = > host_log_line level="info" text=`text` fields=`fields`**
 1. `line`
   > print text=`line`
-2. **
+2. *
   ****
 
 ## warn
@@ -37,7 +37,7 @@ level is debug / info / warn / error.
 **line = > host_log_line level="warn" text=`text` fields=`fields`**
 1. `line`
   > print text=`line`
-2. **
+2. *
   ****
 
 ## error
@@ -47,5 +47,5 @@ level is debug / info / warn / error.
 **line = > host_log_line level="error" text=`text` fields=`fields`**
 1. `line`
   > print text=`line`
-2. **
+2. *
   ****

@@ -10,7 +10,7 @@
 | 2 | 开发 | develop |
 | 3 | 聊天 | chat |
 
-**`boards`**
+*`boards`*
 
 ## news_boards
 
@@ -23,7 +23,7 @@
 | 1 | 站务 | site |
 | 2 | 技术 | tech |
 
-**`news_boards`**
+*`news_boards`*
 
 ## posts
 
@@ -37,7 +37,7 @@
 | 2 | 如何用表格写论坛 | tables-for-forums | 导航、表单、种子数据都是可读表格。 | 若某功能逼你写一长串 json.set，请先审视 ext/web 是否缺命名方法。 | 开发 | 2 | 站务 | 0 | 18 |
 | 3 | 公聊室已开放 | chat-open | WebSocket 广播房间。 | 打开 /chat，连上 /chat/ws，消息会扇出给同房间所有人。 | 聊天 | 3 | 站务 | 0 | 9 |
 
-**`posts`**
+*`posts`*
 
 ## news
 
@@ -50,7 +50,7 @@
 | 1 | 站点迁往 Marqdo | migrate-to-marqdo | 原生层换 Go libweb，作者面保持表格。 | 暗恋见君的验收目标：登录、发帖、列表详情、聊天与站长工具都能用 .mq.md 写完。 | 站务 | 1 |
 | 2 | 外接 PostgreSQL / Redis | pg-redis | 生产可用外接驱动。 | 本示例默认 sqlite:；把数据库地址换成 postgres:// 即可。 | 技术 | 2 |
 
-**`news`**
+*`news`*
 
 ## notices
 
@@ -64,7 +64,7 @@
 | 2 | 站点正用 Marqdo 表格重写验收：导航、首页四段、列表与公聊对齐原站 DOM。 | 2026-09-08 14:30:00 |
 | 3 | 发帖与评论请遵守社区规范；站务公告将在此置顶。 | 2026-09-10 09:00:00 |
 
-**`notices`**
+*`notices`*
 
 ## comments
 
@@ -77,7 +77,7 @@
 | 1 | post | welcome | 终于等到用表格写论坛的一天。 | 路人甲 | 2026-09-10 11:00:00 |
 | 2 | post | welcome | 期待人们能够继续相信爱情。 | 见君 | 2026-09-10 12:15:00 |
 
-**`comments`**
+*`comments`*
 
 ## chat_rooms
 
@@ -90,7 +90,7 @@
 | 1 | lobby | 大厅 | 全站公共聊天室。 |
 | 2 | casual | 闲聊 | 轻松闲聊，勿刷屏。 |
 
-**`chat_rooms`**
+*`chat_rooms`*
 
 ## topics
 
@@ -103,4 +103,4 @@
 | 1 | glass-ui | 粉玻璃界面 | 首页与列表的毛玻璃视觉专题（占位）。 |
 | 2 | tables-as-code | 表格即代码 | Marqdo GFM 表装配专题（占位）。 |
 
-**`topics`**
+*`topics`*

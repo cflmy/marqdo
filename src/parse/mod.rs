@@ -1231,15 +1231,18 @@ fn stmt_from_italic_return(inner: &str, span: Span) -> Result<Stmt> {
 }
 
 /// Merge prose decls into params: promote names that are read in the body (or have defaults).
+///
+/// Design §8.2: elevate only when an executable read cannot be satisfied by a prior
+/// local assign that does not itself read the name (e.g. `score = > json.get …` is local;
+/// `n = n + 1` still needs external `n`).
 fn merge_inferred_params(
     fun: &mut Function,
     prose_decls: &[(String, Option<String>)],
 ) -> Result<()> {
     use std::collections::HashSet;
 
-    let mut read_names = HashSet::new();
-    let mut assigned_names = HashSet::new();
-    collect_reads_assigns(&fun.body, &mut read_names, &mut assigned_names);
+    let mut needs_input = HashSet::new();
+    collect_names_needing_input(&fun.body, &mut HashSet::new(), &mut needs_input);
 
     for (name, default_txt) in prose_decls {
         if name == "self" || name == "自" {
@@ -1249,10 +1252,9 @@ fn merge_inferred_params(
             continue;
         }
         let has_default = default_txt.is_some();
-        let is_read = read_names.contains(name);
-        // Elevate: defaulted always; or read in executable body (required input).
-        if !has_default && !is_read {
-            continue; // dead bind
+        // Elevate: defaulted always; or executable read that needs an external input.
+        if !has_default && !needs_input.contains(name) {
+            continue; // dead bind or pure local
         }
         let default = if let Some(txt) = default_txt {
             Some(parse_expr_prefer_var(txt).or_else(|_| parse_value_or_interp(txt))?)
@@ -1268,38 +1270,78 @@ fn merge_inferred_params(
     Ok(())
 }
 
-fn collect_reads_assigns(
+/// Walk body in order. `bound` = names already assigned locally without needing input.
+/// On read of unbound name → needs input. On assign, RHS reads are checked first
+/// (so `n = n + 1` marks `n` as needing input before binding).
+fn collect_names_needing_input(
     stmts: &[Stmt],
-    reads: &mut std::collections::HashSet<String>,
-    assigns: &mut std::collections::HashSet<String>,
+    bound: &mut std::collections::HashSet<String>,
+    needs: &mut std::collections::HashSet<String>,
 ) {
     for s in stmts {
         match s {
             Stmt::Assign { name, value, .. } => {
-                assigns.insert(name.clone());
-                collect_reads_expr(value, reads);
+                let mut rhs_reads = std::collections::HashSet::new();
+                collect_reads_expr(value, &mut rhs_reads);
+                for r in &rhs_reads {
+                    if !bound.contains(r) {
+                        needs.insert(r.clone());
+                    }
+                }
+                bound.insert(name.clone());
             }
-            Stmt::Return { value, .. } => collect_reads_expr(value, reads),
-            Stmt::Call { call, .. } => collect_reads_call(call, reads),
+            Stmt::Return { value, .. } => {
+                let mut reads = std::collections::HashSet::new();
+                collect_reads_expr(value, &mut reads);
+                for r in reads {
+                    if !bound.contains(&r) {
+                        needs.insert(r);
+                    }
+                }
+            }
+            Stmt::Call { call, .. } => {
+                let mut reads = std::collections::HashSet::new();
+                collect_reads_call(call, &mut reads);
+                for r in reads {
+                    if !bound.contains(&r) {
+                        needs.insert(r);
+                    }
+                }
+            }
             Stmt::Branch { arms, .. } => {
                 for a in arms {
                     if let Some(c) = &a.condition {
-                        collect_reads_expr(c, reads);
+                        let mut reads = std::collections::HashSet::new();
+                        collect_reads_expr(c, &mut reads);
+                        for r in reads {
+                            if !bound.contains(&r) {
+                                needs.insert(r);
+                            }
+                        }
                     }
-                    collect_reads_assigns(&a.body, reads, assigns);
+                    let mut arm_bound = bound.clone();
+                    collect_names_needing_input(&a.body, &mut arm_bound, needs);
                 }
             }
             Stmt::While {
                 condition, body, ..
             } => {
-                collect_reads_expr(condition, reads);
-                collect_reads_assigns(body, reads, assigns);
+                let mut reads = std::collections::HashSet::new();
+                collect_reads_expr(condition, &mut reads);
+                for r in reads {
+                    if !bound.contains(&r) {
+                        needs.insert(r);
+                    }
+                }
+                collect_names_needing_input(body, bound, needs);
             }
             Stmt::ForEach {
                 collection, body, ..
             } => {
-                reads.insert(collection.clone());
-                collect_reads_assigns(body, reads, assigns);
+                if !bound.contains(collection) {
+                    needs.insert(collection.clone());
+                }
+                collect_names_needing_input(body, bound, needs);
             }
         }
     }
@@ -1567,6 +1609,28 @@ mod tests {
             }
             other => panic!("expected return, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn parse_local_assign_not_inferred_param() {
+        let src = r#"## soft
+Candidates may include lexical `score`.
+**score = 1**
+1. `score`
+  **_ = score**
+2. *
+  **_ = 0**
+---
+# main
+> soft
+"#;
+        let m = parse_source(src).unwrap();
+        let soft = m.functions.iter().find(|f| f.name == "soft").unwrap();
+        assert!(
+            soft.params.iter().all(|p| p.name != "score"),
+            "score must stay local, params={:?}",
+            soft.params.iter().map(|p| &p.name).collect::<Vec<_>>()
+        );
     }
 
     #[test]

@@ -9,7 +9,7 @@ import net:lib/net.mq.md
 
 `body` = "--`boundary`\nContent-Disposition: form-data; name=\"title\"\n\nHello\n--`boundary`\nContent-Disposition: form-data; name=\"file\"; filename=\"a.txt\"\nContent-Type: text/plain\n\nfile body\n--`boundary`--\n"
 
-*parts = > net.multipart_parse body=`body` boundary=`boundary`*
+**parts = > net.multipart_parse body=`body` boundary=`boundary`**
 
 > print text=`parts`[^1][^name]
 > print text=`parts`[^1][^value]

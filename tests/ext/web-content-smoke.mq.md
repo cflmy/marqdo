@@ -8,7 +8,7 @@ import sys:lib/sys.mq.md
 
 # main
 
-*p = > plugin.native_path name="web"*
+**p = > plugin.native_path name="web"**
 1. `p`
   > plugin.load path=`p`
 2. *
@@ -22,17 +22,17 @@ import sys:lib/sys.mq.md
 | 2 | description | A demo site |
 | 3 | og:type | website |
 
-*page = > web.page title="Home"*
-*page = > page.meta meta=`meta`*
-*mm = page[^meta]*
-*m = mm[^title]*
+**page = > web.page title="Home"**
+**page = > page.meta meta=`meta`**
+**mm = page[^meta]**
+**m = mm[^title]**
 1. `m` == "My Site"
   > print text=meta-ok
 2. *
   > print text=meta-fail
 
-*page = > page.paginate offset=0 limit=5 path="/"*
-*poff = page[^paginate][^offset]*
+**page = > page.paginate offset=0 limit=5 path="/"**
+**poff = page[^paginate][^offset]**
 1. `poff` == 0
   > print text=paginate-ok
 2. *
@@ -44,7 +44,7 @@ import sys:lib/sys.mq.md
 |----|-------|------|---------|
 | 1 | Hello | /a | First post |
 
-*feed = > web_rss_build title="Blog" link="http://example.com" description="Demo" items=`rows`*
+**feed = > web_rss_build title="Blog" link="http://example.com" description="Demo" items=`rows`**
 1. `feed` != ""
   > print text=rss-ok
 2. *

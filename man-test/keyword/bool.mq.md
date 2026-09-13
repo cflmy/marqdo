@@ -5,8 +5,8 @@ description: AI禁止更改
 
 # main
 
-*`a` = True*
-*`b` = False*
+**`a` = True**
+**`b` = False**
 
 1. `a` and not `b`
   > print text=ok

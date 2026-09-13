@@ -7,6 +7,6 @@ description: AI禁止更改
 
 测试输入
 
-*`name`=> input "你叫什么名字\n"*
+**`name`=> input "你叫什么名字\n"**
 
 > print `name`

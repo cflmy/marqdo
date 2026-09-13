@@ -19,7 +19,7 @@
 | created_at | timestamp | true | |
 | updated_at | timestamp | true | |
 
-**`posts`**
+*`posts`*
 
 ## news
 
@@ -39,7 +39,7 @@
 | created_at | timestamp | true | |
 | updated_at | timestamp | true | |
 
-**`news`**
+*`news`*
 
 ## boards
 
@@ -53,7 +53,7 @@
 | name | text | false | |
 | slug | text | false | 是 |
 
-**`boards`**
+*`boards`*
 
 ## news_boards
 
@@ -67,7 +67,7 @@
 | name | text | false | |
 | slug | text | false | 是 |
 
-**`news_boards`**
+*`news_boards`*
 
 ## notices
 
@@ -81,7 +81,7 @@
 | content | text | false |
 | created_at | timestamp | true |
 
-**`notices`**
+*`notices`*
 
 ## comments
 
@@ -98,7 +98,7 @@
 | author | text | true |
 | created_at | timestamp | true |
 
-**`comments`**
+*`comments`*
 
 ## chat_rooms
 
@@ -113,7 +113,7 @@
 | name | text | false | |
 | summary | text | true | |
 
-**`chat_rooms`**
+*`chat_rooms`*
 
 ## topics
 
@@ -128,7 +128,7 @@
 | title | text | false | |
 | summary | text | true | |
 
-**`topics`**
+*`topics`*
 
 ## api_keys
 
@@ -143,4 +143,4 @@ API Key 校验用哈希表（应用层 scopes）。
 | hash | text | false |
 | scopes | text | true |
 
-**`api_keys`**
+*`api_keys`*

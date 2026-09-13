@@ -12,4 +12,4 @@ Site top navigation. The Admin tab points at the login-gated admin page.
 | Tools | /tools | |
 | Admin | /admin | |
 
-**`nav`**
+*`nav`*

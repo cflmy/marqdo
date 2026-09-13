@@ -37,6 +37,19 @@ fn assert_out(path: &str, expect: &str) {
     assert_eq!(stdout.trim_end(), expect.trim_end(), "{path}");
 }
 
+/// Skip live LLM/agent tests when no real API key is configured.
+fn live_llm_key() -> Option<String> {
+    for k in ["OPENAI_API_KEY", "MARQDO_LLM_API_KEY"] {
+        if let Ok(v) = std::env::var(k) {
+            let t = v.trim();
+            if !t.is_empty() && t != "sk-test" {
+                return Some(t.to_string());
+            }
+        }
+    }
+    None
+}
+
 /// Build Go `plugins/web/build/libweb.so` once per test process (W-G13).
 /// Also sets `MARQDO_WEB_PLUGIN` so child `marqdo` processes do not pick up a
 /// stale Rust `libweb.so` from `~/.marqdo/ext`.
@@ -93,6 +106,25 @@ fn assert_err(path: &str, line_col: &str, substr: &str) {
             "{path} backend={backend} stderr missing {substr:?}: {stderr}"
         );
     }
+}
+
+/// Like [`assert_out`], but sets a dummy OpenAI key so offline LLM/agent paths
+/// that only check for the env var (no live HTTP) can proceed.
+fn assert_out_llm_offline(path: &str, expect: &str) {
+    let output = Command::new(env!("CARGO_BIN_EXE_marqdo"))
+        .args(["run", path])
+        .env("OPENAI_API_KEY", "sk-test")
+        .output()
+        .expect("failed to run marqdo");
+    let code = output.status.code().unwrap_or(1);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert_eq!(code, 0, "{path} stderr={stderr}");
+    assert_eq!(
+        stdout.trim_end(),
+        expect.trim_end(),
+        "{path} stdout={stdout}"
+    );
 }
 
 #[test]
@@ -3159,6 +3191,7 @@ fn ext_agent_framework_smoke() {
 
     let output = Command::new(env!("CARGO_BIN_EXE_marqdo"))
         .args(["run", "tests/ext/agent-smoke.mq.md"])
+        .env("OPENAI_API_KEY", "sk-test")
         .current_dir(env!("CARGO_MANIFEST_DIR"))
         .output()
         .expect("run agent-smoke");
@@ -3200,6 +3233,7 @@ fn ext_agent_plan_confirm() {
 
     let output = Command::new(env!("CARGO_BIN_EXE_marqdo"))
         .args(["run", "tests/ext/agent-plan-confirm.mq.md"])
+        .env("OPENAI_API_KEY", "sk-test")
         .current_dir(env!("CARGO_MANIFEST_DIR"))
         .output()
         .expect("run agent-plan-confirm");
@@ -3288,6 +3322,10 @@ fn ext_agent_plan_observe() {
 
 #[test]
 fn ext_llm_complete_live() {
+    let Some(_key) = live_llm_key() else {
+        eprintln!("skip ext_llm_complete_live: no OPENAI_API_KEY / MARQDO_LLM_API_KEY");
+        return;
+    };
     let output = Command::new(env!("CARGO_BIN_EXE_marqdo"))
         .args(["run", "tests/ext/llm-complete.mq.md"])
         .output()
@@ -3305,6 +3343,10 @@ fn ext_llm_complete_live() {
 
 #[test]
 fn ext_llm_stream_live() {
+    let Some(_key) = live_llm_key() else {
+        eprintln!("skip ext_llm_stream_live: no OPENAI_API_KEY / MARQDO_LLM_API_KEY");
+        return;
+    };
     let output = Command::new(env!("CARGO_BIN_EXE_marqdo"))
         .args(["run", "tests/ext/llm-stream-live.mq.md"])
         .current_dir(env!("CARGO_MANIFEST_DIR"))
@@ -3332,6 +3374,10 @@ fn ext_llm_stream_live() {
 
 #[test]
 fn ext_agent_run_live() {
+    let Some(_key) = live_llm_key() else {
+        eprintln!("skip ext_agent_run_live: no OPENAI_API_KEY / MARQDO_LLM_API_KEY");
+        return;
+    };
     let status = Command::new("cargo")
         .args(["build", "-p", "marqdo_plugin_agent"])
         .current_dir(env!("CARGO_MANIFEST_DIR"))
@@ -3375,6 +3421,10 @@ fn ext_agent_run_live() {
 
 #[test]
 fn ext_agent_plan_live() {
+    let Some(_key) = live_llm_key() else {
+        eprintln!("skip ext_agent_plan_live: no OPENAI_API_KEY / MARQDO_LLM_API_KEY");
+        return;
+    };
     let status = Command::new("cargo")
         .args(["build", "-p", "marqdo_plugin_agent"])
         .current_dir(env!("CARGO_MANIFEST_DIR"))
@@ -3577,7 +3627,7 @@ fn ext_llm_ctor_offline() {
 
 #[test]
 fn ext_agent_plan_stream_offline() {
-    assert_out(
+    assert_out_llm_offline(
         "tests/ext/agent-plan-stream-offline.mq.md",
         "4
 round

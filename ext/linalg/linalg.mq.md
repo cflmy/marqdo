@@ -9,7 +9,7 @@ import sys:lib/sys.mq.md
 
 Load the ABI v2 `linalg` plugin once.
 
-*p = > plugin.native_path name="linalg"*
+**p = > plugin.native_path name="linalg"**
 1. `p`
   > plugin.load path=`p`
 2. *
@@ -20,7 +20,7 @@ Load the ABI v2 `linalg` plugin once.
 ## ping
 
 > ensure_plugin
-**> linalg_ping**
+*> linalg_ping*
 
 ## mul
     + `a`
@@ -29,27 +29,27 @@ Load the ABI v2 `linalg` plugin once.
 Matrix product (lazy MatMul; shape-checked).
 
 > ensure_plugin
-**> linalg_mul a=`a` b=`b`**
+*> linalg_mul a=`a` b=`b`*
 
 ## add
     + `a`
     + `b`
 
 > ensure_plugin
-**> linalg_add a=`a` b=`b`**
+*> linalg_add a=`a` b=`b`*
 
 ## sub
     + `a`
     + `b`
 
 > ensure_plugin
-**> linalg_sub a=`a` b=`b`**
+*> linalg_sub a=`a` b=`b`*
 
 ## transpose
     + `expr`
 
 > ensure_plugin
-**> linalg_transpose expr=`expr`**
+*> linalg_transpose expr=`expr`*
 
 ## inv
     + `expr`
@@ -57,7 +57,7 @@ Matrix product (lazy MatMul; shape-checked).
 Symbolic inverse (lazy).
 
 > ensure_plugin
-**> linalg_inv expr=`expr`**
+*> linalg_inv expr=`expr`*
 
 ## simplify
     + `expr`
@@ -65,29 +65,29 @@ Symbolic inverse (lazy).
 Apply MatExpr rewrite rules (R1–R5).
 
 > ensure_plugin
-**> linalg_simplify expr=`expr`**
+*> linalg_simplify expr=`expr`*
 
 ## ascii
     + `expr`
     + `raw`=False
 
-Display ASCII (default **simplify** first). Pass `raw=True` to keep the written tree.
+Display ASCII (default simplify first). Pass `raw=True` to keep the written tree.
 
 > ensure_plugin
-**> linalg_ascii expr=`expr` raw=`raw`**
+*> linalg_ascii expr=`expr` raw=`raw`*
 
 ## latex
     + `expr`
     + `raw`=False
 
 > ensure_plugin
-**> linalg_latex expr=`expr` raw=`raw`**
+*> linalg_latex expr=`expr` raw=`raw`*
 
 ## shape
     + `expr`
 
 > ensure_plugin
-**> linalg_shape expr=`expr`**
+*> linalg_shape expr=`expr`*
 
 ## show
     + `expr`
@@ -97,20 +97,20 @@ Display ASCII (default **simplify** first). Pass `raw=True` to keep the written 
 Record a formula SVG via host plot channel (default simplify). Returns the expr map.
 
 > ensure_plugin
-**> linalg_show expr=`expr` path=`path` raw=`raw`**
+*> linalg_show expr=`expr` path=`path` raw=`raw`*
 
 ## eye
     + `n`
 
 > ensure_plugin
-**> linalg_eye n=`n`**
+*> linalg_eye n=`n`*
 
 ## zeros
     + `rows`
     + `cols`
 
 > ensure_plugin
-**> linalg_zeros rows=`rows` cols=`cols`**
+*> linalg_zeros rows=`rows` cols=`cols`*
 
 ## from_list
     + `data`
@@ -118,7 +118,7 @@ Record a formula SVG via host plot channel (default simplify). Returns the expr 
 Dense leaf from nested list.
 
 > ensure_plugin
-**> linalg_from_list data=`data`**
+*> linalg_from_list data=`data`*
 
 ## from_formula
     + `formula`
@@ -126,28 +126,28 @@ Dense leaf from nested list.
 Absorb a `$$` numeric matrix formula (or nested list / dense map) as a dense leaf.
 
 > ensure_plugin
-**> linalg_from_formula formula=`formula`**
+*> linalg_from_formula formula=`formula`*
 
 ## explicit
     + `expr`
     + `raw`=False
 
-Evaluate to dense (default **simplify** first).
+Evaluate to dense (default simplify first).
 
 > ensure_plugin
-**> linalg_explicit expr=`expr` raw=`raw`**
+*> linalg_explicit expr=`expr` raw=`raw`*
 
 ## det
     + `expr`
 
 > ensure_plugin
-**> linalg_det expr=`expr`**
+*> linalg_det expr=`expr`*
 
 ## trace
     + `expr`
 
 > ensure_plugin
-**> linalg_trace expr=`expr`**
+*> linalg_trace expr=`expr`*
 
 ## solve
     + `a`=None
@@ -157,7 +157,7 @@ Evaluate to dense (default **simplify** first).
 Solve `a x = b` (Gaussian elimination), or reuse `factorize kind=lu` via `factor` + `b`.
 
 > ensure_plugin
-**> linalg_solve a=`a` b=`b` factor=`factor`**
+*> linalg_solve a=`a` b=`b` factor=`factor`*
 
 ## matmul
     + `a`
@@ -166,7 +166,7 @@ Solve `a x = b` (Gaussian elimination), or reuse `factorize kind=lu` via `factor
 Dense matrix product → `linalg_dense`.
 
 > ensure_plugin
-**> linalg_matmul a=`a` b=`b`**
+*> linalg_matmul a=`a` b=`b`*
 
 ## kron
     + `a`
@@ -175,7 +175,7 @@ Dense matrix product → `linalg_dense`.
 Lazy Kronecker product (does not expand).
 
 > ensure_plugin
-**> linalg_kron a=`a` b=`b`**
+*> linalg_kron a=`a` b=`b`*
 
 ## block
     + `blocks`
@@ -183,7 +183,7 @@ Lazy Kronecker product (does not expand).
 Block matrix from a nested list of expressions.
 
 > ensure_plugin
-**> linalg_block blocks=`blocks`**
+*> linalg_block blocks=`blocks`*
 
 ## collapse
     + `expr`
@@ -191,7 +191,7 @@ Block matrix from a nested list of expressions.
 Block-level collapse (`Block*Block` → block of products).
 
 > ensure_plugin
-**> linalg_collapse expr=`expr`**
+*> linalg_collapse expr=`expr`*
 
 ## factorize
     + `matrix`
@@ -200,7 +200,7 @@ Block-level collapse (`Block*Block` → block of products).
 Dense factorization → `linalg_factor` (`kind` = `lu` | `qr` | `svd` | `eig` | `chol`).
 
 > ensure_plugin
-**> linalg_factorize matrix=`matrix` kind=`kind`**
+*> linalg_factorize matrix=`matrix` kind=`kind`*
 
 ## draw
     + `factor`
@@ -211,7 +211,7 @@ Dense factorization → `linalg_factor` (`kind` = `lu` | `qr` | `svd` | `eig` | 
 Structure SVG (`eig` | `svd` | `qr` | `lu` | `ge` | `chol` | `structure` | `heatmap` | `hinton`). Theme tokens match quantum Q8: `light` | `dark` | `bw`.
 
 > ensure_plugin
-**> linalg_draw factor=`factor` kind=`kind` path=`path` theme=`theme`**
+*> linalg_draw factor=`factor` kind=`kind` path=`path` theme=`theme`*
 
 ## lstsq
     + `a`
@@ -220,7 +220,7 @@ Structure SVG (`eig` | `svd` | `qr` | `lu` | `ge` | `chol` | `structure` | `heat
 Least squares `min ||a x - b||` (QR if tall, SVD if wide).
 
 > ensure_plugin
-**> linalg_lstsq a=`a` b=`b`**
+*> linalg_lstsq a=`a` b=`b`*
 
 ## norm
     + `expr`
@@ -229,7 +229,7 @@ Least squares `min ||a x - b||` (QR if tall, SVD if wide).
 Matrix norm: `fro` | `1` | `inf` | `2`. Complex dense supports `fro` only.
 
 > ensure_plugin
-**> linalg_norm expr=`expr` ord=`ord`**
+*> linalg_norm expr=`expr` ord=`ord`*
 
 ## cond
     + `expr`
@@ -237,7 +237,7 @@ Matrix norm: `fro` | `1` | `inf` | `2`. Complex dense supports `fro` only.
 Spectral condition number via SVD (`ord=2`).
 
 > ensure_plugin
-**> linalg_cond expr=`expr`**
+*> linalg_cond expr=`expr`*
 
 ## rank
     + `expr`
@@ -245,7 +245,7 @@ Spectral condition number via SVD (`ord=2`).
 Numerical rank (SVD).
 
 > ensure_plugin
-**> linalg_rank expr=`expr`**
+*> linalg_rank expr=`expr`*
 
 ## declare
     + `table`
@@ -253,7 +253,7 @@ Numerical rank (SVD).
 Declare several matrix symbols from an `@` record table (`name` / `rows` / `cols`). Returns a map env.
 
 > ensure_plugin
-**> linalg_declare table=`table` type_tag="matrix"**
+*> linalg_declare table=`table` type_tag="matrix"*
 
 ## symbol
     + `name`
@@ -263,7 +263,7 @@ Declare several matrix symbols from an `@` record table (`name` / `rows` / `cols
 Abstract matrix symbol. Returns a `# matrix` instance (supports `+` / `*` and methods).
 
 > ensure_plugin
-**> matrix name=`name` rows=`rows` cols=`cols`**
+*> matrix name=`name` rows=`rows` cols=`cols`*
 
 # matrix
     + `name`=None
@@ -277,96 +277,96 @@ Matrix value (`_type=matrix`). Prefer infix `A + B` / `A * B`, or methods `` `A`
 
 > ensure_plugin
 1. `formula`
-  **> linalg_from_formula formula=`formula`**
+  *> linalg_from_formula formula=`formula`*
 2. `data`
-  **> linalg_from_list data=`data`**
+  *> linalg_from_list data=`data`*
 3. `name`
-  **> linalg_symbol name=`name` rows=`rows` cols=`cols`**
+  *> linalg_symbol name=`name` rows=`rows` cols=`cols`*
 4. `n`
-  **> linalg_eye n=`n`**
+  *> linalg_eye n=`n`*
 5. `rows`
-  **> linalg_zeros rows=`rows` cols=`cols`**
+  *> linalg_zeros rows=`rows` cols=`cols`*
 6. *
   > print text=ext/linalg: matrix needs name= / data= / formula= / n= / rows=
-  **None**
+  *None*
 
 ## T
 
-**> linalg_transpose expr=`self`**
+*> linalg_transpose expr=`self`*
 
 ## T_ascii
 
 Transpose then display ASCII (auto-simplified). Handy for lecture identities.
 
-*`Pt` = > linalg_transpose expr=`self`*
-**> linalg_ascii expr=`Pt` raw=False**
+**`Pt` = > linalg_transpose expr=`self`**
+*> linalg_ascii expr=`Pt` raw=False*
 
 ## add
     + `b`
 
-**> linalg_add a=`self` b=`b`**
+*> linalg_add a=`self` b=`b`*
 
 ## sub
     + `b`
 
-**> linalg_sub a=`self` b=`b`**
+*> linalg_sub a=`self` b=`b`*
 
 ## mul
     + `b`
 
-**> linalg_mul a=`self` b=`b`**
+*> linalg_mul a=`self` b=`b`*
 
 ## inv
 
-**> linalg_inv expr=`self`**
+*> linalg_inv expr=`self`*
 
 ## simplify
 
-**> linalg_simplify expr=`self`**
+*> linalg_simplify expr=`self`*
 
 ## ascii
 
-**> linalg_ascii expr=`self` raw=False**
+*> linalg_ascii expr=`self` raw=False*
 
 ## latex
 
-**> linalg_latex expr=`self` raw=False**
+*> linalg_latex expr=`self` raw=False*
 
 ## explicit
 
-**> linalg_explicit expr=`self` raw=False**
+*> linalg_explicit expr=`self` raw=False*
 
 ## det
 
-**> linalg_det expr=`self`**
+*> linalg_det expr=`self`*
 
 ## trace
 
-**> linalg_trace expr=`self`**
+*> linalg_trace expr=`self`*
 
 ## show
     + `path`=None
     + `raw`=False
 
-**> linalg_show expr=`self` path=`path` raw=`raw`**
+*> linalg_show expr=`self` path=`path` raw=`raw`*
 
 ## eye
     + `n`
 
-**> linalg_eye n=`n`**
+*> linalg_eye n=`n`*
 
 ## zeros
     + `rows`
     + `cols`
 
-**> linalg_zeros rows=`rows` cols=`cols`**
+*> linalg_zeros rows=`rows` cols=`cols`*
 
 ## from_list
     + `data`
 
-**> linalg_from_list data=`data`**
+*> linalg_from_list data=`data`*
 
 ## from_formula
     + `formula`
 
-**> linalg_from_formula formula=`formula`**
+*> linalg_from_formula formula=`formula`*

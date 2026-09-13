@@ -7,7 +7,7 @@
 | background | #ffffff |
 | border-bottom | 1px solid #e7e5e4 |
 
-**`topnav`**
+*`topnav`*
 
 ## side_panel
 
@@ -17,7 +17,7 @@
 |------|-----|
 | background | #f5f5f4 |
 
-**`side_panel`**
+*`side_panel`*
 
 ## card_title
 
@@ -28,7 +28,7 @@
 | font-size | 1.15rem |
 | margin | 0 0 0.35rem |
 
-**`card_title`**
+*`card_title`*
 
 ## card_body
 
@@ -39,4 +39,4 @@
 | color | #57534e |
 | margin | 0 |
 
-**`card_body`**
+*`card_body`*

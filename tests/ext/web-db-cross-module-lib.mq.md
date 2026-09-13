@@ -6,7 +6,7 @@ import web:ext/web/web.mq.md
 
 ## open
 
-*store = > web.db url="sqlite::memory:"*
+**store = > web.db url="sqlite::memory:"**
 
 `fields` =
 
@@ -23,4 +23,4 @@ import web:ext/web/web.mq.md
 | 1 | hello |
 
 > `store`.insert table=items rows=`seed`
-**store**
+*store*

@@ -12,7 +12,7 @@ import web:ext/web/web.mq.md
   NOT under the process cwd.
 -->
 
-*store = > web.db url="sqlite:entrydir-fixtures/data/entrydir.db"*
+**store = > web.db url="sqlite:entrydir-fixtures/data/entrydir.db"**
 
 `schema` =
 
@@ -30,8 +30,8 @@ import web:ext/web/web.mq.md
 
 > `store`.insert table=items rows=`one`
 
-*rows = > `store`.select table="items" limit=10*
-*n = > len value=`rows`*
+**rows = > `store`.select table="items" limit=10**
+**n = > len value=`rows`**
 
 1. `n` == 1
   > print text=entrydir-db-ok

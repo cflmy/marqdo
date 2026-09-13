@@ -8,9 +8,9 @@ import sys:lib/sys.mq.md
 
 Import lib/sys.mq.md. Functions: env_get, env_set, load_dotenv(optional path), args, cwd, exit(code), exec(cmd), stream_publish(event). load_dotenv does not override existing variables. Under view, exit soft-fails instead of killing the process. `stream_publish` feeds the view SSE EventBus.
 
-*`d` = > sys.cwd *
+**`d` = > sys.cwd **
 
-*`n` = > len `d` *
+**`n` = > len `d` **
 
 1. `n` > 0
   > print text=cwd-ok

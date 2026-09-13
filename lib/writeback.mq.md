@@ -9,7 +9,7 @@ description: Persist run output in .mq.md (Jupyter-style writeback)
     + `key`=None
     + `line`=None
 
-Write `value` to `<!-- marqdo-out … -->` in the entry file. Default: insert or replace the block immediately below the call; `at_end=true` replaces the unkeyed EOF block. With `key=` (e.g. `ok` / `error`), replace or create that *named* slot only — slots do not overwrite each other. Optional `line=` anchors the block under that source line (needed when writing from a subtask).
+Write `value` to `<!-- marqdo-out … -->` in the entry file. Default: insert or replace the block immediately below the call; `at_end=true` replaces the unkeyed EOF block. With `key=` (e.g. `ok` / `error`), replace or create that named slot only — slots do not overwrite each other. Optional `line=` anchors the block under that source line (needed when writing from a subtask).
 
 *> host_writeback_record value=`value` at_end=`at_end` key=`key` line=`line`*
 

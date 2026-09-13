@@ -15,11 +15,11 @@ $$
 \begin{bmatrix}4&0\\0&2\end{bmatrix}
 $$
 
-*`M` = > la.from_formula formula=`M`*
-*`f` = > la.factorize matrix=`M` kind="svd"*
-*`S` = f[^S]*
-*`_` = > la.draw factor=`f` kind="svd" theme="light" path="svd-structure.svg"*
-*`hm` = > la.draw factor=`M` kind="hinton" path="svd-hinton.svg"*
+**`M` = > la.from_formula formula=`M`**
+**`f` = > la.factorize matrix=`M` kind="svd"**
+**`S` = f[^S]**
+**`_` = > la.draw factor=`f` kind="svd" theme="light" path="svd-structure.svg"**
+**`hm` = > la.draw factor=`M` kind="hinton" path="svd-hinton.svg"**
 
 > print text=`S`
 > print text=svd-ok

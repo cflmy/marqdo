@@ -15,13 +15,13 @@ import log:lib/log.mq.md
 | 3 |
 | 4 |
 
-*m = > stats.mean list=`xs`*
+**m = > stats.mean list=`xs`**
 > print text=`m`
 
-*med = > stats.median list=`xs`*
+**med = > stats.median list=`xs`**
 > print text=`med`
 
-*s = > stats.stdev list=`xs`*
+**s = > stats.stdev list=`xs`**
 > print text=`s`
 
 `fld` =

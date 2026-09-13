@@ -10,7 +10,7 @@ import table:lib/table.mq.md
 
 Load the ABI v2 `web` plugin once.
 
-*p = > plugin.native_path name="web"*
+**p = > plugin.native_path name="web"**
 1. `p`
   > plugin.load path=`p`
 2. *
@@ -36,7 +36,7 @@ For complex themes prefer `page.css` (raw string, no table eval) or an external
 them into CSS — 样式即数据、装配即函数.
 
 > ensure_plugin
-**> web_style name=`name` table=`table` strict=`strict`**
+*> web_style name=`name` table=`table` strict=`strict`*
 
 ## make_images
     + `table`
@@ -47,7 +47,7 @@ Assemble a GFM image table into an HTML fragment (`div.mq-images` of
 `链接`/`宽度`/`高度`/`加载`/`图注`). Images stay as data — 图片即数据、装配即函数.
 
 > ensure_plugin
-**> web_images table=`table`**
+*> web_images table=`table`*
 
 ## make_head
     + `table`
@@ -56,7 +56,7 @@ Assemble a Head resource table into HTML (`<link>` / `<script>`). Useful for
 preview; prefer `page.head` to attach resources to a page.
 
 > ensure_plugin
-**> web_head table=`table`**
+*> web_head table=`table`*
 
 ## client_embed
     + `bridge`="/static/marqdo-bridge.js"
@@ -65,16 +65,16 @@ preview; prefer `page.head` to attach resources to a page.
     + `boot`=True
 
 Return an HTML snippet that loads the official browser Marqdo bridge (route C/D).
-With `boot` and non-empty `source` (URL path to `.mq.md`), emits `data-mq-wasm` / `data-mq-source-url` so the bridge **auto-mounts** (author zero JS).
+With `boot` and non-empty `source` (URL path to `.mq.md`), emits `data-mq-wasm` / `data-mq-source-url` so the bridge auto-mounts (author zero JS).
 Run `marqdo wasm build -o static` and `app.static dir=static`. Design: [browser-marqdo-wasm.md](../../doc/design/browser-marqdo-wasm.md) §16.
 
 1. `boot`
     1. `source` != ""
-        **"<script type=\"module\" src=\"" + bridge + "\" data-mq-wasm=\"" + wasm + "\" data-mq-source-url=\"" + source + "\"></script>"**
+        *"<script type=\"module\" src=\"" + bridge + "\" data-mq-wasm=\"" + wasm + "\" data-mq-source-url=\"" + source + "\"></script>"*
     2. *
-        **"<script type=\"module\" src=\"" + bridge + "\"></script>"**
+        *"<script type=\"module\" src=\"" + bridge + "\"></script>"*
 2. *
-    **"<script type=\"module\" src=\"" + bridge + "\" data-mq-no-boot=\"1\"></script>"**
+    *"<script type=\"module\" src=\"" + bridge + "\" data-mq-no-boot=\"1\"></script>"*
 
 ## text_patch
     + `sel`
@@ -83,8 +83,8 @@ Run `marqdo wasm build -o static` and `app.static dir=static`. Design: [browser-
 Shortcut: build a `set_text` effects map `{ set_text: { sel: text } }` for browser return values.
 Prefer authoring with `lib/browser` + GFM tables in client `.mq.md` ([marqdo-dev](../../.cursor/skills/marqdo-dev/SKILL.md)).
 
-*`m` = > table.put in=None at=sel value=text*
-**> table.put in=None at="set_text" value=m**
+**`m` = > table.put in=None at=sel value=text**
+*> table.put in=None at="set_text" value=m*
 
 ## dom_patch
     + `set_text`=None
@@ -115,58 +115,58 @@ Prefer authoring with `lib/browser` + GFM tables in client `.mq.md` ([marqdo-dev
 
 Merge browser effect keys into one return map (omit `None`). Route E/F effects included.
 
-*`out` = > table.put in=None at="_mq" value=True*
+**`out` = > table.put in=None at="_mq" value=True**
 1. `set_text` != None
-    *`out` = > table.put in=`out` at="set_text" value=set_text*
+    **`out` = > table.put in=`out` at="set_text" value=set_text**
 1. `set_value` != None
-    *`out` = > table.put in=`out` at="set_value" value=set_value*
+    **`out` = > table.put in=`out` at="set_value" value=set_value**
 1. `set_attr` != None
-    *`out` = > table.put in=`out` at="set_attr" value=set_attr*
+    **`out` = > table.put in=`out` at="set_attr" value=set_attr**
 1. `set_class` != None
-    *`out` = > table.put in=`out` at="set_class" value=set_class*
+    **`out` = > table.put in=`out` at="set_class" value=set_class**
 1. `toggle_class` != None
-    *`out` = > table.put in=`out` at="toggle_class" value=toggle_class*
+    **`out` = > table.put in=`out` at="toggle_class" value=toggle_class**
 1. `set_style` != None
-    *`out` = > table.put in=`out` at="set_style" value=set_style*
+    **`out` = > table.put in=`out` at="set_style" value=set_style**
 1. `set_html` != None
-    *`out` = > table.put in=`out` at="set_html" value=set_html*
+    **`out` = > table.put in=`out` at="set_html" value=set_html**
 1. `render_list` != None
-    *`out` = > table.put in=`out` at="render_list" value=render_list*
+    **`out` = > table.put in=`out` at="render_list" value=render_list**
 1. `navigate` != None
-    *`out` = > table.put in=`out` at="navigate" value=navigate*
+    **`out` = > table.put in=`out` at="navigate" value=navigate**
 1. `storage` != None
-    *`out` = > table.put in=`out` at="storage" value=storage*
+    **`out` = > table.put in=`out` at="storage" value=storage**
 1. `ws` != None
-    *`out` = > table.put in=`out` at="ws" value=ws*
+    **`out` = > table.put in=`out` at="ws" value=ws**
 1. `fetch` != None
-    *`out` = > table.put in=`out` at="fetch" value=fetch*
+    **`out` = > table.put in=`out` at="fetch" value=fetch**
 1. `fetch_all` != None
-    *`out` = > table.put in=`out` at="fetch_all" value=fetch_all*
+    **`out` = > table.put in=`out` at="fetch_all" value=fetch_all**
 1. `after` != None
-    *`out` = > table.put in=`out` at="after" value=after*
+    **`out` = > table.put in=`out` at="after" value=after**
 1. `interval` != None
-    *`out` = > table.put in=`out` at="interval" value=interval*
+    **`out` = > table.put in=`out` at="interval" value=interval**
 1. `clear_interval` != None
-    *`out` = > table.put in=`out` at="clear_interval" value=clear_interval*
+    **`out` = > table.put in=`out` at="clear_interval" value=clear_interval**
 1. `focus` != None
-    *`out` = > table.put in=`out` at="focus" value=focus*
+    **`out` = > table.put in=`out` at="focus" value=focus**
 1. `blur` != None
-    *`out` = > table.put in=`out` at="blur" value=blur*
+    **`out` = > table.put in=`out` at="blur" value=blur**
 1. `scroll_into` != None
-    *`out` = > table.put in=`out` at="scroll_into" value=scroll_into*
+    **`out` = > table.put in=`out` at="scroll_into" value=scroll_into**
 1. `canvas` != None
-    *`out` = > table.put in=`out` at="canvas" value=canvas*
+    **`out` = > table.put in=`out` at="canvas" value=canvas**
 1. `audio` != None
-    *`out` = > table.put in=`out` at="audio" value=audio*
+    **`out` = > table.put in=`out` at="audio" value=audio**
 1. `read_file` != None
-    *`out` = > table.put in=`out` at="read_file" value=read_file*
+    **`out` = > table.put in=`out` at="read_file" value=read_file**
 1. `observe` != None
-    *`out` = > table.put in=`out` at="observe" value=observe*
+    **`out` = > table.put in=`out` at="observe" value=observe**
 1. `unobserve` != None
-    *`out` = > table.put in=`out` at="unobserve" value=unobserve*
+    **`out` = > table.put in=`out` at="unobserve" value=unobserve**
 1. `wire` != None
-    *`out` = > table.put in=`out` at="wire" value=wire*
-**out**
+    **`out` = > table.put in=`out` at="wire" value=wire**
+*out*
 
 ## list_html
     + `sel`
@@ -175,10 +175,10 @@ Merge browser effect keys into one return map (omit `None`). Route E/F effects i
 
 Build a `render_list` effect: `{ render_list: { sel: { tag, items } } }`.
 
-*`spec` = > table.put in=None at="tag" value=tag*
-*`spec` = > table.put in=`spec` at="items" value=items*
-*`m` = > table.put in=None at=sel value=spec*
-**> table.put in=None at="render_list" value=m**
+**`spec` = > table.put in=None at="tag" value=tag**
+**`spec` = > table.put in=`spec` at="items" value=items**
+**`m` = > table.put in=None at=sel value=spec**
+*> table.put in=None at="render_list" value=m*
 
 # page
     + `title`="Marqdo Web"
@@ -188,31 +188,31 @@ Build a `render_list` effect: `{ render_list: { sel: { tag, items } } }`.
     + `asset_version`=None
 
 > ensure_plugin
-**> web_page_new title=`title` intro=`intro` shell_css=`shell_css` layout=`layout` asset_version=`asset_version`**
+*> web_page_new title=`title` intro=`intro` shell_css=`shell_css` layout=`layout` asset_version=`asset_version`*
 
 ## shell_css
     + `mode`=full
 
 Framework shell CSS mode for this page: `full` (default), `minimal` (vars only), or `off`/`none`.
 
-*`out` = > table.put in=`self` at="shell_css" value=mode*
-**out**
+**`out` = > table.put in=`self` at="shell_css" value=mode**
+*out*
 
 ## layout
     + `layout`=sidebar
 
 Page chrome layout: `sidebar` (default when a side slot exists), `stacked` (single column; no `has-sidebar` grid), `bare` (main only), or `rail`.
 
-*`out` = > table.put in=`self` at="layout" value=layout*
-**out**
+**`out` = > table.put in=`self` at="layout" value=layout**
+*out*
 
 ## asset_version
     + `version`=""
 
 Default `?v=` bump for head scripts/styles that omit a per-row `version` column.
 
-*`out` = > table.put in=`self` at="asset_version" value=version*
-**out**
+**`out` = > table.put in=`self` at="asset_version" value=version**
+*out*
 
 ## compose_components
     + `components`
@@ -221,14 +221,14 @@ Assemble nav / sidebar / footer from a page table (`|组件|样式|` or `|src|st
 Nav bind tables may include optional `媒体`/`media` (responsive show) and `当`/`when`
 (`auth` / `guest` / `hide`) columns — see C4 conditional nav.
 
-**> web_compose_components page=`self` components=`components`**
+*> web_compose_components page=`self` components=`components`*
 
 ## compose_main
     + `main`
 
 Assemble main from a bind table (`|属性|值|样式|` or `|front|back|css|`).
 
-**> web_compose_main page=`self` main=`main`**
+*> web_compose_main page=`self` main=`main`*
 
 ## query
     + `query`
@@ -236,14 +236,14 @@ Assemble main from a bind table (`|属性|值|样式|` or `|front|back|css|`).
 Attach a DB where-condition map for the main bind. Values may contain `{param}`
 placeholders that are resolved from dynamic-route params (e.g. `/post/{slug}`).
 
-**> web_page_query page=`self` query=`query`**
+*> web_page_query page=`self` query=`query`*
 
 ## order
     + `order`
 
 Set a default `ORDER BY` for the main bind (e.g. `-created_at` for newest first).
 
-**> web_page_order page=`self` order=`order`**
+*> web_page_order page=`self` order=`order`*
 
 ## link_prefix
     + `prefix`
@@ -251,16 +251,16 @@ Set a default `ORDER BY` for the main bind (e.g. `-created_at` for newest first)
 Prefix for card links in the main bind (default `/post/`). Cards whose bind has
 an `href`/`链接` field become `<a href="{prefix}{href}">`.
 
-**> web_page_link_prefix page=`self` prefix=`prefix`**
+*> web_page_link_prefix page=`self` prefix=`prefix`*
 
 ## css
     + `css`
 
-Append a **raw** CSS string to the page's stylesheet (`styles_css`). Skips table-cell
+Append a *raw* CSS string to the page's stylesheet (`styles_css`). Skips table-cell
 expression evaluation — use for themes with `/`, `@keyframes`, or long media queries.
 Hand-written theme alongside the assembled shell; or link `static/theme.css` via `head`.
 
-**> web_page_css page=`self` css=`css`**
+*> web_page_css page=`self` css=`css`*
 
 ## detail
     + `detail`=True
@@ -268,7 +268,7 @@ Hand-written theme alongside the assembled shell; or link `static/theme.css` via
 Render the main bind's first row as a full article (title/meta/tags/body) instead
 of a list of cards. Set on the dynamic post page so `/post/{slug}` shows one post.
 
-**> web_page_detail page=`self` detail=`detail`**
+*> web_page_detail page=`self` detail=`detail`*
 
 ## chrome
     + `nav_html`=""
@@ -277,28 +277,28 @@ of a list of cards. Set on the dynamic post page so `/post/{slug}` shows one pos
 
 Override default header/footer list chrome with raw HTML (site navbar / footer). Optional `body_class` is appended to `<body class>`.
 
-**> web_page_chrome page=`self` nav_html=`nav_html` footer_html=`footer_html` body_class=`body_class`**
+*> web_page_chrome page=`self` nav_html=`nav_html` footer_html=`footer_html` body_class=`body_class`*
 
 ## meta
     + `meta`
 
 SEO / OpenGraph metadata as a data table (`|key|value|`). Keys such as `title`, `description`, `canonical`, `og:type` become `<head>` tags at render time. Special keys `icon` / `favicon` / `apple-touch-icon` emit `<link rel="…">` (not `<meta name>`).
 
-**> web_page_meta page=`self` meta=`meta`**
+*> web_page_meta page=`self` meta=`meta`*
 
 ## head
     + `table`
 
 Assemble `<head>` resources from a GFM table (`|rel|href|type|sizes|media|as|crossorigin|defer|async|version|` or ZH `|关系|地址|…|推迟|异步|版本|`). `rel=script` / `module` become `<script>`; other rows become `<link>`. Classic scripts emit `defer` / `async` only when those columns are true (compat: missing `defer` stays synchronous). Non-empty `version` appends `?v=`; else page/app `asset_version` is used. Merges with any existing `head` on the page.
 
-**> web_page_head page=`self` table=`table`**
+*> web_page_head page=`self` table=`table`*
 
 ## images
     + `table`
 
 Assemble an image table (`|src|alt|title|class|href|width|height|loading|caption|`) into HTML and attach it as `images_html` (rendered in main before intro). Same table shape as module-level `make_images`.
 
-**> web_page_images page=`self` table=`table`**
+*> web_page_images page=`self` table=`table`*
 
 ## paginate
     + `offset`=0
@@ -307,16 +307,16 @@ Assemble an image table (`|src|alt|title|class|href|width|height|loading|caption
 
 List pagination for the main bind: sets DB `limit`/`offset` and renders previous/next navigation.
 
-**> web_page_paginate page=`self` offset=`offset` limit=`limit` path=`path`**
+*> web_page_paginate page=`self` offset=`offset` limit=`limit` path=`path`*
 
 ## compose_form
     + `form`
     + `id`
     + `target`=None
 
-Embed a form into the page main slot. Optional `target` / `form_slot` (CSS id, e.g. `#qd-note-form-mount`) injects the form **inside** that element in `intro` HTML instead of a sibling `.site-form` after `.main-intro` (GAP-11). Missing mount falls back to sibling. `listen` auto-registers `GET|POST /_form/{id}` from page/route forms (optional `app.mount_form`).
+Embed a form into the page main slot. Optional `target` / `form_slot` (CSS id, e.g. `#qd-note-form-mount`) injects the form inside that element in `intro` HTML instead of a sibling `.site-form` after `.main-intro` (GAP-11). Missing mount falls back to sibling. `listen` auto-registers `GET|POST /_form/{id}` from page/route forms (optional `app.mount_form`).
 
-**> web_compose_form page=`self` form=`form` id=`id` target=`target`**
+*> web_compose_form page=`self` form=`form` id=`id` target=`target`*
 
 ## render
     + `db`=None
@@ -324,24 +324,24 @@ Embed a form into the page main slot. Optional `target` / `form_slot` (CSS id, e
 Offline HTML for tests / previews.
 
 1. `db`
-  *url = db[^url]*
-  **> web_render page=`self` url=`url`**
+  **url = db[^url]**
+  *> web_render page=`self` url=`url`*
 2. *
-  **> web_render page=`self`**
+  *> web_render page=`self`*
 
 # style
     + `name`=""
 
 Style tables live as `##` exports in site style modules; compose resolves them by path.
 
-**self**
+*self*
 
 ## process
     + `style`=None
     + `name`=None
     + `path`=None
 
-**self**
+*self*
 
 # db
     + `url`="sqlite:site.db"
@@ -349,7 +349,7 @@ Style tables live as `##` exports in site style modules; compose resolves them b
 Open a database handle. URL schemes: `sqlite:path` (default), `postgres://…` / `postgresql://…` (same CRUD methods).
 
 > ensure_plugin
-**> web_db_new url=`url`**
+*> web_db_new url=`url`*
 
 ## init
     + `name`
@@ -357,16 +357,16 @@ Open a database handle. URL schemes: `sqlite:path` (default), `postgres://…` /
 
 Create a table from a schema table. Optional columns: `唯一`/`unique`, `索引`/`index` (creates UNIQUE / INDEX), `外键`/`fk`/`references` (e.g. `posts.id` or `posts(id)`). Columns named `created_at` / `updated_at` are filled automatically on insert/update when present.
 
-*url = self[^url]*
-**> web_db_init url=`url` name=`name` fields=`fields`**
+**url = self[^url]**
+*> web_db_init url=`url` name=`name` fields=`fields`*
 
 ## insert
     + `table`
     + `rows`
     + `txn`=None
 
-*url = self[^url]*
-**> web_db_insert url=`url` table=`table` rows=`rows` txn=`txn`**
+**url = self[^url]**
+*> web_db_insert url=`url` table=`table` rows=`rows` txn=`txn`*
 
 ## select
     + `table`
@@ -377,9 +377,9 @@ Create a table from a schema table. Optional columns: `唯一`/`unique`, `索引
 
 Simple filters: one-row map of column→value (AND `=`), or rows `|字段|操作|值|` (`=` `!=` `>` `>=` `<` `<=` `like` `in` `between` `is null`; add `|或|` = `是` to join a row with `OR`). `order` is a column name with optional `-` prefix for descending (`"created_at"`, `"-created_at"`), comma-separated for multiple keys. Pass `txn` to read inside an open transaction. For pages (with a total), use `paginate`.
 
-*url = self[^url]*
-*r = > web_db_select url=`url` table=`table` where=`where` limit=`limit` order=`order` offset=None txn=`txn`*
-**r[^rows]**
+**url = self[^url]**
+**r = > web_db_select url=`url` table=`table` where=`where` limit=`limit` order=`order` offset=None txn=`txn`**
+*r[^rows]*
 
 ## paginate
     + `table`
@@ -391,16 +391,16 @@ Simple filters: one-row map of column→value (AND `=`), or rows `|字段|操作
 
 Like `select` but returns `{ rows, total }` — the total counts rows matching `where` regardless of `limit`/`跳过`, so you can render `上一页 / 下一页`. Set `跳过` to the number of rows to skip (e.g. page 2 with 10 per page ⇒ `跳过`=10).
 
-*url = self[^url]*
-**> web_db_select url=`url` table=`table` where=`where` limit=`limit` order=`order` offset=`跳过` txn=`txn`**
+**url = self[^url]**
+*> web_db_select url=`url` table=`table` where=`where` limit=`limit` order=`order` offset=`跳过` txn=`txn`*
 
 ## get
     + `table`
     + `id`
     + `txn`=None
 
-*url = self[^url]*
-**> web_db_get url=`url` table=`table` id=`id` txn=`txn`**
+**url = self[^url]**
+*> web_db_get url=`url` table=`table` id=`id` txn=`txn`*
 
 ## update
     + `table`
@@ -408,24 +408,24 @@ Like `select` but returns `{ rows, total }` — the total counts rows matching `
     + `row`
     + `txn`=None
 
-*url = self[^url]*
-**> web_db_update url=`url` table=`table` id=`id` row=`row` txn=`txn`**
+**url = self[^url]**
+*> web_db_update url=`url` table=`table` id=`id` row=`row` txn=`txn`*
 
 ## delete
     + `table`
     + `id`
     + `txn`=None
 
-*url = self[^url]*
-**> web_db_delete url=`url` table=`table` id=`id` txn=`txn`**
+**url = self[^url]**
+*> web_db_delete url=`url` table=`table` id=`id` txn=`txn`*
 
 ## exec
     + `sql`
     + `args`=None
     + `txn`=None
 
-*url = self[^url]*
-**> web_db_exec url=`url` sql=`sql` args=`args` txn=`txn`**
+**url = self[^url]**
+*> web_db_exec url=`url` sql=`sql` args=`args` txn=`txn`*
 
 ## query
     + `sql`
@@ -434,8 +434,8 @@ Like `select` but returns `{ rows, total }` — the total counts rows matching `
 
 Run bare SQL and return the result set — count / join / group / subqueries. Returns `{ rows, count }`.
 
-*url = self[^url]*
-**> web_db_query url=`url` sql=`sql` args=`args` txn=`txn`**
+**url = self[^url]**
+*> web_db_query url=`url` sql=`sql` args=`args` txn=`txn`*
 
 ## count
     + `table`
@@ -444,17 +444,17 @@ Run bare SQL and return the result set — count / join / group / subqueries. Re
 
 Count rows matching a `where` filter (same syntax as `select`). Returns a number.
 
-*url = self[^url]*
-*r = > web_db_count url=`url` table=`table` where=`where` txn=`txn`*
-**r[^count]**
+**url = self[^url]**
+**r = > web_db_count url=`url` table=`table` where=`where` txn=`txn`**
+*r[^count]*
 
 ## migrate
     + `steps`
 
 Apply versioned SQL migrations. `steps` is a `|version|sql|` / `|版本|SQL|` table. Applied versions are recorded in `_marqdo_migrations`. Re-running is a no-op for already-applied versions. SQLite only.
 
-*url = self[^url]*
-**> web_db_migrate url=`url` steps=`steps`**
+**url = self[^url]**
+*> web_db_migrate url=`url` steps=`steps`*
 
 ## fts
     + `table`
@@ -463,8 +463,8 @@ Apply versioned SQL migrations. `steps` is a `|version|sql|` / `|版本|SQL|` ta
 
 Create an FTS5 index on `table` for the listed content columns (CSV string or list). Default FTS name is `{table}_fts`. Keeps the index in sync via triggers. Requires integer `id` PK. SQLite only.
 
-*url = self[^url]*
-**> web_db_fts_create url=`url` table=`table` columns=`columns` name=`name`**
+**url = self[^url]**
+*> web_db_fts_create url=`url` table=`table` columns=`columns` name=`name`*
 
 ## search
     + `table`
@@ -474,8 +474,8 @@ Create an FTS5 index on `table` for the listed content columns (CSV string or li
 
 Full-text search (`MATCH`) against the FTS5 index from `fts`. Returns `{ rows, count }` with a `rank` column (bm25). SQLite only.
 
-*url = self[^url]*
-**> web_db_search url=`url` table=`table` q=`q` limit=`limit` name=`name`**
+**url = self[^url]**
+*> web_db_search url=`url` table=`table` q=`q` limit=`limit` name=`name`*
 
 ## 事务
 
@@ -483,8 +483,8 @@ Begin a transaction: borrows the pooled connection exclusively and returns a
 `txn` handle. Write inside it, then `提交` (commit) or `回滚` (roll back).
 Every statement runs on the same connection, so a batch is atomic.
 
-*url = self[^url]*
-**> web_db_begin url=`url`**
+**url = self[^url]**
+*> web_db_begin url=`url`*
 
 # txn
     + `txn`
@@ -493,15 +493,15 @@ Every statement runs on the same connection, so a batch is atomic.
 A transaction handle from `db.事务`. All CRUD here runs on the transaction's
 connection; finish with `提交` or `回滚`.
 
-**self**
+*self*
 
 ## insert
     + `table`
     + `rows`
 
-*url = self[^url]*
-*txn = self[^txn]*
-**> web_db_insert url=`url` table=`table` rows=`rows` txn=`txn`**
+**url = self[^url]**
+**txn = self[^txn]**
+*> web_db_insert url=`url` table=`table` rows=`rows` txn=`txn`*
 
 ## select
     + `table`
@@ -511,57 +511,57 @@ connection; finish with `提交` or `回滚`.
 
 Same filters as `db.select`; runs inside the transaction.
 
-*url = self[^url]*
-*txn = self[^txn]*
-*r = > web_db_select url=`url` table=`table` where=`where` limit=`limit` order=`order` offset=None txn=`txn`*
-**r[^rows]**
+**url = self[^url]**
+**txn = self[^txn]**
+**r = > web_db_select url=`url` table=`table` where=`where` limit=`limit` order=`order` offset=None txn=`txn`**
+*r[^rows]*
 
 ## get
     + `table`
     + `id`
 
-*url = self[^url]*
-*txn = self[^txn]*
-**> web_db_get url=`url` table=`table` id=`id` txn=`txn`**
+**url = self[^url]**
+**txn = self[^txn]**
+*> web_db_get url=`url` table=`table` id=`id` txn=`txn`*
 
 ## update
     + `table`
     + `id`
     + `row`
 
-*url = self[^url]*
-*txn = self[^txn]*
-**> web_db_update url=`url` table=`table` id=`id` row=`row` txn=`txn`**
+**url = self[^url]**
+**txn = self[^txn]**
+*> web_db_update url=`url` table=`table` id=`id` row=`row` txn=`txn`*
 
 ## delete
     + `table`
     + `id`
 
-*url = self[^url]*
-*txn = self[^txn]*
-**> web_db_delete url=`url` table=`table` id=`id` txn=`txn`**
+**url = self[^url]**
+**txn = self[^txn]**
+*> web_db_delete url=`url` table=`table` id=`id` txn=`txn`*
 
 ## exec
     + `sql`
     + `args`=None
 
-*url = self[^url]*
-*txn = self[^txn]*
-**> web_db_exec url=`url` sql=`sql` args=`args` txn=`txn`**
+**url = self[^url]**
+**txn = self[^txn]**
+*> web_db_exec url=`url` sql=`sql` args=`args` txn=`txn`*
 
 ## 提交
 
 Commit the transaction and return its connection to the pool.
 
-*txn = self[^txn]*
-**> web_db_commit txn=`txn`**
+**txn = self[^txn]**
+*> web_db_commit txn=`txn`*
 
 ## 回滚
 
 Roll the transaction back (undo every write) and return its connection.
 
-*txn = self[^txn]*
-**> web_db_rollback txn=`txn`**
+**txn = self[^txn]**
+*> web_db_rollback txn=`txn`*
 
 # form
     + `table`=None
@@ -571,37 +571,37 @@ Roll the transaction back (undo every write) and return its connection.
 Field table + rules table; submit writes through `# db`.
 
 > ensure_plugin
-**> web_form_new table=`table` action=`action` id=`id`**
+*> web_form_new table=`table` action=`action` id=`id`*
 
 ## fields
     + `fields`
 
-**> web_form_fields form=`self` fields=`fields`**
+*> web_form_fields form=`self` fields=`fields`*
 
 ## rules
     + `rules`
 
-**> web_form_rules form=`self` rules=`rules`**
+*> web_form_rules form=`self` rules=`rules`*
 
 ## validate
     + `rules`=None
     + `data`
 
-**> web_form_validate form=`self` rules=`rules` data=`data`**
+*> web_form_validate form=`self` rules=`rules` data=`data`*
 
 ## render
     + `id`=form
     + `data`=None
     + `errors`=None
 
-**> web_form_render form=`self` id=`id` data=`data` errors=`errors`**
+*> web_form_render form=`self` id=`id` data=`data` errors=`errors`*
 
 ## submit
     + `data`
     + `db`
 
-*url = db[^url]*
-**> web_form_submit form=`self` data=`data` url=`url`**
+**url = db[^url]**
+*> web_form_submit form=`self` data=`data` url=`url`*
 
 # app
     + `page`
@@ -616,10 +616,10 @@ Field table + rules table; submit writes through `# db`.
     + `layout`=None
     + `asset_version`=None
 
-Construct an app. `admin=True` mounts the built-in CRUD UI under `admin_prefix` (default `/admin`). When `admin=False`, that prefix is **not** reserved — you may `route` your own pages there. Optional `login_redirect` / `logout_redirect` override post-auth landing. Optional `shell_css` / `layout` / `asset_version` become defaults for pages that do not set their own (see `page.shell_css` / `page.layout` / `page.asset_version`).
+Construct an app. `admin=True` mounts the built-in CRUD UI under `admin_prefix` (default `/admin`). When `admin=False`, that prefix is not reserved — you may `route` your own pages there. Optional `login_redirect` / `logout_redirect` override post-auth landing. Optional `shell_css` / `layout` / `asset_version` become defaults for pages that do not set their own (see `page.shell_css` / `page.layout` / `page.asset_version`).
 
 > ensure_plugin
-**> web_app_new page=`page` db=`db` admin=`admin` host=`host` port=`port` admin_prefix=`admin_prefix` login_redirect=`login_redirect` logout_redirect=`logout_redirect` shell_css=`shell_css` layout=`layout` asset_version=`asset_version`**
+*> web_app_new page=`page` db=`db` admin=`admin` host=`host` port=`port` admin_prefix=`admin_prefix` login_redirect=`login_redirect` logout_redirect=`logout_redirect` shell_css=`shell_css` layout=`layout` asset_version=`asset_version`*
 
 ## route
     + `path`
@@ -627,7 +627,7 @@ Construct an app. `admin=True` mounts the built-in CRUD UI under `admin_prefix` 
 
 Mount an assembled page at `path` (e.g. `/about`). `/` is the home `page=`.
 
-**> web_app_route app=`self` path=`path` page=`page`**
+*> web_app_route app=`self` path=`path` page=`page`*
 
 ## mount_form
     + `id`
@@ -635,7 +635,7 @@ Mount an assembled page at `path` (e.g. `/about`). `/` is the home `page=`.
 
 Register `GET|POST /_form/{id}` for listen when the form is not already embedded via `page.compose_form`.
 
-**> web_app_mount_form app=`self` id=`id` form=`form`**
+*> web_app_mount_form app=`self` id=`id` form=`form`*
 
 ## static
     + `dir`
@@ -643,7 +643,7 @@ Register `GET|POST /_form/{id}` for listen when the form is not already embedded
 
 Serve files from `dir` under `mount` (default `/static`). Path is resolved from the process working directory at listen time. If `dir` contains `favicon.ico` / `favicon.png` / `favicon.svg` and `icons` was not set, listen also serves `GET /favicon.ico` and injects a default `<link rel="icon">` on every page.
 
-**> web_app_static app=`self` dir=`dir` mount=`mount`**
+*> web_app_static app=`self` dir=`dir` mount=`mount`*
 
 ## icons
     + `table`
@@ -653,7 +653,7 @@ Register site icons from a GFM table (`|path|rel|type|sizes|url|` or ZH
 `/favicon.ico` for `.ico` icons, else `/icons/{filename}`), and injects matching
 `<link>` tags into every page via `site_head`. See [web-assets-and-images.md](../../doc/design/web-assets-and-images.md).
 
-**> web_app_icons app=`self` table=`table`**
+*> web_app_icons app=`self` table=`table`*
 
 ## configure
     + `cors`=None
@@ -670,7 +670,7 @@ Each capability is declared as a data table and assembled at listen time. The `c
 
 Tables stay as data; `configure` assembles them. 配置即数据、装配即函数.
 
-**> web_app_middleware app=`self` cors=`cors` security=`security` compress=`compress` body_limit=`body_limit` json_routes=`json` access_log=`access_log` cache_control=`cache_control` proxy=`proxy` invoke=`invoke`**
+*> web_app_middleware app=`self` cors=`cors` security=`security` compress=`compress` body_limit=`body_limit` json_routes=`json` access_log=`access_log` cache_control=`cache_control` proxy=`proxy` invoke=`invoke`*
 
 ## proxy
     + `path`
@@ -683,7 +683,7 @@ Tables stay as data; `configure` assembles them. 配置即数据、装配即函�
 
 Same-origin reverse proxy to an upstream HTTP(S) URL. When `stream` is True (default), the response body — including `text/event-stream` SSE — is piped without buffering the full payload, and responses include `Cache-Control: no-cache, no-transform` plus `X-Accel-Buffering: no` for Nginx/CDN. `upstream` may contain `$ENV` / `${ENV}`. `headers_from_env` is `ENV=Header-Name` (comma-separated); secrets stay on the server. Prefer this over a side Python LLM proxy.
 
-**> web_app_proxy app=`self` path=`path` upstream=`upstream` stream=`stream` strip_prefix=`strip_prefix` methods=`methods` headers_from_env=`headers_from_env` timeout_ms=`timeout_ms`**
+*> web_app_proxy app=`self` path=`path` upstream=`upstream` stream=`stream` strip_prefix=`strip_prefix` methods=`methods` headers_from_env=`headers_from_env` timeout_ms=`timeout_ms`*
 
 ## invoke
     + `path`
@@ -694,13 +694,13 @@ Same-origin reverse proxy to an upstream HTTP(S) URL. When `stream` is True (def
 
 Call a user `##` on each HTTP request. `fn` must be `lib.member` imported on the entry module. `body` is `json` / `form` / `query` / `raw`; object keys map to named params (plus `payload`). Returns JSON by default.
 
-**> web_app_invoke app=`self` path=`path` method=`method` fn=`fn` body=`body` return=`return`**
+*> web_app_invoke app=`self` path=`path` method=`method` fn=`fn` body=`body` return=`return`*
 
 ## listen
 
 Serve `/`, routed pages, `/_part/{id}` (home) and `{path}/_part/{id}` (routes), `/_form/{id}` (from mounts + page embeds), optional `/static` (or custom mount), optional `/admin`, upload/download/WebSocket/RSS/sitemap/robots routes, redirects, proxy/invoke routes, and a custom 404 fallback. Production HTTPS should terminate at a reverse proxy; set `cookie_secure=True` when serving over TLS.
 
-**> web_listen app=`self`**
+*> web_listen app=`self`*
 
 ## route_ws
     + `path`
@@ -709,7 +709,7 @@ Serve `/`, routed pages, `/_part/{id}` (home) and `{path}/_part/{id}` (routes), 
 
 Register a WebSocket endpoint at `path` (e.g. `/live`). `mode` is `echo` (default), `broadcast` (fan-out text to all sockets on this path), or `drain`. Legacy `echo=False` maps to `drain`. Connect from a client with `web.ws.connect`.
 
-**> web_app_route_ws app=`self` path=`path` echo=`echo` mode=`mode`**
+*> web_app_route_ws app=`self` path=`path` echo=`echo` mode=`mode`*
 
 ## auth
     + `users`
@@ -719,9 +719,9 @@ Register a WebSocket endpoint at `path` (e.g. `/live`). `mode` is `echo` (defaul
     + `logout_redirect`=None
     + `login_path`=None
 
-Keep the app's `admin=True`, and gate `{admin_prefix}` (segment-boundary prefix) behind a login page (default `/admin`). Unauthenticated requests **redirect** to `login_path` (default `{admin_prefix}/login`, auto-excluded). Does **not** match `/admin-publish`-style siblings.
+Keep the app's `admin=True`, and gate `{admin_prefix}` (segment-boundary prefix) behind a login page (default `/admin`). Unauthenticated requests redirect to `login_path` (default `{admin_prefix}/login`, auto-excluded). Does not match `/admin-publish`-style siblings.
 
-**> web_app_auth app=`self` users=`users` session_ttl=`session_ttl` admin_prefix=`admin_prefix` login_redirect=`login_redirect` logout_redirect=`logout_redirect` login_path=`login_path`**
+*> web_app_auth app=`self` users=`users` session_ttl=`session_ttl` admin_prefix=`admin_prefix` login_redirect=`login_redirect` logout_redirect=`logout_redirect` login_path=`login_path`*
 
 ## gate
     + `path`
@@ -732,7 +732,7 @@ Keep the app's `admin=True`, and gate `{admin_prefix}` (segment-boundary prefix)
 
 Require one of `roles` (CSV) for `path`. `match=prefix` uses segment boundaries; `exact` is equality. Trailing `*` on `path` means prefix. `on_deny=redirect` sends visitors to `login_path` (with `?next=`); `forbid` returns 403. `exclude` is CSV or list of open paths.
 
-**> web_app_gate app=`self` path=`path` roles=`roles` match=`match` on_deny=`on_deny` exclude=`exclude`**
+*> web_app_gate app=`self` path=`path` roles=`roles` match=`match` on_deny=`on_deny` exclude=`exclude`*
 
 ## gallery
     + `path`=/gallery
@@ -743,7 +743,7 @@ Require one of `roles` (CSV) for `path`. `match=prefix` uses segment boundaries;
 
 Serve an HTML media gallery listing objects under `prefix` in `storage`, linking through `download_base`.
 
-**> web_app_gallery app=`self` path=`path` storage=`storage` prefix=`prefix` title=`title` download_base=`download_base`**
+*> web_app_gallery app=`self` path=`path` storage=`storage` prefix=`prefix` title=`title` download_base=`download_base`*
 
 ## route_rss
     + `path`
@@ -756,7 +756,7 @@ Serve an HTML media gallery listing objects under `prefix` in `storage`, linking
 
 Register an RSS 2.0 feed at `path` (e.g. `/feed.xml`) backed by a DB table.
 
-**> web_app_route_rss app=`self` path=`path` table=`table` limit=`limit` order=`order` title=`title` link=`link` description=`description`**
+*> web_app_route_rss app=`self` path=`path` table=`table` limit=`limit` order=`order` title=`title` link=`link` description=`description`*
 
 ## redirect
     + `from`
@@ -765,7 +765,7 @@ Register an RSS 2.0 feed at `path` (e.g. `/feed.xml`) backed by a DB table.
 
 Register a redirect from `from` to `to`. `permanent=True` issues HTTP 301; otherwise 307.
 
-**> web_app_redirect app=`self` from=`from` to=`to` permanent=`permanent`**
+*> web_app_redirect app=`self` from=`from` to=`to` permanent=`permanent`*
 
 ## error_page
     + `status`=404
@@ -773,7 +773,7 @@ Register a redirect from `from` to `to`. `permanent=True` issues HTTP 301; other
 
 Bind an assembled page for HTTP `404` or `500` responses.
 
-**> web_app_error_page app=`self` status=`status` page=`page`**
+*> web_app_error_page app=`self` status=`status` page=`page`*
 
 ## sitemap
     + `path`=/sitemap.xml
@@ -785,7 +785,7 @@ Bind an assembled page for HTTP `404` or `500` responses.
 
 Serve `sitemap.xml`. Prefer `table` + `loc` column from the DB, or pass an `items` table with `loc`/`路径` rows.
 
-**> web_app_sitemap app=`self` path=`path` base=`base` table=`table` loc=`loc` limit=`limit` items=`items`**
+*> web_app_sitemap app=`self` path=`path` base=`base` table=`table` loc=`loc` limit=`limit` items=`items`*
 
 ## robots
     + `body`=None
@@ -793,7 +793,7 @@ Serve `sitemap.xml`. Prefer `table` + `loc` column from the DB, or pass an `item
 
 Serve `/robots.txt`. Omit `body` to emit a default Allow-all file, optionally with a `Sitemap:` line.
 
-**> web_app_robots app=`self` body=`body` sitemap=`sitemap`**
+*> web_app_robots app=`self` body=`body` sitemap=`sitemap`*
 
 ## upload
     + `path`=/_upload
@@ -805,7 +805,7 @@ Serve `/robots.txt`. Omit `body` to emit a default Allow-all file, optionally wi
 
 Mount `POST path` for multipart file upload. `storage` is a `# storage` handle or `file:…` / `s3://…` URL. Optional `types` is a `|type|ext|` / `|类型|扩展名|` allowlist (or a MIME CSV string). Success returns JSON `{ok,key,size,content_type}`.
 
-**> web_app_upload app=`self` path=`path` field=`field` storage=`storage` prefix=`prefix` max_bytes=`max_bytes` types=`types`**
+*> web_app_upload app=`self` path=`path` field=`field` storage=`storage` prefix=`prefix` max_bytes=`max_bytes` types=`types`*
 
 ## download
     + `path`=/_media/{*key}
@@ -814,7 +814,7 @@ Mount `POST path` for multipart file upload. `storage` is a `# storage` handle o
 
 Mount `GET path` to stream an object. Path must capture `key` (use `{*key}` for nested keys). `disposition` is `attachment` or `inline`.
 
-**> web_app_download app=`self` path=`path` storage=`storage` disposition=`disposition`**
+*> web_app_download app=`self` path=`path` storage=`storage` disposition=`disposition`*
 
 # auth
     + `users`
@@ -823,7 +823,7 @@ Mount `GET path` to stream an object. Path must capture `key` (use `{*key}` for 
 Session/auth helper. Constructs a config object; `login` validates against the users table. To gate `/admin` on this app, use `app.auth users=…` instead.
 
 > ensure_plugin
-**> web_auth_new users=`users` session_ttl=`session_ttl`**
+*> web_auth_new users=`users` session_ttl=`session_ttl`*
 
 ## login
     + `username`
@@ -831,30 +831,30 @@ Session/auth helper. Constructs a config object; `login` validates against the u
 
 Validate credentials against the users table and create a session. Returns `{ok, session_id, username, role}`.
 
-*users = self[^users]*
-*ttl = self[^session_ttl]*
-**> web_auth_login username=`username` password=`password` users=`users` session_ttl=`ttl`**
+**users = self[^users]**
+**ttl = self[^session_ttl]**
+*> web_auth_login username=`username` password=`password` users=`users` session_ttl=`ttl`*
 
 ## check
     + `session_id`
 
 Returns `{ok, username, role}` when the session is valid.
 
-**> web_auth_check session_id=`session_id`**
+*> web_auth_check session_id=`session_id`*
 
 ## logout
     + `session_id`
 
 Destroy the session.
 
-**> web_auth_logout session_id=`session_id`**
+*> web_auth_logout session_id=`session_id`*
 
 ## hash_password
     + `password`
 
 Hash a plaintext password for storage in admin user tables (argon2id). Store the returned `hash` in the `password` column; login verifies automatically.
 
-**> web_password_hash password=`password`**
+*> web_password_hash password=`password`*
 
 # cache
     + `url`="memory:"
@@ -862,13 +862,13 @@ Hash a plaintext password for storage in admin user tables (argon2id). Store the
 Key–value cache. Use `memory:` for in-process (tests / single process) or `redis://host:6379/0` for Redis.
 
 > ensure_plugin
-**> web_cache_new url=`url`**
+*> web_cache_new url=`url`*
 
 ## get
     + `key`
 
-*url = self[^url]*
-**> web_cache_get url=`url` key=`key`**
+**url = self[^url]**
+*> web_cache_get url=`url` key=`key`*
 
 ## set
     + `key`
@@ -877,26 +877,26 @@ Key–value cache. Use `memory:` for in-process (tests / single process) or `red
 
 Optional `ttl` is seconds until expiry.
 
-*url = self[^url]*
-**> web_cache_set url=`url` key=`key` value=`value` ttl=`ttl`**
+**url = self[^url]**
+*> web_cache_set url=`url` key=`key` value=`value` ttl=`ttl`*
 
 ## del
     + `key`
 
-*url = self[^url]*
-**> web_cache_del url=`url` key=`key`**
+**url = self[^url]**
+*> web_cache_del url=`url` key=`key`*
 
 ## exists
     + `key`
 
-*url = self[^url]*
-**> web_cache_exists url=`url` key=`key`**
+**url = self[^url]**
+*> web_cache_exists url=`url` key=`key`*
 
 ## ttl
     + `key`
 
-*url = self[^url]*
-**> web_cache_ttl url=`url` key=`key`**
+**url = self[^url]**
+*> web_cache_ttl url=`url` key=`key`*
 
 # storage
     + `url`="file:data/blobs"
@@ -904,7 +904,7 @@ Optional `ttl` is seconds until expiry.
 Object storage. `file:dir` stores blobs on disk (offline / gold). `s3://bucket?endpoint=http://127.0.0.1:9000&access_key=…&secret_key=…` talks to MinIO / S3.
 
 > ensure_plugin
-**> web_storage_new url=`url`**
+*> web_storage_new url=`url`*
 
 ## put
     + `key`
@@ -914,26 +914,26 @@ Object storage. `file:dir` stores blobs on disk (offline / gold). `s3://bucket?e
 
 Provide either `body` (text) or `path` (local file to upload).
 
-*url = self[^url]*
-**> web_storage_put url=`url` key=`key` body=`body` path=`path` content_type=`content_type`**
+**url = self[^url]**
+*> web_storage_put url=`url` key=`key` body=`body` path=`path` content_type=`content_type`*
 
 ## get
     + `key`
 
-*url = self[^url]*
-**> web_storage_get url=`url` key=`key`**
+**url = self[^url]**
+*> web_storage_get url=`url` key=`key`*
 
 ## delete
     + `key`
 
-*url = self[^url]*
-**> web_storage_delete url=`url` key=`key`**
+**url = self[^url]**
+*> web_storage_delete url=`url` key=`key`*
 
 ## list
     + `prefix`=""
 
-*url = self[^url]*
-**> web_storage_list url=`url` prefix=`prefix`**
+**url = self[^url]**
+*> web_storage_list url=`url` prefix=`prefix`*
 
 # media
     + `storage`=None
@@ -941,7 +941,7 @@ Provide either `body` (text) or `path` (local file to upload).
 Offline helpers for upload validation and saving into `# storage` (also used by HTTP `app.upload`).
 
 > ensure_plugin
-**> web_media_new storage=`storage`**
+*> web_media_new storage=`storage`*
 
 ## validate
     + `filename`
@@ -950,7 +950,7 @@ Offline helpers for upload validation and saving into `# storage` (also used by 
     + `max_bytes`=5242880
     + `types`=None
 
-**> web_upload_validate filename=`filename` content_type=`content_type` size=`size` max_bytes=`max_bytes` types=`types`**
+*> web_upload_validate filename=`filename` content_type=`content_type` size=`size` max_bytes=`max_bytes` types=`types`*
 
 ## save
     + `path`
@@ -959,12 +959,12 @@ Offline helpers for upload validation and saving into `# storage` (also used by 
     + `prefix`=uploads/
     + `storage`=None
 
-*st = storage*
+**st = storage**
 1. `st` == None
-  *st = self[^storage]*
+  **st = self[^storage]**
 2. *
 
-**> web_upload_save storage=`st` path=`path` key=`key` content_type=`content_type` prefix=`prefix`**
+*> web_upload_save storage=`st` path=`path` key=`key` content_type=`content_type` prefix=`prefix`*
 
 # ws
     + `timeout_sec`=30
@@ -978,7 +978,7 @@ WebSocket client helper.
 |-------------|-------|
 | `timeout_sec` | ws |
 
-**out**
+*out*
 
 ## connect
     + `url`
@@ -987,5 +987,5 @@ WebSocket client helper.
 
 Single request–response: connect to `url`, send `message`, collect all server text replies, close. Returns `{ok, messages}`.
 
-*timeout = self[^timeout_sec]*
-**> web_ws_connect url=`url` message=`message` headers=`headers` timeout_sec=`timeout`**
+**timeout = self[^timeout_sec]**
+*> web_ws_connect url=`url` message=`message` headers=`headers` timeout_sec=`timeout`*

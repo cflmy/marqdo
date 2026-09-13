@@ -11,9 +11,9 @@ Integrity digests and cryptographic tokens stay in `lib/` — do not use `math.r
 
 # main
 
-*`d` = > hash.sha256 text="marqdo"*
-*`t` = > sec.token_hex n=8*
-*`L` = > len `t`*
+**`d` = > hash.sha256 text="marqdo"**
+**`t` = > sec.token_hex n=8**
+**`L` = > len `t`**
 > print text=`d`
 > print text=`L`
 1. `L` == 16

@@ -7,7 +7,7 @@ import table:lib/table.mq.md
 
 # main
 
-*`count` = 0*
+**`count` = 0**
 
 `wire` =
 
@@ -16,15 +16,15 @@ import table:lib/table.mq.md
 | 1 | "#bump" | click | bump |
 | 2 | "#reset" | click | reset |
 
-*`ready` = > browser.set_text sel="#log" text="client.mq.md ready"*
-*`boot` = > table.put in=None at="wire" value=wire*
-**> browser.merge a=boot b=ready**
+**`ready` = > browser.set_text sel="#log" text="client.mq.md ready"**
+**`boot` = > table.put in=None at="wire" value=wire**
+*> browser.merge a=boot b=ready*
 
 ## bump
-*`count` = count + 1*
-*`label` = > str count*
-**> browser.set_text sel="#count" text=label**
+**`count` = count + 1**
+**`label` = > str count**
+*> browser.set_text sel="#count" text=label*
 
 ## reset
-*`count` = 0*
-**> browser.set_text sel="#count" text="0"**
+**`count` = 0**
+*> browser.set_text sel="#count" text="0"*

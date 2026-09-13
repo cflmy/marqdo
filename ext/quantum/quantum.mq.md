@@ -10,7 +10,7 @@ import json:lib/json.mq.md
 
 Load the ABI v2 `quantum` plugin once.
 
-*p = > plugin.native_path name="quantum"*
+**p = > plugin.native_path name="quantum"**
 1. `p`
   > plugin.load path=`p`
 2. *
@@ -25,7 +25,7 @@ Load the ABI v2 `quantum` plugin once.
 Tensor product of two states or square matrices.
 
 > ensure_plugin
-**> quantum_kron a=`a` b=`b`**
+*> quantum_kron a=`a` b=`b`*
 
 ## schmidt
     + `state`
@@ -34,7 +34,7 @@ Tensor product of two states or square matrices.
 Schmidt decomposition of a pure state / circuit across `cut` (subsystem A = low qubits).
 
 > ensure_plugin
-**> quantum_schmidt state=`state` cut=`cut`**
+*> quantum_schmidt state=`state` cut=`cut`*
 
 ## fidelity
     + `a`
@@ -43,7 +43,7 @@ Schmidt decomposition of a pure state / circuit across `cut` (subsystem A = low 
 Pure-state fidelity |⟨a|b⟩|².
 
 > ensure_plugin
-**> quantum_fidelity a=`a` b=`b`**
+*> quantum_fidelity a=`a` b=`b`*
 
 # circuit
     + `qubits`=1
@@ -52,98 +52,98 @@ Pure-state fidelity |⟨a|b⟩|².
 State-vector circuit (default |0…0⟩). Optional `steps=` gate table (column or row records). Methods append gates and return an updated handle.
 
 > ensure_plugin
-**> quantum_circuit_new qubits=`qubits` steps=`steps`**
+*> quantum_circuit_new qubits=`qubits` steps=`steps`*
 
 ## h
     + `qubit`=0
 
-**> quantum_h circuit=`self` qubit=`qubit`**
+*> quantum_h circuit=`self` qubit=`qubit`*
 
 ## x
     + `qubit`=0
 
-**> quantum_x circuit=`self` qubit=`qubit`**
+*> quantum_x circuit=`self` qubit=`qubit`*
 
 ## y
     + `qubit`=0
 
-**> quantum_y circuit=`self` qubit=`qubit`**
+*> quantum_y circuit=`self` qubit=`qubit`*
 
 ## z
     + `qubit`=0
 
-**> quantum_z circuit=`self` qubit=`qubit`**
+*> quantum_z circuit=`self` qubit=`qubit`*
 
 ## s
     + `qubit`=0
 
-**> quantum_s circuit=`self` qubit=`qubit`**
+*> quantum_s circuit=`self` qubit=`qubit`*
 
 ## t
     + `qubit`=0
 
-**> quantum_t circuit=`self` qubit=`qubit`**
+*> quantum_t circuit=`self` qubit=`qubit`*
 
 ## i
     + `qubit`=0
 
-**> quantum_i circuit=`self` qubit=`qubit`**
+*> quantum_i circuit=`self` qubit=`qubit`*
 
 ## rx
     + `qubit`=0
     + `theta`
 
-**> quantum_rx circuit=`self` qubit=`qubit` theta=`theta`**
+*> quantum_rx circuit=`self` qubit=`qubit` theta=`theta`*
 
 ## ry
     + `qubit`=0
     + `theta`
 
-**> quantum_ry circuit=`self` qubit=`qubit` theta=`theta`**
+*> quantum_ry circuit=`self` qubit=`qubit` theta=`theta`*
 
 ## rz
     + `qubit`=0
     + `theta`
 
-**> quantum_rz circuit=`self` qubit=`qubit` theta=`theta`**
+*> quantum_rz circuit=`self` qubit=`qubit` theta=`theta`*
 
 ## cx
     + `control`=0
     + `target`=1
 
-**> quantum_cx circuit=`self` control=`control` target=`target`**
+*> quantum_cx circuit=`self` control=`control` target=`target`*
 
 ## cz
     + `control`=0
     + `target`=1
 
-**> quantum_cz circuit=`self` control=`control` target=`target`**
+*> quantum_cz circuit=`self` control=`control` target=`target`*
 
 ## swap
     + `a`=0
     + `b`=1
 
-**> quantum_swap circuit=`self` a=`a` b=`b`**
+*> quantum_swap circuit=`self` a=`a` b=`b`*
 
 ## barrier
 
 Visual separator only (no state change).
 
-**> quantum_barrier circuit=`self`**
+*> quantum_barrier circuit=`self`*
 
 ## measure
     + `qubits`=None
 
 Mark computational-basis readout (`None` / empty = all qubits). Affects which bits `run` reports.
 
-**> quantum_measure circuit=`self` qubits=`qubits`**
+*> quantum_measure circuit=`self` qubits=`qubits`*
 
 ## append
     + `op`
 
 Append another circuit's ops or a `{gate,qubits}` op map.
 
-**> quantum_append circuit=`self` op=`op`**
+*> quantum_append circuit=`self` op=`op`*
 
 ## apply
     + `gate`
@@ -151,7 +151,7 @@ Append another circuit's ops or a `{gate,qubits}` op map.
 
 Apply a gate handle (named or custom `matrix=`) on `qubits` (int or list).
 
-**> quantum_apply circuit=`self` gate=`gate` qubits=`qubits`**
+*> quantum_apply circuit=`self` gate=`gate` qubits=`qubits`*
 
 ## noise
     + `kind`
@@ -159,25 +159,25 @@ Apply a gate handle (named or custom `matrix=`) on `qubits` (int or list).
 
 Teaching noise for `run` trajectories (`bitflip` / `depolarizing` / `amplitude_damping`). Ignored by `simulate` / `probabilities`.
 
-**> quantum_noise circuit=`self` kind=`kind` p=`p`**
+*> quantum_noise circuit=`self` kind=`kind` p=`p`*
 
 ## simulate
 
 Return state vector amplitudes `{re,im}` (ideal; no noise).
 
-**> quantum_simulate circuit=`self`**
+*> quantum_simulate circuit=`self`*
 
 ## state
 
 Ideal state vector (same amplitudes as `simulate`).
 
-**> quantum_state circuit=`self`**
+*> quantum_state circuit=`self`*
 
 ## probabilities
 
 Return map of basis label → probability (qubit 0 = rightmost bit). Ideal; ignores noise.
 
-**> quantum_probabilities circuit=`self`**
+*> quantum_probabilities circuit=`self`*
 
 ## run
     + `shots`=1024
@@ -185,7 +185,7 @@ Return map of basis label → probability (qubit 0 = rightmost bit). Ideal; igno
 
 Sample computational-basis shots (deterministic with `seed=`). Applies circuit `noise` if set.
 
-**> quantum_run circuit=`self` shots=`shots` seed=`seed`**
+*> quantum_run circuit=`self` shots=`shots` seed=`seed`*
 
 ## draw
     + `path`=None
@@ -195,27 +195,27 @@ Sample computational-basis shots (deterministic with `seed=`). Applies circuit `
 
 Circuit rail / probability bars / Bloch / advanced state plots (`kind=circuit|probs|bloch|hinton|city|density|paulivec|qsphere|multibloch`). Theme `dark` (default tech lab) / `light` / `bw`. Records into view/CLI plots via host `record_plot`.
 
-**> quantum_draw_circuit circuit=`self` path=`path` kind=`kind` qubit=`qubit` theme=`theme`**
+*> quantum_draw_circuit circuit=`self` path=`path` kind=`kind` qubit=`qubit` theme=`theme`*
 
 ## density
 
 Pure-state density matrix ρ=|ψ⟩⟨ψ| after ideal simulate.
 
-**> density state=`self`**
+*> density state=`self`*
 
 ## expect
     + `obs`
 
 Pauli string (left = high bit) or matrix expectation on the ideal state.
 
-**> quantum_density_expect density=`self` obs=`obs`**
+*> quantum_density_expect density=`self` obs=`obs`*
 
 ## schmidt
     + `cut`=1
 
 Schmidt / singular values across a bipartition (`cut` = qubits in subsystem A, low bits).
 
-**> quantum_schmidt state=`self` cut=`cut`**
+*> quantum_schmidt state=`self` cut=`cut`*
 
 # gate
     + `name`=None
@@ -225,17 +225,17 @@ Schmidt / singular values across a bipartition (`cut` = qubits in subsystem A, l
 Named built-in gate (`name=H`) or custom unitary from `matrix=` (nested list or formula matrix fence). Optional `name=` label for custom gates (default `U`).
 
 > ensure_plugin
-**> quantum_gate_new name=`name` theta=`theta` matrix=`matrix`**
+*> quantum_gate_new name=`name` theta=`theta` matrix=`matrix`*
 
 ## matrix
 
-**> quantum_gate_matrix gate=`self`**
+*> quantum_gate_matrix gate=`self`*
 
 ## matches_matrix
     + `matrix`
     + `tol`=0.000000001
 
-**> quantum_gate_matches_matrix gate=`self` matrix=`matrix` tol=`tol`**
+*> quantum_gate_matches_matrix gate=`self` matrix=`matrix` tol=`tol`*
 
 ## draw
     + `path`=None
@@ -243,7 +243,7 @@ Named built-in gate (`name=H`) or custom unitary from `matrix=` (nested list or 
 
 Gate glyph or complex-matrix heatmap (`kind=gate|matrix`). Records via host `record_plot`.
 
-**> quantum_gate_draw gate=`self` path=`path` kind=`kind`**
+*> quantum_gate_draw gate=`self` path=`path` kind=`kind`*
 
 # density
     + `state`=None
@@ -253,37 +253,37 @@ Density matrix from a state/circuit (`state=`) or an explicit Hermitian `matrix=
 
 > ensure_plugin
 1. `matrix`
-  **> quantum_density_from_matrix matrix=`matrix`**
+  *> quantum_density_from_matrix matrix=`matrix`*
 2. *
-  **> quantum_density_from_state state=`state`**
+  *> quantum_density_from_state state=`state`*
 
 ## matrix
 
-**> quantum_density_matrix density=`self`**
+*> quantum_density_matrix density=`self`*
 
 ## purity
 
 Tr(ρ²).
 
-**> quantum_density_purity density=`self`**
+*> quantum_density_purity density=`self`*
 
 ## partial_trace
     + `keep`
 
 Keep listed qubits (LSB=0); trace out the rest.
 
-**> quantum_density_partial_trace density=`self` keep=`keep`**
+*> quantum_density_partial_trace density=`self` keep=`keep`*
 
 ## eig
 
 Hermitian spectrum → `{eigenvalues, eigenvectors}`.
 
-**> quantum_density_eig density=`self`**
+*> quantum_density_eig density=`self`*
 
 ## expect
     + `obs`
 
-**> quantum_density_expect density=`self` obs=`obs`**
+*> quantum_density_expect density=`self` obs=`obs`*
 
 ## draw
     + `path`=None
@@ -291,4 +291,4 @@ Hermitian spectrum → `{eigenvalues, eigenvectors}`.
 
 Hinton / city / density-cells / Pauli vector SVG (`kind=hinton` or city or density or paulivec).
 
-**> quantum_density_draw density=`self` path=`path` kind=`kind`**
+*> quantum_density_draw density=`self` path=`path` kind=`kind`*

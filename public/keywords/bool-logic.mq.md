@@ -7,15 +7,15 @@ description: True / False / None and and / or / not
 
 Keywords: `True`, `False`, `None`, and `and` / `or` / `not`.
 
-*`a` = True*
-*`b` = False*
+**`a` = True**
+**`b` = False**
 
 1. `a` and not `b`
   > print text=ok
 2. *
   > print text=fail
 
-*`probe` = 1*
+**`probe` = 1**
 
 1. None
   > print text=none-truthy

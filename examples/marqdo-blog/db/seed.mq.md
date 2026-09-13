@@ -13,7 +13,7 @@
 | 5 | 会话与登录鉴权 | session-auth | 后台用 session 门禁保护，只有登录用户能发布文章。 | 用 app.鉴权 配置管理员用户表，/admin 下的 CRUD 页面都需要有效会话。 | web | 2026-08-18 | 2026-08-20 |
 | 6 | 数据库与 CRUD | database-crud | 博客的文章、标签、关联全部由 SQLite 支撑。 | db.初始化 建表、db.插入 写种子、后台表单增删改。文章与标签通过 post_tags 关联。 | database | 2026-08-20 | 2026-08-21 |
 
-**`posts`**
+*`posts`*
 
 ## tags
 
@@ -29,7 +29,7 @@
 | 4 | 数据库 | database |
 | 5 | 实时 | realtime |
 
-**`tags`**
+*`tags`*
 
 ## post_tags
 
@@ -50,4 +50,4 @@
 | 9 | 6 | 4 |
 | 10 | 6 | 1 |
 
-**`post_tags`**
+*`post_tags`*

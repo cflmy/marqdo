@@ -5,9 +5,9 @@ import net:lib/net.mq.md
 
 # main
 
-*req = > net.cookie_parse text="session=abc123; theme=dark"*
+**req = > net.cookie_parse text="session=abc123; theme=dark"**
 
-*resp = > net.cookie_parse text="id=42; Path=/; HttpOnly; Secure; SameSite=Lax, theme=light; Max-Age=3600" is_response=True*
+**resp = > net.cookie_parse text="id=42; Path=/; HttpOnly; Secure; SameSite=Lax, theme=light; Max-Age=3600" is_response=True**
 
 > print text=`req`[^1][^name]
 > print text=`req`[^1][^value]

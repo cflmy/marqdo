@@ -15,7 +15,7 @@
 | created_at | text | true |
 | updated_at | text | true |
 
-**`schema`**
+*`schema`*
 
 ## tags
 
@@ -29,7 +29,7 @@
 | name | text | false |
 | slug | text | false |
 
-**`tags`**
+*`tags`*
 
 ## post_tags
 
@@ -43,4 +43,4 @@
 | post_id | integer | false |
 | tag_id | integer | false |
 
-**`post_tags`**
+*`post_tags`*

@@ -7,18 +7,18 @@ import enc:lib/encoding.mq.md
 
 # main
 
-*cfg = > toml.parse text="name = \"marqdo\"\ncount = 2\n[pkg]\nver = \"1\"\n"*
+**cfg = > toml.parse text="name = \"marqdo\"\ncount = 2\n[pkg]\nver = \"1\"\n"**
 > print text=`cfg`[^name]
 > print text=`cfg`[^count]
-*pkg = `cfg`[^pkg]*
+**pkg = `cfg`[^pkg]**
 > print text=`pkg`[^ver]
 
-*e = > html.escape text="a<b>&\"c'"*
+**e = > html.escape text="a<b>&\"c'"**
 > print text=`e`
-*u = > html.unescape text=`e`*
+**u = > html.unescape text=`e`**
 > print text=`u`
 
-*b = > enc.base32_encode text="hello"*
+**b = > enc.base32_encode text="hello"**
 > print text=`b`
-*back = > enc.base32_decode text=`b`*
+**back = > enc.base32_decode text=`b`**
 > print text=`back`

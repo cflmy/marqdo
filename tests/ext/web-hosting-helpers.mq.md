@@ -11,8 +11,8 @@ import web:ext/web/web.mq.md
 Nested plugin call (`web.page`) while `app.listen` is the outer plugin frame —
 must not clear GLOBAL_HOST so a second HTTP invoke still works.
 
-*pg = > web.page title=`msg`*
-*title = pg[^title]*
+**pg = > web.page title=`msg`**
+**title = pg[^title]**
 
 `out` =
 
@@ -20,4 +20,4 @@ must not clear GLOBAL_HOST so a second HTTP invoke still works.
 |----|-----|-------|
 | true | `msg` | `title` |
 
-**out**
+*out*

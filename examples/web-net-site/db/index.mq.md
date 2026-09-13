@@ -7,13 +7,13 @@ import articles:articles.mq.md
 
 ## open
 
-*store = > web.db url="sqlite:data/site-net.db"*
-*fields = > articles.schema*
+**store = > web.db url="sqlite:data/site-net.db"**
+**fields = > articles.schema**
 > `store`.init name=articles fields=`fields`
-*rows = > store.select table="articles" limit=1*
+**rows = > store.select table="articles" limit=1**
 1. `rows`
-  **store**
+  *store*
 2. *
-  *seed = > articles.seed*
+  **seed = > articles.seed**
   > `store`.insert table=articles rows=`seed`
-  **store**
+  *store*

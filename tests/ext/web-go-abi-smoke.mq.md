@@ -6,11 +6,11 @@ import plugin:lib/plugin.mq.md
 
 # main
 
-*p = "../../plugins/web/build/libweb.so"*
+**p = "../../plugins/web/build/libweb.so"**
 > plugin.load path=`p`
 
-*r = > web_go_ready*
+**r = > web_go_ready**
 > print text=`r`
 
-*page = > web_page_new title="Go Web" intro="W-G0" shell_css="" layout="" asset_version=""*
+**page = > web_page_new title="Go Web" intro="W-G0" shell_css="" layout="" asset_version=""**
 > print text=`page`

@@ -14,17 +14,17 @@ import sys:lib/sys.mq.md
 | Home | / |
 | Desk | /desk |
 
-*页 = > web.page title="c2" shell_css="off" layout="stacked"*
-*页 = > json.set map=`页` key="nav" value=`链`*
-*页 = > json.set map=`页` key="sidebar" value=`链`*
-*html = > `页`.render*
+**页 = > web.page title="c2" shell_css="off" layout="stacked"**
+**页 = > json.set map=`页` key="nav" value=`链`**
+**页 = > json.set map=`页` key="sidebar" value=`链`**
+**html = > `页`.render**
 
-*a = > split value=`html` sep="layout-stacked"*
-*na = > len value=`a`*
-*b = > split value=`html` sep="has-sidebar"*
-*nb = > len value=`b`*
-*c = > split value=`html` sep="grid-template-columns:14rem"*
-*nc = > len value=`c`*
+**a = > split value=`html` sep="layout-stacked"**
+**na = > len value=`a`**
+**b = > split value=`html` sep="has-sidebar"**
+**nb = > len value=`b`**
+**c = > split value=`html` sep="grid-template-columns:14rem"**
+**nc = > len value=`c`**
 1. `na` > 1
   1. `nb` == 1
     1. `nc` == 1
@@ -39,14 +39,14 @@ import sys:lib/sys.mq.md
   > print text=stacked-missing
   > sys.exit code=1
 
-*裸 = > web.page title="bare" layout="bare" shell_css="minimal"*
-*裸 = > json.set map=`裸` key="nav" value=`链`*
-*裸 = > json.set map=`裸` key="sidebar" value=`链`*
-*h2 = > `裸`.render*
-*d = > split value=`h2` sep="<aside"*
-*nd = > len value=`d`*
-*e = > split value=`h2` sep="--ink:"*
-*ne = > len value=`e`*
+**裸 = > web.page title="bare" layout="bare" shell_css="minimal"**
+**裸 = > json.set map=`裸` key="nav" value=`链`**
+**裸 = > json.set map=`裸` key="sidebar" value=`链`**
+**h2 = > `裸`.render**
+**d = > split value=`h2` sep="<aside"**
+**nd = > len value=`d`**
+**e = > split value=`h2` sep="--ink:"**
+**ne = > len value=`e`**
 1. `nd` == 1
   1. `ne` > 1
     > print text=bare-minimal-ok

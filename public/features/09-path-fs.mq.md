@@ -11,11 +11,11 @@ Join and normalize without plugins; copy/move stay sandboxed under the program d
 
 # main
 
-*`p` = > path.join a="out" b="demo.txt"*
-*`n` = > path.normalize path="out/./x/../demo.txt"*
+**`p` = > path.join a="out" b="demo.txt"**
+**`n` = > path.normalize path="out/./x/../demo.txt"**
 > fs.write_text path=`p` text="path-m2"
 > fs.copy_file src=`p` dest="out/demo-copy.txt"
-*`body` = > fs.read_text path="out/demo-copy.txt"*
+**`body` = > fs.read_text path="out/demo-copy.txt"**
 > print text=`p`
 > print text=`n`
 > print text=`body`

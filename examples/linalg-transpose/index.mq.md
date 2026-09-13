@@ -17,11 +17,11 @@ Declare shapes in a table, form \(P = AB\), then check \((AB)^\top = B^\top A^\t
 | 1 | A | 2 | 3 |
 | 2 | B | 3 | 2 |
 
-*`env` = > la.declare table=`shapes`*
-*`A` = env[^A]*
-*`B` = env[^B]*
-*`P` = `A` * `B`*
-*`t` = > `P`.T_ascii*
+**`env` = > la.declare table=`shapes`**
+**`A` = env[^A]**
+**`B` = env[^B]**
+**`P` = `A` * `B`**
+**`t` = > `P`.T_ascii**
 > print text=`t`
 1. `t` == "B^T*A^T"
   > print text=identity-ok

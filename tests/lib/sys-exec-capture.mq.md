@@ -7,16 +7,16 @@ import json:lib/json.mq.md
 
 # main
 
-*code = > sys.exec cmd="true"*
+**code = > sys.exec cmd="true"**
 1. `code` == 0
   > print text=exec-code-ok
 2. *
   > print text=exec-code-fail
 
-*args = > json.parse text=["-c","printf hi-capture"]*
-*out = > sys.exec cmd="sh" args=args capture=True*
-*c = out[^code]*
-*s = out[^stdout]*
+**args = > json.parse text=["-c","printf hi-capture"]**
+**out = > sys.exec cmd="sh" args=args capture=True**
+**c = out[^code]**
+**s = out[^stdout]**
 1. `c` == 0
   > print text=capture-code-ok
 2. *

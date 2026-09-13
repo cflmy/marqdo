@@ -47,7 +47,7 @@ import text:lib/text.mq.md
 | body.has-sidebar | grid-template-areas | "top top" "side main" "foot foot" |
 | body.no-sidebar | grid-template-areas | "top" "main" "foot" |
 
-**`基础`**
+*`基础`*
 
 ## 顶栏
 
@@ -96,7 +96,7 @@ import text:lib/text.mq.md
 | ul.nav li:first-child a | padding-left | .2rem |
 | ul.nav li:first-child a | padding-right | .2rem |
 
-**`顶栏`**
+*`顶栏`*
 
 ## 侧栏
 
@@ -129,7 +129,7 @@ import text:lib/text.mq.md
 | ul.side-nav a:hover | transform | translateX(4px) |
 | ul.side-nav a:hover | box-shadow | 0 1px 3px rgba(28,25,23,.08) |
 
-**`侧栏`**
+*`侧栏`*
 
 ## 主体
 
@@ -154,7 +154,7 @@ import text:lib/text.mq.md
 | .main-intro p | margin | 0 |
 | .main-intro p | font-size | 1.05rem |
 
-**`主体`**
+*`主体`*
 
 ## 卡片
 
@@ -210,7 +210,7 @@ import text:lib/text.mq.md
 | .content.cards p | font-size | .95rem |
 | .content.cards p | flex | 1 |
 
-**`卡片`**
+*`卡片`*
 
 ## 页脚
 
@@ -240,7 +240,7 @@ import text:lib/text.mq.md
 | ul.foot-nav a | text-decoration | none |
 | ul.foot-nav a:hover | color | var(--accent) |
 
-**`页脚`**
+*`页脚`*
 
 ## 表单
 
@@ -341,7 +341,7 @@ import text:lib/text.mq.md
 | .site-form .admin-list a | text-decoration | none |
 | .site-form .admin-list a | font-size | .9rem |
 
-**`表单`**
+*`表单`*
 
 ## 响应式
 
@@ -364,29 +364,29 @@ import text:lib/text.mq.md
 | (max-width: 860px) | .content.cards | grid-template-columns | 1fr |
 | (max-width: 520px) | ul.nav | flex-wrap | wrap |
 
-**`响应式`**
+*`响应式`*
 
 ## 全局
 
 用 样式装配 函数逐个把段落表装配成 CSS，再拼接成完整样式表。
 
-*基础表 = > 基础*
-*顶栏表 = > 顶栏*
-*侧栏表 = > 侧栏*
-*主体表 = > 主体*
-*卡片表 = > 卡片*
-*页脚表 = > 页脚*
-*表单表 = > 表单*
-*响应式表 = > 响应式*
+**基础表 = > 基础**
+**顶栏表 = > 顶栏**
+**侧栏表 = > 侧栏**
+**主体表 = > 主体**
+**卡片表 = > 卡片**
+**页脚表 = > 页脚**
+**表单表 = > 表单**
+**响应式表 = > 响应式**
 
-*css基础 = > 网页.样式装配 名="基础" 表=`基础表`*
-*css顶栏 = > 网页.样式装配 名="顶栏" 表=`顶栏表`*
-*css侧栏 = > 网页.样式装配 名="侧栏" 表=`侧栏表`*
-*css主体 = > 网页.样式装配 名="主体" 表=`主体表`*
-*css卡片 = > 网页.样式装配 名="卡片" 表=`卡片表`*
-*css页脚 = > 网页.样式装配 名="页脚" 表=`页脚表`*
-*css表单 = > 网页.样式装配 名="表单" 表=`表单表`*
-*css响应式 = > 网页.样式装配 名="响应式" 表=`响应式表`*
+**css基础 = > 网页.样式装配 名="基础" 表=`基础表`**
+**css顶栏 = > 网页.样式装配 名="顶栏" 表=`顶栏表`**
+**css侧栏 = > 网页.样式装配 名="侧栏" 表=`侧栏表`**
+**css主体 = > 网页.样式装配 名="主体" 表=`主体表`**
+**css卡片 = > 网页.样式装配 名="卡片" 表=`卡片表`**
+**css页脚 = > 网页.样式装配 名="页脚" 表=`页脚表`**
+**css表单 = > 网页.样式装配 名="表单" 表=`表单表`**
+**css响应式 = > 网页.样式装配 名="响应式" 表=`响应式表`**
 
 `css段` =
 
@@ -401,5 +401,5 @@ import text:lib/text.mq.md
 | `css表单` |
 | `css响应式` |
 
-*css = > text.str_join xs=`css段` sep=""*
-**css**
+**css = > text.str_join xs=`css段` sep=""**
+*css*

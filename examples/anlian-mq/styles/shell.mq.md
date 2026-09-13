@@ -54,7 +54,7 @@ import text:lib/text.mq.md
 | .main-intro | margin | 0 auto |
 | .main-intro | padding | 1.25rem 1.5rem 0 |
 
-**`基础`**
+*`基础`*
 
 ## 动效
 
@@ -75,7 +75,7 @@ import text:lib/text.mq.md
 | @keyframes cardRise 100% | opacity | "1" |
 | @keyframes cardRise 100% | transform | translateY(0) |
 
-**`动效`**
+*`动效`*
 
 ## 顶栏
 
@@ -126,7 +126,7 @@ import text:lib/text.mq.md
 | ul.nav li:first-child a:hover | transform | none |
 | ul.nav li:first-child a:hover | background | transparent |
 
-**`顶栏`**
+*`顶栏`*
 
 ## Hero
 
@@ -223,7 +223,7 @@ import text:lib/text.mq.md
 | .page-stage p | margin | "0" |
 | .page-stage p | color | var(--muted) |
 
-**`Hero`**
+*`Hero`*
 
 ## 卡片
 
@@ -336,7 +336,7 @@ import text:lib/text.mq.md
 | .search-bar button | font-weight | "600" |
 | .search-bar button | cursor | pointer |
 
-**`卡片`**
+*`卡片`*
 
 ## 页脚
 
@@ -366,7 +366,7 @@ import text:lib/text.mq.md
 | ul.foot-nav a | font-weight | "500" |
 | ul.foot-nav a:hover | color | var(--accent-text) |
 
-**`页脚`**
+*`页脚`*
 
 ## 响应式
 
@@ -393,25 +393,25 @@ import text:lib/text.mq.md
 | (prefers-reduced-motion: reduce) | ul.nav li:first-child a::before | animation | none |
 | (prefers-reduced-motion: reduce) | article.card | animation | none |
 
-**`响应式`**
+*`响应式`*
 
 ## 全局
 
-*基础表 = > 基础*
-*动效表 = > 动效*
-*顶栏表 = > 顶栏*
-*Hero表 = > Hero*
-*卡片表 = > 卡片*
-*页脚表 = > 页脚*
-*响应式表 = > 响应式*
+**基础表 = > 基础**
+**动效表 = > 动效**
+**顶栏表 = > 顶栏**
+**Hero表 = > Hero**
+**卡片表 = > 卡片**
+**页脚表 = > 页脚**
+**响应式表 = > 响应式**
 
-*css基础 = > 网页.样式装配 名="基础" 表=`基础表`*
-*css动效 = > 网页.样式装配 名="动效" 表=`动效表`*
-*css顶栏 = > 网页.样式装配 名="顶栏" 表=`顶栏表`*
-*cssHero = > 网页.样式装配 名="Hero" 表=`Hero表`*
-*css卡片 = > 网页.样式装配 名="卡片" 表=`卡片表`*
-*css页脚 = > 网页.样式装配 名="页脚" 表=`页脚表`*
-*css响应式 = > 网页.样式装配 名="响应式" 表=`响应式表`*
+**css基础 = > 网页.样式装配 名="基础" 表=`基础表`**
+**css动效 = > 网页.样式装配 名="动效" 表=`动效表`**
+**css顶栏 = > 网页.样式装配 名="顶栏" 表=`顶栏表`**
+**cssHero = > 网页.样式装配 名="Hero" 表=`Hero表`**
+**css卡片 = > 网页.样式装配 名="卡片" 表=`卡片表`**
+**css页脚 = > 网页.样式装配 名="页脚" 表=`页脚表`**
+**css响应式 = > 网页.样式装配 名="响应式" 表=`响应式表`**
 
 `css段` =
 
@@ -425,5 +425,5 @@ import text:lib/text.mq.md
 | `css页脚` |
 | `css响应式` |
 
-*css = > text.str_join xs=`css段` sep=""*
-**css**
+**css = > text.str_join xs=`css段` sep=""**
+*css*

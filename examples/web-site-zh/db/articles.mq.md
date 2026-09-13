@@ -8,7 +8,7 @@
 | title | text | false |
 | body | text | true |
 
-**`fields`**
+*`fields`*
 
 ## seed
 
@@ -19,4 +19,4 @@
 | 1 | 你好 Marqdo | 第一篇来自 GFM 表格。 |
 | 2 | 代码即文档 | 页面表就是程序。 |
 
-**`rows`**
+*`rows`*

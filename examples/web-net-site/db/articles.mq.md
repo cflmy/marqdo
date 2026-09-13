@@ -8,7 +8,7 @@
 | title | text | false |
 | body | text | true |
 
-**`fields`**
+*`fields`*
 
 ## seed
 
@@ -20,4 +20,4 @@
 | 2 | Login-gated admin | The /admin page requires a session cookie. |
 | 3 | WebSocket live | The /live endpoint echoes your message in real time. |
 
-**`rows`**
+*`rows`*

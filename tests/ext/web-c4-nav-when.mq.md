@@ -17,21 +17,21 @@ import sys:lib/sys.mq.md
 | Login | /login | | | guest |
 | Gone | /gone | | | hide |
 
-*客 = > web.page title="c4-guest" shell_css="off"*
-*`客` = > table.put in=`客` at="nav" value=`链`*
-*`客` = > table.put in=`客` at="_logged_in" value=False*
-*hg = > `客`.render*
+**客 = > web.page title="c4-guest" shell_css="off"**
+**`客` = > table.put in=`客` at="nav" value=`链`**
+**`客` = > table.put in=`客` at="_logged_in" value=False**
+**hg = > `客`.render**
 
-*a = > split value=`hg` sep="/login"*
-*na = > len value=`a`*
-*b = > split value=`hg` sep="/admin"*
-*nb = > len value=`b`*
-*c = > split value=`hg` sep="/gone"*
-*nc = > len value=`c`*
-*d = > split value=`hg` sep="nav-mq-0"*
-*nd = > len value=`d`*
-*e = > split value=`hg` sep="@media not (max-width: 720px)"*
-*ne = > len value=`e`*
+**a = > split value=`hg` sep="/login"**
+**na = > len value=`a`**
+**b = > split value=`hg` sep="/admin"**
+**nb = > len value=`b`**
+**c = > split value=`hg` sep="/gone"**
+**nc = > len value=`c`**
+**d = > split value=`hg` sep="nav-mq-0"**
+**nd = > len value=`d`**
+**e = > split value=`hg` sep="@media not (max-width: 720px)"**
+**ne = > len value=`e`**
 1. `na` > 1
   1. `nb` == 1
     1. `nc` == 1
@@ -54,14 +54,14 @@ import sys:lib/sys.mq.md
   > print text=guest-login-missing
   > sys.exit code=1
 
-*户 = > web.page title="c4-user" shell_css="off"*
-*`户` = > table.put in=`户` at="nav" value=`链`*
-*`户` = > table.put in=`户` at="_logged_in" value=True*
-*hu = > `户`.render*
-*f = > split value=`hu` sep="/admin"*
-*nf = > len value=`f`*
-*g = > split value=`hu` sep="/login"*
-*ng = > len value=`g`*
+**户 = > web.page title="c4-user" shell_css="off"**
+**`户` = > table.put in=`户` at="nav" value=`链`**
+**`户` = > table.put in=`户` at="_logged_in" value=True**
+**hu = > `户`.render**
+**f = > split value=`hu` sep="/admin"**
+**nf = > len value=`f`**
+**g = > split value=`hu` sep="/login"**
+**ng = > len value=`g`**
 1. `nf` > 1
   1. `ng` == 1
     > print text=auth-ok

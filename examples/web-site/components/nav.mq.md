@@ -11,4 +11,4 @@ Static top links for the shell.
 | New | /new | |
 | Admin | /admin | |
 
-**`nav`**
+*`nav`*
