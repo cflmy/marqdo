@@ -3,12 +3,36 @@
 ## Unreleased
 
 ### Added
-- **GAP-11**：`compose_form` / `表单装配` 支持 `target` / `表单插槽`（如 `#id`），把表单注入引言 HTML 内的挂载点，而不是始终作为 `.main-intro` 的兄弟节点。
+
+### Fixed
+
+### Changed
+
+## v0.4.0 — 2026-09-13
+
+### Highlights
+
+**Go `libweb` 默认落地（W-G0–W-G14）**：官方网页原生插件改为 Go C ABI；CLI / gold / Release 走 `scripts/build-web-plugin.sh`；Rust 源码归档。另附 **anlian-mq** 验收站与表单插槽 / `MARQDO_EXT` 提示修复。
+
+```bash
+git checkout v0.4.0
+# 构建 web 原生插件（需 Go + cgo）：
+bash ./scripts/build-web-plugin.sh
+marqdo ext add web
+marqdo run examples/anlian-mq/index.mq.md
+```
+
+### Added
+- **`plugins/web` Go 全量重写（W-G0–W-G13）**：C ABI 对等装配/DB/表单/listen/鉴权/上传/SEO/WS/驱动/proxy·invoke/定制壳；`scripts/build-web-plugin.sh` → `libweb.so` / `web.dll`；ADR [0004](doc/adr/0004-web-plugin-go.md) · 施工 [ext-web-go-rewrite.md](doc/design/ext-web-go-rewrite.md)。
+- **W-G14 验收**：`examples/anlian-mq/`（暗恋见君风格论坛：路由/登录/粉玻璃主题/片段 API；SQLite 本地可跑）。
+- **GAP-11**：`compose_form` / `表单装配` 支持 `target` / `表单插槽`（如 `#id`），把表单注入引言 HTML 内的挂载点。
 
 ### Fixed
 - **GAP-12**：`ext/…` import 解析失败且未设置 `MARQDO_EXT` 时，错误附带 `hint: set MARQDO_EXT to the directory that contains web/`。
+- **listen 会话 / CSRF**：登录后 `IssueCookie` 不再误设 `Max-Age=0`；页面 ABIs（`query`/`order`/`link_prefix`/`css`/`detail`）与 `web_page_chrome`、`invoke return=html` 对齐 anlian 需求。
 
 ### Changed
+- **默认 `libweb` 为 Go**：Release / gold / `ext add web` 不再构建 Rust `marqdo_plugin_web`；旧 Rust 树移至 `plugins/web-rust-archive/`（非 workspace 成员）。作者面 `ext/web` ABI 名保持兼容。
 
 ## v0.3.9 — 2026-09-09
 

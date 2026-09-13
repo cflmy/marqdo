@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| 状态 | **Accepted · 实现进行中（W-G0…W-G4 ✅）** |
+| 状态 | **Completed（W-G0…W-G14 · v0.4.0）** |
 | 日期 | 2026-09-10 |
 | 相关 | [ext-web.md](ext-web.md) · [ext-web-net.md](ext-web-net.md) · [web-net-capabilities.md](web-net-capabilities.md) · [ext-web-drivers.md](ext-web-drivers.md) · [web-assets-and-images.md](web-assets-and-images.md) · [ext-hosting-fill.md](ext-hosting-fill.md) · [ext-abi.md](ext-abi.md) · [ext-cli.md](ext-cli.md) · [web-asgi-servers-and-marqdo.md](web-asgi-servers-and-marqdo.md) |
 | 实现目录 | `plugins/web/`（**Go module**；产物仍为 `libweb.so` / `web.dll` / `libweb.dylib`） |
@@ -399,7 +399,7 @@ scripts/build-web-plugin.sh   # go build -buildmode=c-shared -o …/libweb.so
 | **W-G11** | 定制 C2–C4 shell/layout/style/nav | ✅ `web-c2`–`c4` |
 | **W-G12** | G 增强 WS rooms + Redis session/pubsub + API key 原语 | ✅ 单测 + `web-g12-api-key-smoke` |
 | **W-G13** | 默认切换 Go `libweb`；归档 Rust；更新发版与 ext CLI | ✅ 离线+live gold（7 个 `*_live`）对 Go 全绿；`ext add`/`gold`/`release` 走 `scripts/build-web-plugin.sh`；Rust 移出 workspace；gold 强制 `MARQDO_WEB_PLUGIN` 避免 `~/.marqdo` 旧 so |
-| **W-G14** | anlian Marqdo 重写主路径（可分仓或 `examples/anlian-mq/`） | §8 矩阵主路径可演示 |
+| **W-G14** | anlian Marqdo 重写主路径（可分仓或 `examples/anlian-mq/`） | ✅ `examples/anlian-mq/`（本地 SQLite + 粉玻璃主题 + 主路由/登录/片段；外接 PG/Redis 仍为增强路径） |
 
 每波次：**先补 Go 实现 → 跑对应 gold → 再进入下一波**。禁止跨波次留下「注册了但返回 stub 错误」的 ABI（除 W-G0 明确的未实现探测）。
 

@@ -124,10 +124,10 @@ jobs:
             ## Marqdo ${{ github.ref_name }}
 
             ### 亮点 / Highlights
-            - **GAP-06–10**：解析恢复 · invoke Null · exec capture · SSE 反缓冲头
-            - **GAP-06–10**: parser recovery, invoke Null, exec capture, SSE anti-buffer headers
-            - **修复**：嵌套插件调用后恢复 `GLOBAL_HOST`（listen/invoke）
-            - Details: [CHANGELOG](https://github.com/cflmy/marqdo/blob/main/CHANGELOG.md) · [stdlib-mid2.md](https://github.com/cflmy/marqdo/blob/main/doc/roadmap/stdlib-mid2.md)
+            - **Go libweb 默认（W-G0–W-G14）**：网页原生插件 Go 重写；anlian-mq 验收；Release 含预编译 web.dll/libweb.so
+            - **Go libweb default (W-G0–W-G14)**: web plugin rewritten in Go; anlian-mq acceptance; prebuilt natives in Release
+            - **GAP-11/12**：表单插槽 · `MARQDO_EXT` 导入提示
+            - Details: [CHANGELOG](https://github.com/cflmy/marqdo/blob/main/CHANGELOG.md) · [ADR 0004](https://github.com/cflmy/marqdo/blob/main/doc/adr/0004-web-plugin-go.md)
 
             ### Downloads
 
