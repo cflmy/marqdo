@@ -177,7 +177,7 @@ Import **one language file** — never mix EN/ZH API names in the same `.mq.md`:
 - Authors use **GFM tables + `#` classes** — no `json.parse` / `json.set` glue, no hand-built part JSON.
 - Table cells stay **literal strings**; path text like `` `posts`.`title` `` is resolved by web classes.
 - **Quote path/MIME cells** that contain `/` (T5 cell expressions treat bare `/` as division): `"/static/logo.svg"`, `"image/png"`.
-- **`ext/**` never calls `host_*`** — hot path is native `plugins/web` ABI.
+- **`ext/**` never calls `host_*`** — hot path is native `plugins/web` ABI (default **Go `libweb`**, build via `scripts/build-web-plugin.sh`).
 - HTTPS: terminate at reverse proxy; set `cookie_secure=True` on auth (no in-process TLS).
 
 **Typical layout:**
