@@ -285,6 +285,29 @@ fn structure_link_index() {
 }
 
 #[test]
+fn structure_bracket_call() {
+    assert_out(
+        "tests/structure/bracket-call.mq.md",
+        "True, Marqdo!
+False, Ada!
+False, Hi Bo!!
+28",
+    );
+}
+
+#[test]
+fn bytecode_bracket_call() {
+    assert_out_backend(
+        "tests/structure/bracket-call.mq.md",
+        "bytecode",
+        "True, Marqdo!
+False, Ada!
+False, Hi Bo!!
+28",
+    );
+}
+
+#[test]
 fn structure_footnote_map_digits() {
     assert_out(
         "tests/structure/footnote-map-digits.mq.md",

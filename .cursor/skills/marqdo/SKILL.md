@@ -34,6 +34,7 @@ Canonical design (repo): [`markdown-mapping-v0.3.md`](../../doc/design/markdown-
 9. **`ext/**` never calls `host_*`.** Agent/OKF helpers are plugin names (`agent_kb_*`, …) after `plugin.load`. Do **not** add agent/OKF domain code to `src/host/` (core bloat). See `doc/design/ext-agent.md` §4.
 10. **Browser (route C/D/E/F):** client logic is Marqdo on WASM; official bridge is host glue and **may** implement lists, routing, storage, WebSocket, canvas, file read, observers — authors **must not hand-write business JS**. Use `web.client_embed` / `data-mq-source-url` auto-mount. Client effects: prefer **GFM tables + `lib/browser`** ([marqdo-dev](../marqdo-dev/SKILL.md)).
 11. **Code-as-documentation / no bag glue:** Prefer **GFM tables** for maps, lists, wire, commands. Prefer **`table.put` / named helpers** over `json.set` / `json.append` chains. `lib/json` is for parse/stringify/quote only — not a dict builder. Unreadable json pipelines are a style bug.
+12. **Bracket-marked calls:** Function name may be marked with `[函数名]`; bare words before `[` are boolean modifiers (`礼貌 [问候] x` → `礼貌=True`). `]` immediately followed by `(` is **index** `[key](coll)`, not a call. Prefer `[k](c)` over footnote index in new code. See [bracket-call-modifiers.md](../../doc/design/bracket-call-modifiers.md).
 
 ## Markup → meaning (v0.3)
 
@@ -46,6 +47,7 @@ Canonical design (repo): [`markdown-mapping-v0.3.md`](../../doc/design/markdown-
 | `- …` inside body | Loop (`while` or `` [item](coll) `` / `` [`item`](`coll`) ``) |
 | Line `N. *` | Else arm |
 | `> fn args` | Call (named `k=v` or positional) |
+| `修饰 [fn] args` | Bracket-marked call; leading words → `名=True` |
 | `` > `obj`.method args `` | Method call (`obj` must be a map with `_type`) |
 | Frontmatter `import bind:path.mq.md` / `导入` | Import file (bind library name) |
 | Frontmatter `import bind:lib.member` / `导入` | Short name for a library member (same keyword; no separate `use`) |

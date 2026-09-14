@@ -601,7 +601,18 @@ impl Interpreter {
             call.callee = callee;
         }
 
+        for m in &call.pre_modifiers {
+            if call.args.iter().any(|a| matches!(a, Arg::Named { name, .. } if name == m)) {
+                return Err(self.err(format!(
+                    "pre-bracket modifier `{m}` conflicts with named argument `{m}`"
+                )));
+            }
+        }
+
         let mut ev_args = Vec::new();
+        for m in &call.pre_modifiers {
+            ev_args.push(EvArg::Named(m.clone(), Value::Bool(true)));
+        }
         for arg in &call.args {
             match arg {
                 Arg::Positional(e) => {

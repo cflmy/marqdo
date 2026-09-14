@@ -434,7 +434,9 @@ impl<'a> FnCompiler<'a> {
     }
 
     fn compile_call(&mut self, call: &CallExpr, as_stmt: bool) -> Result<()> {
-        let mut call = call.clone();
+        let mut call = call
+            .with_modifiers_expanded()
+            .map_err(|m| self.err(m))?;
         if let Some(path) = &call.path {
             // Bare dotted callee `a.b`: if `a` is a local variable, it is a method
             // receiver (Python-style unified namespace); otherwise it's a library path.

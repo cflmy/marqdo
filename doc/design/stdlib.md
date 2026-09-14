@@ -4,8 +4,9 @@
 |---|---|
 | 状态 | **S0–S3 + 核心 L1 + Mid M1–M6 + Mid2 M7–M10 已落地** |
 | 日期 | 2026-09-09 |
-| 相关 | [keywords.md](keywords.md) · [objects.md](objects.md) · [call-arguments.md](call-arguments.md) · [stdlib-i18n.md](stdlib-i18n.md) · [stdlib-modules.md](stdlib-modules.md) · [**stdlib-mid.md**](stdlib-mid.md) · [**stdlib-mid2.md**](stdlib-mid2.md) · [module-namespace.md](module-namespace.md) · [ext-abi.md](ext-abi.md) |
+| 相关 | [keywords.md](keywords.md) · [objects.md](objects.md) · [call-arguments.md](call-arguments.md) · [lib-code-as-docs.md](lib-code-as-docs.md) · [stdlib-i18n.md](stdlib-i18n.md) · [stdlib-modules.md](stdlib-modules.md) · [**stdlib-mid.md**](stdlib-mid.md) · [**stdlib-mid2.md**](stdlib-mid2.md) · [module-namespace.md](module-namespace.md) · [ext-abi.md](ext-abi.md) |
 
+> **库写法（代码即文档）**：[lib-code-as-docs.md](lib-code-as-docs.md) · [roadmap/lib-ext-code-as-docs.md](../roadmap/lib-ext-code-as-docs.md)。  
 > **多语言库命名**：见 [stdlib-i18n.md](stdlib-i18n.md)（不设 `lang:`；中英分文件）。  
 > **L1 模块清单**（含 math/foreign/plugin）：见 [stdlib-modules.md](stdlib-modules.md)。  
 > **中层标准库 Mid（M1–M6）**：已落地——[stdlib-mid.md](stdlib-mid.md) · [roadmap/stdlib-mid.md](../roadmap/stdlib-mid.md)。  

@@ -118,6 +118,41 @@ pub struct CallExpr {
     /// When set, `` `recv`.callee `` method call; receiver is a variable name.
     pub receiver: Option<String>,
     pub args: Vec<Arg>,
+    /// Pre-bracket modifiers: `礼貌 [问候] x` → `["礼貌"]`, expanded to `礼貌=True` at eval.
+    /// See [bracket-call-modifiers.md](../../doc/design/bracket-call-modifiers.md).
+    pub pre_modifiers: Vec<String>,
+}
+
+impl CallExpr {
+    /// Fold `pre_modifiers` into leading `name=True` named args (conflicts → Err).
+    pub fn with_modifiers_expanded(&self) -> Result<CallExpr, String> {
+        let mut call = self.clone();
+        for m in &call.pre_modifiers {
+            if call
+                .args
+                .iter()
+                .any(|a| matches!(a, Arg::Named { name, .. } if name == m))
+            {
+                return Err(format!(
+                    "pre-bracket modifier `{m}` conflicts with named argument `{m}`"
+                ));
+            }
+        }
+        if call.pre_modifiers.is_empty() {
+            return Ok(call);
+        }
+        let mut args = Vec::with_capacity(call.pre_modifiers.len() + call.args.len());
+        for m in &call.pre_modifiers {
+            args.push(Arg::Named {
+                name: m.clone(),
+                value: Expr::Literal(Literal::Bool(true)),
+            });
+        }
+        args.append(&mut call.args);
+        call.args = args;
+        call.pre_modifiers.clear();
+        Ok(call)
+    }
 }
 
 #[derive(Debug, Clone)]

@@ -4,7 +4,7 @@
 |---|---|
 | 状态 | 已定（v0.0.2 方向） |
 | 日期 | 2026-08-04 |
-| 相关 | [examples-and-tests.md](examples-and-tests.md) · [generated-yaml-manifest.md](generated-yaml-manifest.md) · 视觉参考 [id.cflmy.cn](https://id.cflmy.cn) |
+| 相关 | [examples-and-tests.md](examples-and-tests.md) · [view-markup-surface.md](view-markup-surface.md) · [generated-yaml-manifest.md](generated-yaml-manifest.md) · 视觉参考 [id.cflmy.cn](https://id.cflmy.cn) |
 
 ---
 

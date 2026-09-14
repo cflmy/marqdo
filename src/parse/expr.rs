@@ -461,10 +461,20 @@ impl<'a> Parser<'a> {
             }
             return Ok(e);
         }
-        // Link-shaped index: `[key](collection)` / `` [`var`](collection) ``
-        // (same Markdown shape as foreach `- [item](coll)`; see collection-access-link.md).
+        // Link-shaped index `[key](collection)` vs bracket-marked call `[callee] …`
+        // vs JSON-ish `[…]` (arg text fallback when expr parse fails).
         if self.starts_with("[") && !self.starts_with("[^") {
-            return self.parse_link_index();
+            if link_index_shape_ahead(self.rest()) {
+                return self.parse_link_index();
+            }
+            if bracket_callee_shape_ahead(self.rest()) {
+                let rest = self.rest();
+                let prefer_var = self.prefer_var;
+                let (call, consumed) = parse_call_tail(rest, prefer_var)?;
+                self.i += consumed;
+                return Ok(Expr::Call(call));
+            }
+            bail!("unexpected '[' in expression (not a link index or bracket call)");
         }
         if self.eat("\"") {
             return self.parse_quoted_string('"');
@@ -485,6 +495,11 @@ impl<'a> Parser<'a> {
                 bail!("unterminated `name`");
             }
             return self.parse_index_chain(Expr::Var(name));
+        }
+        // `礼貌 [问候] x` — after quotes/ticks so `[DONE]` inside strings is safe.
+        if let Some((call, consumed)) = try_bracket_marked_call(self.rest(), self.prefer_var)? {
+            self.i += consumed;
+            return Ok(Expr::Call(call));
         }
         if self.eat(">") {
             // Inline call: `> name k=v`
@@ -887,15 +902,19 @@ fn is_word_end(s: &str, len: usize) -> bool {
     }
 }
 
-/// Parse `name key=val …` / positional args; returns call + bytes consumed.
+/// Parse `name key=val …` / positional args; returns call + bytes consumed from `s`
+/// (after leading trim). Does **not** consume a trailing unmatched `)` so
+/// `([callee] arg)` expression nesting works.
 /// Callee may be a bare name, library path `time.parse`, or method `` `recv`.method ``.
+/// Bracket-marked form: `mod… [callee] args…` (see bracket-call-modifiers.md).
 /// When `prefer_var`, bare call-arg words parse as variables and bare dotted
 /// callees are allowed to be method receivers.
 pub fn parse_call_tail(s: &str, prefer_var: bool) -> Result<(CallExpr, usize)> {
-    use crate::ast::Arg;
-
     let s = s.trim_start();
-    let original_len = s.len();
+
+    if let Some((call, consumed)) = try_bracket_marked_call(s, prefer_var)? {
+        return Ok((call, consumed));
+    }
 
     let callee_tok = {
         let mut parts = s.split_whitespace();
@@ -918,12 +937,156 @@ pub fn parse_call_tail(s: &str, prefer_var: bool) -> Result<(CallExpr, usize)> {
         let idx = s.find(&callee_tok).unwrap();
         idx + callee_tok.len()
     };
-    let mut args_str = s[after_callee_offset..].trim_start();
+    let after = &s[after_callee_offset..];
+    let args_src = after.trim_start();
+    let ws = after.len() - args_src.len();
+    let (args, args_consumed) = parse_call_args(args_src, prefer_var)?;
+
+    Ok((
+        CallExpr {
+            callee,
+            path,
+            receiver,
+            args,
+            pre_modifiers: Vec::new(),
+        },
+        after_callee_offset + ws + args_consumed,
+    ))
+}
+
+/// `mod… [callee] args` — `]` must not be immediately followed by `(` (that is link-index).
+fn try_bracket_marked_call(s: &str, prefer_var: bool) -> Result<Option<(CallExpr, usize)>> {
+    let bytes = s.as_bytes();
+    let mut i = 0usize;
+    while i < bytes.len() {
+        if bytes[i] == b'[' {
+            if i + 1 < bytes.len() && bytes[i + 1] == b'^' {
+                i += 1;
+                continue;
+            }
+            // Only treat as callee marker at start or after whitespace.
+            if i > 0 && !s[..i].chars().last().map(|c| c.is_whitespace()).unwrap_or(false) {
+                i += 1;
+                continue;
+            }
+            let close = match s[i + 1..].find(']') {
+                Some(rel) => i + 1 + rel,
+                None => {
+                    i += 1;
+                    continue;
+                }
+            };
+            let after = &s[close + 1..];
+            if after.starts_with('(') {
+                // `[key](coll)` link index — not a callee marker.
+                i = close + 1;
+                continue;
+            }
+            let pre = s[..i].trim();
+            // Classic calls may embed `[…]` inside named/paren args
+            // (`print text=(礼貌 [问候] x)`). Only treat as bracket-marked
+            // when the prefix is pure modifiers (no `=` / `(` / quotes / `:`).
+            if pre.contains('=')
+                || pre.contains('(')
+                || pre.contains('"')
+                || pre.contains('\'')
+                || pre.contains(':')
+            {
+                return Ok(None);
+            }
+            let inner = s[i + 1..close].trim();
+            if inner.is_empty() {
+                bail!("empty bracket callee `[]`");
+            }
+            if !is_bracket_callee_inner(inner) {
+                i = close + 1;
+                continue;
+            }
+            let pre_modifiers = match split_modifiers(pre) {
+                Ok(ms) if ms.iter().all(|m| is_modifier_token(m)) => ms,
+                _ => return Ok(None),
+            };
+            let callee_tok = if inner.starts_with('`') && inner.ends_with('`') && inner.len() >= 2 {
+                inner.to_string()
+            } else {
+                inner.to_string()
+            };
+            let (receiver, callee, path) =
+                if let Some((r, m)) = split_method_callee(&callee_tok) {
+                    (Some(r), m, None)
+                } else if let Some(segments) = split_lib_path_callee(&callee_tok) {
+                    let last = segments.last().cloned().unwrap_or_default();
+                    (None, last, Some(segments))
+                } else {
+                    let name = if callee_tok.starts_with('`')
+                        && callee_tok.ends_with('`')
+                        && callee_tok.len() >= 2
+                    {
+                        callee_tok[1..callee_tok.len() - 1].to_string()
+                    } else {
+                        callee_tok
+                    };
+                    (None, name, None)
+                };
+            let after_full = &s[close + 1..];
+            let args_src = after_full.trim_start();
+            let ws = after_full.len() - args_src.len();
+            let (args, args_consumed) = parse_call_args(args_src, prefer_var)?;
+            let consumed = close + 1 + ws + args_consumed;
+            return Ok(Some((
+                CallExpr {
+                    callee,
+                    path,
+                    receiver,
+                    args,
+                    pre_modifiers,
+                },
+                consumed,
+            )));
+        }
+        i += 1;
+    }
+    Ok(None)
+}
+
+fn split_modifiers(pre: &str) -> Result<Vec<String>> {
+    let mut out = Vec::new();
+    let mut rest = pre.trim();
+    while !rest.is_empty() {
+        let (tok, next) = split_first_token(rest);
+        if tok.is_empty() {
+            break;
+        }
+        let name = if tok.starts_with('`') && tok.ends_with('`') && tok.len() >= 2 {
+            tok[1..tok.len() - 1].to_string()
+        } else {
+            if tok.contains('=') {
+                bail!("pre-bracket modifier cannot be a named arg (`{tok}`); put named args after `]`");
+            }
+            tok.to_string()
+        };
+        if name.is_empty() {
+            bail!("empty pre-bracket modifier");
+        }
+        out.push(name);
+        rest = next.trim_start();
+    }
+    Ok(out)
+}
+
+/// Parse call args; returns `(args, bytes_consumed)` from the start of `args_str`.
+/// Stops before an unmatched `)` so parenthesized expression nesting works.
+fn parse_call_args(args_str: &str, prefer_var: bool) -> Result<(Vec<crate::ast::Arg>, usize)> {
+    use crate::ast::Arg;
     let mut args = Vec::new();
     let mut seen_named = false;
+    let mut rest = args_str;
 
-    while !args_str.is_empty() {
-        if let Some((key, after_eq)) = try_named_arg(args_str) {
+    while !rest.is_empty() {
+        if rest.starts_with(')') {
+            break;
+        }
+        if let Some((key, after_eq)) = try_named_arg(rest) {
             seen_named = true;
             let val_end = find_next_arg_boundary(after_eq);
             let val_raw = after_eq[..val_end].trim_end();
@@ -936,12 +1099,12 @@ pub fn parse_call_tail(s: &str, prefer_var: bool) -> Result<(CallExpr, usize)> {
                 name: key,
                 value,
             });
-            args_str = after_eq[val_end..].trim_start();
+            rest = after_eq[val_end..].trim_start();
         } else {
             if seen_named {
                 bail!("positional argument after named argument is not allowed");
             }
-            let (tok, rest) = split_first_token(args_str);
+            let (tok, next) = split_first_token(rest);
             if tok.is_empty() {
                 break;
             }
@@ -951,19 +1114,11 @@ pub fn parse_call_tail(s: &str, prefer_var: bool) -> Result<(CallExpr, usize)> {
                 parse_call_arg_value(tok)?
             };
             args.push(Arg::Positional(value));
-            args_str = rest.trim_start();
+            rest = next.trim_start();
         }
     }
-
-    Ok((
-        CallExpr {
-            callee,
-            path,
-            receiver,
-            args,
-        },
-        original_len,
-    ))
+    let consumed = args_str.len() - rest.len();
+    Ok((args, consumed))
 }
 
 /// `` `recv`.method `` → (recv, method).
@@ -1023,6 +1178,22 @@ fn try_named_arg(s: &str) -> Option<(String, &str)> {
 
 fn split_first_token(s: &str) -> (&str, &str) {
     let s = s.trim_start();
+    if s.starts_with('(') {
+        let mut depth = 0i32;
+        for (i, c) in s.char_indices() {
+            match c {
+                '(' => depth += 1,
+                ')' => {
+                    depth -= 1;
+                    if depth == 0 {
+                        let end = i + c.len_utf8();
+                        return (&s[..end], &s[end..]);
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
     if s.starts_with('"') {
         if let Some(end) = end_of_quoted_string(s) {
             return (&s[..end], &s[end..]);
@@ -1039,6 +1210,71 @@ fn split_first_token(s: &str) -> (&str, &str) {
         Some(i) => (&s[..i], &s[i..]),
         None => (s, ""),
     }
+}
+
+/// `[key](…)` with no whitespace between `]` and `(`.
+fn link_index_shape_ahead(s: &str) -> bool {
+    let s = s.trim_start();
+    if !s.starts_with('[') || s.starts_with("[^") {
+        return false;
+    }
+    let Some(close_rel) = s[1..].find(']') else {
+        return false;
+    };
+    let after = &s[1 + close_rel + 1..];
+    after.starts_with('(')
+}
+
+/// `[callee] …` (not link-index): inner must look like a function/method name, not JSON.
+fn bracket_callee_shape_ahead(s: &str) -> bool {
+    let s = s.trim_start();
+    if !s.starts_with('[') || s.starts_with("[^") {
+        return false;
+    }
+    let Some(close_rel) = s[1..].find(']') else {
+        return false;
+    };
+    let after = &s[1 + close_rel + 1..];
+    if after.starts_with('(') {
+        return false;
+    }
+    is_bracket_callee_inner(&s[1..1 + close_rel])
+}
+
+fn is_bracket_callee_inner(inner: &str) -> bool {
+    let t = inner.trim();
+    if t.is_empty() || t.chars().any(|c| c.is_whitespace()) {
+        return false;
+    }
+    // JSON arrays / objects / strings are never callees.
+    if t.contains(',')
+        || t.contains(':')
+        || t.contains('{')
+        || t.contains('}')
+        || t.contains('[')
+        || t.contains(']')
+        || t.starts_with('"')
+        || t.starts_with('\'')
+    {
+        return false;
+    }
+    if t.starts_with('`') {
+        return split_method_callee(t).is_some()
+            || (t.ends_with('`') && t.len() >= 2 && !t[1..t.len() - 1].contains('`'));
+    }
+    if t.chars().next().is_some_and(|c| c.is_ascii_digit()) {
+        return false;
+    }
+    // Bare name or `lib.path` callee.
+    t.chars()
+        .all(|c| c.is_alphanumeric() || c == '_' || c == '.' || !c.is_ascii())
+}
+
+fn is_modifier_token(name: &str) -> bool {
+    !name.is_empty()
+        && name
+            .chars()
+            .all(|c| c.is_alphanumeric() || c == '_' || !c.is_ascii())
 }
 
 fn find_next_arg_boundary(after_eq: &str) -> usize {
@@ -1440,3 +1676,63 @@ mod tests {
 }
 
 
+
+#[cfg(test)]
+mod bracket_call_tests {
+    use super::*;
+    use crate::ast::{Arg, Expr};
+
+    #[test]
+    fn bracket_with_modifier() {
+        let (c, _) = parse_call_tail(r#"礼貌 [问候] "Marqdo""#, true).unwrap();
+        assert_eq!(c.callee, "问候");
+        assert_eq!(c.pre_modifiers, vec!["礼貌".to_string()]);
+        assert_eq!(c.args.len(), 1);
+    }
+
+    #[test]
+    fn nested_paren_arg() {
+        let (c, _) = parse_call_tail(r#"[问候] ([格式化] "x")"#, true).unwrap();
+        assert_eq!(c.callee, "问候");
+        match &c.args[0] {
+            Arg::Positional(Expr::Call(inner)) => {
+                assert_eq!(inner.callee, "格式化");
+            }
+            other => panic!("expected nested call, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn paren_expr_bracket_call() {
+        let e = parse_expr_prefer_var(r#"([文本] "hi")"#).unwrap();
+        match e {
+            Expr::Call(c) => assert_eq!(c.callee, "文本"),
+            other => panic!("{:?}", other),
+        }
+    }
+
+    #[test]
+    fn modifier_in_paren_expr() {
+        let e = parse_expr_prefer_var(r#"(礼貌 [问候] "Ada")"#).unwrap();
+        match e {
+            Expr::Call(c) => {
+                assert_eq!(c.callee, "问候");
+                assert_eq!(c.pre_modifiers, vec!["礼貌".to_string()]);
+            }
+            other => panic!("{:?}", other),
+        }
+    }
+
+    #[test]
+    fn link_index_not_bracket_call() {
+        let e = parse_expr_prefer_var("[拿铁](菜单)").unwrap();
+        assert!(matches!(e, Expr::Index { .. }));
+    }
+
+    #[test]
+    fn modifier_conflict_expands() {
+        let (c, _) = parse_call_tail("礼貌 [问候] 礼貌=False", false).unwrap();
+        let err = c.with_modifiers_expanded().unwrap_err();
+        assert!(err.contains("conflicts"));
+    }
+}

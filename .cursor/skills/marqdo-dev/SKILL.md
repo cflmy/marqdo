@@ -88,12 +88,15 @@ Better still — call a named helper:
 3. `##` handlers: short prose OK; data as tables; return via `browser.*` / `web.*` / one `table.put`.
 4. Blank line between comment paragraphs and code.
 5. Run `marqdo run path.mq.md` from repo root.
-6. **Calls in narrative:** prefer `**结果 = 某函数 名=`x`**` (no `>` on the RHS). Use `> …` for standalone step lists. See `examples/code-as-docs/`.
+6. **Calls in narrative:** prefer `**结果 = 某函数 名=`x`**` (no `>` on the RHS). Bracket form `礼貌 [问候] "x"` / `**出 = [put] …**` is fine when modifiers help. Use `> …` for standalone step lists. See `examples/code-as-docs/`.
 7. **Do not use `##` inside `# main` for document sectioning** — those become nested functions. Use paragraphs / `---` breaks instead.
+8. **Index:** prefer `[键](集合)` / `` [`名`](集合) `` over footnote `` m[^k] ``.
 
 Browser client programs: prefer `import browser:lib/browser.mq.md` (no native plugin). Server sites: `ext/web` + GFM page/style tables.
 
 ## Developing libraries (`lib/*`, `ext/*`)
+
+Canonical thin-template + waves: [lib-code-as-docs.md](../../doc/design/lib-code-as-docs.md) · [roadmap/lib-ext-code-as-docs.md](../../doc/roadmap/lib-ext-code-as-docs.md).
 
 ### Goals
 
@@ -101,12 +104,15 @@ Browser client programs: prefer `import browser:lib/browser.mq.md` (no native pl
 - One concern per helper; name the effect (`set_text`, `canvas`, …), do not expose bag surgery.
 - EN + ZH pair when shipping user-facing libs (`lib/browser.mq.md` ↔ `lib/浏览器.mq.md`, `ext/web` ↔ `ext/web/网页.mq.md`).
 - `ext/**` never calls `host_*` — use plugins / public lib only (`doc/design/ext-agent.md`).
+- Collection get: **`[key](coll)`** (no new footnote indexes). Calls in examples may use `修饰 [fn] …` or classic `>` / bold.
 
 ### Library checklist
 
+- [ ] Purpose sentence + prose params + one example + short body
 - [ ] Public examples use **tables + helpers**, not json glue
+- [ ] Index with `[k](c)`; foreach `- [item](coll)`
 - [ ] Helpers documented with a one-line purpose above `##`
-- [ ] Defaults on `+` params; omit `None` fields in merged maps
+- [ ] Defaults on params; omit `None` fields in merged maps
 - [ ] No `json.set` chains in new code — use `table.put` / `table.merge` / GFM
 - [ ] `marqdo run` on a tiny demo under `examples/` or inline smoke
 

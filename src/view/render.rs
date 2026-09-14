@@ -1248,17 +1248,38 @@ fn stmt_shell(line: u32, inner: &str, mode: StructureMode) -> String {
 }
 
 fn call_display(call: &CallExpr) -> String {
-    let mut s = String::from("> ");
-    if let Some(recv) = &call.receiver {
-        s.push('`');
-        s.push_str(recv);
-        s.push('`');
-        s.push('.');
-        s.push_str(&call.callee);
-    } else if let Some(path) = &call.path {
-        s.push_str(&path.join("."));
+    let mut s = String::new();
+    if !call.pre_modifiers.is_empty() {
+        for m in &call.pre_modifiers {
+            s.push_str(m);
+            s.push(' ');
+        }
+        s.push('[');
+        if let Some(recv) = &call.receiver {
+            s.push('`');
+            s.push_str(recv);
+            s.push('`');
+            s.push('.');
+            s.push_str(&call.callee);
+        } else if let Some(path) = &call.path {
+            s.push_str(&path.join("."));
+        } else {
+            s.push_str(&call.callee);
+        }
+        s.push(']');
     } else {
-        s.push_str(&call.callee);
+        s.push_str("> ");
+        if let Some(recv) = &call.receiver {
+            s.push('`');
+            s.push_str(recv);
+            s.push('`');
+            s.push('.');
+            s.push_str(&call.callee);
+        } else if let Some(path) = &call.path {
+            s.push_str(&path.join("."));
+        } else {
+            s.push_str(&call.callee);
+        }
     }
     for a in &call.args {
         match a {
@@ -1297,14 +1318,12 @@ fn expr_prec(expr: &Expr, parent_prec: u8) -> String {
                         s.push('`');
                     }
                     InterpPart::Index { base, labels } => {
-                        s.push('`');
-                        s.push_str(base);
-                        s.push('`');
+                        // Preferred surface: nested `[key](base)` (legacy footnote still parses).
+                        let mut inner = format!("`{base}`");
                         for label in labels {
-                            s.push_str("[^");
-                            s.push_str(label);
-                            s.push(']');
+                            inner = format!("[{label}]({inner})");
                         }
+                        s.push_str(&inner);
                     }
                 }
             }
