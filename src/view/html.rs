@@ -355,6 +355,16 @@ section.block > h2 {
   border: 1px solid transparent;
   color: var(--ink);
 }
+.chip.inferred {
+  border-style: dashed;
+  border-color: var(--line);
+  opacity: 0.92;
+}
+.chip.inferred::after {
+  content: " ↑";
+  font-size: 0.65em;
+  opacity: 0.7;
+}
 .nested {
   margin: 0.45rem 0 0.15rem 0.15rem;
   padding-left: 0.85rem;
@@ -683,6 +693,15 @@ section.block > h2 {
   color: var(--muted);
   font-size: 0.66rem;
   margin-left: 0.2rem;
+}
+.outline-item .ol-params {
+  margin-left: 0.25rem;
+  font-family: var(--mono);
+  font-size: 0.62rem;
+  color: var(--muted);
+}
+.outline-item .ol-param.inferred {
+  border-bottom: 1px dashed var(--line);
 }
 .fun-card:target {
   outline: 2px solid var(--focus);

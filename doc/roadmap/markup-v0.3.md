@@ -60,7 +60,7 @@
 ### M4 — 双后端与工具
 
 - [x] 字节码发射跟随新 Stmt 源  
-- [ ] `view` / Variables：显示推断形参与 prose Decl  
+- [x] `view` / Structure：推断形参 `chip inferred` + Functions 大纲标注  
 - [ ] （可选）`marqdo migrate markup-v03` 机械改写提示/工具  
 
 **出门：** tree 与 bytecode 后端对 `markup-v03` 金样一致。

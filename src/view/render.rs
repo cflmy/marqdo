@@ -812,6 +812,26 @@ fn outline_fun(fun: &Function, parent_path: &str) -> String {
         escape(&fun.name),
         fun.level,
     );
+    if !fun.params.is_empty() {
+        s.push_str(" <span class=\"ol-params\">");
+        for (i, p) in fun.params.iter().enumerate() {
+            if i > 0 {
+                s.push(' ');
+            }
+            if p.inferred {
+                s.push_str(&format!(
+                    "<span class=\"ol-param inferred\" title=\"inferred\">{}</span>",
+                    escape(&p.name)
+                ));
+            } else {
+                s.push_str(&format!(
+                    "<span class=\"ol-param\" title=\"explicit\">{}</span>",
+                    escape(&p.name)
+                ));
+            }
+        }
+        s.push_str("</span>");
+    }
     if !fun.children.is_empty() {
         s.push_str("<ul>");
         for child in &fun.children {
@@ -920,7 +940,17 @@ fn render_fun(
     if !fun.params.is_empty() {
         s.push_str("<div class=\"params\">");
         for p in &fun.params {
-            s.push_str(&format!("<span class=\"chip\">{}</span>", escape(&p.name)));
+            let (cls, title) = if p.inferred {
+                ("chip inferred", "inferred from prose / body")
+            } else {
+                ("chip", "explicit + param")
+            };
+            s.push_str(&format!(
+                "<span class=\"{cls}\" title=\"{title}\">{name}</span>",
+                cls = cls,
+                title = title,
+                name = escape(&p.name),
+            ));
         }
         s.push_str("</div>");
     }
@@ -1623,6 +1653,28 @@ mod tests {
         assert!(html.contains("vars-panel"), "{html}");
         assert!(html.contains("vars-card"), "{html}");
         assert!(html.contains(">xs<") || html.contains("vars-name\">xs"), "{html}");
+    }
+
+    #[test]
+    fn structure_marks_inferred_params() {
+        let src = include_str!("../../tests/markup-v03/inc-prose.mq.md");
+        let module = crate::parse::parse_source(src).unwrap();
+        let add = module
+            .functions
+            .iter()
+            .find(|f| f.name == "加一函数")
+            .expect("加一函数");
+        assert!(add.params.iter().any(|p| p.name == "n" && p.inferred));
+        let html = render_module_structure(&module, src);
+        assert!(
+            html.contains("chip inferred") && html.contains(">n<"),
+            "expected inferred chip for n: {html}"
+        );
+        let outline = render_function_outline(&module);
+        assert!(
+            outline.contains("ol-param inferred") && outline.contains(">n<"),
+            "expected outline inferred param: {outline}"
+        );
     }
 
     #[test]

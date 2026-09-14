@@ -570,7 +570,7 @@ FnDef.params:
 | 4 | `` `n`+1 `` 误声明 | 建议 | 仅完整单个 code span `` `ident` `` 触发声明 |
 | 5 | 叙述强调斜体 vs 返回 | 建议 | 函数体内合法返回表达式才当返回；否则当文字 |
 | 6 | 一行多 `**…**` | **建议采纳** | 允许，按出现序执行（M0 钉死为是） |
-| 7 | view 展示 prose Decl | 建议 | Variables 列绑定图 + 标注是否已升参 |
+| 7 | view 展示 prose Decl | **已落地** | Structure / Functions 大纲：`inferred` 形参标注（`chip inferred`） |
 
 ---
 
