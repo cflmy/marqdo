@@ -8,9 +8,9 @@ import plugin:lib/plugin.mq.md
 
 Import lib/plugin.mq.md. Functions: load(path), unload(), list(). After load, registered plugin names are callable like other functions. C ABI: include/marqdo_abi.h — see doc/design/ext-abi.md. Path must stay under the program sandbox (cwd / fs root).
 
-**`names` = > plugin.list **
+**`names` = [plugin.list]**
 
-**`n` = > len `names` **
+**`n` = [len] `names`**
 
 1. `n` >= 0
   > print text=plugin-ok

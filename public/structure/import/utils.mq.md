@@ -1,14 +1,16 @@
 ---
 title: Utility module
-description: Imported by main; bold is a return value
+description: Imported by main; italic is return; print for side effects
 ---
 
 ## add_one
     + `n`
 
-**`n` + 1**
+*n + 1*
 
 ## greet
     + `who`
 
 > print text=Hello, `who`!
+
+*None*

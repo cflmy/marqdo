@@ -63,22 +63,22 @@ Cells are expressions (`doc/design/table-cell-expressions.md`): bare words = tex
 **Single dynamic key** — one `table.put` (or a helper), not a json chain:
 
 ```markdown
-*`set_text` = > table.put in=None at="#log" value=msg*
-**> table.put in=None at="set_text" value=set_text**
+**`set_text` = table.put in=None at="#log" value=msg**
+**table.put in=None at="set_text" value=set_text**
 ```
 
 Better still — call a named helper:
 
 ```markdown
-**> browser.set_text sel="#log" text=msg**
+**browser.set_text sel="#log" text=msg**
 ```
 
 ### 3. Bad pattern (do not write)
 
 ```markdown
-*`ret` = > json.set map=None key="set_text" value=…*
-*`ret` = > json.set map=ret key="canvas" value=…*
-*`cmds` = > json.append list=cmds item=c0*
+**`ret` = json.set map=None key="set_text" value=…**
+**`ret` = json.set map=ret key="canvas" value=…**
+**`cmds` = json.append list=cmds item=c0**
 ```
 
 ## Writing application `.mq.md`
