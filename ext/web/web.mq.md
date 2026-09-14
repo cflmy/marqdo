@@ -324,7 +324,7 @@ Embed a form into the page main slot. Optional `target` / `form_slot` (CSS id, e
 Offline HTML for tests / previews.
 
 1. `db`
-  **url = db[^url]**
+  **url = [url](db)**
   *> web_render page=`self` url=`url`*
 2. *
   *> web_render page=`self`*
@@ -357,7 +357,7 @@ Open a database handle. URL schemes: `sqlite:path` (default), `postgres://…` /
 
 Create a table from a schema table. Optional columns: `唯一`/`unique`, `索引`/`index` (creates UNIQUE / INDEX), `外键`/`fk`/`references` (e.g. `posts.id` or `posts(id)`). Columns named `created_at` / `updated_at` are filled automatically on insert/update when present.
 
-**url = self[^url]**
+**url = [url](self)**
 *> web_db_init url=`url` name=`name` fields=`fields`*
 
 ## insert
@@ -365,7 +365,7 @@ Create a table from a schema table. Optional columns: `唯一`/`unique`, `索引
     + `rows`
     + `txn`=None
 
-**url = self[^url]**
+**url = [url](self)**
 *> web_db_insert url=`url` table=`table` rows=`rows` txn=`txn`*
 
 ## select
@@ -377,9 +377,9 @@ Create a table from a schema table. Optional columns: `唯一`/`unique`, `索引
 
 Simple filters: one-row map of column→value (AND `=`), or rows `|字段|操作|值|` (`=` `!=` `>` `>=` `<` `<=` `like` `in` `between` `is null`; add `|或|` = `是` to join a row with `OR`). `order` is a column name with optional `-` prefix for descending (`"created_at"`, `"-created_at"`), comma-separated for multiple keys. Pass `txn` to read inside an open transaction. For pages (with a total), use `paginate`.
 
-**url = self[^url]**
+**url = [url](self)**
 **r = > web_db_select url=`url` table=`table` where=`where` limit=`limit` order=`order` offset=None txn=`txn`**
-*r[^rows]*
+*[rows](r)*
 
 ## paginate
     + `table`
@@ -391,7 +391,7 @@ Simple filters: one-row map of column→value (AND `=`), or rows `|字段|操作
 
 Like `select` but returns `{ rows, total }` — the total counts rows matching `where` regardless of `limit`/`跳过`, so you can render `上一页 / 下一页`. Set `跳过` to the number of rows to skip (e.g. page 2 with 10 per page ⇒ `跳过`=10).
 
-**url = self[^url]**
+**url = [url](self)**
 *> web_db_select url=`url` table=`table` where=`where` limit=`limit` order=`order` offset=`跳过` txn=`txn`*
 
 ## get
@@ -399,7 +399,7 @@ Like `select` but returns `{ rows, total }` — the total counts rows matching `
     + `id`
     + `txn`=None
 
-**url = self[^url]**
+**url = [url](self)**
 *> web_db_get url=`url` table=`table` id=`id` txn=`txn`*
 
 ## update
@@ -408,7 +408,7 @@ Like `select` but returns `{ rows, total }` — the total counts rows matching `
     + `row`
     + `txn`=None
 
-**url = self[^url]**
+**url = [url](self)**
 *> web_db_update url=`url` table=`table` id=`id` row=`row` txn=`txn`*
 
 ## delete
@@ -416,7 +416,7 @@ Like `select` but returns `{ rows, total }` — the total counts rows matching `
     + `id`
     + `txn`=None
 
-**url = self[^url]**
+**url = [url](self)**
 *> web_db_delete url=`url` table=`table` id=`id` txn=`txn`*
 
 ## exec
@@ -424,7 +424,7 @@ Like `select` but returns `{ rows, total }` — the total counts rows matching `
     + `args`=None
     + `txn`=None
 
-**url = self[^url]**
+**url = [url](self)**
 *> web_db_exec url=`url` sql=`sql` args=`args` txn=`txn`*
 
 ## query
@@ -434,7 +434,7 @@ Like `select` but returns `{ rows, total }` — the total counts rows matching `
 
 Run bare SQL and return the result set — count / join / group / subqueries. Returns `{ rows, count }`.
 
-**url = self[^url]**
+**url = [url](self)**
 *> web_db_query url=`url` sql=`sql` args=`args` txn=`txn`*
 
 ## count
@@ -444,16 +444,16 @@ Run bare SQL and return the result set — count / join / group / subqueries. Re
 
 Count rows matching a `where` filter (same syntax as `select`). Returns a number.
 
-**url = self[^url]**
+**url = [url](self)**
 **r = > web_db_count url=`url` table=`table` where=`where` txn=`txn`**
-*r[^count]*
+*[count](r)*
 
 ## migrate
     + `steps`
 
 Apply versioned SQL migrations. `steps` is a `|version|sql|` / `|版本|SQL|` table. Applied versions are recorded in `_marqdo_migrations`. Re-running is a no-op for already-applied versions. SQLite only.
 
-**url = self[^url]**
+**url = [url](self)**
 *> web_db_migrate url=`url` steps=`steps`*
 
 ## fts
@@ -463,7 +463,7 @@ Apply versioned SQL migrations. `steps` is a `|version|sql|` / `|版本|SQL|` ta
 
 Create an FTS5 index on `table` for the listed content columns (CSV string or list). Default FTS name is `{table}_fts`. Keeps the index in sync via triggers. Requires integer `id` PK. SQLite only.
 
-**url = self[^url]**
+**url = [url](self)**
 *> web_db_fts_create url=`url` table=`table` columns=`columns` name=`name`*
 
 ## search
@@ -474,7 +474,7 @@ Create an FTS5 index on `table` for the listed content columns (CSV string or li
 
 Full-text search (`MATCH`) against the FTS5 index from `fts`. Returns `{ rows, count }` with a `rank` column (bm25). SQLite only.
 
-**url = self[^url]**
+**url = [url](self)**
 *> web_db_search url=`url` table=`table` q=`q` limit=`limit` name=`name`*
 
 ## 事务
@@ -483,7 +483,7 @@ Begin a transaction: borrows the pooled connection exclusively and returns a
 `txn` handle. Write inside it, then `提交` (commit) or `回滚` (roll back).
 Every statement runs on the same connection, so a batch is atomic.
 
-**url = self[^url]**
+**url = [url](self)**
 *> web_db_begin url=`url`*
 
 # txn
@@ -499,8 +499,8 @@ connection; finish with `提交` or `回滚`.
     + `table`
     + `rows`
 
-**url = self[^url]**
-**txn = self[^txn]**
+**url = [url](self)**
+**txn = [txn](self)**
 *> web_db_insert url=`url` table=`table` rows=`rows` txn=`txn`*
 
 ## select
@@ -511,17 +511,17 @@ connection; finish with `提交` or `回滚`.
 
 Same filters as `db.select`; runs inside the transaction.
 
-**url = self[^url]**
-**txn = self[^txn]**
+**url = [url](self)**
+**txn = [txn](self)**
 **r = > web_db_select url=`url` table=`table` where=`where` limit=`limit` order=`order` offset=None txn=`txn`**
-*r[^rows]*
+*[rows](r)*
 
 ## get
     + `table`
     + `id`
 
-**url = self[^url]**
-**txn = self[^txn]**
+**url = [url](self)**
+**txn = [txn](self)**
 *> web_db_get url=`url` table=`table` id=`id` txn=`txn`*
 
 ## update
@@ -529,38 +529,38 @@ Same filters as `db.select`; runs inside the transaction.
     + `id`
     + `row`
 
-**url = self[^url]**
-**txn = self[^txn]**
+**url = [url](self)**
+**txn = [txn](self)**
 *> web_db_update url=`url` table=`table` id=`id` row=`row` txn=`txn`*
 
 ## delete
     + `table`
     + `id`
 
-**url = self[^url]**
-**txn = self[^txn]**
+**url = [url](self)**
+**txn = [txn](self)**
 *> web_db_delete url=`url` table=`table` id=`id` txn=`txn`*
 
 ## exec
     + `sql`
     + `args`=None
 
-**url = self[^url]**
-**txn = self[^txn]**
+**url = [url](self)**
+**txn = [txn](self)**
 *> web_db_exec url=`url` sql=`sql` args=`args` txn=`txn`*
 
 ## 提交
 
 Commit the transaction and return its connection to the pool.
 
-**txn = self[^txn]**
+**txn = [txn](self)**
 *> web_db_commit txn=`txn`*
 
 ## 回滚
 
 Roll the transaction back (undo every write) and return its connection.
 
-**txn = self[^txn]**
+**txn = [txn](self)**
 *> web_db_rollback txn=`txn`*
 
 # form
@@ -600,7 +600,7 @@ Field table + rules table; submit writes through `# db`.
     + `data`
     + `db`
 
-**url = db[^url]**
+**url = [url](db)**
 *> web_form_submit form=`self` data=`data` url=`url`*
 
 # app
@@ -831,8 +831,8 @@ Session/auth helper. Constructs a config object; `login` validates against the u
 
 Validate credentials against the users table and create a session. Returns `{ok, session_id, username, role}`.
 
-**users = self[^users]**
-**ttl = self[^session_ttl]**
+**users = [users](self)**
+**ttl = [session_ttl](self)**
 *> web_auth_login username=`username` password=`password` users=`users` session_ttl=`ttl`*
 
 ## check
@@ -867,7 +867,7 @@ Key–value cache. Use `memory:` for in-process (tests / single process) or `red
 ## get
     + `key`
 
-**url = self[^url]**
+**url = [url](self)**
 *> web_cache_get url=`url` key=`key`*
 
 ## set
@@ -877,25 +877,25 @@ Key–value cache. Use `memory:` for in-process (tests / single process) or `red
 
 Optional `ttl` is seconds until expiry.
 
-**url = self[^url]**
+**url = [url](self)**
 *> web_cache_set url=`url` key=`key` value=`value` ttl=`ttl`*
 
 ## del
     + `key`
 
-**url = self[^url]**
+**url = [url](self)**
 *> web_cache_del url=`url` key=`key`*
 
 ## exists
     + `key`
 
-**url = self[^url]**
+**url = [url](self)**
 *> web_cache_exists url=`url` key=`key`*
 
 ## ttl
     + `key`
 
-**url = self[^url]**
+**url = [url](self)**
 *> web_cache_ttl url=`url` key=`key`*
 
 # storage
@@ -914,25 +914,25 @@ Object storage. `file:dir` stores blobs on disk (offline / gold). `s3://bucket?e
 
 Provide either `body` (text) or `path` (local file to upload).
 
-**url = self[^url]**
+**url = [url](self)**
 *> web_storage_put url=`url` key=`key` body=`body` path=`path` content_type=`content_type`*
 
 ## get
     + `key`
 
-**url = self[^url]**
+**url = [url](self)**
 *> web_storage_get url=`url` key=`key`*
 
 ## delete
     + `key`
 
-**url = self[^url]**
+**url = [url](self)**
 *> web_storage_delete url=`url` key=`key`*
 
 ## list
     + `prefix`=""
 
-**url = self[^url]**
+**url = [url](self)**
 *> web_storage_list url=`url` prefix=`prefix`*
 
 # media
@@ -961,7 +961,7 @@ Offline helpers for upload validation and saving into `# storage` (also used by 
 
 **st = storage**
 1. `st` == None
-  **st = self[^storage]**
+  **st = [storage](self)**
 2. *
 
 *> web_upload_save storage=`st` path=`path` key=`key` content_type=`content_type` prefix=`prefix`*
@@ -987,5 +987,5 @@ WebSocket client helper.
 
 Single request–response: connect to `url`, send `message`, collect all server text replies, close. Returns `{ok, messages}`.
 
-**timeout = self[^timeout_sec]**
+**timeout = [timeout_sec](self)**
 *> web_ws_connect url=`url` message=`message` headers=`headers` timeout_sec=`timeout`*

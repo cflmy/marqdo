@@ -22,11 +22,11 @@ Reduce a `complete stream=True` event list to the final `done.result` text (or `
 **answer = ""**
 
 - [ev](events)
-  **t = ev[^type]**
+  **t = [type](ev)**
   1. `t` == "done"
-    **answer = ev[^result]**
+    **answer = [result](ev)**
   2. `t` == "error"
-    **answer = ev[^message]**
+    **answer = [message](ev)**
   3. `t` == "delta"
   4. *
     **_ = 1**
@@ -74,8 +74,8 @@ Chat completion using `self` handle fields.
 
 Wire body is `{model, messages:[{role,content}], stream?}`. Messages are an `@` row table; headers and optional `stream` use `table.put`. `json` is only for stringify/parse.
 
-**url = self[^base_url] + self[^suffix]**
-**auth = self[^bearer] + self[^api_key]**
+**url = [base_url](self) + [suffix](self)**
+**auth = [bearer](self) + [api_key](self)**
 **headers = > table.put in=None at="Authorization" value=`auth`**
 
 `messages` =
@@ -88,28 +88,28 @@ Wire body is `{model, messages:[{role,content}], stream?}`. Messages are an `@` 
 
 | model | messages |
 |-------|----------|
-| self[^model] | `messages` |
+| [model](self) | `messages` |
 
 1. `stream`
   **req = > table.put in=`req` at="stream" value=True**
   **body = > json.stringify value=`req`**
   **resp = > net.http_post_sse url=`url` body=`body` headers=`headers` echo=`echo`**
-  1. resp[^status] == 200
-    *resp[^events]*
+  1. [status](resp) == 200
+    *[events](resp)*
   2. *
     > print text=ext/ai/llm: HTTP error (stream)
-    > print text=resp[^status]
+    > print text=[status](resp)
     > sys.exit code=1
 2. *
   **body = > json.stringify value=`req`**
   **resp = > net.http_post url=`url` body=`body` headers=`headers`**
-  1. resp[^status] == 200
-    **data = > json.parse text=resp[^body]**
-    *data[^choices][^1][^message][^content]*
+  1. [status](resp) == 200
+    **data = > json.parse text=[body](resp)**
+    *[content]([message]([1]([choices](data))))*
   2. *
     > print text=ext/ai/llm: HTTP error
-    > print text=resp[^status]
-    > print text=resp[^body]
+    > print text=[status](resp)
+    > print text=[body](resp)
     > sys.exit code=1
 
 ---
