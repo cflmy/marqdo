@@ -80,6 +80,9 @@ pub fn scan_prose_line(line: &str) -> Vec<ProseBit> {
 }
 
 /// Whether `*inner*` is a return (vs mid-prose English/CJK emphasis).
+///
+/// Design §12 #5: mid-line italic is return only for whole-line, `返回*…*`,
+/// or an expression-shaped span — not `*very important*` / `*foo.bar*`.
 fn looks_like_italic_return(line: &str, at: usize, after: usize, inner: &str) -> bool {
     let t = inner.trim();
     if t.is_empty()
@@ -90,14 +93,7 @@ fn looks_like_italic_return(line: &str, at: usize, after: usize, inner: &str) ->
     {
         return true;
     }
-    if t.starts_with('>')
-        || t.contains('=')
-        || t.chars()
-            .any(|c| matches!(c, '+' | '-' | '*' | '/' | '(' | ')' | '[' | ']'))
-    {
-        return true;
-    }
-    // Whole-line return: only ws outside the italic span.
+    // Whole-line return: only ws outside the italic span (`*n*` / `*总额*`).
     let before = line[..at].trim();
     let after_s = line.get(after..).unwrap_or("").trim();
     if before.is_empty() && after_s.is_empty() {
@@ -107,20 +103,22 @@ fn looks_like_italic_return(line: &str, at: usize, after: usize, inner: &str) ->
     if before.ends_with("返回") || before.ends_with("return") || before.ends_with("Return") {
         return true;
     }
-    // Mid-prose simple word → soft emphasis (G2).
-    if is_simple_emphasis_word(t) {
+    // Mid-prose: expression-shaped only (`*n + 1*` / `*x=1*`); not hyphenated emphasis.
+    if is_hyphenated_emphasis(t) {
         return false;
     }
-    // Multi-token or dotted id mid-line: keep as return (rare).
-    true
+    t.starts_with('>')
+        || t.contains('=')
+        || t.chars()
+            .any(|c| matches!(c, '+' | '-' | '*' | '/' | '(' | ')' | '[' | ']'))
 }
 
-fn is_simple_emphasis_word(t: &str) -> bool {
-    if t.chars().any(|c| c.is_whitespace()) {
-        return false;
-    }
-    t.chars()
-        .all(|c| c.is_alphanumeric() || c == '_' || !c.is_ascii())
+fn is_hyphenated_emphasis(t: &str) -> bool {
+    !t.chars().any(char::is_whitespace)
+        && t.contains('-')
+        && !t
+            .chars()
+            .any(|c| matches!(c, '+' | '*' | '/' | '(' | ')' | '[' | ']' | '='))
 }
 
 fn scan_backtick_decl(line: &str, start: usize) -> Option<(ProseBit, usize)> {
@@ -225,9 +223,20 @@ mod tests {
     fn soft_italic_emphasis_skipped() {
         let bits = scan_prose_line("When soft=True, *only* FIND continues.");
         assert!(bits.is_empty(), "{bits:?}");
+        let bits = scan_prose_line("This is *very important* documentation.");
+        assert!(bits.is_empty(), "multi-word italic is emphasis: {bits:?}");
+        let bits = scan_prose_line("See *foo.bar* in the text.");
+        assert!(bits.is_empty(), "dotted italic is emphasis: {bits:?}");
+        let bits = scan_prose_line("Use *code-as-docs* style.");
+        assert!(bits.is_empty(), "hyphenated italic is emphasis: {bits:?}");
         let bits = scan_prose_line("*总额*");
         assert!(
             matches!(&bits[..], [ProseBit::ItalicReturn { inner, .. }] if inner == "总额"),
+            "{bits:?}"
+        );
+        let bits = scan_prose_line("接着返回*n*。");
+        assert!(
+            matches!(&bits[..], [ProseBit::ItalicReturn { inner, .. }] if inner == "n"),
             "{bits:?}"
         );
     }

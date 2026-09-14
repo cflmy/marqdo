@@ -9,7 +9,8 @@
 | 路线 | [markup-v0.3.md](../roadmap/markup-v0.3.md) |
 | 相关 | [code-vs-comment.md](code-vs-comment.md) · [return-hr-and-code-surface.md](return-hr-and-code-surface.md) · [call-arguments.md](call-arguments.md) · [objects.md](objects.md) · [keywords.md](keywords.md) |
 
-> **v0.3 为唯一 Markup 映射。** 不做 v0.2 双模式 / `--markup` 版本身份。摸索阶段允许破坏性变更；旧 `.mq.md`（`*语句*` / `**返回**`）须改写。金样例见 `tests/markup-v03/`。
+> **名词：** 本文「Markup」指 Marqdo **如何把 Markdown 标记映射成语法**（`**` 代码、`*` 返回、`` `名` `` 声明），不是另一个语言。产品仍是 Marqdo。  
+> **v0.3 为唯一映射。** 不做 v0.2 双模式 / `--markup` 版本身份。摸索阶段允许破坏性变更；旧 `.mq.md`（`*语句*` / `**返回**`）须改写。金样例见 `tests/markup-v03/`。
 
 ---
 
@@ -568,7 +569,7 @@ FnDef.params:
 | 2 | 提及性反引号 | **已决议** | §4.4：一律视作变量；未使用不报错、不升参；不设提及前缀 |
 | 3 | 粗体内调用 vs 赋值 | **已落地** | §6.2：可赋值左值 → 赋值；否则表达式优先、再裸调用；`**n + 1**` = ExprStmt |
 | 4 | `` `n`+1 `` 误声明 | **已落地** | Decl 名须为标识符；`` `n+1` `` 不升 Decl |
-| 5 | 叙述强调斜体 vs 返回 | 建议 | 函数体内合法返回表达式才当返回；否则当文字 |
+| 5 | 叙述强调斜体 vs 返回 | **已落地** | 整行 / `返回*…*` / 表达式形才当返回；`*only*` `*very important*` `*foo.bar*` 为叙述 |
 | 6 | 一行多 `**…**` | **建议采纳** | 允许，按出现序执行（M0 钉死为是） |
 | 7 | view 展示 prose Decl | **已落地** | Structure / Functions 大纲：`inferred` 形参标注（`chip inferred`） |
 
