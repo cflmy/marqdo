@@ -24,7 +24,7 @@
 | **Call** | `pre_modifiers`；`tests/structure/bracket-call.mq.md`；mapping / call-arguments | **done** |
 | **M0 View** | `InterpPart::Index` → `[k](base)`；`call_display` 修饰表面 | **done** |
 | **M1** | 试点 `lib/table` · `lib/text` · `lib/json`（中英）+ public/stdlib | **done** |
-| **M2** | 其余 `lib/*` 叙述化；禁新脚注取元 | pending |
+| **M2** | 其余 `lib/*` 叙述化；禁新脚注取元 | **done** |
 | **M3–M4** | `ext/web`、`ext/ai`：脚注→链接取元；叙述；示例可逐步换括号调用 | pending |
 | **M5** | quantum / linalg + full gold | pending |
 
@@ -40,3 +40,4 @@
 |------|------|
 | 2026-09-14 | 初稿；Call + M0 标 done |
 | 2026-09-14 | M1 试点 table/text/json + public/stdlib 标 done |
+| 2026-09-14 | M2 其余 lib 叙述化标 done |

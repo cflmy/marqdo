@@ -3,14 +3,20 @@ title: lib/sys
 description: English system wrappers (load_dotenv accepts optional path via host alias)
 ---
 
+English system wrappers (load_dotenv accepts optional path via host alias)
+
 ## env_get
     + `name`
+
+Get environment variable name.
 
 *> host_env_get name=`name`*
 
 ## env_set
     + `name`
     + `value`
+
+Set environment variable name to value.
 
 *> host_env_set name=`name` value=`value`*
 
@@ -23,14 +29,20 @@ Load `.env` (optional named arg `path=`). Existing process env is not overridden
 
 ## args
 
+Process argv list.
+
 *> host_args*
 
 ## cwd
+
+Current working directory.
 
 *> host_cwd*
 
 ## exit
     + `code`
+
+Exit process with code.
 
 *> host_exit code=`code`*
 

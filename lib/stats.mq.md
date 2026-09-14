@@ -3,13 +3,21 @@ title: lib/stats
 description: Thin mean / median / sample stdev (Mid2 M10). Not a dataframe library.
 ---
 
+Thin numeric summaries. Not a dataframe library.
+
 ## mean
     + `list`
+
+Arithmetic mean of list.
+
+Caller: [stats.mean] list=`xs`
 
 *> host_stats_mean list=`list`*
 
 ## median
     + `list`
+
+Median of list.
 
 *> host_stats_median list=`list`*
 

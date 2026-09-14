@@ -3,6 +3,8 @@ title: lib/datetime
 description: Calendar moments as maps {unix, zone, iso} (Mid2 M7). Fixed offsets + a few IANA aliases.
 ---
 
+Calendar moments as maps {unix, zone, iso} (Mid2 M7). Fixed offsets + a few IANA aliases.
+
 ## now
 
 Current UTC moment map.
@@ -13,10 +15,14 @@ Current UTC moment map.
     + `unix`
     + `zone`=None
 
+from_unix.
+
 *> host_datetime_from_unix unix=`unix` zone=`zone`*
 
 ## to_unix
     + `dt`
+
+to_unix.
 
 *> host_datetime_to_unix dt=`dt`*
 
@@ -42,6 +48,8 @@ Styles: `rfc3339` (default), `date`, `time`, or a strftime pattern.
     + `hours`=None
     + `minutes`=None
     + `seconds`=None
+
+add.
 
 *> host_datetime_add dt=`dt` days=`days` hours=`hours` minutes=`minutes` seconds=`seconds`*
 

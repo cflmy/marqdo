@@ -6,6 +6,8 @@ description: >-
 import table:lib/table.mq.md
 ---
 
+Readable browser effect helpers for WASM clients. Prefer GFM tables + these helpers; do not build effects with json.set chains.
+
 ## set_text
     + `sel`
     + `text`
@@ -136,6 +138,8 @@ Build unobserve effect; specs is a map or @ list with id.
 ## focus
     + `sel`
 
+focus.
+
 *> table.put in=None at="focus" value=sel*
 
 ## navigate
@@ -152,6 +156,8 @@ Build unobserve effect; specs is a map or @ list with id.
 
 ## storage
     + `spec`
+
+storage.
 
 *> table.put in=None at="storage" value=spec*
 
@@ -170,6 +176,8 @@ Build unobserve effect; specs is a map or @ list with id.
 
 ## clear_interval
     + `id`="default"
+
+clear_interval.
 
 **`spec` = > table.put in=None at="id" value=id**
 *> table.put in=None at="clear_interval" value=spec*
@@ -214,10 +222,14 @@ Build unobserve effect; specs is a map or @ list with id.
 ## ws
     + `spec`
 
+ws.
+
 *> table.put in=None at="ws" value=spec*
 
 ## clipboard
     + `text`
+
+clipboard.
 
 **`spec` = > table.put in=None at="text" value=text**
 *> table.put in=None at="clipboard" value=spec*

@@ -3,6 +3,8 @@ title: lib/net
 description: English HTTP(S) wrappers. Optional headers / content_type via host aliases.
 ---
 
+English HTTP(S) wrappers. Optional headers / content_type via host aliases.
+
 ## http_get
     + `url`
     + `headers`=None
@@ -53,6 +55,8 @@ Optional `body=` / `content_type=` / `headers=`.
 
 ## url_encode
     + `text`
+
+Percent-encode a URL segment.
 
 *> host_url_encode text=`text`*
 

@@ -3,8 +3,12 @@ title: lib/fs
 description: English filesystem wrappers
 ---
 
+English filesystem wrappers
+
 ## read_text
     + `path`
+
+Read UTF-8 text from path.
 
 *> host_read_text path=`path`*
 
@@ -12,26 +16,36 @@ description: English filesystem wrappers
     + `path`
     + `text`
 
+Write text to path (overwrite).
+
 *> host_write_text path=`path` text=`text`*
 
 ## append_text
     + `path`
     + `text`
 
+Append text to path.
+
 *> host_append_text path=`path` text=`text`*
 
 ## exists
     + `path`
+
+Whether path exists.
 
 *> host_exists path=`path`*
 
 ## list_dir
     + `path`
 
+List directory entries at path.
+
 *> host_list_dir path=`path`*
 
 ## make_dir
     + `path`
+
+Create directory at path.
 
 *> host_make_dir path=`path`*
 
@@ -44,6 +58,8 @@ Create directories recursively (`mkdir -p`).
 
 ## remove
     + `path`
+
+Remove file or empty directory at path.
 
 *> host_remove path=`path`*
 

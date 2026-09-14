@@ -3,6 +3,8 @@ title: lib/writeback
 description: Persist run output in .mq.md (Jupyter-style writeback)
 ---
 
+Persist run output in .mq.md (Jupyter-style writeback)
+
 ## record
     + `value`
     + `at_end`=False
