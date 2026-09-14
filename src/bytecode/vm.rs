@@ -213,7 +213,14 @@ impl Vm {
                     } else {
                         match (a, b) {
                             (Value::Int(x), Value::Int(y)) => stack.push(Value::Int(x - y)),
-                            _ => return Err(self.err_at(span, "`-` needs ints")),
+                            (Value::Num(x), Value::Num(y)) => stack.push(Value::Num(x - y)),
+                            (Value::Int(x), Value::Num(y)) => {
+                                stack.push(Value::Num(x as f64 - y))
+                            }
+                            (Value::Num(x), Value::Int(y)) => {
+                                stack.push(Value::Num(x - y as f64))
+                            }
+                            _ => return Err(self.err_at(span, "`-` needs ints or nums")),
                         }
                     }
                 }
@@ -232,7 +239,14 @@ impl Vm {
                     } else {
                         match (a, b) {
                             (Value::Int(x), Value::Int(y)) => stack.push(Value::Int(x * y)),
-                            _ => return Err(self.err_at(span, "`*` needs ints")),
+                            (Value::Num(x), Value::Num(y)) => stack.push(Value::Num(x * y)),
+                            (Value::Int(x), Value::Num(y)) => {
+                                stack.push(Value::Num(x as f64 * y))
+                            }
+                            (Value::Num(x), Value::Int(y)) => {
+                                stack.push(Value::Num(x * y as f64))
+                            }
+                            _ => return Err(self.err_at(span, "`*` needs ints or nums")),
                         }
                     }
                 }
@@ -244,12 +258,29 @@ impl Vm {
                             return Err(self.err_at(span, "division by zero"));
                         }
                         (Value::Int(x), Value::Int(y)) => stack.push(Value::Int(x / y)),
-                        _ => return Err(self.err_at(span, "`/` needs ints")),
+                        (Value::Num(_), Value::Num(y)) if y == 0.0 => {
+                            return Err(self.err_at(span, "division by zero"));
+                        }
+                        (Value::Int(_), Value::Num(y)) if y == 0.0 => {
+                            return Err(self.err_at(span, "division by zero"));
+                        }
+                        (Value::Num(_), Value::Int(0)) => {
+                            return Err(self.err_at(span, "division by zero"));
+                        }
+                        (Value::Num(x), Value::Num(y)) => stack.push(Value::Num(x / y)),
+                        (Value::Int(x), Value::Num(y)) => {
+                            stack.push(Value::Num(x as f64 / y))
+                        }
+                        (Value::Num(x), Value::Int(y)) => {
+                            stack.push(Value::Num(x / y as f64))
+                        }
+                        _ => return Err(self.err_at(span, "`/` needs ints or nums")),
                     }
                 }
                 Op::Negate => match pop(&mut stack).map_err(|m| self.err_at(span, m))? {
                     Value::Int(n) => stack.push(Value::Int(-n)),
-                    _ => return Err(self.err_at(span, "unary `-` needs int")),
+                    Value::Num(n) => stack.push(Value::Num(-n)),
+                    _ => return Err(self.err_at(span, "unary `-` needs int or num")),
                 },
                 Op::Not => {
                     let v = pop(&mut stack).map_err(|m| self.err_at(span, m))?;
@@ -663,12 +694,15 @@ fn pop(stack: &mut Vec<Value>) -> Result<Value, String> {
 fn add(a: Value, b: Value) -> Result<Value, String> {
     match (a, b) {
         (Value::Int(x), Value::Int(y)) => Ok(Value::Int(x + y)),
+        (Value::Num(x), Value::Num(y)) => Ok(Value::Num(x + y)),
+        (Value::Int(x), Value::Num(y)) => Ok(Value::Num(x as f64 + y)),
+        (Value::Num(x), Value::Int(y)) => Ok(Value::Num(x + y as f64)),
         (Value::Text(x), Value::Text(y)) => Ok(Value::Text(format!("{x}{y}"))),
         (Value::Text(x), y) => Ok(Value::Text(format!("{x}{}", y.as_display()))),
         (x, Value::Text(y)) => Ok(Value::Text(format!("{}{y}", x.as_display()))),
         (Value::Int(x), y) => Ok(Value::Text(format!("{}{}", x, y.as_display()))),
         (x, Value::Int(y)) => Ok(Value::Text(format!("{}{y}", x.as_display()))),
-        _ => Err("`+` needs ints or text".into()),
+        _ => Err("`+` needs ints, nums, or text".into()),
     }
 }
 

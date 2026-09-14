@@ -25,12 +25,12 @@ Canonical design (repo): [`markdown-mapping-v0.3.md`](../../doc/design/markdown-
 
 1. **File suffix** must be `.mq.md` (never plain `.md` for executable sources).
 2. **`**…**` = code** (assign / call). **`*…*` = return value**. Output is **not** either marker — use `> print text=…` / `**print text="…"**` / `> 打印 内容=…`.
-3. **Prose:** unmarked narrative may contain `` `名` `` (declare/ref), inline `**code**`, and `*return*`. Do **not** use `*`/`**` for Markdown emphasis in program files. Dead `` `名` `` (never read) is OK and does not become a param.
+3. **Prose:** unmarked narrative may contain `` `名` `` (declare/ref), inline `**code**`, and `*return*`. Soft Markdown emphasis that is **not** code-shaped (`**说明**`, mid-line `*only*`) is ignored — see [code-as-docs-gaps.md](../../doc/design/code-as-docs-gaps.md). Dead `` `名` `` (never read) is OK and does not become a param.
 4. **Do not invent keywords** `if` / `else` / `while` / `for` / `def` / `return`. Control flow is Markdown: **`1.` `2.` … branches**, **`-` loops**, arm `N. *` = else, `#` = **object/type**, `##`+ = **function/method**. Params: prefer prose `` `名` `` / `` `名`=默认 `` (inferred); `` + `名` `` still accepted.
 5. **Identifiers:** `` `名` `` in prose; inside `*…*` / `**…**`, bare ids are **variables**. **Text literals must be quoted** in bold/italic: `**print text="hi"**`. Standalone `>` calls: bare words = text; vars need ticks: `` > str `n` ``.
 6. **Structure lines** (`#` `>` `+` `-` `|` `1.`) need not be wrapped in bold.
 7. **Paths:** In bare expressions `/` is division. In call args / defaults / table cells, unspaced `a/b` and quoted paths are text.
-8. Prefer ending side-effect-only bodies with `---` / `***` (or `*None*` / whole-line `**` / `****`).
+8. Prefer ending side-effect-only bodies with `*None*` / `*无*` / whole-line `**` / `****` when the next lines must belong to an outer function. Lone `---` / `***` are Markdown thematic breaks (skipped everywhere), not function end.
 9. **`ext/**` never calls `host_*`.** Agent/OKF helpers are plugin names (`agent_kb_*`, …) after `plugin.load`. Do **not** add agent/OKF domain code to `src/host/` (core bloat). See `doc/design/ext-agent.md` §4.
 10. **Browser (route C/D/E/F):** client logic is Marqdo on WASM; official bridge is host glue and **may** implement lists, routing, storage, WebSocket, canvas, file read, observers — authors **must not hand-write business JS**. Use `web.client_embed` / `data-mq-source-url` auto-mount. Client effects: prefer **GFM tables + `lib/browser`** ([marqdo-dev](../marqdo-dev/SKILL.md)).
 11. **Code-as-documentation / no bag glue:** Prefer **GFM tables** for maps, lists, wire, commands. Prefer **`table.put` / named helpers** over `json.set` / `json.append` chains. `lib/json` is for parse/stringify/quote only — not a dict builder. Unreadable json pipelines are a style bug.
@@ -53,7 +53,7 @@ Canonical design (repo): [`markdown-mapping-v0.3.md`](../../doc/design/markdown-
 | `**…**` | **Code** (assign / call) — closing `**` touches last token; bare ids are variables; quote text literals |
 | `*…*` | **Return value** — closing `*` touches last token; bare ids are variables |
 | `****` / whole-line `**` / `*None*` | Return `None` and end function body |
-| Lone `---` / `***` in function body | End function body (no value) |
+| Lone `---` / `***` | Markdown thematic break (skip; not function end) |
 | GFM table after empty RHS bind | Collection (1-col list / ≥2-col map / `@`·`行`·`row` → list of maps); `` `x`[^1] `` / `` `m`[^key] `` |
 | `` ```lang `` | Foreign code block (via `lib/foreign`) |
 | `` `"text"` `` | Quoted string (`\n` `\t` `\\` `\"`; `` `var` `` inside); bare tokens unescaped |
@@ -89,12 +89,13 @@ Chinese builtins (same functions, no import):
 
 > print text=Hello, `who`!
 
----
+*None*
 ```
 
 - Call: `> name key=value` or `> name value`.
 - Nested helpers use deeper `#` (`##`, `###`, …).
-- After a helper with only side effects, end with `---` / `***`.
+- After a helper with only side effects, end with `*None*` / whole-line `**` / `****` when later lines must stay in the outer function. Lone `---` is only a thematic break (skipped).
+- In bold assigns, prefer bare calls: `**摘要 = 结账摘要 …**` (omit `>`).
 
 ## Statements, returns, branches
 
@@ -256,7 +257,7 @@ Examples: [linalg-svd](../../examples/linalg-svd/) · [linalg-least-squares](../
 | `* > print text=hi *` | `> print text=hi` |
 | `` *`a` = 1 * `` (trailing space + backticks) | `*a = 1*` — bare bind, no trailing space before `*` / `**` |
 | `*xs = > text.split value=a,b sep=,*` (bare text args) | `*xs = > text.split value="a,b" sep=","*` — quote text literals; bare words are variables |
-| Forgetting `---` after nested `##` helper | Add `---` / `***` / `****` |
+| Forgetting empty return after nested `##` helper when outer continues | Add `*None*` / `**` / `****` (not `---`) |
 | Import `lib/text` then call bare `split` | `> text.split …` (qualified) |
 | Import `lib/text` then call `拆分` | Match file language (`text.split`, not 文本) |
 | `json.set` / `json.append` to build maps or lists | GFM tables; sparse `table.put`; named helpers (`browser.*`, `web.*`) |
@@ -276,7 +277,7 @@ Examples: [linalg-svd](../../examples/linalg-svd/) · [linalg-least-squares](../
 - [ ] Print via `print` / `打印`, not bold
 - [ ] Blank lines separate comment paragraphs from code
 - [ ] `# main` exists when the file is an entry program
-- [ ] Nested functions ended with `---` / `***` / `****` when needed
+- [ ] Nested side-effect helpers ended with `*None*` / `**` / `****` when the outer function continues
 - [ ] Imports and call names share the same language file
 - [ ] Data shaped as **GFM tables** (or short helpers) — no `json.set` / `json.append` glue
 - [ ] Web sites: tables + web classes only (no JSON glue); `data/` gitignored

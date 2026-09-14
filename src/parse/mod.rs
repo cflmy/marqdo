@@ -12,7 +12,7 @@ pub use prose::{scan_prose_line, ProseBit};
 use anyhow::{bail, Result};
 
 use crate::ast::{
-    BranchArm, Expr, Function, Import, Literal, Module, Param, Stmt, Use,
+    BranchArm, Expr, Function, Import, IndexKey, Literal, Module, Param, Stmt, Use,
 };
 use crate::diagnostics::{bail_at, Diagnostic, Span};
 use crate::lex::{classify_source, ClassifiedLine, LineKind};
@@ -33,8 +33,18 @@ pub fn parse_classified(lines: &[ClassifiedLine]) -> Result<Module> {
     while cur.skip_noise() {
         let Some(line) = cur.peek() else { break };
         let trimmed = line.text.trim();
+        // Module-level Markdown thematic breaks (`---` / `***`) are narrative skip.
+        if is_frame(trimmed) {
+            cur.bump();
+            continue;
+        }
         if is_heading(trimmed) {
             functions.push(cur.parse_function(1)?);
+        } else if line.kind == LineKind::Comment {
+            // Intro paragraphs may still contain return-shaped italics (`返回*值*`)
+            // or leftover soft emphasis; executable prose belongs inside functions.
+            cur.bump();
+            continue;
         } else {
             bail!(
                 "{}:1: expected heading (`#` object or `##` function), got: {trimmed}",
@@ -246,13 +256,19 @@ impl<'a> Cursor<'a> {
                     value: Expr::Literal(Literal::None),
                     span,
                 });
-                break;
+                // Objects (`#`) may still declare `##` methods after the constructor return.
+                if level >= 2 {
+                    break;
+                }
+                continue;
             }
 
-            // --- / *** at function body top level ends the function (no return).
+            // `---` / `***` = Markdown thematic break (narrative skip), not function end.
+            // Side-effect-only helpers end with `*None*` / whole-line `**` / `****`, or at
+            // the next heading / EOF.
             if is_frame(trimmed) {
                 self.bump();
-                break;
+                continue;
             }
 
             if is_heading(trimmed) {
@@ -271,6 +287,7 @@ impl<'a> Cursor<'a> {
                     col: 1,
                 };
                 let bits = scan_prose_line(line.text.trim_end_matches(['\r', '\n']));
+                let mut end_body = false;
                 for bit in bits {
                     match bit {
                         ProseBit::Decl { name, default, .. } => {
@@ -284,8 +301,15 @@ impl<'a> Cursor<'a> {
                         }
                         ProseBit::ItalicReturn { inner, .. } => {
                             fun.body.push(stmt_from_italic_return(&inner, span.clone())?);
+                            // `##`+ : return ends the function so outer/sibling lines attach.
+                            // `#` objects: keep scanning for method headings.
+                            end_body = level >= 2;
+                            break;
                         }
                     }
+                }
+                if end_body {
+                    break;
                 }
                 continue;
             }
@@ -299,7 +323,12 @@ impl<'a> Cursor<'a> {
                 continue;
             }
 
-            fun.body.push(self.parse_simple_stmt()?);
+            let stmt = self.parse_simple_stmt()?;
+            let end_body = matches!(stmt, Stmt::Return { .. }) && level >= 2;
+            fun.body.push(stmt);
+            if end_body {
+                break;
+            }
         }
 
         merge_inferred_params(&mut fun, &prose_decls)?;
@@ -315,7 +344,8 @@ impl<'a> Cursor<'a> {
         let trimmed = line.text.trim();
 
         if is_frame(trimmed) {
-            bail!("{span}: unexpected frame line as statement");
+            // Should be skipped by callers; keep defensive message if reached.
+            bail!("{span}: unexpected frame line as statement (use empty return `*None*` / `**` / `****` to end a side-effect body)");
         }
 
         if trimmed.starts_with("$$") {
@@ -844,7 +874,12 @@ impl<'a> Cursor<'a> {
                 body.push(self.parse_loop_or_err()?);
                 continue;
             }
-            body.push(self.parse_simple_stmt()?);
+            let stmt = self.parse_simple_stmt()?;
+            let end_arm = matches!(stmt, Stmt::Return { .. });
+            body.push(stmt);
+            if end_arm {
+                break;
+            }
         }
         Ok(body)
     }
@@ -1372,7 +1407,12 @@ fn collect_reads_expr(expr: &Expr, reads: &mut std::collections::HashSet<String>
             collect_reads_expr(right, reads);
         }
         Expr::Unary { expr, .. } => collect_reads_expr(expr, reads),
-        Expr::Index { base, .. } => collect_reads_expr(base, reads),
+        Expr::Index { base, label } => {
+            collect_reads_expr(base, reads);
+            if let IndexKey::Var(n) = label {
+                reads.insert(n.clone());
+            }
+        }
         Expr::List(xs) => {
             for x in xs {
                 collect_reads_expr(x, reads);

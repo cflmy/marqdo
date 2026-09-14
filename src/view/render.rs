@@ -1341,7 +1341,11 @@ fn expr_prec(expr: &Expr, parent_prec: u8) -> String {
             format!("{{{}}}", parts.join(", "))
         }
         Expr::Index { base, label } => {
-            format!("{}[^{}]", expr_prec(base, 8), label)
+            let key = match label {
+                crate::ast::IndexKey::Lit(s) => s.clone(),
+                crate::ast::IndexKey::Var(n) => format!("`{n}`"),
+            };
+            format!("{}[^{}]", expr_prec(base, 8), key)
         }
         Expr::Formula(e) => format!("$$ {} $$", e.as_display()),
         Expr::Code(c) => format!("```{} …```", c.lang),
@@ -1436,6 +1440,7 @@ fn lit_display(lit: &Literal) -> String {
         Literal::Bool(true) => "True".into(),
         Literal::Bool(false) => "False".into(),
         Literal::Int(n) => n.to_string(),
+        Literal::Num(n) => crate::formula::format_num(*n),
         Literal::Text(t) => t.clone(),
     }
 }

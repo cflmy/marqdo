@@ -5,7 +5,8 @@ use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
 use crate::ast::{
-    Arg, BinaryOp, CallExpr, Expr, Function, InterpPart, Literal, Module, Param, Stmt, UnaryOp,
+    Arg, BinaryOp, CallExpr, Expr, Function, IndexKey, InterpPart, Literal, Module, Param, Stmt,
+    UnaryOp,
 };
 use crate::builtin::{
     builtin_at, builtin_footnote_get, builtin_int, builtin_iter_items, builtin_join,
@@ -460,6 +461,24 @@ impl Interpreter {
         }
     }
 
+    fn resolve_index_key(
+        &mut self,
+        _module: &Module,
+        _fun: &Function,
+        env: &mut Env,
+        label: &IndexKey,
+    ) -> Result<String> {
+        match label {
+            IndexKey::Lit(s) => Ok(s.clone()),
+            IndexKey::Var(name) => {
+                let v = env.get(name).cloned().ok_or_else(|| {
+                    self.err(format!("undefined variable `{name}` in footnote key"))
+                })?;
+                Ok(v.as_display())
+            }
+        }
+    }
+
     fn eval_expr(
         &mut self,
         module: &Module,
@@ -503,7 +522,8 @@ impl Interpreter {
                     UnaryOp::Not => Ok(Value::Bool(!v.truthy())),
                     UnaryOp::Neg => match v {
                         Value::Int(n) => Ok(Value::Int(-n)),
-                        _ => Err(self.err("unary `-` needs int")),
+                        Value::Num(n) => Ok(Value::Num(-n)),
+                        _ => Err(self.err("unary `-` needs int or num")),
                     },
                 }
             }
@@ -556,7 +576,8 @@ impl Interpreter {
             }
             Expr::Index { base, label } => {
                 let v = self.eval_expr(module, fun, env, base)?;
-                builtin_footnote_get(&v, label).map_err(|m| self.err(m))
+                let key = self.resolve_index_key(module, fun, env, label)?;
+                builtin_footnote_get(&v, &key).map_err(|m| self.err(m))
             }
             Expr::Formula(e) => Ok(Value::Formula(e.clone())),
             Expr::Code(c) => Ok(Value::Code(c.clone())),
@@ -1144,6 +1165,7 @@ fn lit_to_value(lit: &Literal) -> Value {
         Literal::None => Value::None,
         Literal::Bool(b) => Value::Bool(*b),
         Literal::Int(n) => Value::Int(*n),
+        Literal::Num(n) => Value::Num(*n),
         Literal::Text(s) => Value::Text(s.clone()),
     }
 }
@@ -1152,23 +1174,38 @@ fn eval_binary(op: BinaryOp, l: &Value, r: &Value) -> Result<Value> {
     match op {
         BinaryOp::Add => match (l, r) {
             (Value::Int(a), Value::Int(b)) => Ok(Value::Int(a + b)),
+            (Value::Num(a), Value::Num(b)) => Ok(Value::Num(a + b)),
+            (Value::Int(a), Value::Num(b)) => Ok(Value::Num(*a as f64 + b)),
+            (Value::Num(a), Value::Int(b)) => Ok(Value::Num(a + *b as f64)),
             (Value::Text(a), Value::Text(b)) => Ok(Value::Text(format!("{a}{b}"))),
             (Value::Text(a), b) => Ok(Value::Text(format!("{a}{}", b.as_display()))),
             (a, Value::Text(b)) => Ok(Value::Text(format!("{}{b}", a.as_display()))),
-            _ => bail!("`+` needs ints or text"),
+            _ => bail!("`+` needs ints, nums, or text"),
         },
         BinaryOp::Sub => match (l, r) {
             (Value::Int(a), Value::Int(b)) => Ok(Value::Int(a - b)),
-            _ => bail!("`-` needs ints"),
+            (Value::Num(a), Value::Num(b)) => Ok(Value::Num(a - b)),
+            (Value::Int(a), Value::Num(b)) => Ok(Value::Num(*a as f64 - b)),
+            (Value::Num(a), Value::Int(b)) => Ok(Value::Num(a - *b as f64)),
+            _ => bail!("`-` needs ints or nums"),
         },
         BinaryOp::Mul => match (l, r) {
             (Value::Int(a), Value::Int(b)) => Ok(Value::Int(a * b)),
-            _ => bail!("`*` needs ints"),
+            (Value::Num(a), Value::Num(b)) => Ok(Value::Num(a * b)),
+            (Value::Int(a), Value::Num(b)) => Ok(Value::Num(*a as f64 * b)),
+            (Value::Num(a), Value::Int(b)) => Ok(Value::Num(a * *b as f64)),
+            _ => bail!("`*` needs ints or nums"),
         },
         BinaryOp::Div => match (l, r) {
             (Value::Int(_), Value::Int(0)) => bail!("division by zero"),
             (Value::Int(a), Value::Int(b)) => Ok(Value::Int(a / b)),
-            _ => bail!("`/` needs ints"),
+            (Value::Num(_), Value::Num(b)) if *b == 0.0 => bail!("division by zero"),
+            (Value::Int(_), Value::Num(b)) if *b == 0.0 => bail!("division by zero"),
+            (Value::Num(_), Value::Int(0)) => bail!("division by zero"),
+            (Value::Num(a), Value::Num(b)) => Ok(Value::Num(a / b)),
+            (Value::Int(a), Value::Num(b)) => Ok(Value::Num(*a as f64 / b)),
+            (Value::Num(a), Value::Int(b)) => Ok(Value::Num(a / *b as f64)),
+            _ => bail!("`/` needs ints or nums"),
         },
         BinaryOp::Eq => Ok(Value::Bool(l == r)),
         BinaryOp::Ne => Ok(Value::Bool(l != r)),

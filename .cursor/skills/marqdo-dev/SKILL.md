@@ -88,6 +88,8 @@ Better still — call a named helper:
 3. `##` handlers: short prose OK; data as tables; return via `browser.*` / `web.*` / one `table.put`.
 4. Blank line between comment paragraphs and code.
 5. Run `marqdo run path.mq.md` from repo root.
+6. **Calls in narrative:** prefer `**结果 = 某函数 名=`x`**` (no `>` on the RHS). Use `> …` for standalone step lists. See `examples/code-as-docs/`.
+7. **Do not use `##` inside `# main` for document sectioning** — those become nested functions. Use paragraphs / `---` breaks instead.
 
 Browser client programs: prefer `import browser:lib/browser.mq.md` (no native plugin). Server sites: `ext/web` + GFM page/style tables.
 

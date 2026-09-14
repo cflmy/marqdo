@@ -15,6 +15,8 @@
 
 见各 `.mq.md` frontmatter；汇总期望以 `gold.rs` 为准。
 
+代码即文档叙述面（G1–G4）：`module-hr` / `soft-emphasis` / `float-discount` / `dynamic-footnote` —— 设计见 [code-as-docs-gaps.md](../../doc/design/code-as-docs-gaps.md)。
+
 ```bash
 cargo test --test gold markup_v03
 marqdo run tests/markup-v03/inc-prose.mq.md

@@ -38,8 +38,9 @@ Marqdo 把 Markdown **标记当作编程语法**：同一个 `.mq.md` 文件，�
 | `+` / `1.` … | 函数头下 `` + `名` `` = 形参；体内 `1.` `2.` … = 分支（`N. *` = else） |
 | `-` | 循环（`` - `条件` `` 或 `` - [项](集合) `` / `` - [`项`](`集合`) ``） |
 | 表格 | 集合 |
-| 函数体内单独一行 `---` / `***` | **结束本函数体**（无返回值收束；见 mapping §11） |
-| 文件开头成对 `---` … `---` | Frontmatter（元信息 / 导入），与函数结束符消歧 |
+| 单独一行 `---` / `***` | **叙述分隔**（跳过；不是函数收束） |
+| 空返回 `*None*` / 整行 `**` / `****` | **结束本函数体**并返回 `None` |
+| 文件开头成对 `---` … `---` | Frontmatter（元信息 / 导入） |
 
 ```markdown
 # main
@@ -51,7 +52,7 @@ Marqdo 把 Markdown **标记当作编程语法**：同一个 `.mq.md` 文件，�
 
 > print text=Hello `谁`!
 
----
+*None*
 
 ## 加一
     + `n`
@@ -59,7 +60,7 @@ Marqdo 把 Markdown **标记当作编程语法**：同一个 `.mq.md` 文件，�
 **`n` + 1**
 ```
 
-完整约定：[markdown-mapping.md](doc/design/markdown-mapping.md)。
+完整约定：[markdown-mapping-v0.3.md](doc/design/markdown-mapping-v0.3.md)。
 
 ---
 

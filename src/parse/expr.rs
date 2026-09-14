@@ -2,7 +2,7 @@
 
 use anyhow::{bail, Result};
 
-use crate::ast::{BinaryOp, CallExpr, Expr, InterpPart, Literal, UnaryOp};
+use crate::ast::{BinaryOp, CallExpr, Expr, IndexKey, InterpPart, Literal, UnaryOp};
 
 pub fn parse_expr(input: &str) -> Result<Expr> {
     parse_expr_mode(input, false)
@@ -195,7 +195,7 @@ pub fn parse_interp(s: &str) -> Expr {
                 for label in labels {
                     e = Expr::Index {
                         base: Box::new(e),
-                        label: label.clone(),
+                        label: IndexKey::Lit(label.clone()),
                     };
                 }
                 return e;
@@ -516,10 +516,35 @@ impl<'a> Parser<'a> {
             self.i += '空'.len_utf8();
             return Ok(Expr::Literal(Literal::None));
         }
-        if self.peek_char().map(|c| c.is_ascii_digit()).unwrap_or(false) {
+        if self.peek_char().map(|c| c.is_ascii_digit()).unwrap_or(false)
+            || (self.peek_char() == Some('.')
+                && self
+                    .rest()
+                    .chars()
+                    .nth(1)
+                    .map(|c| c.is_ascii_digit())
+                    .unwrap_or(false))
+        {
             let start = self.i;
             while self.peek_char().map(|c| c.is_ascii_digit()).unwrap_or(false) {
                 self.bump_char();
+            }
+            if self.peek_char() == Some('.') {
+                self.bump_char();
+                let frac_start = self.i;
+                while self.peek_char().map(|c| c.is_ascii_digit()).unwrap_or(false) {
+                    self.bump_char();
+                }
+                // Require at least one digit on one side of the dot.
+                let int_part = &self.src[start..frac_start.saturating_sub(1)];
+                let frac_part = &self.src[frac_start..self.i];
+                if int_part.is_empty() && frac_part.is_empty() {
+                    bail!("invalid number literal");
+                }
+                let n: f64 = self.src[start..self.i]
+                    .parse()
+                    .map_err(|e| anyhow::anyhow!("invalid float: {e}"))?;
+                return Ok(Expr::Literal(Literal::Num(n)));
             }
             let n: i64 = self.src[start..self.i].parse()?;
             return Ok(Expr::Literal(Literal::Int(n)));
@@ -691,7 +716,7 @@ impl<'a> Parser<'a> {
                     for label in labels {
                         e = Expr::Index {
                             base: Box::new(e),
-                            label,
+                            label: IndexKey::Lit(label),
                         };
                     }
                     e
@@ -736,10 +761,35 @@ impl<'a> Parser<'a> {
         }
     }
 
-    /// Parse `[^label]` after a value; label is text until `]`.
-    fn parse_footnote_label(&mut self) -> Result<String> {
+    /// Parse `[^label]` or `` [^`ident`] `` after a value.
+    fn parse_footnote_label(&mut self) -> Result<IndexKey> {
         if !self.eat("[^") {
             bail!("expected [^ footnote index");
+        }
+        self.skip_ws();
+        if self.eat("`") {
+            let start = self.i;
+            while let Some(c) = self.peek_char() {
+                if c == '`' {
+                    break;
+                }
+                if c == '\n' || c == '\r' || c == ']' {
+                    bail!("unterminated footnote var `[^`…`]`");
+                }
+                self.bump_char();
+            }
+            let name = self.src[start..self.i].trim().to_string();
+            if !self.eat("`") {
+                bail!("unterminated footnote var `[^`…`]`");
+            }
+            self.skip_ws();
+            if !self.eat("]") {
+                bail!("unterminated footnote index [^…]");
+            }
+            if name.is_empty() {
+                bail!("empty footnote var `[^`]`");
+            }
+            return Ok(IndexKey::Var(name));
         }
         let start = self.i;
         while let Some(c) = self.peek_char() {
@@ -758,7 +808,7 @@ impl<'a> Parser<'a> {
         if label.is_empty() {
             bail!("empty footnote index `[^]`");
         }
-        Ok(label)
+        Ok(IndexKey::Lit(label))
     }
 }
 
@@ -1038,7 +1088,7 @@ mod tests {
         match e {
             Expr::Index { base, label } => {
                 assert!(matches!(base.as_ref(), Expr::Var(n) if n == "ev"));
-                assert_eq!(label, "result");
+                assert_eq!(label, IndexKey::Lit("result".into()));
             }
             other => panic!("expected Index, got {other:?}"),
         }
@@ -1214,13 +1264,25 @@ mod tests {
         }
         // Bare `m`[^key] with no prefix → Expr::Index
         let e = parse_interp("`m`[^苹果]");
-        assert!(matches!(e, Expr::Index { label, .. } if label == "苹果"));
+        assert!(matches!(
+            e,
+            Expr::Index {
+                label: IndexKey::Lit(ref s),
+                ..
+            } if s == "苹果"
+        ));
         // Chained labels fold into one Index part with multiple labels.
         let e = parse_interp("`m`[^a][^b]");
         match &e {
             Expr::Index { base, label } => {
-                assert!(matches!(base.as_ref(), Expr::Index { label: l, .. } if l == "a"));
-                assert_eq!(label, "b");
+                assert!(matches!(
+                    base.as_ref(),
+                    Expr::Index {
+                        label: IndexKey::Lit(ref l),
+                        ..
+                    } if l == "a"
+                ));
+                assert_eq!(label, &IndexKey::Lit("b".into()));
             }
             other => panic!("expected chained Index, got {other:?}"),
         }
@@ -1240,6 +1302,30 @@ mod tests {
             }
             other => panic!("expected Interp, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn float_literal_and_dynamic_footnote_key() {
+        let e = parse_expr("0.85").unwrap();
+        assert!(matches!(e, Expr::Literal(Literal::Num(n)) if (n - 0.85).abs() < 1e-12));
+        let e = parse_expr("28 * 0.85").unwrap();
+        assert!(matches!(e, Expr::Binary { op: BinaryOp::Mul, .. }));
+        let e = parse_expr_prefer_var("菜单[^`名`]").unwrap();
+        match e {
+            Expr::Index { base, label } => {
+                assert!(matches!(base.as_ref(), Expr::Var(n) if n == "菜单"));
+                assert_eq!(label, IndexKey::Var("名".into()));
+            }
+            other => panic!("expected dynamic Index, got {other:?}"),
+        }
+        let e = parse_expr("m[^拿铁]").unwrap();
+        assert!(matches!(
+            e,
+            Expr::Index {
+                label: IndexKey::Lit(ref s),
+                ..
+            } if s == "拿铁"
+        ));
     }
 }
 

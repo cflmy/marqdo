@@ -29,7 +29,7 @@ Canonical design (repo): `doc/design/markdown-mapping.md`, `doc/design/keywords.
 5. **Identifiers use backticks** — params `` + `name` ``. **Exemptions:** foreach `` - [item](coll) ``; footnote `` name[^key] ``; **inside italic `*…*` / bold `**…**`**, bare ids are **variables** (Python-style unified namespace) and method-call receivers are bare too. **Drop the backticks on value-expression variable names and method receivers inside `*…*` / `**…**`** — they are redundant once the `*…*`/`**…**` markers mark the segment as code: `*分类 = 分类[^苹果]*`, `**n * 2**`, `*p = > page.主体装配 组件=home*`. **Text literals must be quoted**: `*a = > text.split value=src sep=","*`. Backticks **still required** where a bare word is *not* a variable in **standalone `>` calls** (bare = text there): `` > str `n` ``, `` > `obj`.method ``. **No trailing space** inside `*…*` / `**…**` wrapped code: the closing marker must touch the last token directly (`*a = 1*`, `**n**`), never `` *a = 1 * ``.
 6. **Structure lines are not wrapped in italics.** `#` `>` `+` `-` `|` lines stand alone; use `*…*` only for general statements (bindings / expressions).
 7. **Paths:** In bare *expressions* `/` is division. In **call args / param defaults / table cells**, unspaced `a/b` and quoted `".marqdo/agent-kb"` are path text — no `json.parse` needed. Numeric ratios that must stay text use quotes (`"1/5"`, `"16/9"`); bare `1/5` is division.
-8. Prefer ending side-effect-only function bodies with a lone `---` or `***` line (or `****` empty return) so later siblings are not swallowed.
+8. Prefer ending side-effect-only function bodies with `*None*` / `*无*` / whole-line `**` / `****` when later lines must belong to an outer function. Lone `---` / `***` are Markdown thematic breaks (skipped), not function end.
 9. **`ext/**` never calls `host_*`.** Agent/OKF helpers are plugin names (`agent_kb_*`, …) after `plugin.load`. Do **not** add agent/OKF domain code to `src/host/` (core bloat). See `doc/design/ext-agent.md` §4.
 10. **Browser (route C/D/E/F):** client logic is Marqdo on WASM; official bridge is host glue and **may** implement lists, routing, storage, WebSocket, canvas, file read, observers — authors **must not hand-write business JS**. Use `web.client_embed` / `data-mq-source-url` auto-mount. Client effects: prefer **GFM tables + `lib/browser`** ([marqdo-dev](../marqdo-dev/SKILL.md)).
 11. **Code-as-documentation / no bag glue:** Prefer **GFM tables** for maps, lists, wire, commands. Prefer **`table.put` / named helpers** over `json.set` / `json.append` chains. `lib/json` is for parse/stringify/quote only — not a dict builder. Unreadable json pipelines are a style bug.
@@ -53,7 +53,7 @@ Canonical design (repo): `doc/design/markdown-mapping.md`, `doc/design/keywords.
 | `*…*` | Statement (bind / expr) — closing `*` touches last token, **no trailing space**; bare ids are variables |
 | `**…**` | Return value — closing `**` touches last token, **no trailing space**; bare ids are variables |
 | `****` or `**` + spaces + `**` | Return `None` and end function body |
-| Lone `---` / `***` in function body | End function body (no value) |
+| Lone `---` / `***` | Markdown thematic break (skip; not function end) |
 | GFM table after empty RHS bind | Collection (1-col list / ≥2-col map / `@`·`行`·`row` → list of maps); `` `x`[^1] `` / `` `m`[^key] `` |
 | `` ```lang `` | Foreign code block (via `lib/foreign`) |
 | `` `"text"` `` | Quoted string (`\n` `\t` `\\` `\"`; `` `var` `` inside); bare tokens unescaped |
@@ -89,12 +89,13 @@ Chinese builtins (same functions, no import):
 
 > print text=Hello, `who`!
 
----
+*None*
 ```
 
 - Call: `> name key=value` or `> name value`.
 - Nested helpers use deeper `#` (`##`, `###`, …).
-- After a helper with only side effects, end with `---` / `***`.
+- After a helper with only side effects, end with `*None*` / whole-line `**` / `****` when later lines must stay in the outer function. Lone `---` is only a thematic break (skipped).
+- In bold assigns, prefer bare calls: `**摘要 = 结账摘要 …**` (omit `>`).
 
 ## Statements, returns, branches
 
@@ -243,7 +244,7 @@ Design: [ext-quantum.md](../../doc/design/ext-quantum.md) · Q7: [ext-quantum-q7
 | `* > print text=hi *` | `> print text=hi` |
 | `` *`a` = 1 * `` (trailing space + backticks) | `*a = 1*` — bare bind, no trailing space before `*` / `**` |
 | `*xs = > text.split value=a,b sep=,*` (bare text args) | `*xs = > text.split value="a,b" sep=","*` — quote text literals; bare words are variables |
-| Forgetting `---` after nested `##` helper | Add `---` / `***` / `****` |
+| Forgetting empty return after nested `##` helper when outer continues | Add `*None*` / `**` / `****` (not `---`) |
 | Import `lib/text` then call bare `split` | `> text.split …` (qualified) |
 | Import `lib/text` then call `拆分` | Match file language (`text.split`, not 文本) |
 | `json.set` / `json.append` to build maps or lists | GFM tables; sparse `table.put`; named helpers (`browser.*`, `web.*`) |
@@ -262,7 +263,7 @@ Design: [ext-quantum.md](../../doc/design/ext-quantum.md) · Q7: [ext-quantum-q7
 - [ ] Print via `print` / `打印`, not bold
 - [ ] Blank lines separate comment paragraphs from code
 - [ ] `# main` exists when the file is an entry program
-- [ ] Nested functions ended with `---` / `***` / `****` when needed
+- [ ] Nested side-effect helpers ended with `*None*` / `**` / `****` when the outer function continues
 - [ ] Imports and call names share the same language file
 - [ ] Data shaped as **GFM tables** (or short helpers) — no `json.set` / `json.append` glue
 - [ ] Web sites: tables + web classes only (no JSON glue); `data/` gitignored

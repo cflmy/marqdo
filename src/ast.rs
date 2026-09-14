@@ -145,11 +145,11 @@ pub enum Expr {
     List(Vec<Expr>),
     /// Object literal / horizontal table (`map` value).
     Map(Vec<(String, Expr)>),
-    /// Footnote index: `` `xs`[^1] `` / `` `m`[^key] `` (see tables-maps-footnotes).
+    /// Footnote index: `` `xs`[^1] `` / `` `m`[^key] `` / `` `m`[^`var`] `` (dynamic key).
     Index {
         base: Box<Expr>,
-        /// Label inside `[^…]` (digits → 1-based list index, or map key text including digit keys).
-        label: String,
+        /// Label inside `[^…]` (digits → 1-based list index, or map key; see [`IndexKey`]).
+        label: IndexKey,
     },
     /// Parsed `$$…$$` formula tree (from assignment RHS).
     Formula(FormulaExpr),
@@ -166,11 +166,22 @@ pub enum InterpPart {
     Index { base: String, labels: Vec<String> },
 }
 
+/// Footnote / map key after `[^…]`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum IndexKey {
+    /// Static text: `[^拿铁]` / `[^1]`.
+    Lit(String),
+    /// Dynamic: `` [^`品名`] `` — evaluate variable, then stringify as key.
+    Var(String),
+}
+
 #[derive(Debug, Clone)]
 pub enum Literal {
     None,
     Bool(bool),
     Int(i64),
+    /// Decimal literal (`0.85`, `3.14`).
+    Num(f64),
     Text(String),
 }
 

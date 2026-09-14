@@ -28,7 +28,7 @@ Named args can include spaces:
 
 > print text=Welcome, `who`!
 
----
+*None*
 
 Beyond the basics above, Marqdo also ships standard libraries: table, time, text, files, system, math, foreign, and more.
 

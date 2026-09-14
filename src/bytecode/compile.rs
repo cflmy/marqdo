@@ -797,6 +797,10 @@ impl<'a> FnCompiler<'a> {
                     let i = self.add_const(Value::Int(*n));
                     self.emit(Op::Constant(i));
                 }
+                Literal::Num(n) => {
+                    let i = self.add_const(Value::Num(*n));
+                    self.emit(Op::Constant(i));
+                }
                 Literal::Text(t) => {
                     let i = self.add_const(Value::Text(t.clone()));
                     self.emit(Op::Constant(i));
@@ -942,8 +946,19 @@ impl<'a> FnCompiler<'a> {
             }
             Expr::Index { base, label } => {
                 self.compile_expr(base)?;
-                let li = self.add_const(Value::Text(label.clone()));
-                self.emit(Op::Constant(li));
+                match label {
+                    crate::ast::IndexKey::Lit(s) => {
+                        let li = self.add_const(Value::Text(s.clone()));
+                        self.emit(Op::Constant(li));
+                    }
+                    crate::ast::IndexKey::Var(name) => {
+                        let slot = self.locals.get(name).copied().ok_or_else(|| {
+                            self.err(format!("undefined variable `{name}` in footnote key"))
+                        })?;
+                        self.emit(Op::GetLocal(slot));
+                        self.emit(Op::Str);
+                    }
+                }
                 self.emit(Op::FootnoteGet);
             }
             Expr::Formula(e) => {

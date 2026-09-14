@@ -3824,3 +3824,23 @@ fn markup_v03_multi_bold() {
 fn markup_v03_print_bold() {
     assert_out_v03("tests/markup-v03/print-bold.mq.md", "Hello");
 }
+
+#[test]
+fn markup_v03_module_hr() {
+    assert_out_v03("tests/markup-v03/module-hr.mq.md", "ok");
+}
+
+#[test]
+fn markup_v03_soft_emphasis() {
+    assert_out_v03("tests/markup-v03/soft-emphasis.mq.md", "2");
+}
+
+#[test]
+fn markup_v03_float_discount() {
+    assert_out_v03("tests/markup-v03/float-discount.mq.md", "23.8");
+}
+
+#[test]
+fn markup_v03_dynamic_footnote() {
+    assert_out_v03("tests/markup-v03/dynamic-footnote.mq.md", "28");
+}
