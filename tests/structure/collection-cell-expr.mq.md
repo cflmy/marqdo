@@ -14,9 +14,9 @@ description: Data cells evaluate like call-arg values (`var`, paths, hyphen pros
 |---------|-------|------|
 | `secret` | `name` | https://api.openai.com/v1 |
 
-> print text=`cfg`[^api_key]
-> print text=`cfg`[^model]
-> print text=`cfg`[^base]
+> print text=[api_key](`cfg`)
+> print text=[model](`cfg`)
+> print text=[base](`cfg`)
 
 `paths` =
 
@@ -24,7 +24,7 @@ description: Data cells evaluate like call-arg values (`var`, paths, hyphen pros
 |---|
 | /chat/completions |
 
-> print text=`paths`[^1]
+> print text=[1](`paths`)
 
 `rec` =
 
@@ -32,7 +32,7 @@ description: Data cells evaluate like call-arg values (`var`, paths, hyphen pros
 |---|------|---------|
 | 1 | user | `secret` |
 
-> print text=`rec`[^1][^content]
+> print text=[content]([1](`rec`))
 
 `ratios` =
 
@@ -41,5 +41,5 @@ description: Data cells evaluate like call-arg values (`var`, paths, hyphen pros
 | "1/5" |
 | "16/9" |
 
-> print text=`ratios`[^1]
-> print text=`ratios`[^2]
+> print text=[1](`ratios`)
+> print text=[2](`ratios`)

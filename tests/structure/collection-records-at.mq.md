@@ -11,10 +11,10 @@ title: row records with @ marker
 | 1 | apple | 2 |
 | 2 | pear | 3 |
 
-**n = orders[^1][^name]**
+**n = [name]([1](orders))**
 
 > print text=`n`
 
-**q = orders[^2][^qty]**
+**q = [qty]([2](orders))**
 
 > print text=`q`

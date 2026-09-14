@@ -28,6 +28,7 @@
 | **M3–M4** | `ext/web`、`ext/ai`：脚注→链接取元；叙述；示例可逐步换括号调用 | **done**（取元迁移） |
 | **M5** | quantum / linalg + full gold | **done** |
 | **M6** | examples + public/structure + tests/ext·lib 链接取元；cafe 括号调用例 | **done** |
+| **M7** | structure collection 金样改链接形；public/stdlib 括号调用例 | **done** |
 
 ## 2. 验收（出门）
 
@@ -46,3 +47,4 @@
 | 2026-09-14 | M3–M4 ext/web+ai 脚注→链接取元 |
 | 2026-09-14 | M5 quantum/linalg 叙述 + public/features 取元 |
 | 2026-09-14 | M6 examples/public/tests 批量链接取元 + cafe 括号调用 |
+| 2026-09-14 | M7 structure collection 金样 + stdlib 括号调用例 |

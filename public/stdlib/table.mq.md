@@ -19,7 +19,7 @@ Read with link-index get. Use json for parse/stringify only.
 | b |
 
 **`xs` = [table.put] in=`xs` at=1 value="A"**
-**`n` = > table.rows xs=`xs`**
+**`n` = [table.rows] xs=`xs`**
 
 **打印 内容=[Authorization](h)**
 **打印 内容=[1](xs)**
