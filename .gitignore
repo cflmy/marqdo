@@ -76,3 +76,6 @@ plugins/*/tmp/
 
 # Go web plugin c-shared build output (./scripts/build-web-plugin.sh)
 /plugins/web/build/
+
+# ephemeral sqlite / test artifacts
+tests/ext/:memory:
