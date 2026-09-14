@@ -124,10 +124,10 @@ jobs:
             ## Marqdo ${{ github.ref_name }}
 
             ### 亮点 / Highlights
-            - **Go libweb 默认（W-G0–W-G14）**：网页原生插件 Go 重写；anlian-mq 验收；Release 含预编译 web.dll/libweb.so
-            - **Go libweb default (W-G0–W-G14)**: web plugin rewritten in Go; anlian-mq acceptance; prebuilt natives in Release
-            - **GAP-11/12**：表单插槽 · `MARQDO_EXT` 导入提示
-            - Details: [CHANGELOG](https://github.com/cflmy/marqdo/blob/main/CHANGELOG.md) · [ADR 0004](https://github.com/cflmy/marqdo/blob/main/doc/adr/0004-web-plugin-go.md)
+            - **v1.0.0**：Markdown 语法映射 v0.3 为唯一运行时（`**` 代码 / `*` 返回 / 叙述 `` `名` ``）
+            - **v1.0.0**: markup mapping v0.3 is the sole runtime (`**` code / `*` return / prose decls)
+            - **Linux 包必出**：`*-native-x86_64-unknown-linux-gnu.zip` + Linux CLI bundle
+            - Details: [CHANGELOG](https://github.com/cflmy/marqdo/blob/main/CHANGELOG.md) · [mapping v0.3](https://github.com/cflmy/marqdo/blob/main/doc/design/markdown-mapping-v0.3.md)
 
             ### Downloads
 

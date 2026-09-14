@@ -3,6 +3,25 @@
 ## Unreleased
 
 ### Added
+
+### Fixed
+
+### Changed
+
+## v1.0.0 — 2026-09-14
+
+### Highlights
+
+**Markdown 语法映射 v0.3 成为 1.0 宪法**：`**粗体**` = 代码，`*斜体*` = 返回，叙述里的 `` `名` `` 声明并推断形参。这是相对 v0.4 / 旧 `*语句*`/`**返回**` 的破坏性对调。Linux 预编译拓展包与 CLI bundle 为 Release 必出资产。
+
+```bash
+git checkout v1.0.0
+cargo build --release
+# Linux：也可直接解压 Release 的 marqdo-1.0.0-x86_64-unknown-linux-gnu.zip
+marqdo run tests/markup-v03/inc-prose.mq.md
+```
+
+### Added
 - **Markup v0.3 运行时闭环**：粗体=`代码`、斜体=`返回`、叙述 `` `名` `` 声明与形参推断为唯一映射；金样 `tests/markup-v03/`。
 - **方括号标记调用**与前置修饰语：`礼貌 [问候] x`；取元主语法 `[键](集合)`（脚注取元过渡保留）。
 - **代码即文档叙述面 G1–G4**：模块级 `---` 跳过、装饰性强调、浮点面量、动态键。

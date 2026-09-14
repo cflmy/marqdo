@@ -4,7 +4,7 @@
 
 | | |
 |---|---|
-| 状态 | **Active（v0.3 sole · 存量已迁移 · gold 绿）** |
+| 状态 | **Done（v1.0.0）** |
 | 日期 | 2026-09-13 |
 | 设计 | [markdown-mapping-v0.3.md](../design/markdown-mapping-v0.3.md) |
 | ADR | [0005-prose-unified-markup.md](../adr/0005-prose-unified-markup.md) |
@@ -77,7 +77,7 @@
 - [x] 更新 `.cursor/skills/marqdo/SKILL.md` 硬规则  
 - [x] 修订 [markdown-mapping.md](../design/markdown-mapping.md) 为 v0.3 正式正文（或声明由 v0.3 文件接任）  
 - [x] ADR 0005 → **Accepted**  
-- [ ] CHANGELOG / 发版说明（破坏性：标记对调）— Unreleased 已起草；随下一 tag 发布
+- [x] CHANGELOG / 发版说明（破坏性：标记对调）— **v1.0.0**
 
 **出门：** 全量 gold 默认绿（live LLM 无钥跳过）；无 v0.2 双模式。
 
