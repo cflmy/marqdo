@@ -5,6 +5,8 @@ import plugin:lib/plugin.mq.md
 import sys:lib/sys.mq.md
 ---
 
+Formula-first linear algebra (English). MatExpr simplify + display; ABI plugin.
+
 ## ensure_plugin
 
 Load the ABI v2 `linalg` plugin once.
@@ -18,6 +20,8 @@ Load the ABI v2 `linalg` plugin once.
 ****
 
 ## ping
+
+Plugin health check.
 
 > ensure_plugin
 *> linalg_ping*
@@ -35,6 +39,8 @@ Matrix product (lazy MatMul; shape-checked).
     + `a`
     + `b`
 
+Matrix / expression addition.
+
 > ensure_plugin
 *> linalg_add a=`a` b=`b`*
 
@@ -42,11 +48,15 @@ Matrix product (lazy MatMul; shape-checked).
     + `a`
     + `b`
 
+Matrix / expression subtraction.
+
 > ensure_plugin
 *> linalg_sub a=`a` b=`b`*
 
 ## transpose
     + `expr`
+
+Transpose expression.
 
 > ensure_plugin
 *> linalg_transpose expr=`expr`*
@@ -80,11 +90,15 @@ Display ASCII (default simplify first). Pass `raw=True` to keep the written tree
     + `expr`
     + `raw`=False
 
+LaTeX display.
+
 > ensure_plugin
 *> linalg_latex expr=`expr` raw=`raw`*
 
 ## shape
     + `expr`
+
+Matrix shape (rows, cols).
 
 > ensure_plugin
 *> linalg_shape expr=`expr`*
@@ -102,12 +116,16 @@ Record a formula SVG via host plot channel (default simplify). Returns the expr 
 ## eye
     + `n`
 
+Identity matrix of order n.
+
 > ensure_plugin
 *> linalg_eye n=`n`*
 
 ## zeros
     + `rows`
     + `cols`
+
+Zero matrix.
 
 > ensure_plugin
 *> linalg_zeros rows=`rows` cols=`cols`*
@@ -140,11 +158,15 @@ Evaluate to dense (default simplify first).
 ## det
     + `expr`
 
+Determinant.
+
 > ensure_plugin
 *> linalg_det expr=`expr`*
 
 ## trace
     + `expr`
+
+Trace.
 
 > ensure_plugin
 *> linalg_trace expr=`expr`*
@@ -292,6 +314,8 @@ Matrix value (`_type=matrix`). Prefer infix `A + B` / `A * B`, or methods `` `A`
 
 ## T
 
+Transpose (method).
+
 *> linalg_transpose expr=`self`*
 
 ## T_ascii
@@ -304,43 +328,63 @@ Transpose then display ASCII (auto-simplified). Handy for lecture identities.
 ## add
     + `b`
 
+Matrix / expression addition.
+
 *> linalg_add a=`self` b=`b`*
 
 ## sub
     + `b`
+
+Matrix / expression subtraction.
 
 *> linalg_sub a=`self` b=`b`*
 
 ## mul
     + `b`
 
+Matrix / expression product.
+
 *> linalg_mul a=`self` b=`b`*
 
 ## inv
+
+Inverse.
 
 *> linalg_inv expr=`self`*
 
 ## simplify
 
+Simplify MatExpr.
+
 *> linalg_simplify expr=`self`*
 
 ## ascii
+
+ASCII display.
 
 *> linalg_ascii expr=`self` raw=False*
 
 ## latex
 
+LaTeX display.
+
 *> linalg_latex expr=`self` raw=False*
 
 ## explicit
+
+Evaluate to an explicit matrix.
 
 *> linalg_explicit expr=`self` raw=False*
 
 ## det
 
+Determinant.
+
 *> linalg_det expr=`self`*
 
 ## trace
+
+Trace.
 
 *> linalg_trace expr=`self`*
 
@@ -348,10 +392,14 @@ Transpose then display ASCII (auto-simplified). Handy for lecture identities.
     + `path`=None
     + `raw`=False
 
+Show / export the expression.
+
 *> linalg_show expr=`self` path=`path` raw=`raw`*
 
 ## eye
     + `n`
+
+Identity matrix of order n.
 
 *> linalg_eye n=`n`*
 
@@ -359,14 +407,20 @@ Transpose then display ASCII (auto-simplified). Handy for lecture identities.
     + `rows`
     + `cols`
 
+Zero matrix.
+
 *> linalg_zeros rows=`rows` cols=`cols`*
 
 ## from_list
     + `data`
 
+Matrix from nested list.
+
 *> linalg_from_list data=`data`*
 
 ## from_formula
     + `formula`
+
+Matrix from formula text.
 
 *> linalg_from_formula formula=`formula`*

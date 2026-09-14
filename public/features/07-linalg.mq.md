@@ -22,8 +22,8 @@ Declare symbols in a table, multiply, transpose — `T_ascii` is one-step displa
 | 2 | B | 3 | 2 |
 
 **`env` = > la.declare table=`shapes`**
-**`A` = env[^A]**
-**`B` = env[^B]**
+**`A` = [A](env)**
+**`B` = [B](env)**
 **`P` = `A` * `B`**
 **`t` = > `P`.T_ascii**
 > print text=`t`

@@ -13,9 +13,9 @@ Parse a TOML subset for tools, escape HTML before assembly, encode with base32.
 # main
 
 **cfg = > toml.parse text="app = \"demo\"\n[server]\nport = 8080\n"**
-> print text=`cfg`[^app]
-**srv = `cfg`[^server]**
-> print text=`srv`[^port]
+> print text=[app](`cfg`)
+**srv = [server](`cfg`)**
+> print text=[port](`srv`)
 
 **safe = > html.escape text="<tag>"**
 > print text=`safe`

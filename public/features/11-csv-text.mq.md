@@ -14,8 +14,8 @@ Parse a tiny CSV, normalize a field, print — no plugins.
 **raw = "name,city\nAda,london\nBob,PARIS\n"**
 **rows = > csv.parse text=`raw`**
 **r0 = > at value=`rows` index=0**
-**city = > text.to_upper text=`r0`[^city]**
-> print text=`r0`[^name]
+**city = > text.to_upper text=[city](`r0`)**
+> print text=[name](`r0`)
 > print text=`city`
 **n = > len `rows`**
 1. `n` == 2

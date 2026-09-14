@@ -12,8 +12,8 @@ Moments are maps `{unix, zone, iso}`. Parse HTTPS URLs and round-trip query stri
 # main
 
 **epoch = > dt.from_unix unix=0 zone="Asia/Shanghai"**
-> print text=`epoch`[^iso]
+> print text=[iso](`epoch`)
 
 **u = > url.parse text="https://example.com/path?q=1#top"**
-> print text=`u`[^host]
-> print text=`u`[^query]
+> print text=[host](`u`)
+> print text=[query](`u`)

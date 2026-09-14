@@ -6,6 +6,8 @@ import sys:lib/sys.mq.md
 import json:lib/json.mq.md
 ---
 
+Official quantum circuit simulator (English). Gates + circuits; ABI plugin.
+
 ## ensure_plugin
 
 Load the ABI v2 `quantum` plugin once.
@@ -57,35 +59,49 @@ State-vector circuit (default |0…0⟩). Optional `steps=` gate table (column o
 ## h
     + `qubit`=0
 
+Hadamard on qubit (default 0).
+
 *> quantum_h circuit=`self` qubit=`qubit`*
 
 ## x
     + `qubit`=0
+
+Pauli X on qubit.
 
 *> quantum_x circuit=`self` qubit=`qubit`*
 
 ## y
     + `qubit`=0
 
+Pauli Y on qubit.
+
 *> quantum_y circuit=`self` qubit=`qubit`*
 
 ## z
     + `qubit`=0
+
+Pauli Z on qubit.
 
 *> quantum_z circuit=`self` qubit=`qubit`*
 
 ## s
     + `qubit`=0
 
+Phase S on qubit.
+
 *> quantum_s circuit=`self` qubit=`qubit`*
 
 ## t
     + `qubit`=0
 
+Phase T on qubit.
+
 *> quantum_t circuit=`self` qubit=`qubit`*
 
 ## i
     + `qubit`=0
+
+Identity on qubit.
 
 *> quantum_i circuit=`self` qubit=`qubit`*
 
@@ -93,11 +109,15 @@ State-vector circuit (default |0…0⟩). Optional `steps=` gate table (column o
     + `qubit`=0
     + `theta`
 
+Rotate about X by theta.
+
 *> quantum_rx circuit=`self` qubit=`qubit` theta=`theta`*
 
 ## ry
     + `qubit`=0
     + `theta`
+
+Rotate about Y by theta.
 
 *> quantum_ry circuit=`self` qubit=`qubit` theta=`theta`*
 
@@ -105,11 +125,15 @@ State-vector circuit (default |0…0⟩). Optional `steps=` gate table (column o
     + `qubit`=0
     + `theta`
 
+Rotate about Z by theta.
+
 *> quantum_rz circuit=`self` qubit=`qubit` theta=`theta`*
 
 ## cx
     + `control`=0
     + `target`=1
+
+CNOT: control → target.
 
 *> quantum_cx circuit=`self` control=`control` target=`target`*
 
@@ -117,11 +141,15 @@ State-vector circuit (default |0…0⟩). Optional `steps=` gate table (column o
     + `control`=0
     + `target`=1
 
+Controlled-Z.
+
 *> quantum_cz circuit=`self` control=`control` target=`target`*
 
 ## swap
     + `a`=0
     + `b`=1
+
+Swap two qubits.
 
 *> quantum_swap circuit=`self` a=`a` b=`b`*
 
@@ -229,11 +257,15 @@ Named built-in gate (`name=H`) or custom unitary from `matrix=` (nested list or 
 
 ## matrix
 
+Explicit matrix of this object.
+
 *> quantum_gate_matrix gate=`self`*
 
 ## matches_matrix
     + `matrix`
     + `tol`=0.000000001
+
+Whether this gate matches matrix (tol).
 
 *> quantum_gate_matches_matrix gate=`self` matrix=`matrix` tol=`tol`*
 
@@ -259,6 +291,8 @@ Density matrix from a state/circuit (`state=`) or an explicit Hermitian `matrix=
 
 ## matrix
 
+Explicit matrix of this object.
+
 *> quantum_density_matrix density=`self`*
 
 ## purity
@@ -282,6 +316,8 @@ Hermitian spectrum → `{eigenvalues, eigenvectors}`.
 
 ## expect
     + `obs`
+
+Expectation value of obs.
 
 *> quantum_density_expect density=`self` obs=`obs`*
 

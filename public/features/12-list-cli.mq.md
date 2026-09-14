@@ -16,12 +16,12 @@ Zero plugins: parse CSV, sort by key, parse `--input`.
 **rows = > csv.parse text=`raw`**
 **rows = > table.sort_by list=`rows` key="name"**
 **r0 = > at value=`rows` index=0**
-> print text=`r0`[^name]
+> print text=[name](`r0`)
 
 **args = > split value="--input,scores.csv,--pretty" sep=","**
 **flags = > cli.parse args=`args`**
-> print text=`flags`[^input]
-1. `flags`[^pretty]
+> print text=[input](`flags`)
+1. [pretty](`flags`)
   > print text=mid-m5-ok
 2. *
   > print text=mid-m5-fail

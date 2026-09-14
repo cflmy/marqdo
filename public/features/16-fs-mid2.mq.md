@@ -15,7 +15,7 @@ import fs:lib/fs.mq.md
 > fs.write_text path="m9-demo/readme.txt" text="ok"
 
 **st = > fs.stat path="m9-demo/readme.txt"**
-> print text=`st`[^size]
+> print text=[size](`st`)
 
 **w = > fs.walk path="m9-demo"**
 **n = > len `w`**
