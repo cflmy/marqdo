@@ -77,7 +77,7 @@
 - [x] 更新 `.cursor/skills/marqdo/SKILL.md` 硬规则  
 - [x] 修订 [markdown-mapping.md](../design/markdown-mapping.md) 为 v0.3 正式正文（或声明由 v0.3 文件接任）  
 - [x] ADR 0005 → **Accepted**  
-- [ ] CHANGELOG / 发版说明（破坏性：标记对调）
+- [ ] CHANGELOG / 发版说明（破坏性：标记对调）— Unreleased 已起草；随下一 tag 发布
 
 **出门：** 全量 gold 默认绿（live LLM 无钥跳过）；无 v0.2 双模式。
 

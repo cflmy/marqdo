@@ -25,21 +25,24 @@ gh release list --limit 3 2>/dev/null || true
 
 ## Asset matrix (CI tag `v*`)
 
-Produced by `.github/workflows/release.yml` on **windows-latest**:
+Produced by `.github/workflows/release.yml` on **windows-latest** (`windows` job) and **ubuntu-latest** (`linux` job, **required**, `needs: windows`):
 
-| Asset | Role |
-|-------|------|
-| `marqdo-VER-x86_64-pc-windows-msvc.exe` | CLI (stdlib embedded) |
-| `marqdo-VER-x86_64-pc-windows-msvc.zip` | `marqdo.exe` + `lib/` |
-| `marqdo-VER-stdlib.zip` | `lib/` only |
-| `marqdo-VER-ext.zip` | Official `ext/` L1 |
-| `marqdo-VER-native-x86_64-pc-windows-msvc.zip` | Prebuilt Windows plugins (`native/*.dll`) |
-| `marqdo-VER-native-x86_64-unknown-linux-gnu.zip` | Prebuilt Linux plugins (`native/lib*.so`) |
-| `marqdo-VER-source.zip` | `git archive` of tagged commit |
-| `marqdo-VER.vsix` | VS Code / Cursor (from branch `vscode-extension`) |
-| `marqdo-VER-public.zip` | Static user docs (`marqdo view output public`) |
+| Asset | Role | Job |
+|-------|------|-----|
+| `marqdo-VER-x86_64-pc-windows-msvc.exe` | CLI (stdlib embedded) | windows |
+| `marqdo-VER-x86_64-pc-windows-msvc.zip` | `marqdo.exe` + `lib/` + `ext/` + native DLL | windows |
+| `marqdo-VER-stdlib.zip` | `lib/` only | windows |
+| `marqdo-VER-ext.zip` | Official `ext/` L1 | windows |
+| `marqdo-VER-native-x86_64-pc-windows-msvc.zip` | Prebuilt Windows plugins (`native/*.dll`) | windows |
+| `marqdo-VER-native-x86_64-unknown-linux-gnu.zip` | Prebuilt Linux plugins (`native/lib*.so`) — **must ship** | linux |
+| `marqdo-VER-x86_64-unknown-linux-gnu.zip` | Linux CLI + `lib/` + `ext/` + native `.so` — **must ship** | linux |
+| `marqdo-VER-source.zip` | `git archive` of tagged commit | windows |
+| `marqdo-VER.vsix` | VS Code / Cursor (from branch `vscode-extension`) | windows |
+| `marqdo-VER-public.zip` | Static user docs (`marqdo view output public`) | windows |
 
-Not CI-uploaded (document in notes): Linux/macOS build from source; WASM via `marqdo wasm build` → `dist/wasm/`.
+Not CI-uploaded (document in notes): macOS build from source; WASM via `marqdo wasm build` → `dist/wasm/`.
+
+A release **without** the Linux native zip is incomplete (`marqdo ext add` on Linux cannot download prebuilts).
 
 ## Doc sync checklist (Phase 2 detail)
 
@@ -189,7 +192,9 @@ marqdo wasm build
 | Asset | 内容 / Contents |
 |-------|-----------------|
 | `marqdo-*-windows-msvc.exe` | CLI（内置 stdlib） |
-| `marqdo-*-windows-msvc.zip` | exe + `lib/` |
+| `marqdo-*-windows-msvc.zip` | exe + `lib/` + `ext/`（含 native） |
+| `marqdo-*-unknown-linux-gnu.zip` | Linux CLI + `lib/` + `ext/` + `.so` |
+| `marqdo-*-native-*.zip` | 预编译 `web`/`agent`/`quantum`/`linalg`（Win + **Linux 必出**） |
 | `marqdo-*-stdlib.zip` | 仅 `lib/` |
 | `marqdo-*-ext.zip` | 官方 `ext/` |
 | `marqdo-*-source.zip` | 源码快照 |
@@ -206,7 +211,32 @@ marqdo wasm build
 
 ## Proxy & auth (network recovery)
 
-Symptoms seen in this project: broken local Clash on `127.0.0.1:7890`, flaky `proxy.cflmy.top` HTTPS (short GET OK, long `git push` / connect timeouts), TLS failures, `gh` needing token, Cursor agent sandbox with only `lo`.
+Symptoms seen in this project: broken local Clash on `127.0.0.1:7890`, flaky GitHub TLS, `gh` needing token, Cursor agent sandbox with only `lo`.
+
+### `proxy.cflmy.top` (try this first)
+
+This machine’s `origin` is typically:
+
+```
+https://proxy.cflmy.top/github.com/cflmy/marqdo.git
+```
+
+Push / fetch / tag through that remote (HTTPS reverse proxy to GitHub):
+
+```bash
+git remote -v   # confirm origin uses proxy.cflmy.top
+git push origin main
+git push origin vVER
+git push origin vscode-extension
+
+# one-shot if origin still points at github.com:
+git push https://proxy.cflmy.top/github.com/cflmy/marqdo.git HEAD:main
+git push https://proxy.cflmy.top/github.com/cflmy/marqdo.git vVER
+```
+
+Short GETs via the proxy often work; **long `git push` may still time out**. If push hangs or drops, skip Clash retries and go to **HK SSH jump** below.
+
+`gh` against `api.github.com` may still need a direct path or HK jump (the reverse proxy is for `github.com` git, not always the API).
 
 ### Diagnose
 

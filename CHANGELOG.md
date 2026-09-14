@@ -3,10 +3,19 @@
 ## Unreleased
 
 ### Added
+- **Markup v0.3 运行时闭环**：粗体=`代码`、斜体=`返回`、叙述 `` `名` `` 声明与形参推断为唯一映射；金样 `tests/markup-v03/`。
+- **方括号标记调用**与前置修饰语：`礼貌 [问候] x`；取元主语法 `[键](集合)`（脚注取元过渡保留）。
+- **代码即文档叙述面 G1–G4**：模块级 `---` 跳过、装饰性强调、浮点面量、动态键。
+- **粗体表达式语句** `**n + 1**`；`--dump-lines` 标注 `[decl]/[bold]/[italic]`；`--dump-ast` 显示 inferred 形参与死绑定。
+- **Release Linux 包必出**：`linux` job 上传 `*-native-x86_64-unknown-linux-gnu.zip` 与 Linux CLI bundle。
 
 ### Fixed
+- 行首 `` `名`… `` 叙述不再当语句（修复 pages CI：`public/features/16-fs-mid2.mq.md`）。
+- 句中斜体强调（`*very important*` / `*foo.bar*`）不再误收束函数；Decl 名须为标识符；残缺粗体保持 GAP 恢复。
+- 胶合 `` `名`=default …prose `` 为 Decl 而非赋值。
 
 ### Changed
+- 教程 / Skill / `lib` / `ext` / `public` 对齐 v0.3 标记；view 推断形参 `chip inferred`。
 
 ## v0.4.0 — 2026-09-13
 

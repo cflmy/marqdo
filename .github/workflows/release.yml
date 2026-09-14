@@ -135,7 +135,8 @@ jobs:
             |-------|----------|
             | `marqdo-*-windows-msvc.exe` | CLI with **embedded** official stdlib |
             | `marqdo-*-windows-msvc.zip` | `marqdo.exe` + `lib/` + `ext/`（含 native DLL） |
-            | `marqdo-*-native-*.zip` | 预编译 `web`/`agent`/`quantum` 插件 |
+            | `marqdo-*-native-*.zip` | 预编译 `web`/`agent`/`quantum`/`linalg`（Windows DLL + **Linux .so 必出**） |
+            | `marqdo-*-unknown-linux-gnu.zip` | Linux CLI + `lib/` + `ext/` + native `.so` |
             | `marqdo-*-stdlib.zip` | `lib/` only |
             | `marqdo-*-ext.zip` | Official `ext/` L1 sources |
             | `marqdo-*-source.zip` | Source snapshot (`git archive`) |
@@ -156,8 +157,11 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  linux-native:
+  linux:
     runs-on: ubuntu-latest
+    # Wait until Windows has created the GitHub Release, then attach Linux zips
+    # (required: native plugins for `marqdo ext add` on Linux + CLI bundle).
+    needs: windows
     steps:
       - uses: actions/checkout@v4
 
@@ -169,28 +173,51 @@ jobs:
         with:
           go-version: "1.23.x"
 
-      - name: Build official plugins (release)
+      - name: Install zip + cgo toolchain
+        run: sudo apt-get update && sudo apt-get install -y zip gcc libc6-dev
+
+      - name: Build Linux CLI + official plugins
         run: |
+          set -euo pipefail
+          cargo build --release
           cargo build --release -p marqdo_plugin_agent -p marqdo_plugin_quantum -p marqdo_plugin_linalg
           bash ./scripts/build-web-plugin.sh
 
-      - name: Package native zip
+      - name: Package Linux native zip + CLI bundle
         run: |
           set -euo pipefail
           VER="${GITHUB_REF_NAME#v}"
           TARGET="x86_64-unknown-linux-gnu"
           mkdir -p dist/stage-native/native
-          cp target/release/libweb.so dist/stage-native/native/libweb.so
-          cp target/release/libagent.so dist/stage-native/native/libagent.so
-          cp target/release/libquantum.so dist/stage-native/native/libquantum.so
-          cp target/release/liblinalg.so dist/stage-native/native/liblinalg.so
+          for lib in libweb.so libagent.so libquantum.so liblinalg.so; do
+            src="target/release/${lib}"
+            if [[ ! -f "$src" && "$lib" == libweb.so ]]; then
+              src="plugins/web/build/libweb.so"
+            fi
+            test -f "$src" || { echo "missing $src" >&2; exit 1; }
+            cp "$src" "dist/stage-native/native/${lib}"
+          done
           (cd dist/stage-native && zip -r "../marqdo-${VER}-native-${TARGET}.zip" .)
           echo "NATIVE=marqdo-${VER}-native-${TARGET}.zip" >> "$GITHUB_ENV"
 
-      - name: Upload Linux native plugins
+          stage="dist/stage-linux"
+          rm -rf "$stage"
+          mkdir -p "$stage/ext/native" "$stage/lib"
+          cp target/release/marqdo "$stage/marqdo"
+          chmod +x "$stage/marqdo"
+          cp -a lib/. "$stage/lib/"
+          cp -a ext/. "$stage/ext/"
+          cp dist/stage-native/native/*.so "$stage/ext/native/"
+          linux_zip="marqdo-${VER}-${TARGET}.zip"
+          (cd "$stage" && zip -r "../${linux_zip}" .)
+          echo "LINUX_ZIP=${linux_zip}" >> "$GITHUB_ENV"
+
+      - name: Upload Linux packages
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/${{ env.NATIVE }}
+          files: |
+            dist/${{ env.NATIVE }}
+            dist/${{ env.LINUX_ZIP }}
           fail_on_unmatched_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

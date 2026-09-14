@@ -4,11 +4,13 @@ description: >-
   Run a full Marqdo product release: detect latest version and ask the user for
   the next tag, update CHANGELOG/README/skills/public docs, bump Cargo versions,
   sync VS Code extension on branch vscode-extension when needed, build or
-  trigger install assets (CLI, stdlib, ext, public zip, VSIX, wasm notes), push
-  tag, publish GitHub Release with detailed notes, and recover from network
-  failures via proxy or HK SSH jump (scripts/push-via-hk-jump.py). Use when the
-  user asks to release, cut a version, publish vX.Y.Z, ship a GitHub release,
-  发版, 发布新版本, or tag marqdo.
+  trigger install assets (Windows CLI + **required Linux native/CLI zips**,
+  stdlib, ext, public zip, VSIX), push via origin or
+  https://proxy.cflmy.top/github.com/cflmy/marqdo.git, publish GitHub Release
+  with detailed notes, and recover from network failures via that proxy or HK
+  SSH jump (scripts/push-via-hk-jump.py). Use when the user asks to release,
+  cut a version, publish vX.Y.Z, ship a GitHub release, 发版, 发布新版本, or tag
+  marqdo.
 ---
 
 # Marqdo release
@@ -22,8 +24,9 @@ Canonical release playbook for **cflmy/marqdo**. Read this skill **before** tagg
 3. **Never commit `vscode-extension/` on `main`** (gitignored). Extension source lives only on branch **`vscode-extension`**. See `doc/design/vscode-extension-commit.md`.
 4. **Do not release from a dirty tree** (except intentional release commits you create in this flow).
 5. **Tag format** is always `vX.Y.Z` matching root `Cargo.toml` `version = "X.Y.Z"`.
-6. Prefer **tag push → GitHub Actions** (`.github/workflows/release.yml`) for Windows CLI + VSIX + zips. Local packaging is fallback / verification.
-7. After network errors: apply [reference.md § Proxy](reference.md); retry; do not silently skip uploads. If GitHub stays unreachable but **HK jump** (`hk.cflmy.de`) works, use `scripts/push-via-hk-jump.py` (Paramiko CONNECT) — see reference § **HK SSH jump**.
+6. Prefer **tag push → GitHub Actions** (`.github/workflows/release.yml`) for **both** Windows and **Linux** install assets. Local packaging is fallback / verification.
+7. After network errors: apply [reference.md § Proxy](reference.md). **First try** `https://proxy.cflmy.top/github.com/cflmy/marqdo.git` (this clone’s usual `origin`). Retry; do not silently skip uploads. If the reverse-proxy still drops long pushes, use **HK jump** (`hk.cflmy.de`) via `scripts/push-via-hk-jump.py` — see reference § **Proxy** / **HK SSH jump**.
+8. **Do not ship a GitHub Release without the Linux extension/native zip.** Job `linux` must attach `marqdo-VER-native-x86_64-unknown-linux-gnu.zip` (and the Linux CLI bundle). Missing Linux packages = release incomplete.
 
 ## Defaults (after version is confirmed)
 
@@ -106,7 +109,16 @@ release: vVER — <one-line highlight>
 EOF
 ```
 
-Push `main`: `git push origin main` (with proxy/`all` perms if needed; on persistent GitHub failure use [reference § HK SSH jump](reference.md)).
+Push `main` (this repo’s `origin` is usually the reverse proxy):
+
+```bash
+# origin typically: https://proxy.cflmy.top/github.com/cflmy/marqdo.git
+git push origin main
+# one-shot if origin still points at github.com:
+git push https://proxy.cflmy.top/github.com/cflmy/marqdo.git HEAD:main
+```
+
+If that times out: [reference § HK SSH jump](reference.md).
 
 ## Phase 3 — VS Code / Cursor extension
 
@@ -127,15 +139,19 @@ git tag -a "TAG" -m "TAG"
 git push origin "TAG"
 ```
 
-This runs `.github/workflows/release.yml` (Windows): CLI exe/zip, stdlib zip, ext zip, source zip, public zip, VSIX.
+This runs `.github/workflows/release.yml`:
 
-If tag push fails: [reference.md § Proxy](reference.md), retry once; then report.
+- **windows** — CLI exe/zip, stdlib zip, ext zip, source zip, public zip, VSIX, Windows native zip
+- **linux** (`needs: windows`) — **required** Linux native plugins zip + Linux CLI bundle (`ext/` + `native/*.so`)
+
+If tag push fails: [reference.md § Proxy](reference.md) (`proxy.cflmy.top` first), retry once; then HK jump.
 
 ## Phase 5 — Release notes & assets
 
-1. Wait for Actions success: `gh run list --workflow=Release --limit 3` / open the run URL.
+1. Wait for Actions success: `gh run list --workflow=Release --limit 3` / open the run URL. **Both** `windows` and `linux` jobs must be green.
 2. Ensure GitHub Release for `TAG` exists with assets (workflow uses `softprops/action-gh-release`).
-3. **Rewrite release body** (workflow body is a stub) with **中英双语** — see [reference.md § Notes template](reference.md). `gh release edit TAG --notes-file …`.
+3. Confirm Linux assets exist: `marqdo-VER-native-x86_64-unknown-linux-gnu.zip` and `marqdo-VER-x86_64-unknown-linux-gnu.zip`. If missing, do **not** call the release done — re-run / upload.
+4. **Rewrite release body** (workflow body is a stub) with **中英双语** — see [reference.md § Notes template](reference.md). `gh release edit TAG --notes-file …`.
 4. Include: Highlights, Breaking, Install (`ext add`, plugins build), Downloads table, WASM (`marqdo wasm build`), links to CHANGELOG/README, extension branch note.
 5. Optional Linux local extras (not required if CI green): `marqdo wasm build` smoke; document in notes that wasm is built from source via CLI.
 
@@ -154,11 +170,11 @@ Local Windows fallback: `scripts/release-full.ps1 -Tag TAG -Upload` (see script 
 | Failure | Action |
 |---------|--------|
 | `gh` / git TLS or Clash `7890` refused | Unset bad proxy; `required_permissions: ["all"]`; see [reference § Proxy](reference.md) |
-| GitHub blocked / `proxy.cflmy.top` push timeout | **HK SSH jump**: `scripts/push-via-hk-jump.py` (ask user for HK password/key; never commit). See reference § **HK SSH jump** |
+| GitHub blocked | **`origin` via proxy.cflmy.top** (see below), then HK jump |
 | Tag exists | Stop; ask user to bump or delete tag (no force on shared tags without explicit order) |
 | CI red | Fix on main, move tag only if user explicitly allows delete+re-push tag |
 | VSIX missing | Fetch `vscode-extension`, build locally, `gh release upload TAG dist/*.vsix` |
-| Partial assets | Re-run workflow or upload missing files only |
+| Linux native/CLI zip missing | Incomplete release — fix `linux` job or `gh release upload`; do not skip |
 
 ## Do not
 
