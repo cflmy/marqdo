@@ -5,6 +5,8 @@
 
 use crate::lex::{matching_bold_close_inline, matching_italic_close_inline};
 
+pub use crate::lex::looks_like_bold_code;
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ProseBit {
     /// `` `ident` `` or `` `ident`=default `` (default string is raw RHS text).
@@ -69,35 +71,6 @@ pub fn scan_prose_line(line: &str) -> Vec<ProseBit> {
         i += 1;
     }
     out
-}
-
-/// Whether `**inner**` should execute (assign / call / expr), not soft emphasis.
-pub fn looks_like_bold_code(inner: &str) -> bool {
-    let t = inner.trim();
-    if t.is_empty() {
-        return false;
-    }
-    if t.contains('=') || t.starts_with('>') {
-        return true;
-    }
-    if t.chars().any(|c| matches!(c, '+' | '-' | '*' | '/' | '(' | ')' | '[' | ']')) {
-        return true;
-    }
-    let parts: Vec<&str> = t.split_whitespace().collect();
-    if parts.len() >= 2 {
-        return parts[1..].iter().any(|p| {
-            p.contains('=')
-                || p.starts_with('"')
-                || p.starts_with('\'')
-                || p.starts_with('`')
-                || p.chars().all(|c| c.is_ascii_digit())
-                || (p.contains('.')
-                    && p.chars()
-                        .filter(|c| *c != '.')
-                        .all(|c| c.is_ascii_digit()))
-        });
-    }
-    false
 }
 
 /// Whether `*inner*` is a return (vs mid-prose English/CJK emphasis).
