@@ -335,6 +335,11 @@ impl<'a> FnCompiler<'a> {
                 self.stmt_span = *span;
                 self.compile_call(call, true)?;
             }
+            Stmt::Expr { value, span } => {
+                self.stmt_span = *span;
+                self.compile_expr(value)?;
+                self.emit(Op::Pop);
+            }
             Stmt::Branch { arms, span } => {
                 self.stmt_span = *span;
                 let mut end_jumps = Vec::new();

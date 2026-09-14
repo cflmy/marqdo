@@ -3883,3 +3883,8 @@ fn markup_v03_leading_backtick_decl() {
 fn markup_v03_decl_ident_only() {
     assert_out_v03("tests/markup-v03/decl-ident-only.mq.md", "42");
 }
+
+#[test]
+fn markup_v03_bold_expr() {
+    assert_out_v03("tests/markup-v03/bold-expr.mq.md", "42");
+}

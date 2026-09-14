@@ -86,6 +86,11 @@ pub enum Stmt {
         call: CallExpr,
         span: Span,
     },
+    /// Bold expression statement (`**n + 1**`); value evaluated and discarded.
+    Expr {
+        value: Expr,
+        span: Span,
+    },
     Branch {
         arms: Vec<BranchArm>,
         span: Span,
@@ -308,6 +313,9 @@ fn dump_stmt(out: &mut String, stmt: &Stmt, depth: usize) {
                 "{pad}(call recv={:?} {:?} {:?} @{span}\n",
                 call.receiver, call.callee, call.args
             ));
+        }
+        Stmt::Expr { value, span } => {
+            out.push_str(&format!("{pad}(expr {value:?} @{span})\n"));
         }
         Stmt::Branch { arms, span } => {
             out.push_str(&format!("{pad}(branch @{span}\n"));

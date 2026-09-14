@@ -427,7 +427,7 @@ impl<'a> Cursor<'a> {
         Err(Diagnostic::new(None, span, format!("unrecognized statement: {trimmed}")).into())
     }
 
-    /// Parse bold-code inner into Assign / Call.
+    /// Parse bold-code inner into Assign / Call / Expr (design §6.2).
     fn stmt_from_bold_inner(&mut self, inner: &str, span: Span) -> Result<Stmt> {
         let inner = inner.trim();
         if inner.is_empty() {
@@ -448,7 +448,20 @@ impl<'a> Cursor<'a> {
                 end_line,
             });
         }
-        // Call without `>`: `print text="hi"` / `加一函数 37`
+        if let Some(rest) = inner.strip_prefix('>') {
+            // Explicit `>` keeps standalone call rules (bare words = text).
+            let call = parse_call_after_gt(rest.trim(), false)
+                .map_err(|e| anyhow::anyhow!("{span}: bold code: {e}"))?;
+            return Ok(Stmt::Call { call, span });
+        }
+        // Expression first (`n + 1` / `[k](c)`); bare call second (`加一 37`).
+        if let Ok(e) = parse_expr_prefer_var(inner) {
+            match e {
+                Expr::Call(call) => return Ok(Stmt::Call { call, span }),
+                Expr::Var(_) | Expr::Literal(_) => {}
+                value => return Ok(Stmt::Expr { value, span }),
+            }
+        }
         let multi = inner.split_whitespace().count() >= 2 || inner.contains('=');
         if multi {
             let call = parse_call_tail(inner, true)
@@ -456,8 +469,7 @@ impl<'a> Cursor<'a> {
                 .map_err(|e| anyhow::anyhow!("{span}: bold code: {e}"))?;
             return Ok(Stmt::Call { call, span });
         }
-        // Single token: treat as expression discarded via assign to `_`? Prefer error.
-        bail!("{span}: bold code must be assignment or call (got `{inner}`)");
+        bail!("{span}: bold code must be assignment, call, or expression (got `{inner}`)");
     }
 
     #[allow(dead_code)]
@@ -1337,6 +1349,15 @@ fn collect_names_needing_input(
             Stmt::Call { call, .. } => {
                 let mut reads = std::collections::HashSet::new();
                 collect_reads_call(call, &mut reads);
+                for r in reads {
+                    if !bound.contains(&r) {
+                        needs.insert(r);
+                    }
+                }
+            }
+            Stmt::Expr { value, .. } => {
+                let mut reads = std::collections::HashSet::new();
+                collect_reads_expr(value, &mut reads);
                 for r in reads {
                     if !bound.contains(&r) {
                         needs.insert(r);

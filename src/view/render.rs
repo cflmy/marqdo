@@ -89,7 +89,7 @@ fn collect_input_prompts_fun(fun: &Function, out: &mut Vec<String>) {
 
 fn collect_input_prompts_stmt(stmt: &Stmt, out: &mut Vec<String>) {
     match stmt {
-        Stmt::Assign { value, .. } | Stmt::Return { value, .. } => {
+        Stmt::Assign { value, .. } | Stmt::Return { value, .. } | Stmt::Expr { value, .. } => {
             collect_input_prompts_expr(value, out);
         }
         Stmt::Call { call, .. } => {
@@ -1010,6 +1010,7 @@ fn stmt_start(stmt: &Stmt) -> u32 {
         Stmt::Assign { span, .. }
         | Stmt::Return { span, .. }
         | Stmt::Call { span, .. }
+        | Stmt::Expr { span, .. }
         | Stmt::Branch { span, .. }
         | Stmt::While { span, .. }
         | Stmt::ForEach { span, .. } => span.line,
@@ -1019,7 +1020,9 @@ fn stmt_start(stmt: &Stmt) -> u32 {
 fn stmt_end_line(stmt: &Stmt) -> u32 {
     match stmt {
         Stmt::Assign { end_line, .. } => end_line + 1,
-        Stmt::Return { span, .. } | Stmt::Call { span, .. } => span.line + 1,
+        Stmt::Return { span, .. } | Stmt::Call { span, .. } | Stmt::Expr { span, .. } => {
+            span.line + 1
+        }
         Stmt::Branch { arms, span, .. } => {
             let mut end = span.line + 1;
             for arm in arms {
@@ -1184,6 +1187,10 @@ fn render_stmt(
         Stmt::Call { call, .. } => format!(
             "<div class=\"card call-card\"><span class=\"badge\">call</span><code class=\"expr\">{}</code></div>",
             escape(&call_display(call))
+        ),
+        Stmt::Expr { value, .. } => format!(
+            "<div class=\"card\"><span class=\"badge\">expr</span><code class=\"expr\">{}</code></div>",
+            escape(&expr_display(value))
         ),
         Stmt::Branch { arms, .. } => {
             let mut body =

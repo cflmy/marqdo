@@ -367,6 +367,19 @@ impl Interpreter {
                 let _ = self.eval_call(module, fun, env, call)?;
                 Ok(None)
             }
+            Stmt::Expr { value, span } => {
+                self.current_span = *span;
+                if self.trace {
+                    emit_trace(
+                        self.path.as_deref(),
+                        Some(*span),
+                        "stmt",
+                        &[("kind", "expr")],
+                    );
+                }
+                let _ = self.eval_expr(module, fun, env, value)?;
+                Ok(None)
+            }
             Stmt::Branch { arms, span } => {
                 self.current_span = *span;
                 if self.trace {
@@ -1248,6 +1261,7 @@ fn stmt_span(stmt: &Stmt) -> Span {
         Stmt::Assign { span, .. }
         | Stmt::Return { span, .. }
         | Stmt::Call { span, .. }
+        | Stmt::Expr { span, .. }
         | Stmt::Branch { span, .. }
         | Stmt::While { span, .. }
         | Stmt::ForEach { span, .. } => *span,
