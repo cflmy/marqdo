@@ -171,7 +171,7 @@ import web:ext/web/web.mq.md
 
 ## 14.6 字典操作：用表格与取元，不用 `json.get`/`json.set`
 
-Marqdo 用 **GFM 表格**构造字典、用 **脚注取元 `变量[^键]`** 读取字典——这是语言原生能力，是「代码即文档」的体现。**不要**用 `json.get` / `json.set` 读写本地字典（那只用于文本 ↔ 结构化的序列化，如 `json.parse` / `json.stringify`）。
+Marqdo 用 **GFM 表格**构造字典、用 **链接取元 `[键](变量)`** 读取字典——这是语言原生能力，是「代码即文档」的体现。**不要**用 `json.get` / `json.set` 读写本地字典（那只用于文本 ↔ 结构化的序列化，如 `json.parse` / `json.stringify`）。
 
 构造字典（横表，≥2 列 + 1 行）：
 

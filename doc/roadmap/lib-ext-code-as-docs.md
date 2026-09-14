@@ -29,6 +29,7 @@
 | **M5** | quantum / linalg + full gold | **done** |
 | **M6** | examples + public/structure + tests/ext·lib 链接取元；cafe 括号调用例 | **done** |
 | **M7** | structure collection 金样改链接形；public/stdlib 括号调用例 | **done** |
+| **M8** | 教程第 9 章 + Skill examples → 链接取元 / v0.3 标记 | **done** |
 
 ## 2. 验收（出门）
 
@@ -36,6 +37,7 @@
 - 试点库可读：目的句 + 叙述形参 + 一例 + 短实现。
 - `cargo test --test gold` 绿。
 - 脚注取元金样（`tests/structure/footnote*`）仍保留作兼容门禁。
+- 教程与 Skill 示例以链接取元 / `**` 代码 / `*` 返回为准。
 
 ## 3. 修订历史
 
@@ -48,3 +50,4 @@
 | 2026-09-14 | M5 quantum/linalg 叙述 + public/features 取元 |
 | 2026-09-14 | M6 examples/public/tests 批量链接取元 + cafe 括号调用 |
 | 2026-09-14 | M7 structure collection 金样 + stdlib 括号调用例 |
+| 2026-09-14 | M8 教程 + Skill examples 同步 |
