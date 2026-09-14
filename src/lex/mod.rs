@@ -90,7 +90,7 @@ fn looks_like_backtick_assign(trimmed: &str) -> bool {
         return false;
     };
     let name = &rest[..end];
-    if name.is_empty() || name.chars().any(|c| c.is_whitespace()) {
+    if name.is_empty() || !is_backtick_bind_name(name) {
         return false;
     }
     let after_tick = &rest[end + 1..];
@@ -113,6 +113,17 @@ fn looks_like_backtick_assign(trimmed: &str) -> bool {
         }
     }
     true
+}
+
+fn is_backtick_bind_name(name: &str) -> bool {
+    let mut chars = name.chars();
+    let Some(first) = chars.next() else {
+        return false;
+    };
+    if !(first.is_alphabetic() || first == '_' || !first.is_ascii()) {
+        return false;
+    }
+    chars.all(|c| c.is_alphanumeric() || c == '_' || !c.is_ascii())
 }
 
 /// `*` / `**` lines that are Marqdo executable (statement / return / else), not narrative Markdown.

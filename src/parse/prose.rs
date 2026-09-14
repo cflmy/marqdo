@@ -35,6 +35,12 @@ pub fn scan_prose_line(line: &str) -> Vec<ProseBit> {
                 i = next;
                 continue;
             }
+            // Non-decl span (e.g. `` `OPENAI_*` ``): skip whole ticks so inner `*`
+            // does not open italic/bold.
+            if let Some(rel) = line[i + 1..].find('`') {
+                i = i + 1 + rel + 1;
+                continue;
+            }
             i += 1;
             continue;
         }
@@ -121,7 +127,7 @@ fn scan_backtick_decl(line: &str, start: usize) -> Option<(ProseBit, usize)> {
     let rest = &line[start + 1..];
     let end = rest.find('`')?;
     let name = rest[..end].to_string();
-    if name.is_empty() || name.chars().any(|c| c.is_whitespace()) {
+    if name.is_empty() || !is_prose_decl_name(&name) {
         return None;
     }
     let after_tick = start + 1 + end + 1;
@@ -152,6 +158,18 @@ fn scan_backtick_decl(line: &str, start: usize) -> Option<(ProseBit, usize)> {
         },
         after_tick,
     ))
+}
+
+/// Identifiers only: letters / digits / `_` / non-ASCII (CJK). Rejects `` `n+1` ``.
+fn is_prose_decl_name(name: &str) -> bool {
+    let mut chars = name.chars();
+    let Some(first) = chars.next() else {
+        return false;
+    };
+    if !(first.is_alphabetic() || first == '_' || !first.is_ascii()) {
+        return false;
+    }
+    chars.all(|c| c.is_alphanumeric() || c == '_' || !c.is_ascii())
 }
 
 #[cfg(test)]
@@ -211,6 +229,21 @@ mod tests {
         assert!(
             matches!(&bits[..], [ProseBit::ItalicReturn { inner, .. }] if inner == "总额"),
             "{bits:?}"
+        );
+    }
+
+    #[test]
+    fn reject_n_plus_one_as_decl() {
+        let bits = scan_prose_line("输入`n+1`然后继续。");
+        assert!(bits.is_empty(), "`` `n+1` `` must not Decl: {bits:?}");
+    }
+
+    #[test]
+    fn skip_glob_backticks_without_italic() {
+        let bits = scan_prose_line("from `OPENAI_*` / `MARQDO_LLM_*`.");
+        assert!(
+            bits.is_empty(),
+            "glob-like ticks must not yield italic: {bits:?}"
         );
     }
 }

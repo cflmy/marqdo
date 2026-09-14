@@ -3878,3 +3878,8 @@ fn markup_v03_dynamic_footnote() {
 fn markup_v03_leading_backtick_decl() {
     assert_out_v03("tests/markup-v03/leading-backtick-decl.mq.md", "ok");
 }
+
+#[test]
+fn markup_v03_decl_ident_only() {
+    assert_out_v03("tests/markup-v03/decl-ident-only.mq.md", "42");
+}
