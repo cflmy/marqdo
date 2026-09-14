@@ -610,14 +610,6 @@ fn error_syntax_bad_line() {
     );
 }
 
-#[test]
-fn error_unclosed_bold() {
-    assert_err(
-        "tests/errors/unclosed-bold.mq.md",
-        "8:1",
-        "unclosed bold code",
-    );
-}
 
 #[test]
 fn error_div_zero() {

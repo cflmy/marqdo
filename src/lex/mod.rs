@@ -74,16 +74,6 @@ pub fn looks_like_bold_code(inner: &str) -> bool {
     false
 }
 
-/// `` **code-shaped… `` without a closing `**` (should diagnose, not skip as comment).
-fn looks_like_unclosed_bold_code(trimmed: &str) -> bool {
-    let t = trimmed.trim();
-    if !t.starts_with("**") || matching_bold_close(t).is_some() {
-        return false;
-    }
-    // Whole-line empty markers are handled by is_marqdo_star_line.
-    looks_like_bold_code(&t[2..])
-}
-
 /// Whole-line backtick bind `` `name` = … `` (empty RHS / fence / table OK).
 ///
 /// Narrative decls are **not** binds:
@@ -294,7 +284,6 @@ pub fn classify_line(text: &str) -> LineKind {
     let first = trimmed.chars().find(|c| !c.is_whitespace());
     match first {
         None => LineKind::Blank,
-        Some('*') if looks_like_unclosed_bold_code(trimmed) => LineKind::Code,
         Some('*') if !is_marqdo_star_line(trimmed) => LineKind::Comment,
         Some('`') if looks_like_backtick_assign(trimmed) => LineKind::Code,
         Some('`') => LineKind::Comment,
@@ -474,16 +463,6 @@ mod tests {
             classify_line("`礼貌` = False"),
             LineKind::Code,
             "spaced = is backtick assign"
-        );
-        assert_eq!(
-            classify_line("**x = 1"),
-            LineKind::Code,
-            "unclosed code-shaped bold → Code for diagnosis"
-        );
-        assert_eq!(
-            classify_line("**说明"),
-            LineKind::Comment,
-            "unclosed soft emphasis stays comment"
         );
     }
 

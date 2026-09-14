@@ -363,19 +363,6 @@ impl<'a> Cursor<'a> {
             });
         }
 
-        // Unclosed code-shaped bold (classified Code so we can diagnose).
-        if trimmed.starts_with("**")
-            && !(trimmed.ends_with("**") && trimmed.len() >= 4)
-            && crate::lex::looks_like_bold_code(&trimmed[2..])
-        {
-            return Err(Diagnostic::new(
-                None,
-                span,
-                "unclosed bold code: expected closing `**`".to_string(),
-            )
-            .into());
-        }
-
         // v0.3: **…** = code segment (assign / call / expr)
         if trimmed.starts_with("**") && trimmed.ends_with("**") && trimmed.len() >= 4 {
             let inner = &trimmed[2..trimmed.len() - 2];
