@@ -32,6 +32,7 @@
 | **M8** | 教程第 9 章 + Skill examples → 链接取元 / v0.3 标记 | **done** |
 | **M9** | 教程其余章节（1–8、10–12、14）全面对齐 v0.3 + 链接取元 | **done** |
 | **M10** | public/stdlib 剩余演示统一括号调用；public import 返回面修到 v0.3 | **done** |
+| **M11** | View：`bracket_marked` 使无修饰 `[callee]` 也显示括号形 | **done** |
 
 ## 2. 验收（出门）
 
@@ -55,3 +56,4 @@
 | 2026-09-14 | M8 教程 + Skill examples 同步 |
 | 2026-09-14 | M9 教程全书对齐 v0.3 标记与链接取元 |
 | 2026-09-14 | M10 public/stdlib 括号调用扫尾 + import 返回面 |
+| 2026-09-14 | M11 View `bracket_marked` 无修饰括号调用表面 |

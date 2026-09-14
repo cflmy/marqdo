@@ -18,7 +18,7 @@
 |------------|---------------|------|
 | `Expr::Index` | `[键](基)` | 嵌套 `[k2]([k1](base))` |
 | `InterpPart::Index` | 同上嵌套链接形 | 不再默认 `` `base`[^k] `` |
-| `CallExpr` + `pre_modifiers` | `修饰 [callee] 实参…` | 无修饰时仍可显示 `> callee …` |
+| `CallExpr` + `bracket_marked` / `pre_modifiers` | `修饰 [callee] 实参…` 或 `[callee] 实参…` | 仅经典 `>` 解析时仍显示 `> callee …` |
 | 赋值 / 返回 | 粗体 / 斜体语义即可 | 不强制还原整句叙述 |
 | foreach | `- [项](集合)` | 不变 |
 
@@ -32,3 +32,4 @@
 | 日期 | 说明 |
 |------|------|
 | 2026-09-14 | 初稿；Index 链接形 + 括号调用修饰表面 |
+| 2026-09-14 | `bracket_marked`：无修饰的 `[callee]` 也保真显示 |

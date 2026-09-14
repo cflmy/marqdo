@@ -1249,7 +1249,8 @@ fn stmt_shell(line: u32, inner: &str, mode: StructureMode) -> String {
 
 fn call_display(call: &CallExpr) -> String {
     let mut s = String::new();
-    if !call.pre_modifiers.is_empty() {
+    let bracket = call.bracket_marked || !call.pre_modifiers.is_empty();
+    if bracket {
         for m in &call.pre_modifiers {
             s.push_str(m);
             s.push(' ');
@@ -1468,7 +1469,7 @@ fn lit_display(lit: &Literal) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ast::{BinaryOp, Expr, Literal};
+    use crate::ast::{Arg, BinaryOp, CallExpr, Expr, Literal};
 
     #[test]
     fn expr_gt_is_surface() {
@@ -1631,5 +1632,40 @@ mod tests {
         assert!(!uses_stream_panel(&hello));
         let llm = crate::parse::parse_source(include_str!("../../tests/ext/llm-import.mq.md")).unwrap();
         assert!(uses_stream_panel(&llm));
+    }
+
+    #[test]
+    fn call_display_bracket_without_modifiers() {
+        let call = CallExpr {
+            callee: "parse".into(),
+            path: Some(vec!["json".into(), "parse".into()]),
+            receiver: None,
+            args: vec![Arg::Named {
+                name: "text".into(),
+                value: Expr::Literal(Literal::Text("{}".into())),
+            }],
+            pre_modifiers: vec![],
+            bracket_marked: true,
+        };
+        let d = call_display(&call);
+        assert!(d.starts_with("[json.parse]"), "{d}");
+        assert!(!d.starts_with("> "), "{d}");
+    }
+
+    #[test]
+    fn call_display_gt_when_not_bracket() {
+        let call = CallExpr {
+            callee: "print".into(),
+            path: None,
+            receiver: None,
+            args: vec![Arg::Named {
+                name: "text".into(),
+                value: Expr::Literal(Literal::Text("hi".into())),
+            }],
+            pre_modifiers: vec![],
+            bracket_marked: false,
+        };
+        let d = call_display(&call);
+        assert!(d.starts_with("> print"), "{d}");
     }
 }

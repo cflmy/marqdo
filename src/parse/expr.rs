@@ -949,6 +949,7 @@ pub fn parse_call_tail(s: &str, prefer_var: bool) -> Result<(CallExpr, usize)> {
             receiver,
             args,
             pre_modifiers: Vec::new(),
+            bracket_marked: false,
         },
         after_callee_offset + ws + args_consumed,
     ))
@@ -1040,6 +1041,7 @@ fn try_bracket_marked_call(s: &str, prefer_var: bool) -> Result<Option<(CallExpr
                     receiver,
                     args,
                     pre_modifiers,
+                    bracket_marked: true,
                 },
                 consumed,
             )));
@@ -1687,6 +1689,7 @@ mod bracket_call_tests {
         let (c, _) = parse_call_tail(r#"礼貌 [问候] "Marqdo""#, true).unwrap();
         assert_eq!(c.callee, "问候");
         assert_eq!(c.pre_modifiers, vec!["礼貌".to_string()]);
+        assert!(c.bracket_marked);
         assert_eq!(c.args.len(), 1);
     }
 
@@ -1694,9 +1697,11 @@ mod bracket_call_tests {
     fn nested_paren_arg() {
         let (c, _) = parse_call_tail(r#"[问候] ([格式化] "x")"#, true).unwrap();
         assert_eq!(c.callee, "问候");
+        assert!(c.bracket_marked);
         match &c.args[0] {
             Arg::Positional(Expr::Call(inner)) => {
                 assert_eq!(inner.callee, "格式化");
+                assert!(inner.bracket_marked);
             }
             other => panic!("expected nested call, got {:?}", other),
         }

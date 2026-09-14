@@ -121,6 +121,9 @@ pub struct CallExpr {
     /// Pre-bracket modifiers: `礼貌 [问候] x` → `["礼貌"]`, expanded to `礼貌=True` at eval.
     /// See [bracket-call-modifiers.md](../../doc/design/bracket-call-modifiers.md).
     pub pre_modifiers: Vec<String>,
+    /// True when the call was authored with `[callee]` (even with no modifiers).
+    /// View prefers `修饰 [callee] …` / `[callee] …` over `> callee …` when set.
+    pub bracket_marked: bool,
 }
 
 impl CallExpr {
