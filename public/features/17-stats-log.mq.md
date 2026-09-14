@@ -24,8 +24,8 @@ Light statistics and optional `fields=` on log lines — no remote sinks, no dat
 
 `fld` =
 
-| step |
-|------|
-| done |
+| step | status |
+|------|--------|
+| done | ok |
 
 > log.info text="mid2-m10" fields=`fld`

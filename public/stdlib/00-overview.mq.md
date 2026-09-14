@@ -13,7 +13,7 @@ No extra allow flags: importing a module means you intend to use it. Under marqd
 
 Modules: text (text / 文本), table (table / 表), files (fs / 文件), time (time / 时间), system (sys / 系统), json (json only), net (net / 网络), math (math / 数学), foreign (foreign / 外联), plugin (plugin / 插件), writeback (writeback / 自写回), subtask (subtask / 子任务).
 
-From **v0.1.2**, official `lib/*.mq.md` is **embedded in the `marqdo` binary** (disk `lib/` or `MARQDO_LIB` still overrides). Standalone `.exe` works without a separate stdlib zip.
+From v0.1.2, official `lib/*.mq.md` is embedded in the `marqdo` binary (disk `lib/` or `MARQDO_LIB` still overrides). Standalone `.exe` works without a separate stdlib zip.
 
 Official optional extensions live under ext/ (not stdlib): ext/llm, ext/agent — see features/05-extensions.mq.md and doc/design/ext-llm.md / ext-agent.md.
 
