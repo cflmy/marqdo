@@ -39,8 +39,27 @@ pub struct ClassifiedLine {
 fn is_code_starter(c: char) -> bool {
     matches!(
         c,
-        '#' | '*' | '>' | '+' | '-' | '`' | '|' | '~' | '$'
+        '#' | '*' | '>' | '+' | '-' | '|' | '~' | '$'
     ) || c.is_ascii_digit()
+}
+
+/// Whole-line backtick bind `` `name` = … `` (empty RHS / fence / table OK).
+/// Narrative decls like `` `捕获=True` 时… `` or `` `n`，我们… `` are **not** binds.
+fn looks_like_backtick_assign(trimmed: &str) -> bool {
+    let t = trimmed.trim();
+    if !t.starts_with('`') {
+        return false;
+    }
+    let rest = &t[1..];
+    let Some(end) = rest.find('`') else {
+        return false;
+    };
+    let name = &rest[..end];
+    if name.is_empty() || name.chars().any(|c| c.is_whitespace()) {
+        return false;
+    }
+    let after = rest[end + 1..].trim_start();
+    after.starts_with('=')
 }
 
 /// `*` / `**` lines that are Marqdo executable (statement / return / else), not narrative Markdown.
@@ -213,6 +232,8 @@ pub fn classify_line(text: &str) -> LineKind {
     match first {
         None => LineKind::Blank,
         Some('*') if !is_marqdo_star_line(trimmed) => LineKind::Comment,
+        Some('`') if looks_like_backtick_assign(trimmed) => LineKind::Code,
+        Some('`') => LineKind::Comment,
         Some(c) if is_code_starter(c) => LineKind::Code,
         Some(_) => LineKind::Comment,
     }
@@ -369,6 +390,17 @@ mod tests {
         assert_eq!(classify_line("1. arm"), LineKind::Code);
         assert_eq!(classify_line("| a |"), LineKind::Code);
         assert_eq!(classify_line("`x` = 1"), LineKind::Code);
+        assert_eq!(
+            classify_line("`捕获=True` 时返回映射。"),
+            LineKind::Comment,
+            "prose decl / narrative, not backtick assign"
+        );
+        assert_eq!(
+            classify_line("`n`，我们执行操作"),
+            LineKind::Comment,
+            "leading decl in narrative"
+        );
+        assert_eq!(classify_line("`礼貌`=False"), LineKind::Code);
     }
 
     #[test]

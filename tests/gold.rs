@@ -3872,3 +3872,8 @@ fn markup_v03_float_discount() {
 fn markup_v03_dynamic_footnote() {
     assert_out_v03("tests/markup-v03/dynamic-footnote.mq.md", "28");
 }
+
+#[test]
+fn markup_v03_leading_backtick_decl() {
+    assert_out_v03("tests/markup-v03/leading-backtick-decl.mq.md", "ok");
+}
