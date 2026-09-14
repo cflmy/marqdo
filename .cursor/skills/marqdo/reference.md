@@ -18,7 +18,7 @@ marqdo ext remove llm|agent|web|quantum|linalg
 
 Diagnostics look like `path:line:col: message` (1-based line/col).
 
-**v0.2 surface:** parameters `` + `name` ``; branches `` 1. `cond` `` / `` 2. * `` (same-indent restart at `1.` = **new** branch statement); loops `` - [item](coll) `` or `` - [`item`](`coll`) ``; identifiers in backticks (foreach header may omit ticks). See `doc/design/markdown-mapping.md`.
+**v0.3 surface:** `**…**` = code; `*…*` = return; parameters `` + `name` `` (or prose-inferred); branches `` 1. `cond` `` / `` 2. * `` (same-indent restart at `1.` = **new** branch statement); loops `` - [item](coll) ``; get `` [key](coll) ``; bracket calls `` mod [fn] args ``. See `doc/design/markdown-mapping-v0.3.md`.
 
 Stdlib search order for `lib/…` imports: `MARQDO_LIB`, `./lib`, directory of the `marqdo` executable (and a few parents). Prefer the **bundle zip** (`marqdo.exe` + `lib/`) over a bare exe.
 
@@ -183,7 +183,8 @@ See `doc/design/call-arguments.md`.
 
 | Doc | Topic |
 |-----|--------|
-| `doc/design/markdown-mapping.md` | Syntax constitution |
+| `doc/design/markdown-mapping-v0.3.md` | Syntax constitution (runtime) |
+| `doc/design/markdown-mapping.md` | Legacy v0.2 notes |
 | `doc/design/objects.md` | `#` objects / `##` methods |
 | `doc/design/keywords.md` | Builtins / keywords |
 | `doc/design/return-hr-and-code-surface.md` | Function end / surfaces |

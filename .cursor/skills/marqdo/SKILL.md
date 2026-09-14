@@ -103,17 +103,17 @@ Chinese builtins (same functions, no import):
 ## Statements, returns, branches
 
 ```markdown
-*x = 1*
-*y = x + 2*
+**x = 1**
+**y = x + 2**
 
 ## add_one
     + `n`
 
-**n + 1**
+*n + 1*
 ```
 
 ```markdown
-*n = 0*
+**n = 0**
 
 1. `n` > 0
   > print text=positive
@@ -136,9 +136,9 @@ import clock:lib/time.mq.md
 
 # main
 
-*xs = > text.split value="a,b,c" sep=","*
+**xs = > text.str_split s="a,b,c" sep=","**
 > print text=`xs`
-*t = > clock.now_unix*
+**t = > clock.now_unix**
 ```
 
 - Import **English** or **Chinese** library file; call that file’s API names via `lib.member` (do not mix languages).

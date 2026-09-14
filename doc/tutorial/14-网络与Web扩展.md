@@ -31,30 +31,30 @@ import net:lib/net.mq.md
 
 # main
 
-*resp = > net.http_get url="https://api.example.com/status"*
-> print text=`resp`[^status]
+**resp = > net.http_get url="https://api.example.com/status"**
+> print text=[status](`resp`)
 ```
 
 `http_post` 默认以 JSON 提交，可用 `content_type=` / `headers=` 覆盖：
 
 ```markdown
-*body = > net.http_post url="https://api.example.com/echo" body={"msg":"hi"}*
+**body = > net.http_post url="https://api.example.com/echo" body={"msg":"hi"}**
 > print text=`body`
 ```
 
-> **字典操作**：返回值是字典（如 `resp`），直接取元 `resp[^键]`，不要用 `json.get`。
+> **字典操作**：返回值是字典（如 `resp`），用链接取元 `[键](resp)`，不要用 `json.get`。
 
 ### Cookie 解析
 
 `cookie_parse` 把 `Cookie` 请求头或 `Set-Cookie` 响应头解析成列表：
 
 ```markdown
-*req = > net.cookie_parse text="session=abc123; theme=dark"*
-> print text=`req`[^1][^name]     # session
-> print text=`req`[^1][^value]    # abc123
+**req = > net.cookie_parse text="session=abc123; theme=dark"**
+> print text=[name]([1](`req`))     # session
+> print text=[value]([1](`req`))    # abc123
 
-*resp = > net.cookie_parse text="id=42; Path=/; HttpOnly; SameSite=Lax" is_response=True*
-> print text=`resp`[^1][^http_only]   # True
+**resp = > net.cookie_parse text="id=42; Path=/; HttpOnly; SameSite=Lax" is_response=True**
+> print text=[http_only]([1](`resp`))   # True
 ```
 
 ### multipart 解析
@@ -62,9 +62,9 @@ import net:lib/net.mq.md
 `multipart_parse` 解析 `multipart/form-data` 正文（给定 `boundary`）：
 
 ```markdown
-*parts = > net.multipart_parse body=`body` boundary="----WebKitFormBoundary"*
-*field = parts[^1]*
-> print text=`field`[^name]
+**parts = > net.multipart_parse body=`body` boundary="----WebKitFormBoundary"**
+**field = [1](parts)**
+> print text=[name](`field`)
 ```
 
 ## 14.3 网页应用（`ext/web`）
@@ -86,17 +86,17 @@ import web:ext/web/web.mq.md
 |------|------|
 | nav.`导航` | shell.`顶栏` |
 
-*page = > web.page title="我的站点" intro="<h1>你好</h1>"*
-*page = > `page`.compose_components components=`首页`*
-*html = > `page`.render*
+**page = > web.page title="我的站点" intro="<h1>你好</h1>"**
+**page = > `page`.compose_components components=`首页`**
+**html = > `page`.render**
 > print text=`html`
 ```
 
 ### 应用 + 路由 + 监听
 
 ```markdown
-*app = > web.app page=`page` host=127.0.0.1 port=18081*
-*app = > `app`.route path="/about" page=`关于`*
+**app = > web.app page=`page` host=127.0.0.1 port=18081**
+**app = > `app`.route path="/about" page=`关于`**
 > web_listen app=`app`
 ```
 
@@ -105,12 +105,12 @@ import web:ext/web/web.mq.md
 ### 数据库（SQLite）
 
 ```markdown
-*store = > web.db url="sqlite:site.db"*
+**store = > web.db url="sqlite:site.db"**
 > `store`.init name=articles fields=`字段表`
 > `store`.insert table=articles rows=`数据`
-*rows = > `store`.select table=articles limit=10*
+**rows = > `store`.select table=articles limit=10**
 - [行](rows)
-  > print text=`行`[^title]
+  > print text=[title](`行`)
 ```
 
 ## 14.4 登录鉴权（session / cookie）
@@ -125,8 +125,8 @@ import web:ext/web/web.mq.md
 | 1 | admin | secret |
 | 2 | 站长 | pw123 |
 
-*app = > web.app page=`page` admin=True*
-*app = > `app`.auth users=`管理员` session_ttl=3600*
+**app = > web.app page=`page` admin=True**
+**app = > `app`.auth users=`管理员` session_ttl=3600**
 > web_listen app=`app`
 ```
 
@@ -135,16 +135,16 @@ import web:ext/web/web.mq.md
 **独立鉴权工具** `web.auth`：登录、校验、登出（不依赖页面），返回 `{ok, session_id, username}`：
 
 ```markdown
-*auth = > web.auth users=`管理员` session_ttl=3600*
-*login = > `auth`.login username="admin" password="secret"*
-1. `login`[^ok]
-  > print text=登录成功：`login`[^username]
+**auth = > web.auth users=`管理员` session_ttl=3600**
+**login = > `auth`.login username="admin" password="secret"**
+1. [ok](`login`)
+  > print text=登录成功：[username](`login`)
 2. *
   > print text=登录失败
 
-*sid = login[^session_id]*
-*check = > `auth`.check session_id=`sid`*
-> print text=`check`[^username]
+**sid = [session_id](login)**
+**check = > `auth`.check session_id=`sid`**
+> print text=[username](`check`)
 
 > `auth`.logout session_id=`sid`
 ```
@@ -154,19 +154,19 @@ import web:ext/web/web.mq.md
 `app.route_ws` 注册端点，`web.ws.connect` 单次请求–响应：
 
 ```markdown
-*app = > `app`.route_ws path="/live" echo=True*
+**app = > `app`.route_ws path="/live" echo=True**
 > web_listen app=`app`
 ```
 
 客户端（另开终端）：
 
 ```markdown
-*ws = > web.ws timeout_sec=30*
-*echo = > `ws`.connect url="ws://127.0.0.1:18081/live" message="hi"*
-1. `echo`[^ok]
-  > print text=`echo`[^messages]
+**ws = > web.ws timeout_sec=30**
+**echo = > `ws`.connect url="ws://127.0.0.1:18081/live" message="hi"**
+1. [ok](`echo`)
+  > print text=[messages](`echo`)
 2. *
-  > print text=连接失败：`echo`[^error]
+  > print text=连接失败：[error](`echo`)
 ```
 
 ## 14.6 字典操作：用表格与取元，不用 `json.get`/`json.set`
@@ -186,15 +186,15 @@ Marqdo 用 **GFM 表格**构造字典、用 **链接取元 `[键](变量)`** 读
 读取字典（取元）：
 
 ```markdown
-> print text=`配置`[^主机]     # 127.0.0.1
-> print text=`配置`[^端口]     # 18081
+> print text=[主机](`配置`)     # 127.0.0.1
+> print text=[端口](`配置`)     # 18081
 ```
 
 读取函数返回的字典字段，同样直接取元：
 
 ```markdown
-*login = > `auth`.login username="admin" password="secret"*
-> print text=`login`[^ok]         # 而不是 json.get value=`login` key="ok"
+**login = > `auth`.login username="admin" password="secret"**
+> print text=[ok](`login`)         # 而不是 json.get value=`login` key="ok"
 ```
 
 ## 14.7 下一步
