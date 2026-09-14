@@ -44,7 +44,11 @@ fn is_code_starter(c: char) -> bool {
 }
 
 /// Whole-line backtick bind `` `name` = … `` (empty RHS / fence / table OK).
-/// Narrative decls like `` `捕获=True` 时… `` or `` `n`，我们… `` are **not** binds.
+///
+/// Narrative decls are **not** binds:
+/// - `` `捕获=True` 时… `` (`=` inside ticks)
+/// - `` `n`，我们… `` (no `=` after ticks)
+/// - `` `礼貌`=False 时… `` (glued default + trailing prose; same shape as prose Decl)
 fn looks_like_backtick_assign(trimmed: &str) -> bool {
     let t = trimmed.trim();
     if !t.starts_with('`') {
@@ -58,8 +62,26 @@ fn looks_like_backtick_assign(trimmed: &str) -> bool {
     if name.is_empty() || name.chars().any(|c| c.is_whitespace()) {
         return false;
     }
-    let after = rest[end + 1..].trim_start();
-    after.starts_with('=')
+    let after_tick = &rest[end + 1..];
+    let after = after_tick.trim_start();
+    if !after.starts_with('=') {
+        return false;
+    }
+    // Glued `` `name`=default …prose `` → Decl, not assign (prose.rs default terminator).
+    let glued = after_tick.starts_with('=');
+    if glued {
+        let stripped = &after[1..];
+        let def_end = stripped
+            .find(|c: char| {
+                c.is_whitespace()
+                    || matches!(c, '，' | '。' | '；' | '、' | ',' | ';' | '*' | '`')
+            })
+            .unwrap_or(stripped.len());
+        if !stripped[def_end..].trim_start().is_empty() {
+            return false;
+        }
+    }
+    true
 }
 
 /// `*` / `**` lines that are Marqdo executable (statement / return / else), not narrative Markdown.
@@ -401,6 +423,16 @@ mod tests {
             "leading decl in narrative"
         );
         assert_eq!(classify_line("`礼貌`=False"), LineKind::Code);
+        assert_eq!(
+            classify_line("`礼貌`=False 时用短称呼。"),
+            LineKind::Comment,
+            "glued default + trailing prose is Decl"
+        );
+        assert_eq!(
+            classify_line("`礼貌` = False"),
+            LineKind::Code,
+            "spaced = is backtick assign"
+        );
     }
 
     #[test]
