@@ -461,6 +461,11 @@ impl<'a> Parser<'a> {
             }
             return Ok(e);
         }
+        // Link-shaped index: `[key](collection)` / `` [`var`](collection) ``
+        // (same Markdown shape as foreach `- [item](coll)`; see collection-access-link.md).
+        if self.starts_with("[") && !self.starts_with("[^") {
+            return self.parse_link_index();
+        }
         if self.eat("\"") {
             return self.parse_quoted_string('"');
         }
@@ -606,6 +611,69 @@ impl<'a> Parser<'a> {
             };
         }
         Ok(expr)
+    }
+
+    /// `[key](collection)` — preferred collection get (GFM link shape).
+    fn parse_link_index(&mut self) -> Result<Expr> {
+        if !self.eat("[") {
+            bail!("expected '[' for link index");
+        }
+        self.skip_ws();
+        let label = if self.eat("`") {
+            let start = self.i;
+            while let Some(c) = self.peek_char() {
+                if c == '`' {
+                    break;
+                }
+                if c == '\n' || c == '\r' || c == ']' {
+                    bail!("unterminated link-index var `[`…`](…)`");
+                }
+                self.bump_char();
+            }
+            let name = self.src[start..self.i].trim().to_string();
+            if !self.eat("`") {
+                bail!("unterminated link-index var `[`…`](…)`");
+            }
+            if name.is_empty() {
+                bail!("empty link-index var `[`](…)`");
+            }
+            IndexKey::Var(name)
+        } else {
+            let start = self.i;
+            while let Some(c) = self.peek_char() {
+                if c == ']' {
+                    break;
+                }
+                if c == '\n' || c == '\r' || c == '[' {
+                    bail!("unterminated or nested link-index key `[…](…)`");
+                }
+                self.bump_char();
+            }
+            let key = self.src[start..self.i].trim().to_string();
+            if key.is_empty() {
+                bail!("empty link-index key `[](…)`");
+            }
+            IndexKey::Lit(key)
+        };
+        self.skip_ws();
+        if !self.eat("]") {
+            bail!("expected ']' after link-index key");
+        }
+        self.skip_ws();
+        if !self.eat("(") {
+            bail!("expected '(' collection after link-index `[key]`");
+        }
+        let base = self.parse_or()?;
+        self.skip_ws();
+        if !self.eat(")") {
+            bail!("expected ')' after link-index collection");
+        }
+        let expr = Expr::Index {
+            base: Box::new(base),
+            label,
+        };
+        // Legacy: allow trailing footnote chain on the result.
+        self.parse_index_chain(expr)
     }
 
     /// `"..."` or `'...'` with escapes and `` `var` `` interpolation.
@@ -1326,6 +1394,48 @@ mod tests {
                 ..
             } if s == "拿铁"
         ));
+    }
+
+    #[test]
+    fn link_shaped_index() {
+        let e = parse_expr_prefer_var("[拿铁](菜单)").unwrap();
+        match e {
+            Expr::Index { base, label } => {
+                assert!(matches!(base.as_ref(), Expr::Var(n) if n == "菜单"));
+                assert_eq!(label, IndexKey::Lit("拿铁".into()));
+            }
+            other => panic!("expected link Index, got {other:?}"),
+        }
+        let e = parse_expr_prefer_var("[`名`](菜单)").unwrap();
+        match e {
+            Expr::Index { base, label } => {
+                assert!(matches!(base.as_ref(), Expr::Var(n) if n == "菜单"));
+                assert_eq!(label, IndexKey::Var("名".into()));
+            }
+            other => panic!("expected dynamic link Index, got {other:?}"),
+        }
+        let e = parse_expr_prefer_var("[1](篮子)").unwrap();
+        assert!(matches!(
+            e,
+            Expr::Index {
+                label: IndexKey::Lit(ref s),
+                ..
+            } if s == "1"
+        ));
+        let e = parse_expr_prefer_var("[1]([苹果](货架))").unwrap();
+        match e {
+            Expr::Index { base, label } => {
+                assert_eq!(label, IndexKey::Lit("1".into()));
+                assert!(matches!(
+                    base.as_ref(),
+                    Expr::Index {
+                        label: IndexKey::Lit(ref k),
+                        ..
+                    } if k == "苹果"
+                ));
+            }
+            other => panic!("expected nested link Index, got {other:?}"),
+        }
     }
 }
 

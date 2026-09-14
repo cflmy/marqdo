@@ -145,10 +145,11 @@ pub enum Expr {
     List(Vec<Expr>),
     /// Object literal / horizontal table (`map` value).
     Map(Vec<(String, Expr)>),
-    /// Footnote index: `` `xs`[^1] `` / `` `m`[^key] `` / `` `m`[^`var`] `` (dynamic key).
+    /// Collection index: `` [拿铁](菜单) `` / `` [`名`](菜单) `` (preferred), or
+    /// legacy footnote `` `菜单`[^拿铁] `` / `` `菜单`[^`名`] ``.
     Index {
         base: Box<Expr>,
-        /// Label inside `[^…]` (digits → 1-based list index, or map key; see [`IndexKey`]).
+        /// Key or 1-based list index; see [`IndexKey`].
         label: IndexKey,
     },
     /// Parsed `$$…$$` formula tree (from assignment RHS).
@@ -166,12 +167,12 @@ pub enum InterpPart {
     Index { base: String, labels: Vec<String> },
 }
 
-/// Footnote / map key after `[^…]`.
+/// Map / list index key (`[key](coll)` or legacy `[^…]`).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum IndexKey {
-    /// Static text: `[^拿铁]` / `[^1]`.
+    /// Static text: `[拿铁](…)` / `[^拿铁]` / `[^1]`.
     Lit(String),
-    /// Dynamic: `` [^`品名`] `` — evaluate variable, then stringify as key.
+    /// Dynamic: `` [`品名`](…) `` / `` [^`品名`] `` — evaluate variable, then stringify as key.
     Var(String),
 }
 

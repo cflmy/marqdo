@@ -280,6 +280,11 @@ fn structure_footnote_index() {
 }
 
 #[test]
+fn structure_link_index() {
+    assert_out("tests/structure/link-index.mq.md", "28\n18\n桃");
+}
+
+#[test]
 fn structure_footnote_map_digits() {
     assert_out(
         "tests/structure/footnote-map-digits.mq.md",

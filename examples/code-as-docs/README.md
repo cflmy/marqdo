@@ -12,10 +12,11 @@ marqdo run examples/code-as-docs/index.mq.md
 |------|------|
 | 数据给人读 | GFM 表当菜单 / 订单 |
 | 步骤嵌在句子里 | `**总额 = 价 * 杯数**`、返回 `*总额*` |
-| 装饰性强调 | `**说明**` 不执行（见设计 G2） |
-| 段落分隔 | 顶层或体内的 `---` 只是分割线 |
+| 装饰性强调 | `**说明**` 不执行 |
+| 段落分隔 | `---` 只是分割线 |
 | 浮点 | `折扣`=0.85 |
-| 动态键 | `` 菜单[^`名`] `` |
-| 调用 | 粗体赋值右侧 **可省略 `>`**：`**摘要 = 结账摘要 …**`；输出可用 `**打印 内容=…**` |
+| 取元 | `[拿铁](菜单)` / `` [`名`](菜单) ``（与循环同形；脚注 `[^…]` 仅过渡） |
+| 循环 | `- [行](今日订单)` |
+| 调用 | `**摘要 = 结账摘要 …**`（粗体 RHS 可省略 `>`） |
 
-相关设计：[code-as-docs-gaps.md](../../doc/design/code-as-docs-gaps.md)、[markdown-mapping-v0.3.md](../../doc/design/markdown-mapping-v0.3.md) §6。
+设计：[collection-access-link.md](../../doc/design/collection-access-link.md)、[code-as-docs-gaps.md](../../doc/design/code-as-docs-gaps.md)。

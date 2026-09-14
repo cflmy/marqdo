@@ -1345,7 +1345,8 @@ fn expr_prec(expr: &Expr, parent_prec: u8) -> String {
                 crate::ast::IndexKey::Lit(s) => s.clone(),
                 crate::ast::IndexKey::Var(n) => format!("`{n}`"),
             };
-            format!("{}[^{}]", expr_prec(base, 8), key)
+            // Preferred surface: GFM link shape (legacy footnote still accepted by parser).
+            format!("[{}]({})", key, expr_prec(base, 0))
         }
         Expr::Formula(e) => format!("$$ {} $$", e.as_display()),
         Expr::Code(c) => format!("```{} …```", c.lang),

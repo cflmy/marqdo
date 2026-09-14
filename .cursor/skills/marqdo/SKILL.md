@@ -54,7 +54,8 @@ Canonical design (repo): [`markdown-mapping-v0.3.md`](../../doc/design/markdown-
 | `*…*` | **Return value** — closing `*` touches last token; bare ids are variables |
 | `****` / whole-line `**` / `*None*` | Return `None` and end function body |
 | Lone `---` / `***` | Markdown thematic break (skip; not function end) |
-| GFM table after empty RHS bind | Collection (1-col list / ≥2-col map / `@`·`行`·`row` → list of maps); `` `x`[^1] `` / `` `m`[^key] `` |
+| GFM table after empty RHS bind | Collection; get with `[key](coll)` (preferred) or legacy `` `m`[^key] `` |
+| `- [item](coll)` | Foreach (unchanged) |
 | `` ```lang `` | Foreign code block (via `lib/foreign`) |
 | `` `"text"` `` | Quoted string (`\n` `\t` `\\` `\"`; `` `var` `` inside); bare tokens unescaped |
 | Unmarked prose | Comment |
