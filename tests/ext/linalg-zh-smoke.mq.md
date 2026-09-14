@@ -15,7 +15,7 @@ import la:ext/linalg/线性代数.mq.md
 > 打印 内容=`txt`
 
 **`ping` = > la.探测**
-**`ok` = ping[^ok]**
+**`ok` = [ok](ping)**
 1. `ok`
   > 打印 内容=探测-ok
 2. *

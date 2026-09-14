@@ -19,7 +19,7 @@ import sys:lib/sys.mq.md
 **c = > web.cache url="memory:drivers-smoke"**
 > `c`.set key="k1" value="v1" ttl=60
 **g = > `c`.get key="k1"**
-**gv = g[^value]**
+**gv = [value](g)**
 1. `gv` == "v1"
   > print text=cache-ok
 2. *
@@ -27,7 +27,7 @@ import sys:lib/sys.mq.md
 
 > `c`.del key="k1"
 **ex = > `c`.exists key="k1"**
-**eok = ex[^ok]**
+**eok = [ok](ex)**
 1. `eok`
   > print text=cache-del-fail
 2. *
@@ -38,14 +38,14 @@ import sys:lib/sys.mq.md
 **blob = > web.storage url="file:tests/ext/web-fixtures/data/drivers-blobs"**
 > `blob`.put key="notes/a.txt" body="hello" content_type="text/plain"
 **got = > `blob`.get key="notes/a.txt"**
-**body = got[^body]**
+**body = [body](got)**
 1. `body` == "hello"
   > print text=storage-ok
 2. *
   > print text=storage-fail
 
 **ls = > `blob`.list prefix="notes/"**
-**n = ls[^count]**
+**n = [count](ls)**
 1. `n` == 1
   > print text=storage-list-ok
 2. *
@@ -56,7 +56,7 @@ import sys:lib/sys.mq.md
 <!-- db: postgres URL is accepted as a handle (no live server required) -->
 
 **pg = > web.db url="postgres://marqdo:marqdo@127.0.0.1:5432/marqdo"**
-**purl = pg[^url]**
+**purl = [url](pg)**
 1. `purl` == "postgres://marqdo:marqdo@127.0.0.1:5432/marqdo"
   > print text=postgres-url-ok
 2. *
@@ -65,7 +65,7 @@ import sys:lib/sys.mq.md
 <!-- s3 URL shape validates at open -->
 
 **s3 = > web.storage url="s3://bucket?endpoint=http://127.0.0.1:9000"**
-**sb = s3[^backend]**
+**sb = [backend](s3)**
 1. `sb` == "s3"
   > print text=s3-open-ok
 2. *

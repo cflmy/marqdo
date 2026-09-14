@@ -141,9 +141,9 @@ import db:db/index.mq.md
 **房间行 = > store.查询 表="chat_rooms" 上限=50**
 **房间段 = None**
 - [房](房间行)
-  **名 = 房[^name]**
-  **链 = 房[^slug]**
-  **摘 = 房[^summary]**
+  **名 = [name](房)**
+  **链 = [slug](房)**
+  **摘 = [summary](房)**
   **项 = "<article class=\"chat-room-card\"><h3><a href=\"/chat/" + 链 + "\">" + 名 + "</a></h3><p>" + 摘 + "</p></article>"**
   **房间段 = > table.append list=房间段 item=项**
 **房间内 = > text.str_join xs=房间段 sep=""**
@@ -165,9 +165,9 @@ import db:db/index.mq.md
 **专题行 = > store.查询 表="topics" 上限=50**
 **专题段 = None**
 - [题](专题行)
-  **题名 = 题[^title]**
-  **链 = 题[^slug]**
-  **摘 = 题[^summary]**
+  **题名 = [title](题)**
+  **链 = [slug](题)**
+  **摘 = [summary](题)**
   **项 = "<article class=\"topic-card\"><h3>" + 题名 + "</h3><p>" + 摘 + "</p><p class=\"text-muted\">slug: " + 链 + "</p></article>"**
   **专题段 = > table.append list=专题段 item=项**
 **专题内 = > text.str_join xs=专题段 sep=""**

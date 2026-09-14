@@ -12,9 +12,9 @@ import fs:lib/fs.mq.md
 > fs.write_text path="m9-tree/nested/b.txt" text="B"
 
 **st = > fs.stat path="m9-tree/a.txt"**
-> print text=`st`[^size]
-> print text=`st`[^is_file]
-> print text=`st`[^is_dir]
+> print text=[size](`st`)
+> print text=[is_file](`st`)
+> print text=[is_dir](`st`)
 
 **w = > fs.walk path="m9-tree"**
 **n = > len `w`**

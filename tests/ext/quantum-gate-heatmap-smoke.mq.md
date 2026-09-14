@@ -8,7 +8,7 @@ import quantum:ext/quantum/quantum.mq.md
 
 **H = > quantum.gate name="H"**
 **img = > `H`.draw kind="matrix" path="quantum-gate-heatmap.svg"**
-**kind = img[^kind]**
+**kind = [kind](img)**
 
 1. `kind` == matrix
   > print text=heatmap-ok

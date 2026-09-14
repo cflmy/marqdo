@@ -28,8 +28,8 @@ Narration: \((AB)^\top = B^\top A^\top\). The identity is checked by running thi
 | 2 | Y | 2 | 2 |
 
 **`env` = > la.declare table=`shapes`**
-**`X` = env[^X]**
-**`Y` = env[^Y]**
+**`X` = [X](env)**
+**`Y` = [Y](env)**
 **`S` = `X` + `Y`**
 **`st` = > la.ascii expr=`S`**
 1. `st` == "X + Y"

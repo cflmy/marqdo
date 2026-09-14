@@ -16,7 +16,7 @@ $$
 **qc = > quantum.circuit qubits=1**
 **qc = > `qc`.apply gate=`U` qubits=0**
 **p = > `qc`.probabilities**
-**p0 = p[^0]**
+**p0 = [0](p)**
 **lo = > math.div a=4 b=10**
 **hi = > math.div a=6 b=10**
 

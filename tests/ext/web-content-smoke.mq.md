@@ -24,15 +24,15 @@ import sys:lib/sys.mq.md
 
 **page = > web.page title="Home"**
 **page = > page.meta meta=`meta`**
-**mm = page[^meta]**
-**m = mm[^title]**
+**mm = [meta](page)**
+**m = [title](mm)**
 1. `m` == "My Site"
   > print text=meta-ok
 2. *
   > print text=meta-fail
 
 **page = > page.paginate offset=0 limit=5 path="/"**
-**poff = page[^paginate][^offset]**
+**poff = [offset]([paginate](page))**
 1. `poff` == 0
   > print text=paginate-ok
 2. *

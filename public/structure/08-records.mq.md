@@ -5,7 +5,7 @@ description: First header @ / row makes a list of maps
 
 # main
 
-When the first header is `@` or `row`, each data row is a map (marker column is not a field).
+When the first header is `@` or `row`, each data row is a map (marker column is not a field). Nested get: `[field]([1](orders))`.
 
 `orders` =
 
@@ -14,10 +14,10 @@ When the first header is `@` or `row`, each data row is a map (marker column is 
 | 1 | apple | 2 |
 | 2 | pear | 3 |
 
-**`n` = `orders`[^1][^name] **
+**`n` = [name]([1](orders))**
 
 > print text=`n`
 
-**`q` = `orders`[^2][^qty] **
+**`q` = [qty]([2](orders))**
 
 > print text=`q`

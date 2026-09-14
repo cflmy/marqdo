@@ -15,8 +15,8 @@ import json:lib/json.mq.md
 
 **args = > json.parse text=["-c","printf hi-capture"]**
 **out = > sys.exec cmd="sh" args=args capture=True**
-**c = out[^code]**
-**s = out[^stdout]**
+**c = [code](out)**
+**s = [stdout](out)**
 1. `c` == 0
   > print text=capture-code-ok
 2. *

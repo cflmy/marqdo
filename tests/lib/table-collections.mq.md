@@ -7,7 +7,7 @@ import table:lib/table.mq.md
 # main
 
 **h = > table.put in=None at="Authorization" value="Bearer-x"**
-> print text=`h`[^Authorization]
+> print text=[Authorization](`h`)
 
 `xs` =
 
@@ -17,8 +17,8 @@ import table:lib/table.mq.md
 | b |
 
 **xs = > table.put in=`xs` at=1 value="A"**
-> print text=`xs`[^1]
-> print text=`xs`[^2]
+> print text=[1](`xs`)
+> print text=[2](`xs`)
 
 `req` =
 
@@ -31,8 +31,8 @@ import table:lib/table.mq.md
 **messages = > table.append list=None item=`msg`**
 **req = > table.put in=`req` at="messages" value=`messages`**
 **req = > table.put in=`req` at="stream" value=True**
-> print text=`req`[^messages][^1][^content]
-> print text=`req`[^stream]
+> print text=[content]([1]([messages](`req`)))
+> print text=[stream](`req`)
 
 **xs = > table.append list=`xs` item="c"**
 **n = > table.len xs=`xs`**

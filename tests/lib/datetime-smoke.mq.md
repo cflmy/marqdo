@@ -6,10 +6,10 @@ import dt:lib/datetime.mq.md
 # main
 
 **m = > dt.from_unix unix=0**
-> print text=`m`[^iso]
+> print text=[iso](`m`)
 
 **sh = > dt.in_zone dt=`m` zone="Asia/Shanghai"**
-> print text=`sh`[^iso]
+> print text=[iso](`sh`)
 
 **p = > dt.parse text="2020-01-02T03:04:05+08:00"**
 **u = > dt.to_unix dt=`p`**

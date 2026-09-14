@@ -15,7 +15,7 @@ import web:ext/web/web.mq.md
 | 2 | CREATE TABLE IF NOT EXISTS comments (id INTEGER PRIMARY KEY AUTOINCREMENT, post_id INTEGER NOT NULL, body TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'pending') |
 
 **m1 = > `store`.migrate steps=`steps`**
-**a1 = m1[^applied]**
+**a1 = [applied](m1)**
 **n1 = > len value=`a1`**
 1. `n1` == 2
   > print text=migrate-ok
@@ -23,7 +23,7 @@ import web:ext/web/web.mq.md
   > print text=migrate-fail
 
 **m2 = > `store`.migrate steps=`steps`**
-**a2 = m2[^applied]**
+**a2 = [applied](m2)**
 **n2 = > len value=`a2`**
 1. `n2` == 0
   > print text=migrate-idempotent-ok
@@ -68,15 +68,15 @@ import web:ext/web/web.mq.md
 
 > `store`.fts table="posts" columns="title,body"
 **hit = > `store`.search table="posts" q="hello" limit=10**
-**hn = hit[^count]**
+**hn = [count](hit)**
 1. `hn` >= 1
   > print text=fts-ok
 2. *
   > print text=fts-fail
 
-**rows2 = hit[^rows]**
-**first = rows2[^1]**
-**ft = first[^title]**
+**rows2 = [rows](hit)**
+**first = [1](rows2)**
+**ft = [title](first)**
 1. `ft`
   > print text=fts-row-ok
 2. *

@@ -10,7 +10,7 @@ import quantum:ext/quantum/quantum.mq.md
 **qc = > `qc`.x qubit=0**
 **qc = > `qc`.noise kind="amplitude_damping" p=1**
 **r = > `qc`.run shots=32 seed=7**
-**c0 = r[^counts][^0]**
+**c0 = [0]([counts](r))**
 
 1. `c0` == 32
   > print text=amp-ok

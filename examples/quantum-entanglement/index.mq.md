@@ -30,7 +30,7 @@ Build |Φ⁺⟩ with H then CX. Full-state purity stays 1; tracing out one qubit
 **ezz = > `qc`.expect obs=`zz`**
 
 **sch = > `qc`.schmidt cut=1**
-**ent = sch[^entropy]**
+**ent = [entropy](sch)**
 
 **_ = > `qc`.draw path="entangle-circuit.svg" theme="dark"**
 **_ = > `qc`.draw kind="hinton" path="entangle-hinton.svg"**

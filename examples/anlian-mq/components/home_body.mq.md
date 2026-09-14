@@ -20,8 +20,8 @@ import feed:feed.mq.md
 
 **公告段 = None**
 - [告](公告行)
-  **文 = 告[^content]**
-  **时 = 告[^created_at]**
+  **文 = [content](告)**
+  **时 = [created_at](告)**
   **一项 = "<div class=\"notice-item\"><article class=\"notice-content\">" + 文 + "</article><p class=\"notice-create-time\">" + 时 + "</p></div>"**
   **公告段 = > table.append list=公告段 item=一项**
 1. 公告段

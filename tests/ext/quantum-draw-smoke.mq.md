@@ -15,7 +15,7 @@ import quantum:ext/quantum/quantum.mq.md
 
 **qc = > quantum.circuit qubits=2 steps=`steps`**
 **img = > `qc`.draw kind="probs" path="quantum-draw-probs.svg"**
-**kind = img[^kind]**
+**kind = [kind](img)**
 
 1. `kind` == probs
   > print text=probs-ok
@@ -25,7 +25,7 @@ import quantum:ext/quantum/quantum.mq.md
 **qc1 = > quantum.circuit qubits=1**
 **qc1 = > `qc1`.h qubit=0**
 **bloch = > `qc1`.draw kind="bloch" path="quantum-draw-bloch.svg"**
-**bk = bloch[^kind]**
+**bk = [kind](bloch)**
 
 1. `bk` == bloch
   > print text=bloch-ok

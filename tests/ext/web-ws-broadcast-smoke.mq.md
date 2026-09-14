@@ -16,17 +16,17 @@ import sys:lib/sys.mq.md
 **pg = > web.page title="w6b"**
 **app = > web.app page=`pg` port=18111**
 **app = > `app`.route_ws path="/room" mode="broadcast"**
-**routes = app[^ws_routes]**
-**room = routes[^/room]**
-**mode = room[^mode]**
+**routes = [ws_routes](app)**
+**room = [/room](routes)**
+**mode = [mode](room)**
 1. `mode` == "broadcast"
   > print text=ws-broadcast-route-ok
 2. *
   > print text=ws-broadcast-route-fail
 
 **app = > `app`.configure access_log=True compress=False**
-**mw = app[^middleware]**
-**al = mw[^access_log]**
+**mw = [middleware](app)**
+**al = [access_log](mw)**
 1. `al`
   > print text=access-log-ok
 2. *

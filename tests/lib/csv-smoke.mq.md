@@ -12,8 +12,8 @@ import csv:lib/csv.mq.md
 > print text=`n`
 
 **r0 = > at value=`rows` index=0**
-> print text=`r0`[^name]
-> print text=`r0`[^note]
+> print text=[name](`r0`)
+> print text=[note](`r0`)
 
 **out = > csv.stringify rows=`rows`**
 **rows2 = > csv.parse text=`out`**

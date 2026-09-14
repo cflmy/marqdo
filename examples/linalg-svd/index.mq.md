@@ -17,7 +17,7 @@ $$
 
 **`M` = > la.from_formula formula=`M`**
 **`f` = > la.factorize matrix=`M` kind="svd"**
-**`S` = f[^S]**
+**`S` = [S](f)**
 **`_` = > la.draw factor=`f` kind="svd" theme="light" path="svd-structure.svg"**
 **`hm` = > la.draw factor=`M` kind="hinton" path="svd-hinton.svg"**
 

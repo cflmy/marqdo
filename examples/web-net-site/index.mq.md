@@ -46,12 +46,12 @@ About page: same shell.
 Parse a `Cookie` request header with the standard library.
 
 **parsed_req = > net.cookie_parse text="session=abc123; theme=dark"**
-**req_cookie = parsed_req[^1]**
+**req_cookie = [1](parsed_req)**
 
 Parse a `Set-Cookie` response header.
 
 **parsed_resp = > net.cookie_parse text="id=42; Path=/; HttpOnly; SameSite=Lax" is_response=True**
-**resp_cookie = parsed_resp[^1]**
+**resp_cookie = [1](parsed_resp)**
 
 Parse a `multipart/form-data` body.
 
@@ -60,8 +60,8 @@ Parse a `multipart/form-data` body.
 `_body` = "--`_b`\nContent-Disposition: form-data; name=\"title\"\n\nHello\n--`_b`\nContent-Disposition: form-data; name=\"cover\"; filename=\"pic.png\"\nContent-Type: image/png\n\n<bytes>\n--`_b`--\n"
 
 **mp = > net.multipart_parse body=`_body` boundary=`_b`**
-**mp_title = mp[^1]**
-**mp_cover = mp[^2]**
+**mp_title = [1](mp)**
+**mp_cover = [2](mp)**
 
 Build the tools page as one HTML intro (intro is served raw).
 
@@ -71,13 +71,13 @@ Build the tools page as one HTML intro (intro is served raw).
 |----|
 | <h1>Net tools</h1><p>Parsing demos powered by lib/net: cookie_parse and multipart_parse.</p><section class="content cards"> |
 | <article><h2>Cookie request</h2><p> |
-| `req_cookie`[^name]=`req_cookie`[^value] |
+| [name](`req_cookie`)=[value](`req_cookie`) |
 | </p></article><article><h2>Set-Cookie response</h2><p> |
-| `resp_cookie`[^name]=`resp_cookie`[^value] · HttpOnly=`resp_cookie`[^http_only] |
+| [name](`resp_cookie`)=[value](`resp_cookie`) · HttpOnly=[http_only](`resp_cookie`) |
 | </p></article><article><h2>Multipart field</h2><p> |
-| `mp_title`[^name]=`mp_title`[^value] |
+| [name](`mp_title`)=[value](`mp_title`) |
 | </p></article><article><h2>Multipart file</h2><p> |
-| `mp_cover`[^name] · `mp_cover`[^filename] · `mp_cover`[^content_type] |
+| [name](`mp_cover`) · [filename](`mp_cover`) · [content_type](`mp_cover`) |
 | </p></article></section> |
 
 **tools_intro = > text.str_join xs=`tools_parts` sep=""**

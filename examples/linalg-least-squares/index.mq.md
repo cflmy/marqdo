@@ -27,8 +27,8 @@ $$
 **`_` = > la.draw factor=`A` kind="heatmap" theme="light" path="ls-heatmap.svg"**
 
 **`ls` = > la.lstsq a=`A` b=`b`**
-**`x` = ls[^x]**
-**`resid` = ls[^residual_fro]**
+**`x` = [x](ls)**
+**`resid` = [residual_fro](ls)**
 
 > print text=`x`
 > print text=`resid`

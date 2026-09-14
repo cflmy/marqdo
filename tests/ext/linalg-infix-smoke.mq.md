@@ -17,7 +17,7 @@ import la:ext/linalg/linalg.mq.md
 **`st` = > `Pt`.ascii**
 > print text=`st`
 
-**`ty` = C[^_type]**
+**`ty` = [_type](C)**
 1. `ty` == matrix
   > print text=type-ok
 2. *
@@ -35,7 +35,7 @@ $$
 
 **`S` = `M` + `N`**
 **`Se` = > la.explicit expr=`S`**
-**`d` = Se[^data]**
+**`d` = [data](Se)**
 **`r0` = > at value=`d` index=0**
 **`x00` = > at value=`r0` index=0**
 **`xs` = > str value=`x00`**

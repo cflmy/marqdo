@@ -23,8 +23,8 @@ $$
 **`eps` = > math.div a=1 b=1000**
 
 **`ls` = > la.lstsq a=`A` b=`b`**
-**`x` = ls[^x]**
-**`xd` = x[^data]**
+**`x` = [x](ls)**
+**`xd` = [data](x)**
 **`r0` = > at value=`xd` index=0**
 **`x0` = > at value=`r0` index=0**
 **`e0` = > math.sub a=`x0` b=1.1666666667**
@@ -49,7 +49,7 @@ $$
 
 **`D` = > la.from_formula formula=`D`**
 **`c` = > la.cond expr=`D`**
-**`cv` = c[^value]**
+**`cv` = [value](c)**
 **`ce` = > math.sub a=`cv` b=2**
 **`ce` = > math.abs value=`ce`**
 1. `ce` < `eps`
@@ -65,7 +65,7 @@ $$
 
 **`raw` = > json.parse text="[[[0,1],[1,0]],[[1,0],[0,-1]]]"**
 **`Z` = > la.from_list data=`raw`**
-**`dt` = Z[^dtype]**
+**`dt` = [dtype](Z)**
 1. `dt` == complex
   > print text=complex-dtype-ok
 2. *
@@ -80,13 +80,13 @@ $$
   > print text=complex-norm-fail
 
 **`img` = > la.draw factor=`D` kind="heatmap" theme="dark" path="linalg-metrics-heat.svg"**
-**`th` = img[^theme]**
+**`th` = [theme](img)**
 1. `th` == dark
   > print text=theme-ok
 2. *
   > print text=theme-fail
 
-**`svg` = img[^svg]**
+**`svg` = [svg](img)**
 **`parts` = > split value=`svg` sep="data-theme=\"dark\""**
 **`pn` = > len value=`parts`**
 1. `pn` > 1

@@ -27,7 +27,7 @@ import sys:lib/sys.mq.md
 > `store`.init name=posts fields=`fields`
 
 **idx = > `store`.query sql="SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='posts'"**
-**nidx = > len value=idx[^rows]**
+**nidx = > len value=[rows](idx)**
 1. `nidx` >= 1
   > print text=unique-ok
 2. *
@@ -41,7 +41,7 @@ import sys:lib/sys.mq.md
 | /about | 2026-08-28 |
 
 **sm = > web_sitemap_build base="https://example.com" items=`items`**
-**xml = sm[^xml]**
+**xml = [xml](sm)**
 1. `xml`
   > print text=sitemap-ok
 2. *
@@ -55,27 +55,27 @@ import sys:lib/sys.mq.md
 **app = > `app`.error_page status=404 page=`notfound`**
 **app = > `app`.sitemap path="/sitemap.xml" base="https://example.com" items=`items`**
 **app = > `app`.robots sitemap="https://example.com/sitemap.xml"**
-**rd = app[^redirects]**
-**has = rd[^/old]**
+**rd = [redirects](app)**
+**has = [/old](rd)**
 1. `has`
   > print text=redirect-ok
 2. *
   > print text=redirect-fail
 
-**rb = app[^robots_body]**
+**rb = [robots_body](app)**
 1. `rb`
   > print text=robots-ok
 2. *
   > print text=robots-fail
 
-**mw = app[^middleware]**
-**cc = mw[^cache_control]**
+**mw = [middleware](app)**
+**cc = [cache_control](mw)**
 1. `cc` == "public, max-age=60"
   > print text=cache-control-ok
 2. *
   > print text=cache-control-fail
 
-**p404 = app[^page_404]**
+**p404 = [page_404](app)**
 1. `p404`
   > print text=error-page-ok
 2. *

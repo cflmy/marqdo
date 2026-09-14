@@ -32,43 +32,43 @@ import sys:lib/sys.mq.md
 **app = > `app`.proxy path="/v1/stream" upstream="https://example.com/v1/chat" stream=True headers_from_env="TOKEN=X-Token"**
 **app = > `app`.invoke path="/api/ping" fn="demo.ping" method="GET" body="query"**
 
-**proutes = app[^proxy_routes]**
-**chat = proutes[^proxy/chat]**
-**up = chat[^upstream]**
+**proutes = [proxy_routes](app)**
+**chat = [proxy/chat](proutes)**
+**up = [upstream](chat)**
 1. `up` == "$OPENAI_BASE_URL"
   > print text=proxy-table-ok
 2. *
   > print text=proxy-table-fail
 
-**stream = chat[^stream]**
+**stream = [stream](chat)**
 1. `stream`
   > print text=proxy-stream-ok
 2. *
   > print text=proxy-stream-fail
 
-**hdr = chat[^headers_from_env]**
+**hdr = [headers_from_env](chat)**
 1. `hdr` == "OPENAI_API_KEY=Authorization"
   > print text=proxy-env-ok
 2. *
   > print text=proxy-env-fail
 
-**v1 = proutes[^v1/stream]**
-**v1u = v1[^upstream]**
+**v1 = [v1/stream](proutes)**
+**v1u = [upstream](v1)**
 1. `v1u` == "https://example.com/v1/chat"
   > print text=proxy-method-ok
 2. *
   > print text=proxy-method-fail
 
-**iroutes = app[^invoke_routes]**
-**echo = iroutes[^api/echo]**
-**efn = echo[^fn]**
+**iroutes = [invoke_routes](app)**
+**echo = [api/echo](iroutes)**
+**efn = [fn](echo)**
 1. `efn` == "demo.echo"
   > print text=invoke-table-ok
 2. *
   > print text=invoke-table-fail
 
-**ping = iroutes[^api/ping]**
-**pm = ping[^method]**
+**ping = [api/ping](iroutes)**
+**pm = [method](ping)**
 1. `pm` == "GET"
   > print text=invoke-method-ok
 2. *

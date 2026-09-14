@@ -17,15 +17,15 @@ import demo:agent-mcp-server-helpers.mq.md
 
 **srv = > agent.mcp_server name="marqdo-test"**
 **srv = > `srv`.tool name="ping" fn="demo.ping" description="ping tool"**
-**tools = srv[^tools]**
+**tools = [tools](srv)**
 **n = > len value=`tools`**
 1. `n` == 1
   > print text=mcp-tool-ok
 2. *
   > print text=mcp-tool-fail
 
-**t0 = tools[^1]**
-**fn = t0[^fn]**
+**t0 = [1](tools)**
+**fn = [fn](t0)**
 1. `fn` == "demo.ping"
   > print text=mcp-fn-ok
 2. *

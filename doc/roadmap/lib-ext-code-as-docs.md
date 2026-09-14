@@ -27,12 +27,14 @@
 | **M2** | 其余 `lib/*` 叙述化；禁新脚注取元 | **done** |
 | **M3–M4** | `ext/web`、`ext/ai`：脚注→链接取元；叙述；示例可逐步换括号调用 | **done**（取元迁移） |
 | **M5** | quantum / linalg + full gold | **done** |
+| **M6** | examples + public/structure + tests/ext·lib 链接取元；cafe 括号调用例 | **done** |
 
 ## 2. 验收（出门）
 
 - 括号调用与 `[k](c)` 取元金样并存、不回归。
 - 试点库可读：目的句 + 叙述形参 + 一例 + 短实现。
 - `cargo test --test gold` 绿。
+- 脚注取元金样（`tests/structure/footnote*`）仍保留作兼容门禁。
 
 ## 3. 修订历史
 
@@ -43,3 +45,4 @@
 | 2026-09-14 | M2 其余 lib 叙述化标 done |
 | 2026-09-14 | M3–M4 ext/web+ai 脚注→链接取元 |
 | 2026-09-14 | M5 quantum/linalg 叙述 + public/features 取元 |
+| 2026-09-14 | M6 examples/public/tests 批量链接取元 + cafe 括号调用 |

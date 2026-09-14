@@ -23,21 +23,21 @@ import sys:lib/sys.mq.md
 
 **m = > web.media**
 **ok = > `m`.validate filename="a.png" content_type="image/png" size=100 max_bytes=1000 types=`types`**
-**ook = ok[^ok]**
+**ook = [ok](ok)**
 1. `ook`
   > print text=validate-ok
 2. *
   > print text=validate-fail
 
 **bad = > `m`.validate filename="a.exe" content_type="application/octet-stream" size=100 max_bytes=1000 types=`types`**
-**bok = bad[^ok]**
+**bok = [ok](bad)**
 1. `bok`
   > print text=reject-type-fail
 2. *
   > print text=reject-type-ok
 
 **big = > `m`.validate filename="a.png" content_type="image/png" size=9000 max_bytes=1000 types=`types`**
-**gok = big[^ok]**
+**gok = [ok](big)**
 1. `gok`
   > print text=reject-size-fail
 2. *
@@ -46,15 +46,15 @@ import sys:lib/sys.mq.md
 **blob = > web.storage url="file:tests/ext/web-fixtures/data/upload-blobs"**
 **m = > web.media storage=`blob`**
 **saved = > `m`.save path="tests/ext/web-fixtures/upload/sample.txt" content_type="text/plain" prefix="smoke/"**
-**sok = saved[^ok]**
-**skey = saved[^key]**
+**sok = [ok](saved)**
+**skey = [key](saved)**
 1. `sok`
   > print text=save-ok
 2. *
   > print text=save-fail
 
 **got = > `blob`.get key=`skey`**
-**body = got[^body]**
+**body = [body](got)**
 1. `body` == "hello-upload"
   > print text=save-roundtrip-ok
 2. *

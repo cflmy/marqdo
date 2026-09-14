@@ -44,7 +44,7 @@ import sys:lib/sys.mq.md
 **应用 = > 应用.门禁 路径="/write" 角色="admin" 匹配="prefix" 拒绝="redirect"**
 **应用 = > 应用.路由实时 路径="/chat/ws" 模式="broadcast"**
 
-**gates = 应用[^gates]**
+**gates = [gates](应用)**
 **n = > len value=`gates`**
 1. `n` >= 2
   > print text=gates-ok
@@ -52,9 +52,9 @@ import sys:lib/sys.mq.md
   > print text=gates-fail
   > sys.exit code=1
 
-**ws = 应用[^ws_routes]**
-**room = ws[^/chat/ws]**
-**mode = room[^mode]**
+**ws = [ws_routes](应用)**
+**room = [/chat/ws](ws)**
+**mode = [mode](room)**
 1. `mode` == "broadcast"
   > print text=ws-ok
 2. *

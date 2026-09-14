@@ -8,10 +8,10 @@ import enc:lib/encoding.mq.md
 # main
 
 **cfg = > toml.parse text="name = \"marqdo\"\ncount = 2\n[pkg]\nver = \"1\"\n"**
-> print text=`cfg`[^name]
-> print text=`cfg`[^count]
-**pkg = `cfg`[^pkg]**
-> print text=`pkg`[^ver]
+> print text=[name](`cfg`)
+> print text=[count](`cfg`)
+**pkg = [pkg](`cfg`)**
+> print text=[ver](`pkg`)
 
 **e = > html.escape text="a<b>&\"c'"**
 > print text=`e`

@@ -55,18 +55,18 @@ import db:db/index.mq.md
 <!-- 工具页：用 lib/net 解析展示 -->
 
 **解析请求 = > net.解析Cookie 内容="session=abc123; theme=dark"**
-**请求块 = 解析请求[^1]**
+**请求块 = [1](解析请求)**
 
 **解析响应 = > net.解析Cookie 内容="id=42; Path=/; HttpOnly; SameSite=Lax" 是响应头=True**
-**响应块 = 解析响应[^1]**
+**响应块 = [1](解析响应)**
 
 `边界` = ----b
 
 `正文` = "--`边界`\nContent-Disposition: form-data; name=\"title\"\n\n你好\n--`边界`\nContent-Disposition: form-data; name=\"封面\"; filename=\"pic.png\"\nContent-Type: image/png\n\n<字节>\n--`边界`--\n"
 
 **多部分 = > net.解析多部分 正文=`正文` 边界=`边界`**
-**字段块 = 多部分[^1]**
-**文件块 = 多部分[^2]**
+**字段块 = [1](多部分)**
+**文件块 = [2](多部分)**
 
 `工具段` =
 
@@ -74,13 +74,13 @@ import db:db/index.mq.md
 |----|
 | <h1>网络工具</h1><p>由 lib/net 提供的解析演示：解析Cookie 与 解析多部分。</p><section class="content cards"> |
 | <article><h2>Cookie 请求头</h2><p> |
-| `请求块`[^name]=`请求块`[^value] |
+| [name](`请求块`)=[value](`请求块`) |
 | </p></article><article><h2>Set-Cookie 响应头</h2><p> |
-| `响应块`[^name]=`响应块`[^value] · HttpOnly=`响应块`[^http_only] |
+| [name](`响应块`)=[value](`响应块`) · HttpOnly=[http_only](`响应块`) |
 | </p></article><article><h2>多部分字段</h2><p> |
-| `字段块`[^name]=`字段块`[^value] |
+| [name](`字段块`)=[value](`字段块`) |
 | </p></article><article><h2>多部分文件</h2><p> |
-| `文件块`[^name] · `文件块`[^filename] · `文件块`[^content_type] |
+| [name](`文件块`) · [filename](`文件块`) · [content_type](`文件块`) |
 | </p></article></section> |
 
 **工具引言 = > text.str_join xs=`工具段` sep=""**

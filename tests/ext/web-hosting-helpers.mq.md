@@ -12,7 +12,7 @@ Nested plugin call (`web.page`) while `app.listen` is the outer plugin frame —
 must not clear GLOBAL_HOST so a second HTTP invoke still works.
 
 **pg = > web.page title=`msg`**
-**title = pg[^title]**
+**title = [title](pg)**
 
 `out` =
 

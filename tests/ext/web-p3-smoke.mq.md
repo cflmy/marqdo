@@ -48,7 +48,7 @@ import json:lib/json.mq.md
 > `store`.insert table="posts" rows=`rows`
 
 **got = > `store`.get table="posts" id=1**
-**ca = got[^created_at]**
+**ca = [created_at](got)**
 1. `ca`
   > print text=audit-insert-ok
 2. *
@@ -57,14 +57,14 @@ import json:lib/json.mq.md
 **upd = > json.parse text={"title":"Hello P3b"}**
 > `store`.update table="posts" id=1 row=`upd`
 **got2 = > `store`.get table="posts" id=1**
-**ua2 = got2[^updated_at]**
+**ua2 = [updated_at](got2)**
 1. `ua2`
   > print text=audit-update-ok
 2. *
   > print text=audit-update-fail
 
 **fk = > `store`.query sql="SELECT sql FROM sqlite_master WHERE type='table' AND name='comments'"**
-**fkddl = fk[^rows][^1][^sql]**
+**fkddl = [sql]([1]([rows](fk)))**
 1. `fkddl`
   > print text=fk-ok
 2. *
@@ -78,7 +78,7 @@ import json:lib/json.mq.md
 | alice | secret | author |
 
 **login = > web_auth_login username="alice" password="secret" users=`users` session_ttl=120**
-**role = login[^role]**
+**role = [role](login)**
 1. `role` == "author"
   > print text=rbac-login-ok
 2. *
@@ -88,7 +88,7 @@ import json:lib/json.mq.md
 **app = > web.app page=`pg` port=18130**
 **app = > `app`.auth users=`users`**
 **app = > `app`.gate path="/write*" roles="admin,author"**
-**gates = app[^gates]**
+**gates = [gates](app)**
 **ng = > len value=`gates`**
 1. `ng` >= 2
   > print text=rbac-gate-ok
@@ -98,8 +98,8 @@ import json:lib/json.mq.md
 **blob = > web.storage url="file:web-fixtures/data/p3-gallery"**
 > `blob`.put key="uploads/a.txt" body="hi" content_type="text/plain"
 **app = > `app`.gallery path="/gallery" storage=`blob` prefix="uploads/" title="Media" download_base="/_media"**
-**gal = app[^gallery_routes]**
-**g = gal[^/gallery]**
+**gal = [gallery_routes](app)**
+**g = [/gallery](gal)**
 1. `g`
   > print text=gallery-ok
 2. *

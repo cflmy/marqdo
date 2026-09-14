@@ -16,13 +16,13 @@ $$
 **`eps` = > math.div a=1 b=1000**
 
 **`f` = > la.factorize matrix=`M` kind="eig"**
-**`kind` = f[^kind]**
+**`kind` = [kind](f)**
 1. `kind` == eig
   > print text=eig-kind-ok
 2. *
   > print text=eig-kind-fail
 
-**`evals` = f[^eigenvalues]**
+**`evals` = [eigenvalues](f)**
 **`ev0` = > at value=`evals` index=0**
 **`e0` = > math.sub a=`ev0` b=3**
 **`e0` = > math.abs value=`e0`**
@@ -32,13 +32,13 @@ $$
   > print text=eig-val-fail
 
 **`img` = > la.draw factor=`f` kind="eig" path="linalg-factor-eig.svg"**
-**`ik` = img[^kind]**
+**`ik` = [kind](img)**
 1. `ik` == eig
   > print text=draw-kind-ok
 2. *
   > print text=draw-kind-fail
 
-**`svg` = img[^svg]**
+**`svg` = [svg](img)**
 **`parts` = > split value=`svg` sep="data-linalg=\"eig\""**
 **`pn` = > len value=`parts`**
 1. `pn` > 1
@@ -60,8 +60,8 @@ $$
 **`b` = > la.from_formula formula=`b`**
 **`lu` = > la.factorize matrix=`A` kind="lu"**
 **`sol` = > la.solve factor=`lu` b=`b`**
-**`x` = sol[^x]**
-**`data` = x[^data]**
+**`x` = [x](sol)**
+**`data` = [data](x)**
 **`row0` = > at value=`data` index=0**
 **`x0` = > at value=`row0` index=0**
 **`xe` = > math.sub a=`x0` b=2**
@@ -72,7 +72,7 @@ $$
   > print text=lu-solve-fail
 
 **`svd` = > la.factorize matrix=`M` kind="svd"**
-**`sk` = svd[^ascii]**
+**`sk` = [ascii](svd)**
 1. `sk` == SVD
   > print text=svd-ok
 2. *

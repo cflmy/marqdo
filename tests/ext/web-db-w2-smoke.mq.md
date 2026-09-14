@@ -49,8 +49,8 @@ import json:lib/json.mq.md
   > print text=count-where-fail
 
 **page1 = > `store`.paginate table="posts" limit=2 跳过=0**
-**total1 = page1[^total]**
-**p1r = page1[^rows]**
+**total1 = [total](page1)**
+**p1r = [rows](page1)**
 **n1 = > len value=`p1r`**
 1. `total1` == 4
 1. `n1` == 2
@@ -59,7 +59,7 @@ import json:lib/json.mq.md
   > print text=page-fail
 
 **page2 = > `store`.paginate table="posts" limit=2 跳过=2**
-**p2r = page2[^rows]**
+**p2r = [rows](page2)**
 **n2 = > len value=`p2r`**
 1. `n2` == 2
   > print text=page2-ok
@@ -107,7 +107,7 @@ import json:lib/json.mq.md
   > print text=or-fail
 
 **agg = > `store`.query sql="SELECT title, views FROM posts WHERE views >= 30 ORDER BY views DESC"**
-**nagg = agg[^count]**
+**nagg = [count](agg)**
 1. `nagg` == 2
   > print text=query-ok
 2. *

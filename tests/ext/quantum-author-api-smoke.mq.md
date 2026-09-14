@@ -13,14 +13,14 @@ import quantum:ext/quantum/quantum.mq.md
 **qc = > `qc`.measure**
 
 **st = > `qc`.state**
-**dim = st[^dim]**
+**dim = [dim](st)**
 1. `dim` == 4
   > print text=state-ok
 2. *
   > print text=state-fail
 
 **img = > `qc`.draw path="quantum-author-draw.svg"**
-**kind = img[^kind]**
+**kind = [kind](img)**
 1. `kind` == circuit
   > print text=draw-ok
 2. *
@@ -29,7 +29,7 @@ import quantum:ext/quantum/quantum.mq.md
 **other = > quantum.circuit qubits=2**
 **other = > `other`.x qubit=1**
 **qc2 = > `qc`.append op=`other`**
-**ops = qc2[^ops]**
+**ops = [ops](qc2)**
 **n = > len `ops`**
 1. `n` == 5
   > print text=append-ok

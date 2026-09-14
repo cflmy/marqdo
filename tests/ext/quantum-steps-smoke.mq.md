@@ -16,7 +16,7 @@ import math:lib/math.mq.md
 
 **qc = > quantum.circuit qubits=2 steps=`steps`**
 **p = > `qc`.probabilities**
-**p00 = p[^00]**
+**p00 = [00](p)**
 **lo = > math.div a=2 b=5**
 **hi = > math.div a=3 b=5**
 
@@ -29,7 +29,7 @@ import math:lib/math.mq.md
   > print text=steps-fail
 
 **img = > `qc`.draw path="quantum-steps-draw.svg"**
-**kind = img[^kind]**
+**kind = [kind](img)**
 
 1. `kind` == circuit
   > print text=draw-ok

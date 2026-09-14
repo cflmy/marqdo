@@ -40,7 +40,7 @@ import math:lib/math.mq.md
   > print text=expect-fail
 
 **sch = > `qc`.schmidt cut=1**
-**ent = sch[^entropy]**
+**ent = [entropy](sch)**
 **elo = > math.div a=1 b=2**
 1. `ent` > `elo`
   > print text=schmidt-ok

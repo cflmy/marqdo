@@ -38,8 +38,8 @@ $$
   > print text=trace-fail
 
 **`sol` = > la.solve a=`A` b=`b`**
-**`x` = sol[^x]**
-**`data` = x[^data]**
+**`x` = [x](sol)**
+**`data` = [data](x)**
 **`row0` = > at value=`data` index=0**
 **`x0` = > at value=`row0` index=0**
 **`e0` = > math.sub a=`x0` b=2**
@@ -52,7 +52,7 @@ $$
 **`I` = > la.eye n=2**
 **`P` = > la.mul a=`A` b=`I`**
 **`E` = > la.explicit expr=`P`**
-**`ed` = E[^data]**
+**`ed` = [data](E)**
 **`ed0` = > at value=`ed` index=0**
 **`ed00` = > at value=`ed0` index=0**
 **`ee` = > math.sub a=`ed00` b=2**

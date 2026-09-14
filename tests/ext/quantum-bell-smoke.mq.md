@@ -12,8 +12,8 @@ import math:lib/math.mq.md
 **qc = > `qc`.cx control=0 target=1**
 **p = > `qc`.probabilities**
 
-**p00 = p[^00]**
-**p11 = p[^11]**
+**p00 = [00](p)**
+**p11 = [11](p)**
 **lo = > math.div a=2 b=5**
 **hi = > math.div a=3 b=5**
 
@@ -34,7 +34,7 @@ import math:lib/math.mq.md
   > print text=p11-fail
 
 **ping = > quantum_ping**
-**ok = ping[^ok]**
+**ok = [ok](ping)**
 1. `ok`
   > print text=ping-ok
 2. *

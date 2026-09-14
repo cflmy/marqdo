@@ -12,12 +12,12 @@ import text:lib/text.mq.md
 
 **段 = None**
 - [帖](行)
-  **板 = 帖[^board]**
-  **题 = 帖[^title]**
-  **链 = 帖[^slug]**
-  **作 = 帖[^author]**
-  **评 = 帖[^comments_count]**
-  **时 = 帖[^created_at]**
+  **板 = [board](帖)**
+  **题 = [title](帖)**
+  **链 = [slug](帖)**
+  **作 = [author](帖)**
+  **评 = [comments_count](帖)**
+  **时 = [created_at](帖)**
   1. not 作
     **作 = "匿名"**
   2. *
@@ -42,10 +42,10 @@ import text:lib/text.mq.md
 
 **段 = None**
 - [讯](行)
-  **题 = 讯[^title]**
-  **链 = 讯[^slug]**
-  **板 = 讯[^board]**
-  **时 = 讯[^created_at]**
+  **题 = [title](讯)**
+  **链 = [slug](讯)**
+  **板 = [board](讯)**
+  **时 = [created_at](讯)**
   1. not 板
     **板 = ""**
   2. *
@@ -80,8 +80,8 @@ import text:lib/text.mq.md
 **全项 = "<a href=\"" + 全链 + "\" class=\"" + 全部类 + " active\" " + 数据属 + "=\"0\">" + 全标签 + "</a>"**
 **段 = > table.append list=段 item=全项**
 - [板](板块)
-  **名 = 板[^name]**
-  **号 = 板[^id]**
+  **名 = [name](板)**
+  **号 = [id](板)**
   **链 = 前缀 + "?" + 查询键 + "=" + 号**
   **项 = "<a href=\"" + 链 + "\" class=\"" + 全部类 + "\" " + 数据属 + "=\"" + 号 + "\">" + 名 + "</a>"**
   **段 = > table.append list=段 item=项**

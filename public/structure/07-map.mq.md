@@ -1,11 +1,11 @@
 ---
 title: Maps (horizontal tables)
-description: Multi-column tables are maps; footnote gets
+description: Multi-column tables are maps; link-index get
 ---
 
 # main
 
-A multi-column table with one data row is a map. Read values with footnote keys.
+A multi-column table with one data row is a map. Read values with `[key](map)`.
 
 `kinds` =
 
@@ -13,10 +13,10 @@ A multi-column table with one data row is a map. Read values with footnote keys.
 |-------|----------|
 | fruit | vegetable |
 
-**`k` = `kinds`[^apple] **
+**`k` = [apple](kinds)**
 
 > print text=`k`
 
-**`k` = `kinds`[^cucumber] **
+**`k` = [cucumber](kinds)**
 
 > print text=`k`

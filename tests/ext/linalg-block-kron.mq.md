@@ -42,7 +42,7 @@ import la:ext/linalg/linalg.mq.md
 > print text=`ct`
 
 **`ping` = > la.ping**
-**`ok` = ping[^ok]**
+**`ok` = [ok](ping)**
 1. `ok`
   > print text=ping-ok
 2. *

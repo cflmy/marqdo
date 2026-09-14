@@ -19,7 +19,7 @@ import sys:lib/sys.mq.md
 <!-- argon2 hash must be non-empty PHC string -->
 
 **hash = > web_password_hash password="secret"**
-**h = hash[^hash]**
+**h = [hash](hash)**
 1. `h` != ""
   > print text=hash-ok
 2. *
@@ -34,14 +34,14 @@ import sys:lib/sys.mq.md
 | 1 | admin | secret |
 
 **login = > web_auth_login username="admin" password="secret" users=`users` session_ttl=120**
-**lok = login[^ok]**
+**lok = [ok](login)**
 1. `lok`
   > print text=auth-login-ok
 2. *
   > print text=auth-login-fail
 
 **bad = > web_auth_login username="admin" password="wrong" users=`users` session_ttl=120**
-**bok = bad[^ok]**
+**bok = [ok](bad)**
 1. `bok`
   > print text=auth-bad-should-fail
 2. *

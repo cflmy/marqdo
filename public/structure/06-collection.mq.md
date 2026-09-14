@@ -5,7 +5,7 @@ description: One-column tables are lists
 
 # main
 
-A single-column Markdown table is a list; loop to read each item. Use `basket`[^1] for 1-based index.
+A single-column Markdown table is a list; loop to read each item. Prefer link-index get `[1](basket)` (1-based).
 
 `basket` =
 

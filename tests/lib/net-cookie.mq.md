@@ -9,9 +9,9 @@ import net:lib/net.mq.md
 
 **resp = > net.cookie_parse text="id=42; Path=/; HttpOnly; Secure; SameSite=Lax, theme=light; Max-Age=3600" is_response=True**
 
-> print text=`req`[^1][^name]
-> print text=`req`[^1][^value]
-> print text=`resp`[^1][^http_only]
-> print text=`resp`[^1][^secure]
-> print text=`resp`[^1][^same_site]
-> print text=`resp`[^2][^max_age]
+> print text=[name]([1](`req`))
+> print text=[value]([1](`req`))
+> print text=[http_only]([1](`resp`))
+> print text=[secure]([1](`resp`))
+> print text=[same_site]([1](`resp`))
+> print text=[max_age]([2](`resp`))

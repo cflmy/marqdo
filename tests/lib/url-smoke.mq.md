@@ -6,16 +6,16 @@ import url:lib/url.mq.md
 # main
 
 **u = > url.parse text="https://example.com:8443/a/b?x=1&y=2#frag"**
-> print text=`u`[^scheme]
-> print text=`u`[^host]
-> print text=`u`[^port]
-> print text=`u`[^path]
-> print text=`u`[^query]
-> print text=`u`[^fragment]
+> print text=[scheme](`u`)
+> print text=[host](`u`)
+> print text=[port](`u`)
+> print text=[path](`u`)
+> print text=[query](`u`)
+> print text=[fragment](`u`)
 
 **q = > url.query_parse text="a=1&b=hi%20x&a=2"**
-> print text=`q`[^b]
-**as = `q`[^a]**
+> print text=[b](`q`)
+**as = [a](`q`)**
 **a0 = > at value=`as` index=0**
 **a1 = > at value=`as` index=1**
 > print text=`a0`

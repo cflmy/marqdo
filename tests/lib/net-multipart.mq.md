@@ -11,9 +11,9 @@ import net:lib/net.mq.md
 
 **parts = > net.multipart_parse body=`body` boundary=`boundary`**
 
-> print text=`parts`[^1][^name]
-> print text=`parts`[^1][^value]
-> print text=`parts`[^2][^name]
-> print text=`parts`[^2][^filename]
-> print text=`parts`[^2][^content_type]
-> print text=`parts`[^2][^value]
+> print text=[name]([1](`parts`))
+> print text=[value]([1](`parts`))
+> print text=[name]([2](`parts`))
+> print text=[filename]([2](`parts`))
+> print text=[content_type]([2](`parts`))
+> print text=[value]([2](`parts`))
