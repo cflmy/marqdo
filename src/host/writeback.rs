@@ -613,7 +613,7 @@ mod tests {
 
     #[test]
     fn parse_and_insert_adjacent() {
-        let src = "# main\n\n*`x` = 1*\n";
+        let src = "# main\n\n**x = 1**\n";
         let block = format_block("1", None);
         let next = insert_after_line(src, 3, &block).unwrap();
         assert!(next.contains("marqdo-out"));
@@ -627,17 +627,17 @@ mod tests {
 
     #[test]
     fn writeback_map_uses_line_above() {
-        let src = "# main\n\n*`x` = 1*\n<!-- marqdo-out\n42\n-->\n\n> print text=tail\n";
+        let src = "# main\n\n**x = 1**\n<!-- marqdo-out\n42\n-->\n\n> print text=tail\n";
         let map = writeback_map(src);
         assert_eq!(map.get(&3), Some(&"42".to_string()));
     }
 
     #[test]
     fn keyed_slots_sit_under_anchor_and_do_not_clobber() {
-        let src = "# main\n\n*`r` = > step *\n\n> print text=after\n";
+        let src = "# main\n\n**r = > step**\n\n> print text=after\n";
         let with_ok = replace_or_insert_keyed_at(src, 3, "ok", "success-1").unwrap();
         let with_both = replace_or_insert_keyed_at(&with_ok, 3, "error", "fail-1").unwrap();
-        let step_at = with_both.find("`r` = > step").unwrap();
+        let step_at = with_both.find("r = > step").unwrap();
         let ok_at = with_both.find("marqdo-out ok").unwrap();
         let err_at = with_both.find("marqdo-out error").unwrap();
         let after_at = with_both.find("> print text=after").unwrap();
@@ -665,7 +665,7 @@ mod tests {
 
     #[test]
     fn unkeyed_replace_does_not_accumulate_blank_lines() {
-        let src = "# main\n\n*`x` = 1*\n<!-- marqdo-out\nold\n-->\n\n> print text=tail\n";
+        let src = "# main\n\n**x = 1**\n<!-- marqdo-out\nold\n-->\n\n> print text=tail\n";
         let line = 3u32;
         let strip_insert = |s: &str, body: &str| {
             let stripped = find_adjacent_block(s, line)

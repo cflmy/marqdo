@@ -23,9 +23,9 @@ marqdo dump FILE --stage lines|tokens|ast|sema|all
 
 | 标志 | 阶段 | 输出内容 |
 |------|------|----------|
-| `--dump-lines` | 行分类 | 每行：`LINE kind=Comment\|Code\|Blank` + 原文预览 |
+| `--dump-lines` | 行分类 | 每行：`kind=Comment\|Code\|Blank` + 原文；v0.3 行内位 `[decl n]` / `[bold …]` / `[italic …]` |
 | `--dump-tokens` | 词法 | Token 流：`type lexeme line:col` |
-| `--dump-ast` | 语法 | S 表达式或缩进树（模块/函数/语句） |
+| `--dump-ast` | 语法 | 模块/函数/语句；形参带 `inferred`；叙述死绑定 `dead=[…]` |
 | `--dump-sema` | 语义 | 作用域、导入图、提升后的符号表 |
 | `--trace-eval` | 求值 | **JSON 行**（stderr）：语句级事件，含 `path` / `span`（`line:col`） |
 | `--dump-bytecode` | 字节码 | 反汇编 `Program`（指令旁带 `@line:col`；见 [bytecode.md](bytecode.md)） |

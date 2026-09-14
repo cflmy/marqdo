@@ -97,7 +97,7 @@ import json:lib/json.mq.md
 
 # main
 
-*`count` = 0*
+**count = 0**
 
 `wire` =
 
@@ -105,13 +105,13 @@ import json:lib/json.mq.md
 |---|--------|------|------|
 | 1 | "#btn" | click | bump |
 
-**`wire`**
+*wire*
 
 ## bump
-*`count` = count + 1*
-*`label` = > str count*
-*`patch` = > json.set map=None key="#out" value=label*
-**> json.set map=None key="set_text" value=patch**
+**count = count + 1**
+**label = > str count**
+**patch = > json.set map=None key="#out" value=label**
+*> json.set map=None key="set_text" value=patch*
 "##;
         let (mut sess, wire) = BrowserSession::boot(src).expect("boot");
         assert!(matches!(wire, Value::List(_)), "wire={wire:?}");

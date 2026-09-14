@@ -833,7 +833,7 @@ mod tests {
 
     #[test]
     fn not_awaiting_when_frontmatter_stdin() {
-        let src = "---\nstdin: Ada\n---\n\n# main\n\n*`n` = > input*\n";
+        let src = "---\nstdin: Ada\n---\n\n# main\n\n**n = > input**\n";
         assert!(!awaiting_preset_input(&["p".into()], &[], src));
     }
 }

@@ -211,6 +211,7 @@ impl<'a> Cursor<'a> {
             body: Vec::new(),
             children: Vec::new(),
             base,
+            dead_binds: Vec::new(),
         };
         // Prose decls pending promotion (name → optional default text).
         let mut prose_decls: Vec<(String, Option<String>)> = Vec::new();
@@ -1289,7 +1290,8 @@ fn merge_inferred_params(
     use std::collections::HashSet;
 
     let mut needs_input = HashSet::new();
-    collect_names_needing_input(&fun.body, &mut HashSet::new(), &mut needs_input);
+    let mut bound = HashSet::new();
+    collect_names_needing_input(&fun.body, &mut bound, &mut needs_input);
 
     for (name, default_txt) in prose_decls {
         if name == "self" || name == "自" {
@@ -1301,6 +1303,9 @@ fn merge_inferred_params(
         let has_default = default_txt.is_some();
         // Elevate: defaulted always; or executable read that needs an external input.
         if !has_default && !needs_input.contains(name) {
+            if !bound.contains(name) {
+                fun.dead_binds.push(name.clone());
+            }
             continue; // dead bind or pure local
         }
         let default = if let Some(txt) = default_txt {
@@ -1702,6 +1707,22 @@ Candidates may include lexical `score`.
         assert_eq!(add.params.len(), 1);
         assert_eq!(add.params[0].name, "n");
         assert!(add.params[0].inferred);
+        let dump = crate::ast::format_ast_dump("t.mq.md", &m);
+        assert!(dump.contains("params=[n inferred]"), "{dump}");
+        assert!(!dump.contains("dead="), "{dump}");
+    }
+
+    #[test]
+    fn parse_dead_binds_visible_in_ast_dump() {
+        let src = include_str!("../../tests/markup-v03/dead-bind.mq.md");
+        let m = parse_source(src).unwrap();
+        let echo = m.functions.iter().find(|f| f.name == "回声").unwrap();
+        assert_eq!(echo.params.iter().map(|p| p.name.as_str()).collect::<Vec<_>>(), ["题干"]);
+        assert!(echo.dead_binds.contains(&"Markdown".to_string()), "{:?}", echo.dead_binds);
+        assert!(echo.dead_binds.contains(&"GFM".to_string()), "{:?}", echo.dead_binds);
+        let dump = crate::ast::format_ast_dump("t.mq.md", &m);
+        assert!(dump.contains("dead="), "{dump}");
+        assert!(dump.contains("Markdown"), "{dump}");
     }
 
     #[test]

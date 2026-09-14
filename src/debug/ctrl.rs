@@ -308,7 +308,7 @@ mod tests {
         use crate::interp::Interpreter;
         use crate::parse::parse_source;
 
-        let src = "# main\n\n*`x` = 1*\n> print text=`x`\n*`x` = 2*\n> print text=`x`\n";
+        let src = "# main\n\n**x = 1**\n> print text=`x`\n**x = 2**\n> print text=`x`\n";
         let module = parse_source(src).expect("parse");
         // Line 4 is first `> print`
         let ctrl = DebugController::new(HashSet::from([4u32]));

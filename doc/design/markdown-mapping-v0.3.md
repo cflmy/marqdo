@@ -570,7 +570,7 @@ FnDef.params:
 | 3 | 粗体内调用 vs 赋值 | **已落地** | §6.2：可赋值左值 → 赋值；否则表达式优先、再裸调用；`**n + 1**` = ExprStmt |
 | 4 | `` `n`+1 `` 误声明 | **已落地** | Decl 名须为标识符；`` `n+1` `` 不升 Decl |
 | 5 | 叙述强调斜体 vs 返回 | **已落地** | 整行 / `返回*…*` / 表达式形才当返回；`*only*` `*very important*` `*foo.bar*` 为叙述 |
-| 6 | 一行多 `**…**` | **建议采纳** | 允许，按出现序执行（M0 钉死为是） |
+| 6 | 一行多 `**…**` | **已落地** | 允许，按出现序执行（`tests/markup-v03/multi-bold.mq.md`） |
 | 7 | view 展示 prose Decl | **已落地** | Structure / Functions 大纲：`inferred` 形参标注（`chip inferred`） |
 
 ---
@@ -598,13 +598,13 @@ FnDef.params:
 - [x] **空返回**对照其它语言并钉死词法  
 - [x] **提及/未使用变量**政策钉死  
 
-实现验收（后续）：
+实现验收：
 
-- [x] 金样例夹具 `tests/markup-v03/`（11 个 · `gold.rs` 暂 ignore）  
-- 动机示例金样例通过（去掉 ignore）  
-- `--dump-ast` 可见 inferred params 与死绑定（若 dump）  
-- 空返回四种形式金样例通过  
-- 旧 v0.2 套件在旗标下行为不变，直到默认切换  
+- [x] 金样例夹具 `tests/markup-v03/`（`gold.rs` `markup_v03_*`）  
+- [x] 动机示例金样例通过（`inc-prose.mq.md`）  
+- [x] `--dump-ast` 可见 inferred params 与死绑定；`--dump-lines` 标注 `[decl]` / `[bold]` / `[italic]`  
+- [x] 空返回四种形式金样例通过  
+- [x] 无 v0.2 双模式（默认即 v0.3）  
 
 ---
 

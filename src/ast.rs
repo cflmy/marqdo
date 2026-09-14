@@ -59,6 +59,8 @@ pub struct Function {
     pub children: Vec<Function>,
     /// Base type name for `# Child = > Parent` (objects only).
     pub base: Option<String>,
+    /// Prose `` `名` `` never read/assigned on the executable surface (not params).
+    pub dead_binds: Vec<String>,
 }
 
 impl Function {
@@ -273,14 +275,20 @@ pub fn format_ast_dump(path: &str, module: &Module) -> String {
 fn dump_fun(out: &mut String, fun: &Function, depth: usize) {
     let pad = "  ".repeat(depth);
     let kind = if fun.is_object() { "object" } else { "fun" };
+    let params = format_params(&fun.params);
+    let dead = if fun.dead_binds.is_empty() {
+        String::new()
+    } else {
+        format!(" dead={:?}", fun.dead_binds)
+    };
     match &fun.base {
         Some(base) => out.push_str(&format!(
-            "{pad}({kind} level={} {:?} extends={base:?} params={:?} @{}\n",
-            fun.level, fun.name, fun.params, fun.span
+            "{pad}({kind} level={} {:?} extends={base:?} params={params}{dead} @{}\n",
+            fun.level, fun.name, fun.span
         )),
         None => out.push_str(&format!(
-            "{pad}({kind} level={} {:?} params={:?} @{}\n",
-            fun.level, fun.name, fun.params, fun.span
+            "{pad}({kind} level={} {:?} params={params}{dead} @{}\n",
+            fun.level, fun.name, fun.span
         )),
     }
     for stmt in &fun.body {
@@ -354,4 +362,21 @@ fn dump_stmt(out: &mut String, stmt: &Stmt, depth: usize) {
             out.push_str(&format!("{pad})\n"));
         }
     }
+}
+
+fn format_params(params: &[Param]) -> String {
+    let parts: Vec<String> = params
+        .iter()
+        .map(|p| {
+            let mut s = p.name.clone();
+            if p.default.is_some() {
+                s.push('?');
+            }
+            if p.inferred {
+                s.push_str(" inferred");
+            }
+            s
+        })
+        .collect();
+    format!("[{}]", parts.join(", "))
 }

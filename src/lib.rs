@@ -42,10 +42,11 @@ use anyhow::{bail, Result};
 
 use crate::host::{flush_auto_plots, HostCaps, HostContext};
 use crate::ast::format_ast_dump;
+use crate::debug::format_lines_dump_v03;
 use crate::bytecode::{compile_module, Vm};
 use crate::capture::RunCapture;
 use crate::interp::Interpreter;
-use crate::lex::{classify_source, format_lines_dump};
+use crate::lex::classify_source;
 use crate::load::{load_module, load_module_from_source};
 
 pub use browser_session::{value_as_json, BrowserSession};
@@ -160,7 +161,7 @@ pub fn run_file(path: &Path, opts: &RunOptions) -> Result<i32> {
 
     if opts.dump_lines {
         let lines = classify_source(&source);
-        print!("{}", format_lines_dump(&path_label, &lines));
+        print!("{}", format_lines_dump_v03(&path_label, &lines));
     }
     if opts.dump_tokens {
         println!("=== marqdo: tokens ({path_label}) ===");

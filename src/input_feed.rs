@@ -366,7 +366,7 @@ mod tests {
 
     #[test]
     fn capture_uses_frontmatter_stdin() {
-        let src = "---\ntitle: t\nstdin: Ada\n---\n\n# main\n\n*`n` = > input*\n\n> print text=`n`\n";
+        let src = "---\ntitle: t\nstdin: Ada\n---\n\n# main\n\n**n = > input**\n\n> print text=`n`\n";
         let dir = std::env::temp_dir().join("marqdo-fm-stdin-test");
         let _ = fs::create_dir_all(&dir);
         let path = dir.join("fm.mq.md");
