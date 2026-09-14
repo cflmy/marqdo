@@ -11,9 +11,9 @@
 
 | 读 | 写 |
 |----|----|
-| 脚注 `` `xs`[^1] `` / `` `m`[^key] `` / 嵌套 `` `m`[^a][^1] `` | **`table.put` / `表.改`** |
+| 链接取元 `[key](xs)` / `[key](m)` / 嵌套 `[1]([a](m))`（脚注 `` `m`[^k] `` 仍兼容） | **`table.put` / `表.改`** |
 
-`put` / `改` 的 `at=`（`于=`）与脚注同构：文本键、**1-based** 整数下标，或键/下标组成的路径列表。
+`put` / `改` 的 `at=`（`于=`）与取元同构：文本键、**1-based** 整数下标，或键/下标组成的路径列表。
 
 ```markdown
 ---
@@ -22,7 +22,7 @@ import table:lib/table.mq.md
 
 # main
 
-*`h` = > table.put in=None at=Authorization value=Bearer-x*
+**`h` = [table.put] in=None at="Authorization" value="Bearer-x"**
 
 `xs` =
 
@@ -31,7 +31,8 @@ import table:lib/table.mq.md
 | a |
 | b |
 
-*`xs` = > table.put in=`xs` at=1 value=A*
+**`xs` = [table.put] in=`xs` at=1 value="A"**
+**打印 内容=[Authorization](h)**
 ```
 
 `in=None` 且 `at=` 为单个文本键 → 新建单键字典。值一律不可变更新（返回新集合）。

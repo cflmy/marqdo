@@ -1,19 +1,16 @@
 ---
 title: lib/text — strings
-description: Trim, split, join wrappers
+description: Trim, split, join (code-as-docs pilot)
 import text:lib/text.mq.md
 ---
 
 # main
 
-Import lib/text.mq.md. Functions: str_trim(s), str_split(s, sep), str_join(xs, sep).
+Import lib/text. Bracket path or classic dotted calls both work.
 
-**`t` = > text.str_trim s="  marqdo  "**
-
-> print text=`t`
+**`t` = [text.str_trim] s="  marqdo  "**
+**打印 内容=`t`**
 
 **`parts` = > text.str_split s="a,b,c" sep=","**
-
 **`j` = > text.str_join xs=`parts` sep="-"**
-
-> print text=`j`
+**打印 内容=`j`**

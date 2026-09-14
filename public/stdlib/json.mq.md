@@ -1,19 +1,17 @@
 ---
 title: lib/json — JSON
-description: Shared EN/ZH path; parse and stringify
+description: Shared EN/ZH path; parse and stringify (code-as-docs pilot)
 import json:lib/json.mq.md
 ---
 
 # main
 
-Import lib/json.mq.md from both English and Chinese docs (no translated twin). Functions: parse(text), stringify(value), get(value, key), keys(value), quote(text) — JSON string literal with quotes (for building request bodies). Objects become the map runtime type.
+Shared JSON helpers for EN and ZH docs. Prefer parse, stringify, and quote.
+Build maps with tables or table.put — not json.set chains.
 
-**`obj` = > json.parse text="{}"**
+**`obj` = [json.parse] text="{}"**
+**`ty` = > type `obj`**
+**打印 内容=`ty`**
 
-**`ty` = > type `obj` **
-
-> print text=`ty`
-
-**`out` = > json.stringify value=`obj` **
-
-> print text=`out`
+**`out` = > json.stringify value=`obj`**
+**打印 内容=`out`**
