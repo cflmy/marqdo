@@ -136,19 +136,17 @@ func NewHandler(appBag map[string]any, entryDir string) (http.Handler, error) {
 		})
 	}
 
-	if staticDir != "" {
-		fmt.Fprintf(os.Stderr, "marqdo web static: %s → %s\n", staticMount, staticDir)
-		fs := http.StripPrefix(staticMount, http.FileServer(http.Dir(staticDir)))
-		mux.Handle("GET "+staticMount+"/", fs)
-		mux.Handle("HEAD "+staticMount+"/", fs)
-		mux.Handle("GET "+staticMount, fs)
-		mux.Handle("HEAD "+staticMount, fs)
-	}
-
+	// Icon routes before the static prefix so /static/favicon.svg does not
+	// conflict with Go 1.22+ ServeMux method/path overlap rules.
 	for _, ir := range iconRoutes {
 		url := ir.URL
 		path := ir.Path
 		ct := ir.ContentType
+		if staticDir != "" && (url == staticMount || strings.HasPrefix(url, staticMount+"/")) {
+			// FileServer under staticMount already serves these paths.
+			fmt.Fprintf(os.Stderr, "marqdo web icon: %s → static %s (via %s)\n", url, path, staticMount)
+			continue
+		}
 		fmt.Fprintf(os.Stderr, "marqdo web icon: %s → %s (%s)\n", url, path, ct)
 		mux.HandleFunc("GET "+url, func(w http.ResponseWriter, r *http.Request) {
 			st.serveIcon(w, path, ct)
@@ -156,6 +154,27 @@ func NewHandler(appBag map[string]any, entryDir string) (http.Handler, error) {
 		mux.HandleFunc("HEAD "+url, func(w http.ResponseWriter, r *http.Request) {
 			st.serveIcon(w, path, ct)
 		})
+	}
+
+	if staticDir != "" {
+		fmt.Fprintf(os.Stderr, "marqdo web static: %s → %s\n", staticMount, staticDir)
+		fs := http.StripPrefix(staticMount, http.FileServer(http.Dir(staticDir)))
+		// Register without method so GET+HEAD share one pattern (avoids conflicts
+		// with more-specific GET/HEAD icon paths under the same prefix).
+		mux.Handle(staticMount+"/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.Method != http.MethodGet && r.Method != http.MethodHead {
+				http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+				return
+			}
+			fs.ServeHTTP(w, r)
+		}))
+		mux.Handle(staticMount, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.Method != http.MethodGet && r.Method != http.MethodHead {
+				http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+				return
+			}
+			fs.ServeHTTP(w, r)
+		}))
 	}
 
 	for _, from := range sortedKeys(st.redirects) {
@@ -625,11 +644,18 @@ func collectPageForms(page map[string]any, forms map[string]any) {
 
 func injectParams(page map[string]any, params map[string]any) {
 	page["params"] = params
+	// Stamp concrete path onto `_route` so part slot URLs use /post/slug not /post/{slug}.
+	if r, ok := page["_route"].(string); ok && r != "" && len(params) > 0 {
+		page["_route"] = render.ResolveRouteParams(r, params)
+	}
 	if parts, ok := page["parts"].(map[string]any); ok {
 		for k, cfg := range parts {
 			if m, ok := cfg.(map[string]any); ok {
 				cp := cloneMap(m)
 				cp["params"] = params
+				if r, ok := cp["_route"].(string); ok && r != "" {
+					cp["_route"] = render.ResolveRouteParams(r, params)
+				}
 				parts[k] = cp
 			}
 		}

@@ -693,9 +693,9 @@ func AsCSSNamedChecked(name string, table any, strict bool) (string, error) {
 }
 
 func cssValueSuspicious(v any) string {
+	// Numbers are normal CSS (z-index, opacity, font-weight, unitless 0).
+	// Do not treat Markup-evaluated ints/floats as "bare `/` division".
 	switch v.(type) {
-	case float64, int, int64:
-		return "numeric CSS value (likely bare `/` division such as `1 / 5`; quote the cell, e.g. `\"1 / 5\"`)"
 	case bool:
 		return "boolean CSS value (quote the cell if intentional)"
 	default:

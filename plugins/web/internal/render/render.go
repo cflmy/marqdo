@@ -191,7 +191,8 @@ func navWhenVisible(when navWhen, auth *bool) bool {
 func selectPageData(url, tableName string, page map[string]any, limit, offset int64) map[string]any {
 	var where any
 	if q, ok := page["query"]; ok {
-		where = q
+		// Expand `{param}` placeholders from dynamic route params (ABI: 查询条件).
+		where = resolvePlaceholders(q, pageParams(page))
 	}
 	order, _ := page["order"].(string)
 	opts := db.SelectOpts{Where: where, Order: order}
@@ -203,6 +204,78 @@ func selectPageData(url, tableName string, page map[string]any, limit, offset in
 		return map[string]any{"rows": []any{}}
 	}
 	return out
+}
+
+func pageParams(page map[string]any) map[string]any {
+	if page == nil {
+		return nil
+	}
+	p, _ := page["params"].(map[string]any)
+	return p
+}
+
+// resolvePlaceholders walks query / route values and replaces `{name}` with
+// page.params[name]. Unmatched placeholders are left as `{name}` for debugging.
+func resolvePlaceholders(v any, params map[string]any) any {
+	if len(params) == 0 {
+		return v
+	}
+	switch t := v.(type) {
+	case string:
+		return resolveParamsString(t, params)
+	case map[string]any:
+		out := make(map[string]any, len(t))
+		for k, val := range t {
+			out[k] = resolvePlaceholders(val, params)
+		}
+		return out
+	case []any:
+		out := make([]any, len(t))
+		for i, val := range t {
+			out[i] = resolvePlaceholders(val, params)
+		}
+		return out
+	default:
+		return v
+	}
+}
+
+// ResolveRouteParams substitutes `{name}` in a route pattern using params.
+func ResolveRouteParams(pattern string, params map[string]any) string {
+	return resolveParamsString(pattern, params)
+}
+
+func resolveParamsString(s string, params map[string]any) string {
+	if !strings.Contains(s, "{") || len(params) == 0 {
+		return s
+	}
+	var out strings.Builder
+	rest := s
+	for {
+		start := strings.Index(rest, "{")
+		if start < 0 {
+			out.WriteString(rest)
+			break
+		}
+		out.WriteString(rest[:start])
+		rest = rest[start+1:]
+		end := strings.Index(rest, "}")
+		if end < 0 {
+			out.WriteByte('{')
+			out.WriteString(rest)
+			break
+		}
+		key := rest[:end]
+		if val, ok := params[key]; ok {
+			out.WriteString(text(val))
+		} else {
+			out.WriteByte('{')
+			out.WriteString(key)
+			out.WriteByte('}')
+		}
+		rest = rest[end+1:]
+	}
+	return out.String()
 }
 
 func resolveLinks(raw any, dbURL string, page map[string]any) []navLink {
@@ -400,6 +473,7 @@ func fieldCSS(obj map[string]any, field string) string {
 
 func partSrcPrefix(page map[string]any) string {
 	r, _ := page["_route"].(string)
+	r = resolveParamsString(r, pageParams(page))
 	if r == "" || r == "/" {
 		return ""
 	}
@@ -479,6 +553,10 @@ const shellWidgets = `
 .site-form { margin-top:1.25rem; max-width:28rem; }
 .article { background:#fff; border:1px solid var(--line); border-radius:8px; padding:2rem; margin-top:1.5rem; }
 .article-title { margin:0 0 .75rem; font-size:2rem; }
+.article-body { line-height:1.75; color:var(--ink); }
+.article-body.md { line-height: 1.75; }
+.article-body.md pre { background:#f5f5f4; border:1px solid var(--line); border-radius:6px; padding:1rem; overflow-x:auto; }
+.article-body.md code { font-size:.9em; }
 .pagination { display:flex; gap:1rem; align-items:center; margin:1.5rem 0; font-size:.95rem; }
 `
 
@@ -624,8 +702,7 @@ func renderArticle(it map[string]any) string {
 		s.WriteString(fmt.Sprintf(`<div class="article-tags">%s</div>`, esc(tag)))
 	}
 	if body != "" {
-		// Minimal: escape as paragraphs (full markdown deferred).
-		s.WriteString(fmt.Sprintf(`<div class="article-body"><p class="article-p">%s</p></div>`, esc(body)))
+		s.WriteString(markdownToHTML(body))
 	}
 	s.WriteString("</article>")
 	return s.String()

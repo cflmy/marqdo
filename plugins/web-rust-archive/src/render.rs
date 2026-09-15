@@ -462,18 +462,8 @@ fn select_page_data(
     offset: i64,
 ) -> Value {
     let mut where_v = args.get("query").cloned();
-    if let Some(m) = where_v.as_ref().and_then(|v| v.as_object()) {
-        if m.iter().any(|(_, v)| v.as_str().is_some_and(|s| s.contains('{'))) {
-            let mut resolved = Map::new();
-            for (k, v) in m {
-                let v = match v {
-                    Value::String(s) => Value::String(resolve_params(s.as_str(), args)),
-                    other => other.clone(),
-                };
-                resolved.insert(k.clone(), v);
-            }
-            where_v = Some(Value::Object(resolved));
-        }
+    if let Some(v) = where_v.take() {
+        where_v = Some(resolve_placeholders(v, args));
     }
     let order = args.get("order").and_then(|v| v.as_str());
     let paginate = args.get("paginate").is_some();
@@ -491,6 +481,26 @@ fn select_page_data(
         None,
     )
     .unwrap_or(json!({ "rows": [] }))
+}
+
+/// Recursively replace `{param}` in all string leaves (columnar / row tables).
+fn resolve_placeholders(v: Value, args: &Value) -> Value {
+    match v {
+        Value::String(s) => Value::String(resolve_params(&s, args)),
+        Value::Array(arr) => Value::Array(
+            arr.into_iter()
+                .map(|x| resolve_placeholders(x, args))
+                .collect(),
+        ),
+        Value::Object(map) => {
+            let mut out = Map::new();
+            for (k, val) in map {
+                out.insert(k, resolve_placeholders(val, args));
+            }
+            Value::Object(out)
+        }
+        other => other,
+    }
 }
 
 /// Replace `{param}` placeholders with values from `args["params"]` (a map).
@@ -532,8 +542,11 @@ fn field_css(obj: &Map<String, Value>, field: &str) -> String {
 }
 
 fn part_src_prefix(args: &Value) -> String {
-    match args.get("_route").and_then(|v| v.as_str()) {
-        Some(r) if !r.is_empty() && r != "/" => {
+    let raw = args.get("_route").and_then(|v| v.as_str()).unwrap_or("");
+    let resolved = resolve_params(raw, args);
+    match resolved.as_str() {
+        "" | "/" => String::new(),
+        r => {
             let mut p = r.to_string();
             while p.len() > 1 && p.ends_with('/') {
                 p.pop();
@@ -544,7 +557,6 @@ fn part_src_prefix(args: &Value) -> String {
                 format!("/{p}")
             }
         }
-        _ => String::new(),
     }
 }
 

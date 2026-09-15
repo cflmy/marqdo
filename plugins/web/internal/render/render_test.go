@@ -227,3 +227,33 @@ func TestRenderPageNavChrome(t *testing.T) {
 		}
 	}
 }
+
+func TestResolveRouteParams(t *testing.T) {
+	got := render.ResolveRouteParams("/post/{slug}", map[string]any{"slug": "hello-marqdo"})
+	if got != "/post/hello-marqdo" {
+		t.Fatalf("got %q", got)
+	}
+	got = render.ResolveRouteParams("/post/{slug}", map[string]any{})
+	if got != "/post/{slug}" {
+		t.Fatalf("unmatched must stay: %q", got)
+	}
+}
+
+func TestPartSlotSrcUsesResolvedRoute(t *testing.T) {
+	page := map[string]any{
+		"title":  "post",
+		"intro":  "",
+		"_route": "/post/{slug}",
+		"params": map[string]any{"slug": "hello-marqdo"},
+		"parts": map[string]any{
+			"index": map[string]any{"slot": "main"},
+		},
+	}
+	html := render.RenderPage(page, "", "")
+	if strings.Contains(html, "/post/{slug}/_part/") {
+		t.Fatalf("slot src still has placeholder: %s", html)
+	}
+	if !strings.Contains(html, `data-slot-src="/post/hello-marqdo/_part/index"`) {
+		t.Fatalf("missing resolved slot src: %s", html)
+	}
+}

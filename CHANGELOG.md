@@ -8,6 +8,29 @@
 
 ### Changed
 
+## v1.0.1 — 2026-09-15
+
+### Highlights
+
+**ext/web（Go libweb）回归修复**：动态路由查询条件恢复 `{param}` 代入；详情 SSR + Markdown；样式表数字不再误报。
+
+```bash
+git checkout v1.0.1
+cargo build --release
+bash ./scripts/build-web-plugin.sh
+# 或：解压 Release 的 marqdo-1.0.1-*-native-*.zip / Linux CLI zip
+marqdo run examples/marqdo-blog/index.mq.md
+```
+
+### Added
+- Go web plugin：详情页正文 Markdown（goldmark GFM），对齐 Rust `pulldown-cmark` 路径。
+
+### Fixed
+- **动态路由 `{param}` 未代入查询条件**（`ext/web` Go）：`selectPageData` 递归展开 `query` 全部字符串叶子；`data-slot-src` / `_route` 同步替换。`examples/marqdo-blog` `/post/{slug}` 详情 SSR 恢复。
+- **样式表数字单元格误报「可疑 `/` 除法」**：`cssValueSuspicious` 不再把合法 `z-index`/`opacity` 等 number 当警告。
+- Go 1.22+ ServeMux：`/static/` 与 `/static/favicon.svg` 的 GET/HEAD 注册冲突导致博客启动 panic。
+- Rust archive 同步：`resolve_placeholders` 递归 + CSS number 误报收窄（非默认构建路径）。
+
 ## v1.0.0 — 2026-09-14
 
 ### Highlights

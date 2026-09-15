@@ -475,10 +475,9 @@ pub fn as_css_named_checked(name: &str, table: &Value, strict: bool) -> Result<S
 }
 
 fn css_value_suspicious(v: &Value) -> Option<&'static str> {
+    // Numbers are normal CSS (z-index, opacity, …). Do not treat Markup-evaluated
+    // ints/floats as bare `/` division false positives.
     match v {
-        Value::Number(_) => Some(
-            "numeric CSS value (likely bare `/` division such as `1 / 5`; quote the cell, e.g. `\"1 / 5\"`)",
-        ),
         Value::Bool(_) => Some("boolean CSS value (quote the cell if intentional)"),
         _ => None,
     }
