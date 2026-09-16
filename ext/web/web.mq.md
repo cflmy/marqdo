@@ -38,6 +38,18 @@ them into CSS — 样式即数据、装配即函数.
 > ensure_plugin
 *> web_style name=`name` table=`table` strict=`strict`*
 
+## make_intro
+    + `table`
+
+Assemble an intro bind table (`|属性|值|样式|` / `|front|back|style|`) into an
+HTML fragment for `.main-intro`. Same slot vocabulary as `compose_intro`
+(`kicker`/`title`/`lede`/`claim`/`step`, plus ZH aliases). The `样式` column is
+treated as a class name only here — prefer `page.compose_intro` when styles
+should resolve from `shell.*` tables into `styles_css`.
+
+> ensure_plugin
+*> web_intro table=`table`*
+
 ## make_images
     + `table`
 
@@ -229,6 +241,21 @@ Nav bind tables may include optional `媒体`/`media` (responsive show) and `当
 Assemble main from a bind table (`|属性|值|样式|` or `|front|back|css|`).
 
 *> web_compose_main page=`self` main=`main`*
+
+## compose_intro
+    + `intro`
+
+Assemble page intro from the same bind shape as `compose_main`
+(`|属性|值|样式|` / `|front|back|style|`). `值` is literal copy (light
+`[label](url)` / `**bold**`); `样式` resolves `shell.*` named
+tables into `styles_css` like `card_title`. Consecutive `claim` / `step` rows
+group into `.claim` / `.steps`. Slot aliases: `kicker`/`眉题`, `title`/`标题`,
+`lede`/`导语`, `claim`/`标签`, `step`/`步骤`, plus `mount`/`插槽` and
+`html`/`原文`. Replaces string `intro=` HTML. In `.mq.md` table cells, avoid
+inline `` `code` `` — backtick refs are Marqdo variables; quote long prose
+and use plain filenames or `[label](url)` links instead.
+
+*> web_compose_intro page=`self` intro=`intro`*
 
 ## query
     + `query`

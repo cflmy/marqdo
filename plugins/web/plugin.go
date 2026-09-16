@@ -60,6 +60,8 @@ extern int web_page_chrome(char *args_json, char **out_json, char **err_msg);
 extern int web_style(char *args_json, char **out_json, char **err_msg);
 extern int web_compose_components(char *args_json, char **out_json, char **err_msg);
 extern int web_compose_main(char *args_json, char **out_json, char **err_msg);
+extern int web_compose_intro(char *args_json, char **out_json, char **err_msg);
+extern int web_intro(char *args_json, char **out_json, char **err_msg);
 extern int web_render(char *args_json, char **out_json, char **err_msg);
 extern int web_db_new(char *args_json, char **out_json, char **err_msg);
 extern int web_db_init(char *args_json, char **out_json, char **err_msg);
@@ -153,6 +155,8 @@ static int register_core(void) {
 	if (host_register((char *)"web_style", (char *)"name,table,strict", web_style) != 0) return 1;
 	if (host_register((char *)"web_compose_components", (char *)"page,components", web_compose_components) != 0) return 1;
 	if (host_register((char *)"web_compose_main", (char *)"page,main", web_compose_main) != 0) return 1;
+	if (host_register((char *)"web_compose_intro", (char *)"page,intro", web_compose_intro) != 0) return 1;
+	if (host_register((char *)"web_intro", (char *)"table", web_intro) != 0) return 1;
 	if (host_register((char *)"web_compose_form", (char *)"page,form,id,target", web_compose_form) != 0) return 1;
 	if (host_register((char *)"web_render", (char *)"page", web_render) != 0) return 1;
 	if (host_register((char *)"web_db_new", (char *)"url", web_db_new) != 0) return 1;
@@ -507,6 +511,46 @@ func web_compose_main(argsJSON *C.char, outJSON **C.char, errMsg **C.char) C.int
 	}
 	out, err := compose.ComposeMain(pageBag, main, callLib)
 	return replyJSON(outJSON, errMsg, out, err)
+}
+
+//export web_compose_intro
+func web_compose_intro(argsJSON *C.char, outJSON **C.char, errMsg **C.char) C.int {
+	args, err := parseArgs(argsJSON)
+	if err != nil {
+		return replyJSON(outJSON, errMsg, nil, err)
+	}
+	pageBag := asPageMap(args["page"])
+	intro := args["intro"]
+	if intro == nil {
+		intro = args["引言"]
+	}
+	if intro == nil {
+		intro = args["table"]
+	}
+	if intro == nil {
+		return replyJSON(outJSON, errMsg, nil, fmt.Errorf("missing `intro`"))
+	}
+	out, err := compose.ComposeIntro(pageBag, intro, callLib)
+	return replyJSON(outJSON, errMsg, out, err)
+}
+
+//export web_intro
+func web_intro(argsJSON *C.char, outJSON **C.char, errMsg **C.char) C.int {
+	args, err := parseArgs(argsJSON)
+	if err != nil {
+		return replyJSON(outJSON, errMsg, nil, err)
+	}
+	tbl := args["table"]
+	if tbl == nil {
+		tbl = args["intro"]
+	}
+	if tbl == nil {
+		tbl = args["表"]
+	}
+	if tbl == nil {
+		return replyJSON(outJSON, errMsg, nil, fmt.Errorf("missing `table`"))
+	}
+	return replyJSON(outJSON, errMsg, compose.MakeIntroHTML(tbl), nil)
 }
 
 //export web_render

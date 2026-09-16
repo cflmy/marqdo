@@ -4,6 +4,7 @@
 
 | 属性 | 值 | 样式 |
 |------|-----|------|
-| Marqdo | https://github.com | |
+| Marqdo | https://www.marqdo.com/ | |
+| Source | https://github.com/cflmy/marqdo | |
 
 *`foot`*

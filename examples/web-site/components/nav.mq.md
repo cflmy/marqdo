@@ -1,12 +1,12 @@
 ## nav
 
-Static top links for the shell.
+Brand first, then demo routes.
 
 `nav` =
 
-| 属性 | 值 | 样式 |
-|------|-----|------|
-| Home | / | |
+| front | back | style |
+|-------|------|-------|
+| Marqdo | / | |
 | About | /about | |
 | New | /new | |
 | Admin | /admin | |

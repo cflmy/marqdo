@@ -1,10 +1,9 @@
 # examples/web-site-zh
 
-中文作者面示例：只导入 `ext/web/网页.mq.md`（不用英文 `web.mq.md`）。
+与 [`examples/web-site`](../web-site/) 对等（`ext/web/网页.mq.md`）。
 
 ```bash
-cargo build -p marqdo_plugin_web
-cargo run -- examples/web-site-zh/index.mq.md
+marqdo run examples/web-site-zh/index.mq.md
 ```
 
-打开 http://127.0.0.1:18082/ — `/about`、`/new`、`/admin`、`/static/site.css`。
+http://127.0.0.1:18082/ — 演示脚本见英文样站 [DEMO.md](../web-site/DEMO.md)。
