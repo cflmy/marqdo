@@ -21,7 +21,7 @@ Open http://127.0.0.1:18081/
 | 3 | Open `index.mq.md` beside the browser | Narrative = program; field/rule/route/intro tables |
 | 4 | `/new` empty title → submit | Server validation from **rule table** (no author JS) |
 | 5 | `/new` valid title+slug → submit | Row appears on Home and Admin |
-| 6 | `/admin` | List + create form — table-declared admin, not an SPA |
+| 6 | Top-nav **Login** (`admin` / `demo`) → **Admin** | Session gate; desk shell + create form |
 | 7 | Terminal check | `find examples/web-site \( -name '*.js' -o -name '*.css' \)` → **0** |
 
 ## Authoring contract

@@ -3,7 +3,7 @@ title: styles/shell
 description: >-
   Literary dark theme for examples/web-site — ink / wine / gold after the
   anlian.cyou Zhang Ailing topic. GFM tables only; no author .css.
-导入 网页:ext/web/网页.mq.md
+import web:ext/web/web.mq.md
 import text:lib/text.mq.md
 ---
 
@@ -151,6 +151,8 @@ wine, cold gold, serif display.
 | body.has-sidebar | grid-template-columns | "14rem minmax(0, 1fr)" |
 | body.has-sidebar | grid-template-areas | '"top top" "side main" "foot foot"' |
 | body.no-sidebar | grid-template-areas | '"top" "main" "foot"' |
+| body.layout-stacked | grid-template-areas | '"top" "main" "foot"' |
+| body.is-desk | grid-template-areas | '"top" "main" "foot"' |
 | header.topnav | grid-area | top |
 | aside.side | grid-area | side |
 | main.main | grid-area | main |
@@ -186,14 +188,17 @@ wine, cold gold, serif display.
 
 `responsive` =
 
-| media | 选择器 | 属性 | 值 |
-|-------|--------|------|-----|
+| 媒体 | 选择器 | 属性 | 值 |
+|------|--------|------|-----|
 | (max-width: 860px) | body.has-sidebar | grid-template-columns | 1fr |
 | (max-width: 860px) | body.has-sidebar | grid-template-areas | '"top" "main" "side" "foot"' |
 | (max-width: 860px) | aside.side | border-right | "0" |
 | (max-width: 860px) | aside.side | border-top | 1px solid var(--border-soft) |
 | (max-width: 860px) | main.main | padding | "var(--space-6) var(--space-4) var(--space-8)" |
 | (max-width: 860px) | .content.cards | grid-template-columns | 1fr |
+| (max-width: 860px) | .site-form form | grid-template-columns | 1fr |
+| (max-width: 860px) | .site-form label:nth-child(1) | grid-column | "1 / -1" |
+| (max-width: 860px) | .site-form label:nth-child(2) | grid-column | "1 / -1" |
 | (max-width: 860px) | header.topnav | padding | "0.85rem var(--space-4)" |
 | (max-width: 860px) | .intro_title | font-size | "2.4rem" |
 | (prefers-reduced-motion: reduce) | main.main | animation | none |
@@ -455,6 +460,16 @@ Panel + claim/steps group layout (field look comes from named bind styles).
 | ul.nav a:hover | background | transparent |
 | ul.nav a:hover | color | var(--gold) |
 | ul.nav a:hover | text-decoration | none |
+| ul.nav a[href="/admin"] | color | var(--gold) |
+| ul.nav a[href="/admin"] | letter-spacing | "0.18em" |
+| ul.nav a[href="/admin"] | border-bottom | 1px solid var(--gold-dim) |
+| ul.side-nav a[href="/admin"] | color | var(--gold) |
+| body.is-desk header.topnav | border-bottom | 1px solid rgba(107,30,58,0.55) |
+| body.is-desk header.topnav | box-shadow | "0 12px 40px rgba(107,30,58,.18)" |
+| body.is-desk .main-intro | border-left | 3px solid var(--wine) |
+| body.is-desk .site-form | border-color | rgba(107,30,58,0.45) |
+| body.is-desk .site-form | box-shadow | "0 0 0 1px rgba(212,175,55,.12), 0 18px 48px rgba(0,0,0,.35)" |
+| body.is-desk .content.cards | margin-top | var(--space-6) |
 | ul.nav li:first-child a | font-family | var(--display) |
 | ul.nav li:first-child a | font-weight | "400" |
 | ul.nav li:first-child a | color | var(--gold) |
@@ -466,7 +481,7 @@ Panel + claim/steps group layout (field look comes from named bind styles).
 | .side-label | display | block |
 | .side-label | font-size | "0" |
 | .side-label | margin | "0 0 var(--space-4)" |
-| .side-label::before | content | '"路径"' |
+| .side-label::before | content | '"Path"' |
 | .side-label::before | display | block |
 | .side-label::before | font-size | "0.68rem" |
 | .side-label::before | letter-spacing | "0.28em" |
@@ -522,15 +537,18 @@ Panel + claim/steps group layout (field look comes from named bind styles).
 | .site-form | background | var(--glass) |
 | .site-form | border | 1px solid var(--border) |
 | .site-form | border-radius | var(--radius) |
-| .site-form | padding | "var(--space-6)" |
+| .site-form | padding | "var(--space-6) var(--space-6) var(--space-7, 1.75rem)" |
 | .site-form | margin | "0 0 var(--space-6)" |
-| .site-form | max-width | "28rem" |
+| .site-form | max-width | "100%" |
 | .site-form | width | "100%" |
 | .site-form | box-shadow | var(--shadow) |
 | .site-form | backdrop-filter | blur(16px) |
 | .site-form | -webkit-backdrop-filter | blur(16px) |
 | .site-form .meta | display | none |
 | .site-form form | display | grid |
+| .site-form form | grid-template-columns | "minmax(0, 1fr) minmax(0, 1fr)" |
+| .site-form form | column-gap | var(--space-5) |
+| .site-form form | row-gap | var(--space-5) |
 | .site-form form | gap | var(--space-5) |
 | .site-form form | margin | "0" |
 | .site-form form | width | "100%" |
@@ -538,11 +556,16 @@ Panel + claim/steps group layout (field look comes from named bind styles).
 | .site-form label | display | grid |
 | .site-form label | gap | var(--space-2) |
 | .site-form label | margin | "0" |
+| .site-form label | min-width | "0" |
 | .site-form label | font-weight | "400" |
 | .site-form label | color | var(--gold) |
 | .site-form label | font-size | "0.78rem" |
 | .site-form label | letter-spacing | "0.16em" |
 | .site-form label | text-transform | uppercase |
+| .site-form label:nth-child(1) | grid-column | "1" |
+| .site-form label:nth-child(2) | grid-column | "2" |
+| .site-form label:nth-child(n+3) | grid-column | "1 / -1" |
+| .site-form .actions | grid-column | "1 / -1" |
 | .site-form input | -webkit-appearance | none |
 | .site-form textarea | -webkit-appearance | none |
 | .site-form input | appearance | none |
@@ -554,7 +577,8 @@ Panel + claim/steps group layout (field look comes from named bind styles).
 | .site-form input | width | "100%" |
 | .site-form textarea | width | "100%" |
 | .site-form input | height | "2.75rem" |
-| .site-form textarea | min-height | "8.5rem" |
+| .site-form textarea | min-height | "10rem" |
+| .site-form label:nth-child(4) textarea | min-height | "14rem" |
 | .site-form textarea | resize | vertical |
 | .site-form input | padding | "0 0.9rem" |
 | .site-form textarea | padding | "0.75rem 0.9rem" |
@@ -629,12 +653,12 @@ Panel + claim/steps group layout (field look comes from named bind styles).
 **r = > responsive**
 **c = > chrome**
 **w = > widgets**
-**css_v = > 网页.样式装配 名="vars" 表=v**
-**css_m = > 网页.样式装配 名="motion" 表=m**
-**css_l = > 网页.样式装配 名="layout" 表=l**
-**css_r = > 网页.样式装配 名="responsive" 表=r**
-**css_c = > 网页.样式装配 名="chrome" 表=c**
-**css_w = > 网页.样式装配 名="widgets" 表=w**
+**css_v = > web.make_style name="vars" table=v**
+**css_m = > web.make_style name="motion" table=m**
+**css_l = > web.make_style name="layout" table=l**
+**css_r = > web.make_style name="responsive" table=r**
+**css_c = > web.make_style name="chrome" table=c**
+**css_w = > web.make_style name="widgets" table=w**
 
 `parts` =
 

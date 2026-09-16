@@ -314,9 +314,10 @@ func (st *state) mountAuthRoutes(mux *http.ServeMux) {
 		mux.HandleFunc("GET "+altLogin, st.handleLoginGet)
 		mux.HandleFunc("POST "+altLogin, st.handleLoginPost)
 	}
+	// Logout is part of session auth, not only built-in admin=True chrome.
+	logoutPath := strings.TrimRight(st.auth.adminPrefix, "/") + "/logout"
+	mux.HandleFunc("GET "+logoutPath, st.handleLogout)
 	if st.auth.admin {
-		logoutPath := strings.TrimRight(st.auth.adminPrefix, "/") + "/logout"
-		mux.HandleFunc("GET "+logoutPath, st.handleLogout)
 		adminHome := strings.TrimRight(st.auth.adminPrefix, "/")
 		if adminHome == "" {
 			adminHome = "/admin"
@@ -427,29 +428,34 @@ func loginPageHTML(loginAction string, errMsg *string, csrf string, next string)
 		nextField = fmt.Sprintf("<input type=\"hidden\" name=\"next\" value=\"%s\"/>", esc(next))
 	}
 	return fmt.Sprintf(`<!DOCTYPE html>
-<html lang="zh-CN"><head>
+<html lang="en"><head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>Admin Login</title>
 <style>
-:root { --ink:#1c1917; --muted:#78716c; --paper:#fafaf9; --line:#e7e5e4; --accent:#0f766e; --err:#b91c1c; }
+:root { --ink:#0a0809; --paper:#f5e6c8; --gold:#d4af37; --wine:#6b1e3a; --err:#b91c1c; }
 * { box-sizing:border-box; }
-body { margin:0; min-height:100vh; display:grid; place-items:center; background:var(--paper); color:var(--ink); font-family:"IBM Plex Sans","Noto Sans SC",sans-serif; }
-.login { background:rgba(255,255,255,.45); border:1px solid rgba(255,255,255,.5); border-radius:14px; padding:2rem 2.25rem; width:min(92vw,22rem); box-shadow:0 8px 24px rgba(253,189,219,.18); backdrop-filter:blur(14px); }
-.login h1 { margin:0 0 .25rem; font-size:1.4rem; color:#a85878; }
-.login .sub { color:#666; margin:0 0 1.25rem; font-size:.9rem; }
+body { margin:0; min-height:100vh; display:grid; place-items:center; color:var(--paper); font-family:"Noto Sans SC","IBM Plex Sans",system-ui,sans-serif;
+  background: radial-gradient(ellipse 90%% 55%% at 50%% -15%%, rgba(107,30,58,.5), transparent 58%%), linear-gradient(180deg,#0a0809,#120c10 45%%,#0a0809); }
+.login { background:rgba(0,0,0,.45); border:1px solid rgba(212,175,55,.28); border-radius:12px; padding:2rem 2.25rem; width:min(92vw,22rem); box-shadow:0 24px 80px rgba(0,0,0,.55); backdrop-filter:blur(14px); }
+.login h1 { margin:0 0 .25rem; font-size:1.55rem; color:var(--gold); letter-spacing:.04em; }
+.login .sub { color:rgba(245,230,200,.72); margin:0 0 1.25rem; font-size:.9rem; line-height:1.55; }
+.login .hint { color:rgba(245,230,200,.5); margin:1rem 0 0; font-size:.78rem; letter-spacing:.04em; }
 .login form { display:grid; gap:.9rem; }
-.login label { display:grid; gap:.25rem; font-size:.9rem; }
-.login input { padding:.55rem .65rem; border:1px solid rgba(253,189,219,.55); border-radius:999px; font:inherit; background:rgba(255,255,255,.7); }
-.login button { background:linear-gradient(120deg,#f0a8c4,#fdbbdb); color:#a85878; border:0; padding:.6rem 1rem; border-radius:999px; cursor:pointer; font:inherit; font-weight:600; }
-.login button:hover { filter:brightness(1.05); }
-.flash.err { background:#fef2f2; color:#b91c1c; border:1px solid #fecaca; padding:.6rem .8rem; border-radius:6px; margin:0 0 .9rem; font-size:.9rem; }
+.login label { display:grid; gap:.25rem; font-size:.85rem; letter-spacing:.08em; }
+.login input { padding:.6rem .75rem; border:1px solid rgba(212,175,55,.35); border-radius:8px; font:inherit; color:var(--paper); background:rgba(10,8,9,.7); }
+.login input:focus { outline:none; border-color:var(--gold); box-shadow:0 0 0 2px rgba(212,175,55,.25); }
+.login button { background:linear-gradient(135deg,#f5e6c8,var(--gold)); color:var(--ink); border:0; padding:.65rem 1rem; border-radius:999px; cursor:pointer; font:inherit; font-weight:600; letter-spacing:.1em; }
+.login button:hover { filter:brightness(1.06); }
+.flash.err { background:rgba(185,28,28,.15); color:#fecaca; border:1px solid rgba(185,28,28,.45); padding:.6rem .8rem; border-radius:8px; margin:0 0 .9rem; font-size:.9rem; }
+a.back { color:var(--gold); text-decoration:none; font-size:.85rem; }
+a.back:hover { color:#f5e6c8; }
 </style>
 </head>
-<body style="background:#f8f9fa url('/static/img/bg-body-960.webp') center/cover fixed;">
+<body>
 <div class="login">
-<h1>暗恋见君</h1>
-<p class="sub">登录后发帖与管理。</p>
+<h1>Marqdo Admin</h1>
+<p class="sub">Sign in to open the table-declared desk.</p>
 %s
 <form method="post" action="%s">
 %s%s
@@ -457,6 +463,8 @@ body { margin:0; min-height:100vh; display:grid; place-items:center; background:
 <label>Password<input name="password" type="password" autocomplete="current-password" required/></label>
 <button type="submit">Sign in</button>
 </form>
+<p class="hint">Demo · admin / demo</p>
+<p style="margin:1.1rem 0 0"><a class="back" href="/">← Site</a></p>
 </div>
 </body></html>`, errHTML, esc(loginAction), csrfField, nextField)
 }

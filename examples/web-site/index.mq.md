@@ -8,6 +8,7 @@ import shell:styles/shell.mq.md
 import nav:components/nav.mq.md
 import side:components/side.mq.md
 import foot:components/foot.mq.md
+import desk:components/desk.mq.md
 import articles:db/articles.mq.md
 import db:db/index.mq.md
 ---
@@ -25,6 +26,15 @@ no hand-written business JavaScript and no author .css file.
 | nav.`nav` | shell.`topnav` |
 | side.`side` | shell.`side_panel` |
 | foot.`foot` | shell.`footer` |
+
+Public shell (nav + side + foot). Desk shell drops the public side rail.
+
+`desk_shell` =
+
+| src | style |
+|-----|-------|
+| desk.`nav` | shell.`topnav` |
+| desk.`foot` | shell.`footer` |
 
 List cards: summary + slug link (click through to detail).
 
@@ -65,7 +75,7 @@ Home intro — same bind shape as main (front / back / style).
 | claim | GFM tables | shell.`claim` |
 | step | "Click any card — /post/{slug} opens the detail page from the same articles table." | shell.`step` |
 | step | "Open [New](/new) and submit with an empty title (validation from a rule table)." | shell.`step` |
-| step | "Submit a valid article — it appears on [Home](/) and [Admin](/admin)." | shell.`step` |
+| step | "Open top-nav **Login** (admin / demo), then **Admin** — gated desk with create form + list." | shell.`step` |
 
 `about_intro` =
 
@@ -90,9 +100,12 @@ Home intro — same bind shape as main (front / back / style).
 
 | front | back | style |
 |-------|------|-------|
-| kicker | admin · table-declared | shell.`kicker` |
+| kicker | desk · you are in admin | shell.`kicker` |
 | title | Admin | shell.`intro_title` |
-| lede | "List and create share the articles schema. Cards link to detail pages — no separate admin SPA." | shell.`lede` |
+| lede | "This is the management desk (login required): same articles schema as the public site, assembled as list + create form — not a separate SPA. Use Site in the topnav to return, or Logout to end the session." | shell.`lede` |
+| claim | login-gated | shell.`claim` |
+| claim | table-declared | shell.`claim` |
+| claim | "create + list" | shell.`claim` |
 
 `post_intro` =
 
@@ -172,10 +185,11 @@ Neat CJK sans for body; Great Vibes for English display.
 **new = > new.compose_form id="article" form=article_form**
 
 **desk = > web.page title="Admin · Marqdo Web" shell_css="off"**
+**desk = > desk.chrome body_class="is-desk"**
 **desk = > desk.compose_intro intro=admin_intro**
 **desk = > desk.head table=fonts**
 **desk = > desk.css css=site_css**
-**desk = > desk.compose_components components=home**
+**desk = > desk.compose_components components=desk_shell**
 **desk = > desk.compose_form id="article" form=article_form**
 **desk = > desk.compose_main main=index**
 **desk = > desk.link_prefix prefix="/post/"**
@@ -189,9 +203,19 @@ Neat CJK sans for body; Great Vibes for English display.
 **post = > post.query query=by_slug**
 **post = > post.detail detail=True**
 
-**app = > web.app page=page db=store admin=False host="127.0.0.1" port=18081 shell_css="off"**
+Demo credentials (table-declared users — host session auth, no author JS).
+
+`admins` =
+
+| username | password | role |
+|----------|----------|------|
+| admin | demo | admin |
+
+**app = > web.app page=page db=store admin=False host="127.0.0.1" port=18081 shell_css="off" login_redirect="/admin" logout_redirect="/"**
 **app = > app.route path="/about" page=about**
 **app = > app.route path="/new" page=new**
 **app = > app.route path="/admin" page=desk**
 **app = > app.route path="/post/{slug}" page=post**
+**app = > app.auth users=admins session_ttl=3600 login_path="/login" login_redirect="/admin" logout_redirect="/"**
+**app = > app.gate path="/admin" roles="admin" match="prefix" on_deny="redirect" exclude="/login"**
 > `app`.listen
