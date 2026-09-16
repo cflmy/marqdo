@@ -124,9 +124,9 @@ jobs:
             ## Marqdo ${{ github.ref_name }}
 
             ### 亮点 / Highlights
-            - **v1.0.1**：修复 Go `libweb` 动态路由 `{param}` 查询代入、详情 Markdown、CSS 数字误报、`/static/` ServeMux 冲突
-            - **v1.0.1**: fix Go `libweb` dynamic-route `{param}` query resolve, article Markdown, CSS numeric false positives, `/static/` ServeMux conflict
-            - **v1.0.0**：Markdown 语法映射 v0.3 为唯一运行时（`**` 代码 / `*` 返回 / 叙述 `` `名` ``）
+            - **v1.0.2**：表驱动页面引言 `compose_intro` / `引言装配`；web-site Demo 与后台门禁加固
+            - **v1.0.2**: table-bound page intro (`compose_intro`); web-site demo + desk auth polish
+            - **v1.0.1**：修复 Go `libweb` 动态路由 `{param}` 查询代入、详情 Markdown、CSS 数字误报
             - **Linux 包必出**：`*-native-x86_64-unknown-linux-gnu.zip` + Linux CLI bundle
             - Details: [CHANGELOG](https://github.com/cflmy/marqdo/blob/main/CHANGELOG.md) · [mapping v0.3](https://github.com/cflmy/marqdo/blob/main/doc/design/markdown-mapping-v0.3.md)
 

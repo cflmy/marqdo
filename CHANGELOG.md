@@ -8,6 +8,30 @@
 
 ### Changed
 
+## v1.0.2 — 2026-09-16
+
+### Highlights
+
+**表驱动页面引言（`compose_intro` / `引言装配`）**：英雄区用 GFM「属性 / 值 / 样式」表声明，不再手写 HTML 字符串；WWW Demo 样站与后台门禁一并加固。
+
+```bash
+git checkout v1.0.2
+cargo build --release
+bash ./scripts/build-web-plugin.sh
+# 或：解压 Release 的 marqdo-1.0.2-*-native-*.zip / Linux CLI zip
+marqdo run examples/web-site-zh/index.mq.md
+```
+
+### Added
+- Go `libweb`：`web_compose_intro` — 将引言表装配为 `.main-intro` HTML；中英 API `页面.引言装配` / `page.compose_intro`（`ext/web`）。
+- 验收样例：`tests/ext/web-intro-compose.mq.md`；`examples/web-site` / `web-site-zh` 升级为表驱动引言 + 文学风壳层 + 卡片→详情路由。
+
+### Fixed
+- 后台样站：导航/侧栏/页脚槽位与门禁登录挂载对齐；表单字段加宽便于创建。
+
+### Changed
+- Demo 叙述与种子数据面向 WWW Industry / 可复现演示；作者仍零业务 JS、零手写 `.css`。
+
 ## v1.0.1 — 2026-09-15
 
 ### Highlights
