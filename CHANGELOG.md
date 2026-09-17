@@ -3,9 +3,32 @@
 ## Unreleased
 
 ### Added
+
+### Fixed
+
+### Changed
+
+## v1.0.3 — 2026-09-17
+
+### Highlights
+
+**分发渠道齐备**：Ubuntu PPA 装 CLI；扩展包走 CDN（`ext.marqdo.com`）与 GitHub；CLI 与扩展可分开发版。本版 CLI 与扩展包 **同步为 1.0.3**。
+
+```bash
+# Ubuntu
+sudo add-apt-repository ppa:cflmy/marqdo
+sudo apt update && sudo apt install marqdo
+marqdo ext add web
+
+# 或源码 / Releases
+git checkout v1.0.3 && cargo build --release
+```
+
+### Added
 - Ubuntu PPA packaging: `debian/` + `scripts/ppa-ship.sh` (一键装工具/打包/dput) + `ppa-build-source.sh` + [ubuntu-ppa.md](doc/design/ubuntu-ppa.md).
 - **Extension CDN** (`https://ext.marqdo.com` / Cloudflare R2)：`ext add` 下载顺序改为 CDN → GitHub → proxy；独立包版本见 `ext/VERSION` 与 CDN `latest/VERSION`；上传脚本 `scripts/upload-ext-r2.py`（凭据 `~/.marqdo/r2.env`）。设计见 [ext-cdn.md](doc/design/ext-cdn.md)。
 - `ext add` 下载：GitHub 失败后自动回退 `https://proxy.cflmy.top/github.com/…`；可用 `MARQDO_EXT_DOWNLOAD_BASE` 指定首选镜像；加长读写超时。
+- 用户文档（README / `public/00-欢迎` / `features/05-扩展`）标明安装渠道：Ubuntu PPA、GitHub Releases、源码；扩展走 CDN。
 
 ### Fixed
 - `ext/` 导入默认搜索 `~/.marqdo/ext`（与 `marqdo ext add` 安装根一致），无需再手动 `export MARQDO_EXT`。
@@ -13,7 +36,7 @@
 
 ### Changed
 - 允许 **CLI 与扩展包分开发版**：扩展包 SemVer 可与 `Cargo.toml` 不同（`MARQDO_EXT_VERSION` / `ext/VERSION` / CDN latest）。
-- 用户文档（README / `public/00-欢迎` / `features/05-扩展`）标明安装渠道：Ubuntu PPA、GitHub Releases、源码；扩展走 CDN。
+- 发版 skill：支持 `full` / `cli` / `ext`；扩展必传 R2+GitHub；CLI 走 PPA；需用户操作时打印确切命令。
 
 ## v1.0.2 — 2026-09-16
 

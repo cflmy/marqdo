@@ -124,8 +124,8 @@ jobs:
             ## Marqdo ${{ github.ref_name }}
 
             ### 亮点 / Highlights
-            - **v1.0.2**：表驱动页面引言 `compose_intro` / `引言装配`；web-site Demo 与后台门禁加固
-            - **v1.0.2**: table-bound page intro (`compose_intro`); web-site demo + desk auth polish
+            - **v1.0.3**：Ubuntu PPA + 扩展 CDN（ext.marqdo.com）；CLI/扩展可分发；noble 捆绑 Rust 工具链
+            - **v1.0.3**: Ubuntu PPA + extension CDN; independent CLI/ext packs; bundled Rust for noble
             - **v1.0.1**：修复 Go `libweb` 动态路由 `{param}` 查询代入、详情 Markdown、CSS 数字误报
             - **Linux 包必出**：`*-native-x86_64-unknown-linux-gnu.zip` + Linux CLI bundle
             - Details: [CHANGELOG](https://github.com/cflmy/marqdo/blob/main/CHANGELOG.md) · [mapping v0.3](https://github.com/cflmy/marqdo/blob/main/doc/design/markdown-mapping-v0.3.md)

@@ -1,3 +1,9 @@
+marqdo (1.0.3-1ppa1) noble; urgency=medium
+
+  * Marqdo 1.0.3: PPA + ext CDN docs; bundled Rust for noble builds.
+
+ -- cflmy <pingan@cflmy.cn>  Thu, 17 Sep 2026 10:30:00 +0800
+
 marqdo (1.0.2-1ppa2) noble; urgency=medium
 
   * Bundle Rust toolchain in orig (third_party/rust) so noble can build
