@@ -4,8 +4,7 @@ Priority: optional
 Maintainer: cflmy <pingan@cflmy.cn>
 Build-Depends:
  debhelper-compat (= 13),
- cargo,
- rustc,
+ build-essential,
  pkg-config,
  libssl-dev,
  ca-certificates
@@ -16,7 +15,7 @@ Vcs-Browser: https://github.com/cflmy/marqdo
 Rules-Requires-Root: no
 
 Package: marqdo
-Architecture: any
+Architecture: amd64
 Depends: ${shlibs:Depends}, ${misc:Depends}, ca-certificates
 Description: Markdown markers as an interpreted programming language
  Marqdo treats Markdown markers as executable syntax (code / return /
@@ -24,3 +23,7 @@ Description: Markdown markers as an interpreted programming language
  .
  Official extensions (web, quantum, …) are installed separately via
  "marqdo ext add" and download from https://ext.marqdo.com .
+ .
+ Launchpad builds use a bundled Rust toolchain under third_party/rust
+ (Ubuntu noble cargo is too old for Cargo.lock v4). Rebuilds on newer
+ series may use distro rustc if cargo ≥ 1.78.

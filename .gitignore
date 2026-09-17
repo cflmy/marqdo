@@ -78,5 +78,9 @@ plugins/*/tmp/
 # Go web plugin c-shared build output (./scripts/build-web-plugin.sh)
 /plugins/web/build/
 
+# PPA build: bundled Rust toolchain (packed into .orig by ppa-build-source.sh only)
+/third_party/rust/
+/third_party/
+
 # ephemeral sqlite / test artifacts
 tests/ext/:memory:

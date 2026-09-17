@@ -5,7 +5,7 @@ description: Optional packages — not stdlib
 
 # main
 
-ext/ holds official optional extensions. They are not part of lib/. Resolve via MARQDO_EXT, ./ext, or ext/ next to the binary.
+ext/ holds official optional extensions. They are not part of lib/. Resolve via `~/.marqdo/ext`, MARQDO_EXT, ./ext, or ext/ next to the binary.
 
 Install (v0.2+):
 
@@ -15,14 +15,18 @@ marqdo ext add llm
 marqdo ext add agent
 marqdo ext add web
 marqdo ext add quantum
+marqdo ext add linalg
 ```
 
-For packages with a native plugin, build first then add:
+`ext add` downloads L1 sources and prebuilt natives when available. Order: CDN https://ext.marqdo.com → GitHub Releases → proxy mirror. Pack SemVer is `ext/VERSION` and may differ from the CLI.
+
+Rebuild natives locally only when developing plugins:
 
 ```text
 cargo build --release -p marqdo_plugin_agent
-cargo build --release -p marqdo_plugin_web
 cargo build --release -p marqdo_plugin_quantum
+cargo build --release -p marqdo_plugin_linalg
+bash ./scripts/build-web-plugin.sh
 marqdo ext add agent
 marqdo ext add web
 marqdo ext add quantum

@@ -13,6 +13,25 @@ AI already prefers Markdown-shaped output. The idea was: why keep docs and code 
 
 The language is still young: structure markers, bilingual core names (`print` / `打印`, …), importable stdlibs (see [`stdlib/`](stdlib/) on this site), local `view`, and static export. Contribute on [GitHub](https://github.com/cflmy/marqdo).
 
+## Install
+
+Pick one way to get the CLI:
+
+| Method | Notes |
+|--------|-------|
+| Ubuntu PPA | `sudo add-apt-repository ppa:cflmy/marqdo` then `sudo apt install marqdo` |
+| GitHub Releases | Prebuilt Windows / Linux zips at [releases](https://github.com/cflmy/marqdo/releases) |
+| From source | `cargo build --release` (needs Rust) |
+
+Official extensions version independently of the CLI:
+
+```text
+marqdo ext add web
+marqdo ext add quantum
+```
+
+`ext add` tries CDN https://ext.marqdo.com first, then GitHub, then the proxy mirror. See [`features/05-extensions.mq.md`](features/05-extensions.mq.md).
+
 中文文档请看同目录的 [`00-欢迎.mq.md`](00-欢迎.mq.md)（叙述与内置均用中文）。
 
 A small function to say hello:

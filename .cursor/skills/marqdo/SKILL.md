@@ -19,7 +19,7 @@ Canonical design (repo): [`markdown-mapping-v0.3.md`](../../doc/design/markdown-
 
 **Authoring / library craft** (GFM-first, no json glue, how to develop Marqdo): use **[marqdo-dev](../marqdo-dev/SKILL.md)** whenever writing or refactoring `.mq.md`, `lib/*`, or `ext/*`.
 
-**Product release** (tag, CHANGELOG, README, public docs, VSIX, GitHub assets): use [marqdo-release](../marqdo-release/SKILL.md) — detect latest version, **ask the user for the next SemVer**, then follow that playbook. Do not invent a version number.
+**Product release** (tag, CHANGELOG, README, public docs, VSIX, GitHub assets, **ext → R2+GitHub**, **CLI → Ubuntu PPA**): use [marqdo-release](../marqdo-release/SKILL.md) — detect versions, **ask for SemVer + mode (`full` / `cli` / `ext`)**, then follow that playbook. Ext-only releases are allowed. If sudo/GPG/PPA steps need the user, print the exact commands.
 
 ## Hard rules (do not violate)
 

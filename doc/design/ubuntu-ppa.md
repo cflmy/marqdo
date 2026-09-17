@@ -2,10 +2,10 @@
 
 | | |
 |---|---|
-| Status | **Scaffold** — local `debian/` ready; first upload needs Launchpad PPA + vendored crates |
+| Status | **Active** — `ppa:cflmy/marqdo`; noble builds need bundled Rust (Cargo.lock v4) |
 | Maintainer | cflmy \<pingan@cflmy.cn\> |
 | GPG | `505943294D04C803` (fingerprint `52A1…C803`) |
-| Suggested PPA | `ppa:cflmy/marqdo` |
+| PPA | `ppa:cflmy/marqdo` |
 
 ## Goal
 
@@ -19,77 +19,65 @@ sudo apt install marqdo
 
 CLI and extension packs stay independent: the `.deb` ships the **interpreter**; `marqdo ext add …` still pulls from **https://ext.marqdo.com** (then GitHub / proxy).
 
+## Why bundled Rust?
+
+Ubuntu **noble** ships cargo/rustc **1.75**, which cannot parse **Cargo.lock version 4** (`lock file version 4 requires -Znext-lockfile-bump`). Launchpad builders also have **no network**, so `ppa-build-source.sh` vendors crates **and** installs a modern toolchain into `third_party/rust` inside the `.orig.tar.xz`. `debian/rules` prefers that toolchain over distro cargo.
+
 ## One-time Launchpad setup
 
 1. Create PPA: https://launchpad.net/~cflmy/+activate-ppa → name e.g. `marqdo`
 2. OpenPGP key already on Launchpad (done)
 3. Sign Ubuntu Code of Conduct if Launchpad asks
-4. On the build machine:
+4. Enable the Ubuntu **series** you upload for (e.g. noble) under PPA → Change details
+5. On the build machine:
 
 ```bash
 sudo apt install build-essential debhelper devscripts dput lintian \
-  dh-cargo cargo rustc pkg-config
+  dpkg-dev quilt cargo rustc pkg-config curl xz-utils
 ```
 
 ## Package layout
 
-Debian packaging lives under repo-root `debian/` (this tree).
-
 | File | Role |
 |------|------|
-| `debian/control` | Package metadata / deps |
-| `debian/changelog` | Upload revisions (`dch`) |
-| `debian/rules` | `dh` + cargo build |
-| `debian/copyright` | Apache-2.0 |
-| `debian/source/format` | `3.0 (quilt)` |
-| `debian/watch` | Optional upstream tarball watch |
-| `scripts/ppa-build-source.sh` | Vendor + `debuild -S` helper |
+| `debian/control` | Metadata (amd64; no distro cargo BD) |
+| `debian/changelog` | Upload revisions (`1ppaN`) |
+| `debian/rules` | `dh` + bundled/system cargo build |
+| `scripts/ppa-build-source.sh` | Vendor + bundle Rust + `debuild -S` |
+| `scripts/ppa-ship.sh` | apt deps + build + `dput` |
 
 ## Versioning
 
 - Upstream SemVer: `Cargo.toml` / git tag `vX.Y.Z`
-- Debian revision: `X.Y.Z-1ppa1~SERIES` (SERIES = `noble`, `jammy`, …)
-- **Ext pack** SemVer (`ext/VERSION`) is **not** the deb version; bump deb only when CLI/stdlib packaging changes.
+- Debian revision: `X.Y.Z-1ppaN~SERIES` (SERIES = `noble`, …) — bump `1ppaN` on packaging-only reuploads
+- **Ext pack** SemVer (`ext/VERSION`) is **not** the deb version
 
 ## One-shot (recommended)
 
-In a normal terminal (sudo password + GPG passphrase when prompted):
-
 ```bash
 cd ~/work/marqdo
-./scripts/ppa-ship.sh noble          # install tools → debuild -S → dput
-# ./scripts/ppa-ship.sh resolute     # if PPA enabled that series
-# ./scripts/ppa-ship.sh noble -n     # build only, no upload
+./scripts/ppa-ship.sh noble          # tools → debuild -S → dput
+./scripts/ppa-ship.sh noble -n       # build only
 ```
 
-`sudo ./scripts/ppa-ship.sh …` is OK: apt runs as root; build/sign/upload drop to `$SUDO_USER` so GPG still works.
-
-## Build source package only
+If automation cannot enter sudo/GPG, tell the user these commands (do not invent alternatives):
 
 ```bash
 ./scripts/ppa-build-source.sh noble
-# → ../build-area/marqdo_X.Y.Z-1ppa1~noble_source.changes
-dput ppa:cflmy/marqdo ../build-area/marqdo_*_source.changes
+dput ppa:cflmy/marqdo ../build-area/marqdo_*~noble_source.changes
 ```
 
-The build script vendors Cargo crates into `vendor/` (Launchpad builders have **no network**).
+Watch: https://launchpad.net/~cflmy/+archive/ubuntu/marqdo/+builds
 
-Wait for https://launchpad.net/~cflmy/+archive/ubuntu/marqdo/+builds
+## Failure notes
 
-## Series strategy
-
-Start with **one** series you use daily (e.g. `noble` 24.04 or `resolute` 26.04). Copy the changelog stanza and rebuild per series, or use `backportpackage` later.
+| Symptom | Fix |
+|---------|-----|
+| `lock file version 4 requires -Znext-lockfile-bump` | Rebuild with current `ppa-build-source.sh` (bundles Rust); bump `1ppaN` |
+| Same version rejected by Launchpad | Bump `debian/changelog` (`1ppa2`, …) |
+| Wrong series | Enable series on PPA; rebuild with that series name |
 
 ## Out of scope (v1 deb)
 
 - Shipping `ext/native/*.so` inside the deb (use CDN `ext add`)
-- WASM / VSIX
-- Multi-arch cross builds beyond amd64
-
-## Checklist for first upload
-
-- [ ] PPA `marqdo` exists under `~cflmy`
-- [ ] `./scripts/ppa-build-source.sh <series>` succeeds
-- [ ] `lintian` on `.changes` is acceptable
-- [ ] `dput` accepted; amd64 build green on Launchpad
-- [ ] Fresh VM: `add-apt-repository` + `apt install marqdo` + `marqdo version`
+- WASM / VSIX / non-amd64

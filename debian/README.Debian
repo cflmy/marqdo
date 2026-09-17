@@ -10,5 +10,13 @@ Official language extensions are not bundled. After install:
 
 Extension packs download from https://ext.marqdo.com (then GitHub / proxy).
 
+Install this package from:
+
+  sudo add-apt-repository ppa:cflmy/marqdo
+  sudo apt update
+  sudo apt install marqdo
+
+Also available: GitHub Releases (Windows/Linux zips) and building from source.
+
 Documentation: https://github.com/cflmy/marqdo
-PPA packaging notes: doc/design/ubuntu-ppa.md in the upstream repository.
+PPA notes: doc/design/ubuntu-ppa.md in the upstream repository.

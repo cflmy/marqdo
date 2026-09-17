@@ -1,28 +1,41 @@
 #!/usr/bin/make -f
 
 export DH_VERBOSE = 1
-# Offline builds on Launchpad: use vendored crates when present.
+# Offline builds on Launchpad: vendored crates + optional bundled Rust toolchain.
 export CARGO_HOME = $(CURDIR)/debian/cargo_home
 export CARGO_NET_OFFLINE = true
+
+# Noble (and older) distro cargo cannot read Cargo.lock v4 / modern crates.
+# Prefer third_party/rust from the orig tarball when present (see ppa-build-source.sh).
+BUNDLED_RUST = $(CURDIR)/third_party/rust
+ifneq ($(wildcard $(BUNDLED_RUST)/bin/cargo),)
+export PATH := $(BUNDLED_RUST)/bin:$(PATH)
+endif
 
 %:
 	dh $@
 
 override_dh_auto_configure:
 	mkdir -p debian/cargo_home
+	@if [ -x "$(BUNDLED_RUST)/bin/cargo" ]; then \
+		echo "Using bundled Rust: $$($(BUNDLED_RUST)/bin/rustc --version)"; \
+	else \
+		echo "Using system Rust: $$(rustc --version 2>/dev/null || echo missing)"; \
+	fi
 	@if [ -f "$(CURDIR)/.cargo/config.toml" ] || [ -d "$(CURDIR)/vendor" ]; then \
 		echo "Using vendored Cargo dependencies"; \
 	else \
 		echo "WARNING: no vendor/ — online cargo fetch required (not for Launchpad)"; \
-		export CARGO_NET_OFFLINE=false; \
 	fi
 
 override_dh_auto_build:
 	mkdir -p debian/cargo_home
+	@command -v cargo >/dev/null || { echo "error: cargo not found (bundle third_party/rust or install rustc/cargo)" >&2; exit 1; }
 	if [ -d "$(CURDIR)/vendor" ]; then \
-		CARGO_NET_OFFLINE=true cargo build --release --locked --offline; \
+		CARGO_NET_OFFLINE=true cargo build --release --locked --offline \
+			-p marqdo; \
 	else \
-		cargo build --release --locked; \
+		cargo build --release --locked -p marqdo; \
 	fi
 
 override_dh_auto_test:
@@ -36,5 +49,5 @@ override_dh_auto_install:
 override_dh_auto_clean:
 	dh_auto_clean
 	rm -rf debian/cargo_home
-	# keep vendor/ if present (part of source package)
-	cargo clean || true
+	# keep vendor/ and third_party/rust (part of source package)
+	-cargo clean

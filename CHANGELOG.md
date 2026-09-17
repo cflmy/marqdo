@@ -9,9 +9,11 @@
 
 ### Fixed
 - `ext/` 导入默认搜索 `~/.marqdo/ext`（与 `marqdo ext add` 安装根一致），无需再手动 `export MARQDO_EXT`。
+- PPA/noble：捆绑 `third_party/rust`（现代 cargo）以构建 Cargo.lock v4；修复首次 Launchpad 构建失败（distro cargo 1.75）。
 
 ### Changed
 - 允许 **CLI 与扩展包分开发版**：扩展包 SemVer 可与 `Cargo.toml` 不同（`MARQDO_EXT_VERSION` / `ext/VERSION` / CDN latest）。
+- 用户文档（README / `public/00-欢迎` / `features/05-扩展`）标明安装渠道：Ubuntu PPA、GitHub Releases、源码；扩展走 CDN。
 
 ## v1.0.2 — 2026-09-16
 

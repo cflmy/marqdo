@@ -73,20 +73,16 @@ echo "==> building source package for series=${SERIES}"
 run_user "$ROOT/scripts/ppa-build-source.sh" "$SERIES"
 
 VER="$(sed -n 's/^version = "\(.*\)"/\1/p' "$ROOT/Cargo.toml" | head -1)"
-DEB_VER="${VER}-1ppa1~${SERIES}"
 BUILD_AREA="$(cd "$ROOT/.." && pwd)/build-area"
-CHANGES="${BUILD_AREA}/marqdo_${DEB_VER}_source.changes"
-
-# ppa-build may leave artifacts next to /tmp/marqdo-ppa — copy already done; also scan
-if [ ! -f "$CHANGES" ]; then
-  alt="$(ls -1 "$BUILD_AREA"/marqdo_*_source.changes 2>/dev/null | tail -1 || true)"
-  if [ -n "${alt:-}" ]; then
-    CHANGES="$alt"
-  else
-    echo "error: no *_source.changes under $BUILD_AREA" >&2
-    ls -la "$BUILD_AREA" 2>/dev/null || true
-    exit 1
-  fi
+# Prefer changes matching this series; fall back to newest source.changes
+CHANGES="$(ls -1t "$BUILD_AREA"/marqdo_*"~${SERIES}"_source.changes 2>/dev/null | head -1 || true)"
+if [ -z "${CHANGES:-}" ]; then
+  CHANGES="$(ls -1t "$BUILD_AREA"/marqdo_*_source.changes 2>/dev/null | head -1 || true)"
+fi
+if [ -z "${CHANGES:-}" ] || [ ! -f "$CHANGES" ]; then
+  echo "error: no *_source.changes under $BUILD_AREA" >&2
+  ls -la "$BUILD_AREA" 2>/dev/null || true
+  exit 1
 fi
 
 echo "==> artifact: $CHANGES"

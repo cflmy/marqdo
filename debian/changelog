@@ -1,3 +1,11 @@
+marqdo (1.0.2-1ppa2) noble; urgency=medium
+
+  * Bundle Rust toolchain in orig (third_party/rust) so noble can build
+    Cargo.lock v4 offline; drop distro cargo/rustc Build-Depends.
+  * Architecture: amd64 (bundled toolchain is x86_64).
+
+ -- cflmy <pingan@cflmy.cn>  Thu, 17 Sep 2026 10:20:00 +0800
+
 marqdo (1.0.2-1ppa1) noble; urgency=medium
 
   * Initial Ubuntu PPA packaging for Marqdo 1.0.2.

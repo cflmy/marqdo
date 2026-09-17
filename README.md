@@ -122,6 +122,16 @@ marqdo catalog public -o .marqdo
 
 ### 如何使用最新 Marqdo（v1.0.2）
 
+**安装解释器（任选其一）**
+
+| 方式 | 适用 | 命令 / 链接 |
+|------|------|-------------|
+| **Ubuntu PPA** | Ubuntu 24.04+（`noble` 等） | `sudo add-apt-repository ppa:cflmy/marqdo && sudo apt update && sudo apt install marqdo` |
+| **GitHub Releases** | Windows / Linux 预编译 zip | https://github.com/cflmy/marqdo/releases |
+| **源码** | 需本机 Rust | 见下方 `git clone` + `cargo build --release` |
+
+**安装官方扩展**（与 CLI 可分开发版）：`marqdo ext add …` 默认下载顺序为 **CDN** [`https://ext.marqdo.com`](https://ext.marqdo.com) → GitHub Releases → [`proxy.cflmy.top`](https://proxy.cflmy.top) 镜像。
+
 ```bash
 # 1) 源码安装（跟 tag 或 main）
 git clone https://github.com/cflmy/marqdo.git && cd marqdo
@@ -138,7 +148,7 @@ marqdo view public --no-open
 marqdo debug public --no-open
 marqdo catalog public -o .marqdo
 
-# 3) 安装官方扩展（Release 用户：无需本机 Rust/Go）
+# 3) 安装官方扩展（Release / CDN 用户：无需本机 Rust/Go）
 marqdo ext add web      # 或：网页 — 自动下载 L1 + 预编译 native（Go libweb）
 marqdo ext add agent    # 或：智能体
 marqdo ext add quantum  # 或：量子
@@ -171,7 +181,7 @@ cargo run -- view output public -o public
 powershell -File ./scripts/build-public.ps1
 ```
 
-**发布包（GitHub Releases）**：单独二进制 **已内置**官方 `lib/`（`import …:lib/…` 可直接导入）。仍提供带 `lib/` 的 zip 便于覆盖或离线分发。**扩展库**用 `marqdo ext add …` 安装（见 [CHANGELOG](CHANGELOG.md) 与 [ext-cli.md](doc/design/ext-cli.md)）；原生 `.so`/`.dll` 需本地编译或从带 `native/` 的安装目录解析。
+**发布包**：GitHub Releases 的单独二进制 **已内置**官方 `lib/`。Ubuntu 用户优先 **PPA** 装 CLI。**扩展库**用 `marqdo ext add …`（CDN → GitHub）；设计见 [ext-cdn.md](doc/design/ext-cdn.md) · [ubuntu-ppa.md](doc/design/ubuntu-ppa.md) · [ext-cli.md](doc/design/ext-cli.md)。
 
 文档：用户站 [public/](public/) · 设计 [doc/](doc/) · OKF / catalog [catalog-cli.md](doc/design/catalog-cli.md) · 调试 [view-debug.md](doc/design/view-debug.md) · 变更 [CHANGELOG.md](CHANGELOG.md)
 ---
