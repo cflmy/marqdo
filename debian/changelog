@@ -1,8 +1,8 @@
 marqdo (1.0.3-1ppa1) noble; urgency=medium
 
-  * Marqdo 1.0.3: PPA + ext CDN docs; bundled Rust for noble builds.
+  * Marqdo 1.0.3: PPA + ext CDN; unbound GFM tables; bundled Rust for noble.
 
- -- cflmy <pingan@cflmy.cn>  Thu, 17 Sep 2026 10:30:00 +0800
+ -- cflmy <pingan@cflmy.cn>  Thu, 17 Sep 2026 10:35:00 +0800
 
 marqdo (1.0.2-1ppa2) noble; urgency=medium
 

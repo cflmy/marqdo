@@ -5,7 +5,6 @@
 ### Added
 
 ### Fixed
-- 未绑定的 GFM 表格不再报 `unrecognized statement`：作为集合值求值后丢弃（文档中可写表）。
 
 ### Changed
 
@@ -14,6 +13,8 @@
 ### Highlights
 
 **分发渠道齐备**：Ubuntu PPA 装 CLI；扩展包走 CDN（`ext.marqdo.com`）与 GitHub；CLI 与扩展可分开发版。本版 CLI 与扩展包 **同步为 1.0.3**。
+
+**语法**：未绑定的 GFM 表格是可丢弃的集合值，不再报 `unrecognized statement`（文档页可直接写安装表）。
 
 ```bash
 # Ubuntu
@@ -34,6 +35,7 @@ git checkout v1.0.3 && cargo build --release
 ### Fixed
 - `ext/` 导入默认搜索 `~/.marqdo/ext`（与 `marqdo ext add` 安装根一致），无需再手动 `export MARQDO_EXT`。
 - PPA/noble：捆绑 `third_party/rust`（现代 cargo）以构建 Cargo.lock v4；修复首次 Launchpad 构建失败（distro cargo 1.75）。
+- 未绑定的 GFM 表格不再报 `unrecognized statement`：作为集合值求值后丢弃（文档中可写表）。
 
 ### Changed
 - 允许 **CLI 与扩展包分开发版**：扩展包 SemVer 可与 `Cargo.toml` 不同（`MARQDO_EXT_VERSION` / `ext/VERSION` / CDN latest）。
