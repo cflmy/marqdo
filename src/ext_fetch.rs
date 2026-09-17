@@ -2,15 +2,22 @@
 //!
 //! Enables `marqdo ext add web` without a local Rust toolchain or repo checkout.
 //! Disable with `MARQDO_EXT_NO_DOWNLOAD=1`. Override tag with `MARQDO_EXT_VERSION=0.3.4`.
+//!
+//! When GitHub is unreachable, downloads automatically fall back to the project
+//! reverse proxy (`https://proxy.cflmy.top/github.com/…`). Override the candidate
+//! list with `MARQDO_EXT_DOWNLOAD_BASE` (tried first).
 
 use std::env;
 use std::fs::{self, File};
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
+use std::time::Duration;
 
 use anyhow::{bail, Context, Result};
 
 const REPO: &str = "cflmy/marqdo";
+/// HTTPS reverse proxy used when github.com is slow or blocked (same as git origin).
+const GITHUB_MIRROR_PREFIX: &str = "https://proxy.cflmy.top/github.com";
 
 pub fn downloads_enabled() -> bool {
     match env::var("MARQDO_EXT_NO_DOWNLOAD") {
@@ -61,13 +68,46 @@ fn user_agent() -> String {
     format!("marqdo/{}", env!("CARGO_PKG_VERSION"))
 }
 
+fn http_agent() -> ureq::Agent {
+    ureq::AgentBuilder::new()
+        .timeout_connect(Duration::from_secs(20))
+        .timeout_read(Duration::from_secs(600))
+        .user_agent(&user_agent())
+        .build()
+}
+
+/// Candidate download URLs: optional `MARQDO_EXT_DOWNLOAD_BASE`, GitHub, then proxy mirror.
+pub fn release_asset_urls(ver: &str, filename: &str) -> Vec<String> {
+    let mut urls = Vec::new();
+    if let Ok(base) = env::var("MARQDO_EXT_DOWNLOAD_BASE") {
+        let base = base.trim().trim_end_matches('/');
+        if !base.is_empty() {
+            // Flexible bases: full github path prefix, repo root, or flat asset dir.
+            urls.push(format!(
+                "{base}/{REPO}/releases/download/v{ver}/{filename}"
+            ));
+            urls.push(format!("{base}/releases/download/v{ver}/{filename}"));
+            urls.push(format!("{base}/v{ver}/{filename}"));
+            urls.push(format!("{base}/{filename}"));
+        }
+    }
+    urls.push(format!(
+        "https://github.com/{REPO}/releases/download/v{ver}/{filename}"
+    ));
+    urls.push(format!(
+        "{GITHUB_MIRROR_PREFIX}/{REPO}/releases/download/v{ver}/{filename}"
+    ));
+    let mut seen = std::collections::HashSet::new();
+    urls.into_iter().filter(|u| seen.insert(u.clone())).collect()
+}
+
 fn download_to_file(url: &str, dest: &Path) -> Result<()> {
     if let Some(parent) = dest.parent() {
         fs::create_dir_all(parent)?;
     }
     let tmp = dest.with_extension("download-tmp");
-    let resp = ureq::get(url)
-        .set("User-Agent", &user_agent())
+    let resp = http_agent()
+        .get(url)
         .set("Accept", "application/octet-stream")
         .call()
         .with_context(|| format!("GET {url}"))?;
@@ -84,6 +124,30 @@ fn download_to_file(url: &str, dest: &Path) -> Result<()> {
     }
     fs::rename(&tmp, dest).with_context(|| format!("rename {}", dest.display()))?;
     Ok(())
+}
+
+fn download_first_ok(urls: &[String], dest: &Path) -> Result<()> {
+    let mut errors: Vec<String> = Vec::new();
+    for (i, url) in urls.iter().enumerate() {
+        if i == 0 {
+            println!("downloading ({url})…");
+        } else {
+            println!("retry via mirror ({url})…");
+        }
+        match download_to_file(url, dest) {
+            Ok(()) => return Ok(()),
+            Err(e) => {
+                eprintln!("note: {e:#}");
+                errors.push(format!("{url} → {e:#}"));
+                let _ = fs::remove_file(dest.with_extension("download-tmp"));
+            }
+        }
+    }
+    bail!(
+        "all download mirrors failed for {}:\n  - {}",
+        dest.file_name().and_then(|s| s.to_str()).unwrap_or("asset"),
+        errors.join("\n  - ")
+    )
 }
 
 fn extract_zip(zip_path: &Path, dest_dir: &Path) -> Result<()> {
@@ -121,10 +185,6 @@ fn extract_zip(zip_path: &Path, dest_dir: &Path) -> Result<()> {
     Ok(())
 }
 
-fn release_asset_url(ver: &str, filename: &str) -> String {
-    format!("https://github.com/{REPO}/releases/download/v{ver}/{filename}")
-}
-
 /// Ensure L1 `ext/` tree is available (repo checkout or downloaded Release zip).
 /// Returns a directory that contains `web/web.mq.md`, `ai/…`, etc.
 pub fn ensure_ext_source_tree() -> Result<PathBuf> {
@@ -143,10 +203,9 @@ pub fn ensure_ext_source_tree() -> Result<PathBuf> {
         bail!("extension sources not found and downloads disabled (MARQDO_EXT_NO_DOWNLOAD)");
     }
     let zip_name = format!("marqdo-{ver}-ext.zip");
-    let url = release_asset_url(&ver, &zip_name);
+    let urls = release_asset_urls(&ver, &zip_name);
     let zip_path = cache_root()?.join(&zip_name);
-    println!("downloading official ext sources ({url})…");
-    download_to_file(&url, &zip_path)?;
+    download_first_ok(&urls, &zip_path)?;
     let stage = cache_root()?.join(format!("ext-src-v{ver}-extract"));
     if stage.exists() {
         let _ = fs::remove_dir_all(&stage);
@@ -206,7 +265,7 @@ pub fn download_native_plugin(short: &str, lib_name: &str) -> Result<PathBuf> {
     };
     let ver = release_version();
     let zip_name = format!("marqdo-{ver}-native-{triple}.zip");
-    let url = release_asset_url(&ver, &zip_name);
+    let urls = release_asset_urls(&ver, &zip_name);
     let cache = cache_root()?.join(format!("native-v{ver}-{triple}"));
     let lib_in_cache = cache.join("native").join(lib_name);
     if lib_in_cache.is_file() {
@@ -218,11 +277,11 @@ pub fn download_native_plugin(short: &str, lib_name: &str) -> Result<PathBuf> {
         return Ok(flat);
     }
     let zip_path = cache_root()?.join(&zip_name);
-    println!("downloading prebuilt native plugins ({url})…");
-    download_to_file(&url, &zip_path).with_context(|| {
+    download_first_ok(&urls, &zip_path).with_context(|| {
         format!(
             "failed to download prebuilt plugins for {triple}. \
-             Build locally with `cargo build --release -p marqdo_plugin_{short}`, \
+             Set MARQDO_EXT_DOWNLOAD_BASE to a reachable mirror, build locally \
+             (`bash ./scripts/build-web-plugin.sh` for web), \
              or check https://github.com/{REPO}/releases/tag/v{ver}"
         )
     })?;
@@ -283,11 +342,15 @@ mod tests {
     use super::*;
 
     #[test]
-    fn asset_url_shape() {
-        let u = release_asset_url("0.3.4", "marqdo-0.3.4-ext.zip");
+    fn asset_urls_include_github_and_mirror() {
+        let u = release_asset_urls("1.0.2", "marqdo-1.0.2-ext.zip");
+        assert!(u.iter().any(|x| x.contains("github.com/cflmy/marqdo")));
+        assert!(u
+            .iter()
+            .any(|x| x.contains("proxy.cflmy.top/github.com/cflmy/marqdo")));
         assert_eq!(
-            u,
-            "https://github.com/cflmy/marqdo/releases/download/v0.3.4/marqdo-0.3.4-ext.zip"
+            u[0],
+            "https://github.com/cflmy/marqdo/releases/download/v1.0.2/marqdo-1.0.2-ext.zip"
         );
     }
 

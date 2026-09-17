@@ -140,10 +140,18 @@ pub fn resolve_import(from_dir: &Path, rel: &str) -> Result<PathBuf> {
             "cannot resolve import `{rel}` from {}",
             from_dir.display()
         );
-        if env::var_os("MARQDO_EXT").is_none() {
-            msg.push_str(
-                "\nhint: set MARQDO_EXT to the directory that contains web/ (or run `marqdo ext add web`)",
-            );
+        let user_ext = crate::ext_cli::default_user_ext_dir();
+        if env::var_os("MARQDO_EXT").is_none() && !user_ext.join("web").join("web.mq.md").is_file()
+        {
+            msg.push_str(&format!(
+                "\nhint: run `marqdo ext add web` (installs under {}), or set MARQDO_EXT",
+                user_ext.display()
+            ));
+        } else if env::var_os("MARQDO_EXT").is_none() {
+            msg.push_str(&format!(
+                "\nhint: looked under {}; set MARQDO_EXT to override",
+                user_ext.display()
+            ));
         }
         bail!("{msg}");
     }
@@ -194,6 +202,8 @@ fn ext_search_roots() -> Vec<PathBuf> {
     if let Ok(h) = env::var("MARQDO_EXT") {
         roots.push(PathBuf::from(h));
     }
+    // Default install root from `marqdo ext add` (~/.marqdo/ext)
+    roots.push(crate::ext_cli::default_user_ext_dir());
     if let Ok(cwd) = env::current_dir() {
         roots.push(cwd.join("ext"));
     }
@@ -318,7 +328,10 @@ mod tests {
             "{msg}"
         );
         assert!(
-            msg.contains("hint: set MARQDO_EXT to the directory that contains web/"),
+            msg.contains("hint:")
+                && (msg.contains("marqdo ext add")
+                    || msg.contains("MARQDO_EXT")
+                    || msg.contains(".marqdo/ext")),
             "{msg}"
         );
     }
