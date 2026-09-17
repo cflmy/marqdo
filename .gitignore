@@ -24,10 +24,8 @@
 .marqdo/
 **/.marqdo/
 .marqdo-ext/
-.env
-.env.r2
-*.pem
-**/r2.env
+/vendor/
+/.cargo/config.toml
 
 # Generated HTML beside tracked public/*.mq.md (sources stay in git)
 /public/index.html

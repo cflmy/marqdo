@@ -1,0 +1,26 @@
+Source: marqdo
+Section: devel
+Priority: optional
+Maintainer: cflmy <pingan@cflmy.cn>
+Build-Depends:
+ debhelper-compat (= 13),
+ cargo,
+ rustc,
+ pkg-config,
+ libssl-dev,
+ ca-certificates
+Standards-Version: 4.7.0
+Homepage: https://github.com/cflmy/marqdo
+Vcs-Git: https://github.com/cflmy/marqdo.git
+Vcs-Browser: https://github.com/cflmy/marqdo
+Rules-Requires-Root: no
+
+Package: marqdo
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, ca-certificates
+Description: Markdown markers as an interpreted programming language
+ Marqdo treats Markdown markers as executable syntax (code / return /
+ control flow). This package installs the marqdo CLI.
+ .
+ Official extensions (web, quantum, …) are installed separately via
+ "marqdo ext add" and download from https://ext.marqdo.com .

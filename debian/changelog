@@ -1,0 +1,6 @@
+marqdo (1.0.2-1ppa1) noble; urgency=medium
+
+  * Initial Ubuntu PPA packaging for Marqdo 1.0.2.
+  * CLI only; extensions via "marqdo ext add" / ext.marqdo.com.
+
+ -- cflmy <pingan@cflmy.cn>  Thu, 17 Sep 2026 09:55:00 +0800

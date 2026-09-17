@@ -1,0 +1,14 @@
+Marqdo for Ubuntu (PPA)
+=======================
+
+This package installs the marqdo CLI (/usr/bin/marqdo).
+
+Official language extensions are not bundled. After install:
+
+  marqdo ext add web
+  marqdo ext add quantum
+
+Extension packs download from https://ext.marqdo.com (then GitHub / proxy).
+
+Documentation: https://github.com/cflmy/marqdo
+PPA packaging notes: doc/design/ubuntu-ppa.md in the upstream repository.

@@ -1,0 +1,40 @@
+#!/usr/bin/make -f
+
+export DH_VERBOSE = 1
+# Offline builds on Launchpad: use vendored crates when present.
+export CARGO_HOME = $(CURDIR)/debian/cargo_home
+export CARGO_NET_OFFLINE = true
+
+%:
+	dh $@
+
+override_dh_auto_configure:
+	mkdir -p debian/cargo_home
+	@if [ -f "$(CURDIR)/.cargo/config.toml" ] || [ -d "$(CURDIR)/vendor" ]; then \
+		echo "Using vendored Cargo dependencies"; \
+	else \
+		echo "WARNING: no vendor/ — online cargo fetch required (not for Launchpad)"; \
+		export CARGO_NET_OFFLINE=false; \
+	fi
+
+override_dh_auto_build:
+	mkdir -p debian/cargo_home
+	if [ -d "$(CURDIR)/vendor" ]; then \
+		CARGO_NET_OFFLINE=true cargo build --release --locked --offline; \
+	else \
+		cargo build --release --locked; \
+	fi
+
+override_dh_auto_test:
+	@echo "Skipping full test suite on package build (run cargo test in CI)."
+
+override_dh_auto_install:
+	install -d $(CURDIR)/debian/marqdo/usr/bin
+	install -m 0755 $(CURDIR)/target/release/marqdo \
+		$(CURDIR)/debian/marqdo/usr/bin/marqdo
+
+override_dh_auto_clean:
+	dh_auto_clean
+	rm -rf debian/cargo_home
+	# keep vendor/ if present (part of source package)
+	cargo clean || true

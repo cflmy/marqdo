@@ -54,6 +54,7 @@
 | [design/ext-agent-plan.md](design/ext-agent-plan.md) | **`## 多步` / `## plan` 锁定设计**（工作簿文件、subtask 执行、修订循环、`step` 默认写回） |
 | [design/ext-cli.md](design/ext-cli.md) | **`marqdo ext list/add/remove` 官方扩展安装器** |
 | [design/ext-cdn.md](design/ext-cdn.md) | **扩展 CDN（R2 / ext.marqdo.com）与分开发版** |
+| [design/ubuntu-ppa.md](design/ubuntu-ppa.md) | **Ubuntu PPA 打包与上传** |
 | [design/ext-web.md](design/ext-web.md) | **官方扩展 `ext/web`（页面/库表/绑定/后台；ABI + CLI；设计锁定）** |
 | [design/ext-web-go-rewrite.md](design/ext-web-go-rewrite.md) | **`plugins/web` Go 全量重写**（多语言 ABI · 网页制备完备 · anlian 验收） |
 | [adr/0004-web-plugin-go.md](adr/0004-web-plugin-go.md) | **Accepted：web 原生插件实现语言为 Go** |
