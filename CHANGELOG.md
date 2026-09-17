@@ -8,6 +8,26 @@
 
 ### Changed
 
+## Ext pack v1.0.4 — 2026-09-17
+
+### Highlights
+
+**ext/web 能力面扩展（CLI 仍为 v1.0.3）**：可配置 RBAC、租户作用域、WS `on_message`/presence、原生 SPA 内存路由、协同记事本 MVP。安装：
+
+```bash
+marqdo ext add web   # CDN latest → 1.0.4
+```
+
+### Added
+- **RBAC**：五表（`web_permissions` / `web_roles` / `web_role_permissions` / `web_users` / `web_user_roles`）；`app.enable_rbac`、`app.gate permissions=`、`rbac.can`、注册页、`/_rbac/*` 管理 API/desk。
+- **Tenant**：`app.tenant`（path/header/subdomain）+ `tenant_scope` 自动过滤/盖戳。
+- **WebSocket G-WS2**：`route_ws` 支持 `on_message` 钩子、动态 room、`presence` 通道。
+- **Native SPA**：内存 `store_set` / `spa_goto` 与全页 WASM SPA 样站。
+- **Collab MVP**：LWW 文档协议（`DOC\t`）双端协同记事本样站。
+
+### Changed
+- 扩展包 SemVer **1.0.4**（`ext/VERSION`）；与 CLI **v1.0.3** 可独立安装。
+
 ## v1.0.3 — 2026-09-17
 
 ### Highlights
