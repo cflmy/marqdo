@@ -79,12 +79,21 @@ cd "$PKG_ROOT"
 echo "==> debuild -S (key ${GPG_KEY})"
 debuild -S -sa -k"${GPG_KEY}" -d
 
-echo "==> artifacts:"
-ls -la "$BUILD_AREA"/marqdo_"${DEB_VER}"* 2>/dev/null || ls -la ../marqdo_"${DEB_VER}"* 
-CHANGES="$(ls -1 ../marqdo_${DEB_VER}_source.changes 2>/dev/null | head -1)"
-if [ -n "${CHANGES:-}" ]; then
-  cp -f ../marqdo_"${DEB_VER}"* "$BUILD_AREA/" 2>/dev/null || true
+# debuild writes next to package parent (/tmp/marqdo-ppa/); collect into build-area
+mkdir -p "$BUILD_AREA"
+shopt -s nullglob
+for f in ../marqdo_"${DEB_VER}"* ../marqdo_"${VER}".orig.tar.*; do
+  [ -e "$f" ] || continue
+  cp -f "$f" "$BUILD_AREA/"
+done
+shopt -u nullglob
+
+echo "==> artifacts in $BUILD_AREA:"
+ls -la "$BUILD_AREA"/marqdo_"${DEB_VER}"* "$BUILD_AREA"/marqdo_"${VER}".orig.tar.* 2>/dev/null || true
+CHANGES="$BUILD_AREA/marqdo_${DEB_VER}_source.changes"
+if [ -f "$CHANGES" ]; then
   echo
   echo "Upload with:"
-  echo "  dput ppa:cflmy/marqdo $BUILD_AREA/$(basename "$CHANGES")"
+  echo "  dput ppa:cflmy/marqdo $CHANGES"
+  echo "  # or: ./scripts/ppa-ship.sh ${SERIES}"
 fi

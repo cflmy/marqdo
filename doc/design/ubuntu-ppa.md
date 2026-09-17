@@ -51,21 +51,28 @@ Debian packaging lives under repo-root `debian/` (this tree).
 - Debian revision: `X.Y.Z-1ppa1~SERIES` (SERIES = `noble`, `jammy`, …)
 - **Ext pack** SemVer (`ext/VERSION`) is **not** the deb version; bump deb only when CLI/stdlib packaging changes.
 
-## Build source package (local)
+## One-shot (recommended)
+
+In a normal terminal (sudo password + GPG passphrase when prompted):
 
 ```bash
-# from repo root, clean tree preferred
-./scripts/ppa-build-source.sh noble   # or jammy
-# → ../build-area/marqdo_X.Y.Z-1ppa1~noble_source.changes
+cd ~/work/marqdo
+./scripts/ppa-ship.sh noble          # install tools → debuild -S → dput
+# ./scripts/ppa-ship.sh resolute     # if PPA enabled that series
+# ./scripts/ppa-ship.sh noble -n     # build only, no upload
 ```
 
-The script vendors Cargo crates into `vendor/` (Launchpad builders have **no network**).
+`sudo ./scripts/ppa-ship.sh …` is OK: apt runs as root; build/sign/upload drop to `$SUDO_USER` so GPG still works.
 
-## Upload
+## Build source package only
 
 ```bash
+./scripts/ppa-build-source.sh noble
+# → ../build-area/marqdo_X.Y.Z-1ppa1~noble_source.changes
 dput ppa:cflmy/marqdo ../build-area/marqdo_*_source.changes
 ```
+
+The build script vendors Cargo crates into `vendor/` (Launchpad builders have **no network**).
 
 Wait for https://launchpad.net/~cflmy/+archive/ubuntu/marqdo/+builds
 
