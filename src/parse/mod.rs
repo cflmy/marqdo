@@ -323,6 +323,16 @@ impl<'a> Cursor<'a> {
                 fun.body.push(self.parse_loop_or_err()?);
                 continue;
             }
+            // Unbound GFM table = collection value (not assigned); evaluate and discard.
+            if trimmed.starts_with('|') {
+                let span = Span {
+                    line: l.line_no,
+                    col: 1,
+                };
+                let value = self.consume_table()?;
+                fun.body.push(Stmt::Expr { value, span });
+                continue;
+            }
 
             let stmt = self.parse_simple_stmt()?;
             let end_body = matches!(stmt, Stmt::Return { .. }) && level >= 2;
@@ -380,6 +390,13 @@ impl<'a> Cursor<'a> {
         if trimmed.starts_with('>') {
             let call = call_after_gt(trimmed[1..].trim(), false)?;
             return Ok(Stmt::Call { call, span });
+        }
+
+        // Unbound GFM table (header already consumed by bump above).
+        if trimmed.starts_with('|') {
+            self.i -= 1;
+            let value = self.consume_table()?;
+            return Ok(Stmt::Expr { value, span });
         }
 
         // Bare assign `` `x` = … ``
@@ -694,6 +711,8 @@ impl<'a> Cursor<'a> {
     /// - 1-col → List
     /// - first header `@` / `行` / `row` → List of row Maps (marker col excluded)
     /// - else ≥2-col → Map (column-oriented)
+    ///
+    /// Also used for **unbound** tables in a function body (value computed, not stored).
     ///
     /// Data cells are expressions ([`parse_call_arg_value`]); headers stay key text.
     fn consume_table(&mut self) -> Result<Expr> {

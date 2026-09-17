@@ -133,6 +133,11 @@ fn structure_hello() {
 }
 
 #[test]
+fn structure_unbound_table() {
+    assert_out("tests/structure/unbound-table.mq.md", "ok");
+}
+
+#[test]
 fn structure_object_handle() {
     assert_out("tests/structure/object-handle.mq.md", "counter\n3\n4");
 }

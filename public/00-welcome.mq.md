@@ -15,13 +15,13 @@ The language is still young: structure markers, bilingual core names (`print` / 
 
 ## Install
 
-Pick one way to get the CLI (not a Markdown table — tables are collections in Marqdo):
+Pick one way to get the CLI:
 
-Ubuntu PPA — `sudo add-apt-repository ppa:cflmy/marqdo` then `sudo apt install marqdo`.
-
-GitHub Releases — prebuilt Windows / Linux zips at [releases](https://github.com/cflmy/marqdo/releases).
-
-From source — `cargo build --release` (needs Rust).
+| Method | Notes |
+|--------|-------|
+| Ubuntu PPA | `sudo add-apt-repository ppa:cflmy/marqdo` then `sudo apt install marqdo` |
+| GitHub Releases | Prebuilt Windows / Linux zips at [releases](https://github.com/cflmy/marqdo/releases) |
+| From source | `cargo build --release` (needs Rust) |
 
 Official extensions version independently of the CLI:
 

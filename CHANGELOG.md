@@ -5,6 +5,7 @@
 ### Added
 
 ### Fixed
+- 未绑定的 GFM 表格不再报 `unrecognized statement`：作为集合值求值后丢弃（文档中可写表）。
 
 ### Changed
 
