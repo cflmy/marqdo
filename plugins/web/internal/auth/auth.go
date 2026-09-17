@@ -86,7 +86,7 @@ func cellStr(v any) string {
 }
 
 // Login validates credentials and creates a session.
-// Success: {"ok":true,"session_id":…,"username":…,"role":…}
+// Success: {"ok":true,"session_id":…,"username":…,"role":…,"permissions":…}
 // Failure: {"ok":false}
 func Login(username, pass string, users any, sessionTTL uint64) map[string]any {
 	u, role, ok := CheckCredentials(users, username, pass)
@@ -102,6 +102,14 @@ func Login(username, pass string, users any, sessionTTL uint64) map[string]any {
 		"username":   u,
 		"role":       role,
 	}
+}
+
+// AttachPermissions writes permission codes onto an existing login session.
+func AttachPermissions(sessionID string, codes []string) {
+	if sessionID == "" {
+		return
+	}
+	session.SetPermissions(sessionID, codes)
 }
 
 // Check returns session auth state (web_auth_check).
@@ -120,7 +128,12 @@ func Check(sessionID string) map[string]any {
 			role = s
 		}
 	}
-	return map[string]any{"ok": true, "username": u, "role": role}
+	perms := session.PermissionsFromSession(sessionID)
+	out := map[string]any{"ok": true, "username": u, "role": role}
+	if len(perms) > 0 {
+		out["permissions"] = perms
+	}
+	return out
 }
 
 // Logout destroys the session (web_auth_logout).

@@ -7,6 +7,7 @@ import (
 
 	"github.com/marqdo/marqdo/plugins/web/internal/assets"
 	"github.com/marqdo/marqdo/plugins/web/internal/session"
+	"github.com/marqdo/marqdo/plugins/web/internal/tenant"
 )
 
 // New builds an app bag matching Rust web_app_new defaults used by zh-smoke.
@@ -194,10 +195,25 @@ func Auth(appBag map[string]any, users any, opts map[string]any) (map[string]any
 		loginPath = prefix + "/login"
 	}
 	out["login_path"] = loginPath
-	out["auth"] = map[string]any{
-		"users":       users,
-		"session_ttl": float64(sessionTTL),
+	authBag, _ := out["auth"].(map[string]any)
+	if authBag == nil {
+		authBag = map[string]any{}
+	} else {
+		authBag = clone(authBag)
 	}
+	authBag["users"] = users
+	authBag["session_ttl"] = float64(sessionTTL)
+	if v, ok := first(opts, "register", "注册"); ok {
+		authBag["register"] = boolish(v)
+	}
+	if v := firstStr(opts, "register_path", "注册路径"); v != "" {
+		authBag["register_path"] = v
+		out["register_path"] = v
+	}
+	if v := firstStr(opts, "default_role", "默认角色"); v != "" {
+		authBag["default_role"] = v
+	}
+	out["auth"] = authBag
 	gates := gatesOf(out)
 	if !hasAdminGate(gates, prefix) {
 		gates = append(gates, map[string]any{
@@ -214,8 +230,15 @@ func Auth(appBag map[string]any, users any, opts map[string]any) (map[string]any
 	return out, nil
 }
 
+// Tenant configures multi-tenant resolution on the app bag (path|subdomain|header).
+func Tenant(appBag map[string]any, opts map[string]any) (map[string]any, error) {
+	return tenant.Configure(appBag, opts)
+}
+
 // Gate appends an RBAC gate (Rust web_app_gate).
-// opts: roles/角色, match/匹配, on_deny/拒绝, exclude/排除.
+// opts: roles/角色, permissions/权限, match/匹配, on_deny/拒绝, exclude/排除.
+// When permissions is non-empty, the HTTP middleware authorizes by permission codes;
+// otherwise it falls back to roles (legacy).
 func Gate(appBag map[string]any, path string, opts map[string]any) (map[string]any, error) {
 	if opts == nil {
 		opts = map[string]any{}
@@ -225,13 +248,19 @@ func Gate(appBag map[string]any, path string, opts map[string]any) (map[string]a
 		return nil, fmt.Errorf("missing `path`")
 	}
 	rolesRaw := firstStr(opts, "roles", "角色")
-	if rolesRaw == "" {
+	permsRaw := firstStr(opts, "permissions", "权限")
+	if rolesRaw == "" && permsRaw == "" {
 		rolesRaw = "admin"
 	}
 	roles := session.ParseRolesCSV(rolesRaw)
 	roleAny := make([]any, len(roles))
 	for i, r := range roles {
 		roleAny[i] = r
+	}
+	perms := session.ParseRolesCSV(permsRaw)
+	permAny := make([]any, len(perms))
+	for i, p := range perms {
+		permAny[i] = p
 	}
 	matchMode := firstStr(opts, "match", "匹配")
 	if matchMode == "" {
@@ -247,6 +276,9 @@ func Gate(appBag map[string]any, path string, opts map[string]any) (map[string]a
 		"match":   matchMode,
 		"on_deny": onDeny,
 	}
+	if len(permAny) > 0 {
+		entry["permissions"] = permAny
+	}
 	if v, ok := first(opts, "exclude", "排除"); ok && v != nil {
 		entry["exclude"] = v
 	}
@@ -254,6 +286,26 @@ func Gate(appBag map[string]any, path string, opts map[string]any) (map[string]a
 	gates := gatesOf(out)
 	gates = append(gates, entry)
 	out["gates"] = gates
+	return out, nil
+}
+
+// Rbac enables DB-backed RBAC on the app (ensure schema at listen).
+// opts may include catalog table (unused beyond flag for now).
+func Rbac(appBag map[string]any, opts map[string]any) (map[string]any, error) {
+	out := clone(appBag)
+	authBag, _ := out["auth"].(map[string]any)
+	if authBag == nil {
+		authBag = map[string]any{}
+	} else {
+		authBag = clone(authBag)
+	}
+	authBag["rbac"] = true
+	if opts != nil {
+		if v, ok := first(opts, "catalog", "目录"); ok && v != nil {
+			authBag["permission_catalog"] = v
+		}
+	}
+	out["auth"] = authBag
 	return out, nil
 }
 

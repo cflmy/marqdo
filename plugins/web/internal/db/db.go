@@ -78,6 +78,12 @@ func open(url string) (*sql.DB, error) {
 	return db, nil
 }
 
+// OpenSQL returns a pooled *sql.DB for sqlite: (and existing) URLs.
+// Used by packages that need raw SQL beyond CRUD helpers (e.g. rbac).
+func OpenSQL(url string) (*sql.DB, error) {
+	return open(url)
+}
+
 // ResetPool closes pooled connections and open transactions (tests).
 func ResetPool() {
 	resetTxns()

@@ -17,6 +17,7 @@ import (
 	"github.com/marqdo/marqdo/plugins/web/internal/httpx"
 	"github.com/marqdo/marqdo/plugins/web/internal/middleware"
 	"github.com/marqdo/marqdo/plugins/web/internal/password"
+	"github.com/marqdo/marqdo/plugins/web/internal/rbac"
 	"github.com/marqdo/marqdo/plugins/web/internal/session"
 )
 
@@ -492,4 +493,155 @@ func web_app_gate(argsJSON *C.char, outJSON **C.char, errMsg **C.char) C.int {
 	}
 	out, err := app.Gate(asPageMap(args["app"]), path, args)
 	return replyJSON(outJSON, errMsg, out, err)
+}
+
+//export web_app_rbac
+func web_app_rbac(argsJSON *C.char, outJSON **C.char, errMsg **C.char) C.int {
+	args, err := parseArgs(argsJSON)
+	if err != nil {
+		return replyJSON(outJSON, errMsg, nil, err)
+	}
+	out, err := app.Rbac(asPageMap(args["app"]), args)
+	return replyJSON(outJSON, errMsg, out, err)
+}
+
+//export web_app_tenant
+func web_app_tenant(argsJSON *C.char, outJSON **C.char, errMsg **C.char) C.int {
+	args, err := parseArgs(argsJSON)
+	if err != nil {
+		return replyJSON(outJSON, errMsg, nil, err)
+	}
+	out, err := app.Tenant(asPageMap(args["app"]), args)
+	return replyJSON(outJSON, errMsg, out, err)
+}
+
+//export web_rbac_can
+func web_rbac_can(argsJSON *C.char, outJSON **C.char, errMsg **C.char) C.int {
+	args, err := parseArgs(argsJSON)
+	if err != nil {
+		return replyJSON(outJSON, errMsg, nil, err)
+	}
+	heldRaw, _ := argStrReq(args, "permissions", "权限", "held")
+	neededRaw, _ := argStrReq(args, "needed", "需要")
+	if neededRaw == "" {
+		neededRaw, _ = argStrReq(args, "permission", "权限码")
+	}
+	ok := rbac.HasAny(rbac.ParseCSV(heldRaw), rbac.ParseCSV(neededRaw))
+	return replyJSON(outJSON, errMsg, map[string]any{"ok": true, "allowed": ok}, nil)
+}
+
+//export web_rbac_ensure
+func web_rbac_ensure(argsJSON *C.char, outJSON **C.char, errMsg **C.char) C.int {
+	args, err := parseArgs(argsJSON)
+	if err != nil {
+		return replyJSON(outJSON, errMsg, nil, err)
+	}
+	url, err := dbURLOf(args)
+	if err != nil {
+		return replyJSON(outJSON, errMsg, nil, err)
+	}
+	if err := rbac.EnsureSchema(url); err != nil {
+		return replyJSON(outJSON, errMsg, nil, err)
+	}
+	return replyJSON(outJSON, errMsg, map[string]any{"ok": true}, nil)
+}
+
+//export web_rbac_assign_role
+func web_rbac_assign_role(argsJSON *C.char, outJSON **C.char, errMsg **C.char) C.int {
+	args, err := parseArgs(argsJSON)
+	if err != nil {
+		return replyJSON(outJSON, errMsg, nil, err)
+	}
+	url, err := dbURLOf(args)
+	if err != nil {
+		return replyJSON(outJSON, errMsg, nil, err)
+	}
+	user, err := argStrReq(args, "username", "用户名", "user")
+	if err != nil {
+		return replyJSON(outJSON, errMsg, nil, err)
+	}
+	role, err := argStrReq(args, "role", "角色")
+	if err != nil {
+		return replyJSON(outJSON, errMsg, nil, err)
+	}
+	err = rbac.AssignRole(url, user, role)
+	if err != nil {
+		return replyJSON(outJSON, errMsg, nil, err)
+	}
+	return replyJSON(outJSON, errMsg, map[string]any{"ok": true}, nil)
+}
+
+//export web_rbac_create_role
+func web_rbac_create_role(argsJSON *C.char, outJSON **C.char, errMsg **C.char) C.int {
+	args, err := parseArgs(argsJSON)
+	if err != nil {
+		return replyJSON(outJSON, errMsg, nil, err)
+	}
+	url, err := dbURLOf(args)
+	if err != nil {
+		return replyJSON(outJSON, errMsg, nil, err)
+	}
+	name, err := argStrReq(args, "name", "名称")
+	if err != nil {
+		return replyJSON(outJSON, errMsg, nil, err)
+	}
+	id, err := rbac.CreateRole(url, name)
+	if err != nil {
+		return replyJSON(outJSON, errMsg, nil, err)
+	}
+	return replyJSON(outJSON, errMsg, map[string]any{"ok": true, "id": id, "name": name}, nil)
+}
+
+//export web_rbac_set_role_permissions
+func web_rbac_set_role_permissions(argsJSON *C.char, outJSON **C.char, errMsg **C.char) C.int {
+	args, err := parseArgs(argsJSON)
+	if err != nil {
+		return replyJSON(outJSON, errMsg, nil, err)
+	}
+	url, err := dbURLOf(args)
+	if err != nil {
+		return replyJSON(outJSON, errMsg, nil, err)
+	}
+	roleName, _ := argStrReq(args, "role", "角色")
+	permsRaw, _ := argStrReq(args, "permissions", "权限")
+	grantRaw, _ := argStrReq(args, "grantable", "可授")
+	err = rbac.SetRolePermissionsByName(url, roleName, rbac.ParseCSV(permsRaw), rbac.ParseCSV(grantRaw))
+	if err != nil {
+		return replyJSON(outJSON, errMsg, nil, err)
+	}
+	return replyJSON(outJSON, errMsg, map[string]any{"ok": true}, nil)
+}
+
+//export web_rbac_list_roles
+func web_rbac_list_roles(argsJSON *C.char, outJSON **C.char, errMsg **C.char) C.int {
+	args, err := parseArgs(argsJSON)
+	if err != nil {
+		return replyJSON(outJSON, errMsg, nil, err)
+	}
+	url, err := dbURLOf(args)
+	if err != nil {
+		return replyJSON(outJSON, errMsg, nil, err)
+	}
+	roles, err := rbac.ListRoles(url)
+	if err != nil {
+		return replyJSON(outJSON, errMsg, nil, err)
+	}
+	return replyJSON(outJSON, errMsg, map[string]any{"ok": true, "roles": roles}, nil)
+}
+
+//export web_rbac_list_permissions
+func web_rbac_list_permissions(argsJSON *C.char, outJSON **C.char, errMsg **C.char) C.int {
+	args, err := parseArgs(argsJSON)
+	if err != nil {
+		return replyJSON(outJSON, errMsg, nil, err)
+	}
+	url, err := dbURLOf(args)
+	if err != nil {
+		return replyJSON(outJSON, errMsg, nil, err)
+	}
+	perms, err := rbac.ListPermissions(url)
+	if err != nil {
+		return replyJSON(outJSON, errMsg, nil, err)
+	}
+	return replyJSON(outJSON, errMsg, map[string]any{"ok": true, "permissions": perms}, nil)
 }

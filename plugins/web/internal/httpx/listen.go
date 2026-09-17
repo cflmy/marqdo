@@ -22,9 +22,11 @@ import (
 	"github.com/marqdo/marqdo/plugins/web/internal/form"
 	"github.com/marqdo/marqdo/plugins/web/internal/middleware"
 	"github.com/marqdo/marqdo/plugins/web/internal/ratelimit"
+	"github.com/marqdo/marqdo/plugins/web/internal/rbac"
 	"github.com/marqdo/marqdo/plugins/web/internal/render"
 	"github.com/marqdo/marqdo/plugins/web/internal/session"
 	"github.com/marqdo/marqdo/plugins/web/internal/sitemap"
+	"github.com/marqdo/marqdo/plugins/web/internal/tenant"
 )
 
 // NewHandler builds the HTTP handler for an app bag (no listen).
@@ -35,6 +37,11 @@ func NewHandler(appBag map[string]any, entryDir string) (http.Handler, error) {
 	}
 	authCfg := authConfigOf(appBag)
 	dbURL := dbURLOf(appBag)
+	if authCfg.rbac && dbURL != "" {
+		if err := rbac.EnsureSchema(dbURL); err != nil {
+			return nil, fmt.Errorf("rbac ensure: %w", err)
+		}
+	}
 	session.Configure(session.Config{
 		DBURL:        dbURL,
 		TTLSec:       authCfg.sessionTTL,
@@ -99,6 +106,7 @@ func NewHandler(appBag map[string]any, entryDir string) (http.Handler, error) {
 		proxyRoutes:    routeMapOf(appBag, "proxy_routes"),
 		invokeRoutes:   routeMapOf(appBag, "invoke_routes"),
 		auth:           authCfg,
+		tenant:         tenant.FromBag(appBag),
 	}
 
 	mux := http.NewServeMux()
@@ -132,7 +140,7 @@ func NewHandler(appBag map[string]any, entryDir string) (http.Handler, error) {
 		route := jr
 		pattern := route.Method + " " + route.Path
 		mux.HandleFunc(pattern, func(w http.ResponseWriter, r *http.Request) {
-			st.handleJSON(w, route)
+			st.handleJSON(w, r, route)
 		})
 	}
 
@@ -217,6 +225,7 @@ func NewHandler(appBag map[string]any, entryDir string) (http.Handler, error) {
 
 	handler := withMiddleware(mux, mw)
 	handler = withRBAC(handler, authCfg.gates, authCfg.loginPath)
+	handler = withTenant(handler, st.tenant)
 	return handler, nil
 }
 
@@ -280,6 +289,7 @@ type state struct {
 	proxyRoutes    map[string]any
 	invokeRoutes   map[string]any
 	auth           authConfig
+	tenant         tenant.Config
 }
 
 func (st *state) handleHome(w http.ResponseWriter, r *http.Request) {
@@ -432,6 +442,11 @@ func (st *state) handleFormPost(w http.ResponseWriter, r *http.Request) {
 			data[k] = vs[0]
 		}
 	}
+	if st.tenant.Enabled() && st.tenant.DefaultScope {
+		if tid := tenant.FromContext(r.Context()); tid != "" {
+			data = tenant.StampRow(data, st.tenant.Column, tid)
+		}
+	}
 	res, err := form.Submit(frm, data, st.dbURL)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -447,18 +462,38 @@ func (st *state) handleFormPost(w http.ResponseWriter, r *http.Request) {
 	_, _ = io.WriteString(w, html)
 }
 
-func (st *state) handleJSON(w http.ResponseWriter, route middleware.JSONRouteMount) {
+func (st *state) handleJSON(w http.ResponseWriter, r *http.Request, route middleware.JSONRouteMount) {
 	if st.dbURL == "" {
 		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "no database"})
 		return
 	}
-	opts := db.SelectOpts{Where: route.Where, Order: route.Order}
+	where := route.Where
+	if (route.TenantScope || st.tenant.DefaultScope) && st.tenant.Enabled() {
+		tid := tenant.FromContext(r.Context())
+		if tid == "" {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "tenant required"})
+			return
+		}
+		where = tenant.MergeWhere(where, st.tenant.Column, tid)
+	}
+	opts := db.SelectOpts{Where: where, Order: route.Order}
 	out, err := db.Select(st.dbURL, route.Table, route.Limit, opts)
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": err.Error()})
 		return
 	}
 	writeJSON(w, http.StatusOK, out)
+}
+
+func withTenant(next http.Handler, cfg tenant.Config) http.Handler {
+	if !cfg.Enabled() {
+		return next
+	}
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		id := tenant.Resolve(r, cfg)
+		ctx := tenant.WithContext(r.Context(), id)
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
 }
 
 func withMiddleware(next http.Handler, mw middleware.Config) http.Handler {

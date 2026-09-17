@@ -733,10 +733,13 @@ Serve `/`, routed pages, `/_part/{id}` (home) and `{path}/_part/{id}` (routes), 
     + `path`
     + `echo`=True
     + `mode`=None
+    + `room_key`=None
+    + `on_message`=None
+    + `presence`=False
 
-Register a WebSocket endpoint at `path` (e.g. `/live`). `mode` is `echo` (default), `broadcast` (fan-out text to all sockets on this path), or `drain`. Legacy `echo=False` maps to `drain`. Connect from a client with `web.ws.connect`.
+Register a WebSocket endpoint at `path` (e.g. `/live` or `/chat/{id}`). `mode` is `echo` (default), `broadcast` (fan-out text to all sockets on this path), `room` (named room via `room_key`, supports `{id}` from the path), or `drain`. Legacy `echo=False` maps to `drain`. `on_message` is an optional `lib.member` hook (G-WS2): called before fan-out with `message`/`room`/`user`; return `{skip:true}` to drop or `{message:…}` to rewrite. `presence=True` also joins `room.presence` and emits join/leave JSON. Connect from a client with `web.ws.connect`.
 
-*> web_app_route_ws app=`self` path=`path` echo=`echo` mode=`mode`*
+*> web_app_route_ws app=`self` path=`path` echo=`echo` mode=`mode` room_key=`room_key` on_message=`on_message` presence=`presence`*
 
 ## auth
     + `users`
@@ -745,21 +748,42 @@ Register a WebSocket endpoint at `path` (e.g. `/live`). `mode` is `echo` (defaul
     + `login_redirect`=None
     + `logout_redirect`=None
     + `login_path`=None
+    + `register`=False
+    + `register_path`=/register
+    + `default_role`="member"
 
-Keep the app's `admin=True`, and gate `{admin_prefix}` (segment-boundary prefix) behind a login page (default `/admin`). Unauthenticated requests redirect to `login_path` (default `{admin_prefix}/login`, auto-excluded). Does not match `/admin-publish`-style siblings.
+Keep the app's `admin=True`, and gate `{admin_prefix}` (segment-boundary prefix) behind a login page (default `/admin`). Unauthenticated requests redirect to `login_path` (default `{admin_prefix}/login`, auto-excluded). Does not match `/admin-publish`-style siblings. With `register=True` and `enable_rbac`, exposes `register_path` (writes `web_users` + default role).
 
-*> web_app_auth app=`self` users=`users` session_ttl=`session_ttl` admin_prefix=`admin_prefix` login_redirect=`login_redirect` logout_redirect=`logout_redirect` login_path=`login_path`*
+*> web_app_auth app=`self` users=`users` session_ttl=`session_ttl` admin_prefix=`admin_prefix` login_redirect=`login_redirect` logout_redirect=`logout_redirect` login_path=`login_path` register=`register` register_path=`register_path` default_role=`default_role`*
 
 ## gate
     + `path`
     + `roles`=admin
+    + `permissions`=""
     + `match`=prefix
     + `on_deny`=forbid
     + `exclude`=None
 
-Require one of `roles` (CSV) for `path`. `match=prefix` uses segment boundaries; `exact` is equality. Trailing `*` on `path` means prefix. `on_deny=redirect` sends visitors to `login_path` (with `?next=`); `forbid` returns 403. `exclude` is CSV or list of open paths.
+Require access for `path`. Prefer `permissions` (CSV of `resource:action` codes such as `desk:access`); when non-empty, authorization uses the session permission set. Otherwise require one of `roles` (legacy). `match=prefix` uses segment boundaries; `exact` is equality. Trailing `*` on `path` means prefix. `on_deny=redirect` sends visitors to `login_path` (with `?next=`); `forbid` returns 403. `exclude` is CSV or list of open paths.
 
-*> web_app_gate app=`self` path=`path` roles=`roles` match=`match` on_deny=`on_deny` exclude=`exclude`*
+*> web_app_gate app=`self` path=`path` roles=`roles` permissions=`permissions` match=`match` on_deny=`on_deny` exclude=`exclude`*
+
+## enable_rbac
+    + `catalog`=None
+
+Enable database-backed RBAC (role ⊥ permission). On listen, ensures `web_permissions` / `web_roles` / `web_role_permissions` / `web_users` / `web_user_roles` and seeds system roles `superadmin` and `member`. See `doc/design/ext-web-rbac.md`. Management UI: `GET /_rbac/desk` (needs `roles:manage`).
+
+*> web_app_rbac app=`self` catalog=`catalog`*
+
+## tenant
+    + `mode`
+    + `param`=None
+    + `column`=tenant_id
+    + `default_scope`=False
+
+Enable multi-tenant resolution: `mode` is `path` (query/`/t/{id}/…`), `subdomain`, or `header`. `param` is the path/query key or header name. When `default_scope=True`, JSON routes and form inserts auto-filter/stamp `column` (default `tenant_id`). Per-route override: JSON table column `tenant_scope` / `租户作用域`.
+
+*> web_app_tenant app=`self` mode=`mode` param=`param` column=`column` default_scope=`default_scope`*
 
 ## gallery
     + `path`=/gallery
@@ -842,6 +866,49 @@ Mount `POST path` for multipart file upload. `storage` is a `# storage` handle o
 Mount `GET path` to stream an object. Path must capture `key` (use `{*key}` for nested keys). `disposition` is `attachment` or `inline`.
 
 *> web_app_download app=`self` path=`path` storage=`storage` disposition=`disposition`*
+
+# rbac
+
+Offline helpers for role ⊥ permission. Prefer `app.enable_rbac` + gates for HTTP; use these for scripts/tests.
+
+## can
+    + `permissions`
+    + `needed`
+
+Return `{ok, allowed}` — whether held permission CSV includes any of `needed` (CSV). Held `*` allows all.
+
+> ensure_plugin
+*> web_rbac_can permissions=`permissions` needed=`needed`*
+
+## assign_role
+    + `url`
+    + `username`
+    + `role`
+
+Bind `username` (in `web_users`) to role name.
+
+> ensure_plugin
+*> web_rbac_assign_role url=`url` username=`username` role=`role`*
+
+## create_role
+    + `url`
+    + `name`
+
+Create a non-system role; returns `{ok, id, name}`.
+
+> ensure_plugin
+*> web_rbac_create_role url=`url` name=`name`*
+
+## set_role_permissions
+    + `url`
+    + `role`
+    + `permissions`
+    + `grantable`=""
+
+Replace permissions on a non-system role (CSV). `grantable` restricts grants (anti-escalation); empty = full catalog.
+
+> ensure_plugin
+*> web_rbac_set_role_permissions url=`url` role=`role` permissions=`permissions` grantable=`grantable`*
 
 # auth
     + `users`

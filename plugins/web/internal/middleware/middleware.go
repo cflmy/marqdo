@@ -34,12 +34,13 @@ type CORSConfig struct {
 
 // JSONRouteMount is one JSON API route with leading-slash path.
 type JSONRouteMount struct {
-	Path   string
-	Method string
-	Table  string
-	Where  any
-	Order  string
-	Limit  int64
+	Path        string
+	Method      string
+	Table       string
+	Where       any
+	Order       string
+	Limit       int64
+	TenantScope bool
 }
 
 // Configure merges configure tables into app.middleware (Rust web_app_middleware).
@@ -178,6 +179,11 @@ func parseJSONRoute(path string, spec any) (JSONRouteMount, bool) {
 	if w, ok := m["where"]; ok && w != nil {
 		r.Where = w
 	}
+	if v, ok := m["tenant_scope"]; ok {
+		r.TenantScope = boolish(v)
+	} else if v, ok := m["租户作用域"]; ok {
+		r.TenantScope = boolish(v)
+	}
 	return r, true
 }
 
@@ -255,7 +261,7 @@ func SecurityFromTable(tableV any) map[string]any {
 	return out
 }
 
-// JSONRoutesFromTable normalizes `|路径|方法|表|条件|排序|上限|` into json_routes.
+// JSONRoutesFromTable normalizes `|路径|方法|表|条件|排序|上限|租户作用域|` into json_routes.
 func JSONRoutesFromTable(tableV any) map[string]any {
 	rows, _ := table.AsRows(tableV).([]any)
 	out := map[string]any{}
@@ -290,6 +296,9 @@ func JSONRoutesFromTable(tableV any) map[string]any {
 		}
 		if order != "" {
 			spec["order"] = order
+		}
+		if scope := col(m, "租户作用域", "tenant_scope", "TenantScope"); scope != "" {
+			spec["tenant_scope"] = boolish(scope)
 		}
 		out[path] = spec
 	}

@@ -113,6 +113,33 @@ func TestRouteWSRoomRequiresKey(t *testing.T) {
 	}
 }
 
+func TestExpandTemplate(t *testing.T) {
+	got := ws.ExpandTemplate("chat.room.{id}", map[string]string{"id": "lobby"})
+	if got != "chat.room.lobby" {
+		t.Fatalf("got %q", got)
+	}
+}
+
+func TestRouteWSOnMessageAndPresence(t *testing.T) {
+	a := app.New(nil)
+	out, err := ws.RouteWS(a, "/chat/{id}", map[string]any{
+		"mode":       "room",
+		"room_key":   "chat.room.{id}",
+		"on_message": "chat.persist",
+		"presence":   true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	spec, err := ws.RouteSpecOf(out, "/chat/{id}")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if spec.OnMessage != "chat.persist" || !spec.Presence {
+		t.Fatalf("spec=%+v", spec)
+	}
+}
+
 func TestConnectRefusesBadURL(t *testing.T) {
 	out := ws.Connect("http://127.0.0.1:1", "hi", nil, 1)
 	if out["ok"] == true {

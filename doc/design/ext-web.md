@@ -580,7 +580,7 @@ submit  → action=insert → db.insert；action=update → db.update
 ## 9. 非本波次（可记入路线图）
 
 - Postgres / Redis / S3 驱动细节（SQLite 已落地）；  
-- 复杂权限与多租户；  
+- ~~复杂权限与多租户~~ → **可配置 RBAC** 见 [ext-web-rbac.md](ext-web-rbac.md)；**多租户** 见 [ext-web-tenant.md](ext-web-tenant.md)（path/subdomain/header + `tenant_scope`）；
 - 子页路由糖的更多约定（`# 应用.route` 已够用）。
 
 ---

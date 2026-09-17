@@ -106,6 +106,15 @@ extern int web_auth_logout(char *args_json, char **out_json, char **err_msg);
 extern int web_auth_new(char *args_json, char **out_json, char **err_msg);
 extern int web_app_auth(char *args_json, char **out_json, char **err_msg);
 extern int web_app_gate(char *args_json, char **out_json, char **err_msg);
+extern int web_app_rbac(char *args_json, char **out_json, char **err_msg);
+extern int web_app_tenant(char *args_json, char **out_json, char **err_msg);
+extern int web_rbac_can(char *args_json, char **out_json, char **err_msg);
+extern int web_rbac_ensure(char *args_json, char **out_json, char **err_msg);
+extern int web_rbac_assign_role(char *args_json, char **out_json, char **err_msg);
+extern int web_rbac_create_role(char *args_json, char **out_json, char **err_msg);
+extern int web_rbac_set_role_permissions(char *args_json, char **out_json, char **err_msg);
+extern int web_rbac_list_roles(char *args_json, char **out_json, char **err_msg);
+extern int web_rbac_list_permissions(char *args_json, char **out_json, char **err_msg);
 extern int web_storage_new(char *args_json, char **out_json, char **err_msg);
 extern int web_storage_put(char *args_json, char **out_json, char **err_msg);
 extern int web_storage_get(char *args_json, char **out_json, char **err_msg);
@@ -199,8 +208,17 @@ static int register_core(void) {
 	if (host_register((char *)"web_auth_check", (char *)"session_id", web_auth_check) != 0) return 1;
 	if (host_register((char *)"web_auth_logout", (char *)"session_id", web_auth_logout) != 0) return 1;
 	if (host_register((char *)"web_auth_new", (char *)"users,session_ttl", web_auth_new) != 0) return 1;
-	if (host_register((char *)"web_app_auth", (char *)"app,users,session_ttl,admin_prefix,login_redirect,logout_redirect,login_path", web_app_auth) != 0) return 1;
-	if (host_register((char *)"web_app_gate", (char *)"app,path,roles,match,on_deny,exclude", web_app_gate) != 0) return 1;
+	if (host_register((char *)"web_app_auth", (char *)"app,users,session_ttl,admin_prefix,login_redirect,logout_redirect,login_path,register,register_path,default_role", web_app_auth) != 0) return 1;
+	if (host_register((char *)"web_app_gate", (char *)"app,path,roles,permissions,match,on_deny,exclude", web_app_gate) != 0) return 1;
+	if (host_register((char *)"web_app_rbac", (char *)"app,catalog", web_app_rbac) != 0) return 1;
+	if (host_register((char *)"web_app_tenant", (char *)"app,mode,param,column,default_scope", web_app_tenant) != 0) return 1;
+	if (host_register((char *)"web_rbac_can", (char *)"permissions,needed", web_rbac_can) != 0) return 1;
+	if (host_register((char *)"web_rbac_ensure", (char *)"url", web_rbac_ensure) != 0) return 1;
+	if (host_register((char *)"web_rbac_assign_role", (char *)"url,username,role", web_rbac_assign_role) != 0) return 1;
+	if (host_register((char *)"web_rbac_create_role", (char *)"url,name", web_rbac_create_role) != 0) return 1;
+	if (host_register((char *)"web_rbac_set_role_permissions", (char *)"url,role,permissions,grantable", web_rbac_set_role_permissions) != 0) return 1;
+	if (host_register((char *)"web_rbac_list_roles", (char *)"url", web_rbac_list_roles) != 0) return 1;
+	if (host_register((char *)"web_rbac_list_permissions", (char *)"url", web_rbac_list_permissions) != 0) return 1;
 	if (host_register((char *)"web_storage_new", (char *)"url", web_storage_new) != 0) return 1;
 	if (host_register((char *)"web_storage_put", (char *)"url,key,body,path,content_type", web_storage_put) != 0) return 1;
 	if (host_register((char *)"web_storage_get", (char *)"url,key", web_storage_get) != 0) return 1;
@@ -226,7 +244,7 @@ static int register_core(void) {
 	if (host_register((char *)"web_app_sitemap", (char *)"app,path,base,table,loc,limit,items", web_app_sitemap) != 0) return 1;
 	if (host_register((char *)"web_app_robots", (char *)"app,body,sitemap", web_app_robots) != 0) return 1;
 	if (host_register((char *)"web_sitemap_build", (char *)"base,items", web_sitemap_build) != 0) return 1;
-	if (host_register((char *)"web_app_route_ws", (char *)"app,path,echo,mode", web_app_route_ws) != 0) return 1;
+	if (host_register((char *)"web_app_route_ws", (char *)"app,path,echo,mode,room_key,on_message,presence", web_app_route_ws) != 0) return 1;
 	if (host_register((char *)"web_ws_connect", (char *)"url,message,headers,timeout_sec", web_ws_connect) != 0) return 1;
 	if (host_register((char *)"web_cache_new", (char *)"url", web_cache_new) != 0) return 1;
 	if (host_register((char *)"web_cache_get", (char *)"url,key", web_cache_get) != 0) return 1;
@@ -424,12 +442,14 @@ func resolveDbURL(url string) string {
 }
 
 func dbURLOf(args map[string]any) (string, error) {
-	if s, ok := argStr(args, "url", "db_url"); ok && s != "" {
+	if s, ok := argStr(args, "url", "db_url", "数据库"); ok && s != "" {
 		return resolveDbURL(s), nil
 	}
-	if dbObj, ok := args["db"].(map[string]any); ok {
-		if s, ok := argStr(dbObj, "url"); ok && s != "" {
-			return resolveDbURL(s), nil
+	for _, key := range []string{"url", "db", "数据库"} {
+		if dbObj, ok := args[key].(map[string]any); ok {
+			if s, ok := argStr(dbObj, "url"); ok && s != "" {
+				return resolveDbURL(s), nil
+			}
 		}
 	}
 	return "", fmt.Errorf("missing db url")

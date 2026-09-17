@@ -612,6 +612,20 @@ func RoleFromCookie(cookieHeader string) string {
 	return "visitor"
 }
 
+// UsernameFromCookie returns the session username or empty string.
+func UsernameFromCookie(cookieHeader string) string {
+	sid, ok := IDFromCookie(cookieHeader)
+	if !ok {
+		return ""
+	}
+	if v, ok := GetValue(sid, "username"); ok {
+		if s, ok := v.(string); ok {
+			return s
+		}
+	}
+	return ""
+}
+
 // RoleAllowed reports whether role is in allowed (empty allowed = all).
 func RoleAllowed(role string, allowed []string) bool {
 	if len(allowed) == 0 {
@@ -620,6 +634,54 @@ func RoleAllowed(role string, allowed []string) bool {
 	role = strings.ToLower(role)
 	for _, a := range allowed {
 		if strings.EqualFold(a, role) {
+			return true
+		}
+	}
+	return false
+}
+
+// PermissionsFromCookie returns session permission codes (empty if anonymous).
+func PermissionsFromCookie(cookieHeader string) []string {
+	sid, ok := IDFromCookie(cookieHeader)
+	if !ok {
+		return nil
+	}
+	return PermissionsFromSession(sid)
+}
+
+// PermissionsFromSession reads the permissions CSV from a session id.
+func PermissionsFromSession(sid string) []string {
+	if v, ok := GetValue(sid, "permissions"); ok {
+		if s, ok := v.(string); ok && s != "" {
+			return ParseRolesCSV(s)
+		}
+	}
+	return nil
+}
+
+// SetPermissions stores permission codes on the session.
+func SetPermissions(sid string, codes []string) {
+	SetValue(sid, "permissions", strings.Join(codes, ","))
+}
+
+// PermissionAllowed reports whether the session holds any of needed.
+func PermissionAllowed(held, needed []string) bool {
+	if len(needed) == 0 {
+		return true
+	}
+	set := map[string]struct{}{}
+	for _, h := range held {
+		h = strings.ToLower(strings.TrimSpace(h))
+		if h == "*" {
+			return true
+		}
+		if h != "" {
+			set[h] = struct{}{}
+		}
+	}
+	for _, n := range needed {
+		n = strings.ToLower(strings.TrimSpace(n))
+		if _, ok := set[n]; ok {
 			return true
 		}
 	}

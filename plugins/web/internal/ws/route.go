@@ -7,13 +7,15 @@ import (
 	"github.com/marqdo/marqdo/plugins/web/internal/app"
 )
 
-// RouteSpec is one ws_routes entry (mode + optional room_key template).
+// RouteSpec is one ws_routes entry (mode + optional room_key / on_message / presence).
 type RouteSpec struct {
-	Mode    Mode
-	RoomKey string
+	Mode      Mode
+	RoomKey   string
+	OnMessage string
+	Presence  bool
 }
 
-// RouteWS registers path → {mode, room_key?} on app.ws_routes (Rust web_app_route_ws).
+// RouteWS registers path → {mode, room_key?, on_message?, presence?} on app.ws_routes.
 func RouteWS(appBag map[string]any, path string, args map[string]any) (map[string]any, error) {
 	path, err := app.NormalizeRoutePath(path, appBag)
 	if err != nil {
@@ -24,6 +26,8 @@ func RouteWS(appBag map[string]any, path string, args map[string]any) (map[strin
 	if mode == ModeRoom && roomKey == "" {
 		return nil, fmt.Errorf("mode=room requires room_key")
 	}
+	onMsg := OnMessageFromArgs(args)
+	presence := PresenceFromArgs(args)
 	out := clone(appBag)
 	wsRoutes := map[string]any{}
 	if r, ok := out["ws_routes"].(map[string]any); ok {
@@ -32,6 +36,12 @@ func RouteWS(appBag map[string]any, path string, args map[string]any) (map[strin
 	spec := map[string]any{"mode": string(mode)}
 	if roomKey != "" {
 		spec["room_key"] = roomKey
+	}
+	if onMsg != "" {
+		spec["on_message"] = onMsg
+	}
+	if presence {
+		spec["presence"] = true
 	}
 	wsRoutes[path] = spec
 	out["ws_routes"] = wsRoutes
@@ -44,6 +54,34 @@ func RoomKeyFromArgs(args map[string]any) string {
 		return strings.TrimSpace(fmt.Sprint(v))
 	}
 	return ""
+}
+
+// OnMessageFromArgs reads on_message / 消息钩子 (lib.member path).
+func OnMessageFromArgs(args map[string]any) string {
+	if v, ok := first(args, "on_message", "消息钩子", "钩子"); ok {
+		return strings.TrimSpace(fmt.Sprint(v))
+	}
+	return ""
+}
+
+// PresenceFromArgs reads presence / 在场 flag.
+func PresenceFromArgs(args map[string]any) bool {
+	if v, ok := first(args, "presence", "在场"); ok {
+		return boolish(v)
+	}
+	return false
+}
+
+// ExpandTemplate replaces `{name}` tokens using values from PathValue-style map.
+func ExpandTemplate(tmpl string, values map[string]string) string {
+	if tmpl == "" || len(values) == 0 {
+		return tmpl
+	}
+	out := tmpl
+	for k, v := range values {
+		out = strings.ReplaceAll(out, "{"+k+"}", v)
+	}
+	return out
 }
 
 // RoutesOf reads ws_routes from an app bag.
@@ -116,6 +154,16 @@ func parseRouteSpec(spec any) RouteSpec {
 		}
 		if rk, ok := t["room_key"]; ok {
 			out.RoomKey = strings.TrimSpace(fmt.Sprint(rk))
+		}
+		if om, ok := t["on_message"]; ok {
+			out.OnMessage = strings.TrimSpace(fmt.Sprint(om))
+		} else if om, ok := t["消息钩子"]; ok {
+			out.OnMessage = strings.TrimSpace(fmt.Sprint(om))
+		}
+		if p, ok := t["presence"]; ok {
+			out.Presence = boolish(p)
+		} else if p, ok := t["在场"]; ok {
+			out.Presence = boolish(p)
 		}
 	case string:
 		out.Mode = ParseMode(t)

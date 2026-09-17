@@ -1,15 +1,19 @@
 package httpx
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"net"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/marqdo/marqdo/plugins/web/internal/app"
 	"github.com/marqdo/marqdo/plugins/web/internal/auth"
+	"github.com/marqdo/marqdo/plugins/web/internal/password"
 	"github.com/marqdo/marqdo/plugins/web/internal/ratelimit"
+	"github.com/marqdo/marqdo/plugins/web/internal/rbac"
 	"github.com/marqdo/marqdo/plugins/web/internal/session"
 )
 
@@ -28,23 +32,28 @@ const (
 )
 
 type gate struct {
-	path      string
-	roles     []string
-	matchMode gateMatch
-	onDeny    onDeny
-	exclude   []string
+	path        string
+	roles       []string
+	permissions []string
+	matchMode   gateMatch
+	onDeny      onDeny
+	exclude     []string
 }
 
 type authConfig struct {
-	users           any
-	sessionTTL      uint64
-	cookieSecure    bool
-	admin           bool
-	adminPrefix     string
-	loginPath       string
-	loginRedirect   string
-	logoutRedirect  string
-	gates           []gate
+	users          any
+	sessionTTL     uint64
+	cookieSecure   bool
+	admin          bool
+	adminPrefix    string
+	loginPath      string
+	loginRedirect  string
+	logoutRedirect string
+	gates          []gate
+	rbac           bool
+	register       bool
+	registerPath   string
+	defaultRole    string
 }
 
 func authConfigOf(appBag map[string]any) authConfig {
@@ -68,6 +77,7 @@ func authConfigOf(appBag map[string]any) authConfig {
 	if v, ok := appBag["cookie_secure"].(bool); ok {
 		cfg.cookieSecure = v
 	}
+	cfg.registerPath = strOpt(appBag, "register_path", "")
 	if authBag, ok := appBag["auth"].(map[string]any); ok {
 		cfg.users = authBag["users"]
 		if n, ok := asUint64(authBag["session_ttl"]); ok && n > 0 {
@@ -75,6 +85,18 @@ func authConfigOf(appBag map[string]any) authConfig {
 		} else if n, ok := asUint64(authBag["ttl"]); ok && n > 0 {
 			cfg.sessionTTL = n
 		}
+		cfg.rbac = boolish(authBag["rbac"])
+		cfg.register = boolish(authBag["register"])
+		if p := strOpt(authBag, "register_path", ""); p != "" {
+			cfg.registerPath = p
+		}
+		cfg.defaultRole = strOpt(authBag, "default_role", "")
+		if cfg.defaultRole == "" {
+			cfg.defaultRole = "member"
+		}
+	}
+	if cfg.registerPath == "" {
+		cfg.registerPath = "/register"
 	}
 	cfg.gates = parseGates(appBag["gates"])
 	return cfg
@@ -106,7 +128,11 @@ func parseGates(v any) []gate {
 		if roles == nil {
 			roles = parseGateRoles(m["角色"])
 		}
-		if len(roles) == 0 {
+		perms := parseGateRoles(m["permissions"])
+		if perms == nil {
+			perms = parseGateRoles(m["权限"])
+		}
+		if len(roles) == 0 && len(perms) == 0 {
 			roles = []string{"admin"}
 		}
 		matchS := strings.ToLower(strings.TrimSpace(strOpt(m, "match", "")))
@@ -136,11 +162,12 @@ func parseGates(v any) []gate {
 			on = onDenyForbid
 		}
 		out = append(out, gate{
-			path:      path,
-			roles:     roles,
-			matchMode: matchMode,
-			onDeny:    on,
-			exclude:   parseExclude(m["exclude"], m["排除"]),
+			path:        path,
+			roles:       roles,
+			permissions: perms,
+			matchMode:   matchMode,
+			onDeny:      on,
+			exclude:     parseExclude(m["exclude"], m["排除"]),
 		})
 	}
 	return out
@@ -245,7 +272,17 @@ func withRBAC(next http.Handler, gates []gate, loginPath string) http.Handler {
 				break
 			}
 			role := session.RoleFromCookie(cookie)
-			if !session.RoleAllowed(role, g.roles) {
+			allowed := false
+			if len(g.permissions) > 0 {
+				held := session.PermissionsFromCookie(cookie)
+				if len(held) == 0 && role != "visitor" {
+					held = expandLegacyRole(role)
+				}
+				allowed = session.PermissionAllowed(held, g.permissions)
+			} else {
+				allowed = session.RoleAllowed(role, g.roles)
+			}
+			if !allowed {
 				if role == "visitor" && g.onDeny == onDenyRedirect {
 					nextQ := urlEncodePath(path)
 					dest := loginPath
@@ -266,6 +303,22 @@ func withRBAC(next http.Handler, gates []gate, loginPath string) http.Handler {
 		}
 		next.ServeHTTP(w, r)
 	})
+}
+
+func expandLegacyRole(role string) []string {
+	switch strings.ToLower(strings.TrimSpace(role)) {
+	case "superadmin", "admin":
+		return []string{
+			"comments:create", "comments:delete", "comments:delete_own",
+			"desk:access", "roles:manage", "posts:edit", "users:manage",
+		}
+	case "member", "user":
+		return []string{"comments:create", "comments:delete_own"}
+	case "editor", "author":
+		return []string{"comments:create", "comments:delete_own", "posts:edit", "desk:access"}
+	default:
+		return nil
+	}
 }
 
 func urlEncodePath(path string) string {
@@ -303,20 +356,34 @@ func withNavAuth(page map[string]any, cookieHeader string) {
 }
 
 func (st *state) mountAuthRoutes(mux *http.ServeMux) {
-	if st.auth.users == nil {
+	if st.auth.users == nil && !(st.auth.rbac && st.auth.register) {
 		return
 	}
-	lp := st.auth.loginPath
-	mux.HandleFunc("GET "+lp, st.handleLoginGet)
-	mux.HandleFunc("POST "+lp, st.handleLoginPost)
-	altLogin := strings.TrimRight(st.auth.adminPrefix, "/") + "/login"
-	if altLogin != lp {
-		mux.HandleFunc("GET "+altLogin, st.handleLoginGet)
-		mux.HandleFunc("POST "+altLogin, st.handleLoginPost)
+	if st.auth.users != nil || st.auth.rbac {
+		lp := st.auth.loginPath
+		mux.HandleFunc("GET "+lp, st.handleLoginGet)
+		mux.HandleFunc("POST "+lp, st.handleLoginPost)
+		altLogin := strings.TrimRight(st.auth.adminPrefix, "/") + "/login"
+		if altLogin != lp {
+			mux.HandleFunc("GET "+altLogin, st.handleLoginGet)
+			mux.HandleFunc("POST "+altLogin, st.handleLoginPost)
+		}
+		logoutPath := strings.TrimRight(st.auth.adminPrefix, "/") + "/logout"
+		mux.HandleFunc("GET "+logoutPath, st.handleLogout)
 	}
-	// Logout is part of session auth, not only built-in admin=True chrome.
-	logoutPath := strings.TrimRight(st.auth.adminPrefix, "/") + "/logout"
-	mux.HandleFunc("GET "+logoutPath, st.handleLogout)
+	if st.auth.register && st.auth.rbac {
+		rp := st.auth.registerPath
+		mux.HandleFunc("GET "+rp, st.handleRegisterGet)
+		mux.HandleFunc("POST "+rp, st.handleRegisterPost)
+	}
+	if st.auth.rbac && st.dbURL != "" {
+		mux.HandleFunc("GET /_rbac/roles", st.handleRbacListRoles)
+		mux.HandleFunc("GET /_rbac/permissions", st.handleRbacListPermissions)
+		mux.HandleFunc("POST /_rbac/roles", st.handleRbacCreateRole)
+		mux.HandleFunc("POST /_rbac/roles/{id}/permissions", st.handleRbacSetRolePerms)
+		mux.HandleFunc("POST /_rbac/assign", st.handleRbacAssign)
+		mux.HandleFunc("GET /_rbac/desk", st.handleRbacDesk)
+	}
 	if st.auth.admin {
 		adminHome := strings.TrimRight(st.auth.adminPrefix, "/")
 		if adminHome == "" {
@@ -327,7 +394,7 @@ func (st *state) mountAuthRoutes(mux *http.ServeMux) {
 }
 
 func (st *state) handleLoginGet(w http.ResponseWriter, r *http.Request) {
-	if st.auth.users == nil {
+	if st.auth.users == nil && !st.auth.rbac {
 		http.Redirect(w, r, st.auth.loginRedirect, http.StatusSeeOther)
 		return
 	}
@@ -344,7 +411,7 @@ func (st *state) handleLoginGet(w http.ResponseWriter, r *http.Request) {
 }
 
 func (st *state) handleLoginPost(w http.ResponseWriter, r *http.Request) {
-	if st.auth.users == nil {
+	if st.auth.users == nil && !st.auth.rbac {
 		http.Redirect(w, r, st.auth.loginRedirect, http.StatusSeeOther)
 		return
 	}
@@ -374,7 +441,7 @@ func (st *state) handleLoginPost(w http.ResponseWriter, r *http.Request) {
 		_, _ = io.WriteString(w, loginPageHTML(st.auth.loginPath, &msg, csrf, r.FormValue("next")))
 		return
 	}
-	res := auth.Login(username, password, st.auth.users, st.auth.sessionTTL)
+	res := st.tryLogin(username, password)
 	if ok, _ := res["ok"].(bool); !ok {
 		ratelimit.RecordFailure(ip, username)
 		errMsg := "Invalid username or password."
@@ -385,9 +452,52 @@ func (st *state) handleLoginPost(w http.ResponseWriter, r *http.Request) {
 	}
 	ratelimit.ClearSuccess(ip, username)
 	sessID, _ := res["session_id"].(string)
+	role, _ := res["role"].(string)
+	st.attachLoginPermissions(sessID, username, role)
 	dest := loginDest(r, st.auth.loginRedirect)
 	w.Header().Add("Set-Cookie", session.IssueCookie(sessID))
 	http.Redirect(w, r, dest, http.StatusSeeOther)
+}
+
+// tryLogin: GFM users first, then web_users when RBAC is on.
+func (st *state) tryLogin(username, password string) map[string]any {
+	if st.auth.users != nil {
+		res := auth.Login(username, password, st.auth.users, st.auth.sessionTTL)
+		if ok, _ := res["ok"].(bool); ok {
+			u, _ := res["username"].(string)
+			role, _ := res["role"].(string)
+			st.seedGFMUserIntoRBAC(u, password, role)
+			return res
+		}
+	}
+	if st.auth.rbac && st.dbURL != "" {
+		role, ok, err := rbac.Authenticate(st.dbURL, username, password, passwordVerify)
+		if err == nil && ok {
+			id := session.NewID(st.auth.sessionTTL)
+			session.SetValue(id, "username", username)
+			session.SetValue(id, "role", role)
+			return map[string]any{
+				"ok": true, "session_id": id, "username": username, "role": role,
+			}
+		}
+	}
+	return map[string]any{"ok": false}
+}
+
+func (st *state) attachLoginPermissions(sessID, username, role string) {
+	var perms []string
+	if st.dbURL != "" && st.auth.rbac {
+		if dbPerms, err := rbac.PermissionsForUser(st.dbURL, username); err == nil && len(dbPerms) > 0 {
+			perms = dbPerms
+		}
+	}
+	if len(perms) == 0 {
+		perms = rbac.ExpandRole(role)
+	}
+	if len(perms) == 0 {
+		perms = expandLegacyRole(role)
+	}
+	auth.AttachPermissions(sessID, perms)
 }
 
 func (st *state) handleLogout(w http.ResponseWriter, r *http.Request) {
@@ -467,6 +577,307 @@ a.back:hover { color:#f5e6c8; }
 <p style="margin:1.1rem 0 0"><a class="back" href="/">← Site</a></p>
 </div>
 </body></html>`, errHTML, esc(loginAction), csrfField, nextField)
+}
+
+func passwordVerify(pass, encoded string) bool {
+	return password.Verify(pass, encoded)
+}
+
+func (st *state) seedGFMUserIntoRBAC(username, plaintext, role string) {
+	if !st.auth.rbac || st.dbURL == "" || username == "" {
+		return
+	}
+	exists, err := rbac.UserExists(st.dbURL, username)
+	if err != nil || exists {
+		return
+	}
+	hash, err := password.Hash(plaintext)
+	if err != nil {
+		return
+	}
+	target := "member"
+	switch strings.ToLower(role) {
+	case "admin", "superadmin":
+		target = "superadmin"
+	case "editor", "author":
+		// custom roles may not exist yet; fall back to member + ExpandRole at session
+		target = "member"
+	}
+	_ = rbac.EnsureUserWithRole(st.dbURL, username, hash, target)
+}
+
+func (st *state) handleRegisterGet(w http.ResponseWriter, r *http.Request) {
+	_, csrf, setCookie := resolveSession(r)
+	html := registerPageHTML(st.auth.registerPath, nil, csrf)
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	appendSetCookie(w, setCookie)
+	_, _ = io.WriteString(w, html)
+}
+
+func (st *state) handleRegisterPost(w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	sid, csrf, setCookie := resolveSession(r)
+	csrfToken := r.FormValue("_csrf")
+	if csrfToken != "" {
+		if !session.ValidateCSRF(sid, csrfToken) {
+			msg := "Invalid CSRF token."
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+			appendSetCookie(w, setCookie)
+			_, _ = io.WriteString(w, registerPageHTML(st.auth.registerPath, &msg, csrf))
+			return
+		}
+	}
+	username := strings.TrimSpace(r.FormValue("username"))
+	pass := r.FormValue("password")
+	if len(username) < 2 || len(pass) < 4 {
+		msg := "Username (≥2) and password (≥4) required."
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		appendSetCookie(w, setCookie)
+		_, _ = io.WriteString(w, registerPageHTML(st.auth.registerPath, &msg, csrf))
+		return
+	}
+	hash, err := password.Hash(pass)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if err := rbac.RegisterUser(st.dbURL, username, hash, st.auth.defaultRole); err != nil {
+		msg := err.Error()
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		appendSetCookie(w, setCookie)
+		_, _ = io.WriteString(w, registerPageHTML(st.auth.registerPath, &msg, csrf))
+		return
+	}
+	res := st.tryLogin(username, pass)
+	if ok, _ := res["ok"].(bool); ok {
+		sessID, _ := res["session_id"].(string)
+		role, _ := res["role"].(string)
+		st.attachLoginPermissions(sessID, username, role)
+		w.Header().Add("Set-Cookie", session.IssueCookie(sessID))
+		dest := st.auth.loginRedirect
+		held := session.PermissionsFromSession(sessID)
+		if !session.PermissionAllowed(held, []string{"desk:access"}) {
+			dest = "/"
+		}
+		http.Redirect(w, r, dest, http.StatusSeeOther)
+		return
+	}
+	http.Redirect(w, r, st.auth.loginPath, http.StatusSeeOther)
+}
+
+func registerPageHTML(action string, errMsg *string, csrf string) string {
+	errHTML := ""
+	if errMsg != nil && *errMsg != "" {
+		errHTML = fmt.Sprintf("<p class=\"flash err\">%s</p>", esc(*errMsg))
+	}
+	csrfField := ""
+	if csrf != "" {
+		csrfField = fmt.Sprintf("<input type=\"hidden\" name=\"_csrf\" value=\"%s\"/>", esc(csrf))
+	}
+	return fmt.Sprintf(`<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Register</title>
+<style>
+:root { --ink:#0a0809; --paper:#f5e6c8; --gold:#d4af37; --err:#b91c1c; }
+* { box-sizing:border-box; }
+body { margin:0; min-height:100vh; display:grid; place-items:center; color:var(--paper); font-family:"Noto Sans SC","IBM Plex Sans",system-ui,sans-serif;
+  background: radial-gradient(ellipse 90%% 55%% at 50%% -15%%, rgba(107,30,58,.5), transparent 58%%), linear-gradient(180deg,#0a0809,#120c10 45%%,#0a0809); }
+.login { background:rgba(0,0,0,.45); border:1px solid rgba(212,175,55,.28); border-radius:12px; padding:2rem 2.25rem; width:min(92vw,22rem); }
+.login h1 { margin:0 0 .25rem; font-size:1.55rem; color:var(--gold); }
+.login .sub { color:rgba(245,230,200,.72); margin:0 0 1.25rem; font-size:.9rem; }
+.login form { display:grid; gap:.9rem; }
+.login label { display:grid; gap:.25rem; font-size:.85rem; }
+.login input { padding:.6rem .75rem; border:1px solid rgba(212,175,55,.35); border-radius:8px; font:inherit; color:var(--paper); background:rgba(10,8,9,.7); }
+.login button { background:linear-gradient(135deg,#f5e6c8,var(--gold)); color:var(--ink); border:0; padding:.65rem 1rem; border-radius:999px; cursor:pointer; font:inherit; font-weight:600; }
+.flash.err { background:rgba(185,28,28,.15); color:#fecaca; border:1px solid rgba(185,28,28,.45); padding:.6rem .8rem; border-radius:8px; margin:0 0 .9rem; font-size:.9rem; }
+a.back { color:var(--gold); text-decoration:none; font-size:.85rem; }
+</style>
+</head>
+<body>
+<div class="login">
+<h1>Create account</h1>
+<p class="sub">New members get the default role (comments).</p>
+%s
+<form method="post" action="%s">
+%s
+<label>Username<input name="username" autocomplete="username" required autofocus/></label>
+<label>Password<input name="password" type="password" autocomplete="new-password" required/></label>
+<button type="submit">Register</button>
+</form>
+<p style="margin:1.1rem 0 0"><a class="back" href="/login">← Sign in</a></p>
+</div>
+</body></html>`, errHTML, esc(action), csrfField)
+}
+
+func (st *state) requireRolesManage(w http.ResponseWriter, r *http.Request) bool {
+	held := session.PermissionsFromCookie(r.Header.Get("Cookie"))
+	if !session.PermissionAllowed(held, []string{"roles:manage"}) {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return false
+	}
+	return true
+}
+
+func (st *state) writeJSON(w http.ResponseWriter, status int, v any) {
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(v)
+}
+
+func (st *state) handleRbacListRoles(w http.ResponseWriter, r *http.Request) {
+	if !st.requireRolesManage(w, r) {
+		return
+	}
+	roles, err := rbac.ListRoles(st.dbURL)
+	if err != nil {
+		st.writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": err.Error()})
+		return
+	}
+	st.writeJSON(w, http.StatusOK, map[string]any{"ok": true, "roles": roles})
+}
+
+func (st *state) handleRbacListPermissions(w http.ResponseWriter, r *http.Request) {
+	if !st.requireRolesManage(w, r) {
+		return
+	}
+	perms, err := rbac.ListPermissions(st.dbURL)
+	if err != nil {
+		st.writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": err.Error()})
+		return
+	}
+	st.writeJSON(w, http.StatusOK, map[string]any{"ok": true, "permissions": perms})
+}
+
+func (st *state) handleRbacCreateRole(w http.ResponseWriter, r *http.Request) {
+	if !st.requireRolesManage(w, r) {
+		return
+	}
+	var body struct {
+		Name string `json:"name"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || strings.TrimSpace(body.Name) == "" {
+		st.writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "name required"})
+		return
+	}
+	id, err := rbac.CreateRole(st.dbURL, strings.TrimSpace(body.Name))
+	if err != nil {
+		st.writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": err.Error()})
+		return
+	}
+	st.writeJSON(w, http.StatusOK, map[string]any{"ok": true, "id": id, "name": body.Name})
+}
+
+func (st *state) handleRbacSetRolePerms(w http.ResponseWriter, r *http.Request) {
+	if !st.requireRolesManage(w, r) {
+		return
+	}
+	idStr := r.PathValue("id")
+	roleID, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		st.writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "bad id"})
+		return
+	}
+	var body struct {
+		Permissions []string `json:"permissions"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		st.writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "bad json"})
+		return
+	}
+	grantable := session.PermissionsFromCookie(r.Header.Get("Cookie"))
+	if err := rbac.SetRolePermissions(st.dbURL, roleID, body.Permissions, grantable); err != nil {
+		st.writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": err.Error()})
+		return
+	}
+	st.writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+}
+
+func (st *state) handleRbacAssign(w http.ResponseWriter, r *http.Request) {
+	if !st.requireRolesManage(w, r) {
+		return
+	}
+	var body struct {
+		Username string `json:"username"`
+		Role     string `json:"role"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		st.writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "bad json"})
+		return
+	}
+	if err := rbac.AssignRole(st.dbURL, body.Username, body.Role); err != nil {
+		st.writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": err.Error()})
+		return
+	}
+	st.writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+}
+
+func (st *state) handleRbacDesk(w http.ResponseWriter, r *http.Request) {
+	if !st.requireRolesManage(w, r) {
+		return
+	}
+	roles, _ := rbac.ListRoles(st.dbURL)
+	perms, _ := rbac.ListPermissions(st.dbURL)
+	var roleOpts, permChecks strings.Builder
+	for _, role := range roles {
+		name, _ := role["name"].(string)
+		id := role["id"]
+		sys, _ := role["is_system"].(bool)
+		tag := ""
+		if sys {
+			tag = " (system)"
+		}
+		fmt.Fprintf(&roleOpts, `<option value="%v">%s%s</option>`, id, esc(name), tag)
+	}
+	for _, p := range perms {
+		code, _ := p["code"].(string)
+		desc, _ := p["description"].(string)
+		fmt.Fprintf(&permChecks, `<label style="display:block;margin:.25rem 0"><input type="checkbox" name="perm" value="%s"/> %s — %s</label>`,
+			esc(code), esc(code), esc(desc))
+	}
+	html := fmt.Sprintf(`<!DOCTYPE html>
+<html lang="zh"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Roles · RBAC</title>
+<style>
+body{font-family:"Noto Sans SC",system-ui,sans-serif;max-width:42rem;margin:2rem auto;padding:0 1rem;line-height:1.5}
+h1{font-size:1.4rem} section{margin:1.5rem 0;padding:1rem;border:1px solid #ddd;border-radius:8px}
+button{padding:.5rem 1rem;cursor:pointer} input,select{padding:.4rem;margin:.25rem 0;width:100%%;max-width:20rem}
+#msg{min-height:1.2rem;color:#b91c1c}
+</style></head><body>
+<h1>角色与权限</h1>
+<p>需 <code>roles:manage</code>。系统角色权限不可在此改写；可新建角色并勾选权限，或给用户赋角色。</p>
+<p id="msg"></p>
+<section>
+<h2>新建角色</h2>
+<input id="new-role" placeholder="角色名"/><button type="button" id="btn-create">创建</button>
+</section>
+<section>
+<h2>设置角色权限</h2>
+<select id="role-sel">%s</select>
+<div>%s</div>
+<button type="button" id="btn-set">保存权限</button>
+</section>
+<section>
+<h2>赋角色给用户</h2>
+<input id="assign-user" placeholder="用户名"/>
+<input id="assign-role" placeholder="角色名（如 member）"/>
+<button type="button" id="btn-assign">赋权</button>
+</section>
+<p><a href="/desk">← 后台</a></p>
+<script>
+const msg=document.getElementById('msg');
+async function j(url,opt){const r=await fetch(url,Object.assign({credentials:'same-origin',headers:{'Content-Type':'application/json'}},opt||{}));const d=await r.json();if(!d.ok)throw new Error(d.error||r.status);return d;}
+document.getElementById('btn-create').onclick=async()=>{try{const name=document.getElementById('new-role').value.trim();await j('/_rbac/roles',{method:'POST',body:JSON.stringify({name})});msg.textContent='已创建 '+name;location.reload();}catch(e){msg.textContent=e.message;}};
+document.getElementById('btn-set').onclick=async()=>{try{const id=document.getElementById('role-sel').value;const permissions=[...document.querySelectorAll('input[name=perm]:checked')].map(x=>x.value);await j('/_rbac/roles/'+id+'/permissions',{method:'POST',body:JSON.stringify({permissions})});msg.textContent='权限已保存';}catch(e){msg.textContent=e.message;}};
+document.getElementById('btn-assign').onclick=async()=>{try{const username=document.getElementById('assign-user').value.trim();const role=document.getElementById('assign-role').value.trim();await j('/_rbac/assign',{method:'POST',body:JSON.stringify({username,role})});msg.textContent='已赋 '+role+' → '+username;}catch(e){msg.textContent=e.message;}};
+</script>
+</body></html>`, roleOpts.String(), permChecks.String())
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_, _ = io.WriteString(w, html)
 }
 
 func clientIP(r *http.Request) string {
