@@ -154,6 +154,50 @@ focus.
 
 *> table.put in=None at="navigate" value=spec*
 
+## store_set
+    + `key`
+    + `value`
+    + `scope`="memory"
+
+In-memory (or local/session) key write for SPA client state. Prefer `scope=memory` for tab-local app state.
+
+`spec` =
+
+| op | key | value | scope |
+|----|-----|-------|-------|
+| set | `key` | `value` | `scope` |
+
+*> table.put in=None at="storage" value=spec*
+
+## store_get
+    + `key`
+    + `then`
+    + `scope`="memory"
+
+Read a key then call `then` with `{ok, value, found, key, scope}`.
+
+`spec` =
+
+| op | key | then | scope |
+|----|-----|------|-------|
+| get | `key` | `then` | `scope` |
+
+*> table.put in=None at="storage" value=spec*
+
+## spa_goto
+    + `url`
+    + `replace`=False
+
+SPA navigation: `history.pushState` / `replaceState` via bridge `navigate` effect.
+
+`spec` =
+
+| url | replace |
+|-----|---------|
+| `url` | `replace` |
+
+*> table.put in=None at="navigate" value=spec*
+
 ## storage
     + `spec`
 

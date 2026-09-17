@@ -921,8 +921,23 @@ function runIntervalEffect(exports, spec, onError) {
   intervalHandles.set(id, handle);
 }
 
+const memoryKV = new Map();
+
 function storageStore(scope) {
   if (scope === "cookie") return null;
+  if (scope === "memory" || scope === "mem" || scope === "内存") {
+    return {
+      getItem(key) {
+        return memoryKV.has(key) ? memoryKV.get(key) : null;
+      },
+      setItem(key, value) {
+        memoryKV.set(key, String(value));
+      },
+      removeItem(key) {
+        memoryKV.delete(key);
+      },
+    };
+  }
   if (typeof localStorage === "undefined") return null;
   return scope === "session" ? sessionStorage : localStorage;
 }
