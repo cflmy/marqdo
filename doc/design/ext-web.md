@@ -582,6 +582,7 @@ submit  → action=insert → db.insert；action=update → db.update
 - Postgres / Redis / S3 驱动细节（SQLite 已落地）；  
 - ~~复杂权限与多租户~~ → **可配置 RBAC** 见 [ext-web-rbac.md](ext-web-rbac.md)；**多租户** 见 [ext-web-tenant.md](ext-web-tenant.md)（path/subdomain/header + `tenant_scope`）；
 - ~~重客户端 SPA~~ → **Native SPA** 见 [ext-web-spa.md](ext-web-spa.md)（WASM + 路由表 + `store_set` memory）；
+- ~~实时协同编辑~~ → **Collab MVP** 见 [ext-web-collab.md](ext-web-collab.md)（WS room LWW 文本 + presence）；
 - 子页路由糖的更多约定（`# 应用.route` 已够用）。
 
 ---
