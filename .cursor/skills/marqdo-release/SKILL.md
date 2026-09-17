@@ -27,6 +27,8 @@ Canonical release playbook for **cflmy/marqdo**. Read this skill **before** tagg
 6. Prefer **tag push → GitHub Actions** (`.github/workflows/release.yml`) for **both** Windows and **Linux** install assets. Local packaging is fallback / verification.
 7. After network errors: apply [reference.md § Proxy](reference.md). **First try** `https://proxy.cflmy.top/github.com/cflmy/marqdo.git` (this clone’s usual `origin`). Retry; do not silently skip uploads. If the reverse-proxy still drops long pushes, use **HK jump** (`hk.cflmy.de`) via `scripts/push-via-hk-jump.py` — see reference § **Proxy** / **HK SSH jump**.
 8. **Do not ship a GitHub Release without the Linux extension/native zip.** Job `linux` must attach `marqdo-VER-native-x86_64-unknown-linux-gnu.zip` (and the Linux CLI bundle). Missing Linux packages = release incomplete.
+9. **After publishing GitHub assets that include ext/native zips, upload the same packs to Cloudflare R2** (`https://ext.marqdo.com`) via `scripts/upload-ext-r2.py` so `marqdo ext add` prefers CDN. Credentials live only in `~/.marqdo/r2.env` / CI secrets — **never** commit. See [ext-cdn.md](../../../doc/design/ext-cdn.md).
+10. **CLI and extension packs may version independently** (`ext/VERSION` / CDN `latest/VERSION` vs `Cargo.toml`). Ext-only releases use tag `ext-vX.Y.Z` (or attach assets without bumping CLI).
 
 ## Defaults (after version is confirmed)
 
@@ -160,10 +162,29 @@ Local Windows fallback: `scripts/release-full.ps1 -Tag TAG -Upload` (see script 
 ## Phase 6 — Post-release
 
 1. `gh release view TAG` — confirm assets + notes.
-2. `git status` clean; `main` synced.
-3. Tell user: release URL `https://github.com/cflmy/marqdo/releases/tag/TAG`.
-4. Optional: `./scripts/deploy-public.ps1` / pages workflow if user wants user-site refresh.
-5. Open fresh `## Unreleased` already done in Phase 2.
+2. **Upload extension packs to R2 CDN** (required when shipping ext/native zips):
+   ```bash
+   # credentials: ~/.marqdo/r2.env (never commit) — see doc/design/ext-cdn.md
+   python3 -m pip install --user boto3
+   python3 scripts/upload-ext-r2.py --version VER --from-dir dist/
+   # verify: curl -fsS https://ext.marqdo.com/latest/VERSION
+   ```
+   Prefer downloading CI artifacts into `dist/` if local build skipped Linux/Windows natives.
+3. `git status` clean; `main` synced.
+4. Tell user: release URL `https://github.com/cflmy/marqdo/releases/tag/TAG` **and** CDN `https://ext.marqdo.com/vVER/`.
+5. Optional: `./scripts/deploy-public.ps1` / pages workflow if user wants user-site refresh.
+6. Open fresh `## Unreleased` already done in Phase 2.
+
+## Extension-only release (no CLI bump)
+
+When only `ext/` / native plugins change:
+
+1. Ask user for **ext pack** SemVer (may differ from `Cargo.toml`).
+2. Bump `ext/VERSION`; update CHANGELOG Unreleased → `## Ext pack vVER`.
+3. Build/package `marqdo-VER-ext.zip` + `marqdo-VER-native-*.zip` (CI or local).
+4. Upload to **R2** (`upload-ext-r2.py`) **and** GitHub (tag `ext-vVER` or attach to latest CLI release).
+5. Do **not** retag CLI `vX.Y.Z` unless Cargo also bumps.
+6. Detail: [ext-cdn.md](../../../doc/design/ext-cdn.md).
 
 ## Failure matrix (short)
 

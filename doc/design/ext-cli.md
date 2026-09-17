@@ -51,12 +51,15 @@ L1 sources:
 
 | Variable | Meaning |
 |----------|---------|
-| `MARQDO_EXT_VERSION` | Override SemVer used for Release asset names (default: CLI `CARGO_PKG_VERSION`) |
+| `MARQDO_EXT_VERSION` | Override **extension pack** SemVer (default: CDN `latest/VERSION` → embedded `ext/VERSION` → CLI version) |
+| `MARQDO_EXT_CDN` | Public CDN base (default `https://ext.marqdo.com`) |
 | `MARQDO_EXT_NO_DOWNLOAD=1` | Never hit the network (CI / air-gap); local/cargo only |
-| `MARQDO_EXT_DOWNLOAD_BASE` | Optional mirror base tried **first** (e.g. `https://proxy.cflmy.top/github.com` or a flat asset dir) |
+| `MARQDO_EXT_DOWNLOAD_BASE` | Optional extra base tried **before** CDN |
 | `MARQDO_WEB_PLUGIN` / `MARQDO_AGENT_PLUGIN` / `MARQDO_QUANTUM_PLUGIN` | Explicit native path |
 
-Download order for each Release asset: `MARQDO_EXT_DOWNLOAD_BASE` (if set) → `github.com` → **`https://proxy.cflmy.top/github.com/…`** fallback. Connect timeout 20s; read timeout 10min so large native zips can finish on slow links.
+Download order for each Release asset: `MARQDO_EXT_DOWNLOAD_BASE` → **CDN `ext.marqdo.com`** → `github.com` → **`proxy.cflmy.top`**. Connect timeout 20s; read timeout 10min.
+
+See [ext-cdn.md](ext-cdn.md) for R2 layout, separate ext releases, and `scripts/upload-ext-r2.py`.
 
 Windows Release **zip** also ships `ext/` + `ext/native/*.dll` next to `marqdo.exe` so a portable unzip works offline after one download.
 

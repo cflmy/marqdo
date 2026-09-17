@@ -25,6 +25,9 @@
 **/.marqdo/
 .marqdo-ext/
 .env
+.env.r2
+*.pem
+**/r2.env
 
 # Generated HTML beside tracked public/*.mq.md (sources stay in git)
 /public/index.html

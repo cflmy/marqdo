@@ -3,12 +3,14 @@
 ## Unreleased
 
 ### Added
+- **Extension CDN** (`https://ext.marqdo.com` / Cloudflare R2)：`ext add` 下载顺序改为 CDN → GitHub → proxy；独立包版本见 `ext/VERSION` 与 CDN `latest/VERSION`；上传脚本 `scripts/upload-ext-r2.py`（凭据 `~/.marqdo/r2.env`）。设计见 [ext-cdn.md](doc/design/ext-cdn.md)。
 - `ext add` 下载：GitHub 失败后自动回退 `https://proxy.cflmy.top/github.com/…`；可用 `MARQDO_EXT_DOWNLOAD_BASE` 指定首选镜像；加长读写超时。
 
 ### Fixed
 - `ext/` 导入默认搜索 `~/.marqdo/ext`（与 `marqdo ext add` 安装根一致），无需再手动 `export MARQDO_EXT`。
 
 ### Changed
+- 允许 **CLI 与扩展包分开发版**：扩展包 SemVer 可与 `Cargo.toml` 不同（`MARQDO_EXT_VERSION` / `ext/VERSION` / CDN latest）。
 
 ## v1.0.2 — 2026-09-16
 

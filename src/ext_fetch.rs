@@ -1,23 +1,32 @@
-//! Download official `ext/` L1 sources and native plugins from GitHub Releases.
+//! Download official `ext/` L1 sources and native plugins.
 //!
 //! Enables `marqdo ext add web` without a local Rust toolchain or repo checkout.
-//! Disable with `MARQDO_EXT_NO_DOWNLOAD=1`. Override tag with `MARQDO_EXT_VERSION=0.3.4`.
 //!
-//! When GitHub is unreachable, downloads automatically fall back to the project
-//! reverse proxy (`https://proxy.cflmy.top/github.com/…`). Override the candidate
-//! list with `MARQDO_EXT_DOWNLOAD_BASE` (tried first).
+//! Disable with `MARQDO_EXT_NO_DOWNLOAD=1`. Override pack SemVer with
+//! `MARQDO_EXT_VERSION` (independent of CLI `CARGO_PKG_VERSION`).
+//!
+//! Download order (first success wins):
+//! 1. `MARQDO_EXT_DOWNLOAD_BASE` (optional override)
+//! 2. **CDN** `https://ext.marqdo.com` (Cloudflare R2 custom domain)
+//! 3. GitHub Releases `github.com/cflmy/marqdo`
+//! 4. GitHub via reverse proxy `proxy.cflmy.top`
 
 use std::env;
 use std::fs::{self, File};
-use std::io::{self, Write};
+use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
+use std::sync::OnceLock;
 use std::time::Duration;
 
 use anyhow::{bail, Context, Result};
 
 const REPO: &str = "cflmy/marqdo";
-/// HTTPS reverse proxy used when github.com is slow or blocked (same as git origin).
+/// Public CDN for extension packs (R2 bucket `marqdo`, custom domain).
+pub const EXT_CDN_BASE: &str = "https://ext.marqdo.com";
+/// HTTPS reverse proxy used when github.com is slow or blocked.
 const GITHUB_MIRROR_PREFIX: &str = "https://proxy.cflmy.top/github.com";
+/// Packaged with the repo; may diverge from CLI SemVer for ext-only releases.
+const EMBEDDED_EXT_VERSION: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/ext/VERSION"));
 
 pub fn downloads_enabled() -> bool {
     match env::var("MARQDO_EXT_NO_DOWNLOAD") {
@@ -29,15 +38,67 @@ pub fn downloads_enabled() -> bool {
     }
 }
 
-/// SemVer without leading `v` (matches release asset names).
+fn normalize_semver(raw: &str) -> Option<String> {
+    let v = raw.trim().trim_start_matches('v').trim();
+    if v.is_empty() {
+        return None;
+    }
+    // one line only
+    let v = v.lines().next()?.trim().trim_start_matches('v').trim();
+    if v.is_empty() {
+        return None;
+    }
+    Some(v.to_string())
+}
+
+/// SemVer of the **extension pack** (may differ from CLI version).
+///
+/// Resolution order:
+/// 1. `MARQDO_EXT_VERSION`
+/// 2. CDN `GET {EXT_CDN}/latest/VERSION` (short timeout; skipped if downloads disabled)
+/// 3. Embedded `ext/VERSION` at build time
+/// 4. CLI `CARGO_PKG_VERSION`
 pub fn release_version() -> String {
     if let Ok(v) = env::var("MARQDO_EXT_VERSION") {
-        let v = v.trim().trim_start_matches('v');
-        if !v.is_empty() {
-            return v.to_string();
+        if let Some(n) = normalize_semver(&v) {
+            return n;
         }
     }
+    if downloads_enabled() {
+        if let Some(n) = fetch_cdn_latest_version() {
+            return n;
+        }
+    }
+    if let Some(n) = normalize_semver(EMBEDDED_EXT_VERSION) {
+        return n;
+    }
     env!("CARGO_PKG_VERSION").to_string()
+}
+
+fn fetch_cdn_latest_version() -> Option<String> {
+    static CACHED: OnceLock<Option<String>> = OnceLock::new();
+    CACHED
+        .get_or_init(|| {
+            let base = env::var("MARQDO_EXT_CDN")
+                .ok()
+                .map(|s| s.trim().trim_end_matches('/').to_string())
+                .filter(|s| !s.is_empty())
+                .unwrap_or_else(|| EXT_CDN_BASE.to_string());
+            let url = format!("{base}/latest/VERSION");
+            let agent = ureq::AgentBuilder::new()
+                .timeout_connect(Duration::from_secs(5))
+                .timeout_read(Duration::from_secs(10))
+                .user_agent(&user_agent())
+                .build();
+            let resp = agent.get(&url).call().ok()?;
+            if !(200..300).contains(&resp.status()) {
+                return None;
+            }
+            let mut body = String::new();
+            resp.into_reader().read_to_string(&mut body).ok()?;
+            normalize_semver(&body)
+        })
+        .clone()
 }
 
 pub fn host_target_triple() -> Option<&'static str> {
@@ -76,21 +137,33 @@ fn http_agent() -> ureq::Agent {
         .build()
 }
 
-/// Candidate download URLs: optional `MARQDO_EXT_DOWNLOAD_BASE`, GitHub, then proxy mirror.
+fn cdn_base() -> String {
+    env::var("MARQDO_EXT_CDN")
+        .ok()
+        .map(|s| s.trim().trim_end_matches('/').to_string())
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| EXT_CDN_BASE.to_string())
+}
+
+/// Candidate download URLs for a release asset.
+///
+/// Order: optional `MARQDO_EXT_DOWNLOAD_BASE` → CDN → GitHub → GitHub proxy.
 pub fn release_asset_urls(ver: &str, filename: &str) -> Vec<String> {
     let mut urls = Vec::new();
     if let Ok(base) = env::var("MARQDO_EXT_DOWNLOAD_BASE") {
         let base = base.trim().trim_end_matches('/');
         if !base.is_empty() {
-            // Flexible bases: full github path prefix, repo root, or flat asset dir.
-            urls.push(format!(
-                "{base}/{REPO}/releases/download/v{ver}/{filename}"
-            ));
+            urls.push(format!("{base}/{REPO}/releases/download/v{ver}/{filename}"));
             urls.push(format!("{base}/releases/download/v{ver}/{filename}"));
             urls.push(format!("{base}/v{ver}/{filename}"));
             urls.push(format!("{base}/{filename}"));
         }
     }
+    let cdn = cdn_base();
+    // Preferred public layout on ext.marqdo.com / R2
+    urls.push(format!("{cdn}/v{ver}/{filename}"));
+    urls.push(format!("{cdn}/releases/v{ver}/{filename}"));
+    urls.push(format!("{cdn}/{filename}"));
     urls.push(format!(
         "https://github.com/{REPO}/releases/download/v{ver}/{filename}"
     ));
@@ -132,7 +205,7 @@ fn download_first_ok(urls: &[String], dest: &Path) -> Result<()> {
         if i == 0 {
             println!("downloading ({url})…");
         } else {
-            println!("retry via mirror ({url})…");
+            println!("retry ({url})…");
         }
         match download_to_file(url, dest) {
             Ok(()) => return Ok(()),
@@ -194,7 +267,6 @@ pub fn ensure_ext_source_tree() -> Result<PathBuf> {
     if marker.is_file() {
         return Ok(cache);
     }
-    // Zip layout from CI: top-level `ext/…`
     let nested = cache.join("ext").join("web").join("web.mq.md");
     if nested.is_file() {
         return Ok(cache.join("ext"));
@@ -211,7 +283,6 @@ pub fn ensure_ext_source_tree() -> Result<PathBuf> {
         let _ = fs::remove_dir_all(&stage);
     }
     extract_zip(&zip_path, &stage)?;
-    // Prefer `ext/` child if present
     let src = if stage.join("ext").join("web").join("web.mq.md").is_file() {
         stage.join("ext")
     } else if stage.join("web").join("web.mq.md").is_file() {
@@ -224,7 +295,6 @@ pub fn ensure_ext_source_tree() -> Result<PathBuf> {
     if cache.exists() {
         let _ = fs::remove_dir_all(&cache);
     }
-    // Move/copy tree into stable cache path
     copy_dir_recursive(&src, &cache)?;
     let _ = fs::remove_dir_all(&stage);
     if !cache.join("web").join("web.mq.md").is_file() {
@@ -271,7 +341,6 @@ pub fn download_native_plugin(short: &str, lib_name: &str) -> Result<PathBuf> {
     if lib_in_cache.is_file() {
         return Ok(lib_in_cache);
     }
-    // Also accept flat layout
     let flat = cache.join(lib_name);
     if flat.is_file() {
         return Ok(flat);
@@ -280,9 +349,8 @@ pub fn download_native_plugin(short: &str, lib_name: &str) -> Result<PathBuf> {
     download_first_ok(&urls, &zip_path).with_context(|| {
         format!(
             "failed to download prebuilt plugins for {triple}. \
-             Set MARQDO_EXT_DOWNLOAD_BASE to a reachable mirror, build locally \
-             (`bash ./scripts/build-web-plugin.sh` for web), \
-             or check https://github.com/{REPO}/releases/tag/v{ver}"
+             Set MARQDO_EXT_CDN / MARQDO_EXT_DOWNLOAD_BASE, build locally, \
+             or check https://github.com/{REPO}/releases and https://ext.marqdo.com/v{ver}/"
         )
     })?;
     if cache.exists() {
@@ -297,7 +365,6 @@ pub fn download_native_plugin(short: &str, lib_name: &str) -> Result<PathBuf> {
     if flat.is_file() {
         return Ok(flat);
     }
-    // Search recursively for the lib name
     if let Some(found) = find_named_file(&cache, lib_name)? {
         return Ok(found);
     }
@@ -342,21 +409,31 @@ mod tests {
     use super::*;
 
     #[test]
-    fn asset_urls_include_github_and_mirror() {
+    fn asset_urls_prefer_cdn_then_github_then_proxy() {
         let u = release_asset_urls("1.0.2", "marqdo-1.0.2-ext.zip");
+        assert!(u[0].starts_with("https://ext.marqdo.com/"));
         assert!(u.iter().any(|x| x.contains("github.com/cflmy/marqdo")));
         assert!(u
             .iter()
             .any(|x| x.contains("proxy.cflmy.top/github.com/cflmy/marqdo")));
-        assert_eq!(
-            u[0],
-            "https://github.com/cflmy/marqdo/releases/download/v1.0.2/marqdo-1.0.2-ext.zip"
-        );
+        let gh = u
+            .iter()
+            .position(|x| x.starts_with("https://github.com/"))
+            .unwrap();
+        let proxy = u
+            .iter()
+            .position(|x| x.contains("proxy.cflmy.top"))
+            .unwrap();
+        assert!(gh < proxy);
+    }
+
+    #[test]
+    fn embedded_ext_version_parses() {
+        assert!(normalize_semver(EMBEDDED_EXT_VERSION).is_some());
     }
 
     #[test]
     fn triple_known_on_ci_hosts() {
-        // At least one of these builds is what we ship.
         let t = host_target_triple();
         if cfg!(any(
             all(target_os = "linux", target_arch = "x86_64"),
