@@ -3,7 +3,7 @@
 ## Unreleased
 
 ### Added
-- Ubuntu PPA packaging scaffold: `debian/` + `scripts/ppa-build-source.sh` + [ubuntu-ppa.md](doc/design/ubuntu-ppa.md).
+- Ubuntu PPA packaging: `debian/` + `scripts/ppa-ship.sh` (一键装工具/打包/dput) + `ppa-build-source.sh` + [ubuntu-ppa.md](doc/design/ubuntu-ppa.md).
 - **Extension CDN** (`https://ext.marqdo.com` / Cloudflare R2)：`ext add` 下载顺序改为 CDN → GitHub → proxy；独立包版本见 `ext/VERSION` 与 CDN `latest/VERSION`；上传脚本 `scripts/upload-ext-r2.py`（凭据 `~/.marqdo/r2.env`）。设计见 [ext-cdn.md](doc/design/ext-cdn.md)。
 - `ext add` 下载：GitHub 失败后自动回退 `https://proxy.cflmy.top/github.com/…`；可用 `MARQDO_EXT_DOWNLOAD_BASE` 指定首选镜像；加长读写超时。
 
