@@ -84,6 +84,10 @@ mkdir -p "$BUILD_AREA"
 shopt -s nullglob
 for f in ../marqdo_"${DEB_VER}"* ../marqdo_"${VER}".orig.tar.*; do
   [ -e "$f" ] || continue
+  # orig may already be a symlink into BUILD_AREA — skip same inode
+  if [ "$(realpath -m "$f")" = "$(realpath -m "$BUILD_AREA/$(basename "$f")")" ]; then
+    continue
+  fi
   cp -f "$f" "$BUILD_AREA/"
 done
 shopt -u nullglob
