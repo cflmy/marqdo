@@ -75,6 +75,9 @@ func TestRenderMarkdownAndLabels(t *testing.T) {
 		map[string]any{"字段": "content", "标签": "正文", "类型": "markdown", "必填": true},
 	})
 	f = form.SetLabels(f, "发布文章", "返回列表", "/desk/posts")
+	if f["redirect"] != "/desk/posts" || f["cancel_href"] != "/desk/posts" {
+		t.Fatalf("labels should stamp redirect/cancel_href, got %#v %#v", f["redirect"], f["cancel_href"])
+	}
 	html := form.Render(f, "post", nil, nil, "")
 	for _, want := range []string{
 		`data-mq-field="markdown"`,

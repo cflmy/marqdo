@@ -69,6 +69,8 @@ func SetRules(formBag map[string]any, rules any) map[string]any {
 }
 
 // SetLabels stamps localized submit / cancel button copy (and optional cancel href).
+// When cancelHref is set, also stamps redirect so successful POST lands on the list
+// (or other cancel target) instead of the composing page's _mq_return path.
 func SetLabels(formBag map[string]any, submit, cancel, cancelHref string) map[string]any {
 	out := cloneMap(formBag)
 	if s := strings.TrimSpace(submit); s != "" {
@@ -79,6 +81,7 @@ func SetLabels(formBag map[string]any, submit, cancel, cancelHref string) map[st
 	}
 	if s := strings.TrimSpace(cancelHref); s != "" {
 		out["cancel_href"] = s
+		out["redirect"] = s
 	}
 	return out
 }
@@ -725,7 +728,16 @@ func RenderBodyCtx(formBag map[string]any, formID string, data, errors any, csrf
 	if csrf != "" {
 		fmt.Fprintf(&body, `<input type="hidden" name="_csrf" value="%s"/>`, esc(csrf))
 	}
-	if action == "update" && rowID != "" {
+	hasIDField := false
+	for _, f := range fields {
+		if fm, ok := f.(map[string]any); ok {
+			if strOf(fm, "name", "") == "id" && IsClientSource(strOf(fm, "source", "client")) {
+				hasIDField = true
+				break
+			}
+		}
+	}
+	if action == "update" && rowID != "" && !hasIDField {
 		fmt.Fprintf(&body, `<input type="hidden" name="id" value="%s"/>`, esc(rowID))
 	}
 	if ctx != nil {

@@ -504,8 +504,10 @@ func (st *state) handleFormPost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if ok, _ := res["ok"].(bool); ok {
+		// Prefer an explicit form redirect (e.g. cancel_href list URL) over the
+		// composing page path stamped as _mq_return.
 		redir := strOpt(res, "redirect", "/")
-		if ctx.ReturnPath != "" {
+		if (redir == "" || redir == "/") && ctx.ReturnPath != "" {
 			redir = ctx.ReturnPath
 		}
 		http.Redirect(w, r, redir, http.StatusSeeOther)

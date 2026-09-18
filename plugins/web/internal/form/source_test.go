@@ -32,6 +32,23 @@ func TestApplySourcesOverwritesClient(t *testing.T) {
 	}
 }
 
+func TestApplySourcesNowIfEmpty(t *testing.T) {
+	frm := SetFields(New("news", "insert", "n"), []any{
+		map[string]any{"字段": "title", "标签": "t", "类型": "text", "必填": true},
+		map[string]any{"字段": "published_at", "标签": "d", "类型": "text", "来源": "空则现在"},
+	})
+	empty := map[string]any{"title": "x", "published_at": ""}
+	ApplySources(frm, empty, &RequestContext{})
+	if empty["published_at"] == nil || empty["published_at"] == "" {
+		t.Fatalf("expected stamp, got %#v", empty["published_at"])
+	}
+	kept := map[string]any{"title": "x", "published_at": "2020-01-02"}
+	ApplySources(frm, kept, &RequestContext{})
+	if kept["published_at"] != "2020-01-02" {
+		t.Fatalf("should keep client date, got %#v", kept["published_at"])
+	}
+}
+
 func TestRenderSkipsServerSources(t *testing.T) {
 	frm := SetFields(New("comments", "insert", "c"), []any{
 		map[string]any{"字段": "body", "标签": "Body", "类型": "textarea", "必填": true},

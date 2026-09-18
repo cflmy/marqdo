@@ -18,6 +18,8 @@ func normalizeSource(raw string) string {
 		return "session.username"
 	case "now", "utc.now", "server.now", "时间", "utc":
 		return "now"
+	case "now_if_empty", "空则现在", "now?":
+		return "now_if_empty"
 	default:
 		return s
 	}
@@ -25,7 +27,8 @@ func normalizeSource(raw string) string {
 
 // IsClientSource reports whether the field is filled by the browser.
 func IsClientSource(source string) bool {
-	return normalizeSource(source) == "client"
+	src := normalizeSource(source)
+	return src == "client" || src == "now_if_empty"
 }
 
 // RequestContext carries session user and route params for form source stamping
@@ -39,7 +42,8 @@ type RequestContext struct {
 }
 
 // ApplySources strips client-supplied values for non-client fields, then stamps
-// from ctx. Always overwrites server-owned keys.
+// from ctx. Always overwrites server-owned keys. `now_if_empty` keeps a non-empty
+// client value and only stamps UTC now when the field was left blank.
 func ApplySources(formBag map[string]any, data map[string]any, ctx *RequestContext) {
 	if data == nil {
 		return
@@ -57,12 +61,21 @@ func ApplySources(formBag map[string]any, data map[string]any, ctx *RequestConte
 			continue
 		}
 		src := normalizeSource(strOf(fm, "source", "client"))
-		if src == "client" {
+		switch src {
+		case "client":
 			continue
-		}
-		delete(data, name)
-		if v, ok := resolveSource(src, ctx); ok {
-			data[name] = v
+		case "now_if_empty":
+			if data[name] != nil && strings.TrimSpace(cellStr(data[name])) != "" {
+				continue
+			}
+			if v, ok := resolveSource("now", ctx); ok {
+				data[name] = v
+			}
+		default:
+			delete(data, name)
+			if v, ok := resolveSource(src, ctx); ok {
+				data[name] = v
+			}
 		}
 	}
 }
