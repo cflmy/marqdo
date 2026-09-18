@@ -185,7 +185,38 @@ fn pack_json(v: &serde_json::Value) -> *mut u8 {
         ptr::copy_nonoverlapping(len.to_le_bytes().as_ptr(), out, 4);
         ptr::copy_nonoverlapping(bytes.as_ptr(), out.add(4), bytes.len());
     }
-    out
+	out
+}
+
+/// getrandom `custom` backend for wasm32 — no wasm-bindgen / JS glue imports.
+/// Preferable to the `js` feature which pulls `__wbindgen_*` and breaks raw mq_* ABI.
+#[cfg(target_arch = "wasm32")]
+#[no_mangle]
+unsafe extern "Rust" fn __getrandom_custom(dest: *mut u8, len: usize) -> u32 {
+    // xorshift64* seeded once; fine for uuid/non-crypto browser host helpers.
+    use std::cell::Cell;
+    thread_local! {
+        static STATE: Cell<u64> = const { Cell::new(0x4d51_5241_4e44_4f21) };
+    }
+    if dest.is_null() || len == 0 {
+        return 0;
+    }
+    let mut s = STATE.with(|c| {
+        let mut v = c.get();
+        if v == 0 {
+            v = 0x4d51_5241_4e44_4f21;
+        }
+        v
+    });
+    let buf = unsafe { std::slice::from_raw_parts_mut(dest, len) };
+    for b in buf.iter_mut() {
+        s ^= s << 13;
+        s ^= s >> 7;
+        s ^= s << 17;
+        *b = (s >> 8) as u8;
+    }
+    STATE.with(|c| c.set(s));
+    0
 }
 
 #[cfg(test)]
