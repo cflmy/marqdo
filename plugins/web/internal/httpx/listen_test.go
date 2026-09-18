@@ -58,6 +58,9 @@ func TestNewHandlerHomeRoutesStatic(t *testing.T) {
 	if rec.Code != 200 {
 		t.Fatalf("static code=%d", rec.Code)
 	}
+	if cc := rec.Header().Get("Cache-Control"); !strings.Contains(cc, "max-age=") {
+		t.Fatalf("static cache-control=%q", cc)
+	}
 	b, _ := io.ReadAll(rec.Result().Body)
 	if string(b) != "hello-static" {
 		// httptest body is already in rec.Body

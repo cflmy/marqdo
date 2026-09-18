@@ -153,8 +153,33 @@ func clientEmbedScript(page map[string]any) string {
 	if wasm == "" {
 		wasm = "/static/marqdo_wasm.wasm"
 	}
+	ver := ""
+	if v, ok := page["asset_version"].(string); ok {
+		ver = strings.TrimSpace(v)
+	} else if v, ok := page["资源版本"].(string); ok {
+		ver = strings.TrimSpace(v)
+	}
+	if ver != "" {
+		bridge = withAssetQuery(bridge, ver)
+		wasm = withAssetQuery(wasm, ver)
+		source = withAssetQuery(source, ver)
+	}
 	return `<script type="module" src="` + esc(bridge) + `" data-mq-wasm="` + esc(wasm) +
 		`" data-mq-source-url="` + esc(source) + `"></script>`
+}
+
+func withAssetQuery(url, ver string) string {
+	if ver == "" || url == "" {
+		return url
+	}
+	if strings.Contains(url, "v=") {
+		return url
+	}
+	sep := "?"
+	if strings.Contains(url, "?") {
+		sep = "&"
+	}
+	return url + sep + "v=" + ver
 }
 
 var firstPBlockRe = regexp.MustCompile(`(?is)^(\s*)(<p\b[^>]*>)(.*?)(</p>)`)

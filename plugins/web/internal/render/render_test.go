@@ -297,3 +297,23 @@ func TestNavBrandClientChrome(t *testing.T) {
 		t.Fatalf("missing drawer veil")
 	}
 }
+
+func TestClientEmbedAssetVersion(t *testing.T) {
+	page := map[string]any{
+		"title":         "v",
+		"asset_version": "20260918d",
+		"client": map[string]any{
+			"source": "/static/client.mq.md",
+		},
+	}
+	html := render.RenderPage(page, "", "")
+	if !strings.Contains(html, `/static/marqdo-bridge.js?v=20260918d`) {
+		t.Fatalf("missing versioned bridge: %s", html)
+	}
+	if !strings.Contains(html, `data-mq-wasm="/static/marqdo_wasm.wasm?v=20260918d"`) {
+		t.Fatalf("missing versioned wasm")
+	}
+	if !strings.Contains(html, `data-mq-source-url="/static/client.mq.md?v=20260918d"`) {
+		t.Fatalf("missing versioned source")
+	}
+}

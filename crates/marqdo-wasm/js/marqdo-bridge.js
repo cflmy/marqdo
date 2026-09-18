@@ -1413,12 +1413,24 @@ export async function autoMount(doc) {
 
 const g = typeof globalThis !== "undefined" ? globalThis : undefined;
 if (g && g.document) {
+  // Defer WASM boot until after first paint / load so LCP images are not
+  // contending with a ~1.6MB wasm download on the critical path.
   const start = () => {
-    autoMount(g.document).catch((e) => console.error("marqdo autoMount:", e));
+    const run = () => {
+      autoMount(g.document).catch((e) => console.error("marqdo autoMount:", e));
+    };
+    const schedule = () => {
+      if (typeof g.requestIdleCallback === "function") {
+        g.requestIdleCallback(() => run(), { timeout: 1500 });
+      } else {
+        g.setTimeout(run, 0);
+      }
+    };
+    if (g.document.readyState === "complete") {
+      schedule();
+    } else {
+      g.addEventListener("load", schedule, { once: true });
+    }
   };
-  if (g.document.readyState === "loading") {
-    g.document.addEventListener("DOMContentLoaded", start);
-  } else {
-    queueMicrotask(start);
-  }
+  start();
 }

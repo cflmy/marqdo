@@ -56,9 +56,23 @@ func NewHandler(appBag map[string]any, entryDir string) (http.Handler, error) {
 	if page == nil {
 		page = map[string]any{}
 	}
+	if _, ok := page["asset_version"]; !ok {
+		if v := strOpt(appBag, "asset_version", ""); v != "" {
+			page["asset_version"] = v
+		}
+	}
 	routes := map[string]any{}
 	if r, ok := appBag["routes"].(map[string]any); ok {
 		routes = r
+	}
+	if av, ok := page["asset_version"]; ok {
+		for _, p := range routes {
+			if pm, ok := p.(map[string]any); ok {
+				if _, has := pm["asset_version"]; !has {
+					pm["asset_version"] = av
+				}
+			}
+		}
 	}
 	forms := map[string]any{}
 	if f, ok := appBag["forms"].(map[string]any); ok {
@@ -174,20 +188,18 @@ func NewHandler(appBag map[string]any, entryDir string) (http.Handler, error) {
 		fs := http.StripPrefix(staticMount, http.FileServer(http.Dir(staticDir)))
 		// Register without method so GET+HEAD share one pattern (avoids conflicts
 		// with more-specific GET/HEAD icon paths under the same prefix).
-		mux.Handle(staticMount+"/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		serveStatic := func(w http.ResponseWriter, r *http.Request) {
 			if r.Method != http.MethodGet && r.Method != http.MethodHead {
 				http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 				return
 			}
+			// Long browser cache; FileServer still honors Last-Modified / 304.
+			// Prefer ?v= / asset_version on HTML refs when assets change.
+			w.Header().Set("Cache-Control", "public, max-age=604800")
 			fs.ServeHTTP(w, r)
-		}))
-		mux.Handle(staticMount, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if r.Method != http.MethodGet && r.Method != http.MethodHead {
-				http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-				return
-			}
-			fs.ServeHTTP(w, r)
-		}))
+		}
+		mux.Handle(staticMount+"/", http.HandlerFunc(serveStatic))
+		mux.Handle(staticMount, http.HandlerFunc(serveStatic))
 	}
 
 	for _, from := range sortedKeys(st.redirects) {
