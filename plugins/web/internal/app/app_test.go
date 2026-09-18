@@ -114,6 +114,50 @@ func TestAuthDefaultGate(t *testing.T) {
 	}
 }
 
+func TestAuthNoAutoGateWhenAdminOff(t *testing.T) {
+	a := app.New(map[string]any{"admin": false})
+	out, err := app.Auth(a, []any{}, map[string]any{"login_path": "/login"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if gates, ok := out["gates"].([]any); ok && len(gates) != 0 {
+		t.Fatalf("expected no auto gate when admin=false, got %v", gates)
+	}
+}
+
+func TestRbacDeskOptIn(t *testing.T) {
+	a := app.New(map[string]any{"admin": false})
+	out, err := app.Rbac(a, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	authBag := out["auth"].(map[string]any)
+	if !boolishTest(authBag["rbac"]) || boolishTest(authBag["rbac_desk"]) {
+		t.Fatalf("default rbac_desk should be false: %v", authBag)
+	}
+	out2, err := app.Rbac(a, map[string]any{"管理台": true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !boolishTest(out2["auth"].(map[string]any)["rbac_desk"]) {
+		t.Fatal("expected rbac_desk true")
+	}
+}
+
+func boolishTest(v any) bool {
+	switch x := v.(type) {
+	case bool:
+		return x
+	case string:
+		s := strings.ToLower(strings.TrimSpace(x))
+		return s == "1" || s == "true" || s == "yes" || s == "真"
+	case float64:
+		return x != 0
+	default:
+		return false
+	}
+}
+
 func TestAuthCustomPrefix(t *testing.T) {
 	a := app.New(map[string]any{"admin": true})
 	out, err := app.Auth(a, []any{}, map[string]any{

@@ -220,7 +220,9 @@ func Auth(appBag map[string]any, users any, opts map[string]any) (map[string]any
 	}
 	out["auth"] = authBag
 	gates := gatesOf(out)
-	if !hasAdminGate(gates, prefix) {
+	// Auto-gate the built-in admin prefix only when admin=true. Custom desks
+	// (admin=false) declare their own gates and must not inherit /admin noise.
+	if boolish(out["admin"]) && !hasAdminGate(gates, prefix) {
 		gates = append(gates, map[string]any{
 			"path":    prefix,
 			"roles":   []any{"admin"},
@@ -228,10 +230,8 @@ func Auth(appBag map[string]any, users any, opts map[string]any) (map[string]any
 			"on_deny": "redirect",
 			"exclude": []any{loginPath},
 		})
-		out["gates"] = gates
-	} else {
-		out["gates"] = gates
 	}
+	out["gates"] = gates
 	return out, nil
 }
 
@@ -337,7 +337,8 @@ func Gate(appBag map[string]any, path string, opts map[string]any) (map[string]a
 }
 
 // Rbac enables DB-backed RBAC on the app (ensure schema at listen).
-// opts may include catalog table (unused beyond flag for now).
+// opts: catalog/目录 (optional seed table); desk/管理台 (bool, default false) —
+// when true, listen mounts /_rbac/* API + desk UI; permission gates work either way.
 func Rbac(appBag map[string]any, opts map[string]any) (map[string]any, error) {
 	out := clone(appBag)
 	authBag, _ := out["auth"].(map[string]any)
@@ -347,9 +348,13 @@ func Rbac(appBag map[string]any, opts map[string]any) (map[string]any, error) {
 		authBag = clone(authBag)
 	}
 	authBag["rbac"] = true
+	authBag["rbac_desk"] = false
 	if opts != nil {
 		if v, ok := first(opts, "catalog", "目录"); ok && v != nil {
 			authBag["permission_catalog"] = v
+		}
+		if v, ok := first(opts, "desk", "管理台"); ok {
+			authBag["rbac_desk"] = boolish(v)
 		}
 	}
 	out["auth"] = authBag

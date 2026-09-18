@@ -224,7 +224,7 @@ static int register_core(void) {
 	if (host_register((char *)"web_app_auth", (char *)"app,users,session_ttl,admin_prefix,login_redirect,logout_redirect,login_path,register,register_path,default_role,session_url", web_app_auth) != 0) return 1;
 	if (host_register((char *)"web_app_oidc", (char *)"app,issuer,client_id,client_secret,redirect_uri,scopes,callback_path,authorize_url,token_url,userinfo_url", web_app_oidc) != 0) return 1;
 	if (host_register((char *)"web_app_gate", (char *)"app,path,roles,permissions,match,on_deny,exclude", web_app_gate) != 0) return 1;
-	if (host_register((char *)"web_app_rbac", (char *)"app,catalog", web_app_rbac) != 0) return 1;
+	if (host_register((char *)"web_app_rbac", (char *)"app,catalog,desk", web_app_rbac) != 0) return 1;
 	if (host_register((char *)"web_app_tenant", (char *)"app,mode,param,column,default_scope", web_app_tenant) != 0) return 1;
 	if (host_register((char *)"web_rbac_can", (char *)"permissions,needed", web_rbac_can) != 0) return 1;
 	if (host_register((char *)"web_rbac_ensure", (char *)"url", web_rbac_ensure) != 0) return 1;

@@ -707,7 +707,7 @@ Localized submit / cancel copy for rendered forms.
     + `layout`=None
     + `asset_version`=None
 
-Construct an app. `admin=True` mounts the built-in CRUD UI under `admin_prefix` (default `/admin`). When `admin=False`, that prefix is not reserved — you may `route` your own pages there. Optional `login_redirect` / `logout_redirect` override post-auth landing. Optional `shell_css` / `layout` / `asset_version` become defaults for pages that do not set their own (see `page.shell_css` / `page.layout` / `page.asset_version`).
+Construct an app. `admin=True` mounts the built-in **table browser** (not a CMS) under `admin_prefix` (default `/admin`). When `admin=False`, that prefix is not reserved and is not auto-gated — declare your own `route` + `gate` desk. Optional `login_redirect` / `logout_redirect` override post-auth landing. Optional `shell_css` / `layout` / `asset_version` become defaults for pages that do not set their own (see `page.shell_css` / `page.layout` / `page.asset_version`).
 
 > ensure_plugin
 *> web_app_new page=`page` db=`db` admin=`admin` host=`host` port=`port` admin_prefix=`admin_prefix` login_redirect=`login_redirect` logout_redirect=`logout_redirect` shell_css=`shell_css` layout=`layout` asset_version=`asset_version`*
@@ -850,10 +850,11 @@ Require access for `path`. Prefer `permissions` (CSV of `resource:action` codes 
 
 ## enable_rbac
     + `catalog`=None
+    + `desk`=False
 
-Enable database-backed RBAC (role ⊥ permission). On listen, ensures `web_permissions` / `web_roles` / `web_role_permissions` / `web_users` / `web_user_roles` and seeds system roles `superadmin` and `member`. See `doc/design/ext-web-rbac.md`. Management UI: `GET /_rbac/desk` (needs `roles:manage`).
+Enable database-backed RBAC (role ⊥ permission). On listen, ensures `web_permissions` / `web_roles` / `web_role_permissions` / `web_users` / `web_user_roles` and seeds system roles `superadmin` and `member`. See `doc/design/ext-web-rbac.md`. By default **no** `/_rbac/*` routes; set `desk=True` to mount the API and `GET /_rbac/desk` (needs `roles:manage`). Permission gates work either way.
 
-*> web_app_rbac app=`self` catalog=`catalog`*
+*> web_app_rbac app=`self` catalog=`catalog` desk=`desk`*
 
 ## tenant
     + `mode`

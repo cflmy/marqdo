@@ -51,6 +51,7 @@ type authConfig struct {
 	logoutRedirect string
 	gates          []gate
 	rbac           bool
+	rbacDesk       bool
 	register       bool
 	registerPath   string
 	defaultRole    string
@@ -86,6 +87,7 @@ func authConfigOf(appBag map[string]any) authConfig {
 			cfg.sessionTTL = n
 		}
 		cfg.rbac = boolish(authBag["rbac"])
+		cfg.rbacDesk = boolish(authBag["rbac_desk"])
 		cfg.register = boolish(authBag["register"])
 		if p := strOpt(authBag, "register_path", ""); p != "" {
 			cfg.registerPath = p
@@ -396,7 +398,8 @@ func (st *state) mountAuthRoutes(mux *http.ServeMux) {
 		}
 		mux.HandleFunc("POST "+rp, st.handleRegisterPost)
 	}
-	if st.auth.rbac && st.dbURL != "" {
+	// Opt-in: enable_rbac alone wires gates/schema; /_rbac HTTP surface needs desk=true.
+	if st.auth.rbac && st.auth.rbacDesk && st.dbURL != "" {
 		mux.HandleFunc("GET /_rbac/roles", st.handleRbacListRoles)
 		mux.HandleFunc("GET /_rbac/permissions", st.handleRbacListPermissions)
 		mux.HandleFunc("POST /_rbac/roles", st.handleRbacCreateRole)
