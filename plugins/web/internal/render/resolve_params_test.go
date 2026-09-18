@@ -103,3 +103,20 @@ func TestMarkdownToHTML(t *testing.T) {
 		t.Fatalf("%s", out)
 	}
 }
+
+func TestCardHrefAbsoluteAndPrefixed(t *testing.T) {
+	page := map[string]any{"link_prefix": "/post/"}
+	if got := cardHref(page, "https://example.com/a"); got != "https://example.com/a" {
+		t.Fatalf("absolute: %q", got)
+	}
+	if got := cardHref(page, "/about"); got != "/about" {
+		t.Fatalf("root: %q", got)
+	}
+	if got := cardHref(page, "hello"); got != "/post/hello" {
+		t.Fatalf("prefixed: %q", got)
+	}
+	html := renderCard(page, map[string]any{"title": "T", "href": "https://ex.test/x", "body": "b"})
+	if !strings.Contains(html, `href="https://ex.test/x"`) {
+		t.Fatalf("card absolute: %s", html)
+	}
+}

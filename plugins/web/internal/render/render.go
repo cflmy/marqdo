@@ -770,10 +770,30 @@ func headHTML(page map[string]any, defaultTitle string) string {
 	return s.String()
 }
 
+func cardHref(page map[string]any, href string) string {
+	href = strings.TrimSpace(href)
+	if href == "" {
+		return ""
+	}
+	if strings.HasPrefix(href, "http://") || strings.HasPrefix(href, "https://") || strings.HasPrefix(href, "//") {
+		return href
+	}
+	if strings.HasPrefix(href, "/") {
+		return href
+	}
+	prefix := "/post/"
+	if page != nil {
+		if p, ok := page["link_prefix"].(string); ok {
+			prefix = p
+		}
+	}
+	return prefix + href
+}
+
 func renderCard(page map[string]any, it map[string]any) string {
 	title := text(it["title"])
 	body := text(it["body"])
-	href := text(it["href"])
+	href := cardHref(page, text(it["href"]))
 	meta := text(it["meta"])
 	tag := text(it["tag"])
 	tc := classAttr(fieldCSS(it, "title"))
@@ -781,11 +801,7 @@ func renderCard(page map[string]any, it map[string]any) string {
 	var card strings.Builder
 	card.WriteString(`<article class="card">`)
 	if href != "" {
-		prefix := "/post/"
-		if p, ok := page["link_prefix"].(string); ok {
-			prefix = p
-		}
-		card.WriteString(fmt.Sprintf(`<a class="card-link" href="%s">`, esc(prefix+href)))
+		card.WriteString(fmt.Sprintf(`<a class="card-link" href="%s">`, esc(href)))
 	}
 	if meta != "" {
 		card.WriteString(fmt.Sprintf(`<div class="card-meta">%s</div>`, esc(meta)))
