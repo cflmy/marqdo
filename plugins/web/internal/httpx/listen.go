@@ -45,6 +45,7 @@ func NewHandler(appBag map[string]any, entryDir string) (http.Handler, error) {
 	}
 	session.Configure(session.Config{
 		DBURL:        dbURL,
+		RedisURL:     sessionURLOf(appBag),
 		TTLSec:       authCfg.sessionTTL,
 		CookieSecure: authCfg.cookieSecure,
 	})
@@ -842,6 +843,18 @@ func dbURLOf(appBag map[string]any) string {
 	}
 	if s, ok := appBag["db_url"].(string); ok {
 		return s
+	}
+	return ""
+}
+
+func sessionURLOf(appBag map[string]any) string {
+	if s, ok := appBag["session_url"].(string); ok && s != "" {
+		return s
+	}
+	if auth, ok := appBag["auth"].(map[string]any); ok {
+		if s, ok := auth["session_url"].(string); ok && s != "" {
+			return s
+		}
 	}
 	return ""
 }

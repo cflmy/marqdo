@@ -213,6 +213,10 @@ func Auth(appBag map[string]any, users any, opts map[string]any) (map[string]any
 	if v := firstStr(opts, "default_role", "默认角色"); v != "" {
 		authBag["default_role"] = v
 	}
+	if v := firstStr(opts, "session_url", "会话地址", "redis_url", "Redis"); v != "" {
+		out["session_url"] = v
+		authBag["session_url"] = v
+	}
 	out["auth"] = authBag
 	gates := gatesOf(out)
 	if !hasAdminGate(gates, prefix) {

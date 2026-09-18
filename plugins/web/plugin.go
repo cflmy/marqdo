@@ -220,7 +220,7 @@ static int register_core(void) {
 	if (host_register((char *)"web_auth_check", (char *)"session_id", web_auth_check) != 0) return 1;
 	if (host_register((char *)"web_auth_logout", (char *)"session_id", web_auth_logout) != 0) return 1;
 	if (host_register((char *)"web_auth_new", (char *)"users,session_ttl", web_auth_new) != 0) return 1;
-	if (host_register((char *)"web_app_auth", (char *)"app,users,session_ttl,admin_prefix,login_redirect,logout_redirect,login_path,register,register_path,default_role", web_app_auth) != 0) return 1;
+	if (host_register((char *)"web_app_auth", (char *)"app,users,session_ttl,admin_prefix,login_redirect,logout_redirect,login_path,register,register_path,default_role,session_url", web_app_auth) != 0) return 1;
 	if (host_register((char *)"web_app_gate", (char *)"app,path,roles,permissions,match,on_deny,exclude", web_app_gate) != 0) return 1;
 	if (host_register((char *)"web_app_rbac", (char *)"app,catalog", web_app_rbac) != 0) return 1;
 	if (host_register((char *)"web_app_tenant", (char *)"app,mode,param,column,default_scope", web_app_tenant) != 0) return 1;
