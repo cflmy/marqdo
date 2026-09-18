@@ -250,6 +250,10 @@ func pathExcluded(path string, exclude []string, loginPath string) bool {
 	if strings.HasPrefix(path, "/oidc/") {
 		return true
 	}
+	// Local logout must always run; never bounce visitors to login→IdP first.
+	if path == "/logout" || strings.HasSuffix(path, "/logout") {
+		return true
+	}
 	for _, ex := range exclude {
 		ex = strings.TrimRight(strings.TrimSuffix(ex, "*"), "/")
 		if ex == "" {
@@ -544,7 +548,13 @@ func (st *state) handleLogout(w http.ResponseWriter, r *http.Request) {
 		auth.Logout(sid)
 	}
 	w.Header().Add("Set-Cookie", session.ClearCookie())
-	http.Redirect(w, r, st.auth.logoutRedirect, http.StatusSeeOther)
+	dest := strings.TrimSpace(st.auth.logoutRedirect)
+	// With OIDC, /login (and siblings) immediately bounce to the IdP — that is
+	// re-auth, not logout. Land on a public page instead.
+	if dest == "" || (st.oidcEnabled() && st.isOIDCEntryPath(dest)) {
+		dest = "/"
+	}
+	http.Redirect(w, r, dest, http.StatusSeeOther)
 }
 
 func (st *state) handleAdminHome(w http.ResponseWriter, r *http.Request) {

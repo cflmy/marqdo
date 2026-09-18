@@ -817,7 +817,7 @@ Register a WebSocket endpoint at `path` (e.g. `/live` or `/chat/{id}`). `mode` i
     + `default_role`="member"
     + `session_url`=None
 
-Keep the app's `admin=True`, and gate `{admin_prefix}` (segment-boundary prefix) behind a login page (default `/admin`). Unauthenticated requests redirect to `login_path` (default `{admin_prefix}/login`, auto-excluded). Does not match `/admin-publish`-style siblings. With `register=True` and `enable_rbac`, exposes `register_path` (writes `web_users` + default role). Optional `session_url` (`redis://…` / `rediss://…`) stores sessions in Redis separately from the Postgres/SQLite app DB; omit to keep `_marqdo_sessions` (or in-memory).
+Keep the app's `admin=True`, and gate `{admin_prefix}` (segment-boundary prefix) behind a login page (default `/admin`). Unauthenticated requests redirect to `login_path` (default `{admin_prefix}/login`, auto-excluded). Does not match `/admin-publish`-style siblings. With `register=True` and `enable_rbac`, exposes `register_path` (writes `web_users` + default role). Optional `session_url` (`redis://…` / `rediss://…`) stores sessions in Redis separately from the Postgres/SQLite app DB; omit to keep `_marqdo_sessions` (or in-memory). With OIDC, do not set `logout_redirect` to a login path (it would bounce to the IdP); conflicting values fall back to `/`.
 
 *> web_app_auth app=`self` users=`users` session_ttl=`session_ttl` admin_prefix=`admin_prefix` login_redirect=`login_redirect` logout_redirect=`logout_redirect` login_path=`login_path` register=`register` register_path=`register_path` default_role=`default_role` session_url=`session_url`*
 

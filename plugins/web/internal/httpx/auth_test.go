@@ -70,3 +70,25 @@ func TestWithNavAuth(t *testing.T) {
 		t.Fatalf("nav user=%v", page["_nav_user"])
 	}
 }
+
+func TestLogoutPathExcludedFromGate(t *testing.T) {
+	gates := []gate{{
+		path:        "/admin",
+		permissions: []string{"desk:access"},
+		matchMode:   gateMatchPrefix,
+		onDeny:      onDenyRedirect,
+		exclude:     []string{"/admin/login"},
+	}}
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /admin/logout", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	})
+	handler := withRBAC(mux, gates, "/login")
+
+	req := httptest.NewRequest(http.MethodGet, "/admin/logout", nil)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("visitor /admin/logout should reach handler, got %d loc=%s", rec.Code, rec.Header().Get("Location"))
+	}
+}
