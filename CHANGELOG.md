@@ -8,6 +8,26 @@
 
 ### Changed
 
+## Ext pack v1.0.5 — 2026-09-18
+
+### Highlights
+
+**ext/web 请求上下文与表单来源（CLI 仍为 v1.0.3）**：字段 `来源`/`source`（session / route / now）、server-only 盖戳、页面 `列表装配`/`compose_list`；禁止按业务表特判。安装：
+
+```bash
+marqdo ext add web   # CDN latest → 1.0.5
+```
+
+### Added
+- **Request context**：表单提交携带 `_mq_params` / `_mq_return`；`ApplySources` 从 session/route/now 写入。
+- **字段来源列**：`client`（默认）/ `session.username` / `route.NAME` / `now`；非 client 不渲染且覆盖客户端伪造。
+- **列表装配**：`compose_list` / `列表装配`（副绑定 + 条件/排序/插槽），详情页可同页渲染子列表。
+- 设计文：[ext-web-request-context.md](doc/design/ext-web-request-context.md)；金样 `ext_web_form_source_live`。
+
+### Changed
+- 扩展包 SemVer **1.0.5**（`ext/VERSION`）；与 CLI **v1.0.3** 可独立安装。
+- 移除评论表名特判（`enrichCommentSubmit`）。
+
 ## Ext pack v1.0.4 — 2026-09-17
 
 ### Highlights
