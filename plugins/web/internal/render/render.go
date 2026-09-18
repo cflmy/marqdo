@@ -731,6 +731,9 @@ func headHTML(page map[string]any, defaultTitle string) string {
 	}
 	var s strings.Builder
 	s.WriteString(fmt.Sprintf("<title>%s</title>", esc(pageTitle)))
+	if csrf, ok := page["_csrf"].(string); ok && strings.TrimSpace(csrf) != "" {
+		s.WriteString(fmt.Sprintf(`<meta name="csrf-token" content="%s"/>`, esc(strings.TrimSpace(csrf))))
+	}
 	if meta, ok := page["meta"].(map[string]any); ok {
 		for k, v := range meta {
 			if k == "title" {

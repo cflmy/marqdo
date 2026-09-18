@@ -236,7 +236,25 @@ git push https://proxy.cflmy.top/github.com/cflmy/marqdo.git vVER
 
 Short GETs via the proxy often work; **long `git push` may still time out**. If push hangs or drops, skip Clash retries and go to **HK SSH jump** below.
 
-`gh` against `api.github.com` may still need a direct path or HK jump (the reverse proxy is for `github.com` git, not always the API).
+`gh` / Release API can use the same path reverse-proxy:
+
+| Path prefix | Upstream |
+|-------------|----------|
+| `/github.com/` | `https://github.com/` |
+| `/api.github.com/` | `https://api.github.com/` |
+| `/uploads.github.com/` | `https://uploads.github.com/` (Release asset POST; OpenResty on HK) |
+
+```bash
+# Upload a Release asset through proxy.cflmy.top (Content-Type: application/octet-stream)
+curl -X POST \
+  -H "Authorization: Bearer $GH_TOKEN" \
+  -H "Accept: application/vnd.github+json" \
+  -H "Content-Type: application/octet-stream" \
+  --data-binary @dist/FILE.zip \
+  "https://proxy.cflmy.top/uploads.github.com/repos/cflmy/marqdo/releases/RELEASE_ID/assets?name=FILE.zip"
+```
+
+Do **not** rewrite `Host: uploads.github.com` against `proxy.cflmy.top` without the `/uploads.github.com/` path prefix — that returns 404.
 
 ### Diagnose
 

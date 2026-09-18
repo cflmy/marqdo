@@ -310,15 +310,37 @@ func (st *state) preparePage(page map[string]any, r *http.Request) map[string]an
 	return p
 }
 
+// attachCSRF stamps page._csrf and returns Set-Cookie when auth is enabled so
+// custom login/register pages (that own GET /login) still expose a token for JS.
+func (st *state) attachCSRF(page map[string]any, r *http.Request) *string {
+	if page == nil || r == nil {
+		return nil
+	}
+	if st.auth.users == nil && !st.auth.rbac {
+		return nil
+	}
+	_, csrf, setCookie := resolveSession(r)
+	if csrf != "" {
+		page["_csrf"] = csrf
+	}
+	return setCookie
+}
+
 func (st *state) writePage(w http.ResponseWriter, r *http.Request, page map[string]any) {
-	html := render.RenderPage(st.preparePage(page, r), st.dbURL, "")
+	p := st.preparePage(page, r)
+	setCookie := st.attachCSRF(p, r)
+	html := render.RenderPage(p, st.dbURL, "")
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	appendSetCookie(w, setCookie)
 	_, _ = io.WriteString(w, html)
 }
 
 func (st *state) writePart(w http.ResponseWriter, r *http.Request, page map[string]any, id string) {
-	html := render.RenderPage(st.preparePage(page, r), st.dbURL, id)
+	p := st.preparePage(page, r)
+	setCookie := st.attachCSRF(p, r)
+	html := render.RenderPage(p, st.dbURL, id)
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	appendSetCookie(w, setCookie)
 	_, _ = io.WriteString(w, html)
 }
 
