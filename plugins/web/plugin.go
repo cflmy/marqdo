@@ -60,6 +60,7 @@ extern int web_page_chrome(char *args_json, char **out_json, char **err_msg);
 extern int web_style(char *args_json, char **out_json, char **err_msg);
 extern int web_compose_components(char *args_json, char **out_json, char **err_msg);
 extern int web_compose_main(char *args_json, char **out_json, char **err_msg);
+extern int web_compose_list(char *args_json, char **out_json, char **err_msg);
 extern int web_compose_intro(char *args_json, char **out_json, char **err_msg);
 extern int web_intro(char *args_json, char **out_json, char **err_msg);
 extern int web_render(char *args_json, char **out_json, char **err_msg);
@@ -164,6 +165,7 @@ static int register_core(void) {
 	if (host_register((char *)"web_style", (char *)"name,table,strict", web_style) != 0) return 1;
 	if (host_register((char *)"web_compose_components", (char *)"page,components", web_compose_components) != 0) return 1;
 	if (host_register((char *)"web_compose_main", (char *)"page,main", web_compose_main) != 0) return 1;
+	if (host_register((char *)"web_compose_list", (char *)"page,main,query,order,target", web_compose_list) != 0) return 1;
 	if (host_register((char *)"web_compose_intro", (char *)"page,intro", web_compose_intro) != 0) return 1;
 	if (host_register((char *)"web_intro", (char *)"table", web_intro) != 0) return 1;
 	if (host_register((char *)"web_compose_form", (char *)"page,form,id,target", web_compose_form) != 0) return 1;
@@ -530,6 +532,30 @@ func web_compose_main(argsJSON *C.char, outJSON **C.char, errMsg **C.char) C.int
 		return replyJSON(outJSON, errMsg, nil, fmt.Errorf("missing `main`"))
 	}
 	out, err := compose.ComposeMain(pageBag, main, callLib)
+	return replyJSON(outJSON, errMsg, out, err)
+}
+
+//export web_compose_list
+func web_compose_list(argsJSON *C.char, outJSON **C.char, errMsg **C.char) C.int {
+	args, err := parseArgs(argsJSON)
+	if err != nil {
+		return replyJSON(outJSON, errMsg, nil, err)
+	}
+	pageBag := asPageMap(args["page"])
+	main := args["main"]
+	if main == nil {
+		main = args["主体"]
+	}
+	if main == nil {
+		return replyJSON(outJSON, errMsg, nil, fmt.Errorf("missing `main`"))
+	}
+	query := args["query"]
+	if query == nil {
+		query = args["条件"]
+	}
+	order, _ := argStr(args, "order", "排序")
+	target, _ := argStr(args, "target", "插槽", "表单插槽")
+	out, err := compose.ComposeList(pageBag, main, query, order, target, callLib)
 	return replyJSON(outJSON, errMsg, out, err)
 }
 

@@ -355,17 +355,30 @@ func withNavAuth(page map[string]any, cookieHeader string) {
 	}
 }
 
+func (st *state) hasPageRoute(path string) bool {
+	if path == "" || st.routes == nil {
+		return false
+	}
+	_, ok := st.routes[path]
+	return ok
+}
+
 func (st *state) mountAuthRoutes(mux *http.ServeMux) {
 	if st.auth.users == nil && !(st.auth.rbac && st.auth.register) {
 		return
 	}
 	if st.auth.users != nil || st.auth.rbac {
 		lp := st.auth.loginPath
-		mux.HandleFunc("GET "+lp, st.handleLoginGet)
+		// Site pages may own GET /login (or /desk/login); always keep POST for auth.
+		if !st.hasPageRoute(lp) {
+			mux.HandleFunc("GET "+lp, st.handleLoginGet)
+		}
 		mux.HandleFunc("POST "+lp, st.handleLoginPost)
 		altLogin := strings.TrimRight(st.auth.adminPrefix, "/") + "/login"
 		if altLogin != lp {
-			mux.HandleFunc("GET "+altLogin, st.handleLoginGet)
+			if !st.hasPageRoute(altLogin) {
+				mux.HandleFunc("GET "+altLogin, st.handleLoginGet)
+			}
 			mux.HandleFunc("POST "+altLogin, st.handleLoginPost)
 		}
 		logoutPath := strings.TrimRight(st.auth.adminPrefix, "/") + "/logout"
@@ -373,7 +386,9 @@ func (st *state) mountAuthRoutes(mux *http.ServeMux) {
 	}
 	if st.auth.register && st.auth.rbac {
 		rp := st.auth.registerPath
-		mux.HandleFunc("GET "+rp, st.handleRegisterGet)
+		if !st.hasPageRoute(rp) {
+			mux.HandleFunc("GET "+rp, st.handleRegisterGet)
+		}
 		mux.HandleFunc("POST "+rp, st.handleRegisterPost)
 	}
 	if st.auth.rbac && st.dbURL != "" {
@@ -455,6 +470,10 @@ func (st *state) handleLoginPost(w http.ResponseWriter, r *http.Request) {
 	role, _ := res["role"].(string)
 	st.attachLoginPermissions(sessID, username, role)
 	dest := loginDest(r, st.auth.loginRedirect)
+	held := session.PermissionsFromSession(sessID)
+	if strings.HasPrefix(dest, "/desk") && !session.PermissionAllowed(held, []string{"desk:access"}) {
+		dest = "/"
+	}
 	w.Header().Add("Set-Cookie", session.IssueCookie(sessID))
 	http.Redirect(w, r, dest, http.StatusSeeOther)
 }

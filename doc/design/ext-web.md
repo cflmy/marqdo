@@ -3,8 +3,8 @@
 | | |
 |---|---|
 | 状态 | **Accepted · W0–W7 + P3 + W8（站点图标/Head/图片装配）完结**（SQLite/Postgres 作者面：页面装配 / db CRUD+`where` / form / 嵌入主区 / `app.route` / 路由 `/_part` / admin UI / RBAC / 上传相册 / SEO·RSS·sitemap / **favicon·头资源·图片装配**；Postgres 等见 §9） |
-| 日期 | 2026-08-11（W8：2026-08-29） |
-| 相关 | [markdown-mapping.md](markdown-mapping.md) · [module-namespace.md](module-namespace.md) · [objects.md](objects.md) · [ext-abi.md](ext-abi.md) · [ext-cli.md](ext-cli.md) · [stdlib-i18n.md](stdlib-i18n.md) · [web-assets-and-images.md](web-assets-and-images.md) |
+| 日期 | 2026-08-11（W8：2026-08-29；请求上下文：2026-09-18） |
+| 相关 | [markdown-mapping.md](markdown-mapping.md) · [module-namespace.md](module-namespace.md) · [objects.md](objects.md) · [ext-abi.md](ext-abi.md) · [ext-cli.md](ext-cli.md) · [stdlib-i18n.md](stdlib-i18n.md) · [web-assets-and-images.md](web-assets-and-images.md) · **[ext-web-request-context.md](ext-web-request-context.md)** |
 | 安装（目标） | `marqdo ext add web`（中英：`web` / `网页`） |
 | 本文目的 | 锁定**作者面**与**类 API**；指导实现 |
 
@@ -247,6 +247,7 @@ import db:db/index.mq.md
 |------|------|
 | compose_components / 组件装配 | 解析组件·样式路径 → 填 nav/sidebar/footer → CSS → 登记 part |
 | compose_main / 主体装配 | 解析库字段与样式路径 → 填 main → 登记 part（如 id=`index`） |
+| compose_list / 列表装配 | 副绑定（独立 query/order）；可选 target 注入引言元素；见 [ext-web-request-context.md](ext-web-request-context.md) |
 
 **槽位推断：** 由组件导出名决定（`nav`→顶栏，`side`→侧栏，`foot`→底栏；其余→main）。
 
@@ -423,6 +424,7 @@ import db:db/index.mq.md
 | `类型` | 控件/值类型：`text` `textarea` `number` `email` `url` `checkbox` `select` … |
 | `必填` | 是否必填 |
 | `默认` | 可选默认值 |
+| `来源` / `source` | 可选；见 [ext-web-request-context.md](ext-web-request-context.md)：`client`（默认）/ `session.username` / `route.NAME` / `now`；非 client 不渲染且服务端盖戳 |
 
 #### 5.5.2 校验表（作者面）
 

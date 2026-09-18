@@ -242,6 +242,17 @@ Assemble main from a bind table (`|属性|值|样式|` or `|front|back|css|`).
 
 *> web_compose_main page=`self` main=`main`*
 
+## compose_list
+    + `main`
+    + `query`=None
+    + `order`=""
+    + `target`=""
+
+Secondary list bind (e.g. comments on a detail page). Same bind shape as compose_main.
+Optional query supports route param placeholders; optional target injects into an intro element id.
+
+*> web_compose_list page=`self` main=`main` query=`query` order=`order` target=`target`*
+
 ## compose_intro
     + `intro`
 

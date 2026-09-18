@@ -2,6 +2,7 @@
 package form
 
 import (
+	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
@@ -17,6 +18,7 @@ var (
 	typeKeys      = []string{"类型", "type"}
 	reqKeys       = []string{"必填", "required"}
 	defKeys       = []string{"默认", "default"}
+	sourceKeys    = []string{"来源", "source"}
 	ruleFieldKeys = []string{"字段", "field", "name"}
 	ruleKeys      = []string{"规则", "rule"}
 	msgKeys       = []string{"消息", "message", "msg"}
@@ -177,12 +179,19 @@ func asFormFields(fields any) []any {
 			if v, ok := pick(m, defKeys); ok {
 				def = cellStr(v)
 			}
+			source := "client"
+			if v, ok := pick(m, sourceKeys); ok {
+				if s := strings.TrimSpace(cellStr(v)); s != "" {
+					source = s
+				}
+			}
 			item := map[string]any{
 				"name":     name,
 				"label":    label,
 				"type":     ty,
 				"required": required,
 				"default":  def,
+				"source":   normalizeSource(source),
 			}
 			if v, ok := m["pk"]; ok {
 				item["pk"] = boolish(v)
@@ -211,6 +220,10 @@ func asFormFields(fields any) []any {
 		if v, ok := pick(t, defKeys); ok {
 			defs = asStrList(v)
 		}
+		sources := []string{}
+		if v, ok := pick(t, sourceKeys); ok {
+			sources = asStrList(v)
+		}
 		var out []any
 		for i, nameRaw := range names {
 			name := table.NormalizeRef(nameRaw)
@@ -233,12 +246,17 @@ func asFormFields(fields any) []any {
 			if i < len(defs) {
 				def = defs[i]
 			}
+			source := "client"
+			if i < len(sources) && strings.TrimSpace(sources[i]) != "" {
+				source = sources[i]
+			}
 			out = append(out, map[string]any{
 				"name":     name,
 				"label":    label,
 				"type":     ty,
 				"required": required,
 				"default":  def,
+				"source":   normalizeSource(source),
 			})
 		}
 		return out
@@ -614,6 +632,11 @@ func strOf(m map[string]any, key, def string) string {
 
 // RenderBody emits form markup only (no document shell).
 func RenderBody(formBag map[string]any, formID string, data, errors any, csrf string) string {
+	return RenderBodyCtx(formBag, formID, data, errors, csrf, nil)
+}
+
+// RenderBodyCtx is RenderBody plus request-context hidden fields for POST.
+func RenderBodyCtx(formBag map[string]any, formID string, data, errors any, csrf string, ctx *RequestContext) string {
 	fields := fieldSlice(formBag)
 	dataM := map[string]any{}
 	if data != nil {
@@ -680,6 +703,20 @@ func RenderBody(formBag map[string]any, formID string, data, errors any, csrf st
 	if action == "update" && rowID != "" {
 		fmt.Fprintf(&body, `<input type="hidden" name="id" value="%s"/>`, esc(rowID))
 	}
+	if ctx != nil {
+		if len(ctx.Params) > 0 {
+			if b, err := json.Marshal(ctx.Params); err == nil {
+				fmt.Fprintf(&body, `<input type="hidden" name="_mq_params" value="%s"/>`, esc(string(b)))
+			}
+		}
+		ret := strings.TrimSpace(ctx.ReturnPath)
+		if ret == "" {
+			ret = strings.TrimSpace(ctx.Path)
+		}
+		if ret != "" && strings.HasPrefix(ret, "/") && !strings.HasPrefix(ret, "//") {
+			fmt.Fprintf(&body, `<input type="hidden" name="_mq_return" value="%s"/>`, esc(ret))
+		}
+	}
 	for _, f := range fields {
 		fm, ok := f.(map[string]any)
 		if !ok {
@@ -687,6 +724,9 @@ func RenderBody(formBag map[string]any, formID string, data, errors any, csrf st
 		}
 		name, _ := fm["name"].(string)
 		if name == "" {
+			continue
+		}
+		if !IsClientSource(strOf(fm, "source", "client")) {
 			continue
 		}
 		label := strOf(fm, "label", name)
@@ -711,6 +751,10 @@ func RenderBody(formBag map[string]any, formID string, data, errors any, csrf st
 		reqAttr := ""
 		if required {
 			reqAttr = " required"
+		}
+		if ty == "hidden" {
+			fmt.Fprintf(&body, `<input type="hidden" name="%s" value="%s"/>`, esc(name), esc(value))
+			continue
 		}
 		body.WriteString("<label>")
 		body.WriteString(esc(label))

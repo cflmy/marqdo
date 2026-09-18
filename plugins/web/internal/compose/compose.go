@@ -152,14 +152,10 @@ func ComposeComponents(page any, layout any, callLib CallLib) (any, error) {
 	return obj, nil
 }
 
-// ComposeMain merges a main bind table into a page bag.
-func ComposeMain(page any, mainTable any, callLib CallLib) (any, error) {
-	obj := asObject(page)
+func resolveBinds(mainTable any, callLib CallLib) (binds []any, css string, err error) {
 	raw := table.AsBind(mainTable)
 	arr, _ := raw.([]any)
-	binds := make([]any, 0, len(arr))
-	css := strField(obj, "styles_css")
-
+	binds = make([]any, 0, len(arr))
 	for _, b := range arr {
 		bm, ok := b.(map[string]any)
 		if !ok {
@@ -191,7 +187,7 @@ func ComposeMain(page any, mainTable any, callLib CallLib) (any, error) {
 		case table.SitePathLibMember:
 			st, err := callLib(sp.Lib + "." + sp.Member)
 			if err != nil {
-				return nil, err
+				return nil, "", err
 			}
 			css += table.AsCSSNamed(sp.Member, st)
 			cssName = sp.Member
@@ -207,6 +203,17 @@ func ComposeMain(page any, mainTable any, callLib CallLib) (any, error) {
 			"css":   cssName,
 		})
 	}
+	return binds, css, nil
+}
+
+// ComposeMain merges a main bind table into a page bag.
+func ComposeMain(page any, mainTable any, callLib CallLib) (any, error) {
+	obj := asObject(page)
+	binds, cssExtra, err := resolveBinds(mainTable, callLib)
+	if err != nil {
+		return nil, err
+	}
+	css := strField(obj, "styles_css") + cssExtra
 
 	if t, ok := table.BindTableName(binds); ok {
 		obj["table"] = t
@@ -231,6 +238,41 @@ func ComposeMain(page any, mainTable any, callLib CallLib) (any, error) {
 	}
 	parts["index"] = part
 	obj["parts"] = parts
+	return obj, nil
+}
+
+// ComposeList appends a secondary bind (detail + child list), with optional
+// query/order/target (inject into intro element id, same as form_target).
+func ComposeList(page any, mainTable any, query any, order, target string, callLib CallLib) (any, error) {
+	obj := asObject(page)
+	binds, cssExtra, err := resolveBinds(mainTable, callLib)
+	if err != nil {
+		return nil, err
+	}
+	if cssExtra != "" {
+		prev := strField(obj, "styles_css")
+		if prev != "" {
+			obj["styles_css"] = prev + cssExtra
+		} else {
+			obj["styles_css"] = cssExtra
+		}
+	}
+	entry := map[string]any{"main": binds}
+	if query != nil {
+		entry["query"] = query
+	}
+	if strings.TrimSpace(order) != "" {
+		entry["order"] = strings.TrimSpace(order)
+	}
+	if t := strings.TrimSpace(target); t != "" {
+		entry["target"] = t
+	}
+	lists := []any{}
+	if existing, ok := obj["lists"].([]any); ok {
+		lists = append(lists, existing...)
+	}
+	lists = append(lists, entry)
+	obj["lists"] = lists
 	return obj, nil
 }
 

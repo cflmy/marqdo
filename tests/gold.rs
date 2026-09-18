@@ -84,6 +84,14 @@ fn ensure_web_plugin_built() {
         assert!(lib.is_file(), "missing Go web plugin at {}", lib.display());
         // SAFETY: single-threaded Once; children inherit for the rest of the test process.
         std::env::set_var("MARQDO_WEB_PLUGIN", &lib);
+        // Prefer repo `ext/` over a stale `~/.marqdo/ext` so new page methods (e.g. compose_list)
+        // are visible without requiring `marqdo ext add web` before gold.
+        if std::env::var_os("MARQDO_EXT").is_none() {
+            let ext = root.join("ext");
+            if ext.join("web").join("web.mq.md").is_file() {
+                std::env::set_var("MARQDO_EXT", &ext);
+            }
+        }
     });
 }
 
@@ -1782,6 +1790,150 @@ fn ext_web_form_slot_smoke() {
         "target-ok
 slot-ok",
     );
+}
+
+#[test]
+fn ext_web_form_source_live() {
+    // Field sources: only body is client-editable; author/slug stamped from session/route.
+    ensure_web_plugin_built();
+
+    let script = "tests/ext/web-form-source-live-server.mq.md";
+    let bin = env!("CARGO_BIN_EXE_marqdo");
+    let mut child = Command::new(bin)
+        .args(["run", script])
+        .current_dir(env!("CARGO_MANIFEST_DIR"))
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("spawn form-source live server");
+
+    let base = "http://127.0.0.1:18117";
+    let ready = std::time::Instant::now();
+    loop {
+        if ready.elapsed().as_secs() > 15 {
+            let _ = child.kill();
+            panic!("form-source live server did not start in time");
+        }
+        let out = Command::new("curl")
+            .args([
+                "-s",
+                "-o",
+                "/dev/null",
+                "-w",
+                "%{http_code}",
+                &format!("{base}/post/hello"),
+            ])
+            .output()
+            .expect("curl probe");
+        if String::from_utf8_lossy(&out.stdout) == "200" {
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(300));
+    }
+
+    let page = Command::new("curl")
+        .args(["-s", &format!("{base}/post/hello")])
+        .output()
+        .expect("curl post page");
+    let html = String::from_utf8_lossy(&page.stdout);
+    assert!(
+        html.contains(r#"name="body""#),
+        "body field missing: {html}"
+    );
+    assert!(
+        !html.contains(r#"name="author""#),
+        "author must not render (server-only): {html}"
+    );
+    assert!(
+        !html.contains(r#"name="post_slug""#),
+        "post_slug must not render (server-only): {html}"
+    );
+    assert!(
+        html.contains("_mq_params") && html.contains("hello"),
+        "expected _mq_params with slug: {html}"
+    );
+
+    let jar = std::env::temp_dir().join("marqdo-form-source-cookies.txt");
+    let _ = std::fs::remove_file(&jar);
+    let login = Command::new("curl")
+        .args([
+            "-s",
+            "-c",
+            jar.to_str().unwrap(),
+            "-b",
+            jar.to_str().unwrap(),
+            "-o",
+            "/dev/null",
+            "-w",
+            "%{http_code}",
+            "-X",
+            "POST",
+            &format!("{base}/login"),
+            "-d",
+            "username=alice&password=secret",
+        ])
+        .output()
+        .expect("curl login");
+    let login_code = String::from_utf8_lossy(&login.stdout);
+    assert!(
+        login_code == "303" || login_code == "302" || login_code == "200",
+        "login http_code={login_code}"
+    );
+
+    let post = Command::new("curl")
+        .args([
+            "-s",
+            "-c",
+            jar.to_str().unwrap(),
+            "-b",
+            jar.to_str().unwrap(),
+            "-o",
+            "/dev/null",
+            "-w",
+            "%{http_code}",
+            "-X",
+            "POST",
+            &format!("{base}/_form/comment"),
+            "--data-urlencode",
+            "body=gold comment",
+            "--data-urlencode",
+            "author=forged-attacker",
+            "--data-urlencode",
+            "post_slug=evil-slug",
+            "--data-urlencode",
+            r#"_mq_params={"slug":"hello"}"#,
+            "--data-urlencode",
+            "_mq_return=/post/hello",
+        ])
+        .output()
+        .expect("curl form post");
+    let post_code = String::from_utf8_lossy(&post.stdout);
+    assert!(
+        post_code == "303" || post_code == "302",
+        "form post http_code={post_code}"
+    );
+
+    let api = Command::new("curl")
+        .args(["-s", &format!("{base}/api/comments")])
+        .output()
+        .expect("curl comments api");
+    let body = String::from_utf8_lossy(&api.stdout);
+    assert!(
+        body.contains("\"author\":\"alice\"") && body.contains("gold comment"),
+        "author must be session user, not forged: {body}"
+    );
+    assert!(
+        body.contains("\"post_slug\":\"hello\""),
+        "post_slug must be route param, not forged: {body}"
+    );
+    assert!(
+        !body.contains("forged-attacker") && !body.contains("evil-slug"),
+        "forged values must not persist: {body}"
+    );
+
+    let _ = child.kill();
+    let _ = child.wait();
+    let _ = std::fs::remove_file(&jar);
 }
 
 #[test]

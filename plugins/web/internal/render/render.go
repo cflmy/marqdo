@@ -462,6 +462,120 @@ func resolveMain(page map[string]any, dbURL string) (intro string, items []map[s
 	return intro, items, total
 }
 
+// listBind is one secondary page list (compose_list / 列表装配).
+type listBind struct {
+	Items  []map[string]any
+	Target string
+	HTML   string
+}
+
+func resolveLists(page map[string]any, dbURL string) []listBind {
+	raw, ok := page["lists"].([]any)
+	if !ok || len(raw) == 0 || dbURL == "" {
+		return nil
+	}
+	var out []listBind
+	for _, entry := range raw {
+		em, ok := entry.(map[string]any)
+		if !ok {
+			continue
+		}
+		bindsAny := table.AsBind(em["main"])
+		arr, _ := bindsAny.([]any)
+		if len(arr) == 0 {
+			continue
+		}
+		tn, ok := table.BindTableName(arr)
+		if !ok {
+			continue
+		}
+		sub := map[string]any{"params": pageParams(page)}
+		if q, ok := em["query"]; ok {
+			sub["query"] = q
+		}
+		if o, ok := em["order"].(string); ok {
+			sub["order"] = o
+		}
+		data := selectPageData(dbURL, tn, sub, 200, 0)
+		rawRows, _ := data["rows"].([]any)
+		projected := table.ProjectRows(arr, rawRows)
+		parr, _ := projected.([]any)
+		var items []map[string]any
+		for _, v := range parr {
+			if m, ok := v.(map[string]any); ok {
+				items = append(items, m)
+			}
+		}
+		lb := listBind{Items: items}
+		if t, ok := em["target"].(string); ok {
+			lb.Target = t
+		}
+		lb.HTML = renderListSection(page, items)
+		out = append(out, lb)
+	}
+	return out
+}
+
+func renderListSection(page map[string]any, items []map[string]any) string {
+	var s strings.Builder
+	s.WriteString(`<div class="list-bind" aria-live="polite">`)
+	if len(items) == 0 {
+		s.WriteString(`<p class="list-empty comment-empty">还没有条目。</p>`)
+	} else {
+		s.WriteString(`<ul class="list-thread comment-thread">`)
+		for _, it := range items {
+			s.WriteString(renderListItem(page, it))
+		}
+		s.WriteString(`</ul>`)
+	}
+	s.WriteString(`</div>`)
+	return s.String()
+}
+
+func renderListItem(page map[string]any, it map[string]any) string {
+	title := text(it["title"])
+	body := text(it["body"])
+	meta := text(it["meta"])
+	href := text(it["href"])
+	if href != "" {
+		return `<li class="list-item">` + renderCard(page, it) + `</li>`
+	}
+	var s strings.Builder
+	s.WriteString(`<li class="list-item comment-item">`)
+	s.WriteString(`<div class="comment-meta">`)
+	if title != "" {
+		s.WriteString(fmt.Sprintf(`<span class="comment-author">%s</span>`, esc(title)))
+	}
+	if meta != "" {
+		s.WriteString(fmt.Sprintf(`<time>%s</time>`, esc(meta)))
+	}
+	s.WriteString(`</div>`)
+	if body != "" {
+		escaped := esc(body)
+		escaped = strings.ReplaceAll(escaped, "\n", "<br>")
+		s.WriteString(fmt.Sprintf(`<p class="comment-body">%s</p>`, escaped))
+	}
+	s.WriteString(`</li>`)
+	return s.String()
+}
+
+func applyListTargets(intro string, lists []listBind) (string, string) {
+	rest := strings.Builder{}
+	for _, lb := range lists {
+		if lb.HTML == "" {
+			continue
+		}
+		if lb.Target != "" && intro != "" {
+			if injected, ok := injectHTMLIntoID(intro, lb.Target, lb.HTML); ok {
+				intro = injected
+				continue
+			}
+		}
+		rest.WriteString(lb.HTML)
+	}
+	return intro, rest.String()
+}
+
 func fieldCSS(obj map[string]any, field string) string {
 	css, _ := obj["_css"].(map[string]any)
 	if css == nil {
@@ -846,7 +960,17 @@ func pageFormHTML(page map[string]any) (formID string, html string) {
 	if !ok || frm == nil {
 		return "", ""
 	}
-	return id, form.RenderBody(frm, id, nil, nil, "")
+	ctx := &form.RequestContext{
+		Params: pageParams(page),
+	}
+	if u, ok := page["_nav_user"].(string); ok {
+		ctx.Username = u
+	}
+	if r, ok := page["_route"].(string); ok && r != "" {
+		ctx.ReturnPath = r
+		ctx.Path = r
+	}
+	return id, form.RenderBodyCtx(frm, id, nil, nil, "", ctx)
 }
 
 func pushIntro(buf *strings.Builder, intro string) {
@@ -906,19 +1030,26 @@ func renderFragment(page map[string]any, dbURL, slot string) string {
 		)
 	default:
 		intro, items, _ := resolveMain(page, dbURL)
+		lists := resolveLists(page, dbURL)
+		intro, listRest := applyListTargets(intro, lists)
+		isDetail, _ := page["detail"].(bool)
 		var body strings.Builder
-		pushIntroAndForm(&body, intro, page)
-		if len(items) > 0 {
-			isDetail, _ := page["detail"].(bool)
-			if isDetail {
+		if isDetail {
+			if len(items) > 0 {
 				body.WriteString(renderArticle(items[0]))
-			} else {
+			}
+			body.WriteString(listRest)
+			pushIntroAndForm(&body, intro, page)
+		} else {
+			pushIntroAndForm(&body, intro, page)
+			if len(items) > 0 {
 				body.WriteString(`<section class="content cards">`)
 				for _, it := range items {
 					body.WriteString(renderCard(page, it))
 				}
 				body.WriteString(`</section>`)
 			}
+			body.WriteString(listRest)
 		}
 		return fmt.Sprintf(`<main class="main" data-slot="main">%s</main>`, body.String())
 	}
@@ -1011,21 +1142,31 @@ func RenderPage(page map[string]any, dbURL string, partID string) string {
 	if images, ok := page["images_html"].(string); ok && images != "" {
 		mainHTML.WriteString(images)
 	}
-	pushIntroAndForm(&mainHTML, intro, page)
-	if len(items) > 0 {
-		isDetail, _ := page["detail"].(bool)
-		if isDetail {
+	lists := resolveLists(page, dbURL)
+	intro, listRest := applyListTargets(intro, lists)
+	isDetail, _ := page["detail"].(bool)
+	if isDetail {
+		if len(items) > 0 {
 			mainHTML.WriteString(renderArticle(items[0]))
-		} else {
+			if total != nil {
+				mainHTML.WriteString(renderPagination(page, *total, len(items)))
+			}
+		}
+		mainHTML.WriteString(listRest)
+		pushIntroAndForm(&mainHTML, intro, page)
+	} else {
+		pushIntroAndForm(&mainHTML, intro, page)
+		if len(items) > 0 {
 			mainHTML.WriteString(`<section class="content cards">`)
 			for _, it := range items {
 				mainHTML.WriteString(renderCard(page, it))
 			}
 			mainHTML.WriteString(`</section>`)
+			if total != nil {
+				mainHTML.WriteString(renderPagination(page, *total, len(items)))
+			}
 		}
-		if total != nil {
-			mainHTML.WriteString(renderPagination(page, *total, len(items)))
-		}
+		mainHTML.WriteString(listRest)
 	}
 
 	styleBlock := ""

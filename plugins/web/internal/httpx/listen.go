@@ -9,6 +9,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -447,6 +448,11 @@ func (st *state) handleFormPost(w http.ResponseWriter, r *http.Request) {
 			data = tenant.StampRow(data, st.tenant.Column, tid)
 		}
 	}
+	ctx := st.requestContext(r, data)
+	delete(data, "_mq_params")
+	delete(data, "_mq_return")
+	delete(data, "_csrf")
+	form.ApplySources(frm, data, ctx)
 	res, err := form.Submit(frm, data, st.dbURL)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -454,12 +460,66 @@ func (st *state) handleFormPost(w http.ResponseWriter, r *http.Request) {
 	}
 	if ok, _ := res["ok"].(bool); ok {
 		redir := strOpt(res, "redirect", "/")
+		if ctx.ReturnPath != "" {
+			redir = ctx.ReturnPath
+		}
 		http.Redirect(w, r, redir, http.StatusSeeOther)
 		return
 	}
-	html := form.Render(frm, id, data, res["errors"], "")
+	html := form.RenderBodyCtx(frm, id, data, res["errors"], "", ctx)
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	_, _ = io.WriteString(w, html)
+}
+
+func (st *state) requestContext(r *http.Request, data map[string]any) *form.RequestContext {
+	ctx := &form.RequestContext{
+		Username: session.UsernameFromCookie(r.Header.Get("Cookie")),
+		Path:     r.URL.Path,
+		Method:   r.Method,
+	}
+	if data != nil {
+		if p := form.ParseMQParams(fmt.Sprint(data["_mq_params"])); len(p) > 0 {
+			ctx.Params = p
+		}
+		if ret, ok := data["_mq_return"].(string); ok {
+			if back := sameHostPath(ret, r.Host); back != "" {
+				ctx.ReturnPath = back
+			} else if strings.HasPrefix(ret, "/") && !strings.HasPrefix(ret, "//") {
+				ctx.ReturnPath = ret
+			}
+		}
+	}
+	if ctx.ReturnPath == "" {
+		if back := sameHostPath(r.Referer(), r.Host); back != "" {
+			ctx.ReturnPath = back
+		}
+	}
+	return ctx
+}
+
+func sameHostPath(raw, host string) string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return ""
+	}
+	u, err := url.Parse(raw)
+	if err != nil || u == nil {
+		return ""
+	}
+	if u.Host != "" && host != "" && !strings.EqualFold(u.Host, host) {
+		return ""
+	}
+	path := u.Path
+	if path == "" {
+		path = "/"
+	}
+	if u.RawQuery != "" {
+		path += "?" + u.RawQuery
+	}
+	if !strings.HasPrefix(path, "/") || strings.HasPrefix(path, "//") {
+		return ""
+	}
+	return path
 }
 
 func (st *state) handleJSON(w http.ResponseWriter, r *http.Request, route middleware.JSONRouteMount) {
