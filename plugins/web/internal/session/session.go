@@ -220,13 +220,17 @@ func Reset(ttlSec uint64) {
 }
 
 func ensureSessionTable(url string) error {
-	_, err := db.Exec(url, fmt.Sprintf(`
+	create := fmt.Sprintf(`
 CREATE TABLE IF NOT EXISTS "%s" (
   id TEXT PRIMARY KEY,
   expires_at INTEGER NOT NULL,
   data TEXT NOT NULL
-);
-CREATE INDEX IF NOT EXISTS idx_marqdo_sessions_exp ON "%s"(expires_at);`, sessionTable, sessionTable), nil)
+)`, sessionTable)
+	if _, err := db.Exec(url, create, nil); err != nil {
+		return err
+	}
+	idx := fmt.Sprintf(`CREATE INDEX IF NOT EXISTS idx_marqdo_sessions_exp ON "%s"(expires_at)`, sessionTable)
+	_, err := db.Exec(url, idx, nil)
 	return err
 }
 
@@ -315,7 +319,7 @@ func saveSQL(url, id string, exp uint64, data map[string]any) error {
 	}
 	_, err = db.Exec(url, fmt.Sprintf(`
 INSERT INTO "%s" (id, expires_at, data) VALUES (?, ?, ?)
-ON CONFLICT(id) DO UPDATE SET expires_at = excluded.expires_at, data = excluded.data`, sessionTable),
+ON CONFLICT (id) DO UPDATE SET expires_at = excluded.expires_at, data = excluded.data`, sessionTable),
 		[]any{id, int64(exp), string(raw)})
 	return err
 }

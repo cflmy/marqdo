@@ -67,15 +67,13 @@ func goMuxPattern(path string) string {
 func resolveSession(r *http.Request) (sid, csrf string, setCookie *string) {
 	cookieHdr := r.Header.Get("Cookie")
 	id, hadCookie := session.IDFromCookie(cookieHdr)
-	if hadCookie {
-		ok := true
-		if ok && id != "" {
-			sid = id
-			if tok, ok := session.CSRFFor(sid); ok {
-				csrf = tok
-			}
-			return sid, csrf, nil
+	if hadCookie && id != "" {
+		if tok, ok := session.CSRFFor(id); ok && tok != "" {
+			return id, tok, nil
 		}
+		// Stale/expired/missing session: mint a fresh session and replace the cookie.
+		// Previously we returned the dead sid with empty CSRF, so login forms had no
+		// _csrf while POST still saw hadCookie=true → "登录令牌失效".
 	}
 	sid = session.NewID(0)
 	tok, _ := session.CSRFFor(sid)

@@ -23,14 +23,23 @@ type txnConn struct {
 }
 
 func (t *txnConn) Exec(query string, args ...any) (sql.Result, error) {
+	if IsPostgres(t.url) {
+		query = RewritePlaceholdersPG(query)
+	}
 	return t.conn.ExecContext(context.Background(), query, args...)
 }
 
 func (t *txnConn) Query(query string, args ...any) (*sql.Rows, error) {
+	if IsPostgres(t.url) {
+		query = RewritePlaceholdersPG(query)
+	}
 	return t.conn.QueryContext(context.Background(), query, args...)
 }
 
 func (t *txnConn) QueryRow(query string, args ...any) *sql.Row {
+	if IsPostgres(t.url) {
+		query = RewritePlaceholdersPG(query)
+	}
 	return t.conn.QueryRowContext(context.Background(), query, args...)
 }
 
@@ -74,7 +83,11 @@ func connFor(url, txnID string) (dbConn, error) {
 		}
 		return t, nil
 	}
-	return open(url)
+	raw, err := open(url)
+	if err != nil {
+		return nil, err
+	}
+	return &rewritingDB{db: raw, pg: IsPostgres(url)}, nil
 }
 
 func takeTxn(txnID string) (*txnConn, error) {
@@ -98,7 +111,7 @@ func resetTxns() {
 	}
 }
 
-// Begin starts a SQLite transaction (BEGIN IMMEDIATE).
+// Begin starts a transaction (BEGIN IMMEDIATE on SQLite, BEGIN on Postgres).
 // Returns {"_type":"txn","txn":id,"url":url,"事务":id,"地址":url}.
 func Begin(url string) (map[string]any, error) {
 	db, err := open(url)
@@ -109,7 +122,11 @@ func Begin(url string) (map[string]any, error) {
 	if err != nil {
 		return nil, err
 	}
-	if _, err := conn.ExecContext(context.Background(), "BEGIN IMMEDIATE"); err != nil {
+	beginSQL := "BEGIN IMMEDIATE"
+	if IsPostgres(url) {
+		beginSQL = "BEGIN"
+	}
+	if _, err := conn.ExecContext(context.Background(), beginSQL); err != nil {
 		_ = conn.Close()
 		return nil, err
 	}
