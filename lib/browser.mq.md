@@ -194,8 +194,10 @@ focus.
     + `key`
     + `value`
     + `scope`="memory"
+    + `then`=""
 
 In-memory (or local/session) key write for SPA client state. Prefer `scope=memory` for tab-local app state.
+Optional `then` is called after the write with `{ok, op, key, scope}`.
 
 `spec` =
 
@@ -203,6 +205,8 @@ In-memory (or local/session) key write for SPA client state. Prefer `scope=memor
 |----|-----|-------|-------|
 | set | `key` | `value` | `scope` |
 
+1. `then` != ""
+    **`spec` = > table.put in=spec at="then" value=then**
 *> table.put in=None at="storage" value=spec*
 
 ## store_get
