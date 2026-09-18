@@ -1162,6 +1162,24 @@ func RenderPage(page map[string]any, dbURL string, partID string) string {
 		mainHTML.WriteString(images)
 	}
 	lists := resolveLists(page, dbURL)
+	csrfTok := ""
+	if v, ok := page["_csrf"].(string); ok {
+		csrfTok = strings.TrimSpace(v)
+	}
+	authNext := ""
+	if v, ok := page["_auth_next"].(string); ok {
+		authNext = strings.TrimSpace(v)
+	}
+	flashErr := ""
+	if v, ok := page["_flash_err"].(string); ok {
+		flashErr = strings.TrimSpace(v)
+	}
+	if spec := AuthFormFromPage(page); spec != nil {
+		if authNext == "" && spec.NextDefault != "" {
+			authNext = spec.NextDefault
+		}
+		intro = ApplyAuthFormIntoIntro(intro, spec, csrfTok, authNext, flashErr)
+	}
 	intro, listRest := applyListTargets(intro, lists)
 	isDetail, _ := page["detail"].(bool)
 	if isDetail {
@@ -1238,7 +1256,7 @@ func RenderPage(page map[string]any, dbURL string, partID string) string {
 		}
 	}
 
-	return fmt.Sprintf(`<!DOCTYPE html>
+	html := fmt.Sprintf(`<!DOCTYPE html>
 <html lang="zh-CN"><head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
@@ -1261,4 +1279,5 @@ func RenderPage(page map[string]any, dbURL string, partID string) string {
 		mainHTML.String(),
 		footerHTML,
 	)
+	return InjectAuthFields(html, csrfTok, authNext, flashErr)
 }

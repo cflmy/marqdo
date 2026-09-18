@@ -310,8 +310,8 @@ func (st *state) preparePage(page map[string]any, r *http.Request) map[string]an
 	return p
 }
 
-// attachCSRF stamps page._csrf and returns Set-Cookie when auth is enabled so
-// custom login/register pages (that own GET /login) still expose a token for JS.
+// attachCSRF stamps page._csrf so custom login/register pages expose a token
+// in meta and (via InjectAuthFields) in POST forms — progressive enhancement, no author JS.
 func (st *state) attachCSRF(page map[string]any, r *http.Request) *string {
 	if page == nil || r == nil {
 		return nil
@@ -328,6 +328,12 @@ func (st *state) attachCSRF(page map[string]any, r *http.Request) *string {
 
 func (st *state) writePage(w http.ResponseWriter, r *http.Request, page map[string]any) {
 	p := st.preparePage(page, r)
+	if st.authEntryRedirect(w, r, p) {
+		return
+	}
+	if next := safeAuthNext(r.URL.Query().Get("next")); next != "" {
+		p["_auth_next"] = next
+	}
 	setCookie := st.attachCSRF(p, r)
 	html := render.RenderPage(p, st.dbURL, "")
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")

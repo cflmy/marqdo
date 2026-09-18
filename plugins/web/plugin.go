@@ -73,6 +73,7 @@ extern int web_db_exec(char *args_json, char **out_json, char **err_msg);
 extern int web_form_new(char *args_json, char **out_json, char **err_msg);
 extern int web_form_fields(char *args_json, char **out_json, char **err_msg);
 extern int web_compose_form(char *args_json, char **out_json, char **err_msg);
+extern int web_compose_auth_form(char *args_json, char **out_json, char **err_msg);
 extern int web_app_new(char *args_json, char **out_json, char **err_msg);
 extern int web_app_route(char *args_json, char **out_json, char **err_msg);
 extern int web_db_update(char *args_json, char **out_json, char **err_msg);
@@ -169,6 +170,7 @@ static int register_core(void) {
 	if (host_register((char *)"web_compose_intro", (char *)"page,intro", web_compose_intro) != 0) return 1;
 	if (host_register((char *)"web_intro", (char *)"table", web_intro) != 0) return 1;
 	if (host_register((char *)"web_compose_form", (char *)"page,form,id,target", web_compose_form) != 0) return 1;
+	if (host_register((char *)"web_compose_auth_form", (char *)"page,action,submit,form_id,err_id,target,next,kind", web_compose_auth_form) != 0) return 1;
 	if (host_register((char *)"web_render", (char *)"page", web_render) != 0) return 1;
 	if (host_register((char *)"web_db_new", (char *)"url", web_db_new) != 0) return 1;
 	if (host_register((char *)"web_db_init", (char *)"url,name,fields", web_db_init) != 0) return 1;
@@ -815,6 +817,45 @@ func web_compose_form(argsJSON *C.char, outJSON **C.char, errMsg **C.char) C.int
 		target = &t
 	}
 	out, err := compose.ComposeForm(pageBag, formV, id, target)
+	return replyJSON(outJSON, errMsg, out, err)
+}
+
+//export web_compose_auth_form
+func web_compose_auth_form(argsJSON *C.char, outJSON **C.char, errMsg **C.char) C.int {
+	args, err := parseArgs(argsJSON)
+	if err != nil {
+		return replyJSON(outJSON, errMsg, nil, err)
+	}
+	pageBag := args["page"]
+	action, _ := argStr(args, "action")
+	if action == "" {
+		action, _ = argStr(args, "动作")
+	}
+	submit, _ := argStr(args, "submit")
+	if submit == "" {
+		submit, _ = argStr(args, "提交")
+	}
+	formID, _ := argStr(args, "form_id")
+	if formID == "" {
+		formID, _ = argStr(args, "表单id")
+	}
+	errID, _ := argStr(args, "err_id")
+	if errID == "" {
+		errID, _ = argStr(args, "错误id")
+	}
+	target, _ := argStr(args, "target")
+	if target == "" {
+		target, _ = argStr(args, "表单插槽")
+	}
+	next, _ := argStr(args, "next")
+	if next == "" {
+		next, _ = argStr(args, "回跳")
+	}
+	kind, _ := argStr(args, "kind")
+	if kind == "" {
+		kind, _ = argStr(args, "种类")
+	}
+	out, err := compose.ComposeAuthForm(pageBag, action, submit, formID, errID, target, next, kind)
 	return replyJSON(outJSON, errMsg, out, err)
 }
 

@@ -356,6 +356,20 @@ Embed a form into the page main slot. Optional `target` / `form_slot` (CSS id, e
 
 *> web_compose_form page=`self` form=`form` id=`id` target=`target`*
 
+## compose_auth_form
+    + `action`
+    + `submit`=""
+    + `form_id`=""
+    + `err_id`=""
+    + `target`=None
+    + `next`=""
+    + `kind`=""
+
+Progressive-enhancement login/register form: server injects `_csrf` / `next`,
+re-renders the same branded page on failure. No author JS.
+
+*> web_compose_auth_form page=`self` action=`action` submit=`submit` form_id=`form_id` err_id=`err_id` target=`target` next=`next` kind=`kind`*
+
 ## render
     + `db`=None
 

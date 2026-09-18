@@ -381,6 +381,7 @@ func (st *state) mountAuthRoutes(mux *http.ServeMux) {
 			}
 			mux.HandleFunc("POST "+altLogin, st.handleLoginPost)
 		}
+		st.mountExtraLoginPosts(mux, map[string]bool{lp: true, altLogin: true})
 		logoutPath := strings.TrimRight(st.auth.adminPrefix, "/") + "/logout"
 		mux.HandleFunc("GET "+logoutPath, st.handleLogout)
 	}
@@ -435,14 +436,12 @@ func (st *state) handleLoginPost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	cookieHdr := r.Header.Get("Cookie")
-	sid, csrf, setCookie := resolveSession(r)
+	sid, _, _ := resolveSession(r)
 	_, hadCookie := session.IDFromCookie(cookieHdr)
 	csrfToken := r.FormValue("_csrf")
 	if csrfToken != "" || hadCookie {
 		if !session.ValidateCSRF(sid, csrfToken) {
-			w.Header().Set("Content-Type", "text/html; charset=utf-8")
-			appendSetCookie(w, setCookie)
-			_, _ = io.WriteString(w, "<p class=\"flash err\">Invalid or missing CSRF token. Refresh and try again.</p>")
+			st.writeAuthFailure(w, r, "Invalid or missing CSRF token. Refresh and try again.")
 			return
 		}
 	}
@@ -450,26 +449,30 @@ func (st *state) handleLoginPost(w http.ResponseWriter, r *http.Request) {
 	password := r.FormValue("password")
 	ip := clientIP(r)
 	if err := ratelimit.Check(ip, username); err != nil {
-		msg := err.Error()
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		appendSetCookie(w, setCookie)
-		_, _ = io.WriteString(w, loginPageHTML(st.auth.loginPath, &msg, csrf, r.FormValue("next")))
+		st.writeAuthFailure(w, r, err.Error())
 		return
 	}
 	res := st.tryLogin(username, password)
 	if ok, _ := res["ok"].(bool); !ok {
 		ratelimit.RecordFailure(ip, username)
-		errMsg := "Invalid username or password."
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		appendSetCookie(w, setCookie)
-		_, _ = io.WriteString(w, loginPageHTML(st.auth.loginPath, &errMsg, csrf, r.FormValue("next")))
+		st.writeAuthFailure(w, r, "Invalid username or password.")
 		return
 	}
 	ratelimit.ClearSuccess(ip, username)
 	sessID, _ := res["session_id"].(string)
 	role, _ := res["role"].(string)
 	st.attachLoginPermissions(sessID, username, role)
-	dest := loginDest(r, st.auth.loginRedirect)
+	fallback := st.auth.loginRedirect
+	if page := st.pageForAuthPath(r.URL.Path); page != nil {
+		if af, ok := page["auth_form"].(map[string]any); ok {
+			if n, ok := af["next"].(string); ok {
+				if n = strings.TrimSpace(n); n != "" {
+					fallback = n
+				}
+			}
+		}
+	}
+	dest := loginDest(r, fallback)
 	held := session.PermissionsFromSession(sessID)
 	if strings.HasPrefix(dest, "/desk") && !session.PermissionAllowed(held, []string{"desk:access"}) {
 		dest = "/"
@@ -477,6 +480,7 @@ func (st *state) handleLoginPost(w http.ResponseWriter, r *http.Request) {
 	w.Header().Add("Set-Cookie", session.IssueCookie(sessID))
 	http.Redirect(w, r, dest, http.StatusSeeOther)
 }
+
 
 // tryLogin: GFM users first, then web_users when RBAC is on.
 func (st *state) tryLogin(username, password string) map[string]any {
@@ -638,24 +642,19 @@ func (st *state) handleRegisterPost(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	sid, csrf, setCookie := resolveSession(r)
+	sid, _, _ := resolveSession(r)
+	_, hadCookie := session.IDFromCookie(r.Header.Get("Cookie"))
 	csrfToken := r.FormValue("_csrf")
-	if csrfToken != "" {
+	if csrfToken != "" || hadCookie {
 		if !session.ValidateCSRF(sid, csrfToken) {
-			msg := "Invalid CSRF token."
-			w.Header().Set("Content-Type", "text/html; charset=utf-8")
-			appendSetCookie(w, setCookie)
-			_, _ = io.WriteString(w, registerPageHTML(st.auth.registerPath, &msg, csrf))
+			st.writeRegisterFailure(w, r, "Invalid CSRF token.")
 			return
 		}
 	}
 	username := strings.TrimSpace(r.FormValue("username"))
 	pass := r.FormValue("password")
 	if len(username) < 2 || len(pass) < 4 {
-		msg := "Username (≥2) and password (≥4) required."
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		appendSetCookie(w, setCookie)
-		_, _ = io.WriteString(w, registerPageHTML(st.auth.registerPath, &msg, csrf))
+		st.writeRegisterFailure(w, r, "Username (≥2) and password (≥4) required.")
 		return
 	}
 	hash, err := password.Hash(pass)
@@ -664,10 +663,7 @@ func (st *state) handleRegisterPost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := rbac.RegisterUser(st.dbURL, username, hash, st.auth.defaultRole); err != nil {
-		msg := err.Error()
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		appendSetCookie(w, setCookie)
-		_, _ = io.WriteString(w, registerPageHTML(st.auth.registerPath, &msg, csrf))
+		st.writeRegisterFailure(w, r, err.Error())
 		return
 	}
 	res := st.tryLogin(username, pass)
