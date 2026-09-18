@@ -8,6 +8,28 @@
 
 ### Changed
 
+## Ext pack v1.0.6 — 2026-09-18
+
+### Highlights
+
+**ext/web OIDC、表单删除与安静管理台（CLI 仍为 v1.0.3）**：OIDC 登录/登出回首页、表单 `删除` 动作、默认关闭内置 admin/RBAC desk、独立 Redis 会话 URL、Postgres CRUD。安装：
+
+```bash
+marqdo ext add web   # CDN latest → 1.0.6
+```
+
+### Added
+- **OIDC**：`auth.oidc` / 网页鉴权 OIDC；登录入口与 `next` 回跳。
+- **表单删除**：`form` 动作 `删除`/`delete`（通用 CRUD，无站点特判）。
+- **列表/路由**：请求上下文、列表装配延续；注销默认回 `/` 避免 IdP 再登录环。
+
+### Fixed
+- 内置 admin / RBAC desk 默认安静，直至显式 `admin` / `enable_rbac`。
+- 静态资源缓存与 WASM 启动延迟；会话 CSRF 与 Postgres 方言。
+
+### Changed
+- 扩展包 SemVer **1.0.6**（`ext/VERSION`）；与 CLI **v1.0.3** 可独立安装。
+
 ## Ext pack v1.0.5 — 2026-09-18
 
 ### Highlights
