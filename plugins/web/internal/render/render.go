@@ -467,6 +467,18 @@ type listBind struct {
 	Items  []map[string]any
 	Target string
 	HTML   string
+	Rail   bool
+}
+
+func isRailTarget(target string) bool {
+	t := strings.TrimSpace(strings.ToLower(target))
+	t = strings.TrimPrefix(t, "#")
+	switch t {
+	case "rail", "轨", "side-rail", "aside.side-rail", "新闻轨":
+		return true
+	default:
+		return false
+	}
 }
 
 func resolveLists(page map[string]any, dbURL string) []listBind {
@@ -496,7 +508,15 @@ func resolveLists(page map[string]any, dbURL string) []listBind {
 		if o, ok := em["order"].(string); ok {
 			sub["order"] = o
 		}
-		data := selectPageData(dbURL, tn, sub, 200, 0)
+		limit := int64(200)
+		target := ""
+		if t, ok := em["target"].(string); ok {
+			target = t
+		}
+		if isRailTarget(target) {
+			limit = 24
+		}
+		data := selectPageData(dbURL, tn, sub, limit, 0)
 		rawRows, _ := data["rows"].([]any)
 		projected := table.ProjectRows(arr, rawRows)
 		parr, _ := projected.([]any)
@@ -506,14 +526,59 @@ func resolveLists(page map[string]any, dbURL string) []listBind {
 				items = append(items, m)
 			}
 		}
-		lb := listBind{Items: items}
-		if t, ok := em["target"].(string); ok {
-			lb.Target = t
+		lb := listBind{Items: items, Target: target, Rail: isRailTarget(target)}
+		if lb.Rail {
+			lb.HTML = renderNewsRail(items)
+		} else {
+			lb.HTML = renderListSection(page, items)
 		}
-		lb.HTML = renderListSection(page, items)
 		out = append(out, lb)
 	}
 	return out
+}
+
+func renderNewsRail(items []map[string]any) string {
+	var list strings.Builder
+	if len(items) == 0 {
+		list.WriteString(`<li class="side-news-empty">暂无快讯，请在库表 news 中添加。</li>`)
+	} else {
+		for _, it := range items {
+			title := text(it["title"])
+			href := strings.TrimSpace(text(it["href"]))
+			if href == "" {
+				href = "#"
+			}
+			meta := text(it["meta"])
+			if len(meta) > 10 {
+				meta = meta[:10]
+			}
+			tag := text(it["tag"])
+			ext := strings.HasPrefix(href, "http://") || strings.HasPrefix(href, "https://")
+			list.WriteString(`<li>`)
+			list.WriteString(`<a href="` + esc(href) + `"`)
+			if ext {
+				list.WriteString(` target="_blank" rel="noopener noreferrer"`)
+			}
+			list.WriteString(`>`)
+			list.WriteString(`<span class="side-news-meta">`)
+			if meta != "" {
+				list.WriteString(`<time>` + esc(meta) + `</time>`)
+			}
+			if tag != "" {
+				list.WriteString(`<span class="side-news-src">` + esc(tag) + `</span>`)
+			}
+			list.WriteString(`</span>`)
+			list.WriteString(`<span class="side-news-title">` + esc(title) + `</span>`)
+			list.WriteString(`</a></li>`)
+		}
+	}
+	return `<aside class="side-rail side-rail--news" aria-label="量子新闻">` +
+		`<div class="side-rail-head">` +
+		`<p class="side-rail-label">量子新闻</p>` +
+		`<a class="side-rail-jump" href="/news" title="浏览全部新闻" aria-label="浏览全部新闻">全部 →</a>` +
+		`</div>` +
+		`<div class="side-rail-body"><ul class="side-news-list">` + list.String() + `</ul></div>` +
+		`</aside>`
 }
 
 func renderListSection(page map[string]any, items []map[string]any) string {
@@ -559,10 +624,17 @@ func renderListItem(page map[string]any, it map[string]any) string {
 	return s.String()
 }
 
-func applyListTargets(intro string, lists []listBind) (string, string) {
+func applyListTargets(intro string, lists []listBind) (string, string, string) {
 	rest := strings.Builder{}
+	rail := ""
 	for _, lb := range lists {
 		if lb.HTML == "" {
+			continue
+		}
+		if lb.Rail {
+			if rail == "" {
+				rail = lb.HTML
+			}
 			continue
 		}
 		if lb.Target != "" && intro != "" {
@@ -573,7 +645,7 @@ func applyListTargets(intro string, lists []listBind) (string, string) {
 		}
 		rest.WriteString(lb.HTML)
 	}
-	return intro, rest.String()
+	return intro, rest.String(), rail
 }
 
 func fieldCSS(obj map[string]any, field string) string {
@@ -766,8 +838,42 @@ func headHTML(page map[string]any, defaultTitle string) string {
 			assetVersion = v
 		}
 		s.WriteString(assets.RenderHeadLinksWithVersion(links, assetVersion))
+		if headNeedsKatexBoot(links) {
+			s.WriteString(katexBootScript())
+		}
 	}
 	return s.String()
+}
+
+func headNeedsKatexBoot(links []assets.HeadLink) bool {
+	hasAuto := false
+	for _, l := range links {
+		href := strings.ToLower(l.Href)
+		if strings.Contains(href, "auto-render") {
+			hasAuto = true
+			break
+		}
+	}
+	return hasAuto
+}
+
+func katexBootScript() string {
+	// Official host glue: call KaTeX auto-render after deferred scripts load.
+	// Authors must not ship this as business JS.
+	return `<script defer>
+document.addEventListener("DOMContentLoaded",function(){
+  if(typeof renderMathInElement!=="function")return;
+  var roots=document.querySelectorAll(".article,.article-body.md");
+  if(!roots.length)roots=document.querySelectorAll("main.main");
+  var opts={delimiters:[
+    {left:"$$",right:"$$",display:true},
+    {left:"\\[",right:"\\]",display:true},
+    {left:"$",right:"$",display:false},
+    {left:"\\(",right:"\\)",display:false}
+  ],throwOnError:false,ignoredTags:["script","noscript","style","textarea","pre","code"]};
+  for(var i=0;i<roots.length;i++){try{renderMathInElement(roots[i],opts);}catch(e){}}
+});
+</script>`
 }
 
 func cardHref(page map[string]any, href string) string {
@@ -798,8 +904,31 @@ func renderCard(page map[string]any, it map[string]any) string {
 	tag := text(it["tag"])
 	tc := classAttr(fieldCSS(it, "title"))
 	bc := classAttr(fieldCSS(it, "body"))
+	cls := "card"
+	switch v := it["pinned"].(type) {
+	case bool:
+		if v {
+			cls += " is-pinned"
+		}
+	case string:
+		if v == "1" || strings.EqualFold(v, "true") {
+			cls += " is-pinned"
+		}
+	case float64:
+		if v == 1 {
+			cls += " is-pinned"
+		}
+	case int:
+		if v == 1 {
+			cls += " is-pinned"
+		}
+	case int64:
+		if v == 1 {
+			cls += " is-pinned"
+		}
+	}
 	var card strings.Builder
-	card.WriteString(`<article class="card">`)
+	card.WriteString(`<article class="` + cls + `">`)
 	if href != "" {
 		card.WriteString(fmt.Sprintf(`<a class="card-link" href="%s">`, esc(href)))
 	}
@@ -1013,17 +1142,24 @@ func pushIntroAndForm(buf *strings.Builder, intro string, page map[string]any) {
 	}
 	if formHTML != "" && target != "" && intro != "" {
 		if injected, ok := injectHTMLIntoID(intro, target, formHTML); ok {
-			buf.WriteString(fmt.Sprintf(`<div class="main-intro">%s</div>`, injected))
+			buf.WriteString(fmt.Sprintf(`<div class="%s">%s</div>`, introWrapClass(injected), injected))
 			return
 		}
 	}
 	if intro != "" {
-		buf.WriteString(fmt.Sprintf(`<div class="main-intro">%s</div>`, intro))
+		buf.WriteString(fmt.Sprintf(`<div class="%s">%s</div>`, introWrapClass(intro), intro))
 	}
 	if formHTML != "" {
 		buf.WriteString(formHTML)
 		_ = formID
 	}
+}
+
+func introWrapClass(intro string) string {
+	if strings.Contains(intro, "masthead-guide") {
+		return "main-intro masthead-split"
+	}
+	return "main-intro"
 }
 
 func renderFragment(page map[string]any, dbURL, slot string) string {
@@ -1050,7 +1186,7 @@ func renderFragment(page map[string]any, dbURL, slot string) string {
 	default:
 		intro, items, _ := resolveMain(page, dbURL)
 		lists := resolveLists(page, dbURL)
-		intro, listRest := applyListTargets(intro, lists)
+		intro, listRest, _ := applyListTargets(intro, lists)
 		isDetail, _ := page["detail"].(bool)
 		var body strings.Builder
 		if isDetail {
@@ -1180,7 +1316,7 @@ func RenderPage(page map[string]any, dbURL string, partID string) string {
 		}
 		intro = ApplyAuthFormIntoIntro(intro, spec, csrfTok, authNext, flashErr)
 	}
-	intro, listRest := applyListTargets(intro, lists)
+	intro, listRest, railHTML := applyListTargets(intro, lists)
 	isDetail, _ := page["detail"].(bool)
 	if isDetail {
 		if len(items) > 0 {
@@ -1255,6 +1391,13 @@ func RenderPage(page map[string]any, dbURL string, partID string) string {
 			bodyClass = bodyClass + " " + strings.TrimSpace(extraBody)
 		}
 	}
+	if railHTML != "" && !strings.Contains(bodyClass, "has-rail") {
+		if bodyClass == "" {
+			bodyClass = "has-rail"
+		} else {
+			bodyClass = bodyClass + " has-rail"
+		}
+	}
 
 	html := fmt.Sprintf(`<!DOCTYPE html>
 <html lang="zh-CN"><head>
@@ -1268,6 +1411,7 @@ func RenderPage(page map[string]any, dbURL string, partID string) string {
 %s
 <main class="%s"%s>%s</main>
 %s
+%s
 </body></html>`,
 		headHTML(page, title),
 		styleBlock,
@@ -1277,6 +1421,7 @@ func RenderPage(page map[string]any, dbURL string, partID string) string {
 		slotClass(page, "main", "main"),
 		slotAttrs("main", parts, page),
 		mainHTML.String(),
+		railHTML,
 		footerHTML,
 	)
 	return InjectAuthFields(html, csrfTok, authNext, flashErr)
