@@ -370,6 +370,28 @@ re-renders the same branded page on failure. No author JS.
 
 *> web_compose_auth_form page=`self` action=`action` submit=`submit` form_id=`form_id` err_id=`err_id` target=`target` next=`next` kind=`kind`*
 
+## compose_nav_brand
+    + `title`=""
+    + `href`="/"
+    + `logo`=""
+    + `logo_light`=""
+    + `theme_key`="mq-theme"
+
+SSR topnav brand (logo + title), theme toggle, and drawer button. Interactive
+behavior stays in `client.mq.md` via `compose_client` / `client_embed`.
+
+*> web_compose_nav_brand page=`self` title=`title` href=`href` logo=`logo` logo_light=`logo_light` theme_key=`theme_key`*
+
+## compose_client
+    + `source`
+    + `bridge`="/static/marqdo-bridge.js"
+    + `wasm`="/static/marqdo_wasm.wasm"
+
+Stamp `page.client` so render injects official bridge auto-mount (`data-mq-wasm` /
+`data-mq-source-url`). Build with `marqdo wasm build -o static` first.
+
+*> web_compose_client page=`self` source=`source` bridge=`bridge` wasm=`wasm`*
+
 ## render
     + `db`=None
 
@@ -634,6 +656,15 @@ Field table + rules table; submit writes through `# db`.
     + `rules`
 
 *> web_form_rules form=`self` rules=`rules`*
+
+## labels
+    + `submit`="Submit"
+    + `cancel`="cancel"
+    + `cancel_href`=""
+
+Localized submit / cancel copy for rendered forms.
+
+*> web_form_labels form=`self` submit=`submit` cancel=`cancel` cancel_href=`cancel_href`*
 
 ## validate
     + `rules`=None

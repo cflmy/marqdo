@@ -73,7 +73,9 @@ extern int web_db_exec(char *args_json, char **out_json, char **err_msg);
 extern int web_form_new(char *args_json, char **out_json, char **err_msg);
 extern int web_form_fields(char *args_json, char **out_json, char **err_msg);
 extern int web_compose_form(char *args_json, char **out_json, char **err_msg);
-extern int web_compose_auth_form(char *args_json, char **out_json, char **err_msg);
+	extern int web_compose_auth_form(char *args_json, char **out_json, char **err_msg);
+	extern int web_compose_nav_brand(char *args_json, char **out_json, char **err_msg);
+	extern int web_compose_client(char *args_json, char **out_json, char **err_msg);
 extern int web_app_new(char *args_json, char **out_json, char **err_msg);
 extern int web_app_route(char *args_json, char **out_json, char **err_msg);
 extern int web_db_update(char *args_json, char **out_json, char **err_msg);
@@ -87,7 +89,8 @@ extern int web_db_migrate(char *args_json, char **out_json, char **err_msg);
 extern int web_db_fts_create(char *args_json, char **out_json, char **err_msg);
 extern int web_db_search(char *args_json, char **out_json, char **err_msg);
 extern int web_db_table_info(char *args_json, char **out_json, char **err_msg);
-extern int web_form_rules(char *args_json, char **out_json, char **err_msg);
+	extern int web_form_rules(char *args_json, char **out_json, char **err_msg);
+	extern int web_form_labels(char *args_json, char **out_json, char **err_msg);
 extern int web_form_validate(char *args_json, char **out_json, char **err_msg);
 extern int web_form_render(char *args_json, char **out_json, char **err_msg);
 extern int web_form_submit(char *args_json, char **out_json, char **err_msg);
@@ -171,6 +174,8 @@ static int register_core(void) {
 	if (host_register((char *)"web_intro", (char *)"table", web_intro) != 0) return 1;
 	if (host_register((char *)"web_compose_form", (char *)"page,form,id,target", web_compose_form) != 0) return 1;
 	if (host_register((char *)"web_compose_auth_form", (char *)"page,action,submit,form_id,err_id,target,next,kind", web_compose_auth_form) != 0) return 1;
+	if (host_register((char *)"web_compose_nav_brand", (char *)"page,title,href,logo,logo_light,theme_key", web_compose_nav_brand) != 0) return 1;
+	if (host_register((char *)"web_compose_client", (char *)"page,source,bridge,wasm", web_compose_client) != 0) return 1;
 	if (host_register((char *)"web_render", (char *)"page", web_render) != 0) return 1;
 	if (host_register((char *)"web_db_new", (char *)"url", web_db_new) != 0) return 1;
 	if (host_register((char *)"web_db_init", (char *)"url,name,fields", web_db_init) != 0) return 1;
@@ -192,6 +197,7 @@ static int register_core(void) {
 	if (host_register((char *)"web_form_new", (char *)"table,action,id", web_form_new) != 0) return 1;
 	if (host_register((char *)"web_form_fields", (char *)"form,fields", web_form_fields) != 0) return 1;
 	if (host_register((char *)"web_form_rules", (char *)"form,rules", web_form_rules) != 0) return 1;
+	if (host_register((char *)"web_form_labels", (char *)"form,submit,cancel,cancel_href", web_form_labels) != 0) return 1;
 	if (host_register((char *)"web_form_validate", (char *)"form,rules,data", web_form_validate) != 0) return 1;
 	if (host_register((char *)"web_form_render", (char *)"form,id", web_form_render) != 0) return 1;
 	if (host_register((char *)"web_form_submit", (char *)"form,data,url", web_form_submit) != 0) return 1;
@@ -856,6 +862,55 @@ func web_compose_auth_form(argsJSON *C.char, outJSON **C.char, errMsg **C.char) 
 		kind, _ = argStr(args, "种类")
 	}
 	out, err := compose.ComposeAuthForm(pageBag, action, submit, formID, errID, target, next, kind)
+	return replyJSON(outJSON, errMsg, out, err)
+}
+
+//export web_compose_nav_brand
+func web_compose_nav_brand(argsJSON *C.char, outJSON **C.char, errMsg **C.char) C.int {
+	args, err := parseArgs(argsJSON)
+	if err != nil {
+		return replyJSON(outJSON, errMsg, nil, err)
+	}
+	title, _ := argStr(args, "title")
+	if title == "" {
+		title, _ = argStr(args, "标题")
+	}
+	href, _ := argStr(args, "href")
+	if href == "" {
+		href, _ = argStr(args, "链接")
+	}
+	logo, _ := argStr(args, "logo")
+	if logo == "" {
+		logo, _ = argStr(args, "标志")
+	}
+	logoLight, _ := argStr(args, "logo_light")
+	if logoLight == "" {
+		logoLight, _ = argStr(args, "浅色标志")
+	}
+	themeKey, _ := argStr(args, "theme_key")
+	if themeKey == "" {
+		themeKey, _ = argStr(args, "主题键")
+	}
+	out, err := compose.ComposeNavBrand(args["page"], title, href, logo, logoLight, themeKey)
+	return replyJSON(outJSON, errMsg, out, err)
+}
+
+//export web_compose_client
+func web_compose_client(argsJSON *C.char, outJSON **C.char, errMsg **C.char) C.int {
+	args, err := parseArgs(argsJSON)
+	if err != nil {
+		return replyJSON(outJSON, errMsg, nil, err)
+	}
+	source, _ := argStr(args, "source")
+	if source == "" {
+		source, _ = argStr(args, "源")
+	}
+	bridge, _ := argStr(args, "bridge")
+	if bridge == "" {
+		bridge, _ = argStr(args, "桥")
+	}
+	wasm, _ := argStr(args, "wasm")
+	out, err := compose.ComposeClient(args["page"], bridge, wasm, source)
 	return replyJSON(outJSON, errMsg, out, err)
 }
 

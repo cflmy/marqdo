@@ -197,6 +197,20 @@ export function eventArgsFromDom(ev, valueFromSel) {
       args.fields = fields;
     }
   }
+  if (ev && (ev.type === "scroll" || ev.type === "resize")) {
+    try {
+      const doc = typeof document !== "undefined" ? document.documentElement : null;
+      const body = typeof document !== "undefined" ? document.body : null;
+      const scrollTop = (doc && (doc.scrollTop || 0)) || (body && body.scrollTop) || 0;
+      const height = doc ? (doc.scrollHeight - doc.clientHeight) || 1 : 1;
+      const ratio = Math.max(0, Math.min(1, scrollTop / height));
+      args.scroll_top = scrollTop;
+      args.scroll_max = height;
+      args.scroll_ratio = ratio;
+    } catch (_) {
+      /* ignore */
+    }
+  }
   return args;
 }
 
@@ -721,75 +735,88 @@ function runObserveEffect(exports, spec, onError) {
   const kind = String(spec.kind || spec.type || "intersect").toLowerCase();
   const sel = String(spec.sel || "");
   const thenFn = spec.then;
-  const id = String(spec.id || `obs${++observeSeq}`);
-  const el = qsOne(sel);
-  if (!el || !thenFn) return;
+  const baseId = String(spec.id || `obs${++observeSeq}`);
+  const nodes = qsAll(sel);
+  if (!nodes.length || (!thenFn && !spec.add_class)) return;
 
-  const prev = observeHandles.get(id);
-  if (prev) {
-    try {
-      prev.disconnect();
-    } catch (_) {
-      /* ignore */
-    }
-  }
-
-  const fire = (payload) => {
-    try {
-      const result = call(exports, thenFn, payload);
-      if (!result.ok) {
-        if (onError) onError(result.error);
-        return;
+  nodes.forEach((el, idx) => {
+    const id = nodes.length === 1 ? baseId : `${baseId}_${idx}`;
+    const prev = observeHandles.get(id);
+    if (prev) {
+      try {
+        prev.disconnect();
+      } catch (_) {
+        /* ignore */
       }
-      applyEffects(exports, result.value, { onError });
-    } catch (e) {
-      if (onError) onError(String(e));
     }
-  };
 
-  if (kind === "resize" && typeof ResizeObserver !== "undefined") {
-    const ro = new ResizeObserver((entries) => {
-      const en = entries[0];
-      const cr = en?.contentRect;
-      fire({
-        ok: true,
-        kind: "resize",
-        id,
-        width: cr ? cr.width : 0,
-        height: cr ? cr.height : 0,
-      });
-    });
-    ro.observe(el);
-    observeHandles.set(id, ro);
-    return;
-  }
+    const fire = (payload) => {
+      try {
+        const result = call(exports, thenFn, payload);
+        if (!result.ok) {
+          if (onError) onError(result.error);
+          return;
+        }
+        applyEffects(exports, result.value, { onError });
+      } catch (e) {
+        if (onError) onError(String(e));
+      }
+    };
 
-  if (typeof IntersectionObserver !== "undefined") {
-    const io = new IntersectionObserver(
-      (entries) => {
+    if (kind === "resize" && typeof ResizeObserver !== "undefined") {
+      const ro = new ResizeObserver((entries) => {
         const en = entries[0];
-        if (!en) return;
+        const cr = en?.contentRect;
         fire({
           ok: true,
-          kind: "intersect",
+          kind: "resize",
           id,
-          intersecting: !!en.isIntersecting,
-          ratio: en.intersectionRatio,
+          width: cr ? cr.width : 0,
+          height: cr ? cr.height : 0,
         });
-        if (spec.once && en.isIntersecting) {
-          try {
-            io.disconnect();
-          } catch (_) {
-            /* ignore */
+      });
+      ro.observe(el);
+      observeHandles.set(id, ro);
+      return;
+    }
+
+    if (typeof IntersectionObserver !== "undefined") {
+      const opts = { threshold: spec.threshold != null ? Number(spec.threshold) : 0.1 };
+      if (spec.rootMargin != null) opts.rootMargin = String(spec.rootMargin);
+      const io = new IntersectionObserver(
+        (entries) => {
+          const en = entries[0];
+          if (!en) return;
+          if (en.isIntersecting && spec.add_class) {
+            for (const c of String(spec.add_class).split(/\s+/).filter(Boolean)) {
+              el.classList.add(c);
+            }
           }
-          observeHandles.delete(id);
-        }
-      },
-      { threshold: spec.threshold != null ? Number(spec.threshold) : 0.1 },
-    );
-    io.observe(el);
-    observeHandles.set(id, io);
-  }
+          if (thenFn) {
+            fire({
+              ok: true,
+              kind: "intersect",
+              id,
+              intersecting: !!en.isIntersecting,
+              ratio: en.intersectionRatio,
+              target_id: el.id || "",
+            });
+          }
+          if (spec.once && en.isIntersecting) {
+            try {
+              io.disconnect();
+            } catch (_) {
+              /* ignore */
+            }
+            observeHandles.delete(id);
+          }
+        },
+        opts,
+      );
+      io.observe(el);
+      observeHandles.set(id, io);
+    }
+  });
 }
 
 function buildFetchInit(spec) {

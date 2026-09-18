@@ -68,6 +68,21 @@ func SetRules(formBag map[string]any, rules any) map[string]any {
 	return out
 }
 
+// SetLabels stamps localized submit / cancel button copy (and optional cancel href).
+func SetLabels(formBag map[string]any, submit, cancel, cancelHref string) map[string]any {
+	out := cloneMap(formBag)
+	if s := strings.TrimSpace(submit); s != "" {
+		out["submit"] = s
+	}
+	if s := strings.TrimSpace(cancel); s != "" {
+		out["cancel"] = s
+	}
+	if s := strings.TrimSpace(cancelHref); s != "" {
+		out["cancel_href"] = s
+	}
+	return out
+}
+
 func cloneMap(m map[string]any) map[string]any {
 	out := map[string]any{}
 	for k, v := range m {
@@ -758,9 +773,15 @@ func RenderBodyCtx(formBag map[string]any, formID string, data, errors any, csrf
 		}
 		body.WriteString("<label>")
 		body.WriteString(esc(label))
-		if ty == "textarea" {
-			fmt.Fprintf(&body, `<textarea name="%s" rows="5"%s>%s</textarea>`,
-				esc(name), reqAttr, esc(value))
+		if ty == "textarea" || ty == "markdown" {
+			rows := "5"
+			cls := ""
+			if ty == "markdown" {
+				rows = "18"
+				cls = ` class="mq-markdown" data-mq-field="markdown"`
+			}
+			fmt.Fprintf(&body, `<textarea name="%s" rows="%s"%s%s>%s</textarea>`,
+				esc(name), rows, cls, reqAttr, esc(value))
 		} else {
 			inputType := "text"
 			switch ty {
@@ -787,8 +808,28 @@ func RenderBodyCtx(formBag map[string]any, formID string, data, errors any, csrf
 		}
 		body.WriteString("</label>")
 	}
-	fmt.Fprintf(&body, `<div class="actions"><button type="submit">Submit</button><a href="%s">cancel</a></div>`,
-		esc(cancel))
+	submitLabel := strOf(formBag, "submit", "")
+	if submitLabel == "" {
+		submitLabel = strOf(formBag, "提交", "")
+	}
+	if submitLabel == "" {
+		submitLabel = "Submit"
+	}
+	cancelLabel := strOf(formBag, "cancel", "")
+	if cancelLabel == "" {
+		cancelLabel = strOf(formBag, "取消", "")
+	}
+	if cancelLabel == "" {
+		cancelLabel = "cancel"
+	}
+	cancelHref := cancel
+	if c := strOf(formBag, "cancel_href", ""); c != "" {
+		cancelHref = c
+	} else if c := strOf(formBag, "取消链接", ""); c != "" {
+		cancelHref = c
+	}
+	fmt.Fprintf(&body, `<div class="actions"><button type="submit">%s</button><a href="%s">%s</a></div>`,
+		esc(submitLabel), esc(cancelHref), esc(cancelLabel))
 	body.WriteString(`</form></div>`)
 	return body.String()
 }

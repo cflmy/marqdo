@@ -257,3 +257,43 @@ func TestPartSlotSrcUsesResolvedRoute(t *testing.T) {
 		t.Fatalf("missing resolved slot src: %s", html)
 	}
 }
+
+func TestNavBrandClientChrome(t *testing.T) {
+	page := map[string]any{
+		"title": "求道量子",
+		"nav": []any{
+			map[string]any{"label": "文章", "href": "/"},
+		},
+		"nav_brand": map[string]any{
+			"title":     "求道量子",
+			"href":      "/",
+			"logo":      "/static/logo.png",
+			"theme_key": "mq-theme",
+		},
+		"client": map[string]any{
+			"source": "/static/client.mq.md",
+		},
+	}
+	html := render.RenderPage(page, "", "")
+	if !strings.Contains(html, `id="nav-brand"`) {
+		t.Fatalf("missing nav-brand: %s", html[:500])
+	}
+	if !strings.Contains(html, `id="theme-toggle"`) {
+		t.Fatalf("missing theme-toggle")
+	}
+	if !strings.Contains(html, `id="nav-menu-toggle"`) {
+		t.Fatalf("missing menu toggle")
+	}
+	if !strings.Contains(html, `data-mq-source-url="/static/client.mq.md"`) {
+		t.Fatalf("missing client embed")
+	}
+	if !strings.Contains(html, `localStorage.getItem("mq-theme")`) {
+		t.Fatalf("missing theme boot")
+	}
+	if !strings.Contains(html, `id="qd-progress"`) {
+		t.Fatalf("missing progress")
+	}
+	if !strings.Contains(html, `id="nav-drawer-veil"`) {
+		t.Fatalf("missing drawer veil")
+	}
+}

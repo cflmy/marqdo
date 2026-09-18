@@ -34,5 +34,5 @@ func markdownToHTML(md string) string {
 	if err := gm.Convert([]byte(md), &buf); err != nil {
 		return `<div class="article-body"><p class="article-p">` + esc(md) + `</p></div>`
 	}
-	return `<div class="article-body md">` + buf.String() + `</div>`
+	return `<div class="article-body md">` + tuneDropcapHTML(buf.String()) + `</div>`
 }

@@ -44,6 +44,42 @@ Build set_class effect map.
 **`m` = > table.put in=None at=sel value=class**
 *> table.put in=None at="set_class" value=m*
 
+## add_class
+    + `sel`
+    + `class`
+
+Build add_class effect map (classList.add; space-separated names OK).
+
+**`m` = > table.put in=None at=sel value=class**
+*> table.put in=None at="add_class" value=m*
+
+## remove_class
+    + `sel`
+    + `class`
+
+Build remove_class effect map.
+
+**`m` = > table.put in=None at=sel value=class**
+*> table.put in=None at="remove_class" value=m*
+
+## toggle_class
+    + `sel`
+    + `class`
+
+Build toggle_class effect map.
+
+**`m` = > table.put in=None at=sel value=class**
+*> table.put in=None at="toggle_class" value=m*
+
+## set_style
+    + `sel`
+    + `style`
+
+Build set_style effect map; style is a map of CSS properties or a cssText string.
+
+**`m` = > table.put in=None at=sel value=style**
+*> table.put in=None at="set_style" value=m*
+
 ## set_attr
     + `sel`
     + `attrs`

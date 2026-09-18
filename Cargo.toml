@@ -52,6 +52,7 @@ libc = { version = "0.2", optional = true }
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 # No `wasmbind`: keeps cdylib free of wasm-bindgen imports (raw mq_* ABI).
 chrono = { version = "0.4", default-features = false, features = ["alloc", "std"] }
+getrandom = { version = "=0.2.17", default-features = false, features = ["js"] }
 
 [workspace]
 members = [

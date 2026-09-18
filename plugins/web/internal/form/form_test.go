@@ -68,3 +68,23 @@ func TestRenderContainsInputFields(t *testing.T) {
 		}
 	}
 }
+
+func TestRenderMarkdownAndLabels(t *testing.T) {
+	f := form.New("posts", "insert", "")
+	f = form.SetFields(f, []any{
+		map[string]any{"字段": "content", "标签": "正文", "类型": "markdown", "必填": true},
+	})
+	f = form.SetLabels(f, "发布文章", "返回列表", "/desk/posts")
+	html := form.Render(f, "post", nil, nil, "")
+	for _, want := range []string{
+		`data-mq-field="markdown"`,
+		`class="mq-markdown"`,
+		">发布文章</button>",
+		`href="/desk/posts"`,
+		">返回列表</a>",
+	} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("missing %q in:\n%s", want, html)
+		}
+	}
+}

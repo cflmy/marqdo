@@ -842,6 +842,8 @@ func headHTML(page map[string]any, defaultTitle string) string {
 			s.WriteString(katexBootScript())
 		}
 	}
+	s.WriteString(themeBootScript(page))
+	s.WriteString(clientEmbedScript(page))
 	return s.String()
 }
 
@@ -933,7 +935,7 @@ func renderCard(page map[string]any, it map[string]any) string {
 		card.WriteString(fmt.Sprintf(`<a class="card-link" href="%s">`, esc(href)))
 	}
 	if meta != "" {
-		card.WriteString(fmt.Sprintf(`<div class="card-meta">%s</div>`, esc(meta)))
+		card.WriteString(fmt.Sprintf(`<div class="card-meta">%s</div>`, esc(formatMetaDate(meta))))
 	}
 	card.WriteString(fmt.Sprintf("<h2%s>%s</h2>", tc, esc(title)))
 	if tag != "" {
@@ -957,7 +959,7 @@ func renderArticle(it map[string]any) string {
 	var s strings.Builder
 	s.WriteString(`<article class="article">`)
 	if meta != "" {
-		s.WriteString(fmt.Sprintf(`<div class="article-meta">%s</div>`, esc(meta)))
+		s.WriteString(fmt.Sprintf(`<div class="article-meta">%s</div>`, esc(formatMetaDate(meta))))
 	}
 	s.WriteString(fmt.Sprintf(`<h1 class="article-title">%s</h1>`, esc(title)))
 	if tag != "" {
@@ -1169,12 +1171,12 @@ func renderFragment(page map[string]any, dbURL, slot string) string {
 		links := resolveLinks(page["nav"], dbURL, page)
 		return fmt.Sprintf(
 			`<header class="topnav" data-slot="nav">%s</header>`,
-			renderULWithMQ(links, "nav", nil),
+			renderNavInner(page, renderULWithMQ(links, "nav", nil)),
 		)
 	case "sidebar":
 		links := resolveLinks(page["sidebar"], dbURL, page)
 		return fmt.Sprintf(
-			`<aside class="side" data-slot="sidebar"><span class="side-label">侧栏</span>%s</aside>`,
+			`<aside class="side" id="site-side-drawer" role="navigation" aria-label="站点目录" data-slot="sidebar"><span class="side-label">侧栏</span>%s</aside>`,
 			renderULWithMQ(links, "side-nav", nil),
 		)
 	case "footer":
@@ -1351,7 +1353,7 @@ func RenderPage(page map[string]any, dbURL string, partID string) string {
 	sideHTML := ""
 	if showChrome && hasSide {
 		sideHTML = fmt.Sprintf(
-			`<aside class="%s"%s><span class="side-label">侧栏</span>%s</aside>`,
+			`<aside class="%s" id="site-side-drawer" role="navigation" aria-label="站点目录"%s><span class="side-label">侧栏</span>%s</aside>`,
 			slotClass(page, "sidebar", "side"),
 			slotAttrs("sidebar", parts, page),
 			renderULWithMQ(side, "side-nav", mqPairs),
@@ -1366,7 +1368,7 @@ func RenderPage(page map[string]any, dbURL string, partID string) string {
 				`<header class="%s"%s>%s</header>`,
 				slotClass(page, "nav", "topnav"),
 				slotAttrs("nav", parts, page),
-				renderULWithMQ(nav, "nav", mqPairs),
+				renderNavInner(page, renderULWithMQ(nav, "nav", mqPairs)),
 			)
 		}
 	}
@@ -1409,6 +1411,7 @@ func RenderPage(page map[string]any, dbURL string, partID string) string {
 <body class="%s">
 %s
 %s
+%s
 <main class="%s"%s>%s</main>
 %s
 %s
@@ -1416,6 +1419,7 @@ func RenderPage(page map[string]any, dbURL string, partID string) string {
 		headHTML(page, title),
 		styleBlock,
 		bodyClass,
+		chromeExtrasHTML(page),
 		headerHTML,
 		sideHTML,
 		slotClass(page, "main", "main"),

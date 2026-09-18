@@ -174,6 +174,27 @@ func web_form_rules(argsJSON *C.char, outJSON **C.char, errMsg **C.char) C.int {
 	return replyJSON(outJSON, errMsg, form.SetRules(formBag, args["rules"]), nil)
 }
 
+//export web_form_labels
+func web_form_labels(argsJSON *C.char, outJSON **C.char, errMsg **C.char) C.int {
+	args, err := parseArgs(argsJSON)
+	if err != nil {
+		return replyJSON(outJSON, errMsg, nil, err)
+	}
+	submit, _ := argStr(args, "submit")
+	if submit == "" {
+		submit, _ = argStr(args, "提交")
+	}
+	cancel, _ := argStr(args, "cancel")
+	if cancel == "" {
+		cancel, _ = argStr(args, "取消")
+	}
+	cancelHref, _ := argStr(args, "cancel_href")
+	if cancelHref == "" {
+		cancelHref, _ = argStr(args, "取消链接")
+	}
+	return replyJSON(outJSON, errMsg, form.SetLabels(asPageMap(args["form"]), submit, cancel, cancelHref), nil)
+}
+
 //export web_form_validate
 func web_form_validate(argsJSON *C.char, outJSON **C.char, errMsg **C.char) C.int {
 	args, err := parseArgs(argsJSON)
