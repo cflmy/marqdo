@@ -842,6 +842,9 @@ func headHTML(page map[string]any, defaultTitle string) string {
 			s.WriteString(katexBootScript())
 		}
 	}
+	if pageNeedsMarkdownPreview(page) {
+		s.WriteString(markdownPreviewBootScript())
+	}
 	s.WriteString(themeBootScript(page))
 	s.WriteString(clientEmbedScript(page))
 	return s.String()
@@ -874,6 +877,51 @@ document.addEventListener("DOMContentLoaded",function(){
     {left:"\\(",right:"\\)",display:false}
   ],throwOnError:false,ignoredTags:["script","noscript","style","textarea","pre","code"]};
   for(var i=0;i<roots.length;i++){try{renderMathInElement(roots[i],opts);}catch(e){}}
+});
+</script>`
+}
+
+func pageNeedsMarkdownPreview(page map[string]any) bool {
+	if page == nil {
+		return false
+	}
+	frm, _ := page["form"].(map[string]any)
+	if frm == nil {
+		return false
+	}
+	fields, _ := frm["fields"].([]any)
+	for _, f := range fields {
+		fm, ok := f.(map[string]any)
+		if !ok {
+			continue
+		}
+		ty := strings.ToLower(strings.TrimSpace(text(fm["type"])))
+		if ty == "markdown" {
+			return true
+		}
+	}
+	return false
+}
+
+func markdownPreviewBootScript() string {
+	// Official host glue: live-preview textarea.mq-markdown via POST /_md.
+	return `<script defer>
+document.addEventListener("DOMContentLoaded",function(){
+  var tas=document.querySelectorAll("textarea.mq-markdown[data-mq-field=markdown]");
+  for(var i=0;i<tas.length;i++){(function(ta){
+    var root=ta.closest(".md-field")||ta.parentElement;
+    var prev=root&&root.querySelector(".mq-md-preview");
+    if(!prev)return;
+    var timer=null;
+    function run(){
+      fetch("/_md",{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:ta.value||""})
+        .then(function(r){return r.text();})
+        .then(function(html){prev.innerHTML=html||'<p class="lede mq-md-empty">预览</p>';})
+        .catch(function(){});
+    }
+    ta.addEventListener("input",function(){clearTimeout(timer);timer=setTimeout(run,160);});
+    run();
+  })(tas[i]);}
 });
 </script>`
 }

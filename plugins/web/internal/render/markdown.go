@@ -10,6 +10,11 @@ import (
 	"github.com/yuin/goldmark/renderer/html"
 )
 
+// MarkdownToHTML renders Markdown to an article-body HTML fragment (GFM subset).
+func MarkdownToHTML(md string) string {
+	return markdownToHTML(md)
+}
+
 // markdownToHTML renders article body Markdown to HTML (GFM subset), matching
 // the Rust web plugin's pulldown-cmark path.
 func markdownToHTML(md string) string {

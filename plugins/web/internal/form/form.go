@@ -801,9 +801,14 @@ func RenderBodyCtx(formBag map[string]any, formID string, data, errors any, csrf
 			if ty == "markdown" {
 				rows = "18"
 				cls = ` class="mq-markdown" data-mq-field="markdown"`
+				body.WriteString(`<div class="md-field">`)
+				fmt.Fprintf(&body, `<textarea name="%s" rows="%s"%s%s>%s</textarea>`,
+					esc(name), rows, cls, reqAttr, esc(value))
+				body.WriteString(`<div class="mq-md-preview md-pane-preview" aria-live="polite"></div></div>`)
+			} else {
+				fmt.Fprintf(&body, `<textarea name="%s" rows="%s"%s%s>%s</textarea>`,
+					esc(name), rows, cls, reqAttr, esc(value))
 			}
-			fmt.Fprintf(&body, `<textarea name="%s" rows="%s"%s%s>%s</textarea>`,
-				esc(name), rows, cls, reqAttr, esc(value))
 		} else {
 			inputType := "text"
 			switch ty {

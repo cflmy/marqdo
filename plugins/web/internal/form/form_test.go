@@ -82,6 +82,8 @@ func TestRenderMarkdownAndLabels(t *testing.T) {
 	for _, want := range []string{
 		`data-mq-field="markdown"`,
 		`class="mq-markdown"`,
+		`class="md-field"`,
+		`mq-md-preview`,
 		">发布文章</button>",
 		`href="/desk/posts"`,
 		">返回列表</a>",

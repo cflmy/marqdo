@@ -117,6 +117,7 @@ func NewHandler(appBag map[string]any, entryDir string) (http.Handler, error) {
 	mux.HandleFunc("GET /_part/{part}", st.handleHomePart)
 	mux.HandleFunc("GET /_form/{id}", st.handleFormGet)
 	mux.HandleFunc("POST /_form/{id}", st.handleFormPost)
+	mux.HandleFunc("POST /_md", st.handleMarkdownPreview)
 
 	paths := sortedKeys(routes)
 	for _, p := range paths {
@@ -301,6 +302,20 @@ func (st *state) handleHome(w http.ResponseWriter, r *http.Request) {
 
 func (st *state) handleHomePart(w http.ResponseWriter, r *http.Request) {
 	st.writePart(w, r, st.page, r.PathValue("part"))
+}
+
+func (st *state) handleMarkdownPreview(w http.ResponseWriter, r *http.Request) {
+	body, err := io.ReadAll(io.LimitReader(r.Body, 1<<20))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	html := render.MarkdownToHTML(string(body))
+	if html == "" {
+		html = `<p class="lede mq-md-empty">预览</p>`
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_, _ = io.WriteString(w, html)
 }
 
 func (st *state) preparePage(page map[string]any, r *http.Request) map[string]any {
