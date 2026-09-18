@@ -112,7 +112,9 @@ func NewHandler(appBag map[string]any, entryDir string) (http.Handler, error) {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /{$}", st.handleHome)
-	mux.HandleFunc("GET /_part/{id}", st.handleHomePart)
+	// Part slot uses {part} (not {id}) so dynamic routes like /desk/posts/{id}
+	// do not collide with Go ServeMux duplicate wildcard names.
+	mux.HandleFunc("GET /_part/{part}", st.handleHomePart)
 	mux.HandleFunc("GET /_form/{id}", st.handleFormGet)
 	mux.HandleFunc("POST /_form/{id}", st.handleFormPost)
 
@@ -125,14 +127,14 @@ func NewHandler(appBag map[string]any, entryDir string) (http.Handler, error) {
 		}
 		if strings.Contains(routePath, "{") {
 			mux.HandleFunc("GET "+goMuxPattern(routePath), st.makeDynamicPage(pageV, routePath))
-			mux.HandleFunc("GET "+goMuxPattern(routePath)+"/_part/{id}", st.makeDynamicPart(pageV, routePath))
+			mux.HandleFunc("GET "+goMuxPattern(routePath)+"/_part/{part}", st.makeDynamicPart(pageV, routePath))
 		} else {
 			pv := pageV
 			mux.HandleFunc("GET "+routePath, func(w http.ResponseWriter, r *http.Request) {
 				st.writePage(w, r, pv)
 			})
-			mux.HandleFunc("GET "+routePath+"/_part/{id}", func(w http.ResponseWriter, r *http.Request) {
-				st.writePart(w, r, pv, r.PathValue("id"))
+			mux.HandleFunc("GET "+routePath+"/_part/{part}", func(w http.ResponseWriter, r *http.Request) {
+				st.writePart(w, r, pv, r.PathValue("part"))
 			})
 		}
 	}
@@ -298,7 +300,7 @@ func (st *state) handleHome(w http.ResponseWriter, r *http.Request) {
 }
 
 func (st *state) handleHomePart(w http.ResponseWriter, r *http.Request) {
-	st.writePart(w, r, st.page, r.PathValue("id"))
+	st.writePart(w, r, st.page, r.PathValue("part"))
 }
 
 func (st *state) preparePage(page map[string]any, r *http.Request) map[string]any {
@@ -306,6 +308,21 @@ func (st *state) preparePage(page map[string]any, r *http.Request) map[string]an
 	assets.MergeSiteHead(p, st.siteHead)
 	if r != nil {
 		withNavAuth(p, r.Header.Get("Cookie"))
+		params, _ := p["params"].(map[string]any)
+		if params == nil {
+			params = map[string]any{}
+		} else {
+			params = cloneMap(params)
+		}
+		for k, vs := range r.URL.Query() {
+			if len(vs) == 0 {
+				continue
+			}
+			if _, exists := params[k]; !exists {
+				params[k] = vs[0]
+			}
+		}
+		p["params"] = params
 	}
 	return p
 }
@@ -431,7 +448,7 @@ func (st *state) makeDynamicPart(page map[string]any, pattern string) http.Handl
 			params[name] = r.PathValue(name)
 		}
 		injectParams(p, params)
-		st.writePart(w, r, p, r.PathValue("id"))
+		st.writePart(w, r, p, r.PathValue("part"))
 	}
 }
 
@@ -791,7 +808,8 @@ func pathParamNames(pattern string) []string {
 		if strings.HasPrefix(seg, "{") && strings.HasSuffix(seg, "}") {
 			name := strings.TrimSuffix(strings.TrimPrefix(seg, "{"), "}")
 			name = strings.TrimPrefix(name, "*")
-			if name != "" && name != "id" {
+			// Include "id" — part slots use {part}, so route {id} is safe for PathValue.
+			if name != "" {
 				names = append(names, name)
 			}
 		}

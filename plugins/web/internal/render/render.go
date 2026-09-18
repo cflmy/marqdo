@@ -1120,8 +1120,58 @@ func pageFormHTML(page map[string]any) (formID string, html string) {
 		ctx.ReturnPath = r
 		ctx.Path = r
 	}
-	return id, form.RenderBodyCtx(frm, id, nil, nil, "", ctx)
+	data := resolveFormData(page, "")
+	return id, form.RenderBodyCtx(frm, id, data, nil, "", ctx)
 }
+
+// resolveFormData returns stamped form_data, or loads a DB row via form_load + params.
+func resolveFormData(page map[string]any, dbURL string) map[string]any {
+	if page == nil {
+		return nil
+	}
+	if raw, ok := page["form_data"].(map[string]any); ok && raw != nil && len(raw) > 0 {
+		return raw
+	}
+	if dbURL == "" {
+		if u, ok := page["_db_url"].(string); ok {
+			dbURL = u
+		}
+	}
+	load, ok := page["form_load"].(map[string]any)
+	if !ok || load == nil || dbURL == "" {
+		return nil
+	}
+	table := text(load["table"])
+	if table == "" {
+		table = text(load["表"])
+	}
+	if table == "" {
+		return nil
+	}
+	idParam := text(load["id_param"])
+	if idParam == "" {
+		idParam = text(load["id参数"])
+	}
+	if idParam == "" {
+		idParam = "id"
+	}
+	id := ""
+	if params, ok := page["params"].(map[string]any); ok {
+		id = text(params[idParam])
+	}
+	if id == "" {
+		return nil
+	}
+	row, err := db.Get(dbURL, table, id)
+	if err != nil || row == nil {
+		return nil
+	}
+	if m, ok := row.(map[string]any); ok {
+		return m
+	}
+	return nil
+}
+
 
 func pushIntro(buf *strings.Builder, intro string) {
 	pushIntroAndForm(buf, intro, nil)
@@ -1216,6 +1266,9 @@ func renderFragment(page map[string]any, dbURL, slot string) string {
 func RenderPage(page map[string]any, dbURL string, partID string) string {
 	if page == nil {
 		page = map[string]any{}
+	}
+	if dbURL != "" {
+		page["_db_url"] = dbURL
 	}
 	if partID != "" {
 		parts, _ := page["parts"].(map[string]any)

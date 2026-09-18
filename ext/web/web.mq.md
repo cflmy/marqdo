@@ -356,6 +356,14 @@ Embed a form into the page main slot. Optional `target` / `form_slot` (CSS id, e
 
 *> web_compose_form page=`self` form=`form` id=`id` target=`target`*
 
+## compose_form_load
+    + `table`
+    + `id_param`="id"
+
+Prefill the composed form from DB using route/query `id` (desk edit pages).
+
+*> web_compose_form_load page=`self` table=`table` id_param=`id_param`*
+
 ## compose_auth_form
     + `action`
     + `submit`=""

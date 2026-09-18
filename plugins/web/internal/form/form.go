@@ -684,6 +684,9 @@ func RenderBodyCtx(formBag map[string]any, formID string, data, errors any, csrf
 	if formBag != nil {
 		rowID = cellStr(formBag["id"])
 	}
+	if rowID == "" {
+		rowID = fieldText(dataM, "id")
+	}
 	showMeta := true
 	if formBag != nil {
 		if v, ok := formBag["show_meta"].(bool); ok {
@@ -692,20 +695,27 @@ func RenderBodyCtx(formBag map[string]any, formID string, data, errors any, csrf
 	}
 
 	var body strings.Builder
-	body.WriteString(`<div class="site-form">`)
-	if showMeta {
-		fmt.Fprintf(&body, `<p class="meta">table=<code>%s</code> · action=<code>%s</code> · id=<code>%s</code></p>`,
-			esc(tableName), esc(action), esc(heading))
-	}
 	hasFile := false
+	hasMarkdown := false
 	for _, f := range fields {
 		if fm, ok := f.(map[string]any); ok {
 			ty, _ := fm["type"].(string)
 			if strings.EqualFold(ty, "file") {
 				hasFile = true
-				break
+			}
+			if strings.EqualFold(ty, "markdown") {
+				hasMarkdown = true
 			}
 		}
+	}
+	formClass := "site-form"
+	if hasMarkdown {
+		formClass += " editor-skin"
+	}
+	body.WriteString(`<div class="` + formClass + `">`)
+	if showMeta {
+		fmt.Fprintf(&body, `<p class="meta">table=<code>%s</code> · action=<code>%s</code> · id=<code>%s</code></p>`,
+			esc(tableName), esc(action), esc(heading))
 	}
 	body.WriteString(`<form method="post" action="` + esc(postTo) + `"`)
 	if hasFile {

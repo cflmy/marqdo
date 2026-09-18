@@ -76,6 +76,7 @@ extern int web_compose_form(char *args_json, char **out_json, char **err_msg);
 	extern int web_compose_auth_form(char *args_json, char **out_json, char **err_msg);
 	extern int web_compose_nav_brand(char *args_json, char **out_json, char **err_msg);
 	extern int web_compose_client(char *args_json, char **out_json, char **err_msg);
+	extern int web_compose_form_load(char *args_json, char **out_json, char **err_msg);
 extern int web_app_new(char *args_json, char **out_json, char **err_msg);
 extern int web_app_route(char *args_json, char **out_json, char **err_msg);
 extern int web_db_update(char *args_json, char **out_json, char **err_msg);
@@ -176,6 +177,7 @@ static int register_core(void) {
 	if (host_register((char *)"web_compose_auth_form", (char *)"page,action,submit,form_id,err_id,target,next,kind", web_compose_auth_form) != 0) return 1;
 	if (host_register((char *)"web_compose_nav_brand", (char *)"page,title,href,logo,logo_light,theme_key", web_compose_nav_brand) != 0) return 1;
 	if (host_register((char *)"web_compose_client", (char *)"page,source,bridge,wasm", web_compose_client) != 0) return 1;
+	if (host_register((char *)"web_compose_form_load", (char *)"page,table,id_param", web_compose_form_load) != 0) return 1;
 	if (host_register((char *)"web_render", (char *)"page", web_render) != 0) return 1;
 	if (host_register((char *)"web_db_new", (char *)"url", web_db_new) != 0) return 1;
 	if (host_register((char *)"web_db_init", (char *)"url,name,fields", web_db_init) != 0) return 1;
@@ -911,6 +913,24 @@ func web_compose_client(argsJSON *C.char, outJSON **C.char, errMsg **C.char) C.i
 	}
 	wasm, _ := argStr(args, "wasm")
 	out, err := compose.ComposeClient(args["page"], bridge, wasm, source)
+	return replyJSON(outJSON, errMsg, out, err)
+}
+
+//export web_compose_form_load
+func web_compose_form_load(argsJSON *C.char, outJSON **C.char, errMsg **C.char) C.int {
+	args, err := parseArgs(argsJSON)
+	if err != nil {
+		return replyJSON(outJSON, errMsg, nil, err)
+	}
+	table, _ := argStr(args, "table")
+	if table == "" {
+		table, _ = argStr(args, "表")
+	}
+	idParam, _ := argStr(args, "id_param")
+	if idParam == "" {
+		idParam, _ = argStr(args, "id参数")
+	}
+	out, err := compose.ComposeFormLoad(args["page"], table, idParam)
 	return replyJSON(outJSON, errMsg, out, err)
 }
 
