@@ -46,6 +46,11 @@ override_dh_auto_install:
 	install -m 0755 $(CURDIR)/target/release/marqdo \
 		$(CURDIR)/debian/marqdo/usr/bin/marqdo
 
+# dh_clean deletes *.orig by default; cargo vendor checksums require
+# vendor/**/Cargo.toml.orig. Exclude the vendored tree from that purge.
+override_dh_clean:
+	dh_clean -Xvendor/
+
 override_dh_auto_clean:
 	dh_auto_clean
 	rm -rf debian/cargo_home

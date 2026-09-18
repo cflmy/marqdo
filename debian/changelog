@@ -1,3 +1,10 @@
+marqdo (1.0.3-1ppa2) noble; urgency=medium
+
+  * Fix Launchpad build: dh_clean -Xvendor/ so cargo vendor checksums keep
+    Cargo.toml.orig (debian-only; reuse published 1.0.3.orig.tar.xz).
+
+ -- cflmy <pingan@cflmy.cn>  Thu, 17 Sep 2026 21:28:00 +0800
+
 marqdo (1.0.3-1ppa1) noble; urgency=medium
 
   * Marqdo 1.0.3: PPA + ext CDN; unbound GFM tables; bundled Rust for noble.
