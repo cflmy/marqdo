@@ -47,6 +47,8 @@ func normalizeAction(action string) string {
 	switch action {
 	case "update", "更新":
 		return "update"
+	case "delete", "删除":
+		return "delete"
 	case "":
 		return "insert"
 	default:
@@ -737,7 +739,7 @@ func RenderBodyCtx(formBag map[string]any, formID string, data, errors any, csrf
 			}
 		}
 	}
-	if action == "update" && rowID != "" && !hasIDField {
+	if (action == "update" || action == "delete") && rowID != "" && !hasIDField {
 		fmt.Fprintf(&body, `<input type="hidden" name="id" value="%s"/>`, esc(rowID))
 	}
 	if ctx != nil {
@@ -896,7 +898,7 @@ body{font-family:"IBM Plex Sans","Noto Sans SC",sans-serif;margin:1.5rem;backgro
 func Submit(formBag map[string]any, data any, dbURL string) (map[string]any, error) {
 	action := strOf(formBag, "action", "insert")
 	rowMap := dataMap(data)
-	if action == "update" {
+	if action == "update" || action == "delete" {
 		if formBag != nil {
 			if fid := cellStr(formBag["id"]); fid != "" {
 				if _, ok := rowMap["id"]; !ok {
@@ -905,14 +907,16 @@ func Submit(formBag map[string]any, data any, dbURL string) (map[string]any, err
 			}
 		}
 	}
-	v := Validate(formBag, nil, rowMap)
-	ok, _ := v["ok"].(bool)
-	if !ok {
-		errs := v["errors"]
-		if errs == nil {
-			errs = []any{}
+	if action != "delete" {
+		v := Validate(formBag, nil, rowMap)
+		ok, _ := v["ok"].(bool)
+		if !ok {
+			errs := v["errors"]
+			if errs == nil {
+				errs = []any{}
+			}
+			return map[string]any{"ok": false, "errors": errs}, nil
 		}
-		return map[string]any{"ok": false, "errors": errs}, nil
 	}
 	tableName := ""
 	if formBag != nil {
@@ -923,7 +927,20 @@ func Submit(formBag map[string]any, data any, dbURL string) (map[string]any, err
 	}
 	var result map[string]any
 	var err error
-	if action == "update" {
+	switch action {
+	case "delete":
+		id := ""
+		if formBag != nil {
+			id = cellStr(formBag["id"])
+		}
+		if id == "" {
+			id = cellStr(rowMap["id"])
+		}
+		if id == "" {
+			return nil, fmt.Errorf("delete requires `id`")
+		}
+		result, err = db.Delete(dbURL, tableName, id)
+	case "update":
 		id := ""
 		if formBag != nil {
 			id = cellStr(formBag["id"])
@@ -935,7 +952,7 @@ func Submit(formBag map[string]any, data any, dbURL string) (map[string]any, err
 			return nil, fmt.Errorf("update requires `id`")
 		}
 		result, err = db.Update(dbURL, tableName, id, rowMap)
-	} else {
+	default:
 		result, err = db.Insert(dbURL, tableName, []any{rowMap})
 	}
 	if err != nil {

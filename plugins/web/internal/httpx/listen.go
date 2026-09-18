@@ -22,6 +22,7 @@ import (
 	"github.com/marqdo/marqdo/plugins/web/internal/db"
 	"github.com/marqdo/marqdo/plugins/web/internal/form"
 	"github.com/marqdo/marqdo/plugins/web/internal/middleware"
+	"github.com/marqdo/marqdo/plugins/web/internal/oidc"
 	"github.com/marqdo/marqdo/plugins/web/internal/ratelimit"
 	"github.com/marqdo/marqdo/plugins/web/internal/rbac"
 	"github.com/marqdo/marqdo/plugins/web/internal/render"
@@ -122,6 +123,7 @@ func NewHandler(appBag map[string]any, entryDir string) (http.Handler, error) {
 		proxyRoutes:    routeMapOf(appBag, "proxy_routes"),
 		invokeRoutes:   routeMapOf(appBag, "invoke_routes"),
 		auth:           authCfg,
+		oidc:           oidc.ParseConfig(appBag),
 		tenant:         tenant.FromBag(appBag),
 	}
 
@@ -306,6 +308,7 @@ type state struct {
 	proxyRoutes    map[string]any
 	invokeRoutes   map[string]any
 	auth           authConfig
+	oidc           oidc.Config
 	tenant         tenant.Config
 }
 
@@ -361,7 +364,7 @@ func (st *state) attachCSRF(page map[string]any, r *http.Request) *string {
 	if page == nil || r == nil {
 		return nil
 	}
-	if st.auth.users == nil && !st.auth.rbac {
+	if st.auth.users == nil && !st.auth.rbac && !st.oidcEnabled() {
 		return nil
 	}
 	_, csrf, setCookie := resolveSession(r)
@@ -372,6 +375,10 @@ func (st *state) attachCSRF(page map[string]any, r *http.Request) *string {
 }
 
 func (st *state) writePage(w http.ResponseWriter, r *http.Request, page map[string]any) {
+	if st.oidcEnabled() && st.isOIDCEntryPath(r.URL.Path) {
+		st.handleOIDCStart(w, r)
+		return
+	}
 	p := st.preparePage(page, r)
 	if st.authEntryRedirect(w, r, p) {
 		return

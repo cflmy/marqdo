@@ -1356,6 +1356,9 @@ func RenderPage(page map[string]any, dbURL string, partID string) string {
 	side := resolveLinks(page["sidebar"], dbURL, page)
 	foot := resolveLinks(page["footer"], dbURL, page)
 	intro, items, total := resolveMain(page, dbURL)
+	if params, ok := page["params"].(map[string]any); ok && len(params) > 0 && intro != "" {
+		intro = ResolveRouteParams(intro, params)
+	}
 	navCSS, mqPairs := navMediaClassMapMany(nav, side, foot)
 	extra, _ := page["styles_css"].(string)
 	if navCSS != "" {

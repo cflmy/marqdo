@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/marqdo/marqdo/plugins/web/internal/assets"
+	"github.com/marqdo/marqdo/plugins/web/internal/oidc"
 	"github.com/marqdo/marqdo/plugins/web/internal/session"
 	"github.com/marqdo/marqdo/plugins/web/internal/tenant"
 )
@@ -231,6 +232,48 @@ func Auth(appBag map[string]any, users any, opts map[string]any) (map[string]any
 	} else {
 		out["gates"] = gates
 	}
+	return out, nil
+}
+
+// OIDC configures OAuth2/OIDC authorization-code login (CFLMY IdP or compatible).
+// When enabled, GET/POST on login_path and register_path redirect to the IdP;
+// callback at redirect_uri path establishes the local session. IdP is_admin /
+// admin_role map to local role "admin".
+func OIDC(appBag map[string]any, opts map[string]any) (map[string]any, error) {
+	if opts == nil {
+		opts = map[string]any{}
+	}
+	cfg := oidc.ParseConfig(opts)
+	if !cfg.Enabled() {
+		return nil, fmt.Errorf("oidc: need client_id, client_secret, redirect_uri, and issuer (or authorize_url)")
+	}
+	out := clone(appBag)
+	bag := map[string]any{
+		"issuer":        cfg.Issuer,
+		"client_id":     cfg.ClientID,
+		"client_secret": cfg.ClientSecret,
+		"redirect_uri":  cfg.RedirectURI,
+		"scopes":        cfg.ScopesCSV(),
+		"callback_path": cfg.Callback(),
+	}
+	if cfg.AuthorizeURL != "" {
+		bag["authorize_url"] = cfg.AuthorizeURL
+	}
+	if cfg.TokenURL != "" {
+		bag["token_url"] = cfg.TokenURL
+	}
+	if cfg.UserInfoURL != "" {
+		bag["userinfo_url"] = cfg.UserInfoURL
+	}
+	out["oidc"] = bag
+	authBag, _ := out["auth"].(map[string]any)
+	if authBag == nil {
+		authBag = map[string]any{}
+	} else {
+		authBag = clone(authBag)
+	}
+	authBag["oidc"] = true
+	out["auth"] = authBag
 	return out, nil
 }
 

@@ -502,6 +502,16 @@ func web_app_auth(argsJSON *C.char, outJSON **C.char, errMsg **C.char) C.int {
 	return replyJSON(outJSON, errMsg, out, err)
 }
 
+//export web_app_oidc
+func web_app_oidc(argsJSON *C.char, outJSON **C.char, errMsg **C.char) C.int {
+	args, err := parseArgs(argsJSON)
+	if err != nil {
+		return replyJSON(outJSON, errMsg, nil, err)
+	}
+	out, err := app.OIDC(asPageMap(args["app"]), args)
+	return replyJSON(outJSON, errMsg, out, err)
+}
+
 //export web_app_gate
 func web_app_gate(argsJSON *C.char, outJSON **C.char, errMsg **C.char) C.int {
 	args, err := parseArgs(argsJSON)

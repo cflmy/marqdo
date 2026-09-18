@@ -821,6 +821,21 @@ Keep the app's `admin=True`, and gate `{admin_prefix}` (segment-boundary prefix)
 
 *> web_app_auth app=`self` users=`users` session_ttl=`session_ttl` admin_prefix=`admin_prefix` login_redirect=`login_redirect` logout_redirect=`logout_redirect` login_path=`login_path` register=`register` register_path=`register_path` default_role=`default_role` session_url=`session_url`*
 
+## oidc
+    + `issuer`=None
+    + `client_id`
+    + `client_secret`
+    + `redirect_uri`
+    + `scopes`="openid profile email"
+    + `callback_path`=None
+    + `authorize_url`=None
+    + `token_url`=None
+    + `userinfo_url`=None
+
+Enable OAuth 2.0 authorization-code / OIDC login (e.g. CFLMY IdP). When set, `login_path` / `register_path` / desk login redirect to the IdP; the `redirect_uri` callback exchanges the code and opens a local session. userinfo `is_admin` / `admin_role` map to local role `admin`; otherwise `default_role`. Secrets stay server-side; PKCE S256 is always sent.
+
+*> web_app_oidc app=`self` issuer=`issuer` client_id=`client_id` client_secret=`client_secret` redirect_uri=`redirect_uri` scopes=`scopes` callback_path=`callback_path` authorize_url=`authorize_url` token_url=`token_url` userinfo_url=`userinfo_url`*
+
 ## gate
     + `path`
     + `roles`=admin

@@ -245,6 +245,9 @@ func pathExcluded(path string, exclude []string, loginPath string) bool {
 	if path == loginPath || strings.HasPrefix(path, loginPath+"?") {
 		return true
 	}
+	if strings.HasPrefix(path, "/oidc/") {
+		return true
+	}
 	for _, ex := range exclude {
 		ex = strings.TrimRight(strings.TrimSuffix(ex, "*"), "/")
 		if ex == "" {
@@ -364,10 +367,11 @@ func (st *state) hasPageRoute(path string) bool {
 }
 
 func (st *state) mountAuthRoutes(mux *http.ServeMux) {
-	if st.auth.users == nil && !(st.auth.rbac && st.auth.register) {
+	st.mountOIDCRoutes(mux)
+	if st.auth.users == nil && !(st.auth.rbac && st.auth.register) && !st.oidcEnabled() {
 		return
 	}
-	if st.auth.users != nil || st.auth.rbac {
+	if st.auth.users != nil || st.auth.rbac || st.oidcEnabled() {
 		lp := st.auth.loginPath
 		// Site pages may own GET /login (or /desk/login); always keep POST for auth.
 		if !st.hasPageRoute(lp) {
@@ -385,7 +389,7 @@ func (st *state) mountAuthRoutes(mux *http.ServeMux) {
 		logoutPath := strings.TrimRight(st.auth.adminPrefix, "/") + "/logout"
 		mux.HandleFunc("GET "+logoutPath, st.handleLogout)
 	}
-	if st.auth.register && st.auth.rbac {
+	if st.auth.register && st.auth.rbac && !st.oidcEnabled() {
 		rp := st.auth.registerPath
 		if !st.hasPageRoute(rp) {
 			mux.HandleFunc("GET "+rp, st.handleRegisterGet)
@@ -410,6 +414,10 @@ func (st *state) mountAuthRoutes(mux *http.ServeMux) {
 }
 
 func (st *state) handleLoginGet(w http.ResponseWriter, r *http.Request) {
+	if st.oidcEnabled() {
+		st.handleOIDCStart(w, r)
+		return
+	}
 	if st.auth.users == nil && !st.auth.rbac {
 		http.Redirect(w, r, st.auth.loginRedirect, http.StatusSeeOther)
 		return
@@ -427,6 +435,10 @@ func (st *state) handleLoginGet(w http.ResponseWriter, r *http.Request) {
 }
 
 func (st *state) handleLoginPost(w http.ResponseWriter, r *http.Request) {
+	if st.oidcEnabled() {
+		st.handleOIDCStart(w, r)
+		return
+	}
 	if st.auth.users == nil && !st.auth.rbac {
 		http.Redirect(w, r, st.auth.loginRedirect, http.StatusSeeOther)
 		return
@@ -474,7 +486,8 @@ func (st *state) handleLoginPost(w http.ResponseWriter, r *http.Request) {
 	}
 	dest := loginDest(r, fallback)
 	held := session.PermissionsFromSession(sessID)
-	if strings.HasPrefix(dest, "/desk") && !session.PermissionAllowed(held, []string{"desk:access"}) {
+	if (strings.HasPrefix(dest, "/desk") || strings.HasPrefix(dest, "/admin")) &&
+		!session.PermissionAllowed(held, []string{"desk:access"}) {
 		dest = "/"
 	}
 	w.Header().Add("Set-Cookie", session.IssueCookie(sessID))
