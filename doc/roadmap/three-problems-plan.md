@@ -163,7 +163,7 @@ T1.1 core-surface ─是─> T3.1 语言面 + T1.3 守卫
   全量回归零失败（含 262 gold）。
 - **T2.6（契约导出 `get_schema`）**：按计划延后至 Phase 3 与 MLSP `schema` 一并实现。
 
-### Phase 3 · MLSP（2026-09-22 完成 T3.1/T3.2 + T2.6；T3.3/T3.4 待做）
+### Phase 3 · MLSP（2026-09-22 完成 T3.1–T3.4 全部工程项 + T2.6）
 
 - **T3.1** `marqdo mlsp` 子命令：行分隔 JSON over stdio，请求 `{"id","method","params"}` →
   响应 `{"id","ok","result"|"error"}`（永不 panic，错误也是结构化 JSON）。
@@ -174,8 +174,12 @@ T1.1 core-surface ─是─> T3.1 语言面 + T1.3 守卫
   `schema`（**T2.6 完成**：单元名 → 形参/返回/字段契约 + 升参清单 + 锚点）。
 - 验收：`tests/mlsp.rs` 7 例全绿（语法问答/未知查询/符号定位/漂移校验/schema 导出/有界修复/结构化错误）；
   stdio 冒烟通过；全量回归零失败。
-- **T3.3（修复循环护栏 · golden 20 例 ≥80%）**：护栏策略字段已就位（anchored-local / abstain /
-  max_attempts=2）；golden 实验需要模型调用，属验证实验性质，待做。
-- **T3.4（AI Skill 换骨：背语法 → 查 MLSP）**（2026-09-22 完成）——`marqdo` / `marqdo-dev` 两件套改为
+- **T3.4（修复回路）**（2026-09-22 完成工程项）——`src/repair.rs` **机械护栏**（有界行编辑
+  replace/delete/insert：触碰行必须落在靶点范围内，越界 ⇒ 整体拒绝 + 越界清单 + abstain，源零字节不改；
+  表尾追加允许 end+1）+ `mlsp repair_apply` 出口（护栏的 MLSP 面）+ **golden 20 例**
+  （10 骨架 × 2 变体：arg/ret/field/key/typo/drift/dup；金修复经完整修复循环复现——诊断 → 靶点 →
+  行编辑自动推导 → 范围自检（「易锚定」的机器验证）→ 应用 → 复验）+ 护栏负例（越界必拒/部分越界全拒）。
+  待做：模型修复实验（把金修复换成模型编辑，测 §5.2(a) ≥80% 修复率）。
+- **T3.3（AI Skill 换骨：背语法 → 查 MLSP）**（2026-09-22 完成）——`marqdo` / `marqdo-dev` 两件套改为
   查询式工作流：写码前 `mlsp syntax/locate`、提交前 `mlsp validate` + `marqdo check`；
   渐进式契约三种表格形状入语法面；错误修复照 `doc_anchor` 局部改（越界必弃权）。
