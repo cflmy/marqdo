@@ -324,6 +324,14 @@ impl Interpreter {
             Stmt::Assign { name, value, span, .. } => {
                 self.current_span = *span;
                 let v = self.eval_expr(module, fun, env, value)?;
+                // 契约边界 3（T2.2）：表绑定 vs 字段契约。
+                if let Some(c) = fun.var_contracts.get(name) {
+                    if let Some(d) =
+                        crate::contract::fields_diag(c, name, &v, self.path.as_deref(), *span)
+                    {
+                        return Err(d.into());
+                    }
+                }
                 if self.trace {
                     let display = v.as_display();
                     emit_trace(
@@ -343,6 +351,14 @@ impl Interpreter {
             Stmt::Return { value, span } => {
                 self.current_span = *span;
                 let v = self.eval_expr(module, fun, env, value)?;
+                // 契约边界 2（T2.2）：返回值 vs 返回契约。
+                if let Some(c) = &fun.contract {
+                    if let Some(d) =
+                        crate::contract::return_diag(c, &fun.name, &v, self.path.as_deref(), *span)
+                    {
+                        return Err(d.into());
+                    }
+                }
                 if self.trace {
                     let display = v.as_display();
                     emit_trace(
@@ -590,7 +606,38 @@ impl Interpreter {
             Expr::Index { base, label } => {
                 let v = self.eval_expr(module, fun, env, base)?;
                 let key = self.resolve_index_key(module, fun, env, label)?;
-                builtin_footnote_get(&v, &key).map_err(|m| self.err(m))
+                // 契约边界 4（T2.2）：字段访问 vs 字段契约——键存在性**先于**取值
+                // （契约诊断优先于运行时 `missing map key`）。
+                if let Expr::Var(name) = base.as_ref() {
+                    if let Some(c) = fun.var_contracts.get(name) {
+                        if let Some(d) = crate::contract::index_diag(
+                            c,
+                            name,
+                            &key,
+                            &Value::None,
+                            self.path.as_deref(),
+                            self.current_span,
+                        ) {
+                            return Err(d.into());
+                        }
+                    }
+                }
+                let out = builtin_footnote_get(&v, &key).map_err(|m| self.err(m))?;
+                if let Expr::Var(name) = base.as_ref() {
+                    if let Some(c) = fun.var_contracts.get(name) {
+                        if let Some(d) = crate::contract::index_diag(
+                            c,
+                            name,
+                            &key,
+                            &out,
+                            self.path.as_deref(),
+                            self.current_span,
+                        ) {
+                            return Err(d.into());
+                        }
+                    }
+                }
+                Ok(out)
             }
             Expr::Formula(e) => Ok(Value::Formula(e.clone())),
             Expr::Code(c) => Ok(Value::Code(c.clone())),
@@ -820,6 +867,18 @@ impl Interpreter {
 
         let bound = bind_function_args(self, module, fun, env, &target.params, &ev_args, false)
             .map_err(|m| self.err(m))?;
+        // 契约边界 1（T2.2）：调用实参 vs 形参契约。
+        if let Some(c) = &target.contract {
+            if let Some(d) = crate::contract::call_arg_diag(
+                c,
+                &target.name,
+                &bound,
+                self.path.as_deref(),
+                self.current_span,
+            ) {
+                return Err(d.into());
+            }
+        }
         let mut call_env = Env::new();
         for (k, v) in bound {
             call_env.set(k, v);
@@ -887,6 +946,18 @@ impl Interpreter {
             )
             .map_err(|m| self.err(m))?
         };
+        // 契约边界 1（T2.2）：库路径调用的实参 vs 形参契约。
+        if let Some(c) = &node.contract {
+            if let Some(d) = crate::contract::call_arg_diag(
+                c,
+                &display,
+                &bound,
+                self.path.as_deref(),
+                self.current_span,
+            ) {
+                return Err(d.into());
+            }
+        }
         let mut call_env = Env::new();
         for (k, v) in bound {
             call_env.set(k, v);
@@ -933,6 +1004,18 @@ impl Interpreter {
             })?;
         let bound = bind_function_args(self, module, fun, env, &target.params, ev_args, false)
             .map_err(|m| self.err(m))?;
+        // 契约边界 1（T2.2）：方法调用的实参 vs 形参契约。
+        if let Some(c) = &target.contract {
+            if let Some(d) = crate::contract::call_arg_diag(
+                c,
+                &target.name,
+                &bound,
+                self.path.as_deref(),
+                self.current_span,
+            ) {
+                return Err(d.into());
+            }
+        }
         let mut call_env = Env::new();
         for (k, v) in bound {
             call_env.set(k, v);

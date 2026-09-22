@@ -11,6 +11,8 @@ pub mod bytecode;
 pub mod capture;
 #[cfg(feature = "cli")]
 pub mod catalog;
+pub mod check;
+pub mod contract;
 pub mod debug;
 pub mod diagnostics;
 pub mod embedded_lib;

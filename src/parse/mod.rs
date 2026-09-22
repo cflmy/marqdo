@@ -212,6 +212,8 @@ impl<'a> Cursor<'a> {
             children: Vec::new(),
             base,
             dead_binds: Vec::new(),
+            contract: None,
+            var_contracts: std::collections::HashMap::new(),
         };
         // Prose decls pending promotion (name → optional default text).
         let mut prose_decls: Vec<(String, Option<String>)> = Vec::new();
@@ -342,6 +344,8 @@ impl<'a> Cursor<'a> {
             }
         }
 
+        // 契约提取（T2.1）必须在升参推断**之前**：契约表的单元不污染推断。
+        extract_function_contract(&mut fun, self.lines)?;
         merge_inferred_params(&mut fun, &prose_decls)?;
         Ok(fun)
     }
@@ -1302,6 +1306,166 @@ fn stmt_from_italic_return(inner: &str, span: Span) -> Result<Stmt> {
 /// Design §8.2: elevate only when an executable read cannot be satisfied by a prior
 /// local assign that does not itself read the name (e.g. `score = > json.get …` is local;
 /// `n = n + 1` still needs external `n`).
+// ---------- 契约提取（T2.1 · 渐进式契约 / 标注类型） ----------
+//
+// 未绑定文档表 → 契约；**位置 + 形状**双重判定；在升参推断之前执行。
+// 契约表从 body 移除（元数据永不执行、不污染升参推断）；
+// 非契约表（普通文档/数据表，含一切**绑定**表）原样保留 ⇒ 无契约文件零回归。
+
+/// 从表头行起收集连续 `|` 行作为契约原文（诊断 `doc_quote`）。
+fn table_quote(lines: &[ClassifiedLine], start_line: u32) -> (u32, Vec<String>) {
+    let Some(mut idx) = (0..lines.len()).find(|&i| lines[i].line_no == start_line) else {
+        return (start_line, Vec::new());
+    };
+    let mut quote = Vec::new();
+    let mut end = start_line;
+    while idx < lines.len() && lines[idx].text.trim().starts_with('|') {
+        quote.push(lines[idx].text.trim_end().to_string());
+        end = lines[idx].line_no;
+        idx += 1;
+    }
+    (end, quote)
+}
+
+/// 是否「字段契约形状」的未绑定文档表（紧邻判定的透明跳过用）。
+fn is_fields_contract_stmt(stmt: &Stmt, lines: &[ClassifiedLine]) -> bool {
+    let Stmt::Expr { value: Expr::Map(pairs), span } = stmt else {
+        return false;
+    };
+    let (end_line, quote) = table_quote(lines, span.line);
+    matches!(
+        crate::contract::parse_contract_table(pairs, span.line, end_line, quote),
+        Some(Ok(ref c)) if !c.fields.is_empty()
+    )
+}
+
+/// 紧邻绑定名：跳过连续的字段契约表后，下一条是不是 `` `名` = `` 绑定。
+fn next_binding_name(body: &[Stmt], start: usize, lines: &[ClassifiedLine]) -> Option<String> {
+    let mut j = start;
+    while j < body.len() && is_fields_contract_stmt(&body[j], lines) {
+        j += 1;
+    }
+    match body.get(j) {
+        Some(Stmt::Assign { name, .. }) => Some(name.clone()),
+        _ => None,
+    }
+}
+
+fn empty_like(piece: &crate::contract::Contract) -> crate::contract::Contract {
+    crate::contract::Contract {
+        params: Vec::new(),
+        returns: None,
+        fields: Vec::new(),
+        start_line: piece.start_line,
+        end_line: piece.end_line,
+        quote: Vec::new(),
+    }
+}
+
+/// 合并契约块；重复行/重复表 → `contract.duplicate` 诊断（防两份契约打架）。
+fn merge_piece(
+    dst: &mut Option<crate::contract::Contract>,
+    piece: crate::contract::Contract,
+    unit: &str,
+    span: Span,
+) -> Result<()> {
+    match dst {
+        None => *dst = Some(piece),
+        Some(slot) => {
+            if let Err(m) = crate::contract::merge_contract(slot, piece.clone()) {
+                return Err(piece
+                    .diagnostic(
+                        "contract.duplicate",
+                        unit,
+                        m,
+                        "删除重复契约表，只保留一份".to_string(),
+                        None,
+                        span,
+                    )
+                    .into());
+            }
+        }
+    }
+    Ok(())
+}
+
+fn extract_function_contract(fun: &mut Function, lines: &[ClassifiedLine]) -> Result<()> {
+    let body = std::mem::take(&mut fun.body);
+    let mut fun_contract: Option<crate::contract::Contract> = None;
+    let mut var_contracts: std::collections::HashMap<String, crate::contract::Contract> =
+        std::collections::HashMap::new();
+    let mut keep: Vec<Stmt> = Vec::with_capacity(body.len());
+    // 「函数体首个可执行行之前」：未绑定表（Map/List 形状的 `Stmt::Expr`）不算可执行行。
+    let mut prefix_zone = true;
+    let mut i = 0usize;
+
+    while i < body.len() {
+        let stmt = &body[i];
+        let (pairs, span) = match stmt {
+            Stmt::Expr {
+                value: Expr::Map(pairs),
+                span,
+            } => (pairs, *span),
+            other => {
+                if !matches!(other, Stmt::Expr { value: Expr::List(_), .. }) {
+                    prefix_zone = false;
+                }
+                keep.push(other.clone());
+                i += 1;
+                continue;
+            }
+        };
+        let (end_line, quote) = table_quote(lines, span.line);
+        let Some(parsed) = crate::contract::parse_contract_table(pairs, span.line, end_line, quote)
+        else {
+            // 非契约形状：普通文档/数据表 → 原样保留（P1 零回归的关键）。
+            keep.push(stmt.clone());
+            i += 1;
+            continue;
+        };
+        let piece = parsed?; // 契约形状但畸形 → 必产诊断（contract.malformed）
+        let is_fn_contract = !piece.params.is_empty() || piece.returns.is_some();
+
+        if is_fn_contract {
+            // 形参/返回表只在「首个可执行行之前」生效，否则视为普通表。
+            if !prefix_zone {
+                keep.push(stmt.clone());
+                i += 1;
+                continue;
+            }
+            merge_piece(&mut fun_contract, piece, &fun.name, span)?;
+            i += 1;
+            continue;
+        }
+
+        // 字段表：紧邻 `` `名` = `` 绑定之前 → 集合契约；对象体首成员前 → 对象字段契约。
+        if let Some(name) = next_binding_name(&body, i + 1, lines) {
+            let mut slot = Some(
+                var_contracts
+                    .remove(&name)
+                    .unwrap_or_else(|| empty_like(&piece)),
+            );
+            merge_piece(&mut slot, piece, &name, span)?;
+            var_contracts.insert(name, slot.unwrap());
+            i += 1;
+            continue;
+        }
+        if prefix_zone && fun.is_object() {
+            merge_piece(&mut fun_contract, piece, &fun.name, span)?;
+            i += 1;
+            continue;
+        }
+        // 不在允许位置 → 不是契约，原样保留。
+        keep.push(stmt.clone());
+        i += 1;
+    }
+
+    fun.body = keep;
+    fun.contract = fun_contract;
+    fun.var_contracts = var_contracts;
+    Ok(())
+}
+
 fn merge_inferred_params(
     fun: &mut Function,
     prose_decls: &[(String, Option<String>)],

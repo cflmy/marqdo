@@ -142,3 +142,23 @@ T1.1 core-surface ─是─> T3.1 语言面 + T1.3 守卫
 | Phase 2 | T2.1–T2.5 验收全绿（T2.6 可延后） |
 | Phase 3 | T3.1–T3.4 验收全绿 |
 | 三大问题「已解决」 | [three-problems.md](three-problems.md) §5.1 判据矩阵全绿 + 实验数字可复现（Phase 4） |
+
+## 落地记录
+
+### Phase 2 · 渐进式契约层（2026-09-22 完成 T2.1–T2.5；T2.6 按计划延后至 Phase 3）
+
+- **T2.1** `src/contract.rs`（类型词汇/三形状契约表解析/合并/四边界校验诊断）+
+  `src/parse/mod.rs::extract_function_contract`（位置 + 形状双重判定，**在升参推断之前**执行——
+  契约表的单元不会被误升参；契约表从 body 移除，元数据永不执行）。
+  反例守住：**绑定**的 `字段|类型` 数据表（web_db_migration 风格）绝不视为契约。
+- **T2.2** 四边界全接：调用实参（普通/库路径/方法三条调用路径）、返回、表绑定、字段访问
+  （键存在性**先于**取值，契约诊断优先于 `missing map key`）。列语义按「几何即类型」：标量或全匹配列向量。
+- **T2.3/T2.5** `marqdo check [FILE] [--json]`：契约行 vs 升参推断形参双向互查
+  （错行 ⇒ Error；新升参未覆盖 ⇒ Warning）、未知类型名（附最近建议）、错位契约；Error ⇒ 非零退出。
+- **T2.4** 全部契约诊断带 `doc_anchor`（`file.mq.md#L7-L13`）+ `doc_quote`（契约表原文）+
+  `contract_ref`（`declared` = 契约声明摘要）；`run --json` / `check --json` 同源输出。
+- **附带修复（错误出口唯一）**：`src/load.rs` 原来把 parse 错误 `anyhow!("{label}: {e}")` 拍平成字符串，
+  结构化诊断在 import 装载链路丢失；改为 `label_error` 保留 Diagnostic（补文件标签），任何装载层都不许拍平错误。
+- 验收：`tests/contracts.rs` 12 例（提取 4 + 四边界 4 + check 3 + 正向对照 1）全绿；
+  全量回归零失败（含 262 gold）。
+- **T2.6（契约导出 `get_schema`）**：按计划延后至 Phase 3 与 MLSP `schema` 一并实现。

@@ -126,6 +126,11 @@ impl Diagnostic {
         self
     }
 
+    /// 从 anyhow 错误链中找回结构化诊断（load/parse 包了 context 也不丢；MLSP 面）。
+    pub fn find(err: &anyhow::Error) -> Option<&Diagnostic> {
+        err.chain().find_map(|e| e.downcast_ref::<Diagnostic>())
+    }
+
     pub fn format_message(&self) -> String {
         match &self.path {
             Some(p) => format!("{}:{}: {}", display_path(p), self.span, self.message),

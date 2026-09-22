@@ -252,6 +252,20 @@ pub fn load_module_from_source(source: &str) -> Result<Module> {
     load_module_from_source_inner(source, "<memory>", &mut visited)
 }
 
+/// 给错误打上文件标签，**保留**结构化诊断（错误出口唯一；AI/MLSP 面不许拍平成字符串）。
+/// 无结构的错误退回 `{label}: {e}` 文本。
+fn label_error(label: &str, e: anyhow::Error) -> anyhow::Error {
+    match crate::diagnostics::Diagnostic::find(&e).cloned() {
+        Some(mut d) => {
+            if d.path.is_none() {
+                d.path = Some(PathBuf::from(label));
+            }
+            d.into()
+        }
+        None => anyhow::anyhow!("{label}: {e}"),
+    }
+}
+
 fn load_module_from_source_inner(
     source: &str,
     label: &str,
@@ -263,7 +277,7 @@ fn load_module_from_source_inner(
     }
 
     let result = (|| {
-        let mut module = parse_source(source).map_err(|e| anyhow::anyhow!("{label}: {e}"))?;
+        let mut module = parse_source(source).map_err(|e| label_error(label, e))?;
         let imports = module.imports.clone();
         let mut import_modules = HashMap::new();
         for imp in imports {
@@ -274,8 +288,7 @@ fn load_module_from_source_inner(
             import_modules.insert(imp.bind, dep);
         }
         module.import_modules = import_modules;
-        crate::inherit::validate_inheritance(&module)
-            .map_err(|e| anyhow::anyhow!("{label}: {e}"))?;
+        crate::inherit::validate_inheritance(&module).map_err(|e| label_error(label, e))?;
         Ok(module)
     })();
 

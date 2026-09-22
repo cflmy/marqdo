@@ -61,6 +61,10 @@ pub struct Function {
     pub base: Option<String>,
     /// Prose `` `名` `` never read/assigned on the executable surface (not params).
     pub dead_binds: Vec<String>,
+    /// 渐进式契约（T2.1）：形参/返回/对象字段契约（附着在文档表上，升参推断前提取）。
+    pub contract: Option<crate::contract::Contract>,
+    /// 集合契约（T2.1）：变量名 → 字段契约（紧邻 `` `名` = `` 绑定之前的文档表）。
+    pub var_contracts: HashMap<String, crate::contract::Contract>,
 }
 
 impl Function {

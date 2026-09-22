@@ -70,6 +70,16 @@ enum Commands {
         #[arg(long)]
         json: bool,
     },
+    /// Static contract cross-check (渐进式契约): drift, unknown types, misplaced tables
+    Check {
+        /// Program path (.mq.md)
+        #[arg(value_name = "FILE")]
+        file: PathBuf,
+
+        /// Emit one JSON diagnostic per line on stdout (machine-readable; AI/MLSP 面)
+        #[arg(long)]
+        json: bool,
+    },
     /// Browse `.mq.md` structure + execution (live server or static output)
     View {
         #[command(subcommand)]
@@ -179,14 +189,19 @@ enum ViewAction {
 
 fn main() -> ExitCode {
     let cli = Cli::parse();
-    let json_errors = matches!(&cli.command, Commands::Run { json: true, .. });
+    let json_errors = matches!(
+        &cli.command,
+        Commands::Run { json: true, .. } | Commands::Check { json: true, .. }
+    );
     match try_main(cli) {
         Ok(code) => ExitCode::from(code as u8),
         Err(err) => {
             if json_errors {
                 let diag = match err.downcast::<Diagnostic>() {
                     Ok(d) => d,
-                    Err(e) => Diagnostic::new(None, Span::new(0, 0), format!("{e:#}")),
+                    Err(e) => Diagnostic::find(&e).cloned().unwrap_or_else(|| {
+                        Diagnostic::new(None, Span::new(0, 0), format!("{e:#}"))
+                    }),
                 };
                 eprintln!("{}", diag.to_json());
             } else {
@@ -243,6 +258,28 @@ fn try_main(cli: Cli) -> Result<i32> {
             }
             marqdo::run_file(&path, &opts)?;
             Ok(0)
+        }
+        Commands::Check { file, json } => {
+            let diags = marqdo::check::check_path(&file)?;
+            let mut errors = 0i32;
+            for d in &diags {
+                if matches!(d.severity, marqdo::diagnostics::Severity::Error) {
+                    errors += 1;
+                }
+                if json {
+                    println!("{}", d.to_json());
+                } else {
+                    println!("{}", d.format_message());
+                }
+            }
+            if !json {
+                if diags.is_empty() {
+                    println!("contract check OK: 无契约问题");
+                } else {
+                    println!("contract check: {} 条诊断（{} error）", diags.len(), errors);
+                }
+            }
+            Ok(errors.min(1))
         }
         Commands::View {
             action,
