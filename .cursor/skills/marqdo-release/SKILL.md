@@ -85,7 +85,7 @@ Checks: clean tree; `main` ff-only; smoke tests; CHANGELOG Unreleased; no secret
 |------|------|-----|-----|
 | `Cargo.toml` + `crates/marqdo-wasm/Cargo.toml` | bump | bump | — |
 | `ext/VERSION` | bump | — | bump |
-| `CHANGELOG.md` | `## vVER` | `## vVER` | `## Ext pack vVER` |
+| `CHANGELOG.md` | `## vVER`（含**核心表面 Δ**，见 `doc/design/layers.md`） | same | `## Ext pack vVER` |
 | `README.md` / `public/**` install + download table | update | update | update ext notes |
 | `.cursor/skills/marqdo/SKILL.md` | if surface changed | same | rare |
 | `.github/workflows/release.yml` Highlights stub | yes | yes | — |

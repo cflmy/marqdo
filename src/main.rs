@@ -5,6 +5,7 @@ use anyhow::Result;
 use clap::{Parser, Subcommand, ValueEnum};
 
 use marqdo::catalog::{write_catalog, CatalogOptions};
+use marqdo::diagnostics::{Diagnostic, Span};
 use marqdo::ext_cli::{add_ext, list_ext, remove_ext};
 use marqdo::input_feed::load_stdin_file;
 use marqdo::view::{serve, serve_debug, write_static, DebugOptions, OutputOptions, ViewOptions};
@@ -64,6 +65,10 @@ enum Commands {
         /// Write `# main` return value as JSON (used by file subtasks).
         #[arg(long, value_name = "FILE")]
         emit_result: Option<PathBuf>,
+
+        /// Emit diagnostics as JSON on stderr (machine-readable; AI/MLSP 面).
+        #[arg(long)]
+        json: bool,
     },
     /// Browse `.mq.md` structure + execution (live server or static output)
     View {
@@ -173,17 +178,26 @@ enum ViewAction {
 }
 
 fn main() -> ExitCode {
-    match try_main() {
+    let cli = Cli::parse();
+    let json_errors = matches!(&cli.command, Commands::Run { json: true, .. });
+    match try_main(cli) {
         Ok(code) => ExitCode::from(code as u8),
         Err(err) => {
-            eprintln!("error: {err:#}");
+            if json_errors {
+                let diag = match err.downcast::<Diagnostic>() {
+                    Ok(d) => d,
+                    Err(e) => Diagnostic::new(None, Span::new(0, 0), format!("{e:#}")),
+                };
+                eprintln!("{}", diag.to_json());
+            } else {
+                eprintln!("error: {err:#}");
+            }
             ExitCode::from(1)
         }
     }
 }
 
-fn try_main() -> Result<i32> {
-    let cli = Cli::parse();
+fn try_main(cli: Cli) -> Result<i32> {
     match cli.command {
         Commands::Run {
             file,
@@ -197,6 +211,7 @@ fn try_main() -> Result<i32> {
             dump_all,
             stdin_file,
             emit_result,
+            json: _,
         } => {
             let path = file.unwrap_or_else(|| PathBuf::from("index.mq.md"));
             let stdin_lines = match stdin_file {

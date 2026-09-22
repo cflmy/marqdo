@@ -1853,3 +1853,32 @@ Candidates may include lexical `score`.
         }
     }
 }
+
+/// 核心表面构造注册表（T1.3）——`(id, Markdown 外形)`。
+///
+/// **紧邻分类代码维护**；与 `doc/design/core-surface.md` 的 id 列强一致，
+/// 由 `tests/core_surface.rs` 守卫：改动任一侧不同步 → CI 红。
+/// 新增条目必须走 ADR（`doc/design/layers.md` 准入戒律）。
+pub const CORE_CONSTRUCTS: &[(&str, &str)] = &[
+    // 行构造
+    ("narrative", "无标记文字"),
+    ("blank", "空行"),
+    ("heading-unit", "# / ##"),
+    ("call-line", ">"),
+    ("branch-list", "1. 递增"),
+    ("loop-list", "-"),
+    ("param", "+ `名`"),
+    ("table", "GFM 表"),
+    ("fence", "```lang"),
+    ("hr", "--- / ***"),
+    ("writeback", "<!-- marqdo-out -->"),
+    // 内联标记
+    ("ident", "`名`"),
+    ("bold-code", "**…**"),
+    ("italic-return", "*…*"),
+    ("empty-return", "*None* / ****"),
+    ("link-index", "[键](集合)"),
+    ("bracket-call", "修饰… [函数] …"),
+    ("footnote-index", "集合[^键]"),
+    ("soft-emphasis", "*仅* / **说明**"),
+];
