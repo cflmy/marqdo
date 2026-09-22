@@ -1,12 +1,53 @@
 ﻿# Marqdo
 
-**代码即文档。文档即代码。文档即知识库。**
+**代码即文档。文档即知识库。知识即可执行。**
 
-Marqdo 把 Markdown **标记当作编程语法**：同一个 `.mq.md` 文件，既是给人读的文稿，也是给机器跑的程序。写文档的过程就是在写可执行逻辑——大型项目里，说明、示例与实现不再分叉成三份真相。
+Marqdo 把 Markdown **标记当作编程语法**：同一个 `.mq.md` 文件，既是给人读的文稿，也是给机器跑的程序。写文档的过程就是在写可执行逻辑——大型项目里，说明、示例与实现不再分叉成三份真相。它不是「又一个 Markdown 编程语言」，而是**文档原生的编程运行时（Document-native runtime）**——一门关于**可执行知识（Executable Knowledge）**的语言。
 
 欢迎访问 [marqdo 官方网站](https://www.marqdo.com/) 阅读更多特性与可执行文档。
 
 语法宪法：[doc/design/markdown-mapping.md](doc/design/markdown-mapping.md) · 对象：[objects.md](doc/design/objects.md) · 调用实参：[call-arguments.md](doc/design/call-arguments.md) · 用户站：[user-site.md](doc/design/user-site.md) · 浏览：[view.md](doc/design/view.md) · 调试：[view-debug.md](doc/design/view-debug.md) · OKF 清单：[catalog-cli.md](doc/design/catalog-cli.md) · VS Code 扩展：[vscode-extension.md](doc/design/vscode-extension.md)（分支 **`vscode-extension`**；提交约定 [vscode-extension-commit.md](doc/design/vscode-extension-commit.md)） · **AI Skill**：[skills/marqdo/](skills/marqdo/)（说明 [ai-skill.md](doc/design/ai-skill.md)） · 官方扩展：[ext-llm.md](doc/design/ext-llm.md)（`ext/llm`）· [ext-agent.md](doc/design/ext-agent.md)（智能体开发框架）· [ext-cli.md](doc/design/ext-cli.md)（`marqdo ext list/add/remove`） · 原生插件 ABI：[ext-abi.md](doc/design/ext-abi.md)（`lib/plugin`） · 金样例：[tests/](tests/) · 用户文档：[public/](public/) · 变更：[CHANGELOG.md](CHANGELOG.md)
+
+---
+
+## 核心优势：可执行知识（Executable Knowledge）
+
+> **Knowledge That Can Run —— 知识即可执行。**
+> Marqdo 不是「用 Markdown 写程序」这么简单：它让一个 `.mq.md` 文档**同时**是文稿、知识与程序——同一份结构，同时服务于人、解释器、工具与 AI。
+
+```text
+         .mq.md（同一份文件）
+        ┌─────────┼─────────┐
+       文稿      知识       程序
+        └─────────┼─────────┘
+                  ▼
+           Marqdo 运行时
+                  ▼
+        可执行知识（Executable Knowledge）
+```
+
+| 真正的核心优势 | 说明 |
+|------|------|
+| **知识-代码一致性**<br>Knowledge-Code Coherence | 说明、数据、示例与实现**同一份源文件**：文档里的表格就是程序的数据，文档里的调用就是真实执行。「文档过期」不再是悄悄漂移，而是可被机器发现的**知识不一致**——知识陈述本身可以被测试。 |
+| **默认安全，AI 友好** | 无标记文字默认是叙述（注释），只有显式标记才进入执行。AI 自由发挥**不会污染**文档与代码的边界——这比「自然语言编程」安全得多，是 AI 原生语言的重要前提。 |
+| **multi-view artifact**<br>`.mq.md` 双后缀即开放接口 | `.mq` 告诉解释器「可执行」，`.md` 告诉整个 Markdown 生态「仍是文档」。GitHub 直接读、VS Code 直接改、搜索引擎直接索引、LLM 直接理解、Marqdo 直接运行。**Marqdo 不占有知识，只是给 Markdown 增加执行语义。** |
+| **表格即数据结构** | 程序的数据结构直接就是文档的数据结构：单列竖表 → `List`；横表（1 数据行）→ `Map`；横表（多数据行）→ `Map` of `List`（列向聚合）；首列写 `@` / `行` / `row` → 行向记录 `List` of `Map`。取元 `[键](集合)` 也是 Markdown 链接形。这是 literate programming 的下一步。 |
+| **语义干净** | **返回是架构，打印只是函数**：`*…*` 改变控制流，`print` 只是副作用函数；分支与循环长在 Markdown 结构上（`1.` `2.` 递增 = 分支，`-` = 循环），不是所有列表都被粗暴当成 if。 |
+| **AI 的可靠上下文与长期记忆** | 一个 `.mq.md` 同时是 documentation + schema + code + examples + knowledge + executable behavior；AI 不必再拼装 README + OpenAPI + JSON Schema + prompt。整个工程天然就是 AI 的**世界模型**——比 RAG 更接近 Executable RAG。 |
+| **完整工程，不是玩具** | Rust 正经解释器（词法 / 语法 / 语义 / 树遍历 + 字节码后端）、stdlib、模块与对象、debugger、viewer、catalog、WASM、原生插件 ABI、VS Code 扩展、agent / LLM / MCP。 |
+
+---
+
+## 愿景与期许
+
+不把「AI 能写 Marqdo」当终点，而是 **「AI 能可靠地生成可验证的 Marqdo」**：
+
+1. **AI 可验证语言**：`LLM → Marqdo AST → 语义检查 → 结构化诊断 → LLM 修复 → 合格程序`。让类型与语义检查成为 AI 编程闭环里的强约束，堵住「语义看似合理、类型实则不对」的生成。
+2. **Marqdo Schema / Language Server for AI**：机器可读的语言 Schema（`get_syntax` / `validate` / `repair` …），AI 不必读千行文档猜语法，而是 discover → construct → validate → execute → inspect。
+3. **程序即 AI 长期记忆**：`.mq.md` 工程 = 可执行知识库 = AI 的世界模型（Executable Knowledge Representation）。
+4. **可执行知识图**：`.mq.md` 之间的 Markdown 链接天然长成文档图 + 知识图 + 程序图（Executable Knowledge Graph）。
+5. **知识可测试**：文档中的示例表自动执行；知识与执行结果不一致会被机器报告——Knowledge-Code Coherence 从理念变为日常。
+6. **可靠性基准**：让同一个 AI 分别用 Python / TypeScript / Marqdo 完成真实任务，测量生成长度、语法 / 语义错误率、修复轮次、token 消耗与人类阅读 / 修改成本——用实验数据证明「文档型语法降低 LLM 生成熵」。
 
 ---
 
@@ -38,7 +79,7 @@ Marqdo 把 Markdown **标记当作编程语法**：同一个 `.mq.md` 文件，�
 | 叙述 `` `名` `` / `` `名`=默认 `` | 形参由体推断（`` + `名` `` 仍可用） |
 | `1.` … | 体内 `1.` `2.` … = 分支（`N. *` = else） |
 | `-` | 循环（`` - `条件` `` 或 `` - [项](集合) ``） |
-| 表格 | 集合；取元优先 `[键](集合)` |
+| 表格 | 集合（几何即类型，见下）；取元优先 `[键](集合)` |
 | 单独一行 `---` / `***` | **叙述分隔**（跳过；不是函数收束） |
 
 ```markdown
@@ -58,6 +99,8 @@ Marqdo 把 Markdown **标记当作编程语法**：同一个 `.mq.md` 文件，�
 对于输入变量`n`，执行**n=n+1**接着返回*n*。
 ```
 
+**表格几何即类型**：单列竖表 → `List`；横表（1 数据行）→ `Map`；横表（多数据行）→ `Map` of `List`（列向聚合）；首列写 `@` / `行` / `row` → 行向记录 `List` of `Map`。详见 [tables-maps-footnotes.md](doc/roadmap/tables-maps-footnotes.md)。
+
 完整约定：[markdown-mapping-v0.3.md](doc/design/markdown-mapping-v0.3.md)。
 
 ---
@@ -68,7 +111,8 @@ Marqdo 把 Markdown **标记当作编程语法**：同一个 `.mq.md` 文件，�
 2. **返回是架构；打印只是函数。**  
 3. **代码即文档即知识库**：文稿可执行，执行可回看结构，结构可导航与调试。  
 4. **对齐 [OKF](https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md)（Open Knowledge Format）方向**：清单由工具从 `.mq.md` **自动生成**，不是手填配置——见下节与 [catalog-cli.md](doc/design/catalog-cli.md)。  
-5. **正经解释器（Rust）**：词法/行分类 → 语法 → 语义 → 树遍历（及字节码）；**不用 Flex/Bison**。见 [路线图](doc/roadmap/interpreter.md)。
+5. **正经解释器（Rust）**：词法/行分类 → 语法 → 语义 → 树遍历（及字节码）；**不用 Flex/Bison**。见 [路线图](doc/roadmap/interpreter.md)。  
+6. **语言核心保持小**：Language（标记映射 / AST / 语义 / 类型）、Runtime（stdlib / 插件 ABI / WASM / agent）、Document（知识 + 代码 + UI + AI）三层分明——生态功能不淹没语言身份。
 
 ---
 
