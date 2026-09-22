@@ -31,6 +31,7 @@ pub mod linalg_ops;
 pub mod load;
 pub mod mlsp;
 pub mod parse;
+pub mod repair;
 pub mod value;
 #[cfg(feature = "net-host")]
 pub mod version_check;

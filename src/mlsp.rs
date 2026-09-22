@@ -13,6 +13,7 @@
 //! | `syntax` | 语法问答：关键字/别名 → 构造卡片 |
 //! | `validate` | 程序校验：结构化诊断数组（parse + 契约 check） |
 //! | `repair_targets` | 修复靶点：错误 → **有界**修复目标（越界必拒，护栏） |
+//! | `repair_apply` | 应用行编辑（全有或全无；越界 ⇒ `mlsp.repair_out_of_scope` abstain） |
 //! | `schema` | 契约查询（T2.6）：单元名 → 形参/返回/字段契约 |
 
 use std::path::{Path, PathBuf};
@@ -54,10 +55,11 @@ fn dispatch(req: &Value) -> Result<Value, Value> {
         Some("syntax") => syntax(&params),
         Some("validate") => validate(&params),
         Some("repair_targets") => repair_targets(&params),
+        Some("repair_apply") => repair_apply(&params),
         Some("schema") => schema(&params),
         other => Err(err(
             "mlsp.unknown_method",
-            format!("未知方法 {other:?}；可用：locate / syntax / validate / repair_targets / schema"),
+            format!("未知方法 {other:?}；可用：locate / syntax / validate / repair_targets / repair_apply / schema"),
         )),
     }
 }
@@ -189,6 +191,83 @@ fn repair_targets(params: &Value) -> Result<Value, Value> {
             "note": "只许改动锚定范围内的行；越界改动必须拒绝并报 abstain"
         }
     }))
+}
+
+/// 应用有界修复（T3.3）：行编辑全有或全无；越界 ⇒ `mlsp.repair_out_of_scope`（abstain），源零字节不改。
+fn repair_apply(params: &Value) -> Result<Value, Value> {
+    let source = source_text(params)?;
+    let ranges = params
+        .get("ranges")
+        .and_then(|r| r.as_array())
+        .ok_or_else(|| err("mlsp.bad_request", "repair_apply 需要 params.ranges（[[起,止],…]）"))?
+        .iter()
+        .map(|pair| {
+            let a = pair.as_array()?;
+            Some((a.first()?.as_u64()? as u32, a.get(1)?.as_u64()? as u32))
+        })
+        .collect::<Option<Vec<(u32, u32)>>>()
+        .ok_or_else(|| err("mlsp.bad_request", "ranges 必须是 [[起,止],…]"))?;
+
+    let mut edits = Vec::new();
+    let edit_list = params
+        .get("edits")
+        .and_then(|e| e.as_array())
+        .ok_or_else(|| err("mlsp.bad_request", "repair_apply 需要 params.edits"))?;
+    for e in edit_list {
+        let line = e
+            .get("line")
+            .and_then(|l| l.as_u64())
+            .ok_or_else(|| err("mlsp.bad_request", "edit 缺 line"))? as u32;
+        let text = e.get("text").and_then(|t| t.as_str()).unwrap_or("").to_string();
+        edits.push(match e.get("op").and_then(|o| o.as_str()) {
+            Some("replace") => crate::repair::Edit::Replace { line, text },
+            Some("delete") => crate::repair::Edit::Delete { line },
+            Some("insert") => crate::repair::Edit::InsertBefore { line, text },
+            other => {
+                return Err(err(
+                    "mlsp.bad_request",
+                    format!("未知编辑 op {other:?}（replace / delete / insert）"),
+                ))
+            }
+        });
+    }
+
+    match crate::repair::apply_edits(&source, &ranges, &edits) {
+        Ok(new_source) => {
+            if params.get("write").and_then(|w| w.as_bool()).unwrap_or(false) {
+                let path = params
+                    .get("path")
+                    .and_then(|p| p.as_str())
+                    .ok_or_else(|| err("mlsp.bad_request", "write=true 需要 params.path"))?;
+                std::fs::write(path, &new_source)
+                    .map_err(|e| err("mlsp.io_error", format!("写回 {path} 失败: {e}")))?;
+            }
+            Ok(json!({"source": new_source, "edits_applied": edits.len()}))
+        }
+        Err(oos) => Err(json!({
+            "code": "mlsp.repair_out_of_scope",
+            "message": format!(
+                "修复越界（abstain）：触及行 {:?} 不在靶点范围 {:?} 内；已拒绝全部编辑，源未改动",
+                oos.lines, oos.ranges
+            ),
+            "lines": oos.lines,
+            "ranges": oos.ranges,
+            "on_violation": "abstain",
+        })),
+    }
+}
+
+/// 取待修源码（source 直给 / path 读取）。
+fn source_text(params: &Value) -> Result<String, Value> {
+    if let Some(s) = params.get("source").and_then(|s| s.as_str()) {
+        return Ok(s.to_string());
+    }
+    let path = params
+        .get("path")
+        .and_then(|p| p.as_str())
+        .ok_or_else(|| err("mlsp.bad_request", "需要 params.source 或 params.path"))?;
+    std::fs::read_to_string(path)
+        .map_err(|e| err("mlsp.io_error", format!("读取 {path} 失败: {e}")))
 }
 
 /// 契约查询（T2.6）：单元名 → 形参/返回/字段契约。
