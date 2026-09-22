@@ -36,6 +36,62 @@ Canonical design (repo): [`markdown-mapping-v0.3.md`](../../doc/design/markdown-
 11. **Code-as-documentation / no bag glue:** Prefer **GFM tables** for maps, lists, wire, commands. Prefer **`table.put` / named helpers** over `json.set` / `json.append` chains. `lib/json` is for parse/stringify/quote only — not a dict builder. Unreadable json pipelines are a style bug.
 12. **Bracket-marked calls:** Function name may be marked with `[函数名]`; bare words before `[` are boolean modifiers (`礼貌 [问候] x` → `礼貌=True`). `]` immediately followed by `(` is **index** `[key](coll)`, not a call. Prefer `[k](c)` over footnote index in new code. See [bracket-call-modifiers.md](../../doc/design/bracket-call-modifiers.md).
 
+## 记不住语法细节？查 MLSP（AI 必读）
+
+**不必背 Marqdo 语法细节**——语法可查、程序可验、修复有界。写码前后走**查询式**工作流：
+
+```bash
+printf '%s\n' '{"id":1,"method":"syntax","params":{"query":"返回"}}' | marqdo mlsp
+printf '%s\n' '{"id":2,"method":"locate","params":{"path":"a.mq.md","symbol":"加一"}}' | marqdo mlsp
+printf '%s\n' '{"id":3,"method":"validate","params":{"path":"a.mq.md"}}' | marqdo mlsp
+printf '%s\n' '{"id":4,"method":"schema","params":{"path":"a.mq.md","unit":"加一"}}' | marqdo mlsp
+printf '%s\n' '{"id":5,"method":"repair_targets","params":{"code":"contract.arg_mismatch","doc_anchor":"a.mq.md#L9-L15"}}' | marqdo mlsp
+```
+
+| method | 何时用 |
+|--------|--------|
+| `syntax` | 不确定某个语法怎么写（关键字/别名 → 构造卡片：「返回」「表」「调用」「循环」…） |
+| `locate` | 找符号定义位置 + 契约；或反查构造卡片 |
+| `validate` | 提交前校验（结构化诊断数组；`ok:false` 就修） |
+| `schema` | 查单元契约（形参/返回/字段） |
+| `repair_targets` | 拿错误的**有界**修复靶点：只改锚点范围内行，越界必弃权（abstain） |
+
+行分隔 JSON：每行请求 `{"id","method","params"}` → 每行响应 `{"id","ok","result"|"error"}`。
+语法唯一事实来源 = `doc/design/core-surface.md`（CI 守卫同步）；卡片带 `manual` 指回文档行。
+所有错误诊断都是结构化 JSON：`code` / `severity` / `span` / `suggestion` / `doc_anchor` / `doc_quote` / `contract_ref`。
+
+### 渐进式契约（可选标注；schema 就长在文档表里）
+
+契约是**未绑定文档表**（绑定表是数据，永远不是契约）。三种形状、严格位置：
+
+| 形状（须含 `类型` 列） | 允许位置 | 附着 |
+|--------------------------|----------|------|
+| `参数`/`类型`/`说明` 表 + `返回`/`类型`/`说明` 表 | 函数体首个可执行行之前 | 函数 |
+| `字段`/`类型`/`可空`/`说明` 表 | 紧邻 `` `名` = `` 绑定之前 | 集合（变量） |
+| `字段`/`类型`/`可空`/`说明` 表 | 对象（`#`）体首成员之前 | 对象类型 |
+
+````text
+## 加一
+
+对于输入变量`n`,期望是数字。
+
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| n | number | 输入值 |
+
+| 返回 | 类型 | 说明 |
+|------|------|------|
+|  | number | 加一结果 |
+
+*n+1*
+````
+
+- 类型词汇：`text` / `number` / `bool` / `list` / `map` / `any` / `#` 对象名（拼错 ⇒ `contract.unknown_type` + 最近建议）。
+- 契约表**永不执行**、不污染升参推断；无契约文件行为逐字节不变（动态默认，零摩擦）。
+- 运行时只在四个边界校验：调用实参 / 字段访问 `[键](集合)` / 表绑定 / 返回。
+- `marqdo check [FILE] [--json]` 静态互查：契约行 vs 升参推断形参**双向**漂移（错行=Error；新升参未覆盖=Warning）、未知类型、错位契约；有 Error 非零退出。
+- 契约诊断带 `doc_anchor` + `doc_quote`（表原文）——修复只照锚点局部改。
+
 ## Markup → meaning (v0.3)
 
 | Marker | Meaning |
@@ -244,11 +300,14 @@ Examples: [linalg-svd](../../examples/linalg-svd/) · [linalg-least-squares](../
 
 ## AI authoring workflow
 
-1. Decide language surface (English builtins + `lib/text.mq.md`, or Chinese + `lib/文本.mq.md`).
-2. Write `.mq.md` with `# main`, blank lines around prose, correct markers.
-3. Run: `marqdo run path/to/file.mq.md` (cwd = project root so `lib/` resolves).
-4. On `path:line:col: message`, fix that span; re-run until exit 0.
-5. Optional: `marqdo view .` / `marqdo debug .` for structure and breakpoints.
+1. **查再写**：不确定语法就 `marqdo mlsp`（`syntax` / `locate`）——不必背语法细节。
+2. Decide language surface (English builtins + `lib/text.mq.md`, or Chinese + `lib/文本.mq.md`).
+3. Write `.mq.md` with `# main`, blank lines around prose, correct markers.
+4. 可选：给函数/集合写**渐进式契约**（上节三种表格形状；写全或不写，别写一半）。
+5. Run: `marqdo run path/to/file.mq.md` (cwd = project root so `lib/` resolves).
+6. On errors：结构化诊断（含 `doc_anchor` / `suggestion`）→ `repair_targets` 取有界靶点，**只改锚点范围内**的行。
+7. 提交前：`marqdo check path/to/file.mq.md`（或 `mlsp validate`）清到零 Error。
+8. Optional: `marqdo view .` / `marqdo debug .` for structure and breakpoints.
 
 ## Anti-patterns (common model mistakes)
 
@@ -287,3 +346,5 @@ Examples: [linalg-svd](../../examples/linalg-svd/) · [linalg-least-squares](../
 - [ ] Browser client: `lib/browser` + tables when returning effects
 - [ ] Quantum draw: quote `kind=` / `theme=`; rebuild plugin → `ext add quantum` before view
 - [ ] `marqdo run` succeeds (or errors addressed)
+- [ ] 语法拿不准的地方已查 MLSP（`syntax`/`locate`），而不是凭记忆发明
+- [ ] 契约（如有）与升参一致：`marqdo check` 零 Error

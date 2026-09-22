@@ -150,3 +150,18 @@ When editing a file full of `json.set`:
 - Tables: `doc/design/stdlib-table.md` · `doc/design/table-cell-expressions.md`
 - Browser effects: `doc/roadmap/browser-wasm-e.md` · `doc/roadmap/browser-wasm-f.md`
 - Release: [marqdo-release](../marqdo-release/SKILL.md)
+
+## 渐进式契约 + MLSP（Phase 2/3 落地后的开发戒律）
+
+- **契约实现**：`src/contract.rs`（类型词汇 / 三形状契约表解析 / 合并 / 四边界校验诊断）；
+  `src/parse/mod.rs::extract_function_contract`（位置 + 形状双重判定，**在升参推断之前**执行；
+  绑定表与普通文档表绝不吃 ⇒ 无契约文件零回归）。契约表从 body 移除——元数据永不执行。
+- **静态互查**：`src/check.rs`（`marqdo check [--json]`）——契约行 vs 升参推断形参双向漂移、
+  未知类型名、错位契约；Error ⇒ 非零退出。
+- **AI 工具面**：`src/mlsp.rs`（`marqdo mlsp`，行分隔 JSON）——`locate` / `syntax` / `validate` /
+  `repair_targets` / `schema`。语法唯一事实来源 = `parse::CORE_CONSTRUCTS`（CI 守卫与
+  `doc/design/core-surface.md` 同步）；MLSP 只加检索别名，**不定义语法**。
+- **准入戒律**：新特性先过 `doc/design/layers.md` 三层归属（Language 层改动须 ADR + core-surface）；
+  新契约形状/类型词汇 = 文档层扩展，进 `src/contract.rs`，不进词法/语法。
+- **错误出口唯一**：`src/load.rs::label_error` 已示范——装载层/任何新代码都**不许**把
+  `Diagnostic` 拍平成字符串；错误链里必须能 `Diagnostic::find` 找回结构化诊断（AI/MLSP 面）。
