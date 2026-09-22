@@ -124,6 +124,8 @@ jobs:
             ## Marqdo ${{ github.ref_name }}
 
             ### 亮点 / Highlights
+            - **v1.0.7**：WS/网络边界加固（同源握手、require_auth/需要登录、消息上限、HTTP 8 MiB 截断）；`url_encode` `%20`
+            - **v1.0.7**: WS/net boundary hardening (same-origin, require_auth, message caps, 8 MiB HTTP cap); `url_encode` `%20`
             - **v1.0.3**：Ubuntu PPA + 扩展 CDN（ext.marqdo.com）；CLI/扩展可分发；noble 捆绑 Rust 工具链
             - **v1.0.3**: Ubuntu PPA + extension CDN; independent CLI/ext packs; bundled Rust for noble
             - **v1.0.1**：修复 Go `libweb` 动态路由 `{param}` 查询代入、详情 Markdown、CSS 数字误报

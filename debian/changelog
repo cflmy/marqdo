@@ -1,3 +1,11 @@
+marqdo (1.0.7-1ppa1) noble; urgency=medium
+
+  * Marqdo 1.0.7: WS/net boundary hardening (same-origin handshake,
+    require_auth/需要登录, message caps, empty-room GC); HTTP 8 MiB cap
+    enforced while reading; url_encode space -> %20.
+
+ -- cflmy <pingan@cflmy.cn>  Tue, 22 Sep 2026 15:40:00 +0800
+
 marqdo (1.0.3-1ppa2) noble; urgency=medium
 
   * Fix Launchpad build: dh_clean -Xvendor/ so cargo vendor checksums keep

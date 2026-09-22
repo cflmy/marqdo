@@ -1,8 +1,21 @@
 # Changelog
 
-## Unreleased
+## v1.0.7 — 2026-09-22
 
-### Added
+### Highlights
+
+**WS / 网络边界加固**：WebSocket 握手同源校验、broadcast/room 默认需登录（`require_auth`/`需要登录` 可显式关闭）、消息 1 MiB × 256 条上限、空 room 回收；HTTP 响应 8 MiB 在读流时截断；`url_encode` 空格 `%20`。本版 CLI 与扩展包 **同步为 1.0.7**。
+
+- **安全默认**：浏览器 WS 握手仅同源；有状态 fan-out 端点未登录 401 / 公开直播流显式 `require_auth=False`
+- **资源上限**：WS 单条 1 MiB、单连接 256 条；HTTP/SSE 8 MiB 读流截断——对端无法借大响应耗尽内存
+- **测试**：P3 金样对齐 quiet-admin 门禁语义；wasm smoke 以 ESM 加载官方 bridge
+
+```bash
+# Ubuntu PPA / 源码
+sudo add-apt-repository ppa:cflmy/marqdo && sudo apt update && sudo apt install marqdo
+git checkout v1.0.7 && cargo build --release
+marqdo ext add web
+```
 
 ### Fixed
 - **WS 安全默认**：握手改为同源校验（不再放行任意 Origin）；`route_ws` 新增 `require_auth`/`需要登录`，broadcast/room 默认要求登录会话，公开直播流需显式设假，未认证握手 401。
@@ -12,6 +25,14 @@
 ### Changed
 - `net.url_encode`：空格编码为 `%20`（原 `+`），URL 段语义下与字面 `+` 消歧义。
 - `web`/`网页` 文档同步：`route_ws` 的 `require_auth`/`需要登录` 与 `ws.connect` 的收集上限语义。
+
+## Unreleased
+
+### Added
+
+### Fixed
+
+### Changed
 
 ## Ext pack v1.0.6 — 2026-09-18
 
