@@ -5,7 +5,7 @@
 | 状态 | **本期开发依据 · 执行中** |
 | 日期 | 2026-09-22 |
 | 设计 | [three-problems.md](three-problems.md)（解决方向与验证设计；判据矩阵 §5.1） |
-| 范围 | **工程任务 = Phase 1–3**；验证实验（three-problems.md §5.2）**不属于开发任务**，待「性能验证设计」（`doc/next/`，用户维护）导入后对接 |
+| 范围 | **工程任务 = Phase 1–3**；验证实验（three-problems.md §5.2）协议见 [perf-validation.md](perf-validation.md)（2026-09-23 用户授权自行设计并执行） |
 | 约定 | 每任务带机器可验证验收；**任务完成 = 验收全绿 + 全量回归绿**；只改宣言不改行为 = 未完成 |
 
 ## 0. 本期范围与依赖
@@ -128,9 +128,11 @@ T1.1 core-surface ─是─> T3.1 语言面 + T1.3 守卫
 
 ---
 
-## Phase 4 · 验证实验（**非开发任务**）
+## Phase 4 · 验证实验（**协议 = [perf-validation.md](perf-validation.md)**）
 
-- 对接「性能验证设计」（`doc/next/`，用户维护，待导入）；three-problems.md §5.2 实验 (a)–(e) 的**材料由 Phase 1–3 的验收金样直接供给**；开发侧仅保留「实验基建适配」支持义务（复用 MarqdoThesis `formal/exp1–3` runner/oracle）。
+- 2026-09-23 用户授权**自行设计**性能验证设计并执行验证；`doc/next/002.md` 与性能验证无关（此前「待导入」表述已纠正）。
+- five 实验 (a)–(e) 的**材料由 Phase 1–3 的验收金样直接供给**；协议 / 指标 / 判据见 [perf-validation.md](perf-validation.md) §1–§5；
+  实验产物 = [perf-validation-report-2026-09-23.md](perf-validation-report-2026-09-23.md)。
 
 ---
 
@@ -201,3 +203,23 @@ T1.1 core-surface ─是─> T3.1 语言面 + T1.3 守卫
 - **T3.3（AI Skill 换骨：背语法 → 查 MLSP）**（2026-09-22 完成）——`marqdo` / `marqdo-dev` 两件套改为
   查询式工作流：写码前 `mlsp syntax/locate`、提交前 `mlsp validate` + `marqdo check`；
   渐进式契约三种表格形状入语法面；错误修复照 `doc_anchor` 局部改（越界必弃权）。
+
+## Phase 4 · 验证执行记录（2026-09-23，协议 [perf-validation.md](perf-validation.md)）
+
+- **(a) 锚点修复消融** ✅ PASS——判据「anchor 一轮 ≥80% + 护栏 0 越界」：cflmy anchor 20/20=100%（plain 85%）、
+  mimo-v2.6-flash anchor 20/20=100%（plain 90%），越界拒/越界应用 0/0。易锚定样本近天花板，
+  增量区分性留难样本扩展（协议 §1 诚实注记）。
+- **(b) 盲测（查询式 vs 全文档背诵）** ❌ 四判据未全立 ⇒ 按 three-problems.md §3.7 **继续改协议**——
+  deepseek-flash：docs 4/6 vs query 0/3（端点 infra 剔除 3/6）；首轮语法错 2/3 vs 2/6；token 69,771 vs 57,276。
+  mimo-v2.6-pro 首跑 12/12 全端点空体，单独重跑（结果回填 [perf-validation-report-2026-09-23.md](perf-validation-report-2026-09-23.md) §3）。
+  **真发现**：查询机制本身无缺陷（多词查询亦正确命中卡片），败例是**跨语言习惯泄漏**（元组表达式/Python 调用形）
+  ——模型"不知道自己不知道"而不去查。协议改进主攻方向：**自查触发机制**（validate 前置自检、
+  陌生构造强制查询），而非继续改进卡片。
+- **(c) 契约消融** ✅ PASS——拦截率 4/4=100%、误报率 0/4=0%、无契约零回归 4/4（四边界：调用实参/返回/表绑定/键访问）。
+- **(d) 防漂移演练** ✅ PASS——必报率 9/9=100%（9 类故意写错全数诊断）、负对照误报 0/2。
+- **(e) 核心守卫演练** ✅ PASS——3/3 变异注入必红（清单私增/文档私增/金样删除）、还原必绿。
+- **判据矩阵回填**：three-problems.md §5.1 逐行标注——问题 1 ✅、问题 2 ✅、**问题 3 ❌（未解决）**。
+- **测量端记录**：LLM 网关随机空体为最大干扰（重试 5→12 次、退避 5→15 秒、截断自适应 max_tokens）；
+  harness 修复两处协议性 bug（查询额度用满误判、提取失败不进修复回路）后采样；
+  模型口径按用户指示由 `cflmy`/`mimo-v2.6-flash` 改 `mimo-v2.6-pro`/`deepseek-flash`（实验 (a) 数据为原组合，不重跑）。
+- **全量干净回归**（无 API key 基线）零失败。

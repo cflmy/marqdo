@@ -93,17 +93,53 @@ const ALIASES: &[(&str, &[&str])] = &[
     ("soft-emphasis", &["强调", "emphasis", "软强调"]),
 ];
 
+/// core-surface.md 全文（与 `tests/core_surface.rs` 守卫同源）——卡片机械携带
+/// 语义/戒律/样例**原文**，AI 一次查询即可自持，不必回读文档（three-problems.md §3.2「单构造戒律」）。
+const SURFACE_MD: &str = include_str!("../doc/design/core-surface.md");
+
+/// 机械提取 core-surface.md 清单行：`| \`id\` | 外形 | 语义 | 戒律 | 样例 |` →
+///（语义, 戒律, 样例, 行原文）；只读不改，卡片内容与文档永不漂移。
+fn surface_row(id: &str) -> Option<(String, String, String, String)> {
+    for line in SURFACE_MD.lines() {
+        let t = line.trim();
+        if !t.starts_with('|') {
+            continue;
+        }
+        let cells: Vec<&str> = t.trim_matches('|').split('|').map(str::trim).collect();
+        if cells.len() != 5 {
+            continue;
+        }
+        let rid = cells[0].trim_matches('`');
+        if rid == id && !rid.is_empty() && !rid.contains(' ') && !rid.starts_with('-') {
+            return Some((
+                cells[2].to_string(),
+                cells[3].to_string(),
+                cells[4].to_string(),
+                t.to_string(),
+            ));
+        }
+    }
+    None
+}
+
 fn card(id: &str) -> Value {
     let form = CORE_CONSTRUCTS
         .iter()
         .find(|(cid, _)| *cid == id)
         .map(|(_, f)| *f)
         .unwrap_or("?");
-    json!({
+    let mut v = json!({
         "id": id,
         "form": form,
         "manual": "doc/design/core-surface.md",
-    })
+    });
+    if let Some((semantics, rule, sample, quote)) = surface_row(id) {
+        v["semantics"] = semantics.into();
+        v["rule"] = rule.into();
+        v["sample"] = sample.into();
+        v["doc_quote"] = quote.into();
+    }
+    v
 }
 
 fn match_constructs(query: &str) -> Vec<Value> {

@@ -34,6 +34,34 @@ fn syntax_unknown_query_structured_error() {
 }
 
 #[test]
+fn syntax_cards_carry_rule_text_self_sufficient() {
+    // 「AI 不必学语法」的前提：卡片自带语义/戒律/样例原文（不必回读文档），
+    // 且空查询列出全部核心构造（three-problems.md §3.2「单构造戒律」）。
+    let resp = call(r#"{"id":9,"method":"syntax","params":{}}"#);
+    assert_eq!(resp["ok"], true, "{resp}");
+    let cards = resp["result"]["cards"].as_array().unwrap();
+    assert_eq!(
+        cards.len(),
+        marqdo::parse::CORE_CONSTRUCTS.len(),
+        "空查询应列出全部核心构造: {resp}"
+    );
+    for c in cards {
+        assert!(
+            c["rule"].as_str().unwrap_or("").len() > 2,
+            "卡片缺戒律原文（不可自持）: {c}"
+        );
+        assert!(
+            c["doc_quote"].as_str().unwrap_or("").starts_with('|'),
+            "卡片缺行原文: {c}"
+        );
+        assert!(
+            !c["semantics"].as_str().unwrap_or("").is_empty(),
+            "卡片缺语义: {c}"
+        );
+    }
+}
+
+#[test]
 fn locate_symbol_returns_span_and_contract() {
     let src = "# main\n\n## 加一\n\n对于输入变量`n`,执行加一。\n\n| 参数 | 类型 | 说明 |\n|------|------|------|\n| n | number | 输入值 |\n\n*n+1*\n";
     let req = serde_json::json!({"id":3,"method":"locate","params":{"source": src, "symbol": "加一"}});
