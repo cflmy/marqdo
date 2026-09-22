@@ -71,7 +71,7 @@ fn chat(llm: &Llm, system: &str, user: &str) -> Result<String, String> {
     let req = json!({
         "model": llm.model,
         "temperature": 0,
-        "max_tokens": 2000,
+        "max_tokens": 8000,
         "messages": [
             {"role": "system", "content": system},
             {"role": "user", "content": user}
@@ -82,7 +82,7 @@ fn chat(llm: &Llm, system: &str, user: &str) -> Result<String, String> {
     let mut last = String::new();
     for _ in 0..5 {
         let mut child = std::process::Command::new("curl")
-            .args(["-sS", "-m", "120", &url, "-H", &auth, "-H", "Content-Type: application/json", "--data-binary", "@-"])
+            .args(["-sS", "-m", "120", "--retry", "2", "--retry-all-errors", "--retry-delay", "2", &url, "-H", &auth, "-H", "Content-Type: application/json", "--data-binary", "@-"])
             .stdin(std::process::Stdio::piped())
             .stdout(std::process::Stdio::piped())
             .stderr(std::process::Stdio::piped())
@@ -111,7 +111,7 @@ fn chat(llm: &Llm, system: &str, user: &str) -> Result<String, String> {
                 last = format!("非 JSON / 空体: {} {}", truncate(&text, 80), truncate(&err, 80));
             }
         }
-        std::thread::sleep(std::time::Duration::from_secs(3));
+        std::thread::sleep(std::time::Duration::from_secs(5));
     }
     Err(last)
 }
@@ -151,8 +151,8 @@ fn prompt(src: &str, ranges: &[(u32, u32)], diags: &[Value], feedback: &str) -> 
     s
 }
 
-/// 从模型输出提取行编辑（容错：数组 / 单对象 / 字符串化元素 / ```围栏 都收）；
-/// 解析失败 ⇒ 空 = 弃权。
+/// 从模型输出提取行编辑（容错：数组 / 单对象 / NDJSON 多对象流 / 字符串化元素 /
+/// 字符串型行号 / ```围栏 都收）；解析失败 ⇒ 空 = 弃权。
 fn parse_edits(reply: &str) -> Vec<Edit> {
     let s = reply.trim();
     let s = s
@@ -160,7 +160,7 @@ fn parse_edits(reply: &str) -> Vec<Edit> {
         .trim_start_matches("```")
         .trim_end_matches("```")
         .trim();
-    // 候选：数组形优先；否则整体按单对象收
+    // 1) 数组形优先（元素可能是字符串化对象）；2) 回退到全串扫描平衡对象（覆盖 NDJSON 流）
     let mut values: Vec<Value> = Vec::new();
     if let (Some(a), Some(b)) = (s.find('['), s.rfind(']')) {
         if b > a {
@@ -170,11 +170,7 @@ fn parse_edits(reply: &str) -> Vec<Edit> {
         }
     }
     if values.is_empty() {
-        if let Ok(one) = serde_json::from_str::<Value>(s) {
-            if one.is_object() {
-                values.push(one);
-            }
-        }
+        values = scan_objects(s);
     }
     values
         .iter()
@@ -185,7 +181,11 @@ fn parse_edits(reply: &str) -> Vec<Edit> {
             } else {
                 e.clone()
             };
-            let line = obj.get("line")?.as_u64()? as u32;
+            let line = match obj.get("line")? {
+                Value::Number(n) => n.as_u64()? as u32,
+                Value::String(s) => s.trim().parse::<u32>().ok()?,
+                _ => return None,
+            };
             let text = obj.get("text").and_then(|t| t.as_str()).unwrap_or("").to_string();
             Some(match obj.get("op")?.as_str()? {
                 "replace" => Edit::Replace { line, text },
@@ -195,6 +195,84 @@ fn parse_edits(reply: &str) -> Vec<Edit> {
             })
         })
         .collect()
+}
+
+/// 扫描文本中所有**平衡的** JSON 对象（字符串感知）；非法片段跳过。
+fn scan_objects(s: &str) -> Vec<Value> {
+    let b = s.as_bytes();
+    let mut out = Vec::new();
+    let mut i = 0;
+    while i < b.len() {
+        if b[i] == b'{' {
+            let (mut depth, mut in_str, mut esc) = (0i32, false, false);
+            let mut j = i;
+            let mut closed = false;
+            while j < b.len() {
+                let c = b[j] as char;
+                if esc {
+                    esc = false;
+                } else if c == '\\' && in_str {
+                    esc = true;
+                } else if c == '"' {
+                    in_str = !in_str;
+                } else if !in_str {
+                    if c == '{' {
+                        depth += 1;
+                    } else if c == '}' {
+                        depth -= 1;
+                        if depth == 0 {
+                            closed = true;
+                            break;
+                        }
+                    }
+                }
+                j += 1;
+            }
+            if closed {
+                let frag = &s[i..=j];
+                let v = serde_json::from_str::<Value>(frag)
+                    .or_else(|_| serde_json::from_str::<Value>(&unquote_line_nums(frag)));
+                if let Ok(v) = v {
+                    out.push(v);
+                }
+                i = j + 1;
+                continue;
+            }
+        }
+        i += 1;
+    }
+    out
+}
+
+/// 确定性修补模型的常见 JSON 笔误：`"line":3` 数字后多余引号（`"line":3"` → `"line":3`）。
+/// 通用 JSON 容错，与 Marqdo 语法无关；只动 `"line"` 后的数字位。
+fn unquote_line_nums(frag: &str) -> String {
+    let cs: Vec<char> = frag.chars().collect();
+    let mut out = String::with_capacity(frag.len());
+    let mut i = 0;
+    while i < cs.len() {
+        if cs[i..].starts_with(&['"', 'l', 'i', 'n', 'e', '"'][..]) {
+            out.extend(['"', 'l', 'i', 'n', 'e', '"']);
+            i += 6;
+            while i < cs.len() && (cs[i] == ':' || cs[i].is_whitespace()) {
+                out.push(cs[i]);
+                i += 1;
+            }
+            let mut digits = 0;
+            while i < cs.len() && cs[i].is_ascii_digit() {
+                out.push(cs[i]);
+                digits += 1;
+                i += 1;
+            }
+            if digits > 0 && i < cs.len() && cs[i] == '"' {
+                i += 1; // 剥掉数字后多余的引号
+            }
+        } else {
+            out.push(cs[i]);
+            i += 1;
+        }
+    }
+    out
 }
 
 /// 消融臂（plain）：把文档上下文从诊断里剥掉——只留 code/severity/message/span。
@@ -421,7 +499,7 @@ fn exp_a_anchored_repair_with_model() {
 
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("doc/roadmap")
-        .join(format!("repair-experiment-{}.md", chrono_date()));
+        .join(format!("repair-experiment-{}-{}.md", chrono_date(), llm.model));
     std::fs::write(&path, &report).unwrap();
     eprintln!("\n{report}");
     eprintln!("报告已写入 {}", path.display());

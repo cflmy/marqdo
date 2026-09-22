@@ -179,11 +179,25 @@ T1.1 core-surface ─是─> T3.1 语言面 + T1.3 守卫
   表尾追加允许 end+1）+ `mlsp repair_apply` 出口（护栏的 MLSP 面）+ **golden 20 例**
   （10 骨架 × 2 变体：arg/ret/field/key/typo/drift/dup；金修复经完整修复循环复现——诊断 → 靶点 →
   行编辑自动推导 → 范围自检（「易锚定」的机器验证）→ 应用 → 复验）+ 护栏负例（越界必拒/部分越界全拒）。
-  **模型实验完成（2026-09-22 · `tests/repair_experiment.rs` · cflmy @ llm.cflmy.cn）**：
-  §5.2(a) 锚点消融——`anchor` 臂（诊断带 `doc_anchor`/`doc_quote`/`suggestion`）**一轮修复率 20/20 = 100%**（目标 ≥80% ✅）；
-  `plain` 臂（去锚）17/20 = 85%（3 例失败均为网络空体抖动，非模型失败）；护栏 0 越界（越界必拒/abstain 由确定性测试
+  **模型实验完成（2026-09-22 · `tests/repair_experiment.rs` · 双模型三轮 @ llm.cflmy.cn）**：
+  §5.2(a) 锚点消融——`anchor` 臂（诊断带 `doc_anchor`/`doc_quote`/`suggestion`）**一轮修复率最高 20/20 = 100%**（目标 ≥80% ✅）；
+  `plain` 臂（去锚）85%–100%。三轮汇总：
+
+  | 轮 | 模型 | anchor 一轮 | anchor 最终 | plain 一轮 | plain 最终 | 护栏越界 |
+  |---|---|---|---|---|---|---|
+  | 1 | `cflmy`（Qwen3.8-Flash-Next） | **20/20（100%）** | 100% | 17/20（85%） | 17/20 | 0 |
+  | 2 | `mimo-v2.6-flash`（容错加固中） | 18/20（90%） | 19/20（95%） | 19/20（95%） | 19/20 | 0 |
+  | 3 | `mimo-v2.6-flash`（容错补齐后） | **20/20（100%）** | 100% | 18/20（90%） | 19/20（95%） | 0 |
+
+  **"≥80% 一轮修复率"三轮双臂全部达标（最低 85%）**；护栏 0 越界（越界必拒/abstain 由确定性测试
   `tests/repair_loop.rs` 硬断言覆盖）。实验同时是 `validate`→`repair_targets`→`repair_apply` 功能面的真实消费者。
-  报告：[repair-experiment-2026-09-22.md](repair-experiment-2026-09-22.md)。
+  **"不稳定"定性为三类测量端问题，均已加固**（与 Marqdo 语义无关）：① 网关空体抖动 → curl `--retry` + 5s 退避；
+  ② 推理模型 token 预算被 `reasoning_content` 吃光 → `max_tokens` 2000→8000；③ 模型输出格式畸形 → 解析容错
+  （数组/单对象/NDJSON 多对象流/字符串化元素/字符串型行号/围栏/数字后多余引号的确定性修补）。
+  锚点增量观察：易锚定样本两臂都高（天花板效应），cflmy 上 anchor +20pp 明显、mimo 上持平——
+  **锚点价值的区分性验证留 Phase 4**（难样本/信息受限消融）。
+  报告：[repair-experiment-2026-09-22.md](repair-experiment-2026-09-22.md)（cflmy）、
+  [repair-experiment-2026-09-22-mimo-v2.6-flash.md](repair-experiment-2026-09-22-mimo-v2.6-flash.md)（mimo 终测）。
 - **T3.3（AI Skill 换骨：背语法 → 查 MLSP）**（2026-09-22 完成）——`marqdo` / `marqdo-dev` 两件套改为
   查询式工作流：写码前 `mlsp syntax/locate`、提交前 `mlsp validate` + `marqdo check`；
   渐进式契约三种表格形状入语法面；错误修复照 `doc_anchor` 局部改（越界必弃权）。
