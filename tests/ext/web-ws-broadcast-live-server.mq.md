@@ -16,5 +16,5 @@ import sys:lib/sys.mq.md
 **pg = > web.page title="ws-live"**
 **app = > web.app page=`pg` port=18112**
 **app = > `app`.configure access_log=True**
-**app = > `app`.route_ws path="/room" mode="broadcast"**
+**app = > `app`.route_ws path="/room" mode="broadcast" require_auth=False**
 > `app`.listen

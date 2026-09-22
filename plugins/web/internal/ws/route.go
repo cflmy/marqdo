@@ -9,10 +9,11 @@ import (
 
 // RouteSpec is one ws_routes entry (mode + optional room_key / on_message / presence).
 type RouteSpec struct {
-	Mode      Mode
-	RoomKey   string
-	OnMessage string
-	Presence  bool
+	Mode        Mode
+	RoomKey     string
+	OnMessage   string
+	Presence    bool
+	RequireAuth bool
 }
 
 // RouteWS registers path → {mode, room_key?, on_message?, presence?} on app.ws_routes.
@@ -28,6 +29,12 @@ func RouteWS(appBag map[string]any, path string, args map[string]any) (map[strin
 	}
 	onMsg := OnMessageFromArgs(args)
 	presence := PresenceFromArgs(args)
+	// Stateful fan-out routes are private by default. Echo and drain remain
+	// useful for public health checks and demos; authors can opt out explicitly.
+	requireAuth := mode == ModeBroadcast || mode == ModeRoom
+	if v, ok := first(args, "require_auth", "需要登录"); ok && v != nil {
+		requireAuth = boolish(v)
+	}
 	out := clone(appBag)
 	wsRoutes := map[string]any{}
 	if r, ok := out["ws_routes"].(map[string]any); ok {
@@ -42,6 +49,9 @@ func RouteWS(appBag map[string]any, path string, args map[string]any) (map[strin
 	}
 	if presence {
 		spec["presence"] = true
+	}
+	if requireAuth {
+		spec["require_auth"] = true
 	}
 	wsRoutes[path] = spec
 	out["ws_routes"] = wsRoutes
@@ -164,6 +174,11 @@ func parseRouteSpec(spec any) RouteSpec {
 			out.Presence = boolish(p)
 		} else if p, ok := t["在场"]; ok {
 			out.Presence = boolish(p)
+		}
+		if a, ok := t["require_auth"]; ok {
+			out.RequireAuth = boolish(a)
+		} else if a, ok := t["需要登录"]; ok {
+			out.RequireAuth = boolish(a)
 		}
 	case string:
 		out.Mode = ParseMode(t)

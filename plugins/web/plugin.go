@@ -258,7 +258,7 @@ static int register_core(void) {
 	if (host_register((char *)"web_app_sitemap", (char *)"app,path,base,table,loc,limit,items", web_app_sitemap) != 0) return 1;
 	if (host_register((char *)"web_app_robots", (char *)"app,body,sitemap", web_app_robots) != 0) return 1;
 	if (host_register((char *)"web_sitemap_build", (char *)"base,items", web_sitemap_build) != 0) return 1;
-	if (host_register((char *)"web_app_route_ws", (char *)"app,path,echo,mode,room_key,on_message,presence", web_app_route_ws) != 0) return 1;
+	if (host_register((char *)"web_app_route_ws", (char *)"app,path,echo,mode,room_key,on_message,presence,require_auth", web_app_route_ws) != 0) return 1;
 	if (host_register((char *)"web_ws_connect", (char *)"url,message,headers,timeout_sec", web_ws_connect) != 0) return 1;
 	if (host_register((char *)"web_cache_new", (char *)"url", web_cache_new) != 0) return 1;
 	if (host_register((char *)"web_cache_get", (char *)"url,key", web_cache_get) != 0) return 1;

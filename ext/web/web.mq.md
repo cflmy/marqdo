@@ -800,10 +800,11 @@ Serve `/`, routed pages, `/_part/{id}` (home) and `{path}/_part/{id}` (routes), 
     + `room_key`=None
     + `on_message`=None
     + `presence`=False
+    + `require_auth`=None
 
-Register a WebSocket endpoint at `path` (e.g. `/live` or `/chat/{id}`). `mode` is `echo` (default), `broadcast` (fan-out text to all sockets on this path), `room` (named room via `room_key`, supports `{id}` from the path), or `drain`. Legacy `echo=False` maps to `drain`. `on_message` is an optional `lib.member` hook (G-WS2): called before fan-out with `message`/`room`/`user`; return `{skip:true}` to drop or `{message:…}` to rewrite. `presence=True` also joins `room.presence` and emits join/leave JSON. Connect from a client with `web.ws.connect`.
+Register a WebSocket endpoint at `path` (e.g. `/live` or `/chat/{id}`). `mode` is `echo` (default), `broadcast` (fan-out text to all sockets on this path), `room` (named room via `room_key`, supports `{id}` from the path), or `drain`. Legacy `echo=False` maps to `drain`. `on_message` is an optional `lib.member` hook (G-WS2): called before fan-out with `message`/`room`/`user`; return `{skip:true}` to drop or `{message:…}` to rewrite. `presence=True` also joins `room.presence` and emits join/leave JSON. Stateful `broadcast` and `room` endpoints require a logged-in session by default; set `require_auth=False` only for intentionally public live feeds. Browser handshakes are same-origin. Connect from a client with `web.ws.connect`.
 
-*> web_app_route_ws app=`self` path=`path` echo=`echo` mode=`mode` room_key=`room_key` on_message=`on_message` presence=`presence`*
+*> web_app_route_ws app=`self` path=`path` echo=`echo` mode=`mode` room_key=`room_key` on_message=`on_message` presence=`presence` require_auth=`require_auth`*
 
 ## auth
     + `users`
@@ -1160,7 +1161,7 @@ WebSocket client helper.
     + `message`=""
     + `headers`=None
 
-Single request–response: connect to `url`, send `message`, collect all server text replies, close. Returns `{ok, messages}`.
+Single request–response: connect to `url`, send `message`, collect up to 256 server text replies (each up to 1 MiB), close. Transport errors and timeouts return `{ok:false, error}` instead of looking like an empty successful reply.
 
 **timeout = [timeout_sec](self)**
 *> web_ws_connect url=`url` message=`message` headers=`headers` timeout_sec=`timeout`*

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/gorilla/websocket"
@@ -12,8 +13,19 @@ import (
 	"github.com/marqdo/marqdo/plugins/web/internal/ws"
 )
 
-var wsUpgrader = websocket.Upgrader{
-	CheckOrigin: func(r *http.Request) bool { return true },
+const maxWSMessageBytes = 1 << 20
+
+var wsUpgrader = websocket.Upgrader{CheckOrigin: sameOrigin}
+
+// Browsers send Origin for a cross-site WebSocket handshake. Permit clients
+// without Origin, but reject browser origins that differ from this application.
+func sameOrigin(r *http.Request) bool {
+	origin := r.Header.Get("Origin")
+	if origin == "" {
+		return true
+	}
+	u, err := url.Parse(origin)
+	return err == nil && strings.EqualFold(u.Host, r.Host)
 }
 
 func (st *state) mountWSRoutes(mux *http.ServeMux) {
@@ -57,11 +69,16 @@ func pathValuesOf(r *http.Request, routePath string) map[string]string {
 }
 
 func (st *state) handleWS(w http.ResponseWriter, r *http.Request, path string, spec ws.RouteSpec) {
+	if spec.RequireAuth && session.UsernameFromCookie(r.Header.Get("Cookie")) == "" {
+		http.Error(w, "WebSocket authentication required", http.StatusUnauthorized)
+		return
+	}
 	conn, err := wsUpgrader.Upgrade(w, r, nil)
 	if err != nil {
 		return
 	}
 	defer conn.Close()
+	conn.SetReadLimit(maxWSMessageBytes)
 
 	vals := pathValuesOf(r, path)
 	switch spec.Mode {

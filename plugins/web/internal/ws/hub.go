@@ -42,7 +42,22 @@ func unsubscribe(path string, ch chan string) {
 	}
 	room.mu.Lock()
 	delete(room.subs, ch)
+	empty := len(room.subs) == 0
 	room.mu.Unlock()
+	if !empty {
+		return
+	}
+	// A room can be derived from a URL path. Remove empty rooms so a stream of
+	// one-off room names cannot leave metadata allocated for the process lifetime.
+	globalHub.mu.Lock()
+	if globalHub.room[path] == room {
+		room.mu.Lock()
+		if len(room.subs) == 0 {
+			delete(globalHub.room, path)
+		}
+		room.mu.Unlock()
+	}
+	globalHub.mu.Unlock()
 }
 
 // JoinRoom subscribes to a named room (G-WS1). Same backing store as path broadcast.

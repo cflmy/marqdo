@@ -35,6 +35,38 @@ func TestBroadcastFanout(t *testing.T) {
 	unsubscribe(path, ch2)
 }
 
+func TestUnsubscribeRemovesEmptyRoom(t *testing.T) {
+	path := "/t-empty-room-gc"
+	ch := subscribe(path)
+	unsubscribe(path, ch)
+	globalHub.mu.Lock()
+	_, ok := globalHub.room[path]
+	globalHub.mu.Unlock()
+	if ok {
+		t.Fatalf("empty room %q was not garbage-collected", path)
+	}
+}
+
+func TestResubscribeDuringCleanupKeepsRoom(t *testing.T) {
+	path := "/t-room-rejoin"
+	ch := subscribe(path)
+	ch2 := subscribe(path)
+	unsubscribe(path, ch)
+	unsubscribe(path, ch2)
+	ch3 := subscribe(path)
+	Publish(path, "still-alive")
+	if got := readOne(ch3); got != "still-alive" {
+		t.Fatalf("re-subscribed chan got %q", got)
+	}
+	unsubscribe(path, ch3)
+	globalHub.mu.Lock()
+	_, ok := globalHub.room[path]
+	globalHub.mu.Unlock()
+	if ok {
+		t.Fatalf("empty room %q was not garbage-collected after rejoin", path)
+	}
+}
+
 func readOne(ch chan string) string {
 	select {
 	case s := <-ch:

@@ -26,6 +26,27 @@ func TestRouteWSBroadcastMode(t *testing.T) {
 	if room["mode"] != "broadcast" {
 		t.Fatalf("bag mode=%v", room["mode"])
 	}
+	if room["require_auth"] != true {
+		t.Fatalf("broadcast must require authentication by default: %v", room)
+	}
+}
+
+func TestRouteWSPublicBroadcastOptOut(t *testing.T) {
+	a := app.New(nil)
+	out, err := ws.RouteWS(a, "/live", map[string]any{
+		"mode":         "broadcast",
+		"require_auth": false,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	spec, err := ws.RouteSpecOf(out, "/live")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if spec.RequireAuth {
+		t.Fatalf("explicit public route unexpectedly requires authentication: %+v", spec)
+	}
 }
 
 func TestRouteWSEchoDefault(t *testing.T) {

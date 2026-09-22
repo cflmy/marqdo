@@ -9,7 +9,7 @@ English HTTP(S) wrappers. Optional headers / content_type via host aliases.
     + `url`
     + `headers`=None
 
-HTTPS supported. Optional named arg `headers=` (map).
+HTTPS supported. Optional named arg `headers=` (map). Responses are capped at 8 MiB before decoding, so an upstream cannot exhaust the interpreter's memory.
 
 *> host_http_get url=`url` headers=`headers`*
 
@@ -56,7 +56,7 @@ Optional `body=` / `content_type=` / `headers=`.
 ## url_encode
     + `text`
 
-Percent-encode a URL segment.
+Percent-encode a URL segment. Spaces become `%20` (not form/query `+`), so literal `+` remains unambiguous in paths.
 
 *> host_url_encode text=`text`*
 

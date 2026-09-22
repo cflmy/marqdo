@@ -9,6 +9,11 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+const (
+	maxMessageBytes = 1 << 20
+	maxMessages     = 256
+)
+
 // Connect dials url, sends one text message, collects text replies until close or timeout.
 // Mirrors Rust ws::connect; errors are returned as {ok:false, error}.
 func Connect(url, message string, headers map[string]any, timeoutSec uint64) map[string]any {
@@ -29,6 +34,7 @@ func Connect(url, message string, headers map[string]any, timeoutSec uint64) map
 		return map[string]any{"ok": false, "error": fmt.Sprintf("ws connect: %v", err)}
 	}
 	defer conn.Close()
+	conn.SetReadLimit(maxMessageBytes)
 
 	if err := conn.SetWriteDeadline(time.Now().Add(timeout)); err != nil {
 		return map[string]any{"ok": false, "error": fmt.Sprintf("ws send: %v", err)}
@@ -45,9 +51,15 @@ func Connect(url, message string, headers map[string]any, timeoutSec uint64) map
 		}
 		mt, data, err := conn.ReadMessage()
 		if err != nil {
-			break
+			if websocket.IsCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway) {
+				break
+			}
+			return map[string]any{"ok": false, "error": fmt.Sprintf("ws receive: %v", err)}
 		}
 		if mt == websocket.TextMessage {
+			if len(messages) == maxMessages {
+				return map[string]any{"ok": false, "error": "ws receive: too many messages"}
+			}
 			messages = append(messages, string(data))
 		}
 		if mt == websocket.CloseMessage {

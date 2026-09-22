@@ -5,8 +5,13 @@
 ### Added
 
 ### Fixed
+- **WS 安全默认**：握手改为同源校验（不再放行任意 Origin）；`route_ws` 新增 `require_auth`/`需要登录`，broadcast/room 默认要求登录会话，公开直播流需显式设假，未认证握手 401。
+- **WS 资源上限**：单条消息 1 MiB、单连接最多收集 256 条回复；传输错误/超时返回 `{ok:false, error}`，不再伪装空成功；空 room 自动回收（防 URL 派生 room 名耗尽内存）。
+- **HTTP 响应上限**：8 MiB 上限在读流时截断（含错误路径与 SSE 错误路径），上游无法借超大响应耗尽内存。
 
 ### Changed
+- `net.url_encode`：空格编码为 `%20`（原 `+`），URL 段语义下与字面 `+` 消歧义。
+- `web`/`网页` 文档同步：`route_ws` 的 `require_auth`/`需要登录` 与 `ws.connect` 的收集上限语义。
 
 ## Ext pack v1.0.6 — 2026-09-18
 

@@ -3735,7 +3735,7 @@ callable-ok",
 
 #[test]
 fn lib_net_encode() {
-    assert_out("tests/lib/net-encode.mq.md", "a+b");
+    assert_out("tests/lib/net-encode.mq.md", "a%20b");
 }
 
 #[test]

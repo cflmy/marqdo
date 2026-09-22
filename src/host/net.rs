@@ -1,6 +1,6 @@
 //! HTTP host primitives (HTTP and HTTPS via ureq).
 
-use std::io::Write;
+use std::io::{Read, Write};
 #[cfg(feature = "net-host")]
 use std::io::{BufRead, BufReader};
 #[cfg(feature = "net-host")]
@@ -30,6 +30,26 @@ fn headers_from_value(headers: Option<&Value>) -> Result<Vec<(String, String)>, 
             .collect()),
         _ => Err("headers must be a map (e.g. from json parse)".into()),
     }
+}
+
+/// Maximum response body accepted by the text HTTP helpers.
+///
+/// Read the limit from the stream, rather than after converting it to a `String`:
+/// an untrusted peer must never be able to allocate an arbitrary response in memory.
+#[cfg(feature = "net-host")]
+const MAX_HTTP_BODY_BYTES: usize = 8 * 1024 * 1024;
+
+#[cfg(feature = "net-host")]
+fn read_response_text<R: Read>(reader: R) -> Result<String, String> {
+    let mut bytes = Vec::new();
+    reader
+        .take(MAX_HTTP_BODY_BYTES as u64 + 1)
+        .read_to_end(&mut bytes)
+        .map_err(|e| format!("http read body: {e}"))?;
+    if bytes.len() > MAX_HTTP_BODY_BYTES {
+        return Err("http response exceeds 8MiB limit".into());
+    }
+    Ok(String::from_utf8_lossy(&bytes).into_owned())
 }
 
 #[cfg(feature = "net-host")]
@@ -74,16 +94,11 @@ fn http_exchange(
     match resp {
         Ok(r) => {
             let status = r.status();
-            let text = r
-                .into_string()
-                .map_err(|e| format!("http read body: {e}"))?;
-            if text.len() > 8 * 1024 * 1024 {
-                return Err("http response exceeds 8MiB limit".into());
-            }
+            let text = read_response_text(r.into_reader())?;
             Ok((status, text))
         }
         Err(ureq::Error::Status(code, r)) => {
-            let text = r.into_string().unwrap_or_default();
+            let text = read_response_text(r.into_reader())?;
             Ok((code, text))
         }
         Err(e) => Err(format!("http {method} {url}: {e}")),
@@ -177,7 +192,9 @@ pub fn url_encode(text: &Value) -> Result<Value, String> {
                 b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
                     (b as char).to_string()
                 }
-                b' ' => "+".into(),
+                // `url_encode` documents a URL *segment*. `+` is form/query
+                // encoding, where it is ambiguous with a literal plus in a path.
+                b' ' => "%20".into(),
                 _ => format!("%{b:02X}"),
             })
             .collect(),
@@ -809,7 +826,7 @@ pub fn http_post_sse(
             ]))
         }
         Err(ureq::Error::Status(code, r)) => {
-            let text = r.into_string().unwrap_or_default();
+            let text = read_response_text(r.into_reader())?;
             Ok(Value::Map(vec![
                 ("status".into(), Value::Int(code as i64)),
                 (
@@ -840,6 +857,20 @@ mod tests {
         assert!(h
             .iter()
             .any(|(k, v)| k == "Authorization" && v == "Bearer x"));
+    }
+
+    #[cfg(feature = "net-host")]
+    #[test]
+    fn response_limit_stops_before_unbounded_allocation() {
+        let body = vec![b'x'; MAX_HTTP_BODY_BYTES + 1];
+        let err = read_response_text(std::io::Cursor::new(body)).unwrap_err();
+        assert_eq!(err, "http response exceeds 8MiB limit");
+    }
+
+    #[test]
+    fn url_segment_encoding_keeps_space_and_plus_distinct() {
+        let encoded = url_encode(&Value::Text("a b+c".into())).unwrap();
+        assert!(matches!(encoded, Value::Text(text) if text == "a%20b%2Bc"));
     }
 
     #[test]
