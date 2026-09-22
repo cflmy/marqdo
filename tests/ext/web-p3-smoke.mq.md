@@ -90,7 +90,8 @@ import json:lib/json.mq.md
 **app = > `app`.gate path="/write*" roles="admin,author"**
 **gates = [gates](app)**
 **ng = > len value=`gates`**
-1. `ng` >= 2
+**gpath = [path]([1](gates))**
+1. `ng` == 1 and `gpath` == "/write*"
   > print text=rbac-gate-ok
 2. *
   > print text=rbac-gate-fail
