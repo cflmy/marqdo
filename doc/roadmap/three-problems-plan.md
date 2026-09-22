@@ -179,7 +179,11 @@ T1.1 core-surface ─是─> T3.1 语言面 + T1.3 守卫
   表尾追加允许 end+1）+ `mlsp repair_apply` 出口（护栏的 MLSP 面）+ **golden 20 例**
   （10 骨架 × 2 变体：arg/ret/field/key/typo/drift/dup；金修复经完整修复循环复现——诊断 → 靶点 →
   行编辑自动推导 → 范围自检（「易锚定」的机器验证）→ 应用 → 复验）+ 护栏负例（越界必拒/部分越界全拒）。
-  待做：模型修复实验（把金修复换成模型编辑，测 §5.2(a) ≥80% 修复率）。
+  **模型实验完成（2026-09-22 · `tests/repair_experiment.rs` · cflmy @ llm.cflmy.cn）**：
+  §5.2(a) 锚点消融——`anchor` 臂（诊断带 `doc_anchor`/`doc_quote`/`suggestion`）**一轮修复率 20/20 = 100%**（目标 ≥80% ✅）；
+  `plain` 臂（去锚）17/20 = 85%（3 例失败均为网络空体抖动，非模型失败）；护栏 0 越界（越界必拒/abstain 由确定性测试
+  `tests/repair_loop.rs` 硬断言覆盖）。实验同时是 `validate`→`repair_targets`→`repair_apply` 功能面的真实消费者。
+  报告：[repair-experiment-2026-09-22.md](repair-experiment-2026-09-22.md)。
 - **T3.3（AI Skill 换骨：背语法 → 查 MLSP）**（2026-09-22 完成）——`marqdo` / `marqdo-dev` 两件套改为
   查询式工作流：写码前 `mlsp syntax/locate`、提交前 `mlsp validate` + `marqdo check`；
   渐进式契约三种表格形状入语法面；错误修复照 `doc_anchor` 局部改（越界必弃权）。

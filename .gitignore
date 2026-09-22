@@ -84,3 +84,6 @@ plugins/*/tmp/
 
 # ephemeral sqlite / test artifacts
 tests/ext/:memory:
+
+# local secrets
+.env
