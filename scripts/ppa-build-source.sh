@@ -200,17 +200,25 @@ PY
   rm -rf third_party/rust
   mkdir -p third_party
   RUST_EXTRACT="$(mktemp -d "${TMPDIR:-/tmp}/marqdo-rust.XXXXXX")"
+  # Always drop the ~1.5G extract dir, even on failure (tmpfs fills up otherwise).
+  trap 'rm -rf "$RUST_EXTRACT"' EXIT
   tar -xzf "$RUST_TARBALL" -C "$RUST_EXTRACT"
   INSTALL_SH="$(find "$RUST_EXTRACT" -maxdepth 2 -name install.sh | head -1)"
   if [ -z "$INSTALL_SH" ]; then
     echo "error: install.sh not found in ${RUST_TARBALL}" >&2
     exit 1
   fi
+  # Launchpad builds need only rustc + cargo + rust-std (debian/rules PATH).
+  # Skip docs/json-docs/rustfmt/rls — ~1G of dead weight in the orig tarball.
   bash "$INSTALL_SH" \
     --prefix="$PKG_ROOT/third_party/rust" \
     --without=rust-docs \
+    --without=rust-docs-json-preview \
+    --without=rustfmt-preview \
+    --without=rls-preview \
     --disable-ldconfig
   rm -rf "$RUST_EXTRACT"
+  trap - EXIT
   "$PKG_ROOT/third_party/rust/bin/rustc" --version
   "$PKG_ROOT/third_party/rust/bin/cargo" --version
 
