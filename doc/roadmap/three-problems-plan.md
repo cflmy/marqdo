@@ -162,3 +162,19 @@ T1.1 core-surface ─是─> T3.1 语言面 + T1.3 守卫
 - 验收：`tests/contracts.rs` 12 例（提取 4 + 四边界 4 + check 3 + 正向对照 1）全绿；
   全量回归零失败（含 262 gold）。
 - **T2.6（契约导出 `get_schema`）**：按计划延后至 Phase 3 与 MLSP `schema` 一并实现。
+
+### Phase 3 · MLSP（2026-09-22 完成 T3.1/T3.2 + T2.6；T3.3/T3.4 待做）
+
+- **T3.1** `marqdo mlsp` 子命令：行分隔 JSON over stdio，请求 `{"id","method","params"}` →
+  响应 `{"id","ok","result"|"error"}`（永不 panic，错误也是结构化 JSON）。
+- **T3.2** 五个 handler 全部实现（`src/mlsp.rs`）：
+  `locate`（构造卡片 / 符号定位 + 契约）、`syntax`（关键字/别名 → 卡片；语法唯一事实来源 =
+  `parse::CORE_CONSTRUCTS`，MLSP 只加检索别名不定义语法）、`validate`（parse + 契约 check → 结构化诊断数组）、
+  `repair_targets`（有界修复靶点：`strategy=anchored-local`、`on_violation=abstain`——越界必拒护栏先行）、
+  `schema`（**T2.6 完成**：单元名 → 形参/返回/字段契约 + 升参清单 + 锚点）。
+- 验收：`tests/mlsp.rs` 7 例全绿（语法问答/未知查询/符号定位/漂移校验/schema 导出/有界修复/结构化错误）；
+  stdio 冒烟通过；全量回归零失败。
+- **T3.3（修复循环护栏 · golden 20 例 ≥80%）**：护栏策略字段已就位（anchored-local / abstain /
+  max_attempts=2）；golden 实验需要模型调用，属验证实验性质，待做。
+- **T3.4（AI Skill 换骨：背语法 → 查 MLSP）**：待做——`.cursor/skills/marqdo*` 三件套改为
+  「写代码前先 `mlsp syntax/locate`、提交前 `mlsp validate`」的查询式工作流。

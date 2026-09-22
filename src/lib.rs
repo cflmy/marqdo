@@ -29,6 +29,7 @@ pub mod interp;
 pub mod lex;
 pub mod linalg_ops;
 pub mod load;
+pub mod mlsp;
 pub mod parse;
 pub mod value;
 #[cfg(feature = "net-host")]

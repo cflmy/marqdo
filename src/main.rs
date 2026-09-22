@@ -80,6 +80,8 @@ enum Commands {
         #[arg(long)]
         json: bool,
     },
+    /// MLSP for AI: line-delimited JSON on stdio (locate / syntax / validate / repair_targets / schema)
+    Mlsp,
     /// Browse `.mq.md` structure + execution (live server or static output)
     View {
         #[command(subcommand)]
@@ -280,6 +282,21 @@ fn try_main(cli: Cli) -> Result<i32> {
                 }
             }
             Ok(errors.min(1))
+        }
+        Commands::Mlsp => {
+            use std::io::{BufRead, Write};
+            let stdin = std::io::stdin();
+            let stdout = std::io::stdout();
+            let mut out = stdout.lock();
+            for line in stdin.lock().lines() {
+                let line = line?;
+                if line.trim().is_empty() {
+                    continue;
+                }
+                writeln!(out, "{}", marqdo::mlsp::handle_line(&line))?;
+                out.flush()?;
+            }
+            Ok(0)
         }
         Commands::View {
             action,
