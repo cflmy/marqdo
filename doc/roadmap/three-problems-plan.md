@@ -176,5 +176,6 @@ T1.1 core-surface ─是─> T3.1 语言面 + T1.3 守卫
   stdio 冒烟通过；全量回归零失败。
 - **T3.3（修复循环护栏 · golden 20 例 ≥80%）**：护栏策略字段已就位（anchored-local / abstain /
   max_attempts=2）；golden 实验需要模型调用，属验证实验性质，待做。
-- **T3.4（AI Skill 换骨：背语法 → 查 MLSP）**：待做——`.cursor/skills/marqdo*` 三件套改为
-  「写代码前先 `mlsp syntax/locate`、提交前 `mlsp validate`」的查询式工作流。
+- **T3.4（AI Skill 换骨：背语法 → 查 MLSP）**（2026-09-22 完成）——`marqdo` / `marqdo-dev` 两件套改为
+  查询式工作流：写码前 `mlsp syntax/locate`、提交前 `mlsp validate` + `marqdo check`；
+  渐进式契约三种表格形状入语法面；错误修复照 `doc_anchor` 局部改（越界必弃权）。
