@@ -17,7 +17,7 @@
 | 实验 | 判据 | 结果 | 判定 |
 |---|---|---|---|
 | **(a) 锚点消融**（T3.3，双模型×20例×双臂，三轮） | anchor 臂一轮修复率 ≥ 80%；护栏 0 次越界应用 | cflmy anchor **20/20=100%**（plain 17/20=85%）；mimo-v2.6-flash anchor **20/20=100%**（plain 18/20=90%；容错加固中的第二轮 anchor 18/20=90% 亦 ≥80%）；越界拒/越界应用 0/0 | ✅ 过 |
-| **(b) 盲测**（查询式 vs 全文档背诵，6任务×2臂） | 四判据：最终通过率 Q 不劣于 D（允许 −0 例）；首轮语法错误率 Q ≤ D；平均修复轮次 Q ≤ D；token ≤ 70% of D（首轮契约诊断率为观测项） | deepseek-flash：docs 4/6 vs query 0/3（3 例端点 infra 剔除）；首轮语法错 2/3 vs 2/6；token 69,771 vs 57,276。mimo-v2.6-pro：首跑 12/12 端点 infra，单独重跑见 §3 | ❌ 四判据未全立 ⇒ 按 §3.7 继续改协议 |
+| **(b) 盲测**（查询式 vs 全文档背诵，6任务×2臂） | 四判据：最终通过率 Q 不劣于 D（允许 −0 例）；首轮语法错误率 Q ≤ D；平均修复轮次 Q ≤ D；token ≤ 70% of D（首轮契约诊断率为观测项） | deepseek-flash：docs 4/6 vs query 0/3（3 例端点 infra 剔除）；首轮语法错 2/3 vs 2/6；token 69,771 vs 57,276。mimo-v2.6-pro：两跑均端点 infra（12/12、11/12），**不可评估** | ❌ 四判据未全立 ⇒ 按 §3.7 继续改协议 |
 | **(c) 契约消融**（四边界×三情形） | 带契约错值拦截 = 100%；带契约对值误报 = 0%；无契约路径零回归 | 拦截 4/4=**100%**；误报 0/4=**0%**；无契约 4/4 动态语义保持（含 `missing map key` 基线） | ✅ 过 |
 | **(d) 防漂移演练**（9 漂移 + 2 负对照） | 故意写错必报 = 100%；对照组误报 = 0% | 必报 9/9=**100%**（`unknown_type`×2、`param_drift`×2、`return_mismatch`、`arg_mismatch`、`unknown_key`、`contract.duplicate`、`contract.unknown_table`）；负对照误报 0/2 | ✅ 过 |
 | **(e) 核心守卫演练**（3 种变异注入） | 单边改动必红；还原必绿 | 3/3 必红（`CORE_CONSTRUCTS` 私增、`core-surface.md` 私增、金样删除）；还原全绿 | ✅ 过 |
@@ -73,9 +73,9 @@
 - **docs 臂**：业务题 3/3 全部一轮通过（各 ~3k token）；`qb_gcd` 修复 2 轮过；`qb_max_sublist_sum`、`qb_get_factors` 暴露真语法滑倒（列表字面量被当调用 `unknown function [-2,`；参数名漂移 `missing argument for parameter value`）。
 - **query 臂**：查询通道**被积极使用**（5/6 例用满 3 次，多词查询如 `条件分支 写法` 也能正确命中卡片——已单独验证查询匹配无缺陷）；但 3 例被端点空体吃掉，其余 3 例败于真语法错（Python 式元组 `(a, b)` ⇒ `trailing input in expression`；Python 式调用 `gcd(48, 18)` ⇒ `unknown function gcd(48`）与 1 例查询后未交程序。
 
-### mimo-v2.6-pro（重跑中）
+### mimo-v2.6-pro（两跑均不可评估）
 
-首跑 12/12 全部"非 JSON / 空体"（与 deepseek 并行时段；同参数小冒烟正常）。三向探针（小提示词×12000/4000、大提示词×12000）证实**网关随机空体**、与 `max_tokens`/提示词体量无稳定关系。已将重试 8→12 次、退避 10→15 秒，并**单独**重跑（不与其它模型抢并发）。结果落地后补入本节。
+首跑 **12/12** 全部"非 JSON / 空体"（与 deepseek 并行时段）。三向探针（小提示词×12000/4000、大提示词×12000）证实**网关随机空体**、与 `max_tokens`/提示词体量无稳定关系。加重试（8→12 次、退避 10→15 秒）并**单独**重跑后仍为 **11/12** 端点 infra（含两臂首聊即 `tok=(0,0)` 的空体）；唯一执行到的 `qb_gcd` 例暴露真语法错（`**y**` 作语句 ⇒ `unexpected expression input`）。**结论：`mimo-v2.6-pro` 经本网关不可评估**，(b) 判据以 `deepseek-flash` 数据为准。原始报告：[blind-experiment-2026-09-23-mimo-v2.6-pro.md](blind-experiment-2026-09-23-mimo-v2.6-pro.md)。
 
 ### 判据对照（截至 deepseek-flash）
 

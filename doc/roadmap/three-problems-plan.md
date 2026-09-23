@@ -211,7 +211,7 @@ T1.1 core-surface ─是─> T3.1 语言面 + T1.3 守卫
   增量区分性留难样本扩展（协议 §1 诚实注记）。
 - **(b) 盲测（查询式 vs 全文档背诵）** ❌ 四判据未全立 ⇒ 按 three-problems.md §3.7 **继续改协议**——
   deepseek-flash：docs 4/6 vs query 0/3（端点 infra 剔除 3/6）；首轮语法错 2/3 vs 2/6；token 69,771 vs 57,276。
-  mimo-v2.6-pro 首跑 12/12 全端点空体，单独重跑（结果回填 [perf-validation-report-2026-09-23.md](perf-validation-report-2026-09-23.md) §3）。
+  mimo-v2.6-pro 两跑均端点 infra（12/12、11/12，**不可评估**；结果回填 [perf-validation-report-2026-09-23.md](perf-validation-report-2026-09-23.md) §3）。
   **真发现**：查询机制本身无缺陷（多词查询亦正确命中卡片），败例是**跨语言习惯泄漏**（元组表达式/Python 调用形）
   ——模型"不知道自己不知道"而不去查。协议改进主攻方向：**自查触发机制**（validate 前置自检、
   陌生构造强制查询），而非继续改进卡片。
