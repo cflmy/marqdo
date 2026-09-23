@@ -142,8 +142,9 @@ marqdo catalog public -o .marqdo
 
 ---
 
-## 现状（v1.0.7）
+## 现状（v1.1.0）
 
+- **AI 原生闭环（v1.1.0 新增）**：核心表面守卫（19 构造，单边改动 CI 必红）· **渐进式契约**（文档内嵌 `参数`/`返回`/`字段` 表 + 四边界校验 + `marqdo check` 防漂移）· **MLSP for AI**（`marqdo mlsp`：`locate`/`syntax`/`validate`/`repair_targets`/`repair_apply`/`schema`，AI 按需查语法而非背诵）· **结构化诊断**（`run --json`，错误即数据）；验证见 [perf-validation-report-2026-09-23.md](doc/roadmap/perf-validation-report-2026-09-23.md)
 - 映射与解释器：**v0.3 语法宪法**（`**` 代码 / `*` 返回 / 叙述声明）；Phase I 树遍历 + 字节码后端；金样例在 `tests/` 与 `tests/markup-v03/`  
 - **对象**：`#` = 类型/构造，`##`+ = 函数/方法；见 [objects.md](doc/design/objects.md)  
 - **`marqdo view`**：文档浏览器（Structure + 函数大纲/搜索 + Execution + Variables 浮窗）  
@@ -164,7 +165,7 @@ marqdo catalog public -o .marqdo
 - **浏览器 Marqdo（WASM）**：`marqdo wasm build` + 官方 bridge 自启（作者零业务 JS；桥内可含列表/路由/storage/ws/文件/Canvas/音频/Observer/拖放）；`lib/browser` + GFM；`web.client_embed`；示例 [browser-hello](examples/browser-hello/) · [browser-app](examples/browser-app/) · [browser-media](examples/browser-media/) · [web-client-site](examples/web-client-site/)（[ADR 0002](doc/adr/0002-browser-marqdo-wasm.md) · [D](doc/roadmap/browser-wasm-d.md) · [E](doc/roadmap/browser-wasm-e.md) · [F](doc/roadmap/browser-wasm-f.md)）
 - 选型：[ADR 0001 — Rust](doc/adr/0001-implementation-language.md) · [ADR 0002 — 浏览器 WASM](doc/adr/0002-browser-marqdo-wasm.md)（C0–C5 完结，见 [roadmap/browser-wasm.md](doc/roadmap/browser-wasm.md)）· [ADR 0003 — 异步效应](doc/adr/0003-browser-async-effects.md)
 
-### 如何使用最新 Marqdo（v1.0.7）
+### 如何使用最新 Marqdo（v1.1.0）
 
 **安装解释器（任选其一）**
 
@@ -179,7 +180,7 @@ marqdo catalog public -o .marqdo
 ```bash
 # 1) 源码安装（跟 tag 或 main）
 git clone https://github.com/cflmy/marqdo.git && cd marqdo
-git checkout v1.0.7   # 或留在 main
+git checkout v1.1.0   # 或留在 main
 cargo build --release
 export PATH="$PWD/target/release:$PATH"
 marqdo version
@@ -191,6 +192,11 @@ marqdo run tests/structure/hello.mq.md --backend bytecode
 marqdo view public --no-open
 marqdo debug public --no-open
 marqdo catalog public -o .marqdo
+
+# 2b) AI 原生闭环（v1.1.0）：契约检查 / 结构化诊断 / MLSP 查询
+marqdo check tests/contracts/ok_contract.mq.md        # 静态契约防漂移
+marqdo run tests/structure/hello.mq.md --json # 结构化诊断（错误即数据）
+printf '{"id":1,"method":"syntax","params":{"query":"返回"}}\n' | marqdo mlsp
 
 # 3) 安装官方扩展（Release / CDN 用户：无需本机 Rust/Go）
 marqdo ext add web      # 或：网页 — 自动下载 L1 + 预编译 native（Go libweb）
@@ -213,7 +219,7 @@ marqdo wasm build
 # → dist/wasm/ … 见 examples/browser-hello/
 
 # 6) Releases：Windows exe/zip/vsix；Linux CLI zip + native `.so` zip
-#    https://github.com/cflmy/marqdo/releases/tag/v1.0.7
+#    https://github.com/cflmy/marqdo/releases/tag/v1.1.0
 ```
 
 开发期也可用 `cargo run -- …` 代替已安装的 `marqdo`：

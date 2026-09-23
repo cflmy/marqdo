@@ -1,3 +1,14 @@
+marqdo (1.1.0-1ppa1) noble; urgency=medium
+
+  * Marqdo 1.1.0: core surface guard + progressive contracts + MLSP for AI.
+    New `marqdo check` (static contract drift) and `marqdo mlsp` (language
+    server for AI: locate/syntax/validate/repair_targets/schema/repair_apply);
+    `run --json` unified structured diagnostics; contract tables
+    (参数/返回/字段/集合) with four validation boundaries; anchored repair
+    guardrails (bounded line edits, out-of-scope refused).
+
+ -- cflmy <pingan@cflmy.cn>  Wed, 23 Sep 2026 13:30:00 +0800
+
 marqdo (1.0.7-1ppa1) noble; urgency=medium
 
   * Marqdo 1.0.7: WS/net boundary hardening (same-origin handshake,

@@ -124,8 +124,9 @@ jobs:
             ## Marqdo ${{ github.ref_name }}
 
             ### 亮点 / Highlights
+            - **v1.1.0**：AI 原生闭环三件套——核心表面守卫（问题一）· 渐进式契约 + `marqdo check`（问题二）· **MLSP for AI**（`marqdo mlsp`：locate/syntax/validate/repair_targets/repair_apply/schema，AI 按需查语法而非背诵）（问题三）· `run --json` 结构化诊断
+            - **v1.1.0**: AI-native loop — core-surface guard, progressive contracts + `marqdo check`, **MLSP for AI** (`marqdo mlsp`: query syntax on demand instead of memorizing), `run --json` structured diagnostics
             - **v1.0.7**：WS/网络边界加固（同源握手、require_auth/需要登录、消息上限、HTTP 8 MiB 截断）；`url_encode` `%20`
-            - **v1.0.7**: WS/net boundary hardening (same-origin, require_auth, message caps, 8 MiB HTTP cap); `url_encode` `%20`
             - **v1.0.3**：Ubuntu PPA + 扩展 CDN（ext.marqdo.com）；CLI/扩展可分发；noble 捆绑 Rust 工具链
             - **v1.0.3**: Ubuntu PPA + extension CDN; independent CLI/ext packs; bundled Rust for noble
             - **v1.0.1**：修复 Go `libweb` 动态路由 `{param}` 查询代入、详情 Markdown、CSS 数字误报

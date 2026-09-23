@@ -1,5 +1,49 @@
 # Changelog
 
+## v1.1.0 — 2026-09-23
+
+### Highlights
+
+**AI 原生闭环三件套落地**：核心表面守卫（问题一）· 渐进式契约（问题二）· MLSP for AI（问题三）。
+`marqdo check` 静态契约防漂移、`marqdo mlsp` 让 AI **按需查询**语法而非背诵、`run --json` 统一结构化诊断（错误即数据，供 AI 直接消费）。
+本版 CLI 与扩展包 **同步为 1.1.0**。
+
+- **核心要小（问题一）**：`doc/design/core-surface.md` 列出 19 个核心构造 + `CORE_CONSTRUCTS` 守卫测试——任一侧（清单/文档/金样）单边改动 CI 必红；三层架构（Core / Runtime / Document）入 `doc/design/layers.md`。
+- **语义校验（问题二）**：渐进式契约表（`参数`/`返回`/`字段`/集合）嵌入文档叙述；四边界校验（调用实参 / 返回值 / 表绑定 / 键访问）；`marqdo check` 静态防漂移（类型 typo / 参数名漂移 / 重复契约必报）。
+- **AI 可靠反馈 + 不必学语法（问题三）**：`marqdo mlsp`（MLSP，行分隔 JSON over stdio）提供 `locate` / `syntax` / `validate` / `repair_targets` / `repair_apply` / `schema`；`syntax` 卡片机械携带戒律原文 / 样例 / 文档锚点，AI 无需预学语法。修复护栏：有界行编辑、越界必拒（abstain）。
+- **验证（P4）**：锚点消融 anchor 一轮修复率 **100%**（双模型，plain 85%/90%）；契约消融拦截 100% / 误报 0%；防漂移必报 9/9；核心守卫演练 3/3 必红。详见 [perf-validation-report-2026-09-23.md](doc/roadmap/perf-validation-report-2026-09-23.md)。
+
+```bash
+# Ubuntu PPA / 源码
+sudo add-apt-repository ppa:cflmy/marqdo && sudo apt update && sudo apt install marqdo
+git checkout v1.1.0 && cargo build --release
+marqdo ext add web
+```
+
+**核心表面 Δ（Core surface Δ）**：**无增删**——19 个核心构造（`heading` / `bold-code` / `italic-return` / `param-list` / `call-quote` / `branch-list` / `loop-list` / `table-bind` / `footnote-index` / `link-index` / …）与 v1.0.7 完全一致，未新增标记。本版为 **Runtime 层（契约校验 / MLSP / 诊断 JSON）** 与 **Document 层（core-surface / layers）** 变更，不触碰语言核心。
+
+### Added
+- **MLSP（`marqdo mlsp`）**：面向 AI 的语言服务协议（行分隔 JSON over stdio）——`locate` / `syntax` / `validate` / `repair_targets` / `repair_apply` / `schema`；`syntax` 卡片含 `semantics` / `rule` / `sample` / `doc_quote`（自持，机器可读戒律原文）。
+- **`marqdo check`**：静态契约漂移检查（未知类型词 / 参数名漂移 / 返回越约 / 重复契约表 / 错位契约表）。
+- **渐进式契约（Progressive contracts）**：文档叙述内嵌契约表（`参数`/`返回`/`字段` + 集合 `字段`），四边界校验（调用实参 / 返回值 / 表绑定 / 键访问）；被绑定的 `字段|类型` 表是**数据**、永不误判为契约。
+- **`marqdo run --json`**：统一结构化诊断（`code` / `severity` / `suggestion` / `doc_anchor` / `doc_quote` / `contract_ref`），错误即数据。
+- **修复护栏**：`mlsp repair_apply` 有界行编辑——只允许落在 `doc_anchor` 指定范围内的编辑，越界整体拒绝（all-or-nothing / abstain）。
+- **守卫与文档**：`doc/design/core-surface.md`（19 构造）、`doc/design/layers.md`（三层架构）、`tests/core_surface.rs`（守卫生效验证）。
+
+### Fixed
+- **错误链不再扁平化**：`src/load.rs` 以 `label_error` 保留结构化 `Diagnostic`（"Error Exit Only" 原则），修复契约类错误被降级为字符串的回归。
+- **契约 parse 边界**：`interp.rs` 键访问优先给出 `index_diag`（索引/键诊断先于取值），空字段 vs 缺字段语义消歧。
+
+### Changed
+- **`.cursor/skills/marqdo`**：由「背诵式压缩操作手册」改为**查询式工作流**——写码前 `mlsp syntax` / `locate`，提交前 `mlsp validate` + `marqdo check`，修复照 `doc_anchor` 局部改。
+- **契约表一经出现即为完整声明**（新推断的升参未覆盖 ⇒ `contract.param_drift` 警告，不静默）。
+- 取元**主推** `[键](集合)`（`link-index`）；`` `集合`[^键] ``（`footnote-index`）保留兼容。
+
+### 已知未决（诚实标注）
+- **P4 实验 (b) 盲测未达标**：「查询式 vs 全文档背诵」四判据未全立（`deepseek-flash`：docs 4/6 vs query 0/3；端点 infra 削样本）。查询机制本身已验证无缺陷，瓶颈在**模型自查纪律**（不知道自己不知道 ⇒ 不查询）——协议改进（写码前强制自检 / 陌生构造强制查询）列入下一阶段。见 [perf-validation-report-2026-09-23.md](doc/roadmap/perf-validation-report-2026-09-23.md) §3。
+
+## Unreleased
+
 ## v1.0.7 — 2026-09-22
 
 ### Highlights
