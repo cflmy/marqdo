@@ -1,3 +1,11 @@
+marqdo (1.1.1-1ppa1) noble; urgency=medium
+
+  * Marqdo 1.1.1: AI stack closure — llm ask/stream/collect, Metadata Binding,
+    Skill Compilation + Adaptive Routing, MCP stdio client + resume checkpoints,
+    optional plugins/llm Transport ABI (fallback lib/net).
+
+ -- cflmy <pingan@cflmy.cn>  Thu, 24 Sep 2026 20:32:00 +0800
+
 marqdo (1.1.0-1ppa1) noble; urgency=medium
 
   * Marqdo 1.1.0: core surface guard + progressive contracts + MLSP for AI.

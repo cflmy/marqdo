@@ -38,7 +38,7 @@ jobs:
         run: |
           export PATH="/c/ProgramData/mingw64/mingw64/bin:/c/ProgramData/chocolatey/lib/mingw/tools/install/mingw64/bin:$PATH"
           cargo build --release
-          cargo build --release -p marqdo_plugin_agent -p marqdo_plugin_quantum -p marqdo_plugin_linalg
+          cargo build --release -p marqdo_plugin_agent -p marqdo_plugin_quantum -p marqdo_plugin_linalg -p marqdo_plugin_llm
           bash ./scripts/build-web-plugin.sh
 
       - name: Checkout extension sources (branch vscode-extension only)
@@ -87,6 +87,7 @@ jobs:
           Copy-Item target/release/agent.dll "$stageNative/native/agent.dll"
           Copy-Item target/release/quantum.dll "$stageNative/native/quantum.dll"
           Copy-Item target/release/linalg.dll "$stageNative/native/linalg.dll"
+          Copy-Item target/release/llm.dll "$stageNative/native/llm.dll"
           if (Test-Path "dist/$nativeZip") { Remove-Item "dist/$nativeZip" -Force }
           Compress-Archive -Path "$stageNative/*" -DestinationPath "dist/$nativeZip" -Force
           $stage = "dist/stage-bundle"
@@ -100,6 +101,7 @@ jobs:
           Copy-Item target/release/agent.dll "$stage/ext/native/agent.dll"
           Copy-Item target/release/quantum.dll "$stage/ext/native/quantum.dll"
           Copy-Item target/release/linalg.dll "$stage/ext/native/linalg.dll"
+          Copy-Item target/release/llm.dll "$stage/ext/native/llm.dll"
           if (Test-Path "dist/$zip") { Remove-Item "dist/$zip" -Force }
           Compress-Archive -Path "$stage/*" -DestinationPath "dist/$zip" -Force
           $stageLib = "dist/stage-stdlib"
@@ -124,12 +126,12 @@ jobs:
             ## Marqdo ${{ github.ref_name }}
 
             ### 亮点 / Highlights
-            - **v1.1.0**：AI 原生闭环三件套——核心表面守卫（问题一）· 渐进式契约 + `marqdo check`（问题二）· **MLSP for AI**（`marqdo mlsp`：locate/syntax/validate/repair_targets/repair_apply/schema，AI 按需查语法而非背诵）（问题三）· `run --json` 结构化诊断
-            - **v1.1.0**: AI-native loop — core-surface guard, progressive contracts + `marqdo check`, **MLSP for AI** (`marqdo mlsp`: query syntax on demand instead of memorizing), `run --json` structured diagnostics
-            - **v1.0.7**：WS/网络边界加固（同源握手、require_auth/需要登录、消息上限、HTTP 8 MiB 截断）；`url_encode` `%20`
-            - **v1.0.3**：Ubuntu PPA + 扩展 CDN（ext.marqdo.com）；CLI/扩展可分发；noble 捆绑 Rust 工具链
-            - **v1.0.3**: Ubuntu PPA + extension CDN; independent CLI/ext packs; bundled Rust for noble
-            - **v1.0.1**：修复 Go `libweb` 动态路由 `{param}` 查询代入、详情 Markdown、CSS 数字误报
+            - **v1.1.1**：AI 栈收口——llm `ask`/`stream`/`collect` · Metadata Binding · Skill Compilation + Adaptive Routing · MCP 客户端 + resume · 可选 `plugins/llm`
+            - **v1.1.1**: AI stack — llm ask/stream/collect, Metadata Binding, Skill Compilation + Adaptive Routing, MCP client + resume, optional plugins/llm
+            - **v1.1.0**：AI 原生闭环三件套——核心表面守卫 · 渐进式契约 + `marqdo check` · **MLSP for AI** · `run --json`
+            - **v1.1.0**: AI-native loop — core-surface guard, progressive contracts + `marqdo check`, **MLSP for AI**, `run --json`
+            - **v1.0.7**：WS/网络边界加固；`url_encode` `%20`
+            - **v1.0.3**：Ubuntu PPA + 扩展 CDN（ext.marqdo.com）
             - **Linux 包必出**：`*-native-x86_64-unknown-linux-gnu.zip` + Linux CLI bundle
             - Details: [CHANGELOG](https://github.com/cflmy/marqdo/blob/main/CHANGELOG.md) · [mapping v0.3](https://github.com/cflmy/marqdo/blob/main/doc/design/markdown-mapping-v0.3.md)
 
@@ -139,7 +141,7 @@ jobs:
             |-------|----------|
             | `marqdo-*-windows-msvc.exe` | CLI with **embedded** official stdlib |
             | `marqdo-*-windows-msvc.zip` | `marqdo.exe` + `lib/` + `ext/`（含 native DLL） |
-            | `marqdo-*-native-*.zip` | 预编译 `web`/`agent`/`quantum`/`linalg`（Windows DLL + **Linux .so 必出**） |
+            | `marqdo-*-native-*.zip` | 预编译 `web`/`agent`/`quantum`/`linalg`/`llm`（Windows DLL + **Linux .so 必出**） |
             | `marqdo-*-unknown-linux-gnu.zip` | Linux CLI + `lib/` + `ext/` + native `.so` |
             | `marqdo-*-stdlib.zip` | `lib/` only |
             | `marqdo-*-ext.zip` | Official `ext/` L1 sources |
@@ -184,7 +186,7 @@ jobs:
         run: |
           set -euo pipefail
           cargo build --release
-          cargo build --release -p marqdo_plugin_agent -p marqdo_plugin_quantum -p marqdo_plugin_linalg
+          cargo build --release -p marqdo_plugin_agent -p marqdo_plugin_quantum -p marqdo_plugin_linalg -p marqdo_plugin_llm
           bash ./scripts/build-web-plugin.sh
 
       - name: Package Linux native zip + CLI bundle
@@ -193,7 +195,7 @@ jobs:
           VER="${GITHUB_REF_NAME#v}"
           TARGET="x86_64-unknown-linux-gnu"
           mkdir -p dist/stage-native/native
-          for lib in libweb.so libagent.so libquantum.so liblinalg.so; do
+          for lib in libweb.so libagent.so libquantum.so liblinalg.so libllm.so; do
             src="target/release/${lib}"
             if [[ ! -f "$src" && "$lib" == libweb.so ]]; then
               src="plugins/web/build/libweb.so"

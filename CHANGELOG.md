@@ -3,12 +3,47 @@
 ## Unreleased
 
 ### Added
-- **`plugins/llm` Transport ABI** (`llm_chat_completions`): `ext/ai/llm/openai` prefers the native plugin when resolvable, else `lib/net` HTTP/SSE.
-- **Agent MCP stdio client** (`agent_mcp_client` / `mcp_connect` / `mcp_client_list` / `mcp_client_call`) plus offline golden against a Python mock server.
-- **Agent resume checkpoints** (`.marqdo/agent-resume/<id>.json` — save/load/clear/list; `run` can set `resume_id=`).
+
+### Fixed
 
 ### Changed
-- Adaptive Routing: `jev` is a **compat alias** of `small-llm` (no `MARQDO_JEV` first-class path). Decision surface is `router_model` (any llm handle).
+
+## v1.1.1 — 2026-09-24
+
+### Highlights
+
+**AI 栈收口（agent + llm）**：语义 `ask`/`stream`/`collect`、Artifact Metadata Binding、Skill Compilation + Adaptive Routing、MCP 客户端与 resume 检查点、可选 `plugins/llm` Transport ABI。
+本版 CLI 与扩展包 **同步为 1.1.1**。
+
+- **LLM 原语**：`ext/ai/llm` 从 OpenAI HTTP 客户端提升为 `ask`/`stream`/`collect` 智能原语（`complete` 保留兼容）；`LLMResult.tool_calls`；可选原生 `llm_chat_completions`（无 `.so` 时回退 `lib/net`）。
+- **Metadata Binding**：frontmatter `${env|arg|sys|secret}` 加载期解析；Phase 2 将绑定键注入入口 env（正文禁止 `${…}`）；`sys.meta` / `--bind`；llm ctor 优先 meta。
+- **Agent**：Skill Compilation（episode → llm_free skills）+ Adaptive Routing（`marqdo` / `small-llm` / `llm` / `auto`；`jev` 为 `small-llm` 兼容别名）；MCP **stdio 客户端**；resume 检查点；零 LLM 金样路径。
+- **度量与后端**：`model_turn` usage、named handles（fast/reasoning）、`type:prompt` 加载、openai/ollama 分流。
+
+```bash
+# Ubuntu PPA / 源码
+sudo add-apt-repository ppa:cflmy/marqdo && sudo apt update && sudo apt install marqdo
+git checkout v1.1.1 && cargo build --release
+marqdo ext add llm && marqdo ext add agent
+```
+
+**核心表面 Δ（Core surface Δ）**：**无增删**——19 个核心构造不变。本版为 **Runtime**（Metadata Binding、LLM/agent 插件与扩展）变更，不触碰语言标记。
+
+### Added
+- **`ext/ai/llm` 语义表面**：`ask` / `stream` / `collect`（`complete` 兼容）；`LLMResult.tool_calls`（OpenAI-shaped `choices[0].message.tool_calls`）；`sys.module_source` + 入口文档 `prompt_body` 离线路径。
+- **`plugins/llm` Transport ABI**（`llm_chat_completions`）：`ext/ai/llm/openai` 优先原生插件，否则 `lib/net` HTTP/SSE。
+- **Artifact Metadata Binding**：frontmatter `${env|arg|sys|secret}` → `Module.metadata`；Secret 掩码；`sys.meta` / `--bind`；Phase 2 入口 env 注入（正文拒绝 `${…}`；字节码 prologue 同源）。
+- **Agent Skill Compilation + Adaptive Routing**：episode → `maybe_learn` → llm_free skills；路由后端 `marqdo` / `small-llm` / `llm` / `auto`（`jev` = `small-llm` 兼容别名，不再探测 `MARQDO_JEV`）。
+- **Agent MCP stdio 客户端**（`agent_mcp_client` / `mcp_connect` / `mcp_client_list` / `mcp_client_call`）+ Python mock 离线金样。
+- **Agent resume 检查点**（`.marqdo/agent-resume/<id>.json` — save/load/clear/list；`run` 可设 `resume_id=`）。
+- **AI 栈度量与后端**：`model_turn` usage、named handles（fast/reasoning）、`type:prompt` 加载、openai/ollama 分流、agent-zero-llm 金样。
+
+### Fixed
+- **plan force 不再冲掉已有 `resources` workbook**（保留 llm_free 资源；金样 `agent-plan-preserve`）。
+- **compiled-skill Marqdo 语法**：llm_free await 不再误落到 plan+HTTP。
+
+### Changed
+- Adaptive Routing：决策面为 `router_model`（任意 llm handle）；`jev` 降为 `small-llm` 文档/兼容别名。
 
 ## v1.1.0 — 2026-09-23
 
