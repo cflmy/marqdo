@@ -31,7 +31,7 @@
 | `create` 工厂；handle 带 `backend` | **done** |
 | LLMResult：`text` / `model` / `finish` / `backend` / `usage` / `tokens` | **done** |
 | Named models（`llm.fast` / `llm.reasoning`） | **done** |
-| Prompt document：`prompt` / `prompt_load` + `type: prompt` 正文 | **done**（`llm.ask` 无参吃当前入口文档仍暂缓，需 `sys.module_source`） |
+| Prompt document：`prompt` / `prompt_load` + `type: prompt` 正文 | **done**（无参 `ask`/`stream` → `sys.module_source` + `prompt_body`） |
 | 拆 `ext/ai/llm/openai.mq.md` + `ollama` 后端 | **done** |
 | tool_calls 完整 Result | 暂缓 |
 | Transport → 可选 ABI 插件 | 暂缓 |
@@ -65,11 +65,12 @@
 
 1. **LLM Result → Agent metrics** — **done**  
 2. **Named handles** — **done**  
-3. **Prompt document** — **done**（`type: prompt` 剥 frontmatter；无参 `ask` 仍暂缓）  
+3. **Prompt document** — **done**（`type: prompt` 剥 frontmatter；无参 `ask`/`stream` 经 `sys.module_source`）  
 4. **Backend split** — **done**  
 5. **Execution compilation** — **done**（`agent-zero-llm` 金样 + harness）
+6. **Metadata Binding** — **done**（Phase 1；`llm-meta-offline`）
 
 ## 6. 验收金样
 
 - Agent：`tests/ext/agent-v2-learn.mq.md` · `agent-p4-route.mq.md` · `agent-zero-llm.mq.md` · `agent-plan-preserve.mq.md` · `scripts/agent-harness.sh`  
-- LLM：`tests/ext/llm-ask-offline.mq.md` · `llm-stream-offline.mq.md` · `llm-ctor-offline.mq.md` · `llm-named-offline.mq.md`
+- LLM：`tests/ext/llm-ask-offline.mq.md` · `llm-stream-offline.mq.md` · `llm-ctor-offline.mq.md` · `llm-named-offline.mq.md` · `llm-meta-offline.mq.md` · `llm-entry-prompt-offline.mq.md`

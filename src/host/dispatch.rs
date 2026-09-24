@@ -200,6 +200,7 @@ pub enum HostFn {
     StatsStdev = 191,
     Meta = 192,
     MetaGet = 193,
+    ModuleSource = 194,
 }
 
 
@@ -390,6 +391,7 @@ impl HostFn {
             191 => Self::StatsStdev,
             192 => Self::Meta,
             193 => Self::MetaGet,
+            194 => Self::ModuleSource,
             _ => return None,
         })
     }
@@ -583,6 +585,7 @@ impl HostFn {
             "host_stats_stdev" | "stats_stdev" => Self::StatsStdev,
             "host_meta" | "meta" => Self::Meta,
             "host_meta_get" | "meta_get" => Self::MetaGet,
+            "host_module_source" | "module_source" => Self::ModuleSource,
             _ => return None,
         })
     }
@@ -763,6 +766,7 @@ impl HostFn {
             Self::StatsStdev => "host_stats_stdev",
             Self::Meta => "host_meta",
             Self::MetaGet => "host_meta_get",
+            Self::ModuleSource => "host_module_source",
             Self::WritebackRecord => "host_writeback_record",
             Self::WritebackGet => "host_writeback_get",
             Self::WritebackClear => "host_writeback_clear",
@@ -786,7 +790,9 @@ impl HostFn {
                 &["path"]
             }
             Self::WriteText | Self::AppendText => &["path", "text"],
-            Self::NowUnix | Self::NowMs | Self::Args | Self::Cwd | Self::Meta => &[],
+            Self::NowUnix | Self::NowMs | Self::Args | Self::Cwd | Self::Meta | Self::ModuleSource => {
+                &[]
+            }
             Self::FormatTime => &["unix", "pattern"],
             Self::ParseTime => &["text", "pattern"],
             Self::SleepMs => &["ms"],
@@ -991,6 +997,7 @@ pub fn call_host(
         HostFn::Cwd => sys::cwd(ctx),
         HostFn::Meta => sys::meta(ctx),
         HostFn::MetaGet => sys::meta_get(ctx, require(bound, "key")?),
+        HostFn::ModuleSource => crate::host::agent_rt::module_source(ctx),
         HostFn::Exit => sys::exit(ctx, require(bound, "code")?),
         HostFn::Exec => sys::exec(
             ctx,

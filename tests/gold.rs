@@ -3995,6 +3995,50 @@ fn ext_llm_ask_offline() {
 }
 
 #[test]
+fn ext_llm_meta_offline() {
+    let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let output = Command::new(env!("CARGO_BIN_EXE_marqdo"))
+        .args(["run", "tests/ext/llm-meta-offline.mq.md"])
+        .env("OPENAI_API_KEY", "sk-test")
+        .env("MARQDO_EXT", root.join("ext"))
+        .env_remove("OPENAI_MODEL")
+        .env_remove("MARQDO_LLM_MODEL")
+        .env_remove("MARQDO_LLM_META_MODEL")
+        .current_dir(&root)
+        .output()
+        .expect("run llm-meta-offline");
+    let code = output.status.code().unwrap_or(1);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert_eq!(code, 0, "llm-meta-offline stderr={stderr}");
+    assert_eq!(
+        stdout.trim_end(),
+        "meta-model\n<secret>",
+        "stdout={stdout}"
+    );
+}
+
+#[test]
+fn ext_llm_entry_prompt_offline() {
+    let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let output = Command::new(env!("CARGO_BIN_EXE_marqdo"))
+        .args(["run", "tests/ext/llm-entry-prompt-offline.mq.md"])
+        .env("MARQDO_EXT", root.join("ext"))
+        .current_dir(&root)
+        .output()
+        .expect("run llm-entry-prompt-offline");
+    let code = output.status.code().unwrap_or(1);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert_eq!(code, 0, "llm-entry-prompt-offline stderr={stderr}");
+    assert_eq!(
+        stdout.trim_end(),
+        "Say hello to Marqdo.\n\n# main\n\n**raw = > sys.module_source**\n**p = > llm.prompt_body src=`raw`**\n> print text=`p`",
+        "stdout={stdout}"
+    );
+}
+
+#[test]
 fn ext_llm_ctor_offline() {
     let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let output = Command::new(env!("CARGO_BIN_EXE_marqdo"))

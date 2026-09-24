@@ -52,6 +52,12 @@ Lookup one metadata key; missing → None.
 
 *> host_meta_get key=`key`*
 
+## module_source
+
+Entry `.mq.md` source text (for document-as-prompt). Empty string if unset.
+
+*> host_module_source*
+
 ## exit
     + `code`
 

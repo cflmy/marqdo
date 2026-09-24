@@ -151,15 +151,19 @@ Prompt artifact helper: `path=` loads a file; `text=` strips `type: prompt` fron
     + `base_url`=None
     + `api_key`=None
 
-Module convenience: create a default handle and return **answer text**. Pass `path=` to load a prompt document, or `prompt=` text.
+Module convenience: create a default handle and return **answer text**. Pass `path=` to load a prompt document, `prompt=` text, or omit both to use the entry `.mq.md` as a prompt artifact (`type: prompt` body via `sys.module_source`).
 
 1. `path`
   **p = > prompt_load path=`path`**
 2. `prompt`
   **p = prompt**
 3. *
-  > print text=ext/ai/llm.ask: pass prompt= or path=
-  > sys.exit code=1
+  **raw = > sys.module_source**
+  1. not `raw`
+    > print text=ext/ai/llm.ask: pass prompt= or path= (or run a prompt document as entry)
+    > sys.exit code=1
+  2. *
+    **p = > prompt_body src=`raw`**
 
 **m = > create model=`model` base_url=`base_url` api_key=`api_key`**
 **r = > m.ask prompt=`p`**
@@ -260,15 +264,19 @@ Resolution: explicit args → entry Artifact Metadata (`sys.meta_get`) → `sys.
     + `prompt`=None
     + `path`=None
 
-Semantic ask → **LLMResult** (`text`, `model`, `finish`, `backend`, `usage`, `name`). Prefer `[text](result)` for the answer string.
+Semantic ask → **LLMResult** (`text`, `model`, `finish`, `backend`, `usage`, `name`). Prefer `[text](result)` for the answer string. Omit `prompt=` / `path=` to use the entry document (`sys.module_source` + `prompt_body`).
 
 1. `path`
   **p = > prompt_load path=`path`**
 2. `prompt`
   **p = prompt**
 3. *
-  > print text=ext/ai/llm: ask needs prompt= or path=
-  > sys.exit code=1
+  **raw = > sys.module_source**
+  1. not `raw`
+    > print text=ext/ai/llm: ask needs prompt= or path= (or entry prompt document)
+    > sys.exit code=1
+  2. *
+    **p = > prompt_body src=`raw`**
 
 **pack = > self.complete_result prompt=`p` stream=False echo=False**
 **text = > json.get value=`pack` key="text"**
@@ -288,15 +296,19 @@ Semantic ask → **LLMResult** (`text`, `model`, `finish`, `backend`, `usage`, `
     + `path`=None
     + `echo`=False
 
-Semantic stream: return the event list (use `llm.collect` to reduce to text).
+Semantic stream: return the event list (use `llm.collect` to reduce to text). Omit `prompt=` / `path=` to use the entry document.
 
 1. `path`
   **p = > prompt_load path=`path`**
 2. `prompt`
   **p = prompt**
 3. *
-  > print text=ext/ai/llm: stream needs prompt= or path=
-  > sys.exit code=1
+  **raw = > sys.module_source**
+  1. not `raw`
+    > print text=ext/ai/llm: stream needs prompt= or path= (or entry prompt document)
+    > sys.exit code=1
+  2. *
+    **p = > prompt_body src=`raw`**
 
 *> self.complete prompt=`p` stream=True echo=`echo`*
 
