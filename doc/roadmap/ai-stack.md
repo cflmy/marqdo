@@ -33,7 +33,7 @@
 | Named models（`llm.fast` / `llm.reasoning`） | **done** |
 | Prompt document：`prompt` / `prompt_load` + `type: prompt` 正文 | **done**（无参 `ask`/`stream` → `sys.module_source` + `prompt_body`） |
 | 拆 `ext/ai/llm/openai.mq.md` + `ollama` 后端 | **done** |
-| tool_calls 完整 Result | 暂缓 |
+| tool_calls 完整 Result | **done**（`openai.tool_calls_from` + `LLMResult.tool_calls`；`llm-tool-calls-offline`） |
 | Transport → 可选 ABI 插件 | 暂缓 |
 | Artifact Metadata Binding（`${env.*}` / `secret` · `sys.meta`） | **done**（Phase 1 Metadata-only + Phase 2 scope lift；[binding.md](../design/binding.md)） |
 
@@ -73,5 +73,5 @@
 ## 6. 验收金样
 
 - Agent：`tests/ext/agent-v2-learn.mq.md` · `agent-p4-route.mq.md` · `agent-zero-llm.mq.md` · `agent-plan-preserve.mq.md` · `scripts/agent-harness.sh`  
-- LLM：`tests/ext/llm-ask-offline.mq.md` · `llm-stream-offline.mq.md` · `llm-ctor-offline.mq.md` · `llm-named-offline.mq.md` · `llm-meta-offline.mq.md` · `llm-entry-prompt-offline.mq.md`
+- LLM：`tests/ext/llm-ask-offline.mq.md` · `llm-stream-offline.mq.md` · `llm-ctor-offline.mq.md` · `llm-named-offline.mq.md` · `llm-meta-offline.mq.md` · `llm-entry-prompt-offline.mq.md` · `llm-tool-calls-offline.mq.md`
 - Binding：`tests/structure/meta-binding.mq.md` · `meta-lift.mq.md`

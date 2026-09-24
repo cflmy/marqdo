@@ -4041,21 +4041,21 @@ fn ext_llm_meta_offline() {
 }
 
 #[test]
-fn ext_llm_entry_prompt_offline() {
+fn ext_llm_tool_calls_offline() {
     let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let output = Command::new(env!("CARGO_BIN_EXE_marqdo"))
-        .args(["run", "tests/ext/llm-entry-prompt-offline.mq.md"])
+        .args(["run", "tests/ext/llm-tool-calls-offline.mq.md"])
         .env("MARQDO_EXT", root.join("ext"))
         .current_dir(&root)
         .output()
-        .expect("run llm-entry-prompt-offline");
+        .expect("run llm-tool-calls-offline");
     let code = output.status.code().unwrap_or(1);
     let stdout = String::from_utf8_lossy(&output.stdout);
     let stderr = String::from_utf8_lossy(&output.stderr);
-    assert_eq!(code, 0, "llm-entry-prompt-offline stderr={stderr}");
+    assert_eq!(code, 0, "llm-tool-calls-offline stderr={stderr}");
     assert_eq!(
         stdout.trim_end(),
-        "Say hello to Marqdo.\n\n# main\n\n**raw = > sys.module_source**\n**p = > llm.prompt_body src=`raw`**\n> print text=`p`",
+        "1\ncall_1\nfunction\nlookup\n0",
         "stdout={stdout}"
     );
 }

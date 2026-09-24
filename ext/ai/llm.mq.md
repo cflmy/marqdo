@@ -265,7 +265,7 @@ Prefer declaring `model` / `api_key` / `base_url` in frontmatter Binding, then u
     + `prompt`=None
     + `path`=None
 
-Semantic ask → **LLMResult** (`text`, `model`, `finish`, `backend`, `usage`, `name`). Prefer `[text](result)` for the answer string. Omit `prompt=` / `path=` to use the entry document (`sys.module_source` + `prompt_body`).
+Semantic ask → **LLMResult** (`text`, `model`, `finish`, `backend`, `usage`, `name`, `tool_calls`). Prefer `[text](result)` for the answer string. Omit `prompt=` / `path=` to use the entry document (`sys.module_source` + `prompt_body`).
 
 1. `path`
   **p = > prompt_load path=`path`**
@@ -283,12 +283,17 @@ Semantic ask → **LLMResult** (`text`, `model`, `finish`, `backend`, `usage`, `
 **text = > json.get value=`pack` key="text"**
 **usage = > json.get value=`pack` key="usage"**
 **finish = > json.get value=`pack` key="finish"**
+**tc = > json.get value=`pack` key="tool_calls"**
+1. not `tc`
+  **tc = > json.parse text=[]**
+2. *
+  **_ = 1**
 
 `result` =
 
-| text | model | finish | backend | usage | name | llm_calls | tokens |
-|------|-------|--------|---------|-------|------|-----------|--------|
-| `text` | [model](self) | `finish` | [backend](self) | `usage` | [name](self) | 1 | [total_tokens](usage) |
+| text | model | finish | backend | usage | name | llm_calls | tokens | tool_calls |
+|------|-------|--------|---------|-------|------|-----------|--------|------------|
+| `text` | [model](self) | `finish` | [backend](self) | `usage` | [name](self) | 1 | [total_tokens](usage) | `tc` |
 
 *result*
 

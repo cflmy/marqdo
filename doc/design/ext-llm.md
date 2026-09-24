@@ -70,6 +70,7 @@ import llm:ext/ai/llm.mq.md
 | `tokens` | Alias of `usage.total_tokens` (agent metrics) |
 | `name` | Optional handle tag (`fast` / `reasoning`) |
 | `llm_calls` | `1` per ask |
+| `tool_calls` | List of OpenAI-shaped tool call objects (empty when none) |
 
 ### Compat
 
@@ -102,4 +103,6 @@ Fallbacks: `MARQDO_LLM_API_KEY`, `MARQDO_LLM_BASE_URL`, `MARQDO_LLM_MODEL`. Ctor
 - `tests/ext/llm-ask-offline.mq.md` (create + collect)
 - `tests/ext/llm-stream-offline.mq.md`
 - `tests/ext/llm-named-offline.mq.md` (fast/reasoning + prompt_load)
+- `tests/ext/llm-tool-calls-offline.mq.md` (`tool_calls_from` / Result field)
+- `tests/ext/llm-meta-offline.mq.md` · `llm-entry-prompt-offline.mq.md`
 - Live: `llm-complete.mq.md` · `llm-stream-live.mq.md`

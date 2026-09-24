@@ -44,6 +44,29 @@ Extract `{prompt_tokens,completion_tokens,total_tokens}` from an OpenAI-shaped r
 
 *usage*
 
+## tool_calls_from
+    + `data`
+
+Extract OpenAI-shaped `choices[0].message.tool_calls` as a list (or empty list).
+
+**choices = > json.get value=`data` key="choices"**
+1. not `choices`
+  **empty = > json.parse text=[]**
+  *empty*
+2. *
+  **c0 = [1](choices)**
+  **msg = > json.get value=`c0` key="message"**
+  1. not `msg`
+    **empty = > json.parse text=[]**
+    *empty*
+  2. *
+    **tc = > json.get value=`msg` key="tool_calls"**
+    1. `tc`
+      *tc*
+    2. *
+      **empty = > json.parse text=[]**
+      *empty*
+
 ## chat_completions
     + `base_url`
     + `api_key`
@@ -54,7 +77,7 @@ Extract `{prompt_tokens,completion_tokens,total_tokens}` from an OpenAI-shaped r
     + `suffix`=/chat/completions
     + `bearer`="Bearer "
 
-POST `/chat/completions` (or stream SSE). Non-stream → `{text,usage,finish}`; stream → `{events,finish}`.
+POST `/chat/completions` (or stream SSE). Non-stream → `{text,usage,finish,tool_calls}`; stream → `{events,finish}`.
 
 **url = base_url + suffix**
 **auth = bearer + api_key**
@@ -89,17 +112,24 @@ POST `/chat/completions` (or stream SSE). Non-stream → `{text,usage,finish}`; 
   **resp = > net.http_post url=`url` body=`body` headers=`headers`**
   1. [status](resp) == 200
     **data = > json.parse text=[body](resp)**
-    **text = [content]([message]([1]([choices](data))))**
+    **msg = [message]([1]([choices](data)))**
+    **text = > json.get value=`msg` key="content"**
+    1. not `text`
+      **text = ""**
+    2. *
+      **_ = 1**
     **usage = > usage_from data=`data`**
     **fr = > json.get value=[1]([choices](data)) key="finish_reason"**
     1. not `fr`
       **fr = "stop"**
     2. *
       **_ = 1**
+    **tc = > tool_calls_from data=`data`**
     **pack = > json.parse text={"finish":"stop"}**
     **pack = > json.set map=`pack` key="text" value=`text`**
     **pack = > json.set map=`pack` key="usage" value=`usage`**
     **pack = > json.set map=`pack` key="finish" value=`fr`**
+    **pack = > json.set map=`pack` key="tool_calls" value=`tc`**
     *pack*
   2. *
     > print text=ext/ai/llm/openai: HTTP error
