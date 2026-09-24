@@ -41,6 +41,7 @@ pub fn builtin_type(v: &Value) -> Value {
             Value::Int(_) => "int",
             Value::Num(_) => "num",
             Value::Text(_) => "text",
+            Value::Secret(_) => "secret",
             Value::List(_) => "list",
             Value::Map(_) => "map",
             Value::Formula(_) => "formula",

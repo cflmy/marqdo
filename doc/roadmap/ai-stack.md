@@ -35,6 +35,7 @@
 | 拆 `ext/ai/llm/openai.mq.md` + `ollama` 后端 | **done** |
 | tool_calls 完整 Result | 暂缓 |
 | Transport → 可选 ABI 插件 | 暂缓 |
+| Artifact Metadata Binding（`${env.*}` / `secret` · `sys.meta`） | **done**（Phase 1 Metadata-only；[binding.md](../design/binding.md)） |
 
 作者面优先：
 

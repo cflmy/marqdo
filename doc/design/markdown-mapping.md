@@ -130,7 +130,7 @@ Markdown **标记即语法**。输出**不是**语言架构原语，而是内置
 
 ## 5. Frontmatter 与跨文件
 
-文件头 `---` 对为元信息。其中 `import bind:path.mq.md` / `导入` 为**文件导入**；`import bind:lib.member` 为**短名**（废除独立 `use` 与 frontmatter `>` 导入）。调用经裸点号路径（`time.parse`、`agent.agent`）；实例方法在独立 `>` 调用须 `` > `var`.method ``（`*…*` 段内接收者裸名）。详见 [module-namespace.md](module-namespace.md)。
+文件头 `---` 对为 **Artifact Metadata**。其中 `import bind:path.mq.md` / `导入` 为**文件导入**；`import bind:lib.member` 为**短名**（废除独立 `use` 与 frontmatter `>` 导入）。其它 `key: value` 可为字面量或 **Binding**（`${env.NAME}` 等，加载期解析）；见 [binding.md](binding.md)。调用经裸点号路径（`time.parse`、`agent.agent`）；实例方法在独立 `>` 调用须 `` > `var`.method ``（`*…*` 段内接收者裸名）。详见 [module-namespace.md](module-namespace.md)。
 
 **函数体内的** `---` / `***` 不解释为 frontmatter（见 §11）。
 

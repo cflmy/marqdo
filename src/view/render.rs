@@ -415,6 +415,7 @@ fn value_kind_label(v: &crate::value::Value) -> String {
         Value::Int(_) => "int".into(),
         Value::Num(_) => "num".into(),
         Value::Text(_) => "text".into(),
+        Value::Secret(_) => "secret".into(),
         Value::Formula(crate::formula::Expr::Matrix { rows, .. }) => {
             format!("formula · {}×{}", rows.len(), rows.first().map(|r| r.len()).unwrap_or(0))
         }

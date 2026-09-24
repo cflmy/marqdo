@@ -98,6 +98,7 @@ pub fn api_debug_start(root: &Path, body: &str) -> serde_json::Value {
         };
         let mut host = HostContext::for_capture(Some(&path_for_thread), opts.host_caps());
         host.fs_root = Some(root_for_thread);
+        host.entry_metadata = module.metadata.clone();
         if let Some(lim) = opts.sleep_limit_ms {
             host.sleep_limit_ms = Some(lim);
         }

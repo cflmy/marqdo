@@ -31,6 +31,19 @@ fn run_with_stdin(args: &[&str], stdin: &str) -> (i32, String, String) {
     (code, stdout, stderr)
 }
 
+fn run_with_env(args: &[&str], env: &[(&str, &str)]) -> (i32, String, String) {
+    let mut cmd = Command::new(env!("CARGO_BIN_EXE_marqdo"));
+    cmd.args(args);
+    for (k, v) in env {
+        cmd.env(k, v);
+    }
+    let output = cmd.output().expect("failed to run marqdo");
+    let code = output.status.code().unwrap_or(1);
+    let stdout = String::from_utf8_lossy(&output.stdout).into_owned();
+    let stderr = String::from_utf8_lossy(&output.stderr).into_owned();
+    (code, stdout, stderr)
+}
+
 fn assert_out(path: &str, expect: &str) {
     let (code, stdout, stderr) = run(&["run", path]);
     assert_eq!(code, 0, "{path} stderr={stderr}");
@@ -505,6 +518,45 @@ fn structure_optional_param() {
     assert_out(
         "tests/structure/optional-param.mq.md",
         "Hi, Ada!\nHello, Bob!",
+    );
+}
+
+#[test]
+fn structure_meta_binding() {
+    let (code, stdout, stderr) = run(&[
+        "run",
+        "tests/structure/meta-binding.mq.md",
+        "--bind",
+        "extra=from-cli",
+    ]);
+    assert_eq!(code, 0, "meta-binding stderr={stderr}");
+    assert_eq!(
+        stdout.trim_end(),
+        "default-model\nHello World\n16\nsk-test\nfrom-cli"
+    );
+}
+
+#[test]
+fn structure_meta_binding_env_and_secret() {
+    let (code, stdout, stderr) = run_with_env(
+        &[
+            "run",
+            "tests/structure/meta-binding.mq.md",
+            "--bind",
+            "model=from-bind",
+        ],
+        &[
+            ("MARQDO_META_MODEL", "from-env"),
+            ("MARQDO_META_USER", "Ada"),
+            ("MARQDO_META_TOKENS", "32"),
+            ("MARQDO_META_SECRET", "s3cr3t"),
+        ],
+    );
+    assert_eq!(code, 0, "meta-binding-env stderr={stderr}");
+    // --bind overlays model; secret displays as <secret>
+    assert_eq!(
+        stdout.trim_end(),
+        "from-bind\nHello Ada\n32\n<secret>\nno-extra"
     );
 }
 

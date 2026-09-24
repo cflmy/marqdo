@@ -93,6 +93,22 @@ pub fn cwd(ctx: &HostContext) -> Result<Value, String> {
     Ok(Value::Text(ctx.cwd.display().to_string()))
 }
 
+/// Bound entry Artifact Metadata (map).
+pub fn meta(ctx: &HostContext) -> Result<Value, String> {
+    Ok(Value::Map(ctx.entry_metadata.clone()))
+}
+
+/// Lookup one metadata key; missing → None.
+pub fn meta_get(ctx: &HostContext, key: &Value) -> Result<Value, String> {
+    let k = as_text(key, "key")?;
+    Ok(ctx
+        .entry_metadata
+        .iter()
+        .find(|(name, _)| name == k)
+        .map(|(_, v)| v.clone())
+        .unwrap_or(Value::None))
+}
+
 pub fn exit(ctx: &HostContext, code: &Value) -> Result<Value, String> {
     let c = as_i64(code, "code")?;
     if ctx.soft_side_effects {

@@ -7,17 +7,27 @@ use std::path::{Path, PathBuf};
 use anyhow::{bail, Context, Result};
 
 use crate::ast::Module;
-use crate::diagnostics::Diagnostic;
+use crate::binding::{cwd_for_path, resolve_metadata, BindingContext};
+use crate::diagnostics::{Diagnostic, Span};
 use crate::embedded_lib;
 use crate::parse::parse_source;
 
 /// Load `path` and recursively bind imported modules (no flat merge).
 pub fn load_module(path: &Path) -> Result<Module> {
-    let mut visited = HashSet::new();
-    load_module_inner(path, &mut visited)
+    load_module_with_ctx(path, &BindingContext::from_binds(&[], cwd_for_path(Some(path))))
 }
 
-fn load_module_inner(path: &Path, visited: &mut HashSet<PathBuf>) -> Result<Module> {
+/// Load with BindingContext (CLI `--bind`, cwd for `sys.cwd`).
+pub fn load_module_with_ctx(path: &Path, ctx: &BindingContext) -> Result<Module> {
+    let mut visited = HashSet::new();
+    load_module_inner(path, &mut visited, ctx)
+}
+
+fn load_module_inner(
+    path: &Path,
+    visited: &mut HashSet<PathBuf>,
+    ctx: &BindingContext,
+) -> Result<Module> {
     let canon = path
         .canonicalize()
         .unwrap_or_else(|_| path.to_path_buf());
@@ -30,12 +40,20 @@ fn load_module_inner(path: &Path, visited: &mut HashSet<PathBuf>) -> Result<Modu
             .with_context(|| format!("failed to read {}", path.display()))?;
         let mut module = parse_source(&source).map_err(|e| attach_path(path, e))?;
 
+        // Resolve Artifact Metadata bindings (entry and imports share the same ctx).
+        let file_ctx = BindingContext {
+            args: ctx.args.clone(),
+            cwd: cwd_for_path(Some(path)),
+        };
+        module.metadata = resolve_metadata(&module.metadata_raw, &file_ctx, Span::new(1, 1))
+            .map_err(|e| attach_path(path, e))?;
+
         let base = path.parent().unwrap_or_else(|| Path::new("."));
         let imports = module.imports.clone();
         let mut import_modules = HashMap::new();
         for imp in imports {
             let dep_path = resolve_import(base, &imp.path)?;
-            let dep = load_module_inner(&dep_path, visited)?;
+            let dep = load_module_inner(&dep_path, visited, ctx)?;
             if import_modules.contains_key(&imp.bind) {
                 bail!(
                     "duplicate import bind `{}` while loading {}",
@@ -249,7 +267,8 @@ fn attach_path(path: &Path, err: anyhow::Error) -> anyhow::Error {
 /// `lib/…` stdlib (no filesystem / `ext/` for this MVP path).
 pub fn load_module_from_source(source: &str) -> Result<Module> {
     let mut visited = HashSet::new();
-    load_module_from_source_inner(source, "<memory>", &mut visited)
+    let ctx = BindingContext::default();
+    load_module_from_source_inner(source, "<memory>", &mut visited, &ctx)
 }
 
 /// 给错误打上文件标签，**保留**结构化诊断（错误出口唯一；AI/MLSP 面不许拍平成字符串）。
@@ -270,6 +289,7 @@ fn load_module_from_source_inner(
     source: &str,
     label: &str,
     visited: &mut HashSet<PathBuf>,
+    ctx: &BindingContext,
 ) -> Result<Module> {
     let key = PathBuf::from(label);
     if !visited.insert(key.clone()) {
@@ -278,10 +298,12 @@ fn load_module_from_source_inner(
 
     let result = (|| {
         let mut module = parse_source(source).map_err(|e| label_error(label, e))?;
+        module.metadata = resolve_metadata(&module.metadata_raw, ctx, Span::new(1, 1))
+            .map_err(|e| label_error(label, e))?;
         let imports = module.imports.clone();
         let mut import_modules = HashMap::new();
         for imp in imports {
-            let dep = load_embedded_import(&imp.path, visited)?;
+            let dep = load_embedded_import(&imp.path, visited, ctx)?;
             if import_modules.contains_key(&imp.bind) {
                 bail!("duplicate import bind `{}` while loading {label}", imp.bind);
             }
@@ -296,7 +318,11 @@ fn load_module_from_source_inner(
     result
 }
 
-fn load_embedded_import(rel: &str, visited: &mut HashSet<PathBuf>) -> Result<Module> {
+fn load_embedded_import(
+    rel: &str,
+    visited: &mut HashSet<PathBuf>,
+    ctx: &BindingContext,
+) -> Result<Module> {
     let rel = rel.replace('\\', "/");
     let rest = if let Some(r) = rel.strip_prefix("lib/") {
         r.to_string()
@@ -314,7 +340,7 @@ fn load_embedded_import(rel: &str, visited: &mut HashSet<PathBuf>) -> Result<Mod
         bail!("embedded lib not found: lib/{rest}");
     };
     let label = format!("lib/{rest}");
-    load_module_from_source_inner(&dep_source, &label, visited)
+    load_module_from_source_inner(&dep_source, &label, visited, ctx)
 }
 
 #[cfg(test)]

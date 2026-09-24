@@ -66,6 +66,10 @@ enum Commands {
         #[arg(long, value_name = "FILE")]
         emit_result: Option<PathBuf>,
 
+        /// Artifact Metadata Binding: `KEY=VALUE` (repeatable). Feeds `arg.KEY` and overlays metadata.
+        #[arg(long = "bind", value_name = "KEY=VALUE")]
+        binds: Vec<String>,
+
         /// Emit diagnostics as JSON on stderr (machine-readable; AI/MLSP 面).
         #[arg(long)]
         json: bool,
@@ -228,6 +232,7 @@ fn try_main(cli: Cli) -> Result<i32> {
             dump_all,
             stdin_file,
             emit_result,
+            binds,
             json: _,
         } => {
             let path = file.unwrap_or_else(|| PathBuf::from("index.mq.md"));
@@ -235,10 +240,15 @@ fn try_main(cli: Cli) -> Result<i32> {
                 Some(p) => load_stdin_file(&p)?,
                 None => Vec::new(),
             };
+            let mut bind_pairs = Vec::new();
+            for b in &binds {
+                bind_pairs.push(marqdo::binding::parse_bind_kv(b)?);
+            }
             let mut opts = if dump_all {
                 RunOptions {
                     stdin_lines: stdin_lines.clone(),
                     emit_result: emit_result.clone(),
+                    binds: bind_pairs.clone(),
                     ..RunOptions::dump_all()
                 }
             } else {
@@ -252,6 +262,7 @@ fn try_main(cli: Cli) -> Result<i32> {
                     backend: backend.into(),
                     stdin_lines,
                     emit_result,
+                    binds: bind_pairs,
                     ..RunOptions::default()
                 }
             };

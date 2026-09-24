@@ -408,6 +408,7 @@ fn spawn_fn(
             host.argv = argv;
             host.foreign_cmds = foreign_cmds;
             host.set_entry_source(Some(&module_path), &source);
+            host.entry_metadata = module.metadata.clone();
             let mut interp = Interpreter::with_capture(Some(&module_path), false).with_host(host);
             interp
                 .invoke_function(&module, &name, &call_args)

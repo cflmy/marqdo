@@ -28,7 +28,7 @@ pub fn parse_source(source: &str) -> Result<Module> {
 
 pub fn parse_classified(lines: &[ClassifiedLine]) -> Result<Module> {
     let mut cur = Cursor::new(lines);
-    let (imports, uses) = cur.parse_frontmatter()?;
+    let (imports, uses, metadata_raw) = cur.parse_frontmatter()?;
     let mut functions = Vec::new();
     while cur.skip_noise() {
         let Some(line) = cur.peek() else { break };
@@ -65,6 +65,8 @@ pub fn parse_classified(lines: &[ClassifiedLine]) -> Result<Module> {
         uses,
         functions,
         import_modules: std::collections::HashMap::new(),
+        metadata_raw,
+        metadata: Vec::new(),
     })
 }
 
@@ -134,17 +136,24 @@ impl<'a> Cursor<'a> {
         })
     }
 
-    fn parse_frontmatter(&mut self) -> Result<(Vec<Import>, Vec<Use>)> {
+    fn parse_frontmatter(
+        &mut self,
+    ) -> Result<(
+        Vec<Import>,
+        Vec<Use>,
+        Vec<(String, crate::binding::MetaValue)>,
+    )> {
         let mut imports = Vec::new();
         let mut uses = Vec::new();
+        let mut metadata_raw = Vec::new();
         if !self.skip_noise() {
-            return Ok((imports, uses));
+            return Ok((imports, uses, metadata_raw));
         }
         let Some(first) = self.peek() else {
-            return Ok((imports, uses));
+            return Ok((imports, uses, metadata_raw));
         };
         if first.text.trim() != "---" {
-            return Ok((imports, uses));
+            return Ok((imports, uses, metadata_raw));
         }
         self.bump();
         while let Some(line) = self.peek() {
@@ -169,6 +178,8 @@ impl<'a> Cursor<'a> {
                         ));
                     }
                     imports.push(imp);
+                    self.bump();
+                    continue;
                 }
                 Ok(Some(ImportLine::Member(u))) => {
                     if imports.iter().any(|i| i.bind == u.bind)
@@ -181,13 +192,43 @@ impl<'a> Cursor<'a> {
                         ));
                     }
                     uses.push(u);
+                    self.bump();
+                    continue;
                 }
                 Ok(None) => {}
                 Err(e) => return Err(bail_at(None, span, e.to_string())),
             }
+            // Artifact metadata key: value (flat Phase 1)
+            if let Some((key, rest)) = split_frontmatter_key(t) {
+                self.bump();
+                let value_raw = if rest.is_empty()
+                    || rest == "|"
+                    || rest == "|-"
+                    || rest == "|+"
+                    || rest == ">"
+                    || rest == ">-"
+                    || rest == ">+"
+                {
+                    collect_block_scalar(self, rest)?
+                } else {
+                    rest.to_string()
+                };
+                let mv = crate::binding::parse_meta_value(&value_raw)
+                    .map_err(|e| bail_at(None, span, e.to_string()))?;
+                if metadata_raw.iter().any(|(k, _)| k == key) {
+                    return Err(bail_at(
+                        None,
+                        span,
+                        format!("duplicate metadata key `{key}`"),
+                    ));
+                }
+                metadata_raw.push((key.to_string(), mv));
+                continue;
+            }
+            // Unknown / non-key line: skip (compat with freeform frontmatter notes)
             self.bump();
         }
-        Ok((imports, uses))
+        Ok((imports, uses, metadata_raw))
     }
 
     fn parse_function(&mut self, min_level: u8) -> Result<Function> {
@@ -1167,6 +1208,80 @@ fn is_simple_type_name(s: &str) -> bool {
 pub enum ImportLine {
     File(Import),
     Member(Use),
+}
+
+fn split_frontmatter_key(trimmed: &str) -> Option<(&str, &str)> {
+    let t = trimmed.trim();
+    if t.is_empty() || t.starts_with('#') {
+        return None;
+    }
+    // import lines are handled earlier
+    let Some((key, rest)) = t.split_once(':') else {
+        return None;
+    };
+    let key = key.trim();
+    if key.is_empty() || key.contains(' ') {
+        return None;
+    }
+    // Avoid treating `http://…` style as key (no spaces in key already; also reject if key has `/`)
+    if key.contains('/') {
+        return None;
+    }
+    Some((key, rest.trim()))
+}
+
+fn collect_block_scalar(cur: &mut Cursor<'_>, indicator: &str) -> Result<String> {
+    let mut lines = Vec::new();
+    while let Some(line) = cur.peek() {
+        let raw = line.text.trim_end_matches(['\r', '\n']);
+        let bt = raw.trim();
+        if bt == "---" {
+            break;
+        }
+        // Next top-level key or import ends the block
+        if !raw.starts_with(' ') && !raw.starts_with('\t') && !bt.is_empty() {
+            if split_frontmatter_key(bt).is_some() || parse_import_line(bt).ok().flatten().is_some()
+            {
+                break;
+            }
+            if indicator.is_empty() {
+                // empty rest on key line without block indicator: no body
+                break;
+            }
+        }
+        if indicator.is_empty() {
+            break;
+        }
+        cur.bump();
+        if raw.starts_with(' ') || raw.starts_with('\t') {
+            lines.push(strip_yaml_indent(raw));
+        } else if bt.is_empty() {
+            lines.push(String::new());
+        } else {
+            // folded content without indent — take as-is once
+            lines.push(bt.to_string());
+            break;
+        }
+    }
+    if indicator.starts_with('>') {
+        Ok(lines
+            .into_iter()
+            .filter(|l| !l.is_empty())
+            .collect::<Vec<_>>()
+            .join(" "))
+    } else {
+        Ok(lines.join("\n"))
+    }
+}
+
+fn strip_yaml_indent(line: &str) -> String {
+    if line.starts_with("  ") {
+        line[2..].to_string()
+    } else if line.starts_with('\t') {
+        line[1..].to_string()
+    } else {
+        line.trim_start_matches([' ', '\t']).to_string()
+    }
 }
 
 fn legacy_frontmatter_import_hint(trimmed: &str) -> Option<String> {

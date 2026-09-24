@@ -5,6 +5,7 @@
 
 pub mod aliases;
 pub mod ast;
+pub mod binding;
 pub mod browser_session;
 pub mod builtin;
 pub mod bytecode;
@@ -51,7 +52,8 @@ use crate::bytecode::{compile_module, Vm};
 use crate::capture::RunCapture;
 use crate::interp::Interpreter;
 use crate::lex::classify_source;
-use crate::load::{load_module, load_module_from_source};
+use crate::load::{load_module_from_source, load_module_with_ctx};
+use crate::binding::{cwd_for_path, BindingContext};
 
 pub use browser_session::{value_as_json, BrowserSession};
 
@@ -95,6 +97,8 @@ pub struct RunOptions {
     pub sleep_limit_ms: Option<u64>,
     /// When set, write `# main` return value as JSON to this path (file subtasks).
     pub emit_result: Option<std::path::PathBuf>,
+    /// CLI `--bind KEY=VALUE` pairs for Artifact Metadata Binding (`arg` + overlay).
+    pub binds: Vec<(String, String)>,
 }
 
 impl Default for RunOptions {
@@ -115,6 +119,7 @@ impl Default for RunOptions {
             fs_root: None,
             sleep_limit_ms: None,
             emit_result: None,
+            binds: Vec::new(),
         }
     }
 }
@@ -173,7 +178,8 @@ pub fn run_file(path: &Path, opts: &RunOptions) -> Result<i32> {
         println!("=== marqdo: end tokens ===");
     }
 
-    let module = load_module(path)?;
+    let bind_ctx = BindingContext::from_binds(&opts.binds, cwd_for_path(Some(path)));
+    let module = load_module_with_ctx(path, &bind_ctx)?;
 
     if opts.dump_ast {
         print!("{}", format_ast_dump(&path_label, &module));
@@ -189,6 +195,7 @@ pub fn run_file(path: &Path, opts: &RunOptions) -> Result<i32> {
                 .collect::<Vec<_>>()
         );
         println!("imports: {:?}", module.imports);
+        println!("metadata: {:?}", module.metadata.iter().map(|(k, v)| (k, v.as_display())).collect::<Vec<_>>());
         println!("=== marqdo: end sema ===");
     }
 
@@ -196,6 +203,7 @@ pub fn run_file(path: &Path, opts: &RunOptions) -> Result<i32> {
         Backend::Tree => {
             let mut host = HostContext::for_run(Some(path), opts.host_caps(), opts.argv.clone());
             host.set_entry_source(Some(path), &source);
+            host.entry_metadata = module.metadata.clone();
             let mut interp = Interpreter::new(Some(path), opts.trace_eval)
                 .with_stdin(stdin_lines.clone())
                 .with_host(host);
@@ -217,6 +225,7 @@ pub fn run_file(path: &Path, opts: &RunOptions) -> Result<i32> {
             }
             let mut host = HostContext::for_run(Some(path), opts.host_caps(), opts.argv.clone());
             host.set_entry_source(Some(path), &source);
+            host.entry_metadata = module.metadata.clone();
             let mut vm = Vm::new(Some(path))
                 .with_stdin(stdin_lines)
                 .with_trace(opts.trace_eval)
@@ -261,12 +270,14 @@ pub fn run_file_capture(path: &Path, opts: &RunOptions) -> Result<RunCapture> {
     let source = std::fs::read_to_string(path)
         .map_err(|e| anyhow::anyhow!("failed to read {}: {e}", path.display()))?;
     let stdin_lines = crate::input_feed::effective_stdin(&source, &opts.stdin_lines);
-    let module = load_module(path)?;
+    let bind_ctx = BindingContext::from_binds(&opts.binds, cwd_for_path(Some(path)));
+    let module = load_module_with_ctx(path, &bind_ctx)?;
     match opts.backend {
         Backend::Tree => {
             let mut host = HostContext::for_capture(Some(path), opts.host_caps());
             host.set_entry_source(Some(path), &source);
             host.argv = opts.argv.clone();
+            host.entry_metadata = module.metadata.clone();
             if let Some(root) = &opts.fs_root {
                 host.fs_root = Some(root.clone());
             }
@@ -290,6 +301,7 @@ pub fn run_file_capture(path: &Path, opts: &RunOptions) -> Result<RunCapture> {
             let mut host = HostContext::for_capture(Some(path), opts.host_caps());
             host.set_entry_source(Some(path), &source);
             host.argv = opts.argv.clone();
+            host.entry_metadata = module.metadata.clone();
             if let Some(root) = &opts.fs_root {
                 host.fs_root = Some(root.clone());
             }
@@ -323,6 +335,7 @@ pub fn run_source(source: &str, opts: &RunOptions) -> Result<RunCapture> {
             let mut host = HostContext::for_capture(None, opts.host_caps());
             host.set_entry_source(None, source);
             host.argv = opts.argv.clone();
+            host.entry_metadata = module.metadata.clone();
             if let Some(root) = &opts.fs_root {
                 host.fs_root = Some(root.clone());
             }
@@ -346,6 +359,7 @@ pub fn run_source(source: &str, opts: &RunOptions) -> Result<RunCapture> {
             let mut host = HostContext::for_capture(None, opts.host_caps());
             host.set_entry_source(None, source);
             host.argv = opts.argv.clone();
+            host.entry_metadata = module.metadata.clone();
             if let Some(root) = &opts.fs_root {
                 host.fs_root = Some(root.clone());
             }

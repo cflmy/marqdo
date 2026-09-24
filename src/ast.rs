@@ -27,6 +27,10 @@ pub struct Module {
     pub functions: Vec<Function>,
     /// Populated by the loader: bind name → imported module (not flattened).
     pub import_modules: HashMap<String, Module>,
+    /// Unresolved Artifact Metadata (from frontmatter); filled by parse.
+    pub metadata_raw: Vec<(String, crate::binding::MetaValue)>,
+    /// Bound metadata after load-time Binding resolve (insertion order).
+    pub metadata: Vec<(String, crate::value::Value)>,
 }
 
 impl Default for Module {
@@ -36,6 +40,8 @@ impl Default for Module {
             uses: Vec::new(),
             functions: Vec::new(),
             import_modules: HashMap::new(),
+            metadata_raw: Vec::new(),
+            metadata: Vec::new(),
         }
     }
 }

@@ -146,6 +146,7 @@ pub(crate) fn value_to_json(v: &Value) -> Result<serde_json::Value, String> {
             }
         },
         Value::Code(c) => serde_json::Value::String(c.source.clone()),
+        Value::Secret(_) => serde_json::Value::String("<secret>".into()),
     })
 }
 

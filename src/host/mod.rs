@@ -103,6 +103,8 @@ pub struct HostContext {
     pub current_line: u32,
     /// Entry-file line of each active user call (for writeback anchoring).
     pub call_site_lines: Vec<u32>,
+    /// Bound Artifact Metadata from the entry `.mq.md` (Phase 1 Binding).
+    pub entry_metadata: Vec<(String, crate::value::Value)>,
     /// Concurrent subtasks (`lib/subtask`): file / function / foreign.
     #[cfg_attr(not(feature = "exec-host"), allow(dead_code))]
     pub(crate) subtasks: HashMap<u64, subtask::Handle>,
@@ -129,6 +131,7 @@ impl Default for HostContext {
             call_stack: Vec::new(),
             current_line: 1,
             call_site_lines: Vec::new(),
+            entry_metadata: Vec::new(),
             subtasks: HashMap::new(),
             subtask_seq: 0,
             log_min_level: 20, // Info

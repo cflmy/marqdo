@@ -27,6 +27,8 @@ pub enum Value {
     Formula(FormulaExpr),
     /// External language source from ```lang fence (`type` → `code`).
     Code(CodeBlock),
+    /// Sensitive text from `${secret.*}` — Display shows `<secret>`; reveal on Text concat.
+    Secret(String),
 }
 
 impl Value {
@@ -37,10 +39,19 @@ impl Value {
             Value::Int(n) => *n != 0,
             Value::Num(n) => *n != 0.0 && !n.is_nan(),
             Value::Text(s) => !s.is_empty(),
+            Value::Secret(s) => !s.is_empty(),
             Value::List(xs) => !xs.is_empty(),
             Value::Map(xs) => !xs.is_empty(),
             Value::Formula(_) => true,
             Value::Code(c) => !c.source.is_empty(),
+        }
+    }
+
+    /// Plaintext for Text / Secret (Authorization etc.). Prefer [`as_display`] for logs.
+    pub fn reveal_text(&self) -> Option<&str> {
+        match self {
+            Value::Text(s) | Value::Secret(s) => Some(s.as_str()),
+            _ => None,
         }
     }
 
@@ -52,6 +63,7 @@ impl Value {
             Value::Int(n) => n.to_string(),
             Value::Num(n) => crate::formula::format_num(*n),
             Value::Text(s) => s.clone(),
+            Value::Secret(_) => "<secret>".into(),
             Value::List(xs) => {
                 let parts: Vec<String> = xs.iter().map(|v| v.as_display()).collect();
                 format!("[{}]", parts.join(", "))

@@ -174,12 +174,18 @@ Module convenience: create a default handle and return **answer text**. Pass `pa
 
 LLM handle — intelligence primitive, not an HTTP client.
 
+Resolution: explicit args → entry Artifact Metadata (`sys.meta_get`) → `sys.env_get` → defaults.
+
 1. `api_key`
   **key = api_key**
 2. *
-  **key = > sys.env_get name="OPENAI_API_KEY"**
+  **key = > sys.meta_get key="api_key"**
   1. not `key`
-    **key = > sys.env_get name="MARQDO_LLM_API_KEY"**
+    **key = > sys.env_get name="OPENAI_API_KEY"**
+    1. not `key`
+      **key = > sys.env_get name="MARQDO_LLM_API_KEY"**
+    2. *
+      **_ = 1**
   2. *
     **_ = 1**
 
@@ -189,45 +195,53 @@ LLM handle — intelligence primitive, not an HTTP client.
   2. *
     **_ = 1**
 2. not `key`
-  > print text=ext/ai/llm: set OPENAI_API_KEY or MARQDO_LLM_API_KEY (or pass api_key=)
+  > print text=ext/ai/llm: set OPENAI_API_KEY or MARQDO_LLM_API_KEY (or pass api_key= / metadata api_key)
   > sys.exit code=1
 3. *
   **_ = 1**
 
 1. `base_url`
   **url = base_url**
-2. `backend` == ollama
-  **url = > sys.env_get name="OLLAMA_HOST"**
-  1. not `url`
-    **url = "http://127.0.0.1:11434/v1"**
-  2. *
+2. *
+  **url = > sys.meta_get key="base_url"**
+  1. `url`
     **_ = 1**
-3. *
-  **url = > sys.env_get name="OPENAI_BASE_URL"**
-  1. not `url`
-    **url = > sys.env_get name="MARQDO_LLM_BASE_URL"**
-  2. *
-    **_ = 1**
-  1. not `url`
-    **url = "https://api.openai.com/v1"**
-  2. *
-    **_ = 1**
+  2. `backend` == ollama
+    **url = > sys.env_get name="OLLAMA_HOST"**
+    1. not `url`
+      **url = "http://127.0.0.1:11434/v1"**
+    2. *
+      **_ = 1**
+  3. *
+    **url = > sys.env_get name="OPENAI_BASE_URL"**
+    1. not `url`
+      **url = > sys.env_get name="MARQDO_LLM_BASE_URL"**
+    2. *
+      **_ = 1**
+    1. not `url`
+      **url = "https://api.openai.com/v1"**
+    2. *
+      **_ = 1**
 
 1. `model`
   **mdl = model**
 2. *
-  **mdl = > sys.env_get name="OPENAI_MODEL"**
-  1. not `mdl`
-    **mdl = > sys.env_get name="MARQDO_LLM_MODEL"**
-  2. *
+  **mdl = > sys.meta_get key="model"**
+  1. `mdl`
     **_ = 1**
-  1. not `mdl`
-    1. `backend` == ollama
-      **mdl = "llama3.2"**
+  2. *
+    **mdl = > sys.env_get name="OPENAI_MODEL"**
+    1. not `mdl`
+      **mdl = > sys.env_get name="MARQDO_LLM_MODEL"**
     2. *
-      **mdl = "gpt-4o-mini"**
-  2. *
-    **_ = 1**
+      **_ = 1**
+    1. not `mdl`
+      1. `backend` == ollama
+        **mdl = "llama3.2"**
+      2. *
+        **mdl = "gpt-4o-mini"**
+    2. *
+      **_ = 1**
 
 1. `name`
   **nm = name**

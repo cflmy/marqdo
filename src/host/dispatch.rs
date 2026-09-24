@@ -198,6 +198,8 @@ pub enum HostFn {
     StatsMean = 189,
     StatsMedian = 190,
     StatsStdev = 191,
+    Meta = 192,
+    MetaGet = 193,
 }
 
 
@@ -386,6 +388,8 @@ impl HostFn {
             189 => Self::StatsMean,
             190 => Self::StatsMedian,
             191 => Self::StatsStdev,
+            192 => Self::Meta,
+            193 => Self::MetaGet,
             _ => return None,
         })
     }
@@ -577,6 +581,8 @@ impl HostFn {
             "host_stats_mean" | "stats_mean" => Self::StatsMean,
             "host_stats_median" | "stats_median" => Self::StatsMedian,
             "host_stats_stdev" | "stats_stdev" => Self::StatsStdev,
+            "host_meta" | "meta" => Self::Meta,
+            "host_meta_get" | "meta_get" => Self::MetaGet,
             _ => return None,
         })
     }
@@ -755,6 +761,8 @@ impl HostFn {
             Self::StatsMean => "host_stats_mean",
             Self::StatsMedian => "host_stats_median",
             Self::StatsStdev => "host_stats_stdev",
+            Self::Meta => "host_meta",
+            Self::MetaGet => "host_meta_get",
             Self::WritebackRecord => "host_writeback_record",
             Self::WritebackGet => "host_writeback_get",
             Self::WritebackClear => "host_writeback_clear",
@@ -778,11 +786,12 @@ impl HostFn {
                 &["path"]
             }
             Self::WriteText | Self::AppendText => &["path", "text"],
-            Self::NowUnix | Self::NowMs | Self::Args | Self::Cwd => &[],
+            Self::NowUnix | Self::NowMs | Self::Args | Self::Cwd | Self::Meta => &[],
             Self::FormatTime => &["unix", "pattern"],
             Self::ParseTime => &["text", "pattern"],
             Self::SleepMs => &["ms"],
             Self::EnvGet => &["name"],
+            Self::MetaGet => &["key"],
             Self::EnvSet => &["name", "value"],
             Self::Exit => &["code"],
             Self::Exec => &["cmd"],
@@ -980,6 +989,8 @@ pub fn call_host(
         HostFn::DotenvLoad => sys::dotenv_load(ctx, bound.get("path")),
         HostFn::Args => sys::args(ctx),
         HostFn::Cwd => sys::cwd(ctx),
+        HostFn::Meta => sys::meta(ctx),
+        HostFn::MetaGet => sys::meta_get(ctx, require(bound, "key")?),
         HostFn::Exit => sys::exit(ctx, require(bound, "code")?),
         HostFn::Exec => sys::exec(
             ctx,

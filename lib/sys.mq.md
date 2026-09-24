@@ -39,6 +39,19 @@ Current working directory.
 
 *> host_cwd*
 
+## meta
+
+Bound Artifact Metadata from the entry `.mq.md` (map). See `doc/design/binding.md`.
+
+*> host_meta*
+
+## meta_get
+    + `key`
+
+Lookup one metadata key; missing → None.
+
+*> host_meta_get key=`key`*
+
 ## exit
     + `code`
 
