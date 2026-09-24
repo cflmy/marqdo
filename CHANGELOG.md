@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- **`plugins/llm` Transport ABI** (`llm_chat_completions`): `ext/ai/llm/openai` prefers the native plugin when resolvable, else `lib/net` HTTP/SSE.
+- **Agent MCP stdio client** (`agent_mcp_client` / `mcp_connect` / `mcp_client_list` / `mcp_client_call`) plus offline golden against a Python mock server.
+- **Agent resume checkpoints** (`.marqdo/agent-resume/<id>.json` — save/load/clear/list; `run` can set `resume_id=`).
+
+### Changed
+- Adaptive Routing: `jev` is a **compat alias** of `small-llm` (no `MARQDO_JEV` first-class path). Decision surface is `router_model` (any llm handle).
+
 ## v1.1.0 — 2026-09-23
 
 ### Highlights

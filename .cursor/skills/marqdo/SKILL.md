@@ -218,7 +218,7 @@ Install: `marqdo ext add agent` (ZH: `智能体`). Native: `cargo build --releas
 2. **Call site is first-class** — `build_step_context` injects path/function/line so the model knows where it is in the program.
 3. **Document is the knowledge base (OKF)** — writeback → promote/solidify → reuse / `llm_free`; MCP/corpus are evidence only.
 4. **Skill Compilation (v2)** — successful runs become `.mq.md` episodes; after enough evidence, `maybe_learn` compiles an executable skill (`llm_free`). Prefer `## run` over bare `## plan` when you want learning.
-5. **Adaptive Routing (P4)** — router is abstract (`marqdo` / `small-llm` / optional `jev` / `llm` / `auto`); Jev is never required. Policy Compilation writes `policies/router.mq.md`.
+5. **Adaptive Routing (P4)** — router is abstract (`marqdo` / `small-llm` / `llm` / `auto`); `jev` is a compat alias of `small-llm`. Decision via `router_model` (any llm handle). Policy Compilation writes `policies/router.mq.md`.
 
 APIs: `# agent` / `# 智能体` → `## run` / `## route` / `## step` / `## plan` (+ `resolve` / `record_episode` / `maybe_learn` / `compile` / `compile_policy` / `metrics`). Context: standing + task + **call site** + tools + budgeted source/skill + act protocol (`CALL:` / `READ:`). Inspect without LLM: `dump_step_context`. Inside `writeback=` / `写回=` branches use `host_writeback_record` (param name shadows the writeback import).
 

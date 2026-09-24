@@ -455,6 +455,128 @@ Call a named tool from a MCP-shaped fixture (`results` / `calls` map). Optional 
 
 ---
 
+## mcp_connect
+    + `command`
+    + `args`=None
+    + `session`="default"
+    + `name`="mcp"
+
+Open a stdio MCP client session (spawn `command` + `args`, JSON-RPC initialize). Evidence only — workbook remains authority.
+
+**p = > plugin.native_path name="agent"**
+1. `p`
+  > plugin.load path=`p`
+2. *
+  > print text=ext/ai/agent: native agent plugin not found
+  > sys.exit code=1
+
+1. `args`
+  *> agent_mcp_client action="connect" command=`command` args=`args` session=`session` name=`name`*
+2. *
+  *> agent_mcp_client action="connect" command=`command` session=`session` name=`name`*
+
+## mcp_client_list
+    + `session`="default"
+    + `command`=None
+    + `args`=None
+
+List tools from an open MCP session, or one-shot when `command=` is set (no session retained).
+
+1. `command`
+  1. `args`
+    *> agent_mcp_client action="list" command=`command` args=`args`*
+  2. *
+    *> agent_mcp_client action="list" command=`command`*
+2. *
+  *> agent_mcp_client action="list" session=`session`*
+
+## mcp_client_call
+    + `name`=None
+    + `session`="default"
+    + `arguments`=None
+    + `command`=None
+    + `args`=None
+    + `tool`=None
+
+Call a tool on an open MCP session, or one-shot when `command=` is set. Prefer `tool=` for oneshot when `name` would collide with server name.
+
+1. `command`
+  1. `tool`
+    **tn = tool**
+  2. *
+    **tn = name**
+  1. `args`
+    *> agent_mcp_client action="call" command=`command` args=`args` tool=`tn` arguments=`arguments`*
+  2. *
+    *> agent_mcp_client action="call" command=`command` tool=`tn` arguments=`arguments`*
+2. *
+  *> agent_mcp_client action="call" session=`session` name=`name` arguments=`arguments`*
+
+## mcp_disconnect
+    + `session`="default"
+
+Close a stdio MCP client session.
+
+*> agent_mcp_client action="close" session=`session`*
+
+---
+
+## resume_save
+    + `id`
+    + `goal`=None
+    + `task`=None
+    + `status`=running
+    + `round`=0
+    + `workbook`=None
+    + `events`=None
+    + `route`=None
+    + `result`=None
+    + `resume_dir`=.marqdo/agent-resume
+
+Persist a plan/run checkpoint as `.marqdo/agent-resume/<id>.json`.
+
+**p = > plugin.native_path name="agent"**
+1. `p`
+  > plugin.load path=`p`
+2. *
+  > print text=ext/ai/agent: native agent plugin not found
+  > sys.exit code=1
+
+*> agent_resume_save id=`id` goal=`goal` task=`task` status=`status` round=`round` workbook=`workbook` events=`events` route=`route` result=`result` resume_dir=`resume_dir`*
+
+## resume_load
+    + `id`
+    + `resume_dir`=.marqdo/agent-resume
+
+Load a resume checkpoint (or `{ok:false,found:false}`).
+
+*> agent_resume_load id=`id` resume_dir=`resume_dir`*
+
+## resume_clear
+    + `id`
+    + `resume_dir`=.marqdo/agent-resume
+
+Delete a resume checkpoint.
+
+*> agent_resume_clear id=`id` resume_dir=`resume_dir`*
+
+## resume_list
+    + `resume_dir`=.marqdo/agent-resume
+
+List checkpoint ids under `resume_dir`.
+
+*> agent_resume_list resume_dir=`resume_dir`*
+
+## resume
+    + `id`
+    + `resume_dir`=.marqdo/agent-resume
+
+Author entry: load checkpoint for continuation. Returns the checkpoint map (`found`/`round`/`workbook`/…). Callers continue with `plan`/`run` using saved fields; clear when done.
+
+*> resume_load id=`id` resume_dir=`resume_dir`*
+
+---
+
 ## extract_call_args
     + `reply`=None
 
@@ -1574,7 +1696,7 @@ Skill resolver (v2): exact → alias → canonical → near. Returns `mode` / `r
     + `memory_dir`=.marqdo/agent-memory
     + `threshold`=0.78
 
-Adaptive Routing (Phase 4): abstract router — `marqdo` | `small-llm` | `jev` | `llm` | `auto`. Jev is optional. `auto` cascades policy → kb → optional jev → small-llm request. May return `needs_llm=True` + `prompt` for the caller to complete with a small/large model, then `route_apply`.
+Adaptive Routing (Phase 4): abstract router — `marqdo` | `small-llm` | `llm` | `auto`. `jev` is accepted as a **compat alias** of `small-llm` (not a first-class backend). `auto` cascades policy → kb → small-llm request. May return `needs_llm=True` + `prompt` for the caller to complete with `router_model` (any llm handle), then `route_apply`.
 
 **tools = > json.get value=`self` key="tools"**
 *> agent_route task=`task` backend=`backend` kb_dir=`kb_dir` memory_dir=`memory_dir` threshold=`threshold` tools=`tools`*
@@ -1682,8 +1804,10 @@ Reasoning amortization stats over recorded episodes (`avg_llm_calls`, `compiled_
     + `force`=False
     + `router`=auto
     + `router_model`=None
+    + `resume_id`=None
+    + `resume_dir`=.marqdo/agent-resume
 
-Primary author entry (v2 + P4): Adaptive `route` → execute (policy/kb skill) or `plan` → record episode → maybe_learn (skill + policy). `router` = `auto`|`marqdo`|`small-llm`|`jev`|`llm`. Optional `router_model` (llm handle) answers `needs_llm` prompts — small models welcome; Jev is never required.
+Primary author entry (v2 + P4): Adaptive `route` → execute (policy/kb skill) or `plan` → record episode → maybe_learn (skill + policy). `router` = `auto`|`marqdo`|`small-llm`|`llm` (`jev`→`small-llm` alias). Optional `router_model` (llm handle) answers `needs_llm` prompts — small models welcome.
 
 **routed = > `self`.route task=`task` backend=`router` kb_dir=`kb_dir` memory_dir=`memory_dir` threshold=`near_threshold`**
 **route_matched = > json.get value=`routed` key="matched"**
@@ -1856,6 +1980,12 @@ Primary author entry (v2 + P4): Adaptive `route` → execute (policy/kb skill) o
 2. *
   **_ = 1**
 
+1. `resume_id`
+  **_ckpt = > resume_save id=`resume_id` goal=`task` task=`task` status=`st` round=1 workbook=`wb_path` result=`res` route=`routed` resume_dir=`resume_dir`**
+  **out = > json.set map=`out` key="resume" value=`_ckpt`**
+2. *
+  **_ = 1**
+
 *out*
 
 ## step
@@ -1995,6 +2125,8 @@ With `stream=True`, the model call uses SSE; `echo=True` prints delta text to st
     + `stream`=False
     + `echo`=False
     + `trace`=False
+    + `resume_id`=None
+    + `resume_dir`=.marqdo/agent-resume
 
 Multi-step with OKF agent-kb. Default workbook is `kb_dir/resources/<slug>.mq.md`. While task file count `< explore_n` and skill is not llm_free, force a new explore variant under `kb_dir/explore/<slug>/`. Code-first: llm_free hits skip parent LLM. File children return via `# main`; `plan` exposes that as `result`.
 

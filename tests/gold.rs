@@ -136,10 +136,21 @@ fn ensure_agent_plugin_built() {
         } else {
             root.join("target").join("release").join("libagent.so")
         };
-        let chosen = if release.is_file() {
-            release
+        // Prefer the debug artifact we just built; only fall back to release if
+        // debug is missing (or release is strictly newer — local release workflows).
+        let chosen = if lib.is_file() {
+            if release.is_file() {
+                let lib_m = std::fs::metadata(&lib).and_then(|m| m.modified()).ok();
+                let rel_m = std::fs::metadata(&release).and_then(|m| m.modified()).ok();
+                match (lib_m, rel_m) {
+                    (Some(l), Some(r)) if r > l => release,
+                    _ => lib,
+                }
+            } else {
+                lib
+            }
         } else {
-            lib
+            release
         };
         assert!(chosen.is_file(), "missing agent plugin at {}", chosen.display());
         // SAFETY: single-threaded Once; children inherit for the rest of the test process.
@@ -2499,6 +2510,39 @@ fn ext_agent_mcp_server_smoke() {
         "tests/ext/agent-mcp-server-smoke.mq.md",
         "mcp-tool-ok
 mcp-fn-ok",
+    );
+}
+
+#[test]
+fn ext_agent_mcp_client() {
+    ensure_agent_plugin_built();
+    assert_out(
+        "tests/ext/agent-mcp-client.mq.md",
+        "mcp-client-list-ok
+mcp-client-call-ok",
+    );
+}
+
+#[test]
+fn ext_agent_resume() {
+    ensure_agent_plugin_built();
+    assert_out(
+        "tests/ext/agent-resume.mq.md",
+        "resume-save-ok
+resume-load-ok
+resume-list-ok
+resume-clear-ok
+resume-gone-ok",
+    );
+}
+
+#[test]
+fn ext_agent_small_llm_route() {
+    ensure_agent_plugin_built();
+    assert_out(
+        "tests/ext/agent-small-llm-route.mq.md",
+        "small-llm-ok
+jev-alias-ok",
     );
 }
 

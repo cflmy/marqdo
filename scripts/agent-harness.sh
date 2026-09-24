@@ -32,6 +32,9 @@ run tests/ext/agent-context-budget-a3.mq.md
 run tests/ext/agent-workbook-patch-a0.mq.md
 run tests/ext/agent-v2-learn.mq.md
 run tests/ext/agent-p4-route.mq.md
+run tests/ext/agent-small-llm-route.mq.md
+run tests/ext/agent-mcp-client.mq.md
+run tests/ext/agent-resume.mq.md
 run tests/ext/agent-zero-llm.mq.md
 run tests/ext/agent-plan-preserve.mq.md
 run examples/agent-okf-flywheel/index.mq.md

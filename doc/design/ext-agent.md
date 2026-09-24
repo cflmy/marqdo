@@ -184,7 +184,7 @@ ext/
 | `## 单步` | `## step` | 原子执行；注入源码 + 位置；可选工具；返回结构化 map；**默认自动写回**（`写回=` / `writeback=` 可关） |
 | `## 多步` | `## plan` | 建/续工作簿 → subtask 跑文件 → 修订循环 → 汇总（见 [ext-agent-plan.md](ext-agent-plan.md)） |
 | `## 解析` | `## resolve` | 技能解析：exact → alias → canonical → near |
-| `## 路由` | `## route` | **P4 Adaptive Routing**：`marqdo` \| `small-llm` \| `jev` \| `llm` \| `auto`（Jev 可选，非必选） |
+| `## 路由` | `## route` | **P4 Adaptive Routing**：`marqdo` \| `small-llm` \| `llm` \| `auto`（`jev` 为 `small-llm` 兼容别名） |
 | `## 应用路由` | `## route_apply` | 将小模型/大模型路由回复（`SKILL:<slug>` / `EXPLORE`）落到 kb 技能 |
 | `## 编译策略` | `## compile_policy` | Policy Compilation → `policies/router.mq.md` |
 | `## 记录情景` | `## record_episode` | 每次执行沉淀为 `.mq.md` episode（`.marqdo/agent-memory/`） |
@@ -198,7 +198,7 @@ ext/
 
 **LLM 成本**：`model_turn` 走 `model.ask` / `stream`+`collect`，把 `LLMResult.tokens` 写入 episode / `execution`。
 
-**Adaptive Routing（P4，原「Jev Router」更名）**：Router 是抽象能力，backend = `marqdo`（已编译 `policies/router.mq.md`）/ `small-llm`（用户自备小参数模型）/ `jev`（可选）/ `llm` / `auto` 级联。**不依赖 Jev**。热路径在 **`plugins/agent`**（`route.rs`）；**禁止**向 `src/host/` 加领域原语。设计：[doc/next/003.md](../next/003.md) · [doc/next/004.md](../next/004.md)。
+**Adaptive Routing（P4）**：Router 是抽象能力，backend = `marqdo`（已编译 `policies/router.mq.md`）/ `small-llm`（`router_model` 任意 llm 句柄）/ `llm` / `auto` 级联。`jev` 仅为 `small-llm` 兼容别名，**不进入框架专属设计**。热路径在 **`plugins/agent`**（`route.rs`）；**禁止**向 `src/host/` 加领域原语。设计：[doc/next/003.md](../next/003.md) · [doc/next/004.md](../next/004.md)。
 
 构造参数（v1）：
 
