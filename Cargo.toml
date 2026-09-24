@@ -58,6 +58,7 @@ getrandom = { version = "=0.2.17", default-features = false, features = ["custom
 members = [
     "plugins/demo",
     "plugins/agent",
+    "plugins/llm",
     "plugins/quantum",
     "plugins/linalg",
     "crates/marqdo-wasm",

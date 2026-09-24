@@ -21,8 +21,13 @@ pub const CATALOG: &[ExtPackage] = &[
     ExtPackage {
         id: "llm",
         description: "OpenAI-compatible chat object (ext/ai/llm)",
-        mq_files: &["ai/llm.mq.md", "ai/大模型.mq.md"],
-        native_crate: None,
+        mq_files: &[
+            "ai/llm.mq.md",
+            "ai/大模型.mq.md",
+            "ai/llm/openai.mq.md",
+            "ai/llm/ollama.mq.md",
+        ],
+        native_crate: Some("marqdo_plugin_llm"),
     },
     ExtPackage {
         id: "agent",
@@ -98,6 +103,7 @@ pub fn native_short_name(crate_or_id: &str) -> &str {
     match crate_or_id {
         "marqdo_plugin_agent" | "agent" => "agent",
         "marqdo_plugin_web" | "web" => "web",
+        "marqdo_plugin_llm" | "llm" => "llm",
         "marqdo_plugin_quantum" | "quantum" => "quantum",
         "marqdo_plugin_linalg" | "linalg" => "linalg",
         other => other,
@@ -118,6 +124,7 @@ pub fn native_lib_filename(short: &str) -> String {
 pub fn native_env_var(short: &str) -> &'static str {
     match native_short_name(short) {
         "web" => "MARQDO_WEB_PLUGIN",
+        "llm" => "MARQDO_LLM_PLUGIN",
         "quantum" => "MARQDO_QUANTUM_PLUGIN",
         "linalg" => "MARQDO_LINALG_PLUGIN",
         _ => "MARQDO_AGENT_PLUGIN",
@@ -507,7 +514,7 @@ pub fn remove_ext(id: &str) -> Result<()> {
 /// point at a freshly built plugin path.
 pub fn installed_native_path(name: &str) -> Option<PathBuf> {
     let short = native_short_name(name);
-    if !matches!(short, "agent" | "web" | "quantum" | "linalg") {
+    if !matches!(short, "agent" | "web" | "llm" | "quantum" | "linalg") {
         return None;
     }
     let lib_name = native_lib_filename(short);
@@ -549,6 +556,7 @@ pub fn path_is_trusted_plugin(path: &Path) -> bool {
     for key in [
         "MARQDO_AGENT_PLUGIN",
         "MARQDO_WEB_PLUGIN",
+        "MARQDO_LLM_PLUGIN",
         "MARQDO_QUANTUM_PLUGIN",
         "MARQDO_LINALG_PLUGIN",
     ] {
@@ -560,7 +568,7 @@ pub fn path_is_trusted_plugin(path: &Path) -> bool {
             }
         }
     }
-    for short in ["agent", "web", "quantum", "linalg"] {
+    for short in ["agent", "web", "llm", "quantum", "linalg"] {
         if let Ok(found) = find_native_plugin(short) {
             let found = found.canonicalize().unwrap_or(found);
             if found == path {

@@ -633,6 +633,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "marqdo_plugin_llm"
+version = "0.1.0"
+dependencies = [
+ "idna_adapter",
+ "serde_json",
+ "ureq",
+ "zeroize",
+]
+
+[[package]]
 name = "marqdo_plugin_quantum"
 version = "0.1.0"
 dependencies = [
