@@ -180,10 +180,23 @@ ext/
 | 中文 | 英文 | 角色 |
 |------|------|------|
 | `# 智能体` | `# agent` | 构造：`大模型`/`model`，`工具`/`tools`，可选 `站立提示`/`standing` |
+| `## 运行` | `## run` | **v2 主入口**：Adaptive `route` → execute → record episode → maybe_learn（技能 + 策略） |
 | `## 单步` | `## step` | 原子执行；注入源码 + 位置；可选工具；返回结构化 map；**默认自动写回**（`写回=` / `writeback=` 可关） |
 | `## 多步` | `## plan` | 建/续工作簿 → subtask 跑文件 → 修订循环 → 汇总（见 [ext-agent-plan.md](ext-agent-plan.md)） |
+| `## 解析` | `## resolve` | 技能解析：exact → alias → canonical → near |
+| `## 路由` | `## route` | **P4 Adaptive Routing**：`marqdo` \| `small-llm` \| `jev` \| `llm` \| `auto`（Jev 可选，非必选） |
+| `## 应用路由` | `## route_apply` | 将小模型/大模型路由回复（`SKILL:<slug>` / `EXPLORE`）落到 kb 技能 |
+| `## 编译策略` | `## compile_policy` | Policy Compilation → `policies/router.mq.md` |
+| `## 记录情景` | `## record_episode` | 每次执行沉淀为 `.mq.md` episode（`.marqdo/agent-memory/`） |
+| `## 尝试学习` | `## maybe_learn` | 情景足够时归纳 → 合成 → 编译技能，并尝试编译策略 |
+| `## 编译` | `## compile` | 候选技能 → 版本化 `skills/<slug>/vN.mq.md` + 可选 OKF promote |
+| `## 指标` | `## metrics` | Reasoning amortization（`avg_llm_calls` / `compiled_runs`） |
 | `## 分解` | `## decompose` |（可公开或内部）目标 → 子任务表 |
 | `## 清空历史` | `## clear_history` | 若仍保留会话式辅助状态则清空；**不以隐藏 chat 袋为真相源**——真相在文档写回 |
+
+**Skill Compilation（v2）**：Agent 的记忆不是向量袋，而是可执行 `.mq.md`。路径：`episodes/` → `experiences/` → `candidates/` → `skills/vN.mq.md` → OKF `agent-kb`（`llm_free`）。
+
+**Adaptive Routing（P4，原「Jev Router」更名）**：Router 是抽象能力，backend = `marqdo`（已编译 `policies/router.mq.md`）/ `small-llm`（用户自备小参数模型）/ `jev`（可选）/ `llm` / `auto` 级联。**不依赖 Jev**。热路径在 **`plugins/agent`**（`route.rs`）；**禁止**向 `src/host/` 加领域原语。设计：[doc/next/003.md](../next/003.md) · [doc/next/004.md](../next/004.md)。
 
 构造参数（v1）：
 

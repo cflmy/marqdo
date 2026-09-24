@@ -1,8 +1,10 @@
-//! Agent plugin (C ABI v2): layout helpers + session bag + context via host_query + agent-kb.
+//! Agent plugin (C ABI v2): layout helpers + session bag + context via host_query + agent-kb + v2 memory + adaptive route.
 
 mod corpus;
 mod kb;
 mod mcp_server;
+mod memory;
+mod route;
 
 use std::collections::HashMap;
 use std::ffi::{CStr, CString};
@@ -902,6 +904,26 @@ kb_ffi!(
     "agent_workbook_solidify"
 );
 kb_ffi!(agent_kb_task_files, kb::kb_task_files, "agent_kb_task_files");
+kb_ffi!(agent_memory_ensure, memory::memory_ensure, "agent_memory_ensure");
+kb_ffi!(agent_record_episode, memory::record_episode, "agent_record_episode");
+kb_ffi!(agent_list_episodes, memory::list_episodes, "agent_list_episodes");
+kb_ffi!(agent_get_episode, memory::get_episode, "agent_get_episode");
+kb_ffi!(agent_cluster_episodes, memory::cluster_episodes, "agent_cluster_episodes");
+kb_ffi!(agent_extract_pattern, memory::extract_pattern, "agent_extract_pattern");
+kb_ffi!(agent_generalize, memory::generalize, "agent_generalize");
+kb_ffi!(agent_synthesize_skill, memory::synthesize_skill, "agent_synthesize_skill");
+kb_ffi!(agent_compile_skill, memory::compile_skill, "agent_compile_skill");
+kb_ffi!(agent_maybe_learn, memory::maybe_learn, "agent_maybe_learn");
+kb_ffi!(agent_metrics, memory::metrics, "agent_metrics");
+kb_ffi!(agent_resolve, memory::resolve_task, "agent_resolve");
+kb_ffi!(agent_route, route::route, "agent_route");
+kb_ffi!(agent_route_apply, route::route_apply, "agent_route_apply");
+kb_ffi!(agent_compile_policy, route::compile_policy, "agent_compile_policy");
+kb_ffi!(
+    agent_maybe_compile_policy,
+    route::maybe_compile_policy,
+    "agent_maybe_compile_policy"
+);
 
 #[no_mangle]
 pub unsafe extern "C" fn marqdo_plugin_abi_version() -> u32 {
@@ -1020,6 +1042,90 @@ pub unsafe extern "C" fn marqdo_plugin_init(host: *const MarqdoHostApi) -> c_int
         return 1;
     }
     if register(host, "agent_kb_task_files", "kb_dir,goal", agent_kb_task_files) != 0 {
+        return 1;
+    }
+    if register(host, "agent_memory_ensure", "memory_dir", agent_memory_ensure) != 0 {
+        return 1;
+    }
+    if register(
+        host,
+        "agent_record_episode",
+        "task,status,result,mode",
+        agent_record_episode,
+    ) != 0
+    {
+        return 1;
+    }
+    if register(host, "agent_list_episodes", "memory_dir,task", agent_list_episodes) != 0 {
+        return 1;
+    }
+    if register(host, "agent_get_episode", "id", agent_get_episode) != 0 {
+        return 1;
+    }
+    if register(
+        host,
+        "agent_cluster_episodes",
+        "memory_dir,task,threshold",
+        agent_cluster_episodes,
+    ) != 0
+    {
+        return 1;
+    }
+    if register(host, "agent_extract_pattern", "task", agent_extract_pattern) != 0 {
+        return 1;
+    }
+    if register(host, "agent_generalize", "task", agent_generalize) != 0 {
+        return 1;
+    }
+    if register(host, "agent_synthesize_skill", "task", agent_synthesize_skill) != 0 {
+        return 1;
+    }
+    if register(
+        host,
+        "agent_compile_skill",
+        "task,kb_dir,min_evidence",
+        agent_compile_skill,
+    ) != 0
+    {
+        return 1;
+    }
+    if register(
+        host,
+        "agent_maybe_learn",
+        "task,kb_dir,improve_every",
+        agent_maybe_learn,
+    ) != 0
+    {
+        return 1;
+    }
+    if register(host, "agent_metrics", "memory_dir", agent_metrics) != 0 {
+        return 1;
+    }
+    if register(host, "agent_resolve", "task,kb_dir", agent_resolve) != 0 {
+        return 1;
+    }
+    if register(host, "agent_route", "task,backend,kb_dir,memory_dir", agent_route) != 0 {
+        return 1;
+    }
+    if register(host, "agent_route_apply", "task,reply,kb_dir", agent_route_apply) != 0 {
+        return 1;
+    }
+    if register(
+        host,
+        "agent_compile_policy",
+        "memory_dir,min_evidence",
+        agent_compile_policy,
+    ) != 0
+    {
+        return 1;
+    }
+    if register(
+        host,
+        "agent_maybe_compile_policy",
+        "memory_dir,min_evidence",
+        agent_maybe_compile_policy,
+    ) != 0
+    {
         return 1;
     }
     0

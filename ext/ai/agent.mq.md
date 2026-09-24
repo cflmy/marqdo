@@ -1,6 +1,6 @@
 ---
 title: ext/ai/agent
-description: Document-driven agent — step / plan; tools via lib/subtask; runtime via ABI v2 agent plugin.
+description: Document-driven agent v2 — step / plan / run; Skill Compilation via ABI plugin (episodes → learn → llm_free).
 import llm:ext/ai/llm.mq.md
 import json:lib/json.mq.md
 import sys:lib/sys.mq.md
@@ -1514,6 +1514,308 @@ Clear the plugin session bag for this agent id.
 **id = > json.get value=`self` key="id"**
 > agent_history_clear id=`id`
 ****
+
+## resolve
+    + `task`
+    + `kb_dir`=.marqdo/agent-kb
+    + `near_match`=True
+    + `near_threshold`=0.78
+
+Skill resolver (v2): exact → alias → canonical → near. Returns `mode` / `resource` / `llm_free` / `confidence`. Plugin ABI — no core host_* calls.
+
+**tools = > json.get value=`self` key="tools"**
+*> agent_resolve task=`task` kb_dir=`kb_dir` near_match=`near_match` near_threshold=`near_threshold` tools=`tools`*
+
+## route
+    + `task`
+    + `backend`=auto
+    + `kb_dir`=.marqdo/agent-kb
+    + `memory_dir`=.marqdo/agent-memory
+    + `threshold`=0.78
+
+Adaptive Routing (Phase 4): abstract router — `marqdo` | `small-llm` | `jev` | `llm` | `auto`. Jev is optional. `auto` cascades policy → kb → optional jev → small-llm request. May return `needs_llm=True` + `prompt` for the caller to complete with a small/large model, then `route_apply`.
+
+**tools = > json.get value=`self` key="tools"**
+*> agent_route task=`task` backend=`backend` kb_dir=`kb_dir` memory_dir=`memory_dir` threshold=`threshold` tools=`tools`*
+
+## route_apply
+    + `task`
+    + `reply`
+    + `kb_dir`=.marqdo/agent-kb
+    + `backend`=small-llm
+
+Apply a router model line (`SKILL:<slug>` / `EXPLORE`) to a kb skill hit.
+
+*> agent_route_apply task=`task` reply=`reply` kb_dir=`kb_dir` backend=`backend`*
+
+## compile_policy
+    + `memory_dir`=.marqdo/agent-memory
+    + `min_evidence`=3
+    + `force`=False
+
+Policy Compilation: stable episode skill selections → `policies/router.mq.md` (deterministic Marqdo rules).
+
+*> agent_compile_policy memory_dir=`memory_dir` min_evidence=`min_evidence` force=`force`*
+
+## maybe_compile_policy
+    + `memory_dir`=.marqdo/agent-memory
+    + `min_evidence`=3
+
+Learn gate for the Adaptive Router policy layer.
+
+*> agent_maybe_compile_policy memory_dir=`memory_dir` min_evidence=`min_evidence`*
+
+## record_episode
+    + `task`
+    + `status`=ok
+    + `result`=None
+    + `mode`=explore
+    + `skill`=none
+    + `observation`=None
+    + `workbook`=None
+    + `cache`=None
+    + `match`=None
+    + `llm_calls`=0
+    + `tool_calls`=0
+    + `error`=None
+    + `memory_dir`=.marqdo/agent-memory
+
+Persist one run as `.mq.md` under `memory_dir/episodes/YYYY/MM/` (v2 Phase 1). Memory is executable documentation, not a vector bag.
+
+*> agent_record_episode task=`task` status=`status` result=`result` mode=`mode` skill=`skill` observation=`observation` workbook=`workbook` cache=`cache` match=`match` llm_calls=`llm_calls` tool_calls=`tool_calls` error=`error` memory_dir=`memory_dir`*
+
+## maybe_learn
+    + `task`
+    + `kb_dir`=.marqdo/agent-kb
+    + `memory_dir`=.marqdo/agent-memory
+    + `improve_every`=3
+    + `promote`=True
+
+Offline learn gate: when ≥ `improve_every` successful episodes share a task hash, generalize → synthesize → compile → optional OKF promote (`llm_free`). Also attempts Policy Compilation for Adaptive Routing.
+
+**skill_learn = > agent_maybe_learn task=`task` kb_dir=`kb_dir` memory_dir=`memory_dir` improve_every=`improve_every` promote=`promote`**
+**policy_learn = > agent_maybe_compile_policy memory_dir=`memory_dir` min_evidence=`improve_every`**
+**out = > json.parse text={"learned":false}**
+**sl = > json.get value=`skill_learn` key="learned"**
+**out = > json.set map=`out` key="learned" value=`sl`**
+**out = > json.set map=`out` key="skill" value=`skill_learn`**
+**out = > json.set map=`out` key="policy" value=`policy_learn`**
+*out*
+
+## compile
+    + `task`
+    + `kb_dir`=.marqdo/agent-kb
+    + `memory_dir`=.marqdo/agent-memory
+    + `min_evidence`=3
+    + `promote`=True
+    + `force`=False
+
+Compile a candidate skill into versioned `skills/<slug>/vN.mq.md` and optionally promote into agent-kb.
+
+*> agent_compile_skill task=`task` kb_dir=`kb_dir` memory_dir=`memory_dir` min_evidence=`min_evidence` promote=`promote` force=`force`*
+
+## metrics
+    + `memory_dir`=.marqdo/agent-memory
+
+Reasoning amortization stats over recorded episodes (`avg_llm_calls`, `compiled_runs`, …).
+
+*> agent_metrics memory_dir=`memory_dir`*
+
+## run
+    + `task`
+    + `kb_dir`=.marqdo/agent-kb
+    + `memory_dir`=.marqdo/agent-memory
+    + `learn`=True
+    + `verify`=True
+    + `writeback`=True
+    + `reuse`=True
+    + `near_match`=True
+    + `near_threshold`=0.78
+    + `promote`=True
+    + `improve_every`=3
+    + `explore_n`=3
+    + `max_rounds`=4
+    + `stream`=False
+    + `echo`=False
+    + `trace`=False
+    + `force`=False
+    + `router`=auto
+    + `router_model`=None
+
+Primary author entry (v2 + P4): Adaptive `route` → execute (policy/kb skill) or `plan` → record episode → maybe_learn (skill + policy). `router` = `auto`|`marqdo`|`small-llm`|`jev`|`llm`. Optional `router_model` (llm handle) answers `needs_llm` prompts — small models welcome; Jev is never required.
+
+**routed = > `self`.route task=`task` backend=`router` kb_dir=`kb_dir` memory_dir=`memory_dir` threshold=`near_threshold`**
+**route_matched = > json.get value=`routed` key="matched"**
+**needs_llm = > json.get value=`routed` key="needs_llm"**
+**exec_mode = "explore"**
+**llm_calls = 0**
+**out = None**
+**route_backend = > json.get value=`routed` key="backend"**
+
+1. `route_matched`
+  **path = > json.get value=`routed` key="resource"**
+  1. `path`
+    **aw = > await_workbook path=`path`**
+    **code = > json.get value=`aw` key="code"**
+    **child_val = > json.get value=`aw` key="value"**
+    **last_obs = > json.get value=`aw` key="observation"**
+    1. `code` == 0
+      > agent_kb_record_hit kb_dir=`kb_dir` goal=`task` improve_every=`improve_every`
+      **lf = > json.get value=`routed` key="llm_free"**
+      1. `lf`
+        **exec_mode = "compiled"**
+      2. *
+        **exec_mode = "routed"**
+      **out = > json.parse text={"status":"ok"}**
+      **out = > json.set map=`out` key="status" value="ok"**
+      **out = > json.set map=`out` key="goal" value=`task`**
+      **out = > json.set map=`out` key="result" value=`child_val`**
+      **out = > json.set map=`out` key="workbook" value=`path`**
+      **out = > json.set map=`out` key="cache" value="hit"**
+      **rmode = > json.get value=`routed` key="mode"**
+      **out = > json.set map=`out` key="match" value=`rmode`**
+      **sk = > json.get value=`routed` key="skill"**
+      **out = > json.set map=`out` key="skill" value=`sk`**
+      **out = > json.set map=`out` key="observation" value=`last_obs`**
+      **out = > json.set map=`out` key="summary" value="adaptive route hit"**
+      **out = > json.set map=`out` key="route" value=`routed`**
+      **llm_calls = 0**
+    2. *
+      **route_matched = False**
+  2. *
+    **route_matched = False**
+2. *
+  **_ = 1**
+
+1. `route_matched`
+  **_ = 1**
+2. `needs_llm`
+  1. `router_model`
+    **prompt = > json.get value=`routed` key="prompt"**
+    1. `stream`
+      **evs = > router_model.complete prompt=`prompt` stream=True echo=`echo`**
+      **reply = > llm.stream_result events=`evs`**
+    2. *
+      **reply = > router_model.complete prompt=`prompt`**
+    **applied = > `self`.route_apply task=`task` reply=`reply` kb_dir=`kb_dir` backend=`router`**
+    **llm_calls = 1**
+    **am = > json.get value=`applied` key="matched"**
+    1. `am`
+      **path = > json.get value=`applied` key="resource"**
+      **aw = > await_workbook path=`path`**
+      **code = > json.get value=`aw` key="code"**
+      **child_val = > json.get value=`aw` key="value"**
+      **last_obs = > json.get value=`aw` key="observation"**
+      1. `code` == 0
+        **exec_mode = "routed"**
+        **out = > json.parse text={"status":"ok"}**
+        **out = > json.set map=`out` key="status" value="ok"**
+        **out = > json.set map=`out` key="goal" value=`task`**
+        **out = > json.set map=`out` key="result" value=`child_val`**
+        **out = > json.set map=`out` key="workbook" value=`path`**
+        **out = > json.set map=`out` key="cache" value="soft-hit"**
+        **out = > json.set map=`out` key="match" value="routed"**
+        **sk = > json.get value=`applied` key="skill"**
+        **out = > json.set map=`out` key="skill" value=`sk`**
+        **out = > json.set map=`out` key="observation" value=`last_obs`**
+        **out = > json.set map=`out` key="summary" value="router model selected skill"**
+        **out = > json.set map=`out` key="route" value=`applied`**
+        **route_matched = True**
+      2. *
+        **route_matched = False**
+    2. *
+      **route_matched = False**
+  2. *
+    **route_matched = False**
+3. *
+  **_ = 1**
+
+1. `route_matched`
+  **_ = 1**
+2. *
+  **resolved = > `self`.resolve task=`task` kb_dir=`kb_dir` near_match=`near_match` near_threshold=`near_threshold`**
+  **mode = > json.get value=`resolved` key="mode"**
+  **llm_free = > json.get value=`resolved` key="llm_free"**
+  1. `llm_free`
+    **path = > json.get value=`resolved` key="resource"**
+    **aw = > await_workbook path=`path`**
+    **code = > json.get value=`aw` key="code"**
+    **child_val = > json.get value=`aw` key="value"**
+    **last_obs = > json.get value=`aw` key="observation"**
+    1. `code` == 0
+      > agent_kb_record_hit kb_dir=`kb_dir` goal=`task` improve_every=`improve_every`
+      **exec_mode = "compiled"**
+      **out = > json.parse text={"status":"ok"}**
+      **out = > json.set map=`out` key="status" value="ok"**
+      **out = > json.set map=`out` key="goal" value=`task`**
+      **out = > json.set map=`out` key="result" value=`child_val`**
+      **out = > json.set map=`out` key="workbook" value=`path`**
+      **out = > json.set map=`out` key="cache" value="hit"**
+      **out = > json.set map=`out` key="match" value=`mode`**
+      **sk = > json.get value=`resolved` key="skill"**
+      **out = > json.set map=`out` key="skill" value=`sk`**
+      **out = > json.set map=`out` key="observation" value=`last_obs`**
+      **out = > json.set map=`out` key="summary" value="compiled skill (llm_free)"**
+      **llm_calls = 0**
+    2. *
+      **out = > `self`.plan goal=`task` kb_dir=`kb_dir` writeback=`writeback` reuse=`reuse` near_match=`near_match` near_threshold=`near_threshold` promote=`promote` improve_every=`improve_every` explore_n=`explore_n` max_rounds=`max_rounds` stream=`stream` echo=`echo` trace=`trace` force=`force`**
+      **exec_mode = "explore"**
+      **llm_calls = 1**
+  2. *
+    **out = > `self`.plan goal=`task` kb_dir=`kb_dir` writeback=`writeback` reuse=`reuse` near_match=`near_match` near_threshold=`near_threshold` promote=`promote` improve_every=`improve_every` explore_n=`explore_n` max_rounds=`max_rounds` stream=`stream` echo=`echo` trace=`trace` force=`force`**
+    **cache = > json.get value=`out` key="cache"**
+    1. `cache` == hit
+      **exec_mode = "compiled"**
+      **llm_calls = 0**
+    2. `cache` == soft-hit
+      **exec_mode = "near"**
+      **llm_calls = 0**
+    3. *
+      **exec_mode = "explore"**
+      **llm_calls = 1**
+
+**st = > json.get value=`out` key="status"**
+**res = > json.get value=`out` key="result"**
+**wb_path = > json.get value=`out` key="workbook"**
+**obs = > json.get value=`out` key="observation"**
+**sk2 = > json.get value=`out` key="skill"**
+**cache2 = > json.get value=`out` key="cache"**
+**match2 = > json.get value=`out` key="match"**
+**err = > json.get value=`out` key="error"**
+
+1. `verify`
+  1. `st` == "ok"
+    **verification = "status: passed"**
+  2. *
+    **verification = "status: failed"**
+2. *
+  **verification = "status: skipped"**
+
+**ep = > `self`.record_episode task=`task` status=`st` result=`res` mode=`exec_mode` skill=`sk2` observation=`obs` workbook=`wb_path` cache=`cache2` match=`match2` llm_calls=`llm_calls` error=`err` memory_dir=`memory_dir`**
+
+**learning = None**
+1. `learn`
+  1. `st` == "ok"
+    **learning = > `self`.maybe_learn task=`task` kb_dir=`kb_dir` memory_dir=`memory_dir` improve_every=`improve_every` promote=`promote`**
+  2. *
+    **learning = None**
+2. *
+  **_ = 1**
+
+**execution = > json.parse text={"mode":"explore","llm_calls":0}**
+**execution = > json.set map=`execution` key="mode" value=`exec_mode`**
+**execution = > json.set map=`execution` key="llm_calls" value=`llm_calls`**
+**execution = > json.set map=`execution` key="skill" value=`sk2`**
+**execution = > json.set map=`execution` key="router" value=`route_backend`**
+**out = > json.set map=`out` key="execution" value=`execution`**
+**out = > json.set map=`out` key="episode" value=`ep`**
+**out = > json.set map=`out` key="route" value=`routed`**
+1. `learning`
+  **out = > json.set map=`out` key="learning" value=`learning`**
+2. *
+  **_ = 1**
+
+*out*
 
 ## step
     + `task`

@@ -217,10 +217,12 @@ Install: `marqdo ext add agent` (ZH: `智能体`). Native: `cargo build --releas
 1. **Code is documentation** — the runbook `.mq.md` is the model’s ground truth, not a hidden system prompt bag.
 2. **Call site is first-class** — `build_step_context` injects path/function/line so the model knows where it is in the program.
 3. **Document is the knowledge base (OKF)** — writeback → promote/solidify → reuse / `llm_free`; MCP/corpus are evidence only.
+4. **Skill Compilation (v2)** — successful runs become `.mq.md` episodes; after enough evidence, `maybe_learn` compiles an executable skill (`llm_free`). Prefer `## run` over bare `## plan` when you want learning.
+5. **Adaptive Routing (P4)** — router is abstract (`marqdo` / `small-llm` / optional `jev` / `llm` / `auto`); Jev is never required. Policy Compilation writes `policies/router.mq.md`.
 
-APIs: `# agent` / `# 智能体` → `## step` / `## plan`. Context: standing + task + **call site** + tools + budgeted source/skill + act protocol (`CALL:` / `READ:`). Inspect without LLM: `dump_step_context`. Inside `writeback=` / `写回=` branches use `host_writeback_record` (param name shadows the writeback import).
+APIs: `# agent` / `# 智能体` → `## run` / `## route` / `## step` / `## plan` (+ `resolve` / `record_episode` / `maybe_learn` / `compile` / `compile_policy` / `metrics`). Context: standing + task + **call site** + tools + budgeted source/skill + act protocol (`CALL:` / `READ:`). Inspect without LLM: `dump_step_context`. Inside `writeback=` / `写回=` branches use `host_writeback_record` (param name shadows the writeback import).
 
-Examples: [agent-pong](../../examples/agent-pong/) · [agent-okf-flywheel](../../examples/agent-okf-flywheel/). Harness: `scripts/agent-harness.sh`. Design: [ext-agent.md](../../doc/design/ext-agent.md) · Wave B: [agent-framework-2026-09.md](../../doc/research/agent-framework-2026-09.md). Dev LLM: copy [.env.example](../../.env.example) → `.env` (gitignored).
+Examples: [agent-pong](../../examples/agent-pong/) · [agent-okf-flywheel](../../examples/agent-okf-flywheel/). Harness: `scripts/agent-harness.sh`. Design: [ext-agent.md](../../doc/design/ext-agent.md) · Wave B: [agent-framework-2026-09.md](../../doc/research/agent-framework-2026-09.md) · v2: [doc/next/003.md](../../doc/next/003.md) · P4: [doc/next/004.md](../../doc/next/004.md). Dev LLM: copy [.env.example](../../.env.example) → `.env` (gitignored).
 
 ## Official extension: `ext/web` (dynamic sites)
 

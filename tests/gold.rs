@@ -96,6 +96,50 @@ fn ensure_web_plugin_built() {
 }
 
 
+/// Build `libagent` once per test process and prefer it over a stale `~/.marqdo/ext`.
+fn ensure_agent_plugin_built() {
+    use std::sync::Once;
+    static ONCE: Once = Once::new();
+    ONCE.call_once(|| {
+        let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let status = Command::new("cargo")
+            .args(["build", "-p", "marqdo_plugin_agent"])
+            .current_dir(&root)
+            .status()
+            .expect("build marqdo_plugin_agent");
+        assert!(status.success(), "failed to build marqdo_plugin_agent");
+        let lib = if cfg!(windows) {
+            root.join("target").join("debug").join("agent.dll")
+        } else if cfg!(target_os = "macos") {
+            root.join("target").join("debug").join("libagent.dylib")
+        } else {
+            root.join("target").join("debug").join("libagent.so")
+        };
+        // Prefer release if newer / present (local `cargo build --release -p …`).
+        let release = if cfg!(windows) {
+            root.join("target").join("release").join("agent.dll")
+        } else if cfg!(target_os = "macos") {
+            root.join("target").join("release").join("libagent.dylib")
+        } else {
+            root.join("target").join("release").join("libagent.so")
+        };
+        let chosen = if release.is_file() {
+            release
+        } else {
+            lib
+        };
+        assert!(chosen.is_file(), "missing agent plugin at {}", chosen.display());
+        // SAFETY: single-threaded Once; children inherit for the rest of the test process.
+        std::env::set_var("MARQDO_AGENT_PLUGIN", &chosen);
+        if std::env::var_os("MARQDO_EXT").is_none() {
+            let ext = root.join("ext");
+            if ext.join("ai").join("agent.mq.md").is_file() {
+                std::env::set_var("MARQDO_EXT", &ext);
+            }
+        }
+    });
+}
+
 /// Assert failure with `path:line:col:` prefix and message substring (both backends).
 fn assert_err(path: &str, line_col: &str, substr: &str) {
     for backend in ["tree", "bytecode"] {
@@ -3730,6 +3774,31 @@ lib.fs.exists
 exists-ok
 deny-ok
 callable-ok",
+    );
+}
+
+#[test]
+fn ext_agent_v2_learn() {
+    ensure_agent_plugin_built();
+    assert_out(
+        "tests/ext/agent-v2-learn.mq.md",
+        "ep-ok
+3
+learned
+llm-free
+3",
+    );
+}
+
+#[test]
+fn ext_agent_p4_route() {
+    ensure_agent_plugin_built();
+    assert_out(
+        "tests/ext/agent-p4-route.mq.md",
+        "skill-learned
+policy-ok
+route-hit
+auto/marqdo",
     );
 }
 
