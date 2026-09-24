@@ -31,7 +31,7 @@ import llm:ext/ai/llm.mq.md
 | `## load_env` | `## 加载环境` | Load `.env` |
 | `## create` | `## 创建` | Factory → LLM handle |
 | `## fast` / `## reasoning` | `## 快速` / `## 推理` | Named handles |
-| `## prompt_load` | `## 加载提示` | Load prompt artifact (`type: prompt` → body) |
+| `## prompt_load` / `## prompt` / `## prompt_body` | `## 加载提示` / `## 提示` / `## 提示正文` | Prompt artifacts (`type: prompt` → body) |
 | `## ask` (module) | `## 提问` | Convenience → **text** (`prompt=` or `path=`) |
 | `## collect` | `## 收集` | Events → text |
 | `## stream_result` | `## 流式结果` | Alias of `collect` |
@@ -54,7 +54,8 @@ import llm:ext/ai/llm.mq.md
 **events = > `fast`.stream prompt=`prompt`**
 **text = > llm.collect events=`events`**
 
-**body = > llm.prompt_load path="fixtures/prompt-marqdo.md"**
+**body = > llm.prompt path="fixtures/prompt-marqdo.md"**
+**body2 = > llm.prompt text=`raw`**
 ```
 
 ### LLMResult

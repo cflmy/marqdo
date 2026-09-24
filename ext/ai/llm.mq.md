@@ -96,21 +96,19 @@ Named strong/reasoning handle. Model from arg, else `MARQDO_LLM_REASONING_MODEL`
 
 *> create model=`mdl` base_url=`base_url` api_key=`api_key` name="reasoning" backend="openai-compatible"*
 
-## prompt_load
-    + `path`
+## prompt_body
+    + `src`
 
-Load a prompt artifact (`.mq.md` / `.md`) from disk for `ask`.
-If frontmatter declares `type: prompt` (or `类型: 提示`), return the body after the closing `---`; otherwise the full file text.
+If `src` starts with YAML frontmatter declaring `type: prompt` / `类型: 提示`, return the body after the closing `---`; otherwise return `src` unchanged.
 
-**raw = > fs.read_text path=`path`**
-**sw = > text.starts_with text=`raw` prefix="---"**
+**sw = > text.starts_with text=`src` prefix="---"**
 1. not `sw`
-  *raw*
+  *src*
 2. *
-  **parts = > split value=`raw` sep="\n---\n"**
+  **parts = > split value=`src` sep="\n---\n"**
   **n = > len value=`parts`**
   1. `n` < 2
-    *raw*
+    *src*
   2. *
     **fm = > at value=`parts` index=0**
     **is_p = > text.contains text=`fm` sub="type: prompt"**
@@ -122,7 +120,29 @@ If frontmatter declares `type: prompt` (or `类型: 提示`), return the body af
       **body = > at value=`parts` index=1**
       *> text.str_trim s=`body`*
     2. *
-      *raw*
+      *src*
+
+## prompt_load
+    + `path`
+
+Load a prompt artifact (`.mq.md` / `.md`) from disk for `ask`.
+
+**raw = > fs.read_text path=`path`**
+*> prompt_body src=`raw`*
+
+## prompt
+    + `path`=None
+    + `text`=None
+
+Prompt artifact helper: `path=` loads a file; `text=` strips `type: prompt` frontmatter from an in-memory string.
+
+1. `path`
+  *> prompt_load path=`path`*
+2. `text`
+  *> prompt_body src=`text`*
+3. *
+  > print text=ext/ai/llm.prompt: pass path= or text=
+  > sys.exit code=1
 
 ## ask
     + `prompt`=None

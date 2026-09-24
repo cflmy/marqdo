@@ -33,6 +33,7 @@ run tests/ext/agent-workbook-patch-a0.mq.md
 run tests/ext/agent-v2-learn.mq.md
 run tests/ext/agent-p4-route.mq.md
 run tests/ext/agent-zero-llm.mq.md
+run tests/ext/agent-plan-preserve.mq.md
 run examples/agent-okf-flywheel/index.mq.md
 run examples/agent-pong/index.mq.md
 

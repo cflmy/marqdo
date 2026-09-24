@@ -31,7 +31,7 @@
 | `create` 工厂；handle 带 `backend` | **done** |
 | LLMResult：`text` / `model` / `finish` / `backend` / `usage` / `tokens` | **done** |
 | Named models（`llm.fast` / `llm.reasoning`） | **done** |
-| Prompt document：`prompt_load` + `type: prompt` 正文 | **done**（`ask path=` / `llm.ask` 无参吃当前文档仍暂缓） |
+| Prompt document：`prompt` / `prompt_load` + `type: prompt` 正文 | **done**（`llm.ask` 无参吃当前入口文档仍暂缓，需 `sys.module_source`） |
 | 拆 `ext/ai/llm/openai.mq.md` + `ollama` 后端 | **done** |
 | tool_calls 完整 Result | 暂缓 |
 | Transport → 可选 ABI 插件 | 暂缓 |
@@ -43,7 +43,7 @@
 **events = > model.stream prompt=`p`**
 **text = > llm.collect events=`events`**
 **fast = > llm.fast**
-**prompt = > llm.prompt_load path="prompts/task.md"**
+**prompt = > llm.prompt path="prompts/task.md"**
 ```
 
 ## 4. Agent（002–004）— 已/待
@@ -55,8 +55,9 @@
 | Policy Compilation → `policies/router.mq.md` | **done** |
 | `run` 串联 route → execute → record → learn | **done** |
 | Agent 默认走 `model.ask` + Result.usage 记成本 | **done**（`model_turn`） |
-| Prompt artifact / document-as-prompt | **done**（经 llm `path=`） |
+| Prompt artifact / document-as-prompt | **done**（经 llm `path=` / `prompt`） |
 | 零 LLM 执行（policy+skill → `llm_calls=0`） | **done** |
+| `plan` 不覆盖已有 `llm_free` resource | **done** |
 | 真 MCP client / resume / Jev 接线 / 小模型 live 路由 | 暂缓 |
 
 ## 5. 联调顺序
@@ -69,5 +70,5 @@
 
 ## 6. 验收金样
 
-- Agent：`tests/ext/agent-v2-learn.mq.md` · `agent-p4-route.mq.md` · `agent-zero-llm.mq.md` · `scripts/agent-harness.sh`  
+- Agent：`tests/ext/agent-v2-learn.mq.md` · `agent-p4-route.mq.md` · `agent-zero-llm.mq.md` · `agent-plan-preserve.mq.md` · `scripts/agent-harness.sh`  
 - LLM：`tests/ext/llm-ask-offline.mq.md` · `llm-stream-offline.mq.md` · `llm-ctor-offline.mq.md` · `llm-named-offline.mq.md`

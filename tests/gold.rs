@@ -3809,6 +3809,17 @@ auto/marqdo",
 }
 
 #[test]
+fn ext_agent_plan_preserve() {
+    ensure_agent_plugin_built();
+    assert_out_llm_offline(
+        "tests/ext/agent-plan-preserve.mq.md",
+        "pending
+True
+False",
+    );
+}
+
+#[test]
 fn ext_agent_zero_llm() {
     ensure_agent_plugin_built();
     assert_out_llm_offline(

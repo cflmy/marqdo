@@ -2250,18 +2250,28 @@ Reuse lookup: exact → alias → canonicalize → optional local n-gram `near` 
       **b = > json.get value=`parts` key="b"**
       **c = > json.get value=`parts` key="c"**
       **path = workbook_dir + a + slug + b + ts + c**
+      > fs.write_text path=`path` text=`skel`
     2. `explore`
       **parts = > json.parse text={"a":"/explore/","b":"/","c":".mq.md"}**
       **a = > json.get value=`parts` key="a"**
       **b = > json.get value=`parts` key="b"**
       **c = > json.get value=`parts` key="c"**
       **path = kb_dir + a + slug + b + explore_attempt + c**
+      **ex = > fs.exists path=`path`**
+      1. `ex`
+        **_ = 1**
+      2. *
+        > fs.write_text path=`path` text=`skel`
     3. *
       **parts = > json.parse text={"a":"/resources/","b":".mq.md"}**
       **a = > json.get value=`parts` key="a"**
       **b = > json.get value=`parts` key="b"**
       **path = kb_dir + a + slug + b**
-    > fs.write_text path=`path` text=`skel`
+      **ex = > fs.exists path=`path`**
+      1. `ex`
+        **_ = 1**
+      2. *
+        > fs.write_text path=`path` text=`skel`
 
 1. `confirm`
   **out = > json.parse text={"status":"pending"}**
