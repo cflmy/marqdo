@@ -1,5 +1,6 @@
 //! Adaptive Routing / Policy Compilation (Phase 4).
-//! Router is abstract: marqdo | small-llm | jev | llm | auto — Jev is optional.
+//! Router is abstract: marqdo | small-llm | llm | auto.
+//! `jev` is accepted as an alias of `small-llm` (compat); not a first-class backend.
 
 use std::collections::HashMap;
 use std::fs;
@@ -220,15 +221,6 @@ fn match_policy(rules: &[PolicyRule], task: &str, threshold: f64) -> Option<Poli
     })
 }
 
-fn jev_available() -> bool {
-    if let Ok(p) = std::env::var("MARQDO_JEV") {
-        if !p.is_empty() && p != "0" && p != "false" {
-            return PathBuf::from(&p).is_file() || p == "1" || p == "true";
-        }
-    }
-    false
-}
-
 fn build_route_prompt(task: &str, candidates: &[Value]) -> String {
     let mut s = String::from(
         "You are a Marqdo Agent router. Pick the best skill slug for the task, or say EXPLORE.\n\nReply with exactly one line:\nSKILL:<slug>\nor\nEXPLORE\n\nTask:\n",
@@ -385,27 +377,11 @@ fn route_model_request(args: &Value, level: &str) -> Result<Value, String> {
     }))
 }
 
-fn route_jev(args: &Value) -> Result<Value, String> {
-    if !jev_available() {
-        return Ok(json!({
-            "backend": "jev",
-            "mode": "unavailable",
-            "matched": false,
-            "needs_llm": false,
-            "confidence": 0.0,
-            "reason": "jev_not_configured",
-        }));
-    }
-    // Optional external binary path; without a stable Jev ABI we surface a model-shaped request
-    // so callers can treat Jev like a decision engine when wired later.
-    route_model_request(args, "jev")
-}
-
 /// Cascade Adaptive Router (Phase 4).
 ///
-/// `backend`: `auto` | `marqdo` | `small-llm` | `jev` | `llm`
+/// `backend`: `auto` | `marqdo` | `small-llm` | `llm` (`jev` → alias of `small-llm`).
 ///
-/// `auto` order: marqdo policy → kb resolve → (optional jev) → small-llm request → llm request.
+/// `auto` order: marqdo policy → kb resolve → small-llm request.
 pub fn route(args: &Value) -> Result<Value, String> {
     let backend = opt_text(args, "backend").unwrap_or("auto");
     let threshold = opt_f64(args, "threshold", 0.78);
@@ -418,9 +394,8 @@ pub fn route(args: &Value) -> Result<Value, String> {
             }
             route_resolve_fallback(args)
         }
-        "small-llm" | "small_llm" | "small" => route_model_request(args, "small-llm"),
+        "small-llm" | "small_llm" | "small" | "jev" => route_model_request(args, "small-llm"),
         "llm" | "large" | "large-llm" => route_model_request(args, "llm"),
-        "jev" => route_jev(args),
         "auto" | _ => {
             let mut trace: Vec<Value> = Vec::new();
             let m = route_marqdo(args)?;
@@ -444,17 +419,6 @@ pub fn route(args: &Value) -> Result<Value, String> {
                     obj.insert("backend".into(), Value::String("auto/kb".into()));
                 }
                 return Ok(out);
-            }
-            if jev_available() {
-                let j = route_jev(args)?;
-                trace.push(json!({"try": "jev", "mode": j.get("mode")}));
-                if j.get("needs_llm").and_then(|v| v.as_bool()) == Some(true) {
-                    let mut out = j;
-                    if let Some(obj) = out.as_object_mut() {
-                        obj.insert("trace".into(), Value::Array(trace));
-                    }
-                    return Ok(out);
-                }
             }
             // Prefer small-llm request in auto when nothing matched (caller may use large).
             let mut req = route_model_request(args, "small-llm")?;

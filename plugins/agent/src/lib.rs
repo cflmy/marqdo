@@ -2,8 +2,10 @@
 
 mod corpus;
 mod kb;
+mod mcp_client;
 mod mcp_server;
 mod memory;
+mod resume;
 mod route;
 
 use std::collections::HashMap;
@@ -924,6 +926,10 @@ kb_ffi!(
     route::maybe_compile_policy,
     "agent_maybe_compile_policy"
 );
+kb_ffi!(agent_resume_save, resume::resume_save, "agent_resume_save");
+kb_ffi!(agent_resume_load, resume::resume_load, "agent_resume_load");
+kb_ffi!(agent_resume_clear, resume::resume_clear, "agent_resume_clear");
+kb_ffi!(agent_resume_list, resume::resume_list, "agent_resume_list");
 
 #[no_mangle]
 pub unsafe extern "C" fn marqdo_plugin_abi_version() -> u32 {
@@ -1021,6 +1027,27 @@ pub unsafe extern "C" fn marqdo_plugin_init(host: *const MarqdoHostApi) -> c_int
     if register(host, "agent_mcp_serve", "name,tools,transport", mcp_server::agent_mcp_serve)
         != 0
     {
+        return 1;
+    }
+    if register(
+        host,
+        "agent_mcp_client",
+        "action,command",
+        mcp_client::agent_mcp_client,
+    ) != 0
+    {
+        return 1;
+    }
+    if register(host, "agent_resume_save", "id,goal,status,round", agent_resume_save) != 0 {
+        return 1;
+    }
+    if register(host, "agent_resume_load", "id,resume_dir", agent_resume_load) != 0 {
+        return 1;
+    }
+    if register(host, "agent_resume_clear", "id,resume_dir", agent_resume_clear) != 0 {
+        return 1;
+    }
+    if register(host, "agent_resume_list", "resume_dir", agent_resume_list) != 0 {
         return 1;
     }
     if register(host, "agent_kb_add_alias", "kb_dir,slug,alias", agent_kb_add_alias) != 0 {
