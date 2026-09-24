@@ -194,7 +194,9 @@ ext/
 | `## 分解` | `## decompose` |（可公开或内部）目标 → 子任务表 |
 | `## 清空历史` | `## clear_history` | 若仍保留会话式辅助状态则清空；**不以隐藏 chat 袋为真相源**——真相在文档写回 |
 
-**Skill Compilation（v2）**：Agent 的记忆不是向量袋，而是可执行 `.mq.md`。路径：`episodes/` → `experiences/` → `candidates/` → `skills/vN.mq.md` → OKF `agent-kb`（`llm_free`）。
+**Skill Compilation（v2）**：Agent 的记忆不是向量袋，而是可执行 `.mq.md`。路径：`episodes/` → `experiences/` → `candidates/` → `skills/vN.mq.md` → OKF `agent-kb`（`llm_free`）。编译技能正文为合法 Marqdo（`**result = …**` + 斜体返回）；金样 `tests/ext/agent-zero-llm.mq.md` 验收 policy+skill 全路径 `execution.llm_calls=0`。
+
+**LLM 成本**：`model_turn` 走 `model.ask` / `stream`+`collect`，把 `LLMResult.tokens` 写入 episode / `execution`。
 
 **Adaptive Routing（P4，原「Jev Router」更名）**：Router 是抽象能力，backend = `marqdo`（已编译 `policies/router.mq.md`）/ `small-llm`（用户自备小参数模型）/ `jev`（可选）/ `llm` / `auto` 级联。**不依赖 Jev**。热路径在 **`plugins/agent`**（`route.rs`）；**禁止**向 `src/host/` 加领域原语。设计：[doc/next/003.md](../next/003.md) · [doc/next/004.md](../next/004.md)。
 

@@ -676,7 +676,7 @@ pub fn generalize(args: &Value) -> Result<Value, String> {
 fn write_compiled_mq(result: &str, title: &str) -> String {
     let lit = marqdo_quoted(result);
     format!(
-        "---\ntitle: {title}\ntype: skill\nstatus: compiled\nllm_free: true\n---\n\nCompiled from successful episodes (deterministic return).\n\n# main\n\n*`result` = {lit} *\n**`result`**\n"
+        "---\ntitle: {title}\ntype: skill\nstatus: compiled\nllm_free: true\n---\n\nCompiled from successful episodes (deterministic return).\n\n# main\n\n**`result` = {lit}**\n*`result`*\n"
     )
 }
 

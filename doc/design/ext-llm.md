@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | **Accepted · v0.2 semantic**（005：Intelligence Primitive） |
+| Status | **Accepted · v0.3 semantic**（005：Intelligence Primitive） |
 | Date | 2026-09-24 |
 | Related | [objects.md](objects.md) · [ext-agent.md](ext-agent.md) · [ext-cli.md](ext-cli.md) · [ai-stack.md](../roadmap/ai-stack.md) · [doc/next/005.md](../next/005.md) |
 
@@ -11,8 +11,9 @@
 `ext/ai/llm` is Marqdo’s **intelligence primitive**, not an OpenAI SDK wrapper.
 
 ```text
-Author surface:  ask / stream / collect / create
-Internal:        complete (compat) + openai-compatible HTTP
+Author surface:  ask / stream / collect / create / fast / reasoning / prompt_load
+Transport:       ext/ai/llm/openai.mq.md  (+ ollama defaults)
+Compat:          complete / chat
 ```
 
 Import:
@@ -29,10 +30,12 @@ import llm:ext/ai/llm.mq.md
 |---------|---------|------|
 | `## load_env` | `## 加载环境` | Load `.env` |
 | `## create` | `## 创建` | Factory → LLM handle |
-| `## ask` (module) | `## 提问` | Convenience → **text** |
+| `## fast` / `## reasoning` | `## 快速` / `## 推理` | Named handles |
+| `## prompt_load` | `## 加载提示` | Load prompt artifact (`type: prompt` → body) |
+| `## ask` (module) | `## 提问` | Convenience → **text** (`prompt=` or `path=`) |
 | `## collect` | `## 收集` | Events → text |
 | `## stream_result` | `## 流式结果` | Alias of `collect` |
-| `# llm` | `# 大模型` | Handle ctor |
+| `# llm` | `# 大模型` | Handle ctor (`backend=` openai-compatible \| ollama) |
 | `## ask` (method) | `## 提问` | → **LLMResult** map |
 | `## stream` | `## 流式` | → event list |
 | `## complete` / `## chat` | `## 运行` / `## 聊天` | Compat / transport primitive |
@@ -47,18 +50,25 @@ import llm:ext/ai/llm.mq.md
 **result = > `model`.ask prompt=`prompt`**
 *[text](result)*
 
-**events = > `model`.stream prompt=`prompt`**
+**fast = > llm.fast**
+**events = > `fast`.stream prompt=`prompt`**
 **text = > llm.collect events=`events`**
+
+**body = > llm.prompt_load path="fixtures/prompt-marqdo.md"**
 ```
 
-### LLMResult (minimal)
+### LLMResult
 
 | Field | Meaning |
 |-------|---------|
 | `text` | Answer string |
 | `model` | Model id |
 | `finish` | Finish reason (`stop`, …) |
-| `backend` | e.g. `openai-compatible` |
+| `backend` | e.g. `openai-compatible` / `ollama` |
+| `usage` | `{prompt_tokens,completion_tokens,total_tokens}` |
+| `tokens` | Alias of `usage.total_tokens` (agent metrics) |
+| `name` | Optional handle tag (`fast` / `reasoning`) |
+| `llm_calls` | `1` per ask |
 
 ### Compat
 
@@ -70,13 +80,19 @@ import llm:ext/ai/llm.mq.md
 OPENAI_API_KEY=sk-...
 OPENAI_BASE_URL=https://api.openai.com/v1
 OPENAI_MODEL=gpt-4o-mini
+MARQDO_LLM_FAST_MODEL=...
+MARQDO_LLM_REASONING_MODEL=...
+OLLAMA_HOST=http://127.0.0.1:11434/v1
 ```
 
 Fallbacks: `MARQDO_LLM_API_KEY`, `MARQDO_LLM_BASE_URL`, `MARQDO_LLM_MODEL`. Ctor also accepts `api_key=` / `base_url=` / `model=` / `backend=`.
 
-## Roadmap (see ai-stack.md)
+## Backends
 
-Prompt-as-document, named models (`fast` / `reasoning`), multi-backend split, richer usage/tool_calls — deferred; keep transport behind the semantic API.
+| `backend=` | Module | Notes |
+|------------|--------|-------|
+| `openai-compatible` (default) | `ext/ai/llm/openai.mq.md` | Chat Completions HTTP + SSE |
+| `ollama` | defaults in ctor + same transport | Key defaults to `ollama`; host from `OLLAMA_HOST` |
 
 ## Tests
 
@@ -84,4 +100,5 @@ Prompt-as-document, named models (`fast` / `reasoning`), multi-backend split, ri
 - `tests/ext/llm-ctor-offline.mq.md`
 - `tests/ext/llm-ask-offline.mq.md` (create + collect)
 - `tests/ext/llm-stream-offline.mq.md`
+- `tests/ext/llm-named-offline.mq.md` (fast/reasoning + prompt_load)
 - Live: `llm-complete.mq.md` · `llm-stream-live.mq.md`

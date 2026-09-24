@@ -3809,6 +3809,48 @@ auto/marqdo",
 }
 
 #[test]
+fn ext_agent_zero_llm() {
+    ensure_agent_plugin_built();
+    assert_out_llm_offline(
+        "tests/ext/agent-zero-llm.mq.md",
+        "compiled
+0",
+    );
+}
+
+#[test]
+fn ext_llm_named_offline() {
+    let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let output = Command::new(env!("CARGO_BIN_EXE_marqdo"))
+        .args(["run", "tests/ext/llm-named-offline.mq.md"])
+        .env("OPENAI_API_KEY", "sk-test")
+        .env("MARQDO_EXT", root.join("ext"))
+        .env_remove("OPENAI_MODEL")
+        .env_remove("MARQDO_LLM_MODEL")
+        .env_remove("MARQDO_LLM_FAST_MODEL")
+        .env_remove("MARQDO_LLM_REASONING_MODEL")
+        .current_dir(&root)
+        .output()
+        .expect("run llm-named-offline");
+    let code = output.status.code().unwrap_or(1);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert_eq!(code, 0, "llm-named-offline stderr={stderr}");
+    assert_eq!(
+        stdout.trim_end(),
+        "fast
+qwen-fast-test
+reasoning
+gpt-reason-test
+ollama
+llama3.2
+True
+False",
+        "stdout={stdout}"
+    );
+}
+
+#[test]
 fn lib_net_encode() {
     assert_out("tests/lib/net-encode.mq.md", "a%20b");
 }

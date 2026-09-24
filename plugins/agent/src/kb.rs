@@ -1269,7 +1269,7 @@ pub fn workbook_solidify(args: &Value) -> Result<Value, String> {
     };
     let lit = marqdo_quoted_text(&result);
     let body = format!(
-        "---\ntitle: agent workbook\n---\n\n# main\n\n*`result` = {lit} *\n**`result`**\n"
+        "---\ntitle: agent workbook\n---\n\n# main\n\n**`result` = {lit}**\n*`result`*\n"
     );
     fs::write(&p, body).map_err(|e| format!("solidify write: {e}"))?;
     Ok(json!({

@@ -49,6 +49,37 @@ The runbook `.mq.md` is ground truth (code as documentation). Default budgets ke
 
 ---
 
+## model_turn
+    + `model`
+    + `prompt`
+    + `stream`=False
+    + `echo`=False
+
+One LLM turn via the semantic surface (`ask` / `stream`+`collect`). Returns `{text,llm_calls,tokens}` for episode metrics.
+
+1. `stream`
+  **evs = > model.stream prompt=`prompt` echo=`echo`**
+  **text = > llm.collect events=`evs`**
+  **tokens = 0**
+2. *
+  **r = > model.ask prompt=`prompt`**
+  **text = [text](r)**
+  **tokens = [tokens](r)**
+  1. `tokens`
+    **_ = 1**
+  2. *
+    **tokens = 0**
+
+`out` =
+
+| text | llm_calls | tokens |
+|------|-----------|--------|
+| `text` | 1 | `tokens` |
+
+*out*
+
+---
+
 ## dump_step_context
     + `agent`
     + `task`=""
@@ -1264,7 +1295,7 @@ Parent Plan-and-Move prompt. Short protocol only — no long monologues.
     + `events`
     + `max_acts`=6
 
-LLM Plan → CALL/READ/DECISION loop. Returns `{decision,reply,observation,events}`.
+LLM Plan → CALL/READ/DECISION loop. Returns `{decision,reply,observation,events,llm_calls,tokens}`.
 
 **model = > json.get value=`agent` key="model"**
 **last_obs = observation**
@@ -1272,6 +1303,8 @@ LLM Plan → CALL/READ/DECISION loop. Returns `{decision,reply,observation,event
 **decision = None**
 **last_reply = None**
 **evs_all = events**
+**llm_calls = 0**
+**tokens = 0**
 
 - `left` > 0
   1. `decision`
@@ -1279,11 +1312,17 @@ LLM Plan → CALL/READ/DECISION loop. Returns `{decision,reply,observation,event
   2. *
     **ctx = > build_plan_context agent=`agent` goal=`goal` observation=`last_obs` explore_attempt=`explore_attempt` explore_n=`explore_n` phase=`phase`**
     1. `stream`
-      **evs = > model.complete prompt=`ctx` stream=True echo=`echo`**
-      **last_reply = > llm.stream_result events=`evs`**
+      **evs = > model.stream prompt=`ctx` echo=`echo`**
+      **last_reply = > llm.collect events=`evs`**
       **evs_all = > plan_merge_deltas events=`evs_all` from=`evs` stream=`stream`**
+      **llm_calls = llm_calls + 1**
     2. *
-      **last_reply = > model.complete prompt=`ctx`**
+      **turn = > model_turn model=`model` prompt=`ctx` stream=False echo=`echo`**
+      **last_reply = > json.get value=`turn` key="text"**
+      **c = > json.get value=`turn` key="llm_calls"**
+      **t = > json.get value=`turn` key="tokens"**
+      **llm_calls = llm_calls + c**
+      **tokens = tokens + t**
     **last_reply = > trim value=`last_reply`**
     **act = > extract_plan_act reply=`last_reply`**
     **kind = > json.get value=`act` key="kind"**
@@ -1314,6 +1353,8 @@ LLM Plan → CALL/READ/DECISION loop. Returns `{decision,reply,observation,event
 **out = > json.set map=`out` key="reply" value=`last_reply`**
 **out = > json.set map=`out` key="observation" value=`last_obs`**
 **out = > json.set map=`out` key="events" value=`evs_all`**
+**out = > json.set map=`out` key="llm_calls" value=`llm_calls`**
+**out = > json.set map=`out` key="tokens" value=`tokens`**
 *out*
 
 ---
@@ -1649,6 +1690,7 @@ Primary author entry (v2 + P4): Adaptive `route` → execute (policy/kb skill) o
 **needs_llm = > json.get value=`routed` key="needs_llm"**
 **exec_mode = "explore"**
 **llm_calls = 0**
+**tokens = 0**
 **out = None**
 **route_backend = > json.get value=`routed` key="backend"**
 
@@ -1692,13 +1734,11 @@ Primary author entry (v2 + P4): Adaptive `route` → execute (policy/kb skill) o
 2. `needs_llm`
   1. `router_model`
     **prompt = > json.get value=`routed` key="prompt"**
-    1. `stream`
-      **evs = > router_model.complete prompt=`prompt` stream=True echo=`echo`**
-      **reply = > llm.stream_result events=`evs`**
-    2. *
-      **reply = > router_model.complete prompt=`prompt`**
+    **turn = > model_turn model=`router_model` prompt=`prompt` stream=`stream` echo=`echo`**
+    **reply = > json.get value=`turn` key="text"**
+    **llm_calls = > json.get value=`turn` key="llm_calls"**
+    **tokens = > json.get value=`turn` key="tokens"**
     **applied = > `self`.route_apply task=`task` reply=`reply` kb_dir=`kb_dir` backend=`router`**
-    **llm_calls = 1**
     **am = > json.get value=`applied` key="matched"**
     1. `am`
       **path = > json.get value=`applied` key="resource"**
@@ -1791,7 +1831,7 @@ Primary author entry (v2 + P4): Adaptive `route` → execute (policy/kb skill) o
 2. *
   **verification = "status: skipped"**
 
-**ep = > `self`.record_episode task=`task` status=`st` result=`res` mode=`exec_mode` skill=`sk2` observation=`obs` workbook=`wb_path` cache=`cache2` match=`match2` llm_calls=`llm_calls` error=`err` memory_dir=`memory_dir`**
+**ep = > `self`.record_episode task=`task` status=`st` result=`res` mode=`exec_mode` skill=`sk2` observation=`obs` workbook=`wb_path` cache=`cache2` match=`match2` llm_calls=`llm_calls` tokens=`tokens` error=`err` memory_dir=`memory_dir`**
 
 **learning = None**
 1. `learn`
@@ -1802,9 +1842,10 @@ Primary author entry (v2 + P4): Adaptive `route` → execute (policy/kb skill) o
 2. *
   **_ = 1**
 
-**execution = > json.parse text={"mode":"explore","llm_calls":0}**
+**execution = > json.parse text={"mode":"explore","llm_calls":0,"tokens":0}**
 **execution = > json.set map=`execution` key="mode" value=`exec_mode`**
 **execution = > json.set map=`execution` key="llm_calls" value=`llm_calls`**
+**execution = > json.set map=`execution` key="tokens" value=`tokens`**
 **execution = > json.set map=`execution` key="skill" value=`sk2`**
 **execution = > json.set map=`execution` key="router" value=`route_backend`**
 **out = > json.set map=`out` key="execution" value=`execution`**
@@ -1841,17 +1882,20 @@ With `stream=True`, the model call uses SSE; `echo=True` prints delta text to st
 **reads_left = max_reads**
 **reply = None**
 **decision = None**
+**llm_calls = 0**
+**tokens = 0**
 
 - `reads_left` > 0
   1. `decision`
     **reads_left = 0**
   2. *
     **ctx = > build_step_context agent=`self` task=`task` source_depth=`source_depth` skill_depth=`skill_depth`**
-    1. `stream`
-      **evs = > model.complete prompt=`ctx` stream=True echo=`echo`**
-      **reply = > llm.stream_result events=`evs`**
-    2. *
-      **reply = > model.complete prompt=`ctx`**
+    **turn = > model_turn model=`model` prompt=`ctx` stream=`stream` echo=`echo`**
+    **reply = > json.get value=`turn` key="text"**
+    **c = > json.get value=`turn` key="llm_calls"**
+    **t = > json.get value=`turn` key="tokens"**
+    **llm_calls = llm_calls + c**
+    **tokens = tokens + t**
     **reply = > trim value=`reply`**
     **rk = > extract_plan_read reply=`reply`**
     1. `rk` == source
@@ -1880,11 +1924,12 @@ With `stream=True`, the model call uses SSE; `echo=True` prints delta text to st
     **task_s = > json.stringify value=`task`**
     **fp = "Tool CALL was rejected (not on the tools whitelist). Do NOT emit CALL. Answer the user task directly with the final answer only.\n\nUser task:\n"**
     **fp = fp + task_s**
-    1. `stream`
-      **evs_retry = > model.complete prompt=`fp` stream=True echo=`echo`**
-      **reply = > llm.stream_result events=`evs_retry`**
-    2. *
-      **reply = > model.complete prompt=`fp`**
+    **turn2 = > model_turn model=`model` prompt=`fp` stream=`stream` echo=`echo`**
+    **reply = > json.get value=`turn2` key="text"**
+    **c = > json.get value=`turn2` key="llm_calls"**
+    **t = > json.get value=`turn2` key="tokens"**
+    **llm_calls = llm_calls + c**
+    **tokens = tokens + t**
     **out = > json.set map=`out` key="status" value="ok"**
     **out = > json.set map=`out` key="decision" value=`decision`**
     **out = > json.set map=`out` key="denied_tool" value=`tool_name`**
@@ -1898,16 +1943,20 @@ With `stream=True`, the model call uses SSE; `echo=True` prints delta text to st
     **fp = fp + "ran via subtask and returned:"**
     **fp = fp + tool_s**
     **fp = fp + ". Reply to the user briefly."**
-    1. `stream`
-      **evs2 = > model.complete prompt=`fp` stream=True echo=`echo`**
-      **reply = > llm.stream_result events=`evs2`**
-    2. *
-      **reply = > model.complete prompt=`fp`**
+    **turn2 = > model_turn model=`model` prompt=`fp` stream=`stream` echo=`echo`**
+    **reply = > json.get value=`turn2` key="text"**
+    **c = > json.get value=`turn2` key="llm_calls"**
+    **t = > json.get value=`turn2` key="tokens"**
+    **llm_calls = llm_calls + c**
+    **tokens = tokens + t**
     **out = > json.set map=`out` key="tool" value=`tool_name`**
     **out = > json.set map=`out` key="tool_result" value=`tool_s`**
     **out = > json.set map=`out` key="result" value=`reply`**
 2. *
   **out = > json.set map=`out` key="result" value=`reply`**
+
+**out = > json.set map=`out` key="llm_calls" value=`llm_calls`**
+**out = > json.set map=`out` key="tokens" value=`tokens`**
 
 **as_turn = > json.parse text={"role":"assistant"}**
 **as_turn = > json.set map=`as_turn` key="content" value=`reply`**
@@ -2101,11 +2150,12 @@ Reuse lookup: exact → alias → canonicalize → optional local n-gram `near` 
         **soft_prompt = > build_soft_match_prompt goal=`goal` tasks=`tasks`**
         **model = > json.get value=`self` key="model"**
         1. `stream`
-          **evs = > model.complete prompt=`soft_prompt` stream=True echo=`echo`**
-          **soft_reply = > llm.stream_result events=`evs`**
+          **evs = > model.stream prompt=`soft_prompt` echo=`echo`**
+          **soft_reply = > llm.collect events=`evs`**
           **events = > plan_merge_deltas events=`events` from=`evs` stream=`stream`**
         2. *
-          **soft_reply = > model.complete prompt=`soft_prompt`**
+          **soft_turn = > model_turn model=`model` prompt=`soft_prompt` stream=False echo=`echo`**
+          **soft_reply = > json.get value=`soft_turn` key="text"**
         **soft_reply = > trim value=`soft_reply`**
         **soft_dec = > extract_plan_decision reply=`soft_reply`**
         **events = > plan_append_decision events=`events` decision=`soft_dec` stream=`stream`**

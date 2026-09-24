@@ -4,8 +4,10 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 MQ="${MARQDO_BIN:-$ROOT/target/release/marqdo}"
-export MARQDO_EXT="${MARQDO_EXT:-$ROOT/.marqdo-ext}"
-export MARQDO_AGENT_PLUGIN="${MARQDO_AGENT_PLUGIN:-$ROOT/.marqdo-ext/native/libagent.so}"
+export MARQDO_EXT="${MARQDO_EXT:-$ROOT/ext}"
+export MARQDO_AGENT_PLUGIN="${MARQDO_AGENT_PLUGIN:-$ROOT/target/release/libagent.so}"
+# Offline golds that construct an llm handle need a dummy key (no network).
+export OPENAI_API_KEY="${OPENAI_API_KEY:-sk-test}"
 
 if [[ ! -x "$MQ" ]]; then
   echo "missing $MQ — run: cargo build --release -p marqdo -p marqdo_plugin_agent" >&2
@@ -30,6 +32,7 @@ run tests/ext/agent-context-budget-a3.mq.md
 run tests/ext/agent-workbook-patch-a0.mq.md
 run tests/ext/agent-v2-learn.mq.md
 run tests/ext/agent-p4-route.mq.md
+run tests/ext/agent-zero-llm.mq.md
 run examples/agent-okf-flywheel/index.mq.md
 run examples/agent-pong/index.mq.md
 

@@ -1,12 +1,13 @@
 ---
 title: ext/ai/llm
 description: >-
-  Marqdo LLM intelligence primitive — ask / stream / collect.
-  OpenAI-compatible HTTP is an internal backend, not the authoring surface.
+  Marqdo LLM intelligence primitive — ask / stream / collect / named handles.
+  OpenAI-compatible and Ollama HTTP stay behind the semantic surface.
 import sys:lib/sys.mq.md
-import net:lib/net.mq.md
 import json:lib/json.mq.md
-import table:lib/table.mq.md
+import fs:lib/fs.mq.md
+import text:lib/text.mq.md
+import openai:ext/ai/llm/openai.mq.md
 ---
 
 ## load_env
@@ -48,27 +49,100 @@ Compatibility alias for `collect`.
 
 *> collect events=`events`*
 
+## usage_from
+    + `data`
+
+Extract `{prompt_tokens,completion_tokens,total_tokens}` from an OpenAI-shaped response map (or empty zeros).
+
+*> openai.usage_from data=`data`*
+
 ## create
     + `model`=None
     + `base_url`=None
     + `api_key`=None
     + `backend`=openai-compatible
+    + `name`=None
 
-Factory for an LLM handle (same as constructing `# llm`). Env fallbacks apply inside the constructor.
+Factory for an LLM handle (same as constructing `# llm`). Env fallbacks apply inside the constructor. Optional `name=` tags the handle (`fast` / `reasoning`).
 
-**h = > llm model=`model` base_url=`base_url` api_key=`api_key` backend=`backend`**
+**h = > llm model=`model` base_url=`base_url` api_key=`api_key` backend=`backend` name=`name`**
 *h*
 
-## ask
-    + `prompt`
+## fast
     + `model`=None
     + `base_url`=None
     + `api_key`=None
 
-Module convenience: create a default handle and return **answer text** (document-native one-liner).
+Named small/fast handle. Model from arg, else `MARQDO_LLM_FAST_MODEL`, else default create model.
+
+1. `model`
+  **mdl = model**
+2. *
+  **mdl = > sys.env_get name="MARQDO_LLM_FAST_MODEL"**
+
+*> create model=`mdl` base_url=`base_url` api_key=`api_key` name="fast" backend="openai-compatible"*
+
+## reasoning
+    + `model`=None
+    + `base_url`=None
+    + `api_key`=None
+
+Named strong/reasoning handle. Model from arg, else `MARQDO_LLM_REASONING_MODEL`, else default create model.
+
+1. `model`
+  **mdl = model**
+2. *
+  **mdl = > sys.env_get name="MARQDO_LLM_REASONING_MODEL"**
+
+*> create model=`mdl` base_url=`base_url` api_key=`api_key` name="reasoning" backend="openai-compatible"*
+
+## prompt_load
+    + `path`
+
+Load a prompt artifact (`.mq.md` / `.md`) from disk for `ask`.
+If frontmatter declares `type: prompt` (or `类型: 提示`), return the body after the closing `---`; otherwise the full file text.
+
+**raw = > fs.read_text path=`path`**
+**sw = > text.starts_with text=`raw` prefix="---"**
+1. not `sw`
+  *raw*
+2. *
+  **parts = > split value=`raw` sep="\n---\n"**
+  **n = > len value=`parts`**
+  1. `n` < 2
+    *raw*
+  2. *
+    **fm = > at value=`parts` index=0**
+    **is_p = > text.contains text=`fm` sub="type: prompt"**
+    1. not `is_p`
+      **is_p = > text.contains text=`fm` sub="类型: 提示"**
+    2. *
+      **_ = 1**
+    1. `is_p`
+      **body = > at value=`parts` index=1**
+      *> text.str_trim s=`body`*
+    2. *
+      *raw*
+
+## ask
+    + `prompt`=None
+    + `path`=None
+    + `model`=None
+    + `base_url`=None
+    + `api_key`=None
+
+Module convenience: create a default handle and return **answer text**. Pass `path=` to load a prompt document, or `prompt=` text.
+
+1. `path`
+  **p = > prompt_load path=`path`**
+2. `prompt`
+  **p = prompt**
+3. *
+  > print text=ext/ai/llm.ask: pass prompt= or path=
+  > sys.exit code=1
 
 **m = > create model=`model` base_url=`base_url` api_key=`api_key`**
-**r = > m.ask prompt=`prompt`**
+**r = > m.ask prompt=`p`**
 *[text](r)*
 
 # llm
@@ -76,8 +150,9 @@ Module convenience: create a default handle and return **answer text** (document
     + `base_url`=None
     + `api_key`=None
     + `backend`=openai-compatible
+    + `name`=None
 
-LLM handle — intelligence primitive, not an HTTP client. Transport fields stay on the handle for the openai-compatible backend only.
+LLM handle — intelligence primitive, not an HTTP client.
 
 1. `api_key`
   **key = api_key**
@@ -88,15 +163,26 @@ LLM handle — intelligence primitive, not an HTTP client. Transport fields stay
   2. *
     **_ = 1**
 
-1. not `key`
+1. `backend` == ollama
+  1. not `key`
+    **key = "ollama"**
+  2. *
+    **_ = 1**
+2. not `key`
   > print text=ext/ai/llm: set OPENAI_API_KEY or MARQDO_LLM_API_KEY (or pass api_key=)
   > sys.exit code=1
-2. *
+3. *
   **_ = 1**
 
 1. `base_url`
   **url = base_url**
-2. *
+2. `backend` == ollama
+  **url = > sys.env_get name="OLLAMA_HOST"**
+  1. not `url`
+    **url = "http://127.0.0.1:11434/v1"**
+  2. *
+    **_ = 1**
+3. *
   **url = > sys.env_get name="OPENAI_BASE_URL"**
   1. not `url`
     **url = > sys.env_get name="MARQDO_LLM_BASE_URL"**
@@ -116,85 +202,92 @@ LLM handle — intelligence primitive, not an HTTP client. Transport fields stay
   2. *
     **_ = 1**
   1. not `mdl`
-    **mdl = "gpt-4o-mini"**
+    1. `backend` == ollama
+      **mdl = "llama3.2"**
+    2. *
+      **mdl = "gpt-4o-mini"**
   2. *
     **_ = 1**
 
+1. `name`
+  **nm = name**
+2. *
+  **nm = None**
+
 `h` =
 
-| _type | backend | api_key | base_url | model | suffix | bearer |
-|-------|---------|---------|----------|-------|--------|--------|
-| llm | `backend` | `key` | `url` | `mdl` | /chat/completions | "Bearer " |
+| _type | backend | api_key | base_url | model | suffix | bearer | name |
+|-------|---------|---------|----------|-------|--------|--------|------|
+| llm | `backend` | `key` | `url` | `mdl` | /chat/completions | "Bearer " | `nm` |
 
 *h*
 
 ## ask
-    + `prompt`
+    + `prompt`=None
+    + `path`=None
 
-Semantic ask: one-shot answer as an **LLMResult** map (`text`, `model`, `finish`, `backend`). Prefer `[text](result)` or `result` in agent metrics.
+Semantic ask → **LLMResult** (`text`, `model`, `finish`, `backend`, `usage`, `name`). Prefer `[text](result)` for the answer string.
 
-**text = > self.complete prompt=`prompt` stream=False echo=False**
+1. `path`
+  **p = > prompt_load path=`path`**
+2. `prompt`
+  **p = prompt**
+3. *
+  > print text=ext/ai/llm: ask needs prompt= or path=
+  > sys.exit code=1
+
+**pack = > self.complete_result prompt=`p` stream=False echo=False**
+**text = > json.get value=`pack` key="text"**
+**usage = > json.get value=`pack` key="usage"**
+**finish = > json.get value=`pack` key="finish"**
 
 `result` =
 
-| text | model | finish | backend |
-|------|-------|--------|---------|
-| `text` | [model](self) | stop | [backend](self) |
+| text | model | finish | backend | usage | name | llm_calls | tokens |
+|------|-------|--------|---------|-------|------|-----------|--------|
+| `text` | [model](self) | `finish` | [backend](self) | `usage` | [name](self) | 1 | [total_tokens](usage) |
 
 *result*
 
 ## stream
-    + `prompt`
+    + `prompt`=None
+    + `path`=None
     + `echo`=False
 
 Semantic stream: return the event list (use `llm.collect` to reduce to text).
 
-*> self.complete prompt=`prompt` stream=True echo=`echo`*
+1. `path`
+  **p = > prompt_load path=`path`**
+2. `prompt`
+  **p = prompt**
+3. *
+  > print text=ext/ai/llm: stream needs prompt= or path=
+  > sys.exit code=1
+
+*> self.complete prompt=`p` stream=True echo=`echo`*
+
+## complete_result
+    + `prompt`
+    + `stream`=False
+    + `echo`=False
+
+Transport pack via `ext/ai/llm/openai` (Ollama uses the same OpenAI-compatible path). Non-stream → `{text,usage,finish}`; stream → `{events}`.
+
+*> openai.chat_completions base_url=[base_url](self) api_key=[api_key](self) model=[model](self) prompt=`prompt` stream=`stream` echo=`echo` suffix=[suffix](self) bearer=[bearer](self)*
 
 ## complete
     + `prompt`
     + `stream`=False
     + `echo`=False
 
-Internal / compatibility primitive (API-client shape). Prefer `ask` / `stream` in new code. OpenAI-compatible transport only when `backend` is openai-compatible.
-
-**url = [base_url](self) + [suffix](self)**
-**auth = [bearer](self) + [api_key](self)**
-**headers = > table.put in=None at="Authorization" value=`auth`**
-
-`messages` =
-
-| @ | role | content |
-|---|------|---------|
-| 1 | user | `prompt` |
-
-`req` =
-
-| model | messages |
-|-------|----------|
-| [model](self) | `messages` |
+Internal / compatibility primitive. Prefer `ask` / `stream` in new code.
 
 1. `stream`
-  **req = > table.put in=`req` at="stream" value=True**
-  **body = > json.stringify value=`req`**
-  **resp = > net.http_post_sse url=`url` body=`body` headers=`headers` echo=`echo`**
-  1. [status](resp) == 200
-    *[events](resp)*
-  2. *
-    > print text=ext/ai/llm: HTTP error (stream)
-    > print text=[status](resp)
-    > sys.exit code=1
+  **pack = > self.complete_result prompt=`prompt` stream=True echo=`echo`**
+  *[events](pack)*
 2. *
-  **body = > json.stringify value=`req`**
-  **resp = > net.http_post url=`url` body=`body` headers=`headers`**
-  1. [status](resp) == 200
-    **data = > json.parse text=[body](resp)**
-    *[content]([message]([1]([choices](data))))*
-  2. *
-    > print text=ext/ai/llm: HTTP error
-    > print text=[status](resp)
-    > print text=[body](resp)
-    > sys.exit code=1
+  **pack = > self.complete_result prompt=`prompt` stream=False echo=`echo`**
+  *[text](pack)*
 
 ## chat
     + `prompt`
