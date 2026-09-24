@@ -162,10 +162,16 @@ fn assert_err(path: &str, line_col: &str, substr: &str) {
 
 /// Like [`assert_out`], but sets a dummy OpenAI key so offline LLM/agent paths
 /// that only check for the env var (no live HTTP) can proceed.
+/// Also points `MARQDO_EXT` at the repo `ext/` so tests do not pick up a stale
+/// `~/.marqdo/ext` pack ahead of in-tree sources.
 fn assert_out_llm_offline(path: &str, expect: &str) {
+    let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let ext = root.join("ext");
     let output = Command::new(env!("CARGO_BIN_EXE_marqdo"))
         .args(["run", path])
         .env("OPENAI_API_KEY", "sk-test")
+        .env("MARQDO_EXT", &ext)
+        .current_dir(&root)
         .output()
         .expect("failed to run marqdo");
     let code = output.status.code().unwrap_or(1);
@@ -3861,12 +3867,38 @@ fn ext_llm_stream_offline() {
 }
 
 #[test]
+fn ext_llm_ask_offline() {
+    let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let output = Command::new(env!("CARGO_BIN_EXE_marqdo"))
+        .args(["run", "tests/ext/llm-ask-offline.mq.md"])
+        .env("OPENAI_API_KEY", "sk-test")
+        .env("MARQDO_EXT", root.join("ext"))
+        .env_remove("OPENAI_MODEL")
+        .env_remove("MARQDO_LLM_MODEL")
+        .current_dir(&root)
+        .output()
+        .expect("run llm-ask-offline");
+    let code = output.status.code().unwrap_or(1);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert_eq!(code, 0, "llm-ask-offline stderr={stderr}");
+    assert_eq!(
+        stdout.trim_end(),
+        "gpt-4o-mini\nopenai-compatible\nHi!\nHi!",
+        "stdout={stdout}"
+    );
+}
+
+#[test]
 fn ext_llm_ctor_offline() {
+    let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let output = Command::new(env!("CARGO_BIN_EXE_marqdo"))
         .args(["run", "tests/ext/llm-ctor-offline.mq.md"])
         .env("OPENAI_API_KEY", "sk-test")
+        .env("MARQDO_EXT", root.join("ext"))
         .env_remove("OPENAI_MODEL")
         .env_remove("MARQDO_LLM_MODEL")
+        .current_dir(&root)
         .output()
         .expect("run llm-ctor-offline");
     let code = output.status.code().unwrap_or(1);

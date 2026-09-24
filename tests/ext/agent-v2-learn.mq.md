@@ -22,6 +22,8 @@ import sys:lib/sys.mq.md
 **kb = > json.get value=`paths` key="kb"**
 **task = > json.get value=`paths` key="task"**
 
+> fs.remove_tree path=`mem`
+> fs.remove_tree path=`kb`
 > agent_memory_ensure memory_dir=`mem`
 
 **ep1 = > agent_record_episode task=`task` status="ok" result="pong" mode="explore" llm_calls=2 memory_dir=`mem`**

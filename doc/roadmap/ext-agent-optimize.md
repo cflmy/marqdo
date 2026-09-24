@@ -41,6 +41,7 @@
 | **B1** | 评测 harness 锁差异化指标（constitution / dump / writeback 遮蔽） | **Active** |
 | **B1.5** | **Skill Compilation v2（Phase 1–3）**：episode → maybe_learn → compile → `llm_free`；`agent.run` / `resolve` / `metrics`；ABI 在 `plugins/agent`（`memory.rs`）；金样 `agent-v2-learn` | **done** |
 | **B1.6 / P4** | **Adaptive Routing**（原 Jev Router 更名）：`route` backends = `marqdo` \| `small-llm` \| `jev?` \| `llm` \| `auto`；Policy Compilation → `policies/router.mq.md`；金样 `agent-p4-route`；设计 [004.md](../next/004.md) | **done** |
-| **B2–B5** | 真 MCP / resume+HITL / stats / 并行；小模型 live 路由；Jev 可选接线 | 暂缓 |
+| **L0** | **LLM semantic surface（005）**：`ask` / `stream` / `collect` / `create`；`complete` 降为兼容；统一方案 [ai-stack.md](ai-stack.md) | **done** |
+| **B2–B5** | 真 MCP / resume+HITL / stats / 并行；小模型 live 路由；Jev 可选接线；LLM named models / prompt-document | 暂缓 |
 
-示例：`examples/agent-pong/` · `examples/agent-okf-flywheel/`。v2 设计：[doc/next/002.md](../next/002.md) · [doc/next/003.md](../next/003.md) · P4：[doc/next/004.md](../next/004.md)。
+示例：`examples/agent-pong/` · `examples/agent-okf-flywheel/`。v2 设计：[doc/next/002.md](../next/002.md) · [doc/next/003.md](../next/003.md) · P4：[doc/next/004.md](../next/004.md) · LLM：[doc/next/005.md](../next/005.md)。

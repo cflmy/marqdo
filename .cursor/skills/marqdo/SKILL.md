@@ -201,7 +201,7 @@ import clock:lib/time.mq.md
 - Instance methods stay `` > `obj`.method `` (backticks on the receiver only).
 - `lib/…` resolves via `MARQDO_LIB`, cwd `lib/`, or `lib/` next to the `marqdo` binary.
 - Design: [module-namespace.md](../../doc/design/module-namespace.md).
-- Official optional extensions (`ext/`, not stdlib): install with `marqdo ext add llm|agent|web|quantum|linalg` (see `doc/design/ext-cli.md`). `ext/llm` — chat; **`ext/agent`** — document-driven agents (see **ext/agent** below); **`ext/web`** — dynamic sites (see below); **`ext/quantum`** — circuits + Q7/Q8 (see below); **`ext/linalg`** — formula-first linear algebra (see below).
+- Official optional extensions (`ext/`, not stdlib): install with `marqdo ext add llm|agent|web|quantum|linalg` (see `doc/design/ext-cli.md`). **`ext/llm`** — intelligence primitive (`ask` / `stream` / `collect`; `complete` is compat); **`ext/agent`** — document-driven agents (see **ext/agent** below); **`ext/web`** — dynamic sites (see below); **`ext/quantum`** — circuits + Q7/Q8 (see below); **`ext/linalg`** — formula-first linear algebra (see below).
 - Native plugins: `lib/plugin` — `## load` / `unload` / `list`. C ABI: `include/marqdo_abi.h`.
 - Prefer `table.put` / `表.改` for list/map element updates; keep `json` for parse/stringify/quote (see `doc/design/stdlib-table.md`).
 - Builtins (no import): `print`/`打印`, `input`/`输入`, `len`/`长度`, `str`/`文本`, `int`/`整数`; literals `True`/`真`, `False`/`假`, `None`/`空`; logic `and`/`且`, `or`/`或`, `not`/`非`.

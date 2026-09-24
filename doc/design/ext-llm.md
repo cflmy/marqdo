@@ -2,13 +2,20 @@
 
 | | |
 |---|---|
-| Status | Accepted (v0.1.x) |
-| Date | 2026-08-06 |
-| Related | [objects.md](objects.md) · [ext-abi.md](ext-abi.md) · [ext-agent.md](ext-agent.md) · [ext-cli.md](ext-cli.md) |
+| Status | **Accepted · v0.2 semantic**（005：Intelligence Primitive） |
+| Date | 2026-09-24 |
+| Related | [objects.md](objects.md) · [ext-agent.md](ext-agent.md) · [ext-cli.md](ext-cli.md) · [ai-stack.md](../roadmap/ai-stack.md) · [doc/next/005.md](../next/005.md) |
 
 ## Scope
 
-`ext/ai/` holds **official LLM + agent** extensions. Import paths:
+`ext/ai/llm` is Marqdo’s **intelligence primitive**, not an OpenAI SDK wrapper.
+
+```text
+Author surface:  ask / stream / collect / create
+Internal:        complete (compat) + openai-compatible HTTP
+```
+
+Import:
 
 ```markdown
 ---
@@ -16,55 +23,48 @@ import llm:ext/ai/llm.mq.md
 ---
 ```
 
-Resolution: `MARQDO_EXT/ai/…`, repo `ext/ai/…`, cwd `ext/ai/…` (see [ext-cli.md](ext-cli.md)).
-
-Other official ext: [ext-agent.md](ext-agent.md) / [ext-agent-plan.md](ext-agent-plan.md) (**document-driven agent** — step with default writeback / plan workbook; thin `TOOL:` loop superseded). Installer: [ext-cli.md](ext-cli.md). Native plugins: [ext-abi.md](ext-abi.md).
-
-Streaming: `complete stream=True` returns an event list (`reasoning` / `delta` / `done` / `error`); `echo=True` prints thinking (`reasoning_content`) and answer tokens as they arrive. See [agent-streaming.md](../roadmap/agent-streaming.md). Default (`stream=False`) is unchanged (answer string).
-
-**Note:** Prefer `marqdo ext add llm`. Import `import llm:ext/ai/llm.mq.md` from repo or install root.
-
-## Platform prerequisites
-
-| Capability | Surface |
-|------------|---------|
-| HTTPS + headers | `lib/net` → `http_post` / `headers=` map |
-| Dotenv | `## load_env` in ext (or `load_dotenv` / `lib/sys`) |
-| JSON quote | `lib/json` → `quote` |
-
-## `ext/ai/llm` / `ext/ai/大模型` (object handles)
+## Public API
 
 | English | Chinese | Role |
 |---------|---------|------|
-| `## load_env` | `## 加载环境` | Free function: load `.env` |
-| `## stream_result` | `## 流式结果` | Collapse event list → final text |
-| `# llm` | `# 大模型` | Object ctor → handle map |
-| `## complete` / `## chat` | `## 运行` / `## 聊天` | Methods; optional `stream` / `流式`, `echo` / `打印增量` |
+| `## load_env` | `## 加载环境` | Load `.env` |
+| `## create` | `## 创建` | Factory → LLM handle |
+| `## ask` (module) | `## 提问` | Convenience → **text** |
+| `## collect` | `## 收集` | Events → text |
+| `## stream_result` | `## 流式结果` | Alias of `collect` |
+| `# llm` | `# 大模型` | Handle ctor |
+| `## ask` (method) | `## 提问` | → **LLMResult** map |
+| `## stream` | `## 流式` | → event list |
+| `## complete` / `## chat` | `## 运行` / `## 聊天` | Compat / transport primitive |
+
+### Preferred
 
 ```markdown
----
-import llm:ext/ai/llm.mq.md
----
+**answer = > llm.ask prompt="What is Marqdo?"**
+*answer*
 
-# main
+**model = > llm.create**
+**result = > `model`.ask prompt=`prompt`**
+*[text](result)*
 
-> load_env
-
-*`model` = > llm *
-*`reply` = > `model`.complete prompt=Say hi in one word *
-> print text=`reply`
-
-*`events` = > `model`.complete prompt=Say hi stream=True *
-- [`ev`](`events`)
-  *`t` = > json.get value=`ev` key=type *
-  1. `t` == "delta"
-    *`chunk` = > json.get value=`ev` key=text *
-    > print text=`chunk`
-  2. *
-    *`_` = 1*
+**events = > `model`.stream prompt=`prompt`**
+**text = > llm.collect events=`events`**
 ```
 
-Environment (create a **project-local** `.env`; do not commit secrets):
+### LLMResult (minimal)
+
+| Field | Meaning |
+|-------|---------|
+| `text` | Answer string |
+| `model` | Model id |
+| `finish` | Finish reason (`stop`, …) |
+| `backend` | e.g. `openai-compatible` |
+
+### Compat
+
+`complete` / `chat` still return a bare string (or event list when `stream=True`) so `ext/ai/agent` and older runbooks keep working. **New code should use `ask` / `stream` / `collect`.**
+
+## Environment
 
 ```env
 OPENAI_API_KEY=sk-...
@@ -72,14 +72,16 @@ OPENAI_BASE_URL=https://api.openai.com/v1
 OPENAI_MODEL=gpt-4o-mini
 ```
 
-Fallbacks: `MARQDO_LLM_API_KEY`, `MARQDO_LLM_BASE_URL`, `MARQDO_LLM_MODEL`.
+Fallbacks: `MARQDO_LLM_API_KEY`, `MARQDO_LLM_BASE_URL`, `MARQDO_LLM_MODEL`. Ctor also accepts `api_key=` / `base_url=` / `model=` / `backend=`.
+
+## Roadmap (see ai-stack.md)
+
+Prompt-as-document, named models (`fast` / `reasoning`), multi-backend split, richer usage/tool_calls — deferred; keep transport behind the semantic API.
 
 ## Tests
 
-- Import smoke: `tests/ext/llm-import.mq.md`
-- Offline stream: `tests/ext/llm-stream-offline.mq.md` + `tests/lib/net-openai-sse.mq.md`
-- Live complete (local): `tests/ext/llm-complete.mq.md` + `tests/ext/.env`
-- Live agent `## step`: `tests/ext/agent-run-live.mq.md` (DeepSeek; gold: `ext_agent_run_live`)
-- Agent smoke (real `llm` handle): `tests/ext/agent-smoke.mq.md` (gold: `ext_agent_framework_smoke`)
-- Live complete: `tests/ext/llm-complete.mq.md` (gold: `ext_llm_complete_live`)
-
+- `tests/ext/llm-import.mq.md`
+- `tests/ext/llm-ctor-offline.mq.md`
+- `tests/ext/llm-ask-offline.mq.md` (create + collect)
+- `tests/ext/llm-stream-offline.mq.md`
+- Live: `llm-complete.mq.md` · `llm-stream-live.mq.md`

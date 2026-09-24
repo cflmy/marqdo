@@ -1,6 +1,7 @@
 ---
 title: Agent Framework P4 — Adaptive Routing + Policy Compilation (offline)
 description: Learn skill, compile policy from skill-tagged episodes, route via marqdo backend without Jev/LLM.
+import fs:lib/fs.mq.md
 import json:lib/json.mq.md
 import plugin:lib/plugin.mq.md
 import sys:lib/sys.mq.md
@@ -21,6 +22,8 @@ import sys:lib/sys.mq.md
 **task = > json.get value=`paths` key="task"**
 **skill = > json.get value=`paths` key="skill"**
 
+> fs.remove_tree path=`mem`
+> fs.remove_tree path=`kb`
 > agent_memory_ensure memory_dir=`mem`
 
 **ep1 = > agent_record_episode task=`task` status="ok" result="pong" mode="explore" skill=`skill` llm_calls=2 memory_dir=`mem`**
