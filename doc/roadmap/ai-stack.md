@@ -35,7 +35,7 @@
 | 拆 `ext/ai/llm/openai.mq.md` + `ollama` 后端 | **done** |
 | tool_calls 完整 Result | 暂缓 |
 | Transport → 可选 ABI 插件 | 暂缓 |
-| Artifact Metadata Binding（`${env.*}` / `secret` · `sys.meta`） | **done**（Phase 1 Metadata-only；[binding.md](../design/binding.md)） |
+| Artifact Metadata Binding（`${env.*}` / `secret` · `sys.meta`） | **done**（Phase 1 Metadata-only + Phase 2 scope lift；[binding.md](../design/binding.md)） |
 
 作者面优先：
 
@@ -68,9 +68,10 @@
 3. **Prompt document** — **done**（`type: prompt` 剥 frontmatter；无参 `ask`/`stream` 经 `sys.module_source`）  
 4. **Backend split** — **done**  
 5. **Execution compilation** — **done**（`agent-zero-llm` 金样 + harness）
-6. **Metadata Binding** — **done**（Phase 1；`llm-meta-offline`）
+6. **Metadata Binding** — **done**（Phase 1 + Phase 2 scope lift；`llm-meta-offline` · `meta-lift`）
 
 ## 6. 验收金样
 
 - Agent：`tests/ext/agent-v2-learn.mq.md` · `agent-p4-route.mq.md` · `agent-zero-llm.mq.md` · `agent-plan-preserve.mq.md` · `scripts/agent-harness.sh`  
 - LLM：`tests/ext/llm-ask-offline.mq.md` · `llm-stream-offline.mq.md` · `llm-ctor-offline.mq.md` · `llm-named-offline.mq.md` · `llm-meta-offline.mq.md` · `llm-entry-prompt-offline.mq.md`
+- Binding：`tests/structure/meta-binding.mq.md` · `meta-lift.mq.md`

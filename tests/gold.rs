@@ -561,6 +561,28 @@ fn structure_meta_binding_env_and_secret() {
 }
 
 #[test]
+fn structure_meta_lift() {
+    let (code, stdout, stderr) = run(&["run", "tests/structure/meta-lift.mq.md"]);
+    assert_eq!(code, 0, "meta-lift stderr={stderr}");
+    assert_eq!(stdout.trim_end(), "lifted-model\nhi\nsk-lift");
+}
+
+#[test]
+fn structure_meta_lift_secret_and_bytecode() {
+    let (code, stdout, stderr) = run_with_env(
+        &[
+            "run",
+            "--backend",
+            "bytecode",
+            "tests/structure/meta-lift.mq.md",
+        ],
+        &[("MARQDO_LIFT_SECRET", "top-secret")],
+    );
+    assert_eq!(code, 0, "meta-lift-bc stderr={stderr}");
+    assert_eq!(stdout.trim_end(), "lifted-model\nhi\n<secret>");
+}
+
+#[test]
 fn keywords_print() {
     assert_out(
         "tests/keywords/print.mq.md",

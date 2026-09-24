@@ -46,6 +46,16 @@ impl Env {
         }
     }
 
+    /// Phase 2: lift resolved Artifact Metadata into the entry environment.
+    /// Existing keys are left unchanged (`or_insert` semantics).
+    fn with_metadata(module: &Module) -> Self {
+        let mut env = Self::new();
+        for (k, v) in &module.metadata {
+            env.vars.entry(k.clone()).or_insert_with(|| v.clone());
+        }
+        env
+    }
+
     fn get(&self, name: &str) -> Option<&Value> {
         self.vars.get(name)
     }
@@ -162,7 +172,7 @@ impl Interpreter {
     ) -> Result<Value> {
         let fun = find_function_anywhere(module, name)
             .ok_or_else(|| self.err(format!("unknown function `{name}`")))?;
-        let mut env = Env::new();
+        let mut env = Env::with_metadata(module);
         for (k, v) in &self.entry_bindings {
             env.set(k.clone(), v.clone());
         }
@@ -178,7 +188,7 @@ impl Interpreter {
         self.site_module = Some(module as *const Module);
         let result = (|| {
             if let Some(main) = find_top(module, "main") {
-                return self.run_function(module, main, Env::new(), &[], true);
+                return self.run_function(module, main, Env::with_metadata(module), &[], true);
             }
             // Document-as-entry: sole top-level `#` object with no params (e.g. `# Hello World`).
             let entries: Vec<&Function> = module
@@ -187,7 +197,13 @@ impl Interpreter {
                 .filter(|f| f.is_object() && f.params.is_empty())
                 .collect();
             if entries.len() == 1 {
-                return self.run_function(module, entries[0], Env::new(), &[], true);
+                return self.run_function(
+                    module,
+                    entries[0],
+                    Env::with_metadata(module),
+                    &[],
+                    true,
+                );
             }
             bail!("no `# main` object to run");
         })();

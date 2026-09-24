@@ -178,7 +178,8 @@ Module convenience: create a default handle and return **answer text**. Pass `pa
 
 LLM handle — intelligence primitive, not an HTTP client.
 
-Resolution: explicit args → entry Artifact Metadata (`sys.meta_get`) → `sys.env_get` → defaults.
+Resolution: explicit args → entry-scope / Artifact Metadata (`sys.meta_get`) → `sys.env_get` → defaults.
+Prefer declaring `model` / `api_key` / `base_url` in frontmatter Binding, then use the lifted names.
 
 1. `api_key`
   **key = api_key**

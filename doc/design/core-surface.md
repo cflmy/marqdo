@@ -44,4 +44,4 @@
 
 ## 4. 范围外（进 Language 层，但不在本守卫）
 
-frontmatter / Artifact Metadata（元信息）、`import` 行（模块装载）、以及 Metadata 内的 **Binding Expression**（`${ns.name}`，见 [binding.md](binding.md) · [ADR 0006](../adr/0006-artifact-metadata-binding.md)）属于 Language 层的其它语言面，随 [layers.md](layers.md) 准入流程登记，**暂不进本清单守卫**（不增 CORE_CONSTRUCTS 计数）。如需一并守卫，走 ADR 扩表。
+frontmatter / Artifact Metadata（元信息）、`import` 行（模块装载）、以及 Metadata 内的 **Binding Expression**（`${ns.name}`，见 [binding.md](binding.md) · [ADR 0006](../adr/0006-artifact-metadata-binding.md)）属于 Language 层的其它语言面，随 [layers.md](layers.md) 准入流程登记，**暂不进本清单守卫**（不增 CORE_CONSTRUCTS 计数）。Phase 2 将已绑定 metadata **提升为入口普通变量**（仍非新标记）。如需一并守卫，走 ADR 扩表。

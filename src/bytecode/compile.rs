@@ -79,7 +79,12 @@ pub fn compile_module(path: Option<&Path>, module: &Module) -> Result<Program> {
     let path_buf = path.map(|p| p.to_path_buf());
     let mut functions = Vec::new();
     for i in 0..flat.len() {
-        functions.push(compile_function(i, &flat, path_buf.as_deref())?);
+        let meta = if i == entry {
+            Some(module.metadata.as_slice())
+        } else {
+            None
+        };
+        functions.push(compile_function(i, &flat, path_buf.as_deref(), meta)?);
     }
 
     let parents: Vec<Option<usize>> = flat.iter().map(|f| f.parent).collect();
@@ -175,7 +180,12 @@ struct FnCompiler<'a> {
     stmt_span: Span,
 }
 
-fn compile_function(fn_id: usize, flat: &[FlatFun], path: Option<&Path>) -> Result<FnChunk> {
+fn compile_function(
+    fn_id: usize,
+    flat: &[FlatFun],
+    path: Option<&Path>,
+    metadata: Option<&[(String, Value)]>,
+) -> Result<FnChunk> {
     let fun = &flat[fn_id];
     let mut locals = HashMap::new();
     for (i, p) in fun.params.iter().enumerate() {
@@ -190,6 +200,15 @@ fn compile_function(fn_id: usize, flat: &[FlatFun], path: Option<&Path>) -> Resu
             if !locals.contains_key(name) {
                 let s = locals.len() as u8;
                 locals.insert(name.to_string(), s);
+            }
+        }
+    }
+    // Phase 2: reserve locals for entry metadata keys before body compile.
+    if let Some(meta) = metadata {
+        for (k, _) in meta {
+            if !locals.contains_key(k) {
+                let s = locals.len() as u8;
+                locals.insert(k.clone(), s);
             }
         }
     }
@@ -208,6 +227,16 @@ fn compile_function(fn_id: usize, flat: &[FlatFun], path: Option<&Path>) -> Resu
         locals,
         stmt_span: fun.span,
     };
+    // Prologue: seed entry locals from bound metadata.
+    if let Some(meta) = metadata {
+        for (k, v) in meta {
+            let slot = *c.locals.get(k).expect("metadata local reserved");
+            let ci = c.add_const(v.clone());
+            c.emit(Op::Constant(ci));
+            c.emit(Op::SetLocal(slot));
+            c.emit(Op::Pop);
+        }
+    }
     for stmt in &fun.body {
         c.compile_stmt(stmt)?;
     }

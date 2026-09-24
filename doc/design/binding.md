@@ -1,15 +1,15 @@
-# Marqdo Binding · Artifact Metadata（Phase 1）
+# Marqdo Binding · Artifact Metadata
 
 | | |
 |---|---|
-| 状态 | **Accepted · Phase 1（Metadata-only）** |
+| 状态 | **Accepted · Phase 1 + Phase 2（scope lift）** |
 | 日期 | 2026-09-24 |
 | ADR | [0006-artifact-metadata-binding.md](../adr/0006-artifact-metadata-binding.md) |
 | 讨论稿 | [doc/next/006.md](../next/006.md) |
-| 实现 | `src/binding/` · `Module.metadata` · `sys.meta` / `sys.meta_get` · `marqdo run --bind` |
+| 实现 | `src/binding/` · `Module.metadata` · entry env lift · `sys.meta` / `sys.meta_get` · `marqdo run --bind` |
 
 > **边界**：核心负责「声明与解析配置」；扩展负责「解释配置的语义」。  
-> **本波**：`${…}` 只出现在文件头 `---` Artifact Metadata 中。正文插值见 §8。
+> **`${…}` 只出现在文件头 Artifact Metadata**——正文 / 粗体 / 调用 / 表 **永不**写 `${env…}`（否决讨论稿 §17）。正文使用已绑定的普通名字。
 
 ---
 
@@ -150,14 +150,37 @@ CLI --bind
 
 ## 7. 与扩展的分工
 
-- **核心**：解析 Metadata、resolve Binding、暴露 `Module.metadata` / `sys.meta*`。
-- **`ext/ai/llm`**：构造次序为 **显式实参 → `sys.meta_get`（model / base_url / api_key）→ `sys.env_get` 回退 → 默认**。
+- **核心**：解析 Metadata、resolve Binding、暴露 `Module.metadata` / `sys.meta*`，并在入口把 metadata **提升为普通变量**。
+- **`ext/ai/llm`**：构造次序为 **显式实参 → 入口作用域同名变量 / `sys.meta_get` → `sys.env_get` 回退 → 默认**。
 
 ---
 
-## 8. Phase 2（不做于本波）
+## 8. Phase 2 · Metadata scope lift（Accepted）
 
-- 正文 / 粗体 / 表 / 调用实参中的 `${…}`
-- `config` / `file` namespace、嵌套 YAML map
+加载期绑定完成后，入口执行（`# main` 或唯一无参顶层对象）前，把 `Module.metadata` 的每个键注入 entry 环境，成为**普通变量**：
+
+```yaml
+---
+model: ${env.ModelName ?? "gpt-4o-mini"}
+---
+```
+
+```marqdo
+# main
+
+> print text=`model`
+```
+
+### 规则
+
+1. 注入时机：进入入口函数之前。
+2. 冲突：形参 / 调用实参 **覆盖** 同名 metadata；程序内赋值亦然。metadata **不**覆盖已存在的绑定。
+3. `sys.meta` / `sys.meta_get` 仍可用（显式通道）。
+4. **拒绝** 正文 / 粗体 / 表 / 叙述中的 `${…}`（讨论稿 006 §17 否决）。普通语言也不在语句里 `${ENV}`。
+
+### 仍推迟（P3+）
+
+- `config` / `file` namespace
+- 嵌套 YAML map
 - 显式 `override:` 糖
 - 计入 `CORE_CONSTRUCTS`
