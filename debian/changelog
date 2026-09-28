@@ -1,3 +1,11 @@
+marqdo (1.2.0-1ppa1) noble; urgency=medium
+
+  * Marqdo 1.2.0: Web Artifact rewrite (ADR 0007) — Document/Endpoint/Resource,
+    type:web|endpoint, web.serve/render/inspect, ext/data|security|net split,
+    compose_* author surface removed; marqdo-blog Artifact example.
+
+ -- cflmy <pingan@cflmy.cn>  Mon, 28 Sep 2026 11:39:04 +0800
+
 marqdo (1.1.1-1ppa1) noble; urgency=medium
 
   * Marqdo 1.1.1: AI stack closure — llm ask/stream/collect, Metadata Binding,

@@ -126,10 +126,10 @@ jobs:
             ## Marqdo ${{ github.ref_name }}
 
             ### 亮点 / Highlights
+            - **v1.2.0**：Web Artifact（ADR 0007）——Document/Endpoint · `web.serve`/`render`/`inspect` · `ext/data|security|net` · 移除 `compose_*`/`configure`
+            - **v1.2.0**: Web Artifact (ADR 0007) — Document/Endpoint, web.serve/render/inspect, ext/data|security|net, compose_*/configure removed
             - **v1.1.1**：AI 栈收口——llm `ask`/`stream`/`collect` · Metadata Binding · Skill Compilation + Adaptive Routing · MCP 客户端 + resume · 可选 `plugins/llm`
             - **v1.1.1**: AI stack — llm ask/stream/collect, Metadata Binding, Skill Compilation + Adaptive Routing, MCP client + resume, optional plugins/llm
-            - **v1.1.0**：AI 原生闭环三件套——核心表面守卫 · 渐进式契约 + `marqdo check` · **MLSP for AI** · `run --json`
-            - **v1.1.0**: AI-native loop — core-surface guard, progressive contracts + `marqdo check`, **MLSP for AI**, `run --json`
             - **v1.0.7**：WS/网络边界加固；`url_encode` `%20`
             - **v1.0.3**：Ubuntu PPA + 扩展 CDN（ext.marqdo.com）
             - **Linux 包必出**：`*-native-x86_64-unknown-linux-gnu.zip` + Linux CLI bundle

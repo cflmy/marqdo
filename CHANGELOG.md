@@ -3,6 +3,32 @@
 ## Unreleased
 
 ### Added
+
+### Fixed
+
+### Changed
+
+## v1.2.0 — 2026-09-28
+
+### Highlights
+
+**Web Artifact 重写（ADR 0007）**：Document / Endpoint / Resource 一等公民；`type: web|endpoint`（ZH `类型: 网页|端点`）；facade `web.page|route|serve|render|inspect|use`；DB/auth/ws 拆到 `ext/data` · `ext/security` · `ext/net`。本版 CLI 与扩展包 **同步为 1.2.0**。
+
+- **Document**：文件级 Artifact + `data_source` / `data_order` / `data_where`；正文 Markdown → HTML；列表卡片 / 详情文章由 serve 时加载。
+- **Endpoint**：`# main` 处理器；请求经 `run_artifact` Binding 注入；`response` 序列化 JSON/text/html。
+- **破坏性**：删除作者面 `compose_*` / `app.configure` / 作者 `ensure_plugin`；旧 web gold 移除，新金样 `ext_web_*`。
+- **示例**：`examples/marqdo-blog/` Artifact 站（pages/api/db + smoke）；`web-client-site` serve 扫描。
+
+```bash
+sudo add-apt-repository ppa:cflmy/marqdo && sudo apt update && sudo apt install marqdo
+git checkout v1.2.0 && cargo build --release
+bash scripts/build-web-plugin.sh && marqdo ext add web
+marqdo run examples/marqdo-blog/serve.mq.md
+```
+
+**核心表面 Δ（Core surface Δ）**：**无增删**——复用 Metadata `type`；装配语义在 ext + plugin。语言标记不变。
+
+### Added
 - **Web Artifact 模型（ADR 0007）**：`type: web|endpoint`（ZH `类型: 网页|端点`）；核心 `src/artifact/`；`sys.artifact_kind`；无 `# main` 时 Result 摘要。
 - **`ext/web` facade**：`page` · `route` · `serve` · `render` · `inspect` · `use`；子模块 page/route/dom/client/component。
 - **`ext/data` · `ext/security` · `ext/net`**：从 monolithic web 拆出 Resource。

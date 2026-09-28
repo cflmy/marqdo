@@ -142,8 +142,9 @@ marqdo catalog public -o .marqdo
 
 ---
 
-## 现状（v1.1.1）
+## 现状（v1.2.0）
 
+- **Web Artifact（v1.2.0 · ADR 0007）**：Document/Endpoint 一等公民（`type: web|endpoint`）· facade `page`/`route`/`serve`/`render`/`inspect`/`use` · Resource 拆到 `ext/data`/`security`/`net` · 统一 View 表 · 破坏性移除 `compose_*`/`configure`
 - **AI 栈（v1.1.1）**：`ext/ai/llm` 语义 `ask`/`stream`/`collect` · Artifact Metadata Binding（`${env|arg|sys|secret}`）· Agent Skill Compilation + Adaptive Routing · MCP stdio 客户端 + resume 检查点 · 可选 `plugins/llm` Transport ABI
 - **AI 原生闭环（v1.1.0）**：核心表面守卫（19 构造，单边改动 CI 必红）· **渐进式契约**（文档内嵌 `参数`/`返回`/`字段` 表 + 四边界校验 + `marqdo check` 防漂移）· **MLSP for AI**（`marqdo mlsp`：`locate`/`syntax`/`validate`/`repair_targets`/`repair_apply`/`schema`，AI 按需查语法而非背诵）· **结构化诊断**（`run --json`，错误即数据）；验证见 [perf-validation-report-2026-09-23.md](doc/roadmap/perf-validation-report-2026-09-23.md)
 - 映射与解释器：**v0.3 语法宪法**（`**` 代码 / `*` 返回 / 叙述声明）；Phase I 树遍历 + 字节码后端；金样例在 `tests/` 与 `tests/markup-v03/`  
@@ -166,7 +167,7 @@ marqdo catalog public -o .marqdo
 - **浏览器 Marqdo（WASM）**：`marqdo wasm build` + 官方 bridge 自启（作者零业务 JS；桥内可含列表/路由/storage/ws/文件/Canvas/音频/Observer/拖放）；`lib/browser` + GFM；`web.client_embed`；示例 [browser-hello](examples/browser-hello/) · [browser-app](examples/browser-app/) · [browser-media](examples/browser-media/) · [web-client-site](examples/web-client-site/)（[ADR 0002](doc/adr/0002-browser-marqdo-wasm.md) · [D](doc/roadmap/browser-wasm-d.md) · [E](doc/roadmap/browser-wasm-e.md) · [F](doc/roadmap/browser-wasm-f.md)）
 - 选型：[ADR 0001 — Rust](doc/adr/0001-implementation-language.md) · [ADR 0002 — 浏览器 WASM](doc/adr/0002-browser-marqdo-wasm.md)（C0–C5 完结，见 [roadmap/browser-wasm.md](doc/roadmap/browser-wasm.md)）· [ADR 0003 — 异步效应](doc/adr/0003-browser-async-effects.md)
 
-### 如何使用最新 Marqdo（v1.1.1）
+### 如何使用最新 Marqdo（v1.2.0）
 
 **安装解释器（任选其一）**
 
@@ -181,7 +182,7 @@ marqdo catalog public -o .marqdo
 ```bash
 # 1) 源码安装（跟 tag 或 main）
 git clone https://github.com/cflmy/marqdo.git && cd marqdo
-git checkout v1.1.1   # 或留在 main
+git checkout v1.2.0   # 或留在 main
 cargo build --release
 export PATH="$PWD/target/release:$PATH"
 marqdo version
@@ -220,7 +221,7 @@ marqdo wasm build
 # → dist/wasm/ … 见 examples/browser-hello/
 
 # 6) Releases：Windows exe/zip/vsix；Linux CLI zip + native `.so` zip
-#    https://github.com/cflmy/marqdo/releases/tag/v1.1.1
+#    https://github.com/cflmy/marqdo/releases/tag/v1.2.0
 ```
 
 开发期也可用 `cargo run -- …` 代替已安装的 `marqdo`：
