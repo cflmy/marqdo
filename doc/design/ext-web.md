@@ -2,18 +2,21 @@
 
 | | |
 |---|---|
-| 状态 | **Accepted · W0–W7 + P3 + W8（站点图标/Head/图片装配）完结**（SQLite/Postgres 作者面：页面装配 / db CRUD+`where` / form / 嵌入主区 / `app.route` / 路由 `/_part` / admin UI / RBAC / 上传相册 / SEO·RSS·sitemap / **favicon·头资源·图片装配**；Postgres 等见 §9） |
-| 日期 | 2026-08-11（W8：2026-08-29；请求上下文：2026-09-18） |
-| 相关 | [markdown-mapping.md](markdown-mapping.md) · [module-namespace.md](module-namespace.md) · [objects.md](objects.md) · [ext-abi.md](ext-abi.md) · [ext-cli.md](ext-cli.md) · [stdlib-i18n.md](stdlib-i18n.md) · [web-assets-and-images.md](web-assets-and-images.md) · **[ext-web-request-context.md](ext-web-request-context.md)** |
+| 状态 | **Superseded（作者面）· 历史能力档案** — 现行作者面见 **[ext-web-artifact.md](ext-web-artifact.md)** · ADR [0007](../adr/0007-web-document-endpoint.md) |
+| 日期 | 2026-08-11（W8：2026-08-29；请求上下文：2026-09-18；Artifact 重构：2026-09-28） |
+| 相关 | [ext-web-artifact.md](ext-web-artifact.md) · [markdown-mapping.md](markdown-mapping.md) · [module-namespace.md](module-namespace.md) · [objects.md](objects.md) · [ext-abi.md](ext-abi.md) · [ext-cli.md](ext-cli.md) · [stdlib-i18n.md](stdlib-i18n.md) · [web-assets-and-images.md](web-assets-and-images.md) · **[ext-web-request-context.md](ext-web-request-context.md)** |
 | 安装（目标） | `marqdo ext add web`（中英：`web` / `网页`） |
-| 本文目的 | 锁定**作者面**与**类 API**；指导实现 |
+| 本文目的 | **历史**类 API 与能力矩阵；新站请勿按本文 `compose_*` / `app.configure` 写作 |
+
+> **2026-09-28**：作者面迁移到 Document / Endpoint / Resource。C1 已由 ADR 0007 修订。下文保留作迁移对照，**不是**现行推荐 API。
 
 ---
 
 ## 0. 一句话
 
-`ext/web` 用 **GFM 表格 + Marqdo 类方法** 描述动态网站：表仍是字典/列表嵌套；类方法把表装配成可渲染页面。  
-**不改 Marqdo 核心语法**；扩展库存在的理由，正是让「文档即代码」在网站场景下成立。
+**现行**：`.mq.md` Artifact（`type: web|endpoint`）描述页面与交互；见 [ext-web-artifact.md](ext-web-artifact.md)。
+
+**历史（废止）**：`ext/web` 曾用 GFM 表格 + `# page`/`# app` 类方法拼装站点。该模型因 God Object / 碎片 DSL / 隐式路由被破坏性替换。
 
 ---
 
@@ -41,13 +44,14 @@
 
 | # | 约束 |
 |---|------|
-| C1 | **禁止**为 web 改动 Marqdo 核心：单元格求值、import、点号值读取等保持不变 |
-| C2 | 作者面**禁止** `json.parse` / `json.set` 袋胶水、手写 part JSON、手写 assemble 袋 |
-| C3 | 能力以 **`#` 类 + `##` 方法** 暴露；**英文库文件只用英文名，中文库文件只用中文名**（见 [stdlib-i18n.md](stdlib-i18n.md)）；同一 `.mq.md` 内禁止中英 API 混排 |
-| C4 | 首页在 **`index.mq.md`**：页面表在此；可复用片段进 `components/`；主体可就地写 |
-| C5 | **旧有网络扩展库全部废弃**：`plugins/web`、`ext/web/**`（含现网示例/gold 中依赖旧 API 者）评审通过后**删除或清空后重写**；禁止在旧代码上打补丁演进。**落实**：原生层 Go 全量重写见 [ext-web-go-rewrite.md](ext-web-go-rewrite.md)；作者面 ABI 名保持兼容 |
-| C6 | `# db` / `# 数据库` 必须提供完整**增删改查**；列表查询英文方法名为 **`select`**（中文 **`查询`**）；后台 `/admin` 与表单提交走同一套写库 API |
-| C7 | 用户输入经 `# form` / `# 表单`：字段表 + 校验表；**服务端校验必须在写库前执行**（见 §5.5） |
+| C1 | **修订（ADR 0007）**：核心可识别 Artifact `type: web\|endpoint`（及 ZH）；**不**新增 CORE_CONSTRUCTS 标记；单元格求值 / import 句法不变；装配语义仍在 ext + plugin。旧文「禁止为 web 改核心」作废 |
+| C2 | 作者面**禁止** `json.parse` / `json.set` 袋胶水（现行见 ext-web-artifact A2） |
+| C3 | 中英分文件；同文件禁止混 API（现行 A3） |
+| C4 | **废止**「页面表 + compose」心智 → Document Artifact + `pages/` · `api/` |
+| C5 | 破坏性重写作者面（ADR 0007）；原生 Go 演进见 [ext-web-go-rewrite.md](ext-web-go-rewrite.md) |
+| C6 | DB 迁至 **`ext/data`**；CRUD 仍须完整（`select` / `查询`） |
+| C7 | 表单校验仍须在写库前执行；挂载经 declared Endpoint / system `/_form`（inspect 可见） |
+| A1–A8 | **现行硬约束**见 [ext-web-artifact.md](ext-web-artifact.md) §9 |
 
 ---
 

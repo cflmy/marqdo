@@ -3,10 +3,18 @@
 ## Unreleased
 
 ### Added
+- **Web Artifact 模型（ADR 0007）**：`type: web|endpoint`（ZH `类型: 网页|端点`）；核心 `src/artifact/`；`sys.artifact_kind`；无 `# main` 时 Result 摘要。
+- **`ext/web` facade**：`page` · `route` · `serve` · `render` · `inspect` · `use`；子模块 page/route/dom/client/component。
+- **`ext/data` · `ext/security` · `ext/net`**：从 monolithic web 拆出 Resource。
+- **统一 View** `|type|slot|value|attrs|style|` + ABI `web_render_nodes` / `web_serve_root` / `web_inspect` / `web_app_use`。
+- **规则**：`.cursor/rules/web-artifact-no-degrade.mdc`；设计 `doc/design/ext-web-artifact.md`。
 
 ### Fixed
 
 ### Changed
+- **破坏性**：删除作者面 `compose_*` / `app.configure` / 作者 `ensure_plugin`。旧 web gold 标 `#[ignore]`；新金样 `web-artifact-*`。
+- **核心表面 Δ**：**无增删**（复用 Metadata `type`）。
+- 修订 `ext-web.md` C1；`doc/next/007.md` superseded。
 
 ## v1.1.1 — 2026-09-24
 

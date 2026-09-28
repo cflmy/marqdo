@@ -205,10 +205,51 @@ impl Interpreter {
                     true,
                 );
             }
+            // Web Artifact entry (ADR 0007): `type: web|endpoint` may be pure document —
+            // no `# main`. Return a Result-shaped summary for run/check gold paths.
+            if let Some(kind) = crate::artifact::classify(&module.metadata) {
+                use crate::artifact::ArtifactKind;
+                if matches!(kind, ArtifactKind::Web | ArtifactKind::Endpoint) {
+                    return Ok(Self::artifact_run_summary(module, kind));
+                }
+            }
             bail!("no `# main` object to run");
         })();
         self.site_module = prev;
         result
+    }
+
+
+    fn artifact_run_summary(module: &Module, kind: crate::artifact::ArtifactKind) -> Value {
+        use crate::artifact::{endpoint_path, http_method, web_route, ArtifactKind};
+        let kind_s = match kind {
+            ArtifactKind::Web => "web",
+            ArtifactKind::Endpoint => "endpoint",
+            ArtifactKind::Prompt => "prompt",
+            ArtifactKind::Other => "other",
+        };
+        let mut value = vec![
+            ("kind".into(), Value::Text(kind_s.into())),
+            ("method".into(), Value::Text(http_method(&module.metadata))),
+        ];
+        match kind {
+            ArtifactKind::Web => {
+                if let Some(r) = web_route(&module.metadata) {
+                    value.push(("route".into(), Value::Text(r)));
+                }
+            }
+            ArtifactKind::Endpoint => {
+                if let Some(r) = endpoint_path(&module.metadata) {
+                    value.push(("path".into(), Value::Text(r)));
+                }
+            }
+            _ => {}
+        }
+        Value::Map(vec![
+            ("ok".into(), Value::Bool(true)),
+            ("value".into(), Value::Map(value)),
+            ("error".into(), Value::None),
+        ])
     }
 
     /// Resolve `lib.member` on the site (entry) module — used by ABI `call_lib_path`.

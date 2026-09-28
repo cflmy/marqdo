@@ -164,44 +164,16 @@ APIs: `# agent` / `# 智能体` → `## step` / `## plan`. Context: standing + t
 
 Examples: [agent-pong](../../examples/agent-pong/) · [agent-okf-flywheel](../../examples/agent-okf-flywheel/). Harness: `scripts/agent-harness.sh`. Design: [ext-agent.md](../../doc/design/ext-agent.md) · Wave B: [agent-framework-2026-09.md](../../doc/research/agent-framework-2026-09.md). Dev LLM: copy [.env.example](../../.env.example) → `.env` (gitignored).
 
-## Official extension: `ext/web` (dynamic sites)
+## Official extension: `ext/web` (Document / Endpoint / Resource)
 
-Install: `marqdo ext add web` (ZH id: `网页`). Build native plugin first: `cargo build --release -p marqdo_plugin_web`.
+Install: `marqdo ext add web` (ZH id: `网页`). See ADR 0007 · [ext-web-artifact.md](../../doc/design/ext-web-artifact.md).
 
-Import **one language file** — never mix EN/ZH API names in the same `.mq.md`:
+**Do not degrade:** Document/Endpoint metadata; facade `web.page|route|serve|render|inspect`; View `|type|slot|value|attrs|style|` only; no `compose_*` / `configure` / author `ensure_plugin`. DB → `ext/data`; auth → `ext/security`; net → `ext/net`.
 
 - EN: `import web:ext/web/web.mq.md`
 - ZH: `导入 网页:ext/web/网页.mq.md`
 
-**Hard rules (web):**
-
-- Authors use **GFM tables + `#` classes** — no `json.parse` / `json.set` glue, no hand-built part JSON.
-- Table cells stay **literal strings**; path text like `` `posts`.`title` `` is resolved by web classes.
-- **Quote path/MIME cells** that contain `/` (T5 cell expressions treat bare `/` as division): `"/static/logo.svg"`, `"image/png"`.
-- **`ext/**` never calls `host_*`** — hot path is native `plugins/web` ABI.
-- HTTPS: terminate at reverse proxy; set `cookie_secure=True` on auth (no in-process TLS).
-
-**Typical layout:**
-
-```text
-index.mq.md          # entry + home page table + listen
-pages/               # sub-pages
-components/          # reusable |属性|值|样式| tables
-styles/              # CSS modules
-public/              # static + favicon.ico|png|svg
-db/                  # schema + open/init
-data/                # sqlite runtime (gitignore)
-```
-
-**Core objects (EN / ZH):** `# page`/`页面`, `# style`/`样式`, `# db`/`数据库`, `# form`/`表单`, `# app`/`应用`, `# auth`/`鉴权`, `# cache`/`缓存`, `# storage`/`存储`.
-
-**Typical flow:** `db.init` → `page.compose_*` → `app` + `static` / `listen`. Client: `marqdo wasm build -o static` + `web.client_embed source="/static/client.mq.md"` — **no author JS**; bridge may implement rich host effects ([browser-wasm-e.md](../../doc/roadmap/browser-wasm-e.md) · [browser-app](../../examples/browser-app/)).
-
-**Shipped surface (W0–W7 + P3 + W8 + route D mount):** middleware + JSON API (`app.configure`); transactions, pagination, FTS search (`db.migrate`, `db.fts`, `db.search`); security (argon2, CSRF, SQLite sessions, login rate limit); SEO / RSS / Markdown (`page.meta`, `route_rss`, `lib/net.markdown_parse`); upload / download / gallery; sitemap / robots / error pages / redirects; RBAC (`app.gate`, user `role`); audit timestamps + FK in `db.init`; ETag on downloads; **W8** site icons (`app.icons` → `/favicon.ico`), head resource tables (`page.head`), image assembly (`make_images` / `page.images`); **D** `client_embed` auto-mount + DOM effect helpers (`text_patch` / `dom_patch`).
-
-Design: [ext-web.md](../../doc/design/ext-web.md) · assets: [web-assets-and-images.md](../../doc/design/web-assets-and-images.md) · capability matrix: [web-net-capabilities.md](../../doc/design/web-net-capabilities.md) · example: [examples/marqdo-blog/](../../examples/marqdo-blog/) · client: [examples/web-client-site/](../../examples/web-client-site/).
-
-Web patterns: [examples.md](examples.md) §13 · API index: [reference.md](reference.md).
+Design: [ext-web-artifact.md](../../doc/design/ext-web-artifact.md) · example: [examples/marqdo-blog/](../../examples/marqdo-blog/).
 
 ## Official extension: `ext/quantum` (circuits + Q7/Q8)
 
@@ -249,7 +221,7 @@ Design: [ext-quantum.md](../../doc/design/ext-quantum.md) · Q7: [ext-quantum-q7
 | Import `lib/text` then call bare `split` | `> text.split …` (qualified) |
 | Import `lib/text` then call `拆分` | Match file language (`text.split`, not 文本) |
 | `json.set` / `json.append` to build maps or lists | GFM tables; sparse `table.put`; named helpers (`browser.*`, `web.*`) |
-| `json.set` to build page parts | GFM tables + `page.compose_*` / `web.page` methods |
+| `json.set` / `compose_*` page parts | `type: web` Document + View table / `web.render` |
 | Import `json` for every browser handler | `import browser:lib/browser.mq.md` + tables ([marqdo-dev](../marqdo-dev/SKILL.md)) |
 | Mix `web.page` and `网页.页面` in one file | One import language per `.mq.md` |
 | Call `host_web_*` from `ext/web` | Use `# app` / `# db` methods; plugin ABI only |

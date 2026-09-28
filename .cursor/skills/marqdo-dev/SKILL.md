@@ -92,7 +92,7 @@ Better still — call a named helper:
 7. **Do not use `##` inside `# main` for document sectioning** — those become nested functions. Use paragraphs / `---` breaks instead.
 8. **Index:** prefer `[键](集合)` / `` [`名`](集合) `` over footnote `` m[^k] ``.
 
-Browser client programs: prefer `import browser:lib/browser.mq.md` (no native plugin). Server sites: `ext/web` + GFM page/style tables.
+Browser client programs: prefer `import browser:lib/browser.mq.md` (no native plugin). Server sites: Artifact Metadata (`type: web|endpoint`) + `ext/web` facade + `ext/data` / `ext/security` / `ext/net` — see [ext-web-artifact.md](../../doc/design/ext-web-artifact.md). **Never** restore `compose_*` / `app.configure`.
 
 ## Developing libraries (`lib/*`, `ext/*`)
 
@@ -121,7 +121,9 @@ Canonical thin-template + waves: [lib-code-as-docs.md](../../doc/design/lib-code
 | Need | Place |
 |------|--------|
 | Browser effect maps (WASM client) | `lib/browser.mq.md` |
-| Site HTML / HTTP / DB | `ext/web` classes + compose from tables |
+| Site HTML / HTTP | `ext/web` Document/Endpoint + View tables |
+| DB / cache / storage | `ext/data` |
+| Auth / OIDC / RBAC | `ext/security` |
 | List/map primitives | `lib/table.mq.md` |
 | Parse JSON text | `lib/json.mq.md` only |
 

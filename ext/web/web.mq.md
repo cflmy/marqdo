@@ -1,74 +1,93 @@
 ---
 title: ext/web/web
-description: Official web site classes (English). Tables + methods; no bag glue.
-import plugin:lib/plugin.mq.md
-import sys:lib/sys.mq.md
+description: >-
+  Web Artifact facade (ADR 0007) — page · route · serve · render · inspect · use.
+  Document/Endpoint first-class. No compose_* / configure / author ensure_plugin.
+import cap:ext/web/_capability.mq.md
+import page_mod:ext/web/page.mq.md
+import route_mod:ext/web/route.mq.md
+import dom_mod:ext/web/dom.mq.md
+import client_mod:ext/web/client.mq.md
 import table:lib/table.mq.md
 ---
 
-## ensure_plugin
+Importing this module is the web **capability** (native plugin loads on first facade call).
 
-Load the ABI v2 `web` plugin once.
+## page
+    + `title`=""
+    + `route`="/"
+    + `method`="GET"
+    + `body`=""
+    + `nodes`=None
+    + `data_source`=""
+    + `data_order`=""
+    + `data_where`=""
 
-**p = > plugin.native_path name="web"**
-1. `p`
-  > plugin.load path=`p`
-2. *
-  > print text=ext/web: native web plugin not found (build marqdo_plugin_web or marqdo ext add web)
-  > sys.exit code=1
-****
+Construct a Document handle. Prefer `type: web` Artifact files discovered by `serve`.
 
-## make_style
-    + `name`=""
-    + `table`
-    + `strict`=False
+*> page_mod.page title=`title` route=`route` method=`method` body=`body` nodes=`nodes` data_source=`data_source` data_order=`data_order` data_where=`data_where`*
 
-Assemble a GFM style table into a CSS string. Two shapes are accepted:
-`|选择器|属性|值|` rule rows (arbitrary selectors; rows sharing a selector are
-merged, and a leading `|媒体|` column groups rows into `@media` blocks), or
-`|属性|值|` property rows wrapped as `.name { … }`. Selectors starting with
-`@keyframes name` emit keyframe blocks (`属性` = stop `from`/`to`/`N%`,
-`值` = `prop: val` or use `@keyframes name from` + normal 属性/值). Quote CSS
-values that contain `/` (e.g. `"16/9"`, `"1 / 5"`); bare `1 / 5` is integer
-division and becomes a numeric cell — default mode warns, `strict=True` errors.
-For complex themes prefer `page.css` (raw string, no table eval) or an external
-`static/*.css` via `page.head`. Styles stay as data tables, `make_style` turns
-them into CSS — 样式即数据、装配即函数.
+## route
+    + `app`
+    + `path`
+    + `method`="GET"
+    + `page`=None
+    + `fn`=""
+    + `request`="json"
+    + `response`="json"
+    + `auth`=""
 
-> ensure_plugin
-*> web_style name=`name` table=`table` strict=`strict`*
+Register a declared Document page or Endpoint (`fn` = `lib.member`).
 
-## make_intro
-    + `table`
+**r = > route_mod.route app=`app` path=`path` method=`method` page=`page` fn=`fn` request=`request` response=`response` auth=`auth`**
+*> `r`.register app=`app`*
 
-Assemble an intro bind table (`|属性|值|样式|` / `|front|back|style|`) into an
-HTML fragment for `.main-intro`. Same slot vocabulary as `compose_intro`
-(`kicker`/`title`/`lede`/`claim`/`step`, plus ZH aliases). The `样式` column is
-treated as a class name only here — prefer `page.compose_intro` when styles
-should resolve from `shell.*` tables into `styles_css`.
+## render
+    + `doc`=None
+    + `nodes`=None
+    + `body`=""
+    + `title`=""
+    + `db`=None
 
-> ensure_plugin
-*> web_intro table=`table`*
+Render a Document or View nodes to HTML (offline / preview).
 
-## make_images
-    + `table`
+> cap.load
+1. `doc`
+  *> `doc`.render nodes=`nodes` db=`db`*
+2. `nodes`
+  *> web_render_nodes page=`doc` nodes=`nodes` db=`db` title=`title`*
+3. *
+  *> web_render_document page=`doc` body=`body` db=`db` title=`title`*
 
-Assemble a GFM image table into an HTML fragment (`div.mq-images` of
-`<figure class="mq-img">` / `<img>`). Columns: `src`/`alt`/`title`/`class`/
-`href`/`width`/`height`/`loading`/`caption` (ZH: `源`/`替代`/`标题`/`类`/
-`链接`/`宽度`/`高度`/`加载`/`图注`). Images stay as data — 图片即数据、装配即函数.
+## use
+    + `app`
+    + `middleware`
 
-> ensure_plugin
-*> web_images table=`table`*
+First-class middleware — pass a GFM table (security headers, cors row, etc.). Replaces `configure(...)` junk drawer.
 
-## make_head
-    + `table`
+> cap.load
+*> web_app_use app=`app` middleware=`middleware`*
 
-Assemble a Head resource table into HTML (`<link>` / `<script>`). Useful for
-preview; prefer `page.head` to attach resources to a page.
+## inspect
+    + `app`=None
 
-> ensure_plugin
-*> web_head table=`table`*
+Return `{declared, system}` route tables for introspection (code-as-documentation).
+
+> cap.load
+*> web_inspect app=`app`*
+
+## serve
+    + `root`="."
+    + `host`="127.0.0.1"
+    + `port`=18081
+    + `db`=None
+    + `static_dir`=""
+    + `middleware`=None
+
+Scan `root/**/*.mq.md` for `type: web|endpoint` (ZH `类型: 网页|端点`), register declared routes, attach system routes, listen.
+
+> cap.load
+*> web_serve_root root=`root` host=`host` port=`port` db=`db` static_dir=`static_dir` middleware=`middleware`*
 
 ## client_embed
     + `bridge`="/static/marqdo-bridge.js"
@@ -76,766 +95,69 @@ preview; prefer `page.head` to attach resources to a page.
     + `source`=""
     + `boot`=True
 
-Return an HTML snippet that loads the official browser Marqdo bridge (route C/D).
-With `boot` and non-empty `source` (URL path to `.mq.md`), emits `data-mq-wasm` / `data-mq-source-url` so the bridge auto-mounts (author zero JS).
-Run `marqdo wasm build -o static` and `app.static dir=static`. Design: [browser-marqdo-wasm.md](../../doc/design/browser-marqdo-wasm.md) §16.
-
-1. `boot`
-    1. `source` != ""
-        *"<script type=\"module\" src=\"" + bridge + "\" data-mq-wasm=\"" + wasm + "\" data-mq-source-url=\"" + source + "\"></script>"*
-    2. *
-        *"<script type=\"module\" src=\"" + bridge + "\"></script>"*
-2. *
-    *"<script type=\"module\" src=\"" + bridge + "\" data-mq-no-boot=\"1\"></script>"*
+*> client_mod.embed bridge=`bridge` wasm=`wasm` source=`source` boot=`boot`*
 
 ## text_patch
     + `sel`
     + `text`
 
-Shortcut: build a `set_text` effects map `{ set_text: { sel: text } }` for browser return values.
-Prefer authoring with `lib/browser` + GFM tables in client `.mq.md` ([marqdo-dev](../../.cursor/skills/marqdo-dev/SKILL.md)).
-
-**`m` = > table.put in=None at=sel value=text**
-*> table.put in=None at="set_text" value=m*
+*> client_mod.text_patch sel=`sel` text=`text`*
 
 ## dom_patch
-    + `set_text`=None
-    + `set_value`=None
-    + `set_attr`=None
-    + `set_class`=None
-    + `toggle_class`=None
-    + `set_style`=None
-    + `set_html`=None
-    + `render_list`=None
-    + `navigate`=None
-    + `storage`=None
-    + `ws`=None
-    + `fetch`=None
-    + `fetch_all`=None
-    + `after`=None
-    + `interval`=None
-    + `clear_interval`=None
-    + `focus`=None
-    + `blur`=None
-    + `scroll_into`=None
-    + `canvas`=None
-    + `audio`=None
-    + `read_file`=None
-    + `observe`=None
-    + `unobserve`=None
-    + `wire`=None
-
-Merge browser effect keys into one return map (omit `None`). Route E/F effects included.
-
-**`out` = > table.put in=None at="_mq" value=True**
-1. `set_text` != None
-    **`out` = > table.put in=`out` at="set_text" value=set_text**
-1. `set_value` != None
-    **`out` = > table.put in=`out` at="set_value" value=set_value**
-1. `set_attr` != None
-    **`out` = > table.put in=`out` at="set_attr" value=set_attr**
-1. `set_class` != None
-    **`out` = > table.put in=`out` at="set_class" value=set_class**
-1. `toggle_class` != None
-    **`out` = > table.put in=`out` at="toggle_class" value=toggle_class**
-1. `set_style` != None
-    **`out` = > table.put in=`out` at="set_style" value=set_style**
-1. `set_html` != None
-    **`out` = > table.put in=`out` at="set_html" value=set_html**
-1. `render_list` != None
-    **`out` = > table.put in=`out` at="render_list" value=render_list**
-1. `navigate` != None
-    **`out` = > table.put in=`out` at="navigate" value=navigate**
-1. `storage` != None
-    **`out` = > table.put in=`out` at="storage" value=storage**
-1. `ws` != None
-    **`out` = > table.put in=`out` at="ws" value=ws**
-1. `fetch` != None
-    **`out` = > table.put in=`out` at="fetch" value=fetch**
-1. `fetch_all` != None
-    **`out` = > table.put in=`out` at="fetch_all" value=fetch_all**
-1. `after` != None
-    **`out` = > table.put in=`out` at="after" value=after**
-1. `interval` != None
-    **`out` = > table.put in=`out` at="interval" value=interval**
-1. `clear_interval` != None
-    **`out` = > table.put in=`out` at="clear_interval" value=clear_interval**
-1. `focus` != None
-    **`out` = > table.put in=`out` at="focus" value=focus**
-1. `blur` != None
-    **`out` = > table.put in=`out` at="blur" value=blur**
-1. `scroll_into` != None
-    **`out` = > table.put in=`out` at="scroll_into" value=scroll_into**
-1. `canvas` != None
-    **`out` = > table.put in=`out` at="canvas" value=canvas**
-1. `audio` != None
-    **`out` = > table.put in=`out` at="audio" value=audio**
-1. `read_file` != None
-    **`out` = > table.put in=`out` at="read_file" value=read_file**
-1. `observe` != None
-    **`out` = > table.put in=`out` at="observe" value=observe**
-1. `unobserve` != None
-    **`out` = > table.put in=`out` at="unobserve" value=unobserve**
-1. `wire` != None
-    **`out` = > table.put in=`out` at="wire" value=wire**
-*out*
-
-## list_html
     + `sel`
-    + `tag`="li"
-    + `items`
+    + `html`=""
+    + `attrs`=None
+    + `remove`=False
 
-Build a `render_list` effect: `{ render_list: { sel: { tag, items } } }`.
+*> client_mod.dom_patch sel=`sel` html=`html` attrs=`attrs` remove=`remove`*
 
-**`spec` = > table.put in=None at="tag" value=tag**
-**`spec` = > table.put in=`spec` at="items" value=items**
-**`m` = > table.put in=None at=sel value=spec**
-*> table.put in=None at="render_list" value=m*
-
-# page
-    + `title`="Marqdo Web"
-    + `intro`=""
-    + `shell_css`=None
-    + `layout`=None
-    + `asset_version`=None
-
-> ensure_plugin
-*> web_page_new title=`title` intro=`intro` shell_css=`shell_css` layout=`layout` asset_version=`asset_version`*
-
-## shell_css
-    + `mode`=full
-
-Framework shell CSS mode for this page: `full` (default), `minimal` (vars only), or `off`/`none`.
-
-**`out` = > table.put in=`self` at="shell_css" value=mode**
-*out*
-
-## layout
-    + `layout`=sidebar
-
-Page chrome layout: `sidebar` (default when a side slot exists), `stacked` (single column; no `has-sidebar` grid), `bare` (main only), or `rail`.
-
-**`out` = > table.put in=`self` at="layout" value=layout**
-*out*
-
-## asset_version
-    + `version`=""
-
-Default `?v=` bump for head scripts/styles that omit a per-row `version` column.
-
-**`out` = > table.put in=`self` at="asset_version" value=version**
-*out*
-
-## compose_components
-    + `components`
-
-Assemble nav / sidebar / footer from a page table (`|组件|样式|` or `|src|style|`).
-Nav bind tables may include optional `媒体`/`media` (responsive show) and `当`/`when`
-(`auth` / `guest` / `hide`) columns — see C4 conditional nav.
-
-*> web_compose_components page=`self` components=`components`*
-
-## compose_main
-    + `main`
-
-Assemble main from a bind table (`|属性|值|样式|` or `|front|back|css|`).
-
-*> web_compose_main page=`self` main=`main`*
-
-## compose_list
-    + `main`
-    + `query`=None
-    + `order`=""
-    + `target`=""
-
-Secondary list bind (e.g. comments on a detail page). Same bind shape as compose_main.
-Optional query supports route param placeholders; optional target injects into an intro element id.
-
-*> web_compose_list page=`self` main=`main` query=`query` order=`order` target=`target`*
-
-## compose_intro
-    + `intro`
-
-Assemble page intro from the same bind shape as `compose_main`
-(`|属性|值|样式|` / `|front|back|style|`). `值` is literal copy (light
-`[label](url)` / `**bold**`); `样式` resolves `shell.*` named
-tables into `styles_css` like `card_title`. Consecutive `claim` / `step` rows
-group into `.claim` / `.steps`. Slot aliases: `kicker`/`眉题`, `title`/`标题`,
-`lede`/`导语`, `claim`/`标签`, `step`/`步骤`, plus `mount`/`插槽` and
-`html`/`原文`. Replaces string `intro=` HTML. In `.mq.md` table cells, avoid
-inline `` `code` `` — backtick refs are Marqdo variables; quote long prose
-and use plain filenames or `[label](url)` links instead.
-
-*> web_compose_intro page=`self` intro=`intro`*
-
-## query
-    + `query`
-
-Attach a DB where-condition map for the main bind. Values may contain `{param}`
-placeholders that are resolved from dynamic-route params (e.g. `/post/{slug}`).
-
-*> web_page_query page=`self` query=`query`*
-
-## order
-    + `order`
-
-Set a default `ORDER BY` for the main bind (e.g. `-created_at` for newest first).
-
-*> web_page_order page=`self` order=`order`*
-
-## link_prefix
-    + `prefix`
-
-Prefix for card links in the main bind (default `/post/`). Cards whose bind has
-an `href`/`链接` field become `<a href="{prefix}{href}">`.
-
-*> web_page_link_prefix page=`self` prefix=`prefix`*
-
-## css
-    + `css`
-
-Append a *raw* CSS string to the page's stylesheet (`styles_css`). Skips table-cell
-expression evaluation — use for themes with `/`, `@keyframes`, or long media queries.
-Hand-written theme alongside the assembled shell; or link `static/theme.css` via `head`.
-
-*> web_page_css page=`self` css=`css`*
-
-## detail
-    + `detail`=True
-
-Render the main bind's first row as a full article (title/meta/tags/body) instead
-of a list of cards. Set on the dynamic post page so `/post/{slug}` shows one post.
-
-*> web_page_detail page=`self` detail=`detail`*
-
-## chrome
-    + `nav_html`=""
-    + `footer_html`=""
-    + `body_class`=""
-
-Override default header/footer list chrome with raw HTML (site navbar / footer). Optional `body_class` is appended to `<body class>`.
-
-*> web_page_chrome page=`self` nav_html=`nav_html` footer_html=`footer_html` body_class=`body_class`*
-
-## meta
-    + `meta`
-
-SEO / OpenGraph metadata as a data table (`|key|value|`). Keys such as `title`, `description`, `canonical`, `og:type` become `<head>` tags at render time. Special keys `icon` / `favicon` / `apple-touch-icon` emit `<link rel="…">` (not `<meta name>`).
-
-*> web_page_meta page=`self` meta=`meta`*
-
-## head
-    + `table`
-
-Assemble `<head>` resources from a GFM table (`|rel|href|type|sizes|media|as|crossorigin|defer|async|version|` or ZH `|关系|地址|…|推迟|异步|版本|`). `rel=script` / `module` become `<script>`; other rows become `<link>`. Classic scripts emit `defer` / `async` only when those columns are true (compat: missing `defer` stays synchronous). Non-empty `version` appends `?v=`; else page/app `asset_version` is used. Merges with any existing `head` on the page.
-
-*> web_page_head page=`self` table=`table`*
-
-## images
-    + `table`
-
-Assemble an image table (`|src|alt|title|class|href|width|height|loading|caption|`) into HTML and attach it as `images_html` (rendered in main before intro). Same table shape as module-level `make_images`.
-
-*> web_page_images page=`self` table=`table`*
-
-## paginate
-    + `offset`=0
-    + `limit`=10
-    + `path`=/
-
-List pagination for the main bind: sets DB `limit`/`offset` and renders previous/next navigation.
-
-*> web_page_paginate page=`self` offset=`offset` limit=`limit` path=`path`*
-
-## compose_form
-    + `form`
-    + `id`
-    + `target`=None
-
-Embed a form into the page main slot. Optional `target` / `form_slot` (CSS id, e.g. `#qd-note-form-mount`) injects the form inside that element in `intro` HTML instead of a sibling `.site-form` after `.main-intro` (GAP-11). Missing mount falls back to sibling. `listen` auto-registers `GET|POST /_form/{id}` from page/route forms (optional `app.mount_form`).
-
-*> web_compose_form page=`self` form=`form` id=`id` target=`target`*
-
-## compose_form_load
-    + `table`
-    + `id_param`="id"
-
-Prefill the composed form from DB using route/query `id` (desk edit pages).
-
-*> web_compose_form_load page=`self` table=`table` id_param=`id_param`*
-
-## compose_auth_form
-    + `action`
-    + `submit`=""
-    + `form_id`=""
-    + `err_id`=""
-    + `target`=None
-    + `next`=""
-    + `kind`=""
-
-Progressive-enhancement login/register form: server injects `_csrf` / `next`,
-re-renders the same branded page on failure. No author JS.
-
-*> web_compose_auth_form page=`self` action=`action` submit=`submit` form_id=`form_id` err_id=`err_id` target=`target` next=`next` kind=`kind`*
-
-## compose_nav_brand
-    + `title`=""
-    + `href`="/"
-    + `logo`=""
-    + `logo_light`=""
-    + `theme_key`="mq-theme"
-
-SSR topnav brand (logo + title), theme toggle, and drawer button. Interactive
-behavior stays in `client.mq.md` via `compose_client` / `client_embed`.
-
-*> web_compose_nav_brand page=`self` title=`title` href=`href` logo=`logo` logo_light=`logo_light` theme_key=`theme_key`*
-
-## compose_client
-    + `source`
-    + `bridge`="/static/marqdo-bridge.js"
-    + `wasm`="/static/marqdo_wasm.wasm"
-
-Stamp `page.client` so render injects official bridge auto-mount (`data-mq-wasm` /
-`data-mq-source-url`). Build with `marqdo wasm build -o static` first.
-
-*> web_compose_client page=`self` source=`source` bridge=`bridge` wasm=`wasm`*
-
-## render
-    + `db`=None
-
-Offline HTML for tests / previews.
-
-1. `db`
-  **url = [url](db)**
-  *> web_render page=`self` url=`url`*
-2. *
-  *> web_render page=`self`*
-
-# style
+## make_style
     + `name`=""
-
-Style tables live as `##` exports in site style modules; compose resolves them by path.
-
-*self*
-
-## process
-    + `style`=None
-    + `name`=None
-    + `path`=None
-
-*self*
-
-# db
-    + `url`="sqlite:site.db"
-
-Open a database handle. URL schemes: `sqlite:path` (default), `postgres://…` / `postgresql://…` (same CRUD methods).
-
-> ensure_plugin
-*> web_db_new url=`url`*
-
-## init
-    + `name`
-    + `fields`
-
-Create a table from a schema table. Optional columns: `唯一`/`unique`, `索引`/`index` (creates UNIQUE / INDEX), `外键`/`fk`/`references` (e.g. `posts.id` or `posts(id)`). Columns named `created_at` / `updated_at` are filled automatically on insert/update when present.
-
-**url = [url](self)**
-*> web_db_init url=`url` name=`name` fields=`fields`*
-
-## insert
     + `table`
-    + `rows`
-    + `txn`=None
+    + `strict`=False
 
-**url = [url](self)**
-*> web_db_insert url=`url` table=`table` rows=`rows` txn=`txn`*
+Style table → CSS (data, not hidden page DSL).
 
-## select
+> cap.load
+*> web_style name=`name` table=`table` strict=`strict`*
+
+## make_images
     + `table`
-    + `where`=None
-    + `limit`=200
-    + `order`=None
-    + `txn`=None
 
-Simple filters: one-row map of column→value (AND `=`), or rows `|字段|操作|值|` (`=` `!=` `>` `>=` `<` `<=` `like` `in` `between` `is null`; add `|或|` = `是` to join a row with `OR`). `order` is a column name with optional `-` prefix for descending (`"created_at"`, `"-created_at"`), comma-separated for multiple keys. Pass `txn` to read inside an open transaction. For pages (with a total), use `paginate`.
+> cap.load
+*> web_images table=`table`*
 
-**url = [url](self)**
-**r = > web_db_select url=`url` table=`table` where=`where` limit=`limit` order=`order` offset=None txn=`txn`**
-*[rows](r)*
-
-## paginate
+## make_head
     + `table`
-    + `where`=None
-    + `limit`=200
-    + `order`=None
-    + `跳过`=0
-    + `txn`=None
 
-Like `select` but returns `{ rows, total }` — the total counts rows matching `where` regardless of `limit`/`跳过`, so you can render `上一页 / 下一页`. Set `跳过` to the number of rows to skip (e.g. page 2 with 10 per page ⇒ `跳过`=10).
-
-**url = [url](self)**
-*> web_db_select url=`url` table=`table` where=`where` limit=`limit` order=`order` offset=`跳过` txn=`txn`*
-
-## get
-    + `table`
-    + `id`
-    + `txn`=None
-
-**url = [url](self)**
-*> web_db_get url=`url` table=`table` id=`id` txn=`txn`*
-
-## update
-    + `table`
-    + `id`
-    + `row`
-    + `txn`=None
-
-**url = [url](self)**
-*> web_db_update url=`url` table=`table` id=`id` row=`row` txn=`txn`*
-
-## delete
-    + `table`
-    + `id`
-    + `txn`=None
-
-**url = [url](self)**
-*> web_db_delete url=`url` table=`table` id=`id` txn=`txn`*
-
-## exec
-    + `sql`
-    + `args`=None
-    + `txn`=None
-
-**url = [url](self)**
-*> web_db_exec url=`url` sql=`sql` args=`args` txn=`txn`*
-
-## query
-    + `sql`
-    + `args`=None
-    + `txn`=None
-
-Run bare SQL and return the result set — count / join / group / subqueries. Returns `{ rows, count }`.
-
-**url = [url](self)**
-*> web_db_query url=`url` sql=`sql` args=`args` txn=`txn`*
-
-## count
-    + `table`
-    + `where`=None
-    + `txn`=None
-
-Count rows matching a `where` filter (same syntax as `select`). Returns a number.
-
-**url = [url](self)**
-**r = > web_db_count url=`url` table=`table` where=`where` txn=`txn`**
-*[count](r)*
-
-## migrate
-    + `steps`
-
-Apply versioned SQL migrations. `steps` is a `|version|sql|` / `|版本|SQL|` table. Applied versions are recorded in `_marqdo_migrations`. Re-running is a no-op for already-applied versions. SQLite only.
-
-**url = [url](self)**
-*> web_db_migrate url=`url` steps=`steps`*
-
-## fts
-    + `table`
-    + `columns`
-    + `name`=None
-
-Create an FTS5 index on `table` for the listed content columns (CSV string or list). Default FTS name is `{table}_fts`. Keeps the index in sync via triggers. Requires integer `id` PK. SQLite only.
-
-**url = [url](self)**
-*> web_db_fts_create url=`url` table=`table` columns=`columns` name=`name`*
-
-## search
-    + `table`
-    + `q`
-    + `limit`=20
-    + `name`=None
-
-Full-text search (`MATCH`) against the FTS5 index from `fts`. Returns `{ rows, count }` with a `rank` column (bm25). SQLite only.
-
-**url = [url](self)**
-*> web_db_search url=`url` table=`table` q=`q` limit=`limit` name=`name`*
-
-## 事务
-
-Begin a transaction: borrows the pooled connection exclusively and returns a
-`txn` handle. Write inside it, then `提交` (commit) or `回滚` (roll back).
-Every statement runs on the same connection, so a batch is atomic.
-
-**url = [url](self)**
-*> web_db_begin url=`url`*
-
-# txn
-    + `txn`
-    + `url`
-
-A transaction handle from `db.事务`. All CRUD here runs on the transaction's
-connection; finish with `提交` or `回滚`.
-
-*self*
-
-## insert
-    + `table`
-    + `rows`
-
-**url = [url](self)**
-**txn = [txn](self)**
-*> web_db_insert url=`url` table=`table` rows=`rows` txn=`txn`*
-
-## select
-    + `table`
-    + `where`=None
-    + `limit`=200
-    + `order`=None
-
-Same filters as `db.select`; runs inside the transaction.
-
-**url = [url](self)**
-**txn = [txn](self)**
-**r = > web_db_select url=`url` table=`table` where=`where` limit=`limit` order=`order` offset=None txn=`txn`**
-*[rows](r)*
-
-## get
-    + `table`
-    + `id`
-
-**url = [url](self)**
-**txn = [txn](self)**
-*> web_db_get url=`url` table=`table` id=`id` txn=`txn`*
-
-## update
-    + `table`
-    + `id`
-    + `row`
-
-**url = [url](self)**
-**txn = [txn](self)**
-*> web_db_update url=`url` table=`table` id=`id` row=`row` txn=`txn`*
-
-## delete
-    + `table`
-    + `id`
-
-**url = [url](self)**
-**txn = [txn](self)**
-*> web_db_delete url=`url` table=`table` id=`id` txn=`txn`*
-
-## exec
-    + `sql`
-    + `args`=None
-
-**url = [url](self)**
-**txn = [txn](self)**
-*> web_db_exec url=`url` sql=`sql` args=`args` txn=`txn`*
-
-## 提交
-
-Commit the transaction and return its connection to the pool.
-
-**txn = [txn](self)**
-*> web_db_commit txn=`txn`*
-
-## 回滚
-
-Roll the transaction back (undo every write) and return its connection.
-
-**txn = [txn](self)**
-*> web_db_rollback txn=`txn`*
-
-# form
-    + `table`=None
-    + `action`=insert
-    + `id`=None
-
-Field table + rules table; submit writes through `# db`.
-
-> ensure_plugin
-*> web_form_new table=`table` action=`action` id=`id`*
-
-## fields
-    + `fields`
-
-*> web_form_fields form=`self` fields=`fields`*
-
-## rules
-    + `rules`
-
-*> web_form_rules form=`self` rules=`rules`*
-
-## labels
-    + `submit`="Submit"
-    + `cancel`="cancel"
-    + `cancel_href`=""
-
-Localized submit / cancel copy for rendered forms.
-
-*> web_form_labels form=`self` submit=`submit` cancel=`cancel` cancel_href=`cancel_href`*
-
-## validate
-    + `rules`=None
-    + `data`
-
-*> web_form_validate form=`self` rules=`rules` data=`data`*
-
-## render
-    + `id`=form
-    + `data`=None
-    + `errors`=None
-
-*> web_form_render form=`self` id=`id` data=`data` errors=`errors`*
-
-## submit
-    + `data`
-    + `db`
-
-**url = [url](db)**
-*> web_form_submit form=`self` data=`data` url=`url`*
+> cap.load
+*> web_head table=`table`*
 
 # app
-    + `page`
+    + `page`=None
     + `db`=None
-    + `admin`=False
     + `host`=127.0.0.1
     + `port`=18081
+    + `admin`=False
     + `admin_prefix`=/admin
-    + `login_redirect`=None
-    + `logout_redirect`=None
     + `shell_css`=None
     + `layout`=None
     + `asset_version`=None
 
-Construct an app. `admin=True` mounts the built-in **table browser** (not a CMS) under `admin_prefix` (default `/admin`). When `admin=False`, that prefix is not reserved and is not auto-gated — declare your own `route` + `gate` desk. Optional `login_redirect` / `logout_redirect` override post-auth landing. Optional `shell_css` / `layout` / `asset_version` become defaults for pages that do not set their own (see `page.shell_css` / `page.layout` / `page.asset_version`).
+Low-level app handle for advanced mounts. Prefer `web.serve` for Artifact sites.
 
-> ensure_plugin
-*> web_app_new page=`page` db=`db` admin=`admin` host=`host` port=`port` admin_prefix=`admin_prefix` login_redirect=`login_redirect` logout_redirect=`logout_redirect` shell_css=`shell_css` layout=`layout` asset_version=`asset_version`*
-
-## route
-    + `path`
-    + `page`
-
-Mount an assembled page at `path` (e.g. `/about`). `/` is the home `page=`.
-
-*> web_app_route app=`self` path=`path` page=`page`*
-
-## mount_form
-    + `id`
-    + `form`
-
-Register `GET|POST /_form/{id}` for listen when the form is not already embedded via `page.compose_form`.
-
-*> web_app_mount_form app=`self` id=`id` form=`form`*
+> cap.load
+*> web_app_new page=`page` db=`db` admin=`admin` host=`host` port=`port` admin_prefix=`admin_prefix` login_redirect=None logout_redirect=None shell_css=`shell_css` layout=`layout` asset_version=`asset_version`*
 
 ## static
     + `dir`
     + `mount`=/static
 
-Serve files from `dir` under `mount` (default `/static`). Path is resolved from the process working directory at listen time. If `dir` contains `favicon.ico` / `favicon.png` / `favicon.svg` and `icons` was not set, listen also serves `GET /favicon.ico` and injects a default `<link rel="icon">` on every page.
-
 *> web_app_static app=`self` dir=`dir` mount=`mount`*
-
-## icons
-    + `table`
-
-Register site icons from a GFM table (`|path|rel|type|sizes|url|` or ZH
-`|路径|关系|类型|尺寸|地址|`). Listen serves each file at `url` (default
-`/favicon.ico` for `.ico` icons, else `/icons/{filename}`), and injects matching
-`<link>` tags into every page via `site_head`. See [web-assets-and-images.md](../../doc/design/web-assets-and-images.md).
-
-*> web_app_icons app=`self` table=`table`*
-
-## configure
-    + `cors`=None
-    + `security`=None
-    + `compress`=None
-    + `body_limit`=None
-    + `json`=None
-    + `access_log`=None
-    + `cache_control`=None
-    + `proxy`=None
-    + `invoke`=None
-
-Each capability is declared as a data table and assembled at listen time. The `cors` parameter takes a `|允许来源|方法|头|暴露头|凭证|` table (one row per origin; an empty `允许来源` column means any origin). The `security` parameter takes a `|头|值|` response-header table (e.g. `X-Frame-Options`, `Content-Security-Policy`, `X-Content-Type-Options`, `Referrer-Policy`, `Strict-Transport-Security`). Set `compress` to `True` to gzip response bodies. `body_limit` is the max request body bytes (e.g. `1048576`). The `json` parameter takes a `|路径|方法|表|条件|排序|上限|` table of JSON API endpoints backed by DB queries (each returns `application/json`). Set `access_log` to `True` to log `METHOD path status duration_ms` on stderr. `cache_control` sets a global `Cache-Control` header (e.g. `public, max-age=3600`). `proxy` takes a `|路径|上游|流式|去前缀|方法|环境头|超时|` table of streaming reverse-proxy routes. `invoke` takes a `|路径|方法|函数|正文|返回|` table that calls entry-module `lib.member` handlers per request.
-
-Tables stay as data; `configure` assembles them. 配置即数据、装配即函数.
-
-*> web_app_middleware app=`self` cors=`cors` security=`security` compress=`compress` body_limit=`body_limit` json_routes=`json` access_log=`access_log` cache_control=`cache_control` proxy=`proxy` invoke=`invoke`*
-
-## proxy
-    + `path`
-    + `upstream`
-    + `stream`=True
-    + `strip_prefix`=None
-    + `methods`=None
-    + `headers_from_env`=None
-    + `timeout_ms`=120000
-
-Same-origin reverse proxy to an upstream HTTP(S) URL. When `stream` is True (default), the response body — including `text/event-stream` SSE — is piped without buffering the full payload, and responses include `Cache-Control: no-cache, no-transform` plus `X-Accel-Buffering: no` for Nginx/CDN. `upstream` may contain `$ENV` / `${ENV}`. `headers_from_env` is `ENV=Header-Name` (comma-separated); secrets stay on the server. Prefer this over a side Python LLM proxy.
-
-*> web_app_proxy app=`self` path=`path` upstream=`upstream` stream=`stream` strip_prefix=`strip_prefix` methods=`methods` headers_from_env=`headers_from_env` timeout_ms=`timeout_ms`*
-
-## invoke
-    + `path`
-    + `fn`
-    + `method`=POST
-    + `body`=json
-    + `return`=json
-
-Call a user `##` on each HTTP request. `fn` must be `lib.member` imported on the entry module. `body` is `json` / `form` / `query` / `raw`; object keys map to named params (plus `payload`). Returns JSON by default.
-
-*> web_app_invoke app=`self` path=`path` method=`method` fn=`fn` body=`body` return=`return`*
 
 ## listen
 
-Serve `/`, routed pages, `/_part/{id}` (home) and `{path}/_part/{id}` (routes), `/_form/{id}` (from mounts + page embeds), optional `/static` (or custom mount), optional `/admin`, upload/download/WebSocket/RSS/sitemap/robots routes, redirects, proxy/invoke routes, and a custom 404 fallback. Production HTTPS should terminate at a reverse proxy; set `cookie_secure=True` when serving over TLS.
-
 *> web_listen app=`self`*
-
-## route_ws
-    + `path`
-    + `echo`=True
-    + `mode`=None
-    + `room_key`=None
-    + `on_message`=None
-    + `presence`=False
-    + `require_auth`=None
-
-Register a WebSocket endpoint at `path` (e.g. `/live` or `/chat/{id}`). `mode` is `echo` (default), `broadcast` (fan-out text to all sockets on this path), `room` (named room via `room_key`, supports `{id}` from the path), or `drain`. Legacy `echo=False` maps to `drain`. `on_message` is an optional `lib.member` hook (G-WS2): called before fan-out with `message`/`room`/`user`; return `{skip:true}` to drop or `{message:…}` to rewrite. `presence=True` also joins `room.presence` and emits join/leave JSON. Stateful `broadcast` and `room` endpoints require a logged-in session by default; set `require_auth=False` only for intentionally public live feeds. Browser handshakes are same-origin. Connect from a client with `web.ws.connect`.
-
-*> web_app_route_ws app=`self` path=`path` echo=`echo` mode=`mode` room_key=`room_key` on_message=`on_message` presence=`presence` require_auth=`require_auth`*
-
-## auth
-    + `users`
-    + `session_ttl`=3600
-    + `admin_prefix`=None
-    + `login_redirect`=None
-    + `logout_redirect`=None
-    + `login_path`=None
-    + `register`=False
-    + `register_path`=/register
-    + `default_role`="member"
-    + `session_url`=None
-
-Keep the app's `admin=True`, and gate `{admin_prefix}` (segment-boundary prefix) behind a login page (default `/admin`). Unauthenticated requests redirect to `login_path` (default `{admin_prefix}/login`, auto-excluded). Does not match `/admin-publish`-style siblings. With `register=True` and `enable_rbac`, exposes `register_path` (writes `web_users` + default role). Optional `session_url` (`redis://…` / `rediss://…`) stores sessions in Redis separately from the Postgres/SQLite app DB; omit to keep `_marqdo_sessions` (or in-memory). With OIDC, do not set `logout_redirect` to a login path (it would bounce to the IdP); conflicting values fall back to `/`.
-
-*> web_app_auth app=`self` users=`users` session_ttl=`session_ttl` admin_prefix=`admin_prefix` login_redirect=`login_redirect` logout_redirect=`logout_redirect` login_path=`login_path` register=`register` register_path=`register_path` default_role=`default_role` session_url=`session_url`*
-
-## oidc
-    + `issuer`=None
-    + `client_id`
-    + `client_secret`
-    + `redirect_uri`
-    + `scopes`="openid profile email"
-    + `callback_path`=None
-    + `authorize_url`=None
-    + `token_url`=None
-    + `userinfo_url`=None
-
-Enable OAuth 2.0 authorization-code / OIDC login (e.g. CFLMY IdP). When set, `login_path` / `register_path` / desk login redirect to the IdP; the `redirect_uri` callback exchanges the code and opens a local session. userinfo `is_admin` / `admin_role` map to local role `admin`; otherwise `default_role`. Secrets stay server-side; PKCE S256 is always sent.
-
-*> web_app_oidc app=`self` issuer=`issuer` client_id=`client_id` client_secret=`client_secret` redirect_uri=`redirect_uri` scopes=`scopes` callback_path=`callback_path` authorize_url=`authorize_url` token_url=`token_url` userinfo_url=`userinfo_url`*
 
 ## gate
     + `path`
@@ -845,323 +167,4 @@ Enable OAuth 2.0 authorization-code / OIDC login (e.g. CFLMY IdP). When set, `lo
     + `on_deny`=forbid
     + `exclude`=None
 
-Require access for `path`. Prefer `permissions` (CSV of `resource:action` codes such as `desk:access`); when non-empty, authorization uses the session permission set. Otherwise require one of `roles` (legacy). `match=prefix` uses segment boundaries; `exact` is equality. Trailing `*` on `path` means prefix. `on_deny=redirect` sends visitors to `login_path` (with `?next=`); `forbid` returns 403. `exclude` is CSV or list of open paths.
-
 *> web_app_gate app=`self` path=`path` roles=`roles` permissions=`permissions` match=`match` on_deny=`on_deny` exclude=`exclude`*
-
-## enable_rbac
-    + `catalog`=None
-    + `desk`=False
-
-Enable database-backed RBAC (role ⊥ permission). On listen, ensures `web_permissions` / `web_roles` / `web_role_permissions` / `web_users` / `web_user_roles` and seeds system roles `superadmin` and `member`. See `doc/design/ext-web-rbac.md`. By default **no** `/_rbac/*` routes; set `desk=True` to mount the API and `GET /_rbac/desk` (needs `roles:manage`). Permission gates work either way.
-
-*> web_app_rbac app=`self` catalog=`catalog` desk=`desk`*
-
-## tenant
-    + `mode`
-    + `param`=None
-    + `column`=tenant_id
-    + `default_scope`=False
-
-Enable multi-tenant resolution: `mode` is `path` (query/`/t/{id}/…`), `subdomain`, or `header`. `param` is the path/query key or header name. When `default_scope=True`, JSON routes and form inserts auto-filter/stamp `column` (default `tenant_id`). Per-route override: JSON table column `tenant_scope` / `租户作用域`.
-
-*> web_app_tenant app=`self` mode=`mode` param=`param` column=`column` default_scope=`default_scope`*
-
-## gallery
-    + `path`=/gallery
-    + `storage`
-    + `prefix`=uploads/
-    + `title`=Gallery
-    + `download_base`=/_media
-
-Serve an HTML media gallery listing objects under `prefix` in `storage`, linking through `download_base`.
-
-*> web_app_gallery app=`self` path=`path` storage=`storage` prefix=`prefix` title=`title` download_base=`download_base`*
-
-## route_rss
-    + `path`
-    + `table`
-    + `limit`=20
-    + `order`=-created_at
-    + `title`=Feed
-    + `link`=/
-    + `description`=""
-
-Register an RSS 2.0 feed at `path` (e.g. `/feed.xml`) backed by a DB table.
-
-*> web_app_route_rss app=`self` path=`path` table=`table` limit=`limit` order=`order` title=`title` link=`link` description=`description`*
-
-## redirect
-    + `from`
-    + `to`
-    + `permanent`=False
-
-Register a redirect from `from` to `to`. `permanent=True` issues HTTP 301; otherwise 307.
-
-*> web_app_redirect app=`self` from=`from` to=`to` permanent=`permanent`*
-
-## error_page
-    + `status`=404
-    + `page`
-
-Bind an assembled page for HTTP `404` or `500` responses.
-
-*> web_app_error_page app=`self` status=`status` page=`page`*
-
-## sitemap
-    + `path`=/sitemap.xml
-    + `base`=""
-    + `table`=None
-    + `loc`=path
-    + `limit`=1000
-    + `items`=None
-
-Serve `sitemap.xml`. Prefer `table` + `loc` column from the DB, or pass an `items` table with `loc`/`路径` rows.
-
-*> web_app_sitemap app=`self` path=`path` base=`base` table=`table` loc=`loc` limit=`limit` items=`items`*
-
-## robots
-    + `body`=None
-    + `sitemap`=None
-
-Serve `/robots.txt`. Omit `body` to emit a default Allow-all file, optionally with a `Sitemap:` line.
-
-*> web_app_robots app=`self` body=`body` sitemap=`sitemap`*
-
-## upload
-    + `path`=/_upload
-    + `field`=file
-    + `storage`
-    + `prefix`=uploads/
-    + `max_bytes`=5242880
-    + `types`=None
-
-Mount `POST path` for multipart file upload. `storage` is a `# storage` handle or `file:…` / `s3://…` URL. Optional `types` is a `|type|ext|` / `|类型|扩展名|` allowlist (or a MIME CSV string). Success returns JSON `{ok,key,size,content_type}`.
-
-*> web_app_upload app=`self` path=`path` field=`field` storage=`storage` prefix=`prefix` max_bytes=`max_bytes` types=`types`*
-
-## download
-    + `path`=/_media/{*key}
-    + `storage`
-    + `disposition`=attachment
-
-Mount `GET path` to stream an object. Path must capture `key` (use `{*key}` for nested keys). `disposition` is `attachment` or `inline`.
-
-*> web_app_download app=`self` path=`path` storage=`storage` disposition=`disposition`*
-
-# rbac
-
-Offline helpers for role ⊥ permission. Prefer `app.enable_rbac` + gates for HTTP; use these for scripts/tests.
-
-## can
-    + `permissions`
-    + `needed`
-
-Return `{ok, allowed}` — whether held permission CSV includes any of `needed` (CSV). Held `*` allows all.
-
-> ensure_plugin
-*> web_rbac_can permissions=`permissions` needed=`needed`*
-
-## assign_role
-    + `url`
-    + `username`
-    + `role`
-
-Bind `username` (in `web_users`) to role name.
-
-> ensure_plugin
-*> web_rbac_assign_role url=`url` username=`username` role=`role`*
-
-## create_role
-    + `url`
-    + `name`
-
-Create a non-system role; returns `{ok, id, name}`.
-
-> ensure_plugin
-*> web_rbac_create_role url=`url` name=`name`*
-
-## set_role_permissions
-    + `url`
-    + `role`
-    + `permissions`
-    + `grantable`=""
-
-Replace permissions on a non-system role (CSV). `grantable` restricts grants (anti-escalation); empty = full catalog.
-
-> ensure_plugin
-*> web_rbac_set_role_permissions url=`url` role=`role` permissions=`permissions` grantable=`grantable`*
-
-# auth
-    + `users`
-    + `session_ttl`=3600
-
-Session/auth helper. Constructs a config object; `login` validates against the users table. To gate `/admin` on this app, use `app.auth users=…` instead.
-
-> ensure_plugin
-*> web_auth_new users=`users` session_ttl=`session_ttl`*
-
-## login
-    + `username`
-    + `password`
-
-Validate credentials against the users table and create a session. Returns `{ok, session_id, username, role}`.
-
-**users = [users](self)**
-**ttl = [session_ttl](self)**
-*> web_auth_login username=`username` password=`password` users=`users` session_ttl=`ttl`*
-
-## check
-    + `session_id`
-
-Returns `{ok, username, role}` when the session is valid.
-
-*> web_auth_check session_id=`session_id`*
-
-## logout
-    + `session_id`
-
-Destroy the session.
-
-*> web_auth_logout session_id=`session_id`*
-
-## hash_password
-    + `password`
-
-Hash a plaintext password for storage in admin user tables (argon2id). Store the returned `hash` in the `password` column; login verifies automatically.
-
-*> web_password_hash password=`password`*
-
-# cache
-    + `url`="memory:"
-
-Key–value cache. Use `memory:` for in-process (tests / single process) or `redis://host:6379/0` for Redis.
-
-> ensure_plugin
-*> web_cache_new url=`url`*
-
-## get
-    + `key`
-
-**url = [url](self)**
-*> web_cache_get url=`url` key=`key`*
-
-## set
-    + `key`
-    + `value`
-    + `ttl`=None
-
-Optional `ttl` is seconds until expiry.
-
-**url = [url](self)**
-*> web_cache_set url=`url` key=`key` value=`value` ttl=`ttl`*
-
-## del
-    + `key`
-
-**url = [url](self)**
-*> web_cache_del url=`url` key=`key`*
-
-## exists
-    + `key`
-
-**url = [url](self)**
-*> web_cache_exists url=`url` key=`key`*
-
-## ttl
-    + `key`
-
-**url = [url](self)**
-*> web_cache_ttl url=`url` key=`key`*
-
-# storage
-    + `url`="file:data/blobs"
-
-Object storage. `file:dir` stores blobs on disk (offline / gold). `s3://bucket?endpoint=http://127.0.0.1:9000&access_key=…&secret_key=…` talks to MinIO / S3.
-
-> ensure_plugin
-*> web_storage_new url=`url`*
-
-## put
-    + `key`
-    + `body`=None
-    + `path`=None
-    + `content_type`="application/octet-stream"
-
-Provide either `body` (text) or `path` (local file to upload).
-
-**url = [url](self)**
-*> web_storage_put url=`url` key=`key` body=`body` path=`path` content_type=`content_type`*
-
-## get
-    + `key`
-
-**url = [url](self)**
-*> web_storage_get url=`url` key=`key`*
-
-## delete
-    + `key`
-
-**url = [url](self)**
-*> web_storage_delete url=`url` key=`key`*
-
-## list
-    + `prefix`=""
-
-**url = [url](self)**
-*> web_storage_list url=`url` prefix=`prefix`*
-
-# media
-    + `storage`=None
-
-Offline helpers for upload validation and saving into `# storage` (also used by HTTP `app.upload`).
-
-> ensure_plugin
-*> web_media_new storage=`storage`*
-
-## validate
-    + `filename`
-    + `content_type`="application/octet-stream"
-    + `size`
-    + `max_bytes`=5242880
-    + `types`=None
-
-*> web_upload_validate filename=`filename` content_type=`content_type` size=`size` max_bytes=`max_bytes` types=`types`*
-
-## save
-    + `path`
-    + `key`=None
-    + `content_type`="application/octet-stream"
-    + `prefix`=uploads/
-    + `storage`=None
-
-**st = storage**
-1. `st` == None
-  **st = [storage](self)**
-2. *
-
-*> web_upload_save storage=`st` path=`path` key=`key` content_type=`content_type` prefix=`prefix`*
-
-# ws
-    + `timeout_sec`=30
-
-WebSocket client helper.
-
-> ensure_plugin
-`out` =
-
-| timeout_sec | _type |
-|-------------|-------|
-| `timeout_sec` | ws |
-
-*out*
-
-## connect
-    + `url`
-    + `message`=""
-    + `headers`=None
-
-Single request–response: connect to `url`, send `message`, collect up to 256 server text replies (each up to 1 MiB), close. Transport errors and timeouts return `{ok:false, error}` instead of looking like an empty successful reply.
-
-**timeout = [timeout_sec](self)**
-*> web_ws_connect url=`url` message=`message` headers=`headers` timeout_sec=`timeout`*

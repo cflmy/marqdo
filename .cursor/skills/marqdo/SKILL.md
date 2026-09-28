@@ -224,44 +224,53 @@ APIs: `# agent` / `# 智能体` → `## run` / `## route` / `## step` / `## plan
 
 Examples: [agent-pong](../../examples/agent-pong/) · [agent-okf-flywheel](../../examples/agent-okf-flywheel/). Harness: `scripts/agent-harness.sh`. Design: [ext-agent.md](../../doc/design/ext-agent.md) · Wave B: [agent-framework-2026-09.md](../../doc/research/agent-framework-2026-09.md) · v2: [doc/next/003.md](../../doc/next/003.md) · P4: [doc/next/004.md](../../doc/next/004.md). Dev LLM: copy [.env.example](../../.env.example) → `.env` (gitignored).
 
-## Official extension: `ext/web` (dynamic sites)
+## Official extension: `ext/web` (Document / Endpoint / Resource)
 
-Install: `marqdo ext add web` (ZH id: `网页`). Build native plugin first: `cargo build --release -p marqdo_plugin_web`.
+Install: `marqdo ext add web` (ZH id: `网页`). Build native plugin: `scripts/build-web-plugin.sh` / `marqdo ext add web`.
 
-Import **one language file** — never mix EN/ZH API names in the same `.mq.md`:
+**Constitution (ADR 0007 — do not degrade):**
 
-- EN: `import web:ext/web/web.mq.md`
+1. **Document / Endpoint / Resource** — `.mq.md` with `type: web|endpoint` (ZH `类型: 网页|端点`) is the site surface; not a Flask-style class pile.
+2. **Code is documentation** — the file is docs + route + handler.
+3. **Table = data** — View schema only `|type|slot|value|attrs|style|`. No `compose_*` dialects, no `json.set` glue.
+4. **Facade only** — `web.page` · `web.route` · `web.serve` · `web.render` · `web.inspect`. DB → `ext/data`; auth → `ext/security`; ws/http → `ext/net`.
+5. **No author `ensure_plugin` / `host_*`**; import web = capability (plugin auto-load).
+6. **Declared vs system routes**; `web.inspect` lists both. No silent user routes.
+
+Import **one language** per file:
+
+- EN: `import web:ext/web/web.mq.md` (+ `import data:ext/data/db.mq.md` as needed)
 - ZH: `导入 网页:ext/web/网页.mq.md`
 
-**Hard rules (web):**
+```markdown
+---
+type: web
+route: /
+title: Hello
+import web:ext/web/web.mq.md
+---
 
-- Authors use **GFM tables + `#` classes** — no `json.parse` / `json.set` glue, no hand-built part JSON.
-- Table cells stay **literal strings**; path text like `` `posts`.`title` `` is resolved by web classes.
-- **Quote path/MIME cells** that contain `/` (T5 cell expressions treat bare `/` as division): `"/static/logo.svg"`, `"image/png"`.
-- **`ext/**` never calls `host_*`** — hot path is native `plugins/web` ABI (default **Go `libweb`**, build via `scripts/build-web-plugin.sh`).
-- HTTPS: terminate at reverse proxy; set `cookie_secure=True` on auth (no in-process TLS).
+# Hello
 
-**Typical layout:**
-
-```text
-index.mq.md          # entry + home page table + listen
-pages/               # sub-pages
-components/          # reusable |属性|值|样式| tables
-styles/              # CSS modules
-public/              # static + favicon.ico|png|svg
-db/                  # schema + open/init
-data/                # sqlite runtime (gitignore)
+Executable document as a page.
 ```
 
-**Core objects (EN / ZH):** `# page`/`页面`, `# style`/`样式`, `# db`/`数据库`, `# form`/`表单`, `# app`/`应用`, `# auth`/`鉴权`, `# cache`/`缓存`, `# storage`/`存储`.
+```markdown
+---
+type: endpoint
+method: POST
+path: /api/ping
+response: json
+---
 
-**Typical flow:** `db.init` → `page.compose_*` → `app` + `static` / `listen`. Client: `marqdo wasm build -o static` + `web.client_embed source="/static/client.mq.md"` — **no author JS**; bridge may implement rich host effects ([browser-wasm-e.md](../../doc/roadmap/browser-wasm-e.md) · [browser-app](../../examples/browser-app/)).
+*{"ok": true}*
+```
 
-**Shipped surface (W0–W7 + P3 + W8 + route D mount):** middleware + JSON API (`app.configure`); transactions, pagination, FTS search (`db.migrate`, `db.fts`, `db.search`); security (argon2, CSRF, SQLite sessions, login rate limit); SEO / RSS / Markdown (`page.meta`, `route_rss`, `lib/net.markdown_parse`); upload / download / gallery; sitemap / robots / error pages / redirects; RBAC (`app.gate`, user `role`); audit timestamps + FK in `db.init`; ETag on downloads; **W8** site icons (`app.icons` → `/favicon.ico`), head resource tables (`page.head`), image assembly (`make_images` / `page.images`); **表驱动引言** `page.compose_intro` / `页面.引言装配`（属性/值/样式表 → `.main-intro`，避免手写 HTML 字符串）；**D** `client_embed` auto-mount + DOM effect helpers (`text_patch` / `dom_patch`).
+Site entry may `# main` → `web.serve root="."`. Client WASM: `ext/web/client.mq.md` / `lib/browser` — no author JS.
 
-Design: [ext-web.md](../../doc/design/ext-web.md) · assets: [web-assets-and-images.md](../../doc/design/web-assets-and-images.md) · capability matrix: [web-net-capabilities.md](../../doc/design/web-net-capabilities.md) · example: [examples/marqdo-blog/](../../examples/marqdo-blog/) · client: [examples/web-client-site/](../../examples/web-client-site/).
+Design: [ext-web-artifact.md](../../doc/design/ext-web-artifact.md) · ADR [0007](../../doc/adr/0007-web-document-endpoint.md) · rule: `.cursor/rules/web-artifact-no-degrade.mdc` · example: [examples/marqdo-blog/](../../examples/marqdo-blog/).
 
-Web patterns: [examples.md](examples.md) §13 · API index: [reference.md](reference.md).
+Web patterns: [examples.md](examples.md) · API index: [reference.md](reference.md).
 
 ## Official extension: `ext/quantum` (circuits + Q7/Q8)
 

@@ -1,19 +1,22 @@
 # 第 14 章：网络与 Web 扩展
 
-Marqdo 的网络能力分两层：**标准库 `lib/net`**（HTTP 客户端、cookie / multipart 解析）与**官方扩展 `ext/web`**（网页应用、数据库、表单、登录鉴权、WebSocket）。分层的依据是「代码即文档」的可读性——基础、通用、低依赖的进标准库；领域性强、依赖重、只在 Web 场景才用的进扩展。
+> **现行作者面（2026-09-28 · ADR 0007）**：Document / Endpoint / Resource —— 见 [ext-web-artifact.md](../design/ext-web-artifact.md)。  
+> 下文若仍出现 `compose_*` / `app.configure` / `web.db` 同文件混写，视为**历史示例**；DB → `ext/data`，鉴权 → `ext/security`，实时 → `ext/net`。
+
+Marqdo 的网络能力分两层：**标准库 `lib/net`**（HTTP 客户端、cookie / multipart 解析）与**官方扩展 `ext/web`**（Document/Endpoint facade + 拆分后的 data/security/net）。分层的依据是「代码即文档」。
 
 ## 14.1 概览
 
-| 能力 | 位置 | 典型函数 |
+| 能力 | 位置 | 典型 API |
 |------|------|----------|
 | HTTP(S) 客户端 | `lib/net` | `http_get` / `http_post` / `http_request` |
-| Cookie 解析 | `lib/net` | `cookie_parse` |
-| multipart/form-data 解析 | `lib/net` | `multipart_parse` |
-| 网页应用 / 路由 / 静态 | `ext/web` | `web.page` / `web.app` |
-| SQLite 数据库 | `ext/web` | `web.db` |
-| 表单 | `ext/web` | `web.form` |
-| 登录鉴权（session） | `ext/web` | `web.auth` / `app.auth` |
-| WebSocket 客户端 / 端点 | `ext/web` | `web.ws` / `app.route_ws` |
+| Cookie / multipart | `lib/net` | `cookie_parse` / `multipart_parse` |
+| Document / Endpoint | `ext/web` | `type: web\|endpoint` · `web.serve` · `web.render` · `web.inspect` |
+| View 装配 | `ext/web` | `|type|slot|value|attrs|style|` → `web.render` |
+| 数据库 | `ext/data` | `db` CRUD / txn |
+| 表单 | `ext/data` | `form` |
+| 鉴权 / RBAC / OIDC | `ext/security` | `auth` · `rbac` · `oidc` |
+| WebSocket | `ext/net` | `websocket` |
 
 ```bash
 # 运行使用 ext/web 的程序前，先安装扩展

@@ -1,0 +1,26 @@
+---
+description: Marqdo Web Artifact — no degradation; Document/Endpoint/Resource only
+globs: ext/web/**,ext/net/**,ext/data/**,ext/security/**,examples/**/*,tests/ext/web*,doc/design/ext-web*,doc/adr/0007*
+alwaysApply: true
+---
+
+# Web Artifact — 不允许降级
+
+Canonical: `doc/adr/0007-web-document-endpoint.md` · `doc/design/ext-web-artifact.md` · `doc/next/007.md` (superseded).
+
+## Hard bans
+
+1. **Do not** restore or reintroduce author-facing `compose_main` / `compose_intro` / `compose_*` fragmented table DSLs, god `# page` mutation piles, or `app.configure(...)` junk-drawer APIs.
+2. **Do not** use `json.set` / `json.append` bag glue for pages, routes, or middleware. Tables = data. View schema is only `|type|slot|value|attrs|style|` (ZH aliases allowed).
+3. **Do not** call `ensure_plugin` or `host_*` from author programs or from `ext/**` (plugin load is facade/capability only).
+4. **Do not** register implicit user routes. Declared routes come from Artifact metadata or `web.route`. System routes (`/_part`, `/_form`, …) must appear in `web.inspect`.
+5. **Do not** invent DSL, nested frontmatter under `##`, or new table dialects when the design is silent — **stop and ask**.
+6. **Do not** mix EN/ZH API names in one `.mq.md`.
+7. **Do not** silently delete capabilities. Removals require design text + tests updated in the same change.
+8. **Do not** put DB/auth/cache/storage/websocket author APIs back into `ext/web/web.mq.md` — they live in `ext/data`, `ext/security`, `ext/net`.
+
+## Required direction
+
+- Document (`type: web` / `类型: 网页`), Endpoint (`type: endpoint` / `类型: 端点`), Resource modules.
+- Facade only: `web.page` · `web.route` · `web.serve` · `web.render` · `web.inspect` (ZH mirrors).
+- Code is documentation: the `.mq.md` is the page/API docs and the implementation.

@@ -4,6 +4,7 @@
 //! CLI also offers `view` for AST-backed browsing.
 
 pub mod aliases;
+pub mod artifact;
 pub mod ast;
 pub mod binding;
 pub mod browser_session;

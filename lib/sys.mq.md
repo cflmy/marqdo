@@ -52,6 +52,12 @@ Lookup one metadata key; missing → None.
 
 *> host_meta_get key=`key`*
 
+## artifact_kind
+
+Classify entry Artifact Metadata: `web` / `endpoint` / `prompt` / `other`, or None if no `type`/`类型`. ADR 0007.
+
+*> host_artifact_kind*
+
 ## module_source
 
 Entry `.mq.md` source text (for document-as-prompt). Empty string if unset.

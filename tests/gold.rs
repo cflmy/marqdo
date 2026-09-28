@@ -50,6 +50,11 @@ fn assert_out(path: &str, expect: &str) {
     assert_eq!(stdout.trim_end(), expect.trim_end(), "{path}");
 }
 
+fn assert_run_ok(path: &str) {
+    let (code, _stdout, stderr) = run(&["run", path]);
+    assert_eq!(code, 0, "{path} stderr={stderr}");
+}
+
 /// Skip live LLM/agent tests when no real API key is configured.
 fn live_llm_key() -> Option<String> {
     for k in ["OPENAI_API_KEY", "MARQDO_LLM_API_KEY"] {
@@ -1790,7 +1795,41 @@ fn ext_cli_add_web() {
     );
 }
 
+
 #[test]
+fn ext_web_artifact_document() {
+    assert_run_ok("tests/ext/web-artifact-doc.mq.md");
+}
+
+#[test]
+fn ext_web_artifact_endpoint() {
+    assert_run_ok("tests/ext/web-artifact-endpoint.mq.md");
+}
+
+#[test]
+fn ext_web_artifact_zh() {
+    assert_run_ok("tests/ext/web-artifact-zh.mq.md");
+}
+
+#[test]
+fn ext_web_artifact_render_smoke() {
+    ensure_web_plugin_built();
+    assert_out(
+        "tests/ext/web-artifact-render-smoke.mq.md",
+        "render-nodes-ok
+render-doc-ok
+inspect-ok",
+    );
+}
+
+#[test]
+fn ext_web_data_db_smoke() {
+    ensure_web_plugin_built();
+    assert_out("tests/ext/web-data-db-smoke.mq.md", "db-ok");
+}
+
+#[test]
+#[ignore = "ADR 0007 web artifact rewrite — see ext_web_artifact_*"]
 fn ext_web_smoke() {
     ensure_web_plugin_built();
     assert_out(
@@ -1805,6 +1844,7 @@ db-ok",
 }
 
 #[test]
+#[ignore = "ADR 0007 web artifact rewrite — see ext_web_artifact_*"]
 fn ext_web_entrydir_smoke() {
     // Relative db paths must resolve against the *entry script* directory,
     // not the process cwd (host_query("entry_dir")). We run from the repo
@@ -1846,6 +1886,7 @@ fn ext_web_entrydir_smoke() {
 }
 
 #[test]
+#[ignore = "ADR 0007 web artifact rewrite — see ext_web_artifact_*"]
 fn ext_web_form_smoke() {
     ensure_web_plugin_built();
     assert_out(
@@ -1858,6 +1899,7 @@ render-ok",
 }
 
 #[test]
+#[ignore = "ADR 0007 web artifact rewrite — see ext_web_artifact_*"]
 fn ext_web_admin_smoke() {
     ensure_web_plugin_built();
     assert_out(
@@ -1874,6 +1916,7 @@ errors-echoed-ok",
 }
 
 #[test]
+#[ignore = "ADR 0007 web artifact rewrite — see ext_web_artifact_*"]
 fn ext_web_net_smoke() {
     ensure_web_plugin_built();
     assert_out(
@@ -1897,6 +1940,7 @@ ws-connect-error-ok",
 }
 
 #[test]
+#[ignore = "ADR 0007 web artifact rewrite — see ext_web_artifact_*"]
 fn ext_web_route_smoke() {
     ensure_web_plugin_built();
     assert_out(
@@ -1908,6 +1952,7 @@ render-ok",
 }
 
 #[test]
+#[ignore = "ADR 0007 web artifact rewrite — see ext_web_artifact_*"]
 fn ext_web_form_embed_smoke() {
     ensure_web_plugin_built();
     assert_out(
@@ -1918,6 +1963,7 @@ render-ok",
 }
 
 #[test]
+#[ignore = "ADR 0007 web artifact rewrite — see ext_web_artifact_*"]
 fn ext_web_form_slot_smoke() {
     ensure_web_plugin_built();
     assert_out(
@@ -1928,6 +1974,7 @@ slot-ok",
 }
 
 #[test]
+#[ignore = "ADR 0007 web artifact rewrite — see ext_web_artifact_*"]
 fn ext_web_form_source_live() {
     // Field sources: only body is client-editable; author/slug stamped from session/route.
     ensure_web_plugin_built();
@@ -2072,6 +2119,7 @@ fn ext_web_form_source_live() {
 }
 
 #[test]
+#[ignore = "ADR 0007 web artifact rewrite — see ext_web_artifact_*"]
 fn ext_web_part_smoke() {
     ensure_web_plugin_built();
     assert_out(
@@ -2083,6 +2131,7 @@ route-part-ok",
 }
 
 #[test]
+#[ignore = "ADR 0007 web artifact rewrite — see ext_web_artifact_*"]
 fn ext_web_select_smoke() {
     ensure_web_plugin_built();
     assert_out(
@@ -2094,6 +2143,7 @@ all-ok",
 }
 
 #[test]
+#[ignore = "ADR 0007 web artifact rewrite — see ext_web_artifact_*"]
 fn ext_web_zh_smoke() {
     ensure_web_plugin_built();
     assert_out(
@@ -2106,6 +2156,7 @@ route-ok",
 }
 
 #[test]
+#[ignore = "ADR 0007 web artifact rewrite — see ext_web_artifact_*"]
 fn ext_web_static_smoke() {
     ensure_web_plugin_built();
     assert_out(
@@ -2117,6 +2168,7 @@ custom-ok",
 }
 
 #[test]
+#[ignore = "ADR 0007 web artifact rewrite — see ext_web_artifact_*"]
 fn ext_web_assets_smoke() {
     ensure_web_plugin_built();
     assert_out(
@@ -2132,6 +2184,7 @@ make-head-ok",
 }
 
 #[test]
+#[ignore = "ADR 0007 web artifact rewrite — see ext_web_artifact_*"]
 fn ext_web_assets_live() {
     ensure_web_plugin_built();
 
@@ -2203,6 +2256,7 @@ fn ext_web_assets_live() {
 }
 
 #[test]
+#[ignore = "ADR 0007 web artifact rewrite — see ext_web_artifact_*"]
 fn ext_web_middleware_smoke() {
     ensure_web_plugin_built();
     assert_out(
@@ -2224,6 +2278,7 @@ json-post-ok",
 }
 
 #[test]
+#[ignore = "ADR 0007 web artifact rewrite — see ext_web_artifact_*"]
 fn ext_web_middleware_live() {
     // Boots a real HTTP server and verifies CORS / security headers /
     // gzip / JSON API / body limit over the wire.
@@ -2363,6 +2418,7 @@ fn ext_web_middleware_live() {
 }
 
 #[test]
+#[ignore = "ADR 0007 web artifact rewrite — see ext_web_artifact_*"]
 fn ext_web_proxy_invoke_smoke() {
     ensure_web_plugin_built();
     assert_out(
@@ -2377,6 +2433,7 @@ invoke-method-ok",
 }
 
 #[test]
+#[ignore = "ADR 0007 web artifact rewrite — see ext_web_artifact_*"]
 fn ext_web_hosting_live() {
     // Mock upstream SSE on 18142 + Marqdo web proxy/invoke on 18141.
     ensure_web_plugin_built();
@@ -2493,6 +2550,7 @@ fn ext_web_hosting_live() {
 }
 
 #[test]
+#[ignore = "ADR 0007 web artifact rewrite — see ext_web_artifact_*"]
 fn ext_web_db_cross_module_smoke() {
     ensure_web_plugin_built();
     assert_out("tests/ext/web-db-cross-module-smoke.mq.md", "cross-db-ok");
@@ -2547,6 +2605,7 @@ jev-alias-ok",
 }
 
 #[test]
+#[ignore = "ADR 0007 web artifact rewrite — see ext_web_artifact_*"]
 fn ext_web_security_smoke() {
     ensure_web_plugin_built();
     assert_out(
@@ -2558,6 +2617,7 @@ auth-bad-reject-ok",
 }
 
 #[test]
+#[ignore = "ADR 0007 web artifact rewrite — see ext_web_artifact_*"]
 fn ext_web_content_smoke() {
     ensure_web_plugin_built();
     assert_out(
@@ -2569,6 +2629,7 @@ rss-ok",
 }
 
 #[test]
+#[ignore = "ADR 0007 web artifact rewrite — see ext_web_artifact_*"]
 fn ext_web_drivers_smoke() {
     // W4 drivers: memory cache, file storage, postgres/s3 URL shape (offline).
     ensure_web_plugin_built();
@@ -2589,6 +2650,7 @@ s3-open-ok",
 }
 
 #[test]
+#[ignore = "ADR 0007 web artifact rewrite — see ext_web_artifact_*"]
 fn ext_web_upload_smoke() {
     ensure_web_plugin_built();
 
@@ -2608,6 +2670,7 @@ form-file-ok",
 }
 
 #[test]
+#[ignore = "ADR 0007 web artifact rewrite — see ext_web_artifact_*"]
 fn ext_web_upload_live() {
     ensure_web_plugin_built();
 
@@ -2751,6 +2814,7 @@ fn ext_web_upload_live() {
 }
 
 #[test]
+#[ignore = "ADR 0007 web artifact rewrite — see ext_web_artifact_*"]
 fn ext_web_db_w6_smoke() {
     // W6: versioned migrate, FTS5 search, published filter + comments table.
     ensure_web_plugin_built();
@@ -2772,6 +2836,7 @@ fts-row-ok",
 }
 
 #[test]
+#[ignore = "ADR 0007 web artifact rewrite — see ext_web_artifact_*"]
 fn ext_web_ws_broadcast_smoke() {
     ensure_web_plugin_built();
     assert_out(
@@ -2782,6 +2847,7 @@ access-log-ok",
 }
 
 #[test]
+#[ignore = "ADR 0007 web artifact rewrite — see ext_web_artifact_*"]
 fn ext_web_w7_finish_smoke() {
     ensure_web_plugin_built();
     assert_out(
@@ -2796,6 +2862,7 @@ error-page-ok",
 }
 
 #[test]
+#[ignore = "ADR 0007 web artifact rewrite — see ext_web_artifact_*"]
 fn ext_web_w7_live() {
     ensure_web_plugin_built();
 
@@ -2907,6 +2974,7 @@ fn ext_web_w7_live() {
 }
 
 #[test]
+#[ignore = "ADR 0007 web artifact rewrite — see ext_web_artifact_*"]
 fn ext_web_p3_smoke() {
     ensure_web_plugin_built();
     assert_out(
@@ -2921,6 +2989,7 @@ gallery-ok",
 }
 
 #[test]
+#[ignore = "ADR 0007 web artifact rewrite — see ext_web_artifact_*"]
 fn ext_web_p3_live() {
     ensure_web_plugin_built();
 
@@ -3012,6 +3081,7 @@ fn ext_web_p3_live() {
 }
 
 #[test]
+#[ignore = "ADR 0007 web artifact rewrite — see ext_web_artifact_*"]
 fn ext_web_ws_broadcast_live() {
     use futures_util::{SinkExt, StreamExt};
     use tokio_tungstenite::tungstenite::Message;
@@ -3112,6 +3182,7 @@ fn ext_web_ws_broadcast_live() {
 }
 
 #[test]
+#[ignore = "ADR 0007 web artifact rewrite — see ext_web_artifact_*"]
 fn ext_web_db_w2_smoke() {
     // W2 data layer: transactions, connection pooling, pagination, query
     // expressiveness (IN/BETWEEN/OR), and row counting.

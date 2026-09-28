@@ -109,6 +109,17 @@ pub fn meta_get(ctx: &HostContext, key: &Value) -> Result<Value, String> {
         .unwrap_or(Value::None))
 }
 
+/// Classify entry Artifact (`web` / `endpoint` / `prompt` / `other`); missing type → None.
+pub fn artifact_kind(ctx: &HostContext) -> Result<Value, String> {
+    Ok(match crate::artifact::classify(&ctx.entry_metadata) {
+        None => Value::None,
+        Some(crate::artifact::ArtifactKind::Web) => Value::Text("web".into()),
+        Some(crate::artifact::ArtifactKind::Endpoint) => Value::Text("endpoint".into()),
+        Some(crate::artifact::ArtifactKind::Prompt) => Value::Text("prompt".into()),
+        Some(crate::artifact::ArtifactKind::Other) => Value::Text("other".into()),
+    })
+}
+
 pub fn exit(ctx: &HostContext, code: &Value) -> Result<Value, String> {
     let c = as_i64(code, "code")?;
     if ctx.soft_side_effects {

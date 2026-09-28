@@ -1,20 +1,14 @@
-# web-client-site（路线 D）
+# examples/web-client-site
 
-服务端 `ext/web` + 浏览器 WASM 会话；**作者零业务 JS**。
+SSR **Document Artifact** + `web.client_embed` auto-mount（零作者 JS）。ADR 0007。
 
 ```bash
-# 仓库根
-cargo build -p marqdo --release
-cargo build --release -p marqdo_plugin_web
-./target/release/marqdo ext add web
-
-# 构建 WASM + bridge 到本示例 static/
-./target/release/marqdo wasm build -o examples/web-client-site/static
-# 保留 client.mq.md（wasm build 只写入 wasm/bridge）
-
-cd examples/web-client-site
-marqdo run index.mq.md
-# 打开 http://127.0.0.1:18090/
+bash scripts/build-web-plugin.sh
+export MARQDO_EXT=$PWD/ext   # 若本机 ~/.marqdo/ext 未同步
+marqdo wasm build -o examples/web-client-site/static
+cargo run -- run examples/web-client-site/serve.mq.md
 ```
 
-`index.mq.md` 用 `web.client_embed source="/static/client.mq.md"` 注入自启脚本；交互在 `static/client.mq.md`。
+- `index.mq.md` — `type: web` 文档页  
+- `serve.mq.md` — `web.serve` + `static_dir`  
+- `static/client.mq.md` — `lib/browser` wire（不变）
