@@ -78,6 +78,11 @@ enum Commands {
         #[arg(long = "bind", value_name = "KEY=VALUE")]
         binds: Vec<String>,
 
+        /// Filesystem sandbox + process cwd root (default: entry file's directory).
+        /// Also read from env `MARQDO_FS_ROOT`. Use repo root when running `cli/…` entries.
+        #[arg(long = "fs-root", value_name = "DIR")]
+        fs_root: Option<PathBuf>,
+
         /// Emit diagnostics as JSON on stderr (machine-readable; AI/MLSP 面).
         #[arg(long)]
         json: bool,
@@ -412,6 +417,7 @@ fn try_main(cli: Cli) -> Result<i32> {
             stdin_file,
             emit_result,
             binds,
+            fs_root,
             json: _,
         } => {
             let path = file.unwrap_or_else(|| PathBuf::from("index.mq.md"));
@@ -423,11 +429,14 @@ fn try_main(cli: Cli) -> Result<i32> {
             for b in &binds {
                 bind_pairs.push(marqdo::binding::parse_bind_kv(b)?);
             }
+            let env_fs_root = std::env::var_os("MARQDO_FS_ROOT").map(PathBuf::from);
+            let fs_root = fs_root.or(env_fs_root);
             let mut opts = if dump_all {
                 RunOptions {
                     stdin_lines: stdin_lines.clone(),
                     emit_result: emit_result.clone(),
                     binds: bind_pairs.clone(),
+                    fs_root: fs_root.clone(),
                     ..RunOptions::dump_all()
                 }
             } else {
@@ -442,6 +451,7 @@ fn try_main(cli: Cli) -> Result<i32> {
                     stdin_lines,
                     emit_result,
                     binds: bind_pairs,
+                    fs_root,
                     ..RunOptions::default()
                 }
             };
