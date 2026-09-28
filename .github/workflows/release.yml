@@ -126,6 +126,8 @@ jobs:
             ## Marqdo ${{ github.ref_name }}
 
             ### 亮点 / Highlights
+            - **v1.3.0**：Engineering Knowledge Compiler——L0–L4 · `reuse`/`find`/`duplicate` · Agent preflight（REUSE→ADAPT→CREATE）
+            - **v1.3.0**: Engineering Knowledge Compiler — L0–L4 catalog, reuse/find/duplicate, Agent preflight (REUSE→ADAPT→CREATE)
             - **v1.2.0**：Web Artifact（ADR 0007）——Document/Endpoint · `web.serve`/`render`/`inspect` · `ext/data|security|net` · 移除 `compose_*`/`configure`
             - **v1.2.0**: Web Artifact (ADR 0007) — Document/Endpoint, web.serve/render/inspect, ext/data|security|net, compose_*/configure removed
             - **v1.1.1**：AI 栈收口——llm `ask`/`stream`/`collect` · Metadata Binding · Skill Compilation + Adaptive Routing · MCP 客户端 + resume · 可选 `plugins/llm`

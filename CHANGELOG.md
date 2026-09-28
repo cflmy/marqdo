@@ -8,6 +8,39 @@
 
 ### Changed
 
+## v1.3.0 — 2026-09-28
+
+### Highlights
+
+**Engineering Knowledge Compiler（EKC）**：把仓库投影为 AI 可查询的工程知识系统——L0–L4 Catalog、Capability / Decision / Constraint / Failure、知识图、Reuse Preflight（REUSE→ADAPT→CREATE）与 Context Pack。本版 CLI 与扩展包 **同步为 1.3.0**。
+
+- **杀手命令**：`marqdo reuse "task"` / `find` / `duplicate` / `impact` / `conflicts` / `stale` / `verify` / `knowledge`
+- **Agent**：`agent.preflight` · `agent_eng_*`；`plan … eng_preflight=True` 在造轮子前强制 EFI
+- **投影**：`.marqdo/catalog|knowledge|graph|agent/` + `engineering.yaml`；`catalog` 默认挂钩 EKC
+- **示例 / 金样**：`examples/engineering-knowledge/` · `tests/engineering/` · `tests/ext/eng-preflight.mq.md`
+
+```bash
+sudo add-apt-repository ppa:cflmy/marqdo && sudo apt update && sudo apt install marqdo
+git checkout v1.3.0 && cargo build --release
+marqdo knowledge . -o .marqdo
+marqdo reuse "resolve configuration"
+marqdo ext add agent
+```
+
+**核心表面 Δ（Core surface Δ）**：**无增删**——19 个核心构造不变。本版为 **Runtime / Tooling**（知识编译器 + CLI + agent 插件），不触碰语言标记。
+
+### Added
+- **`src/knowledge/` EKC**：L0–L4 IR、指纹、能力推导、图边、compile、find/reuse/preflight、impact/lifecycle/duplicate、metrics、policy、learn。
+- **CLI**：`knowledge` · `find` · `reuse` · `impact` · `conflicts` · `stale` · `duplicate` · `verify`；`catalog`/`sync` 默认编译 EKC（`--no-knowledge` 可关）。
+- **Agent**：`agent_eng_preflight` / `agent_eng_reuse` / `agent_eng_record`；`ext/ai` `## preflight` + `plan eng_preflight`。
+- **规范**：`doc/design/engineering-knowledge.md`；提案叙事 `doc/next/008.md`（已实现标注）。
+
+### Fixed
+
+### Changed
+- **OKF type 注册表**扩展 Capability/Decision/Constraint/Failure/Context Pack/Policy 等（[okf.md](doc/design/okf.md)）。
+- **核心表面 Δ**：**无增删**。
+
 ## v1.2.0 — 2026-09-28
 
 ### Highlights

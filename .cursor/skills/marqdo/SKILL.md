@@ -216,7 +216,7 @@ Install: `marqdo ext add agent` (ZH: `智能体`). Native: `cargo build --releas
 
 1. **Code is documentation** — the runbook `.mq.md` is the model’s ground truth, not a hidden system prompt bag.
 2. **Call site is first-class** — `build_step_context` injects path/function/line so the model knows where it is in the program.
-3. **Document is the knowledge base (OKF)** — writeback → promote/solidify → reuse / `llm_free`; MCP/corpus are evidence only.
+3. **Document is the knowledge base (OKF)** — writeback → promote/solidify → reuse / `llm_free`; MCP/corpus are evidence only. **Engineering Knowledge（EKC）**：`marqdo knowledge|find|reuse|…` + `agent.preflight`（REUSE→ADAPT→CREATE）——见 [engineering-knowledge.md](../../doc/design/engineering-knowledge.md)。
 4. **Skill Compilation (v2)** — successful runs become `.mq.md` episodes; after enough evidence, `maybe_learn` compiles an executable skill (`llm_free`). Prefer `## run` over bare `## plan` when you want learning.
 5. **Adaptive Routing (P4)** — router is abstract (`marqdo` / `small-llm` / `llm` / `auto`); `jev` is a compat alias of `small-llm`. Decision via `router_model` (any llm handle). Policy Compilation writes `policies/router.mq.md`.
 

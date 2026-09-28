@@ -1,3 +1,11 @@
+marqdo (1.3.0-1ppa1) noble; urgency=medium
+
+  * Marqdo 1.3.0: Engineering Knowledge Compiler (EKC) — L0–L4 catalog,
+    marqdo knowledge/find/reuse/duplicate/verify, Agent preflight
+    (REUSE→ADAPT→CREATE), graph + context packs.
+
+ -- cflmy <pingan@cflmy.cn>  Mon, 28 Sep 2026 16:50:00 +0800
+
 marqdo (1.2.0-1ppa1) noble; urgency=medium
 
   * Marqdo 1.2.0: Web Artifact rewrite (ADR 0007) — Document/Endpoint/Resource,
