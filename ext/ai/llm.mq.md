@@ -289,11 +289,20 @@ Semantic ask → **LLMResult** (`text`, `model`, `finish`, `backend`, `usage`, `
 2. *
   **_ = 1**
 
+Hoist receiver fields before the result table — table cells can shadow `self` /
+column names (`model`, `usage`), so `[model](self)` / `[total_tokens](usage)`
+inside the table is unsafe.
+
+**mdl = [model](self)**
+**b = [backend](self)**
+**nm = [name](self)**
+**tt = [total_tokens](usage)**
+
 `result` =
 
 | text | model | finish | backend | usage | name | llm_calls | tokens | tool_calls |
 |------|-------|--------|---------|-------|------|-----------|--------|------------|
-| `text` | [model](self) | `finish` | [backend](self) | `usage` | [name](self) | 1 | [total_tokens](usage) | `tc` |
+| `text` | `mdl` | `finish` | `b` | `usage` | `nm` | 1 | `tt` | `tc` |
 
 *result*
 
