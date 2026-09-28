@@ -1,0 +1,22 @@
+---
+type: Decision
+id: ADR-022
+title: Cache is not persistence
+status: accepted
+applies_to:
+  - config.resolve
+---
+
+# Cache is not persistence
+
+## Decision
+
+Redis is only used for ephemeral cache.
+
+## Reason
+
+The application must remain correct when Redis is unavailable.
+
+## Consequence
+
+Do not introduce Redis as the source of truth.

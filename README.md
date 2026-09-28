@@ -6,7 +6,7 @@ Marqdo 把 Markdown **标记当作编程语法**：同一个 `.mq.md` 文件，�
 
 欢迎访问 [marqdo 官方网站](https://www.marqdo.com/) 阅读更多特性与可执行文档。
 
-语法宪法：[doc/design/markdown-mapping.md](doc/design/markdown-mapping.md) · 对象：[objects.md](doc/design/objects.md) · 调用实参：[call-arguments.md](doc/design/call-arguments.md) · 用户站：[user-site.md](doc/design/user-site.md) · 浏览：[view.md](doc/design/view.md) · 调试：[view-debug.md](doc/design/view-debug.md) · OKF 清单：[catalog-cli.md](doc/design/catalog-cli.md) · VS Code 扩展：[vscode-extension.md](doc/design/vscode-extension.md)（分支 **`vscode-extension`**；提交约定 [vscode-extension-commit.md](doc/design/vscode-extension-commit.md)） · **AI Skill**：[skills/marqdo/](skills/marqdo/)（说明 [ai-skill.md](doc/design/ai-skill.md)） · 官方扩展：[ext-llm.md](doc/design/ext-llm.md)（`ext/llm`）· [ext-agent.md](doc/design/ext-agent.md)（智能体开发框架）· [ext-cli.md](doc/design/ext-cli.md)（`marqdo ext list/add/remove`） · 原生插件 ABI：[ext-abi.md](doc/design/ext-abi.md)（`lib/plugin`） · 金样例：[tests/](tests/) · 用户文档：[public/](public/) · 变更：[CHANGELOG.md](CHANGELOG.md)
+语法宪法：[doc/design/markdown-mapping.md](doc/design/markdown-mapping.md) · 对象：[objects.md](doc/design/objects.md) · 调用实参：[call-arguments.md](doc/design/call-arguments.md) · 用户站：[user-site.md](doc/design/user-site.md) · 浏览：[view.md](doc/design/view.md) · 调试：[view-debug.md](doc/design/view-debug.md) · OKF 清单：[catalog-cli.md](doc/design/catalog-cli.md) · Engineering Knowledge：[engineering-knowledge.md](doc/design/engineering-knowledge.md) · VS Code 扩展：[vscode-extension.md](doc/design/vscode-extension.md)（分支 **`vscode-extension`**；提交约定 [vscode-extension-commit.md](doc/design/vscode-extension-commit.md)） · **AI Skill**：[skills/marqdo/](skills/marqdo/)（说明 [ai-skill.md](doc/design/ai-skill.md)） · 官方扩展：[ext-llm.md](doc/design/ext-llm.md)（`ext/llm`）· [ext-agent.md](doc/design/ext-agent.md)（智能体开发框架）· [ext-cli.md](doc/design/ext-cli.md)（`marqdo ext list/add/remove`） · 原生插件 ABI：[ext-abi.md](doc/design/ext-abi.md)（`lib/plugin`） · 金样例：[tests/](tests/) · 用户文档：[public/](public/) · 变更：[CHANGELOG.md](CHANGELOG.md)
 
 ---
 
@@ -123,6 +123,13 @@ Marqdo 把 Markdown **标记当作编程语法**：同一个 `.mq.md` 文件，�
 ```bash
 marqdo catalog [PATH] -o OUT_DIR
 marqdo sync [PATH] -o OUT_DIR          # catalog 的别名
+
+# Engineering Knowledge Compiler（L0–L4 能力目录 / 复用门闩）
+marqdo knowledge [PATH] -o OUT_DIR
+marqdo find "authentication"
+marqdo reuse "implement oauth login"
+marqdo duplicate [--fail]
+marqdo verify
 ```
 
 | 参数 | 默认 | 说明 |
@@ -130,7 +137,7 @@ marqdo sync [PATH] -o OUT_DIR          # catalog 的别名
 | `PATH` | `.` | 工程根或含 `.mq.md` 的目录 |
 | `-o` / `--out` | `.marqdo` | 输出目录 |
 
-产物示例：`catalog.yaml`、`index.md`、`modules/*.md`（`type: Marqdo Module` 等）。设计见 [generated-yaml-manifest.md](doc/design/generated-yaml-manifest.md) · 调研 [okf-and-marqdo.md](doc/research/okf-and-marqdo.md)。
+`catalog` 成功后默认再跑 EKC（`--no-knowledge` 可关）。产物示例：`catalog.yaml`、`engineering.yaml`、`catalog/capabilities/`、`graph/graph.json`。设计见 [engineering-knowledge.md](doc/design/engineering-knowledge.md) · [catalog-cli.md](doc/design/catalog-cli.md) · 调研 [okf-and-marqdo.md](doc/research/okf-and-marqdo.md)。
 
 智能体框架横向调研（LangGraph / CrewAI / 厂商 SDK 等 vs Marqdo 文档驱动优势）：[agent-frameworks-and-marqdo.md](doc/research/agent-frameworks-and-marqdo.md) · 优化路线 [ext-agent-optimize.md](doc/roadmap/ext-agent-optimize.md)。
 
@@ -151,14 +158,15 @@ marqdo catalog public -o .marqdo
 - **对象**：`#` = 类型/构造，`##`+ = 函数/方法；见 [objects.md](doc/design/objects.md)  
 - **`marqdo view`**：文档浏览器（Structure + 函数大纲/搜索 + Execution + Variables 浮窗）  
 - **`marqdo debug`**：独立调试页（断点 / 单步 / locals；默认端口 7430；页面 favicon / 品牌使用官方 Logo）  
-- **`marqdo catalog` / `sync`**：OKF 风格 YAML + 模块概念页  
+- **`marqdo catalog` / `sync`**：OKF 风格 YAML + 模块概念页（默认挂钩 EKC）  
+- **`marqdo knowledge` / `find` / `reuse` / `impact` / `conflicts` / `stale` / `duplicate` / `verify`**：Engineering Knowledge Compiler（[engineering-knowledge.md](doc/design/engineering-knowledge.md)）  
 - **`marqdo version --check`**：与 GitHub 最新 release 对比  
 - 标准库：**内置于二进制**（v0.1.2+）；磁盘 `lib/` 或 `MARQDO_LIB` 可覆盖。模块含文本、表、**浏览器效应**、文件、系统、时间、JSON、网络、数学、外联、插件、**自写回**、**子任务**；**中层 Mid M1–M6** + **Mid2 M7–M10**（datetime/url/toml/html/fs++/stats/log.fields 等，见 [stdlib-mid.md](doc/design/stdlib-mid.md) · [stdlib-mid2.md](doc/design/stdlib-mid2.md)）  
 - **官方扩展库 `ext/`**（**非** stdlib，本版收口）：
   - **`web`**：**Artifact 模型（ADR [0007](doc/adr/0007-web-document-endpoint.md)）** — `type: web|endpoint` Document/Endpoint；facade `page`/`route`/`serve`/`render`/`inspect`/`use`；Resource 在 `ext/data` · `ext/security` · `ext/net`；设计 [ext-web-artifact.md](doc/design/ext-web-artifact.md)；原生 **Go `libweb`**（[ADR 0004](doc/adr/0004-web-plugin-go.md)）；示例 [marqdo-blog](examples/marqdo-blog/) · [web-client-site](examples/web-client-site/) · [anlian-mq](examples/anlian-mq/)
   - **`quantum`**：Q0–Q7 + Q8a/b 主题 SVG；示例 [quantum-entanglement](examples/quantum-entanglement/)
   - **`linalg`**：L0–L6 + 公式文档面（中缀 / `declare` / 展示化简）；示例 [linalg-transpose](examples/linalg-transpose/) · [linalg-svd](examples/linalg-svd/) · [linalg-least-squares](examples/linalg-least-squares/)
-  - **`agent`**：A1–A4 + **MCP Server/Client stdio** + Skill Compilation + Adaptive Routing + resume；宿主缺口见 [ext-hosting.md](doc/roadmap/ext-hosting.md) · [agent-framework-gaps-after-a4.md](doc/research/agent-framework-gaps-after-a4.md)
+  - **`agent`**：A1–A4 + **MCP Server/Client stdio** + Skill Compilation + Adaptive Routing + resume + **Engineering preflight**（`agent.preflight` / `eng_preflight`）；宿主缺口见 [ext-hosting.md](doc/roadmap/ext-hosting.md) · [agent-framework-gaps-after-a4.md](doc/research/agent-framework-gaps-after-a4.md) · [engineering-knowledge.md](doc/design/engineering-knowledge.md)
   - **`llm`**：语义 `ask`/`stream`/`collect`（OpenAI/Ollama；可选原生 `plugins/llm`）
   - 安装：`marqdo ext list` / `add …` / `remove`（[ext-cli.md](doc/design/ext-cli.md)；默认 `~/.marqdo/ext`）。原生插件先 `cargo build -p marqdo_plugin_*` 再 `ext add`
 - **原生插件 ABI**：[`include/marqdo_abi.h`](include/marqdo_abi.h) · [ext-abi.md](doc/design/ext-abi.md)；`plugins/{demo,agent,web,quantum,linalg,llm}`（`web` 为 Go；其余为 Rust）  

@@ -25,6 +25,7 @@
 | [design/return-hr-and-code-surface.md](design/return-hr-and-code-surface.md) | 语句/返回/输出决议 |
 | [design/generated-yaml-manifest.md](design/generated-yaml-manifest.md) | 生成式 OKF 清单（早期方向） |
 | [design/okf.md](design/okf.md) | **Marqdo OKF 实现规范**（catalog v0 + 任务知识包） |
+| [design/engineering-knowledge.md](design/engineering-knowledge.md) | **Engineering Knowledge Compiler（EKC）**：L0–L4、reuse、EFI |
 | [design/catalog-cli.md](design/catalog-cli.md) | **`marqdo catalog` / `sync` OKF 清单命令** |
 | [design/tech-stack.md](design/tech-stack.md) | 实现栈对比 |
 | [adr/0001-implementation-language.md](adr/0001-implementation-language.md) | **Accepted：Rust 参考解释器；不用 Flex/Bison** |

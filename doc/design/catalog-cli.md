@@ -23,14 +23,19 @@ YAML / OKF 风格清单是**从 `.mq.md` 派生的生成物**，不是手写配�
 marqdo catalog [PATH] -o OUT_DIR
 # 别名（与早期草案一致）
 marqdo sync [PATH] -o OUT_DIR
+# 跳过 Engineering Knowledge 投影（仅旧式 catalog）
+marqdo catalog [PATH] -o OUT_DIR --no-knowledge
 ```
 
 | 参数 | 默认 | 说明 |
 |------|------|------|
 | `PATH` | `.` | 工程根或含 `.mq.md` 的目录（递归扫描） |
 | `-o` / `--out` | `.marqdo` | 生成目录（写入前创建；**覆盖**同名生成文件；扫描时跳过该目录） |
+| `--no-knowledge` | off | 不跑 EKC；默认在 catalog 成功后编译 L0–L4 / graph |
 
 退出码：成功 0；无可扫描文件或 IO/解析失败非 0（单文件解析失败时写入 `diagnostics` 并继续其余文件，最终若有失败则非 0）。
+
+Engineering Knowledge 命令见 [engineering-knowledge.md](engineering-knowledge.md)（`find` / `reuse` / `duplicate` / …）。
 
 ---
 

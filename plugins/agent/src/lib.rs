@@ -1,6 +1,7 @@
 //! Agent plugin (C ABI v2): layout helpers + session bag + context via host_query + agent-kb + v2 memory + adaptive route.
 
 mod corpus;
+mod eng;
 mod kb;
 mod mcp_client;
 mod mcp_server;
@@ -930,6 +931,9 @@ kb_ffi!(agent_resume_save, resume::resume_save, "agent_resume_save");
 kb_ffi!(agent_resume_load, resume::resume_load, "agent_resume_load");
 kb_ffi!(agent_resume_clear, resume::resume_clear, "agent_resume_clear");
 kb_ffi!(agent_resume_list, resume::resume_list, "agent_resume_list");
+kb_ffi!(agent_eng_preflight, eng::eng_preflight, "agent_eng_preflight");
+kb_ffi!(agent_eng_reuse, eng::eng_reuse, "agent_eng_reuse");
+kb_ffi!(agent_eng_record, eng::eng_record, "agent_eng_record");
 
 #[no_mangle]
 pub unsafe extern "C" fn marqdo_plugin_abi_version() -> u32 {
@@ -1151,6 +1155,27 @@ pub unsafe extern "C" fn marqdo_plugin_init(host: *const MarqdoHostApi) -> c_int
         "agent_maybe_compile_policy",
         "memory_dir,min_evidence",
         agent_maybe_compile_policy,
+    ) != 0
+    {
+        return 1;
+    }
+    if register(
+        host,
+        "agent_eng_preflight",
+        "task",
+        agent_eng_preflight,
+    ) != 0
+    {
+        return 1;
+    }
+    if register(host, "agent_eng_reuse", "task", agent_eng_reuse) != 0 {
+        return 1;
+    }
+    if register(
+        host,
+        "agent_eng_record",
+        "decision",
+        agent_eng_record,
     ) != 0
     {
         return 1;

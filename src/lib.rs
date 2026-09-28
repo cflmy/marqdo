@@ -13,6 +13,8 @@ pub mod bytecode;
 pub mod capture;
 #[cfg(feature = "cli")]
 pub mod catalog;
+#[cfg(feature = "cli")]
+pub mod knowledge;
 pub mod check;
 pub mod contract;
 pub mod debug;

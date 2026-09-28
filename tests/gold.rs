@@ -1167,6 +1167,7 @@ fn catalog_writes_yaml() {
         "tests",
         "-o",
         dir.to_str().unwrap(),
+        "--no-knowledge",
     ]);
     assert_eq!(code, 0, "{stderr}");
     let yaml = std::fs::read_to_string(dir.join("catalog.yaml")).unwrap();
@@ -1187,6 +1188,166 @@ fn catalog_writes_yaml() {
         import_page.contains("](") && import_page.contains("utils"),
         "depends should link to utils module: {import_page}"
     );
+}
+
+#[test]
+fn knowledge_compile_engineering_fixture() {
+    let dir = tempfile_dir("mq-ekc");
+    let (code, _, stderr) = run(&[
+        "knowledge",
+        "tests/engineering",
+        "-o",
+        dir.to_str().unwrap(),
+    ]);
+    assert_eq!(code, 0, "{stderr}");
+    assert!(dir.join("catalog/repository.mq.md").exists());
+    assert!(dir.join("graph/graph.json").exists());
+    assert!(dir.join("graph/edges.json").exists());
+    assert!(dir.join("engineering.yaml").exists());
+    assert!(dir.join("index.mq.md").exists());
+    let eng = std::fs::read_to_string(dir.join("engineering.yaml")).unwrap();
+    assert!(eng.contains("type: Marqdo Engineering Knowledge"), "{eng}");
+    assert!(eng.contains("capabilities:"), "{eng}");
+    assert!(
+        dir.join("knowledge/decisions").exists()
+            || dir.join("knowledge/constraints").exists(),
+        "L4 knowledge dirs"
+    );
+    let caps: Vec<_> = std::fs::read_dir(dir.join("catalog/capabilities"))
+        .unwrap()
+        .flatten()
+        .collect();
+    assert!(!caps.is_empty(), "expected capability pages");
+}
+
+#[test]
+fn knowledge_reuse_prefers_existing_capability() {
+    let dir = tempfile_dir("mq-reuse");
+    let (code, stdout, stderr) = run(&[
+        "reuse",
+        "resolve configuration",
+        "tests/engineering",
+        "-o",
+        dir.to_str().unwrap(),
+        "--json",
+    ]);
+    assert_eq!(code, 0, "{stderr}");
+    assert!(
+        stdout.contains("\"decision\":\"REUSE\"") || stdout.contains("\"decision\": \"REUSE\""),
+        "expected REUSE: {stdout}"
+    );
+    assert!(stdout.contains("create_allowed"), "{stdout}");
+    assert!(
+        stdout.contains("false") || stdout.contains("\"create_allowed\":false"),
+        "create should not be required: {stdout}"
+    );
+}
+
+#[test]
+fn knowledge_find_surfaces_negative_knowledge() {
+    let dir = tempfile_dir("mq-find");
+    let (code, stdout, stderr) = run(&[
+        "find",
+        "JWT",
+        "tests/engineering",
+        "-o",
+        dir.to_str().unwrap(),
+        "--json",
+    ]);
+    assert_eq!(code, 0, "{stderr}");
+    assert!(
+        stdout.contains("AntiPattern") || stdout.contains("JWT") || stdout.contains("parse"),
+        "expected JWT anti-pattern hit: {stdout}"
+    );
+}
+
+#[test]
+fn knowledge_duplicate_detects_merge_pair() {
+    let dir = tempfile_dir("mq-dup");
+    let (code, stdout, stderr) = run(&[
+        "duplicate",
+        "tests/engineering",
+        "-o",
+        dir.to_str().unwrap(),
+        "--threshold",
+        "0.75",
+        "--json",
+    ]);
+    assert_eq!(code, 0, "{stderr}");
+    assert!(
+        stdout.contains("merge_config") && stdout.contains("merge_settings"),
+        "expected merge_* duplicate pair: {stdout}"
+    );
+}
+
+#[test]
+fn knowledge_verify_and_conflicts_and_stale() {
+    let dir = tempfile_dir("mq-verify");
+    for cmd in ["verify", "conflicts", "stale"] {
+        let (code, stdout, stderr) = run(&[
+            cmd,
+            "tests/engineering",
+            "-o",
+            dir.to_str().unwrap(),
+            "--json",
+        ]);
+        assert_eq!(code, 0, "{cmd}: {stderr}");
+        assert!(!stdout.is_empty(), "{cmd} empty stdout");
+    }
+}
+
+#[test]
+fn knowledge_impact_lists_capabilities() {
+    let dir = tempfile_dir("mq-impact");
+    let (code, stdout, stderr) = run(&[
+        "impact",
+        "config_resolve.mq.md",
+        "--root",
+        "tests/engineering",
+        "-o",
+        dir.to_str().unwrap(),
+        "--json",
+    ]);
+    assert_eq!(code, 0, "{stderr}");
+    assert!(
+        stdout.contains("config.resolve") || stdout.contains("capabilities"),
+        "{stdout}"
+    );
+}
+
+#[test]
+fn knowledge_preflight_writes_context_pack() {
+    let dir = tempfile_dir("mq-pf");
+    let (code, stdout, stderr) = run(&[
+        "knowledge",
+        "tests/engineering",
+        "preflight",
+        "resolve configuration",
+        "-o",
+        dir.to_str().unwrap(),
+        "--json",
+    ]);
+    assert_eq!(code, 0, "{stderr}\n{stdout}");
+    assert!(stdout.contains("create_allowed"), "{stdout}");
+    let ctx = dir.join("agent/contexts");
+    assert!(ctx.exists(), "contexts dir missing");
+    let packs: Vec<_> = std::fs::read_dir(&ctx).unwrap().flatten().collect();
+    assert!(!packs.is_empty(), "expected context pack");
+}
+
+#[test]
+fn catalog_hooks_knowledge_by_default() {
+    let dir = tempfile_dir("mq-cat-ekc");
+    let (code, _, stderr) = run(&[
+        "catalog",
+        "tests/engineering",
+        "-o",
+        dir.to_str().unwrap(),
+    ]);
+    assert_eq!(code, 0, "{stderr}");
+    assert!(dir.join("catalog.yaml").exists());
+    assert!(dir.join("engineering.yaml").exists());
+    assert!(dir.join("graph/graph.json").exists());
 }
 
 #[test]
@@ -1243,6 +1404,7 @@ fn catalog_includes_agent_kb_concepts() {
         "tests/ext",
         "-o",
         dir.to_str().unwrap(),
+        "--no-knowledge",
     ]);
     assert_eq!(code, 0, "{stderr}");
     let yaml = std::fs::read_to_string(dir.join("catalog.yaml")).unwrap();

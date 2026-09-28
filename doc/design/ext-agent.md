@@ -4,7 +4,7 @@
 |---|---|
 | Status | **Accepted · redesign**（取代「thin TOOL: loop」方案） |
 | Date | 2026-08-07 |
-| Related | [ext-llm.md](ext-llm.md) · [ext-cli.md](ext-cli.md) · [ext-abi.md](ext-abi.md) · [**ext-agent-plan.md**](ext-agent-plan.md)（**多步锁定设计**） · [**ext-agent-parent.md**](ext-agent-parent.md)（**父 Plan-and-Move**） · [**okf.md**](okf.md)（**OKF / 任务知识包**） · [**调研：主流框架与 Marqdo 优势**](../research/agent-frameworks-and-marqdo.md) · [**缺口：A0–A4 之后**](../research/agent-framework-gaps-after-a4.md) · [module-namespace.md](module-namespace.md) · [objects.md](objects.md) · [stdlib-writeback.md](stdlib-writeback.md) · [stdlib-subtask.md](stdlib-subtask.md) · [markdown-mapping.md](markdown-mapping.md) |
+| Related | [ext-llm.md](ext-llm.md) · [ext-cli.md](ext-cli.md) · [ext-abi.md](ext-abi.md) · [**ext-agent-plan.md**](ext-agent-plan.md)（**多步锁定设计**） · [**ext-agent-parent.md**](ext-agent-parent.md)（**父 Plan-and-Move**） · [**okf.md**](okf.md)（**OKF / 任务知识包**） · [**engineering-knowledge.md**](engineering-knowledge.md)（**EKC / EFI preflight**） · [**调研：主流框架与 Marqdo 优势**](../research/agent-frameworks-and-marqdo.md) · [**缺口：A0–A4 之后**](../research/agent-framework-gaps-after-a4.md) · [module-namespace.md](module-namespace.md) · [objects.md](objects.md) · [stdlib-writeback.md](stdlib-writeback.md) · [stdlib-subtask.md](stdlib-subtask.md) · [markdown-mapping.md](markdown-mapping.md) |
 
 ## 0. 为什么要改掉旧方案
 
@@ -167,8 +167,9 @@ ext/
 **分层纪律（硬规则，勿破）**：
 
 1. `ext/**/*.mq.md` **禁止**出现任何 `host_*` / `host_` 调用。  
-2. Agent 专属能力（含 OKF agent-kb：`agent_goal_sig` / `agent_kb_lookup` / `agent_kb_promote` / …）只进 **`plugins/agent` 注册名**，由 `ext/ai/agent` 在 `plugin.load` 后调用。  
-3. **禁止**向 `src/host/`（`HostFn` 表）添加 agent / OKF 领域原语，以免核心包体膨胀。通用 L0.5 仅保留 fs/json/subtask 等标准库底层。  
+2. Agent 专属能力（含 OKF agent-kb：`agent_goal_sig` / `agent_kb_lookup` / `agent_kb_promote` / …；以及 EKC：`agent_eng_preflight` / `agent_eng_reuse` / `agent_eng_record`）只进 **`plugins/agent` 注册名**，由 `ext/ai/agent` 在 `plugin.load` 后调用。  
+3. **禁止**向 `src/host/`（`HostFn` 表）添加 agent / OKF / EKC 领域原语，以免核心包体膨胀。通用 L0.5 仅保留 fs/json/subtask 等标准库底层。  
+4. **Engineering preflight**：`agent.preflight` / `plan … eng_preflight=True` 在 agent-kb 之前解析 REUSE/ADAPT/CREATE（见 [engineering-knowledge.md](engineering-knowledge.md)）。缺 `.marqdo` 知识图时返回 `missing_knowledge` 并放行，以兼容纯任务包测试。
 4. 进程退出用 `sys.exit` / `系统.退出`，不用裸 `exit`。
 
 官方 `ext/ai/` 用 `lib/*` 包装或插件注册名；见 [module-namespace.md](module-namespace.md) §8 · [ext-abi.md](ext-abi.md)。

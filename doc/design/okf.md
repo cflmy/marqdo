@@ -143,13 +143,18 @@ Marqdo 对齐的判断是：
 
 | `type` | 状态 | 含义 | 主要生产者 |
 |--------|------|------|------------|
-| `Marqdo Catalog` | **v0 已实现** | 包总览（`catalog.yaml` / `index.md`） | `marqdo catalog` |
-| `Marqdo Module` | **v0 已实现** | 一个 `.mq.md` 模块的投影 | `marqdo catalog` |
-| `Marqdo Task` | **规范已定；实现待做** | 一项可匹配的任务意图 | `plan` 晋升 |
-| `Marqdo Agent Skill` | **规范已定；实现待做** | 指向可执行工作簿的技能 | `plan` 晋升 |
+| `Marqdo Catalog` | **已实现** | 包总览（`catalog.yaml` / `index.md`） | `marqdo catalog` |
+| `Marqdo Module` | **已实现** | 一个 `.mq.md` 模块的投影 | `marqdo catalog` |
+| `Marqdo Task` | **已实现** | 一项可匹配的任务意图 | `plan` 晋升 |
+| `Marqdo Agent Skill` | **已实现** | 指向可执行工作簿的技能 | `plan` 晋升 |
+| `Capability` / `Function` | **EKC** | 工程能力 / 符号投影 | `marqdo knowledge` |
+| `Decision` / `Constraint` / `Failure` / `AntiPattern` / `Pattern` / `Migration` / `Fact` | **EKC** | L4 工程知识 | 源 frontmatter + learn |
+| `Marqdo Context Pack` | **EKC** | Agent EFI 上下文制品 | `reuse` / `preflight` |
+| `Marqdo Policy` | **EKC** | 复用决议编译 | `marqdo reuse` |
+| `Marqdo Engineering Knowledge` | **EKC** | 工程知识总览 | `engineering.yaml` / `index.mq.md` |
 | 其他 | 开放 | 第三方/未来扩展 | — |
 
-**不**引入 Google OKF 的 `Metric` / BigQuery 表类型作为 Marqdo 核心词汇；需要时可由用户包自行使用，运行时降级。
+完整 EKC 规范见 [engineering-knowledge.md](engineering-knowledge.md)。
 
 ---
 

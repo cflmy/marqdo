@@ -8,11 +8,19 @@ use marqdo::catalog::{write_catalog, CatalogOptions};
 use marqdo::diagnostics::{Diagnostic, Span};
 use marqdo::ext_cli::{add_ext, list_ext, remove_ext};
 use marqdo::input_feed::load_stdin_file;
+use marqdo::knowledge::{
+    compile_policy, conflicts_json, ensure_compiled, find, find_duplicates, find_json,
+    find_conflicts, find_stale, format_conflicts_text, format_duplicates_text, format_find_text,
+    format_impact_text, format_preflight_yaml, format_reuse_text, format_stale_text,
+    format_verify_text, impact, impact_json, learn, preflight, preflight_json, record_decision,
+    resolve, reuse_json, stale_json, verify, verify_json, write_knowledge, KnowledgeOptions,
+    LearnInput, ReuseBudget,
+};
 use marqdo::view::{serve, serve_debug, write_static, DebugOptions, OutputOptions, ViewOptions};
 use marqdo::{Backend, RunOptions};
 
 #[derive(Parser, Debug)]
-#[command(name = "marqdo", version, about = "Marqdo interpreter — run, view, debug, catalog, and ext")]
+#[command(name = "marqdo", version, about = "Marqdo interpreter — run, view, debug, catalog, knowledge, and ext")]
 struct Cli {
     #[command(subcommand)]
     command: Commands,
@@ -119,13 +127,17 @@ enum Commands {
         #[arg(long)]
         no_open: bool,
     },
-    /// Generate OKF-compatible catalog YAML + module pages
+    /// Generate OKF-compatible catalog YAML + module pages (+ Engineering Knowledge)
     Catalog {
         #[arg(value_name = "PATH")]
         path: Option<PathBuf>,
 
         #[arg(short = 'o', long = "out", default_value = ".marqdo")]
         out: PathBuf,
+
+        /// Skip Engineering Knowledge Compiler after catalog
+        #[arg(long)]
+        no_knowledge: bool,
     },
     /// Alias for `catalog`
     Sync {
@@ -134,6 +146,129 @@ enum Commands {
 
         #[arg(short = 'o', long = "out", default_value = ".marqdo")]
         out: PathBuf,
+
+        #[arg(long)]
+        no_knowledge: bool,
+    },
+    /// Engineering Knowledge Compiler (L0–L4 catalog / graph / projections)
+    Knowledge {
+        #[command(subcommand)]
+        action: Option<KnowledgeAction>,
+
+        #[arg(value_name = "PATH", global = true)]
+        path: Option<PathBuf>,
+
+        #[arg(short = 'o', long = "out", default_value = ".marqdo", global = true)]
+        out: PathBuf,
+
+        #[arg(long, global = true)]
+        json: bool,
+    },
+    /// Find engineering capabilities / symbols / knowledge
+    Find {
+        #[arg(value_name = "QUERY")]
+        query: String,
+
+        #[arg(value_name = "PATH")]
+        path: Option<PathBuf>,
+
+        #[arg(short = 'o', long = "out", default_value = ".marqdo")]
+        out: PathBuf,
+
+        #[arg(long, default_value_t = 20)]
+        limit: usize,
+
+        #[arg(long)]
+        json: bool,
+    },
+    /// Engineering First Information: REUSE / ADAPT / CREATE
+    Reuse {
+        #[arg(value_name = "TASK")]
+        task: String,
+
+        #[arg(value_name = "PATH")]
+        path: Option<PathBuf>,
+
+        #[arg(short = 'o', long = "out", default_value = ".marqdo")]
+        out: PathBuf,
+
+        /// Also write preflight context pack + policy
+        #[arg(long)]
+        preflight: bool,
+
+        #[arg(long, default_value_t = 3)]
+        min_candidates: usize,
+
+        #[arg(long, default_value_t = 2)]
+        allow_create_after: usize,
+
+        #[arg(long)]
+        json: bool,
+    },
+    /// Knowledge impact of changed paths
+    Impact {
+        #[arg(value_name = "PATH")]
+        paths: Vec<PathBuf>,
+
+        #[arg(long, value_name = "ROOT", default_value = ".")]
+        root: PathBuf,
+
+        #[arg(short = 'o', long = "out", default_value = ".marqdo")]
+        out: PathBuf,
+
+        #[arg(long)]
+        json: bool,
+    },
+    /// Detect knowledge conflicts / possible duplicates edges
+    Conflicts {
+        #[arg(value_name = "PATH")]
+        path: Option<PathBuf>,
+
+        #[arg(short = 'o', long = "out", default_value = ".marqdo")]
+        out: PathBuf,
+
+        #[arg(long)]
+        json: bool,
+    },
+    /// List stale / deprecated / superseded knowledge
+    Stale {
+        #[arg(value_name = "PATH")]
+        path: Option<PathBuf>,
+
+        #[arg(short = 'o', long = "out", default_value = ".marqdo")]
+        out: PathBuf,
+
+        #[arg(long)]
+        json: bool,
+    },
+    /// Detect duplicate capabilities via symbol fingerprints
+    Duplicate {
+        #[arg(value_name = "PATH")]
+        path: Option<PathBuf>,
+
+        #[arg(short = 'o', long = "out", default_value = ".marqdo")]
+        out: PathBuf,
+
+        #[arg(long, default_value_t = 0.75)]
+        threshold: f64,
+
+        /// Exit non-zero when duplicates found (CI gate)
+        #[arg(long)]
+        fail: bool,
+
+        #[arg(long)]
+        json: bool,
+    },
+    /// Verify code ↔ knowledge consistency
+    Verify {
+        #[arg(value_name = "PATH")]
+        path: Option<PathBuf>,
+
+        #[arg(short = 'o', long = "out", default_value = ".marqdo")]
+        out: PathBuf,
+
+        #[arg(long)]
+        json: bool,
     },
     /// Official extension installer (`list` / `add` / `remove`)
     Ext {
@@ -149,6 +284,50 @@ enum Commands {
     Wasm {
         #[command(subcommand)]
         action: WasmAction,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+enum KnowledgeAction {
+    /// Compile L0–L4 projections (default)
+    Compile,
+    /// Run engineering preflight for a task
+    Preflight {
+        #[arg(value_name = "TASK")]
+        task: String,
+
+        #[arg(long, default_value_t = 3)]
+        min_candidates: usize,
+
+        #[arg(long, default_value_t = 2)]
+        allow_create_after: usize,
+    },
+    /// Record a reuse decision into metrics
+    Record {
+        #[arg(value_name = "DECISION")]
+        decision: String,
+
+        #[arg(long)]
+        duplicated: bool,
+    },
+    /// Learn failure/decision/constraint into knowledge/
+    Learn {
+        #[arg(long)]
+        task: String,
+        #[arg(long)]
+        failed_approach: Option<String>,
+        #[arg(long)]
+        failure: Option<String>,
+        #[arg(long)]
+        correct_approach: Option<String>,
+        #[arg(long)]
+        decision_title: Option<String>,
+        #[arg(long)]
+        decision_body: Option<String>,
+        #[arg(long)]
+        constraint_title: Option<String>,
+        #[arg(long)]
+        constraint_body: Option<String>,
     },
 }
 
@@ -354,12 +533,249 @@ fn try_main(cli: Cli) -> Result<i32> {
             })?;
             Ok(0)
         }
-        Commands::Catalog { path, out } | Commands::Sync { path, out } => {
+        Commands::Catalog {
+            path,
+            out,
+            no_knowledge,
+        }
+        | Commands::Sync {
+            path,
+            out,
+            no_knowledge,
+        } => {
+            let path = path.unwrap_or_else(|| PathBuf::from("."));
             write_catalog(CatalogOptions {
-                path: path.unwrap_or_else(|| PathBuf::from(".")),
-                out_dir: out,
+                path: path.clone(),
+                out_dir: out.clone(),
             })?;
+            if !no_knowledge {
+                write_knowledge(KnowledgeOptions {
+                    path,
+                    out_dir: out,
+                })?;
+            }
             Ok(0)
+        }
+        Commands::Knowledge {
+            action,
+            path,
+            out,
+            json,
+        } => {
+            let path = path.unwrap_or_else(|| PathBuf::from("."));
+            match action.unwrap_or(KnowledgeAction::Compile) {
+                KnowledgeAction::Compile => {
+                    write_knowledge(KnowledgeOptions {
+                        path,
+                        out_dir: out,
+                    })?;
+                    Ok(0)
+                }
+                KnowledgeAction::Preflight {
+                    task,
+                    min_candidates,
+                    allow_create_after,
+                } => {
+                    let graph = ensure_compiled(&path, &out)?;
+                    let budget = ReuseBudget {
+                        min_candidates,
+                        allow_create_after,
+                        ..ReuseBudget::default()
+                    };
+                    let pf = preflight(&graph, &task, &budget, Some(&out))?;
+                    let _ = compile_policy(&out, &task, &resolve(&graph, &task, &budget));
+                    if json {
+                        println!("{}", preflight_json(&pf));
+                    } else {
+                        print!("{}", format_preflight_yaml(&pf));
+                    }
+                    Ok(if pf.create_allowed
+                        || pf.decision == "REUSE"
+                        || pf.decision == "ADAPT"
+                    {
+                        0
+                    } else {
+                        2
+                    })
+                }
+                KnowledgeAction::Record {
+                    decision,
+                    duplicated,
+                } => {
+                    let m = record_decision(&out, &decision, duplicated)?;
+                    if json {
+                        println!("{}", m.to_json());
+                    } else {
+                        println!(
+                            "reuse_ratio={:.2} adapt_ratio={:.2} novel_ratio={:.2} duplication_rate={:.2}",
+                            m.reuse_ratio(),
+                            m.adapt_ratio(),
+                            m.novel_ratio(),
+                            m.duplication_rate()
+                        );
+                    }
+                    Ok(0)
+                }
+                KnowledgeAction::Learn {
+                    task,
+                    failed_approach,
+                    failure,
+                    correct_approach,
+                    decision_title,
+                    decision_body,
+                    constraint_title,
+                    constraint_body,
+                } => {
+                    let written = learn(
+                        &out,
+                        &LearnInput {
+                            task,
+                            failed_approach,
+                            failure,
+                            correct_approach,
+                            decision_title,
+                            decision_body,
+                            constraint_title,
+                            constraint_body,
+                        },
+                    )?;
+                    for p in written {
+                        println!("{}", p.display());
+                    }
+                    Ok(0)
+                }
+            }
+        }
+        Commands::Find {
+            query,
+            path,
+            out,
+            limit,
+            json,
+        } => {
+            let path = path.unwrap_or_else(|| PathBuf::from("."));
+            let graph = ensure_compiled(&path, &out)?;
+            let hits = find(&graph, &query, limit);
+            if json {
+                println!("{}", find_json(&query, &hits));
+            } else {
+                print!("{}", format_find_text(&query, &hits, &graph));
+            }
+            Ok(0)
+        }
+        Commands::Reuse {
+            task,
+            path,
+            out,
+            preflight: do_preflight,
+            min_candidates,
+            allow_create_after,
+            json,
+        } => {
+            let path = path.unwrap_or_else(|| PathBuf::from("."));
+            let graph = ensure_compiled(&path, &out)?;
+            let budget = ReuseBudget {
+                min_candidates,
+                allow_create_after,
+                ..ReuseBudget::default()
+            };
+            let result = resolve(&graph, &task, &budget);
+            let _ = compile_policy(&out, &task, &result);
+            if do_preflight {
+                let _ = preflight(&graph, &task, &budget, Some(&out))?;
+            }
+            if json {
+                println!("{}", reuse_json(&task, &result));
+            } else {
+                print!("{}", format_reuse_text(&task, &result));
+            }
+            Ok(0)
+        }
+        Commands::Impact {
+            paths,
+            root,
+            out,
+            json,
+        } => {
+            let graph = ensure_compiled(&root, &out)?;
+            let path_strs: Vec<String> = paths
+                .iter()
+                .map(|p| p.to_string_lossy().replace('\\', "/"))
+                .collect();
+            let report = impact(&graph, &path_strs);
+            if json {
+                println!("{}", impact_json(&report));
+            } else {
+                print!("{}", format_impact_text(&report));
+            }
+            Ok(0)
+        }
+        Commands::Conflicts { path, out, json } => {
+            let path = path.unwrap_or_else(|| PathBuf::from("."));
+            let graph = ensure_compiled(&path, &out)?;
+            let items = find_conflicts(&graph);
+            if json {
+                println!("{}", conflicts_json(&items));
+            } else {
+                print!("{}", format_conflicts_text(&items));
+            }
+            Ok(0)
+        }
+        Commands::Stale { path, out, json } => {
+            let path = path.unwrap_or_else(|| PathBuf::from("."));
+            let graph = ensure_compiled(&path, &out)?;
+            let items = find_stale(&graph, &path);
+            if json {
+                println!("{}", stale_json(&items));
+            } else {
+                print!("{}", format_stale_text(&items));
+            }
+            Ok(0)
+        }
+        Commands::Duplicate {
+            path,
+            out,
+            threshold,
+            fail,
+            json,
+        } => {
+            let path = path.unwrap_or_else(|| PathBuf::from("."));
+            let graph = ensure_compiled(&path, &out)?;
+            let pairs = find_duplicates(&graph.symbols, threshold);
+            if json {
+                println!(
+                    "{}",
+                    serde_json::json!({
+                        "threshold": threshold,
+                        "duplicates": pairs.iter().map(|p| serde_json::json!({
+                            "left": p.left,
+                            "right": p.right,
+                            "similarity": p.similarity,
+                            "left_resource": p.left_resource,
+                            "right_resource": p.right_resource,
+                        })).collect::<Vec<_>>(),
+                    })
+                );
+            } else {
+                print!("{}", format_duplicates_text(&pairs));
+            }
+            if fail && !pairs.is_empty() {
+                Ok(1)
+            } else {
+                Ok(0)
+            }
+        }
+        Commands::Verify { path, out, json } => {
+            let path = path.unwrap_or_else(|| PathBuf::from("."));
+            let graph = ensure_compiled(&path, &out)?;
+            let issues = verify(&graph);
+            if json {
+                println!("{}", verify_json(&issues));
+            } else {
+                print!("{}", format_verify_text(&issues));
+            }
+            let errors = issues.iter().filter(|i| i.severity == "error").count();
+            Ok(if errors > 0 { 1 } else { 0 })
         }
         Commands::Ext { action } => {
             match action {

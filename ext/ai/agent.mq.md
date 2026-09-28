@@ -2104,6 +2104,51 @@ With `stream=True`, the model call uses SSE; `echo=True` prints delta text to st
 
 *out*
 
+## preflight
+    + `task`
+    + `root`="."
+    + `marqdo_dir`=None
+    + `min_candidates`=3
+    + `allow_create_after`=2
+    + `reuse_threshold`=0.72
+    + `adapt_threshold`=0.45
+
+Engineering First Information gate (008 / EKC). Reads compiled `.marqdo` knowledge.
+Returns `{status,decision,create_allowed,existing,constraints,decisions,failures,recommended,context_path}`.
+Hard rule: generate only when `create_allowed` is true (or decision is REUSE/ADAPT).
+
+1. `marqdo_dir`
+  **pf = > agent_eng_preflight task=`task` root=`root` marqdo_dir=`marqdo_dir` min_candidates=`min_candidates` allow_create_after=`allow_create_after` reuse_threshold=`reuse_threshold` adapt_threshold=`adapt_threshold`**
+2. *
+  **pf = > agent_eng_preflight task=`task` root=`root` min_candidates=`min_candidates` allow_create_after=`allow_create_after` reuse_threshold=`reuse_threshold` adapt_threshold=`adapt_threshold`**
+
+*pf*
+
+## eng_reuse
+    + `task`
+    + `root`="."
+    + `marqdo_dir`=None
+
+Alias of `preflight` focused on REUSE / ADAPT / CREATE payload.
+
+1. `marqdo_dir`
+  *> agent_eng_reuse task=`task` root=`root` marqdo_dir=`marqdo_dir`*
+2. *
+  *> agent_eng_reuse task=`task` root=`root`*
+
+## eng_record
+    + `decision`
+    + `root`="."
+    + `marqdo_dir`=None
+    + `duplicated`=False
+
+Record REUSE/ADAPT/CREATE into `.marqdo/agent/episodes/reuse_metrics.json`.
+
+1. `marqdo_dir`
+  *> agent_eng_record decision=`decision` root=`root` marqdo_dir=`marqdo_dir` duplicated=`duplicated`*
+2. *
+  *> agent_eng_record decision=`decision` root=`root` duplicated=`duplicated`*
+
 ## plan
     + `goal`
     + `workbook_dir`=None
@@ -2127,8 +2172,13 @@ With `stream=True`, the model call uses SSE; `echo=True` prints delta text to st
     + `trace`=False
     + `resume_id`=None
     + `resume_dir`=.marqdo/agent-resume
+    + `eng_preflight`=False
+    + `marqdo_dir`=.marqdo
+    + `allow_create_after`=2
 
 Multi-step with OKF agent-kb. Default workbook is `kb_dir/resources/<slug>.mq.md`. While task file count `< explore_n` and skill is not llm_free, force a new explore variant under `kb_dir/explore/<slug>/`. Code-first: llm_free hits skip parent LLM. File children return via `# main`; `plan` exposes that as `result`.
+
+Engineering Knowledge preflight when `eng_preflight=True`: REUSE/ADAPT preferred; CREATE only if `create_allowed`. Production agents should enable this; tests that only exercise agent-kb may leave it false.
 
 Reuse lookup: exact → alias → canonicalize → optional local n-gram `near` when `near_match=True` and score ≥ `near_threshold`. Non-hit path: optional `soft_match=True` parent REUSE/NEW over ranked `agent_kb_near_match` candidates; else decompose before first child spawn (`DECISION: RUN` / `CONTINUE`+patch / solidified `DONE`). Then `await` → revise loop. Process events (`decision` / `round` / `done` / tools) are always attached on the result map for audit and view process cards; `stream=True` additionally SSE-publishes them (and parent `delta`). `echo=True` prints `plan:decompose` / `plan:await` / deltas. `trace=True` writes events to writeback slot `trace`. Quiet child subtasks stay quiet.
 
@@ -2140,6 +2190,32 @@ Reuse lookup: exact → alias → canonicalize → optional local n-gram `near` 
 **explore_attempt = None**
 **skel_kind = skeleton**
 **events = > json.parse text=[]**
+**eng = None**
+
+1. `eng_preflight`
+  **eng = > agent_eng_preflight task=`goal` marqdo_dir=`marqdo_dir` allow_create_after=`allow_create_after`**
+  **eng_status = > json.get value=`eng` key="status"**
+  **eng_decision = > json.get value=`eng` key="decision"**
+  **eng_allowed = > json.get value=`eng` key="create_allowed"**
+  1. `eng_status` == missing_knowledge
+    **_ = 1**
+  2. `eng_decision` == REUSE
+    > agent_eng_record decision="REUSE" marqdo_dir=`marqdo_dir`
+    **_ = 1**
+  3. `eng_decision` == ADAPT
+    > agent_eng_record decision="ADAPT" marqdo_dir=`marqdo_dir`
+    **_ = 1**
+  4. `eng_allowed`
+    > agent_eng_record decision="CREATE" marqdo_dir=`marqdo_dir`
+    **_ = 1**
+  5. *
+    **out = > json.parse text={"status":"blocked","cache":"eng-block","eng":true}**
+    **out = > json.set map=`out` key="decision" value="BLOCKED"**
+    **out = > json.set map=`out` key="preflight" value=`eng`**
+    **out = > json.set map=`out` key="events" value=`events`**
+    *out*
+2. *
+  **_ = 1**
 
 **tf = > agent_kb_task_files kb_dir=`kb_dir` goal=`goal` tools=`tools`**
 **nfiles = > json.get value=`tf` key="count"**
