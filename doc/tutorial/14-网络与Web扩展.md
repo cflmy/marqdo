@@ -70,107 +70,111 @@ import net:lib/net.mq.md
 > print text=[name](`field`)
 ```
 
-## 14.3 网页应用（`ext/web`）
+## 14.3 网页应用（Artifact · ADR 0007）
 
-`ext/web` 用类 + 方法装配页面。导入 `web:ext/web/web.mq.md`（中文 `网页:ext/web/网页.mq.md`）。
+站点是一堆 `.mq.md`：**Document**（`type: web`）与 **Endpoint**（`type: endpoint`）。入口调用 `web.serve` 扫描目录并监听。完整设计见 [ext-web-artifact.md](../design/ext-web-artifact.md)；示例 [marqdo-blog](../../examples/marqdo-blog/)。
 
-### 页面、组件、主体
+### Document 首页
 
 ```markdown
 ---
+type: web
+title: 我的站点
+route: /
+method: GET
+data_source: posts
+data_order: -created_at
 import web:ext/web/web.mq.md
+---
+
+# 我的站点
+
+欢迎。下方卡片列表由 `data_source` 在服务时从数据库加载。
+```
+
+### Endpoint
+
+```markdown
+---
+type: endpoint
+method: GET
+path: /api/ping
+request: none
+response: json
 ---
 
 # main
 
-`首页` =
+`out` =
 
-| 组件 | 样式 |
-|------|------|
-| nav.`导航` | shell.`顶栏` |
+| ok | service |
+|----|---------|
+| True | demo |
 
-**page = > web.page title="我的站点" intro="<h1>你好</h1>"**
-**page = > `page`.compose_components components=`首页`**
-**html = > `page`.render**
+*out*
+```
+
+### 服务入口
+
+```markdown
+---
+import web:ext/web/web.mq.md
+import posts:db/posts.mq.md
+---
+
+# main
+
+**store = > posts.open url="sqlite:data/site.db"**
+> web.serve root="." host="127.0.0.1" port=18081 db=`store` static_dir="public"
+```
+
+离线预览可用 View 表 + `web.render`：
+
+```markdown
+`nodes` =
+
+| type | slot | value | attrs | style |
+|------|------|-------|-------|-------|
+| title | title | Marqdo | | title |
+
+**html = > web.render nodes=`nodes` title="preview"**
 > print text=`html`
 ```
 
-### 应用 + 路由 + 监听
+### 数据库（`ext/data`）
 
 ```markdown
-**app = > web.app page=`page` host=127.0.0.1 port=18081**
-**app = > `app`.route path="/about" page=`关于`**
-> web_listen app=`app`
-```
+---
+import data:ext/data/db.mq.md
+---
 
-`listen` 提供 `/`、路由页、表单端点 `/_form/{id}`、可选静态目录与 `/admin`。
+# main
 
-### 数据库（SQLite）
-
-```markdown
-**store = > web.db url="sqlite:site.db"**
+**store = > data.db url="sqlite:site.db"**
 > `store`.init name=articles fields=`字段表`
 > `store`.insert table=articles rows=`数据`
 **rows = > `store`.select table=articles limit=10**
-- [行](rows)
-  > print text=[title](`行`)
 ```
 
-## 14.4 登录鉴权（session / cookie）
+## 14.4 鉴权（`ext/security`）
 
-给 `/admin*` 加登录门禁：`app.auth` 挂用户表，未登录重定向到 `/admin/login`。
+HTTP 门禁与登录走 `ext/security`（`auth` / `rbac` / `oidc`），再用 `web.use` 挂中间件表；勿再写 `app.configure`。独立脚本可用：
 
 ```markdown
-`管理员` =
+---
+import rbac:ext/security/rbac.mq.md
+---
 
-| 行 | 用户名 | 密码 |
-|----|--------|------|
-| 1 | admin | secret |
-| 2 | 站长 | pw123 |
+# main
 
-**app = > web.app page=`page` admin=True**
-**app = > `app`.auth users=`管理员` session_ttl=3600**
-> web_listen app=`app`
+**gate = > rbac.rbac**
+**r = > `gate`.can permissions="desk:access" needed="desk:access"**
+> print text=[allowed](`r`)
 ```
 
-`session_ttl` 是会话有效期（秒），过期后重新登录。
+## 14.5 WebSocket（`ext/net`）
 
-**独立鉴权工具** `web.auth`：登录、校验、登出（不依赖页面），返回 `{ok, session_id, username}`：
-
-```markdown
-**auth = > web.auth users=`管理员` session_ttl=3600**
-**login = > `auth`.login username="admin" password="secret"**
-1. [ok](`login`)
-  > print text=登录成功：[username](`login`)
-2. *
-  > print text=登录失败
-
-**sid = [session_id](login)**
-**check = > `auth`.check session_id=`sid`**
-> print text=[username](`check`)
-
-> `auth`.logout session_id=`sid`
-```
-
-## 14.5 WebSocket
-
-`app.route_ws` 注册端点，`web.ws.connect` 单次请求–响应：
-
-```markdown
-**app = > `app`.route_ws path="/live" echo=True**
-> web_listen app=`app`
-```
-
-客户端（另开终端）：
-
-```markdown
-**ws = > web.ws timeout_sec=30**
-**echo = > `ws`.connect url="ws://127.0.0.1:18081/live" message="hi"**
-1. [ok](`echo`)
-  > print text=[messages](`echo`)
-2. *
-  > print text=连接失败：[error](`echo`)
-```
+实时能力在 `ext/net`（如 `websocket`），与 Document 站点并列导入，不再挂在 `web.app` 的 junk drawer 上。
 
 ## 14.6 字典操作：用表格与取元，不用 `json.get`/`json.set`
 

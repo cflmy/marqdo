@@ -420,22 +420,6 @@ func renderULWithMQ(links []navLink, class string, mqPairs [][2]string) string {
 
 func resolveMain(page map[string]any, dbURL string) (intro string, items []map[string]any, total *int64) {
 	intro, _ = page["intro"].(string)
-	main, ok := page["main"]
-	if !ok {
-		return intro, nil, nil
-	}
-	bindsAny := table.AsBind(main)
-	arr, _ := bindsAny.([]any)
-	if len(arr) == 0 {
-		return intro, nil, nil
-	}
-	if dbURL == "" {
-		return intro, nil, nil
-	}
-	tn, ok := table.BindTableName(arr)
-	if !ok {
-		return intro, nil, nil
-	}
 	limit := int64(200)
 	offset := int64(0)
 	if p, ok := page["paginate"].(map[string]any); ok {
@@ -446,20 +430,88 @@ func resolveMain(page map[string]any, dbURL string) (intro string, items []map[s
 			offset = int64(v)
 		}
 	}
-	data := selectPageData(dbURL, tn, page, limit, offset)
+
+	// Legacy compose_main bind table (internal); prefer when present.
+	if main, ok := page["main"]; ok {
+		bindsAny := table.AsBind(main)
+		arr, _ := bindsAny.([]any)
+		if len(arr) > 0 && dbURL != "" {
+			if tn, ok := table.BindTableName(arr); ok {
+				data := selectPageData(dbURL, tn, page, limit, offset)
+				if t, ok := data["total"].(float64); ok {
+					ti := int64(t)
+					total = &ti
+				}
+				rawRows, _ := data["rows"].([]any)
+				projected := table.ProjectRows(arr, rawRows)
+				parr, _ := projected.([]any)
+				for _, v := range parr {
+					if m, ok := v.(map[string]any); ok {
+						items = append(items, m)
+					}
+				}
+				return intro, items, total
+			}
+		}
+	}
+
+	// Artifact Document: flat data_source / data_order / data_where (ADR 0007).
+	src, _ := page["data_source"].(string)
+	if src == "" || dbURL == "" {
+		return intro, nil, nil
+	}
+	data := selectPageData(dbURL, src, page, limit, offset)
 	if t, ok := data["total"].(float64); ok {
 		ti := int64(t)
 		total = &ti
 	}
 	rawRows, _ := data["rows"].([]any)
-	projected := table.ProjectRows(arr, rawRows)
-	parr, _ := projected.([]any)
-	for _, v := range parr {
-		if m, ok := v.(map[string]any); ok {
+	for _, v := range rawRows {
+		if m := projectArtifactRow(v); m != nil {
 			items = append(items, m)
 		}
 	}
 	return intro, items, total
+}
+
+// projectArtifactRow maps a DB row to card/article fields without compose binds.
+func projectArtifactRow(row any) map[string]any {
+	obj, ok := row.(map[string]any)
+	if !ok || obj == nil {
+		return nil
+	}
+	m := map[string]any{}
+	if id, ok := obj["id"]; ok {
+		m["id"] = id
+	}
+	if t := text(obj["title"]); t != "" {
+		m["title"] = t
+	}
+	if s := text(obj["slug"]); s != "" {
+		m["href"] = s
+	} else if h := text(obj["href"]); h != "" {
+		m["href"] = h
+	}
+	// Detail pages prefer full content; list cards prefer summary.
+	if c := text(obj["content"]); c != "" {
+		m["body"] = c
+	} else if s := text(obj["summary"]); s != "" {
+		m["body"] = s
+	} else if b := text(obj["body"]); b != "" {
+		m["body"] = b
+	}
+	if tag := text(obj["tag"]); tag != "" {
+		m["tag"] = tag
+	}
+	if meta := text(obj["created_at"]); meta != "" {
+		m["meta"] = meta
+	} else if meta := text(obj["meta"]); meta != "" {
+		m["meta"] = meta
+	}
+	if len(m) == 0 {
+		return nil
+	}
+	return m
 }
 
 // listBind is one secondary page list (compose_list / 列表装配).

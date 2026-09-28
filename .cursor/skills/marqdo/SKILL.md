@@ -334,7 +334,7 @@ Examples: [linalg-svd](../../examples/linalg-svd/) · [linalg-least-squares](../
 | Import `lib/text` then call bare `split` | `> text.split …` (qualified) |
 | Import `lib/text` then call `拆分` | Match file language (`text.split`, not 文本) |
 | `json.set` / `json.append` to build maps or lists | GFM tables; sparse `table.put`; named helpers (`browser.*`, `web.*`) |
-| `json.set` to build page parts | GFM tables + `page.compose_*` / `web.page` methods |
+| `json.set` / `compose_*` page parts | `type: web` Document + View table / `web.render` / `web.serve` |
 | Import `json` for every browser handler | `import browser:lib/browser.mq.md` + tables ([marqdo-dev](../marqdo-dev/SKILL.md)) |
 | Mix `web.page` and `网页.页面` in one file | One import language per `.mq.md` |
 | Call `host_web_*` from `ext/web` | Use `# app` / `# db` methods; plugin ABI only |

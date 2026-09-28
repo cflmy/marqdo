@@ -19,6 +19,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 
 	"github.com/marqdo/marqdo/plugins/web/internal/app"
 	"github.com/marqdo/marqdo/plugins/web/internal/artifact"
@@ -123,6 +124,7 @@ func web_serve_root(argsJSON *C.char, outJSON **C.char, errMsg **C.char) C.int {
 		}
 	}
 	homeArgs := map[string]any{"title": "Marqdo"}
+	var homeMeta map[string]string
 	for _, f := range files {
 		if f.Kind == "web" && (f.Route == "/" || f.Rel == "index.mq.md") {
 			title := f.Meta["title"]
@@ -136,33 +138,72 @@ func web_serve_root(argsJSON *C.char, outJSON **C.char, errMsg **C.char) C.int {
 				"title": title,
 				"intro": artifact.MarkdownHTML(f.Body),
 			}
+			homeMeta = f.Meta
 			break
 		}
 	}
 	home := page.New(homeArgs)
+	stampArtifactData(home, homeMeta)
 	a := app.New(map[string]any{
 		"page": home,
 		"db":   args["db"],
 		"host": host,
 		"port": port,
 	})
+	artifactRoutes := map[string]any{}
 	for _, f := range files {
-		if f.Kind != "web" || f.Route == "/" {
+		if f.Kind == "web" {
+			if f.Route == "/" {
+				continue
+			}
+			title := f.Meta["title"]
+			if title == "" {
+				title = f.Meta["标题"]
+			}
+			pg := page.New(map[string]any{
+				"title": title,
+				"intro": artifact.MarkdownHTML(f.Body),
+			})
+			stampArtifactData(pg, f.Meta)
+			out, err := app.Route(a, f.Route, pg)
+			if err != nil {
+				return replyJSON(outJSON, errMsg, nil, err)
+			}
+			a = out
 			continue
 		}
-		title := f.Meta["title"]
-		if title == "" {
-			title = f.Meta["标题"]
+		// endpoint
+		req := f.Meta["request"]
+		if req == "" {
+			req = f.Meta["请求"]
 		}
-		pg := page.New(map[string]any{
-			"title": title,
-			"intro": artifact.MarkdownHTML(f.Body),
-		})
-		out, err := app.Route(a, f.Route, pg)
-		if err != nil {
-			return replyJSON(outJSON, errMsg, nil, err)
+		if req == "" {
+			req = "json"
 		}
-		a = out
+		resp := f.Meta["response"]
+		if resp == "" {
+			resp = f.Meta["响应"]
+		}
+		if resp == "" {
+			resp = "json"
+		}
+		auth := f.Meta["auth"]
+		if auth == "" {
+			auth = f.Meta["鉴权"]
+		}
+		key := f.Method + " " + f.Route
+		artifactRoutes[key] = map[string]any{
+			"method":   f.Method,
+			"path":     f.Route,
+			"file":     f.Path,
+			"request":  req,
+			"response": resp,
+			"auth":     auth,
+			"kind":     "endpoint",
+		}
+	}
+	if len(artifactRoutes) > 0 {
+		a["artifact_routes"] = artifactRoutes
 	}
 	if mw := args["middleware"]; mw != nil {
 		out, err := middleware.Configure(a, map[string]any{"security": mw})
@@ -221,4 +262,65 @@ func web_route_use(argsJSON *C.char, outJSON **C.char, errMsg **C.char) C.int {
 	}
 	rt["middleware"] = args["middleware"]
 	return replyJSON(outJSON, errMsg, rt, nil)
+}
+
+// stampArtifactData applies flat Document metadata (ADR 0007) onto a page bag.
+func stampArtifactData(pg map[string]any, meta map[string]string) {
+	if pg == nil || meta == nil {
+		return
+	}
+	src := meta["data_source"]
+	if src == "" {
+		src = meta["数据源"]
+	}
+	if src != "" {
+		pg["data_source"] = src
+	}
+	order := meta["data_order"]
+	if order == "" {
+		order = meta["排序"]
+	}
+	if order != "" {
+		pg["order"] = order
+	}
+	where := meta["data_where"]
+	if where == "" {
+		where = meta["条件"]
+	}
+	if where != "" {
+		// col=val,col2=val2 → query map (values may contain {param})
+		q := map[string]any{}
+		for _, part := range strings.Split(where, ",") {
+			part = strings.TrimSpace(part)
+			if part == "" {
+				continue
+			}
+			k, v, ok := strings.Cut(part, "=")
+			if !ok {
+				continue
+			}
+			q[strings.TrimSpace(k)] = strings.TrimSpace(v)
+		}
+		if len(q) > 0 {
+			pg["query"] = q
+			// Filtered Document routes render as article detail (007 /post/{slug}).
+			pg["detail"] = true
+		}
+	}
+	if d := meta["detail"]; d != "" {
+		pg["detail"] = d == "true" || d == "True" || d == "1"
+	}
+	if d := meta["详情"]; d != "" {
+		pg["detail"] = d == "true" || d == "True" || d == "1" || d == "是"
+	}
+	prefix := meta["link_prefix"]
+	if prefix == "" {
+		prefix = meta["链接前缀"]
+	}
+	if prefix != "" {
+		pg["link_prefix"] = prefix
+	} else if src != "" && where == "" {
+		// List pages default card links to /post/{slug}.
+		pg["link_prefix"] = "/post/"
+	}
 }

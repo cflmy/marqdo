@@ -154,7 +154,7 @@ marqdo catalog public -o .marqdo
 - **`marqdo version --check`**：与 GitHub 最新 release 对比  
 - 标准库：**内置于二进制**（v0.1.2+）；磁盘 `lib/` 或 `MARQDO_LIB` 可覆盖。模块含文本、表、**浏览器效应**、文件、系统、时间、JSON、网络、数学、外联、插件、**自写回**、**子任务**；**中层 Mid M1–M6** + **Mid2 M7–M10**（datetime/url/toml/html/fs++/stats/log.fields 等，见 [stdlib-mid.md](doc/design/stdlib-mid.md) · [stdlib-mid2.md](doc/design/stdlib-mid2.md)）  
 - **官方扩展库 `ext/`**（**非** stdlib，本版收口）：
-  - **`web`**：W0–W7 + P3 + **W8**；**定制 C0–C4**；**宿主 H1–H2**（`proxy`/`invoke`，见 [ext-hosting.md](doc/roadmap/ext-hosting.md)）；**表驱动引言**（`compose_intro` / `引言装配`）；原生层默认 **Go `libweb`**（[ADR 0004](doc/adr/0004-web-plugin-go.md)，`scripts/build-web-plugin.sh`）；示例 [web-site](examples/web-site/) · [web-site-zh](examples/web-site-zh/) · [marqdo-blog](examples/marqdo-blog/) · [anlian-mq](examples/anlian-mq/)；生产路径见 [web-asgi-servers-and-marqdo.md](doc/design/web-asgi-servers-and-marqdo.md)
+  - **`web`**：**Artifact 模型（ADR [0007](doc/adr/0007-web-document-endpoint.md)）** — `type: web|endpoint` Document/Endpoint；facade `page`/`route`/`serve`/`render`/`inspect`/`use`；Resource 在 `ext/data` · `ext/security` · `ext/net`；设计 [ext-web-artifact.md](doc/design/ext-web-artifact.md)；原生 **Go `libweb`**（[ADR 0004](doc/adr/0004-web-plugin-go.md)）；示例 [marqdo-blog](examples/marqdo-blog/) · [web-client-site](examples/web-client-site/) · [anlian-mq](examples/anlian-mq/)
   - **`quantum`**：Q0–Q7 + Q8a/b 主题 SVG；示例 [quantum-entanglement](examples/quantum-entanglement/)
   - **`linalg`**：L0–L6 + 公式文档面（中缀 / `declare` / 展示化简）；示例 [linalg-transpose](examples/linalg-transpose/) · [linalg-svd](examples/linalg-svd/) · [linalg-least-squares](examples/linalg-least-squares/)
   - **`agent`**：A1–A4 + **MCP Server/Client stdio** + Skill Compilation + Adaptive Routing + resume；宿主缺口见 [ext-hosting.md](doc/roadmap/ext-hosting.md) · [agent-framework-gaps-after-a4.md](doc/research/agent-framework-gaps-after-a4.md)
@@ -211,7 +211,7 @@ marqdo ext add llm      # 或：大模型（.mq.md + 可选 native llm）
 
 # 4) 动态站示例（扩展装好后）
 marqdo run examples/web-site-zh/index.mq.md   # 表驱动引言 Demo
-marqdo run examples/marqdo-blog/index.mq.md
+marqdo run examples/marqdo-blog/serve.mq.md
 marqdo run examples/anlian-mq/index.mq.md   # W-G14 验收站
 # 浏览器打开终端打印的 listen 地址；/favicon.ico 与 logo 装配见 W8
 

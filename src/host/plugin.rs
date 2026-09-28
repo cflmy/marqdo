@@ -417,6 +417,44 @@ unsafe extern "C" fn host_query(
             });
             Ok(serde_json::json!({ "ok": true }))
         })(),
+        // ADR 0007: run a Document/Endpoint `.mq.md` for HTTP handlers.
+        "run_artifact" => (|| {
+            let raw = args_owned.as_deref().unwrap_or("{}");
+            let args: serde_json::Value = serde_json::from_str(if raw.trim().is_empty() {
+                "{}"
+            } else {
+                raw
+            })
+            .map_err(|e| format!("run_artifact args: {e}"))?;
+            let path = args
+                .get("path")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| "run_artifact requires `path`".to_string())?;
+            let p = std::path::PathBuf::from(path);
+            if !p.is_file() {
+                return Err(format!("run_artifact: not a file: {path}"));
+            }
+            let mut binds: Vec<(String, String)> = Vec::new();
+            if let Some(obj) = args.get("args").and_then(|v| v.as_object()) {
+                for (k, v) in obj {
+                    let s = match v {
+                        serde_json::Value::String(t) => t.clone(),
+                        serde_json::Value::Null => continue,
+                        other => other.to_string(),
+                    };
+                    binds.push((k.clone(), s));
+                }
+            }
+            let opts = crate::RunOptions {
+                binds,
+                allow_fs_write: ctx.caps.fs_write,
+                allow_exec: ctx.caps.exec,
+                allow_net: ctx.caps.net,
+                ..crate::RunOptions::default()
+            };
+            let cap = crate::run_file_capture(&p, &opts).map_err(|e| e.to_string())?;
+            value_to_json(&cap.value)
+        })(),
         other => Err(format!("host_query: unknown `{other}`")),
     };
 

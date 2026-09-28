@@ -1,9 +1,11 @@
 ---
 title: marqdo-blog serve
-description: Scan Artifact .mq.md under this directory and listen (ADR 0007).
-导入 网页:ext/web/网页.mq.md
+description: Scan Artifact documents/endpoints and listen (ADR 0007).
+import web:ext/web/web.mq.md
+import posts:db/posts.mq.md
 ---
 
 # main
 
-> 网页.服务 根="." 主机="127.0.0.1" 端口=18081
+**store = > posts.open url="sqlite:data/blog.db"**
+> web.serve root="." host="127.0.0.1" port=18081 db=`store` static_dir="public"

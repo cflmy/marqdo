@@ -60,24 +60,24 @@ Import one file; use **that** file’s function names.
 
 Open the imported `.mq.md` under `lib/` or `ext/` to see exact `##` / `#` names and parameters. Gold tests: `tests/lib/`, `tests/structure/`, `tests/ext/`.
 
-## ext/web (dynamic sites)
+## ext/web (Artifact sites · ADR 0007)
 
-Install: `marqdo ext add web` (`网页`). Native: `cargo build --release -p marqdo_plugin_web`.
+Install: `marqdo ext add web` (`网页`). Native: `bash scripts/build-web-plugin.sh`.
 
-| EN import | ZH import | Core types |
-|-----------|-----------|------------|
-| `ext/web/web.mq.md` | `ext/web/网页.mq.md` | `# page` `# style` `# db` `# form` `# app` `# auth` `# cache` `# storage` |
+| EN import | ZH import | Surface |
+|-----------|-----------|---------|
+| `ext/web/web.mq.md` | `ext/web/网页.mq.md` | facade: `page` · `route` · `serve` · `render` · `inspect` · `use` |
 
-| Area | EN methods (representative) | Notes |
-|------|----------------------------|-------|
-| Page | `compose_components`, `compose_main`, `render`, `meta`, `paginate` | GFM tables; cells are literal path strings |
-| DB | `init`, `insert`, `select`, `paginate`, `get`, `update`, `delete`, `migrate`, `fts`, `search`, `count`, `事务`/`txn` | init supports `unique`/`index`/`fk`; auto `created_at`/`updated_at` |
-| App | `route`, `static`, `configure`, `listen`, `auth`, `gate`, `upload`, `download`, `gallery`, `route_rss`, `redirect`, `error_page`, `sitemap`, `robots` | W0–W7 + P3 complete |
-| Auth | `login`, `check`, `logout`, `hash_password` | argon2 + CSRF + SQLite sessions; `role` for RBAC |
+| Kind | Metadata | Notes |
+|------|----------|-------|
+| Document | `type: web` / `类型: 网页` | `route` · `data_source` · `data_order` · `data_where` |
+| Endpoint | `type: endpoint` / `类型: 端点` | `path` · `method` · `# main` handler · `request`/`response` |
+| View | `|type|slot|value|attrs|style|` | `web.render nodes=` |
+| Resource | `ext/data` · `ext/security` · `ext/net` | db/cache/storage · auth/rbac/oidc · websocket |
 
-Drivers (Postgres / Redis / S3): `db url=postgres://…`, `cache url=memory:`, `storage url=file:…` — see `doc/design/ext-web-drivers.md`.
+Do **not** use `compose_*` / `app.configure` / author `ensure_plugin`.
 
-Example project: `examples/marqdo-blog/`. Capability matrix: `doc/design/web-net-capabilities.md`.
+Example: `examples/marqdo-blog/`. Design: `doc/design/ext-web-artifact.md`. Historical matrix: `doc/design/web-net-capabilities.md`.
 
 ## ext/quantum (circuits + Q7/Q8)
 

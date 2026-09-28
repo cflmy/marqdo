@@ -279,6 +279,17 @@ func InspectBag(app map[string]any, declared []ArtifactFile) map[string]any {
 				dec = append(dec, map[string]any{"path": key, "kind": "endpoint"})
 			}
 		}
+		if art, ok := app["artifact_routes"].(map[string]any); ok {
+			for key, v := range art {
+				m, _ := v.(map[string]any)
+				dec = append(dec, map[string]any{
+					"path":   key,
+					"kind":   "endpoint",
+					"method": fmt.Sprint(m["method"]),
+					"file":   fmt.Sprint(m["file"]),
+				})
+			}
+		}
 	}
 	return map[string]any{
 		"declared": dec,

@@ -176,16 +176,6 @@ static int register_core(void) {
 	if (host_register((char *)"web_page_detail", (char *)"page,detail", web_page_detail) != 0) return 1;
 	if (host_register((char *)"web_page_chrome", (char *)"page,nav_html,footer_html,body_class", web_page_chrome) != 0) return 1;
 	if (host_register((char *)"web_style", (char *)"name,table,strict", web_style) != 0) return 1;
-	if (host_register((char *)"web_compose_components", (char *)"page,components", web_compose_components) != 0) return 1;
-	if (host_register((char *)"web_compose_main", (char *)"page,main", web_compose_main) != 0) return 1;
-	if (host_register((char *)"web_compose_list", (char *)"page,main,query,order,target", web_compose_list) != 0) return 1;
-	if (host_register((char *)"web_compose_intro", (char *)"page,intro", web_compose_intro) != 0) return 1;
-	if (host_register((char *)"web_intro", (char *)"table", web_intro) != 0) return 1;
-	if (host_register((char *)"web_compose_form", (char *)"page,form,id,target", web_compose_form) != 0) return 1;
-	if (host_register((char *)"web_compose_auth_form", (char *)"page,action,submit,form_id,err_id,target,next,kind", web_compose_auth_form) != 0) return 1;
-	if (host_register((char *)"web_compose_nav_brand", (char *)"page,title,href,logo,logo_light,theme_key", web_compose_nav_brand) != 0) return 1;
-	if (host_register((char *)"web_compose_client", (char *)"page,source,bridge,wasm", web_compose_client) != 0) return 1;
-	if (host_register((char *)"web_compose_form_load", (char *)"page,table,id_param", web_compose_form_load) != 0) return 1;
 	if (host_register((char *)"web_render", (char *)"page", web_render) != 0) return 1;
 	if (host_register((char *)"web_db_new", (char *)"url", web_db_new) != 0) return 1;
 	if (host_register((char *)"web_db_init", (char *)"url,name,fields", web_db_init) != 0) return 1;

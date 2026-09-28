@@ -49,3 +49,25 @@ func CallLibPath(path string, args map[string]any) (any, error) {
 	}
 	return v, nil
 }
+
+// RunArtifact loads and runs a Document/Endpoint `.mq.md` (ADR 0007).
+// Request fields are passed as Metadata Binding overlays (`arg` / `--bind`).
+func RunArtifact(path string, args map[string]any) (any, error) {
+	payload := map[string]any{"path": path}
+	if len(args) > 0 {
+		payload["args"] = args
+	}
+	raw, err := json.Marshal(payload)
+	if err != nil {
+		return nil, err
+	}
+	out, err := Query("run_artifact", string(raw))
+	if err != nil {
+		return nil, err
+	}
+	var v any
+	if err := json.Unmarshal([]byte(out), &v); err != nil {
+		return nil, err
+	}
+	return v, nil
+}

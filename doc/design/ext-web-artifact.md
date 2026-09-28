@@ -125,6 +125,8 @@ import data:ext/data/db.mq.md
 
 正文在请求时执行；返回值按 `response` 序列化。Result 协议见 §8。
 
+**Handler 约定（锁定）**：Endpoint 文件用 `# main` 作为请求处理器。请求体/query/path 参数经 `run_artifact` 以 Metadata Binding 覆盖注入（与 `--bind` 同源），正文用已提升的普通变量名。无 `# main` 时返回 Artifact Result 摘要（`ok`/`value`/`error`），适合作文档型 ping。
+
 ---
 
 ## 5. Facade API（EN / ZH）

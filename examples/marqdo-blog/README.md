@@ -1,28 +1,39 @@
 # examples/marqdo-blog
 
-Marqdo **Web Artifact** 示例（ADR 0007）：`.mq.md` 即文档、即路由、即页面。
+Marqdo **Web Artifact** blog (ADR 0007).
 
-## 运行
+## Layout
+
+```text
+index.mq.md          # type: web · / · data_source: posts
+pages/about.mq.md    # 类型: 网页 · /about
+pages/post.mq.md     # type: web · /post/{slug} · data_where
+api/ping.mq.md       # type: endpoint · GET /api/ping
+api/echo.mq.md       # type: endpoint · POST /api/echo
+db/posts.mq.md       # ext/data schema + seed + open
+public/              # static (mounted at /static)
+serve.mq.md          # web.serve + db open
+smoke.sh             # curl checks against a running serve
+```
+
+## Run
 
 ```bash
 bash scripts/build-web-plugin.sh
-# 若 ~/.marqdo/ext 仍是旧 compose_* 面：export MARQDO_EXT=$PWD/ext
-cargo run -- run examples/marqdo-blog/serve.mq.md
+export MARQDO_EXT=$PWD/ext   # if ~/.marqdo/ext is stale
+export MARQDO_WEB_PLUGIN=$PWD/plugins/web/build/libweb.so
+cd examples/marqdo-blog && marqdo run serve.mq.md
+# other terminal:
+bash examples/marqdo-blog/smoke.sh
 ```
 
-打开 http://127.0.0.1:18081/：
+| Path | Artifact |
+|------|----------|
+| `/` | Document home + post cards |
+| `/about` | ZH Document |
+| `/post/{slug}` | Document detail |
+| `/api/ping` | Endpoint JSON |
+| `/api/echo` | Endpoint JSON echo |
+| `/static/*` | public assets |
 
-| 路径 | 来源 |
-|------|------|
-| `/` | `index.mq.md`（`type: web` / 本例中文 `serve` 扫描） |
-| `/about` | `pages/about.mq.md`（`类型: 网页`） |
-| `/api/ping` | `api/ping.mq.md`（`type: endpoint`） |
-
-## 设计（代码即文档）
-
-- **Document** — frontmatter `type`/`类型` + Markdown 正文。
-- **Endpoint** — `type: endpoint` + 可执行正文。
-- **发现** — `网页.服务` / `web.serve root=` 扫描目录内 Artifact。
-- **Resource** — DB 等见 `ext/data`（本示例入口以 Document 为主）。
-
-规范：[ext-web-artifact.md](../../doc/design/ext-web-artifact.md) · ADR [0007](../../doc/adr/0007-web-document-endpoint.md)。
+Design: [ext-web-artifact.md](../../doc/design/ext-web-artifact.md).

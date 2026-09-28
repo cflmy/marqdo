@@ -2,16 +2,23 @@
 
 | | |
 |---|---|
-| 状态 | **Accepted · W0–W7 + P3 完结**（2026-08-28 复核） |
-| 日期 | 2026-08-26（初稿）· 2026-08-28（完结复核） |
-| 相关 | [ext-web.md](ext-web.md) · [ext-web-net.md](ext-web-net.md) · [ext-abi.md](ext-abi.md) · [stdlib-modules.md](stdlib-modules.md) |
-| 目标 | 盘点 `ext/web` + `plugins/web` + `lib/net` 现状，对照主流语言网络栈，给出「开发一个完整 Web 项目」所需能力的差距清单与补强路线 |
+| 状态 | **Historical capability matrix** — 作者面以 **[ext-web-artifact.md](ext-web-artifact.md)** / ADR [0007](../adr/0007-web-document-endpoint.md) 为准（2026-09-28） |
+| 日期 | 2026-08-26（初稿）· 2026-08-28（完结复核）· 2026-09-28（Artifact 标注） |
+| 相关 | [ext-web-artifact.md](ext-web-artifact.md) · [ext-web.md](ext-web.md) · [ext-web-net.md](ext-web-net.md) · [ext-abi.md](ext-abi.md) · [stdlib-modules.md](stdlib-modules.md) |
+| 目标 | 盘点 `ext/web` + `plugins/web` + `lib/net` 现状；**下文 API 名多为 W0–W7 历史面**（`compose_*` / `configure` 已废止） |
+
+> **2026-09-28**：作者面迁移到 Document / Endpoint / Resource。  
+> - Document/Endpoint：`type: web|endpoint` + `web.serve` / `web.render` / `web.inspect`  
+> - DB/cache/storage → `ext/data`；auth/oidc/rbac → `ext/security`；ws → `ext/net`  
+> - 统一 View：`|type|slot|value|attrs|style|`；中间件：`web.use`  
+> 本文件保留为**原生能力矩阵**对照，勿再按 `compose_*` / `app.configure` 写作。
 
 ---
 
 ## 0. 一句话结论
 
-**`ext/web` + `plugins/web` 已完成 W0–W7 + P3 路线图**：中间件/JSON API、数据层（连接池/事务/分页/FTS/迁移/外键/审计时间戳）、安全硬化（argon2/CSRF/会话持久化/限速/RBAC）、内容站点标配（SEO/RSS/Markdown/分页 UI）、上传下载/相册/ETag、sitemap/robots/错误页/重定向、WebSocket 广播与访问日志。足以在 Marqdo 上实现博客/CMS/中小型 API 站点；**未内置**的仅剩标签页模板（D6，可用路由+`db.count` 自建）与应用层反垃圾。边界不变：**纯解析进 `lib/net`，HTTP 服务器与领域能力进 `plugins/web` + `ext/web` 作者面**。
+**能力层（plugins/web）**：中间件/JSON API、数据层、安全、内容站点、上传下载、sitemap、WebSocket 等仍在原生实现中。  
+**作者面（2026-09-28）**：改为 Artifact Metadata + facade；`compose_*` / `configure` **已删除**。边界不变：**纯解析进 `lib/net`，HTTP 服务器进 `plugins/web`，作者 API 进 `ext/web` + `ext/data` + `ext/security` + `ext/net`**。
 
 **宿主集成下一刀**（同域 LLM SSE 中继、HTTP→用户 `##`、与 MCP Server 协作）不在本 W 表内，见 [ext-hosting-gaps.md](../research/ext-hosting-gaps.md) · [ext-hosting-fill.md](ext-hosting-fill.md) · [ext-hosting.md](../roadmap/ext-hosting.md)。
 

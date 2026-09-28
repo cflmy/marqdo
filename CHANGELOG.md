@@ -10,9 +10,10 @@
 - **规则**：`.cursor/rules/web-artifact-no-degrade.mdc`；设计 `doc/design/ext-web-artifact.md`。
 
 ### Fixed
+- Document `data_source` / `data_where` now drive list cards and detail articles under `web.serve` (ADR 0007 flat metadata).
 
 ### Changed
-- **破坏性**：删除作者面 `compose_*` / `app.configure` / 作者 `ensure_plugin`。旧 web gold 标 `#[ignore]`；新金样 `web-artifact-*`。
+- **破坏性**：删除作者面 `compose_*` / `app.configure` / 作者 `ensure_plugin`。旧 web gold 已移除；新金样 `web-artifact-*` / `ext_web_*`。
 - **核心表面 Δ**：**无增删**（复用 Metadata `type`）。
 - 修订 `ext-web.md` C1；`doc/next/007.md` superseded。
 

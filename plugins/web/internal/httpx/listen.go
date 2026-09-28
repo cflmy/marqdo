@@ -122,6 +122,7 @@ func NewHandler(appBag map[string]any, entryDir string) (http.Handler, error) {
 		galleryRoutes:  routeMapOf(appBag, "gallery_routes"),
 		proxyRoutes:    routeMapOf(appBag, "proxy_routes"),
 		invokeRoutes:   routeMapOf(appBag, "invoke_routes"),
+		artifactRoutes: routeMapOf(appBag, "artifact_routes"),
 		auth:           authCfg,
 		oidc:           oidc.ParseConfig(appBag),
 		tenant:         tenant.FromBag(appBag),
@@ -238,6 +239,7 @@ func NewHandler(appBag map[string]any, entryDir string) (http.Handler, error) {
 	st.mountGalleryRoutes(mux)
 	st.mountProxyRoutes(mux)
 	st.mountInvokeRoutes(mux)
+	st.mountArtifactRoutes(mux)
 	st.mountAuthRoutes(mux)
 
 	mux.HandleFunc("/{path...}", st.handleNotFound)
@@ -307,6 +309,7 @@ type state struct {
 	galleryRoutes  map[string]any
 	proxyRoutes    map[string]any
 	invokeRoutes   map[string]any
+	artifactRoutes map[string]any
 	auth           authConfig
 	oidc           oidc.Config
 	tenant         tenant.Config
