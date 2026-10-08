@@ -8,6 +8,25 @@
 
 ### Changed
 
+## Ext pack v1.3.1 — 2026-10-08
+
+### Highlights
+
+**OIDC 路径型 `redirect_uri`（CLI 仍为 v1.3.0）**：`redirect_uri=/oidc/callback` 按请求 Host / `X-Forwarded-*` 拼绝对回调，写入会话供 token 交换；可选 `redirect_origins` allowlist。apex / www 多域名无需写死单一绝对 URI。
+
+```bash
+marqdo ext add web   # CDN latest → 1.3.1
+# 或：MARQDO_EXT_VERSION=1.3.1 marqdo ext add web
+```
+
+### Added
+- **路径型 redirect_uri**：绝对 URL 行为不变；路径模式解析 public origin，session 键 `oidc_redirect_uri`。
+- **`redirect_origins` / `回调来源`**：逗号分隔 origin allowlist（路径模式）。
+- **ABI**：`web_app_oidc` 透传 `redirect_origins`；`ext/security/oidc.attach` 文档同步。
+
+### Changed
+- 扩展包 SemVer **1.3.1**（`ext/VERSION`）；与 CLI **v1.3.0** 可独立安装。
+
 ## v1.3.0 — 2026-09-28
 
 ### Highlights
