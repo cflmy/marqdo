@@ -117,11 +117,17 @@ func (st *state) handleOIDCStart(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	redirectURI, err := st.oidc.ResolveRedirectURI(r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 	session.SetValue(sid, "oidc_state", state)
 	session.SetValue(sid, "oidc_verifier", verifier)
+	session.SetValue(sid, "oidc_redirect_uri", redirectURI)
 	next := loginDest(r, st.oidcFallbackNext(r))
 	session.SetValue(sid, "oidc_next", next)
-	loc, err := st.oidc.AuthorizeRedirect(state, oidc.PKCEChallengeS256(verifier))
+	loc, err := st.oidc.AuthorizeRedirect(state, oidc.PKCEChallengeS256(verifier), redirectURI)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -164,6 +170,15 @@ func (st *state) handleOIDCCallback(w http.ResponseWriter, r *http.Request) {
 	}
 	verifier, _ := session.GetValue(sid, "oidc_verifier")
 	verifierS, _ := verifier.(string)
+	redirVal, _ := session.GetValue(sid, "oidc_redirect_uri")
+	redirectURI, _ := redirVal.(string)
+	if redirectURI == "" && !st.oidc.IsPathRedirect() {
+		redirectURI = strings.TrimSpace(st.oidc.RedirectURI)
+	}
+	if redirectURI == "" {
+		http.Error(w, "oidc: missing redirect_uri in session", http.StatusBadRequest)
+		return
+	}
 	nextVal, _ := session.GetValue(sid, "oidc_next")
 	next, _ := nextVal.(string)
 	if next == "" {
@@ -171,9 +186,10 @@ func (st *state) handleOIDCCallback(w http.ResponseWriter, r *http.Request) {
 	}
 	session.DelKey(sid, "oidc_state")
 	session.DelKey(sid, "oidc_verifier")
+	session.DelKey(sid, "oidc_redirect_uri")
 	session.DelKey(sid, "oidc_next")
 
-	tok, err := st.oidc.ExchangeCode(oidcClient(), code, verifierS)
+	tok, err := st.oidc.ExchangeCode(oidcClient(), code, verifierS, redirectURI)
 	if err != nil {
 		http.Error(w, "oidc token exchange: "+err.Error(), http.StatusBadGateway)
 		return

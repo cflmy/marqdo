@@ -256,6 +256,9 @@ func OIDC(appBag map[string]any, opts map[string]any) (map[string]any, error) {
 		"scopes":        cfg.ScopesCSV(),
 		"callback_path": cfg.Callback(),
 	}
+	if cfg.RedirectOrigins != "" {
+		bag["redirect_origins"] = cfg.RedirectOrigins
+	}
 	if cfg.AuthorizeURL != "" {
 		bag["authorize_url"] = cfg.AuthorizeURL
 	}

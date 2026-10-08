@@ -20,8 +20,11 @@ type Config struct {
 	ClientID     string
 	ClientSecret string
 	RedirectURI  string
-	Scopes       string
-	CallbackPath string
+	// RedirectOrigins is an optional comma-separated allowlist of origins
+	// (e.g. "https://qdqc.com,https://www.qdqc.com") used when RedirectURI is a path.
+	RedirectOrigins string
+	Scopes          string
+	CallbackPath    string
 	// AuthorizeURL / TokenURL / UserInfoURL override discovery when set.
 	AuthorizeURL string
 	TokenURL     string
@@ -36,11 +39,35 @@ func (c Config) Enabled() bool {
 		(strings.TrimSpace(c.Issuer) != "" || strings.TrimSpace(c.AuthorizeURL) != "")
 }
 
+// IsPathRedirect reports whether RedirectURI is a path (resolved per request Host).
+func (c Config) IsPathRedirect() bool {
+	s := strings.TrimSpace(c.RedirectURI)
+	if s == "" {
+		return false
+	}
+	if strings.HasPrefix(s, "/") {
+		return true
+	}
+	u, err := url.Parse(s)
+	if err != nil {
+		return false
+	}
+	// scheme-relative or bare path without host
+	return u.Scheme == "" && u.Host == "" && u.Path != ""
+}
+
 // Callback reports the local path (default /oidc/callback).
 func (c Config) Callback() string {
 	p := strings.TrimSpace(c.CallbackPath)
 	if p == "" {
-		if u, err := url.Parse(c.RedirectURI); err == nil && u.Path != "" {
+		ru := strings.TrimSpace(c.RedirectURI)
+		if c.IsPathRedirect() {
+			if !strings.HasPrefix(ru, "/") {
+				ru = "/" + ru
+			}
+			return ru
+		}
+		if u, err := url.Parse(ru); err == nil && u.Path != "" {
 			return u.Path
 		}
 		return "/oidc/callback"
@@ -49,6 +76,91 @@ func (c Config) Callback() string {
 		p = "/" + p
 	}
 	return p
+}
+
+// PublicOrigin derives scheme://host from a login/callback request.
+// Prefers X-Forwarded-Proto + X-Forwarded-Host (first value), else Host + TLS.
+func PublicOrigin(r *http.Request) (string, error) {
+	if r == nil {
+		return "", fmt.Errorf("oidc: nil request")
+	}
+	scheme := strings.TrimSpace(r.Header.Get("X-Forwarded-Proto"))
+	if i := strings.IndexByte(scheme, ','); i >= 0 {
+		scheme = strings.TrimSpace(scheme[:i])
+	}
+	if scheme == "" {
+		if r.TLS != nil {
+			scheme = "https"
+		} else {
+			scheme = "http"
+		}
+	}
+	host := strings.TrimSpace(r.Header.Get("X-Forwarded-Host"))
+	if i := strings.IndexByte(host, ','); i >= 0 {
+		host = strings.TrimSpace(host[:i])
+	}
+	if host == "" {
+		host = strings.TrimSpace(r.Host)
+	}
+	if host == "" {
+		return "", fmt.Errorf("oidc: empty Host")
+	}
+	return scheme + "://" + host, nil
+}
+
+// ResolveRedirectURI returns the absolute redirect_uri for this request.
+// Absolute RedirectURI is returned unchanged; path RedirectURI is joined to the request origin.
+func (c Config) ResolveRedirectURI(r *http.Request) (string, error) {
+	ru := strings.TrimSpace(c.RedirectURI)
+	if ru == "" {
+		return "", fmt.Errorf("oidc: empty redirect_uri")
+	}
+	if !c.IsPathRedirect() {
+		return ru, nil
+	}
+	origin, err := PublicOrigin(r)
+	if err != nil {
+		return "", err
+	}
+	path := ru
+	if !strings.HasPrefix(path, "/") {
+		path = "/" + path
+	}
+	abs := origin + path
+	if err := c.checkOriginAllowlist(origin); err != nil {
+		return "", err
+	}
+	return abs, nil
+}
+
+// AllowedOrigins returns trimmed non-empty origins from RedirectOrigins.
+func (c Config) AllowedOrigins() []string {
+	raw := strings.TrimSpace(c.RedirectOrigins)
+	if raw == "" {
+		return nil
+	}
+	var out []string
+	for _, p := range strings.Split(raw, ",") {
+		p = strings.TrimRight(strings.TrimSpace(p), "/")
+		if p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
+func (c Config) checkOriginAllowlist(origin string) error {
+	allowed := c.AllowedOrigins()
+	if len(allowed) == 0 {
+		return nil
+	}
+	origin = strings.TrimRight(strings.TrimSpace(origin), "/")
+	for _, a := range allowed {
+		if strings.EqualFold(a, origin) {
+			return nil
+		}
+	}
+	return fmt.Errorf("oidc: origin %q not in redirect_origins", origin)
 }
 
 type discoveryDoc struct {
@@ -126,14 +238,19 @@ func PKCEChallengeS256(verifier string) string {
 }
 
 // AuthorizeRedirect builds the browser redirect to the IdP authorize endpoint.
-func (c Config) AuthorizeRedirect(state, codeChallenge string) (string, error) {
+// redirectURI must be the absolute URI used for this login (same value later for token exchange).
+func (c Config) AuthorizeRedirect(state, codeChallenge, redirectURI string) (string, error) {
 	if c.AuthorizeURL == "" {
 		return "", fmt.Errorf("oidc: authorize URL not resolved")
+	}
+	redirectURI = strings.TrimSpace(redirectURI)
+	if redirectURI == "" {
+		return "", fmt.Errorf("oidc: empty redirect_uri")
 	}
 	q := url.Values{}
 	q.Set("response_type", "code")
 	q.Set("client_id", c.ClientID)
-	q.Set("redirect_uri", c.RedirectURI)
+	q.Set("redirect_uri", redirectURI)
 	q.Set("scope", c.ScopesCSV())
 	q.Set("state", state)
 	if codeChallenge != "" {
@@ -160,9 +277,14 @@ type TokenResponse struct {
 }
 
 // ExchangeCode swaps authorization code for tokens (client_secret_post).
-func (c Config) ExchangeCode(client *http.Client, code, codeVerifier string) (*TokenResponse, error) {
+// redirectURI must match the absolute URI sent in AuthorizeRedirect.
+func (c Config) ExchangeCode(client *http.Client, code, codeVerifier, redirectURI string) (*TokenResponse, error) {
 	if c.TokenURL == "" {
 		return nil, fmt.Errorf("oidc: token URL not resolved")
+	}
+	redirectURI = strings.TrimSpace(redirectURI)
+	if redirectURI == "" {
+		return nil, fmt.Errorf("oidc: empty redirect_uri")
 	}
 	if client == nil {
 		client = &http.Client{Timeout: 15 * time.Second}
@@ -170,7 +292,7 @@ func (c Config) ExchangeCode(client *http.Client, code, codeVerifier string) (*T
 	form := url.Values{}
 	form.Set("grant_type", "authorization_code")
 	form.Set("code", code)
-	form.Set("redirect_uri", c.RedirectURI)
+	form.Set("redirect_uri", redirectURI)
 	form.Set("client_id", c.ClientID)
 	form.Set("client_secret", c.ClientSecret)
 	if codeVerifier != "" {
@@ -313,15 +435,16 @@ func ParseConfig(m map[string]any) Config {
 		m = nested
 	}
 	c := Config{
-		Issuer:       firstStr(m, "issuer", "发行方", "issuer_url"),
-		ClientID:     firstStr(m, "client_id", "客户端编号", "客户端id", "clientId"),
-		ClientSecret: firstStr(m, "client_secret", "客户端密钥", "clientSecret"),
-		RedirectURI:  firstStr(m, "redirect_uri", "回调", "回调地址", "redirect"),
-		Scopes:       firstStr(m, "scopes", "范围", "scope"),
-		CallbackPath: firstStr(m, "callback_path", "回调路径"),
-		AuthorizeURL: firstStr(m, "authorize_url", "授权地址"),
-		TokenURL:     firstStr(m, "token_url", "令牌地址"),
-		UserInfoURL:  firstStr(m, "userinfo_url", "用户信息地址"),
+		Issuer:          firstStr(m, "issuer", "发行方", "issuer_url"),
+		ClientID:        firstStr(m, "client_id", "客户端编号", "客户端id", "clientId"),
+		ClientSecret:    firstStr(m, "client_secret", "客户端密钥", "clientSecret"),
+		RedirectURI:     firstStr(m, "redirect_uri", "回调", "回调地址", "redirect"),
+		RedirectOrigins: firstStr(m, "redirect_origins", "回调来源", "redirect_origin"),
+		Scopes:          firstStr(m, "scopes", "范围", "scope"),
+		CallbackPath:    firstStr(m, "callback_path", "回调路径"),
+		AuthorizeURL:    firstStr(m, "authorize_url", "授权地址"),
+		TokenURL:        firstStr(m, "token_url", "令牌地址"),
+		UserInfoURL:     firstStr(m, "userinfo_url", "用户信息地址"),
 	}
 	return c
 }
