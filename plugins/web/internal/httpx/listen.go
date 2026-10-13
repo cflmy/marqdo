@@ -247,6 +247,7 @@ func NewHandler(appBag map[string]any, entryDir string) (http.Handler, error) {
 	handler := withMiddleware(mux, mw)
 	handler = withRBAC(handler, authCfg.gates, authCfg.loginPath)
 	handler = withTenant(handler, st.tenant)
+	handler = withStripTrailingSlash(handler)
 	return handler, nil
 }
 
@@ -638,6 +639,21 @@ func withTenant(next http.Handler, cfg tenant.Config) http.Handler {
 		id := tenant.Resolve(r, cfg)
 		ctx := tenant.WithContext(r.Context(), id)
 		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
+// withStripTrailingSlash rewrites request URLs so that paths like /post/foo/
+// are routed as /post/foo. The root path "/" is left unchanged.
+func withStripTrailingSlash(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		path := r.URL.Path
+		if len(path) > 1 && path[len(path)-1] == '/' {
+			r.URL.Path = strings.TrimRight(path, "/")
+			if r.URL.Path == "" {
+				r.URL.Path = "/"
+			}
+		}
+		next.ServeHTTP(w, r)
 	})
 }
 

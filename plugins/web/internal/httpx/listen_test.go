@@ -152,3 +152,65 @@ func TestNewHandlerIconsRedirectSitemap404(t *testing.T) {
 		t.Fatalf("home missing icon link: %s", rec.Body.String())
 	}
 }
+
+func TestTrailingSlashNormalization(t *testing.T) {
+	page := map[string]any{"title": "Home", "intro": "<p>home</p>"}
+	a := app.New(map[string]any{"page": page})
+	about := map[string]any{"title": "About", "intro": "<h1>About</h1>", "_route": "/about"}
+	var err error
+	a, err = app.Route(a, "/about", about)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Dynamic route: /post/{slug}
+	post := map[string]any{"title": "Post", "intro": "<h1>Post</h1>", "_route": "/post/{slug}"}
+	a, err = app.Route(a, "/post/{slug}", post)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	h, err := httpx.NewHandler(a, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Static route: /about should work with and without trailing slash.
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/about", nil))
+	if rec.Code != 200 || !strings.Contains(rec.Body.String(), "About") {
+		t.Fatalf("about (no slash) code=%d body=%q", rec.Code, rec.Body.String())
+	}
+
+	rec = httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/about/", nil))
+	if rec.Code != 200 || !strings.Contains(rec.Body.String(), "About") {
+		t.Fatalf("about (trailing slash) code=%d body=%q", rec.Code, rec.Body.String())
+	}
+
+	// Dynamic route: /post/hello should work with and without trailing slash.
+	rec = httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/post/hello", nil))
+	if rec.Code != 200 {
+		t.Fatalf("post/hello (no slash) code=%d body=%q", rec.Code, rec.Body.String())
+	}
+
+	rec = httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/post/hello/", nil))
+	if rec.Code != 200 {
+		t.Fatalf("post/hello (trailing slash) code=%d body=%q", rec.Code, rec.Body.String())
+	}
+
+	// Root path "/" should still work.
+	rec = httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/", nil))
+	if rec.Code != 200 || !strings.Contains(rec.Body.String(), "Home") {
+		t.Fatalf("root code=%d body=%q", rec.Code, rec.Body.String())
+	}
+
+	// Query string should be preserved after trailing slash strip.
+	rec = httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/about/?foo=bar", nil))
+	if rec.Code != 200 || !strings.Contains(rec.Body.String(), "About") {
+		t.Fatalf("about (trailing slash + query) code=%d body=%q", rec.Code, rec.Body.String())
+	}
+}
