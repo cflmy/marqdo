@@ -8,6 +8,21 @@
 
 ### Changed
 
+## Ext pack v1.3.2 — 2026-10-13
+
+### Highlights
+
+**Trailing slash 路由修复（CLI 仍为 v1.3.0）**：Go `ServeMux` 精确匹配导致 `/post/foo/`（带尾部斜杠）落入 404。新增 `withStripTrailingSlash` 中间件作为最外层 handler wrapper，所有下游中间件（RBAC、Tenant、路由）均看到规范化路径。覆盖静态路由、动态路由、根路径、查询参数保留。
+
+```bash
+marqdo ext add web   # CDN latest → 1.3.2
+# 或：MARQDO_EXT_VERSION=1.3.2 marqdo ext add web
+```
+
+### Fixed
+
+- **web**: `/post/foo/` trailing slash now routes the same as `/post/foo` (dynamic and static routes). Root `/` unchanged. Query strings preserved after normalization.
+
 ## Ext pack v1.3.1 — 2026-10-08
 
 ### Highlights
