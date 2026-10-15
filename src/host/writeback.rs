@@ -1,7 +1,11 @@
-//! Jupyter-style output persistence in `.mq.md` (`<!-- marqdo-out … -->`).
+//! Jupyter-style output persistence in `.mq.md`.
 //!
-//! Optional **named slots**: `<!-- marqdo-out ok -->` / `<!-- marqdo-out error -->`
-//! so success and failure results do not overwrite each other.
+//! Two surface forms (both scanned / replaced):
+//! - HTML comment: `<!-- marqdo-out … -->` (text / structured output)
+//! - Markdown image: `![marqdo-out](path-or-url)` (image refs; validated)
+//!
+//! Optional **named slots**: `marqdo-out ok` / `marqdo-out error` so success and
+//! failure results do not overwrite each other.
 
 use std::collections::HashMap;
 use std::sync::Mutex;
@@ -14,14 +18,30 @@ const MAGIC: &str = "marqdo-out";
 /// Serialize all writeback file mutations (sync + subtask writers).
 static WRITEBACK_LOCK: Mutex<()> = Mutex::new(());
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum BlockKind {
+    Comment,
+    Image,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct BlockSpan {
     start: usize,
     end: usize,
+    /// Comment body text, or image URL/path for [`BlockKind::Image`].
     body: String,
     start_line: u32,
     /// Named slot from header (`marqdo-out ok` → `ok`); `None` = legacy unkeyed.
     key: Option<String>,
+    kind: BlockKind,
+}
+
+/// View-facing writeback piece under a statement line.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct WritebackEntry {
+    pub key: Option<String>,
+    pub body: String,
+    pub is_image: bool,
 }
 
 fn display_value(v: &Value) -> String {
@@ -119,10 +139,68 @@ fn line_number_at(source: &str, byte: usize) -> u32 {
         + 1
 }
 
-fn format_block(body: &str, key: Option<&str>) -> String {
+fn format_comment_block(body: &str, key: Option<&str>) -> String {
     match key {
         Some(k) => format!("<!-- {MAGIC} {k}\n{body}\n-->"),
         None => format!("<!-- {MAGIC}\n{body}\n-->"),
+    }
+}
+
+fn format_image_block(url: &str, key: Option<&str>) -> String {
+    match key {
+        Some(k) => format!("![{MAGIC} {k}]({url})"),
+        None => format!("![{MAGIC}]({url})"),
+    }
+}
+
+fn format_block_for_value(body: &str, key: Option<&str>) -> Result<String, String> {
+    if looks_like_image_ref(body) {
+        validate_image_ref(body)?;
+        Ok(format_image_block(body.trim(), key))
+    } else {
+        Ok(format_comment_block(body, key))
+    }
+}
+
+/// True when `s` looks like a path/URL that should persist as `![marqdo-out](…)`.
+pub fn looks_like_image_ref(s: &str) -> bool {
+    validate_image_ref(s).is_ok()
+}
+
+/// Accept local/relative paths and http(s) URLs with a known image extension,
+/// or `data:image/…` URIs.
+pub fn validate_image_ref(s: &str) -> Result<(), String> {
+    let t = s.trim().trim_matches('"').trim_matches('\'');
+    if t.is_empty() {
+        return Err("writeback image: empty path".into());
+    }
+    if t.starts_with("data:image/") {
+        return Ok(());
+    }
+    // Strip query/fragment for extension check.
+    let no_query = t.split_once('?').map(|(p, _)| p).unwrap_or(t);
+    let path_part = no_query.split_once('#').map(|(p, _)| p).unwrap_or(no_query);
+    let file = path_part.rsplit('/').next().unwrap_or(path_part);
+    // Require a real extension (reject bare names like `svg` / `png`).
+    let Some((stem, ext)) = file.rsplit_once('.') else {
+        return Err(format!(
+            "writeback image: path needs an image extension (got `{t}`)"
+        ));
+    };
+    if stem.is_empty() {
+        return Err(format!("writeback image: invalid file name `{t}`"));
+    }
+    let ext = ext.to_ascii_lowercase();
+    const OK: &[&str] = &[
+        "png", "jpg", "jpeg", "gif", "webp", "svg", "bmp", "ico", "avif", "tif", "tiff",
+    ];
+    if OK.contains(&ext.as_str()) {
+        Ok(())
+    } else {
+        Err(format!(
+            "writeback image: not an image path/URL (got `{t}`; need .{})",
+            OK.join("/.")
+        ))
     }
 }
 
@@ -160,11 +238,43 @@ fn parse_one_block(block: &str, start_byte: usize, source: &str) -> Option<Block
         body,
         start_line: line_number_at(source, start_byte),
         key,
+        kind: BlockKind::Comment,
+    })
+}
+
+/// `![marqdo-out …](url)` on a single source line.
+fn parse_image_line(line: &str, line_start: usize, source: &str) -> Option<BlockSpan> {
+    let trimmed = line.trim();
+    let rest = trimmed.strip_prefix("![")?;
+    let alt_end = rest.find("](")?;
+    let alt = rest[..alt_end].trim();
+    if !alt.split_whitespace().any(|t| t == MAGIC) {
+        return None;
+    }
+    let key = parse_header_key(alt);
+    let after_alt = &rest[alt_end + 2..];
+    let url_end = after_alt.rfind(')')?;
+    let url = after_alt[..url_end].trim();
+    if url.is_empty() || validate_image_ref(url).is_err() {
+        return None;
+    }
+    // Span covers the trimmed image on its line (indent kept outside).
+    let trim_start = line.find(trimmed).unwrap_or(0);
+    let start = line_start + trim_start;
+    let end = start + trimmed.len();
+    Some(BlockSpan {
+        start,
+        end,
+        body: url.to_string(),
+        start_line: line_number_at(source, start),
+        key,
+        kind: BlockKind::Image,
     })
 }
 
 fn scan_blocks(source: &str) -> Vec<BlockSpan> {
     let mut out = Vec::new();
+    // HTML comment blocks
     let mut i = 0usize;
     while i < source.len() {
         let rest = &source[i..];
@@ -186,6 +296,16 @@ fn scan_blocks(source: &str) -> Vec<BlockSpan> {
         }
         i = abs + end_rel + 3;
     }
+    // Image writebacks (line-oriented)
+    let mut line_start = 0usize;
+    for line in source.split_inclusive('\n') {
+        let content = line.trim_end_matches(['\r', '\n']);
+        if let Some(b) = parse_image_line(content, line_start, source) {
+            out.push(b);
+        }
+        line_start += line.len();
+    }
+    out.sort_by_key(|b| b.start);
     out
 }
 
@@ -323,7 +443,7 @@ fn find_keyed_in_cluster(source: &str, after_line: u32, key: &str) -> Option<Blo
 /// Replace keyed block under `anchor` line, or insert into that cluster (not EOF).
 fn replace_or_insert_keyed_at(source: &str, anchor: u32, key: &str, body: &str) -> Result<String, String> {
     let key = normalize_slot_key(key);
-    let block = format_block(body, Some(&key));
+    let block = format_block_for_value(body, Some(&key))?;
     if let Some(existing) = find_keyed_in_cluster(source, anchor, &key) {
         return Ok(splice_block(source, existing.start, existing.end, &block));
     }
@@ -438,13 +558,13 @@ pub fn record(
             let stripped = find_eof_block(&source)
                 .map(|b| strip_span(&source, b.start, span_end_including_nl(&source, b.end)))
                 .unwrap_or_else(|| source.clone());
-            append_eof(&stripped, &format_block(&body, None))
+            append_eof(&stripped, &format_block_for_value(&body, None)?)
         } else {
             let line = anchor.ok_or_else(|| "writeback: missing anchor line".to_string())?;
             let stripped = find_adjacent_block(&source, line)
                 .map(|b| strip_span(&source, b.start, span_end_including_nl(&source, b.end)))
                 .unwrap_or_else(|| source.clone());
-            insert_after_line(&stripped, line, &format_block(&body, None))?
+            insert_after_line(&stripped, line, &format_block_for_value(&body, None)?)?
         };
         persist(ctx, &next)?;
         Ok(Value::Text(body.clone()))
@@ -549,10 +669,15 @@ fn slots_from_source(source: &str) -> Value {
         .map(|b| {
             let anchor = anchor_line_above(source, b.start_line);
             let at_eof = b.key.is_none() && is_eof_block(source, &b);
+            let kind = match b.kind {
+                BlockKind::Comment => "comment",
+                BlockKind::Image => "image",
+            };
             let mut entries = vec![
                 ("line".into(), Value::Int(anchor as i64)),
                 ("body".into(), Value::Text(b.body)),
                 ("at_end".into(), Value::Bool(at_eof)),
+                ("kind".into(), Value::Text(kind.into())),
             ];
             if let Some(k) = b.key {
                 entries.push(("key".into(), Value::Text(k)));
@@ -584,28 +709,48 @@ pub fn ensure_slot(
     })
 }
 
-/// Map statement line → body for adjacent blocks (keyed slots included under their anchor).
-pub fn writeback_map(source: &str) -> HashMap<u32, String> {
-    let mut map = HashMap::new();
+/// Structured writebacks keyed by the statement line above the block cluster.
+pub fn writeback_entries(source: &str) -> HashMap<u32, Vec<WritebackEntry>> {
+    let mut map: HashMap<u32, Vec<WritebackEntry>> = HashMap::new();
     for b in scan_blocks(source) {
-        let anchor = anchor_line_above(source, b.start_line);
-        let piece = match &b.key {
-            Some(k) => format!("[{k}]\n{}", b.body),
-            None => b.body.clone(),
-        };
-        if b.key.is_none() && is_eof_block(source, &b) {
-            map.insert(0, piece);
+        let anchor = if b.key.is_none() && is_eof_block(source, &b) {
+            0
         } else {
-            map.entry(anchor)
-                .and_modify(|e| {
-                    e.push_str("\n\n");
-                    e.push_str(&piece);
-                })
-                .or_insert(piece);
-        }
+            anchor_line_above(source, b.start_line)
+        };
+        let entry = WritebackEntry {
+            key: b.key.clone(),
+            body: b.body.clone(),
+            is_image: b.kind == BlockKind::Image,
+        };
+        map.entry(anchor).or_default().push(entry);
     }
     map
 }
+
+/// Map statement line → combined body for adjacent blocks (keyed slots included).
+/// Image slots are encoded as a markdown image line so view/static can render `<img>`.
+pub fn writeback_map(source: &str) -> HashMap<u32, String> {
+    let mut map = HashMap::new();
+    for (anchor, entries) in writeback_entries(source) {
+        let mut pieces = Vec::new();
+        for e in entries {
+            let content = if e.is_image {
+                format!("![]({})", e.body)
+            } else {
+                e.body
+            };
+            let piece = match &e.key {
+                Some(k) => format!("[{k}]\n{content}"),
+                None => content,
+            };
+            pieces.push(piece);
+        }
+        map.insert(anchor, pieces.join("\n\n"));
+    }
+    map
+}
+
 
 #[cfg(test)]
 mod tests {
@@ -614,7 +759,7 @@ mod tests {
     #[test]
     fn parse_and_insert_adjacent() {
         let src = "# main\n\n**x = 1**\n";
-        let block = format_block("1", None);
+        let block = format_comment_block("1", None);
         let next = insert_after_line(src, 3, &block).unwrap();
         assert!(next.contains("marqdo-out"));
         assert!(!next.contains("@line"));
@@ -623,6 +768,79 @@ mod tests {
         assert_eq!(blocks[0].body, "1");
         let replaced = strip_span(&next, blocks[0].start, blocks[0].end);
         assert!(!replaced.contains("marqdo-out"));
+    }
+
+    #[test]
+    fn image_writeback_scan_and_format() {
+        assert!(looks_like_image_ref("plot.svg"));
+        assert!(looks_like_image_ref("https://ex.com/a.PNG"));
+        assert!(looks_like_image_ref("data:image/png;base64,xx"));
+        assert!(looks_like_image_ref("plots/a.svg?v=1"));
+        assert!(!looks_like_image_ref("readme.txt"));
+        assert!(!looks_like_image_ref("42"));
+        assert!(!looks_like_image_ref("svg")); // bare name, not an extension
+        assert!(!looks_like_image_ref(".svg"));
+        let block = format_image_block("out/plot.svg", Some("ok"));
+        assert_eq!(block, "![marqdo-out ok](out/plot.svg)");
+        let src = "# main\n\n**x = 1**\n![marqdo-out ok](out/plot.svg)\n\n> print text=tail\n";
+        let blocks = scan_blocks(src);
+        assert_eq!(blocks.len(), 1);
+        assert_eq!(blocks[0].kind, BlockKind::Image);
+        assert_eq!(blocks[0].body, "out/plot.svg");
+        assert_eq!(blocks[0].key.as_deref(), Some("ok"));
+        let map = writeback_map(src);
+        assert_eq!(
+            map.get(&3).map(|s| s.as_str()),
+            Some("[ok]\n![](out/plot.svg)")
+        );
+        // Invalid image URL in marqdo-out alt → not a writeback slot
+        let bad = "# main\n\n![marqdo-out](notes.txt)\n";
+        assert!(scan_blocks(bad).is_empty());
+    }
+
+    #[test]
+    fn unkeyed_comment_and_image_replace_each_other() {
+        let src = "# main\n\n**x = 1**\n<!-- marqdo-out\nold\n-->\n\n> print text=tail\n";
+        let line = 3u32;
+        let to_image = {
+            let stripped = find_adjacent_block(src, line)
+                .map(|b| strip_span(src, b.start, span_end_including_nl(src, b.end)))
+                .unwrap_or_else(|| src.to_string());
+            insert_after_line(
+                &stripped,
+                line,
+                &format_block_for_value("fig.svg", None).unwrap(),
+            )
+            .unwrap()
+        };
+        assert!(to_image.contains("![marqdo-out](fig.svg)"));
+        assert!(!to_image.contains("<!-- marqdo-out"));
+        let blocks = scan_blocks(&to_image);
+        assert_eq!(blocks.len(), 1);
+        assert_eq!(blocks[0].kind, BlockKind::Image);
+
+        let to_text = {
+            let stripped = find_adjacent_block(&to_image, line)
+                .map(|b| strip_span(&to_image, b.start, span_end_including_nl(&to_image, b.end)))
+                .unwrap_or_else(|| to_image.clone());
+            insert_after_line(
+                &stripped,
+                line,
+                &format_block_for_value("hello", None).unwrap(),
+            )
+            .unwrap()
+        };
+        assert!(to_text.contains("<!-- marqdo-out\nhello\n-->"));
+        assert!(!to_text.contains("![marqdo-out]"));
+    }
+
+    #[test]
+    fn record_format_picks_image_for_svg_path() {
+        let s = format_block_for_value("figs/a.svg", None).unwrap();
+        assert_eq!(s, "![marqdo-out](figs/a.svg)");
+        let t = format_block_for_value("hello", None).unwrap();
+        assert!(t.contains("<!-- marqdo-out"));
+        assert!(format_block_for_value("notes.txt", None).unwrap().contains("<!--"));
     }
 
     #[test]
@@ -671,7 +889,7 @@ mod tests {
             let stripped = find_adjacent_block(s, line)
                 .map(|b| strip_span(s, b.start, span_end_including_nl(s, b.end)))
                 .unwrap_or_else(|| s.to_string());
-            insert_after_line(&stripped, line, &format_block(body, None)).unwrap()
+            insert_after_line(&stripped, line, &format_comment_block(body, None)).unwrap()
         };
         let once = strip_insert(src, "a");
         let twice = strip_insert(&once, "b");

@@ -101,6 +101,10 @@ pub fn render_module_document(module: &Module, source: &str, annots: &[ViewAnnot
             }
             LineKind::Writeback => {
                 flush_para(&mut para, &mut out);
+                out.push_str(&crate::view::render::render_writeback_source_line(
+                    l.line_no,
+                    l.text.trim_end_matches(['\r', '\n']),
+                ));
                 i += 1;
             }
             LineKind::Comment => {
@@ -313,11 +317,7 @@ fn render_table_block(
         }
     }
     if let Some(body) = writebacks.get(&first_line) {
-        html.push_str(&format!(
-            r#"<div class="card output-card" id="wb-{line}"><pre class="output-body">{}</pre></div>"#,
-            escape(body),
-            line = first_line
-        ));
+        html.push_str(&crate::view::render::render_output_card(first_line, body));
     }
     html.push_str("</div>");
     (html, i)
@@ -746,11 +746,7 @@ fn render_line_block(
     }
 
     if let Some(body) = writeback_body {
-        s.push_str(&format!(
-            r#"<div class="card output-card" id="wb-{line}"><pre class="output-body">{}</pre></div>"#,
-            escape(body),
-            line = line_no
-        ));
+        s.push_str(&crate::view::render::render_output_card(line_no, body));
     }
 
     // Formula/code cards are the single visual truth — do not stack Bind chips

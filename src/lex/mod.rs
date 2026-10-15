@@ -292,7 +292,23 @@ fn breaks_comment_paragraph(trimmed: &str) -> bool {
     if trimmed.starts_with('+') {
         return true;
     }
+    if is_image_writeback_line(trimmed) {
+        return true;
+    }
     false
+}
+
+/// `![marqdo-out …](image-url)` — image writeback surface (see stdlib-writeback).
+pub fn is_image_writeback_line(trimmed: &str) -> bool {
+    let t = trimmed.trim();
+    let Some(rest) = t.strip_prefix("![") else {
+        return false;
+    };
+    let Some(alt_end) = rest.find("](") else {
+        return false;
+    };
+    let alt = rest[..alt_end].trim();
+    alt.split_whitespace().any(|tok| tok == "marqdo-out")
 }
 
 fn looks_like_ordered_list_item(trimmed: &str) -> bool {
@@ -381,6 +397,9 @@ pub fn classify_source(source: &str) -> Vec<ClassifiedLine> {
             if trimmed.contains("-->") {
                 in_writeback = false;
             }
+            LineKind::Writeback
+        } else if is_image_writeback_line(trimmed) {
+            in_comment_paragraph = false;
             LineKind::Writeback
         } else {
             match base {
@@ -545,6 +564,17 @@ mod tests {
         assert_eq!(lines[1].kind, LineKind::Writeback);
         assert_eq!(lines[2].kind, LineKind::Writeback);
         assert_eq!(lines[3].kind, LineKind::Writeback);
+    }
+
+    #[test]
+    fn image_writeback_line_classified() {
+        assert!(is_image_writeback_line("![marqdo-out](a.svg)"));
+        assert!(is_image_writeback_line("![marqdo-out ok](plots/x.png)"));
+        assert!(!is_image_writeback_line("![plot](a.svg)"));
+        let src = "# main\n\n**x = 1**\n![marqdo-out](out.svg)\n\n> print text=x\n";
+        let lines = classify_source(src);
+        let img = lines.iter().find(|l| l.text.contains("marqdo-out]")).unwrap();
+        assert_eq!(img.kind, LineKind::Writeback, "{:?}", lines);
     }
 
     #[test]

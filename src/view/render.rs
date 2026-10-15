@@ -1070,15 +1070,87 @@ fn stmt_end_line(stmt: &Stmt) -> u32 {
 
 fn output_card(line: u32, writebacks: &HashMap<u32, String>) -> String {
     match writebacks.get(&line) {
-        Some(body) => {
-            let badges = writeback_badges(body);
-            format!(
-                r#"<div class="card output-card" id="wb-{line}"><div class="wb-badges">{badges}</div><pre class="output-body">{}</pre></div>"#,
-                escape(body)
-            )
-        }
+        Some(body) => render_output_card(line, body),
         None => String::new(),
     }
+}
+
+/// Live view + static site: text `<pre>` and/or `<img>` for image writebacks.
+pub fn render_output_card(line: u32, combined: &str) -> String {
+    if combined.trim().is_empty() {
+        return String::new();
+    }
+    let badges = writeback_badges(combined);
+    let mut body_html = String::new();
+    let mut buf_text = String::new();
+    let flush_text = |buf: &mut String, out: &mut String| {
+        if buf.is_empty() {
+            return;
+        }
+        out.push_str(&format!(
+            r#"<pre class="output-body">{}</pre>"#,
+            escape(buf.trim_end())
+        ));
+        buf.clear();
+    };
+    for line_s in combined.lines() {
+        let t = line_s.trim();
+        if let Some(url) = extract_md_image_url(t) {
+            flush_text(&mut buf_text, &mut body_html);
+            body_html.push_str(&format!(
+                r#"<figure class="wb-figure"><img class="wb-image" src="{src}" alt="writeback"/><figcaption class="wb-image-url">{cap}</figcaption></figure>"#,
+                src = escape(&url),
+                cap = escape(&url),
+            ));
+        } else {
+            if !buf_text.is_empty() {
+                buf_text.push('\n');
+            }
+            buf_text.push_str(line_s);
+        }
+    }
+    flush_text(&mut buf_text, &mut body_html);
+    let has_img = body_html.contains("wb-image");
+    format!(
+        r#"<div class="card output-card{img_cls}" id="wb-{line}" data-wb="1"><div class="wb-badges">{badges}</div>{body}</div>"#,
+        line = line,
+        img_cls = if has_img { " output-card-image" } else { "" },
+        badges = badges,
+        body = body_html,
+    )
+}
+
+fn extract_md_image_url(line: &str) -> Option<String> {
+    let t = line.trim();
+    let rest = t.strip_prefix("![")?;
+    let alt_end = rest.find("](")?;
+    let after = &rest[alt_end + 2..];
+    let url_end = after.rfind(')')?;
+    let url = after[..url_end].trim();
+    if url.is_empty() {
+        None
+    } else {
+        Some(url.to_string())
+    }
+}
+
+/// Document-surface marker for a writeback source line (comment or image).
+pub fn render_writeback_source_line(line_no: u32, text: &str) -> String {
+    let trimmed = text.trim();
+    let is_image = trimmed.starts_with("![") && trimmed.contains("marqdo-out");
+    let kind = if is_image { "image" } else { "comment" };
+    let label = if is_image {
+        "writeback · image"
+    } else {
+        "writeback"
+    };
+    format!(
+        r#"<div class="doc-block doc-writeback" data-line="{line}" data-wb-kind="{kind}"><span class="wb-source-badge">{label}</span><code class="wb-source-text">{text}</code></div>"#,
+        line = line_no,
+        kind = kind,
+        label = label,
+        text = escape(trimmed),
+    )
 }
 
 fn writeback_badges(body: &str) -> String {
@@ -1737,6 +1809,20 @@ mod tests {
         assert!(html.contains("vars-panel"), "{html}");
         assert!(html.contains("vars-card"), "{html}");
         assert!(html.contains(">xs<") || html.contains("vars-name\">xs"), "{html}");
+    }
+
+    #[test]
+    fn output_card_renders_image_writeback() {
+        let html = render_output_card(3, "[ok]\n![](plots/a.svg)");
+        assert!(html.contains("output-card-image"), "{html}");
+        assert!(html.contains(r#"src="plots/a.svg""#), "{html}");
+        assert!(html.contains("wb-ok") || html.contains(">ok<"), "{html}");
+        let text = render_output_card(1, "plain-42");
+        assert!(text.contains("output-body"), "{text}");
+        assert!(!text.contains("wb-image"), "{text}");
+        let src = render_writeback_source_line(4, "![marqdo-out](plots/a.svg)");
+        assert!(src.contains(r#"data-wb-kind="image""#), "{src}");
+        assert!(src.contains("writeback · image"), "{src}");
     }
 
     #[test]

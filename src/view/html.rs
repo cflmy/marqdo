@@ -972,6 +972,9 @@ ul.doc-loop, ol.doc-branch {
   border-left: 3px solid #2563eb;
   background: #f8fafc;
 }
+.output-card.output-card-image {
+  border-left-color: #0d9488;
+}
 .output-card .wb-badges {
   display: flex;
   flex-wrap: wrap;
@@ -986,6 +989,58 @@ ul.doc-loop, ol.doc-branch {
   font: 0.85rem/1.45 var(--mono);
   white-space: pre-wrap;
   color: #0f172a;
+}
+.wb-figure {
+  margin: 0.5rem 0 0;
+  padding: 0;
+}
+.wb-image {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: #fff;
+}
+.wb-image-url {
+  margin: 0.35rem 0 0;
+  font: 0.75rem/1.35 var(--mono);
+  color: var(--muted);
+  word-break: break-all;
+}
+.doc-writeback {
+  margin: 0.35rem 0;
+  padding: 0.4rem 0.55rem;
+  border-radius: 8px;
+  border: 1px dashed #94a3b8;
+  background: #f1f5f9;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 0.65rem;
+  align-items: baseline;
+}
+.doc-writeback[data-wb-kind="image"] {
+  border-color: #0d9488;
+  background: #f0fdfa;
+}
+.wb-source-badge {
+  font: 0.68rem/1.2 var(--sans);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #334155;
+  background: #e2e8f0;
+  padding: 0.12rem 0.4rem;
+  border-radius: 4px;
+}
+.doc-writeback[data-wb-kind="image"] .wb-source-badge {
+  background: #ccfbf1;
+  color: #115e59;
+}
+.wb-source-text {
+  font: 0.82rem/1.4 var(--mono);
+  color: #0f172a;
+  white-space: pre-wrap;
+  word-break: break-all;
 }
 .wb-outline {
   margin-top: 0.75rem;
