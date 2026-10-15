@@ -124,7 +124,10 @@ if [ "$REUSE_ORIG" -eq 1 ]; then
   echo "==> reusing published ${ORIG_NAME} (debian-only bump; do not rewrite orig)"
   echo "    source: ${ORIG_SRC}"
   sha256sum "$ORIG_SRC"
-  cp -f "$ORIG_SRC" "$BUILD_AREA/$ORIG_NAME"
+  # Local fallback may already be build-area/ORIG_NAME — do not cp onto itself.
+  if [ "$(realpath "$ORIG_SRC")" != "$(realpath "$BUILD_AREA/$ORIG_NAME" 2>/dev/null || echo "")" ]; then
+    cp -f "$ORIG_SRC" "$BUILD_AREA/$ORIG_NAME"
+  fi
   # Unpack orig (top dir is usually ${VER} or marqdo-${VER})
   tar -xJf "$BUILD_AREA/$ORIG_NAME" -C "$(dirname "$PKG_ROOT")"
   if [ ! -d "$PKG_ROOT" ]; then
