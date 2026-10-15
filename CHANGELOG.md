@@ -8,6 +8,34 @@
 
 ### Changed
 
+## v1.3.3 — 2026-10-15
+
+### Highlights
+
+**view 文档面 Structure**：Browse 保真叙述与标记面（变量/语句/返回无源码定界符）；表/循环/分支结构块；语句后绑定值、分支命中臂、函数多调用与循环迭代下拉（默认末帧）；`#mq-view-trace` AI JSON。静态 `marqdo view output` 与 live view **同源渲染**（含用户站 `public/` → gh-pages）。
+
+```bash
+git checkout v1.3.3 && cargo build --release
+marqdo view tests/view/document-annot-demo.mq.md --no-open
+marqdo view output public -o public
+# Ubuntu: sudo apt update && sudo apt install marqdo
+marqdo ext add web   # CDN latest → 1.3.3
+```
+
+**核心表面 Δ（Core surface Δ）**：**无增删**——19 个核心构造不变。本版为 **Runtime / Tooling**（view 文档面 + 帧选择），不触碰语言标记。
+
+### Added
+- **Browse Structure 文档面**（`src/view/document.rs` · `annot.rs`）：叙述保真、标记面、GFM 表 / `doc-loop` / `doc-branch`、CSS L-leader 标注带。
+- **StmtEvent / CallFrame / LoopFrame** 静默轨迹：post-stmt 绑定、分支 `call_id`、循环 `分 = 分数表[i] · value`；调用/迭代 picker（源码常显，只滤 chip）。
+- **`ViewExecutionReport`** JSON（`#mq-view-trace` · `/api/view-trace` · SSE `trace_json`）。
+- 设计：[view-document-annotations.md](doc/design/view-document-annotations.md) · [view-execution-trace.md](doc/design/view-execution-trace.md) · [view-frame-selection.md](doc/design/view-frame-selection.md)；样例 `tests/view/document-annot-demo.mq.md`。
+
+### Fixed
+- 多调用分支 taken 混叠；调用切换误藏未执行臂源码；循环头重复 chip。
+
+### Changed
+- CLI / wasm / `ext/VERSION` **同步 1.3.3**；静态导出与 live view 共用 `build_file_view` → 文档面。
+
 ## Ext pack v1.3.2 — 2026-10-13
 
 ### Highlights

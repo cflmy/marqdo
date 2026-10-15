@@ -1,3 +1,11 @@
+marqdo (1.3.3-1ppa1) noble; urgency=medium
+
+  * Marqdo 1.3.3: Browse document-surface Structure — narration-preserving
+    markers, branch/loop frame pickers, ViewExecutionReport JSON; static
+    view output / gh-pages share the same render path as live view.
+
+ -- cflmy <pingan@cflmy.cn>  Wed, 15 Oct 2026 13:20:00 +0800
+
 marqdo (1.3.0-1ppa1) noble; urgency=medium
 
   * Marqdo 1.3.0: Engineering Knowledge Compiler (EKC) — L0–L4 catalog,
