@@ -138,20 +138,19 @@ Chinese builtins (same functions, no import):
 
 ## Functions, calls, end-body
 
+Prefer **body-inferred params** and **prose-unified** wording (v0.3). `` + `name` `` still works, but teach the inferred form first:
+
 ```markdown
 # main
 
-> greet who=Marqdo
+**greet who="Marqdo"**
 
 ## greet
-    + `who`
 
-> print text=Hello, `who`!
-
-*None*
+When we meet`who`, we **print text="Hello, `who`!"** and close with*None*.
 ```
 
-- Call: `> name key=value` or `> name value`.
+- Call: `**fn key="text"**` (bold; quote text literals) or `> fn key=text` (standalone `>`; bare words are text).
 - Nested helpers use deeper `#` (`##`, `###`, …).
 - After a helper with only side effects, end with `*None*` / whole-line `**` / `****` when later lines must stay in the outer function. Lone `---` is only a thematic break (skipped).
 - In bold assigns, prefer bare calls: `**摘要 = 结账摘要 …**` (omit `>`).
@@ -163,9 +162,8 @@ Chinese builtins (same functions, no import):
 **y = x + 2**
 
 ## add_one
-    + `n`
 
-*n + 1*
+For input`n`, do **n = n + 1** and return*n*.
 ```
 
 ```markdown

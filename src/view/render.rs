@@ -971,10 +971,11 @@ fn render_fun(
                 ("chip", "explicit + param")
             };
             s.push_str(&format!(
-                "<span class=\"{cls}\" title=\"{title}\">{name}</span>",
+                "<span class=\"{cls}\" data-param-name=\"{name}\" data-fn=\"{fn}\" title=\"{title}\">{name}<span class=\"chip-val\"></span></span>",
                 cls = cls,
                 title = title,
                 name = escape(&p.name),
+                fn = escape(&fun.name),
             ));
         }
         s.push_str("</div>");
@@ -1750,7 +1751,8 @@ mod tests {
         assert!(add.params.iter().any(|p| p.name == "n" && p.inferred));
         let html = render_module_structure(&module, src);
         assert!(
-            html.contains("chip inferred") && html.contains(">n<"),
+            html.contains("chip inferred")
+                && (html.contains(">n<") || html.contains(r#"data-param-name="n""#)),
             "expected inferred chip for n: {html}"
         );
         let outline = render_function_outline(&module);

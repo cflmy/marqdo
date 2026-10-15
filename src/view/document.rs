@@ -633,6 +633,11 @@ fn render_fun_heading(fun: &Function, annots: &[ViewAnnot]) -> String {
     }
     s.push_str("</div>");
     if !fun.params.is_empty() {
+        // Default SSR values = last call frame (matches picker default = last option).
+        let default_args = call_labels
+            .last()
+            .map(|a| parse_args_brief(&a.value))
+            .unwrap_or_default();
         s.push_str(r#"<div class="params">"#);
         for p in &fun.params {
             let cls = if p.inferred {
@@ -645,17 +650,41 @@ fn render_fun_heading(fun: &Function, annots: &[ViewAnnot]) -> String {
             } else {
                 "explicit + param"
             };
+            let val = default_args
+                .get(p.name.as_str())
+                .filter(|v| !v.is_empty())
+                .map(|v| format!("={}", escape(v)))
+                .unwrap_or_default();
+            // Always emit chip-val so call-picker JS can refresh per frame.
             s.push_str(&format!(
-                r#"<span class="{cls}" title="{title}">{name}</span>"#,
+                r#"<span class="{cls}" data-param-name="{name}" data-fn="{fn}" title="{title}">{name}<span class="chip-val">{val}</span></span>"#,
                 cls = cls,
                 title = title,
                 name = escape(&p.name),
+                fn = escape(&fun.name),
+                val = val,
             ));
         }
         s.push_str("</div>");
     }
     s.push_str("</div>");
     s
+}
+
+/// Parse `args_brief` (`谁=marqdo, n=37`) into name → value.
+fn parse_args_brief(brief: &str) -> HashMap<String, String> {
+    let mut m = HashMap::new();
+    if brief.trim().is_empty() {
+        return m;
+    }
+    for part in brief.split(", ") {
+        if let Some((k, v)) = part.split_once('=') {
+            if !k.is_empty() {
+                m.insert(k.to_string(), v.to_string());
+            }
+        }
+    }
+    m
 }
 
 fn render_line_block(
@@ -1160,6 +1189,29 @@ mod tests {
             annots.iter().any(|a| a.kind == crate::view::annot::AnnotKind::Branch),
             "branch annot missing: {:?}",
             cap.view_trace
+        );
+    }
+
+    #[test]
+    fn inferred_param_chip_shows_call_value() {
+        let src = include_str!("../../tests/markup-v03/inc-prose.mq.md");
+        let module = crate::parse::parse_source(src).unwrap();
+        let add = module
+            .functions
+            .iter()
+            .find(|f| f.name == "加一函数")
+            .expect("加一函数");
+        assert!(add.params.iter().any(|p| p.name == "n" && p.inferred));
+        let cap = crate::run_source(src, &crate::RunOptions::default()).unwrap();
+        let annots = build_view_annots(&module, src, &cap);
+        let html = render_module_document(&module, src, &annots);
+        assert!(
+            html.contains(r#"data-param-name="n""#) && html.contains("chip inferred"),
+            "inferred param chip missing: {html}"
+        );
+        assert!(
+            html.contains(r#"class="chip-val">=37"#) || html.contains("chip-val\">=37"),
+            "expected param chip value from call frame: {html}"
         );
     }
 

@@ -593,6 +593,15 @@ ul.doc-loop, ol.doc-branch {
   font-size: 0.65em;
   opacity: 0.7;
 }
+.chip .chip-val {
+  font-weight: 500;
+  opacity: 0.78;
+  font-family: var(--mono);
+  font-size: 0.92em;
+}
+.chip .chip-val:empty {
+  display: none;
+}
 .nested {
   margin: 0.45rem 0 0.15rem 0.15rem;
   padding-left: 0.85rem;
@@ -2185,11 +2194,43 @@ pub fn layout(title: &str, nav: &str, main: &str) -> String {
     try {{ return JSON.parse(el.textContent || "{{}}"); }} catch (e) {{ return null; }}
   }}
 
+  function parseArgsBrief(brief) {{
+    var out = {{}};
+    if (!brief) return out;
+    String(brief).split(", ").forEach(function (part) {{
+      var i = part.indexOf("=");
+      if (i <= 0) return;
+      out[part.slice(0, i)] = part.slice(i + 1);
+    }});
+    return out;
+  }}
+
+  function applyParamChipValues(fnName, callId, trace) {{
+    if (!trace || !Array.isArray(trace.calls)) return;
+    var brief = "";
+    for (var i = 0; i < trace.calls.length; i++) {{
+      var c = trace.calls[i];
+      if (String(c.call_id) === String(callId) && String(c.fn || "") === String(fnName)) {{
+        brief = c.args_brief || "";
+        break;
+      }}
+    }}
+    var args = parseArgsBrief(brief);
+    document.querySelectorAll('.chip[data-fn="' + fnName + '"][data-param-name]').forEach(function (chip) {{
+      var name = chip.getAttribute("data-param-name") || "";
+      var slot = chip.querySelector(".chip-val");
+      if (!slot) return;
+      var v = args[name];
+      slot.textContent = v ? ("=" + v) : "";
+    }});
+  }}
+
   /** Source structure always stays visible; only chips + arm classes follow the frame. */
   function initCallPickers() {{
     document.querySelectorAll(".call-picker").forEach(function (sel) {{
       function apply() {{
         var callId = String(sel.value || "");
+        var fnName = String(sel.getAttribute("data-fn") || "");
         var allowed = {{}};
         Array.prototype.forEach.call(sel.options, function (o) {{
           allowed[String(o.value)] = true;
@@ -2202,6 +2243,7 @@ pub fn layout(title: &str, nav: &str, main: &str) -> String {
           chip.hidden = cid !== callId;
         }});
         var trace = readViewTrace();
+        applyParamChipValues(fnName, callId, trace);
         if (trace && Array.isArray(trace.events)) {{
           var takenByLine = {{}};
           trace.events.forEach(function (ev) {{
