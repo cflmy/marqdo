@@ -1440,25 +1440,26 @@ pub(crate) fn formula_ascii_to_tex_pub(ascii: &str) -> String {
     formula_ascii_to_tex(ascii)
 }
 
-/// Formula assign card for document surface embedding.
+/// Formula assign card for document surface embedding (single visual layer).
 pub(crate) fn render_formula_assign_card(name: &str, tex: &str) -> String {
     format!(
-        "<div class=\"card formula-card\"><span class=\"badge\">formula</span> \
-         <code class=\"expr\">`{}` =</code> \
-         <div class=\"math-block\">$${}$$</div></div>",
-        escape(name),
-        escape(tex),
+        r#"<div class="card formula-card" data-formula-name="{name}">
+  <div class="formula-head"><span class="badge">formula</span> <span class="formula-name">{name}</span></div>
+  <div class="math-block">$${tex}$$</div>
+</div>"#,
+        name = escape(name),
+        tex = escape(tex),
     )
 }
 
-/// Foreign code assign card for document surface embedding.
+/// Foreign code assign card for document surface embedding (single visual layer).
 pub(crate) fn render_code_assign_card(name: &str, lang: &str, source: &str) -> String {
     let placeholder = escape(&crate::foreign::default_cmd_display(lang));
     format!(
-        r#"<div class="card code-card" data-lang="{lang}">
+        r#"<div class="card code-card" data-lang="{lang}" data-code-name="{name}">
   <div class="code-head">
     <span class="badge">code</span>
-    <code class="expr">`{name}` =</code>
+    <span class="code-name">{name}</span>
     <span class="code-lang">{lang}</span>
     <div class="code-actions">
       <input type="text" class="code-cmd" placeholder="{placeholder}" spellcheck="false" autocomplete="off"/>

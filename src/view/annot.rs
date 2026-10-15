@@ -835,6 +835,73 @@ mod tests {
         );
     }
 
+
+    /// `# main` is the entry object; `##` children are methods. A `>` call under
+    /// `## 安装` belongs to that method — it does **not** run until something
+    /// calls `安装`. This is object semantics, not a parser failure.
+    #[test]
+    fn call_under_child_heading_does_not_auto_run() {
+        let src = r#"---
+title: t
+---
+
+# main
+
+## 安装
+
+> 问候 谁=a
+
+## 问候
+    + `谁`
+
+> print text=hi `谁`
+"#;
+        let module = crate::parse::parse_source(src).unwrap();
+        let main = &module.functions[0];
+        assert_eq!(main.name, "main");
+        let install = main.children.iter().find(|c| c.name == "安装").expect("安装");
+        let install_calls: Vec<_> = install
+            .body
+            .iter()
+            .filter_map(|s| match s {
+                crate::ast::Stmt::Call { call, .. } => Some(call.callee.as_str()),
+                _ => None,
+            })
+            .collect();
+        let main_calls: Vec<_> = main
+            .body
+            .iter()
+            .filter_map(|s| match s {
+                crate::ast::Stmt::Call { call, .. } => Some(call.callee.as_str()),
+                _ => None,
+            })
+            .collect();
+        assert!(main_calls.is_empty());
+        assert_eq!(install_calls, ["问候"]);
+        let cap = crate::run_source(src, &crate::RunOptions::default()).unwrap();
+        assert!(
+            cap.stdout.trim().is_empty(),
+            "entry does not auto-run ## 安装; stdout={:?}",
+            cap.stdout
+        );
+        assert!(
+            !cap.view_trace.calls.iter().any(|c| c.fn_name == "问候"),
+            "no CallFrame for 问候 when only nested under uncalled ## 安装"
+        );
+    }
+
+    #[test]
+    fn call_in_main_before_child_def_runs_like_nested_call() {
+        let src = include_str!("../../tests/structure/nested-call.mq.md");
+        let cap = crate::run_source(src, &crate::RunOptions::default()).unwrap();
+        assert!(cap.stdout.contains("Hello"), "{:?}", cap.stdout);
+        assert!(
+            cap.view_trace.calls.iter().any(|c| c.fn_name == "问候"),
+            "expected CallFrame for 问候: {:?}",
+            cap.view_trace.calls
+        );
+    }
+
     #[test]
     fn report_json_has_version() {
         let cap = RunCapture {

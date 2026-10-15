@@ -4,7 +4,7 @@
 |---|---|
 | 状态 | 已定 |
 | 日期 | 2026-08-04 |
-| 相关 | [view.md](view.md) · 源目录 [`public/`](../../public/) |
+| 相关 | [view.md](view.md) · [view-static-interactive.md](view-static-interactive.md)（静态交互 / 公式代码视觉 · Proposal） · 源目录 [`public/`](../../public/) |
 
 ---
 

@@ -23,7 +23,8 @@ pub fn render_module_document(module: &Module, source: &str, annots: &[ViewAnnot
     let lines = classify_source(source);
     let by_line = annots_by_line(annots);
     let fun_by_line = index_functions(module);
-    let special = index_special_assigns(module);
+    let special = index_special_assigns(module, source);
+    let skip_body = special_body_lines(&special);
     let stmt_lines = index_stmt_lines(module);
     let writebacks = writeback::writeback_map(source);
     let taken_arms = taken_arms_by_branch_line(annots);
@@ -74,6 +75,12 @@ pub fn render_module_document(module: &Module, source: &str, annots: &[ViewAnnot
     while i < lines.len() {
         let l = &lines[i];
         if l.line_no < body_start {
+            i += 1;
+            continue;
+        }
+        // Body lines of $$ / ``` already folded into formula/code cards.
+        if skip_body.contains(&l.line_no) {
+            flush_para(&mut para, &mut out);
             i += 1;
             continue;
         }
@@ -671,13 +678,14 @@ fn render_line_block(
     );
 
     match special {
-        Some(SpecialAssign::Formula { name, tex }) => {
+        Some(SpecialAssign::Formula { name, tex, .. }) => {
             s.push_str(&render_formula_assign_card(name, tex));
         }
         Some(SpecialAssign::Code {
             name,
             lang,
             source,
+            ..
         }) => {
             s.push_str(&render_code_assign_card(name, lang, source));
         }
@@ -716,13 +724,32 @@ fn render_line_block(
         ));
     }
 
-    if !annots.is_empty() {
-        let owned: Vec<ViewAnnot> = annots.iter().map(|a| (*a).clone()).collect();
-        s.push_str(&render_annot_band(&owned, MAX_VISIBLE_ANNOTS));
+    // Formula/code cards are the single visual truth — do not stack Bind chips
+    // (or fence/SVG dumps) underneath. Variables rail still has final values.
+    let band_annots: Vec<ViewAnnot> = if special.is_some() {
+        Vec::new()
+    } else {
+        annots
+            .iter()
+            .filter(|a| !is_noisy_result_chip(a))
+            .map(|a| (*a).clone())
+            .collect()
+    };
+    if !band_annots.is_empty() {
+        s.push_str(&render_annot_band(&band_annots, MAX_VISIBLE_ANNOTS));
     }
 
     s.push_str("</div>");
     s
+}
+
+/// Huge SVG / fenced code dumps make annot bands unreadable — keep those out of chips.
+fn is_noisy_result_chip(a: &ViewAnnot) -> bool {
+    if a.kind != crate::view::annot::AnnotKind::Bind {
+        return false;
+    }
+    let v = a.detail.as_str();
+    v.contains("<svg") || v.contains("```") || v.chars().count() > 96
 }
 
 /// Render prose with markers stripped; show surface inner text only.
@@ -792,8 +819,36 @@ fn match_annot_for_span<'a>(
 
 #[derive(Clone)]
 enum SpecialAssign {
-    Formula { name: String, tex: String },
-    Code { name: String, lang: String, source: String },
+    Formula {
+        name: String,
+        tex: String,
+        /// Last source line of the `$$ … $$` block (inclusive).
+        end_line: u32,
+    },
+    Code {
+        name: String,
+        lang: String,
+        source: String,
+        /// Last source line of the fenced block (inclusive).
+        end_line: u32,
+    },
+}
+
+fn special_body_lines(special: &HashMap<u32, SpecialAssign>) -> HashSet<u32> {
+    let mut s = HashSet::new();
+    for (start, sp) in special {
+        let end = match sp {
+            SpecialAssign::Formula { end_line, .. } | SpecialAssign::Code { end_line, .. } => {
+                *end_line
+            }
+        };
+        let mut ln = *start + 1;
+        while ln <= end {
+            s.insert(ln);
+            ln += 1;
+        }
+    }
+    s
 }
 
 fn index_functions(module: &Module) -> HashMap<u32, &Function> {
@@ -858,32 +913,33 @@ fn stmt_line(st: &Stmt) -> u32 {
     }
 }
 
-fn index_special_assigns(module: &Module) -> HashMap<u32, SpecialAssign> {
+fn index_special_assigns(module: &Module, source: &str) -> HashMap<u32, SpecialAssign> {
+    let src_lines: Vec<&str> = source.lines().collect();
     let mut m = HashMap::new();
-    fn walk(fun: &Function, m: &mut HashMap<u32, SpecialAssign>) {
+    fn walk(fun: &Function, m: &mut HashMap<u32, SpecialAssign>, src_lines: &[&str]) {
         for st in &fun.body {
-            record(st, m);
+            record(st, m, src_lines);
             match st {
                 Stmt::Branch { arms, .. } => {
                     for arm in arms {
                         for b in &arm.body {
-                            record(b, m);
+                            record(b, m, src_lines);
                         }
                     }
                 }
                 Stmt::While { body, .. } | Stmt::ForEach { body, .. } => {
                     for b in body {
-                        record(b, m);
+                        record(b, m, src_lines);
                     }
                 }
                 _ => {}
             }
         }
         for c in &fun.children {
-            walk(c, m);
+            walk(c, m, src_lines);
         }
     }
-    fn record(st: &Stmt, m: &mut HashMap<u32, SpecialAssign>) {
+    fn record(st: &Stmt, m: &mut HashMap<u32, SpecialAssign>, src_lines: &[&str]) {
         match st {
             Stmt::Assign {
                 name,
@@ -895,11 +951,13 @@ fn index_special_assigns(module: &Module) -> HashMap<u32, SpecialAssign> {
                     crate::formula::Expr::Matrix { source, .. } => source.clone(),
                     _ => crate::view::render::formula_ascii_to_tex_pub(&e.as_display()),
                 };
+                let end_line = fence_block_end(src_lines, span.line, "$$");
                 m.insert(
                     span.line,
                     SpecialAssign::Formula {
                         name: name.clone(),
                         tex,
+                        end_line,
                     },
                 );
             }
@@ -909,12 +967,14 @@ fn index_special_assigns(module: &Module) -> HashMap<u32, SpecialAssign> {
                 span,
                 ..
             } => {
+                let end_line = fence_block_end(src_lines, span.line, "```");
                 m.insert(
                     span.line,
                     SpecialAssign::Code {
                         name: name.clone(),
                         lang: c.lang.clone(),
                         source: c.source.clone(),
+                        end_line,
                     },
                 );
             }
@@ -922,9 +982,61 @@ fn index_special_assigns(module: &Module) -> HashMap<u32, SpecialAssign> {
         }
     }
     for f in &module.functions {
-        walk(f, &mut m);
+        walk(f, &mut m, &src_lines);
     }
     m
+}
+
+/// Inclusive end line of a `$$` / ` ``` ` block starting on or after `assign_line`.
+fn fence_block_end(src_lines: &[&str], assign_line: u32, fence: &str) -> u32 {
+    let start = assign_line as usize; // 1-based → index of next line candidate
+    if start == 0 || start > src_lines.len() {
+        return assign_line;
+    }
+    let mut i = start; // 0-based index of line after assign (assign_line is 1-based)
+    // Allow fence on the assign line itself after `=`.
+    let assign = src_lines.get(assign_line as usize - 1).copied().unwrap_or("");
+    if assign.contains(fence) && fence == "$$" {
+        // rare one-liner
+    }
+    let mut seen_open = false;
+    while i < src_lines.len() {
+        let t = src_lines[i].trim();
+        let line_no = (i + 1) as u32;
+        if !seen_open {
+            if t.starts_with(fence) {
+                seen_open = true;
+                if fence == "```" && t == "```" {
+                    // closing without open — stop
+                    return line_no;
+                }
+                // opening ```lang or $$
+                if fence == "$$" && t == "$$" {
+                    // look for closing $$
+                    i += 1;
+                    while i < src_lines.len() {
+                        let t2 = src_lines[i].trim();
+                        let ln = (i + 1) as u32;
+                        if t2 == "$$" {
+                            return ln;
+                        }
+                        i += 1;
+                    }
+                    return line_no;
+                }
+            } else if t.is_empty() {
+                i += 1;
+                continue;
+            } else {
+                // no fence body
+                return assign_line;
+            }
+        } else if fence == "```" && t.starts_with("```") {
+            return line_no;
+        }
+        i += 1;
+    }
+    assign_line
 }
 
 fn skip_frontmatter_end(lines: &[ClassifiedLine]) -> Option<u32> {
