@@ -3365,3 +3365,33 @@ fn markup_v03_decl_ident_only() {
 fn markup_v03_bold_expr() {
     assert_out_v03("tests/markup-v03/bold-expr.mq.md", "42");
 }
+
+#[test]
+fn markup_v03_formula_meta_var() {
+    assert_out_v03("tests/markup-v03/formula-meta-var.mq.md", "x^2 - 2");
+}
+
+#[test]
+fn markup_v03_inline_dollar_formula() {
+    assert_out_v03("tests/markup-v03/inline-dollar-formula.mq.md", "x + 1");
+}
+
+#[test]
+fn markup_v03_branch_arm_prose() {
+    assert_out_v03("tests/markup-v03/branch-arm-prose.mq.md", "正");
+}
+
+#[test]
+fn markup_v03_branch_cond_narrative() {
+    assert_out_v03("tests/markup-v03/branch-cond-narrative.mq.md", "正");
+}
+
+#[test]
+fn markup_v03_foreach_narrative() {
+    assert_out_v03("tests/markup-v03/foreach-narrative.mq.md", "a\nb\n1\n2");
+}
+
+#[test]
+fn markup_v03_foreach_nested_link() {
+    assert_out_v03("tests/markup-v03/foreach-nested-link.mq.md", "x\ny");
+}

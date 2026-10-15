@@ -19,10 +19,10 @@ Want a quick hello? Calls only run when they sit in the entry `# main` — `##` 
 
 Beyond the basics, Marqdo ships table, time, text, files, system, math, foreign, and more. Math and foreign deserve a special mention.
 
-Bind a formula to `f` like this:
+Write a math block and bind it with a TeX comment:
 
-`f` =
 $$
+% marqdo: var=f
 x^2 - 2
 $$
 

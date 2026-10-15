@@ -17,6 +17,8 @@
 
 代码即文档叙述面（G1–G4）：`module-hr` / `soft-emphasis` / `float-discount` / `dynamic-footnote` —— 设计见 [code-as-docs-gaps.md](../../doc/design/code-as-docs-gaps.md)。
 
+块公式 meta / 控制流叙述：`formula-meta-var` / `inline-dollar-formula` / `branch-arm-prose` / `branch-cond-narrative` / `foreach-narrative` / `foreach-nested-link` —— 见 [fence-meta-and-control-prose.md](../../doc/design/fence-meta-and-control-prose.md)。
+
 ```bash
 cargo test --test gold markup_v03
 marqdo run tests/markup-v03/inc-prose.mq.md

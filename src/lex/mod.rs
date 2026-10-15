@@ -279,7 +279,36 @@ fn breaks_comment_paragraph(trimmed: &str) -> bool {
     if trimmed.starts_with('#') || trimmed.starts_with('>') {
         return true;
     }
-    is_marqdo_star_line(trimmed)
+    if is_marqdo_star_line(trimmed) {
+        return true;
+    }
+    // Branch arms / loops / params must not be swallowed after prose in an arm body.
+    if looks_like_ordered_list_item(trimmed) {
+        return true;
+    }
+    if trimmed.starts_with("- ") || trimmed.starts_with("-\t") || trimmed == "-" {
+        return true;
+    }
+    if trimmed.starts_with('+') {
+        return true;
+    }
+    false
+}
+
+fn looks_like_ordered_list_item(trimmed: &str) -> bool {
+    let mut chars = trimmed.chars();
+    let mut saw_digit = false;
+    while let Some(c) = chars.next() {
+        if c.is_ascii_digit() {
+            saw_digit = true;
+            continue;
+        }
+        if c == '.' && saw_digit {
+            return true;
+        }
+        return false;
+    }
+    false
 }
 
 /// Classify a single logical line (no trailing newline required).
@@ -438,6 +467,26 @@ pub fn format_lines_dump(path: &str, lines: &[ClassifiedLine]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn ordered_arm_breaks_prose_paragraph() {
+        let src = "\
+# main\n\
+\n\
+1. `n` > 0\n\
+  此时我们 **打印 内容=\"正\"**\n\
+2. *\n\
+  否则 **打印 内容=\"非正\"**\n\
+";
+        let lines = classify_source(src);
+        let l12 = lines.iter().find(|l| l.text.trim() == "2. *").expect("2. *");
+        assert_eq!(
+            l12.kind,
+            LineKind::Code,
+            "else arm must stay Code after prose, got dump:\n{}",
+            format_lines_dump("t", &lines)
+        );
+    }
 
     #[test]
     fn blank_and_comment_and_code() {

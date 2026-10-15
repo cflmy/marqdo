@@ -114,7 +114,9 @@ printf '%s\n' '{"id":5,"method":"repair_targets","params":{"code":"contract.arg_
 | Lone `---` / `***` | Markdown thematic break (skip; not function end) |
 | GFM table after empty RHS bind | Collection; get with `[key](coll)` (preferred) or legacy `` `m`[^key] `` |
 | `- [item](coll)` | Foreach (unchanged) |
-| `` ```lang `` | Foreign code block (via `lib/foreign`) |
+| `` ```lang `` | Foreign code block (via `lib/foreign`); bind with `` `name` = `` then fence |
+| `$$` + `% marqdo: var=name` | Block formula bind (TeX comment; prefer over empty RHS) |
+| `- [item](coll)` | Foreach (**preferred**, nestable). Sugar: `- 对`coll`的每一项`item`` / `- for each `item` in `coll`` |
 | `` `"text"` `` | Quoted string (`\n` `\t` `\\` `\"`; `` `var` `` inside); bare tokens unescaped |
 | Unmarked prose | Comment |
 

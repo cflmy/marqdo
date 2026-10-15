@@ -358,6 +358,13 @@ impl<'a> Cursor<'a> {
                 continue;
             }
 
+            if self.peek_is_formula_fence() {
+                if let Some(stmt) = self.try_parse_meta_formula_assign()? {
+                    fun.body.push(stmt);
+                    continue;
+                }
+            }
+
             if is_ordered_branch(trimmed) {
                 fun.body.push(self.parse_branch()?);
                 continue;
@@ -405,9 +412,10 @@ impl<'a> Cursor<'a> {
         }
 
         if trimmed.starts_with("$$") {
+            // Standalone meta formulas are handled before parse_simple_stmt.
             bail!(
-                "{span}: formula fence must follow an empty assignment (`name` =); \
-                 `$$:name` binding was removed"
+                "{span}: formula fence must follow an empty assignment (`name` =) \
+                 or include `% marqdo: var=name` inside the block"
             );
         }
 
@@ -503,7 +511,7 @@ impl<'a> Cursor<'a> {
             if crate::aliases::is_reserved_keyword(&name) {
                 bail!("{span}: `{name}` is a reserved keyword");
             }
-            let (value, end_line) = self.resolve_assign_rhs(&rhs, span, true)?;
+            let (value, end_line) = self.resolve_assign_rhs(&name, &rhs, span, true)?;
             return Ok(Stmt::Assign {
                 name,
                 value,
@@ -544,7 +552,7 @@ impl<'a> Cursor<'a> {
         if crate::aliases::is_reserved_keyword(&name) {
             bail!("{span}: `{name}` is a reserved keyword");
         }
-        let (value, end_line) = self.resolve_assign_rhs(&rhs, span, true)?;
+        let (value, end_line) = self.resolve_assign_rhs(&name, &rhs, span, true)?;
         Ok(Stmt::Assign {
             name,
             value,
@@ -570,7 +578,7 @@ impl<'a> Cursor<'a> {
             return Ok(None);
         }
         let rhs = after[1..].trim().to_string();
-        let (value, end_line) = self.resolve_assign_rhs(&rhs, span, false)?;
+        let (value, end_line) = self.resolve_assign_rhs(&name, &rhs, span, false)?;
         Ok(Some(Stmt::Assign {
             name,
             value,
@@ -584,6 +592,7 @@ impl<'a> Cursor<'a> {
     /// `prefer_var`: italic RHS uses variable-preferring expression syntax.
     fn resolve_assign_rhs(
         &mut self,
+        assign_name: &str,
         rhs: &str,
         span: Span,
         prefer_var: bool,
@@ -592,7 +601,9 @@ impl<'a> Cursor<'a> {
         if rhs.is_empty() {
             self.skip_blanks();
             if self.peek_is_formula_fence() {
-                return self.consume_formula_fence(span);
+                let (expr, end_line, meta_var) = self.consume_formula_fence(span)?;
+                check_formula_meta_var(assign_name, meta_var.as_deref(), span)?;
+                return Ok((expr, end_line));
             }
             if self.peek_is_code_fence() {
                 return self.consume_code_fence(span);
@@ -698,7 +709,8 @@ impl<'a> Cursor<'a> {
         ))
     }
 
-    fn consume_formula_fence(&mut self, span: Span) -> Result<(Expr, u32)> {
+    /// Consume `$$…$$`. Returns `(expr, end_line, optional var from % marqdo: var=)`.
+    fn consume_formula_fence(&mut self, span: Span) -> Result<(Expr, u32, Option<String>)> {
         let open = self
             .bump()
             .ok_or_else(|| anyhow::anyhow!("{span}: expected `$$` formula fence"))?;
@@ -707,7 +719,7 @@ impl<'a> Cursor<'a> {
         if trimmed.starts_with("$$:") || trimmed.starts_with("$$ name=") {
             bail!(
                 "{open_line}:1: `$$:name` / `$$ name=` binding was removed; \
-                 use `name` = then a `$$…$$` fence"
+                 use `% marqdo: var=name` inside `$$…$$` or `name` = then a fence"
             );
         }
         // Single-line: $$body$$
@@ -716,15 +728,21 @@ impl<'a> Cursor<'a> {
             if body.is_empty() {
                 bail!("{open_line}:1: empty formula");
             }
+            let (meta_var, tex) = strip_formula_marqdo_meta(body)
+                .map_err(|e| anyhow::anyhow!("{open_line}:1: {e}"))?;
+            if tex.is_empty() {
+                bail!("{open_line}:1: empty formula");
+            }
             return Ok((
-                formula_fence_to_expr(body)
+                formula_fence_to_expr(&tex)
                     .map_err(|e| anyhow::anyhow!("{open_line}:1: formula: {e}"))?,
                 open_line,
+                meta_var,
             ));
         }
         if trimmed != "$$" {
             bail!(
-                "{open_line}:1: expected `$$` fence opener after empty assignment, got: {trimmed}"
+                "{open_line}:1: expected `$$` fence opener, got: {trimmed}"
             );
         }
         let mut body_lines: Vec<String> = Vec::new();
@@ -743,13 +761,45 @@ impl<'a> Cursor<'a> {
         if !closed {
             bail!("{open_line}:1: unclosed formula fence `$$`");
         }
-        let text = body_lines.join("\n").trim().to_string();
-        if text.is_empty() {
+        let raw = body_lines.join("\n");
+        let (meta_var, tex) = strip_formula_marqdo_meta(&raw)
+            .map_err(|e| anyhow::anyhow!("{open_line}:1: {e}"))?;
+        if tex.is_empty() {
             bail!("{open_line}:1: empty formula");
         }
-        let expr = formula_fence_to_expr(&text)
+        let expr = formula_fence_to_expr(&tex)
             .map_err(|e| anyhow::anyhow!("{open_line}:1: formula: {e}"))?;
-        Ok((expr, end_line))
+        Ok((expr, end_line, meta_var))
+    }
+
+    /// Standalone `$$` with `% marqdo: var=` → Assign (no empty RHS required).
+    fn try_parse_meta_formula_assign(&mut self) -> Result<Option<Stmt>> {
+        if !self.peek_is_formula_fence() {
+            return Ok(None);
+        }
+        let Some(l) = self.peek() else {
+            return Ok(None);
+        };
+        let span = Span {
+            line: l.line_no,
+            col: 1,
+        };
+        let (value, end_line, meta_var) = self.consume_formula_fence(span)?;
+        let Some(name) = meta_var else {
+            bail!(
+                "{span}: formula fence must follow an empty assignment (`name` =) \
+                 or include `% marqdo: var=name` inside the block"
+            );
+        };
+        if crate::aliases::is_reserved_keyword(&name) {
+            bail!("{span}: `{name}` is a reserved keyword");
+        }
+        Ok(Some(Stmt::Assign {
+            name,
+            value,
+            span,
+            end_line,
+        }))
     }
 
     /// GFM table after empty RHS:
@@ -878,11 +928,7 @@ impl<'a> Cursor<'a> {
             let cond_src = strip_ordered(trimmed).unwrap();
             self.bump();
 
-            let condition = if cond_src == "*" || cond_src.is_empty() {
-                None
-            } else {
-                Some(parse_expr_str(cond_src)?)
-            };
+            let condition = parse_branch_condition(cond_src)?;
 
             let body = self.parse_indented_body(base_indent)?;
             arms.push(BranchArm { condition, body });
@@ -904,8 +950,10 @@ impl<'a> Cursor<'a> {
         let trimmed = line.text.trim();
         let rest = trimmed.strip_prefix('-').unwrap().trim();
 
-        // foreach: [item](collection)
-        if let Some((item, coll)) = parse_foreach_header(rest) {
+        // foreach: [item](collection) or narrative sugar
+        if let Some((item, coll)) = parse_foreach_header(rest)
+            .or_else(|| parse_foreach_narrative(rest))
+        {
             let body = self.parse_indented_body(base_indent)?;
             return Ok(Stmt::ForEach {
                 item,
@@ -931,7 +979,7 @@ impl<'a> Cursor<'a> {
             let Some(l) = self.peek() else { break };
             let ind = indent_of(&l.text);
             if ind <= parent_indent {
-                // Same-indent `+`/`-` ends body (next arm / sibling).
+                // Same-indent `2.` / `-` ends body (next arm / sibling).
                 break;
             }
             let trimmed = l.text.trim();
@@ -950,6 +998,39 @@ impl<'a> Cursor<'a> {
             if trimmed.starts_with('-') {
                 body.push(self.parse_loop_or_err()?);
                 continue;
+            }
+            // Same prose rights as function body (fixes arm/loop narrative escape).
+            if self.peek_is_prose() {
+                let line = self.bump().unwrap();
+                let span = Span {
+                    line: line.line_no,
+                    col: 1,
+                };
+                let bits = scan_prose_line(line.text.trim_end_matches(['\r', '\n']));
+                let mut end_arm = false;
+                for bit in bits {
+                    match bit {
+                        ProseBit::Decl { .. } => {}
+                        ProseBit::BoldCode { inner, .. } => {
+                            body.push(self.stmt_from_bold_inner(&inner, span.clone())?);
+                        }
+                        ProseBit::ItalicReturn { inner, .. } => {
+                            body.push(stmt_from_italic_return(&inner, span.clone())?);
+                            end_arm = true;
+                            break;
+                        }
+                    }
+                }
+                if end_arm {
+                    break;
+                }
+                continue;
+            }
+            if self.peek_is_formula_fence() {
+                if let Some(stmt) = self.try_parse_meta_formula_assign()? {
+                    body.push(stmt);
+                    continue;
+                }
             }
             let stmt = self.parse_simple_stmt()?;
             let end_arm = matches!(stmt, Stmt::Return { .. });
@@ -998,26 +1079,101 @@ fn is_bare_assign_ident(s: &str) -> bool {
     true
 }
 
-/// Same-line `$$body$$` → Formula or numeric matrix List; otherwise None.
+/// Same-line `$$body$$` or `$body$` → Formula; otherwise None.
 fn try_parse_inline_formula(rhs: &str) -> Result<Option<Expr>> {
     let rhs = rhs.trim();
-    if !rhs.starts_with("$$") {
-        return Ok(None);
-    }
     if rhs.starts_with("$$:") || rhs.starts_with("$$ name=") {
         bail!(
-            "`$$:name` / `$$ name=` binding was removed; use `name` = then a `$$…$$` fence"
+            "`$$:name` / `$$ name=` binding was removed; use `% marqdo: var=name` \
+             inside `$$…$$` or `name` = then a fence"
         );
     }
-    if rhs.ends_with("$$") && rhs.len() > 4 {
-        let body = rhs[2..rhs.len() - 2].trim();
+    if rhs.starts_with("$$") {
+        if rhs.ends_with("$$") && rhs.len() > 4 {
+            let body = rhs[2..rhs.len() - 2].trim();
+            if body.is_empty() {
+                bail!("empty formula");
+            }
+            let (_meta, tex) = strip_formula_marqdo_meta(body)
+                .map_err(|e| anyhow::anyhow!("{e}"))?;
+            if tex.is_empty() {
+                bail!("empty formula");
+            }
+            let expr = formula_fence_to_expr(&tex).map_err(|e| anyhow::anyhow!("formula: {e}"))?;
+            return Ok(Some(expr));
+        }
+        bail!("incomplete inline formula (expected `$$…$$` on one line)");
+    }
+    // Traditional inline: $…$ (not $$)
+    if rhs.starts_with('$') && rhs.ends_with('$') && rhs.len() > 2 && !rhs.starts_with("$$") {
+        let body = rhs[1..rhs.len() - 1].trim();
         if body.is_empty() {
             bail!("empty formula");
+        }
+        if body.contains('%') && body.to_lowercase().contains("marqdo:") {
+            bail!(
+                "inline `$…$` must not use `% marqdo:` (breaks Markdown/TeX); \
+                 bind with `name` = $…$ or use a `$$` block with `% marqdo: var=`"
+            );
         }
         let expr = formula_fence_to_expr(body).map_err(|e| anyhow::anyhow!("formula: {e}"))?;
         return Ok(Some(expr));
     }
-    bail!("incomplete inline formula (expected `$$…$$` on one line)");
+    Ok(None)
+}
+
+/// Strip `% marqdo: var=name` directive lines from formula fence body.
+/// Returns `(optional var name, remaining TeX)`.
+fn strip_formula_marqdo_meta(body: &str) -> Result<(Option<String>, String), String> {
+    let mut meta_var: Option<String> = None;
+    let mut out: Vec<&str> = Vec::new();
+    for line in body.lines() {
+        let t = line.trim();
+        if let Some(rest) = t.strip_prefix('%') {
+            let rest = rest.trim_start();
+            if rest.to_ascii_lowercase().starts_with("marqdo:") {
+                let after = rest["marqdo:".len()..].trim_start();
+                let mut got_var = false;
+                for part in after.split_whitespace() {
+                    if let Some(v) = part.strip_prefix("var=") {
+                        if v.is_empty() {
+                            return Err("% marqdo: var= requires a name".into());
+                        }
+                        if !is_bare_assign_ident(v) {
+                            return Err(format!("invalid marqdo var name `{v}`"));
+                        }
+                        if meta_var.as_deref() == Some(v) || meta_var.is_none() {
+                            meta_var = Some(v.to_string());
+                        } else {
+                            return Err(format!(
+                                "conflicting % marqdo: var= ({} vs {v})",
+                                meta_var.as_deref().unwrap_or("")
+                            ));
+                        }
+                        got_var = true;
+                    } else {
+                        return Err(format!("unknown marqdo key `{part}` (only var= is supported)"));
+                    }
+                }
+                if !got_var {
+                    return Err("% marqdo: requires var=<name>".into());
+                }
+                continue; // strip directive line
+            }
+        }
+        out.push(line);
+    }
+    Ok((meta_var, out.join("\n").trim().to_string()))
+}
+
+fn check_formula_meta_var(assign_name: &str, meta: Option<&str>, span: Span) -> Result<()> {
+    match meta {
+        None => Ok(()),
+        Some(v) if v == assign_name => Ok(()),
+        Some(v) => bail!(
+            "{span}: formula `% marqdo: var={v}` conflicts with assignment `{assign_name}`"
+        ),
+    }
 }
 
 fn formula_fence_to_expr(body: &str) -> Result<Expr, String> {
@@ -1110,6 +1266,148 @@ fn parse_foreach_header(rest: &str) -> Option<(String, String)> {
     }
     let coll = parse_foreach_ident(&after[1..after.len() - 1])?;
     Some((item, coll))
+}
+
+/// Narrative foreach sugar (recommended remains `- [item](coll)`).
+/// - ZH: `对`xs`的每一项`项`` optional `遍历`
+/// - EN: `for each `item` in `xs``
+fn parse_foreach_narrative(rest: &str) -> Option<(String, String)> {
+    let rest = rest.trim();
+    if let Some(after) = rest.strip_prefix('对') {
+        let (coll, after) = take_backtick_token(after.trim_start())?;
+        let after = after.trim_start().strip_prefix("的每一项")?;
+        let (item, after) = take_backtick_token(after.trim_start())?;
+        let after = after
+            .trim()
+            .trim_end_matches('。')
+            .trim();
+        let after = after.strip_prefix("遍历").unwrap_or(after).trim();
+        if after.is_empty() {
+            return Some((item, coll));
+        }
+        return None;
+    }
+    let lower = rest.to_ascii_lowercase();
+    let Some(idx) = lower.find("for each ") else {
+        return None;
+    };
+    if idx != 0 {
+        return None;
+    }
+    let after = rest["for each ".len()..].trim_start();
+    let (item, after) = take_backtick_token(after)?;
+    let after = after.trim_start();
+    let after_l = after.to_ascii_lowercase();
+    if !after_l.starts_with("in ") && !after_l.starts_with("in\t") {
+        // require ` in `
+        let Some(in_at) = after_l.find("in ") else {
+            return None;
+        };
+        if in_at != 0 {
+            return None;
+        }
+    }
+    let after = after["in ".len()..].trim_start();
+    let (coll, after) = take_backtick_token(after)?;
+    if after.trim().is_empty() {
+        return Some((item, coll));
+    }
+    None
+}
+
+fn take_backtick_token(s: &str) -> Option<(String, &str)> {
+    let s = s.trim_start();
+    if !s.starts_with('`') {
+        return None;
+    }
+    let end = s[1..].find('`')?;
+    let name = s[1..1 + end].to_string();
+    if name.is_empty() {
+        return None;
+    }
+    Some((name, &s[1 + end + 1..]))
+}
+
+/// Branch arm condition: expr, bold code, narrative (当`n`大于 0 时), or else `*`.
+fn parse_branch_condition(cond_src: &str) -> Result<Option<Expr>> {
+    let t = cond_src.trim();
+    if t.is_empty() || t == "*" {
+        return Ok(None);
+    }
+    // "否则 *" / "else *"
+    if let Some(before) = t.strip_suffix('*') {
+        let before = before.trim();
+        if before.is_empty()
+            || before == "否则"
+            || before == "其它"
+            || before == "其他"
+            || before.eq_ignore_ascii_case("else")
+            || before.eq_ignore_ascii_case("otherwise")
+        {
+            return Ok(None);
+        }
+    }
+    if let Ok(e) = parse_expr_str(t) {
+        return Ok(Some(e));
+    }
+    if let Some(inner) = extract_first_bold_inner(t) {
+        if let Ok(e) = parse_expr_str(inner.trim()) {
+            return Ok(Some(e));
+        }
+    }
+    if let Some(e) = try_narrative_condition(t) {
+        return Ok(Some(e));
+    }
+    bail!(
+        "branch condition: cannot parse `{t}` \
+         (use an expression, **`n` > 0**, or 当`n`大于 0 时)"
+    )
+}
+
+fn extract_first_bold_inner(s: &str) -> Option<&str> {
+    let start = s.find("**")?;
+    let rest = &s[start + 2..];
+    let end = rest.find("**")?;
+    Some(&rest[..end])
+}
+
+fn try_narrative_condition(s: &str) -> Option<Expr> {
+    let mut s = s.trim();
+    for p in ["当且仅当", "当", "若", "如果"] {
+        if let Some(r) = s.strip_prefix(p) {
+            s = r.trim_start();
+            break;
+        }
+    }
+    let lower = s.to_ascii_lowercase();
+    if let Some(r) = lower.strip_prefix("when ") {
+        let _ = r;
+        s = s[5..].trim_start();
+    } else if let Some(r) = lower.strip_prefix("if ") {
+        let _ = r;
+        s = s[3..].trim_start();
+    }
+    for suf in ["的话", "时", "则"] {
+        if let Some(r) = s.strip_suffix(suf) {
+            s = r.trim_end();
+        }
+    }
+    let mut mapped = s.to_string();
+    let replacements = [
+        ("大于等于", ">="),
+        ("小于等于", "<="),
+        ("不等于", "!="),
+        ("等于", "=="),
+        ("大于", ">"),
+        ("小于", "<"),
+    ];
+    for (zh, op) in replacements {
+        if mapped.contains(zh) {
+            mapped = mapped.replace(zh, op);
+            break;
+        }
+    }
+    parse_expr_str(mapped.trim()).ok()
 }
 
 fn parse_heading(trimmed: &str) -> Option<(u8, &str)> {
@@ -1881,6 +2179,89 @@ fn split_table_row(line: &str) -> Vec<String> {
 mod tests {
     use super::*;
     use crate::ast::Stmt;
+
+    #[test]
+    fn parse_formula_meta_var_standalone() {
+        let src = "# main\n\n$$\n% marqdo: var=f\nx^2 - 2\n$$\n";
+        let m = parse_source(src).unwrap();
+        match &m.functions[0].body[0] {
+            Stmt::Assign { name, value, .. } => {
+                assert_eq!(name, "f");
+                assert!(matches!(value, Expr::Formula(_)));
+            }
+            other => panic!("expected formula assign, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn parse_formula_meta_conflicts_with_assign() {
+        let src = "# main\n\n`f` =\n$$\n% marqdo: var=g\nx\n$$\n";
+        let err = parse_source(src).unwrap_err().to_string();
+        assert!(
+            err.contains("conflicts") || err.contains("var=g"),
+            "{err}"
+        );
+    }
+
+    #[test]
+    fn parse_foreach_narrative_zh_en() {
+        let src = "# main\n\n- 对`xs`的每一项`项`\n  > print text=`项`\n\n- for each `item` in `ys`\n  > print text=`item`\n";
+        let m = parse_source(src).unwrap();
+        match &m.functions[0].body[0] {
+            Stmt::ForEach { item, collection, .. } => {
+                assert_eq!(item, "项");
+                assert_eq!(collection, "xs");
+            }
+            other => panic!("zh foreach: {other:?}"),
+        }
+        match &m.functions[0].body[1] {
+            Stmt::ForEach { item, collection, .. } => {
+                assert_eq!(item, "item");
+                assert_eq!(collection, "ys");
+            }
+            other => panic!("en foreach: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn branch_arm_prose_stays_inside_arm() {
+        let src = include_str!("../../tests/markup-v03/branch-arm-prose.mq.md");
+        let m = parse_source(src).unwrap();
+        let main = &m.functions[0];
+        let branches: Vec<_> = main
+            .body
+            .iter()
+            .filter(|s| matches!(s, Stmt::Branch { .. }))
+            .collect();
+        assert_eq!(
+            branches.len(),
+            1,
+            "expected one Branch, body={:?}",
+            main.body
+        );
+        match &main.body[1] {
+            Stmt::Branch { arms, .. } => {
+                assert_eq!(arms.len(), 2, "arms={arms:?}");
+                assert!(
+                    !arms[0].body.is_empty(),
+                    "then arm must contain prose stmts: {:?}",
+                    arms[0].body
+                );
+                assert!(
+                    !arms[1].body.is_empty(),
+                    "else arm must contain prose stmts: {:?}",
+                    arms[1].body
+                );
+            }
+            other => panic!("expected Branch as body[1] after assign, got {other:?}"),
+        }
+        // No Call/Assign print siblings after the branch
+        assert!(
+            !main.body.iter().skip(2).any(|s| matches!(s, Stmt::Call { .. } | Stmt::Assign { .. })),
+            "prose escaped branch: {:?}",
+            main.body
+        );
+    }
 
     #[test]
     fn parse_hello() {

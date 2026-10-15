@@ -215,7 +215,9 @@ v0.3：
 | 表达式 `[键](集合)` | **取元**（与 foreach 同形；见 [collection-access-link.md](collection-access-link.md)） |
 | `修饰… [函数名] 实参…` | **方括号标记调用**（前置修饰 → `名=True`；见 [bracket-call-modifiers.md](bracket-call-modifiers.md)） |
 | `` 集合[^键] `` | **过渡**：旧脚注取元（仍可用） |
-| ` ```lang ` | 外联（不变） |
+| ` ```lang ` | 外联（不变；绑定仍用 `` `名` = `` + 围栏） |
+| `$$` 内 `% marqdo: var=名` | 块公式绑定（[fence-meta-and-control-prose.md](fence-meta-and-control-prose.md)） |
+| `- 对`集`的每一项`项`` / `for each` | foreach 叙述糖；推荐 `- [项](集)` |
 | 单独一行 `---` / `***` | **叙述分隔**（跳过；模块顶与函数体内相同） |
 | 整行恰 `**` 或 `****` / `*None*` / `*无*` | **空返回**并结束本函数体（见 §7.2） |
 
