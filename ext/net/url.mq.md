@@ -1,9 +1,10 @@
 ---
 title: ext/net/url
-description: URL helpers (stdlib host wrappers). ADR 0007.
+description: URL helpers (stdlib wrappers). ADR 0007.
+import net:lib/net.mq.md
 ---
 
 ## encode
     + `text`
 
-*> host_url_encode text=`text`*
+*> net.url_encode text=`text`*
