@@ -126,6 +126,8 @@ jobs:
             ## Marqdo ${{ github.ref_name }}
 
             ### 亮点 / Highlights
+            - **v1.4.0**：叙述统一——`% marqdo: var=` · 臂/循环体叙述 · foreach 中英糖 · 图片自写回 · view 推断形参
+            - **v1.4.0**: Prose-unified control flow — formula meta bind, arm/loop narrative, foreach sugar, image writeback, inferred-param view
             - **v1.3.3**：view 文档面 Structure——叙述保真 · 标记面 · 调用/循环帧 · `#mq-view-trace` · 静态站同源
             - **v1.3.3**: Browse document-surface Structure — narration, markers, call/loop frames, `#mq-view-trace`, static site parity
             - **v1.3.0**：Engineering Knowledge Compiler——L0–L4 · `reuse`/`find`/`duplicate` · Agent preflight（REUSE→ADAPT→CREATE）

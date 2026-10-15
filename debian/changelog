@@ -1,3 +1,11 @@
+marqdo (1.4.0-1ppa1) noble; urgency=medium
+
+  * Marqdo 1.4.0: Prose-unified control flow — block formula % marqdo: var=,
+    arm/loop narrative + foreach sugar, image writeback ![marqdo-out](...),
+    view inferred-param values; welcome pages on v0.3 prose surface.
+
+ -- cflmy <pingan@cflmy.cn>  Wed, 15 Oct 2026 15:53:00 +0800
+
 marqdo (1.3.3-1ppa1) noble; urgency=medium
 
   * Marqdo 1.3.3: Browse document-surface Structure — narration-preserving

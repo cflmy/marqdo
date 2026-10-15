@@ -8,6 +8,37 @@
 
 ### Changed
 
+## v1.4.0 — 2026-10-15
+
+### Highlights
+
+**叙述统一 + 公式 meta + 图片自写回**：块公式 `% marqdo: var=`；分支/循环体与函数体同权叙述；foreach 中英糖；自写回图片 `![marqdo-out](…)`（扩展名校验）与 view/静态站同源标记；view 展示推断形参实值；欢迎页迁到 v0.3 叙述面。
+
+```bash
+git checkout v1.4.0 && cargo build --release
+marqdo run tests/markup-v03/formula-meta-var.mq.md
+marqdo run tests/markup-v03/foreach-narrative.mq.md
+marqdo view tests/view/document-annot-demo.mq.md --no-open
+# Ubuntu: sudo apt update && sudo apt install marqdo
+marqdo ext add web   # CDN latest → 1.4.0
+```
+
+**核心表面 Δ（Core surface Δ）**：**无增删**——19 个核心构造不变。Language 层在既有 `formula` / `branch-list` / `loop-list` 上扩展语义（块公式 TeX 注释绑定、臂/循环体叙述、foreach 糖）；Runtime：自写回图片形态 + view 推断形参展示。设计：[fence-meta-and-control-prose.md](doc/design/fence-meta-and-control-prose.md) · [stdlib-writeback.md](doc/design/stdlib-writeback.md)。
+
+### Added
+- **块公式 meta 绑定**：`$$` 内 `% marqdo: var=<ident>`（剥离后解析；可无空 RHS）；金样 `tests/markup-v03/formula-meta-var.mq.md`。
+- **控制流叙述统一**：臂/循环体 `parse_indented_body` 与函数体同权；分支条件行支持叙述前缀与行内 `**…**`；foreach 糖 `- 对…的每一项…` / `- for each … in …`。
+- **图片自写回**：路径/URL 且扩展名合法 → `![marqdo-out](…)`；文本仍 HTML 注释；view / `view output` 同源样式卡与 `<img>`。
+- **view 推断形参实值**：Browse 展示 body-inferred 参数绑定值；欢迎页 EN/ZH 迁 v0.3 叙述。
+
+### Fixed
+- `ext/net/url.encode`：经 `lib/net` 包装，不再直接 `host_*`（金样 `ext_mq_md_never_calls_host`）。
+- PPA 源包：`ppa-build-source.sh` 本地 `.orig` 已在 build-area 时跳过重复 `cp`。
+- view：嵌套调用欢迎页与公式/代码卡渲染清理。
+
+### Changed
+- CLI / wasm / `ext/VERSION` **同步 1.4.0**；词法评论段遇有序分支臂 / 循环头 / 图片自写回标记时断开，避免吞掉控制流行。
+
 ## v1.3.3 — 2026-10-15
 
 ### Highlights
