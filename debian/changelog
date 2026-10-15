@@ -1,3 +1,10 @@
+marqdo (1.4.1-1ppa1) noble; urgency=medium
+
+  * Marqdo 1.4.1: View annot leaders — SVG mid-to-mid (mark bottom-center
+    to chip top-center), unify frame chip ids, L-to-R chip density.
+
+ -- cflmy <pingan@cflmy.cn>  Thu, 15 Oct 2026 20:40:00 +0800
+
 marqdo (1.4.0-1ppa1) noble; urgency=medium
 
   * Marqdo 1.4.0: Prose-unified control flow — block formula % marqdo: var=,

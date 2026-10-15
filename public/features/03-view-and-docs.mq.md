@@ -5,7 +5,7 @@ description: Local browse and static export from the interpreter
 
 # main
 
-Milestone: `marqdo view` and `view output` (v1.4.0 document surface + inferred params).
+Milestone: `marqdo view` and `view output` (v1.4.1 mid→mid annot leaders + document surface).
 
 Local: `marqdo view public`
 

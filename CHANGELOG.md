@@ -8,6 +8,32 @@
 
 ### Changed
 
+## v1.4.1 — 2026-10-15
+
+### Highlights
+
+**view 叙述标注连线**：Browse / `view output` 中 underline→chip 改为 SVG 正交连线（描述底边中点 → 轨道 → 短竖线 → 值顶边中点）；同跨度多帧 chip 共用 annot id；可见 chip 按锚点 L→R；帧切换后重算密度。设计：[view-prose-annot-gaps.md](doc/design/view-prose-annot-gaps.md)。
+
+```bash
+git checkout v1.4.1 && cargo build --release
+marqdo view public/00-welcome.mq.md --no-open
+marqdo view output public -o /tmp/mq-public
+# Ubuntu: sudo apt update && sudo apt install marqdo
+marqdo ext add web   # CDN latest → 1.4.1
+```
+
+**核心表面 Δ（Core surface Δ）**：**无增删**——19 个核心构造不变。本版为 **Runtime / Tooling**（view 标注几何与帧 chip 对齐），不触碰语言标记。
+
+### Added
+- 设计缺口文档 [view-prose-annot-gaps.md](doc/design/view-prose-annot-gaps.md)：叙述 fence 卡、帧感知 chip 密度、L-leader 几何约定。
+
+### Fixed
+- view L-leader：id 与 mark 错配、chip 逆序交叉、border 无色变黑碎段、横线穿过 chip 文字；现为 mid→mid SVG path。
+- 叙述 fence / 代码卡单层渲染；静态页隐藏 Run；主文函数引用 call chip + leader。
+
+### Changed
+- CLI / wasm / `ext/VERSION` **同步 1.4.1**。
+
 ## v1.4.0 — 2026-10-15
 
 ### Highlights

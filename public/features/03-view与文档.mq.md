@@ -5,7 +5,7 @@ description: 本地浏览与静态导出由解释器生成
 
 # main
 
-里程碑：`marqdo view` 与 `view output`（v1.4.0 文档面 + 推断形参）。
+里程碑：`marqdo view` 与 `view output`（v1.4.1 mid→mid 标注连线 + 文档面）。
 
 本地浏览：`marqdo view public`
 
