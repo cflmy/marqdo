@@ -330,6 +330,234 @@ section.block > h2 {
   background: transparent;
   padding-left: calc(1.1rem - 2px);
 }
+/* Document surface (Browse Structure) */
+.document-surface {
+  padding: 0.5rem 1rem 1.25rem;
+  color: var(--ink);
+  line-height: 1.55;
+}
+.doc-imports { margin: 0 0 0.85rem; }
+.doc-fun {
+  margin: 1.1rem 0 0.65rem;
+  padding-bottom: 0.35rem;
+  border-bottom: 1px solid var(--line);
+}
+.doc-fun-title {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+.doc-fun-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1rem;
+}
+.call-picker-label {
+  font-size: 0.78rem;
+  color: var(--muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+.call-picker, .loop-picker {
+  font-size: 0.78rem;
+  padding: 0.2rem 0.4rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink);
+}
+.loop-picker-label {
+  font-size: 0.78rem;
+  color: var(--muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+li.doc-list-meta {
+  list-style: none;
+  margin: 0.25rem 0 0.5rem;
+  margin-left: -1.25rem;
+}
+.doc-block { position: relative; margin: 0.55rem 0 0.85rem; }
+.doc-block.doc-exec[style*="--doc-indent"] {
+  margin-left: calc(var(--doc-indent, 1) * 1.5rem);
+}
+.doc-prose { color: var(--ink); }
+.doc-prose > :first-child { margin-top: 0; }
+.doc-prose > :last-child { margin-bottom: 0; }
+.doc-line { margin: 0.15rem 0; }
+.doc-prose-line { white-space: pre-wrap; }
+.doc-stmt, .doc-call, .doc-cond {
+  font-family: var(--mono);
+  font-size: 0.92em;
+}
+.mq-call-gt { color: var(--muted); margin-right: 0.25rem; }
+.mq-else { font-family: var(--mono); color: var(--muted); font-style: italic; }
+.doc-table-wrap { overflow-x: auto; }
+.doc-table {
+  border-collapse: collapse;
+  width: auto;
+  min-width: 12rem;
+  font-size: 0.92rem;
+  margin: 0.35rem 0;
+}
+.doc-table th, .doc-table td {
+  border: 1px solid var(--line);
+  padding: 0.35rem 0.7rem;
+  text-align: left;
+}
+.doc-table th {
+  background: var(--fill);
+  font-weight: 600;
+}
+ul.doc-loop, ol.doc-branch {
+  margin: 0.5rem 0 0.75rem;
+  padding-left: calc(var(--doc-indent, 1) * 1.5rem + 1.25rem);
+}
+.doc-list-item { margin: 0.45rem 0; }
+.doc-list-head { font-family: var(--mono); font-size: 0.92em; }
+.doc-list-body {
+  margin: 0.35rem 0 0.2rem;
+  padding-left: 1.5rem;
+  border-left: 2px solid var(--line);
+}
+.doc-list-item.arm-taken {
+  border-left: 3px solid #bf5af2;
+  padding-left: 0.55rem;
+  margin-left: -0.15rem;
+}
+.doc-list-item.arm-taken > .doc-list-head { font-weight: 600; }
+.doc-list-item.arm-miss { opacity: 0.45; }
+.doc-code {
+  font-family: var(--mono);
+  font-size: 0.9em;
+  white-space: pre-wrap;
+}
+.mq-anchor {
+  background: transparent;
+  color: inherit;
+  padding: 0 0.05em;
+  border-radius: 0;
+  border-bottom: 2px solid var(--line-strong);
+  font-style: normal;
+  font-weight: inherit;
+  cursor: default;
+}
+.mq-anchor.mq-decl {
+  border-bottom-color: #5ac8fa;
+  font-family: var(--mono);
+  font-size: 0.95em;
+}
+.mq-anchor.mq-code {
+  border-bottom-color: #ff9f0a;
+  font-family: var(--mono);
+  font-size: 0.95em;
+  font-weight: 600;
+}
+.mq-anchor.mq-return {
+  border-bottom-color: #30d158;
+  font-family: var(--mono);
+  font-size: 0.95em;
+  font-style: italic;
+}
+.mq-anchor.is-focus { background: rgba(0,0,0,0.04); }
+.annot-band {
+  position: relative;
+  margin: 0.35rem 0 0.15rem;
+  min-height: 1.6rem;
+  padding-top: 0.55rem;
+}
+.annot-leaders {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: visible;
+}
+.annot-leader {
+  position: absolute;
+  box-sizing: border-box;
+  border-left: 1.5px solid var(--line-strong);
+  border-bottom: 1.5px solid var(--line-strong);
+  border-color: #8e8e93;
+  pointer-events: none;
+}
+.annot-leader.annot-bind { border-color: #5ac8fa; }
+.annot-leader.annot-return { border-color: #30d158; }
+.annot-leader.annot-code,
+.annot-leader.annot-call,
+.annot-leader.annot-expr { border-color: #ff9f0a; }
+.annot-leader.annot-branch { border-color: #bf5af2; }
+.annot-leader.annot-loop { border-color: #64d2ff; }
+.annot-leader.annot-writeback { border-color: #8e8e93; }
+.annot-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 0.55rem;
+  position: relative;
+  z-index: 1;
+}
+.annot-chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  max-width: 100%;
+  margin: 0;
+  padding: 0.22rem 0.5rem;
+  border: 1px solid var(--line);
+  border-left-width: 3px;
+  border-radius: 8px;
+  background: var(--fill);
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  cursor: pointer;
+  text-align: left;
+}
+/* Author `display:inline-flex` must not defeat frame filtering. */
+.annot-chip[hidden],
+.annot-chip.is-frame-hidden {
+  display: none !important;
+}
+.annot-chip:hover,
+.annot-chip.is-focus { background: #fff; }
+.annot-chip.annot-bind { border-left-color: #5ac8fa; }
+.annot-chip.annot-return { border-left-color: #30d158; }
+.annot-chip.annot-call,
+.annot-chip.annot-expr,
+.annot-chip.annot-code { border-left-color: #ff9f0a; }
+.annot-chip.annot-branch { border-left-color: #bf5af2; }
+.annot-chip.annot-loop { border-left-color: #64d2ff; }
+.annot-chip.annot-writeback { border-left-color: #8e8e93; }
+.annot-chip-overflow { display: none; }
+.annot-band.is-expanded .annot-chip-overflow:not([hidden]):not(.is-frame-hidden) {
+  display: inline-flex;
+}
+.annot-label { color: var(--muted); font-weight: 600; }
+.annot-value { color: var(--ink); word-break: break-word; }
+.annot-more {
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.72rem;
+  padding: 0.22rem 0.45rem;
+  cursor: pointer;
+}
+.annot-band.is-keyed .annot-leaders { display: none; }
+.annot-band.is-keyed .annot-chip::before {
+  content: attr(data-annot-key) " ";
+  color: var(--muted);
+}
+@media (max-width: 640px) {
+  .annot-band { padding-top: 0.25rem; }
+  .annot-leaders { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .annot-leaders { display: none; }
+}
 .badge {
   display: inline-block;
   font-family: var(--mono);
@@ -1740,6 +1968,19 @@ pub fn layout(title: &str, nav: &str, main: &str) -> String {
               initVarsPanel();
             }}
           }}
+          if (typeof ev.structure_html === "string" && ev.structure_html) {{
+            var structEl = document.getElementById("structure");
+            if (structEl) {{
+              structEl.innerHTML = ev.structure_html;
+              initAnnotLeaders();
+              initCallPickers();
+              initLoopPickers();
+            }}
+          }}
+          if (typeof ev.trace_json === "string" && ev.trace_json) {{
+            var tr = document.getElementById("mq-view-trace");
+            if (tr) tr.textContent = ev.trace_json;
+          }}
         }}
       }}
     }}
@@ -1938,18 +2179,208 @@ pub fn layout(title: &str, nav: &str, main: &str) -> String {
     renderMath(panel);
   }}
 
+  function readViewTrace() {{
+    var el = document.getElementById("mq-view-trace");
+    if (!el) return null;
+    try {{ return JSON.parse(el.textContent || "{{}}"); }} catch (e) {{ return null; }}
+  }}
+
+  /** Source structure always stays visible; only chips + arm classes follow the frame. */
+  function initCallPickers() {{
+    document.querySelectorAll(".call-picker").forEach(function (sel) {{
+      function apply() {{
+        var callId = String(sel.value || "");
+        var allowed = {{}};
+        Array.prototype.forEach.call(sel.options, function (o) {{
+          allowed[String(o.value)] = true;
+        }});
+        var root = document.getElementById("structure") || document;
+        // Only touch chips whose call_id belongs to this function's calls.
+        root.querySelectorAll(".annot-chip[data-call-id]").forEach(function (chip) {{
+          var cid = String(chip.getAttribute("data-call-id") || "");
+          if (!allowed[cid]) return;
+          chip.hidden = cid !== callId;
+        }});
+        var trace = readViewTrace();
+        if (trace && Array.isArray(trace.events)) {{
+          var takenByLine = {{}};
+          trace.events.forEach(function (ev) {{
+            if (ev.kind === "branch" && String(ev.call_id) === callId && ev.arm_index != null) {{
+              takenByLine[ev.line] = ev.arm_index;
+            }}
+          }});
+          root.querySelectorAll("ol.doc-branch").forEach(function (ol) {{
+            var line = parseInt(ol.getAttribute("data-line") || "0", 10);
+            var taken = takenByLine[line];
+            if (taken === undefined) return;
+            ol.querySelectorAll(":scope > li.doc-list-item[data-arm-index]").forEach(function (li) {{
+              var idx = parseInt(li.getAttribute("data-arm-index") || "-1", 10);
+              li.classList.remove("arm-taken", "arm-miss");
+              if (idx === taken) li.classList.add("arm-taken");
+              else li.classList.add("arm-miss");
+            }});
+          }});
+        }}
+        initAnnotLeaders();
+      }}
+      if (sel.dataset.bound !== "1") {{
+        sel.dataset.bound = "1";
+        sel.addEventListener("change", apply);
+      }}
+      apply();
+    }});
+  }}
+
+  function setFrameHidden(el, hide) {{
+    el.hidden = !!hide;
+    if (hide) el.classList.add("is-frame-hidden");
+    else el.classList.remove("is-frame-hidden");
+  }}
+
+  function initLoopPickers() {{
+    document.querySelectorAll(".loop-picker").forEach(function (sel) {{
+      function apply() {{
+        var iter = String(sel.value || "");
+        var loopId = String(sel.getAttribute("data-loop-id") || "");
+        var ul = sel.closest("ul.doc-loop");
+        var scope = ul || document.getElementById("structure");
+        if (!scope) return;
+        // Only the selected iteration's chips; structure source stays visible.
+        scope.querySelectorAll(".annot-chip").forEach(function (chip) {{
+          var lid = chip.getAttribute("data-loop-id");
+          var chipIter = chip.getAttribute("data-iter");
+          if (loopId && lid && String(lid) !== loopId) return;
+          if (chipIter == null) {{
+            // No data-iter: leave alone (foreach uses BindRef chips; while may have one summary).
+            return;
+          }}
+          // Chips with data-iter but no loop-id still filter by iter inside this ul.
+          if (lid && loopId && String(lid) !== loopId) return;
+          setFrameHidden(chip, String(chipIter) !== iter);
+        }});
+        initAnnotLeaders();
+      }}
+      if (sel.dataset.bound !== "1") {{
+        sel.dataset.bound = "1";
+        sel.addEventListener("change", apply);
+      }}
+      apply();
+    }});
+  }}
+
+  function initAnnotLeaders() {{
+    var bands = document.querySelectorAll("[data-annot-band]");
+    if (!bands.length) return;
+    var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    var narrow = window.matchMedia && window.matchMedia("(max-width: 640px)").matches;
+
+    function layoutBand(band) {{
+      var leaders = band.querySelector(".annot-leaders");
+      var chips = band.querySelectorAll(".annot-chip:not(.annot-chip-overflow):not([hidden]):not(.is-frame-hidden)");
+      if (!leaders) return;
+      leaders.innerHTML = "";
+      if (reduce || narrow || chips.length > 4) {{
+        band.classList.add("is-keyed");
+        chips.forEach(function (chip, i) {{
+          chip.setAttribute("data-annot-key", String(i + 1));
+        }});
+        return;
+      }}
+      band.classList.remove("is-keyed");
+      var bandRect = band.getBoundingClientRect();
+      chips.forEach(function (chip) {{
+        if (chip.hidden || chip.classList.contains("is-frame-hidden")) return;
+        var id = chip.getAttribute("data-annot-id") || "";
+        var kind = chip.getAttribute("data-annot-kind") || "";
+        var anchor = id
+          ? document.querySelector('.mq-anchor[data-annot-id="' + id + '"]')
+          : null;
+        if (!anchor) {{
+          var block = band.closest(".doc-block");
+          anchor = block ? block.querySelector(".mq-anchor") : null;
+        }}
+        if (!anchor) return;
+        var a = anchor.getBoundingClientRect();
+        var c = chip.getBoundingClientRect();
+        var x0 = a.left + a.width / 2 - bandRect.left;
+        var y0 = 0;
+        var x1 = c.left + Math.min(12, c.width / 2) - bandRect.left;
+        var y1 = c.top - bandRect.top + c.height / 2;
+        var left = Math.min(x0, x1);
+        var width = Math.max(2, Math.abs(x1 - x0));
+        var height = Math.max(2, y1 - y0);
+        var el = document.createElement("div");
+        el.className = "annot-leader annot-" + kind;
+        el.style.left = left + "px";
+        el.style.top = y0 + "px";
+        el.style.width = width + "px";
+        el.style.height = height + "px";
+        if (x1 < x0) {{
+          el.style.borderLeft = "none";
+          el.style.borderRight = "1.5px solid";
+          el.style.borderBottom = "1.5px solid";
+        }}
+        leaders.appendChild(el);
+      }});
+    }}
+
+    function layoutAll() {{
+      bands.forEach(layoutBand);
+    }}
+    layoutAll();
+    if (typeof ResizeObserver !== "undefined") {{
+      var ro = new ResizeObserver(function () {{ layoutAll(); }});
+      bands.forEach(function (b) {{ ro.observe(b); }});
+      var surface = document.querySelector(".document-surface");
+      if (surface) ro.observe(surface);
+    }}
+    window.addEventListener("resize", layoutAll);
+
+    document.querySelectorAll("[data-annot-more]").forEach(function (btn) {{
+      btn.addEventListener("click", function () {{
+        var band = btn.closest("[data-annot-band]");
+        if (!band) return;
+        band.classList.add("is-expanded");
+        btn.hidden = true;
+        layoutAll();
+      }});
+    }});
+    document.querySelectorAll(".annot-chip").forEach(function (chip) {{
+      chip.addEventListener("mouseenter", function () {{
+        var id = chip.getAttribute("data-annot-id");
+        if (!id) return;
+        var a = document.querySelector('.mq-anchor[data-annot-id="' + id + '"]');
+        if (a) a.classList.add("is-focus");
+        chip.classList.add("is-focus");
+      }});
+      chip.addEventListener("mouseleave", function () {{
+        var id = chip.getAttribute("data-annot-id");
+        if (!id) return;
+        var a = document.querySelector('.mq-anchor[data-annot-id="' + id + '"]');
+        if (a) a.classList.remove("is-focus");
+        chip.classList.remove("is-focus");
+      }});
+    }});
+  }}
+
   if (document.readyState === "loading") {{
     document.addEventListener("DOMContentLoaded", function () {{
       initForeignCards();
       initOutlineSearch();
       initStreamPanel();
       initVarsPanel();
+      initAnnotLeaders();
+      initCallPickers();
+      initLoopPickers();
     }});
   }} else {{
     initForeignCards();
     initOutlineSearch();
     initStreamPanel();
     initVarsPanel();
+    initAnnotLeaders();
+    initCallPickers();
+    initLoopPickers();
   }}
 
   function initOutlineSearch() {{
@@ -2293,6 +2724,9 @@ pub fn page_file(files: &[PathBuf], rel: &str, vm: &FileViewModel, links: &LinkM
         .to_string(),
         _ => String::new(),
     };
+    let trace_safe = vm
+        .trace_json
+        .replace("</", "<\\/");
     let main = format!(
         r#"
 <script>
@@ -2300,6 +2734,7 @@ window.MARQDO_VIEW_LIVE = {live};
 window.MARQDO_FILE_PATH = {path_js};
 window.MARQDO_AUTO_STREAM = {auto_stream};
 </script>
+<script type="application/json" id="mq-view-trace">{trace}</script>
 <h1 class="page">{title}<span class="status-pill {status}">{status_label}</span></h1>
 <p class="meta">{rel}</p>
 <section class="block">
@@ -2322,6 +2757,11 @@ window.MARQDO_AUTO_STREAM = {auto_stream};
         live = live_flag,
         path_js = escape_js_string(rel),
         auto_stream = if vm.auto_stream { "true" } else { "false" },
+        trace = if trace_safe.is_empty() {
+            "{}"
+        } else {
+            trace_safe.as_str()
+        },
         title = escape(title),
         status = status,
         status_label = status_label,

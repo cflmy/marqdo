@@ -17,6 +17,9 @@ use crate::debug::{emit_trace, DebugController};
 use crate::diagnostics::{bail_at, Span};
 use crate::host::{call_host, HostContext, HostFn};
 use crate::input_feed::InputFeed;
+use crate::capture::{
+    BranchHit, CallFrame, LoopFrame, LoopHit, LoopIter, StmtEvent, StmtEventKind, ViewTrace,
+};
 use crate::value::Value;
 use std::sync::Arc;
 
@@ -27,6 +30,14 @@ pub struct Interpreter {
     pub captured_stdout: String,
     /// Bindings in the entry (`# main` / sole object) env after it finishes.
     pub entry_bindings: HashMap<String, Value>,
+    /// Silent branch/loop hits for `marqdo view` annotations.
+    pub view_trace: ViewTrace,
+    next_call_id: u32,
+    call_stack: Vec<u32>,
+    fn_ordinals: HashMap<String, u32>,
+    next_loop_id: u32,
+    /// Active loops: `(loop_id, iter_index_0based)`.
+    loop_stack: Vec<(u32, u32)>,
     current_span: Span,
     input: InputFeed,
     host: HostContext,
@@ -82,6 +93,12 @@ impl Interpreter {
             capture: false,
             captured_stdout: String::new(),
             entry_bindings: HashMap::new(),
+            view_trace: ViewTrace::default(),
+            next_call_id: 1,
+            call_stack: Vec::new(),
+            fn_ordinals: HashMap::new(),
+            next_loop_id: 1,
+            loop_stack: Vec::new(),
             current_span: Span::new(1, 1),
             input: InputFeed::new(false, Vec::new()),
             host: HostContext::for_run(path, Default::default(), Vec::new()),
@@ -97,6 +114,12 @@ impl Interpreter {
             capture: true,
             captured_stdout: String::new(),
             entry_bindings: HashMap::new(),
+            view_trace: ViewTrace::default(),
+            next_call_id: 1,
+            call_stack: Vec::new(),
+            fn_ordinals: HashMap::new(),
+            next_loop_id: 1,
+            loop_stack: Vec::new(),
             current_span: Span::new(1, 1),
             input: InputFeed::new(true, Vec::new()),
             host: HostContext::for_capture(path, Default::default()),
@@ -148,6 +171,172 @@ impl Interpreter {
             use std::io::Write;
             let _ = std::io::stdout().flush();
         }
+    }
+
+    fn current_call_id(&self) -> u32 {
+        self.call_stack.last().copied().unwrap_or(0)
+    }
+
+    fn loop_ctx(&self) -> (Option<u32>, Option<u32>) {
+        self.loop_stack
+            .last()
+            .map(|(id, iter)| (Some(*id), Some(*iter)))
+            .unwrap_or((None, None))
+    }
+
+    fn push_view_call(&mut self, fun: &Function, env: &Env) {
+        if !self.capture {
+            return;
+        }
+        let call_id = self.next_call_id;
+        self.next_call_id += 1;
+        let ordinal = {
+            let e = self.fn_ordinals.entry(fun.name.clone()).or_insert(0);
+            *e += 1;
+            *e
+        };
+        let args_brief = fun
+            .params
+            .iter()
+            .filter_map(|p| {
+                env.get(&p.name)
+                    .map(|v| format!("{}={}", p.name, brief_trace_val(v)))
+            })
+            .collect::<Vec<_>>()
+            .join(", ");
+        self.view_trace.calls.push(CallFrame {
+            call_id,
+            fn_name: fun.name.clone(),
+            fn_line: fun.span.line,
+            ordinal,
+            args_brief,
+        });
+        self.call_stack.push(call_id);
+    }
+
+    fn pop_view_call(&mut self) {
+        if self.capture {
+            self.call_stack.pop();
+        }
+    }
+
+    fn begin_view_loop(
+        &mut self,
+        line: u32,
+        item: Option<&str>,
+        collection: Option<&str>,
+    ) -> u32 {
+        let loop_id = self.next_loop_id;
+        self.next_loop_id += 1;
+        self.view_trace.loop_frames.push(LoopFrame {
+            loop_id,
+            line,
+            item_name: item.map(|s| s.to_string()),
+            collection: collection.map(|s| s.to_string()),
+            iterations: Vec::new(),
+        });
+        self.loop_stack.push((loop_id, 0));
+        loop_id
+    }
+
+    fn enter_loop_iter(&mut self, loop_id: u32, index: u32, item_value: &str) {
+        if let Some((_, cur)) = self.loop_stack.iter_mut().rev().find(|(id, _)| *id == loop_id)
+        {
+            *cur = index;
+        }
+        let call_id = self.current_call_id();
+        if let Some(fr) = self
+            .view_trace
+            .loop_frames
+            .iter_mut()
+            .find(|f| f.loop_id == loop_id)
+        {
+            fr.iterations.push(LoopIter {
+                index,
+                item_value: item_value.to_string(),
+                call_id,
+            });
+        }
+    }
+
+    fn end_view_loop(&mut self, loop_id: u32) {
+        if self
+            .loop_stack
+            .last()
+            .map(|(id, _)| *id == loop_id)
+            .unwrap_or(false)
+        {
+            self.loop_stack.pop();
+        }
+    }
+
+    fn record_stmt_event(&mut self, mut ev: StmtEvent) {
+        if self.capture {
+            if ev.loop_id.is_none() || ev.iter.is_none() {
+                let (lid, iter) = self.loop_ctx();
+                if ev.loop_id.is_none() {
+                    ev.loop_id = lid;
+                }
+                if ev.iter.is_none() {
+                    ev.iter = iter;
+                }
+            }
+            self.view_trace.events.push(ev);
+        }
+    }
+
+    fn record_branch_hit(&mut self, line: u32, arm_index: usize) {
+        let call_id = self.current_call_id();
+        if let Some(existing) = self.view_trace.branches.iter_mut().find(|h| {
+            h.line == line && h.arm_index == arm_index && h.call_id == call_id
+        }) {
+            existing.count += 1;
+        } else {
+            self.view_trace.branches.push(BranchHit {
+                line,
+                arm_index,
+                count: 1,
+                call_id,
+            });
+        }
+        let (loop_id, iter) = self.loop_ctx();
+        self.record_stmt_event(StmtEvent {
+            line,
+            kind: StmtEventKind::Branch,
+            name: None,
+            value_after: Some(format!("arm {}", arm_index + 1)),
+            arm_index: Some(arm_index),
+            iter,
+            call_id,
+            loop_id,
+        });
+    }
+
+    fn record_loop_hit(&mut self, line: u32, iterations: u32, last_item: Option<String>) {
+        if let Some(existing) = self.view_trace.loops.iter_mut().find(|h| h.line == line) {
+            existing.iterations = iterations;
+            if last_item.is_some() {
+                existing.last_item = last_item.clone();
+            }
+        } else {
+            self.view_trace.loops.push(LoopHit {
+                line,
+                iterations,
+                last_item: last_item.clone(),
+            });
+        }
+        let (loop_id, _) = self.loop_ctx();
+        self.record_stmt_event(StmtEvent {
+            line,
+            kind: StmtEventKind::Loop,
+            name: None,
+            value_after: Some(format!("{iterations} iters")),
+            arm_index: None,
+            // Summary event: total count (not 0-based index).
+            iter: Some(iterations),
+            call_id: self.current_call_id(),
+            loop_id,
+        });
     }
 
     /// Run a function by name anywhere in the module (for `lib/subtask` workers).
@@ -337,6 +526,7 @@ impl Interpreter {
         }
 
         let ret = Value::None;
+        self.push_view_call(fun, &env);
         self.host.push_call_frame(&fun.name);
         let body_result = (|| -> Result<Value> {
             for stmt in &fun.body {
@@ -347,6 +537,7 @@ impl Interpreter {
             Ok(ret)
         })();
         self.host.pop_call_frame();
+        self.pop_view_call();
         let ret = body_result?;
         if capture_entry_env {
             self.entry_bindings = env.vars_clone();
@@ -402,6 +593,18 @@ impl Interpreter {
                         ],
                     );
                 }
+                if self.capture {
+                    self.record_stmt_event(StmtEvent {
+                        line: span.line,
+                        kind: StmtEventKind::Assign,
+                        name: Some(name.clone()),
+                        value_after: Some(v.as_display()),
+                        arm_index: None,
+                        iter: None,
+                        call_id: self.current_call_id(),
+                        loop_id: None,
+                    });
+                }
                 env.set(name.clone(), v);
                 Ok(None)
             }
@@ -424,6 +627,18 @@ impl Interpreter {
                         "stmt",
                         &[("kind", "return"), ("value", display.as_str())],
                     );
+                }
+                if self.capture {
+                    self.record_stmt_event(StmtEvent {
+                        line: span.line,
+                        kind: StmtEventKind::Return,
+                        name: None,
+                        value_after: Some(v.as_display()),
+                        arm_index: None,
+                        iter: None,
+                        call_id: self.current_call_id(),
+                        loop_id: None,
+                    });
                 }
                 Ok(Some(v))
             }
@@ -463,12 +678,15 @@ impl Interpreter {
                         &[("kind", "branch")],
                     );
                 }
-                for arm in arms {
+                for (arm_index, arm) in arms.iter().enumerate() {
                     let take = match &arm.condition {
                         None => true,
                         Some(cond) => self.eval_expr(module, fun, env, cond)?.truthy(),
                     };
                     if take {
+                        if self.capture {
+                            self.record_branch_hit(span.line, arm_index);
+                        }
                         for s in &arm.body {
                             if let Some(v) = self.exec_stmt(module, fun, env, s)? {
                                 return Ok(Some(v));
@@ -493,17 +711,37 @@ impl Interpreter {
                         &[("kind", "while")],
                     );
                 }
+                let loop_id = if self.capture {
+                    Some(self.begin_view_loop(span.line, None, None))
+                } else {
+                    None
+                };
                 let mut guard = 0u32;
                 while self.eval_expr(module, fun, env, condition)?.truthy() {
                     guard += 1;
                     if guard > 1_000_000 {
                         return Err(self.err("while loop exceeded iteration limit"));
                     }
+                    if let Some(lid) = loop_id {
+                        self.enter_loop_iter(lid, guard - 1, &format!("iter {guard}"));
+                    }
                     for s in body {
                         if let Some(v) = self.exec_stmt(module, fun, env, s)? {
+                            if self.capture {
+                                if let Some(lid) = loop_id {
+                                    self.end_view_loop(lid);
+                                }
+                                self.record_loop_hit(span.line, guard, None);
+                            }
                             return Ok(Some(v));
                         }
                     }
+                }
+                if self.capture {
+                    if let Some(lid) = loop_id {
+                        self.end_view_loop(lid);
+                    }
+                    self.record_loop_hit(span.line, guard, None);
                 }
                 Ok(None)
             }
@@ -534,13 +772,55 @@ impl Interpreter {
                     Ok(_) => unreachable!(),
                     Err(m) => return Err(self.err(m)),
                 };
+                let loop_id = if self.capture {
+                    Some(self.begin_view_loop(
+                        span.line,
+                        Some(item.as_str()),
+                        Some(collection.as_str()),
+                    ))
+                } else {
+                    None
+                };
+                let mut iterations = 0u32;
+                let mut last_item: Option<String> = None;
                 for val in items {
+                    let index = iterations;
+                    iterations += 1;
+                    let display = val.as_display();
+                    last_item = Some(display.clone());
+                    if let Some(lid) = loop_id {
+                        self.enter_loop_iter(lid, index, &display);
+                        self.record_stmt_event(StmtEvent {
+                            line: span.line,
+                            kind: StmtEventKind::BindRef,
+                            name: Some(item.clone()),
+                            value_after: Some(format!(
+                                "{collection}[{index}]={display}"
+                            )),
+                            arm_index: None,
+                            iter: Some(index),
+                            call_id: self.current_call_id(),
+                            loop_id: Some(lid),
+                        });
+                    }
                     env.set(item.clone(), val);
                     for s in body {
                         if let Some(v) = self.exec_stmt(module, fun, env, s)? {
+                            if self.capture {
+                                if let Some(lid) = loop_id {
+                                    self.end_view_loop(lid);
+                                }
+                                self.record_loop_hit(span.line, iterations, last_item.clone());
+                            }
                             return Ok(Some(v));
                         }
                     }
+                }
+                if self.capture {
+                    if let Some(lid) = loop_id {
+                        self.end_view_loop(lid);
+                    }
+                    self.record_loop_hit(span.line, iterations, last_item);
                 }
                 Ok(None)
             }
@@ -1396,6 +1676,15 @@ fn cmp_ord(l: &Value, r: &Value, f: impl Fn(std::cmp::Ordering) -> bool) -> Resu
         }
         (Value::Text(a), Value::Text(b)) => Ok(Value::Bool(f(a.cmp(b)))),
         _ => bail!("comparison needs two ints/nums or two texts"),
+    }
+}
+
+fn brief_trace_val(v: &Value) -> String {
+    let s = v.as_display();
+    if s.chars().count() > 24 {
+        format!("{}…", s.chars().take(24).collect::<String>())
+    } else {
+        s
     }
 }
 

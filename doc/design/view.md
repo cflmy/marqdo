@@ -4,7 +4,7 @@
 |---|---|
 | 状态 | 已定（v0.0.2 方向） |
 | 日期 | 2026-08-04 |
-| 相关 | [examples-and-tests.md](examples-and-tests.md) · [view-markup-surface.md](view-markup-surface.md) · [generated-yaml-manifest.md](generated-yaml-manifest.md) · 视觉参考 [id.cflmy.cn](https://id.cflmy.cn) |
+| 相关 | [examples-and-tests.md](examples-and-tests.md) · [view-markup-surface.md](view-markup-surface.md) · [view-document-annotations.md](view-document-annotations.md) · [generated-yaml-manifest.md](generated-yaml-manifest.md) · 视觉参考 [id.cflmy.cn](https://id.cflmy.cn) |
 
 ---
 
@@ -77,7 +77,7 @@ OUT_DIR/
 - 用户文档推荐流程：`marqdo view output public -o public`，将生成物发布到 `gh-pages`（见 [user-site.md](user-site.md)）。  
 - **执行权限**：与 `marqdo run` 一致（导入即用）；view/导出仅对 `exit`/`sleep` 做软化，避免拖垮进程。详见 [stdlib-modules.md](stdlib-modules.md) §6。  
 - 金样例浏览仍可用：`marqdo view output tests -o /tmp/mq-tests`（含 errors，勿当对外用户站）。  
-- 渲染逻辑与实时 `view` **共用**同一套 HTML 构件（结构 / 执行 / 源码），禁止两套皮肤分叉。
+- 渲染逻辑与实时 `view` **共用**同一路径：`build_file_view` → 文档面 Structure（`document.rs` + annots）→ `page_file`（同一 CSS/JS，含 call/loop picker、`#mq-view-trace`）。禁止第二套皮肤。`--no-exec` 时仍出文档面，但无运行标注。
 
 示例：
 
@@ -90,14 +90,16 @@ marqdo view output tests/structure/hello.mq.md -o /tmp/hello-doc
 
 ## 4. 信息架构
 
-侧栏文件索引 + 主区：结构（AST+注释）· 执行 · 源码。结构旁**右侧栏**（现有 outline 槽）为：
+侧栏文件索引 + 主区：**文档面 Structure** · 执行 · 源码。Structure（Browse）为叙述保真文档面：标记面（变量/语句/返回无源码定界符）、表/列表/分支结构保真，跑后结果经 **CSS L-leader** 引出——见 [view-document-annotations.md](view-document-annotations.md) · [view-execution-trace.md](view-execution-trace.md)。**不是** AST 卡片栈（那是 debug）。
+
+结构旁**右侧栏**（现有 outline 槽）为：
 
 | 区块 | 内容 |
 |------|------|
 | **Functions** | 原函数大纲 + 搜索；可折叠（默认展开） |
 | **Variables** | 跑完后的入口（`# main`）顶层绑定只读快照；List/Map/`@` 行向渲成 HTML 表；可折叠（默认展开） |
 
-view Variables ≠ debug Variables：前者是跑后快照，后者是暂停时的 locals。`--no-exec` 时 Variables 显示 skipped。Live `/api/run` 终态帧可带 `bindings_html` 刷新该面板。
+view Variables ≠ debug Variables：前者是跑后快照，后者是暂停时的 locals。`--no-exec` 时 Variables 显示 skipped。Live `/api/run` 终态帧可带 `bindings_html` 刷新该面板；终态亦可刷新 Structure 内标注。
 
 表达式为表面语法。**断点调试**不在 view 内，见 [`marqdo debug`](view-debug.md)。
 

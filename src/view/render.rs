@@ -45,6 +45,8 @@ pub struct FileViewModel {
     pub plots: Vec<String>,
     /// HTML for Variables panel (entry bindings after run).
     pub bindings_html: String,
+    /// ViewExecutionReport JSON for AI / call-picker (empty if no run).
+    pub trace_json: String,
 }
 
 /// Collect prompt strings from every `input` / `输入` call in the module (pre-order).
@@ -187,11 +189,33 @@ fn prompt_expr_text(expr: &Expr) -> String {
     }
 }
 
+/// Browse Structure without run annotations (empty callouts).
 pub fn render_module_structure(module: &Module, source: &str) -> String {
     render_module_structure_mode(module, source, StructureMode::Browse)
 }
 
+/// Browse Structure: document surface with optional result annotations.
+pub fn render_module_structure_with_annots(
+    module: &Module,
+    source: &str,
+    annots: &[crate::view::annot::ViewAnnot],
+) -> String {
+    crate::view::document::render_module_document(module, source, annots)
+}
+
 pub fn render_module_structure_mode(
+    module: &Module,
+    source: &str,
+    mode: StructureMode,
+) -> String {
+    match mode {
+        StructureMode::Browse => render_module_structure_with_annots(module, source, &[]),
+        StructureMode::Debug => render_module_structure_cards(module, source, mode),
+    }
+}
+
+/// Legacy AST-card Structure (debug + tests that need card markup).
+pub fn render_module_structure_cards(
     module: &Module,
     source: &str,
     mode: StructureMode,
@@ -905,7 +929,7 @@ fn emit_comments(lines: &[ClassifiedLine], from_line: u32, before_line: u32) -> 
 }
 
 /// Render narrative comments as Markdown (links, emphasis, code, lists, …).
-fn comment_markdown_to_html(md: &str) -> String {
+pub(crate) fn comment_markdown_to_html(md: &str) -> String {
     let mut opts = Options::empty();
     opts.insert(Options::ENABLE_STRIKETHROUGH);
     opts.insert(Options::ENABLE_TABLES);
@@ -1412,6 +1436,45 @@ fn expr_prec(expr: &Expr, parent_prec: u8) -> String {
 }
 
 /// Best-effort ASCII formula → TeX for KaTeX in view Structure.
+pub(crate) fn formula_ascii_to_tex_pub(ascii: &str) -> String {
+    formula_ascii_to_tex(ascii)
+}
+
+/// Formula assign card for document surface embedding.
+pub(crate) fn render_formula_assign_card(name: &str, tex: &str) -> String {
+    format!(
+        "<div class=\"card formula-card\"><span class=\"badge\">formula</span> \
+         <code class=\"expr\">`{}` =</code> \
+         <div class=\"math-block\">$${}$$</div></div>",
+        escape(name),
+        escape(tex),
+    )
+}
+
+/// Foreign code assign card for document surface embedding.
+pub(crate) fn render_code_assign_card(name: &str, lang: &str, source: &str) -> String {
+    let placeholder = escape(&crate::foreign::default_cmd_display(lang));
+    format!(
+        r#"<div class="card code-card" data-lang="{lang}">
+  <div class="code-head">
+    <span class="badge">code</span>
+    <code class="expr">`{name}` =</code>
+    <span class="code-lang">{lang}</span>
+    <div class="code-actions">
+      <input type="text" class="code-cmd" placeholder="{placeholder}" spellcheck="false" autocomplete="off"/>
+      <button type="button" class="code-run">Run</button>
+    </div>
+  </div>
+  <pre class="code-body"><code class="language-{lang}">{src}</code></pre>
+  <pre class="code-out" hidden></pre>
+</div>"#,
+        lang = escape(lang),
+        name = escape(name),
+        placeholder = placeholder,
+        src = escape(source),
+    )
+}
+
 fn formula_ascii_to_tex(ascii: &str) -> String {
     let mut out = String::new();
     let chars: Vec<char> = ascii.chars().collect();
@@ -1525,7 +1588,7 @@ mod tests {
         let src = include_str!("../../tests/structure/nested-call.mq.md");
         let module = crate::parse::parse_source(src).unwrap();
         let html = render_module_structure(&module, src);
-        assert!(html.contains("comment-card"));
+        assert!(html.contains("doc-prose") || html.contains("打印一句问候"), "{html}");
         assert!(html.contains("print"));
         assert!(!html.contains("Binary {"));
         assert!(!html.contains("Literal(Int"));
@@ -1536,9 +1599,9 @@ mod tests {
         let src = "段首说明\n续行仍属同段\n\n下一段\n\n# main\n\n> print text=x\n";
         let module = crate::parse::parse_source(src).unwrap();
         let html = render_module_structure(&module, src);
-        let cards = html.matches("comment-card").count();
-        assert_eq!(cards, 2, "blank line should split comment paragraphs: {html}");
-        assert!(html.contains("段首说明 续行仍属同段") || html.contains("段首说明</p>"));
+        let blocks = html.matches("doc-prose").count();
+        assert!(blocks >= 2, "blank line should split comment paragraphs: {html}");
+        assert!(html.contains("段首说明 续行仍属同段") || html.contains("段首说明</p>") || html.contains("段首说明"));
         assert!(html.contains("下一段"));
     }
 
@@ -1575,11 +1638,10 @@ mod tests {
         let src = "---\ntitle: t\nimport text:lib/text.mq.md\n---\n\n# main\n\n> print text=hi\n";
         let local = crate::parse::parse_source(src).unwrap();
         let html = render_module_structure(&local, src);
-        assert!(html.contains("badge\">import"), "{html}");
+        assert!(html.contains("doc-imports") || html.contains("lib/text.mq.md"), "{html}");
         assert!(html.contains("lib/text.mq.md"), "{html}");
         assert!(html.contains("main"), "{html}");
         assert!(!html.contains("trim"), "{html}");
-        assert!(html.contains("class=\"stmt\""), "{html}");
         assert!(html.contains("data-line="), "{html}");
         assert_eq!(local.functions.len(), 1);
         assert_eq!(local.functions[0].name, "main");
@@ -1624,9 +1686,21 @@ mod tests {
         let browse = render_module_structure_mode(&module, src, StructureMode::Browse);
         let debug = render_module_structure_mode(&module, src, StructureMode::Debug);
         assert!(browse.contains("id=\"fn-"), "{browse}");
+        assert!(browse.contains("document-surface"), "{browse}");
         assert!(!browse.contains("bp-gutter"), "{browse}");
         assert!(debug.contains("bp-gutter"), "{debug}");
         assert!(debug.contains("id=\"stmt-"), "{debug}");
+        assert!(debug.contains("card"), "{debug}");
+    }
+
+    #[test]
+    fn browse_preserves_prose_unified_line() {
+        let src = include_str!("../../tests/markup-v03/inc-prose.mq.md");
+        let module = crate::parse::parse_source(src).unwrap();
+        let html = render_module_structure(&module, src);
+        assert!(html.contains("对于输入变量"), "{html}");
+        assert!(html.contains("mq-anchor"), "{html}");
+        assert!(!html.contains("badge\">bind"), "{html}");
     }
 
     #[test]

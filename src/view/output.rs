@@ -32,11 +32,17 @@ pub fn write_static(opts: OutputOptions) -> Result<()> {
             vm.ok = true;
             vm.plots.clear();
             vm.bindings_html = String::from(r#"<p class="vars-skipped">skipped</p>"#);
-            // Rebuild outline so Variables shows skipped.
+            vm.trace_json.clear();
+            // Rebuild outline + Structure without run annotations.
             if let Ok(module) = crate::parse::parse_source(&vm.source) {
                 let wb = crate::view::render::render_writeback_outline(&vm.source);
                 vm.outline_html =
                     crate::view::render::render_right_rail(&module, &vm.bindings_html, &wb);
+                vm.structure_html = crate::view::render::render_module_structure_with_annots(
+                    &module,
+                    &vm.source,
+                    &[],
+                );
             }
         }
         let links = LinkMode::Static {

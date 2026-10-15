@@ -1,8 +1,10 @@
 //! `marqdo view` — local HTML browser for `.mq.md` structure + output.
 //! `marqdo debug` — separate debugger host (tree-walk breakpoints).
 
+mod annot;
 mod debug_api;
 mod debug_page;
+mod document;
 mod html;
 mod output;
 mod render;
@@ -23,9 +25,10 @@ use tiny_http::{Header, Method, Request, Response, Server, StatusCode};
 use crate::input_feed::{effective_stdin, extract_frontmatter_stdin, split_stdin_text};
 use crate::view::debug_page::{build_debug_model, page_debug};
 use crate::view::html::{escape, page_file, page_index, LinkMode};
+use crate::view::annot::{build_view_annots, view_execution_report_json};
 use crate::view::render::{
-    collect_input_prompts, render_bindings_html, render_module_structure, render_right_rail,
-    uses_stream_panel, FileViewModel,
+    collect_input_prompts, render_bindings_html, render_module_structure,
+    render_module_structure_with_annots, render_right_rail, uses_stream_panel, FileViewModel,
 };
 use crate::{run_file_capture, RunOptions};
 
@@ -212,6 +215,24 @@ fn handle(root: &ViewRoot, request: Request) -> Result<()> {
             let json = files_json(&root.files);
             respond_json(request, json)
         }
+        "/api/view-trace" => {
+            let rel = query_param(query, "path").unwrap_or_default();
+            if rel.is_empty() {
+                return respond_json_status(
+                    request,
+                    StatusCode(400),
+                    serde_json::json!({ "ok": false, "error": "missing path" }).to_string(),
+                );
+            }
+            let resolved = resolve_rel(root, &rel)?;
+            let vm = build_file_view(root, &resolved, &rel, &[], true)?;
+            let body = if vm.trace_json.is_empty() {
+                serde_json::json!({ "version": 1, "path": rel, "ok": vm.ok, "calls": [], "events": [], "bindings_final": {} }).to_string()
+            } else {
+                vm.trace_json
+            };
+            respond_json(request, body)
+        }
         "/api/events" => api_events(request),
         _ => {
             let resp = Response::from_string("not found").with_status_code(StatusCode(404));
@@ -345,6 +366,7 @@ pub(crate) fn build_file_view(
     opts.sleep_limit_ms = if live { Some(30_000) } else { Some(0) };
     // Optional: sandbox to the whole view tree so sibling folders are reachable.
     opts.fs_root = Some(root.root.clone());
+    let mut captured: Option<crate::capture::RunCapture> = None;
     let (stdout, stderr, ok, plots, mut bindings_html) = if awaiting_input || auto_stream {
         (
             String::new(),
@@ -355,13 +377,13 @@ pub(crate) fn build_file_view(
         )
     } else {
         match run_file_capture(abs, &opts) {
-            Ok(cap) => (
-                cap.stdout,
-                String::new(),
-                true,
-                cap.plots.into_iter().map(|p| p.svg).collect(),
-                render_bindings_html(&cap.bindings),
-            ),
+            Ok(cap) => {
+                let stdout = cap.stdout.clone();
+                let plots = cap.plots.iter().map(|p| p.svg.clone()).collect();
+                let bindings_html = render_bindings_html(&cap.bindings);
+                captured = Some(cap);
+                (stdout, String::new(), true, plots, bindings_html)
+            }
             Err(e) => (
                 String::new(),
                 tidy_user_error(&format!("{e:#}"), abs, rel),
@@ -375,10 +397,14 @@ pub(crate) fn build_file_view(
     if !awaiting_input && !auto_stream {
         if let Ok(next) = fs::read_to_string(abs) {
             source = next;
-            if let Ok(module) = crate::parse::parse_source(&source) {
-                structure = render_module_structure(&module, &source);
-                module_opt = Some(module);
-            }
+        }
+        if let Ok(module) = crate::parse::parse_source(&source) {
+            let annots = match &captured {
+                Some(cap) => build_view_annots(&module, &source, cap),
+                None => Vec::new(),
+            };
+            structure = render_module_structure_with_annots(&module, &source, &annots);
+            module_opt = Some(module);
         }
     }
     let wb = crate::view::render::render_writeback_outline(&source);
@@ -391,6 +417,10 @@ pub(crate) fn build_file_view(
                 render_right_rail(&crate::ast::Module::default(), &bindings_html, &wb)
             }
         }
+    };
+    let trace_json = match &captured {
+        Some(cap) => view_execution_report_json(rel, ok, cap),
+        None => String::new(),
     };
     Ok(FileViewModel {
         rel_path: rel.to_string(),
@@ -407,6 +437,7 @@ pub(crate) fn build_file_view(
         show_stream,
         plots,
         bindings_html: std::mem::take(&mut bindings_html),
+        trace_json,
     })
 }
 
@@ -641,6 +672,17 @@ fn api_run(root: &ViewRoot, mut request: Request) -> Result<()> {
                 // Keep the terminal frame small — tokens already streamed via bus.
                 let preview: String = cap.stdout.chars().take(500).collect();
                 let bindings_html = render_bindings_html(&cap.bindings);
+                let source_now = fs::read_to_string(&abs).unwrap_or(source);
+                let (structure_html, trace_json) = match crate::parse::parse_source(&source_now) {
+                    Ok(module) => {
+                        let annots = build_view_annots(&module, &source_now, &cap);
+                        (
+                            render_module_structure_with_annots(&module, &source_now, &annots),
+                            view_execution_report_json(&rel_clone, true, &cap),
+                        )
+                    }
+                    Err(_) => (String::new(), String::new()),
+                };
                 let done = serde_json::json!({
                     "type": "done",
                     "run_id": run_id,
@@ -648,6 +690,8 @@ fn api_run(root: &ViewRoot, mut request: Request) -> Result<()> {
                     "ok": true,
                     "result": preview,
                     "bindings_html": bindings_html,
+                    "structure_html": structure_html,
+                    "trace_json": trace_json,
                 });
                 crate::host::event_bus::EventBus::global().publish_json(&done.to_string());
             }

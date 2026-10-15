@@ -4,14 +4,14 @@
 |---|---|
 | 状态 | **v1（独立 debug 页）** |
 | 日期 | 2026-08-05 |
-| 相关 | [next-phase.md](../roadmap/next-phase.md) P3 · [view.md](view.md) · [pipeline-debug.md](pipeline-debug.md) |
+| 相关 | [next-phase.md](../roadmap/next-phase.md) P3 · [view.md](view.md) · [view-document-annotations.md](view-document-annotations.md) · [pipeline-debug.md](pipeline-debug.md) |
 
 ## 分工
 
 | 命令 | 角色 |
 |------|------|
-| `marqdo view` | 文档浏览器：Structure + Execution + Source；函数大纲与搜索；**无断点** |
-| `marqdo debug` | 调试宿主（默认端口 **7430**）：IDE 式布局；**仅 live** |
+| `marqdo view` | 文档浏览器：**叙述保真文档面** Structure + Execution + Source；函数大纲与搜索；跑后引出标注；**无断点**（见 [view-document-annotations.md](view-document-annotations.md)） |
+| `marqdo debug` | 调试宿主（默认端口 **7430**）：IDE 式布局；AST Structure + BP；**仅 live** |
 
 静态 `gh-pages` / `view output` **不能**真断点。
 

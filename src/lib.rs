@@ -306,6 +306,7 @@ pub fn run_file_capture(path: &Path, opts: &RunOptions) -> Result<RunCapture> {
                 value,
                 plots,
                 bindings: interp.entry_bindings,
+                view_trace: interp.view_trace,
             })
         }
         Backend::Bytecode => {
@@ -331,6 +332,7 @@ pub fn run_file_capture(path: &Path, opts: &RunOptions) -> Result<RunCapture> {
                 value,
                 plots,
                 bindings: Default::default(),
+                view_trace: Default::default(),
             })
         }
     }
@@ -366,6 +368,7 @@ pub fn run_source(source: &str, opts: &RunOptions) -> Result<RunCapture> {
                 value,
                 plots,
                 bindings: interp.entry_bindings,
+                view_trace: interp.view_trace,
             })
         }
         Backend::Bytecode => {
@@ -391,6 +394,7 @@ pub fn run_source(source: &str, opts: &RunOptions) -> Result<RunCapture> {
                 value,
                 plots,
                 bindings: Default::default(),
+                view_trace: Default::default(),
             })
         }
     }
