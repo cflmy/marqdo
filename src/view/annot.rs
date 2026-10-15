@@ -33,7 +33,7 @@ pub enum AnnotKind {
     Return,
     #[allow(dead_code)]
     Call,
-    #[allow(dead_code)]
+    #[allow(dead_code)] // reserved for non-call BoldCode expr chips
     Expr,
     Branch,
     Loop,
@@ -119,7 +119,9 @@ pub fn build_view_annots(module: &Module, source: &str, cap: &RunCapture) -> Vec
                     )
                 });
             let key = (*line, name.clone(), ev.call_id, ev.loop_id, ev.iter);
-            let mut value = ev.value_after.clone().unwrap_or_else(|| "?".into());
+            let raw = ev.value_after.clone().unwrap_or_else(|| "?".into());
+            let (value, detail) = abbreviate_bind_value(&raw);
+            let mut value = value;
             let count = assign_counts.get(&key).copied().unwrap_or(1);
             if count > 1 {
                 value = format!("{value} · ×{count}");
@@ -132,7 +134,7 @@ pub fn build_view_annots(module: &Module, source: &str, cap: &RunCapture) -> Vec
                 anchor_byte_end: end,
                 label: name.clone(),
                 value: brief_str(&value),
-                detail: ev.value_after.clone().unwrap_or_default(),
+                detail,
                 arm_index: None,
                 call_id: Some(ev.call_id),
                 loop_id: ev.loop_id,
@@ -352,6 +354,62 @@ pub fn build_view_annots(module: &Module, source: &str, cap: &RunCapture) -> Vec
         }
     }
 
+    // Call / expr events → chips; zip with BoldCode spans when several share a line.
+    let mut calls_by_line: HashMap<u32, Vec<&crate::capture::StmtEvent>> = HashMap::new();
+    for ev in &cap.view_trace.events {
+        if ev.kind == StmtEventKind::Call {
+            calls_by_line.entry(ev.line).or_default().push(ev);
+        }
+    }
+    for (line, evs) in calls_by_line {
+        let text = lines
+            .get(line.saturating_sub(1) as usize)
+            .copied()
+            .unwrap_or("");
+        let bold_spans: Vec<(usize, usize)> = scan_prose_line(text)
+            .into_iter()
+            .filter_map(|bit| match bit {
+                ProseBit::BoldCode { .. } => {
+                    let start = bit_at(&bit);
+                    Some((start, prose_bit_end(text, &bit)))
+                }
+                _ => None,
+            })
+            .collect();
+        for (i, ev) in evs.iter().enumerate() {
+            // One BoldCode on the line (e.g. print across call frames): share it.
+            // Several BoldCodes (e.g. two greets in main): zip by index.
+            let (start, end) = if bold_spans.is_empty() {
+                (None, None)
+            } else if bold_spans.len() == 1 {
+                let (s, e) = bold_spans[0];
+                (Some(s), Some(e))
+            } else {
+                bold_spans
+                    .get(i)
+                    .copied()
+                    .map(|(s, e)| (Some(s), Some(e)))
+                    .unwrap_or((None, None))
+            };
+            let value = ev.value_after.clone().unwrap_or_default();
+            let label = ev.name.clone().unwrap_or_else(|| "call".into());
+            out.push(ViewAnnot {
+                id: next_id("c"),
+                kind: AnnotKind::Call,
+                anchor_line: line,
+                anchor_byte_start: start,
+                anchor_byte_end: end,
+                label,
+                value: brief_str(&value),
+                detail: value,
+                arm_index: None,
+                call_id: Some(ev.call_id),
+                loop_id: ev.loop_id,
+                iter: ev.iter,
+            });
+        }
+    }
+
     // Call frames for picker (label = fn name).
     for fr in &cap.view_trace.calls {
         out.push(ViewAnnot {
@@ -370,7 +428,165 @@ pub fn build_view_annots(module: &Module, source: &str, cap: &RunCapture) -> Vec
         });
     }
 
+    // Param Decl sites in function body: bind chips from CallFrame args.
+    for fr in &cap.view_trace.calls {
+        let Some(fun) = find_fun_by_line(module, fr.fn_line) else {
+            continue;
+        };
+        let body_lines = fun_stmt_lines(fun);
+        for (pname, pval) in parse_args_brief_pairs(&fr.args_brief) {
+            for (i, text) in lines.iter().enumerate() {
+                let line_no = (i + 1) as u32;
+                if !body_lines.contains(&line_no) {
+                    continue;
+                }
+                for bit in scan_prose_line(text) {
+                    if let ProseBit::Decl { name, at, .. } = &bit {
+                        if name != &pname {
+                            continue;
+                        }
+                        let end = prose_bit_end(text, &bit);
+                        out.push(ViewAnnot {
+                            id: next_id("p"),
+                            kind: AnnotKind::Bind,
+                            anchor_line: line_no,
+                            anchor_byte_start: Some(*at),
+                            anchor_byte_end: Some(end),
+                            label: pname.clone(),
+                            value: brief_str(&pval),
+                            detail: format!("{pname}={pval}"),
+                            arm_index: None,
+                            call_id: Some(fr.call_id),
+                            loop_id: None,
+                            iter: None,
+                        });
+                    }
+                }
+            }
+        }
+    }
+
+    // Same prose span across call frames shares one id so <mark data-annot-id>
+    // matches the visible chip after frame filter (else L-leaders find no anchor).
+    unify_annot_ids_by_span(&mut out);
+
     out
+}
+
+fn unify_annot_ids_by_span(annots: &mut [ViewAnnot]) {
+    let mut first: HashMap<(u32, Option<usize>, Option<usize>, u8), String> = HashMap::new();
+    for a in annots.iter_mut() {
+        if matches!(a.kind, AnnotKind::CallFrame | AnnotKind::LoopFrame) {
+            continue;
+        }
+        if a.anchor_byte_start.is_none() {
+            continue;
+        }
+        let tag = match a.kind {
+            AnnotKind::Bind => 1u8,
+            AnnotKind::Return => 2,
+            AnnotKind::Call | AnnotKind::Expr => 3,
+            AnnotKind::Branch => 4,
+            AnnotKind::Loop => 5,
+            AnnotKind::Writeback => 6,
+            AnnotKind::CallFrame | AnnotKind::LoopFrame => 0,
+        };
+        let key = (
+            a.anchor_line,
+            a.anchor_byte_start,
+            a.anchor_byte_end,
+            tag,
+        );
+        if let Some(id) = first.get(&key) {
+            a.id = id.clone();
+        } else {
+            first.insert(key, a.id.clone());
+        }
+    }
+}
+
+fn abbreviate_bind_value(raw: &str) -> (String, String) {
+    if raw.contains("<svg") {
+        return ("svg".into(), "svg".into());
+    }
+    if raw.contains("```") {
+        return ("code".into(), "code".into());
+    }
+    if raw.chars().count() > 96 {
+        let short: String = raw.chars().take(48).collect();
+        return (format!("{short}…"), format!("{short}…"));
+    }
+    (raw.to_string(), raw.to_string())
+}
+
+fn parse_args_brief_pairs(brief: &str) -> Vec<(String, String)> {
+    let mut out = Vec::new();
+    for part in brief.split(", ") {
+        if let Some((k, v)) = part.split_once('=') {
+            if !k.is_empty() {
+                out.push((k.to_string(), v.to_string()));
+            }
+        }
+    }
+    out
+}
+
+fn find_fun_by_line(module: &Module, line: u32) -> Option<&Function> {
+    fn walk<'a>(fun: &'a Function, line: u32) -> Option<&'a Function> {
+        if fun.span.line == line {
+            return Some(fun);
+        }
+        for c in &fun.children {
+            if let Some(f) = walk(c, line) {
+                return Some(f);
+            }
+        }
+        None
+    }
+    for f in &module.functions {
+        if let Some(found) = walk(f, line) {
+            return Some(found);
+        }
+    }
+    None
+}
+
+fn fun_stmt_lines(fun: &Function) -> std::collections::HashSet<u32> {
+    let mut s = std::collections::HashSet::new();
+    fn walk_stmt(st: &Stmt, s: &mut std::collections::HashSet<u32>) {
+        let line = match st {
+            Stmt::Assign { span, .. }
+            | Stmt::Return { span, .. }
+            | Stmt::Call { span, .. }
+            | Stmt::Expr { span, .. }
+            | Stmt::Branch { span, .. }
+            | Stmt::While { span, .. }
+            | Stmt::ForEach { span, .. } => span.line,
+        };
+        s.insert(line);
+        match st {
+            Stmt::Branch { arms, .. } => {
+                for arm in arms {
+                    for b in &arm.body {
+                        walk_stmt(b, s);
+                    }
+                }
+            }
+            Stmt::While { body, .. } | Stmt::ForEach { body, .. } => {
+                for b in body {
+                    walk_stmt(b, s);
+                }
+            }
+            _ => {}
+        }
+    }
+    for st in &fun.body {
+        walk_stmt(st, &mut s);
+    }
+    for c in &fun.children {
+        s.extend(fun_stmt_lines(c));
+    }
+    s
 }
 
 /// Serialize ViewExecutionReport JSON for AI / page embed.
@@ -583,8 +799,10 @@ pub fn bit_kind_class(bit: &ProseBit) -> &'static str {
 
 /// Render annotation band HTML for a set of annots (already filtered to one block).
 ///
-/// Chips with `iter` default to the **last** iteration per `loop_id` (SSR); the loop
-/// picker toggles `hidden` / `is-frame-hidden` so only the selected iter is shown.
+/// SSR defaults to the **last** call_id and **last** iteration per loop_id (matches
+/// pickers). Overflow (`max_visible`) is counted only among chips visible in that
+/// default frame — so `who` on the last greet call is not buried behind +N.
+/// Client `applyCallFrame` recomputes overflow after switching.
 pub fn render_annot_band(annots: &[ViewAnnot], max_visible: usize) -> String {
     let annots: Vec<&ViewAnnot> = annots
         .iter()
@@ -603,17 +821,35 @@ pub fn render_annot_band(annots: &[ViewAnnot], max_visible: usize) -> String {
             }
         }
     }
+    // Default call frame = max call_id among chips that carry one (last invocation).
+    let default_call_id: Option<u32> = annots.iter().filter_map(|a| a.call_id).max();
+    // Left-to-right by anchor so chips sit under their underlines (avoids
+    // crossed L-leaders that look like “missing” lines when crowded).
+    let mut ordered: Vec<&ViewAnnot> = annots;
+    ordered.sort_by(|a, b| {
+        let sa = a.anchor_byte_start.unwrap_or(usize::MAX);
+        let sb = b.anchor_byte_start.unwrap_or(usize::MAX);
+        sa.cmp(&sb).then_with(|| a.id.cmp(&b.id))
+    });
+
     let mut s = String::from(r#"<div class="annot-band" data-annot-band>"#);
+    // Leaders live on the parent .doc-block (see initAnnotLeaders); keep a hook
+    // for keyed mode / a11y but geometry is computed against the block.
     s.push_str(r#"<div class="annot-leaders" aria-hidden="true"></div>"#);
     s.push_str(r#"<div class="annot-chips">"#);
     let mut shown = 0usize;
     let mut overflow_count = 0usize;
-    for a in &annots {
-        let frame_miss = a
+    for a in &ordered {
+        let iter_miss = a
             .iter
             .zip(default_iter.get(&a.loop_id))
             .map(|(i, d)| i != *d)
             .unwrap_or(false);
+        let call_miss = match (a.call_id, default_call_id) {
+            (Some(cid), Some(def)) if cid != def => true,
+            _ => false,
+        };
+        let frame_miss = iter_miss || call_miss;
         let overflow = if frame_miss {
             false
         } else if shown >= max_visible {

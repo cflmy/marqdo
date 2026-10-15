@@ -1259,12 +1259,14 @@ fn render_stmt(
     <span class="badge">code</span>
     <code class="expr">`{name}` =</code>
     <span class="code-lang">{lang}</span>
+  </div>
+  <pre class="code-body"><code class="language-{lang}">{src}</code></pre>
+  <div class="code-foot">
     <div class="code-actions">
       <input type="text" class="code-cmd" placeholder="{placeholder}" spellcheck="false" autocomplete="off"/>
       <button type="button" class="code-run">Run</button>
     </div>
   </div>
-  <pre class="code-body"><code class="language-{lang}">{src}</code></pre>
   <pre class="code-out" hidden></pre>
 </div>"#,
                     lang = lang,
@@ -1526,6 +1528,7 @@ pub(crate) fn render_formula_assign_card(name: &str, tex: &str) -> String {
 }
 
 /// Foreign code assign card for document surface embedding (single visual layer).
+/// Head → body → foot(actions) so the source is never collapsed under the Run row.
 pub(crate) fn render_code_assign_card(name: &str, lang: &str, source: &str) -> String {
     let placeholder = escape(&crate::foreign::default_cmd_display(lang));
     format!(
@@ -1534,12 +1537,14 @@ pub(crate) fn render_code_assign_card(name: &str, lang: &str, source: &str) -> S
     <span class="badge">code</span>
     <span class="code-name">{name}</span>
     <span class="code-lang">{lang}</span>
+  </div>
+  <pre class="code-body"><code class="language-{lang}">{src}</code></pre>
+  <div class="code-foot">
     <div class="code-actions">
       <input type="text" class="code-cmd" placeholder="{placeholder}" spellcheck="false" autocomplete="off"/>
       <button type="button" class="code-run">Run</button>
     </div>
   </div>
-  <pre class="code-body"><code class="language-{lang}">{src}</code></pre>
   <pre class="code-out" hidden></pre>
 </div>"#,
         lang = escape(lang),

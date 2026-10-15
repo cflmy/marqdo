@@ -652,7 +652,26 @@ impl Interpreter {
                         &[("kind", "call"), ("callee", call.callee.as_str())],
                     );
                 }
-                let _ = self.eval_call(module, fun, env, call)?;
+                let stdout_before = self.captured_stdout.len();
+                let v = self.eval_call(module, fun, env, call)?;
+                if self.capture {
+                    let (loop_id, iter) = self.loop_ctx();
+                    self.record_stmt_event(StmtEvent {
+                        line: span.line,
+                        kind: StmtEventKind::Call,
+                        name: Some(call.callee.clone()),
+                        value_after: Some(call_event_brief(
+                            &v,
+                            &self.captured_stdout,
+                            stdout_before,
+                            &call.callee,
+                        )),
+                        arm_index: None,
+                        iter,
+                        call_id: self.current_call_id(),
+                        loop_id,
+                    });
+                }
                 Ok(None)
             }
             Stmt::Expr { value, span } => {
@@ -665,7 +684,30 @@ impl Interpreter {
                         &[("kind", "expr")],
                     );
                 }
-                let _ = self.eval_expr(module, fun, env, value)?;
+                let stdout_before = self.captured_stdout.len();
+                let v = self.eval_expr(module, fun, env, value)?;
+                if self.capture {
+                    let (loop_id, iter) = self.loop_ctx();
+                    let name = match value {
+                        Expr::Call(c) => Some(c.callee.clone()),
+                        _ => None,
+                    };
+                    self.record_stmt_event(StmtEvent {
+                        line: span.line,
+                        kind: StmtEventKind::Call,
+                        name: name.clone(),
+                        value_after: Some(call_event_brief(
+                            &v,
+                            &self.captured_stdout,
+                            stdout_before,
+                            name.as_deref().unwrap_or("expr"),
+                        )),
+                        arm_index: None,
+                        iter,
+                        call_id: self.current_call_id(),
+                        loop_id,
+                    });
+                }
                 Ok(None)
             }
             Stmt::Branch { arms, span } => {
@@ -1686,6 +1728,29 @@ fn brief_trace_val(v: &Value) -> String {
     } else {
         s
     }
+}
+
+/// Prefer real result; else last stdout line emitted by the call; else callee name.
+fn call_event_brief(v: &Value, stdout: &str, stdout_before: usize, callee: &str) -> String {
+    if !matches!(v, Value::None) {
+        return brief_trace_val(v);
+    }
+    if stdout.len() > stdout_before {
+        let delta = &stdout[stdout_before..];
+        let line = delta
+            .trim_end()
+            .lines()
+            .last()
+            .unwrap_or(delta.trim_end());
+        if !line.is_empty() {
+            return if line.chars().count() > 48 {
+                format!("{}…", line.chars().take(48).collect::<String>())
+            } else {
+                line.to_string()
+            };
+        }
+    }
+    callee.to_string()
 }
 
 fn stmt_span(stmt: &Stmt) -> Span {

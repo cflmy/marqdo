@@ -382,6 +382,20 @@ li.doc-list-meta {
   margin-left: -1.25rem;
 }
 .doc-block { position: relative; margin: 0.55rem 0 0.85rem; }
+.doc-block > .annot-leaders {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: visible;
+  z-index: 1; /* below .annot-chips */
+}
+.doc-block > .annot-leaders svg {
+  position: absolute;
+  left: 0;
+  top: 0;
+  overflow: visible;
+}
+.doc-block.is-keyed > .annot-leaders { display: none; }
 .doc-block.doc-exec[style*="--doc-indent"] {
   margin-left: calc(var(--doc-indent, 1) * 1.5rem);
 }
@@ -466,38 +480,26 @@ ul.doc-loop, ol.doc-branch {
 .mq-anchor.is-focus { background: rgba(0,0,0,0.04); }
 .annot-band {
   position: relative;
-  margin: 0.35rem 0 0.15rem;
+  margin: 0.55rem 0 0.15rem;
   min-height: 1.6rem;
-  padding-top: 0.55rem;
+  padding-top: 1.15rem; /* room for mid→mid leaders (rail + stub) */
+  z-index: 1;
 }
-.annot-leaders {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  overflow: visible;
-}
+/* Band-local leaders kept for keyed fallback; geometry uses .doc-block > .annot-leaders */
+.annot-band > .annot-leaders { display: none; }
 .annot-leader {
-  position: absolute;
-  box-sizing: border-box;
-  border-left: 1.5px solid var(--line-strong);
-  border-bottom: 1.5px solid var(--line-strong);
-  border-color: #8e8e93;
+  fill: none;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
   pointer-events: none;
 }
-.annot-leader.annot-bind { border-color: #5ac8fa; }
-.annot-leader.annot-return { border-color: #30d158; }
-.annot-leader.annot-code,
-.annot-leader.annot-call,
-.annot-leader.annot-expr { border-color: #ff9f0a; }
-.annot-leader.annot-branch { border-color: #bf5af2; }
-.annot-leader.annot-loop { border-color: #64d2ff; }
-.annot-leader.annot-writeback { border-color: #8e8e93; }
 .annot-chips {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.4rem 0.55rem;
+  gap: 0.45rem 0.7rem;
   position: relative;
-  z-index: 1;
+  z-index: 3; /* chips above leaders */
 }
 .annot-chip {
   display: inline-flex;
@@ -531,9 +533,9 @@ ul.doc-loop, ol.doc-branch {
 .annot-chip.annot-branch { border-left-color: #bf5af2; }
 .annot-chip.annot-loop { border-left-color: #64d2ff; }
 .annot-chip.annot-writeback { border-left-color: #8e8e93; }
-.annot-chip-overflow { display: none; }
-.annot-band.is-expanded .annot-chip-overflow:not([hidden]):not(.is-frame-hidden) {
-  display: inline-flex;
+.annot-chip.annot-chip-overflow { display: none !important; }
+.annot-band.is-expanded .annot-chip.annot-chip-overflow:not([hidden]):not(.is-frame-hidden) {
+  display: inline-flex !important;
 }
 .annot-label { color: var(--muted); font-weight: 600; }
 .annot-value { color: var(--ink); word-break: break-word; }
@@ -546,17 +548,17 @@ ul.doc-loop, ol.doc-branch {
   padding: 0.22rem 0.45rem;
   cursor: pointer;
 }
-.annot-band.is-keyed .annot-leaders { display: none; }
-.annot-band.is-keyed .annot-chip::before {
+.annot-band.is-keyed .annot-chip::before,
+.doc-block.is-keyed .annot-chip::before {
   content: attr(data-annot-key) " ";
   color: var(--muted);
 }
 @media (max-width: 640px) {
   .annot-band { padding-top: 0.25rem; }
-  .annot-leaders { display: none; }
+  .doc-block > .annot-leaders { display: none; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .annot-leaders { display: none; }
+  .doc-block > .annot-leaders { display: none; }
 }
 .badge {
   display: inline-block;
@@ -1340,6 +1342,16 @@ ul.doc-loop, ol.doc-branch {
   align-items: center;
   gap: 0.4rem;
 }
+.code-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem 0.65rem;
+  padding: 0.5rem 0.85rem;
+  border-top: 1px solid var(--line);
+  background: #fafafa;
+}
+.code-foot .code-actions { margin-left: auto; }
 .code-cmd {
   min-width: 9rem;
   max-width: 16rem;
@@ -1376,6 +1388,7 @@ ul.doc-loop, ol.doc-branch {
   background: #1e1e1e;
   color: #d4d4d4;
   font: 0.82rem/1.45 var(--mono);
+  min-height: 2.4rem;
 }
 .code-body code {
   font: inherit;
@@ -1579,17 +1592,23 @@ pub fn layout(title: &str, nav: &str, main: &str) -> String {
   function initForeignCards() {{
     var live = !!window.MARQDO_VIEW_LIVE;
     document.querySelectorAll(".code-card").forEach(function (card) {{
+      var foot = card.querySelector(".code-foot");
       var btn = card.querySelector(".code-run");
       var cmd = card.querySelector(".code-cmd");
       var out = card.querySelector(".code-out");
       var body = card.querySelector(".code-body code");
-      if (!btn || !out || !body) return;
+      // Narrative ```text``` cards have no Run chrome — leave as-is.
+      if (!btn) return;
       if (!live) {{
-        btn.disabled = true;
-        btn.title = "Run is available in live marqdo view";
-        if (cmd) cmd.disabled = true;
+        // Static: hide fake Run (view-static-interactive D5 / view-prose-annot-gaps P4).
+        if (foot) foot.hidden = true;
+        else {{
+          btn.hidden = true;
+          if (cmd) cmd.hidden = true;
+        }}
         return;
       }}
+      if (!out || !body) return;
       btn.addEventListener("click", function () {{
         btn.disabled = true;
         out.hidden = false;
@@ -2280,6 +2299,45 @@ pub fn layout(title: &str, nav: &str, main: &str) -> String {
     }});
   }}
 
+  var MAX_VISIBLE_ANNOTS = 4;
+
+  function setFrameHidden(el, hide) {{
+    el.hidden = !!hide;
+    if (hide) el.classList.add("is-frame-hidden");
+    else el.classList.remove("is-frame-hidden");
+  }}
+
+  /** After frame filter: overflow only among chips visible in the selected frame. */
+  function recomputeAnnotOverflow(scope) {{
+    var root = scope || document.getElementById("structure") || document;
+    root.querySelectorAll("[data-annot-band]").forEach(function (band) {{
+      band.classList.remove("is-expanded");
+      var chips = band.querySelectorAll(".annot-chip");
+      var visible = [];
+      chips.forEach(function (chip) {{
+        chip.classList.remove("annot-chip-overflow");
+        if (chip.hidden || chip.classList.contains("is-frame-hidden")) return;
+        visible.push(chip);
+      }});
+      var overflow = 0;
+      visible.forEach(function (chip, i) {{
+        if (i >= MAX_VISIBLE_ANNOTS) {{
+          chip.classList.add("annot-chip-overflow");
+          overflow++;
+        }}
+      }});
+      var more = band.querySelector("[data-annot-more]");
+      if (more) {{
+        if (overflow > 0) {{
+          more.hidden = false;
+          more.textContent = "+" + overflow;
+        }} else {{
+          more.hidden = true;
+        }}
+      }}
+    }});
+  }}
+
   /** Source structure always stays visible; only chips + arm classes follow the frame. */
   function initCallPickers() {{
     document.querySelectorAll(".call-picker").forEach(function (sel) {{
@@ -2295,7 +2353,7 @@ pub fn layout(title: &str, nav: &str, main: &str) -> String {
         root.querySelectorAll(".annot-chip[data-call-id]").forEach(function (chip) {{
           var cid = String(chip.getAttribute("data-call-id") || "");
           if (!allowed[cid]) return;
-          chip.hidden = cid !== callId;
+          setFrameHidden(chip, cid !== callId);
         }});
         var trace = readViewTrace();
         applyParamChipValues(fnName, callId, trace);
@@ -2318,6 +2376,7 @@ pub fn layout(title: &str, nav: &str, main: &str) -> String {
             }});
           }});
         }}
+        recomputeAnnotOverflow(root);
         initAnnotLeaders();
       }}
       if (sel.dataset.bound !== "1") {{
@@ -2326,12 +2385,6 @@ pub fn layout(title: &str, nav: &str, main: &str) -> String {
       }}
       apply();
     }});
-  }}
-
-  function setFrameHidden(el, hide) {{
-    el.hidden = !!hide;
-    if (hide) el.classList.add("is-frame-hidden");
-    else el.classList.remove("is-frame-hidden");
   }}
 
   function initLoopPickers() {{
@@ -2355,6 +2408,7 @@ pub fn layout(title: &str, nav: &str, main: &str) -> String {
           if (lid && loopId && String(lid) !== loopId) return;
           setFrameHidden(chip, String(chipIter) !== iter);
         }});
+        recomputeAnnotOverflow(scope);
         initAnnotLeaders();
       }}
       if (sel.dataset.bound !== "1") {{
@@ -2365,6 +2419,26 @@ pub fn layout(title: &str, nav: &str, main: &str) -> String {
     }});
   }}
 
+  function ensureBlockLeaders(block) {{
+    var leaders = block.querySelector(":scope > .annot-leaders");
+    if (!leaders) {{
+      leaders = document.createElement("div");
+      leaders.className = "annot-leaders";
+      leaders.setAttribute("aria-hidden", "true");
+      block.insertBefore(leaders, block.firstChild);
+    }}
+    return leaders;
+  }}
+
+  function leaderColor(kind) {{
+    if (kind === "bind") return "#5ac8fa";
+    if (kind === "return") return "#30d158";
+    if (kind === "call" || kind === "expr" || kind === "code") return "#ff9f0a";
+    if (kind === "branch") return "#bf5af2";
+    if (kind === "loop") return "#64d2ff";
+    return "#8e8e93";
+  }}
+
   function initAnnotLeaders() {{
     var bands = document.querySelectorAll("[data-annot-band]");
     if (!bands.length) return;
@@ -2372,68 +2446,122 @@ pub fn layout(title: &str, nav: &str, main: &str) -> String {
     var narrow = window.matchMedia && window.matchMedia("(max-width: 640px)").matches;
 
     function layoutBand(band) {{
-      var leaders = band.querySelector(".annot-leaders");
-      var chips = band.querySelectorAll(".annot-chip:not(.annot-chip-overflow):not([hidden]):not(.is-frame-hidden)");
-      if (!leaders) return;
+      var block = band.closest(".doc-block");
+      if (!block) return;
+      var leaders = ensureBlockLeaders(block);
       leaders.innerHTML = "";
-      if (reduce || narrow || chips.length > 4) {{
-        band.classList.add("is-keyed");
-        chips.forEach(function (chip, i) {{
-          chip.setAttribute("data-annot-key", String(i + 1));
-        }});
-        return;
-      }}
-      band.classList.remove("is-keyed");
-      var bandRect = band.getBoundingClientRect();
+      var chipsEl = band.querySelector(".annot-chips");
+      var chips = Array.prototype.slice.call(
+        band.querySelectorAll(".annot-chip:not(.annot-chip-overflow):not([hidden]):not(.is-frame-hidden)")
+      );
+      // Pair chips with anchors; reorder DOM left→right under underlines so
+      // L-leaders do not cross (crowded reverse order looked like missing lines).
+      var items = [];
       chips.forEach(function (chip) {{
-        if (chip.hidden || chip.classList.contains("is-frame-hidden")) return;
         var id = chip.getAttribute("data-annot-id") || "";
         var kind = chip.getAttribute("data-annot-kind") || "";
         var anchor = id
-          ? document.querySelector('.mq-anchor[data-annot-id="' + id + '"]')
+          ? (block.querySelector('.mq-anchor[data-annot-id="' + id + '"]')
+            || document.querySelector('.mq-anchor[data-annot-id="' + id + '"]'))
           : null;
+        // Fallback: match mark kind on this block (frame chips may share a span).
         if (!anchor) {{
-          var block = band.closest(".doc-block");
-          anchor = block ? block.querySelector(".mq-anchor") : null;
+          var cls = kind === "bind" ? "mq-decl"
+            : kind === "return" ? "mq-return"
+            : (kind === "call" || kind === "expr" || kind === "code") ? "mq-code"
+            : "";
+          if (cls) anchor = block.querySelector(".mq-anchor." + cls);
         }}
         if (!anchor) return;
-        var a = anchor.getBoundingClientRect();
-        var c = chip.getBoundingClientRect();
-        var x0 = a.left + a.width / 2 - bandRect.left;
-        var y0 = 0;
-        var x1 = c.left + Math.min(12, c.width / 2) - bandRect.left;
-        var y1 = c.top - bandRect.top + c.height / 2;
-        var left = Math.min(x0, x1);
-        var width = Math.max(2, Math.abs(x1 - x0));
-        var height = Math.max(2, y1 - y0);
-        var el = document.createElement("div");
-        el.className = "annot-leader annot-" + kind;
-        el.style.left = left + "px";
-        el.style.top = y0 + "px";
-        el.style.width = width + "px";
-        el.style.height = height + "px";
-        if (x1 < x0) {{
-          el.style.borderLeft = "none";
-          el.style.borderRight = "1.5px solid";
-          el.style.borderBottom = "1.5px solid";
-        }}
-        leaders.appendChild(el);
+        if (id) anchor.setAttribute("data-annot-id", id);
+        items.push({{
+          chip: chip,
+          anchor: anchor,
+          kind: kind,
+          x: anchor.getBoundingClientRect().left
+        }});
       }});
+      items.sort(function (a, b) {{ return a.x - b.x; }});
+      if (chipsEl && items.length) {{
+        items.forEach(function (it) {{ chipsEl.appendChild(it.chip); }});
+        var more = band.querySelector("[data-annot-more]");
+        if (more) chipsEl.appendChild(more);
+      }}
+      if (reduce || narrow || items.length > MAX_VISIBLE_ANNOTS) {{
+        block.classList.add("is-keyed");
+        band.classList.add("is-keyed");
+        items.forEach(function (it, i) {{
+          it.chip.setAttribute("data-annot-key", String(i + 1));
+        }});
+        return;
+      }}
+      block.classList.remove("is-keyed");
+      band.classList.remove("is-keyed");
+      // Mid-bottom of mark → mid-top of chip: vertical, horizontal rail, short stub.
+      var blockRect = block.getBoundingClientRect();
+      var bw = Math.max(1, block.offsetWidth);
+      var bh = Math.max(1, block.offsetHeight);
+      var svgNS = "http://www.w3.org/2000/svg";
+      var svg = document.createElementNS(svgNS, "svg");
+      svg.setAttribute("width", String(bw));
+      svg.setAttribute("height", String(bh));
+      svg.setAttribute("viewBox", "0 0 " + bw + " " + bh);
+      svg.setAttribute("aria-hidden", "true");
+      items.forEach(function (it) {{
+        var a = it.anchor.getBoundingClientRect();
+        var c = it.chip.getBoundingClientRect();
+        var x0 = a.left + a.width / 2 - blockRect.left;
+        var y0 = a.bottom - blockRect.top + 1;
+        var x1 = c.left + c.width / 2 - blockRect.left;
+        var y1 = c.top - blockRect.top;
+        if (y1 < y0 + 8) {{
+          y1 = y0 + 12;
+        }}
+        // Short stub into chip top-center; rail sits above that.
+        var stub = Math.min(10, Math.max(6, (y1 - y0) * 0.28));
+        var yRail = y1 - stub;
+        if (yRail < y0 + 4) {{
+          yRail = (y0 + y1) / 2;
+        }}
+        var path = document.createElementNS(svgNS, "path");
+        path.setAttribute("class", "annot-leader annot-" + it.kind);
+        path.setAttribute("stroke", leaderColor(it.kind));
+        // Orthogonal: down from mark mid → across → short down to chip mid.
+        path.setAttribute(
+          "d",
+          "M " + x0.toFixed(1) + " " + y0.toFixed(1) +
+            " L " + x0.toFixed(1) + " " + yRail.toFixed(1) +
+            " L " + x1.toFixed(1) + " " + yRail.toFixed(1) +
+            " L " + x1.toFixed(1) + " " + y1.toFixed(1)
+        );
+        svg.appendChild(path);
+      }});
+      leaders.appendChild(svg);
     }}
 
     function layoutAll() {{
       bands.forEach(layoutBand);
     }}
     layoutAll();
+    // Second pass after fonts/layout settle (first paint often has zero chip width).
+    requestAnimationFrame(function () {{ layoutAll(); }});
+    if (document.documentElement.dataset.annotLeadersRo === "1") return;
+    document.documentElement.dataset.annotLeadersRo = "1";
     if (typeof ResizeObserver !== "undefined") {{
       var ro = new ResizeObserver(function () {{ layoutAll(); }});
-      bands.forEach(function (b) {{ ro.observe(b); }});
+      bands.forEach(function (b) {{
+        ro.observe(b);
+        var blk = b.closest(".doc-block");
+        if (blk) ro.observe(blk);
+      }});
       var surface = document.querySelector(".document-surface");
       if (surface) ro.observe(surface);
     }}
     window.addEventListener("resize", layoutAll);
 
     document.querySelectorAll("[data-annot-more]").forEach(function (btn) {{
+      if (btn.dataset.bound === "1") return;
+      btn.dataset.bound = "1";
       btn.addEventListener("click", function () {{
         var band = btn.closest("[data-annot-band]");
         if (!band) return;
@@ -2443,6 +2571,8 @@ pub fn layout(title: &str, nav: &str, main: &str) -> String {
       }});
     }});
     document.querySelectorAll(".annot-chip").forEach(function (chip) {{
+      if (chip.dataset.focusBound === "1") return;
+      chip.dataset.focusBound = "1";
       chip.addEventListener("mouseenter", function () {{
         var id = chip.getAttribute("data-annot-id");
         if (!id) return;

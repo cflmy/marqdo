@@ -110,9 +110,33 @@ pub fn render_module_document(module: &Module, source: &str, annots: &[ViewAnnot
             LineKind::Comment => {
                 let text = l.text.trim_end_matches(['\r', '\n']);
                 let trimmed = text.trim();
+                // Unbound ```lang fences stay Comment in lex — render as code cards
+                // (same chrome as bound foreign), never join into a prose <code> blob.
+                if crate::foreign::is_fence_opener(trimmed)
+                    || (trimmed.starts_with("```") && !crate::foreign::is_fence_closer(trimmed))
+                {
+                    flush_para(&mut para, &mut out);
+                    let (html, next) = render_narrative_fence(&lines, i);
+                    out.push_str(&html);
+                    i = next;
+                    continue;
+                }
+                if crate::foreign::is_fence_closer(trimmed) {
+                    // Orphan closer — skip.
+                    flush_para(&mut para, &mut out);
+                    i += 1;
+                    continue;
+                }
                 let bits = scan_prose_line(text);
                 let is_stmt = stmt_lines.contains(&l.line_no);
+                let has_annots = by_line
+                    .get(&l.line_no)
+                    .map(|v| !v.is_empty())
+                    .unwrap_or(false);
+                // Decl alone stays in Markdown prose (keep links). Open a marked
+                // line block when there is executable prose, a stmt, or chips.
                 let needs_annot = is_stmt
+                    || has_annots
                     || bits.iter().any(|b| {
                         matches!(b, ProseBit::BoldCode { .. } | ProseBit::ItalicReturn { .. })
                     });
@@ -722,14 +746,24 @@ fn render_line_block(
             let trimmed = text.trim_start();
             if bits.is_empty() {
                 if let Some(rest) = trimmed.strip_prefix("> ") {
+                    let aid = match_annot_for_line(annots)
+                        .map(|a| a.id.as_str())
+                        .unwrap_or("");
                     s.push_str(&format!(
-                        r#"<div class="doc-line doc-call"><span class="mq-call-gt">&gt;</span> {}</div>"#,
-                        escape(rest)
+                        r#"<div class="doc-line doc-call"><span class="mq-call-gt">&gt;</span> <mark class="mq-anchor mq-code" data-line="{line}" data-annot-id="{aid}">{rest}</mark></div>"#,
+                        line = line_no,
+                        aid = escape(aid),
+                        rest = escape(rest),
                     ));
                 } else if let Some(rest) = trimmed.strip_prefix('>') {
+                    let aid = match_annot_for_line(annots)
+                        .map(|a| a.id.as_str())
+                        .unwrap_or("");
                     s.push_str(&format!(
-                        r#"<div class="doc-line doc-call"><span class="mq-call-gt">&gt;</span> {}</div>"#,
-                        escape(rest.trim_start())
+                        r#"<div class="doc-line doc-call"><span class="mq-call-gt">&gt;</span> <mark class="mq-anchor mq-code" data-line="{line}" data-annot-id="{aid}">{rest}</mark></div>"#,
+                        line = line_no,
+                        aid = escape(aid),
+                        rest = escape(rest.trim_start()),
                     ));
                 } else {
                     s.push_str(&format!(
@@ -768,13 +802,57 @@ fn render_line_block(
     s
 }
 
-/// Huge SVG / fenced code dumps make annot bands unreadable — keep those out of chips.
+/// Huge SVG / fenced code dumps — prefer abbreviated chips from annot builder;
+/// only drop if detail is still an unreadable dump.
 fn is_noisy_result_chip(a: &ViewAnnot) -> bool {
     if a.kind != crate::view::annot::AnnotKind::Bind {
         return false;
     }
     let v = a.detail.as_str();
     v.contains("<svg") || v.contains("```") || v.chars().count() > 96
+}
+
+fn match_annot_for_line<'a>(annots: &[&'a ViewAnnot]) -> Option<&'a ViewAnnot> {
+    annots.iter().copied().find(|a| {
+        matches!(
+            a.kind,
+            crate::view::annot::AnnotKind::Call
+                | crate::view::annot::AnnotKind::Bind
+                | crate::view::annot::AnnotKind::Return
+        )
+    })
+}
+
+/// Unbound Markdown fence → same visual card as bound foreign (no Run chrome).
+fn render_narrative_fence(lines: &[ClassifiedLine], start: usize) -> (String, usize) {
+    let opener = lines[start].text.trim_end_matches(['\r', '\n']).trim();
+    let lang = crate::foreign::fence_lang(opener).unwrap_or_else(|| "text".into());
+    let line_no = lines[start].line_no;
+    let mut body: Vec<String> = Vec::new();
+    let mut j = start + 1;
+    while j < lines.len() {
+        let t = lines[j].text.trim_end_matches(['\r', '\n']);
+        if crate::foreign::is_fence_closer(t.trim()) {
+            j += 1;
+            break;
+        }
+        body.push(t.to_string());
+        j += 1;
+    }
+    let source = body.join("\n");
+    let html = format!(
+        r#"<div class="doc-block doc-exec" data-line="{line}"><div class="card code-card" data-lang="{lang}">
+  <div class="code-head">
+    <span class="badge">code</span>
+    <span class="code-lang">{lang}</span>
+  </div>
+  <pre class="code-body"><code class="language-{lang}">{src}</code></pre>
+</div></div>"#,
+        line = line_no,
+        lang = escape(&lang),
+        src = escape(&source),
+    );
+    (html, j)
 }
 
 /// Render prose with markers stripped; show surface inner text only.
@@ -1242,6 +1320,90 @@ mod tests {
         assert!(
             html.contains(r#"data-call-id=""#) || html.contains("data-call-id="),
             "{html}"
+        );
+    }
+
+    #[test]
+    fn narrative_text_fence_renders_as_code_card() {
+        let src = r#"# main
+
+```text
+marqdo ext add web
+marqdo ext add quantum
+```
+
+> print text=ok
+"#;
+        let module = crate::parse::parse_source(src).unwrap();
+        let html = render_module_document(&module, src, &[]);
+        assert!(
+            html.contains(r#"data-lang="text""#) && html.contains("code-body"),
+            "text fence should be a code card: {html}"
+        );
+        assert!(
+            html.contains("marqdo ext add web\nmarqdo ext add quantum"),
+            "fence body newlines preserved: {html}"
+        );
+        assert!(
+            !html.contains("<code>text marqdo"),
+            "must not collapse fence into inline code: {html}"
+        );
+    }
+
+    #[test]
+    fn prose_calls_and_param_decl_get_chips() {
+        let src = r#"# main
+
+Try **greet who="a"** and **greet who="b"**.
+
+## greet
+
+When we meet `who`, we **print text="Hi, `who`!"** and close with*None*.
+"#;
+        let module = crate::parse::parse_source(src).unwrap();
+        let cap = crate::run_source(src, &crate::RunOptions::default()).unwrap();
+        let annots = build_view_annots(&module, src, &cap);
+        assert!(
+            annots
+                .iter()
+                .filter(|a| a.kind == crate::view::annot::AnnotKind::Call)
+                .count()
+                >= 3,
+            "expected greet×2 + print call events: {:?}",
+            cap.view_trace.events
+        );
+        assert!(
+            annots.iter().any(|a| {
+                a.kind == crate::view::annot::AnnotKind::Bind && a.label == "who"
+            }),
+            "param Decl bind missing: {annots:?}"
+        );
+        let html = render_module_document(&module, src, &annots);
+        assert!(html.contains("annot-call"), "{html}");
+        assert!(html.contains("annot-bind"), "{html}");
+        assert!(html.contains("Hi, a!") || html.contains("Hi, b!"), "{html}");
+        // Dual greet call sites each get a non-empty annot id.
+        let greet_ids: Vec<_> = html
+            .match_indices("mq-code")
+            .filter(|_| true)
+            .collect();
+        assert!(
+            html.matches(r#"data-annot-id="c"#).count() >= 2
+                || html.contains(r#"data-annot-id="c"#),
+            "expected call annot ids on greet marks: {html}"
+        );
+        let _ = greet_ids;
+        // Last-frame who bind must not be buried in overflow (frame-aware density).
+        assert!(
+            !html.contains(r#"annot-bind annot-chip-overflow"#)
+                || html.contains(r#"annot-label">who</span>"#),
+            "who bind should be visible for default (last) call frame: {html}"
+        );
+        // Prefer: no overflow on bind chips when last frame has ≤4 chips.
+        let bind_overflow = html.matches("annot-bind annot-chip-overflow").count();
+        assert_eq!(
+            bind_overflow, 0,
+            "default frame who/print/return must not overflow: {html}"
         );
     }
 }

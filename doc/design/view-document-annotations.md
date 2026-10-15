@@ -4,7 +4,7 @@
 |---|---|
 | 状态 | **Active** |
 | 日期 | 2026-10-15 |
-| 相关 | [view.md](view.md) · [view-debug.md](view-debug.md) · [view-markup-surface.md](view-markup-surface.md) · [view-execution-trace.md](view-execution-trace.md) · [view-frame-selection.md](view-frame-selection.md) · [code-as-docs-gaps.md](code-as-docs-gaps.md) |
+| 相关 | [view.md](view.md) · [view-debug.md](view-debug.md) · [view-markup-surface.md](view-markup-surface.md) · [view-execution-trace.md](view-execution-trace.md) · [view-frame-selection.md](view-frame-selection.md) · [view-prose-annot-gaps.md](view-prose-annot-gaps.md) · [code-as-docs-gaps.md](code-as-docs-gaps.md) |
 
 ---
 
