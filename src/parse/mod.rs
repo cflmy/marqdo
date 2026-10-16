@@ -257,7 +257,7 @@ impl<'a> Cursor<'a> {
             var_contracts: std::collections::HashMap::new(),
         };
         // Prose decls pending promotion (name → optional default text).
-        let mut prose_decls: Vec<(String, Option<String>)> = Vec::new();
+        let mut prose_decls: Vec<(String, Option<String>, u32)> = Vec::new();
 
         // Parameter zone: explicit `+` lines (legacy / optional).
         while self.skip_noise() {
@@ -335,8 +335,8 @@ impl<'a> Cursor<'a> {
                 for bit in bits {
                     match bit {
                         ProseBit::Decl { name, default, .. } => {
-                            if !prose_decls.iter().any(|(n, _)| n == &name) {
-                                prose_decls.push((name, default));
+                            if !prose_decls.iter().any(|(n, _, _)| n == &name) {
+                                prose_decls.push((name, default, span.line));
                             }
                         }
                         ProseBit::BoldCode { inner, .. } => {
@@ -1714,10 +1714,11 @@ fn stmt_from_italic_return(inner: &str, span: Span) -> Result<Stmt> {
     Ok(Stmt::Return { value, span })
 }
 
-/// Merge prose decls into params: promote names that are read in the body (or have defaults).
+/// Merge declarations into params: promote names that are read in the body (or have defaults).
 ///
-/// Design §8.2: elevate only when an executable read cannot be satisfied by a prior
-/// local assign that does not itself read the name (e.g. `score = > json.get …` is local;
+/// Design §8.2: a declaration is a backtick mention or the first bold assignment
+/// to that name. Elevate only when an executable read cannot be satisfied by a prior
+/// local assign that does not itself read the name (e.g. `score = 1` is local;
 /// `n = n + 1` still needs external `n`).
 // ---------- 契约提取（T2.1 · 渐进式契约 / 标注类型） ----------
 //
@@ -1881,36 +1882,62 @@ fn extract_function_contract(fun: &mut Function, lines: &[ClassifiedLine]) -> Re
 
 fn merge_inferred_params(
     fun: &mut Function,
-    prose_decls: &[(String, Option<String>)],
+    prose_decls: &[(String, Option<String>, u32)],
 ) -> Result<()> {
     use std::collections::HashSet;
 
     let mut needs_input = HashSet::new();
     let mut bound = HashSet::new();
-    collect_names_needing_input(&fun.body, &mut bound, &mut needs_input);
+    let mut assign_decls = Vec::new();
+    collect_names_needing_input(
+        &fun.body,
+        &mut bound,
+        &mut needs_input,
+        &HashSet::new(),
+        &mut assign_decls,
+    );
 
-    for (name, default_txt) in prose_decls {
+    // Declaration order is source order: backtick mentions and first assignment
+    // left-hand sides. An assignment promotes only when its right-hand side (or a
+    // later read) still needs an external value.
+    let mut events: Vec<(u32, usize, String, Option<String>)> = Vec::new();
+    for (i, (name, default_txt, line)) in prose_decls.iter().enumerate() {
+        events.push((*line, i, name.clone(), default_txt.clone()));
+    }
+    let prose_n = events.len();
+    for (j, (name, line)) in assign_decls.iter().enumerate() {
+        if prose_decls.iter().any(|(n, _, _)| n == name) {
+            continue;
+        }
+        if !needs_input.contains(name) {
+            continue;
+        }
+        events.push((*line, prose_n + j, name.clone(), None));
+    }
+    events.sort_by_key(|e| (e.0, e.1));
+
+    for (_line, _ord, name, default_txt) in events {
         if name == "self" || name == "自" {
             continue;
         }
-        if fun.params.iter().any(|p| &p.name == name) {
+        if fun.params.iter().any(|p| p.name == name) {
             continue;
         }
         let has_default = default_txt.is_some();
         // Elevate: defaulted always; or executable read that needs an external input.
-        if !has_default && !needs_input.contains(name) {
-            if !bound.contains(name) {
-                fun.dead_binds.push(name.clone());
+        if !has_default && !needs_input.contains(&name) {
+            if !bound.contains(&name) {
+                fun.dead_binds.push(name);
             }
             continue; // dead bind or pure local
         }
         let default = if let Some(txt) = default_txt {
-            Some(parse_expr_prefer_var(txt).or_else(|_| parse_value_or_interp(txt))?)
+            Some(parse_expr_prefer_var(&txt).or_else(|_| parse_value_or_interp(&txt))?)
         } else {
             None
         };
         fun.params.push(Param {
-            name: name.clone(),
+            name,
             default,
             inferred: true,
         });
@@ -1921,20 +1948,29 @@ fn merge_inferred_params(
 /// Walk body in order. `bound` = names already assigned locally without needing input.
 /// On read of unbound name → needs input. On assign, RHS reads are checked first
 /// (so `n = n + 1` marks `n` as needing input before binding).
+/// `assign_decls` records the first assignment of each name, which §8.2 treats as
+/// a declaration when no backtick mention came first. Loop items are not declarations.
 fn collect_names_needing_input(
     stmts: &[Stmt],
     bound: &mut std::collections::HashSet<String>,
     needs: &mut std::collections::HashSet<String>,
+    loop_items: &std::collections::HashSet<String>,
+    assign_decls: &mut Vec<(String, u32)>,
 ) {
     for s in stmts {
         match s {
-            Stmt::Assign { name, value, .. } => {
+            Stmt::Assign { name, value, span, .. } => {
                 let mut rhs_reads = std::collections::HashSet::new();
                 collect_reads_expr(value, &mut rhs_reads);
                 for r in &rhs_reads {
-                    if !bound.contains(r) {
+                    if !bound.contains(r) && !loop_items.contains(r) {
                         needs.insert(r.clone());
                     }
+                }
+                if !loop_items.contains(name)
+                    && !assign_decls.iter().any(|(n, _)| n == name)
+                {
+                    assign_decls.push((name.clone(), span.line));
                 }
                 bound.insert(name.clone());
             }
@@ -1977,7 +2013,13 @@ fn collect_names_needing_input(
                         }
                     }
                     let mut arm_bound = bound.clone();
-                    collect_names_needing_input(&a.body, &mut arm_bound, needs);
+                    collect_names_needing_input(
+                        &a.body,
+                        &mut arm_bound,
+                        needs,
+                        loop_items,
+                        assign_decls,
+                    );
                 }
             }
             Stmt::While {
@@ -1986,19 +2028,24 @@ fn collect_names_needing_input(
                 let mut reads = std::collections::HashSet::new();
                 collect_reads_expr(condition, &mut reads);
                 for r in reads {
-                    if !bound.contains(&r) {
+                    if !bound.contains(&r) && !loop_items.contains(&r) {
                         needs.insert(r);
                     }
                 }
-                collect_names_needing_input(body, bound, needs);
+                collect_names_needing_input(body, bound, needs, loop_items, assign_decls);
             }
             Stmt::ForEach {
-                collection, body, ..
+                item,
+                collection,
+                body,
+                ..
             } => {
-                if !bound.contains(collection) {
+                if !bound.contains(collection) && !loop_items.contains(collection) {
                     needs.insert(collection.clone());
                 }
-                collect_names_needing_input(body, bound, needs);
+                let mut nested = loop_items.clone();
+                nested.insert(item.clone());
+                collect_names_needing_input(body, bound, needs, &nested, assign_decls);
             }
         }
     }
@@ -2389,6 +2436,21 @@ Candidates may include lexical `score`.
         let dump = crate::ast::format_ast_dump("t.mq.md", &m);
         assert!(dump.contains("params=[n inferred]"), "{dump}");
         assert!(!dump.contains("dead="), "{dump}");
+    }
+
+    #[test]
+    fn parse_bare_inc_is_required_param() {
+        // §8.2: the first bold assignment is a declaration. The RHS reads `n`
+        // before the bind, so `n` is a required parameter even without a backtick.
+        let src = "## inc\n\n**n = n + 1**\n*n*\n\n# main\n\n**print text=\"ok\"**\n";
+        let m = parse_source(src).unwrap();
+        let inc = m.functions.iter().find(|f| f.name == "inc").unwrap();
+        assert_eq!(
+            inc.params.iter().map(|p| p.name.as_str()).collect::<Vec<_>>(),
+            ["n"]
+        );
+        assert!(inc.params[0].default.is_none());
+        assert!(inc.params[0].inferred);
     }
 
     #[test]
