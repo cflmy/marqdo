@@ -6,11 +6,32 @@
 
 ### Fixed
 
-- **LLM / Agent 传输软失败**：上游连接拒绝、超时或 HTTP≠200 时，`host_http_post` / `llm` 插件 / `ext/ai/llm/openai` 不再硬中断；`llm.ask` · `agent.step` · `agent.run` 返回 `finish|status=error` + `error`。金样 `tests/ext/agent-llm-transport-soft.mq.md`。说明：[doc/research/agent-llm-transport-soft-2026-10.md](doc/research/agent-llm-transport-soft-2026-10.md)。
-- **`agent.run`**：`cache == soft-hit` 改为引号比较（裸 `soft-hit` 被解析为减法，软失败路径上才暴露）。
-- **`ext/ai` 去 json 胶水**：`agent.mq.md` / `智能体.mq.md` / `llm/openai.mq.md` 结果 map 与事件构建改为 GFM 表 + `table.put` / `table.append` / `table.empty_*`（`json.set`/`json.append` 清零）。SKILL 正面示例：`.cursor/skills/marqdo-dev` §2 · `marqdo/examples.md` §6e。
+### Changed
+
+## v1.4.4 — 2026-10-16
+
+### Highlights
+
+**LLM 传输软失败 + `ext/ai` 表优先重构**：上游连接拒绝/超时/HTTP≠200 时，Runtime 返回结构化 `finish|status=error`（不再硬中断 VM）；`agent` / `智能体` / `llm/openai` 去掉 `json.set`/`json.append` 袋胶水。含 CLI host · `plugins/llm` · Ext pack **1.4.4**。
+
+```bash
+git checkout v1.4.4 && cargo build --release
+cargo build --release -p marqdo_plugin_llm
+marqdo run tests/ext/agent-llm-transport-soft.mq.md
+marqdo ext add agent   # CDN → 1.4.4
+```
+
+**核心表面 Δ（Core surface Δ）**：**无增删**——HTTP 宿主软失败契约 + Extension 风格重构；不改 MQ 关键词 / 表几何。
+
+### Fixed
+
+- **LLM / Agent 传输软失败**：`host_http_post` / SSE · `plugins/llm` · `ext/ai/llm/openai` 结构化 `finish=error`；`agent.step` / `plan` / `run` 收成 `status=error`。金样 `tests/ext/agent-llm-transport-soft.mq.md`。说明：[doc/research/agent-llm-transport-soft-2026-10.md](doc/research/agent-llm-transport-soft-2026-10.md)。
+- **`agent.run`**：`cache == "soft-hit"` 引号比较（裸 `soft-hit` 曾被解析为减法）。
 
 ### Changed
+
+- **`ext/ai` 去 json 胶水**：结果 map / 事件用 GFM 表 + `table.put` / `table.append` / `table.empty_*`。SKILL 正面示例：`.cursor/skills/marqdo-dev` §2 · `marqdo/examples.md` §6e。
+- CLI / Ext / wasm SemVer **1.4.4**。
 
 ## Ext pack v1.4.3 — 2026-10-16
 
