@@ -7,6 +7,7 @@
 | 调研 | [agent-frameworks-and-marqdo.md](../research/agent-frameworks-and-marqdo.md) · [agent-framework-gaps-after-a4.md](../research/agent-framework-gaps-after-a4.md) · **[agent-framework-2026-09.md](../research/agent-framework-2026-09.md)** |
 | 设计 | [ext-agent.md](../design/ext-agent.md) · [ext-agent-plan.md](../design/ext-agent-plan.md) · [ext-agent-parent.md](../design/ext-agent-parent.md) · [okf.md](../design/okf.md) |
 | 邻近 | [agent-streaming.md](agent-streaming.md) · [okf-near-match.md](okf-near-match.md) |
+| 后续 | 优化波次 O1–O5 见 [ext-ai-optimize.md](ext-ai-optimize.md)（沙盒证明 · Skill Lift · 路由/成本 · lint · 隔离） |
 
 ---
 

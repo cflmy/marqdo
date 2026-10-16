@@ -9,6 +9,8 @@ import time:lib/time.mq.md
 import wb:lib/writeback.mq.md
 import subtask:lib/subtask.mq.md
 import plugin:lib/plugin.mq.md
+import sandbox:ext/ai/sandbox.mq.md
+import table:lib/table.mq.md
 ---
 
 ## build_step_context
@@ -247,23 +249,129 @@ Structured observation for the parent developer-agent: source, named writeback s
 
 ---
 
+## trial
+    + `path`=None
+    + `source`=None
+    + `root`=None
+    + `write_path`=None
+    + `text`=None
+    + `commit`=True
+    + `profile`=default
+
+Opt-in CoW trial (O1): open → optional upper write → optional run → diff → commit on success else discard.
+Host tree unchanged until a successful commit. Return map is a GFM table (link-index readable).
+
+**sb = sandbox.open root=`root` profile=`profile`**
+**id = [id](sb)**
+**prof = [profile](sb)**
+**ok = True**
+**stdout = ""**
+**stderr = ""**
+
+1. `write_path`
+  1. `text`
+    > sandbox.write id=`id` path=`write_path` text=`text`
+  2. *
+    **_ = 1**
+2. *
+  **_ = 1**
+
+1. `source`
+  **ret = sandbox.run id=`id` source=`source`**
+  **ok = [ok](ret)**
+  **stdout = [stdout](ret)**
+  **stderr = [stderr](ret)**
+2. `path`
+  **ret = sandbox.run id=`id` path=`path`**
+  **ok = [ok](ret)**
+  **stdout = [stdout](ret)**
+  **stderr = [stderr](ret)**
+3. *
+  **_ = 1**
+
+**pending = sandbox.diff id=`id`**
+**committed = False**
+
+1. `ok`
+  1. `commit`
+    > sandbox.commit id=`id`
+    **committed = True**
+  2. *
+    > sandbox.discard id=`id`
+2. *
+  > sandbox.discard id=`id`
+
+**out = **
+
+| ok | committed | diff | stdout | stderr | id | profile |
+|----|-----------|------|--------|--------|-----|---------|
+| `ok` | `committed` | `pending` | `stdout` | `stderr` | `id` | `prof` |
+
+*out*
+
+## step_route
+    + `kind`=default
+
+O3: map step class (`lookup` | `patch` | `sandbox_run` | `net` | `default`) → Adaptive Routing backend.
+Authority is the GFM table in `ext/ai/policies/step-route.mq.md` (mirrored here for offline reads).
+
+1. `kind` == "lookup"
+  **backend = "marqdo"**
+2. `kind` == "patch"
+  **backend = "small-llm"**
+3. `kind` == "sandbox_run"
+  **backend = "marqdo"**
+4. `kind` == "net"
+  **backend = "llm"**
+5. *
+  **backend = "auto"**
+
+**out = table.put in=None at="kind" value=`kind`**
+**out = table.put in=`out` at="backend" value=`backend`**
+*out*
+
 ## await_workbook
     + `path`
+    + `sandbox`=False
+    + `sandbox_root`=None
+    + `sandbox_profile`=default
 
-Spawn a workbook file (quiet by default), wait for `{code,value,stdout?,stderr?}`, and inspect.
+Spawn a workbook file (quiet by default), wait, and inspect.
+With `sandbox=True`, run via `## trial` first (commit on ok); host unchanged until that commit.
 
-**id = > subtask.spawn path=`path`**
-**waited = > subtask.wait id=`id`**
-**code = > json.get value=`waited` key="code"**
-**value = > json.get value=`waited` key="value"**
-**stdout = > json.get value=`waited` key="stdout"**
-**stderr = > json.get value=`waited` key="stderr"**
-**obs = > inspect_workbook path=`path` exit_code=`code` value=`value` stdout=`stdout` stderr=`stderr`**
-**out = > json.parse text={"code":0}**
-**out = > json.set map=`out` key="code" value=`code`**
-**out = > json.set map=`out` key="value" value=`value`**
-**out = > json.set map=`out` key="observation" value=`obs`**
-*out*
+1. `sandbox`
+  **tr = trial path=`path` root=`sandbox_root` profile=`sandbox_profile` commit=True**
+  **ok = [ok](tr)**
+  **stdout = [stdout](tr)**
+  **stderr = [stderr](tr)**
+  1. `ok`
+    **code = 0**
+  2. *
+    **code = 1**
+  **value = stdout**
+  **obs = inspect_workbook path=`path` exit_code=`code` value=`value` stdout=`stdout` stderr=`stderr`**
+  **out = **
+
+  | code | value | observation | sandbox |
+  |------|-------|-------------|---------|
+  | `code` | `value` | `obs` | `tr` |
+
+  *out*
+2. *
+  **id = subtask.spawn path=`path`**
+  **waited = subtask.wait id=`id`**
+  **code = [code](waited)**
+  **value = [value](waited)**
+  **stdout = [stdout](waited)**
+  **stderr = [stderr](waited)**
+  **obs = inspect_workbook path=`path` exit_code=`code` value=`value` stdout=`stdout` stderr=`stderr`**
+  **out = **
+
+  | code | value | observation |
+  |------|-------|-------------|
+  | `code` | `value` | `obs` |
+
+  *out*
 
 ---
 
@@ -1695,8 +1803,16 @@ Skill resolver (v2): exact → alias → canonical → near. Returns `mode` / `r
     + `kb_dir`=.marqdo/agent-kb
     + `memory_dir`=.marqdo/agent-memory
     + `threshold`=0.78
+    + `step_kind`=None
 
 Adaptive Routing (Phase 4): abstract router — `marqdo` | `small-llm` | `llm` | `auto`. `jev` is accepted as a **compat alias** of `small-llm` (not a first-class backend). `auto` cascades policy → kb → small-llm request. May return `needs_llm=True` + `prompt` for the caller to complete with `router_model` (any llm handle), then `route_apply`.
+Optional `step_kind=` (O3) selects backend via module `## step_route` before the ABI call.
+
+1. `step_kind`
+  **sr = step_route kind=`step_kind`**
+  **backend = [backend](sr)**
+2. *
+  **_ = 1**
 
 **tools = > json.get value=`self` key="tools"**
 *> agent_route task=`task` backend=`backend` kb_dir=`kb_dir` memory_dir=`memory_dir` threshold=`threshold` tools=`tools`*
@@ -1747,6 +1863,15 @@ Persist one run as `.mq.md` under `memory_dir/episodes/YYYY/MM/` (v2 Phase 1). M
 
 *> agent_record_episode task=`task` status=`status` result=`result` mode=`mode` skill=`skill` observation=`observation` workbook=`workbook` cache=`cache` match=`match` llm_calls=`llm_calls` tool_calls=`tool_calls` error=`error` memory_dir=`memory_dir`*
 
+## quarantine
+    + `slug`
+    + `kb_dir`=.marqdo/agent-kb
+    + `reason`=sandbox_or_harness_failed
+
+O5: mark OKF skill `status: quarantine` and force `llm_free: false`. Regression fixtures stay with the slug.
+
+*> agent_kb_quarantine kb_dir=`kb_dir` slug=`slug` reason=`reason`*
+
 ## maybe_learn
     + `task`
     + `kb_dir`=.marqdo/agent-kb
@@ -1755,6 +1880,7 @@ Persist one run as `.mq.md` under `memory_dir/episodes/YYYY/MM/` (v2 Phase 1). M
     + `promote`=True
 
 Offline learn gate: when ≥ `improve_every` successful episodes share a task hash, generalize → synthesize → compile → optional OKF promote (`llm_free`). Also attempts Policy Compilation for Adaptive Routing.
+O2: promote path requires sandbox proof unless `require_proof=false`.
 
 **skill_learn = > agent_maybe_learn task=`task` kb_dir=`kb_dir` memory_dir=`memory_dir` improve_every=`improve_every` promote=`promote`**
 **policy_learn = > agent_maybe_compile_policy memory_dir=`memory_dir` min_evidence=`improve_every`**
@@ -1806,45 +1932,51 @@ Reasoning amortization stats over recorded episodes (`avg_llm_calls`, `compiled_
     + `router_model`=None
     + `resume_id`=None
     + `resume_dir`=.marqdo/agent-resume
+    + `sandbox`=False
+    + `sandbox_profile`=default
+    + `efi`=True
 
 Primary author entry (v2 + P4): Adaptive `route` → execute (policy/kb skill) or `plan` → record episode → maybe_learn (skill + policy). `router` = `auto`|`marqdo`|`small-llm`|`llm` (`jev`→`small-llm` alias). Optional `router_model` (llm handle) answers `needs_llm` prompts — small models welcome.
+`sandbox=True` (O1 opt-in): workbook paths run via CoW trial before host commit. `efi=True` (O3): EKC preflight before explore; REUSE short-circuits. Pass `efi=False` to keep legacy golds that skip eng knowledge.
 
-**routed = > `self`.route task=`task` backend=`router` kb_dir=`kb_dir` memory_dir=`memory_dir` threshold=`near_threshold`**
-**route_matched = > json.get value=`routed` key="matched"**
-**needs_llm = > json.get value=`routed` key="needs_llm"**
+**efi_pf = None**
+1. `efi`
+  **efi_pf = preflight task=`task`**
+2. *
+  **_ = 1**
+
+**routed = `self`.route task=`task` backend=`router` kb_dir=`kb_dir` memory_dir=`memory_dir` threshold=`near_threshold`**
+**route_matched = [matched](routed)**
+**needs_llm = [needs_llm](routed)**
 **exec_mode = "explore"**
 **llm_calls = 0**
 **tokens = 0**
+**token_cost = 0**
 **out = None**
-**route_backend = > json.get value=`routed` key="backend"**
+**route_backend = [backend](routed)**
 
 1. `route_matched`
   **path = > json.get value=`routed` key="resource"**
   1. `path`
-    **aw = > await_workbook path=`path`**
-    **code = > json.get value=`aw` key="code"**
-    **child_val = > json.get value=`aw` key="value"**
-    **last_obs = > json.get value=`aw` key="observation"**
+    **aw = await_workbook path=`path` sandbox=`sandbox` sandbox_profile=`sandbox_profile`**
+    **code = [code](aw)**
+    **child_val = [value](aw)**
+    **last_obs = [observation](aw)**
     1. `code` == 0
       > agent_kb_record_hit kb_dir=`kb_dir` goal=`task` improve_every=`improve_every`
-      **lf = > json.get value=`routed` key="llm_free"**
+      **lf = [llm_free](routed)**
       1. `lf`
         **exec_mode = "compiled"**
       2. *
         **exec_mode = "routed"**
-      **out = > json.parse text={"status":"ok"}**
-      **out = > json.set map=`out` key="status" value="ok"**
-      **out = > json.set map=`out` key="goal" value=`task`**
-      **out = > json.set map=`out` key="result" value=`child_val`**
-      **out = > json.set map=`out` key="workbook" value=`path`**
-      **out = > json.set map=`out` key="cache" value="hit"**
-      **rmode = > json.get value=`routed` key="mode"**
-      **out = > json.set map=`out` key="match" value=`rmode`**
-      **sk = > json.get value=`routed` key="skill"**
-      **out = > json.set map=`out` key="skill" value=`sk`**
-      **out = > json.set map=`out` key="observation" value=`last_obs`**
-      **out = > json.set map=`out` key="summary" value="adaptive route hit"**
-      **out = > json.set map=`out` key="route" value=`routed`**
+      **rmode = [mode](routed)**
+      **sk = [skill](routed)**
+      **out = **
+
+      | status | goal | result | workbook | cache | match | skill | observation | summary | route |
+      |--------|------|--------|----------|-------|-------|-------|-------------|---------|-------|
+      | ok | `task` | `child_val` | `path` | hit | `rmode` | `sk` | `last_obs` | adaptive route hit | `routed` |
+
       **llm_calls = 0**
     2. *
       **route_matched = False**
@@ -1857,33 +1989,28 @@ Primary author entry (v2 + P4): Adaptive `route` → execute (policy/kb skill) o
   **_ = 1**
 2. `needs_llm`
   1. `router_model`
-    **prompt = > json.get value=`routed` key="prompt"**
-    **turn = > model_turn model=`router_model` prompt=`prompt` stream=`stream` echo=`echo`**
-    **reply = > json.get value=`turn` key="text"**
-    **llm_calls = > json.get value=`turn` key="llm_calls"**
-    **tokens = > json.get value=`turn` key="tokens"**
-    **applied = > `self`.route_apply task=`task` reply=`reply` kb_dir=`kb_dir` backend=`router`**
-    **am = > json.get value=`applied` key="matched"**
+    **prompt = [prompt](routed)**
+    **turn = model_turn model=`router_model` prompt=`prompt` stream=`stream` echo=`echo`**
+    **reply = [text](turn)**
+    **llm_calls = [llm_calls](turn)**
+    **tokens = [tokens](turn)**
+    **applied = `self`.route_apply task=`task` reply=`reply` kb_dir=`kb_dir` backend=`router`**
+    **am = [matched](applied)**
     1. `am`
-      **path = > json.get value=`applied` key="resource"**
-      **aw = > await_workbook path=`path`**
-      **code = > json.get value=`aw` key="code"**
-      **child_val = > json.get value=`aw` key="value"**
-      **last_obs = > json.get value=`aw` key="observation"**
+      **path = [resource](applied)**
+      **aw = await_workbook path=`path` sandbox=`sandbox` sandbox_profile=`sandbox_profile`**
+      **code = [code](aw)**
+      **child_val = [value](aw)**
+      **last_obs = [observation](aw)**
       1. `code` == 0
         **exec_mode = "routed"**
-        **out = > json.parse text={"status":"ok"}**
-        **out = > json.set map=`out` key="status" value="ok"**
-        **out = > json.set map=`out` key="goal" value=`task`**
-        **out = > json.set map=`out` key="result" value=`child_val`**
-        **out = > json.set map=`out` key="workbook" value=`path`**
-        **out = > json.set map=`out` key="cache" value="soft-hit"**
-        **out = > json.set map=`out` key="match" value="routed"**
-        **sk = > json.get value=`applied` key="skill"**
-        **out = > json.set map=`out` key="skill" value=`sk`**
-        **out = > json.set map=`out` key="observation" value=`last_obs`**
-        **out = > json.set map=`out` key="summary" value="router model selected skill"**
-        **out = > json.set map=`out` key="route" value=`applied`**
+        **sk = [skill](applied)**
+        **out = **
+
+        | status | goal | result | workbook | cache | match | skill | observation | summary | route |
+        |--------|------|--------|----------|-------|-------|-------|-------------|---------|-------|
+        | ok | `task` | `child_val` | `path` | soft-hit | routed | `sk` | `last_obs` | router model selected skill | `applied` |
+
         **route_matched = True**
       2. *
         **route_matched = False**
@@ -1897,29 +2024,51 @@ Primary author entry (v2 + P4): Adaptive `route` → execute (policy/kb skill) o
 1. `route_matched`
   **_ = 1**
 2. *
-  **resolved = > `self`.resolve task=`task` kb_dir=`kb_dir` near_match=`near_match` near_threshold=`near_threshold`**
-  **mode = > json.get value=`resolved` key="mode"**
-  **llm_free = > json.get value=`resolved` key="llm_free"**
+  1. `efi_pf`
+    **efi_st = [status](efi_pf)**
+    **efi_dec = [decision](efi_pf)**
+    **efi_allow = [create_allowed](efi_pf)**
+    1. `efi_st` == "missing_knowledge"
+      **_ = 1**
+    2. `efi_dec` == "REUSE"
+      **_ = 1**
+    3. `efi_dec` == "ADAPT"
+      **_ = 1**
+    4. `efi_allow`
+      **_ = 1**
+    5. *
+      **out = **
+
+      | status | goal | error | summary | efi |
+      |--------|------|-------|---------|-----|
+      | error | `task` | efi_create_denied | EKC preflight denied CREATE | `efi_pf` |
+
+      **exec_mode = "efi"**
+  2. *
+    **_ = 1**
+
+  1. `out`
+    **_ = 1**
+  2. *
+  **resolved = `self`.resolve task=`task` kb_dir=`kb_dir` near_match=`near_match` near_threshold=`near_threshold`**
+  **mode = [mode](resolved)**
+  **llm_free = [llm_free](resolved)**
   1. `llm_free`
-    **path = > json.get value=`resolved` key="resource"**
-    **aw = > await_workbook path=`path`**
-    **code = > json.get value=`aw` key="code"**
-    **child_val = > json.get value=`aw` key="value"**
-    **last_obs = > json.get value=`aw` key="observation"**
+    **path = [resource](resolved)**
+    **aw = await_workbook path=`path` sandbox=`sandbox` sandbox_profile=`sandbox_profile`**
+    **code = [code](aw)**
+    **child_val = [value](aw)**
+    **last_obs = [observation](aw)**
     1. `code` == 0
       > agent_kb_record_hit kb_dir=`kb_dir` goal=`task` improve_every=`improve_every`
       **exec_mode = "compiled"**
-      **out = > json.parse text={"status":"ok"}**
-      **out = > json.set map=`out` key="status" value="ok"**
-      **out = > json.set map=`out` key="goal" value=`task`**
-      **out = > json.set map=`out` key="result" value=`child_val`**
-      **out = > json.set map=`out` key="workbook" value=`path`**
-      **out = > json.set map=`out` key="cache" value="hit"**
-      **out = > json.set map=`out` key="match" value=`mode`**
-      **sk = > json.get value=`resolved` key="skill"**
-      **out = > json.set map=`out` key="skill" value=`sk`**
-      **out = > json.set map=`out` key="observation" value=`last_obs`**
-      **out = > json.set map=`out` key="summary" value="compiled skill (llm_free)"**
+      **sk = [skill](resolved)**
+      **out = **
+
+      | status | goal | result | workbook | cache | match | skill | observation | summary |
+      |--------|------|--------|----------|-------|-------|-------|-------------|--------|
+      | ok | `task` | `child_val` | `path` | hit | `mode` | `sk` | `last_obs` | compiled skill (llm_free) |
+
       **llm_calls = 0**
     2. *
       **out = > `self`.plan goal=`task` kb_dir=`kb_dir` writeback=`writeback` reuse=`reuse` near_match=`near_match` near_threshold=`near_threshold` promote=`promote` improve_every=`improve_every` explore_n=`explore_n` max_rounds=`max_rounds` stream=`stream` echo=`echo` trace=`trace` force=`force`**
@@ -1966,23 +2115,37 @@ Primary author entry (v2 + P4): Adaptive `route` → execute (policy/kb skill) o
 2. *
   **_ = 1**
 
-**execution = > json.parse text={"mode":"explore","llm_calls":0,"tokens":0}**
-**execution = > json.set map=`execution` key="mode" value=`exec_mode`**
-**execution = > json.set map=`execution` key="llm_calls" value=`llm_calls`**
-**execution = > json.set map=`execution` key="tokens" value=`tokens`**
-**execution = > json.set map=`execution` key="skill" value=`sk2`**
-**execution = > json.set map=`execution` key="router" value=`route_backend`**
-**out = > json.set map=`out` key="execution" value=`execution`**
-**out = > json.set map=`out` key="episode" value=`ep`**
-**out = > json.set map=`out` key="route" value=`routed`**
+**token_cost = tokens**
+**usage = **
+
+| llm_calls | tokens | token_cost |
+|-----------|--------|------------|
+| `llm_calls` | `tokens` | `token_cost` |
+
+**execution = **
+
+| mode | llm_calls | tokens | token_cost | skill | router |
+|------|-----------|--------|------------|-------|--------|
+| `exec_mode` | `llm_calls` | `tokens` | `token_cost` | `sk2` | `route_backend` |
+
+**out = table.put in=`out` at="execution" value=`execution`**
+**out = table.put in=`out` at="episode" value=`ep`**
+**out = table.put in=`out` at="route" value=`routed`**
+**out = table.put in=`out` at="usage" value=`usage`**
+**out = table.put in=`out` at="token_cost" value=`token_cost`**
 1. `learning`
-  **out = > json.set map=`out` key="learning" value=`learning`**
+  **out = table.put in=`out` at="learning" value=`learning`**
+2. *
+  **_ = 1**
+
+1. `efi_pf`
+  **out = table.put in=`out` at="efi" value=`efi_pf`**
 2. *
   **_ = 1**
 
 1. `resume_id`
-  **_ckpt = > resume_save id=`resume_id` goal=`task` task=`task` status=`st` round=1 workbook=`wb_path` result=`res` route=`routed` resume_dir=`resume_dir`**
-  **out = > json.set map=`out` key="resume" value=`_ckpt`**
+  **_ckpt = resume_save id=`resume_id` goal=`task` task=`task` status=`st` round=1 workbook=`wb_path` result=`res` route=`routed` resume_dir=`resume_dir`**
+  **out = table.put in=`out` at="resume" value=`_ckpt`**
 2. *
   **_ = 1**
 
@@ -1994,10 +2157,13 @@ Primary author entry (v2 + P4): Adaptive `route` → execute (policy/kb skill) o
     + `stream`=False
     + `echo`=False
     + `max_reads`=2
+    + `sandbox`=False
+    + `sandbox_profile`=default
 
 One atomic turn: budgeted context → LLM → optional `READ:` deepen → optional tool via subtask. Returns a *map* (`status`, `task`, `decision`, and on success `result` plus optional `tool` / `tool_result`; on failure `error`). By default (`writeback=True`) persists that map under named slots `ok` / `error` at the call site; pass `writeback=False` to skip.
 
 With `stream=True`, the model call uses SSE; `echo=True` prints delta text to stdout as it arrives. The returned map is unchanged (final `result` string). Context source/skill start at default budget; up to `max_reads` of `READ:source` / `READ:skill` deepen before CALL/answer.
+`sandbox=True` (O1 opt-in): attach the sandbox profile row on the result map (trial via `## trial` / `run sandbox=`).
 
 **id = > json.get value=`self` key="id"**
 **model = > json.get value=`self` key="model"**
@@ -2087,6 +2253,12 @@ With `stream=True`, the model call uses SSE; `echo=True` prints delta text to st
 
 **out = > json.set map=`out` key="llm_calls" value=`llm_calls`**
 **out = > json.set map=`out` key="tokens" value=`tokens`**
+
+1. `sandbox`
+  **prof = sandbox.profile name=`sandbox_profile`**
+  **out = table.put in=`out` at="sandbox_profile" value=`prof`**
+2. *
+  **_ = 1**
 
 **as_turn = > json.parse text={"role":"assistant"}**
 **as_turn = > json.set map=`as_turn` key="content" value=`reply`**

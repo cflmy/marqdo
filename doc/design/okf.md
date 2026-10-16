@@ -314,10 +314,15 @@ type: Marqdo Agent Skill
 title: <短名>
 sig: <12hex>
 resource: ../../resources/<slug>.mq.md
-status: stable | candidate
+status: stable | candidate | quarantine
 llm_free: true | false
 quality: <int>
 hits: <int>
+# O2 optional metadata (from workbook frontmatter; see §7.5):
+applies_when: <text condition or tag>
+fixtures: <relative .mq.md proof path>
+sandbox_profile: default | readonly | <name>
+proof: <relative .mq.md>   # alias of fixtures for sandbox gate
 generated:
   by: marqdo-agent/plan
   at: <ISO8601>
@@ -331,7 +336,7 @@ verified:
 Prefer spawning `resource` over re-planning.
 ```
 
-`status`：`llm_free` 的 resource 晋升为 **stable**（零父 LLM 快路径）；否则为 **candidate**（可复用，但按 `improve_every` 偶发再优化，每轮最多 1 次改进）。失败运行不晋升；质量更差不覆盖。
+`status`：`llm_free` 的 resource 晋升为 **stable**（零父 LLM 快路径）；否则为 **candidate**（可复用，但按 `improve_every` 偶发再优化，每轮最多 1 次改进）。失败运行不晋升；质量更差不覆盖。**O2：** `agent_kb_promote` 默认要求 sandbox proof（`proof` / `fixtures` / workbook 本身经 `sandbox.run` 成功）才写入；失败返回 `promoted: false` / `reason: sandbox_proof_failed`。传 `require_proof=false` 仅用于明确豁免。
 
 ### 7.3 任务签名 → Concept 路径
 
@@ -401,6 +406,17 @@ Prefer spawning `resource` over re-planning.
 | 迭代 | 同 Concept slug/`sig` 覆盖 resource + 刷新 `generated`/`verified` |
 | 成长 | 命中快路径；`candidate`/`hits`/`improve_every` 驱动再优化；`log.md` 可审计 |
 | 分发 | 整包 `agent-kb/` 可复制（格式即契约） |
+| **证明晋升（O2）** | `applies_when` / `fixtures` / `sandbox_profile` / `proof` 写在技能与 workbook frontmatter；promote 前 `sandbox.run` 绿才 `llm_free` |
+| **隔离（O5）** | 失败技能 `status: quarantine`；回归 fixture 跟随 slug |
+
+### 7.5a 技能 frontmatter 约定（O2 B1）
+
+| 字段 | 含义 |
+|------|------|
+| `applies_when` | 适用条件（短文本 / 标签）；路由与 harness 可读 |
+| `fixtures` | 相对路径：sandbox 证明用 `.mq.md` |
+| `sandbox_profile` | `default` / `readonly` / 其它 `sandbox.profile` 名 |
+| `proof` | 与 `fixtures` 同义；promote 优先读 `proof` 再 `fixtures`，否则跑 workbook 自身 |
 
 ---
 

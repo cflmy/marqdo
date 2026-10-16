@@ -94,11 +94,12 @@
 | [design/ext-ai-sandbox.md](design/ext-ai-sandbox.md) | **`ext/ai/sandbox` 设计锁定**：CoW · 能力表 · agent ABI（非 stdlib） |
 | [roadmap/ext-ai-sandbox.md](roadmap/ext-ai-sandbox.md) | **`ext/ai/sandbox` 实现里程碑** S0–S4 |
 | [research/ai-agent-llm-optimize-2026-10.md](research/ai-agent-llm-optimize-2026-10.md) | **2026-10 调研**：代码即文档×OKF×沙盒下的 Agent/LLM 优化与问题分析 |
-| [design/ext-ai-optimize.md](design/ext-ai-optimize.md) | **方案**：Agent/LLM 优化可行方向全集与推荐波次 O1–O5 |
+| [design/ext-ai-optimize.md](design/ext-ai-optimize.md) | **Accepted**：Agent/LLM 优化 O1–O5 locked |
+| [roadmap/ext-ai-optimize.md](roadmap/ext-ai-optimize.md) | **O1–O5 实现路线**（沙盒接入→证明晋升→路由/成本→lint→隔离） |
 | [research/ext-hosting-gaps.md](research/ext-hosting-gaps.md) | **宿主集成缺口**：同域 SSE 中继 · HTTP→`##` · MCP Server · 副端口 · 跨模块 db/corpus |
 | [design/ext-hosting-fill.md](design/ext-hosting-fill.md) | **宿主缺口补齐设计**（`ext/web` proxy/invoke · `ext/ai` mcp_server） |
 | [roadmap/ext-hosting.md](roadmap/ext-hosting.md) | **宿主集成 H0–H4**（规划） |
-| [roadmap/ext-agent-optimize.md](roadmap/ext-agent-optimize.md) | **`ext/agent` A0–A4 done · Wave B Active** |
+| [roadmap/ext-agent-optimize.md](roadmap/ext-agent-optimize.md) | **`ext/agent` A0–A4 done · Wave B Active** · 后续优化见 [ext-ai-optimize](roadmap/ext-ai-optimize.md) O 波次 |
 
 金样例与集成测试：[`tests/`](../tests/)。面向访客的可执行文档：[`public/`](../public/)。Spike 存档：[`spike/`](../spike/)。
 

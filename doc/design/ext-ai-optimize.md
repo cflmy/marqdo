@@ -2,9 +2,10 @@
 
 | | |
 |---|---|
-| 状态 | **Proposed · 方向全集（待选型排期）** |
+| 状态 | **Accepted · O1–O5 locked** |
 | 日期 | 2026-10-16 |
 | 调研 | [ai-agent-llm-optimize-2026-10.md](../research/ai-agent-llm-optimize-2026-10.md) |
+| 路线 | [ext-ai-optimize.md](../roadmap/ext-ai-optimize.md) |
 | 相关 | [ext-ai-sandbox.md](ext-ai-sandbox.md) · [ext-agent.md](ext-agent.md) · [okf.md](okf.md) · [engineering-knowledge.md](engineering-knowledge.md) · [ext-agent-optimize.md](../roadmap/ext-agent-optimize.md) · [ai-stack.md](../roadmap/ai-stack.md) |
 
 ---
@@ -112,7 +113,7 @@ sandbox.open → sandbox.run（caps）→ diff
 
 ---
 
-## 3. 推荐落地波次（默认建议，可改）
+## 3. 执行顺序（O1→O5 locked）
 
 | 波次 | 方向组合 | 为何先做 |
 |------|----------|----------|
@@ -122,6 +123,8 @@ sandbox.open → sandbox.run（caps）→ diff
 | **O4** | A4 + D2 + A5 | 质量门禁与人审 |
 | **O5** | B4 + C3 | 失败隔离与离线提示优化 |
 | **O∞** | C4 / A6 | 研究项，单独立项 |
+
+切片实现见 [ext-ai-optimize.md](../roadmap/ext-ai-optimize.md)。
 
 ---
 
@@ -134,6 +137,6 @@ sandbox.open → sandbox.run（caps）→ diff
 
 ---
 
-## 5. 下一步
+## 5. 落地
 
-请从 §2 方向方向中圈选优先级（或确认 §3 默认 O1→O2）。确认后另开 `doc/roadmap/ext-ai-optimize.md` 做切片实现，**仍不改** `doc/next/*`。
+O1–O5 已锁定；实现见 [roadmap/ext-ai-optimize.md](../roadmap/ext-ai-optimize.md)。**仍不改** `doc/next/*`。

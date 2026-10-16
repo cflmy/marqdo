@@ -39,6 +39,32 @@ run tests/ext/agent-zero-llm.mq.md
 run tests/ext/agent-plan-preserve.mq.md
 run examples/agent-okf-flywheel/index.mq.md
 run examples/agent-pong/index.mq.md
+run examples/agent-sandbox-okf/index.mq.md
+run tests/ext/agent-sandbox-optin.mq.md
+run tests/ext/agent-sandbox-promote.mq.md
+
+# Skill Lift subset (O2 B3/E1): with-skill vs without — constitution / writeback / call_site markers.
+skill_lift_pass=0
+skill_lift_fail=0
+assert_out_has() {
+  local f="$1"
+  local needle="$2"
+  local label="$3"
+  local out
+  out="$("$MQ" run "$f" 2>/dev/null || true)"
+  if printf '%s' "$out" | grep -q -- "$needle"; then
+    echo "SkillLift OK  $label ($needle)"
+    skill_lift_pass=$((skill_lift_pass + 1))
+  else
+    echo "SkillLift MISS $label (need $needle)" >&2
+    skill_lift_fail=$((skill_lift_fail + 1))
+    fail=1
+  fi
+}
+assert_out_has tests/ext/agent-constitution-b0.mq.md "constitution-ok" "constitution"
+assert_out_has tests/ext/agent-writeback-shadow.mq.md "writeback-shadow-ok" "writeback"
+assert_out_has tests/ext/agent-dump-context.mq.md "dump-context-ok" "call_site"
+echo "SkillLift summary: pass=$skill_lift_pass fail=$skill_lift_fail"
 
 if [[ "${AGENT_HARNESS_LIVE:-}" == "1" ]]; then
   export AGENT_LIVE=1

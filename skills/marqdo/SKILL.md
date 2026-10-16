@@ -32,7 +32,9 @@ Canonical design (repo): `doc/design/markdown-mapping.md`, `doc/design/keywords.
 8. Prefer ending side-effect-only function bodies with `*None*` / `*无*` / whole-line `**` / `****` when later lines must belong to an outer function. Lone `---` / `***` are Markdown thematic breaks (skipped), not function end.
 9. **`ext/**` never calls `host_*`.** Agent/OKF helpers are plugin names (`agent_kb_*`, …) after `plugin.load`. Do **not** add agent/OKF domain code to `src/host/` (core bloat). See `doc/design/ext-agent.md` §4.
 10. **Browser (route C/D/E/F):** client logic is Marqdo on WASM; official bridge is host glue and **may** implement lists, routing, storage, WebSocket, canvas, file read, observers — authors **must not hand-write business JS**. Use `web.client_embed` / `data-mq-source-url` auto-mount. Client effects: prefer **GFM tables + `lib/browser`** ([marqdo-dev](../marqdo-dev/SKILL.md)).
-11. **Code-as-documentation / no bag glue:** Prefer **GFM tables** for maps, lists, wire, commands. Prefer **`table.put` / named helpers** over `json.set` / `json.append` chains. `lib/json` is for parse/stringify/quote only — not a dict builder. Unreadable json pipelines are a style bug.
+11. **Code-as-documentation / no bag glue:** Prefer **GFM tables** for maps, lists, wire, commands. Prefer **`table.put` / named helpers** over `json.set` / `json.append` chains. `lib/json` is for parse/stringify/quote only — not a dict builder. Unreadable json pipelines are a style bug. Read collections with **`[key](map)`**, not footnote indexes for new code.
+12. **One language per file:** Do not mix EN and ZH API names in the same `.mq.md` (imports, calls, params). Pick English *or* Chinese mirrors for the whole program.
+13. **Sandbox trial habit (Agent / generated `.mq.md`):** Prefer `agent.trial` / `run sandbox=True` / `sandbox.open`→`run`→`diff`→`commit` before promoting to the host tree. Host files must stay unchanged until a successful commit. Caps live in `sandbox.profile` GFM tables — do not invent a second dialect.
 
 
 ## Markup → meaning (v0.2)
@@ -162,7 +164,9 @@ Install: `marqdo ext add agent` (ZH: `智能体`). Native: `cargo build --releas
 
 APIs: `# agent` / `# 智能体` → `## step` / `## plan`. Context: standing + task + **call site** + tools + budgeted source/skill + act protocol (`CALL:` / `READ:`).
 
-Examples: [agent-pong](../../examples/agent-pong/) · [agent-okf-flywheel](../../examples/agent-okf-flywheel/). Harness: `scripts/agent-harness.sh`. Design: [ext-agent.md](../../doc/design/ext-agent.md) · Wave B: [agent-framework-2026-09.md](../../doc/research/agent-framework-2026-09.md). Dev LLM: copy [.env.example](../../.env.example) → `.env` (gitignored).
+Examples: [agent-pong](../../examples/agent-pong/) · [agent-okf-flywheel](../../examples/agent-okf-flywheel/) · [agent-sandbox-okf](../../examples/agent-sandbox-okf/). Harness: `scripts/agent-harness.sh`. Design: [ext-agent.md](../../doc/design/ext-agent.md) · optimize O1–O5: [ext-ai-optimize.md](../../doc/roadmap/ext-ai-optimize.md). Dev LLM: copy [.env.example](../../.env.example) → `.env` (gitignored).
+
+**Sandbox (O1):** `import sandbox:ext/ai/sandbox.mq.md` · `agent.trial` / `智能体.试跑` · `run`/`step` take `sandbox=` / `沙盒=` (default `False`). Profile caps are tables via `sandbox.profile`. Gold: `tests/ext/agent-sandbox-optin.mq.md`.
 
 ## Official extension: `ext/web` (Document / Endpoint / Resource)
 

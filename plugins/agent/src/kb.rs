@@ -511,11 +511,25 @@ fn write_skill_concept(
     quality: i64,
     hits: i64,
     now: &str,
+    meta: &SkillMeta,
 ) -> Result<(), String> {
     if let Some(p) = path.parent() {
         fs::create_dir_all(p).map_err(|e| format!("mkdir: {e}"))?;
     }
     let title: String = goal.chars().take(48).collect();
+    let mut extra = String::new();
+    if let Some(ref s) = meta.applies_when {
+        extra.push_str(&format!("applies_when: {}\n", yaml_escape(s)));
+    }
+    if let Some(ref s) = meta.fixtures {
+        extra.push_str(&format!("fixtures: {}\n", yaml_escape(s)));
+    }
+    if let Some(ref s) = meta.sandbox_profile {
+        extra.push_str(&format!("sandbox_profile: {}\n", yaml_escape(s)));
+    }
+    if let Some(ref s) = meta.proof {
+        extra.push_str(&format!("proof: {}\n", yaml_escape(s)));
+    }
     let body = format!(
         r#"---
 type: Marqdo Agent Skill
@@ -526,7 +540,7 @@ status: {status}
 llm_free: {llm_free}
 quality: {quality}
 hits: {hits}
-generated:
+{extra}generated:
   by: marqdo-agent/plan
   at: {now}
 verified:
@@ -545,9 +559,27 @@ Prefer spawning `resource` over re-planning.
         llm_free = if llm_free { "true" } else { "false" },
         quality = quality,
         hits = hits,
+        extra = extra,
         now = now,
     );
     fs::write(path, body).map_err(|e| format!("write skill: {e}"))
+}
+
+#[derive(Default)]
+struct SkillMeta {
+    applies_when: Option<String>,
+    fixtures: Option<String>,
+    sandbox_profile: Option<String>,
+    proof: Option<String>,
+}
+
+fn skill_meta_from_src(src: &str) -> SkillMeta {
+    SkillMeta {
+        applies_when: extract_fm_field(src, "applies_when"),
+        fixtures: extract_fm_field(src, "fixtures"),
+        sandbox_profile: extract_fm_field(src, "sandbox_profile"),
+        proof: extract_fm_field(src, "proof"),
+    }
 }
 
 fn refresh_index(root: &Path, slug: &str, goal: &str) -> Result<(), String> {
@@ -583,6 +615,10 @@ fn arg_text<'a>(args: &'a Value, key: &str) -> Result<&'a str, String> {
     args.get(key)
         .and_then(|v| v.as_str())
         .ok_or_else(|| format!("missing text `{key}`"))
+}
+
+fn opt_text<'a>(args: &'a Value, key: &str) -> Option<&'a str> {
+    args.get(key).and_then(|v| v.as_str()).filter(|s| !s.is_empty())
 }
 
 fn opt_tools(args: &Value) -> Option<&Value> {
@@ -1107,6 +1143,54 @@ pub fn kb_record_hit(args: &Value) -> Result<Value, String> {
     }))
 }
 
+/// Run workbook (or FM `proof:` / `fixtures:` path) inside CoW sandbox; discard after.
+/// O2: llm_free promote requires this proof to succeed (unless `require_proof=false`).
+fn sandbox_proof(workbook: &Path, proof_rel: Option<&str>) -> Result<(bool, String), String> {
+    let root = workbook
+        .parent()
+        .ok_or_else(|| "sandbox_proof: workbook has no parent".to_string())?;
+    // Always pass an absolute root so host `sandbox_open` does not re-join cwd.
+    let root_abs = if root.is_absolute() {
+        root.to_path_buf()
+    } else {
+        fs::canonicalize(root).unwrap_or_else(|_| {
+            std::env::current_dir()
+                .unwrap_or_else(|_| PathBuf::from("."))
+                .join(root)
+        })
+    };
+    let root_abs = fs::canonicalize(&root_abs).unwrap_or(root_abs);
+    let default_name = workbook
+        .file_name()
+        .and_then(|s| s.to_str())
+        .ok_or_else(|| "sandbox_proof: bad workbook name".to_string())?;
+    let path = proof_rel.unwrap_or(default_name);
+    let open = crate::host_query_json_args(
+        "sandbox_open",
+        &json!({ "root": root_abs.to_string_lossy() }),
+    )?;
+    let id = open
+        .get("id")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| "sandbox_proof: open missing id".to_string())?
+        .to_string();
+    let run = crate::host_query_json_args("sandbox_run", &json!({ "id": id, "path": path }));
+    let _ = crate::host_query_json_args("sandbox_discard", &json!({ "id": id }));
+    match run {
+        Ok(r) => {
+            let ok = r.get("ok").and_then(|v| v.as_bool()).unwrap_or(false);
+            let detail = r
+                .get("stderr")
+                .and_then(|v| v.as_str())
+                .or_else(|| r.get("stdout").and_then(|v| v.as_str()))
+                .unwrap_or("")
+                .to_string();
+            Ok((ok, detail))
+        }
+        Err(e) => Ok((false, e)),
+    }
+}
+
 pub fn kb_promote(args: &Value) -> Result<Value, String> {
     let kb = arg_text(args, "kb_dir")?;
     let goal = arg_text(args, "goal")?;
@@ -1119,6 +1203,26 @@ pub fn kb_promote(args: &Value) -> Result<Value, String> {
     let src_path = resolve_path(workbook);
     let src = fs::read_to_string(&src_path)
         .map_err(|e| format!("kb_promote read workbook: {e}"))?;
+    let require_proof = args
+        .get("require_proof")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(true);
+    let proof_rel = extract_fm_field(&src, "proof")
+        .or_else(|| extract_fm_field(&src, "fixtures"));
+    if require_proof {
+        let (ok, detail) = sandbox_proof(&src_path, proof_rel.as_deref())?;
+        if !ok {
+            return Ok(json!({
+                "promoted": false,
+                "reason": "sandbox_proof_failed",
+                "detail": detail,
+                "sig": sig,
+                "slug": slug,
+                "workbook": workbook,
+                "proof": proof_rel.unwrap_or_else(|| src_path.file_name().and_then(|s| s.to_str()).unwrap_or("").to_string()),
+            }));
+        }
+    }
     let (llm_free, quality) = llm_free_score(&src);
     let status = if llm_free { "stable" } else { "candidate" };
 
@@ -1168,6 +1272,7 @@ pub fn kb_promote(args: &Value) -> Result<Value, String> {
         &now,
         &extra_aliases,
     )?;
+    let meta = skill_meta_from_src(&src);
     write_skill_concept(
         &skill_path,
         &sig,
@@ -1178,6 +1283,7 @@ pub fn kb_promote(args: &Value) -> Result<Value, String> {
         quality,
         prev_hits,
         &now,
+        &meta,
     )?;
     refresh_index(&root, &slug, &goal_n)?;
 
@@ -1190,6 +1296,69 @@ pub fn kb_promote(args: &Value) -> Result<Value, String> {
         "quality": quality,
         "status": status,
         "hits": prev_hits,
+        "proof_ok": true,
+        "applies_when": meta.applies_when,
+        "fixtures": meta.fixtures,
+        "sandbox_profile": meta.sandbox_profile,
+    }))
+}
+
+/// O5: mark a skill concept as `status: quarantine` and keep fixtures path in FM.
+pub fn kb_quarantine(args: &Value) -> Result<Value, String> {
+    let kb = arg_text(args, "kb_dir")?;
+    let slug = arg_text(args, "slug")?;
+    let reason = opt_text(args, "reason").unwrap_or("sandbox_or_harness_failed");
+    let root = resolve_path(kb);
+    let skill_path = root.join("concepts/skills").join(format!("{slug}.md"));
+    if !skill_path.is_file() {
+        return Ok(json!({
+            "ok": false,
+            "reason": "skill_not_found",
+            "slug": slug,
+            "path": skill_path.to_string_lossy(),
+        }));
+    }
+    let src = fs::read_to_string(&skill_path)
+        .map_err(|e| format!("kb_quarantine read: {e}"))?;
+    let mut lines: Vec<String> = Vec::new();
+    let mut saw_status = false;
+    let mut in_fm = false;
+    for line in src.lines() {
+        let t = line.trim();
+        if t == "---" {
+            if !in_fm {
+                in_fm = true;
+                lines.push(line.to_string());
+                continue;
+            } else {
+                if !saw_status {
+                    lines.push("status: quarantine".to_string());
+                }
+                lines.push(format!("quarantine_reason: {}", yaml_escape(reason)));
+                in_fm = false;
+                lines.push(line.to_string());
+                continue;
+            }
+        }
+        if in_fm && t.starts_with("status:") {
+            lines.push("status: quarantine".to_string());
+            saw_status = true;
+            continue;
+        }
+        if in_fm && t.starts_with("llm_free:") {
+            lines.push("llm_free: false".to_string());
+            continue;
+        }
+        lines.push(line.to_string());
+    }
+    let body = lines.join("\n") + "\n";
+    fs::write(&skill_path, body).map_err(|e| format!("kb_quarantine write: {e}"))?;
+    Ok(json!({
+        "ok": true,
+        "slug": slug,
+        "status": "quarantine",
+        "reason": reason,
+        "path": skill_path.to_string_lossy(),
     }))
 }
 

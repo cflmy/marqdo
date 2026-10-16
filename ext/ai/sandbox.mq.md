@@ -5,9 +5,13 @@ description: >-
   Native work lives in plugins/agent (`sandbox_*` → host_query).
 import plugin:lib/plugin.mq.md
 import sys:lib/sys.mq.md
+import table:lib/table.mq.md
+import fs:lib/fs.mq.md
 ---
 
 Load the agent plugin once per call (same pattern as other `ext/ai` helpers).
+
+Capability profiles are GFM tables under `## profile` (readable authority; `open` / `inspect` echo them). Do not invent a second table dialect.
 
 ## ensure_plugin
 
@@ -18,10 +22,38 @@ Load the agent plugin once per call (same pattern as other `ext/ai` helpers).
   > print text=ext/ai/sandbox: native agent plugin not found (build marqdo_plugin_agent or marqdo ext add agent)
   > sys.exit code=1
 
-## open
+## profile
+    + `name`=default
+
+Named caps row as a map table (`name`, `fs_write`, `exec`, `net`, `plugin`). Unknown names → `default`.
+
+Catalog (documentation + authority):
+
+| name | fs_write | exec | net | plugin |
+|------|----------|------|-----|--------|
+| default | true | false | false | false |
+| readonly | false | false | false | false |
+
+1. `name` == "readonly"
+  **row = **
+
+  | name | fs_write | exec | net | plugin |
+  |------|----------|------|-----|--------|
+  | readonly | false | false | false | false |
+
+2. *
+  **row = **
+
+  | name | fs_write | exec | net | plugin |
+  |------|----------|------|-----|--------|
+  | default | true | false | false | false |
+
+*row*
+
+## open_native
     + `root`=None
 
-Open a CoW session. Optional `root=` (directory). Default: entry file directory.
+Native CoW open (plugin ABI italic return). Prefer `## open` for the profile-aware facade.
 
 > ensure_plugin
 
@@ -29,6 +61,18 @@ Open a CoW session. Optional `root=` (directory). Default: entry file directory.
   *> sandbox_open root=`root`*
 2. *
   *> sandbox_open*
+
+## open
+    + `root`=None
+    + `profile`=default
+
+Open a CoW session. Optional `root=` (directory). Default: entry file directory.
+`profile=` selects the caps row from `## profile` (echoed by `inspect`).
+
+**sess = open_native root=`root`**
+**prof = profile name=`profile`**
+**sess = table.put in=`sess` at="profile" value=`prof`**
+*sess*
 
 ## write
     + `id`
@@ -100,10 +144,48 @@ Pass `source=` or `path=` (relative to session root).
   > print text=ext/ai/sandbox.run: need source= or path=
   > sys.exit code=1
 
-## inspect
+## inspect_native
     + `id`
-
-Caps defaults, change counts, and availability notes.
 
 > ensure_plugin
 *> sandbox_inspect id=`id`*
+
+## inspect
+    + `id`
+    + `profile`=default
+
+Native caps / change counts, plus the GFM `## profile` row under key `profile`.
+
+**raw = inspect_native id=`id`**
+**prof = profile name=`profile`**
+**out = table.put in=`raw` at="profile" value=`prof`**
+*out*
+
+## report
+    + `id`
+    + `path`=sandbox-diff.md
+
+O4: write a markdown review of `## diff` for `marqdo view` / HITL (static report file, not a UI rewrite).
+
+**pending = diff id=`id`**
+**n = len value=`pending`**
+**body = "# Sandbox diff report\n\nPending changes: "**
+**body = body + n**
+**body = body + "\n\n| path | kind |\n|------|------|\n"**
+- [row](pending)
+  **p = [path](row)**
+  **k = [kind](row)**
+  **body = body + "| "**
+  **body = body + p**
+  **body = body + " | "**
+  **body = body + k**
+  **body = body + " |\n"**
+> fs.write_text path=`path` text=`body`
+
+**out = **
+
+| path | count |
+|------|-------|
+| `path` | `n` |
+
+*out*

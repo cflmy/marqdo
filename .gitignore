@@ -90,3 +90,6 @@ tests/ext/:memory:
 
 # sandbox gold leftovers
 tests/ext/_sbx_cow/
+
+tests/ext/_sbx_*/
+examples/**/_example_sbx/

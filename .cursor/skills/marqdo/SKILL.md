@@ -4,95 +4,40 @@ description: >-
   Author and edit Marqdo programs (.mq.md): Markdown markers are executable
   syntax (functions, calls, statements, returns, control flow). Use when writing
   or modifying .mq.md files, teaching Marqdo, generating Marqdo from prose,
-  importing lib/* or ext/web or ext/quantum or ext/linalg, running marqdo CLI,
-  building dynamic sites with ext/web, quantum circuits with ext/quantum,
-  formula-first linear algebra with ext/linalg, or when the user mentions
-  Marqdo, mq.md, markup-as-syntax, code-as-documentation, web/网页, quantum/量子,
-  or linalg/线性代数 extension.
+  importing lib/* or ext/web or ext/quantum, running marqdo CLI, building dynamic
+  sites with ext/web, quantum circuits with ext/quantum, or when the user
+  mentions Marqdo, mq.md, markup-as-syntax, code-as-documentation, web/网页, or
+  quantum/量子 extension.
 ---
 
 # Marqdo development
 
 Marqdo = **Markdown markers as syntax**. A `.mq.md` file is both documentation and a runnable program. Read this skill **before** inventing syntax from Markdown habits or Python.
 
-Canonical design (repo): [`markdown-mapping-v0.3.md`](../../doc/design/markdown-mapping-v0.3.md) (**v0.3 · runtime**), `doc/design/keywords.md`. Legacy v0.2 notes: `doc/design/markdown-mapping.md` (historical). Deeper tables: [reference.md](reference.md). Copy-paste patterns: [examples.md](examples.md).
+Canonical design (repo): `doc/design/markdown-mapping.md`, `doc/design/keywords.md`. Deeper tables: [reference.md](reference.md). Copy-paste patterns: [examples.md](examples.md).
 
 **Authoring / library craft** (GFM-first, no json glue, how to develop Marqdo): use **[marqdo-dev](../marqdo-dev/SKILL.md)** whenever writing or refactoring `.mq.md`, `lib/*`, or `ext/*`.
 
-**Product release** (tag, CHANGELOG, README, public docs, VSIX, GitHub assets, **ext → R2+GitHub**, **CLI → Ubuntu PPA**): use [marqdo-release](../marqdo-release/SKILL.md) — detect versions, **ask for SemVer + mode (`full` / `cli` / `ext`)**, then follow that playbook. Ext-only releases are allowed. If sudo/GPG/PPA steps need the user, print the exact commands.
+**Product release** (tag, CHANGELOG, README, public docs, VSIX, GitHub assets): use [marqdo-release](../marqdo-release/SKILL.md) — detect latest version, **ask the user for the next SemVer**, then follow that playbook. Do not invent a version number.
 
 ## Hard rules (do not violate)
 
 1. **File suffix** must be `.mq.md` (never plain `.md` for executable sources).
-2. **`**…**` = code** (assign / call). **`*…*` = return value**. Output is **not** either marker — use `> print text=…` / `**print text="…"**` / `> 打印 内容=…`.
-3. **Prose:** unmarked narrative may contain `` `名` `` (declare/ref), inline `**code**`, and `*return*`. Soft Markdown emphasis that is **not** code-shaped (`**说明**`, mid-line `*only*`) is ignored — see [code-as-docs-gaps.md](../../doc/design/code-as-docs-gaps.md). Dead `` `名` `` (never read) is OK and does not become a param.
-4. **Do not invent keywords** `if` / `else` / `while` / `for` / `def` / `return`. Control flow is Markdown: **`1.` `2.` … branches**, **`-` loops**, arm `N. *` = else, `#` = **object/type**, `##`+ = **function/method**. Params: prefer prose `` `名` `` / `` `名`=默认 `` (inferred); `` + `名` `` still accepted.
-5. **Identifiers:** `` `名` `` in prose; inside `*…*` / `**…**`, bare ids are **variables**. **Text literals must be quoted** in bold/italic: `**print text="hi"**`. Standalone `>` calls: bare words = text; vars need ticks: `` > str `n` ``.
-6. **Structure lines** (`#` `>` `+` `-` `|` `1.`) need not be wrapped in bold.
-7. **Paths:** In bare expressions `/` is division. In call args / defaults / table cells, unspaced `a/b` and quoted paths are text.
-8. Prefer ending side-effect-only bodies with `*None*` / `*无*` / whole-line `**` / `****` when the next lines must belong to an outer function. Lone `---` / `***` are Markdown thematic breaks (skipped everywhere), not function end.
+2. **Output is not `**bold**`.** Print with `> print text=…` (or `> 打印 内容=…`). Bold `**…**` is **return value only**.
+3. **Prose vs code:** after a blank line, an unmarked first line starts a **comment paragraph**; every following non-blank line stays comment until the next blank line. Put a **blank line** between narration and executable lines.
+4. **Do not invent keywords** `if` / `else` / `while` / `for` / `def` / `return`. Control flow is Markdown: **`+` params** (under heading), **`1.` `2.` … branches**, **`-` loops**, arm `N. *` = else, `#` = **object/type**, `##`+ = **function/method**, `**…**` = return.
+5. **Identifiers use backticks** — params `` + `name` ``. **Exemptions:** foreach `` - [item](coll) ``; footnote `` name[^key] ``; **inside italic `*…*` / bold `**…**`**, bare ids are **variables** (Python-style unified namespace) and method-call receivers are bare too. **Drop the backticks on value-expression variable names and method receivers inside `*…*` / `**…**`** — they are redundant once the `*…*`/`**…**` markers mark the segment as code: `*分类 = 分类[^苹果]*`, `**n * 2**`, `*p = > page.主体装配 组件=home*`. **Text literals must be quoted**: `*a = > text.split value=src sep=","*`. Backticks **still required** where a bare word is *not* a variable in **standalone `>` calls** (bare = text there): `` > str `n` ``, `` > `obj`.method ``. **No trailing space** inside `*…*` / `**…**` wrapped code: the closing marker must touch the last token directly (`*a = 1*`, `**n**`), never `` *a = 1 * ``.
+6. **Structure lines are not wrapped in italics.** `#` `>` `+` `-` `|` lines stand alone; use `*…*` only for general statements (bindings / expressions).
+7. **Paths:** In bare *expressions* `/` is division. In **call args / param defaults / table cells**, unspaced `a/b` and quoted `".marqdo/agent-kb"` are path text — no `json.parse` needed. Numeric ratios that must stay text use quotes (`"1/5"`, `"16/9"`); bare `1/5` is division.
+8. Prefer ending side-effect-only function bodies with `*None*` / `*无*` / whole-line `**` / `****` when later lines must belong to an outer function. Lone `---` / `***` are Markdown thematic breaks (skipped), not function end.
 9. **`ext/**` never calls `host_*`.** Agent/OKF helpers are plugin names (`agent_kb_*`, …) after `plugin.load`. Do **not** add agent/OKF domain code to `src/host/` (core bloat). See `doc/design/ext-agent.md` §4.
 10. **Browser (route C/D/E/F):** client logic is Marqdo on WASM; official bridge is host glue and **may** implement lists, routing, storage, WebSocket, canvas, file read, observers — authors **must not hand-write business JS**. Use `web.client_embed` / `data-mq-source-url` auto-mount. Client effects: prefer **GFM tables + `lib/browser`** ([marqdo-dev](../marqdo-dev/SKILL.md)).
-11. **Code-as-documentation / no bag glue:** Prefer **GFM tables** for maps, lists, wire, commands. Prefer **`table.put` / named helpers** over `json.set` / `json.append` chains. `lib/json` is for parse/stringify/quote only — not a dict builder. Unreadable json pipelines are a style bug.
-12. **Bracket-marked calls:** Function name may be marked with `[函数名]`; bare words before `[` are boolean modifiers (`礼貌 [问候] x` → `礼貌=True`). `]` immediately followed by `(` is **index** `[key](coll)`, not a call. Prefer `[k](c)` over footnote index in new code. See [bracket-call-modifiers.md](../../doc/design/bracket-call-modifiers.md).
+11. **Code-as-documentation / no bag glue:** Prefer **GFM tables** for maps, lists, wire, commands. Prefer **`table.put` / named helpers** over `json.set` / `json.append` chains. `lib/json` is for parse/stringify/quote only — not a dict builder. Unreadable json pipelines are a style bug. Read collections with **`[key](map)`**, not footnote indexes for new code.
+12. **One language per file:** Do not mix EN and ZH API names in the same `.mq.md` (imports, calls, params). Pick English *or* Chinese mirrors for the whole program.
+13. **Sandbox trial habit (Agent / generated `.mq.md`):** Prefer `agent.trial` / `run sandbox=True` / `sandbox.open`→`run`→`diff`→`commit` before promoting to the host tree. Host files must stay unchanged until a successful commit. Caps live in `sandbox.profile` GFM tables — do not invent a second dialect.
 
-## 记不住语法细节？查 MLSP（AI 必读）
 
-**不必背 Marqdo 语法细节**——语法可查、程序可验、修复有界。写码前后走**查询式**工作流：
-
-```bash
-printf '%s\n' '{"id":1,"method":"syntax","params":{"query":"返回"}}' | marqdo mlsp
-printf '%s\n' '{"id":2,"method":"locate","params":{"path":"a.mq.md","symbol":"加一"}}' | marqdo mlsp
-printf '%s\n' '{"id":3,"method":"validate","params":{"path":"a.mq.md"}}' | marqdo mlsp
-printf '%s\n' '{"id":4,"method":"schema","params":{"path":"a.mq.md","unit":"加一"}}' | marqdo mlsp
-printf '%s\n' '{"id":5,"method":"repair_targets","params":{"code":"contract.arg_mismatch","doc_anchor":"a.mq.md#L9-L15"}}' | marqdo mlsp
-```
-
-| method | 何时用 |
-|--------|--------|
-| `syntax` | 不确定某个语法怎么写（关键字/别名 → 构造卡片：「返回」「表」「调用」「循环」…） |
-| `locate` | 找符号定义位置 + 契约；或反查构造卡片 |
-| `validate` | 提交前校验（结构化诊断数组；`ok:false` 就修） |
-| `schema` | 查单元契约（形参/返回/字段） |
-| `repair_targets` | 拿错误的**有界**修复靶点：只改锚点范围内行，越界必弃权（abstain） |
-
-行分隔 JSON：每行请求 `{"id","method","params"}` → 每行响应 `{"id","ok","result"|"error"}`。
-语法唯一事实来源 = `doc/design/core-surface.md`（CI 守卫同步）；卡片带 `manual` 指回文档行。
-所有错误诊断都是结构化 JSON：`code` / `severity` / `span` / `suggestion` / `doc_anchor` / `doc_quote` / `contract_ref`。
-
-### 渐进式契约（可选标注；schema 就长在文档表里）
-
-契约是**未绑定文档表**（绑定表是数据，永远不是契约）。三种形状、严格位置：
-
-| 形状（须含 `类型` 列） | 允许位置 | 附着 |
-|--------------------------|----------|------|
-| `参数`/`类型`/`说明` 表 + `返回`/`类型`/`说明` 表 | 函数体首个可执行行之前 | 函数 |
-| `字段`/`类型`/`可空`/`说明` 表 | 紧邻 `` `名` = `` 绑定之前 | 集合（变量） |
-| `字段`/`类型`/`可空`/`说明` 表 | 对象（`#`）体首成员之前 | 对象类型 |
-
-````text
-## 加一
-
-对于输入变量`n`,期望是数字。
-
-| 参数 | 类型 | 说明 |
-|------|------|------|
-| n | number | 输入值 |
-
-| 返回 | 类型 | 说明 |
-|------|------|------|
-|  | number | 加一结果 |
-
-*n+1*
-````
-
-- 类型词汇：`text` / `number` / `bool` / `list` / `map` / `any` / `#` 对象名（拼错 ⇒ `contract.unknown_type` + 最近建议）。
-- 契约表**永不执行**、不污染升参推断；无契约文件行为逐字节不变（动态默认，零摩擦）。
-- 运行时只在四个边界校验：调用实参 / 字段访问 `[键](集合)` / 表绑定 / 返回。
-- `marqdo check [FILE] [--json]` 静态互查：契约行 vs 升参推断形参**双向**漂移（错行=Error；新升参未覆盖=Warning）、未知类型、错位契约；有 Error 非零退出。
-- 契约诊断带 `doc_anchor` + `doc_quote`（表原文）——修复只照锚点局部改。
-
-## Markup → meaning (v0.3)
+## Markup → meaning (v0.2)
 
 | Marker | Meaning |
 |--------|---------|
@@ -103,20 +48,17 @@ printf '%s\n' '{"id":5,"method":"repair_targets","params":{"code":"contract.arg_
 | `- …` inside body | Loop (`while` or `` [item](coll) `` / `` [`item`](`coll`) ``) |
 | Line `N. *` | Else arm |
 | `> fn args` | Call (named `k=v` or positional) |
-| `修饰 [fn] args` | Bracket-marked call; leading words → `名=True` |
 | `` > `obj`.method args `` | Method call (`obj` must be a map with `_type`) |
 | Frontmatter `import bind:path.mq.md` / `导入` | Import file (bind library name) |
 | Frontmatter `import bind:lib.member` / `导入` | Short name for a library member (same keyword; no separate `use`) |
 | `> lib.member …` / `> lib.Type.member …` | Call via bare dotted path (instance methods need `` `var`.m ``) |
-| `**…**` | **Code** (assign / call) — closing `**` touches last token; bare ids are variables; quote text literals |
-| `*…*` | **Return value** — closing `*` touches last token; bare ids are variables |
-| `****` / whole-line `**` / `*None*` | Return `None` and end function body |
+| `*…*` | Statement (bind / expr) — closing `*` touches last token, **no trailing space**; bare ids are variables |
+| `**…**` | Return value — closing `**` touches last token, **no trailing space**; bare ids are variables |
+| `****` or `**` + spaces + `**` | Return `None` and end function body |
 | Lone `---` / `***` | Markdown thematic break (skip; not function end) |
 | GFM table after empty RHS bind | Collection; get with `[key](coll)` (preferred) or legacy `` `m`[^key] `` |
-| `` ```lang `` | Foreign code block (via `lib/foreign`); bind with `` `name` = `` then fence |
-| `$$` + `% marqdo: var=name` | Block formula bind (TeX comment; prefer over empty RHS) |
-| `- [item](coll)` | Foreach (**preferred**, nestable). Sugar: `- 对`coll`的每一项`item`` / `- for each `item` in `coll`` |
-| `![marqdo-out](path)` | Image writeback form (validated stem.ext / URL); text writeback stays HTML comment |
+| `- [item](coll)` | Foreach (unchanged) |
+| `` ```lang `` | Foreign code block (via `lib/foreign`) |
 | `` `"text"` `` | Quoted string (`\n` `\t` `\\` `\"`; `` `var` `` inside); bare tokens unescaped |
 | Unmarked prose | Comment |
 
@@ -140,19 +82,20 @@ Chinese builtins (same functions, no import):
 
 ## Functions, calls, end-body
 
-Prefer **body-inferred params** and **prose-unified** wording (v0.3). `` + `name` `` still works, but teach the inferred form first:
-
 ```markdown
 # main
 
-**greet who="Marqdo"**
+> greet who=Marqdo
 
 ## greet
+    + `who`
 
-When we meet`who`, we **print text="Hello, `who`!"** and close with*None*.
+> print text=Hello, `who`!
+
+*None*
 ```
 
-- Call: `**fn key="text"**` (bold; quote text literals) or `> fn key=text` (standalone `>`; bare words are text).
+- Call: `> name key=value` or `> name value`.
 - Nested helpers use deeper `#` (`##`, `###`, …).
 - After a helper with only side effects, end with `*None*` / whole-line `**` / `****` when later lines must stay in the outer function. Lone `---` is only a thematic break (skipped).
 - In bold assigns, prefer bare calls: `**摘要 = 结账摘要 …**` (omit `>`).
@@ -160,16 +103,17 @@ When we meet`who`, we **print text="Hello, `who`!"** and close with*None*.
 ## Statements, returns, branches
 
 ```markdown
-**x = 1**
-**y = x + 2**
+*x = 1*
+*y = x + 2*
 
 ## add_one
+    + `n`
 
-For input`n`, do **n = n + 1** and return*n*.
+**n + 1**
 ```
 
 ```markdown
-**n = 0**
+*n = 0*
 
 1. `n` > 0
   > print text=positive
@@ -192,16 +136,16 @@ import clock:lib/time.mq.md
 
 # main
 
-**xs = > text.str_split s="a,b,c" sep=","**
+*xs = > text.split value="a,b,c" sep=","*
 > print text=`xs`
-**t = > clock.now_unix**
+*t = > clock.now_unix*
 ```
 
 - Import **English** or **Chinese** library file; call that file’s API names via `lib.member` (do not mix languages).
 - Instance methods stay `` > `obj`.method `` (backticks on the receiver only).
 - `lib/…` resolves via `MARQDO_LIB`, cwd `lib/`, or `lib/` next to the `marqdo` binary.
 - Design: [module-namespace.md](../../doc/design/module-namespace.md).
-- Official optional extensions (`ext/`, not stdlib): install with `marqdo ext add llm|agent|web|quantum|linalg` (see `doc/design/ext-cli.md`). **`ext/llm`** — intelligence primitive (`ask` / `stream` / `collect`; `complete` is compat); **`ext/agent`** — document-driven agents (see **ext/agent** below); **`ext/web`** — dynamic sites (see below); **`ext/quantum`** — circuits + Q7/Q8 (see below); **`ext/linalg`** — formula-first linear algebra (see below).
+- Official optional extensions (`ext/`, not stdlib): install with `marqdo ext add llm|agent|web|quantum` (see `doc/design/ext-cli.md`). `ext/llm` — chat; **`ext/agent`** — document-driven agents (see **ext/agent** below); **`ext/web`** — dynamic sites (see below); **`ext/quantum`** — circuits + Q7/Q8 (see below).
 - Native plugins: `lib/plugin` — `## load` / `unload` / `list`. C ABI: `include/marqdo_abi.h`.
 - Prefer `table.put` / `表.改` for list/map element updates; keep `json` for parse/stringify/quote (see `doc/design/stdlib-table.md`).
 - Builtins (no import): `print`/`打印`, `input`/`输入`, `len`/`长度`, `str`/`文本`, `int`/`整数`; literals `True`/`真`, `False`/`假`, `None`/`空`; logic `and`/`且`, `or`/`或`, `not`/`非`.
@@ -216,61 +160,24 @@ Install: `marqdo ext add agent` (ZH: `智能体`). Native: `cargo build --releas
 
 1. **Code is documentation** — the runbook `.mq.md` is the model’s ground truth, not a hidden system prompt bag.
 2. **Call site is first-class** — `build_step_context` injects path/function/line so the model knows where it is in the program.
-3. **Document is the knowledge base (OKF)** — writeback → promote/solidify → reuse / `llm_free`; MCP/corpus are evidence only. **Engineering Knowledge（EKC）**：`marqdo knowledge|find|reuse|…` + `agent.preflight`（REUSE→ADAPT→CREATE）——见 [engineering-knowledge.md](../../doc/design/engineering-knowledge.md)。
-4. **Skill Compilation (v2)** — successful runs become `.mq.md` episodes; after enough evidence, `maybe_learn` compiles an executable skill (`llm_free`). Prefer `## run` over bare `## plan` when you want learning.
-5. **Adaptive Routing (P4)** — router is abstract (`marqdo` / `small-llm` / `llm` / `auto`); `jev` is a compat alias of `small-llm`. Decision via `router_model` (any llm handle). Policy Compilation writes `policies/router.mq.md`.
+3. **Document is the knowledge base (OKF)** — writeback → promote/solidify → reuse / `llm_free`; MCP/corpus are evidence only.
 
-APIs: `# agent` / `# 智能体` → `## run` / `## route` / `## step` / `## plan` (+ `resolve` / `record_episode` / `maybe_learn` / `compile` / `compile_policy` / `metrics`). Context: standing + task + **call site** + tools + budgeted source/skill + act protocol (`CALL:` / `READ:`). Inspect without LLM: `dump_step_context`. Inside `writeback=` / `写回=` branches use `host_writeback_record` (param name shadows the writeback import).
+APIs: `# agent` / `# 智能体` → `## step` / `## plan`. Context: standing + task + **call site** + tools + budgeted source/skill + act protocol (`CALL:` / `READ:`).
 
-Examples: [agent-pong](../../examples/agent-pong/) · [agent-okf-flywheel](../../examples/agent-okf-flywheel/). Harness: `scripts/agent-harness.sh`. Design: [ext-agent.md](../../doc/design/ext-agent.md) · Wave B: [agent-framework-2026-09.md](../../doc/research/agent-framework-2026-09.md) · v2: [doc/next/003.md](../../doc/next/003.md) · P4: [doc/next/004.md](../../doc/next/004.md). Dev LLM: copy [.env.example](../../.env.example) → `.env` (gitignored).
+Examples: [agent-pong](../../examples/agent-pong/) · [agent-okf-flywheel](../../examples/agent-okf-flywheel/) · [agent-sandbox-okf](../../examples/agent-sandbox-okf/). Harness: `scripts/agent-harness.sh`. Design: [ext-agent.md](../../doc/design/ext-agent.md) · optimize O1–O5: [ext-ai-optimize.md](../../doc/roadmap/ext-ai-optimize.md). Dev LLM: copy [.env.example](../../.env.example) → `.env` (gitignored).
+
+**Sandbox (O1):** `import sandbox:ext/ai/sandbox.mq.md` · `agent.trial` / `智能体.试跑` · `run`/`step` take `sandbox=` / `沙盒=` (default `False`). Profile caps are tables via `sandbox.profile`. Gold: `tests/ext/agent-sandbox-optin.mq.md`.
 
 ## Official extension: `ext/web` (Document / Endpoint / Resource)
 
-Install: `marqdo ext add web` (ZH id: `网页`). Build native plugin: `scripts/build-web-plugin.sh` / `marqdo ext add web`.
+Install: `marqdo ext add web` (ZH id: `网页`). See ADR 0007 · [ext-web-artifact.md](../../doc/design/ext-web-artifact.md).
 
-**Constitution (ADR 0007 — do not degrade):**
+**Do not degrade:** Document/Endpoint metadata; facade `web.page|route|serve|render|inspect`; View `|type|slot|value|attrs|style|` only; no `compose_*` / `configure` / author `ensure_plugin`. DB → `ext/data`; auth → `ext/security`; net → `ext/net`.
 
-1. **Document / Endpoint / Resource** — `.mq.md` with `type: web|endpoint` (ZH `类型: 网页|端点`) is the site surface; not a Flask-style class pile.
-2. **Code is documentation** — the file is docs + route + handler.
-3. **Table = data** — View schema only `|type|slot|value|attrs|style|`. No `compose_*` dialects, no `json.set` glue.
-4. **Facade only** — `web.page` · `web.route` · `web.serve` · `web.render` · `web.inspect`. DB → `ext/data`; auth → `ext/security`; ws/http → `ext/net`.
-5. **No author `ensure_plugin` / `host_*`**; import web = capability (plugin auto-load).
-6. **Declared vs system routes**; `web.inspect` lists both. No silent user routes.
-
-Import **one language** per file:
-
-- EN: `import web:ext/web/web.mq.md` (+ `import data:ext/data/db.mq.md` as needed)
+- EN: `import web:ext/web/web.mq.md`
 - ZH: `导入 网页:ext/web/网页.mq.md`
 
-```markdown
----
-type: web
-route: /
-title: Hello
-import web:ext/web/web.mq.md
----
-
-# Hello
-
-Executable document as a page.
-```
-
-```markdown
----
-type: endpoint
-method: POST
-path: /api/ping
-response: json
----
-
-*{"ok": true}*
-```
-
-Site entry may `# main` → `web.serve root="."`. Client WASM: `ext/web/client.mq.md` / `lib/browser` — no author JS.
-
-Design: [ext-web-artifact.md](../../doc/design/ext-web-artifact.md) · ADR [0007](../../doc/adr/0007-web-document-endpoint.md) · rule: `.cursor/rules/web-artifact-no-degrade.mdc` · example: [examples/marqdo-blog/](../../examples/marqdo-blog/).
-
-Web patterns: [examples.md](examples.md) · API index: [reference.md](reference.md).
+Design: [ext-web-artifact.md](../../doc/design/ext-web-artifact.md) · example: [examples/marqdo-blog/](../../examples/marqdo-blog/).
 
 ## Official extension: `ext/quantum` (circuits + Q7/Q8)
 
@@ -296,29 +203,13 @@ Install: `marqdo ext add quantum` (ZH id: `量子`). Build: `cargo build --relea
 
 Design: [ext-quantum.md](../../doc/design/ext-quantum.md) · Q7: [ext-quantum-q7.md](../../doc/design/ext-quantum-q7.md) · Q8 viz: [ext-quantum-viz-style.md](../../doc/design/ext-quantum-viz-style.md) · examples: [quantum-bell](../../examples/quantum-bell/) · [quantum-entanglement](../../examples/quantum-entanglement/).
 
-## Official extension: `ext/linalg` (formula-first LA)
-
-Install: `marqdo ext add linalg` (ZH id: `线性代数`). Build: `cargo build --release -p marqdo_plugin_linalg`, then **`marqdo ext add linalg` again** so view loads the new native lib.
-
-- EN: `import la:ext/linalg/linalg.mq.md`
-- ZH: `导入 la:ext/linalg/线性代数.mq.md`
-
-**Hard rules:** `ext/**` never calls `host_*`; hot path is ABI plugin; prefer top-level `la.symbol` (not `matrix.symbol` without a receiver); quote `kind=` strings; dense `explicit` / factorize obey size guards.
-
-APIs (EN): `symbol` → `# matrix`；中缀 `+`/`-`/`*`；方法 `` `A`.T `` / ``.simplify`` / ``.ascii`` · `from_formula` / `explicit` / `factorize` / `draw` · `lstsq` / `norm` / `cond` / `rank`.
-
-Examples: [linalg-svd](../../examples/linalg-svd/) · [linalg-least-squares](../../examples/linalg-least-squares/). Design: [ext-linalg.md](../../doc/design/ext-linalg.md) · formula-doc: [ext-linalg-formula-doc.md](../../doc/design/ext-linalg-formula-doc.md).
-
 ## AI authoring workflow
 
-1. **查再写**：不确定语法就 `marqdo mlsp`（`syntax` / `locate`）——不必背语法细节。
-2. Decide language surface (English builtins + `lib/text.mq.md`, or Chinese + `lib/文本.mq.md`).
-3. Write `.mq.md` with `# main`, blank lines around prose, correct markers.
-4. 可选：给函数/集合写**渐进式契约**（上节三种表格形状；写全或不写，别写一半）。
-5. Run: `marqdo run path/to/file.mq.md` (cwd = project root so `lib/` resolves).
-6. On errors：结构化诊断（含 `doc_anchor` / `suggestion`）→ `repair_targets` 取有界靶点，**只改锚点范围内**的行。
-7. 提交前：`marqdo check path/to/file.mq.md`（或 `mlsp validate`）清到零 Error。
-8. Optional: `marqdo view .` / `marqdo debug .` for structure and breakpoints.
+1. Decide language surface (English builtins + `lib/text.mq.md`, or Chinese + `lib/文本.mq.md`).
+2. Write `.mq.md` with `# main`, blank lines around prose, correct markers.
+3. Run: `marqdo run path/to/file.mq.md` (cwd = project root so `lib/` resolves).
+4. On `path:line:col: message`, fix that span; re-run until exit 0.
+5. Optional: `marqdo view .` / `marqdo debug .` for structure and breakpoints.
 
 ## Anti-patterns (common model mistakes)
 
@@ -339,8 +230,7 @@ Examples: [linalg-svd](../../examples/linalg-svd/) · [linalg-least-squares](../
 | Mix `web.page` and `网页.页面` in one file | One import language per `.mq.md` |
 | Call `host_web_*` from `ext/web` | Use `# app` / `# db` methods; plugin ABI only |
 | Call `host_*` from `ext/quantum` | Use `# circuit` / `# density` methods; plugin ABI only |
-| Call `host_*` from `ext/linalg` | Use `la.*` L1 wrappers; plugin ABI only |
-| Bare `kind=eig` inside `*…*` | `kind="eig"` — quote text literals |
+| Bare `kind=hinton` inside `*…*` | `kind="hinton"` — quote text literals |
 | Bare `theme=dark` inside `*…*` | `theme="dark"` — quote; ZH `主题="dark"` |
 | Rebuild plugin but skip `ext add` | `cargo build -p marqdo_plugin_quantum` then `marqdo ext add quantum` (or set `MARQDO_QUANTUM_PLUGIN`) |
 
@@ -357,5 +247,3 @@ Examples: [linalg-svd](../../examples/linalg-svd/) · [linalg-least-squares](../
 - [ ] Browser client: `lib/browser` + tables when returning effects
 - [ ] Quantum draw: quote `kind=` / `theme=`; rebuild plugin → `ext add quantum` before view
 - [ ] `marqdo run` succeeds (or errors addressed)
-- [ ] 语法拿不准的地方已查 MLSP（`syntax`/`locate`），而不是凭记忆发明
-- [ ] 契约（如有）与升参一致：`marqdo check` 零 Error

@@ -2987,6 +2987,54 @@ inspect-ok",
 }
 
 #[test]
+fn ext_ai_agent_sandbox_optin() {
+    ensure_agent_plugin_built();
+    assert_out(
+        "tests/ext/agent-sandbox-optin.mq.md",
+        "True
+False
+False
+True
+True
+optin-ok
+default",
+    );
+}
+
+#[test]
+fn ext_ai_agent_sandbox_promote() {
+    ensure_agent_plugin_built();
+    assert_out(
+        "tests/ext/agent-sandbox-promote.mq.md",
+        "True
+False
+sandbox_proof_failed",
+    );
+}
+
+#[test]
+fn ext_ai_agent_step_route() {
+    ensure_agent_plugin_built();
+    assert_out(
+        "tests/ext/agent-step-route.mq.md",
+        "marqdo
+llm
+auto",
+    );
+}
+
+#[test]
+fn ext_ai_agent_sandbox_quarantine() {
+    ensure_agent_plugin_built();
+    assert_out(
+        "tests/ext/agent-sandbox-quarantine.mq.md",
+        "True
+True
+quarantine",
+    );
+}
+
+#[test]
 fn ext_llm_named_offline() {
     let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let output = Command::new(env!("CARGO_BIN_EXE_marqdo"))

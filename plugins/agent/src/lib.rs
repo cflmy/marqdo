@@ -901,6 +901,7 @@ kb_ffi!(agent_corpus_search, corpus::corpus_search, "agent_corpus_search");
 kb_ffi!(agent_mcp_fixture, corpus::mcp_fixture, "agent_mcp_fixture");
 kb_ffi!(agent_kb_add_alias, kb::kb_add_alias, "agent_kb_add_alias");
 kb_ffi!(agent_kb_promote, kb::kb_promote, "agent_kb_promote");
+kb_ffi!(agent_kb_quarantine, kb::kb_quarantine, "agent_kb_quarantine");
 kb_ffi!(agent_kb_record_hit, kb::kb_record_hit, "agent_kb_record_hit");
 kb_ffi!(
     agent_workbook_solidify,
@@ -1063,6 +1064,15 @@ pub unsafe extern "C" fn marqdo_plugin_init(host: *const MarqdoHostApi) -> c_int
         "agent_kb_promote",
         "kb_dir,goal,workbook",
         agent_kb_promote,
+    ) != 0
+    {
+        return 1;
+    }
+    if register(
+        host,
+        "agent_kb_quarantine",
+        "kb_dir,slug",
+        agent_kb_quarantine,
     ) != 0
     {
         return 1;
