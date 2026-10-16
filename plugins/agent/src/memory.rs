@@ -1038,10 +1038,17 @@ pub fn resolve_task(args: &Value) -> Result<Value, String> {
         "tools": args.get("tools").cloned().unwrap_or(Value::Null),
     }))?;
     if hit.is_null() {
+        // Keep field set aligned with hit path so facades can safely read llm_free
+        // (qdagent / agent.run crashed on missing key when OKF is cold).
         return Ok(json!({
             "mode": "unknown",
+            "match": null,
             "skill": null,
             "resource": null,
+            "slug": null,
+            "status": null,
+            "llm_free": false,
+            "score": null,
             "confidence": 0.0,
         }));
     }
@@ -1077,6 +1084,25 @@ pub fn resolve_task(args: &Value) -> Result<Value, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn resolve_miss_includes_llm_free() {
+        let dir = std::env::temp_dir().join(format!(
+            "marqdo-resolve-miss-{}",
+            std::process::id()
+        ));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        let out = resolve_task(&json!({
+            "task": "no-such-skill-cold-miss",
+            "kb_dir": dir.to_string_lossy(),
+            "near_match": false,
+        }))
+        .unwrap();
+        assert_eq!(out.get("mode").and_then(|v| v.as_str()), Some("unknown"));
+        assert_eq!(out.get("llm_free").and_then(|v| v.as_bool()), Some(false));
+        let _ = fs::remove_dir_all(&dir);
+    }
 
     #[test]
     fn record_and_cluster_and_compile() {

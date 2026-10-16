@@ -3,8 +3,10 @@
 ## Unreleased
 
 ### Added
+- Regression gold `tests/ext/agent-run-cold-efi.mq.md` + research note [`doc/research/agent-run-efi-resolve-bugs-2026-10.md`](doc/research/agent-run-efi-resolve-bugs-2026-10.md)（qdagent cold EFI）。
 
 ### Fixed
+- **`agent.run` / `agent_resolve`（qdagent 复现）**：miss resolve 补齐 `llm_free: false`；`## run` 改为 `` `self`.preflight ``，并对 `llm_free` / route 字段用 `json.get` 防御缺键硬崩。
 
 ### Changed
 

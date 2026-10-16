@@ -1941,19 +1941,19 @@ Primary author entry (v2 + P4): Adaptive `route` → execute (policy/kb skill) o
 
 **efi_pf = None**
 1. `efi`
-  **efi_pf = preflight task=`task`**
+  **efi_pf = > `self`.preflight task=`task`**
 2. *
   **_ = 1**
 
-**routed = `self`.route task=`task` backend=`router` kb_dir=`kb_dir` memory_dir=`memory_dir` threshold=`near_threshold`**
-**route_matched = [matched](routed)**
-**needs_llm = [needs_llm](routed)**
+**routed = > `self`.route task=`task` backend=`router` kb_dir=`kb_dir` memory_dir=`memory_dir` threshold=`near_threshold`**
+**route_matched = > json.get value=`routed` key="matched"**
+**needs_llm = > json.get value=`routed` key="needs_llm"**
 **exec_mode = "explore"**
 **llm_calls = 0**
 **tokens = 0**
 **token_cost = 0**
 **out = None**
-**route_backend = [backend](routed)**
+**route_backend = > json.get value=`routed` key="backend"**
 
 1. `route_matched`
   **path = > json.get value=`routed` key="resource"**
@@ -1964,13 +1964,13 @@ Primary author entry (v2 + P4): Adaptive `route` → execute (policy/kb skill) o
     **last_obs = [observation](aw)**
     1. `code` == 0
       > agent_kb_record_hit kb_dir=`kb_dir` goal=`task` improve_every=`improve_every`
-      **lf = [llm_free](routed)**
+      **lf = > json.get value=`routed` key="llm_free"**
       1. `lf`
         **exec_mode = "compiled"**
       2. *
         **exec_mode = "routed"**
-      **rmode = [mode](routed)**
-      **sk = [skill](routed)**
+      **rmode = > json.get value=`routed` key="mode"**
+      **sk = > json.get value=`routed` key="skill"**
       **out = **
 
       | status | goal | result | workbook | cache | match | skill | observation | summary | route |
@@ -1989,22 +1989,22 @@ Primary author entry (v2 + P4): Adaptive `route` → execute (policy/kb skill) o
   **_ = 1**
 2. `needs_llm`
   1. `router_model`
-    **prompt = [prompt](routed)**
+    **prompt = > json.get value=`routed` key="prompt"**
     **turn = model_turn model=`router_model` prompt=`prompt` stream=`stream` echo=`echo`**
-    **reply = [text](turn)**
-    **llm_calls = [llm_calls](turn)**
-    **tokens = [tokens](turn)**
-    **applied = `self`.route_apply task=`task` reply=`reply` kb_dir=`kb_dir` backend=`router`**
-    **am = [matched](applied)**
+    **reply = > json.get value=`turn` key="text"**
+    **llm_calls = > json.get value=`turn` key="llm_calls"**
+    **tokens = > json.get value=`turn` key="tokens"**
+    **applied = > `self`.route_apply task=`task` reply=`reply` kb_dir=`kb_dir` backend=`router`**
+    **am = > json.get value=`applied` key="matched"**
     1. `am`
-      **path = [resource](applied)**
+      **path = > json.get value=`applied` key="resource"**
       **aw = await_workbook path=`path` sandbox=`sandbox` sandbox_profile=`sandbox_profile`**
       **code = [code](aw)**
       **child_val = [value](aw)**
       **last_obs = [observation](aw)**
       1. `code` == 0
         **exec_mode = "routed"**
-        **sk = [skill](applied)**
+        **sk = > json.get value=`applied` key="skill"**
         **out = **
 
         | status | goal | result | workbook | cache | match | skill | observation | summary | route |
@@ -2025,9 +2025,9 @@ Primary author entry (v2 + P4): Adaptive `route` → execute (policy/kb skill) o
   **_ = 1**
 2. *
   1. `efi_pf`
-    **efi_st = [status](efi_pf)**
-    **efi_dec = [decision](efi_pf)**
-    **efi_allow = [create_allowed](efi_pf)**
+    **efi_st = > json.get value=`efi_pf` key="status"**
+    **efi_dec = > json.get value=`efi_pf` key="decision"**
+    **efi_allow = > json.get value=`efi_pf` key="create_allowed"**
     1. `efi_st` == "missing_knowledge"
       **_ = 1**
     2. `efi_dec` == "REUSE"
@@ -2050,11 +2050,13 @@ Primary author entry (v2 + P4): Adaptive `route` → execute (policy/kb skill) o
   1. `out`
     **_ = 1**
   2. *
-  **resolved = `self`.resolve task=`task` kb_dir=`kb_dir` near_match=`near_match` near_threshold=`near_threshold`**
-  **mode = [mode](resolved)**
-  **llm_free = [llm_free](resolved)**
+  **resolved = > `self`.resolve task=`task` kb_dir=`kb_dir` near_match=`near_match` near_threshold=`near_threshold`**
+  **mode = > json.get value=`resolved` key="mode"**
+  **llm_free = > json.get value=`resolved` key="llm_free"**
+  1. not `llm_free`
+    **llm_free = False**
   1. `llm_free`
-    **path = [resource](resolved)**
+    **path = > json.get value=`resolved` key="resource"**
     **aw = await_workbook path=`path` sandbox=`sandbox` sandbox_profile=`sandbox_profile`**
     **code = [code](aw)**
     **child_val = [value](aw)**
@@ -2062,7 +2064,7 @@ Primary author entry (v2 + P4): Adaptive `route` → execute (policy/kb skill) o
     1. `code` == 0
       > agent_kb_record_hit kb_dir=`kb_dir` goal=`task` improve_every=`improve_every`
       **exec_mode = "compiled"**
-      **sk = [skill](resolved)**
+      **sk = > json.get value=`resolved` key="skill"**
       **out = **
 
       | status | goal | result | workbook | cache | match | skill | observation | summary |
