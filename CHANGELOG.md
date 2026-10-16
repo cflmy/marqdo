@@ -3,12 +3,30 @@
 ## Unreleased
 
 ### Added
-- Regression gold `tests/ext/agent-run-cold-efi.mq.md` + research note [`doc/research/agent-run-efi-resolve-bugs-2026-10.md`](doc/research/agent-run-efi-resolve-bugs-2026-10.md)（qdagent cold EFI）。
 
 ### Fixed
-- **`agent.run` / `agent_resolve`（qdagent 复现）**：miss resolve 补齐 `llm_free: false`；`## run` 改为 `` `self`.preflight ``，并对 `llm_free` / route 字段用 `json.get` 防御缺键硬崩。
 
 ### Changed
+
+## Ext pack v1.4.3 — 2026-10-16
+
+### Highlights
+
+**Agent cold EFI / resolve 硬崩修复（CLI 仍为 v1.4.2）**：qdagent 接通 `agent.run` 时空 OKF 触发 `unknown function preflight` 与 `missing map key llm_free`。本包修复 `ext/ai/agent` facade 与 `agent` native；金样 `tests/ext/agent-run-cold-efi.mq.md`。说明：[`doc/research/agent-run-efi-resolve-bugs-2026-10.md`](doc/research/agent-run-efi-resolve-bugs-2026-10.md)。
+
+```bash
+marqdo ext add agent   # CDN latest → 1.4.3
+# 或：MARQDO_EXT_VERSION=1.4.3 marqdo ext add agent
+```
+
+**核心表面 Δ（Core surface Δ）**：**无增删**——仅 Extension / Agent Runtime 契约修补。
+
+### Fixed
+- **`agent.run`**：`efi=True` 改为 `` `self`.preflight ``（不再裸调全局 `preflight`）。
+- **`agent_resolve` miss**：返回字段对齐命中路径，含 `llm_free: false`；facade 对 `llm_free` / route 字段改用 `json.get`。
+
+### Changed
+- 扩展包 SemVer **1.4.3**（`ext/VERSION`）；与 CLI **v1.4.2** 可独立安装。
 
 ## v1.4.2 — 2026-10-16
 

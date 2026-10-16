@@ -149,8 +149,9 @@ marqdo catalog public -o .marqdo
 
 ---
 
-## 现状（v1.4.2）
+## 现状（v1.4.2 · Ext pack **1.4.3**）
 
+- **Ext pack 1.4.3**：修复 `agent.run` cold EFI（`` `self`.preflight `` + miss resolve `llm_free`）；`marqdo ext add agent` → CDN latest · [agent-run-efi-resolve-bugs-2026-10.md](doc/research/agent-run-efi-resolve-bugs-2026-10.md)
 - **Agent/LLM 优化 O1–O5（v1.4.2）**：`ext/ai/sandbox` CoW · `agent.trial` / `sandbox=` · promote sandbox proof · `step_route` / EFI / cost · style lint · quarantine · [ext-ai-optimize.md](doc/roadmap/ext-ai-optimize.md)
 - **view 标注连线（v1.4.1）**：underline→chip SVG mid→mid（底边中点→轨道→短竖线→顶边中点）· 帧 chip 共用 id · L→R 密度 · [view-prose-annot-gaps.md](doc/design/view-prose-annot-gaps.md)
 - **叙述统一 / 公式 meta / 图片自写回（v1.4.0）**：`% marqdo: var=` 块公式绑定 · 臂/循环体叙述与 foreach 中英糖 · `![marqdo-out](…)` 图片自写回 · view 推断形参实值 · [fence-meta-and-control-prose.md](doc/design/fence-meta-and-control-prose.md) · [stdlib-writeback.md](doc/design/stdlib-writeback.md)
