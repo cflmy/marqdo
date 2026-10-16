@@ -149,10 +149,11 @@ marqdo catalog public -o .marqdo
 
 ---
 
-## 现状（v1.4.4）
+## 现状（v1.4.5）
 
+- **Streamable HTTP MCP + web invoke 鉴权（v1.4.5）**：`agent_mcp_serve transport=http` · Bearer/`X-Api-Key` 注入 · `unauthorized`→401 · openai/agent `json.get` 硬化
 - **LLM 传输软失败 + `ext/ai` 表优先（v1.4.4）**：上游不可达 → `status=error`（不 abort）；`agent`/`llm` 去 `json.set` 胶水 · [agent-llm-transport-soft-2026-10.md](doc/research/agent-llm-transport-soft-2026-10.md)
-- **Ext pack 1.4.3**：修复 `agent.run` cold EFI（`` `self`.preflight `` + miss resolve `llm_free`）；已并入 **1.4.4** · [agent-run-efi-resolve-bugs-2026-10.md](doc/research/agent-run-efi-resolve-bugs-2026-10.md)
+- **Ext pack 1.4.3**：修复 `agent.run` cold EFI（`` `self`.preflight `` + miss resolve `llm_free`）；已并入 **≥1.4.4** · [agent-run-efi-resolve-bugs-2026-10.md](doc/research/agent-run-efi-resolve-bugs-2026-10.md)
 - **Agent/LLM 优化 O1–O5（v1.4.2）**：`ext/ai/sandbox` CoW · `agent.trial` / `sandbox=` · promote sandbox proof · `step_route` / EFI / cost · style lint · quarantine · [ext-ai-optimize.md](doc/roadmap/ext-ai-optimize.md)
 - **view 标注连线（v1.4.1）**：underline→chip SVG mid→mid（底边中点→轨道→短竖线→顶边中点）· 帧 chip 共用 id · L→R 密度 · [view-prose-annot-gaps.md](doc/design/view-prose-annot-gaps.md)
 - **叙述统一 / 公式 meta / 图片自写回（v1.4.0）**：`% marqdo: var=` 块公式绑定 · 臂/循环体叙述与 foreach 中英糖 · `![marqdo-out](…)` 图片自写回 · view 推断形参实值 · [fence-meta-and-control-prose.md](doc/design/fence-meta-and-control-prose.md) · [stdlib-writeback.md](doc/design/stdlib-writeback.md)
@@ -173,7 +174,7 @@ marqdo catalog public -o .marqdo
   - **`web`**：**Artifact 模型（ADR [0007](doc/adr/0007-web-document-endpoint.md)）** — `type: web|endpoint` Document/Endpoint；facade `page`/`route`/`serve`/`render`/`inspect`/`use`；Resource 在 `ext/data` · `ext/security` · `ext/net`；设计 [ext-web-artifact.md](doc/design/ext-web-artifact.md)；原生 **Go `libweb`**（[ADR 0004](doc/adr/0004-web-plugin-go.md)）；示例 [marqdo-blog](examples/marqdo-blog/) · [web-client-site](examples/web-client-site/) · [anlian-mq](examples/anlian-mq/)
   - **`quantum`**：Q0–Q7 + Q8a/b 主题 SVG；示例 [quantum-entanglement](examples/quantum-entanglement/)
   - **`linalg`**：L0–L6 + 公式文档面（中缀 / `declare` / 展示化简）；示例 [linalg-transpose](examples/linalg-transpose/) · [linalg-svd](examples/linalg-svd/) · [linalg-least-squares](examples/linalg-least-squares/)
-  - **`agent`**：A1–A4 + **MCP Server/Client stdio** + Skill Compilation + Adaptive Routing + resume + **Engineering preflight**（`agent.preflight` / `eng_preflight`）；宿主缺口见 [ext-hosting.md](doc/roadmap/ext-hosting.md) · [agent-framework-gaps-after-a4.md](doc/research/agent-framework-gaps-after-a4.md) · [engineering-knowledge.md](doc/design/engineering-knowledge.md)
+  - **`agent`**：A1–A4 + **MCP Server/Client**（stdio + **Streamable HTTP**）+ Skill Compilation + Adaptive Routing + resume + **Engineering preflight**（`agent.preflight` / `eng_preflight`）；宿主缺口见 [ext-hosting.md](doc/roadmap/ext-hosting.md) · [agent-framework-gaps-after-a4.md](doc/research/agent-framework-gaps-after-a4.md) · [engineering-knowledge.md](doc/design/engineering-knowledge.md)
   - **`llm`**：语义 `ask`/`stream`/`collect`（OpenAI/Ollama；可选原生 `plugins/llm`）
   - 安装：`marqdo ext list` / `add …` / `remove`（[ext-cli.md](doc/design/ext-cli.md)；默认 `~/.marqdo/ext`）。原生插件先 `cargo build -p marqdo_plugin_*` 再 `ext add`
 - **原生插件 ABI**：[`include/marqdo_abi.h`](include/marqdo_abi.h) · [ext-abi.md](doc/design/ext-abi.md)；`plugins/{demo,agent,web,quantum,linalg,llm}`（`web` 为 Go；其余为 Rust）  
@@ -182,7 +183,7 @@ marqdo catalog public -o .marqdo
 - **浏览器 Marqdo（WASM）**：`marqdo wasm build` + 官方 bridge 自启（作者零业务 JS；桥内可含列表/路由/storage/ws/文件/Canvas/音频/Observer/拖放）；`lib/browser` + GFM；`web.client_embed`；示例 [browser-hello](examples/browser-hello/) · [browser-app](examples/browser-app/) · [browser-media](examples/browser-media/) · [web-client-site](examples/web-client-site/)（[ADR 0002](doc/adr/0002-browser-marqdo-wasm.md) · [D](doc/roadmap/browser-wasm-d.md) · [E](doc/roadmap/browser-wasm-e.md) · [F](doc/roadmap/browser-wasm-f.md)）
 - 选型：[ADR 0001 — Rust](doc/adr/0001-implementation-language.md) · [ADR 0002 — 浏览器 WASM](doc/adr/0002-browser-marqdo-wasm.md)（C0–C5 完结，见 [roadmap/browser-wasm.md](doc/roadmap/browser-wasm.md)）· [ADR 0003 — 异步效应](doc/adr/0003-browser-async-effects.md)
 
-### 如何使用最新 Marqdo（v1.4.4）
+### 如何使用最新 Marqdo（v1.4.5）
 
 **安装解释器（任选其一）**
 
@@ -197,7 +198,7 @@ marqdo catalog public -o .marqdo
 ```bash
 # 1) 源码安装（跟 tag 或 main）
 git clone https://github.com/cflmy/marqdo.git && cd marqdo
-git checkout v1.4.4   # 或留在 main
+git checkout v1.4.5   # 或留在 main
 cargo build --release
 export PATH="$PWD/target/release:$PATH"
 marqdo version
@@ -236,7 +237,7 @@ marqdo wasm build
 # → dist/wasm/ … 见 examples/browser-hello/
 
 # 6) Releases：Windows exe/zip/vsix；Linux CLI zip + native `.so` zip
-#    https://github.com/cflmy/marqdo/releases/tag/v1.4.4
+#    https://github.com/cflmy/marqdo/releases/tag/v1.4.5
 ```
 
 开发期也可用 `cargo run -- …` 代替已安装的 `marqdo`：

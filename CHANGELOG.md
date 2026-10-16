@@ -8,6 +8,37 @@
 
 ### Changed
 
+## v1.4.5 — 2026-10-16
+
+### Highlights
+
+**Streamable HTTP MCP + web `/v1` 鉴权硬化**：`agent_mcp_serve` 支持 `transport=http`（MCP Streamable HTTP 2025-03-26）；web invoke 注入 `Authorization` / `X-Api-Key`，`ok=false`+`unauthorized` → HTTP 401；`ext/ai` openai/agent 字段访问改 `json.get`，消除 footnote 硬崩。CLI · Ext · wasm **1.4.5**。
+
+```bash
+git checkout v1.4.5 && cargo build --release
+cargo build --release -p marqdo_plugin_agent
+# HTTP MCP:
+# QDAGENT_MCP_TRANSPORT=http marqdo run cli/求道-mcp.mq.md
+marqdo ext add agent   # CDN → 1.4.5
+```
+
+**核心表面 Δ（Core surface Δ）**：**新增** MCP Streamable HTTP 传输（`transport=http|streamable-http`）；web invoke 契约扩展（header 注入 · 401）；**无** MQ 关键词 / 表几何变更。
+
+### Added
+
+- **`agent_mcp_serve` Streamable HTTP**：`transport=http` · `host`/`port`/`path`；POST JSON-RPC + 可选 GET SSE；`Mcp-Session-Id`。facade：`ext/ai/agent` `## serve`。
+
+### Fixed
+
+- **web invoke**：`Authorization` / `X-Api-Key` 注入 payload；`jsonWrapInvokeValue` 对 `unauthorized` 返回 401；`{sse}` 自动 event-stream。
+- **`ext/ai/llm/openai` · `agent` · `llm`**：字段访问改 `json.get` / `at`，避免 `[field](x)` 在非 map 上硬崩。
+- **explore workbook**：子任务 `stream=False`（网关 SSE 524 更稳）。
+
+### Changed
+
+- CLI / Ext / wasm SemVer **1.4.5**。
+- 设计：[doc/design/ext-web-artifact.md](doc/design/ext-web-artifact.md)（sse / bearer）。
+
 ## v1.4.4 — 2026-10-16
 
 ### Highlights

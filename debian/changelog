@@ -1,3 +1,11 @@
+marqdo (1.4.5-1ppa1) noble; urgency=medium
+
+  * Marqdo 1.4.5: Streamable HTTP MCP (agent_mcp_serve transport=http);
+    web invoke Bearer/X-Api-Key inject + unauthorized→401; openai/agent
+    field access via json.get (no footnote hard-fail).
+
+ -- cflmy <pingan@cflmy.cn>  Fri, 16 Oct 2026 17:40:00 +0800
+
 marqdo (1.4.4-1ppa1) noble; urgency=medium
 
   * Marqdo 1.4.4: Soft LLM transport errors (structured status=error);

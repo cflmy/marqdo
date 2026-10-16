@@ -126,8 +126,8 @@ jobs:
             ## Marqdo ${{ github.ref_name }}
 
             ### 亮点 / Highlights
-            - **v1.4.4**：LLM 传输软失败 + `ext/ai` 表优先——`status=error` 不 abort · 去 json.set 胶水
-            - **v1.4.4**: Soft LLM transport errors + table-first ext/ai — structured status=error, no json.set glue
+            - **v1.4.5**：Streamable HTTP MCP + web invoke Bearer/401 · openai/agent json.get 硬化
+            - **v1.4.5**: Streamable HTTP MCP + web invoke Bearer/401; openai/agent json.get hardening
             - **v1.4.2**：Agent/LLM 优化 O1–O5——sandbox trial · promote proof · step_route/EFI/cost · lint · quarantine
             - **v1.4.2**: Agent/LLM optimize O1–O5 — sandbox trial, promote proof, step_route/EFI/cost, lint, quarantine
             - **v1.4.1**：view 标注连线——SVG mid→mid（underline 底中 → chip 顶中）· 帧 chip id 对齐 · L→R 密度
