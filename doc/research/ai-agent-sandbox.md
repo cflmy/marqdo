@@ -6,7 +6,7 @@
 | 日期 | 2026-10-16 |
 | 范围 | 浏览器 WASM / WASI、OS 进程沙盒、容器 / microVM、CoW 叠加工作区、符号链接暂存方案；对照 Marqdo AI 栈 |
 | 相关设计 | **[ext-ai-sandbox.md](../design/ext-ai-sandbox.md)** · **[roadmap/ext-ai-sandbox.md](../roadmap/ext-ai-sandbox.md)** · [ext-agent.md](../design/ext-agent.md) · [ext-agent-plan.md](../design/ext-agent-plan.md) · [stdlib-writeback.md](../design/stdlib-writeback.md) · [stdlib-subtask.md](../design/stdlib-subtask.md) · [browser-marqdo-wasm.md](../design/browser-marqdo-wasm.md) · [adr/0002-browser-marqdo-wasm.md](../adr/0002-browser-marqdo-wasm.md) · [ai-stack.md](../roadmap/ai-stack.md) · [ext-abi.md](../design/ext-abi.md) · [stdlib-modules.md](../design/stdlib-modules.md) |
-| 姊妹调研 | [agent-frameworks-and-marqdo.md](agent-frameworks-and-marqdo.md) · [agent-framework-gaps-after-a4.md](agent-framework-gaps-after-a4.md) |
+| 姊妹调研 | [agent-frameworks-and-marqdo.md](agent-frameworks-and-marqdo.md) · [agent-framework-gaps-after-a4.md](agent-framework-gaps-after-a4.md) · [ai-agent-llm-optimize-2026-10.md](ai-agent-llm-optimize-2026-10.md) · [ext-ai-optimize.md](../design/ext-ai-optimize.md) |
 
 ---
 
