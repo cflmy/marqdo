@@ -1,3 +1,10 @@
+marqdo (1.4.2-1ppa1) noble; urgency=medium
+
+  * Marqdo 1.4.2: Agent/LLM optimize O1–O5 — sandbox trial opt-in,
+    promote sandbox proof, step_route/EFI/cost, style lint, quarantine.
+
+ -- cflmy <pingan@cflmy.cn>  Fri, 16 Oct 2026 11:51:05 +0800
+
 marqdo (1.4.1-1ppa1) noble; urgency=medium
 
   * Marqdo 1.4.1: View annot leaders — SVG mid-to-mid (mark bottom-center

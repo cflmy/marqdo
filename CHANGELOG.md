@@ -3,11 +3,41 @@
 ## Unreleased
 
 ### Added
-- **`ext/ai/sandbox`**：AI 试跑 CoW 工作区（`open` / `run` / `diff` / `commit` / `discard` / `inspect`）；经 `plugins/agent` `sandbox_*` → `host_query`；默认拒 `plugin`/`exec`/`net`；设计见 [ext-ai-sandbox.md](doc/design/ext-ai-sandbox.md)。
 
 ### Fixed
 
 ### Changed
+
+## v1.4.2 — 2026-10-16
+
+### Highlights
+
+**Agent/LLM 优化 O1–O5**：`ext/ai/sandbox` CoW 试跑接入 `agent.trial` / `run sandbox=`（默认关）；promote 强制 sandbox proof；步骤路由 `step_route` + EFI preflight + `usage`/`token_cost`；风格 lint 与 `sandbox.report`；技能 `quarantine` 与离线 standing/policy 优化脚本。表优先、少 json 胶水。路线：[ext-ai-optimize.md](doc/roadmap/ext-ai-optimize.md)。
+
+```bash
+git checkout v1.4.2 && cargo build --release
+cargo build --release -p marqdo_plugin_agent
+marqdo run tests/ext/agent-sandbox-optin.mq.md
+marqdo run examples/agent-sandbox-okf/index.mq.md
+# Ubuntu: sudo apt update && sudo apt install marqdo
+marqdo ext add agent   # CDN latest → 1.4.2
+```
+
+**核心表面 Δ（Core surface Δ）**：**无增删**——19 个核心构造不变。本版为 **Extension / Agent Runtime**（`ext/ai` 沙盒与晋升闸门），不触碰语言标记。
+
+### Added
+- **`ext/ai/sandbox`**：CoW 工作区（`open` / `run` / `diff` / `commit` / `discard` / `inspect` / `profile` / `report`）；经 `plugins/agent` `sandbox_*` → `host_query`；默认拒 `plugin`/`exec`/`net`。
+- **O1**：`agent.trial` · `run`/`step` `sandbox=` · 中文 `试跑`/`沙盒=` · 示例 `examples/agent-sandbox-okf/` · 金样 `agent-sandbox-optin`。
+- **O2**：`agent_kb_promote` 默认 sandbox proof；OKF `applies_when`/`fixtures`/`sandbox_profile`/`proof`；harness Skill Lift。
+- **O3**：`agent.step_route` · `ext/ai/policies/step-route.mq.md` · `run efi=`（缺工程知识时软放行）· 结果 `usage`/`token_cost`。
+- **O4**：`scripts/mq-style-lint.sh` · `sandbox.report` markdown 审阅面。
+- **O5**：`agent_kb_quarantine` / `agent.quarantine` · `scripts/optimize-standing-policy.sh`。
+
+### Fixed
+
+### Changed
+- CLI / wasm / `ext/VERSION` **同步 1.4.2**。
+- Skill：强制表/链接取元、禁同文件混 EN/ZH、点名 sandbox 试跑习惯。
 
 ## v1.4.1 — 2026-10-15
 
