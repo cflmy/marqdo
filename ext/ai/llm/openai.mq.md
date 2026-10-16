@@ -4,6 +4,7 @@ description: >-
   OpenAI-compatible chat completions transport (HTTP + SSE).
   Prefers optional plugins/llm ABI when present; falls back to lib/net.
   Used by ext/ai/llm; authors should prefer llm.ask / llm.stream.
+  Result packs are GFM tables / table.put (code-as-documentation).
 import net:lib/net.mq.md
 import json:lib/json.mq.md
 import table:lib/table.mq.md
@@ -53,21 +54,18 @@ Extract OpenAI-shaped `choices[0].message.tool_calls` as a list (or empty list).
 
 **choices = > json.get value=`data` key="choices"**
 1. not `choices`
-  **empty = > json.parse text=[]**
-  *empty*
+  *> table.empty_list*
 2. *
   **c0 = [1](choices)**
   **msg = > json.get value=`c0` key="message"**
   1. not `msg`
-    **empty = > json.parse text=[]**
-    *empty*
+    *> table.empty_list*
   2. *
     **tc = > json.get value=`msg` key="tool_calls"**
     1. `tc`
       *tc*
     2. *
-      **empty = > json.parse text=[]**
-      *empty*
+      *> table.empty_list*
 
 ## chat_completions
     + `base_url`
@@ -79,7 +77,7 @@ Extract OpenAI-shaped `choices[0].message.tool_calls` as a list (or empty list).
     + `suffix`=/chat/completions
     + `bearer`="Bearer "
 
-POST `/chat/completions` (or stream SSE). Prefers `plugins/llm` ABI (`llm_chat_completions`) when the native plugin is resolvable; otherwise `lib/net` HTTP/SSE. Non-stream → `{text,usage,finish,tool_calls}`; stream → `{events,finish}`.
+POST `/chat/completions` (or stream SSE). Prefers `plugins/llm` ABI (`llm_chat_completions`) when the native plugin is resolvable; otherwise `lib/net` HTTP/SSE. Non-stream → `{text,usage,finish,tool_calls}`; stream → `{events,finish}`. Soft transport / HTTP failures return `finish=error` packs (never abort the VM).
 
 **p = > plugin.native_path name="llm"**
 1. `p`
@@ -107,13 +105,32 @@ POST `/chat/completions` (or stream SSE). Prefers `plugins/llm` ABI (`llm_chat_c
     **body = > json.stringify value=`req`**
     **resp = > net.http_post_sse url=`url` body=`body` headers=`headers` echo=`echo`**
     1. [status](resp) == 200
-      **pack = > json.parse text={"finish":"stop"}**
-      **pack = > json.set map=`pack` key="events" value=[events](resp)**
+      **evs = [events](resp)**
+
+      `pack` =
+
+      | finish | events |
+      |--------|--------|
+      | stop | `evs` |
+
       *pack*
     2. *
-      > print text=ext/ai/llm/openai: HTTP error (stream)
-      > print text=[status](resp)
-      > sys.exit code=1
+      Soft transport / HTTP failure — structured pack, never abort the VM.
+      **st = [status](resp)**
+      **msg = "HTTP " + `st`**
+      **evs = [events](resp)**
+      1. `evs`
+        **e0 = [1](evs)**
+        **m2 = > json.get value=`e0` key="message"**
+        1. `m2`
+          **msg = `m2`**
+      `pack` =
+
+      | finish | text | error | events |
+      |--------|------|-------|--------|
+      | error | "" | `msg` | `evs` |
+
+      *pack*
   2. *
     **body = > json.stringify value=`req`**
     **resp = > net.http_post url=`url` body=`body` headers=`headers`**
@@ -132,14 +149,33 @@ POST `/chat/completions` (or stream SSE). Prefers `plugins/llm` ABI (`llm_chat_c
       2. *
         **_ = 1**
       **tc = > tool_calls_from data=`data`**
-      **pack = > json.parse text={"finish":"stop"}**
-      **pack = > json.set map=`pack` key="text" value=`text`**
-      **pack = > json.set map=`pack` key="usage" value=`usage`**
-      **pack = > json.set map=`pack` key="finish" value=`fr`**
-      **pack = > json.set map=`pack` key="tool_calls" value=`tc`**
+
+      `pack` =
+
+      | finish | text | usage | tool_calls |
+      |--------|------|-------|------------|
+      | `fr` | `text` | `usage` | `tc` |
+
       *pack*
     2. *
-      > print text=ext/ai/llm/openai: HTTP error
-      > print text=[status](resp)
-      > print text=[body](resp)
-      > sys.exit code=1
+      Soft transport / HTTP failure — structured pack, never abort the VM.
+      **st = [status](resp)**
+      **raw = [body](resp)**
+      **msg = "HTTP " + `st`**
+      1. `raw`
+        **msg = `msg` + ": " + `raw`**
+      `usage0` =
+
+      | prompt_tokens | completion_tokens | total_tokens |
+      |---------------|-------------------|--------------|
+      | 0 | 0 | 0 |
+
+      **empty_tc = > table.empty_list**
+
+      `pack` =
+
+      | finish | text | error | usage | tool_calls |
+      |--------|------|-------|-------|------------|
+      | error | "" | `msg` | `usage0` | `empty_tc` |
+
+      *pack*

@@ -6,6 +6,10 @@
 
 ### Fixed
 
+- **LLM / Agent 传输软失败**：上游连接拒绝、超时或 HTTP≠200 时，`host_http_post` / `llm` 插件 / `ext/ai/llm/openai` 不再硬中断；`llm.ask` · `agent.step` · `agent.run` 返回 `finish|status=error` + `error`。金样 `tests/ext/agent-llm-transport-soft.mq.md`。说明：[doc/research/agent-llm-transport-soft-2026-10.md](doc/research/agent-llm-transport-soft-2026-10.md)。
+- **`agent.run`**：`cache == soft-hit` 改为引号比较（裸 `soft-hit` 被解析为减法，软失败路径上才暴露）。
+- **`ext/ai` 去 json 胶水**：`agent.mq.md` / `智能体.mq.md` / `llm/openai.mq.md` 结果 map 与事件构建改为 GFM 表 + `table.put` / `table.append` / `table.empty_*`（`json.set`/`json.append` 清零）。SKILL 正面示例：`.cursor/skills/marqdo-dev` §2 · `marqdo/examples.md` §6e。
+
 ### Changed
 
 ## Ext pack v1.4.3 — 2026-10-16

@@ -245,7 +245,12 @@ fn chat_completions(args: &Value) -> Result<Value, String> {
                 let status = r.status();
                 if status != 200 {
                     let text = read_limited(r.into_reader())?;
-                    return Err(format!("HTTP {status}: {text}"));
+                    return Ok(json!({
+                        "events": [{"type": "error", "message": format!("HTTP {status}: {text}")}],
+                        "finish": "error",
+                        "error": format!("HTTP {status}: {text}"),
+                        "transport": "plugin",
+                    }));
                 }
                 let events = parse_sse_events(BufReader::new(r.into_reader()), echo)?;
                 Ok(json!({
@@ -256,9 +261,19 @@ fn chat_completions(args: &Value) -> Result<Value, String> {
             }
             Err(ureq::Error::Status(code, r)) => {
                 let text = read_limited(r.into_reader()).unwrap_or_default();
-                Err(format!("HTTP {code}: {text}"))
+                Ok(json!({
+                    "events": [{"type": "error", "message": format!("HTTP {code}: {text}")}],
+                    "finish": "error",
+                    "error": format!("HTTP {code}: {text}"),
+                    "transport": "plugin",
+                }))
             }
-            Err(e) => Err(format!("http POST sse {url}: {e}")),
+            Err(e) => Ok(json!({
+                "events": [{"type": "error", "message": format!("http POST sse {url}: {e}")}],
+                "finish": "error",
+                "error": format!("http POST sse {url}: {e}"),
+                "transport": "plugin",
+            })),
         }
     } else {
         match req.send_string(&body) {
@@ -266,7 +281,14 @@ fn chat_completions(args: &Value) -> Result<Value, String> {
                 let status = r.status();
                 let text = read_limited(r.into_reader())?;
                 if status != 200 {
-                    return Err(format!("HTTP {status}: {text}"));
+                    return Ok(json!({
+                        "text": "",
+                        "usage": {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0},
+                        "finish": "error",
+                        "error": format!("HTTP {status}: {text}"),
+                        "tool_calls": [],
+                        "transport": "plugin",
+                    }));
                 }
                 let data: Value = serde_json::from_str(&text).map_err(|e| e.to_string())?;
                 let msg = data
@@ -299,9 +321,23 @@ fn chat_completions(args: &Value) -> Result<Value, String> {
             }
             Err(ureq::Error::Status(code, r)) => {
                 let text = read_limited(r.into_reader()).unwrap_or_default();
-                Err(format!("HTTP {code}: {text}"))
+                Ok(json!({
+                    "text": "",
+                    "usage": {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0},
+                    "finish": "error",
+                    "error": format!("HTTP {code}: {text}"),
+                    "tool_calls": [],
+                    "transport": "plugin",
+                }))
             }
-            Err(e) => Err(format!("http POST {url}: {e}")),
+            Err(e) => Ok(json!({
+                "text": "",
+                "usage": {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0},
+                "finish": "error",
+                "error": format!("http POST {url}: {e}"),
+                "tool_calls": [],
+                "transport": "plugin",
+            })),
         }
     }
 }

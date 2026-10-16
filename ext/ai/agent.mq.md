@@ -57,26 +57,43 @@ The runbook `.mq.md` is ground truth (code as documentation). Default budgets ke
     + `stream`=False
     + `echo`=False
 
-One LLM turn via the semantic surface (`ask` / `stream`+`collect`). Returns `{text,llm_calls,tokens}` for episode metrics.
+One LLM turn via the semantic surface (`ask` / `stream`+`collect`). Returns `{text,llm_calls,tokens}` for episode metrics; transport failures set `error` + `llm_calls=0` (never abort).
 
 1. `stream`
   **evs = > model.stream prompt=`prompt` echo=`echo`**
   **text = > llm.collect events=`evs`**
   **tokens = 0**
+  **err = None**
+  **calls = 1**
+  1. not `text`
+    **e0 = [1](evs)**
+    **err = > json.get value=`e0` key="message"**
+    1. `err`
+      **calls = 0**
 2. *
   **r = > model.ask prompt=`prompt`**
   **text = [text](r)**
   **tokens = [tokens](r)**
+  **err = > json.get value=`r` key="error"**
+  **fin = > json.get value=`r` key="finish"**
   1. `tokens`
     **_ = 1**
   2. *
     **tokens = 0**
+  1. `err`
+    **calls = 0**
+  2. `fin` == "error"
+    **calls = 0**
+    1. not `err`
+      **err = "llm transport error"**
+  3. *
+    **calls = 1**
 
 `out` =
 
-| text | llm_calls | tokens |
-|------|-----------|--------|
-| `text` | 1 | `tokens` |
+| text | llm_calls | tokens | error |
+|------|-----------|--------|-------|
+| `text` | `calls` | `tokens` | `err` |
 
 *out*
 
@@ -100,11 +117,12 @@ Inspect what `build_step_context` would send — no LLM. Returns a map: `prompt`
   **truncated = True**
 2. *
   **_ = 1**
-**out = > json.parse text={}**
-**out = > json.set map=`out` key="prompt" value=`prompt`**
-**out = > json.set map=`out` key="call_site" value=`site`**
-**out = > json.set map=`out` key="prompt_chars" value=`chars`**
-**out = > json.set map=`out` key="truncated" value=`truncated`**
+`out` =
+
+| prompt | call_site | prompt_chars | truncated |
+|--------|-----------|--------------|-----------|
+| `prompt` | `site` | `chars` | `truncated` |
+
 *out*
 
 ---
@@ -163,7 +181,7 @@ Allowlist check, then invoke the runbook `##` via `lib/subtask` (`spawn fn=` →
 Build a runnable workbook. `skeleton=single` (default): one worker `step`. `skeleton=dual`: research then write agents. On success the parent chooses DONE; runtime `agent_workbook_solidify` freezes the answer.
 
 **q = > json.quote text=`goal`**
-**esc = > json.parse text={"h":"---\ntitle: agent workbook\nimport llm:ext/ai/llm.mq.md\nimport agent:ext/ai/agent.mq.md\nimport json:lib/json.mq.md\nimport sys:lib/sys.mq.md\nimport wb:lib/writeback.mq.md\nimport subtask:lib/subtask.mq.md\n---\n\n# Goal\n\nParent goal is embedded as JSON in # main.\n\n## Solidify\n\nWhen the child returns a good value, parent DECISION: DONE — runtime agent_workbook_solidify freezes the answer as **return** (do not invent long FIND/REPLACE).\n\n# main\n\n> llm.load_env\n\n","s1":"\u002a\u0060model\u0060 = > llm.llm \u002a\n","s2":"\u002a\u0060tools\u0060 = > json.parse text=[] \u002a\n","s3":"\u002a\u0060worker\u0060 = > agent.agent model=\u0060model\u0060 tools=\u0060tools\u0060 standing=You are a workbook worker. tools=[] means never CALL. Finish the task with a direct final answer; do not invent tools. \u002a\n","s4":"\u002a\u0060wrap\u0060 = > json.parse text={\"task\":","s5":"} \u002a\n","s6":"\u002a\u0060task\u0060 = > json.get value=\u0060wrap\u0060 key=task \u002a\n","s7":"\u002a\u0060out\u0060 = > \u0060worker\u0060.step task=\u0060task\u0060 stream=True \u002a\n","s7b":"\u002a\u0060text\u0060 = > json.get value=\u0060out\u0060 key=result \u002a\n","s8":"\u002a\u002a\u0060text\u0060\u002a\u002a\n","d3":"\u002a\u0060research\u0060 = > agent.agent model=\u0060model\u0060 tools=\u0060tools\u0060 standing=You gather facts for the goal. Be concise. Do not invent tools. \u002a\n","d3b":"\u002a\u0060writer\u0060 = > agent.agent model=\u0060model\u0060 tools=\u0060tools\u0060 standing=You write the final answer from research notes. Do not invent tools. \u002a\n","d4":"\u002a\u0060wrap\u0060 = > json.parse text={\"task\":","d5":"} \u002a\n","d6":"\u002a\u0060task\u0060 = > json.get value=\u0060wrap\u0060 key=task \u002a\n","d7":"\u002a\u0060notes\u0060 = > \u0060research\u0060.step task=\u0060task\u0060 stream=True \u002a\n","d8":"\u002a\u0060ns\u0060 = > json.stringify value=\u0060notes\u0060 \u002a\n","d9":"\u002a\u0060wt\u0060 = Write the final answer. Research notes: \u002a\n","d10":"\u002a\u0060wt\u0060 = \u0060wt\u0060 + \u0060ns\u0060 \u002a\n","d11":"\u002a\u0060out\u0060 = > \u0060writer\u0060.step task=\u0060wt\u0060 stream=True \u002a\n","d11b":"\u002a\u0060text\u0060 = > json.get value=\u0060out\u0060 key=result \u002a\n","d12":"\u002a\u002a\u0060text\u0060\u002a\u002a\n"}**
+**esc = > json.parse text={"h":"---\ntitle: agent workbook\nimport llm:ext/ai/llm.mq.md\nimport agent:ext/ai/agent.mq.md\nimport json:lib/json.mq.md\nimport sys:lib/sys.mq.md\nimport wb:lib/writeback.mq.md\nimport subtask:lib/subtask.mq.md\n---\n\n# Goal\n\nParent goal is embedded as JSON in # main.\n\n## Solidify\n\nWhen the child returns a good value, parent DECISION: DONE — runtime agent_workbook_solidify freezes the answer as **return** (do not invent long FIND/REPLACE).\n\n# main\n\n> llm.load_env\n\n","s1":"\u002a\u0060model\u0060 = > llm.llm \u002a\n","s2":"\u002a\u0060tools\u0060 = > table.empty_list \u002a\n","s3":"\u002a\u0060worker\u0060 = > agent.agent model=\u0060model\u0060 tools=\u0060tools\u0060 standing=You are a workbook worker. tools=[] means never CALL. Finish the task with a direct final answer; do not invent tools. \u002a\n","s4":"\u002a\u0060wrap\u0060 = > json.parse text={\"task\":","s5":"} \u002a\n","s6":"\u002a\u0060task\u0060 = > json.get value=\u0060wrap\u0060 key=task \u002a\n","s7":"\u002a\u0060out\u0060 = > \u0060worker\u0060.step task=\u0060task\u0060 stream=True \u002a\n","s7b":"\u002a\u0060text\u0060 = > json.get value=\u0060out\u0060 key=result \u002a\n","s8":"\u002a\u002a\u0060text\u0060\u002a\u002a\n","d3":"\u002a\u0060research\u0060 = > agent.agent model=\u0060model\u0060 tools=\u0060tools\u0060 standing=You gather facts for the goal. Be concise. Do not invent tools. \u002a\n","d3b":"\u002a\u0060writer\u0060 = > agent.agent model=\u0060model\u0060 tools=\u0060tools\u0060 standing=You write the final answer from research notes. Do not invent tools. \u002a\n","d4":"\u002a\u0060wrap\u0060 = > json.parse text={\"task\":","d5":"} \u002a\n","d6":"\u002a\u0060task\u0060 = > json.get value=\u0060wrap\u0060 key=task \u002a\n","d7":"\u002a\u0060notes\u0060 = > \u0060research\u0060.step task=\u0060task\u0060 stream=True \u002a\n","d8":"\u002a\u0060ns\u0060 = > json.stringify value=\u0060notes\u0060 \u002a\n","d9":"\u002a\u0060wt\u0060 = Write the final answer. Research notes: \u002a\n","d10":"\u002a\u0060wt\u0060 = \u0060wt\u0060 + \u0060ns\u0060 \u002a\n","d11":"\u002a\u0060out\u0060 = > \u0060writer\u0060.step task=\u0060wt\u0060 stream=True \u002a\n","d11b":"\u002a\u0060text\u0060 = > json.get value=\u0060out\u0060 key=result \u002a\n","d12":"\u002a\u002a\u0060text\u0060\u002a\u002a\n"}**
 **h = > json.get value=`esc` key="h"**
 **s1 = > json.get value=`esc` key="s1"**
 **s2 = > json.get value=`esc` key="s2"**
@@ -205,21 +223,22 @@ Structured observation for the parent developer-agent: source, named writeback s
 
 **source = > fs.read_text path=`path`**
 **slots = > wb.scan_path path=`path`**
-**obs = > json.parse text={"path":""}**
-**obs = > json.set map=`obs` key="path" value=`path`**
-**obs = > json.set map=`obs` key="source" value=`source`**
-**obs = > json.set map=`obs` key="slots" value=`slots`**
-**obs = > json.set map=`obs` key="exit_code" value=`exit_code`**
+`obs` =
+
+| path | source | slots | exit_code |
+|------|--------|-------|-----------|
+| `path` | `source` | `slots` | `exit_code` |
+
 1. `value`
-  **obs = > json.set map=`obs` key="value" value=`value`**
+  **obs = table.put in=`obs` at="value" value=`value`**
 2. *
   **_ = 1**
 1. `stdout`
-  **obs = > json.set map=`obs` key="stdout" value=`stdout`**
+  **obs = table.put in=`obs` at="stdout" value=`stdout`**
 2. *
   **_ = 1**
 1. `stderr`
-  **obs = > json.set map=`obs` key="stderr" value=`stderr`**
+  **obs = table.put in=`obs` at="stderr" value=`stderr`**
 2. *
   **_ = 1**
 
@@ -236,12 +255,12 @@ Structured observation for the parent developer-agent: source, named writeback s
     **_ = 1**
 
 1. `last_ok`
-  **obs = > json.set map=`obs` key="last_ok" value=`last_ok`**
+  **obs = table.put in=`obs` at="last_ok" value=`last_ok`**
 2. *
   **_ = 1**
 
 1. `last_error`
-  **obs = > json.set map=`obs` key="last_error" value=`last_error`**
+  **obs = table.put in=`obs` at="last_error" value=`last_error`**
 2. *
   **_ = 1**
 
@@ -384,7 +403,7 @@ With `sandbox=True`, run via `## trial` first (commit on ok); host unchanged unt
 **nl = > json.get value=`esc` key="nl"**
 **raw = > str value=`text`**
 **lines = > split value=`raw` sep=`nl`**
-**acc = > json.parse text=[]**
+**acc = > table.empty_list**
 **chars = 0**
 **count = 0**
 - [`line`](`lines`)
@@ -394,7 +413,7 @@ With `sandbox=True`, run via `## trial` first (commit on ok); host unchanged unt
     1. `next` > `max_chars`
       **count = max_lines**
     2. *
-      **acc = > json.append list=`acc` item=`line`**
+      **acc = > table.append list=`acc` item=`line`**
       **chars = next**
       **count = count + 1**
   2. *
@@ -418,7 +437,7 @@ With `sandbox=True`, run via `## trial` first (commit on ok); host unchanged unt
   **start = 0**
 2. *
   **_ = 1**
-**acc = > json.parse text=[]**
+**acc = > table.empty_list**
 **i = 0**
 **chars = 0**
 - [`line`](`lines`)
@@ -428,7 +447,7 @@ With `sandbox=True`, run via `## trial` first (commit on ok); host unchanged unt
     1. `next` > `max_chars`
       **i = n**
     2. *
-      **acc = > json.append list=`acc` item=`line`**
+      **acc = > table.append list=`acc` item=`line`**
       **chars = next**
   2. *
     **_ = 1**
@@ -446,7 +465,7 @@ Drop `<!-- … -->` blocks (including marqdo-out bodies) so parent excerpts stay
 **nl = > json.get value=`esc` key="nl"**
 **raw = > str value=`text`**
 **lines = > split value=`raw` sep=`nl`**
-**acc = > json.parse text=[]**
+**acc = > table.empty_list**
 **skip = None**
 - [`line`](`lines`)
   1. `skip`
@@ -463,7 +482,7 @@ Drop `<!-- … -->` blocks (including marqdo-out bodies) so parent excerpts stay
       **before = > at value=`start_parts` index=0**
       **before = > trim value=`before`**
       1. `before`
-        **acc = > json.append list=`acc` item=`before`**
+        **acc = > table.append list=`acc` item=`before`**
       2. *
         **_ = 1**
       **tail = > at value=`start_parts` index=1**
@@ -474,7 +493,7 @@ Drop `<!-- … -->` blocks (including marqdo-out bodies) so parent excerpts stay
       2. *
         **skip = 1**
     2. *
-      **acc = > json.append list=`acc` item=`line`**
+      **acc = > table.append list=`acc` item=`line`**
 *> join value=`acc` sep=`nl`*
 
 ---
@@ -694,7 +713,7 @@ Parse `ARGS:{…}` JSON line, or a bare `{…}` line after CALL.
 **nl = > json.get value=`esc` key="nl"**
 **mark = > json.get value=`esc` key="mark"**
 **brace = > json.get value=`esc` key="brace"**
-**empty = > json.parse text={}**
+**empty = > table.empty_map**
 1. `reply`
   **text = > trim value=`reply`**
   **lines = > split value=`text` sep=`nl`**
@@ -753,15 +772,17 @@ Truncate a tool result for `tool_end` events (~1KiB).
 
 Always append `tool_start` / `tool_end` to `events` for audit / view process cards. SSE publish only when `stream=True`.
 
-**ev = > json.parse text={}**
-**ev = > json.set map=`ev` key="type" value=`type`**
-**ev = > json.set map=`ev` key="name" value=`name`**
-**ev = > json.set map=`ev` key="kind" value=`kind`**
+`ev` =
+
+| type | name | kind |
+|------|------|------|
+| `type` | `name` | `kind` |
+
 1. `result`
-  **ev = > json.set map=`ev` key="result" value=`result`**
+  **ev = table.put in=`ev` at="result" value=`result`**
 2. *
   **_ = 1**
-**events = > json.append list=`events` item=`ev`**
+**events = > table.append list=`events` item=`ev`**
 1. `stream`
   > sys.stream_publish event=`ev`
 2. *
@@ -816,8 +837,12 @@ Write a scratch tool workbook under `.marqdo/agent-runs/tools/<name>.mq.md`.
 > fs.make_dir path=`dir`
 **path = a + name + b**
 > fs.write_text path=`path` text=`text`
-**out = > json.parse text={"ok":True}**
-**out = > json.set map=`out` key="path" value=`path`**
+`out` =
+
+| ok | path |
+|----|------|
+| True | `path` |
+
 *out*
 
 ---
@@ -925,25 +950,42 @@ Priority: CALL → READ → DECISION. Returns `{kind,name}`.
 
 **tool = > extract_tool_name reply=`reply`**
 1. `tool`
-  **out = > json.parse text={"kind":"call"}**
-  **out = > json.set map=`out` key="name" value=`tool`**
+  `out` =
+
+  | kind | name |
+  |------|------|
+  | call | `tool` |
+
   *out*
 2. *
   **_ = 1**
 **rk = > extract_plan_read reply=`reply`**
 1. `rk`
-  **out = > json.parse text={"kind":"read"}**
-  **out = > json.set map=`out` key="name" value=`rk`**
+  `out` =
+
+  | kind | name |
+  |------|------|
+  | read | `rk` |
+
   *out*
 2. *
   **_ = 1**
 **dec = > extract_plan_decision reply=`reply`**
 1. `dec`
-  **out = > json.parse text={"kind":"decision"}**
-  **out = > json.set map=`out` key="name" value=`dec`**
+  `out` =
+
+  | kind | name |
+  |------|------|
+  | decision | `dec` |
+
   *out*
 2. *
-  **out = > json.parse text={"kind":"unknown"}**
+  `out` =
+
+  | kind |
+  |------|
+  | unknown |
+
   *out*
 
 ---
@@ -960,7 +1002,7 @@ Parse NAME: id plus a triple-angle body after CALL:scratch_tool_write.
 **text = > trim value=`reply`**
 **lines = > split value=`text` sep=`nl`**
 **name = None**
-**body_lines = > json.parse text=[]**
+**body_lines = > table.empty_list**
 **in_body = None**
 - [`line`](`lines`)
   1. `in_body`
@@ -968,7 +1010,7 @@ Parse NAME: id plus a triple-angle body after CALL:scratch_tool_write.
     1. `t` == `close`
       **in_body = None**
     2. *
-      **body_lines = > json.append list=`body_lines` item=`line`**
+      **body_lines = > table.append list=`body_lines` item=`line`**
   2. *
     **t = > trim value=`line`**
     **parts = > split value=`t` sep=":"**
@@ -991,9 +1033,12 @@ Parse NAME: id plus a triple-angle body after CALL:scratch_tool_write.
     2. *
       **_ = 1**
 **body = > join value=`body_lines` sep=`nl`**
-**out = > json.parse text={}**
-**out = > json.set map=`out` key="name" value=`name`**
-**out = > json.set map=`out` key="text" value=`body`**
+`out` =
+
+| name | text |
+|------|------|
+| `name` | `body` |
+
 *out*
 
 ---
@@ -1084,26 +1129,26 @@ Parent Plan-and-Move tools (helpers + whitelist `CALL:lib…`).
 **obs = observation**
 1. `kind` == source
   **ex = > workbook_read path=`path` depth="deep"**
-  **obs = > json.set map=`obs` key="source_excerpt" value=`ex`**
-  **obs = > json.set map=`obs` key="read_source" value=True**
+  **obs = table.put in=`obs` at="source_excerpt" value=`ex`**
+  **obs = table.put in=`obs` at="read_source" value=True**
 2. `kind` == stderr
   **err = > json.get value=`obs` key="stderr"**
   **tail = > text_tail_lines text=`err` max_lines=80 max_chars=6000**
-  **obs = > json.set map=`obs` key="stderr_tail" value=`tail`**
-  **obs = > json.set map=`obs` key="read_stderr" value=True**
+  **obs = table.put in=`obs` at="stderr_tail" value=`tail`**
+  **obs = table.put in=`obs` at="read_stderr" value=True**
 3. `kind` == stdout
   **out = > json.get value=`obs` key="stdout"**
   **tail = > text_tail_lines text=`out` max_lines=80 max_chars=6000**
-  **obs = > json.set map=`obs` key="stdout_tail" value=`tail`**
-  **obs = > json.set map=`obs` key="read_stdout" value=True**
+  **obs = table.put in=`obs` at="stdout_tail" value=`tail`**
+  **obs = table.put in=`obs` at="read_stdout" value=True**
 4. `kind` == slots
   **slots = > json.get value=`obs` key="slots"**
-  **obs = > json.set map=`obs` key="slots_detail" value=`slots`**
-  **obs = > json.set map=`obs` key="read_slots" value=True**
+  **obs = table.put in=`obs` at="slots_detail" value=`slots`**
+  **obs = table.put in=`obs` at="read_slots" value=True**
 5. `kind` == skill
   **brief = > skill_brief depth="deep"**
-  **obs = > json.set map=`obs` key="skill_brief" value=`brief`**
-  **obs = > json.set map=`obs` key="read_skill" value=True**
+  **obs = table.put in=`obs` at="skill_brief" value=`brief`**
+  **obs = table.put in=`obs` at="read_skill" value=True**
 6. *
   **_ = 1**
 *obs*
@@ -1135,56 +1180,55 @@ Bounded observation for the parent prompt (actionable, short).
 2. *
   **_ = 1**
 
-**compact = > json.parse text={"note":"Plan-and-Move: CALL/READ then DECISION. Success (exit 0 + has_value) → DONE. solidify_on_done. No long prose."}**
-**compact = > json.set map=`compact` key="path" value=`obs_path`**
-**compact = > json.set map=`compact` key="exit_code" value=`obs_code`**
-**compact = > json.set map=`compact` key="source_len" value=`src_len`**
-**compact = > json.set map=`compact` key="has_worker_step" value=`has_step`**
-**compact = > json.set map=`compact` key="solidify_on_done" value=True**
+`compact` =
+
+| note | path | exit_code | source_len | has_worker_step | solidify_on_done |
+|------|------|-----------|------------|-----------------|------------------|
+| Plan-and-Move: CALL/READ then DECISION. Success (exit 0 + has_value) → DONE. solidify_on_done. No long prose. | `obs_path` | `obs_code` | `src_len` | `has_step` | True |
 
 1. `obs_src`
   **ex = > json.get value=`observation` key="source_excerpt"**
   1. `ex`
-    **compact = > json.set map=`compact` key="source_excerpt" value=`ex`**
+    **compact = table.put in=`compact` at="source_excerpt" value=`ex`**
   2. *
     **ex = > workbook_source_excerpt source=`obs_src`**
-    **compact = > json.set map=`compact` key="source_excerpt" value=`ex`**
+    **compact = table.put in=`compact` at="source_excerpt" value=`ex`**
 2. *
   **_ = 1**
 
 1. `obs_stderr`
   **tail = > json.get value=`observation` key="stderr_tail"**
   1. `tail`
-    **compact = > json.set map=`compact` key="stderr_tail" value=`tail`**
+    **compact = table.put in=`compact` at="stderr_tail" value=`tail`**
   2. *
     **tail = > text_tail_lines text=`obs_stderr`**
-    **compact = > json.set map=`compact` key="stderr_tail" value=`tail`**
+    **compact = table.put in=`compact` at="stderr_tail" value=`tail`**
 2. *
   **_ = 1**
 1. `obs_stdout`
   **tail = > json.get value=`observation` key="stdout_tail"**
   1. `tail`
-    **compact = > json.set map=`compact` key="stdout_tail" value=`tail`**
+    **compact = table.put in=`compact` at="stdout_tail" value=`tail`**
   2. *
     **tail = > text_tail_lines text=`obs_stdout`**
-    **compact = > json.set map=`compact` key="stdout_tail" value=`tail`**
+    **compact = table.put in=`compact` at="stdout_tail" value=`tail`**
 2. *
   **_ = 1**
 
 **val_txt = > str value=`obs_val`**
 **val_len = > len value=`val_txt`**
 1. `obs_val`
-  **compact = > json.set map=`compact` key="has_value" value=True**
-  **compact = > json.set map=`compact` key="value_len" value=`val_len`**
+  **compact = table.put in=`compact` at="has_value" value=True**
+  **compact = table.put in=`compact` at="value_len" value=`val_len`**
   1. `val_len` > 200
     **preview = > text_head_lines text=`val_txt` max_lines=4 max_chars=200**
-    **compact = > json.set map=`compact` key="value_preview" value=`preview`**
+    **compact = table.put in=`compact` at="value_preview" value=`preview`**
   2. *
-    **compact = > json.set map=`compact` key="value" value=`obs_val`**
+    **compact = table.put in=`compact` at="value" value=`obs_val`**
 2. *
-  **compact = > json.set map=`compact` key="has_value" value=False**
+  **compact = table.put in=`compact` at="has_value" value=False**
 
-**slots_brief = > json.parse text=[]**
+**slots_brief = > table.empty_list**
 1. `obs_slots`
   - [`slot`](`obs_slots`)
     **sk = > json.get value=`slot` key="key"**
@@ -1192,22 +1236,24 @@ Bounded observation for the parent prompt (actionable, short).
     **sb = > json.get value=`slot` key="body"**
     **sb_txt = > str value=`sb`**
     **sb_len = > len value=`sb_txt`**
-    **brief = > json.parse text={"key":""}**
-    **brief = > json.set map=`brief` key="key" value=`sk`**
-    **brief = > json.set map=`brief` key="line" value=`sl`**
-    **brief = > json.set map=`brief` key="body_len" value=`sb_len`**
+    `brief` =
+
+    | key | line | body_len |
+    |-----|------|----------|
+    | `sk` | `sl` | `sb_len` |
+
     1. `sk` == error
       **prev = > text_head_lines text=`sb_txt` max_lines=8 max_chars=400**
-      **brief = > json.set map=`brief` key="body_preview" value=`prev`**
+      **brief = table.put in=`brief` at="body_preview" value=`prev`**
     2. *
       **_ = 1**
-    **slots_brief = > json.append list=`slots_brief` item=`brief`**
+    **slots_brief = > table.append list=`slots_brief` item=`brief`**
 2. *
   **_ = 1**
-**compact = > json.set map=`compact` key="slots" value=`slots_brief`**
+**compact = table.put in=`compact` at="slots" value=`slots_brief`**
 **detail = > json.get value=`observation` key="slots_detail"**
 1. `detail`
-  **compact = > json.set map=`compact` key="slots_detail" value=`detail`**
+  **compact = table.put in=`compact` at="slots_detail" value=`detail`**
 2. *
   **_ = 1**
 
@@ -1215,7 +1261,7 @@ Bounded observation for the parent prompt (actionable, short).
 1. `tool_result`
   **tr = > str value=`tool_result`**
   **tr = > text_head_lines text=`tr` max_lines=40 max_chars=3000**
-  **compact = > json.set map=`compact` key="tool_result" value=`tr`**
+  **compact = table.put in=`compact` at="tool_result" value=`tr`**
 2. *
   **_ = 1**
 
@@ -1225,10 +1271,10 @@ Bounded observation for the parent prompt (actionable, short).
   **err_len = > len value=`err_txt`**
   1. `err_len` > 200
     **prev = > text_head_lines text=`err_txt` max_lines=8 max_chars=400**
-    **compact = > json.set map=`compact` key="last_error_preview" value=`prev`**
-    **compact = > json.set map=`compact` key="last_error_len" value=`err_len`**
+    **compact = table.put in=`compact` at="last_error_preview" value=`prev`**
+    **compact = table.put in=`compact` at="last_error_len" value=`err_len`**
   2. *
-    **compact = > json.set map=`compact` key="last_error" value=`last_error`**
+    **compact = table.put in=`compact` at="last_error" value=`last_error`**
 2. *
   **_ = 1**
 
@@ -1372,7 +1418,7 @@ Short parent prompt: REUSE+SLUG or NEW only. Candidates may include lexical `sco
 **sp = > json.get value=`esc` key="sp"**
 **st = > json.get value=`esc` key="st"**
 **lf = > json.get value=`esc` key="lf"**
-**lines = > json.parse text=[]**
+**lines = > table.empty_list**
 - [`t`](`tasks`)
   **slug = > json.get value=`t` key="slug"**
   **title = > json.get value=`t` key="title"**
@@ -1403,7 +1449,7 @@ Short parent prompt: REUSE+SLUG or NEW only. Candidates may include lexical `sco
     **row = row + sep + desc**
   2. *
     **_ = 1**
-  **lines = > json.append list=`lines` item=`row`**
+  **lines = > table.append list=`lines` item=`row`**
 **catalog = > join value=`lines` sep=`nl`**
 **p = "Soft-match: same task intent?"**
 *p + a + goal + b + catalog + c*
@@ -1536,55 +1582,81 @@ LLM Plan → CALL/READ/DECISION loop. Returns `{decision,reply,observation,event
 **llm_calls = 0**
 **tokens = 0**
 
+**transport_err = None**
+
 - `left` > 0
   1. `decision`
     **left = 0**
-  2. *
+  2. `transport_err`
+    **left = 0**
+  3. *
     **ctx = > build_plan_context agent=`agent` goal=`goal` observation=`last_obs` explore_attempt=`explore_attempt` explore_n=`explore_n` phase=`phase`**
     1. `stream`
       **evs = > model.stream prompt=`ctx` echo=`echo`**
       **last_reply = > llm.collect events=`evs`**
       **evs_all = > plan_merge_deltas events=`evs_all` from=`evs` stream=`stream`**
-      **llm_calls = llm_calls + 1**
+      **e0 = [1](evs)**
+      **terr = > json.get value=`e0` key="message"**
+      **etype = > json.get value=`e0` key="type"**
+      1. `etype` == "error"
+        **transport_err = `terr`**
+        1. not `transport_err`
+          **transport_err = "llm stream transport error"**
+        **left = 0**
+      2. *
+        **llm_calls = llm_calls + 1**
     2. *
       **turn = > model_turn model=`model` prompt=`ctx` stream=False echo=`echo`**
-      **last_reply = > json.get value=`turn` key="text"**
-      **c = > json.get value=`turn` key="llm_calls"**
-      **t = > json.get value=`turn` key="tokens"**
-      **llm_calls = llm_calls + c**
-      **tokens = tokens + t**
-    **last_reply = > trim value=`last_reply`**
-    **act = > extract_plan_act reply=`last_reply`**
-    **kind = > json.get value=`act` key="kind"**
-    **name = > json.get value=`act` key="name"**
-    1. `kind` == call
-      **evs_all = > plan_append_tool events=`evs_all` type="tool_start" name=`name` kind="call" stream=`stream`**
-      **tool_out = > run_parent_tool name=`name` path=`path` observation=`last_obs` reply=`last_reply`**
-      **brief = > tool_result_brief value=`tool_out`**
-      **evs_all = > plan_append_tool events=`evs_all` type="tool_end" name=`name` kind="call" result=`brief` stream=`stream`**
-      **last_obs = > json.set map=`last_obs` key="tool_result" value=`tool_out`**
-      **left = left - 1**
-    2. `kind` == read
-      **evs_all = > plan_append_tool events=`evs_all` type="tool_start" name=`name` kind="read" stream=`stream`**
-      **last_obs = > plan_read_deepen observation=`last_obs` kind=`name` path=`path`**
-      **brief = > tool_result_brief value=`last_obs`**
-      **evs_all = > plan_append_tool events=`evs_all` type="tool_end" name=`name` kind="read" result=`brief` stream=`stream`**
-      **left = left - 1**
-    3. `kind` == decision
-      **decision = name**
-      **evs_all = > plan_append_decision events=`evs_all` decision=`decision` stream=`stream`**
+      **terr = > json.get value=`turn` key="error"**
+      1. `terr`
+        **transport_err = `terr`**
+        **left = 0**
+      2. *
+        **last_reply = > json.get value=`turn` key="text"**
+        **c = > json.get value=`turn` key="llm_calls"**
+        **t = > json.get value=`turn` key="tokens"**
+        **llm_calls = llm_calls + c**
+        **tokens = tokens + t**
+    1. `transport_err`
+      **decision = "TRANSPORT_ERROR"**
+      **last_reply = `transport_err`**
       **left = 0**
-    4. *
-      **decision = "unknown"**
-      **left = 0**
+    2. *
+      **last_reply = > trim value=`last_reply`**
+      **act = > extract_plan_act reply=`last_reply`**
+      **kind = > json.get value=`act` key="kind"**
+      **name = > json.get value=`act` key="name"**
+      1. `kind` == call
+        **evs_all = > plan_append_tool events=`evs_all` type="tool_start" name=`name` kind="call" stream=`stream`**
+        **tool_out = > run_parent_tool name=`name` path=`path` observation=`last_obs` reply=`last_reply`**
+        **brief = > tool_result_brief value=`tool_out`**
+        **evs_all = > plan_append_tool events=`evs_all` type="tool_end" name=`name` kind="call" result=`brief` stream=`stream`**
+        **last_obs = table.put in=`last_obs` at="tool_result" value=`tool_out`**
+        **left = left - 1**
+      2. `kind` == read
+        **evs_all = > plan_append_tool events=`evs_all` type="tool_start" name=`name` kind="read" stream=`stream`**
+        **last_obs = > plan_read_deepen observation=`last_obs` kind=`name` path=`path`**
+        **brief = > tool_result_brief value=`last_obs`**
+        **evs_all = > plan_append_tool events=`evs_all` type="tool_end" name=`name` kind="read" result=`brief` stream=`stream`**
+        **left = left - 1**
+      3. `kind` == decision
+        **decision = name**
+        **evs_all = > plan_append_decision events=`evs_all` decision=`decision` stream=`stream`**
+        **left = 0**
+      4. *
+        **decision = "unknown"**
+        **left = 0**
 
-**out = > json.parse text={}**
-**out = > json.set map=`out` key="decision" value=`decision`**
-**out = > json.set map=`out` key="reply" value=`last_reply`**
-**out = > json.set map=`out` key="observation" value=`last_obs`**
-**out = > json.set map=`out` key="events" value=`evs_all`**
-**out = > json.set map=`out` key="llm_calls" value=`llm_calls`**
-**out = > json.set map=`out` key="tokens" value=`tokens`**
+`out` =
+
+| decision | reply | observation | events | llm_calls | tokens |
+|----------|-------|-------------|--------|-----------|--------|
+| `decision` | `last_reply` | `last_obs` | `evs_all` | `llm_calls` | `tokens` |
+
+1. `transport_err`
+  **out = table.put in=`out` at="error" value=`transport_err`**
+2. *
+  **_ = 1**
 *out*
 
 ---
@@ -1597,8 +1669,12 @@ LLM Plan → CALL/READ/DECISION loop. Returns `{decision,reply,observation,event
 Pre-run parent decompose marker. With `stream=True`, publish `{type:decompose}` so view is not silent before the first child.
 
 1. `stream`
-  **ev = > json.parse text={"type":"decompose"}**
-  **ev = > json.set map=`ev` key="workbook" value=`workbook`**
+  `ev` =
+
+  | type | workbook |
+  |------|----------|
+  | decompose | `workbook` |
+
   > sys.stream_publish event=`ev`
   1. `echo`
     > print text=plan:decompose
@@ -1617,9 +1693,12 @@ Pre-run parent decompose marker. With `stream=True`, publish `{type:decompose}` 
 Marker before `await_workbook`. With `stream=True`, publish `{type:await,round,workbook}` so the Stream panel shows progress while the quiet child runs (TTY `echo` optional).
 
 1. `stream`
-  **ev = > json.parse text={"type":"await"}**
-  **ev = > json.set map=`ev` key="round" value=`round`**
-  **ev = > json.set map=`ev` key="workbook" value=`workbook`**
+  `ev` =
+
+  | type | round | workbook |
+  |------|-------|----------|
+  | await | `round` | `workbook` |
+
   > sys.stream_publish event=`ev`
   1. `echo`
     > print text=plan:await
@@ -1658,15 +1737,17 @@ True when source still contains `worker.step` or `.单步`.
 
 Always append a `round` event (child workbook finished) for audit / view. Optional `result` is the child `# main` return. SSE + optional TTY `plan:round` only when `stream` / `echo`.
 
-**ev = > json.parse text={"type":"round"}**
-**ev = > json.set map=`ev` key="round" value=`round`**
-**ev = > json.set map=`ev` key="workbook" value=`workbook`**
-**ev = > json.set map=`ev` key="exit_code" value=`exit_code`**
+`ev` =
+
+| type | round | workbook | exit_code |
+|------|-------|----------|-----------|
+| round | `round` | `workbook` | `exit_code` |
+
 1. `result`
-  **ev = > json.set map=`ev` key="result" value=`result`**
+  **ev = table.put in=`ev` at="result" value=`result`**
 2. *
   **_ = 1**
-**events = > json.append list=`events` item=`ev`**
+**events = > table.append list=`events` item=`ev`**
 1. `stream`
   > sys.stream_publish event=`ev`
 2. *
@@ -1686,13 +1767,17 @@ Always append a `round` event (child workbook finished) for audit / view. Option
 
 Always append a `decision` event. SSE publish only when `stream=True`.
 
-**ev = > json.parse text={"type":"decision"}**
-**ev = > json.set map=`ev` key="decision" value=`decision`**
+`ev` =
+
+| type | decision |
+|------|----------|
+| decision | `decision` |
+
 1. `summary`
-  **ev = > json.set map=`ev` key="summary" value=`summary`**
+  **ev = table.put in=`ev` at="summary" value=`summary`**
 2. *
   **_ = 1**
-**events = > json.append list=`events` item=`ev`**
+**events = > table.append list=`events` item=`ev`**
 1. `stream`
   > sys.stream_publish event=`ev`
 2. *
@@ -1710,11 +1795,11 @@ Bubble parent `complete stream=True` reasoning/deltas (and errors) into the plan
 - [`ev`](`from`)
   **t = > json.get value=`ev` key="type"**
   1. `t` == delta
-    **events = > json.append list=`events` item=`ev`**
+    **events = > table.append list=`events` item=`ev`**
   2. `t` == reasoning
-    **events = > json.append list=`events` item=`ev`**
+    **events = > table.append list=`events` item=`ev`**
   3. `t` == error
-    **events = > json.append list=`events` item=`ev`**
+    **events = > table.append list=`events` item=`ev`**
   4. *
     **_ = 1**
 
@@ -1729,17 +1814,24 @@ Bubble parent `complete stream=True` reasoning/deltas (and errors) into the plan
 
 Always append `done` and attach `events` on the result map (process audit even when not streaming). SSE publish of `done` only when `stream=True`. Optional `trace=True` writes the event list to writeback slot `trace`.
 
-**ev = > json.parse text={"type":"done"}**
+**ev = > table.put in=None at="type" value="done"**
 1. `result`
-  **ev = > json.set map=`ev` key="result" value=`result`**
+  **ev = > table.put in=`ev` at="result" value=`result`**
 2. *
   **_ = 1**
-**events = > json.append list=`events` item=`ev`**
+1. `events`
+  **events = > table.append list=`events` item=`ev`**
+2. *
+  **events = > table.append list=None item=`ev`**
 1. `stream`
   > sys.stream_publish event=`ev`
 2. *
   **_ = 1**
-**out = > json.set map=`out` key="events" value=`events`**
+1. not `out`
+  **out = > table.empty_map**
+2. *
+  **_ = 1**
+**out = > table.put in=`out` at="events" value=`events`**
 
 1. `trace`
   **body = > json.stringify value=`events`**
@@ -1766,13 +1858,14 @@ Load ABI v2 agent plugin once (session bag + context queries).
   > sys.exit code=1
 
 **id = > agent_alloc**
-**h = > json.parse text={"_type":"agent"}**
-**h = > json.set map=`h` key="id" value=`id`**
-**h = > json.set map=`h` key="model" value=`model`**
-**h = > json.set map=`h` key="tools" value=`tools`**
+`h` =
+
+| _type | id | model | tools |
+|-------|-----|-------|-------|
+| agent | `id` | `model` | `tools` |
 
 1. `standing`
-  **h = > json.set map=`h` key="standing" value=`standing`**
+  **h = table.put in=`h` at="standing" value=`standing`**
 2. *
   **_ = 1**
 
@@ -1884,11 +1977,13 @@ O2: promote path requires sandbox proof unless `require_proof=false`.
 
 **skill_learn = > agent_maybe_learn task=`task` kb_dir=`kb_dir` memory_dir=`memory_dir` improve_every=`improve_every` promote=`promote`**
 **policy_learn = > agent_maybe_compile_policy memory_dir=`memory_dir` min_evidence=`improve_every`**
-**out = > json.parse text={"learned":false}**
 **sl = > json.get value=`skill_learn` key="learned"**
-**out = > json.set map=`out` key="learned" value=`sl`**
-**out = > json.set map=`out` key="skill" value=`skill_learn`**
-**out = > json.set map=`out` key="policy" value=`policy_learn`**
+`out` =
+
+| learned | skill | policy |
+|---------|-------|--------|
+| `sl` | `skill_learn` | `policy_learn` |
+
 *out*
 
 ## compile
@@ -2079,10 +2174,10 @@ Primary author entry (v2 + P4): Adaptive `route` → execute (policy/kb skill) o
   2. *
     **out = > `self`.plan goal=`task` kb_dir=`kb_dir` writeback=`writeback` reuse=`reuse` near_match=`near_match` near_threshold=`near_threshold` promote=`promote` improve_every=`improve_every` explore_n=`explore_n` max_rounds=`max_rounds` stream=`stream` echo=`echo` trace=`trace` force=`force`**
     **cache = > json.get value=`out` key="cache"**
-    1. `cache` == hit
+    1. `cache` == "hit"
       **exec_mode = "compiled"**
       **llm_calls = 0**
-    2. `cache` == soft-hit
+    2. `cache` == "soft-hit"
       **exec_mode = "near"**
       **llm_calls = 0**
     3. *
@@ -2171,8 +2266,12 @@ With `stream=True`, the model call uses SSE; `echo=True` prints delta text to st
 **model = > json.get value=`self` key="model"**
 **tools = > json.get value=`self` key="tools"**
 
-**user_turn = > json.parse text={"role":"user"}**
-**user_turn = > json.set map=`user_turn` key="content" value=`task`**
+`user_turn` =
+
+| role | content |
+|------|---------|
+| user | `task` |
+
 > agent_history_append id=`id` item=`user_turn`
 
 **source_depth = "default"**
@@ -2183,35 +2282,62 @@ With `stream=True`, the model call uses SSE; `echo=True` prints delta text to st
 **llm_calls = 0**
 **tokens = 0**
 
+**transport_err = None**
+
 - `reads_left` > 0
   1. `decision`
     **reads_left = 0**
-  2. *
+  2. `transport_err`
+    **reads_left = 0**
+  3. *
     **ctx = > build_step_context agent=`self` task=`task` source_depth=`source_depth` skill_depth=`skill_depth`**
     **turn = > model_turn model=`model` prompt=`ctx` stream=`stream` echo=`echo`**
-    **reply = > json.get value=`turn` key="text"**
-    **c = > json.get value=`turn` key="llm_calls"**
-    **t = > json.get value=`turn` key="tokens"**
-    **llm_calls = llm_calls + c**
-    **tokens = tokens + t**
-    **reply = > trim value=`reply`**
-    **rk = > extract_plan_read reply=`reply`**
-    1. `rk` == source
-      **source_depth = "deep"**
-      **reads_left = reads_left - 1**
-    2. `rk` == skill
-      **skill_depth = "deep"**
-      **reads_left = reads_left - 1**
-    3. *
-      **decision = reply**
+    **terr = > json.get value=`turn` key="error"**
+    1. `terr`
+      **transport_err = `terr`**
       **reads_left = 0**
+    2. *
+      **reply = > json.get value=`turn` key="text"**
+      **c = > json.get value=`turn` key="llm_calls"**
+      **t = > json.get value=`turn` key="tokens"**
+      **llm_calls = llm_calls + c**
+      **tokens = tokens + t**
+      **reply = > trim value=`reply`**
+      **rk = > extract_plan_read reply=`reply`**
+      1. `rk` == source
+        **source_depth = "deep"**
+        **reads_left = reads_left - 1**
+      2. `rk` == skill
+        **skill_depth = "deep"**
+        **reads_left = reads_left - 1**
+      3. *
+        **decision = reply**
+        **reads_left = 0**
+
+1. `transport_err`
+  `out` =
+
+  | status | task | error | llm_calls | tokens |
+  |--------|------|-------|-----------|--------|
+  | error | `task` | `transport_err` | `llm_calls` | `tokens` |
+
+  1. `writeback`
+    **body = > json.stringify value=`out`**
+    > wb.record value=`body` key="error"
+  2. *
+    **_ = 1**
+  *out*
+2. *
+  **_ = 1**
 
 **reply = > trim value=`reply`**
 **decision = reply**
 **tool_name = > extract_tool_name reply=`reply`**
-**out = > json.parse text={"status":"ok"}**
-**out = > json.set map=`out` key="task" value=`task`**
-**out = > json.set map=`out` key="decision" value=`decision`**
+`out` =
+
+| status | task | decision |
+|--------|------|----------|
+| ok | `task` | `decision` |
 
 1. `tool_name`
   **tool_out = > run_tool tools=`tools` name=`tool_name`**
@@ -2228,10 +2354,8 @@ With `stream=True`, the model call uses SSE; `echo=True` prints delta text to st
     **t = > json.get value=`turn2` key="tokens"**
     **llm_calls = llm_calls + c**
     **tokens = tokens + t**
-    **out = > json.set map=`out` key="status" value="ok"**
-    **out = > json.set map=`out` key="decision" value=`decision`**
-    **out = > json.set map=`out` key="denied_tool" value=`tool_name`**
-    **out = > json.set map=`out` key="result" value=`reply`**
+    **out = table.put in=`out` at="denied_tool" value=`tool_name`**
+    **out = table.put in=`out` at="result" value=`reply`**
   2. *
     **task_s = > json.stringify value=`task`**
     **fp = "The user asked:"**
@@ -2247,14 +2371,14 @@ With `stream=True`, the model call uses SSE; `echo=True` prints delta text to st
     **t = > json.get value=`turn2` key="tokens"**
     **llm_calls = llm_calls + c**
     **tokens = tokens + t**
-    **out = > json.set map=`out` key="tool" value=`tool_name`**
-    **out = > json.set map=`out` key="tool_result" value=`tool_s`**
-    **out = > json.set map=`out` key="result" value=`reply`**
+    **out = table.put in=`out` at="tool" value=`tool_name`**
+    **out = table.put in=`out` at="tool_result" value=`tool_s`**
+    **out = table.put in=`out` at="result" value=`reply`**
 2. *
-  **out = > json.set map=`out` key="result" value=`reply`**
+  **out = table.put in=`out` at="result" value=`reply`**
 
-**out = > json.set map=`out` key="llm_calls" value=`llm_calls`**
-**out = > json.set map=`out` key="tokens" value=`tokens`**
+**out = table.put in=`out` at="llm_calls" value=`llm_calls`**
+**out = table.put in=`out` at="tokens" value=`tokens`**
 
 1. `sandbox`
   **prof = sandbox.profile name=`sandbox_profile`**
@@ -2262,8 +2386,12 @@ With `stream=True`, the model call uses SSE; `echo=True` prints delta text to st
 2. *
   **_ = 1**
 
-**as_turn = > json.parse text={"role":"assistant"}**
-**as_turn = > json.set map=`as_turn` key="content" value=`reply`**
+`as_turn` =
+
+| role | content |
+|------|---------|
+| assistant | `reply` |
+
 > agent_history_append id=`id` item=`as_turn`
 
 1. `writeback`
@@ -2363,7 +2491,7 @@ Reuse lookup: exact → alias → canonicalize → optional local n-gram `near` 
 **explore = None**
 **explore_attempt = None**
 **skel_kind = skeleton**
-**events = > json.parse text=[]**
+**events = > table.empty_list**
 **eng = None**
 
 1. `eng_preflight`
@@ -2383,10 +2511,12 @@ Reuse lookup: exact → alias → canonicalize → optional local n-gram `near` 
     > agent_eng_record decision="CREATE" marqdo_dir=`marqdo_dir`
     **_ = 1**
   5. *
-    **out = > json.parse text={"status":"blocked","cache":"eng-block","eng":true}**
-    **out = > json.set map=`out` key="decision" value="BLOCKED"**
-    **out = > json.set map=`out` key="preflight" value=`eng`**
-    **out = > json.set map=`out` key="events" value=`events`**
+    `out` =
+
+    | status | cache | eng | decision | preflight | events |
+    |--------|-------|-----|----------|-----------|--------|
+    | blocked | eng-block | true | BLOCKED | `eng` | `events` |
+
     *out*
 2. *
   **_ = 1**
@@ -2426,29 +2556,23 @@ Reuse lookup: exact → alias → canonicalize → optional local n-gram `near` 
       1. `code` == 0
         > agent_kb_record_hit kb_dir=`kb_dir` goal=`goal` tools=`tools` improve_every=`improve_every`
         **cache = cache_label**
-        **out = > json.parse text={"status":"ok"}**
-        **out = > json.set map=`out` key="status" value="ok"**
-        **out = > json.set map=`out` key="goal" value=`goal`**
-        **out = > json.set map=`out` key="workbook" value=`path`**
-        **out = > json.set map=`out` key="rounds" value=1**
-        **out = > json.set map=`out` key="cache" value=`cache_label`**
-        **out = > json.set map=`out` key="match" value=`match_kind`**
         **hit_score = > json.get value=`hit` key="score"**
-        1. `hit_score`
-          **out = > json.set map=`out` key="score" value=`hit_score`**
-        2. *
-          **_ = 1**
         **sk = > json.get value=`hit` key="skill"**
-        **out = > json.set map=`out` key="skill" value=`sk`**
         **st = > json.get value=`hit` key="status"**
-        **out = > json.set map=`out` key="skill_status" value=`st`**
         **sum = > json.parse text={"a":"OKF llm_free skill hit (","b":"); spawned resource"}**
         **suma = > json.get value=`sum` key="a"**
         **sumb = > json.get value=`sum` key="b"**
         **sum = suma + match_kind + sumb**
-        **out = > json.set map=`out` key="summary" value=`sum`**
-        **out = > json.set map=`out` key="observation" value=`last_obs`**
-        **out = > json.set map=`out` key="result" value=`child_val`**
+        `out` =
+
+        | status | goal | workbook | rounds | cache | match | skill | skill_status | summary | observation | result |
+        |--------|------|----------|--------|-------|-------|-------|--------------|---------|-------------|--------|
+        | ok | `goal` | `path` | 1 | `cache_label` | `match_kind` | `sk` | `st` | `sum` | `last_obs` | `child_val` |
+
+        1. `hit_score`
+          **out = table.put in=`out` at="score" value=`hit_score`**
+        2. *
+          **_ = 1**
         **events = > plan_append_decision events=`events` decision="REUSE" stream=`stream` summary=`sum`**
         **events = > plan_append_round events=`events` round=1 workbook=`path` exit_code=`code` result=`child_val` stream=`stream` echo=`echo`**
         1. `writeback`
@@ -2483,29 +2607,23 @@ Reuse lookup: exact → alias → canonicalize → optional local n-gram `near` 
           **cache = "improve"**
         2. *
           **cache = cache_label**
-          **out = > json.parse text={"status":"ok"}**
-          **out = > json.set map=`out` key="status" value="ok"**
-          **out = > json.set map=`out` key="goal" value=`goal`**
-          **out = > json.set map=`out` key="workbook" value=`path`**
-          **out = > json.set map=`out` key="rounds" value=1**
-          **out = > json.set map=`out` key="cache" value=`cache_label`**
-          **out = > json.set map=`out` key="match" value=`match_kind`**
           **hit_score = > json.get value=`hit` key="score"**
-          1. `hit_score`
-            **out = > json.set map=`out` key="score" value=`hit_score`**
-          2. *
-            **_ = 1**
           **sk = > json.get value=`hit` key="skill"**
-          **out = > json.set map=`out` key="skill" value=`sk`**
           **st = > json.get value=`hit` key="status"**
-          **out = > json.set map=`out` key="skill_status" value=`st`**
           **sum = > json.parse text={"a":"OKF skill hit (","b":"); spawned resource"}**
           **suma = > json.get value=`sum` key="a"**
           **sumb = > json.get value=`sum` key="b"**
           **sum = suma + match_kind + sumb**
-          **out = > json.set map=`out` key="summary" value=`sum`**
-          **out = > json.set map=`out` key="observation" value=`last_obs`**
-          **out = > json.set map=`out` key="result" value=`child_val`**
+          `out` =
+
+          | status | goal | workbook | rounds | cache | match | skill | skill_status | summary | observation | result |
+          |--------|------|----------|--------|-------|-------|-------|--------------|---------|-------------|--------|
+          | ok | `goal` | `path` | 1 | `cache_label` | `match_kind` | `sk` | `st` | `sum` | `last_obs` | `child_val` |
+
+          1. `hit_score`
+            **out = table.put in=`out` at="score" value=`hit_score`**
+          2. *
+            **_ = 1**
           **events = > plan_append_decision events=`events` decision="REUSE" stream=`stream` summary=`sum`**
           **events = > plan_append_round events=`events` round=1 workbook=`path` exit_code=`code` result=`child_val` stream=`stream` echo=`echo`**
           1. `writeback`
@@ -2556,21 +2674,14 @@ Reuse lookup: exact → alias → canonicalize → optional local n-gram `near` 
               1. `code` == 0
                 > agent_kb_record_hit kb_dir=`kb_dir` goal=`goal` tools=`tools` improve_every=`improve_every`
                 **cache = "soft-hit"**
-                **out = > json.parse text={"status":"ok"}**
-                **out = > json.set map=`out` key="status" value="ok"**
-                **out = > json.set map=`out` key="goal" value=`goal`**
-                **out = > json.set map=`out` key="workbook" value=`path`**
-                **out = > json.set map=`out` key="rounds" value=1**
-                **out = > json.set map=`out` key="cache" value="soft-hit"**
-                **out = > json.set map=`out` key="match" value="soft"**
                 **sk = > json.get value=`hit` key="skill"**
-                **out = > json.set map=`out` key="skill" value=`sk`**
                 **st = > json.get value=`hit` key="status"**
-                **out = > json.set map=`out` key="skill_status" value=`st`**
                 **sum = "OKF soft_match REUSE; spawned resource"**
-                **out = > json.set map=`out` key="summary" value=`sum`**
-                **out = > json.set map=`out` key="observation" value=`last_obs`**
-                **out = > json.set map=`out` key="result" value=`child_val`**
+                `out` =
+
+                | status | goal | workbook | rounds | cache | match | skill | skill_status | summary | observation | result |
+                |--------|------|----------|--------|-------|-------|-------|--------------|---------|-------------|--------|
+                | ok | `goal` | `path` | 1 | soft-hit | soft | `sk` | `st` | `sum` | `last_obs` | `child_val` |
                 **events = > plan_append_decision events=`events` decision="REUSE" stream=`stream` summary=`sum`**
                 **events = > plan_append_round events=`events` round=1 workbook=`path` exit_code=`code` result=`child_val` stream=`stream` echo=`echo`**
                 1. `writeback`
@@ -2656,11 +2767,11 @@ Reuse lookup: exact → alias → canonicalize → optional local n-gram `near` 
         > fs.write_text path=`path` text=`skel`
 
 1. `confirm`
-  **out = > json.parse text={"status":"pending"}**
-  **out = > json.set map=`out` key="goal" value=`goal`**
-  **out = > json.set map=`out` key="workbook" value=`path`**
-  **out = > json.set map=`out` key="summary" value="workbook created; confirm to run"**
-  **out = > json.set map=`out` key="cache" value="bypass"**
+  `out` =
+
+  | status | goal | workbook | summary | cache |
+  |--------|------|----------|---------|-------|
+  | pending | `goal` | `path` | workbook created; confirm to run | bypass |
   1. `writeback`
     **body = > json.stringify value=`out`**
     > wb.record value=`body` key="ok"
@@ -2690,7 +2801,15 @@ Reuse lookup: exact → alias → canonicalize → optional local n-gram `near` 
 **last_obs = > json.get value=`turn` key="observation"**
 **events = > json.get value=`turn` key="events"**
 
-1. `dec` == CONTINUE
+1. `dec` == "TRANSPORT_ERROR"
+  **done = 1**
+  **status = "error"**
+  **err = > json.get value=`turn` key="error"**
+  1. not `err`
+    **err = `last_reply`**
+  **summary = "llm transport error"**
+  **skip_loop = 1**
+2. `dec` == CONTINUE
   **n = > fs.apply_patch_blocks path=`path` text=`last_reply` soft=True**
   1. `n`
     **_ = 1**
@@ -2700,9 +2819,9 @@ Reuse lookup: exact → alias → canonicalize → optional local n-gram `near` 
     **err = "no patches applied"**
     **summary = > extract_plan_summary reply=`last_reply`**
     **skip_loop = 1**
-2. `dec` == RUN
+3. `dec` == RUN
   **_ = 1**
-3. `dec` == DONE
+4. `dec` == DONE
   **has_step = > workbook_has_worker_step path=`path`**
   1. `has_step`
     **_ = 1**
@@ -2722,7 +2841,7 @@ Reuse lookup: exact → alias → canonicalize → optional local n-gram `near` 
       **skip_loop = 1**
     2. *
       **_ = 1**
-4. *
+5. *
   **done = 1**
   **status = "error"**
   **err = "unrecognized plan decision"**
@@ -2811,32 +2930,32 @@ Deterministic success stop (loop engineering): when the child already returned a
 2. *
   **_ = 1**
 
-**out = > json.parse text={"status":"ok"}**
-**out = > json.set map=`out` key="status" value=`status`**
-**out = > json.set map=`out` key="goal" value=`goal`**
-**out = > json.set map=`out` key="workbook" value=`path`**
-**out = > json.set map=`out` key="rounds" value=`round`**
-**out = > json.set map=`out` key="cache" value=`cache`**
+`out` =
+
+| status | goal | workbook | rounds | cache |
+|--------|------|----------|--------|-------|
+| `status` | `goal` | `path` | `round` | `cache` |
+
 1. `summary`
-  **out = > json.set map=`out` key="summary" value=`summary`**
+  **out = table.put in=`out` at="summary" value=`summary`**
 2. *
   **_ = 1**
 
 1. `err`
-  **out = > json.set map=`out` key="error" value=`err`**
+  **out = table.put in=`out` at="error" value=`err`**
 2. *
   **_ = 1**
 
 1. `last_obs`
-  **out = > json.set map=`out` key="observation" value=`last_obs`**
+  **out = table.put in=`out` at="observation" value=`last_obs`**
 2. *
   **_ = 1**
 
 1. `child_val`
-  **out = > json.set map=`out` key="result" value=`child_val`**
+  **out = table.put in=`out` at="result" value=`child_val`**
   **plan_result = child_val**
 2. `summary`
-  **out = > json.set map=`out` key="result" value=`summary`**
+  **out = table.put in=`out` at="result" value=`summary`**
   **plan_result = summary**
 3. *
   **plan_result = None**
@@ -2867,8 +2986,12 @@ Minimal MCP Server host (stdio JSON-RPC). Tools point at entry-module `lib.membe
   > print text=ext/ai/agent: native agent plugin not found (build marqdo_plugin_agent or marqdo ext add agent)
   > sys.exit code=1
 
-**h = > json.parse text={"_type":"mcp_server","tools":[]}**
-**h = > json.set map=`h` key="name" value=`name`**
+`h` =
+
+| _type | tools | name |
+|-------|-------|------|
+| mcp_server | [] | `name` |
+
 *h*
 
 ## tool
@@ -2879,12 +3002,14 @@ Minimal MCP Server host (stdio JSON-RPC). Tools point at entry-module `lib.membe
 Register one tool. `fn` must be `lib.member` imported on the entry workbook.
 
 **tools = > json.get value=`self` key="tools"**
-**row = > json.parse text={"name":"","fn":"","description":""}**
-**row = > json.set map=`row` key="name" value=`name`**
-**row = > json.set map=`row` key="fn" value=`fn`**
-**row = > json.set map=`row` key="description" value=`description`**
-**tools = > json.append list=`tools` item=`row`**
-**h = > json.set map=`self` key="tools" value=`tools`**
+`row` =
+
+| name | fn | description |
+|------|-----|-------------|
+| `name` | `fn` | `description` |
+
+**tools = > table.append list=`tools` item=`row`**
+**h = table.put in=`self` at="tools" value=`tools`**
 *h*
 
 ## serve

@@ -162,6 +162,56 @@ import browser:lib/browser.mq.md
 
 Do **not** build effect maps with `json.set` chains. See [marqdo-dev](../marqdo-dev/SKILL.md).
 
+## 6e. Agent / LLM result maps — GFM first (positive)
+
+Return and soft-error packs are **tables**, not `json.set` pipelines. Full style contract: [marqdo-dev](../marqdo-dev/SKILL.md) §2.
+
+```markdown
+---
+import table:lib/table.mq.md
+---
+
+## step_ok
+    + `task`
+    + `reply`
+
+`out` =
+
+| status | task | result |
+|--------|------|--------|
+| ok | `task` | `reply` |
+
+*out*
+
+## step_err
+    + `task`
+    + `err`
+
+`out` =
+
+| status | task | error |
+|--------|------|-------|
+| error | `task` | `err` |
+
+*out*
+
+## soft_http_pack
+    + `msg`
+    + `usage0`
+
+**empty_tc = > table.empty_list**
+
+`pack` =
+
+| finish | text | error | usage | tool_calls |
+|--------|------|-------|-------|------------|
+| error | "" | `msg` | `usage0` | `empty_tc` |
+
+*pack*
+```
+
+Do **not** mirror legacy `ext/ai/agent.mq.md` `json.parse`+`json.set` chains when adding new arms — convert the shape to a table.
+
 ## 7. Import text stdlib
 
 ```markdown

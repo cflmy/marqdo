@@ -5,6 +5,7 @@ description: >-
   OpenAI-compatible and Ollama HTTP stay behind the semantic surface.
 import sys:lib/sys.mq.md
 import json:lib/json.mq.md
+import table:lib/table.mq.md
 import fs:lib/fs.mq.md
 import text:lib/text.mq.md
 import openai:ext/ai/llm/openai.mq.md
@@ -283,9 +284,21 @@ Semantic ask → **LLMResult** (`text`, `model`, `finish`, `backend`, `usage`, `
 **text = > json.get value=`pack` key="text"**
 **usage = > json.get value=`pack` key="usage"**
 **finish = > json.get value=`pack` key="finish"**
+**err = > json.get value=`pack` key="error"**
 **tc = > json.get value=`pack` key="tool_calls"**
 1. not `tc`
-  **tc = > json.parse text=[]**
+  **tc = > table.empty_list**
+2. *
+  **_ = 1**
+1. not `text`
+  **text = ""**
+2. *
+  **_ = 1**
+1. not `finish`
+  1. `err`
+    **finish = "error"**
+  2. *
+    **finish = "stop"**
 2. *
   **_ = 1**
 
@@ -296,13 +309,24 @@ inside the table is unsafe.
 **mdl = [model](self)**
 **b = [backend](self)**
 **nm = [name](self)**
-**tt = [total_tokens](usage)**
+1. `usage`
+  **tt = [total_tokens](usage)**
+2. *
+  **tt = 0**
+1. not `tt`
+  **tt = 0**
+2. *
+  **_ = 1**
+1. `err`
+  **calls = 0**
+2. *
+  **calls = 1**
 
 `result` =
 
-| text | model | finish | backend | usage | name | llm_calls | tokens | tool_calls |
-|------|-------|--------|---------|-------|------|-----------|--------|------------|
-| `text` | `mdl` | `finish` | `b` | `usage` | `nm` | 1 | `tt` | `tc` |
+| text | model | finish | backend | usage | name | llm_calls | tokens | tool_calls | error |
+|------|-------|--------|---------|-------|------|-----------|--------|------------|-------|
+| `text` | `mdl` | `finish` | `b` | `usage` | `nm` | `calls` | `tt` | `tc` | `err` |
 
 *result*
 

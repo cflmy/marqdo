@@ -152,8 +152,13 @@ pub fn http_post(
         Some(v) => as_text(v, "content_type")?,
     };
     let hdrs = headers_from_value(headers)?;
-    let (status, resp) = http_exchange("POST", url, Some(body), Some(ct), &hdrs)?;
-    Ok(response_map(status, resp))
+    // Transport failures → status 0 + body message (soft). Callers that need
+    // hard errors can still treat status!=200 as failure; Agent/LLM surfaces
+    // map this into structured `{finish:error}` instead of aborting the VM.
+    match http_exchange("POST", url, Some(body), Some(ct), &hdrs) {
+        Ok((status, resp)) => Ok(response_map(status, resp)),
+        Err(e) => Ok(response_map(0, e)),
+    }
 }
 
 /// Generic request: method + url + optional body / content_type / headers.
@@ -847,7 +852,16 @@ pub fn http_post_sse(
                 ),
             ]))
         }
-        Err(e) => Err(format!("http POST sse {url}: {e}")),
+        Err(e) => Ok(Value::Map(vec![
+            ("status".into(), Value::Int(0)),
+            (
+                "events".into(),
+                Value::List(vec![event_map(vec![
+                    ("type", Value::Text("error".into())),
+                    ("message", Value::Text(format!("http POST sse {url}: {e}"))),
+                ])]),
+            ),
+        ])),
     }
 }
 

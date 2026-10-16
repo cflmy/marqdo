@@ -38,7 +38,7 @@ A `.mq.md` file must stay readable as Markdown. If a human cannot skim the data 
 
 Cells are expressions (`doc/design/table-cell-expressions.md`): bare words = text, `` `var` `` = variable, quote paths/`/` ratios.
 
-### 2. Good patterns
+### 2. Good patterns (copy these — not `json.set`)
 
 **Wire / steps / commands** — `@` record table:
 
@@ -60,7 +60,53 @@ Cells are expressions (`doc/design/table-cell-expressions.md`): bare words = tex
 | `wire` | `set_text` |
 ```
 
-**Single dynamic key** — one `table.put` (or a helper), not a json chain:
+**Agent / LLM result map** — one readable row, not a `json.parse` + `json.set` chain:
+
+```markdown
+`out` =
+
+| status | task | result | llm_calls | tokens |
+|--------|------|--------|-----------|--------|
+| ok | `task` | `reply` | `llm_calls` | `tokens` |
+
+*out*
+```
+
+**Soft error pack** (transport / gate failure) — still a table humans can skim:
+
+```markdown
+`pack` =
+
+| finish | text | error | usage | tool_calls |
+|--------|------|-------|-------|------------|
+| error | "" | `msg` | `usage0` | `empty_tc` |
+
+*pack*
+```
+
+**Optional / conditional key** — sparse `table.put` after the static table (one dynamic key only):
+
+```markdown
+`out` =
+
+| status | task |
+|--------|------|
+| error | `task` |
+
+1. `err`
+  **out = > table.put in=`out` at="error" value=`err`**
+2. *
+  **_ = 1**
+```
+
+**Empty list / empty map** — prefer stdlib seeds over `json.parse text=[]` / `{}`:
+
+```markdown
+**empty_tc = > table.empty_list**
+**empty_map = > table.empty_map**
+```
+
+**Single dynamic key from scratch** — one `table.put` (or a helper), not a json chain:
 
 ```markdown
 **`set_text` = table.put in=None at="#log" value=msg**
@@ -73,13 +119,19 @@ Better still — call a named helper:
 **browser.set_text sel="#log" text=msg**
 ```
 
-### 3. Bad pattern (do not write)
+**When `json.*` is OK:** `json.parse` / `json.stringify` / `json.quote` on **wire text**; `json.get` to read an opaque map. Never use `json.set` / `json.append` to *build* author-facing structures.
+
+### 3. Bad pattern (do not write — and do not copy from old `ext/ai`)
 
 ```markdown
 **`ret` = json.set map=None key="set_text" value=…**
 **`ret` = json.set map=ret key="canvas" value=…**
 **`cmds` = json.append list=cmds item=c0**
+**`out` = json.parse text={"status":"ok"}**
+**`out` = json.set map=out key="task" value=task**
 ```
+
+Matching surrounding **legacy** `json.set` in `ext/ai/*.mq.md` is **not** compliance. Refactor the call site to tables / `table.put` instead of extending the glue.
 
 ## Writing application `.mq.md`
 
