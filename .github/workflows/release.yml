@@ -126,6 +126,8 @@ jobs:
             ## Marqdo ${{ github.ref_name }}
 
             ### 亮点 / Highlights
+            - **v1.4.6**：裸自增升参——首次粗体赋值左值即声明；`n = n + 1` 无反引号也是必选形参
+            - **v1.4.6**: Bare self-increment is a required parameter — first bold assignment LHS is a declaration
             - **v1.4.5**：Streamable HTTP MCP + web invoke Bearer/401 · openai/agent json.get 硬化
             - **v1.4.5**: Streamable HTTP MCP + web invoke Bearer/401; openai/agent json.get hardening
             - **v1.4.2**：Agent/LLM 优化 O1–O5——sandbox trial · promote proof · step_route/EFI/cost · lint · quarantine

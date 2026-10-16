@@ -1,3 +1,11 @@
+marqdo (1.4.6-1ppa1) noble; urgency=medium
+
+  * Marqdo 1.4.6: Promote a bare self-increment to a required parameter.
+    The first bold assignment LHS is a declaration (design §8.2); a missing
+    argument reports missing argument for parameter, not undefined variable.
+
+ -- cflmy <pingan@cflmy.cn>  Fri, 16 Oct 2026 23:56:00 +0800
+
 marqdo (1.4.5-1ppa1) noble; urgency=medium
 
   * Marqdo 1.4.5: Streamable HTTP MCP (agent_mcp_serve transport=http);

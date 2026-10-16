@@ -8,6 +8,26 @@
 
 ### Changed
 
+## v1.4.6 — 2026-10-16
+
+### Highlights
+
+**裸自增升参**：粗体首次赋值的左值按设计 §8.2 视为声明。`**n = n + 1**` 在没有反引号提及时也会把 `n` 升成必选形参；缺参报 `missing argument for parameter`，不再是函数体内的 `undefined variable`。纯局部赋值（`**score = 1**`）与循环变量不升参。CLI · wasm **1.4.6**（扩展包仍为 **1.4.5**）。
+
+```bash
+git checkout v1.4.6 && cargo build --release
+```
+
+**核心表面 Δ（Core surface Δ）**：**无增删**——升参与 §8.2 对齐（赋值左值声明）；不改 MQ 关键词 / 表几何。
+
+### Fixed
+
+- **升参**：`merge_inferred_params` 纳入首次粗体赋值左值。右值在绑定前读取同名（`n = n + 1`）时，该名成为必选推断形参。
+
+### Changed
+
+- CLI / wasm SemVer **1.4.6**。扩展包保持 **1.4.5**。
+
 ## v1.4.5 — 2026-10-16
 
 ### Highlights
