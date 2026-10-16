@@ -3,6 +3,7 @@
 ## Unreleased
 
 ### Added
+- **`ext/ai/sandbox`**：AI 试跑 CoW 工作区（`open` / `run` / `diff` / `commit` / `discard` / `inspect`）；经 `plugins/agent` `sandbox_*` → `host_query`；默认拒 `plugin`/`exec`/`net`；设计见 [ext-ai-sandbox.md](doc/design/ext-ai-sandbox.md)。
 
 ### Fixed
 

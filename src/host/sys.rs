@@ -150,6 +150,9 @@ pub fn exec(
     {
     use std::process::Stdio;
     if !ctx.allow_exec() {
+        if ctx.sandbox_session.is_some() {
+            return Err("exec unavailable in sandbox".into());
+        }
         return Err("exec denied by host policy".into());
     }
     let cmd = as_text(cmd, "cmd")?;

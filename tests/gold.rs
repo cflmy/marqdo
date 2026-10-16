@@ -2952,6 +2952,41 @@ fn ext_agent_zero_llm() {
 }
 
 #[test]
+fn ext_ai_sandbox_cow() {
+    ensure_agent_plugin_built();
+    assert_out(
+        "tests/ext/sandbox-cow.mq.md",
+        "2
+seed-lower
+False
+brand-new
+False
+brand-new",
+    );
+}
+
+#[test]
+fn ext_ai_sandbox_run_lib() {
+    ensure_agent_plugin_built();
+    assert_out(
+        "tests/ext/sandbox-run-lib.mq.md",
+        "True
+1",
+    );
+}
+
+#[test]
+fn ext_ai_sandbox_deny() {
+    ensure_agent_plugin_built();
+    assert_out(
+        "tests/ext/sandbox-deny.mq.md",
+        "False
+deny-ok
+inspect-ok",
+    );
+}
+
+#[test]
 fn ext_llm_named_offline() {
     let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let output = Command::new(env!("CARGO_BIN_EXE_marqdo"))

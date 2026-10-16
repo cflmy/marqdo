@@ -90,6 +90,9 @@
 | [research/agent-frameworks-and-marqdo.md](research/agent-frameworks-and-marqdo.md) | 主流智能体框架 vs Marqdo 优势 |
 | [research/agent-framework-gaps-after-a4.md](research/agent-framework-gaps-after-a4.md) | **`ext/agent` A0–A4 之后缺口盘点** |
 | [research/agent-framework-2026-09.md](research/agent-framework-2026-09.md) | **2026-09 刷新：宪法优先 Wave B** |
+| [research/ai-agent-sandbox.md](research/ai-agent-sandbox.md) | **AI 扩展沙盒调研**：Wasm / OS / CoW / symlink 对比与 Marqdo 分层推荐 |
+| [design/ext-ai-sandbox.md](design/ext-ai-sandbox.md) | **`ext/ai/sandbox` 设计锁定**：CoW · 能力表 · agent ABI（非 stdlib） |
+| [roadmap/ext-ai-sandbox.md](roadmap/ext-ai-sandbox.md) | **`ext/ai/sandbox` 实现里程碑** S0–S4 |
 | [research/ext-hosting-gaps.md](research/ext-hosting-gaps.md) | **宿主集成缺口**：同域 SSE 中继 · HTTP→`##` · MCP Server · 副端口 · 跨模块 db/corpus |
 | [design/ext-hosting-fill.md](design/ext-hosting-fill.md) | **宿主缺口补齐设计**（`ext/web` proxy/invoke · `ext/ai` mcp_server） |
 | [roadmap/ext-hosting.md](roadmap/ext-hosting.md) | **宿主集成 H0–H4**（规划） |

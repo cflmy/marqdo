@@ -40,6 +40,7 @@ pub mod subtask;
 #[cfg(not(feature = "exec-host"))]
 #[path = "subtask_stub.rs"]
 pub mod subtask;
+pub mod sandbox_fs;
 mod sys;
 pub mod writeback;
 
@@ -111,6 +112,8 @@ pub struct HostContext {
     pub subtask_seq: u64,
     /// Minimum log level (`lib/log`); default Info (20). See `host::log::Level`.
     pub log_min_level: u8,
+    /// Active `ext/ai/sandbox` CoW session id (nested `sandbox_run`).
+    pub sandbox_session: Option<String>,
 }
 
 impl Default for HostContext {
@@ -135,6 +138,7 @@ impl Default for HostContext {
             subtasks: HashMap::new(),
             subtask_seq: 0,
             log_min_level: 20, // Info
+            sandbox_session: None,
         }
     }
 }

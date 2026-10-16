@@ -8,6 +8,7 @@ mod mcp_server;
 mod memory;
 mod resume;
 mod route;
+mod sandbox;
 
 use std::collections::HashMap;
 use std::ffi::{CStr, CString};
@@ -1178,6 +1179,34 @@ pub unsafe extern "C" fn marqdo_plugin_init(host: *const MarqdoHostApi) -> c_int
         agent_eng_record,
     ) != 0
     {
+        return 1;
+    }
+    // Optional JSON keys only — empty params CSV so omitted args are not required.
+    if register(host, "sandbox_open", "", sandbox::sandbox_open) != 0 {
+        return 1;
+    }
+    if register(host, "sandbox_write", "", sandbox::sandbox_write) != 0 {
+        return 1;
+    }
+    if register(host, "sandbox_read", "", sandbox::sandbox_read) != 0 {
+        return 1;
+    }
+    if register(host, "sandbox_remove", "", sandbox::sandbox_remove) != 0 {
+        return 1;
+    }
+    if register(host, "sandbox_diff", "", sandbox::sandbox_diff) != 0 {
+        return 1;
+    }
+    if register(host, "sandbox_commit", "", sandbox::sandbox_commit) != 0 {
+        return 1;
+    }
+    if register(host, "sandbox_discard", "", sandbox::sandbox_discard) != 0 {
+        return 1;
+    }
+    if register(host, "sandbox_inspect", "", sandbox::sandbox_inspect) != 0 {
+        return 1;
+    }
+    if register(host, "sandbox_run", "", sandbox::sandbox_run) != 0 {
         return 1;
     }
     0

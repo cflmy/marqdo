@@ -87,3 +87,6 @@ tests/ext/:memory:
 
 # local secrets
 .env
+
+# sandbox gold leftovers
+tests/ext/_sbx_cow/

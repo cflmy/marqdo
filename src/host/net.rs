@@ -120,6 +120,9 @@ pub fn http_get(
     headers: Option<&Value>,
 ) -> Result<Value, String> {
     if !ctx.allow_net() {
+        if ctx.sandbox_session.is_some() {
+            return Err("net unavailable in sandbox".into());
+        }
         return Err("http_get denied by host policy".into());
     }
     let url = as_text(url, "url")?;
@@ -137,6 +140,9 @@ pub fn http_post(
     headers: Option<&Value>,
 ) -> Result<Value, String> {
     if !ctx.allow_net() {
+        if ctx.sandbox_session.is_some() {
+            return Err("net unavailable in sandbox".into());
+        }
         return Err("http_post denied by host policy".into());
     }
     let url = as_text(url, "url")?;
@@ -161,6 +167,9 @@ pub fn http_request(
     headers: Option<&Value>,
 ) -> Result<Value, String> {
     if !ctx.allow_net() {
+        if ctx.sandbox_session.is_some() {
+            return Err("net unavailable in sandbox".into());
+        }
         return Err("http_request denied by host policy".into());
     }
     let method = as_text(method, "method")?.to_uppercase();

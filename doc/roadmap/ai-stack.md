@@ -18,6 +18,7 @@
 |----|------|------|
 | **Intelligence primitive** | `ask` / `stream` / `collect`；结果对象 | `ext/ai/llm` |
 | **Agent runtime** | `run` / `step` / `plan` / `route` | `ext/ai/agent` |
+| **Sandbox (trial)** | CoW workspace + capped `run` | `ext/ai/sandbox` · [ext-ai-sandbox.md](../design/ext-ai-sandbox.md) |
 | **Memory / compile** | episode → skill → policy | `plugins/agent`（ABI；**不进** `src/host`） |
 | **Transport** | HTTP / SSE / provider | `ext/ai/llm/openai` · `ollama`；用户不可见 |
 

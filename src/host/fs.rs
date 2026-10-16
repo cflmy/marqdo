@@ -34,6 +34,9 @@ fn text_body(v: &Value) -> Result<&str, String> {
 
 pub fn read_text(ctx: &HostContext, path: &Value) -> Result<Value, String> {
     let p = ctx.resolve_path(text_path(path)?)?;
+    if let Some(hit) = crate::host::sandbox_fs::cow_read_text(ctx, &p)? {
+        return Ok(Value::Text(hit));
+    }
     let s = fs::read_to_string(&p).map_err(|e| format!("read_text {}: {e}", p.display()))?;
     Ok(Value::Text(s))
 }
@@ -43,10 +46,14 @@ pub fn write_text(ctx: &HostContext, path: &Value, text: &Value) -> Result<Value
         return Err("write_text denied by host policy".into());
     }
     let p = ctx.resolve_path(text_path(path)?)?;
+    let body = text_body(text)?;
+    if crate::host::sandbox_fs::cow_write_text(ctx, &p, body)? {
+        return Ok(Value::None);
+    }
     if let Some(parent) = p.parent() {
         fs::create_dir_all(parent).map_err(|e| format!("write_text mkdir: {e}"))?;
     }
-    fs::write(&p, text_body(text)?).map_err(|e| format!("write_text {}: {e}", p.display()))?;
+    fs::write(&p, body).map_err(|e| format!("write_text {}: {e}", p.display()))?;
     Ok(Value::None)
 }
 
@@ -68,6 +75,9 @@ pub fn append_text(ctx: &HostContext, path: &Value, text: &Value) -> Result<Valu
 
 pub fn exists(ctx: &HostContext, path: &Value) -> Result<Value, String> {
     let p = ctx.resolve_path(text_path(path)?)?;
+    if let Some(hit) = crate::host::sandbox_fs::cow_exists(ctx, &p)? {
+        return Ok(Value::Bool(hit));
+    }
     Ok(Value::Bool(p.exists()))
 }
 
@@ -109,6 +119,9 @@ pub fn remove(ctx: &HostContext, path: &Value) -> Result<Value, String> {
         return Err("remove denied by host policy".into());
     }
     let p = ctx.resolve_path(text_path(path)?)?;
+    if crate::host::sandbox_fs::cow_remove(ctx, &p)? {
+        return Ok(Value::None);
+    }
     if p.is_dir() {
         fs::remove_dir_all(&p).map_err(|e| format!("remove {}: {e}", p.display()))?;
     } else {

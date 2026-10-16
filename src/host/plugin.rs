@@ -417,6 +417,16 @@ unsafe extern "C" fn host_query(
             });
             Ok(serde_json::json!({ "ok": true }))
         })(),
+        name if name.starts_with("sandbox_") => (|| {
+            let raw = args_owned.as_deref().unwrap_or("{}");
+            let args: serde_json::Value = serde_json::from_str(if raw.trim().is_empty() {
+                "{}"
+            } else {
+                raw
+            })
+            .map_err(|e| format!("{name} args: {e}"))?;
+            crate::host::sandbox_fs::query(name, &args, ctx)
+        })(),
         // ADR 0007: run a Document/Endpoint `.mq.md` for HTTP handlers.
         "run_artifact" => (|| {
             let raw = args_owned.as_deref().unwrap_or("{}");
@@ -472,6 +482,9 @@ unsafe extern "C" fn host_query(
 
 pub fn load(ctx: &mut HostContext, path: &Value) -> Result<Value, String> {
     if !ctx.allow_plugin() {
+        if ctx.sandbox_session.is_some() {
+            return Err("plugin.load unavailable in sandbox".into());
+        }
         return Err("plugin_load denied by host policy".into());
     }
     let rel = as_text(path, "path")?;

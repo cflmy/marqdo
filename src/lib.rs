@@ -92,6 +92,8 @@ pub struct RunOptions {
     pub allow_fs_write: bool,
     pub allow_exec: bool,
     pub allow_net: bool,
+    /// Native `plugin.load` (default true for CLI; false inside `sandbox.run`).
+    pub allow_plugin: bool,
     /// Exposed via `host_args` / `args`.
     pub argv: Vec<String>,
     /// Override filesystem sandbox root (default: source file's directory).
@@ -102,6 +104,8 @@ pub struct RunOptions {
     pub emit_result: Option<std::path::PathBuf>,
     /// CLI `--bind KEY=VALUE` pairs for Artifact Metadata Binding (`arg` + overlay).
     pub binds: Vec<(String, String)>,
+    /// Attach CoW session for `ext/ai/sandbox` nested runs.
+    pub sandbox_session: Option<String>,
 }
 
 impl Default for RunOptions {
@@ -118,11 +122,13 @@ impl Default for RunOptions {
             allow_fs_write: true,
             allow_exec: true,
             allow_net: true,
+            allow_plugin: true,
             argv: Vec::new(),
             fs_root: None,
             sleep_limit_ms: None,
             emit_result: None,
             binds: Vec::new(),
+            sandbox_session: None,
         }
     }
 }
@@ -154,7 +160,7 @@ impl RunOptions {
             fs_write: self.allow_fs_write,
             exec: self.allow_exec,
             net: self.allow_net,
-            plugin: true,
+            plugin: self.allow_plugin,
         }
     }
 }
@@ -289,6 +295,7 @@ pub fn run_file_capture(path: &Path, opts: &RunOptions) -> Result<RunCapture> {
             host.set_entry_source(Some(path), &source);
             host.argv = opts.argv.clone();
             host.entry_metadata = module.metadata.clone();
+            host.sandbox_session = opts.sandbox_session.clone();
             if let Some(root) = &opts.fs_root {
                 host.fs_root = Some(root.clone());
                 host.cwd = root.clone();
@@ -315,6 +322,7 @@ pub fn run_file_capture(path: &Path, opts: &RunOptions) -> Result<RunCapture> {
             host.set_entry_source(Some(path), &source);
             host.argv = opts.argv.clone();
             host.entry_metadata = module.metadata.clone();
+            host.sandbox_session = opts.sandbox_session.clone();
             if let Some(root) = &opts.fs_root {
                 host.fs_root = Some(root.clone());
                 host.cwd = root.clone();
@@ -351,6 +359,7 @@ pub fn run_source(source: &str, opts: &RunOptions) -> Result<RunCapture> {
             host.set_entry_source(None, source);
             host.argv = opts.argv.clone();
             host.entry_metadata = module.metadata.clone();
+            host.sandbox_session = opts.sandbox_session.clone();
             if let Some(root) = &opts.fs_root {
                 host.fs_root = Some(root.clone());
                 host.cwd = root.clone();
@@ -377,6 +386,7 @@ pub fn run_source(source: &str, opts: &RunOptions) -> Result<RunCapture> {
             host.set_entry_source(None, source);
             host.argv = opts.argv.clone();
             host.entry_metadata = module.metadata.clone();
+            host.sandbox_session = opts.sandbox_session.clone();
             if let Some(root) = &opts.fs_root {
                 host.fs_root = Some(root.clone());
                 host.cwd = root.clone();
