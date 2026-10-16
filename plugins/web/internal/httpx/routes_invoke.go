@@ -102,6 +102,18 @@ func (st *state) handleInvoke(w http.ResponseWriter, r *http.Request, route invo
 		}
 	}
 
+	// Bind common auth / client headers for OpenAI-compatible and API-key surfaces.
+	if auth := strings.TrimSpace(r.Header.Get("Authorization")); auth != "" {
+		if _, exists := payload["authorization"]; !exists {
+			payload["authorization"] = auth
+		}
+	}
+	if key := strings.TrimSpace(r.Header.Get("X-Api-Key")); key != "" {
+		if _, exists := payload["api_key"]; !exists {
+			payload["api_key"] = key
+		}
+	}
+
 	args := invokeArgsFromPayload(payload)
 	value, err := plugin.CallLibPath(route.FnPath, args)
 	if err != nil {
@@ -114,8 +126,20 @@ func (st *state) handleInvoke(w http.ResponseWriter, r *http.Request, route invo
 			strings.Contains(msg, "no active host") {
 			code = http.StatusBadRequest
 		}
+		if strings.Contains(msg, "unauthorized") || strings.Contains(msg, "Unauthorized") {
+			code = http.StatusUnauthorized
+		}
 		jsonErr(w, code, msg)
 		return
+	}
+
+	// OpenAI-compatible handlers may return `{sse: "..."}` to force event-stream
+	// even when the route's declared return mode is json.
+	if m, ok := value.(map[string]any); ok {
+		if s, ok := m["sse"].(string); ok && strings.TrimSpace(s) != "" {
+			writeSSE(w, m)
+			return
+		}
 	}
 
 	switch route.ReturnMode {
@@ -135,6 +159,8 @@ func (st *state) handleInvoke(w http.ResponseWriter, r *http.Request, route invo
 		w.Header().Set("Content-Type", ct)
 		w.WriteHeader(http.StatusOK)
 		_, _ = io.WriteString(w, text)
+	case "sse", "event-stream", "text/event-stream":
+		writeSSE(w, value)
 	case "status":
 		if value == nil {
 			jsonErr(w, http.StatusInternalServerError, "null result")

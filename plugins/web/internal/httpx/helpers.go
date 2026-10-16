@@ -3,6 +3,7 @@ package httpx
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"strings"
@@ -118,9 +119,71 @@ func jsonWrapInvokeValue(value any) (int, map[string]any, error) {
 	}
 	switch t := value.(type) {
 	case map[string]any:
-		return http.StatusOK, t, nil
+		code := http.StatusOK
+		if ok, has := t["ok"]; has {
+			if b, isBool := ok.(bool); isBool && !b {
+				if errMsg, _ := t["error"].(string); strings.EqualFold(errMsg, "unauthorized") ||
+					strings.Contains(strings.ToLower(errMsg), "unauthorized") {
+					code = http.StatusUnauthorized
+				}
+			}
+		}
+		return code, t, nil
 	default:
 		return http.StatusOK, map[string]any{"ok": true, "result": value}, nil
+	}
+}
+
+// writeSSE writes OpenAI-compatible (or generic) Server-Sent Events.
+// value may be a string body, or a map with key "sse" / "body" / "chunks".
+func writeSSE(w http.ResponseWriter, value any) {
+	w.Header().Set("Content-Type", "text/event-stream; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+	w.WriteHeader(http.StatusOK)
+	flusher, _ := w.(http.Flusher)
+
+	writeChunk := func(s string) {
+		if s == "" {
+			return
+		}
+		if !strings.HasSuffix(s, "\n") {
+			s += "\n"
+		}
+		_, _ = io.WriteString(w, s)
+		if flusher != nil {
+			flusher.Flush()
+		}
+	}
+
+	switch t := value.(type) {
+	case string:
+		writeChunk(t)
+	case map[string]any:
+		if s, ok := t["sse"].(string); ok {
+			writeChunk(s)
+			return
+		}
+		if s, ok := t["body"].(string); ok {
+			writeChunk(s)
+			return
+		}
+		if chunks, ok := t["chunks"].([]any); ok {
+			for _, c := range chunks {
+				writeChunk(fmt.Sprint(c))
+			}
+			return
+		}
+		b, err := json.Marshal(t)
+		if err != nil {
+			writeChunk("data: {\"error\":\"sse_encode\"}\n\n")
+			return
+		}
+		writeChunk("data: " + string(b) + "\n\n")
+		writeChunk("data: [DONE]\n\n")
+	default:
+		writeChunk("data: " + fmt.Sprint(value) + "\n\n")
+		writeChunk("data: [DONE]\n\n")
 	}
 }
 

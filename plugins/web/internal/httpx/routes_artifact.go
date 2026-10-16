@@ -17,8 +17,8 @@ type artifactRoute struct {
 	Path     string
 	File     string
 	Request  string // json | form | none | query
-	Response string // json | text | html
-	Auth     string // role name or "" / "none"
+	Response string // json | text | html | sse
+	Auth     string // role name or "" / "none" | "bearer"
 }
 
 func parseArtifactRoute(v any) artifactRoute {
@@ -57,16 +57,21 @@ func (st *state) mountArtifactRoutes(mux *http.ServeMux) {
 
 func (st *state) handleArtifact(w http.ResponseWriter, r *http.Request, route artifactRoute) {
 	if route.Auth != "" && !strings.EqualFold(route.Auth, "none") {
-		cookie := r.Header.Get("Cookie")
-		user := session.UsernameFromCookie(cookie)
-		if user == "" {
-			jsonErr(w, http.StatusUnauthorized, "auth required")
-			return
-		}
-		role := session.RoleFromCookie(cookie)
-		if role != "" && role != route.Auth && role != "admin" && role != "superadmin" {
-			jsonErr(w, http.StatusForbidden, "forbidden")
-			return
+		if strings.EqualFold(route.Auth, "bearer") || strings.EqualFold(route.Auth, "api_key") {
+			// Bearer / API-key auth is enforced inside the Endpoint `# main`
+			// (payload carries authorization / api_key). Do not require cookies.
+		} else {
+			cookie := r.Header.Get("Cookie")
+			user := session.UsernameFromCookie(cookie)
+			if user == "" {
+				jsonErr(w, http.StatusUnauthorized, "auth required")
+				return
+			}
+			role := session.RoleFromCookie(cookie)
+			if role != "" && role != route.Auth && role != "admin" && role != "superadmin" {
+				jsonErr(w, http.StatusForbidden, "forbidden")
+				return
+			}
 		}
 	}
 
@@ -115,6 +120,16 @@ func (st *state) handleArtifact(w http.ResponseWriter, r *http.Request, route ar
 			payload[name] = v
 		}
 	}
+	if auth := strings.TrimSpace(r.Header.Get("Authorization")); auth != "" {
+		if _, exists := payload["authorization"]; !exists {
+			payload["authorization"] = auth
+		}
+	}
+	if key := strings.TrimSpace(r.Header.Get("X-Api-Key")); key != "" {
+		if _, exists := payload["api_key"]; !exists {
+			payload["api_key"] = key
+		}
+	}
 
 	value, err := plugin.RunArtifact(route.File, payload)
 	if err != nil {
@@ -131,6 +146,8 @@ func (st *state) handleArtifact(w http.ResponseWriter, r *http.Request, route ar
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		w.WriteHeader(http.StatusOK)
 		_, _ = io.WriteString(w, fmt.Sprint(value))
+	case "sse", "event-stream", "text/event-stream":
+		writeSSE(w, value)
 	default:
 		code, body, err := jsonWrapInvokeValue(value)
 		if err != nil {

@@ -104,8 +104,9 @@ POST `/chat/completions` (or stream SSE). Prefers `plugins/llm` ABI (`llm_chat_c
     **req = > table.put in=`req` at="stream" value=True**
     **body = > json.stringify value=`req`**
     **resp = > net.http_post_sse url=`url` body=`body` headers=`headers` echo=`echo`**
-    1. [status](resp) == 200
-      **evs = [events](resp)**
+    **st = > json.get value=`resp` key="status"**
+    1. `st` == 200
+      **evs = > json.get value=`resp` key="events"**
 
       `pack` =
 
@@ -116,11 +117,10 @@ POST `/chat/completions` (or stream SSE). Prefers `plugins/llm` ABI (`llm_chat_c
       *pack*
     2. *
       Soft transport / HTTP failure — structured pack, never abort the VM.
-      **st = [status](resp)**
       **msg = "HTTP " + `st`**
-      **evs = [events](resp)**
+      **evs = > json.get value=`resp` key="events"**
       1. `evs`
-        **e0 = [1](evs)**
+        **e0 = > at value=`evs` index=0**
         **m2 = > json.get value=`e0` key="message"**
         1. `m2`
           **msg = `m2`**
@@ -134,16 +134,20 @@ POST `/chat/completions` (or stream SSE). Prefers `plugins/llm` ABI (`llm_chat_c
   2. *
     **body = > json.stringify value=`req`**
     **resp = > net.http_post url=`url` body=`body` headers=`headers`**
-    1. [status](resp) == 200
-      **data = > json.parse text=[body](resp)**
-      **msg = [message]([1]([choices](data)))**
+    **st = > json.get value=`resp` key="status"**
+    1. `st` == 200
+      **raw = > json.get value=`resp` key="body"**
+      **data = > json.parse text=`raw`**
+      **choices = > json.get value=`data` key="choices"**
+      **choice0 = > at value=`choices` index=0**
+      **msg = > json.get value=`choice0` key="message"**
       **text = > json.get value=`msg` key="content"**
       1. not `text`
         **text = ""**
       2. *
         **_ = 1**
       **usage = > usage_from data=`data`**
-      **fr = > json.get value=[1]([choices](data)) key="finish_reason"**
+      **fr = > json.get value=`choice0` key="finish_reason"**
       1. not `fr`
         **fr = "stop"**
       2. *
@@ -159,8 +163,7 @@ POST `/chat/completions` (or stream SSE). Prefers `plugins/llm` ABI (`llm_chat_c
       *pack*
     2. *
       Soft transport / HTTP failure — structured pack, never abort the VM.
-      **st = [status](resp)**
-      **raw = [body](resp)**
+      **raw = > json.get value=`resp` key="body"**
       **msg = "HTTP " + `st`**
       1. `raw`
         **msg = `msg` + ": " + `raw`**

@@ -120,8 +120,8 @@ import data:ext/data/db.mq.md
 | `path` | `路径` | URL |
 | `method` | `方法` | GET/POST/… |
 | `request` | `请求` | `json` / `form` / `none` |
-| `response` | `响应` | `json` / `text` / `html` |
-| `auth` | `鉴权` | 角色名或 `none` |
+| `response` | `响应` | `json` / `text` / `html` / `sse`（`text/event-stream`） |
+| `auth` | `鉴权` | 角色名或 `none`；`bearer` / `api_key` = 不要求 cookie，把 `Authorization` / `X-Api-Key` 注入 payload 由 `# main` 校验 |
 
 正文在请求时执行；返回值按 `response` 序列化。Result 协议见 §8。
 

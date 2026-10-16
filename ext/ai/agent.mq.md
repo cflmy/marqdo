@@ -66,14 +66,14 @@ One LLM turn via the semantic surface (`ask` / `stream`+`collect`). Returns `{te
   **err = None**
   **calls = 1**
   1. not `text`
-    **e0 = [1](evs)**
+    **e0 = > at value=`evs` index=0**
     **err = > json.get value=`e0` key="message"**
     1. `err`
       **calls = 0**
 2. *
   **r = > model.ask prompt=`prompt`**
-  **text = [text](r)**
-  **tokens = [tokens](r)**
+  **text = > json.get value=`r` key="text"**
+  **tokens = > json.get value=`r` key="tokens"**
   **err = > json.get value=`r` key="error"**
   **fin = > json.get value=`r` key="finish"**
   1. `tokens`
@@ -181,7 +181,7 @@ Allowlist check, then invoke the runbook `##` via `lib/subtask` (`spawn fn=` →
 Build a runnable workbook. `skeleton=single` (default): one worker `step`. `skeleton=dual`: research then write agents. On success the parent chooses DONE; runtime `agent_workbook_solidify` freezes the answer.
 
 **q = > json.quote text=`goal`**
-**esc = > json.parse text={"h":"---\ntitle: agent workbook\nimport llm:ext/ai/llm.mq.md\nimport agent:ext/ai/agent.mq.md\nimport json:lib/json.mq.md\nimport sys:lib/sys.mq.md\nimport wb:lib/writeback.mq.md\nimport subtask:lib/subtask.mq.md\n---\n\n# Goal\n\nParent goal is embedded as JSON in # main.\n\n## Solidify\n\nWhen the child returns a good value, parent DECISION: DONE — runtime agent_workbook_solidify freezes the answer as **return** (do not invent long FIND/REPLACE).\n\n# main\n\n> llm.load_env\n\n","s1":"\u002a\u0060model\u0060 = > llm.llm \u002a\n","s2":"\u002a\u0060tools\u0060 = > table.empty_list \u002a\n","s3":"\u002a\u0060worker\u0060 = > agent.agent model=\u0060model\u0060 tools=\u0060tools\u0060 standing=You are a workbook worker. tools=[] means never CALL. Finish the task with a direct final answer; do not invent tools. \u002a\n","s4":"\u002a\u0060wrap\u0060 = > json.parse text={\"task\":","s5":"} \u002a\n","s6":"\u002a\u0060task\u0060 = > json.get value=\u0060wrap\u0060 key=task \u002a\n","s7":"\u002a\u0060out\u0060 = > \u0060worker\u0060.step task=\u0060task\u0060 stream=True \u002a\n","s7b":"\u002a\u0060text\u0060 = > json.get value=\u0060out\u0060 key=result \u002a\n","s8":"\u002a\u002a\u0060text\u0060\u002a\u002a\n","d3":"\u002a\u0060research\u0060 = > agent.agent model=\u0060model\u0060 tools=\u0060tools\u0060 standing=You gather facts for the goal. Be concise. Do not invent tools. \u002a\n","d3b":"\u002a\u0060writer\u0060 = > agent.agent model=\u0060model\u0060 tools=\u0060tools\u0060 standing=You write the final answer from research notes. Do not invent tools. \u002a\n","d4":"\u002a\u0060wrap\u0060 = > json.parse text={\"task\":","d5":"} \u002a\n","d6":"\u002a\u0060task\u0060 = > json.get value=\u0060wrap\u0060 key=task \u002a\n","d7":"\u002a\u0060notes\u0060 = > \u0060research\u0060.step task=\u0060task\u0060 stream=True \u002a\n","d8":"\u002a\u0060ns\u0060 = > json.stringify value=\u0060notes\u0060 \u002a\n","d9":"\u002a\u0060wt\u0060 = Write the final answer. Research notes: \u002a\n","d10":"\u002a\u0060wt\u0060 = \u0060wt\u0060 + \u0060ns\u0060 \u002a\n","d11":"\u002a\u0060out\u0060 = > \u0060writer\u0060.step task=\u0060wt\u0060 stream=True \u002a\n","d11b":"\u002a\u0060text\u0060 = > json.get value=\u0060out\u0060 key=result \u002a\n","d12":"\u002a\u002a\u0060text\u0060\u002a\u002a\n"}**
+**esc = > json.parse text={"h":"---\ntitle: agent workbook\nimport llm:ext/ai/llm.mq.md\nimport agent:ext/ai/agent.mq.md\nimport json:lib/json.mq.md\nimport sys:lib/sys.mq.md\nimport wb:lib/writeback.mq.md\nimport subtask:lib/subtask.mq.md\n---\n\n# Goal\n\nParent goal is embedded as JSON in # main.\n\n## Solidify\n\nWhen the child returns a good value, parent DECISION: DONE — runtime agent_workbook_solidify freezes the answer as **return** (do not invent long FIND/REPLACE).\n\n# main\n\n> llm.load_env\n\n","s1":"\u002a\u0060model\u0060 = > llm.llm \u002a\n","s2":"\u002a\u0060tools\u0060 = > table.empty_list \u002a\n","s3":"\u002a\u0060worker\u0060 = > agent.agent model=\u0060model\u0060 tools=\u0060tools\u0060 standing=You are a workbook worker. tools=[] means never CALL. Finish the task with a direct final answer; do not invent tools. \u002a\n","s4":"\u002a\u0060wrap\u0060 = > json.parse text={\"task\":","s5":"} \u002a\n","s6":"\u002a\u0060task\u0060 = > json.get value=\u0060wrap\u0060 key=task \u002a\n","s7":"\u002a\u0060out\u0060 = > \u0060worker\u0060.step task=\u0060task\u0060 stream=False \u002a\n","s7b":"\u002a\u0060text\u0060 = > json.get value=\u0060out\u0060 key=result \u002a\n","s8":"\u002a\u002a\u0060text\u0060\u002a\u002a\n","d3":"\u002a\u0060research\u0060 = > agent.agent model=\u0060model\u0060 tools=\u0060tools\u0060 standing=You gather facts for the goal. Be concise. Do not invent tools. \u002a\n","d3b":"\u002a\u0060writer\u0060 = > agent.agent model=\u0060model\u0060 tools=\u0060tools\u0060 standing=You write the final answer from research notes. Do not invent tools. \u002a\n","d4":"\u002a\u0060wrap\u0060 = > json.parse text={\"task\":","d5":"} \u002a\n","d6":"\u002a\u0060task\u0060 = > json.get value=\u0060wrap\u0060 key=task \u002a\n","d7":"\u002a\u0060notes\u0060 = > \u0060research\u0060.step task=\u0060task\u0060 stream=False \u002a\n","d8":"\u002a\u0060ns\u0060 = > json.stringify value=\u0060notes\u0060 \u002a\n","d9":"\u002a\u0060wt\u0060 = Write the final answer. Research notes: \u002a\n","d10":"\u002a\u0060wt\u0060 = \u0060wt\u0060 + \u0060ns\u0060 \u002a\n","d11":"\u002a\u0060out\u0060 = > \u0060writer\u0060.step task=\u0060wt\u0060 stream=False \u002a\n","d11b":"\u002a\u0060text\u0060 = > json.get value=\u0060out\u0060 key=result \u002a\n","d12":"\u002a\u002a\u0060text\u0060\u002a\u002a\n"}**
 **h = > json.get value=`esc` key="h"**
 **s1 = > json.get value=`esc` key="s1"**
 **s2 = > json.get value=`esc` key="s2"**
@@ -281,8 +281,8 @@ Opt-in CoW trial (O1): open → optional upper write → optional run → diff �
 Host tree unchanged until a successful commit. Return map is a GFM table (link-index readable).
 
 **sb = sandbox.open root=`root` profile=`profile`**
-**id = [id](sb)**
-**prof = [profile](sb)**
+**id = > json.get value=`sb` key="id"**
+**prof = > json.get value=`sb` key="profile"**
 **ok = True**
 **stdout = ""**
 **stderr = ""**
@@ -297,14 +297,14 @@ Host tree unchanged until a successful commit. Return map is a GFM table (link-i
 
 1. `source`
   **ret = sandbox.run id=`id` source=`source`**
-  **ok = [ok](ret)**
-  **stdout = [stdout](ret)**
-  **stderr = [stderr](ret)**
+  **ok = > json.get value=`ret` key="ok"**
+  **stdout = > json.get value=`ret` key="stdout"**
+  **stderr = > json.get value=`ret` key="stderr"**
 2. `path`
   **ret = sandbox.run id=`id` path=`path`**
-  **ok = [ok](ret)**
-  **stdout = [stdout](ret)**
-  **stderr = [stderr](ret)**
+  **ok = > json.get value=`ret` key="ok"**
+  **stdout = > json.get value=`ret` key="stdout"**
+  **stderr = > json.get value=`ret` key="stderr"**
 3. *
   **_ = 1**
 
@@ -360,9 +360,9 @@ With `sandbox=True`, run via `## trial` first (commit on ok); host unchanged unt
 
 1. `sandbox`
   **tr = trial path=`path` root=`sandbox_root` profile=`sandbox_profile` commit=True**
-  **ok = [ok](tr)**
-  **stdout = [stdout](tr)**
-  **stderr = [stderr](tr)**
+  **ok = > json.get value=`tr` key="ok"**
+  **stdout = > json.get value=`tr` key="stdout"**
+  **stderr = > json.get value=`tr` key="stderr"**
   1. `ok`
     **code = 0**
   2. *
@@ -379,10 +379,10 @@ With `sandbox=True`, run via `## trial` first (commit on ok); host unchanged unt
 2. *
   **id = subtask.spawn path=`path`**
   **waited = subtask.wait id=`id`**
-  **code = [code](waited)**
-  **value = [value](waited)**
-  **stdout = [stdout](waited)**
-  **stderr = [stderr](waited)**
+  **code = > json.get value=`waited` key="code"**
+  **value = > json.get value=`waited` key="value"**
+  **stdout = > json.get value=`waited` key="stdout"**
+  **stderr = > json.get value=`waited` key="stderr"**
   **obs = inspect_workbook path=`path` exit_code=`code` value=`value` stdout=`stdout` stderr=`stderr`**
   **out = **
 
@@ -1595,7 +1595,7 @@ LLM Plan → CALL/READ/DECISION loop. Returns `{decision,reply,observation,event
       **evs = > model.stream prompt=`ctx` echo=`echo`**
       **last_reply = > llm.collect events=`evs`**
       **evs_all = > plan_merge_deltas events=`evs_all` from=`evs` stream=`stream`**
-      **e0 = [1](evs)**
+      **e0 = > at value=`evs` index=0**
       **terr = > json.get value=`e0` key="message"**
       **etype = > json.get value=`e0` key="type"**
       1. `etype` == "error"
@@ -1903,7 +1903,7 @@ Optional `step_kind=` (O3) selects backend via module `## step_route` before the
 
 1. `step_kind`
   **sr = step_route kind=`step_kind`**
-  **backend = [backend](sr)**
+  **backend = > json.get value=`sr` key="backend"**
 2. *
   **_ = 1**
 
@@ -2054,9 +2054,9 @@ Primary author entry (v2 + P4): Adaptive `route` → execute (policy/kb skill) o
   **path = > json.get value=`routed` key="resource"**
   1. `path`
     **aw = await_workbook path=`path` sandbox=`sandbox` sandbox_profile=`sandbox_profile`**
-    **code = [code](aw)**
-    **child_val = [value](aw)**
-    **last_obs = [observation](aw)**
+    **code = > json.get value=`aw` key="code"**
+    **child_val = > json.get value=`aw` key="value"**
+    **last_obs = > json.get value=`aw` key="observation"**
     1. `code` == 0
       > agent_kb_record_hit kb_dir=`kb_dir` goal=`task` improve_every=`improve_every`
       **lf = > json.get value=`routed` key="llm_free"**
@@ -2094,9 +2094,9 @@ Primary author entry (v2 + P4): Adaptive `route` → execute (policy/kb skill) o
     1. `am`
       **path = > json.get value=`applied` key="resource"**
       **aw = await_workbook path=`path` sandbox=`sandbox` sandbox_profile=`sandbox_profile`**
-      **code = [code](aw)**
-      **child_val = [value](aw)**
-      **last_obs = [observation](aw)**
+      **code = > json.get value=`aw` key="code"**
+      **child_val = > json.get value=`aw` key="value"**
+      **last_obs = > json.get value=`aw` key="observation"**
       1. `code` == 0
         **exec_mode = "routed"**
         **sk = > json.get value=`applied` key="skill"**
@@ -2153,9 +2153,9 @@ Primary author entry (v2 + P4): Adaptive `route` → execute (policy/kb skill) o
   1. `llm_free`
     **path = > json.get value=`resolved` key="resource"**
     **aw = await_workbook path=`path` sandbox=`sandbox` sandbox_profile=`sandbox_profile`**
-    **code = [code](aw)**
-    **child_val = [value](aw)**
-    **last_obs = [observation](aw)**
+    **code = > json.get value=`aw` key="code"**
+    **child_val = > json.get value=`aw` key="value"**
+    **last_obs = > json.get value=`aw` key="observation"**
     1. `code` == 0
       > agent_kb_record_hit kb_dir=`kb_dir` goal=`task` improve_every=`improve_every`
       **exec_mode = "compiled"**
@@ -2977,7 +2977,7 @@ Deterministic success stop (loop engineering): when the child already returned a
 # mcp_server
     + `name`=marqdo
 
-Minimal MCP Server host (stdio JSON-RPC). Tools point at entry-module `lib.member` functions (same bridge as `ext/web` invoke). Evidence/results may carry `authority=workbook`.
+Minimal MCP Server host (stdio JSON-RPC / Streamable HTTP). Tools point at entry-module `lib.member` functions (same bridge as `ext/web` invoke). Evidence/results may carry `authority=workbook`.
 
 **p = > plugin.native_path name="agent"**
 1. `p`
@@ -2986,11 +2986,12 @@ Minimal MCP Server host (stdio JSON-RPC). Tools point at entry-module `lib.membe
   > print text=ext/ai/agent: native agent plugin not found (build marqdo_plugin_agent or marqdo ext add agent)
   > sys.exit code=1
 
+**tools0 = > table.empty_list**
 `h` =
 
 | _type | tools | name |
 |-------|-------|------|
-| mcp_server | [] | `name` |
+| mcp_server | `tools0` | `name` |
 
 *h*
 
@@ -3002,6 +3003,8 @@ Minimal MCP Server host (stdio JSON-RPC). Tools point at entry-module `lib.membe
 Register one tool. `fn` must be `lib.member` imported on the entry workbook.
 
 **tools = > json.get value=`self` key="tools"**
+1. not `tools`
+  **tools = > table.empty_list**
 `row` =
 
 | name | fn | description |
@@ -3014,9 +3017,12 @@ Register one tool. `fn` must be `lib.member` imported on the entry workbook.
 
 ## serve
     + `transport`=stdio
+    + `host`="127.0.0.1"
+    + `port`=7434
+    + `path`="/mcp"
 
-Block on stdio MCP (`initialize` / `tools/list` / `tools/call`). HTTP transport is H4b.
+Block on MCP: `stdio` (line JSON-RPC) or `http` / `streamable-http` (Streamable HTTP, POST JSON-RPC + optional GET SSE). Spec 2025-03-26.
 
 **name = > json.get value=`self` key="name"**
 **tools = > json.get value=`self` key="tools"**
-*> agent_mcp_serve name=`name` tools=`tools` transport=`transport`*
+*> agent_mcp_serve name=`name` tools=`tools` transport=`transport` host=`host` port=`port` path=`path`*

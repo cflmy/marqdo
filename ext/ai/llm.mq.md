@@ -26,14 +26,14 @@ Collapse a stream event list to final answer text (`done.result` or `error.messa
 **answer = ""**
 
 - [ev](events)
-  **t = [type](ev)**
+  **t = > json.get value=`ev` key="type"**
   1. `t` == "done"
-    **answer = [result](ev)**
+    **answer = > json.get value=`ev` key="result"**
   2. `t` == "error"
-    **answer = [message](ev)**
+    **answer = > json.get value=`ev` key="message"**
   3. `t` == "delta"
   4. `t` == "text"
-    **chunk = [text](ev)**
+    **chunk = > json.get value=`ev` key="text"**
     1. `chunk`
       **answer = answer + chunk**
     2. *
@@ -168,7 +168,8 @@ Module convenience: create a default handle and return **answer text**. Pass `pa
 
 **m = > create model=`model` base_url=`base_url` api_key=`api_key`**
 **r = > m.ask prompt=`p`**
-*[text](r)*
+**_ret = > json.get value=`r` key="text"**
+*_ret*
 
 # llm
     + `model`=None
@@ -306,11 +307,11 @@ Hoist receiver fields before the result table — table cells can shadow `self` 
 column names (`model`, `usage`), so `[model](self)` / `[total_tokens](usage)`
 inside the table is unsafe.
 
-**mdl = [model](self)**
-**b = [backend](self)**
-**nm = [name](self)**
+**mdl = > json.get value=`self` key="model"**
+**b = > json.get value=`self` key="backend"**
+**nm = > json.get value=`self` key="name"**
 1. `usage`
-  **tt = [total_tokens](usage)**
+  **tt = > json.get value=`usage` key="total_tokens"**
 2. *
   **tt = 0**
 1. not `tt`
@@ -369,10 +370,12 @@ Internal / compatibility primitive. Prefer `ask` / `stream` in new code.
 
 1. `stream`
   **pack = > self.complete_result prompt=`prompt` stream=True echo=`echo`**
-  *[events](pack)*
+  **_ret = > json.get value=`pack` key="events"**
+*_ret*
 2. *
   **pack = > self.complete_result prompt=`prompt` stream=False echo=`echo`**
-  *[text](pack)*
+  **_ret = > json.get value=`pack` key="text"**
+*_ret*
 
 ## chat
     + `prompt`
