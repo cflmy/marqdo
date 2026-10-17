@@ -2002,6 +2002,8 @@ fn collect_names_needing_input(
                 }
             }
             Stmt::Branch { arms, .. } => {
+                let has_else = arms.iter().any(|a| a.condition.is_none());
+                let mut common: Option<std::collections::HashSet<String>> = None;
                 for a in arms {
                     if let Some(c) = &a.condition {
                         let mut reads = std::collections::HashSet::new();
@@ -2020,6 +2022,17 @@ fn collect_names_needing_input(
                         loop_items,
                         assign_decls,
                     );
+                    if has_else {
+                        common = Some(match common {
+                            None => arm_bound,
+                            Some(prev) => prev.intersection(&arm_bound).cloned().collect(),
+                        });
+                    }
+                }
+                if let Some(c) = common {
+                    for n in c {
+                        bound.insert(n);
+                    }
                 }
             }
             Stmt::While {
@@ -2573,6 +2586,37 @@ Candidates may include lexical `score`.
             }
             other => panic!("expected code assign, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn branch_else_common_local_is_not_a_param() {
+        let src = r#"# main
+
+## f
+    + `a`=None
+
+1. `a`
+  **k = a**
+2. *
+  **k = None**
+
+| x |
+|---|
+| `k` |
+"#;
+        let m = parse_source(src).unwrap();
+        let f = m
+            .functions
+            .iter()
+            .flat_map(|outer| outer.children.iter())
+            .find(|f| f.name == "f")
+            .unwrap();
+        assert_eq!(
+            f.params.iter().map(|p| p.name.as_str()).collect::<Vec<_>>(),
+            ["a"],
+            "{:?}",
+            f.params
+        );
     }
 }
 

@@ -13,6 +13,7 @@
 
 ### Fixed
 
+- **分支内共同局部变量**：if/else 各臂都赋值的局部变量不再被误提升为必选形参；修复 `# llm` 构造器无端要求 `key`，恢复 agent/llm/ext 全量测试。新增 `branch_else_common_local_is_not_a_param` 回归测试。
 - **外联临时脚本路径**：入口目录为相对路径时，脚本参数现在使用绝对路径，避免 `tests/lib/tests/lib/...` 双拼接。
 - **外联失败可观测**：解释器不存在时进入 `invoke` 记录，`run` 仍报错；view 显示 stderr / exit / ms。
 
