@@ -124,11 +124,53 @@ pub fn canonical_param(builtin: &str, param: &str) -> String {
         ("host_json_stringify" | "stringify", "indent" | "缩进") => "indent".into(),
         ("host_plot", "steps" | "步数") => "steps".into(),
         ("host_plot", "derivative" | "导数") => "derivative".into(),
-        ("host_foreign_run", "code" | "代码") => "code".into(),
-        ("host_foreign_run" | "host_foreign_run_lang", "stdin" | "标准输入") => "stdin".into(),
-        ("host_foreign_set_cmd" | "host_foreign_run_lang", "lang" | "语言") => "lang".into(),
-        ("host_foreign_set_cmd", "cmd" | "命令") => "cmd".into(),
-        ("host_foreign_run_lang", "source" | "源码") => "source".into(),
+        ("host_foreign_run" | "host_foreign_invoke", "code" | "代码") => "code".into(),
+        (
+            "host_foreign_run" | "host_foreign_run_lang" | "host_foreign_invoke",
+            "stdin" | "标准输入",
+        ) => "stdin".into(),
+        (
+            "host_foreign_set_cmd"
+            | "host_foreign_run_lang"
+            | "host_foreign_invoke"
+            | "host_foreign_probe"
+            | "host_foreign_register"
+            | "host_foreign_unset",
+            "lang" | "语言",
+        ) => "lang".into(),
+        (
+            "host_foreign_set_cmd" | "host_foreign_invoke" | "host_foreign_register",
+            "cmd" | "命令",
+        ) => "cmd".into(),
+        ("host_foreign_run_lang" | "host_foreign_invoke", "source" | "源码") => "source".into(),
+        (
+            "host_foreign_run" | "host_foreign_run_lang" | "host_foreign_invoke",
+            "env" | "环境",
+        ) => "env".into(),
+        (
+            "host_foreign_run" | "host_foreign_run_lang" | "host_foreign_invoke",
+            "cwd" | "工作目录",
+        ) => "cwd".into(),
+        (
+            "host_foreign_run" | "host_foreign_run_lang" | "host_foreign_invoke",
+            "timeout" | "超时",
+        ) => "timeout".into(),
+        (
+            "host_foreign_run" | "host_foreign_run_lang" | "host_foreign_invoke"
+            | "host_foreign_register",
+            "args" | "参数",
+        ) => "args".into(),
+        (
+            "host_foreign_run" | "host_foreign_run_lang" | "host_foreign_invoke",
+            "max_output" | "最大输出",
+        ) => "max_output".into(),
+        ("host_foreign_invoke", "input" | "输入") => "input".into(),
+        ("host_foreign_invoke", "output" | "输出") => "output".into(),
+        ("host_foreign_invoke", "keep" | "保留") => "keep".into(),
+        ("host_foreign_register", "template" | "模板") => "template".into(),
+        ("host_foreign_register", "ext" | "扩展名") => "ext".into(),
+        ("host_foreign_register", "version_args" | "版本参数") => "version_args".into(),
+        ("host_foreign_load_config", "path" | "路径") => "path".into(),
         ("host_ext_native_path", "name" | "名") => "name".into(),
         _ => param.to_string(),
     }

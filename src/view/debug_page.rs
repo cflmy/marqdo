@@ -958,13 +958,22 @@ fn debug_js() -> &'static str {
       })
         .then(function (r) { return r.json(); })
         .then(function (data) {
+          var parts = [];
+          if (data.stdout) parts.push(data.stdout);
+          if (data.stderr) parts.push("[stderr]\n" + data.stderr);
+          if (data.error) parts.push(data.error);
+          var meta = [];
+          if (typeof data.code === "number") meta.push("exit " + data.code);
+          if (typeof data.ms === "number") meta.push(data.ms + "ms");
+          if (data.timed_out) meta.push("timed out");
+          if (data.truncated) meta.push("truncated");
+          if (meta.length) parts.push("— " + meta.join(" · "));
           if (data.ok) {
             out.classList.remove("err");
-            out.textContent = data.stdout === "" ? "(no stdout)" : data.stdout;
           } else {
             out.classList.add("err");
-            out.textContent = data.error || "foreign run failed";
           }
+          out.textContent = parts.length ? parts.join("\n\n") : "(no output)";
         })
         .catch(function (e) {
           out.classList.add("err");

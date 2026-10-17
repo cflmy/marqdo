@@ -3317,6 +3317,79 @@ fn lib_foreign_zh() {
     assert_out("tests/lib/外联-python.mq.md", "中文外联");
 }
 
+fn node_available() -> bool {
+    Command::new("node")
+        .args(["-e", "process.exit(0)"])
+        .output()
+        .map(|o| o.status.success())
+        .unwrap_or(false)
+}
+
+#[test]
+fn lib_foreign_invoke() {
+    if !node_available() {
+        eprintln!("skip lib_foreign_invoke: no node on PATH");
+        return;
+    }
+    assert_out("tests/lib/foreign-invoke.mq.md", "False\n3\nboom\nFalse");
+}
+
+#[test]
+fn lib_foreign_json() {
+    if !node_available() {
+        eprintln!("skip lib_foreign_json: no node on PATH");
+        return;
+    }
+    assert_out("tests/lib/foreign-json.mq.md", "True\n4\n10");
+}
+
+#[test]
+fn lib_foreign_env_timeout() {
+    if !node_available() {
+        eprintln!("skip lib_foreign_env_timeout: no node on PATH");
+        return;
+    }
+    assert_out(
+        "tests/lib/foreign-env-timeout.mq.md",
+        "fast|node\nFalse\nTrue",
+    );
+}
+
+#[test]
+fn lib_foreign_probe_register() {
+    if !node_available() {
+        eprintln!("skip lib_foreign_probe_register: no node on PATH");
+        return;
+    }
+    assert_out(
+        "tests/lib/foreign-probe-register.mq.md",
+        "True\nnode\ntiny",
+    );
+}
+
+#[test]
+fn lib_foreign_config() {
+    if !node_available() {
+        eprintln!("skip lib_foreign_config: no node on PATH");
+        return;
+    }
+    let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let output = Command::new(env!("CARGO_BIN_EXE_marqdo"))
+        .args(["run", "tests/lib/foreign-config.mq.md"])
+        .env(
+            "MARQDO_FOREIGN_CONFIG",
+            root.join("tests/lib/fixtures/foreign.toml"),
+        )
+        .current_dir(&root)
+        .output()
+        .expect("run foreign-config");
+    let code = output.status.code().unwrap_or(1);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert_eq!(code, 0, "foreign-config stderr={stderr}");
+    assert_eq!(stdout.trim_end(), "1\ncfg", "stdout={stdout}");
+}
+
 #[test]
 fn bytecode_lib_math_formula() {
     assert_out_backend(

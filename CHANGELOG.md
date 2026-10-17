@@ -4,9 +4,18 @@
 
 ### Added
 
+- **`lib/foreign` F0/F1**：`invoke` 结构化记录（`ok`/`code`/`stdout`/`stderr`/`ms`/`timed_out`/`truncated`/`result`）；`run`/`run_lang` 新增 `env`/`cwd`/`timeout`/`args`/`max_output`；15 个语言预设；`probe`/`register`/`unset`/`load_config`；`.marqdo/foreign.toml`。
+- **安全与健壮性**：所有外联入口检查 `exec` 能力；有界 stdout/stderr 读取与截断标记；stdin 写线程；Unix 进程组 / Windows `taskkill /T` 超时清理；shell-like argv 切分。
+
 ### Fixed
 
+- **外联临时脚本路径**：入口目录为相对路径时，脚本参数现在使用绝对路径，避免 `tests/lib/tests/lib/...` 双拼接。
+- **外联失败可观测**：解释器不存在时进入 `invoke` 记录，`run` 仍报错；view 显示 stderr / exit / ms。
+
 ### Changed
+
+- **`langs`** 现在返回「预设 ∪ 注册 ∪ 配置」的已知语言（原集合是子集）。
+- 大输出从 `Err` 改为「截断 + `truncated=true`」；`subtask` 外联输出同步采用该语义。
 
 ## v1.4.6 — 2026-10-16
 

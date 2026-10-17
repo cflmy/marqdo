@@ -120,8 +120,8 @@ fn republish_child_event(line: &str) {
 pub(crate) struct ForeignTask {
     child: Child,
     temp_script: PathBuf,
-    stdout: JoinHandle<String>,
-    stderr: JoinHandle<String>,
+    stdout: JoinHandle<(String, bool)>,
+    stderr: JoinHandle<(String, bool)>,
 }
 
 enum FnState {
@@ -392,6 +392,9 @@ fn spawn_fn(
     let cwd = ctx.cwd.clone();
     let caps = ctx.caps.clone();
     let foreign_cmds = ctx.foreign_cmds.clone();
+    let foreign_specs = ctx.foreign_specs.clone();
+    let foreign_config_specs = ctx.foreign_config_specs.clone();
+    let foreign_config_loaded = ctx.foreign_config_loaded;
     let fs_root = ctx.fs_root.clone();
     let argv = ctx.argv.clone();
 
@@ -407,6 +410,9 @@ fn spawn_fn(
             host.fs_root = fs_root;
             host.argv = argv;
             host.foreign_cmds = foreign_cmds;
+            host.foreign_specs = foreign_specs;
+            host.foreign_config_specs = foreign_config_specs;
+            host.foreign_config_loaded = foreign_config_loaded;
             host.set_entry_source(Some(&module_path), &source);
             host.entry_metadata = module.metadata.clone();
             let mut interp = Interpreter::with_capture(Some(&module_path), false).with_host(host);
@@ -587,12 +593,9 @@ fn join_foreign(mut task: ForeignTask) -> Result<Value, String> {
         .child
         .wait()
         .map_err(|e| format!("subtask foreign join: {e}"))?;
-    let stdout = task.stdout.join().unwrap_or_default();
-    let stderr = task.stderr.join().unwrap_or_default();
+    let (stdout, out_trunc) = task.stdout.join().unwrap_or_default();
+    let (stderr, err_trunc) = task.stderr.join().unwrap_or_default();
     let _ = std::fs::remove_file(&task.temp_script);
-    if stdout.len() > foreign::MAX_OUTPUT || stderr.len() > foreign::MAX_OUTPUT {
-        return Err("subtask foreign output too large".into());
-    }
     if !status.success() {
         let code = status.code().unwrap_or(1);
         let mut msg = format!("subtask foreign failed (exit={code})");
@@ -608,6 +611,9 @@ fn join_foreign(mut task: ForeignTask) -> Result<Value, String> {
         if out.ends_with('\r') {
             out.pop();
         }
+    }
+    if out_trunc || err_trunc {
+        out.push_str("\n…(truncated)");
     }
     Ok(Value::Text(out))
 }

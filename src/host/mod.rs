@@ -27,7 +27,7 @@ mod secrets;
 mod stats;
 mod text_ops;
 mod time;
-mod toml_ops;
+pub(crate) mod toml_ops;
 mod url_ops;
 mod uuid_ops;
 #[cfg(feature = "plugin-host")]
@@ -93,6 +93,12 @@ pub struct HostContext {
     pub plots: Vec<PlotArtifact>,
     /// lang → interpreter argv (from `set_cmd`).
     pub foreign_cmds: HashMap<String, Vec<String>>,
+    /// Process-local language registrations (`register` / `set_cmd`).
+    pub foreign_specs: HashMap<String, crate::foreign::registry::LangSpec>,
+    /// Project config specs (`.marqdo/foreign.toml`), lower priority than runtime.
+    pub foreign_config_specs: HashMap<String, crate::foreign::registry::LangSpec>,
+    /// Whether project config has been discovered/loaded.
+    pub foreign_config_loaded: bool,
     /// Loaded native plugins (ABI v1/v2).
     pub plugins: PluginState,
     /// Entry `.mq.md` source text (for ABI host_query / context injection).
@@ -128,6 +134,9 @@ impl Default for HostContext {
             rng: 0xC0FF_EE42_CAFE_BABE,
             plots: Vec::new(),
             foreign_cmds: HashMap::new(),
+            foreign_specs: HashMap::new(),
+            foreign_config_specs: HashMap::new(),
+            foreign_config_loaded: false,
             plugins: PluginState::default(),
             entry_source: None,
             entry_path: None,

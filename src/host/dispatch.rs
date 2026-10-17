@@ -202,6 +202,11 @@ pub enum HostFn {
     MetaGet = 193,
     ModuleSource = 194,
     ArtifactKind = 195,
+    ForeignInvoke = 196,
+    ForeignProbe = 197,
+    ForeignRegister = 198,
+    ForeignUnset = 199,
+    ForeignLoadConfig = 200,
 }
 
 
@@ -394,6 +399,11 @@ impl HostFn {
             193 => Self::MetaGet,
             194 => Self::ModuleSource,
             195 => Self::ArtifactKind,
+            196 => Self::ForeignInvoke,
+            197 => Self::ForeignProbe,
+            198 => Self::ForeignRegister,
+            199 => Self::ForeignUnset,
+            200 => Self::ForeignLoadConfig,
             _ => return None,
         })
     }
@@ -470,6 +480,11 @@ impl HostFn {
             "host_foreign_set_cmd" => Self::ForeignSetCmd,
             "host_foreign_run" => Self::ForeignRun,
             "host_foreign_run_lang" => Self::ForeignRunLang,
+            "host_foreign_invoke" | "foreign_invoke" => Self::ForeignInvoke,
+            "host_foreign_probe" | "foreign_probe" => Self::ForeignProbe,
+            "host_foreign_register" | "foreign_register" => Self::ForeignRegister,
+            "host_foreign_unset" | "foreign_unset" => Self::ForeignUnset,
+            "host_foreign_load_config" | "foreign_load_config" => Self::ForeignLoadConfig,
             "host_foreign_langs" => Self::ForeignLangs,
             "host_dotenv_load" | "load_dotenv" => Self::DotenvLoad,
             "host_http_request" | "http_request" => Self::HttpRequest,
@@ -666,6 +681,11 @@ impl HostFn {
             Self::ForeignSetCmd => "host_foreign_set_cmd",
             Self::ForeignRun => "host_foreign_run",
             Self::ForeignRunLang => "host_foreign_run_lang",
+            Self::ForeignInvoke => "host_foreign_invoke",
+            Self::ForeignProbe => "host_foreign_probe",
+            Self::ForeignRegister => "host_foreign_register",
+            Self::ForeignUnset => "host_foreign_unset",
+            Self::ForeignLoadConfig => "host_foreign_load_config",
             Self::ForeignLangs => "host_foreign_langs",
             Self::DotenvLoad => "host_dotenv_load",
             Self::HttpRequest => "host_http_request",
@@ -832,6 +852,9 @@ impl HostFn {
             Self::ForeignSetCmd => &["lang", "cmd"],
             Self::ForeignRun => &["code"],
             Self::ForeignRunLang => &["lang", "source"],
+            Self::ForeignInvoke => &[],
+            Self::ForeignProbe | Self::ForeignLoadConfig => &[],
+            Self::ForeignRegister | Self::ForeignUnset => &["lang"],
             Self::ForeignLangs => &[],
             Self::PluginLoad => &["path"],
             Self::PluginUnload | Self::PluginList => &[],
@@ -935,7 +958,35 @@ impl HostFn {
             Self::PlotPoints => &["path", "grid"],
             Self::PlotConic => &["b", "h", "k", "path", "grid"],
             Self::ForeignSetCmd => &["args"],
-            Self::ForeignRun | Self::ForeignRunLang => &["stdin"],
+            Self::ForeignRun | Self::ForeignRunLang => {
+                &["stdin", "env", "cwd", "timeout", "args", "max_output"]
+            }
+            Self::ForeignInvoke => &[
+                "code",
+                "lang",
+                "source",
+                "stdin",
+                "input",
+                "env",
+                "cwd",
+                "timeout",
+                "args",
+                "output",
+                "max_output",
+                "cmd",
+                "keep",
+            ],
+            Self::ForeignProbe => &["lang"],
+            Self::ForeignRegister => &[
+                "cmd",
+                "args",
+                "template",
+                "ext",
+                "env",
+                "version_args",
+            ],
+            Self::ForeignUnset => &[],
+            Self::ForeignLoadConfig => &["path"],
             Self::WritebackRecord | Self::WritebackGet | Self::WritebackClear => {
                 &["at_end", "key", "line"]
             }
@@ -1184,7 +1235,12 @@ pub fn call_host(
         HostFn::ForeignRun => {
             #[cfg(feature = "exec-host")]
             {
-                foreign::run(ctx, require(bound, "code")?, bound.get("stdin"))
+                foreign::run_with_options(
+                    ctx,
+                    require(bound, "code")?,
+                    bound.get("stdin"),
+                    bound,
+                )
             }
             #[cfg(not(feature = "exec-host"))]
             {
@@ -1195,12 +1251,94 @@ pub fn call_host(
         HostFn::ForeignRunLang => {
             #[cfg(feature = "exec-host")]
             {
-                foreign::run_lang(
+                foreign::run_lang_with_options(
                     ctx,
                     require(bound, "lang")?,
                     require(bound, "source")?,
                     bound.get("stdin"),
+                    bound,
                 )
+            }
+            #[cfg(not(feature = "exec-host"))]
+            {
+                let _ = (ctx, bound);
+                Err("foreign unavailable in browser wasm".into())
+            }
+        }
+        HostFn::ForeignInvoke => {
+            #[cfg(feature = "exec-host")]
+            {
+                foreign::invoke(
+                    ctx,
+                    foreign::InvokeArgs {
+                        code: bound.get("code"),
+                        lang: bound.get("lang"),
+                        source: bound.get("source"),
+                        stdin: bound.get("stdin"),
+                        input: bound.get("input"),
+                        env: bound.get("env"),
+                        cwd: bound.get("cwd"),
+                        timeout: bound.get("timeout"),
+                        args: bound.get("args"),
+                        output: bound.get("output"),
+                        max_output: bound.get("max_output"),
+                        cmd: bound.get("cmd"),
+                        keep: bound.get("keep"),
+                    },
+                )
+            }
+            #[cfg(not(feature = "exec-host"))]
+            {
+                let _ = (ctx, bound);
+                Err("foreign unavailable in browser wasm".into())
+            }
+        }
+        HostFn::ForeignProbe => {
+            #[cfg(feature = "exec-host")]
+            {
+                foreign::probe(ctx, bound.get("lang"))
+            }
+            #[cfg(not(feature = "exec-host"))]
+            {
+                let _ = (ctx, bound);
+                Err("foreign unavailable in browser wasm".into())
+            }
+        }
+        HostFn::ForeignRegister => {
+            #[cfg(feature = "exec-host")]
+            {
+                foreign::register(
+                    ctx,
+                    require(bound, "lang")?,
+                    bound.get("cmd"),
+                    bound.get("args"),
+                    bound.get("template"),
+                    bound.get("ext"),
+                    bound.get("env"),
+                    bound.get("version_args"),
+                )
+            }
+            #[cfg(not(feature = "exec-host"))]
+            {
+                let _ = (ctx, bound);
+                Err("foreign unavailable in browser wasm".into())
+            }
+        }
+        HostFn::ForeignUnset => {
+            #[cfg(feature = "exec-host")]
+            {
+                foreign::unset(ctx, require(bound, "lang")?)
+            }
+            #[cfg(not(feature = "exec-host"))]
+            {
+                let _ = (ctx, bound);
+                Err("foreign unavailable in browser wasm".into())
+            }
+        }
+        HostFn::ForeignLoadConfig => {
+            #[cfg(feature = "exec-host")]
+            {
+                foreign::load_config(ctx, bound.get("path"))
             }
             #[cfg(not(feature = "exec-host"))]
             {

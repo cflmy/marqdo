@@ -1,30 +1,49 @@
 //! Foreign / code-block helpers (外联).
 
-/// Default interpreter argv for a language tag (before env / set_cmd).
-pub fn default_argv(lang: &str) -> Option<Vec<String>> {
-    match lang.to_ascii_lowercase().as_str() {
-        "python" | "python3" | "py" => Some(default_python_argv()),
-        "javascript" | "js" | "node" => Some(vec!["node".into()]),
-        _ => None,
-    }
-}
+pub mod registry;
 
-pub fn default_python_argv() -> Vec<String> {
-    #[cfg(windows)]
-    {
-        vec!["python".into()]
-    }
-    #[cfg(not(windows))]
-    {
-        vec!["python3".into()]
-    }
-}
+pub use registry::{default_argv, default_cmd_display, default_python_argv};
 
-/// Placeholder shown in the view command box.
-pub fn default_cmd_display(lang: &str) -> String {
-    default_argv(lang)
-        .map(|a| a.join(" "))
-        .unwrap_or_else(|| lang.to_string())
+/// Shell-like split: whitespace, single/double quotes, backslash escapes.
+pub fn split_cmd_line(s: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    let mut cur = String::new();
+    let mut quote: Option<char> = None;
+    let mut chars = s.chars().peekable();
+    while let Some(c) = chars.next() {
+        match quote {
+            Some(q) => {
+                if c == q {
+                    quote = None;
+                } else if c == '\\' && q == '"' {
+                    if let Some(n) = chars.next() {
+                        cur.push(n);
+                    }
+                } else {
+                    cur.push(c);
+                }
+            }
+            None => {
+                if c.is_whitespace() {
+                    if !cur.is_empty() {
+                        out.push(std::mem::take(&mut cur));
+                    }
+                } else if c == '\'' || c == '"' {
+                    quote = Some(c);
+                } else if c == '\\' {
+                    if let Some(n) = chars.next() {
+                        cur.push(n);
+                    }
+                } else {
+                    cur.push(c);
+                }
+            }
+        }
+    }
+    if !cur.is_empty() {
+        out.push(cur);
+    }
+    out
 }
 
 /// Parse ```lang … opener → language id (first token).

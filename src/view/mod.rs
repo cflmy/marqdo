@@ -595,6 +595,8 @@ fn api_foreign_run(root: &ViewRoot, mut request: Request) -> Result<()> {
         .and_then(|x| x.as_str())
         .unwrap_or("python");
     let source = v.get("source").and_then(|x| x.as_str()).unwrap_or("");
+    let stdin = v.get("stdin").and_then(|x| x.as_str());
+    let timeout = v.get("timeout").and_then(|x| x.as_f64());
     let cmd = v
         .get("cmd")
         .and_then(|x| x.as_str())
@@ -603,13 +605,18 @@ fn api_foreign_run(root: &ViewRoot, mut request: Request) -> Result<()> {
     let json = if source.is_empty() {
         serde_json::json!({ "ok": false, "error": "missing source" }).to_string()
     } else {
-        match crate::host::foreign::run_with_cmd_override(
+        match crate::host::foreign::invoke_for_view(
             &root.root,
             lang,
             source,
             cmd,
+            stdin,
+            timeout,
         ) {
-            Ok(stdout) => serde_json::json!({ "ok": true, "stdout": stdout }).to_string(),
+            Ok(value) => match crate::host::json::value_to_json(&value) {
+                Ok(j) => j.to_string(),
+                Err(e) => serde_json::json!({ "ok": false, "error": e }).to_string(),
+            },
             Err(error) => serde_json::json!({ "ok": false, "error": error }).to_string(),
         }
     };
