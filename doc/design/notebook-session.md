@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| 状态 | **D1–D2 首版已实现；D3/D4 部分** |
+| 状态 | **D1–D3 首版已实现；D4/D5 待做** |
 | 日期 | 2026-10-17 |
 | 层 | Runtime + Document（view 服务端 / notebook 交互） |
 | 相关 | [notebook-syntax.md](notebook-syntax.md) · [foreign-kernel.md](foreign-kernel.md) · [foreign-notebook-decisions.md](../research/foreign-notebook-decisions.md) · [view.md](view.md) · [view-debug.md](view-debug.md) · [stdlib-subtask.md](stdlib-subtask.md) |
