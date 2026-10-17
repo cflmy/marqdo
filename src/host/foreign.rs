@@ -3,17 +3,19 @@
 //! F0: safe one-shot execution + structured `invoke` records.
 //! Later phases add language registry, JSON bridge, parallel fan-out and sessions.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::io::{Read, Write};
+use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
+use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use crate::foreign::registry::{self, LangSpec};
 use crate::foreign::split_cmd_line;
 use crate::host::json::{json_to_value, value_to_json};
-use crate::host::HostContext;
+use crate::host::{HostCaps, HostContext};
 use crate::value::{CodeBlock, Value};
 
 const DEFAULT_TIMEOUT_SECS: f64 = 10.0;
@@ -581,9 +583,13 @@ fn bound_job(
 }
 
 /// Structured one-shot execution. Never errors for process failures; only bad args/policy.
-pub fn invoke(ctx: &mut HostContext, args: InvokeArgs<'_>) -> Result<Value, String> {
-    ensure_config(ctx);
-    let (lang, source) = resolve_invoke_source(&args)?;
+struct PreparedInvoke {
+    job: Job,
+    output: String,
+}
+
+fn prepare_invoke(args: &InvokeArgs<'_>) -> Result<PreparedInvoke, String> {
+    let (lang, source) = resolve_invoke_source(args)?;
     let stdin = opt_text(args.stdin)?;
     let input_json = match args.input {
         None | Some(Value::None) => None,
@@ -612,9 +618,36 @@ pub fn invoke(ctx: &mut HostContext, args: InvokeArgs<'_>) -> Result<Value, Stri
     job.max_output = parse_max_output(args.max_output)?;
     job.cmd_override = opt_text(args.cmd)?;
     job.keep = parse_bool(args.keep, "keep", false)?;
-    let exec = execute_job(ctx, &job)?;
-    let (result, result_error) = parse_output(&exec.stdout, &output);
+    Ok(PreparedInvoke { job, output })
+}
+
+pub fn invoke(ctx: &mut HostContext, args: InvokeArgs<'_>) -> Result<Value, String> {
+    ensure_config(ctx);
+    let prepared = prepare_invoke(&args)?;
+    let exec = execute_job(ctx, &prepared.job)?;
+    let (result, result_error) = parse_output(&exec.stdout, &prepared.output);
     Ok(exec.record(result, result_error))
+}
+
+/// JSON-in / JSON-out convenience: raises on process failure or invalid JSON.
+pub fn call(ctx: &mut HostContext, args: InvokeArgs<'_>) -> Result<Value, String> {
+    ensure_config(ctx);
+    let mut prepared = prepare_invoke(&args)?;
+    prepared.output = "json".into();
+    let exec = execute_job(ctx, &prepared.job)?;
+    if !exec.ok {
+        return Err(format_failure(&exec));
+    }
+    if exec.stdout.trim().is_empty() {
+        return Ok(Value::None);
+    }
+    match serde_json::from_str::<serde_json::Value>(&exec.stdout) {
+        Ok(j) => json_to_value(&j),
+        Err(e) => Err(format!(
+            "foreign call: stdout is not JSON: {e}; stdout: {}",
+            tail(exec.stdout.trim(), 512)
+        )),
+    }
 }
 
 fn present(v: Option<&Value>) -> Option<&Value> {
@@ -622,6 +655,273 @@ fn present(v: Option<&Value>) -> Option<&Value> {
         None | Some(Value::None) => None,
         Some(x) => Some(x),
     }
+}
+
+#[derive(Clone)]
+struct ForeignEnv {
+    cwd: PathBuf,
+    fs_root: Option<PathBuf>,
+    entry_path: Option<PathBuf>,
+    caps: HostCaps,
+    foreign_cmds: HashMap<String, Vec<String>>,
+    foreign_specs: HashMap<String, LangSpec>,
+    foreign_config_specs: HashMap<String, LangSpec>,
+    foreign_config_loaded: bool,
+    sandbox_session: Option<String>,
+}
+
+impl ForeignEnv {
+    fn from_ctx(ctx: &HostContext) -> Self {
+        Self {
+            cwd: ctx.cwd.clone(),
+            fs_root: ctx.fs_root.clone(),
+            entry_path: ctx.entry_path.clone(),
+            caps: ctx.caps.clone(),
+            foreign_cmds: ctx.foreign_cmds.clone(),
+            foreign_specs: ctx.foreign_specs.clone(),
+            foreign_config_specs: ctx.foreign_config_specs.clone(),
+            foreign_config_loaded: ctx.foreign_config_loaded,
+            sandbox_session: ctx.sandbox_session.clone(),
+        }
+    }
+
+    fn to_ctx(&self) -> HostContext {
+        let mut c = HostContext::default();
+        c.cwd = self.cwd.clone();
+        c.fs_root = self.fs_root.clone();
+        c.entry_path = self.entry_path.clone();
+        c.caps = self.caps.clone();
+        c.foreign_cmds = self.foreign_cmds.clone();
+        c.foreign_specs = self.foreign_specs.clone();
+        c.foreign_config_specs = self.foreign_config_specs.clone();
+        c.foreign_config_loaded = self.foreign_config_loaded;
+        c.sandbox_session = self.sandbox_session.clone();
+        c
+    }
+}
+
+struct PreparedMany {
+    idx: usize,
+    job: Job,
+    output: String,
+}
+
+fn parse_concurrency(v: Option<&Value>) -> Result<usize, String> {
+    let n = match v {
+        None | Some(Value::None) => 4,
+        Some(Value::Int(n)) if *n >= 0 => *n as usize,
+        Some(_) => return Err("concurrency must be a non-negative integer".into()),
+    };
+    Ok(n.min(32))
+}
+
+fn map_get<'a>(m: &'a Value, key: &str) -> Option<&'a Value> {
+    match m {
+        Value::Map(entries) => entries
+            .iter()
+            .find(|(k, _)| k == key)
+            .map(|(_, v)| v)
+            .filter(|v| !matches!(v, Value::None)),
+        _ => None,
+    }
+}
+
+fn args_from_map<'a>(m: &'a Value) -> InvokeArgs<'a> {
+    InvokeArgs {
+        code: map_get(m, "code"),
+        lang: map_get(m, "lang"),
+        source: map_get(m, "source"),
+        stdin: map_get(m, "stdin"),
+        input: map_get(m, "input"),
+        env: map_get(m, "env"),
+        cwd: map_get(m, "cwd"),
+        timeout: map_get(m, "timeout"),
+        args: map_get(m, "args"),
+        output: map_get(m, "output"),
+        max_output: map_get(m, "max_output"),
+        cmd: map_get(m, "cmd"),
+        keep: map_get(m, "keep"),
+    }
+}
+
+fn error_record(ctx: &HostContext, job: &Job, error: String) -> Value {
+    Execution {
+        ok: false,
+        code: -1,
+        stdout: String::new(),
+        stderr: String::new(),
+        ms: 0,
+        timed_out: false,
+        truncated: false,
+        error,
+        lang: job.lang.clone(),
+        cmd: display_for_job(ctx, job, None),
+        script: String::new(),
+    }
+    .record(Value::None, String::new())
+}
+
+fn run_prepared(env: &ForeignEnv, items: Vec<PreparedMany>, concurrency: usize) -> Vec<(usize, Value)> {
+    if items.is_empty() {
+        return Vec::new();
+    }
+    let workers = concurrency.max(1).min(items.len());
+    let queue = Arc::new(Mutex::new(VecDeque::from(items)));
+    let results: Arc<Mutex<Vec<(usize, Value)>>> = Arc::new(Mutex::new(Vec::new()));
+    thread::scope(|scope| {
+        for _ in 0..workers {
+            let queue = Arc::clone(&queue);
+            let results = Arc::clone(&results);
+            let env = env.clone();
+            scope.spawn(move || loop {
+                let item = {
+                    let mut q = match queue.lock() {
+                        Ok(q) => q,
+                        Err(_) => break,
+                    };
+                    q.pop_front()
+                };
+                let Some(item) = item else { break };
+                let ctx = env.to_ctx();
+                let value = match catch_unwind(AssertUnwindSafe(|| {
+                    execute_job(&ctx, &item.job)
+                })) {
+                    Ok(Ok(exec)) => {
+                        let (result, result_error) = parse_output(&exec.stdout, &item.output);
+                        exec.record(result, result_error)
+                    }
+                    Ok(Err(e)) => error_record(&ctx, &item.job, e),
+                    Err(_) => error_record(&ctx, &item.job, "foreign worker panicked".into()),
+                };
+                if let Ok(mut out) = results.lock() {
+                    out.push((item.idx, value));
+                }
+            });
+        }
+    });
+    let mut out = match Arc::try_unwrap(results) {
+        Ok(m) => m.into_inner().unwrap_or_default(),
+        Err(shared) => shared.lock().map(|m| m.clone()).unwrap_or_default(),
+    };
+    out.sort_by_key(|(i, _)| *i);
+    out
+}
+
+/// Build a prepared job for one `runs` item (code value or option map).
+fn prepare_many_item(ctx: &HostContext, idx: usize, item: &Value) -> Result<PreparedMany, String> {
+    match item {
+        Value::Code(c) => Ok(PreparedMany {
+            idx,
+            job: Job::simple(&c.lang, &c.source, None),
+            output: "auto".into(),
+        }),
+        Value::Map(_) => {
+            let args = args_from_map(item);
+            let prepared = prepare_invoke(&args)?;
+            let _ = ctx;
+            Ok(PreparedMany {
+                idx,
+                job: prepared.job,
+                output: prepared.output,
+            })
+        }
+        _ => Err(format!(
+            "runs[{idx}] must be a code value or a map of invoke options"
+        )),
+    }
+}
+
+pub fn run_many(
+    ctx: &mut HostContext,
+    runs: &Value,
+    concurrency: Option<&Value>,
+) -> Result<Value, String> {
+    ensure_config(ctx);
+    if !ctx.allow_exec() {
+        return Err("foreign run_many denied by host policy".into());
+    }
+    let list = match runs {
+        Value::List(xs) => xs,
+        _ => return Err("run_many runs must be a list".into()),
+    };
+    let mut prepared = Vec::with_capacity(list.len());
+    for (idx, item) in list.iter().enumerate() {
+        prepared.push(prepare_many_item(ctx, idx, item)?);
+    }
+    let n = prepared.len();
+    let requested = parse_concurrency(concurrency)?;
+    let concurrency = if requested == 0 {
+        n.min(8)
+    } else {
+        requested
+    };
+    let env = ForeignEnv::from_ctx(ctx);
+    let results = run_prepared(&env, prepared, concurrency);
+    Ok(Value::List(results.into_iter().map(|(_, v)| v).collect()))
+}
+
+pub fn call_many(
+    ctx: &mut HostContext,
+    args: InvokeArgs<'_>,
+    inputs: &Value,
+    concurrency: Option<&Value>,
+) -> Result<Value, String> {
+    ensure_config(ctx);
+    if !ctx.allow_exec() {
+        return Err("foreign call_many denied by host policy".into());
+    }
+    let list = match inputs {
+        Value::List(xs) => xs,
+        _ => return Err("call_many inputs must be a list".into()),
+    };
+    let base = prepare_invoke(&args)?;
+    let n = list.len();
+    let requested = parse_concurrency(concurrency)?;
+    let concurrency = if requested == 0 {
+        n.min(8)
+    } else {
+        requested
+    };
+    let mut prepared = Vec::with_capacity(n);
+    for (idx, input) in list.iter().enumerate() {
+        let json = serde_json::to_string(&value_to_json(input)?)
+            .map_err(|e| format!("call_many input JSON encode: {e}"))?;
+        let mut job = base.job.clone();
+        job.stdin = Some(json.clone());
+        job.input_json = Some(json);
+        prepared.push(PreparedMany {
+            idx,
+            job,
+            output: "json".into(),
+        });
+    }
+    let env = ForeignEnv::from_ctx(ctx);
+    let records = run_prepared(&env, prepared, concurrency);
+    let mut results = Vec::with_capacity(records.len());
+    let mut errors = Vec::new();
+    for (idx, record) in records {
+        let ok = matches!(map_get(&record, "ok"), Some(Value::Bool(true)));
+        let result_error = map_get(&record, "result_error")
+            .and_then(|v| v.reveal_text())
+            .unwrap_or("");
+        if !ok {
+            let err = map_get(&record, "error")
+                .and_then(|v| v.reveal_text())
+                .or_else(|| map_get(&record, "stderr").and_then(|v| v.reveal_text()))
+                .unwrap_or("foreign call failed");
+            errors.push(format!("call_many[{idx}]: {err}"));
+            continue;
+        }
+        if !result_error.is_empty() {
+            errors.push(format!("call_many[{idx}]: {result_error}"));
+            continue;
+        }
+        results.push(map_get(&record, "result").cloned().unwrap_or(Value::None));
+    }
+    if !errors.is_empty() {
+        return Err(errors.join("; "));
+    }
+    Ok(Value::List(results))
 }
 
 fn resolve_invoke_source(args: &InvokeArgs<'_>) -> Result<(String, String), String> {
@@ -1624,5 +1924,43 @@ mod tests {
         let (text, truncated) = read_capped(Some(std::io::Cursor::new(data)), 4);
         assert_eq!(text, "0123");
         assert!(truncated);
+    }
+
+    fn node_available() -> bool {
+        Command::new("node")
+            .args(["-e", "process.exit(0)"])
+            .output()
+            .map(|o| o.status.success())
+            .unwrap_or(false)
+    }
+
+    #[test]
+    fn run_many_keeps_order_and_isolates_failures() {
+        if !node_available() {
+            return;
+        }
+        let mut ctx = HostContext::default();
+        let runs = Value::List(vec![
+            Value::Code(CodeBlock {
+                lang: "node".into(),
+                source: "console.log('a')".into(),
+            }),
+            Value::Code(CodeBlock {
+                lang: "node".into(),
+                source: "process.exit(2)".into(),
+            }),
+            Value::Code(CodeBlock {
+                lang: "node".into(),
+                source: "console.log('c')".into(),
+            }),
+        ]);
+        let out = run_many(&mut ctx, &runs, Some(&Value::Int(2))).unwrap();
+        let Value::List(records) = out else {
+            panic!("expected list");
+        };
+        assert_eq!(records.len(), 3);
+        assert_eq!(map_get(&records[0], "stdout").and_then(|v| v.reveal_text()), Some("a\n"));
+        assert_eq!(map_get(&records[1], "ok"), Some(&Value::Bool(false)));
+        assert_eq!(map_get(&records[2], "stdout").and_then(|v| v.reveal_text()), Some("c\n"));
     }
 }

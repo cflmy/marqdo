@@ -105,6 +105,49 @@ tables read.
 
 *> host_foreign_load_config path=`path`*
 
+## call
+    + `code`=None
+    + `lang`=None
+    + `source`=None
+    + `input`=None
+    + `stdin`=None
+    + `env`=None
+    + `cwd`=None
+    + `timeout`=None
+    + `args`=None
+
+JSON-in / JSON-out call: encode `input` on stdin, parse stdout JSON and return
+the value (empty stdout -> None). Raises on process failure or invalid JSON.
+
+*> host_foreign_call code=`code` lang=`lang` source=`source` input=`input` stdin=`stdin` env=`env` cwd=`cwd` timeout=`timeout` args=`args`*
+
+## run_many
+    + `runs`
+    + `concurrency`=4
+
+Run a list of code values or invoke-option maps in parallel; returns records in
+input order. One failing item does not stop the others.
+
+*> host_foreign_run_many runs=`runs` concurrency=`concurrency`*
+
+## call_many
+    + `inputs`
+    + `code`=None
+    + `lang`=None
+    + `source`=None
+    + `cmd`=None
+    + `env`=None
+    + `cwd`=None
+    + `timeout`=None
+    + `args`=None
+    + `max_output`=None
+    + `concurrency`=4
+
+Apply one code/function to each input in parallel; returns parsed JSON results
+in input order. Raises with the failing index after all workers finish.
+
+*> host_foreign_call_many inputs=`inputs` code=`code` lang=`lang` source=`source` cmd=`cmd` env=`env` cwd=`cwd` timeout=`timeout` args=`args` max_output=`max_output` concurrency=`concurrency`*
+
 ## langs
 
 List configured foreign languages.

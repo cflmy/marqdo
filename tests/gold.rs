@@ -3344,6 +3344,18 @@ fn lib_foreign_json() {
 }
 
 #[test]
+fn lib_foreign_call() {
+    if !node_available() {
+        eprintln!("skip lib_foreign_call: no node on PATH");
+        return;
+    }
+    assert_out(
+        "tests/lib/foreign-call.mq.md",
+        "2\n[2, 4, 6, 8]",
+    );
+}
+
+#[test]
 fn lib_foreign_env_timeout() {
     if !node_available() {
         eprintln!("skip lib_foreign_env_timeout: no node on PATH");

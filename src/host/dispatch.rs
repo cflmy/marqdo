@@ -207,6 +207,9 @@ pub enum HostFn {
     ForeignRegister = 198,
     ForeignUnset = 199,
     ForeignLoadConfig = 200,
+    ForeignCall = 201,
+    ForeignRunMany = 202,
+    ForeignCallMany = 203,
 }
 
 
@@ -404,6 +407,9 @@ impl HostFn {
             198 => Self::ForeignRegister,
             199 => Self::ForeignUnset,
             200 => Self::ForeignLoadConfig,
+            201 => Self::ForeignCall,
+            202 => Self::ForeignRunMany,
+            203 => Self::ForeignCallMany,
             _ => return None,
         })
     }
@@ -485,6 +491,9 @@ impl HostFn {
             "host_foreign_register" | "foreign_register" => Self::ForeignRegister,
             "host_foreign_unset" | "foreign_unset" => Self::ForeignUnset,
             "host_foreign_load_config" | "foreign_load_config" => Self::ForeignLoadConfig,
+            "host_foreign_call" | "foreign_call" => Self::ForeignCall,
+            "host_foreign_run_many" | "foreign_run_many" => Self::ForeignRunMany,
+            "host_foreign_call_many" | "foreign_call_many" => Self::ForeignCallMany,
             "host_foreign_langs" => Self::ForeignLangs,
             "host_dotenv_load" | "load_dotenv" => Self::DotenvLoad,
             "host_http_request" | "http_request" => Self::HttpRequest,
@@ -686,6 +695,9 @@ impl HostFn {
             Self::ForeignRegister => "host_foreign_register",
             Self::ForeignUnset => "host_foreign_unset",
             Self::ForeignLoadConfig => "host_foreign_load_config",
+            Self::ForeignCall => "host_foreign_call",
+            Self::ForeignRunMany => "host_foreign_run_many",
+            Self::ForeignCallMany => "host_foreign_call_many",
             Self::ForeignLangs => "host_foreign_langs",
             Self::DotenvLoad => "host_dotenv_load",
             Self::HttpRequest => "host_http_request",
@@ -852,9 +864,11 @@ impl HostFn {
             Self::ForeignSetCmd => &["lang", "cmd"],
             Self::ForeignRun => &["code"],
             Self::ForeignRunLang => &["lang", "source"],
-            Self::ForeignInvoke => &[],
+            Self::ForeignInvoke | Self::ForeignCall => &[],
             Self::ForeignProbe | Self::ForeignLoadConfig => &[],
             Self::ForeignRegister | Self::ForeignUnset => &["lang"],
+            Self::ForeignRunMany => &["runs"],
+            Self::ForeignCallMany => &["inputs"],
             Self::ForeignLangs => &[],
             Self::PluginLoad => &["path"],
             Self::PluginUnload | Self::PluginList => &[],
@@ -987,6 +1001,22 @@ impl HostFn {
             ],
             Self::ForeignUnset => &[],
             Self::ForeignLoadConfig => &["path"],
+            Self::ForeignCall => &[
+                "code", "lang", "source", "input", "stdin", "env", "cwd", "timeout", "args",
+            ],
+            Self::ForeignRunMany => &["concurrency"],
+            Self::ForeignCallMany => &[
+                "code",
+                "lang",
+                "source",
+                "cmd",
+                "env",
+                "cwd",
+                "timeout",
+                "args",
+                "max_output",
+                "concurrency",
+            ],
             Self::WritebackRecord | Self::WritebackGet | Self::WritebackClear => {
                 &["at_end", "key", "line"]
             }
@@ -1339,6 +1369,79 @@ pub fn call_host(
             #[cfg(feature = "exec-host")]
             {
                 foreign::load_config(ctx, bound.get("path"))
+            }
+            #[cfg(not(feature = "exec-host"))]
+            {
+                let _ = (ctx, bound);
+                Err("foreign unavailable in browser wasm".into())
+            }
+        }
+        HostFn::ForeignCall => {
+            #[cfg(feature = "exec-host")]
+            {
+                foreign::call(
+                    ctx,
+                    foreign::InvokeArgs {
+                        code: bound.get("code"),
+                        lang: bound.get("lang"),
+                        source: bound.get("source"),
+                        stdin: bound.get("stdin"),
+                        input: bound.get("input"),
+                        env: bound.get("env"),
+                        cwd: bound.get("cwd"),
+                        timeout: bound.get("timeout"),
+                        args: bound.get("args"),
+                        output: None,
+                        max_output: None,
+                        cmd: None,
+                        keep: None,
+                    },
+                )
+            }
+            #[cfg(not(feature = "exec-host"))]
+            {
+                let _ = (ctx, bound);
+                Err("foreign unavailable in browser wasm".into())
+            }
+        }
+        HostFn::ForeignRunMany => {
+            #[cfg(feature = "exec-host")]
+            {
+                foreign::run_many(
+                    ctx,
+                    require(bound, "runs")?,
+                    bound.get("concurrency"),
+                )
+            }
+            #[cfg(not(feature = "exec-host"))]
+            {
+                let _ = (ctx, bound);
+                Err("foreign unavailable in browser wasm".into())
+            }
+        }
+        HostFn::ForeignCallMany => {
+            #[cfg(feature = "exec-host")]
+            {
+                foreign::call_many(
+                    ctx,
+                    foreign::InvokeArgs {
+                        code: bound.get("code"),
+                        lang: bound.get("lang"),
+                        source: bound.get("source"),
+                        stdin: None,
+                        input: None,
+                        env: bound.get("env"),
+                        cwd: bound.get("cwd"),
+                        timeout: bound.get("timeout"),
+                        args: bound.get("args"),
+                        output: None,
+                        max_output: bound.get("max_output"),
+                        cmd: bound.get("cmd"),
+                        keep: None,
+                    },
+                    require(bound, "inputs")?,
+                    bound.get("concurrency"),
+                )
             }
             #[cfg(not(feature = "exec-host"))]
             {
