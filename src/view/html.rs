@@ -2881,7 +2881,7 @@ body.notebook-page {
   --nb-surface-3: #333333;
   --nb-border: #3c3c3c;
   --nb-border-soft: #2a2a2a;
-  --nb-text: #d4d4d4;
+  --nb-text: #f0f0f0;
   --nb-strong: #f0f0f0;
   --nb-muted: #9d9d9d;
   --nb-accent: #0e639c;
@@ -2897,6 +2897,20 @@ body.notebook-page {
   --nb-error-bg: #2a0f12;
   --nb-error-border: #5a1d1d;
   --nb-radius: 6px;
+  /* Map every legacy view token onto the active theme. This fixes the
+     document surface and annotation chips without duplicating rules. */
+  --bg: var(--nb-bg);
+  --surface: var(--nb-surface);
+  --ink: var(--nb-text);
+  --muted: var(--nb-muted);
+  --line: var(--nb-border);
+  --line-strong: var(--nb-strong);
+  --fill: var(--nb-surface-2);
+  --hover: var(--nb-surface-3);
+  --focus: var(--nb-accent);
+  --fail-bg: var(--nb-error-bg);
+  --ok-bg: var(--nb-surface);
+  --radius: var(--nb-radius);
   background: var(--nb-bg);
   color: var(--nb-text);
 }
@@ -3192,6 +3206,13 @@ body.notebook-page .doc-table th {
 body.notebook-page .doc-table td { color: var(--nb-text); }
 
 /* ── Code cell ─────────────────────────────────────────────────────── */
+body.notebook-page .annot-chip:hover,
+body.notebook-page .annot-chip.is-focus {
+  background: var(--nb-surface-3);
+}
+body.notebook-page .mq-anchor.is-focus {
+  background: rgba(255,255,255,.08);
+}
 body.notebook-page .code-card {
   display: flex;
   flex-direction: column;
