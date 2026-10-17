@@ -203,6 +203,16 @@ Install: `marqdo ext add quantum` (ZH id: `量子`). Build: `cargo build --relea
 
 Design: [ext-quantum.md](../../doc/design/ext-quantum.md) · Q7: [ext-quantum-q7.md](../../doc/design/ext-quantum-q7.md) · Q8 viz: [ext-quantum-viz-style.md](../../doc/design/ext-quantum-viz-style.md) · examples: [quantum-bell](../../examples/quantum-bell/) · [quantum-entanglement](../../examples/quantum-entanglement/).
 
+## Foreign kernels (v1.5.0)
+
+`lib/foreign` is now a full foreign-kernel surface, not only `run`:
+
+- `invoke` returns a record (`ok`, `code`, `stdout`, `stderr`, `ms`, `timed_out`, `truncated`, `result`); pass `input` for JSON stdin and `output="json"` for a parsed result.
+- `call` is JSON-in / JSON-out; `call_many` fans out one program over a list with ordered results.
+- `session_open` starts a persistent Python/Node kernel; `session_eval` evaluates source; `session_set` / `session_get` bridge values explicitly as JSON. Close it with `session_close`.
+- A notebook is still a document: bind `内核表` and `会话表` as ordinary tables inside `# main`. A `view` session adds cell stepping, Run All, kernel switching, journal and reload. No new Markdown marker exists.
+- The same source remains the authority; state crossing kernels is explicit, never implicitly mirrored.
+
 ## AI authoring workflow
 
 1. Decide language surface (English builtins + `lib/text.mq.md`, or Chinese + `lib/文本.mq.md`).

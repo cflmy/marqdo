@@ -126,6 +126,9 @@ jobs:
             ## Marqdo ${{ github.ref_name }}
 
             ### 亮点 / Highlights
+            - **v1.5.0**：外联 v2 + 文档原生 Notebook——invoke/JSON call/并行/持久 Python·Node/状态桥 · cell 单步 · 高对比 view
+            - **v1.5.0**: Foreign v2 + document-native notebooks — invoke, JSON calls, fan-out, persistent Python/Node, state bridge, cell stepping, high-contrast view
+            - **v1.5.0 ext**：扩展包同步 1.5.0 / Ext pack 1.5.0
             - **v1.4.6**：裸自增升参——首次粗体赋值左值即声明；`n = n + 1` 无反引号也是必选形参
             - **v1.4.6**: Bare self-increment is a required parameter — first bold assignment LHS is a declaration
             - **v1.4.5**：Streamable HTTP MCP + web invoke Bearer/401 · openai/agent json.get 硬化

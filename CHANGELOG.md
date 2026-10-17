@@ -4,6 +4,24 @@
 
 ### Added
 
+### Fixed
+
+### Changed
+
+## v1.5.0 — 2026-10-18
+
+### Highlights
+
+**外联 v2 / 文档原生 Notebook**：`lib/foreign` 从“运行一段代码”升级为完整外联内核：结构化 `invoke` 记录、JSON 进出的 `call` / `call_many`、并行扇出、Python/Node 持久内核、显式状态桥，以及用绑定表声明的 Notebook 单元。`view` 增加 cell 单步、Run All、内核切换、journal、状态面板、浅/深主题与可调高度代码区；高对比度 token 修复了代码和 STRUCTURE 文字与背景区分度不足的问题。CLI · wasm · ext **1.5.0**。
+
+```bash
+git checkout v1.5.0 && cargo build --release
+```
+
+**核心表面 Δ（Core surface Δ）**：**无增删**——外联 v2 只扩展 `lib/foreign` 的库 API；Notebook 的 `内核表` / `会话表` 是既有绑定表；没有新增 Markdown 标记。
+
+### Added
+
 - **用户静态站（外联 / OKF / EKC）**：新增中英双语 `features/19-foreign-notebook` 与 `features/20-okf-ekc`，重写 `stdlib/foreign`，首页加入「一份文件三个面」、外联 Python 运行、Notebook 表、OKF/EKC 与 preflight 说明。
 - **`lib/foreign` F0/F1**：`invoke` 结构化记录（`ok`/`code`/`stdout`/`stderr`/`ms`/`timed_out`/`truncated`/`result`）；`run`/`run_lang` 新增 `env`/`cwd`/`timeout`/`args`/`max_output`；15 个语言预设；`probe`/`register`/`unset`/`load_config`；`.marqdo/foreign.toml`。
 - **`lib/foreign` F2**：JSON 进 / JSON 出 `call`；并行 `run_many` / `call_many`（有序、单项隔离、并发上限）；`invoke` 的 `input` / `output` / `result` / `result_error`。
