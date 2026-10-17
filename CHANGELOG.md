@@ -13,6 +13,7 @@
 
 ### Fixed
 
+- **view 代码对比度**：移除会互相覆盖的 highlight.js 深/浅两套外链样式，改用内置高对比 token 变量；深色代码正文 `#f0f0f0` on `#1e1e1e`（14.6:1），浅色 `#24292f` on `#f6f8fa`（13.8:1）；关键词/字符串/注释均使用可读的对比色。
 - **view 反向代理兼容**：Notebook / Debug 的 API 与 Debug URL 改为相对路径，可在 `/marqdo-view/...` 路径前缀下工作，便于 Docker 内通过 DSH 同源预览。
 - **分支内共同局部变量**：if/else 各臂都赋值的局部变量不再被误提升为必选形参；修复 `# llm` 构造器无端要求 `key`，恢复 agent/llm/ext 全量测试。新增 `branch_else_common_local_is_not_a_param` 回归测试。
 - **外联临时脚本路径**：入口目录为相对路径时，脚本参数现在使用绝对路径，避免 `tests/lib/tests/lib/...` 双拼接。

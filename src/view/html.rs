@@ -46,6 +46,15 @@ fn stylesheet() -> &'static str {
   --radius: 12px;
   --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  --syn-fg: #f0f0f0;
+  --syn-comment: #6a9955;
+  --syn-keyword: #569cd6;
+  --syn-string: #ce9178;
+  --syn-number: #b5cea8;
+  --syn-variable: #9cdcfe;
+  --syn-function: #dcdcaa;
+  --syn-type: #4ec9b0;
+  --syn-meta: #c586c0;
 }
 * { box-sizing: border-box; }
 html { scroll-behavior: smooth; }
@@ -1385,8 +1394,11 @@ ul.doc-loop, ol.doc-branch {
   margin: 0;
   padding: 0.85rem 1rem;
   overflow: auto;
+  resize: vertical;
+  min-height: 2.4rem;
+  max-height: 40rem;
   background: #1e1e1e;
-  color: #d4d4d4;
+  color: var(--syn-fg);
   font: 0.82rem/1.45 var(--mono);
   min-height: 2.4rem;
 }
@@ -1396,6 +1408,41 @@ ul.doc-loop, ol.doc-branch {
   padding: 0;
   color: inherit;
 }
+.code-body .hljs { color: var(--syn-fg); background: transparent; }
+.code-body .hljs-comment,
+.code-body .hljs-quote { color: var(--syn-comment); font-style: italic; }
+.code-body .hljs-keyword,
+.code-body .hljs-selector-tag,
+.code-body .hljs-literal,
+.code-body .hljs-section,
+.code-body .hljs-link,
+.code-body .hljs-doctag,
+.code-body .hljs-type,
+.code-body .hljs-tag,
+.code-body .hljs-name { color: var(--syn-keyword); }
+.code-body .hljs-string,
+.code-body .hljs-regexp,
+.code-body .hljs-addition,
+.code-body .hljs-meta .hljs-string { color: var(--syn-string); }
+.code-body .hljs-number,
+.code-body .hljs-symbol,
+.code-body .hljs-bullet { color: var(--syn-number); }
+.code-body .hljs-variable,
+.code-body .hljs-template-variable,
+.code-body .hljs-attr,
+.code-body .hljs-attribute,
+.code-body .hljs-selector-attr,
+.code-body .hljs-selector-pseudo { color: var(--syn-variable); }
+.code-body .hljs-title,
+.code-body .hljs-title.function_,
+.code-body .hljs-function .hljs-title { color: var(--syn-function); }
+.code-body .hljs-built_in,
+.code-body .hljs-title.class_ { color: var(--syn-type); }
+.code-body .hljs-meta,
+.code-body .hljs-meta .hljs-keyword { color: var(--syn-meta); }
+.code-body .hljs-deletion { color: var(--syn-string); }
+.code-body .hljs-emphasis { font-style: italic; }
+.code-body .hljs-strong { font-weight: 700; }
 .code-out {
   margin: 0;
   padding: 0.75rem 1rem;
@@ -1541,7 +1588,6 @@ pub fn layout(title: &str, nav: &str, main: &str) -> String {
 <link rel="shortcut icon" href="https://s3.cflmy.cn/logo/Logo.ico" type="image/x-icon"/>
 <link rel="apple-touch-icon" href="https://s3.cflmy.cn/logo/Logo.png"/>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" crossorigin="anonymous"/>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github-dark.min.css" crossorigin="anonymous"/>
 <style>{css}</style>
 </head>
 <body>
@@ -2825,8 +2871,7 @@ pub fn page_index(files: &[PathBuf], only: Option<&Path>, links: &LinkMode) -> S
 }
 
 fn notebook_ui() -> &'static str {
-    r#"<link id="nb-hljs-light" rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github.min.css" disabled/>
-<style>
+    r#"<style>
 /* ── VS Code / Jupyter notebook skin ───────────────────────────────── */
 body.notebook-page {
   color-scheme: dark;
@@ -2848,7 +2893,7 @@ body.notebook-page {
   --nb-on-accent: #ffffff;
   --nb-topbar: rgba(30,30,30,.94);
   --nb-code-bg: #1e1e1e;
-  --nb-code-text: #d4d4d4;
+  --nb-code-text: #f0f0f0;
   --nb-error-bg: #2a0f12;
   --nb-error-border: #5a1d1d;
   --nb-radius: 6px;
@@ -2865,7 +2910,7 @@ body.notebook-page[data-theme="light"] {
   --nb-border-soft: #e8e8eb;
   --nb-text: #24292f;
   --nb-strong: #111418;
-  --nb-muted: #6e7781;
+  --nb-muted: #57606a;
   --nb-accent: #0969da;
   --nb-accent-hover: #0550ae;
   --nb-success: #1a7f37;
@@ -2878,6 +2923,15 @@ body.notebook-page[data-theme="light"] {
   --nb-code-text: #24292f;
   --nb-error-bg: #fff5f5;
   --nb-error-border: #ffc1c1;
+  --syn-fg: #24292f;
+  --syn-comment: #57606a;
+  --syn-keyword: #0550ae;
+  --syn-string: #0a3069;
+  --syn-number: #0550ae;
+  --syn-variable: #953800;
+  --syn-function: #8250df;
+  --syn-type: #116329;
+  --syn-meta: #8250df;
 }
 body.notebook-page .panel-wrap { background: var(--nb-bg); }
 body.notebook-page main.panel {
@@ -3423,10 +3477,6 @@ body.notebook-page .stdin-form button {
   function applyTheme(theme) {
     theme = theme === "light" ? "light" : "dark";
     document.body.dataset.theme = theme;
-    var darkCss = document.querySelector('link[href*="github-dark.min.css"]');
-    var lightCss = document.getElementById("nb-hljs-light");
-    if (darkCss) darkCss.disabled = theme === "light";
-    if (lightCss) lightCss.disabled = theme !== "light";
     var btn = document.getElementById("nb-theme");
     if (btn) {
       btn.textContent = theme === "light" ? "深色" : "浅色";
