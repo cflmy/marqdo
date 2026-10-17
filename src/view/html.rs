@@ -3250,6 +3250,10 @@ body.notebook-page .code-body {
   font: 0.76rem/1.55 var(--mono);
   tab-size: 4;
 }
+body.notebook-page .code-body::-webkit-resizer,
+body.notebook-page .code-out::-webkit-resizer {
+  background: linear-gradient(135deg, transparent 0 48%, var(--nb-muted) 48% 100%);
+}
 body.notebook-page .code-body code {
   background: transparent;
   color: inherit;
@@ -3559,6 +3563,9 @@ body.notebook-page .stdin-form button {
         applyTheme(document.body.dataset.theme === "light" ? "dark" : "light");
       });
     }
+    document.querySelectorAll(".code-body, .code-out").forEach(function (el) {
+      el.title = "拖动右下角调整高度";
+    });
     document.querySelectorAll(".code-card").forEach(function (cardEl) {
       var head = cardEl.querySelector(".code-head");
       var foot = cardEl.querySelector(".code-foot");
