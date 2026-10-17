@@ -48,7 +48,13 @@
 | [roadmap/stdlib-mid.md](roadmap/stdlib-mid.md) | **Mid M1–M6 路线（done）** |
 | [roadmap/stdlib-mid2.md](roadmap/stdlib-mid2.md) | **Mid2 M7–M10 路线（规划）** |
 | [design/stdlib-math.md](design/stdlib-math.md) | **数学库（数值/随机/作图/轻量求解）** |
-| [design/stdlib-foreign.md](design/stdlib-foreign.md) | **外联胶水（\`\`\`lang 具名块）— 已落地** |
+| [design/stdlib-foreign.md](design/stdlib-foreign.md) | **外联胶水（\`\`\`lang 具名块）— v1 已落地** |
+| [design/foreign-kernel.md](design/foreign-kernel.md) | **外联内核：持久内核 / JSON 桥 / 状态桥 / 安全** |
+| [design/notebook-session.md](design/notebook-session.md) | **文档会话：cell / kernel / step / journal / 状态面板** |
+| [design/notebook-syntax.md](design/notebook-syntax.md) | **文档原生 notebook 语法：内核表 / 会话表** |
+| [research/foreign-notebook-decisions.md](research/foreign-notebook-decisions.md) | **外联 / notebook 决策记录（逐问逐答）** |
+| [roadmap/foreign-v2.md](roadmap/foreign-v2.md) | **外联内核 v2 路线（F0–F4）** |
+| [roadmap/notebook-session.md](roadmap/notebook-session.md) | **文档会话路线（D0–D5）** |
 | [design/ext-abi.md](design/ext-abi.md) | **原生插件 C ABI v1**（`lib/plugin`） |
 | [design/ext-llm.md](design/ext-llm.md) | **官方扩展 `ext/llm`（OpenAI 兼容）** |
 | [design/ext-agent.md](design/ext-agent.md) | **官方扩展 `ext/agent`（文档驱动：单步 / 多步工作簿 + 自写回；废弃 thin TOOL 循环）** |

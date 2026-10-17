@@ -2,9 +2,9 @@
 
 | | |
 |---|---|
-| 状态 | **已落地（v1）** |
+| 状态 | **v1 已落地**；v2 设计见 [foreign-kernel.md](foreign-kernel.md) · [notebook-session.md](notebook-session.md) · [notebook-syntax.md](notebook-syntax.md) |
 | 日期 | 2026-08-06 |
-| 相关 | [stdlib-modules.md](stdlib-modules.md) · [stdlib-math.md](stdlib-math.md)（公式同构绑定） |
+| 相关 | [stdlib-modules.md](stdlib-modules.md) · [stdlib-math.md](stdlib-math.md)（公式同构绑定） · [foreign-kernel.md](foreign-kernel.md) · [notebook-session.md](notebook-session.md) · [roadmap/foreign-v2.md](../roadmap/foreign-v2.md) |
 
 ---
 
