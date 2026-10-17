@@ -2847,20 +2847,45 @@ body.notebook-page {
   background: var(--nb-bg);
   color: var(--nb-text);
 }
-body.notebook-page .topbar { display: none; }
-body.notebook-page .shell {
-  display: block;
-  max-width: 1120px;
-  margin: 0 auto;
-  min-height: 100vh;
-}
-body.notebook-page .nav { display: none; }
-body.notebook-page .panel-wrap { overflow: visible; background: transparent; }
+body.notebook-page .panel-wrap { background: var(--nb-bg); }
 body.notebook-page main.panel {
-  max-width: 960px;
-  margin: 0 auto;
-  padding: 1.6rem 1.5rem 4.5rem;
+  max-width: 76rem;
+  margin: 0;
+  padding: 2rem 2.25rem 3.5rem;
 }
+/* Left file navigation: keep the original layout, styled for the dark skin. */
+body.notebook-page .nav {
+  background: var(--nb-bg);
+  border-right: 1px solid var(--nb-border);
+}
+body.notebook-page .nav .brand { color: var(--nb-strong); }
+body.notebook-page .nav .tagline,
+body.notebook-page .nav h2,
+body.notebook-page .folder > summary { color: var(--nb-muted); }
+body.notebook-page .nav a.file { color: var(--nb-text); }
+body.notebook-page .nav a.file:hover { background: var(--nb-surface-2); }
+body.notebook-page .nav a.file.active {
+  background: #04395e;
+  color: #ffffff;
+}
+body.notebook-page .folder > summary:hover {
+  background: var(--nb-surface-2);
+  color: var(--nb-strong);
+}
+body.notebook-page .folder > summary::before {
+  border-color: transparent transparent transparent var(--nb-muted);
+}
+body.notebook-page .topbar {
+  background: rgba(30,30,30,.94);
+  border-bottom-color: var(--nb-border);
+}
+body.notebook-page .topbar .brand,
+body.notebook-page .nav-btn { color: var(--nb-text); }
+body.notebook-page .nav-btn {
+  background: var(--nb-surface);
+  border-color: var(--nb-border);
+}
+body.notebook-page .nav-btn:hover { background: var(--nb-surface-2); }
 body.notebook-page h1.page {
   font-size: clamp(1.5rem, 2.6vw, 1.9rem);
   line-height: 1.2;
@@ -2890,10 +2915,20 @@ body.notebook-page .status-pill {
 body.notebook-page .status-pill.ok { color: var(--nb-success); }
 body.notebook-page .status-pill.pending { color: var(--nb-warning); }
 body.notebook-page .status-pill.fail { color: var(--nb-error); }
-body.notebook-page section.block { margin: 0.65rem 0 0; }
-body.notebook-page section.block > h2 { display: none; }
-body.notebook-page .exec-block,
-body.notebook-page .source-block { display: none; }
+body.notebook-page section.block { margin: 1.4rem 0 0; }
+body.notebook-page section.block > h2 {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0 0 0.65rem;
+  padding-bottom: 0.35rem;
+  border-bottom: 1px solid var(--nb-border);
+  color: var(--nb-muted);
+  font: 600 0.66rem/1.4 var(--sans);
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+body.notebook-page .structure-block { margin-top: 0.7rem; }
 
 /* ── Toolbar ───────────────────────────────────────────────────────── */
 body.notebook-page #notebook-bar {
@@ -3213,6 +3248,97 @@ body.notebook-page #nb-state-actions[hidden],
 body.notebook-page #nb-state-out[hidden],
 body.notebook-page .code-out[hidden] { display: none !important; }
 
+/* ── Original right rail: Functions / Variables ───────────────────── */
+body.notebook-page .outline-rail { gap: 0.5rem; }
+body.notebook-page .outline-section {
+  padding: 0.4rem 0.55rem 0.55rem;
+  border: 1px solid var(--nb-border);
+  border-radius: var(--nb-radius);
+  background: var(--nb-surface);
+  box-shadow: none;
+}
+body.notebook-page .outline-summary { color: var(--nb-muted); }
+body.notebook-page .outline-panel { background: transparent; }
+body.notebook-page .fn-search {
+  margin-bottom: 0.4rem;
+  padding: 0.3rem 0.4rem;
+  border: 1px solid var(--nb-border);
+  border-radius: 3px;
+  background: var(--nb-bg);
+  color: var(--nb-text);
+  font: 0.7rem/1.3 var(--sans);
+}
+body.notebook-page .fn-search:focus {
+  outline: 1px solid var(--nb-accent);
+  border-color: var(--nb-accent);
+}
+body.notebook-page .outline-tree ul { border-left-color: var(--nb-border); }
+body.notebook-page .outline-item > a { color: var(--nb-text); }
+body.notebook-page .outline-item .ol-meta,
+body.notebook-page .outline-item .ol-params { color: var(--nb-muted); }
+body.notebook-page .outline-item .ol-param.inferred { border-bottom-color: var(--nb-border); }
+body.notebook-page .vars-panel { padding-right: 0.15rem; }
+body.notebook-page .vars-card {
+  padding: 0.42rem 0.48rem;
+  border: 1px solid var(--nb-border);
+  border-radius: 4px;
+  background: var(--nb-surface-2);
+}
+body.notebook-page .vars-card:hover {
+  border-color: var(--nb-accent);
+  box-shadow: none;
+}
+body.notebook-page .vars-name { color: var(--nb-text); }
+body.notebook-page .vars-kind { color: var(--nb-muted); }
+body.notebook-page .vars-preview {
+  border: 1px solid var(--nb-border);
+  border-radius: 3px;
+  background: var(--nb-bg);
+}
+body.notebook-page .vars-preview::after {
+  background: linear-gradient(transparent, var(--nb-bg));
+}
+body.notebook-page .vars-table th {
+  border-color: var(--nb-border);
+  background: var(--nb-surface-2);
+  color: var(--nb-muted);
+}
+body.notebook-page .vars-table td { border-color: var(--nb-border); }
+body.notebook-page .vars-idx,
+body.notebook-page .vars-key,
+body.notebook-page .vars-muted,
+body.notebook-page .vars-empty,
+body.notebook-page .vars-skipped,
+body.notebook-page .vars-nested > summary { color: var(--nb-muted); }
+
+/* ── Execution / Source blocks that the original layout keeps ──────── */
+body.notebook-page .out,
+body.notebook-page .source {
+  border: 1px solid var(--nb-border);
+  border-radius: var(--nb-radius);
+  background: var(--nb-surface);
+  color: var(--nb-text);
+  box-shadow: none;
+}
+body.notebook-page .source { background: var(--nb-bg); }
+body.notebook-page .out.ok { background: var(--nb-surface); }
+body.notebook-page .out.fail {
+  border-color: #5a1d1d;
+  background: #2a0f12;
+  color: var(--nb-error);
+}
+body.notebook-page .stdin-form label { color: var(--nb-text); }
+body.notebook-page .stdin-form textarea {
+  border-color: var(--nb-border);
+  background: var(--nb-bg);
+  color: var(--nb-text);
+}
+body.notebook-page .stdin-form button {
+  border-color: var(--nb-accent);
+  background: var(--nb-accent);
+  color: #fff;
+}
+
 /* ── Narrow preview panes ──────────────────────────────────────────── */
 @media (max-width: 760px) {
   body.notebook-page main.panel { padding: 1rem 0.75rem 3.5rem; }
@@ -3369,8 +3495,6 @@ body.notebook-page .code-out[hidden] { display: none !important; }
   }
   function bind(id, fn) { var b = document.getElementById(id); if (b) b.addEventListener("click", fn); }
   function init() {
-    var sh = document.querySelector(".structure-block > h2");
-    if (sh) sh.textContent = "Notebook";
     document.querySelectorAll(".code-card").forEach(function (cardEl) {
       var head = cardEl.querySelector(".code-head");
       var foot = cardEl.querySelector(".code-foot");
