@@ -1614,7 +1614,7 @@ pub fn layout(title: &str, nav: &str, main: &str) -> String {
         out.hidden = false;
         out.classList.remove("err");
         out.textContent = "Running…";
-        fetch("/api/foreign-run", {{
+        fetch("api/foreign-run", {{
           method: "POST",
           headers: {{ "Content-Type": "application/json" }},
           body: JSON.stringify({{
@@ -2137,7 +2137,7 @@ pub fn layout(title: &str, nav: &str, main: &str) -> String {
       clearStream();
       pinned = true;
       var stdinEl = document.getElementById("stdin");
-      fetch("/api/run", {{
+      fetch("api/run", {{
         method: "POST",
         headers: {{
           "Content-Type": "application/json",
@@ -2927,7 +2927,7 @@ fn notebook_ui() -> &'static str {
         var head = el.querySelector(".code-head");
         if (head) head.appendChild(sel);
         sel.addEventListener("change", function () {
-          post("/api/session/kernel/assign", { cell: c.name, kernel: sel.value }).then(function (r) {
+          post("api/session/kernel/assign", { cell: c.name, kernel: sel.value }).then(function (r) {
             status(r.ok ? "kernel: " + sel.value : (r.error || "assign failed"));
           });
         });
@@ -2946,7 +2946,7 @@ fn notebook_ui() -> &'static str {
   function openSession() {
     var bar = document.getElementById("notebook-bar");
     if (bar) bar.hidden = false;
-    post("/api/session/open", {}).then(function (r) {
+    post("api/session/open", {}).then(function (r) {
       if (!r.ok) { status(r.error || "session open failed"); return; }
       state.open = true;
       renderSummary(r.session);
@@ -2954,14 +2954,14 @@ fn notebook_ui() -> &'static str {
     });
   }
   function runOne(name) {
-    return post("/api/session/cell/run", { cell: name }).then(function (r) {
+    return post("api/session/cell/run", { cell: name }).then(function (r) {
       if (r.ok) { renderRecord(name, r.record); if (r.session) renderSummary(r.session); }
       else status(r.error || "run failed");
     });
   }
   function runAll(restart) {
     status(restart ? "restarting…" : "running all…");
-    post("/api/session/run_all", { restart: !!restart }).then(function (r) {
+    post("api/session/run_all", { restart: !!restart }).then(function (r) {
       if (!r.ok) { status(r.error || "run all failed"); return; }
       if (r.session) renderSummary(r.session);
       var recs = (r.summary && r.summary.records) || [];
@@ -2974,7 +2974,7 @@ fn notebook_ui() -> &'static str {
     bind("nb-run-all", function () { runAll(false); });
     bind("nb-restart", function () { runAll(true); });
     bind("nb-step", function () {
-      post("/api/session/cell/step", {}).then(function (r) {
+      post("api/session/cell/step", {}).then(function (r) {
         if (!r.ok) { status(r.error || "step failed"); return; }
         if (r.record) {
           if (r.record.cell) renderRecord(r.record.cell, r.record);
@@ -2985,7 +2985,7 @@ fn notebook_ui() -> &'static str {
       });
     });
     bind("nb-state", function () {
-      post("/api/session/state/list", {}).then(function (r) {
+      post("api/session/state/list", {}).then(function (r) {
         var pre = document.getElementById("nb-state-out");
         var actions = document.getElementById("nb-state-actions");
         var ki = document.getElementById("nb-kernel-input");
@@ -3005,7 +3005,7 @@ fn notebook_ui() -> &'static str {
       if (raw.trim()) {
         try { value = JSON.parse(raw); } catch (e) { status("value must be JSON"); return; }
       }
-      post("/api/session/state/push", { kernel: k, name: n, value: value }).then(function (r) {
+      post("api/session/state/push", { kernel: k, name: n, value: value }).then(function (r) {
         status(r.ok ? "pushed " + n + " → " + k : (r.error || "push failed"));
       });
     });
@@ -3014,13 +3014,13 @@ fn notebook_ui() -> &'static str {
       var n = (document.getElementById("nb-name-input") || {}).value || "";
       var out = document.getElementById("nb-pull-out");
       if (!k || !n) { status("kernel and name required"); return; }
-      post("/api/session/state/pull", { kernel: k, name: n }).then(function (r) {
+      post("api/session/state/pull", { kernel: k, name: n }).then(function (r) {
         if (out) out.textContent = r.ok ? (n + " = " + JSON.stringify(r.value)) : (r.error || "pull failed");
         status(r.ok ? "pulled " + n + " ← " + k : "pull failed");
       });
     });
     bind("nb-journal", function () {
-      post("/api/session/journal", {}).then(function (r) {
+      post("api/session/journal", {}).then(function (r) {
         var pre = document.getElementById("nb-state-out");
         if (!pre) return;
         pre.hidden = false;
@@ -3028,10 +3028,10 @@ fn notebook_ui() -> &'static str {
       });
     });
     bind("nb-debug", function () {
-      window.open("/debug?path=" + encodeURIComponent(path), "_blank");
+      window.open("debug?path=" + encodeURIComponent(path), "_blank");
     });
     bind("nb-reload", function () {
-      post("/api/session/reload", {}).then(function (r) {
+      post("api/session/reload", {}).then(function (r) {
         if (!r.ok) { status(r.error || "reload failed"); return; }
         renderSummary(r.session);
         status("reloaded");
@@ -3459,5 +3459,10 @@ mod tests {
         ] {
             assert!(ui.contains(id), "notebook UI missing {id}");
         }
+        assert!(
+            !ui.contains("\"/api/session"),
+            "notebook API URLs must stay relative for path-prefix proxy"
+        );
+        assert!(ui.contains("post(\"api/session/open\""));
     }
 }

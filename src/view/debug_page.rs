@@ -849,7 +849,7 @@ fn debug_js() -> &'static str {
       }
       renderBps();
       if (session) {
-        post("/api/debug/breakpoints", {
+        post("api/debug/breakpoints", {
           session: session,
           breakpoints: bpList()
         }).catch(function () {});
@@ -861,7 +861,7 @@ fn debug_js() -> &'static str {
     startBtn.disabled = true;
     setStatus("Starting…");
     clearCurrent();
-    post("/api/debug/start", {
+    post("api/debug/start", {
       path: path,
       breakpoints: bpList(),
       stdin: stdinText()
@@ -875,7 +875,7 @@ fn debug_js() -> &'static str {
     if (!session) return;
     setStatus("Continue…");
     setPausedUi(false);
-    post("/api/debug/continue", {
+    post("api/debug/continue", {
       session: session,
       breakpoints: bpList()
     }).then(applySnap).catch(function (e) { setStatus(String(e)); });
@@ -884,14 +884,14 @@ fn debug_js() -> &'static str {
     if (!session) return;
     setStatus("Step…");
     setPausedUi(false);
-    post("/api/debug/step", {
+    post("api/debug/step", {
       session: session,
       breakpoints: bpList()
     }).then(applySnap).catch(function (e) { setStatus(String(e)); });
   });
   stopBtn.addEventListener("click", function () {
     if (!session) return;
-    post("/api/debug/stop", { session: session }).then(function () {
+    post("api/debug/stop", { session: session }).then(function () {
       session = null;
       clearCurrent();
       setStatus("Stopped");
@@ -947,7 +947,7 @@ fn debug_js() -> &'static str {
       out.hidden = false;
       out.classList.remove("err");
       out.textContent = "Running…";
-      fetch("/api/foreign-run", {
+      fetch("api/foreign-run", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
