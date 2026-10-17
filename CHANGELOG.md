@@ -20,7 +20,7 @@
 
 ### Changed
 
-- **Notebook view 视觉重做**：单列 notebook 壳、粘性玻璃工具栏、卡片式 cell、深色代码区、状态/内核胶囊、输出标签、暗色模式与移动端适配；隐藏 Execution/Source 重复区块和文件导航。
+- **Notebook view 视觉重做**：采用 VS Code Dark 的扁平色板与 Jupyter 的 cell 组织：单一深色底、明确 surface/border 层级、`In [n]` / `Out [ ]` 提示、顶部 cell 工具栏、无渐变/无重阴影、暗色代码区与一致的字号/间距；隐藏 Execution/Source 重复区块和文件导航。
 - **`langs`** 现在返回「预设 ∪ 注册 ∪ 配置」的已知语言（原集合是子集）。
 - 大输出从 `Err` 改为「截断 + `truncated=true`」；`subtask` 外联输出同步采用该语义。
 
