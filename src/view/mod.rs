@@ -234,6 +234,29 @@ fn handle(root: &ViewRoot, request: Request) -> Result<()> {
                     notebook_api::api_journal(&root.root, body)
                 })
             }
+            "/api/debug/start" => {
+                return api_debug_post(request, |body| {
+                    debug_api::api_debug_start(&root.root, body)
+                })
+            }
+            "/api/debug/continue" => {
+                return api_debug_post(request, |body| {
+                    debug_api::api_debug_action(body, crate::debug::DebugAction::Continue)
+                })
+            }
+            "/api/debug/step" => {
+                return api_debug_post(request, |body| {
+                    debug_api::api_debug_action(body, crate::debug::DebugAction::Step)
+                })
+            }
+            "/api/debug/stop" => {
+                return api_debug_post(request, |body| debug_api::api_debug_stop(body))
+            }
+            "/api/debug/breakpoints" => {
+                return api_debug_post(request, |body| {
+                    debug_api::api_debug_set_breakpoints(body)
+                })
+            }
             _ => {
                 let resp =
                     Response::from_string("method not allowed").with_status_code(StatusCode(405));
@@ -270,6 +293,14 @@ fn handle(root: &ViewRoot, request: Request) -> Result<()> {
             let resolved = resolve_rel(root, &rel)?;
             let vm = build_file_view(root, &resolved, &rel, &stdin_lines, true)?;
             let body = page_file(&root.files, &rel, &vm, &LinkMode::Live);
+            respond_html(request, body)
+        }
+        "/debug" => {
+            let rel = query_param(query, "path").unwrap_or_default();
+            let resolved = resolve_rel(root, &rel)?;
+            let source = std::fs::read_to_string(&resolved).unwrap_or_default();
+            let vm = build_debug_model(&resolved, &rel, &source);
+            let body = page_debug(&root.files, &rel, &vm);
             respond_html(request, body)
         }
         "/api/tree" => {

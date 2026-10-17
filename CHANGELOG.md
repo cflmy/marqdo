@@ -8,7 +8,7 @@
 - **`lib/foreign` F2**：JSON 进 / JSON 出 `call`；并行 `run_many` / `call_many`（有序、单项隔离、并发上限）；`invoke` 的 `input` / `output` / `result` / `result_error`。
 - **`lib/foreign` F3/F3.5**：Python / Node 持久会话 `session_open` / `session_eval` / `session_close` / `session_list`；状态桥 `session_set` / `session_get` / `session_names`；会话超时即杀、崩溃隔离、drop 清理。
 - **Notebook D1/D2**：`内核表` / `会话表` 文档原生语法；`DocumentSession`（cell index / 命名内核 / journal / value store）；view Notebook 工具栏（Run All / Restart & Run All / Step / State / Journal / Reload）、状态徽标、内核下拉、Push/Pull 状态表单；`POST /api/session/*`。
-- **Notebook D3（部分）**：`reload` 重新解析并保留内核，源码变更的 cell 标为 `dirty`；Journal/Reload 按钮；状态桥 Push/Pull。
+- **Notebook D3**：`reload` 重新解析并保留内核，源码变更的 cell 标为 `dirty`；Journal/Reload/Debug 按钮；Debug 打开同一 view 服务的语句级单步页（`/debug` + `/api/debug/*`）；状态桥 Push/Pull。
 - **安全与健壮性**：所有外联入口检查 `exec` 能力；有界 stdout/stderr 读取与截断标记；stdin 写线程；Unix 进程组 / Windows `taskkill /T` 超时清理；shell-like argv 切分。
 
 ### Fixed

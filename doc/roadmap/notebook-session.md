@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| 状态 | **D1–D2 已落地；D3–D5 待做** |
+| 状态 | **D1–D3 已落地（首版）；D4–D5 待做** |
 | 日期 | 2026-10-17 |
 | 层 | Runtime + Document（view 服务端 / 前端） |
 | 相关 | [notebook-session.md](../design/notebook-session.md) · [notebook-syntax.md](../design/notebook-syntax.md) · [foreign-kernel.md](../design/foreign-kernel.md) · [foreign-v2.md](foreign-v2.md) · [foreign-notebook-decisions.md](../research/foreign-notebook-decisions.md) |

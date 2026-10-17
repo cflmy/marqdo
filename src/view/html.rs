@@ -2844,6 +2844,7 @@ fn notebook_ui() -> &'static str {
   <button type="button" id="nb-state">State</button>
   <button type="button" id="nb-journal">Journal</button>
   <button type="button" id="nb-reload">Reload</button>
+  <button type="button" id="nb-debug">Debug</button>
   <span id="nb-status">opening…</span>
 </div>
 <div class="notebook-bar" id="nb-state-actions" hidden>
@@ -3025,6 +3026,9 @@ fn notebook_ui() -> &'static str {
         pre.hidden = false;
         pre.textContent = JSON.stringify(r.journal || r, null, 2);
       });
+    });
+    bind("nb-debug", function () {
+      window.open("/debug?path=" + encodeURIComponent(path), "_blank");
     });
     bind("nb-reload", function () {
       post("/api/session/reload", {}).then(function (r) {
@@ -3447,6 +3451,7 @@ mod tests {
             "nb-state",
             "nb-journal",
             "nb-reload",
+            "nb-debug",
             "nb-kernel-input",
             "nb-push",
             "nb-pull",

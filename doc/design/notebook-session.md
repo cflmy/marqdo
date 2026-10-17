@@ -39,7 +39,7 @@
 | view 工具栏 / 状态徽标 / 内核下拉 / 状态表单 | ✅ | `src/view/html.rs` |
 | `POST /api/session/*` | ✅（含 `reload`） | `src/view/notebook_api.rs` |
 | cell step | ✅ | 同上 |
-| Marqdo statement step | 复用 `marqdo debug`；view 集成待做 | `src/debug` |
+| Marqdo statement step | ✅（notebook 工具栏 Debug → 同一 view 服务的 `/debug`；`/api/debug/*`） | `src/debug` · `src/view/debug_api.rs` |
 | dirty/stale 自动检测 | 部分（reload → dirty；assign → dirty；stale 传播待做） | `src/notebook/mod.rs` |
 | writeback 集成 | 待做 | `writeback` |
 | replay / 持久化 | 待做 | — |
@@ -417,7 +417,7 @@ Kernel: [分析 ▾]  Status: ready  [Restart] [Interrupt]
 | POST | `/api/session/state/list` | Marqdo / kernel 变量列表 |
 | POST | `/api/session/state/push` | Marqdo 值 → kernel |
 | POST | `/api/session/state/pull` | kernel 变量 → value store |
-| POST | `/api/session/statement/step` | Marqdo 语句单步（复用 debug） |
+| POST | `/api/debug/*` + `/debug` | Marqdo 语句单步（Debug 按钮，复用 debugger） |
 | POST | `/api/session/writeback` | 显式写回 cell 输出 |
 | POST | `/api/session/journal` | 执行日志 |
 | GET | `/api/session` | 当前会话摘要 |
