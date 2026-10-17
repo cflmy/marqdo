@@ -2825,7 +2825,8 @@ pub fn page_index(files: &[PathBuf], only: Option<&Path>, links: &LinkMode) -> S
 }
 
 fn notebook_ui() -> &'static str {
-    r#"<style>
+    r#"<link id="nb-hljs-light" rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github.min.css" disabled/>
+<style>
 /* ── VS Code / Jupyter notebook skin ───────────────────────────────── */
 body.notebook-page {
   color-scheme: dark;
@@ -2843,9 +2844,40 @@ body.notebook-page {
   --nb-success: #4ec9b0;
   --nb-error: #f48771;
   --nb-warning: #cca700;
+  --nb-selection: #04395e;
+  --nb-on-accent: #ffffff;
+  --nb-topbar: rgba(30,30,30,.94);
+  --nb-code-bg: #1e1e1e;
+  --nb-code-text: #d4d4d4;
+  --nb-error-bg: #2a0f12;
+  --nb-error-border: #5a1d1d;
   --nb-radius: 6px;
   background: var(--nb-bg);
   color: var(--nb-text);
+}
+body.notebook-page[data-theme="light"] {
+  color-scheme: light;
+  --nb-bg: #ffffff;
+  --nb-surface: #f7f7f8;
+  --nb-surface-2: #efeff1;
+  --nb-surface-3: #e4e4e7;
+  --nb-border: #d8d8dc;
+  --nb-border-soft: #e8e8eb;
+  --nb-text: #24292f;
+  --nb-strong: #111418;
+  --nb-muted: #6e7781;
+  --nb-accent: #0969da;
+  --nb-accent-hover: #0550ae;
+  --nb-success: #1a7f37;
+  --nb-error: #cf222e;
+  --nb-warning: #9a6700;
+  --nb-selection: #0969da;
+  --nb-on-accent: #ffffff;
+  --nb-topbar: rgba(255,255,255,.94);
+  --nb-code-bg: #f6f8fa;
+  --nb-code-text: #24292f;
+  --nb-error-bg: #fff5f5;
+  --nb-error-border: #ffc1c1;
 }
 body.notebook-page .panel-wrap { background: var(--nb-bg); }
 body.notebook-page main.panel {
@@ -2865,8 +2897,8 @@ body.notebook-page .folder > summary { color: var(--nb-muted); }
 body.notebook-page .nav a.file { color: var(--nb-text); }
 body.notebook-page .nav a.file:hover { background: var(--nb-surface-2); }
 body.notebook-page .nav a.file.active {
-  background: #04395e;
-  color: #ffffff;
+  background: var(--nb-selection);
+  color: var(--nb-on-accent);
 }
 body.notebook-page .folder > summary:hover {
   background: var(--nb-surface-2);
@@ -2876,7 +2908,7 @@ body.notebook-page .folder > summary::before {
   border-color: transparent transparent transparent var(--nb-muted);
 }
 body.notebook-page .topbar {
-  background: rgba(30,30,30,.94);
+  background: var(--nb-topbar);
   border-bottom-color: var(--nb-border);
 }
 body.notebook-page .topbar .brand,
@@ -3208,11 +3240,13 @@ body.notebook-page .code-run:disabled { opacity: 0.45; cursor: not-allowed; }
 body.notebook-page .code-body {
   margin: 0;
   padding: 0.9rem 1rem;
-  max-height: 27rem;
+  min-height: 6rem;
+  max-height: 70vh;
   overflow: auto;
+  resize: vertical;
   border: 0;
-  background: var(--nb-bg);
-  color: var(--nb-text);
+  background: var(--nb-code-bg);
+  color: var(--nb-code-text);
   font: 0.76rem/1.55 var(--mono);
   tab-size: 4;
 }
@@ -3225,11 +3259,13 @@ body.notebook-page .code-body .hljs { background: transparent; padding: 0; }
 body.notebook-page .code-out {
   margin: 0;
   padding: 0.7rem 1rem 0.85rem;
-  max-height: 24rem;
+  min-height: 3rem;
+  max-height: 60vh;
   overflow: auto;
+  resize: vertical;
   border-top: 1px solid var(--nb-border);
-  background: var(--nb-bg);
-  color: var(--nb-text);
+  background: var(--nb-code-bg);
+  color: var(--nb-code-text);
   font: 0.74rem/1.55 var(--mono);
   white-space: pre-wrap;
   word-break: break-word;
@@ -3241,7 +3277,10 @@ body.notebook-page .code-out::before {
   color: var(--nb-muted);
   font: 0.62rem/1.2 var(--mono);
 }
-body.notebook-page .code-out.err { color: var(--nb-error); }
+body.notebook-page .code-out.err {
+  background: var(--nb-error-bg);
+  color: var(--nb-error);
+}
 body.notebook-page .code-card .code-out:not([hidden]) { display: block; }
 body.notebook-page #notebook-bar[hidden],
 body.notebook-page #nb-state-actions[hidden],
@@ -3323,8 +3362,8 @@ body.notebook-page .source {
 body.notebook-page .source { background: var(--nb-bg); }
 body.notebook-page .out.ok { background: var(--nb-surface); }
 body.notebook-page .out.fail {
-  border-color: #5a1d1d;
-  background: #2a0f12;
+  border-color: var(--nb-error-border);
+  background: var(--nb-error-bg);
   color: var(--nb-error);
 }
 body.notebook-page .stdin-form label { color: var(--nb-text); }
@@ -3360,6 +3399,7 @@ body.notebook-page .stdin-form button {
   <button type="button" id="nb-journal">Journal</button>
   <button type="button" id="nb-reload">Reload</button>
   <button type="button" id="nb-debug">Debug</button>
+  <button type="button" id="nb-theme" title="切换浅色/深色主题">浅色</button>
   <span id="nb-status">opening…</span>
 </div>
 <div class="notebook-bar" id="nb-state-actions" hidden>
@@ -3375,6 +3415,24 @@ body.notebook-page .stdin-form button {
 <script>
 (function () {
   document.body.classList.add("notebook-page");
+  var THEME_KEY = "marqdo.nb.theme";
+  function applyTheme(theme) {
+    theme = theme === "light" ? "light" : "dark";
+    document.body.dataset.theme = theme;
+    var darkCss = document.querySelector('link[href*="github-dark.min.css"]');
+    var lightCss = document.getElementById("nb-hljs-light");
+    if (darkCss) darkCss.disabled = theme === "light";
+    if (lightCss) lightCss.disabled = theme !== "light";
+    var btn = document.getElementById("nb-theme");
+    if (btn) {
+      btn.textContent = theme === "light" ? "深色" : "浅色";
+      btn.title = theme === "light" ? "切换到深色主题" : "切换到浅色主题";
+    }
+    try { localStorage.setItem(THEME_KEY, theme); } catch (e) {}
+  }
+  var savedTheme = "dark";
+  try { savedTheme = localStorage.getItem(THEME_KEY) || "dark"; } catch (e) {}
+  applyTheme(savedTheme);
   if (!window.MARQDO_VIEW_LIVE) return;
   var path = window.MARQDO_FILE_PATH || "";
   if (!path) return;
@@ -3495,6 +3553,12 @@ body.notebook-page .stdin-form button {
   }
   function bind(id, fn) { var b = document.getElementById(id); if (b) b.addEventListener("click", fn); }
   function init() {
+    var themeBtn = document.getElementById("nb-theme");
+    if (themeBtn) {
+      themeBtn.addEventListener("click", function () {
+        applyTheme(document.body.dataset.theme === "light" ? "dark" : "light");
+      });
+    }
     document.querySelectorAll(".code-card").forEach(function (cardEl) {
       var head = cardEl.querySelector(".code-head");
       var foot = cardEl.querySelector(".code-foot");
@@ -3985,6 +4049,7 @@ mod tests {
             "nb-journal",
             "nb-reload",
             "nb-debug",
+            "nb-theme",
             "nb-kernel-input",
             "nb-push",
             "nb-pull",
