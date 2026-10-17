@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| 状态 | **Decided（待实现）** |
+| 状态 | **D1–D2 首版已实现；D3/D4 部分** |
 | 日期 | 2026-10-17 |
 | 层 | Runtime + Document（view 服务端 / notebook 交互） |
 | 相关 | [notebook-syntax.md](notebook-syntax.md) · [foreign-kernel.md](foreign-kernel.md) · [foreign-notebook-decisions.md](../research/foreign-notebook-decisions.md) · [view.md](view.md) · [view-debug.md](view-debug.md) · [stdlib-subtask.md](stdlib-subtask.md) |
@@ -20,6 +20,32 @@
 4. **Git 友好**：状态/输出不默认写进 `.mq.md`。
 5. **多语言**：命名内核 + 显式状态桥。
 6. **可复现**：Run All / journal / dirty / stale / replay。
+
+---
+
+## 1.1 实施状态（2026-10-17）
+
+| 能力 | 状态 | 位置 |
+|---|---|---|
+| `内核表` / `会话表` 解析（中英列名） | ✅ | `src/notebook/mod.rs` |
+| cell index（绑定名 / 行号 / source hash） | ✅ | 同上 |
+| 命名内核 + 默认内核 + 语言校验 | ✅ | 同上 |
+| 同内核共享 / 跨内核隔离 | ✅ | Node 金样例 + 单测 |
+| `run_cell` / `step` / `run_all(restart)` | ✅ | `DocumentSession` |
+| `restart_kernel` / `assign_kernel` | ✅ | 同上 |
+| 状态桥 `push` / `pull` / `state_list` | ✅ | `DocumentSession` + `foreign_session` |
+| journal（记录 + API） | ✅（UI 面板待补） | `DocumentSession::journal_json` |
+| view 工具栏 / 状态徽标 / 内核下拉 / 状态表单 | ✅ | `src/view/html.rs` |
+| `POST /api/session/*` | ✅ | `src/view/notebook_api.rs` |
+| cell step | ✅ | 同上 |
+| Marqdo statement step | 复用 `marqdo debug`；view 集成待做 | `src/debug` |
+| dirty/stale 自动检测 | 部分（assign → dirty；reload 待做） | `src/notebook/mod.rs` |
+| writeback 集成 | 待做 | `writeback` |
+| replay / 持久化 | 待做 | — |
+| Python 会话 | ✅（本机无 python，CI/用户机条件测试） | `src/host/foreign_session.rs` |
+| Node 会话 | ✅ | 同上 |
+
+首版刻意不做：把状态写进 `.mq.md`、自动镜像变量、foreign 行级 debug、跨文档共享内核。
 
 ---
 

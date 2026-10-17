@@ -2824,6 +2824,219 @@ pub fn page_index(files: &[PathBuf], only: Option<&Path>, links: &LinkMode) -> S
     layout("index", &nav, &main)
 }
 
+fn notebook_ui() -> &'static str {
+    r#"<style>
+.notebook-bar{display:flex;flex-wrap:wrap;gap:.4rem;align-items:center;margin:.6rem 0;padding:.45rem .6rem;border:1px solid #2d2d2d;background:#232323;border-radius:4px;font:0.75rem/1.3 var(--mono);}
+.notebook-bar button{cursor:pointer;background:#2f2f2f;color:#ddd;border:1px solid #444;border-radius:3px;padding:.2rem .45rem;font:inherit;}
+.notebook-bar button:hover{background:#3a3a3a;}
+.nb-badge{font:0.6rem/1 var(--mono);padding:.15rem .3rem;border-radius:3px;background:#333;color:#aaa;margin-left:.3rem;}
+.nb-badge.ok{background:#1d3a24;color:#8fd19e;}
+.nb-badge.bad{background:#3a1d1d;color:#f19a9a;}
+.nb-kernel{font:0.65rem/1 var(--mono);background:#2a2a2a;color:#ddd;border:1px solid #444;border-radius:3px;padding:.12rem .2rem;margin-left:.3rem;}
+#nb-state-out{max-height:18rem;overflow:auto;margin:.4rem 0;padding:.4rem;background:#1b1b1b;border:1px solid #2d2d2d;color:#bbb;font:0.7rem/1.35 var(--mono);white-space:pre-wrap;}
+#nb-state-actions input{background:#1b1b1b;color:#ddd;border:1px solid #444;border-radius:3px;padding:.18rem .3rem;font:inherit;width:7rem;}
+</style>
+<div class="notebook-bar" id="notebook-bar" hidden>
+  <strong>Notebook</strong>
+  <button type="button" id="nb-run-all">Run All</button>
+  <button type="button" id="nb-restart">Restart &amp; Run All</button>
+  <button type="button" id="nb-step">Step</button>
+  <button type="button" id="nb-state">State</button>
+  <span id="nb-status">opening…</span>
+</div>
+<div class="notebook-bar" id="nb-state-actions" hidden>
+  <span>Bridge</span>
+  <input id="nb-kernel-input" placeholder="kernel" autocomplete="off"/>
+  <input id="nb-name-input" placeholder="name" autocomplete="off"/>
+  <input id="nb-value-input" placeholder="JSON value" autocomplete="off"/>
+  <button type="button" id="nb-push">Push</button>
+  <button type="button" id="nb-pull">Pull</button>
+  <span id="nb-pull-out"></span>
+</div>
+<pre id="nb-state-out" hidden></pre>
+<script>
+(function () {
+  if (!window.MARQDO_VIEW_LIVE) return;
+  var path = window.MARQDO_FILE_PATH || "";
+  if (!path) return;
+  var state = { open: false, kernels: [], cells: {} };
+  function post(url, body) {
+    return fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(Object.assign({ path: path }, body || {}))
+    }).then(function (r) { return r.json(); });
+  }
+  function status(t) { var e = document.getElementById("nb-status"); if (e) e.textContent = t; }
+  function card(name) {
+    var els = document.querySelectorAll(".code-card");
+    for (var i = 0; i < els.length; i++) {
+      if (els[i].getAttribute("data-code-name") === name) return els[i];
+    }
+    return null;
+  }
+  function badge(el, text, ok) {
+    if (!el) return;
+    var b = el.querySelector(".nb-badge");
+    if (!b) {
+      b = document.createElement("span");
+      var head = el.querySelector(".code-head");
+      if (!head) return;
+      head.appendChild(b);
+    }
+    b.textContent = text;
+    b.className = "nb-badge " + (ok ? "ok" : (text === "clean" || text === "never" ? "" : "bad"));
+  }
+  function renderRecord(name, rec) {
+    var el = card(name);
+    if (!el || !rec) return;
+    var out = el.querySelector(".code-out");
+    if (out) {
+      out.hidden = false;
+      var parts = [];
+      if (rec.stdout) parts.push(rec.stdout);
+      if (rec.stderr) parts.push("[stderr]\n" + rec.stderr);
+      if (rec.error) parts.push(rec.error);
+      var meta = [];
+      if (typeof rec.code === "number") meta.push("exit " + rec.code);
+      if (typeof rec.ms === "number") meta.push(rec.ms + "ms");
+      if (rec.timed_out) meta.push("timed out");
+      if (rec.truncated) meta.push("truncated");
+      if (meta.length) parts.push("— " + meta.join(" · "));
+      out.textContent = parts.length ? parts.join("\n\n") : "(no output)";
+      out.classList.toggle("err", !rec.ok);
+    }
+    badge(el, rec.ok ? "clean" : "error", !!rec.ok);
+  }
+  function renderSummary(s) {
+    if (!s) return;
+    state.kernels = s.kernels || [];
+    state.cells = {};
+    (s.cells || []).forEach(function (c) { state.cells[c.name] = c; });
+    (s.cells || []).forEach(function (c) {
+      var el = card(c.name);
+      if (!el) return;
+      badge(el, c.status, c.status === "clean");
+      var sel = el.querySelector(".nb-kernel");
+      if (!sel) {
+        sel = document.createElement("select");
+        sel.className = "nb-kernel";
+        var head = el.querySelector(".code-head");
+        if (head) head.appendChild(sel);
+        sel.addEventListener("change", function () {
+          post("/api/session/kernel/assign", { cell: c.name, kernel: sel.value }).then(function (r) {
+            status(r.ok ? "kernel: " + sel.value : (r.error || "assign failed"));
+          });
+        });
+      }
+      var opts = state.kernels.filter(function (k) { return k.lang === c.lang; }).map(function (k) { return k.name; });
+      if (!opts.length) opts = [c.kernel];
+      sel.innerHTML = "";
+      opts.forEach(function (n) {
+        var o = document.createElement("option");
+        o.value = n; o.textContent = n;
+        if (n === c.kernel) o.selected = true;
+        sel.appendChild(o);
+      });
+    });
+  }
+  function openSession() {
+    var bar = document.getElementById("notebook-bar");
+    if (bar) bar.hidden = false;
+    post("/api/session/open", {}).then(function (r) {
+      if (!r.ok) { status(r.error || "session open failed"); return; }
+      state.open = true;
+      renderSummary(r.session);
+      status("session ready");
+    });
+  }
+  function runOne(name) {
+    return post("/api/session/cell/run", { cell: name }).then(function (r) {
+      if (r.ok) { renderRecord(name, r.record); if (r.session) renderSummary(r.session); }
+      else status(r.error || "run failed");
+    });
+  }
+  function runAll(restart) {
+    status(restart ? "restarting…" : "running all…");
+    post("/api/session/run_all", { restart: !!restart }).then(function (r) {
+      if (!r.ok) { status(r.error || "run all failed"); return; }
+      if (r.session) renderSummary(r.session);
+      var recs = (r.summary && r.summary.records) || [];
+      recs.forEach(function (rec) { if (rec.cell) renderRecord(rec.cell, rec); });
+      status("run all done");
+    });
+  }
+  function bind(id, fn) { var b = document.getElementById(id); if (b) b.addEventListener("click", fn); }
+  function init() {
+    bind("nb-run-all", function () { runAll(false); });
+    bind("nb-restart", function () { runAll(true); });
+    bind("nb-step", function () {
+      post("/api/session/cell/step", {}).then(function (r) {
+        if (!r.ok) { status(r.error || "step failed"); return; }
+        if (r.record) {
+          if (r.record.cell) renderRecord(r.record.cell, r.record);
+          if (r.record.done) status("done");
+        }
+        if (r.session) renderSummary(r.session);
+        if (!r.record || !r.record.done) status("step");
+      });
+    });
+    bind("nb-state", function () {
+      post("/api/session/state/list", {}).then(function (r) {
+        var pre = document.getElementById("nb-state-out");
+        var actions = document.getElementById("nb-state-actions");
+        var ki = document.getElementById("nb-kernel-input");
+        if (!pre) return;
+        pre.hidden = false;
+        pre.textContent = JSON.stringify(r.state || r, null, 2);
+        if (actions) actions.hidden = false;
+        if (ki && !ki.value && state.kernels.length) ki.value = state.kernels[0].name;
+      });
+    });
+    bind("nb-push", function () {
+      var k = (document.getElementById("nb-kernel-input") || {}).value || "";
+      var n = (document.getElementById("nb-name-input") || {}).value || "";
+      var raw = (document.getElementById("nb-value-input") || {}).value || "";
+      if (!k || !n) { status("kernel and name required"); return; }
+      var value = null;
+      if (raw.trim()) {
+        try { value = JSON.parse(raw); } catch (e) { status("value must be JSON"); return; }
+      }
+      post("/api/session/state/push", { kernel: k, name: n, value: value }).then(function (r) {
+        status(r.ok ? "pushed " + n + " → " + k : (r.error || "push failed"));
+      });
+    });
+    bind("nb-pull", function () {
+      var k = (document.getElementById("nb-kernel-input") || {}).value || "";
+      var n = (document.getElementById("nb-name-input") || {}).value || "";
+      var out = document.getElementById("nb-pull-out");
+      if (!k || !n) { status("kernel and name required"); return; }
+      post("/api/session/state/pull", { kernel: k, name: n }).then(function (r) {
+        if (out) out.textContent = r.ok ? (n + " = " + JSON.stringify(r.value)) : (r.error || "pull failed");
+        status(r.ok ? "pulled " + n + " ← " + k : "pull failed");
+      });
+    });
+    document.addEventListener("click", function (e) {
+      var btn = e.target && e.target.closest ? e.target.closest(".code-run") : null;
+      if (!btn || !state.open) return;
+      var el = btn.closest(".code-card");
+      if (!el) return;
+      var name = el.getAttribute("data-code-name");
+      if (!name) return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      btn.disabled = true;
+      status("running " + name);
+      runOne(name).finally(function () { btn.disabled = false; status("ready"); });
+    }, true);
+    openSession();
+  }
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
+  else init();
+})();
+</script>"#
+}
+
 pub fn page_file(files: &[PathBuf], rel: &str, vm: &FileViewModel, links: &LinkMode) -> String {
     let nav = nav_html(files, Some(rel), links);
     let (status, status_label, out_text) = if vm.awaiting_input {
@@ -2963,6 +3176,11 @@ pub fn page_file(files: &[PathBuf], rel: &str, vm: &FileViewModel, links: &LinkM
     let trace_safe = vm
         .trace_json
         .replace("</", "<\\/");
+    let notebook = if matches!(links, LinkMode::Live) {
+        notebook_ui().to_string()
+    } else {
+        String::new()
+    };
     let main = format!(
         r#"
 <script>
@@ -2973,6 +3191,7 @@ window.MARQDO_AUTO_STREAM = {auto_stream};
 <script type="application/json" id="mq-view-trace">{trace}</script>
 <h1 class="page">{title}<span class="status-pill {status}">{status_label}</span></h1>
 <p class="meta">{rel}</p>
+{notebook}
 <section class="block">
   <h2>Structure</h2>
   {structure_block}
@@ -3002,6 +3221,7 @@ window.MARQDO_AUTO_STREAM = {auto_stream};
         status = status,
         status_label = status_label,
         rel = escape(rel),
+        notebook = notebook,
         structure_block = structure_block,
         stdin_panel = stdin_panel,
         stream_panel = stream_panel,
@@ -3193,5 +3413,27 @@ mod plan_card_tests {
         assert!(html.contains("REUSE"), "{html}");
         assert!(html.contains("pp-type\">round"), "{html}");
         assert!(!html.contains("pp-type\">delta"), "{html}");
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn notebook_ui_has_controls() {
+        let ui = notebook_ui();
+        for id in [
+            "nb-run-all",
+            "nb-restart",
+            "nb-step",
+            "nb-state",
+            "nb-kernel-input",
+            "nb-push",
+            "nb-pull",
+            "nb-state-out",
+        ] {
+            assert!(ui.contains(id), "notebook UI missing {id}");
+        }
     }
 }

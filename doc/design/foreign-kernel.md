@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| 状态 | **Decided（待实现）** |
+| 状态 | **F0–F3.5 已实现** |
 | 日期 | 2026-10-17 |
 | 层 | Runtime（`src/foreign/` · `src/host/foreign*` · `lib/foreign.mq.md`） |
 | 相关 | [foreign-notebook-decisions.md](../research/foreign-notebook-decisions.md) · [notebook-syntax.md](notebook-syntax.md) · [notebook-session.md](notebook-session.md) · [stdlib-foreign.md](stdlib-foreign.md) · [stdlib-subtask.md](stdlib-subtask.md) |
@@ -43,6 +43,21 @@
 | `writeback` | 文档级 | 把输出写回 `.mq.md` |
 
 `subtask` 不管理持久状态；`foreign` 不管理文档执行顺序。
+
+---
+
+## 1.4 实施状态（2026-10-17）
+
+| 阶段 | 状态 | 关键文件 |
+|---|---|---|
+| F0 安全执行 / `invoke` 记录 | ✅ | `src/host/foreign.rs` |
+| F1 预设 / probe / register / config | ✅ | `src/foreign/registry.rs` · `src/host/foreign.rs` |
+| F2 JSON 桥 / run_many / call_many | ✅ | `src/host/foreign.rs` |
+| F3 Python/Node 持久内核 | ✅ | `src/host/foreign_session.rs` |
+| F3.5 session_set/get/names | ✅ | 同上 |
+| F4 history / view 打磨 / 发布 | 部分 | — |
+
+测试：`cargo test --lib foreign`（11+）、`cargo test --test gold lib_foreign`（12，python 条件跳过）、`tests/notebook/shared.mq.md` 手工 view 验证。
 
 ---
 

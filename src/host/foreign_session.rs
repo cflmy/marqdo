@@ -107,7 +107,8 @@ rl.on("line", async (line) => {
     return;
   }
   if (op === "names") {
-    const names = Object.keys(globalThis).filter(k => !k.startsWith("__") && typeof globalThis[k] !== "function");
+    const skip = new Set(["global","globalThis","process","Buffer","console","require","module","exports","__dirname","__filename","performance","crypto","navigator","fetch","URL","URLSearchParams","TextEncoder","TextDecoder","setTimeout","clearTimeout","setInterval","clearInterval","queueMicrotask","structuredClone","atob","btoa","marqdo_input"]);
+    const names = Object.keys(globalThis).filter(k => !k.startsWith("__") && !skip.has(k) && typeof globalThis[k] !== "function");
     send({ id: rid, ok: true, stdout: "", stderr: "", result: names, error: "" });
     return;
   }
@@ -295,6 +296,7 @@ pub fn open(
             cwd_path.display()
         ));
     }
+    let session_timeout = parse_timeout(timeout, SESSION_TIMEOUT_SECS)?;
     let mut command = Command::new(&argv[0]);
     for a in &argv[1..] {
         command.arg(a);
@@ -384,7 +386,6 @@ pub fn open(
     ctx.foreign_session_seq = seq;
     let id = format!("s{seq}");
     let started_ms = now_ms();
-    let session_timeout = parse_timeout(timeout, SESSION_TIMEOUT_SECS)?;
     let cmd_display = argv[0].clone();
     let session = Session {
         id: id.clone(),

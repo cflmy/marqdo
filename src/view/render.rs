@@ -1254,7 +1254,7 @@ fn render_stmt(
                 let lang = escape(&c.lang);
                 let src = escape(&c.source);
                 format!(
-                    r#"<div class="card code-card" data-lang="{lang}">
+                    r#"<div class="card code-card" data-lang="{lang}" data-code-name="{name}">
   <div class="code-head">
     <span class="badge">code</span>
     <code class="expr">`{name}` =</code>

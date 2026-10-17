@@ -6,6 +6,7 @@ mod debug_api;
 mod debug_page;
 mod document;
 mod html;
+mod notebook_api;
 mod output;
 mod render;
 
@@ -173,6 +174,61 @@ fn handle(root: &ViewRoot, request: Request) -> Result<()> {
         match path_part {
             "/api/foreign-run" => return api_foreign_run(root, request),
             "/api/run" => return api_run(root, request),
+            "/api/session/open" => {
+                return api_debug_post(request, |body| {
+                    notebook_api::api_open(&root.root, body)
+                })
+            }
+            "/api/session/close" => {
+                return api_debug_post(request, |body| {
+                    notebook_api::api_close(&root.root, body)
+                })
+            }
+            "/api/session/cell/run" => {
+                return api_debug_post(request, |body| {
+                    notebook_api::api_cell_run(&root.root, body)
+                })
+            }
+            "/api/session/cell/step" => {
+                return api_debug_post(request, |body| {
+                    notebook_api::api_cell_step(&root.root, body)
+                })
+            }
+            "/api/session/run_all" => {
+                return api_debug_post(request, |body| {
+                    notebook_api::api_run_all(&root.root, body)
+                })
+            }
+            "/api/session/kernel/restart" => {
+                return api_debug_post(request, |body| {
+                    notebook_api::api_kernel_restart(&root.root, body)
+                })
+            }
+            "/api/session/kernel/assign" => {
+                return api_debug_post(request, |body| {
+                    notebook_api::api_assign(&root.root, body)
+                })
+            }
+            "/api/session/state/list" => {
+                return api_debug_post(request, |body| {
+                    notebook_api::api_state_list(&root.root, body)
+                })
+            }
+            "/api/session/state/push" => {
+                return api_debug_post(request, |body| {
+                    notebook_api::api_state_push(&root.root, body)
+                })
+            }
+            "/api/session/state/pull" => {
+                return api_debug_post(request, |body| {
+                    notebook_api::api_state_pull(&root.root, body)
+                })
+            }
+            "/api/session/journal" => {
+                return api_debug_post(request, |body| {
+                    notebook_api::api_journal(&root.root, body)
+                })
+            }
             _ => {
                 let resp =
                     Response::from_string("method not allowed").with_status_code(StatusCode(405));

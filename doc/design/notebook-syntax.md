@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| 状态 | **Decided（v2 目标）** |
+| 状态 | **Decided；D1 解析已实现** |
 | 日期 | 2026-10-17 |
 | 层 | Document（读取约定） + Runtime（校验） |
 | 相关 | [foreign-notebook-decisions.md](../research/foreign-notebook-decisions.md) · [notebook-session.md](notebook-session.md) · [foreign-kernel.md](foreign-kernel.md) · [core-surface.md](core-surface.md) · [layers.md](layers.md) |

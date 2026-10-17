@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| 状态 | **待实施** |
+| 状态 | **F0–F3.5 已落地；F4 进行中** |
 | 日期 | 2026-10-17 |
 | 层 | Runtime |
 | 相关 | [foreign-kernel.md](../design/foreign-kernel.md) · [notebook-session.md](../design/notebook-session.md) · [notebook-syntax.md](../design/notebook-syntax.md) · [foreign-notebook-decisions.md](../research/foreign-notebook-decisions.md) · [stdlib-foreign.md](../design/stdlib-foreign.md) · [notebook-session.md](notebook-session.md)（D 层路线） |
