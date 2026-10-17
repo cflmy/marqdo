@@ -370,6 +370,53 @@ impl DocumentSession {
         })
     }
 
+    /// Re-read the document, preserving kernels/state/journal. Changed cells become dirty.
+    pub fn reload(&mut self, root: &Path) -> Result<(), String> {
+        let mut fresh = Self::open(&self.path, root)?;
+        let old: HashMap<String, Cell> = self
+            .cells
+            .iter()
+            .cloned()
+            .map(|c| (c.name.clone(), c))
+            .collect();
+        for c in &mut fresh.cells {
+            if let Some(o) = old.get(&c.name) {
+                c.runs = o.runs;
+                c.last_ms = o.last_ms;
+                c.last_ok = o.last_ok;
+                c.last_error = o.last_error.clone();
+                c.status = if o.source_hash != c.source_hash || o.kernel != c.kernel {
+                    CellStatus::Dirty
+                } else if o.status == CellStatus::Running {
+                    CellStatus::Dirty
+                } else {
+                    o.status
+                };
+            }
+        }
+        fresh.host = std::mem::replace(&mut self.host, HostContext::default());
+        fresh.kernel_sessions = std::mem::take(&mut self.kernel_sessions);
+        fresh.value_store = std::mem::take(&mut self.value_store);
+        fresh.journal = std::mem::take(&mut self.journal);
+        fresh.seq = self.seq;
+        fresh.cursor = self.cursor.min(fresh.order.len());
+        fresh.opened_ms = self.opened_ms;
+        let known: HashSet<String> = fresh.kernels.iter().map(|k| k.name.clone()).collect();
+        let orphans: Vec<String> = fresh
+            .kernel_sessions
+            .keys()
+            .filter(|k| !known.contains(*k))
+            .cloned()
+            .collect();
+        for k in orphans {
+            if let Some(id) = fresh.kernel_sessions.remove(&k) {
+                let _ = foreign_session::close(&mut fresh.host, &Value::Text(id));
+            }
+        }
+        *self = fresh;
+        Ok(())
+    }
+
     pub fn title(&self) -> String {
         self.path
             .file_stem()
@@ -913,6 +960,35 @@ console.log(typeof shared === "undefined" ? "isolated" : "leaked");
         s.restart_all().unwrap();
         let r = s.run_cell("读取", None).unwrap();
         assert_eq!(field(&r, "ok"), Some(Value::Bool(false)));
+        s.close();
+        let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn reload_marks_changed_cell_dirty() {
+        if !node_available() {
+            return;
+        }
+        let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let path = root.join(format!(
+            "target/notebook-reload-{}-{}.mq.md",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_nanos())
+                .unwrap_or(0)
+        ));
+        let src = "# main\n\n`a` =\n```node\nconsole.log(1);\n```\n";
+        std::fs::write(&path, src).unwrap();
+        let mut s = DocumentSession::open(&path, &root).unwrap();
+        let r = s.run_cell("a", None).unwrap();
+        assert_eq!(field(&r, "ok"), Some(Value::Bool(true)));
+        assert_eq!(s.cells[0].status, CellStatus::Clean);
+        let src2 = "# main\n\n`a` =\n```node\nconsole.log(2);\n```\n";
+        std::fs::write(&path, src2).unwrap();
+        s.reload(&root).unwrap();
+        assert_eq!(s.cells[0].status, CellStatus::Dirty);
+        assert!(s.cells[0].source.contains("console.log(2)"));
         s.close();
         let _ = std::fs::remove_file(&path);
     }

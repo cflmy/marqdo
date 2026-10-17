@@ -2842,6 +2842,8 @@ fn notebook_ui() -> &'static str {
   <button type="button" id="nb-restart">Restart &amp; Run All</button>
   <button type="button" id="nb-step">Step</button>
   <button type="button" id="nb-state">State</button>
+  <button type="button" id="nb-journal">Journal</button>
+  <button type="button" id="nb-reload">Reload</button>
   <span id="nb-status">opening…</span>
 </div>
 <div class="notebook-bar" id="nb-state-actions" hidden>
@@ -3014,6 +3016,21 @@ fn notebook_ui() -> &'static str {
       post("/api/session/state/pull", { kernel: k, name: n }).then(function (r) {
         if (out) out.textContent = r.ok ? (n + " = " + JSON.stringify(r.value)) : (r.error || "pull failed");
         status(r.ok ? "pulled " + n + " ← " + k : "pull failed");
+      });
+    });
+    bind("nb-journal", function () {
+      post("/api/session/journal", {}).then(function (r) {
+        var pre = document.getElementById("nb-state-out");
+        if (!pre) return;
+        pre.hidden = false;
+        pre.textContent = JSON.stringify(r.journal || r, null, 2);
+      });
+    });
+    bind("nb-reload", function () {
+      post("/api/session/reload", {}).then(function (r) {
+        if (!r.ok) { status(r.error || "reload failed"); return; }
+        renderSummary(r.session);
+        status("reloaded");
       });
     });
     document.addEventListener("click", function (e) {
@@ -3428,6 +3445,8 @@ mod tests {
             "nb-restart",
             "nb-step",
             "nb-state",
+            "nb-journal",
+            "nb-reload",
             "nb-kernel-input",
             "nb-push",
             "nb-pull",

@@ -33,13 +33,14 @@
 | 同内核共享 / 跨内核隔离 | ✅ | Node 金样例 + 单测 |
 | `run_cell` / `step` / `run_all(restart)` | ✅ | `DocumentSession` |
 | `restart_kernel` / `assign_kernel` | ✅ | 同上 |
+| `kernel/interrupt` | 待做 | — |
 | 状态桥 `push` / `pull` / `state_list` | ✅ | `DocumentSession` + `foreign_session` |
-| journal（记录 + API） | ✅（UI 面板待补） | `DocumentSession::journal_json` |
+| journal（记录 + API + Journal 按钮） | ✅ | `DocumentSession::journal_json` · view |
 | view 工具栏 / 状态徽标 / 内核下拉 / 状态表单 | ✅ | `src/view/html.rs` |
-| `POST /api/session/*` | ✅ | `src/view/notebook_api.rs` |
+| `POST /api/session/*` | ✅（含 `reload`） | `src/view/notebook_api.rs` |
 | cell step | ✅ | 同上 |
 | Marqdo statement step | 复用 `marqdo debug`；view 集成待做 | `src/debug` |
-| dirty/stale 自动检测 | 部分（assign → dirty；reload 待做） | `src/notebook/mod.rs` |
+| dirty/stale 自动检测 | 部分（reload → dirty；assign → dirty；stale 传播待做） | `src/notebook/mod.rs` |
 | writeback 集成 | 待做 | `writeback` |
 | replay / 持久化 | 待做 | — |
 | Python 会话 | ✅（本机无 python，CI/用户机条件测试） | `src/host/foreign_session.rs` |
@@ -418,7 +419,7 @@ Kernel: [分析 ▾]  Status: ready  [Restart] [Interrupt]
 | POST | `/api/session/state/pull` | kernel 变量 → value store |
 | POST | `/api/session/statement/step` | Marqdo 语句单步（复用 debug） |
 | POST | `/api/session/writeback` | 显式写回 cell 输出 |
-| GET | `/api/session/journal` | 执行日志 |
+| POST | `/api/session/journal` | 执行日志 |
 | GET | `/api/session` | 当前会话摘要 |
 
 响应统一：`{ok, session, ...}`；错误 `{ok:false, error, code?}`。

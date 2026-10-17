@@ -179,6 +179,11 @@ fn handle(root: &ViewRoot, request: Request) -> Result<()> {
                     notebook_api::api_open(&root.root, body)
                 })
             }
+            "/api/session/reload" => {
+                return api_debug_post(request, |body| {
+                    notebook_api::api_reload(&root.root, body)
+                })
+            }
             "/api/session/close" => {
                 return api_debug_post(request, |body| {
                     notebook_api::api_close(&root.root, body)

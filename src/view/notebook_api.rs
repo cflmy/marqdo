@@ -75,7 +75,30 @@ pub fn api_open(root: &Path, body: &str) -> serde_json::Value {
     };
     match get_or_open(root, &abs) {
         Ok(s) => match s.lock() {
-            Ok(sess) => ok_session(&sess, serde_json::json!({})),
+            Ok(mut sess) => {
+                if let Err(e) = sess.reload(root) {
+                    return err(e);
+                }
+                ok_session(&sess, serde_json::json!({}))
+            }
+            Err(_) => err("session lock poisoned".into()),
+        },
+        Err(e) => err(e),
+    }
+}
+
+pub fn api_reload(root: &Path, body: &str) -> serde_json::Value {
+    let v = body_value(body);
+    let (_rel, abs) = match path_of(root, &v) {
+        Ok(p) => p,
+        Err(e) => return err(e),
+    };
+    match get_or_open(root, &abs) {
+        Ok(s) => match s.lock() {
+            Ok(mut sess) => match sess.reload(root) {
+                Ok(()) => ok_session(&sess, serde_json::json!({})),
+                Err(e) => err(e),
+            },
             Err(_) => err("session lock poisoned".into()),
         },
         Err(e) => err(e),
