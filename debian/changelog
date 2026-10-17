@@ -1,3 +1,14 @@
+marqdo (1.5.0-1ppa1) noble; urgency=medium
+
+  * Marqdo 1.5.0: Foreign kernels v2 (structured invoke, JSON calls,
+    parallel fan-out, persistent Python/Node kernels, explicit state
+    bridge) and document-native notebooks in view; high-contrast
+    light/dark view themes, resizable code/output panes, OKF/EKC and
+    Python examples on the user site. Fixes branch-local variables
+    leaking into required constructor parameters.
+
+ -- cflmy <pingan@cflmy.cn>  Sun, 18 Oct 2026 03:30:00 +0800
+
 marqdo (1.4.6-1ppa1) noble; urgency=medium
 
   * Marqdo 1.4.6: Promote a bare self-increment to a required parameter.
