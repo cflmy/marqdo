@@ -11,6 +11,8 @@
 | [`keywords/`](keywords/) | 关键字与 L0 内置 |
 | [`stdlib/`](stdlib/) | **标准库**（导入方式 + text/表/文件/时间/系统/json/网络/数学/外联/插件/**自写回**/**子任务**；v0.1.2+ 内置于 CLI） |
 | [`features/`](features/) | 特性迭代（含对象、官方 `ext/`） |
+| [`features/19-foreign-notebook.mq.md`](features/19-foreign-notebook.mq.md) / [`19-外联Notebook.mq.md`](features/19-外联Notebook.mq.md) | 外联 v2 完整 Python 示例：probe / JSON call / 并行 / 持久内核 / 状态桥 / notebook |
+| [`features/20-okf-ekc.mq.md`](features/20-okf-ekc.mq.md) / [`20-OKF与EKC.mq.md`](features/20-OKF与EKC.mq.md) | 代码即文档、文档即知识：OKF 形态与 EKC 工程知识编译器 |
 
 官方扩展（非 stdlib）：`ext/llm`、`ext/agent`、`ext/web`、`ext/quantum`、`ext/linalg` — 见 `features/05-*.mq.md`、`06-*.mq.md`、`07-linalg.mq.md` / `07-线性代数.mq.md` 与 `doc/design/ext-*.md`。
 

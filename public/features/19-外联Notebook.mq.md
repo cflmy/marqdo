@@ -1,0 +1,183 @@
+---
+title: 外联内核 v2 — Python 分析 Notebook
+description: 从 probe、JSON 调用、并行扇出、持久状态到显式桥与文档原生 notebook 单元的完整 Python 示例
+导入 外联:lib/外联.mq.md
+---
+
+# main
+
+这一页既是可读文档，也是可运行程序。它用同一份文件展示 v2 的外联内核能力：语言探测、结构化记录、JSON 进出、并行扇出、持久 Python 内核，以及显式状态桥。
+
+数据故意保持小而确定，因此下面每个数字都可以通过运行本页复现。
+
+---
+
+输入数据。
+
+`订单` =
+
+| @ | 区域 | 金额 |
+|---|------|------|
+| 1 | 华东 | 120 |
+| 2 | 华东 | 300 |
+| 3 | 华南 | 90 |
+| 4 | 华南 | 140 |
+| 5 | 华北 | 220 |
+| 6 | 西部 | 80 |
+
+---
+
+先探测 Python。
+
+**python = > 外联.探测 语言="python"**
+
+> 打印 内容=[ok](`python`)
+> 打印 内容=[version](`python`)
+
+探测记录还带 `cmd`、`path` 与 `error`，所以站点可以解释“解释器缺失”，而不是显示一个空白单元。
+
+---
+
+JSON 调用。Python 把表读成 JSON，按区域聚合，再写出一个 JSON 结果。
+
+`分析` =
+```python
+import json
+import statistics
+import sys
+
+rows = json.load(sys.stdin)
+by_region = {}
+for row in rows:
+    by_region.setdefault(row["区域"], []).append(float(row["金额"]))
+
+summary = []
+for region, values in sorted(by_region.items()):
+    mean = statistics.mean(values)
+    sd = statistics.pstdev(values) or 1.0
+    summary.append({
+        "region": region,
+        "orders": len(values),
+        "total": round(sum(values), 2),
+        "mean": round(mean, 2),
+        "z_span": round((max(values) - mean) / sd, 3),
+    })
+
+print(json.dumps({
+    "regions": summary,
+    "total": round(sum(float(row["金额"]) for row in rows), 2),
+    "count": len(rows),
+}, ensure_ascii=False))
+```
+
+**结果 = > 外联.调用 代码=`分析` 输入=`订单`**
+
+> 打印 内容=[count](`结果`)
+> 打印 内容=[total](`结果`)
+> 打印 内容=[region]([1]([regions](`结果`)))
+> 打印 内容=[mean]([1]([regions](`结果`)))
+
+调用是 JSON 进 / JSON 出：表编码到 stdin，stdout 的最后一个值再解析成 Marqdo 值。
+
+---
+
+同样的工作也可以保留成结构化记录。`执行` 即使进程失败也保留 stdout、stderr、退出码与耗时。
+
+**记录 = > 外联.执行 代码=`分析` 输入=`订单` 输出="json"**
+
+> 打印 内容=[ok](`记录`)
+> 打印 内容=[code](`记录`)
+> 打印 内容=[ms](`记录`)
+
+这里 `result` 已经是解析后的值，同时 `stdout` 仍可用于日志。
+
+---
+
+持久 Python 状态。第一次求值导入模块并创建列表；第二次求值仍能看到两者。
+
+**会话 = > 外联.会话开启 语言="python"**
+
+**第一次 = > 外联.会话求值 标识=`会话` 源码="import math\nvalues = [3, 4, 5]"**
+
+**第二次 = > 外联.会话求值 标识=`会话` 源码="round(math.sqrt(sum(value * value for value in values)), 3)"**
+
+> 打印 内容=[result](`第二次`)
+
+内核严格串行：求值不会交错，超时会杀掉进程组。
+
+---
+
+显式状态桥。值以 JSON 拷贝跨越边界，永远不是共享对象引用。
+
+**> 外联.会话设值 标识=`会话` 名称="threshold" 值=2.5**
+
+**阈值 = > 外联.会话取值 标识=`会话` 名称="threshold"**
+
+> 打印 内容=`阈值`
+
+**> 外联.会话关闭 标识=`会话`**
+
+没有隐式镜像：没有 push / pull 的变量，另一边看不到。
+
+---
+
+并行扇出。每个输入都有独立进程；失败互相隔离，顺序保持不变。
+
+`加一` =
+```python
+import json
+import sys
+
+value = json.load(sys.stdin)
+print(json.dumps(value + 1))
+```
+
+`数值` =
+
+| value |
+|-------|
+| 1 |
+| 2 |
+| 3 |
+| 4 |
+
+**加一后 = > 外联.批量调用 代码=`加一` 输入表=`数值` 并发=4**
+
+> 打印 内容=`加一后`
+
+---
+
+文档原生 Notebook。命名内核和会话表都是普通绑定数据表，不是 fence 元数据或 YAML 配置。
+
+```text
+`内核表` =
+
+| 名称 | 语言 | 命令 | 说明 |
+|------|------|------|------|
+| 分析 | python | | 共享分析 |
+| 复核 | python | | 独立复核 |
+
+`会话表` =
+
+| 单元 | 内核 | 说明 |
+|------|------|------|
+| 准备数据 | 分析 | 生成订单 |
+| 计算指标 | 分析 | 区域与总额 |
+| 独立复核 | 复核 | 读取 JSON 报告 |
+```
+
+live `view` 会把这些渲染成带 Run All、Step、切换内核、journal、dirty reload 和状态面板的单元。同一份文件仍可作为单个程序运行。
+
+---
+
+为什么它仍然可读。
+
+| 层 | 读者看到什么 |
+|---|---|
+| Markdown | 标题、叙述、表格与围栏代码 |
+| 程序 | 赋值、调用与返回值 |
+| 知识 | frontmatter、链接、任务页与生成的 catalog 条目 |
+
+外联层没有给语言新增语法。围栏还是围栏，表还是表。
+
+底层 API 与安全默认值见 [`../../lib/外联.mq.md`](../../lib/外联.mq.md) 与 [`../../doc/design/foreign-kernel.md`](../../doc/design/foreign-kernel.md)。

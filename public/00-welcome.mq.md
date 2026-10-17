@@ -37,6 +37,59 @@ print("hello-from-python")
 
 Under Markdown this stays easy to read — which is the point: code as documentation, documentation as code.
 
+One file, three surfaces.
+
+| Surface | What it is |
+|---|---|
+| Document | ordinary Markdown: prose, tables, links and fenced code |
+| Program | the same markers are executable: assignments, calls, returns |
+| Knowledge | frontmatter, links and generated catalog entries an agent can query |
+
+The static site you are reading is generated from these files, so the examples are not screenshots. Run the same source and you get the same page.
+
+Foreign v2 is a good example. Probe Python, then run the bound fence:
+
+**python = > foreign.probe lang="python"**
+
+1. [ok](`python`)
+  **hello = > foreign.run code=`hi`**
+  > print text=`hello`
+2. *
+  > print text="(python3 not found — install Python to run this cell)"
+
+The same module also supports JSON calls, parallel fan-out, persistent kernels and an explicit state bridge. See [stdlib/foreign.mq.md](stdlib/foreign.mq.md) and the full Python walkthrough in [features/19-foreign-notebook.mq.md](features/19-foreign-notebook.mq.md).
+
+A notebook is still a document. Named kernels and a cell order are ordinary bound tables:
+
+```text
+`内核表` =
+
+| 名称 | 语言 | 说明 |
+|------|------|------|
+| 分析 | python | shared state |
+| 复核 | python | isolated state |
+
+`会话表` =
+
+| 单元 | 内核 | 说明 |
+|------|------|------|
+| 准备数据 | 分析 | write |
+| 计算指标 | 分析 | read |
+| 独立复核 | 复核 | validate |
+```
+
+Live view turns that into Run All, Step, per-cell kernels, a journal and a state panel. Program mode still runs the file as one program.
+
+Documentation becomes knowledge when it can be discovered, verified and reused. OKF supplies the portable Markdown + YAML shape; EKC projects the repository into catalog layers L0–L4, a graph and an engineering preflight. The source `.mq.md` remains the only authority; generated artifacts are marked and rebuildable.
+
+| Loop | Question |
+|---|---|
+| OKF | How do people and agents share a readable knowledge page? |
+| EKC | What existing capability, decision, constraint or failure should be reused before creating more? |
+| Preflight | REUSE → ADAPT → CREATE |
+
+Read [features/20-okf-ekc.mq.md](features/20-okf-ekc.mq.md) for the concepts and commands.
+
 Welcome again — enjoy exploring Marqdo.
 
 ## greet
