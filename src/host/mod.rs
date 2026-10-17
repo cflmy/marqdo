@@ -14,6 +14,8 @@ mod encoding;
 pub mod event_bus;
 #[cfg(feature = "exec-host")]
 pub mod foreign;
+#[cfg(feature = "exec-host")]
+pub mod foreign_session;
 mod fs;
 mod hash;
 mod html_ops;
@@ -99,6 +101,12 @@ pub struct HostContext {
     pub foreign_config_specs: HashMap<String, crate::foreign::registry::LangSpec>,
     /// Whether project config has been discovered/loaded.
     pub foreign_config_loaded: bool,
+    /// Persistent foreign kernels (`session_open`).
+    #[cfg(feature = "exec-host")]
+    pub foreign_sessions: HashMap<String, foreign_session::Session>,
+    /// Monotonic session id counter.
+    #[cfg(feature = "exec-host")]
+    pub foreign_session_seq: u64,
     /// Loaded native plugins (ABI v1/v2).
     pub plugins: PluginState,
     /// Entry `.mq.md` source text (for ABI host_query / context injection).
@@ -137,6 +145,10 @@ impl Default for HostContext {
             foreign_specs: HashMap::new(),
             foreign_config_specs: HashMap::new(),
             foreign_config_loaded: false,
+            #[cfg(feature = "exec-host")]
+            foreign_sessions: HashMap::new(),
+            #[cfg(feature = "exec-host")]
+            foreign_session_seq: 0,
             plugins: PluginState::default(),
             entry_source: None,
             entry_path: None,
@@ -155,6 +167,8 @@ impl Default for HostContext {
 impl Drop for HostContext {
     fn drop(&mut self) {
         subtask::kill_all(self);
+        #[cfg(feature = "exec-host")]
+        foreign_session::shutdown(self);
     }
 }
 

@@ -210,6 +210,13 @@ pub enum HostFn {
     ForeignCall = 201,
     ForeignRunMany = 202,
     ForeignCallMany = 203,
+    ForeignSessionOpen = 204,
+    ForeignSessionEval = 205,
+    ForeignSessionSet = 206,
+    ForeignSessionGet = 207,
+    ForeignSessionNames = 208,
+    ForeignSessionClose = 209,
+    ForeignSessionList = 210,
 }
 
 
@@ -410,6 +417,13 @@ impl HostFn {
             201 => Self::ForeignCall,
             202 => Self::ForeignRunMany,
             203 => Self::ForeignCallMany,
+            204 => Self::ForeignSessionOpen,
+            205 => Self::ForeignSessionEval,
+            206 => Self::ForeignSessionSet,
+            207 => Self::ForeignSessionGet,
+            208 => Self::ForeignSessionNames,
+            209 => Self::ForeignSessionClose,
+            210 => Self::ForeignSessionList,
             _ => return None,
         })
     }
@@ -494,6 +508,13 @@ impl HostFn {
             "host_foreign_call" | "foreign_call" => Self::ForeignCall,
             "host_foreign_run_many" | "foreign_run_many" => Self::ForeignRunMany,
             "host_foreign_call_many" | "foreign_call_many" => Self::ForeignCallMany,
+            "host_foreign_session_open" | "foreign_session_open" => Self::ForeignSessionOpen,
+            "host_foreign_session_eval" | "foreign_session_eval" => Self::ForeignSessionEval,
+            "host_foreign_session_set" | "foreign_session_set" => Self::ForeignSessionSet,
+            "host_foreign_session_get" | "foreign_session_get" => Self::ForeignSessionGet,
+            "host_foreign_session_names" | "foreign_session_names" => Self::ForeignSessionNames,
+            "host_foreign_session_close" | "foreign_session_close" => Self::ForeignSessionClose,
+            "host_foreign_session_list" | "foreign_session_list" => Self::ForeignSessionList,
             "host_foreign_langs" => Self::ForeignLangs,
             "host_dotenv_load" | "load_dotenv" => Self::DotenvLoad,
             "host_http_request" | "http_request" => Self::HttpRequest,
@@ -698,6 +719,13 @@ impl HostFn {
             Self::ForeignCall => "host_foreign_call",
             Self::ForeignRunMany => "host_foreign_run_many",
             Self::ForeignCallMany => "host_foreign_call_many",
+            Self::ForeignSessionOpen => "host_foreign_session_open",
+            Self::ForeignSessionEval => "host_foreign_session_eval",
+            Self::ForeignSessionSet => "host_foreign_session_set",
+            Self::ForeignSessionGet => "host_foreign_session_get",
+            Self::ForeignSessionNames => "host_foreign_session_names",
+            Self::ForeignSessionClose => "host_foreign_session_close",
+            Self::ForeignSessionList => "host_foreign_session_list",
             Self::ForeignLangs => "host_foreign_langs",
             Self::DotenvLoad => "host_dotenv_load",
             Self::HttpRequest => "host_http_request",
@@ -869,6 +897,13 @@ impl HostFn {
             Self::ForeignRegister | Self::ForeignUnset => &["lang"],
             Self::ForeignRunMany => &["runs"],
             Self::ForeignCallMany => &["inputs"],
+            Self::ForeignSessionOpen => &["lang"],
+            Self::ForeignSessionEval => &["id"],
+            Self::ForeignSessionSet => &["id", "name", "value"],
+            Self::ForeignSessionGet => &["id", "name"],
+            Self::ForeignSessionNames => &["id"],
+            Self::ForeignSessionClose => &["id"],
+            Self::ForeignSessionList => &[],
             Self::ForeignLangs => &[],
             Self::PluginLoad => &["path"],
             Self::PluginUnload | Self::PluginList => &[],
@@ -1017,6 +1052,13 @@ impl HostFn {
                 "max_output",
                 "concurrency",
             ],
+            Self::ForeignSessionOpen => &["cmd", "env", "cwd", "timeout"],
+            Self::ForeignSessionEval => &["code", "source", "input", "timeout"],
+            Self::ForeignSessionSet
+            | Self::ForeignSessionGet
+            | Self::ForeignSessionNames
+            | Self::ForeignSessionClose
+            | Self::ForeignSessionList => &[],
             Self::WritebackRecord | Self::WritebackGet | Self::WritebackClear => {
                 &["at_end", "key", "line"]
             }
@@ -1447,6 +1489,106 @@ pub fn call_host(
             {
                 let _ = (ctx, bound);
                 Err("foreign unavailable in browser wasm".into())
+            }
+        }
+        HostFn::ForeignSessionOpen => {
+            #[cfg(feature = "exec-host")]
+            {
+                crate::host::foreign_session::open(
+                    ctx,
+                    require(bound, "lang")?,
+                    bound.get("cmd"),
+                    bound.get("env"),
+                    bound.get("cwd"),
+                    bound.get("timeout"),
+                )
+            }
+            #[cfg(not(feature = "exec-host"))]
+            {
+                let _ = (ctx, bound);
+                Err("foreign unavailable in browser wasm".into())
+            }
+        }
+        HostFn::ForeignSessionEval => {
+            #[cfg(feature = "exec-host")]
+            {
+                crate::host::foreign_session::eval(
+                    ctx,
+                    require(bound, "id")?,
+                    bound.get("code"),
+                    bound.get("source"),
+                    bound.get("input"),
+                    bound.get("timeout"),
+                )
+            }
+            #[cfg(not(feature = "exec-host"))]
+            {
+                let _ = (ctx, bound);
+                Err("foreign unavailable in browser wasm".into())
+            }
+        }
+        HostFn::ForeignSessionSet => {
+            #[cfg(feature = "exec-host")]
+            {
+                crate::host::foreign_session::set(
+                    ctx,
+                    require(bound, "id")?,
+                    require(bound, "name")?,
+                    require(bound, "value")?,
+                )
+            }
+            #[cfg(not(feature = "exec-host"))]
+            {
+                let _ = (ctx, bound);
+                Err("foreign unavailable in browser wasm".into())
+            }
+        }
+        HostFn::ForeignSessionGet => {
+            #[cfg(feature = "exec-host")]
+            {
+                crate::host::foreign_session::get(
+                    ctx,
+                    require(bound, "id")?,
+                    require(bound, "name")?,
+                )
+            }
+            #[cfg(not(feature = "exec-host"))]
+            {
+                let _ = (ctx, bound);
+                Err("foreign unavailable in browser wasm".into())
+            }
+        }
+        HostFn::ForeignSessionNames => {
+            #[cfg(feature = "exec-host")]
+            {
+                crate::host::foreign_session::names(ctx, require(bound, "id")?)
+            }
+            #[cfg(not(feature = "exec-host"))]
+            {
+                let _ = (ctx, bound);
+                Err("foreign unavailable in browser wasm".into())
+            }
+        }
+        HostFn::ForeignSessionClose => {
+            #[cfg(feature = "exec-host")]
+            {
+                crate::host::foreign_session::close(ctx, require(bound, "id")?)
+            }
+            #[cfg(not(feature = "exec-host"))]
+            {
+                let _ = (ctx, bound);
+                Err("foreign unavailable in browser wasm".into())
+            }
+        }
+        HostFn::ForeignSessionList => {
+            #[cfg(feature = "exec-host")]
+            {
+                crate::host::foreign_session::list(ctx)
+            }
+            #[cfg(not(feature = "exec-host"))]
+            {
+                let _ = ctx;
+                Ok(Value::List(Vec::new()))
             }
         }
         HostFn::ForeignLangs => {

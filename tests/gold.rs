@@ -3403,6 +3403,36 @@ fn lib_foreign_config() {
 }
 
 #[test]
+fn lib_foreign_session() {
+    if !node_available() {
+        eprintln!("skip lib_foreign_session: no node on PATH");
+        return;
+    }
+    assert_out("tests/lib/foreign-session.mq.md", "42\n41\n5\n1\nTrue");
+}
+
+#[test]
+fn lib_foreign_session_timeout() {
+    if !node_available() {
+        eprintln!("skip lib_foreign_session_timeout: no node on PATH");
+        return;
+    }
+    assert_out(
+        "tests/lib/foreign-session-timeout.mq.md",
+        "False\nTrue\nFalse",
+    );
+}
+
+#[test]
+fn lib_foreign_session_python() {
+    if !python_available() {
+        eprintln!("skip lib_foreign_session_python: no python on PATH");
+        return;
+    }
+    assert_out("tests/lib/foreign-session-python.mq.md", "42\n5");
+}
+
+#[test]
 fn bytecode_lib_math_formula() {
     assert_out_backend(
         "tests/lib/math-formula.mq.md",

@@ -1291,6 +1291,13 @@ fn resolve_spec(ctx: &HostContext, lang: &str) -> Result<LangSpec, String> {
     ))
 }
 
+pub(crate) fn resolve_session_spec(
+    ctx: &HostContext,
+    lang: &str,
+) -> Result<LangSpec, String> {
+    resolve_spec(ctx, lang)
+}
+
 struct Invocation {
     argv: Vec<String>,
     template: Option<Vec<String>>,

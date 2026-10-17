@@ -6,6 +6,7 @@
 
 - **`lib/foreign` F0/F1**：`invoke` 结构化记录（`ok`/`code`/`stdout`/`stderr`/`ms`/`timed_out`/`truncated`/`result`）；`run`/`run_lang` 新增 `env`/`cwd`/`timeout`/`args`/`max_output`；15 个语言预设；`probe`/`register`/`unset`/`load_config`；`.marqdo/foreign.toml`。
 - **`lib/foreign` F2**：JSON 进 / JSON 出 `call`；并行 `run_many` / `call_many`（有序、单项隔离、并发上限）；`invoke` 的 `input` / `output` / `result` / `result_error`。
+- **`lib/foreign` F3/F3.5**：Python / Node 持久会话 `session_open` / `session_eval` / `session_close` / `session_list`；状态桥 `session_set` / `session_get` / `session_names`；会话超时即杀、崩溃隔离、drop 清理。
 - **安全与健壮性**：所有外联入口检查 `exec` 能力；有界 stdout/stderr 读取与截断标记；stdin 写线程；Unix 进程组 / Windows `taskkill /T` 超时清理；shell-like argv 切分。
 
 ### Fixed

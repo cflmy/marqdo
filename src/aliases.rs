@@ -124,7 +124,7 @@ pub fn canonical_param(builtin: &str, param: &str) -> String {
         ("host_json_stringify" | "stringify", "indent" | "缩进") => "indent".into(),
         ("host_plot", "steps" | "步数") => "steps".into(),
         ("host_plot", "derivative" | "导数") => "derivative".into(),
-        ("host_foreign_run" | "host_foreign_invoke" | "host_foreign_call" | "host_foreign_call_many", "code" | "代码") => "code".into(),
+        ("host_foreign_run" | "host_foreign_invoke" | "host_foreign_call" | "host_foreign_call_many" | "host_foreign_session_eval", "code" | "代码") => "code".into(),
         (
             "host_foreign_run" | "host_foreign_run_lang" | "host_foreign_invoke"
             | "host_foreign_call",
@@ -138,27 +138,29 @@ pub fn canonical_param(builtin: &str, param: &str) -> String {
             | "host_foreign_register"
             | "host_foreign_unset"
             | "host_foreign_call"
-            | "host_foreign_call_many",
+            | "host_foreign_call_many"
+            | "host_foreign_session_open",
             "lang" | "语言",
         ) => "lang".into(),
         (
             "host_foreign_set_cmd"
             | "host_foreign_invoke"
             | "host_foreign_register"
-            | "host_foreign_call_many",
+            | "host_foreign_call_many"
+            | "host_foreign_session_open",
             "cmd" | "命令",
         ) => "cmd".into(),
-        ("host_foreign_run_lang" | "host_foreign_invoke" | "host_foreign_call" | "host_foreign_call_many", "source" | "源码") => "source".into(),
+        ("host_foreign_run_lang" | "host_foreign_invoke" | "host_foreign_call" | "host_foreign_call_many" | "host_foreign_session_eval", "source" | "源码") => "source".into(),
         (
-            "host_foreign_run" | "host_foreign_run_lang" | "host_foreign_invoke" | "host_foreign_call" | "host_foreign_call_many",
+            "host_foreign_run" | "host_foreign_run_lang" | "host_foreign_invoke" | "host_foreign_call" | "host_foreign_call_many" | "host_foreign_session_open" | "host_foreign_session_eval",
             "env" | "环境",
         ) => "env".into(),
         (
-            "host_foreign_run" | "host_foreign_run_lang" | "host_foreign_invoke" | "host_foreign_call" | "host_foreign_call_many",
+            "host_foreign_run" | "host_foreign_run_lang" | "host_foreign_invoke" | "host_foreign_call" | "host_foreign_call_many" | "host_foreign_session_open" | "host_foreign_session_eval",
             "cwd" | "工作目录",
         ) => "cwd".into(),
         (
-            "host_foreign_run" | "host_foreign_run_lang" | "host_foreign_invoke" | "host_foreign_call" | "host_foreign_call_many",
+            "host_foreign_run" | "host_foreign_run_lang" | "host_foreign_invoke" | "host_foreign_call" | "host_foreign_call_many" | "host_foreign_session_open" | "host_foreign_session_eval",
             "timeout" | "超时",
         ) => "timeout".into(),
         (
@@ -170,7 +172,10 @@ pub fn canonical_param(builtin: &str, param: &str) -> String {
             "host_foreign_run" | "host_foreign_run_lang" | "host_foreign_invoke" | "host_foreign_call_many",
             "max_output" | "最大输出",
         ) => "max_output".into(),
-        ("host_foreign_invoke" | "host_foreign_call", "input" | "输入") => "input".into(),
+        ("host_foreign_invoke" | "host_foreign_call" | "host_foreign_session_eval", "input" | "输入") => "input".into(),
+        ("host_foreign_session_eval" | "host_foreign_session_set" | "host_foreign_session_get" | "host_foreign_session_names" | "host_foreign_session_close", "id" | "标识") => "id".into(),
+        ("host_foreign_session_set" | "host_foreign_session_get", "name" | "名称") => "name".into(),
+        ("host_foreign_session_set", "value" | "值") => "value".into(),
         ("host_foreign_invoke", "output" | "输出") => "output".into(),
         ("host_foreign_invoke", "keep" | "保留") => "keep".into(),
         ("host_foreign_register", "template" | "模板") => "template".into(),

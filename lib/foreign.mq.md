@@ -148,6 +148,67 @@ in input order. Raises with the failing index after all workers finish.
 
 *> host_foreign_call_many inputs=`inputs` code=`code` lang=`lang` source=`source` cmd=`cmd` env=`env` cwd=`cwd` timeout=`timeout` args=`args` max_output=`max_output` concurrency=`concurrency`*
 
+## session_open
+    + `lang`
+    + `cmd`=None
+    + `env`=None
+    + `cwd`=None
+    + `timeout`=None
+
+Start a persistent Python/Node kernel; returns a session id. `timeout` is the
+default per-eval timeout.
+
+*> host_foreign_session_open lang=`lang` cmd=`cmd` env=`env` cwd=`cwd` timeout=`timeout`*
+
+## session_eval
+    + `id`
+    + `code`=None
+    + `source`=None
+    + `input`=None
+    + `timeout`=None
+
+Evaluate code (a code value) or source text in session id; returns a record
+with id/alive. `input` is JSON-encoded for the kernel.
+
+*> host_foreign_session_eval id=`id` code=`code` source=`source` input=`input` timeout=`timeout`*
+
+## session_set
+    + `id`
+    + `name`
+    + `value`
+
+Set one kernel variable from a Marqdo value (JSON copy).
+
+*> host_foreign_session_set id=`id` name=`name` value=`value`*
+
+## session_get
+    + `id`
+    + `name`
+
+Read one kernel variable as a Marqdo value.
+
+*> host_foreign_session_get id=`id` name=`name`*
+
+## session_names
+    + `id`
+
+List kernel variable names.
+
+*> host_foreign_session_names id=`id`*
+
+## session_close
+    + `id`
+
+Kill and remove a session; returns whether it existed.
+
+*> host_foreign_session_close id=`id`*
+
+## session_list
+
+List live sessions with id/lang/cmd/evals/alive/started_ms.
+
+*> host_foreign_session_list*
+
 ## langs
 
 List configured foreign languages.
