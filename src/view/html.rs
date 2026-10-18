@@ -1663,15 +1663,7 @@ pub fn layout(title: &str, nav: &str, main: &str) -> String {
       var body = card.querySelector(".code-body code");
       // Narrative ```text``` cards have no Run chrome — leave as-is.
       if (!btn) return;
-      if (!live) {{
-        // Static: hide fake Run (view-static-interactive D5 / view-prose-annot-gaps P4).
-        if (foot) foot.hidden = true;
-        else {{
-          btn.hidden = true;
-          if (cmd) cmd.hidden = true;
-        }}
-        return;
-      }}
+      if (!live) return; // static actions are bound to the view-shell notice
       if (!out || !body) return;
       btn.addEventListener("click", function () {{
         btn.disabled = true;
@@ -3517,7 +3509,7 @@ body.notebook-page .stdin-form button {
   var savedTheme = "dark";
   try { savedTheme = localStorage.getItem(THEME_KEY) || "dark"; } catch (e) {}
   applyTheme(savedTheme);
-  if (!window.MARQDO_VIEW_LIVE) return;
+  var live = !!window.MARQDO_VIEW_LIVE;
   var path = window.MARQDO_FILE_PATH || "";
   if (!path) return;
   var state = { open: false, persistent: false, kernels: [], cells: {} };
@@ -3701,6 +3693,25 @@ body.notebook-page .stdin-form button {
         foot.remove();
       }
     });
+    if (!live) {
+      var staticBar = document.getElementById("notebook-bar");
+      if (staticBar) staticBar.hidden = false;
+      function staticNotice() {
+        status("静态页面无法真实执行 / static export: no live execution");
+      }
+      ["nb-run-all", "nb-restart", "nb-step", "nb-state", "nb-journal",
+       "nb-clear", "nb-reload", "nb-debug", "exec-clear"].forEach(function (id) {
+        bind(id, staticNotice);
+      });
+      document.querySelectorAll(".code-run").forEach(function (btn) {
+        btn.addEventListener("click", function (e) {
+          e.preventDefault();
+          staticNotice();
+        });
+      });
+      status("static export · preview only");
+      return;
+    }
     bind("nb-run-all", function () { runAll(false); });
     bind("nb-restart", function () { runAll(true); });
     bind("nb-step", function () {
@@ -3895,11 +3906,7 @@ pub fn page_file(files: &[PathBuf], rel: &str, vm: &FileViewModel, links: &LinkM
         LinkMode::Live => "true",
         LinkMode::Static { .. } => "false",
     };
-    let exec_clear = if matches!(links, LinkMode::Live) {
-        r#"<button type="button" class="exec-clear" id="exec-clear">Clear</button>"#
-    } else {
-        ""
-    };
+    let exec_clear = r#"<button type="button" class="exec-clear" id="exec-clear">Clear</button>"#;
     let outline_block = if vm.outline_html.is_empty() {
         String::new()
     } else {
