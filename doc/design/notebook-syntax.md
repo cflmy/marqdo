@@ -110,7 +110,7 @@ Marqdo 的选择：
 ````markdown
 # main
 
-这份文档演示一个最小 notebook：两个 Python 单元共享 `分析` 内核，
+这份文档演示一个最小 view cells 文档：两个 Python 单元共享 `分析` 内核，
 一个绘图单元在隔离的 `绘图` 内核里运行。
 
 `内核表` =
@@ -211,7 +211,7 @@ print(x + 1)
 
 ## 5. 可读性规则（语法评审标准）
 
-新增/修改任何 notebook 语法，必须满足：
+新增/修改任何 cell 表约定，必须满足：
 
 1. **先读人话**：去掉执行语义后，表格仍像目录/清单。
 2. **不使用属性串**：不写 `kernel=…`、`class=…`、JSON/YAML 元数据。
@@ -243,12 +243,12 @@ print(x + 1)
 
 ---
 
-## 7. 与 Program mode 的关系
+## 7. 与 program execution 的关系
 
 - `内核表` / `会话表` 是**声明**，不是执行指令。
 - `marqdo run` 仍然执行 `# main` 的程序语义；这两个表会被求值为普通数据。
 - `run` 的外联编排用显式 API（`foreign.session_open` / `session_eval` / `call`）；表只服务 `view` 的 cells 与一键 Run All。
-- 两种模式可以并存：
+- 两者可以并存：
   - 文档用表描述“交互时怎么跑”；
   - `# main` 用显式调用描述“CI 时怎么跑”。
 - 如果两者冲突，以 `run` 的程序语义为准；cell 表只影响 `view`。

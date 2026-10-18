@@ -23,11 +23,12 @@
 
 ---
 
-## 1.1 实施状态（2026-10-17）
+## 1.1 实施状态（2026-10-18）
 
 | 能力 | 状态 | 位置 |
 |---|---|---|
 | `内核表` / `会话表` 解析（中英列名） | ✅ | `src/notebook/mod.rs` |
+| cell plan 求值 | ✅ 解释器 `capture_declarations`；不再扫描源码行 | `src/interp.rs` · `src/notebook/mod.rs` |
 | cell index（绑定名 / 行号 / source hash） | ✅ | 同上 |
 | 命名内核 + 默认内核 + 语言校验 | ✅ | 同上 |
 | 同内核共享 / 跨内核隔离 | ✅ | Node 金样例 + 单测 |
@@ -50,7 +51,7 @@
 
 ---
 
-## 2. 两种执行面（不是两个 CLI 模式）
+## 2. 两个执行面（不是两个 CLI 模式）
 
 ### 2.1 Program execution（规范）
 
@@ -130,7 +131,7 @@ DocumentSession
 1. 读取/解析文档（现有 `parse_source` / `load_module`）。
 2. 遍历 AST，找 `Stmt::Assign { name, value: Expr::Code(c) }`。
 3. 记录 name、lang、source、span、source hash。
-4. 读取 `内核表` / `会话表` 绑定（见 [notebook-syntax.md](notebook-syntax.md)）。
+4. 通过解释器求值 `内核表` / `会话表` 绑定（`capture_declarations`，含简单依赖）；不扫描源码行（见 [notebook-syntax.md](notebook-syntax.md)）。
 5. 解析 kernel 声明与 cell 归属；校验；生成诊断。
 6. 生成执行顺序：
    - 有会话表 → 行顺序；

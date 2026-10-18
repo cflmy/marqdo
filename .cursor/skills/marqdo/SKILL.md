@@ -210,7 +210,7 @@ Design: [ext-quantum.md](../../doc/design/ext-quantum.md) · Q7: [ext-quantum-q7
 - `invoke` returns a record (`ok`, `code`, `stdout`, `stderr`, `ms`, `timed_out`, `truncated`, `result`); pass `input` for JSON stdin and `output="json"` for a parsed result.
 - `call` is JSON-in / JSON-out; `call_many` fans out one program over a list with ordered results.
 - `session_open` starts a persistent Python/Node kernel; `session_eval` evaluates source; `session_set` / `session_get` bridge values explicitly as JSON. Close it with `session_close`.
-- A view document can expose cells: bind `内核表` and `会话表` as ordinary tables inside `# main`. `marqdo view` adds cell stepping, Run All, kernel switching, journal and reload. There is no separate notebook CLI mode or command, and no new Markdown marker exists.
+- A view document can expose cells: bind `内核表` and `会话表` as ordinary tables inside `# main`. `marqdo view` evaluates those bindings through the interpreter (`capture_declarations`), never by scanning source lines, and adds cell stepping, Run All, kernel switching, journal and reload. There is no separate notebook CLI mode or command, and no new Markdown marker exists.
 - The same source remains the authority; state crossing kernels is explicit, never implicitly mirrored.
 
 ## AI authoring workflow

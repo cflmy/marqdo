@@ -11,7 +11,6 @@ use sha2::{Digest, Sha256};
 use crate::foreign::registry;
 use crate::host::foreign_session;
 use crate::host::HostContext;
-use crate::parse::parse_source;
 use crate::value::Value;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -104,95 +103,109 @@ fn now_ms() -> i64 {
         .unwrap_or(0)
 }
 
-/// Split a GFM row into trimmed cells.
-fn split_row(line: &str) -> Vec<String> {
-    let t = line.trim();
-    let t = t.strip_prefix('|').unwrap_or(t);
-    let t = t.strip_suffix('|').unwrap_or(t);
-    t.split('|')
-        .map(|c| c.trim().trim_matches('`').trim().to_string())
-        .collect()
+/// Convert a table value into row maps. Handles both row tables (`| @ | ... |`)
+/// and ordinary column tables; no source text is scanned.
+fn table_rows(v: &Value) -> Result<Vec<HashMap<String, Value>>, String> {
+    match v {
+        Value::None => Ok(Vec::new()),
+        Value::List(rows) => {
+            let mut out = Vec::with_capacity(rows.len());
+            for (i, row) in rows.iter().enumerate() {
+                let Value::Map(pairs) = row else {
+                    return Err(format!("view table row {} is not a map", i + 1));
+                };
+                out.push(
+                    pairs
+                        .iter()
+                        .filter(|(k, _)| k != "@")
+                        .map(|(k, v)| (k.clone(), v.clone()))
+                        .collect(),
+                );
+            }
+            Ok(out)
+        }
+        Value::Map(cols) => {
+            let mut width = 0usize;
+            for (name, value) in cols {
+                let Value::List(xs) = value else {
+                    return Err(format!("view table column `{name}` is not a list"));
+                };
+                width = width.max(xs.len());
+            }
+            let mut out = Vec::with_capacity(width);
+            for i in 0..width {
+                let mut row = HashMap::new();
+                for (name, value) in cols {
+                    if let Value::List(xs) = value {
+                        if let Some(v) = xs.get(i) {
+                            row.insert(name.clone(), v.clone());
+                        }
+                    }
+                }
+                out.push(row);
+            }
+            Ok(out)
+        }
+        _ => Err("view plan binding is not a table".into()),
+    }
 }
 
-/// Find `` `name` = `` and the first contiguous table after it.
-fn table_after(source: &str, name: &str) -> Result<Option<Vec<HashMap<String, String>>>, String> {
-    let lines: Vec<&str> = source.lines().collect();
-    let needle_a = format!("`{name}`");
-    let needle_b = format!("{name} =");
-    let mut start = None;
-    for (i, line) in lines.iter().enumerate() {
-        let t = line.trim();
-        if t.starts_with(&needle_a) && t.contains('=') || t.starts_with(&needle_b) {
-            start = Some(i + 1);
-            break;
-        }
-    }
-    let Some(mut i) = start else {
-        return Ok(None);
-    };
-    while i < lines.len() && !lines[i].trim().starts_with('|') {
-        if !lines[i].trim().is_empty() && !lines[i].trim().starts_with('|') {
-            // Prose between the binding and the table is allowed.
-        }
-        i += 1;
-    }
-    if i >= lines.len() {
-        return Ok(None);
-    }
-    let mut rows = Vec::new();
-    let mut header: Option<Vec<String>> = None;
-    while i < lines.len() {
-        let t = lines[i].trim();
-        if !t.starts_with('|') {
-            break;
-        }
-        i += 1;
-        if t.chars().all(|c| c == '|' || c == '-' || c == ':' || c.is_whitespace()) {
-            continue;
-        }
-        let cells = split_row(t);
-        if header.is_none() {
-            header = Some(cells);
-            continue;
-        }
-        let h = header.as_ref().unwrap();
-        if cells.len() != h.len() {
-            return Err(format!(
-                "table `{name}`: row has {} cells, header has {}",
-                cells.len(),
-                h.len()
-            ));
-        }
-        let mut row = HashMap::new();
-        for (k, v) in h.iter().zip(cells) {
-            row.insert(k.clone(), v);
-        }
-        rows.push(row);
-    }
-    Ok(Some(rows))
-}
-
-fn table_any(
-    source: &str,
+fn table_from_bindings(
+    bindings: &HashMap<String, Value>,
     names: &[&str],
-) -> Result<Option<Vec<HashMap<String, String>>>, String> {
+) -> Result<Option<Vec<HashMap<String, Value>>>, String> {
     for name in names {
-        if let Some(rows) = table_after(source, name)? {
-            return Ok(Some(rows));
+        if let Some(value) = bindings.get(*name) {
+            return table_rows(value).map(Some);
         }
     }
     Ok(None)
 }
 
-fn col<'a>(row: &'a HashMap<String, String>, names: &[&str]) -> Option<&'a String> {
+fn col_value<'a>(row: &'a HashMap<String, Value>, names: &[&str]) -> Option<&'a Value> {
     for n in names {
         if let Some(v) = row.get(*n) {
-            if !v.is_empty() {
+            if !matches!(v, Value::None) {
                 return Some(v);
             }
         }
     }
     None
+}
+
+fn value_text(v: &Value) -> String {
+    match v {
+        Value::Text(s) => s.clone(),
+        Value::None => String::new(),
+        other => other.as_display(),
+    }
+}
+
+fn col_text(row: &HashMap<String, Value>, names: &[&str]) -> Option<String> {
+    col_value(row, names).map(value_text).filter(|s| !s.trim().is_empty())
+}
+
+/// Evaluate the entry object's declarations with the real interpreter. Tables
+/// are ordinary Marqdo values; the view does not re-parse source text.
+fn capture_bindings(
+    path: &Path,
+    root: &Path,
+    module: &crate::ast::Module,
+    source: &str,
+) -> Result<HashMap<String, Value>, String> {
+    let mut host = HostContext::for_capture(Some(path), crate::host::HostCaps::default());
+    host.cwd = path.parent().unwrap_or_else(|| Path::new(".")).to_path_buf();
+    host.fs_root = Some(root.to_path_buf());
+    host.entry_path = Some(path.to_path_buf());
+    host.entry_source = Some(source.to_string());
+    host.entry_metadata = module.metadata.clone();
+    let mut interp = crate::interp::Interpreter::with_capture(Some(path), false).with_host(host);
+    interp
+        .capture_declarations(
+            module,
+            &["内核表", "kernels", "Kernels", "会话表", "session", "Session"],
+        )
+        .map_err(|e| format!("view plan evaluation: {e}"))
 }
 
 fn collect_cells(stmts: &[crate::ast::Stmt], out: &mut Vec<Cell>, seen: &mut HashSet<String>) -> Result<(), String> {
@@ -244,7 +257,12 @@ impl DocumentSession {
     pub fn open(path: &Path, root: &Path) -> Result<Self, String> {
         let source = std::fs::read_to_string(path)
             .map_err(|e| format!("read {}: {e}", path.display()))?;
-        let module = parse_source(&source).map_err(|e| format!("parse {}: {e}", path.display()))?;
+        let bind_ctx = crate::binding::BindingContext::from_binds(
+            &[],
+            crate::binding::cwd_for_path(Some(path)),
+        );
+        let module = crate::load::load_module_with_ctx(path, &bind_ctx)
+            .map_err(|e| format!("load {}: {e}", path.display()))?;
         let entry = module
             .functions
             .iter()
@@ -261,25 +279,21 @@ impl DocumentSession {
         let mut cells = Vec::new();
         let mut seen = HashSet::new();
         collect_cells(&entry.body, &mut cells, &mut seen)?;
-        if cells.is_empty() {
-            return Err("notebook: no bound code fences (`name` = + ```lang)".into());
-        }
+        let declarations = capture_bindings(path, root, &module, &source)?;
 
         let mut kernels: Vec<KernelDecl> = Vec::new();
         let mut kernel_map: HashMap<String, KernelDecl> = HashMap::new();
-        if let Some(rows) = table_any(&source, &["内核表", "kernels", "Kernels"])? {
+        if let Some(rows) = table_from_bindings(&declarations, &["内核表", "kernels", "Kernels"])? {
             if rows.is_empty() {
                 return Err("内核表: at least one kernel row is required".into());
             }
             for row in rows {
-                let name = col(&row, &["名称", "Name", "name"])
-                    .ok_or_else(|| "内核表: missing 名称/Name".to_string())?
-                    .clone();
-                let lang = col(&row, &["语言", "Language", "language", "lang"])
-                    .ok_or_else(|| format!("内核表[{name}]: missing 语言/Language"))?
-                    .clone();
+                let name = col_text(&row, &["名称", "Name", "name"])
+                    .ok_or_else(|| "内核表: missing 名称/Name".to_string())?;
+                let lang = col_text(&row, &["语言", "Language", "language", "lang"])
+                    .ok_or_else(|| format!("内核表[{name}]: missing 语言/Language"))?;
                 let lang = registry::canonical(&lang);
-                let cmd = col(&row, &["命令", "Command", "command", "cmd"]).cloned();
+                let cmd = col_text(&row, &["命令", "Command", "command", "cmd"]);
                 if kernel_map.contains_key(&name) {
                     return Err(format!("内核表: kernel `{name}` is declared twice"));
                 }
@@ -295,7 +309,7 @@ impl DocumentSession {
         }
 
         let mut order: Vec<String> = Vec::new();
-        let session_rows = table_any(&source, &["会话表", "session", "Session"])?;
+        let session_rows = table_from_bindings(&declarations, &["会话表", "session", "Session"])?;
         if let Some(rows) = session_rows {
             if rows.is_empty() {
                 return Err("会话表: at least one cell row is required".into());
@@ -307,12 +321,10 @@ impl DocumentSession {
                 .collect();
             let mut listed = HashSet::new();
             for row in rows {
-                let cell_name = col(&row, &["单元", "Cell", "cell", "单元名"])
-                    .ok_or_else(|| "会话表: missing 单元/Cell".to_string())?
-                    .clone();
-                let kernel_name = col(&row, &["内核", "Kernel", "kernel"])
-                    .ok_or_else(|| format!("会话表[{cell_name}]: missing 内核/Kernel"))?
-                    .clone();
+                let cell_name = col_text(&row, &["单元", "Cell", "cell", "单元名"])
+                    .ok_or_else(|| "会话表: missing 单元/Cell".to_string())?;
+                let kernel_name = col_text(&row, &["内核", "Kernel", "kernel"])
+                    .ok_or_else(|| format!("会话表[{cell_name}]: missing 内核/Kernel"))?;
                 let Some(&ci) = by_name.get(&cell_name) else {
                     return Err(format!("会话表: unknown cell `{cell_name}`"));
                 };
@@ -862,17 +874,80 @@ mod tests {
     use super::*;
 
     #[test]
-    fn rows_parse() {
-        assert_eq!(split_row("| a | b |"), vec!["a", "b"]);
-        assert_eq!(split_row("| `a` | b |"), vec!["a", "b"]);
+    fn table_rows_reads_row_records_and_columns() {
+        let row_table = Value::List(vec![Value::Map(vec![
+            ("@".into(), Value::Text("1".into())),
+            ("名称".into(), Value::Text("分析".into())),
+            ("语言".into(), Value::Text("python".into())),
+        ])]);
+        let rows = table_rows(&row_table).unwrap();
+        assert_eq!(rows.len(), 1);
+        assert_eq!(col_text(&rows[0], &["名称"]).as_deref(), Some("分析"));
+
+        let column_table = Value::Map(vec![
+            ("名称".into(), Value::List(vec![Value::Text("分析".into())])),
+            ("语言".into(), Value::List(vec![Value::Text("python".into())])),
+        ]);
+        let rows = table_rows(&column_table).unwrap();
+        assert_eq!(rows.len(), 1);
+        assert_eq!(col_text(&rows[0], &["语言"]).as_deref(), Some("python"));
     }
 
     #[test]
-    fn table_after_finds_rows() {
-        let src = "# main\n\n`内核表` =\n\n| 名称 | 语言 |\n|---|---|\n| 分析 | python |\n";
-        let rows = table_after(src, "内核表").unwrap().unwrap();
-        assert_eq!(rows.len(), 1);
-        assert_eq!(rows[0].get("名称").map(|s| s.as_str()), Some("分析"));
+    fn plan_uses_evaluated_bindings() {
+        let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let path = root.join(format!(
+            "target/view-plan-{}-{}.mq.md",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_nanos())
+                .unwrap_or(0)
+        ));
+        let source = r#"# main
+
+`lang` = python
+
+`内核表` =
+
+| @ | 名称 | 语言 |
+|---|------|------|
+| 1 | 分析 | `lang` |
+
+`会话表` =
+
+| @ | 单元 | 内核 |
+|---|------|------|
+| 1 | 单元 | 分析 |
+
+`单元` =
+```python
+print(1)
+```
+"#;
+        std::fs::write(&path, source).unwrap();
+        let s = DocumentSession::open(&path, &root).unwrap();
+        assert_eq!(s.cells.len(), 1);
+        assert_eq!(s.cells[0].kernel, "分析");
+        assert_eq!(s.kernels[0].lang, "python");
+        let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn view_open_accepts_a_document_without_cells() {
+        let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let path = root.join(format!(
+            "target/view-empty-{}-{}.mq.md",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_nanos())
+                .unwrap_or(0)
+        ));
+        std::fs::write(&path, "# main\n\n> print text=hello\n").unwrap();
+        let s = DocumentSession::open(&path, &root).unwrap();
+        assert!(s.cells.is_empty());
+        let _ = std::fs::remove_file(&path);
     }
 
     fn node_available() -> bool {

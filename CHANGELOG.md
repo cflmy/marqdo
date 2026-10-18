@@ -4,7 +4,7 @@
 
 ### Added
 
-- **view cells 概念收敛**：`view` 是唯一交互面；只有文档声明 `内核表` / `会话表` 时才显示 cell 控件，普通 view 不显示；移除 `In []` / `Out []` 的 Jupyter 式提示与 Notebook 品牌；没有新增 notebook CLI 或第二个交互模式。
+- **view cells 概念收敛**：`view` 是唯一交互面；所有 view 页面共用同一套 cell 工具栏/布局；cell plan 由解释器 `capture_declarations` 对 `内核表` / `会话表` 求值（含简单依赖），删除源码行扫描；移除 `In []` / `Out []` 的 Jupyter 式提示与 Notebook 品牌；没有新增 CLI 或第二个交互模式。
 ### Fixed
 
 ### Changed

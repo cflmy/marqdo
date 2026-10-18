@@ -151,7 +151,7 @@ marqdo catalog public -o .marqdo
 
 ## 现状（v1.5.0）
 
-- **外联 v2 / view 交互单元（v1.5.0）**：结构化 invoke · JSON call/call_many · 并行扇出 · Python/Node 持久内核 · 显式状态桥 · cell 单步/Run All/内核切换 · 高对比浅深主题；扩展包同步 **1.5.0**
+- **外联 v2 / view 交互单元（v1.5.0）**：结构化 invoke · JSON call/call_many · 并行扇出 · Python/Node 持久内核 · 显式状态桥 · cell 单步/Run All/内核切换 · 解释器求值 cell plan（无源码行扫描）· 高对比浅深主题；扩展包同步 **1.5.0**
 - **裸自增升参（v1.4.6）**：首次粗体赋值左值即声明；`**n = n + 1**` 无反引号也升为必选形参。扩展包仍为 **1.4.5**
 - **Streamable HTTP MCP + web invoke 鉴权（v1.4.5）**：`agent_mcp_serve transport=http` · Bearer/`X-Api-Key` 注入 · `unauthorized`→401 · openai/agent `json.get` 硬化
 - **LLM 传输软失败 + `ext/ai` 表优先（v1.4.4）**：上游不可达 → `status=error`（不 abort）；`agent`/`llm` 去 `json.set` 胶水 · [agent-llm-transport-soft-2026-10.md](doc/research/agent-llm-transport-soft-2026-10.md)

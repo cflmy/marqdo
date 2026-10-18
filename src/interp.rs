@@ -372,6 +372,98 @@ impl Interpreter {
         result
     }
 
+    /// Evaluate only the entry object's top-level assignments, without running
+    /// calls/returns/control flow. This is the view plan's language-native
+    /// projection: cell tables are ordinary Marqdo values, not source scans.
+    /// Evaluate selected entry bindings plus their assignment dependencies.
+    /// This is the view plan's language-native projection: cell tables are
+    /// ordinary Marqdo values, not source scans.
+    pub fn capture_declarations(
+        &mut self,
+        module: &Module,
+        names: &[&str],
+    ) -> Result<std::collections::HashMap<String, Value>> {
+        let prev = self.site_module;
+        self.site_module = Some(module as *const Module);
+        let result = (|| {
+            let entry = find_top(module, "main").or_else(|| {
+                let entries: Vec<&Function> = module
+                    .functions
+                    .iter()
+                    .filter(|f| f.is_object() && f.params.is_empty())
+                    .collect();
+                if entries.len() == 1 {
+                    Some(entries[0])
+                } else {
+                    None
+                }
+            });
+            let entry = entry.ok_or_else(|| self.err("no `# main` object to inspect"))?;
+            let assignments: std::collections::HashMap<&str, &Expr> = entry
+                .body
+                .iter()
+                .filter_map(|stmt| match stmt {
+                    Stmt::Assign { name, value, .. } => Some((name.as_str(), value)),
+                    _ => None,
+                })
+                .collect();
+            let mut env = Env::with_metadata(module);
+            let mut done = std::collections::HashSet::new();
+            let mut visiting = std::collections::HashSet::new();
+
+            fn resolve(
+                this: &mut Interpreter,
+                module: &Module,
+                fun: &Function,
+                assignments: &std::collections::HashMap<&str, &Expr>,
+                name: &str,
+                env: &mut Env,
+                done: &mut std::collections::HashSet<String>,
+                visiting: &mut std::collections::HashSet<String>,
+            ) -> Result<()> {
+                if done.contains(name) {
+                    return Ok(());
+                }
+                if !visiting.insert(name.to_string()) {
+                    return Err(this.err(format!("cyclic view-plan binding `{name}`")));
+                }
+                let Some(expr) = assignments.get(name) else {
+                    visiting.remove(name);
+                    return Ok(());
+                };
+                let mut deps = std::collections::HashSet::new();
+                collect_decl_reads(expr, &mut deps);
+                for dep in deps {
+                    if assignments.contains_key(dep.as_str()) && env.get(&dep).is_none() {
+                        resolve(this, module, fun, assignments, &dep, env, done, visiting)?;
+                    }
+                }
+                let value = this.eval_expr(module, fun, env, expr)?;
+                env.set(name.to_string(), value);
+                done.insert(name.to_string());
+                visiting.remove(name);
+                Ok(())
+            }
+
+            for name in names {
+                resolve(
+                    self,
+                    module,
+                    entry,
+                    &assignments,
+                    name,
+                    &mut env,
+                    &mut done,
+                    &mut visiting,
+                )?;
+            }
+            self.entry_bindings = env.vars_clone();
+            Ok(self.entry_bindings.clone())
+        })();
+        self.site_module = prev;
+        result
+    }
+
     pub fn run_module(&mut self, module: &Module) -> Result<Value> {
         let prev = self.site_module;
         self.site_module = Some(module as *const Module);
@@ -1555,6 +1647,61 @@ fn bind_args(
     }
 
     Ok(out)
+}
+
+fn collect_decl_reads(expr: &Expr, out: &mut std::collections::HashSet<String>) {
+    match expr {
+        Expr::Var(name) => {
+            out.insert(name.clone());
+        }
+        Expr::Interp(parts) => {
+            for part in parts {
+                match part {
+                    InterpPart::Var(name) => {
+                        out.insert(name.clone());
+                    }
+                    InterpPart::Index { base, .. } => {
+                        out.insert(base.clone());
+                    }
+                    InterpPart::Lit(_) => {}
+                }
+            }
+        }
+        Expr::Index { base, label } => {
+            collect_decl_reads(base, out);
+            if let IndexKey::Var(name) = label {
+                out.insert(name.clone());
+            }
+        }
+        Expr::Binary { left, right, .. } => {
+            collect_decl_reads(left, out);
+            collect_decl_reads(right, out);
+        }
+        Expr::Unary { expr, .. } => collect_decl_reads(expr, out),
+        Expr::List(xs) => {
+            for x in xs {
+                collect_decl_reads(x, out);
+            }
+        }
+        Expr::Map(entries) => {
+            for (_, v) in entries {
+                collect_decl_reads(v, out);
+            }
+        }
+        Expr::Call(call) => {
+            if let Some(receiver) = &call.receiver {
+                out.insert(receiver.clone());
+            }
+            for arg in &call.args {
+                match arg {
+                    Arg::Positional(e) | Arg::Named { value: e, .. } => {
+                        collect_decl_reads(e, out);
+                    }
+                }
+            }
+        }
+        Expr::Literal(_) | Expr::Formula(_) | Expr::Code(_) => {}
+    }
 }
 
 fn find_top<'a>(module: &'a Module, name: &str) -> Option<&'a Function> {

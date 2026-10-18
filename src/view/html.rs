@@ -2870,13 +2870,6 @@ pub fn page_index(files: &[PathBuf], only: Option<&Path>, links: &LinkMode) -> S
     layout("index", &nav, &main)
 }
 
-/// True only when the document declares a cell table; ordinary view pages stay classic.
-fn has_cell_tables(source: &str) -> bool {
-    ["`内核表`", "`会话表`", "`kernels`", "`session`"]
-        .iter()
-        .any(|needle| source.contains(needle))
-}
-
 fn notebook_ui() -> &'static str {
     r#"<style>
 /* ── VS Code / Jupyter notebook skin ───────────────────────────────── */
@@ -3861,7 +3854,7 @@ pub fn page_file(files: &[PathBuf], rel: &str, vm: &FileViewModel, links: &LinkM
     let trace_safe = vm
         .trace_json
         .replace("</", "<\\/");
-    let notebook = if matches!(links, LinkMode::Live) && has_cell_tables(&vm.source) {
+    let notebook = if matches!(links, LinkMode::Live) {
         notebook_ui().to_string()
     } else {
         String::new()
@@ -4133,10 +4126,4 @@ mod tests {
         assert!(!ui.contains("Out ["), "view cells must not mimic Jupyter Out[] prompts");
     }
 
-    #[test]
-    fn cell_controls_only_for_cell_tables() {
-        assert!(has_cell_tables("# main\n\n`内核表` =\n"));
-        assert!(has_cell_tables("# main\n\n`session` =\n"));
-        assert!(!has_cell_tables("# main\n\n`hi` =\n```python\nprint(1)\n```\n"));
-    }
 }
