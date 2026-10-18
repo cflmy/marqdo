@@ -50,12 +50,16 @@ fn record_field(record: &Value, key: &str) -> Option<Value> {
 
 /// Run the document's cells at export time and keep their real outputs. This
 /// is what makes a static page show foreign results instead of just source.
-fn static_cell_outputs(root: &ViewRoot, abs: &std::path::Path) -> HashMap<String, StaticCellOutput> {
+fn static_cell_outputs(
+    root: &ViewRoot,
+    abs: &std::path::Path,
+    stdin: &str,
+) -> HashMap<String, StaticCellOutput> {
     let mut out = HashMap::new();
     let Ok(mut session) = DocumentSession::open(abs, &root.root) else {
         return out;
     };
-    let Ok(summary) = session.run_all(false) else {
+    let Ok(summary) = session.run_all_with_stdin(false, Some(stdin)) else {
         session.close();
         return out;
     };
@@ -185,7 +189,7 @@ pub fn write_static(opts: OutputOptions) -> Result<()> {
         let cell_outputs = if opts.no_exec {
             HashMap::new()
         } else {
-            static_cell_outputs(&root, &abs)
+            static_cell_outputs(&root, &abs, &vm.preset_stdin)
         };
         let html = inject_cell_outputs(
             &page_file(&root.files, &rel, &vm, &links),

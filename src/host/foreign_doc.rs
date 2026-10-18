@@ -561,6 +561,15 @@ impl DocumentSession {
     }
 
     pub fn run_cell(&mut self, cell_name: &str, kernel_override: Option<&str>) -> Result<Value, String> {
+        self.run_cell_with_stdin(cell_name, kernel_override, None)
+    }
+
+    pub fn run_cell_with_stdin(
+        &mut self,
+        cell_name: &str,
+        kernel_override: Option<&str>,
+        stdin: Option<&str>,
+    ) -> Result<Value, String> {
         let ci = self
             .cell_index(cell_name)
             .ok_or_else(|| format!("unknown cell `{cell_name}`"))?;
@@ -577,7 +586,7 @@ impl DocumentSession {
                 &lang,
                 &source,
                 None,
-                None,
+                stdin,
                 None,
             );
             return match result {
@@ -624,7 +633,7 @@ impl DocumentSession {
                 &Value::Text(id),
                 None,
                 Some(&source),
-                None,
+                stdin.map(|s| Value::Text(s.to_string())).as_ref(),
                 None,
             )?;
             self.record_result(cell_name, &kernel, &record)?;
@@ -637,6 +646,10 @@ impl DocumentSession {
     }
 
     pub fn step(&mut self) -> Result<Value, String> {
+        self.step_with_stdin(None)
+    }
+
+    pub fn step_with_stdin(&mut self, stdin: Option<&str>) -> Result<Value, String> {
         if self.cursor >= self.order.len() {
             return Ok(Value::Map(vec![
                 ("done".into(), Value::Bool(true)),
@@ -644,7 +657,7 @@ impl DocumentSession {
             ]));
         }
         let name = self.order[self.cursor].clone();
-        let record = self.run_cell(&name, None)?;
+        let record = self.run_cell_with_stdin(&name, None, stdin)?;
         let ci = self.cell_index(&name).unwrap_or(0);
         let kernel = self.cells[ci].kernel.clone();
         self.cursor += 1;
@@ -659,6 +672,14 @@ impl DocumentSession {
     }
 
     pub fn run_all(&mut self, restart: bool) -> Result<Value, String> {
+        self.run_all_with_stdin(restart, None)
+    }
+
+    pub fn run_all_with_stdin(
+        &mut self,
+        restart: bool,
+        stdin: Option<&str>,
+    ) -> Result<Value, String> {
         if restart {
             self.restart_all()?;
         }
@@ -666,7 +687,7 @@ impl DocumentSession {
         let mut records = Vec::new();
         let mut failed = 0i64;
         for name in self.order.clone() {
-            let record = match self.run_cell(&name, None) {
+            let record = match self.run_cell_with_stdin(&name, None, stdin) {
                 Ok(record) => record,
                 Err(error) => {
                     if let Some(i) = self.cell_index(&name) {
@@ -1259,6 +1280,42 @@ console.log(globalThis.kept);
             field(&r, "stdout").and_then(|v| v.reveal_text().map(|s| s.to_string())),
             Some("2\n".to_string()),
             "clear outputs must not restart the kernel"
+        );
+        s.close();
+        let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn stateless_cell_accepts_stdin() {
+        if !node_available() {
+            return;
+        }
+        let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let path = root.join(format!(
+            "target/view-stdin-{}-{}.mq.md",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_nanos())
+                .unwrap_or(0)
+        ));
+        let source = r#"# main
+
+`a` =
+```node
+const fs = require("fs");
+const input = fs.readFileSync(0, "utf8").trim();
+console.log("got:" + input);
+```
+"#;
+        std::fs::write(&path, source).unwrap();
+        let mut s = DocumentSession::open(&path, &root).unwrap();
+        let record = s
+            .run_cell_with_stdin("a", None, Some("hello stdin"))
+            .unwrap();
+        assert_eq!(
+            field(&record, "stdout").and_then(|v| v.reveal_text().map(|s| s.to_string())),
+            Some("got:hello stdin\n".to_string())
         );
         s.close();
         let _ = std::fs::remove_file(&path);

@@ -3060,6 +3060,33 @@ body.notebook-page #notebook-bar strong {
   color: var(--nb-strong);
   font: 600 0.76rem/1.6 var(--sans);
 }
+body.notebook-page .nb-stdin-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin: 0 0 0.75rem;
+  padding: 0.4rem 0.55rem;
+  border: 1px solid var(--nb-border);
+  border-radius: var(--nb-radius);
+  background: var(--nb-surface);
+}
+body.notebook-page .nb-stdin-bar label {
+  color: var(--nb-muted);
+  font: 0.7rem/1.2 var(--mono);
+  white-space: nowrap;
+}
+body.notebook-page .nb-stdin-bar textarea {
+  flex: 1;
+  min-height: 2.1rem;
+  max-height: 7rem;
+  resize: vertical;
+  border: 1px solid var(--nb-border);
+  border-radius: 6px;
+  padding: 0.3rem 0.5rem;
+  background: var(--nb-bg);
+  color: var(--nb-text);
+  font: 0.72rem/1.35 var(--mono);
+}
 body.notebook-page #notebook-bar button {
   appearance: none;
   padding: 0.34rem 0.58rem;
@@ -3482,6 +3509,10 @@ body.notebook-page .stdin-form button {
   <button type="button" id="nb-theme" title="切换浅色/深色主题">浅色</button>
   <span id="nb-status">opening…</span>
 </div>
+<div class="nb-stdin-bar" id="nb-stdin-bar">
+  <label for="nb-stdin">Cell stdin / input</label>
+  <textarea id="nb-stdin" rows="1" placeholder="raw stdin for stateless cells; JSON/string for persistent kernels" spellcheck="false"></textarea>
+</div>
 <div class="notebook-bar" id="nb-state-actions" hidden>
   <span>Bridge</span>
   <input id="nb-kernel-input" placeholder="kernel" autocomplete="off"/>
@@ -3521,6 +3552,10 @@ body.notebook-page .stdin-form button {
     }).then(function (r) { return r.json(); });
   }
   function status(t) { var e = document.getElementById("nb-status"); if (e) e.textContent = t; }
+  function cellStdin() {
+    var el = document.getElementById("nb-stdin");
+    return el ? el.value : "";
+  }
   function card(name) {
     var els = document.querySelectorAll(".code-card");
     for (var i = 0; i < els.length; i++) {
@@ -3610,7 +3645,7 @@ body.notebook-page .stdin-form button {
     });
   }
   function runOne(name) {
-    return post("api/session/cell/run", { cell: name }).then(function (r) {
+    return post("api/session/cell/run", { cell: name, stdin: cellStdin() }).then(function (r) {
       if (r.ok) { renderRecord(name, r.record); if (r.session) renderSummary(r.session); }
       else status(r.error || "run failed");
     });
@@ -3634,7 +3669,7 @@ body.notebook-page .stdin-form button {
       }).catch(function (e) { status(String(e)); });
       return;
     }
-    post("api/session/run_all", { restart: !!restart }).then(function (r) {
+    post("api/session/run_all", { restart: !!restart, stdin: cellStdin() }).then(function (r) {
       if (!r.ok) { status(r.error || "run all failed"); return; }
       if (r.session) renderSummary(r.session);
       var recs = (r.summary && r.summary.records) || [];
@@ -3696,6 +3731,8 @@ body.notebook-page .stdin-form button {
     if (!live) {
       var staticBar = document.getElementById("notebook-bar");
       if (staticBar) staticBar.hidden = false;
+      var staticStdin = document.getElementById("nb-stdin-bar");
+      if (staticStdin) staticStdin.hidden = false;
       function staticNotice() {
         status("静态页面无法真实执行 / static export: no live execution");
       }
@@ -3719,7 +3756,7 @@ body.notebook-page .stdin-form button {
         status("no cells; Run All runs the document");
         return;
       }
-      post("api/session/cell/step", {}).then(function (r) {
+      post("api/session/cell/step", { stdin: cellStdin() }).then(function (r) {
         if (!r.ok) { status(r.error || "step failed"); return; }
         if (r.record) {
           if (r.record.cell) renderRecord(r.record.cell, r.record);

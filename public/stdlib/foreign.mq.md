@@ -2,6 +2,7 @@
 title: lib/foreign — foreign kernels v2
 description: Structured execution, JSON calls, parallel fan-out, persistent kernels and an explicit state bridge
 import foreign:lib/foreign.mq.md
+stdin: 21
 ---
 
 # main

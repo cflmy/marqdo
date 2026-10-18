@@ -178,20 +178,24 @@ pub fn api_cell_run(root: &Path, body: &str) -> serde_json::Value {
     let v = body_value(body);
     let cell = v.get("cell").and_then(|x| x.as_str()).unwrap_or("");
     let kernel = v.get("kernel").and_then(|x| x.as_str()).filter(|s| !s.is_empty());
+    let stdin = v.get("stdin").and_then(|x| x.as_str());
     if cell.is_empty() {
         return err("missing cell".into());
     }
-    with_session(root, body, "record", |s| s.run_cell(cell, kernel))
+    with_session(root, body, "record", |s| s.run_cell_with_stdin(cell, kernel, stdin))
 }
 
 pub fn api_cell_step(root: &Path, body: &str) -> serde_json::Value {
-    with_session(root, body, "record", |s| s.step())
+    let v = body_value(body);
+    let stdin = v.get("stdin").and_then(|x| x.as_str());
+    with_session(root, body, "record", |s| s.step_with_stdin(stdin))
 }
 
 pub fn api_run_all(root: &Path, body: &str) -> serde_json::Value {
     let v = body_value(body);
     let restart = v.get("restart").and_then(|x| x.as_bool()).unwrap_or(false);
-    with_session(root, body, "summary", |s| s.run_all(restart))
+    let stdin = v.get("stdin").and_then(|x| x.as_str());
+    with_session(root, body, "summary", |s| s.run_all_with_stdin(restart, stdin))
 }
 
 pub fn api_kernel_restart(root: &Path, body: &str) -> serde_json::Value {
