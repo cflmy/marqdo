@@ -13,6 +13,7 @@
 | [`features/`](features/) | 特性迭代（含对象、官方 `ext/`） |
 | [`features/19-foreign-view-cells.mq.md`](features/19-foreign-view-cells.mq.md) / [`19-外联视图单元.mq.md`](features/19-外联视图单元.mq.md) | 外联 v2 完整 Python 示例：probe / JSON call / 并行 / 持久内核 / 状态桥 / view 单元 |
 | [`features/20-okf-ekc.mq.md`](features/20-okf-ekc.mq.md) / [`20-OKF与EKC.mq.md`](features/20-OKF与EKC.mq.md) | 代码即文档、文档即知识：OKF 形态与 EKC 工程知识编译器 |
+| [`features/21-persistence.mq.md`](features/21-persistence.mq.md) / [`21-持久化.mq.md`](features/21-持久化.mq.md) | 外联结果持久化：静态快照与 writeback |
 
 官方扩展（非 stdlib）：`ext/llm`、`ext/agent`、`ext/web`、`ext/quantum`、`ext/linalg` — 见 `features/05-*.mq.md`、`06-*.mq.md`、`07-linalg.mq.md` / `07-线性代数.mq.md` 与 `doc/design/ext-*.md`。
 

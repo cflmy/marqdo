@@ -145,29 +145,6 @@ print(json.dumps({
 
 `查看` consumes the `会话` handle. Run All runs `计算` in the `分析` kernel and `复核` in the `复核` kernel; the static export runs the same cells and embeds their real outputs.
 
----
-
-Persisting results: two complementary options.
-
-The static export is the publishing snapshot. `marqdo view output` runs the cells and embeds their outputs in HTML; it does not mutate the source. Use it for user docs, reviews and links.
-
-Writeback is for living reports. Pair `foreign` with `lib/writeback` when the source should retain the latest result:
-
-```text
-import writeback:lib/writeback.mq.md
-`写回代码` =
-```python
-print(950)
-```
-
-**结果 = > foreign.run code=`写回代码`**
-**> writeback.record value=`结果` key="total"**
-```
-
-`writeback.record` writes an explicit `<!-- marqdo-out total ... -->` slot adjacent to the call. Keyed slots do not overwrite each other, and the slot can be reviewed and committed with the source. This is opt-in; it is not hidden kernel serialization.
-
-Recommended split: static export for published user documentation; writeback for exploratory or audit documents that must keep the latest run result in the `.mq.md` itself.
-
 The important language point:
 
 The `初始值` table passes the same Marqdo `订单` value into both kernels. Kernel state lives in `foreign`. View only renders the handle and its cells. `run` still executes the same document as a program.
