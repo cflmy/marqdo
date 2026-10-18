@@ -4,7 +4,7 @@
 
 ### Added
 
-- **foreign 拥有视图会话**：新增 `foreign.session kernels= cells=`，返回 foreign 会话句柄；`view` 只消费 `会话` 绑定，不再识别 `内核表` / `会话表` 保留名。没有 `会话` 时，view cells 使用无状态一次性执行，不创建内核。清除输出已接通 `/api/session/clear`，普通 view 与 foreign cells 共用，并由 Execution 面板的 Clear 按钮清除页面输出；无 `会话` 的 view 在 Run All 时执行整个文档并回写 Execution（不再空转）；移除 `In []` / `Out []` 与 Notebook 品牌；没有新增 CLI 或第二个交互模式。
+- **foreign 拥有视图会话**：新增 `foreign.session kernels= cells=`，返回 foreign 会话句柄；`view` 只消费 `会话` 绑定，不再识别 `内核表` / `会话表` 保留名。没有 `会话` 时，view cells 使用无状态一次性执行，不创建内核。清除输出已接通 `/api/session/clear`，普通 view 与 foreign cells 共用，并由 Execution 面板的 Clear 按钮清除页面输出；无 `会话` 的 view 在 Run All 时执行整个文档并回写 Execution（不再空转）；静态导出与动态 view 共用同一套 View 外壳，静态只隐藏交互控件；移除 `In []` / `Out []` 与 Notebook 品牌；没有新增 CLI 或第二个交互模式。
 
 ### Fixed
 

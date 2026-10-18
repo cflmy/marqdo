@@ -3895,6 +3895,11 @@ pub fn page_file(files: &[PathBuf], rel: &str, vm: &FileViewModel, links: &LinkM
         LinkMode::Live => "true",
         LinkMode::Static { .. } => "false",
     };
+    let exec_clear = if matches!(links, LinkMode::Live) {
+        r#"<button type="button" class="exec-clear" id="exec-clear">Clear</button>"#
+    } else {
+        ""
+    };
     let outline_block = if vm.outline_html.is_empty() {
         String::new()
     } else {
@@ -3935,11 +3940,9 @@ pub fn page_file(files: &[PathBuf], rel: &str, vm: &FileViewModel, links: &LinkM
     let trace_safe = vm
         .trace_json
         .replace("</", "<\\/");
-    let notebook = if matches!(links, LinkMode::Live) {
-        notebook_ui().to_string()
-    } else {
-        String::new()
-    };
+    // Static exports share the same view shell. The script sees
+    // MARQDO_VIEW_LIVE=false and leaves the interactive controls hidden.
+    let notebook = notebook_ui().to_string();
     let main = format!(
         r#"
 <script>
@@ -3956,7 +3959,7 @@ window.MARQDO_AUTO_STREAM = {auto_stream};
   {structure_block}
 </section>
 <section class="block exec-block" id="exec-block">
-  <h2>Execution <button type="button" class="exec-clear" id="exec-clear">Clear</button></h2>
+  <h2>Execution {exec_clear}</h2>
   {stdin_panel}
   {stream_panel}
   {plan_card}
@@ -3981,6 +3984,7 @@ window.MARQDO_AUTO_STREAM = {auto_stream};
         status_label = status_label,
         rel = escape(rel),
         notebook = notebook,
+        exec_clear = exec_clear,
         structure_block = structure_block,
         stdin_panel = stdin_panel,
         stream_panel = stream_panel,
