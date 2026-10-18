@@ -59,7 +59,8 @@ fn static_page_data(
     let Ok(mut session) = DocumentSession::open(abs, &root.root) else {
         return (out, None);
     };
-    let Ok(summary) = session.run_all_with_stdin(false, Some(stdin)) else {
+    let page_stdin = if stdin.trim().is_empty() { None } else { Some(stdin) };
+    let Ok(summary) = session.run_all_with_stdin(false, page_stdin) else {
         session.close();
         return (out, None);
     };

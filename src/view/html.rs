@@ -3290,8 +3290,18 @@ body.notebook-page .code-head .nb-kernel {
   font: 0.66rem/1.2 var(--sans);
   cursor: pointer;
 }
-body.notebook-page .code-head .nb-clean {
+body.notebook-page .code-head .nb-cell-stdin {
   order: 4;
+  width: 8rem;
+  padding: 0.16rem 0.3rem;
+  border: 1px solid var(--nb-border);
+  border-radius: 3px;
+  background: var(--nb-bg);
+  color: var(--nb-text);
+  font: 0.62rem/1.2 var(--mono);
+}
+body.notebook-page .code-head .nb-clean {
+  order: 5;
   padding: 0.14rem 0.4rem;
   border: 1px solid var(--nb-border);
   border-radius: 3px;
@@ -3305,7 +3315,7 @@ body.notebook-page .code-head .nb-clean:hover {
   color: var(--nb-strong);
 }
 body.notebook-page .code-head .nb-badge {
-  order: 5;
+  order: 6;
   padding: 0.14rem 0.34rem;
   border: 1px solid var(--nb-border);
   border-radius: 3px;
@@ -3317,7 +3327,7 @@ body.notebook-page .code-head .nb-badge {
 body.notebook-page .nb-badge.ok { color: var(--nb-success); }
 body.notebook-page .nb-badge.bad { color: var(--nb-error); }
 body.notebook-page .code-head .code-actions {
-  order: 6;
+  order: 7;
   display: flex;
   align-items: center;
   gap: 0.3rem;
@@ -3637,6 +3647,22 @@ body.notebook-page .wb-source-text { color: var(--nb-text); }
     }
     return sel;
   }
+  function ensureCellStdin(el, c) {
+    var inp = el.querySelector(".nb-cell-stdin");
+    if (!inp) {
+      inp = document.createElement("input");
+      inp.className = "nb-cell-stdin";
+      inp.placeholder = "stdin";
+      inp.autocomplete = "off";
+      var head = el.querySelector(".code-head");
+      if (head) head.appendChild(inp);
+    }
+    if (c && inp.dataset.loaded !== "1") {
+      inp.value = c.stdin || "";
+      inp.dataset.loaded = "1";
+    }
+    return inp;
+  }
   function clearCard(el) {
     var out = el.querySelector(".code-out");
     if (out) {
@@ -3729,6 +3755,7 @@ body.notebook-page .wb-source-text { color: var(--nb-text); }
       var el = card(c.name);
       if (!el) return;
       badge(el, c.status, c.status === "clean");
+      ensureCellStdin(el, c);
       if (!state.persistent) {
         ensureKernel(el, false);
         return;
@@ -3758,7 +3785,9 @@ body.notebook-page .wb-source-text { color: var(--nb-text); }
     });
   }
   function runOne(name) {
-    return post("api/session/cell/run", { cell: name, stdin: cellStdin() }).then(function (r) {
+    var inputEl = document.querySelector('.code-card[data-code-name="' + name + '"] .nb-cell-stdin');
+    var stdinValue = inputEl && inputEl.value ? inputEl.value : cellStdin();
+    return post("api/session/cell/run", { cell: name, stdin: stdinValue }).then(function (r) {
       if (r.ok) { renderRecord(name, r.record); if (r.session) renderSummary(r.session); }
       else status(r.error || "run failed");
     });
@@ -3782,7 +3811,13 @@ body.notebook-page .wb-source-text { color: var(--nb-text); }
       }).catch(function (e) { status(String(e)); });
       return;
     }
-    post("api/session/run_all", { restart: !!restart, stdin: cellStdin() }).then(function (r) {
+    var perCell = {};
+    document.querySelectorAll(".code-card").forEach(function (el) {
+      var inp = el.querySelector(".nb-cell-stdin");
+      var name = el.getAttribute("data-code-name");
+      if (inp && name && inp.value) perCell[name] = inp.value;
+    });
+    post("api/session/run_all", { restart: !!restart, stdin: cellStdin(), inputs: perCell }).then(function (r) {
       if (!r.ok) { status(r.error || "run all failed"); return; }
       if (r.session) renderSummary(r.session);
       var recs = (r.summary && r.summary.records) || [];

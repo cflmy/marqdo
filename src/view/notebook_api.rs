@@ -204,7 +204,12 @@ pub fn api_run_all(root: &Path, body: &str) -> serde_json::Value {
     let v = body_value(body);
     let restart = v.get("restart").and_then(|x| x.as_bool()).unwrap_or(false);
     let stdin = v.get("stdin").and_then(|x| x.as_str());
-    with_session(root, body, "summary", |s| s.run_all_with_stdin(restart, stdin))
+    let inputs: Option<HashMap<String, String>> = v.get("inputs").and_then(|x| x.as_object()).map(|m| {
+        m.iter()
+            .filter_map(|(k, val)| val.as_str().map(|s| (k.clone(), s.to_string())))
+            .collect()
+    });
+    with_session(root, body, "summary", |s| s.run_all_with_inputs(restart, stdin, inputs.as_ref()))
 }
 
 pub fn api_kernel_restart(root: &Path, body: &str) -> serde_json::Value {

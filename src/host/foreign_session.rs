@@ -53,6 +53,9 @@ for _line in sys.stdin:
         continue
     _code = req.get("code", "")
     _g["marqdo_input"] = req.get("input")
+    _old_stdin = sys.stdin
+    if req.get("stdin") is not None:
+        sys.stdin = io.StringIO(str(req.get("stdin")))
     _out_buf = io.StringIO()
     _err_buf = io.StringIO()
     try:
@@ -69,6 +72,8 @@ for _line in sys.stdin:
         _send({"id": rid, "ok": True, "stdout": _out_buf.getvalue(), "stderr": _err_buf.getvalue(), "result": _result, "error": ""})
     except BaseException:
         _send({"id": rid, "ok": False, "stdout": _out_buf.getvalue(), "stderr": _err_buf.getvalue(), "result": None, "error": traceback.format_exc(limit=8)})
+    finally:
+        sys.stdin = _old_stdin
 "#;
 
 const JS_BOOTSTRAP: &str = r#"const readline = require("readline");
@@ -113,7 +118,21 @@ rl.on("line", async (line) => {
     return;
   }
   globalThis.marqdo_input = req.input === undefined ? null : req.input;
+  const oldStdin = process.stdin;
+  let stdinPatched = false;
+  if (req.stdin !== undefined && req.stdin !== null) {
+    try {
+      const { PassThrough } = require("stream");
+      const ps = new PassThrough();
+      ps.end(String(req.stdin));
+      Object.defineProperty(process, "stdin", { value: ps, configurable: true, writable: true });
+      stdinPatched = true;
+    } catch (e) {}
+  }
   const cap = await capture(async () => vm.runInThisContext(req.code || "", { filename: "<marqdo>" }));
+  if (stdinPatched) {
+    try { Object.defineProperty(process, "stdin", { value: oldStdin, configurable: true, writable: true }); } catch (e) {}
+  }
   send({ id: rid, ok: !cap.error, stdout: cap.logs, stderr: cap.errs, result: toJSON(cap.result), error: cap.error });
 });
 "#;
@@ -426,6 +445,18 @@ pub fn eval(
     input: Option<&Value>,
     timeout: Option<&Value>,
 ) -> Result<Value, String> {
+    eval_with_stdin(ctx, id, code, source, input, None, timeout)
+}
+
+pub fn eval_with_stdin(
+    ctx: &mut HostContext,
+    id: &Value,
+    code: Option<&Value>,
+    source: Option<&Value>,
+    input: Option<&Value>,
+    stdin: Option<&str>,
+    timeout: Option<&Value>,
+) -> Result<Value, String> {
     ensure_config(ctx);
     let id = as_text(id, "id")?.to_string();
     if !ctx.foreign_sessions.contains_key(&id) {
@@ -462,6 +493,7 @@ pub fn eval(
         "op": "eval",
         "code": code,
         "input": input_json,
+        "stdin": stdin,
     });
     let start = Instant::now();
     let (lang, cmd) = {

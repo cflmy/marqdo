@@ -48,6 +48,8 @@ pub struct Cell {
     pub line_end: u32,
     pub source_hash: String,
     pub kernel: String,
+    /// Per-cell raw stdin from foreign.session inputs=.
+    pub stdin: String,
     pub listed: bool,
     pub status: CellStatus,
     pub runs: u64,
@@ -170,16 +172,17 @@ fn plan_tables(
         Option<Vec<HashMap<String, Value>>>,
         Option<Vec<HashMap<String, Value>>>,
         Option<Vec<HashMap<String, Value>>>,
+        Option<Vec<HashMap<String, Value>>>,
     ),
     String,
 > {
     let Some(plan) = bindings.get("会话") else {
-        return Ok((None, None, None));
+        return Ok((None, None, None, None));
     };
     let Value::Map(fields) = plan else {
         // `会话` is also a common low-level session id binding (e.g. from
         // foreign.session_open). It is not a view plan; leave cells stateless.
-        return Ok((None, None, None));
+        return Ok((None, None, None, None));
     };
     let field = |name: &str| {
         fields
@@ -203,7 +206,11 @@ fn plan_tables(
         Some(Value::None) | None => None,
         Some(v) => Some(table_rows(&v)?),
     };
-    Ok((kernels, cells, values))
+    let inputs = match field("inputs") {
+        Some(Value::None) | None => None,
+        Some(v) => Some(table_rows(&v)?),
+    };
+    Ok((kernels, cells, values, inputs))
 }
 
 fn col_value<'a>(row: &'a HashMap<String, Value>, names: &[&str]) -> Option<&'a Value> {
@@ -272,6 +279,7 @@ fn collect_cells(stmts: &[crate::ast::Stmt], out: &mut Vec<Cell>, seen: &mut Has
                     line_end: *end_line,
                     source_hash: hash_source(&c.source),
                     kernel: String::new(),
+                    stdin: String::new(),
                     listed: false,
                     status: CellStatus::Never,
                     runs: 0,
@@ -322,7 +330,7 @@ impl DocumentSession {
         collect_cells(&entry.body, &mut cells, &mut seen)?;
         let declarations = capture_bindings(path, root, &module, &source)?;
 
-        let (plan_kernels, plan_cells, plan_values) = plan_tables(&declarations)?;
+        let (plan_kernels, plan_cells, plan_values, plan_inputs) = plan_tables(&declarations)?;
         let persistent = matches!(
             declarations.get("会话"),
             Some(Value::Map(fields))
@@ -453,6 +461,18 @@ impl DocumentSession {
                     &Value::Text(name),
                     &value,
                 )?;
+            }
+        }
+        if let Some(rows) = plan_inputs {
+            for row in rows {
+                let cell = col_text(&row, &["单元", "Cell", "cell", "单元名"])
+                    .ok_or_else(|| "foreign.session inputs: missing 单元/Cell".to_string())?;
+                let raw = col_value(&row, &["stdin", "标准输入", "输入"])
+                    .map(value_text)
+                    .unwrap_or_default();
+                if let Some(i) = session.cell_index(&cell) {
+                    session.cells[i].stdin = raw;
+                }
             }
         }
         Ok(session)
@@ -614,6 +634,11 @@ impl DocumentSession {
         if !self.cells[ci].listed && kernel_override.is_none() {
             return Err(format!("cell `{cell_name}` is not listed in the foreign session"));
         }
+        let stdin_owned = stdin.map(str::to_string).or_else(|| {
+            let s = self.cells[ci].stdin.clone();
+            if s.is_empty() { None } else { Some(s) }
+        });
+        let stdin = stdin_owned.as_deref();
         if !self.persistent {
             self.cells[ci].kernel = "one-shot".into();
             self.cells[ci].status = CellStatus::Running;
@@ -666,12 +691,13 @@ impl DocumentSession {
         let result = (|| -> Result<Value, String> {
             let id = self.ensure_kernel_session(&kernel)?;
             let source = Value::Text(self.cells[ci].source.clone());
-            let record = foreign_session::eval(
+            let record = foreign_session::eval_with_stdin(
                 &mut self.host,
                 &Value::Text(id),
                 None,
                 Some(&source),
-                stdin.map(|s| Value::Text(s.to_string())).as_ref(),
+                None,
+                stdin,
                 None,
             )?;
             self.record_result(cell_name, &kernel, &record)?;
@@ -718,6 +744,15 @@ impl DocumentSession {
         restart: bool,
         stdin: Option<&str>,
     ) -> Result<Value, String> {
+        self.run_all_with_inputs(restart, stdin, None)
+    }
+
+    pub fn run_all_with_inputs(
+        &mut self,
+        restart: bool,
+        stdin: Option<&str>,
+        inputs: Option<&HashMap<String, String>>,
+    ) -> Result<Value, String> {
         if restart {
             self.restart_all()?;
         }
@@ -725,7 +760,11 @@ impl DocumentSession {
         let mut records = Vec::new();
         let mut failed = 0i64;
         for name in self.order.clone() {
-            let record = match self.run_cell_with_stdin(&name, None, stdin) {
+            let cell_stdin = inputs
+                .and_then(|m| m.get(&name))
+                .map(String::as_str)
+                .or(stdin);
+            let record = match self.run_cell_with_stdin(&name, None, cell_stdin) {
                 Ok(record) => record,
                 Err(error) => {
                     if let Some(i) = self.cell_index(&name) {
@@ -885,6 +924,7 @@ impl DocumentSession {
                     ("last_ms".into(), Value::Int(c.last_ms as i64)),
                     ("last_ok".into(), Value::Bool(c.last_ok)),
                     ("last_error".into(), Value::Text(c.last_error.clone())),
+                    ("stdin".into(), Value::Text(c.stdin.clone())),
                 ])
             })
             .collect();
@@ -1334,6 +1374,169 @@ console.log(globalThis.kept);
             field(&r, "stdout").and_then(|v| v.reveal_text().map(|s| s.to_string())),
             Some("2\n".to_string()),
             "clear outputs must not restart the kernel"
+        );
+        s.close();
+        let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn plan_inputs_feed_each_cell() {
+        let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let path = root.join(format!(
+            "target/view-plan-input-{}-{}.mq.md",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_nanos())
+                .unwrap_or(0)
+        ));
+        let source = r#"---
+title: plan inputs test
+import foreign:lib/foreign.mq.md
+---
+
+# main
+
+`内核` =
+| 名称 | 语言 |
+|------|------|
+| py | python |
+
+`单元` =
+| 单元 | 内核 |
+|------|------|
+| a | py |
+
+`输入` =
+| 单元 | stdin |
+|------|-------|
+| a | hello plan |
+
+`会话` = > foreign.session kernels=`内核` cells=`单元` inputs=`输入`
+
+`a` =
+```python
+import sys
+print(sys.stdin.read().strip())
+```
+"#;
+        std::fs::write(&path, source).unwrap();
+        let mut s = DocumentSession::open(&path, &root).unwrap();
+        let summary = s.run_all_with_stdin(false, None).unwrap();
+        let records = match &summary {
+            Value::Map(entries) => entries.iter().find(|(k, _)| k == "records").map(|(_, v)| v.clone()),
+            _ => None,
+        };
+        let Some(Value::List(records)) = records else { panic!("no records") };
+        assert_eq!(
+            field(&records[0], "stdout").and_then(|v| v.reveal_text().map(|s| s.to_string())),
+            Some("hello plan\n".to_string())
+        );
+        s.close();
+        let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn persistent_node_cell_accepts_raw_stdin() {
+        if !node_available() {
+            return;
+        }
+        let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let path = root.join(format!(
+            "target/view-node-stdin-{}-{}.mq.md",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_nanos())
+                .unwrap_or(0)
+        ));
+        let source = r#"---
+title: persistent node stdin test
+import foreign:lib/foreign.mq.md
+---
+
+# main
+
+`内核` =
+| 名称 | 语言 |
+|------|------|
+| js | node |
+
+`单元` =
+| 单元 | 内核 |
+|------|------|
+| a | js |
+
+`会话` = > foreign.session kernels=`内核` cells=`单元`
+
+`a` =
+```node
+(async () => {
+  await new Promise((resolve) => {
+    let input = "";
+    process.stdin.on("data", (chunk) => { input += chunk; });
+    process.stdin.on("end", () => { console.log(input.trim()); resolve(); });
+  });
+})();
+```
+"#;
+        std::fs::write(&path, source).unwrap();
+        let mut s = DocumentSession::open(&path, &root).unwrap();
+        let record = s
+            .run_cell_with_stdin("a", None, Some("hello node"))
+            .unwrap();
+        assert_eq!(
+            field(&record, "stdout").and_then(|v| v.reveal_text().map(|s| s.to_string())),
+            Some("hello node\n".to_string())
+        );
+        s.close();
+        let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn persistent_python_cell_accepts_raw_stdin() {
+        let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let path = root.join(format!(
+            "target/view-persistent-stdin-{}-{}.mq.md",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_nanos())
+                .unwrap_or(0)
+        ));
+        let source = r#"---
+title: persistent stdin test
+import foreign:lib/foreign.mq.md
+---
+
+# main
+
+`内核` =
+| 名称 | 语言 |
+|------|------|
+| py | python |
+
+`单元` =
+| 单元 | 内核 |
+|------|------|
+| a | py |
+
+`会话` = > foreign.session kernels=`内核` cells=`单元`
+
+`a` =
+```python
+import sys
+print(sys.stdin.read().strip())
+```
+"#;
+        std::fs::write(&path, source).unwrap();
+        let mut s = DocumentSession::open(&path, &root).unwrap();
+        let record = s
+            .run_cell_with_stdin("a", None, Some("hello persistent"))
+            .unwrap();
+        assert_eq!(
+            field(&record, "stdout").and_then(|v| v.reveal_text().map(|s| s.to_string())),
+            Some("hello persistent\n".to_string())
         );
         s.close();
         let _ = std::fs::remove_file(&path);

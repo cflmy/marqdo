@@ -1053,7 +1053,7 @@ impl HostFn {
                 "concurrency",
             ],
             Self::ForeignSessionOpen => &["cmd", "env", "cwd", "timeout"],
-            Self::ForeignSessionEval => &["code", "source", "input", "timeout"],
+            Self::ForeignSessionEval => &["code", "source", "input", "stdin", "timeout"],
             Self::ForeignSessionSet
             | Self::ForeignSessionGet
             | Self::ForeignSessionNames
@@ -1512,12 +1512,13 @@ pub fn call_host(
         HostFn::ForeignSessionEval => {
             #[cfg(feature = "exec-host")]
             {
-                crate::host::foreign_session::eval(
+                crate::host::foreign_session::eval_with_stdin(
                     ctx,
                     require(bound, "id")?,
                     bound.get("code"),
                     bound.get("source"),
                     bound.get("input"),
+                    bound.get("stdin").and_then(|v| v.reveal_text()),
                     bound.get("timeout"),
                 )
             }

@@ -153,6 +153,7 @@ in input order. Raises with the failing index after all workers finish.
     + `kernels`=None
     + `cells`=None
     + `values`=None
+    + `inputs`=None
 
 Declare a document view session. `kernels` and `cells` are ordinary tables:
 kernels are `|名称|语言|命令|` (ZH or EN), cells are `|单元|内核|`.
@@ -164,6 +165,7 @@ view has no persistent kernel state.
 **p = > table.put in=`p` at="kernels" value=`kernels`**
 **p = > table.put in=`p` at="cells" value=`cells`**
 **p = > table.put in=`p` at="values" value=`values`**
+**p = > table.put in=`p` at="inputs" value=`inputs`**
 *p*
 
 ## session_open
@@ -183,12 +185,14 @@ default per-eval timeout.
     + `code`=None
     + `source`=None
     + `input`=None
+    + `stdin`=None
     + `timeout`=None
 
 Evaluate code (a code value) or source text in session id; returns a record
-with id/alive. `input` is JSON-encoded for the kernel.
+with id/alive. `input` is JSON-encoded for the kernel; `stdin` is raw program
+stdin for this evaluation.
 
-*> host_foreign_session_eval id=`id` code=`code` source=`source` input=`input` timeout=`timeout`*
+*> host_foreign_session_eval id=`id` code=`code` source=`source` input=`input` stdin=`stdin` timeout=`timeout`*
 
 ## session_set
     + `id`
