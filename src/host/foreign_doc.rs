@@ -89,6 +89,7 @@ pub struct DocumentSession {
     pub journal: Vec<JournalRecord>,
     pub value_store: HashMap<String, Value>,
     pub cursor: usize,
+    pub generation: u64,
     pub opened_ms: i64,
     host: HostContext,
     kernel_sessions: HashMap<String, String>,
@@ -440,6 +441,7 @@ impl DocumentSession {
             journal: Vec::new(),
             value_store: HashMap::new(),
             cursor: 0,
+            generation: 1,
             opened_ms: now_ms(),
             host,
             kernel_sessions: HashMap::new(),
@@ -718,6 +720,7 @@ impl DocumentSession {
             return Ok(Value::Map(vec![
                 ("done".into(), Value::Bool(true)),
                 ("cursor".into(), Value::Int(self.cursor as i64)),
+            ("generation".into(), Value::Int(self.generation as i64)),
             ]));
         }
         let name = self.order[self.cursor].clone();
@@ -863,7 +866,67 @@ impl DocumentSession {
         self.cells[ci].kernel = kernel.to_string();
         self.cells[ci].listed = true;
         self.cells[ci].status = CellStatus::Dirty;
+        self.generation += 1;
         Ok(Value::None)
+    }
+
+    pub fn add_cell(
+        &mut self,
+        cell: &str,
+        lang: &str,
+        source: &str,
+        kernel: &str,
+    ) -> Result<Value, String> {
+        if self.cell_index(cell).is_some() {
+            return Err(format!("cell `{cell}` already exists"));
+        }
+        let lang = registry::canonical(lang);
+        let decl = self
+            .kernel(kernel)
+            .ok_or_else(|| format!("unknown kernel `{kernel}`"))?
+            .clone();
+        if registry::canonical(&decl.lang) != lang {
+            return Err(format!(
+                "cell `{cell}` ({lang}) cannot use kernel `{kernel}` ({})",
+                decl.lang
+            ));
+        }
+        self.cells.push(Cell {
+            name: cell.to_string(),
+            lang,
+            source: source.to_string(),
+            line_start: 0,
+            line_end: 0,
+            source_hash: hash_source(source),
+            kernel: kernel.to_string(),
+            stdin: String::new(),
+            listed: true,
+            status: CellStatus::Never,
+            runs: 0,
+            last_ms: 0,
+            last_ok: false,
+            last_error: String::new(),
+        });
+        self.order.push(cell.to_string());
+        self.generation += 1;
+        Ok(Value::Bool(true))
+    }
+
+    pub fn remove_cell(&mut self, cell: &str) -> Result<Value, String> {
+        let Some(i) = self.cell_index(cell) else {
+            return Err(format!("unknown cell `{cell}`"));
+        };
+        self.cells.remove(i);
+        self.order.retain(|name| name != cell);
+        self.journal.retain(|j| j.cell != cell);
+        self.generation += 1;
+        Ok(Value::Bool(true))
+    }
+
+    pub fn set_value(&mut self, kernel: &str, name: &str, value: Value) -> Result<Value, String> {
+        let out = self.push_value(kernel, name, value)?;
+        self.generation += 1;
+        Ok(out)
     }
 
     pub fn state_list(&mut self) -> Result<Value, String> {
@@ -967,6 +1030,7 @@ impl DocumentSession {
                 self.order.iter().cloned().map(Value::Text).collect(),
             )),
             ("cursor".into(), Value::Int(self.cursor as i64)),
+            ("generation".into(), Value::Int(self.generation as i64)),
             ("journal".into(), Value::List(
                 self.journal
                     .iter()
@@ -1391,6 +1455,23 @@ console.log(globalThis.kept);
         );
         s.close();
         let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn runtime_plan_add_remove_and_generation() {
+        let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let path = root.join("tests/notebook/shared.mq.md");
+        let mut s = DocumentSession::open(&path, &root).unwrap();
+        let before = s.generation;
+        s.add_cell("extra", "node", "console.log('extra');", "分析")
+            .unwrap();
+        assert!(s.generation > before);
+        assert!(s.cells.iter().any(|c| c.name == "extra"));
+        s.assign_kernel("extra", "分析").unwrap();
+        s.remove_cell("extra").unwrap();
+        assert!(!s.cells.iter().any(|c| c.name == "extra"));
+        assert!(s.generation > before + 1);
+        s.close();
     }
 
     #[test]

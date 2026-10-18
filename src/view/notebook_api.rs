@@ -225,6 +225,54 @@ pub fn api_kernel_restart(root: &Path, body: &str) -> serde_json::Value {
     with_session(root, body, "value", |s| s.restart_kernel(kernel))
 }
 
+pub fn api_plan_assign(root: &Path, body: &str) -> serde_json::Value {
+    let v = body_value(body);
+    let cell = v.get("cell").and_then(|x| x.as_str()).unwrap_or("");
+    let kernel = v.get("kernel").and_then(|x| x.as_str()).unwrap_or("");
+    if cell.is_empty() || kernel.is_empty() {
+        return err("missing cell/kernel".into());
+    }
+    with_session(root, body, "value", |s| s.assign_kernel(cell, kernel))
+}
+
+pub fn api_plan_add(root: &Path, body: &str) -> serde_json::Value {
+    let v = body_value(body);
+    let cell = v.get("cell").and_then(|x| x.as_str()).unwrap_or("");
+    let lang = v.get("lang").and_then(|x| x.as_str()).unwrap_or("");
+    let kernel = v.get("kernel").and_then(|x| x.as_str()).unwrap_or("");
+    let source = v.get("source").and_then(|x| x.as_str()).unwrap_or("");
+    if cell.is_empty() || lang.is_empty() || kernel.is_empty() {
+        return err("missing cell/lang/kernel".into());
+    }
+    with_session(root, body, "value", |s| s.add_cell(cell, lang, source, kernel))
+}
+
+pub fn api_plan_remove(root: &Path, body: &str) -> serde_json::Value {
+    let v = body_value(body);
+    let cell = v.get("cell").and_then(|x| x.as_str()).unwrap_or("");
+    if cell.is_empty() {
+        return err("missing cell".into());
+    }
+    with_session(root, body, "value", |s| s.remove_cell(cell))
+}
+
+pub fn api_plan_value(root: &Path, body: &str) -> serde_json::Value {
+    let v = body_value(body);
+    let kernel = v.get("kernel").and_then(|x| x.as_str()).unwrap_or("");
+    let name = v.get("name").and_then(|x| x.as_str()).unwrap_or("");
+    if kernel.is_empty() || name.is_empty() {
+        return err("missing kernel/name".into());
+    }
+    let value = match v.get("value") {
+        Some(v) => match json_to_value(v) {
+            Ok(v) => v,
+            Err(e) => return err(e),
+        },
+        None => Value::None,
+    };
+    with_session(root, body, "value", |s| s.set_value(kernel, name, value))
+}
+
 pub fn api_assign(root: &Path, body: &str) -> serde_json::Value {
     let v = body_value(body);
     let cell = v.get("cell").and_then(|x| x.as_str()).unwrap_or("");
