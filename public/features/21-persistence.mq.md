@@ -25,9 +25,9 @@ For an exploratory or audit document, pair `foreign` with `lib/writeback`. `writ
 
 | Step | What it does |
 |------|--------------|
-| foreign.run / foreign.session | Execute the foreign code and return a Marqdo value |
-| writeback.record | Persist that value in a named slot |
-| git diff | Review the changed result like any other document change |
+| `foreign.run` / `foreign.session` | Execute the foreign code and return a Marqdo value |
+| `writeback.record` | Persist that value in a named slot |
+| `git diff` | Review the changed result like any other document change |
 
 A real writeback in this page.
 
