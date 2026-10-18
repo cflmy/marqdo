@@ -54,7 +54,7 @@ v3 必须继续满足以下约束，否则不进入实现：
 | G4 | ✅ 已实现（API） | add/remove/set-value + generation；view 尚未提供 add/remove UI |
 | G6 | ✅ 已实现（API） | export/import/replay JSON snapshot；view/CLI 尚未做文件封装 |
 | G9 | ✅ 已实现（CLI/API 基础） | `view capture` + `view output --snapshot`；source hash 校验 |
-| G3/G7/G8/G9/G10 | ⏳ 设计已定，未实现 | 见对应章节 |
+| G3/G7/G8/G10 | ⏳ 设计已定，未实现 | 见对应章节 |
 
 ## 3. 缺口清单
 
