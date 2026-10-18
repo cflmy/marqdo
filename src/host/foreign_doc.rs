@@ -303,6 +303,22 @@ fn collect_cells(stmts: &[crate::ast::Stmt], out: &mut Vec<Cell>, seen: &mut Has
     Ok(())
 }
 
+fn fun_has_plan(fun: &crate::ast::Function) -> bool {
+    fun.body.iter().any(|stmt| match stmt {
+        crate::ast::Stmt::Assign { name, .. } => name == "会话",
+        _ => false,
+    }) || fun.children.iter().any(fun_has_plan)
+}
+
+fn has_nested_plan(module: &crate::ast::Module, entry_name: &str) -> bool {
+    module
+        .functions
+        .iter()
+        .find(|f| f.name == entry_name)
+        .map(|entry| entry.children.iter().any(fun_has_plan))
+        .unwrap_or(false)
+}
+
 impl DocumentSession {
     pub fn open(path: &Path, root: &Path) -> Result<Self, String> {
         let source = std::fs::read_to_string(path)
@@ -330,6 +346,12 @@ impl DocumentSession {
         let mut seen = HashSet::new();
         collect_cells(&entry.body, &mut cells, &mut seen)?;
         let declarations = capture_bindings(path, root, &module, &source)?;
+        if !declarations.contains_key("会话") && has_nested_plan(&module, &entry.name) {
+            return Err(
+                "foreign.session: plan must be a top-level binding (`会话` = > foreign.session ...)"
+                    .into(),
+            );
+        }
 
         let (plan_kernels, plan_cells, plan_values, plan_inputs) = plan_tables(&declarations)?;
         let persistent = matches!(
@@ -1658,6 +1680,34 @@ console.log(globalThis.kept);
         let rate = b.pull_value("分析", "rate").unwrap();
         assert_eq!(rate, Value::Int(42));
         b.close();
+    }
+
+    #[test]
+    fn nested_plan_is_rejected_at_open() {
+        let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let path = root.join(format!(
+            "target/view-nested-plan-{}-{}.mq.md",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_nanos())
+                .unwrap_or(0)
+        ));
+        let source = "# main\n\n## view\n\n`会话` = > foreign.session\n";
+        std::fs::write(&path, source).unwrap();
+        let err = match DocumentSession::open(&path, &root) {
+            Ok(_) => panic!("nested plan should be rejected"),
+            Err(e) => e,
+        };
+        assert!(err.contains("top-level"), "{err}");
+        let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn nested_plan_helper_detects_child_binding() {
+        let src = "# main\n\n## view\n\n`会话` = > foreign.session\n";
+        let module = crate::parse::parse_source(src).unwrap();
+        assert!(has_nested_plan(&module, "main"));
     }
 
     #[test]
