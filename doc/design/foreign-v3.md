@@ -45,6 +45,16 @@ v3 必须继续满足以下约束，否则不进入实现：
 
 ---
 
+## 2.1 实施状态（2026-10-18）
+
+| ID | 状态 | 备注 |
+|---|---|---|
+| G1/G2 | ✅ 已实现 | session eval raw stdin；`foreign.session inputs=`；per-cell UI；Python/Node 测试 |
+| G5 | ✅ 基本实现 | `session_interrupt` + view Interrupt；Python SIGINT 保留会话；Node 进程可能被终止 |
+| G4 | ✅ 已实现（API） | add/remove/set-value + generation；view 尚未提供 add/remove UI |
+| G6 | ✅ 已实现（API） | export/import/replay JSON snapshot；view/CLI 尚未做文件封装 |
+| G3/G7/G8/G9/G10 | ⏳ 设计已定，未实现 | 见对应章节 |
+
 ## 3. 缺口清单
 
 | ID | 缺口 | 优先级 | 当前行为 | 目标 |
