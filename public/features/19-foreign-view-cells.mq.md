@@ -1,23 +1,32 @@
 ---
 title: Foreign kernels v2 — Python analysis in view
-description: A complete Python data walkthrough with probe, JSON calls, parallel fan-out, persistent state and view cells
+description: Kernel state, Marqdo-to-kernel values and view cells — without a stdin-only demo
 import foreign:lib/foreign.mq.md
 ---
 
 # main
 
-This page is both a readable document and a runnable program. It uses the same file to show the foreign-kernel features added in v2: language probing, structured records, JSON in/out, parallel fan-out, a persistent Python kernel, and an explicit state bridge. The same source can also be opened in view as interactive cells.
-
-The data is intentionally small and deterministic, so every number below can be reproduced by running the page.
+This page shows the foreign runtime as a language feature: a persistent kernel, explicit state from Marqdo values, and view cells that share kernel state. It never asks the reader to type JSON into stdin.
 
 ---
 
-The input.
+Probe the interpreter first. The result is ordinary Marqdo data.
 
-`orders` =
+**python = > foreign.probe lang="python"**
 
-| @ | region | amount |
-|---|--------|--------|
+> print text=[ok](`python`)
+> print text=[version](`python`)
+
+---
+
+Marqdo values into a kernel.
+
+The `订单` table is a normal Marqdo value. `foreign.session_set` copies it into the Python kernel as JSON; no shell and no stdin.
+
+`订单` =
+
+| @ | 区域 | 金额 |
+|---|------|------|
 | 1 | 华东 | 120 |
 | 2 | 华东 | 300 |
 | 3 | 华南 | 90 |
@@ -25,39 +34,73 @@ The input.
 | 5 | 华北 | 220 |
 | 6 | 西部 | 80 |
 
+**内核会话 = > foreign.session_open lang="python"**
+
+**> foreign.session_set id=`内核会话` name="orders" value=`订单`**
+
+**total = > foreign.session_eval id=`内核会话` source="round(sum(float(row['金额']) for row in orders), 2)"**
+
+> print text=[result](`total`)
+
+The low-level kernel session is managed entirely by `foreign`; the table crossed the boundary as an explicit JSON copy.
+
 ---
 
-Probe Python before using it.
+Kernel state persists.
 
-**python = > foreign.probe lang="python"**
+Two evaluations share the same kernel. The second sees the first variable.
 
-> print text=[ok](`python`)
-> print text=[version](`python`)
+**> foreign.session_eval id=`内核会话` source="values = [3, 4, 5]"**
 
-The probe record also carries `cmd`, `path` and `error`, so a site can explain a missing interpreter instead of producing a blank cell.
+**square_sum = > foreign.session_eval id=`内核会话` source="sum(value * value for value in values)"**
+
+> print text=[result](`square_sum`)
+
+**> foreign.session_close id=`内核会话`**
+
+This is kernel state, not a one-shot process. It is created, queried and closed through `foreign`.
 
 ---
 
-A JSON call. Python reads the table as JSON, groups it, and writes one JSON result.
+View cells share state.
 
-`analyze` =
+`foreign.session` declares a view session from ordinary tables. The table names are free; this document uses `分析内核` and `分析单元`.
+
+`分析内核` =
+
+| @ | 名称 | 语言 |
+|---|------|------|
+| 1 | 分析 | python |
+
+`分析单元` =
+
+| @ | 单元 | 内核 |
+|---|------|------|
+| 1 | 准备 | 分析 |
+| 2 | 计算 | 分析 |
+
+`会话` = > foreign.session kernels=`分析内核` cells=`分析单元`
+
+`准备` =
+```python
+orders = [
+    {"区域": "华东", "金额": 120},
+    {"区域": "华东", "金额": 300},
+    {"区域": "华南", "金额": 90},
+    {"区域": "华南", "金额": 140},
+    {"区域": "华北", "金额": 220},
+    {"区域": "西部", "金额": 80},
+]
+```
+
+`计算` =
 ```python
 import json
 import statistics
-import sys
 
-raw = sys.stdin.read()
-rows = json.loads(raw) if raw.strip() else [
-    {"region": "华东", "amount": 120},
-    {"region": "华东", "amount": 300},
-    {"region": "华南", "amount": 90},
-    {"region": "华南", "amount": 140},
-    {"region": "华北", "amount": 220},
-    {"region": "西部", "amount": 80},
-]
 by_region = {}
-for row in rows:
-    by_region.setdefault(row["region"], []).append(float(row["amount"]))
+for row in orders:
+    by_region.setdefault(row["区域"], []).append(float(row["金额"]))
 
 summary = []
 for region, values in sorted(by_region.items()):
@@ -73,121 +116,15 @@ for region, values in sorted(by_region.items()):
 
 print(json.dumps({
     "regions": summary,
-    "total": round(sum(float(row["amount"]) for row in rows), 2),
-    "count": len(rows),
+    "total": round(sum(float(row["金额"]) for row in orders), 2),
+    "count": len(orders),
 }, ensure_ascii=False))
 ```
 
-**result = > foreign.call code=`analyze` input=`orders`**
+`查看` consumes the `会话` handle. Run All runs `准备` then `计算` in the same Python kernel; the static export runs the same cells at build time and embeds their real outputs.
 
-> print text=[count](`result`)
-> print text=[total](`result`)
-> print text=[region]([1]([regions](`result`)))
-> print text=[mean]([1]([regions](`result`)))
+The important language point:
 
-A call is JSON-in / JSON-out: the table is encoded on stdin, and the final stdout value is parsed into Marqdo values.
+Tables are values passed to `foreign.session`. Kernel state lives in `foreign`. View only renders the handle and its cells. `run` still executes the same document as a program.
 
----
-
-The same work as a structured record. `invoke` keeps stdout, stderr, exit code and timing even when the program fails.
-
-**record = > foreign.invoke code=`analyze` input=`orders` output="json"**
-
-> print text=[ok](`record`)
-> print text=[code](`record`)
-> print text=[ms](`record`)
-
-Here `result` is already a parsed value, while `stdout` remains available for logging.
-
----
-
-Persistent Python state. The first evaluation imports a module and creates a list; the second evaluation sees both.
-
-**session = > foreign.session_open lang="python"**
-
-**first = > foreign.session_eval id=`session` source="import math\nvalues = [3, 4, 5]"**
-
-**second = > foreign.session_eval id=`session` source="round(math.sqrt(sum(value * value for value in values)), 3)"**
-
-> print text=[result](`second`)
-
-The kernel is strict and serial: evaluations do not interleave, and a timeout kills the process group.
-
----
-
-The explicit state bridge. Values cross as JSON copies, never as shared object references.
-
-**> foreign.session_set id=`session` name="threshold" value=2.5**
-
-**threshold = > foreign.session_get id=`session` name="threshold"**
-
-> print text=`threshold`
-
-**> foreign.session_close id=`session`**
-
-No implicit mirroring: if a variable is not pushed or pulled, the other side does not see it.
-
----
-
-Parallel fan-out. Every input gets its own process; failures are isolated and order is preserved.
-
-`increment` =
-```python
-import json
-import sys
-
-raw = sys.stdin.read()
-value = json.loads(raw) if raw.strip() else 1
-print(json.dumps(value + 1))
-```
-
-`numbers` =
-
-| value |
-|-------|
-| 1 |
-| 2 |
-| 3 |
-| 4 |
-
-**bumped = > foreign.call_many code=`increment` inputs=`numbers` concurrency=4**
-
-> print text=`bumped`
-
----
-
-Cells in view. Named kernels and a cell order are ordinary bound tables, not fence metadata or YAML config.
-
-```text
-`分析内核` =
-
-| 名称 | 语言 | 命令 | 说明 |
-|------|------|------|------|
-| 分析 | python | | shared analysis |
-| 复核 | python | | isolated review |
-
-`分析单元` =
-
-| 单元 | 内核 | 说明 |
-|------|------|------|
-| 准备数据 | 分析 | generate orders |
-| 计算指标 | 分析 | regions and totals |
-| 独立复核 | 复核 | read the JSON report |
-```
-
-
-`marqdo view` consumes the foreign-owned `会话` handle and renders Run All, Step, per-cell kernel switching, a journal, dirty reload and a state panel. Without that handle, cells are stateless one-shot runs. There is no separate interactive command; `marqdo run` still executes the same file as one program.
-
----
-
-Why this stays readable.
-
-| Layer | What the reader sees |
-|---|---|
-| Markdown | headings, prose, tables and fenced code |
-| Program | assignments, calls and return values |
-| Knowledge | frontmatter, links, task pages and generated catalog entries |
-
-The foreign layer does not add syntax to the language. A fence is still a fence; a table is still a table.
-
-For the lower-level API and safety defaults, read [`../../lib/foreign.mq.md`](../../lib/foreign.mq.md) and [`../../doc/design/foreign-kernel.md`](../../doc/design/foreign-kernel.md).
+There is no separate notebook CLI, no stdin requirement in this example, and no hidden language switch.

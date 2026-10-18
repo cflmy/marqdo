@@ -94,6 +94,7 @@ fn static_cell_outputs(
                     parts.push(error);
                 }
             }
+            let has_body = !parts.is_empty();
             let mut meta = Vec::new();
             if let Some(code) = record_field(&rec, "code").and_then(|v| match v {
                 Value::Int(n) => Some(n),
@@ -114,7 +115,7 @@ fn static_cell_outputs(
             if !meta.is_empty() {
                 parts.push(format!("— {}", meta.join(" · ")));
             }
-            let text = if parts.is_empty() {
+            let text = if !has_body {
                 "(no output)".to_string()
             } else {
                 parts.join("\n\n")
