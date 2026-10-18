@@ -46,7 +46,15 @@ import json
 import statistics
 import sys
 
-rows = json.load(sys.stdin)
+raw = sys.stdin.read()
+rows = json.loads(raw) if raw.strip() else [
+    {"region": "华东", "amount": 120},
+    {"region": "华东", "amount": 300},
+    {"region": "华南", "amount": 90},
+    {"region": "华南", "amount": 140},
+    {"region": "华北", "amount": 220},
+    {"region": "西部", "amount": 80},
+]
 by_region = {}
 for row in rows:
     by_region.setdefault(row["region"], []).append(float(row["amount"]))
@@ -128,7 +136,8 @@ Parallel fan-out. Every input gets its own process; failures are isolated and or
 import json
 import sys
 
-value = json.load(sys.stdin)
+raw = sys.stdin.read()
+value = json.loads(raw) if raw.strip() else 1
 print(json.dumps(value + 1))
 ```
 

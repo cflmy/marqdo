@@ -170,7 +170,9 @@ fn plan_tables(
         return Ok((None, None));
     };
     let Value::Map(fields) = plan else {
-        return Err("`会话` must be a foreign.session handle".into());
+        // `会话` is also a common low-level session id binding (e.g. from
+        // foreign.session_open). It is not a view plan; leave cells stateless.
+        return Ok((None, None));
     };
     let field = |name: &str| {
         fields
@@ -309,8 +311,14 @@ impl DocumentSession {
         collect_cells(&entry.body, &mut cells, &mut seen)?;
         let declarations = capture_bindings(path, root, &module, &source)?;
 
-        let persistent = declarations.contains_key("会话");
         let (plan_kernels, plan_cells) = plan_tables(&declarations)?;
+        let persistent = matches!(
+            declarations.get("会话"),
+            Some(Value::Map(fields))
+                if fields
+                    .iter()
+                    .any(|(k, v)| k == "kind" && value_text(v) == "foreign-session")
+        );
         let mut kernels: Vec<KernelDecl> = Vec::new();
         let mut kernel_map: HashMap<String, KernelDecl> = HashMap::new();
         if let Some(rows) = plan_kernels {
