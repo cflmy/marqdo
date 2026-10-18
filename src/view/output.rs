@@ -55,69 +55,68 @@ fn static_cell_outputs(root: &ViewRoot, abs: &std::path::Path) -> HashMap<String
     let Ok(mut session) = DocumentSession::open(abs, &root.root) else {
         return out;
     };
-    for cell in session.order.clone() {
-        let record = match session.run_cell(&cell, None) {
-            Ok(record) => record,
-            Err(error) => {
-                out.insert(
-                    cell,
-                    StaticCellOutput {
-                        ok: false,
-                        text: error,
-                    },
-                );
+    let Ok(summary) = session.run_all(false) else {
+        session.close();
+        return out;
+    };
+    let records = match &summary {
+        Value::Map(entries) => entries
+            .iter()
+            .find(|(k, _)| k == "records")
+            .map(|(_, v)| v.clone()),
+        _ => None,
+    };
+    if let Some(Value::List(records)) = records {
+        for rec in records {
+            let Some(cell) = record_field(&rec, "cell").and_then(|v| value_text(&v)) else {
                 continue;
+            };
+            let ok = record_field(&rec, "ok")
+                .and_then(|v| value_bool(&v))
+                .unwrap_or(false);
+            let mut parts = Vec::new();
+            if let Some(stdout) = record_field(&rec, "stdout").and_then(|v| value_text(&v)) {
+                if !stdout.is_empty() {
+                    parts.push(stdout);
+                }
             }
-        };
-        let ok = record_field(&record, "ok")
-            .and_then(|v| value_bool(&v))
-            .unwrap_or(false);
-        let mut parts = Vec::new();
-        if let Some(stdout) = record_field(&record, "stdout").and_then(|v| value_text(&v)) {
-            if !stdout.is_empty() {
-                parts.push(stdout);
+            if let Some(stderr) = record_field(&rec, "stderr").and_then(|v| value_text(&v)) {
+                if !stderr.is_empty() {
+                    parts.push(format!("[stderr]\n{stderr}"));
+                }
             }
-        }
-        if let Some(stderr) = record_field(&record, "stderr").and_then(|v| value_text(&v)) {
-            if !stderr.is_empty() {
-                parts.push(format!("[stderr]\n{stderr}"));
+            if let Some(error) = record_field(&rec, "error").and_then(|v| value_text(&v)) {
+                if !error.is_empty() {
+                    parts.push(error);
+                }
             }
-        }
-        if let Some(error) = record_field(&record, "error").and_then(|v| value_text(&v)) {
-            if !error.is_empty() {
-                parts.push(error);
-            }
-        }
-        let mut meta = Vec::new();
-        if let Some(code) =
-            record_field(&record, "code").and_then(|v| match v {
+            let mut meta = Vec::new();
+            if let Some(code) = record_field(&rec, "code").and_then(|v| match v {
                 Value::Int(n) => Some(n),
                 _ => None,
-            })
-        {
-            if code != 0 {
-                meta.push(format!("exit {code}"));
+            }) {
+                if code != 0 {
+                    meta.push(format!("exit {code}"));
+                }
             }
-        }
-        if let Some(ms) =
-            record_field(&record, "ms").and_then(|v| match v {
+            if let Some(ms) = record_field(&rec, "ms").and_then(|v| match v {
                 Value::Int(n) => Some(n),
                 _ => None,
-            })
-        {
-            if ms > 0 {
-                meta.push(format!("{ms}ms"));
+            }) {
+                if ms > 0 {
+                    meta.push(format!("{ms}ms"));
+                }
             }
+            if !meta.is_empty() {
+                parts.push(format!("— {}", meta.join(" · ")));
+            }
+            let text = if parts.is_empty() {
+                "(no output)".to_string()
+            } else {
+                parts.join("\n\n")
+            };
+            out.insert(cell, StaticCellOutput { ok, text });
         }
-        if !meta.is_empty() {
-            parts.push(format!("— {}", meta.join(" · ")));
-        }
-        let text = if parts.is_empty() {
-            "(no output)".to_string()
-        } else {
-            parts.join("\n\n")
-        };
-        out.insert(cell, StaticCellOutput { ok, text });
     }
     session.close();
     out

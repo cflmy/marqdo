@@ -666,7 +666,23 @@ impl DocumentSession {
         let mut records = Vec::new();
         let mut failed = 0i64;
         for name in self.order.clone() {
-            let record = self.run_cell(&name, None)?;
+            let record = match self.run_cell(&name, None) {
+                Ok(record) => record,
+                Err(error) => {
+                    if let Some(i) = self.cell_index(&name) {
+                        self.cells[i].status = CellStatus::Error;
+                        self.cells[i].last_error = error.clone();
+                    }
+                    Value::Map(vec![
+                        ("ok".into(), Value::Bool(false)),
+                        ("stdout".into(), Value::Text(String::new())),
+                        ("stderr".into(), Value::Text(String::new())),
+                        ("error".into(), Value::Text(error)),
+                        ("code".into(), Value::Int(-1)),
+                        ("ms".into(), Value::Int(0)),
+                    ])
+                }
+            };
             let ok = match &record {
                 Value::Map(m) => matches!(
                     m.iter().find(|(k, _)| k == "ok").map(|(_, v)| v),
@@ -1244,6 +1260,51 @@ console.log(globalThis.kept);
             Some("2\n".to_string()),
             "clear outputs must not restart the kernel"
         );
+        s.close();
+        let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn run_all_continues_after_a_cell_error() {
+        if !node_available() {
+            return;
+        }
+        let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let path = root.join(format!(
+            "target/view-run-all-error-{}-{}.mq.md",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_nanos())
+                .unwrap_or(0)
+        ));
+        let source = r#"# main
+
+`a` =
+```node
+throw new Error("boom");
+```
+
+`b` =
+```node
+console.log("after error");
+```
+"#;
+        std::fs::write(&path, source).unwrap();
+        let mut s = DocumentSession::open(&path, &root).unwrap();
+        let summary = s.run_all(false).unwrap();
+        let records = match &summary {
+            Value::Map(entries) => entries.iter().find(|(k, _)| k == "records").map(|(_, v)| v.clone()),
+            _ => None,
+        };
+        let Some(Value::List(records)) = records else { panic!("no records") };
+        assert_eq!(records.len(), 2);
+        assert_eq!(field(&records[0], "ok"), Some(Value::Bool(false)));
+        assert_eq!(field(&records[1], "ok"), Some(Value::Bool(true)));
+        assert!(field(&records[1], "stdout")
+            .and_then(|v| v.reveal_text().map(|s| s.to_string()))
+            .unwrap_or_default()
+            .contains("after error"));
         s.close();
         let _ = std::fs::remove_file(&path);
     }
