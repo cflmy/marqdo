@@ -11,7 +11,7 @@ English-named files export English APIs; Chinese-named files export Chinese APIs
 
 No extra allow flags: importing a module means you intend to use it. Under marqdo view or static export, exit soft-fails and long sleeps are clamped so the console stays up.
 
-Modules: text (text / 文本), table (table / 表), files (fs / 文件), time (time / 时间), system (sys / 系统), json (json only), net (net / 网络), math (math / 数学), foreign (foreign / 外联), plugin (plugin / 插件), writeback (writeback / 自写回), subtask (subtask / 子任务). Foreign v2 adds structured invoke records, JSON calls, parallel fan-out, persistent Python/Node kernels, an explicit state bridge and document-native notebook sessions — see stdlib/foreign.mq.md and features/19-foreign-notebook.mq.md.
+Modules: text (text / 文本), table (table / 表), files (fs / 文件), time (time / 时间), system (sys / 系统), json (json only), net (net / 网络), math (math / 数学), foreign (foreign / 外联), plugin (plugin / 插件), writeback (writeback / 自写回), subtask (subtask / 子任务). Foreign v2 adds structured invoke records, JSON calls, parallel fan-out, persistent Python/Node kernels, an explicit state bridge and document-native view cells — see stdlib/foreign.mq.md and features/19-foreign-view-cells.mq.md.
 
 From v0.1.2, official `lib/*.mq.md` is embedded in the `marqdo` binary (disk `lib/` or `MARQDO_LIB` still overrides). Standalone `.exe` works without a separate stdlib zip.
 

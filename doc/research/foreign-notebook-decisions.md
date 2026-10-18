@@ -54,8 +54,8 @@
 ### 结论 C：Hybrid 执行模型
 
 - **Program mode（规范模式）**：`marqdo run` / CI / 可复现执行。文档是程序；外联通过显式 `foreign.session_*` / `call` 编排；结果可重复。
-- **Notebook mode（交互模式）**：`view` 中按 cell 执行、单步、切换内核、查看状态。适合探索，不默认写入文档。
-- 两者共享同一个内核运行时与同一套 cell 索引；Notebook mode 是 Program mode 的**交互镜头**，不是替代品。
+- **View cells（交互面）**：`view` 中按 cell 执行、单步、切换内核、查看状态。适合探索，不默认写入文档；不是第二个 CLI 模式。
+- 两者共享同一个内核运行时与同一套 cell 索引；view cells 是 program execution 的**交互镜头**，不是替代品。
 
 理由：如果让 cell 执行取代文档程序语义，Marqdo 就退化成 Jupyter；如果只有 Program mode，就失去 Jupyter 的即时反馈。Hybrid 同时保留两者。
 
@@ -99,7 +99,7 @@
 
 ### 结论 H：输出默认临时，writeback 显式；状态不写进 `.mq.md`
 
-- Notebook mode 的输出默认只在 view 中显示，不修改文档。
+- View cells 的输出默认只在 view 中显示，不修改文档。
 - 需要持久化时显式 writeback（沿用 `<!-- marqdo-out … -->`），可 Git 跟踪、可忽略。
 - 执行日志放 `.marqdo/sessions/…`（默认 git 忽略）。
 - 不把 execution_count / kernel 状态 / base64 输出写进 `.mq.md`。

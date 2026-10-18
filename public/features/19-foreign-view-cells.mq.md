@@ -1,12 +1,12 @@
 ---
-title: Foreign kernels v2 — a Python analysis notebook
-description: A complete Python data walkthrough with probe, JSON calls, parallel fan-out, persistent state, an explicit bridge and document-native notebook cells
+title: Foreign kernels v2 — Python analysis in view
+description: A complete Python data walkthrough with probe, JSON calls, parallel fan-out, persistent state and view cells
 import foreign:lib/foreign.mq.md
 ---
 
 # main
 
-This page is both a readable document and a runnable program. It uses the same file to show the foreign-kernel features added in v2: language probing, structured records, JSON in/out, parallel fan-out, a persistent Python kernel, and an explicit state bridge.
+This page is both a readable document and a runnable program. It uses the same file to show the foreign-kernel features added in v2: language probing, structured records, JSON in/out, parallel fan-out, a persistent Python kernel, and an explicit state bridge. The same source can also be opened in view as interactive cells.
 
 The data is intentionally small and deterministic, so every number below can be reproduced by running the page.
 
@@ -147,7 +147,7 @@ print(json.dumps(value + 1))
 
 ---
 
-A document-native notebook. Named kernels and a session table are ordinary bound data tables, not fence metadata or YAML config.
+Cells in view. Named kernels and a cell order are ordinary bound tables, not fence metadata or YAML config.
 
 ```text
 `内核表` =
@@ -166,7 +166,7 @@ A document-native notebook. Named kernels and a session table are ordinary bound
 | 独立复核 | 复核 | read the JSON report |
 ```
 
-Live `view` renders these as cells with Run All, Step, per-cell kernel switching, a journal, dirty reload and a state panel. The same file still runs as a single program.
+`marqdo view` renders these as cells with Run All, Step, per-cell kernel switching, a journal, dirty reload and a state panel. There is no separate interactive command; `marqdo run` still executes the same file as one program.
 
 ---
 

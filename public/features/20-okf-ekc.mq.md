@@ -21,13 +21,13 @@ A concept page can therefore point at the exact file that proves it:
 type: Capability
 title: Persistent foreign kernels
 description: Run Python or Node in a named, stateful kernel
-resource: public/features/19-foreign-notebook.mq.md
+resource: public/features/19-foreign-view-cells.mq.md
 status: stable
 verified:
   by: marqdo-knowledge/verify
 tags:
   - foreign
-  - notebook
+  - view-cells
 ```
 
 The same page can be opened in an editor, linked from a catalog, queried by an agent, and executed. Unknown fields are preserved; unknown types degrade to readable prose. The page is a concept, not a copy of one.
@@ -104,7 +104,7 @@ marqdo find "foreign session"
 marqdo reuse "implement JSON fan-out"
 
 # See what a change would touch
-marqdo impact public/features/19-foreign-notebook.mq.md
+marqdo impact public/features/19-foreign-view-cells.mq.md
 
 # Validate the knowledge projection
 marqdo knowledge verify
@@ -132,4 +132,4 @@ Catalog CLI: [Catalog CLI](../../doc/design/catalog-cli.md)
 
 OKF and Marqdo research: [OKF and Marqdo research](../../doc/research/okf-and-marqdo.md)
 
-Foreign notebook example: [Foreign notebook example](19-foreign-notebook.mq.md)
+Foreign view-cells example: [Foreign view-cells example](19-foreign-view-cells.mq.md)

@@ -1,4 +1,4 @@
-# 文档原生 Notebook 语法
+# 文档原生 view cells 语法
 
 | | |
 |---|---|
@@ -247,11 +247,11 @@ print(x + 1)
 
 - `内核表` / `会话表` 是**声明**，不是执行指令。
 - `marqdo run` 仍然执行 `# main` 的程序语义；这两个表会被求值为普通数据。
-- Program mode 的外联编排用显式 API（`foreign.session_open` / `session_eval` / `call`）；表只服务 view 的 notebook 会话与一键 Run All。
+- `run` 的外联编排用显式 API（`foreign.session_open` / `session_eval` / `call`）；表只服务 `view` 的 cells 与一键 Run All。
 - 两种模式可以并存：
   - 文档用表描述“交互时怎么跑”；
   - `# main` 用显式调用描述“CI 时怎么跑”。
-- 如果两者冲突，以 Program mode 的程序语义为准；Notebook mode 的表只影响 view。
+- 如果两者冲突，以 `run` 的程序语义为准；cell 表只影响 `view`。
 
 这样避免把“执行计划”变成第二套程序语义。
 

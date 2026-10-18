@@ -106,7 +106,7 @@ This is a JSON copy, not shared memory. The kernel receives a value; Marqdo rece
 
 ---
 
-Notebook sessions.
+Cells in view.
 
 A document can declare named kernels and a cell order without new Markdown markers:
 
@@ -127,7 +127,7 @@ A document can declare named kernels and a cell order without new Markdown marke
 | 独立复核 | 复核 | isolated kernel |
 ```
 
-Live `view` then adds Run All, Step, kernel switching, a journal and per-cell state. See the complete Python walkthrough in [`features/19-foreign-notebook.mq.md`](../features/19-foreign-notebook.mq.md).
+`marqdo view` then adds Run All, Step, kernel switching, a journal and per-cell state. This is a view capability, not a second CLI mode. See the complete Python walkthrough in [`features/19-foreign-view-cells.mq.md`](../features/19-foreign-view-cells.mq.md).
 
 ---
 

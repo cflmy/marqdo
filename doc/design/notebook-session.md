@@ -1,14 +1,14 @@
-# 文档会话（Document Session）
+# 文档会话（View Cells）
 
 | | |
 |---|---|
 | 状态 | **D1–D3 首版已实现；D4/D5 待做** |
 | 日期 | 2026-10-17 |
-| 层 | Runtime + Document（view 服务端 / notebook 交互） |
+| 层 | Runtime + Document（view 服务端 / 交互单元） |
 | 相关 | [notebook-syntax.md](notebook-syntax.md) · [foreign-kernel.md](foreign-kernel.md) · [foreign-notebook-decisions.md](../research/foreign-notebook-decisions.md) · [view.md](view.md) · [view-debug.md](view-debug.md) · [stdlib-subtask.md](stdlib-subtask.md) |
 | 核心表面 Δ | 无（读取既有 AST 与表格） |
 
-> 文档会话是 view 背后的“notebook 运行时”：它记住哪些 cell、在哪个内核、按什么顺序执行、状态是什么、结果是否过期。
+> 文档会话是 view 背后的交互单元运行时：它记住哪些 cell、在哪个内核、按什么顺序执行、状态是什么、结果是否过期。它不是第二个 CLI 模式——`marqdo view` 是唯一的交互面，`marqdo run` 是规范执行。
 
 ---
 
@@ -39,7 +39,7 @@
 | view 工具栏 / 状态徽标 / 内核下拉 / 状态表单 | ✅ | `src/view/html.rs` |
 | `POST /api/session/*` | ✅（含 `reload`） | `src/view/notebook_api.rs` |
 | cell step | ✅ | 同上 |
-| Marqdo statement step | ✅（notebook 工具栏 Debug → 同一 view 服务的 `/debug`；`/api/debug/*`） | `src/debug` · `src/view/debug_api.rs` |
+| Marqdo statement step | ✅（view 工具栏 Debug → 同一 view 服务的 `/debug`；`/api/debug/*`） | `src/debug` · `src/view/debug_api.rs` |
 | dirty/stale 自动检测 | 部分（reload → dirty；assign → dirty；stale 传播待做） | `src/notebook/mod.rs` |
 | writeback 集成 | 待做 | `writeback` |
 | replay / 持久化 | 待做 | — |
@@ -50,18 +50,18 @@
 
 ---
 
-## 2. 两种执行模式
+## 2. 两种执行面（不是两个 CLI 模式）
 
-### 2.1 Program mode（规范）
+### 2.1 Program execution（规范）
 
 - 入口：`marqdo run doc.mq.md` / CI / `view` 的 `Run document`。
 - 执行：`# main` 程序语义；外联通过显式 `foreign.session_open/eval/call` 编排。
 - 状态：一次运行内有效；运行结束进程退出（除非显式持久内核）。
 - 结果：可复现；是文档的“真理”。
 
-### 2.2 Notebook mode（交互）
+### 2.2 View cells（交互）
 
-- 入口：`marqdo view doc.mq.md` → Session 面板。
+- 入口：`marqdo view doc.mq.md` → 文档单元（cell）控制。
 - 执行：按 `会话表`（或自动顺序）逐 cell 执行。
 - 状态：内核持久；可切换、重启、单步。
 - 结果：默认临时显示；可显式 writeback。
@@ -72,7 +72,7 @@
 ```text
                     .mq.md
                    /      \
-          Program mode     Notebook mode
+          Program run      View cells
           (canonical)      (interactive)
                 \             /
                  Document Session
@@ -83,8 +83,8 @@
 ```
 
 - 共享 cell index 与 kernel registry。
-- Program mode 可以不使用 notebook 表；Notebook mode 可以使用。
-- 冲突时以 Program mode 为准；Notebook mode 不改变文档语义。
+- `run` 不使用 cell 表；`view` 在文档声明 `内核表` / `会话表` 时提供 cell 控制。
+- 冲突时以 `run` 的程序语义为准；view cells 不改变文档语义。
 
 ---
 
@@ -107,7 +107,7 @@ DocumentSession
 ├── value_store: HashMap<String, Value>   // Marqdo 侧会话值
 ├── journal: Vec<ExecutionRecord>
 ├── created_ms / last_active_ms
-└── mode: program | notebook
+└── surface: program | view
 ```
 
 ### 3.1 Cell
@@ -233,7 +233,7 @@ resolve cell -> resolve kernel
 | **Marqdo statement step** | 执行下一条 Marqdo 语句；遇到 `foreign.session_eval` 时整个外联调用原子完成 |
 | **Foreign line step** | 不做；未来 DAP |
 
-- Cell step 是 Notebook mode 的主单步。
+- Cell step 是 view cells 的主单步。
 - Statement step 复用 `DebugController`；需要把 debug session 与 DocumentSession 关联。
 - 两者可以互相切换：cell step 到某个 Marqdo cell 后可 statement step；语句执行完回到 cell 边界。
 
@@ -333,7 +333,7 @@ resolve cell -> resolve kernel
 
 ### 7.1 默认
 
-- Notebook mode 输出只在 view 中显示；不写 `.mq.md`。
+- View cells 输出只在 view 中显示；不写 `.mq.md`。
 - 关闭/刷新后可通过 journal 恢复最近结果（若 session 持久化）。
 - 不写 execution_count 到文档。
 
@@ -495,7 +495,7 @@ Kernel: [分析 ▾]  Status: ready  [Restart] [Interrupt]
 | 源 | `.ipynb` | `.mq.md` |
 | 执行顺序 | 隐藏的 `In[n]` | 会话表 / 文档顺序 / journal |
 | 状态 | 隐藏 kernel | kernel + value store + 状态面板 |
-| 多语言 | 一 notebook 一 kernel | 命名内核 + 每 cell 归属 |
+| 多语言 | 一文档一 kernel | 命名内核 + 每 cell 归属 |
 | 单步 | cell | cell + statement |
 | 复现 | 手动 | Restart & Run All + journal + replay |
 | Git | 输出/计数噪声 | 源码干净；输出显式 |

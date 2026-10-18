@@ -2870,6 +2870,13 @@ pub fn page_index(files: &[PathBuf], only: Option<&Path>, links: &LinkMode) -> S
     layout("index", &nav, &main)
 }
 
+/// True only when the document declares a cell table; ordinary view pages stay classic.
+fn has_cell_tables(source: &str) -> bool {
+    ["`内核表`", "`会话表`", "`kernels`", "`session`"]
+        .iter()
+        .any(|needle| source.contains(needle))
+}
+
 fn notebook_ui() -> &'static str {
     r#"<style>
 /* ── VS Code / Jupyter notebook skin ───────────────────────────────── */
@@ -3233,16 +3240,6 @@ body.notebook-page .code-head {
   background: var(--nb-surface-2);
 }
 body.notebook-page .code-head .badge { display: none; }
-body.notebook-page .nb-prompt {
-  order: 0;
-  min-width: 3.2rem;
-  padding-right: 0.5rem;
-  border-right: 1px solid var(--nb-border);
-  color: var(--nb-muted);
-  font: 0.66rem/1.3 var(--mono);
-  text-align: right;
-  white-space: nowrap;
-}
 body.notebook-page .code-name {
   order: 1;
   color: var(--nb-strong);
@@ -3350,7 +3347,7 @@ body.notebook-page .code-out {
   word-break: break-word;
 }
 body.notebook-page .code-out::before {
-  content: "Out [ ]";
+  content: "Output";
   display: block;
   margin-bottom: 0.38rem;
   color: var(--nb-muted);
@@ -3470,7 +3467,7 @@ body.notebook-page .stdin-form button {
 }
 </style>
 <div class="notebook-bar" id="notebook-bar" hidden>
-  <strong>Notebook</strong>
+  <strong>View</strong>
   <button type="button" id="nb-run-all">Run All</button>
   <button type="button" id="nb-restart">Restart &amp; Run All</button>
   <button type="button" id="nb-step">Step</button>
@@ -3568,14 +3565,6 @@ body.notebook-page .stdin-form button {
     (s.cells || []).forEach(function (c) {
       var el = card(c.name);
       if (!el) return;
-      var head0 = el.querySelector(".code-head");
-      var prompt = el.querySelector(".nb-prompt");
-      if (!prompt && head0) {
-        prompt = document.createElement("span");
-        prompt.className = "nb-prompt";
-        head0.insertBefore(prompt, head0.firstChild);
-      }
-      if (prompt) prompt.textContent = "In [" + (c.runs ? c.runs : " ") + "]";
       badge(el, c.status, c.status === "clean");
       var sel = el.querySelector(".nb-kernel");
       if (!sel) {
@@ -3872,7 +3861,7 @@ pub fn page_file(files: &[PathBuf], rel: &str, vm: &FileViewModel, links: &LinkM
     let trace_safe = vm
         .trace_json
         .replace("</", "<\\/");
-    let notebook = if matches!(links, LinkMode::Live) {
+    let notebook = if matches!(links, LinkMode::Live) && has_cell_tables(&vm.source) {
         notebook_ui().to_string()
     } else {
         String::new()
@@ -4140,5 +4129,14 @@ mod tests {
             "notebook API URLs must stay relative for path-prefix proxy"
         );
         assert!(ui.contains("post(\"api/session/open\""));
+        assert!(!ui.contains("In ["), "view cells must not mimic Jupyter In[] prompts");
+        assert!(!ui.contains("Out ["), "view cells must not mimic Jupyter Out[] prompts");
+    }
+
+    #[test]
+    fn cell_controls_only_for_cell_tables() {
+        assert!(has_cell_tables("# main\n\n`内核表` =\n"));
+        assert!(has_cell_tables("# main\n\n`session` =\n"));
+        assert!(!has_cell_tables("# main\n\n`hi` =\n```python\nprint(1)\n```\n"));
     }
 }

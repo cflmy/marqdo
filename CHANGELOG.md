@@ -4,6 +4,7 @@
 
 ### Added
 
+- **view cells 概念收敛**：`view` 是唯一交互面；只有文档声明 `内核表` / `会话表` 时才显示 cell 控件，普通 view 不显示；移除 `In []` / `Out []` 的 Jupyter 式提示与 Notebook 品牌；没有新增 notebook CLI 或第二个交互模式。
 ### Fixed
 
 ### Changed
@@ -22,7 +23,7 @@ git checkout v1.5.0 && cargo build --release
 
 ### Added
 
-- **用户静态站（外联 / OKF / EKC）**：新增中英双语 `features/19-foreign-notebook` 与 `features/20-okf-ekc`，重写 `stdlib/foreign`，首页加入「一份文件三个面」、外联 Python 运行、Notebook 表、OKF/EKC 与 preflight 说明。
+- **用户静态站（外联 / OKF / EKC）**：新增中英双语 `features/19-foreign-view-cells` 与 `features/20-okf-ekc`，重写 `stdlib/foreign`，首页加入「一份文件三个面」、外联 Python 运行、Notebook 表、OKF/EKC 与 preflight 说明。
 - **`lib/foreign` F0/F1**：`invoke` 结构化记录（`ok`/`code`/`stdout`/`stderr`/`ms`/`timed_out`/`truncated`/`result`）；`run`/`run_lang` 新增 `env`/`cwd`/`timeout`/`args`/`max_output`；15 个语言预设；`probe`/`register`/`unset`/`load_config`；`.marqdo/foreign.toml`。
 - **`lib/foreign` F2**：JSON 进 / JSON 出 `call`；并行 `run_many` / `call_many`（有序、单项隔离、并发上限）；`invoke` 的 `input` / `output` / `result` / `result_error`。
 - **`lib/foreign` F3/F3.5**：Python / Node 持久会话 `session_open` / `session_eval` / `session_close` / `session_list`；状态桥 `session_set` / `session_get` / `session_names`；会话超时即杀、崩溃隔离、drop 清理。

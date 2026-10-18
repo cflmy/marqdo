@@ -57,9 +57,9 @@ Foreign v2 is a good example. Probe Python, then run the bound fence:
 2. *
   > print text="(python3 not found — install Python to run this cell)"
 
-The same module also supports JSON calls, parallel fan-out, persistent kernels and an explicit state bridge. See [stdlib/foreign.mq.md](stdlib/foreign.mq.md) and the full Python walkthrough in [features/19-foreign-notebook.mq.md](features/19-foreign-notebook.mq.md).
+The same module also supports JSON calls, parallel fan-out, persistent kernels and an explicit state bridge. See [stdlib/foreign.mq.md](stdlib/foreign.mq.md) and the full Python walkthrough in [features/19-foreign-view-cells.mq.md](features/19-foreign-view-cells.mq.md).
 
-A notebook is still a document. Named kernels and a cell order are ordinary bound tables:
+A view document is still a document. Named kernels and a cell order are ordinary bound tables:
 
 ```text
 `内核表` =
@@ -78,7 +78,7 @@ A notebook is still a document. Named kernels and a cell order are ordinary boun
 | 独立复核 | 复核 | validate |
 ```
 
-Live view turns that into Run All, Step, per-cell kernels, a journal and a state panel. Program mode still runs the file as one program.
+`marqdo view` turns that into Run All, Step, per-cell kernels, a journal and a state panel. There is no separate interactive mode or command; `marqdo run` still executes the file as one program.
 
 Documentation becomes knowledge when it can be discovered, verified and reused. OKF supplies the portable Markdown + YAML shape; EKC projects the repository into catalog layers L0–L4, a graph and an engineering preflight. The source `.mq.md` remains the only authority; generated artifacts are marked and rebuildable.
 

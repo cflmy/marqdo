@@ -21,13 +21,13 @@ OKF（Open Knowledge Format）用 Markdown + YAML frontmatter 表示知识：一
 type: Capability
 title: 持久外联内核
 description: 在命名内核中运行 Python 或 Node 并保留状态
-resource: public/features/19-外联Notebook.mq.md
+resource: public/features/19-外联视图单元.mq.md
 status: stable
 verified:
   by: marqdo-knowledge/verify
 tags:
   - foreign
-  - notebook
+  - view-cells
 ```
 
 同一页可以在编辑器里读、从 catalog 链接、被 Agent 查询，也可以直接运行。未知字段保留；未知类型降级为可读正文。概念页不是源文件的复制品。
@@ -104,7 +104,7 @@ marqdo find "外联 会话"
 marqdo reuse "实现 JSON 并行扇出"
 
 # 看一次修改会影响什么
-marqdo impact public/features/19-外联Notebook.mq.md
+marqdo impact public/features/19-外联视图单元.mq.md
 
 # 校验知识投影
 marqdo knowledge verify
@@ -132,4 +132,4 @@ Catalog CLI：[Catalog CLI](../../doc/design/catalog-cli.md)
 
 OKF 与 Marqdo 调研：[OKF 与 Marqdo 调研](../../doc/research/okf-and-marqdo.md)
 
-外联 Notebook 示例：[外联 Notebook 示例](19-外联Notebook.mq.md)
+外联 view 单元示例：[外联 view 单元示例](19-外联视图单元.mq.md)
