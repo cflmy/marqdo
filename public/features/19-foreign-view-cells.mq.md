@@ -71,27 +71,23 @@ View cells share state.
 | @ | 名称 | 语言 |
 |---|------|------|
 | 1 | 分析 | python |
+| 2 | 复核 | python |
 
 `分析单元` =
 
 | @ | 单元 | 内核 |
 |---|------|------|
-| 1 | 准备 | 分析 |
-| 2 | 计算 | 分析 |
+| 1 | 计算 | 分析 |
+| 2 | 复核 | 复核 |
 
-`会话` = > foreign.session kernels=`分析内核` cells=`分析单元`
+`初始值` =
 
-`准备` =
-```python
-orders = [
-    {"区域": "华东", "金额": 120},
-    {"区域": "华东", "金额": 300},
-    {"区域": "华南", "金额": 90},
-    {"区域": "华南", "金额": 140},
-    {"区域": "华北", "金额": 220},
-    {"区域": "西部", "金额": 80},
-]
-```
+| 内核 | 名称 | 值 |
+|------|------|----|
+| 分析 | orders | `订单` |
+| 复核 | orders | `订单` |
+
+`会话` = > foreign.session kernels=`分析内核` cells=`分析单元` values=`初始值`
 
 `计算` =
 ```python
@@ -121,10 +117,21 @@ print(json.dumps({
 }, ensure_ascii=False))
 ```
 
-`查看` consumes the `会话` handle. Run All runs `准备` then `计算` in the same Python kernel; the static export runs the same cells at build time and embeds their real outputs.
+`复核` =
+```python
+import json
+
+print(json.dumps({
+    "kernel": "复核",
+    "count": len(orders),
+    "total": round(sum(float(row["金额"]) for row in orders), 2),
+}, ensure_ascii=False))
+```
+
+`查看` consumes the `会话` handle. Run All runs `计算` in the `分析` kernel and `复核` in the `复核` kernel; the static export runs the same cells and embeds their real outputs.
 
 The important language point:
 
-Tables are values passed to `foreign.session`. Kernel state lives in `foreign`. View only renders the handle and its cells. `run` still executes the same document as a program.
+The `初始值` table passes the same Marqdo `订单` value into both kernels. Kernel state lives in `foreign`. View only renders the handle and its cells. `run` still executes the same document as a program.
 
 There is no separate notebook CLI, no stdin requirement in this example, and no hidden language switch.

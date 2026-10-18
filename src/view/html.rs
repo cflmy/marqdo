@@ -3692,6 +3692,34 @@ body.notebook-page .stdin-form button {
       });
     });
   }
+  function renderStaticSummary(s) {
+    if (!s) return;
+    state.persistent = !!s.persistent;
+    state.kernels = s.kernels || [];
+    state.cells = {};
+    (s.cells || []).forEach(function (c) { state.cells[c.name] = c; });
+    (s.cells || []).forEach(function (c) {
+      var el = card(c.name);
+      if (!el) return;
+      badge(el, c.status, c.status === "clean");
+      if (!state.persistent) {
+        ensureKernel(el, false);
+        return;
+      }
+      var sel = ensureKernel(el, true);
+      var opts = state.kernels.filter(function (k) { return k.lang === c.lang; }).map(function (k) { return k.name; });
+      if (!opts.length) opts = [c.kernel];
+      sel.innerHTML = "";
+      opts.forEach(function (n) {
+        var o = document.createElement("option");
+        o.value = n; o.textContent = n;
+        if (n === c.kernel) o.selected = true;
+        sel.appendChild(o);
+      });
+      sel.disabled = true;
+      sel.title = "Static export: kernel fixed to " + c.kernel;
+    });
+  }
   function openSession() {
     var bar = document.getElementById("notebook-bar");
     if (bar) bar.hidden = false;
@@ -3804,10 +3832,14 @@ body.notebook-page .stdin-form button {
           staticNotice();
         });
       });
-      document.querySelectorAll(".code-card").forEach(function (el) {
-        ensureKernel(el, false);
-        bindClean(el);
-      });
+      if (window.MARQDO_STATIC_SESSION) {
+        renderStaticSummary(window.MARQDO_STATIC_SESSION);
+      } else {
+        document.querySelectorAll(".code-card").forEach(function (el) {
+          ensureKernel(el, false);
+        });
+      }
+      document.querySelectorAll(".code-card").forEach(bindClean);
       status("static export · preview only");
       return;
     }

@@ -152,6 +152,7 @@ in input order. Raises with the failing index after all workers finish.
 ## session
     + `kernels`=None
     + `cells`=None
+    + `values`=None
 
 Declare a document view session. `kernels` and `cells` are ordinary tables:
 kernels are `|名称|语言|命令|` (ZH or EN), cells are `|单元|内核|`.
@@ -162,6 +163,7 @@ view has no persistent kernel state.
 **p = > table.put in=`p` at="kind" value="foreign-session"**
 **p = > table.put in=`p` at="kernels" value=`kernels`**
 **p = > table.put in=`p` at="cells" value=`cells`**
+**p = > table.put in=`p` at="values" value=`values`**
 *p*
 
 ## session_open

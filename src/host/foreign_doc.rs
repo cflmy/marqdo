@@ -165,14 +165,21 @@ fn table_rows(v: &Value) -> Result<Vec<HashMap<String, Value>>, String> {
 
 fn plan_tables(
     bindings: &HashMap<String, Value>,
-) -> Result<(Option<Vec<HashMap<String, Value>>>, Option<Vec<HashMap<String, Value>>>), String> {
+) -> Result<
+    (
+        Option<Vec<HashMap<String, Value>>>,
+        Option<Vec<HashMap<String, Value>>>,
+        Option<Vec<HashMap<String, Value>>>,
+    ),
+    String,
+> {
     let Some(plan) = bindings.get("会话") else {
-        return Ok((None, None));
+        return Ok((None, None, None));
     };
     let Value::Map(fields) = plan else {
         // `会话` is also a common low-level session id binding (e.g. from
         // foreign.session_open). It is not a view plan; leave cells stateless.
-        return Ok((None, None));
+        return Ok((None, None, None));
     };
     let field = |name: &str| {
         fields
@@ -192,7 +199,11 @@ fn plan_tables(
         Some(Value::None) | None => None,
         Some(v) => Some(table_rows(&v)?),
     };
-    Ok((kernels, cells))
+    let values = match field("values") {
+        Some(Value::None) | None => None,
+        Some(v) => Some(table_rows(&v)?),
+    };
+    Ok((kernels, cells, values))
 }
 
 fn col_value<'a>(row: &'a HashMap<String, Value>, names: &[&str]) -> Option<&'a Value> {
@@ -311,7 +322,7 @@ impl DocumentSession {
         collect_cells(&entry.body, &mut cells, &mut seen)?;
         let declarations = capture_bindings(path, root, &module, &source)?;
 
-        let (plan_kernels, plan_cells) = plan_tables(&declarations)?;
+        let (plan_kernels, plan_cells, plan_values) = plan_tables(&declarations)?;
         let persistent = matches!(
             declarations.get("会话"),
             Some(Value::Map(fields))
@@ -411,7 +422,7 @@ impl DocumentSession {
         host.entry_path = Some(path.to_path_buf());
         host.entry_source = Some(source);
 
-        Ok(Self {
+        let mut session = Self {
             path: path.to_path_buf(),
             root: root.to_path_buf(),
             persistent,
@@ -425,7 +436,26 @@ impl DocumentSession {
             host,
             kernel_sessions: HashMap::new(),
             seq: 0,
-        })
+        };
+        if let Some(rows) = plan_values {
+            for row in rows {
+                let kernel = col_text(&row, &["内核", "Kernel", "kernel"])
+                    .ok_or_else(|| "foreign.session values: missing 内核/Kernel".to_string())?;
+                let name = col_text(&row, &["名称", "Name", "name"])
+                    .ok_or_else(|| "foreign.session values: missing 名称/Name".to_string())?;
+                let value = col_value(&row, &["值", "Value", "value", "数据"])
+                    .ok_or_else(|| format!("foreign.session values[{name}]: missing 值/Value"))?
+                    .clone();
+                let id = session.ensure_kernel_session(&kernel)?;
+                foreign_session::set(
+                    &mut session.host,
+                    &Value::Text(id),
+                    &Value::Text(name),
+                    &value,
+                )?;
+            }
+        }
+        Ok(session)
     }
 
     /// Re-read the document, preserving kernels/state/journal. Changed cells become dirty.

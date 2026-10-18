@@ -50,18 +50,18 @@ fn record_field(record: &Value, key: &str) -> Option<Value> {
 
 /// Run the document's cells at export time and keep their real outputs. This
 /// is what makes a static page show foreign results instead of just source.
-fn static_cell_outputs(
+fn static_page_data(
     root: &ViewRoot,
     abs: &std::path::Path,
     stdin: &str,
-) -> HashMap<String, StaticCellOutput> {
+) -> (HashMap<String, StaticCellOutput>, Option<Value>) {
     let mut out = HashMap::new();
     let Ok(mut session) = DocumentSession::open(abs, &root.root) else {
-        return out;
+        return (out, None);
     };
     let Ok(summary) = session.run_all_with_stdin(false, Some(stdin)) else {
         session.close();
-        return out;
+        return (out, None);
     };
     let records = match &summary {
         Value::Map(entries) => entries
@@ -123,8 +123,9 @@ fn static_cell_outputs(
             out.insert(cell, StaticCellOutput { ok, text });
         }
     }
+    let view_summary = session.summary();
     session.close();
-    out
+    (out, Some(view_summary))
 }
 
 /// Inject static cell outputs into code cards without running client JS.
@@ -151,6 +152,22 @@ fn inject_cell_outputs(html: &str, outputs: &HashMap<String, StaticCellOutput>) 
         );
     }
     html
+}
+
+fn inject_static_session(html: &str, summary: Option<&Value>) -> String {
+    let Some(summary) = summary else {
+        return html.to_string();
+    };
+    let Ok(json) = crate::host::json::value_to_json(summary) else {
+        return html.to_string();
+    };
+    let Ok(json) = serde_json::to_string(&json) else {
+        return html.to_string();
+    };
+    let line = format!(
+        "window.MARQDO_VIEW_LIVE = false;\nwindow.MARQDO_STATIC_SESSION = {json};"
+    );
+    html.replace("window.MARQDO_VIEW_LIVE = false;", &line)
 }
 
 pub fn write_static(opts: OutputOptions) -> Result<()> {
@@ -187,14 +204,17 @@ pub fn write_static(opts: OutputOptions) -> Result<()> {
         let links = LinkMode::Static {
             from: Some(rel.clone()),
         };
-        let cell_outputs = if opts.no_exec {
-            HashMap::new()
+        let (cell_outputs, static_summary) = if opts.no_exec {
+            (HashMap::new(), None)
         } else {
-            static_cell_outputs(&root, &abs, &vm.preset_stdin)
+            static_page_data(&root, &abs, &vm.preset_stdin)
         };
-        let html = inject_cell_outputs(
-            &page_file(&root.files, &rel, &vm, &links),
-            &cell_outputs,
+        let html = inject_static_session(
+            &inject_cell_outputs(
+                &page_file(&root.files, &rel, &vm, &links),
+                &cell_outputs,
+            ),
+            static_summary.as_ref(),
         );
         let out_file = pages_root.join(format!("{rel}.html"));
         if let Some(parent) = out_file.parent() {
@@ -204,14 +224,17 @@ pub fn write_static(opts: OutputOptions) -> Result<()> {
 
         if first_page_html.is_none() {
             // index.html = first file (same content, links rooted at OUT_DIR)
-            first_page_html = Some(inject_cell_outputs(
-                &page_file(
-                    &root.files,
-                    &rel,
-                    &vm,
-                    &LinkMode::Static { from: None },
+            first_page_html = Some(inject_static_session(
+                &inject_cell_outputs(
+                    &page_file(
+                        &root.files,
+                        &rel,
+                        &vm,
+                        &LinkMode::Static { from: None },
+                    ),
+                    &cell_outputs,
                 ),
-                &cell_outputs,
+                static_summary.as_ref(),
             ));
         }
     }
