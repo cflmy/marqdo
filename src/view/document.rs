@@ -342,8 +342,14 @@ fn render_table_block(
     html.push_str("</table>");
     // Annots on first table line (bind of collection).
     if let Some(list) = by_line.get(&first_line) {
-        if !list.is_empty() {
-            let owned: Vec<ViewAnnot> = list.iter().map(|a| (*a).clone()).collect();
+        // A table is already its own readable value; a call chip would collapse
+        // the whole collection into an ellipsis. Keep only non-call chips.
+        let owned: Vec<ViewAnnot> = list
+            .iter()
+            .filter(|a| a.kind != crate::view::annot::AnnotKind::Call)
+            .map(|a| (*a).clone())
+            .collect();
+        if !owned.is_empty() {
             html.push_str(&render_annot_band(&owned, MAX_VISIBLE_ANNOTS));
         }
     }
