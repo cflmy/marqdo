@@ -1039,20 +1039,18 @@ body.notebook-page .exec-clear:hover { border-color: var(--nb-accent); color: va
 }
 .doc-writeback {
   margin: 0.35rem 0;
-  padding: 0.4rem 0.55rem;
+  padding: 0.45rem 0.6rem;
   border-radius: 8px;
   border: 1px dashed #94a3b8;
   background: #f1f5f9;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem 0.65rem;
-  align-items: baseline;
 }
 .doc-writeback[data-wb-kind="image"] {
   border-color: #0d9488;
   background: #f0fdfa;
 }
 .wb-source-badge {
+  display: inline-block;
+  margin-bottom: 0.28rem;
   font: 0.68rem/1.2 var(--sans);
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -1066,10 +1064,11 @@ body.notebook-page .exec-clear:hover { border-color: var(--nb-accent); color: va
   color: #115e59;
 }
 .wb-source-text {
+  display: block;
   font: 0.82rem/1.4 var(--mono);
   color: #0f172a;
   white-space: pre-wrap;
-  word-break: break-all;
+  word-break: break-word;
 }
 .wb-outline {
   margin-top: 0.75rem;
@@ -3497,6 +3496,34 @@ body.notebook-page .stdin-form button {
   background: var(--nb-accent);
   color: #fff;
 }
+
+body.notebook-page .output-card {
+  background: var(--nb-surface-2);
+  border-left-color: var(--nb-accent);
+}
+body.notebook-page .output-card.output-card-image { border-left-color: var(--nb-success); }
+body.notebook-page .output-card .wb-badges { color: var(--nb-muted); }
+body.notebook-page .output-card .output-body {
+  color: var(--nb-text);
+  background: var(--nb-bg);
+}
+body.notebook-page .wb-badge {
+  background: var(--nb-surface-3);
+  color: var(--nb-text);
+  border-color: var(--nb-border);
+}
+body.notebook-page .wb-badge.wb-ok { background: #143d2b; color: #86efac; }
+body.notebook-page .wb-badge.wb-error { background: #4a1d1d; color: #fca5a5; }
+body.notebook-page .wb-badge.wb-trace { background: #2e2a5a; color: #c7d2fe; }
+body.notebook-page .doc-writeback {
+  background: var(--nb-surface-2);
+  border-color: var(--nb-border);
+}
+body.notebook-page .wb-source-badge {
+  background: var(--nb-surface-3);
+  color: var(--nb-muted);
+}
+body.notebook-page .wb-source-text { color: var(--nb-text); }
 
 /* ── Narrow preview panes ──────────────────────────────────────────── */
 @media (max-width: 760px) {

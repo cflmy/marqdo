@@ -101,11 +101,18 @@ pub fn render_module_document(module: &Module, source: &str, annots: &[ViewAnnot
             }
             LineKind::Writeback => {
                 flush_para(&mut para, &mut out);
+                let start_line = l.line_no;
+                let mut block = String::new();
+                while i < lines.len() && matches!(lines[i].kind, LineKind::Writeback) {
+                    if !block.is_empty() {
+                        block.push('\n');
+                    }
+                    block.push_str(lines[i].text.trim_end_matches(['\r', '\n']));
+                    i += 1;
+                }
                 out.push_str(&crate::view::render::render_writeback_source_line(
-                    l.line_no,
-                    l.text.trim_end_matches(['\r', '\n']),
+                    start_line, &block,
                 ));
-                i += 1;
             }
             LineKind::Comment => {
                 let text = l.text.trim_end_matches(['\r', '\n']);
