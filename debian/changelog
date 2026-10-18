@@ -1,3 +1,12 @@
+marqdo (1.5.2-1ppa1) noble; urgency=medium
+
+  * Marqdo 1.5.2: Foreign v3 P0/P1 — raw stdin with per-cell inputs and
+    interrupt, plan generation/add/remove/value API, snapshot
+    export/import/replay, view capture for static export, explicit Persist
+    button, nested plan boundary.
+
+ -- cflmy <pingan@cflmy.cn>  Sun, 18 Oct 2026 15:00:00 +0800
+
 marqdo (1.5.1-1ppa1) noble; urgency=medium
 
   * Marqdo 1.5.1: View static/live execution path unified; foreign value

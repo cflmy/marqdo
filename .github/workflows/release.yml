@@ -126,9 +126,11 @@ jobs:
             ## Marqdo ${{ github.ref_name }}
 
             ### 亮点 / Highlights
+            - **v1.5.2**：外联 v3 P0/P1——raw stdin + 每 cell 输入 · plan API · snapshot · `view capture` · Persist
+            - **v1.5.2**: Foreign v3 P0/P1 — raw stdin + per-cell inputs, plan API, snapshot export/import/replay, `view capture`, Persist
+            - **v1.5.2 ext**：扩展包同步 1.5.2 / Ext pack 1.5.2
             - **v1.5.1**：view 静态/动态统一 + 外联值传递——共用执行路径 · 构建时运行注入 stdout · `foreign.session` 值传递 · cell stdin
             - **v1.5.1**: View static/live unified + foreign value passing — shared execution path, build-time run with stdout injection, `foreign.session` value passing, cell stdin
-            - **v1.5.1 ext**：扩展包同步 1.5.1 / Ext pack 1.5.1
             - **v1.5.0**：外联 v2 + 文档原生 Notebook——invoke/JSON call/并行/持久 Python·Node/状态桥 · cell 单步 · 高对比 view
             - **v1.5.0**: Foreign v2 + document-native notebooks — invoke, JSON calls, fan-out, persistent Python/Node, state bridge, cell stepping, high-contrast view
             - **v1.5.0 ext**：扩展包同步 1.5.0 / Ext pack 1.5.0

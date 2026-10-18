@@ -4,11 +4,38 @@
 
 ### Added
 
-- **外联 v3 P0/P1**：session eval 支持 raw stdin（Python/Node 持久内核）；`foreign.session inputs=` 支持每 cell 独立 stdin；view 增加每卡 stdin 字段与 Interrupt；静态导出使用 inputs 表；新增 plan generation/add/remove/value API、snapshot export/import/replay，以及 `view capture` / `view output --snapshot`；新增显式 Persist 按钮与 `/api/session/cell/persist`。
-
 ### Fixed
 
 ### Changed
+
+## v1.5.2 — 2026-10-18
+
+### Highlights
+
+**外联 v3 P0/P1**：session eval 支持 raw stdin（Python/Node 持久内核）；每 cell 独立 stdin 与 Interrupt；plan generation/add/remove/value API；snapshot export/import/replay；`view capture` / `view output --snapshot` 捕获实时快照；显式 Persist 按钮。CLI · wasm · ext **1.5.2**。
+
+```bash
+git checkout v1.5.2 && cargo build --release
+marqdo ext add web   # CDN → 1.5.2
+```
+
+**核心表面 Δ（Core surface Δ）**：**无增删**——外联 v3 扩展 `lib/foreign` 库 API；不改 MQ 关键词 / 表几何。
+
+### Added
+
+- **raw stdin + 每 cell 输入**：session eval 支持 raw stdin；`foreign.session inputs=` 每 cell 独立 stdin；view 增加每卡 stdin 字段与 Interrupt 按钮。
+- **plan API**：plan generation/add/remove/value；运行时 plan 更新与 generation。
+- **snapshot**：snapshot export/import/replay；`view capture` / `view output --snapshot` 捕获 live 快照用于静态导出。
+- **显式 Persist**：Persist 按钮 + `/api/session/cell/persist`。
+- **嵌套 plan 边界**：显式 persist 与嵌套 plan 边界；foreign 拒绝嵌套 view plans。
+
+### Fixed
+
+- **`session_list` arity**：保持空 arity。
+
+### Changed
+
+- CLI / wasm / `ext/VERSION` **同步 1.5.2**。
 
 ## v1.5.1 — 2026-10-18
 
