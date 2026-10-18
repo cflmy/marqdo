@@ -23,6 +23,8 @@ import foreign:lib/foreign.mq.md
 | 生成报告 | 分析 | ASCII 图 + JSON 报告 |
 | 独立复核 | 复核 | 另一个内核读取报告做校验 |
 
+`会话` = > foreign.session kernels=`内核表` cells=`会话表`
+
 `准备数据` =
 ```python
 import math

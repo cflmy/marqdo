@@ -1,5 +1,6 @@
 ---
 title: notebook shared state
+import foreign:lib/foreign.mq.md
 ---
 
 # main
@@ -18,6 +19,8 @@ title: notebook shared state
 | 设置 | 分析 | 写入共享变量 |
 | 读取 | 分析 | 读取共享变量 |
 | 隔离 | 绘图 | 看不到 shared |
+
+`会话` = > foreign.session kernels=`内核表` cells=`会话表`
 
 `设置` =
 ```node

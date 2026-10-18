@@ -231,7 +231,7 @@ print(x + 1)
 | 情况 | 诊断（中文示例） | 修复建议 |
 |---|---|---|
 | 内核名重复 | `内核表: 内核名「分析」重复（第 12、20 行）` | 改名或合并 |
-| 会话引用未知内核 | `会话表: 单元「汇总」引用了未声明的内核「分析」` | 在 `内核表` 声明，或改用语言 id |
+| 会话引用未知内核 | `foreign.session: cell「汇总」引用了未声明的内核「分析」` | 在 kernels 表声明，或改用语言 id |
 | 会话引用未知单元 | `会话表: 找不到名为「清洗」的代码单元` | 检查 `` `清洗` = `` 绑定 |
 | 单元重复 | `会话表: 单元「汇总」重复出现` | 每个单元只列一次 |
 | 语言不匹配 | `会话表: 单元「前端」(node) 不能使用 python 内核「分析」` | 换内核或换语言 |
@@ -245,9 +245,9 @@ print(x + 1)
 
 ## 7. 与 program execution 的关系
 
-- `内核表` / `会话表` 是**声明**，不是执行指令。
+- `内核表` / `会话表` 只是传递给 `foreign.session` 的普通表变量，不是保留名。
 - `marqdo run` 仍然执行 `# main` 的程序语义；这两个表会被求值为普通数据。
-- `run` 的外联编排用显式 API（`foreign.session_open` / `session_eval` / `call`）；表只服务 `view` 的 cells 与一键 Run All。
+- `run` 的外联编排用显式 API（`foreign.session_open` / `session_eval` / `call`）；`foreign.session` 句柄服务 `view` 的 cells 与一键 Run All。
 - 两者可以并存：
   - 文档用表描述“交互时怎么跑”；
   - `# main` 用显式调用描述“CI 时怎么跑”。
@@ -295,7 +295,7 @@ v2 **不**为状态交换新增表格/注释。原因：
 
 | 逻辑 | 位置 |
 |---|---|
-| 识别 `内核表` / `会话表` 绑定 | `src/notebook/syntax.rs`（新） |
+| 识别 `会话` 的 foreign.session 句柄 | `src/host/foreign_doc.rs` |
 | 读取绑定值 | AST `Stmt::Assign` + `Expr::Table` / `Expr::List`；或最近一次 run 的 bindings |
 | 校验名称/语言/重复/未入会话 | 同上；错误进入现有 Diagnostic |
 | cell index（绑定名/行号/语言/source hash） | 解析后的 `Module` 遍历 |

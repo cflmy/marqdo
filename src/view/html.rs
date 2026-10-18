@@ -3466,6 +3466,7 @@ body.notebook-page .stdin-form button {
   <button type="button" id="nb-step">Step</button>
   <button type="button" id="nb-state">State</button>
   <button type="button" id="nb-journal">Journal</button>
+  <button type="button" id="nb-clear">Clear outputs</button>
   <button type="button" id="nb-reload">Reload</button>
   <button type="button" id="nb-debug">Debug</button>
   <button type="button" id="nb-theme" title="切换浅色/深色主题">浅色</button>
@@ -3501,7 +3502,7 @@ body.notebook-page .stdin-form button {
   if (!window.MARQDO_VIEW_LIVE) return;
   var path = window.MARQDO_FILE_PATH || "";
   if (!path) return;
-  var state = { open: false, kernels: [], cells: {} };
+  var state = { open: false, persistent: false, kernels: [], cells: {} };
   function post(url, body) {
     return fetch(url, {
       method: "POST",
@@ -3552,6 +3553,7 @@ body.notebook-page .stdin-form button {
   }
   function renderSummary(s) {
     if (!s) return;
+    state.persistent = !!s.persistent;
     state.kernels = s.kernels || [];
     state.cells = {};
     (s.cells || []).forEach(function (c) { state.cells[c.name] = c; });
@@ -3559,6 +3561,11 @@ body.notebook-page .stdin-form button {
       var el = card(c.name);
       if (!el) return;
       badge(el, c.status, c.status === "clean");
+      if (!state.persistent) {
+        var old = el.querySelector(".nb-kernel");
+        if (old) old.remove();
+        return;
+      }
       var sel = el.querySelector(".nb-kernel");
       if (!sel) {
         sel = document.createElement("select");
@@ -3607,6 +3614,30 @@ body.notebook-page .stdin-form button {
       recs.forEach(function (rec) { if (rec.cell) renderRecord(rec.cell, rec); });
       status("run all done");
     });
+  }
+  function clearDom() {
+    document.querySelectorAll(".code-out").forEach(function (el) {
+      el.hidden = true;
+      el.textContent = "";
+      el.classList.remove("err");
+    });
+    document.querySelectorAll(".nb-badge").forEach(function (el) {
+      el.textContent = "never";
+      el.className = "nb-badge";
+    });
+    var exec = document.getElementById("exec-main");
+    if (exec) { exec.hidden = true; exec.textContent = ""; }
+    var stateOut = document.getElementById("nb-state-out");
+    if (stateOut) { stateOut.hidden = true; stateOut.textContent = ""; }
+    var pullOut = document.getElementById("nb-pull-out");
+    if (pullOut) pullOut.textContent = "";
+  }
+  function clearOutputs() {
+    clearDom();
+    post("api/session/clear", {}).then(function (r) {
+      if (r.ok && r.session) renderSummary(r.session);
+      status(r.ok ? "outputs cleared" : (r.error || "clear failed"));
+    }).catch(function (e) { status(String(e)); });
   }
   function bind(id, fn) { var b = document.getElementById(id); if (b) b.addEventListener("click", fn); }
   function init() {
@@ -3687,6 +3718,7 @@ body.notebook-page .stdin-form button {
     bind("nb-debug", function () {
       window.open("debug?path=" + encodeURIComponent(path), "_blank");
     });
+    bind("nb-clear", clearOutputs);
     bind("nb-reload", function () {
       post("api/session/reload", {}).then(function (r) {
         if (!r.ok) { status(r.error || "reload failed"); return; }
@@ -3879,7 +3911,7 @@ window.MARQDO_AUTO_STREAM = {auto_stream};
   {stdin_panel}
   {stream_panel}
   {plan_card}
-  <div class="out {status}">{out}</div>
+  <div class="out {status}" id="exec-main">{out}</div>
   {plots}
 </section>
 <section class="block source-block">
@@ -4124,6 +4156,8 @@ mod tests {
         assert!(ui.contains("post(\"api/session/open\""));
         assert!(!ui.contains("In ["), "view cells must not mimic Jupyter In[] prompts");
         assert!(!ui.contains("Out ["), "view cells must not mimic Jupyter Out[] prompts");
+        assert!(ui.contains("id=\"nb-clear\""), "view must expose Clear outputs");
+        assert!(ui.contains("api/session/clear"), "Clear outputs must call the session API");
     }
 
 }

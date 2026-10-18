@@ -150,14 +150,14 @@ print(json.dumps(value + 1))
 Cells in view. Named kernels and a cell order are ordinary bound tables, not fence metadata or YAML config.
 
 ```text
-`内核表` =
+`分析内核` =
 
 | 名称 | 语言 | 命令 | 说明 |
 |------|------|------|------|
 | 分析 | python | | shared analysis |
 | 复核 | python | | isolated review |
 
-`会话表` =
+`分析单元` =
 
 | 单元 | 内核 | 说明 |
 |------|------|------|
@@ -166,7 +166,9 @@ Cells in view. Named kernels and a cell order are ordinary bound tables, not fen
 | 独立复核 | 复核 | read the JSON report |
 ```
 
-`marqdo view` renders these as cells with Run All, Step, per-cell kernel switching, a journal, dirty reload and a state panel. There is no separate interactive command; `marqdo run` still executes the same file as one program.
+`会话` = > foreign.session kernels=`分析内核` cells=`分析单元`
+
+`marqdo view` consumes the foreign-owned `会话` handle and renders Run All, Step, per-cell kernel switching, a journal, dirty reload and a state panel. Without that handle, cells are stateless one-shot runs. There is no separate interactive command; `marqdo run` still executes the same file as one program.
 
 ---
 

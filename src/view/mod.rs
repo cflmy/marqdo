@@ -189,6 +189,11 @@ fn handle(root: &ViewRoot, request: Request) -> Result<()> {
                     notebook_api::api_close(&root.root, body)
                 })
             }
+            "/api/session/clear" => {
+                return api_debug_post(request, |body| {
+                    notebook_api::api_clear(&root.root, body)
+                })
+            }
             "/api/session/cell/run" => {
                 return api_debug_post(request, |body| {
                     notebook_api::api_cell_run(&root.root, body)

@@ -62,23 +62,25 @@ The same module also supports JSON calls, parallel fan-out, persistent kernels a
 A view document is still a document. Named kernels and a cell order are ordinary bound tables:
 
 ```text
-`内核表` =
+`分析内核` =
 
 | 名称 | 语言 | 说明 |
 |------|------|------|
 | 分析 | python | shared state |
 | 复核 | python | isolated state |
 
-`会话表` =
+`分析单元` =
 
 | 单元 | 内核 | 说明 |
 |------|------|------|
 | 准备数据 | 分析 | write |
 | 计算指标 | 分析 | read |
 | 独立复核 | 复核 | validate |
+
+`会话` = > foreign.session kernels=`分析内核` cells=`分析单元`
 ```
 
-`marqdo view` turns that into Run All, Step, per-cell kernels, a journal and a state panel. There is no separate interactive mode or command; `marqdo run` still executes the file as one program.
+`marqdo view` consumes the foreign-owned `会话` handle and turns it into Run All, Step, per-cell kernels, a journal and a state panel. Without `会话`, cells are stateless one-shot runs. There is no separate interactive mode or command; `marqdo run` still executes the file as one program.
 
 Documentation becomes knowledge when it can be discovered, verified and reused. OKF supplies the portable Markdown + YAML shape; EKC projects the repository into catalog layers L0–L4, a graph and an engineering preflight. The source `.mq.md` remains the only authority; generated artifacts are marked and rebuildable.
 

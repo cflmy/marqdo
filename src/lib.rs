@@ -34,8 +34,6 @@ pub mod lex;
 pub mod linalg_ops;
 pub mod load;
 pub mod mlsp;
-#[cfg(feature = "exec-host")]
-pub mod notebook;
 pub mod parse;
 pub mod repair;
 pub mod value;

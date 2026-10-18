@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, OnceLock};
 
 use crate::host::json::{json_to_value, value_to_json};
-use crate::notebook::DocumentSession;
+use crate::host::foreign_doc::DocumentSession;
 use crate::value::Value;
 
 fn sessions() -> &'static Mutex<HashMap<String, Arc<Mutex<DocumentSession>>>> {
@@ -151,6 +151,10 @@ where
     }
 }
 
+pub fn api_clear(root: &Path, body: &str) -> serde_json::Value {
+    with_session(root, body, "cleared", |s| Ok(s.clear_outputs()))
+}
+
 pub fn api_cell_run(root: &Path, body: &str) -> serde_json::Value {
     let v = body_value(body);
     let cell = v.get("cell").and_then(|x| x.as_str()).unwrap_or("");
@@ -281,6 +285,10 @@ mod tests {
             Some(false),
             "{failed:?}"
         );
+        let clear = api_clear(&root, r#"{"path":"shared.mq.md"}"#);
+        assert_eq!(clear.get("ok").and_then(|v| v.as_bool()), Some(true), "{clear:?}");
+        let cleared = clear.get("session").and_then(|s| s.get("cells")).and_then(|c| c.as_array()).cloned().unwrap_or_default();
+        assert!(cleared.iter().all(|c| c.get("runs").and_then(|v| v.as_u64()) == Some(0)));
         let push = api_state_push(
             &root,
             r#"{"path":"shared.mq.md","kernel":"分析","name":"z","value":9}"#,

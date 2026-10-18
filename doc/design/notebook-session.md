@@ -27,8 +27,8 @@
 
 | 能力 | 状态 | 位置 |
 |---|---|---|
-| `内核表` / `会话表` 解析（中英列名） | ✅ | `src/notebook/mod.rs` |
-| cell plan 求值 | ✅ 解释器 `capture_declarations`；不再扫描源码行 | `src/interp.rs` · `src/notebook/mod.rs` |
+| `foreign.session` 句柄（kernels/cells 表参数） | ✅ | `lib/foreign.mq.md` · `src/host/foreign_doc.rs` |
+| cell plan 求值 | ✅ 解释器求值 `会话` 绑定；不扫描源码行、不认保留表名 | `src/interp.rs` · `src/host/foreign_doc.rs` |
 | cell index（绑定名 / 行号 / source hash） | ✅ | 同上 |
 | 命名内核 + 默认内核 + 语言校验 | ✅ | 同上 |
 | 同内核共享 / 跨内核隔离 | ✅ | Node 金样例 + 单测 |
@@ -41,7 +41,7 @@
 | `POST /api/session/*` | ✅（含 `reload`） | `src/view/notebook_api.rs` |
 | cell step | ✅ | 同上 |
 | Marqdo statement step | ✅（view 工具栏 Debug → 同一 view 服务的 `/debug`；`/api/debug/*`） | `src/debug` · `src/view/debug_api.rs` |
-| dirty/stale 自动检测 | 部分（reload → dirty；assign → dirty；stale 传播待做） | `src/notebook/mod.rs` |
+| dirty/stale 自动检测 | 部分（reload → dirty；assign → dirty；stale 传播待做） | `src/host/foreign_doc.rs` |
 | writeback 集成 | 待做 | `writeback` |
 | replay / 持久化 | 待做 | — |
 | Python 会话 | ✅（本机无 python，CI/用户机条件测试） | `src/host/foreign_session.rs` |
@@ -84,7 +84,7 @@
 ```
 
 - 共享 cell index 与 kernel registry。
-- `run` 不使用 cell 表；`view` 在文档声明 `内核表` / `会话表` 时提供 cell 控制。
+- `run` 不消费视图会话；`view` 只在文档绑定 `会话 = > foreign.session ...` 时提供持久 cell 控制；无 `会话` 时 cells 无状态一次性执行。
 - 冲突时以 `run` 的程序语义为准；view cells 不改变文档语义。
 
 ---
@@ -131,7 +131,7 @@ DocumentSession
 1. 读取/解析文档（现有 `parse_source` / `load_module`）。
 2. 遍历 AST，找 `Stmt::Assign { name, value: Expr::Code(c) }`。
 3. 记录 name、lang、source、span、source hash。
-4. 通过解释器求值 `内核表` / `会话表` 绑定（`capture_declarations`，含简单依赖）；不扫描源码行（见 [notebook-syntax.md](notebook-syntax.md)）。
+4. 通过解释器求值 `会话` 绑定（`foreign.session` 返回的句柄，含简单依赖）；不扫描源码行、不认保留表名（见 [notebook-syntax.md](notebook-syntax.md)）。
 5. 解析 kernel 声明与 cell 归属；校验；生成诊断。
 6. 生成执行顺序：
    - 有会话表 → 行顺序；
@@ -464,7 +464,7 @@ Kernel: [分析 ▾]  Status: ready  [Restart] [Interrupt]
 ### 12.1 服务端
 
 - cell index：绑定名/行号/lang/source hash；未绑定围栏排除。
-- 表解析：内核表/会话表/自动模式/重复/未知/语言不匹配。
+- 会话解析：foreign.session 句柄/自动模式/重复/未知/语言不匹配。
 - 会话：open/close/reload；kernel 启动/重启/中断。
 - cell run：状态机 never→running→clean/error；dirty/stale。
 - step：cell step 顺序；statement step 与 debug 联动。
@@ -475,7 +475,7 @@ Kernel: [分析 ▾]  Status: ready  [Restart] [Interrupt]
 
 ### 12.2 金样例
 
-- `tests/notebook/kernels.mq.md`：内核表/会话表。
+- `tests/notebook/kernels.mq.md`：foreign.session 句柄。
 - `tests/notebook/shared-state.mq.md`：两个 Python cell 共享 `x`。
 - `tests/notebook/step.mq.md`：cell step 顺序。
 - `tests/notebook/state-bridge.mq.md`：Marqdo ↔ Python 推拉。
@@ -510,7 +510,7 @@ Kernel: [分析 ▾]  Status: ready  [Restart] [Interrupt]
 | 阶段 | 内容 |
 |---|---|
 | D0 | 设计/语法/决策文档（本文件） |
-| D1 | `src/notebook/`：cell index、表解析、session 结构、诊断 |
+| D1 | `src/host/foreign_doc.rs`：cell index、foreign.session 句柄、session 结构、诊断 |
 | D2 | 服务端 API：open/close/cell run/step/run_all/restart/interrupt |
 | D3 | view UI：工具栏、cell 徽标、kernel 下拉、状态面板、journal |
 | D4 | statement step 接入；dirty/stale；writeback |

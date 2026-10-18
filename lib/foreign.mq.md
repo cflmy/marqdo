@@ -1,6 +1,7 @@
 ---
 title: lib/foreign
 description: Run bound code fences and inline sources via local interpreters
+import table:lib/table.mq.md
 ---
 
 Run bound code fences and inline sources via local interpreters.
@@ -147,6 +148,21 @@ Apply one code/function to each input in parallel; returns parsed JSON results
 in input order. Raises with the failing index after all workers finish.
 
 *> host_foreign_call_many inputs=`inputs` code=`code` lang=`lang` source=`source` cmd=`cmd` env=`env` cwd=`cwd` timeout=`timeout` args=`args` max_output=`max_output` concurrency=`concurrency`*
+
+## session
+    + `kernels`=None
+    + `cells`=None
+
+Declare a document view session. `kernels` and `cells` are ordinary tables:
+kernels are `|名称|语言|命令|` (ZH or EN), cells are `|单元|内核|`.
+Returns a foreign session handle consumed by `view`; without this handle the
+view has no persistent kernel state.
+
+**p = > table.empty_map**
+**p = > table.put in=`p` at="kind" value="foreign-session"**
+**p = > table.put in=`p` at="kernels" value=`kernels`**
+**p = > table.put in=`p` at="cells" value=`cells`**
+*p*
 
 ## session_open
     + `lang`

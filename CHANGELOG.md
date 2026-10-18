@@ -4,7 +4,8 @@
 
 ### Added
 
-- **view cells 概念收敛**：`view` 是唯一交互面；所有 view 页面共用同一套 cell 工具栏/布局；cell plan 由解释器 `capture_declarations` 对 `内核表` / `会话表` 求值（含简单依赖），删除源码行扫描；移除 `In []` / `Out []` 的 Jupyter 式提示与 Notebook 品牌；没有新增 CLI 或第二个交互模式。
+- **foreign 拥有视图会话**：新增 `foreign.session kernels= cells=`，返回 foreign 会话句柄；`view` 只消费 `会话` 绑定，不再识别 `内核表` / `会话表` 保留名。没有 `会话` 时，view cells 使用无状态一次性执行，不创建内核。清除输出已接通 `/api/session/clear`，普通 view 与 foreign cells 共用；移除 `In []` / `Out []` 与 Notebook 品牌；没有新增 CLI 或第二个交互模式。
+
 ### Fixed
 
 ### Changed

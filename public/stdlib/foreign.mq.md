@@ -108,26 +108,28 @@ This is a JSON copy, not shared memory. The kernel receives a value; Marqdo rece
 
 Cells in view.
 
-A document can declare named kernels and a cell order without new Markdown markers:
+`foreign.session` owns the document's kernel state. The kernel and cell order are ordinary tables passed as arguments; the names are free:
 
 ```text
-`内核表` =
+`分析内核` =
 
 | 名称 | 语言 | 命令 | 说明 |
 |------|------|------|------|
 | 分析 | python | | shared analysis |
 | 复核 | python | | isolated review |
 
-`会话表` =
+`分析单元` =
 
 | 单元 | 内核 | 说明 |
 |------|------|------|
 | 准备数据 | 分析 | write state |
 | 计算指标 | 分析 | read state |
 | 独立复核 | 复核 | isolated kernel |
+
+`会话` = > foreign.session kernels=`分析内核` cells=`分析单元`
 ```
 
-`marqdo view` then adds Run All, Step, kernel switching, a journal and per-cell state. This is a view capability, not a second CLI mode. See the complete Python walkthrough in [`features/19-foreign-view-cells.mq.md`](../features/19-foreign-view-cells.mq.md).
+`view` consumes the `会话` handle and adds Run All, Step, kernel switching, a journal and per-cell state. Without `会话`, view cells are stateless one-shot runs: same shell, no persistent kernel. There is no second CLI mode. See the complete Python walkthrough in [`features/19-foreign-view-cells.mq.md`](../features/19-foreign-view-cells.mq.md).
 
 ---
 

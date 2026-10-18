@@ -1,7 +1,8 @@
 //! Document session: cells, kernels, execution journal, state store.
 //!
-//! The notebook layer reads the conventional `内核表`/`会话表` bindings and the
-//! bound code fences. It does not change the Markdown parser.
+//! Stateful cells live here, owned by the foreign runtime. The view reads a
+//! `会话 = > foreign.session ...` handle; no table names are reserved, and a
+//! document without that handle gets stateless one-shot cells.
 
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
@@ -78,6 +79,8 @@ pub struct JournalRecord {
 
 pub struct DocumentSession {
     pub path: PathBuf,
+    root: PathBuf,
+    pub persistent: bool,
     pub cells: Vec<Cell>,
     pub kernels: Vec<KernelDecl>,
     pub order: Vec<String>,
@@ -125,10 +128,20 @@ fn table_rows(v: &Value) -> Result<Vec<HashMap<String, Value>>, String> {
             Ok(out)
         }
         Value::Map(cols) => {
+            // A single-row table may evaluate to a map of scalar fields rather
+            // than a column map. Treat that map as one record.
+            if !cols.iter().all(|(_, v)| matches!(v, Value::List(_))) {
+                let row = cols
+                    .iter()
+                    .filter(|(k, _)| k != "@")
+                    .map(|(k, v)| (k.clone(), v.clone()))
+                    .collect();
+                return Ok(vec![row]);
+            }
             let mut width = 0usize;
-            for (name, value) in cols {
+            for (_, value) in cols {
                 let Value::List(xs) = value else {
-                    return Err(format!("view table column `{name}` is not a list"));
+                    unreachable!();
                 };
                 width = width.max(xs.len());
             }
@@ -150,16 +163,34 @@ fn table_rows(v: &Value) -> Result<Vec<HashMap<String, Value>>, String> {
     }
 }
 
-fn table_from_bindings(
+fn plan_tables(
     bindings: &HashMap<String, Value>,
-    names: &[&str],
-) -> Result<Option<Vec<HashMap<String, Value>>>, String> {
-    for name in names {
-        if let Some(value) = bindings.get(*name) {
-            return table_rows(value).map(Some);
-        }
+) -> Result<(Option<Vec<HashMap<String, Value>>>, Option<Vec<HashMap<String, Value>>>), String> {
+    let Some(plan) = bindings.get("会话") else {
+        return Ok((None, None));
+    };
+    let Value::Map(fields) = plan else {
+        return Err("`会话` must be a foreign.session handle".into());
+    };
+    let field = |name: &str| {
+        fields
+            .iter()
+            .find(|(k, _)| k == name)
+            .map(|(_, v)| v.clone())
+    };
+    let kind = field("kind").map(|v| value_text(&v)).unwrap_or_default();
+    if kind != "foreign-session" {
+        return Err("`会话` must be a foreign.session handle".into());
     }
-    Ok(None)
+    let kernels = match field("kernels") {
+        Some(Value::None) | None => None,
+        Some(v) => Some(table_rows(&v)?),
+    };
+    let cells = match field("cells") {
+        Some(Value::None) | None => None,
+        Some(v) => Some(table_rows(&v)?),
+    };
+    Ok((kernels, cells))
 }
 
 fn col_value<'a>(row: &'a HashMap<String, Value>, names: &[&str]) -> Option<&'a Value> {
@@ -201,10 +232,7 @@ fn capture_bindings(
     host.entry_metadata = module.metadata.clone();
     let mut interp = crate::interp::Interpreter::with_capture(Some(path), false).with_host(host);
     interp
-        .capture_declarations(
-            module,
-            &["内核表", "kernels", "Kernels", "会话表", "session", "Session"],
-        )
+        .capture_declarations(module, &["会话"])
         .map_err(|e| format!("view plan evaluation: {e}"))
 }
 
@@ -281,21 +309,23 @@ impl DocumentSession {
         collect_cells(&entry.body, &mut cells, &mut seen)?;
         let declarations = capture_bindings(path, root, &module, &source)?;
 
+        let persistent = declarations.contains_key("会话");
+        let (plan_kernels, plan_cells) = plan_tables(&declarations)?;
         let mut kernels: Vec<KernelDecl> = Vec::new();
         let mut kernel_map: HashMap<String, KernelDecl> = HashMap::new();
-        if let Some(rows) = table_from_bindings(&declarations, &["内核表", "kernels", "Kernels"])? {
+        if let Some(rows) = plan_kernels {
             if rows.is_empty() {
-                return Err("内核表: at least one kernel row is required".into());
+                return Err("foreign.session: at least one kernel row is required".into());
             }
             for row in rows {
                 let name = col_text(&row, &["名称", "Name", "name"])
-                    .ok_or_else(|| "内核表: missing 名称/Name".to_string())?;
+                    .ok_or_else(|| "foreign.session kernels: missing 名称/Name".to_string())?;
                 let lang = col_text(&row, &["语言", "Language", "language", "lang"])
-                    .ok_or_else(|| format!("内核表[{name}]: missing 语言/Language"))?;
+                    .ok_or_else(|| format!("foreign.session[{name}]: missing 语言/Language"))?;
                 let lang = registry::canonical(&lang);
                 let cmd = col_text(&row, &["命令", "Command", "command", "cmd"]);
                 if kernel_map.contains_key(&name) {
-                    return Err(format!("内核表: kernel `{name}` is declared twice"));
+                    return Err(format!("foreign.session: kernel `{name}` is declared twice"));
                 }
                 let decl = KernelDecl {
                     name: name.clone(),
@@ -309,10 +339,10 @@ impl DocumentSession {
         }
 
         let mut order: Vec<String> = Vec::new();
-        let session_rows = table_from_bindings(&declarations, &["会话表", "session", "Session"])?;
+        let session_rows = plan_cells;
         if let Some(rows) = session_rows {
             if rows.is_empty() {
-                return Err("会话表: at least one cell row is required".into());
+                return Err("foreign.session cells: at least one cell row is required".into());
             }
             let by_name: HashMap<String, usize> = cells
                 .iter()
@@ -322,19 +352,19 @@ impl DocumentSession {
             let mut listed = HashSet::new();
             for row in rows {
                 let cell_name = col_text(&row, &["单元", "Cell", "cell", "单元名"])
-                    .ok_or_else(|| "会话表: missing 单元/Cell".to_string())?;
+                    .ok_or_else(|| "foreign.session cells: missing 单元/Cell".to_string())?;
                 let kernel_name = col_text(&row, &["内核", "Kernel", "kernel"])
-                    .ok_or_else(|| format!("会话表[{cell_name}]: missing 内核/Kernel"))?;
+                    .ok_or_else(|| format!("foreign.session[{cell_name}]: missing 内核/Kernel"))?;
                 let Some(&ci) = by_name.get(&cell_name) else {
-                    return Err(format!("会话表: unknown cell `{cell_name}`"));
+                    return Err(format!("foreign.session: unknown cell `{cell_name}`"));
                 };
                 if !listed.insert(cell_name.clone()) {
-                    return Err(format!("会话表: cell `{cell_name}` is listed twice"));
+                    return Err(format!("foreign.session: cell `{cell_name}` is listed twice"));
                 }
                 let kernel = resolve_kernel(&mut kernels, &mut kernel_map, &kernel_name)?;
                 if registry::canonical(&cells[ci].lang) != registry::canonical(&kernel.lang) {
                     return Err(format!(
-                        "会话表: cell `{cell_name}` ({}) cannot use kernel `{}` ({})",
+                        "foreign.session: cell `{cell_name}` ({}) cannot use kernel `{}` ({})",
                         cells[ci].lang, kernel.name, kernel.lang
                     ));
                 }
@@ -347,7 +377,7 @@ impl DocumentSession {
                     cell.status = CellStatus::Unlisted;
                 }
             }
-        } else {
+        } else if persistent {
             for cell in &mut cells {
                 let kernel = ensure_default_kernel(
                     &mut kernels,
@@ -355,6 +385,12 @@ impl DocumentSession {
                     &cell.lang,
                 );
                 cell.kernel = kernel;
+                cell.listed = true;
+                order.push(cell.name.clone());
+            }
+        } else {
+            for cell in &mut cells {
+                cell.kernel = "one-shot".into();
                 cell.listed = true;
                 order.push(cell.name.clone());
             }
@@ -369,6 +405,8 @@ impl DocumentSession {
 
         Ok(Self {
             path: path.to_path_buf(),
+            root: root.to_path_buf(),
+            persistent,
             cells,
             kernels,
             order,
@@ -527,7 +565,34 @@ impl DocumentSession {
             .cell_index(cell_name)
             .ok_or_else(|| format!("unknown cell `{cell_name}`"))?;
         if !self.cells[ci].listed && kernel_override.is_none() {
-            return Err(format!("cell `{cell_name}` is not in 会话表"));
+            return Err(format!("cell `{cell_name}` is not listed in the foreign session"));
+        }
+        if !self.persistent {
+            self.cells[ci].kernel = "one-shot".into();
+            self.cells[ci].status = CellStatus::Running;
+            let lang = self.cells[ci].lang.clone();
+            let source = self.cells[ci].source.clone();
+            let result = crate::host::foreign::invoke_for_view(
+                &self.root,
+                &lang,
+                &source,
+                None,
+                None,
+                None,
+            );
+            return match result {
+                Ok(record) => {
+                    self.record_result(cell_name, "one-shot", &record)?;
+                    Ok(record)
+                }
+                Err(e) => {
+                    if let Some(i) = self.cell_index(cell_name) {
+                        self.cells[i].status = CellStatus::Error;
+                        self.cells[i].last_error = e.clone();
+                    }
+                    Err(e)
+                }
+            };
         }
         let kernel = match kernel_override {
             Some(k) => {
@@ -766,6 +831,7 @@ impl DocumentSession {
         Value::Map(vec![
             ("title".into(), Value::Text(self.title())),
             ("path".into(), Value::Text(self.path.display().to_string())),
+            ("persistent".into(), Value::Bool(self.persistent)),
             ("cells".into(), Value::List(cells)),
             ("kernels".into(), Value::List(kernels)),
             ("order".into(), Value::List(
@@ -792,6 +858,22 @@ impl DocumentSession {
             )),
             ("opened_ms".into(), Value::Int(self.opened_ms)),
         ])
+    }
+
+    /// Clear displayed outputs and per-cell records; kernels and live state survive.
+    pub fn clear_outputs(&mut self) -> Value {
+        for cell in &mut self.cells {
+            cell.runs = 0;
+            cell.last_ms = 0;
+            cell.last_ok = false;
+            cell.last_error.clear();
+            if cell.listed {
+                cell.status = CellStatus::Never;
+            }
+        }
+        self.journal.clear();
+        self.cursor = 0;
+        self.summary()
     }
 
     pub fn journal_json(&self) -> Value {
@@ -845,7 +927,7 @@ fn resolve_kernel(
         return Ok(decl);
     }
     Err(format!(
-        "会话表: kernel `{name}` is not declared in 内核表"
+        "foreign.session: kernel `{name}` is not declared in kernels"
     ))
 }
 
@@ -904,21 +986,28 @@ mod tests {
                 .map(|d| d.as_nanos())
                 .unwrap_or(0)
         ));
-        let source = r#"# main
+        let source = r#"---
+title: evaluated plan test
+import foreign:lib/foreign.mq.md
+---
+
+# main
 
 `lang` = python
 
-`内核表` =
+`分析内核` =
 
 | @ | 名称 | 语言 |
 |---|------|------|
 | 1 | 分析 | `lang` |
 
-`会话表` =
+`分析单元` =
 
 | @ | 单元 | 内核 |
 |---|------|------|
 | 1 | 单元 | 分析 |
+
+`会话` = > foreign.session kernels=`分析内核` cells=`分析单元`
 
 `单元` =
 ```python
@@ -982,7 +1071,12 @@ print(1)
                 .map(|d| d.as_nanos())
                 .unwrap_or(0)
         ));
-        let source = r#"# main
+        let source = r#"---
+title: shared state test
+import foreign:lib/foreign.mq.md
+---
+
+# main
 
 `内核表` =
 
@@ -998,6 +1092,8 @@ print(1)
 | 设置 | 分析 | write |
 | 读取 | 分析 | read |
 | 隔离 | 绘图 | isolated |
+
+`会话` = > foreign.session kernels=`内核表` cells=`会话表`
 
 `设置` =
 ```node
@@ -1035,6 +1131,119 @@ console.log(typeof shared === "undefined" ? "isolated" : "leaked");
         s.restart_all().unwrap();
         let r = s.run_cell("读取", None).unwrap();
         assert_eq!(field(&r, "ok"), Some(Value::Bool(false)));
+        s.close();
+        let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn magic_table_names_without_session_are_ignored() {
+        if !node_available() {
+            return;
+        }
+        let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let path = root.join(format!(
+            "target/view-stateless-{}-{}.mq.md",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_nanos())
+                .unwrap_or(0)
+        ));
+        let source = r#"# main
+
+`内核表` =
+
+| 名称 | 语言 |
+|------|------|
+| 分析 | node |
+
+`会话表` =
+
+| 单元 | 内核 |
+|------|------|
+| a | 分析 |
+
+`a` =
+```node
+console.log("stateless");
+```
+"#;
+        std::fs::write(&path, source).unwrap();
+        let mut s = DocumentSession::open(&path, &root).unwrap();
+        assert!(!s.persistent);
+        assert!(s.kernels.is_empty(), "magic tables must not create kernels");
+        assert_eq!(s.order, vec!["a".to_string()]);
+        assert_eq!(s.cells[0].kernel, "one-shot");
+        let r = s.run_cell("a", None).unwrap();
+        assert_eq!(
+            field(&r, "stdout").and_then(|v| v.reveal_text().map(|s| s.to_string())),
+            Some("stateless\n".to_string())
+        );
+        assert_eq!(s.cells[0].status, CellStatus::Clean);
+        s.clear_outputs();
+        assert_eq!(s.cells[0].status, CellStatus::Never);
+        assert!(s.journal.is_empty());
+        s.close();
+        let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn clear_outputs_keeps_persistent_kernel_state() {
+        if !node_available() {
+            return;
+        }
+        let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let path = root.join(format!(
+            "target/view-clear-{}-{}.mq.md",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_nanos())
+                .unwrap_or(0)
+        ));
+        let source = r#"---
+title: clear outputs
+import foreign:lib/foreign.mq.md
+---
+
+# main
+
+`内核` =
+
+| 名称 | 语言 |
+|------|------|
+| 分析 | node |
+
+`单元` =
+
+| 单元 | 内核 |
+|------|------|
+| a | 分析 |
+
+`会话` = > foreign.session kernels=`内核` cells=`单元`
+
+`a` =
+```node
+globalThis.kept = (globalThis.kept || 0) + 1;
+console.log(globalThis.kept);
+```
+"#;
+        std::fs::write(&path, source).unwrap();
+        let mut s = DocumentSession::open(&path, &root).unwrap();
+        let r = s.run_cell("a", None).unwrap();
+        assert_eq!(
+            field(&r, "stdout").and_then(|v| v.reveal_text().map(|s| s.to_string())),
+            Some("1\n".to_string())
+        );
+        s.clear_outputs();
+        assert_eq!(s.cells[0].status, CellStatus::Never);
+        assert!(s.journal.is_empty());
+        let r = s.run_cell("a", None).unwrap();
+        assert_eq!(
+            field(&r, "stdout").and_then(|v| v.reveal_text().map(|s| s.to_string())),
+            Some("2\n".to_string()),
+            "clear outputs must not restart the kernel"
+        );
         s.close();
         let _ = std::fs::remove_file(&path);
     }

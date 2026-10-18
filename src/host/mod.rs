@@ -15,6 +15,8 @@ pub mod event_bus;
 #[cfg(feature = "exec-host")]
 pub mod foreign;
 #[cfg(feature = "exec-host")]
+pub mod foreign_doc;
+#[cfg(feature = "exec-host")]
 pub mod foreign_session;
 mod fs;
 mod hash;
