@@ -56,7 +56,7 @@ v3 必须继续满足以下约束，否则不进入实现：
 | G9 | ✅ 已实现（CLI/API 基础） | `view capture` + `view output --snapshot`；source hash 校验 |
 | G3 | ✅ 边界已实现 | 顶层 plan；嵌套 plan 诊断 |
 | G10 | ✅ 显式 persist | `/api/session/cell/persist` + view Persist；不自动写源码 |
-| G7/G8 | ⏳ 设计已定，未实现 | 见对应章节 |
+| G7/G8 | 📌 已移出当前目标 | 设计保留，后续版本再开发 |
 
 ## 3. 缺口清单
 
@@ -347,7 +347,9 @@ foreign.session_replay path="..." verify=True
 
 ---
 
-## 10. G7：跨文档内核
+## 10. G7：跨文档内核（Deferred / future）
+
+> **状态：已移出 v3 当前实现目标。** 本节设计保留，作为后续版本（v4 或独立 session-scope 工作）的输入；当前不承诺 API 或兼容性。
 
 ### 10.1 原则
 
@@ -376,7 +378,9 @@ foreign.session_close id=... scope=...
 
 ---
 
-## 11. G8：非 Python/Node 持久内核
+## 11. G8：非 Python/Node 持久内核（Deferred / future）
+
+> **状态：已移出 v3 当前实现目标。** 本节设计保留，等待目标语言与 worker 适配器确定后再实现；当前不承诺 API。
 
 ### 11.1 模型
 
@@ -548,7 +552,7 @@ marqdo run --writeback
 | raw stdin | 支持（一次性/session） | 每 cell | inputs 表/快照 |
 | interrupt | 无 UI | 可调用 | 不可用 |
 | state export | 可调用 | 可显式导出 | 不导出或快照 |
-| cross-doc | 显式 scope | 仅允许的 scope | 默认关闭 |
+| cross-doc（deferred） | 设计保留 | 设计保留 | 设计保留 |
 | writeback | `--writeback` | 显式按钮 | 默认不写 |
 
 ---
@@ -568,13 +572,13 @@ marqdo run --writeback
 
 ### P2
 
-6. **G7 cross-document scope**。
-7. **G3 dynamic plan**：按第 6 节的边界，只做顶层纯表达式；任意控制流不承诺。
-8. **G10 explicit writeback policy**。
+6. **G3 dynamic plan 边界**：按第 6 节，只做顶层纯表达式；任意控制流不承诺。
+7. **G10 explicit writeback policy**。
 
-### P3
+### Deferred（不在当前目标）
 
-9. **G8 non-Python/Node persistent adapters**。
+- **G7 cross-document scope**：设计保留，后续版本再开发。
+- **G8 non-Python/Node persistent adapters**：设计保留，等待目标语言与 worker。
 
 ---
 
@@ -632,7 +636,13 @@ marqdo run --writeback
 
 ---
 
-## 20. 非目标
+## 20. 当前目标范围
+
+v3 当前实现目标为：**G1、G2、G3、G4、G5、G6、G9、G10**。
+
+**G7、G8 已移出当前目标**，但设计文档保留在本文件第 10、11 节，供后续开发；它们不计入 v3 完成条件，也不影响现有 API 的兼容性承诺。
+
+## 21. 非目标
 
 - 不新增 Markdown 标记；
 - 不新增 notebook CLI/模式；
