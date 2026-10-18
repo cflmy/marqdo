@@ -10,7 +10,7 @@ mod notebook_api;
 mod output;
 mod render;
 
-pub use output::{write_static, OutputOptions};
+pub use output::{write_capture, write_static, CaptureOptions, OutputOptions};
 
 use std::fs;
 use std::io::{self, Read};

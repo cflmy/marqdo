@@ -16,7 +16,7 @@ use marqdo::knowledge::{
     resolve, reuse_json, stale_json, verify, verify_json, write_knowledge, KnowledgeOptions,
     LearnInput, ReuseBudget,
 };
-use marqdo::view::{serve, serve_debug, write_static, DebugOptions, OutputOptions, ViewOptions};
+use marqdo::view::{serve, serve_debug, write_capture, write_static, CaptureOptions, DebugOptions, OutputOptions, ViewOptions};
 use marqdo::{Backend, RunOptions};
 
 #[derive(Parser, Debug)]
@@ -374,6 +374,17 @@ enum ViewAction {
 
         #[arg(long)]
         no_exec: bool,
+
+        #[arg(long, value_name = "FILE")]
+        snapshot: Option<PathBuf>,
+    },
+    /// Capture live cell results for `view output --snapshot`
+    Capture {
+        #[arg(value_name = "PATH")]
+        path: Option<PathBuf>,
+
+        #[arg(short = 'o', long = "out", required = true)]
+        out: PathBuf,
     },
 }
 
@@ -509,6 +520,7 @@ fn try_main(cli: Cli) -> Result<i32> {
                 path: out_path,
                 out,
                 no_exec,
+                snapshot,
             }) => {
                 write_static(OutputOptions {
                     path: out_path
@@ -516,6 +528,16 @@ fn try_main(cli: Cli) -> Result<i32> {
                         .unwrap_or_else(|| PathBuf::from(".")),
                     out_dir: out,
                     no_exec,
+                    snapshot,
+                })?;
+                Ok(0)
+            }
+            Some(ViewAction::Capture { path: out_path, out }) => {
+                write_capture(CaptureOptions {
+                    path: out_path
+                        .or(path)
+                        .unwrap_or_else(|| PathBuf::from(".")),
+                    out,
                 })?;
                 Ok(0)
             }
