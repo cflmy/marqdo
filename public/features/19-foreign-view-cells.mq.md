@@ -166,7 +166,6 @@ Cells in view. Named kernels and a cell order are ordinary bound tables, not fen
 | 独立复核 | 复核 | read the JSON report |
 ```
 
-`会话` = > foreign.session kernels=`分析内核` cells=`分析单元`
 
 `marqdo view` consumes the foreign-owned `会话` handle and renders Run All, Step, per-cell kernel switching, a journal, dirty reload and a state panel. Without that handle, cells are stateless one-shot runs. There is no separate interactive command; `marqdo run` still executes the same file as one program.
 
