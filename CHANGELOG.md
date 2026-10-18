@@ -4,6 +4,7 @@
 
 ### Added
 
+- **code 卡控制**：恢复每个代码卡的内核切换下拉与 Clean 按钮；Clean 清除单个 cell 输出/记录，不重启内核，动态走 `/api/session/cell/clear`，静态只清本地显示。
 - **view Cell stdin**：view 增加 `Cell stdin / input` 输入框，Run/Step/Run All 都会传给外联 cells；无状态 cell 使用 raw stdin，持久内核使用 `marqdo_input`；静态导出使用 frontmatter `stdin` 作为构建时输入。
 - **foreign 拥有视图会话**：新增 `foreign.session kernels= cells=`，返回 foreign 会话句柄；`view` 只消费 `会话` 绑定，不再识别 `内核表` / `会话表` 保留名。没有 `会话` 时，view cells 使用无状态一次性执行，不创建内核。清除输出已接通 `/api/session/clear`，普通 view 与 foreign cells 共用，并由 Execution 面板的 Clear 按钮清除页面输出；无 `会话` 的 view 在 Run All 时执行整个文档并回写 Execution（不再空转）；静态导出与动态 view 共用同一套 View 外壳和按钮布局；静态页面执行按钮点击显示“静态页面无法真实执行”，不伪造成功；静态导出与 view 的 Run All 共用同一 foreign_doc `run_all` 路径；构建时实际执行代码单元并把 stdout/stderr 注入代码卡；静态示例通过代码 fallback 或 frontmatter `stdin` 提供输入，不再依赖空 stdin；`会话` 作为低层 session id 时不会被误判为 view plan；移除 `In []` / `Out []` 与 Notebook 品牌；没有新增 CLI 或第二个交互模式。
 

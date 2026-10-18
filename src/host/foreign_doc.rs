@@ -905,6 +905,22 @@ impl DocumentSession {
         ])
     }
 
+    /// Clear one cell's displayed output/record; kernels and live state survive.
+    pub fn clear_cell(&mut self, cell: &str) -> Result<Value, String> {
+        let i = self
+            .cell_index(cell)
+            .ok_or_else(|| format!("unknown cell `{cell}`"))?;
+        self.cells[i].runs = 0;
+        self.cells[i].last_ms = 0;
+        self.cells[i].last_ok = false;
+        self.cells[i].last_error.clear();
+        if self.cells[i].listed {
+            self.cells[i].status = CellStatus::Never;
+        }
+        self.journal.retain(|j| j.cell != cell);
+        Ok(self.summary())
+    }
+
     /// Clear displayed outputs and per-cell records; kernels and live state survive.
     pub fn clear_outputs(&mut self) -> Value {
         for cell in &mut self.cells {

@@ -170,6 +170,15 @@ where
     }
 }
 
+pub fn api_clear_cell(root: &Path, body: &str) -> serde_json::Value {
+    let v = body_value(body);
+    let cell = v.get("cell").and_then(|x| x.as_str()).unwrap_or("");
+    if cell.is_empty() {
+        return err("missing cell".into());
+    }
+    with_session(root, body, "cleared", |s| s.clear_cell(cell))
+}
+
 pub fn api_clear(root: &Path, body: &str) -> serde_json::Value {
     with_session(root, body, "cleared", |s| Ok(s.clear_outputs()))
 }

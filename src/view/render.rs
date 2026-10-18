@@ -1259,6 +1259,7 @@ fn render_stmt(
     <span class="badge">code</span>
     <code class="expr">`{name}` =</code>
     <span class="code-lang">{lang}</span>
+    <button type="button" class="nb-clean" title="Clear this output">Clean</button>
   </div>
   <pre class="code-body"><code class="language-{lang}">{src}</code></pre>
   <div class="code-foot">
@@ -1537,6 +1538,7 @@ pub(crate) fn render_code_assign_card(name: &str, lang: &str, source: &str) -> S
     <span class="badge">code</span>
     <span class="code-name">{name}</span>
     <span class="code-lang">{lang}</span>
+    <button type="button" class="nb-clean" title="Clear this output">Clean</button>
   </div>
   <pre class="code-body"><code class="language-{lang}">{src}</code></pre>
   <div class="code-foot">

@@ -3291,8 +3291,22 @@ body.notebook-page .code-head .nb-kernel {
   font: 0.66rem/1.2 var(--sans);
   cursor: pointer;
 }
-body.notebook-page .code-head .nb-badge {
+body.notebook-page .code-head .nb-clean {
   order: 4;
+  padding: 0.14rem 0.4rem;
+  border: 1px solid var(--nb-border);
+  border-radius: 3px;
+  background: var(--nb-bg);
+  color: var(--nb-muted);
+  font: 0.62rem/1.2 var(--sans);
+  cursor: pointer;
+}
+body.notebook-page .code-head .nb-clean:hover {
+  border-color: var(--nb-accent);
+  color: var(--nb-strong);
+}
+body.notebook-page .code-head .nb-badge {
+  order: 5;
   padding: 0.14rem 0.34rem;
   border: 1px solid var(--nb-border);
   border-radius: 3px;
@@ -3304,7 +3318,7 @@ body.notebook-page .code-head .nb-badge {
 body.notebook-page .nb-badge.ok { color: var(--nb-success); }
 body.notebook-page .nb-badge.bad { color: var(--nb-error); }
 body.notebook-page .code-head .code-actions {
-  order: 5;
+  order: 6;
   display: flex;
   align-items: center;
   gap: 0.3rem;
@@ -3575,6 +3589,57 @@ body.notebook-page .stdin-form button {
     b.textContent = text;
     b.className = "nb-badge " + (ok ? "ok" : (text === "clean" || text === "never" ? "" : "bad"));
   }
+  function ensureKernel(el, persistent) {
+    var sel = el.querySelector(".nb-kernel");
+    if (!sel) {
+      sel = document.createElement("select");
+      sel.className = "nb-kernel";
+      var head = el.querySelector(".code-head");
+      if (head) head.appendChild(sel);
+    }
+    if (!persistent) {
+      sel.disabled = true;
+      sel.title = "No live kernel; this cell is stateless";
+      sel.innerHTML = "";
+      var opt = document.createElement("option");
+      opt.textContent = "one-shot";
+      sel.appendChild(opt);
+    } else {
+      sel.disabled = false;
+      sel.title = "Switch kernel";
+    }
+    return sel;
+  }
+  function clearCard(el) {
+    var out = el.querySelector(".code-out");
+    if (out) {
+      out.hidden = true;
+      out.textContent = "";
+      out.classList.remove("err");
+    }
+    var b = el.querySelector(".nb-badge");
+    if (b) { b.textContent = "never"; b.className = "nb-badge"; }
+  }
+  function bindClean(el) {
+    var btn = el.querySelector(".nb-clean");
+    if (!btn || btn.dataset.bound) return;
+    btn.dataset.bound = "1";
+    btn.addEventListener("click", function (e) {
+      e.preventDefault();
+      var name = el.getAttribute("data-code-name") || "";
+      if (!live) {
+        clearCard(el);
+        status("static export: local output cleared");
+        return;
+      }
+      if (!name) return;
+      post("api/session/cell/clear", { cell: name }).then(function (r) {
+        clearCard(el);
+        if (r.ok && r.session) renderSummary(r.session);
+        status(r.ok ? "clean" : (r.error || "clean failed"));
+      }).catch(function (e2) { status(String(e2)); });
+    });
+  }
   function renderRecord(name, rec) {
     var el = card(name);
     if (!el || !rec) return;
@@ -3606,17 +3671,10 @@ body.notebook-page .stdin-form button {
       var el = card(c.name);
       if (!el) return;
       badge(el, c.status, c.status === "clean");
-      if (!state.persistent) {
-        var old = el.querySelector(".nb-kernel");
-        if (old) old.remove();
-        return;
-      }
-      var sel = el.querySelector(".nb-kernel");
-      if (!sel) {
-        sel = document.createElement("select");
-        sel.className = "nb-kernel";
-        var head = el.querySelector(".code-head");
-        if (head) head.appendChild(sel);
+      var sel = ensureKernel(el, state.persistent);
+      if (!state.persistent) return;
+      if (!sel.dataset.bound) {
+        sel.dataset.bound = "1";
         sel.addEventListener("change", function () {
           post("api/session/kernel/assign", { cell: c.name, kernel: sel.value }).then(function (r) {
             status(r.ok ? "kernel: " + sel.value : (r.error || "assign failed"));
@@ -3746,9 +3804,14 @@ body.notebook-page .stdin-form button {
           staticNotice();
         });
       });
+      document.querySelectorAll(".code-card").forEach(function (el) {
+        ensureKernel(el, false);
+        bindClean(el);
+      });
       status("static export · preview only");
       return;
     }
+    document.querySelectorAll(".code-card").forEach(bindClean);
     bind("nb-run-all", function () { runAll(false); });
     bind("nb-restart", function () { runAll(true); });
     bind("nb-step", function () {
