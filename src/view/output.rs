@@ -50,6 +50,13 @@ fn record_field(record: &Value, key: &str) -> Option<Value> {
 
 /// Run the document's cells at export time and keep their real outputs. This
 /// is what makes a static page show foreign results instead of just source.
+fn cell_needs_stdin(source: &str) -> bool {
+    source.contains("sys.stdin")
+        || source.contains("process.stdin")
+        || source.contains("readFileSync(0")
+        || source.contains("readFileSync(0,")
+}
+
 fn static_cell_outputs(
     root: &ViewRoot,
     abs: &std::path::Path,
@@ -59,6 +66,23 @@ fn static_cell_outputs(
     let Ok(mut session) = DocumentSession::open(abs, &root.root) else {
         return out;
     };
+    if stdin.trim().is_empty() {
+        let mut run_order = Vec::new();
+        for cell in session.cells.iter() {
+            if cell_needs_stdin(&cell.source) {
+                out.insert(
+                    cell.name.clone(),
+                    StaticCellOutput {
+                        ok: true,
+                        text: "(static: this cell reads stdin; its input is supplied by foreign.call — see Execution)".to_string(),
+                    },
+                );
+            } else {
+                run_order.push(cell.name.clone());
+            }
+        }
+        session.order = run_order;
+    }
     let Ok(summary) = session.run_all_with_stdin(false, Some(stdin)) else {
         session.close();
         return out;
@@ -238,6 +262,13 @@ fn resolve_abs(root: &ViewRoot, rel: &str) -> Result<PathBuf> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn detects_stdin_dependent_cells() {
+        assert!(cell_needs_stdin("import sys\njson.load(sys.stdin)"));
+        assert!(cell_needs_stdin("process.stdin.on('data', () => {})"));
+        assert!(!cell_needs_stdin("console.log('hello')"));
+    }
 
     #[test]
     fn injects_visible_static_cell_outputs() {
