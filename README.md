@@ -149,8 +149,9 @@ marqdo catalog public -o .marqdo
 
 ---
 
-## 现状（v1.5.0）
+## 现状（v1.5.1）
 
+- **view 静态/动态统一 + 外联值传递（v1.5.1）**：静态导出与 live view 共用 `foreign_doc` 执行路径 · 构建时运行注入 stdout · `foreign.session` 值传递 · cell stdin · 扩展包同步 **1.5.1**
 - **外联 v2 / view 交互单元（v1.5.0）**：结构化 invoke · JSON call/call_many · 并行扇出 · Python/Node 持久内核 · 显式状态桥 · cell 单步/Run All/内核切换 · `foreign.session` 句柄 · 无 `会话` 时无状态 cells · 清除输出 API · 高对比浅深主题；扩展包同步 **1.5.0**
 - **裸自增升参（v1.4.6）**：首次粗体赋值左值即声明；`**n = n + 1**` 无反引号也升为必选形参。扩展包仍为 **1.4.5**
 - **Streamable HTTP MCP + web invoke 鉴权（v1.4.5）**：`agent_mcp_serve transport=http` · Bearer/`X-Api-Key` 注入 · `unauthorized`→401 · openai/agent `json.get` 硬化
@@ -185,7 +186,7 @@ marqdo catalog public -o .marqdo
 - **浏览器 Marqdo（WASM）**：`marqdo wasm build` + 官方 bridge 自启（作者零业务 JS；桥内可含列表/路由/storage/ws/文件/Canvas/音频/Observer/拖放）；`lib/browser` + GFM；`web.client_embed`；示例 [browser-hello](examples/browser-hello/) · [browser-app](examples/browser-app/) · [browser-media](examples/browser-media/) · [web-client-site](examples/web-client-site/)（[ADR 0002](doc/adr/0002-browser-marqdo-wasm.md) · [D](doc/roadmap/browser-wasm-d.md) · [E](doc/roadmap/browser-wasm-e.md) · [F](doc/roadmap/browser-wasm-f.md)）
 - 选型：[ADR 0001 — Rust](doc/adr/0001-implementation-language.md) · [ADR 0002 — 浏览器 WASM](doc/adr/0002-browser-marqdo-wasm.md)（C0–C5 完结，见 [roadmap/browser-wasm.md](doc/roadmap/browser-wasm.md)）· [ADR 0003 — 异步效应](doc/adr/0003-browser-async-effects.md)
 
-### 如何使用最新 Marqdo（v1.5.0）
+### 如何使用最新 Marqdo（v1.5.1）
 
 **安装解释器（任选其一）**
 
@@ -200,7 +201,7 @@ marqdo catalog public -o .marqdo
 ```bash
 # 1) 源码安装（跟 tag 或 main）
 git clone https://github.com/cflmy/marqdo.git && cd marqdo
-git checkout v1.5.0   # 或留在 main
+git checkout v1.5.1   # 或留在 main
 cargo build --release
 export PATH="$PWD/target/release:$PATH"
 marqdo version
@@ -239,7 +240,7 @@ marqdo wasm build
 # → dist/wasm/ … 见 examples/browser-hello/
 
 # 6) Releases：Windows exe/zip/vsix；Linux CLI zip + native `.so` zip
-#    https://github.com/cflmy/marqdo/releases/tag/v1.5.0
+#    https://github.com/cflmy/marqdo/releases/tag/v1.5.1
 ```
 
 开发期也可用 `cargo run -- …` 代替已安装的 `marqdo`：

@@ -4,14 +4,46 @@
 
 ### Added
 
-- **code 卡控制**：恢复每个代码卡的内核切换下拉与 Clean 按钮；Clean 清除单个 cell 输出/记录，不重启内核，动态走 `/api/session/cell/clear`，静态只清本地显示。
-- **持久化示例**：新增可运行 `examples/foreign-writeback/index.mq.md`，用 `foreign.run` + `writeback.record` 将结果写入 `.mq.md` 的 keyed 槽位；用户站新增独立的静态快照 vs 自写回说明页。
-- **view Cell stdin**：view 增加 `Cell stdin / input` 输入框，Run/Step/Run All 都会传给外联 cells；无状态 cell 使用 raw stdin，持久内核使用 `marqdo_input`；静态导出使用 frontmatter `stdin` 作为构建时输入。
-- **foreign 拥有视图会话**：新增 `foreign.session kernels= cells=`，返回 foreign 会话句柄；`view` 只消费 `会话` 绑定，不再识别 `内核表` / `会话表` 保留名。没有 `会话` 时，view cells 使用无状态一次性执行，不创建内核。清除输出已接通 `/api/session/clear`，普通 view 与 foreign cells 共用，并由 Execution 面板的 Clear 按钮清除页面输出；无 `会话` 的 view 在 Run All 时执行整个文档并回写 Execution（不再空转）；静态导出与动态 view 共用同一套 View 外壳和按钮布局；静态页面执行按钮点击显示“静态页面无法真实执行”，不伪造成功；静态导出与 view 的 Run All 共用同一 foreign_doc `run_all` 路径；构建时实际执行代码单元并把 stdout/stderr 注入代码卡；静态示例通过代码 fallback 或 frontmatter `stdin` 提供输入，不再依赖空 stdin；`会话` 作为低层 session id 时不会被误判为 view plan；移除 `In []` / `Out []` 与 Notebook 品牌；没有新增 CLI 或第二个交互模式。
-
 ### Fixed
 
 ### Changed
+
+## v1.5.1 — 2026-10-18
+
+### Highlights
+
+**view 静态/动态统一 + 外联值传递**：静态导出与 live view 共用同一套 `foreign_doc` 执行路径；构建时实际运行代码单元并注入 stdout；`foreign.session` 可把 Marqdo 值传入多内核会话；cell stdin 支持 live/static/持久内核三种模式。CLI · wasm · ext **1.5.1**。
+
+```bash
+git checkout v1.5.1 && cargo build --release
+marqdo ext add web   # CDN → 1.5.1
+```
+
+**核心表面 Δ（Core surface Δ）**：**无增删**——view 执行路径统一 + 外联值传递；不改 MQ 关键词 / 表几何。
+
+### Added
+
+- **外联值传递**：`foreign.session kernels= cells=` 可把 Marqdo 值传入多内核 view 会话；`view` 只消费 `会话` 绑定，不再识别 `内核表` / `会话表` 保留名。
+- **Cell stdin**：view 增加 `Cell stdin / input` 输入框；Run/Step/Run All 都会传给外联 cells；无状态 cell 使用 raw stdin，持久内核使用 `marqdo_input`；静态导出使用 frontmatter `stdin` 作为构建时输入。
+- **静态导出真实执行**：构建时实际执行代码单元并把 stdout/stderr 注入代码卡；静态示例通过代码 fallback 或 frontmatter `stdin` 提供输入。
+- **可运行外联写回示例**：新增 `examples/foreign-writeback/index.mq.md`，用 `foreign.run` + `writeback.record` 将结果写入 `.mq.md` 的 keyed 槽位。
+- **写回块分组与主题**：view 对写回块按目标分组并统一主题样式。
+
+### Fixed
+
+- **code 卡控制恢复**：恢复每个代码卡的内核切换下拉与 Clean 按钮；Clean 清除单个 cell 输出/记录，不重启内核。
+- **导入函数返回锚定**：导入函数的返回值锚定在调用位置。
+- **静态导出自包含**：静态示例不再依赖空 stdin 或外部内核状态。
+- **Execution 输出清除**：view 清除 Execution 输出从 view 表面。
+- **文档表不再变 call chips**：view 不再把文档表转为 call chips。
+- **写回表标签**：写回表标签保持为行内代码。
+
+### Changed
+
+- **静态/动态统一执行路径**：static 与 live cells 使用同一 `foreign_doc` `run_all` 路径；移除 `In []` / `Out []` 与 Notebook 品牌。
+- **静态按钮行为**：静态页面执行按钮点击显示"静态页面无法真实执行"，不伪造成功。
+- **低层会话评估可见**：文档展示低层 session evaluation 为代码围栏。
+- CLI / wasm / `ext/VERSION` **同步 1.5.1**。
 
 ## v1.5.0 — 2026-10-18
 
