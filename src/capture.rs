@@ -89,7 +89,10 @@ impl StmtEventKind {
 pub struct CallFrame {
     pub call_id: u32,
     pub fn_name: String,
+    /// Definition line of the callee.
     pub fn_line: u32,
+    /// Call site line in the executing document (0 for the entry call).
+    pub call_line: u32,
     pub ordinal: u32,
     pub args_brief: String,
 }

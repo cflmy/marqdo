@@ -205,9 +205,22 @@ pub fn build_view_annots(module: &Module, source: &str, cap: &RunCapture) -> Vec
             last_ret.insert((ev.line, ev.call_id, ev.loop_id, ev.iter), ev);
         }
     }
+    let call_sites: HashMap<u32, u32> = cap
+        .view_trace
+        .calls
+        .iter()
+        .map(|fr| (fr.call_id, fr.call_line))
+        .collect();
     for ((line, _, _, _), ev) in last_ret {
+        // Return events from an imported library carry the callee's line
+        // number. Anchor the chip at the caller's line instead.
+        let anchor_line = call_sites
+            .get(&ev.call_id)
+            .copied()
+            .filter(|l| *l > 0)
+            .unwrap_or(line);
         let text = lines
-            .get(line.saturating_sub(1) as usize)
+            .get(anchor_line.saturating_sub(1) as usize)
             .copied()
             .unwrap_or("");
         let mut start = None;
@@ -222,7 +235,7 @@ pub fn build_view_annots(module: &Module, source: &str, cap: &RunCapture) -> Vec
         out.push(ViewAnnot {
             id: next_id("r"),
             kind: AnnotKind::Return,
-            anchor_line: line,
+            anchor_line,
             anchor_byte_start: start,
             anchor_byte_end: end,
             label: "return".into(),

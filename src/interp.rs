@@ -208,6 +208,7 @@ impl Interpreter {
             call_id,
             fn_name: fun.name.clone(),
             fn_line: fun.span.line,
+            call_line: self.current_span.line,
             ordinal,
             args_brief,
         });
