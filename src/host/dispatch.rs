@@ -907,7 +907,7 @@ impl HostFn {
             Self::ForeignSessionGet => &["id", "name"],
             Self::ForeignSessionNames => &["id"],
             Self::ForeignSessionClose => &["id"],
-            Self::ForeignSessionList => &["id"],
+            Self::ForeignSessionList => &[],
             Self::ForeignSessionInterrupt => &["id"],
             Self::ForeignLangs => &[],
             Self::PluginLoad => &["path"],
