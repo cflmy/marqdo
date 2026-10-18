@@ -1260,6 +1260,7 @@ fn render_stmt(
     <code class="expr">`{name}` =</code>
     <span class="code-lang">{lang}</span>
     <button type="button" class="nb-clean" title="Clear this output">Clean</button>
+    <button type="button" class="nb-persist" title="Persist this result with writeback">Persist</button>
   </div>
   <pre class="code-body"><code class="language-{lang}">{src}</code></pre>
   <div class="code-foot">
@@ -1539,6 +1540,7 @@ pub(crate) fn render_code_assign_card(name: &str, lang: &str, source: &str) -> S
     <span class="code-name">{name}</span>
     <span class="code-lang">{lang}</span>
     <button type="button" class="nb-clean" title="Clear this output">Clean</button>
+    <button type="button" class="nb-persist" title="Persist this result with writeback">Persist</button>
   </div>
   <pre class="code-body"><code class="language-{lang}">{src}</code></pre>
   <div class="code-foot">

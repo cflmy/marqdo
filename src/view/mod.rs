@@ -229,6 +229,11 @@ fn handle(root: &ViewRoot, request: Request) -> Result<()> {
                     notebook_api::api_plan_value(&root.root, body)
                 })
             }
+            "/api/session/cell/persist" => {
+                return api_debug_post(request, |body| {
+                    notebook_api::api_persist_cell(&root.root, body)
+                })
+            }
             "/api/session/interrupt" => {
                 return api_debug_post(request, |body| {
                     notebook_api::api_interrupt(&root.root, body)

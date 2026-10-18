@@ -3300,6 +3300,20 @@ body.notebook-page .code-head .nb-cell-stdin {
   color: var(--nb-text);
   font: 0.62rem/1.2 var(--mono);
 }
+body.notebook-page .code-head .nb-persist {
+  order: 6;
+  padding: 0.14rem 0.4rem;
+  border: 1px solid var(--nb-border);
+  border-radius: 3px;
+  background: var(--nb-bg);
+  color: var(--nb-muted);
+  font: 0.62rem/1.2 var(--sans);
+  cursor: pointer;
+}
+body.notebook-page .code-head .nb-persist:hover {
+  border-color: var(--nb-accent);
+  color: var(--nb-strong);
+}
 body.notebook-page .code-head .nb-clean {
   order: 5;
   padding: 0.14rem 0.4rem;
@@ -3315,7 +3329,7 @@ body.notebook-page .code-head .nb-clean:hover {
   color: var(--nb-strong);
 }
 body.notebook-page .code-head .nb-badge {
-  order: 6;
+  order: 7;
   padding: 0.14rem 0.34rem;
   border: 1px solid var(--nb-border);
   border-radius: 3px;
@@ -3327,7 +3341,7 @@ body.notebook-page .code-head .nb-badge {
 body.notebook-page .nb-badge.ok { color: var(--nb-success); }
 body.notebook-page .nb-badge.bad { color: var(--nb-error); }
 body.notebook-page .code-head .code-actions {
-  order: 7;
+  order: 8;
   display: flex;
   align-items: center;
   gap: 0.3rem;
@@ -3694,6 +3708,23 @@ body.notebook-page .wb-source-text { color: var(--nb-text); }
       }).catch(function (e2) { status(String(e2)); });
     });
   }
+  function bindPersist(el) {
+    var btn = el.querySelector(".nb-persist");
+    if (!btn || btn.dataset.bound) return;
+    btn.dataset.bound = "1";
+    btn.addEventListener("click", function (e) {
+      e.preventDefault();
+      var name = el.getAttribute("data-code-name") || "";
+      if (!name) return;
+      if (!live) {
+        status("static export: persist is unavailable");
+        return;
+      }
+      post("api/session/cell/persist", { cell: name, key: name }).then(function (r) {
+        status(r.ok ? "persisted " + name : (r.error || "persist failed"));
+      }).catch(function (e2) { status(String(e2)); });
+    });
+  }
   function renderRecord(name, rec) {
     var el = card(name);
     if (!el || !rec) return;
@@ -3902,11 +3933,17 @@ body.notebook-page .wb-source-text { color: var(--nb-text); }
           ensureKernel(el, false);
         });
       }
-      document.querySelectorAll(".code-card").forEach(bindClean);
+      document.querySelectorAll(".code-card").forEach(function (el) {
+        bindClean(el);
+        bindPersist(el);
+      });
       status("static export · preview only");
       return;
     }
-    document.querySelectorAll(".code-card").forEach(bindClean);
+    document.querySelectorAll(".code-card").forEach(function (el) {
+      bindClean(el);
+      bindPersist(el);
+    });
     bind("nb-run-all", function () { runAll(false); });
     bind("nb-restart", function () { runAll(true); });
     bind("nb-interrupt", function () {

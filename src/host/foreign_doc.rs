@@ -56,6 +56,8 @@ pub struct Cell {
     pub last_ms: u64,
     pub last_ok: bool,
     pub last_error: String,
+    /// Value returned by the last successful evaluation, used by explicit persist.
+    pub last_result: Value,
 }
 
 #[derive(Debug, Clone)]
@@ -287,6 +289,7 @@ fn collect_cells(stmts: &[crate::ast::Stmt], out: &mut Vec<Cell>, seen: &mut Has
                     last_ms: 0,
                     last_ok: false,
                     last_error: String::new(),
+                    last_result: Value::None,
                 });
             }
             crate::ast::Stmt::Branch { arms, .. } => {
@@ -625,6 +628,13 @@ impl DocumentSession {
             c.last_ms = ms;
             c.last_ok = ok;
             c.last_error = error.clone();
+            c.last_result = field("result")
+                .filter(|v| !matches!(v, Value::None))
+                .unwrap_or_else(|| {
+                    field("stdout")
+                        .and_then(|v| v.reveal_text().map(|s| Value::Text(s.to_string())))
+                        .unwrap_or(Value::None)
+                });
             c.status = if ok { CellStatus::Clean } else { CellStatus::Error };
         }
         self.seq += 1;
@@ -928,6 +938,7 @@ impl DocumentSession {
             last_ms: 0,
             last_ok: false,
             last_error: String::new(),
+            last_result: Value::None,
         });
         self.order.push(cell.to_string());
         self.generation += 1;
@@ -1274,6 +1285,28 @@ impl DocumentSession {
             ("replayed".into(), Value::Int(records.len() as i64)),
             ("records".into(), Value::List(records)),
         ]))
+    }
+
+    /// Explicitly persist the last cell result through lib/writeback.
+    pub fn persist_cell(&mut self, cell: &str, key: &str) -> Result<Value, String> {
+        let i = self
+            .cell_index(cell)
+            .ok_or_else(|| format!("unknown cell `{cell}`"))?;
+        let value = self.cells[i].last_result.clone();
+        if matches!(value, Value::None) {
+            return Err(format!("cell `{cell}` has no result to persist"));
+        }
+        let key = if key.is_empty() { cell } else { key };
+        let line = self.cells[i].line_end.max(self.cells[i].line_start);
+        crate::host::writeback::record(
+            &mut self.host,
+            &value,
+            None,
+            Some(&Value::Text(key.to_string())),
+            Some(&Value::Int(line as i64)),
+        )?;
+        self.generation += 1;
+        Ok(Value::Bool(true))
     }
 
     pub fn clear_outputs(&mut self) -> Value {
@@ -1725,6 +1758,34 @@ console.log(globalThis.kept);
         assert!(!s.cells.iter().any(|c| c.name == "extra"));
         assert!(s.generation > before + 1);
         s.close();
+    }
+
+    #[test]
+    fn persist_cell_writes_a_keyed_slot() {
+        let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let path = root.join(format!(
+            "target/view-persist-{}-{}.mq.md",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_nanos())
+                .unwrap_or(0)
+        ));
+        let source = r#"# main
+
+`a` =
+```python
+print(950)
+```
+"#;
+        std::fs::write(&path, source).unwrap();
+        let mut s = DocumentSession::open(&path, &root).unwrap();
+        s.run_cell("a", None).unwrap();
+        s.persist_cell("a", "total").unwrap();
+        let text = std::fs::read_to_string(&path).unwrap();
+        assert!(text.contains("marqdo-out total"), "{text}");
+        s.close();
+        let _ = std::fs::remove_file(&path);
     }
 
     #[test]
