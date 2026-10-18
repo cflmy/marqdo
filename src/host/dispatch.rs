@@ -217,6 +217,7 @@ pub enum HostFn {
     ForeignSessionNames = 208,
     ForeignSessionClose = 209,
     ForeignSessionList = 210,
+    ForeignSessionInterrupt = 211,
 }
 
 
@@ -424,6 +425,7 @@ impl HostFn {
             208 => Self::ForeignSessionNames,
             209 => Self::ForeignSessionClose,
             210 => Self::ForeignSessionList,
+            211 => Self::ForeignSessionInterrupt,
             _ => return None,
         })
     }
@@ -515,6 +517,7 @@ impl HostFn {
             "host_foreign_session_names" | "foreign_session_names" => Self::ForeignSessionNames,
             "host_foreign_session_close" | "foreign_session_close" => Self::ForeignSessionClose,
             "host_foreign_session_list" | "foreign_session_list" => Self::ForeignSessionList,
+            "host_foreign_session_interrupt" | "foreign_session_interrupt" => Self::ForeignSessionInterrupt,
             "host_foreign_langs" => Self::ForeignLangs,
             "host_dotenv_load" | "load_dotenv" => Self::DotenvLoad,
             "host_http_request" | "http_request" => Self::HttpRequest,
@@ -726,6 +729,7 @@ impl HostFn {
             Self::ForeignSessionNames => "host_foreign_session_names",
             Self::ForeignSessionClose => "host_foreign_session_close",
             Self::ForeignSessionList => "host_foreign_session_list",
+            Self::ForeignSessionInterrupt => "host_foreign_session_interrupt",
             Self::ForeignLangs => "host_foreign_langs",
             Self::DotenvLoad => "host_dotenv_load",
             Self::HttpRequest => "host_http_request",
@@ -903,7 +907,8 @@ impl HostFn {
             Self::ForeignSessionGet => &["id", "name"],
             Self::ForeignSessionNames => &["id"],
             Self::ForeignSessionClose => &["id"],
-            Self::ForeignSessionList => &[],
+            Self::ForeignSessionList => &["id"],
+            Self::ForeignSessionInterrupt => &["id"],
             Self::ForeignLangs => &[],
             Self::PluginLoad => &["path"],
             Self::PluginUnload | Self::PluginList => &[],
@@ -1574,6 +1579,17 @@ pub fn call_host(
             #[cfg(feature = "exec-host")]
             {
                 crate::host::foreign_session::close(ctx, require(bound, "id")?)
+            }
+            #[cfg(not(feature = "exec-host"))]
+            {
+                let _ = (ctx, bound);
+                Err("foreign unavailable in browser wasm".into())
+            }
+        }
+        HostFn::ForeignSessionInterrupt => {
+            #[cfg(feature = "exec-host")]
+            {
+                crate::host::foreign_session::interrupt(ctx, require(bound, "id")?)
             }
             #[cfg(not(feature = "exec-host"))]
             {

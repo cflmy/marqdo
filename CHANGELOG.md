@@ -4,6 +4,8 @@
 
 ### Added
 
+- **外联 v3 P0**：session eval 支持 raw stdin（Python/Node 持久内核）；`foreign.session inputs=` 支持每 cell 独立 stdin；view 增加每卡 stdin 字段与 Interrupt；静态导出使用 inputs 表。
+
 ### Fixed
 
 ### Changed

@@ -807,6 +807,20 @@ impl DocumentSession {
         ]))
     }
 
+    pub fn interrupt(&mut self) -> Result<Value, String> {
+        let ids: Vec<String> = self.kernel_sessions.keys().cloned().collect();
+        let mut out = Vec::new();
+        for name in ids {
+            if let Some(id) = self.kernel_sessions.get(&name) {
+                match foreign_session::interrupt(&mut self.host, &Value::Text(id.clone())) {
+                    Ok(_) => out.push(Value::Text(name)),
+                    Err(e) => out.push(Value::Text(format!("{name}: {e}"))),
+                }
+            }
+        }
+        Ok(Value::List(out))
+    }
+
     pub fn restart_kernel(&mut self, name: &str) -> Result<Value, String> {
         if let Some(id) = self.kernel_sessions.remove(name) {
             let _ = foreign_session::close(&mut self.host, &Value::Text(id));

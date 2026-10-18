@@ -652,6 +652,28 @@ fn kill_session(ctx: &mut HostContext, id: &str) {
     }
 }
 
+/// Interrupt the current evaluation without destroying the kernel. Python
+/// reports KeyboardInterrupt through the normal result frame.
+pub fn interrupt(ctx: &mut HostContext, id: &Value) -> Result<Value, String> {
+    let id = as_text(id, "id")?.to_string();
+    let session = ctx
+        .foreign_sessions
+        .get_mut(&id)
+        .ok_or_else(|| format!("foreign session `{id}` not found"))?;
+    #[cfg(unix)]
+    unsafe {
+        libc::kill(-(session.child.id() as i32), libc::SIGINT);
+    }
+    #[cfg(windows)]
+    {
+        let _ = Command::new("taskkill")
+            .args(["/PID", &session.child.id().to_string(), "/T", "/F"])
+            .output();
+        session.alive = false;
+    }
+    Ok(Value::Bool(true))
+}
+
 pub fn set(
     ctx: &mut HostContext,
     id: &Value,

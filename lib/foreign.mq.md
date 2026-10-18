@@ -225,6 +225,14 @@ Kill and remove a session; returns whether it existed.
 
 *> host_foreign_session_close id=`id`*
 
+## session_interrupt
+    + `id`
+
+Interrupt the current evaluation of a persistent kernel. The session remains
+usable for the next evaluation when the worker supports interruption.
+
+*> host_foreign_session_interrupt id=`id`*
+
 ## session_list
 
 List live sessions with id/lang/cmd/evals/alive/started_ms.

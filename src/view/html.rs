@@ -3552,6 +3552,7 @@ body.notebook-page .wb-source-text { color: var(--nb-text); }
   <button type="button" id="nb-run-all">Run All</button>
   <button type="button" id="nb-restart">Restart &amp; Run All</button>
   <button type="button" id="nb-step">Step</button>
+  <button type="button" id="nb-interrupt">Interrupt</button>
   <button type="button" id="nb-state">State</button>
   <button type="button" id="nb-journal">Journal</button>
   <button type="button" id="nb-clear">Clear outputs</button>
@@ -3884,7 +3885,7 @@ body.notebook-page .wb-source-text { color: var(--nb-text); }
       function staticNotice() {
         status("静态页面无法真实执行 / static export: no live execution");
       }
-      ["nb-run-all", "nb-restart", "nb-step", "nb-state", "nb-journal",
+      ["nb-run-all", "nb-restart", "nb-step", "nb-interrupt", "nb-state", "nb-journal",
        "nb-clear", "nb-reload", "nb-debug", "exec-clear"].forEach(function (id) {
         bind(id, staticNotice);
       });
@@ -3908,6 +3909,11 @@ body.notebook-page .wb-source-text { color: var(--nb-text); }
     document.querySelectorAll(".code-card").forEach(bindClean);
     bind("nb-run-all", function () { runAll(false); });
     bind("nb-restart", function () { runAll(true); });
+    bind("nb-interrupt", function () {
+      post("api/session/interrupt", {}).then(function (r) {
+        status(r.ok ? "interrupt sent" : (r.error || "interrupt failed"));
+      });
+    });
     bind("nb-step", function () {
       if (!state.persistent && Object.keys(state.cells).length === 0) {
         status("no cells; Run All runs the document");

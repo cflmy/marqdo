@@ -170,6 +170,10 @@ where
     }
 }
 
+pub fn api_interrupt(root: &Path, body: &str) -> serde_json::Value {
+    with_session(root, body, "interrupted", |s| s.interrupt())
+}
+
 pub fn api_clear_cell(root: &Path, body: &str) -> serde_json::Value {
     let v = body_value(body);
     let cell = v.get("cell").and_then(|x| x.as_str()).unwrap_or("");

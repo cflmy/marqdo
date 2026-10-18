@@ -194,6 +194,11 @@ fn handle(root: &ViewRoot, request: Request) -> Result<()> {
                     notebook_api::api_run_document(&root.root, body)
                 })
             }
+            "/api/session/interrupt" => {
+                return api_debug_post(request, |body| {
+                    notebook_api::api_interrupt(&root.root, body)
+                })
+            }
             "/api/session/cell/clear" => {
                 return api_debug_post(request, |body| {
                     notebook_api::api_clear_cell(&root.root, body)
