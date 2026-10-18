@@ -1070,6 +1070,190 @@ impl DocumentSession {
     }
 
     /// Clear displayed outputs and per-cell records; kernels and live state survive.
+    /// Export plan, explicit values, kernel values and journal as JSON-safe data.
+    pub fn export_snapshot(&mut self) -> Result<Value, String> {
+        let mut kernels = Vec::new();
+        for decl in self.kernels.clone() {
+            let mut values = Vec::new();
+            if let Some(id) = self.kernel_sessions.get(&decl.name).cloned() {
+                if let Ok(Value::List(names)) =
+                    foreign_session::names(&mut self.host, &Value::Text(id.clone()))
+                {
+                    for name in names {
+                        if let Value::Text(n) = &name {
+                            if let Ok(v) = foreign_session::get(
+                                &mut self.host,
+                                &Value::Text(id.clone()),
+                                &Value::Text(n.clone()),
+                            ) {
+                                values.push(Value::Map(vec![
+                                    ("name".into(), Value::Text(n.clone())),
+                                    ("value".into(), v),
+                                ]));
+                            }
+                        }
+                    }
+                }
+            }
+            kernels.push(Value::Map(vec![
+                ("name".into(), Value::Text(decl.name.clone())),
+                ("lang".into(), Value::Text(decl.lang.clone())),
+                ("cmd".into(), Value::Text(decl.cmd.clone().unwrap_or_default())),
+                ("values".into(), Value::List(values)),
+            ]));
+        }
+        let cells = self
+            .cells
+            .iter()
+            .map(|c| {
+                Value::Map(vec![
+                    ("name".into(), Value::Text(c.name.clone())),
+                    ("lang".into(), Value::Text(c.lang.clone())),
+                    ("kernel".into(), Value::Text(c.kernel.clone())),
+                    ("source".into(), Value::Text(c.source.clone())),
+                    ("stdin".into(), Value::Text(c.stdin.clone())),
+                    ("status".into(), Value::Text(c.status.as_str().into())),
+                    ("runs".into(), Value::Int(c.runs as i64)),
+                    ("last_ok".into(), Value::Bool(c.last_ok)),
+                ])
+            })
+            .collect();
+        let journal = self.journal_json();
+        Ok(Value::Map(vec![
+            ("version".into(), Value::Int(1)),
+            ("path".into(), Value::Text(self.path.display().to_string())),
+            ("persistent".into(), Value::Bool(self.persistent)),
+            ("generation".into(), Value::Int(self.generation as i64)),
+            ("kernels".into(), Value::List(kernels)),
+            ("cells".into(), Value::List(cells)),
+            ("order".into(), Value::List(
+                self.order.iter().cloned().map(Value::Text).collect(),
+            )),
+            ("journal".into(), journal),
+        ]))
+    }
+
+    /// Import JSON-safe values from an exported snapshot. Source identity and
+    /// cell names must already match; no arbitrary objects are deserialized.
+    pub fn import_snapshot(&mut self, snapshot: &Value) -> Result<Value, String> {
+        let Value::Map(fields) = snapshot else {
+            return Err("snapshot must be a map".into());
+        };
+        let field = |name: &str| {
+            fields
+                .iter()
+                .find(|(k, _)| k == name)
+                .map(|(_, v)| v.clone())
+        };
+        let Some(Value::List(kernels)) = field("kernels") else {
+            return Err("snapshot: missing kernels".into());
+        };
+        let mut restored = 0i64;
+        for kernel in kernels {
+            let Value::Map(kfields) = kernel else { continue };
+            let get = |name: &str| {
+                kfields
+                    .iter()
+                    .find(|(k, _)| k == name)
+                    .map(|(_, v)| v.clone())
+            };
+            let Some(Value::Text(name)) = get("name") else { continue };
+            if self.kernel(&name).is_none() {
+                return Err(format!("snapshot: unknown kernel `{name}`"));
+            }
+            let Some(Value::List(values)) = get("values") else { continue };
+            let id = self.ensure_kernel_session(&name)?;
+            for item in values {
+                let Value::Map(vfields) = item else { continue };
+                let getv = |name: &str| {
+                    vfields
+                        .iter()
+                        .find(|(k, _)| k == name)
+                        .map(|(_, v)| v.clone())
+                };
+                let Some(Value::Text(vname)) = getv("name") else { continue };
+                let Some(value) = getv("value") else { continue };
+                foreign_session::set(
+                    &mut self.host,
+                    &Value::Text(id.clone()),
+                    &Value::Text(vname),
+                    &value,
+                )?;
+                restored += 1;
+            }
+        }
+        if let Some(Value::List(cells)) = field("cells") {
+            for item in cells {
+                let Value::Map(cfields) = item else { continue };
+                let getc = |name: &str| {
+                    cfields
+                        .iter()
+                        .find(|(k, _)| k == name)
+                        .map(|(_, v)| v.clone())
+                };
+                let Some(Value::Text(name)) = getc("name") else { continue };
+                let Some(i) = self.cell_index(&name) else { continue };
+                if let Some(Value::Text(status)) = getc("status") {
+                    self.cells[i].status = match status.as_str() {
+                        "clean" => CellStatus::Clean,
+                        "error" => CellStatus::Error,
+                        "dirty" => CellStatus::Dirty,
+                        "stale" => CellStatus::Stale,
+                        "unlisted" => CellStatus::Unlisted,
+                        _ => CellStatus::Never,
+                    };
+                }
+            }
+        }
+        self.generation += 1;
+        Ok(Value::Int(restored))
+    }
+
+    /// Replay recorded cells in order, using the snapshot's per-cell stdin.
+    pub fn replay_snapshot(&mut self, snapshot: &Value) -> Result<Value, String> {
+        let Value::Map(fields) = snapshot else {
+            return Err("snapshot must be a map".into());
+        };
+        let cells = fields
+            .iter()
+            .find(|(k, _)| k == "cells")
+            .and_then(|(_, v)| match v {
+                Value::List(xs) => Some(xs.clone()),
+                _ => None,
+            })
+            .ok_or_else(|| "snapshot: missing cells".to_string())?;
+        let mut records = Vec::new();
+        for item in cells {
+            let Value::Map(cfields) = item else { continue };
+            let getc = |name: &str| {
+                cfields
+                    .iter()
+                    .find(|(k, _)| k == name)
+                    .map(|(_, v)| v.clone())
+            };
+            let Some(Value::Text(name)) = getc("name") else { continue };
+            if self.cell_index(&name).is_none() {
+                continue;
+            }
+            let stdin = getc("stdin").and_then(|v| match v {
+                Value::Text(s) if !s.is_empty() => Some(s),
+                _ => None,
+            });
+            let record = self.run_cell_with_stdin(&name, None, stdin.as_deref())?;
+            let mut m = match record {
+                Value::Map(m) => m,
+                other => vec![("result".into(), other)],
+            };
+            m.push(("cell".into(), Value::Text(name)));
+            records.push(Value::Map(m));
+        }
+        Ok(Value::Map(vec![
+            ("ok".into(), Value::Bool(true)),
+            ("replayed".into(), Value::Int(records.len() as i64)),
+            ("records".into(), Value::List(records)),
+        ]))
+    }
+
     pub fn clear_outputs(&mut self) -> Value {
         for cell in &mut self.cells {
             cell.runs = 0;
@@ -1455,6 +1639,25 @@ console.log(globalThis.kept);
         );
         s.close();
         let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn snapshot_export_import_restores_values() {
+        if !node_available() {
+            return;
+        }
+        let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let path = root.join("tests/notebook/shared.mq.md");
+        let mut a = DocumentSession::open(&path, &root).unwrap();
+        a.set_value("分析", "rate", Value::Int(42)).unwrap();
+        let snap = a.export_snapshot().unwrap();
+        a.close();
+        let mut b = DocumentSession::open(&path, &root).unwrap();
+        let restored = b.import_snapshot(&snap).unwrap();
+        assert!(matches!(restored, Value::Int(n) if n > 0));
+        let rate = b.pull_value("分析", "rate").unwrap();
+        assert_eq!(rate, Value::Int(42));
+        b.close();
     }
 
     #[test]

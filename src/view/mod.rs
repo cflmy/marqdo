@@ -194,6 +194,21 @@ fn handle(root: &ViewRoot, request: Request) -> Result<()> {
                     notebook_api::api_run_document(&root.root, body)
                 })
             }
+            "/api/session/snapshot/export" => {
+                return api_debug_post(request, |body| {
+                    notebook_api::api_export_snapshot(&root.root, body)
+                })
+            }
+            "/api/session/snapshot/import" => {
+                return api_debug_post(request, |body| {
+                    notebook_api::api_import_snapshot(&root.root, body)
+                })
+            }
+            "/api/session/snapshot/replay" => {
+                return api_debug_post(request, |body| {
+                    notebook_api::api_replay_snapshot(&root.root, body)
+                })
+            }
             "/api/session/plan/assign" => {
                 return api_debug_post(request, |body| {
                     notebook_api::api_plan_assign(&root.root, body)

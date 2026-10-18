@@ -174,6 +174,30 @@ pub fn api_interrupt(root: &Path, body: &str) -> serde_json::Value {
     with_session(root, body, "interrupted", |s| s.interrupt())
 }
 
+pub fn api_export_snapshot(root: &Path, body: &str) -> serde_json::Value {
+    with_session(root, body, "snapshot", |s| s.export_snapshot())
+}
+
+pub fn api_import_snapshot(root: &Path, body: &str) -> serde_json::Value {
+    let v = body_value(body);
+    let snapshot = v.get("snapshot").cloned().unwrap_or(serde_json::Value::Null);
+    let snapshot = match json_to_value(&snapshot) {
+        Ok(v) => v,
+        Err(e) => return err(e),
+    };
+    with_session(root, body, "restored", |s| s.import_snapshot(&snapshot))
+}
+
+pub fn api_replay_snapshot(root: &Path, body: &str) -> serde_json::Value {
+    let v = body_value(body);
+    let snapshot = v.get("snapshot").cloned().unwrap_or(serde_json::Value::Null);
+    let snapshot = match json_to_value(&snapshot) {
+        Ok(v) => v,
+        Err(e) => return err(e),
+    };
+    with_session(root, body, "replay", |s| s.replay_snapshot(&snapshot))
+}
+
 pub fn api_clear_cell(root: &Path, body: &str) -> serde_json::Value {
     let v = body_value(body);
     let cell = v.get("cell").and_then(|x| x.as_str()).unwrap_or("");
