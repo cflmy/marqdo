@@ -67,6 +67,25 @@ fn err(error: String) -> serde_json::Value {
     serde_json::json!({ "ok": false, "error": error })
 }
 
+pub fn api_run_document(root: &Path, body: &str) -> serde_json::Value {
+    let v = body_value(body);
+    let (_rel, abs) = match path_of(root, &v) {
+        Ok(p) => p,
+        Err(e) => return err(e),
+    };
+    let mut opts = crate::RunOptions::default();
+    opts.fs_root = Some(root.to_path_buf());
+    opts.sleep_limit_ms = Some(30_000);
+    match crate::run_file_capture(&abs, &opts) {
+        Ok(cap) => serde_json::json!({
+            "ok": true,
+            "stdout": cap.stdout,
+            "value": json_value(&cap.value),
+        }),
+        Err(e) => serde_json::json!({ "ok": false, "error": format!("{e:#}") }),
+    }
+}
+
 pub fn api_open(root: &Path, body: &str) -> serde_json::Value {
     let v = body_value(body);
     let (_rel, abs) = match path_of(root, &v) {

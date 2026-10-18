@@ -3623,8 +3623,25 @@ body.notebook-page .stdin-form button {
       else status(r.error || "run failed");
     });
   }
+  function renderDocumentResult(data) {
+    var out = document.getElementById("exec-main");
+    if (out) {
+      out.hidden = false;
+      out.classList.toggle("err", !data.ok);
+      out.textContent = data.ok ? (data.stdout || "(no output)") : (data.error || "run failed");
+    }
+    var block = document.getElementById("exec-block");
+    if (block) block.hidden = false;
+  }
   function runAll(restart) {
     status(restart ? "restarting…" : "running all…");
+    if (!state.persistent && Object.keys(state.cells).length === 0) {
+      post("api/session/run_document", {}).then(function (r) {
+        renderDocumentResult(r);
+        status(r.ok ? "document run done" : (r.error || "document run failed"));
+      }).catch(function (e) { status(String(e)); });
+      return;
+    }
     post("api/session/run_all", { restart: !!restart }).then(function (r) {
       if (!r.ok) { status(r.error || "run all failed"); return; }
       if (r.session) renderSummary(r.session);
@@ -3687,6 +3704,10 @@ body.notebook-page .stdin-form button {
     bind("nb-run-all", function () { runAll(false); });
     bind("nb-restart", function () { runAll(true); });
     bind("nb-step", function () {
+      if (!state.persistent && Object.keys(state.cells).length === 0) {
+        status("no cells; Run All runs the document");
+        return;
+      }
       post("api/session/cell/step", {}).then(function (r) {
         if (!r.ok) { status(r.error || "step failed"); return; }
         if (r.record) {
@@ -3707,6 +3728,7 @@ body.notebook-page .stdin-form button {
         pre.textContent = JSON.stringify(r.state || r, null, 2);
         if (actions) actions.hidden = false;
         if (ki && !ki.value && state.kernels.length) ki.value = state.kernels[0].name;
+        if (!state.persistent) status("stateless: no kernel state");
       });
     });
     bind("nb-push", function () {
@@ -3738,6 +3760,7 @@ body.notebook-page .stdin-form button {
         if (!pre) return;
         pre.hidden = false;
         pre.textContent = JSON.stringify(r.journal || r, null, 2);
+        if (!state.persistent) status("stateless: journal is per one-shot run");
       });
     });
     bind("nb-debug", function () {
