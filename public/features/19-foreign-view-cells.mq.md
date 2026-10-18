@@ -38,7 +38,12 @@ The `订单` table is a normal Marqdo value. `foreign.session_set` copies it int
 
 **> foreign.session_set id=`内核会话` name="orders" value=`订单`**
 
-**total = > foreign.session_eval id=`内核会话` source="round(sum(float(row['金额']) for row in orders), 2)"**
+`total_code` =
+```python
+round(sum(float(row["金额"]) for row in orders), 2)
+```
+
+**total = > foreign.session_eval id=`内核会话` code=`total_code`**
 
 > print text=[result](`total`)
 
@@ -50,9 +55,19 @@ Kernel state persists.
 
 Two evaluations share the same kernel. The second sees the first variable.
 
-**> foreign.session_eval id=`内核会话` source="values = [3, 4, 5]"**
+`set_values_code` =
+```python
+values = [3, 4, 5]
+```
 
-**square_sum = > foreign.session_eval id=`内核会话` source="sum(value * value for value in values)"**
+**> foreign.session_eval id=`内核会话` code=`set_values_code`**
+
+`square_sum_code` =
+```python
+sum(value * value for value in values)
+```
+
+**square_sum = > foreign.session_eval id=`内核会话` code=`square_sum_code`**
 
 > print text=[result](`square_sum`)
 
