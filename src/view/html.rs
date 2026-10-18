@@ -625,6 +625,24 @@ ul.doc-loop, ol.doc-branch {
   border-radius: 10px;
   border: 1px solid transparent;
 }
+.exec-clear {
+  float: right;
+  font: inherit;
+  font-size: 0.72rem;
+  padding: 0.2rem 0.6rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--muted);
+  cursor: pointer;
+}
+.exec-clear:hover { color: var(--ink); border-color: var(--muted); }
+body.notebook-page .exec-clear {
+  border-color: var(--nb-border);
+  background: var(--nb-surface-2);
+  color: var(--nb-text);
+}
+body.notebook-page .exec-clear:hover { border-color: var(--nb-accent); color: var(--nb-strong); }
 .out, .source {
   font-family: var(--mono);
   font-size: 0.82rem;
@@ -3627,6 +3645,13 @@ body.notebook-page .stdin-form button {
     });
     var exec = document.getElementById("exec-main");
     if (exec) { exec.hidden = true; exec.textContent = ""; }
+    var execBlock = document.getElementById("exec-block");
+    if (execBlock) {
+      execBlock.querySelectorAll(".plots, .plan-card").forEach(function (el) {
+        el.hidden = true;
+        el.innerHTML = "";
+      });
+    }
     var stateOut = document.getElementById("nb-state-out");
     if (stateOut) { stateOut.hidden = true; stateOut.textContent = ""; }
     var pullOut = document.getElementById("nb-pull-out");
@@ -3719,6 +3744,7 @@ body.notebook-page .stdin-form button {
       window.open("debug?path=" + encodeURIComponent(path), "_blank");
     });
     bind("nb-clear", clearOutputs);
+    bind("exec-clear", clearOutputs);
     bind("nb-reload", function () {
       post("api/session/reload", {}).then(function (r) {
         if (!r.ok) { status(r.error || "reload failed"); return; }
@@ -3906,8 +3932,8 @@ window.MARQDO_AUTO_STREAM = {auto_stream};
   <h2>Structure</h2>
   {structure_block}
 </section>
-<section class="block exec-block">
-  <h2>Execution</h2>
+<section class="block exec-block" id="exec-block">
+  <h2>Execution <button type="button" class="exec-clear" id="exec-clear">Clear</button></h2>
   {stdin_panel}
   {stream_panel}
   {plan_card}
