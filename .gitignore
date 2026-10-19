@@ -71,6 +71,11 @@ plugins/*/tmp/
 /examples/linalg-*/**/*.svg
 /examples/linalg-*/*.svg
 /examples/linalg-*.svg
+# Plot SVGs emitted beside tests / notebooks when demos run
+/tests/**/*-plot-*.svg
+
+# PLDI / thesis harness scratch must never land in this tree
+.lx*-tmp/
 
 # Local ABI plugin copies (use `marqdo ext add quantum` / cargo build)
 /ext/native/
