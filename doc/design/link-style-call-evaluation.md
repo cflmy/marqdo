@@ -2,11 +2,16 @@
 
 | | |
 |---|---|
-| 状态 | **Proposed · 待决策**（未实施任何代码改动） |
+| 状态 | **Proposed · 已被 [paren-call-and-readable-invocation.md](paren-call-and-readable-invocation.md) 取代** |
 | 日期 | 2026-10-22 |
 | 提出 | 用户：「markdown 的链接语义似乎很适合做这种操作」 |
 | 相邻 | [spaced-function-names-d8.md](spaced-function-names-d8.md)（方括号调用 + 空格） |
 | 影响面 | **核心解析**：`[key](coll)` 链接索引与调用语法冲突 |
+
+> **后续更正**：本文的 L1–L4 方案列表把问题当成「表/语义」来讨论，偏离了用户原意。
+> 用户问的是**调用写法**本身。最新评估（含原型实测 554/0 回归）见
+> [paren-call-and-readable-invocation.md](paren-call-and-readable-invocation.md)：
+> 方括号确实不可行（2 个真实冲突文件），但**去掉方括号的 `f(args)` 是空闲语法且可行**。
 
 ---
 
