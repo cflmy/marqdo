@@ -628,6 +628,15 @@ fn try_main(cli: Cli) -> Result<i32> {
                 }
             }
 
+            // Accept the documented shapes `labels pending` / `labels search`
+            // as no-op words (the flags carry the real intent).
+            let paths: Vec<&std::path::PathBuf> = paths
+                .iter()
+                .filter(|p| {
+                    let s = p.to_string_lossy();
+                    !(s == "pending" || s == "search")
+                })
+                .collect();
             let mut files: Vec<std::path::PathBuf> = Vec::new();
             for p in &paths {
                 files.extend(collect_mq_files(p)?);
