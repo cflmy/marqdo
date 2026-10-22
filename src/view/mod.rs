@@ -386,7 +386,7 @@ pub(crate) fn build_file_view(
 ) -> Result<FileViewModel> {
     let mut source = fs::read_to_string(abs).with_context(|| format!("read {}", abs.display()))?;
     // Structure shows this file only — do not merge imported lib bodies into the tree.
-    let (mut structure, mut module_opt, input_prompts) = match crate::parse::parse_source(&source) {
+    let (mut structure, mut module_opt, input_prompts) = match crate::load::parse_source_auto(&source) {
         Ok(module) => {
             let prompts = collect_input_prompts(&module);
             (
@@ -454,7 +454,7 @@ pub(crate) fn build_file_view(
         if let Ok(next) = fs::read_to_string(abs) {
             source = next;
         }
-        if let Ok(module) = crate::parse::parse_source(&source) {
+        if let Ok(module) = crate::load::parse_source_auto(&source) {
             let annots = match &captured {
                 Some(cap) => build_view_annots(&module, &source, cap),
                 None => Vec::new(),
@@ -736,7 +736,7 @@ fn api_run(root: &ViewRoot, mut request: Request) -> Result<()> {
                 let preview: String = cap.stdout.chars().take(500).collect();
                 let bindings_html = render_bindings_html(&cap.bindings);
                 let source_now = fs::read_to_string(&abs).unwrap_or(source);
-                let (structure_html, trace_json) = match crate::parse::parse_source(&source_now) {
+                let (structure_html, trace_json) = match crate::load::parse_source_auto(&source_now) {
                     Ok(module) => {
                         let annots = build_view_annots(&module, &source_now, &cap);
                         (

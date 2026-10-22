@@ -21,7 +21,7 @@ pub struct DebugPageModel {
 
 pub fn build_debug_model(abs: &Path, rel: &str, source: &str) -> DebugPageModel {
     let _ = abs;
-    let (structure, outline, has_input) = match crate::parse::parse_source(source) {
+    let (structure, outline, has_input) = match crate::load::parse_source_auto(source) {
         Ok(module) => (
             render_module_structure_mode(&module, source, StructureMode::Debug),
             render_function_outline(&module),

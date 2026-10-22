@@ -1222,6 +1222,31 @@ pub fn render_writeback_outline(source: &str) -> String {
     out
 }
 
+/// `<TAB>` M8: occlusion card — the description reads as prose, the payload as a
+/// code chip, stubs get a badge. Shared by bind / expr / return statements.
+fn occl_card(name: Option<&str>, label: &str, payload: Option<&Expr>) -> String {
+    let pre = match name {
+        Some(n) => format!(
+            "<code class=\"expr occl-name\">`{}` =</code>",
+            escape(n)
+        ),
+        None => String::new(),
+    };
+    let val = match payload {
+        Some(e) => format!(
+            "<code class=\"occl-code\">{}</code>",
+            escape(&expr_display(e))
+        ),
+        None => String::from(
+            "<span class=\"occl-stub\" title=\"空载荷：未接通或待补返回值\">桩</span>",
+        ),
+    };
+    format!(
+        "<div class=\"card occl-card\"><span class=\"badge\">遮蔽</span>{pre}<span class=\"occl-label\">{}</span>{val}</div>",
+        escape(label)
+    )
+}
+
 fn render_stmt(
     stmt: &Stmt,
     lines: &[ClassifiedLine],
@@ -1231,6 +1256,19 @@ fn render_stmt(
     let end = stmt_end_line(stmt);
     let line = stmt_start(stmt);
     let inner = match stmt {
+            Stmt::Assign {
+                name,
+                value: Expr::Occluded { label, payload },
+                ..
+            } => occl_card(Some(name), label, payload.as_deref()),
+            Stmt::Expr {
+                value: Expr::Occluded { label, payload },
+                ..
+            } => occl_card(None, label, payload.as_deref()),
+            Stmt::Return {
+                value: Expr::Occluded { label, payload },
+                ..
+            } => occl_card(None, label, payload.as_deref()),
             Stmt::Assign {
                 name,
                 value: Expr::Formula(e),

@@ -724,6 +724,157 @@ fn parse_args_brief(brief: &str) -> HashMap<String, String> {
     m
 }
 
+/// Split a statement line holding one occlusion `[描述](实现)`.
+///
+/// Returns `(prefix, label, payload, suffix)`. Display-only: the parser already
+/// validated the real structure, this just decides how to paint it.
+fn split_occlusion(line: &str) -> Option<(String, String, String, String)> {
+    let chars: Vec<char> = line.chars().collect();
+    let mut i = 0usize;
+    let mut in_bt = false;
+    let mut in_str = false;
+    while i < chars.len() {
+        let c = chars[i];
+        if in_str {
+            if c == '\\' {
+                i += 2;
+                continue;
+            }
+            if c == '"' {
+                in_str = false;
+            }
+            i += 1;
+            continue;
+        }
+        if in_bt {
+            if c == '`' {
+                in_bt = false;
+            }
+            i += 1;
+            continue;
+        }
+        match c {
+            '`' => in_bt = true,
+            '"' => in_str = true,
+            '[' if chars.get(i + 1) != Some(&'^') => {
+                if let Some(close) = match_delim(&chars, i, '[', ']') {
+                    if chars.get(close + 1) == Some(&'(') {
+                        if let Some(paren) = match_delim(&chars, close + 1, '(', ')') {
+                            let mut prefix: String = chars[..i].iter().collect();
+                            let label: String = chars[i + 1..close].iter().collect();
+                            let payload: String = chars[close + 2..paren].iter().collect();
+                            let suffix: String = chars[paren + 1..].iter().collect();
+                            // `**名 = [..](..)**` reads as bold code: drop the
+                            // emphasis markers so the label reads as prose.
+                            if let Some(p) = prefix.strip_suffix("**") {
+                                prefix = p.to_string();
+                            }
+                            prefix = prefix.trim_end().to_string();
+                            if let Some(p) = prefix.strip_prefix("**") {
+                                prefix = p.to_string();
+                            }
+                            let suffix = suffix.strip_prefix("**").unwrap_or(&suffix).to_string();
+                            return Some((
+                                prefix,
+                                label.trim().to_string(),
+                                payload.trim().to_string(),
+                                suffix.trim().to_string(),
+                            ));
+                        }
+                    }
+                }
+            }
+            _ => {}
+        }
+        i += 1;
+    }
+    None
+}
+
+fn match_delim(chars: &[char], start: usize, open: char, close: char) -> Option<usize> {
+    let mut depth = 0i32;
+    let mut i = start;
+    let mut in_bt = false;
+    let mut in_str = false;
+    while i < chars.len() {
+        let c = chars[i];
+        if in_str {
+            if c == '\\' {
+                i += 2;
+                continue;
+            }
+            if c == '"' {
+                in_str = false;
+            }
+            i += 1;
+            continue;
+        }
+        if in_bt {
+            if c == '`' {
+                in_bt = false;
+            }
+            i += 1;
+            continue;
+        }
+        match c {
+            '`' => in_bt = true,
+            '"' => in_str = true,
+            c if c == open => depth += 1,
+            c if c == close => {
+                depth -= 1;
+                if depth == 0 {
+                    return Some(i);
+                }
+            }
+            _ => {}
+        }
+        i += 1;
+    }
+    None
+}
+
+/// Render one occlusion line: description as prose, payload as a code chip,
+/// stubs get a badge. `<TAB>` M8
+fn render_occlusion_line(line_no: u32, line: &str) -> Option<String> {
+    let (prefix, label, payload, suffix) = split_occlusion(line)?;
+    let stub = payload.is_empty();
+    // The rest of the view drops backticks (see the `mq-anchor` marks), so the
+    // assignment head reads as `留存 =` rather than `` `留存` = ``.
+    let head = prefix
+        .trim_end()
+        .trim_end_matches('=')
+        .trim()
+        .trim_matches('`')
+        .to_string();
+    let mut html = format!(r#"<div class="doc-line doc-occl" data-line="{line_no}">"#);
+    if !head.is_empty() {
+        html.push_str(&format!(
+            r#"<span class="occl-pre">{} =</span>"#,
+            escape(&head)
+        ));
+    }
+    html.push_str(&format!(
+        r#"<span class="occl-label">{}</span>"#,
+        escape(&label)
+    ));
+    if stub {
+        html.push_str(r#"<span class="occl-stub" title="空载荷：未接通或待补返回值">桩</span>"#);
+    } else {
+        html.push_str(&format!(
+            r#"<code class="occl-code">{}</code>"#,
+            escape(&payload)
+        ));
+    }
+    if !suffix.is_empty() {
+        html.push_str(&format!(
+            r#"<span class="occl-pre">{}</span>"#,
+            escape(&suffix)
+        ));
+    }
+    html.push_str("</div>");
+    Some(html)
+}
+
 fn render_line_block(
     line_no: u32,
     text: &str,
@@ -757,6 +908,15 @@ fn render_line_block(
         }
         None => {
             let trimmed = text.trim_start();
+            // `<TAB>` M8: an occlusion line is painted as description + code chip
+            // regardless of annotation bits (the annotator always emits spans).
+            if let Some(html) = render_occlusion_line(line_no, trimmed) {
+                s.push_str(&html);
+                if let Some(body) = writeback_body {
+                    s.push_str(&crate::view::render::render_output_card(line_no, body));
+                }
+                return s;
+            }
             if bits.is_empty() {
                 if let Some(rest) = trimmed.strip_prefix("> ") {
                     let aid = match_annot_for_line(annots)
@@ -1381,5 +1541,50 @@ When we meet `who`, we **print text="Hi, `who`!"** and close with*None*.
             bind_overflow, 0,
             "default frame who/print/return must not overflow: {html}"
         );
+    }
+}
+
+#[cfg(test)]
+mod occl_split_tests {
+    use super::split_occlusion;
+
+    #[test]
+    fn splits_bare_assignment_occlusion() {
+        let (head, label, payload, rest) =
+            split_occlusion("`留存` = [客户留存率，模拟数据](0.42)").unwrap();
+        assert_eq!(head, "`留存` =");
+        assert_eq!(label, "客户留存率，模拟数据");
+        assert_eq!(payload, "0.42");
+        assert_eq!(rest, "");
+    }
+
+    #[test]
+    fn splits_bold_assignment_occlusion_without_markers() {
+        let (head, label, payload, _) =
+            split_occlusion("**留存 = [客户留存率，模拟数据](0.42)**").unwrap();
+        assert_eq!(head, "留存 =");
+        assert_eq!(label, "客户留存率，模拟数据");
+        assert_eq!(payload, "0.42");
+    }
+
+    #[test]
+    fn splits_stub_and_nested_payload() {
+        let (_, label, payload, _) =
+            split_occlusion("`待接` = [搜索接入，待开发]()").unwrap();
+        assert_eq!(label, "搜索接入，待开发");
+        assert!(payload.is_empty());
+
+        let (_, label, payload, _) =
+            split_occlusion("`取第一` = [第一颗](access(`篮子`, \"1\"))").unwrap();
+        assert_eq!(label, "第一颗");
+        assert_eq!(payload, "access(`篮子`, \"1\")");
+    }
+
+    #[test]
+    fn ignores_index_and_plain_lines() {
+        // Link-index (classic) and ordinary statements are not occlusions.
+        assert!(split_occlusion("**v = [键](`表`)**").is_some()); // shape matches; parser decides meaning
+        assert!(split_occlusion("**甲 = 加(1 2)**").is_none());
+        assert!(split_occlusion("> print text=x").is_none());
     }
 }

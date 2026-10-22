@@ -292,6 +292,14 @@ fn label_error(label: &str, e: anyhow::Error) -> anyhow::Error {
 /// Looks for `markup: occlusion` (or `标记: 遮蔽`) inside the leading frontmatter
 /// block. Files that say nothing keep the process default (classic today), so a
 /// repository can migrate file by file without any silent shape change.
+/// Parse a standalone source the way the file itself declares (`markup:` in
+/// frontmatter). The viewer must use this — otherwise an occluded document is
+/// re-parsed in classic mode and fails. `<TAB>` M7/M8
+pub fn parse_source_auto(source: &str) -> anyhow::Result<Module> {
+    let markup = frontmatter_markup(source);
+    crate::parse::expr::with_markup(markup, || crate::parse::parse_source(source))
+}
+
 fn frontmatter_markup(source: &str) -> crate::parse::expr::Markup {
     use crate::parse::expr::Markup;
     let mut lines = source.lines();

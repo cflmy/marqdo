@@ -412,6 +412,49 @@ li.doc-list-meta {
 .doc-prose > :first-child { margin-top: 0; }
 .doc-prose > :last-child { margin-bottom: 0; }
 .doc-line { margin: 0.15rem 0; }
+/* `<TAB>` M8: occlusion statement — description reads as prose, payload as code.
+   Stubs (empty payload) get a badge so "未接通" is visible at a glance. */
+.doc-occl {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0.3rem 0;
+}
+.occl-pre {
+  font-family: var(--mono);
+  font-size: 0.86em;
+  color: var(--muted);
+}
+.occl-label {
+  color: var(--ink);
+}
+.occl-code {
+  font-family: var(--mono);
+  font-size: 0.84em;
+  color: var(--ink);
+  background: var(--fill);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 0.02rem 0.38rem;
+}
+.occl-card {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+.occl-card .occl-label { font-weight: 500; }
+.occl-card .occl-code { font-size: 0.9em; }
+.occl-stub {
+  font-size: 0.72em;
+  line-height: 1.5;
+  padding: 0.02rem 0.42rem;
+  border-radius: 999px;
+  background: rgba(255, 159, 10, 0.18);
+  color: #9a5b00;
+  border: 1px solid rgba(255, 159, 10, 0.35);
+}
 .doc-prose-line { white-space: pre-wrap; }
 .doc-stmt, .doc-call, .doc-cond {
   font-family: var(--mono);
