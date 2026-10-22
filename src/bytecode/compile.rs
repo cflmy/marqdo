@@ -825,6 +825,12 @@ impl<'a> FnCompiler<'a> {
 
     fn compile_expr(&mut self, expr: &Expr) -> Result<()> {
         match expr {
+            // `<TAB>` M2: occlusion is transparent for execution — only the
+            // payload runs; the label is diagnosed/rendered, never evaluated.
+            Expr::Occluded { payload, .. } => match payload {
+                Some(inner) => self.compile_expr(inner)?,
+                None => self.emit(Op::None_),
+            },
             Expr::Literal(lit) => match lit {
                 Literal::None => self.emit(Op::None_),
                 Literal::Bool(true) => self.emit(Op::True),

@@ -132,6 +132,11 @@ fn collect_input_prompts_stmt(stmt: &Stmt, out: &mut Vec<String>) {
 
 fn collect_input_prompts_expr(expr: &Expr, out: &mut Vec<String>) {
     match expr {
+        Expr::Occluded { payload, .. } => {
+            if let Some(inner) = payload {
+                collect_input_prompts_expr(inner, out);
+            }
+        }
         Expr::Call(call) => {
             push_input_prompt(call, out);
             for a in &call.args {
@@ -1445,6 +1450,11 @@ pub fn expr_display(expr: &Expr) -> String {
 
 fn expr_prec(expr: &Expr, parent_prec: u8) -> String {
     match expr {
+        // `<TAB>` M2: show the occlusion surface (label + payload).
+        Expr::Occluded { label, payload } => match payload {
+            Some(inner) => format!("[{}]({})", label, expr_prec(inner, 0)),
+            None => format!("[{}]()", label),
+        },
         Expr::Literal(lit) => lit_display(lit),
         Expr::Var(name) => format!("`{name}`"),
         Expr::Interp(parts) => {

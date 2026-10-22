@@ -211,6 +211,14 @@ pub enum Expr {
     Formula(FormulaExpr),
     /// Bound ```lang … ``` fence (`code` value).
     Code(CodeBlock),
+    /// `[描述](实现)` — **occlusion**: `label` is inert prose (never executed,
+    /// only scanned for keywords and checked for staleness), `payload` is the
+    /// only thing that runs. `payload: None` means the empty-payload stub
+    /// (`[某某功能开发中]()`), which evaluates to `None`. `<TAB>` M2
+    Occluded {
+        label: String,
+        payload: Option<Box<Expr>>,
+    },
 }
 
 #[derive(Debug, Clone)]

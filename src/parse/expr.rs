@@ -8,6 +8,38 @@ pub fn parse_expr(input: &str) -> Result<Expr> {
     parse_expr_mode(input, false)
 }
 
+/// Markup mode for `[描述](实现)` vs the legacy `[键](集合)` index. `<TAB>` M2
+///
+/// `Classic` keeps today's index semantics; `Occlusion` reads the same shape as
+/// an occlusion. The default is `Classic` until M7 migrates the corpus and flips
+/// the gate (otherwise every legacy index would silently change meaning).
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
+pub enum Markup {
+    #[default]
+    Classic,
+    Occlusion,
+}
+
+static MARKUP: std::sync::atomic::AtomicU8 = std::sync::atomic::AtomicU8::new(0);
+
+/// Set the process-wide default markup mode (CLI / tests).
+pub fn set_markup_default(m: Markup) {
+    MARKUP.store(
+        match m {
+            Markup::Classic => 0,
+            Markup::Occlusion => 1,
+        },
+        std::sync::atomic::Ordering::Relaxed,
+    );
+}
+
+pub fn markup_default() -> Markup {
+    match MARKUP.load(std::sync::atomic::Ordering::Relaxed) {
+        1 => Markup::Occlusion,
+        _ => Markup::Classic,
+    }
+}
+
 /// Italic / bold value syntax: bare words are variables; text needs `"…"` / `'…'`.
 pub fn parse_expr_prefer_var(input: &str) -> Result<Expr> {
     parse_expr_mode(input, true)
@@ -15,6 +47,17 @@ pub fn parse_expr_prefer_var(input: &str) -> Result<Expr> {
 
 fn parse_expr_mode(input: &str, prefer_var: bool) -> Result<Expr> {
     parse_expr_opts(input, prefer_var, true)
+}
+
+/// Parse a full expression under an explicit markup mode (tests / migration).
+pub fn parse_expr_markup(input: &str, prefer_var: bool, markup: Markup) -> Result<Expr> {
+    let mut p = Parser::new(input.trim(), prefer_var, true).with_markup(markup);
+    let e = p.parse_or()?;
+    p.skip_ws();
+    if !p.rest().is_empty() {
+        bail!("trailing input in expression: {:?}", p.rest());
+    }
+    Ok(e)
 }
 
 /// Parse a full expression; `allow_paren_call` controls `name(args)` postfix calls.
@@ -232,6 +275,8 @@ struct Parser<'a> {
     i: usize,
     /// When true (italic/bold), bare words are variables, not text literals.
     prefer_var: bool,
+    /// `<TAB>` M2: how to read `[…] (...)`.
+    markup: Markup,
     /// `<TAB>` M1: allow `name(args)` postfix calls inside this expression.
     /// Classic (space-separated) call *values* stay text-like, so they turn
     /// this off to keep `source=print(2+2)` as text.
@@ -244,8 +289,14 @@ impl<'a> Parser<'a> {
             src,
             i: 0,
             prefer_var,
+            markup: markup_default(),
             allow_paren_call,
         }
+    }
+
+    fn with_markup(mut self, markup: Markup) -> Self {
+        self.markup = markup;
+        self
     }
 
     fn rest(&self) -> &str {
@@ -466,6 +517,9 @@ impl<'a> Parser<'a> {
         // Link-shaped index `[key](collection)` vs bracket-marked call `[callee] …`
         // vs JSON-ish `[…]` (arg text fallback when expr parse fails).
         if self.starts_with("[") && !self.starts_with("[^") {
+            if self.markup == Markup::Occlusion {
+                return self.parse_occluded();
+            }
             if link_index_shape_ahead(self.rest()) {
                 return self.parse_link_index();
             }
@@ -620,6 +674,63 @@ impl<'a> Parser<'a> {
             return Ok(Expr::Literal(Literal::Text(word)));
         }
         bail!("unexpected expression input: {:?}", self.rest());
+    }
+
+    /// `[描述](实现)` — occlusion. `<TAB>` M2
+    ///
+    /// - label: raw prose up to `]` (`\]` escapes a literal bracket)
+    /// - payload: expression, or empty → `None` (empty-payload stub)
+    fn parse_occluded(&mut self) -> Result<Expr> {
+        if !self.eat("[") {
+            bail!("expected '[' for occlusion");
+        }
+        let mut label = String::new();
+        loop {
+            let Some(c) = self.peek_char() else {
+                bail!("unterminated occlusion label `[…]`");
+            };
+            match c {
+                ']' => {
+                    self.bump_char();
+                    break;
+                }
+                '\\' => {
+                    self.bump_char();
+                    match self.peek_char() {
+                        Some(n) => {
+                            label.push(n);
+                            self.bump_char();
+                        }
+                        None => bail!("unterminated escape in occlusion label"),
+                    }
+                }
+                '\n' | '\r' => bail!("unterminated occlusion label `[…]`"),
+                _ => {
+                    label.push(c);
+                    self.bump_char();
+                }
+            }
+        }
+        self.skip_ws();
+        if !self.eat("(") {
+            bail!("occlusion `[描述]` must be followed by `(实现)`");
+        }
+        self.skip_ws();
+        if self.eat(")") {
+            return Ok(Expr::Occluded {
+                label: label.trim().to_string(),
+                payload: None,
+            });
+        }
+        let inner = self.parse_or()?;
+        self.skip_ws();
+        if !self.eat(")") {
+            bail!("expected ')' to close occlusion payload");
+        }
+        Ok(Expr::Occluded {
+            label: label.trim().to_string(),
+            payload: Some(Box::new(inner)),
+        })
     }
 
     /// `` `xs`[^1] `` / `m[^key]` / chained `m[^k][^1]` (base already parsed).
@@ -1949,6 +2060,73 @@ mod bracket_call_tests {
     fn bracketed_call_still_works() {
         let (c, _) = parse_call_tail("[加一 号] 31", false).unwrap();
         assert_eq!(c.callee, "加一 号");
+    }
+
+    // ---- M2: 遮蔽语法 `[描述](实现)` ----
+
+    fn occl(e: Expr) -> (String, Option<Expr>) {
+        match e {
+            Expr::Occluded { label, payload } => (label, payload.map(|b| *b)),
+            other => panic!("expected Occluded, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn occlusion_basic_value_passthrough() {
+        let e = parse_expr_markup("[加一之后的值](加(1))", false, Markup::Occlusion).unwrap();
+        let (label, payload) = occl(e);
+        assert_eq!(label, "加一之后的值");
+        assert!(matches!(payload, Some(Expr::Call(_))));
+    }
+
+    #[test]
+    fn occlusion_empty_payload_is_none() {
+        let e = parse_expr_markup("[某某功能开发中]()", false, Markup::Occlusion).unwrap();
+        let (label, payload) = occl(e);
+        assert_eq!(label, "某某功能开发中");
+        assert!(payload.is_none());
+    }
+
+    #[test]
+    fn occlusion_label_allows_spaces_and_punctuation() {
+        let e = parse_expr_markup(
+            "[按 `税率` 与档位计算，注意四舍五入](1 + 2)",
+            true,
+            Markup::Occlusion,
+        )
+        .unwrap();
+        let (label, payload) = occl(e);
+        assert!(label.contains("税率"));
+        assert!(payload.is_some());
+    }
+
+    #[test]
+    fn occlusion_label_escaped_bracket() {
+        let e = parse_expr_markup("[数组 a\\]b 的长度](1)", false, Markup::Occlusion).unwrap();
+        let (label, _) = occl(e);
+        assert_eq!(label, "数组 a]b 的长度");
+    }
+
+    #[test]
+    fn occlusion_nested() {
+        let e = parse_expr_markup("[外层]([内层](1))", false, Markup::Occlusion).unwrap();
+        let (label, payload) = occl(e);
+        assert_eq!(label, "外层");
+        let (inner_label, inner_payload) = occl(payload.unwrap());
+        assert_eq!(inner_label, "内层");
+        assert!(matches!(inner_payload, Some(Expr::Literal(Literal::Int(1)))));
+    }
+
+    #[test]
+    fn occlusion_classic_mode_keeps_index() {
+        let e = parse_expr_markup("[键](表)", false, Markup::Classic).unwrap();
+        assert!(matches!(e, Expr::Index { .. }), "classic must stay an index");
+    }
+
+    #[test]
+    fn occlusion_requires_paren() {
+        let err = parse_expr_markup("[只有描述]", false, Markup::Occlusion).unwrap_err();
+        assert!(err.to_string().contains("followed by"), "{err}");
     }
 
     #[test]

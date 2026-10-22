@@ -388,7 +388,20 @@ enum ViewAction {
     },
 }
 
+/// `<TAB>` M2: `MARQDO_MARKUP=occlusion` enables `[描述](实现)` (purity mode).
+/// Default stays `classic` so legacy `[键](集合)` keeps its meaning until M7.
+fn init_markup_from_env() {
+    if let Ok(v) = std::env::var("MARQDO_MARKUP") {
+        let m = match v.trim().to_ascii_lowercase().as_str() {
+            "occlusion" | "purity" | "1" | "on" | "true" => marqdo::parse::expr::Markup::Occlusion,
+            _ => marqdo::parse::expr::Markup::Classic,
+        };
+        marqdo::parse::expr::set_markup_default(m);
+    }
+}
+
 fn main() -> ExitCode {
+    init_markup_from_env();
     let cli = Cli::parse();
     let json_errors = matches!(
         &cli.command,

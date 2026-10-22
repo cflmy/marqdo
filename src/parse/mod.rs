@@ -1,6 +1,6 @@
 //! Line-oriented recursive descent → AST (no Bison).
 
-mod expr;
+pub mod expr;
 mod prose;
 
 pub use expr::{
@@ -2091,6 +2091,11 @@ fn collect_reads_call(call: &crate::ast::CallExpr, reads: &mut std::collections:
 
 fn collect_reads_expr(expr: &Expr, reads: &mut std::collections::HashSet<String>) {
     match expr {
+        Expr::Occluded { payload, .. } => {
+            if let Some(inner) = payload {
+                collect_reads_expr(inner, reads);
+            }
+        }
         Expr::Var(n) => {
             reads.insert(n.clone());
         }

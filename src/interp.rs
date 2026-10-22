@@ -1113,6 +1113,11 @@ impl Interpreter {
             }
             Expr::Formula(e) => Ok(Value::Formula(e.clone())),
             Expr::Code(c) => Ok(Value::Code(c.clone())),
+            // `<TAB>` M2: the label is inert prose; only the payload evaluates.
+            Expr::Occluded { payload, .. } => match payload {
+                Some(inner) => self.eval_expr(module, fun, env, inner),
+                None => Ok(Value::None),
+            },
         }
     }
 
@@ -1652,6 +1657,11 @@ fn bind_args(
 
 fn collect_decl_reads(expr: &Expr, out: &mut std::collections::HashSet<String>) {
     match expr {
+        Expr::Occluded { payload, .. } => {
+            if let Some(inner) = payload {
+                collect_decl_reads(inner, out);
+            }
+        }
         Expr::Var(name) => {
             out.insert(name.clone());
         }
