@@ -97,6 +97,32 @@ enum Commands {
         #[arg(long)]
         json: bool,
     },
+    /// Occlusion label queries: pending stubs (built-in words) or keyword search
+    Labels {
+        /// File or directory (recursively scans `*.mq.md`)
+        #[arg(value_name = "PATH", default_value = ".")]
+        path: PathBuf,
+
+        /// Keywords (comma separated). Replaces the built-in pending set.
+        #[arg(long, value_name = "WORDS")]
+        grep: Option<String>,
+
+        /// Union with the built-in groups instead of replacing them
+        #[arg(long)]
+        also_builtin: bool,
+
+        /// Built-in group names, comma separated (default: pending = 未完成,假数据)
+        #[arg(long, value_name = "GROUPS")]
+        group: Option<String>,
+
+        /// One JSON array on stdout
+        #[arg(long)]
+        json: bool,
+
+        /// Print only the hit count
+        #[arg(long)]
+        count: bool,
+    },
     /// MLSP for AI: line-delimited JSON on stdio (locate / syntax / validate / repair_targets / schema)
     Mlsp,
     /// Browse `.mq.md` structure + execution (live server or static output)
@@ -426,6 +452,32 @@ fn main() -> ExitCode {
     }
 }
 
+/// Recursively collect `*.mq.md` under `path` (file → itself).
+fn collect_mq_files(path: &std::path::Path) -> Result<Vec<std::path::PathBuf>> {
+    fn walk(dir: &std::path::Path, out: &mut Vec<std::path::PathBuf>) {
+        let Ok(rd) = std::fs::read_dir(dir) else { return };
+        for e in rd.flatten() {
+            let p = e.path();
+            let name = p.file_name().and_then(|n| n.to_str()).unwrap_or("");
+            if p.is_dir() {
+                if matches!(name, "target" | "dist" | "node_modules" | ".git" | ".marqdo") {
+                    continue;
+                }
+                walk(&p, out);
+            } else if name.ends_with(".mq.md") {
+                out.push(p);
+            }
+        }
+    }
+    if path.is_file() {
+        return Ok(vec![path.to_path_buf()]);
+    }
+    let mut out = Vec::new();
+    walk(path, &mut out);
+    out.sort();
+    Ok(out)
+}
+
 fn try_main(cli: Cli) -> Result<i32> {
     match cli.command {
         Commands::Run {
@@ -506,6 +558,81 @@ fn try_main(cli: Cli) -> Result<i32> {
                 }
             }
             Ok(errors.min(1))
+        }
+        Commands::Labels {
+            path,
+            grep,
+            also_builtin,
+            group,
+            json,
+            count,
+        } => {
+            let mut words: Vec<String> = match &grep {
+                Some(spec) => marqdo::label::parse_words(spec),
+                None => {
+                    let groups: Vec<&str> = match &group {
+                        Some(g) => g.split(',').map(|s| s.trim()).filter(|s| !s.is_empty()).collect(),
+                        None => marqdo::label::PENDING_GROUPS.to_vec(),
+                    };
+                    marqdo::label::group_words(&groups)
+                }
+            };
+            if also_builtin {
+                let groups: Vec<&str> = match &group {
+                    Some(g) => g.split(',').map(|s| s.trim()).filter(|s| !s.is_empty()).collect(),
+                    None => marqdo::label::PENDING_GROUPS.to_vec(),
+                };
+                for w in marqdo::label::group_words(&groups) {
+                    if !words.contains(&w) {
+                        words.push(w);
+                    }
+                }
+            }
+
+            let files = collect_mq_files(&path)?;
+            let mut rows: Vec<(String, u32, String, String, Vec<String>, bool)> = Vec::new();
+            for f in &files {
+                let module = match marqdo::load::load_module(f) {
+                    Ok(m) => m,
+                    Err(_) => continue, // unparsable files are `check`'s problem, not ours
+                };
+                for hit in marqdo::label::search(&module, &words) {
+                    rows.push((
+                        f.display().to_string(),
+                        hit.site.line,
+                        hit.site.unit.clone(),
+                        hit.site.label.clone(),
+                        hit.words.clone(),
+                        hit.site.has_payload,
+                    ));
+                }
+            }
+
+            if json {
+                let arr: Vec<serde_json::Value> = rows
+                    .iter()
+                    .map(|(file, line, unit, label, words, has_payload)| {
+                        serde_json::json!({
+                            "file": file, "line": line, "unit": unit,
+                            "label": label, "words": words, "has_payload": has_payload,
+                        })
+                    })
+                    .collect();
+                println!("{}", serde_json::Value::Array(arr));
+            } else if count {
+                println!("{}", rows.len());
+            } else {
+                for (file, line, unit, label, words, _) in &rows {
+                    println!("{file}:{line}  [{unit}] {label}  ← {}", words.join(","));
+                }
+                println!(
+                    "label search: {} 命中（{} 文件，词={:?}）",
+                    rows.len(),
+                    files.len(),
+                    words
+                );
+            }
+            Ok(0)
         }
         Commands::Mlsp => {
             use std::io::{BufRead, Write};

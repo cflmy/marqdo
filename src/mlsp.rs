@@ -57,6 +57,8 @@ fn dispatch(req: &Value) -> Result<Value, Value> {
         Some("repair_targets") => repair_targets(&params),
         Some("repair_apply") => repair_apply(&params),
         Some("schema") => schema(&params),
+        // `<TAB>` M9: occlusion label search (two-tier vocabulary).
+        Some("labels.search") => labels_search(&params),
         other => Err(err(
             "mlsp.unknown_method",
             format!("未知方法 {other:?}；可用：locate / syntax / validate / repair_targets / repair_apply / schema"),
@@ -330,6 +332,51 @@ fn schema(params: &Value) -> Result<Value, Value> {
 }
 
 // ---------- 公共小工具 ----------
+
+/// `labels.search` — occlusion label query. `<TAB>` M9
+///
+/// params: `{ source | path, grep?: [..] | "a,b", also_builtin?: bool,
+///           group?: "未完成,假数据" }`
+fn labels_search(params: &Value) -> Result<Value, Value> {
+    let (module, _path) = module_from_params(params)?;
+    let mut words: Vec<String> = match params.get("grep") {
+        Some(Value::String(s)) => crate::label::parse_words(s),
+        Some(Value::Array(a)) => a
+            .iter()
+            .filter_map(|v| v.as_str())
+            .map(|s| s.to_string())
+            .collect(),
+        _ => Vec::new(),
+    };
+    let groups: Vec<String> = match params.get("group").and_then(|g| g.as_str()) {
+        Some(spec) => crate::label::parse_words(spec),
+        None => crate::label::PENDING_GROUPS
+            .iter()
+            .map(|s| s.to_string())
+            .collect(),
+    };
+    let group_refs: Vec<&str> = groups.iter().map(|s| s.as_str()).collect();
+    if words.is_empty() || params.get("also_builtin").and_then(|b| b.as_bool()) == Some(true) {
+        for w in crate::label::group_words(&group_refs) {
+            if !words.contains(&w) {
+                words.push(w);
+            }
+        }
+    }
+    let hits: Vec<Value> = crate::label::search(&module, &words)
+        .into_iter()
+        .map(|h| {
+            json!({
+                "line": h.site.line,
+                "unit": h.site.unit,
+                "label": h.site.label,
+                "words": h.words,
+                "has_payload": h.site.has_payload,
+            })
+        })
+        .collect();
+    Ok(json!({"ok": true, "words": words, "count": hits.len(), "hits": hits}))
+}
 
 fn module_from_params(params: &Value) -> Result<(Module, Option<PathBuf>), Value> {
     if let Some(src) = params.get("source").and_then(|s| s.as_str()) {

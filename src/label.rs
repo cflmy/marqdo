@@ -336,3 +336,104 @@ mod tests {
         assert!(refs("空 `` 引号").is_empty());
     }
 }
+
+// ---------------------------------------------------------------------------
+// M9: 两级词表检索（built-in groups = 默认/范例；`--grep` = 调用方自定义）
+// ---------------------------------------------------------------------------
+
+/// One built-in keyword group. `<TAB>` M9
+///
+/// The table is **data**, not syntax: it seeds the default query
+/// (`marqdo labels pending`) and gives LLMs a stable vocabulary; any project can
+/// override or extend it at the call site with `--grep`.
+pub struct WordGroup {
+    pub name: &'static str,
+    pub words: &'static [&'static str],
+}
+
+/// Built-in groups (v1). Extending this table never changes the grammar.
+pub const BUILTIN_GROUPS: &[WordGroup] = &[
+    WordGroup {
+        name: "未完成",
+        words: &[
+            "待开发", "未开发", "开发中", "未实现", "待实现", "未接", "接口未接", "TODO",
+        ],
+    },
+    WordGroup {
+        name: "假数据",
+        words: &["模拟", "假数据", "桩", "占位", "stub", "mock"],
+    },
+    WordGroup {
+        name: "示例",
+        words: &["示例", "样例", "demo"],
+    },
+    WordGroup {
+        name: "实验",
+        words: &["实验", "试验", "experimental"],
+    },
+    WordGroup {
+        name: "废弃",
+        words: &["废弃", "弃用", "deprecated"],
+    },
+    WordGroup {
+        name: "待校验",
+        words: &["待校验", "未验证", "待确认"],
+    },
+];
+
+/// Groups that count as "pending" (default query for `labels pending`).
+pub const PENDING_GROUPS: &[&str] = &["未完成", "假数据"];
+
+/// Expand group names into their words; unknown names are ignored.
+pub fn group_words(names: &[&str]) -> Vec<String> {
+    let mut out = Vec::new();
+    for g in BUILTIN_GROUPS {
+        if names.iter().any(|n| *n == g.name) {
+            out.extend(g.words.iter().map(|w| w.to_string()));
+        }
+    }
+    out
+}
+
+/// Split a `--grep` value (`a,b` / `a，b`) into words.
+pub fn parse_words(spec: &str) -> Vec<String> {
+    spec.split([',', '，'])
+        .map(|w| w.trim())
+        .filter(|w| !w.is_empty())
+        .map(|w| w.to_string())
+        .collect()
+}
+
+/// Words that hit `label` (substring, ASCII case-insensitive). `<TAB>` M9
+pub fn matched_words(label: &str, words: &[String]) -> Vec<String> {
+    let hay = label.to_lowercase();
+    let mut out = Vec::new();
+    for w in words {
+        if w.is_empty() {
+            continue;
+        }
+        if hay.contains(&w.to_lowercase()) {
+            out.push(w.clone());
+        }
+    }
+    out
+}
+
+/// One search hit: where, what the label says, which words matched.
+#[derive(Debug, Clone)]
+pub struct Hit {
+    pub site: OcclusionSite,
+    pub words: Vec<String>,
+}
+
+/// Search every occlusion whose label matches any of `words`.
+pub fn search(module: &Module, words: &[String]) -> Vec<Hit> {
+    let mut out = Vec::new();
+    for site in collect(module) {
+        let words = matched_words(&site.label, words);
+        if !words.is_empty() {
+            out.push(Hit { site, words });
+        }
+    }
+    out
+}

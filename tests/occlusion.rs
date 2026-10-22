@@ -99,3 +99,72 @@ fn label_refs_that_resolve_are_fine() {
     assert_eq!(code, 0, "text={text}");
     assert!(!text.contains("不存在的实体"), "text={text}");
 }
+
+// ---- M9: two-tier label search (`labels` CLI + MLSP `labels.search`) ----
+
+fn labels(args: &[&str]) -> (i32, String) {
+    let out = Command::new(env!("CARGO_BIN_EXE_marqdo"))
+        .arg("labels")
+        .args(args)
+        .env("MARQDO_MARKUP", "occlusion")
+        .output()
+        .expect("run marqdo labels");
+    (
+        out.status.code().unwrap_or(1),
+        format!(
+            "{}{}",
+            String::from_utf8_lossy(&out.stdout),
+            String::from_utf8_lossy(&out.stderr)
+        ),
+    )
+}
+
+#[test]
+fn labels_pending_uses_builtin_groups() {
+    let (code, text) = labels(&["tests/occlusion/labels.mq.md", "--count"]);
+    assert_eq!(code, 0, "text={text}");
+    assert_eq!(text.trim(), "2", "expected 待开发 + 模拟: {text}");
+}
+
+#[test]
+fn labels_grep_replaces_builtin() {
+    let (code, text) = labels(&["tests/occlusion/labels.mq.md", "--grep", "联调", "--count"]);
+    assert_eq!(code, 0, "text={text}");
+    assert_eq!(text.trim(), "1", "text={text}");
+}
+
+#[test]
+fn labels_grep_with_builtin_unions() {
+    let (code, text) = labels(&[
+        "tests/occlusion/labels.mq.md",
+        "--grep",
+        "联调",
+        "--also-builtin",
+        "--count",
+    ]);
+    assert_eq!(code, 0, "text={text}");
+    assert_eq!(text.trim(), "3", "text={text}");
+}
+
+#[test]
+fn mlsp_labels_search_returns_hits() {
+    use std::io::Write;
+    let mut child = Command::new(env!("CARGO_BIN_EXE_marqdo"))
+        .arg("mlsp")
+        .env("MARQDO_MARKUP", "occlusion")
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .spawn()
+        .expect("spawn mlsp");
+    let req = r#"{"id":1,"method":"labels.search","params":{"path":"tests/occlusion/labels.mq.md","also_builtin":true}}"#;
+    child
+        .stdin
+        .as_mut()
+        .unwrap()
+        .write_all(format!("{req}\n").as_bytes())
+        .unwrap();
+    let out = child.wait_with_output().unwrap();
+    let text = String::from_utf8_lossy(&out.stdout).into_owned();
+    assert!(text.contains("\"count\":2"), "text={text}");
+    assert!(text.contains("客户留存率"), "text={text}");
+}
