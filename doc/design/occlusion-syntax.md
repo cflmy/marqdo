@@ -7,7 +7,7 @@
 | 决策 | 纯度；标签可省略书写但**编译器报错**；新鲜度校验**不依赖 git**；**会话末做一次性汇总** |
 | 定位 | 本文把 `[]()` 从「若干语法的集合」重新定义为**一种语法、一个目的：遮蔽** |
 | 前置 | [bracket-as-label-evaluation.md](bracket-as-label-evaluation.md) · [label-freshness-and-repair.md](label-freshness-and-repair.md) · [warning-fatigue-control.md](warning-fatigue-control.md) · [staleness-providers.md](staleness-providers.md) · [t1-session-staleness.md](t1-session-staleness.md) |
-| 增补 | [occlusion-tags-and-stubs.md](occlusion-tags-and-stubs.md) — 描述内标签（待开发/模拟/…）与桩语义；**`()` 内部语法定稿见该文 §2** |
+| 增补 | [occlusion-tags-and-stubs.md](occlusion-tags-and-stubs.md) — **描述是自由文本，内置词只做「检索」不做语法**；桩语义；**`()` 内部语法定稿见该文 §2** |
 
 ---
 
@@ -442,7 +442,7 @@ T1 刻意"不重复"，因此需要**闭合**：
 | **M6** | T1 + 会话汇总 | `repair_apply.check_labels` + 汇总 | M2 | 低 |
 | **M7** | 迁移与版本门 | `marqdo migrate labels`、`syntax.legacy_index` | M3 | **高** |
 | **M8** | 呈现与门禁 | `view` 徽章、`labels status/review`、CI | M4–M6 | 低 |
-| **M9** | 标签与桩 | 描述内标签抽取、`marqdo stubs`（清单/棘轮/`--changed`）、MLSP `stubs` | M2 | 低 |
+| **M9** | 标签与桩 | **检索层**：内置词识别、`marqdo stubs`（清单/棘轮/`--changed`/`--uncounted`）、MLSP `stubs` | M2 | 低 |
 
 **顺序建议**：M0 → M1 → M2 → (M2.5 标签/空载荷) → M4 → **M9** → M6 → M5 → M3 → M7 → M8
 
