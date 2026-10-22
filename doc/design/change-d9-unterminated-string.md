@@ -182,3 +182,50 @@ panicked: expected Code (so parser reports the error),
 | `doc/design/parser-diagnostics-d8-d9.md` | 新增（设计依据 + 影响面 + 方案评判） |
 | `doc/design/spaced-function-names-d8.md` | 新增（D8 方案评估，待审阅） |
 | `doc/design/change-d9-unterminated-string.md` | 本文件 |
+
+---
+
+## 8. 附：本机测试环境（2026-10-22 装好）
+
+修复过程中发现本机缺两样东西，导致基线本来就有失败。补环境后全量测试 **554 passed / 0 failed**。
+
+### 8.1 两个非直觉约束
+
+| 约束 | 表现 | 解法 |
+|------|------|------|
+| `$HOME` 不可写 | zig 报 `error: AccessDenied`（全局缓存无处可写） | `ZIG_GLOBAL_CACHE_DIR` / `ZIG_LOCAL_CACHE_DIR` 显式指向工作区 |
+| **`/tmp` 是 noexec tmpfs** | Go 链接报 `running gcc failed: signal: aborted`；zig 链接报 `AccessDenied` | `TMPDIR` 指向可写**且可执行**目录 |
+
+第二条最隐蔽：`/tmp` 挂载为 `rw,nosuid,nodev,noexec`，构建工具会把产物写到那里再执行，
+于是「文件能写、却执行不了」。错误信息完全指向不了这一点。
+
+### 8.2 Go 插件（`libweb.so`）
+
+`gold` 测试里 8 个 `ext_web_*` 失败全因缺 `libweb.so`：
+
+```bash
+source scripts/dev-env.sh          # 提供 go 1.25 + gcc shim(zig) + TMPDIR
+./scripts/build-web-plugin.sh      # 产出 plugins/web/build/libweb.so
+cp plugins/web/build/libweb.so target/release/ target/debug/
+```
+
+Go 的 cgo 要 `gcc`，本机没有，用 zig cc 充当：
+`/workspace/qdagent/.tools/zigcc/bin/gcc`（会过滤 Go 传入的 `-Qunused-arguments`，
+该参数会让 zig 驱动 abort）。
+
+### 8.3 一键复用
+
+新增 `scripts/dev-env.sh`，`source` 后即具备完整工具链：
+
+```
+marqdo dev-env: rust=1.81.0 go=go1.25.0 python=3.12.15 cc=zig-glibc2.36
+```
+
+### 8.4 环境修复前后的测试对比
+
+| 阶段 | lib 测试 | gold 测试 |
+|------|----------|-----------|
+| 无 python3 | 231 / 2 failed | — |
+| 加 python3 | 233 / 0 failed | 276 / 8 failed |
+| 加 go + libweb | — | **284 / 0 failed** |
+| **全量** | | **554 passed / 0 failed** |
