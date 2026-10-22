@@ -961,6 +961,20 @@ impl<'a> Cursor<'a> {
         let trimmed = line.text.trim();
         let rest = trimmed.strip_prefix('-').unwrap().trim();
 
+        // `<TAB>` M3: occlusion loop `- [描述](遍历 集合 为 变量)`
+        if crate::parse::expr::markup_default() == crate::parse::expr::Markup::Occlusion {
+            if let Some((label, coll, item)) = parse_occluded_foreach(rest) {
+                let body = self.parse_indented_body(base_indent)?;
+                return Ok(Stmt::ForEach {
+                    item,
+                    collection: coll,
+                    label: Some(label),
+                    body,
+                    span,
+                });
+            }
+        }
+
         // foreach: [item](collection) or narrative sugar
         if let Some((item, coll)) = parse_foreach_header(rest)
             .or_else(|| parse_foreach_narrative(rest))
@@ -969,6 +983,7 @@ impl<'a> Cursor<'a> {
             return Ok(Stmt::ForEach {
                 item,
                 collection: coll,
+                label: None,
                 body,
                 span,
             });
@@ -1261,6 +1276,34 @@ fn parse_foreach_ident(s: &str) -> Option<String> {
         return None;
     }
     Some(s.to_string())
+}
+
+/// `<TAB>` M3: `[描述](遍历 集合 为 变量)` → `(label, collection, item)`.
+fn parse_occluded_foreach(rest: &str) -> Option<(String, String, String)> {
+    let rest = rest.trim();
+    if !rest.starts_with('[') {
+        return None;
+    }
+    let end = rest.find(']')?;
+    let label = rest[1..end].trim().to_string();
+    let after = rest[end + 1..].trim_start();
+    if !after.starts_with('(') || !after.ends_with(')') {
+        return None;
+    }
+    let inner = after[1..after.len() - 1].trim();
+    let parts: Vec<&str> = inner.split_whitespace().collect();
+    // `遍历 <collection> 为 <item>` (English `for <c> as <i>` accepted too)
+    if parts.len() != 4 {
+        return None;
+    }
+    let head_ok = matches!(parts[0], "遍历" | "for");
+    let mid_ok = matches!(parts[2], "为" | "as" | "in");
+    if !head_ok || !mid_ok {
+        return None;
+    }
+    let coll = parse_foreach_ident(parts[1])?;
+    let item = parse_foreach_ident(parts[3])?;
+    Some((label, coll, item))
 }
 
 fn parse_foreach_header(rest: &str) -> Option<(String, String)> {

@@ -115,6 +115,8 @@ pub enum Stmt {
     ForEach {
         item: String,
         collection: String,
+        /// `<TAB>` M3: occlusion form `- [描述](遍历 集合 为 变量)` carries prose.
+        label: Option<String>,
         body: Vec<Stmt>,
         span: Span,
     },
@@ -368,6 +370,7 @@ fn dump_stmt(out: &mut String, stmt: &Stmt, depth: usize) {
         Stmt::ForEach {
             item,
             collection,
+            label: _,
             body,
             span,
         } => {

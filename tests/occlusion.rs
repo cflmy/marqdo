@@ -277,3 +277,33 @@ fn implicit_labels_opt_in_stays_quiet_when_consistent() {
     let text = String::from_utf8_lossy(&out.stdout).into_owned();
     assert!(!text.contains("调用上方的描述"), "{text}");
 }
+
+// ---- M3: `access` (legacy index semantics) + occlusion loop ----
+
+#[test]
+fn access_matches_legacy_index_semantics() {
+    let (code, stdout, stderr) = run("tests/occlusion/access-and-loop.mq.md", Some("occlusion"));
+    assert_eq!(code, 0, "stderr={stderr}");
+    assert_eq!(stdout.trim_end(), "a=值\nb=二\n果子=一\n果子=二");
+}
+
+#[test]
+fn access_errors_on_missing_key_like_legacy() {
+    // Same failure mode as `[键](集合)`: no silent None.
+    let dir = std::env::temp_dir().join("marqdo-m3-access");
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("missing.mq.md");
+    std::fs::write(
+        &path,
+        "---\nimport json:lib/json.mq.md\n---\n\n# main\n\n`表` = > json.parse text={\"键\":\"值\"}\n**x = [取不存在的键](access(`表`, \"无\"))**\n> print text=`x`\n",
+    )
+    .unwrap();
+    let out = Command::new(env!("CARGO_BIN_EXE_marqdo"))
+        .args(["run", path.to_str().unwrap()])
+        .env("MARQDO_MARKUP", "occlusion")
+        .output()
+        .expect("run");
+    assert_ne!(out.status.code(), Some(0));
+    let err = String::from_utf8_lossy(&out.stderr);
+    assert!(err.contains("missing map key"), "err={err}");
+}

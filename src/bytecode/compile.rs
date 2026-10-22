@@ -419,6 +419,7 @@ impl<'a> FnCompiler<'a> {
             Stmt::ForEach {
                 item,
                 collection,
+                label: _,
                 body,
                 span,
             } => {
