@@ -13,8 +13,8 @@
 | 部分 | 行数 | 说明 |
 |------|------|------|
 | `src/` | **53,072** | 其中 **5,220** 是内联测试（`#[cfg(test)]`） |
-| `plugins/` + `crates/` | **15,423** | 5 个 ABI 插件 + wasm crate |
-| 合计 Rust | **68,495** | |
+| `plugins/` + `crates/` | **14,700** | 5 个 ABI 插件（含共享 SDK）+ wasm crate |
+| 合计 Rust | **67,786** | |
 
 最大的 10 个文件：
 
@@ -77,7 +77,7 @@
 
 | 项 | 可删 | 风险 | 说明 |
 |----|------|------|------|
-| 插件 ABI 前言共享 crate | ~450–550 | 中 | 5 个插件各抄一份 `MarqdoHostApi` + statics + `host_strdup/set_out/set_err/host_query_json`（每插件约 140 行，约 60% 相同）；需同步 rebuild `.so` 并跑 gold |
+| ~~插件 ABI 前言共享 crate~~ | ~~~450–550~~ **已完成** | — | 见 [change-plugin-sdk.md](change-plugin-sdk.md)：`crates/marqdo-plugin-sdk`，净减 674 行，注册项 0 差异 |
 | `view/html.rs` notebook 皮肤重复声明基础 CSS 规则 | ~250 | 中 | 纯视觉，无测试覆盖，需人工比对浏览器效果 |
 | `debug_page.rs` 复刻 shell 布局（`layout_debug` / `debug_css`） | ~120 | 中 | 与大页面共用 head/topbar/nav，只是配色不同 |
 | HostFn 五张表合一（enum/from_u16/from_name/name/params） | ~450 | 中 | 现已有一致性测试守护漂移，收益主要是行数 |
