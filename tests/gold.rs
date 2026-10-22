@@ -763,6 +763,18 @@ fn error_syntax_bad_line() {
     );
 }
 
+/// 回归（qdagent labels 全仓扫描期间实测）：孤立的 `*` 行曾令解析器 panic
+/// （`begin <= end (1 <= 0)`，exit 101，整条 labels 扫描被一个文件打死）。
+/// 修复后必须是干净的 `unrecognized statement` 诊断，而不是进程崩溃。
+#[test]
+fn error_lone_asterisk_line() {
+    assert_err(
+        "tests/errors/lone-asterisk.mq.md",
+        "9:1",
+        "unrecognized statement",
+    );
+}
+
 
 #[test]
 fn error_div_zero() {

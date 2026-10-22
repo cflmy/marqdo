@@ -444,8 +444,12 @@ impl<'a> Cursor<'a> {
             );
         }
 
-        // v0.3: *…* = return
-        if trimmed.starts_with('*') && trimmed.ends_with('*') && !trimmed.starts_with("**") {
+        // v0.3: *…* = return. A lone `*` (markdown emphasis leftover) must NOT
+        // enter this branch: it both starts and ends with `*`, and the slice
+        // below would panic (`[1..0]`). Require a real opener+closer pair; a
+        // bare `*` falls through to the ordinary statement error / narration
+        // handling instead of crashing the whole process.
+        if trimmed.starts_with('*') && trimmed.ends_with('*') && trimmed.len() >= 2 && !trimmed.starts_with("**") {
             let inner = &trimmed[1..trimmed.len() - 1];
             return stmt_from_italic_return(inner, span);
         }
