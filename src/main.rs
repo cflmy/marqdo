@@ -46,7 +46,7 @@ enum MigrateAction {
     /// `[键](集合)` → `access(集合, 键)`；`- [项](集合)` → `- [项](遍历 集合 为 项)`
     Labels {
         #[arg(value_name = "PATH", default_value = ".")]
-        path: PathBuf,
+        paths: Vec<PathBuf>,
         /// Actually rewrite files (default: dry run)
         #[arg(long)]
         write: bool,
@@ -738,8 +738,11 @@ fn try_main(cli: Cli) -> Result<i32> {
             Ok(0)
         }
         Commands::Migrate { action } => match action {
-            MigrateAction::Labels { path, write, json } => {
-                let reports = marqdo::migrate::migrate_path(&path, write)?;
+            MigrateAction::Labels { paths, write, json } => {
+                let mut reports = Vec::new();
+                for p in &paths {
+                    reports.extend(marqdo::migrate::migrate_path(p, write)?);
+                }
                 let (mut idx, mut loops, mut applied) = (0usize, 0usize, 0usize);
                 for r in &reports {
                     idx += r.indexes;

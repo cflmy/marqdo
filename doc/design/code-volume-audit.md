@@ -12,9 +12,9 @@
 
 | 部分 | 行数 | 说明 |
 |------|------|------|
-| `src/` | **53,072** | 其中 **5,220** 是内联测试（`#[cfg(test)]`） |
+| `src/` | **52,668** | 其中约 **5,200** 是内联测试（`#[cfg(test)]`） |
 | `plugins/` + `crates/` | **14,700** | 5 个 ABI 插件（含共享 SDK）+ wasm crate |
-| 合计 Rust | **67,786** | |
+| 合计 Rust | **67,368** | |
 
 最大的 10 个文件：
 
@@ -24,7 +24,7 @@
 | 2,691 | `src/parse/mod.rs` | 解析器主体 + 412 行内联测试 |
 | 2,194 | `src/parse/expr.rs` | 表达式解析 + 465 行内联测试 |
 | 2,063 | `src/host/foreign_doc.rs` | 外部语言内核（python/node 文档执行） |
-| 2,052 | `src/host/dispatch.rs` | 202 个宿主函数的五张元数据表 |
+| 1,648 | `src/host/dispatch.rs` | 202 个宿主函数的元数据表（已合一） |
 | 1,968 | `src/host/foreign.rs` | 外部进程/会话管理 |
 | 1,925 | `src/interp.rs` | 树遍历求值器 |
 | 1,913 | `src/view/render.rs` | 渲染 |
@@ -75,13 +75,16 @@
 
 ## 4. 剩余可精简项（已定位，未做）
 
-| 项 | 可删 | 风险 | 说明 |
-|----|------|------|------|
-| ~~插件 ABI 前言共享 crate~~ | ~~~450–550~~ **已完成** | — | 见 [change-plugin-sdk.md](change-plugin-sdk.md)：`crates/marqdo-plugin-sdk`，净减 674 行，注册项 0 差异 |
-| `view/html.rs` notebook 皮肤重复声明基础 CSS 规则 | ~250 | 中 | 纯视觉，无测试覆盖，需人工比对浏览器效果 |
-| `debug_page.rs` 复刻 shell 布局（`layout_debug` / `debug_css`） | ~120 | 中 | 与大页面共用 head/topbar/nav，只是配色不同 |
-| HostFn 五张表合一（enum/from_u16/from_name/name/params） | ~450 | 中 | 现已有一致性测试守护漂移，收益主要是行数 |
-| 内联测试迁到 `tests/` | 0（不减少总量） | 低 | 只让 `src` 变薄，总量不变 |
+| 项 | 结论 |
+|----|------|
+| ~~插件 ABI 前言共享 crate~~ | **已完成**：[change-plugin-sdk.md](change-plugin-sdk.md)，净减 674 行，注册项 0 差异 |
+| ~~HostFn 五表合一~~ | **已完成**：[change-hostfn-table.md](change-hostfn-table.md)，−404 行，203 项逐字节一致 |
+| `view/html.rs` 皮肤"重复声明基础 CSS" | **审计判断不成立**：实测基础样式 312 条规则、notebook 128 条，**选择器零重叠**，无重复可删 |
+| `debug_page.rs` "复刻 shell" | **判断基本不成立**：只在 head/favicon 上有约 10 行相似；它没有 nav/topbar，是独立极简页 |
+| 内联测试迁到 `tests/` | 不减总量，只让 `src` 变薄；不做 |
+
+**结论（修正后）**：可机械消除的重复**已经清完**。剩余体量全是特性实现，
+要再压只能砍功能（例如 `view` 调试面板、`formula` 引擎），不是"找重复"。
 
 **判断**：这些加起来约 1.3k 行（总量的 2%），收益边际递减；其中插件 SDK 最值得做（消除 5 份漂移），
 其余属于"可以但不必"。
