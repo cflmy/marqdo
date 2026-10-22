@@ -5,7 +5,7 @@
 | 状态 | **Proposed · 待决策**（未修改任何代码） |
 | 日期 | 2026-10-22 |
 | 提出 | 用户：「函数本身可以理解为 `` `函数名` = `` + 参数/函数体表；此时和表格取元有极大相似性」 |
-| 相邻 | [link-style-call-evaluation.md](link-style-call-evaluation.md) · [spaced-function-names-d8.md](spaced-function-names-d8.md) |
+| 相邻 | [link-style-call-evaluation.md](link-style-call-evaluation.md) · [spaced-function-names-d8.md](spaced-function-names-d8.md) · [function-as-table-semantics.md](function-as-table-semantics.md)（后续：函数与表格的语义考古，11 组实验） |
 | 影响面 | 值模型 / 调用语义 / 契约 / EKC 指纹 / 字节码 / 序列化 |
 
 ---
