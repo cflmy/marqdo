@@ -142,6 +142,14 @@ enum Commands {
         /// Print only the hit count
         #[arg(long)]
         count: bool,
+
+        /// Debt ledger (JSON) for the ratchet: seed it, then only allow decreases
+        #[arg(long, value_name = "FILE")]
+        baseline: Option<PathBuf>,
+
+        /// Fail (exit 1) when the hit count exceeds the baseline (`<TAB>` M8)
+        #[arg(long)]
+        fail_on_increase: bool,
     },
     /// Migrate legacy syntax to the purity forms (`<TAB>` M7)
     Migrate {
@@ -595,6 +603,8 @@ fn try_main(cli: Cli) -> Result<i32> {
             group,
             json,
             count,
+            baseline,
+            fail_on_increase,
         } => {
             let mut words: Vec<String> = match &grep {
                 Some(spec) => marqdo::label::parse_words(spec),
@@ -660,6 +670,56 @@ fn try_main(cli: Cli) -> Result<i32> {
                     files.len(),
                     words
                 );
+            }
+
+            // `<TAB>` M8: ratchet — debt may shrink, never grow.
+            let current = rows.len();
+            let mut violation = false;
+            if let Some(ledger) = &baseline {
+                let prior = std::fs::read_to_string(ledger)
+                    .ok()
+                    .and_then(|s| serde_json::from_str::<serde_json::Value>(&s).ok())
+                    .and_then(|v| v.get("count").and_then(|c| c.as_u64()))
+                    .map(|n| n as usize);
+                match prior {
+                    None => {
+                        let body = serde_json::json!({"count": current, "words": words});
+                        if let Some(dir) = ledger.parent() {
+                            if !dir.as_os_str().is_empty() {
+                                let _ = std::fs::create_dir_all(dir);
+                            }
+                        }
+                        std::fs::write(ledger, format!("{body}\n"))?;
+                        if !json && !count {
+                            println!("baseline: 已建立 {current}（{}）", ledger.display());
+                        }
+                    }
+                    Some(prior) if current > prior => {
+                        violation = true;
+                        if !count {
+                            println!(
+                                "baseline: {current} > {prior} —— 未完成项增加了 {}（{}）",
+                                current - prior,
+                                ledger.display()
+                            );
+                        }
+                    }
+                    Some(prior) => {
+                        if current < prior || std::fs::read_to_string(ledger).is_err() {
+                            let body = serde_json::json!({"count": current, "words": words});
+                            std::fs::write(ledger, format!("{body}\n"))?;
+                            if !json && !count {
+                                println!(
+                                    "baseline: {prior} → {current}（棘轮收紧，{}）",
+                                    ledger.display()
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+            if violation && fail_on_increase {
+                return Ok(1);
             }
             Ok(0)
         }
