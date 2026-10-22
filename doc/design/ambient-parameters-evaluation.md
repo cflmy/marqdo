@@ -2,11 +2,17 @@
 
 | | |
 |---|---|
-| 状态 | **Proposed · 待决策**（未改代码） |
+| 状态 | **§3 的 L0 方案已被否决**（违反「只执行标记」原则）；L1/L2 结论仍有效 |
 | 日期 | 2026-10-22 |
 | 提出 | 「让函数参数从上下文推断，`对**n=31**执行**加一函数**` 这种写法可能吗」 |
 | 方法 | 运行时实测 8 组 + 全仓库语料扫描（1322 个函数）+ 源码比对 |
-| 相邻 | [paren-call-and-readable-invocation.md](paren-call-and-readable-invocation.md) · [functions-as-values-evaluation.md](functions-as-values-evaluation.md) |
+| 相邻 | [call-syntax-from-marks.md](call-syntax-from-marks.md)（**接替本文 §3 的设计**）· [paren-call-and-readable-invocation.md](paren-call-and-readable-invocation.md) |
+
+> **后续更正**：本文 §3 提出的 L0「叙述式调用」用**未标记的词**（`执行`）触发调用，
+> 这会破坏「叙述默认安全、只有标记才执行」的底层原则，已被否决。
+> 在「只执行标记」约束下重新设计的调用语法见
+> [call-syntax-from-marks.md](call-syntax-from-marks.md)
+> （含树遍历 vs 字节码 3.8× 实测、叙述顺序导致位置绑定翻转的实验）。
 
 ---
 
