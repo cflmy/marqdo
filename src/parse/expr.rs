@@ -19,7 +19,7 @@ fn parse_expr_mode(input: &str, prefer_var: bool) -> Result<Expr> {
 
 /// Parse a full expression; `allow_paren_call` controls `name(args)` postfix calls.
 fn parse_expr_opts(input: &str, prefer_var: bool, allow_paren_call: bool) -> Result<Expr> {
-    let mut p = Parser::new_plain(input.trim(), prefer_var, allow_paren_call);
+    let mut p = Parser::new(input.trim(), prefer_var, allow_paren_call);
     let e = p.parse_or()?;
     p.skip_ws();
     if !p.rest().is_empty() {
@@ -104,10 +104,6 @@ fn parse_call_arg_value_mode(input: &str, prefer_var: bool, allow_call: bool) ->
 /// Like [`parse_call_arg_value`], but for call args inside `*…*` / `**…**`
 /// value-expression segments: a bare word is a **variable** (not a text literal).
 /// Quoted strings, hyphenated prose, and `/path` prose stay text; `` `x` `` still works.
-pub fn parse_call_arg_value_prefer_var(input: &str) -> Result<Expr> {
-    parse_call_arg_value_mode(input, true, false)
-}
-
 fn is_text_only_div_chain(e: &Expr) -> bool {
     match e {
         Expr::Literal(Literal::Text(_)) => true,
@@ -243,16 +239,7 @@ struct Parser<'a> {
 }
 
 impl<'a> Parser<'a> {
-    fn new(src: &'a str, prefer_var: bool) -> Self {
-        Self {
-            src,
-            i: 0,
-            prefer_var,
-            allow_paren_call: true,
-        }
-    }
-
-    fn new_plain(src: &'a str, prefer_var: bool, allow_paren_call: bool) -> Self {
+    fn new(src: &'a str, prefer_var: bool, allow_paren_call: bool) -> Self {
         Self {
             src,
             i: 0,
