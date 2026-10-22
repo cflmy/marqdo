@@ -168,3 +168,69 @@ fn mlsp_labels_search_returns_hits() {
     assert!(text.contains("\"count\":2"), "text={text}");
     assert!(text.contains("客户留存率"), "text={text}");
 }
+
+// ---- M6 (T1): session-scoped staleness via `repair_apply` ----
+
+fn mlsp_session(reqs: &[&str]) -> Vec<String> {
+    use std::io::Write;
+    let mut child = Command::new(env!("CARGO_BIN_EXE_marqdo"))
+        .arg("mlsp")
+        .env("MARQDO_MARKUP", "occlusion")
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .spawn()
+        .expect("spawn mlsp");
+    let payload: String = reqs.iter().map(|r| format!("{r}\n")).collect();
+    child
+        .stdin
+        .as_mut()
+        .unwrap()
+        .write_all(payload.as_bytes())
+        .unwrap();
+    let out = child.wait_with_output().unwrap();
+    String::from_utf8_lossy(&out.stdout)
+        .lines()
+        .map(|s| s.to_string())
+        .collect()
+}
+
+fn repair_req(src: &str, new_line: &str) -> String {
+    let src_json = serde_json::to_string(src).unwrap();
+    let line_json = serde_json::to_string(new_line).unwrap();
+    format!(
+        r#"{{"id":1,"method":"repair_apply","params":{{"source":{src_json},"ranges":[[3,3]],"edits":[{{"op":"replace","line":3,"text":{line_json}}}],"check_labels":true}}}}"#
+    )
+}
+
+#[test]
+fn t1_flags_payload_change_only() {
+    let src = "# main\n\n**a = [按税率算总价](100 * 0.1)**\n> print text=`a`\n";
+    let out = mlsp_session(&[&repair_req(src, "**a = [按税率算总价](100 * 0.2)**")]);
+    let line = out.join("\n");
+    assert!(line.contains("\"stale\""), "{line}");
+    assert!(line.contains("100 * 0.1"), "must show code_past: {line}");
+    assert!(line.contains("100 * 0.2"), "must show code_now: {line}");
+}
+
+#[test]
+fn t1_silent_when_label_also_changes() {
+    let src = "# main\n\n**a = [按税率算总价](100 * 0.1)**\n> print text=`a`\n";
+    let out = mlsp_session(&[&repair_req(
+        src,
+        "**a = [改成按两倍税率算](100 * 0.2)**",
+    )]);
+    let line = out.join("\n");
+    assert!(line.contains("\"stale\":[]"), "label edit = author reviewed: {line}");
+}
+
+#[test]
+fn t1_session_summary_reports_counters() {
+    let src = "# main\n\n**a = [按税率算总价](100 * 0.1)**\n> print text=`a`\n";
+    let out = mlsp_session(&[
+        &repair_req(src, "**a = [按税率算总价](100 * 0.2)**"),
+        r#"{"id":2,"method":"session.summary","params":{}}"#,
+    ]);
+    let summary = out.last().expect("summary line");
+    assert!(summary.contains("\"labels_stale_seen\":1"), "{summary}");
+    assert!(summary.contains("\"labels_outstanding\":1"), "{summary}");
+}

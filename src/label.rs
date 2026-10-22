@@ -22,6 +22,10 @@ pub struct OcclusionSite {
     pub unit: String,
     /// Identifiers the payload actually mentions (for L1 ref checks).
     pub payload_idents: std::collections::HashSet<String>,
+    /// In-process fingerprint of the payload (T1 staleness comparison).
+    pub payload_fp: String,
+    /// Surface rendering of the payload (diagnostics: `code_past` / `code_now`).
+    pub payload_src: String,
 }
 
 /// Collect every occlusion in `module` (declaration order).
@@ -99,6 +103,8 @@ fn walk_expr(expr: &Expr, line: u32, unit: &str, out: &mut Vec<OcclusionSite>) {
                 line,
                 unit: unit.to_string(),
                 payload_idents: idents,
+                payload_fp: payload_fingerprint(payload),
+                payload_src: render_payload(payload),
             });
             if let Some(inner) = payload {
                 walk_expr(inner, line, unit, out);
@@ -436,4 +442,106 @@ pub fn search(module: &Module, words: &[String]) -> Vec<Hit> {
         }
     }
     out
+}
+
+// ---------------------------------------------------------------------------
+// M6 (T1): session-scoped staleness — compare before/after edits in memory.
+// ---------------------------------------------------------------------------
+
+/// One occlusion whose payload changed while its label stayed the same.
+#[derive(Debug, Clone)]
+pub struct StaleItem {
+    pub label: String,
+    /// 1-based line in the **new** source.
+    pub line: u32,
+    /// Rendered payload before the edit.
+    pub code_past: String,
+    /// Rendered payload after the edit.
+    pub code_now: String,
+}
+
+/// In-process fingerprint of a payload. Only used to compare two versions parsed
+/// by the *same* process, so a stable cross-version format is unnecessary.
+fn payload_fingerprint(payload: &Option<Box<Expr>>) -> String {
+    match payload {
+        Some(e) => format!("{e:?}"),
+        None => "<empty>".to_string(),
+    }
+}
+
+fn render_payload(payload: &Option<Box<Expr>>) -> String {
+    match payload {
+        Some(e) => crate::view::expr_display(e),
+        None => String::new(),
+    }
+}
+
+/// Compare two versions of a document and return occlusions whose **payload**
+/// changed but whose **label** did not. Matching is by `(label, occurrence)`, so
+/// moving code around does not produce false positives.
+pub fn compare(before: &Module, after: &Module) -> Vec<StaleItem> {
+    use std::collections::HashMap;
+
+    let before_sites = collect(before);
+    let after_sites = collect(after);
+
+    // Group by label → ordered occurrences.
+    let mut past: HashMap<&str, Vec<&OcclusionSite>> = HashMap::new();
+    for s in &before_sites {
+        past.entry(s.label.as_str()).or_default().push(s);
+    }
+
+    let mut seen: HashMap<&str, usize> = HashMap::new();
+    let mut out = Vec::new();
+    for site in &after_sites {
+        let idx = seen.entry(site.label.as_str()).or_insert(0);
+        let occurrence = *idx;
+        *idx += 1;
+        let Some(old) = past.get(site.label.as_str()).and_then(|v| v.get(occurrence)) else {
+            continue; // brand-new label: no history, nothing to compare
+        };
+        if old.payload_fp == site.payload_fp {
+            continue;
+        }
+        out.push(StaleItem {
+            label: site.label.clone(),
+            line: site.line,
+            code_past: old.payload_src.clone(),
+            code_now: site.payload_src.clone(),
+        });
+    }
+    out
+}
+
+/// Session accumulator for `session.summary` (`<TAB>` M6).
+#[derive(Debug, Default, Clone)]
+pub struct SessionSummary {
+    pub stale_seen: usize,
+    pub fixed: usize,
+    pub items: Vec<String>,
+}
+
+impl SessionSummary {
+    /// Record one round's comparison; returns the number of *newly* seen labels.
+    pub fn record(&mut self, stale: &[StaleItem]) -> usize {
+        let now: Vec<String> = stale.iter().map(|s| s.label.clone()).collect();
+        let mut newly = 0;
+        for label in &now {
+            if !self.items.contains(label) {
+                self.items.push(label.clone());
+                self.stale_seen += 1;
+                newly += 1;
+            }
+        }
+        // Labels that were outstanding and are no longer stale are considered fixed.
+        let still: Vec<String> = self
+            .items
+            .iter()
+            .filter(|l| now.contains(l))
+            .cloned()
+            .collect();
+        self.fixed += self.items.len() - still.len();
+        self.items = still;
+        newly
+    }
 }

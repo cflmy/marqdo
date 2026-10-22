@@ -59,6 +59,8 @@ fn dispatch(req: &Value) -> Result<Value, Value> {
         Some("schema") => schema(&params),
         // `<TAB>` M9: occlusion label search (two-tier vocabulary).
         Some("labels.search") => labels_search(&params),
+        // `<TAB>` M6: one-shot session summary (T1 staleness seen/fixed).
+        Some("session.summary") => session_summary(),
         other => Err(err(
             "mlsp.unknown_method",
             format!("未知方法 {other:?}；可用：locate / syntax / validate / repair_targets / repair_apply / schema"),
@@ -270,6 +272,12 @@ fn repair_apply(params: &Value) -> Result<Value, Value> {
         });
     }
 
+    let check_labels = match params.get("check_labels") {
+        Some(Value::Bool(b)) => *b,
+        Some(Value::String(s)) => s != "off" && s != "false",
+        _ => false,
+    };
+
     match crate::repair::apply_edits(&source, &ranges, &edits) {
         Ok(new_source) => {
             if params.get("write").and_then(|w| w.as_bool()).unwrap_or(false) {
@@ -280,7 +288,36 @@ fn repair_apply(params: &Value) -> Result<Value, Value> {
                 std::fs::write(path, &new_source)
                     .map_err(|e| err("mlsp.io_error", format!("写回 {path} 失败: {e}")))?;
             }
-            Ok(json!({"source": new_source, "edits_applied": edits.len()}))
+            // `<TAB>` M6 (T1): the edit is the perfect moment to ask "did the
+            // description survive?" — before/after are both in hand, no VCS,
+            // no ledger, and the answer is scoped to this very edit.
+            let mut labels = Value::Null;
+            if check_labels {
+                if let (Ok(before), Ok(after)) = (
+                    crate::load::load_module_from_source(&source),
+                    crate::load::load_module_from_source(&new_source),
+                ) {
+                    let stale = crate::label::compare(&before, &after);
+                    let newly = with_session(|s| s.record(&stale));
+                    labels = json!({
+                        "stale": stale
+                            .iter()
+                            .map(|s| json!({
+                                "label": s.label,
+                                "line": s.line,
+                                "code_past": s.code_past,
+                                "code_now": s.code_now,
+                            }))
+                            .collect::<Vec<_>>(),
+                        "newly_seen": newly,
+                    });
+                }
+            }
+            Ok(json!({
+                "source": new_source,
+                "edits_applied": edits.len(),
+                "labels": labels,
+            }))
         }
         Err(oos) => Err(json!({
             "code": "mlsp.repair_out_of_scope",
@@ -332,6 +369,32 @@ fn schema(params: &Value) -> Result<Value, Value> {
 }
 
 // ---------- 公共小工具 ----------
+
+/// Per-process T1 session state (`repair_apply` rounds accumulate here).
+static SESSION: std::sync::Mutex<Option<crate::label::SessionSummary>> =
+    std::sync::Mutex::new(None);
+
+fn with_session<T>(f: impl FnOnce(&mut crate::label::SessionSummary) -> T) -> T {
+    let mut guard = SESSION.lock().unwrap_or_else(|e| e.into_inner());
+    let s = guard.get_or_insert_with(Default::default);
+    f(s)
+}
+
+/// `session.summary` — report (and reset) the T1 counters. `<TAB>` M6
+fn session_summary() -> Result<Value, Value> {
+    let s = with_session(|s| {
+        let snap = s.clone();
+        *s = Default::default();
+        snap
+    });
+    Ok(json!({
+        "ok": true,
+        "labels_stale_seen": s.stale_seen,
+        "labels_fixed": s.fixed,
+        "labels_outstanding": s.items.len(),
+        "items": s.items,
+    }))
+}
 
 /// `labels.search` — occlusion label query. `<TAB>` M9
 ///

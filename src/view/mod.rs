@@ -10,6 +10,9 @@ mod notebook_api;
 mod output;
 mod render;
 
+/// Surface rendering of an expression (labels/diagnostics reuse). `<TAB>` M6
+pub use render::expr_display;
+
 pub use output::{write_capture, write_static, CaptureOptions, OutputOptions};
 
 use std::fs;
