@@ -10,98 +10,8 @@ use std::ptr;
 
 use serde_json::{json, Value};
 
-const ABI_VERSION: u32 = 2;
+use marqdo_plugin_sdk::*;
 
-type PluginFn = unsafe extern "C" fn(
-    args_json: *const c_char,
-    out_json: *mut *mut c_char,
-    err_msg: *mut *mut c_char,
-) -> c_int;
-
-type HostQueryFn = unsafe extern "C" fn(
-    userdata: *mut c_void,
-    name: *const c_char,
-    args_json: *const c_char,
-    out_json: *mut *mut c_char,
-    err_msg: *mut *mut c_char,
-) -> c_int;
-
-#[repr(C)]
-pub struct MarqdoHostApi {
-    pub userdata: *mut c_void,
-    pub register_fn: Option<
-        unsafe extern "C" fn(
-            userdata: *mut c_void,
-            name: *const c_char,
-            params: *const c_char,
-            fn_ptr: PluginFn,
-        ) -> c_int,
-    >,
-    pub alloc: Option<unsafe extern "C" fn(n: usize) -> *mut c_void>,
-    pub free: Option<unsafe extern "C" fn(p: *mut c_void)>,
-    pub host_query: Option<HostQueryFn>,
-}
-
-static mut HOST_FREE: Option<unsafe extern "C" fn(*mut c_void)> = None;
-static mut HOST_ALLOC: Option<unsafe extern "C" fn(usize) -> *mut c_void> = None;
-static mut HOST_QUERY: Option<HostQueryFn> = None;
-static mut HOST_USERDATA: *mut c_void = ptr::null_mut();
-
-unsafe fn host_strdup(s: &str) -> *mut c_char {
-    let alloc = HOST_ALLOC.expect("host alloc");
-    let bytes = s.as_bytes();
-    let p = alloc(bytes.len() + 1) as *mut u8;
-    if p.is_null() {
-        return ptr::null_mut();
-    }
-    std::ptr::copy_nonoverlapping(bytes.as_ptr(), p, bytes.len());
-    *p.add(bytes.len()) = 0;
-    p as *mut c_char
-}
-
-fn set_out(out: *mut *mut c_char, s: &str) {
-    if out.is_null() {
-        return;
-    }
-    unsafe {
-        *out = host_strdup(s);
-    }
-}
-
-fn set_err(err: *mut *mut c_char, s: &str) {
-    if err.is_null() {
-        return;
-    }
-    unsafe {
-        *err = host_strdup(s);
-    }
-}
-
-fn parse_args(args_json: *const c_char) -> Result<Value, String> {
-    if args_json.is_null() {
-        return Ok(json!({}));
-    }
-    let s = unsafe { CStr::from_ptr(args_json) }
-        .to_str()
-        .map_err(|_| "args not utf-8".to_string())?;
-    if s.trim().is_empty() {
-        return Ok(json!({}));
-    }
-    serde_json::from_str(s).map_err(|e| e.to_string())
-}
-
-fn reply(out_json: *mut *mut c_char, err_msg: *mut *mut c_char, r: Result<Value, String>) -> c_int {
-    match r {
-        Ok(v) => {
-            set_out(out_json, &v.to_string());
-            0
-        }
-        Err(e) => {
-            set_err(err_msg, &e);
-            1
-        }
-    }
-}
 
 macro_rules! q_ffi {
     ($name:ident, $body:expr) => {
@@ -880,166 +790,46 @@ fn parse_usize_list(v: &Value) -> Result<Vec<usize>, String> {
     }
 }
 
-fn register(host: &MarqdoHostApi, name: &str, params: &str, fn_ptr: PluginFn) -> c_int {
-    let register = match host.register_fn {
-        Some(f) => f,
-        None => return 1,
-    };
-    let n = CString::new(name).unwrap();
-    let p = CString::new(params).unwrap();
-    unsafe { register(host.userdata, n.as_ptr(), p.as_ptr(), fn_ptr) }
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn marqdo_plugin_abi_version() -> u32 {
-    ABI_VERSION
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn marqdo_plugin_shutdown() {}
-
-#[no_mangle]
-pub unsafe extern "C" fn marqdo_plugin_init(host: *const MarqdoHostApi) -> c_int {
-    if host.is_null() {
-        return 1;
-    }
-    let host = &*host;
-    HOST_ALLOC = host.alloc;
-    HOST_FREE = host.free;
-    HOST_QUERY = host.host_query;
-    HOST_USERDATA = host.userdata;
-    let regs = [
-        ("quantum_ping", "", quantum_ping as PluginFn),
-        (
-            "quantum_circuit_new",
-            "qubits,steps",
-            quantum_circuit_new as PluginFn,
-        ),
-        ("quantum_h", "circuit,qubit", quantum_h as PluginFn),
-        ("quantum_x", "circuit,qubit", quantum_x as PluginFn),
-        ("quantum_y", "circuit,qubit", quantum_y as PluginFn),
-        ("quantum_z", "circuit,qubit", quantum_z as PluginFn),
-        ("quantum_s", "circuit,qubit", quantum_s as PluginFn),
-        ("quantum_t", "circuit,qubit", quantum_t as PluginFn),
-        ("quantum_i", "circuit,qubit", quantum_i as PluginFn),
-        ("quantum_rx", "circuit,qubit,theta", quantum_rx as PluginFn),
-        ("quantum_ry", "circuit,qubit,theta", quantum_ry as PluginFn),
-        ("quantum_rz", "circuit,qubit,theta", quantum_rz as PluginFn),
-        (
-            "quantum_cx",
-            "circuit,control,target",
-            quantum_cx as PluginFn,
-        ),
-        (
-            "quantum_cz",
-            "circuit,control,target",
-            quantum_cz as PluginFn,
-        ),
-        ("quantum_swap", "circuit,a,b", quantum_swap as PluginFn),
-        (
-            "quantum_simulate",
-            "circuit",
-            quantum_simulate as PluginFn,
-        ),
-        (
-            "quantum_probabilities",
-            "circuit",
-            quantum_probabilities as PluginFn,
-        ),
-        ("quantum_run", "circuit,shots,seed", quantum_run as PluginFn),
-        ("quantum_barrier", "circuit", quantum_barrier as PluginFn),
-        (
-            "quantum_measure",
-            "circuit,qubits",
-            quantum_measure as PluginFn,
-        ),
-        ("quantum_append", "circuit,op", quantum_append as PluginFn),
-        ("quantum_noise", "circuit,kind,p", quantum_noise as PluginFn),
-        ("quantum_state", "circuit", quantum_state as PluginFn),
-        (
-            "quantum_draw_circuit",
-            "circuit,path,kind,qubit",
-            quantum_draw_circuit as PluginFn,
-        ),
-        // `matrix` is optional (custom unitary); omit from required bind list.
-        ("quantum_gate_new", "name,theta", quantum_gate_new as PluginFn),
-        (
-            "quantum_gate_from_matrix",
-            "matrix",
-            quantum_gate_from_matrix as PluginFn,
-        ),
-        (
-            "quantum_gate_matrix",
-            "gate",
-            quantum_gate_matrix as PluginFn,
-        ),
-        (
-            "quantum_gate_matches_matrix",
-            "gate,matrix,tol",
-            quantum_gate_matches_matrix as PluginFn,
-        ),
-        (
-            "quantum_gate_draw",
-            "gate,path,kind",
-            quantum_gate_draw as PluginFn,
-        ),
-        (
-            "quantum_apply",
-            "circuit,gate,qubits",
-            quantum_apply as PluginFn,
-        ),
-        (
-            "quantum_density_from_state",
-            "state",
-            quantum_density_from_state as PluginFn,
-        ),
-        (
-            "quantum_density_from_matrix",
-            "matrix",
-            quantum_density_from_matrix as PluginFn,
-        ),
-        (
-            "quantum_density_matrix",
-            "density",
-            quantum_density_matrix as PluginFn,
-        ),
-        (
-            "quantum_density_purity",
-            "density",
-            quantum_density_purity as PluginFn,
-        ),
-        (
-            "quantum_density_partial_trace",
-            "density,keep",
-            quantum_density_partial_trace as PluginFn,
-        ),
-        (
-            "quantum_density_eig",
-            "density",
-            quantum_density_eig as PluginFn,
-        ),
-        (
-            "quantum_density_expect",
-            "density,obs",
-            quantum_density_expect as PluginFn,
-        ),
-        (
-            "quantum_density_draw",
-            "density,path,kind",
-            quantum_density_draw as PluginFn,
-        ),
-        ("quantum_kron", "a,b", quantum_kron as PluginFn),
-        (
-            "quantum_schmidt",
-            "state,cut",
-            quantum_schmidt as PluginFn,
-        ),
-        ("quantum_fidelity", "a,b", quantum_fidelity as PluginFn),
-    ];
-    for (name, params, f) in regs {
-        if register(host, name, params, f) != 0 {
-            return 1;
-        }
-    }
-    0
-}
+marqdo_plugin!(marqdo_plugin_sdk::ABI_VERSION, [
+    ("quantum_ping", "", quantum_ping),
+    ("quantum_circuit_new", "qubits,steps", quantum_circuit_new),
+    ("quantum_h", "circuit,qubit", quantum_h),
+    ("quantum_x", "circuit,qubit", quantum_x),
+    ("quantum_y", "circuit,qubit", quantum_y),
+    ("quantum_z", "circuit,qubit", quantum_z),
+    ("quantum_s", "circuit,qubit", quantum_s),
+    ("quantum_t", "circuit,qubit", quantum_t),
+    ("quantum_i", "circuit,qubit", quantum_i),
+    ("quantum_rx", "circuit,qubit,theta", quantum_rx),
+    ("quantum_ry", "circuit,qubit,theta", quantum_ry),
+    ("quantum_rz", "circuit,qubit,theta", quantum_rz),
+    ("quantum_cx", "circuit,control,target", quantum_cx),
+    ("quantum_cz", "circuit,control,target", quantum_cz),
+    ("quantum_swap", "circuit,a,b", quantum_swap),
+    ("quantum_simulate", "circuit", quantum_simulate),
+    ("quantum_probabilities", "circuit", quantum_probabilities),
+    ("quantum_run", "circuit,shots,seed", quantum_run),
+    ("quantum_barrier", "circuit", quantum_barrier),
+    ("quantum_measure", "circuit,qubits", quantum_measure),
+    ("quantum_append", "circuit,op", quantum_append),
+    ("quantum_noise", "circuit,kind,p", quantum_noise),
+    ("quantum_state", "circuit", quantum_state),
+    ("quantum_draw_circuit", "circuit,path,kind,qubit", quantum_draw_circuit),
+    ("quantum_gate_new", "name,theta", quantum_gate_new),
+    ("quantum_gate_from_matrix", "matrix", quantum_gate_from_matrix),
+    ("quantum_gate_matrix", "gate", quantum_gate_matrix),
+    ("quantum_gate_matches_matrix", "gate,matrix,tol", quantum_gate_matches_matrix),
+    ("quantum_gate_draw", "gate,path,kind", quantum_gate_draw),
+    ("quantum_apply", "circuit,gate,qubits", quantum_apply),
+    ("quantum_density_from_state", "state", quantum_density_from_state),
+    ("quantum_density_from_matrix", "matrix", quantum_density_from_matrix),
+    ("quantum_density_matrix", "density", quantum_density_matrix),
+    ("quantum_density_purity", "density", quantum_density_purity),
+    ("quantum_density_partial_trace", "density,keep", quantum_density_partial_trace),
+    ("quantum_density_eig", "density", quantum_density_eig),
+    ("quantum_density_expect", "density,obs", quantum_density_expect),
+    ("quantum_density_draw", "density,path,kind", quantum_density_draw),
+    ("quantum_kron", "a,b", quantum_kron),
+    ("quantum_schmidt", "state,cut", quantum_schmidt),
+    ("quantum_fidelity", "a,b", quantum_fidelity),
+]);

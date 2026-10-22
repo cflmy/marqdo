@@ -62,6 +62,7 @@ members = [
     "plugins/quantum",
     "plugins/linalg",
     "crates/marqdo-wasm",
+    "crates/marqdo-plugin-sdk",
 ]
 # Official web plugin is Go (`plugins/web/`). The legacy Rust web plugin was
 # deleted from the tree (see CHANGELOG); git history keeps it if ever needed.

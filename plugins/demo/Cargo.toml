@@ -11,4 +11,5 @@ name = "demo"
 crate-type = ["cdylib"]
 
 [dependencies]
+marqdo-plugin-sdk = { path = "../../crates/marqdo-plugin-sdk" }
 serde_json = "1"

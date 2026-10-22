@@ -11,6 +11,7 @@ name = "llm"
 crate-type = ["cdylib"]
 
 [dependencies]
+marqdo-plugin-sdk = { path = "../../crates/marqdo-plugin-sdk" }
 serde_json = "1"
 # Pin with host (edition2024-safe for rustc 1.81).
 ureq = { version = "=2.9.7", default-features = false, features = ["tls", "gzip"] }

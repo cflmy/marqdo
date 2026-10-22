@@ -1,104 +1,14 @@
 //! Marqdo LLM transport plugin (C ABI v2): OpenAI-compatible chat completions.
 
-use std::ffi::{CStr, CString};
 use std::io::{BufRead, BufReader, Read};
-use std::os::raw::{c_char, c_int, c_void};
-use std::ptr;
+use std::os::raw::{c_char, c_int};
 use std::time::Duration;
 
 use serde_json::{json, Map, Value};
 
-const ABI_VERSION: u32 = 2;
+use marqdo_plugin_sdk::*;
+
 const MAX_BODY: usize = 32 * 1024 * 1024;
-
-type PluginFn = unsafe extern "C" fn(
-    args_json: *const c_char,
-    out_json: *mut *mut c_char,
-    err_msg: *mut *mut c_char,
-) -> c_int;
-
-type HostQueryFn = unsafe extern "C" fn(
-    userdata: *mut c_void,
-    name: *const c_char,
-    args_json: *const c_char,
-    out_json: *mut *mut c_char,
-    err_msg: *mut *mut c_char,
-) -> c_int;
-
-#[repr(C)]
-pub struct MarqdoHostApi {
-    pub userdata: *mut c_void,
-    pub register_fn: Option<
-        unsafe extern "C" fn(
-            userdata: *mut c_void,
-            name: *const c_char,
-            params: *const c_char,
-            fn_ptr: PluginFn,
-        ) -> c_int,
-    >,
-    pub alloc: Option<unsafe extern "C" fn(n: usize) -> *mut c_void>,
-    pub free: Option<unsafe extern "C" fn(p: *mut c_void)>,
-    pub host_query: Option<HostQueryFn>,
-}
-
-static mut HOST_FREE: Option<unsafe extern "C" fn(*mut c_void)> = None;
-static mut HOST_ALLOC: Option<unsafe extern "C" fn(usize) -> *mut c_void> = None;
-
-unsafe fn host_strdup(s: &str) -> *mut c_char {
-    let alloc = HOST_ALLOC.expect("host alloc");
-    let bytes = s.as_bytes();
-    let p = alloc(bytes.len() + 1) as *mut u8;
-    if p.is_null() {
-        return ptr::null_mut();
-    }
-    std::ptr::copy_nonoverlapping(bytes.as_ptr(), p, bytes.len());
-    *p.add(bytes.len()) = 0;
-    p as *mut c_char
-}
-
-fn set_out(out: *mut *mut c_char, s: &str) {
-    if out.is_null() {
-        return;
-    }
-    unsafe {
-        *out = host_strdup(s);
-    }
-}
-
-fn set_err(err: *mut *mut c_char, s: &str) {
-    if err.is_null() {
-        return;
-    }
-    unsafe {
-        *err = host_strdup(s);
-    }
-}
-
-fn parse_args(args_json: *const c_char) -> Result<Value, String> {
-    if args_json.is_null() {
-        return Ok(json!({}));
-    }
-    let s = unsafe { CStr::from_ptr(args_json) }
-        .to_str()
-        .map_err(|_| "args not utf-8".to_string())?;
-    if s.trim().is_empty() {
-        return Ok(json!({}));
-    }
-    serde_json::from_str(s).map_err(|e| e.to_string())
-}
-
-fn reply(out_json: *mut *mut c_char, err_msg: *mut *mut c_char, r: Result<Value, String>) -> c_int {
-    match r {
-        Ok(v) => {
-            set_out(out_json, &v.to_string());
-            0
-        }
-        Err(e) => {
-            set_err(err_msg, &e);
-            1
-        }
-    }
-}
 
 fn opt_text<'a>(args: &'a Value, key: &str) -> Option<&'a str> {
     args.get(key).and_then(|v| v.as_str()).filter(|s| !s.is_empty())
@@ -362,44 +272,7 @@ unsafe extern "C" fn llm_ping(
     reply(out_json, err_msg, Ok(json!({"ok": true, "plugin": "llm"})))
 }
 
-fn register(host: &MarqdoHostApi, name: &str, params: &str, fn_ptr: PluginFn) -> c_int {
-    let register = match host.register_fn {
-        Some(f) => f,
-        None => return 1,
-    };
-    let n = CString::new(name).unwrap();
-    let p = CString::new(params).unwrap();
-    unsafe { register(host.userdata, n.as_ptr(), p.as_ptr(), fn_ptr) }
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn marqdo_plugin_abi_version() -> u32 {
-    ABI_VERSION
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn marqdo_plugin_shutdown() {}
-
-#[no_mangle]
-pub unsafe extern "C" fn marqdo_plugin_init(host: *const MarqdoHostApi) -> c_int {
-    if host.is_null() {
-        return 1;
-    }
-    let host = &*host;
-    HOST_ALLOC = host.alloc;
-    HOST_FREE = host.free;
-    let regs = [
-        ("llm_ping", "", llm_ping as PluginFn),
-        (
-            "llm_chat_completions",
-            "base_url,api_key,model,prompt,stream,echo,suffix,bearer",
-            llm_chat_completions as PluginFn,
-        ),
-    ];
-    for (name, params, f) in regs {
-        if register(host, name, params, f) != 0 {
-            return 1;
-        }
-    }
-    0
-}
+marqdo_plugin!(marqdo_plugin_sdk::ABI_VERSION, [
+    ("llm_ping", "", llm_ping),
+    ("llm_chat_completions", "base_url,api_key,model,prompt,stream,echo,suffix,bearer", llm_chat_completions),
+]);

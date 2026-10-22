@@ -11,96 +11,23 @@ mod route;
 mod sandbox;
 
 use std::collections::HashMap;
-use std::ffi::{CStr, CString};
-use std::os::raw::{c_char, c_int, c_void};
+use std::ffi::CString;
+use std::os::raw::{c_char, c_int};
 use std::path::{Component, Path, PathBuf};
 use std::ptr;
 use std::sync::{LazyLock, Mutex};
 
-const ABI_VERSION: u32 = 2;
+use marqdo_plugin_sdk::*;
+
 const DEFAULT_MARKERS: &str = "agents,runbooks,marqdo.agent.json";
 const LAYOUT_DIRS: &[&str] = &["agents", "runbooks", "templates", "reports"];
 
-type PluginFn = unsafe extern "C" fn(
-    args_json: *const c_char,
-    out_json: *mut *mut c_char,
-    err_msg: *mut *mut c_char,
-) -> c_int;
-
-type HostQueryFn = unsafe extern "C" fn(
-    userdata: *mut c_void,
-    name: *const c_char,
-    args_json: *const c_char,
-    out_json: *mut *mut c_char,
-    err_msg: *mut *mut c_char,
-) -> c_int;
-
-#[repr(C)]
-pub struct MarqdoHostApi {
-    pub userdata: *mut c_void,
-    pub register_fn: Option<
-        unsafe extern "C" fn(
-            userdata: *mut c_void,
-            name: *const c_char,
-            params: *const c_char,
-            fn_ptr: PluginFn,
-        ) -> c_int,
-    >,
-    pub alloc: Option<unsafe extern "C" fn(n: usize) -> *mut c_void>,
-    pub free: Option<unsafe extern "C" fn(p: *mut c_void)>,
-    pub host_query: Option<HostQueryFn>,
-}
-
-static mut HOST_FREE: Option<unsafe extern "C" fn(*mut c_void)> = None;
-static mut HOST_ALLOC: Option<unsafe extern "C" fn(usize) -> *mut c_void> = None;
-static mut HOST_QUERY: Option<HostQueryFn> = None;
-static mut HOST_USERDATA: *mut c_void = ptr::null_mut();
 
 static HISTORIES: LazyLock<Mutex<HashMap<String, Vec<serde_json::Value>>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
 static AGENT_SEQ: LazyLock<Mutex<u64>> = LazyLock::new(|| Mutex::new(0));
 
-unsafe fn host_strdup(s: &str) -> *mut c_char {
-    let alloc = HOST_ALLOC.expect("host alloc");
-    let bytes = s.as_bytes();
-    let p = alloc(bytes.len() + 1) as *mut u8;
-    if p.is_null() {
-        return ptr::null_mut();
-    }
-    std::ptr::copy_nonoverlapping(bytes.as_ptr(), p, bytes.len());
-    *p.add(bytes.len()) = 0;
-    p as *mut c_char
-}
-
-fn set_out(out: *mut *mut c_char, s: &str) {
-    if out.is_null() {
-        return;
-    }
-    unsafe {
-        *out = host_strdup(s);
-    }
-}
-
-fn set_err(err: *mut *mut c_char, s: &str) {
-    if err.is_null() {
-        return;
-    }
-    unsafe {
-        *err = host_strdup(s);
-    }
-}
-
-fn parse_args(args_json: *const c_char) -> Result<serde_json::Value, String> {
-    if args_json.is_null() {
-        return Err("null args".into());
-    }
-    let s = unsafe { CStr::from_ptr(args_json) }
-        .to_str()
-        .map_err(|_| "args not utf-8".to_string())?;
-    serde_json::from_str(s).map_err(|e| e.to_string())
-}
-
-fn arg_str<'a>(v: &'a serde_json::Value, key: &str) -> Result<&'a str, String> {
+unsafe fn arg_str<'a>(v: &'a serde_json::Value, key: &str) -> Result<&'a str, String> {
     v.get(key)
         .and_then(|x| x.as_str())
         .ok_or_else(|| format!("missing text `{key}`"))
@@ -543,21 +470,6 @@ unsafe extern "C" fn agent_bump_load(
         }
     }
 }
-
-fn register(host: &MarqdoHostApi, name: &str, params: &str, fn_ptr: PluginFn) -> c_int {
-    let register = match host.register_fn {
-        Some(f) => f,
-        None => return 1,
-    };
-    let n = CString::new(name).unwrap();
-    let p = CString::new(params).unwrap();
-    unsafe { register(host.userdata, n.as_ptr(), p.as_ptr(), fn_ptr) }
-}
-
-pub(crate) fn host_query_json(name: &str) -> Result<serde_json::Value, String> {
-    host_query_json_args(name, &serde_json::json!({}))
-}
-
 pub(crate) fn host_query_json_args(
     name: &str,
     args: &serde_json::Value,
@@ -585,22 +497,6 @@ pub(crate) fn host_query_json_args(
     }
     let out = out.unwrap_or_else(|| "null".into());
     serde_json::from_str(&out).map_err(|e| format!("host_query `{name}` bad JSON: {e}"))
-}
-
-fn take_host_string(p: *mut c_char) -> Option<String> {
-    if p.is_null() {
-        return None;
-    }
-    let s = unsafe { CStr::from_ptr(p) }
-        .to_str()
-        .ok()
-        .map(|s| s.to_string());
-    unsafe {
-        if let Some(free) = HOST_FREE {
-            free(p as *mut c_void);
-        }
-    }
-    s
 }
 
 unsafe extern "C" fn agent_alloc(
@@ -947,279 +843,75 @@ pub unsafe extern "C" fn marqdo_plugin_init(host: *const MarqdoHostApi) -> c_int
     if host.is_null() {
         return 1;
     }
-    let host = &*host;
-    HOST_ALLOC = host.alloc;
-    HOST_FREE = host.free;
-    HOST_QUERY = host.host_query;
-    HOST_USERDATA = host.userdata;
-    if host.host_query.is_none() {
-        return 1;
-    }
-    if register(host, "agent_find_root", "start,markers", agent_find_root) != 0 {
-        return 1;
-    }
-    if register(host, "agent_ensure_layout", "root", agent_ensure_layout) != 0 {
-        return 1;
-    }
-    if register(host, "agent_probe", "root", agent_probe) != 0 {
-        return 1;
-    }
-    if register(
-        host,
-        "agent_scaffold",
-        "root,name,template,dest",
-        agent_scaffold,
-    ) != 0
-    {
-        return 1;
-    }
-    if register(host, "agent_match_skill", "skill,members", agent_match_skill) != 0 {
-        return 1;
-    }
-    if register(host, "agent_bump_load", "member,delta", agent_bump_load) != 0 {
-        return 1;
-    }
-    if register(host, "agent_alloc", "", agent_alloc) != 0 {
-        return 1;
-    }
-    if register(host, "agent_history_get", "id", agent_history_get) != 0 {
-        return 1;
-    }
-    if register(host, "agent_history_clear", "id", agent_history_clear) != 0 {
-        return 1;
-    }
-    if register(host, "agent_history_append", "id,item", agent_history_append) != 0 {
-        return 1;
-    }
-    if register(host, "agent_module_source", "", agent_module_source) != 0 {
-        return 1;
-    }
-    if register(host, "agent_call_site", "", agent_call_site) != 0 {
-        return 1;
-    }
-    if register(host, "agent_marqdo_skill", "", agent_marqdo_skill) != 0 {
-        return 1;
-    }
-    if register(host, "agent_format_tools", "tools", agent_format_tools) != 0 {
-        return 1;
-    }
-    if register(host, "agent_tool_allowed", "tools,name", agent_tool_allowed) != 0 {
-        return 1;
-    }
-    if register(host, "agent_goal_sig", "goal", agent_goal_sig) != 0 {
-        return 1;
-    }
-    if register(host, "agent_goal_slug", "goal", agent_goal_slug) != 0 {
-        return 1;
-    }
-    if register(host, "agent_kb_canonicalize", "goal", agent_kb_canonicalize) != 0 {
-        return 1;
-    }
-    if register(host, "agent_kb_lookup", "kb_dir,goal", agent_kb_lookup) != 0 {
-        return 1;
-    }
-    if register(host, "agent_kb_near_match", "kb_dir,goal", agent_kb_near_match) != 0 {
-        return 1;
-    }
-    if register(host, "agent_kb_list_tasks", "kb_dir", agent_kb_list_tasks) != 0 {
-        return 1;
-    }
-    if register(host, "agent_corpus_search", "query", agent_corpus_search) != 0 {
-        return 1;
-    }
-    if register(host, "agent_mcp_fixture", "action,fixture", agent_mcp_fixture) != 0 {
-        return 1;
-    }
-    if register(host, "agent_mcp_serve", "name,tools,transport", mcp_server::agent_mcp_serve)
-        != 0
-    {
-        return 1;
-    }
-    if register(
-        host,
-        "agent_mcp_client",
-        "action,command",
-        mcp_client::agent_mcp_client,
-    ) != 0
-    {
-        return 1;
-    }
-    if register(host, "agent_resume_save", "id,goal,status,round", agent_resume_save) != 0 {
-        return 1;
-    }
-    if register(host, "agent_resume_load", "id,resume_dir", agent_resume_load) != 0 {
-        return 1;
-    }
-    if register(host, "agent_resume_clear", "id,resume_dir", agent_resume_clear) != 0 {
-        return 1;
-    }
-    if register(host, "agent_resume_list", "resume_dir", agent_resume_list) != 0 {
-        return 1;
-    }
-    if register(host, "agent_kb_add_alias", "kb_dir,slug,alias", agent_kb_add_alias) != 0 {
-        return 1;
-    }
-    if register(
-        host,
-        "agent_kb_promote",
-        "kb_dir,goal,workbook",
-        agent_kb_promote,
-    ) != 0
-    {
-        return 1;
-    }
-    if register(
-        host,
-        "agent_kb_quarantine",
-        "kb_dir,slug",
-        agent_kb_quarantine,
-    ) != 0
-    {
-        return 1;
-    }
-    if register(host, "agent_kb_record_hit", "kb_dir,goal", agent_kb_record_hit) != 0 {
-        return 1;
-    }
-    if register(host, "agent_workbook_solidify", "path", agent_workbook_solidify) != 0 {
-        return 1;
-    }
-    if register(host, "agent_kb_task_files", "kb_dir,goal", agent_kb_task_files) != 0 {
-        return 1;
-    }
-    if register(host, "agent_memory_ensure", "memory_dir", agent_memory_ensure) != 0 {
-        return 1;
-    }
-    if register(
-        host,
-        "agent_record_episode",
-        "task,status,result,mode",
-        agent_record_episode,
-    ) != 0
-    {
-        return 1;
-    }
-    if register(host, "agent_list_episodes", "memory_dir,task", agent_list_episodes) != 0 {
-        return 1;
-    }
-    if register(host, "agent_get_episode", "id", agent_get_episode) != 0 {
-        return 1;
-    }
-    if register(
-        host,
-        "agent_cluster_episodes",
-        "memory_dir,task,threshold",
-        agent_cluster_episodes,
-    ) != 0
-    {
-        return 1;
-    }
-    if register(host, "agent_extract_pattern", "task", agent_extract_pattern) != 0 {
-        return 1;
-    }
-    if register(host, "agent_generalize", "task", agent_generalize) != 0 {
-        return 1;
-    }
-    if register(host, "agent_synthesize_skill", "task", agent_synthesize_skill) != 0 {
-        return 1;
-    }
-    if register(
-        host,
-        "agent_compile_skill",
-        "task,kb_dir,min_evidence",
-        agent_compile_skill,
-    ) != 0
-    {
-        return 1;
-    }
-    if register(
-        host,
-        "agent_maybe_learn",
-        "task,kb_dir,improve_every",
-        agent_maybe_learn,
-    ) != 0
-    {
-        return 1;
-    }
-    if register(host, "agent_metrics", "memory_dir", agent_metrics) != 0 {
-        return 1;
-    }
-    if register(host, "agent_resolve", "task,kb_dir", agent_resolve) != 0 {
-        return 1;
-    }
-    if register(host, "agent_route", "task,backend,kb_dir,memory_dir", agent_route) != 0 {
-        return 1;
-    }
-    if register(host, "agent_route_apply", "task,reply,kb_dir", agent_route_apply) != 0 {
-        return 1;
-    }
-    if register(
-        host,
-        "agent_compile_policy",
-        "memory_dir,min_evidence",
-        agent_compile_policy,
-    ) != 0
-    {
-        return 1;
-    }
-    if register(
-        host,
-        "agent_maybe_compile_policy",
-        "memory_dir,min_evidence",
-        agent_maybe_compile_policy,
-    ) != 0
-    {
-        return 1;
-    }
-    if register(
-        host,
-        "agent_eng_preflight",
-        "task",
-        agent_eng_preflight,
-    ) != 0
-    {
-        return 1;
-    }
-    if register(host, "agent_eng_reuse", "task", agent_eng_reuse) != 0 {
-        return 1;
-    }
-    if register(
-        host,
-        "agent_eng_record",
-        "decision",
-        agent_eng_record,
-    ) != 0
-    {
-        return 1;
-    }
-    // Optional JSON keys only — empty params CSV so omitted args are not required.
-    if register(host, "sandbox_open", "", sandbox::sandbox_open) != 0 {
-        return 1;
-    }
-    if register(host, "sandbox_write", "", sandbox::sandbox_write) != 0 {
-        return 1;
-    }
-    if register(host, "sandbox_read", "", sandbox::sandbox_read) != 0 {
-        return 1;
-    }
-    if register(host, "sandbox_remove", "", sandbox::sandbox_remove) != 0 {
-        return 1;
-    }
-    if register(host, "sandbox_diff", "", sandbox::sandbox_diff) != 0 {
-        return 1;
-    }
-    if register(host, "sandbox_commit", "", sandbox::sandbox_commit) != 0 {
-        return 1;
-    }
-    if register(host, "sandbox_discard", "", sandbox::sandbox_discard) != 0 {
-        return 1;
-    }
-    if register(host, "sandbox_inspect", "", sandbox::sandbox_inspect) != 0 {
-        return 1;
-    }
-    if register(host, "sandbox_run", "", sandbox::sandbox_run) != 0 {
-        return 1;
-    }
-    0
+    if (*host).host_query.is_none() {
+        return 1;
+    }
+    let regs: &[(&str, &str, PluginFn)] = &[
+        ("agent_find_root", "start,markers", agent_find_root),
+        ("agent_ensure_layout", "root", agent_ensure_layout),
+        ("agent_probe", "root", agent_probe),
+        ("agent_scaffold", "root,name,template,dest", agent_scaffold),
+        ("agent_match_skill", "skill,members", agent_match_skill),
+        ("agent_bump_load", "member,delta", agent_bump_load),
+        ("agent_alloc", "", agent_alloc),
+        ("agent_history_get", "id", agent_history_get),
+        ("agent_history_clear", "id", agent_history_clear),
+        ("agent_history_append", "id,item", agent_history_append),
+        ("agent_module_source", "", agent_module_source),
+        ("agent_call_site", "", agent_call_site),
+        ("agent_marqdo_skill", "", agent_marqdo_skill),
+        ("agent_format_tools", "tools", agent_format_tools),
+        ("agent_tool_allowed", "tools,name", agent_tool_allowed),
+        ("agent_goal_sig", "goal", agent_goal_sig),
+        ("agent_goal_slug", "goal", agent_goal_slug),
+        ("agent_kb_canonicalize", "goal", agent_kb_canonicalize),
+        ("agent_kb_lookup", "kb_dir,goal", agent_kb_lookup),
+        ("agent_kb_near_match", "kb_dir,goal", agent_kb_near_match),
+        ("agent_kb_list_tasks", "kb_dir", agent_kb_list_tasks),
+        ("agent_corpus_search", "query", agent_corpus_search),
+        ("agent_mcp_fixture", "action,fixture", agent_mcp_fixture),
+        ("agent_mcp_serve", "name,tools,transport", mcp_server::agent_mcp_serve),
+        ("agent_mcp_client", "action,command", mcp_client::agent_mcp_client),
+        ("agent_resume_save", "id,goal,status,round", agent_resume_save),
+        ("agent_resume_load", "id,resume_dir", agent_resume_load),
+        ("agent_resume_clear", "id,resume_dir", agent_resume_clear),
+        ("agent_resume_list", "resume_dir", agent_resume_list),
+        ("agent_kb_add_alias", "kb_dir,slug,alias", agent_kb_add_alias),
+        ("agent_kb_promote", "kb_dir,goal,workbook", agent_kb_promote),
+        ("agent_kb_quarantine", "kb_dir,slug", agent_kb_quarantine),
+        ("agent_kb_record_hit", "kb_dir,goal", agent_kb_record_hit),
+        ("agent_workbook_solidify", "path", agent_workbook_solidify),
+        ("agent_kb_task_files", "kb_dir,goal", agent_kb_task_files),
+        ("agent_memory_ensure", "memory_dir", agent_memory_ensure),
+        ("agent_record_episode", "task,status,result,mode", agent_record_episode),
+        ("agent_list_episodes", "memory_dir,task", agent_list_episodes),
+        ("agent_get_episode", "id", agent_get_episode),
+        ("agent_cluster_episodes", "memory_dir,task,threshold", agent_cluster_episodes),
+        ("agent_extract_pattern", "task", agent_extract_pattern),
+        ("agent_generalize", "task", agent_generalize),
+        ("agent_synthesize_skill", "task", agent_synthesize_skill),
+        ("agent_compile_skill", "task,kb_dir,min_evidence", agent_compile_skill),
+        ("agent_maybe_learn", "task,kb_dir,improve_every", agent_maybe_learn),
+        ("agent_metrics", "memory_dir", agent_metrics),
+        ("agent_resolve", "task,kb_dir", agent_resolve),
+        ("agent_route", "task,backend,kb_dir,memory_dir", agent_route),
+        ("agent_route_apply", "task,reply,kb_dir", agent_route_apply),
+        ("agent_compile_policy", "memory_dir,min_evidence", agent_compile_policy),
+        ("agent_maybe_compile_policy", "memory_dir,min_evidence", agent_maybe_compile_policy),
+        ("agent_eng_preflight", "task", agent_eng_preflight),
+        ("agent_eng_reuse", "task", agent_eng_reuse),
+        ("agent_eng_record", "decision", agent_eng_record),
+        ("sandbox_open", "", sandbox::sandbox_open),
+        ("sandbox_write", "", sandbox::sandbox_write),
+        ("sandbox_read", "", sandbox::sandbox_read),
+        ("sandbox_remove", "", sandbox::sandbox_remove),
+        ("sandbox_diff", "", sandbox::sandbox_diff),
+        ("sandbox_commit", "", sandbox::sandbox_commit),
+        ("sandbox_discard", "", sandbox::sandbox_discard),
+        ("sandbox_inspect", "", sandbox::sandbox_inspect),
+        ("sandbox_run", "", sandbox::sandbox_run),
+    ];
+    init_plugin(host, regs)
 }
 
 #[no_mangle]

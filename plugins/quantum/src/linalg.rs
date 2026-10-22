@@ -626,10 +626,12 @@ pub fn value_as_matrix(v: &Value) -> Result<(usize, Mat), String> {
 }
 
 /// Helper for JSON amps list export (re-export style).
+#[allow(dead_code)] // kept: referenced by draw/JSON export paths in the host
 pub fn amps_json(amps: &[C]) -> Value {
     amps_to_json(amps)
 }
 
+#[allow(dead_code)] // kept: referenced by draw/JSON export paths in the host
 pub fn density_map_insert_matrix(obj: &mut Map<String, Value>, rho: &Mat, dim: usize) {
     obj.insert(
         "matrix".into(),

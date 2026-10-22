@@ -7,106 +7,14 @@ mod factor;
 mod matexpr;
 mod metrics;
 
-use std::ffi::{CStr, CString};
-use std::os::raw::{c_char, c_int, c_void};
-use std::ptr;
+use std::os::raw::{c_char, c_int};
 
 use serde_json::{json, Value};
 
+use marqdo_plugin_sdk::*;
+
 use matexpr::{Dim, Expr};
 
-const ABI_VERSION: u32 = 2;
-
-type PluginFn = unsafe extern "C" fn(
-    args_json: *const c_char,
-    out_json: *mut *mut c_char,
-    err_msg: *mut *mut c_char,
-) -> c_int;
-
-type HostQueryFn = unsafe extern "C" fn(
-    userdata: *mut c_void,
-    name: *const c_char,
-    args_json: *const c_char,
-    out_json: *mut *mut c_char,
-    err_msg: *mut *mut c_char,
-) -> c_int;
-
-#[repr(C)]
-pub struct MarqdoHostApi {
-    pub userdata: *mut c_void,
-    pub register_fn: Option<
-        unsafe extern "C" fn(
-            userdata: *mut c_void,
-            name: *const c_char,
-            params: *const c_char,
-            fn_ptr: PluginFn,
-        ) -> c_int,
-    >,
-    pub alloc: Option<unsafe extern "C" fn(n: usize) -> *mut c_void>,
-    pub free: Option<unsafe extern "C" fn(p: *mut c_void)>,
-    pub host_query: Option<HostQueryFn>,
-}
-
-static mut HOST_FREE: Option<unsafe extern "C" fn(*mut c_void)> = None;
-static mut HOST_ALLOC: Option<unsafe extern "C" fn(usize) -> *mut c_void> = None;
-static mut HOST_QUERY: Option<HostQueryFn> = None;
-static mut HOST_USERDATA: *mut c_void = ptr::null_mut();
-
-unsafe fn host_strdup(s: &str) -> *mut c_char {
-    let alloc = HOST_ALLOC.expect("host alloc");
-    let bytes = s.as_bytes();
-    let p = alloc(bytes.len() + 1) as *mut u8;
-    if p.is_null() {
-        return ptr::null_mut();
-    }
-    std::ptr::copy_nonoverlapping(bytes.as_ptr(), p, bytes.len());
-    *p.add(bytes.len()) = 0;
-    p as *mut c_char
-}
-
-fn set_out(out: *mut *mut c_char, s: &str) {
-    if out.is_null() {
-        return;
-    }
-    unsafe {
-        *out = host_strdup(s);
-    }
-}
-
-fn set_err(err: *mut *mut c_char, s: &str) {
-    if err.is_null() {
-        return;
-    }
-    unsafe {
-        *err = host_strdup(s);
-    }
-}
-
-fn parse_args(args_json: *const c_char) -> Result<Value, String> {
-    if args_json.is_null() {
-        return Ok(json!({}));
-    }
-    let s = unsafe { CStr::from_ptr(args_json) }
-        .to_str()
-        .map_err(|_| "args not utf-8".to_string())?;
-    if s.trim().is_empty() {
-        return Ok(json!({}));
-    }
-    serde_json::from_str(s).map_err(|e| e.to_string())
-}
-
-fn reply(out_json: *mut *mut c_char, err_msg: *mut *mut c_char, r: Result<Value, String>) -> c_int {
-    match r {
-        Ok(v) => {
-            set_out(out_json, &v.to_string());
-            0
-        }
-        Err(e) => {
-            set_err(err_msg, &e);
-            1
-        }
-    }
-}
 
 macro_rules! la_ffi {
     ($name:ident, $body:expr) => {
@@ -132,47 +40,6 @@ macro_rules! la_ffi {
     };
 }
 
-fn take_host_string(p: *mut c_char) -> Option<String> {
-    if p.is_null() {
-        return None;
-    }
-    let s = unsafe { CStr::from_ptr(p) }
-        .to_str()
-        .ok()
-        .map(|s| s.to_string());
-    unsafe {
-        if let Some(free) = HOST_FREE {
-            free(p as *mut c_void);
-        }
-    }
-    s
-}
-
-fn host_query_json(name: &str, args: &Value) -> Result<Value, String> {
-    let query = unsafe { HOST_QUERY }.ok_or_else(|| "host_query not available".to_string())?;
-    let userdata = unsafe { HOST_USERDATA };
-    let c_name = CString::new(name).map_err(|e| e.to_string())?;
-    let c_args = CString::new(args.to_string()).map_err(|e| e.to_string())?;
-    let mut out_ptr: *mut c_char = ptr::null_mut();
-    let mut err_ptr: *mut c_char = ptr::null_mut();
-    let rc = unsafe {
-        query(
-            userdata,
-            c_name.as_ptr(),
-            c_args.as_ptr(),
-            &mut out_ptr,
-            &mut err_ptr,
-        )
-    };
-    let err = take_host_string(err_ptr);
-    let out = take_host_string(out_ptr);
-    if rc != 0 {
-        return Err(err.unwrap_or_else(|| format!("host_query `{name}` failed")));
-    }
-    let out = out.unwrap_or_else(|| "null".into());
-    serde_json::from_str(&out).map_err(|e| format!("host_query `{name}` bad JSON: {e}"))
-}
-
 fn record_plot(svg: &str, path: Option<&str>) -> Result<(), String> {
     let mut args = json!({ "svg": svg });
     if let Some(p) = path {
@@ -182,7 +49,7 @@ fn record_plot(svg: &str, path: Option<&str>) -> Result<(), String> {
                 .insert("path".into(), json!(p));
         }
     }
-    host_query_json("record_plot", &args)?;
+    host_query_json_with("record_plot", &args)?;
     Ok(())
 }
 
@@ -622,67 +489,36 @@ fn dense_arg(args: &Value, keys: &[&str]) -> Result<dense::Mat, String> {
     Err(format!("missing dense matrix among {:?}", keys))
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn marqdo_plugin_abi_version() -> u32 {
-    ABI_VERSION
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn marqdo_plugin_shutdown() {}
-
-#[no_mangle]
-pub unsafe extern "C" fn marqdo_plugin_init(host: *const MarqdoHostApi) -> c_int {
-    if host.is_null() {
-        return 1;
-    }
-    let host = &*host;
-    HOST_ALLOC = host.alloc;
-    HOST_FREE = host.free;
-    HOST_QUERY = host.host_query;
-    HOST_USERDATA = host.userdata;
-    let register = match host.register_fn {
-        Some(f) => f,
-        None => return 1,
-    };
-    let regs = [
-        ("linalg_ping", "", linalg_ping as PluginFn),
-        ("linalg_symbol", "name,rows,cols", linalg_symbol as PluginFn),
-        ("linalg_eye", "n", linalg_eye as PluginFn),
-        ("linalg_zeros", "rows,cols", linalg_zeros as PluginFn),
-        ("linalg_from_list", "data", linalg_from_list as PluginFn),
-        ("linalg_declare", "table,type_tag", linalg_declare as PluginFn),
-        ("linalg_from_formula", "formula", linalg_from_formula as PluginFn),
-        ("linalg_mul", "a,b", linalg_mul as PluginFn),
-        ("linalg_add", "a,b", linalg_add as PluginFn),
-        ("linalg_sub", "a,b", linalg_sub as PluginFn),
-        ("linalg_transpose", "expr", linalg_transpose as PluginFn),
-        ("linalg_inv", "expr", linalg_inv as PluginFn),
-        ("linalg_simplify", "expr", linalg_simplify as PluginFn),
-        ("linalg_ascii", "expr,raw", linalg_ascii as PluginFn),
-        ("linalg_latex", "expr,raw", linalg_latex as PluginFn),
-        ("linalg_shape", "expr", linalg_shape as PluginFn),
-        ("linalg_show", "expr,path,raw", linalg_show as PluginFn),
-        ("linalg_explicit", "expr,raw", linalg_explicit as PluginFn),
-        ("linalg_det", "expr", linalg_det as PluginFn),
-        ("linalg_trace", "expr", linalg_trace as PluginFn),
-        ("linalg_solve", "a,b,factor", linalg_solve as PluginFn),
-        ("linalg_matmul", "a,b", linalg_matmul as PluginFn),
-        ("linalg_kron", "a,b", linalg_kron as PluginFn),
-        ("linalg_block", "blocks", linalg_block as PluginFn),
-        ("linalg_collapse", "expr", linalg_collapse as PluginFn),
-        ("linalg_factorize", "matrix,kind", linalg_factorize as PluginFn),
-        ("linalg_draw", "factor,kind,path,theme", linalg_draw as PluginFn),
-        ("linalg_lstsq", "a,b", linalg_lstsq as PluginFn),
-        ("linalg_norm", "expr,ord", linalg_norm as PluginFn),
-        ("linalg_cond", "expr", linalg_cond as PluginFn),
-        ("linalg_rank", "expr", linalg_rank as PluginFn),
-    ];
-    for (name, params, f) in regs {
-        let c_name = CString::new(name).unwrap();
-        let c_params = CString::new(params).unwrap();
-        if register(host.userdata, c_name.as_ptr(), c_params.as_ptr(), f) != 0 {
-            return 1;
-        }
-    }
-    0
-}
+marqdo_plugin!(marqdo_plugin_sdk::ABI_VERSION, [
+    ("linalg_ping", "", linalg_ping),
+    ("linalg_symbol", "name,rows,cols", linalg_symbol),
+    ("linalg_eye", "n", linalg_eye),
+    ("linalg_zeros", "rows,cols", linalg_zeros),
+    ("linalg_from_list", "data", linalg_from_list),
+    ("linalg_declare", "table,type_tag", linalg_declare),
+    ("linalg_from_formula", "formula", linalg_from_formula),
+    ("linalg_mul", "a,b", linalg_mul),
+    ("linalg_add", "a,b", linalg_add),
+    ("linalg_sub", "a,b", linalg_sub),
+    ("linalg_transpose", "expr", linalg_transpose),
+    ("linalg_inv", "expr", linalg_inv),
+    ("linalg_simplify", "expr", linalg_simplify),
+    ("linalg_ascii", "expr,raw", linalg_ascii),
+    ("linalg_latex", "expr,raw", linalg_latex),
+    ("linalg_shape", "expr", linalg_shape),
+    ("linalg_show", "expr,path,raw", linalg_show),
+    ("linalg_explicit", "expr,raw", linalg_explicit),
+    ("linalg_det", "expr", linalg_det),
+    ("linalg_trace", "expr", linalg_trace),
+    ("linalg_solve", "a,b,factor", linalg_solve),
+    ("linalg_matmul", "a,b", linalg_matmul),
+    ("linalg_kron", "a,b", linalg_kron),
+    ("linalg_block", "blocks", linalg_block),
+    ("linalg_collapse", "expr", linalg_collapse),
+    ("linalg_factorize", "matrix,kind", linalg_factorize),
+    ("linalg_draw", "factor,kind,path,theme", linalg_draw),
+    ("linalg_lstsq", "a,b", linalg_lstsq),
+    ("linalg_norm", "expr,ord", linalg_norm),
+    ("linalg_cond", "expr", linalg_cond),
+    ("linalg_rank", "expr", linalg_rank),
+]);
