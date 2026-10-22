@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: ext/data/cache
 description: Cache Resource (ADR 0007).
 import plugin:lib/plugin.mq.md
@@ -27,7 +28,7 @@ Key–value cache. Use `memory:` for in-process (tests / single process) or `red
 ## get
     + `key`
 
-**url = [url](self)**
+**url = [url](access(self, "url"))**
 *> web_cache_get url=`url` key=`key`*
 
 ## set
@@ -37,24 +38,24 @@ Key–value cache. Use `memory:` for in-process (tests / single process) or `red
 
 Optional `ttl` is seconds until expiry.
 
-**url = [url](self)**
+**url = [url](access(self, "url"))**
 *> web_cache_set url=`url` key=`key` value=`value` ttl=`ttl`*
 
 ## del
     + `key`
 
-**url = [url](self)**
+**url = [url](access(self, "url"))**
 *> web_cache_del url=`url` key=`key`*
 
 ## exists
     + `key`
 
-**url = [url](self)**
+**url = [url](access(self, "url"))**
 *> web_cache_exists url=`url` key=`key`*
 
 ## ttl
     + `key`
 
-**url = [url](self)**
+**url = [url](access(self, "url"))**
 *> web_cache_ttl url=`url` key=`key`*
 

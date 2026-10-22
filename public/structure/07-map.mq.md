@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: Maps (horizontal tables)
 description: Multi-column tables are maps; link-index get
 ---
@@ -13,10 +14,10 @@ A multi-column table with one data row is a map. Read values with `[key](map)`.
 |-------|----------|
 | fruit | vegetable |
 
-**`k` = [apple](kinds)**
+**`k` = [apple](access(kinds, "apple"))**
 
 > print text=`k`
 
-**`k` = [cucumber](kinds)**
+**`k` = [cucumber](access(kinds, "cucumber"))**
 
 > print text=`k`

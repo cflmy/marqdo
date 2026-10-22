@@ -33,7 +33,26 @@ pub fn set_markup_default(m: Markup) {
     );
 }
 
+thread_local! {
+    /// Per-module override (`markup:` in frontmatter) — wins over the process default.
+    static MARKUP_OVERRIDE: std::cell::Cell<Option<Markup>> = const { std::cell::Cell::new(None) };
+}
+
+/// Run `f` with `markup` as the effective mode for everything parsed inside.
+///
+/// Frontmatter `markup: occlusion` uses this so that one process can load files
+/// in different modes (imports!). `<TAB>` M7
+pub fn with_markup<T>(markup: Markup, f: impl FnOnce() -> T) -> T {
+    let saved = MARKUP_OVERRIDE.with(|c| c.replace(Some(markup)));
+    let out = f();
+    MARKUP_OVERRIDE.with(|c| c.set(saved));
+    out
+}
+
 pub fn markup_default() -> Markup {
+    if let Some(m) = MARKUP_OVERRIDE.with(|c| c.get()) {
+        return m;
+    }
     match MARKUP.load(std::sync::atomic::Ordering::Relaxed) {
         1 => Markup::Occlusion,
         _ => Markup::Classic,
@@ -517,7 +536,7 @@ impl<'a> Parser<'a> {
         // Link-shaped index `[key](collection)` vs bracket-marked call `[callee] …`
         // vs JSON-ish `[…]` (arg text fallback when expr parse fails).
         if self.starts_with("[") && !self.starts_with("[^") {
-            if self.markup == Markup::Occlusion {
+            if self.markup == Markup::Occlusion && occlusion_shape_ahead(self.rest()) {
                 return self.parse_occluded();
             }
             if link_index_shape_ahead(self.rest()) {
@@ -722,7 +741,13 @@ impl<'a> Parser<'a> {
                 payload: None,
             });
         }
-        let inner = self.parse_or()?;
+        // `()` is machine code: the payload always allows `callee(args)` even
+        // when the occlusion sits inside a text-like argument value. `<TAB>` M7
+        let saved_allow = self.allow_paren_call;
+        self.allow_paren_call = true;
+        let inner = self.parse_or();
+        self.allow_paren_call = saved_allow;
+        let inner = inner?;
         self.skip_ws();
         if !self.eat(")") {
             bail!("expected ')' to close occlusion payload");
@@ -1432,6 +1457,33 @@ fn split_first_token(s: &str, paren_mode: bool) -> (&str, &str) {
 }
 
 /// `[key](…)` with no whitespace between `]` and `(`.
+/// True when `[…]` is immediately followed by `(` — i.e. an occlusion shape.
+/// `[问候] "Ada"` (bracket-marked call) has no `(`, so it keeps its meaning. `<TAB>` M7
+fn occlusion_shape_ahead(s: &str) -> bool {
+    let mut chars = s.char_indices();
+    let Some((_, '[')) = chars.next() else {
+        return false;
+    };
+    let mut escaped = false;
+    for (i, c) in chars {
+        if escaped {
+            escaped = false;
+            continue;
+        }
+        match c {
+            '\\' => escaped = true,
+            ']' => {
+                // Strict: `(` must follow immediately. `[问候] ([…])` is a
+                // bracket-marked call with a parenthesised argument, not an occlusion.
+                return s[i + 1..].starts_with('(');
+            }
+            '\n' => return false,
+            _ => {}
+        }
+    }
+    false
+}
+
 fn link_index_shape_ahead(s: &str) -> bool {
     let s = s.trim_start();
     if !s.starts_with('[') || s.starts_with("[^") {
@@ -2124,9 +2176,13 @@ mod bracket_call_tests {
     }
 
     #[test]
-    fn occlusion_requires_paren() {
-        let err = parse_expr_markup("[只有描述]", false, Markup::Occlusion).unwrap_err();
-        assert!(err.to_string().contains("followed by"), "{err}");
+    fn occlusion_requires_immediate_paren() {
+        // No `(` after `]` → falls back to the bracket-marked call form.
+        let e = parse_expr_markup("[只有描述]", false, Markup::Occlusion).unwrap();
+        assert!(matches!(e, Expr::Call(_)), "got {e:?}");
+        // A space before `(` also means "not an occlusion".
+        let e = parse_expr_markup("[问候] (1)", false, Markup::Occlusion).unwrap();
+        assert!(matches!(e, Expr::Call(_)), "got {e:?}");
     }
 
     #[test]

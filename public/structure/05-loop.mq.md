@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: Loops
 description: Condition loops and table walks
 ---
@@ -24,5 +25,5 @@ Walk a table (tables are collections):
 | apple |
 | pear |
 
-- [fruit](basket)
+- [fruit](遍历 basket 为 fruit)
   > print text=today `fruit`

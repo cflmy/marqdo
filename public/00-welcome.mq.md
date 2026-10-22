@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: Welcome to Marqdo
 description: User-docs home — code as documentation (English)
 import math:lib/math.mq.md
@@ -51,7 +52,7 @@ Foreign v2 is a good example. Probe Python, then run the bound fence:
 
 **python = > foreign.probe lang="python"**
 
-1. [ok](`python`)
+1. [ok](access(`python`, "ok"))
   **hello = > foreign.run code=`hi`**
   > print text=`hello`
 2. *

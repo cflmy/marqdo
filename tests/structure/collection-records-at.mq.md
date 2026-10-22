@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: row records with @ marker
 ---
 
@@ -11,10 +12,10 @@ title: row records with @ marker
 | 1 | apple | 2 |
 | 2 | pear | 3 |
 
-**n = [name]([1](orders))**
+**n = [name](access([1](access(orders, "1")), "name"))**
 
 > print text=`n`
 
-**q = [qty]([2](orders))**
+**q = [qty](access([2](access(orders, "2")), "qty"))**
 
 > print text=`q`

@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: net multipart_parse
 import net:lib/net.mq.md
 ---
@@ -11,9 +12,9 @@ import net:lib/net.mq.md
 
 **parts = > net.multipart_parse body=`body` boundary=`boundary`**
 
-> print text=[name]([1](`parts`))
-> print text=[value]([1](`parts`))
-> print text=[name]([2](`parts`))
-> print text=[filename]([2](`parts`))
-> print text=[content_type]([2](`parts`))
-> print text=[value]([2](`parts`))
+> print text=[name](access([1](access(`parts`, "1")), "name"))
+> print text=[value](access([1](access(`parts`, "1")), "value"))
+> print text=[name](access([2](access(`parts`, "2")), "name"))
+> print text=[filename](access([2](access(`parts`, "2")), "filename"))
+> print text=[content_type](access([2](access(`parts`, "2")), "content_type"))
+> print text=[value](access([2](access(`parts`, "2")), "value"))

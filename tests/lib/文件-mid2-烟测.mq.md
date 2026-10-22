@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: 文件 Mid2 M9 烟测
 导入 文件:lib/文件.mq.md
 ---
@@ -10,7 +11,7 @@ title: 文件 Mid2 M9 烟测
 > 文件.写文本 路径="m9-zh/a.txt" 内容="A"
 
 **st = > 文件.状态 路径="m9-zh/a.txt"**
-> print text=[is_file](`st`)
+> print text=[is_file](access(`st`, "is_file"))
 
 **w = > 文件.遍历 路径="m9-zh"**
 **n = > 长度 `w`**

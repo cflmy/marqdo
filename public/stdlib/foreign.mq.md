@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: lib/foreign — foreign kernels v2
 description: Structured execution, JSON calls, parallel fan-out, persistent kernels and an explicit state bridge
 import foreign:lib/foreign.mq.md
@@ -17,8 +18,8 @@ Probe before you run.
 
 **node = > foreign.probe lang="node"**
 
-> print text=[ok](`node`)
-> print text=[version](`node`)
+> print text=[ok](access(`node`, "ok"))
+> print text=[version](access(`node`, "version"))
 
 `probe` returns `{lang, cmd, path, ok, version, error}`. Omit `lang` to inspect every known language.
 
@@ -33,9 +34,9 @@ console.log("hello from a foreign kernel");
 
 **record = > foreign.invoke code=`marker`**
 
-> print text=[ok](`record`)
-> print text=[stdout](`record`)
-> print text=[code](`record`)
+> print text=[ok](access(`record`, "ok"))
+> print text=[stdout](access(`record`, "stdout"))
+> print text=[code](access(`record`, "code"))
 
 `invoke` never throws on a process failure. Read `ok`, `code`, `stdout`, `stderr`, `ms`, `timed_out`, `truncated`, `result` and `error` from one record.
 
@@ -87,7 +88,7 @@ A persistent kernel.
 
 **second = > foreign.session_eval id=`session` source="total * 2"**
 
-> print text=[result](`second`)
+> print text=[result](access(`second`, "result"))
 
 Variables created in the first evaluation survive into the second. The kernel is not a shell: use `session_eval`, `session_get`, `session_names`, then `session_close`.
 

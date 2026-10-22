@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: ext/data/form
 description: Form Resource — fields, validate, submit (ADR 0007).
 import plugin:lib/plugin.mq.md
@@ -62,6 +63,6 @@ Localized submit / cancel copy for rendered forms.
     + `data`
     + `db`
 
-**url = [url](db)**
+**url = [url](access(db, "url"))**
 *> web_form_submit form=`self` data=`data` url=`url`*
 

@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: ext/data/db
 description: Database Resource — CRUD, txn, migrate, FTS (ADR 0007).
 import plugin:lib/plugin.mq.md
@@ -30,7 +31,7 @@ Open a database handle. URL schemes: `sqlite:path` (default), `postgres://…` /
 
 Create a table from a schema table. Optional columns: `唯一`/`unique`, `索引`/`index` (creates UNIQUE / INDEX), `外键`/`fk`/`references` (e.g. `posts.id` or `posts(id)`). Columns named `created_at` / `updated_at` are filled automatically on insert/update when present.
 
-**url = [url](self)**
+**url = [url](access(self, "url"))**
 *> web_db_init url=`url` name=`name` fields=`fields`*
 
 ## insert
@@ -38,7 +39,7 @@ Create a table from a schema table. Optional columns: `唯一`/`unique`, `索引
     + `rows`
     + `txn`=None
 
-**url = [url](self)**
+**url = [url](access(self, "url"))**
 *> web_db_insert url=`url` table=`table` rows=`rows` txn=`txn`*
 
 ## select
@@ -50,9 +51,9 @@ Create a table from a schema table. Optional columns: `唯一`/`unique`, `索引
 
 Simple filters: one-row map of column→value (AND `=`), or rows `|字段|操作|值|` (`=` `!=` `>` `>=` `<` `<=` `like` `in` `between` `is null`; add `|或|` = `是` to join a row with `OR`). `order` is a column name with optional `-` prefix for descending (`"created_at"`, `"-created_at"`), comma-separated for multiple keys. Pass `txn` to read inside an open transaction. For pages (with a total), use `paginate`.
 
-**url = [url](self)**
+**url = [url](access(self, "url"))**
 **r = > web_db_select url=`url` table=`table` where=`where` limit=`limit` order=`order` offset=None txn=`txn`**
-*[rows](r)*
+*[rows](access(r, "rows"))*
 
 ## paginate
     + `table`
@@ -64,7 +65,7 @@ Simple filters: one-row map of column→value (AND `=`), or rows `|字段|操作
 
 Like `select` but returns `{ rows, total }` — the total counts rows matching `where` regardless of `limit`/`跳过`, so you can render `上一页 / 下一页`. Set `跳过` to the number of rows to skip (e.g. page 2 with 10 per page ⇒ `跳过`=10).
 
-**url = [url](self)**
+**url = [url](access(self, "url"))**
 *> web_db_select url=`url` table=`table` where=`where` limit=`limit` order=`order` offset=`跳过` txn=`txn`*
 
 ## get
@@ -72,7 +73,7 @@ Like `select` but returns `{ rows, total }` — the total counts rows matching `
     + `id`
     + `txn`=None
 
-**url = [url](self)**
+**url = [url](access(self, "url"))**
 *> web_db_get url=`url` table=`table` id=`id` txn=`txn`*
 
 ## update
@@ -81,7 +82,7 @@ Like `select` but returns `{ rows, total }` — the total counts rows matching `
     + `row`
     + `txn`=None
 
-**url = [url](self)**
+**url = [url](access(self, "url"))**
 *> web_db_update url=`url` table=`table` id=`id` row=`row` txn=`txn`*
 
 ## delete
@@ -89,7 +90,7 @@ Like `select` but returns `{ rows, total }` — the total counts rows matching `
     + `id`
     + `txn`=None
 
-**url = [url](self)**
+**url = [url](access(self, "url"))**
 *> web_db_delete url=`url` table=`table` id=`id` txn=`txn`*
 
 ## exec
@@ -97,7 +98,7 @@ Like `select` but returns `{ rows, total }` — the total counts rows matching `
     + `args`=None
     + `txn`=None
 
-**url = [url](self)**
+**url = [url](access(self, "url"))**
 *> web_db_exec url=`url` sql=`sql` args=`args` txn=`txn`*
 
 ## query
@@ -107,7 +108,7 @@ Like `select` but returns `{ rows, total }` — the total counts rows matching `
 
 Run bare SQL and return the result set — count / join / group / subqueries. Returns `{ rows, count }`.
 
-**url = [url](self)**
+**url = [url](access(self, "url"))**
 *> web_db_query url=`url` sql=`sql` args=`args` txn=`txn`*
 
 ## count
@@ -117,16 +118,16 @@ Run bare SQL and return the result set — count / join / group / subqueries. Re
 
 Count rows matching a `where` filter (same syntax as `select`). Returns a number.
 
-**url = [url](self)**
+**url = [url](access(self, "url"))**
 **r = > web_db_count url=`url` table=`table` where=`where` txn=`txn`**
-*[count](r)*
+*[count](access(r, "count"))*
 
 ## migrate
     + `steps`
 
 Apply versioned SQL migrations. `steps` is a `|version|sql|` / `|版本|SQL|` table. Applied versions are recorded in `_marqdo_migrations`. Re-running is a no-op for already-applied versions. SQLite only.
 
-**url = [url](self)**
+**url = [url](access(self, "url"))**
 *> web_db_migrate url=`url` steps=`steps`*
 
 ## fts
@@ -136,7 +137,7 @@ Apply versioned SQL migrations. `steps` is a `|version|sql|` / `|版本|SQL|` ta
 
 Create an FTS5 index on `table` for the listed content columns (CSV string or list). Default FTS name is `{table}_fts`. Keeps the index in sync via triggers. Requires integer `id` PK. SQLite only.
 
-**url = [url](self)**
+**url = [url](access(self, "url"))**
 *> web_db_fts_create url=`url` table=`table` columns=`columns` name=`name`*
 
 ## search
@@ -147,7 +148,7 @@ Create an FTS5 index on `table` for the listed content columns (CSV string or li
 
 Full-text search (`MATCH`) against the FTS5 index from `fts`. Returns `{ rows, count }` with a `rank` column (bm25). SQLite only.
 
-**url = [url](self)**
+**url = [url](access(self, "url"))**
 *> web_db_search url=`url` table=`table` q=`q` limit=`limit` name=`name`*
 
 ## 事务
@@ -156,7 +157,7 @@ Begin a transaction: borrows the pooled connection exclusively and returns a
 `txn` handle. Write inside it, then `提交` (commit) or `回滚` (roll back).
 Every statement runs on the same connection, so a batch is atomic.
 
-**url = [url](self)**
+**url = [url](access(self, "url"))**
 *> web_db_begin url=`url`*
 
 # txn
@@ -172,8 +173,8 @@ connection; finish with `提交` or `回滚`.
     + `table`
     + `rows`
 
-**url = [url](self)**
-**txn = [txn](self)**
+**url = [url](access(self, "url"))**
+**txn = [txn](access(self, "txn"))**
 *> web_db_insert url=`url` table=`table` rows=`rows` txn=`txn`*
 
 ## select
@@ -184,17 +185,17 @@ connection; finish with `提交` or `回滚`.
 
 Same filters as `db.select`; runs inside the transaction.
 
-**url = [url](self)**
-**txn = [txn](self)**
+**url = [url](access(self, "url"))**
+**txn = [txn](access(self, "txn"))**
 **r = > web_db_select url=`url` table=`table` where=`where` limit=`limit` order=`order` offset=None txn=`txn`**
-*[rows](r)*
+*[rows](access(r, "rows"))*
 
 ## get
     + `table`
     + `id`
 
-**url = [url](self)**
-**txn = [txn](self)**
+**url = [url](access(self, "url"))**
+**txn = [txn](access(self, "txn"))**
 *> web_db_get url=`url` table=`table` id=`id` txn=`txn`*
 
 ## update
@@ -202,37 +203,37 @@ Same filters as `db.select`; runs inside the transaction.
     + `id`
     + `row`
 
-**url = [url](self)**
-**txn = [txn](self)**
+**url = [url](access(self, "url"))**
+**txn = [txn](access(self, "txn"))**
 *> web_db_update url=`url` table=`table` id=`id` row=`row` txn=`txn`*
 
 ## delete
     + `table`
     + `id`
 
-**url = [url](self)**
-**txn = [txn](self)**
+**url = [url](access(self, "url"))**
+**txn = [txn](access(self, "txn"))**
 *> web_db_delete url=`url` table=`table` id=`id` txn=`txn`*
 
 ## exec
     + `sql`
     + `args`=None
 
-**url = [url](self)**
-**txn = [txn](self)**
+**url = [url](access(self, "url"))**
+**txn = [txn](access(self, "txn"))**
 *> web_db_exec url=`url` sql=`sql` args=`args` txn=`txn`*
 
 ## 提交
 
 Commit the transaction and return its connection to the pool.
 
-**txn = [txn](self)**
+**txn = [txn](access(self, "txn"))**
 *> web_db_commit txn=`txn`*
 
 ## 回滚
 
 Roll the transaction back (undo every write) and return its connection.
 
-**txn = [txn](self)**
+**txn = [txn](access(self, "txn"))**
 *> web_db_rollback txn=`txn`*
 

@@ -42,6 +42,22 @@ impl From<BackendCli> for Backend {
 }
 
 #[derive(Subcommand, Debug)]
+enum MigrateAction {
+    /// `[键](集合)` → `access(集合, 键)`；`- [项](集合)` → `- [项](遍历 集合 为 项)`
+    Labels {
+        #[arg(value_name = "PATH", default_value = ".")]
+        path: PathBuf,
+        /// Actually rewrite files (default: dry run)
+        #[arg(long)]
+        write: bool,
+        /// One JSON object on stdout
+        #[arg(long)]
+        json: bool,
+    },
+}
+
+
+#[derive(Subcommand, Debug)]
 enum Commands {
     /// Execute a Marqdo source file (defaults to ./index.mq.md)
     Run {
@@ -126,6 +142,11 @@ enum Commands {
         /// Print only the hit count
         #[arg(long)]
         count: bool,
+    },
+    /// Migrate legacy syntax to the purity forms (`<TAB>` M7)
+    Migrate {
+        #[command(subcommand)]
+        action: MigrateAction,
     },
     /// MLSP for AI: line-delimited JSON on stdio (locate / syntax / validate / repair_targets / schema)
     Mlsp,
@@ -642,6 +663,62 @@ fn try_main(cli: Cli) -> Result<i32> {
             }
             Ok(0)
         }
+        Commands::Migrate { action } => match action {
+            MigrateAction::Labels { path, write, json } => {
+                let reports = marqdo::migrate::migrate_path(&path, write)?;
+                let (mut idx, mut loops, mut applied) = (0usize, 0usize, 0usize);
+                for r in &reports {
+                    idx += r.indexes;
+                    loops += r.loops;
+                    applied += usize::from(r.applied);
+                }
+                if json {
+                    let arr: Vec<serde_json::Value> = reports
+                        .iter()
+                        .filter(|r| r.indexes > 0 || r.loops > 0 || r.note.is_some())
+                        .map(|r| {
+                            serde_json::json!({
+                                "file": r.file.display().to_string(),
+                                "indexes": r.indexes,
+                                "loops": r.loops,
+                                "applied": r.applied,
+                                "note": r.note,
+                            })
+                        })
+                        .collect();
+                    println!("{}", serde_json::Value::Array(arr));
+                } else {
+                    for r in &reports {
+                        if r.indexes == 0 && r.loops == 0 {
+                            continue;
+                        }
+                        let state = if r.applied {
+                            "written"
+                        } else if r.note.is_some() {
+                            "skipped"
+                        } else {
+                            "would change"
+                        };
+                        println!(
+                            "{}  indexes={} loops={} {}{}",
+                            r.file.display(),
+                            r.indexes,
+                            r.loops,
+                            state,
+                            r.note
+                                .as_ref()
+                                .map(|n| format!(" ({n})"))
+                                .unwrap_or_default()
+                        );
+                    }
+                    println!(
+                        "migrate labels: {idx} index, {loops} loop, {applied} file written{}",
+                        if write { "" } else { " (dry run; pass --write)" }
+                    );
+                }
+                Ok(0)
+            }
+        },
         Commands::Mlsp => {
             use std::io::{BufRead, Write};
             let stdin = std::io::stdin();

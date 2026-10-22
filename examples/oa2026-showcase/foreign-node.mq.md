@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: 外联：把 Node 当作文档里的计算车间
 description: 一次性执行、持久会话、显式传值，以及可读的结果。
 import foreign:lib/foreign.mq.md
@@ -59,7 +60,7 @@ console.log(ranked.map(([region, total]) => `${region}: ${total}`).join("\n"));
 ```
 
 **`第一次` = > foreign.session_eval id=`会话` code=`排序代码`**
-> print text=[stdout](`第一次`)
+> print text=[stdout](access(`第一次`, "stdout"))
 
 内核状态是持续的。下面这段代码在同一个`orders`上追加一条华北订单，
 再重新排序；不需要重新传一遍整张表。
@@ -79,6 +80,6 @@ console.log(rankedAgain.map(([region, total]) => `${region}: ${total}`).join("\n
 ```
 
 **`第二次` = > foreign.session_eval id=`会话` code=`追加代码`**
-> print text=[stdout](`第二次`)
+> print text=[stdout](access(`第二次`, "stdout"))
 
 **> foreign.session_close id=`会话`**

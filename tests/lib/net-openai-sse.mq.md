@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: openai SSE parse offline
 import net:lib/net.mq.md
 import json:lib/json.mq.md
@@ -10,7 +11,7 @@ import json:lib/json.mq.md
 
 **events = > net.openai_sse_parse text=`fixture`**
 
-- [`ev`](`events`)
+- [ev](遍历 `events` 为 `ev`)
   **t = > json.get value=`ev` key="type"**
   1. `t` == "delta"
     **chunk = > json.get value=`ev` key="text"**

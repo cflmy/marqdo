@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: Row records
 description: First header @ / row makes a list of maps
 ---
@@ -14,10 +15,10 @@ When the first header is `@` or `row`, each data row is a map (marker column is 
 | 1 | apple | 2 |
 | 2 | pear | 3 |
 
-**`n` = [name]([1](orders))**
+**`n` = [name](access([1](access(orders, "1")), "name"))**
 
 > print text=`n`
 
-**`q` = [qty]([2](orders))**
+**`q` = [qty](access([2](access(orders, "2")), "qty"))**
 
 > print text=`q`

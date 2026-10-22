@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: foreign invoke JSON input
 import foreign:lib/foreign.mq.md
 ---
@@ -25,8 +26,8 @@ process.stdin.on("end", () => {
 ```
 
 **记录 = > foreign.invoke code=`统计` input=`数值表` output="json"**
-**统计结果 = [result](`记录`)**
+**统计结果 = [result](access(`记录`, "result"))**
 
-> print text=[ok](`记录`)
-> print text=[n](`统计结果`)
-> print text=[sum](`统计结果`)
+> print text=[ok](access(`记录`, "ok"))
+> print text=[n](access(`统计结果`, "n"))
+> print text=[sum](access(`统计结果`, "sum"))

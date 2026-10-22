@@ -1185,28 +1185,6 @@ impl Interpreter {
         }
 
         match call.callee.as_str() {
-            // `<TAB>` M3: `access(集合, 键)` — the exact polymorphism of the
-            // legacy `[键](集合)` index (map key / 1-based list index, error on
-            // missing). Migration rewrites legacy indexes to this call, so the
-            // two must stay semantically identical.
-            "access" | "取" | "取值" => {
-                let bound = bind_args(&["value".into(), "key".into()], &ev_args, false)
-                    .map_err(|m| self.err(m))?;
-                let base = bound
-                    .get("value")
-                    .cloned()
-                    .ok_or_else(|| self.err("access requires value (collection)"))?;
-                let key = bound
-                    .get("key")
-                    .map(|v| match v {
-                        Value::Text(t) => t.clone(),
-                        Value::Int(i) => i.to_string(),
-                        other => other.as_display(),
-                    })
-                    .ok_or_else(|| self.err("access requires key"))?;
-                return crate::builtin::builtin_footnote_get(&base, &key)
-                    .map_err(|m| self.err(m));
-            }
             "print" => {
                 let bound = bind_args(&["text".into()], &ev_args, false)
                     .map_err(|m| self.err(m))?;

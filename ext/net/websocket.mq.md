@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: ext/net/websocket
 description: WebSocket client Resource (ADR 0007).
 import plugin:lib/plugin.mq.md
@@ -37,5 +38,5 @@ WebSocket client helper.
 
 Single request–response: connect to `url`, send `message`, collect up to 256 server text replies (each up to 1 MiB), close. Transport errors and timeouts return `{ok:false, error}` instead of looking like an empty successful reply.
 
-**timeout = [timeout_sec](self)**
+**timeout = [timeout_sec](access(self, "timeout_sec"))**
 *> web_ws_connect url=`url` message=`message` headers=`headers` timeout_sec=`timeout`*

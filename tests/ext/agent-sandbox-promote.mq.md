@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: promote requires sandbox proof (O2)
 description: >
   Good workbook promotes; broken workbook is rejected (sandbox_proof_failed).
@@ -25,11 +26,11 @@ import sys:lib/sys.mq.md
   **_ = 0**
 
 **prom = agent_kb_promote kb_dir=`kb` goal="sandbox promote good" workbook="sandbox-fixtures/promote-good.mq.md"**
-**ok = [promoted](prom)**
+**ok = [promoted](access(prom, "promoted"))**
 > print text=`ok`
 
 **rej = agent_kb_promote kb_dir=`kb` goal="sandbox promote bad" workbook="sandbox-fixtures/promote-bad.mq.md"**
-**rej_ok = [promoted](rej)**
-**reason = [reason](rej)**
+**rej_ok = [promoted](access(rej, "promoted"))**
+**reason = [reason](access(rej, "reason"))**
 > print text=`rej_ok`
 > print text=`reason`

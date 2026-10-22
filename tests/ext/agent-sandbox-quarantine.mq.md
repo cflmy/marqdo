@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: O5 quarantine skill status
 description: Promote good skill then quarantine — status becomes quarantine.
 import plugin:lib/plugin.mq.md
@@ -23,12 +24,12 @@ import sys:lib/sys.mq.md
   **_ = 0**
 
 **prom = agent_kb_promote kb_dir=`kb` goal="quarantine demo" workbook="sandbox-fixtures/promote-good.mq.md"**
-**ok = [promoted](prom)**
-**slug = [slug](prom)**
+**ok = [promoted](access(prom, "promoted"))**
+**slug = [slug](access(prom, "slug"))**
 > print text=`ok`
 
 **q = agent_kb_quarantine kb_dir=`kb` slug=`slug` reason="fixture_regression"**
-**qok = [ok](q)**
-**st = [status](q)**
+**qok = [ok](access(q, "ok"))**
+**st = [status](access(q, "status"))**
 > print text=`qok`
 > print text=`st`

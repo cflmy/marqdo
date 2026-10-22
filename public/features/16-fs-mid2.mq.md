@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: Mid stdlib — fs make_dirs, walk, stat
 description: Recursive dirs, walk, and file metadata (Mid2 M9)
 import fs:lib/fs.mq.md
@@ -15,7 +16,7 @@ import fs:lib/fs.mq.md
 > fs.write_text path="m9-demo/readme.txt" text="ok"
 
 **st = > fs.stat path="m9-demo/readme.txt"**
-> print text=[size](`st`)
+> print text=[size](access(`st`, "size"))
 
 **w = > fs.walk path="m9-demo"**
 **n = > len `w`**

@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: ext/ai/llm/openai
 description: >-
   OpenAI-compatible chat completions transport (HTTP + SSE).
@@ -56,7 +57,7 @@ Extract OpenAI-shaped `choices[0].message.tool_calls` as a list (or empty list).
 1. not `choices`
   *> table.empty_list*
 2. *
-  **c0 = [1](choices)**
+  **c0 = [1](access(choices, "1"))**
   **msg = > json.get value=`c0` key="message"**
   1. not `msg`
     *> table.empty_list*

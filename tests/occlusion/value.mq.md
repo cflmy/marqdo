@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: occlusion value passthrough
 ---
 

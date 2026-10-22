@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: table collections
 description: put + list/map helpers
 import table:lib/table.mq.md
@@ -7,7 +8,7 @@ import table:lib/table.mq.md
 # main
 
 **h = > table.put in=None at="Authorization" value="Bearer-x"**
-> print text=[Authorization](`h`)
+> print text=[Authorization](access(`h`, "Authorization"))
 
 `xs` =
 
@@ -17,8 +18,8 @@ import table:lib/table.mq.md
 | b |
 
 **xs = > table.put in=`xs` at=1 value="A"**
-> print text=[1](`xs`)
-> print text=[2](`xs`)
+> print text=[1](access(`xs`, "1"))
+> print text=[2](access(`xs`, "2"))
 
 `req` =
 
@@ -31,8 +32,8 @@ import table:lib/table.mq.md
 **messages = > table.append list=None item=`msg`**
 **req = > table.put in=`req` at="messages" value=`messages`**
 **req = > table.put in=`req` at="stream" value=True**
-> print text=[content]([1]([messages](`req`)))
-> print text=[stream](`req`)
+> print text=[content](access([1](access([messages](access(`req`, "messages")), "1")), "content"))
+> print text=[stream](access(`req`, "stream"))
 
 **xs = > table.append list=`xs` item="c"**
 **n = > table.len xs=`xs`**

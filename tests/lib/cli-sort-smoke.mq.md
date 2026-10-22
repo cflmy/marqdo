@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: table sort_by + cli
 import table:lib/table.mq.md
 import csv:lib/csv.mq.md
@@ -11,12 +12,12 @@ import cli:lib/cli.mq.md
 **rows = > csv.parse text=`raw`**
 **rows = > table.sort_by list=`rows` key="name"**
 **r0 = > at value=`rows` index=0**
-> print text=[name](`r0`)
+> print text=[name](access(`r0`, "name"))
 
 **args = > split value="--input,data.csv,rest,--verbose" sep=","**
 **flags = > cli.parse args=`args`**
-> print text=[input](`flags`)
-> print text=[verbose](`flags`)
-**pos = [_](`flags`)**
+> print text=[input](access(`flags`, "input"))
+> print text=[verbose](access(`flags`, "verbose"))
+**pos = [_](access(`flags`, "_"))**
 **p0 = > at value=`pos` index=0**
 > print text=`p0`

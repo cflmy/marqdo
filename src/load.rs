@@ -38,7 +38,9 @@ fn load_module_inner(
     let result = (|| {
         let source = read_module_source(path)
             .with_context(|| format!("failed to read {}", path.display()))?;
-        let mut module = parse_source(&source).map_err(|e| attach_path(path, e))?;
+        let markup = frontmatter_markup(&source);
+        let mut module = crate::parse::expr::with_markup(markup, || parse_source(&source))
+            .map_err(|e| attach_path(path, e))?;
 
         // Resolve Artifact Metadata bindings (entry and imports share the same ctx).
         let file_ctx = BindingContext {
@@ -285,6 +287,37 @@ fn label_error(label: &str, e: anyhow::Error) -> anyhow::Error {
     }
 }
 
+/// Effective markup mode declared by the file itself. `<TAB>` M7
+///
+/// Looks for `markup: occlusion` (or `标记: 遮蔽`) inside the leading frontmatter
+/// block. Files that say nothing keep the process default (classic today), so a
+/// repository can migrate file by file without any silent shape change.
+fn frontmatter_markup(source: &str) -> crate::parse::expr::Markup {
+    use crate::parse::expr::Markup;
+    let mut lines = source.lines();
+    if lines.next().map(|l| l.trim_end()) != Some("---") {
+        return crate::parse::expr::markup_default();
+    }
+    for line in lines {
+        let t = line.trim();
+        if t == "---" {
+            break;
+        }
+        let lower = t.to_ascii_lowercase();
+        for key in ["markup:", "标记:"] {
+            if let Some(rest) = lower.strip_prefix(key) {
+                let val = rest.trim();
+                return if matches!(val, "occlusion" | "purity" | "遮蔽" | "纯度") {
+                    Markup::Occlusion
+                } else {
+                    Markup::Classic
+                };
+            }
+        }
+    }
+    crate::parse::expr::markup_default()
+}
+
 fn load_module_from_source_inner(
     source: &str,
     label: &str,
@@ -297,7 +330,9 @@ fn load_module_from_source_inner(
     }
 
     let result = (|| {
-        let mut module = parse_source(source).map_err(|e| label_error(label, e))?;
+        let markup = frontmatter_markup(source);
+        let mut module = crate::parse::expr::with_markup(markup, || parse_source(source))
+            .map_err(|e| label_error(label, e))?;
         module.metadata = resolve_metadata(&module.metadata_raw, ctx, Span::new(1, 1))
             .map_err(|e| label_error(label, e))?;
         let imports = module.imports.clone();

@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: browser-app (route E+)
 description: list CRUD, storage, navigate, interval, fetch_all, ws — GFM + lib/browser
 import browser:lib/browser.mq.md
@@ -64,7 +65,7 @@ import text:lib/text.mq.md
         **`bag` = bag + "\n" + value**
     **`parts` = > text.str_split s=bag sep="\n"**
     **`html` = ""**
-    - [item](parts)
+    - [item](遍历 parts 为 item)
         1. `item` != ""
             **`html` = html + "<li><span>" + item + "</span> <button type=\"button\" data-id=\"" + item + "\">删</button></li>"**
     **`ret` = > browser.set_html sel="#items" html=html**
@@ -81,7 +82,7 @@ import text:lib/text.mq.md
 1. `data_id` != ""
     **`parts` = > text.str_split s=bag sep="\n"**
     **`next` = ""**
-    - [item](parts)
+    - [item](遍历 parts 为 item)
         1. `item` != ""
             1. `item` != `data_id`
                 1. `next` == ""
@@ -91,7 +92,7 @@ import text:lib/text.mq.md
     **`bag` = next**
     **`parts2` = > text.str_split s=bag sep="\n"**
     **`html` = ""**
-    - [item](parts2)
+    - [item](遍历 parts2 为 item)
         1. `item` != ""
             **`html` = html + "<li><span>" + item + "</span> <button type=\"button\" data-id=\"" + item + "\">删</button></li>"**
     **`ret` = > browser.set_html sel="#items" html=html**

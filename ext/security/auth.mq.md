@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: ext/security/auth
 description: Auth Resource (ADR 0007).
 import plugin:lib/plugin.mq.md
@@ -31,8 +32,8 @@ Session/auth helper. Constructs a config object; `login` validates against the u
 
 Validate credentials against the users table and create a session. Returns `{ok, session_id, username, role}`.
 
-**users = [users](self)**
-**ttl = [session_ttl](self)**
+**users = [users](access(self, "users"))**
+**ttl = [session_ttl](access(self, "session_ttl"))**
 *> web_auth_login username=`username` password=`password` users=`users` session_ttl=`ttl`*
 
 ## check

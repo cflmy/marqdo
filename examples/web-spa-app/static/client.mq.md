@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: spa client
 description: routes table + memory store; list / detail / edit
 import browser:lib/browser.mq.md
@@ -87,7 +88,7 @@ Routes (documentation + titles). Runtime switches panels by `path`.
     1. `cur_id` != ""
         **`parts` = > text.str_split s=items sep="\n"**
         **`next` = ""**
-        - [item](parts)
+        - [item](遍历 parts 为 item)
             1. `item` != ""
                 1. `item` == `cur_id`
                     1. `next` == ""
@@ -145,7 +146,7 @@ Routes (documentation + titles). Runtime switches panels by `path`.
         **`body` = ""**
 **`parts` = > text.str_split s=items sep="\n"**
 **`html` = ""**
-- [item](parts)
+- [item](遍历 parts 为 item)
     1. `item` != ""
         **`html` = html + "<li data-id=\"" + item + "\">" + item + "</li>"**
 `persist` =

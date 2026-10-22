@@ -218,6 +218,8 @@ pub enum HostFn {
     ForeignSessionClose = 209,
     ForeignSessionList = 210,
     ForeignSessionInterrupt = 211,
+    /// `<TAB>` M7: `access(集合, 键)` — polymorphic collection access (legacy index).
+    Access,
 }
 
 
@@ -426,6 +428,7 @@ impl HostFn {
             209 => Self::ForeignSessionClose,
             210 => Self::ForeignSessionList,
             211 => Self::ForeignSessionInterrupt,
+            212 => Self::Access,
             _ => return None,
         })
     }
@@ -525,6 +528,7 @@ impl HostFn {
             "host_plugin_load" | "plugin_load" => Self::PluginLoad,
             "host_plugin_unload" | "plugin_unload" => Self::PluginUnload,
             "host_plugin_list" | "plugin_list" => Self::PluginList,
+            "host_access" | "access" | "取" | "取值" => Self::Access,
             "host_ext_native_path" | "ext_native_path" => Self::ExtNativePath,
                                                 "host_map_set" | "map_set" => Self::MapSet,
             "host_list_append" | "list_append" => Self::ListAppend,
@@ -647,6 +651,7 @@ impl HostFn {
 
     pub fn name(self) -> &'static str {
         match self {
+            Self::Access => "host_access",
             Self::ReadText => "host_read_text",
             Self::WriteText => "host_write_text",
             Self::AppendText => "host_append_text",
@@ -854,6 +859,7 @@ impl HostFn {
 
     pub fn required_params(self) -> &'static [&'static str] {
         match self {
+            Self::Access => &["value", "key"],
             Self::ReadText | Self::Exists | Self::ListDir | Self::MakeDir | Self::Remove => {
                 &["path"]
             }
@@ -1098,6 +1104,15 @@ pub fn call_host(
     bound: &HashMap<String, Value>,
 ) -> Result<Value, String> {
     match fn_id {
+        HostFn::Access => {
+            let base = require(bound, "value")?;
+            let key = match require(bound, "key")? {
+                Value::Text(t) => t.clone(),
+                Value::Int(i) => i.to_string(),
+                other => crate::builtin::builtin_str(other).as_display(),
+            };
+            crate::builtin::builtin_footnote_get(base, &key)
+        }
         HostFn::ReadText => fs::read_text(ctx, require(bound, "path")?),
         HostFn::WriteText => {
             fs::write_text(ctx, require(bound, "path")?, require(bound, "text")?)

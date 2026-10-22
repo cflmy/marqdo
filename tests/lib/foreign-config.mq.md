@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: foreign config load
 import foreign:lib/foreign.mq.md
 ---
@@ -9,4 +10,4 @@ import foreign:lib/foreign.mq.md
 > print text=`载入`
 
 **运行 = > foreign.invoke lang="tinycfg" source="console.log('cfg')"**
-> print text=[stdout](`运行`)
+> print text=[stdout](access(`运行`, "stdout"))

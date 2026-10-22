@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: Collections (tables)
 description: One-column tables are lists
 ---
@@ -15,5 +16,5 @@ A single-column Markdown table is a list; loop to read each item. Prefer link-in
 | pear |
 | peach |
 
-- [fruit](basket)
+- [fruit](遍历 basket 为 fruit)
   > print text=`fruit`

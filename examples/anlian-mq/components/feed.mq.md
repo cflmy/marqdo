@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: components/feed
 description: 帖子列表 / 新闻时间线 / 板块栏 HTML 片段（对齐 Django feed 与 home 局部模板）。
 import table:lib/table.mq.md
@@ -11,13 +12,13 @@ import text:lib/text.mq.md
 给定帖子行记录列表，输出 `ul.home-posts-list` 标记（首页与列表页共用）。
 
 **段 = None**
-- [帖](行)
-  **板 = [board](帖)**
-  **题 = [title](帖)**
-  **链 = [slug](帖)**
-  **作 = [author](帖)**
-  **评 = [comments_count](帖)**
-  **时 = [created_at](帖)**
+- [帖](遍历 行 为 帖)
+  **板 = [board](access(帖, "board"))**
+  **题 = [title](access(帖, "title"))**
+  **链 = [slug](access(帖, "slug"))**
+  **作 = [author](access(帖, "author"))**
+  **评 = [comments_count](access(帖, "comments_count"))**
+  **时 = [created_at](access(帖, "created_at"))**
   1. not 作
     **作 = "匿名"**
   2. *
@@ -41,11 +42,11 @@ import text:lib/text.mq.md
 给定新闻行记录列表，输出 `.news-timeline` 标记。
 
 **段 = None**
-- [讯](行)
-  **题 = [title](讯)**
-  **链 = [slug](讯)**
-  **板 = [board](讯)**
-  **时 = [created_at](讯)**
+- [讯](遍历 行 为 讯)
+  **题 = [title](access(讯, "title"))**
+  **链 = [slug](access(讯, "slug"))**
+  **板 = [board](access(讯, "board"))**
+  **时 = [created_at](access(讯, "created_at"))**
   1. not 板
     **板 = ""**
   2. *
@@ -79,9 +80,9 @@ import text:lib/text.mq.md
 **全链 = 前缀 + "?" + 查询键 + "=0"**
 **全项 = "<a href=\"" + 全链 + "\" class=\"" + 全部类 + " active\" " + 数据属 + "=\"0\">" + 全标签 + "</a>"**
 **段 = > table.append list=段 item=全项**
-- [板](板块)
-  **名 = [name](板)**
-  **号 = [id](板)**
+- [板](遍历 板块 为 板)
+  **名 = [name](access(板, "name"))**
+  **号 = [id](access(板, "id"))**
   **链 = 前缀 + "?" + 查询键 + "=" + 号**
   **项 = "<a href=\"" + 链 + "\" class=\"" + 全部类 + "\" " + 数据属 + "=\"" + 号 + "\">" + 名 + "</a>"**
   **段 = > table.append list=段 item=项**

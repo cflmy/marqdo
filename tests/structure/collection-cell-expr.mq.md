@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: table cell expressions
 description: Data cells evaluate like call-arg values (`var`, paths, hyphen prose).
 ---
@@ -14,9 +15,9 @@ description: Data cells evaluate like call-arg values (`var`, paths, hyphen pros
 |---------|-------|------|
 | `secret` | `name` | https://api.openai.com/v1 |
 
-> print text=[api_key](`cfg`)
-> print text=[model](`cfg`)
-> print text=[base](`cfg`)
+> print text=[api_key](access(`cfg`, "api_key"))
+> print text=[model](access(`cfg`, "model"))
+> print text=[base](access(`cfg`, "base"))
 
 `paths` =
 
@@ -24,7 +25,7 @@ description: Data cells evaluate like call-arg values (`var`, paths, hyphen pros
 |---|
 | /chat/completions |
 
-> print text=[1](`paths`)
+> print text=[1](access(`paths`, "1"))
 
 `rec` =
 
@@ -32,7 +33,7 @@ description: Data cells evaluate like call-arg values (`var`, paths, hyphen pros
 |---|------|---------|
 | 1 | user | `secret` |
 
-> print text=[content]([1](`rec`))
+> print text=[content](access([1](access(`rec`, "1")), "content"))
 
 `ratios` =
 
@@ -41,5 +42,5 @@ description: Data cells evaluate like call-arg values (`var`, paths, hyphen pros
 | "1/5" |
 | "16/9" |
 
-> print text=[1](`ratios`)
-> print text=[2](`ratios`)
+> print text=[1](access(`ratios`, "1"))
+> print text=[2](access(`ratios`, "2"))

@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: ext/ai/sandbox
 description: >-
   CoW trial workspace for AI-generated Marqdo: open / run / diff / commit.
@@ -172,9 +173,9 @@ O4: write a markdown review of `## diff` for `marqdo view` / HITL (static report
 **body = "# Sandbox diff report\n\nPending changes: "**
 **body = body + n**
 **body = body + "\n\n| path | kind |\n|------|------|\n"**
-- [row](pending)
-  **p = [path](row)**
-  **k = [kind](row)**
+- [row](遍历 pending 为 row)
+  **p = [path](access(row, "path"))**
+  **k = [kind](access(row, "kind"))**
   **body = body + "| "**
   **body = body + p**
   **body = body + " | "**

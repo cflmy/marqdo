@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: foreign persistent session
 import foreign:lib/foreign.mq.md
 ---
@@ -9,7 +10,7 @@ import foreign:lib/foreign.mq.md
 **设值 = > foreign.session_eval id=`会话` source="let x = 41"**
 **求值 = > foreign.session_eval id=`会话` source="x + 1"**
 
-> print text=[result](`求值`)
+> print text=[result](access(`求值`, "result"))
 
 **取x = > foreign.session_get id=`会话` name="x"**
 > print text=`取x`

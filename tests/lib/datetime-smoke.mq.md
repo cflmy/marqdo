@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: lib/datetime smoke
 import dt:lib/datetime.mq.md
 ---
@@ -6,10 +7,10 @@ import dt:lib/datetime.mq.md
 # main
 
 **m = > dt.from_unix unix=0**
-> print text=[iso](`m`)
+> print text=[iso](access(`m`, "iso"))
 
 **sh = > dt.in_zone dt=`m` zone="Asia/Shanghai"**
-> print text=[iso](`sh`)
+> print text=[iso](access(`sh`, "iso"))
 
 **p = > dt.parse text="2020-01-02T03:04:05+08:00"**
 **u = > dt.to_unix dt=`p`**

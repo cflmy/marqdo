@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: ext/data/storage
 description: Object storage Resource (ADR 0007).
 import plugin:lib/plugin.mq.md
@@ -32,25 +33,25 @@ Object storage. `file:dir` stores blobs on disk (offline / gold). `s3://bucket?e
 
 Provide either `body` (text) or `path` (local file to upload).
 
-**url = [url](self)**
+**url = [url](access(self, "url"))**
 *> web_storage_put url=`url` key=`key` body=`body` path=`path` content_type=`content_type`*
 
 ## get
     + `key`
 
-**url = [url](self)**
+**url = [url](access(self, "url"))**
 *> web_storage_get url=`url` key=`key`*
 
 ## delete
     + `key`
 
-**url = [url](self)**
+**url = [url](access(self, "url"))**
 *> web_storage_delete url=`url` key=`key`*
 
 ## list
     + `prefix`=""
 
-**url = [url](self)**
+**url = [url](access(self, "url"))**
 *> web_storage_list url=`url` prefix=`prefix`*
 
 # media
@@ -79,7 +80,7 @@ Offline helpers for upload validation and saving into `# storage` (also used by 
 
 **st = storage**
 1. `st` == None
-  **st = [storage](self)**
+  **st = [storage](access(self, "storage"))**
 2. *
 
 *> web_upload_save storage=`st` path=`path` key=`key` content_type=`content_type` prefix=`prefix`*

@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: Foreign kernels v2 — Python analysis in view
 description: Kernel state, Marqdo-to-kernel values and view cells — without a stdin-only demo
 import foreign:lib/foreign.mq.md
@@ -14,8 +15,8 @@ Probe the interpreter first. The result is ordinary Marqdo data.
 
 **python = > foreign.probe lang="python"**
 
-> print text=[ok](`python`)
-> print text=[version](`python`)
+> print text=[ok](access(`python`, "ok"))
+> print text=[version](access(`python`, "version"))
 
 ---
 
@@ -45,7 +46,7 @@ round(sum(float(row["金额"]) for row in orders), 2)
 
 **total = > foreign.session_eval id=`内核会话` code=`total_code`**
 
-> print text=[result](`total`)
+> print text=[result](access(`total`, "result"))
 
 The low-level kernel session is managed entirely by `foreign`; the table crossed the boundary as an explicit JSON copy.
 
@@ -69,7 +70,7 @@ sum(value * value for value in values)
 
 **square_sum = > foreign.session_eval id=`内核会话` code=`square_sum_code`**
 
-> print text=[result](`square_sum`)
+> print text=[result](access(`square_sum`, "result"))
 
 **> foreign.session_close id=`内核会话`**
 

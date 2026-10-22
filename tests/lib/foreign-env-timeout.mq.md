@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: foreign env cwd timeout
 import foreign:lib/foreign.mq.md
 ---
@@ -17,7 +18,7 @@ console.log(process.env.MODE + "|" + process.env.MARQDO_FOREIGN_LANG);
 ```
 
 **检查 = > foreign.invoke code=`环境检查` env=`环境`**
-**检查输出 = > trim [stdout](`检查`)**
+**检查输出 = > trim [stdout](access(`检查`, "stdout"))**
 
 > print text=`检查输出`
 
@@ -28,5 +29,5 @@ setTimeout(() => console.log("late"), 5000);
 
 **超时 = > foreign.invoke code=`慢` timeout=0.5**
 
-> print text=[ok](`超时`)
-> print text=[timed_out](`超时`)
+> print text=[ok](access(`超时`, "ok"))
+> print text=[timed_out](access(`超时`, "timed_out"))
