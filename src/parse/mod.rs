@@ -554,24 +554,6 @@ impl<'a> Cursor<'a> {
         bail!("{span}: bold code must be assignment, call, or expression (got `{inner}`)");
     }
 
-    #[allow(dead_code)]
-    fn parse_italic_assign(&mut self, inner: &str, span: Span) -> Result<Stmt> {
-        // Kept for unit tests migrating; v0.3 uses bold for assign.
-        let Some((name, rhs)) = split_assign_inner(inner) else {
-            bail!("{span}: assignment must be name = …");
-        };
-        if crate::aliases::is_reserved_keyword(&name) {
-            bail!("{span}: `{name}` is a reserved keyword");
-        }
-        let (value, end_line) = self.resolve_assign_rhs(&name, &rhs, span, true)?;
-        Ok(Stmt::Assign {
-            name,
-            value,
-            span,
-            end_line,
-        })
-    }
-
     fn parse_backtick_assign(&mut self, trimmed: &str, span: Span) -> Result<Option<Stmt>> {
         // `name` = [rhs]
         let Some(rest) = trimmed.strip_prefix('`') else {

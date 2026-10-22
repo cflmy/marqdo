@@ -2,7 +2,6 @@
 
 use std::collections::{HashMap, HashSet};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::mpsc::{self, Receiver, Sender};
 use std::sync::{Arc, Condvar, Mutex};
 use std::time::Duration;
 
@@ -235,12 +234,6 @@ pub fn snapshot_json(s: &DebugSnapshot) -> serde_json::Value {
             "stderr": stderr,
         }),
     }
-}
-
-/// Channel pair helper if needed by callers.
-#[allow(dead_code)]
-pub fn action_channel() -> (Sender<DebugAction>, Receiver<DebugAction>) {
-    mpsc::channel()
 }
 
 #[cfg(test)]

@@ -13,7 +13,7 @@ use crate::knowledge::ir::{
 };
 use crate::knowledge::util::{
     extract_fm_field, extract_fm_list, extract_nested_by, extract_section, first_paragraph,
-    module_stem, slugify,
+    slugify,
 };
 use crate::lex::{classify_source, LineKind};
 use crate::parse::parse_source;
@@ -522,7 +522,3 @@ fn extract_frontmatter_imports(source: &str) -> Vec<String> {
     imports
 }
 
-#[allow(dead_code)]
-pub fn stem_of(resource: &str) -> String {
-    module_stem(resource)
-}

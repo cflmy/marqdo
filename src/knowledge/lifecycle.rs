@@ -2,7 +2,6 @@
 
 use std::fs;
 use std::path::Path;
-use std::time::SystemTime;
 
 use serde_json::{json, Value};
 
@@ -248,7 +247,3 @@ pub fn verify_json(issues: &[VerifyIssue]) -> Value {
     })
 }
 
-#[allow(dead_code)]
-fn _system_time_now() -> SystemTime {
-    SystemTime::now()
-}

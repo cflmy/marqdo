@@ -456,11 +456,6 @@ pub fn query(name: &str, args: &serde_json::Value, ctx: &HostContext) -> Result<
     }
 }
 
-#[allow(dead_code)]
-pub fn unavailable(feature: &str) -> String {
-    format!("{feature} unavailable in sandbox")
-}
-
 /// Used by fs layer when session is active — map Value path through resolve then CoW.
 pub fn try_read_value(ctx: &HostContext, path: &Value) -> Result<Option<Value>, String> {
     let rel = match path {
