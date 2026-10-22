@@ -83,3 +83,19 @@ fn label_ok_has_no_diagnostics() {
     assert!(!text.contains("空载荷"), "text={text}");
     assert!(!text.contains("缺少描述"), "text={text}");
 }
+
+// ---- M4: L1 reference consistency (`label.ref_dangling`) ----
+
+#[test]
+fn label_ref_dangling_is_an_error() {
+    let (code, text) = check("tests/occlusion/ref-dangling.mq.md", "occlusion");
+    assert_eq!(code, 1, "text={text}");
+    assert!(text.contains("描述引用了不存在的实体"), "text={text}");
+}
+
+#[test]
+fn label_refs_that_resolve_are_fine() {
+    let (code, text) = check("tests/occlusion/ref-ok.mq.md", "occlusion");
+    assert_eq!(code, 0, "text={text}");
+    assert!(!text.contains("不存在的实体"), "text={text}");
+}

@@ -20,6 +20,8 @@ pub struct OcclusionSite {
     pub line: u32,
     /// Enclosing function/object name (`# main` → `main`).
     pub unit: String,
+    /// Identifiers the payload actually mentions (for L1 ref checks).
+    pub payload_idents: std::collections::HashSet<String>,
 }
 
 /// Collect every occlusion in `module` (declaration order).
@@ -87,11 +89,16 @@ fn walk_arm(arm: &BranchArm, line: u32, unit: &str, out: &mut Vec<OcclusionSite>
 fn walk_expr(expr: &Expr, line: u32, unit: &str, out: &mut Vec<OcclusionSite>) {
     match expr {
         Expr::Occluded { label, payload } => {
+            let mut idents = std::collections::HashSet::new();
+            if let Some(inner) = payload {
+                payload_idents(inner, &mut idents);
+            }
             out.push(OcclusionSite {
                 label: label.clone(),
                 has_payload: payload.is_some(),
                 line,
                 unit: unit.to_string(),
+                payload_idents: idents,
             });
             if let Some(inner) = payload {
                 walk_expr(inner, line, unit, out);
@@ -127,12 +134,120 @@ fn walk_expr(expr: &Expr, line: u32, unit: &str, out: &mut Vec<OcclusionSite>) {
     }
 }
 
+/// Backticked entity references inside a label: `` 按 `税率` 计算 `` → `["税率"]`.
+///
+/// Only explicit backticks count as claims — plain prose never is. `<TAB>` M4
+pub fn refs(label: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    let mut rest = label;
+    while let Some(open) = rest.find('`') {
+        let after = &rest[open + 1..];
+        let Some(close) = after.find('`') else {
+            break;
+        };
+        let name = after[..close].trim();
+        if !name.is_empty() {
+            out.push(name.to_string());
+        }
+        rest = &after[close + 1..];
+    }
+    out
+}
+
+/// Every identifier the payload actually mentions (variables, callees, path parts).
+fn payload_idents(expr: &Expr, out: &mut std::collections::HashSet<String>) {
+    match expr {
+        Expr::Var(n) => {
+            out.insert(n.clone());
+        }
+        Expr::Occluded { payload, .. } => {
+            if let Some(inner) = payload {
+                payload_idents(inner, out);
+            }
+        }
+        Expr::Unary { expr, .. } => payload_idents(expr, out),
+        Expr::Binary { left, right, .. } => {
+            payload_idents(left, out);
+            payload_idents(right, out);
+        }
+        Expr::Call(call) => {
+            out.insert(call.callee.clone());
+            if let Some(p) = &call.path {
+                for seg in p {
+                    out.insert(seg.clone());
+                }
+            }
+            if let Some(r) = &call.receiver {
+                out.insert(r.clone());
+            }
+            for a in &call.args {
+                match a {
+                    Arg::Positional(e) | Arg::Named { value: e, .. } => payload_idents(e, out),
+                }
+            }
+        }
+        Expr::List(items) => {
+            for e in items {
+                payload_idents(e, out);
+            }
+        }
+        Expr::Map(pairs) => {
+            for (_, e) in pairs {
+                payload_idents(e, out);
+            }
+        }
+        Expr::Index { base, label } => {
+            payload_idents(base, out);
+            if let crate::ast::IndexKey::Var(n) = label {
+                out.insert(n.clone());
+            }
+        }
+        Expr::Interp(parts) => {
+            for p in parts {
+                if let crate::ast::InterpPart::Var(n) = p {
+                    out.insert(n.clone());
+                }
+            }
+        }
+        Expr::Literal(_) | Expr::Formula(_) | Expr::Code(_) => {}
+    }
+}
+
+/// Names that exist in the document scope: functions/objects (recursive),
+/// import aliases, frontmatter keys. Builtins are checked separately.
+fn module_symbols(module: &Module) -> std::collections::HashSet<String> {
+    let mut out = std::collections::HashSet::new();
+    fn walk_fun(f: &Function, out: &mut std::collections::HashSet<String>) {
+        out.insert(f.name.clone());
+        for p in &f.params {
+            out.insert(p.name.clone());
+        }
+        for c in &f.children {
+            walk_fun(c, out);
+        }
+    }
+    for f in &module.functions {
+        walk_fun(f, &mut out);
+    }
+    for imp in &module.imports {
+        out.insert(imp.bind.clone());
+    }
+    for u in &module.uses {
+        out.insert(u.bind.clone());
+    }
+    for (k, _) in &module.metadata {
+        out.insert(k.clone());
+    }
+    out
+}
+
 /// Diagnostics for label structure. `<TAB>` M2.5
 ///
 /// - empty label → `label.missing` (**error**): you wrote a shape without prose
 /// - empty payload → `label.empty_payload` (**warning**): say what the stub returns
 pub fn check(module: &Module, path: Option<&std::path::Path>) -> Vec<Diagnostic> {
     let mut out = Vec::new();
+    let symbols = module_symbols(module);
     for site in collect(module) {
         let span = Span::new(site.line, 1);
         if site.label.is_empty() {
@@ -164,6 +279,60 @@ pub fn check(module: &Module, path: Option<&std::path::Path>) -> Vec<Diagnostic>
                 .with_suggestion("写清桩的返回值（如 `(None)` 或 `(0)`），或补上真实实现"),
             );
         }
+
+        // `<TAB>` M4 (L1): every backticked ref in the label must resolve —
+        // either the payload mentions it, or the document defines it, or it is
+        // a builtin. This is the deterministic half of staleness detection.
+        for r in refs(&site.label) {
+            if site.payload_idents.contains(&r)
+                || symbols.contains(&r)
+                || crate::host::HostFn::from_name(&r).is_some()
+            {
+                continue;
+            }
+            out.push(
+                Diagnostic::new(
+                    path,
+                    span,
+                    format!(
+                        "描述引用了不存在的实体：`{r}` —— 本段实现没有用到它，模块里也没有定义"
+                    ),
+                )
+                .with_code("label.ref_dangling")
+                .with_severity(Severity::Error)
+                .with_doc_quote(site.label.clone())
+                .with_suggestion(format!(
+                    "检查是否改名/删除；若只是措辞，把 `{r}` 的反引号去掉或改写描述"
+                )),
+            );
+        }
     }
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::refs;
+
+    #[test]
+    fn refs_extracts_backticked_names() {
+        assert_eq!(refs("按 `税率` 计算"), vec!["税率".to_string()]);
+    }
+
+    #[test]
+    fn refs_multiple_and_skips_prose() {
+        assert_eq!(
+            refs("用 `a` 和 `b`，但 plain words 不算"),
+            vec!["a".to_string(), "b".to_string()]
+        );
+    }
+
+    #[test]
+    fn refs_none_and_unmatched_backtick() {
+        assert!(refs("纯口语描述").is_empty());
+        // Unmatched trailing backtick: ignore, do not panic.
+        assert!(refs("半截 `名字").is_empty());
+        // Empty ticks are not refs.
+        assert!(refs("空 `` 引号").is_empty());
+    }
 }
