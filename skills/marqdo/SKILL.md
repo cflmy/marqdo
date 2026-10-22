@@ -32,7 +32,7 @@ Canonical design (repo): `doc/design/markdown-mapping.md`, `doc/design/keywords.
 8. Prefer ending side-effect-only function bodies with `*None*` / `*无*` / whole-line `**` / `****` when later lines must belong to an outer function. Lone `---` / `***` are Markdown thematic breaks (skipped), not function end.
 9. **`ext/**` never calls `host_*`.** Agent/OKF helpers are plugin names (`agent_kb_*`, …) after `plugin.load`. Do **not** add agent/OKF domain code to `src/host/` (core bloat). See `doc/design/ext-agent.md` §4.
 10. **Browser (route C/D/E/F):** client logic is Marqdo on WASM; official bridge is host glue and **may** implement lists, routing, storage, WebSocket, canvas, file read, observers — authors **must not hand-write business JS**. Use `web.client_embed` / `data-mq-source-url` auto-mount. Client effects: prefer **GFM tables + `lib/browser`** ([marqdo-dev](../marqdo-dev/SKILL.md)).
-11. **Code-as-documentation / no bag glue:** Prefer **GFM tables** for maps, lists, wire, commands. Prefer **`table.put` / named helpers** over `json.set` / `json.append` chains. `lib/json` is for parse/stringify/quote only — not a dict builder. Unreadable json pipelines are a style bug. Read collections with **`[key](map)`**, not footnote indexes for new code.
+11. **Code-as-documentation / no bag glue:** Prefer **GFM tables** for maps, lists, wire, commands. Prefer **`table.put` / named helpers** over `json.set` / `json.append` chains. `lib/json` is for parse/stringify/quote only — not a dict builder. Unreadable json pipelines are a style bug. Read collections with **`[key](map)`**, not footnote indexes for new code. In `markup: occlusion` files read with **`access(map, key)`** — there `[x](y)` is occlusion, not index.
 12. **One language per file:** Do not mix EN and ZH API names in the same `.mq.md` (imports, calls, params). Pick English *or* Chinese mirrors for the whole program.
 13. **Sandbox trial habit (Agent / generated `.mq.md`):** Prefer `agent.trial` / `run sandbox=True` / `sandbox.open`→`run`→`diff`→`commit` before promoting to the host tree. Host files must stay unchanged until a successful commit. Caps live in `sandbox.profile` GFM tables — do not invent a second dialect.
 
@@ -63,6 +63,17 @@ Canonical design (repo): `doc/design/markdown-mapping.md`, `doc/design/keywords.
 | Unmarked prose | Comment |
 
 Entry: load file (often `index.mq.md`) → collect defs → run `# main`.
+
+## Occlusion syntax (v2.0.0)
+
+A file with frontmatter `markup: occlusion` (or `标记: 遮蔽`) reads `[x](y)` as **occlusion**, not index — in that file only (`MARQDO_MARKUP=occlusion` sets the process default; classic files are unchanged).
+
+- `[描述](实现)` — `[]` is prose (never executed); `()` is the **only** executed part.
+- `[顾客留存率](0.42)` · `[总价](at(价目表, "苹果") * 数量)` · `[功能开发中]()` → `None` (stub; `label.empty_payload` warning).
+- Read maps/lists with `access(集合, 键)` (aliases `取` / `取值`): `[第二项](access(列, 2))`.
+- Foreach: `- [篮子里的每个果子](遍历 篮子 为 果)` (accepts `遍历`/`for` and `为`/`as`/`in`).
+- Calls inside `()`: `加(1)` / `加(1, 2)` / `加一 号(31)` / `txt.str_trim(" x ")` — `)` terminates, commas optional.
+- Tooling: `marqdo labels pending` (stub ledger) · `marqdo labels --grep 词 --count` · `marqdo migrate labels . --write` · `marqdo check` reports `label.missing` / `label.empty_payload` / `label.ref_dangling`.
 
 ## Minimal program
 

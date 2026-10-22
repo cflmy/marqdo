@@ -1,3 +1,15 @@
+marqdo (2.0.0-1ppa1) noble; urgency=medium
+
+  * Marqdo 2.0.0: Occlusion syntax — [description](payload), where the
+    bracketed label is inert prose and the parenthesized payload is the
+    only executed part. Adds paren-call arguments, access() element
+    access, occlusion loops, marqdo labels (two-tier search + debt
+    ratchet), marqdo migrate labels, and label.missing / empty_payload /
+    ref_dangling diagnostics; view renders labels as prose, payloads as
+    code, stubs with a badge. 80 corpus files migrated.
+
+ -- cflmy <pingan@cflmy.cn>  Thu, 22 Oct 2026 16:30:00 +0800
+
 marqdo (1.5.2-1ppa1) noble; urgency=medium
 
   * Marqdo 1.5.2: Foreign v3 P0/P1 — raw stdin with per-cell inputs and

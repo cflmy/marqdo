@@ -1,18 +1,53 @@
 # Changelog
 
+## v2.0.0 — 2026-10-22
+
+### Highlights
+
+**遮蔽语法（Occlusion）落地**：`[描述](实现)` —— 方括号是给人读的描述（**永不执行**），圆括号是**唯一执行体**。配套 `()` 内调用、`access` 取元、`遍历` 遮蔽循环、`labels` 两级检索与债务棘轮、`migrate labels` 迁移；`view` 把描述渲染为正文、实现渲染为代码片、空载荷给「桩」徽章。全仓 **80 个语料文件 / 256 处取元 / 23 处循环** 已迁移（M7），语义零漂移。
+
+```bash
+git checkout v2.0.0 && cargo build --release
+marqdo ext add web   # CDN → 2.0.0
+```
+
+**核心表面 Δ（Core surface Δ）**：**无增删**（仍 19 个构造）—— 遮蔽是既有 `[键](集合)` 与 `- [项](集合)` 形状在 `markup: occlusion` 文件中的**第二种读法**，默认 `classic` 语义不变；`access` 是宿主函数（id 212），不是新标记。
+
+### Added
+
+- **M2 遮蔽语法**：`[描述](实现)`；`[]` 为自由文本、永不执行，`()` 为唯一执行体；支持嵌套；空载荷 `()` 值为 `None`（桩）。frontmatter `markup: occlusion` 按文件启用，`MARQDO_MARKUP=occlusion` 可作进程默认。
+- **M1 `()` 内调用**：`加(1)` / `加(1, 2)` / `加(加(1 2), 10)` / `加一 号(31)`（callee 可含空格，解决 D8）/ `txt.str_trim(" x ")`；`)` 是参数终止符，逗号可选，支持嵌套；括号形参数按表达式解析，空格形（`> f k=v`）仍按文本。
+- **M3 `access` 与遮蔽循环**：新增宿主函数 `access(集合, 键)`（别名 `取` / `取值`），与旧取元逐字等价；`- [描述](遍历 集合 为 变量)` 遮蔽循环，接受 `遍历`/`for` 与 `为`/`as`/`in`。
+- **M2.5 / M4 遮蔽诊断**：`label.missing`（空描述，error）、`label.empty_payload`（空载荷，warning）、`label.ref_dangling`（描述里的反引号实体不可解析，error）；由 `marqdo check` 一并输出。
+- **M5 隐式遮蔽**：`marqdo check --implicit-labels` 把 `>` 调用上方的叙述当作描述（默认关闭，不改变既有输出）。
+- **M6 T1 会话内陈旧检测**：MLSP `repair_apply` 前后对照 payload 并返回变更的遮蔽点；新增 `session.summary` 会话末一次性汇总。
+- **M7 迁移与版本门**：frontmatter `markup:` 按文件切换解析模式（同进程可混载 classic / occlusion，imports 亦然）；`marqdo migrate labels`（多路径、`--write`、`--json`）把 `[键](集合)` 改写为 `[键](access(集合, "键"))`、`- [项](集合)` 改写为遍历形。
+- **M8 债务棘轮与呈现**：`marqdo labels --baseline FILE` 记欠据、`--fail-on-increase` 只许降不许升；`view` 浏览 / 卡片 / 静态导出一致呈现遮蔽：描述为正文、实现为代码片、空载荷「桩」徽章。
+- **M9 两级词表检索**：`marqdo labels`（默认 `pending` 口径 / `--grep` 自定义词 / `--group` / `--also-builtin` / `--count` / `--json`，支持多路径）；MLSP `labels.search`；兼容文档写法 `labels pending` / `labels search`。
+- **M10 工程化落点**：`ext/ai` 提示词加入「接不了就申报」；README「工程习惯」；空载荷一律 warning。
+- **示例与教程**：`examples/syntax-tour` 一页跑通全部现行语法；`examples/oa2026-showcase`；`doc/tutorial/15-常见陷阱.md`（D1–D10 实测）。
+
+### Fixed
+
+- **D9 未闭合引号**：不再静默吞掉后续行——分类层与解析层双层修复，直接报错并给出原始行。
+- **`加(31)`**：曾被解析成 `unknown function 加(31`（末个位置实参吞掉 `)`）。
+- **view 解析模式回归**：带 `markup: occlusion` 的文档在 `view` 结构区报 `expected ')' after link-index collection`；新增 `load::parse_source_auto` 统一五处解析点。
+
+### Changed
+
+- **HostFn 单表**：五张分派表合一为 `HOST_FN_TABLE`（`src/host/dispatch.rs` **−404 行**），203 项逐字节一致，行为零变化。
+- **插件 ABI 共享 crate**：新增 `marqdo-plugin-sdk`，5 个原生插件共用同一份 ABI 前言；**ABI 不变**（`include/marqdo_abi.h` / 符号与布局不变）。
+- **精简**：删除归档的 Rust web 插件 `plugins/web-rust-archive/`（14,235 行，非 workspace 成员，已由 Go `libweb` 取代）；删除无调用点死代码，收拢 `as_text` 18 处重复、catalog 助手与 view 路由 34 臂，AST 遍历器合流。
+- **语料迁移（M7）**：`public/` `ext/` `tests/` `examples/` `doc/` 等语料加 `markup: occlusion`，改写 **80 个语料文件 / 256 处取元 / 23 处循环**；新增 `tests/ratchet` 锁定标签债务。
+- **文档**：遮蔽语法总纲 + M0–M10 变更记录、标签新鲜度 / 修复回路、函数作为值 6 篇评估、代码体量审计；`doc/design/code-volume-audit.md` 记 53k 行构成。
+
 ## Unreleased
 
 ### Added
 
-- **M1 `()` 内调用语法**：`加(1)` / `加(1, 2)` / `加(加(1 2), 10)` / `加一 号(31)`（callee 可含空格，解决 D8）/ `txt.str_trim(" x ")`。`)` 是参数终止符，逗号可选，支持嵌套。括号形参数值按表达式解析，空格形（`> f k=v`）仍按文本，`source=print(2+2)` 不受影响。
-
 ### Fixed
 
-- `加(31)` 曾被解析成 `unknown function 加(31`（末个位置实参吞掉 `)`）。
-
 ### Changed
-
-- **精简**：删除 `plugins/web-rust-archive/`（14,235 行 Rust，非 workspace 成员、默认不构建；Go `libweb` 已取代）。Git 历史仍可追溯。
 
 ## v1.5.2 — 2026-10-18
 

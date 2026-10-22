@@ -1,4 +1,4 @@
-﻿# Marqdo
+# Marqdo
 
 **代码即文档。文档即知识库。知识即可执行。**
 
@@ -193,8 +193,9 @@ marqdo catalog public -o .marqdo
 
 ---
 
-## 现状（v1.5.2）
+## 现状（v2.0.0）
 
+- **遮蔽语法（v2.0.0）**：`[描述](实现)` 描述不执行 · `()` 内调用（`加(1)` / `加一 号(31)`）· `access` 取元与 `遍历` 遮蔽循环 · `marqdo labels` 两级检索 / `--baseline` 债务棘轮 · `migrate labels` · 诊断 `label.missing` / `empty_payload` / `ref_dangling` · view 描述正文 + 代码片 + 桩徽章 · 扩展包同步 **2.0.0**
 - **外联 v3 P0/P1（v1.5.2）**：raw stdin + 每 cell 独立输入 · plan API · snapshot export/import/replay · `view capture` · Persist 按钮 · 扩展包同步 **1.5.2**
 - **view 静态/动态统一 + 外联值传递（v1.5.1）**：静态导出与 live view 共用 `foreign_doc` 执行路径 · 构建时运行注入 stdout · `foreign.session` 值传递 · cell stdin；扩展包同步 **1.5.0**
 - **裸自增升参（v1.4.6）**：首次粗体赋值左值即声明；`**n = n + 1**` 无反引号也升为必选形参。扩展包仍为 **1.4.5**
@@ -230,7 +231,7 @@ marqdo catalog public -o .marqdo
 - **浏览器 Marqdo（WASM）**：`marqdo wasm build` + 官方 bridge 自启（作者零业务 JS；桥内可含列表/路由/storage/ws/文件/Canvas/音频/Observer/拖放）；`lib/browser` + GFM；`web.client_embed`；示例 [browser-hello](examples/browser-hello/) · [browser-app](examples/browser-app/) · [browser-media](examples/browser-media/) · [web-client-site](examples/web-client-site/)（[ADR 0002](doc/adr/0002-browser-marqdo-wasm.md) · [D](doc/roadmap/browser-wasm-d.md) · [E](doc/roadmap/browser-wasm-e.md) · [F](doc/roadmap/browser-wasm-f.md)）
 - 选型：[ADR 0001 — Rust](doc/adr/0001-implementation-language.md) · [ADR 0002 — 浏览器 WASM](doc/adr/0002-browser-marqdo-wasm.md)（C0–C5 完结，见 [roadmap/browser-wasm.md](doc/roadmap/browser-wasm.md)）· [ADR 0003 — 异步效应](doc/adr/0003-browser-async-effects.md)
 
-### 如何使用最新 Marqdo（v1.5.2）
+### 如何使用最新 Marqdo（v2.0.0）
 
 **安装解释器（任选其一）**
 
@@ -245,7 +246,7 @@ marqdo catalog public -o .marqdo
 ```bash
 # 1) 源码安装（跟 tag 或 main）
 git clone https://github.com/cflmy/marqdo.git && cd marqdo
-git checkout v1.5.2   # 或留在 main
+git checkout v2.0.0   # 或留在 main
 cargo build --release
 export PATH="$PWD/target/release:$PATH"
 marqdo version
@@ -284,7 +285,7 @@ marqdo wasm build
 # → dist/wasm/ … 见 examples/browser-hello/
 
 # 6) Releases：Windows exe/zip/vsix；Linux CLI zip + native `.so` zip
-#    https://github.com/cflmy/marqdo/releases/tag/v1.5.2
+#    https://github.com/cflmy/marqdo/releases/tag/v2.0.0
 ```
 
 开发期也可用 `cargo run -- …` 代替已安装的 `marqdo`：
