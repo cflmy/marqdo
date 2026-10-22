@@ -8,6 +8,13 @@
 | 前置 | [label-freshness-and-repair.md](label-freshness-and-repair.md) |
 | 结论 | stale **不是"扫描报告"，而是"变更报告"**；默认零噪音，严格模式 opt-in |
 
+> **§2 的 M5 已修订**：原文以 `git diff` 作为核心机制是错的——沙箱 `exec=false` 调不了 git、
+> 浏览器 WASM 无进程能力、非 git 用户无从使用，而**最需要它的 agent 修复回路恰在这些环境里**。
+> 现改为 **「前一状态」provider 分层**：`T0 引用一致性 + T1 会话内前后对照` 为核心（零依赖），
+> `T2 外部历史源（git 等）` 与 `T3 台账` 为可选适配器。
+> 见 [staleness-providers.md](staleness-providers.md)。本文其余结论（分级、聚合、去重、
+> 可证伪、节流、三道闸、验收指标）不受影响。
+
 ---
 
 ## 0. 为什么标签检查比一般 lint 更容易被忽视
@@ -81,7 +88,7 @@ contract check OK（另有 3 条标签提示，见 marqdo labels status --json�
 对某个「标签 + `()` 指纹」组合确认后，记录 `confirmed` → 同样的组合不再报。
 这是最直接的对症药：**说过的就不再说**。
 
-### M5 结构化 diff（**推荐作为核心**）
+### M5 结构化 diff（**已修订：降级为可选 provider T2**，见 [staleness-providers.md](staleness-providers.md)）
 
 > **stale 只在"`()` 变了、`[]` 没变"时报，且只针对本次变更集。**
 
