@@ -2,11 +2,16 @@
 
 | | |
 |---|---|
-| 状态 | **Proposed · 待决策**（哲学层评定，未改代码） |
+| 状态 | **已决策：走「路线二 纯度」**（落地见 [label-freshness-and-repair.md](label-freshness-and-repair.md)） |
 | 日期 | 2026-10-22 |
 | 提案 | 「`[]()` 不是两个部分两个含义，而是 `[描述性显示文字](实际执行的简短语句)`」 |
 | 方法 | 语料实测（索引 506 / 循环 44 / 方括号调用 0）+ 渲染器源码核对 + 设计史对照 |
-| 相邻 | [function-as-naming-philosophy.md](function-as-naming-philosophy.md) · [collection-access-link.md](collection-access-link.md) · [call-syntax-from-marks.md](call-syntax-from-marks.md) |
+| 相邻 | [label-freshness-and-repair.md](label-freshness-and-repair.md)（后续：纯度落地 + 标签过期检测）· [function-as-naming-philosophy.md](function-as-naming-philosophy.md) · [collection-access-link.md](collection-access-link.md) · [call-syntax-from-marks.md](call-syntax-from-marks.md) |
+
+> **决策**：用户选择**路线二（纯度）**——`()` 只装机器语句，取元搬进 `()`；
+> 标签可省略书写但**编译器必须报错**；循环写法不追求统一，`()` 内自洽即可。
+> 落地细节、普通取元形态，以及**标签过期检测（L1 引用一致性 / L2 指纹台账 / L3 LLM 复核）**
+> 见 [label-freshness-and-repair.md](label-freshness-and-repair.md)。
 
 ---
 
