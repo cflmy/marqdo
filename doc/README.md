@@ -105,6 +105,8 @@
 | [research/ext-hosting-gaps.md](research/ext-hosting-gaps.md) | **宿主集成缺口**：同域 SSE 中继 · HTTP→`##` · MCP Server · 副端口 · 跨模块 db/corpus |
 | [design/ext-hosting-fill.md](design/ext-hosting-fill.md) | **宿主缺口补齐设计**（`ext/web` proxy/invoke · `ext/ai` mcp_server） |
 | [roadmap/ext-hosting.md](roadmap/ext-hosting.md) | **宿主集成 H0–H4**（规划） |
+| [tutorial/15-常见陷阱.md](tutorial/15-常见陷阱.md) | **使用向陷阱手册**：行首数字、跨函数作用域、空格函数名、导入路径、`table.put` 非原地（1.5.2 实测） |
+| [research/qdagent-refactor-defects-2026-10.md](research/qdagent-refactor-defects-2026-10.md) | **qdagent 重构期缺陷实录 D1–D7**（沙箱 profile 不生效 · 全角 CALL 静默丢失 …） |
 | [roadmap/ext-agent-optimize.md](roadmap/ext-agent-optimize.md) | **`ext/agent` A0–A4 done · Wave B Active** · 后续优化见 [ext-ai-optimize](roadmap/ext-ai-optimize.md) O 波次 |
 
 金样例与集成测试：[`tests/`](../tests/)。面向访客的可执行文档：[`public/`](../public/)。Spike 存档：[`spike/`](../spike/)。
