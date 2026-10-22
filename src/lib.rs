@@ -5,6 +5,7 @@
 
 pub mod aliases;
 pub mod artifact;
+pub mod label;
 pub mod ast;
 pub mod binding;
 pub mod browser_session;

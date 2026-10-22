@@ -32,6 +32,8 @@ pub fn check_module(module: &Module, path: Option<&Path>) -> Vec<Diagnostic> {
     let known = known_type_names(module);
     let mut out = Vec::new();
     walk(module, &module.functions, path, &known, &mut out);
+    // `<TAB>` M2.5: occlusion labels (`label.missing` / `label.empty_payload`).
+    out.extend(crate::label::check(module, path));
     out
 }
 

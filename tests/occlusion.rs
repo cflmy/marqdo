@@ -43,3 +43,43 @@ fn occlusion_mode_rejects_legacy_index_shape() {
     assert_eq!(code, 0, "stderr={stderr}");
     assert_ne!(stdout.trim_end(), "值", "occlusion mode must not index");
 }
+
+// ---- M2.5: label diagnostics (`label.missing` / `label.empty_payload`) ----
+
+fn check(path: &str, markup: &str) -> (i32, String) {
+    let out = Command::new(env!("CARGO_BIN_EXE_marqdo"))
+        .args(["check", path])
+        .env("MARQDO_MARKUP", markup)
+        .output()
+        .expect("run marqdo check");
+    (
+        out.status.code().unwrap_or(1),
+        format!(
+            "{}{}",
+            String::from_utf8_lossy(&out.stdout),
+            String::from_utf8_lossy(&out.stderr)
+        ),
+    )
+}
+
+#[test]
+fn label_missing_is_an_error() {
+    let (code, text) = check("tests/occlusion/empty-label.mq.md", "occlusion");
+    assert_eq!(code, 1, "text={text}");
+    assert!(text.contains("遮蔽缺少描述"), "text={text}");
+}
+
+#[test]
+fn label_empty_payload_is_a_warning() {
+    let (code, text) = check("tests/occlusion/empty-payload.mq.md", "occlusion");
+    assert_eq!(code, 0, "warnings must not fail the build: text={text}");
+    assert!(text.contains("空载荷遮蔽"), "text={text}");
+}
+
+#[test]
+fn label_ok_has_no_diagnostics() {
+    let (code, text) = check("tests/occlusion/clean.mq.md", "occlusion");
+    assert_eq!(code, 0, "text={text}");
+    assert!(!text.contains("空载荷"), "text={text}");
+    assert!(!text.contains("缺少描述"), "text={text}");
+}
