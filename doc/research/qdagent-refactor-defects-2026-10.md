@@ -29,6 +29,7 @@ qdagent 重构把「智能体输出与沉淀笔记必须是可运行 `.mq.md`」
 | D8 | 函数名含空格：定义成功、调用必崩 | **高** | Open（不对称） |
 | D9 | 未闭合引号静默吞行，退出码 0 | **高** | Open（静默） |
 | D10 | `table.put` 非原地修改，累积状态静默失效 | 中 | Open（文档） |
+| D11 | 函数可见环境随运行面不同（CLI 无 metadata，Web 有 + 共享 entry_bindings） | **高** | Open（行为分裂） |
 
 ---
 
@@ -368,6 +369,85 @@ LLM 生成代码时尤其容易命中。
 
 ---
 
+## D11 — 函数可见环境随运行面不同（CLI vs Web）
+
+### 现象
+
+同一份文档，`# main` 与普通函数看到的变量环境不一致：
+
+| 路径 | 函数能看到的变量 | 源码 |
+|------|-----------------|------|
+| `# main`（CLI） | frontmatter metadata ✅ | `src/interp.rs:473` `run(..., Env::with_metadata(module), ...)` |
+| **普通函数调用（CLI）** | **只有实参** | `eval_call` 内 `let mut call_env = Env::new();` |
+| **浏览器 WASM 入口** | metadata ✅ + `# main` 的 `entry_bindings` ✅ | `invoke_in_entry`（`src/interp.rs:365`） |
+
+复现（1.5.2 实测）：
+
+```markdown
+---
+title: m1
+税率: 0.1
+---
+
+## 按税率
+    + `金额`
+
+*`金额` * `税率`*
+
+# main
+
+**r = > 按税率 金额=100**
+```
+
+```
+error: m1.mq.md:9:1: undefined variable `税率`
+```
+
+但同样在 `# main` 里直接读：
+
+```markdown
+# main
+
+> print text="main里读到税率=" + `税率`      # → 0.1
+```
+
+**能读到。**
+
+### 根因
+
+- `Env::with_metadata(module)` 把 frontmatter metadata 注入 env（`src/interp.rs:62`），
+  但只在三处使用：`# main` 运行（473/485）、`invoke_in_entry`（365）、以及
+  入口依赖解析（411）。
+- 普通用户函数调用走 `eval_call`，用 `Env::new()` 新建空环境，只写入绑定好的实参。
+
+于是「文件级常量」这个概念**只对入口可见**，函数不可见。
+
+### 影响
+
+1. **行为随运行面变化**：同一 `.mq.md`，在浏览器里函数能读到 frontmatter 常量、
+   还能读到 `# main` 的绑定（`entry_bindings`）；在 CLI 里报 `undefined variable`。
+   这类差异极难排查——代码看着一样，结果不同。
+2. **阻断合法用法**：把配置写在 frontmatter、供多个函数共享，是文档化的自然写法，
+   但今天在 CLI 下不可用，只能靠每个调用点重复传参。
+3. **掩盖真实能力**：读者会以为「函数能读文件级常量」（因为 Web 能），
+   在 CLI 复现时才发现不能。
+
+### 建议
+
+二选一并写进文档：
+
+1. **统一为「函数可见 metadata」**：`eval_call` 改用 `Env::with_metadata(module)`
+   再写入实参（实参优先覆盖同名 metadata）。这样 frontmatter 成为**受控的只读环境**：
+   写一次、文档开头可见、可序列化，且不随调用者变化。
+2. **统一为「函数不可见 metadata」**：把 `invoke_in_entry` 也改成 `Env::new()`，
+   只保留 `# main` 可见，并在文档中明确「frontmatter 只供入口使用」。
+
+倾向方案 1：它把已存在的机制补成一致的、静态可判定的「常量默认值」通道，
+对文档化使用场景价值明显，且不引入动态作用域的风险（见
+[ambient-parameters-evaluation.md](../design/ambient-parameters-evaluation.md) §4.3）。
+
+---
+
 ## 附录：本次开发中确认正常的项
 
 避免误报，以下行为经实测**符合文档**，不在缺陷之列：
@@ -397,6 +477,7 @@ LLM 生成代码时尤其容易命中。
 | D8 | `## my func` + `> my func n=1` | `undefined variable func`（check 却通过） |
 | D9 | `**s = "abc` 不闭合 | 静默吞行，退出码 0 |
 | D10 | `> table.put in=`m` at=…` 后读 `m` | 原表未变；计数永远是 0 |
+| D11 | frontmatter 写 `税率: 0.1`，函数体读 `` `税率` `` | CLI 报 `undefined variable`；`# main` 里却能读到 |
 
 ---
 
