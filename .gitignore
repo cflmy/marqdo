@@ -71,6 +71,11 @@ plugins/*/tmp/
 /examples/linalg-*/**/*.svg
 /examples/linalg-*/*.svg
 /examples/linalg-*.svg
+# oa2026 showcase: SVGs beside the examples ARE tracked; root-level ones are
+# run artifacts (draw/plot write to cwd when the example is run from root)
+/bell-*.svg
+/calculus-*.svg
+
 # Plot SVGs emitted beside tests / notebooks when demos run
 /tests/**/*-plot-*.svg
 

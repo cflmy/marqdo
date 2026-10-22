@@ -24,7 +24,7 @@ import data:ext/data/db.mq.md
 
 | title | slug | summary | content | tag | created_at |
 |-------|------|---------|---------|-----|------------|
-| Hello Marqdo | hello | Welcome | # Hello\n\nExecutable documents. | intro | 2026-09-01 |
+| Hello Marqdo | hello | Welcome | Hello — executable documents. | intro | 2026-09-01 |
 | Artifact Web | artifact-web | Document first | Pages are mq.md files. | design | 2026-09-28 |
 
 *rows*
