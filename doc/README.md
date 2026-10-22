@@ -105,7 +105,7 @@
 | [research/ext-hosting-gaps.md](research/ext-hosting-gaps.md) | **宿主集成缺口**：同域 SSE 中继 · HTTP→`##` · MCP Server · 副端口 · 跨模块 db/corpus |
 | [design/ext-hosting-fill.md](design/ext-hosting-fill.md) | **宿主缺口补齐设计**（`ext/web` proxy/invoke · `ext/ai` mcp_server） |
 | [roadmap/ext-hosting.md](roadmap/ext-hosting.md) | **宿主集成 H0–H4**（规划） |
-| [design/occlusion-description-and-search.md](design/occlusion-description-and-search.md) | **遮蔽描述与检索**：描述自由文本 · **编译器不内置词表，检索由调用方传词** · 空载荷 warning · 申报习惯 |
+| [design/occlusion-description-and-search.md](design/occlusion-description-and-search.md) | **遮蔽描述与两级检索**：内置词表=范例/默认，参数=扩展 · 空载荷一律 warning · 申报习惯 |
 | [design/occlusion-syntax.md](design/occlusion-syntax.md) | **遮蔽语法总纲（实施依据）**：`[描述](实现)` 的目的/语义/新鲜度校验 + M0–M8 计划 |
 | [design/label-freshness-and-repair.md](design/label-freshness-and-repair.md) | 标签过期检测：L1 引用一致性 · 指纹台账 · LLM 复核 · MLSP 修复回路 |
 | [design/warning-fatigue-control.md](design/warning-fatigue-control.md) | 防警告疲劳：stale 是变更报告而非扫描报告 · 分级/聚合/会话末汇总 |

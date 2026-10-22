@@ -116,6 +116,50 @@ Marqdo 把 Markdown **标记当作编程语法**：同一个 `.mq.md` 文件，�
 
 ---
 
+## 工程习惯：允许申报未完成，但不允许假装完成
+
+Marqdo 允许你写出"还没接通"的代码——**只要写在描述里**。这样文档整体仍能跑，
+而欠账是可见、可数、可结算的（而不是假装完成）：
+
+```markdown
+## 检索资料
+
+| 返回 | 类型 | 说明 |
+|------|------|------|
+|  | list | 命中列表（当前未接） |
+
+[按关键词检索，接口未接，待开发](None)
+
+[ERP 推送，模拟](json.parse text={"ok":true,"stub":true})
+```
+
+`[]` 里是**自由描述**（不执行）；`()` 里是**实现**（唯一执行）。这条语法叫**遮蔽**：
+把不可读或未完成的实现藏到括号里，人读描述、机器读代码。
+
+**四条约定**
+
+1. **桩必须能跑**：不得报错，否则整篇文档被阻断。
+2. **桩必须写明返回值**：写 `None` 也比空着好；空 `()` 会报 `label.empty_payload`（warning）。
+3. **申报用词有范例**：内置词表（`待开发` `未实现` `开发中` `模拟` `桩` `示例` `实验` `废弃` …）
+   是**推荐用词与默认检索集**，不是语法——写别的说法同样合法。
+4. **接不了就申报，别声称完成**：这条已写进 `ext/ai` 的 agent 提示词。
+
+**盘点与门禁**
+
+```bash
+marqdo labels pending                          # 内置口径：还有多少未完成
+marqdo labels search --grep "接口未联调,联调中"   # 用你自己的说法
+marqdo labels search --grep 联调 --also-builtin  # 自定义 + 内置一起数
+marqdo labels pending --count --baseline .marqdo/pending.json --fail-on-increase
+```
+
+最后一条是**棘轮**：只拦"新增未完成"，不追旧账。
+
+设计依据：[occlusion-syntax.md](doc/design/occlusion-syntax.md) ·
+[occlusion-description-and-search.md](doc/design/occlusion-description-and-search.md)
+
+---
+
 ## OKF 风格清单（自动生成）
 
 从源码派生 YAML / Markdown 知识包（勿手改生成物）：
