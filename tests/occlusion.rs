@@ -234,3 +234,46 @@ fn t1_session_summary_reports_counters() {
     assert!(summary.contains("\"labels_stale_seen\":1"), "{summary}");
     assert!(summary.contains("\"labels_outstanding\":1"), "{summary}");
 }
+
+// ---- M5: implicit occlusion (prose above `>` calls) ----
+
+#[test]
+fn implicit_labels_off_by_default() {
+    let out = Command::new(env!("CARGO_BIN_EXE_marqdo"))
+        .args(["check", "tests/occlusion/implicit-stale.mq.md"])
+        .output()
+        .expect("check");
+    let text = String::from_utf8_lossy(&out.stdout).into_owned();
+    assert!(
+        !text.contains("调用上方的描述"),
+        "must stay silent by default: {text}"
+    );
+}
+
+#[test]
+fn implicit_labels_opt_in_reports_mismatch() {
+    let out = Command::new(env!("CARGO_BIN_EXE_marqdo"))
+        .args([
+            "check",
+            "tests/occlusion/implicit-stale.mq.md",
+            "--implicit-labels",
+        ])
+        .output()
+        .expect("check");
+    let text = String::from_utf8_lossy(&out.stdout).into_owned();
+    assert!(text.contains("调用上方的描述提到 `税率`"), "{text}");
+}
+
+#[test]
+fn implicit_labels_opt_in_stays_quiet_when_consistent() {
+    let out = Command::new(env!("CARGO_BIN_EXE_marqdo"))
+        .args([
+            "check",
+            "tests/occlusion/implicit-ok.mq.md",
+            "--implicit-labels",
+        ])
+        .output()
+        .expect("check");
+    let text = String::from_utf8_lossy(&out.stdout).into_owned();
+    assert!(!text.contains("调用上方的描述"), "{text}");
+}

@@ -96,6 +96,10 @@ enum Commands {
         /// Emit one JSON diagnostic per line on stdout (machine-readable; AI/MLSP 面)
         #[arg(long)]
         json: bool,
+
+        /// Also check prose above `>` calls (implicit occlusion; fuzzy, off by default)
+        #[arg(long)]
+        implicit_labels: bool,
     },
     /// Occlusion label queries: pending stubs (built-in words) or keyword search
     Labels {
@@ -537,8 +541,12 @@ fn try_main(cli: Cli) -> Result<i32> {
             marqdo::run_file(&path, &opts)?;
             Ok(0)
         }
-        Commands::Check { file, json } => {
-            let diags = marqdo::check::check_path(&file)?;
+        Commands::Check {
+            file,
+            json,
+            implicit_labels,
+        } => {
+            let diags = marqdo::check::check_path_opts(&file, implicit_labels)?;
             let mut errors = 0i32;
             for d in &diags {
                 if matches!(d.severity, marqdo::diagnostics::Severity::Error) {

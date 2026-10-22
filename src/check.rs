@@ -23,8 +23,22 @@ use crate::load;
 
 /// 读取文件 + 装载（含 import）后做全量契约互查。
 pub fn check_path(path: &Path) -> Result<Vec<Diagnostic>> {
+    check_path_opts(path, false)
+}
+
+/// `implicit_labels` enables the fuzzy M5 check (prose above `>` calls).
+///
+/// It is **off by default**: describing a call in prose is freeform, so the
+/// check is inherently ambiguous and would be noisy — opt in when you want it.
+pub fn check_path_opts(path: &Path, implicit_labels: bool) -> Result<Vec<Diagnostic>> {
     let module = load::load_module(path)?;
-    Ok(check_module(&module, Some(path)))
+    let mut out = check_module(&module, Some(path));
+    if implicit_labels {
+        if let Ok(source) = std::fs::read_to_string(path) {
+            out.extend(crate::label::check_implicit(&module, &source, Some(path)));
+        }
+    }
+    Ok(out)
 }
 
 /// 递归检查模块全部函数（含子函数）的契约。

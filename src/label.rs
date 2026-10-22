@@ -545,3 +545,179 @@ impl SessionSummary {
         newly
     }
 }
+
+// ---------------------------------------------------------------------------
+// M5: implicit occlusion — the narrative paragraph above a `>` call is its
+// description. Only falsifiable claims (backticked refs) are checked, so
+// ordinary prose never produces noise.
+// ---------------------------------------------------------------------------
+
+/// A `>` statement call with the identifiers it mentions.
+#[derive(Debug, Clone)]
+pub struct CallSite {
+    pub line: u32,
+    pub idents: std::collections::HashSet<String>,
+}
+
+/// Collect `>` call statements (recursively).
+pub fn call_sites(module: &Module) -> Vec<CallSite> {
+    fn walk_fun(f: &Function, out: &mut Vec<CallSite>) {
+        for s in &f.body {
+            walk_stmt(s, out);
+        }
+        for c in &f.children {
+            walk_fun(c, out);
+        }
+    }
+    fn walk_stmt(stmt: &Stmt, out: &mut Vec<CallSite>) {
+        match stmt {
+            Stmt::Call { call, span } => {
+                let mut idents = std::collections::HashSet::new();
+                idents.insert(call.callee.clone());
+                if let Some(p) = &call.path {
+                    for seg in p {
+                        idents.insert(seg.clone());
+                    }
+                }
+                if let Some(r) = &call.receiver {
+                    idents.insert(r.clone());
+                }
+                for a in &call.args {
+                    match a {
+                        Arg::Positional(e) | Arg::Named { value: e, .. } => {
+                            payload_idents(e, &mut idents)
+                        }
+                    }
+                }
+                out.push(CallSite {
+                    line: span.line,
+                    idents,
+                });
+            }
+            Stmt::Branch { arms, .. } => {
+                for arm in arms {
+                    for s in &arm.body {
+                        walk_stmt(s, out);
+                    }
+                }
+            }
+            Stmt::While { body, .. } | Stmt::ForEach { body, .. } => {
+                for s in body {
+                    walk_stmt(s, out);
+                }
+            }
+            Stmt::Assign { value, .. } | Stmt::Return { value, .. } | Stmt::Expr { value, .. } => {
+                // Nested calls inside expressions are not `>` statements.
+                let _ = value;
+            }
+        }
+    }
+    let mut out = Vec::new();
+    for f in &module.functions {
+        walk_fun(f, &mut out);
+    }
+    out
+}
+
+/// The narrative paragraph immediately above `line` (1-based), if any.
+///
+/// A paragraph is a run of non-blank lines directly above; blank line ends it.
+/// Structural lines (`#`, `**`, `>`, `-`, `|`, digits) are not prose.
+fn paragraph_above(lines: &[&str], line: u32) -> Option<String> {
+    let idx = (line as usize).checked_sub(2)?; // line-1 → 0-based index of the previous line
+    let mut collected: Vec<&str> = Vec::new();
+    let mut i = idx as isize;
+    // People write `paragraph`, one blank line, then the `>` call (blockquote).
+    // Allow exactly one blank separator; a second blank ends the description.
+    if i >= 0 && lines[i as usize].trim().is_empty() {
+        i -= 1;
+    }
+    while i >= 0 {
+        let raw = lines[i as usize];
+        let t = raw.trim();
+        if t.is_empty() {
+            break;
+        }
+        let first = t.chars().next().unwrap_or(' ');
+        let structural = matches!(first, '#')
+            || t.starts_with("**")
+            || t.starts_with('>')
+            || t.starts_with('-')
+            || t.starts_with('|')
+            || t.starts_with("```")
+            || first.is_ascii_digit();
+        if structural {
+            break;
+        }
+        collected.push(raw);
+        i -= 1;
+    }
+    if collected.is_empty() {
+        None
+    } else {
+        collected.reverse();
+        Some(collected.join("\n"))
+    }
+}
+
+/// True when a backticked ref looks like an *entity name* rather than prose.
+///
+/// Prose often backticks shapes (`{ path, kind }`), flags (`source=`), or
+/// headings (`## open`); those must not be treated as claims. `<TAB>` M5
+fn is_entity_ref(s: &str) -> bool {
+    if s.is_empty() {
+        return false;
+    }
+    let mut chars = s.chars();
+    let first = chars.next().unwrap();
+    if first.is_ascii_digit() {
+        return false;
+    }
+    let ok_first = first.is_ascii_alphabetic() || first == '_' || !first.is_ascii();
+    let ok_rest = s.chars().all(|c| {
+        c.is_ascii_alphanumeric() || c == '_' || c == '.' || (!c.is_ascii() && !c.is_whitespace())
+    });
+    ok_first && ok_rest
+}
+
+/// Implicit-occlusion diagnostics for `>` calls. `<TAB>` M5
+///
+/// The paragraph above a call is its description; backticked refs there must be
+/// mentioned by the call (or resolve in the module). No paragraph / no refs →
+/// silent, which keeps the check at zero noise on ordinary code.
+pub fn check_implicit(
+    module: &Module,
+    source: &str,
+    path: Option<&std::path::Path>,
+) -> Vec<Diagnostic> {
+    let mut out = Vec::new();
+    let symbols = module_symbols(module);
+    let lines: Vec<&str> = source.lines().collect();
+    for site in call_sites(module) {
+        let Some(para) = paragraph_above(&lines, site.line) else {
+            continue;
+        };
+        for r in refs(&para).into_iter().filter(|r| is_entity_ref(r)) {
+            if site.idents.contains(&r)
+                || symbols.contains(&r)
+                || crate::host::HostFn::from_name(&r).is_some()
+            {
+                continue;
+            }
+            out.push(
+                Diagnostic::new(
+                    path,
+                    Span::new(site.line, 1),
+                    format!("调用上方的描述提到 `{r}`，但这次调用没有用到它"),
+                )
+                .with_code("label.implicit_stale")
+                .with_severity(Severity::Warning)
+                .with_doc_quote(para.replace('\n', " "))
+                .with_suggestion(format!(
+                    "确认描述是否已过期：把 `{r}` 换成现在的参数名，或修改调用"
+                )),
+            );
+        }
+    }
+    out
+}
