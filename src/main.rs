@@ -119,9 +119,9 @@ enum Commands {
     },
     /// Occlusion label queries: pending stubs (built-in words) or keyword search
     Labels {
-        /// File or directory (recursively scans `*.mq.md`)
+        /// Files or directories (recursively scans `*.mq.md`)
         #[arg(value_name = "PATH", default_value = ".")]
-        path: PathBuf,
+        paths: Vec<PathBuf>,
 
         /// Keywords (comma separated). Replaces the built-in pending set.
         #[arg(long, value_name = "WORDS")]
@@ -597,7 +597,7 @@ fn try_main(cli: Cli) -> Result<i32> {
             Ok(errors.min(1))
         }
         Commands::Labels {
-            path,
+            paths,
             grep,
             also_builtin,
             group,
@@ -628,7 +628,12 @@ fn try_main(cli: Cli) -> Result<i32> {
                 }
             }
 
-            let files = collect_mq_files(&path)?;
+            let mut files: Vec<std::path::PathBuf> = Vec::new();
+            for p in &paths {
+                files.extend(collect_mq_files(p)?);
+            }
+            files.sort();
+            files.dedup();
             let mut rows: Vec<(String, u32, String, String, Vec<String>, bool)> = Vec::new();
             for f in &files {
                 let module = match marqdo::load::load_module(f) {

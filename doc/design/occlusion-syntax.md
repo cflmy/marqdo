@@ -439,9 +439,22 @@ T1 刻意"不重复"，因此需要**闭合**：
 |---|------|------|------|------|
 ## 13.1 实施进度
 
-已完成：M0 · M1 · M2 · M2.5 · M3 · M4 · M5 · M6 · M9 · M10（每步含变更文档与测试）。
+**全部完成**：M0 · M1 · M2 · M2.5 · M3 · M4 · M5 · M6 · M7 · M8 · M9 · M10
+（每步含变更文档与测试；全量 605 passed / 0 failed；0 编译警告）。
 
-待做：**M7**（迁移 + 版本门）、**M8**（呈现与门禁）。
+| 里程碑 | 变更文档 |
+|--------|---------|
+| M1 | [change-m1-paren-call.md](change-m1-paren-call.md) |
+| M2 | [change-m2-occlusion.md](change-m2-occlusion.md) |
+| M2.5 | [change-m25-label-diagnostics.md](change-m25-label-diagnostics.md) |
+| M3 | [change-m3-access-and-loop.md](change-m3-access-and-loop.md) |
+| M4 | [change-m4-label-refs.md](change-m4-label-refs.md) |
+| M5 | [change-m5-implicit-occlusion.md](change-m5-implicit-occlusion.md) |
+| M6 | [change-m6-t1-session.md](change-m6-t1-session.md) |
+| M7 | [change-m7-migration.md](change-m7-migration.md) |
+| M8 | [change-m8-ratchet.md](change-m8-ratchet.md) |
+| M9 | [change-m9-label-search.md](change-m9-label-search.md) |
+| M10 | [change-m10-engineering-habits.md](change-m10-engineering-habits.md) |
 
 | **M0** | 语义冻结 | 本文档 Accepted + 术语表进 `doc/design/` | — | 无 |
 | **M1** | `()` 内调用增强 | `callee(args)`：`)` 终止、逗号、嵌套、**空格 callee** | M0 | 中（分词器共享） |
