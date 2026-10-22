@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| 状态 | **Proposed · 修订**（取代 [warning-fatigue-control.md](warning-fatigue-control.md) §2 的 M5a） |
+| 状态 | **Accepted · 修订**（取代 [warning-fatigue-control.md](warning-fatigue-control.md) §2 的 M5a） |
 | 日期 | 2026-10-22 |
 | 触发 | 用户：不是所有开发都用 git，依赖 git 是否是好设计 |
 | 结论 | **不是好设计**。保住「变更驱动」原则，把「前一状态」抽象为可插拔 provider；核心能力零依赖 |

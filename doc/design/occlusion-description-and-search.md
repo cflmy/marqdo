@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| 状态 | **Proposed · 待批准**（最终规范，可直接开工） |
+| 状态 | **Accepted · 实施中**（与 [occlusion-syntax.md](occlusion-syntax.md) 同步） |
 | 日期 | 2026-10-22 |
 | 关键决策 | ①`[]` 是自由描述，不执行 ②**两级词表**：内置=范例/默认，参数=扩展 ③空载荷**一律 warning** ④工程化写进 README，提示词同步更新 |
 | 前置 | [occlusion-syntax.md](occlusion-syntax.md) |

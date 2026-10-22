@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| 状态 | **Proposed · 待决策**（含语法落地、诊断 schema、分阶段计划） |
+| 状态 | **Accepted**（含语法落地、诊断 schema、分阶段计划） |
 | 日期 | 2026-10-22 |
 | 决策来源 | 用户：取**纯度**；标签**可省略但编译器须报错**；循环写法不重要；**重点：标签过期与 agent 误导** |
 | 前置 | [bracket-as-label-evaluation.md](bracket-as-label-evaluation.md) |

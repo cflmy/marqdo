@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| 状态 | **Proposed · 开工前必须先定**（未改代码） |
+| 状态 | **Accepted**（机制基线：stale 是变更报告） |
 | 日期 | 2026-10-22 |
 | 触发 | 用户：`[]()` 每次报 warning 会导致烦躁与忽略，必须先有机制再开工 |
 | 前置 | [label-freshness-and-repair.md](label-freshness-and-repair.md) |

@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| 状态 | **Proposed · 机制说明**（未改代码） |
+| 状态 | **Accepted · 机制说明**（M6 落地） |
 | 日期 | 2026-10-22 |
 | 回答 | 「在不改变的情况下，能让模型免于多次警告疲劳吗？」——**能，而且几乎不用改什么** |
 | 前置 | [staleness-providers.md](staleness-providers.md) · [warning-fatigue-control.md](warning-fatigue-control.md) |
