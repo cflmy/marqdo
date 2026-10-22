@@ -105,6 +105,7 @@
 | [research/ext-hosting-gaps.md](research/ext-hosting-gaps.md) | **宿主集成缺口**：同域 SSE 中继 · HTTP→`##` · MCP Server · 副端口 · 跨模块 db/corpus |
 | [design/ext-hosting-fill.md](design/ext-hosting-fill.md) | **宿主缺口补齐设计**（`ext/web` proxy/invoke · `ext/ai` mcp_server） |
 | [roadmap/ext-hosting.md](roadmap/ext-hosting.md) | **宿主集成 H0–H4**（规划） |
+| [design/code-volume-audit.md](design/code-volume-audit.md) | **代码体量审计**：53k 行的构成 · 已清 14.5k 冗余 · 剩余是特性面 · 可精简项与风险 |
 | [design/occlusion-description-and-search.md](design/occlusion-description-and-search.md) | **遮蔽描述与两级检索**：内置词表=范例/默认，参数=扩展 · 空载荷一律 warning · 申报习惯 |
 | [design/occlusion-syntax.md](design/occlusion-syntax.md) | **遮蔽语法总纲（实施依据）**：`[描述](实现)` 的目的/语义/新鲜度校验 + M0–M8 计划 |
 | [design/label-freshness-and-repair.md](design/label-freshness-and-repair.md) | 标签过期检测：L1 引用一致性 · 指纹台账 · LLM 复核 · MLSP 修复回路 |
