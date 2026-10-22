@@ -15,7 +15,7 @@ use crate::ast::{
     BranchArm, Expr, Function, Import, IndexKey, Literal, Module, Param, Stmt, Use,
 };
 use crate::diagnostics::{bail_at, Diagnostic, Span};
-use crate::lex::{classify_source, ClassifiedLine, LineKind};
+use crate::lex::{ClassifiedLine, LineKind, classify_source, has_unterminated_string};
 use crate::parse::expr::parse_call_after_gt as call_after_gt;
 use crate::parse::expr::parse_call_tail;
 use crate::parse::expr::parse_expr as parse_expr_str;
@@ -431,6 +431,17 @@ impl<'a> Cursor<'a> {
         if trimmed.starts_with("**") && trimmed.ends_with("**") && trimmed.len() >= 4 {
             let inner = &trimmed[2..trimmed.len() - 2];
             return self.stmt_from_bold_inner(inner, span);
+        }
+
+        // D9: bold code whose string literal is never closed. The line reaches
+        // this point (classifier keeps it Code) but has no closing `**`, so the
+        // generic "unrecognized statement" would hide the real cause.
+        if trimmed.starts_with("**") && has_unterminated_string(trimmed) {
+            bail!(
+                "{span}: unterminated string: this line starts bold code but \
+                 contains an odd number of `\"` -- close the string and the \
+                 trailing `**` (line: {trimmed})"
+            );
         }
 
         // v0.3: *…* = return

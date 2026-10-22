@@ -138,12 +138,42 @@ fn is_marqdo_star_line(trimmed: &str) -> bool {
         if trimmed.trim() == "** **" {
             return true;
         }
-        return matching_bold_close(trimmed).is_some();
+        if matching_bold_close(trimmed).is_some() {
+            return true;
+        }
+        // D9: a bold-starting line whose string literal is never closed has no
+        // findable closing `**` -- the scanner stays "inside the string" forever.
+        // Classifying it as Comment would silently drop the line; treat it as
+        // Code so the parser can report `unterminated " string`.
+        return has_unterminated_string(trimmed);
     }
     if !trimmed.starts_with('*') || trimmed.len() < 2 {
         return false;
     }
     matching_italic_close(trimmed).is_some()
+}
+
+/// True when `line` contains an odd number of unescaped double quotes,
+/// i.e. a string literal that is opened but never closed.
+///
+/// Used only by [`is_marqdo_star_line`] to keep a malformed bold line in the
+/// Code class so the parser surfaces the error (D9). Prose lines never reach
+/// here -- they do not start with `**`.
+pub fn has_unterminated_string(line: &str) -> bool {
+    let bytes = line.as_bytes();
+    let mut i = 0usize;
+    let mut count = 0usize;
+    while i < bytes.len() {
+        match bytes[i] {
+            b'\\' => i += 2,
+            b'"' => {
+                count += 1;
+                i += 1;
+            }
+            _ => i += 1,
+        }
+    }
+    count % 2 == 1
 }
 
 /// Closing `**` for a bold segment, skipping strings and backticks.
@@ -603,6 +633,40 @@ mod tests {
         let lines = classify_source(src);
         assert!(lines.iter().any(|l| l.kind == LineKind::Comment));
         assert!(lines.iter().any(|l| l.kind == LineKind::Code));
+    }
+
+    #[test]
+    fn unterminated_quote_inside_bold_is_code_not_comment() {
+        // D9: "**s = \"abc" has an unclosed string. Classification must keep it
+        // as Code so the parser reports "unterminated \" string" instead of
+        // silently demoting the line to narration.
+        let lines = classify_source("**s = \"abc\n");
+        let code = lines.iter().find(|l| l.text.contains("abc"));
+        assert!(
+            matches!(code.map(|l| l.kind), Some(LineKind::Code)),
+            "expected Code (so parser reports the error), got {lines:?}"
+        );
+    }
+
+    #[test]
+    fn balanced_quote_inside_bold_still_code() {
+        let lines = classify_source("**s = \"abc\"**\n");
+        let code = lines.iter().find(|l| l.text.contains("abc"));
+        assert!(matches!(code.map(|l| l.kind), Some(LineKind::Code)));
+    }
+
+    #[test]
+    fn prose_with_quotes_stays_comment() {
+        // Narration that merely mentions quotes must stay narration.
+        let lines = classify_source("他说 \"你好\"，然后走了。\n");
+        assert!(matches!(lines.first().map(|l| l.kind), Some(LineKind::Comment)));
+    }
+
+    #[test]
+    fn prose_bold_emphasis_with_quote_stays_comment() {
+        // **强调** with a stray quote in surrounding prose is still narration.
+        let lines = classify_source("这一句有 \" 引号但不是代码。\n");
+        assert!(matches!(lines.first().map(|l| l.kind), Some(LineKind::Comment)));
     }
 
     #[test]
