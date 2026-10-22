@@ -24,4 +24,6 @@ Override path: `export MARQDO_WEB_PLUGIN=$PWD/plugins/web/build/libweb.so`
 | `abi/marqdo_abi_cgo.h` | C contract for cgo |
 | `internal/*` | page / db / http / ws / … |
 
-Rust reference (not built by default): `plugins/web-rust-archive/`.
+The legacy Rust implementation was archived during v1.6 and then removed from the
+working tree (it remains in git history before commit `<this commit>`); see
+`CHANGELOG.md` “默认 libweb 为 Go”。

@@ -63,8 +63,8 @@ members = [
     "plugins/linalg",
     "crates/marqdo-wasm",
 ]
-# Official web plugin is Go (`plugins/web/`); Rust sources kept as
-# `plugins/web-rust-archive/` for reference (not a workspace member).
+# Official web plugin is Go (`plugins/web/`). The legacy Rust web plugin was
+# deleted from the tree (see CHANGELOG); git history keeps it if ever needed.
 resolver = "2"
 
 [dev-dependencies]

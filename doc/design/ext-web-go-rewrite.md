@@ -347,7 +347,8 @@ plugins/web/                 # Go module（替换原 Rust crate）
 scripts/build-web-plugin.sh   # go build -buildmode=c-shared -o …/libweb.so
 ```
 
-原 Rust 源码：`plugins/web-rust-archive/`（**已移出 Cargo workspace**；参考用，默认不构建）。
+原 Rust 源码：曾置于 `plugins/web-rust-archive/`（已移出 Cargo workspace，参考用）；
+该目录已于 v1.6 精简时从工作树移除，历史保留在 git 中。
 
 ### 9.2 产物与解析
 
