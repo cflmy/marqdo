@@ -36,7 +36,7 @@ The runbook `.mq.md` is ground truth (code as documentation). Default budgets ke
 **skill = > skill_brief depth=`skill_depth`**
 **task_s = > json.stringify value=`task`**
 
-**esc = > json.parse text={"a":"\n\n--- standing ---\n","b":"\n\n--- task ---\n","c":"\n\n--- tools ---\n","d":"\n\n--- call site ---\n","e":"\n\n--- source (.mq.md) ---\n","f":"\n\n--- marqdo skill ---\n","g":"\n\n--- how to act ---\nCall ONLY names listed under --- tools --- (whitelist). If that section is empty or says none, do NOT emit CALL / 调用 — reply with the final answer only.\nNever CALL internal framework helpers (build_step_context, plan, inspect_workbook, etc.).\nContext is budgeted: if you see a [truncated …] marker, you may first emit exactly one line READ:source or READ:skill (Chinese: 读取：source|skill) to deepen, then you will be re-prompted.\nWhen calling an allowed tool, reply with exactly one line: CALL:<name>\n(Chinese ok: 调用：<name>)\nOtherwise reply with the final answer only.\nTools run via Marqdo subtask (spawn fn / wait).\n"}**
+**esc = > json.parse text={"a":"\n\n--- standing ---\n","b":"\n\n--- task ---\n","c":"\n\n--- tools ---\n","d":"\n\n--- call site ---\n","e":"\n\n--- source (.mq.md) ---\n","f":"\n\n--- marqdo skill ---\n","g":"\n\n--- how to act ---\nCall ONLY names listed under --- tools --- (whitelist). If that section is empty or says none, do NOT emit CALL / 调用 — reply with the final answer only.\nNever CALL internal framework helpers (build_step_context, plan, inspect_workbook, etc.).\nContext is budgeted: if you see a [truncated …] marker, you may first emit exactly one line READ:source or READ:skill (Chinese: 读取：source|skill) to deepen, then you will be re-prompted.\nWhen calling an allowed tool, reply with exactly one line: CALL:<name>\n(Chinese ok: 调用：<name>)\nOtherwise reply with the final answer only.\nIf a capability cannot truly be wired, do NOT fake it silently and never claim it works: write an occlusion with an explicit status, e.g. [按关键词检索，接口未接，待开发](None). Stubs must run without error and must state their return value (None is acceptable). Before finishing, check your own declarations with labels.search.\nTools run via Marqdo subtask (spawn fn / wait).\n"}**
 **a = > json.get value=`esc` key="a"**
 **b = > json.get value=`esc` key="b"**
 **c = > json.get value=`esc` key="c"**
@@ -45,7 +45,7 @@ The runbook `.mq.md` is ground truth (code as documentation). Default budgets ke
 **f = > json.get value=`esc` key="f"**
 **g = > json.get value=`esc` key="g"**
 
-**p = "You are a Marqdo agent. Code is documentation: this runbook source and call site are your ground truth — not a hidden system prompt."**
+**p = "You are a Marqdo agent. Code is documentation: this runbook source and call site are your ground truth — not a hidden system prompt. When you cannot wire a capability, declare it in the description (待开发 / 模拟) instead of faking success."**
 **p = p + a + up + b + task_s + d + site_s + c + tools_s + e + src + f + skill + g**
 *p*
 
