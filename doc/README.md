@@ -105,6 +105,11 @@
 | [research/ext-hosting-gaps.md](research/ext-hosting-gaps.md) | **宿主集成缺口**：同域 SSE 中继 · HTTP→`##` · MCP Server · 副端口 · 跨模块 db/corpus |
 | [design/ext-hosting-fill.md](design/ext-hosting-fill.md) | **宿主缺口补齐设计**（`ext/web` proxy/invoke · `ext/ai` mcp_server） |
 | [roadmap/ext-hosting.md](roadmap/ext-hosting.md) | **宿主集成 H0–H4**（规划） |
+| [design/occlusion-syntax.md](design/occlusion-syntax.md) | **遮蔽语法总纲（实施依据）**：`[描述](实现)` 的目的/语义/新鲜度校验 + M0–M8 计划 |
+| [design/label-freshness-and-repair.md](design/label-freshness-and-repair.md) | 标签过期检测：L1 引用一致性 · 指纹台账 · LLM 复核 · MLSP 修复回路 |
+| [design/warning-fatigue-control.md](design/warning-fatigue-control.md) | 防警告疲劳：stale 是变更报告而非扫描报告 · 分级/聚合/会话末汇总 |
+| [design/staleness-providers.md](design/staleness-providers.md) | 变更检测不依赖 git：T0/T1 零依赖 + T2/T3 可选 provider |
+| [design/t1-session-staleness.md](design/t1-session-staleness.md) | 会话内陈旧检测：为何模型在结构上收不到重复警告 |
 | [tutorial/15-常见陷阱.md](tutorial/15-常见陷阱.md) | **使用向陷阱手册**：行首数字、跨函数作用域、空格函数名、导入路径、`table.put` 非原地（1.5.2 实测） |
 | [research/qdagent-refactor-defects-2026-10.md](research/qdagent-refactor-defects-2026-10.md) | **qdagent 重构期缺陷实录 D1–D7**（沙箱 profile 不生效 · 全角 CALL 静默丢失 …） |
 | [roadmap/ext-agent-optimize.md](roadmap/ext-agent-optimize.md) | **`ext/agent` A0–A4 done · Wave B Active** · 后续优化见 [ext-ai-optimize](roadmap/ext-ai-optimize.md) O 波次 |
