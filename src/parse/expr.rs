@@ -14,7 +14,12 @@ pub fn parse_expr_prefer_var(input: &str) -> Result<Expr> {
 }
 
 fn parse_expr_mode(input: &str, prefer_var: bool) -> Result<Expr> {
-    let mut p = Parser::new(input.trim(), prefer_var);
+    parse_expr_opts(input, prefer_var, true)
+}
+
+/// Parse a full expression; `allow_paren_call` controls `name(args)` postfix calls.
+fn parse_expr_opts(input: &str, prefer_var: bool, allow_paren_call: bool) -> Result<Expr> {
+    let mut p = Parser::new_plain(input.trim(), prefer_var, allow_paren_call);
     let e = p.parse_or()?;
     p.skip_ws();
     if !p.rest().is_empty() {
@@ -50,12 +55,21 @@ pub fn parse_value_or_interp(input: &str) -> Result<Expr> {
 /// unspaced `Text / Text` divisions as a single path string (`a/b`, `.marqdo/agent-kb`).
 /// Real math (`1/2`, `` `n` / 2 ``) is unchanged.
 pub fn parse_call_arg_value(input: &str) -> Result<Expr> {
+    parse_call_arg_value_mode(input, false, false)
+}
+
+/// Shared call-argument value parsing.
+///
+/// `allow_call` is true only inside `callee(args)` (paren form), where arguments
+/// are expression-like; classic space-separated values stay text-like so that
+/// `source=print(2+2)` remains the text `print(2+2)`. `<TAB>` M1
+fn parse_call_arg_value_mode(input: &str, prefer_var: bool, allow_call: bool) -> Result<Expr> {
     let s = input.trim();
     if s.is_empty() {
         return Ok(Expr::Literal(Literal::Text(String::new())));
     }
     if s.starts_with('"') || s.starts_with('\'') {
-        return match parse_expr(s) {
+        return match parse_expr_opts(s, prefer_var, allow_call) {
             Ok(e) => Ok(e),
             Err(_) => Ok(parse_interp(s)),
         };
@@ -63,12 +77,22 @@ pub fn parse_call_arg_value(input: &str) -> Result<Expr> {
     if has_hyphenated_prose(s) {
         return Ok(parse_interp(s));
     }
-    match parse_expr(s) {
-        Ok(e) => Ok(collapse_text_div_path(e, s)),
+    match parse_expr_opts(s, prefer_var, allow_call) {
+        Ok(e) => Ok(if prefer_var {
+            e
+        } else {
+            collapse_text_div_path(e, s)
+        }),
         Err(_) => {
             // ext/web paths: `nav.`nav``, `articles.`articles`.title` — ticks are path
-            // punctuation, not interpolation.
-            if s.contains(".`") {
+            // punctuation, not interpolation. Plain `/about` is prose too.
+            if prefer_var {
+                if s.starts_with('/') || s.contains(".`") {
+                    Ok(Expr::Literal(Literal::Text(s.to_string())))
+                } else {
+                    Ok(parse_interp(s))
+                }
+            } else if s.contains(".`") {
                 Ok(Expr::Literal(Literal::Text(s.to_string())))
             } else {
                 Ok(parse_interp(s))
@@ -81,30 +105,7 @@ pub fn parse_call_arg_value(input: &str) -> Result<Expr> {
 /// value-expression segments: a bare word is a **variable** (not a text literal).
 /// Quoted strings, hyphenated prose, and `/path` prose stay text; `` `x` `` still works.
 pub fn parse_call_arg_value_prefer_var(input: &str) -> Result<Expr> {
-    let s = input.trim();
-    if s.is_empty() {
-        return Ok(Expr::Literal(Literal::Text(String::new())));
-    }
-    if s.starts_with('"') || s.starts_with('\'') {
-        return match parse_expr(s) {
-            Ok(e) => Ok(e),
-            Err(_) => Ok(parse_interp(s)),
-        };
-    }
-    if has_hyphenated_prose(s) {
-        return Ok(parse_interp(s));
-    }
-    match parse_expr_prefer_var(s) {
-        Ok(e) => Ok(e),
-        Err(_) => {
-            // `/about`, `.marqdo/x`, `nav.`nav`` etc. → prose text, not variables.
-            if s.starts_with('/') || s.contains(".`") {
-                Ok(Expr::Literal(Literal::Text(s.to_string())))
-            } else {
-                Ok(parse_interp(s))
-            }
-        }
-    }
+    parse_call_arg_value_mode(input, true, false)
 }
 
 fn is_text_only_div_chain(e: &Expr) -> bool {
@@ -235,6 +236,10 @@ struct Parser<'a> {
     i: usize,
     /// When true (italic/bold), bare words are variables, not text literals.
     prefer_var: bool,
+    /// `<TAB>` M1: allow `name(args)` postfix calls inside this expression.
+    /// Classic (space-separated) call *values* stay text-like, so they turn
+    /// this off to keep `source=print(2+2)` as text.
+    allow_paren_call: bool,
 }
 
 impl<'a> Parser<'a> {
@@ -243,6 +248,16 @@ impl<'a> Parser<'a> {
             src,
             i: 0,
             prefer_var,
+            allow_paren_call: true,
+        }
+    }
+
+    fn new_plain(src: &'a str, prefer_var: bool, allow_paren_call: bool) -> Self {
+        Self {
+            src,
+            i: 0,
+            prefer_var,
+            allow_paren_call,
         }
     }
 
@@ -600,6 +615,14 @@ impl<'a> Parser<'a> {
                 self.bump_char();
             }
             let word = self.src[start..self.i].to_string();
+            // `name(args)` postfix call: `(` must follow immediately. `<TAB>` M1
+            if self.allow_paren_call && self.rest().starts_with('(') {
+                let from_word = &self.src[start..];
+                if let Some((call, used)) = try_paren_call(from_word, self.prefer_var)? {
+                    self.i = start + used;
+                    return Ok(Expr::Call(call));
+                }
+            }
             self.skip_ws();
             if self.starts_with("[^") {
                 return self.parse_index_chain(Expr::Var(word));
@@ -916,6 +939,10 @@ pub fn parse_call_tail(s: &str, prefer_var: bool) -> Result<(CallExpr, usize)> {
         return Ok((call, consumed));
     }
 
+    if let Some((call, consumed)) = try_paren_call(s, prefer_var)? {
+        return Ok((call, consumed));
+    }
+
     let callee_tok = {
         let mut parts = s.split_whitespace();
         parts
@@ -924,14 +951,7 @@ pub fn parse_call_tail(s: &str, prefer_var: bool) -> Result<(CallExpr, usize)> {
             .to_string()
     };
 
-    let (receiver, callee, path) = if let Some((r, m)) = split_method_callee(&callee_tok) {
-        (Some(r), m, None)
-    } else if let Some(segments) = split_lib_path_callee(&callee_tok) {
-        let last = segments.last().cloned().unwrap_or_default();
-        (None, last, Some(segments))
-    } else {
-        (None, callee_tok.clone(), None)
-    };
+    let (receiver, callee, path) = split_callee(&callee_tok);
 
     let after_callee_offset = {
         let idx = s.find(&callee_tok).unwrap();
@@ -940,7 +960,7 @@ pub fn parse_call_tail(s: &str, prefer_var: bool) -> Result<(CallExpr, usize)> {
     let after = &s[after_callee_offset..];
     let args_src = after.trim_start();
     let ws = after.len() - args_src.len();
-    let (args, args_consumed) = parse_call_args(args_src, prefer_var)?;
+    let (args, args_consumed) = parse_call_args(args_src, prefer_var, false)?;
 
     Ok((
         CallExpr {
@@ -953,6 +973,70 @@ pub fn parse_call_tail(s: &str, prefer_var: bool) -> Result<(CallExpr, usize)> {
         },
         after_callee_offset + ws + args_consumed,
     ))
+}
+
+
+/// Split a callee token into `(receiver, callee, lib path)`.
+fn split_callee(callee_tok: &str) -> (Option<String>, String, Option<Vec<String>>) {
+    if let Some((r, m)) = split_method_callee(callee_tok) {
+        (Some(r), m, None)
+    } else if let Some(segments) = split_lib_path_callee(callee_tok) {
+        let last = segments.last().cloned().unwrap_or_default();
+        (None, last, Some(segments))
+    } else {
+        (None, callee_tok.to_string(), None)
+    }
+}
+
+/// `callee(args)` — callee is **everything before the first `(`** (spaces allowed).
+///
+/// Returns `None` when the shape is not a paren call (e.g. `print text=…`,
+/// `text=(a)`), so callers can fall back to the classic token form. `<TAB>` M1.
+fn try_paren_call(s: &str, prefer_var: bool) -> Result<Option<(CallExpr, usize)>> {
+    let Some(open) = s.find('(') else {
+        return Ok(None);
+    };
+    if open == 0 {
+        return Ok(None);
+    }
+    let callee_tok = s[..open].trim();
+    if callee_tok.is_empty() {
+        return Ok(None);
+    }
+    // A named argument (`text=a(b)`) is not a paren call, and neither is a
+    // bracket-marked argument (`trim [stdout](…)`): the callee side must not
+    // contain `=`, quotes or brackets. Backticks stay legal so that the
+    // backticked-receiver method form `` `obj`.方法(…) `` still reaches here.
+    if callee_tok
+        .chars()
+        .any(|c| matches!(c, '=' | '[' | ']' | '(' | ')' | '"' | '\''))
+    {
+        return Ok(None);
+    }
+    let first = callee_tok.chars().next().unwrap_or(' ');
+    if matches!(first, '[' | ']' | '"' | '\'') {
+        return Ok(None);
+    }
+    let inside = &s[open + 1..];
+    let (args, used) = parse_call_args(inside, prefer_var, true)?;
+    let rest = &inside[used..];
+    let rest_t = rest.trim_start();
+    if !rest_t.starts_with(')') {
+        return Ok(None);
+    }
+    let consumed = open + 1 + used + (rest.len() - rest_t.len()) + 1;
+    let (receiver, callee, path) = split_callee(callee_tok);
+    Ok(Some((
+        CallExpr {
+            callee,
+            path,
+            receiver,
+            args,
+            pre_modifiers: Vec::new(),
+            bracket_marked: false,
+        },
+        consumed,
+    )))
 }
 
 /// `mod… [callee] args` — `]` must not be immediately followed by `(` (that is link-index).
@@ -1032,7 +1116,7 @@ fn try_bracket_marked_call(s: &str, prefer_var: bool) -> Result<Option<(CallExpr
             let after_full = &s[close + 1..];
             let args_src = after_full.trim_start();
             let ws = after_full.len() - args_src.len();
-            let (args, args_consumed) = parse_call_args(args_src, prefer_var)?;
+            let (args, args_consumed) = parse_call_args(args_src, prefer_var, false)?;
             let consumed = close + 1 + ws + args_consumed;
             return Ok(Some((
                 CallExpr {
@@ -1055,7 +1139,7 @@ fn split_modifiers(pre: &str) -> Result<Vec<String>> {
     let mut out = Vec::new();
     let mut rest = pre.trim();
     while !rest.is_empty() {
-        let (tok, next) = split_first_token(rest);
+        let (tok, next) = split_first_token(rest, false);
         if tok.is_empty() {
             break;
         }
@@ -1078,24 +1162,38 @@ fn split_modifiers(pre: &str) -> Result<Vec<String>> {
 
 /// Parse call args; returns `(args, bytes_consumed)` from the start of `args_str`.
 /// Stops before an unmatched `)` so parenthesized expression nesting works.
-fn parse_call_args(args_str: &str, prefer_var: bool) -> Result<(Vec<crate::ast::Arg>, usize)> {
+fn parse_call_args(
+    args_str: &str,
+    prefer_var: bool,
+    paren_mode: bool,
+) -> Result<(Vec<crate::ast::Arg>, usize)> {
     use crate::ast::Arg;
     let mut args = Vec::new();
     let mut seen_named = false;
     let mut rest = args_str;
 
     while !rest.is_empty() {
-        if rest.starts_with(')') {
+        rest = rest.trim_start();
+        if rest.is_empty() || rest.starts_with(')') {
             break;
+        }
+        // `<TAB>` M1: optional comma separator inside `callee(...)`.
+        if paren_mode {
+            while let Some(r) = rest.strip_prefix(',') {
+                rest = r.trim_start();
+            }
+            if rest.is_empty() || rest.starts_with(')') {
+                break;
+            }
         }
         if let Some((key, after_eq)) = try_named_arg(rest) {
             seen_named = true;
-            let val_end = find_next_arg_boundary(after_eq);
+            let val_end = find_next_arg_boundary(after_eq, paren_mode);
             let val_raw = after_eq[..val_end].trim_end();
             let value = if prefer_var {
-                parse_call_arg_value_prefer_var(val_raw)?
+                parse_call_arg_value_mode(val_raw, prefer_var, paren_mode)?
             } else {
-                parse_call_arg_value(val_raw)?
+                parse_call_arg_value_mode(val_raw, prefer_var, paren_mode)?
             };
             args.push(Arg::Named {
                 name: key,
@@ -1106,14 +1204,14 @@ fn parse_call_args(args_str: &str, prefer_var: bool) -> Result<(Vec<crate::ast::
             if seen_named {
                 bail!("positional argument after named argument is not allowed");
             }
-            let (tok, next) = split_first_token(rest);
+            let (tok, next) = split_first_token(rest, paren_mode);
             if tok.is_empty() {
                 break;
             }
             let value = if prefer_var {
-                parse_call_arg_value_prefer_var(tok)?
+                parse_call_arg_value_mode(tok, prefer_var, paren_mode)?
             } else {
-                parse_call_arg_value(tok)?
+                parse_call_arg_value_mode(tok, prefer_var, paren_mode)?
             };
             args.push(Arg::Positional(value));
             rest = next.trim_start();
@@ -1178,40 +1276,61 @@ fn try_named_arg(s: &str) -> Option<(String, &str)> {
     None
 }
 
-fn split_first_token(s: &str) -> (&str, &str) {
+/// Split one call-argument token off `s`.
+///
+/// Stops at a **top-level** whitespace, `)`, and (when `stop_comma`) `,`.
+/// Tracks `()` `[]` `{}` nesting plus quoted strings and backticks, so nested
+/// calls (`f(g(1))`) and JSON-ish values stay one token. `<TAB>` M1.
+fn split_first_token(s: &str, paren_mode: bool) -> (&str, &str) {
     let s = s.trim_start();
-    if s.starts_with('(') {
-        let mut depth = 0i32;
-        for (i, c) in s.char_indices() {
-            match c {
-                '(' => depth += 1,
-                ')' => {
-                    depth -= 1;
-                    if depth == 0 {
-                        let end = i + c.len_utf8();
-                        return (&s[..end], &s[end..]);
-                    }
-                }
-                _ => {}
+    let mut depth = 0i32;
+    let mut in_str = false;
+    let mut in_bt = false;
+    let mut chars = s.char_indices().peekable();
+    while let Some((i, c)) = chars.next() {
+        if in_str {
+            if c == '\\' {
+                chars.next();
+                continue;
             }
+            if c == '"' {
+                in_str = false;
+            }
+            continue;
+        }
+        if in_bt {
+            if c == '`' {
+                in_bt = false;
+            }
+            continue;
+        }
+        match c {
+            '`' => {
+                in_bt = true;
+                continue;
+            }
+            '"' => {
+                in_str = true;
+                continue;
+            }
+            '(' | '[' | '{' => {
+                depth += 1;
+                continue;
+            }
+            ')' | ']' | '}' => {
+                if depth == 0 {
+                    // Top-level closer terminates the token and is NOT consumed.
+                    return (&s[..i], &s[i..]);
+                }
+                depth -= 1;
+                continue;
+            }
+            ',' if paren_mode && depth == 0 => return (&s[..i], &s[i..]),
+            c if depth == 0 && c.is_whitespace() => return (&s[..i], &s[i..]),
+            _ => {}
         }
     }
-    if s.starts_with('"') {
-        if let Some(end) = end_of_quoted_string(s) {
-            return (&s[..end], &s[end..]);
-        }
-    }
-    if s.starts_with('`') {
-        // `` `name` `` as one token
-        if let Some(end) = s[1..].find('`') {
-            let end = end + 2; // include closing `
-            return (&s[..end], &s[end..]);
-        }
-    }
-    match s.find(char::is_whitespace) {
-        Some(i) => (&s[..i], &s[i..]),
-        None => (s, ""),
-    }
+    (s, "")
 }
 
 /// `[key](…)` with no whitespace between `]` and `(`.
@@ -1245,7 +1364,7 @@ fn bracket_callee_shape_ahead(s: &str) -> bool {
 
 fn is_bracket_callee_inner(inner: &str) -> bool {
     let t = inner.trim();
-    if t.is_empty() || t.chars().any(|c| c.is_whitespace()) {
+    if t.is_empty() {
         return false;
     }
     // JSON arrays / objects / strings are never callees.
@@ -1267,9 +1386,10 @@ fn is_bracket_callee_inner(inner: &str) -> bool {
     if t.chars().next().is_some_and(|c| c.is_ascii_digit()) {
         return false;
     }
-    // Bare name or `lib.path` callee.
+    // Bare name or `lib.path` callee. Internal spaces allowed: `[加一 号] 31`
+    // is the bracket-marked form of a callee whose name contains spaces (D8).
     t.chars()
-        .all(|c| c.is_alphanumeric() || c == '_' || c == '.' || !c.is_ascii())
+        .all(|c| c.is_alphanumeric() || c == '_' || c == '.' || c == ' ' || !c.is_ascii())
 }
 
 fn is_modifier_token(name: &str) -> bool {
@@ -1279,13 +1399,14 @@ fn is_modifier_token(name: &str) -> bool {
             .all(|c| c.is_alphanumeric() || c == '_' || !c.is_ascii())
 }
 
-fn find_next_arg_boundary(after_eq: &str) -> usize {
+fn find_next_arg_boundary(after_eq: &str, paren_mode: bool) -> usize {
     // Look for ` <ident>=` pattern not inside backticks, quoted strings, or
     // JSON-ish `[…]` / `{…}` (GAP-07: `text=["a"] other=…`).
     let mut in_bt = false;
     let mut in_str = false;
     let mut bracket_depth: i32 = 0;
     let mut brace_depth: i32 = 0;
+    let mut paren_depth: i32 = 0;
     let mut chars = after_eq.char_indices().peekable();
     while let Some((i, c)) = chars.next() {
         if in_str {
@@ -1329,9 +1450,24 @@ fn find_next_arg_boundary(after_eq: &str) -> usize {
                 brace_depth = brace_depth.saturating_sub(1);
                 continue;
             }
+            '(' => {
+                paren_depth += 1;
+                continue;
+            }
+            ')' => {
+                if paren_depth == 0 {
+                    // `<TAB>` M1: `)` ends the enclosing call's argument list.
+                    return i;
+                }
+                paren_depth -= 1;
+                continue;
+            }
+            ',' if paren_mode && paren_depth == 0 && bracket_depth == 0 && brace_depth == 0 => {
+                return i;
+            }
             _ => {}
         }
-        if bracket_depth > 0 || brace_depth > 0 {
+        if bracket_depth > 0 || brace_depth > 0 || paren_depth > 0 {
             continue;
         }
         if c.is_whitespace() {
@@ -1354,27 +1490,6 @@ fn find_next_arg_boundary(after_eq: &str) -> usize {
     after_eq.len()
 }
 
-/// Byte index after a leading `"..."` token (opening quote included in slice).
-fn end_of_quoted_string(s: &str) -> Option<usize> {
-    if !s.starts_with('"') {
-        return None;
-    }
-    let mut escaped = false;
-    for (i, c) in s.char_indices().skip(1) {
-        if escaped {
-            escaped = false;
-            continue;
-        }
-        if c == '\\' {
-            escaped = true;
-            continue;
-        }
-        if c == '"' {
-            return Some(i + c.len_utf8());
-        }
-    }
-    None
-}
 
 /// Parse `> callee args` call expression/statement text (without leading `>`).
 /// When `prefer_var` (inside `*…*` / `**…**`), bare call-arg words are variables
@@ -1732,6 +1847,121 @@ mod bracket_call_tests {
     fn link_index_not_bracket_call() {
         let e = parse_expr_prefer_var("[拿铁](菜单)").unwrap();
         assert!(matches!(e, Expr::Index { .. }));
+    }
+
+    // ---- M1: `()` 内调用语法（`)` 终止 / 逗号 / 嵌套 / 空格 callee）----
+
+    fn call_of(e: Expr) -> crate::ast::CallExpr {
+        match e {
+            Expr::Call(c) => c,
+            other => panic!("expected Call, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn paren_call_single_positional() {
+        let (c, used) = parse_call_tail("加(1)", false).unwrap();
+        assert_eq!(c.callee, "加");
+        assert_eq!(used, "加(1)".len());
+        assert_eq!(c.args.len(), 1);
+    }
+
+    #[test]
+    fn paren_call_bare_number_stops_at_paren() {
+        // 历史缺陷：末个位置实参会吞掉 `)`
+        let (c, used) = parse_call_tail("加(31)", false).unwrap();
+        assert_eq!(used, "加(31)".len(), "consumed must cover the closing paren");
+        assert_eq!(c.args.len(), 1);
+    }
+
+    #[test]
+    fn paren_call_comma_and_space_separated() {
+        for src in ["加(1, 2)", "加(1 2)", "加(1,2)", "加( 1 , 2 )"] {
+            let (c, _) = parse_call_tail(src, false).unwrap();
+            assert_eq!(c.args.len(), 2, "src={src}");
+        }
+    }
+
+    #[test]
+    fn paren_call_named_args() {
+        let (c, _) = parse_call_tail("计税(档位=2, 金额=100)", false).unwrap();
+        assert_eq!(c.callee, "计税");
+        assert_eq!(c.args.len(), 2);
+        match &c.args[0] {
+            crate::ast::Arg::Named { name, .. } => assert_eq!(name, "档位"),
+            other => panic!("{other:?}"),
+        }
+    }
+
+    #[test]
+    fn paren_call_callee_may_contain_spaces() {
+        let (c, used) = parse_call_tail("加一 号(31)", false).unwrap();
+        assert_eq!(c.callee, "加一 号");
+        assert_eq!(used, "加一 号(31)".len());
+        assert_eq!(c.args.len(), 1);
+    }
+
+    #[test]
+    fn paren_call_zero_args() {
+        let (c, _) = parse_call_tail("刷新()", false).unwrap();
+        assert_eq!(c.callee, "刷新");
+        assert!(c.args.is_empty());
+    }
+
+    #[test]
+    fn paren_call_lib_path_and_method() {
+        let c = call_of(parse_expr("txt.str_trim(s)").unwrap());
+        assert_eq!(c.callee, "str_trim");
+        assert_eq!(c.path.as_deref(), Some(&["txt".to_string(), "str_trim".to_string()][..]));
+
+        // 点号 callee 在 parse 期保存为 lib path；若 `obj` 是局部变量，
+        // 运行期 eval_call 会把它当 method receiver（与 `> obj.方法` 一致）。
+        let c = call_of(parse_expr("obj.方法(1)").unwrap());
+        assert_eq!(c.callee, "方法");
+        assert_eq!(
+            c.path.as_deref(),
+            Some(&["obj".to_string(), "方法".to_string()][..])
+        );
+        assert!(c.receiver.is_none());
+    }
+
+    #[test]
+    fn paren_call_nested_in_expression() {
+        let c = call_of(parse_expr("加(加(1 2), 3)").unwrap());
+        assert_eq!(c.args.len(), 2);
+        match &c.args[0] {
+            crate::ast::Arg::Positional(Expr::Call(inner)) => {
+                assert_eq!(inner.callee, "加");
+                assert_eq!(inner.args.len(), 2);
+            }
+            other => panic!("expected nested call, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn paren_call_quoted_args_keep_commas() {
+        // 逗号只在括号形里当分隔符；字符串内的逗号不受影响
+        let (c, _) = parse_call_tail(r#"拼接("a,b", "c")"#, false).unwrap();
+        assert_eq!(c.args.len(), 2);
+    }
+
+    #[test]
+    fn whitespace_call_unaffected_by_commas() {
+        // 旧式空格调用：`text=a,b` 的逗号仍是文本一部分
+        let (c, _) = parse_call_tail("print text=a,b", false).unwrap();
+        match &c.args[0] {
+            crate::ast::Arg::Named { value, .. } => match value {
+                Expr::Literal(Literal::Text(s)) => assert_eq!(s, "a,b"),
+                other => panic!("expected text a,b, got {other:?}"),
+            },
+            other => panic!("{other:?}"),
+        }
+    }
+
+    #[test]
+    fn bracketed_call_still_works() {
+        let (c, _) = parse_call_tail("[加一 号] 31", false).unwrap();
+        assert_eq!(c.callee, "加一 号");
     }
 
     #[test]
