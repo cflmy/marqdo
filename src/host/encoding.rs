@@ -1,14 +1,9 @@
 //! Base64 / hex encoding for Mid M1 (`lib/encoding`).
 //! No third-party crates — standard alphabet + padding.
 
+use crate::host::as_text;
 use crate::value::Value;
 
-fn as_text<'a>(v: &'a Value, label: &str) -> Result<&'a str, String> {
-    match v {
-        Value::Text(s) => Ok(s.as_str()),
-        _ => Err(format!("{label} needs text")),
-    }
-}
 
 const B64: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 

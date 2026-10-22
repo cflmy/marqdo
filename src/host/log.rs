@@ -1,5 +1,6 @@
 //! Log level gate for Mid M6 (`lib/log`).
 
+use crate::host::as_text;
 use crate::host::HostContext;
 use crate::value::Value;
 
@@ -32,12 +33,6 @@ impl Level {
     }
 }
 
-fn as_text<'a>(v: &'a Value, label: &str) -> Result<&'a str, String> {
-    match v {
-        Value::Text(s) => Ok(s.as_str()),
-        _ => Err(format!("{label} needs text")),
-    }
-}
 
 pub fn set_level(ctx: &mut HostContext, level: &Value) -> Result<Value, String> {
     let s = as_text(level, "level")?;

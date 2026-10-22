@@ -2,14 +2,9 @@
 //! Distinct from `net::url_encode` (single-segment form encoding).
 //! Hand-rolled subset (no `url` crate): scheme://[userinfo@]host[:port]/path[?query][#frag].
 
+use crate::host::as_text;
 use crate::value::Value;
 
-fn as_text<'a>(v: &'a Value, label: &str) -> Result<&'a str, String> {
-    match v {
-        Value::Text(s) => Ok(s.as_str()),
-        _ => Err(format!("{label} must be text")),
-    }
-}
 
 fn encode_component(s: &str) -> String {
     let mut out = String::new();

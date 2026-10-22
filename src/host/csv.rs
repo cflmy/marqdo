@@ -1,13 +1,8 @@
 //! Minimal RFC4180 CSV for Mid M4 (`lib/csv`).
 
+use crate::host::as_text;
 use crate::value::Value;
 
-fn as_text<'a>(v: &'a Value, label: &str) -> Result<&'a str, String> {
-    match v {
-        Value::Text(s) => Ok(s.as_str()),
-        _ => Err(format!("{label} needs text")),
-    }
-}
 
 /// Parse CSV text into a list of maps (first row = headers).
 pub fn parse(text: &Value) -> Result<Value, String> {

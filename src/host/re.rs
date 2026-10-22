@@ -1,14 +1,9 @@
 //! Regex host primitives for Mid M1 (`lib/re`).
 
+use crate::host::as_text;
 use crate::value::Value;
 use regex::Regex;
 
-fn as_text<'a>(v: &'a Value, label: &str) -> Result<&'a str, String> {
-    match v {
-        Value::Text(s) => Ok(s.as_str()),
-        _ => Err(format!("{label} needs text")),
-    }
-}
 
 fn compile(pattern: &str) -> Result<Regex, String> {
     Regex::new(pattern).map_err(|e| format!("invalid regex: {e}"))

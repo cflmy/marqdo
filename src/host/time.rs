@@ -1,5 +1,6 @@
 //! Time host primitives.
 
+use crate::host::as_text;
 use std::time::Duration;
 #[cfg(not(target_arch = "wasm32"))]
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -47,12 +48,6 @@ fn as_i64(v: &Value, label: &str) -> Result<i64, String> {
     }
 }
 
-fn as_text<'a>(v: &'a Value, label: &str) -> Result<&'a str, String> {
-    match v {
-        Value::Text(s) => Ok(s.as_str()),
-        _ => Err(format!("{label} must be text")),
-    }
-}
 
 pub fn format_time(unix: &Value, pattern: &Value) -> Result<Value, String> {
     let secs = as_i64(unix, "unix")?;

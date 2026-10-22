@@ -1,15 +1,10 @@
 //! Path algebra for Mid M2 (`lib/path`) — no I/O.
 
+use crate::host::as_text;
 use std::path::{Component, Path, PathBuf};
 
 use crate::value::Value;
 
-fn as_text<'a>(v: &'a Value, label: &str) -> Result<&'a str, String> {
-    match v {
-        Value::Text(s) => Ok(s.as_str()),
-        _ => Err(format!("{label} needs text")),
-    }
-}
 
 fn path_to_text(p: &Path) -> String {
     if p.as_os_str().is_empty() {

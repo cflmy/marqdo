@@ -3,6 +3,9 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
+// `<TAB>` slimming: these were byte-identical copies of `knowledge::util`.
+use crate::knowledge::util::{extract_fm_field, extract_fm_list, extract_nested_by, yaml_escape};
+
 use anyhow::{Context, Result};
 
 use crate::lex::{classify_source, LineKind};
@@ -318,111 +321,10 @@ fn extract_frontmatter_title(source: &str) -> Option<String> {
     extract_fm_field(source, "title")
 }
 
-fn extract_fm_field(source: &str, key: &str) -> Option<String> {
-    let source = source.strip_prefix('\u{feff}').unwrap_or(source);
-    let lines: Vec<&str> = source.lines().collect();
-    if lines.first().map(|l| l.trim()) != Some("---") {
-        return None;
-    }
-    let prefix = format!("{key}:");
-    for line in lines.iter().skip(1) {
-        let t = line.trim();
-        if t == "---" {
-            break;
-        }
-        if let Some(rest) = t.strip_prefix(&prefix) {
-            return Some(rest.trim().trim_matches('"').to_string());
-        }
-    }
-    None
-}
 
 /// `verified:\n  by: foo` → Some("foo")
-fn extract_nested_by(source: &str, block: &str) -> Option<String> {
-    let source = source.strip_prefix('\u{feff}').unwrap_or(source);
-    let lines: Vec<&str> = source.lines().collect();
-    if lines.first().map(|l| l.trim()) != Some("---") {
-        return None;
-    }
-    let mut in_block = false;
-    for line in lines.iter().skip(1) {
-        let t = line.trim_end();
-        if t.trim() == "---" {
-            break;
-        }
-        if t.trim() == format!("{block}:") || t.trim().starts_with(&format!("{block}:")) {
-            // inline `verified: { by: x }` not supported; block form:
-            if t.trim() == format!("{block}:") {
-                in_block = true;
-                continue;
-            }
-        }
-        if in_block {
-            let trimmed = t.trim();
-            if trimmed.starts_with("by:") {
-                return Some(
-                    trimmed
-                        .trim_start_matches("by:")
-                        .trim()
-                        .trim_matches('"')
-                        .to_string(),
-                );
-            }
-            if !trimmed.is_empty() && !line.starts_with(' ') && !line.starts_with('\t') {
-                break;
-            }
-        }
-    }
-    None
-}
 
-fn extract_fm_list(source: &str, key: &str) -> Vec<String> {
-    let source = source.strip_prefix('\u{feff}').unwrap_or(source);
-    let lines: Vec<&str> = source.lines().collect();
-    if lines.first().map(|l| l.trim()) != Some("---") {
-        return Vec::new();
-    }
-    let mut out = Vec::new();
-    let mut in_list = false;
-    let header = format!("{key}:");
-    for line in lines.iter().skip(1) {
-        let t = line.trim_end();
-        if t.trim() == "---" {
-            break;
-        }
-        if t.trim() == header || t.trim() == format!("{key}: []") {
-            if t.trim().ends_with("[]") {
-                return Vec::new();
-            }
-            in_list = true;
-            continue;
-        }
-        if in_list {
-            let trimmed = t.trim();
-            if let Some(rest) = trimmed.strip_prefix("- ") {
-                out.push(rest.trim().trim_matches('"').to_string());
-            } else if !trimmed.is_empty() && !line.starts_with(' ') && !line.starts_with('\t') {
-                break;
-            }
-        }
-    }
-    out
-}
 
-fn yaml_escape(s: &str) -> String {
-    if s.is_empty()
-        || s.contains(':')
-        || s.contains('#')
-        || s.contains('"')
-        || s.contains('\'')
-        || s.contains('\n')
-        || s.starts_with(' ')
-    {
-        format!("\"{}\"", s.replace('\\', "\\\\").replace('"', "\\\""))
-    } else {
-        s.to_string()
-    }
-}
 
 fn import_path(imp: &str) -> &str {
     imp.split(" as ").next().unwrap_or(imp).trim()

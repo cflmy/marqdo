@@ -4,6 +4,7 @@
 //! Quiet file children get `MARQDO_EVENT_FORWARD` so LLM stream events published in the
 //! child process are tailed into the parent EventBus while `wait` blocks (view SSE).
 
+use crate::host::as_text;
 use std::collections::HashMap;
 use std::io::{Read, Seek, SeekFrom};
 use std::path::PathBuf;
@@ -136,12 +137,6 @@ pub(crate) struct FunctionTask {
     handle: Option<JoinHandle<()>>,
 }
 
-fn as_text<'a>(v: &'a Value, label: &str) -> Result<&'a str, String> {
-    match v {
-        Value::Text(s) => Ok(s.as_str()),
-        _ => Err(format!("{label} must be text")),
-    }
-}
 
 fn as_code(v: &Value) -> Result<&CodeBlock, String> {
     match v {

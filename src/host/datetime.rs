@@ -3,6 +3,7 @@
 //! Moments are plain maps: `{unix, zone, iso}`. Zone is a fixed offset (`+08:00`)
 //! or alias (`UTC`); a few fixed-offset IANA names are accepted. Full tzdb is out of scope.
 
+use crate::host::as_text;
 use chrono::{DateTime, Duration, FixedOffset, NaiveDate, NaiveDateTime, TimeZone, Utc};
 
 use crate::value::Value;
@@ -14,12 +15,6 @@ fn as_i64(v: &Value, label: &str) -> Result<i64, String> {
     }
 }
 
-fn as_text<'a>(v: &'a Value, label: &str) -> Result<&'a str, String> {
-    match v {
-        Value::Text(s) => Ok(s.as_str()),
-        _ => Err(format!("{label} must be text")),
-    }
-}
 
 fn optional_i64(v: Option<&Value>, label: &str) -> Result<i64, String> {
     match v {

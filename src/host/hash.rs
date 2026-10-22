@@ -1,5 +1,6 @@
 //! Digest / HMAC host primitives for Mid M3 (`lib/hash`).
 
+use crate::host::as_text;
 use hmac::{Hmac, Mac};
 use md5::Md5;
 use sha1::Sha1;
@@ -9,12 +10,6 @@ use crate::value::Value;
 
 type HmacSha256 = Hmac<Sha256>;
 
-fn as_text<'a>(v: &'a Value, label: &str) -> Result<&'a str, String> {
-    match v {
-        Value::Text(s) => Ok(s.as_str()),
-        _ => Err(format!("{label} needs text")),
-    }
-}
 
 fn to_hex(bytes: &[u8]) -> String {
     bytes.iter().map(|b| format!("{b:02x}")).collect()

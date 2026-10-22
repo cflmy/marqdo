@@ -3,6 +3,7 @@
 //! Protocol: one JSON request per stdin line, one JSON response per original
 //! stdout line. User stdout/stderr are captured inside the bootstrap.
 
+use crate::host::as_text;
 use std::io::{BufRead, BufReader, Read, Write};
 use std::process::{Child, Command, Stdio};
 use std::sync::mpsc::{self, Receiver};
@@ -171,12 +172,6 @@ impl Drop for Session {
     }
 }
 
-fn as_text<'a>(v: &'a Value, what: &str) -> Result<&'a str, String> {
-    match v {
-        Value::Text(s) => Ok(s.as_str()),
-        _ => Err(format!("{what} must be text")),
-    }
-}
 
 fn opt_text(v: Option<&Value>) -> Result<Option<String>, String> {
     match v {

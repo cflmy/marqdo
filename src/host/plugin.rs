@@ -1,5 +1,6 @@
 //! Native plugin loader (C ABI v1/v2). Shared libs are not linked into marqdo.
 
+use crate::host::as_text;
 use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
 use std::ffi::{CStr, CString};
@@ -170,12 +171,6 @@ impl PluginState {
     }
 }
 
-fn as_text<'a>(v: &'a Value, label: &str) -> Result<&'a str, String> {
-    match v {
-        Value::Text(s) => Ok(s.as_str()),
-        _ => Err(format!("{label} must be text")),
-    }
-}
 
 extern "C" {
     fn malloc(n: usize) -> *mut c_void;

@@ -1,13 +1,8 @@
 //! Text helpers for Mid M4 (`lib/text` thicken).
 
+use crate::host::as_text;
 use crate::value::Value;
 
-fn as_text<'a>(v: &'a Value, label: &str) -> Result<&'a str, String> {
-    match v {
-        Value::Text(s) => Ok(s.as_str()),
-        _ => Err(format!("{label} needs text")),
-    }
-}
 
 fn as_usize(v: &Value, label: &str) -> Result<usize, String> {
     match v {

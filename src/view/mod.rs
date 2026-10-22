@@ -168,6 +168,59 @@ fn is_mq_md(path: &Path) -> bool {
         .unwrap_or(false)
 }
 
+
+/// POST API route tables. `<TAB>` slimming: 39 hand-written match arms across the
+/// two handlers collapsed into tables; each arm repeated the `api_debug_post` wrapper.
+type NotebookFn = fn(&std::path::Path, &str) -> serde_json::Value;
+type DebugFn = fn(&str) -> serde_json::Value;
+
+#[derive(Clone, Copy)]
+enum ApiRoute {
+    Notebook(NotebookFn),
+    Debug(DebugFn),
+    Action(crate::debug::DebugAction),
+}
+
+const API_ROUTES: &[(&str, ApiRoute)] = &[
+    ("/api/session/open", ApiRoute::Notebook(notebook_api::api_open)),
+    ("/api/session/reload", ApiRoute::Notebook(notebook_api::api_reload)),
+    ("/api/session/close", ApiRoute::Notebook(notebook_api::api_close)),
+    ("/api/session/run_document", ApiRoute::Notebook(notebook_api::api_run_document)),
+    ("/api/session/snapshot/export", ApiRoute::Notebook(notebook_api::api_export_snapshot)),
+    ("/api/session/snapshot/import", ApiRoute::Notebook(notebook_api::api_import_snapshot)),
+    ("/api/session/snapshot/replay", ApiRoute::Notebook(notebook_api::api_replay_snapshot)),
+    ("/api/session/plan/assign", ApiRoute::Notebook(notebook_api::api_plan_assign)),
+    ("/api/session/plan/add", ApiRoute::Notebook(notebook_api::api_plan_add)),
+    ("/api/session/plan/remove", ApiRoute::Notebook(notebook_api::api_plan_remove)),
+    ("/api/session/plan/value", ApiRoute::Notebook(notebook_api::api_plan_value)),
+    ("/api/session/cell/persist", ApiRoute::Notebook(notebook_api::api_persist_cell)),
+    ("/api/session/interrupt", ApiRoute::Notebook(notebook_api::api_interrupt)),
+    ("/api/session/cell/clear", ApiRoute::Notebook(notebook_api::api_clear_cell)),
+    ("/api/session/clear", ApiRoute::Notebook(notebook_api::api_clear)),
+    ("/api/session/cell/run", ApiRoute::Notebook(notebook_api::api_cell_run)),
+    ("/api/session/cell/step", ApiRoute::Notebook(notebook_api::api_cell_step)),
+    ("/api/session/run_all", ApiRoute::Notebook(notebook_api::api_run_all)),
+    ("/api/session/kernel/restart", ApiRoute::Notebook(notebook_api::api_kernel_restart)),
+    ("/api/session/kernel/assign", ApiRoute::Notebook(notebook_api::api_assign)),
+    ("/api/session/state/list", ApiRoute::Notebook(notebook_api::api_state_list)),
+    ("/api/session/state/push", ApiRoute::Notebook(notebook_api::api_state_push)),
+    ("/api/session/state/pull", ApiRoute::Notebook(notebook_api::api_state_pull)),
+    ("/api/session/journal", ApiRoute::Notebook(notebook_api::api_journal)),
+    ("/api/debug/start", ApiRoute::Notebook(debug_api::api_debug_start)),
+    ("/api/debug/continue", ApiRoute::Action(crate::debug::DebugAction::Continue)),
+    ("/api/debug/step", ApiRoute::Action(crate::debug::DebugAction::Step)),
+    ("/api/debug/breakpoints", ApiRoute::Debug(debug_api::api_debug_set_breakpoints)),
+    ("/api/debug/stop", ApiRoute::Debug(debug_api::api_debug_stop)),
+];
+
+const API_ROUTES_DEBUG: &[(&str, ApiRoute)] = &[
+    ("/api/debug/start", ApiRoute::Notebook(debug_api::api_debug_start)),
+    ("/api/debug/continue", ApiRoute::Action(crate::debug::DebugAction::Continue)),
+    ("/api/debug/step", ApiRoute::Action(crate::debug::DebugAction::Step)),
+    ("/api/debug/breakpoints", ApiRoute::Debug(debug_api::api_debug_set_breakpoints)),
+    ("/api/debug/stop", ApiRoute::Debug(debug_api::api_debug_stop)),
+];
+
 fn handle(root: &ViewRoot, request: Request) -> Result<()> {
     let url = request.url().to_string();
     let method = request.method().clone();
@@ -177,150 +230,14 @@ fn handle(root: &ViewRoot, request: Request) -> Result<()> {
         match path_part {
             "/api/foreign-run" => return api_foreign_run(root, request),
             "/api/run" => return api_run(root, request),
-            "/api/session/open" => {
-                return api_debug_post(request, |body| {
-                    notebook_api::api_open(&root.root, body)
-                })
-            }
-            "/api/session/reload" => {
-                return api_debug_post(request, |body| {
-                    notebook_api::api_reload(&root.root, body)
-                })
-            }
-            "/api/session/close" => {
-                return api_debug_post(request, |body| {
-                    notebook_api::api_close(&root.root, body)
-                })
-            }
-            "/api/session/run_document" => {
-                return api_debug_post(request, |body| {
-                    notebook_api::api_run_document(&root.root, body)
-                })
-            }
-            "/api/session/snapshot/export" => {
-                return api_debug_post(request, |body| {
-                    notebook_api::api_export_snapshot(&root.root, body)
-                })
-            }
-            "/api/session/snapshot/import" => {
-                return api_debug_post(request, |body| {
-                    notebook_api::api_import_snapshot(&root.root, body)
-                })
-            }
-            "/api/session/snapshot/replay" => {
-                return api_debug_post(request, |body| {
-                    notebook_api::api_replay_snapshot(&root.root, body)
-                })
-            }
-            "/api/session/plan/assign" => {
-                return api_debug_post(request, |body| {
-                    notebook_api::api_plan_assign(&root.root, body)
-                })
-            }
-            "/api/session/plan/add" => {
-                return api_debug_post(request, |body| {
-                    notebook_api::api_plan_add(&root.root, body)
-                })
-            }
-            "/api/session/plan/remove" => {
-                return api_debug_post(request, |body| {
-                    notebook_api::api_plan_remove(&root.root, body)
-                })
-            }
-            "/api/session/plan/value" => {
-                return api_debug_post(request, |body| {
-                    notebook_api::api_plan_value(&root.root, body)
-                })
-            }
-            "/api/session/cell/persist" => {
-                return api_debug_post(request, |body| {
-                    notebook_api::api_persist_cell(&root.root, body)
-                })
-            }
-            "/api/session/interrupt" => {
-                return api_debug_post(request, |body| {
-                    notebook_api::api_interrupt(&root.root, body)
-                })
-            }
-            "/api/session/cell/clear" => {
-                return api_debug_post(request, |body| {
-                    notebook_api::api_clear_cell(&root.root, body)
-                })
-            }
-            "/api/session/clear" => {
-                return api_debug_post(request, |body| {
-                    notebook_api::api_clear(&root.root, body)
-                })
-            }
-            "/api/session/cell/run" => {
-                return api_debug_post(request, |body| {
-                    notebook_api::api_cell_run(&root.root, body)
-                })
-            }
-            "/api/session/cell/step" => {
-                return api_debug_post(request, |body| {
-                    notebook_api::api_cell_step(&root.root, body)
-                })
-            }
-            "/api/session/run_all" => {
-                return api_debug_post(request, |body| {
-                    notebook_api::api_run_all(&root.root, body)
-                })
-            }
-            "/api/session/kernel/restart" => {
-                return api_debug_post(request, |body| {
-                    notebook_api::api_kernel_restart(&root.root, body)
-                })
-            }
-            "/api/session/kernel/assign" => {
-                return api_debug_post(request, |body| {
-                    notebook_api::api_assign(&root.root, body)
-                })
-            }
-            "/api/session/state/list" => {
-                return api_debug_post(request, |body| {
-                    notebook_api::api_state_list(&root.root, body)
-                })
-            }
-            "/api/session/state/push" => {
-                return api_debug_post(request, |body| {
-                    notebook_api::api_state_push(&root.root, body)
-                })
-            }
-            "/api/session/state/pull" => {
-                return api_debug_post(request, |body| {
-                    notebook_api::api_state_pull(&root.root, body)
-                })
-            }
-            "/api/session/journal" => {
-                return api_debug_post(request, |body| {
-                    notebook_api::api_journal(&root.root, body)
-                })
-            }
-            "/api/debug/start" => {
-                return api_debug_post(request, |body| {
-                    debug_api::api_debug_start(&root.root, body)
-                })
-            }
-            "/api/debug/continue" => {
-                return api_debug_post(request, |body| {
-                    debug_api::api_debug_action(body, crate::debug::DebugAction::Continue)
-                })
-            }
-            "/api/debug/step" => {
-                return api_debug_post(request, |body| {
-                    debug_api::api_debug_action(body, crate::debug::DebugAction::Step)
-                })
-            }
-            "/api/debug/stop" => {
-                return api_debug_post(request, |body| debug_api::api_debug_stop(body))
-            }
-            "/api/debug/breakpoints" => {
-                return api_debug_post(request, |body| {
-                    debug_api::api_debug_set_breakpoints(body)
-                })
-            }
-            _ => {
+                                                                                                                                                                                                                                                                                                                                                                        other => {
+                if let Some((_, route)) = API_ROUTES.iter().find(|(p, _)| *p == other) {
+                    return api_debug_post(request, |body| match route {
+                        ApiRoute::Notebook(f) => f(&root.root, body),
+                        ApiRoute::Debug(f) => f(body),
+                        ApiRoute::Action(a) => debug_api::api_debug_action(body, *a),
+                    });
+                }
                 let resp =
                     Response::from_string("method not allowed").with_status_code(StatusCode(405));
                 let _ = request.respond(resp);
@@ -405,30 +322,14 @@ fn handle_debug(root: &ViewRoot, request: Request) -> Result<()> {
         let (path_part, _) = split_url(&url);
         match path_part {
             "/api/foreign-run" => return api_foreign_run(root, request),
-            "/api/debug/start" => {
-                return api_debug_post(request, |body| {
-                    debug_api::api_debug_start(&root.root, body)
-                })
-            }
-            "/api/debug/continue" => {
-                return api_debug_post(request, |body| {
-                    debug_api::api_debug_action(body, crate::debug::DebugAction::Continue)
-                })
-            }
-            "/api/debug/step" => {
-                return api_debug_post(request, |body| {
-                    debug_api::api_debug_action(body, crate::debug::DebugAction::Step)
-                })
-            }
-            "/api/debug/stop" => {
-                return api_debug_post(request, |body| debug_api::api_debug_stop(body))
-            }
-            "/api/debug/breakpoints" => {
-                return api_debug_post(request, |body| {
-                    debug_api::api_debug_set_breakpoints(body)
-                })
-            }
-            _ => {
+                                                                        other => {
+                if let Some((_, route)) = API_ROUTES_DEBUG.iter().find(|(p, _)| *p == other) {
+                    return api_debug_post(request, |body| match route {
+                        ApiRoute::Notebook(f) => f(&root.root, body),
+                        ApiRoute::Debug(f) => f(body),
+                        ApiRoute::Action(a) => debug_api::api_debug_action(body, *a),
+                    });
+                }
                 let resp =
                     Response::from_string("method not allowed").with_status_code(StatusCode(405));
                 let _ = request.respond(resp);

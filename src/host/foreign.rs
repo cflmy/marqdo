@@ -3,6 +3,7 @@
 //! F0: safe one-shot execution + structured `invoke` records.
 //! Later phases add language registry, JSON bridge, parallel fan-out and sessions.
 
+use crate::host::as_text;
 use std::collections::{HashMap, VecDeque};
 use std::io::{Read, Write};
 use std::panic::{catch_unwind, AssertUnwindSafe};
@@ -26,12 +27,6 @@ const MAX_OUTPUT_LIMIT: usize = 64 * 1024 * 1024;
 const INPUT_ENV_CAP: usize = 8 * 1024;
 const FAILURE_TAIL: usize = 4096;
 
-fn as_text<'a>(v: &'a Value, what: &str) -> Result<&'a str, String> {
-    match v {
-        Value::Text(s) => Ok(s.as_str()),
-        _ => Err(format!("{what} must be text")),
-    }
-}
 
 fn opt_text(v: Option<&Value>) -> Result<Option<String>, String> {
     match v {

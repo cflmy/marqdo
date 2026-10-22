@@ -2,15 +2,10 @@
 //! Subset: comments, keys, strings, ints, floats, bools, arrays of scalars,
 //! `[table]` / dotted tables. No datetime, inline tables, or array-of-tables.
 
+use crate::host::as_text;
 use crate::host::json::json_to_value;
 use crate::value::Value;
 
-fn as_text<'a>(v: &'a Value, label: &str) -> Result<&'a str, String> {
-    match v {
-        Value::Text(s) => Ok(s.as_str()),
-        _ => Err(format!("{label} must be text")),
-    }
-}
 
 pub fn parse(text: &Value) -> Result<Value, String> {
     let raw = as_text(text, "text")?;

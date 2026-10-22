@@ -1,17 +1,12 @@
 //! System / process host primitives.
 
+use crate::host::as_text;
 #[cfg(feature = "exec-host")]
 use std::process::Command;
 
 use crate::host::HostContext;
 use crate::value::Value;
 
-fn as_text<'a>(v: &'a Value, label: &str) -> Result<&'a str, String> {
-    match v {
-        Value::Text(s) => Ok(s.as_str()),
-        _ => Err(format!("{label} must be text")),
-    }
-}
 
 fn as_i64(v: &Value, label: &str) -> Result<i64, String> {
     match v {

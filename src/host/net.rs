@@ -1,5 +1,6 @@
 //! HTTP host primitives (HTTP and HTTPS via ureq).
 
+use crate::host::as_text;
 use std::io::{Read, Write};
 #[cfg(feature = "net-host")]
 use std::io::{BufRead, BufReader};
@@ -10,12 +11,6 @@ use crate::value::Value;
 #[cfg(feature = "net-host")]
 use crate::host::HostContext;
 
-fn as_text<'a>(v: &'a Value, label: &str) -> Result<&'a str, String> {
-    match v {
-        Value::Text(s) => Ok(s.as_str()),
-        _ => Err(format!("{label} must be text")),
-    }
-}
 
 #[cfg(feature = "net-host")]
 fn headers_from_value(headers: Option<&Value>) -> Result<Vec<(String, String)>, String> {

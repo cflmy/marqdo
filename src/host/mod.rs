@@ -49,6 +49,17 @@ mod sys;
 pub mod writeback;
 
 pub use dispatch::{call_host, HostFn};
+
+/// Shared `text` argument extraction for host modules.
+///
+/// `<TAB>` slimming: this used to be copy-pasted in 17 host modules with two
+/// different wordings; one implementation keeps messages consistent.
+pub fn as_text<'a>(v: &'a crate::value::Value, label: &str) -> Result<&'a str, String> {
+    match v {
+        crate::value::Value::Text(s) => Ok(s.as_str()),
+        _ => Err(format!("{label} needs text")),
+    }
+}
 pub use fs::path_under_root;
 pub use plugin::PluginState;
 
