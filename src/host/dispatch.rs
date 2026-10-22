@@ -219,7 +219,7 @@ pub enum HostFn {
     ForeignSessionList = 210,
     ForeignSessionInterrupt = 211,
     /// `<TAB>` M7: `access(集合, 键)` — polymorphic collection access (legacy index).
-    Access,
+    Access = 212,
 }
 
 
@@ -1972,4 +1972,81 @@ fn require<'a>(bound: &'a HashMap<String, Value>, key: &str) -> Result<&'a Value
     bound
         .get(key)
         .ok_or_else(|| format!("host call missing `{key}`"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::HostFn;
+
+    /// Every host id must round-trip through `from_u16` / `as_u16`, and every
+    /// canonical name through `from_name` / `name`. This pins the drift the
+    /// audit found (`from_name` accepted `http_get` while `name()` emitted
+    /// `host_http_get`) without rewriting the five tables.
+    #[test]
+    fn every_assigned_id_round_trips() {
+        // The id space is intentionally sparse: retired ids are never reused
+        // (bytecode from an older build must not silently change meaning).
+        let mut seen = 0;
+        for id in 1..=400u16 {
+            let Some(f) = HostFn::from_u16(id) else {
+                continue; // retired id
+            };
+            seen += 1;
+            assert_eq!(f.as_u16(), id, "id {id} → {f:?} → {}", f.as_u16());
+        }
+        assert!(seen >= 200, "expected ~200 live host ids, got {seen}");
+    }
+
+    #[test]
+    fn every_id_has_a_name_that_round_trips() {
+        for id in 1..=300u16 {
+            let Some(f) = HostFn::from_u16(id) else {
+                continue;
+            };
+            let name = f.name();
+            assert!(!name.is_empty(), "id {id} has an empty name");
+            assert_eq!(
+                HostFn::from_name(name),
+                Some(f),
+                "id {id}: name `{name}` does not round-trip"
+            );
+        }
+    }
+
+    #[test]
+    fn names_are_unique() {
+        let mut seen = std::collections::HashMap::new();
+        for id in 1..=300u16 {
+            let Some(f) = HostFn::from_u16(id) else {
+                continue;
+            };
+            let name = f.name();
+            if let Some(prev) = seen.insert(name.to_string(), id) {
+                panic!("duplicate host name `{name}` at ids {prev} and {id}");
+            }
+        }
+    }
+
+    #[test]
+    fn required_and_optional_params_are_disjoint() {
+        for id in 1..=300u16 {
+            let Some(f) = HostFn::from_u16(id) else {
+                continue;
+            };
+            let req = f.required_params();
+            let opt = f.optional_params();
+            for r in req {
+                assert!(
+                    !opt.contains(r),
+                    "{:?} lists `{r}` as both required and optional",
+                    f
+                );
+            }
+            let all = f.all_params();
+            let mut uniq = all.clone();
+            uniq.sort_unstable();
+            uniq.dedup();
+            assert_eq!(uniq.len(), all.len(), "{f:?} has duplicate params");
+        }
+    }
 }

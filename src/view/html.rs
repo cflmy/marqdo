@@ -2805,7 +2805,7 @@ fn open_nav_group(out: &mut String, folder: &str, active: Option<&str>) {
 
 fn href_file(links: &LinkMode, target_rel: &str) -> String {
     match links {
-        LinkMode::Live => format!("/file?path={}", urlencoding_encode(target_rel)),
+        LinkMode::Live => format!("/file?path={}", urlencoding_path(target_rel)),
         LinkMode::Static { from: None } => format!("pages/{}.html", target_rel),
         LinkMode::Static {
             from: Some(from_rel),
@@ -2843,18 +2843,6 @@ fn relative_page_href(from_rel: &str, to_rel: &str) -> String {
     format!("{}{}", "../".repeat(ups), to_path.to_string_lossy().replace('\\', "/"))
 }
 
-fn urlencoding_encode(s: &str) -> String {
-    let mut out = String::new();
-    for b in s.bytes() {
-        match b {
-            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' | b'/' => {
-                out.push(b as char);
-            }
-            _ => out.push_str(&format!("%{b:02X}")),
-        }
-    }
-    out
-}
 
 pub fn page_index(files: &[PathBuf], only: Option<&Path>, links: &LinkMode) -> String {
     let nav = nav_html(files, None, links);
@@ -4374,7 +4362,8 @@ fn plan_process_list(events: Option<&Vec<serde_json::Value>>) -> String {
     format!(r#"<ul class="plan-process">{}</ul>"#, items.join(""))
 }
 
-fn urlencoding_path(s: &str) -> String {
+/// Percent-encode a path for `?path=` (shared by every link builder).
+pub(crate) fn urlencoding_path(s: &str) -> String {
     let mut out = String::new();
     for b in s.as_bytes() {
         match *b {
@@ -4387,7 +4376,9 @@ fn urlencoding_path(s: &str) -> String {
     out
 }
 
-fn escape_js_string(s: &str) -> String {
+/// Escape a Rust string as a JS string literal (keeps U+2028/2029 escaped,
+/// which the debug-page copy used to miss).
+pub(crate) fn escape_js_string(s: &str) -> String {
     let mut out = String::from('"');
     for c in s.chars() {
         match c {

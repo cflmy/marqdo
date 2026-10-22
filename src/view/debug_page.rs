@@ -3,6 +3,7 @@
 //! Toolbar · Structure (breakpoints) · Variables / Breakpoints / Frame · Console
 
 use std::path::{Path, PathBuf};
+use super::html::escape_js_string;
 
 use crate::view::html::{escape, nav_html, LinkMode};
 use crate::view::render::{render_function_outline, render_module_structure_mode, StructureMode};
@@ -144,21 +145,6 @@ window.MARQDO_FILE_PATH = {path_js};
     layout_debug(rel, &body)
 }
 
-fn escape_js_string(s: &str) -> String {
-    let mut out = String::from('"');
-    for c in s.chars() {
-        match c {
-            '\\' => out.push_str("\\\\"),
-            '"' => out.push_str("\\\""),
-            '\n' => out.push_str("\\n"),
-            '\r' => out.push_str("\\r"),
-            c if c.is_control() => out.push_str(&format!("\\u{:04x}", c as u32)),
-            c => out.push(c),
-        }
-    }
-    out.push('"');
-    out
-}
 
 fn layout_debug(title: &str, main: &str) -> String {
     format!(
