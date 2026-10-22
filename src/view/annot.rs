@@ -566,39 +566,9 @@ fn find_fun_by_line(module: &Module, line: u32) -> Option<&Function> {
 
 fn fun_stmt_lines(fun: &Function) -> std::collections::HashSet<u32> {
     let mut s = std::collections::HashSet::new();
-    fn walk_stmt(st: &Stmt, s: &mut std::collections::HashSet<u32>) {
-        let line = match st {
-            Stmt::Assign { span, .. }
-            | Stmt::Return { span, .. }
-            | Stmt::Call { span, .. }
-            | Stmt::Expr { span, .. }
-            | Stmt::Branch { span, .. }
-            | Stmt::While { span, .. }
-            | Stmt::ForEach { span, .. } => span.line,
-        };
-        s.insert(line);
-        match st {
-            Stmt::Branch { arms, .. } => {
-                for arm in arms {
-                    for b in &arm.body {
-                        walk_stmt(b, s);
-                    }
-                }
-            }
-            Stmt::While { body, .. } | Stmt::ForEach { body, .. } => {
-                for b in body {
-                    walk_stmt(b, s);
-                }
-            }
-            _ => {}
-        }
-    }
-    for st in &fun.body {
-        walk_stmt(st, &mut s);
-    }
-    for c in &fun.children {
-        s.extend(fun_stmt_lines(c));
-    }
+    crate::ast::walk_stmts(fun, &mut |st| {
+        s.insert(crate::ast::stmt_line(st));
+    });
     s
 }
 

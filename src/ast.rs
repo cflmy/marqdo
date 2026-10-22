@@ -80,6 +80,51 @@ impl Function {
     }
 }
 
+/// Source line of a statement (every variant carries a span).
+pub fn stmt_line(st: &Stmt) -> u32 {
+    match st {
+        Stmt::Assign { span, .. }
+        | Stmt::Return { span, .. }
+        | Stmt::Call { span, .. }
+        | Stmt::Expr { span, .. }
+        | Stmt::Branch { span, .. }
+        | Stmt::While { span, .. }
+        | Stmt::ForEach { span, .. } => span.line,
+    }
+}
+
+/// Depth-first walk over every statement of a function: its body, nested block
+/// bodies (branch arms / loops) and child functions.
+///
+/// `<TAB>` slimming: three view modules each re-implemented this recursion; the
+/// traversal lives here so collectors only supply the per-statement logic.
+pub fn walk_stmts(fun: &Function, f: &mut impl FnMut(&Stmt)) {
+    fn go(st: &Stmt, f: &mut impl FnMut(&Stmt)) {
+        f(st);
+        match st {
+            Stmt::Branch { arms, .. } => {
+                for arm in arms {
+                    for b in &arm.body {
+                        go(b, f);
+                    }
+                }
+            }
+            Stmt::While { body, .. } | Stmt::ForEach { body, .. } => {
+                for b in body {
+                    go(b, f);
+                }
+            }
+            _ => {}
+        }
+    }
+    for st in &fun.body {
+        go(st, f);
+    }
+    for c in &fun.children {
+        walk_stmts(c, f);
+    }
+}
+
 #[derive(Debug, Clone)]
 pub enum Stmt {
     Assign {

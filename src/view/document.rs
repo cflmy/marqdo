@@ -983,51 +983,14 @@ fn index_functions(module: &Module) -> HashMap<u32, &Function> {
 
 fn index_stmt_lines(module: &Module) -> HashSet<u32> {
     let mut s = HashSet::new();
-    fn walk(fun: &Function, s: &mut HashSet<u32>) {
-        for st in &fun.body {
-            s.insert(stmt_line(st));
-            walk_stmt(st, s);
-        }
-        for c in &fun.children {
-            walk(c, s);
-        }
-    }
-    fn walk_stmt(st: &Stmt, s: &mut HashSet<u32>) {
-        match st {
-            Stmt::Branch { arms, .. } => {
-                for arm in arms {
-                    for b in &arm.body {
-                        s.insert(stmt_line(b));
-                        walk_stmt(b, s);
-                    }
-                }
-            }
-            Stmt::While { body, .. } | Stmt::ForEach { body, .. } => {
-                for b in body {
-                    s.insert(stmt_line(b));
-                    walk_stmt(b, s);
-                }
-            }
-            _ => {}
-        }
-    }
     for f in &module.functions {
-        walk(f, &mut s);
+        crate::ast::walk_stmts(f, &mut |st| {
+            s.insert(crate::ast::stmt_line(st));
+        });
     }
     s
 }
 
-fn stmt_line(st: &Stmt) -> u32 {
-    match st {
-        Stmt::Assign { span, .. }
-        | Stmt::Return { span, .. }
-        | Stmt::Call { span, .. }
-        | Stmt::Expr { span, .. }
-        | Stmt::Branch { span, .. }
-        | Stmt::While { span, .. }
-        | Stmt::ForEach { span, .. } => span.line,
-    }
-}
 
 fn index_special_assigns(module: &Module, source: &str) -> HashMap<u32, SpecialAssign> {
     let src_lines: Vec<&str> = source.lines().collect();
