@@ -100,24 +100,6 @@ fn s0_06a_missing_import_rejected() {
 }
 
 #[test]
-fn s0_06b_ambiguous_bare_name_tree_rejects() {
-    let (code, stdout, stderr) = run_backend(
-        "tests/executable_knowledge/baseline/06-reject/ambiguous.mq.md",
-        "tree",
-    );
-    assert_ne!(code, 0, "tree should reject bare ambiguous name; stdout={stdout}");
-    assert!(
-        stderr.contains("商品小计"),
-        "tree stderr should name the unresolved function: {stderr}"
-    );
-}
-
-/// Baseline defect fingerprint (S2 BoundCall must flip this to a hard failure).
-///
-/// Today bytecode silently picks one of the same-named imports (`60` from A or
-/// `120` from B — order is not stable). When fixed, change this test to
-/// `assert_ne!(code, 0)` on both backends.
-#[test]
 fn s2_g07_mlsp_bind_execute_reuses_existing_capability() {
     // Stub/no-LLM REUSE path (G07/G09 subset): find → bind → execute, no new source.
     use marqdo::mlsp::handle_line;
@@ -418,19 +400,20 @@ fn s1_g01_semantic_edges_not_overwritten_by_ekc() {
 }
 
 #[test]
-fn s0_06b_bytecode_ambiguous_wrongly_resolves_baseline_defect() {
-    let (code, stdout, stderr) = run_backend(
-        "tests/executable_knowledge/baseline/06-reject/ambiguous.mq.md",
-        "bytecode",
-    );
-    assert_eq!(
-        code, 0,
-        "baseline defect: bytecode still wrongly resolves; if this fails with \
-         a rejection, BoundCall may have landed — flip test to expect failure. stderr={stderr}"
-    );
-    let out = stdout.trim_end();
-    assert!(
-        out == "60" || out == "120",
-        "baseline defect fingerprint: silent pick of A(60) or B(120), got {out:?}"
-    );
+fn s0_06b_ambiguous_bare_name_rejected_both_backends() {
+    // G02: bare same-named imports must not silently bind (Tree + Bytecode).
+    for backend in ["tree", "bytecode"] {
+        let (code, stdout, stderr) = run_backend(
+            "tests/executable_knowledge/baseline/06-reject/ambiguous.mq.md",
+            backend,
+        );
+        assert_ne!(
+            code, 0,
+            "{backend} must reject bare ambiguous name; stdout={stdout}"
+        );
+        assert!(
+            stderr.contains("商品小计"),
+            "{backend} stderr should name the unresolved function: {stderr}"
+        );
+    }
 }

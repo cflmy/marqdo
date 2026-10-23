@@ -16,16 +16,11 @@
 | 04 | `baseline/04-access-loop/` | implemented | 取元+遍历输出 | `import json` + `access`/`遍历` 写法（与现网一致） |
 | 05 | `baseline/05-policy-draft/` | **design** | 可试跑 → `113`；**不**宣称税率事实已证实 | 叙述中的来源意图（尚未有强制 schema） |
 | 06a | `baseline/06-reject/missing-import.mq.md` | expected_failure | 双后端均非 0 | 0（正确拒绝） |
-| 06b | `baseline/06-reject/ambiguous.mq.md` | expected_failure / **基线缺陷** | Tree 拒绝；Bytecode **误返回 `120`**（见下） | — |
+| 06b | `baseline/06-reject/ambiguous.mq.md` | expected_failure | **双后端均拒绝**裸名同名（G02） | — |
 
-### 基线缺陷（须在 S1/S2 消除）
+### 同名裸调用（G02）
 
-`06-reject/ambiguous.mq.md` 同时 `import` 了 `a` 与 `b`（同名 `商品小计`），正文用**裸名**调用。
-
-- Tree：`unknown function \`商品小计\``（正确拒绝）
-- Bytecode：静默选中 A 或 B，输出 `60` 或 `120`（**顺序不稳定**）
-
-这违反「同名不得误连 / 不得静默选目标」。S2 BoundCall 落地后，双后端均应失败或要求消歧路径；届时翻转对应测试。
+`06-reject/ambiguous.mq.md` 同时 `import` 了 `a` 与 `b`（同名 `商品小计`），正文用**裸名**调用。双后端均须拒绝；正确写法是 `a.商品小计` / `b.商品小计` 等显式路径。
 
 ## 不计为成功的项
 
@@ -37,15 +32,15 @@
 
 | 切片 | 状态 | 证据 |
 |---|---|---|
-| S0 | **done** | `s0_*` 八项（含 bytecode 同名误连缺陷指纹） |
+| S0 | **done** | `s0_*` 基线正负例 |
 | S1/G01 | **done** | `graph/` 权威 + `ekc/graph/` 检索分离 |
 | S1/G03 | **done** | 步骤 kind ≠ 全 call；`steps.json`；view `#stmt-` 导航 |
 | S1 同名 | **done** | `08-same-name` resolve→A + 运行 `60` |
 | S2/G06 | **done** | 包装继承 `fs.write`；未知不标 pure |
 | S2/G07 子集 | **done** | MLSP bind 含 `symbol_id`；execute 按源行绑定；pure 拒非纯 |
-| S2/G02 BoundCall | **待办** | Tree/Bytecode 仍按名查找；`06b` bytecode 缺陷待翻转 |
+| S2/G02 BoundCall | **done（作用域子集）** | Bytecode 裸名解析不跨 import scope；`06b` 双后端拒绝 |
 
 ## 与后续切片的关系
 
-- S2 BoundCall：双后端只消费绑定目标 → 翻转 `s0_06b_bytecode_ambiguous_*`
+- S2 后续：sema 路径 BoundCall 记录、Agent eng_reuse 强制 bind
 - S3+：局部编辑、来源适用性、整代快照 — 见缺口路线图

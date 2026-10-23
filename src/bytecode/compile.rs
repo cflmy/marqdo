@@ -28,11 +28,14 @@ struct FlatFun {
     path_index: HashMap<Vec<String>, usize>,
     /// Short name from frontmatter `use` → path segments.
     uses: HashMap<String, Vec<String>>,
+    /// Module collection scope (G02): bare-name resolve must not cross imports.
+    scope: u32,
 }
 
 pub fn compile_module(path: Option<&Path>, module: &Module) -> Result<Program> {
     let mut flat = Vec::new();
-    let _exports = collect_module_tree(module, &mut flat);
+    let mut next_scope = 1u32;
+    let _exports = collect_module_tree(module, &mut flat, 0, &mut next_scope);
     if flat.is_empty() {
         bail!("bytecode: no functions to compile");
     }
@@ -106,10 +109,21 @@ pub fn compile_module(path: Option<&Path>, module: &Module) -> Result<Program> {
 
 /// Collect `module` and its imports into `flat`.
 /// Returns relative export paths within this module (e.g. `["parse"]`, `["agent","step"]`).
-fn collect_module_tree(module: &Module, flat: &mut Vec<FlatFun>) -> HashMap<Vec<String>, usize> {
+///
+/// Each module gets a distinct `scope` id. Bare-name `resolve_call` only searches
+/// within the caller's scope so imported same-named functions cannot be silently
+/// selected (BoundCall / G02). Cross-module calls must use `bind.member` paths.
+fn collect_module_tree(
+    module: &Module,
+    flat: &mut Vec<FlatFun>,
+    scope: u32,
+    next_scope: &mut u32,
+) -> HashMap<Vec<String>, usize> {
     let mut path_index = HashMap::new();
     for (bind, dep) in &module.import_modules {
-        let dep_exports = collect_module_tree(dep, flat);
+        let child_scope = *next_scope;
+        *next_scope += 1;
+        let dep_exports = collect_module_tree(dep, flat, child_scope, next_scope);
         for (rel, idx) in dep_exports {
             let mut full = Vec::with_capacity(rel.len() + 1);
             full.push(bind.clone());
@@ -126,7 +140,7 @@ fn collect_module_tree(module: &Module, flat: &mut Vec<FlatFun>) -> HashMap<Vec<
 
     let mut exports = HashMap::new();
     for fun in &module.functions {
-        let id = collect_fun(fun, None, flat, &path_index, &uses);
+        let id = collect_fun(fun, None, flat, &path_index, &uses, scope);
         export_tree(&mut exports, &[], id, flat);
     }
     exports
@@ -152,6 +166,7 @@ fn collect_fun(
     flat: &mut Vec<FlatFun>,
     path_index: &HashMap<Vec<String>, usize>,
     uses: &HashMap<String, Vec<String>>,
+    scope: u32,
 ) -> usize {
     let id = flat.len();
     flat.push(FlatFun {
@@ -166,10 +181,11 @@ fn collect_fun(
         span: fun.span,
         path_index: path_index.clone(),
         uses: uses.clone(),
+        scope,
     });
     let mut child_ids = Vec::new();
     for child in &fun.children {
-        child_ids.push(collect_fun(child, Some(id), flat, path_index, uses));
+        child_ids.push(collect_fun(child, Some(id), flat, path_index, uses, scope));
     }
     flat[id].children = child_ids;
     id
@@ -323,28 +339,42 @@ impl<'a> FnCompiler<'a> {
         s
     }
 
+    /// BoundCall-equivalent bare-name resolve (G02): only the caller's module
+    /// scope. Imported functions are reachable solely via `path_index` paths.
     fn resolve_call(&self, name: &str) -> Result<usize> {
         let fun = &self.flat[self.fn_id];
+        let scope = fun.scope;
         for &cid in &fun.children {
-            if self.flat[cid].name == name {
+            if self.flat[cid].name == name && self.flat[cid].scope == scope {
                 return Ok(cid);
             }
         }
         let mut parent = fun.parent;
         while let Some(pid) = parent {
+            if self.flat[pid].scope != scope {
+                break;
+            }
             for &cid in &self.flat[pid].children {
-                if self.flat[cid].name == name {
+                if self.flat[cid].name == name && self.flat[cid].scope == scope {
                     return Ok(cid);
                 }
             }
             parent = self.flat[pid].parent;
         }
+        let mut matches = Vec::new();
         for (i, f) in self.flat.iter().enumerate() {
-            if f.parent.is_none() && f.name == name {
-                return Ok(i);
+            if f.parent.is_none() && f.scope == scope && f.name == name {
+                matches.push(i);
             }
         }
-        Err(self.err(format!("unknown function `{name}`")))
+        match matches.as_slice() {
+            [only] => Ok(*only),
+            [] => Err(self.err(format!("unknown function `{name}`"))),
+            _ => Err(self.err(format!(
+                "ambiguous function `{name}`: {} candidates in this module; use an explicit path",
+                matches.len()
+            ))),
+        }
     }
 
     fn compile_stmt(&mut self, stmt: &Stmt) -> Result<()> {
@@ -650,7 +680,15 @@ impl<'a> FnCompiler<'a> {
 
         match self.resolve_call(&call.callee) {
             Ok(fid) => self.compile_user_call(fid, &call, as_stmt),
-            Err(_) => self.compile_plugin_call(&call, as_stmt),
+            Err(err) => {
+                // Ambiguous bare names must not fall through to PluginCall (G02).
+                let msg = format!("{err:#}");
+                if msg.contains("ambiguous function") {
+                    return Err(err);
+                }
+                // Unresolved bare names may still be runtime plugins.
+                self.compile_plugin_call(&call, as_stmt)
+            }
         }
     }
 
