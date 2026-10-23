@@ -190,10 +190,10 @@ P0/P1/P2 分类改为缺口领域，不再按编号整组串行：G06 的未知�
 | S0 作者基线与最小语料 | 无 | 六类实际写作/复用任务、当前语法入口、无网络最小门禁（G10/G11） | **已落地**：[tests/executable_knowledge/](../../tests/executable_knowledge/README.md) + `cargo test --test executable_knowledge` |
 | S1 可读步骤与唯一目标 | S0 | 一份文档的源码/步骤/view 联动；统一 resolver、图与上下文节点（G01/G03） | **已落地**：G01 双图分离；G03 步骤 kind + NarrativeRef（`11-narrative-ref`）+ view 导航；同名 import resolve |
 | S2 确定执行与早期 AI 复用 | S1 | BoundCall 双后端、最小上下文卡、本地 handle 与现有 Agent 试点（G02/G06/G07/G09 的安全子集） | **已落地**：G02 BoundCall；G06 效应；G07 MLSP bind/execute；eng_reuse `bind_required` |
-| S3 局部编辑与库可读性 | S1–S2 | 摘要保护的局部补丁、语义 diff、受限纯表达式提取；lib/ext 示例优化（G03/G09/G10/G11） | **已落地子集**：MLSP `artifact.patch` + wording 回滚；纯表达式自动提取 / 全库润色仍待 |
-| S4 业务知识与适用性 | S2；与 S3 可交错 | 书店契约、来源/验证事件、传递效应及政策、负知识（G05/G06/G07/G09） | **已落地子集**：`sources`/`valid_until` → sourced/expired；business bind；完整书店与负知识仍待 |
+| S3 局部编辑与库可读性 | S1–S2 | 摘要保护的局部补丁、语义 diff、受限纯表达式提取；lib/ext 示例优化（G03/G09/G10/G11） | **已落地**：`artifact.patch` + wording 回滚；`artifact.extract_pure` 纯表达式预览；全库润色仍可选后续 |
+| S4 业务知识与适用性 | S2；与 S3 可交错 | 书店契约、来源/验证事件、传递效应及政策、负知识（G05/G06/G07/G09） | **已落地子集**：来源/过期；`13-bookstore` 可运行含税故事；完整类函数订单链与负知识仍为设计态示例 |
 | S5 变化传播与严格复用 | S1–S2/S4 | 分类摘要、SCC 闭包、整代快照、impact、严格 handle 复核（G04/G08） | **已落地子集**：`generations/`+`CURRENT`；锁 `classes`；impact 含 narrates；SCC/闭包摘要仍待 |
-| S6 生态验收与发布 | 按发布声明选择 S1–S5 范围 | 全仓兼容矩阵、可运行端到端示例、平台冒烟、作者/AI 指标（G10/G11/G12） | **已落地子集**：CI `executable-knowledge.yml`；完整矩阵/冒烟/G12 SLO 仍待 |
+| S6 生态验收与发布 | 按发布声明选择 S1–S5 范围 | 全仓兼容矩阵、可运行端到端示例、平台冒烟、作者/AI 指标（G10/G11/G12） | **已落地子集**：CI 门禁；扫描 depth/size/count 上限诊断；完整打包冒烟与 100 单元语料仍待 |
 
 每切片完成时同时更新 [详细开发规范](../next/Marqdo_Executable_Knowledge_Development.md)的实现状态、相关示例及本表；只改文档状态不算完成。S1/S2 先用**无 LLM、无网络、无插件**测试证明确定性协议，随即接现有 Agent 验证实际复用；不等所有治理工程结束。G10/G11 是每片持续门禁，100 单元语料逐片增长；G04 的并发一致性必须在开放并发消费前完成，不能因为列在 S5 就忽略前置风险。
 

@@ -5,6 +5,7 @@
 //! the meaning of the same source text.
 
 pub mod bind;
+pub mod extract;
 pub mod ir;
 pub mod lock;
 pub mod provenance;
@@ -13,6 +14,7 @@ pub mod symbols;
 pub use bind::{
     call_display, is_static_bound, lookup_local, resolve_for_exec, DynamicReason, ExecTarget,
 };
+pub use extract::{plan_pure_extract, ExtractError, ExtractPlan};
 pub use ir::{
     artifact_json, compile_project, semantic_generation_dir, write_semantic_projections, ArtifactId,
     BoundCall, CompileOptions, Compilation, Digest, DynamicCall, EffectSet, LockMode,

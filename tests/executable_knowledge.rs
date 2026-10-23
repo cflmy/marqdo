@@ -497,6 +497,74 @@ fn s2_g02_boundcall_runs_both_backends() {
 }
 
 #[test]
+fn s3_extract_pure_plan_rejects_calls() {
+    use marqdo::mlsp::handle_line;
+    let ok: serde_json::Value = serde_json::from_str(&handle_line(
+        &serde_json::json!({
+            "method":"artifact.extract_pure",
+            "params":{"name":"商品小计","expression":"数量 * 单价"}
+        })
+        .to_string(),
+    ))
+    .unwrap();
+    assert_eq!(ok["ok"], true, "{ok}");
+    assert_eq!(ok["result"]["effects"][0], "pure");
+    assert!(ok["result"]["call"].as_str().unwrap().contains("商品小计"));
+    let params = ok["result"]["params"].as_array().unwrap();
+    assert_eq!(params.len(), 2, "{ok}");
+    let bad: serde_json::Value = serde_json::from_str(&handle_line(
+        &serde_json::json!({
+            "method":"artifact.extract_pure",
+            "params":{"name":"x","expression":"fs.write_text(path=\"a\", text=\"b\")"}
+        })
+        .to_string(),
+    ))
+    .unwrap();
+    assert_eq!(bad["ok"], false, "{bad}");
+    assert_eq!(bad["error"]["code"], "extract.not_pure");
+}
+
+#[test]
+fn s4_bookstore_story_runs_with_narrative_and_source() {
+    assert_out_both(
+        "tests/executable_knowledge/baseline/13-bookstore/main.mq.md",
+        "113",
+    );
+    let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let out = std::env::temp_dir().join(format!(
+        "marqdo-ek-book-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    let _ = std::fs::remove_dir_all(&out);
+    let status = Command::new(env!("CARGO_BIN_EXE_marqdo"))
+        .args([
+            "knowledge",
+            "tests/executable_knowledge/baseline/13-bookstore",
+            "-o",
+            out.to_str().unwrap(),
+        ])
+        .current_dir(&root)
+        .output()
+        .expect("knowledge");
+    assert_eq!(status.status.code(), Some(0));
+    let steps: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(out.join("steps.json")).unwrap()).unwrap();
+    assert!(
+        steps["steps"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|s| s["kind"] == "narrate"),
+        "{steps}"
+    );
+    let _ = std::fs::remove_dir_all(&out);
+}
+
+#[test]
 fn s4_g05_sourced_evidence_and_expired_diag() {
     let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let out = std::env::temp_dir().join(format!(

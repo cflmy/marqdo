@@ -65,14 +65,39 @@ fn dispatch(req: &Value) -> Result<Value, Value> {
         Some("artifact.bind") => artifact_bind(&params),
         Some("artifact.execute") => artifact_execute(&params),
         Some("artifact.patch") => artifact_patch(&params),
+        Some("artifact.extract_pure") => artifact_extract_pure(&params),
         // `<TAB>` M9: occlusion label search (two-tier vocabulary).
         Some("labels.search") => labels_search(&params),
         // `<TAB>` M6: one-shot session summary (T1 staleness seen/fixed).
         Some("session.summary") => session_summary(),
         other => Err(err(
             "mlsp.unknown_method",
-            format!("未知方法 {other:?}；可用：locate / syntax / validate / repair_targets / repair_apply / schema / artifact.find / artifact.inspect / link.resolve / artifact.verify / artifact.impact / artifact.bind / artifact.execute / artifact.patch"),
+            format!("未知方法 {other:?}；可用：locate / syntax / validate / repair_targets / repair_apply / schema / artifact.find / artifact.inspect / link.resolve / artifact.verify / artifact.impact / artifact.bind / artifact.execute / artifact.patch / artifact.extract_pure"),
         )),
+    }
+}
+
+fn artifact_extract_pure(params: &Value) -> Result<Value, Value> {
+    let name = params
+        .get("name")
+        .and_then(Value::as_str)
+        .ok_or_else(|| err("mlsp.bad_request", "artifact.extract_pure 需要 name"))?;
+    let expression = params
+        .get("expression")
+        .and_then(Value::as_str)
+        .ok_or_else(|| err("mlsp.bad_request", "artifact.extract_pure 需要 expression"))?;
+    match crate::sema::plan_pure_extract(name, expression) {
+        Ok(plan) => Ok(json!({
+            "schema_version": 1,
+            "name": plan.name,
+            "params": plan.params,
+            "expression": plan.expression,
+            "heading": plan.heading,
+            "call": plan.call,
+            "effects": ["pure"],
+            "note": "预览补丁；写入请配合 artifact.patch / 人工审阅",
+        })),
+        Err(e) => Err(json!({"code": e.code, "message": e.message})),
     }
 }
 

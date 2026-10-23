@@ -81,7 +81,22 @@ const EXCLUDED_DIRS: &[&str] = &[
     ".agents",
 ];
 
+/// Soft limits so discovery fails with a clear diagnosis instead of hanging (G12).
+pub const MAX_SOURCE_DEPTH: u32 = 32;
+pub const MAX_SOURCE_FILE_BYTES: u64 = 2 * 1024 * 1024;
+pub const MAX_SOURCE_FILES: usize = 10_000;
+
 fn collect_sources(root: &Path, dir: &Path, out: &mut Vec<PathBuf>) -> Result<()> {
+    collect_sources_at(root, dir, out, 0)
+}
+
+fn collect_sources_at(root: &Path, dir: &Path, out: &mut Vec<PathBuf>, depth: u32) -> Result<()> {
+    if depth > MAX_SOURCE_DEPTH {
+        bail!(
+            "project.scan_depth_exceeded: directory depth > {MAX_SOURCE_DEPTH} under {}",
+            dir.display()
+        );
+    }
     let mut entries: Vec<_> = fs::read_dir(dir)
         .with_context(|| format!("read project directory {}", dir.display()))?
         .collect::<std::result::Result<Vec<_>, _>>()?;
@@ -100,9 +115,9 @@ fn collect_sources(root: &Path, dir: &Path, out: &mut Vec<PathBuf>) -> Result<()
                 continue;
             }
             if canonical.is_dir() {
-                collect_sources(root, &canonical, out)?;
+                collect_sources_at(root, &canonical, out, depth + 1)?;
             } else if is_mq_md(&canonical) {
-                out.push(canonical);
+                push_source(out, &canonical)?;
             }
             continue;
         }
@@ -111,11 +126,30 @@ fn collect_sources(root: &Path, dir: &Path, out: &mut Vec<PathBuf>) -> Result<()
             if EXCLUDED_DIRS.iter().any(|excluded| name == *excluded) {
                 continue;
             }
-            collect_sources(root, &path, out)?;
+            collect_sources_at(root, &path, out, depth + 1)?;
         } else if file_type.is_file() && is_mq_md(&path) {
-            out.push(path);
+            push_source(out, &path)?;
         }
     }
+    Ok(())
+}
+
+fn push_source(out: &mut Vec<PathBuf>, path: &Path) -> Result<()> {
+    if out.len() >= MAX_SOURCE_FILES {
+        bail!(
+            "project.scan_count_exceeded: more than {MAX_SOURCE_FILES} `.mq.md` sources"
+        );
+    }
+    let meta = fs::metadata(path)
+        .with_context(|| format!("stat {}", path.display()))?;
+    if meta.len() > MAX_SOURCE_FILE_BYTES {
+        bail!(
+            "project.scan_file_too_large: {} is {} bytes (max {MAX_SOURCE_FILE_BYTES})",
+            path.display(),
+            meta.len()
+        );
+    }
+    out.push(path.to_path_buf());
     Ok(())
 }
 
@@ -170,6 +204,20 @@ mod tests {
             })
             .collect();
         assert_eq!(names, ["a/a.mq.md", "z/b.mq.md"]);
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn oversized_source_is_diagnosed() {
+        let root = fixture_root("too-large");
+        let big = "x".repeat((MAX_SOURCE_FILE_BYTES as usize) + 8);
+        fs::write(root.join("big.mq.md"), format!("# main\n\n{big}\n")).unwrap();
+        let project = ProjectRoot::new(&root).unwrap();
+        let err = project.source_files().unwrap_err().to_string();
+        assert!(
+            err.contains("project.scan_file_too_large"),
+            "expected size diagnostic, got {err}"
+        );
         fs::remove_dir_all(root).unwrap();
     }
 
