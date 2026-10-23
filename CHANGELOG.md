@@ -69,6 +69,44 @@ marqdo ext add web
 
 ## Unreleased
 
+### Added
+
+### Fixed
+
+### Changed
+
+## v2.1.1 — 2026-10-23
+
+### Highlights
+
+**可执行知识主链落地（S0–S6）**：BoundCall 双后端共享解析、正文 NarrativeRef、来源/适用期、digest 保护补丁与纯表达式提取、整代 `CURRENT` 投影与闭包摘要；订单发票示例双后端输出 `113`；离线门禁含 100 单元语料与 CLI 冒烟。
+
+```bash
+git checkout v2.1.1 && cargo build --release
+marqdo ext add web
+marqdo run examples/executable-knowledge/docs/invoice-answer.mq.md
+```
+
+**核心表面 Δ**：**无增删关键词**——同模块 `Type.member` 纳入 BoundCall；语义投影新增 `bound_calls` / `dynamic_calls` / `hashes.closure` / NarrativeRef 步骤；不改变默认 Occlusion 链接读法。
+
+### Added
+
+- **BoundCall / DynamicCall**：`sema::bind::resolve_for_exec`；Tree 与 Bytecode 静态路径对齐；`bound_calls.json` / `dynamic_calls.json`；同模块定义树路径绑定。
+- **NarrativeRef**：注释行 Markdown 链接 → `narrate` / `navigation` 步骤；围栏与行内代码不计步骤。
+- **来源与适用性**：frontmatter `sources` / `valid_until` → `evidence=sourced|expired|missing_source`；`artifact.bind policy=business`。
+- **局部编辑与提取**：MLSP `artifact.patch`（digest + wording 回滚）；`artifact.extract_pure` 纯表达式预览。
+- **整代与闭包**：`generations/<id>/` + `CURRENT`；`hashes.closure` 随依赖变化；锁报告 `classes`。
+- **门禁**：`tests/executable_knowledge`（含 100 单元）；CI `.github/workflows/executable-knowledge.yml`；项目扫描 depth/size/count 上限。
+- **示例**：`examples/executable-knowledge` 发票含税链可运行；负知识文档。
+
+### Fixed
+
+- Bytecode 裸名解析不再跨 import scope 误连同名函数；同模块 `Type.member` 写入 path_index 供兄弟调用。
+
+### Changed
+
+- Agent / reuse 发现结果标记 `discovery_only` + `bind_required` / `bind_targets`，不可把打分结果直接当可执行目标。
+
 ## v1.5.2 — 2026-10-18
 
 ### Highlights

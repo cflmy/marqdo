@@ -63,7 +63,7 @@ Canonical design (repo): `doc/design/markdown-mapping.md`, `doc/design/keywords.
 
 Entry: load file (often `index.mq.md`) → collect defs → run `# main`.
 
-## Occlusion syntax (v2.1.0)
+## Occlusion syntax (v2.1.0+) · Executable knowledge (v2.1.1)
 
 Occlusion is the default syntax. Shipped source declares `markup: occlusion` (or `标记: 遮蔽`) explicitly so imports stay deterministic. Legacy `[key](collection)` requires `markup: classic` or the one-cycle CLI flag `--legacy-markup`; `MARQDO_MARKUP` does not change parsing.
 
