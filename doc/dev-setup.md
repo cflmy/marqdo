@@ -13,6 +13,8 @@
 |------|------|------|
 | Rust + Cargo | stable，建议 ≥ 1.81（本机验证过 1.81） | `rustc --version` / `cargo --version` |
 | Git | 任意近期版本 | `git --version` |
+| GCC / Binutils | 原生依赖编译与链接 | `cc --version` / `ld --version` |
+| Go | ≥ 1.22（仅构建 `plugins/web` 与 web 扩展测试需要） | `go version` |
 
 安装 Rust（若尚未安装）：
 
@@ -21,7 +23,17 @@
 
 本仓库可选 `rust-toolchain.toml`（钉 1.81.0）。若本机无 `rustup`、但已有匹配的 `rustc`/`cargo`，也可直接开发。
 
-**不需要：** Flex、Bison、LLVM、Node/npm（实现栈为 Rust）。
+**不需要：** Flex、Bison、LLVM。Node/npm 只在开发 VS Code 扩展时需要；核心 Rust 开发不依赖它们。
+
+本仓库提供了固定 Rust 版本：`rust-toolchain.toml` 使用 Rust 1.81.0，并启用
+`rustfmt` / `clippy`。在受限开发容器中，推荐先加载仓库环境脚本：
+
+```bash
+source scripts/dev-env.sh
+```
+
+脚本会优先使用 `target/toolchain/` 下的工具链，普通开发机则回退到 PATH 中已有的工具，
+并把 Cargo、Go 缓存和临时目录放在工作区内。
 
 ---
 
@@ -36,6 +48,12 @@ cargo test
 cargo run -- run tests/structure/hello.mq.md
 ```
 
+构建 Go web 插件（完整扩展开发需要）：
+
+```bash
+bash scripts/build-web-plugin.sh
+```
+
 当前 M0：`run` 会读入文件并明确报错「evaluation not implemented」（脚手架，非静默假成功）。
 
 > 若 `cargo build` 报 `edition2024` / 过新 crate：仓库已对 `clap` 等做兼容钉扎（见 `Cargo.toml`）；请使用附带的 `Cargo.lock`，勿盲目 `cargo update` 到最新 major。
@@ -48,6 +66,13 @@ cargo run -- run tests/structure/hello.mq.md
 rustup component add rustfmt clippy   # 若使用 rustup
 cargo fmt
 cargo clippy --all-targets
+```
+
+只验证 Rust 核心时可运行 `cargo test --locked --lib`；包含全部扩展的 gold 测试需要 Go，
+并建议单线程运行以避免共享临时夹具互相影响：
+
+```bash
+cargo test --locked --test gold -- --test-threads=1
 ```
 
 代理下拉 crate（可选，与 git 推送类似）：

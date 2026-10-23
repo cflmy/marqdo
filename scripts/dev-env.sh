@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Marqdo dev environment for this sandbox (glibc 2.36 host, no system gcc/python3/go).
+# Marqdo dev environment.
 #
 # Usage:  source scripts/dev-env.sh
 #
-# Everything lives under target/toolchain/ (bundled): rust 1.81, zig 0.13 (as cc),
-# go 1.25, python 3.12. Zig also solves the "release binary needs GLIBC_2.39"
-# problem by targeting x86_64-linux-gnu.2.36.
+# If a bundled toolchain is present under target/toolchain/, it is preferred;
+# otherwise the script keeps using tools already installed on PATH. This makes
+# the script work both in the maintained sandbox image and on a normal dev host.
 #
 # Two non-obvious constraints this script encodes:
 #   1. $HOME is not writable -> zig/rust caches must be redirected explicitly.
@@ -15,24 +15,33 @@
 
 _marqdo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 _tc="$_marqdo_root/target/toolchain"
-_zshim="/workspace/qdagent/.tools/zigcc"
+_zshim="${MARQDO_ZIG_SHIM:-$_marqdo_root/.tools/zigcc}"
 
-export RUSTUP_HOME="$_tc/rustup"
-export CARGO_HOME="$_tc/cargo"
-export GOCACHE="$_tc/gocache"
-export GOPATH="$_tc/gopath"
-export TMPDIR="$_tc/gotmp"
-export ZIG_GLOBAL_CACHE_DIR="/workspace/qdagent/.tools/zigcache"
-export ZIG_LOCAL_CACHE_DIR="/workspace/qdagent/.tools/zigcache"
+_prepend_existing() {
+  [ -d "$1" ] && PATH="$1:$PATH"
+}
 
-export PATH="$_zshim/bin:$_tc/python/bin:$_tc/go/bin:$_tc/cargo/bin:$PATH"
+export RUSTUP_HOME="${RUSTUP_HOME:-$_tc/rustup}"
+export CARGO_HOME="${CARGO_HOME:-$_tc/cargo}"
+export GOCACHE="${GOCACHE:-$_tc/gocache}"
+export GOPATH="${GOPATH:-$_tc/gopath}"
+export TMPDIR="${TMPDIR:-$_tc/tmp}"
+export ZIG_GLOBAL_CACHE_DIR="${ZIG_GLOBAL_CACHE_DIR:-$_tc/zigcache}"
+export ZIG_LOCAL_CACHE_DIR="${ZIG_LOCAL_CACHE_DIR:-$_tc/zigcache}"
+
+_prepend_existing "$_zshim/bin"
+_prepend_existing "$_tc/python/bin"
+_prepend_existing "$_tc/go/bin"
+_prepend_existing "$_tc/cargo/bin"
 
 # Rust: link through zig cc pinned to glibc 2.36 so the binary runs on this host.
-export CC="$_zshim/cc"
-export CXX="$_zshim/cc"
-export AR="$_zshim/ar"
-export CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER="$_zshim/cc"
+if [ -x "$_zshim/cc" ] && [ -x "$_zshim/ar" ]; then
+  export CC="$_zshim/cc"
+  export CXX="$_zshim/cc"
+  export AR="$_zshim/ar"
+  export CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER="$_zshim/cc"
+fi
 
 mkdir -p "$TMPDIR" "$GOCACHE" "$GOPATH" "$ZIG_GLOBAL_CACHE_DIR"
 
-echo "marqdo dev-env: rust=$(rustc --version 2>/dev/null | cut -d' ' -f2) go=$(go version 2>/dev/null | awk '{print $3}') python=$(python3 --version 2>&1 | awk '{print $2}') cc=zig-glibc2.36"
+echo "marqdo dev-env: rust=$(rustc --version 2>/dev/null | cut -d' ' -f2 || echo missing) go=$(go version 2>/dev/null | awk '{print $3}' || echo missing) python=$(python3 --version 2>&1 | awk '{print $2}' || echo missing)"
