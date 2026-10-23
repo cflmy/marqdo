@@ -1,10 +1,11 @@
 ---
 title: writeback param must not shadow writeback module
 description: Regression — step/plan param writeback=True used to break > writeback.record (bool is not a map). Use a non-colliding import alias.
-import wb:lib/writeback.mq.md
-import writeback:lib/writeback.mq.md
-import json:lib/json.mq.md
-import sys:lib/sys.mq.md
+import:
+  wb: lib/writeback.mq.md
+  writeback: lib/writeback.mq.md
+  json: lib/json.mq.md
+  sys: lib/sys.mq.md
 ---
 
 # box

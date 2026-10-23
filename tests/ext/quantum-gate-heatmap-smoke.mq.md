@@ -1,7 +1,8 @@
 ---
 title: quantum gate matrix heatmap smoke
 description: gate.draw kind=matrix writes SVG heatmap.
-import quantum:ext/quantum/quantum.mq.md
+import:
+  quantum: ext/quantum/quantum.mq.md
 ---
 
 # main

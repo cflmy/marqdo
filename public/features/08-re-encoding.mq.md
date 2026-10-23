@@ -1,8 +1,9 @@
 ---
 title: Mid stdlib — regex and encoding
 description: lib/re + lib/encoding without plugins (Mid M1)
-import re:lib/re.mq.md
-import enc:lib/encoding.mq.md
+import:
+  re: lib/re.mq.md
+  enc: lib/encoding.mq.md
 ---
 
 # Regex and encoding in lib/

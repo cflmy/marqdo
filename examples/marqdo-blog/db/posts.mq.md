@@ -1,6 +1,7 @@
 ---
 title: blog posts schema
-import data:ext/data/db.mq.md
+import:
+  data: ext/data/db.mq.md
 ---
 
 ## schema

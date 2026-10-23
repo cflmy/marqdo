@@ -1,8 +1,9 @@
 ---
 title: ext/web/page
 description: Document → View. Sole compose path is render(nodes=) with unified View schema (ADR 0007).
-import cap:ext/web/_capability.mq.md
-import table:lib/table.mq.md
+import:
+  cap: ext/web/_capability.mq.md
+  table: lib/table.mq.md
 ---
 
 # page

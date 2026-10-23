@@ -1,5 +1,6 @@
 ---
-import plugin:lib/plugin.mq.md
+import:
+  plugin: lib/plugin.mq.md
 ---
 
 # main

@@ -1,7 +1,8 @@
 ---
 title: 线性代数公式冒烟
 description: (AB)^T 化简为 B^T*A^T；探测 ok。
-import la:ext/linalg/线性代数.mq.md
+import:
+  la: ext/linalg/线性代数.mq.md
 ---
 
 # main

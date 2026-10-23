@@ -32,7 +32,7 @@ Canonical design (repo): `doc/design/markdown-mapping.md`, `doc/design/keywords.
 8. Prefer ending side-effect-only function bodies with `*None*` / `*无*` / whole-line `**` / `****` when later lines must belong to an outer function. Lone `---` / `***` are Markdown thematic breaks (skipped), not function end.
 9. **`ext/**` never calls `host_*`.** Agent/OKF helpers are plugin names (`agent_kb_*`, …) after `plugin.load`. Do **not** add agent/OKF domain code to `src/host/` (core bloat). See `doc/design/ext-agent.md` §4.
 10. **Browser (route C/D/E/F):** client logic is Marqdo on WASM; official bridge is host glue and **may** implement lists, routing, storage, WebSocket, canvas, file read, observers — authors **must not hand-write business JS**. Use `web.client_embed` / `data-mq-source-url` auto-mount. Client effects: prefer **GFM tables + `lib/browser`** ([marqdo-dev](../marqdo-dev/SKILL.md)).
-11. **Code-as-documentation / no bag glue:** Prefer **GFM tables** for maps, lists, wire, commands. Prefer **`table.put` / named helpers** over `json.set` / `json.append` chains. `lib/json` is for parse/stringify/quote only — not a dict builder. Unreadable json pipelines are a style bug. Read collections with **`[key](map)`**, not footnote indexes for new code. In `markup: occlusion` files read with **`access(map, key)`** — there `[x](y)` is occlusion, not index.
+11. **Code-as-documentation / no bag glue:** Prefer **GFM tables** for maps, lists, wire, commands. Prefer **`table.put` / named helpers** over `json.set` / `json.append` chains. `lib/json` is for parse/stringify/quote only — not a dict builder. Unreadable json pipelines are a style bug. Read collections with **`[key](map)`**, not footnote indexes for new code. In `markup: occlusion` files read with **`access(map, key)`** — there `[x](y)` is occlusion, not index. **Positive copy-paste shapes** (result map, soft-error pack, sparse `table.put`): [marqdo-dev](../marqdo-dev/SKILL.md) §2 · [examples.md](examples.md) §6e. Do **not** extend legacy `json.set` in `ext/ai` — refactor to tables.
 12. **One language per file:** Do not mix EN and ZH API names in the same `.mq.md` (imports, calls, params). Pick English *or* Chinese mirrors for the whole program.
 13. **Sandbox trial habit (Agent / generated `.mq.md`):** Prefer `agent.trial` / `run sandbox=True` / `sandbox.open`→`run`→`diff`→`commit` before promoting to the host tree. Host files must stay unchanged until a successful commit. Caps live in `sandbox.profile` GFM tables — do not invent a second dialect.
 
@@ -49,8 +49,7 @@ Canonical design (repo): `doc/design/markdown-mapping.md`, `doc/design/keywords.
 | Line `N. *` | Else arm |
 | `> fn args` | Call (named `k=v` or positional) |
 | `` > `obj`.method args `` | Method call (`obj` must be a map with `_type`) |
-| Frontmatter `import bind:path.mq.md` / `导入` | Import file (bind library name) |
-| Frontmatter `import bind:lib.member` / `导入` | Short name for a library member (same keyword; no separate `use`) |
+| Frontmatter nested `import:` / `导入:` map | Import file (`bind: path.mq.md`) or short name (`bind: lib.member`) |
 | `> lib.member …` / `> lib.Type.member …` | Call via bare dotted path (instance methods need `` `var`.m ``) |
 | `*…*` | Statement (bind / expr) — closing `*` touches last token, **no trailing space**; bare ids are variables |
 | `**…**` | Return value — closing `**` touches last token, **no trailing space**; bare ids are variables |
@@ -136,13 +135,14 @@ Chinese builtins (same functions, no import):
 
 ## Frontmatter imports + stdlib
 
-Imports use `import bind:target` (`导入` equivalent): file (`.mq.md`) or short name (`lib.member`). Members are **not** flattened into the caller. Call with a bare dotted path:
+Imports use nested YAML `import:` (`导入` equivalent): file (`.mq.md`) or short name (`lib.member`). Members are **not** flattened into the caller. Call with a bare dotted path:
 
 ```markdown
 ---
 title: example
-import text:lib/text.mq.md
-import clock:lib/time.mq.md
+import:
+  text: lib/text.mq.md
+  clock: lib/time.mq.md
 ---
 
 # main
@@ -213,6 +213,16 @@ Install: `marqdo ext add quantum` (ZH id: `量子`). Build: `cargo build --relea
 ```
 
 Design: [ext-quantum.md](../../doc/design/ext-quantum.md) · Q7: [ext-quantum-q7.md](../../doc/design/ext-quantum-q7.md) · Q8 viz: [ext-quantum-viz-style.md](../../doc/design/ext-quantum-viz-style.md) · examples: [quantum-bell](../../examples/quantum-bell/) · [quantum-entanglement](../../examples/quantum-entanglement/).
+
+## Foreign kernels (v1.5.0)
+
+`lib/foreign` is now a full foreign-kernel surface, not only `run`:
+
+- `invoke` returns a record (`ok`, `code`, `stdout`, `stderr`, `ms`, `timed_out`, `truncated`, `result`); pass `input` for JSON stdin and `output="json"` for a parsed result.
+- `call` is JSON-in / JSON-out; `call_many` fans out one program over a list with ordered results.
+- `session_open` starts a persistent Python/Node kernel; `session_eval` evaluates source; `session_set` / `session_get` bridge values explicitly as JSON. Close it with `session_close`.
+- A view document opts into kernel state with `会话 = > foreign.session kernels=... cells=...`; the table names are free. `view` consumes only the `会话` handle and never scans source lines or reserved table names. Without `会话`, cells are stateless one-shot runs; no kernel is created. Clearing outputs calls `/api/session/clear` and keeps persistent kernel state. There is no separate notebook CLI mode or command, and no new Markdown marker exists.
+- The same source remains the authority; state crossing kernels is explicit, never implicitly mirrored.
 
 ## AI authoring workflow
 

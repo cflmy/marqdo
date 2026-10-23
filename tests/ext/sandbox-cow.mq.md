@@ -3,8 +3,9 @@ title: sandbox CoW — write stays upper until commit
 description: >
   Readable trial: seed on disk, mutate in session, host tree unchanged,
   then commit / discard. Prefer link index over json.get.
-import sandbox:ext/ai/sandbox.mq.md
-import fs:lib/fs.mq.md
+import:
+  sandbox: ext/ai/sandbox.mq.md
+  fs: lib/fs.mq.md
 ---
 
 # main

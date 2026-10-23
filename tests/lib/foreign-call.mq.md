@@ -1,6 +1,7 @@
 ---
 title: foreign call and call_many
-import foreign:lib/foreign.mq.md
+import:
+  foreign: lib/foreign.mq.md
 ---
 
 # main

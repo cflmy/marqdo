@@ -1,7 +1,8 @@
 ---
 title: quiet file subtask captures stdout/stderr
-import subtask:lib/subtask.mq.md
-import json:lib/json.mq.md
+import:
+  subtask: lib/subtask.mq.md
+  json: lib/json.mq.md
 ---
 
 # main

@@ -1,8 +1,9 @@
 ---
 title: Mid stdlib — stats and log fields
 description: Thin mean/median/stdev + structured log fields (Mid2 M10)
-import stats:lib/stats.mq.md
-import log:lib/log.mq.md
+import:
+  stats: lib/stats.mq.md
+  log: lib/log.mq.md
 ---
 
 # Closing Mid2 sugar

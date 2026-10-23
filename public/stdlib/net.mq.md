@@ -1,7 +1,8 @@
 ---
 title: lib/net — HTTP(S)
 description: Minimal HTTP(S) client and URL encode
-import net:lib/net.mq.md
+import:
+  net: lib/net.mq.md
 ---
 
 # main

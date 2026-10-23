@@ -1,11 +1,12 @@
 ---
 title: agent context budget + progressive disclose (A3 offline)
 description: source/skill briefs truncate with markers; READ:skill deepen; step protocol mentions READ.
-import llm:ext/ai/llm.mq.md
-import agent:ext/ai/agent.mq.md
-import json:lib/json.mq.md
-import plugin:lib/plugin.mq.md
-import sys:lib/sys.mq.md
+import:
+  llm: ext/ai/llm.mq.md
+  agent: ext/ai/agent.mq.md
+  json: lib/json.mq.md
+  plugin: lib/plugin.mq.md
+  sys: lib/sys.mq.md
 ---
 
 A3 padding block so this module source exceeds the default 4KiB budget when injected into step context. Keep as plain prose (not HTML comments) so strip_html_comments leaves it in place.

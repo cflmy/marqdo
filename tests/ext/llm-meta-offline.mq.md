@@ -4,7 +4,8 @@ description: Create handle from Artifact Metadata (model / api_key); no network.
 type: llm
 model: ${env.MARQDO_LLM_META_MODEL ?? "meta-model"}
 api_key: ${secret.OPENAI_API_KEY ?? "sk-test"}
-import llm:ext/ai/llm.mq.md
+import:
+  llm: ext/ai/llm.mq.md
 ---
 
 # main

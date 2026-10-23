@@ -159,11 +159,12 @@ REPLACE
 ```markdown
 ---
 title: agent-run-…
-import llm:ext/ai/llm.mq.md
-import agent:ext/ai/agent.mq.md
-import json:lib/json.mq.md
-import writeback:lib/writeback.mq.md
-import subtask:lib/subtask.mq.md
+import:
+  llm: ext/ai/llm.mq.md
+  agent: ext/ai/agent.mq.md
+  json: lib/json.mq.md
+  writeback: lib/writeback.mq.md
+  subtask: lib/subtask.mq.md
 ---
 
 # 总目标

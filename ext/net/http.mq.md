@@ -1,8 +1,9 @@
 ---
 title: ext/net/http
 description: HTTP primitives surface for Web Runtime (ADR 0007). Prefer Document/Endpoint Artifacts over raw calls.
-import plugin:lib/plugin.mq.md
-import sys:lib/sys.mq.md
+import:
+  plugin: lib/plugin.mq.md
+  sys: lib/sys.mq.md
 ---
 
 ## _load

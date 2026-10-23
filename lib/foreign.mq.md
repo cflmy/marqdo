@@ -1,7 +1,8 @@
 ---
 title: lib/foreign
 description: Run bound code fences and inline sources via local interpreters
-import table:lib/table.mq.md
+import:
+  table: lib/table.mq.md
 ---
 
 Run bound code fences and inline sources via local interpreters.

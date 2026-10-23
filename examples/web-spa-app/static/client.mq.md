@@ -2,9 +2,10 @@
 markup: occlusion
 title: spa client
 description: routes table + memory store; list / detail / edit
-import browser:lib/browser.mq.md
-import table:lib/table.mq.md
-import text:lib/text.mq.md
+import:
+  browser: lib/browser.mq.md
+  table: lib/table.mq.md
+  text: lib/text.mq.md
 ---
 
 # main

@@ -1,7 +1,8 @@
 ---
 title: web-ws-room demo
 description: Dynamic room WS with presence (G-WS1/2 bag). Open / and connect via bridge or wscat.
-import web:ext/web/web.mq.md
+import:
+  web: ext/web/web.mq.md
 ---
 
 # main

@@ -1,8 +1,9 @@
 ---
 title: quantum custom gate from formula matrix
 description: $$ H matrix $$ → gate matrix= → apply → probs match built-in H.
-import quantum:ext/quantum/quantum.mq.md
-import math:lib/math.mq.md
+import:
+  quantum: ext/quantum/quantum.mq.md
+  math: lib/math.mq.md
 ---
 
 # main

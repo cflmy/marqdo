@@ -1,10 +1,11 @@
 ---
 title: components/home_body
 description: 首页主体 HTML — hero + 公告 + 新闻时间线 + 论坛帖子（对齐 Django home.html，无外层导航）。
-导入 网页:ext/web/网页.mq.md
-import table:lib/table.mq.md
-import text:lib/text.mq.md
-import feed:feed.mq.md
+导入:
+  网页: ext/web/网页.mq.md
+  table: lib/table.mq.md
+  text: lib/text.mq.md
+  feed: feed.mq.md
 ---
 
 ## 装配

@@ -2,8 +2,9 @@
 title: agent-sandbox-okf — trial then commit
 description: >
   O1 example: opt-in sandbox trial with GFM-table returns and link-index reads.
-import agent:ext/ai/agent.mq.md
-import fs:lib/fs.mq.md
+import:
+  agent: ext/ai/agent.mq.md
+  fs: lib/fs.mq.md
 ---
 
 # main

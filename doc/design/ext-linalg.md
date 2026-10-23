@@ -201,8 +201,9 @@ $$
 
 ````markdown
 ---
-import la:ext/linalg/linalg.mq.md
-import table:lib/table.mq.md
+import:
+  la: ext/linalg/linalg.mq.md
+  table: lib/table.mq.md
 ---
 
 # main

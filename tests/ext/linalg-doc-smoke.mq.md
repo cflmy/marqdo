@@ -1,7 +1,8 @@
 ---
 title: linalg formula-doc smoke (F1)
 description: Run-implies-correct — (AB)^T ascii without explicit simplify.
-import la:ext/linalg/linalg.mq.md
+import:
+  la: ext/linalg/linalg.mq.md
 ---
 
 # Transpose reverses products

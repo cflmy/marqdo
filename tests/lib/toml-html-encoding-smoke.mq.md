@@ -1,9 +1,10 @@
 ---
 markup: occlusion
 title: lib/toml html encoding M8 smoke
-import toml:lib/toml.mq.md
-import html:lib/html.mq.md
-import enc:lib/encoding.mq.md
+import:
+  toml: lib/toml.mq.md
+  html: lib/html.mq.md
+  enc: lib/encoding.mq.md
 ---
 
 # main

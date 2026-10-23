@@ -1,10 +1,11 @@
 ---
 title: agent mcp server smoke
 description: Offline assemble mcp_server + one tool (no serve).
-import agent:ext/ai/agent.mq.md
-import plugin:lib/plugin.mq.md
-import sys:lib/sys.mq.md
-import demo:agent-mcp-server-helpers.mq.md
+import:
+  agent: ext/ai/agent.mq.md
+  plugin: lib/plugin.mq.md
+  sys: lib/sys.mq.md
+  demo: agent-mcp-server-helpers.mq.md
 ---
 
 # main

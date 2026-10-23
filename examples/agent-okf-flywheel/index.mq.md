@@ -1,12 +1,13 @@
 ---
 title: agent-okf-flywheel (Wave B0)
 description: Promote solidified workbook; second plan is cache=hit — document as knowledge base (OKF).
-import llm:ext/ai/llm.mq.md
-import agent:ext/ai/agent.mq.md
-import fs:lib/fs.mq.md
-import json:lib/json.mq.md
-import plugin:lib/plugin.mq.md
-import sys:lib/sys.mq.md
+import:
+  llm: ext/ai/llm.mq.md
+  agent: ext/ai/agent.mq.md
+  fs: lib/fs.mq.md
+  json: lib/json.mq.md
+  plugin: lib/plugin.mq.md
+  sys: lib/sys.mq.md
 ---
 
 # main

@@ -72,10 +72,11 @@ Marqdo 的宪法是 **代码即文档、文档即知识库**：
 
 ```markdown
 ---
-导入 智能体:ext/ai/智能体.mq.md
-导入 大模型:ext/ai/大模型.mq.md
-导入 自写回:lib/自写回.mq.md
-导入 时间:lib/时间.mq.md
+导入:
+  智能体: ext/ai/智能体.mq.md
+  大模型: ext/ai/大模型.mq.md
+  自写回: lib/自写回.mq.md
+  时间: lib/时间.mq.md
 ---
 
 ## 获取时间

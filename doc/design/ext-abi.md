@@ -61,7 +61,8 @@ Unknown names fail. Queries are only valid during a plugin function call (host s
 
 ```markdown
 ---
-import plugin:lib/plugin.mq.md
+import:
+  plugin: lib/plugin.mq.md
 ---
 
 # main

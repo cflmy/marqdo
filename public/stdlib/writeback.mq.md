@@ -1,7 +1,8 @@
 ---
 title: lib/writeback — Jupyter-style writeback
 description: Persist run output in the entry .mq.md file
-import writeback:lib/writeback.mq.md
+import:
+  writeback: lib/writeback.mq.md
 ---
 
 # main

@@ -3,12 +3,13 @@ title: ext/ai/llm
 description: >-
   Marqdo LLM intelligence primitive — ask / stream / collect / named handles.
   OpenAI-compatible and Ollama HTTP stay behind the semantic surface.
-import sys:lib/sys.mq.md
-import json:lib/json.mq.md
-import table:lib/table.mq.md
-import fs:lib/fs.mq.md
-import text:lib/text.mq.md
-import openai:ext/ai/llm/openai.mq.md
+import:
+  sys: lib/sys.mq.md
+  json: lib/json.mq.md
+  table: lib/table.mq.md
+  fs: lib/fs.mq.md
+  text: lib/text.mq.md
+  openai: ext/ai/llm/openai.mq.md
 ---
 
 ## load_env

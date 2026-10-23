@@ -1,12 +1,13 @@
 ---
 title: Agent zero-LLM execution after policy/skill compile
 description: After Skill+Policy compilation, run with router=marqdo records llm_calls=0.
-import agent:ext/ai/agent.mq.md
-import fs:lib/fs.mq.md
-import json:lib/json.mq.md
-import llm:ext/ai/llm.mq.md
-import plugin:lib/plugin.mq.md
-import sys:lib/sys.mq.md
+import:
+  agent: ext/ai/agent.mq.md
+  fs: lib/fs.mq.md
+  json: lib/json.mq.md
+  llm: ext/ai/llm.mq.md
+  plugin: lib/plugin.mq.md
+  sys: lib/sys.mq.md
 ---
 
 # main

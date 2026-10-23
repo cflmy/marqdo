@@ -1,7 +1,8 @@
 ---
 markup: occlusion
 title: foreign config load
-import foreign:lib/foreign.mq.md
+import:
+  foreign: lib/foreign.mq.md
 ---
 
 # main

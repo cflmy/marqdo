@@ -1,7 +1,8 @@
 ---
 title: classic index still works
 markup: occlusion
-import json:lib/json.mq.md
+import:
+  json: lib/json.mq.md
 ---
 
 # main

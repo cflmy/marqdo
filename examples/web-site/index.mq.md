@@ -3,14 +3,15 @@ title: web-site
 description: >-
   WWW Demo sample — GFM tables for shell, schema, forms, styles, and admin.
   Author business JavaScript: none. Author hand-written .css: none.
-import web:ext/web/web.mq.md
-import shell:styles/shell.mq.md
-import nav:components/nav.mq.md
-import side:components/side.mq.md
-import foot:components/foot.mq.md
-import desk:components/desk.mq.md
-import articles:db/articles.mq.md
-import db:db/index.mq.md
+import:
+  web: ext/web/web.mq.md
+  shell: styles/shell.mq.md
+  nav: components/nav.mq.md
+  side: components/side.mq.md
+  foot: components/foot.mq.md
+  desk: components/desk.mq.md
+  articles: db/articles.mq.md
+  db: db/index.mq.md
 ---
 
 # main

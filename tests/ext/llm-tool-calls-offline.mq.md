@@ -1,8 +1,9 @@
 ---
 title: llm tool_calls offline
 description: Parse OpenAI-shaped tool_calls into a list; no network.
-import openai:ext/ai/llm/openai.mq.md
-import json:lib/json.mq.md
+import:
+  openai: ext/ai/llm/openai.mq.md
+  json: lib/json.mq.md
 ---
 
 # main

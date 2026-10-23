@@ -2,7 +2,8 @@
 markup: occlusion
 title: 外联：把 Node 当作文档里的计算车间
 description: 一次性执行、持久会话、显式传值，以及可读的结果。
-import foreign:lib/foreign.mq.md
+import:
+  foreign: lib/foreign.mq.md
 ---
 
 # main

@@ -156,7 +156,8 @@ source: &str (+ optional import map)
 
 ```markdown
 ---
-import json:lib/json.mq.md
+import:
+  json: lib/json.mq.md
 ---
 
 # main

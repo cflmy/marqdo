@@ -1,8 +1,9 @@
 ---
 title: db/index
 description: 打开 sqlite、建表、幂等种子。
-导入 网页:ext/web/网页.mq.md
-import articles:articles.mq.md
+导入:
+  网页: ext/web/网页.mq.md
+  articles: articles.mq.md
 ---
 
 ## open

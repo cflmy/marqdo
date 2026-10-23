@@ -290,7 +290,7 @@ fn access_errors_on_missing_key_like_legacy() {
     let path = dir.join("missing.mq.md");
     std::fs::write(
         &path,
-        "---\nimport json:lib/json.mq.md\n---\n\n# main\n\n`表` = > json.parse text={\"键\":\"值\"}\n**x = [取不存在的键](access(`表`, \"无\"))**\n> print text=`x`\n",
+        "---\nimport:\n  json: lib/json.mq.md\n---\n\n# main\n\n`表` = > json.parse text={\"键\":\"值\"}\n**x = [取不存在的键](access(`表`, \"无\"))**\n> print text=`x`\n",
     )
     .unwrap();
     let out = Command::new(env!("CARGO_BIN_EXE_marqdo"))

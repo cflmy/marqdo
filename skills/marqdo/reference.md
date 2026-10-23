@@ -102,7 +102,8 @@ Examples: `examples/quantum-bell/`, `examples/quantum-entanglement/`. Design: `d
 
 ```markdown
 ---
-import math:lib/math.mq.md
+import:
+  math: lib/math.mq.md
 ---
 
 # main
@@ -121,7 +122,8 @@ Empty RHS assignment + following `$$…$$` binds a formula value. Narrative-only
 
 ```markdown
 ---
-import foreign:lib/foreign.mq.md
+import:
+  foreign: lib/foreign.mq.md
 ---
 
 # main

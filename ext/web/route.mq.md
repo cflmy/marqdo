@@ -1,8 +1,9 @@
 ---
 title: ext/web/route
 description: Declared Endpoint / Document route registration (ADR 0007).
-import cap:ext/web/_capability.mq.md
-import table:lib/table.mq.md
+import:
+  cap: ext/web/_capability.mq.md
+  table: lib/table.mq.md
 ---
 
 # route

@@ -1,8 +1,9 @@
 ---
 title: llm named handles + prompt_load offline
 description: fast/reasoning names, ollama backend tag, and type:prompt body load; no network.
-import llm:ext/ai/llm.mq.md
-import text:lib/text.mq.md
+import:
+  llm: ext/ai/llm.mq.md
+  text: lib/text.mq.md
 ---
 
 # main

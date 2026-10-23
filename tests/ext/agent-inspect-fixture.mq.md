@@ -1,9 +1,10 @@
 ---
 title: agent inspect_workbook (offline)
 description: Parse named writeback slots from a fixture workbook path.
-import agent:ext/ai/agent.mq.md
-import json:lib/json.mq.md
-import fs:lib/fs.mq.md
+import:
+  agent: ext/ai/agent.mq.md
+  json: lib/json.mq.md
+  fs: lib/fs.mq.md
 ---
 
 # main

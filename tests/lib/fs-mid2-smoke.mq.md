@@ -1,7 +1,8 @@
 ---
 markup: occlusion
 title: fs mid2 M9 smoke
-import fs:lib/fs.mq.md
+import:
+  fs: lib/fs.mq.md
 ---
 
 # main

@@ -1,8 +1,9 @@
 ---
 title: lib/log + uuid smoke
-import log:lib/log.mq.md
-import uuid:lib/uuid.mq.md
-import re:lib/re.mq.md
+import:
+  log: lib/log.mq.md
+  uuid: lib/uuid.mq.md
+  re: lib/re.mq.md
 ---
 
 # main

@@ -1,6 +1,7 @@
 ---
 title: lib/encoding smoke
-import enc:lib/encoding.mq.md
+import:
+  enc: lib/encoding.mq.md
 ---
 
 # main

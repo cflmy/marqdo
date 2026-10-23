@@ -3,8 +3,9 @@ title: styles/shell
 description: >-
   Literary dark theme for examples/web-site — ink / wine / gold after the
   anlian.cyou Zhang Ailing topic. GFM tables only; no author .css.
-import web:ext/web/web.mq.md
-import text:lib/text.mq.md
+import:
+  web: ext/web/web.mq.md
+  text: lib/text.mq.md
 ---
 
 Authors style the site with **GFM tables** only. App pages use `shell_css=off`

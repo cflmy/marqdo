@@ -1,8 +1,9 @@
 ---
 title: Mid stdlib — hash and secrets
 description: lib/hash + lib/secrets without plugins (Mid M3)
-import hash:lib/hash.mq.md
-import sec:lib/secrets.mq.md
+import:
+  hash: lib/hash.mq.md
+  sec: lib/secrets.mq.md
 ---
 
 # Digests and secure tokens

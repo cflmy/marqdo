@@ -1,8 +1,9 @@
 ---
 title: quantum linalg smoke
 description: Q7a density / partial_trace / expect / schmidt / purity
-import quantum:ext/quantum/quantum.mq.md
-import math:lib/math.mq.md
+import:
+  quantum: ext/quantum/quantum.mq.md
+  math: lib/math.mq.md
 ---
 
 # main

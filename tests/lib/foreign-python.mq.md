@@ -1,6 +1,7 @@
 ---
 title: foreign python hello
-import foreign:lib/foreign.mq.md
+import:
+  foreign: lib/foreign.mq.md
 ---
 
 # main

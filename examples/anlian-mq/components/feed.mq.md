@@ -2,8 +2,9 @@
 markup: occlusion
 title: components/feed
 description: 帖子列表 / 新闻时间线 / 板块栏 HTML 片段（对齐 Django feed 与 home 局部模板）。
-import table:lib/table.mq.md
-import text:lib/text.mq.md
+import:
+  table: lib/table.mq.md
+  text: lib/text.mq.md
 ---
 
 ## 帖子列表HTML

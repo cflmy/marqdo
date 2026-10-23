@@ -1,11 +1,12 @@
 ---
 title: agent workbook multi-CONTINUE patch + solidify (A0 offline)
 description: Two precise CONTINUE patches then agent_workbook_solidify freezes step workbook.
-import agent:ext/ai/agent.mq.md
-import json:lib/json.mq.md
-import fs:lib/fs.mq.md
-import plugin:lib/plugin.mq.md
-import sys:lib/sys.mq.md
+import:
+  agent: ext/ai/agent.mq.md
+  json: lib/json.mq.md
+  fs: lib/fs.mq.md
+  plugin: lib/plugin.mq.md
+  sys: lib/sys.mq.md
 ---
 
 # main

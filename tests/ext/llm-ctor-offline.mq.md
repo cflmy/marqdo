@@ -1,7 +1,8 @@
 ---
 title: llm constructor offline
 description: Build llm handle from env + defaults; no network.
-import llm:ext/ai/llm.mq.md
+import:
+  llm: ext/ai/llm.mq.md
 ---
 
 # main

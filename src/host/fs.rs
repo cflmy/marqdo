@@ -659,8 +659,9 @@ PATCH:
 @@
 -> ext/ai/llm.mq.md
 -> lib/json.mq.md
-+import llm:ext/ai/llm.mq.md
-+import json:lib/json.mq.md
++import:
++  llm: ext/ai/llm.mq.md
++  json: lib/json.mq.md
 *** End Patch
 ```
 "#;
@@ -674,7 +675,7 @@ PATCH:
         assert_eq!(n, Value::Int(1));
         assert_eq!(
             fs::read_to_string(&path).unwrap(),
-            "import llm:ext/ai/llm.mq.md\nimport json:lib/json.mq.md\n"
+            "import:\n llm: ext/ai/llm.mq.md\n json: lib/json.mq.md\n"
         );
         let _ = fs::remove_dir_all(&dir);
     }

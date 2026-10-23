@@ -4,7 +4,8 @@ model: ${env.MARQDO_META_MODEL ?? "default-model"}
 greeting: "Hello ${env.MARQDO_META_USER ?? "World"}"
 tokens: ${int(env.MARQDO_META_TOKENS ?? "16")}
 api_key: ${secret.MARQDO_META_SECRET ?? "sk-test"}
-import sys:lib/sys.mq.md
+import:
+  sys: lib/sys.mq.md
 ---
 
 # main

@@ -1,7 +1,8 @@
 ---
 id: document.invoice-answer
 type: Answer
-import pricing:../capabilities/order-pricing.mq.md
+import:
+  pricing: ../capabilities/order-pricing.mq.md
 ---
 
 # 发票回答

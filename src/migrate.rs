@@ -2,7 +2,9 @@
 //! purity forms (`access(集合, 键)` and `- [描述](遍历 集合 为 项)`), then mark
 //! the file `markup: occlusion`.
 //!
-//! Safety model: **transform, re-parse, prove equivalence, then write.**
+//! Also: nested YAML `import:` migration (`marqdo migrate imports`).
+//!
+//! Safety model (labels): **transform, re-parse, prove equivalence, then write.**
 //! The transformed file is parsed in occlusion mode and *denormalized* back to
 //! the legacy AST shape; if the denormalized AST is not byte-identical (Debug)
 //! to the original, the file is left untouched and reported.
@@ -10,13 +12,23 @@
 use std::path::{Path, PathBuf};
 
 use crate::ast::{Arg, BranchArm, Expr, Function, IndexKey, Module, Stmt};
+use crate::parse::{is_legacy_import_oneliner, parse_import_binding};
 
-/// Outcome of migrating one file.
+/// Outcome of migrating one file (labels).
 #[derive(Debug, Clone)]
 pub struct FileReport {
     pub file: PathBuf,
     pub indexes: usize,
     pub loops: usize,
+    pub applied: bool,
+    pub note: Option<String>,
+}
+
+/// Outcome of migrating one-liner imports → nested `import:` / `导入:`.
+#[derive(Debug, Clone)]
+pub struct ImportFileReport {
+    pub file: PathBuf,
+    pub bindings: usize,
     pub applied: bool,
     pub note: Option<String>,
 }
@@ -555,6 +567,167 @@ pub fn migrate_path(path: &Path, write: bool) -> anyhow::Result<Vec<FileReport>>
     Ok(out)
 }
 
+/// Rewrite frontmatter one-liner `import bind:target` / `导入 bind:target` into a
+/// nested YAML map. Returns `(new_source, binding_count)` or `None` if unchanged.
+pub fn rewrite_import_frontmatter(source: &str) -> Result<Option<(String, usize)>, String> {
+    let source = source.strip_prefix('\u{feff}').unwrap_or(source);
+    let lines: Vec<&str> = source.lines().collect();
+    if lines.first().map(|l| l.trim()) != Some("---") {
+        return Ok(None);
+    }
+    let mut fm_end = None;
+    for (i, line) in lines.iter().enumerate().skip(1) {
+        if line.trim() == "---" {
+            fm_end = Some(i);
+            break;
+        }
+    }
+    let Some(fm_end) = fm_end else {
+        return Ok(None);
+    };
+
+    let mut keyword: Option<&'static str> = None;
+    let mut entries: Vec<(String, String)> = Vec::new();
+    let mut legacy_idxs: Vec<usize> = Vec::new();
+    let mut has_nested = false;
+    let mut nested_kw: Option<&'static str> = None;
+
+    for i in 1..fm_end {
+        let t = lines[i].trim();
+        // Nested header with empty RHS only (`import:` / `导入:`)
+        if let Some(rest) = t.strip_prefix("import:") {
+            if rest.trim().is_empty() {
+                has_nested = true;
+                nested_kw = Some("import");
+                continue;
+            }
+        }
+        if let Some(rest) = t.strip_prefix("导入:") {
+            if rest.trim().is_empty() {
+                has_nested = true;
+                nested_kw = Some("导入");
+                continue;
+            }
+        }
+        if !is_legacy_import_oneliner(t) {
+            continue;
+        }
+        let (kw, after) = if t.starts_with("import") {
+            ("import", t[6..].trim())
+        } else if let Some(a) = t.strip_prefix("导入") {
+            ("导入", a.trim())
+        } else {
+            return Err(format!("internal: not a legacy import: {t}"));
+        };
+        // Pre-existing EN/ZH one-liner mixes: fold under the first keyword seen.
+        if keyword.is_none() {
+            keyword = Some(kw);
+        }
+        let _ = kw;
+        let Some((bind_raw, target_raw)) = after.split_once(':') else {
+            return Err(format!("expected bind:target in `{t}`"));
+        };
+        let bind = bind_raw.trim().to_string();
+        let target = target_raw.trim().to_string();
+        parse_import_binding(&bind, &target).map_err(|e| e.to_string())?;
+        if entries.iter().any(|(b, _)| b == &bind) {
+            return Err(format!("duplicate import bind `{bind}`"));
+        }
+        entries.push((bind, target));
+        legacy_idxs.push(i);
+    }
+
+    if entries.is_empty() {
+        return Ok(None);
+    }
+    if has_nested {
+        return Err(format!(
+            "file already has `{}:` block and legacy one-liners — resolve manually",
+            nested_kw.unwrap_or("import")
+        ));
+    }
+
+    let kw = keyword.unwrap_or("import");
+    let insert_at = legacy_idxs[0];
+    let skip: std::collections::HashSet<usize> = legacy_idxs.into_iter().collect();
+
+    let mut out: Vec<String> = Vec::new();
+    for (i, line) in lines.iter().enumerate() {
+        if i == insert_at {
+            out.push(format!("{kw}:"));
+            for (bind, target) in &entries {
+                out.push(format!("  {bind}: {target}"));
+            }
+        }
+        if skip.contains(&i) {
+            continue;
+        }
+        out.push((*line).to_string());
+    }
+
+    let mut body = out.join("\n");
+    if source.ends_with('\n') {
+        body.push('\n');
+    }
+    Ok(Some((body, entries.len())))
+}
+
+/// Migrate one file's import frontmatter. `write=false` is dry-run.
+pub fn migrate_imports_file(path: &Path, write: bool) -> anyhow::Result<ImportFileReport> {
+    let source = std::fs::read_to_string(path)?;
+    let mut report = ImportFileReport {
+        file: path.to_path_buf(),
+        bindings: 0,
+        applied: false,
+        note: None,
+    };
+    match rewrite_import_frontmatter(&source) {
+        Ok(None) => {
+            report.note = Some("no legacy import one-liners".into());
+            Ok(report)
+        }
+        Err(e) => {
+            report.note = Some(e);
+            Ok(report)
+        }
+        Ok(Some((new_src, n))) => {
+            report.bindings = n;
+            // Soft smoke: nested map must extract the same binding count.
+            let scanned = crate::parse::scan_frontmatter_imports(&new_src);
+            if scanned.len() != n {
+                report.note = Some(format!(
+                    "scan mismatch after rewrite: got {} expected {n}",
+                    scanned.len()
+                ));
+                return Ok(report);
+            }
+            if write {
+                std::fs::write(path, &new_src)?;
+                report.applied = true;
+            }
+            Ok(report)
+        }
+    }
+}
+
+/// Recursively migrate import one-liners under `path`.
+pub fn migrate_imports_path(path: &Path, write: bool) -> anyhow::Result<Vec<ImportFileReport>> {
+    let files = collect_files(path);
+    let mut out = Vec::new();
+    for f in files {
+        match migrate_imports_file(&f, write) {
+            Ok(r) => out.push(r),
+            Err(e) => out.push(ImportFileReport {
+                file: f,
+                bindings: 0,
+                applied: false,
+                note: Some(format!("read failed: {e:#}")),
+            }),
+        }
+    }
+    Ok(out)
+}
+
 /// Collect `*.mq.md` under `path` (file → itself).
 pub fn collect_files(path: &Path) -> Vec<PathBuf> {
     fn walk(dir: &Path, out: &mut Vec<PathBuf>) {
@@ -583,7 +756,16 @@ pub fn collect_files(path: &Path) -> Vec<PathBuf> {
 
 #[cfg(test)]
 mod tests {
-    use super::{rewrite_indexes, rewrite_loop};
+    use super::{rewrite_import_frontmatter, rewrite_indexes, rewrite_loop};
+
+    #[test]
+    fn rewrites_import_oneliners_to_nested() {
+        let src = "---\ntitle: t\nimport json:lib/json.mq.md\nimport fmt:time.format\n---\n\n# main\n";
+        let (out, n) = rewrite_import_frontmatter(src).unwrap().unwrap();
+        assert_eq!(n, 2);
+        assert!(out.contains("import:\n  json: lib/json.mq.md\n  fmt: time.format\n"));
+        assert!(!out.contains("import json:"));
+    }
 
     #[test]
     fn rewrites_static_key() {

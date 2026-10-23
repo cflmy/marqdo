@@ -5,12 +5,13 @@ description: >-
   (A) miss resolve must expose llm_free=false;
   (B) `self`.preflight must resolve when agent is imported by a consumer.
   Offline — dummy API key; no live network required for assertions A/B.
-import agent:ext/ai/agent.mq.md
-import fs:lib/fs.mq.md
-import json:lib/json.mq.md
-import llm:ext/ai/llm.mq.md
-import plugin:lib/plugin.mq.md
-import sys:lib/sys.mq.md
+import:
+  agent: ext/ai/agent.mq.md
+  fs: lib/fs.mq.md
+  json: lib/json.mq.md
+  llm: ext/ai/llm.mq.md
+  plugin: lib/plugin.mq.md
+  sys: lib/sys.mq.md
 ---
 
 # main

@@ -1,8 +1,9 @@
 ---
 title: ext/web/client
 description: Browser Runtime helpers (WASM bridge). Prefer lib/browser for effect tables (ADR 0007).
-import cap:ext/web/_capability.mq.md
-import table:lib/table.mq.md
+import:
+  cap: ext/web/_capability.mq.md
+  table: lib/table.mq.md
 ---
 
 ## embed

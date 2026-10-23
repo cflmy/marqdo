@@ -1,7 +1,8 @@
 ---
 title: lib/stats + log fields M10 smoke
-import stats:lib/stats.mq.md
-import log:lib/log.mq.md
+import:
+  stats: lib/stats.mq.md
+  log: lib/log.mq.md
 ---
 
 # main

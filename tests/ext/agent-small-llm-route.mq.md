@@ -1,9 +1,10 @@
 ---
 title: agent small-llm route request (offline)
 description: router=small-llm returns needs_llm + prompt; jev alias same shape.
-import plugin:lib/plugin.mq.md
-import sys:lib/sys.mq.md
-import json:lib/json.mq.md
+import:
+  plugin: lib/plugin.mq.md
+  sys: lib/sys.mq.md
+  json: lib/json.mq.md
 ---
 
 # main

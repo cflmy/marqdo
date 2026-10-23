@@ -1,10 +1,11 @@
 ---
 title: Agent Framework P4 — Adaptive Routing + Policy Compilation (offline)
 description: Learn skill, compile policy from skill-tagged episodes, route via marqdo backend without Jev/LLM.
-import fs:lib/fs.mq.md
-import json:lib/json.mq.md
-import plugin:lib/plugin.mq.md
-import sys:lib/sys.mq.md
+import:
+  fs: lib/fs.mq.md
+  json: lib/json.mq.md
+  plugin: lib/plugin.mq.md
+  sys: lib/sys.mq.md
 ---
 
 # main

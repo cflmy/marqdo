@@ -2,9 +2,10 @@
 markup: occlusion
 title: Mid stdlib — toml, html, base32
 description: Config TOML + HTML escape + base32 (Mid2 M8)
-import toml:lib/toml.mq.md
-import html:lib/html.mq.md
-import enc:lib/encoding.mq.md
+import:
+  toml: lib/toml.mq.md
+  html: lib/html.mq.md
+  enc: lib/encoding.mq.md
 ---
 
 # Config and safe text without plugins

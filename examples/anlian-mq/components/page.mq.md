@@ -1,8 +1,9 @@
 ---
 title: components/page
 description: 用原站 chrome 包一层完整 HTML 引言（bare 布局）。
-import text:lib/text.mq.md
-import chrome:chrome.mq.md
+import:
+  text: lib/text.mq.md
+  chrome: chrome.mq.md
 ---
 
 ## 包装

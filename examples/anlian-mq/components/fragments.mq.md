@@ -1,9 +1,10 @@
 ---
 title: components/fragments
 description: AJAX 片段 — /post/ten、/news/five。
-导入 网页:ext/web/网页.mq.md
-import db:../db/index.mq.md
-import feed:feed.mq.md
+导入:
+  网页: ext/web/网页.mq.md
+  db: ../db/index.mq.md
+  feed: feed.mq.md
 ---
 
 ## 帖子十

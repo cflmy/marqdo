@@ -1,8 +1,9 @@
 ---
 title: Mid stdlib — path and fs
 description: lib/path + fs copy/move/temp (Mid M2)
-import path:lib/path.mq.md
-import fs:lib/fs.mq.md
+import:
+  path: lib/path.mq.md
+  fs: lib/fs.mq.md
 ---
 
 # Path algebra and file mid-layer

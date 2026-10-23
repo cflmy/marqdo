@@ -1,6 +1,7 @@
 ---
 title: math plot svg
-import math:lib/math.mq.md
+import:
+  math: lib/math.mq.md
 ---
 
 # main

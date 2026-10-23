@@ -1,8 +1,9 @@
 ---
 title: Persisting foreign execution results
 description: Static snapshots and writeback — how foreign results survive after the process exits
-import foreign:lib/foreign.mq.md
-import writeback:lib/writeback.mq.md
+import:
+  foreign: lib/foreign.mq.md
+  writeback: lib/writeback.mq.md
 ---
 
 # main

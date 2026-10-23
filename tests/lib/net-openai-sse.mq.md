@@ -1,8 +1,9 @@
 ---
 markup: occlusion
 title: openai SSE parse offline
-import net:lib/net.mq.md
-import json:lib/json.mq.md
+import:
+  net: lib/net.mq.md
+  json: lib/json.mq.md
 ---
 
 # main

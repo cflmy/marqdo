@@ -1,6 +1,7 @@
 ---
 title: math formula chain
-import math:lib/math.mq.md
+import:
+  math: lib/math.mq.md
 ---
 
 # main

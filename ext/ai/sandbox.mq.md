@@ -4,10 +4,11 @@ title: ext/ai/sandbox
 description: >-
   CoW trial workspace for AI-generated Marqdo: open / run / diff / commit.
   Native work lives in plugins/agent (`sandbox_*` → host_query).
-import plugin:lib/plugin.mq.md
-import sys:lib/sys.mq.md
-import table:lib/table.mq.md
-import fs:lib/fs.mq.md
+import:
+  plugin: lib/plugin.mq.md
+  sys: lib/sys.mq.md
+  table: lib/table.mq.md
+  fs: lib/fs.mq.md
 ---
 
 Load the agent plugin once per call (same pattern as other `ext/ai` helpers).

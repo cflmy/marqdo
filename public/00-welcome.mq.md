@@ -2,8 +2,9 @@
 markup: occlusion
 title: Welcome to Marqdo
 description: User-docs home — code as documentation (English)
-import math:lib/math.mq.md
-import foreign:lib/foreign.mq.md
+import:
+  math: lib/math.mq.md
+  foreign: lib/foreign.mq.md
 ---
 
 # main

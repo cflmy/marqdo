@@ -1,6 +1,7 @@
 ---
 title: table list mid smoke
-import table:lib/table.mq.md
+import:
+  table: lib/table.mq.md
 ---
 
 # main

@@ -1,11 +1,12 @@
 ---
 title: dump_step_context (Wave B1 offline)
 description: Assert dump_step_context exposes call_site + prompt without LLM.
-import llm:ext/ai/llm.mq.md
-import agent:ext/ai/agent.mq.md
-import json:lib/json.mq.md
-import plugin:lib/plugin.mq.md
-import sys:lib/sys.mq.md
+import:
+  llm: ext/ai/llm.mq.md
+  agent: ext/ai/agent.mq.md
+  json: lib/json.mq.md
+  plugin: lib/plugin.mq.md
+  sys: lib/sys.mq.md
 ---
 
 ## probe_tool

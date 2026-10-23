@@ -1,8 +1,9 @@
 ---
 id: capability.order-pricing
 type: Capability
-import tax:../knowledge/tax-2026.mq.md
-import order:../schema/order.mq.md
+import:
+  tax: ../knowledge/tax-2026.mq.md
+  order: ../schema/order.mq.md
 ---
 
 # 订单定价

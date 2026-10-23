@@ -1,8 +1,9 @@
 ---
 title: plugin demo ABI
 description: Loads demo cdylib; path from MARQDO_TEST_PLUGIN (set by gold harness).
-import plugin:lib/plugin.mq.md
-import sys:lib/sys.mq.md
+import:
+  plugin: lib/plugin.mq.md
+  sys: lib/sys.mq.md
 ---
 
 # main

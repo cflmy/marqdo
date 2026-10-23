@@ -1,6 +1,7 @@
 ---
 title: lib/path smoke
-import path:lib/path.mq.md
+import:
+  path: lib/path.mq.md
 ---
 
 # main

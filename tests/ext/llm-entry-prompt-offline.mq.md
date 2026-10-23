@@ -1,8 +1,9 @@
 ---
 type: prompt
 title: entry prompt offline
-import llm:ext/ai/llm.mq.md
-import sys:lib/sys.mq.md
+import:
+  llm: ext/ai/llm.mq.md
+  sys: lib/sys.mq.md
 ---
 
 Say hello to Marqdo.

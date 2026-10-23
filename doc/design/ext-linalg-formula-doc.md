@@ -197,7 +197,8 @@
 
 ````markdown
 ---
-import la:ext/linalg/linalg.mq.md
+import:
+  la: ext/linalg/linalg.mq.md
 ---
 
 # 转置反序

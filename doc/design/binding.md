@@ -36,7 +36,8 @@ type: llm
 model: ${env.OPENAI_MODEL ?? "gpt-4o-mini"}
 api_key: ${secret.OPENAI_API_KEY!}
 base_url: ${env.OPENAI_BASE_URL ?? "https://api.openai.com/v1"}
-import sys:lib/sys.mq.md
+import:
+  sys: lib/sys.mq.md
 ---
 ```
 

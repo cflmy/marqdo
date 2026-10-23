@@ -1,10 +1,11 @@
 ---
 title: ext/agent plan live (DeepSeek)
 description: Full plan loop — spawn workbook, inspect, secondary plan; simple pong goal.
-import llm:ext/ai/llm.mq.md
-import agent:ext/ai/agent.mq.md
-import json:lib/json.mq.md
-import fs:lib/fs.mq.md
+import:
+  llm: ext/ai/llm.mq.md
+  agent: ext/ai/agent.mq.md
+  json: lib/json.mq.md
+  fs: lib/fs.mq.md
 ---
 
 # main

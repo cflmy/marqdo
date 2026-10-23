@@ -1,8 +1,9 @@
 ---
 title: llm create + collect offline
 description: Factory create + collect alias; no network.
-import llm:ext/ai/llm.mq.md
-import net:lib/net.mq.md
+import:
+  llm: ext/ai/llm.mq.md
+  net: lib/net.mq.md
 ---
 
 # main

@@ -1,7 +1,8 @@
 ---
 title: quantum viz advanced smoke
 description: Q7b hinton / qsphere / multibloch SVG markers
-import quantum:ext/quantum/quantum.mq.md
+import:
+  quantum: ext/quantum/quantum.mq.md
 ---
 
 # main

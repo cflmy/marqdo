@@ -1,7 +1,8 @@
 ---
 title: web-spa-app
 description: Native Marqdo SPA — list/detail/edit via WASM client routes + memory store
-import web:ext/web/web.mq.md
+import:
+  web: ext/web/web.mq.md
 ---
 
 # main

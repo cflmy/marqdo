@@ -1,8 +1,9 @@
 ---
 title: quantum gates + run smoke
 description: Z sandwich, Ry(pi), seeded Bell run counts.
-import quantum:ext/quantum/quantum.mq.md
-import math:lib/math.mq.md
+import:
+  quantum: ext/quantum/quantum.mq.md
+  math: lib/math.mq.md
 ---
 
 # main

@@ -80,7 +80,7 @@ Marqdo 换 **Rust 或 C++** 都不改变「主前端不该是 Flex/Bison」这�
 | **pulldown-cmark** *或* **comrak** | GFM 事件/AST | 标题、列表、表格、emphasis/strong；Spike 已证明「库 + 行扫描」可行。二选一做 Spike 对比后钉死 |
 | **thiserror** / **anyhow** | 错误类型 | 诊断与 CLI 报错 |
 | **clap** | CLI | `marqdo run [path]` |
-| **serde** + **serde_yaml** | 元信息 | 仅解析 frontmatter 中的 YAML **键值**；`import x:x.mq.md` 仍按**行**抽取（见 Spike） |
+| **serde** + **serde_yaml** | 元信息 | 仅解析 frontmatter 中的 YAML **键值**；嵌套 `import:` 映射与其它 YAML 键一并解析 |
 | **ureq** (=2.9.7) | HTTP(S) | `lib/net`；为 Cargo 1.81 另钉 `idna_adapter`/`zeroize`（见根 `Cargo.toml`） |
 | **regex** (=1.13.1) | 正则 | Mid M1 `lib/re`；`default-features=false` + `std`/`unicode`；无回溯引用 |
 | **sha2** (=0.10.9) / **sha1** (=0.10.6) / **md-5** (=0.10.6) / **hmac** (=0.12.1) | 摘要 | Mid M3 `lib/hash` |

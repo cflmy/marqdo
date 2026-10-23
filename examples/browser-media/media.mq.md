@@ -1,8 +1,9 @@
 ---
 title: browser-media (route F)
 description: file / canvas / audio / observers / drag — GFM tables + lib/browser
-import browser:lib/browser.mq.md
-import table:lib/table.mq.md
+import:
+  browser: lib/browser.mq.md
+  table: lib/table.mq.md
 ---
 
 # main

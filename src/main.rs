@@ -61,6 +61,17 @@ enum MigrateAction {
         #[arg(long)]
         json: bool,
     },
+    /// One-liner `import bind:target` → nested YAML `import:\n  bind: target`
+    Imports {
+        #[arg(value_name = "PATH", default_value = ".")]
+        paths: Vec<PathBuf>,
+        /// Actually rewrite files (default: dry run)
+        #[arg(long)]
+        write: bool,
+        /// One JSON array on stdout
+        #[arg(long)]
+        json: bool,
+    },
 }
 
 #[derive(Subcommand, Debug)]
@@ -918,6 +929,74 @@ fn try_main(cli: Cli) -> Result<i32> {
                         } else {
                             " (dry run; pass --write)"
                         }
+                    );
+                }
+                Ok(0)
+            }
+            MigrateAction::Imports { paths, write, json } => {
+                let mut reports = Vec::new();
+                for p in &paths {
+                    reports.extend(marqdo::migrate::migrate_imports_path(p, write)?);
+                }
+                let (mut bindings, mut applied, mut problems) = (0usize, 0usize, 0usize);
+                for r in &reports {
+                    bindings += r.bindings;
+                    applied += usize::from(r.applied);
+                    if r.note.as_ref().is_some_and(|n| {
+                        n != "no legacy import one-liners"
+                    }) && r.bindings == 0
+                    {
+                        problems += 1;
+                    }
+                }
+                if json {
+                    let arr: Vec<serde_json::Value> = reports
+                        .iter()
+                        .filter(|r| r.bindings > 0 || r.note.as_ref().is_some_and(|n| n != "no legacy import one-liners"))
+                        .map(|r| {
+                            serde_json::json!({
+                                "file": r.file.display().to_string(),
+                                "bindings": r.bindings,
+                                "applied": r.applied,
+                                "note": r.note,
+                            })
+                        })
+                        .collect();
+                    println!("{}", serde_json::Value::Array(arr));
+                } else {
+                    for r in &reports {
+                        if r.bindings == 0 && r.note.as_ref().is_some_and(|n| n == "no legacy import one-liners") {
+                            continue;
+                        }
+                        if r.bindings == 0 {
+                            println!(
+                                "{}  skipped ({})",
+                                r.file.display(),
+                                r.note.as_deref().unwrap_or("?")
+                            );
+                            continue;
+                        }
+                        let state = if r.applied {
+                            "written"
+                        } else if r.note.is_some() {
+                            "skipped"
+                        } else {
+                            "would change"
+                        };
+                        println!(
+                            "{}  bindings={} {}{}",
+                            r.file.display(),
+                            r.bindings,
+                            state,
+                            r.note
+                                .as_ref()
+                                .map(|n| format!(" ({n})"))
+                                .unwrap_or_default()
+                        );
+                    }
+                    println!(
+                        "migrate imports: {bindings} binding(s), {applied} file written, {problems} problem(s){}",
+                        if write { "" } else { " (dry run; pass --write)" }
                     );
                 }
                 Ok(0)

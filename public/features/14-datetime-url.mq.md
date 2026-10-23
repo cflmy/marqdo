@@ -2,8 +2,9 @@
 markup: occlusion
 title: Mid stdlib — datetime and url
 description: Calendar moments + URL/query parse (Mid2 M7)
-import dt:lib/datetime.mq.md
-import url:lib/url.mq.md
+import:
+  dt: lib/datetime.mq.md
+  url: lib/url.mq.md
 ---
 
 # Time and addresses without plugins

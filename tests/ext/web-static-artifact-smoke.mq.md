@@ -1,6 +1,7 @@
 ---
 title: web static artifact smoke
-import web:ext/web/web.mq.md
+import:
+  web: ext/web/web.mq.md
 ---
 
 # main

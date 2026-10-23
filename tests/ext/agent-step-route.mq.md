@@ -1,7 +1,8 @@
 ---
 title: O3 step_route table backends
 description: lookup → marqdo; net → llm; default → auto.
-import agent:ext/ai/agent.mq.md
+import:
+  agent: ext/ai/agent.mq.md
 ---
 
 # main

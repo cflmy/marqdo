@@ -1,7 +1,8 @@
 ---
 markup: occlusion
 title: foreign invoke JSON input
-import foreign:lib/foreign.mq.md
+import:
+  foreign: lib/foreign.mq.md
 ---
 
 # main

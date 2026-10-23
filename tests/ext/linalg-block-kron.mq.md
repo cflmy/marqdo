@@ -1,7 +1,8 @@
 ---
 title: linalg block/kron smoke (L3)
 description: Lazy kron ascii; block*block collapse.
-import la:ext/linalg/linalg.mq.md
+import:
+  la: ext/linalg/linalg.mq.md
 ---
 
 # main

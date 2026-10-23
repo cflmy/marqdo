@@ -62,8 +62,9 @@ route: /
 method: GET
 data_source: posts
 data_order: -created_at
-import web:ext/web/web.mq.md
-import data:ext/data/db.mq.md
+import:
+  web: ext/web/web.mq.md
+  data: ext/data/db.mq.md
 ---
 
 # Marqdo
@@ -106,7 +107,8 @@ path: /api/posts
 request: json
 response: json
 auth: member
-import data:ext/data/db.mq.md
+import:
+  data: ext/data/db.mq.md
 ---
 
 **post = > data.db.insert …**

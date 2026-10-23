@@ -4,9 +4,10 @@ title: promote requires sandbox proof (O2)
 description: >
   Good workbook promotes; broken workbook is rejected (sandbox_proof_failed).
   Link-index reads; no json glue.
-import plugin:lib/plugin.mq.md
-import fs:lib/fs.mq.md
-import sys:lib/sys.mq.md
+import:
+  plugin: lib/plugin.mq.md
+  fs: lib/fs.mq.md
+  sys: lib/sys.mq.md
 ---
 
 # main

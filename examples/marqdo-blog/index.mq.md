@@ -7,7 +7,8 @@ data_source: posts
 data_order: -created_at
 description: >-
   Document Artifact 首页（ADR 0007）：正文即文档，列表来自 data_source。
-导入 网页:ext/web/网页.mq.md
+导入:
+  网页: ext/web/网页.mq.md
 ---
 
 # Marqdo 博客
