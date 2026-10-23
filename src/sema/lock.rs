@@ -74,7 +74,7 @@ pub fn check_links_lock(out_dir: &Path, project: &SemanticProject) -> Result<Loc
             None => report.missing.push(id.clone()),
             Some(found) => {
                 let mut drifted = Vec::new();
-                for key in ["interface", "implementation", "evidence", "artifact"] {
+                for key in ["interface", "implementation", "evidence", "artifact", "closure"] {
                     let want = entry.get(key).and_then(Value::as_str);
                     let got = found.get(key).and_then(Value::as_str);
                     if want != got {
@@ -119,6 +119,11 @@ pub fn impact(project: &SemanticProject, query: &str) -> Value {
             || artifact.symbol_id.as_ref().is_some_and(|id| id.as_str() == query)
             || artifact.display_name == query
             || artifact.source.file == query
+            || artifact.source.file.ends_with(query)
+            || std::path::Path::new(&artifact.source.file)
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .is_some_and(|stem| stem == query || query.ends_with(stem))
             || artifact.artifact_id.0.ends_with(query)
         {
             seeds.insert(artifact.artifact_id.0.clone());
@@ -182,6 +187,7 @@ fn artifact_lock_entries(project: &SemanticProject) -> BTreeMap<String, Value> {
                     "implementation": artifact.hashes.implementation.0,
                     "evidence": artifact.hashes.evidence.0,
                     "artifact": artifact.hashes.artifact.0,
+                    "closure": artifact.hashes.closure.0,
                 }),
             )
         })
@@ -196,6 +202,7 @@ fn lock_json(project: &SemanticProject) -> Value {
             "implementation": artifact.hashes.implementation.0,
             "evidence": artifact.hashes.evidence.0,
             "artifact": artifact.hashes.artifact.0,
+            "closure": artifact.hashes.closure.0,
             "dependencies": artifact.dependencies.iter().map(|item| &item.0).collect::<Vec<_>>(),
         }));
     }

@@ -157,17 +157,35 @@ pub fn resolve_for_exec<'a>(
     }
 
     if let Some(path) = &call.path {
-        if path.len() == 2 && module.import_modules.contains_key(&path[0]) {
+        if module.import_modules.contains_key(&path[0]) {
             return resolve_import_path(module, path);
         }
-        if path.len() == 2 {
-            // Possible local-variable method; caller checks env.
-            return ExecTarget::Dynamic {
-                reason: DynamicReason::MethodReceiver,
-                name: call_display(call),
-            };
+        // Same-module definition-tree path (`Type.member` / nested), BoundCall.
+        if path.len() >= 2 {
+            match walk_path(module, path) {
+                Ok(fun) => return ExecTarget::Local(fun),
+                Err(_) if path.len() == 2 => {
+                    // Possible local-variable method; caller checks env.
+                    return ExecTarget::Dynamic {
+                        reason: DynamicReason::MethodReceiver,
+                        name: call_display(call),
+                    };
+                }
+                Err(message) => {
+                    return ExecTarget::Unresolved {
+                        message,
+                        span_hint: None,
+                    };
+                }
+            }
         }
-        return resolve_import_path(module, path);
+        return ExecTarget::Unresolved {
+            message: format!(
+                "library path `{}`: need at least `lib.member`",
+                path.join(".")
+            ),
+            span_hint: None,
+        };
     }
 
     if let Some(u) = module.uses.iter().find(|u| u.bind == call.callee) {

@@ -157,6 +157,8 @@ pub struct ArtifactHashes {
     pub implementation: Digest,
     pub evidence: Digest,
     pub artifact: Digest,
+    /// Transitive dependency closure over call edges (G08).
+    pub closure: Digest,
 }
 
 #[derive(Debug, Clone)]
@@ -325,6 +327,7 @@ pub fn compile_project(options: &CompileOptions) -> Result<Compilation> {
         }
     }
     close_effect_dependencies(&mut artifacts);
+    close_closure_digests(&mut artifacts);
     artifacts.sort_by(|a, b| a.artifact_id.0.cmp(&b.artifact_id.0));
     refs.sort_by(|a, b| a.id.cmp(&b.id));
     steps.sort_by(|a, b| a.id.0.cmp(&b.id.0));
@@ -717,10 +720,12 @@ fn semantic_artifact(
     dependencies.sort_by(|a, b| a.0.cmp(&b.0));
     dependencies.dedup();
     let artifact = digest(format!("{}:{}:{}", interface.0, implementation.0, evidence.0));
+    // Placeholder; replaced by `close_closure_digests` after the full graph exists.
+    let closure = artifact.clone();
     SemanticArtifact {
         artifact_id, symbol_id, display_name, kind, callable, source, signature, contract,
         effects, dependencies, provenance, applicability, hashes: ArtifactHashes {
-            interface, implementation, evidence, artifact,
+            interface, implementation, evidence, artifact, closure,
         },
         verification: VerificationRecord {
             parse: "passed".into(), resolve: "passed".into(), contract: "unchecked".into(),
@@ -1007,6 +1012,43 @@ fn direct_effects(calls: &[(usize, CallExpr, u32)]) -> EffectSet {
 
 /// Propagate callee effects along local `dependencies` edges until fixpoint.
 /// Empty effect sets become `pure` only after closure (no unknown remains).
+/// Fixpoint closure digest: own artifact hash + sorted dependency closure hashes (G08).
+fn close_closure_digests(artifacts: &mut [SemanticArtifact]) {
+    let n = artifacts.len();
+    let index: BTreeMap<String, usize> = artifacts
+        .iter()
+        .enumerate()
+        .map(|(i, a)| (a.artifact_id.0.clone(), i))
+        .collect();
+    for _ in 0..n.saturating_add(1) {
+        let mut changed = false;
+        let snap: Vec<String> = artifacts
+            .iter()
+            .map(|a| a.hashes.closure.0.clone())
+            .collect();
+        for artifact in artifacts.iter_mut() {
+            let mut parts = vec![artifact.hashes.artifact.0.clone()];
+            for dep in &artifact.dependencies {
+                if let Some(&i) = index.get(&dep.0) {
+                    parts.push(snap[i].clone());
+                } else {
+                    parts.push(dep.0.clone());
+                }
+            }
+            parts.sort();
+            parts.dedup();
+            let next = digest(parts.join("|"));
+            if next.0 != artifact.hashes.closure.0 {
+                artifact.hashes.closure = next;
+                changed = true;
+            }
+        }
+        if !changed {
+            break;
+        }
+    }
+}
+
 fn close_effect_dependencies(artifacts: &mut [SemanticArtifact]) {
     let index: BTreeMap<String, usize> = artifacts
         .iter()
@@ -1085,7 +1127,7 @@ impl SemanticProject {
 }
 
 pub fn artifact_json(artifact: &SemanticArtifact) -> Value {
-    json!({"schema_version": SCHEMA_VERSION, "artifact_id": artifact.artifact_id.0, "symbol_id": artifact.symbol_id.as_ref().map(SymbolId::as_str), "display_name": artifact.display_name, "kind": artifact.kind, "callable": artifact.callable, "source": {"file": artifact.source.file, "line": artifact.source.line, "end_line": artifact.source.end_line}, "signature": artifact.signature.as_ref().map(|s| json!({"receiver":s.receiver,"params":s.params.iter().map(|p|json!({"name":p.name,"type":p.ty,"required":p.required,"default_digest":p.default_digest.as_ref().map(|d|&d.0),"unit":p.unit})).collect::<Vec<_>>(),"returns":s.returns,"effects":s.effects.values()})), "contract":{"params":artifact.contract.params,"returns":artifact.contract.returns,"fields":artifact.contract.fields}, "effects":artifact.effects.values(), "dependencies":artifact.dependencies.iter().map(|d|&d.0).collect::<Vec<_>>(), "provenance":artifact.provenance.iter().map(|p|json!({"uri":p.uri,"locator":p.locator,"content_digest":p.content_digest.as_ref().map(|d|&d.0),"relation":p.relation})).collect::<Vec<_>>(), "applicability":artifact.applicability, "hashes":{"interface":artifact.hashes.interface.0,"implementation":artifact.hashes.implementation.0,"evidence":artifact.hashes.evidence.0,"artifact":artifact.hashes.artifact.0}, "verification":{"parse":artifact.verification.parse,"resolve":artifact.verification.resolve,"contract":artifact.verification.contract,"execution":artifact.verification.execution,"tests":artifact.verification.tests,"evidence":artifact.verification.evidence,"domain":artifact.verification.domain,"methods":artifact.verification.methods}, "lifecycle":artifact.lifecycle})
+    json!({"schema_version": SCHEMA_VERSION, "artifact_id": artifact.artifact_id.0, "symbol_id": artifact.symbol_id.as_ref().map(SymbolId::as_str), "display_name": artifact.display_name, "kind": artifact.kind, "callable": artifact.callable, "source": {"file": artifact.source.file, "line": artifact.source.line, "end_line": artifact.source.end_line}, "signature": artifact.signature.as_ref().map(|s| json!({"receiver":s.receiver,"params":s.params.iter().map(|p|json!({"name":p.name,"type":p.ty,"required":p.required,"default_digest":p.default_digest.as_ref().map(|d|&d.0),"unit":p.unit})).collect::<Vec<_>>(),"returns":s.returns,"effects":s.effects.values()})), "contract":{"params":artifact.contract.params,"returns":artifact.contract.returns,"fields":artifact.contract.fields}, "effects":artifact.effects.values(), "dependencies":artifact.dependencies.iter().map(|d|&d.0).collect::<Vec<_>>(), "provenance":artifact.provenance.iter().map(|p|json!({"uri":p.uri,"locator":p.locator,"content_digest":p.content_digest.as_ref().map(|d|&d.0),"relation":p.relation})).collect::<Vec<_>>(), "applicability":artifact.applicability, "hashes":{"interface":artifact.hashes.interface.0,"implementation":artifact.hashes.implementation.0,"evidence":artifact.hashes.evidence.0,"artifact":artifact.hashes.artifact.0,"closure":artifact.hashes.closure.0}, "verification":{"parse":artifact.verification.parse,"resolve":artifact.verification.resolve,"contract":artifact.verification.contract,"execution":artifact.verification.execution,"tests":artifact.verification.tests,"evidence":artifact.verification.evidence,"domain":artifact.verification.domain,"methods":artifact.verification.methods}, "lifecycle":artifact.lifecycle})
 }
 fn ref_json(reference: &KnowledgeRef) -> Value { json!({"id":reference.id,"label":reference.label,"context":reference.context,"source":{"file":reference.source.file,"line":reference.source.line,"end_line":reference.source.end_line},"resolution":reference.resolution,"target":reference.target.as_ref().map(SymbolId::as_str)}) }
 fn step_json(step: &KnowledgeStep) -> Value { json!({"id":step.id.0,"reference":step.reference,"kind":step.kind,"calls":step.calls.iter().map(SymbolId::as_str).collect::<Vec<_>>(),"effects":step.effects.values(),"source":{"file":step.source.file,"line":step.source.line,"end_line":step.source.end_line}}) }

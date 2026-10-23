@@ -1,42 +1,44 @@
 # 可执行知识系统示例：订单含税总额
 
-这是 [可执行知识系统设计](../../doc/design/executable-knowledge-system.md) 的目标示例。
-它刻意展示 `[]()` 不只包“知识函数”：同一套语法同时命名取元、循环、推导、跨文件调用和正文结论。
+这是 [可执行知识系统设计](../../doc/design/executable-knowledge-system.md) 的目标示例，
+已按当前 occlusion 语法落地为**可运行**订单链（Tree / Bytecode）。
 
 | 文件 | 图中的职责 | 关键步骤 |
 |---|---|---|
 | `corpus/tax-policy-2026.md` | E：证据 | 税率原文 |
 | `schema/order.mq.md` | C：概念 | 订单/订单行字段与单位 |
-| `knowledge/tax-2026.mq.md` | K：原子知识 | `[标准税率](0.13)` 及来源 |
+| `knowledge/tax-2026.mq.md` | K：原子知识 | `标准税率.查询` + `sources:` |
+| `knowledge/negative-refund.mq.md` | 负知识 | 折扣不适用于退款 |
 | `capabilities/order-pricing.mq.md` | D：推导知识 | 取元、调用、循环、汇总 |
-| `docs/invoice-answer.mq.md` | N：叙述知识 | 用同一个计算给人可读的回答 |
+| `docs/invoice-answer.mq.md` | N：叙述知识 | 含税结论 + NarrativeRef |
+
+## 运行
+
+```bash
+marqdo run examples/executable-knowledge/docs/invoice-answer.mq.md --backend tree
+marqdo run examples/executable-knowledge/docs/invoice-answer.mq.md --backend bytecode
+# → 113
+marqdo knowledge examples/executable-knowledge -o /tmp/ek
+marqdo knowledge impact "标准税率.查询" examples/executable-knowledge --json
+```
+
+门禁：`cargo test --test executable_knowledge s4_examples_bookstore_chain_runs_both_backends --locked`
 
 ## 读法
 
-`[]()` 的每一次出现都是 `Named<T>`：
+`[]()` 的每一次出现都是命名步骤（observe / derive / iterate / call / narrate）：
 
 ```markdown
-[订单行金额](at(行, "金额"))                 # observe
-[本行含税价](订单行金额 * (1 + 税率))          # derive
-[逐个订单行](遍历 订单.行 为 行)               # iterate
-[含税总价](pricing.订单定价.含税总额(订单))     # reuse / narrate
+[订单行金额](access(行, "金额"))                 # observe
+[本行含税价](金额 * (1 + 税率))                    # derive
+[逐个订单行](遍历 行列表 为 行)                    # iterate
+这张订单的含税总额是[含税总价](总额)。              # narrate
 ```
 
-它们不是四种语法。`()` 中仍是原有的取元、算术、循环和调用；`[]` 让每一步同时可读、可查、
-可在图中定位。
-
-**运行状态（勿与设计态混淆）**
+## 运行状态
 
 | 子集 | 状态 | 证据 |
 |---|---|---|
-| 纯计算 / BoundCall / 步骤 kind / NarrativeRef | 门禁已覆盖 | `tests/executable_knowledge/` |
-| 本目录完整订单链（类函数、证据闭环、impact→原文） | **设计态** | 仍作目标示例，不计入发布成功 |
-| `knowledge/tax-2026.mq.md` 的 `sources:` | 编译可关联 corpus；`business` bind 需 `evidence=sourced` | 见 `baseline/12-tax-source` |
-
-## 预期闭环
-
-1. `check` 从每个 `[]()` 提取观测、推导、遍历和调用依赖；
-2. `view` 在“含税总额”旁显示所经过的订单行、标准税率和税率原文；
-3. 税率原文变更时，`impact` 找到原子税率、订单定价、发票回答中的每一个命名步骤；
-4. `verify` 只重算 pure 步骤，不执行写入或发送等 `act` 步骤；
-5. agent 通过 catalog 得到“已有订单定价能力”和其证据链，不必从自然语言猜测。
+| 发票含税链双后端 `113` | **可运行** | 上表命令 / EK 门禁 |
+| 来源 `sourced` + impact 下游 | **可运行** | knowledge 投影 + impact |
+| 负知识文档 | **已收录** | `knowledge/negative-refund.mq.md`（发现层；非执行目标） |

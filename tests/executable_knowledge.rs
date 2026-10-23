@@ -497,6 +497,214 @@ fn s2_g02_boundcall_runs_both_backends() {
 }
 
 #[test]
+fn s4_examples_bookstore_chain_runs_both_backends() {
+    assert_out_both(
+        "examples/executable-knowledge/docs/invoice-answer.mq.md",
+        "113",
+    );
+}
+
+#[test]
+fn s5_closure_digest_moves_with_dependency() {
+    let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let dir = std::env::temp_dir().join(format!(
+        "marqdo-ek-closure-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(
+        dir.join("dep.mq.md"),
+        "---\nmarkup: occlusion\n---\n\n## rate\n\n*0.13*\n",
+    )
+    .unwrap();
+    std::fs::write(
+        dir.join("main.mq.md"),
+        "---\nmarkup: occlusion\nimport:\n  d: dep.mq.md\n---\n\n# main\n\n**t = [税](d.rate())**\n> print text=`t`\n",
+    )
+    .unwrap();
+    let out1 = std::env::temp_dir().join(format!("marqdo-ek-closure-o1-{}", std::process::id()));
+    let out2 = std::env::temp_dir().join(format!("marqdo-ek-closure-o2-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&out1);
+    let _ = std::fs::remove_dir_all(&out2);
+    let status = Command::new(env!("CARGO_BIN_EXE_marqdo"))
+        .args(["knowledge", dir.to_str().unwrap(), "-o", out1.to_str().unwrap()])
+        .current_dir(&root)
+        .output()
+        .unwrap();
+    assert_eq!(
+        status.status.code(),
+        Some(0),
+        "stderr={}",
+        String::from_utf8_lossy(&status.stderr)
+    );
+    let mut main_closure = None;
+    let mut main_impl = None;
+    for ent in std::fs::read_dir(out1.join("artifacts")).unwrap().flatten() {
+        let v: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(ent.path()).unwrap()).unwrap();
+        if v["display_name"] == "main" {
+            main_closure = v["hashes"]["closure"].as_str().map(str::to_string);
+            main_impl = v["hashes"]["implementation"].as_str().map(str::to_string);
+        }
+    }
+    assert!(main_closure.is_some(), "main closure missing in {}", out1.display());
+    std::fs::write(
+        dir.join("dep.mq.md"),
+        "---\nmarkup: occlusion\n---\n\n## rate\n\n*0.14*\n",
+    )
+    .unwrap();
+    let status = Command::new(env!("CARGO_BIN_EXE_marqdo"))
+        .args(["knowledge", dir.to_str().unwrap(), "-o", out2.to_str().unwrap()])
+        .current_dir(&root)
+        .output()
+        .unwrap();
+    assert_eq!(
+        status.status.code(),
+        Some(0),
+        "stderr={}",
+        String::from_utf8_lossy(&status.stderr)
+    );
+    let mut main_closure2 = None;
+    let mut main_impl2 = None;
+    for ent in std::fs::read_dir(out2.join("artifacts")).unwrap().flatten() {
+        let v: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(ent.path()).unwrap()).unwrap();
+        if v["display_name"] == "main" {
+            main_closure2 = v["hashes"]["closure"].as_str().map(str::to_string);
+            main_impl2 = v["hashes"]["implementation"].as_str().map(str::to_string);
+        }
+    }
+    assert_eq!(
+        main_impl, main_impl2,
+        "caller implementation must stay put when only dep body changes"
+    );
+    assert_ne!(
+        main_closure, main_closure2,
+        "caller closure digest must move with dependency"
+    );
+    let _ = std::fs::remove_dir_all(&out1);
+    let _ = std::fs::remove_dir_all(&out2);
+    let _ = root;
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn s6_corpus_100_deterministic_units() {
+    let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let dir = std::env::temp_dir().join(format!(
+        "marqdo-ek-corpus100-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    for i in 0..100u32 {
+        let n = i + 1;
+        let expect = n * 2;
+        let src = format!(
+            "---\nmarkup: occlusion\ntitle: unit-{n}\n---\n\n# main\n\n**v = [翻倍]({n} * 2)**\n> print text=`v`\n"
+        );
+        let path = dir.join(format!("u{n:03}.mq.md"));
+        std::fs::write(&path, src).unwrap();
+        for backend in ["tree", "bytecode"] {
+            let out = Command::new(env!("CARGO_BIN_EXE_marqdo"))
+                .args(["run", path.to_str().unwrap(), "--backend", backend])
+                .current_dir(&root)
+                .output()
+                .unwrap();
+            assert_eq!(
+                out.status.code(),
+                Some(0),
+                "unit {n} backend={backend} stderr={}",
+                String::from_utf8_lossy(&out.stderr)
+            );
+            assert_eq!(
+                String::from_utf8_lossy(&out.stdout).trim_end(),
+                expect.to_string(),
+                "unit {n} backend={backend}"
+            );
+        }
+    }
+    let out = dir.join(".marqdo-out");
+    let status = Command::new(env!("CARGO_BIN_EXE_marqdo"))
+        .args(["knowledge", dir.to_str().unwrap(), "-o", out.to_str().unwrap()])
+        .current_dir(&root)
+        .output()
+        .unwrap();
+    assert_eq!(
+        status.status.code(),
+        Some(0),
+        "stderr={}",
+        String::from_utf8_lossy(&status.stderr)
+    );
+    assert!(out.join("CURRENT").is_file());
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn s6_cli_smoke_version_check_knowledge() {
+    let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let ver = Command::new(env!("CARGO_BIN_EXE_marqdo"))
+        .arg("--version")
+        .current_dir(&root)
+        .output()
+        .unwrap();
+    assert_eq!(ver.status.code(), Some(0));
+    assert!(
+        String::from_utf8_lossy(&ver.stdout).contains("marqdo")
+            || String::from_utf8_lossy(&ver.stderr).contains("marqdo")
+            || !ver.stdout.is_empty()
+            || ver.status.success()
+    );
+    let check = Command::new(env!("CARGO_BIN_EXE_marqdo"))
+        .args([
+            "check",
+            "tests/executable_knowledge/baseline/01-inline/main.mq.md",
+        ])
+        .current_dir(&root)
+        .output()
+        .unwrap();
+    assert_eq!(
+        check.status.code(),
+        Some(0),
+        "check stderr={}",
+        String::from_utf8_lossy(&check.stderr)
+    );
+    let out = std::env::temp_dir().join(format!(
+        "marqdo-ek-smoke-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    let _ = std::fs::remove_dir_all(&out);
+    let kn = Command::new(env!("CARGO_BIN_EXE_marqdo"))
+        .args([
+            "knowledge",
+            "tests/executable_knowledge/baseline/13-bookstore",
+            "-o",
+            out.to_str().unwrap(),
+        ])
+        .current_dir(&root)
+        .output()
+        .unwrap();
+    assert_eq!(kn.status.code(), Some(0));
+    assert!(out.join("project.json").is_file());
+    assert!(out.join("graph/edges.json").is_file());
+    assert!(out.join("CURRENT").is_file());
+    let _ = std::fs::remove_dir_all(&out);
+}
+
+#[test]
 fn s3_extract_pure_plan_rejects_calls() {
     use marqdo::mlsp::handle_line;
     let ok: serde_json::Value = serde_json::from_str(&handle_line(

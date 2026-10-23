@@ -49,11 +49,10 @@
 | S1/G03 NarrativeRef | **done（子集）** | 注释行 `[]()` → narrate/navigation；`11-narrative-ref` |
 | S4/G05 来源 | **done（子集）** | frontmatter `sources`/`valid_until`；`12-tax-source`；business bind |
 | S3 patch / extract | **done** | `artifact.patch`；`artifact.extract_pure` |
-| S4 书店子集 | **done（子集）** | `13-bookstore` 可运行 `113` + narrate + sources |
-| S5/G04 整代 | **done（子集）** | `generations/<id>/` + `CURRENT` 指针 |
-| S5/G08 锁分类 | **done（子集）** | `LockReport.classes`；impact 含 narrates |
-| S6 CI / G12 扫描 | **done（子集）** | CI workflow；depth/size/count 上限 |
+| S4 书店 | **done** | `13-bookstore` + `examples/executable-knowledge` 发票链 |
+| S5/G04·G08 | **done** | 整代 `CURRENT`；锁 classes+closure；impact |
+| S6 CI / 语料 / 冒烟 | **done** | CI；100 单元；CLI smoke；扫描上限 |
 
 ## 与后续切片的关系
 
-- `examples/executable-knowledge/` 完整类函数订单链、100 单元语料、SCC 闭包摘要、远程授权 — 见缺口路线图；未完成项不得笼统宣称「可执行知识已交付」
+- 远程凭据/多租户授权、平台打包产物冒烟、作者/AI 对照实验指标 — 按发布声明另验；不得用本地门禁覆盖为「已安全支持远程」

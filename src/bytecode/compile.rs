@@ -138,10 +138,22 @@ fn collect_module_tree(
         .map(|u| (u.bind.clone(), u.path.clone()))
         .collect();
 
+    let start = flat.len();
     let mut exports = HashMap::new();
     for fun in &module.functions {
         let id = collect_fun(fun, None, flat, &path_index, &uses, scope);
         export_tree(&mut exports, &[], id, flat);
+    }
+    // Same-module BoundCall paths (`Type.member`) must be visible to siblings.
+    for (rel, idx) in &exports {
+        path_index.insert(rel.clone(), *idx);
+    }
+    for f in &mut flat[start..] {
+        if f.scope == scope {
+            for (rel, idx) in &exports {
+                f.path_index.insert(rel.clone(), *idx);
+            }
+        }
     }
     exports
 }
