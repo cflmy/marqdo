@@ -103,3 +103,4 @@ tests/ext/_sbx_cow/
 
 tests/ext/_sbx_*/
 examples/**/_example_sbx/
+.secrets/
