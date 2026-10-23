@@ -41,7 +41,18 @@ marqdo ext add web   # CDN → 2.0.0
 - **语料迁移（M7）**：`public/` `ext/` `tests/` `examples/` `doc/` 等语料加 `markup: occlusion`，改写 **80 个语料文件 / 256 处取元 / 23 处循环**；新增 `tests/ratchet` 锁定标签债务。
 - **文档**：遮蔽语法总纲 + M0–M10 变更记录、标签新鲜度 / 修复回路、函数作为值 6 篇评估、代码体量审计；`doc/design/code-volume-audit.md` 记 53k 行构成。
 
-## Unreleased
+## v2.1.0 — 2026-10-23
+
+### Highlights
+
+**文件级可执行知识语义**：标准库、扩展库、示例与公开文档全部采用显式 `markup: occlusion`；`[描述](实现)` 成为默认链接语义，`access` 与 `遍历` 承担原有取元与循环职责。迁移工具可离线证明语法形状等价，Tree 与 Bytecode 均完成全量回归。
+
+```bash
+git checkout v2.1.0 && cargo build --release
+marqdo ext add web
+```
+
+**核心表面 Δ**：默认链接语义从 Classic 切换到 Occlusion。未迁移的旧 `[键](集合)` 仅可用 `markup: classic` 或一个版本周期内的 `marqdo run --legacy-markup` / `check --legacy-markup` 执行。
 
 ### Added
 
@@ -55,6 +66,8 @@ marqdo ext add web   # CDN → 2.0.0
 ### Changed
 
 - 未标注源码默认采用 Occlusion。Classic 仅能通过明确的 frontmatter 或 `--legacy-markup` 进入，避免同一文档因进程配置而静默改变含义。
+
+## Unreleased
 
 ## v1.5.2 — 2026-10-18
 

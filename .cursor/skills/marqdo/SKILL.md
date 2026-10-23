@@ -55,24 +55,24 @@ Canonical design (repo): `doc/design/markdown-mapping.md`, `doc/design/keywords.
 | `**…**` | Return value — closing `**` touches last token, **no trailing space**; bare ids are variables |
 | `****` or `**` + spaces + `**` | Return `None` and end function body |
 | Lone `---` / `***` | Markdown thematic break (skip; not function end) |
-| GFM table after empty RHS bind | Collection; get with `[key](coll)` (preferred) or legacy `` `m`[^key] `` |
-| `- [item](coll)` | Foreach (unchanged) |
+| GFM table after empty RHS bind | Collection; get with `access(coll, "key")` (legacy `` `m`[^key] `` remains available) |
+| `- [item](遍历 coll 为 item)` | Foreach |
 | `` ```lang `` | Foreign code block (via `lib/foreign`) |
 | `` `"text"` `` | Quoted string (`\n` `\t` `\\` `\"`; `` `var` `` inside); bare tokens unescaped |
 | Unmarked prose | Comment |
 
 Entry: load file (often `index.mq.md`) → collect defs → run `# main`.
 
-## Occlusion syntax (v2.0.0)
+## Occlusion syntax (v2.1.0)
 
-A file with frontmatter `markup: occlusion` (or `标记: 遮蔽`) reads `[x](y)` as **occlusion**, not index — in that file only (`MARQDO_MARKUP=occlusion` sets the process default; classic files are unchanged).
+Occlusion is the default syntax. Shipped source declares `markup: occlusion` (or `标记: 遮蔽`) explicitly so imports stay deterministic. Legacy `[key](collection)` requires `markup: classic` or the one-cycle CLI flag `--legacy-markup`; `MARQDO_MARKUP` does not change parsing.
 
 - `[描述](实现)` — `[]` is prose (never executed); `()` is the **only** executed part.
-- `[顾客留存率](0.42)` · `[总价](at(价目表, "苹果") * 数量)` · `[功能开发中]()` → `None` (stub; `label.empty_payload` warning).
+- `[顾客留存率](0.42)` · `[总价](access(价目表, "苹果") * 数量)` · `[功能开发中]()` → `None` (stub; `label.empty_payload` warning).
 - Read maps/lists with `access(集合, 键)` (aliases `取` / `取值`): `[第二项](access(列, 2))`.
 - Foreach: `- [篮子里的每个果子](遍历 篮子 为 果)` (accepts `遍历`/`for` and `为`/`as`/`in`).
 - Calls inside `()`: `加(1)` / `加(1, 2)` / `加一 号(31)` / `txt.str_trim(" x ")` — `)` terminates, commas optional.
-- Tooling: `marqdo labels pending` (stub ledger) · `marqdo labels --grep 词 --count` · `marqdo migrate labels . --write` · `marqdo check` reports `label.missing` / `label.empty_payload` / `label.ref_dangling`.
+- Tooling: `marqdo labels pending` (stub ledger) · `marqdo labels --grep 词 --count` · `marqdo migrate labels . --mark --write` · `marqdo check` reports `label.missing` / `label.empty_payload` / `label.ref_dangling`.
 
 ## Minimal program
 

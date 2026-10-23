@@ -126,9 +126,9 @@ jobs:
             ## Marqdo ${{ github.ref_name }}
 
             ### 亮点 / Highlights
-            - **v2.0.0**：遮蔽语法——`[描述](实现)` 描述不执行 · `()` 内调用 · `access` 取元 · 遮蔽循环 · `labels` / `migrate labels` · view 桩徽章
-            - **v2.0.0**: Occlusion syntax — `[label](payload)` inert prose, paren calls, `access`, occlusion loops, `labels` / `migrate labels`, view stub badges
-            - **v2.0.0 ext**：扩展包同步 2.0.0 / Ext pack 2.0.0
+            - **v2.1.0**：文件级 Occlusion 默认语义——全仓迁移 · `migrate labels --mark` · `access` / `遍历` · 可执行知识语义投影
+            - **v2.1.0**: File-scoped Occlusion by default — corpus migration, `migrate labels --mark`, `access` / `for`, executable-knowledge projections
+            - **v2.1.0 ext**：扩展包同步 2.1.0 / Ext pack 2.1.0
             - **v1.5.2**：外联 v3 P0/P1——raw stdin + 每 cell 输入 · plan API · snapshot · `view capture` · Persist
             - **v1.5.2**: Foreign v3 P0/P1 — raw stdin + per-cell inputs, plan API, snapshot export/import/replay, `view capture`, Persist
             - **v1.5.2 ext**：扩展包同步 1.5.2 / Ext pack 1.5.2

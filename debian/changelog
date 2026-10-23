@@ -1,3 +1,10 @@
+marqdo (2.1.0-1ppa1) noble; urgency=medium
+
+  * Marqdo 2.1.0: file-scoped Occlusion is the default syntax; migrated
+    standard/extension libraries and executable-knowledge projections.
+
+ -- cflmy <pingan@cflmy.cn>  Fri, 23 Oct 2026 12:00:00 +0000
+
 marqdo (2.0.0-1ppa1) noble; urgency=medium
 
   * Marqdo 2.0.0: Occlusion syntax — [description](payload), where the

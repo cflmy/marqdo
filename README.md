@@ -34,14 +34,14 @@ Marqdo 把 Markdown **标记当作编程语法**：同一个 `.mq.md` 文件，�
 | **表格即数据结构** | 程序的数据结构直接就是文档的数据结构：单列竖表 → `List`；横表（1 数据行）→ `Map`；横表（多数据行）→ `Map` of `List`（列向聚合）；首列写 `@` / `行` / `row` → 行向记录 `List` of `Map`。取元使用 `access(集合, "键")`，链接 `[描述](表达式)` 只承载叙述与执行体。这是 literate programming 的下一步。 |
 | **语义干净** | **返回是架构，打印只是函数**：`*…*` 改变控制流，`print` 只是副作用函数；分支与循环长在 Markdown 结构上（`1.` `2.` 递增 = 分支，`-` = 循环），不是所有列表都被粗暴当成 if。 |
 | **AI 的可靠上下文与长期记忆** | 一个 `.mq.md` 同时是 documentation + schema + code + examples + knowledge + executable behavior；AI 不必再拼装 README + OpenAPI + JSON Schema + prompt。整个工程天然就是 AI 的**世界模型**——比 RAG 更接近 Executable RAG。 |
-| **链接即调用**<br>Link as Call | 文档里的 `[描述](类.函数)` 不是装饰，是跨文档类调用；编译器解析类/函数并返回 **LinkInfo**，`view` 显示调用点，EKC 建边，`links.lock` 可选复现。**v2.1 设计目标**；v2.0.0 已具备本地表达式链接与 `import` + 实例调用。 |
+| **链接即调用**<br>Link as Call | 文档里的 `[描述](类.函数)` 不是装饰，是跨文档类调用；编译器解析类/函数并返回 **LinkInfo**，`view` 显示调用点，EKC 建边，`links.lock` 可选复现。**v2.1 已实现可执行知识基础设施**。 |
 | **完整工程，不是玩具** | Rust 正经解释器（词法 / 语法 / 语义 / 树遍历 + 字节码后端）、stdlib、模块与对象、debugger、viewer、catalog、WASM、原生插件 ABI、VS Code 扩展、agent / LLM / MCP。 |
 
 ---
 
 ## 链接语法：链接即调用（v2.1 设计声明）
 
-> **这是 v2.1 的设计目标，不是 v2.0.0 的全部现状。**
+> **这是 v2.1 的可执行知识模型。**
 > `[]()` 不新增语法：`[]` 是 Markdown 链接的描述；`()` 是**已有代码**，与 `**代码**` 同权。
 > `#` 是类，`##` 是函数；`类.函数` 是**类调用**。
 > 链接只是给这次调用一个名字；`view` 显示调用信息，编译器返回 **LinkInfo**，EKC 建边。
@@ -91,7 +91,7 @@ Marqdo 把 Markdown **标记当作编程语法**：同一个 `.mq.md` 文件，�
 
 ### 现状与目标
 
-| 能力 | v2.0.0 当前 | v2.1 目标 |
+| 能力 | v2.0.0 | v2.1 |
 |------|-------------|-----------|
 | 本地表达式链接（遮蔽） | ✅ `markup: occlusion` | ✅ |
 | `()` 与 `**代码**` 同权 | ✅ 表达式/调用 | ✅ |
@@ -113,7 +113,7 @@ Marqdo 把 Markdown **标记当作编程语法**：同一个 `.mq.md` 文件，�
 > `# 李白 = > 诗人` 语法上是继承/特化，语义上是「李白是诗人」的知识个体；
 > 运行时实例仍是 `> 诗人` / `> 李白`。详见 [knowledge-layers.md](doc/design/knowledge-layers.md)。
 
-**当前可运行**的等价写法（v2.0.0）：见 [examples/link-syntax/main.compat.mq.md](examples/link-syntax/main.compat.mq.md)。
+兼容迁移示例见 [examples/link-syntax/main.compat.mq.md](examples/link-syntax/main.compat.mq.md)。
 
 设计宪法：[doc/design/link-syntax.md](doc/design/link-syntax.md) · 链接示例：[examples/link-syntax/](examples/link-syntax/) · 知识分层示例：[examples/knowledge-layers/](examples/knowledge-layers/) · 证据复核：[occlusion-vs-executable-knowledge-2026-10.md](doc/research/occlusion-vs-executable-knowledge-2026-10.md)
 
@@ -222,7 +222,7 @@ Marqdo 允许你写出"还没接通"的代码——**只要写在描述里**。�
 
 `[]` 里是**自由描述**（不执行）；`()` 里是**目标**（唯一执行）。这条语法叫**链接语法**：
 目标是本地表达式时，就是**遮蔽**（把代码折叠在括号里）；目标是 `类.函数` 时，就是**跨文档类调用**。
-v2.0.0 已实现前者；后者是 v2.1 目标（见 [link-syntax.md](doc/design/link-syntax.md)）。
+v2.1 实现了文件级链接语义与可执行知识投影（见 [link-syntax.md](doc/design/link-syntax.md)）。
 
 **四条约定**
 
@@ -281,9 +281,9 @@ marqdo catalog public -o .marqdo
 
 ---
 
-## 现状（v2.0.0）
+## 现状（v2.1.0）
 
-- **链接语法（v2.0.0 本地表达式链接；v2.1 目标：`类.函数` 跨文档类调用）**：`[描述](目标)` 描述不执行 · `()` 与 `**代码**` 同权（`加(1)` / `加一 号(31)`）· `access` 取元与 `遍历` 链接循环 · `marqdo labels` 两级检索 / `--baseline` 债务棘轮 · `migrate labels` · 诊断 `label.*` · view 描述正文 + 代码片 + 桩徽章 · **设计声明 [link-syntax.md](doc/design/link-syntax.md)**（`类.函数` / LinkInfo / 链接图 / lock 为 v2.1 目标） · 扩展包同步 **2.0.0**
+- **链接语法（v2.1.0）**：`[描述](目标)` 描述不执行 · `()` 与 `**代码**` 同权（`加(1)` / `加一 号(31)`）· `access` 取元与 `遍历` 链接循环 · `marqdo labels` 两级检索 / `--baseline` 债务棘轮 · `migrate labels --mark` · 诊断 `label.*` · view 描述正文 + 代码片 + 桩徽章 · **可执行知识 [link-syntax.md](doc/design/link-syntax.md)**（项目索引、LinkInfo、链接图与 lock） · 扩展包同步 **2.1.0**
 - **外联 v3 P0/P1（v1.5.2）**：raw stdin + 每 cell 独立输入 · plan API · snapshot export/import/replay · `view capture` · Persist 按钮 · 扩展包同步 **1.5.2**
 - **view 静态/动态统一 + 外联值传递（v1.5.1）**：静态导出与 live view 共用 `foreign_doc` 执行路径 · 构建时运行注入 stdout · `foreign.session` 值传递 · cell stdin；扩展包同步 **1.5.0**
 - **裸自增升参（v1.4.6）**：首次粗体赋值左值即声明；`**n = n + 1**` 无反引号也升为必选形参。扩展包仍为 **1.4.5**
@@ -319,7 +319,7 @@ marqdo catalog public -o .marqdo
 - **浏览器 Marqdo（WASM）**：`marqdo wasm build` + 官方 bridge 自启（作者零业务 JS；桥内可含列表/路由/storage/ws/文件/Canvas/音频/Observer/拖放）；`lib/browser` + GFM；`web.client_embed`；示例 [browser-hello](examples/browser-hello/) · [browser-app](examples/browser-app/) · [browser-media](examples/browser-media/) · [web-client-site](examples/web-client-site/)（[ADR 0002](doc/adr/0002-browser-marqdo-wasm.md) · [D](doc/roadmap/browser-wasm-d.md) · [E](doc/roadmap/browser-wasm-e.md) · [F](doc/roadmap/browser-wasm-f.md)）
 - 选型：[ADR 0001 — Rust](doc/adr/0001-implementation-language.md) · [ADR 0002 — 浏览器 WASM](doc/adr/0002-browser-marqdo-wasm.md)（C0–C5 完结，见 [roadmap/browser-wasm.md](doc/roadmap/browser-wasm.md)）· [ADR 0003 — 异步效应](doc/adr/0003-browser-async-effects.md)
 
-### 如何使用最新 Marqdo（v2.0.0）
+### 如何使用最新 Marqdo（v2.1.0）
 
 **安装解释器（任选其一）**
 
@@ -334,7 +334,7 @@ marqdo catalog public -o .marqdo
 ```bash
 # 1) 源码安装（跟 tag 或 main）
 git clone https://github.com/cflmy/marqdo.git && cd marqdo
-git checkout v2.0.0   # 或留在 main
+git checkout v2.1.0   # 或留在 main
 cargo build --release
 export PATH="$PWD/target/release:$PATH"
 marqdo version
@@ -373,7 +373,7 @@ marqdo wasm build
 # → dist/wasm/ … 见 examples/browser-hello/
 
 # 6) Releases：Windows exe/zip/vsix；Linux CLI zip + native `.so` zip
-#    https://github.com/cflmy/marqdo/releases/tag/v2.0.0
+#    https://github.com/cflmy/marqdo/releases/tag/v2.1.0
 ```
 
 开发期也可用 `cargo run -- …` 代替已安装的 `marqdo`：
