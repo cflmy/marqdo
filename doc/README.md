@@ -13,6 +13,8 @@
 
 ## 当前文档
 
+> **可执行知识下一阶段的规范优先级**：实现 `[]()`、Semantic Artifact、知识绑定、验证、锁定、EKC/Agent 复用时，以 [next/Marqdo_Executable_Knowledge_Development.md](next/Marqdo_Executable_Knowledge_Development.md) 为实施基线。与其冲突的早期链接、遮蔽、知识分层或 EKC 设计只作历史参考。
+
 | 文档 | 摘要 |
 |------|------|
 | [design/markdown-mapping.md](design/markdown-mapping.md) | **v0.2 语法宪法（现行运行时）** |
@@ -108,6 +110,7 @@
 | [design/code-volume-audit.md](design/code-volume-audit.md) | **代码体量审计**：53k 行的构成 · 已清 14.5k 冗余 · 剩余是特性面 · 可精简项与风险 |
 | [design/link-syntax.md](design/link-syntax.md) | **链接语法（v2.1 设计声明）**：链接即调用 · `()` 与 `**代码**` 同权 · `类.函数` 跨文档 · LinkInfo · view 调用点 · 图边 · lock · L0–L5 开发指导 |
 | [design/executable-knowledge-system.md](design/executable-knowledge-system.md) | **可执行知识系统（v2.1 重构草案）**：每个 `[]()` 都是命名的可执行知识步骤 · 取元/推导/循环/调用/叙述统一建图 · 跨文件稳定寻址 · check/view/verify/impact 闭环 |
+| [next/Marqdo_Executable_Knowledge_Development.md](next/Marqdo_Executable_Knowledge_Development.md) | **可执行知识系统详细开发规范**：以 `next/009.md` 及两份附属文档为真实意图基线，冻结统一语义 IR、稳定寻址、绑定/验证/锁定、EKC/Agent 集成、迁移路线与验收矩阵 |
 | [design/knowledge-layers.md](design/knowledge-layers.md) | **知识分层（语法评审）**：原始语料 / 本体 / 可执行知识 / 调用面 · 单体知识类 vs 运行时实例 · `# 李白 = > 诗人` · 出处/还原验证 · EKC 映射 |
 | [design/occlusion-description-and-search.md](design/occlusion-description-and-search.md) | **遮蔽描述与两级检索**：内置词表=范例/默认，参数=扩展 · 空载荷一律 warning · 申报习惯 |
 | [design/occlusion-syntax.md](design/occlusion-syntax.md) | **遮蔽语法总纲（实施依据）**：`[描述](实现)` 的目的/语义/新鲜度校验 + M0–M8 计划 |
