@@ -367,6 +367,16 @@ enum KnowledgeAction {
         #[arg(value_name = "SYMBOL")]
         symbol: String,
     },
+    /// Resolve a new-style knowledge path in the import scope of a source file
+    Resolve {
+        /// `mq://…` URI or a value-path such as `facts.Person.birth_year`
+        #[arg(value_name = "REFERENCE")]
+        reference: String,
+
+        /// Source file whose frontmatter imports supply the path's first segment
+        #[arg(long, value_name = "FILE")]
+        from: Option<PathBuf>,
+    },
     /// Run engineering preflight for a task
     Preflight {
         #[arg(value_name = "TASK")]
@@ -495,6 +505,70 @@ fn main() -> ExitCode {
             ExitCode::from(1)
         }
     }
+}
+
+/// Resolve the value-path spelling introduced for executable knowledge without
+/// evaluating it. The import bind comes from the caller's source file, so
+/// `math.pi` never degrades into a project-wide name guess.
+fn resolve_knowledge_reference<'a>(
+    index: &'a marqdo::sema::ProjectIndex,
+    reference: &str,
+    from: Option<&std::path::Path>,
+) -> Result<&'a marqdo::sema::SymbolDecl> {
+    if reference.starts_with("mq://") {
+        return index
+            .symbols()
+            .iter()
+            .find(|symbol| symbol.id.as_str() == reference)
+            .ok_or_else(|| anyhow::anyhow!("unknown symbol URI `{reference}`"));
+    }
+
+    let expression = marqdo::parse::expr::parse_expr_prefer_var(reference)
+        .map_err(|error| anyhow::anyhow!("invalid knowledge reference `{reference}`: {error}"))?;
+    let marqdo::ast::Expr::Call(call) = expression else {
+        anyhow::bail!("knowledge reference `{reference}` must be a dotted value path or mq:// URI");
+    };
+    if !call.args.is_empty() {
+        anyhow::bail!("knowledge resolve only binds a zero-argument path; `{reference}` has arguments");
+    }
+    let path = call.path.ok_or_else(|| {
+        anyhow::anyhow!("knowledge reference `{reference}` must start with an imported module bind")
+    })?;
+    if path.len() < 2 {
+        anyhow::bail!("knowledge reference `{reference}` needs at least `module.symbol`");
+    }
+    let from = from.ok_or_else(|| {
+        anyhow::anyhow!("`--from FILE` is required to resolve imported path `{reference}`")
+    })?;
+    let module = marqdo::load::load_module(from)?;
+    let imported = module
+        .imports
+        .iter()
+        .find(|item| item.bind == path[0])
+        .ok_or_else(|| anyhow::anyhow!("unknown import bind `{}` in {}", path[0], from.display()))?;
+    let base = from.parent().unwrap_or_else(|| std::path::Path::new("."));
+    let imported_path = marqdo::load::resolve_import(base, &imported.path)?;
+    let imported_path = imported_path.canonicalize().unwrap_or(imported_path);
+    let module_id = index
+        .modules()
+        .iter()
+        .find_map(|(module_id, source)| {
+            (source.canonicalize().unwrap_or_else(|_| source.clone()) == imported_path)
+                .then_some(module_id)
+        })
+        .ok_or_else(|| {
+            anyhow::anyhow!(
+                "import `{}` resolves to {}, which is outside the indexed project",
+                path[0],
+                imported_path.display()
+            )
+        })?;
+    let declaration_path = &path[1..];
+    index
+        .symbols()
+        .iter()
+        .find(|symbol| symbol.module == *module_id && symbol.declaration_path == declaration_path)
+        .ok_or_else(|| anyhow::anyhow!("unknown knowledge path `{reference}`"))
 }
 
 /// Recursively collect `*.mq.md` under `path` (file → itself).
@@ -993,6 +1067,42 @@ fn try_main(cli: Cli) -> Result<i32> {
                         }
                     }
                     Ok(0)
+                }
+                KnowledgeAction::Resolve { reference, from } => {
+                    let from = from.as_deref().or_else(|| path.is_file().then_some(path.as_path()));
+                    let index = marqdo::sema::ProjectIndex::build(if path.is_dir() {
+                        marqdo::project::ProjectRoot::new(&path)?
+                    } else {
+                        marqdo::project::ProjectRoot::discover(&path)?
+                    })?;
+                    let symbol = resolve_knowledge_reference(&index, &reference, from)?;
+                    let instance_only = symbol.callable
+                        == Some(marqdo::sema::CallableKind::InstanceMethod);
+                    if json {
+                        println!(
+                            "{}",
+                            serde_json::json!({
+                                "reference": reference,
+                                "resolution": if instance_only { "instance_only" } else { "symbol" },
+                                "symbol": {
+                                    "id": symbol.id.as_str(),
+                                    "module": symbol.module.as_str(),
+                                    "kind": symbol.kind.as_str(),
+                                    "callable": symbol.callable.map(|kind| kind.as_str()),
+                                    "declaration_path": symbol.declaration_path,
+                                    "source": { "file": symbol.source, "line": symbol.line },
+                                },
+                            })
+                        );
+                    } else {
+                        println!("{}", symbol.id);
+                        println!("  {}", symbol.declaration_path.join("."));
+                        println!("  {}:{}", symbol.source.display(), symbol.line);
+                        if instance_only {
+                            println!("  instance_only: call through an instance receiver");
+                        }
+                    }
+                    Ok(if instance_only { 1 } else { 0 })
                 }
                 KnowledgeAction::Preflight {
                     task,

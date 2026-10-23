@@ -24,7 +24,7 @@ H-Z-H on |0⟩ → |1⟩.
 
 Ry(π) on |0⟩ → |1⟩.
 
-**pi = > math.pi**
+**pi = math.pi**
 **ry = > quantum.circuit qubits=1**
 **ry = > `ry`.ry qubit=0 theta=`pi`**
 **rp = > `ry`.probabilities**

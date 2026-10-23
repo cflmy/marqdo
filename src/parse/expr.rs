@@ -686,16 +686,22 @@ impl<'a> Parser<'a> {
             // A dotted definition path in a value position is a zero-argument
             // call. This makes a documented fact such as `facts.Person.birth_year`
             // executable without ceremonial `()`.
-            if let Some(path) = split_lib_path_callee(&word) {
-                let callee = path.last().cloned().unwrap_or_default();
-                return Ok(Expr::Call(CallExpr {
-                    callee,
-                    path: Some(path),
-                    receiver: None,
-                    args: Vec::new(),
-                    pre_modifiers: Vec::new(),
-                    bracket_marked: false,
-                }));
+            // Classic expression contexts intentionally preserve bare dotted
+            // text such as `refunds.md` in branch conditions.  The new path
+            // spelling is enabled only on the executable value surface
+            // (`*…*` / `**…**`), where bare words already mean bindings.
+            if self.prefer_var {
+                if let Some(path) = split_lib_path_callee(&word) {
+                    let callee = path.last().cloned().unwrap_or_default();
+                    return Ok(Expr::Call(CallExpr {
+                        callee,
+                        path: Some(path),
+                        receiver: None,
+                        args: Vec::new(),
+                        pre_modifiers: Vec::new(),
+                        bracket_marked: false,
+                    }));
+                }
             }
             self.skip_ws();
             if self.starts_with("[^") {
@@ -2102,6 +2108,17 @@ mod bracket_call_tests {
             ][..])
         );
         assert!(c.args.is_empty());
+    }
+
+    #[test]
+    fn classic_dotted_text_is_not_an_implicit_path_call() {
+        // Branch conditions and other classic contexts use bare dotted text
+        // for filenames such as `refunds.md`; new paths live on the
+        // executable value surface only.
+        assert!(matches!(
+            parse_expr("refunds.md").unwrap(),
+            Expr::Literal(Literal::Text(value)) if value == "refunds.md"
+        ));
     }
 
     #[test]

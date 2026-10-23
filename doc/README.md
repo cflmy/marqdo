@@ -111,6 +111,7 @@
 | [design/link-syntax.md](design/link-syntax.md) | **链接语法（v2.1 设计声明）**：链接即调用 · `()` 与 `**代码**` 同权 · `类.函数` 跨文档 · LinkInfo · view 调用点 · 图边 · lock · L0–L5 开发指导 |
 | [design/executable-knowledge-system.md](design/executable-knowledge-system.md) | **可执行知识系统（v2.1 重构草案）**：每个 `[]()` 都是命名的可执行知识步骤 · 取元/推导/循环/调用/叙述统一建图 · 跨文件稳定寻址 · check/view/verify/impact 闭环 |
 | [next/Marqdo_Executable_Knowledge_Development.md](next/Marqdo_Executable_Knowledge_Development.md) | **可执行知识系统详细开发规范**：以 `next/009.md` 及两份附属文档为真实意图基线，冻结统一语义 IR、稳定寻址、绑定/验证/锁定、EKC/Agent 集成、迁移路线与验收矩阵 |
+| [next/Marqdo_Executable_Knowledge_Testing.md](next/Marqdo_Executable_Knowledge_Testing.md) | **可执行知识语法测试与兼容性规程**：标准库、扩展库、CLI、Tree/Bytecode 的仓库级门禁 |
 | [design/knowledge-layers.md](design/knowledge-layers.md) | **知识分层（语法评审）**：原始语料 / 本体 / 可执行知识 / 调用面 · 单体知识类 vs 运行时实例 · `# 李白 = > 诗人` · 出处/还原验证 · EKC 映射 |
 | [design/occlusion-description-and-search.md](design/occlusion-description-and-search.md) | **遮蔽描述与两级检索**：内置词表=范例/默认，参数=扩展 · 空载荷一律 warning · 申报习惯 |
 | [design/occlusion-syntax.md](design/occlusion-syntax.md) | **遮蔽语法总纲（实施依据）**：`[描述](实现)` 的目的/语义/新鲜度校验 + M0–M8 计划 |

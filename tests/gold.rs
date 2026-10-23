@@ -505,6 +505,56 @@ fn bytecode_ns_associated_function() {
 }
 
 #[test]
+fn structure_new_path_stdlib() {
+    assert_out(
+        "tests/structure/new-path-stdlib.mq.md",
+        "3.1415926536",
+    );
+}
+
+#[test]
+fn bytecode_new_path_stdlib() {
+    assert_out_backend(
+        "tests/structure/new-path-stdlib.mq.md",
+        "bytecode",
+        "3.1415926536",
+    );
+}
+
+#[test]
+fn knowledge_resolve_new_path() {
+    let (code, stdout, stderr) = run(&[
+        "knowledge",
+        "tests/structure/ns",
+        "--json",
+        "resolve",
+        "helpers.Box.birth_year",
+        "--from",
+        "tests/structure/ns/associated.mq.md",
+    ]);
+    assert_eq!(code, 0, "{stderr}");
+    let value: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+    assert_eq!(value["resolution"], "symbol");
+    assert_eq!(value["symbol"]["callable"], "associated_function");
+}
+
+#[test]
+fn knowledge_resolve_rejects_instance_path() {
+    let (code, stdout, stderr) = run(&[
+        "knowledge",
+        "tests/structure/ns",
+        "--json",
+        "resolve",
+        "helpers.Box.type_name",
+        "--from",
+        "tests/structure/ns/associated.mq.md",
+    ]);
+    assert_eq!(code, 1, "{stderr}");
+    let value: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+    assert_eq!(value["resolution"], "instance_only");
+}
+
+#[test]
 fn error_ns_instance_method() {
     assert_err(
         "tests/errors/ns-instance-method.mq.md",
@@ -2046,6 +2096,13 @@ fn ext_web_cache_artifact_smoke() {
 
 #[test]
 fn ext_web_artifact_endpoint_live() {
+    // Restricted CI/sandbox runners may disallow every listening socket. The
+    // static/artifact tests still exercise the feature there; this one only
+    // verifies the live HTTP boundary when the OS grants that capability.
+    if std::net::TcpListener::bind("127.0.0.1:0").is_err() {
+        eprintln!("skip ext_web_artifact_endpoint_live: local sockets are unavailable");
+        return;
+    }
     ensure_web_plugin_built();
     let bin = env!("CARGO_BIN_EXE_marqdo");
     let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
