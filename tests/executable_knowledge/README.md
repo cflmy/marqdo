@@ -17,10 +17,13 @@
 | 05 | `baseline/05-policy-draft/` | **design** | 可试跑 → `113`；**不**宣称税率事实已证实 | 叙述中的来源意图（尚未有强制 schema） |
 | 06a | `baseline/06-reject/missing-import.mq.md` | expected_failure | 双后端均非 0 | 0（正确拒绝） |
 | 06b | `baseline/06-reject/ambiguous.mq.md` | expected_failure | **双后端均拒绝**裸名同名（G02） | — |
+| 10 | `baseline/10-boundcall/` | implemented | BoundCall 路径 SymbolId + DynamicCall(`call_fn`)；双后端 `hi`/`60` | import 一行 |
 
 ### 同名裸调用（G02）
 
 `06-reject/ambiguous.mq.md` 同时 `import` 了 `a` 与 `b`（同名 `商品小计`），正文用**裸名**调用。双后端均须拒绝；正确写法是 `a.商品小计` / `b.商品小计` 等显式路径。
+
+`10-boundcall`：显式 `pricing.商品小计` 写入 `bound_calls.json`（`binding: BoundCall` + SymbolId）；`call_fn` 写入 `dynamic_calls.json`（不得假装已绑定）。
 
 ## 不计为成功的项
 
@@ -38,9 +41,9 @@
 | S1 同名 | **done** | `08-same-name` resolve→A + 运行 `60` |
 | S2/G06 | **done** | 包装继承 `fs.write`；未知不标 pure |
 | S2/G07 子集 | **done** | MLSP bind 含 `symbol_id`；execute 按源行绑定；pure 拒非纯 |
-| S2/G02 BoundCall | **done（作用域子集）** | Bytecode 裸名解析不跨 import scope；`06b` 双后端拒绝 |
+| S2/G02 BoundCall | **done** | 共享 `resolve_for_exec`；Tree/Bytecode 静态路径绑定；`bound_calls.json` / `dynamic_calls.json`；`10-boundcall` + `06b` |
+| S2/G07 eng_reuse | **done（子集）** | `reuse_json` / `agent_eng_reuse`：`discovery_only` + `bind_required` + `bind_targets`；执行仍须 MLSP bind |
 
 ## 与后续切片的关系
 
-- S2 后续：sema 路径 BoundCall 记录、Agent eng_reuse 强制 bind
 - S3+：局部编辑、来源适用性、整代快照 — 见缺口路线图

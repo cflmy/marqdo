@@ -12,11 +12,12 @@ use anyhow::{Context, Result};
 use serde_json::{json, Value};
 use sha2::{Digest as _, Sha256};
 
-use crate::ast::{Arg, CallExpr, Expr, Function, Stmt};
+use crate::ast::{Arg, CallExpr, Expr, Function, Module, Stmt};
 use crate::contract::Ty;
 use crate::diagnostics::{Diagnostic, Severity, Span};
 use crate::project::ProjectRoot;
 
+use super::bind::{call_display, resolve_for_exec, DynamicReason, ExecTarget};
 use super::{CallableKind, ModuleId, ProjectIndex, SymbolDecl, SymbolId, SymbolKind};
 
 pub const SCHEMA_VERSION: u32 = 1;
@@ -99,7 +100,7 @@ impl EffectSet {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SourceLocation {
     pub file: String,
     pub line: u32,
@@ -197,6 +198,23 @@ pub struct KnowledgeStep {
     pub source: SourceLocation,
 }
 
+/// Static call site bound to a SymbolId (G02).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BoundCall {
+    pub target: SymbolId,
+    pub call_site: String,
+    pub source: SourceLocation,
+    pub required_effects: EffectSet,
+}
+
+/// Call site that must not pretend to be statically bound (G02).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DynamicCall {
+    pub reason: String,
+    pub call_site: String,
+    pub source: SourceLocation,
+}
+
 #[derive(Debug, Clone)]
 pub struct SemanticProject {
     pub schema_version: u32,
@@ -205,6 +223,8 @@ pub struct SemanticProject {
     pub artifacts: Vec<SemanticArtifact>,
     pub refs: Vec<KnowledgeRef>,
     pub steps: Vec<KnowledgeStep>,
+    pub bound_calls: Vec<BoundCall>,
+    pub dynamic_calls: Vec<DynamicCall>,
 }
 
 #[derive(Debug, Clone)]
@@ -245,10 +265,16 @@ pub fn compile_project(options: &CompileOptions) -> Result<Compilation> {
         }
     }
 
+    // Wire import_modules from already-parsed project files so BoundCall path
+    // resolve shares `resolve_for_exec` (no plugin load / no re-parse).
+    attach_project_imports(&mut files);
+
     let project_id = index.project_id().to_string();
     let mut artifacts = Vec::new();
     let mut refs = Vec::new();
     let mut steps = Vec::new();
+    let mut bound_calls = Vec::new();
+    let mut dynamic_calls = Vec::new();
     let mut local_by_name: BTreeMap<(ModuleId, String), SymbolId> = BTreeMap::new();
     for symbol in index.symbols() {
         local_by_name.insert((symbol.module.clone(), symbol.name.clone()), symbol.id.clone());
@@ -260,16 +286,20 @@ pub fn compile_project(options: &CompileOptions) -> Result<Compilation> {
         collect_functions(&module.functions, &mut Vec::new(), &mut by_path);
         for symbol in index.symbols().iter().filter(|s| &s.module == module_id) {
             let function = by_path.get(&symbol.declaration_path).expect("symbol collected from module");
-            let (artifact, mut artifact_refs, mut artifact_steps) = artifact_for_function(
-                &index,
-                module_id,
-                path,
-                function,
-                symbol,
-                &local_by_name,
-            );
+            let (artifact, mut artifact_refs, mut artifact_steps, mut bounds, mut dynamics) =
+                artifact_for_function(
+                    &index,
+                    module_id,
+                    module,
+                    path,
+                    function,
+                    symbol,
+                    &local_by_name,
+                );
             refs.append(&mut artifact_refs);
             steps.append(&mut artifact_steps);
+            bound_calls.append(&mut bounds);
+            dynamic_calls.append(&mut dynamics);
             artifacts.push(artifact);
         }
     }
@@ -277,6 +307,20 @@ pub fn compile_project(options: &CompileOptions) -> Result<Compilation> {
     artifacts.sort_by(|a, b| a.artifact_id.0.cmp(&b.artifact_id.0));
     refs.sort_by(|a, b| a.id.cmp(&b.id));
     steps.sort_by(|a, b| a.id.0.cmp(&b.id.0));
+    bound_calls.sort_by(|a, b| {
+        a.source
+            .file
+            .cmp(&b.source.file)
+            .then(a.source.line.cmp(&b.source.line))
+            .then(a.call_site.cmp(&b.call_site))
+    });
+    dynamic_calls.sort_by(|a, b| {
+        a.source
+            .file
+            .cmp(&b.source.file)
+            .then(a.source.line.cmp(&b.source.line))
+            .then(a.call_site.cmp(&b.call_site))
+    });
     Ok(Compilation {
         index,
         semantics: SemanticProject {
@@ -286,6 +330,8 @@ pub fn compile_project(options: &CompileOptions) -> Result<Compilation> {
             artifacts,
             refs,
             steps,
+            bound_calls,
+            dynamic_calls,
         },
         diagnostics,
     })
@@ -315,30 +361,88 @@ fn module_artifact(index: &ProjectIndex, module: &ModuleId, path: &Path, text: &
     )
 }
 
+fn path_key(path: &Path) -> PathBuf {
+    path.canonicalize().unwrap_or_else(|_| path.to_path_buf())
+}
+
+/// Clone imported modules already present in `files` into each Module's
+/// `import_modules` map (G02 BoundCall for explicit import paths).
+fn attach_project_imports(files: &mut BTreeMap<ModuleId, (PathBuf, String, Module)>) {
+    let by_path: BTreeMap<PathBuf, Module> = files
+        .values()
+        .map(|(path, _, module)| (path_key(path), module.clone()))
+        .collect();
+    for (path, _, module) in files.values_mut() {
+        let base = path
+            .parent()
+            .map(|p| p.to_path_buf())
+            .unwrap_or_else(|| path.to_path_buf());
+        let mut import_modules = std::collections::HashMap::new();
+        for imp in &module.imports {
+            let Ok(resolved) = crate::load::resolve_import(&base, &imp.path) else {
+                continue;
+            };
+            let key = path_key(&resolved);
+            if let Some(dep) = by_path.get(&key) {
+                import_modules.insert(imp.bind.clone(), dep.clone());
+            }
+        }
+        module.import_modules = import_modules;
+    }
+}
+
 fn artifact_for_function(
     index: &ProjectIndex,
-    module: &ModuleId,
+    module_id: &ModuleId,
+    ast_module: &Module,
     path: &Path,
     function: &Function,
     symbol: &SymbolDecl,
     local_by_name: &BTreeMap<(ModuleId, String), SymbolId>,
-) -> (SemanticArtifact, Vec<KnowledgeRef>, Vec<KnowledgeStep>) {
+) -> (
+    SemanticArtifact,
+    Vec<KnowledgeRef>,
+    Vec<KnowledgeStep>,
+    Vec<BoundCall>,
+    Vec<DynamicCall>,
+) {
     let calls = collect_call_sites(function);
     let mut effects = direct_effects(&calls);
     let mut dependencies = Vec::new();
-    for (_, call, _) in &calls {
-        if let Some(target) = resolve_local_call(module, call, local_by_name) {
-            dependencies.push(ArtifactId(target.as_str().to_string()));
+    let mut bound_calls = Vec::new();
+    let mut dynamic_calls = Vec::new();
+    for (_, call, line) in &calls {
+        let source = source_location(index.root().path(), path, *line, *line);
+        match classify_call(index, module_id, ast_module, function, call, local_by_name) {
+            CallClass::Bound { target, effects: call_effects } => {
+                dependencies.push(ArtifactId(target.as_str().to_string()));
+                bound_calls.push(BoundCall {
+                    target,
+                    call_site: call_display(call),
+                    source,
+                    required_effects: call_effects,
+                });
+            }
+            CallClass::Dynamic { reason } => {
+                dynamic_calls.push(DynamicCall {
+                    reason: reason.as_str().into(),
+                    call_site: call_display(call),
+                    source,
+                });
+            }
+            CallClass::Other => {}
         }
     }
     let named = collect_named_steps(function);
     let mut refs = Vec::new();
     let mut steps = Vec::new();
     for (n, named) in named.iter().enumerate() {
-        let target = named
-            .call
-            .as_ref()
-            .and_then(|call| resolve_local_call(module, call, local_by_name));
+        let target = named.call.as_ref().and_then(|call| {
+            match classify_call(index, module_id, ast_module, function, call, local_by_name) {
+                CallClass::Bound { target, .. } => Some(target),
+                _ => None,
+            }
+        });
         let ref_id = format!("{}#ref-{}", symbol.id.as_str(), n + 1);
         refs.push(KnowledgeRef {
             id: ref_id.clone(),
@@ -399,7 +503,109 @@ fn artifact_for_function(
         implementation,
         evidence,
     );
-    (artifact, refs, steps)
+    (artifact, refs, steps, bound_calls, dynamic_calls)
+}
+
+enum CallClass {
+    Bound {
+        target: SymbolId,
+        effects: EffectSet,
+    },
+    Dynamic {
+        reason: DynamicReason,
+    },
+    Other,
+}
+
+fn declaration_path_of(module: &Module, target: &Function) -> Option<Vec<String>> {
+    fn walk(funs: &[Function], target: &Function, prefix: &mut Vec<String>) -> Option<Vec<String>> {
+        for fun in funs {
+            prefix.push(fun.name.clone());
+            if std::ptr::eq(fun, target) {
+                return Some(prefix.clone());
+            }
+            if let Some(found) = walk(&fun.children, target, prefix) {
+                return Some(found);
+            }
+            prefix.pop();
+        }
+        None
+    }
+    walk(&module.functions, target, &mut Vec::new())
+}
+
+fn symbol_for_path(
+    index: &ProjectIndex,
+    module_id: &ModuleId,
+    decl_path: &[String],
+) -> Option<SymbolId> {
+    index
+        .symbols()
+        .iter()
+        .find(|s| &s.module == module_id && s.declaration_path == decl_path)
+        .map(|s| s.id.clone())
+}
+
+fn classify_call(
+    index: &ProjectIndex,
+    module_id: &ModuleId,
+    ast_module: &Module,
+    current: &Function,
+    call: &CallExpr,
+    _local_by_name: &BTreeMap<(ModuleId, String), SymbolId>,
+) -> CallClass {
+    match resolve_for_exec(ast_module, current, call) {
+        ExecTarget::Local(fun) => {
+            let Some(decl) = declaration_path_of(ast_module, fun) else {
+                return CallClass::Other;
+            };
+            let Some(target) = symbol_for_path(index, module_id, &decl) else {
+                return CallClass::Other;
+            };
+            CallClass::Bound {
+                target,
+                effects: effects_for_call(call),
+            }
+        }
+        ExecTarget::Import { bind, lib, fun, path } => {
+            let Some(imp) = ast_module.imports.iter().find(|i| i.bind == bind) else {
+                return CallClass::Other;
+            };
+            let base = index
+                .modules()
+                .get(module_id)
+                .and_then(|p| p.parent().map(|d| d.to_path_buf()))
+                .unwrap_or_else(|| index.root().path().to_path_buf());
+            let Ok(imported_path) = crate::load::resolve_import(&base, &imp.path) else {
+                return CallClass::Other;
+            };
+            let imported_path = imported_path
+                .canonicalize()
+                .unwrap_or(imported_path);
+            let Some((imported_id, _)) = index.modules().iter().find(|(_, p)| {
+                p.canonicalize().unwrap_or_else(|_| (*p).clone()) == imported_path
+            }) else {
+                return CallClass::Other;
+            };
+            let decl = if path.len() >= 2 {
+                path[1..].to_vec()
+            } else if let Some(d) = declaration_path_of(lib, fun) {
+                d
+            } else {
+                return CallClass::Other;
+            };
+            let Some(target) = symbol_for_path(index, imported_id, &decl) else {
+                return CallClass::Other;
+            };
+            CallClass::Bound {
+                target,
+                effects: effects_for_call(call),
+            }
+        }
+        ExecTarget::Builtin(_) | ExecTarget::Host(_) => CallClass::Other,
+        ExecTarget::Dynamic { reason, .. } => CallClass::Dynamic { reason },
+        ExecTarget::Unresolved { .. } => CallClass::Other,
+    }
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -666,11 +872,7 @@ fn collect_named_steps(function: &Function) -> Vec<NamedStepSite> {
 }
 
 fn call_name(call: &CallExpr) -> String {
-    call.path.as_ref().map(|path| path.join(".")).or_else(|| call.receiver.as_ref().map(|receiver| format!("{receiver}.{}", call.callee))).unwrap_or_else(|| call.callee.clone())
-}
-
-fn resolve_local_call(module: &ModuleId, call: &CallExpr, symbols: &BTreeMap<(ModuleId, String), SymbolId>) -> Option<SymbolId> {
-    if call.path.is_none() && call.receiver.is_none() { symbols.get(&(module.clone(), call.callee.clone())).cloned() } else { None }
+    call_display(call)
 }
 
 fn effects_for_call(call: &CallExpr) -> EffectSet {
@@ -687,12 +889,12 @@ fn effects_for_call(call: &CallExpr) -> EffectSet {
     else if name.starts_with("print") || name.starts_with("log.") { "output.write" }
     else if is_observe_call(call) {
         return EffectSet::pure();
-    } else if call.path.is_none() && call.receiver.is_none() {
-        // Bare local name: effects filled by `close_effect_dependencies` from
-        // resolved SymbolId deps. Do not guess pure.
+    } else if call.path.is_some() || (call.path.is_none() && call.receiver.is_none()) {
+        // Local bare name or import path: effects filled by BoundCall dependency
+        // closure. Do not guess pure / unknown here.
         return EffectSet::default();
     } else {
-        // Path/receiver/dynamic — unknown until BoundCall + metadata registry (G06).
+        // Receiver / unresolved dynamic — unknown (G06).
         return EffectSet::unknown();
     };
     effects.add(effect);
@@ -732,6 +934,22 @@ fn close_effect_dependencies(artifacts: &mut [SemanticArtifact]) {
         }
     }
     for artifact in artifacts.iter_mut() {
+        if artifact.effects.contains("unknown")
+            && artifact
+                .effects
+                .values()
+                .iter()
+                .any(|e| e != "unknown" && e != "pure")
+        {
+            // Concrete effects from BoundCall closure supersede unknown.
+            let mut cleaned = EffectSet::default();
+            for e in artifact.effects.values() {
+                if e != "unknown" {
+                    cleaned.add(e);
+                }
+            }
+            artifact.effects = cleaned;
+        }
         if artifact.effects.values().is_empty() {
             artifact.effects = EffectSet::pure();
         }
@@ -762,6 +980,8 @@ impl SemanticProject {
             "artifacts": self.artifacts.iter().map(artifact_json).collect::<Vec<_>>(),
             "refs": self.refs.iter().map(ref_json).collect::<Vec<_>>(),
             "steps": self.steps.iter().map(step_json).collect::<Vec<_>>(),
+            "bound_calls": self.bound_calls.iter().map(bound_call_json).collect::<Vec<_>>(),
+            "dynamic_calls": self.dynamic_calls.iter().map(dynamic_call_json).collect::<Vec<_>>(),
         })
     }
 }
@@ -771,6 +991,23 @@ pub fn artifact_json(artifact: &SemanticArtifact) -> Value {
 }
 fn ref_json(reference: &KnowledgeRef) -> Value { json!({"id":reference.id,"label":reference.label,"context":reference.context,"source":{"file":reference.source.file,"line":reference.source.line,"end_line":reference.source.end_line},"resolution":reference.resolution,"target":reference.target.as_ref().map(SymbolId::as_str)}) }
 fn step_json(step: &KnowledgeStep) -> Value { json!({"id":step.id.0,"reference":step.reference,"kind":step.kind,"calls":step.calls.iter().map(SymbolId::as_str).collect::<Vec<_>>(),"effects":step.effects.values(),"source":{"file":step.source.file,"line":step.source.line,"end_line":step.source.end_line}}) }
+fn bound_call_json(call: &BoundCall) -> Value {
+    json!({
+        "target": call.target.as_str(),
+        "call_site": call.call_site,
+        "source": {"file": call.source.file, "line": call.source.line, "end_line": call.source.end_line},
+        "required_effects": call.required_effects.values(),
+        "binding": "BoundCall",
+    })
+}
+fn dynamic_call_json(call: &DynamicCall) -> Value {
+    json!({
+        "reason": call.reason,
+        "call_site": call.call_site,
+        "source": {"file": call.source.file, "line": call.source.line, "end_line": call.source.end_line},
+        "binding": "DynamicCall",
+    })
+}
 
 /// Atomically write the semantic portion of `.marqdo/`.  A reader therefore
 /// sees either the previous graph or the complete next graph, never a mix.
@@ -785,6 +1022,8 @@ pub fn write_semantic_projections(out_dir: &Path, compilation: &Compilation) -> 
     write_json(&stage.join("symbols.json"), &json!({"schema_version":SCHEMA_VERSION,"symbols":compilation.index.symbols().iter().map(|s|json!({"id":s.id.as_str(),"module":s.module.as_str(),"kind":s.kind.as_str(),"callable":s.callable.map(|c|c.as_str()),"name":s.name,"declaration_path":s.declaration_path,"source":{"file":rel_uri(compilation.index.root().path(),&s.source),"line":s.line}})).collect::<Vec<_>>() }))?;
     write_json(&stage.join("refs.json"), &json!({"schema_version":SCHEMA_VERSION,"refs":project["refs"]}))?;
     write_json(&stage.join("steps.json"), &json!({"schema_version":SCHEMA_VERSION,"steps":project["steps"]}))?;
+    write_json(&stage.join("bound_calls.json"), &json!({"schema_version":SCHEMA_VERSION,"bound_calls":project["bound_calls"]}))?;
+    write_json(&stage.join("dynamic_calls.json"), &json!({"schema_version":SCHEMA_VERSION,"dynamic_calls":project["dynamic_calls"]}))?;
     write_json(&stage.join("graph/nodes.json"), &json!({"schema_version":SCHEMA_VERSION,"nodes":project["artifacts"]}))?;
     write_json(&stage.join("graph/edges.json"), &json!({"schema_version":SCHEMA_VERSION,"authority":"SemanticProject","edges":compilation.semantics.artifacts.iter().flat_map(|a|a.dependencies.iter().map(move |d|json!({"from":a.artifact_id.0,"to":d.0,"kind":"calls"}))).collect::<Vec<_>>() }))?;
     for artifact in &compilation.semantics.artifacts {
@@ -792,10 +1031,34 @@ pub fn write_semantic_projections(out_dir: &Path, compilation: &Compilation) -> 
         write_json(&stage.join("artifacts").join(format!("{name}.json")), &artifact_json(artifact))?;
         write_json(&stage.join("verification").join(format!("{name}.json")), &artifact_json(artifact)["verification"])?;
     }
+    const SEMANTIC_NAMES: &[&str] = &[
+        "project.json",
+        "symbols.json",
+        "refs.json",
+        "steps.json",
+        "bound_calls.json",
+        "dynamic_calls.json",
+        "artifacts",
+        "graph",
+        "verification",
+    ];
     if out_dir.exists() {
-        for name in ["project.json", "symbols.json", "refs.json", "steps.json", "artifacts", "graph", "verification"] { let target = out_dir.join(name); if target.exists() { if target.is_dir() { fs::remove_dir_all(&target)?; } else { fs::remove_file(&target)?; } } }
-    } else { fs::create_dir_all(out_dir)?; }
-    for name in ["project.json", "symbols.json", "refs.json", "steps.json", "artifacts", "graph", "verification"] { fs::rename(stage.join(name), out_dir.join(name))?; }
+        for name in SEMANTIC_NAMES {
+            let target = out_dir.join(name);
+            if target.exists() {
+                if target.is_dir() {
+                    fs::remove_dir_all(&target)?;
+                } else {
+                    fs::remove_file(&target)?;
+                }
+            }
+        }
+    } else {
+        fs::create_dir_all(out_dir)?;
+    }
+    for name in SEMANTIC_NAMES {
+        fs::rename(stage.join(name), out_dir.join(name))?;
+    }
     fs::remove_dir_all(stage)?;
     Ok(())
 }

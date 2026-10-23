@@ -430,14 +430,73 @@ pub fn eng_preflight(args: &Value) -> Result<Value, String> {
     }))
 }
 
-/// `agent_eng_reuse` — alias of preflight focused on decision payload.
+/// `agent_eng_reuse` — discovery + REUSE|ADAPT|CREATE decision.
+///
+/// Scores and capability names are **not** executable targets (G02/G07).
+/// When decision is REUSE/ADAPT, callers must `artifact.bind` a
+/// `bind_targets[]` entry before `artifact.execute`.
 pub fn eng_reuse(args: &Value) -> Result<Value, String> {
     let mut pf = eng_preflight(args)?;
     if let Some(obj) = pf.as_object_mut() {
-        obj.insert(
-            "protocol".into(),
-            json!("REUSE|ADAPT|CREATE"),
-        );
+        obj.insert("protocol".into(), json!("REUSE|ADAPT|CREATE"));
+        obj.insert("discovery_only".into(), json!(true));
+        let decision = obj
+            .get("decision")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_ascii_uppercase();
+        let bind_required = matches!(decision.as_str(), "REUSE" | "ADAPT");
+        obj.insert("bind_required".into(), json!(bind_required));
+        let mut targets = Vec::new();
+        if let Some(cands) = obj.get("candidates").and_then(|v| v.as_array()) {
+            for c in cands {
+                if let Some(impls) = c.get("implemented_by").and_then(|v| v.as_array()) {
+                    for t in impls {
+                        if let Some(s) = t.as_str() {
+                            if !s.is_empty() {
+                                targets.push(json!({
+                                    "query": s,
+                                    "via": "implemented_by",
+                                    "capability": c.get("name"),
+                                    "note": "pass query to artifact.bind then artifact.execute",
+                                }));
+                            }
+                        }
+                    }
+                }
+                if let Some(id) = c.get("id").and_then(|v| v.as_str()) {
+                    if id.contains(':') || id.contains('.') {
+                        targets.push(json!({
+                            "query": id,
+                            "via": "candidate_id",
+                            "capability": c.get("name"),
+                            "note": "pass query to artifact.bind then artifact.execute",
+                        }));
+                    }
+                }
+            }
+        }
+        // Dedup by query
+        let mut seen = std::collections::HashSet::new();
+        targets.retain(|t| {
+            t.get("query")
+                .and_then(|q| q.as_str())
+                .map(|q| seen.insert(q.to_string()))
+                .unwrap_or(false)
+        });
+        obj.insert("bind_targets".into(), json!(targets));
+        if bind_required {
+            let mut reasons = obj
+                .get("reason")
+                .cloned()
+                .unwrap_or_else(|| json!([]));
+            if let Some(arr) = reasons.as_array_mut() {
+                arr.push(json!(
+                    "scores are discovery-only; bind SymbolId/handle before execute (G02/G07)"
+                ));
+            }
+            obj.insert("reason".into(), reasons);
+        }
     }
     Ok(pf)
 }

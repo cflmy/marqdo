@@ -189,7 +189,7 @@ P0/P1/P2 分类改为缺口领域，不再按编号整组串行：G06 的未知�
 |---|---|---|---|
 | S0 作者基线与最小语料 | 无 | 六类实际写作/复用任务、当前语法入口、无网络最小门禁（G10/G11） | **已落地**：[tests/executable_knowledge/](../../tests/executable_knowledge/README.md) + `cargo test --test executable_knowledge`；Bytecode 裸名同名误连记为基线缺陷待 S2/G02 |
 | S1 可读步骤与唯一目标 | S0 | 一份文档的源码/步骤/view 联动；统一 resolver、图与上下文节点（G01/G03） | **已落地子集**：G01 双图分离；G03 步骤 kind + `steps.json` + view 导航；同名 import resolve；正文 NarrativeRef 仍待 |
-| S2 确定执行与早期 AI 复用 | S1 | BoundCall 双后端、最小上下文卡、本地 handle 与现有 Agent 试点（G02/G06/G07/G09 的安全子集） | **已落地子集**：G06 效应；G07 MLSP symbol 绑定；G02 Bytecode 裸名不跨 import scope（`06b` 双后端拒绝）；完整 BoundCall IR / Agent 强制 bind 仍待 |
+| S2 确定执行与早期 AI 复用 | S1 | BoundCall 双后端、最小上下文卡、本地 handle 与现有 Agent 试点（G02/G06/G07/G09 的安全子集） | **已落地**：G02 共享 `resolve_for_exec` + Tree/Bytecode + `bound_calls.json`/`dynamic_calls.json`（`10-boundcall`）；G06 效应；G07 MLSP bind/execute；eng_reuse `bind_required`/`bind_targets` |
 | S3 局部编辑与库可读性 | S1–S2 | 摘要保护的局部补丁、语义 diff、受限纯表达式提取；lib/ext 示例优化（G03/G09/G10/G11） | 无无关改写；提取等价；声明变更可见；不为旧库增加兼容语法 |
 | S4 业务知识与适用性 | S2；与 S3 可交错 | 书店契约、来源/验证事件、传递效应及政策、负知识（G05/G06/G07/G09） | 分清输入不适用、来源过期和测试失败；纯工具免虚构来源 |
 | S5 变化传播与严格复用 | S1–S2/S4 | 分类摘要、SCC 闭包、整代快照、impact、严格 handle 复核（G04/G08） | 依赖/证据变化影响正确；文案不混同实现；故障注入无混代 |

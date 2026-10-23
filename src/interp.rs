@@ -15,7 +15,7 @@ use crate::builtin::{
 };
 use crate::debug::{emit_trace, DebugController};
 use crate::diagnostics::{bail_at, Span};
-use crate::host::{call_host, HostContext, HostFn};
+use crate::host::{call_host, HostContext};
 use crate::input_feed::InputFeed;
 use crate::capture::{
     BranchHit, CallFrame, LoopFrame, LoopHit, LoopIter, StmtEvent, StmtEventKind, ViewTrace,
@@ -1180,34 +1180,150 @@ impl Interpreter {
             return self.eval_method_call(module, fun, env, recv_name, &call.callee, &ev_args);
         }
 
+        // Local-var method sugar (`a.b` when `a` is in env) before BoundCall path resolve.
         if let Some(path) = &call.path {
-            // Bare dotted callee `a.b`: if `a` is a local variable, it is a method
-            // receiver (Python-style unified namespace); otherwise it's a library path.
-            if path.len() == 2 && env.get(&path[0]).is_some() {
+            if path.len() == 2
+                && env.get(&path[0]).is_some()
+                && !module.import_modules.contains_key(&path[0])
+            {
                 let recv = path[0].clone();
                 let method = path[1].clone();
                 return self.eval_method_call(module, fun, env, &recv, &method, &ev_args);
             }
-            return self.eval_path_call(module, path, &ev_args);
         }
 
-        if let Some(u) = module.uses.iter().find(|u| u.bind == call.callee) {
-            return self.eval_path_call(module, &u.path, &ev_args);
+        use crate::sema::bind::{resolve_for_exec, DynamicReason, ExecTarget};
+        match resolve_for_exec(module, fun, &call) {
+            ExecTarget::Local(target) => {
+                self.eval_bound_function_call(module, fun, env, target, &ev_args)
+            }
+            ExecTarget::Import {
+                lib: lib_mod,
+                fun: target,
+                ..
+            } => self.eval_bound_function_call(lib_mod, fun, env, target, &ev_args),
+            ExecTarget::Builtin(name) => self.eval_builtin_call(name, &ev_args),
+            ExecTarget::Host(hf) => {
+                let mut params: Vec<String> =
+                    hf.required_params().iter().map(|s| (*s).to_string()).collect();
+                for p in hf.optional_params() {
+                    params.push((*p).to_string());
+                }
+                let bound = bind_args(&params, &ev_args, true).map_err(|m| self.err(m))?;
+                for req in hf.required_params() {
+                    if !bound.contains_key(*req) {
+                        return Err(self.err(format!("{} requires `{req}`", hf.name())));
+                    }
+                }
+                call_host(&mut self.host, hf, &bound).map_err(|m| self.err(m))
+            }
+            ExecTarget::Dynamic {
+                reason: DynamicReason::CallFn,
+                ..
+            } => {
+                let bound = bind_args(&["name".into()], &ev_args, false)
+                    .map_err(|m| self.err(m))?;
+                let name = match bound.get("name") {
+                    Some(Value::Text(s)) => s.as_str(),
+                    _ => return Err(self.err("call_fn requires text name")),
+                };
+                let target = lookup_function(module, fun, name).ok_or_else(|| {
+                    self.err(format!("call_fn: unknown function `{name}`"))
+                })?;
+                if !target.params.is_empty() {
+                    return Err(self.err(format!(
+                        "call_fn: `{name}` must have no parameters"
+                    )));
+                }
+                self.run_function(module, target, Env::new(), &[], false)
+            }
+            ExecTarget::Dynamic {
+                reason: DynamicReason::Plugin,
+                name,
+            } => {
+                if let Some(reg) = self.host.plugins.get(&name).cloned() {
+                    let bound =
+                        bind_args(&reg.params, &ev_args, false).map_err(|m| self.err(m))?;
+                    return self
+                        .call_plugin_registered(&name, &bound)
+                        .map_err(|m| self.err(m));
+                }
+                Err(self.err(format!("unknown function `{name}`")))
+            }
+            ExecTarget::Dynamic {
+                reason: DynamicReason::MethodReceiver,
+                name,
+            } => {
+                if let Some(path) = &call.path {
+                    if path.len() == 2 && env.get(&path[0]).is_some() {
+                        return self.eval_method_call(
+                            module,
+                            fun,
+                            env,
+                            &path[0],
+                            &path[1],
+                            &ev_args,
+                        );
+                    }
+                }
+                Err(self.err(format!("unresolved dynamic call `{name}`")))
+            }
+            ExecTarget::Unresolved { message, .. } => Err(self.err(message)),
         }
+    }
 
-        match call.callee.as_str() {
+    /// Invoke a function already resolved via [`crate::sema::bind::resolve_for_exec`].
+    fn eval_bound_function_call(
+        &mut self,
+        module: &Module,
+        caller: &Function,
+        env: &mut Env,
+        target: &Function,
+        ev_args: &[EvArg],
+    ) -> Result<Value> {
+        let bound =
+            bind_function_args(self, module, caller, env, &target.params, ev_args, false)
+                .map_err(|m| self.err(m))?;
+        if let Some(c) = &target.contract {
+            if let Some(d) = crate::contract::call_arg_diag(
+                c,
+                &target.name,
+                &bound,
+                self.path.as_deref(),
+                self.current_span,
+            ) {
+                return Err(d.into());
+            }
+        }
+        let mut call_env = Env::new();
+        for (k, v) in bound {
+            call_env.set(k, v);
+        }
+        self.host.push_call_site_line(self.host.current_line);
+        let result = self.run_function(module, target, call_env, &[], false);
+        self.host.pop_call_site_line();
+        let result = result?;
+        if target.is_object() {
+            Ok(tag_instance(&target.name, result))
+        } else {
+            Ok(result)
+        }
+    }
+
+    fn eval_builtin_call(&mut self, name: &str, ev_args: &[EvArg]) -> Result<Value> {
+        match name {
             "print" => {
-                let bound = bind_args(&["text".into()], &ev_args, false)
+                let bound = bind_args(&["text".into()], ev_args, false)
                     .map_err(|m| self.err(m))?;
                 let text = bound
                     .get("text")
                     .map(|v| v.as_display())
                     .ok_or_else(|| self.err("print requires text (named or positional)"))?;
                 self.emit_line(&text);
-                return Ok(Value::None);
+                Ok(Value::None)
             }
             "input" => {
-                let bound = bind_args(&["prompt".into()], &ev_args, true)
+                let bound = bind_args(&["prompt".into()], ev_args, true)
                     .map_err(|m| self.err(m))?;
                 let prompt = bound
                     .get("prompt")
@@ -1232,52 +1348,52 @@ impl Interpreter {
                         e
                     }
                 })?;
-                return Ok(Value::Text(line));
+                Ok(Value::Text(line))
             }
             "len" => {
-                let bound = bind_args(&["value".into()], &ev_args, false)
+                let bound = bind_args(&["value".into()], ev_args, false)
                     .map_err(|m| self.err(m))?;
                 let v = bound
                     .get("value")
                     .ok_or_else(|| self.err("len requires value"))?;
                 let n = builtin_len(v).map_err(|m| self.err(m))?;
-                return Ok(Value::Int(n));
+                Ok(Value::Int(n))
             }
             "str" => {
-                let bound = bind_args(&["value".into()], &ev_args, false)
+                let bound = bind_args(&["value".into()], ev_args, false)
                     .map_err(|m| self.err(m))?;
                 let v = bound
                     .get("value")
                     .ok_or_else(|| self.err("str requires value"))?;
-                return Ok(builtin_str(v));
+                Ok(builtin_str(v))
             }
             "int" => {
-                let bound = bind_args(&["value".into()], &ev_args, false)
+                let bound = bind_args(&["value".into()], ev_args, false)
                     .map_err(|m| self.err(m))?;
                 let v = bound
                     .get("value")
                     .ok_or_else(|| self.err("int requires value"))?;
                 let n = builtin_int(v).map_err(|m| self.err(m))?;
-                return Ok(Value::Int(n));
+                Ok(Value::Int(n))
             }
             "type" => {
-                let bound = bind_args(&["value".into()], &ev_args, false)
+                let bound = bind_args(&["value".into()], ev_args, false)
                     .map_err(|m| self.err(m))?;
                 let v = bound
                     .get("value")
                     .ok_or_else(|| self.err("type requires value"))?;
-                return Ok(builtin_type(v));
+                Ok(builtin_type(v))
             }
             "trim" => {
-                let bound = bind_args(&["value".into()], &ev_args, false)
+                let bound = bind_args(&["value".into()], ev_args, false)
                     .map_err(|m| self.err(m))?;
                 let v = bound
                     .get("value")
                     .ok_or_else(|| self.err("trim requires value"))?;
-                return builtin_trim(v).map_err(|m| self.err(m));
+                builtin_trim(v).map_err(|m| self.err(m))
             }
             "split" => {
-                let bound = bind_args(&["value".into(), "sep".into()], &ev_args, false)
+                let bound = bind_args(&["value".into(), "sep".into()], ev_args, false)
                     .map_err(|m| self.err(m))?;
                 let value = bound
                     .get("value")
@@ -1285,10 +1401,10 @@ impl Interpreter {
                 let sep = bound
                     .get("sep")
                     .ok_or_else(|| self.err("split requires sep"))?;
-                return builtin_split(value, sep).map_err(|m| self.err(m));
+                builtin_split(value, sep).map_err(|m| self.err(m))
             }
             "join" => {
-                let bound = bind_args(&["value".into(), "sep".into()], &ev_args, false)
+                let bound = bind_args(&["value".into(), "sep".into()], ev_args, false)
                     .map_err(|m| self.err(m))?;
                 let value = bound
                     .get("value")
@@ -1296,10 +1412,10 @@ impl Interpreter {
                 let sep = bound
                     .get("sep")
                     .ok_or_else(|| self.err("join requires sep"))?;
-                return builtin_join(value, sep).map_err(|m| self.err(m));
+                builtin_join(value, sep).map_err(|m| self.err(m))
             }
             "at" => {
-                let bound = bind_args(&["value".into(), "index".into()], &ev_args, false)
+                let bound = bind_args(&["value".into(), "index".into()], ev_args, false)
                     .map_err(|m| self.err(m))?;
                 let value = bound
                     .get("value")
@@ -1307,80 +1423,9 @@ impl Interpreter {
                 let index = bound
                     .get("index")
                     .ok_or_else(|| self.err("at requires index"))?;
-                return builtin_at(value, index).map_err(|m| self.err(m));
+                builtin_at(value, index).map_err(|m| self.err(m))
             }
-            "call_fn" => {
-                let bound = bind_args(&["name".into()], &ev_args, false)
-                    .map_err(|m| self.err(m))?;
-                let name = match bound.get("name") {
-                    Some(Value::Text(s)) => s.as_str(),
-                    _ => return Err(self.err("call_fn requires text name")),
-                };
-                let target = lookup_function(module, fun, name).ok_or_else(|| {
-                    self.err(format!("call_fn: unknown function `{name}`"))
-                })?;
-                if !target.params.is_empty() {
-                    return Err(self.err(format!(
-                        "call_fn: `{name}` must have no parameters"
-                    )));
-                }
-                return self.run_function(module, target, Env::new(), &[], false);
-            }
-            other if HostFn::from_name(other).is_some() => {
-                let hf = HostFn::from_name(other).unwrap();
-                let mut params: Vec<String> =
-                    hf.required_params().iter().map(|s| (*s).to_string()).collect();
-                for p in hf.optional_params() {
-                    params.push((*p).to_string());
-                }
-                let bound = bind_args(&params, &ev_args, true).map_err(|m| self.err(m))?;
-                for req in hf.required_params() {
-                    if !bound.contains_key(*req) {
-                        return Err(self.err(format!("{} requires `{req}`", hf.name())));
-                    }
-                }
-                return call_host(&mut self.host, hf, &bound).map_err(|m| self.err(m));
-            }
-            _ => {}
-        }
-
-        if let Some(reg) = self.host.plugins.get(&call.callee).cloned() {
-            let bound = bind_args(&reg.params, &ev_args, false).map_err(|m| self.err(m))?;
-            return self
-                .call_plugin_registered(&call.callee, &bound)
-                .map_err(|m| self.err(m));
-        }
-
-        let target = lookup_function(module, fun, &call.callee)
-            .ok_or_else(|| self.err(format!("unknown function `{}`", call.callee)))?;
-
-        let bound = bind_function_args(self, module, fun, env, &target.params, &ev_args, false)
-            .map_err(|m| self.err(m))?;
-        // 契约边界 1（T2.2）：调用实参 vs 形参契约。
-        if let Some(c) = &target.contract {
-            if let Some(d) = crate::contract::call_arg_diag(
-                c,
-                &target.name,
-                &bound,
-                self.path.as_deref(),
-                self.current_span,
-            ) {
-                return Err(d.into());
-            }
-        }
-        let mut call_env = Env::new();
-        for (k, v) in bound {
-            call_env.set(k, v);
-        }
-
-        self.host.push_call_site_line(self.host.current_line);
-        let result = self.run_function(module, target, call_env, &[], false);
-        self.host.pop_call_site_line();
-        let result = result?;
-        if target.is_object() {
-            Ok(tag_instance(&target.name, result))
-        } else {
-            Ok(result)
+            other => Err(self.err(format!("unknown builtin `{other}`"))),
         }
     }
 

@@ -274,6 +274,25 @@ pub fn format_reuse_text(task: &str, result: &ReuseResult) -> String {
 }
 
 pub fn reuse_json(task: &str, result: &ReuseResult) -> Value {
+    let bind_required = matches!(
+        result.decision,
+        ReuseDecision::Reuse | ReuseDecision::Adapt
+    );
+    let mut bind_targets = Vec::new();
+    if let Some(sym) = &result.symbol {
+        bind_targets.push(json!({
+            "query": sym,
+            "via": "reuse.symbol",
+            "note": "pass query to artifact.bind then artifact.execute",
+        }));
+    }
+    if let Some(src) = &result.source {
+        bind_targets.push(json!({
+            "query": src,
+            "via": "reuse.source",
+            "note": "pass query to artifact.bind then artifact.execute",
+        }));
+    }
     json!({
         "task": task,
         "decision": result.decision.as_str(),
@@ -287,6 +306,9 @@ pub fn reuse_json(task: &str, result: &ReuseResult) -> Value {
         "constraints": result.constraints,
         "decisions": result.decisions,
         "failures": result.failures,
+        "discovery_only": true,
+        "bind_required": bind_required,
+        "bind_targets": bind_targets,
         "candidates": result.candidates.iter().map(|c| json!({
             "id": c.id,
             "kind": c.kind,

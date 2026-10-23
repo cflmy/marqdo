@@ -500,13 +500,20 @@ impl<'a> FnCompiler<'a> {
     }
 
     fn compile_call(&mut self, call: &CallExpr, as_stmt: bool) -> Result<()> {
+        // Mirror `sema::bind::resolve_for_exec` (G02 BoundCall):
+        // static → Op::Call(fid); dynamic → MethodCall / CallFn / PluginCall.
         let mut call = call
             .with_modifiers_expanded()
             .map_err(|m| self.err(m))?;
+        if let Some(recv) = &call.receiver {
+            return self.compile_method_call(recv, &call, as_stmt);
+        }
         if let Some(path) = &call.path {
-            // Bare dotted callee `a.b`: if `a` is a local variable, it is a method
-            // receiver (Python-style unified namespace); otherwise it's a library path.
-            if path.len() == 2 && self.locals.contains_key(&path[0]) {
+            // Local-var method sugar before import path (same as Tree / resolve_for_exec).
+            if path.len() == 2
+                && self.locals.contains_key(&path[0])
+                && !self.flat[self.fn_id].path_index.keys().any(|p| p.first() == Some(&path[0]))
+            {
                 let recv = path[0].clone();
                 return self.compile_method_call(&recv, &call, as_stmt);
             }
@@ -517,10 +524,6 @@ impl<'a> FnCompiler<'a> {
         }
         call.callee =
             crate::aliases::normalize_call_callee_and_args(&call.callee, &mut call.args);
-
-        if let Some(recv) = &call.receiver {
-            return self.compile_method_call(recv, &call, as_stmt);
-        }
 
         match call.callee.as_str() {
             "print" => {
@@ -678,15 +681,15 @@ impl<'a> FnCompiler<'a> {
             _ => {}
         }
 
+        // BoundCall bare name (same-module scope only) or DynamicCall plugin.
         match self.resolve_call(&call.callee) {
             Ok(fid) => self.compile_user_call(fid, &call, as_stmt),
             Err(err) => {
-                // Ambiguous bare names must not fall through to PluginCall (G02).
                 let msg = format!("{err:#}");
                 if msg.contains("ambiguous function") {
                     return Err(err);
                 }
-                // Unresolved bare names may still be runtime plugins.
+                // DynamicCall(Plugin): unresolved bare names may be runtime plugins.
                 self.compile_plugin_call(&call, as_stmt)
             }
         }

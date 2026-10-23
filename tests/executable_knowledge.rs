@@ -1,8 +1,7 @@
-//! S0 executable-knowledge baseline gate (offline).
+//! Executable-knowledge gate (offline): S0 baseline + S1/S2 BoundCall/effects.
 //!
 //! See `tests/executable_knowledge/README.md`. Design-status samples may run
-//! but do not prove source/applicability. Expected failures are asserted;
-//! the bytecode ambiguous-name defect is fingerprinted until S2 BoundCall.
+//! but do not prove source/applicability. Expected failures are asserted.
 
 use std::process::Command;
 
@@ -416,4 +415,122 @@ fn s0_06b_ambiguous_bare_name_rejected_both_backends() {
             "{backend} stderr should name the unresolved function: {stderr}"
         );
     }
+}
+
+#[test]
+fn s2_g02_boundcall_path_and_dynamic_projections() {
+    let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let out = std::env::temp_dir().join(format!(
+        "marqdo-ek-g02-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    let _ = std::fs::remove_dir_all(&out);
+    let status = Command::new(env!("CARGO_BIN_EXE_marqdo"))
+        .args([
+            "knowledge",
+            "tests/executable_knowledge/baseline/10-boundcall",
+            "-o",
+            out.to_str().unwrap(),
+        ])
+        .current_dir(&root)
+        .output()
+        .expect("knowledge compile");
+    assert_eq!(
+        status.status.code(),
+        Some(0),
+        "stderr={}",
+        String::from_utf8_lossy(&status.stderr)
+    );
+    let bound: serde_json::Value = serde_json::from_str(
+        &std::fs::read_to_string(out.join("bound_calls.json")).unwrap(),
+    )
+    .unwrap();
+    let dynamic: serde_json::Value = serde_json::from_str(
+        &std::fs::read_to_string(out.join("dynamic_calls.json")).unwrap(),
+    )
+    .unwrap();
+    let bounds = bound["bound_calls"].as_array().expect("bound_calls");
+    assert!(
+        bounds.iter().any(|c| {
+            c["binding"] == "BoundCall"
+                && c["call_site"].as_str().unwrap_or("").contains("pricing.商品小计")
+                && c["target"].as_str().is_some_and(|t| !t.is_empty())
+        }),
+        "import path must be BoundCall with SymbolId: {bound}"
+    );
+    let dyns = dynamic["dynamic_calls"].as_array().expect("dynamic_calls");
+    assert!(
+        dyns.iter().any(|c| {
+            c["binding"] == "DynamicCall" && c["reason"] == "call_fn"
+        }),
+        "call_fn must be DynamicCall: {dynamic}"
+    );
+    // Edges from caller must include the BoundCall target SymbolId.
+    let edges: serde_json::Value = serde_json::from_str(
+        &std::fs::read_to_string(out.join("graph/edges.json")).unwrap(),
+    )
+    .unwrap();
+    let target = bounds
+        .iter()
+        .find(|c| c["call_site"].as_str().unwrap_or("").contains("pricing.商品小计"))
+        .unwrap()["target"]
+        .as_str()
+        .unwrap();
+    let edge_txt = edges.to_string();
+    assert!(
+        edge_txt.contains(target),
+        "graph edges must mention BoundCall target {target}: {edges}"
+    );
+    let _ = std::fs::remove_dir_all(&out);
+}
+
+#[test]
+fn s2_g02_boundcall_runs_both_backends() {
+    assert_out_both(
+        "tests/executable_knowledge/baseline/10-boundcall/main.mq.md",
+        "hi\n60",
+    );
+}
+
+#[test]
+fn s2_g07_eng_reuse_requires_bind_before_execute() {
+    // Discovery scores must not be treated as executable handles.
+    use marqdo::knowledge::ir::{ReuseCandidate, ReuseDecision, ReuseResult};
+    use marqdo::knowledge::reuse::reuse_json;
+    let result = ReuseResult {
+        decision: ReuseDecision::Reuse,
+        confidence: 0.9,
+        capability: Some("定价".into()),
+        symbol: Some("商品小计".into()),
+        source: None,
+        reason: vec!["score meets REUSE threshold".into()],
+        candidates: vec![ReuseCandidate {
+            id: "capability:定价".into(),
+            kind: "Capability".into(),
+            title: "定价".into(),
+            score: 0.9,
+            resource: None,
+            reason: vec![],
+        }],
+        constraints: vec![],
+        decisions: vec![],
+        failures: vec![],
+        create_allowed: false,
+        recommended: vec!["REUSE 定价".into()],
+    };
+    let v = reuse_json("商品小计", &result);
+    assert_eq!(v["discovery_only"], true, "{v}");
+    assert_eq!(v["bind_required"], true, "{v}");
+    assert!(
+        v["bind_targets"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|t| t["query"] == "商品小计"),
+        "REUSE must expose bind_targets for MLSP bind: {v}"
+    );
 }
