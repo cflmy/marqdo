@@ -15,6 +15,8 @@ pub struct LockReport {
     pub missing: Vec<String>,
     pub changed: Vec<String>,
     pub removed: Vec<String>,
+    /// Per-artifact which digest class drifted (G08).
+    pub classes: Vec<Value>,
 }
 
 impl LockReport {
@@ -29,6 +31,7 @@ impl LockReport {
             "missing": self.missing,
             "changed": self.changed,
             "removed": self.removed,
+            "classes": self.classes,
         })
     }
 }
@@ -63,21 +66,47 @@ pub fn check_links_lock(out_dir: &Path, project: &SemanticProject) -> Result<Loc
             ..LockReport::default()
         });
     }
-    let expected = artifact_lock_map(project);
+    let expected = artifact_lock_entries(project);
     let actual = raw.get("artifacts").and_then(Value::as_object).cloned().unwrap_or_default();
     let mut report = LockReport::default();
-    for (id, digest) in &expected {
+    for (id, entry) in &expected {
         match actual.get(id).and_then(Value::as_object) {
             None => report.missing.push(id.clone()),
-            Some(found) if found.get("artifact").and_then(Value::as_str) != Some(digest.as_str()) => report.changed.push(id.clone()),
-            _ => {}
+            Some(found) => {
+                let mut drifted = Vec::new();
+                for key in ["interface", "implementation", "evidence", "artifact"] {
+                    let want = entry.get(key).and_then(Value::as_str);
+                    let got = found.get(key).and_then(Value::as_str);
+                    if want != got {
+                        drifted.push(key.to_string());
+                    }
+                }
+                if !drifted.is_empty() {
+                    report.changed.push(id.clone());
+                    report.classes.push(json!({
+                        "artifact_id": id,
+                        "changed": drifted,
+                    }));
+                }
+            }
         }
     }
     for id in actual.keys() {
-        if !expected.contains_key(id) { report.removed.push(id.clone()); }
+        if !expected.contains_key(id) {
+            report.removed.push(id.clone());
+        }
     }
-    report.missing.sort(); report.changed.sort(); report.removed.sort();
-    report.status = if report.missing.is_empty() && report.changed.is_empty() && report.removed.is_empty() { "clean".into() } else { "outdated".into() };
+    report.missing.sort();
+    report.changed.sort();
+    report.removed.sort();
+    report.status = if report.missing.is_empty()
+        && report.changed.is_empty()
+        && report.removed.is_empty()
+    {
+        "clean".into()
+    } else {
+        "outdated".into()
+    };
     Ok(report)
 }
 
@@ -98,7 +127,29 @@ pub fn impact(project: &SemanticProject, query: &str) -> Value {
     let mut reverse: BTreeMap<String, Vec<String>> = BTreeMap::new();
     for artifact in &project.artifacts {
         for dependency in &artifact.dependencies {
-            reverse.entry(dependency.0.clone()).or_default().push(artifact.artifact_id.0.clone());
+            reverse
+                .entry(dependency.0.clone())
+                .or_default()
+                .push(artifact.artifact_id.0.clone());
+        }
+    }
+    // NarrativeRef edges: step → symbol; impact includes the step's owning artifact.
+    for step in &project.steps {
+        if step.kind != "narrate" {
+            continue;
+        }
+        let owner = step
+            .id
+            .0
+            .split("#step-")
+            .next()
+            .unwrap_or(step.id.0.as_str())
+            .to_string();
+        for target in &step.calls {
+            reverse
+                .entry(target.as_str().to_string())
+                .or_default()
+                .push(owner.clone());
         }
     }
     let mut queue: VecDeque<String> = seeds.iter().cloned().collect();
@@ -119,8 +170,22 @@ pub fn impact(project: &SemanticProject, query: &str) -> Value {
     json!({"schema_version":SCHEMA_VERSION,"query":query,"resolved":!seeds.is_empty(),"seeds":seeds,"affected":entries})
 }
 
-fn artifact_lock_map(project: &SemanticProject) -> BTreeMap<String, String> {
-    project.artifacts.iter().map(|artifact| (artifact.artifact_id.0.clone(), artifact.hashes.artifact.0.clone())).collect()
+fn artifact_lock_entries(project: &SemanticProject) -> BTreeMap<String, Value> {
+    project
+        .artifacts
+        .iter()
+        .map(|artifact| {
+            (
+                artifact.artifact_id.0.clone(),
+                json!({
+                    "interface": artifact.hashes.interface.0,
+                    "implementation": artifact.hashes.implementation.0,
+                    "evidence": artifact.hashes.evidence.0,
+                    "artifact": artifact.hashes.artifact.0,
+                }),
+            )
+        })
+        .collect()
 }
 
 fn lock_json(project: &SemanticProject) -> Value {

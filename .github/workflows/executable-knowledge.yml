@@ -1,0 +1,22 @@
+name: executable-knowledge
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Offline executable-knowledge gate
+        run: cargo test --test executable_knowledge --locked
+      - name: no ignored tests counted as success
+        run: |
+          if grep -n '#\[ignore\]' tests/executable_knowledge.rs; then
+            echo "executable_knowledge must not use #[ignore] as success evidence" >&2
+            exit 1
+          fi
+          echo "ok: no #[ignore] in executable_knowledge gate"

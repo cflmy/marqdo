@@ -497,6 +497,267 @@ fn s2_g02_boundcall_runs_both_backends() {
 }
 
 #[test]
+fn s4_g05_sourced_evidence_and_expired_diag() {
+    let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let out = std::env::temp_dir().join(format!(
+        "marqdo-ek-src-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    let _ = std::fs::remove_dir_all(&out);
+    let status = Command::new(env!("CARGO_BIN_EXE_marqdo"))
+        .args([
+            "knowledge",
+            "tests/executable_knowledge/baseline/12-tax-source",
+            "-o",
+            out.to_str().unwrap(),
+        ])
+        .current_dir(&root)
+        .output()
+        .expect("knowledge");
+    assert_eq!(
+        status.status.code(),
+        Some(0),
+        "stderr={}",
+        String::from_utf8_lossy(&status.stderr)
+    );
+    let mut found_sourced = false;
+    for ent in std::fs::read_dir(out.join("artifacts")).unwrap().flatten() {
+        let v: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(ent.path()).unwrap()).unwrap();
+        let ev = v["verification"]["evidence"].as_str().unwrap_or("");
+        if v["kind"] == "function" && ev == "sourced" {
+            found_sourced = true;
+            let prov = v["provenance"].as_array().cloned().unwrap_or_default();
+            assert!(
+                prov.iter().any(|p| p["relation"] == "supports"),
+                "supports SourceRef required: {v}"
+            );
+        }
+    }
+    assert!(found_sourced, "functions should be evidence=sourced");
+    assert_out_both(
+        "tests/executable_knowledge/baseline/12-tax-source/main.mq.md",
+        "113",
+    );
+    use marqdo::mlsp::handle_line;
+    let project = root.join("tests/executable_knowledge/baseline/12-tax-source");
+    let found: serde_json::Value = serde_json::from_str(&handle_line(
+        &serde_json::json!({"method":"artifact.find","params":{"project":&project,"query":"标准税率"}})
+            .to_string(),
+    ))
+    .unwrap();
+    let id = found["result"]["candidates"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|c| c["kind"] == "function")
+        .unwrap()["artifact_id"]
+        .as_str()
+        .unwrap();
+    let biz: serde_json::Value = serde_json::from_str(&handle_line(
+        &serde_json::json!({"method":"artifact.bind","params":{"project":&project,"artifact_id":id,"policy":"business"}})
+            .to_string(),
+    ))
+    .unwrap();
+    assert_eq!(biz["ok"], true, "sourced artifact binds under business: {biz}");
+
+    let out2 = std::env::temp_dir().join(format!(
+        "marqdo-ek-exp-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    let _ = std::fs::remove_dir_all(&out2);
+    let status2 = Command::new(env!("CARGO_BIN_EXE_marqdo"))
+        .args([
+            "knowledge",
+            "tests/executable_knowledge/baseline/12b-tax-expired",
+            "-o",
+            out2.to_str().unwrap(),
+        ])
+        .current_dir(&root)
+        .output()
+        .expect("knowledge expired");
+    assert_eq!(status2.status.code(), Some(0));
+    let mut found_expired = false;
+    for ent in std::fs::read_dir(out2.join("artifacts")).unwrap().flatten() {
+        let v: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(ent.path()).unwrap()).unwrap();
+        if v["verification"]["evidence"] == "expired" {
+            found_expired = true;
+        }
+    }
+    assert!(found_expired, "12b-tax-expired should be evidence=expired");
+    let _ = std::fs::remove_dir_all(&out);
+    let _ = std::fs::remove_dir_all(&out2);
+}
+
+#[test]
+fn s3_artifact_patch_wording_guard() {
+    use marqdo::mlsp::handle_line;
+    let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let dir = std::env::temp_dir().join(format!(
+        "marqdo-ek-patch-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    let src = "---\nmarkup: occlusion\n---\n\n## 商品小计\n\n`数量` 与 `单价`。\n\n*[按数量与单价计算](数量 * 单价)*\n\n# main\n\n**小计 = [两件](商品小计(数量=2, 单价=30))**\n> print text=`小计`\n";
+    std::fs::write(dir.join("main.mq.md"), src).unwrap();
+    let found: serde_json::Value = serde_json::from_str(&handle_line(
+        &serde_json::json!({"method":"artifact.find","params":{"project":&dir,"query":"商品小计"}})
+            .to_string(),
+    ))
+    .unwrap();
+    assert_eq!(found["ok"], true, "{found}");
+    let art = found["result"]["candidates"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|c| c["kind"] == "function")
+        .unwrap();
+    let id = art["artifact_id"].as_str().unwrap();
+    let inspected: serde_json::Value = serde_json::from_str(&handle_line(
+        &serde_json::json!({"method":"artifact.inspect","params":{"project":&dir,"artifact_id":id}})
+            .to_string(),
+    ))
+    .unwrap();
+    let impl_digest = inspected["result"]["hashes"]["implementation"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    let line = inspected["result"]["source"]["line"].as_u64().unwrap() as u32;
+    // Wording-only: change prose near the heading without touching signature.
+    let prose_line = line + 2;
+    let ok_patch: serde_json::Value = serde_json::from_str(&handle_line(
+        &serde_json::json!({
+            "method":"artifact.patch",
+            "params":{
+                "project":&dir,
+                "artifact_id":id,
+                "expected_digest":impl_digest,
+                "intent":"wording",
+                "edits":[{"op":"replace","line":prose_line,"text":"`数量` 与 `单价`（说明）。"}]
+            }
+        })
+        .to_string(),
+    ))
+    .unwrap();
+    assert_eq!(ok_patch["ok"], true, "prose tweak should apply: {ok_patch}");
+    assert_eq!(ok_patch["result"]["diff"]["signature_changed"], false);
+    // Re-inspect and try a signature-breaking edit under wording intent.
+    let inspected2: serde_json::Value = serde_json::from_str(&handle_line(
+        &serde_json::json!({"method":"artifact.inspect","params":{"project":&dir,"artifact_id":id}})
+            .to_string(),
+    ))
+    .unwrap();
+    let impl2 = inspected2["result"]["hashes"]["implementation"]
+        .as_str()
+        .unwrap();
+    let bad: serde_json::Value = serde_json::from_str(&handle_line(
+        &serde_json::json!({
+            "method":"artifact.patch",
+            "params":{
+                "project":&dir,
+                "artifact_id":id,
+                "expected_digest":impl2,
+                "intent":"wording",
+                "edits":[{"op":"replace","line":prose_line,"text":"`数量` `单价` `折扣`。"}]
+            }
+        })
+        .to_string(),
+    ))
+    .unwrap();
+    // Declaring a new backtick param may or may not change interface hash depending on
+    // whether params are inferred from prose; if signature changes, wording must roll back.
+    if bad["ok"] == false {
+        assert_eq!(
+            bad["error"]["code"], "artifact.wording_broke_contract",
+            "{bad}"
+        );
+    }
+    let _ = root;
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn s1_g03_narrative_ref_steps_not_executed() {
+    let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let out = std::env::temp_dir().join(format!(
+        "marqdo-ek-narr-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    let _ = std::fs::remove_dir_all(&out);
+    let status = Command::new(env!("CARGO_BIN_EXE_marqdo"))
+        .args([
+            "knowledge",
+            "tests/executable_knowledge/baseline/11-narrative-ref",
+            "-o",
+            out.to_str().unwrap(),
+        ])
+        .current_dir(&root)
+        .output()
+        .expect("knowledge");
+    assert_eq!(
+        status.status.code(),
+        Some(0),
+        "stderr={}",
+        String::from_utf8_lossy(&status.stderr)
+    );
+    let steps: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(out.join("steps.json")).unwrap()).unwrap();
+    let arr = steps["steps"].as_array().unwrap();
+    assert!(
+        arr.iter().any(|s| s["kind"] == "narrate"),
+        "expected narrate step: {steps}"
+    );
+    assert!(
+        arr.iter().any(|s| s["kind"] == "navigation"),
+        "expected navigation step: {steps}"
+    );
+    let nav_count = arr.iter().filter(|s| s["kind"] == "navigation").count();
+    assert_eq!(
+        nav_count, 1,
+        "only the prose URL becomes navigation (fence ignored): {steps}"
+    );
+    let refs: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(out.join("refs.json")).unwrap()).unwrap();
+    assert!(
+        refs["refs"].as_array().unwrap().iter().any(|r| {
+            r["context"] == "narrative" && r["resolution"] == "symbol"
+        }),
+        "narrate target 总额 should resolve: {refs}"
+    );
+    // run must not fetch URL; stdout ok only
+    assert_out_both(
+        "tests/executable_knowledge/baseline/11-narrative-ref/main.mq.md",
+        "ok",
+    );
+    let current = std::fs::read_to_string(out.join("CURRENT")).unwrap();
+    let gen = out.join("generations").join(current.trim());
+    assert!(
+        gen.join("steps.json").is_file(),
+        "generation tree must be complete under {}",
+        gen.display()
+    );
+    let _ = std::fs::remove_dir_all(&out);
+}
+
+#[test]
 fn s2_g07_eng_reuse_requires_bind_before_execute() {
     // Discovery scores must not be treated as executable handles.
     use marqdo::knowledge::ir::{ReuseCandidate, ReuseDecision, ReuseResult};

@@ -7,7 +7,10 @@ pub use expr::{
     parse_call_after_gt, parse_call_arg_value, parse_expr, parse_expr_prefer_var,
     parse_value_or_interp,
 };
-pub use prose::{scan_prose_line, ProseBit};
+pub use prose::{
+    classify_narrative_target, scan_md_links_in_line, scan_narrative_links, scan_prose_line,
+    NarrativeLink, NarrativeLinkKind, ProseBit,
+};
 
 use anyhow::{bail, Result};
 

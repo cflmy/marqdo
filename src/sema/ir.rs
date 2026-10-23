@@ -284,9 +284,21 @@ pub fn compile_project(options: &CompileOptions) -> Result<Compilation> {
         artifacts.push(module_artifact(&index, module_id, path, text));
         let mut by_path = BTreeMap::new();
         collect_functions(&module.functions, &mut Vec::new(), &mut by_path);
+        let narrative_links = crate::parse::scan_narrative_links(text);
+        let module_prov = super::provenance::parse_module_provenance(text);
+        let module_symbols: Vec<&SymbolDecl> = index
+            .symbols()
+            .iter()
+            .filter(|s| &s.module == module_id)
+            .collect();
         for symbol in index.symbols().iter().filter(|s| &s.module == module_id) {
             let function = by_path.get(&symbol.declaration_path).expect("symbol collected from module");
-            let (artifact, mut artifact_refs, mut artifact_steps, mut bounds, mut dynamics) =
+            let owned_links: Vec<_> = narrative_links
+                .iter()
+                .filter(|link| enclosing_symbol(&module_symbols, link.line).is_some_and(|s| s.id == symbol.id))
+                .cloned()
+                .collect();
+            let (artifact, mut artifact_refs, mut artifact_steps, mut bounds, mut dynamics, prov_diags) =
                 artifact_for_function(
                     &index,
                     module_id,
@@ -295,7 +307,16 @@ pub fn compile_project(options: &CompileOptions) -> Result<Compilation> {
                     function,
                     symbol,
                     &local_by_name,
+                    &owned_links,
+                    &module_prov,
                 );
+            for diag in prov_diags {
+                diagnostics.push(
+                    Diagnostic::new(Some(path), Span::new(1, 1), diag.message())
+                        .with_code(diag.code())
+                        .with_severity(Severity::Warning),
+                );
+            }
             refs.append(&mut artifact_refs);
             steps.append(&mut artifact_steps);
             bound_calls.append(&mut bounds);
@@ -391,6 +412,37 @@ fn attach_project_imports(files: &mut BTreeMap<ModuleId, (PathBuf, String, Modul
     }
 }
 
+fn enclosing_symbol<'a>(symbols: &[&'a SymbolDecl], line: u32) -> Option<&'a SymbolDecl> {
+    symbols
+        .iter()
+        .copied()
+        .filter(|s| s.line <= line)
+        .max_by_key(|s| s.line)
+}
+
+fn resolve_narrative_target(
+    index: &ProjectIndex,
+    module_id: &ModuleId,
+    local_by_name: &BTreeMap<(ModuleId, String), SymbolId>,
+    target: &str,
+) -> Option<SymbolId> {
+    let t = target.trim().trim_start_matches('#');
+    if t.is_empty() {
+        return None;
+    }
+    if let Some(id) = local_by_name.get(&(module_id.clone(), t.to_string())) {
+        return Some(id.clone());
+    }
+    // Path-like `bind.member` via display name suffix match within project.
+    index.symbols().iter().find_map(|s| {
+        if s.declaration_path.join(".") == t || s.name == t {
+            Some(s.id.clone())
+        } else {
+            None
+        }
+    })
+}
+
 fn artifact_for_function(
     index: &ProjectIndex,
     module_id: &ModuleId,
@@ -399,12 +451,15 @@ fn artifact_for_function(
     function: &Function,
     symbol: &SymbolDecl,
     local_by_name: &BTreeMap<(ModuleId, String), SymbolId>,
+    narrative_links: &[crate::parse::NarrativeLink],
+    module_prov: &super::provenance::ModuleProvenance,
 ) -> (
     SemanticArtifact,
     Vec<KnowledgeRef>,
     Vec<KnowledgeStep>,
     Vec<BoundCall>,
     Vec<DynamicCall>,
+    Vec<super::provenance::ProvenanceDiag>,
 ) {
     let calls = collect_call_sites(function);
     let mut effects = direct_effects(&calls);
@@ -436,14 +491,16 @@ fn artifact_for_function(
     let named = collect_named_steps(function);
     let mut refs = Vec::new();
     let mut steps = Vec::new();
-    for (n, named) in named.iter().enumerate() {
+    let mut step_n = 0u32;
+    for named in named.iter() {
+        step_n += 1;
         let target = named.call.as_ref().and_then(|call| {
             match classify_call(index, module_id, ast_module, function, call, local_by_name) {
                 CallClass::Bound { target, .. } => Some(target),
                 _ => None,
             }
         });
-        let ref_id = format!("{}#ref-{}", symbol.id.as_str(), n + 1);
+        let ref_id = format!("{}#ref-{}", symbol.id.as_str(), step_n);
         refs.push(KnowledgeRef {
             id: ref_id.clone(),
             label: named.label.clone(),
@@ -461,12 +518,43 @@ fn artifact_for_function(
             .map(effects_for_call)
             .unwrap_or_else(EffectSet::pure);
         steps.push(KnowledgeStep {
-            id: ArtifactId(format!("{}#step-{}", symbol.id.as_str(), n + 1)),
+            id: ArtifactId(format!("{}#step-{}", symbol.id.as_str(), step_n)),
             reference: ref_id,
             kind: named.kind.clone(),
             calls: target.into_iter().collect(),
             effects: step_effects,
             source: source_location(index.root().path(), path, named.line, named.line),
+        });
+    }
+    // G03 NarrativeRef: comment-line []() — never BoundCall, never effects.
+    for link in narrative_links {
+        step_n += 1;
+        let target = match link.kind {
+            crate::parse::NarrativeLinkKind::Narrate => {
+                resolve_narrative_target(index, module_id, local_by_name, &link.target)
+            }
+            crate::parse::NarrativeLinkKind::Navigation => None,
+        };
+        let ref_id = format!("{}#ref-{}", symbol.id.as_str(), step_n);
+        refs.push(KnowledgeRef {
+            id: ref_id.clone(),
+            label: link.label.clone(),
+            context: "narrative".into(),
+            source: source_location(index.root().path(), path, link.line, link.line),
+            resolution: match link.kind {
+                crate::parse::NarrativeLinkKind::Navigation => "navigation".into(),
+                crate::parse::NarrativeLinkKind::Narrate if target.is_some() => "symbol".into(),
+                crate::parse::NarrativeLinkKind::Narrate => "unresolved".into(),
+            },
+            target: target.clone(),
+        });
+        steps.push(KnowledgeStep {
+            id: ArtifactId(format!("{}#step-{}", symbol.id.as_str(), step_n)),
+            reference: ref_id,
+            kind: link.kind.as_str().into(),
+            calls: target.into_iter().collect(),
+            effects: EffectSet::pure(),
+            source: source_location(index.root().path(), path, link.line, link.line),
         });
     }
     if effects.0.is_empty() {
@@ -475,18 +563,20 @@ fn artifact_for_function(
     let (signature, contract) = signature(function, symbol.callable, &effects);
     let interface = digest(signature_json(signature.as_ref()));
     let implementation = digest(format!("{:?}", function.body));
-    let provenance = vec![SourceRef {
+    let mut provenance = vec![SourceRef {
         uri: rel_uri(index.root().path(), path),
         locator: Some(format!("L{}", function.span.line)),
         content_digest: Some(implementation.clone()),
         relation: "defines".into(),
     }];
+    let resolved = super::provenance::resolve_provenance(path, module_prov);
+    provenance.extend(resolved.refs);
     let evidence = digest(contract_summary(&contract));
     let kind = match symbol.kind {
         SymbolKind::Type => "type",
         SymbolKind::Function => "function",
     }.to_string();
-    let artifact = semantic_artifact(
+    let mut artifact = semantic_artifact(
         ArtifactId(symbol.id.as_str().to_string()),
         Some(symbol.id.clone()),
         symbol.declaration_path.join("."),
@@ -498,12 +588,20 @@ fn artifact_for_function(
         effects,
         dependencies,
         provenance,
-        "no explicit applicability constraints".into(),
+        resolved.applicability,
         interface,
         implementation,
         evidence,
     );
-    (artifact, refs, steps, bound_calls, dynamic_calls)
+    artifact.verification.evidence = resolved.evidence_status;
+    (
+        artifact,
+        refs,
+        steps,
+        bound_calls,
+        dynamic_calls,
+        resolved.diagnostics,
+    )
 }
 
 enum CallClass {
@@ -1009,57 +1107,166 @@ fn dynamic_call_json(call: &DynamicCall) -> Value {
     })
 }
 
-/// Atomically write the semantic portion of `.marqdo/`.  A reader therefore
-/// sees either the previous graph or the complete next graph, never a mix.
+const SEMANTIC_NAMES: &[&str] = &[
+    "project.json",
+    "symbols.json",
+    "refs.json",
+    "steps.json",
+    "bound_calls.json",
+    "dynamic_calls.json",
+    "artifacts",
+    "graph",
+    "verification",
+];
+
+/// Resolve the active semantic generation directory (G04).
+/// Prefers `CURRENT` → `generations/<id>/`; falls back to `out_dir` itself.
+pub fn semantic_generation_dir(out_dir: &Path) -> PathBuf {
+    let current = out_dir.join("CURRENT");
+    if let Ok(id) = fs::read_to_string(&current) {
+        let id = id.trim();
+        if !id.is_empty() {
+            let gen = out_dir.join("generations").join(id);
+            if gen.join("project.json").is_file() {
+                return gen;
+            }
+        }
+    }
+    out_dir.to_path_buf()
+}
+
+/// Atomically write the semantic portion of `.marqdo/` as a whole generation
+/// (G04). Readers that open via [`semantic_generation_dir`] never see a mix.
 pub fn write_semantic_projections(out_dir: &Path, compilation: &Compilation) -> Result<()> {
-    let stage = out_dir.with_extension("tmp-sema");
-    if stage.exists() { fs::remove_dir_all(&stage).with_context(|| format!("clear {}", stage.display()))?; }
-    fs::create_dir_all(stage.join("artifacts"))?;
-    fs::create_dir_all(stage.join("graph"))?;
-    fs::create_dir_all(stage.join("verification"))?;
+    fs::create_dir_all(out_dir).with_context(|| format!("create {}", out_dir.display()))?;
+    let build_id = {
+        let mut hasher = Sha256::new();
+        hasher.update(compilation.semantics.project_id.as_bytes());
+        for a in &compilation.semantics.artifacts {
+            hasher.update(a.hashes.artifact.0.as_bytes());
+        }
+        hasher.update(
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_nanos()
+                .to_le_bytes(),
+        );
+        format!("{:x}", hasher.finalize())[..16].to_string()
+    };
+    let gens = out_dir.join("generations");
+    fs::create_dir_all(&gens)?;
+    let gen_dir = gens.join(&build_id);
+    if gen_dir.exists() {
+        fs::remove_dir_all(&gen_dir)?;
+    }
+    fs::create_dir_all(gen_dir.join("artifacts"))?;
+    fs::create_dir_all(gen_dir.join("graph"))?;
+    fs::create_dir_all(gen_dir.join("verification"))?;
+    write_generation_tree(&gen_dir, compilation)?;
+
+    // Atomic generation pointer: only publish CURRENT after the tree is complete.
+    let current_tmp = out_dir.join("CURRENT.tmp");
+    fs::write(&current_tmp, format!("{build_id}\n"))
+        .with_context(|| format!("write {}", current_tmp.display()))?;
+    fs::rename(&current_tmp, out_dir.join("CURRENT"))
+        .with_context(|| format!("publish CURRENT under {}", out_dir.display()))?;
+
+    // Compatibility root: stage a full mirror, then swap names (best-effort for
+    // legacy readers that do not follow CURRENT).
+    let stage = out_dir.join(".tmp-sema-publish");
+    if stage.exists() {
+        fs::remove_dir_all(&stage)?;
+    }
+    copy_dir_recursive(&gen_dir, &stage)?;
+    for name in SEMANTIC_NAMES {
+        let target = out_dir.join(name);
+        if target.exists() {
+            if target.is_dir() {
+                fs::remove_dir_all(&target)?;
+            } else {
+                fs::remove_file(&target)?;
+            }
+        }
+        fs::rename(stage.join(name), &target)?;
+    }
+    let _ = fs::remove_dir_all(&stage);
+    Ok(())
+}
+
+fn write_generation_tree(stage: &Path, compilation: &Compilation) -> Result<()> {
     let project = compilation.semantics.to_json();
-    write_json(&stage.join("project.json"), &json!({"schema_version":SCHEMA_VERSION,"project":project["project"],"artifact_count":compilation.semantics.artifacts.len()}))?;
+    write_json(
+        &stage.join("project.json"),
+        &json!({
+            "schema_version": SCHEMA_VERSION,
+            "project": project["project"],
+            "artifact_count": compilation.semantics.artifacts.len(),
+            "generation": stage.file_name().and_then(|s| s.to_str()),
+        }),
+    )?;
     write_json(&stage.join("symbols.json"), &json!({"schema_version":SCHEMA_VERSION,"symbols":compilation.index.symbols().iter().map(|s|json!({"id":s.id.as_str(),"module":s.module.as_str(),"kind":s.kind.as_str(),"callable":s.callable.map(|c|c.as_str()),"name":s.name,"declaration_path":s.declaration_path,"source":{"file":rel_uri(compilation.index.root().path(),&s.source),"line":s.line}})).collect::<Vec<_>>() }))?;
     write_json(&stage.join("refs.json"), &json!({"schema_version":SCHEMA_VERSION,"refs":project["refs"]}))?;
     write_json(&stage.join("steps.json"), &json!({"schema_version":SCHEMA_VERSION,"steps":project["steps"]}))?;
     write_json(&stage.join("bound_calls.json"), &json!({"schema_version":SCHEMA_VERSION,"bound_calls":project["bound_calls"]}))?;
     write_json(&stage.join("dynamic_calls.json"), &json!({"schema_version":SCHEMA_VERSION,"dynamic_calls":project["dynamic_calls"]}))?;
     write_json(&stage.join("graph/nodes.json"), &json!({"schema_version":SCHEMA_VERSION,"nodes":project["artifacts"]}))?;
-    write_json(&stage.join("graph/edges.json"), &json!({"schema_version":SCHEMA_VERSION,"authority":"SemanticProject","edges":compilation.semantics.artifacts.iter().flat_map(|a|a.dependencies.iter().map(move |d|json!({"from":a.artifact_id.0,"to":d.0,"kind":"calls"}))).collect::<Vec<_>>() }))?;
-    for artifact in &compilation.semantics.artifacts {
-        let name = hex_name(&artifact.artifact_id.0);
-        write_json(&stage.join("artifacts").join(format!("{name}.json")), &artifact_json(artifact))?;
-        write_json(&stage.join("verification").join(format!("{name}.json")), &artifact_json(artifact)["verification"])?;
-    }
-    const SEMANTIC_NAMES: &[&str] = &[
-        "project.json",
-        "symbols.json",
-        "refs.json",
-        "steps.json",
-        "bound_calls.json",
-        "dynamic_calls.json",
-        "artifacts",
-        "graph",
-        "verification",
-    ];
-    if out_dir.exists() {
-        for name in SEMANTIC_NAMES {
-            let target = out_dir.join(name);
-            if target.exists() {
-                if target.is_dir() {
-                    fs::remove_dir_all(&target)?;
-                } else {
-                    fs::remove_file(&target)?;
-                }
+    let mut edges: Vec<Value> = compilation
+        .semantics
+        .artifacts
+        .iter()
+        .flat_map(|a| {
+            a.dependencies.iter().map(move |d| {
+                json!({"from": a.artifact_id.0, "to": d.0, "kind": "calls"})
+            })
+        })
+        .collect();
+    for step in &compilation.semantics.steps {
+        if step.kind == "narrate" {
+            for target in &step.calls {
+                edges.push(json!({
+                    "from": step.id.0,
+                    "to": target.as_str(),
+                    "kind": "narrates",
+                }));
             }
         }
-    } else {
-        fs::create_dir_all(out_dir)?;
     }
-    for name in SEMANTIC_NAMES {
-        fs::rename(stage.join(name), out_dir.join(name))?;
+    write_json(
+        &stage.join("graph/edges.json"),
+        &json!({
+            "schema_version": SCHEMA_VERSION,
+            "authority": "SemanticProject",
+            "edges": edges,
+        }),
+    )?;
+    for artifact in &compilation.semantics.artifacts {
+        let name = hex_name(&artifact.artifact_id.0);
+        write_json(
+            &stage.join("artifacts").join(format!("{name}.json")),
+            &artifact_json(artifact),
+        )?;
+        write_json(
+            &stage.join("verification").join(format!("{name}.json")),
+            &artifact_json(artifact)["verification"],
+        )?;
     }
-    fs::remove_dir_all(stage)?;
+    Ok(())
+}
+
+fn copy_dir_recursive(src: &Path, dst: &Path) -> Result<()> {
+    fs::create_dir_all(dst)?;
+    for ent in fs::read_dir(src).with_context(|| format!("read {}", src.display()))? {
+        let ent = ent?;
+        let from = ent.path();
+        let to = dst.join(ent.file_name());
+        if from.is_dir() {
+            copy_dir_recursive(&from, &to)?;
+        } else {
+            fs::copy(&from, &to)
+                .with_context(|| format!("copy {} → {}", from.display(), to.display()))?;
+        }
+    }
     Ok(())
 }
 
@@ -1103,25 +1310,29 @@ mod tests {
         let root = root();
         fs::write(
             root.join("main.mq.md"),
-            r#"# main
+            r#"---
+markup: occlusion
+---
 
 ## save
 
 > fs.write_text path=out.txt text=ok
-
 *1*
 
 ## wrap
 
 > save
-
 *None*
 
 ## mystery
 
 > weird_plugin_thing x=1
-
 *None*
+
+# main
+
+> wrap
+> print text=ok
 "#,
         )
         .unwrap();

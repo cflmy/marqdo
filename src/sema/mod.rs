@@ -7,14 +7,16 @@
 pub mod bind;
 pub mod ir;
 pub mod lock;
+pub mod provenance;
 pub mod symbols;
 
 pub use bind::{
     call_display, is_static_bound, lookup_local, resolve_for_exec, DynamicReason, ExecTarget,
 };
 pub use ir::{
-    artifact_json, compile_project, write_semantic_projections, ArtifactId, BoundCall, CompileOptions,
-    Compilation, Digest, DynamicCall, EffectSet, LockMode, SemanticArtifact, SemanticProject,
+    artifact_json, compile_project, semantic_generation_dir, write_semantic_projections, ArtifactId,
+    BoundCall, CompileOptions, Compilation, Digest, DynamicCall, EffectSet, LockMode,
+    SemanticArtifact, SemanticProject,
 };
 pub use lock::{check_links_lock, impact as semantic_impact, update_links_lock, LockReport};
 pub use symbols::{CallableKind, ModuleId, ProjectIndex, SymbolDecl, SymbolId, SymbolKind};

@@ -2,8 +2,11 @@
 //!
 //! Soft Markdown emphasis that does not look like code/return is skipped (G2 —
 //! [code-as-docs-gaps.md](../../../doc/design/code-as-docs-gaps.md)).
+//!
+//! Comment-line Markdown links `[label](target)` are NarrativeRef / navigation
+//! sites (G03); they are never executed.
 
-use crate::lex::{matching_bold_close_inline, matching_italic_close_inline};
+use crate::lex::{matching_bold_close_inline, matching_italic_close_inline, LineKind};
 
 pub use crate::lex::looks_like_bold_code;
 
@@ -20,6 +23,162 @@ pub enum ProseBit {
     BoldCode { inner: String, at: usize },
     /// Inner text of `*…*` (return), when not starting a bold.
     ItalicReturn { inner: String, at: usize },
+}
+
+/// Why a comment-line `[]()` is not an executable BoundCall (G03).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NarrativeLinkKind {
+    /// In-project symbol / binding / `#anchor` — inert explanation.
+    Narrate,
+    /// URL or file path — navigation only; never fetched by compile/run.
+    Navigation,
+}
+
+impl NarrativeLinkKind {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Narrate => "narrate",
+            Self::Navigation => "navigation",
+        }
+    }
+}
+
+/// One Markdown link found on a comment (narrative) line.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NarrativeLink {
+    pub label: String,
+    pub target: String,
+    pub kind: NarrativeLinkKind,
+    /// 1-based source line.
+    pub line: u32,
+    pub at: usize,
+}
+
+/// Classify a link target without parsing it as an expression.
+pub fn classify_narrative_target(target: &str) -> NarrativeLinkKind {
+    let t = target.trim();
+    if t.starts_with("http://")
+        || t.starts_with("https://")
+        || t.starts_with("mailto:")
+        || t.starts_with("//")
+    {
+        return NarrativeLinkKind::Navigation;
+    }
+    if t.contains('/') || t.ends_with(".md") || t.ends_with(".mq.md") || t.ends_with(".html")
+    {
+        return NarrativeLinkKind::Navigation;
+    }
+    NarrativeLinkKind::Narrate
+}
+
+/// Scan whole-source comment lines for Markdown links; skip fences and code lines.
+pub fn scan_narrative_links(source: &str) -> Vec<NarrativeLink> {
+    let classified = crate::lex::classify_source(source);
+    let mut out = Vec::new();
+    let mut in_fence = false;
+    for (i, cl) in classified.iter().enumerate() {
+        let line_no = (i + 1) as u32;
+        let trimmed = cl.text.trim();
+        if trimmed.starts_with("```") {
+            in_fence = !in_fence;
+            continue;
+        }
+        if in_fence {
+            continue;
+        }
+        if cl.kind != LineKind::Comment {
+            continue;
+        }
+        out.extend(scan_md_links_in_line(&cl.text, line_no));
+    }
+    out
+}
+
+/// Scan one line for `[label](target)`, skipping `` `inline` `` spans.
+pub fn scan_md_links_in_line(line: &str, line_no: u32) -> Vec<NarrativeLink> {
+    let bytes = line.as_bytes();
+    let mut i = 0usize;
+    let mut out = Vec::new();
+    while i < bytes.len() {
+        if bytes[i] == b'`' {
+            if let Some(rel) = line[i + 1..].find('`') {
+                i = i + 1 + rel + 1;
+                continue;
+            }
+            i += 1;
+            continue;
+        }
+        if bytes[i] != b'[' {
+            i += 1;
+            continue;
+        }
+        let Some((label, target, next)) = parse_md_link(line, i) else {
+            i += 1;
+            continue;
+        };
+        let kind = classify_narrative_target(&target);
+        out.push(NarrativeLink {
+            label,
+            target,
+            kind,
+            line: line_no,
+            at: i,
+        });
+        i = next;
+    }
+    out
+}
+
+fn parse_md_link(line: &str, start: usize) -> Option<(String, String, usize)> {
+    if !line[start..].starts_with('[') {
+        return None;
+    }
+    let mut depth = 0i32;
+    let mut label_end = None;
+    for (rel, ch) in line[start..].char_indices() {
+        match ch {
+            '[' => depth += 1,
+            ']' => {
+                depth -= 1;
+                if depth == 0 {
+                    label_end = Some(start + rel);
+                    break;
+                }
+            }
+            _ => {}
+        }
+    }
+    let label_end = label_end?;
+    let after = line.get(label_end + 1..)?;
+    if !after.starts_with('(') {
+        return None;
+    }
+    let mut depth = 0i32;
+    let mut target_end = None;
+    for (rel, ch) in after.char_indices() {
+        match ch {
+            '(' => depth += 1,
+            ')' => {
+                depth -= 1;
+                if depth == 0 {
+                    target_end = Some(rel);
+                    break;
+                }
+            }
+            _ => {}
+        }
+    }
+    let target_end = target_end?;
+    let label = line[start + 1..label_end].to_string();
+    let target = after[1..target_end].trim().to_string();
+    if label.is_empty() || target.is_empty() {
+        return None;
+    }
+    // Executable occlusion payloads look like calls (`foo(…)` / `a.b(…)`); those
+    // live on Code lines already. If a comment link target is expression-shaped
+    // with `(`, still treat as narrate/navigation by target class — do not eval.
+    let next = label_end + 1 + target_end + 1;
+    Some((label, target, next))
 }
 
 /// Scan a narrative (or mixed) line for v0.3 inline bits, left to right.
@@ -253,6 +412,32 @@ mod tests {
         assert!(
             bits.is_empty(),
             "glob-like ticks must not yield italic: {bits:?}"
+        );
+    }
+
+    #[test]
+    fn narrative_links_skip_fence_and_classify() {
+        let src = "---\nmarkup: occlusion\n---\n\n# main\n\n见[文档](https://example.com/a)与[总额](总额)。\n\n```\n[ignored](https://x.test)\n```\n\n行内跳过 `[not](x)` 标记。\n";
+        let links = scan_narrative_links(src);
+        assert!(
+            links.iter().any(|l| {
+                l.kind == NarrativeLinkKind::Navigation && l.target.contains("example.com")
+            }),
+            "{links:?}"
+        );
+        assert!(
+            links
+                .iter()
+                .any(|l| l.kind == NarrativeLinkKind::Narrate && l.target == "总额"),
+            "{links:?}"
+        );
+        assert!(
+            !links.iter().any(|l| l.target.contains("x.test")),
+            "fenced link must not become a step: {links:?}"
+        );
+        assert!(
+            !links.iter().any(|l| l.target == "x"),
+            "inline-code link must not become a step: {links:?}"
         );
     }
 }

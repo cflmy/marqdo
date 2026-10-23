@@ -15,7 +15,7 @@
 
 > **可执行知识下一阶段的阅读顺序**：[原始意图 009](next/009.md) → [文档原生开发指导](design/document-native-development-guide.md)（作者体验、语法审查结论、AI 工作协议）→ [详细开发规范](next/Marqdo_Executable_Knowledge_Development.md)（目标语义与工程约束）→ [缺口与交付路线](roadmap/executable-knowledge-gaps-2026-10-23.md)（现状证据、S0–S6）。指导文档修订作者负担、场景政策和交付次序；不得把所有内部治理字段变成作者必填项。与之冲突的早期设计只作历史参考，设计目标不等于已实现能力。
 >
-> **S0 作者基线（已落地门禁）**：[tests/executable_knowledge/](../tests/executable_knowledge/README.md) — 六类写法 + `cargo test --test executable_knowledge --locked`。`status: design` / 预期失败与已实现分开报告；Bytecode 裸名同名误连记为基线缺陷，待 S2 BoundCall 翻转。
+> **可执行知识门禁**：[tests/executable_knowledge/](../tests/executable_knowledge/README.md) — S0–S2 BoundCall / 效应 / MLSP bind，以及后续 NarrativeRef、来源与整代投影子集；`cargo test --test executable_knowledge --locked`（CI：`.github/workflows/executable-knowledge.yml`）。`status: design` / 预期失败与已实现分开报告。
 
 | 文档 | 摘要 |
 |------|------|

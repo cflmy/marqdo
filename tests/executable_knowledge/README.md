@@ -18,6 +18,8 @@
 | 06a | `baseline/06-reject/missing-import.mq.md` | expected_failure | 双后端均非 0 | 0（正确拒绝） |
 | 06b | `baseline/06-reject/ambiguous.mq.md` | expected_failure | **双后端均拒绝**裸名同名（G02） | — |
 | 10 | `baseline/10-boundcall/` | implemented | BoundCall 路径 SymbolId + DynamicCall(`call_fn`)；双后端 `hi`/`60` | import 一行 |
+| 11 | `baseline/11-narrative-ref/` | implemented | `narrate`/`navigation` 步骤；围栏不计；run 不拉 URL | 0 |
+| 12 | `baseline/12-tax-source/` | implemented | `sources:` → evidence=sourced；过期 → expired；可试跑 `113` | sources + valid_until |
 
 ### 同名裸调用（G02）
 
@@ -43,7 +45,13 @@
 | S2/G07 子集 | **done** | MLSP bind 含 `symbol_id`；execute 按源行绑定；pure 拒非纯 |
 | S2/G02 BoundCall | **done** | 共享 `resolve_for_exec`；Tree/Bytecode 静态路径绑定；`bound_calls.json` / `dynamic_calls.json`；`10-boundcall` + `06b` |
 | S2/G07 eng_reuse | **done（子集）** | `reuse_json` / `agent_eng_reuse`：`discovery_only` + `bind_required` + `bind_targets`；执行仍须 MLSP bind |
+| S1/G03 NarrativeRef | **done（子集）** | 注释行 `[]()` → narrate/navigation；`11-narrative-ref` |
+| S4/G05 来源 | **done（子集）** | frontmatter `sources`/`valid_until`；`12-tax-source`；business bind |
+| S3 patch | **done（子集）** | MLSP `artifact.patch` + wording 回滚 |
+| S5/G04 整代 | **done（子集）** | `generations/<id>/` + `CURRENT` 指针 |
+| S5/G08 锁分类 | **done（子集）** | `LockReport.classes`；impact 含 narrates |
+| S6 CI | **done（子集）** | `.github/workflows/executable-knowledge.yml` |
 
 ## 与后续切片的关系
 
-- S3+：局部编辑、来源适用性、整代快照 — 见缺口路线图
+- 完整订单示例、100 单元语料、远程授权与规模 SLO — 见缺口路线图；未完成项不得笼统宣称「可执行知识已交付」

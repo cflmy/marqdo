@@ -64,13 +64,14 @@ fn dispatch(req: &Value) -> Result<Value, Value> {
         Some("artifact.impact") => artifact_impact(&params),
         Some("artifact.bind") => artifact_bind(&params),
         Some("artifact.execute") => artifact_execute(&params),
+        Some("artifact.patch") => artifact_patch(&params),
         // `<TAB>` M9: occlusion label search (two-tier vocabulary).
         Some("labels.search") => labels_search(&params),
         // `<TAB>` M6: one-shot session summary (T1 staleness seen/fixed).
         Some("session.summary") => session_summary(),
         other => Err(err(
             "mlsp.unknown_method",
-            format!("未知方法 {other:?}；可用：locate / syntax / validate / repair_targets / repair_apply / schema / artifact.find / artifact.inspect / link.resolve / artifact.verify / artifact.impact / artifact.bind / artifact.execute"),
+            format!("未知方法 {other:?}；可用：locate / syntax / validate / repair_targets / repair_apply / schema / artifact.find / artifact.inspect / link.resolve / artifact.verify / artifact.impact / artifact.bind / artifact.execute / artifact.patch"),
         )),
     }
 }
@@ -186,6 +187,19 @@ fn artifact_bind(params: &Value) -> Result<Value, Value> {
             "effects": effects,
         }));
     }
+    if policy == "business"
+        && !matches!(
+            artifact.verification.evidence.as_str(),
+            "sourced" | "verified"
+        )
+    {
+        return Err(json!({
+            "code": "artifact.evidence_denied",
+            "message": "business 策略要求来源已关联；当前证据状态不足",
+            "policy": policy,
+            "evidence": artifact.verification.evidence,
+        }));
+    }
     let symbol_id = artifact
         .symbol_id
         .as_ref()
@@ -198,8 +212,147 @@ fn artifact_bind(params: &Value) -> Result<Value, Value> {
         "project": compilation.semantics.root,
         "policy": policy,
         "effects": effects,
+        "evidence": artifact.verification.evidence,
         "source": {"file": artifact.source.file, "line": artifact.source.line},
     }}))
+}
+
+/// Digest-guarded local patch (S3/G09). `intent: wording` refuses signature/effect drift.
+fn artifact_patch(params: &Value) -> Result<Value, Value> {
+    let compilation = semantic_project(params)?;
+    let query = params
+        .get("artifact_id")
+        .or_else(|| params.get("symbol_id"))
+        .and_then(Value::as_str)
+        .ok_or_else(|| err("mlsp.bad_request", "artifact.patch 需要 artifact_id 或 symbol_id"))?;
+    let candidates = artifact_query(&compilation.semantics, query);
+    if candidates.len() != 1 {
+        return Err(err(
+            if candidates.is_empty() {
+                "artifact.unresolved"
+            } else {
+                "artifact.ambiguous"
+            },
+            format!("无法唯一修补 `{query}`"),
+        ));
+    }
+    let before = candidates[0];
+    let expected = params
+        .get("expected_digest")
+        .and_then(Value::as_str)
+        .ok_or_else(|| {
+            err(
+                "mlsp.bad_request",
+                "artifact.patch 需要 expected_digest（hashes.implementation）",
+            )
+        })?;
+    if expected != before.hashes.implementation.0 {
+        return Err(json!({
+            "code": "artifact.digest_mismatch",
+            "message": "源码实现摘要已变化，拒绝覆盖",
+            "expected": expected,
+            "actual": before.hashes.implementation.0,
+        }));
+    }
+    let path = compilation.semantics.root.join(&before.source.file);
+    let original = std::fs::read_to_string(&path)
+        .map_err(|e| err("artifact.load", format!("读源失败: {e}")))?;
+    let edits_v = params
+        .get("edits")
+        .and_then(Value::as_array)
+        .ok_or_else(|| err("mlsp.bad_request", "artifact.patch 需要 edits"))?;
+    let mut edits = Vec::new();
+    for e in edits_v {
+        let line = e
+            .get("line")
+            .and_then(Value::as_u64)
+            .ok_or_else(|| err("mlsp.bad_request", "edit.line 必填"))? as u32;
+        let kind = e.get("op").and_then(Value::as_str).unwrap_or("replace");
+        match kind {
+            "replace" => {
+                let text = e
+                    .get("text")
+                    .and_then(Value::as_str)
+                    .ok_or_else(|| err("mlsp.bad_request", "replace 需要 text"))?
+                    .to_string();
+                edits.push(crate::repair::Edit::Replace { line, text });
+            }
+            "delete" => edits.push(crate::repair::Edit::Delete { line }),
+            "insert_before" => {
+                let text = e
+                    .get("text")
+                    .and_then(Value::as_str)
+                    .unwrap_or("")
+                    .to_string();
+                edits.push(crate::repair::Edit::InsertBefore { line, text });
+            }
+            other => {
+                return Err(err(
+                    "mlsp.bad_request",
+                    format!("未知 edit.op `{other}`"),
+                ))
+            }
+        }
+    }
+    let start = before.source.line;
+    let end = before.source.end_line.max(start);
+    let ranges = [(start, end.max(start + 40))];
+    let patched = crate::repair::apply_edits(&original, &ranges, &edits).map_err(|o| {
+        json!({
+            "code": "mlsp.repair_out_of_scope",
+            "message": "补丁超出制品源码范围",
+            "lines": o.lines,
+            "ranges": o.ranges,
+        })
+    })?;
+    std::fs::write(&path, &patched)
+        .map_err(|e| err("artifact.write", format!("写源失败: {e}")))?;
+    let after_comp = semantic_project(params)?;
+    let after_cands = artifact_query(&after_comp.semantics, query);
+    if after_cands.len() != 1 {
+        // roll back
+        let _ = std::fs::write(&path, &original);
+        return Err(err(
+            "artifact.patch_ambiguous",
+            "补丁后制品无法唯一解析；已回滚",
+        ));
+    }
+    let after = after_cands[0];
+    let signature_changed = before.hashes.interface.0 != after.hashes.interface.0;
+    let effects_changed = before.effects.values() != after.effects.values();
+    let implementation_changed =
+        before.hashes.implementation.0 != after.hashes.implementation.0;
+    let intent = params.get("intent").and_then(Value::as_str).unwrap_or("edit");
+    if intent == "wording" && (signature_changed || effects_changed) {
+        let _ = std::fs::write(&path, &original);
+        return Err(json!({
+            "code": "artifact.wording_broke_contract",
+            "message": "intent=wording 但签名或效应已变；已回滚",
+            "signature_changed": signature_changed,
+            "effects_changed": effects_changed,
+        }));
+    }
+    Ok(json!({
+        "schema_version": 1,
+        "artifact_id": after.artifact_id.0,
+        "symbol_id": after.symbol_id.as_ref().map(|id| id.as_str()),
+        "applied": true,
+        "diff": {
+            "signature_changed": signature_changed,
+            "effects_changed": effects_changed,
+            "implementation_changed": implementation_changed,
+            "before": {
+                "interface": before.hashes.interface.0,
+                "implementation": before.hashes.implementation.0,
+                "effects": before.effects.values(),
+            },
+            "after": {
+                "interface": after.hashes.interface.0,
+                "implementation": after.hashes.implementation.0,
+                "effects": after.effects.values(),
+            },
+        },
+    }))
 }
 
 fn artifact_execute(params: &Value) -> Result<Value, Value> {

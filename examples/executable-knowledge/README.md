@@ -23,8 +23,15 @@
 ```
 
 它们不是四种语法。`()` 中仍是原有的取元、算术、循环和调用；`[]` 让每一步同时可读、可查、
-可在图中定位。当前实现尚不能完整运行该目标形式（类函数、统一 `Named<T>`、步骤图仍是设计目标），
-但它给出了实际项目中应当写成什么样子。
+可在图中定位。
+
+**运行状态（勿与设计态混淆）**
+
+| 子集 | 状态 | 证据 |
+|---|---|---|
+| 纯计算 / BoundCall / 步骤 kind / NarrativeRef | 门禁已覆盖 | `tests/executable_knowledge/` |
+| 本目录完整订单链（类函数、证据闭环、impact→原文） | **设计态** | 仍作目标示例，不计入发布成功 |
+| `knowledge/tax-2026.mq.md` 的 `sources:` | 编译可关联 corpus；`business` bind 需 `evidence=sourced` | 见 `baseline/12-tax-source` |
 
 ## 预期闭环
 
