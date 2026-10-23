@@ -13,12 +13,14 @@
 
 ## 当前文档
 
-> **可执行知识下一阶段的规范优先级**：实现 `[]()`、Semantic Artifact、知识绑定、验证、锁定、EKC/Agent 复用时，以 [next/Marqdo_Executable_Knowledge_Development.md](next/Marqdo_Executable_Knowledge_Development.md) 为实施基线。与其冲突的早期链接、遮蔽、知识分层或 EKC 设计只作历史参考。
+> **可执行知识下一阶段的阅读顺序**：[原始意图 009](next/009.md) → [文档原生开发指导](design/document-native-development-guide.md)（作者体验、语法审查结论、AI 工作协议）→ [详细开发规范](next/Marqdo_Executable_Knowledge_Development.md)（目标语义与工程约束）→ [缺口与交付路线](roadmap/executable-knowledge-gaps-2026-10-23.md)（现状证据、S0–S6）。指导文档修订作者负担、场景政策和交付次序；不得把所有内部治理字段变成作者必填项。与之冲突的早期设计只作历史参考，设计目标不等于已实现能力。
 
 | 文档 | 摘要 |
 |------|------|
-| [design/markdown-mapping.md](design/markdown-mapping.md) | **v0.2 语法宪法（现行运行时）** |
-| [design/markdown-mapping-v0.3.md](design/markdown-mapping-v0.3.md) | **v0.3 草案：叙述统一 · 粗体代码 · 斜体返回 · 形参体推断** |
+| [design/document-native-development-guide.md](design/document-native-development-guide.md) | **下一阶段开发指导**：语法审查裁决、正文→命名→复用工作流、AI 上下文与局部编辑、渐进严格、作者成本及 S0–S6 验收 |
+| [design/core-surface.md](design/core-surface.md) | **核心构造清单**：v2.1 默认链接/循环说明与构造守卫；不是全部实现状态清单 |
+| [design/markdown-mapping.md](design/markdown-mapping.md) | **历史 v0.2 映射**：不再代表现行默认链接语义 |
+| [design/markdown-mapping-v0.3.md](design/markdown-mapping-v0.3.md) | **v0.3 设计背景**：叙述统一 · 粗体代码 · 斜体返回 · 形参体推断；链接语义以 v2.1 规范和测试为准 |
 | [adr/0005-prose-unified-markup.md](adr/0005-prose-unified-markup.md) | **Proposed：采纳 mapping v0.3** |
 | [roadmap/markup-v0.3.md](roadmap/markup-v0.3.md) | **Markup v0.3 实现路线（M0–M5）** |
 | [design/objects.md](design/objects.md) | **`#` 对象 / `##` 函数与方法** |
@@ -112,7 +114,7 @@
 | [design/executable-knowledge-system.md](design/executable-knowledge-system.md) | **可执行知识系统（v2.1 重构草案）**：每个 `[]()` 都是命名的可执行知识步骤 · 取元/推导/循环/调用/叙述统一建图 · 跨文件稳定寻址 · check/view/verify/impact 闭环 |
 | [next/Marqdo_Executable_Knowledge_Development.md](next/Marqdo_Executable_Knowledge_Development.md) | **可执行知识系统详细开发规范**：以 `next/009.md` 及两份附属文档为真实意图基线，冻结统一语义 IR、稳定寻址、绑定/验证/锁定、EKC/Agent 集成、迁移路线与验收矩阵 |
 | [next/Marqdo_Executable_Knowledge_Testing.md](next/Marqdo_Executable_Knowledge_Testing.md) | **可执行知识语法测试与兼容性规程**：标准库、扩展库、CLI、Tree/Bytecode 的仓库级门禁 |
-| [roadmap/executable-knowledge-gaps-2026-10-23.md](roadmap/executable-knowledge-gaps-2026-10-23.md) | **v2.1 现状与规划缺口审计**：以当前代码对照真实设计意图，列出单一语义图、绑定执行、证据/效应/锁、Agent 复用及发布门禁的优先级与验收 |
+| [roadmap/executable-knowledge-gaps-2026-10-23.md](roadmap/executable-knowledge-gaps-2026-10-23.md) | **v2.1 现状与规划缺口审计（方向修订）**：保留 G01–G12 代码证据，以可读步骤、确定执行、早期 AI 复用和局部修改重排 S0–S6，严格治理按场景增加 |
 | [design/knowledge-layers.md](design/knowledge-layers.md) | **知识分层（语法评审）**：原始语料 / 本体 / 可执行知识 / 调用面 · 单体知识类 vs 运行时实例 · `# 李白 = > 诗人` · 出处/还原验证 · EKC 映射 |
 | [design/occlusion-description-and-search.md](design/occlusion-description-and-search.md) | **遮蔽描述与两级检索**：内置词表=范例/默认，参数=扩展 · 空载荷一律 warning · 申报习惯 |
 | [design/occlusion-syntax.md](design/occlusion-syntax.md) | **遮蔽语法总纲（实施依据）**：`[描述](实现)` 的目的/语义/新鲜度校验 + M0–M8 计划 |
