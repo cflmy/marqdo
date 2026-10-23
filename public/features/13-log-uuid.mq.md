@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: Mid stdlib — log and uuid
 description: Level-filtered logs + UUID v4 (Mid M6)
 import:

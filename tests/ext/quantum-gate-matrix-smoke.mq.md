@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: quantum gate matches_matrix smoke
 description: Named H matches an explicit 2x2 nested list.
 import:

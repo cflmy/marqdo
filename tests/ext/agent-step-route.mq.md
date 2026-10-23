@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: O3 step_route table backends
 description: lookup → marqdo; net → llm; default → auto.
 import:
@@ -8,13 +9,13 @@ import:
 # main
 
 **a = agent.step_route kind="lookup"**
-**ba = [backend](a)**
+**ba = [backend](access(a, "backend"))**
 > print text=`ba`
 
 **b = agent.step_route kind="net"**
-**bb = [backend](b)**
+**bb = [backend](access(b, "backend"))**
 > print text=`bb`
 
 **c = agent.step_route kind="default"**
-**bc = [backend](c)**
+**bc = [backend](access(c, "backend"))**
 > print text=`bc`

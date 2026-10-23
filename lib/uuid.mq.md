@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: lib/uuid
 description: UUID v4 (Mid M6). Cryptographic random via getrandom.
 ---

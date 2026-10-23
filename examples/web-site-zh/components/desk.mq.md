@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: components/desk
 description: 管理台壳 — 顶栏品牌为「后台」，无前台侧栏。
 ---

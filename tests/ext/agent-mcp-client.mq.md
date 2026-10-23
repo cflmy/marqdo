@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: agent MCP stdio client (offline)
 description: Oneshoot list+call against python mock MCP server.
 import:

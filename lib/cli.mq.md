@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: lib/cli
 description: Parse argv flags (Mid M5). --key value / --key=value / --flag; positionals under _.
 ---

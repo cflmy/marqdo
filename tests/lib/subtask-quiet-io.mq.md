@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: quiet file subtask captures stdout/stderr
 import:
   subtask: lib/subtask.mq.md

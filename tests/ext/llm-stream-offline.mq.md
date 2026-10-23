@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: llm stream_result offline
 description: No network — SSE fixture via net.openai_sse_parse + llm.stream_result
 import:

@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: How to write a linear-algebra formula document
 description: ext/linalg formula-doc — declare, infix, run-implies-correct
 import:
@@ -23,8 +24,8 @@ Declare symbols in a table, multiply, transpose — `T_ascii` is one-step displa
 | 2 | B | 3 | 2 |
 
 **`env` = > la.declare table=`shapes`**
-**`A` = [A](env)**
-**`B` = [B](env)**
+**`A` = [A](access(env, "A"))**
+**`B` = [B](access(env, "B"))**
 **`P` = `A` * `B`**
 **`t` = > `P`.T_ascii**
 > print text=`t`

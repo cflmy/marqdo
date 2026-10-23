@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: quantum gate matrix heatmap smoke
 description: gate.draw kind=matrix writes SVG heatmap.
 import:
@@ -9,7 +10,7 @@ import:
 
 **H = > quantum.gate name="H"**
 **img = > `H`.draw kind="matrix" path="quantum-gate-heatmap.svg"**
-**kind = [kind](img)**
+**kind = [kind](access(img, "kind"))**
 
 1. `kind` == matrix
   > print text=heatmap-ok

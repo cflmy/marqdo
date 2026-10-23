@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: input
 description: Read one stdin line (optional prompt)
 ---

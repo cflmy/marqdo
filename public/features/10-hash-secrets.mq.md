@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: Mid stdlib — hash and secrets
 description: lib/hash + lib/secrets without plugins (Mid M3)
 import:

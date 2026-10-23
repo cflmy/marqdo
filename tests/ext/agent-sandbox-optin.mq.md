@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: agent trial sandbox opt-in — host unchanged until commit
 description: >
   O1: agent.trial write stays upper until commit=True.
@@ -24,8 +25,8 @@ Reset leftover workspace from prior runs.
 Trial with `commit=False`: upper write must not touch the host tree.
 
 **dry = agent.trial root="_sbx_optin" write_path="proof.txt" text=optin-ok commit=False**
-**dry_ok = [ok](dry)**
-**dry_committed = [committed](dry)**
+**dry_ok = [ok](access(dry, "ok"))**
+**dry_committed = [committed](access(dry, "committed"))**
 > print text=`dry_ok`
 > print text=`dry_committed`
 
@@ -35,8 +36,8 @@ Trial with `commit=False`: upper write must not touch the host tree.
 Trial with `commit=True`: host sees the file after success.
 
 **wet = agent.trial root="_sbx_optin" write_path="proof.txt" text=optin-ok commit=True**
-**wet_ok = [ok](wet)**
-**wet_committed = [committed](wet)**
+**wet_ok = [ok](access(wet, "ok"))**
+**wet_committed = [committed](access(wet, "committed"))**
 > print text=`wet_ok`
 > print text=`wet_committed`
 
@@ -45,6 +46,6 @@ Trial with `commit=True`: host sees the file after success.
 
 Profile row is attached (link-index readable).
 
-**prof = [profile](wet)**
-**pname = [name](prof)**
+**prof = [profile](access(wet, "profile"))**
+**pname = [name](access(prof, "name"))**
 > print text=`pname`

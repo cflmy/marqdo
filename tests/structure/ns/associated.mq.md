@@ -1,6 +1,8 @@
 ---
+markup: occlusion
 title: receiver-free object children are associated executable knowledge
-import helpers:helpers.mq.md
+import:
+  helpers: helpers.mq.md
 ---
 
 # main

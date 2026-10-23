@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: GHZ state
 description: 3-qubit GHZ; |000⟩/|111⟩ ≈ 1/2; probs + H matrix heatmap.
 import:

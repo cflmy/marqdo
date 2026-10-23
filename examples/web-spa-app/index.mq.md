@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: web-spa-app
 description: Native Marqdo SPA — list/detail/edit via WASM client routes + memory store
 import:

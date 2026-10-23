@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: step-route policy (O3)
 description: >
   Table-driven map from step class → Adaptive Routing backend.

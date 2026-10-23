@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: subtask foreign spawn
 import:
   subtask: lib/subtask.mq.md

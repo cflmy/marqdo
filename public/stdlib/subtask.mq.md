@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: lib/subtask — concurrent tasks
 description: Spawn file, function, or foreign code in parallel
 import:

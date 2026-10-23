@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: Bell state
 description: H then CX; probabilities ≈ 1/2; circuit SVG.
 import:

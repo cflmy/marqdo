@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 type: prompt
 title: entry prompt offline
 import:

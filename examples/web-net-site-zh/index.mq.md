@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: 网络扩展站（中文）
 description: 首页 + /about + /new（表单）+ /tools（lib/net）+ /admin（登录鉴权）+ /live（WebSocket）。
 导入:
@@ -56,18 +57,18 @@ description: 首页 + /about + /new（表单）+ /tools（lib/net）+ /admin（�
 <!-- 工具页：用 lib/net 解析展示 -->
 
 **解析请求 = > net.解析Cookie 内容="session=abc123; theme=dark"**
-**请求块 = [1](解析请求)**
+**请求块 = [1](access(解析请求, "1"))**
 
 **解析响应 = > net.解析Cookie 内容="id=42; Path=/; HttpOnly; SameSite=Lax" 是响应头=True**
-**响应块 = [1](解析响应)**
+**响应块 = [1](access(解析响应, "1"))**
 
 `边界` = ----b
 
 `正文` = "--`边界`\nContent-Disposition: form-data; name=\"title\"\n\n你好\n--`边界`\nContent-Disposition: form-data; name=\"封面\"; filename=\"pic.png\"\nContent-Type: image/png\n\n<字节>\n--`边界`--\n"
 
 **多部分 = > net.解析多部分 正文=`正文` 边界=`边界`**
-**字段块 = [1](多部分)**
-**文件块 = [2](多部分)**
+**字段块 = [1](access(多部分, "1"))**
+**文件块 = [2](access(多部分, "2"))**
 
 `工具段` =
 

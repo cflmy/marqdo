@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: subtask spawn join
 import:
   subtask: lib/subtask.mq.md

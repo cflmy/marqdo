@@ -38,6 +38,45 @@ fn declared_occlusion_ignores_legacy_environment_switches() {
     assert_eq!(stdout.trim_end(), "值");
 }
 
+fn temporary_source(tag: &str, source: &str) -> std::path::PathBuf {
+    let path =
+        std::env::temp_dir().join(format!("marqdo-markup-{tag}-{}.mq.md", std::process::id()));
+    std::fs::write(&path, source).expect("write temporary source");
+    path
+}
+
+#[test]
+fn unmarked_source_uses_occlusion_by_default() {
+    let path = temporary_source(
+        "default",
+        "# main\n\n**answer = [one plus one](1 + 1)**\n> print text=`answer`\n",
+    );
+    let (code, stdout, stderr) = run(path.to_str().unwrap(), None);
+    let _ = std::fs::remove_file(&path);
+    assert_eq!(code, 0, "stderr={stderr}");
+    assert_eq!(stdout.trim_end(), "2");
+}
+
+#[test]
+fn legacy_markup_flag_is_an_explicit_transition_path() {
+    let path = temporary_source(
+        "legacy",
+        "---\nimport:\n  json: lib/json.mq.md\n---\n\n# main\n\n**table = > json.parse text={\"key\":\"value\"}**\n**answer = [key](`table`)**\n> print text=`answer`\n",
+    );
+    let out = Command::new(env!("CARGO_BIN_EXE_marqdo"))
+        .args(["run", path.to_str().unwrap(), "--legacy-markup"])
+        .output()
+        .expect("run legacy source");
+    let _ = std::fs::remove_file(&path);
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stderr={}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert_eq!(String::from_utf8_lossy(&out.stdout).trim_end(), "value");
+}
+
 // ---- M2.5: label diagnostics (`label.missing` / `label.empty_payload`) ----
 
 fn check(path: &str, markup: &str) -> (i32, String) {
@@ -210,12 +249,12 @@ fn t1_flags_payload_change_only() {
 #[test]
 fn t1_silent_when_label_also_changes() {
     let src = "# main\n\n**a = [按税率算总价](100 * 0.1)**\n> print text=`a`\n";
-    let out = mlsp_session(&[&repair_req(
-        src,
-        "**a = [改成按两倍税率算](100 * 0.2)**",
-    )]);
+    let out = mlsp_session(&[&repair_req(src, "**a = [改成按两倍税率算](100 * 0.2)**")]);
     let line = out.join("\n");
-    assert!(line.contains("\"stale\":[]"), "label edit = author reviewed: {line}");
+    assert!(
+        line.contains("\"stale\":[]"),
+        "label edit = author reviewed: {line}"
+    );
 }
 
 #[test]

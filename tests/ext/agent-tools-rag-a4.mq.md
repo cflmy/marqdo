@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: agent corpus_search + mcp fixture tools (A4 offline)
 description: Local RAG-lite corpus search and MCP fixture call; authority stays workbook.
 import:

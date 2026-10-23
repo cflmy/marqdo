@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: lib/hash
 description: Digests and HMAC (Mid M3). Integrity / cache keys — not password hashing.
 ---

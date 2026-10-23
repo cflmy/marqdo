@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: ext/ai/llm
 description: >-
   Marqdo LLM intelligence primitive — ask / stream / collect / named handles.
@@ -26,7 +27,7 @@ Collapse a stream event list to final answer text (`done.result` or `error.messa
 
 **answer = ""**
 
-- [ev](events)
+- [ev](遍历 events 为 ev)
   **t = > json.get value=`ev` key="type"**
   1. `t` == "done"
     **answer = > json.get value=`ev` key="result"**
@@ -357,7 +358,7 @@ Semantic stream: return the event list (use `llm.collect` to reduce to text). Om
 
 Transport pack via `ext/ai/llm/openai` (Ollama uses the same OpenAI-compatible path). Non-stream → `{text,usage,finish}`; stream → `{events}`.
 
-*> openai.chat_completions base_url=[base_url](self) api_key=[api_key](self) model=[model](self) prompt=`prompt` stream=`stream` echo=`echo` suffix=[suffix](self) bearer=[bearer](self)*
+*> openai.chat_completions base_url=[base_url](access(self, "base_url")) api_key=[api_key](access(self, "api_key")) model=[model](access(self, "model")) prompt=`prompt` stream=`stream` echo=`echo` suffix=[suffix](access(self, "suffix")) bearer=[bearer](access(self, "bearer"))*
 
 ## complete
     + `prompt`

@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: OKF agent-kb alias lookup (offline)
 description: Promote resource; patch Task aliases; variant goal hits same resource.
 import:

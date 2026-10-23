@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: ext/quantum/quantum
 description: Official quantum circuit simulator (English). Gates + circuits; ABI plugin.
 import:

@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: inherit parent method
 import:
   json: lib/json.mq.md

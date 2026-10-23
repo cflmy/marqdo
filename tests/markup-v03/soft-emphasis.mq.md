@@ -1,7 +1,7 @@
 ---
 title: G2 叙述强调不执行
 description: 句中 **说明** / *only* / *very important* 为装饰；像代码的粗体与整行斜体仍执行
-markup: v0.3
+markup: occlusion
 ---
 
 # main

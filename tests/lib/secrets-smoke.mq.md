@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: lib/secrets smoke
 import:
   sec: lib/secrets.mq.md

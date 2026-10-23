@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: agent inspect_workbook (offline)
 description: Parse named writeback slots from a fixture workbook path.
 import:

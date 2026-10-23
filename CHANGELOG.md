@@ -45,9 +45,16 @@ marqdo ext add web   # CDN → 2.0.0
 
 ### Added
 
+- **文件级新语义迁移**：`marqdo migrate labels --mark` 可把整个库/目录迁移到显式 `markup: occlusion`，即使文件没有旧式索引也不再依赖进程默认值。迁移验证为语法级、无导入解析依赖，并在写入前比较 Classic 与 Occlusion AST 形状。
+- **显式过渡入口**：`marqdo run --legacy-markup` 与 `marqdo check --legacy-markup` 可在一个版本周期内审阅未迁移的旧文件；环境变量不再改变语法。
+
 ### Fixed
 
+- 标准库、扩展库、示例、公开文档与可解析测试夹具迁移为文件级 Occlusion；旧的 `[键](集合)` 和 `- [项](集合)` 分别改为 `access` 与 `遍历`。
+
 ### Changed
+
+- 未标注源码默认采用 Occlusion。Classic 仅能通过明确的 frontmatter 或 `--legacy-markup` 进入，避免同一文档因进程配置而静默改变含义。
 
 ## v1.5.2 — 2026-10-18
 

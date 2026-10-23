@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: object handle smoke
 import:
   json: lib/json.mq.md

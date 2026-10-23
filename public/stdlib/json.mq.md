@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: lib/json — JSON
 description: Shared EN/ZH path; parse and stringify (code-as-docs pilot)
 import:

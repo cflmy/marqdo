@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: lib/math — numbers, formulas, plots
 description: High-school math stdlib (English)
 import:

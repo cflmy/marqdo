@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: components/page
 description: 用原站 chrome 包一层完整 HTML 引言（bare 布局）。
 import:

@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: plan must not overwrite existing llm_free resources
 description: force+confirm plan keeps a pre-seeded compiled skill workbook intact (offline).
 import:
@@ -28,12 +29,12 @@ import:
   **_ = 1**
 > fs.make_dirs path=`kb`
 **parts = > json.parse text={"res":"/resources/","ext":".mq.md","dir":"/resources"}**
-**res_dir = kb + [dir](`parts`)**
+**res_dir = kb + [dir](access(`parts`, "dir"))**
 > fs.make_dirs path=`res_dir`
 
 **goal = "Preserve compiled skill body under force plan"**
 **slug = > agent_goal_slug goal=`goal`**
-**res = kb + [res](`parts`) + slug + [ext](`parts`)**
+**res = kb + [res](access(`parts`, "res")) + slug + [ext](access(`parts`, "ext"))**
 **body = > fs.read_text path="fixtures/preserve-skill.mq.md"**
 > fs.write_text path=`res` text=`body`
 

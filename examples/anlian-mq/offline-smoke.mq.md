@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: anlian-mq offline smoke
 description: 不 listen：装配库表/页面/门禁/WS 路由袋，验证可读路径可构造。
 导入:
@@ -45,7 +46,7 @@ description: 不 listen：装配库表/页面/门禁/WS 路由袋，验证可读
 **应用 = > 应用.门禁 路径="/write" 角色="admin" 匹配="prefix" 拒绝="redirect"**
 **应用 = > 应用.路由实时 路径="/chat/ws" 模式="broadcast"**
 
-**gates = [gates](应用)**
+**gates = [gates](access(应用, "gates"))**
 **n = > len value=`gates`**
 1. `n` >= 2
   > print text=gates-ok
@@ -53,9 +54,9 @@ description: 不 listen：装配库表/页面/门禁/WS 路由袋，验证可读
   > print text=gates-fail
   > sys.exit code=1
 
-**ws = [ws_routes](应用)**
-**room = [/chat/ws](ws)**
-**mode = [mode](room)**
+**ws = [ws_routes](access(应用, "ws_routes"))**
+**room = [/chat/ws](access(ws, "/chat/ws"))**
+**mode = [mode](access(room, "mode"))**
 1. `mode` == "broadcast"
   > print text=ws-ok
 2. *

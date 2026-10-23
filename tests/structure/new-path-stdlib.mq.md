@@ -1,6 +1,8 @@
 ---
+markup: occlusion
 title: zero-argument standard-library knowledge in a value position
-import math:lib/math.mq.md
+import:
+  math: lib/math.mq.md
 ---
 
 # main

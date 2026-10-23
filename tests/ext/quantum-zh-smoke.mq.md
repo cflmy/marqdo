@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: quantum zh API smoke
 description: Chinese 量子.电路 泡利Z sandwich.
 导入:
@@ -13,7 +14,7 @@ description: Chinese 量子.电路 泡利Z sandwich.
 **电路 = > `电路`.泡利Z 比特=0**
 **电路 = > `电路`.哈达玛 比特=0**
 **概率 = > `电路`.概率**
-**p1 = [1](概率)**
+**p1 = [1](access(概率, "1"))**
 **lo = > math.div a=9 b=10**
 
 1. `p1` > `lo`

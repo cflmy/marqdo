@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: SVD structure demo
 description: Diagonal SVD + structure SVG via ext/linalg.
 import:
@@ -18,7 +19,7 @@ $$
 
 **`M` = > la.from_formula formula=`M`**
 **`f` = > la.factorize matrix=`M` kind="svd"**
-**`S` = [S](f)**
+**`S` = [S](access(f, "S"))**
 **`_` = > la.draw factor=`f` kind="svd" theme="light" path="svd-structure.svg"**
 **`hm` = > la.draw factor=`M` kind="hinton" path="svd-hinton.svg"**
 

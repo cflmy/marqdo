@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: resolve_config
 capability: config.resolve
 status: stable

@@ -1,3 +1,7 @@
+---
+markup: occlusion
+---
+
 ## posts
 
 种子文章。首页与详情页的初始数据。created_at 用于按时间倒序展示；tag 是主标签 slug。

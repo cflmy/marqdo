@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: Agent Framework v2 — episode → learn → compile (offline)
 description: Record three identical successes, maybe_learn compiles llm_free skill, resolve hits compiled path.
 import:

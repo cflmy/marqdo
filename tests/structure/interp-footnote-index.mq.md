@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: 插值中脚注取元（前缀 + `var`[^key]）
 description: 独立 > 调用实参与引号字符串内，`前缀`var`[^key]` 的取元应生效。
 ---

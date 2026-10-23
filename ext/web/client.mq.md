@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: ext/web/client
 description: Browser Runtime helpers (WASM bridge). Prefer lib/browser for effect tables (ADR 0007).
 import:

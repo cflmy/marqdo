@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: agent constitution markers (Wave B1 offline)
 description: Assert call_site / source / protocol order in build_step_context.
 import:

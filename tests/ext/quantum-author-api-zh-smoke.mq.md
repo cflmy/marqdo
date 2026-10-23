@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: quantum author API zh smoke
 description: 屏障 / 测量 / 追加 / 态 / 绘图.
 导入:
@@ -14,14 +15,14 @@ description: 屏障 / 测量 / 追加 / 态 / 绘图.
 **qc = > `qc`.测量**
 
 **st = > `qc`.态**
-**dim = [dim](st)**
+**dim = [dim](access(st, "dim"))**
 1. `dim` == 4
   > print text=state-ok
 2. *
   > print text=state-fail
 
 **img = > `qc`.绘图 路径="quantum-author-zh-draw.svg"**
-**kind = [kind](img)**
+**kind = [kind](access(img, "kind"))**
 1. `kind` == circuit
   > print text=draw-ok
 2. *
@@ -30,7 +31,7 @@ description: 屏障 / 测量 / 追加 / 态 / 绘图.
 **other = > 量子.电路 比特数=2**
 **other = > `other`.泡利X 比特=1**
 **qc2 = > `qc`.追加 操作=`other`**
-**ops = [ops](qc2)**
+**ops = [ops](access(qc2, "ops"))**
 **n = > len `ops`**
 1. `n` == 5
   > print text=append-ok

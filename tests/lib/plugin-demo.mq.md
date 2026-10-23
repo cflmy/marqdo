@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: plugin demo ABI
 description: Loads demo cdylib; path from MARQDO_TEST_PLUGIN (set by gold harness).
 import:

@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: 线性代数公式冒烟
 description: (AB)^T 化简为 B^T*A^T；探测 ok。
 import:
@@ -16,7 +17,7 @@ import:
 > 打印 内容=`txt`
 
 **`ping` = > la.探测**
-**`ok` = [ok](ping)**
+**`ok` = [ok](access(ping, "ok"))**
 1. `ok`
   > 打印 内容=探测-ok
 2. *

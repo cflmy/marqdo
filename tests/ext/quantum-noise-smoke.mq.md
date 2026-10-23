@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: quantum noise smoke
 description: bitflip p=1 after I flips |0> to |1| for all shots.
 import:
@@ -11,7 +12,7 @@ import:
 **qc = > `qc`.i qubit=0**
 **qc = > `qc`.noise kind="bitflip" p=1**
 **r = > `qc`.run shots=32 seed=3**
-**c1 = [1]([counts](r))**
+**c1 = [1](access([counts](access(r, "counts")), "1"))**
 
 1. `c1` == 32
   > print text=noise-ok

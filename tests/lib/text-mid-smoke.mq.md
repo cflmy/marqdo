@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: lib/text mid smoke
 import:
   text: lib/text.mq.md

@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: linalg block/kron smoke (L3)
 description: Lazy kron ascii; block*block collapse.
 import:
@@ -43,7 +44,7 @@ import:
 > print text=`ct`
 
 **`ping` = > la.ping**
-**`ok` = [ok](ping)**
+**`ok` = [ok](access(ping, "ok"))**
 1. `ok`
   > print text=ping-ok
 2. *

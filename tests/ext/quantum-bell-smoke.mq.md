@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: quantum bell smoke
 description: H+CX Bell state probabilities ≈ 1/2 each.
 import:
@@ -13,8 +14,8 @@ import:
 **qc = > `qc`.cx control=0 target=1**
 **p = > `qc`.probabilities**
 
-**p00 = [00](p)**
-**p11 = [11](p)**
+**p00 = [00](access(p, "00"))**
+**p11 = [11](access(p, "11"))**
 **lo = > math.div a=2 b=5**
 **hi = > math.div a=3 b=5**
 
@@ -35,7 +36,7 @@ import:
   > print text=p11-fail
 
 **ping = > quantum_ping**
-**ok = [ok](ping)**
+**ok = [ok](access(ping, "ok"))**
 1. `ok`
   > print text=ping-ok
 2. *

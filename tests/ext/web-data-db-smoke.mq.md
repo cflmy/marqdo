@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: ext/data db smoke
 description: DB Resource lives in ext/data (ADR 0007).
 import:

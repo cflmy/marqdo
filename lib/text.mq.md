@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: lib/text
 description: Text helpers (Mid M4). Literal replace — use lib/re for regex.
 ---

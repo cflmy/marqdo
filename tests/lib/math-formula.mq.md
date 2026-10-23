@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: math formula pipeline
 import:
   math: lib/math.mq.md

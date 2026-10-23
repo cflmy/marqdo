@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: Mid stdlib — stats and log fields
 description: Thin mean/median/stdev + structured log fields (Mid2 M10)
 import:

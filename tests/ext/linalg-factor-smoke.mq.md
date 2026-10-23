@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: linalg factor smoke (L4)
 description: eig factorize, structure SVG, LU reuse solve.
 import:
@@ -17,13 +18,13 @@ $$
 **`eps` = > math.div a=1 b=1000**
 
 **`f` = > la.factorize matrix=`M` kind="eig"**
-**`kind` = [kind](f)**
+**`kind` = [kind](access(f, "kind"))**
 1. `kind` == eig
   > print text=eig-kind-ok
 2. *
   > print text=eig-kind-fail
 
-**`evals` = [eigenvalues](f)**
+**`evals` = [eigenvalues](access(f, "eigenvalues"))**
 **`ev0` = > at value=`evals` index=0**
 **`e0` = > math.sub a=`ev0` b=3**
 **`e0` = > math.abs value=`e0`**
@@ -33,13 +34,13 @@ $$
   > print text=eig-val-fail
 
 **`img` = > la.draw factor=`f` kind="eig" path="linalg-factor-eig.svg"**
-**`ik` = [kind](img)**
+**`ik` = [kind](access(img, "kind"))**
 1. `ik` == eig
   > print text=draw-kind-ok
 2. *
   > print text=draw-kind-fail
 
-**`svg` = [svg](img)**
+**`svg` = [svg](access(img, "svg"))**
 **`parts` = > split value=`svg` sep="data-linalg=\"eig\""**
 **`pn` = > len value=`parts`**
 1. `pn` > 1
@@ -61,8 +62,8 @@ $$
 **`b` = > la.from_formula formula=`b`**
 **`lu` = > la.factorize matrix=`A` kind="lu"**
 **`sol` = > la.solve factor=`lu` b=`b`**
-**`x` = [x](sol)**
-**`data` = [data](x)**
+**`x` = [x](access(sol, "x"))**
+**`data` = [data](access(x, "data"))**
 **`row0` = > at value=`data` index=0**
 **`x0` = > at value=`row0` index=0**
 **`xe` = > math.sub a=`x0` b=2**
@@ -73,7 +74,7 @@ $$
   > print text=lu-solve-fail
 
 **`svd` = > la.factorize matrix=`M` kind="svd"**
-**`sk` = [ascii](svd)**
+**`sk` = [ascii](access(svd, "ascii"))**
 1. `sk` == SVD
   > print text=svd-ok
 2. *

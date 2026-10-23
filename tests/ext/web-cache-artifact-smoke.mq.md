@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: ext/data cache smoke
 import:
   cache: ext/data/cache.mq.md
@@ -9,7 +10,7 @@ import:
 **c = > cache.cache url="memory:"**
 > `c`.set key="k" value="v" ttl=60
 **got = > `c`.get key="k"**
-**val = [value](got)**
+**val = [value](access(got, "value"))**
 1. `val` == "v"
   > print text=cache-ok
 2. *

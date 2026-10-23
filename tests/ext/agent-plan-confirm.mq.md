@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: agent plan confirm (offline)
 description: Create workbook skeleton with confirm=True; no LLM spawn loop.
 import:

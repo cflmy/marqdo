@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: lib/writeback
 description: Persist run output in .mq.md (Jupyter-style writeback)
 ---

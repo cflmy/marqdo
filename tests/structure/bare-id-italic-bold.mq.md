@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: bare id in italic and bold
 description: Inside **…** / *…*, bare ids are variables; strings need quotes.
 ---

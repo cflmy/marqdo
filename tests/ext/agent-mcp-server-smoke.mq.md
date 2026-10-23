@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: agent mcp server smoke
 description: Offline assemble mcp_server + one tool (no serve).
 import:
@@ -18,15 +19,15 @@ import:
 
 **srv = > agent.mcp_server name="marqdo-test"**
 **srv = > `srv`.tool name="ping" fn="demo.ping" description="ping tool"**
-**tools = [tools](srv)**
+**tools = [tools](access(srv, "tools"))**
 **n = > len value=`tools`**
 1. `n` == 1
   > print text=mcp-tool-ok
 2. *
   > print text=mcp-tool-fail
 
-**t0 = [1](tools)**
-**fn = [fn](t0)**
+**t0 = [1](access(tools, "1"))**
+**fn = [fn](access(t0, "fn"))**
 1. `fn` == "demo.ping"
   > print text=mcp-fn-ok
 2. *

@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: Least squares via lstsq
 description: Overdetermined Ax≈b with ext/linalg lstsq + heatmap.
 import:
@@ -28,8 +29,8 @@ $$
 **`_` = > la.draw factor=`A` kind="heatmap" theme="light" path="ls-heatmap.svg"**
 
 **`ls` = > la.lstsq a=`A` b=`b`**
-**`x` = [x](ls)**
-**`resid` = [residual_fro](ls)**
+**`x` = [x](access(ls, "x"))**
+**`resid` = [residual_fro](access(ls, "residual_fro"))**
 
 > print text=`x`
 > print text=`resid`

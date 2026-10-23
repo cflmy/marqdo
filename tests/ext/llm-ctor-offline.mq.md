@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: llm constructor offline
 description: Build llm handle from env + defaults; no network.
 import:
@@ -8,5 +9,5 @@ import:
 # main
 
 **model = > llm.llm**
-> print text=[model](`model`)
-> print text=[suffix](`model`)
+> print text=[model](access(`model`, "model"))
+> print text=[suffix](access(`model`, "suffix"))

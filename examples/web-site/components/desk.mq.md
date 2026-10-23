@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: components/desk
 description: Admin desk chrome — brand reads Admin; no public side rail.
 ---

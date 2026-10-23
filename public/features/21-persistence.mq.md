@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: Persisting foreign execution results
 description: Static snapshots and writeback — how foreign results survive after the process exits
 import:

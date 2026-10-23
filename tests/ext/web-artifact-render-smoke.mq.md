@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: web artifact render smoke
 description: Unified View nodes + document render (ADR 0007); offline, no listen.
 import:

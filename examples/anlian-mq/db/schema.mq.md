@@ -1,3 +1,7 @@
+---
+markup: occlusion
+---
+
 ## posts
 
 帖子主表。`slug` 用于详情路径；`board` 为板块显示名，`board_id` 关联 `boards`。

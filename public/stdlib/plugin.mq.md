@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: lib/plugin — native ABI
 description: Load optional shared libraries (.dll / .so / .dylib)
 import:

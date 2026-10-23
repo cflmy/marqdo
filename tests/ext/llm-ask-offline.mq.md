@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: llm create + collect offline
 description: Factory create + collect alias; no network.
 import:
@@ -9,8 +10,8 @@ import:
 # main
 
 **model = > llm.create**
-> print text=[model](`model`)
-> print text=[backend](`model`)
+> print text=[model](access(`model`, "model"))
+> print text=[backend](access(`model`, "backend"))
 
 **fixture = "data: {\"choices\":[{\"delta\":{\"content\":\"Hi\"}}]}\n\ndata: {\"choices\":[{\"delta\":{\"content\":\"!\"}}]}\n\ndata: [DONE]\n"**
 **events = > net.openai_sse_parse text=`fixture`**

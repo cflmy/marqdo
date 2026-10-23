@@ -1,7 +1,7 @@
 ---
 title: v0.3 死绑定不升参
 description: 叙述提到`Markdown`/`GFM`但不读写；仅`题干`为形参
-markup: v0.3
+markup: occlusion
 ---
 
 ## 回声

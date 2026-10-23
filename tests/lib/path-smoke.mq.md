@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: lib/path smoke
 import:
   path: lib/path.mq.md

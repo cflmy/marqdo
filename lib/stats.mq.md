@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: lib/stats
 description: Thin mean / median / sample stdev (Mid2 M10). Not a dataframe library.
 ---

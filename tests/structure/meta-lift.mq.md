@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: meta-lift
 model: ${env.MARQDO_LIFT_MODEL ?? "lifted-model"}
 api_key: ${secret.MARQDO_LIFT_SECRET ?? "sk-lift"}

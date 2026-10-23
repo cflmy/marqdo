@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: db/index
 description: 打开 sqlite、建表、幂等种子。
 导入:

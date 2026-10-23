@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: agent resume checkpoint (offline)
 description: save / load / list / clear under .marqdo/agent-resume-test
 import:

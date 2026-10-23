@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: Unbound GFM table is a discarded value
 ---
 

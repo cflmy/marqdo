@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: db/index
 description: 打开库、建全表、幂等种子、帖子全文索引。
 导入:

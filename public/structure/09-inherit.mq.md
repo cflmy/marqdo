@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: Object inheritance
 description: "# Child = > Parent; methods walk the base chain"
 ---

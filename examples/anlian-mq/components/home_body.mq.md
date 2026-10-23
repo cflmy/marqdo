@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: components/home_body
 description: 首页主体 HTML — hero + 公告 + 新闻时间线 + 论坛帖子（对齐 Django home.html，无外层导航）。
 导入:
@@ -20,9 +21,9 @@ description: 首页主体 HTML — hero + 公告 + 新闻时间线 + 论坛帖�
 **帖子行 = > 库.查询 表="posts" 上限=10 排序="-created_at"**
 
 **公告段 = None**
-- [告](公告行)
-  **文 = [content](告)**
-  **时 = [created_at](告)**
+- [告](遍历 公告行 为 告)
+  **文 = [content](access(告, "content"))**
+  **时 = [created_at](access(告, "created_at"))**
   **一项 = "<div class=\"notice-item\"><article class=\"notice-content\">" + 文 + "</article><p class=\"notice-create-time\">" + 时 + "</p></div>"**
   **公告段 = > table.append list=公告段 item=一项**
 1. 公告段

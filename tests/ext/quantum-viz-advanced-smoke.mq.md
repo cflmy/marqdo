@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: quantum viz advanced smoke
 description: Q7b hinton / qsphere / multibloch SVG markers
 import:

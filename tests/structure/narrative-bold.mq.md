@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: narrative without star emphasis
 description: v0.3 — do not use * /** for Markdown emphasis; plain prose stays non-executable
 ---

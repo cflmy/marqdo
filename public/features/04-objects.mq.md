@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: Objects and methods
 description: Sharp heading is a type; deeper headings are functions or methods
 ---

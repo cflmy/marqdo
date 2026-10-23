@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: OKF agent-kb promote + lookup + spawn (offline)
 description: Promote a solidified workbook, lookup by goal, spawn without parent LLM.
 import:

@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: linalg basic smoke (L2)
 description: from_formula, det, solve 2×2, explicit mul.
 import:
@@ -39,8 +40,8 @@ $$
   > print text=trace-fail
 
 **`sol` = > la.solve a=`A` b=`b`**
-**`x` = [x](sol)**
-**`data` = [data](x)**
+**`x` = [x](access(sol, "x"))**
+**`data` = [data](access(x, "data"))**
 **`row0` = > at value=`data` index=0**
 **`x0` = > at value=`row0` index=0**
 **`e0` = > math.sub a=`x0` b=2**
@@ -53,7 +54,7 @@ $$
 **`I` = > la.eye n=2**
 **`P` = > la.mul a=`A` b=`I`**
 **`E` = > la.explicit expr=`P`**
-**`ed` = [data](E)**
+**`ed` = [data](access(E, "data"))**
 **`ed0` = > at value=`ed` index=0**
 **`ed00` = > at value=`ed0` index=0**
 **`ee` = > math.sub a=`ed00` b=2**

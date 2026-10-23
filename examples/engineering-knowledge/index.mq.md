@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: Engineering Knowledge demo
 description: Tiny project demonstrating Capability Catalog + reuse + decisions.
 ---

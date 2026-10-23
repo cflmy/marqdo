@@ -1,3 +1,7 @@
+---
+markup: occlusion
+---
+
 ## posts
 
 文章主表结构。`slug` 用于详情页 `/post/{slug}` 的动态路由；`content` 存 Markdown 正文；`tag` 是主标签（tags 表 slug）。

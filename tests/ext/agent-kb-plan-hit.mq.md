@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: OKF plan llm_free hit + list_tasks curation (A1 offline)
 description: Promote solidified workbook; plan same goal takes cache=hit; near→soft-hit; list_tasks exposes status/llm_free.
 import:

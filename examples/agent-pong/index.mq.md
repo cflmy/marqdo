@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: agent-pong (Wave B0)
 description: >-
   Constitution demo — call_site + source in step context; optional live CALL via .env.

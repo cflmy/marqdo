@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: lib/re smoke
 import:
   re: lib/re.mq.md

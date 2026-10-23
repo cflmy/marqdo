@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: ext/agent step (DeepSeek)
 description: Real agent.step with tool via lib/subtask; default writeback to ok/error slots.
 import:

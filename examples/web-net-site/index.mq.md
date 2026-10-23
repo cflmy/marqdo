@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: web-net-site
 description: Home + /about + /new (form) + /tools (net lib) + /admin (auth) + /live (WebSocket).
 import:
@@ -47,12 +48,12 @@ About page: same shell.
 Parse a `Cookie` request header with the standard library.
 
 **parsed_req = > net.cookie_parse text="session=abc123; theme=dark"**
-**req_cookie = [1](parsed_req)**
+**req_cookie = [1](access(parsed_req, "1"))**
 
 Parse a `Set-Cookie` response header.
 
 **parsed_resp = > net.cookie_parse text="id=42; Path=/; HttpOnly; SameSite=Lax" is_response=True**
-**resp_cookie = [1](parsed_resp)**
+**resp_cookie = [1](access(parsed_resp, "1"))**
 
 Parse a `multipart/form-data` body.
 
@@ -61,8 +62,8 @@ Parse a `multipart/form-data` body.
 `_body` = "--`_b`\nContent-Disposition: form-data; name=\"title\"\n\nHello\n--`_b`\nContent-Disposition: form-data; name=\"cover\"; filename=\"pic.png\"\nContent-Type: image/png\n\n<bytes>\n--`_b`--\n"
 
 **mp = > net.multipart_parse body=`_body` boundary=`_b`**
-**mp_title = [1](mp)**
-**mp_cover = [2](mp)**
+**mp_title = [1](access(mp, "1"))**
+**mp_cover = [2](access(mp, "2"))**
 
 Build the tools page as one HTML intro (intro is served raw).
 

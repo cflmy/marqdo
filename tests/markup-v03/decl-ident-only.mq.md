@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: `` `n+1` `` is not a Decl name
 description: Only identifier Decl names elevate; `` `n+1` `` stays narrative
 ---

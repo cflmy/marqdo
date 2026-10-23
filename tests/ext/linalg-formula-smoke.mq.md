@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: linalg formula smoke
 description: (AB)^T simplifies to B^T*A^T; ping ok.
 import:
@@ -16,7 +17,7 @@ import:
 > print text=`txt`
 
 **`ping` = > la.ping**
-**`ok` = [ok](ping)**
+**`ok` = [ok](access(ping, "ok"))**
 1. `ok`
   > print text=ping-ok
 2. *

@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: View without foreign
 description: A pure Marqdo document — formula, table, plot and prose, no external kernel
 import:

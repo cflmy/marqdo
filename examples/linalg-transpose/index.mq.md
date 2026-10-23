@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: Transpose identity (formula document)
 description: (AB)^T = B^T A^T as a runnable lecture fragment.
 import:
@@ -19,8 +20,8 @@ Declare shapes in a table, form \(P = AB\), then check \((AB)^\top = B^\top A^\t
 | 2 | B | 3 | 2 |
 
 **`env` = > la.declare table=`shapes`**
-**`A` = [A](env)**
-**`B` = [B](env)**
+**`A` = [A](access(env, "A"))**
+**`B` = [B](access(env, "B"))**
 **`P` = `A` * `B`**
 **`t` = > `P`.T_ascii**
 > print text=`t`

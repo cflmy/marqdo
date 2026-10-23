@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: quantum linalg smoke
 description: Q7a density / partial_trace / expect / schmidt / purity
 import:
@@ -41,7 +42,7 @@ import:
   > print text=expect-fail
 
 **sch = > `qc`.schmidt cut=1**
-**ent = [entropy](sch)**
+**ent = [entropy](access(sch, "entropy"))**
 **elo = > math.div a=1 b=2**
 1. `ent` > `elo`
   > print text=schmidt-ok

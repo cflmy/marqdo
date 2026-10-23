@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: lib/log + uuid smoke
 import:
   log: lib/log.mq.md

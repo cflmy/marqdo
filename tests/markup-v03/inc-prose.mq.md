@@ -1,7 +1,7 @@
 ---
 title: v0.3 加一（叙述统一动机例）
 description: 叙述声明 `n`；粗体赋值；斜体返回；`>` 调用后打印返回值
-markup: v0.3
+markup: occlusion
 ---
 
 ## 加一函数

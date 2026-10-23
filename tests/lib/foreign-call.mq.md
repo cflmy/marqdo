@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: foreign call and call_many
 import:
   foreign: lib/foreign.mq.md

@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: styles/shell
 description: 暗恋见君壳样式——对照 Django 原站粉玻璃 + 动效，用表格声明。
 导入:

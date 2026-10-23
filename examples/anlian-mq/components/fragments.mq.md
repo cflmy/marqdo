@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: components/fragments
 description: AJAX 片段 — /post/ten、/news/five。
 导入:

@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: lib/json
 description: JSON parse/stringify (shared EN/ZH import). Not a dict builder — use lib/table.
 ---

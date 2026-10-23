@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: lib/fs — files
 description: Read and write text under the sandbox
 import:

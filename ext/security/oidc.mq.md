@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: ext/security/oidc
 description: OIDC attach helper for app handles (ADR 0007). Prefer declared auth metadata on Endpoints.
 import:

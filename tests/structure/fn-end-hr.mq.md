@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: 函数体内 --- 为叙述分隔
 description: 分割线不再收束函数；嵌套 ## 在下一标题或空返回处结束
 ---

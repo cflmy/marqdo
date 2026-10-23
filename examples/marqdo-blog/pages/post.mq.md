@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 type: web
 title: Post
 route: /post/{slug}

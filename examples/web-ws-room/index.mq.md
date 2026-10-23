@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: web-ws-room demo
 description: Dynamic room WS with presence (G-WS1/2 bag). Open / and connect via bridge or wscat.
 import:

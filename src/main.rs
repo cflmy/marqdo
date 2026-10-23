@@ -57,6 +57,10 @@ enum MigrateAction {
         /// Actually rewrite files (default: dry run)
         #[arg(long)]
         write: bool,
+        /// Add `markup: occlusion` to every unmarked file, including files
+        /// with no legacy index. Use this when migrating a shipped library.
+        #[arg(long)]
+        mark: bool,
         /// One JSON object on stdout
         #[arg(long)]
         json: bool,
@@ -550,7 +554,9 @@ fn resolve_knowledge_reference<'a>(
         anyhow::bail!("knowledge reference `{reference}` must be a dotted value path or mq:// URI");
     };
     if !call.args.is_empty() {
-        anyhow::bail!("knowledge resolve only binds a zero-argument path; `{reference}` has arguments");
+        anyhow::bail!(
+            "knowledge resolve only binds a zero-argument path; `{reference}` has arguments"
+        );
     }
     let path = call.path.ok_or_else(|| {
         anyhow::anyhow!("knowledge reference `{reference}` must start with an imported module bind")
@@ -566,7 +572,9 @@ fn resolve_knowledge_reference<'a>(
         .imports
         .iter()
         .find(|item| item.bind == path[0])
-        .ok_or_else(|| anyhow::anyhow!("unknown import bind `{}` in {}", path[0], from.display()))?;
+        .ok_or_else(|| {
+            anyhow::anyhow!("unknown import bind `{}` in {}", path[0], from.display())
+        })?;
     let base = from.parent().unwrap_or_else(|| std::path::Path::new("."));
     let imported_path = marqdo::load::resolve_import(base, &imported.path)?;
     let imported_path = imported_path.canonicalize().unwrap_or(imported_path);
@@ -872,26 +880,36 @@ fn try_main(cli: Cli) -> Result<i32> {
             Ok(0)
         }
         Commands::Migrate { action } => match action {
-            MigrateAction::Labels { paths, write, json } => {
+            MigrateAction::Labels {
+                paths,
+                write,
+                mark,
+                json,
+            } => {
                 let mut reports = Vec::new();
                 for p in &paths {
-                    reports.extend(marqdo::migrate::migrate_path(p, write)?);
+                    reports.extend(marqdo::migrate::migrate_path_with_options(p, write, mark)?);
                 }
-                let (mut idx, mut loops, mut applied) = (0usize, 0usize, 0usize);
+                let (mut idx, mut loops, mut marked, mut applied) =
+                    (0usize, 0usize, 0usize, 0usize);
                 for r in &reports {
                     idx += r.indexes;
                     loops += r.loops;
+                    marked += usize::from(r.mode_marked);
                     applied += usize::from(r.applied);
                 }
                 if json {
                     let arr: Vec<serde_json::Value> = reports
                         .iter()
-                        .filter(|r| r.indexes > 0 || r.loops > 0 || r.note.is_some())
+                        .filter(|r| {
+                            r.indexes > 0 || r.loops > 0 || r.mode_marked || r.note.is_some()
+                        })
                         .map(|r| {
                             serde_json::json!({
                                 "file": r.file.display().to_string(),
                                 "indexes": r.indexes,
                                 "loops": r.loops,
+                                "mode_marked": r.mode_marked,
                                 "applied": r.applied,
                                 "note": r.note,
                             })
@@ -900,7 +918,7 @@ fn try_main(cli: Cli) -> Result<i32> {
                     println!("{}", serde_json::Value::Array(arr));
                 } else {
                     for r in &reports {
-                        if r.indexes == 0 && r.loops == 0 {
+                        if r.indexes == 0 && r.loops == 0 && !r.mode_marked {
                             continue;
                         }
                         let state = if r.applied {
@@ -911,10 +929,15 @@ fn try_main(cli: Cli) -> Result<i32> {
                             "would change"
                         };
                         println!(
-                            "{}  indexes={} loops={} {}{}",
+                            "{}  indexes={} loops={} mode={} {}{}",
                             r.file.display(),
                             r.indexes,
                             r.loops,
+                            if r.mode_marked {
+                                "occlusion"
+                            } else {
+                                "unchanged"
+                            },
                             state,
                             r.note
                                 .as_ref()
@@ -923,7 +946,7 @@ fn try_main(cli: Cli) -> Result<i32> {
                         );
                     }
                     println!(
-                        "migrate labels: {idx} index, {loops} loop, {applied} file written{}",
+                        "migrate labels: {idx} index, {loops} loop, {marked} explicit mode, {applied} file written{}",
                         if write {
                             ""
                         } else {
@@ -942,9 +965,10 @@ fn try_main(cli: Cli) -> Result<i32> {
                 for r in &reports {
                     bindings += r.bindings;
                     applied += usize::from(r.applied);
-                    if r.note.as_ref().is_some_and(|n| {
-                        n != "no legacy import one-liners"
-                    }) && r.bindings == 0
+                    if r.note
+                        .as_ref()
+                        .is_some_and(|n| n != "no legacy import one-liners")
+                        && r.bindings == 0
                     {
                         problems += 1;
                     }
@@ -952,7 +976,12 @@ fn try_main(cli: Cli) -> Result<i32> {
                 if json {
                     let arr: Vec<serde_json::Value> = reports
                         .iter()
-                        .filter(|r| r.bindings > 0 || r.note.as_ref().is_some_and(|n| n != "no legacy import one-liners"))
+                        .filter(|r| {
+                            r.bindings > 0
+                                || r.note
+                                    .as_ref()
+                                    .is_some_and(|n| n != "no legacy import one-liners")
+                        })
                         .map(|r| {
                             serde_json::json!({
                                 "file": r.file.display().to_string(),
@@ -965,7 +994,11 @@ fn try_main(cli: Cli) -> Result<i32> {
                     println!("{}", serde_json::Value::Array(arr));
                 } else {
                     for r in &reports {
-                        if r.bindings == 0 && r.note.as_ref().is_some_and(|n| n == "no legacy import one-liners") {
+                        if r.bindings == 0
+                            && r.note
+                                .as_ref()
+                                .is_some_and(|n| n == "no legacy import one-liners")
+                        {
                             continue;
                         }
                         if r.bindings == 0 {
@@ -1155,7 +1188,9 @@ fn try_main(cli: Cli) -> Result<i32> {
                                 "{}\n  {}{} {} · module {}\n  {}:{}",
                                 item.id,
                                 item.kind.as_str(),
-                                item.callable.map(|kind| format!(" ({})", kind.as_str())).unwrap_or_default(),
+                                item.callable
+                                    .map(|kind| format!(" ({})", kind.as_str()))
+                                    .unwrap_or_default(),
                                 item.declaration_path.join("."),
                                 item.module,
                                 item.source.display(),
@@ -1172,15 +1207,17 @@ fn try_main(cli: Cli) -> Result<i32> {
                     Ok(0)
                 }
                 KnowledgeAction::Resolve { reference, from } => {
-                    let from = from.as_deref().or_else(|| path.is_file().then_some(path.as_path()));
+                    let from = from
+                        .as_deref()
+                        .or_else(|| path.is_file().then_some(path.as_path()));
                     let index = marqdo::sema::ProjectIndex::build(if path.is_dir() {
                         marqdo::project::ProjectRoot::new(&path)?
                     } else {
                         marqdo::project::ProjectRoot::discover(&path)?
                     })?;
                     let symbol = resolve_knowledge_reference(&index, &reference, from)?;
-                    let instance_only = symbol.callable
-                        == Some(marqdo::sema::CallableKind::InstanceMethod);
+                    let instance_only =
+                        symbol.callable == Some(marqdo::sema::CallableKind::InstanceMethod);
                     if json {
                         println!(
                             "{}",
@@ -1209,32 +1246,83 @@ fn try_main(cli: Cli) -> Result<i32> {
                 }
                 KnowledgeAction::Lock { update, strict } => {
                     let semantic_root = if path.is_file() {
-                        path.parent().unwrap_or_else(|| std::path::Path::new(".")).to_path_buf()
+                        path.parent()
+                            .unwrap_or_else(|| std::path::Path::new("."))
+                            .to_path_buf()
                     } else {
                         path.clone()
                     };
-                    let compilation = marqdo::sema::compile_project(&marqdo::sema::CompileOptions {
-                        project_root: semantic_root,
-                        entry: path.is_file().then(|| path.clone()),
-                        lock_mode: if strict { marqdo::sema::LockMode::Strict } else { marqdo::sema::LockMode::Check },
-                    })?;
+                    let compilation =
+                        marqdo::sema::compile_project(&marqdo::sema::CompileOptions {
+                            project_root: semantic_root,
+                            entry: path.is_file().then(|| path.clone()),
+                            lock_mode: if strict {
+                                marqdo::sema::LockMode::Strict
+                            } else {
+                                marqdo::sema::LockMode::Check
+                            },
+                        })?;
                     if update {
                         marqdo::sema::update_links_lock(&out, &compilation.semantics)?;
                         let body = serde_json::json!({"schema_version": 1, "status": "updated", "path": out.join("links.lock.json")});
-                        if json { println!("{body}"); } else { println!("knowledge lock updated: {}", out.join("links.lock.json").display()); }
+                        if json {
+                            println!("{body}");
+                        } else {
+                            println!(
+                                "knowledge lock updated: {}",
+                                out.join("links.lock.json").display()
+                            );
+                        }
                         Ok(0)
                     } else {
                         let report = marqdo::sema::check_links_lock(&out, &compilation.semantics)?;
-                        if json { println!("{}", report.to_json()); } else { println!("knowledge lock: {}", report.status); for id in report.missing.iter().chain(report.changed.iter()).chain(report.removed.iter()) { println!("  {id}"); } }
+                        if json {
+                            println!("{}", report.to_json());
+                        } else {
+                            println!("knowledge lock: {}", report.status);
+                            for id in report
+                                .missing
+                                .iter()
+                                .chain(report.changed.iter())
+                                .chain(report.removed.iter())
+                            {
+                                println!("  {id}");
+                            }
+                        }
                         Ok(if strict && !report.is_clean() { 3 } else { 0 })
                     }
                 }
                 KnowledgeAction::Impact { query } => {
-                    let semantic_root = if path.is_file() { path.parent().unwrap_or_else(|| std::path::Path::new(".")).to_path_buf() } else { path.clone() };
-                    let compilation = marqdo::sema::compile_project(&marqdo::sema::CompileOptions { project_root: semantic_root, entry: path.is_file().then(|| path.clone()), lock_mode: marqdo::sema::LockMode::Off })?;
+                    let semantic_root = if path.is_file() {
+                        path.parent()
+                            .unwrap_or_else(|| std::path::Path::new("."))
+                            .to_path_buf()
+                    } else {
+                        path.clone()
+                    };
+                    let compilation =
+                        marqdo::sema::compile_project(&marqdo::sema::CompileOptions {
+                            project_root: semantic_root,
+                            entry: path.is_file().then(|| path.clone()),
+                            lock_mode: marqdo::sema::LockMode::Off,
+                        })?;
                     let report = marqdo::sema::semantic_impact(&compilation.semantics, &query);
-                    if json { println!("{report}"); } else { for item in report["affected"].as_array().into_iter().flatten() { println!("{}  {}", item["artifact_id"].as_str().unwrap_or(""), item["display_name"].as_str().unwrap_or("")); } }
-                    Ok(if report["resolved"].as_bool() == Some(true) { 0 } else { 1 })
+                    if json {
+                        println!("{report}");
+                    } else {
+                        for item in report["affected"].as_array().into_iter().flatten() {
+                            println!(
+                                "{}  {}",
+                                item["artifact_id"].as_str().unwrap_or(""),
+                                item["display_name"].as_str().unwrap_or("")
+                            );
+                        }
+                    }
+                    Ok(if report["resolved"].as_bool() == Some(true) {
+                        0
+                    } else {
+                        1
+                    })
                 }
                 KnowledgeAction::Preflight {
                     task,

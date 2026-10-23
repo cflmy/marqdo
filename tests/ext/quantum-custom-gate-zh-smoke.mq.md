@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: quantum custom gate zh from formula
 description: $$ 矩阵 $$ → 门 矩阵= → 施加.
 导入:
@@ -17,7 +18,7 @@ $$
 **qc = > 量子.电路 比特数=1**
 **qc = > `qc`.施加 门=`U` 比特=0**
 **p = > `qc`.概率**
-**p0 = [0](p)**
+**p0 = [0](access(p, "0"))**
 **lo = > math.div a=4 b=10**
 **hi = > math.div a=6 b=10**
 

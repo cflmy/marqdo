@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 type: endpoint
 method: GET
 path: /api/ping

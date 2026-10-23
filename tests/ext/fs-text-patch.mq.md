@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: fs text_patch / apply_patch_blocks (offline)
 import:
   fs: lib/fs.mq.md

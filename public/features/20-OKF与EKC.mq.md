@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: 代码即文档，文档即知识 — OKF 与 EKC
 description: Marqdo 如何以一份可执行源为唯一权威，把它投影成 OKF 风格知识与 Engineering Knowledge Compiler 制品
 ---

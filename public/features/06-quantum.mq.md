@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: Quantum circuits (ext/quantum)
 description: Official quantum simulator — tables, gates, Q7 density, Q8 themed SVG
 import:

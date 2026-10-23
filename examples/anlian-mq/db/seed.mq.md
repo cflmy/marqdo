@@ -1,3 +1,7 @@
+---
+markup: occlusion
+---
+
 ## boards
 
 帖子板块：日常 / 开发 / 聊天。

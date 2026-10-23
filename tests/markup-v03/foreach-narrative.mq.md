@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: v0.3 循环头叙述糖
 description: 对`xs`的每一项`项` / for each `item` in `ys`
 ---

@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: styles/shell
 description: >-
   Literary dark theme for examples/web-site — ink / wine / gold after the

@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: ext/net/http
 description: HTTP primitives surface for Web Runtime (ADR 0007). Prefer Document/Endpoint Artifacts over raw calls.
 import:

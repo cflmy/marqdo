@@ -1,3 +1,7 @@
+---
+markup: occlusion
+---
+
 ## nav
 
 Site top navigation. The Admin tab points at the login-gated admin page.

@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: lib/html
 description: HTML escape / unescape (Mid2 M8). XSS floor for string assembly.
 ---

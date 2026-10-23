@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: 中文站点示例
 description: >-
   与 examples/web-site 对等的 WWW Demo 样站：表驱动全站；作者业务 JS=0；作者 .css=0。

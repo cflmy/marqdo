@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: foreign zh
 导入:
   外联: lib/外联.mq.md

@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 id: document.invoice-answer
 type: Answer
 import:
@@ -7,7 +8,7 @@ import:
 
 # 发票回答
 
-**总额 = [订单的含税总价](pricing.订单定价.含税总额(订单))**
+**总额 = [订单的含税总价](access(pricing.订单定价.含税总额(订单), "订单的含税总价"))**
 
 这张订单的含税总额是[含税总价](总额)。
 

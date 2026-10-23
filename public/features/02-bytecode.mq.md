@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: Bytecode backend
 description: `--backend bytecode` shares semantics with tree-walk
 ---

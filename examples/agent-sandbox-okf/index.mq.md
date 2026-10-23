@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: agent-sandbox-okf — trial then commit
 description: >
   O1 example: opt-in sandbox trial with GFM-table returns and link-index reads.
@@ -20,8 +21,8 @@ Short demo: write via `agent.trial`, prove the host is clean until commit.
 > fs.make_dir path="_example_sbx"
 
 **dry = agent.trial root="_example_sbx" write_path="note.txt" text=sandbox-okf commit=False**
-**dry_ok = [ok](dry)**
-**dry_committed = [committed](dry)**
+**dry_ok = [ok](access(dry, "ok"))**
+**dry_committed = [committed](access(dry, "committed"))**
 1. `dry_ok`
   1. not `dry_committed`
     > print text=dry-ok
@@ -37,8 +38,8 @@ Short demo: write via `agent.trial`, prove the host is clean until commit.
   > print text=host-clean
 
 **wet = agent.trial root="_example_sbx" write_path="note.txt" text=sandbox-okf commit=True**
-**wet_ok = [ok](wet)**
-**wet_committed = [committed](wet)**
+**wet_ok = [ok](access(wet, "ok"))**
+**wet_committed = [committed](access(wet, "committed"))**
 1. `wet_ok`
   1. `wet_committed`
     > print text=wet-ok
@@ -53,7 +54,7 @@ Short demo: write via `agent.trial`, prove the host is clean until commit.
 2. *
   > print text=proof-missing
 
-**pname = [name]([profile](wet))**
+**pname = [name](access([profile](access(wet, "profile")), "name"))**
 1. `pname` == "default"
   > print text=profile-default
 2. *

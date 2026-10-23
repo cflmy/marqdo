@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: ext llm DeepSeek complete
 description: OpenAI-compatible chat via DeepSeek. Credentials from tests/ext/.env.
 import:

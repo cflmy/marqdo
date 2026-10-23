@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: linalg metrics smoke (L6)
 description: lstsq, norm, cond, rank, complex fro, themed draw.
 import:
@@ -24,8 +25,8 @@ $$
 **`eps` = > math.div a=1 b=1000**
 
 **`ls` = > la.lstsq a=`A` b=`b`**
-**`x` = [x](ls)**
-**`xd` = [data](x)**
+**`x` = [x](access(ls, "x"))**
+**`xd` = [data](access(x, "data"))**
 **`r0` = > at value=`xd` index=0**
 **`x0` = > at value=`r0` index=0**
 **`e0` = > math.sub a=`x0` b=1.1666666667**
@@ -50,7 +51,7 @@ $$
 
 **`D` = > la.from_formula formula=`D`**
 **`c` = > la.cond expr=`D`**
-**`cv` = [value](c)**
+**`cv` = [value](access(c, "value"))**
 **`ce` = > math.sub a=`cv` b=2**
 **`ce` = > math.abs value=`ce`**
 1. `ce` < `eps`
@@ -66,7 +67,7 @@ $$
 
 **`raw` = > json.parse text="[[[0,1],[1,0]],[[1,0],[0,-1]]]"**
 **`Z` = > la.from_list data=`raw`**
-**`dt` = [dtype](Z)**
+**`dt` = [dtype](access(Z, "dtype"))**
 1. `dt` == complex
   > print text=complex-dtype-ok
 2. *
@@ -81,13 +82,13 @@ $$
   > print text=complex-norm-fail
 
 **`img` = > la.draw factor=`D` kind="heatmap" theme="dark" path="linalg-metrics-heat.svg"**
-**`th` = [theme](img)**
+**`th` = [theme](access(img, "theme"))**
 1. `th` == dark
   > print text=theme-ok
 2. *
   > print text=theme-fail
 
-**`svg` = [svg](img)**
+**`svg` = [svg](access(img, "svg"))**
 **`parts` = > split value=`svg` sep="data-theme=\"dark\""**
 **`pn` = > len value=`parts`**
 1. `pn` > 1

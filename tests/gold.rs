@@ -558,7 +558,7 @@ fn knowledge_resolve_rejects_instance_path() {
 fn error_ns_instance_method() {
     assert_err(
         "tests/errors/ns-instance-method.mq.md",
-        "9:1",
+        "10:1",
         "instance method",
     );
 }
@@ -804,7 +804,7 @@ a",
 fn error_undefined_var() {
     assert_err(
         "tests/errors/undefined-var.mq.md",
-        "7:1",
+        "8:1",
         "undefined variable `missing`",
     );
 }
@@ -813,7 +813,7 @@ fn error_undefined_var() {
 fn error_unknown_fn() {
     assert_err(
         "tests/errors/unknown-fn.mq.md",
-        "7:1",
+        "8:1",
         "unknown function `no_such_fn`",
     );
 }
@@ -822,7 +822,7 @@ fn error_unknown_fn() {
 fn error_bad_arity() {
     assert_err(
         "tests/errors/bad-arity.mq.md",
-        "7:1",
+        "8:1",
         "missing argument for parameter `x`",
     );
 }
@@ -851,14 +851,14 @@ fn error_lone_asterisk_line() {
 
 #[test]
 fn error_div_zero() {
-    assert_err("tests/errors/div-zero.mq.md", "7:1", "division by zero");
+    assert_err("tests/errors/div-zero.mq.md", "8:1", "division by zero");
 }
 
 #[test]
 fn error_footnote_zero() {
     assert_err(
         "tests/errors/footnote-zero.mq.md",
-        "13:1",
+        "14:1",
         "`[^0]` is invalid",
     );
 }
@@ -867,7 +867,7 @@ fn error_footnote_zero() {
 fn error_footnote_oob() {
     assert_err(
         "tests/errors/footnote-oob.mq.md",
-        "13:1",
+        "14:1",
         "out of range",
     );
 }
@@ -876,7 +876,7 @@ fn error_footnote_oob() {
 fn error_footnote_missing_key() {
     assert_err(
         "tests/errors/footnote-missing-key.mq.md",
-        "13:1",
+        "14:1",
         "missing map key",
     );
 }
@@ -903,7 +903,7 @@ fn error_table_row_marker_only() {
 fn error_inherit_cycle() {
     assert_err(
         "tests/errors/inherit-cycle.mq.md",
-        "5:1",
+        "6:1",
         "cyclic inheritance",
     );
 }
@@ -912,7 +912,7 @@ fn error_inherit_cycle() {
 fn error_inherit_unknown_base() {
     assert_err(
         "tests/errors/inherit-unknown-base.mq.md",
-        "5:1",
+        "6:1",
         "unknown base type",
     );
 }
@@ -930,7 +930,7 @@ fn error_inherit_bad_rhs() {
 fn error_bad_int() {
     assert_err(
         "tests/errors/bad-int.mq.md",
-        "7:1",
+        "8:1",
         "cannot convert to int",
     );
 }
@@ -939,7 +939,7 @@ fn error_bad_int() {
 fn error_bad_split_sep() {
     assert_err(
         "tests/errors/bad-split-sep.mq.md",
-        "7:1",
+        "8:1",
         "split sep must not be empty",
     );
 }

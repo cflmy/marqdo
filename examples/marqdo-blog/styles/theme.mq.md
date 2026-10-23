@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: styles/theme
 description: 博客主题：样式即数据表格，装配即函数。
 import:

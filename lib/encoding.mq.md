@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: lib/encoding
 description: Base64, hex, and base32 encode/decode (Mid M1 + Mid2 M8). UTF-8 text round-trip.
 ---

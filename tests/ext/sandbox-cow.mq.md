@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: sandbox CoW — write stays upper until commit
 description: >
   Readable trial: seed on disk, mutate in session, host tree unchanged,
@@ -22,7 +23,7 @@ Prepare a tiny workspace under this test directory (reset leftovers from prior r
 > fs.write_text path="_sbx_cow/seed.txt" text=seed-lower
 
 **sb = sandbox.open root="_sbx_cow"**
-**id = [id](sb)**
+**id = [id](access(sb, "id"))**
 
 Session edits (upper / whiteout only).
 
@@ -53,7 +54,7 @@ Commit applies upper + whiteout.
 Discard must not touch the host.
 
 **sb2 = sandbox.open root="_sbx_cow"**
-**id2 = [id](sb2)**
+**id2 = [id](access(sb2, "id"))**
 > sandbox.write id=`id2` path="new.txt" text=should-discard
 > sandbox.discard id=`id2`
 

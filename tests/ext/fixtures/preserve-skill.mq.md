@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 type: skill
 status: compiled
 llm_free: true

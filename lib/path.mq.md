@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: lib/path
 description: Path algebra (Mid M2). No I/O; OS separators.
 ---

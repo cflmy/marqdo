@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: OKF agent-kb near_match (offline)
 description: Promote trip resource; near-dupe goals hit match=near; unrelated misses.
 import:

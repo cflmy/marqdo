@@ -1,3 +1,7 @@
+---
+markup: occlusion
+---
+
 ## side
 
 Hands-on demo checklist (links only — no JS).

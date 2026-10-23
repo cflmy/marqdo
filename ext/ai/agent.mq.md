@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: ext/ai/agent
 description: Document-driven agent v2 — step / plan / run; Skill Compilation via ABI plugin (episodes → learn → llm_free).
 import:
@@ -139,7 +140,7 @@ Find a human-readable call line: `CALL:<name>` or `调用：<name>` / `调用:<n
 **lines = > split value=`text` sep=`nl`**
 **found = None**
 
-- [`line`](`lines`)
+- [line](遍历 `lines` 为 `line`)
   **t = > trim value=`line`**
   **parts = > split value=`t` sep=":"**
   **n = > len value=`parts`**
@@ -245,7 +246,7 @@ Structured observation for the parent developer-agent: source, named writeback s
 
 **last_ok = None**
 **last_error = None**
-- [`slot`](`slots`)
+- [slot](遍历 `slots` 为 `slot`)
   **k = > json.get value=`slot` key="key"**
   **body = > json.get value=`slot` key="body"**
   1. `k` == "ok"
@@ -407,7 +408,7 @@ With `sandbox=True`, run via `## trial` first (commit on ok); host unchanged unt
 **acc = > table.empty_list**
 **chars = 0**
 **count = 0**
-- [`line`](`lines`)
+- [line](遍历 `lines` 为 `line`)
   1. `count` < `max_lines`
     **ln = > len value=`line`**
     **next = chars + ln**
@@ -441,7 +442,7 @@ With `sandbox=True`, run via `## trial` first (commit on ok); host unchanged unt
 **acc = > table.empty_list**
 **i = 0**
 **chars = 0**
-- [`line`](`lines`)
+- [line](遍历 `lines` 为 `line`)
   1. `i` >= `start`
     **ln = > len value=`line`**
     **next = chars + ln**
@@ -468,7 +469,7 @@ Drop `<!-- … -->` blocks (including marqdo-out bodies) so parent excerpts stay
 **lines = > split value=`raw` sep=`nl`**
 **acc = > table.empty_list**
 **skip = None**
-- [`line`](`lines`)
+- [line](遍历 `lines` 为 `line`)
   1. `skip`
     **end_parts = > split value=`line` sep="-->"**
     **en = > len value=`end_parts`**
@@ -719,7 +720,7 @@ Parse `ARGS:{…}` JSON line, or a bare `{…}` line after CALL.
   **text = > trim value=`reply`**
   **lines = > split value=`text` sep=`nl`**
   **found = None**
-  - [`line`](`lines`)
+  - [line](遍历 `lines` 为 `line`)
     1. `found`
       **_ = 1**
     2. *
@@ -909,7 +910,7 @@ Parse READ:source|stderr|stdout|slots|skill (Chinese: 读取：…).
 **text = > trim value=`reply`**
 **lines = > split value=`text` sep=`nl`**
 **found = None**
-- [`line`](`lines`)
+- [line](遍历 `lines` 为 `line`)
   **t = > trim value=`line`**
   **parts = > split value=`t` sep=":"**
   **n = > len value=`parts`**
@@ -1005,7 +1006,7 @@ Parse NAME: id plus a triple-angle body after CALL:scratch_tool_write.
 **name = None**
 **body_lines = > table.empty_list**
 **in_body = None**
-- [`line`](`lines`)
+- [line](遍历 `lines` 为 `line`)
   1. `in_body`
     **t = > trim value=`line`**
     1. `t` == `close`
@@ -1231,7 +1232,7 @@ Bounded observation for the parent prompt (actionable, short).
 
 **slots_brief = > table.empty_list**
 1. `obs_slots`
-  - [`slot`](`obs_slots`)
+  - [slot](遍历 `obs_slots` 为 `slot`)
     **sk = > json.get value=`slot` key="key"**
     **sl = > json.get value=`slot` key="line"**
     **sb = > json.get value=`slot` key="body"**
@@ -1296,7 +1297,7 @@ First matching DECISION / 决定 line wins (ignore later conflicting decisions i
 **lines = > split value=`text` sep=`nl`**
 **found = None**
 
-- [`line`](`lines`)
+- [line](遍历 `lines` 为 `line`)
   1. `found`
     **_ = 1**
   2. *
@@ -1368,7 +1369,7 @@ Parse `SLUG: …` / `标识：…` after a soft-match REUSE decision.
 **lines = > split value=`text` sep=`nl`**
 **found = None**
 
-- [`line`](`lines`)
+- [line](遍历 `lines` 为 `line`)
   **t = > trim value=`line`**
   **parts = > split value=`t` sep=":"**
   **n = > len value=`parts`**
@@ -1420,7 +1421,7 @@ Short parent prompt: REUSE+SLUG or NEW only. Candidates may include lexical `sco
 **st = > json.get value=`esc` key="st"**
 **lf = > json.get value=`esc` key="lf"**
 **lines = > table.empty_list**
-- [`t`](`tasks`)
+- [t](遍历 `tasks` 为 `t`)
   **slug = > json.get value=`t` key="slug"**
   **title = > json.get value=`t` key="title"**
   **row = slug + sep + title**
@@ -1469,7 +1470,7 @@ First `SUMMARY:` / `汇总:` / `汇总：` line body, else trimmed reply.
 **lines = > split value=`text` sep=`nl`**
 **found = None**
 
-- [`line`](`lines`)
+- [line](遍历 `lines` 为 `line`)
   **t = > trim value=`line`**
   **parts = > split value=`t` sep=":"**
   **n = > len value=`parts`**
@@ -1793,7 +1794,7 @@ Always append a `decision` event. SSE publish only when `stream=True`.
 
 Bubble parent `complete stream=True` reasoning/deltas (and errors) into the plan event list. Skip nested `done` so plan owns the final `done`. Always merge into `events` when present; `stream` reserved for callers that also SSE-publish upstream.
 
-- [`ev`](`from`)
+- [ev](遍历 `from` 为 `ev`)
   **t = > json.get value=`ev` key="type"**
   1. `t` == delta
     **events = > table.append list=`events` item=`ev`**

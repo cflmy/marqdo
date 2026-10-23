@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: ext/web/web
 description: >-
   Web Artifact facade (ADR 0007) — page · route · serve · render · inspect · use.

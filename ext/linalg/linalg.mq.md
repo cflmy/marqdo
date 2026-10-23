@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: ext/linalg/linalg
 description: Formula-first linear algebra (English). MatExpr simplify + display; ABI plugin.
 import:

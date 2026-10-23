@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: ext/security/rbac
 description: RBAC Resource (ADR 0007).
 import:

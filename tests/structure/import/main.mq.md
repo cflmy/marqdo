@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: 跨文件导入示例
 import:
   utils: utils.mq.md

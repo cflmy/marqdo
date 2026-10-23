@@ -14,7 +14,10 @@ use crate::parse::parse_source;
 
 /// Load `path` and recursively bind imported modules (no flat merge).
 pub fn load_module(path: &Path) -> Result<Module> {
-    load_module_with_ctx(path, &BindingContext::from_binds(&[], cwd_for_path(Some(path))))
+    load_module_with_ctx(
+        path,
+        &BindingContext::from_binds(&[], cwd_for_path(Some(path))),
+    )
 }
 
 /// Load with BindingContext (CLI `--bind`, cwd for `sys.cwd`).
@@ -28,9 +31,7 @@ fn load_module_inner(
     visited: &mut HashSet<PathBuf>,
     ctx: &BindingContext,
 ) -> Result<Module> {
-    let canon = path
-        .canonicalize()
-        .unwrap_or_else(|_| path.to_path_buf());
+    let canon = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
     if !visited.insert(canon.clone()) {
         bail!("circular import involving {}", path.display());
     }
@@ -86,7 +87,9 @@ fn read_module_source(path: &Path) -> Result<String> {
 }
 
 fn read_embedded_for_path(path: &Path) -> Option<String> {
-    lib_remainder(path).as_deref().and_then(embedded_lib::read_file)
+    lib_remainder(path)
+        .as_deref()
+        .and_then(embedded_lib::read_file)
 }
 
 fn lib_remainder(path: &Path) -> Option<String> {
@@ -156,10 +159,7 @@ pub fn resolve_import(from_dir: &Path, rel: &str) -> Result<PathBuf> {
         if let Some(p) = find_in_ancestor_dir(from_dir, "ext", rest) {
             return Ok(p);
         }
-        let mut msg = format!(
-            "cannot resolve import `{rel}` from {}",
-            from_dir.display()
-        );
+        let mut msg = format!("cannot resolve import `{rel}` from {}", from_dir.display());
         #[cfg(feature = "cli")]
         {
             let user_ext = crate::ext_cli::default_user_ext_dir();
@@ -290,9 +290,10 @@ fn label_error(label: &str, e: anyhow::Error) -> anyhow::Error {
 /// Effective markup mode declared by the file itself. `<TAB>` M7
 ///
 /// Looks for `markup: occlusion` (or `标记: 遮蔽`) inside the leading frontmatter
-/// block. Files that say nothing retain the compatibility default (`classic`)
-/// until the full library migration lands. There is no environment/process
-/// default: an explicit file declaration always decides its own grammar.
+/// block. Unmarked sources use the new `occlusion` default; a legacy source
+/// must opt in with `markup: classic` or be run through `--legacy-markup` for
+/// the transition cycle. There is no environment/process default: an explicit
+/// file declaration always decides its own grammar.
 /// Parse a standalone source the way the file itself declares (`markup:` in
 /// frontmatter). The viewer must use this — otherwise an occluded document is
 /// re-parsed in classic mode and fails. `<TAB>` M7/M8
@@ -409,11 +410,8 @@ mod tests {
         let prev = env::var_os("MARQDO_EXT");
         env::remove_var("MARQDO_EXT");
         // Unique path so cwd/ext cannot satisfy the import.
-        let err = resolve_import(
-            Path::new("/tmp"),
-            "ext/__gap12_missing__/nope.mq.md",
-        )
-        .unwrap_err();
+        let err =
+            resolve_import(Path::new("/tmp"), "ext/__gap12_missing__/nope.mq.md").unwrap_err();
         let msg = format!("{err:#}");
         match prev {
             Some(v) => env::set_var("MARQDO_EXT", v),

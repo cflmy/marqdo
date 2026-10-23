@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: web.use middleware smoke
 description: First-class middleware via web.use (replaces configure junk drawer).
 import:
@@ -17,8 +18,8 @@ import:
 **pg = > web.page title="use-smoke"**
 **app = > web.app page=`pg`**
 **app = > web.use app=`app` middleware=`headers`**
-**mw = [middleware](app)**
-**sec = [security](mw)**
+**mw = [middleware](access(app, "middleware"))**
+**sec = [security](access(mw, "security"))**
 1. `sec`
   > print text=use-ok
 2. *

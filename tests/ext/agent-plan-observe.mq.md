@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: parent observation excerpt + deepen (offline)
 import:
   agent: ext/ai/agent.mq.md

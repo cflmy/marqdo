@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: lib/hash smoke
 import:
   hash: lib/hash.mq.md

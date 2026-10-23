@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: lib/secrets
 description: Cryptographic tokens (Mid M3). Do not use math.random for secrets.
 ---

@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: agent workbook multi-CONTINUE patch + solidify (A0 offline)
 description: Two precise CONTINUE patches then agent_workbook_solidify freezes step workbook.
 import:

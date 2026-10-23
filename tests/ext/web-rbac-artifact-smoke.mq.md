@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: ext/security rbac smoke
 import:
   rbac: ext/security/rbac.mq.md
@@ -8,8 +9,8 @@ import:
 
 **gate = > rbac.rbac**
 **r = > `gate`.can permissions="desk:access,posts:read" needed="desk:access"**
-**ok = [ok](r)**
-**allowed = [allowed](r)**
+**ok = [ok](access(r, "ok"))**
+**allowed = [allowed](access(r, "allowed"))**
 1. `ok`
   1. `allowed`
     > print text=rbac-ok

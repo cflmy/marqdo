@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: meta-binding
 model: ${env.MARQDO_META_MODEL ?? "default-model"}
 greeting: "Hello ${env.MARQDO_META_USER ?? "World"}"

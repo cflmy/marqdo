@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: quantum noise zh smoke
 description: 噪声 bitflip p=1 后 I 使全部射中 |1⟩.
 导入:
@@ -11,7 +12,7 @@ description: 噪声 bitflip p=1 后 I 使全部射中 |1⟩.
 **qc = > `qc`.单位 比特=0**
 **qc = > `qc`.噪声 种类="bitflip" 概率=1**
 **r = > `qc`.运行 次数=32 种子=3**
-**c1 = [1]([counts](r))**
+**c1 = [1](access([counts](access(r, "counts")), "1"))**
 
 1. `c1` == 32
   > print text=noise-ok

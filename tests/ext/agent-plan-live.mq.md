@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: ext/agent plan live (DeepSeek)
 description: Full plan loop — spawn workbook, inspect, secondary plan; simple pong goal.
 import:

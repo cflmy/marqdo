@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 type: Fact
 id: libai
 title: 李白

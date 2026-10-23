@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: agent context budget + progressive disclose (A3 offline)
 description: source/skill briefs truncate with markers; READ:skill deepen; step protocol mentions READ.
 import:

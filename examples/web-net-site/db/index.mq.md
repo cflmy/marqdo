@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: db/index
 description: Open sqlite, init articles, seed once.
 import:

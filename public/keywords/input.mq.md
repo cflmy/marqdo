@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: Built-in input
 description: Read one line from stdin; optional prompt. Demo via frontmatter stdin.
 stdin: Ada

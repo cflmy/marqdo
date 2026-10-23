@@ -1,7 +1,7 @@
 ---
 title: G4 动态脚注键
 description: 菜单[^`名`] 用变量值取 map 键
-markup: v0.3
+markup: occlusion
 ---
 
 # main

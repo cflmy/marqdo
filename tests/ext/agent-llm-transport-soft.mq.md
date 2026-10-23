@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: agent / llm soft transport errors
 description: >-
   Regression (2026-10): unreachable OpenAI upstream must not abort the VM.

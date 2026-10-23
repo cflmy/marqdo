@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: footnote [^0] invalid
 ---
 

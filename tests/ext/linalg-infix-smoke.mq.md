@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: linalg infix and matrix methods
 description: A+B / A*B dispatch; `A`.T method chain; display auto-simplify.
 import:
@@ -18,7 +19,7 @@ import:
 **`st` = > `Pt`.ascii**
 > print text=`st`
 
-**`ty` = [_type](C)**
+**`ty` = [_type](access(C, "_type"))**
 1. `ty` == matrix
   > print text=type-ok
 2. *
@@ -36,7 +37,7 @@ $$
 
 **`S` = `M` + `N`**
 **`Se` = > la.explicit expr=`S`**
-**`d` = [data](Se)**
+**`d` = [data](access(Se, "data"))**
 **`r0` = > at value=`d` index=0**
 **`x00` = > at value=`r0` index=0**
 **`xs` = > str value=`x00`**

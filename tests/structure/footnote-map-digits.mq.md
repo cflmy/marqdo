@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: map footnote digit keys
 description: Pure-digit labels are map keys (text), not list indices. Bare base ok.
 ---

@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: v0.3 分支臂内叙述
 description: 臂内 prose 不得逃逸；n>0 时仅 then
 ---

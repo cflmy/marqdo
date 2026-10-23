@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: dump_step_context (Wave B1 offline)
 description: Assert dump_step_context exposes call_site + prompt without LLM.
 import:

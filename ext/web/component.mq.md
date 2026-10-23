@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: ext/web/component
 description: Reusable Document fragments as View node tables (ADR 0007).
 import:

@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: ext/web/dom
 description: DOM Artifact — Markdown/body to structure; raw HTML is escape hatch only (ADR 0007).
 import:
@@ -30,10 +31,10 @@ Escape hatch — wrap a raw HTML string. Prefer Markdown / View nodes.
 Render a DOM Artifact (markdown or raw) to HTML via native plugin.
 
 > cap.load
-**kind = [kind](dom)**
+**kind = [kind](access(dom, "kind"))**
 1. `kind` == "raw"
-  **html = [html](dom)**
+  **html = [html](access(dom, "html"))**
   *html*
 2. *
-  **text = [text](dom)**
+  **text = [text](access(dom, "text"))**
   *> web_dom_markdown text=`text`*

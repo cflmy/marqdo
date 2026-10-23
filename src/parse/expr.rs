@@ -11,13 +11,14 @@ pub fn parse_expr(input: &str) -> Result<Expr> {
 /// Markup mode for `[描述](实现)` vs the legacy `[键](集合)` index. `<TAB>` M2
 ///
 /// `Classic` keeps the legacy index semantics; `Occlusion` reads the same shape
-/// as an occlusion.  The compatibility default remains `Classic` until every
-/// shipped library has an explicit per-file declaration; new syntax opts in
-/// with `markup: occlusion`.  No environment/process switch exists.
+/// as an occlusion. Every shipped module declares its mode and new/unmarked
+/// sources use `Occlusion`. The legacy grammar is available only through an
+/// explicit `markup: classic` declaration or the one-cycle CLI compatibility
+/// flag. No environment/process switch exists.
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
 pub enum Markup {
-    #[default]
     Classic,
+    #[default]
     Occlusion,
 }
 
@@ -43,7 +44,7 @@ pub fn markup_default() -> Markup {
     if let Some(m) = MARKUP_OVERRIDE.with(|c| c.get()) {
         return m;
     }
-    Markup::Classic
+    Markup::Occlusion
 }
 
 /// Italic / bold value syntax: bare words are variables; text needs `"…"` / `'…'`.
@@ -160,7 +161,10 @@ fn is_text_only_div_chain(e: &Expr) -> bool {
             op: BinaryOp::Div,
             left,
             right,
-        } => is_text_only_div_chain(left) && matches!(right.as_ref(), Expr::Literal(Literal::Text(_))),
+        } => {
+            is_text_only_div_chain(left)
+                && matches!(right.as_ref(), Expr::Literal(Literal::Text(_)))
+        }
         _ => false,
     }
 }
@@ -196,7 +200,10 @@ fn has_hyphenated_prose(s: &str) -> bool {
             continue;
         }
         // `none-falsy` / `Hello-World` — not `` `n` - 1 ``
-        if left.is_alphanumeric() || right.is_alphanumeric() || !left.is_ascii() || !right.is_ascii()
+        if left.is_alphanumeric()
+            || right.is_alphanumeric()
+            || !left.is_ascii()
+            || !right.is_ascii()
         {
             return true;
         }
@@ -598,7 +605,10 @@ impl<'a> Parser<'a> {
             self.i += '空'.len_utf8();
             return Ok(Expr::Literal(Literal::None));
         }
-        if self.peek_char().map(|c| c.is_ascii_digit()).unwrap_or(false)
+        if self
+            .peek_char()
+            .map(|c| c.is_ascii_digit())
+            .unwrap_or(false)
             || (self.peek_char() == Some('.')
                 && self
                     .rest()
@@ -608,13 +618,21 @@ impl<'a> Parser<'a> {
                     .unwrap_or(false))
         {
             let start = self.i;
-            while self.peek_char().map(|c| c.is_ascii_digit()).unwrap_or(false) {
+            while self
+                .peek_char()
+                .map(|c| c.is_ascii_digit())
+                .unwrap_or(false)
+            {
                 self.bump_char();
             }
             if self.peek_char() == Some('.') {
                 self.bump_char();
                 let frac_start = self.i;
-                while self.peek_char().map(|c| c.is_ascii_digit()).unwrap_or(false) {
+                while self
+                    .peek_char()
+                    .map(|c| c.is_ascii_digit())
+                    .unwrap_or(false)
+                {
                     self.bump_char();
                 }
                 // Require at least one digit on one side of the dot.
@@ -633,7 +651,10 @@ impl<'a> Parser<'a> {
         }
         // Bare identifier / text word. If immediately followed by `[^…]`, treat as
         // variable + footnote index (exemption: ticks optional when `[^` marks the slot).
-        if self.peek_char().map(|c| c.is_alphanumeric() || c == '_' || !c.is_ascii()).unwrap_or(false)
+        if self
+            .peek_char()
+            .map(|c| c.is_alphanumeric() || c == '_' || !c.is_ascii())
+            .unwrap_or(false)
         {
             let start = self.i;
             while let Some(c) = self.peek_char() {
@@ -1105,7 +1126,6 @@ pub fn parse_call_tail(s: &str, prefer_var: bool) -> Result<(CallExpr, usize)> {
     ))
 }
 
-
 /// Split a callee token into `(receiver, callee, lib path)`.
 fn split_callee(callee_tok: &str) -> (Option<String>, String, Option<Vec<String>>) {
     if let Some((r, m)) = split_method_callee(callee_tok) {
@@ -1180,7 +1200,13 @@ fn try_bracket_marked_call(s: &str, prefer_var: bool) -> Result<Option<(CallExpr
                 continue;
             }
             // Only treat as callee marker at start or after whitespace.
-            if i > 0 && !s[..i].chars().last().map(|c| c.is_whitespace()).unwrap_or(false) {
+            if i > 0
+                && !s[..i]
+                    .chars()
+                    .last()
+                    .map(|c| c.is_whitespace())
+                    .unwrap_or(false)
+            {
                 i += 1;
                 continue;
             }
@@ -1226,23 +1252,22 @@ fn try_bracket_marked_call(s: &str, prefer_var: bool) -> Result<Option<(CallExpr
             } else {
                 inner.to_string()
             };
-            let (receiver, callee, path) =
-                if let Some((r, m)) = split_method_callee(&callee_tok) {
-                    (Some(r), m, None)
-                } else if let Some(segments) = split_lib_path_callee(&callee_tok) {
-                    let last = segments.last().cloned().unwrap_or_default();
-                    (None, last, Some(segments))
+            let (receiver, callee, path) = if let Some((r, m)) = split_method_callee(&callee_tok) {
+                (Some(r), m, None)
+            } else if let Some(segments) = split_lib_path_callee(&callee_tok) {
+                let last = segments.last().cloned().unwrap_or_default();
+                (None, last, Some(segments))
+            } else {
+                let name = if callee_tok.starts_with('`')
+                    && callee_tok.ends_with('`')
+                    && callee_tok.len() >= 2
+                {
+                    callee_tok[1..callee_tok.len() - 1].to_string()
                 } else {
-                    let name = if callee_tok.starts_with('`')
-                        && callee_tok.ends_with('`')
-                        && callee_tok.len() >= 2
-                    {
-                        callee_tok[1..callee_tok.len() - 1].to_string()
-                    } else {
-                        callee_tok
-                    };
-                    (None, name, None)
+                    callee_tok
                 };
+                (None, name, None)
+            };
             let after_full = &s[close + 1..];
             let args_src = after_full.trim_start();
             let ws = after_full.len() - args_src.len();
@@ -1325,10 +1350,7 @@ fn parse_call_args(
             } else {
                 parse_call_arg_value_mode(val_raw, prefer_var, paren_mode)?
             };
-            args.push(Arg::Named {
-                name: key,
-                value,
-            });
+            args.push(Arg::Named { name: key, value });
             rest = after_eq[val_end..].trim_start();
         } else {
             if seen_named {
@@ -1647,7 +1669,6 @@ fn find_next_arg_boundary(after_eq: &str, paren_mode: bool) -> usize {
     after_eq.len()
 }
 
-
 /// Parse `> callee args` call expression/statement text (without leading `>`).
 /// When `prefer_var` (inside `*…*` / `**…**`), bare call-arg words are variables
 /// and a bare dotted callee may be a method receiver (resolved at eval/compile).
@@ -1685,7 +1706,13 @@ mod tests {
         let e = parse_expr_prefer_var("answer").unwrap();
         assert!(matches!(e, Expr::Var(ref n) if n == "answer"));
         let e = parse_expr_prefer_var("n + 1").unwrap();
-        assert!(matches!(e, Expr::Binary { op: BinaryOp::Add, .. }));
+        assert!(matches!(
+            e,
+            Expr::Binary {
+                op: BinaryOp::Add,
+                ..
+            }
+        ));
         let e = parse_expr_prefer_var("\"ok\"").unwrap();
         assert!(matches!(e, Expr::Literal(Literal::Text(ref s)) if s == "ok"));
         let e = parse_expr_prefer_var("'hi'").unwrap();
@@ -1815,7 +1842,13 @@ mod tests {
     #[test]
     fn chinese_logic_and_literals() {
         let e = parse_expr("`a` 且 非 `b`").unwrap();
-        assert!(matches!(e, Expr::Binary { op: BinaryOp::And, .. }));
+        assert!(matches!(
+            e,
+            Expr::Binary {
+                op: BinaryOp::And,
+                ..
+            }
+        ));
         assert!(matches!(
             parse_expr("真").unwrap(),
             Expr::Literal(Literal::Bool(true))
@@ -1887,7 +1920,13 @@ mod tests {
         let e = parse_expr("0.85").unwrap();
         assert!(matches!(e, Expr::Literal(Literal::Num(n)) if (n - 0.85).abs() < 1e-12));
         let e = parse_expr("28 * 0.85").unwrap();
-        assert!(matches!(e, Expr::Binary { op: BinaryOp::Mul, .. }));
+        assert!(matches!(
+            e,
+            Expr::Binary {
+                op: BinaryOp::Mul,
+                ..
+            }
+        ));
         let e = parse_expr_prefer_var("菜单[^`名`]").unwrap();
         match e {
             Expr::Index { base, label } => {
@@ -1948,8 +1987,6 @@ mod tests {
         }
     }
 }
-
-
 
 #[cfg(test)]
 mod bracket_call_tests {
@@ -2027,7 +2064,11 @@ mod bracket_call_tests {
     fn paren_call_bare_number_stops_at_paren() {
         // 历史缺陷：末个位置实参会吞掉 `)`
         let (c, used) = parse_call_tail("加(31)", false).unwrap();
-        assert_eq!(used, "加(31)".len(), "consumed must cover the closing paren");
+        assert_eq!(
+            used,
+            "加(31)".len(),
+            "consumed must cover the closing paren"
+        );
         assert_eq!(c.args.len(), 1);
     }
 
@@ -2069,7 +2110,10 @@ mod bracket_call_tests {
     fn paren_call_lib_path_and_method() {
         let c = call_of(parse_expr("txt.str_trim(s)").unwrap());
         assert_eq!(c.callee, "str_trim");
-        assert_eq!(c.path.as_deref(), Some(&["txt".to_string(), "str_trim".to_string()][..]));
+        assert_eq!(
+            c.path.as_deref(),
+            Some(&["txt".to_string(), "str_trim".to_string()][..])
+        );
 
         // 点号 callee 在 parse 期保存为 lib path；若 `obj` 是局部变量，
         // 运行期 eval_call 会把它当 method receiver（与 `> obj.方法` 一致）。
@@ -2088,11 +2132,13 @@ mod bracket_call_tests {
         assert_eq!(c.callee, "birth_year");
         assert_eq!(
             c.path.as_deref(),
-            Some(&[
-                "facts".to_string(),
-                "Person".to_string(),
-                "birth_year".to_string(),
-            ][..])
+            Some(
+                &[
+                    "facts".to_string(),
+                    "Person".to_string(),
+                    "birth_year".to_string(),
+                ][..]
+            )
         );
         assert!(c.args.is_empty());
     }
@@ -2199,13 +2245,19 @@ mod bracket_call_tests {
         assert_eq!(label, "外层");
         let (inner_label, inner_payload) = occl(payload.unwrap());
         assert_eq!(inner_label, "内层");
-        assert!(matches!(inner_payload, Some(Expr::Literal(Literal::Int(1)))));
+        assert!(matches!(
+            inner_payload,
+            Some(Expr::Literal(Literal::Int(1)))
+        ));
     }
 
     #[test]
     fn occlusion_classic_mode_keeps_index() {
         let e = parse_expr_markup("[键](表)", false, Markup::Classic).unwrap();
-        assert!(matches!(e, Expr::Index { .. }), "classic must stay an index");
+        assert!(
+            matches!(e, Expr::Index { .. }),
+            "classic must stay an index"
+        );
     }
 
     #[test]

@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: Agent Framework P4 — Adaptive Routing + Policy Compilation (offline)
 description: Learn skill, compile policy from skill-tagged episodes, route via marqdo backend without Jev/LLM.
 import:

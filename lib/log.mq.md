@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: lib/log
 description: Level-filtered one-line logs (Mid M6 + Mid2 M10 fields). Default level info.
 ---

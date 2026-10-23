@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: linalg formula-doc smoke (F1)
 description: Run-implies-correct — (AB)^T ascii without explicit simplify.
 import:
@@ -29,8 +30,8 @@ Narration: \((AB)^\top = B^\top A^\top\). The identity is checked by running thi
 | 2 | Y | 2 | 2 |
 
 **`env` = > la.declare table=`shapes`**
-**`X` = [X](env)**
-**`Y` = [Y](env)**
+**`X` = [X](access(env, "X"))**
+**`Y` = [Y](access(env, "Y"))**
 **`S` = `X` + `Y`**
 **`st` = > la.ascii expr=`S`**
 1. `st` == "X + Y"

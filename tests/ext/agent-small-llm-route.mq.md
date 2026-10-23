@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: agent small-llm route request (offline)
 description: router=small-llm returns needs_llm + prompt; jev alias same shape.
 import:

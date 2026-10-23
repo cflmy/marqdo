@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: ext/agent framework smoke
 description: Real llm handle from tests/ext/.env; context, extract_tool_name, run_tool via subtask.
 import:

@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: input quoted prompt
 stdin: Ada
 ---

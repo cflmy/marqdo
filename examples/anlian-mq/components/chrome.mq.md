@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: components/chrome
 description: 暗恋见君壳层 — head 资源表、导航 HTML、页脚 HTML（对齐 Django base / site_footer）。
 ---

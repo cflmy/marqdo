@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: agent plan stream helpers + confirm (offline)
 description: plan_append_*/plan_finish_stream; confirm=True with stream attaches done event.
 import:

@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: ext llm DeepSeek stream live
 description: Live SSE complete with echo; credentials from tests/ext/.env.
 import:

@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: async writeback via subtask
 description: Fire-and-forget persist_slot with explicit line=; join on exit.
 import:

@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: GAP-06/07 star + JSON array body keep following stmts
 description: Nested args=`args` and text=["…"] must not truncate the ## body.
 import:

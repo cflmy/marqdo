@@ -1,3 +1,7 @@
+---
+markup: occlusion
+---
+
 ## side
 
 Sidebar index of what this example demonstrates.

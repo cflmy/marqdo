@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: ext/ai/llm/ollama
 description: >-
   Ollama backend defaults. Transport reuses openai-compatible /v1 chat completions.

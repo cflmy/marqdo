@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: Code as documentation, documentation as knowledge — OKF and EKC
 description: How Marqdo keeps one executable source of truth while projecting it into OKF-style knowledge and Engineering Knowledge Compiler artifacts
 ---

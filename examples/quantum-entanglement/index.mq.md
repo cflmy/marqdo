@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: Entanglement lab
 description: Bell state — density, partial trace, Schmidt, themed SVG (Q7/Q8).
 import:
@@ -31,7 +32,7 @@ Build |Φ⁺⟩ with H then CX. Full-state purity stays 1; tracing out one qubit
 **ezz = > `qc`.expect obs=`zz`**
 
 **sch = > `qc`.schmidt cut=1**
-**ent = [entropy](sch)**
+**ent = [entropy](access(sch, "entropy"))**
 
 **_ = > `qc`.draw path="entangle-circuit.svg" theme="dark"**
 **_ = > `qc`.draw kind="hinton" path="entangle-hinton.svg"**

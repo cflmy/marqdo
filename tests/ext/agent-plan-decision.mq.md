@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: agent plan decision + dual skeleton (offline)
 description: extract_plan_decision/summary; dual skeleton contains research+writer; patch apply on fixture.
 import:

@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: lib/browser
 description: >-
   Readable browser effect helpers for WASM clients. Prefer GFM tables + these

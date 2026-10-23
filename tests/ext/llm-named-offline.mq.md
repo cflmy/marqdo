@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: llm named handles + prompt_load offline
 description: fast/reasoning names, ollama backend tag, and type:prompt body load; no network.
 import:
@@ -9,16 +10,16 @@ import:
 # main
 
 **fast = > llm.fast model="qwen-fast-test"**
-> print text=[name](`fast`)
-> print text=[model](`fast`)
+> print text=[name](access(`fast`, "name"))
+> print text=[model](access(`fast`, "model"))
 
 **reason = > llm.reasoning model="gpt-reason-test"**
-> print text=[name](`reason`)
-> print text=[model](`reason`)
+> print text=[name](access(`reason`, "name"))
+> print text=[model](access(`reason`, "model"))
 
 **ollama = > llm.create backend="ollama" model="llama3.2"**
-> print text=[backend](`ollama`)
-> print text=[model](`ollama`)
+> print text=[backend](access(`ollama`, "backend"))
+> print text=[model](access(`ollama`, "model"))
 
 **prompt = > llm.prompt_load path="fixtures/prompt-marqdo.md"**
 **has = > text.contains text=`prompt` sub="Explain Marqdo"**

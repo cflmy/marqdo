@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: 中文内置函数
 description: 打印 / 长度 / 文本 / 整数（与英文别名等价）
 ---

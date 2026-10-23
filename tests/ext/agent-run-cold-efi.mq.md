@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: agent.run cold OKF — resolve llm_free + self.preflight
 description: >-
   Regression for qdagent-facing bugs (2026-10):

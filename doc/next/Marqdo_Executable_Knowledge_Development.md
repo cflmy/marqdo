@@ -1066,8 +1066,8 @@ View 至少展示：
 
 | 阶段 | 默认行为 | 兼容行为 |
 |---|---|---|
-| 2.0.x | Classic 默认，Occlusion opt-in | 当前行为 |
-| 2.1 preview | 新语义可显式开启；迁移报告必开 | Classic 发 deprecated warning |
+| 2.0.x | Classic 默认，Occlusion opt-in | 历史行为 |
+| 2.1 preview | 新语义默认；全仓语料具有文件级 `markup: occlusion` | `--legacy-markup` / 显式 `markup: classic` 只读过渡 |
 | 2.1 stable | 新语义默认；旧形状必须已迁移 | `--legacy-markup` 只读运行一个周期 |
 | 2.2 | 删除全局模式与旧 parser 分支 | 仅保留明确错误和迁移建议 |
 
@@ -1085,7 +1085,7 @@ View 至少展示：
 
 ### 16.3 必须显式变化的能力
 
-- `[键](集合)` 迁为 `at`；
+- `[键](集合)` 迁为 `access(集合, "键")`；
 - 链接不再依赖进程级 markup 模式；
 - `类.函数` 对无 receiver 函数成为合法 AssociatedFunction 调用；
 - 正文知识链接被解析和诊断，但不自动执行；

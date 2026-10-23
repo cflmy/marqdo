@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: lib/stats + log fields M10 smoke
 import:
   stats: lib/stats.mq.md

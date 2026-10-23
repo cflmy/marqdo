@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: Python 经营洞察 · View Cells
 description: 多 cell 共享 Python 内核，做订单生成、区域/产品指标、异常检测、报告输出与独立复核。
 import:

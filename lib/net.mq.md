@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: lib/net
 description: English HTTP(S) wrappers. Optional headers / content_type via host aliases.
 ---

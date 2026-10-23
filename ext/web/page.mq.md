@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: ext/web/page
 description: Document → View. Sole compose path is render(nodes=) with unified View schema (ADR 0007).
 import:
@@ -37,13 +38,13 @@ Render Document to HTML. `nodes` is the unified View table; when omitted, uses `
 > cap.load
 **n = nodes**
 1. `n` == None
-  **n = [nodes](self)**
+  **n = [nodes](access(self, "nodes"))**
 2. *
   **_ = 1**
 1. `n`
   *> web_render_nodes page=`self` nodes=`n` db=`db`*
 2. *
-  **body = [body](self)**
+  **body = [body](access(self, "body"))**
   *> web_render_document page=`self` body=`body` db=`db`*
 
 ## css

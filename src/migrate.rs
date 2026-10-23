@@ -20,6 +20,9 @@ pub struct FileReport {
     pub file: PathBuf,
     pub indexes: usize,
     pub loops: usize,
+    /// Whether this file will receive (or already has) an explicit
+    /// `markup: occlusion` declaration.
+    pub mode_marked: bool,
     pub applied: bool,
     pub note: Option<String>,
 }
@@ -45,7 +48,10 @@ fn has_marker(source: &str) -> bool {
         }
         let lower = t.to_ascii_lowercase();
         if lower.starts_with("markup:") || t.starts_with("标记:") {
-            return lower.contains("occlusion") || lower.contains("purity") || t.contains("遮蔽") || t.contains("纯度");
+            return lower.contains("occlusion")
+                || lower.contains("purity")
+                || t.contains("遮蔽")
+                || t.contains("纯度");
         }
     }
     false
@@ -64,10 +70,14 @@ fn add_marker(source: &str) -> String {
             if lower.starts_with("markup:") || line.trim().starts_with("标记:") {
                 *line = "markup: occlusion".to_string();
                 let mut out = lines.join("\n");
-                if source.ends_with('\n') { out.push('\n'); }
+                if source.ends_with('\n') {
+                    out.push('\n');
+                }
                 return out;
             }
-            if line.trim() == "---" && index != 0 { break; }
+            if line.trim() == "---" && index != 0 {
+                break;
+            }
         }
     }
     if let Some(rest) = source.strip_prefix("---\n") {
@@ -162,10 +172,7 @@ fn rewrite_one_innermost(line: &str) -> Option<String> {
                         } else {
                             quote_key(k)
                         };
-                        let replaced = format!(
-                            "[{label}](access({}, {key_arg}))",
-                            coll.trim()
-                        );
+                        let replaced = format!("[{label}](access({}, {key_arg}))", coll.trim());
                         let mut out = String::new();
                         out.extend(chars[..i].iter());
                         out.push_str(&replaced);
@@ -284,9 +291,7 @@ fn rewrite_loop(line: &str) -> Option<String> {
     }
     let indent = &line[..line.len() - trimmed.len()];
     let shown = item.trim_matches('`').to_string();
-    Some(format!(
-        "{indent}- [{shown}](遍历 {coll} 为 {item})"
-    ))
+    Some(format!("{indent}- [{shown}](遍历 {coll} 为 {item})"))
 }
 
 fn says_foreach(s: &str) -> bool {
@@ -310,7 +315,9 @@ fn denorm_expr(expr: &Expr) -> Expr {
                     _ => return expr.clone(),
                 };
                 let key_label = match key {
-                    Expr::Literal(crate::ast::Literal::Text(t)) if t == label => Some(IndexKey::Lit(t.clone())),
+                    Expr::Literal(crate::ast::Literal::Text(t)) if t == label => {
+                        Some(IndexKey::Lit(t.clone()))
+                    }
                     Expr::Var(v) if v == label => Some(IndexKey::Var(v.clone())),
                     _ => None,
                 };
@@ -401,7 +408,10 @@ fn denorm_stmt(stmt: &Stmt) -> Stmt {
                     },
                 })
                 .collect();
-            Stmt::Call { call: c, span: *span }
+            Stmt::Call {
+                call: c,
+                span: *span,
+            }
         }
         Stmt::Branch { arms, span } => Stmt::Branch {
             arms: arms
@@ -477,22 +487,40 @@ fn shape(module: &Module) -> String {
 
 /// Migrate one file. `write=false` performs a dry run (still fully verified).
 pub fn migrate_file(path: &Path, write: bool) -> anyhow::Result<FileReport> {
+    migrate_file_with_options(path, write, false)
+}
+
+/// Migrate one file and, when `mark_all` is set, give a file that has no
+/// legacy index an explicit new-syntax declaration too.  This is the mode used
+/// for shipped libraries: their behavior must not depend on the process
+/// default even if they happen not to contain a link-shaped index today.
+pub fn migrate_file_with_options(
+    path: &Path,
+    write: bool,
+    mark_all: bool,
+) -> anyhow::Result<FileReport> {
     let source = std::fs::read_to_string(path)?;
     let mut report = FileReport {
         file: path.to_path_buf(),
         indexes: 0,
         loops: 0,
+        mode_marked: false,
         applied: false,
         note: None,
     };
     if has_marker(&source) {
+        report.mode_marked = true;
         report.note = Some("already marked `markup: occlusion`".into());
         return Ok(report);
     }
 
-    // The original must be readable in classic mode (that is what it means today).
+    // Migration is deliberately syntax-only.  Resolving imports here makes a
+    // library's safe local rewrite depend on the host checkout, unavailable
+    // plugins, or a transitive dependency that is itself being migrated.
+    // Import resolution and both execution backends are verified afterwards by
+    // the repository migration suite.
     let original = crate::parse::expr::with_markup(crate::parse::expr::Markup::Classic, || {
-        crate::load::load_module(path)
+        crate::parse::parse_source(&source)
     })?;
 
     let classified = crate::lex::classify_source(&source);
@@ -516,7 +544,7 @@ pub fn migrate_file(path: &Path, write: bool) -> anyhow::Result<FileReport> {
             lines[idx] = new_line;
         }
     }
-    if report.indexes == 0 && report.loops == 0 {
+    if report.indexes == 0 && report.loops == 0 && !mark_all {
         report.note = Some("no legacy index or loop".into());
         return Ok(report);
     }
@@ -526,11 +554,12 @@ pub fn migrate_file(path: &Path, write: bool) -> anyhow::Result<FileReport> {
         body.push('\n');
     }
     let migrated = add_marker(&body);
+    report.mode_marked = true;
 
     // Prove equivalence: the migrated file, parsed in occlusion mode and
     // denormalized, must be structurally identical to the original.
     let reparsed = crate::parse::expr::with_markup(crate::parse::expr::Markup::Occlusion, || {
-        crate::load::load_module_from_source(&migrated)
+        crate::parse::parse_source(&migrated)
     })?;
     if std::env::var("MARQDO_MIGRATE_DEBUG").is_ok() {
         eprintln!("ORIG: {}", shape(&original));
@@ -550,15 +579,25 @@ pub fn migrate_file(path: &Path, write: bool) -> anyhow::Result<FileReport> {
 
 /// Recursively migrate every `*.mq.md` under `path`.
 pub fn migrate_path(path: &Path, write: bool) -> anyhow::Result<Vec<FileReport>> {
+    migrate_path_with_options(path, write, false)
+}
+
+/// Recursive counterpart of [`migrate_file_with_options`].
+pub fn migrate_path_with_options(
+    path: &Path,
+    write: bool,
+    mark_all: bool,
+) -> anyhow::Result<Vec<FileReport>> {
     let files = crate::migrate::collect_files(path);
     let mut out = Vec::new();
     for f in files {
-        match migrate_file(&f, write) {
+        match migrate_file_with_options(&f, write, mark_all) {
             Ok(r) => out.push(r),
             Err(e) => out.push(FileReport {
                 file: f,
                 indexes: 0,
                 loops: 0,
+                mode_marked: false,
                 applied: false,
                 note: Some(format!("load failed: {e:#}")),
             }),
@@ -731,12 +770,17 @@ pub fn migrate_imports_path(path: &Path, write: bool) -> anyhow::Result<Vec<Impo
 /// Collect `*.mq.md` under `path` (file → itself).
 pub fn collect_files(path: &Path) -> Vec<PathBuf> {
     fn walk(dir: &Path, out: &mut Vec<PathBuf>) {
-        let Ok(rd) = std::fs::read_dir(dir) else { return };
+        let Ok(rd) = std::fs::read_dir(dir) else {
+            return;
+        };
         for e in rd.flatten() {
             let p = e.path();
             let name = p.file_name().and_then(|n| n.to_str()).unwrap_or("");
             if p.is_dir() {
-                if matches!(name, "target" | "dist" | "node_modules" | ".git" | ".marqdo") {
+                if matches!(
+                    name,
+                    "target" | "dist" | "node_modules" | ".git" | ".marqdo"
+                ) {
                     continue;
                 }
                 walk(&p, out);
@@ -760,7 +804,8 @@ mod tests {
 
     #[test]
     fn rewrites_import_oneliners_to_nested() {
-        let src = "---\ntitle: t\nimport json:lib/json.mq.md\nimport fmt:time.format\n---\n\n# main\n";
+        let src =
+            "---\ntitle: t\nimport json:lib/json.mq.md\nimport fmt:time.format\n---\n\n# main\n";
         let (out, n) = rewrite_import_frontmatter(src).unwrap().unwrap();
         assert_eq!(n, 2);
         assert!(out.contains("import:\n  json: lib/json.mq.md\n  fmt: time.format\n"));

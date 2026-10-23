@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: promote-ok
 type: skill
 applies_when: demo

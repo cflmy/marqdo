@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: 工具函数
 description: 供 frontmatter > 导入；返回用粗体；副作用用输出函数
 ---

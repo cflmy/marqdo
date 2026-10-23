@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: agent-okf-flywheel (Wave B0)
 description: Promote solidified workbook; second plan is cache=hit — document as knowledge base (OKF).
 import:

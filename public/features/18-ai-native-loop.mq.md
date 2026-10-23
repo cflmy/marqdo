@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: AI-native loop (contracts + MLSP)
 description: Progressive contracts, structured diagnostics, and the Marqdo Language Server for AI
 ---

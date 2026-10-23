@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: quantum steps + draw smoke
 description: steps= Bell table + draw SVG via record_plot.
 import:
@@ -17,7 +18,7 @@ import:
 
 **qc = > quantum.circuit qubits=2 steps=`steps`**
 **p = > `qc`.probabilities**
-**p00 = [00](p)**
+**p00 = [00](access(p, "00"))**
 **lo = > math.div a=2 b=5**
 **hi = > math.div a=3 b=5**
 
@@ -30,7 +31,7 @@ import:
   > print text=steps-fail
 
 **img = > `qc`.draw path="quantum-steps-draw.svg"**
-**kind = [kind](img)**
+**kind = [kind](access(img, "kind"))**
 
 1. `kind` == circuit
   > print text=draw-ok

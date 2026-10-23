@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: lib/plugin
 description: Load optional native ABI plugins (.dll / .so / .dylib)
 ---

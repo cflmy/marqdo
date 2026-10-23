@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: 内置 print
 ---
 

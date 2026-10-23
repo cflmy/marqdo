@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: lib/math
 description: High-school math — num, random, formula, plot
 ---

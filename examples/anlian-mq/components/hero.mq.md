@@ -1,3 +1,7 @@
+---
+markup: occlusion
+---
+
 ## 首页引言
 
 英雄区 HTML（品牌标语 + CTA + 漂浮主图）。样式在 `styles/shell` 的 Hero / 动效表。

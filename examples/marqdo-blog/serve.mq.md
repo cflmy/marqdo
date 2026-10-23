@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: marqdo-blog serve
 description: Scan Artifact documents/endpoints and listen (ADR 0007).
 import:

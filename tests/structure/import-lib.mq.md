@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: import official lib (Chinese)
 导入:
   文本: lib/文本.mq.md

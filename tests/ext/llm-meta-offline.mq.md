@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: llm meta binding offline
 description: Create handle from Artifact Metadata (model / api_key); no network.
 type: llm
@@ -11,5 +12,5 @@ import:
 # main
 
 **h = > llm.llm**
-> print text=[model](`h`)
-> print text=[api_key](`h`)
+> print text=[model](access(`h`, "model"))
+> print text=[api_key](access(`h`, "api_key"))

@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: 一份可执行的求导讲义
 description: 公式、求导、求根、求值与绘图，在同一条叙述里完成。
 import:

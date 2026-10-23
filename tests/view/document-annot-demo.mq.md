@@ -1,7 +1,7 @@
 ---
 title: View 文档面演示（叙述 · 分支 · 循环）
 description: 给 marqdo view Browse 用的稍长样例：散文保真、变量高亮、分支命中与循环次数标注
-markup: v0.3
+markup: occlusion
 ---
 
 # main
@@ -24,7 +24,7 @@ markup: v0.3
 **总分 = 0**
 **人数 = 0**
 
-- [分](分数表)
+- [分](遍历 分数表 为 分)
   **总分 = 总分 + 分**
   **人数 = 人数 + 1**
   > print text=录入分数 `分`

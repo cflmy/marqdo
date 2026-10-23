@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: inherit explicit parent constructor
 import:
   json: lib/json.mq.md

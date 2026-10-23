@@ -1,3 +1,7 @@
+---
+markup: occlusion
+---
+
 ## nav
 
 Brand first, then demo routes. Guest sees **Login**; signed-in sees **Admin** + **Logout**.

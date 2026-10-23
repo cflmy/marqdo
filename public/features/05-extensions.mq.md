@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: Official extensions (ext/)
 description: Optional packages — not stdlib
 ---

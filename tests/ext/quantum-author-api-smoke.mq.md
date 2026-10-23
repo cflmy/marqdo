@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: quantum author API smoke
 description: barrier, measure, append, state, draw meters.
 import:
@@ -14,14 +15,14 @@ import:
 **qc = > `qc`.measure**
 
 **st = > `qc`.state**
-**dim = [dim](st)**
+**dim = [dim](access(st, "dim"))**
 1. `dim` == 4
   > print text=state-ok
 2. *
   > print text=state-fail
 
 **img = > `qc`.draw path="quantum-author-draw.svg"**
-**kind = [kind](img)**
+**kind = [kind](access(img, "kind"))**
 1. `kind` == circuit
   > print text=draw-ok
 2. *
@@ -30,7 +31,7 @@ import:
 **other = > quantum.circuit qubits=2**
 **other = > `other`.x qubit=1**
 **qc2 = > `qc`.append op=`other`**
-**ops = [ops](qc2)**
+**ops = [ops](access(qc2, "ops"))**
 **n = > len `ops`**
 1. `n` == 5
   > print text=append-ok

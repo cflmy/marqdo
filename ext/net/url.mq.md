@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: ext/net/url
 description: URL helpers (stdlib wrappers). ADR 0007.
 import:

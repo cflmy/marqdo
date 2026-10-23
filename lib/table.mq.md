@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: lib/table
 description: >-
   List and map helpers. Prefer put (1-based path, same nesting as link-index get);

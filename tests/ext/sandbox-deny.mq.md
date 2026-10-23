@@ -1,4 +1,5 @@
 ---
+markup: occlusion
 title: sandbox.run — plugin.load denied; inspect lists notes
 description: >
   Guest that loads a native plugin must fail with unavailable in sandbox.
@@ -10,11 +11,11 @@ import:
 # main
 
 **sb = sandbox.open root="sandbox-fixtures"**
-**id = [id](sb)**
+**id = [id](access(sb, "id"))**
 
 **ret = sandbox.run id=`id` path="guest-plugin.mq.md"**
-**ok = [ok](ret)**
-**err = [error](ret)**
+**ok = [ok](access(ret, "ok"))**
+**err = [error](access(ret, "error"))**
 > print text=`ok`
 
 **parts = split value=`err` sep="unavailable in sandbox"**
@@ -25,7 +26,7 @@ import:
   > print text=`err`
 
 **info = sandbox.inspect id=`id`**
-**notes = [notes](info)**
+**notes = [notes](access(info, "notes"))**
 **nn = len value=`notes`**
 1. `nn` > 0
   > print text=inspect-ok
