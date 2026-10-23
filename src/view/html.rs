@@ -4229,6 +4229,7 @@ window.MARQDO_AUTO_STREAM = {auto_stream};
 <h1 class="page">{title}<span class="status-pill {status}">{status_label}</span></h1>
 <p class="meta">{rel}</p>
 {notebook}
+{knowledge}
 <section class="block structure-block">
   <h2>Structure</h2>
   {structure_block}
@@ -4259,6 +4260,7 @@ window.MARQDO_AUTO_STREAM = {auto_stream};
         status_label = status_label,
         rel = escape(rel),
         notebook = notebook,
+        knowledge = if vm.knowledge_html.is_empty() { String::new() } else { format!("<section class=\"block knowledge-block\"><h2>Executable knowledge</h2>{}</section>", vm.knowledge_html) },
         exec_clear = exec_clear,
         structure_block = structure_block,
         stdin_panel = stdin_panel,

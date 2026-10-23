@@ -57,15 +57,150 @@ fn dispatch(req: &Value) -> Result<Value, Value> {
         Some("repair_targets") => repair_targets(&params),
         Some("repair_apply") => repair_apply(&params),
         Some("schema") => schema(&params),
+        Some("artifact.find") => artifact_find(&params),
+        Some("artifact.inspect") => artifact_inspect(&params),
+        Some("link.resolve") => link_resolve(&params),
+        Some("artifact.verify") => artifact_verify(&params),
+        Some("artifact.impact") => artifact_impact(&params),
+        Some("artifact.bind") => artifact_bind(&params),
+        Some("artifact.execute") => artifact_execute(&params),
         // `<TAB>` M9: occlusion label search (two-tier vocabulary).
         Some("labels.search") => labels_search(&params),
         // `<TAB>` M6: one-shot session summary (T1 staleness seen/fixed).
         Some("session.summary") => session_summary(),
         other => Err(err(
             "mlsp.unknown_method",
-            format!("未知方法 {other:?}；可用：locate / syntax / validate / repair_targets / repair_apply / schema"),
+            format!("未知方法 {other:?}；可用：locate / syntax / validate / repair_targets / repair_apply / schema / artifact.find / artifact.inspect / link.resolve / artifact.verify / artifact.impact / artifact.bind / artifact.execute"),
         )),
     }
+}
+
+// ---------- Executable-knowledge artifact protocol ----------
+
+/// All artifact methods compile the same semantic project as the CLI.  They
+/// never fall back to EKC's lexical search when a binding decision is needed.
+fn semantic_project(params: &Value) -> Result<crate::sema::Compilation, Value> {
+    if params.get("source").is_some() {
+        return Err(err("mlsp.overlay_requires_path", "artifact 方法需要 params.project/path；内存 overlay 尚未持久化到项目边界"));
+    }
+    let root = params.get("project").or_else(|| params.get("path"))
+        .and_then(Value::as_str).unwrap_or(".");
+    let root = PathBuf::from(root);
+    let project_root = if root.is_file() {
+        root.parent().unwrap_or_else(|| Path::new(".")).to_path_buf()
+    } else { root.clone() };
+    crate::sema::compile_project(&crate::sema::CompileOptions {
+        project_root,
+        entry: root.is_file().then_some(root),
+        lock_mode: crate::sema::LockMode::Off,
+    }).map_err(|e| err("mlsp.semantic_compile", format!("{e:#}")))
+}
+
+fn artifact_query<'a>(project: &'a crate::sema::SemanticProject, query: &str) -> Vec<&'a crate::sema::SemanticArtifact> {
+    project.artifacts.iter().filter(|artifact| {
+        artifact.artifact_id.0 == query || artifact.symbol_id.as_ref().is_some_and(|id| id.as_str() == query)
+            || artifact.display_name == query || artifact.artifact_id.0.ends_with(query)
+    }).collect()
+}
+
+fn artifact_find(params: &Value) -> Result<Value, Value> {
+    let compilation = semantic_project(params)?;
+    let query = params.get("query").and_then(Value::as_str).unwrap_or("").to_ascii_lowercase();
+    let kind = params.get("kind").and_then(Value::as_str);
+    let limit = params.get("limit").and_then(Value::as_u64).unwrap_or(20) as usize;
+    let mut matches: Vec<Value> = compilation.semantics.artifacts.iter().filter(|artifact| {
+        kind.map(|kind| kind == artifact.kind).unwrap_or(true) && (query.is_empty()
+            || artifact.display_name.to_ascii_lowercase().contains(&query)
+            || artifact.artifact_id.0.to_ascii_lowercase().contains(&query))
+    }).take(limit).map(|artifact| json!({
+        "artifact_id": artifact.artifact_id.0, "symbol_id": artifact.symbol_id.as_ref().map(|id| id.as_str()),
+        "display_name": artifact.display_name, "kind": artifact.kind,
+        "effects": artifact.effects.values(), "source": {"file":artifact.source.file,"line":artifact.source.line},
+    })).collect();
+    matches.sort_by(|a, b| a["artifact_id"].as_str().cmp(&b["artifact_id"].as_str()));
+    Ok(json!({"schema_version":1,"discovery_only":true,"candidates":matches}))
+}
+
+fn artifact_inspect(params: &Value) -> Result<Value, Value> {
+    let compilation = semantic_project(params)?;
+    let query = params.get("artifact_id").or_else(|| params.get("symbol_id")).or_else(|| params.get("id"))
+        .and_then(Value::as_str).ok_or_else(|| err("mlsp.bad_request", "artifact.inspect 需要 artifact_id 或 symbol_id"))?;
+    let candidates = artifact_query(&compilation.semantics, query);
+    if candidates.is_empty() { return Err(err("artifact.unresolved", format!("没有制品 `{query}`"))); }
+    if candidates.len() != 1 { return Err(json!({"code":"artifact.ambiguous","message":format!("制品 `{query}` 不唯一"),"candidates":candidates.iter().map(|a|&a.artifact_id.0).collect::<Vec<_>>() })); }
+    Ok(crate::sema::artifact_json(candidates[0]))
+}
+
+fn link_resolve(params: &Value) -> Result<Value, Value> {
+    let compilation = semantic_project(params)?;
+    let reference = params.get("payload").or_else(|| params.get("reference")).and_then(Value::as_str)
+        .ok_or_else(|| err("mlsp.bad_request", "link.resolve 需要 payload/reference"))?;
+    let candidates = artifact_query(&compilation.semantics, reference);
+    let resolution = if candidates.is_empty() { "unresolved" } else if candidates.len() == 1 { "symbol" } else { "ambiguous" };
+    Ok(json!({"schema_version":1,"reference":reference,"resolution":resolution,"candidates":candidates.iter().map(|a|json!({"artifact_id":a.artifact_id.0,"symbol_id":a.symbol_id.as_ref().map(|id|id.as_str()),"display_name":a.display_name,"effects":a.effects.values()})).collect::<Vec<_>>() }))
+}
+
+fn artifact_verify(params: &Value) -> Result<Value, Value> {
+    let compilation = semantic_project(params)?;
+    let query = params.get("artifact_id").or_else(|| params.get("symbol_id")).and_then(Value::as_str)
+        .ok_or_else(|| err("mlsp.bad_request", "artifact.verify 需要 artifact_id 或 symbol_id"))?;
+    let candidates = artifact_query(&compilation.semantics, query);
+    if candidates.len() != 1 { return Err(err(if candidates.is_empty() { "artifact.unresolved" } else { "artifact.ambiguous" }, format!("无法唯一验证 `{query}`"))); }
+    let artifact = candidates[0];
+    let mut record = crate::sema::artifact_json(artifact)["verification"].clone();
+    record["policy"] = params.get("policy").cloned().unwrap_or_else(|| json!("static"));
+    record["artifact_id"] = json!(artifact.artifact_id.0);
+    Ok(record)
+}
+
+fn artifact_impact(params: &Value) -> Result<Value, Value> {
+    let compilation = semantic_project(params)?;
+    let query = params.get("artifact_id").or_else(|| params.get("symbol_id")).or_else(|| params.get("path")).and_then(Value::as_str)
+        .ok_or_else(|| err("mlsp.bad_request", "artifact.impact 需要 artifact_id、symbol_id 或 path"))?;
+    Ok(crate::sema::semantic_impact(&compilation.semantics, query))
+}
+
+fn artifact_bind(params: &Value) -> Result<Value, Value> {
+    let compilation = semantic_project(params)?;
+    let query = params.get("artifact_id").or_else(|| params.get("symbol_id")).and_then(Value::as_str)
+        .ok_or_else(|| err("mlsp.bad_request", "artifact.bind 需要 artifact_id 或 symbol_id"))?;
+    let candidates = artifact_query(&compilation.semantics, query);
+    if candidates.len() != 1 { return Err(err(if candidates.is_empty() { "artifact.unresolved" } else { "artifact.ambiguous" }, format!("无法唯一绑定 `{query}`"))); }
+    let artifact = candidates[0];
+    let expected = params.get("expected_digest").and_then(Value::as_str);
+    if expected.is_some() && expected != Some(artifact.hashes.artifact.0.as_str()) {
+        return Err(json!({"code":"artifact.digest_mismatch","message":"目标摘要已变化，拒绝绑定","expected":expected,"actual":artifact.hashes.artifact.0}));
+    }
+    Ok(json!({"schema_version":1,"handle":{"artifact_id":artifact.artifact_id.0,"digest":artifact.hashes.artifact.0,"project":compilation.semantics.root,"policy":params.get("policy").cloned().unwrap_or_else(||json!("pure")),"effects":artifact.effects.values()}}))
+}
+
+fn artifact_execute(params: &Value) -> Result<Value, Value> {
+    let handle = params.get("handle").ok_or_else(|| err("mlsp.bad_request", "artifact.execute 需要 artifact.bind 返回的 handle"))?;
+    let artifact_id = handle.get("artifact_id").and_then(Value::as_str).ok_or_else(|| err("mlsp.bad_handle", "handle 缺少 artifact_id"))?;
+    let digest = handle.get("digest").and_then(Value::as_str).ok_or_else(|| err("mlsp.bad_handle", "handle 缺少 digest"))?;
+    let project_path = handle.get("project").and_then(Value::as_str).or_else(|| params.get("project").and_then(Value::as_str)).ok_or_else(|| err("mlsp.bad_handle", "handle 缺少 project"))?;
+    let compilation = semantic_project(&json!({"project":project_path}))?;
+    let candidates = artifact_query(&compilation.semantics, artifact_id);
+    if candidates.len() != 1 { return Err(err("artifact.stale_handle", "制品不再可唯一解析；请重新 bind")); }
+    let artifact = candidates[0];
+    if artifact.hashes.artifact.0 != digest { return Err(json!({"code":"artifact.stale_handle","message":"源码或契约已改变；拒绝执行过期 handle","expected":digest,"actual":artifact.hashes.artifact.0})); }
+    if artifact.kind != "function" || artifact.callable.as_deref() == Some("instance_method") { return Err(err("artifact.not_executable", "只有非实例函数制品可由 artifact.execute 直接执行")); }
+    let allowed: Vec<&str> = params.get("allow_effects").and_then(Value::as_array).map(|items| items.iter().filter_map(Value::as_str).collect()).unwrap_or_default();
+    let denied: Vec<String> = artifact.effects.values().into_iter().filter(|effect| effect != "pure" && !allowed.contains(&effect.as_str())).collect();
+    if !denied.is_empty() { return Err(json!({"code":"artifact.effect_denied","message":"效果策略拒绝执行","denied":denied,"effects":artifact.effects.values()})); }
+    let path = compilation.semantics.root.join(&artifact.source.file);
+    let module = load::load_module(&path).map_err(|e| diagnostic_err("artifact.load", &e))?;
+    let input = params.get("inputs").cloned().unwrap_or_else(|| json!({}));
+    let object = input.as_object().ok_or_else(|| err("mlsp.bad_request", "inputs 必须是 JSON 对象"))?;
+    let mut args = Vec::new();
+    for (name, value) in object { args.push((name.clone(), crate::host::json::json_to_value(value).map_err(|e| err("mlsp.bad_input", e))?)); }
+    let caps = crate::host::HostCaps { fs_write: allowed.contains(&"fs.write"), exec: allowed.iter().any(|e| matches!(*e, "process.exec" | "plugin.call" | "llm.call")), net: allowed.iter().any(|e| matches!(*e, "network.read" | "network.write" | "llm.call")), plugin: allowed.contains(&"plugin.call") };
+    let host = crate::host::HostContext::for_capture(Some(&path), caps);
+    let mut interpreter = crate::interp::Interpreter::with_capture(Some(&path), false).with_host(host);
+    let name = artifact.display_name.rsplit('.').next().unwrap_or(&artifact.display_name);
+    let value = interpreter.invoke_function(&module, name, &args).map_err(|e| diagnostic_err("artifact.execution_failed", &e))?;
+    let stdout = std::mem::take(&mut interpreter.captured_stdout);
+    Ok(json!({"schema_version":1,"artifact_id":artifact.artifact_id.0,"digest":digest,"result":crate::value_as_json(&value).map_err(|e|err("artifact.serialization",e))?,"stdout":stdout,"effects":artifact.effects.values()}))
 }
 
 fn err(code: &str, message: impl Into<String>) -> Value {
@@ -499,4 +634,41 @@ fn contract_json(c: &Contract, path: Option<&Path>) -> Value {
         })).collect::<Vec<_>>(),
         "doc_anchor": c.anchor(path),
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn fixture() -> PathBuf {
+        let stamp = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
+        let root = std::env::temp_dir().join(format!("marqdo-mlsp-artifact-{stamp}"));
+        fs::create_dir_all(&root).unwrap();
+        fs::write(root.join("main.mq.md"), "# main\n\n## add\n\n*`x` + 1*").unwrap();
+        root
+    }
+
+    #[test]
+    fn artifact_protocol_binds_then_executes_a_digest_checked_function() {
+        let root = fixture();
+        let project = root.display().to_string();
+        let found = dispatch(&json!({"method":"artifact.find","params":{"project":project,"query":"add"}})).unwrap();
+        let candidate = found["candidates"].as_array().unwrap().iter().find(|v| v["kind"] == "function").unwrap();
+        let id = candidate["artifact_id"].as_str().unwrap();
+        let bound = dispatch(&json!({"method":"artifact.bind","params":{"project":root,"artifact_id":id}})).unwrap();
+        let handle = bound["handle"].clone();
+        let result = dispatch(&json!({"method":"artifact.execute","params":{"handle":handle,"inputs":{"x":4}}})).unwrap();
+        assert_eq!(result["result"], 5);
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn link_resolution_never_silently_selects_a_nonexistent_target() {
+        let root = fixture();
+        let result = dispatch(&json!({"method":"link.resolve","params":{"project":root,"payload":"does_not_exist"}})).unwrap();
+        assert_eq!(result["resolution"], "unresolved");
+        fs::remove_dir_all(root).unwrap();
+    }
 }

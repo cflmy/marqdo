@@ -47,6 +47,32 @@ pub struct FileViewModel {
     pub bindings_html: String,
     /// ViewExecutionReport JSON for AI / call-picker (empty if no run).
     pub trace_json: String,
+    /// Static semantic facts; generated without evaluating the document.
+    pub knowledge_html: String,
+}
+
+/// A compact, textual (not colour-only) explanation of executable knowledge.
+/// View deliberately compiles semantics without running the target, so a page
+/// can show binding/effect/verification facts even in `--no-exec` exports.
+pub fn render_knowledge_html(project: &crate::sema::SemanticProject, rel: &str) -> String {
+    let artifacts: Vec<_> = project.artifacts.iter().filter(|artifact| artifact.source.file == rel).collect();
+    if artifacts.is_empty() { return String::new(); }
+    let mut out = String::from(r#"<div class="knowledge-panel" aria-label="Executable knowledge">"#);
+    for artifact in artifacts {
+        let target = artifact.symbol_id.as_ref().map(|id| id.as_str()).unwrap_or(artifact.artifact_id.0.as_str());
+        let signature = artifact.signature.as_ref().map(|sig| {
+            let params = sig.params.iter().map(|param| format!("{}: {}{}", param.name, param.ty, if param.required { "" } else { "?" })).collect::<Vec<_>>().join(", ");
+            format!("({params}) → {}", sig.returns)
+        }).unwrap_or_else(|| "module/type declaration".into());
+        let effects = artifact.effects.values().join(", ");
+        let deps = if artifact.dependencies.is_empty() { "none".to_string() } else { artifact.dependencies.iter().map(|id| id.0.as_str()).collect::<Vec<_>>().join(", ") };
+        out.push_str(&format!(
+            r#"<article class="knowledge-card"><h3>{}</h3><dl><dt>Target</dt><dd><code>{}</code></dd><dt>Kind</dt><dd>{}{}</dd><dt>Signature</dt><dd><code>{}</code></dd><dt>Effects</dt><dd>{}</dd><dt>Verification</dt><dd>parse: {}; resolve: {}; contract: {}; tests: {}; evidence: {}</dd><dt>Lock digest</dt><dd><code>{}</code></dd><dt>Depends on</dt><dd><code>{}</code></dd><dt>Execution</dt><dd>Not executed by knowledge preview.</dd></dl></article>"#,
+            escape(&artifact.display_name), escape(target), escape(&artifact.kind), artifact.callable.as_ref().map(|callable| format!(" ({})", escape(callable))).unwrap_or_default(), escape(&signature), escape(&effects), escape(&artifact.verification.parse), escape(&artifact.verification.resolve), escape(&artifact.verification.contract), escape(&artifact.verification.tests), escape(&artifact.verification.evidence), escape(&artifact.hashes.artifact.0), escape(&deps),
+        ));
+    }
+    out.push_str("</div>");
+    out
 }
 
 /// Collect prompt strings from every `input` / `输入` call in the module (pre-order).

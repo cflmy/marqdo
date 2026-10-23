@@ -377,6 +377,20 @@ enum KnowledgeAction {
         #[arg(long, value_name = "FILE")]
         from: Option<PathBuf>,
     },
+    /// Check or update the reviewed semantic target lock (`links.lock.json`)
+    Lock {
+        /// Replace the lock with the current deterministic semantic graph
+        #[arg(long)]
+        update: bool,
+        /// Return exit code 3 when the lock is missing or differs
+        #[arg(long)]
+        strict: bool,
+    },
+    /// Show transitive reverse dependencies of a symbol, artifact, or source path
+    Impact {
+        #[arg(value_name = "SYMBOL_OR_PATH")]
+        query: String,
+    },
     /// Run engineering preflight for a task
     Preflight {
         #[arg(value_name = "TASK")]
@@ -1103,6 +1117,35 @@ fn try_main(cli: Cli) -> Result<i32> {
                         }
                     }
                     Ok(if instance_only { 1 } else { 0 })
+                }
+                KnowledgeAction::Lock { update, strict } => {
+                    let semantic_root = if path.is_file() {
+                        path.parent().unwrap_or_else(|| std::path::Path::new(".")).to_path_buf()
+                    } else {
+                        path.clone()
+                    };
+                    let compilation = marqdo::sema::compile_project(&marqdo::sema::CompileOptions {
+                        project_root: semantic_root,
+                        entry: path.is_file().then(|| path.clone()),
+                        lock_mode: if strict { marqdo::sema::LockMode::Strict } else { marqdo::sema::LockMode::Check },
+                    })?;
+                    if update {
+                        marqdo::sema::update_links_lock(&out, &compilation.semantics)?;
+                        let body = serde_json::json!({"schema_version": 1, "status": "updated", "path": out.join("links.lock.json")});
+                        if json { println!("{body}"); } else { println!("knowledge lock updated: {}", out.join("links.lock.json").display()); }
+                        Ok(0)
+                    } else {
+                        let report = marqdo::sema::check_links_lock(&out, &compilation.semantics)?;
+                        if json { println!("{}", report.to_json()); } else { println!("knowledge lock: {}", report.status); for id in report.missing.iter().chain(report.changed.iter()).chain(report.removed.iter()) { println!("  {id}"); } }
+                        Ok(if strict && !report.is_clean() { 3 } else { 0 })
+                    }
+                }
+                KnowledgeAction::Impact { query } => {
+                    let semantic_root = if path.is_file() { path.parent().unwrap_or_else(|| std::path::Path::new(".")).to_path_buf() } else { path.clone() };
+                    let compilation = marqdo::sema::compile_project(&marqdo::sema::CompileOptions { project_root: semantic_root, entry: path.is_file().then(|| path.clone()), lock_mode: marqdo::sema::LockMode::Off })?;
+                    let report = marqdo::sema::semantic_impact(&compilation.semantics, &query);
+                    if json { println!("{report}"); } else { for item in report["affected"].as_array().into_iter().flatten() { println!("{}  {}", item["artifact_id"].as_str().unwrap_or(""), item["display_name"].as_str().unwrap_or("")); } }
+                    Ok(if report["resolved"].as_bool() == Some(true) { 0 } else { 1 })
                 }
                 KnowledgeAction::Preflight {
                     task,

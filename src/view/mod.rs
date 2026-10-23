@@ -32,7 +32,7 @@ use crate::view::html::{escape, page_file, page_index, LinkMode};
 use crate::view::annot::{build_view_annots, view_execution_report_json};
 use crate::view::render::{
     collect_input_prompts, render_bindings_html, render_module_structure,
-    render_module_structure_with_annots, render_right_rail, uses_stream_panel, FileViewModel,
+    render_knowledge_html, render_module_structure_with_annots, render_right_rail, uses_stream_panel, FileViewModel,
 };
 use crate::{run_file_capture, RunOptions};
 
@@ -478,6 +478,11 @@ pub(crate) fn build_file_view(
         Some(cap) => view_execution_report_json(rel, ok, cap),
         None => String::new(),
     };
+    // Analysis is intentionally independent from capture/run.  If a document
+    // has side effects, its facts remain visible while its values stay absent.
+    let knowledge_html = crate::sema::compile_project(&crate::sema::CompileOptions {
+        project_root: root.root.clone(), entry: Some(abs.to_path_buf()), lock_mode: crate::sema::LockMode::Off,
+    }).map(|compilation| render_knowledge_html(&compilation.semantics, rel)).unwrap_or_default();
     Ok(FileViewModel {
         rel_path: rel.to_string(),
         source,
@@ -494,6 +499,7 @@ pub(crate) fn build_file_view(
         plots,
         bindings_html: std::mem::take(&mut bindings_html),
         trace_json,
+        knowledge_html,
     })
 }
 

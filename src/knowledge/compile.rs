@@ -17,6 +17,20 @@ pub struct KnowledgeOptions {
 }
 
 pub fn compile(opts: KnowledgeOptions) -> Result<KnowledgeGraph> {
+    // The semantic projection is the authoritative machine-facing graph.  The
+    // older EKC catalog below remains intentionally available as a compatible
+    // human/retrieval projection, but never substitutes for semantic binding.
+    let semantic_root = if opts.path.is_file() {
+        opts.path.parent().unwrap_or_else(|| Path::new(".")).to_path_buf()
+    } else {
+        opts.path.clone()
+    };
+    let semantic = crate::sema::compile_project(&crate::sema::CompileOptions {
+        project_root: semantic_root,
+        entry: opts.path.is_file().then(|| opts.path.clone()),
+        lock_mode: crate::sema::LockMode::Off,
+    })?;
+    crate::sema::write_semantic_projections(&opts.out_dir, &semantic)?;
     let extract_opts = ExtractOptions {
         path: opts.path.clone(),
         out_dir: opts.out_dir.clone(),
