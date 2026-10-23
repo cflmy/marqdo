@@ -1,6 +1,7 @@
 ---
 title: fs read/exists
-import fs:lib/fs.mq.md
+import:
+  fs: lib/fs.mq.md
 ---
 
 # main

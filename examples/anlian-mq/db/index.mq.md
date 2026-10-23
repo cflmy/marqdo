@@ -1,9 +1,10 @@
 ---
 title: db/index
 description: 打开库、建全表、幂等种子、帖子全文索引。
-导入 网页:ext/web/网页.mq.md
-import schema:schema.mq.md
-import seed:seed.mq.md
+导入:
+  网页: ext/web/网页.mq.md
+  schema: schema.mq.md
+  seed: seed.mq.md
 ---
 
 ## 打开

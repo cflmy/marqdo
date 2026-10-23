@@ -1,8 +1,9 @@
 ---
 title: styles/shell
 description: 暗恋见君壳样式——对照 Django 原站粉玻璃 + 动效，用表格声明。
-导入 网页:ext/web/网页.mq.md
-import text:lib/text.mq.md
+导入:
+  网页: ext/web/网页.mq.md
+  text: lib/text.mq.md
 ---
 
 对照原站 `config/static/front/css/{base,feed_common,footer,index/hero}.css`：

@@ -1436,7 +1436,8 @@ mod tests {
         ));
         let source = r#"---
 title: evaluated plan test
-import foreign:lib/foreign.mq.md
+import:
+  foreign: lib/foreign.mq.md
 ---
 
 # main
@@ -1521,7 +1522,8 @@ print(1)
         ));
         let source = r#"---
 title: shared state test
-import foreign:lib/foreign.mq.md
+import:
+  foreign: lib/foreign.mq.md
 ---
 
 # main
@@ -1651,7 +1653,8 @@ console.log("stateless");
         ));
         let source = r#"---
 title: clear outputs
-import foreign:lib/foreign.mq.md
+import:
+  foreign: lib/foreign.mq.md
 ---
 
 # main
@@ -1801,7 +1804,8 @@ print(950)
         ));
         let source = r#"---
 title: plan inputs test
-import foreign:lib/foreign.mq.md
+import:
+  foreign: lib/foreign.mq.md
 ---
 
 # main
@@ -1861,7 +1865,8 @@ print(sys.stdin.read().strip())
         ));
         let source = r#"---
 title: persistent node stdin test
-import foreign:lib/foreign.mq.md
+import:
+  foreign: lib/foreign.mq.md
 ---
 
 # main
@@ -1915,7 +1920,8 @@ import foreign:lib/foreign.mq.md
         ));
         let source = r#"---
 title: persistent stdin test
-import foreign:lib/foreign.mq.md
+import:
+  foreign: lib/foreign.mq.md
 ---
 
 # main

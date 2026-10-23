@@ -2,14 +2,15 @@
 title: 中文站点示例
 description: >-
   与 examples/web-site 对等的 WWW Demo 样站：表驱动全站；作者业务 JS=0；作者 .css=0。
-导入 网页:ext/web/网页.mq.md
-import shell:styles/shell.mq.md
-import nav:components/nav.mq.md
-import side:components/side.mq.md
-import foot:components/foot.mq.md
-import desk:components/desk.mq.md
-import articles:db/articles.mq.md
-import db:db/index.mq.md
+导入:
+  网页: ext/web/网页.mq.md
+  shell: styles/shell.mq.md
+  nav: components/nav.mq.md
+  side: components/side.mq.md
+  foot: components/foot.mq.md
+  desk: components/desk.mq.md
+  articles: db/articles.mq.md
+  db: db/index.mq.md
 ---
 
 # main

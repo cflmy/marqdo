@@ -1,7 +1,8 @@
 ---
 markup: occlusion
 title: lib/url smoke
-import url:lib/url.mq.md
+import:
+  url: lib/url.mq.md
 ---
 
 # main

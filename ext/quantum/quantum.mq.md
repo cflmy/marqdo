@@ -1,9 +1,10 @@
 ---
 title: ext/quantum/quantum
 description: Official quantum circuit simulator (English). Gates + circuits; ABI plugin.
-import plugin:lib/plugin.mq.md
-import sys:lib/sys.mq.md
-import json:lib/json.mq.md
+import:
+  plugin: lib/plugin.mq.md
+  sys: lib/sys.mq.md
+  json: lib/json.mq.md
 ---
 
 Official quantum circuit simulator (English). Gates + circuits; ABI plugin.

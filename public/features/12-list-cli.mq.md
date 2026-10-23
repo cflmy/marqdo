@@ -2,9 +2,10 @@
 markup: occlusion
 title: Mid stdlib — lists and cli
 description: table sort/unique/zip + cli.parse (Mid M5)
-import table:lib/table.mq.md
-import csv:lib/csv.mq.md
-import cli:lib/cli.mq.md
+import:
+  table: lib/table.mq.md
+  csv: lib/csv.mq.md
+  cli: lib/cli.mq.md
 ---
 
 # Sort CSV rows and parse flags

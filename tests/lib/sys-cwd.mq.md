@@ -1,6 +1,7 @@
 ---
 title: sys cwd
-import sys:lib/sys.mq.md
+import:
+  sys: lib/sys.mq.md
 ---
 
 # main

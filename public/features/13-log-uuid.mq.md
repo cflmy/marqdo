@@ -1,8 +1,9 @@
 ---
 title: Mid stdlib — log and uuid
 description: Level-filtered logs + UUID v4 (Mid M6)
-import log:lib/log.mq.md
-import uuid:lib/uuid.mq.md
+import:
+  log: lib/log.mq.md
+  uuid: lib/uuid.mq.md
 ---
 
 # Observable scripts without plugins

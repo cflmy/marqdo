@@ -1,6 +1,7 @@
 ---
 title: ext/security rbac smoke
-import rbac:ext/security/rbac.mq.md
+import:
+  rbac: ext/security/rbac.mq.md
 ---
 
 # main

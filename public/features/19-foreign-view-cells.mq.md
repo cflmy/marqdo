@@ -2,7 +2,8 @@
 markup: occlusion
 title: Foreign kernels v2 — Python analysis in view
 description: Kernel state, Marqdo-to-kernel values and view cells — without a stdin-only demo
-import foreign:lib/foreign.mq.md
+import:
+  foreign: lib/foreign.mq.md
 ---
 
 # main

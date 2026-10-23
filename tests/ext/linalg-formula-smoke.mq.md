@@ -1,7 +1,8 @@
 ---
 title: linalg formula smoke
 description: (AB)^T simplifies to B^T*A^T; ping ok.
-import la:ext/linalg/linalg.mq.md
+import:
+  la: ext/linalg/linalg.mq.md
 ---
 
 # main

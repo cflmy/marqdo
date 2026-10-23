@@ -3,9 +3,10 @@ title: agent trial sandbox opt-in — host unchanged until commit
 description: >
   O1: agent.trial write stays upper until commit=True.
   Prefer link index over json.get.
-import agent:ext/ai/agent.mq.md
-import sandbox:ext/ai/sandbox.mq.md
-import fs:lib/fs.mq.md
+import:
+  agent: ext/ai/agent.mq.md
+  sandbox: ext/ai/sandbox.mq.md
+  fs: lib/fs.mq.md
 ---
 
 # main

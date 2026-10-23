@@ -1,5 +1,6 @@
 ---
-import libai:libai.mq.md
+import:
+  libai: libai.mq.md
 ---
 
 # main

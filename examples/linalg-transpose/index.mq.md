@@ -1,7 +1,8 @@
 ---
 title: Transpose identity (formula document)
 description: (AB)^T = B^T A^T as a runnable lecture fragment.
-import la:ext/linalg/linalg.mq.md
+import:
+  la: ext/linalg/linalg.mq.md
 ---
 
 # Transpose reverses products

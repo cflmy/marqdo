@@ -471,7 +471,16 @@ fn payload_fingerprint(payload: &Option<Box<Expr>>) -> String {
 
 fn render_payload(payload: &Option<Box<Expr>>) -> String {
     match payload {
-        Some(e) => crate::view::expr_display(e),
+        Some(e) => {
+            #[cfg(feature = "view")]
+            {
+                crate::view::expr_display(e)
+            }
+            #[cfg(not(feature = "view"))]
+            {
+                format!("{e:?}")
+            }
+        }
         None => String::new(),
     }
 }

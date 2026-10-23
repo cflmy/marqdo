@@ -293,28 +293,10 @@ fn inspect_file(abs: &Path, rel: &str) -> Result<ModuleInfo> {
 }
 
 fn extract_frontmatter_imports(source: &str) -> Vec<String> {
-    let source = source.strip_prefix('\u{feff}').unwrap_or(source);
-    let mut imports = Vec::new();
-    let lines: Vec<&str> = source.lines().collect();
-    if lines.first().map(|l| l.trim()) != Some("---") {
-        return imports;
-    }
-    for line in lines.iter().skip(1) {
-        let t = line.trim();
-        if t == "---" {
-            break;
-        }
-        if let Ok(Some(crate::parse::ImportLine::File(imp))) =
-            crate::parse::parse_import_line(t)
-        {
-            imports.push(format!("import {}:{}", imp.bind, imp.path));
-        } else if let Ok(Some(crate::parse::ImportLine::Member(u))) =
-            crate::parse::parse_import_line(t)
-        {
-            imports.push(format!("import {}:{}", u.bind, u.path.join(".")));
-        }
-    }
-    imports
+    crate::parse::scan_frontmatter_imports(source)
+        .iter()
+        .map(crate::parse::format_import_display)
+        .collect()
 }
 
 fn extract_frontmatter_title(source: &str) -> Option<String> {

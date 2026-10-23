@@ -1,11 +1,12 @@
 ---
 title: OKF agent-kb near_match (offline)
 description: Promote trip resource; near-dupe goals hit match=near; unrelated misses.
-import agent:ext/ai/agent.mq.md
-import fs:lib/fs.mq.md
-import json:lib/json.mq.md
-import plugin:lib/plugin.mq.md
-import sys:lib/sys.mq.md
+import:
+  agent: ext/ai/agent.mq.md
+  fs: lib/fs.mq.md
+  json: lib/json.mq.md
+  plugin: lib/plugin.mq.md
+  sys: lib/sys.mq.md
 ---
 
 # main

@@ -1,11 +1,12 @@
 ---
 title: ext/agent step (DeepSeek)
 description: Real agent.step with tool via lib/subtask; default writeback to ok/error slots.
-import time:lib/time.mq.md
-import writeback:lib/writeback.mq.md
-import json:lib/json.mq.md
-import llm:ext/ai/llm.mq.md
-import agent:ext/ai/agent.mq.md
+import:
+  time: lib/time.mq.md
+  writeback: lib/writeback.mq.md
+  json: lib/json.mq.md
+  llm: ext/ai/llm.mq.md
+  agent: ext/ai/agent.mq.md
 ---
 
 ## 获取时间

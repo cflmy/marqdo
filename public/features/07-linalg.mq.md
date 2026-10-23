@@ -1,7 +1,8 @@
 ---
 title: How to write a linear-algebra formula document
 description: ext/linalg formula-doc — declare, infix, run-implies-correct
-import la:ext/linalg/linalg.mq.md
+import:
+  la: ext/linalg/linalg.mq.md
 ---
 
 # Formula documents with ext/linalg

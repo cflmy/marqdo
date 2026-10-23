@@ -3,12 +3,13 @@ title: ext/web/web
 description: >-
   Web Artifact facade (ADR 0007) — page · route · serve · render · inspect · use.
   Document/Endpoint first-class. No compose_* / configure / author ensure_plugin.
-import cap:ext/web/_capability.mq.md
-import page_mod:ext/web/page.mq.md
-import route_mod:ext/web/route.mq.md
-import dom_mod:ext/web/dom.mq.md
-import client_mod:ext/web/client.mq.md
-import table:lib/table.mq.md
+import:
+  cap: ext/web/_capability.mq.md
+  page_mod: ext/web/page.mq.md
+  route_mod: ext/web/route.mq.md
+  dom_mod: ext/web/dom.mq.md
+  client_mod: ext/web/client.mq.md
+  table: lib/table.mq.md
 ---
 
 Importing this module is the web **capability** (native plugin loads on first facade call).

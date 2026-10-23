@@ -1,7 +1,8 @@
 ---
 title: browser fetch (C4)
 description: fetch/after effects via lib/browser — no json glue
-import browser:lib/browser.mq.md
+import:
+  browser: lib/browser.mq.md
 ---
 
 # main

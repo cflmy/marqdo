@@ -144,7 +144,7 @@ Matching surrounding **legacy** `json.set` in `ext/ai/*.mq.md` is **not** compli
 7. **Do not use `##` inside `# main` for document sectioning** — those become nested functions. Use paragraphs / `---` breaks instead.
 8. **Index:** prefer `[键](集合)` / `` [`名`](集合) `` over footnote `` m[^k] ``.
 
-Browser client programs: prefer `import browser:lib/browser.mq.md` (no native plugin). Server sites: Artifact Metadata (`type: web|endpoint`) + `ext/web` facade + `ext/data` / `ext/security` / `ext/net` — see [ext-web-artifact.md](../../doc/design/ext-web-artifact.md). **Never** restore `compose_*` / `app.configure`.
+Browser client programs: prefer nested `import:` with `browser: lib/browser.mq.md` (no native plugin). Server sites: Artifact Metadata (`type: web|endpoint`) + `ext/web` facade + `ext/data` / `ext/security` / `ext/net` — see [ext-web-artifact.md](../../doc/design/ext-web-artifact.md). **Never** restore `compose_*` / `app.configure`.
 
 ## Developing libraries (`lib/*`, `ext/*`)
 
@@ -186,7 +186,7 @@ When editing a file full of `json.set`:
 1. Turn static structures into GFM tables.
 2. Replace repeated effect shapes with `browser.*` / `web.text_patch` / `web.dom_patch`.
 3. Leave at most sparse `table.put` for dynamic keys.
-4. Drop `import json:…` if unused.
+4. Drop unused `json:` (or other) entries under nested `import:`.
 
 ## Anti-patterns
 

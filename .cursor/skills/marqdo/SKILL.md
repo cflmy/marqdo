@@ -49,8 +49,7 @@ Canonical design (repo): `doc/design/markdown-mapping.md`, `doc/design/keywords.
 | Line `N. *` | Else arm |
 | `> fn args` | Call (named `k=v` or positional) |
 | `` > `obj`.method args `` | Method call (`obj` must be a map with `_type`) |
-| Frontmatter `import bind:path.mq.md` / `导入` | Import file (bind library name) |
-| Frontmatter `import bind:lib.member` / `导入` | Short name for a library member (same keyword; no separate `use`) |
+| Frontmatter nested `import:` / `导入:` map | Import file (`bind: path.mq.md`) or short name (`bind: lib.member`) |
 | `> lib.member …` / `> lib.Type.member …` | Call via bare dotted path (instance methods need `` `var`.m ``) |
 | `*…*` | Statement (bind / expr) — closing `*` touches last token, **no trailing space**; bare ids are variables |
 | `**…**` | Return value — closing `**` touches last token, **no trailing space**; bare ids are variables |
@@ -136,13 +135,14 @@ Chinese builtins (same functions, no import):
 
 ## Frontmatter imports + stdlib
 
-Imports use `import bind:target` (`导入` equivalent): file (`.mq.md`) or short name (`lib.member`). Members are **not** flattened into the caller. Call with a bare dotted path:
+Imports use nested YAML `import:` (`导入:` equivalent): file (`.mq.md`) or short name (`lib.member`). Members are **not** flattened into the caller. Call with a bare dotted path:
 
 ```markdown
 ---
 title: example
-import text:lib/text.mq.md
-import clock:lib/time.mq.md
+import:
+  text: lib/text.mq.md
+  clock: lib/time.mq.md
 ---
 
 # main

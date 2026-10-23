@@ -1,6 +1,7 @@
 ---
 title: lib/net markdown_parse smoke
-import net:lib/net.mq.md
+import:
+  net: lib/net.mq.md
 ---
 
 # main

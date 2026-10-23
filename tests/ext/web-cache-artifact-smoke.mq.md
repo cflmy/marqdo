@@ -1,6 +1,7 @@
 ---
 title: ext/data cache smoke
-import cache:ext/data/cache.mq.md
+import:
+  cache: ext/data/cache.mq.md
 ---
 
 # main

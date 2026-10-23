@@ -114,7 +114,8 @@ Row-oriented records (SQL-like): first header `@` / `行` / `row` → list of ma
 
 ```markdown
 ---
-import browser:lib/browser.mq.md
+import:
+  browser: lib/browser.mq.md
 ---
 
 # main
@@ -140,7 +141,8 @@ Do **not** build effect maps with `json.set` chains. See [marqdo-dev](../marqdo-
 ```markdown
 ---
 title: split demo
-import text:lib/text.mq.md
+import:
+  text: lib/text.mq.md
 ---
 
 # main
@@ -168,7 +170,8 @@ After a blank line, code runs:
 ```markdown
 ---
 description: loads math
-import math:lib/math.mq.md
+import:
+  math: lib/math.mq.md
 ---
 
 # main
@@ -216,7 +219,8 @@ See `tests/structure/object-handle.mq.md` and `ext/llm.mq.md`: `# Type` construc
 
 ```markdown
 ---
-import agent:ext/agent.mq.md
+import:
+  agent: ext/agent.mq.md
 ---
 
 # main
@@ -280,7 +284,8 @@ Executable document as a page.
 
 ```markdown
 ---
-import web:ext/web/web.mq.md
+import:
+  web: ext/web/web.mq.md
 ---
 
 # main
@@ -296,7 +301,8 @@ import web:ext/web/web.mq.md
 
 ```markdown
 ---
-import quantum:ext/quantum/quantum.mq.md
+import:
+  quantum: ext/quantum/quantum.mq.md
 ---
 
 # main

@@ -1,9 +1,10 @@
 ---
 title: db/index
 description: Open sqlite, init articles, seed once.
-import web:ext/web/web.mq.md
-import articles:articles.mq.md
-import fs:lib/fs.mq.md
+import:
+  web: ext/web/web.mq.md
+  articles: articles.mq.md
+  fs: lib/fs.mq.md
 ---
 
 ## open

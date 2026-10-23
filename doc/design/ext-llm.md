@@ -20,7 +20,8 @@ Import:
 
 ```markdown
 ---
-import llm:ext/ai/llm.mq.md
+import:
+  llm: ext/ai/llm.mq.md
 ---
 ```
 

@@ -678,7 +678,8 @@ L1 完成后 AI 就能静态查链接；L2/L3 才是执行与呈现。
 ```markdown
 ---
 markup: occlusion
-import libai:libai.mq.md
+import:
+  libai: libai.mq.md
 ---
 
 # main

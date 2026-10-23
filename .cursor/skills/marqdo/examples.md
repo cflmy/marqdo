@@ -141,7 +141,8 @@ Row-oriented records (SQL-like): first header `@` / `行` / `row` → list of ma
 
 ```markdown
 ---
-import browser:lib/browser.mq.md
+import:
+  browser: lib/browser.mq.md
 ---
 
 # main
@@ -168,7 +169,8 @@ Return and soft-error packs are **tables**, not `json.set` pipelines. Full style
 
 ```markdown
 ---
-import table:lib/table.mq.md
+import:
+  table: lib/table.mq.md
 ---
 
 ## step_ok
@@ -217,7 +219,8 @@ Do **not** mirror legacy `ext/ai/agent.mq.md` `json.parse`+`json.set` chains whe
 ```markdown
 ---
 title: split demo
-import text:lib/text.mq.md
+import:
+  text: lib/text.mq.md
 ---
 
 # main
@@ -230,8 +233,9 @@ import text:lib/text.mq.md
 
 ```markdown
 ---
-import re:lib/re.mq.md
-import enc:lib/encoding.mq.md
+import:
+  re: lib/re.mq.md
+  enc: lib/encoding.mq.md
 ---
 
 # main
@@ -246,8 +250,9 @@ import enc:lib/encoding.mq.md
 
 ```markdown
 ---
-import log:lib/log.mq.md
-import uuid:lib/uuid.mq.md
+import:
+  log: lib/log.mq.md
+  uuid: lib/uuid.mq.md
 ---
 
 # main
@@ -278,7 +283,8 @@ After a blank line, code runs:
 ```markdown
 ---
 description: loads math
-import math:lib/math.mq.md
+import:
+  math: lib/math.mq.md
 ---
 
 # main
@@ -326,7 +332,8 @@ See `tests/structure/object-handle.mq.md` and `ext/ai/llm.mq.md`: `# Type` const
 
 ```markdown
 ---
-import agent:ext/agent.mq.md
+import:
+  agent: ext/agent.mq.md
 ---
 
 # main
@@ -378,8 +385,9 @@ if x > 0:
 ```markdown
 ---
 title: hello-site
-import web:ext/web/web.mq.md
-import db:db/index.mq.md
+import:
+  web: ext/web/web.mq.md
+  db: db/index.mq.md
 ---
 
 # main
@@ -416,7 +424,8 @@ import db:db/index.mq.md
 
 ```markdown
 ---
-import quantum:ext/quantum/quantum.mq.md
+import:
+  quantum: ext/quantum/quantum.mq.md
 ---
 
 # main
@@ -445,7 +454,8 @@ import quantum:ext/quantum/quantum.mq.md
 
 ```markdown
 ---
-import la:ext/linalg/linalg.mq.md
+import:
+  la: ext/linalg/linalg.mq.md
 ---
 
 # main

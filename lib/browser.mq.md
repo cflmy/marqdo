@@ -3,7 +3,8 @@ title: lib/browser
 description: >-
   Readable browser effect helpers for WASM clients. Prefer GFM tables + these
   helpers; do not build effects with json.set chains.
-import table:lib/table.mq.md
+import:
+  table: lib/table.mq.md
 ---
 
 Readable browser effect helpers for WASM clients. Prefer GFM tables + these helpers; do not build effects with json.set chains.

@@ -2,7 +2,8 @@
 markup: occlusion
 title: lib/table — collections
 description: put, append, and map helpers (code-as-docs pilot)
-import table:lib/table.mq.md
+import:
+  table: lib/table.mq.md
 ---
 
 # main

@@ -1,9 +1,10 @@
 ---
 markup: occlusion
 title: table sort_by + cli
-import table:lib/table.mq.md
-import csv:lib/csv.mq.md
-import cli:lib/cli.mq.md
+import:
+  table: lib/table.mq.md
+  csv: lib/csv.mq.md
+  cli: lib/cli.mq.md
 ---
 
 # main

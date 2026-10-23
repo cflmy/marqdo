@@ -1,8 +1,9 @@
 ---
 title: ext/web/_capability
 description: Internal — load native web plugin once. Authors must not call this; import web = capability (ADR 0007).
-import plugin:lib/plugin.mq.md
-import sys:lib/sys.mq.md
+import:
+  plugin: lib/plugin.mq.md
+  sys: lib/sys.mq.md
 ---
 
 ## load

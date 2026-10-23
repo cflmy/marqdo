@@ -1,6 +1,7 @@
 ---
 title: fs copy/move/temp
-import fs:lib/fs.mq.md
+import:
+  fs: lib/fs.mq.md
 ---
 
 # main

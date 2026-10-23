@@ -2,9 +2,10 @@
 markup: occlusion
 title: O5 quarantine skill status
 description: Promote good skill then quarantine — status becomes quarantine.
-import plugin:lib/plugin.mq.md
-import fs:lib/fs.mq.md
-import sys:lib/sys.mq.md
+import:
+  plugin: lib/plugin.mq.md
+  fs: lib/fs.mq.md
+  sys: lib/sys.mq.md
 ---
 
 # main

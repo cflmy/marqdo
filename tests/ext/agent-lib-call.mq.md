@@ -1,10 +1,11 @@
 ---
 title: Parent CALL:lib whitelist (offline)
 description: lib.fs.exists + ARGS; reject lib.net; catalog callable.
-import agent:ext/ai/agent.mq.md
-import json:lib/json.mq.md
-import fs:lib/fs.mq.md
-import sys:lib/sys.mq.md
+import:
+  agent: ext/ai/agent.mq.md
+  json: lib/json.mq.md
+  fs: lib/fs.mq.md
+  sys: lib/sys.mq.md
 ---
 
 # main

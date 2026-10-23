@@ -2,8 +2,9 @@
 markup: occlusion
 title: sys.exec capture=True returns stdout map
 description: GAP-09 optional capture.
-import sys:lib/sys.mq.md
-import json:lib/json.mq.md
+import:
+  sys: lib/sys.mq.md
+  json: lib/json.mq.md
 ---
 
 # main

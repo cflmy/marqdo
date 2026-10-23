@@ -92,7 +92,8 @@ mod tests {
     #[test]
     fn boot_and_call_share_count() {
         let src = r##"---
-import json:lib/json.mq.md
+import:
+  json: lib/json.mq.md
 ---
 
 # main

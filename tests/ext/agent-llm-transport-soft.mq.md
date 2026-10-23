@@ -3,11 +3,12 @@ title: agent / llm soft transport errors
 description: >-
   Regression (2026-10): unreachable OpenAI upstream must not abort the VM.
   `llm.ask` / `agent.step` / `agent.run` return structured status=error.
-import agent:ext/ai/agent.mq.md
-import json:lib/json.mq.md
-import llm:ext/ai/llm.mq.md
-import plugin:lib/plugin.mq.md
-import sys:lib/sys.mq.md
+import:
+  agent: ext/ai/agent.mq.md
+  json: lib/json.mq.md
+  llm: ext/ai/llm.mq.md
+  plugin: lib/plugin.mq.md
+  sys: lib/sys.mq.md
 ---
 
 # main

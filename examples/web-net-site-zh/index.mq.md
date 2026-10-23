@@ -1,15 +1,16 @@
 ---
 title: 网络扩展站（中文）
 description: 首页 + /about + /new（表单）+ /tools（lib/net）+ /admin（登录鉴权）+ /live（WebSocket）。
-导入 网页:ext/web/网页.mq.md
-import net:lib/网络.mq.md
-import text:lib/text.mq.md
-import shell:styles/shell.mq.md
-import nav:components/nav.mq.md
-import side:components/side.mq.md
-import foot:components/foot.mq.md
-import articles:db/articles.mq.md
-import db:db/index.mq.md
+导入:
+  网页: ext/web/网页.mq.md
+  net: lib/网络.mq.md
+  text: lib/text.mq.md
+  shell: styles/shell.mq.md
+  nav: components/nav.mq.md
+  side: components/side.mq.md
+  foot: components/foot.mq.md
+  articles: db/articles.mq.md
+  db: db/index.mq.md
 ---
 
 # main

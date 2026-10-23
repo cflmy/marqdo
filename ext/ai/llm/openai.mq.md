@@ -6,11 +6,12 @@ description: >-
   Prefers optional plugins/llm ABI when present; falls back to lib/net.
   Used by ext/ai/llm; authors should prefer llm.ask / llm.stream.
   Result packs are GFM tables / table.put (code-as-documentation).
-import net:lib/net.mq.md
-import json:lib/json.mq.md
-import table:lib/table.mq.md
-import sys:lib/sys.mq.md
-import plugin:lib/plugin.mq.md
+import:
+  net: lib/net.mq.md
+  json: lib/json.mq.md
+  table: lib/table.mq.md
+  sys: lib/sys.mq.md
+  plugin: lib/plugin.mq.md
 ---
 
 ## usage_from

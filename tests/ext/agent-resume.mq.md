@@ -1,11 +1,12 @@
 ---
 title: agent resume checkpoint (offline)
 description: save / load / list / clear under .marqdo/agent-resume-test
-import agent:ext/ai/agent.mq.md
-import plugin:lib/plugin.mq.md
-import sys:lib/sys.mq.md
-import json:lib/json.mq.md
-import fs:lib/fs.mq.md
+import:
+  agent: ext/ai/agent.mq.md
+  plugin: lib/plugin.mq.md
+  sys: lib/sys.mq.md
+  json: lib/json.mq.md
+  fs: lib/fs.mq.md
 ---
 
 # main

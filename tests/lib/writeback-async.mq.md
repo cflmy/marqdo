@@ -1,9 +1,10 @@
 ---
 title: async writeback via subtask
 description: Fire-and-forget persist_slot with explicit line=; join on exit.
-import writeback:lib/writeback.mq.md
-import subtask:lib/subtask.mq.md
-import json:lib/json.mq.md
+import:
+  writeback: lib/writeback.mq.md
+  subtask: lib/subtask.mq.md
+  json: lib/json.mq.md
 ---
 
 ## persist_slot

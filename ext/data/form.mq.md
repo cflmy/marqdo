@@ -2,9 +2,10 @@
 markup: occlusion
 title: ext/data/form
 description: Form Resource — fields, validate, submit (ADR 0007).
-import plugin:lib/plugin.mq.md
-import sys:lib/sys.mq.md
-import table:lib/table.mq.md
+import:
+  plugin: lib/plugin.mq.md
+  sys: lib/sys.mq.md
+  table: lib/table.mq.md
 ---
 
 ## _load

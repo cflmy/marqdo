@@ -3,7 +3,8 @@ title: sandbox.run — plugin.load denied; inspect lists notes
 description: >
   Guest that loads a native plugin must fail with unavailable in sandbox.
   No json.get chains — link index + a small expect table.
-import sandbox:ext/ai/sandbox.mq.md
+import:
+  sandbox: ext/ai/sandbox.mq.md
 ---
 
 # main

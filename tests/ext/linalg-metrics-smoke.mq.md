@@ -1,9 +1,10 @@
 ---
 title: linalg metrics smoke (L6)
 description: lstsq, norm, cond, rank, complex fro, themed draw.
-import la:ext/linalg/linalg.mq.md
-import math:lib/math.mq.md
-import json:lib/json.mq.md
+import:
+  la: ext/linalg/linalg.mq.md
+  math: lib/math.mq.md
+  json: lib/json.mq.md
 ---
 
 # main

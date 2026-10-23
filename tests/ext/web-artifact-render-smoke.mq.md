@@ -1,8 +1,9 @@
 ---
 title: web artifact render smoke
 description: Unified View nodes + document render (ADR 0007); offline, no listen.
-import web:ext/web/web.mq.md
-import text:lib/text.mq.md
+import:
+  web: ext/web/web.mq.md
+  text: lib/text.mq.md
 ---
 
 # main

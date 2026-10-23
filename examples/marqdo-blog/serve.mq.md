@@ -1,8 +1,9 @@
 ---
 title: marqdo-blog serve
 description: Scan Artifact documents/endpoints and listen (ADR 0007).
-import web:ext/web/web.mq.md
-import posts:db/posts.mq.md
+import:
+  web: ext/web/web.mq.md
+  posts: db/posts.mq.md
 ---
 
 # main

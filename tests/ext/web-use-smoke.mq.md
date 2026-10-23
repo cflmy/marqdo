@@ -1,7 +1,8 @@
 ---
 title: web.use middleware smoke
 description: First-class middleware via web.use (replaces configure junk drawer).
-import web:ext/web/web.mq.md
+import:
+  web: ext/web/web.mq.md
 ---
 
 # main

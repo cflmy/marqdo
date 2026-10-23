@@ -1,13 +1,14 @@
 ---
 title: plan must not overwrite existing llm_free resources
 description: force+confirm plan keeps a pre-seeded compiled skill workbook intact (offline).
-import agent:ext/ai/agent.mq.md
-import fs:lib/fs.mq.md
-import json:lib/json.mq.md
-import llm:ext/ai/llm.mq.md
-import plugin:lib/plugin.mq.md
-import sys:lib/sys.mq.md
-import text:lib/text.mq.md
+import:
+  agent: ext/ai/agent.mq.md
+  fs: lib/fs.mq.md
+  json: lib/json.mq.md
+  llm: ext/ai/llm.mq.md
+  plugin: lib/plugin.mq.md
+  sys: lib/sys.mq.md
+  text: lib/text.mq.md
 ---
 
 # main

@@ -1,6 +1,7 @@
 ---
 title: lib/re smoke
-import re:lib/re.mq.md
+import:
+  re: lib/re.mq.md
 ---
 
 # main

@@ -1,8 +1,9 @@
 ---
 title: ext/data db smoke
 description: DB Resource lives in ext/data (ADR 0007).
-import data:ext/data/db.mq.md
-import fs:lib/fs.mq.md
+import:
+  data: ext/data/db.mq.md
+  fs: lib/fs.mq.md
 ---
 
 # main

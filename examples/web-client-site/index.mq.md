@@ -4,7 +4,8 @@ title: Marqdo client site
 route: /
 method: GET
 description: SSR Document + client_embed auto-mount; author zero JS (ADR 0007).
-import web:ext/web/web.mq.md
+import:
+  web: ext/web/web.mq.md
 ---
 
 # Marqdo client site

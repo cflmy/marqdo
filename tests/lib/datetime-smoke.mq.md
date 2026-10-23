@@ -1,7 +1,8 @@
 ---
 markup: occlusion
 title: lib/datetime smoke
-import dt:lib/datetime.mq.md
+import:
+  dt: lib/datetime.mq.md
 ---
 
 # main

@@ -1766,7 +1766,7 @@ mod tests {
 
     #[test]
     fn structure_omits_imported_lib_bodies() {
-        let src = "---\ntitle: t\nimport text:lib/text.mq.md\n---\n\n# main\n\n> print text=hi\n";
+        let src = "---\ntitle: t\nimport:\n  text: lib/text.mq.md\n---\n\n# main\n\n> print text=hi\n";
         let local = crate::parse::parse_source(src).unwrap();
         let html = render_module_structure(&local, src);
         assert!(html.contains("doc-imports") || html.contains("lib/text.mq.md"), "{html}");

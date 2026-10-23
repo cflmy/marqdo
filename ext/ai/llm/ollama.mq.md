@@ -2,8 +2,9 @@
 title: ext/ai/llm/ollama
 description: >-
   Ollama backend defaults. Transport reuses openai-compatible /v1 chat completions.
-import openai:ext/ai/llm/openai.mq.md
-import sys:lib/sys.mq.md
+import:
+  openai: ext/ai/llm/openai.mq.md
+  sys: lib/sys.mq.md
 ---
 
 ## resolve

@@ -1,7 +1,8 @@
 ---
 title: lib/text — strings
 description: Trim, split, join (code-as-docs pilot)
-import text:lib/text.mq.md
+import:
+  text: lib/text.mq.md
 ---
 
 # main

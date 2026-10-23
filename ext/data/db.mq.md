@@ -2,9 +2,10 @@
 markup: occlusion
 title: ext/data/db
 description: Database Resource — CRUD, txn, migrate, FTS (ADR 0007).
-import plugin:lib/plugin.mq.md
-import sys:lib/sys.mq.md
-import table:lib/table.mq.md
+import:
+  plugin: lib/plugin.mq.md
+  sys: lib/sys.mq.md
+  table: lib/table.mq.md
 ---
 
 ## _load

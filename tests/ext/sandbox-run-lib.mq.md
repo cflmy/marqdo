@@ -1,7 +1,8 @@
 ---
 title: sandbox.run — core lib/json inside the trial
 description: Guest fixture imports lib/json; print ok and guest stdout via link index.
-import sandbox:ext/ai/sandbox.mq.md
+import:
+  sandbox: ext/ai/sandbox.mq.md
 ---
 
 # main

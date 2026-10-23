@@ -1,7 +1,8 @@
 ---
 title: View without foreign
 description: A pure Marqdo document — formula, table, plot and prose, no external kernel
-import math:lib/math.mq.md
+import:
+  math: lib/math.mq.md
 ---
 
 # main

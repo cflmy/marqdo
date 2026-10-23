@@ -1,6 +1,7 @@
 ---
 markup: occlusion
-import table:lib/table.mq.md
+import:
+  table: lib/table.mq.md
 title: Marqdo 语法全景（v1.6 现状）
 description: 一页看完全部现行语法：遮蔽、调用、取值、循环、分支、表格、契约
 ---

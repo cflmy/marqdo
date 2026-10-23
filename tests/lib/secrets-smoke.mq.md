@@ -1,6 +1,7 @@
 ---
 title: lib/secrets smoke
-import sec:lib/secrets.mq.md
+import:
+  sec: lib/secrets.mq.md
 ---
 
 # main

@@ -1,8 +1,9 @@
 ---
 title: Least squares via lstsq
 description: Overdetermined Ax≈b with ext/linalg lstsq + heatmap.
-import la:ext/linalg/linalg.mq.md
-import math:lib/math.mq.md
+import:
+  la: ext/linalg/linalg.mq.md
+  math: lib/math.mq.md
 ---
 
 # Least squares from a runnable document

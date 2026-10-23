@@ -112,7 +112,8 @@ parse/check/catalog 保留整个 `Named<T>`。所以循环不会被误判成“�
 ```markdown
 ---
 id: knowledge.people.li-bai
-import li_bai:knowledge/people/li-bai.mq.md
+import:
+  li_bai: knowledge/people/li-bai.mq.md
 ---
 
 # 回答

@@ -1,8 +1,9 @@
 ---
 title: linalg factor smoke (L4)
 description: eig factorize, structure SVG, LU reuse solve.
-import la:ext/linalg/linalg.mq.md
-import math:lib/math.mq.md
+import:
+  la: ext/linalg/linalg.mq.md
+  math: lib/math.mq.md
 ---
 
 # main

@@ -1,12 +1,13 @@
 ---
 title: anlian-mq offline smoke
 description: 不 listen：装配库表/页面/门禁/WS 路由袋，验证可读路径可构造。
-导入 网页:ext/web/网页.mq.md
-import shell:styles/shell.mq.md
-import nav:components/nav.mq.md
-import foot:components/foot.mq.md
-import db:db/index.mq.md
-import sys:lib/sys.mq.md
+导入:
+  网页: ext/web/网页.mq.md
+  shell: styles/shell.mq.md
+  nav: components/nav.mq.md
+  foot: components/foot.mq.md
+  db: db/index.mq.md
+  sys: lib/sys.mq.md
 ---
 
 # main

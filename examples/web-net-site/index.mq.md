@@ -1,15 +1,16 @@
 ---
 title: web-net-site
 description: Home + /about + /new (form) + /tools (net lib) + /admin (auth) + /live (WebSocket).
-import web:ext/web/web.mq.md
-import net:lib/net.mq.md
-import text:lib/text.mq.md
-import shell:styles/shell.mq.md
-import nav:components/nav.mq.md
-import side:components/side.mq.md
-import foot:components/foot.mq.md
-import articles:db/articles.mq.md
-import db:db/index.mq.md
+import:
+  web: ext/web/web.mq.md
+  net: lib/net.mq.md
+  text: lib/text.mq.md
+  shell: styles/shell.mq.md
+  nav: components/nav.mq.md
+  side: components/side.mq.md
+  foot: components/foot.mq.md
+  articles: db/articles.mq.md
+  db: db/index.mq.md
 ---
 
 # main

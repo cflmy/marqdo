@@ -1,7 +1,8 @@
 ---
 title: SVD structure demo
 description: Diagonal SVD + structure SVG via ext/linalg.
-import la:ext/linalg/linalg.mq.md
+import:
+  la: ext/linalg/linalg.mq.md
 ---
 
 # SVD from a runnable document

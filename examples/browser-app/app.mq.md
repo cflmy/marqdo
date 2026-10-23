@@ -2,9 +2,10 @@
 markup: occlusion
 title: browser-app (route E+)
 description: list CRUD, storage, navigate, interval, fetch_all, ws — GFM + lib/browser
-import browser:lib/browser.mq.md
-import table:lib/table.mq.md
-import text:lib/text.mq.md
+import:
+  browser: lib/browser.mq.md
+  table: lib/table.mq.md
+  text: lib/text.mq.md
 ---
 
 # main

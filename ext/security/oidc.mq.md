@@ -1,8 +1,9 @@
 ---
 title: ext/security/oidc
 description: OIDC attach helper for app handles (ADR 0007). Prefer declared auth metadata on Endpoints.
-import plugin:lib/plugin.mq.md
-import sys:lib/sys.mq.md
+import:
+  plugin: lib/plugin.mq.md
+  sys: lib/sys.mq.md
 ---
 
 ## _load

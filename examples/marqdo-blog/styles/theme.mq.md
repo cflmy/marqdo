@@ -1,8 +1,9 @@
 ---
 title: styles/theme
 description: 博客主题：样式即数据表格，装配即函数。
-import 网页:ext/web/网页.mq.md
-import text:lib/text.mq.md
+import:
+  网页: ext/web/网页.mq.md
+  text: lib/text.mq.md
 ---
 
 博客主题的样式即数据表格：每个 `## 段` 导出一张 GFM 样式表（`|选择器|属性|值|`，

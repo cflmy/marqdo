@@ -1,11 +1,12 @@
 ---
 title: agent corpus_search + mcp fixture tools (A4 offline)
 description: Local RAG-lite corpus search and MCP fixture call; authority stays workbook.
-import agent:ext/ai/agent.mq.md
-import fs:lib/fs.mq.md
-import json:lib/json.mq.md
-import plugin:lib/plugin.mq.md
-import sys:lib/sys.mq.md
+import:
+  agent: ext/ai/agent.mq.md
+  fs: lib/fs.mq.md
+  json: lib/json.mq.md
+  plugin: lib/plugin.mq.md
+  sys: lib/sys.mq.md
 ---
 
 # main

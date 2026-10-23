@@ -1,6 +1,7 @@
 ---
 title: writeback get
-import writeback:lib/writeback.mq.md
+import:
+  writeback: lib/writeback.mq.md
 ---
 
 # main

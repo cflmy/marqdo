@@ -1,9 +1,10 @@
 ---
 title: collab client
 description: LWW text sync over WS room + presence (DOC\\t protocol)
-import browser:lib/browser.mq.md
-import table:lib/table.mq.md
-import text:lib/text.mq.md
+import:
+  browser: lib/browser.mq.md
+  table: lib/table.mq.md
+  text: lib/text.mq.md
 ---
 
 # main

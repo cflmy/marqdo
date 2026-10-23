@@ -6,14 +6,14 @@ use crate::diagnostics::Span;
 use crate::formula::Expr as FormulaExpr;
 use crate::value::CodeBlock;
 
-/// Frontmatter file import: `import bind:path.mq.md` (see `doc/design/module-namespace.md`).
+/// Frontmatter file import under nested `import:\n  bind: path.mq.md` (see `doc/design/module-namespace.md`).
 #[derive(Debug, Clone)]
 pub struct Import {
     pub path: String,
     pub bind: String,
 }
 
-/// Frontmatter short-name bind: `import bind:lib.member` (same keyword as file import).
+/// Frontmatter short-name bind under nested `import:\n  bind: lib.member` (same map as file import).
 #[derive(Debug, Clone)]
 pub struct Use {
     pub path: Vec<String>,

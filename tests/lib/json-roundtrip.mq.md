@@ -1,7 +1,8 @@
 ---
 title: json roundtrip
-import fs:lib/fs.mq.md
-import json:lib/json.mq.md
+import:
+  fs: lib/fs.mq.md
+  json: lib/json.mq.md
 ---
 
 # main

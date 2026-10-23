@@ -1,7 +1,8 @@
 ---
 markup: occlusion
 title: foreign env cwd timeout
-import foreign:lib/foreign.mq.md
+import:
+  foreign: lib/foreign.mq.md
 ---
 
 # main

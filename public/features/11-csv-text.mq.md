@@ -2,8 +2,9 @@
 markup: occlusion
 title: Mid stdlib — csv and text
 description: lib/csv + thickened lib/text (Mid M4)
-import csv:lib/csv.mq.md
-import text:lib/text.mq.md
+import:
+  csv: lib/csv.mq.md
+  text: lib/text.mq.md
 ---
 
 # CSV cleaning with text helpers

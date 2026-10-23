@@ -29,7 +29,8 @@ marqdo ext add web
 
 ```markdown
 ---
-import net:lib/net.mq.md
+import:
+  net: lib/net.mq.md
 ---
 
 # main
@@ -84,7 +85,8 @@ route: /
 method: GET
 data_source: posts
 data_order: -created_at
-import web:ext/web/web.mq.md
+import:
+  web: ext/web/web.mq.md
 ---
 
 # 我的站点
@@ -118,8 +120,9 @@ response: json
 
 ```markdown
 ---
-import web:ext/web/web.mq.md
-import posts:db/posts.mq.md
+import:
+  web: ext/web/web.mq.md
+  posts: db/posts.mq.md
 ---
 
 # main
@@ -145,7 +148,8 @@ import posts:db/posts.mq.md
 
 ```markdown
 ---
-import data:ext/data/db.mq.md
+import:
+  data: ext/data/db.mq.md
 ---
 
 # main
@@ -162,7 +166,8 @@ HTTP 门禁与登录走 `ext/security`（`auth` / `rbac` / `oidc`），再用 `w
 
 ```markdown
 ---
-import rbac:ext/security/rbac.mq.md
+import:
+  rbac: ext/security/rbac.mq.md
 ---
 
 # main

@@ -1,9 +1,10 @@
 ---
 title: agent plan decision + dual skeleton (offline)
 description: extract_plan_decision/summary; dual skeleton contains research+writer; patch apply on fixture.
-import agent:ext/ai/agent.mq.md
-import json:lib/json.mq.md
-import fs:lib/fs.mq.md
+import:
+  agent: ext/ai/agent.mq.md
+  json: lib/json.mq.md
+  fs: lib/fs.mq.md
 ---
 
 # main
@@ -77,7 +78,7 @@ import fs:lib/fs.mq.md
 2. *
   > print text=solidify-missing
 
-**has_imp = > split value=`dual` sep="import llm:ext/ai/llm.mq.md"**
+**has_imp = > split value=`dual` sep="llm: ext/ai/llm.mq.md"**
 **n_imp = > len value=`has_imp`**
 1. `n_imp` > 1
   > print text=import-ok

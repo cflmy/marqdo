@@ -1,15 +1,16 @@
 ---
 title: 暗恋见君 · Marqdo
 description: 对齐 Django 暗恋见君：原站 CSS/DOM、首页四段、列表详情、发帖门禁、聊天室、专题、搜索、API 指南。
-导入 网页:ext/web/网页.mq.md
-import table:lib/table.mq.md
-import text:lib/text.mq.md
-import chrome:components/chrome.mq.md
-import page:components/page.mq.md
-import home:components/home_body.mq.md
-import feed:components/feed.mq.md
-import fragments:components/fragments.mq.md
-import db:db/index.mq.md
+导入:
+  网页: ext/web/网页.mq.md
+  table: lib/table.mq.md
+  text: lib/text.mq.md
+  chrome: components/chrome.mq.md
+  page: components/page.mq.md
+  home: components/home_body.mq.md
+  feed: components/feed.mq.md
+  fragments: components/fragments.mq.md
+  db: db/index.mq.md
 ---
 
 # main

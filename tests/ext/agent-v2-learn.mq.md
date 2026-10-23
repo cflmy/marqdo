@@ -1,11 +1,12 @@
 ---
 title: Agent Framework v2 — episode → learn → compile (offline)
 description: Record three identical successes, maybe_learn compiles llm_free skill, resolve hits compiled path.
-import agent:ext/ai/agent.mq.md
-import fs:lib/fs.mq.md
-import json:lib/json.mq.md
-import plugin:lib/plugin.mq.md
-import sys:lib/sys.mq.md
+import:
+  agent: ext/ai/agent.mq.md
+  fs: lib/fs.mq.md
+  json: lib/json.mq.md
+  plugin: lib/plugin.mq.md
+  sys: lib/sys.mq.md
 ---
 
 # main

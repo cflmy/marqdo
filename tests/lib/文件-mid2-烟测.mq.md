@@ -1,7 +1,8 @@
 ---
 markup: occlusion
 title: 文件 Mid2 M9 烟测
-导入 文件:lib/文件.mq.md
+导入:
+  文件: lib/文件.mq.md
 ---
 
 # main

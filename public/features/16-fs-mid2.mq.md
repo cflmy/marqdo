@@ -2,7 +2,8 @@
 markup: occlusion
 title: Mid stdlib — fs make_dirs, walk, stat
 description: Recursive dirs, walk, and file metadata (Mid2 M9)
-import fs:lib/fs.mq.md
+import:
+  fs: lib/fs.mq.md
 ---
 
 # Practical filesystem without plugins

@@ -1,8 +1,9 @@
 ---
 title: client counter (route D)
 description: wired by client_embed auto-mount; GFM + lib/browser
-import browser:lib/browser.mq.md
-import table:lib/table.mq.md
+import:
+  browser: lib/browser.mq.md
+  table: lib/table.mq.md
 ---
 
 # main

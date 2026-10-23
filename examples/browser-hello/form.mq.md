@@ -1,8 +1,9 @@
 ---
 title: browser form (D3)
 description: input wire passes value; effects via lib/browser
-import browser:lib/browser.mq.md
-import table:lib/table.mq.md
+import:
+  browser: lib/browser.mq.md
+  table: lib/table.mq.md
 ---
 
 # main

@@ -1,6 +1,7 @@
 ---
 title: lib/text mid smoke
-import text:lib/text.mq.md
+import:
+  text: lib/text.mq.md
 ---
 
 # main

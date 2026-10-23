@@ -1,6 +1,7 @@
 ---
 title: notebook shared state
-import foreign:lib/foreign.mq.md
+import:
+  foreign: lib/foreign.mq.md
 ---
 
 # main

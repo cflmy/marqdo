@@ -1,7 +1,8 @@
 ---
 markup: occlusion
 title: net cookie_parse
-import net:lib/net.mq.md
+import:
+  net: lib/net.mq.md
 ---
 
 # main

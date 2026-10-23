@@ -1,8 +1,9 @@
 ---
 title: quantum gate matches_matrix smoke
 description: Named H matches an explicit 2x2 nested list.
-import quantum:ext/quantum/quantum.mq.md
-import json:lib/json.mq.md
+import:
+  quantum: ext/quantum/quantum.mq.md
+  json: lib/json.mq.md
 ---
 
 # main

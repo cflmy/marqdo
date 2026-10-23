@@ -2,7 +2,8 @@
 type: Fact
 id: libai
 title: 李白
-import poet:poet.mq.md
+import:
+  poet: poet.mq.md
 ---
 
 # 李白 = > 诗人

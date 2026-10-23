@@ -128,13 +128,14 @@ myapp/
 ---
 title: web-site
 description: Home = page table; main may be inline; class methods assemble.
-import web:ext/web/web.mq.md
-import shell:styles/shell.mq.md
-import nav:components/nav.mq.md
-import side:components/side.mq.md
-import foot:components/foot.mq.md
-import articles:db/articles.mq.md
-import db:db/index.mq.md
+import:
+  web: ext/web/web.mq.md
+  shell: styles/shell.mq.md
+  nav: components/nav.mq.md
+  side: components/side.mq.md
+  foot: components/foot.mq.md
+  articles: db/articles.mq.md
+  db: db/index.mq.md
 ---
 
 # main
@@ -171,13 +172,14 @@ Main content is not a reusable component, so it is authored here.
 ```markdown
 ---
 title: 站点
-导入 网页:ext/web/网页.mq.md
-import shell:styles/shell.mq.md
-import nav:components/nav.mq.md
-import side:components/side.mq.md
-import foot:components/foot.mq.md
-import articles:db/articles.mq.md
-import db:db/index.mq.md
+导入:
+  网页: ext/web/网页.mq.md
+  shell: styles/shell.mq.md
+  nav: components/nav.mq.md
+  side: components/side.mq.md
+  foot: components/foot.mq.md
+  articles: db/articles.mq.md
+  db: db/index.mq.md
 ---
 
 # main

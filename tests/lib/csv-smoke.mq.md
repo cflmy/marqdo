@@ -1,7 +1,8 @@
 ---
 markup: occlusion
 title: lib/csv smoke
-import csv:lib/csv.mq.md
+import:
+  csv: lib/csv.mq.md
 ---
 
 # main

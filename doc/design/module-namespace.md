@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| 状态 | **Accepted；统一 `import bind:target` 已锁定** |
+| 状态 | **Accepted；嵌套 YAML `import:` / `导入:` 映射已锁定** |
 | 日期 | 2026-08-13 |
 | 相关 | [stdlib-modules.md](stdlib-modules.md) · [stdlib-i18n.md](stdlib-i18n.md) · [markdown-mapping.md](markdown-mapping.md) · [objects.md](objects.md) · [call-arguments.md](call-arguments.md) · [ext-agent.md](ext-agent.md) |
 
@@ -16,9 +16,9 @@
 
 - `lib/json` 的 `parse` 与 `lib/time` 的 `parse` 不能共存。
 - 官方 ext / 多库编排无法按大型语言习惯书写 `time.parse` / `json.parse`。
-- 旧 frontmatter `import path:path.mq.md` 对 Markdown / 编辑器不友好，且与调用标记 `>` 抢外形。
+- 旧 frontmatter 一行式 `import bind:target` 在 YAML 里会变成带空格的键，与正规元信息不兼容。
 
-**结论**：模块命名空间 + 点号寻址；frontmatter 导入统一为可读的 `import bind:target`。
+**结论**：模块命名空间 + 点号寻址；frontmatter 导入统一为嵌套 YAML 映射 `import:\n  bind: target`。
 
 ---
 
@@ -29,8 +29,8 @@
 1. **导入绑定库名**：导入一个 `.mq.md` 得到一个**库（模块）绑定**，成员不倒进全局。
 2. **点号寻址调用**：`库.成员`、`库.对象.成员`；`.` 表示定义树寻址。
 3. **库名不是变量**：路径段为**裸标识符**，不加反引号。
-4. **短名与文件导入同形**：`import fmt:time.format`，废除独立 `use` 关键字。
-5. **中英对等**：`import` / `导入`。
+4. **短名与文件导入同形**：同在 `import:` 映射下写 `fmt: time.format`，废除独立 `use` 关键字。
+5. **中英对等**：`import:` / `导入:`。
 
 ### 2.2 非目标
 
@@ -54,27 +54,38 @@
 
 ### 3.2 导入句法（frontmatter）
 
-仍只出现在文件头成对 `---` 内。**调用**仍用 `> print`（不变）。
+仍只出现在文件头成对 `---` 内。**调用**仍用 `> print`（不变）。键为合法 YAML：`import:` / `导入:`，值为嵌套映射。
+
+```yaml
+---
+import:
+  utils: utils.mq.md
+  json: lib/json.mq.md
+  fmt: time.format
+---
+```
 
 | 含义 | 英文 | 中文 |
 |------|------|------|
-| 导入文件 | `import utils:utils.mq.md` | `导入 utils:utils.mq.md` |
-| 标准库 | `import json:lib/json.mq.md` | `导入 json:lib/json.mq.md` |
-| 短名（成员） | `import fmt:time.format` | `导入 fmt:时间.格式化` |
+| 导入文件 | `import:` → `utils: utils.mq.md` | `导入:` → `utils: utils.mq.md` |
+| 标准库 | `json: lib/json.mq.md` | 同左（或中文库路径） |
+| 短名（成员） | `fmt: time.format` | `fmt: 时间.格式化` |
 
 规则：
 
-- **绑定名必填**，在 `:` 左侧（裸名，无反引号）。
-- `:` 右侧 `target`：
+- **绑定名必填**，为映射键（裸名，无反引号）；冒号后须有空格（正规 YAML）。
+- 映射值 `target`：
   - 以 `.mq.md` 结尾 → **文件导入**；
   - 否则为 **点号路径**（≥2 段），把该成员绑为本地短名（须先有对应文件导入）。
 - 同一文件内绑定名不得冲突（文件库名与短名共用命名空间）→ 硬错误。
-- 旧写法 `> ….mq.md`、`> … as …`、`> use …`、`> 使用 …` → **硬错误**，并提示新句法。
+- 同一文件不得同时出现 `import:` 与 `导入:`。
+- 旧写法一行式 `import bind:target`、`> ….mq.md`、`> use …` → **硬错误**；可用 `marqdo migrate imports --write` 迁移。
 
 ### 3.3 废除的旧规则
 
 不再支持：
 
+- 一行式 `import bind:target` / `导入 bind:target`；
 - 省略绑定名时用文件名茎作库名；
 - 导入侧 `as` / `作为`；
 - 独立关键字 `use` / `使用`。
@@ -101,8 +112,9 @@ path_callee ::= ident ('.' ident)+
 
 ```markdown
 ---
-import time:lib/time.mq.md
-import json:lib/json.mq.md
+import:
+  time: lib/time.mq.md
+  json: lib/json.mq.md
 ---
 
 # main
@@ -139,8 +151,9 @@ import json:lib/json.mq.md
 
 ```markdown
 ---
-import time:lib/time.mq.md
-import fmt:time.format
+import:
+  time: lib/time.mq.md
+  fmt: time.format
 ---
 
 # main
@@ -153,10 +166,11 @@ import fmt:time.format
 
 ```markdown
 ---
-import time:lib/time.mq.md
-import writeback:lib/writeback.mq.md
-import agent:ext/ai/agent.mq.md
-import json:lib/json.mq.md
+import:
+  time: lib/time.mq.md
+  writeback: lib/writeback.mq.md
+  agent: ext/ai/agent.mq.md
+  json: lib/json.mq.md
 ---
 
 # main
@@ -179,13 +193,12 @@ import json:lib/json.mq.md
 
 | 旧 | 新 |
 |----|----|
-| `import time:lib/time.mq.md` | `import time:lib/time.mq.md` |
-| `import t`:lib/time.mq.md | `import t:lib/time.mq.md` |
-| `import fmt`:time.format
+| `import time:lib/time.mq.md` | `import:` → `time: lib/time.mq.md` |
+| `import fmt:time.format` | `import:` → `fmt: time.format` |
 | 茎名默认库名 | 绑定名始终显式 |
 | 扁平合并进全局 | 仅库绑定 + 可选短名 |
 
-不提供旧 `>` 导入过渡开关。
+不提供旧一行式 / `>` 导入过渡开关；`marqdo migrate imports --write` 可机械迁移。
 
 ---
 
@@ -201,20 +214,20 @@ import json:lib/json.mq.md
 
 ## 8. 实现要点
 
-1. frontmatter 只解析 `import` / `导入` 行；右侧分流文件 / 成员。  
+1. frontmatter 解析嵌套 `import:` / `导入:` 映射；子项分流文件 / 成员。  
 2. AST 仍用 `Import`（文件）与 `Use`（短名）存储，对外无 `use` 关键字。  
 3. 金样例：`tests/structure/import/`、`tests/structure/ns/`。
 
 | 阶段 | 内容 |
 |------|------|
 | M1+M2 | 点号路径 + 短名 — 已落地 |
-| **Import 句法** | 统一 `import bind:target` — **本波次** |
+| **Import 句法** | 嵌套 YAML `import:` — **本波次** |
 
 ---
 
 ## 9. 决议摘要
 
-1. 导入 = `import bind:target`（`导入` 等价）。  
+1. 导入 = 嵌套 `import:` / `导入:` 映射（`bind: target`）。  
 2. target = `.mq.md` 文件 **或** `库.成员` 点号路径。  
 3. 调用以裸名点号路径寻址；实例方法用反引号接收者（仅独立 `>` 调用；`*…*`/`**…**` 段内接收者不加反引号）。  
 4. 裸点号 `a.b`：`a` 为局部变量 → 方法调用，否则 → 库路径（Python 统一命名空间）。

@@ -35,7 +35,8 @@
 
 ```markdown
 ---
-import text:lib/text.mq.md
+import:
+  text: lib/text.mq.md
 ---
 
 # main
@@ -44,7 +45,8 @@ import text:lib/text.mq.md
 
 ```markdown
 ---
-导入 文本:lib/文本.mq.md
+导入:
+  文本: lib/文本.mq.md
 ---
 
 # main

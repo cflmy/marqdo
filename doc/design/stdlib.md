@@ -51,8 +51,9 @@ Frontmatter 导入**绑定库名**（默认 = 文件名茎；`as` / `作为` 可
 
 ```markdown
 ---
-import text:lib/text.mq.md
-import table:lib/table.mq.md
+import:
+  text: lib/text.mq.md
+  table: lib/table.mq.md
 ---
 ```
 

@@ -1,8 +1,9 @@
 ---
 title: eng preflight offline
-import plugin:lib/plugin.mq.md
-import agent:ext/ai/agent.mq.md
-import json:lib/json.mq.md
+import:
+  plugin: lib/plugin.mq.md
+  agent: ext/ai/agent.mq.md
+  json: lib/json.mq.md
 ---
 
 Offline Engineering Knowledge gate against `tests/engineering/.marqdo`

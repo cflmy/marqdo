@@ -1,6 +1,7 @@
 ---
 title: object handle smoke
-import json:lib/json.mq.md
+import:
+  json: lib/json.mq.md
 ---
 
 # counter

@@ -1,8 +1,9 @@
 ---
 title: linalg basic smoke (L2)
 description: from_formula, det, solve 2×2, explicit mul.
-import la:ext/linalg/linalg.mq.md
-import math:lib/math.mq.md
+import:
+  la: ext/linalg/linalg.mq.md
+  math: lib/math.mq.md
 ---
 
 # main

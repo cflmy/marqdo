@@ -1,7 +1,8 @@
 ---
 title: 贝尔态：两个量子比特如何一起回答
 description: 从一条假设开始，搭电路、看概率、画图，并用断言验收。
-import quantum:ext/quantum/quantum.mq.md
+import:
+  quantum: ext/quantum/quantum.mq.md
 ---
 
 # main

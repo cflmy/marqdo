@@ -1,6 +1,7 @@
 ---
 title: lib/hash smoke
-import hash:lib/hash.mq.md
+import:
+  hash: lib/hash.mq.md
 ---
 
 # main

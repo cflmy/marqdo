@@ -1,9 +1,10 @@
 ---
 title: Bell state
 description: H then CX; probabilities ≈ 1/2; circuit SVG.
-import quantum:ext/quantum/quantum.mq.md
-import math:lib/math.mq.md
-import json:lib/json.mq.md
+import:
+  quantum: ext/quantum/quantum.mq.md
+  math: lib/math.mq.md
+  json: lib/json.mq.md
 ---
 
 # Bell |Φ+⟩

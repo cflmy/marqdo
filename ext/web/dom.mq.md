@@ -1,8 +1,9 @@
 ---
 title: ext/web/dom
 description: DOM Artifact — Markdown/body to structure; raw HTML is escape hatch only (ADR 0007).
-import cap:ext/web/_capability.mq.md
-import table:lib/table.mq.md
+import:
+  cap: ext/web/_capability.mq.md
+  table: lib/table.mq.md
 ---
 
 ## from_markdown

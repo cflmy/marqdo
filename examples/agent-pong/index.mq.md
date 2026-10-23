@@ -3,12 +3,13 @@ title: agent-pong (Wave B0)
 description: >-
   Constitution demo — call_site + source in step context; optional live CALL via .env.
   Code is documentation; tools are ## in this same file.
-import llm:ext/ai/llm.mq.md
-import agent:ext/ai/agent.mq.md
-import json:lib/json.mq.md
-import plugin:lib/plugin.mq.md
-import sys:lib/sys.mq.md
-import time:lib/time.mq.md
+import:
+  llm: ext/ai/llm.mq.md
+  agent: ext/ai/agent.mq.md
+  json: lib/json.mq.md
+  plugin: lib/plugin.mq.md
+  sys: lib/sys.mq.md
+  time: lib/time.mq.md
 ---
 
 ## 获取时间

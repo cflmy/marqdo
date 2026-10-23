@@ -2,7 +2,8 @@
 markup: occlusion
 title: table collections
 description: put + list/map helpers
-import table:lib/table.mq.md
+import:
+  table: lib/table.mq.md
 ---
 
 # main

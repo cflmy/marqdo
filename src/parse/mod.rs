@@ -146,6 +146,7 @@ impl<'a> Cursor<'a> {
         let mut imports = Vec::new();
         let mut uses = Vec::new();
         let mut metadata_raw = Vec::new();
+        let mut import_keyword: Option<&'static str> = None;
         if !self.skip_noise() {
             return Ok((imports, uses, metadata_raw));
         }
@@ -166,40 +167,41 @@ impl<'a> Cursor<'a> {
             if let Some(msg) = legacy_frontmatter_import_hint(t) {
                 return Err(bail_at(None, span, msg));
             }
-            match parse_import_line(t) {
-                Ok(Some(ImportLine::File(imp))) => {
-                    if imports.iter().any(|i| i.bind == imp.bind)
-                        || uses.iter().any(|u| u.bind == imp.bind)
-                    {
-                        return Err(bail_at(
-                            None,
-                            span,
-                            format!("duplicate import bind `{}`", imp.bind),
-                        ));
-                    }
-                    imports.push(imp);
-                    self.bump();
-                    continue;
-                }
-                Ok(Some(ImportLine::Member(u))) => {
-                    if imports.iter().any(|i| i.bind == u.bind)
-                        || uses.iter().any(|x| x.bind == u.bind)
-                    {
-                        return Err(bail_at(
-                            None,
-                            span,
-                            format!("duplicate import bind `{}`", u.bind),
-                        ));
-                    }
-                    uses.push(u);
-                    self.bump();
-                    continue;
-                }
-                Ok(None) => {}
-                Err(e) => return Err(bail_at(None, span, e.to_string())),
-            }
-            // Artifact metadata key: value (flat Phase 1)
+            // Artifact metadata key: value (flat Phase 1); `import:` / `导入:` are nested maps
             if let Some((key, rest)) = split_frontmatter_key(t) {
+                if key == "import" || key == "导入" {
+                    let kw = if key == "import" { "import" } else { "导入" };
+                    if let Some(prev) = import_keyword {
+                        if prev != kw {
+                            return Err(bail_at(
+                                None,
+                                span,
+                                format!(
+                                    "cannot mix `{prev}:` and `{kw}:` in one frontmatter (one language per file)"
+                                ),
+                            ));
+                        }
+                        return Err(bail_at(
+                            None,
+                            span,
+                            format!("duplicate `{kw}:` block in frontmatter"),
+                        ));
+                    }
+                    if !rest.is_empty() {
+                        return Err(bail_at(
+                            None,
+                            span,
+                            format!(
+                                "`{kw}:` must be a nested YAML map (not `{kw}: …` on one line); \
+                                 use indented `bind: target` under `{kw}:`"
+                            ),
+                        ));
+                    }
+                    import_keyword = Some(kw);
+                    self.bump();
+                    self.collect_import_map(span, &mut imports, &mut uses)?;
+                    continue;
+                }
                 self.bump();
                 let value_raw = if rest.is_empty()
                     || rest == "|"
@@ -229,6 +231,47 @@ impl<'a> Cursor<'a> {
             self.bump();
         }
         Ok((imports, uses, metadata_raw))
+    }
+
+    /// Consume indented `bind: target` lines under `import:` / `导入:`.
+    fn collect_import_map(
+        &mut self,
+        header_span: Span,
+        imports: &mut Vec<Import>,
+        uses: &mut Vec<Use>,
+    ) -> Result<()> {
+        let _ = header_span;
+        while let Some(line) = self.peek() {
+            let raw = line.text.trim_end_matches(['\r', '\n']);
+            let bt = raw.trim();
+            if bt == "---" {
+                break;
+            }
+            if bt.is_empty() {
+                self.bump();
+                continue;
+            }
+            // Next top-level key ends the import map
+            if !raw.starts_with(' ') && !raw.starts_with('\t') {
+                break;
+            }
+            let span = Span::new(line.line_no, 1);
+            self.bump();
+            let content = strip_yaml_indent(raw);
+            let Some((bind_raw, target_raw)) = content.split_once(':') else {
+                return Err(bail_at(
+                    None,
+                    span,
+                    format!("expected `bind: target` under import map, got `{content}`"),
+                ));
+            };
+            let bind = bind_raw.trim();
+            let target = target_raw.trim();
+            let entry = parse_import_binding(bind, target)
+                .map_err(|e| bail_at(None, span, e.to_string()))?;
+            push_import_line(imports, uses, entry, span)?;
+        }
+        Ok(())
     }
 
     fn parse_function(&mut self, min_level: u8) -> Result<Function> {
@@ -1541,19 +1584,22 @@ fn is_simple_type_name(s: &str) -> bool {
     chars.all(|c| c.is_alphanumeric() || c == '_' || !c.is_ascii())
 }
 
-/// Result of parsing one frontmatter `import` / `导入` line.
+/// Result of one import map entry (`bind: target` under `import:` / `导入:`).
 #[derive(Debug, Clone)]
 pub enum ImportLine {
     File(Import),
     Member(Use),
 }
 
+/// Hint shown when legacy one-line or `>` imports are rejected.
+pub const NESTED_IMPORT_HINT: &str = "legacy frontmatter import removed; use nested YAML \
+`import:\\n  bind: target` (Chinese: `导入:`) — or run `marqdo migrate imports --write`";
+
 fn split_frontmatter_key(trimmed: &str) -> Option<(&str, &str)> {
     let t = trimmed.trim();
     if t.is_empty() || t.starts_with('#') {
         return None;
     }
-    // import lines are handled earlier
     let Some((key, rest)) = t.split_once(':') else {
         return None;
     };
@@ -1576,10 +1622,9 @@ fn collect_block_scalar(cur: &mut Cursor<'_>, indicator: &str) -> Result<String>
         if bt == "---" {
             break;
         }
-        // Next top-level key or import ends the block
+        // Next top-level key ends the block
         if !raw.starts_with(' ') && !raw.starts_with('\t') && !bt.is_empty() {
-            if split_frontmatter_key(bt).is_some() || parse_import_line(bt).ok().flatten().is_some()
-            {
+            if split_frontmatter_key(bt).is_some() {
                 break;
             }
             if indicator.is_empty() {
@@ -1622,8 +1667,32 @@ fn strip_yaml_indent(line: &str) -> String {
     }
 }
 
+/// True for removed one-liner `import bind:target` / `导入 bind:target`.
+pub fn is_legacy_import_oneliner(trimmed: &str) -> bool {
+    let t = trimmed.trim();
+    if t.starts_with("import")
+        && t.get(6..)
+            .is_some_and(|s| s.starts_with(|c: char| c.is_whitespace()))
+    {
+        let after = t[6..].trim();
+        return after.contains(':') && !after.is_empty();
+    }
+    if let Some(a) = t.strip_prefix("导入") {
+        let a = a.trim_start();
+        // `导入:` is the new nested header, not a one-liner
+        if a.is_empty() || a.starts_with(':') {
+            return false;
+        }
+        return a.contains(':');
+    }
+    false
+}
+
 fn legacy_frontmatter_import_hint(trimmed: &str) -> Option<String> {
     let t = trimmed.trim();
+    if is_legacy_import_oneliner(t) {
+        return Some(NESTED_IMPORT_HINT.into());
+    }
     if !t.starts_with('>') {
         return None;
     }
@@ -1634,39 +1703,13 @@ fn legacy_frontmatter_import_hint(trimmed: &str) -> Option<String> {
         || rest.starts_with("use ")
         || rest.starts_with("使用 ");
     if looks_file || looks_use {
-        return Some(
-            "legacy frontmatter import `> …` is removed; use `import bind:path.mq.md` \
-             or `import bind:lib.member` (Chinese: `导入`)"
-                .into(),
-        );
+        return Some(NESTED_IMPORT_HINT.into());
     }
     None
 }
 
-/// Parse `import json:lib/json.mq.md` / `导入 fmt:time.format`.
-/// Returns `Ok(None)` for non-import frontmatter lines (e.g. `title:`).
-pub fn parse_import_line(trimmed: &str) -> Result<Option<ImportLine>> {
-    let t = trimmed.trim();
-    let after = if t.starts_with("import")
-        && t.get(6..)
-            .is_some_and(|s| s.starts_with(|c: char| c.is_whitespace()))
-    {
-        t[6..].trim()
-    } else if let Some(a) = t.strip_prefix("导入") {
-        let a = a.trim();
-        if a.is_empty() {
-            bail!("expected `导入 bind:target`");
-        }
-        a
-    } else {
-        return Ok(None);
-    };
-
-    let Some((bind_raw, target_raw)) = after.split_once(':') else {
-        bail!("expected `import bind:target` (file `.mq.md` or `lib.member`)");
-    };
-    let bind = bind_raw.trim();
-    let target = target_raw.trim();
+/// Parse one `bind` / `target` pair from a nested import map entry.
+pub fn parse_import_binding(bind: &str, target: &str) -> Result<ImportLine> {
     if bind.is_empty() || !is_simple_bind_name(bind) {
         bail!("invalid import bind `{bind}`");
     }
@@ -1675,10 +1718,10 @@ pub fn parse_import_line(trimmed: &str) -> Result<Option<ImportLine>> {
     }
 
     if target.ends_with(".mq.md") {
-        return Ok(Some(ImportLine::File(Import {
+        return Ok(ImportLine::File(Import {
             path: target.to_string(),
             bind: bind.to_string(),
-        })));
+        }));
     }
 
     let path: Vec<String> = target
@@ -1690,23 +1733,134 @@ pub fn parse_import_line(trimmed: &str) -> Result<Option<ImportLine>> {
             "import target `{target}` must be a `.mq.md` path or dotted member path (e.g. `time.format`)"
         );
     }
-    Ok(Some(ImportLine::Member(Use {
+    Ok(ImportLine::Member(Use {
         path,
         bind: bind.to_string(),
-    })))
+    }))
+}
+
+fn push_import_line(
+    imports: &mut Vec<Import>,
+    uses: &mut Vec<Use>,
+    entry: ImportLine,
+    span: Span,
+) -> Result<()> {
+    match entry {
+        ImportLine::File(imp) => {
+            if imports.iter().any(|i| i.bind == imp.bind) || uses.iter().any(|u| u.bind == imp.bind)
+            {
+                return Err(bail_at(
+                    None,
+                    span,
+                    format!("duplicate import bind `{}`", imp.bind),
+                ));
+            }
+            imports.push(imp);
+        }
+        ImportLine::Member(u) => {
+            if imports.iter().any(|i| i.bind == u.bind) || uses.iter().any(|x| x.bind == u.bind) {
+                return Err(bail_at(
+                    None,
+                    span,
+                    format!("duplicate import bind `{}`", u.bind),
+                ));
+            }
+            uses.push(u);
+        }
+    }
+    Ok(())
+}
+
+/// Format an import entry as the catalog display string `import bind:target`.
+pub fn format_import_display(line: &ImportLine) -> String {
+    match line {
+        ImportLine::File(imp) => format!("import {}:{}", imp.bind, imp.path),
+        ImportLine::Member(u) => format!("import {}:{}", u.bind, u.path.join(".")),
+    }
+}
+
+/// Scan frontmatter for nested `import:` / `导入:` entries (soft; skips legacy / errors).
+pub fn scan_frontmatter_imports(source: &str) -> Vec<ImportLine> {
+    let source = source.strip_prefix('\u{feff}').unwrap_or(source);
+    let lines: Vec<&str> = source.lines().collect();
+    if lines.first().map(|l| l.trim()) != Some("---") {
+        return Vec::new();
+    }
+    let mut out = Vec::new();
+    let mut i = 1usize;
+    while i < lines.len() {
+        let t = lines[i].trim();
+        if t == "---" {
+            break;
+        }
+        if let Some((key, rest)) = split_frontmatter_key(t) {
+            if (key == "import" || key == "导入") && rest.is_empty() {
+                i += 1;
+                while i < lines.len() {
+                    let raw = lines[i].trim_end_matches(['\r', '\n']);
+                    let bt = raw.trim();
+                    if bt == "---" {
+                        break;
+                    }
+                    if bt.is_empty() {
+                        i += 1;
+                        continue;
+                    }
+                    if !raw.starts_with(' ') && !raw.starts_with('\t') {
+                        break;
+                    }
+                    let content = strip_yaml_indent(raw);
+                    if let Some((bind_raw, target_raw)) = content.split_once(':') {
+                        if let Ok(entry) =
+                            parse_import_binding(bind_raw.trim(), target_raw.trim())
+                        {
+                            out.push(entry);
+                        }
+                    }
+                    i += 1;
+                }
+                continue;
+            }
+        }
+        i += 1;
+    }
+    out
 }
 
 fn is_simple_bind_name(s: &str) -> bool {
     is_simple_type_name(s)
 }
 
-/// Parse a file import line body for catalog / tooling (`bind:path.mq.md` after keyword stripped),
-/// or the full `import bind:path` / legacy-free form via [`parse_import_line`].
+/// Parse a catalog-style `import bind:path` display string, or bare `bind:path`.
 pub fn parse_import_spec(line: &str) -> Option<Import> {
-    match parse_import_line(line).ok()? {
-        Some(ImportLine::File(imp)) => Some(imp),
-        _ => None,
+    let t = line.trim();
+    let body = if t.starts_with("import")
+        && t.get(6..)
+            .is_some_and(|s| s.starts_with(|c: char| c.is_whitespace()))
+    {
+        t[6..].trim()
+    } else if let Some(a) = t.strip_prefix("导入") {
+        let a = a.trim();
+        if a.is_empty() || a.starts_with(':') {
+            return None;
+        }
+        a
+    } else {
+        t
+    };
+    let (bind, target) = body.split_once(':')?;
+    match parse_import_binding(bind.trim(), target.trim()).ok()? {
+        ImportLine::File(imp) => Some(imp),
+        ImportLine::Member(_) => None,
     }
+}
+
+/// Rejected API: old one-liner always errors (kept for callers that still probe lines).
+pub fn parse_import_line(trimmed: &str) -> Result<Option<ImportLine>> {
+    if is_legacy_import_oneliner(trimmed) {
+        bail!("{NESTED_IMPORT_HINT}");
+    }
+    Ok(None)
 }
 
 fn is_heading(trimmed: &str) -> bool {

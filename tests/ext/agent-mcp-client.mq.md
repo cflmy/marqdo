@@ -1,10 +1,11 @@
 ---
 title: agent MCP stdio client (offline)
 description: Oneshoot list+call against python mock MCP server.
-import agent:ext/ai/agent.mq.md
-import plugin:lib/plugin.mq.md
-import sys:lib/sys.mq.md
-import json:lib/json.mq.md
+import:
+  agent: ext/ai/agent.mq.md
+  plugin: lib/plugin.mq.md
+  sys: lib/sys.mq.md
+  json: lib/json.mq.md
 ---
 
 # main

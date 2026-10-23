@@ -49,7 +49,8 @@
 英文：
 
 ```markdown
-import web:ext/web/web.mq.md
+import:
+  web: ext/web/web.mq.md
 
 # main
 

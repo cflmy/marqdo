@@ -1,8 +1,9 @@
 ---
 title: ext/linalg/linalg
 description: Formula-first linear algebra (English). MatExpr simplify + display; ABI plugin.
-import plugin:lib/plugin.mq.md
-import sys:lib/sys.mq.md
+import:
+  plugin: lib/plugin.mq.md
+  sys: lib/sys.mq.md
 ---
 
 Formula-first linear algebra (English). MatExpr simplify + display; ABI plugin.

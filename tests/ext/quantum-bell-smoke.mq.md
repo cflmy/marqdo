@@ -1,8 +1,9 @@
 ---
 title: quantum bell smoke
 description: H+CX Bell state probabilities ≈ 1/2 each.
-import quantum:ext/quantum/quantum.mq.md
-import math:lib/math.mq.md
+import:
+  quantum: ext/quantum/quantum.mq.md
+  math: lib/math.mq.md
 ---
 
 # main
