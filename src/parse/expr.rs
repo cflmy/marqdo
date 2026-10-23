@@ -10,9 +10,10 @@ pub fn parse_expr(input: &str) -> Result<Expr> {
 
 /// Markup mode for `[描述](实现)` vs the legacy `[键](集合)` index. `<TAB>` M2
 ///
-/// `Classic` keeps today's index semantics; `Occlusion` reads the same shape as
-/// an occlusion. The default is `Classic` until M7 migrates the corpus and flips
-/// the gate (otherwise every legacy index would silently change meaning).
+/// `Classic` keeps the legacy index semantics; `Occlusion` reads the same shape
+/// as an occlusion.  The compatibility default remains `Classic` until every
+/// shipped library has an explicit per-file declaration; new syntax opts in
+/// with `markup: occlusion`.  No environment/process switch exists.
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
 pub enum Markup {
     #[default]
@@ -20,28 +21,17 @@ pub enum Markup {
     Occlusion,
 }
 
-static MARKUP: std::sync::atomic::AtomicU8 = std::sync::atomic::AtomicU8::new(0);
-
-/// Set the process-wide default markup mode (CLI / tests).
-pub fn set_markup_default(m: Markup) {
-    MARKUP.store(
-        match m {
-            Markup::Classic => 0,
-            Markup::Occlusion => 1,
-        },
-        std::sync::atomic::Ordering::Relaxed,
-    );
-}
-
 thread_local! {
-    /// Per-module override (`markup:` in frontmatter) — wins over the process default.
+    /// Scoped parser context for loader/migration calls.  It is never mutated
+    /// from environment/process configuration, so two project files cannot
+    /// silently change each other's grammar.
     static MARKUP_OVERRIDE: std::cell::Cell<Option<Markup>> = const { std::cell::Cell::new(None) };
 }
 
 /// Run `f` with `markup` as the effective mode for everything parsed inside.
 ///
-/// Frontmatter `markup: occlusion` uses this so that one process can load files
-/// in different modes (imports!). `<TAB>` M7
+/// Used by the loader and migration verifier to give one parse an explicit
+/// mode.  Imported files establish their own nested scope from frontmatter.
 pub fn with_markup<T>(markup: Markup, f: impl FnOnce() -> T) -> T {
     let saved = MARKUP_OVERRIDE.with(|c| c.replace(Some(markup)));
     let out = f();
@@ -53,10 +43,7 @@ pub fn markup_default() -> Markup {
     if let Some(m) = MARKUP_OVERRIDE.with(|c| c.get()) {
         return m;
     }
-    match MARKUP.load(std::sync::atomic::Ordering::Relaxed) {
-        1 => Markup::Occlusion,
-        _ => Markup::Classic,
-    }
+    Markup::Classic
 }
 
 /// Italic / bold value syntax: bare words are variables; text needs `"…"` / `'…'`.
@@ -1921,7 +1908,7 @@ mod tests {
 
     #[test]
     fn link_shaped_index() {
-        let e = parse_expr_prefer_var("[拿铁](菜单)").unwrap();
+        let e = parse_expr_markup("[拿铁](菜单)", true, Markup::Classic).unwrap();
         match e {
             Expr::Index { base, label } => {
                 assert!(matches!(base.as_ref(), Expr::Var(n) if n == "菜单"));
@@ -1929,7 +1916,7 @@ mod tests {
             }
             other => panic!("expected link Index, got {other:?}"),
         }
-        let e = parse_expr_prefer_var("[`名`](菜单)").unwrap();
+        let e = parse_expr_markup("[`名`](菜单)", true, Markup::Classic).unwrap();
         match e {
             Expr::Index { base, label } => {
                 assert!(matches!(base.as_ref(), Expr::Var(n) if n == "菜单"));
@@ -1937,7 +1924,7 @@ mod tests {
             }
             other => panic!("expected dynamic link Index, got {other:?}"),
         }
-        let e = parse_expr_prefer_var("[1](篮子)").unwrap();
+        let e = parse_expr_markup("[1](篮子)", true, Markup::Classic).unwrap();
         assert!(matches!(
             e,
             Expr::Index {
@@ -1945,7 +1932,7 @@ mod tests {
                 ..
             } if s == "1"
         ));
-        let e = parse_expr_prefer_var("[1]([苹果](货架))").unwrap();
+        let e = parse_expr_markup("[1]([苹果](货架))", true, Markup::Classic).unwrap();
         match e {
             Expr::Index { base, label } => {
                 assert_eq!(label, IndexKey::Lit("1".into()));
@@ -2015,7 +2002,7 @@ mod bracket_call_tests {
 
     #[test]
     fn link_index_not_bracket_call() {
-        let e = parse_expr_prefer_var("[拿铁](菜单)").unwrap();
+        let e = parse_expr_markup("[拿铁](菜单)", true, Markup::Classic).unwrap();
         assert!(matches!(e, Expr::Index { .. }));
     }
 

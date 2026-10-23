@@ -21,7 +21,7 @@ fn fixture() -> (std::path::PathBuf, String) {
     let dir = std::env::temp_dir().join(format!("marqdo-migrate-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     let path = dir.join("demo.mq.md");
-    let src = "---\nimport json:lib/json.mq.md\n---\n\n# main\n\n`表` = > json.parse text={\"键\":\"值\"}\n**a = [键](`表`)**\n> print text=\"a=\" + `a`\n";
+    let src = "---\nmarkup: classic\nimport json:lib/json.mq.md\n---\n\n# main\n\n`表` = > json.parse text={\"键\":\"值\"}\n**a = [键](`表`)**\n> print text=\"a=\" + `a`\n";
     std::fs::write(&path, src).unwrap();
     (path, src.to_string())
 }

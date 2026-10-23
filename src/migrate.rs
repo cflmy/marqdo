@@ -33,7 +33,7 @@ fn has_marker(source: &str) -> bool {
         }
         let lower = t.to_ascii_lowercase();
         if lower.starts_with("markup:") || t.starts_with("标记:") {
-            return true;
+            return lower.contains("occlusion") || lower.contains("purity") || t.contains("遮蔽") || t.contains("纯度");
         }
     }
     false
@@ -42,6 +42,21 @@ fn has_marker(source: &str) -> bool {
 fn add_marker(source: &str) -> String {
     if has_marker(source) {
         return source.to_string();
+    }
+    // A classic marker is an explicit request to migrate; replace it rather
+    // than adding conflicting keys to the same frontmatter block.
+    if source.starts_with("---\n") {
+        let mut lines: Vec<String> = source.lines().map(str::to_string).collect();
+        for (index, line) in lines.iter_mut().enumerate() {
+            let lower = line.trim().to_ascii_lowercase();
+            if lower.starts_with("markup:") || line.trim().starts_with("标记:") {
+                *line = "markup: occlusion".to_string();
+                let mut out = lines.join("\n");
+                if source.ends_with('\n') { out.push('\n'); }
+                return out;
+            }
+            if line.trim() == "---" && index != 0 { break; }
+        }
     }
     if let Some(rest) = source.strip_prefix("---\n") {
         format!("---\nmarkup: occlusion\n{rest}")

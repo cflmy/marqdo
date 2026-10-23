@@ -215,16 +215,21 @@ fn drills() -> Vec<Drill> {
     ]
 }
 
+fn classic(src: &str) -> String {
+    format!("---\nmarkup: classic\n---\n\n{src}")
+}
+
 #[test]
 fn drift_cases_all_reported() {
     let all = drills();
     let total = all.len();
     let mut caught = 0;
     for d in &all {
+        let src = classic(d.src);
         let diags = if d.runtime {
-            diagnose(Verify::Run(d.code), d.src, &format!("drift_{}", d.name))
+            diagnose(Verify::Run(d.code), &src, &format!("drift_{}", d.name))
         } else {
-            static_diags(d.src)
+            static_diags(&src)
         };
         let hit = diags.iter().any(|v| v["code"].as_str() == Some(d.code));
         assert!(
@@ -240,15 +245,16 @@ fn drift_cases_all_reported() {
 #[test]
 fn negative_controls_zero_false_positives() {
     // 1. 被绑定的 `字段|类型|可空` 数据表 = 数据（web_db_migration 式）——绝不能被当契约吃掉。
-    let diags = diagnose(Verify::Run(""), SRC_BOUND_DATA, "drill_neg_bound");
+    let diags = diagnose(Verify::Run(""), &classic(SRC_BOUND_DATA), "drill_neg_bound");
     assert!(
         diags.iter().all(|v| !v["code"].as_str().unwrap_or("").starts_with("contract.")),
         "绑定数据表被误当契约: {diags:?}"
     );
     // 2. 干净契约 + 对值 ⇒ 静态零诊断、运行零诊断。
-    let diags = static_diags(SRC_OK);
+    let src_ok = classic(SRC_OK);
+    let diags = static_diags(&src_ok);
     assert!(diags.is_empty(), "干净契约被误报（静态）: {diags:?}");
-    let diags = diagnose(Verify::Run(""), SRC_OK, "drill_neg_ok");
+    let diags = diagnose(Verify::Run(""), &src_ok, "drill_neg_ok");
     assert!(diags.is_empty(), "干净契约被误报（运行）: {diags:?}");
     eprintln!("负对照误报 = 0/2 = 0%");
 }

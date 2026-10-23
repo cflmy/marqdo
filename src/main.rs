@@ -108,6 +108,11 @@ enum Commands {
         /// Emit diagnostics as JSON on stderr (machine-readable; AI/MLSP 面).
         #[arg(long)]
         json: bool,
+
+        /// Parse unmarked files using the legacy `[key](collection)` grammar.
+        /// Explicit per-file `markup:` still wins; this flag is transitional.
+        #[arg(long)]
+        legacy_markup: bool,
     },
     /// Static contract cross-check (渐进式契约): drift, unknown types, misplaced tables
     Check {
@@ -122,6 +127,10 @@ enum Commands {
         /// Also check prose above `>` calls (implicit occlusion; fuzzy, off by default)
         #[arg(long)]
         implicit_labels: bool,
+
+        /// Parse an unmarked file with the legacy grammar for migration review.
+        #[arg(long)]
+        legacy_markup: bool,
     },
     /// Occlusion label queries: pending stubs (built-in words) or keyword search
     Labels {
@@ -483,20 +492,7 @@ enum ViewAction {
     },
 }
 
-/// `<TAB>` M2: `MARQDO_MARKUP=occlusion` enables `[描述](实现)` (purity mode).
-/// Default stays `classic` so legacy `[键](集合)` keeps its meaning until M7.
-fn init_markup_from_env() {
-    if let Ok(v) = std::env::var("MARQDO_MARKUP") {
-        let m = match v.trim().to_ascii_lowercase().as_str() {
-            "occlusion" | "purity" | "1" | "on" | "true" => marqdo::parse::expr::Markup::Occlusion,
-            _ => marqdo::parse::expr::Markup::Classic,
-        };
-        marqdo::parse::expr::set_markup_default(m);
-    }
-}
-
 fn main() -> ExitCode {
-    init_markup_from_env();
     let cli = Cli::parse();
     let json_errors = matches!(
         &cli.command,
@@ -633,6 +629,7 @@ fn try_main(cli: Cli) -> Result<i32> {
             binds,
             fs_root,
             json: _,
+            legacy_markup,
         } => {
             let path = file.unwrap_or_else(|| PathBuf::from("index.mq.md"));
             let stdin_lines = match stdin_file {
@@ -672,15 +669,28 @@ fn try_main(cli: Cli) -> Result<i32> {
             if dump_all {
                 opts.backend = backend.into();
             }
-            marqdo::run_file(&path, &opts)?;
+            if legacy_markup {
+                marqdo::parse::expr::with_markup(marqdo::parse::expr::Markup::Classic, || {
+                    marqdo::run_file(&path, &opts)
+                })?;
+            } else {
+                marqdo::run_file(&path, &opts)?;
+            }
             Ok(0)
         }
         Commands::Check {
             file,
             json,
             implicit_labels,
+            legacy_markup,
         } => {
-            let diags = marqdo::check::check_path_opts(&file, implicit_labels)?;
+            let diags = if legacy_markup {
+                marqdo::parse::expr::with_markup(marqdo::parse::expr::Markup::Classic, || {
+                    marqdo::check::check_path_opts(&file, implicit_labels)
+                })?
+            } else {
+                marqdo::check::check_path_opts(&file, implicit_labels)?
+            };
             let mut errors = 0i32;
             for d in &diags {
                 if matches!(d.severity, marqdo::diagnostics::Severity::Error) {

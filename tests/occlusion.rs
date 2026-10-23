@@ -1,7 +1,5 @@
-//! `<TAB>` M2: occlusion syntax end-to-end (CLI + `MARQDO_MARKUP=occlusion`).
-//!
-//! The mode flag keeps `[键](集合)` (classic index) intact until M7 migrates the
-//! corpus; these tests pin both sides of the switch.
+//! Occlusion syntax end-to-end. Grammar is declared by each document, not a
+//! process environment variable, so imports and MLSP requests stay isolated.
 
 use std::process::Command;
 
@@ -27,21 +25,17 @@ fn occlusion_value_is_payload() {
 }
 
 #[test]
-fn occlusion_off_keeps_classic_index() {
+fn migrated_index_uses_access_without_a_process_mode() {
     let (code, stdout, stderr) = run("tests/occlusion/classic-index.mq.md", None);
     assert_eq!(code, 0, "stderr={stderr}");
     assert_eq!(stdout.trim_end(), "值");
 }
 
 #[test]
-fn occlusion_mode_rejects_legacy_index_shape() {
-    // In occlusion mode `[键](集合)` is read as an occlusion whose payload is the
-    // collection — i.e. it returns the *whole* map, not the member. This is why
-    // M7 must migrate before flipping the default; here we only pin that the
-    // shape no longer means "index".
-    let (code, stdout, stderr) = run("tests/occlusion/classic-index.mq.md", Some("occlusion"));
+fn declared_occlusion_ignores_legacy_environment_switches() {
+    let (code, stdout, stderr) = run("tests/occlusion/classic-index.mq.md", Some("classic"));
     assert_eq!(code, 0, "stderr={stderr}");
-    assert_ne!(stdout.trim_end(), "值", "occlusion mode must not index");
+    assert_eq!(stdout.trim_end(), "值");
 }
 
 // ---- M2.5: label diagnostics (`label.missing` / `label.empty_payload`) ----
@@ -195,10 +189,11 @@ fn mlsp_session(reqs: &[&str]) -> Vec<String> {
 }
 
 fn repair_req(src: &str, new_line: &str) -> String {
-    let src_json = serde_json::to_string(src).unwrap();
+    let src = format!("---\nmarkup: occlusion\n---\n\n{src}");
+    let src_json = serde_json::to_string(&src).unwrap();
     let line_json = serde_json::to_string(new_line).unwrap();
     format!(
-        r#"{{"id":1,"method":"repair_apply","params":{{"source":{src_json},"ranges":[[3,3]],"edits":[{{"op":"replace","line":3,"text":{line_json}}}],"check_labels":true}}}}"#
+        r#"{{"id":1,"method":"repair_apply","params":{{"source":{src_json},"ranges":[[7,7]],"edits":[{{"op":"replace","line":7,"text":{line_json}}}],"check_labels":true}}}}"#
     )
 }
 

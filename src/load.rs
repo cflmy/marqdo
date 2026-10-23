@@ -290,8 +290,9 @@ fn label_error(label: &str, e: anyhow::Error) -> anyhow::Error {
 /// Effective markup mode declared by the file itself. `<TAB>` M7
 ///
 /// Looks for `markup: occlusion` (or `标记: 遮蔽`) inside the leading frontmatter
-/// block. Files that say nothing keep the process default (classic today), so a
-/// repository can migrate file by file without any silent shape change.
+/// block. Files that say nothing retain the compatibility default (`classic`)
+/// until the full library migration lands. There is no environment/process
+/// default: an explicit file declaration always decides its own grammar.
 /// Parse a standalone source the way the file itself declares (`markup:` in
 /// frontmatter). The viewer must use this — otherwise an occluded document is
 /// re-parsed in classic mode and fails. `<TAB>` M7/M8

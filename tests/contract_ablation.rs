@@ -164,6 +164,10 @@ const BIND_BARE: &str = "\
 ";
 
 const KEY_WRONG: &str = "\
+---
+markup: classic
+---
+
 # main
 
 | 字段 | 类型 | 可空 |
@@ -180,6 +184,10 @@ const KEY_WRONG: &str = "\
 ";
 
 const KEY_RIGHT: &str = "\
+---
+markup: classic
+---
+
 # main
 
 | 字段 | 类型 | 可空 |
@@ -196,6 +204,10 @@ const KEY_RIGHT: &str = "\
 ";
 
 const KEY_BARE: &str = "\
+---
+markup: classic
+---
+
 # main
 
 `用户` =
