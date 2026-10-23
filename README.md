@@ -6,7 +6,7 @@ Marqdo 把 Markdown **标记当作编程语法**：同一个 `.mq.md` 文件，�
 
 欢迎访问 [marqdo 官方网站](https://www.marqdo.com/) 阅读更多特性与可执行文档。
 
-语法宪法：[doc/design/markdown-mapping.md](doc/design/markdown-mapping.md) · 对象：[objects.md](doc/design/objects.md) · 调用实参：[call-arguments.md](doc/design/call-arguments.md) · 用户站：[user-site.md](doc/design/user-site.md) · 浏览：[view.md](doc/design/view.md) · 调试：[view-debug.md](doc/design/view-debug.md) · OKF 清单：[catalog-cli.md](doc/design/catalog-cli.md) · Engineering Knowledge：[engineering-knowledge.md](doc/design/engineering-knowledge.md) · VS Code 扩展：[vscode-extension.md](doc/design/vscode-extension.md)（分支 **`vscode-extension`**；提交约定 [vscode-extension-commit.md](doc/design/vscode-extension-commit.md)） · **AI Skill**：[skills/marqdo/](skills/marqdo/)（说明 [ai-skill.md](doc/design/ai-skill.md)） · 官方扩展：[ext-llm.md](doc/design/ext-llm.md)（`ext/llm`）· [ext-agent.md](doc/design/ext-agent.md)（智能体开发框架）· [ext-cli.md](doc/design/ext-cli.md)（`marqdo ext list/add/remove`） · 原生插件 ABI：[ext-abi.md](doc/design/ext-abi.md)（`lib/plugin`） · 金样例：[tests/](tests/) · 用户文档：[public/](public/) · 变更：[CHANGELOG.md](CHANGELOG.md)
+**链接语法**：[doc/design/link-syntax.md](doc/design/link-syntax.md) · 语法宪法：[doc/design/markdown-mapping.md](doc/design/markdown-mapping.md) · 对象：[objects.md](doc/design/objects.md) · 调用实参：[call-arguments.md](doc/design/call-arguments.md) · 用户站：[user-site.md](doc/design/user-site.md) · 浏览：[view.md](doc/design/view.md) · 调试：[view-debug.md](doc/design/view-debug.md) · OKF 清单：[catalog-cli.md](doc/design/catalog-cli.md) · Engineering Knowledge：[engineering-knowledge.md](doc/design/engineering-knowledge.md) · VS Code 扩展：[vscode-extension.md](doc/design/vscode-extension.md)（分支 **`vscode-extension`**；提交约定 [vscode-extension-commit.md](doc/design/vscode-extension-commit.md)） · **AI Skill**：[skills/marqdo/](skills/marqdo/)（说明 [ai-skill.md](doc/design/ai-skill.md)） · 官方扩展：[ext-llm.md](doc/design/ext-llm.md)（`ext/llm`）· [ext-agent.md](doc/design/ext-agent.md)（智能体开发框架）· [ext-cli.md](doc/design/ext-cli.md)（`marqdo ext list/add/remove`） · 原生插件 ABI：[ext-abi.md](doc/design/ext-abi.md)（`lib/plugin`） · 金样例：[tests/](tests/) · 用户文档：[public/](public/) · 变更：[CHANGELOG.md](CHANGELOG.md)
 
 ---
 
@@ -34,7 +34,88 @@ Marqdo 把 Markdown **标记当作编程语法**：同一个 `.mq.md` 文件，�
 | **表格即数据结构** | 程序的数据结构直接就是文档的数据结构：单列竖表 → `List`；横表（1 数据行）→ `Map`；横表（多数据行）→ `Map` of `List`（列向聚合）；首列写 `@` / `行` / `row` → 行向记录 `List` of `Map`。取元 `[键](集合)` 也是 Markdown 链接形。这是 literate programming 的下一步。 |
 | **语义干净** | **返回是架构，打印只是函数**：`*…*` 改变控制流，`print` 只是副作用函数；分支与循环长在 Markdown 结构上（`1.` `2.` 递增 = 分支，`-` = 循环），不是所有列表都被粗暴当成 if。 |
 | **AI 的可靠上下文与长期记忆** | 一个 `.mq.md` 同时是 documentation + schema + code + examples + knowledge + executable behavior；AI 不必再拼装 README + OpenAPI + JSON Schema + prompt。整个工程天然就是 AI 的**世界模型**——比 RAG 更接近 Executable RAG。 |
+| **链接即调用**<br>Link as Call | 文档里的 `[描述](类.函数)` 不是装饰，是跨文档类调用；编译器解析类/函数并返回 **LinkInfo**，`view` 显示调用点，EKC 建边，`links.lock` 可选复现。**v2.1 设计目标**；v2.0.0 已具备本地表达式链接与 `import` + 实例调用。 |
 | **完整工程，不是玩具** | Rust 正经解释器（词法 / 语法 / 语义 / 树遍历 + 字节码后端）、stdlib、模块与对象、debugger、viewer、catalog、WASM、原生插件 ABI、VS Code 扩展、agent / LLM / MCP。 |
+
+---
+
+## 链接语法：链接即调用（v2.1 设计声明）
+
+> **这是 v2.1 的设计目标，不是 v2.0.0 的全部现状。**
+> `[]()` 不新增语法：`[]` 是 Markdown 链接的描述；`()` 是**已有代码**，与 `**代码**` 同权。
+> `#` 是类，`##` 是函数；`类.函数` 是**类调用**。
+> 链接只是给这次调用一个名字；`view` 显示调用信息，编译器返回 **LinkInfo**，EKC 建边。
+
+### 两文档，一次类调用
+
+知识文档 `libai.mq.md`：
+
+```markdown
+# 李白
+
+这个文档存储了李白的信息。
+
+## 李白的出生年份
+
+*701*
+```
+
+- `# 李白` = 类；
+- `## 李白的出生年份` = 函数；
+- `*701*` = 返回值。
+
+调用文档 `main.mq.md`：
+
+```markdown
+# main
+用户想要知道李白的出生年份，我们要告诉用户[李白的出生年份](李白.李白的出生年份)
+```
+
+`[]` 是描述，`()` 是已有调用 `李白.李白的出生年份`——**类 `李白` 调用函数 `李白的出生年份`**。
+不需要 `print`：`view` 模式天然显示 `()` 的调用信息（类、函数、签名、值）。
+要终端输出，就把同一段代码放进代码链接并加 `print`：
+
+```markdown
+**year = [李白的出生年份](李白.李白的出生年份)**
+> print text=`year`
+```
+
+输出：`701`。
+
+### 四条语义
+
+1. **`[]` 永不执行**：描述只给人读、给检索/诊断/展示用。
+2. **`()` 与 `**代码**` 同权**：同一套 parser/evaluator；`类.函数` 是类调用，`obj.函数` 是实例调用。
+3. **`#` 是类，`##` 是函数**：不使用 `self`/`自` 的函数是**类函数**，可直接 `类.函数` 调用；使用 `self`/`自` 的是**实例函数**。
+4. **链接 = 描述 + 调用**：`view` 显示调用点；编译器返回 `LinkInfo`；EKC 建边；`links.lock` 可选复现。
+
+### 现状与目标
+
+| 能力 | v2.0.0 当前 | v2.1 目标 |
+|------|-------------|-----------|
+| 本地表达式链接（遮蔽） | ✅ `markup: occlusion` | ✅ |
+| `()` 与 `**代码**` 同权 | ✅ 表达式/调用 | ✅ |
+| 类调用 `类.函数` | ❌ 需先构造实例 | ✅ 直接调用 |
+| 跨文档类索引 | ❌ 需 `import` + 实例 | ✅ 项目类索引 |
+| 正文链接 `view` 信息 | ❌ | ✅ 目标/签名/值 |
+| LinkInfo / check | ❌（`check` 只查契约） | ✅ `link.*` |
+| 链接图边（EKC） | ❌ | ✅ `calls` / `references` |
+| `links.lock` 可复现 | ❌ | ✅ 可选 |
+
+### 知识分层：本体 → 知识个体 → 调用面
+
+| 层 | 写法 | 语义 |
+|----|------|------|
+| L1 本体 | `# 诗人` + 字段/类型表 | 类/模式 |
+| L2 知识个体 | `# 李白 = > 诗人` + `## 出生年份` + `*701*` | 单体知识类（不是运行时实例） |
+| L3 调用面 | `[出生年份](李白.出生年份)` | 类调用/链接 |
+
+> `# 李白 = > 诗人` 语法上是继承/特化，语义上是「李白是诗人」的知识个体；
+> 运行时实例仍是 `> 诗人` / `> 李白`。详见 [knowledge-layers.md](doc/design/knowledge-layers.md)。
+
+**当前可运行**的等价写法（v2.0.0）：见 [examples/link-syntax/main.compat.mq.md](examples/link-syntax/main.compat.mq.md)。
+
+设计宪法：[doc/design/link-syntax.md](doc/design/link-syntax.md) · 链接示例：[examples/link-syntax/](examples/link-syntax/) · 知识分层示例：[examples/knowledge-layers/](examples/knowledge-layers/) · 证据复核：[occlusion-vs-executable-knowledge-2026-10.md](doc/research/occlusion-vs-executable-knowledge-2026-10.md)
 
 ---
 
@@ -45,7 +126,7 @@ Marqdo 把 Markdown **标记当作编程语法**：同一个 `.mq.md` 文件，�
 1. **AI 可验证语言**：`LLM → Marqdo AST → 语义检查 → 结构化诊断 → LLM 修复 → 合格程序`。让类型与语义检查成为 AI 编程闭环里的强约束，堵住「语义看似合理、类型实则不对」的生成。
 2. **Marqdo Schema / Language Server for AI**：机器可读的语言 Schema（`get_syntax` / `validate` / `repair` …），AI 不必读千行文档猜语法，而是 discover → construct → validate → execute → inspect。
 3. **程序即 AI 长期记忆**：`.mq.md` 工程 = 可执行知识库 = AI 的世界模型（Executable Knowledge Representation）。
-4. **可执行知识图**：`.mq.md` 之间的 Markdown 链接天然长成文档图 + 知识图 + 程序图（Executable Knowledge Graph）。
+4. **链接即调用 / 可执行知识图**：`[描述](类.函数)` 既是文档链接，也是类/函数调用；编译器解析目标、校验签名、返回 LinkInfo；`view` 显示调用点；`.mq.md` 之间的链接长成文档图 + 知识图 + 程序图（Executable Knowledge Graph）。
 5. **知识可测试**：文档中的示例表自动执行；知识与执行结果不一致会被机器报告——Knowledge-Code Coherence 从理念变为日常。
 6. **可靠性基准**：让同一个 AI 分别用 Python / TypeScript / Marqdo 完成真实任务，测量生成长度、语法 / 语义错误率、修复轮次、token 消耗与人类阅读 / 修改成本——用实验数据证明「文档型语法降低 LLM 生成熵」。
 
@@ -64,23 +145,29 @@ Marqdo 把 Markdown **标记当作编程语法**：同一个 `.mq.md` 文件，�
 
 ---
 
-## 语法速览（v0.3）
+## 语法速览
 
 | 标记 | 含义 |
 |------|------|
 | 无标记行 | 叙述（注释）；行内 `` `名` `` 可声明 |
 | `**…**` | **代码**（赋值 / 调用 / 表达式） |
+| `[描述](表达式)` | **链接（本地）**：描述 + 代码；`()` 与 `**…**` 同权（v2.0.0 需 `markup: occlusion`） |
+| `[描述](类.函数)` | **链接（跨文档/类调用）**：描述 + 已有类函数调用；可解析、可执行（v2.1 目标） |
+| `[描述](url)` | 普通 Markdown 导航链接（惰性，不执行） |
 | `*…*` | **返回值**（整行、`返回*n*`、或表达式形） |
 | `****` / 整行 `**` / `*None*` | **空返回**（`None`），并结束本函数体 |
 | `> print …` 等 | 输出等副作用 = **普通函数**，非架构标记 |
-| `#` | 对象 / 类型（构造体；`# main` = 入口） |
-| `##` … | 函数 / 方法（按标题深度嵌套） |
+| `#` | **类 / 类型**（知识命名空间；`# main` = 入口） |
+| `##` … | **函数**（类下函数；使用 `self`/`自` 时为实例方法） |
+| `类.函数` | **类调用**（不使用 `self` 的函数；v2.1 目标） |
 | `` > `obj`.method … `` | 方法调用（`obj` 为带 `_type` 的 map） |
 | 叙述 `` `名` `` / `` `名`=默认 `` | 形参由体推断（`` + `名` `` 仍可用） |
 | `1.` … | 体内 `1.` `2.` … = 分支（`N. *` = else） |
 | `-` | 循环（`` - `条件` `` 或 `` - [项](集合) ``） |
 | 表格 | 集合（几何即类型，见下）；取元优先 `[键](集合)` |
 | 单独一行 `---` / `***` | **叙述分隔**（跳过；不是函数收束） |
+
+> `[键](集合)` / `- [项](集合)` 是旧取元/循环形；v2 链接语法推荐 `[描述](表达式)` / `[描述](类.函数)` / `- [描述](遍历 集合 为 项)`。旧形在 Classic 下保留，见 [link-syntax.md](doc/design/link-syntax.md)。
 
 ```markdown
 # main
@@ -133,8 +220,9 @@ Marqdo 允许你写出"还没接通"的代码——**只要写在描述里**。�
 [ERP 推送，模拟](json.parse text={"ok":true,"stub":true})
 ```
 
-`[]` 里是**自由描述**（不执行）；`()` 里是**实现**（唯一执行）。这条语法叫**遮蔽**：
-把不可读或未完成的实现藏到括号里，人读描述、机器读代码。
+`[]` 里是**自由描述**（不执行）；`()` 里是**目标**（唯一执行）。这条语法叫**链接语法**：
+目标是本地表达式时，就是**遮蔽**（把代码折叠在括号里）；目标是 `类.函数` 时，就是**跨文档类调用**。
+v2.0.0 已实现前者；后者是 v2.1 目标（见 [link-syntax.md](doc/design/link-syntax.md)）。
 
 **四条约定**
 
@@ -147,15 +235,15 @@ Marqdo 允许你写出"还没接通"的代码——**只要写在描述里**。�
 **盘点与门禁**
 
 ```bash
-marqdo labels pending                          # 内置口径：还有多少未完成
-marqdo labels search --grep "接口未联调,联调中"   # 用你自己的说法
-marqdo labels search --grep 联调 --also-builtin  # 自定义 + 内置一起数
-marqdo labels pending --count --baseline .marqdo/pending.json --fail-on-increase
+marqdo labels --count                              # 内置口径：还有多少未完成
+marqdo labels --grep "接口未联调,联调中" --count    # 用你自己的说法
+marqdo labels --grep 联调 --also-builtin --count  # 自定义 + 内置一起数
+marqdo labels --count --baseline .marqdo/pending.json --fail-on-increase
 ```
 
 最后一条是**棘轮**：只拦"新增未完成"，不追旧账。
 
-设计依据：[occlusion-syntax.md](doc/design/occlusion-syntax.md) ·
+设计依据：[link-syntax.md](doc/design/link-syntax.md) · [occlusion-syntax.md](doc/design/occlusion-syntax.md) ·
 [occlusion-description-and-search.md](doc/design/occlusion-description-and-search.md)
 
 ---
@@ -195,7 +283,7 @@ marqdo catalog public -o .marqdo
 
 ## 现状（v2.0.0）
 
-- **遮蔽语法（v2.0.0）**：`[描述](实现)` 描述不执行 · `()` 内调用（`加(1)` / `加一 号(31)`）· `access` 取元与 `遍历` 遮蔽循环 · `marqdo labels` 两级检索 / `--baseline` 债务棘轮 · `migrate labels` · 诊断 `label.missing` / `empty_payload` / `ref_dangling` · view 描述正文 + 代码片 + 桩徽章 · 扩展包同步 **2.0.0**
+- **链接语法（v2.0.0 本地表达式链接；v2.1 目标：`类.函数` 跨文档类调用）**：`[描述](目标)` 描述不执行 · `()` 与 `**代码**` 同权（`加(1)` / `加一 号(31)`）· `access` 取元与 `遍历` 链接循环 · `marqdo labels` 两级检索 / `--baseline` 债务棘轮 · `migrate labels` · 诊断 `label.*` · view 描述正文 + 代码片 + 桩徽章 · **设计声明 [link-syntax.md](doc/design/link-syntax.md)**（`类.函数` / LinkInfo / 链接图 / lock 为 v2.1 目标） · 扩展包同步 **2.0.0**
 - **外联 v3 P0/P1（v1.5.2）**：raw stdin + 每 cell 独立输入 · plan API · snapshot export/import/replay · `view capture` · Persist 按钮 · 扩展包同步 **1.5.2**
 - **view 静态/动态统一 + 外联值传递（v1.5.1）**：静态导出与 live view 共用 `foreign_doc` 执行路径 · 构建时运行注入 stdout · `foreign.session` 值传递 · cell stdin；扩展包同步 **1.5.0**
 - **裸自增升参（v1.4.6）**：首次粗体赋值左值即声明；`**n = n + 1**` 无反引号也升为必选形参。扩展包仍为 **1.4.5**

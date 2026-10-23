@@ -106,6 +106,8 @@
 | [design/ext-hosting-fill.md](design/ext-hosting-fill.md) | **宿主缺口补齐设计**（`ext/web` proxy/invoke · `ext/ai` mcp_server） |
 | [roadmap/ext-hosting.md](roadmap/ext-hosting.md) | **宿主集成 H0–H4**（规划） |
 | [design/code-volume-audit.md](design/code-volume-audit.md) | **代码体量审计**：53k 行的构成 · 已清 14.5k 冗余 · 剩余是特性面 · 可精简项与风险 |
+| [design/link-syntax.md](design/link-syntax.md) | **链接语法（v2.1 设计声明）**：链接即调用 · `()` 与 `**代码**` 同权 · `类.函数` 跨文档 · LinkInfo · view 调用点 · 图边 · lock · L0–L5 开发指导 |
+| [design/knowledge-layers.md](design/knowledge-layers.md) | **知识分层（语法评审）**：原始语料 / 本体 / 可执行知识 / 调用面 · 单体知识类 vs 运行时实例 · `# 李白 = > 诗人` · 出处/还原验证 · EKC 映射 |
 | [design/occlusion-description-and-search.md](design/occlusion-description-and-search.md) | **遮蔽描述与两级检索**：内置词表=范例/默认，参数=扩展 · 空载荷一律 warning · 申报习惯 |
 | [design/occlusion-syntax.md](design/occlusion-syntax.md) | **遮蔽语法总纲（实施依据）**：`[描述](实现)` 的目的/语义/新鲜度校验 + M0–M8 计划 |
 | [design/label-freshness-and-repair.md](design/label-freshness-and-repair.md) | 标签过期检测：L1 引用一致性 · 指纹台账 · LLM 复核 · MLSP 修复回路 |
@@ -114,6 +116,7 @@
 | [design/t1-session-staleness.md](design/t1-session-staleness.md) | 会话内陈旧检测：为何模型在结构上收不到重复警告 |
 | [tutorial/15-常见陷阱.md](tutorial/15-常见陷阱.md) | **使用向陷阱手册**：行首数字、跨函数作用域、空格函数名、导入路径、`table.put` 非原地（1.5.2 实测） |
 | [research/qdagent-refactor-defects-2026-10.md](research/qdagent-refactor-defects-2026-10.md) | **qdagent 重构期缺陷实录 D1–D7**（沙箱 profile 不生效 · 全角 CALL 静默丢失 …） |
+| [research/occlusion-vs-executable-knowledge-2026-10.md](research/occlusion-vs-executable-knowledge-2026-10.md) | **遮蔽 vs 可执行知识复核**：v2.0.0 的 `[]()` 只做了呈现层 · 两文档例子实测不可执行 · `check`/`labels`/图边工程漂移证据 · 原始设计=类-函数调用（见 link-syntax） |
 | [roadmap/ext-agent-optimize.md](roadmap/ext-agent-optimize.md) | **`ext/agent` A0–A4 done · Wave B Active** · 后续优化见 [ext-ai-optimize](roadmap/ext-ai-optimize.md) O 波次 |
 
 金样例与集成测试：[`tests/`](../tests/)。面向访客的可执行文档：[`public/`](../public/)。Spike 存档：[`spike/`](../spike/)。

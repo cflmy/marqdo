@@ -1,0 +1,22 @@
+{
+  "label": "李白的出生年份",
+  "source": {
+    "file": "main.mq.md",
+    "line": 2,
+    "col": 26
+  },
+  "target": {
+    "class": "李白",
+    "function": "李白的出生年份",
+    "doc": "libai.mq.md",
+    "kind": "class_function",
+    "signature": {
+      "params": [],
+      "returns": "number"
+    },
+    "instance_only": false
+  },
+  "status": "ok",
+  "value": null,
+  "fingerprint": "sha256:<target-body-hash>"
+}

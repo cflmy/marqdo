@@ -1,0 +1,9 @@
+version: 1
+generated_by: marqdo/2.1.0
+links:
+  - from: main.mq.md
+    label: 李白的出生年份
+    to: libai.mq.md::李白.李白的出生年份
+    kind: class_function
+    signature: "() -> number"
+    fingerprint: sha256:<target-body-hash>
