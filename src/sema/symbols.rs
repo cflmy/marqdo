@@ -58,12 +58,34 @@ impl SymbolKind {
     }
 }
 
+/// Callable classification is semantic metadata, separate from `SymbolKind`.
+/// This keeps stable SymbolIds independent of whether a body later gains or
+/// loses a receiver dependency.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum CallableKind {
+    FreeFunction,
+    AssociatedFunction,
+    InstanceMethod,
+}
+
+impl CallableKind {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::FreeFunction => "free_function",
+            Self::AssociatedFunction => "associated_function",
+            Self::InstanceMethod => "instance_method",
+        }
+    }
+}
+
 /// One source declaration, including a display path for human-facing tools.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SymbolDecl {
     pub id: SymbolId,
     pub module: ModuleId,
     pub kind: SymbolKind,
+    /// Present only for functions; never inferred from the display name.
+    pub callable: Option<CallableKind>,
     pub name: String,
     pub declaration_path: Vec<String>,
     pub source: PathBuf,
@@ -107,6 +129,7 @@ impl ProjectIndex {
                     &module_id,
                     &file,
                     function,
+                    None,
                     &mut Vec::new(),
                     &mut symbols,
                 )?;
@@ -173,6 +196,7 @@ fn collect_symbols(
     module_id: &ModuleId,
     source: &Path,
     function: &Function,
+    parent: Option<&Function>,
     parent_path: &mut Vec<String>,
     out: &mut Vec<SymbolDecl>,
 ) -> Result<()> {
@@ -180,6 +204,17 @@ fn collect_symbols(
         SymbolKind::Type
     } else {
         SymbolKind::Function
+    };
+    let callable = if function.is_object() {
+        None
+    } else if parent.is_some_and(Function::is_object) {
+        Some(if crate::ast::function_uses_receiver(function) {
+            CallableKind::InstanceMethod
+        } else {
+            CallableKind::AssociatedFunction
+        })
+    } else {
+        Some(CallableKind::FreeFunction)
     };
     parent_path.push(function.name.clone());
     let id = symbol_id(project_id, module_id, kind, parent_path);
@@ -193,13 +228,22 @@ fn collect_symbols(
         id,
         module: module_id.clone(),
         kind,
+        callable,
         name: function.name.clone(),
         declaration_path: parent_path.clone(),
         source: source.to_path_buf(),
         line: function.span.line,
     });
     for child in &function.children {
-        collect_symbols(project_id, module_id, source, child, parent_path, out)?;
+        collect_symbols(
+            project_id,
+            module_id,
+            source,
+            child,
+            Some(function),
+            parent_path,
+            out,
+        )?;
     }
     parent_path.pop();
     Ok(())
@@ -374,5 +418,24 @@ id: knowledge.policy
             percent_encode("李白/出生 年份"),
             "%E6%9D%8E%E7%99%BD%2F%E5%87%BA%E7%94%9F%20%E5%B9%B4%E4%BB%BD"
         );
+    }
+
+    #[test]
+    fn object_children_are_classified_without_changing_their_symbol_identity() {
+        let root = fixture_root("callable-kind");
+        fs::write(
+            root.join("facts.mq.md"),
+            "# 李白\n\n## 出生年份\n\n*701*\n\n## 名称\n\n*`self`*",
+        )
+        .unwrap();
+
+        let index = ProjectIndex::build(ProjectRoot::new(&root).unwrap()).unwrap();
+        let fact = index.symbols_named("出生年份").pop().unwrap();
+        let method = index.symbols_named("名称").pop().unwrap();
+        assert_eq!(fact.kind, SymbolKind::Function);
+        assert_eq!(fact.callable, Some(CallableKind::AssociatedFunction));
+        assert_eq!(method.callable, Some(CallableKind::InstanceMethod));
+        assert!(fact.id.as_str().contains("/function/"));
+        fs::remove_dir_all(root).unwrap();
     }
 }

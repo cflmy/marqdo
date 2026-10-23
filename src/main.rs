@@ -962,6 +962,7 @@ fn try_main(cli: Cli) -> Result<i32> {
                                     "id": item.id.as_str(),
                                     "module": item.module.as_str(),
                                     "kind": item.kind.as_str(),
+                                    "callable": item.callable.map(|kind| kind.as_str()),
                                     "name": item.name,
                                     "declaration_path": item.declaration_path,
                                     "source": {
@@ -974,9 +975,10 @@ fn try_main(cli: Cli) -> Result<i32> {
                     } else {
                         for item in &candidates {
                             println!(
-                                "{}\n  {} {} · module {}\n  {}:{}",
+                                "{}\n  {}{} {} · module {}\n  {}:{}",
                                 item.id,
                                 item.kind.as_str(),
+                                item.callable.map(|kind| format!(" ({})", kind.as_str())).unwrap_or_default(),
                                 item.declaration_path.join("."),
                                 item.module,
                                 item.source.display(),

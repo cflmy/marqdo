@@ -6,4 +6,4 @@
 
 pub mod symbols;
 
-pub use symbols::{ModuleId, ProjectIndex, SymbolDecl, SymbolId, SymbolKind};
+pub use symbols::{CallableKind, ModuleId, ProjectIndex, SymbolDecl, SymbolId, SymbolKind};
