@@ -77,7 +77,10 @@ fn resolve_marqdo_root(start: &str) -> PathBuf {
     }
     for _ in 0..8 {
         let cand = cur.join(".marqdo");
-        if cand.join("engineering.yaml").exists() || cand.join("graph/graph.json").exists() {
+        if cand.join("engineering.yaml").exists()
+            || cand.join("ekc/graph/graph.json").exists()
+            || cand.join("graph/graph.json").exists()
+        {
             return cand;
         }
         if !cur.pop() {
@@ -289,7 +292,10 @@ pub fn eng_preflight(args: &Value) -> Result<Value, String> {
         .map(PathBuf::from)
         .unwrap_or_else(|| resolve_marqdo_root(root));
 
-    if !marqdo.join("engineering.yaml").exists() && !marqdo.join("graph/graph.json").exists() {
+    if !marqdo.join("engineering.yaml").exists()
+        && !marqdo.join("ekc/graph/graph.json").exists()
+        && !marqdo.join("graph/graph.json").exists()
+    {
         return Ok(json!({
             "status": "missing_knowledge",
             "create_allowed": false,

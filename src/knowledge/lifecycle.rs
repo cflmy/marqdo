@@ -52,7 +52,9 @@ pub fn find_stale(graph: &KnowledgeGraph, root: &Path) -> Vec<StaleItem> {
         if src.exists() {
             if let (Ok(meta), Ok(proj_meta)) = (
                 fs::metadata(&src),
-                fs::metadata(root.join(".marqdo/graph/graph.json"))
+                fs::metadata(root.join(".marqdo/ekc/graph/graph.json"))
+                    .or_else(|_| fs::metadata(root.join(".marqdo/graph/graph.json")))
+                    .or_else(|_| fs::metadata(root.join("ekc/graph/graph.json")))
                     .or_else(|_| fs::metadata(root.join("graph/graph.json"))),
             ) {
                 if let (Ok(st), Ok(pt)) = (meta.modified(), proj_meta.modified()) {

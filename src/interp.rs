@@ -349,6 +349,17 @@ impl Interpreter {
     ) -> Result<Value> {
         let fun = find_function_anywhere(module, name)
             .ok_or_else(|| self.err(format!("unknown function `{name}`")))?;
+        self.invoke_bound_function(module, fun, args)
+    }
+
+    /// Run an already-bound function node (SymbolId / source-line identity).
+    /// Prefer this over name lookup so nested same-named functions cannot drift (G07).
+    pub fn invoke_bound_function(
+        &mut self,
+        module: &Module,
+        fun: &Function,
+        args: &[(String, Value)],
+    ) -> Result<Value> {
         self.run_function(module, fun, Env::new(), args, false)
     }
 

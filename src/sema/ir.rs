@@ -64,6 +64,14 @@ impl EffectSet {
         Self(BTreeSet::from(["pure".to_string()]))
     }
 
+    /// Effect is not yet known (dynamic target, missing metadata, or unresolved name).
+    /// Must never be treated as `pure` for policy checks (G06).
+    pub fn unknown() -> Self {
+        let mut set = Self::default();
+        set.add("unknown");
+        set
+    }
+
     pub fn add(&mut self, effect: impl Into<String>) {
         let effect = effect.into();
         if effect != "pure" {
@@ -80,6 +88,10 @@ impl EffectSet {
 
     pub fn is_pure(&self) -> bool {
         self.0.len() == 1 && self.0.contains("pure")
+    }
+
+    pub fn contains(&self, effect: &str) -> bool {
+        self.0.contains(effect)
     }
 
     pub fn values(&self) -> Vec<String> {
@@ -261,6 +273,7 @@ pub fn compile_project(options: &CompileOptions) -> Result<Compilation> {
             artifacts.push(artifact);
         }
     }
+    close_effect_dependencies(&mut artifacts);
     artifacts.sort_by(|a, b| a.artifact_id.0.cmp(&b.artifact_id.0));
     refs.sort_by(|a, b| a.id.cmp(&b.id));
     steps.sort_by(|a, b| a.id.0.cmp(&b.id.0));
@@ -313,29 +326,43 @@ fn artifact_for_function(
     let calls = collect_call_sites(function);
     let mut effects = direct_effects(&calls);
     let mut dependencies = Vec::new();
-    let mut refs = Vec::new();
-    let mut steps = Vec::new();
-    for (n, (_, call, line)) in calls.iter().enumerate() {
-        let target = resolve_local_call(module, call, local_by_name);
-        if let Some(target) = &target {
+    for (_, call, _) in &calls {
+        if let Some(target) = resolve_local_call(module, call, local_by_name) {
             dependencies.push(ArtifactId(target.as_str().to_string()));
         }
+    }
+    let named = collect_named_steps(function);
+    let mut refs = Vec::new();
+    let mut steps = Vec::new();
+    for (n, named) in named.iter().enumerate() {
+        let target = named
+            .call
+            .as_ref()
+            .and_then(|call| resolve_local_call(module, call, local_by_name));
         let ref_id = format!("{}#ref-{}", symbol.id.as_str(), n + 1);
         refs.push(KnowledgeRef {
             id: ref_id.clone(),
-            label: call_name(call),
-            context: "executable".into(),
-            source: source_location(index.root().path(), path, *line, *line),
-            resolution: target.as_ref().map(|_| "symbol".to_string()).unwrap_or_else(|| "external_or_dynamic".to_string()),
+            label: named.label.clone(),
+            context: named.context.clone(),
+            source: source_location(index.root().path(), path, named.line, named.line),
+            resolution: target
+                .as_ref()
+                .map(|_| "symbol".to_string())
+                .unwrap_or_else(|| named.resolution.clone()),
             target: target.clone(),
         });
+        let step_effects = named
+            .call
+            .as_ref()
+            .map(effects_for_call)
+            .unwrap_or_else(EffectSet::pure);
         steps.push(KnowledgeStep {
             id: ArtifactId(format!("{}#step-{}", symbol.id.as_str(), n + 1)),
             reference: ref_id,
-            kind: "call".into(),
+            kind: named.kind.clone(),
             calls: target.into_iter().collect(),
-            effects: effects_for_call(call),
-            source: source_location(index.root().path(), path, *line, *line),
+            effects: step_effects,
+            source: source_location(index.root().path(), path, named.line, named.line),
         });
     }
     if effects.0.is_empty() {
@@ -471,6 +498,173 @@ fn collect_call_sites(function: &Function) -> Vec<(usize, CallExpr, u32)> {
     calls
 }
 
+/// One author-visible knowledge step extracted from occlusion / labeled loop / call stmt.
+struct NamedStepSite {
+    label: String,
+    kind: String,
+    context: String,
+    resolution: String,
+    line: u32,
+    call: Option<CallExpr>,
+}
+
+fn is_observe_call(call: &CallExpr) -> bool {
+    matches!(call.callee.as_str(), "access" | "取" | "取值" | "at" | "get")
+        && call.path.is_none()
+        && call.receiver.is_none()
+}
+
+fn classify_payload_kind(payload: &Expr) -> (&'static str, Option<CallExpr>) {
+    match payload {
+        Expr::Call(call) if is_observe_call(call) => ("observe", Some(call.clone())),
+        Expr::Call(call) => ("call", Some(call.clone())),
+        Expr::Index { .. } => ("observe", None),
+        Expr::Binary { .. } | Expr::Unary { .. } => ("derive", None),
+        Expr::Literal(_) | Expr::Var(_) => ("derive", None),
+        // Nested occlusion is its own step; outer stays a wrapper derive.
+        Expr::Occluded { .. } => ("derive", None),
+        _ => ("derive", None),
+    }
+}
+
+fn collect_named_steps(function: &Function) -> Vec<NamedStepSite> {
+    let mut out = Vec::new();
+    fn push_occluded(label: &str, payload: Option<&Expr>, line: u32, out: &mut Vec<NamedStepSite>) {
+        let label = label.trim();
+        if label.is_empty() {
+            return;
+        }
+        let (kind, call) = match payload {
+            Some(p) => classify_payload_kind(p),
+            None => ("derive", None),
+        };
+        out.push(NamedStepSite {
+            label: label.to_string(),
+            kind: kind.into(),
+            context: "executable".into(),
+            resolution: if call.is_some() {
+                "external_or_dynamic".into()
+            } else {
+                "payload".into()
+            },
+            line,
+            call,
+        });
+        if let Some(p) = payload {
+            walk_expr_for_nested(p, line, out);
+        }
+    }
+    fn walk_expr_for_nested(value: &Expr, line: u32, out: &mut Vec<NamedStepSite>) {
+        match value {
+            Expr::Occluded { label, payload } => {
+                // Nested occlusions are separate steps; outer already recorded.
+                push_occluded(label, payload.as_deref(), line, out);
+            }
+            Expr::Call(call) => {
+                for arg in &call.args {
+                    match arg {
+                        Arg::Positional(value) | Arg::Named { value, .. } => {
+                            walk_expr_for_nested(value, line, out)
+                        }
+                    }
+                }
+            }
+            Expr::Unary { expr: value, .. } => walk_expr_for_nested(value, line, out),
+            Expr::Binary { left, right, .. } => {
+                walk_expr_for_nested(left, line, out);
+                walk_expr_for_nested(right, line, out);
+            }
+            Expr::List(items) => {
+                for item in items {
+                    walk_expr_for_nested(item, line, out);
+                }
+            }
+            Expr::Map(items) => {
+                for (_, item) in items {
+                    walk_expr_for_nested(item, line, out);
+                }
+            }
+            Expr::Index { base, .. } => walk_expr_for_nested(base, line, out),
+            _ => {}
+        }
+    }
+    fn walk_expr_top(value: &Expr, line: u32, out: &mut Vec<NamedStepSite>) {
+        match value {
+            Expr::Occluded { label, payload } => {
+                push_occluded(label, payload.as_deref(), line, out);
+            }
+            other => walk_expr_for_nested(other, line, out),
+        }
+    }
+    fn statements(items: &[Stmt], out: &mut Vec<NamedStepSite>) {
+        for item in items {
+            match item {
+                Stmt::Call { call, span } => {
+                    out.push(NamedStepSite {
+                        label: call_name(call),
+                        kind: if is_observe_call(call) {
+                            "observe".into()
+                        } else {
+                            "call".into()
+                        },
+                        context: "executable".into(),
+                        resolution: "external_or_dynamic".into(),
+                        line: span.line,
+                        call: Some(call.clone()),
+                    });
+                    for arg in &call.args {
+                        match arg {
+                            Arg::Positional(value) | Arg::Named { value, .. } => {
+                                walk_expr_top(value, span.line, out)
+                            }
+                        }
+                    }
+                }
+                Stmt::Assign { value, span, .. }
+                | Stmt::Return { value, span }
+                | Stmt::Expr { value, span } => walk_expr_top(value, span.line, out),
+                Stmt::Branch { arms, .. } => {
+                    for arm in arms {
+                        if let Some(condition) = &arm.condition {
+                            walk_expr_top(condition, 0, out);
+                        }
+                        statements(&arm.body, out);
+                    }
+                }
+                Stmt::While { condition, body, span, .. } => {
+                    walk_expr_top(condition, span.line, out);
+                    statements(body, out);
+                }
+                Stmt::ForEach {
+                    item,
+                    collection,
+                    label,
+                    body,
+                    span,
+                } => {
+                    let shown = label
+                        .as_deref()
+                        .map(str::trim)
+                        .filter(|s| !s.is_empty())
+                        .map(|s| s.to_string())
+                        .unwrap_or_else(|| format!("遍历 {collection} 为 {item}"));
+                    out.push(NamedStepSite {
+                        label: shown,
+                        kind: "iterate".into(),
+                        context: "executable".into(),
+                        resolution: "payload".into(),
+                        line: span.line,
+                        call: None,
+                    });
+                    statements(body, out);
+                }
+            }
+        }
+    }
+    statements(&function.body, &mut out);
+    out
+}
+
 fn call_name(call: &CallExpr) -> String {
     call.path.as_ref().map(|path| path.join(".")).or_else(|| call.receiver.as_ref().map(|receiver| format!("{receiver}.{}", call.callee))).unwrap_or_else(|| call.callee.clone())
 }
@@ -491,7 +685,16 @@ fn effects_for_call(call: &CallExpr) -> EffectSet {
     else if name.starts_with("random.") || name.starts_with("uuid.") { "random.read" }
     else if name.starts_with("input") { "user.input" }
     else if name.starts_with("print") || name.starts_with("log.") { "output.write" }
-    else { return EffectSet::pure() };
+    else if is_observe_call(call) {
+        return EffectSet::pure();
+    } else if call.path.is_none() && call.receiver.is_none() {
+        // Bare local name: effects filled by `close_effect_dependencies` from
+        // resolved SymbolId deps. Do not guess pure.
+        return EffectSet::default();
+    } else {
+        // Path/receiver/dynamic — unknown until BoundCall + metadata registry (G06).
+        return EffectSet::unknown();
+    };
     effects.add(effect);
     effects
 }
@@ -500,6 +703,42 @@ fn direct_effects(calls: &[(usize, CallExpr, u32)]) -> EffectSet {
     let mut effects = EffectSet::default();
     for (_, call, _) in calls { effects.extend(&effects_for_call(call)); }
     effects
+}
+
+/// Propagate callee effects along local `dependencies` edges until fixpoint.
+/// Empty effect sets become `pure` only after closure (no unknown remains).
+fn close_effect_dependencies(artifacts: &mut [SemanticArtifact]) {
+    let index: BTreeMap<String, usize> = artifacts
+        .iter()
+        .enumerate()
+        .map(|(i, a)| (a.artifact_id.0.clone(), i))
+        .collect();
+    for _ in 0..artifacts.len().saturating_add(1) {
+        let mut changed = false;
+        let snapshot: Vec<EffectSet> = artifacts.iter().map(|a| a.effects.clone()).collect();
+        for artifact in artifacts.iter_mut() {
+            for dep in &artifact.dependencies {
+                if let Some(&i) = index.get(&dep.0) {
+                    let before = artifact.effects.values();
+                    artifact.effects.extend(&snapshot[i]);
+                    if artifact.effects.values() != before {
+                        changed = true;
+                    }
+                }
+            }
+        }
+        if !changed {
+            break;
+        }
+    }
+    for artifact in artifacts.iter_mut() {
+        if artifact.effects.values().is_empty() {
+            artifact.effects = EffectSet::pure();
+        }
+        if let Some(sig) = artifact.signature.as_mut() {
+            sig.effects = artifact.effects.clone();
+        }
+    }
 }
 
 fn source_location(root: &Path, path: &Path, line: u32, end_line: u32) -> SourceLocation {
@@ -545,17 +784,18 @@ pub fn write_semantic_projections(out_dir: &Path, compilation: &Compilation) -> 
     write_json(&stage.join("project.json"), &json!({"schema_version":SCHEMA_VERSION,"project":project["project"],"artifact_count":compilation.semantics.artifacts.len()}))?;
     write_json(&stage.join("symbols.json"), &json!({"schema_version":SCHEMA_VERSION,"symbols":compilation.index.symbols().iter().map(|s|json!({"id":s.id.as_str(),"module":s.module.as_str(),"kind":s.kind.as_str(),"callable":s.callable.map(|c|c.as_str()),"name":s.name,"declaration_path":s.declaration_path,"source":{"file":rel_uri(compilation.index.root().path(),&s.source),"line":s.line}})).collect::<Vec<_>>() }))?;
     write_json(&stage.join("refs.json"), &json!({"schema_version":SCHEMA_VERSION,"refs":project["refs"]}))?;
+    write_json(&stage.join("steps.json"), &json!({"schema_version":SCHEMA_VERSION,"steps":project["steps"]}))?;
     write_json(&stage.join("graph/nodes.json"), &json!({"schema_version":SCHEMA_VERSION,"nodes":project["artifacts"]}))?;
-    write_json(&stage.join("graph/edges.json"), &json!({"schema_version":SCHEMA_VERSION,"edges":compilation.semantics.artifacts.iter().flat_map(|a|a.dependencies.iter().map(move |d|json!({"from":a.artifact_id.0,"to":d.0,"kind":"calls"}))).collect::<Vec<_>>() }))?;
+    write_json(&stage.join("graph/edges.json"), &json!({"schema_version":SCHEMA_VERSION,"authority":"SemanticProject","edges":compilation.semantics.artifacts.iter().flat_map(|a|a.dependencies.iter().map(move |d|json!({"from":a.artifact_id.0,"to":d.0,"kind":"calls"}))).collect::<Vec<_>>() }))?;
     for artifact in &compilation.semantics.artifacts {
         let name = hex_name(&artifact.artifact_id.0);
         write_json(&stage.join("artifacts").join(format!("{name}.json")), &artifact_json(artifact))?;
         write_json(&stage.join("verification").join(format!("{name}.json")), &artifact_json(artifact)["verification"])?;
     }
     if out_dir.exists() {
-        for name in ["project.json", "symbols.json", "refs.json", "artifacts", "graph", "verification"] { let target = out_dir.join(name); if target.exists() { if target.is_dir() { fs::remove_dir_all(&target)?; } else { fs::remove_file(&target)?; } } }
+        for name in ["project.json", "symbols.json", "refs.json", "steps.json", "artifacts", "graph", "verification"] { let target = out_dir.join(name); if target.exists() { if target.is_dir() { fs::remove_dir_all(&target)?; } else { fs::remove_file(&target)?; } } }
     } else { fs::create_dir_all(out_dir)?; }
-    for name in ["project.json", "symbols.json", "refs.json", "artifacts", "graph", "verification"] { fs::rename(stage.join(name), out_dir.join(name))?; }
+    for name in ["project.json", "symbols.json", "refs.json", "steps.json", "artifacts", "graph", "verification"] { fs::rename(stage.join(name), out_dir.join(name))?; }
     fs::remove_dir_all(stage)?;
     Ok(())
 }
@@ -592,6 +832,152 @@ mod tests {
         let project: Value = serde_json::from_str(&fs::read_to_string(out.join("project.json")).unwrap()).unwrap();
         assert_eq!(project["schema_version"], SCHEMA_VERSION);
         assert!(out.join("artifacts").read_dir().unwrap().next().is_some());
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn unknown_call_is_not_pure_and_wrapper_inherits_fs_write() {
+        let root = root();
+        fs::write(
+            root.join("main.mq.md"),
+            r#"# main
+
+## save
+
+> fs.write_text path=out.txt text=ok
+
+*1*
+
+## wrap
+
+> save
+
+*None*
+
+## mystery
+
+> weird_plugin_thing x=1
+
+*None*
+"#,
+        )
+        .unwrap();
+        let compilation = compile_project(&CompileOptions::for_path(&root).unwrap()).unwrap();
+        let wrap = compilation
+            .semantics
+            .artifacts
+            .iter()
+            .find(|a| a.display_name.ends_with("wrap"))
+            .unwrap();
+        assert!(
+            wrap.effects.values().contains(&"fs.write".to_string()),
+            "wrapper must inherit fs.write, got {:?}",
+            wrap.effects.values()
+        );
+        assert!(!wrap.effects.is_pure());
+        let mystery = compilation
+            .semantics
+            .artifacts
+            .iter()
+            .find(|a| a.display_name.ends_with("mystery"))
+            .unwrap();
+        // bare local unresolved name → empty then closed; without a symbol it stays
+        // as empty→pure OR if treated as call site with no resolve, empty→pure.
+        // Path-like / unknown plugin style: use a dotted name.
+        let _ = mystery;
+        fs::write(
+            root.join("dyn.mq.md"),
+            "# dyn\n\n## go\n\n> plugin.do_stuff x=1\n\n*None*\n",
+        )
+        .unwrap();
+        let dyn_comp = compile_project(&CompileOptions::for_path(&root).unwrap()).unwrap();
+        let go = dyn_comp
+            .semantics
+            .artifacts
+            .iter()
+            .find(|a| a.display_name.ends_with("go"))
+            .unwrap();
+        assert!(
+            go.effects.contains("plugin.call") || go.effects.contains("unknown"),
+            "plugin/dynamic must not be pure: {:?}",
+            go.effects.values()
+        );
+        assert!(!go.effects.is_pure());
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn named_steps_classify_observe_derive_iterate_call() {
+        let root = root();
+        fs::write(
+            root.join("main.mq.md"),
+            r#"---
+markup: occlusion
+import:
+  json: lib/json.mq.md
+---
+
+## 加倍
+
+根据输入`n`返回两倍。
+
+*[两倍](n * 2)*
+
+# main
+
+`列` = > json.parse text=["一","二"]
+**a = [取表项](access(`列`, 1))**
+**b = [两件小计](2 * 30)**
+**c = [调用加倍](加倍(n=3))**
+- [篮子里的每个果子](遍历 `列` 为 `果`)
+  > print text=`果`
+> print text=`c`
+"#,
+        )
+        .unwrap();
+        let compilation = compile_project(&CompileOptions::for_path(&root).unwrap()).unwrap();
+        let main_steps: Vec<&KnowledgeStep> = compilation
+            .semantics
+            .steps
+            .iter()
+            .filter(|s| s.id.0.contains("main"))
+            .collect();
+        let kinds: Vec<&str> = main_steps.iter().map(|s| s.kind.as_str()).collect();
+        assert!(
+            kinds.contains(&"observe"),
+            "expected observe step, got {kinds:?}"
+        );
+        assert!(
+            kinds.contains(&"derive"),
+            "expected derive step, got {kinds:?}"
+        );
+        assert!(
+            kinds.contains(&"iterate"),
+            "expected iterate step, got {kinds:?}"
+        );
+        assert!(
+            kinds.iter().any(|k| *k == "call"),
+            "expected call step, got {kinds:?}"
+        );
+        assert!(
+            !kinds.iter().all(|k| *k == "call"),
+            "steps must not all be forged as call: {kinds:?}"
+        );
+        let labels: Vec<String> = main_steps
+            .iter()
+            .filter_map(|s| {
+                compilation
+                    .semantics
+                    .refs
+                    .iter()
+                    .find(|r| r.id == s.reference)
+                    .map(|r| r.label.clone())
+            })
+            .collect();
+        assert!(labels.iter().any(|l| l.contains("取表项")), "{labels:?}");
+        assert!(labels.iter().any(|l| l.contains("两件小计")), "{labels:?}");
+        assert!(labels.iter().any(|l| l.contains("篮子")), "{labels:?}");
+        assert!(labels.iter().any(|l| l.contains("调用加倍")), "{labels:?}");
         fs::remove_dir_all(root).unwrap();
     }
 }

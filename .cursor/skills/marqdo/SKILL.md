@@ -67,6 +67,8 @@ Entry: load file (often `index.mq.md`) → collect defs → run `# main`.
 
 Occlusion is the default syntax. Shipped source declares `markup: occlusion` (or `标记: 遮蔽`) explicitly so imports stay deterministic. Legacy `[key](collection)` requires `markup: classic` or the one-cycle CLI flag `--legacy-markup`; `MARQDO_MARKUP` does not change parsing.
 
+Executable-knowledge **S0 author baseline** (six tasks, offline gate): [`tests/executable_knowledge/`](../../../tests/executable_knowledge/README.md). Design goals ≠ shipped knowledge reuse — see [`doc/design/document-native-development-guide.md`](../../../doc/design/document-native-development-guide.md).
+
 - `[描述](实现)` — `[]` is prose (never executed); `()` is the **only** executed part.
 - `[顾客留存率](0.42)` · `[总价](access(价目表, "苹果") * 数量)` · `[功能开发中]()` → `None` (stub; `label.empty_payload` warning).
 - Read maps/lists with `access(集合, 键)` (aliases `取` / `取值`): `[第二项](access(列, 2))`.

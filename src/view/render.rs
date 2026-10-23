@@ -56,8 +56,38 @@ pub struct FileViewModel {
 /// can show binding/effect/verification facts even in `--no-exec` exports.
 pub fn render_knowledge_html(project: &crate::sema::SemanticProject, rel: &str) -> String {
     let artifacts: Vec<_> = project.artifacts.iter().filter(|artifact| artifact.source.file == rel).collect();
-    if artifacts.is_empty() { return String::new(); }
+    let steps: Vec<_> = project.steps.iter().filter(|step| step.source.file == rel).collect();
+    if artifacts.is_empty() && steps.is_empty() { return String::new(); }
     let mut out = String::from(r#"<div class="knowledge-panel" aria-label="Executable knowledge">"#);
+    if !steps.is_empty() {
+        out.push_str(r#"<article class="knowledge-card knowledge-steps"><h3>Steps</h3><ol class="knowledge-step-list">"#);
+        for step in &steps {
+            let label = project
+                .refs
+                .iter()
+                .find(|r| r.id == step.reference)
+                .map(|r| r.label.as_str())
+                .unwrap_or(step.reference.as_str());
+            let line = step.source.line;
+            let target_ids = if step.calls.is_empty() {
+                String::new()
+            } else {
+                format!(
+                    r#" <span class="knowledge-step-targets">→ {}</span>"#,
+                    escape(&step.calls.iter().map(|id| id.as_str()).collect::<Vec<_>>().join(", "))
+                )
+            };
+            // Structure pane uses #stmt-{line}; jump there for source navigation.
+            out.push_str(&format!(
+                "<li class=\"knowledge-step\" data-step-kind=\"{0}\" data-line=\"{1}\"><a href=\"#stmt-{1}\"><code class=\"ks-kind\">{0}</code> {2}</a>{3}</li>",
+                escape(&step.kind),
+                line,
+                escape(label),
+                target_ids,
+            ));
+        }
+        out.push_str("</ol></article>");
+    }
     for artifact in artifacts {
         let target = artifact.symbol_id.as_ref().map(|id| id.as_str()).unwrap_or(artifact.artifact_id.0.as_str());
         let signature = artifact.signature.as_ref().map(|sig| {

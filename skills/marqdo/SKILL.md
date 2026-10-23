@@ -63,12 +63,14 @@ Canonical design (repo): `doc/design/markdown-mapping.md`, `doc/design/keywords.
 
 Entry: load file (often `index.mq.md`) → collect defs → run `# main`.
 
-## Occlusion syntax (v2.0.0)
+## Occlusion syntax (v2.1 default)
 
-A file with frontmatter `markup: occlusion` (or `标记: 遮蔽`) reads `[x](y)` as **occlusion**, not index — in that file only (`MARQDO_MARKUP=occlusion` sets the process default; classic files are unchanged).
+**Default:** unmarked sources and `markup: occlusion` / `标记: 遮蔽` treat `[x](y)` as **occlusion** (description wraps payload), not classic index. Explicit Classic / `--legacy-markup` is a transition path only — do not teach `[键](集合)` as the default. Prefer `access(集合, 键)` for reads.
+
+Executable-knowledge author baseline (six tasks, offline gate): [`tests/executable_knowledge/`](../../tests/executable_knowledge/README.md). Design goals ≠ shipped knowledge reuse; see [`doc/design/document-native-development-guide.md`](../../doc/design/document-native-development-guide.md).
 
 - `[描述](实现)` — `[]` is prose (never executed); `()` is the **only** executed part.
-- `[顾客留存率](0.42)` · `[总价](at(价目表, "苹果") * 数量)` · `[功能开发中]()` → `None` (stub; `label.empty_payload` warning).
+- `[顾客留存率](0.42)` · `[总价](access(价目表, "苹果") * 数量)` · `[功能开发中]()` → `None` (stub; `label.empty_payload` warning).
 - Read maps/lists with `access(集合, 键)` (aliases `取` / `取值`): `[第二项](access(列, 2))`.
 - Foreach: `- [篮子里的每个果子](遍历 篮子 为 果)` (accepts `遍历`/`for` and `为`/`as`/`in`).
 - Calls inside `()`: `加(1)` / `加(1, 2)` / `加一 号(31)` / `txt.str_trim(" x ")` — `)` terminates, commas optional.

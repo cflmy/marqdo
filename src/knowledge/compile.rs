@@ -17,9 +17,9 @@ pub struct KnowledgeOptions {
 }
 
 pub fn compile(opts: KnowledgeOptions) -> Result<KnowledgeGraph> {
-    // The semantic projection is the authoritative machine-facing graph.  The
-    // older EKC catalog below remains intentionally available as a compatible
-    // human/retrieval projection, but never substitutes for semantic binding.
+    // Authoritative execution/binding graph: SemanticProject under `graph/`.
+    // Legacy EKC retrieval catalog writes only under `ekc/` and must never
+    // overwrite `graph/edges.json` (G01).
     let semantic_root = if opts.path.is_file() {
         opts.path.parent().unwrap_or_else(|| Path::new(".")).to_path_buf()
     } else {
@@ -38,7 +38,7 @@ pub fn compile(opts: KnowledgeOptions) -> Result<KnowledgeGraph> {
     let graph = extract_graph(&extract_opts)?;
     write_projections(&opts.out_dir, &graph)?;
     eprintln!(
-        "marqdo knowledge: {} module(s), {} symbol(s), {} capability(ies), {} knowledge → {}",
+        "marqdo knowledge: {} module(s), {} symbol(s), {} capability(ies), {} knowledge → {} (semantic graph/; retrieval ekc/)",
         graph.modules.len(),
         graph.symbols.len(),
         graph.capabilities.len(),
@@ -48,12 +48,17 @@ pub fn compile(opts: KnowledgeOptions) -> Result<KnowledgeGraph> {
     Ok(graph)
 }
 
+/// Directory for the legacy EKC retrieval projection (not execution authority).
+pub fn ekc_graph_dir(out_dir: &Path) -> std::path::PathBuf {
+    out_dir.join("ekc").join("graph")
+}
+
 pub fn load_graph(out_dir: &Path) -> Result<KnowledgeGraph> {
-    let graph_path = out_dir.join("graph").join("graph.json");
-    let edges_path = out_dir.join("graph").join("edges.json");
+    let graph_path = ekc_graph_dir(out_dir).join("graph.json");
+    let edges_path = ekc_graph_dir(out_dir).join("edges.json");
     if !graph_path.exists() {
         anyhow::bail!(
-            "no knowledge graph at {} — run `marqdo knowledge` first",
+            "no EKC retrieval graph at {} — run `marqdo knowledge` first",
             graph_path.display()
         );
     }
@@ -139,14 +144,7 @@ pub fn load_graph(out_dir: &Path) -> Result<KnowledgeGraph> {
 }
 
 pub fn ensure_compiled(path: &Path, out_dir: &Path) -> Result<KnowledgeGraph> {
-    let graph_path = out_dir.join("graph").join("graph.json");
-    if graph_path.exists() {
-        // Always refresh from source when path given
-        return compile(KnowledgeOptions {
-            path: path.to_path_buf(),
-            out_dir: out_dir.to_path_buf(),
-        });
-    }
+    // Always refresh from source when path is given.
     compile(KnowledgeOptions {
         path: path.to_path_buf(),
         out_dir: out_dir.to_path_buf(),
@@ -164,7 +162,7 @@ fn write_projections(out_dir: &Path, graph: &KnowledgeGraph) -> Result<()> {
         "knowledge/patterns",
         "knowledge/failures",
         "knowledge/migrations",
-        "graph",
+        "ekc/graph",
         "agent/policies",
         "agent/skills",
         "agent/contexts",
@@ -234,20 +232,23 @@ fn write_projections(out_dir: &Path, graph: &KnowledgeGraph) -> Result<()> {
         fs::write(&path, body)?;
     }
 
-    // Graph JSON
+    // Retrieval-only EKC graph (must not touch authoritative `graph/`).
+    let ekc = ekc_graph_dir(out_dir);
     let graph_json = serde_json::to_string_pretty(&graph.to_graph_json())?;
-    fs::write(out_dir.join("graph/graph.json"), graph_json)?;
+    fs::write(ekc.join("graph.json"), graph_json)?;
     let edges_json = serde_json::to_string_pretty(&graph.to_edges_json())?;
-    fs::write(out_dir.join("graph/edges.json"), edges_json)?;
+    fs::write(ekc.join("edges.json"), edges_json)?;
 
     // Search index
     let index = json!({
         "type": "Marqdo Knowledge Index",
+        "role": "retrieval_only",
+        "note": "Not an execution authority; binding uses graph/edges.json (SemanticProject).",
         "generated": { "by": graph.generated_by },
         "entries": graph.index_map(),
     });
     fs::write(
-        out_dir.join("graph/index.json"),
+        ekc.join("index.json"),
         serde_json::to_string_pretty(&index)?,
     )?;
 

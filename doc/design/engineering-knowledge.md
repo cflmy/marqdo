@@ -51,7 +51,9 @@ Marqdo 把仓库投影为 **可查询、可验证、可复用** 的工程知识�
 
 `implements` · `uses` · `depends_on` · `tested_by` · `documented_by` · `constrained_by` · `decided_by` · `supersedes` · `conflicts_with` · `deprecated_by` · `derived_from` · `failed_by` · `related_to`
 
-落盘：`.marqdo/graph/graph.json` · `edges.json` · `index.json`。
+落盘（G01 分离后）：
+- **权威语义图**：`.marqdo/graph/edges.json` · `nodes.json`（`SemanticProject`，含 `authority` 字段）· `steps.json`
+- **EKC 检索投影**（非执行依据）：`.marqdo/ekc/graph/graph.json` · `edges.json` · `index.json`
 
 ## 5. CLI
 

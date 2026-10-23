@@ -20,7 +20,7 @@ pub mod preflight;
 pub mod reuse;
 pub mod util;
 
-pub use compile::{compile, ensure_compiled, load_graph, KnowledgeOptions};
+pub use compile::{compile, ekc_graph_dir, ensure_compiled, load_graph, KnowledgeOptions};
 pub use duplicate::{find_duplicates, format_duplicates_text};
 pub use find::{find, find_json, format_find_text};
 pub use impact::{format_impact_text, impact, impact_json};

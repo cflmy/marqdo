@@ -171,7 +171,35 @@ fn artifact_bind(params: &Value) -> Result<Value, Value> {
     if expected.is_some() && expected != Some(artifact.hashes.artifact.0.as_str()) {
         return Err(json!({"code":"artifact.digest_mismatch","message":"目标摘要已变化，拒绝绑定","expected":expected,"actual":artifact.hashes.artifact.0}));
     }
-    Ok(json!({"schema_version":1,"handle":{"artifact_id":artifact.artifact_id.0,"digest":artifact.hashes.artifact.0,"project":compilation.semantics.root,"policy":params.get("policy").cloned().unwrap_or_else(||json!("pure")),"effects":artifact.effects.values()}}))
+    let policy = params
+        .get("policy")
+        .and_then(Value::as_str)
+        .unwrap_or("pure");
+    let effects = artifact.effects.values();
+    if policy == "pure"
+        && effects.iter().any(|effect| effect != "pure")
+    {
+        return Err(json!({
+            "code": "artifact.effect_denied",
+            "message": "pure 策略下不能绑定含非纯/未知效应的制品",
+            "policy": policy,
+            "effects": effects,
+        }));
+    }
+    let symbol_id = artifact
+        .symbol_id
+        .as_ref()
+        .map(|id| id.as_str().to_string())
+        .unwrap_or_else(|| artifact.artifact_id.0.clone());
+    Ok(json!({"schema_version":1,"handle":{
+        "artifact_id": artifact.artifact_id.0,
+        "symbol_id": symbol_id,
+        "digest": artifact.hashes.artifact.0,
+        "project": compilation.semantics.root,
+        "policy": policy,
+        "effects": effects,
+        "source": {"file": artifact.source.file, "line": artifact.source.line},
+    }}))
 }
 
 fn artifact_execute(params: &Value) -> Result<Value, Value> {
@@ -184,6 +212,21 @@ fn artifact_execute(params: &Value) -> Result<Value, Value> {
     if candidates.len() != 1 { return Err(err("artifact.stale_handle", "制品不再可唯一解析；请重新 bind")); }
     let artifact = candidates[0];
     if artifact.hashes.artifact.0 != digest { return Err(json!({"code":"artifact.stale_handle","message":"源码或契约已改变；拒绝执行过期 handle","expected":digest,"actual":artifact.hashes.artifact.0})); }
+    if let Some(bound_symbol) = handle.get("symbol_id").and_then(Value::as_str) {
+        let current = artifact
+            .symbol_id
+            .as_ref()
+            .map(|id| id.as_str())
+            .unwrap_or(artifact.artifact_id.0.as_str());
+        if bound_symbol != current {
+            return Err(json!({
+                "code": "artifact.stale_handle",
+                "message": "handle 绑定的 SymbolId 与当前制品不一致",
+                "expected": bound_symbol,
+                "actual": current,
+            }));
+        }
+    }
     if artifact.kind != "function" || artifact.callable.as_deref() == Some("instance_method") { return Err(err("artifact.not_executable", "只有非实例函数制品可由 artifact.execute 直接执行")); }
     let allowed: Vec<&str> = params.get("allow_effects").and_then(Value::as_array).map(|items| items.iter().filter_map(Value::as_str).collect()).unwrap_or_default();
     let denied: Vec<String> = artifact.effects.values().into_iter().filter(|effect| effect != "pure" && !allowed.contains(&effect.as_str())).collect();
@@ -197,10 +240,44 @@ fn artifact_execute(params: &Value) -> Result<Value, Value> {
     let caps = crate::host::HostCaps { fs_write: allowed.contains(&"fs.write"), exec: allowed.iter().any(|e| matches!(*e, "process.exec" | "plugin.call" | "llm.call")), net: allowed.iter().any(|e| matches!(*e, "network.read" | "network.write" | "llm.call")), plugin: allowed.contains(&"plugin.call") };
     let host = crate::host::HostContext::for_capture(Some(&path), caps);
     let mut interpreter = crate::interp::Interpreter::with_capture(Some(&path), false).with_host(host);
-    let name = artifact.display_name.rsplit('.').next().unwrap_or(&artifact.display_name);
-    let value = interpreter.invoke_function(&module, name, &args).map_err(|e| diagnostic_err("artifact.execution_failed", &e))?;
+    // Bind by source line / declaration identity — never by bare display_name suffix (G07).
+    let fun = find_function_at_line(&module.functions, artifact.source.line).ok_or_else(|| {
+        err(
+            "artifact.unresolved",
+            format!(
+                "无法在 {}:{} 定位绑定函数 {}",
+                artifact.source.file, artifact.source.line, artifact.display_name
+            ),
+        )
+    })?;
+    let value = interpreter
+        .invoke_bound_function(&module, fun, &args)
+        .map_err(|e| diagnostic_err("artifact.execution_failed", &e))?;
     let stdout = std::mem::take(&mut interpreter.captured_stdout);
-    Ok(json!({"schema_version":1,"artifact_id":artifact.artifact_id.0,"digest":digest,"result":crate::value_as_json(&value).map_err(|e|err("artifact.serialization",e))?,"stdout":stdout,"effects":artifact.effects.values()}))
+    Ok(json!({
+        "schema_version": 1,
+        "artifact_id": artifact.artifact_id.0,
+        "symbol_id": artifact.symbol_id.as_ref().map(|id| id.as_str()),
+        "digest": digest,
+        "result": crate::value_as_json(&value).map_err(|e| err("artifact.serialization", e))?,
+        "stdout": stdout,
+        "effects": artifact.effects.values(),
+    }))
+}
+
+fn find_function_at_line<'a>(
+    functions: &'a [crate::ast::Function],
+    line: u32,
+) -> Option<&'a crate::ast::Function> {
+    for fun in functions {
+        if fun.span.line == line {
+            return Some(fun);
+        }
+        if let Some(found) = find_function_at_line(&fun.children, line) {
+            return Some(found);
+        }
+    }
+    None
 }
 
 fn err(code: &str, message: impl Into<String>) -> Value {
@@ -658,9 +735,32 @@ mod tests {
         let candidate = found["candidates"].as_array().unwrap().iter().find(|v| v["kind"] == "function").unwrap();
         let id = candidate["artifact_id"].as_str().unwrap();
         let bound = dispatch(&json!({"method":"artifact.bind","params":{"project":root,"artifact_id":id}})).unwrap();
-        let handle = bound["handle"].clone();
+        let handle = &bound["handle"];
+        assert!(handle.get("symbol_id").and_then(|v| v.as_str()).is_some());
+        assert!(handle.get("source").is_some());
         let result = dispatch(&json!({"method":"artifact.execute","params":{"handle":handle,"inputs":{"x":4}}})).unwrap();
         assert_eq!(result["result"], 5);
+        assert_eq!(result["symbol_id"], handle["symbol_id"]);
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn artifact_bind_rejects_non_pure_under_pure_policy() {
+        let stamp = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
+        let root = std::env::temp_dir().join(format!("marqdo-mlsp-effect-{stamp}"));
+        fs::create_dir_all(&root).unwrap();
+        fs::write(
+            root.join("main.mq.md"),
+            "# main\n\n## save\n\n> fs.write_text path=t.txt text=x\n\n*1*\n",
+        )
+        .unwrap();
+        let found = dispatch(&json!({"method":"artifact.find","params":{"project":root,"query":"save"}})).unwrap();
+        let id = found["candidates"].as_array().unwrap().iter().find(|v| v["kind"] == "function").unwrap()["artifact_id"]
+            .as_str()
+            .unwrap();
+        let err = dispatch(&json!({"method":"artifact.bind","params":{"project":root,"artifact_id":id,"policy":"pure"}}))
+            .unwrap_err();
+        assert_eq!(err["code"], "artifact.effect_denied");
         fs::remove_dir_all(root).unwrap();
     }
 

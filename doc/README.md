@@ -14,6 +14,8 @@
 ## 当前文档
 
 > **可执行知识下一阶段的阅读顺序**：[原始意图 009](next/009.md) → [文档原生开发指导](design/document-native-development-guide.md)（作者体验、语法审查结论、AI 工作协议）→ [详细开发规范](next/Marqdo_Executable_Knowledge_Development.md)（目标语义与工程约束）→ [缺口与交付路线](roadmap/executable-knowledge-gaps-2026-10-23.md)（现状证据、S0–S6）。指导文档修订作者负担、场景政策和交付次序；不得把所有内部治理字段变成作者必填项。与之冲突的早期设计只作历史参考，设计目标不等于已实现能力。
+>
+> **S0 作者基线（已落地门禁）**：[tests/executable_knowledge/](../tests/executable_knowledge/README.md) — 六类写法 + `cargo test --test executable_knowledge --locked`。`status: design` / 预期失败与已实现分开报告；Bytecode 裸名同名误连记为基线缺陷，待 S2 BoundCall 翻转。
 
 | 文档 | 摘要 |
 |------|------|
@@ -115,6 +117,7 @@
 | [next/Marqdo_Executable_Knowledge_Development.md](next/Marqdo_Executable_Knowledge_Development.md) | **可执行知识系统详细开发规范**：以 `next/009.md` 及两份附属文档为真实意图基线，冻结统一语义 IR、稳定寻址、绑定/验证/锁定、EKC/Agent 集成、迁移路线与验收矩阵 |
 | [next/Marqdo_Executable_Knowledge_Testing.md](next/Marqdo_Executable_Knowledge_Testing.md) | **可执行知识语法测试与兼容性规程**：标准库、扩展库、CLI、Tree/Bytecode 的仓库级门禁 |
 | [roadmap/executable-knowledge-gaps-2026-10-23.md](roadmap/executable-knowledge-gaps-2026-10-23.md) | **v2.1 现状与规划缺口审计（方向修订）**：保留 G01–G12 代码证据，以可读步骤、确定执行、早期 AI 复用和局部修改重排 S0–S6，严格治理按场景增加 |
+| [../tests/executable_knowledge/README.md](../tests/executable_knowledge/README.md) | **S0 作者基线门禁**：六类任务语料、作者成本计数、预期失败与 Bytecode 同名误连缺陷指纹 |
 | [design/knowledge-layers.md](design/knowledge-layers.md) | **知识分层（语法评审）**：原始语料 / 本体 / 可执行知识 / 调用面 · 单体知识类 vs 运行时实例 · `# 李白 = > 诗人` · 出处/还原验证 · EKC 映射 |
 | [design/occlusion-description-and-search.md](design/occlusion-description-and-search.md) | **遮蔽描述与两级检索**：内置词表=范例/默认，参数=扩展 · 空载荷一律 warning · 申报习惯 |
 | [design/occlusion-syntax.md](design/occlusion-syntax.md) | **遮蔽语法总纲（实施依据）**：`[描述](实现)` 的目的/语义/新鲜度校验 + M0–M8 计划 |

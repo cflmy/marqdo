@@ -1286,8 +1286,19 @@ fn knowledge_compile_engineering_fixture() {
     ]);
     assert_eq!(code, 0, "{stderr}");
     assert!(dir.join("catalog/repository.mq.md").exists());
-    assert!(dir.join("graph/graph.json").exists());
-    assert!(dir.join("graph/edges.json").exists());
+    // G01: SemanticProject owns graph/; EKC retrieval lives under ekc/.
+    assert!(dir.join("graph/edges.json").exists(), "semantic edges");
+    assert!(dir.join("ekc/graph/graph.json").exists(), "EKC retrieval graph");
+    assert!(dir.join("ekc/graph/edges.json").exists(), "EKC retrieval edges");
+    assert!(
+        !dir.join("graph/graph.json").exists(),
+        "EKC graph.json must not overwrite semantic graph/"
+    );
+    let edges: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(dir.join("graph/edges.json")).unwrap())
+            .unwrap();
+    assert_eq!(edges["authority"], "SemanticProject", "{edges}");
+    assert!(dir.join("steps.json").exists(), "semantic steps projection");
     assert!(dir.join("engineering.yaml").exists());
     assert!(dir.join("index.mq.md").exists());
     let eng = std::fs::read_to_string(dir.join("engineering.yaml")).unwrap();
@@ -1432,7 +1443,8 @@ fn catalog_hooks_knowledge_by_default() {
     assert_eq!(code, 0, "{stderr}");
     assert!(dir.join("catalog.yaml").exists());
     assert!(dir.join("engineering.yaml").exists());
-    assert!(dir.join("graph/graph.json").exists());
+    assert!(dir.join("ekc/graph/graph.json").exists());
+    assert!(dir.join("graph/edges.json").exists());
 }
 
 #[test]
