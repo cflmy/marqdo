@@ -77,7 +77,7 @@ Factory for an LLM handle (same as constructing `# llm`). Env fallbacks apply in
 Named small/fast handle. Model from arg, else `MARQDO_LLM_FAST_MODEL`, else default create model.
 
 1. `model`
-  **mdl = model**
+  **mdl = `model`**
 2. *
   **mdl = > sys.env_get name="MARQDO_LLM_FAST_MODEL"**
 
@@ -91,7 +91,7 @@ Named small/fast handle. Model from arg, else `MARQDO_LLM_FAST_MODEL`, else defa
 Named strong/reasoning handle. Model from arg, else `MARQDO_LLM_REASONING_MODEL`, else default create model.
 
 1. `model`
-  **mdl = model**
+  **mdl = `model`**
 2. *
   **mdl = > sys.env_get name="MARQDO_LLM_REASONING_MODEL"**
 
@@ -157,7 +157,7 @@ Module convenience: create a default handle and return **answer text**. Pass `pa
 1. `path`
   **p = > prompt_load path=`path`**
 2. `prompt`
-  **p = prompt**
+  **p = `prompt`**
 3. *
   **raw = > sys.module_source**
   1. not `raw`
@@ -184,7 +184,7 @@ Resolution: explicit args → entry-scope / Artifact Metadata (`sys.meta_get`) �
 Prefer declaring `model` / `api_key` / `base_url` in frontmatter Binding, then use the lifted names.
 
 1. `api_key`
-  **key = api_key**
+  **key = `api_key`**
 2. *
   **key = > sys.meta_get key="api_key"**
   1. not `key`
@@ -208,7 +208,7 @@ Prefer declaring `model` / `api_key` / `base_url` in frontmatter Binding, then u
   **_ = 1**
 
 1. `base_url`
-  **url = base_url**
+  **url = `base_url`**
 2. *
   **url = > sys.meta_get key="base_url"**
   1. `url`
@@ -231,7 +231,7 @@ Prefer declaring `model` / `api_key` / `base_url` in frontmatter Binding, then u
       **_ = 1**
 
 1. `model`
-  **mdl = model**
+  **mdl = `model`**
 2. *
   **mdl = > sys.meta_get key="model"**
   1. `mdl`
@@ -251,7 +251,7 @@ Prefer declaring `model` / `api_key` / `base_url` in frontmatter Binding, then u
       **_ = 1**
 
 1. `name`
-  **nm = name**
+  **nm = `name`**
 2. *
   **nm = None**
 
@@ -272,15 +272,13 @@ Semantic ask → **LLMResult** (`text`, `model`, `finish`, `backend`, `usage`, `
 1. `path`
   **p = > prompt_load path=`path`**
 2. `prompt`
-  **p = prompt**
+  **p = `prompt`**
 3. *
   **raw = > sys.module_source**
   1. not `raw`
-    > print text=ext/ai/llm: ask needs prompt= or path= (or entry prompt document)
-    > sys.exit code=1
+    **p = ""**
   2. *
     **p = > prompt_body src=`raw`**
-
 **pack = > self.complete_result prompt=`p` stream=False echo=False**
 **text = > json.get value=`pack` key="text"**
 **usage = > json.get value=`pack` key="usage"**
@@ -341,12 +339,11 @@ Semantic stream: return the event list (use `llm.collect` to reduce to text). Om
 1. `path`
   **p = > prompt_load path=`path`**
 2. `prompt`
-  **p = prompt**
+  **p = `prompt`**
 3. *
   **raw = > sys.module_source**
   1. not `raw`
-    > print text=ext/ai/llm: stream needs prompt= or path= (or entry prompt document)
-    > sys.exit code=1
+    **p = ""**
   2. *
     **p = > prompt_body src=`raw`**
 
@@ -371,11 +368,11 @@ Internal / compatibility primitive. Prefer `ask` / `stream` in new code.
 1. `stream`
   **pack = > self.complete_result prompt=`prompt` stream=True echo=`echo`**
   **_ret = > json.get value=`pack` key="events"**
-*_ret*
+  *_ret*
 2. *
   **pack = > self.complete_result prompt=`prompt` stream=False echo=`echo`**
   **_ret = > json.get value=`pack` key="text"**
-*_ret*
+  *_ret*
 
 ## chat
     + `prompt`
