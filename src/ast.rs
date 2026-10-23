@@ -80,6 +80,72 @@ impl Function {
     }
 }
 
+/// Whether this function needs an instance receiver.
+///
+/// A direct child of a level-1 object may be an associated function: when its
+/// executable body does not read `self` / `自`, it can be invoked through its
+/// definition path (`lib.Type.fact`).  Child declarations are not traversed;
+/// each declaration owns its own receiver requirement.
+pub fn function_uses_receiver(fun: &Function) -> bool {
+    fn is_receiver(name: &str) -> bool {
+        matches!(name, "self" | "自")
+    }
+
+    fn expr_uses_receiver(expr: &Expr) -> bool {
+        match expr {
+            Expr::Var(name) => is_receiver(name),
+            Expr::Interp(parts) => parts.iter().any(|part| match part {
+                InterpPart::Var(name) | InterpPart::Index { base: name, .. } => is_receiver(name),
+                InterpPart::Lit(_) => false,
+            }),
+            Expr::Unary { expr, .. } => expr_uses_receiver(expr),
+            Expr::Binary { left, right, .. } => {
+                expr_uses_receiver(left) || expr_uses_receiver(right)
+            }
+            Expr::Call(call) => {
+                call.receiver.as_deref().is_some_and(is_receiver)
+                    || call.args.iter().any(|arg| match arg {
+                        Arg::Positional(value) | Arg::Named { value, .. } => expr_uses_receiver(value),
+                    })
+            }
+            Expr::List(items) => items.iter().any(expr_uses_receiver),
+            Expr::Map(entries) => entries.iter().any(|(_, value)| expr_uses_receiver(value)),
+            Expr::Index { base, label } => {
+                expr_uses_receiver(base)
+                    || matches!(label, IndexKey::Var(name) if is_receiver(name))
+            }
+            Expr::Occluded { payload, .. } => payload.as_deref().is_some_and(expr_uses_receiver),
+            Expr::Literal(_) | Expr::Formula(_) | Expr::Code(_) => false,
+        }
+    }
+
+    fn stmt_uses_receiver(stmt: &Stmt) -> bool {
+        match stmt {
+            Stmt::Assign { value, .. } | Stmt::Return { value, .. } | Stmt::Expr { value, .. } => {
+                expr_uses_receiver(value)
+            }
+            Stmt::Call { call, .. } => {
+                call.receiver.as_deref().is_some_and(is_receiver)
+                    || call.args.iter().any(|arg| match arg {
+                        Arg::Positional(value) | Arg::Named { value, .. } => expr_uses_receiver(value),
+                    })
+            }
+            Stmt::Branch { arms, .. } => arms.iter().any(|arm| {
+                arm.condition.as_ref().is_some_and(expr_uses_receiver)
+                    || arm.body.iter().any(stmt_uses_receiver)
+            }),
+            Stmt::While { condition, body, .. } => {
+                expr_uses_receiver(condition) || body.iter().any(stmt_uses_receiver)
+            }
+            Stmt::ForEach { collection, body, .. } => {
+                is_receiver(collection) || body.iter().any(stmt_uses_receiver)
+            }
+        }
+    }
+
+    fun.body.iter().any(stmt_uses_receiver)
+}
+
 /// Source line of a statement (every variant carries a span).
 pub fn stmt_line(st: &Stmt) -> u32 {
     match st {

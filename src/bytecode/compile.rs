@@ -14,6 +14,9 @@ use crate::value::Value;
 struct FlatFun {
     name: String,
     level: u8,
+    /// Receiver-free children of an object are associated functions, not
+    /// instance methods. This flag is computed from executable AST only.
+    uses_receiver: bool,
     parent: Option<usize>,
     /// Inheritance base type name (`# Child = > Parent`), objects only.
     base: Option<String>,
@@ -154,6 +157,7 @@ fn collect_fun(
     flat.push(FlatFun {
         name: fun.name.clone(),
         level: fun.level,
+        uses_receiver: crate::ast::function_uses_receiver(fun),
         parent,
         base: fun.base.clone(),
         params: fun.params.clone(),
@@ -191,10 +195,7 @@ fn compile_function(
     for (i, p) in fun.params.iter().enumerate() {
         locals.insert(p.name.clone(), i as u8);
     }
-    let is_method = fun
-        .parent
-        .map(|pid| flat[pid].level == 1 && flat[pid].parent.is_none())
-        .unwrap_or(false);
+    let is_method = fun.uses_receiver;
     if is_method {
         for name in ["自", "self"] {
             if !locals.contains_key(name) {
@@ -666,7 +667,11 @@ impl<'a> FnCompiler<'a> {
             .ok_or_else(|| self.err(format!("unknown `{display}`")))?;
         if let Some(pid) = self.flat[fid].parent {
             let parent = &self.flat[pid];
-            if parent.level == 1 && parent.parent.is_none() && !(self.flat[fid].level == 1) {
+            if parent.level == 1
+                && parent.parent.is_none()
+                && self.flat[fid].level != 1
+                && self.flat[fid].uses_receiver
+            {
                 return Err(self.err(format!(
                     "`{display}` is an instance method; call it as `var`.{}",
                     self.flat[fid].name

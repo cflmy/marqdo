@@ -683,6 +683,20 @@ impl<'a> Parser<'a> {
                     return Ok(Expr::Call(call));
                 }
             }
+            // A dotted definition path in a value position is a zero-argument
+            // call. This makes a documented fact such as `facts.Person.birth_year`
+            // executable without ceremonial `()`.
+            if let Some(path) = split_lib_path_callee(&word) {
+                let callee = path.last().cloned().unwrap_or_default();
+                return Ok(Expr::Call(CallExpr {
+                    callee,
+                    path: Some(path),
+                    receiver: None,
+                    args: Vec::new(),
+                    pre_modifiers: Vec::new(),
+                    bracket_marked: false,
+                }));
+            }
             self.skip_ws();
             if self.starts_with("[^") {
                 return self.parse_index_chain(Expr::Var(word));
@@ -2073,6 +2087,21 @@ mod bracket_call_tests {
             Some(&["obj".to_string(), "方法".to_string()][..])
         );
         assert!(c.receiver.is_none());
+    }
+
+    #[test]
+    fn dotted_path_is_implicit_zero_arg_call() {
+        let c = call_of(parse_expr_prefer_var("facts.Person.birth_year").unwrap());
+        assert_eq!(c.callee, "birth_year");
+        assert_eq!(
+            c.path.as_deref(),
+            Some(&[
+                "facts".to_string(),
+                "Person".to_string(),
+                "birth_year".to_string(),
+            ][..])
+        );
+        assert!(c.args.is_empty());
     }
 
     #[test]

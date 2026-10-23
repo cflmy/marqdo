@@ -17,3 +17,11 @@ Nested free function (not an object method) for `helpers.pack.label`.
     + `s`
 
 *s*
+
+## birth_year
+
+*701*
+
+## type_name
+
+*`self`*

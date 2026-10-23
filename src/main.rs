@@ -9,18 +9,25 @@ use marqdo::diagnostics::{Diagnostic, Span};
 use marqdo::ext_cli::{add_ext, list_ext, remove_ext};
 use marqdo::input_feed::load_stdin_file;
 use marqdo::knowledge::{
-    compile_policy, conflicts_json, ensure_compiled, find, find_duplicates, find_json,
-    find_conflicts, find_stale, format_conflicts_text, format_duplicates_text, format_find_text,
+    compile_policy, conflicts_json, ensure_compiled, find, find_conflicts, find_duplicates,
+    find_json, find_stale, format_conflicts_text, format_duplicates_text, format_find_text,
     format_impact_text, format_preflight_yaml, format_reuse_text, format_stale_text,
     format_verify_text, impact, impact_json, learn, preflight, preflight_json, record_decision,
     resolve, reuse_json, stale_json, verify, verify_json, write_knowledge, KnowledgeOptions,
     LearnInput, ReuseBudget,
 };
-use marqdo::view::{serve, serve_debug, write_capture, write_static, CaptureOptions, DebugOptions, OutputOptions, ViewOptions};
+use marqdo::view::{
+    serve, serve_debug, write_capture, write_static, CaptureOptions, DebugOptions, OutputOptions,
+    ViewOptions,
+};
 use marqdo::{Backend, RunOptions};
 
 #[derive(Parser, Debug)]
-#[command(name = "marqdo", version, about = "Marqdo interpreter — run, view, debug, catalog, knowledge, and ext")]
+#[command(
+    name = "marqdo",
+    version,
+    about = "Marqdo interpreter — run, view, debug, catalog, knowledge, and ext"
+)]
 struct Cli {
     #[command(subcommand)]
     command: Commands,
@@ -55,7 +62,6 @@ enum MigrateAction {
         json: bool,
     },
 }
-
 
 #[derive(Subcommand, Debug)]
 enum Commands {
@@ -355,6 +361,12 @@ enum Commands {
 enum KnowledgeAction {
     /// Compile L0–L4 projections (default)
     Compile,
+    /// Inspect stable project symbols by exact URI or display name
+    Inspect {
+        /// Symbol URI (`mq://…`) or declaration name
+        #[arg(value_name = "SYMBOL")]
+        symbol: String,
+    },
     /// Run engineering preflight for a task
     Preflight {
         #[arg(value_name = "TASK")]
@@ -488,12 +500,17 @@ fn main() -> ExitCode {
 /// Recursively collect `*.mq.md` under `path` (file → itself).
 fn collect_mq_files(path: &std::path::Path) -> Result<Vec<std::path::PathBuf>> {
     fn walk(dir: &std::path::Path, out: &mut Vec<std::path::PathBuf>) {
-        let Ok(rd) = std::fs::read_dir(dir) else { return };
+        let Ok(rd) = std::fs::read_dir(dir) else {
+            return;
+        };
         for e in rd.flatten() {
             let p = e.path();
             let name = p.file_name().and_then(|n| n.to_str()).unwrap_or("");
             if p.is_dir() {
-                if matches!(name, "target" | "dist" | "node_modules" | ".git" | ".marqdo") {
+                if matches!(
+                    name,
+                    "target" | "dist" | "node_modules" | ".git" | ".marqdo"
+                ) {
                     continue;
                 }
                 walk(&p, out);
@@ -610,7 +627,11 @@ fn try_main(cli: Cli) -> Result<i32> {
                 Some(spec) => marqdo::label::parse_words(spec),
                 None => {
                     let groups: Vec<&str> = match &group {
-                        Some(g) => g.split(',').map(|s| s.trim()).filter(|s| !s.is_empty()).collect(),
+                        Some(g) => g
+                            .split(',')
+                            .map(|s| s.trim())
+                            .filter(|s| !s.is_empty())
+                            .collect(),
                         None => marqdo::label::PENDING_GROUPS.to_vec(),
                     };
                     marqdo::label::group_words(&groups)
@@ -618,7 +639,11 @@ fn try_main(cli: Cli) -> Result<i32> {
             };
             if also_builtin {
                 let groups: Vec<&str> = match &group {
-                    Some(g) => g.split(',').map(|s| s.trim()).filter(|s| !s.is_empty()).collect(),
+                    Some(g) => g
+                        .split(',')
+                        .map(|s| s.trim())
+                        .filter(|s| !s.is_empty())
+                        .collect(),
                     None => marqdo::label::PENDING_GROUPS.to_vec(),
                 };
                 for w in marqdo::label::group_words(&groups) {
@@ -790,7 +815,11 @@ fn try_main(cli: Cli) -> Result<i32> {
                     }
                     println!(
                         "migrate labels: {idx} index, {loops} loop, {applied} file written{}",
-                        if write { "" } else { " (dry run; pass --write)" }
+                        if write {
+                            ""
+                        } else {
+                            " (dry run; pass --write)"
+                        }
                     );
                 }
                 Ok(0)
@@ -825,20 +854,19 @@ fn try_main(cli: Cli) -> Result<i32> {
                 snapshot,
             }) => {
                 write_static(OutputOptions {
-                    path: out_path
-                        .or(path)
-                        .unwrap_or_else(|| PathBuf::from(".")),
+                    path: out_path.or(path).unwrap_or_else(|| PathBuf::from(".")),
                     out_dir: out,
                     no_exec,
                     snapshot,
                 })?;
                 Ok(0)
             }
-            Some(ViewAction::Capture { path: out_path, out }) => {
+            Some(ViewAction::Capture {
+                path: out_path,
+                out,
+            }) => {
                 write_capture(CaptureOptions {
-                    path: out_path
-                        .or(path)
-                        .unwrap_or_else(|| PathBuf::from(".")),
+                    path: out_path.or(path).unwrap_or_else(|| PathBuf::from(".")),
                     out,
                 })?;
                 Ok(0)
@@ -883,10 +911,7 @@ fn try_main(cli: Cli) -> Result<i32> {
                 out_dir: out.clone(),
             })?;
             if !no_knowledge {
-                write_knowledge(KnowledgeOptions {
-                    path,
-                    out_dir: out,
-                })?;
+                write_knowledge(KnowledgeOptions { path, out_dir: out })?;
             }
             Ok(0)
         }
@@ -899,10 +924,72 @@ fn try_main(cli: Cli) -> Result<i32> {
             let path = path.unwrap_or_else(|| PathBuf::from("."));
             match action.unwrap_or(KnowledgeAction::Compile) {
                 KnowledgeAction::Compile => {
-                    write_knowledge(KnowledgeOptions {
-                        path,
-                        out_dir: out,
-                    })?;
+                    write_knowledge(KnowledgeOptions { path, out_dir: out })?;
+                    Ok(0)
+                }
+                KnowledgeAction::Inspect { symbol } => {
+                    // A supplied directory is an explicit compilation scope;
+                    // a supplied file inherits the nearest project boundary.
+                    let project = if path.is_dir() {
+                        marqdo::project::ProjectRoot::new(&path)?
+                    } else {
+                        marqdo::project::ProjectRoot::discover(&path)?
+                    };
+                    let index = marqdo::sema::ProjectIndex::build(project)?;
+                    let candidates: Vec<_> = if symbol.starts_with("mq://") {
+                        index
+                            .symbols()
+                            .iter()
+                            .filter(|item| item.id.as_str() == symbol)
+                            .collect()
+                    } else {
+                        index.symbols_named(&symbol)
+                    };
+                    if candidates.is_empty() {
+                        anyhow::bail!(
+                            "no semantic symbol matching `{symbol}` in project {}",
+                            index.root().path().display()
+                        );
+                    }
+                    if json {
+                        println!(
+                            "{}",
+                            serde_json::json!({
+                                "project": index.project_id(),
+                                "query": symbol,
+                                "ambiguous": candidates.len() > 1,
+                                "symbols": candidates.iter().map(|item| serde_json::json!({
+                                    "id": item.id.as_str(),
+                                    "module": item.module.as_str(),
+                                    "kind": item.kind.as_str(),
+                                    "name": item.name,
+                                    "declaration_path": item.declaration_path,
+                                    "source": {
+                                        "file": item.source,
+                                        "line": item.line,
+                                    },
+                                })).collect::<Vec<_>>(),
+                            })
+                        );
+                    } else {
+                        for item in &candidates {
+                            println!(
+                                "{}\n  {} {} · module {}\n  {}:{}",
+                                item.id,
+                                item.kind.as_str(),
+                                item.declaration_path.join("."),
+                                item.module,
+                                item.source.display(),
+                                item.line,
+                            );
+                        }
+                        if candidates.len() > 1 {
+                            println!(
+                                "ambiguous: {} symbols named `{symbol}`; use one full mq:// URI",
+                                candidates.len()
+                            );
+                        }
+                    }
                     Ok(0)
                 }
                 KnowledgeAction::Preflight {
@@ -923,14 +1010,13 @@ fn try_main(cli: Cli) -> Result<i32> {
                     } else {
                         print!("{}", format_preflight_yaml(&pf));
                     }
-                    Ok(if pf.create_allowed
-                        || pf.decision == "REUSE"
-                        || pf.decision == "ADAPT"
-                    {
-                        0
-                    } else {
-                        2
-                    })
+                    Ok(
+                        if pf.create_allowed || pf.decision == "REUSE" || pf.decision == "ADAPT" {
+                            0
+                        } else {
+                            2
+                        },
+                    )
                 }
                 KnowledgeAction::Record {
                     decision,

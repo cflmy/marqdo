@@ -5,4 +5,4 @@ import helpers:../structure/ns/helpers.mq.md
 
 # main
 
-> helpers.Box.tag s=x
+> helpers.Box.type_name

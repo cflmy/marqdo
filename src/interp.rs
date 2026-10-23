@@ -1404,7 +1404,7 @@ impl Interpreter {
                 .ok_or_else(|| self.err(format!("unknown `{display}`")))?;
         }
 
-        if parent_is_object && !node.is_object() {
+        if parent_is_object && !node.is_object() && crate::ast::function_uses_receiver(node) {
             return Err(self.err(format!(
                 "`{display}` is an instance method; call it as `var`.{}",
                 node.name

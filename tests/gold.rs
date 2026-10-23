@@ -491,6 +491,20 @@ fn bytecode_ns_use() {
 }
 
 #[test]
+fn structure_ns_associated_function() {
+    assert_out("tests/structure/ns/associated.mq.md", "associated\n701");
+}
+
+#[test]
+fn bytecode_ns_associated_function() {
+    assert_out_backend(
+        "tests/structure/ns/associated.mq.md",
+        "bytecode",
+        "associated\n701",
+    );
+}
+
+#[test]
 fn error_ns_instance_method() {
     assert_err(
         "tests/errors/ns-instance-method.mq.md",
