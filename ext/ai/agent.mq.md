@@ -849,25 +849,44 @@ Write a scratch tool workbook under `.marqdo/agent-runs/tools/<name>.mq.md`.
 
 ---
 
+## skill_core_card
+
+Protected v2.1 Occlusion card always prepended to skill_brief (M05). Must not be truncated by budget.
+
+**esc = > json.parse text={"card":"## CORE SYNTAX (v2.1 Occlusion)\n1. Print with > print / > 打印 — never use bold markers to print.\n2. Bold markers = return/code; italic markers = statement.\n3. [desc](payload) = occlusion; brackets never execute.\n4. Read with access(coll, key) — never Classic [key](map) index.\n5. Foreach: - [desc](for coll as item). import + one language per file.\n6. # type · ## function · + params · numbered branches · - loops.\n"}**
+*> json.get value=`esc` key="card"*
+
+---
+
 ## skill_brief
     + `max_chars`=1200
     + `depth`=default
 
-Budgeted marqdo skill text for prompts. `depth=deep` raises the char budget.
+Budgeted marqdo skill text for prompts. Core Occlusion card is always included; remaining budget truncates the rest. `depth=deep` raises the char budget.
 
 1. `depth` == deep
   **budget = 4000**
 2. *
   **budget = max_chars**
+**core = > skill_core_card**
+**core_len = > len value=`core`**
+**rest_budget = budget - core_len - 2**
+1. `rest_budget` < 200
+  **rest_budget = 200**
+2. *
+  **_ = 1**
 **skill = > agent_marqdo_skill**
 **full = > len value=`skill`**
-**ex = > text_head_lines text=`skill` max_lines=80 max_chars=`budget`**
+**rest = > text_head_lines text=`skill` max_lines=80 max_chars=`rest_budget`**
+**esc = > json.parse text={"nl":"\n\n"}**
+**nl = > json.get value=`esc` key="nl"**
+**ex = core + nl + rest**
 **used = > len value=`ex`**
-1. `used` < `full`
-  **esc = > json.parse text={"a":"\n…[truncated skill_len=","b":" budget_chars=","c":"; emit READ:skill to deepen]"}**
-  **a = > json.get value=`esc` key="a"**
-  **b = > json.get value=`esc` key="b"**
-  **c = > json.get value=`esc` key="c"**
+1. `used` < `full` + `core_len`
+  **esc2 = > json.parse text={"a":"\n…[truncated skill_len=","b":" budget_chars=","c":"; emit READ:skill to deepen]"}**
+  **a = > json.get value=`esc2` key="a"**
+  **b = > json.get value=`esc2` key="b"**
+  **c = > json.get value=`esc2` key="c"**
   *ex + a + full + b + budget + c*
 2. *
   *ex*
@@ -1973,18 +1992,27 @@ O5: mark OKF skill `status: quarantine` and force `llm_free: false`. Regression 
     + `memory_dir`=.marqdo/agent-memory
     + `improve_every`=3
     + `promote`=True
+    + `candidate_only`=False
+    + `product_gate_ok`=True
 
 Offline learn gate: when ≥ `improve_every` successful episodes share a task hash, generalize → synthesize → compile → optional OKF promote (`llm_free`). Also attempts Policy Compilation for Adaptive Routing.
 O2: promote path requires sandbox proof unless `require_proof=false`.
+M04: `candidate_only=True` or `product_gate_ok=False` forces promote off via eng_publish_gate.
 
+**gate = > `self`.eng_publish_gate project="." candidate_only=`candidate_only` product_gate_ok=`product_gate_ok`**
+**may_prom = > json.get value=`gate` key="may_promote"**
+1. not `may_prom`
+  **promote = False**
+2. *
+  **_ = 1**
 **skill_learn = > agent_maybe_learn task=`task` kb_dir=`kb_dir` memory_dir=`memory_dir` improve_every=`improve_every` promote=`promote`**
 **policy_learn = > agent_maybe_compile_policy memory_dir=`memory_dir` min_evidence=`improve_every`**
 **sl = > json.get value=`skill_learn` key="learned"**
 `out` =
 
-| learned | skill | policy |
-|---------|-------|--------|
-| `sl` | `skill_learn` | `policy_learn` |
+| learned | skill | policy | promote_allowed | gate |
+|---------|-------|--------|-----------------|------|
+| `sl` | `skill_learn` | `policy_learn` | `may_prom` | `gate` |
 
 *out*
 
@@ -2128,7 +2156,18 @@ Primary author entry (v2 + P4): Adaptive `route` → execute (policy/kb skill) o
     1. `efi_st` == "missing_knowledge"
       **_ = 1**
     2. `efi_dec` == "REUSE"
-      **_ = 1**
+      **efi_exec = > agent_eng_bind_execute project="." query=`task` policy="pure" candidate_only=False**
+      **efi_ok = > json.get value=`efi_exec` key="ok"**
+      1. `efi_ok`
+        **exec_mode = "efi_bound"**
+        **out = **
+
+        | status | goal | result | summary | efi | reuse_trace |
+        |--------|------|--------|---------|-----|-------------|
+        | ok | `task` | `efi_exec` | EFI REUSE bound+executed | `efi_pf` | `efi_exec` |
+
+      2. *
+        **_ = 1**
     3. `efi_dec` == "ADAPT"
       **_ = 1**
     4. `efi_allow`
@@ -2433,12 +2472,41 @@ Hard rule: generate only when `create_allowed` is true (or decision is REUSE/ADA
     + `root`="."
     + `marqdo_dir`=None
 
-Alias of `preflight` focused on REUSE / ADAPT / CREATE payload.
+Alias of `preflight` focused on REUSE / ADAPT / CREATE payload (discovery_only).
 
 1. `marqdo_dir`
   *> agent_eng_reuse task=`task` root=`root` marqdo_dir=`marqdo_dir`*
 2. *
   *> agent_eng_reuse task=`task` root=`root`*
+
+---
+
+## eng_bind_execute
+    + `project`="."
+    + `query`
+    + `policy`="pure"
+    + `inputs`=None
+    + `candidate_only`=False
+
+M04: discover → bind → execute → record. Prefer over treating eng_reuse scores as execution.
+
+1. `inputs`
+  *> agent_eng_bind_execute project=`project` query=`query` policy=`policy` inputs=`inputs` candidate_only=`candidate_only`*
+2. *
+  *> agent_eng_bind_execute project=`project` query=`query` policy=`policy` candidate_only=`candidate_only`*
+
+---
+
+## eng_publish_gate
+    + `project`="."
+    + `artifact_id`=None
+    + `candidate_only`=False
+    + `product_gate_ok`=True
+    + `policy`="business"
+
+Refuse promote when candidate_only or product/verification gate fails.
+
+*> agent_eng_publish_gate project=`project` artifact_id=`artifact_id` candidate_only=`candidate_only` product_gate_ok=`product_gate_ok` policy=`policy`*
 
 ## eng_record
     + `decision`

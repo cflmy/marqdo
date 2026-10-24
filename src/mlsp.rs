@@ -64,6 +64,8 @@ fn dispatch(req: &Value) -> Result<Value, Value> {
         Some("artifact.impact") => artifact_impact(&params),
         Some("artifact.bind") => artifact_bind(&params),
         Some("artifact.execute") => artifact_execute(&params),
+        Some("artifact.reuse_execute") => artifact_reuse_execute(&params),
+        Some("document.extract") => document_extract(&params),
         Some("artifact.patch") => artifact_patch(&params),
         Some("artifact.extract_pure") => artifact_extract_pure(&params),
         // `<TAB>` M9: occlusion label search (two-tier vocabulary).
@@ -72,7 +74,7 @@ fn dispatch(req: &Value) -> Result<Value, Value> {
         Some("session.summary") => session_summary(),
         other => Err(err(
             "mlsp.unknown_method",
-            format!("未知方法 {other:?}；可用：locate / syntax / validate / repair_targets / repair_apply / schema / artifact.find / artifact.inspect / link.resolve / artifact.verify / artifact.impact / artifact.bind / artifact.execute / artifact.patch / artifact.extract_pure"),
+            format!("未知方法 {other:?}；可用：locate / syntax / validate / repair_targets / repair_apply / schema / artifact.find / artifact.inspect / link.resolve / artifact.verify / artifact.impact / artifact.bind / artifact.execute / artifact.reuse_execute / artifact.patch / artifact.extract_pure / document.extract"),
         )),
     }
 }
@@ -129,6 +131,22 @@ fn artifact_query<'a>(project: &'a crate::sema::SemanticProject, query: &str) ->
     }).collect()
 }
 
+fn document_extract(params: &Value) -> Result<Value, Value> {
+    let path = params
+        .get("path")
+        .and_then(Value::as_str)
+        .ok_or_else(|| err("mlsp.bad_request", "document.extract 需要 path"))?;
+    let hint = params
+        .get("format")
+        .and_then(Value::as_str)
+        .map(|s| s.to_string());
+    let doc = crate::document_extract::extract_document(&crate::document_extract::DocumentSource {
+        path: PathBuf::from(path),
+        format_hint: hint,
+    });
+    Ok(doc.to_json())
+}
+
 fn artifact_find(params: &Value) -> Result<Value, Value> {
     let compilation = semantic_project(params)?;
     let query = params.get("query").and_then(Value::as_str).unwrap_or("").to_ascii_lowercase();
@@ -173,10 +191,216 @@ fn artifact_verify(params: &Value) -> Result<Value, Value> {
     let candidates = artifact_query(&compilation.semantics, query);
     if candidates.len() != 1 { return Err(err(if candidates.is_empty() { "artifact.unresolved" } else { "artifact.ambiguous" }, format!("无法唯一验证 `{query}`"))); }
     let artifact = candidates[0];
-    let mut record = crate::sema::artifact_json(artifact)["verification"].clone();
-    record["policy"] = params.get("policy").cloned().unwrap_or_else(|| json!("static"));
-    record["artifact_id"] = json!(artifact.artifact_id.0);
-    Ok(record)
+    let policy = params.get("policy").and_then(Value::as_str).unwrap_or("static");
+    Ok(build_verification_report(artifact, policy))
+}
+
+/// CLI / product machine adjudication over semantic artifacts (M03).
+pub fn adjudicate_project(project: &std::path::Path, artifact: Option<&str>, policy: &str) -> Result<Value, Value> {
+    let compilation = semantic_project(&json!({"project": project}))?;
+    let targets: Vec<&crate::sema::SemanticArtifact> = if let Some(q) = artifact {
+        let c = artifact_query(&compilation.semantics, q);
+        if c.is_empty() {
+            return Err(err("artifact.unresolved", format!("没有制品 `{q}`")));
+        }
+        c
+    } else {
+        compilation
+            .semantics
+            .artifacts
+            .iter()
+            .filter(|a| a.kind == "function")
+            .collect()
+    };
+    let reports: Vec<Value> = targets
+        .iter()
+        .map(|a| build_verification_report(a, policy))
+        .collect();
+    let any_denied = reports.iter().any(|r| r["may_bind"] == false);
+    Ok(json!({
+        "schema_version": 1,
+        "policy": policy,
+        "count": reports.len(),
+        "may_bind_all": !any_denied,
+        "reports": reports,
+    }))
+}
+
+/// Known bind/verify policies (M03). Unknown strings are rejected.
+fn parse_policy(policy: &str) -> Result<&str, Value> {
+    match policy {
+        "pure" | "business" | "static" => Ok(policy),
+        other => Err(json!({
+            "code": "artifact.unknown_policy",
+            "message": format!("未知政策 `{other}`；允许 pure / business / static"),
+            "policy": other,
+        })),
+    }
+}
+
+fn evidence_allows_business(status: &str) -> bool {
+    matches!(status, "sourced" | "verified")
+}
+
+fn build_verification_report(artifact: &crate::sema::SemanticArtifact, policy: &str) -> Value {
+    let policy = match parse_policy(policy) {
+        Ok(p) => p,
+        Err(e) => {
+            return json!({
+                "schema_version": 1,
+                "artifact_id": artifact.artifact_id.0,
+                "policy": policy,
+                "checks": {},
+                "blockers": [e],
+                "may_bind": false,
+                "may_publish": false,
+                "verification": crate::sema::artifact_json(artifact)["verification"].clone(),
+            });
+        }
+    };
+    let region_status = if artifact.applicability.contains("region=") {
+        "declared"
+    } else {
+        "unknown"
+    };
+    let checks = json!({
+        "parse": {"status": artifact.verification.parse, "detail": "static_project_compile"},
+        "resolve": {"status": artifact.verification.resolve, "detail": "symbol_bound"},
+        "contract": {"status": artifact.verification.contract, "detail": "not_executed_by_verify"},
+        "execution": {"status": artifact.verification.execution, "detail": "not_run"},
+        "tests": {"status": artifact.verification.tests, "detail": "no_test_runner_invoked"},
+        "evidence": {"status": artifact.verification.evidence, "detail": "compile_time_provenance"},
+        "domain": {"status": artifact.verification.domain, "detail": "unreviewed"},
+        "region": {"status": region_status, "detail": "input_domain_not_checked"},
+        "input_domain": {"status": "unknown", "detail": "not_checked_by_static_verify"},
+    });
+    let mut blockers = Vec::new();
+    // Never upgrade tests/execution to passed without a runner (M03).
+    if matches!(
+        artifact.verification.tests.as_str(),
+        "passed" | "verified"
+    ) && artifact
+        .verification
+        .methods
+        .iter()
+        .all(|m| m == "static_project_compile")
+    {
+        blockers.push(json!({
+            "code": "artifact.tests_unproven",
+            "check": "tests",
+            "status": artifact.verification.tests,
+            "detail": "static compile must not claim tests passed",
+        }));
+    }
+    if policy == "business" && !evidence_allows_business(&artifact.verification.evidence) {
+        blockers.push(json!({
+            "code": "artifact.evidence_denied",
+            "check": "evidence",
+            "status": artifact.verification.evidence,
+        }));
+    }
+    if policy == "pure"
+        && artifact
+            .effects
+            .values()
+            .iter()
+            .any(|e| e != "pure")
+    {
+        blockers.push(json!({
+            "code": "artifact.effect_denied",
+            "check": "effects",
+            "effects": artifact.effects.values(),
+        }));
+    }
+    let may_bind = blockers.is_empty()
+        && match policy {
+            "business" => evidence_allows_business(&artifact.verification.evidence),
+            "pure" => artifact.effects.values().iter().all(|e| e == "pure"),
+            _ => true,
+        };
+    // Publish requires stronger evidence than bind; static verify never claims tests passed.
+    let may_publish = may_bind
+        && artifact.verification.tests != "unknown"
+        && artifact.verification.tests != "not_run"
+        && artifact.verification.execution != "not_run"
+        && !matches!(
+            artifact.verification.evidence.as_str(),
+            "unverified" | "missing_source" | "anchor_missing" | "expired" | "invalid_date"
+        );
+    json!({
+        "schema_version": 1,
+        "artifact_id": artifact.artifact_id.0,
+        "symbol_id": artifact.symbol_id.as_ref().map(|id| id.as_str()),
+        "digest": artifact.hashes.artifact.0,
+        "evidence_digest": artifact.hashes.evidence.0,
+        "closure_digest": artifact.hashes.closure.0,
+        "policy": policy,
+        "checks": checks,
+        "blockers": blockers,
+        "may_bind": may_bind,
+        "may_publish": may_publish,
+        "verification": {
+            "parse": artifact.verification.parse,
+            "resolve": artifact.verification.resolve,
+            "contract": artifact.verification.contract,
+            "execution": artifact.verification.execution,
+            "tests": artifact.verification.tests,
+            "evidence": artifact.verification.evidence,
+            "domain": artifact.verification.domain,
+            "methods": artifact.verification.methods,
+        },
+    })
+}
+
+/// M04: bind then execute in one call (actual reuse, not discovery scores).
+fn artifact_reuse_execute(params: &Value) -> Result<Value, Value> {
+    let project = params
+        .get("project")
+        .or_else(|| params.get("path"))
+        .cloned()
+        .ok_or_else(|| err("mlsp.bad_request", "artifact.reuse_execute 需要 project"))?;
+    let query = params
+        .get("artifact_id")
+        .or_else(|| params.get("symbol_id"))
+        .or_else(|| params.get("query"))
+        .and_then(Value::as_str)
+        .ok_or_else(|| err("mlsp.bad_request", "artifact.reuse_execute 需要 artifact_id"))?;
+    let policy = params.get("policy").and_then(Value::as_str).unwrap_or("pure");
+    let inputs = params.get("inputs").cloned().unwrap_or(json!({}));
+    let bound = artifact_bind(&json!({
+        "project": project,
+        "artifact_id": query,
+        "policy": policy,
+        "expected_digest": params.get("expected_digest"),
+    }))?;
+    let handle = bound
+        .get("handle")
+        .cloned()
+        .ok_or_else(|| err("artifact.bind_failed", "bind 未返回 handle"))?;
+    let executed = artifact_execute(&json!({
+        "handle": handle,
+        "inputs": inputs,
+        "allow_effects": params.get("allow_effects"),
+    }))?;
+    Ok(json!({
+        "schema_version": 1,
+        "actual_reuse": true,
+        "discovery_only": false,
+        "artifact_id": executed.get("artifact_id"),
+        "symbol_id": executed.get("symbol_id"),
+        "digest": executed.get("digest"),
+        "result": executed.get("result"),
+        "stdout": executed.get("stdout"),
+        "effects": executed.get("effects"),
+        "trace": {
+            "artifact_id": executed.get("artifact_id"),
+            "symbol_id": executed.get("symbol_id"),
+            "digest": executed.get("digest"),
+            "inputs": inputs,
+            "value": executed.get("result"),
+            "stdout": executed.get("stdout"),
+        },
+    }))
 }
 
 fn artifact_impact(params: &Value) -> Result<Value, Value> {
@@ -197,10 +421,12 @@ fn artifact_bind(params: &Value) -> Result<Value, Value> {
     if expected.is_some() && expected != Some(artifact.hashes.artifact.0.as_str()) {
         return Err(json!({"code":"artifact.digest_mismatch","message":"目标摘要已变化，拒绝绑定","expected":expected,"actual":artifact.hashes.artifact.0}));
     }
-    let policy = params
-        .get("policy")
-        .and_then(Value::as_str)
-        .unwrap_or("pure");
+    let policy = parse_policy(
+        params
+            .get("policy")
+            .and_then(Value::as_str)
+            .unwrap_or("pure"),
+    )?;
     let effects = artifact.effects.values();
     if policy == "pure"
         && effects.iter().any(|effect| effect != "pure")
@@ -212,15 +438,10 @@ fn artifact_bind(params: &Value) -> Result<Value, Value> {
             "effects": effects,
         }));
     }
-    if policy == "business"
-        && !matches!(
-            artifact.verification.evidence.as_str(),
-            "sourced" | "verified"
-        )
-    {
+    if policy == "business" && !evidence_allows_business(&artifact.verification.evidence) {
         return Err(json!({
             "code": "artifact.evidence_denied",
-            "message": "business 策略要求来源已关联；当前证据状态不足",
+            "message": "business 策略要求来源已关联且锚点有效、未过期；当前证据状态不足",
             "policy": policy,
             "evidence": artifact.verification.evidence,
         }));
@@ -230,14 +451,38 @@ fn artifact_bind(params: &Value) -> Result<Value, Value> {
         .as_ref()
         .map(|id| id.as_str().to_string())
         .unwrap_or_else(|| artifact.artifact_id.0.clone());
+    let valid_until = artifact
+        .applicability
+        .split(';')
+        .find_map(|part| {
+            part.trim()
+                .strip_prefix("valid_until=")
+                .map(|s| s.trim().to_string())
+        });
+    let provenance_digests: Vec<Value> = artifact
+        .provenance
+        .iter()
+        .filter(|p| p.relation == "supports")
+        .map(|p| {
+            json!({
+                "uri": p.uri,
+                "locator": p.locator,
+                "content_digest": p.content_digest.as_ref().map(|d| &d.0),
+            })
+        })
+        .collect();
     Ok(json!({"schema_version":1,"handle":{
         "artifact_id": artifact.artifact_id.0,
         "symbol_id": symbol_id,
         "digest": artifact.hashes.artifact.0,
+        "closure_digest": artifact.hashes.closure.0,
+        "evidence_digest": artifact.hashes.evidence.0,
         "project": compilation.semantics.root,
         "policy": policy,
         "effects": effects,
         "evidence": artifact.verification.evidence,
+        "valid_until": valid_until,
+        "provenance": provenance_digests,
         "source": {"file": artifact.source.file, "line": artifact.source.line},
     }}))
 }
@@ -389,7 +634,27 @@ fn artifact_execute(params: &Value) -> Result<Value, Value> {
     let candidates = artifact_query(&compilation.semantics, artifact_id);
     if candidates.len() != 1 { return Err(err("artifact.stale_handle", "制品不再可唯一解析；请重新 bind")); }
     let artifact = candidates[0];
-    if artifact.hashes.artifact.0 != digest { return Err(json!({"code":"artifact.stale_handle","message":"源码或契约已改变；拒绝执行过期 handle","expected":digest,"actual":artifact.hashes.artifact.0})); }
+    if artifact.hashes.artifact.0 != digest { return Err(json!({"code":"artifact.stale_handle","message":"源码、契约或来源证据已改变；拒绝执行过期 handle","expected":digest,"actual":artifact.hashes.artifact.0})); }
+    if let Some(bound_closure) = handle.get("closure_digest").and_then(Value::as_str) {
+        if bound_closure != artifact.hashes.closure.0 {
+            return Err(json!({
+                "code": "artifact.stale_handle",
+                "message": "依赖闭包已改变；拒绝执行过期 handle",
+                "expected": bound_closure,
+                "actual": artifact.hashes.closure.0,
+            }));
+        }
+    }
+    if let Some(bound_evidence) = handle.get("evidence_digest").and_then(Value::as_str) {
+        if bound_evidence != artifact.hashes.evidence.0 {
+            return Err(json!({
+                "code": "artifact.stale_handle",
+                "message": "来源证据摘要已改变；拒绝执行过期 handle",
+                "expected": bound_evidence,
+                "actual": artifact.hashes.evidence.0,
+            }));
+        }
+    }
     if let Some(bound_symbol) = handle.get("symbol_id").and_then(Value::as_str) {
         let current = artifact
             .symbol_id
@@ -402,6 +667,40 @@ fn artifact_execute(params: &Value) -> Result<Value, Value> {
                 "message": "handle 绑定的 SymbolId 与当前制品不一致",
                 "expected": bound_symbol,
                 "actual": current,
+            }));
+        }
+    }
+    // Re-check policy at execute time (M02) — do not trust bind-time evidence string alone.
+    let policy = handle.get("policy").and_then(Value::as_str).unwrap_or("pure");
+    let _ = parse_policy(policy)?;
+    if policy == "business" && !evidence_allows_business(&artifact.verification.evidence) {
+        return Err(json!({
+            "code": "artifact.evidence_denied",
+            "message": "business 句柄在执行时证据状态不足（来源缺失、锚点失效或已过期）",
+            "policy": policy,
+            "evidence": artifact.verification.evidence,
+        }));
+    }
+    if policy == "pure"
+        && artifact
+            .effects
+            .values()
+            .iter()
+            .any(|effect| effect != "pure")
+    {
+        return Err(json!({
+            "code": "artifact.effect_denied",
+            "message": "pure 句柄在执行时出现非纯效应",
+            "policy": policy,
+            "effects": artifact.effects.values(),
+        }));
+    }
+    if let Some(until) = handle.get("valid_until").and_then(Value::as_str) {
+        if crate::sema::provenance::valid_until_expired(until) {
+            return Err(json!({
+                "code": "artifact.expired",
+                "message": "句柄适用期已过",
+                "valid_until": until,
             }));
         }
     }

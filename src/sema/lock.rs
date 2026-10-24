@@ -111,7 +111,8 @@ pub fn check_links_lock(out_dir: &Path, project: &SemanticProject) -> Result<Loc
 }
 
 /// Static reverse dependency closure.  Queries can be an artifact/symbol URI,
-/// a declaration suffix, or a project-relative source filename.
+/// a declaration suffix, a project-relative source filename, or a corpus
+/// provenance URI (`supports` relation — M02).
 pub fn impact(project: &SemanticProject, query: &str) -> Value {
     let mut seeds = BTreeSet::new();
     for artifact in &project.artifacts {
@@ -125,6 +126,15 @@ pub fn impact(project: &SemanticProject, query: &str) -> Value {
                 .and_then(|s| s.to_str())
                 .is_some_and(|stem| stem == query || query.ends_with(stem))
             || artifact.artifact_id.0.ends_with(query)
+            || artifact.provenance.iter().any(|p| {
+                p.relation == "supports"
+                    && (p.uri == query
+                        || p.uri.ends_with(query)
+                        || query.ends_with(&p.uri)
+                        || p.locator
+                            .as_ref()
+                            .is_some_and(|loc| format!("{}#{}", p.uri, loc) == query))
+            })
         {
             seeds.insert(artifact.artifact_id.0.clone());
         }
@@ -136,6 +146,22 @@ pub fn impact(project: &SemanticProject, query: &str) -> Value {
                 .entry(dependency.0.clone())
                 .or_default()
                 .push(artifact.artifact_id.0.clone());
+        }
+        // Corpus URI → citing artifact (provenance supports edges).
+        for prov in &artifact.provenance {
+            if prov.relation != "supports" {
+                continue;
+            }
+            reverse
+                .entry(prov.uri.clone())
+                .or_default()
+                .push(artifact.artifact_id.0.clone());
+            if let Some(loc) = &prov.locator {
+                reverse
+                    .entry(format!("{}#{}", prov.uri, loc))
+                    .or_default()
+                    .push(artifact.artifact_id.0.clone());
+            }
         }
     }
     // NarrativeRef edges: step → symbol; impact includes the step's owning artifact.
@@ -157,21 +183,54 @@ pub fn impact(project: &SemanticProject, query: &str) -> Value {
                 .push(owner.clone());
         }
     }
+    // Also seed reverse walk from corpus URI keys when query matches them.
+    if reverse.contains_key(query) {
+        seeds.insert(query.to_string());
+    }
     let mut queue: VecDeque<String> = seeds.iter().cloned().collect();
     let mut affected = BTreeSet::new();
     while let Some(current) = queue.pop_front() {
-        if !affected.insert(current.clone()) { continue; }
+        if !affected.insert(current.clone()) {
+            continue;
+        }
         if let Some(users) = reverse.get(&current) {
-            for user in users { queue.push_back(user.clone()); }
+            for user in users {
+                queue.push_back(user.clone());
+            }
         }
     }
-    let entries = affected.iter().filter_map(|id| project.artifacts.iter().find(|a| &a.artifact_id.0 == id)).map(|artifact| json!({
-        "artifact_id": artifact.artifact_id.0,
-        "symbol_id": artifact.symbol_id.as_ref().map(|id| id.as_str()),
-        "display_name": artifact.display_name,
-        "kind": artifact.kind,
-        "source": {"file": artifact.source.file, "line": artifact.source.line},
-    })).collect::<Vec<_>>();
+    // Drop pure corpus URI keys that are not artifacts from the affected set display.
+    let entries = affected
+        .iter()
+        .filter_map(|id| project.artifacts.iter().find(|a| &a.artifact_id.0 == id))
+        .map(|artifact| {
+            let classes = {
+                let mut c = Vec::new();
+                if !artifact.hashes.interface.0.is_empty() {
+                    c.push("interface");
+                }
+                if !artifact.hashes.implementation.0.is_empty() {
+                    c.push("implementation");
+                }
+                if !artifact.hashes.evidence.0.is_empty() {
+                    c.push("evidence");
+                }
+                if !artifact.dependencies.is_empty() {
+                    c.push("dependency");
+                }
+                c
+            };
+            json!({
+                "artifact_id": artifact.artifact_id.0,
+                "symbol_id": artifact.symbol_id.as_ref().map(|id| id.as_str()),
+                "display_name": artifact.display_name,
+                "kind": artifact.kind,
+                "source": {"file": artifact.source.file, "line": artifact.source.line},
+                "hash_classes": classes,
+                "evidence": artifact.verification.evidence,
+            })
+        })
+        .collect::<Vec<_>>();
     json!({"schema_version":SCHEMA_VERSION,"query":query,"resolved":!seeds.is_empty(),"seeds":seeds,"affected":entries})
 }
 

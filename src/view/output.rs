@@ -11,7 +11,7 @@ use crate::host::foreign_doc::DocumentSession;
 use crate::host::json::json_to_value;
 use crate::value::Value;
 use crate::view::html::{escape, page_file, page_index, LinkMode};
-use crate::view::{build_file_view, build_root, ViewRoot};
+use crate::view::{build_file_view, build_file_view_with_exec, build_root, ViewRoot};
 
 pub struct OutputOptions {
     pub path: PathBuf,
@@ -280,26 +280,8 @@ pub fn write_static(opts: OutputOptions) -> Result<()> {
     for rel_pb in &root.files {
         let rel = rel_pb.to_string_lossy().replace('\\', "/");
         let abs = resolve_abs(&root, &rel)?;
-        let mut vm = build_file_view(&root, &abs, &rel, &[], false)?;
-        if opts.no_exec {
-            vm.stdout.clear();
-            vm.stderr = "execution skipped (--no-exec)".into();
-            vm.ok = true;
-            vm.plots.clear();
-            vm.bindings_html = String::from(r#"<p class="vars-skipped">skipped</p>"#);
-            vm.trace_json.clear();
-            // Rebuild outline + Structure without run annotations.
-            if let Ok(module) = crate::parse::parse_source(&vm.source) {
-                let wb = crate::view::render::render_writeback_outline(&vm.source);
-                vm.outline_html =
-                    crate::view::render::render_right_rail(&module, &vm.bindings_html, &wb);
-                vm.structure_html = crate::view::render::render_module_structure_with_annots(
-                    &module,
-                    &vm.source,
-                    &[],
-                );
-            }
-        }
+        // V0: apply --no-exec before any capture run (do not execute then clear).
+        let vm = build_file_view_with_exec(&root, &abs, &rel, &[], false, !opts.no_exec)?;
         let links = LinkMode::Static {
             from: Some(rel.clone()),
         };

@@ -81,7 +81,16 @@ func (st *state) handleUpload(w http.ResponseWriter, r *http.Request, routePath 
 	_, hadCookie := session.IDFromCookie(r.Header.Get("Cookie"))
 	sid, _, setCookie := resolveSession(r)
 
-	if err := r.ParseMultipartForm(32 << 20); err != nil {
+	// M01: hard-limit request body before multipart parse (32MiB was only in-memory
+	// form budget, not a request total). Cap at configured MaxBytes + 1MiB overhead.
+	maxBody := int64(cfg.MaxBytes)
+	if maxBody <= 0 {
+		maxBody = 32 << 20
+	}
+	overhead := int64(1 << 20)
+	r.Body = http.MaxBytesReader(w, r.Body, maxBody+overhead)
+
+	if err := r.ParseMultipartForm(maxBody + overhead); err != nil {
 		jsonErr(w, http.StatusBadRequest, fmt.Sprintf("multipart: %v", err))
 		return
 	}
@@ -109,9 +118,18 @@ func (st *state) handleUpload(w http.ResponseWriter, r *http.Request, routePath 
 			return
 		}
 		defer f.Close()
-		b, err := io.ReadAll(f)
+		// Stream-capped read: never buffer more than MaxBytes.
+		lim := maxBody
+		if lim <= 0 {
+			lim = 32 << 20
+		}
+		b, err := io.ReadAll(io.LimitReader(f, lim+1))
 		if err != nil {
 			jsonErr(w, http.StatusBadRequest, fmt.Sprintf("read file: %v", err))
+			return
+		}
+		if int64(len(b)) > lim {
+			jsonErr(w, http.StatusRequestEntityTooLarge, "file exceeds max_bytes")
 			return
 		}
 		fileBytes = b

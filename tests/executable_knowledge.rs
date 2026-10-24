@@ -302,7 +302,72 @@ fn s1_view_lists_steps_with_source_anchors() {
             || html.contains("data-step-kind=\"iterate\""),
         "expected classified step kinds in view HTML"
     );
+    // V0: document body must appear before the knowledge auxiliary panel in main content
+    // (ignore stylesheet class mentions that appear earlier in <style>).
+    let main = html.split("<main").nth(1).unwrap_or(&html);
+    let struct_pos = main
+        .find("id=\"structure\"")
+        .or_else(|| main.find("structure-block"))
+        .expect("structure in main");
+    let know_pos = main
+        .find("block knowledge-block")
+        .or_else(|| main.find("knowledge-block\">"))
+        .unwrap_or(main.len());
+    assert!(
+        struct_pos < know_pos,
+        "V0: document Structure must precede knowledge panel in <main>"
+    );
+    assert!(
+        !html.contains("Lock digest"),
+        "V0: must not mislabel artifact hash as Lock digest"
+    );
     let _ = std::fs::remove_dir_all(&out_dir);
+}
+
+#[test]
+fn v0_no_exec_does_not_run_side_effects() {
+    let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let dir = std::env::temp_dir().join(format!(
+        "marqdo-ek-noexec-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    let marker = dir.join("SIDE_EFFECT.txt");
+    let src = format!(
+        "---\nmarkup: occlusion\n---\n\n# main\n\n> fs.write_text path=\"{}\" text=ran\n> print text=ok\n",
+        marker.display().to_string().replace('\\', "/")
+    );
+    std::fs::write(dir.join("main.mq.md"), src).unwrap();
+    let out_dir = dir.join("out");
+    let status = Command::new(env!("CARGO_BIN_EXE_marqdo"))
+        .args([
+            "view",
+            "output",
+            "--out",
+            out_dir.to_str().unwrap(),
+            "--no-exec",
+            dir.join("main.mq.md").to_str().unwrap(),
+        ])
+        .current_dir(&root)
+        .output()
+        .expect("view no-exec");
+    assert_eq!(
+        status.status.code(),
+        Some(0),
+        "stderr={}",
+        String::from_utf8_lossy(&status.stderr)
+    );
+    assert!(
+        !marker.exists(),
+        "V0: --no-exec must not execute side effects (found {})",
+        marker.display()
+    );
+    let _ = std::fs::remove_dir_all(&dir);
 }
 
 #[test]
@@ -542,17 +607,29 @@ fn s5_closure_digest_moves_with_dependency() {
         "stderr={}",
         String::from_utf8_lossy(&status.stderr)
     );
+    // Select the caller by dependency edge (not display_name alone — module also named "main").
     let mut main_closure = None;
     let mut main_impl = None;
+    let mut main_id = None;
     for ent in std::fs::read_dir(out1.join("artifacts")).unwrap().flatten() {
         let v: serde_json::Value =
             serde_json::from_str(&std::fs::read_to_string(ent.path()).unwrap()).unwrap();
-        if v["display_name"] == "main" {
+        let deps = v["dependencies"].as_array().cloned().unwrap_or_default();
+        let calls_rate = deps.iter().any(|d| {
+            d.as_str()
+                .is_some_and(|s| s.contains("/function/rate") || s.ends_with("rate"))
+        });
+        if v["display_name"] == "main" && v["kind"] != "module" && calls_rate {
             main_closure = v["hashes"]["closure"].as_str().map(str::to_string);
             main_impl = v["hashes"]["implementation"].as_str().map(str::to_string);
+            main_id = v["artifact_id"].as_str().map(str::to_string);
         }
     }
-    assert!(main_closure.is_some(), "main closure missing in {}", out1.display());
+    assert!(
+        main_closure.is_some(),
+        "caller (type/function main with rate dep) closure missing in {}",
+        out1.display()
+    );
     std::fs::write(
         dir.join("dep.mq.md"),
         "---\nmarkup: occlusion\n---\n\n## rate\n\n*0.14*\n",
@@ -571,10 +648,11 @@ fn s5_closure_digest_moves_with_dependency() {
     );
     let mut main_closure2 = None;
     let mut main_impl2 = None;
+    let want_id = main_id.as_deref().unwrap();
     for ent in std::fs::read_dir(out2.join("artifacts")).unwrap().flatten() {
         let v: serde_json::Value =
             serde_json::from_str(&std::fs::read_to_string(ent.path()).unwrap()).unwrap();
-        if v["display_name"] == "main" {
+        if v["artifact_id"].as_str() == Some(want_id) {
             main_closure2 = v["hashes"]["closure"].as_str().map(str::to_string);
             main_impl2 = v["hashes"]["implementation"].as_str().map(str::to_string);
         }
@@ -1070,4 +1148,746 @@ fn s2_g07_eng_reuse_requires_bind_before_execute() {
             .any(|t| t["query"] == "商品小计"),
         "REUSE must expose bind_targets for MLSP bind: {v}"
     );
+}
+
+#[test]
+fn m02_source_change_invalidates_business_handle() {
+    // M02: missing anchor blocks business bind; valid source then edit/delete rejects execute.
+    use marqdo::mlsp::handle_line;
+    let dir = std::env::temp_dir().join(format!(
+        "marqdo-ek-m02-src-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(dir.join("source.md"), "# rate\n\nrate = 0.13\n").unwrap();
+    std::fs::write(
+        dir.join("facts.mq.md"),
+        "---\nmarkup: occlusion\nsources:\n  - source.md#missing-anchor\napplicability:\n  region: CN\n  valid_until: 2099-12-31\n---\n\n## rate\n\n*0.13*\n",
+    )
+    .unwrap();
+    let found: serde_json::Value = serde_json::from_str(&handle_line(
+        &serde_json::json!({"method":"artifact.find","params":{"project":&dir,"query":"rate","kind":"function"}})
+            .to_string(),
+    ))
+    .unwrap();
+    let id = found["result"]["candidates"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|c| c["kind"] == "function")
+        .unwrap()["artifact_id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    let inspect: serde_json::Value = serde_json::from_str(&handle_line(
+        &serde_json::json!({"method":"artifact.inspect","params":{"project":&dir,"artifact_id":&id}})
+            .to_string(),
+    ))
+    .unwrap();
+    assert_eq!(
+        inspect["result"]["verification"]["evidence"], "anchor_missing",
+        "missing anchor must not be sourced: {inspect}"
+    );
+    let denied: serde_json::Value = serde_json::from_str(&handle_line(
+        &serde_json::json!({"method":"artifact.bind","params":{"project":&dir,"artifact_id":&id,"policy":"business"}})
+            .to_string(),
+    ))
+    .unwrap();
+    assert_eq!(denied["ok"], false, "business bind must reject anchor_missing: {denied}");
+
+    // Repair anchor and bind.
+    std::fs::write(
+        dir.join("facts.mq.md"),
+        "---\nmarkup: occlusion\nsources:\n  - source.md#rate\napplicability:\n  region: CN\n  valid_until: 2099-12-31\n---\n\n## rate\n\n*0.13*\n",
+    )
+    .unwrap();
+    let inspect2: serde_json::Value = serde_json::from_str(&handle_line(
+        &serde_json::json!({"method":"artifact.inspect","params":{"project":&dir,"artifact_id":&id}})
+            .to_string(),
+    ))
+    .unwrap();
+    assert_eq!(
+        inspect2["result"]["verification"]["evidence"], "sourced",
+        "{inspect2}"
+    );
+    let evidence1 = inspect2["result"]["hashes"]["evidence"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    let bound: serde_json::Value = serde_json::from_str(&handle_line(
+        &serde_json::json!({"method":"artifact.bind","params":{"project":&dir,"artifact_id":&id,"policy":"business"}})
+            .to_string(),
+    ))
+    .unwrap();
+    assert_eq!(bound["ok"], true, "business bind with valid anchor: {bound}");
+    let handle = bound["result"]["handle"].clone();
+    assert!(handle["evidence_digest"].as_str().is_some());
+    assert!(handle["closure_digest"].as_str().is_some());
+
+    // Edit source content → evidence digest moves → stale handle.
+    std::fs::write(dir.join("source.md"), "# rate\n\nrate = 0.14\n").unwrap();
+    let inspect3: serde_json::Value = serde_json::from_str(&handle_line(
+        &serde_json::json!({"method":"artifact.inspect","params":{"project":&dir,"artifact_id":&id}})
+            .to_string(),
+    ))
+    .unwrap();
+    let evidence2 = inspect3["result"]["hashes"]["evidence"].as_str().unwrap();
+    assert_ne!(
+        evidence1, evidence2,
+        "source content change must move evidence digest"
+    );
+    let after_edit: serde_json::Value = serde_json::from_str(&handle_line(
+        &serde_json::json!({"method":"artifact.execute","params":{"handle":&handle,"inputs":{}}})
+            .to_string(),
+    ))
+    .unwrap();
+    assert_eq!(
+        after_edit["ok"], false,
+        "old business handle must fail after source edit: {after_edit}"
+    );
+
+    // Remove source → evidence denied / stale.
+    let _ = std::fs::remove_file(dir.join("source.md"));
+    let after_rm: serde_json::Value = serde_json::from_str(&handle_line(
+        &serde_json::json!({"method":"artifact.execute","params":{"handle":&handle,"inputs":{}}})
+            .to_string(),
+    ))
+    .unwrap();
+    assert_eq!(
+        after_rm["ok"], false,
+        "old business handle must fail after source removal: {after_rm}"
+    );
+
+    // Unknown policy rejected.
+    let bad_pol: serde_json::Value = serde_json::from_str(&handle_line(
+        &serde_json::json!({"method":"artifact.bind","params":{"project":&dir,"artifact_id":&id,"policy":"trust-me"}})
+            .to_string(),
+    ))
+    .unwrap();
+    assert_eq!(bad_pol["ok"], false, "unknown policy must be rejected: {bad_pol}");
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn m01_document_extract_markdown() {
+    use marqdo::mlsp::handle_line;
+    let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/executable_knowledge/baseline/12-tax-source/corpus.md");
+    let out: serde_json::Value = serde_json::from_str(&handle_line(
+        &serde_json::json!({"method":"document.extract","params":{"path":root}})
+            .to_string(),
+    ))
+    .unwrap();
+    assert_eq!(out["ok"], true, "{out}");
+    assert_eq!(out["result"]["status"], "ok");
+    assert!(
+        out["result"]["segments"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|s| s["kind"] == "heading"),
+        "expected heading segments: {out}"
+    );
+}
+
+#[test]
+fn m06_publish_manifest_written() {
+    let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let out = std::env::temp_dir().join(format!(
+        "marqdo-ek-manifest-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    let _ = std::fs::remove_dir_all(&out);
+    let status = Command::new(env!("CARGO_BIN_EXE_marqdo"))
+        .args([
+            "knowledge",
+            "tests/executable_knowledge/baseline/02-extract",
+            "-o",
+            out.to_str().unwrap(),
+        ])
+        .current_dir(&root)
+        .output()
+        .unwrap();
+    assert_eq!(status.status.code(), Some(0));
+    let manifest: serde_json::Value = serde_json::from_str(
+        &std::fs::read_to_string(out.join("publish_manifest.json")).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(manifest["kind"], "publish_manifest");
+    assert!(manifest["semantic_generation"].as_str().is_some());
+    assert!(
+        manifest["excluded_dirs"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|d| d == "data"),
+        "excluded_dirs must include data: {manifest}"
+    );
+    let _ = std::fs::remove_dir_all(&out);
+}
+
+#[test]
+fn m05_skill_front_has_occlusion_core_not_classic_index() {
+    let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let skill = std::fs::read_to_string(root.join("skills/marqdo/SKILL.md")).unwrap();
+    // Skip YAML frontmatter; skill_brief budgets apply to body text.
+    let body = skill
+        .split_once("\n---\n")
+        .map(|(_, rest)| rest)
+        .unwrap_or(skill.as_str());
+    let head: String = body.chars().take(1200).collect();
+    assert!(
+        head.contains("CORE SYNTAX") && head.contains("access(coll, key)"),
+        "first 1200 body chars must include Occlusion core: {}",
+        &head[..head.len().min(200)]
+    );
+    assert!(
+        !head.contains("get with `[key](coll)`")
+            && !head.contains("Bold `**…**` is **return value only**"),
+        "first 1200 body chars must not teach Classic index / bold-as-print: {head}"
+    );
+    assert!(
+        root.join("skills/marqdo/migration-classic.md").is_file(),
+        "Classic rules must live in migration-classic.md"
+    );
+}
+
+#[test]
+fn m02_impact_includes_provenance_corpus_uri() {
+    use marqdo::mlsp::handle_line;
+    let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/executable_knowledge/baseline/12-tax-source");
+    let impact: serde_json::Value = serde_json::from_str(&handle_line(
+        &serde_json::json!({"method":"artifact.impact","params":{"project":&root,"path":"corpus.md"}})
+            .to_string(),
+    ))
+    .unwrap();
+    assert_eq!(impact["ok"], true, "{impact}");
+    let affected = impact["result"]["affected"].as_array().unwrap();
+    assert!(
+        !affected.is_empty(),
+        "corpus.md provenance must seed impact: {impact}"
+    );
+    assert!(
+        affected.iter().any(|a| a["kind"] == "function"),
+        "impact should reach citing functions: {impact}"
+    );
+}
+
+#[test]
+fn m03_verify_unknown_policy_and_may_publish_gate() {
+    use marqdo::mlsp::handle_line;
+    let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/executable_knowledge/baseline/02-extract");
+    let found: serde_json::Value = serde_json::from_str(&handle_line(
+        &serde_json::json!({"method":"artifact.find","params":{"project":&root,"query":"商品小计","kind":"function"}})
+            .to_string(),
+    ))
+    .unwrap();
+    let id = found["result"]["candidates"][0]["artifact_id"].as_str().unwrap();
+    let bad: serde_json::Value = serde_json::from_str(&handle_line(
+        &serde_json::json!({"method":"artifact.verify","params":{"project":&root,"artifact_id":id,"policy":"trust-me"}})
+            .to_string(),
+    ))
+    .unwrap();
+    assert_eq!(bad["ok"], true, "{bad}");
+    assert_eq!(bad["result"]["may_bind"], false, "unknown policy must deny bind: {bad}");
+    assert_eq!(bad["result"]["may_publish"], false);
+    let okv: serde_json::Value = serde_json::from_str(&handle_line(
+        &serde_json::json!({"method":"artifact.verify","params":{"project":&root,"artifact_id":id,"policy":"pure"}})
+            .to_string(),
+    ))
+    .unwrap();
+    assert_eq!(okv["result"]["may_bind"], true, "{okv}");
+    assert_eq!(
+        okv["result"]["may_publish"], false,
+        "static verify must not allow publish without tests/execution: {okv}"
+    );
+    assert_eq!(okv["result"]["checks"]["tests"]["status"], "unknown");
+    assert_eq!(okv["result"]["checks"]["input_domain"]["status"], "unknown");
+}
+
+#[test]
+fn m04_reuse_execute_is_actual_reuse_not_discovery() {
+    use marqdo::mlsp::handle_line;
+    let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/executable_knowledge/baseline/02-extract");
+    let found: serde_json::Value = serde_json::from_str(&handle_line(
+        &serde_json::json!({"method":"artifact.find","params":{"project":&root,"query":"商品小计","kind":"function"}})
+            .to_string(),
+    ))
+    .unwrap();
+    let id = found["result"]["candidates"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|c| c["kind"] == "function")
+        .unwrap()["artifact_id"]
+        .as_str()
+        .unwrap();
+    let out: serde_json::Value = serde_json::from_str(&handle_line(
+        &serde_json::json!({
+            "method":"artifact.reuse_execute",
+            "params":{"project":&root,"artifact_id":id,"policy":"pure","inputs":{"数量":2,"单价":30}}
+        })
+        .to_string(),
+    ))
+    .unwrap();
+    assert_eq!(out["ok"], true, "{out}");
+    assert_eq!(out["result"]["actual_reuse"], true);
+    assert_eq!(out["result"]["discovery_only"], false);
+    assert_eq!(out["result"]["result"], 60);
+    assert!(out["result"]["trace"]["digest"].as_str().is_some());
+}
+
+#[test]
+fn m07_function_sources_override_module_sources() {
+    use marqdo::mlsp::handle_line;
+    let dir = std::env::temp_dir().join(format!(
+        "marqdo-ek-fnsrc-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(dir.join("a.md"), "# alpha\n\nA\n").unwrap();
+    std::fs::write(dir.join("b.md"), "# beta\n\nB\n").unwrap();
+    std::fs::write(
+        dir.join("facts.mq.md"),
+        "---\nmarkup: occlusion\nsources:\n  - a.md#alpha\nfunction_sources:\n  rate:\n    - b.md#beta\napplicability:\n  valid_until: 2099-12-31\n---\n\n## rate\n\n*0.13*\n\n## other\n\n*1*\n",
+    )
+    .unwrap();
+    let found: serde_json::Value = serde_json::from_str(&handle_line(
+        &serde_json::json!({"method":"artifact.find","params":{"project":&dir,"query":"rate","kind":"function"}})
+            .to_string(),
+    ))
+    .unwrap();
+    let id = found["result"]["candidates"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|c| c["kind"] == "function" && c["display_name"] == "rate")
+        .unwrap()["artifact_id"]
+        .as_str()
+        .unwrap();
+    let rate: serde_json::Value = serde_json::from_str(&handle_line(
+        &serde_json::json!({"method":"artifact.inspect","params":{"project":&dir,"artifact_id":id}})
+            .to_string(),
+    ))
+    .unwrap();
+    assert_eq!(rate["ok"], true, "{rate}");
+    let prov = rate["result"]["provenance"].as_array().unwrap();
+    assert!(
+        prov.iter()
+            .any(|p| p["relation"] == "supports" && p["uri"] == "b.md"),
+        "rate must use function_sources b.md: {rate}"
+    );
+    assert!(
+        !prov
+            .iter()
+            .any(|p| p["relation"] == "supports" && p["uri"] == "a.md"),
+        "rate must not inherit module a.md when overridden: {rate}"
+    );
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn m08_story_build_reuse_invalidate_repair() {
+    // Full story: bind → execute → source edit invalidates → rebind succeeds.
+    use marqdo::mlsp::handle_line;
+    let dir = std::env::temp_dir().join(format!(
+        "marqdo-ek-story-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(dir.join("source.md"), "# rate\n\nv=0.13\n").unwrap();
+    std::fs::write(
+        dir.join("facts.mq.md"),
+        "---\nmarkup: occlusion\nsources:\n  - source.md#rate\napplicability:\n  region: CN\n  valid_until: 2099-12-31\n---\n\n## rate\n\n*0.13*\n",
+    )
+    .unwrap();
+    let found: serde_json::Value = serde_json::from_str(&handle_line(
+        &serde_json::json!({"method":"artifact.find","params":{"project":&dir,"query":"rate","kind":"function"}})
+            .to_string(),
+    ))
+    .unwrap();
+    let id = found["result"]["candidates"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|c| c["kind"] == "function")
+        .unwrap()["artifact_id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    let first: serde_json::Value = serde_json::from_str(&handle_line(
+        &serde_json::json!({
+            "method":"artifact.reuse_execute",
+            "params":{"project":&dir,"artifact_id":&id,"policy":"business","inputs":{}}
+        })
+        .to_string(),
+    ))
+    .unwrap();
+    assert_eq!(first["ok"], true, "first reuse: {first}");
+    assert_eq!(first["result"]["result"], 0.13);
+    let handle = {
+        let bound: serde_json::Value = serde_json::from_str(&handle_line(
+            &serde_json::json!({"method":"artifact.bind","params":{"project":&dir,"artifact_id":&id,"policy":"business"}})
+                .to_string(),
+        ))
+        .unwrap();
+        bound["result"]["handle"].clone()
+    };
+    std::fs::write(dir.join("source.md"), "# rate\n\nv=0.14\n").unwrap();
+    let stale: serde_json::Value = serde_json::from_str(&handle_line(
+        &serde_json::json!({"method":"artifact.execute","params":{"handle":handle,"inputs":{}}})
+            .to_string(),
+    ))
+    .unwrap();
+    assert_eq!(stale["ok"], false, "stale after source edit: {stale}");
+    let repaired: serde_json::Value = serde_json::from_str(&handle_line(
+        &serde_json::json!({
+            "method":"artifact.reuse_execute",
+            "params":{"project":&dir,"artifact_id":&id,"policy":"business","inputs":{}}
+        })
+        .to_string(),
+    ))
+    .unwrap();
+    assert_eq!(repaired["ok"], true, "rebind after repair: {repaired}");
+    assert_eq!(repaired["result"]["result"], 0.13);
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn m05_skill_core_card_has_access_not_classic_index() {
+    // skill_core_card text is embedded in ext/ai; SKILL body already gated by m05_*.
+    // Also assert migration card and CORE SYNTAX marker remain the release contract.
+    let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let agent = std::fs::read_to_string(root.join("ext/ai/agent.mq.md")).unwrap();
+    assert!(
+        agent.contains("## skill_core_card") && agent.contains("access(coll, key)"),
+        "skill_core_card must teach access()"
+    );
+    assert!(
+        !agent.contains("never **bold** to print") || agent.contains("never use bold markers"),
+        "core card must not rely on conflicting bold-as-print Classic wording"
+    );
+}
+
+#[test]
+fn v1_view_exports_knowledge_presentation_and_explain_links() {
+    let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let out_dir = std::env::temp_dir().join(format!(
+        "marqdo-ek-v1-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    let _ = std::fs::remove_dir_all(&out_dir);
+    let status = Command::new(env!("CARGO_BIN_EXE_marqdo"))
+        .args([
+            "view",
+            "output",
+            "--out",
+            out_dir.to_str().unwrap(),
+            "--no-exec",
+            "tests/executable_knowledge/baseline/02-extract/main.mq.md",
+        ])
+        .current_dir(&root)
+        .output()
+        .unwrap();
+    assert_eq!(status.status.code(), Some(0));
+    let mut html = String::new();
+    fn walk(dir: &std::path::Path, acc: &mut String) {
+        let Ok(rd) = std::fs::read_dir(dir) else {
+            return;
+        };
+        for ent in rd.flatten() {
+            let p = ent.path();
+            if p.is_dir() {
+                walk(&p, acc);
+            } else if p.extension().and_then(|e| e.to_str()) == Some("html") {
+                if let Ok(s) = std::fs::read_to_string(&p) {
+                    if s.contains("mq-knowledge-presentation") || s.contains("knowledge-explain") {
+                        *acc = s;
+                    }
+                }
+            }
+        }
+    }
+    walk(&out_dir, &mut html);
+    assert!(
+        html.contains("mq-knowledge-presentation"),
+        "V1 must embed KnowledgePresentation JSON"
+    );
+    assert!(
+        html.contains("knowledge-explain") || html.contains("id=\"knowledge-"),
+        "V1 must expose explain / knowledge anchors: {}",
+        &html[..html.len().min(400)]
+    );
+    assert!(
+        !html.contains("\"verified_claim\":true"),
+        "must not claim verified without evidence runner"
+    );
+    let _ = std::fs::remove_dir_all(&out_dir);
+}
+
+#[test]
+fn v2_sse_accepts_packet_rejects_stale_token() {
+    assert!(marqdo::view::sse_accepts_packet("abc", None));
+    assert!(marqdo::view::sse_accepts_packet("abc", Some("")));
+    assert!(marqdo::view::sse_accepts_packet("abc", Some("abc")));
+    assert!(!marqdo::view::sse_accepts_packet("abc", Some("zzz")));
+    assert_eq!(
+        marqdo::view::page_token_from_source("a.mq.md", "x"),
+        marqdo::view::page_token_from_source("a.mq.md", "x")
+    );
+    assert_ne!(
+        marqdo::view::page_token_from_source("a.mq.md", "x"),
+        marqdo::view::page_token_from_source("a.mq.md", "y")
+    );
+}
+
+#[test]
+fn v2_view_embeds_page_token_and_semantic_generation() {
+    let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let out_dir = std::env::temp_dir().join(format!(
+        "marqdo-ek-v2-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    let _ = std::fs::remove_dir_all(&out_dir);
+    let status = Command::new(env!("CARGO_BIN_EXE_marqdo"))
+        .args([
+            "view",
+            "output",
+            "--out",
+            out_dir.to_str().unwrap(),
+            "--no-exec",
+            "tests/executable_knowledge/baseline/12-tax-source/main.mq.md",
+        ])
+        .current_dir(&root)
+        .output()
+        .unwrap();
+    assert_eq!(status.status.code(), Some(0), "{}", String::from_utf8_lossy(&status.stderr));
+    let mut html = String::new();
+    fn walk(dir: &std::path::Path, acc: &mut String) {
+        let Ok(rd) = std::fs::read_dir(dir) else {
+            return;
+        };
+        for ent in rd.flatten() {
+            let p = ent.path();
+            if p.is_dir() {
+                walk(&p, acc);
+            } else if p.extension().and_then(|e| e.to_str()) == Some("html") {
+                if let Ok(s) = std::fs::read_to_string(&p) {
+                    if s.contains("mq-knowledge-presentation") {
+                        *acc = s;
+                    }
+                }
+            }
+        }
+    }
+    walk(&out_dir, &mut html);
+    assert!(html.contains("MARQDO_VIEW_PAGE_TOKEN"), "page token global");
+    assert!(html.contains("\"semantic_generation\""), "presentation generation");
+    assert!(html.contains("\"page_token\""), "presentation page_token");
+    assert!(html.contains("\"local_deps\""), "local deps edges");
+    assert!(
+        html.contains("已关联来源") || html.contains("尚未核验"),
+        "sourced must not look verified"
+    );
+    assert!(
+        html.contains("stale result ignored") || html.contains("page_token"),
+        "SSE stale reject path present in page script"
+    );
+    let _ = std::fs::remove_dir_all(&out_dir);
+}
+
+#[test]
+fn v3_corpus_1000_compile_smoke() {
+    // Scale gate: 1000 tiny units compile under a fixed wall budget (no per-unit dual-backend).
+    let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let dir = std::env::temp_dir().join(format!(
+        "marqdo-ek-corpus1000-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    for i in 0..1000u32 {
+        let n = i + 1;
+        let src = format!(
+            "---\nmarkup: occlusion\ntitle: unit-{n}\n---\n\n# main\n\n**v = [翻倍]({n} * 2)**\n*v*\n"
+        );
+        std::fs::write(dir.join(format!("u{n:04}.mq.md")), src).unwrap();
+    }
+    let out = dir.join(".marqdo-out");
+    let start = std::time::Instant::now();
+    let status = Command::new(env!("CARGO_BIN_EXE_marqdo"))
+        .args(["knowledge", dir.to_str().unwrap(), "-o", out.to_str().unwrap()])
+        .current_dir(&root)
+        .output()
+        .unwrap();
+    let elapsed = start.elapsed();
+    assert_eq!(
+        status.status.code(),
+        Some(0),
+        "stderr={}",
+        String::from_utf8_lossy(&status.stderr)
+    );
+    assert!(out.join("CURRENT").is_file());
+    assert!(
+        out.join("publish_manifest.json").is_file() || out.join("CURRENT").is_file(),
+        "generation published"
+    );
+    // Soft budget: 1000 units should finish offline compile in under 3 minutes on CI.
+    assert!(
+        elapsed.as_secs() < 180,
+        "1000-unit knowledge compile took {:?}",
+        elapsed
+    );
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn v3_view_css_has_responsive_and_print_and_nojs_structure() {
+    let cssish = std::fs::read_to_string(
+        std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("src/view/html.rs"),
+    )
+    .unwrap();
+    assert!(cssish.contains("@media print"));
+    assert!(cssish.contains("@media (max-width: 640px)") || cssish.contains("max-width: 760px"));
+    assert!(cssish.contains("prefers-color-scheme") || cssish.contains("--muted"));
+    // no-JS: structure/knowledge/source blocks remain in static HTML (not JS-only).
+    assert!(cssish.contains("structure-block"));
+    assert!(cssish.contains("knowledge-block"));
+}
+
+#[test]
+fn m01_extract_pdf_and_ocr_fail_explicitly() {
+    use marqdo::mlsp::handle_line;
+    let dir = std::env::temp_dir().join(format!(
+        "marqdo-ek-extract-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    let pdf = dir.join("x.pdf");
+    std::fs::write(&pdf, b"%PDF-1.4 fake").unwrap();
+    let png = dir.join("scan.png");
+    std::fs::write(&png, b"\x89PNG").unwrap();
+    for (path, expect_fmt) in [(&pdf, "pdf"), (&png, "png")] {
+        let out: serde_json::Value = serde_json::from_str(&handle_line(
+            &serde_json::json!({"method":"document.extract","params":{"path": path}})
+                .to_string(),
+        ))
+        .unwrap();
+        assert_eq!(out["ok"], true, "{out}");
+        assert_eq!(out["result"]["status"], "failed", "{expect_fmt}: {out}");
+        assert!(
+            out["result"]["missing"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|m| m == "full_document"),
+            "{expect_fmt}: {out}"
+        );
+    }
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn f1_publish_gate_chain_via_verify_may_publish() {
+    // Framework-side gate: static verify never may_publish; reuse_execute is actual reuse.
+    use marqdo::mlsp::handle_line;
+    let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/executable_knowledge/baseline/02-extract");
+    let found: serde_json::Value = serde_json::from_str(&handle_line(
+        &serde_json::json!({"method":"artifact.find","params":{"project":&root,"query":"商品小计","kind":"function"}})
+            .to_string(),
+    ))
+    .unwrap();
+    let id = found["result"]["candidates"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|c| c["kind"] == "function")
+        .unwrap()["artifact_id"]
+        .as_str()
+        .unwrap();
+    let reused: serde_json::Value = serde_json::from_str(&handle_line(
+        &serde_json::json!({
+            "method":"artifact.reuse_execute",
+            "params":{"project":&root,"artifact_id":id,"policy":"pure","inputs":{"数量":2,"单价":30}}
+        })
+        .to_string(),
+    ))
+    .unwrap();
+    assert_eq!(reused["ok"], true, "{reused}");
+    assert_eq!(reused["result"]["actual_reuse"], true);
+    let verify: serde_json::Value = serde_json::from_str(&handle_line(
+        &serde_json::json!({"method":"artifact.verify","params":{"project":&root,"artifact_id":id,"policy":"pure"}})
+            .to_string(),
+    ))
+    .unwrap();
+    assert_eq!(verify["ok"], true, "{verify}");
+    assert_eq!(
+        verify["result"]["may_publish"], false,
+        "must not promote from static verify alone: {verify}"
+    );
+}
+
+#[test]
+fn f1_agent_eng_bind_gate_mq_offline() {
+    let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let out = Command::new(env!("CARGO_BIN_EXE_marqdo"))
+        .args([
+            "run",
+            "tests/ext/agent-eng-bind-gate.mq.md",
+            "--backend",
+            "tree",
+        ])
+        .current_dir(&root)
+        .output()
+        .unwrap();
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stdout={stdout}\nstderr={stderr}"
+    );
+    assert!(stdout.contains("agent-eng-bind-gate-ok"), "{stdout}");
+    assert!(stdout.contains("actual-reuse-ok"), "{stdout}");
+    assert!(stdout.contains("candidate-only-blocks-promote"), "{stdout}");
 }

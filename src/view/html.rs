@@ -58,6 +58,17 @@ fn stylesheet() -> &'static str {
 }
 * { box-sizing: border-box; }
 html { scroll-behavior: smooth; }
+[id] { scroll-margin-top: 4.5rem; }
+.knowledge-block summary { cursor: pointer; font-weight: 600; }
+.knowledge-hint { color: var(--muted); font-size: 0.85em; margin: 0.25rem 0 0.5rem; }
+.knowledge-error .err { color: #8b1a1a; }
+@media print {
+  .topbar, .stdin-form, .stream-panel, .exec-clear, #notebook-bar, nav { display: none !important; }
+  .knowledge-block, .source-block { display: block; }
+}
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+}
 body {
   margin: 0;
   min-height: 100vh;
@@ -2150,6 +2161,14 @@ pub fn layout(title: &str, nav: &str, main: &str) -> String {
             scrollIfPinned();
           }}
           if (thinkingEl && (answerNode && answerNode.data)) thinkingEl.open = false;
+          // V2: reject stale result packets when page_token mismatches (source changed).
+          var pageTok = window.MARQDO_VIEW_PAGE_TOKEN || "";
+          var pktTok = (typeof ev.page_token === "string") ? ev.page_token : "";
+          var acceptPacket = !pktTok || !pageTok || pktTok === pageTok;
+          if (!acceptPacket) {{
+            if (status) status.textContent = "stale result ignored";
+            return;
+          }}
           if (typeof ev.bindings_html === "string") {{
             var vp = document.getElementById("vars-panel");
             if (vp) {{
@@ -2161,10 +2180,38 @@ pub fn layout(title: &str, nav: &str, main: &str) -> String {
           if (typeof ev.structure_html === "string" && ev.structure_html) {{
             var structEl = document.getElementById("structure");
             if (structEl) {{
+              // Preserve call/loop frame selection across SSE structure swap.
+              var savedCall = {{}};
+              structEl.querySelectorAll("select.call-picker").forEach(function(sel) {{
+                if (sel.id) savedCall[sel.id] = sel.value;
+              }});
+              var savedLoop = {{}};
+              structEl.querySelectorAll("select.loop-picker").forEach(function(sel) {{
+                if (sel.id) savedLoop[sel.id] = sel.value;
+              }});
+              var focusId = (document.activeElement && document.activeElement.id) || "";
               structEl.innerHTML = ev.structure_html;
               initAnnotLeaders();
               initCallPickers();
               initLoopPickers();
+              Object.keys(savedCall).forEach(function(id) {{
+                var el = document.getElementById(id);
+                if (el && savedCall[id]) {{
+                  el.value = savedCall[id];
+                  el.dispatchEvent(new Event("change", {{ bubbles: true }}));
+                }}
+              }});
+              Object.keys(savedLoop).forEach(function(id) {{
+                var el = document.getElementById(id);
+                if (el && savedLoop[id]) {{
+                  el.value = savedLoop[id];
+                  el.dispatchEvent(new Event("change", {{ bubbles: true }}));
+                }}
+              }});
+              if (focusId) {{
+                var fe = document.getElementById(focusId);
+                if (fe && fe.focus) try {{ fe.focus(); }} catch (e) {{}}
+              }}
             }}
           }}
           if (typeof ev.trace_json === "string" && ev.trace_json) {{
@@ -4153,11 +4200,12 @@ pub fn page_file(files: &[PathBuf], rel: &str, vm: &FileViewModel, links: &LinkM
             }
         }
     };
-    let title = Path::new(rel)
+    let fallback_title = Path::new(rel)
         .file_name()
         .and_then(|s| s.to_str())
         .unwrap_or(rel)
         .trim_end_matches(".mq.md");
+    let title = crate::view::title_from_source(&vm.source, fallback_title);
     let plots_html = if vm.plots.is_empty() {
         String::new()
     } else {
@@ -4224,43 +4272,59 @@ pub fn page_file(files: &[PathBuf], rel: &str, vm: &FileViewModel, links: &LinkM
 window.MARQDO_VIEW_LIVE = {live};
 window.MARQDO_FILE_PATH = {path_js};
 window.MARQDO_AUTO_STREAM = {auto_stream};
+window.MARQDO_VIEW_PAGE_TOKEN = {page_token_js};
 </script>
 <script type="application/json" id="mq-view-trace">{trace}</script>
 <h1 class="page">{title}<span class="status-pill {status}">{status_label}</span></h1>
 <p class="meta">{rel}</p>
 {notebook}
-{knowledge}
-<section class="block structure-block">
-  <h2>Structure</h2>
+<section class="block structure-block" id="structure">
+  <h2>文档</h2>
   {structure_block}
 </section>
+{knowledge}
 <section class="block exec-block" id="exec-block">
-  <h2>Execution {exec_clear}</h2>
+  <h2>运行与结果 {exec_clear}</h2>
   {stdin_panel}
   {stream_panel}
   {plan_card}
   <div class="out {status}" id="exec-main">{out}</div>
   {plots}
 </section>
-<section class="block source-block">
-  <h2>Source</h2>
+<details class="block source-block">
+  <summary>完整源码</summary>
   <pre class="source">{source}</pre>
-</section>
+</details>
 "#,
         live = live_flag,
         path_js = escape_js_string(rel),
         auto_stream = if vm.auto_stream { "true" } else { "false" },
+        page_token_js = escape_js_string(&vm.page_token),
         trace = if trace_safe.is_empty() {
             "{}"
         } else {
             trace_safe.as_str()
         },
-        title = escape(title),
+        title = escape(&title),
         status = status,
         status_label = status_label,
         rel = escape(rel),
         notebook = notebook,
-        knowledge = if vm.knowledge_html.is_empty() { String::new() } else { format!("<section class=\"block knowledge-block\"><h2>Executable knowledge</h2>{}</section>", vm.knowledge_html) },
+        knowledge = {
+            if !vm.knowledge_error.is_empty() {
+                format!(
+                    "<section class=\"block knowledge-block knowledge-error\"><h2>知识关系</h2><p class=\"err\">{}</p></section>",
+                    escape(&vm.knowledge_error)
+                )
+            } else if vm.knowledge_html.is_empty() {
+                String::new()
+            } else {
+                format!(
+                    "<details class=\"block knowledge-block\"><summary>可执行知识（辅助）</summary>{}</details>",
+                    vm.knowledge_html
+                )
+            }
+        },
         exec_clear = exec_clear,
         structure_block = structure_block,
         stdin_panel = stdin_panel,

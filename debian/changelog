@@ -1,3 +1,11 @@
+marqdo (2.1.2-1ppa1) noble; urgency=medium
+
+  * Marqdo 2.1.2: executable-knowledge F0–F3 + View V0–V3 release bar
+    (evidence/closure, verify gates, bind/reuse_execute, document.extract,
+    KnowledgePresentation, SSE page_token, upload max_bytes).
+
+ -- cflmy <pingan@cflmy.cn>  Sat, 24 Oct 2026 14:50:00 +0000
+
 marqdo (2.1.1-1ppa1) noble; urgency=medium
 
   * Marqdo 2.1.1: executable-knowledge spine (BoundCall, NarrativeRef,

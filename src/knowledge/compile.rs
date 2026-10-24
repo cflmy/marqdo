@@ -37,6 +37,7 @@ pub fn compile(opts: KnowledgeOptions) -> Result<KnowledgeGraph> {
     };
     let graph = extract_graph(&extract_opts)?;
     write_projections(&opts.out_dir, &graph)?;
+    write_publish_manifest(&opts.out_dir, &semantic, &graph)?;
     eprintln!(
         "marqdo knowledge: {} module(s), {} symbol(s), {} capability(ies), {} knowledge → {} (semantic graph/; retrieval ekc/)",
         graph.modules.len(),
@@ -46,6 +47,52 @@ pub fn compile(opts: KnowledgeOptions) -> Result<KnowledgeGraph> {
         opts.out_dir.display()
     );
     Ok(graph)
+}
+
+/// M06: associate semantic generation, retrieval generation, and source digests.
+fn write_publish_manifest(
+    out_dir: &Path,
+    semantic: &crate::sema::Compilation,
+    graph: &KnowledgeGraph,
+) -> Result<()> {
+    let current = fs::read_to_string(out_dir.join("CURRENT")).unwrap_or_default();
+    let generation = current.trim().to_string();
+    let source_digest = {
+        use sha2::{Digest, Sha256};
+        let mut h = Sha256::new();
+        for a in &semantic.semantics.artifacts {
+            h.update(a.hashes.artifact.0.as_bytes());
+        }
+        format!("sha256:{:x}", h.finalize())
+    };
+    let evidence_digest = {
+        use sha2::{Digest, Sha256};
+        let mut h = Sha256::new();
+        for a in &semantic.semantics.artifacts {
+            h.update(a.hashes.evidence.0.as_bytes());
+        }
+        format!("sha256:{:x}", h.finalize())
+    };
+    let manifest = json!({
+        "schema_version": 1,
+        "kind": "publish_manifest",
+        "semantic_generation": generation,
+        "retrieval": {
+            "ekc_graph": "ekc/graph",
+            "modules": graph.modules.len(),
+            "symbols": graph.symbols.len(),
+            "capabilities": graph.capabilities.len(),
+            "knowledge": graph.knowledge.len(),
+        },
+        "source_digest": source_digest,
+        "evidence_digest": evidence_digest,
+        "excluded_dirs": crate::project::EXCLUDED_DIRS,
+        "project_id": semantic.semantics.project_id,
+    });
+    let path = out_dir.join("publish_manifest.json");
+    fs::write(&path, serde_json::to_string_pretty(&manifest)?)
+        .with_context(|| format!("write {}", path.display()))?;
+    Ok(())
 }
 
 /// Directory for the legacy EKC retrieval projection (not execution authority).

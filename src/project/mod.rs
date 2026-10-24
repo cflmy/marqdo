@@ -72,14 +72,25 @@ impl ProjectRoot {
     }
 }
 
-const EXCLUDED_DIRS: &[&str] = &[
+/// Shared with EKC extract (M06): authored sources never include corpus/runtime bags.
+pub const EXCLUDED_DIRS: &[&str] = &[
     ".git",
     ".marqdo",
     "target",
     "node_modules",
     ".cursor",
     ".agents",
+    "data",
+    "docker",
+    "drafts",
+    "candidates",
+    "corpus",
 ];
+
+/// True when a directory basename is outside the authored source scan.
+pub fn is_excluded_dir_name(name: &str) -> bool {
+    EXCLUDED_DIRS.iter().any(|excluded| name == *excluded)
+}
 
 /// Soft limits so discovery fails with a clear diagnosis instead of hanging (G12).
 pub const MAX_SOURCE_DEPTH: u32 = 32;

@@ -572,9 +572,17 @@ fn artifact_for_function(
         content_digest: Some(implementation.clone()),
         relation: "defines".into(),
     }];
-    let resolved = super::provenance::resolve_provenance(path, module_prov);
-    provenance.extend(resolved.refs);
-    let evidence = digest(contract_summary(&contract));
+    let fn_sources = super::provenance::sources_for_function(module_prov, &function.name);
+    let mut fn_prov = module_prov.clone();
+    fn_prov.sources = fn_sources;
+    let resolved = super::provenance::resolve_provenance_sources(path, &fn_prov, &fn_prov.sources);
+    provenance.extend(resolved.refs.clone());
+    // M02: evidence digest includes contract + canonical provenance (URI/locator/content/applicability).
+    let evidence = digest(format!(
+        "{}|{}",
+        contract_summary(&contract),
+        resolved.evidence_record
+    ));
     let kind = match symbol.kind {
         SymbolKind::Type => "type",
         SymbolKind::Function => "function",
@@ -1012,39 +1020,139 @@ fn direct_effects(calls: &[(usize, CallExpr, u32)]) -> EffectSet {
 
 /// Propagate callee effects along local `dependencies` edges until fixpoint.
 /// Empty effect sets become `pure` only after closure (no unknown remains).
-/// Fixpoint closure digest: own artifact hash + sorted dependency closure hashes (G08).
+///
+/// Deterministic SCC closure digests (M02/G08):
+/// - Member seed = sorted `(artifact_id, interface, implementation)` within the SCC
+/// - External = sorted closures of dependencies outside the SCC
+/// - All members of an SCC share one closure digest
 fn close_closure_digests(artifacts: &mut [SemanticArtifact]) {
     let n = artifacts.len();
+    if n == 0 {
+        return;
+    }
     let index: BTreeMap<String, usize> = artifacts
         .iter()
         .enumerate()
         .map(|(i, a)| (a.artifact_id.0.clone(), i))
         .collect();
-    for _ in 0..n.saturating_add(1) {
-        let mut changed = false;
-        let snap: Vec<String> = artifacts
-            .iter()
-            .map(|a| a.hashes.closure.0.clone())
-            .collect();
-        for artifact in artifacts.iter_mut() {
-            let mut parts = vec![artifact.hashes.artifact.0.clone()];
-            for dep in &artifact.dependencies {
-                if let Some(&i) = index.get(&dep.0) {
-                    parts.push(snap[i].clone());
-                } else {
-                    parts.push(dep.0.clone());
+
+    // Tarjan SCC
+    let mut stack: Vec<usize> = Vec::new();
+    let mut on_stack = vec![false; n];
+    let mut indices = vec![-1i32; n];
+    let mut lowlink = vec![0i32; n];
+    let mut index_counter = 0i32;
+    let mut sccs: Vec<Vec<usize>> = Vec::new();
+
+    fn strongconnect(
+        v: usize,
+        artifacts: &[SemanticArtifact],
+        index_map: &BTreeMap<String, usize>,
+        stack: &mut Vec<usize>,
+        on_stack: &mut [bool],
+        indices: &mut [i32],
+        lowlink: &mut [i32],
+        index_counter: &mut i32,
+        sccs: &mut Vec<Vec<usize>>,
+    ) {
+        indices[v] = *index_counter;
+        lowlink[v] = *index_counter;
+        *index_counter += 1;
+        stack.push(v);
+        on_stack[v] = true;
+        for dep in &artifacts[v].dependencies {
+            if let Some(&w) = index_map.get(&dep.0) {
+                if indices[w] < 0 {
+                    strongconnect(
+                        w,
+                        artifacts,
+                        index_map,
+                        stack,
+                        on_stack,
+                        indices,
+                        lowlink,
+                        index_counter,
+                        sccs,
+                    );
+                    lowlink[v] = lowlink[v].min(lowlink[w]);
+                } else if on_stack[w] {
+                    lowlink[v] = lowlink[v].min(indices[w]);
                 }
             }
-            parts.sort();
-            parts.dedup();
-            let next = digest(parts.join("|"));
-            if next.0 != artifact.hashes.closure.0 {
-                artifact.hashes.closure = next;
-                changed = true;
+        }
+        if lowlink[v] == indices[v] {
+            let mut scc = Vec::new();
+            loop {
+                let w = stack.pop().expect("tarjan stack");
+                on_stack[w] = false;
+                scc.push(w);
+                if w == v {
+                    break;
+                }
+            }
+            scc.sort_unstable();
+            sccs.push(scc);
+        }
+    }
+
+    for v in 0..n {
+        if indices[v] < 0 {
+            strongconnect(
+                v,
+                artifacts,
+                &index,
+                &mut stack,
+                &mut on_stack,
+                &mut indices,
+                &mut lowlink,
+                &mut index_counter,
+                &mut sccs,
+            );
+        }
+    }
+
+    // sccs are in reverse topological order (callees before callers for DAGs).
+    let mut scc_of = vec![0usize; n];
+    for (si, scc) in sccs.iter().enumerate() {
+        for &v in scc {
+            scc_of[v] = si;
+        }
+    }
+    let mut closure_done = vec![false; n];
+    for scc in &sccs {
+        let mut member_parts = Vec::new();
+        for &v in scc {
+            let a = &artifacts[v];
+            member_parts.push(format!(
+                "{}|{}|{}",
+                a.artifact_id.0, a.hashes.interface.0, a.hashes.implementation.0
+            ));
+        }
+        member_parts.sort();
+        member_parts.dedup();
+        let mut external = Vec::new();
+        for &v in scc {
+            for dep in &artifacts[v].dependencies {
+                if let Some(&w) = index.get(&dep.0) {
+                    if scc_of[w] != scc_of[v] && closure_done[w] {
+                        external.push(artifacts[w].hashes.closure.0.clone());
+                    } else if scc_of[w] != scc_of[v] {
+                        // External not yet closed — use artifact hash as stable seed.
+                        external.push(artifacts[w].hashes.artifact.0.clone());
+                    }
+                } else {
+                    external.push(dep.0.clone());
+                }
             }
         }
-        if !changed {
-            break;
+        external.sort();
+        external.dedup();
+        let mut parts = member_parts;
+        parts.extend(external);
+        let scc_digest = digest(parts.join("|"));
+        for &v in scc {
+            artifacts[v].hashes.closure = scc_digest.clone();
+            closure_done[v] = true;
         }
     }
 }

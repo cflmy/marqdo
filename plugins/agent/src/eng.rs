@@ -501,6 +501,175 @@ pub fn eng_reuse(args: &Value) -> Result<Value, String> {
     Ok(pf)
 }
 
+/// M04: discover → inspect → bind → execute → record (actual reuse, not n-gram REUSE).
+///
+/// Requires host_query `mlsp`. Returns trace with artifact_id, digests, inputs, result.
+/// Does **not** promote skills — callers pass `candidate_only=true` to skip learn/promote.
+pub fn eng_bind_execute(args: &Value) -> Result<Value, String> {
+    let project = args
+        .get("project")
+        .or_else(|| args.get("root"))
+        .and_then(|v| v.as_str())
+        .unwrap_or(".");
+    let policy = args
+        .get("policy")
+        .and_then(|v| v.as_str())
+        .unwrap_or("pure");
+    let inputs = args.get("inputs").cloned().unwrap_or(json!({}));
+    let query = if let Some(q) = args.get("artifact_id").or_else(|| args.get("query")).and_then(|v| v.as_str()) {
+        q.to_string()
+    } else {
+        // Fall back to first bind_target from eng_reuse.
+        let reuse = eng_reuse(args)?;
+        let targets = reuse
+            .get("bind_targets")
+            .and_then(|v| v.as_array())
+            .cloned()
+            .unwrap_or_default();
+        targets
+            .first()
+            .and_then(|t| t.get("query").and_then(|q| q.as_str()))
+            .ok_or_else(|| {
+                "eng_bind_execute: no artifact_id/query and eng_reuse returned no bind_targets"
+                    .to_string()
+            })?
+            .to_string()
+    };
+
+    let inspect = crate::host_query_json_args(
+        "mlsp",
+        &json!({"method":"artifact.inspect","params":{"project":project,"artifact_id":&query}}),
+    )?;
+    if inspect.get("ok") != Some(&json!(true)) {
+        return Ok(json!({
+            "ok": false,
+            "stage": "inspect",
+            "error": inspect.get("error").cloned().unwrap_or(json!("inspect failed")),
+            "query": query,
+        }));
+    }
+    let artifact_id = inspect["result"]["artifact_id"]
+        .as_str()
+        .unwrap_or(&query)
+        .to_string();
+
+    let bound = crate::host_query_json_args(
+        "mlsp",
+        &json!({"method":"artifact.bind","params":{"project":project,"artifact_id":&artifact_id,"policy":policy}}),
+    )?;
+    if bound.get("ok") != Some(&json!(true)) {
+        return Ok(json!({
+            "ok": false,
+            "stage": "bind",
+            "error": bound.get("error").cloned().unwrap_or(json!("bind failed")),
+            "artifact_id": artifact_id,
+            "discovery_only": false,
+        }));
+    }
+    let handle = bound["result"]["handle"].clone();
+
+    let executed = crate::host_query_json_args(
+        "mlsp",
+        &json!({"method":"artifact.execute","params":{"handle":&handle,"inputs":inputs}}),
+    )?;
+    if executed.get("ok") != Some(&json!(true)) {
+        return Ok(json!({
+            "ok": false,
+            "stage": "execute",
+            "error": executed.get("error").cloned().unwrap_or(json!("execute failed")),
+            "artifact_id": artifact_id,
+            "handle": handle,
+        }));
+    }
+
+    // Record only after successful bind+execute (actual reuse).
+    let _ = eng_record(&json!({
+        "decision": "REUSE",
+        "root": project,
+        "marqdo_dir": args.get("marqdo_dir"),
+    }));
+
+    Ok(json!({
+        "ok": true,
+        "stage": "executed",
+        "discovery_only": false,
+        "bind_required": false,
+        "actual_reuse": true,
+        "artifact_id": artifact_id,
+        "symbol_id": handle.get("symbol_id"),
+        "digest": handle.get("digest"),
+        "evidence_digest": handle.get("evidence_digest"),
+        "closure_digest": handle.get("closure_digest"),
+        "policy": policy,
+        "inputs": inputs,
+        "result": executed.get("result"),
+        "candidate_only": args.get("candidate_only").and_then(|v| v.as_bool()).unwrap_or(false),
+        "trace": {
+            "artifact_id": artifact_id,
+            "symbol_id": handle.get("symbol_id"),
+            "digest": handle.get("digest"),
+            "inputs": inputs,
+            "stdout": executed["result"]["stdout"],
+            "value": executed["result"]["result"],
+        },
+    }))
+}
+
+/// Gate promote/learn: when `candidate_only` or may_bind=false, refuse promotion.
+pub fn eng_publish_gate(args: &Value) -> Result<Value, String> {
+    let candidate_only = matches!(args.get("candidate_only"), Some(Value::Bool(true)));
+    let product_ok = !matches!(args.get("product_gate_ok"), Some(Value::Bool(false)));
+    let project = args
+        .get("project")
+        .or_else(|| args.get("root"))
+        .and_then(|v| v.as_str())
+        .unwrap_or(".");
+    let policy = args
+        .get("policy")
+        .and_then(|v| v.as_str())
+        .unwrap_or("business");
+    let artifact = args
+        .get("artifact_id")
+        .or_else(|| args.get("query"))
+        .and_then(|v| v.as_str());
+
+    if candidate_only {
+        return Ok(json!({
+            "ok": true,
+            "may_promote": false,
+            "reason": "candidate_only — framework must not promote",
+        }));
+    }
+    if !product_ok {
+        return Ok(json!({
+            "ok": true,
+            "may_promote": false,
+            "reason": "product gate failed — framework must not promote",
+        }));
+    }
+    if let Some(id) = artifact {
+        let adj = crate::host_query_json_args(
+            "mlsp",
+            &json!({"method":"artifact.verify","params":{"project":project,"artifact_id":id,"policy":policy}}),
+        )?;
+        let may_bind = adj
+            .pointer("/result/may_bind")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
+        return Ok(json!({
+            "ok": true,
+            "may_promote": may_bind,
+            "verification": adj.get("result"),
+            "reason": if may_bind { "verification allows bind" } else { "verification denied bind" },
+        }));
+    }
+    Ok(json!({
+        "ok": true,
+        "may_promote": product_ok,
+        "reason": "no artifact_id; deferred to product_gate_ok",
+    }))
+}
+
 /// `agent_eng_record` — append reuse metrics under `.marqdo/agent/episodes`.
 pub fn eng_record(args: &Value) -> Result<Value, String> {
     let decision = arg_text(args, "decision")?;

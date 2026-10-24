@@ -632,9 +632,10 @@ fn taken_arms_by_branch_line(annots: &[ViewAnnot]) -> HashMap<u32, usize> {
 
 fn render_fun_heading(fun: &Function, annots: &[ViewAnnot]) -> String {
     let mut s = format!(
-        r#"<div class="doc-fun" id="fn-{line}" data-fn="{name}" data-fn-path="{name}" data-line="{line}">
+        r##"<div class="doc-fun" id="fn-{line}" data-fn="{name}" data-fn-path="{name}" data-line="{line}">
 <div class="doc-fun-bar">
-<h3 class="doc-fun-title">{name}</h3>"#,
+<h3 class="doc-fun-title">{name}</h3>
+<a class="knowledge-explain" href="#knowledge-{name}" data-node="{name}">说明</a>"##,
         line = fun.span.line,
         name = escape(&fun.name),
     );

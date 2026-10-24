@@ -44,23 +44,38 @@ pub struct FileViewModel {
     /// SVG plots from math lib (embedded in Execution).
     pub plots: Vec<String>,
     /// HTML for Variables panel (entry bindings after run).
+    #[allow(dead_code)]
     pub bindings_html: String,
     /// ViewExecutionReport JSON for AI / call-picker (empty if no run).
     pub trace_json: String,
     /// Static semantic facts; generated without evaluating the document.
     pub knowledge_html: String,
+    /// Visible when semantic analysis fails (V0); empty when analysis succeeded or was skipped.
+    pub knowledge_error: String,
+    /// V2: page token for SSE stale-packet rejection (empty when unknown).
+    pub page_token: String,
 }
 
 /// A compact, textual (not colour-only) explanation of executable knowledge.
 /// View deliberately compiles semantics without running the target, so a page
 /// can show binding/effect/verification facts even in `--no-exec` exports.
+///
+/// V0: skip module/type container cards by default; rename lock digest accurately.
 pub fn render_knowledge_html(project: &crate::sema::SemanticProject, rel: &str) -> String {
-    let artifacts: Vec<_> = project.artifacts.iter().filter(|artifact| artifact.source.file == rel).collect();
+    let artifacts: Vec<_> = project
+        .artifacts
+        .iter()
+        .filter(|artifact| {
+            artifact.source.file == rel && artifact.kind != "module" && artifact.kind != "type"
+        })
+        .collect();
     let steps: Vec<_> = project.steps.iter().filter(|step| step.source.file == rel).collect();
-    if artifacts.is_empty() && steps.is_empty() { return String::new(); }
+    if artifacts.is_empty() && steps.is_empty() {
+        return String::new();
+    }
     let mut out = String::from(r#"<div class="knowledge-panel" aria-label="Executable knowledge">"#);
     if !steps.is_empty() {
-        out.push_str(r#"<article class="knowledge-card knowledge-steps"><h3>Steps</h3><ol class="knowledge-step-list">"#);
+        out.push_str(r#"<article class="knowledge-card knowledge-steps"><h3>文档中的步骤</h3><p class="knowledge-hint">结构步骤（非实际执行时序）</p><ol class="knowledge-step-list">"#);
         for step in &steps {
             let label = project
                 .refs
@@ -93,12 +108,38 @@ pub fn render_knowledge_html(project: &crate::sema::SemanticProject, rel: &str) 
         let signature = artifact.signature.as_ref().map(|sig| {
             let params = sig.params.iter().map(|param| format!("{}: {}{}", param.name, param.ty, if param.required { "" } else { "?" })).collect::<Vec<_>>().join(", ");
             format!("({params}) → {}", sig.returns)
-        }).unwrap_or_else(|| "module/type declaration".into());
+        }).unwrap_or_else(|| "declaration".into());
         let effects = artifact.effects.values().join(", ");
         let deps = if artifact.dependencies.is_empty() { "none".to_string() } else { artifact.dependencies.iter().map(|id| id.0.as_str()).collect::<Vec<_>>().join(", ") };
+        // Short digest for display; full value in title for copy.
+        let digest = &artifact.hashes.artifact.0;
+        let digest_short = if digest.len() > 20 {
+            format!("{}…", &digest[..20])
+        } else {
+            digest.clone()
+        };
+        let evidence_note = match artifact.verification.evidence.as_str() {
+            "sourced" => "已关联来源，内容尚未核验",
+            "verified" => "证据已核验",
+            "unverified" => "尚无来源记录",
+            other => other,
+        };
         out.push_str(&format!(
-            r#"<article class="knowledge-card"><h3>{}</h3><dl><dt>Target</dt><dd><code>{}</code></dd><dt>Kind</dt><dd>{}{}</dd><dt>Signature</dt><dd><code>{}</code></dd><dt>Effects</dt><dd>{}</dd><dt>Verification</dt><dd>parse: {}; resolve: {}; contract: {}; tests: {}; evidence: {}</dd><dt>Lock digest</dt><dd><code>{}</code></dd><dt>Depends on</dt><dd><code>{}</code></dd><dt>Execution</dt><dd>Not executed by knowledge preview.</dd></dl></article>"#,
-            escape(&artifact.display_name), escape(target), escape(&artifact.kind), artifact.callable.as_ref().map(|callable| format!(" ({})", escape(callable))).unwrap_or_default(), escape(&signature), escape(&effects), escape(&artifact.verification.parse), escape(&artifact.verification.resolve), escape(&artifact.verification.contract), escape(&artifact.verification.tests), escape(&artifact.verification.evidence), escape(&artifact.hashes.artifact.0), escape(&deps),
+            r#"<article class="knowledge-card" id="knowledge-{name}"><h3>{name} <span class="ks-kind">{kind}</span></h3><dl><dt>Target</dt><dd><code>{target}</code></dd><dt>Signature</dt><dd><code>{sig}</code></dd><dt>Effects</dt><dd>{effects}</dd><dt>Verification</dt><dd>parse: {parse}; resolve: {resolve}; contract: {contract}; tests: {tests}; evidence: {evidence}（{evidence_note}）</dd><dt>制品摘要</dt><dd><code title="{digest}">{digest_short}</code> <span class="knowledge-hint">（未检查锁定状态）</span></dd><dt>Depends on</dt><dd><code>{deps}</code></dd><dt>Execution</dt><dd>尚无该知识的运行记录（知识预览不执行）。</dd></dl></article>"#,
+            name = escape(&artifact.display_name),
+            kind = escape(&artifact.kind),
+            target = escape(target),
+            sig = escape(&signature),
+            effects = escape(&effects),
+            parse = escape(&artifact.verification.parse),
+            resolve = escape(&artifact.verification.resolve),
+            contract = escape(&artifact.verification.contract),
+            tests = escape(&artifact.verification.tests),
+            evidence = escape(&artifact.verification.evidence),
+            evidence_note = escape(evidence_note),
+            digest = escape(digest),
+            digest_short = escape(&digest_short),
+            deps = escape(&deps),
         ));
     }
     out.push_str("</div>");

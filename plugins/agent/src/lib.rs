@@ -831,6 +831,8 @@ kb_ffi!(agent_resume_clear, resume::resume_clear, "agent_resume_clear");
 kb_ffi!(agent_resume_list, resume::resume_list, "agent_resume_list");
 kb_ffi!(agent_eng_preflight, eng::eng_preflight, "agent_eng_preflight");
 kb_ffi!(agent_eng_reuse, eng::eng_reuse, "agent_eng_reuse");
+kb_ffi!(agent_eng_bind_execute, eng::eng_bind_execute, "agent_eng_bind_execute");
+kb_ffi!(agent_eng_publish_gate, eng::eng_publish_gate, "agent_eng_publish_gate");
 kb_ffi!(agent_eng_record, eng::eng_record, "agent_eng_record");
 
 #[no_mangle]
@@ -900,6 +902,8 @@ pub unsafe extern "C" fn marqdo_plugin_init(host: *const MarqdoHostApi) -> c_int
         ("agent_maybe_compile_policy", "memory_dir,min_evidence", agent_maybe_compile_policy),
         ("agent_eng_preflight", "task", agent_eng_preflight),
         ("agent_eng_reuse", "task", agent_eng_reuse),
+        ("agent_eng_bind_execute", "project,query,policy", agent_eng_bind_execute),
+        ("agent_eng_publish_gate", "project,artifact_id,candidate_only", agent_eng_publish_gate),
         ("agent_eng_record", "decision", agent_eng_record),
         ("sandbox_open", "", sandbox::sandbox_open),
         ("sandbox_write", "", sandbox::sandbox_write),

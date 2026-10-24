@@ -52,6 +52,15 @@
 | S4 书店 | **done** | `13-bookstore` + `examples/executable-knowledge` 发票链 |
 | S5/G04·G08 | **done** | 整代 `CURRENT`；锁 classes+closure；impact |
 | S6 CI / 语料 / 冒烟 | **done** | CI；100 单元；CLI smoke；扫描上限 |
+| F0/M02 证据·闭包·句柄 | **done** | evidence 含来源摘要；锚点诊断；business handle 改/删来源失效；SCC closure；`m02_*` |
+| F0/M03 验证裁决 | **done（子集）** | `artifact.verify` 结构化 may_bind；policy 枚举；`knowledge adjudicate` |
+| F0/M05 语法 Skill | **done** | CORE SYNTAX 置顶；`migration-classic.md`；`skill_core_card` |
+| View V0–V1 | **done** | 正文优先；no-exec 不执行；制品摘要；`KnowledgePresentation`；frontmatter title；说明锚点 |
+| View V2 | **done（子集）** | `page_token`/`semantic_generation`；SSE 过期包拒绝；帧选择保留；`local_deps`；sourced≠verified |
+| View V3 | **done（子集）** | print/响应式 CSS；100 单元确定性；1000 单元 compile smoke；无 JS 结构块仍在静态 HTML |
+| F1/M04 bind 闭环 | **done** | `artifact.reuse_execute` 实际复用；`agent_eng_bind_execute` + `publish_gate`（candidate_only / product gate）；`tests/ext/agent-eng-bind-gate.mq.md` |
+| F2/M06–M07 | **done（子集）** | 统一 `EXCLUDED_DIRS`；`publish_manifest.json`；`function_sources`；story 失效/修复 |
+| F3/M01 提取 | **done（子集）** | `document.extract` text/Markdown；PDF/DOCX/OCR 显式失败；超限截断 partial；上传 `max_bytes` |
 
 ## 与后续切片的关系
 

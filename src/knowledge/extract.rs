@@ -164,13 +164,7 @@ fn collect_mq_md(
         let p = entry.path();
         if p.is_dir() {
             let name = p.file_name().and_then(|s| s.to_str()).unwrap_or("");
-            if name == "target"
-                || name == ".git"
-                || name == "node_modules"
-                || name == "docker"
-                || name == "data"
-                || name == ".cursor"
-            {
+            if crate::project::is_excluded_dir_name(name) {
                 continue;
             }
             if let Ok(canon) = p.canonicalize() {
@@ -210,13 +204,7 @@ fn walk_knowledge_md(
         let p = entry.path();
         if p.is_dir() {
             let name = p.file_name().and_then(|s| s.to_str()).unwrap_or("");
-            if name == "target"
-                || name == ".git"
-                || name == ".marqdo"
-                || name == "docker"
-                || name == "data"
-                || name == ".cursor"
-            {
+            if crate::project::is_excluded_dir_name(name) {
                 continue;
             }
             if let Ok(canon) = p.canonicalize() {

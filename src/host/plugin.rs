@@ -460,6 +460,24 @@ unsafe extern "C" fn host_query(
             let cap = crate::run_file_capture(&p, &opts).map_err(|e| e.to_string())?;
             value_to_json(&cap.value)
         })(),
+        // M04: plugins may drive MLSP artifact.bind/execute without inventing a second protocol.
+        "mlsp" => (|| {
+            let raw = args_owned.as_deref().unwrap_or("{}");
+            let args: serde_json::Value = serde_json::from_str(if raw.trim().is_empty() {
+                "{}"
+            } else {
+                raw
+            })
+            .map_err(|e| format!("mlsp args: {e}"))?;
+            let method = args
+                .get("method")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| "mlsp requires `method`".to_string())?;
+            let params = args.get("params").cloned().unwrap_or(serde_json::json!({}));
+            let line = serde_json::json!({"method": method, "params": params}).to_string();
+            let resp = crate::mlsp::handle_line(&line);
+            serde_json::from_str(&resp).map_err(|e| format!("mlsp response: {e}"))
+        })(),
         other => Err(format!("host_query: unknown `{other}`")),
     };
 

@@ -323,6 +323,10 @@ enum Commands {
 
         #[arg(long)]
         json: bool,
+
+        /// Exit non-zero when conflicts found (CI gate; default remains report-only)
+        #[arg(long)]
+        fail: bool,
     },
     /// List stale / deprecated / superseded knowledge
     Stale {
@@ -334,6 +338,10 @@ enum Commands {
 
         #[arg(long)]
         json: bool,
+
+        /// Exit non-zero when stale items found (CI gate; default remains report-only)
+        #[arg(long)]
+        fail: bool,
     },
     /// Detect duplicate capabilities via symbol fingerprints
     Duplicate {
@@ -353,7 +361,7 @@ enum Commands {
         #[arg(long)]
         json: bool,
     },
-    /// Verify code ↔ knowledge consistency
+    /// Verify code ↔ knowledge consistency (EKC structural; exit 1 only on errors)
     Verify {
         #[arg(value_name = "PATH")]
         path: Option<PathBuf>,
@@ -363,6 +371,10 @@ enum Commands {
 
         #[arg(long)]
         json: bool,
+
+        /// Also fail on warnings (does not change default success-when-no-errors)
+        #[arg(long)]
+        fail_on_warning: bool,
     },
     /// Official extension installer (`list` / `add` / `remove`)
     Ext {
@@ -414,6 +426,18 @@ enum KnowledgeAction {
     Impact {
         #[arg(value_name = "SYMBOL_OR_PATH")]
         query: String,
+    },
+    /// Machine adjudication of semantic artifacts (M03): may_bind / may_publish
+    Adjudicate {
+        /// Artifact id, symbol id, or display name (omit to report all functions)
+        #[arg(value_name = "ARTIFACT")]
+        artifact: Option<String>,
+        /// Policy: pure | business | static
+        #[arg(long, default_value = "business")]
+        policy: String,
+        /// Exit 1 when any reported artifact has may_bind=false
+        #[arg(long)]
+        fail: bool,
     },
     /// Run engineering preflight for a task
     Preflight {
@@ -1324,6 +1348,51 @@ fn try_main(cli: Cli) -> Result<i32> {
                         1
                     })
                 }
+                KnowledgeAction::Adjudicate {
+                    artifact,
+                    policy,
+                    fail,
+                } => {
+                    let semantic_root = if path.is_file() {
+                        path.parent()
+                            .unwrap_or_else(|| std::path::Path::new("."))
+                            .to_path_buf()
+                    } else {
+                        path.clone()
+                    };
+                    let report = marqdo::mlsp::adjudicate_project(
+                        &semantic_root,
+                        artifact.as_deref(),
+                        &policy,
+                    )
+                    .map_err(|e| anyhow::anyhow!("{}", e))?;
+                    if json {
+                        println!("{report}");
+                    } else {
+                        println!(
+                            "knowledge adjudicate policy={} may_bind_all={} count={}",
+                            policy,
+                            report["may_bind_all"],
+                            report["count"]
+                        );
+                        for item in report["reports"].as_array().into_iter().flatten() {
+                            println!(
+                                "  {} evidence={} may_bind={} may_publish={}",
+                                item["artifact_id"].as_str().unwrap_or(""),
+                                item["verification"]["evidence"].as_str().unwrap_or(""),
+                                item["may_bind"],
+                                item["may_publish"]
+                            );
+                        }
+                    }
+                    Ok(
+                        if fail && report["may_bind_all"].as_bool() != Some(true) {
+                            1
+                        } else {
+                            0
+                        },
+                    )
+                }
                 KnowledgeAction::Preflight {
                     task,
                     min_candidates,
@@ -1462,7 +1531,12 @@ fn try_main(cli: Cli) -> Result<i32> {
             }
             Ok(0)
         }
-        Commands::Conflicts { path, out, json } => {
+        Commands::Conflicts {
+            path,
+            out,
+            json,
+            fail,
+        } => {
             let path = path.unwrap_or_else(|| PathBuf::from("."));
             let graph = ensure_compiled(&path, &out)?;
             let items = find_conflicts(&graph);
@@ -1471,9 +1545,14 @@ fn try_main(cli: Cli) -> Result<i32> {
             } else {
                 print!("{}", format_conflicts_text(&items));
             }
-            Ok(0)
+            Ok(if fail && !items.is_empty() { 1 } else { 0 })
         }
-        Commands::Stale { path, out, json } => {
+        Commands::Stale {
+            path,
+            out,
+            json,
+            fail,
+        } => {
             let path = path.unwrap_or_else(|| PathBuf::from("."));
             let graph = ensure_compiled(&path, &out)?;
             let items = find_stale(&graph, &path);
@@ -1482,7 +1561,7 @@ fn try_main(cli: Cli) -> Result<i32> {
             } else {
                 print!("{}", format_stale_text(&items));
             }
-            Ok(0)
+            Ok(if fail && !items.is_empty() { 1 } else { 0 })
         }
         Commands::Duplicate {
             path,
@@ -1517,7 +1596,12 @@ fn try_main(cli: Cli) -> Result<i32> {
                 Ok(0)
             }
         }
-        Commands::Verify { path, out, json } => {
+        Commands::Verify {
+            path,
+            out,
+            json,
+            fail_on_warning,
+        } => {
             let path = path.unwrap_or_else(|| PathBuf::from("."));
             let graph = ensure_compiled(&path, &out)?;
             let issues = verify(&graph);
@@ -1527,7 +1611,12 @@ fn try_main(cli: Cli) -> Result<i32> {
                 print!("{}", format_verify_text(&issues));
             }
             let errors = issues.iter().filter(|i| i.severity == "error").count();
-            Ok(if errors > 0 { 1 } else { 0 })
+            let warnings = issues.iter().filter(|i| i.severity == "warning").count();
+            Ok(if errors > 0 || (fail_on_warning && warnings > 0) {
+                1
+            } else {
+                0
+            })
         }
         Commands::Ext { action } => {
             match action {

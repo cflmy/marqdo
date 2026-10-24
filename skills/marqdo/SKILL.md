@@ -14,67 +14,48 @@ description: >-
 
 Marqdo = **Markdown markers as syntax**. A `.mq.md` file is both documentation and a runnable program. Read this skill **before** inventing syntax from Markdown habits or Python.
 
-Canonical design (repo): `doc/design/markdown-mapping.md`, `doc/design/keywords.md`. Deeper tables: [reference.md](reference.md). Copy-paste patterns: [examples.md](examples.md).
+<!-- CORE_SYNTAX_V2.1: must stay at the top so skill_brief budgets never truncate it -->
 
-**Authoring / library craft** (GFM-first, no json glue, how to develop Marqdo): use **[marqdo-dev](../marqdo-dev/SKILL.md)** whenever writing or refactoring `.mq.md`, `lib/*`, or `ext/*`.
+## CORE SYNTAX (v2.1 Occlusion — mandatory)
 
-**Product release** (tag, CHANGELOG, README, public docs, VSIX, GitHub assets): use [marqdo-release](../marqdo-release/SKILL.md) — detect latest version, **ask the user for the next SemVer**, then follow that playbook. Do not invent a version number.
+These rules are the **current default**. Do **not** teach Classic `[key](map)` index or “bold is return of print”. Classic migration only: [migration-classic.md](migration-classic.md).
+
+1. **File suffix** `.mq.md`. Print with `> print text=…` / `> 打印 内容=…` — never use `**…**` to print.
+2. **`**…**` = code / return expression.** `*…*` = statement (bind / expr). Closing markers touch the last token (no trailing space).
+3. **`[描述](payload)` = occlusion:** `[]` is prose (never executed); `()` is the only executed part. Empty `()` → `None` stub.
+4. **Read collections with `access(coll, key)`** (aliases `取` / `取值`). **Never** use `[key](map)` as index under default Occlusion.
+5. **Foreach:** `- [描述](遍历 coll 为 item)` (`遍历`/`for`, `为`/`as`/`in`). Prefer explicit traversal when generating new code.
+6. **Import / call:** frontmatter `import:` / `导入:`; call `lib.member`. One language (EN or ZH) per file.
+7. **Control flow:** `#` object/type, `##`+ function, `+` params, `1.`/`2.` branches, `-` loops, `N. *` else. No invented `if`/`for`/`def`/`return` keywords.
+8. **Prose vs code:** blank line separates comment paragraphs from executable lines.
+9. **GFM tables** for data; prefer `table.put` over `json.set` chains. `ext/**` never calls `host_*`.
+10. Body narrative `[描述](target)` is lazy (NarrativeRef) — reading does not execute side effects.
+
+| Marker | Meaning (v2.1) |
+|--------|----------------|
+| `#` / `##`+ | Object/type · function/method |
+| `*…*` | Statement |
+| `**…**` | Return / code expression |
+| `[描述](payload)` | Occlusion step (payload executes) |
+| `access(c, k)` | Collection read |
+| `> fn …` | Call |
+| GFM table | Collection literal |
+
+Canonical: `doc/design/core-surface.md`, `doc/design/document-native-development-guide.md`. Deeper tables: [reference.md](reference.md). Patterns: [examples.md](examples.md). Authoring craft: [marqdo-dev](../marqdo-dev/SKILL.md). Release: [marqdo-release](../marqdo-release/SKILL.md).
+
+Executable-knowledge gate: [`tests/executable_knowledge/`](../../tests/executable_knowledge/README.md).
 
 ## Hard rules (do not violate)
 
-1. **File suffix** must be `.mq.md` (never plain `.md` for executable sources).
-2. **Output is not `**bold**`.** Print with `> print text=…` (or `> 打印 内容=…`). Bold `**…**` is **return value only**.
-3. **Prose vs code:** after a blank line, an unmarked first line starts a **comment paragraph**; every following non-blank line stays comment until the next blank line. Put a **blank line** between narration and executable lines.
-4. **Do not invent keywords** `if` / `else` / `while` / `for` / `def` / `return`. Control flow is Markdown: **`+` params** (under heading), **`1.` `2.` … branches**, **`-` loops**, arm `N. *` = else, `#` = **object/type**, `##`+ = **function/method**, `**…**` = return.
-5. **Identifiers use backticks** — params `` + `name` ``. **Exemptions:** foreach `` - [item](coll) ``; footnote `` name[^key] ``; **inside italic `*…*` / bold `**…**`**, bare ids are **variables** (Python-style unified namespace) and method-call receivers are bare too. **Drop the backticks on value-expression variable names and method receivers inside `*…*` / `**…**`** — they are redundant once the `*…*`/`**…**` markers mark the segment as code: `*分类 = 分类[^苹果]*`, `**n * 2**`, `*p = > page.主体装配 组件=home*`. **Text literals must be quoted**: `*a = > text.split value=src sep=","*`. Backticks **still required** where a bare word is *not* a variable in **standalone `>` calls** (bare = text there): `` > str `n` ``, `` > `obj`.method ``. **No trailing space** inside `*…*` / `**…**` wrapped code: the closing marker must touch the last token directly (`*a = 1*`, `**n**`), never `` *a = 1 * ``.
-6. **Structure lines are not wrapped in italics.** `#` `>` `+` `-` `|` lines stand alone; use `*…*` only for general statements (bindings / expressions).
-7. **Paths:** In bare *expressions* `/` is division. In **call args / param defaults / table cells**, unspaced `a/b` and quoted `".marqdo/agent-kb"` are path text — no `json.parse` needed. Numeric ratios that must stay text use quotes (`"1/5"`, `"16/9"`); bare `1/5` is division.
-8. Prefer ending side-effect-only function bodies with `*None*` / `*无*` / whole-line `**` / `****` when later lines must belong to an outer function. Lone `---` / `***` are Markdown thematic breaks (skipped), not function end.
-9. **`ext/**` never calls `host_*`.** Agent/OKF helpers are plugin names (`agent_kb_*`, …) after `plugin.load`. Do **not** add agent/OKF domain code to `src/host/` (core bloat). See `doc/design/ext-agent.md` §4.
-10. **Browser (route C/D/E/F):** client logic is Marqdo on WASM; official bridge is host glue and **may** implement lists, routing, storage, WebSocket, canvas, file read, observers — authors **must not hand-write business JS**. Use `web.client_embed` / `data-mq-source-url` auto-mount. Client effects: prefer **GFM tables + `lib/browser`** ([marqdo-dev](../marqdo-dev/SKILL.md)).
-11. **Code-as-documentation / no bag glue:** Prefer **GFM tables** for maps, lists, wire, commands. Prefer **`table.put` / named helpers** over `json.set` / `json.append` chains. `lib/json` is for parse/stringify/quote only — not a dict builder. Unreadable json pipelines are a style bug. Read collections with **`[key](map)`**, not footnote indexes for new code. In `markup: occlusion` files read with **`access(map, key)`** — there `[x](y)` is occlusion, not index. **Positive copy-paste shapes** (result map, soft-error pack, sparse `table.put`): [marqdo-dev](../marqdo-dev/SKILL.md) §2 · [examples.md](examples.md) §6e. Do **not** extend legacy `json.set` in `ext/ai` — refactor to tables.
-12. **One language per file:** Do not mix EN and ZH API names in the same `.mq.md` (imports, calls, params). Pick English *or* Chinese mirrors for the whole program.
-13. **Sandbox trial habit (Agent / generated `.mq.md`):** Prefer `agent.trial` / `run sandbox=True` / `sandbox.open`→`run`→`diff`→`commit` before promoting to the host tree. Host files must stay unchanged until a successful commit. Caps live in `sandbox.profile` GFM tables — do not invent a second dialect.
+1. Obey **CORE SYNTAX** above — Occlusion is default; do not emit Classic index links.
+2. **Identifiers:** params `` + `name` ``; inside `*…*` / `**…**` bare ids are variables. Quote text literals. Standalone `>` calls: backticks where bare would be text.
+3. **Structure lines** (`#` `>` `+` `-` `|`) are not wrapped in italics.
+4. **Paths:** bare `/` in expressions is division; in call args / table cells unspaced `a/b` is path text. Ratios as text need quotes (`"1/5"`).
+5. End side-effect-only helpers with `*None*` / `*空*` / `**` / `****` when the outer function continues. Lone `---` is a thematic break, not function end.
+6. **`ext/**` never calls `host_*`.** Prefer tables over `json.set` / `json.append`.
+7. **One language per file.** Sandbox trial before promoting Agent-generated trees.
+8. Browser: Marqdo on WASM + `lib/browser` tables; do not hand-write business JS.
 
-
-## Markup → meaning (v0.2)
-
-| Marker | Meaning |
-|--------|---------|
-| `#` | **Object / type** (constructor body). `# main` = entry object. `# Child = > Parent` = inherit (**no** implicit parent constructor; call `` `self` = > Parent … `` explicitly when needed). |
-| `##` … `######` | **Function / method** (nesting by heading depth). |
-| `` + `name` `` under heading | Parameter (optional `` `name`=default ``) |
-| `1.` `2.` … in body | Branch arm (condition or `N. *` else). **Same-indent restart at `1.` = new branch statement** (not more arms of the previous list). |
-| `- …` inside body | Loop (`while` or `` [item](coll) `` / `` [`item`](`coll`) ``) |
-| Line `N. *` | Else arm |
-| `> fn args` | Call (named `k=v` or positional) |
-| `` > `obj`.method args `` | Method call (`obj` must be a map with `_type`) |
-| Frontmatter nested `import:` / `导入:` map | Import file (`bind: path.mq.md`) or short name (`bind: lib.member`) |
-| `> lib.member …` / `> lib.Type.member …` | Call via bare dotted path (instance methods need `` `var`.m ``) |
-| `*…*` | Statement (bind / expr) — closing `*` touches last token, **no trailing space**; bare ids are variables |
-| `**…**` | Return value — closing `**` touches last token, **no trailing space**; bare ids are variables |
-| `****` or `**` + spaces + `**` | Return `None` and end function body |
-| Lone `---` / `***` | Markdown thematic break (skip; not function end) |
-| GFM table after empty RHS bind | Collection; get with `[key](coll)` (preferred) or legacy `` `m`[^key] `` |
-| `- [item](coll)` | Foreach (unchanged) |
-| `` ```lang `` | Foreign code block (via `lib/foreign`) |
-| `` `"text"` `` | Quoted string (`\n` `\t` `\\` `\"`; `` `var` `` inside); bare tokens unescaped |
-| Unmarked prose | Comment |
-
-Entry: load file (often `index.mq.md`) → collect defs → run `# main`.
-
-## Occlusion syntax (v2.1 default)
-
-**Default:** unmarked sources and `markup: occlusion` / `标记: 遮蔽` treat `[x](y)` as **occlusion** (description wraps payload), not classic index. Explicit Classic / `--legacy-markup` is a transition path only — do not teach `[键](集合)` as the default. Prefer `access(集合, 键)` for reads.
-
-Executable-knowledge author baseline (six tasks, offline gate): [`tests/executable_knowledge/`](../../tests/executable_knowledge/README.md). Design goals ≠ shipped knowledge reuse; see [`doc/design/document-native-development-guide.md`](../../doc/design/document-native-development-guide.md).
-
-- `[描述](实现)` — `[]` is prose (never executed); `()` is the **only** executed part.
-- `[顾客留存率](0.42)` · `[总价](access(价目表, "苹果") * 数量)` · `[功能开发中]()` → `None` (stub; `label.empty_payload` warning).
-- Read maps/lists with `access(集合, 键)` (aliases `取` / `取值`): `[第二项](access(列, 2))`.
-- Foreach: `- [篮子里的每个果子](遍历 篮子 为 果)` (accepts `遍历`/`for` and `为`/`as`/`in`).
-- Calls inside `()`: `加(1)` / `加(1, 2)` / `加一 号(31)` / `txt.str_trim(" x ")` — `)` terminates, commas optional.
-- Tooling: `marqdo labels pending` (stub ledger) · `marqdo labels --grep 词 --count` · `marqdo migrate labels . --write` · `marqdo check` reports `label.missing` / `label.empty_payload` / `label.ref_dangling`.
 
 ## Minimal program
 

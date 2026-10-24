@@ -75,6 +75,41 @@ marqdo ext add web
 
 ### Changed
 
+## v2.1.2 — 2026-10-24
+
+### Highlights
+
+**可执行知识生产消费链 + View 阅读体验发版门槛**：证据摘要进闭包/句柄；`artifact.verify` / `knowledge adjudicate` 结构化裁决；`artifact.reuse_execute` 与 `agent_eng_bind_execute` / `publish_gate` 实际复用（非 n-gram）；`document.extract` 文本/Markdown + PDF/OCR 显式失败；View `KnowledgePresentation`、说明锚点、SSE `page_token` 过期包拒绝；上传 `max_bytes`；门禁 45 项（含 100/1000 单元）。CLI · wasm · ext **2.1.2**。
+
+```bash
+git checkout v2.1.2 && cargo build --release
+marqdo ext add web
+cargo test --offline --locked --test executable_knowledge
+```
+
+**核心表面 Δ（Core surface Δ）**：**无增删关键词**——语义/MLSP/View/Agent 宿主扩展；不改变默认 Occlusion 链接读法与表几何。
+
+### Added
+
+- **证据与闭包（F0/M02）**：来源 digests 进入 artifact/evidence/closure；business handle 改/删来源失效；锚点/可读性诊断。
+- **验证裁决（F0/M03）**：`artifact.verify` 结构化 `may_bind` / `may_publish`；policy 枚举；`knowledge adjudicate`；CLI `--fail`。
+- **语法 Skill（F0/M05）**：CORE SYNTAX 置顶；`migration-classic.md`；`skill_core_card` 与预算截断防护。
+- **绑定执行（F1/M04）**：`artifact.reuse_execute`；`agent_eng_bind_execute` + `eng_publish_gate`（`candidate_only` / product gate）；host_query `mlsp`；`tests/ext/agent-eng-bind-gate.mq.md`。
+- **发布与来源（F2/M06–M07）**：统一 `EXCLUDED_DIRS`；`publish_manifest.json`；`function_sources` 函数级来源覆盖。
+- **文档提取（F3/M01）**：`document.extract` DocumentSource→ExtractedDocument；PDF/DOCX/OCR 显式 `failed`；超限截断 `partial`；Web 上传 `MaxBytesReader` / `LimitReader`。
+- **View V0–V3（子集）**：正文优先；no-exec；`KnowledgePresentation`（`semantic_generation` / `page_token` / `local_deps`）；SSE 过期包拒绝与帧选择保留；print/响应式；1000 单元 compile smoke。
+- **故事门禁（M08）**：建库→复用→来源变更失效→修复重绑。
+
+### Fixed
+
+- View 说明链接 raw-string 截断；skill_brief / CORE SYNTAX 预算不被冲突旧规则吃掉。
+- 上传体积限制在 multipart 解析前生效（不再只靠内存 form 预算）。
+
+### Changed
+
+- CLI / wasm / `ext/VERSION` **同步 2.1.2**。
+- `tests/executable_knowledge` 门禁扩至 45 项；README 切片进度表与发版子集对齐。
+
 ## v2.1.1 — 2026-10-23
 
 ### Highlights

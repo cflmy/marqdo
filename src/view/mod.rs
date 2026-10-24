@@ -6,9 +6,14 @@ mod debug_api;
 mod debug_page;
 mod document;
 mod html;
+mod knowledge_present;
 mod notebook_api;
 mod output;
 mod render;
+
+pub use knowledge_present::{
+    page_token_from_source, sse_accepts_packet, title_from_source, KnowledgePresentation,
+};
 
 /// Surface rendering of an expression (labels/diagnostics reuse). `<TAB>` M6
 pub use render::expr_display;
@@ -384,6 +389,18 @@ pub(crate) fn build_file_view(
     stdin_lines: &[String],
     live: bool,
 ) -> Result<FileViewModel> {
+    build_file_view_with_exec(root, abs, rel, stdin_lines, live, true)
+}
+
+/// Like [`build_file_view`], but `execute=false` skips `run_file_capture` entirely (V0 / `--no-exec`).
+pub(crate) fn build_file_view_with_exec(
+    root: &ViewRoot,
+    abs: &Path,
+    rel: &str,
+    stdin_lines: &[String],
+    live: bool,
+    execute: bool,
+) -> Result<FileViewModel> {
     let mut source = fs::read_to_string(abs).with_context(|| format!("read {}", abs.display()))?;
     // Structure shows this file only — do not merge imported lib bodies into the tree.
     let (mut structure, mut module_opt, input_prompts) = match crate::load::parse_source_auto(&source) {
@@ -423,34 +440,43 @@ pub(crate) fn build_file_view(
     // Optional: sandbox to the whole view tree so sibling folders are reachable.
     opts.fs_root = Some(root.root.clone());
     let mut captured: Option<crate::capture::RunCapture> = None;
-    let (stdout, stderr, ok, plots, mut bindings_html) = if awaiting_input || auto_stream {
-        (
-            String::new(),
-            String::new(),
-            true,
-            Vec::new(),
-            String::new(),
-        )
-    } else {
-        match run_file_capture(abs, &opts) {
-            Ok(cap) => {
-                let stdout = cap.stdout.clone();
-                let plots = cap.plots.iter().map(|p| p.svg.clone()).collect();
-                let bindings_html = render_bindings_html(&cap.bindings);
-                captured = Some(cap);
-                (stdout, String::new(), true, plots, bindings_html)
-            }
-            Err(e) => (
+    let (stdout, stderr, ok, plots, mut bindings_html) =
+        if !execute {
+            (
                 String::new(),
-                tidy_user_error(&format!("{e:#}"), abs, rel),
-                false,
+                "execution skipped (--no-exec)".into(),
+                true,
+                Vec::new(),
+                String::from(r#"<p class="vars-skipped">skipped</p>"#),
+            )
+        } else if awaiting_input || auto_stream {
+            (
+                String::new(),
+                String::new(),
+                true,
                 Vec::new(),
                 String::new(),
-            ),
-        }
-    };
+            )
+        } else {
+            match run_file_capture(abs, &opts) {
+                Ok(cap) => {
+                    let stdout = cap.stdout.clone();
+                    let plots = cap.plots.iter().map(|p| p.svg.clone()).collect();
+                    let bindings_html = render_bindings_html(&cap.bindings);
+                    captured = Some(cap);
+                    (stdout, String::new(), true, plots, bindings_html)
+                }
+                Err(e) => (
+                    String::new(),
+                    tidy_user_error(&format!("{e:#}"), abs, rel),
+                    false,
+                    Vec::new(),
+                    String::new(),
+                ),
+            }
+        };
     // Re-read after run so writeback slots / workbook edits show in Structure.
-    if !awaiting_input && !auto_stream {
+    if execute && !awaiting_input && !auto_stream {
         if let Ok(next) = fs::read_to_string(abs) {
             source = next;
         }
@@ -480,9 +506,52 @@ pub(crate) fn build_file_view(
     };
     // Analysis is intentionally independent from capture/run.  If a document
     // has side effects, its facts remain visible while its values stay absent.
-    let knowledge_html = crate::sema::compile_project(&crate::sema::CompileOptions {
-        project_root: root.root.clone(), entry: Some(abs.to_path_buf()), lock_mode: crate::sema::LockMode::Off,
-    }).map(|compilation| render_knowledge_html(&compilation.semantics, rel)).unwrap_or_default();
+    let title_guess = crate::view::title_from_source(&source, rel);
+    let (knowledge_html, knowledge_error, page_token) =
+        match crate::sema::compile_project(&crate::sema::CompileOptions {
+            project_root: root.root.clone(),
+            entry: Some(abs.to_path_buf()),
+            lock_mode: crate::sema::LockMode::Off,
+        }) {
+            Ok(compilation) => {
+                let html = render_knowledge_html(&compilation.semantics, rel);
+                // V1: also materialize structured presentation (JSON available to page scripts).
+                let mut presentation = crate::view::KnowledgePresentation::from_project(
+                    &compilation.semantics,
+                    rel,
+                    &title_guess,
+                );
+                presentation.page_token = crate::view::page_token_from_source(rel, &source);
+                let json = presentation.to_json().to_string();
+                let with_model = if html.is_empty() {
+                    format!(
+                        r#"<script type="application/json" id="mq-knowledge-presentation">{json}</script>"#,
+                        json = json.replace("</", "<\\/")
+                    )
+                } else {
+                    format!(
+                        r#"{html}<script type="application/json" id="mq-knowledge-presentation">{json}</script>"#,
+                        html = html,
+                        json = json.replace("</", "<\\/")
+                    )
+                };
+                (
+                    with_model,
+                    String::new(),
+                    presentation.page_token.clone(),
+                )
+            }
+            Err(e) => (
+                String::new(),
+                format!("知识关系暂不可用：{}", tidy_user_error(&format!("{e:#}"), abs, rel)),
+                crate::view::page_token_from_source(rel, &source),
+            ),
+        };
+    let page_token = if page_token.is_empty() {
+        crate::view::page_token_from_source(rel, &source)
+    } else {
+        page_token
+    };
     Ok(FileViewModel {
         rel_path: rel.to_string(),
         source,
@@ -500,6 +569,8 @@ pub(crate) fn build_file_view(
         bindings_html: std::mem::take(&mut bindings_html),
         trace_json,
         knowledge_html,
+        knowledge_error,
+        page_token,
     })
 }
 
@@ -752,6 +823,7 @@ fn api_run(root: &ViewRoot, mut request: Request) -> Result<()> {
                     }
                     Err(_) => (String::new(), String::new()),
                 };
+                let page_token = crate::view::page_token_from_source(&rel_clone, &source_now);
                 let done = serde_json::json!({
                     "type": "done",
                     "run_id": run_id,
@@ -761,6 +833,7 @@ fn api_run(root: &ViewRoot, mut request: Request) -> Result<()> {
                     "bindings_html": bindings_html,
                     "structure_html": structure_html,
                     "trace_json": trace_json,
+                    "page_token": page_token,
                 });
                 crate::host::event_bus::EventBus::global().publish_json(&done.to_string());
             }

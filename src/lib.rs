@@ -21,6 +21,7 @@ pub mod check;
 pub mod contract;
 pub mod debug;
 pub mod diagnostics;
+pub mod document_extract;
 pub mod embedded_lib;
 #[cfg(feature = "cli")]
 pub mod ext_cli;
