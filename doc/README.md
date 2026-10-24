@@ -19,6 +19,7 @@
 
 | 文档 | 摘要 |
 |------|------|
+| [design/qdagent-workbench-runtime-and-view-2026-10-25.md](design/qdagent-workbench-runtime-and-view-2026-10-25.md) | **qdagent 知识工作台框架支持（Proposed）**：2.1.2 增量审阅；请求级多模型、逐调用用量/真流式/取消、只读 View 嵌入、引用与历史快照、工作区隔离、跨库合同与验收；含本机门禁结果 |
 | [design/view-knowledge-reading-experience-2026-10-24.md](design/view-knowledge-reading-experience-2026-10-24.md) | **View 知识阅读体验重设计（建议）**：正文优先、结构导航、就地知识说明、来源与运行状态、响应式线框、实现契约与验收；含当前呈现和 no-exec 反例 |
 | [roadmap/qdagent-knowledge-support-gaps-2026-10-24.md](roadmap/qdagent-knowledge-support-gaps-2026-10-24.md) | **求道知识沉淀与文档编译支撑缺口**：2.1.1 源码复核、来源/依赖失效反例、验证与 Agent 协议、语法提示词、导入底座及跨库分工 |
 | [design/document-native-development-guide.md](design/document-native-development-guide.md) | **下一阶段开发指导**：语法审查裁决、正文→命名→复用工作流、AI 上下文与局部编辑、渐进严格、作者成本及 S0–S6 验收 |
