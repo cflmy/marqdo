@@ -19,6 +19,8 @@
 
 | 文档 | 摘要 |
 |------|------|
+| [design/view-knowledge-reading-experience-2026-10-24.md](design/view-knowledge-reading-experience-2026-10-24.md) | **View 知识阅读体验重设计（建议）**：正文优先、结构导航、就地知识说明、来源与运行状态、响应式线框、实现契约与验收；含当前呈现和 no-exec 反例 |
+| [roadmap/qdagent-knowledge-support-gaps-2026-10-24.md](roadmap/qdagent-knowledge-support-gaps-2026-10-24.md) | **求道知识沉淀与文档编译支撑缺口**：2.1.1 源码复核、来源/依赖失效反例、验证与 Agent 协议、语法提示词、导入底座及跨库分工 |
 | [design/document-native-development-guide.md](design/document-native-development-guide.md) | **下一阶段开发指导**：语法审查裁决、正文→命名→复用工作流、AI 上下文与局部编辑、渐进严格、作者成本及 S0–S6 验收 |
 | [design/core-surface.md](design/core-surface.md) | **核心构造清单**：v2.1 默认链接/循环说明与构造守卫；不是全部实现状态清单 |
 | [design/markdown-mapping.md](design/markdown-mapping.md) | **历史 v0.2 映射**：不再代表现行默认链接语义 |
