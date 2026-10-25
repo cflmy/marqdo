@@ -489,6 +489,38 @@ fn m03_f08_side_effect_marker_not_created_by_view() {
 }
 
 #[test]
+fn m03_f09_step_kinds_baseline_projects_nodes() {
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/executable_knowledge/baseline/07-step-kinds");
+    let resp = mlsp(
+        "view.document",
+        serde_json::json!({
+            "project": root.to_string_lossy(),
+            "document": "main.mq.md",
+            "mode": "read",
+            "include": ["outline", "nodes", "fragment"]
+        }),
+    );
+    assert_eq!(resp["ok"], true, "{resp}");
+    let outline = resp["result"]["outline"].as_array().unwrap();
+    assert!(
+        outline.iter().any(|o| o["kind"] == "heading"),
+        "expected heading outline: {outline:?}"
+    );
+    let nodes = resp["result"]["nodes"].as_array().unwrap();
+    assert!(!nodes.is_empty(), "expected at least one semantic node: {nodes:?}");
+    // Evidence statuses must not be silently upgraded to verified by the read path.
+    for n in nodes {
+        if let Some(ev) = n.get("evidence").and_then(|v| v.as_str()) {
+            assert_ne!(ev, "verified", "read path must not invent verified: {n}");
+        }
+    }
+    let fragment = resp["result"]["render"]["fragment"].as_str().unwrap_or("");
+    assert!(fragment.contains("mq-document"));
+    assert!(!fragment.contains("<script"));
+}
+
+#[test]
 fn m03_f09_outline_nodes_chinese_and_static_a11y_subset() {
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("tests/executable_knowledge/baseline/02-extract");

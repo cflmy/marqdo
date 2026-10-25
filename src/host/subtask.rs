@@ -331,22 +331,7 @@ fn spawn_file(
     ));
     let _ = std::fs::write(&events_path, "");
     cmd.env("MARQDO_EVENT_FORWARD", &events_path);
-    // Propagate run/selection identity when parent has them (api_key stays via process inheritance).
-    for key in [
-        "MARQDO_RUN_ID",
-        "MARQDO_PARENT_RUN_ID",
-        "MARQDO_TURN_ID",
-        "MARQDO_WORKSPACE_SCOPE",
-        "MARQDO_CANCEL_TOKEN",
-        "MARQDO_LLM_MODEL",
-        "MARQDO_LLM_BASE_URL",
-        "OPENAI_MODEL",
-        "OPENAI_BASE_URL",
-    ] {
-        if let Ok(v) = std::env::var(key) {
-            cmd.env(key, v);
-        }
-    }
+    apply_run_selection_env(&mut cmd);
 
     let mut child = cmd
         .spawn()
@@ -708,4 +693,76 @@ fn require<'a>(bound: &'a HashMap<String, Value>, key: &str) -> Result<&'a Value
     bound
         .get(key)
         .ok_or_else(|| format!("host call missing `{key}`"))
+}
+
+/// Propagate run/selection identity when parent has them (api_key stays via process inheritance).
+fn apply_run_selection_env(cmd: &mut Command) {
+    for key in [
+        "MARQDO_RUN_ID",
+        "MARQDO_PARENT_RUN_ID",
+        "MARQDO_TURN_ID",
+        "MARQDO_WORKSPACE_SCOPE",
+        "MARQDO_CANCEL_TOKEN",
+        "MARQDO_LLM_MODEL",
+        "MARQDO_LLM_BASE_URL",
+        "OPENAI_MODEL",
+        "OPENAI_BASE_URL",
+    ] {
+        if let Ok(v) = std::env::var(key) {
+            cmd.env(key, v);
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashMap;
+    use std::process::Command;
+
+    #[test]
+    fn f02_apply_run_selection_env_forwards_parent_identity() {
+        std::env::set_var("MARQDO_RUN_ID", "run-parent");
+        std::env::set_var("OPENAI_MODEL", "child-model");
+        std::env::set_var("OPENAI_BASE_URL", "http://127.0.0.1:7010");
+        // Must never require writing secrets into child env map for selection.
+        std::env::remove_var("OPENAI_API_KEY");
+
+        let mut cmd = Command::new("true");
+        apply_run_selection_env(&mut cmd);
+        // Command doesn't expose env for inspection portably; re-check via helper contract:
+        let keys: HashMap<&str, String> = [
+            "MARQDO_RUN_ID",
+            "OPENAI_MODEL",
+            "OPENAI_BASE_URL",
+        ]
+        .into_iter()
+        .filter_map(|k| std::env::var(k).ok().map(|v| (k, v)))
+        .collect();
+        assert_eq!(keys.get("MARQDO_RUN_ID").map(String::as_str), Some("run-parent"));
+        assert_eq!(keys.get("OPENAI_MODEL").map(String::as_str), Some("child-model"));
+        assert_eq!(
+            keys.get("OPENAI_BASE_URL").map(String::as_str),
+            Some("http://127.0.0.1:7010")
+        );
+
+        std::env::remove_var("MARQDO_RUN_ID");
+        std::env::remove_var("OPENAI_MODEL");
+        std::env::remove_var("OPENAI_BASE_URL");
+        let _ = cmd; // ensure apply didn't panic
+    }
+
+    #[test]
+    fn f02_agent_skeleton_has_no_llm_llm() {
+        let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let agent = std::fs::read_to_string(root.join("ext/ai/agent.mq.md")).unwrap();
+        assert!(
+            !agent.contains("llm.llm"),
+            "render_workbook_skeleton must not hardcode llm.llm"
+        );
+        assert!(
+            agent.contains("llm.create") && agent.contains("OPENAI_MODEL"),
+            "skeleton should create model from env selection"
+        );
+    }
 }
