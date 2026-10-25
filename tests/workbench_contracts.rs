@@ -452,6 +452,7 @@ fn m03_view_document_path_escape_rejected() {
 
 #[test]
 fn m05_project_cache_isolation_f14() {
+    marqdo::workbench::reset_cache_for_tests();
     let a = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("tests/executable_knowledge/baseline/02-extract");
     let b = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -464,6 +465,111 @@ fn m05_project_cache_isolation_f14() {
     let hit = marqdo::workbench::analysis_cache::note_analysis(&a);
     assert!(hit, "second analysis of same snapshot should hit cache");
     let _ = marqdo::workbench::analysis_cache::note_analysis(&b);
+}
+
+#[test]
+fn m05_f14_concurrent_100_same_snapshot() {
+    use std::sync::{Arc, Barrier};
+    use std::thread;
+
+    marqdo::workbench::reset_cache_for_tests();
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/executable_knowledge/baseline/02-extract");
+    let root_s = root.to_string_lossy().to_string();
+    let n = 100usize;
+    let barrier = Arc::new(Barrier::new(n));
+    let mut handles = Vec::with_capacity(n);
+    for _ in 0..n {
+        let barrier = Arc::clone(&barrier);
+        let root_s = root_s.clone();
+        handles.push(thread::spawn(move || {
+            barrier.wait();
+            let resp = mlsp(
+                "view.document",
+                serde_json::json!({
+                    "project": root_s,
+                    "document": "main.mq.md",
+                    "mode": "read",
+                    "include": ["fragment"]
+                }),
+            );
+            assert_eq!(resp["ok"], true, "{resp}");
+            resp["result"]["document"]["source_revision"]
+                .as_str()
+                .unwrap_or("")
+                .to_string()
+        }));
+    }
+    let mut revs = Vec::new();
+    for h in handles {
+        revs.push(h.join().expect("thread"));
+    }
+    assert!(revs.iter().all(|r| r == &revs[0]), "all reads same revision");
+    assert!(revs[0].starts_with("sha256:"));
+    let (hits, misses, merges) = marqdo::workbench::cache_stats();
+    // At least one miss (leader) and either merges (coalesce) or subsequent hits.
+    assert!(misses >= 1, "hits={hits} misses={misses} merges={merges}");
+    assert!(
+        merges > 0 || hits > 0,
+        "expected coalesce or reuse: hits={hits} misses={misses} merges={merges}"
+    );
+}
+
+#[test]
+fn m04_snapshot_manifest_on_document_view() {
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/executable_knowledge/baseline/02-extract");
+    let resp = mlsp(
+        "view.document",
+        serde_json::json!({
+            "project": root.to_string_lossy(),
+            "document": "main.mq.md",
+            "mode": "read",
+            "include": ["fragment"]
+        }),
+    );
+    assert_eq!(resp["ok"], true, "{resp}");
+    let snap = &resp["result"]["snapshot"];
+    assert_eq!(snap["schema"], "SnapshotManifestV1");
+    assert_eq!(snap["retention"]["owner"], "application");
+    assert!(snap["source_revision"].as_str().unwrap().starts_with("sha256:"));
+    assert_eq!(
+        snap["source_revision"],
+        resp["result"]["document"]["source_revision"]
+    );
+}
+
+#[test]
+fn m01_f02_run_context_three_level_inherit() {
+    let root = marqdo::workbench::RunContext::from_value(&serde_json::json!({
+        "run_id": "run-root",
+        "turn_id": "turn-1",
+        "workspace_scope": "ws-1",
+        "selection_context": {
+            "selection_id": "sel-1",
+            "upstream_model_id": "model-fixed",
+            "base_url": "http://127.0.0.1:7700"
+        },
+        "cancellation_token": "/tmp/mq-cancel-f02"
+    }))
+    .unwrap();
+    let child = root.spawn_child("run-child");
+    let grand = child.spawn_child("run-grand");
+    assert_eq!(grand.parent_run_id.as_deref(), Some("run-child"));
+    assert_eq!(
+        grand.selection_context["upstream_model_id"],
+        "model-fixed"
+    );
+    assert_eq!(grand.turn_id.as_deref(), Some("turn-1"));
+    assert_eq!(
+        grand.cancellation_token.as_deref(),
+        Some("/tmp/mq-cancel-f02")
+    );
+    let env = grand.selection_env();
+    assert!(env.iter().any(|(k, v)| k == "OPENAI_MODEL" && v == "model-fixed"));
+    // Root selection must not be mutated by descendants.
+    assert_eq!(root.selection_context["upstream_model_id"], "model-fixed");
+    assert_eq!(root.run_id, "run-root");
 }
 
 #[test]

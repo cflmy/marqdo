@@ -419,16 +419,15 @@ cargo test --offline --locked --test executable_knowledge f1_agent_eng_bind_gate
 | M01 | strict selection；`RunContextV1` 并行不串扰；llm plugin messages/roles；workbook 禁 `llm.llm` |
 | M02 | usage null≠0；revision 替换（F05）；cancel token（F06/F07）；event_sink；web `sse-live` 断连 cancel |
 | M03 | `view.document`；CJK outline/nodes；path escape；静态 a11y 子集；F08 无副作用标记 |
-| M04 | stale / version_unavailable / **ambiguous**（08-same-name）；`artifact.version_mismatch`；embed strict SSE |
-| M05 | extract `:B`；analysis_cache 隔离（F14 子集） |
-| M06 | CI 预构建 agent+llm + `workbench_contracts` |
+| M04 | stale / version_unavailable / **ambiguous**；`SnapshotManifestV1` 输出（retention=application）；`artifact.version_mismatch`；embed strict SSE |
+| M05 | extract `:B`；analysis_cache begin/finish；**F14 并发 100** 同 snapshot + 跨 project 隔离 |
+| M06 | CI 预构建 agent+llm + `workbench_contracts`；Go `drainForward` / cancel-token 桥 |
 
-已知限制（**发版阻断直至补齐或书面豁免**）：
+已知限制（发版前须书面接受或继续补）：
 
-- 双真实 HTTP 端点联调、Agent resume 全路径、Go `sse-live` 集成测试仍薄。
-- DocumentView 六类步骤完整树 / 历史正文快照仍未闭合（缺快照 → `version_unavailable`）。
-- 完整浏览器 F12 留给 qdagent；原生适配器 / PDF/OCR 仍 unavailable。
-- 未调用付费供应商。
+- Agent resume/repair **全路径 e2e**（假模型）仍薄；F02 现有 RunContext 三级继承 + skeleton 禁 `llm.llm` + 子任务 env。
+- 历史正文由应用按 SnapshotManifest 保留；框架缺快照 → `version_unavailable`（不静默降级）。
+- 完整浏览器 F12 留给 qdagent；原生适配器 / PDF/OCR 仍 unavailable；未调用付费供应商。
 
 ### 12.2 历史基线记录（设计起草时）
 

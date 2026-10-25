@@ -111,22 +111,14 @@ pub fn resolve_reference(params: &Value) -> Result<Value, Value> {
         if !expected_gen.is_empty() {
             let current_gen = semantic_generation(&compilation.semantics);
             if &current_gen != expected_gen {
-                return Ok(json!({
-                    "schema": "KnowledgeLocatorV1",
-                    "schema_version": 1,
-                    "resolution": "version_unavailable",
-                    "precision": "none",
-                    "locator": locator.to_json(),
-                    "target": Value::Null,
-                    "candidates": [],
-                    "diagnostics": [{
-                        "code": "generation_mismatch",
-                        "message": format!(
-                            "expected generation {expected_gen}, current projection is {current_gen}; refusing silent downgrade"
-                        )
-                    }],
-                    "label": "引用版本不可用"
-                }));
+                return Ok(crate::workbench::snapshot::version_unavailable_result(
+                    &locator.to_json(),
+                    &format!(
+                        "expected generation {expected_gen}, current projection is {current_gen}; refusing silent downgrade (no retained snapshot)"
+                    ),
+                    expected_gen,
+                    Some(&current_gen),
+                ));
             }
         }
     }
