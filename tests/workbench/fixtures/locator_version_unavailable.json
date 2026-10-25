@@ -1,0 +1,19 @@
+{
+  "schema": "KnowledgeLocatorV1",
+  "schema_version": 1,
+  "resolution": "version_unavailable",
+  "precision": "none",
+  "locator": {
+    "schema": "KnowledgeLocatorV1",
+    "schema_version": 1,
+    "project_id": "/authorized/project",
+    "document_id": "knowledge/example.mq.md",
+    "generation_id": "generation-missing",
+    "artifact_id": "mq://project/example/function",
+    "relation": "cites"
+  },
+  "target": null,
+  "candidates": [],
+  "diagnostics": [{"code": "generation_unavailable", "message": "snapshot not retained"}],
+  "label": "引用版本不可用"
+}

@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "marqdo://contracts/RuntimeEventV1",
+  "title": "RuntimeEventV1",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "event_id",
+    "seq",
+    "run_id",
+    "type",
+    "payload"
+  ],
+  "properties": {
+    "schema": { "const": "RuntimeEventV1" },
+    "schema_version": { "const": 1 },
+    "event_id": { "type": "string", "minLength": 1 },
+    "seq": { "type": "integer", "minimum": 0 },
+    "run_id": { "type": "string", "minLength": 1 },
+    "type": { "type": "string", "minLength": 1 },
+    "payload": { "type": "object" },
+    "timestamp": { "type": "string" }
+  },
+  "additionalProperties": true
+}

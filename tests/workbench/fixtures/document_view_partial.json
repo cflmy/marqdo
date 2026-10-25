@@ -1,0 +1,20 @@
+{
+  "schema": "DocumentViewV1",
+  "schema_version": 1,
+  "document": {
+    "id": "knowledge/example.mq.md",
+    "title": "知识标题",
+    "source_revision": "sha256:requested-source",
+    "semantic_digest": "sha256:semantic-facts",
+    "generation_id": null,
+    "presentation_token": "opaque-token"
+  },
+  "execution": {"state": "not_run", "run_id": null},
+  "render": {"format": "sanitized_html", "fragment": "<article class=\"mq-document\"></article>", "renderer_version": "1"},
+  "outline": [],
+  "nodes": [],
+  "refs": [],
+  "diagnostics": [{"code": "partial", "message": "missing dependency"}],
+  "completeness": "partial",
+  "capabilities": {"read_only": true, "has_semantics": true, "executed": false}
+}

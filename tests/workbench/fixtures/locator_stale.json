@@ -1,0 +1,19 @@
+{
+  "schema": "KnowledgeLocatorV1",
+  "schema_version": 1,
+  "resolution": "stale",
+  "precision": "document",
+  "locator": {
+    "schema": "KnowledgeLocatorV1",
+    "schema_version": 1,
+    "project_id": "/authorized/project",
+    "document_id": "knowledge/example.mq.md",
+    "source_revision": "sha256:old",
+    "artifact_id": "mq://project/example/function",
+    "relation": "cites"
+  },
+  "target": null,
+  "candidates": [],
+  "diagnostics": [{"code": "source_revision_mismatch", "message": "expected sha256:old, actual sha256:new"}],
+  "label": "该来源已变化"
+}

@@ -268,20 +268,25 @@ Prefer declaring `model` / `api_key` / `base_url` in frontmatter Binding, then u
 ## ask
     + `prompt`=None
     + `path`=None
+    + `messages`=None
+    + `selection`=None
+    + `strict_selection`=False
 
-Semantic ask → **LLMResult** (`text`, `model`, `finish`, `backend`, `usage`, `name`, `tool_calls`). Prefer `[text](result)` for the answer string. Omit `prompt=` / `path=` to use the entry document (`sys.module_source` + `prompt_body`).
+Semantic ask → **LLMResult** (`text`, `model`, `finish`, `backend`, `usage`, `name`, `tool_calls`). Prefer `[text](result)` for the answer string. Omit `prompt=` / `path=` to use the entry document (`sys.module_source` + `prompt_body`). Pass `messages=` for multi-turn history (M01). `selection=` + `strict_selection=True` freeze request identity without env fallback.
 
-1. `path`
+1. `messages`
+  **p = None**
+2. `path`
   **p = > prompt_load path=`path`**
-2. `prompt`
+3. `prompt`
   **p = `prompt`**
-3. *
+4. *
   **raw = > sys.module_source**
   1. not `raw`
     **p = ""**
   2. *
     **p = > prompt_body src=`raw`**
-**pack = > self.complete_result prompt=`p` stream=False echo=False**
+**pack = > self.complete_result prompt=`p` messages=`messages` selection=`selection` strict_selection=`strict_selection` stream=False echo=False**
 **text = > json.get value=`pack` key="text"**
 **usage = > json.get value=`pack` key="usage"**
 **finish = > json.get value=`pack` key="finish"**
@@ -312,11 +317,16 @@ inside the table is unsafe.
 **nm = > json.get value=`self` key="name"**
 1. `usage`
   **tt = > json.get value=`usage` key="total_tokens"**
+  **ustate = > json.get value=`usage` key="usage_state"**
 2. *
-  **tt = 0**
-1. not `tt`
-  **tt = 0**
-2. *
+  **tt = None**
+  **ustate = "unknown"**
+1. `ustate` == "unknown"
+  Keep null — never coerce missing usage to zero tokens (M02 / F04).
+  **tt = None**
+2. not `tt`
+  **tt = None**
+3. *
   **_ = 1**
 1. `err`
   **calls = 0**
@@ -325,9 +335,9 @@ inside the table is unsafe.
 
 `result` =
 
-| text | model | finish | backend | usage | name | llm_calls | tokens | tool_calls | error |
-|------|-------|--------|---------|-------|------|-----------|--------|------------|-------|
-| `text` | `mdl` | `finish` | `b` | `usage` | `nm` | `calls` | `tt` | `tc` | `err` |
+| text | model | finish | backend | usage | name | llm_calls | tokens | tool_calls | error | selection |
+|------|-------|--------|---------|-------|------|-----------|--------|------------|-------|-----------|
+| `text` | `mdl` | `finish` | `b` | `usage` | `nm` | `calls` | `tt` | `tc` | `err` | `selection` |
 
 *result*
 
@@ -352,13 +362,16 @@ Semantic stream: return the event list (use `llm.collect` to reduce to text). Om
 *> self.complete prompt=`p` stream=True echo=`echo`*
 
 ## complete_result
-    + `prompt`
+    + `prompt`=None
+    + `messages`=None
+    + `selection`=None
+    + `strict_selection`=False
     + `stream`=False
     + `echo`=False
 
-Transport pack via `ext/ai/llm/openai` (Ollama uses the same OpenAI-compatible path). Non-stream → `{text,usage,finish}`; stream → `{events}`.
+Transport pack via `ext/ai/llm/openai` (Ollama uses the same OpenAI-compatible path). Non-stream → `{text,usage,finish}`; stream → `{events}`. Prefer `messages=` for multi-turn; optional `selection=` (ModelSelectionV1) with `strict_selection=True` for request-scoped identity (M01).
 
-*> openai.chat_completions base_url=[base_url](access(self, "base_url")) api_key=[api_key](access(self, "api_key")) model=[model](access(self, "model")) prompt=`prompt` stream=`stream` echo=`echo` suffix=[suffix](access(self, "suffix")) bearer=[bearer](access(self, "bearer"))*
+*> openai.chat_completions base_url=[base_url](access(self, "base_url")) api_key=[api_key](access(self, "api_key")) model=[model](access(self, "model")) prompt=`prompt` messages=`messages` selection=`selection` strict_selection=`strict_selection` stream=`stream` echo=`echo` suffix=[suffix](access(self, "suffix")) bearer=[bearer](access(self, "bearer"))*
 
 ## complete
     + `prompt`

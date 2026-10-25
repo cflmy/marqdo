@@ -193,8 +193,12 @@ fn extract_markdown_or_text(
 ) -> ExtractedDocument {
     let mut segments = Vec::new();
     let mut n = 0u32;
+    let mut byte_off = 0usize;
     for (i, line) in text.lines().enumerate() {
         let line_no = i + 1;
+        let line_bytes = line.len();
+        // M05: stable fragment locator with 1-based line + UTF-8 byte offset.
+        let loc = |kind: &str| format!("{kind}:L{line_no}:B{byte_off}");
         if let Some(rest) = line.trim().strip_prefix('#') {
             n += 1;
             let heading = rest.trim_start_matches('#').trim();
@@ -202,7 +206,7 @@ fn extract_markdown_or_text(
                 id: format!("seg-{n}"),
                 kind: "heading".into(),
                 text: heading.to_string(),
-                locator: format!("L{line_no}"),
+                locator: loc("heading"),
                 confidence: 1.0,
             });
         } else if line.trim().starts_with('|') {
@@ -211,7 +215,7 @@ fn extract_markdown_or_text(
                 id: format!("seg-{n}"),
                 kind: "table_row".into(),
                 text: line.to_string(),
-                locator: format!("L{line_no}"),
+                locator: loc("table_row"),
                 confidence: 0.9,
             });
         } else if !line.trim().is_empty() {
@@ -220,10 +224,12 @@ fn extract_markdown_or_text(
                 id: format!("seg-{n}"),
                 kind: "paragraph".into(),
                 text: line.to_string(),
-                locator: format!("L{line_no}"),
+                locator: loc("paragraph"),
                 confidence: 1.0,
             });
         }
+        // +1 for '\n' when present in original (lines() strips it).
+        byte_off += line_bytes + 1;
     }
     ExtractedDocument {
         source_uri: uri.to_string(),

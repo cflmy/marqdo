@@ -37,6 +37,7 @@ pub mod lex;
 pub mod linalg_ops;
 pub mod load;
 pub mod mlsp;
+pub mod workbench;
 pub mod parse;
 pub mod project;
 pub mod repair;

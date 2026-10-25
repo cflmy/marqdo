@@ -11,6 +11,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+      - name: Build agent + llm plugins (EK / workbench gates)
+        run: |
+          cargo build -p marqdo_plugin_agent --locked
+          cargo build -p marqdo_plugin_llm --locked
+      - name: Workbench contracts (M00–M06 / F-subset)
+        run: cargo test --test workbench_contracts --locked
       - name: Offline executable-knowledge gate
         run: cargo test --test executable_knowledge --locked
       - name: no ignored tests counted as success

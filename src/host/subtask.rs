@@ -331,6 +331,22 @@ fn spawn_file(
     ));
     let _ = std::fs::write(&events_path, "");
     cmd.env("MARQDO_EVENT_FORWARD", &events_path);
+    // Propagate run/selection identity when parent has them (api_key stays via process inheritance).
+    for key in [
+        "MARQDO_RUN_ID",
+        "MARQDO_PARENT_RUN_ID",
+        "MARQDO_TURN_ID",
+        "MARQDO_WORKSPACE_SCOPE",
+        "MARQDO_CANCEL_TOKEN",
+        "MARQDO_LLM_MODEL",
+        "MARQDO_LLM_BASE_URL",
+        "OPENAI_MODEL",
+        "OPENAI_BASE_URL",
+    ] {
+        if let Ok(v) = std::env::var(key) {
+            cmd.env(key, v);
+        }
+    }
 
     let mut child = cmd
         .spawn()

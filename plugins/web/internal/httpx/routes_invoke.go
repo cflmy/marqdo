@@ -1,11 +1,15 @@
 package httpx
 
 import (
+	"bufio"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/marqdo/marqdo/plugins/web/internal/plugin"
 )
@@ -115,6 +119,15 @@ func (st *state) handleInvoke(w http.ResponseWriter, r *http.Request, route invo
 	}
 
 	args := invokeArgsFromPayload(payload)
+
+	// M02: live SSE — stream host_stream_publish events while CallLibPath runs.
+	// return=sse-live|sse_live uses MARQDO_EVENT_FORWARD NDJSON bridge (request-local).
+	liveSSE := route.ReturnMode == "sse-live" || route.ReturnMode == "sse_live"
+	if liveSSE {
+		st.handleInvokeLiveSSE(w, r, route, args)
+		return
+	}
+
 	value, err := plugin.CallLibPath(route.FnPath, args)
 	if err != nil {
 		code := http.StatusInternalServerError
@@ -175,4 +188,161 @@ func (st *state) handleInvoke(w http.ResponseWriter, r *http.Request, route invo
 		}
 		writeJSON(w, code, body)
 	}
+}
+
+// handleInvokeLiveSSE streams RuntimeEvent-shaped lines while the lib call runs.
+// Client disconnect sets MARQDO_CANCEL + cancel token file so the llm plugin can stop.
+func (st *state) handleInvokeLiveSSE(w http.ResponseWriter, r *http.Request, route invokeRoute, args map[string]any) {
+	dir := os.TempDir()
+	fwd, err := os.CreateTemp(dir, "mq-evt-*.ndjson")
+	if err != nil {
+		jsonErr(w, http.StatusInternalServerError, fmt.Sprintf("event forward: %v", err))
+		return
+	}
+	fwdPath := fwd.Name()
+	_ = fwd.Close()
+	defer os.Remove(fwdPath)
+
+	prev := os.Getenv("MARQDO_EVENT_FORWARD")
+	_ = os.Setenv("MARQDO_EVENT_FORWARD", fwdPath)
+	cancelFile, cancelErr := os.CreateTemp(dir, "mq-cancel-*.tok")
+	cancelPath := ""
+	if cancelErr == nil {
+		cancelPath = cancelFile.Name()
+		_ = cancelFile.Close()
+		_ = os.Setenv("MARQDO_CANCEL_TOKEN", cancelPath)
+	}
+	defer func() {
+		if prev == "" {
+			_ = os.Unsetenv("MARQDO_EVENT_FORWARD")
+		} else {
+			_ = os.Setenv("MARQDO_EVENT_FORWARD", prev)
+		}
+		_ = os.Unsetenv("MARQDO_CANCEL_TOKEN")
+		_ = os.Unsetenv("MARQDO_CANCEL")
+		if cancelPath != "" {
+			_ = os.Remove(cancelPath)
+		}
+	}()
+
+	w.Header().Set("Content-Type", "text/event-stream; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+	w.Header().Set("X-Accel-Buffering", "no")
+	w.WriteHeader(http.StatusOK)
+	flusher, _ := w.(http.Flusher)
+	writeEvent := func(payload any) {
+		b, err := json.Marshal(payload)
+		if err != nil {
+			return
+		}
+		_, _ = io.WriteString(w, "data: "+string(b)+"\n\n")
+		if flusher != nil {
+			flusher.Flush()
+		}
+	}
+	writeEvent(map[string]any{
+		"schema":         "RuntimeEventV1",
+		"schema_version": 1,
+		"type":           "run.started",
+		"payload":        map[string]any{"fn": route.FnPath, "bridge": "sse-live"},
+	})
+
+	type callResult struct {
+		value any
+		err   error
+	}
+	done := make(chan callResult, 1)
+	go func() {
+		v, e := plugin.CallLibPath(route.FnPath, args)
+		done <- callResult{value: v, err: e}
+	}()
+
+	var mu sync.Mutex
+	offset := int64(0)
+	seq := uint64(1)
+	poll := time.NewTicker(25 * time.Millisecond)
+	defer poll.Stop()
+
+	ctx := r.Context()
+	for {
+		select {
+		case <-ctx.Done():
+			// Propagate cancel to in-flight LLM/plugin via token file + env.
+			_ = os.Setenv("MARQDO_CANCEL", "1")
+			if cancelPath != "" {
+				_ = os.WriteFile(cancelPath, []byte("cancelled"), 0o600)
+			}
+			writeEvent(map[string]any{
+				"schema": "RuntimeEventV1", "schema_version": 1, "type": "run.interrupted",
+				"payload": map[string]any{"reason": "client_disconnect", "cancel_propagated": cancelPath != ""},
+			})
+			return
+		case res := <-done:
+			// Drain remaining forward lines once.
+			mu.Lock()
+			offset = drainForward(fwdPath, offset, func(line string) {
+				seq++
+				var obj any
+				if json.Unmarshal([]byte(line), &obj) == nil {
+					writeEvent(map[string]any{
+						"schema": "RuntimeEventV1", "schema_version": 1,
+						"seq": seq, "type": "message.delta", "payload": obj,
+					})
+				}
+			})
+			mu.Unlock()
+			if res.err != nil {
+				writeEvent(map[string]any{
+					"schema": "RuntimeEventV1", "schema_version": 1, "type": "run.failed",
+					"payload": map[string]any{"error": res.err.Error()},
+				})
+			} else {
+				writeEvent(map[string]any{
+					"schema": "RuntimeEventV1", "schema_version": 1, "type": "run.completed",
+					"payload": map[string]any{"result": res.value},
+				})
+			}
+			_, _ = io.WriteString(w, "data: [DONE]\n\n")
+			if flusher != nil {
+				flusher.Flush()
+			}
+			return
+		case <-poll.C:
+			mu.Lock()
+			offset = drainForward(fwdPath, offset, func(line string) {
+				seq++
+				var obj any
+				if json.Unmarshal([]byte(line), &obj) == nil {
+					writeEvent(map[string]any{
+						"schema": "RuntimeEventV1", "schema_version": 1,
+						"seq": seq, "type": "message.delta", "payload": obj,
+					})
+				}
+			})
+			mu.Unlock()
+		}
+	}
+}
+
+func drainForward(path string, offset int64, onLine func(string)) int64 {
+	f, err := os.Open(path)
+	if err != nil {
+		return offset
+	}
+	defer f.Close()
+	if _, err := f.Seek(offset, io.SeekStart); err != nil {
+		return offset
+	}
+	sc := bufio.NewScanner(f)
+	sc.Buffer(make([]byte, 0, 64*1024), 1024*1024)
+	for sc.Scan() {
+		line := strings.TrimSpace(sc.Text())
+		offset += int64(len(sc.Bytes()) + 1)
+		if line == "" {
+			continue
+		}
+		onLine(line)
+	}
+	return offset
 }

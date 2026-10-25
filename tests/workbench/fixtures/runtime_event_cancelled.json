@@ -1,0 +1,13 @@
+{
+  "schema": "RuntimeEventV1",
+  "schema_version": 1,
+  "event_id": "evt-9",
+  "seq": 9,
+  "run_id": "run-1",
+  "parent_run_id": null,
+  "turn_id": "turn-1",
+  "workspace_scope": "ws-1",
+  "timestamp": "2026-10-25T01:00:04Z",
+  "type": "run.cancelled",
+  "payload": {"reason": "user_stop", "usage_state": "partial"}
+}

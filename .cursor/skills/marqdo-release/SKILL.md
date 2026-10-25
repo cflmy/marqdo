@@ -28,6 +28,7 @@ Canonical release playbook for **cflmy/marqdo**. Read this skill **before** tagg
 9. **Extension packs always publish to both** Cloudflare R2 (`https://ext.marqdo.com` via `scripts/upload-ext-r2.py`) **and** GitHub (Release assets / `ext-v*` tag). Credentials only in `~/.marqdo/r2.env` / CI — **never** commit. See [ext-cdn.md](../../../doc/design/ext-cdn.md).
 10. **CLI Ubuntu package = PPA** (`ppa:cflmy/marqdo`) via `./scripts/ppa-ship.sh` / `ppa-build-source.sh`. GitHub zips remain for Windows and non-apt Linux.
 11. **When a step needs the user** (sudo password, GPG passphrase, Launchpad UI, interactive `dput`): **stop, state what failed, and give the exact commands** to run in their terminal. Do not pretend the step succeeded.
+12. **GitHub auto-build must be green before declaring a release done.** For full/cli: wait for the tag-triggered **Release** workflow (`windows` + `linux`) **and** the push-triggered **`executable-knowledge`** workflow on the release commit / `main` tip. Release asset zips alone are **not** sufficient — a green Release job with a red EK gate is an incomplete release. Do not skip or reframe a red `executable-knowledge` as “assets already uploaded.”
 
 ## Release modes
 
@@ -78,6 +79,7 @@ Release progress:
 ```
 
 Checks: clean tree; `main` ff-only; smoke tests; CHANGELOG Unreleased; no secrets.
+Also confirm the latest `main` **`executable-knowledge`** Actions run is green (or that this release commit will be covered after push) — do not proceed to tag if EK is already red on tip without a fix in the same release PR.
 
 ## Phase 2 — Docs & version bumps (main)
 
@@ -129,7 +131,9 @@ git push https://proxy.cflmy.top/github.com/cflmy/marqdo.git vVER
 
 ## Phase 5 — GitHub Release notes & assets
 
-1. Wait for Actions (full/cli): both `windows` and `linux` green when ext natives required.
+1. Wait for Actions (full/cli):
+   - Tag **Release** workflow: both `windows` and `linux` green when ext natives required.
+   - Push **`executable-knowledge`** workflow on the release commit / `main`: **must be success**. Poll with `gh run list --workflow=executable-knowledge.yml --branch main` / `gh run watch`. If EK is red → **stop**; fix plugin/harness on `main`, re-run; do **not** declare the release complete from assets alone.
 2. Rewrite release body 中英双语 — [reference.md § Notes](reference.md).
 3. Confirm Linux `marqdo-VER-native-x86_64-unknown-linux-gnu.zip` when mode ships ext.
 
@@ -174,10 +178,11 @@ On Launchpad failure: read the build log, fix `debian/` or bundle script, bump `
 ## Phase 8 — Post-release
 
 1. `gh release view TAG` — assets + notes.
-2. CDN `https://ext.marqdo.com/vVER/` (if ext shipped).
-3. PPA build green (if cli shipped).
-4. Tell user URLs: GitHub release, CDN, PPA install one-liner.
-5. Optional gh-pages only if asked.
+2. Confirm **`executable-knowledge`** and **Release** Actions are both green for this tag/commit; if either is red, say so and do not claim “发版完成”.
+3. CDN `https://ext.marqdo.com/vVER/` (if ext shipped).
+4. PPA build green (if cli shipped).
+5. Tell user URLs: GitHub release, CDN, PPA install one-liner.
+6. Optional gh-pages only if asked.
 
 ## Extension-only release (mode=ext)
 
@@ -194,7 +199,8 @@ On Launchpad failure: read the build log, fix `debian/` or bundle script, bump `
 | `gh` / git TLS or Clash `7890` refused | Unset bad proxy; see [reference § Proxy](reference.md) |
 | GitHub blocked | proxy.cflmy.top, then HK jump; **print commands** if agent cannot push |
 | Tag exists | Stop; ask user |
-| CI red | Fix on main; retag only if user allows |
+| CI red (Release assets) | Fix on main; retag only if user allows |
+| `executable-knowledge` red | Fix agent plugin / test harness (e.g. `ensure_agent_plugin_built`); push `main`; wait for EK green. **Do not** treat uploaded Release zips as a successful release |
 | R2 upload fails | Print `upload-ext-r2.py` command; do not skip silently |
 | PPA / sudo / GPG | Print `./scripts/ppa-ship.sh noble` (or `dput …`); do not skip silently |
 | Launchpad `Cargo.lock` v4 / old cargo | Ensure bundled `third_party/rust` via current `ppa-build-source.sh`; bump `1ppaN` |

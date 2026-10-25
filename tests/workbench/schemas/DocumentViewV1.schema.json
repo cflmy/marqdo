@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "marqdo://contracts/DocumentViewV1",
+  "title": "DocumentViewV1",
+  "type": "object",
+  "required": ["schema", "schema_version", "document", "execution", "completeness"],
+  "properties": {
+    "schema": { "const": "DocumentViewV1" },
+    "schema_version": { "const": 1 },
+    "document": {
+      "type": "object",
+      "required": ["id", "source_revision"],
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "source_revision": { "type": "string" },
+        "semantic_digest": { "type": "string" },
+        "generation_id": { "type": ["string", "null"] },
+        "presentation_token": { "type": "string" }
+      }
+    },
+    "execution": {
+      "type": "object",
+      "required": ["state"],
+      "properties": {
+        "state": { "const": "not_run" },
+        "run_id": { "type": ["string", "null"] }
+      }
+    },
+    "completeness": { "enum": ["complete", "partial"] },
+    "render": { "type": "object" },
+    "outline": { "type": "array" },
+    "nodes": { "type": "array" },
+    "refs": { "type": "array" },
+    "diagnostics": { "type": "array" }
+  },
+  "additionalProperties": true
+}

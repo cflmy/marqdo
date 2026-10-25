@@ -1,0 +1,17 @@
+{
+  "schema": "ModelSelectionV1",
+  "schema_version": 1,
+  "selection_id": "sel-1",
+  "provider_id": "provider-1",
+  "model_id": "model-2",
+  "provider_revision": 3,
+  "model_revision": 5,
+  "adapter": "openai-compatible",
+  "endpoint_ref": "endpoint-local-1",
+  "credential_ref": "credential-local-1",
+  "credential_version": 2,
+  "upstream_model_id": "example-model",
+  "parameters": {"max_output_tokens": 2048},
+  "fallback_policy": "disabled",
+  "auth_mode": "api_key"
+}

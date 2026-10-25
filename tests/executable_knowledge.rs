@@ -5,6 +5,64 @@
 
 use std::process::Command;
 
+/// Build `libagent` once per test process and prefer it over a stale `~/.marqdo/ext`.
+/// Same contract as `tests/gold.rs::ensure_agent_plugin_built` — EK gate must not
+/// depend on a manually copied `ext/native/libagent.so`.
+fn ensure_agent_plugin_built() {
+    use std::sync::Once;
+    static ONCE: Once = Once::new();
+    ONCE.call_once(|| {
+        let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let status = Command::new("cargo")
+            .args(["build", "-p", "marqdo_plugin_agent"])
+            .current_dir(&root)
+            .status()
+            .expect("build marqdo_plugin_agent");
+        assert!(status.success(), "failed to build marqdo_plugin_agent");
+        let lib = if cfg!(windows) {
+            root.join("target").join("debug").join("agent.dll")
+        } else if cfg!(target_os = "macos") {
+            root.join("target").join("debug").join("libagent.dylib")
+        } else {
+            root.join("target").join("debug").join("libagent.so")
+        };
+        let release = if cfg!(windows) {
+            root.join("target").join("release").join("agent.dll")
+        } else if cfg!(target_os = "macos") {
+            root.join("target").join("release").join("libagent.dylib")
+        } else {
+            root.join("target").join("release").join("libagent.so")
+        };
+        let chosen = if lib.is_file() {
+            if release.is_file() {
+                let lib_m = std::fs::metadata(&lib).and_then(|m| m.modified()).ok();
+                let rel_m = std::fs::metadata(&release).and_then(|m| m.modified()).ok();
+                match (lib_m, rel_m) {
+                    (Some(l), Some(r)) if r > l => release,
+                    _ => lib,
+                }
+            } else {
+                lib
+            }
+        } else {
+            release
+        };
+        assert!(
+            chosen.is_file(),
+            "missing agent plugin at {}",
+            chosen.display()
+        );
+        // SAFETY: single-threaded Once; children inherit for the rest of the test process.
+        std::env::set_var("MARQDO_AGENT_PLUGIN", &chosen);
+        if std::env::var_os("MARQDO_EXT").is_none() {
+            let ext = root.join("ext");
+            if ext.join("ai").join("agent.mq.md").is_file() {
+                std::env::set_var("MARQDO_EXT", &ext);
+            }
+        }
+    });
+}
+
 fn run_backend(path: &str, backend: &str) -> (i32, String, String) {
     let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let out = Command::new(env!("CARGO_BIN_EXE_marqdo"))
@@ -1657,6 +1715,12 @@ fn v2_sse_accepts_packet_rejects_stale_token() {
     assert!(marqdo::view::sse_accepts_packet("abc", Some("")));
     assert!(marqdo::view::sse_accepts_packet("abc", Some("abc")));
     assert!(!marqdo::view::sse_accepts_packet("abc", Some("zzz")));
+    // Embed clients must use strict: missing/empty/mismatch all reject.
+    assert!(!marqdo::view::sse_accepts_packet_strict("abc", None));
+    assert!(!marqdo::view::sse_accepts_packet_strict("abc", Some("")));
+    assert!(!marqdo::view::sse_accepts_packet_strict("", Some("abc")));
+    assert!(!marqdo::view::sse_accepts_packet_strict("abc", Some("zzz")));
+    assert!(marqdo::view::sse_accepts_packet_strict("abc", Some("abc")));
     assert_eq!(
         marqdo::view::page_token_from_source("a.mq.md", "x"),
         marqdo::view::page_token_from_source("a.mq.md", "x")
@@ -1869,6 +1933,7 @@ fn f1_publish_gate_chain_via_verify_may_publish() {
 
 #[test]
 fn f1_agent_eng_bind_gate_mq_offline() {
+    ensure_agent_plugin_built();
     let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let out = Command::new(env!("CARGO_BIN_EXE_marqdo"))
         .args([
@@ -1878,6 +1943,10 @@ fn f1_agent_eng_bind_gate_mq_offline() {
             "tree",
         ])
         .current_dir(&root)
+        .env(
+            "MARQDO_AGENT_PLUGIN",
+            std::env::var_os("MARQDO_AGENT_PLUGIN").expect("MARQDO_AGENT_PLUGIN set by ensure"),
+        )
         .output()
         .unwrap();
     let stdout = String::from_utf8_lossy(&out.stdout);

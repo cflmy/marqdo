@@ -12,11 +12,16 @@ mod output;
 mod render;
 
 pub use knowledge_present::{
-    page_token_from_source, sse_accepts_packet, title_from_source, KnowledgePresentation,
+    page_token_from_source, sse_accepts_packet, sse_accepts_packet_strict, title_from_source,
+    KnowledgePresentation,
 };
 
 /// Surface rendering of an expression (labels/diagnostics reuse). `<TAB>` M6
 pub use render::expr_display;
+
+/// Read-model HTML helpers for embedded DocumentView (M03) — never execute.
+pub use document::render_module_document;
+pub use render::render_knowledge_html;
 
 pub use output::{write_capture, write_static, CaptureOptions, OutputOptions};
 
@@ -37,7 +42,7 @@ use crate::view::html::{escape, page_file, page_index, LinkMode};
 use crate::view::annot::{build_view_annots, view_execution_report_json};
 use crate::view::render::{
     collect_input_prompts, render_bindings_html, render_module_structure,
-    render_knowledge_html, render_module_structure_with_annots, render_right_rail, uses_stream_panel, FileViewModel,
+    render_module_structure_with_annots, render_right_rail, uses_stream_panel, FileViewModel,
 };
 use crate::{run_file_capture, RunOptions};
 

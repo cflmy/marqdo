@@ -127,11 +127,27 @@ impl KnowledgePresentation {
     }
 }
 
-/// V2: whether an SSE result packet may update the live document structure.
+/// Live View SSE: whether a result packet may update the document structure.
+///
+/// Legacy packets without a token are accepted so older live-view clients keep
+/// working. **Embedded DocumentView clients must use [`sse_accepts_packet_strict`]
+/// instead** — missing/empty tokens and mismatches are rejected there.
 pub fn sse_accepts_packet(page_token: &str, packet_token: Option<&str>) -> bool {
     match packet_token {
         None | Some("") => true, // legacy packets without token still apply
         Some(_tok) if page_token.is_empty() => true,
+        Some(tok) => tok == page_token,
+    }
+}
+
+/// Strict SSE / embed gate: reject missing, empty, or mismatched page tokens.
+///
+/// Use this for DocumentView / qdagent embed hosts. Do not inherit the live-view
+/// leniency of [`sse_accepts_packet`].
+pub fn sse_accepts_packet_strict(page_token: &str, packet_token: Option<&str>) -> bool {
+    match packet_token {
+        None | Some("") => false,
+        Some(_tok) if page_token.is_empty() => false,
         Some(tok) => tok == page_token,
     }
 }

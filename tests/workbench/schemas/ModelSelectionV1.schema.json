@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "marqdo://contracts/ModelSelectionV1",
+  "title": "ModelSelectionV1",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "selection_id",
+    "provider_id",
+    "model_id",
+    "adapter",
+    "upstream_model_id"
+  ],
+  "properties": {
+    "schema": { "const": "ModelSelectionV1" },
+    "schema_version": { "const": 1 },
+    "selection_id": { "type": "string", "minLength": 1 },
+    "provider_id": { "type": "string", "minLength": 1 },
+    "model_id": { "type": "string", "minLength": 1 },
+    "adapter": { "type": "string" },
+    "upstream_model_id": { "type": "string", "minLength": 1 },
+    "provider_revision": { "type": ["integer", "null"] },
+    "model_revision": { "type": ["integer", "null"] },
+    "endpoint_ref": { "type": ["string", "null"] },
+    "credential_ref": { "type": ["string", "null"] },
+    "credential_version": { "type": ["integer", "null"] },
+    "parameters": { "type": "object" },
+    "fallback_policy": { "type": "string" },
+    "auth_mode": { "type": "string" }
+  },
+  "additionalProperties": true
+}

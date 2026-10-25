@@ -68,15 +68,32 @@ fn dispatch(req: &Value) -> Result<Value, Value> {
         Some("document.extract") => document_extract(&params),
         Some("artifact.patch") => artifact_patch(&params),
         Some("artifact.extract_pure") => artifact_extract_pure(&params),
+        // Workbench M00–M04: capability probe + read-only view + locator.
+        Some("capabilities") => Ok(crate::workbench::probe_capabilities(&params)),
+        #[cfg(feature = "view")]
+        Some("view.document") => view_document(&params),
+        #[cfg(not(feature = "view"))]
+        Some("view.document") => Err(err(
+            "mlsp.unsupported",
+            "view.document requires the view feature",
+        )),
+        Some("view.reference_resolve") => crate::workbench::resolve_reference(&params),
         // `<TAB>` M9: occlusion label search (two-tier vocabulary).
         Some("labels.search") => labels_search(&params),
         // `<TAB>` M6: one-shot session summary (T1 staleness seen/fixed).
         Some("session.summary") => session_summary(),
         other => Err(err(
             "mlsp.unknown_method",
-            format!("未知方法 {other:?}；可用：locate / syntax / validate / repair_targets / repair_apply / schema / artifact.find / artifact.inspect / link.resolve / artifact.verify / artifact.impact / artifact.bind / artifact.execute / artifact.reuse_execute / artifact.patch / artifact.extract_pure / document.extract"),
+            format!("未知方法 {other:?}；可用：locate / syntax / validate / repair_targets / repair_apply / schema / artifact.find / artifact.inspect / link.resolve / artifact.verify / artifact.impact / artifact.bind / artifact.execute / artifact.reuse_execute / artifact.patch / artifact.extract_pure / document.extract / capabilities / view.document / view.reference_resolve"),
         )),
     }
+}
+
+#[cfg(feature = "view")]
+fn view_document(params: &Value) -> Result<Value, Value> {
+    let req = crate::workbench::DocumentViewRequest::from_params(params)
+        .map_err(|e| err("mlsp.bad_request", e))?;
+    crate::workbench::build_document_view(&req)
 }
 
 fn artifact_extract_pure(params: &Value) -> Result<Value, Value> {
@@ -172,7 +189,100 @@ fn artifact_inspect(params: &Value) -> Result<Value, Value> {
     let candidates = artifact_query(&compilation.semantics, query);
     if candidates.is_empty() { return Err(err("artifact.unresolved", format!("没有制品 `{query}`"))); }
     if candidates.len() != 1 { return Err(json!({"code":"artifact.ambiguous","message":format!("制品 `{query}` 不唯一"),"candidates":candidates.iter().map(|a|&a.artifact_id.0).collect::<Vec<_>>() })); }
-    Ok(crate::sema::artifact_json(candidates[0]))
+    let artifact = candidates[0];
+    // Version contract: expected source/generation mismatch must not silently return current.
+    check_artifact_version_params(params, &compilation, artifact)?;
+    Ok(crate::sema::artifact_json(artifact))
+}
+
+/// Reject inspect when caller pinned an expected source revision or generation that
+/// does not match the current project snapshot (`artifact.version_mismatch`).
+fn check_artifact_version_params(
+    params: &Value,
+    compilation: &crate::sema::Compilation,
+    artifact: &crate::sema::SemanticArtifact,
+) -> Result<(), Value> {
+    let expected_rev = params
+        .get("expected_source_revision")
+        .and_then(Value::as_str)
+        .filter(|s| !s.is_empty());
+    if let Some(expected) = expected_rev {
+        let project_root = params
+            .get("project")
+            .or_else(|| params.get("path"))
+            .and_then(Value::as_str)
+            .map(PathBuf::from)
+            .unwrap_or_else(|| PathBuf::from("."));
+        let root = if project_root.is_file() {
+            project_root
+                .parent()
+                .unwrap_or_else(|| Path::new("."))
+                .to_path_buf()
+        } else {
+            project_root
+        };
+        let abs = root.join(&artifact.source.file);
+        match std::fs::read(&abs) {
+            Ok(raw) => {
+                use sha2::{Digest, Sha256};
+                let actual = format!("sha256:{:x}", Sha256::digest(&raw));
+                if actual != expected {
+                    return Err(json!({
+                        "code": "artifact.version_mismatch",
+                        "message": format!(
+                            "expected source_revision {expected}, actual {actual}; refusing silent downgrade"
+                        ),
+                        "expected_source_revision": expected,
+                        "actual_source_revision": actual,
+                        "artifact_id": artifact.artifact_id.0,
+                    }));
+                }
+            }
+            Err(e) => {
+                return Err(json!({
+                    "code": "artifact.version_mismatch",
+                    "message": format!(
+                        "cannot verify source_revision for {}: {e}; refusing silent downgrade",
+                        artifact.source.file
+                    ),
+                    "expected_source_revision": expected,
+                    "artifact_id": artifact.artifact_id.0,
+                }));
+            }
+        }
+    }
+
+    let expected_gen = params
+        .get("expected_generation")
+        .or_else(|| params.get("generation_id"))
+        .and_then(Value::as_str)
+        .filter(|s| !s.is_empty());
+    if let Some(expected) = expected_gen {
+        let actual = semantic_generation_id(&compilation.semantics);
+        if actual != expected {
+            return Err(json!({
+                "code": "artifact.version_mismatch",
+                "message": format!(
+                    "expected generation {expected}, current projection is {actual}; refusing silent downgrade"
+                ),
+                "expected_generation": expected,
+                "actual_generation": actual,
+                "artifact_id": artifact.artifact_id.0,
+            }));
+        }
+    }
+    Ok(())
+}
+
+/// Semantic generation token matching KnowledgePresentation / DocumentView.
+fn semantic_generation_id(project: &crate::sema::SemanticProject) -> String {
+    use sha2::{Digest, Sha256};
+    let mut gh = Sha256::new();
+    gh.update(project.project_id.as_bytes());
+    for a in &project.artifacts {
+        gh.update(a.hashes.artifact.0.as_bytes());
+    }
+    format!("{:x}", gh.finalize())[..16].to_string()
 }
 
 fn link_resolve(params: &Value) -> Result<Value, Value> {

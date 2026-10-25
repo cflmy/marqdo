@@ -304,6 +304,15 @@ gh workflow run Release --ref "vVER"  # only if workflow_dispatch exists; else f
 
 Current Release workflow is **tag-push only**. Red CI after tag → fix on `main`, then either new patch tag or **user-approved** delete+recreate tag (dangerous; prefer patch).
 
+**Also required before declaring release done:** the push-triggered **`executable-knowledge`** workflow on the release commit / `main` tip must be **success**. Poll with:
+
+```bash
+gh run list --workflow=executable-knowledge.yml --branch main --limit 5
+gh run watch <run-id>
+```
+
+A green Release asset job with a red `executable-knowledge` gate is an **incomplete** release — fix the plugin/harness (e.g. `ensure_agent_plugin_built` for agent-dependent EK tests), push `main`, and wait for EK green. Do not skip.
+
 ### HK SSH jump (Paramiko CONNECT)
 
 **When to use:** local → GitHub fails (timeout / TLS / Clash flaky / reverse-proxy `proxy.cflmy.top` connect drops), but this host can reach an overseas box that has stable GitHub (default `hk.cflmy.de`). Proven path for v0.3.9 push/tag/`gh`.

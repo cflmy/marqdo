@@ -1,0 +1,12 @@
+{
+  "schema": "ModelSelectionV1",
+  "schema_version": 1,
+  "error": {
+    "code": "llm.selection_missing",
+    "message": "selection_id required in strict mode",
+    "retryable": false
+  },
+  "partial": {
+    "model_id": "model-2"
+  }
+}

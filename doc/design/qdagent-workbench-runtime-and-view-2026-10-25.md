@@ -1,6 +1,6 @@
 # qdagent 知识工作台所需的多模型运行与 View 嵌入支持
 
-日期：2026-10-25。状态：Proposed / 框架开发规格，新增接口均为拟议，不能当作当前能力使用。
+日期：2026-10-25。状态：Verified（M00–M06 切片，以 `tests/workbench_contracts` + MLSP capabilities 证据为准；原生非兼容适配器仍 unavailable）。
 
 源码基线：Marqdo `dc853fb`（2.1.2），qdagent `643dd31`，已同步远端。应用侧配套：[qdagent 多提供商与知识工作台](../../../qdagent/doc/design/multi-provider-and-knowledge-workbench-2026-10-25.md)。跨仓相对链接以兄弟仓库工作区布局为准。
 
@@ -401,13 +401,35 @@ M01 支持多个兼容提供商不等待原生协议全做完；但原生适配�
 
 ## 12. 本次验证结果与已知阻碍
 
-本次执行 `cargo test --offline --locked --test executable_knowledge`，45 项中 43 通过、2 失败：
+### 12.1 M00–M06 落地证据（2026-10-25 续）
 
-- `f1_agent_eng_bind_gate_mq_offline`：`unknown function agent_eng_bind_execute`；需要核对实际 native plugin 产物与宿主版本，不能仅因源码存在符号就判断已安装可用。
-- `v3_corpus_1000_compile_smoke`：本机 debug 运行约 216.32s，超过测试中 180s 门限；编译命令本身成功，失败为耗时断言。这是本环境的性能证据，不推断所有机器/发布构建都失败。
+命令（本机）：
 
-随后运行 `cargo build --offline --locked -p marqdo_plugin_agent`，并以 `MARQDO_AGENT_PLUGIN=/root/work/marqdo/target/debug/libagent.so` 显式指向本次产物，定向执行 `f1_agent_eng_bind_gate_mq_offline -- --exact`，结果 **1/1 通过**。这说明新源码构建的插件可通过该用例，初次失败与本地插件产物/解析路径有关；未据此声称默认安装路径已修复。未重复整套耗时测试，1000 单元性能失败仍保留。
+```bash
+cargo test --offline --locked --test workbench_contracts
+cargo test --offline --locked --test executable_knowledge f1_agent_eng_bind_gate_mq_offline -- --exact
+```
 
-`v0_no_exec_does_not_run_side_effects`、来源变化失效、闭包摘要、View presentation、SSE token、基础引用/复用故事等测试在首次运行通过。它们证明已有子集可用，不证明嵌入阅读、完整多模型计量或浏览器可读性已经交付。
+已交付并通过自动化子集：
 
-本次不改框架实现，也不调用付费模型；后续实现按 M/F 编号记录证据、实测环境、未支持格式/适配器和兼容限制。
+| 切片 | 证据 |
+|---|---|
+| M00 | fixtures + JSON Schema 消费；`capabilities`；`force_unloaded` / `force_*_off` 诚实降级（F16） |
+| M01 | `messages[]` + strict selection；`RunContextV1`；workbook skeleton 禁 `llm.llm`；子任务转发 model/base_url |
+| M02 | usage null≠0；event_sink；`MARQDO_CANCEL`/`_TOKEN`；web `sse-live` 断连写 cancel |
+| M03 | `view.document` 不经 `build_file_view`；heading outline；path escape 拒绝；F08 无副作用标记 |
+| M04 | `view.reference_resolve` stale/version_unavailable；`artifact.inspect` version_mismatch；embed `sse_accepts_packet_strict` |
+| M05 | extract `:B` locator；analysis_cache 按 project_root 隔离（F14） |
+| M06 | CI `executable-knowledge.yml` 预构建 agent+llm 并跑 `workbench_contracts` |
+
+已知限制（不得宣称已完成）：
+
+- `anthropic-native` / `gemini-native` 仍 `available:false`。
+- PDF/DOCX/OCR extract 仍显式 unsupported。
+- 历史正文快照存储仍由应用负责；框架对缺快照返回 `version_unavailable`。
+- `v3_corpus_1000_compile_smoke` 耗时门限随机器变化；release/debug 分剖面记录，不删 corpus。
+- 未调用付费供应商；流式/取消端到端依赖假 HTTP / 本地 cancel token。
+
+### 12.2 历史基线记录（设计起草时）
+
+起草时 `executable_knowledge` 曾出现 `f1` 缺插件与 `v3_corpus_1000` debug 超时；其后 `ensure_agent_plugin_built` + CI 预构建已修复 f1 路径。1000 单元性能仍按剖面单独记录。

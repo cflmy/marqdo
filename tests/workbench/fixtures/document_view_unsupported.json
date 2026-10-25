@@ -1,0 +1,8 @@
+{
+  "ok": false,
+  "error": {
+    "code": "view.document_unsupported_format",
+    "message": "binary formats require extract adapter",
+    "retryable": false
+  }
+}
