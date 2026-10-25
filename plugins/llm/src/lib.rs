@@ -461,3 +461,166 @@ marqdo_plugin!(marqdo_plugin_sdk::ABI_VERSION, [
     ("llm_ping", "", llm_ping),
     ("llm_chat_completions", "base_url,api_key,model,prompt,messages,selection,strict_selection,auth_mode,stream,echo,suffix,bearer", llm_chat_completions),
 ]);
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn f03_messages_preserve_roles_and_reject_image() {
+        let msgs = build_messages(&json!({
+            "messages": [
+                {"role": "system", "content": "rules"},
+                {"role": "user", "content": "你好"},
+                {"role": "assistant", "content": "先前"},
+                {"role": "user", "content": "最新用户"}
+            ]
+        }))
+        .unwrap();
+        let arr = msgs.as_array().unwrap();
+        assert_eq!(arr.len(), 4);
+        assert_eq!(arr[3]["role"], "user");
+        assert_eq!(arr[3]["content"], "最新用户");
+
+        let err = build_messages(&json!({
+            "messages": [{"role": "user", "content": [{"type": "image", "url": "x"}]}]
+        }))
+        .unwrap_err();
+        assert!(err.contains("unsupported_input"), "{err}");
+    }
+
+    #[test]
+    fn f01_strict_selection_does_not_invent_env_model() {
+        std::env::remove_var("MARQDO_CANCEL");
+        std::env::remove_var("MARQDO_CANCEL_TOKEN");
+        let err = chat_completions(&json!({
+            "strict_selection": true,
+            "base_url": "http://127.0.0.1:9",
+            "api_key": "k",
+            "prompt": "hi"
+            // missing selection → must fail before any HTTP
+        }))
+        .unwrap_err();
+        assert!(err.contains("selection_missing"), "{err}");
+    }
+
+    #[test]
+    fn f06_cancel_short_circuits_before_http() {
+        // Prefer token file over process-global MARQDO_CANCEL to avoid parallel test races.
+        let tok = std::env::temp_dir().join(format!("llm-cancel-{}", std::process::id()));
+        std::fs::write(&tok, "cancelled").unwrap();
+        std::env::set_var("MARQDO_CANCEL_TOKEN", &tok);
+        let out = chat_completions(&json!({
+            "base_url": "http://127.0.0.1:9",
+            "api_key": "k",
+            "model": "m",
+            "prompt": "hi"
+        }));
+        std::env::remove_var("MARQDO_CANCEL_TOKEN");
+        let _ = std::fs::remove_file(&tok);
+        let out = out.unwrap();
+        assert_eq!(out["finish"], "cancelled");
+    }
+
+    /// F01: two local endpoints receive distinct models/auth — no cross-talk.
+    #[test]
+    fn f01_dual_endpoint_isolation() {
+        use std::io::{Read, Write};
+        use std::net::TcpListener;
+        use std::sync::{Arc, Mutex};
+        use std::thread;
+
+        fn spawn_mock(tag: &'static str, seen: Arc<Mutex<Vec<String>>>) -> String {
+            let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+            let addr = listener.local_addr().unwrap();
+            thread::spawn(move || {
+                if let Ok((mut stream, _)) = listener.accept() {
+                    let mut raw = Vec::new();
+                    let mut buf = [0u8; 4096];
+                    loop {
+                        let n = stream.read(&mut buf).unwrap_or(0);
+                        if n == 0 {
+                            break;
+                        }
+                        raw.extend_from_slice(&buf[..n]);
+                        if let Some(pos) = raw.windows(4).position(|w| w == b"\r\n\r\n") {
+                            let header = String::from_utf8_lossy(&raw[..pos]);
+                            let cl = header
+                                .lines()
+                                .find_map(|l| l.strip_prefix("Content-Length:"))
+                                .and_then(|v| v.trim().parse::<usize>().ok())
+                                .unwrap_or(0);
+                            let body_start = pos + 4;
+                            while raw.len() < body_start + cl {
+                                let n = stream.read(&mut buf).unwrap_or(0);
+                                if n == 0 {
+                                    break;
+                                }
+                                raw.extend_from_slice(&buf[..n]);
+                            }
+                            break;
+                        }
+                    }
+                    let req = String::from_utf8_lossy(&raw).to_string();
+                    seen.lock().unwrap().push(format!("{tag}:{req}"));
+                    let body = r#"{"choices":[{"message":{"content":"ok"},"finish_reason":"stop"}],"usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}}"#;
+                    let resp = format!(
+                        "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+                        body.len(),
+                        body
+                    );
+                    let _ = stream.write_all(resp.as_bytes());
+                }
+            });
+            format!("http://{addr}")
+        }
+
+        let seen_a = Arc::new(Mutex::new(Vec::new()));
+        let seen_b = Arc::new(Mutex::new(Vec::new()));
+        let url_a = spawn_mock("A", seen_a.clone());
+        let url_b = spawn_mock("B", seen_b.clone());
+
+        let out_a = chat_completions(&json!({
+            "base_url": url_a,
+            "api_key": "key-a",
+            "model": "model-a",
+            "auth_mode": "api_key",
+            "messages": [{"role":"user","content":"from-a"}],
+            "selection": {
+                "selection_id": "sel-a",
+                "provider_id": "p-a",
+                "model_id": "m-a",
+                "upstream_model_id": "model-a",
+                "strict": true
+            },
+            "strict_selection": true
+        }))
+        .unwrap();
+        let out_b = chat_completions(&json!({
+            "base_url": url_b,
+            "api_key": "key-b",
+            "model": "model-b",
+            "auth_mode": "api_key",
+            "messages": [{"role":"user","content":"from-b"}],
+            "selection": {
+                "selection_id": "sel-b",
+                "provider_id": "p-b",
+                "model_id": "m-b",
+                "upstream_model_id": "model-b",
+                "strict": true
+            },
+            "strict_selection": true
+        }))
+        .unwrap();
+
+        assert_eq!(out_a["finish"], "stop", "{out_a}");
+        assert_eq!(out_b["finish"], "stop", "{out_b}");
+        let a = seen_a.lock().unwrap().join("\n");
+        let b = seen_b.lock().unwrap().join("\n");
+        assert!(a.contains("model-a"), "A saw wrong model: {a}");
+        assert!(a.contains("key-a") || a.contains("Authorization"), "{a}");
+        assert!(!a.contains("model-b"), "A must not see B's model: {a}");
+        assert!(b.contains("model-b"), "B saw wrong model: {b}");
+        assert!(!b.contains("model-a"), "B must not see A's model: {b}");
+    }
+}

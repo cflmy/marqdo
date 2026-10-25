@@ -22,4 +22,7 @@ pub use event_sink::{bind_event_sink, clear_event_sink, emit_event, emit_message
 pub use locator::{resolve_reference, KnowledgeLocator};
 pub use run_context::{cancel_requested, RunContext};
 pub use selection::{parse_model_selection, ModelSelection};
-pub use usage::{model_call_usage_from_provider, runtime_event, token_or_null};
+pub use usage::{
+    model_call_usage_from_provider, model_call_usage_from_provider_rev, replace_usage_if_newer,
+    runtime_event, token_or_null,
+};

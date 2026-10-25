@@ -19,6 +19,19 @@ pub fn model_call_usage_from_provider(
     provider_usage: &Value,
     status: &str,
 ) -> Value {
+    model_call_usage_from_provider_rev(call_id, attempt_id, run_id, selection, provider_usage, status, 1)
+}
+
+/// Same as [`model_call_usage_from_provider`] with an explicit revision (F05).
+pub fn model_call_usage_from_provider_rev(
+    call_id: &str,
+    attempt_id: &str,
+    run_id: &str,
+    selection: &Value,
+    provider_usage: &Value,
+    status: &str,
+    revision: u64,
+) -> Value {
     let has_usage = provider_usage.is_object();
     let input = provider_usage
         .get("prompt_tokens")
@@ -97,7 +110,7 @@ pub fn model_call_usage_from_provider(
         "total_tokens": token_or_null(total),
         "cached_input_tokens": token_or_null(cached),
         "reasoning_output_tokens": token_or_null(reasoning),
-        "revision": 1,
+        "revision": revision.max(1),
         "provider_request_id": provider_usage.get("provider_request_id").cloned().unwrap_or(Value::Null),
         "diagnostics": diagnostics,
         // Legacy fields kept but marked — apps must not treat token_cost as money.
@@ -108,6 +121,23 @@ pub fn model_call_usage_from_provider(
             "unit": "tokens"
         }
     })
+}
+
+/// Replace prior usage for the same (call_id, attempt_id) when revision is newer (F05).
+/// Returns the winning snapshot; does not sum cumulative stream counters.
+pub fn replace_usage_if_newer(prior: &Value, next: &Value) -> Value {
+    let same_call = prior.get("call_id") == next.get("call_id")
+        && prior.get("attempt_id") == next.get("attempt_id");
+    if !same_call {
+        return next.clone();
+    }
+    let pr = prior.get("revision").and_then(|v| v.as_u64()).unwrap_or(0);
+    let nr = next.get("revision").and_then(|v| v.as_u64()).unwrap_or(0);
+    if nr >= pr {
+        next.clone()
+    } else {
+        prior.clone()
+    }
 }
 
 /// RuntimeEventV1 envelope helper.

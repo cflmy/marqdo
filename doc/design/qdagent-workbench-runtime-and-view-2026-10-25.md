@@ -1,6 +1,6 @@
 # qdagent 知识工作台所需的多模型运行与 View 嵌入支持
 
-日期：2026-10-25。状态：Verified（M00–M06 切片，以 `tests/workbench_contracts` + MLSP capabilities 证据为准；原生非兼容适配器仍 unavailable）。
+日期：2026-10-25。状态：Partial / in progress（M00–M06 脚手架与合同门禁已落地；F 矩阵仍有缺口，不得整文宣称 Verified；原生非兼容适配器仍 unavailable）。
 
 源码基线：Marqdo `dc853fb`（2.1.2），qdagent `643dd31`，已同步远端。应用侧配套：[qdagent 多提供商与知识工作台](../../../qdagent/doc/design/multi-provider-and-knowledge-workbench-2026-10-25.md)。跨仓相对链接以兄弟仓库工作区布局为准。
 
@@ -407,28 +407,28 @@ M01 支持多个兼容提供商不等待原生协议全做完；但原生适配�
 
 ```bash
 cargo test --offline --locked --test workbench_contracts
+cargo test --offline --locked -p marqdo_plugin_llm
 cargo test --offline --locked --test executable_knowledge f1_agent_eng_bind_gate_mq_offline -- --exact
 ```
 
-已交付并通过自动化子集：
+已交付并通过自动化子集（**非** F01–F16 全绿）：
 
 | 切片 | 证据 |
 |---|---|
-| M00 | fixtures + JSON Schema 消费；`capabilities`；`force_unloaded` / `force_*_off` 诚实降级（F16） |
-| M01 | `messages[]` + strict selection；`RunContextV1`；workbook skeleton 禁 `llm.llm`；子任务转发 model/base_url |
-| M02 | usage null≠0；event_sink；`MARQDO_CANCEL`/`_TOKEN`；web `sse-live` 断连写 cancel |
-| M03 | `view.document` 不经 `build_file_view`；heading outline；path escape 拒绝；F08 无副作用标记 |
-| M04 | `view.reference_resolve` stale/version_unavailable；`artifact.inspect` version_mismatch；embed `sse_accepts_packet_strict` |
-| M05 | extract `:B` locator；analysis_cache 按 project_root 隔离（F14） |
-| M06 | CI `executable-knowledge.yml` 预构建 agent+llm 并跑 `workbench_contracts` |
+| M00 | fixtures + JSON Schema 消费；`capabilities`；`force_unloaded` / `force_*_off`（F16） |
+| M01 | strict selection；`RunContextV1` 并行不串扰；llm plugin messages/roles；workbook 禁 `llm.llm` |
+| M02 | usage null≠0；revision 替换（F05）；cancel token（F06/F07）；event_sink；web `sse-live` 断连 cancel |
+| M03 | `view.document`；CJK outline/nodes；path escape；静态 a11y 子集；F08 无副作用标记 |
+| M04 | stale / version_unavailable / **ambiguous**（08-same-name）；`artifact.version_mismatch`；embed strict SSE |
+| M05 | extract `:B`；analysis_cache 隔离（F14 子集） |
+| M06 | CI 预构建 agent+llm + `workbench_contracts` |
 
-已知限制（不得宣称已完成）：
+已知限制（**发版阻断直至补齐或书面豁免**）：
 
-- `anthropic-native` / `gemini-native` 仍 `available:false`。
-- PDF/DOCX/OCR extract 仍显式 unsupported。
-- 历史正文快照存储仍由应用负责；框架对缺快照返回 `version_unavailable`。
-- `v3_corpus_1000_compile_smoke` 耗时门限随机器变化；release/debug 分剖面记录，不删 corpus。
-- 未调用付费供应商；流式/取消端到端依赖假 HTTP / 本地 cancel token。
+- 双真实 HTTP 端点联调、Agent resume 全路径、Go `sse-live` 集成测试仍薄。
+- DocumentView 六类步骤完整树 / 历史正文快照仍未闭合（缺快照 → `version_unavailable`）。
+- 完整浏览器 F12 留给 qdagent；原生适配器 / PDF/OCR 仍 unavailable。
+- 未调用付费供应商。
 
 ### 12.2 历史基线记录（设计起草时）
 

@@ -308,13 +308,33 @@ fn m01_run_context_spawn_child_inherits_selection() {
 }
 
 #[test]
-fn m01_messages_shape_rejects_unsupported_part() {
-    // Plugin validation is mirrored by selection/message contract: unsupported part types error.
-    let bad = serde_json::json!([
-        {"role": "user", "content": [{"type": "image", "url": "x"}]}
-    ]);
-    let ty = bad[0]["content"][0]["type"].as_str().unwrap();
-    assert_ne!(ty, "text");
+fn m01_f01_parallel_selections_do_not_cross() {
+    let a = marqdo::workbench::RunContext::from_value(&serde_json::json!({
+        "run_id": "run-a",
+        "selection_context": {
+            "upstream_model_id": "model-a",
+            "base_url": "http://127.0.0.1:7001"
+        }
+    }))
+    .unwrap();
+    let b = marqdo::workbench::RunContext::from_value(&serde_json::json!({
+        "run_id": "run-b",
+        "selection_context": {
+            "upstream_model_id": "model-b",
+            "base_url": "http://127.0.0.1:7002"
+        }
+    }))
+    .unwrap();
+    let ea = a.selection_env();
+    let eb = b.selection_env();
+    let model_a = ea.iter().find(|(k, _)| k == "OPENAI_MODEL").map(|(_, v)| v.as_str());
+    let model_b = eb.iter().find(|(k, _)| k == "OPENAI_MODEL").map(|(_, v)| v.as_str());
+    let base_a = ea.iter().find(|(k, _)| k == "OPENAI_BASE_URL").map(|(_, v)| v.as_str());
+    let base_b = eb.iter().find(|(k, _)| k == "OPENAI_BASE_URL").map(|(_, v)| v.as_str());
+    assert_eq!(model_a, Some("model-a"));
+    assert_eq!(model_b, Some("model-b"));
+    assert_ne!(base_a, base_b);
+    assert_ne!(a.run_id, b.run_id);
 }
 
 #[test]
@@ -337,6 +357,63 @@ fn m02_usage_revision_and_cancel_token() {
     assert!(marqdo::workbench::cancel_requested(Some(dir.to_str().unwrap())));
     let _ = std::fs::remove_file(&dir);
     assert!(!marqdo::workbench::cancel_requested(Some("/no/such/cancel/token")));
+}
+
+#[test]
+fn m02_f05_usage_revision_replaces_same_attempt_not_sum() {
+    let sel = serde_json::json!({"selection_id": "s"});
+    let partial = marqdo::workbench::model_call_usage_from_provider_rev(
+        "c1",
+        "a1",
+        "r1",
+        &sel,
+        &serde_json::json!({"prompt_tokens": 10, "completion_tokens": 1, "total_tokens": 11}),
+        "started",
+        1,
+    );
+    let final_u = marqdo::workbench::model_call_usage_from_provider_rev(
+        "c1",
+        "a1",
+        "r1",
+        &sel,
+        &serde_json::json!({"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15}),
+        "succeeded",
+        2,
+    );
+    let won = marqdo::workbench::replace_usage_if_newer(&partial, &final_u);
+    assert_eq!(won["revision"], 2);
+    assert_eq!(won["total_tokens"], 15);
+    // Older revision must not overwrite.
+    let kept = marqdo::workbench::replace_usage_if_newer(&final_u, &partial);
+    assert_eq!(kept["revision"], 2);
+    assert_eq!(kept["total_tokens"], 15);
+    // New attempt is a distinct identity (caller must not merge).
+    let retry = marqdo::workbench::model_call_usage_from_provider_rev(
+        "c1",
+        "a2",
+        "r1",
+        &sel,
+        &serde_json::json!({"prompt_tokens": 3, "completion_tokens": 1, "total_tokens": 4}),
+        "succeeded",
+        1,
+    );
+    assert_ne!(retry["attempt_id"], final_u["attempt_id"]);
+}
+
+#[test]
+fn m02_f07_cancel_does_not_undo_external_write() {
+    let marker = std::env::temp_dir().join(format!("mq-f07-{}", std::process::id()));
+    std::fs::write(&marker, "already-written").unwrap();
+    let tok = std::env::temp_dir().join(format!("mq-f07-cancel-{}", std::process::id()));
+    std::fs::write(&tok, "cancelled").unwrap();
+    assert!(marqdo::workbench::cancel_requested(Some(tok.to_str().unwrap())));
+    // Cancel must not claim or perform undo of prior external writes.
+    assert_eq!(
+        std::fs::read_to_string(&marker).unwrap(),
+        "already-written"
+    );
+    let _ = std::fs::remove_file(&marker);
+    let _ = std::fs::remove_file(&tok);
 }
 
 #[test]
@@ -391,18 +468,74 @@ fn m05_project_cache_isolation_f14() {
 
 #[test]
 fn m03_f08_side_effect_marker_not_created_by_view() {
-    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("tests/executable_knowledge/baseline/02-extract");
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/workbench/fixtures");
     let marker = root.join(".workbench-f08-marker");
     let _ = std::fs::remove_file(&marker);
     let resp = mlsp(
         "view.document",
         serde_json::json!({
             "project": root.to_string_lossy(),
-            "document": "main.mq.md",
-            "mode": "read"
+            "document": "f08_write_side_effect.mq.md",
+            "mode": "read",
+            "include": ["fragment", "diagnostics"]
         }),
     );
     assert_eq!(resp["ok"], true, "{resp}");
-    assert!(!marker.exists(), "view.document must not create side-effect markers");
+    assert_eq!(resp["result"]["execution"]["state"], "not_run");
+    assert!(
+        !marker.exists(),
+        "view.document must not execute file.write side effects"
+    );
+}
+
+#[test]
+fn m03_f09_outline_nodes_chinese_and_static_a11y_subset() {
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/executable_knowledge/baseline/02-extract");
+    let resp = mlsp(
+        "view.document",
+        serde_json::json!({
+            "project": root.to_string_lossy(),
+            "document": "main.mq.md",
+            "mode": "read",
+            "include": ["fragment", "outline", "nodes", "refs"]
+        }),
+    );
+    assert_eq!(resp["ok"], true, "{resp}");
+    let doc = &resp["result"];
+    let outline = doc["outline"].as_array().unwrap();
+    assert!(outline.iter().any(|o| o["kind"] == "heading"));
+    let nodes = doc["nodes"].as_array().unwrap();
+    assert!(!nodes.is_empty(), "expected semantic nodes");
+    // Chinese / CJK labels should round-trip in outline or nodes when present in source.
+    let blob = format!("{outline:?}{nodes:?}");
+    assert!(
+        blob.chars().any(|c| c >= '\u{4e00}'),
+        "expected CJK in outline/nodes for 02-extract: {blob}"
+    );
+    let fragment = doc["render"]["fragment"].as_str().unwrap_or("");
+    // F12 static HTML subset (full browser → qdagent): semantic article, no script, mq namespace.
+    assert!(fragment.starts_with("<article") || fragment.contains("mq-document"));
+    assert!(!fragment.contains("<script"));
+    assert!(!fragment.contains("javascript:"));
+}
+
+#[test]
+fn m04_f11_ambiguous_same_name() {
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/executable_knowledge/baseline/08-same-name");
+    assert!(root.is_dir(), "missing 08-same-name fixture");
+    // a.mq.md and b.mq.md both define 商品小计 — omit document_id so both stay in scope.
+    let resp = mlsp(
+        "view.reference_resolve",
+        serde_json::json!({
+            "project": root.to_string_lossy(),
+            "project_id": root.to_string_lossy(),
+            "artifact_id": "商品小计"
+        }),
+    );
+    assert_eq!(resp["ok"], true, "{resp}");
+    assert_eq!(resp["result"]["resolution"], "ambiguous", "{resp}");
+    let cands = resp["result"]["candidates"].as_array().unwrap();
+    assert!(cands.len() >= 2, "{resp}");
 }
