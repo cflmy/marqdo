@@ -508,7 +508,18 @@ fn m03_f09_step_kinds_baseline_projects_nodes() {
         "expected heading outline: {outline:?}"
     );
     let nodes = resp["result"]["nodes"].as_array().unwrap();
-    assert!(!nodes.is_empty(), "expected at least one semantic node: {nodes:?}");
+    assert!(nodes.len() >= 2, "expected artifact+step nodes: {nodes:?}");
+    let kinds: std::collections::HashSet<&str> = nodes
+        .iter()
+        .filter_map(|n| n["kind"].as_str())
+        .collect();
+    assert!(
+        kinds.iter().any(|k| matches!(
+            *k,
+            "observe" | "derive" | "call" | "iterate" | "narrate" | "type" | "function"
+        )),
+        "expected step/artifact kinds in read model: {kinds:?}"
+    );
     // Evidence statuses must not be silently upgraded to verified by the read path.
     for n in nodes {
         if let Some(ev) = n.get("evidence").and_then(|v| v.as_str()) {

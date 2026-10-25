@@ -146,7 +146,12 @@ pub fn build_document_view(req: &DocumentViewRequest) -> Result<Value, Value> {
         json!([])
     };
     let nodes = if wants("nodes") {
-        nodes_from_presentation(&presentation, &req.node_id)
+        nodes_from_presentation_and_steps(
+            &presentation,
+            &compilation.semantics,
+            &rel,
+            &req.node_id,
+        )
     } else {
         json!([])
     };
@@ -350,27 +355,67 @@ fn outline_from_presentation(p: &KnowledgePresentation) -> Value {
         .collect::<Vec<_>>())
 }
 
-fn nodes_from_presentation(p: &KnowledgePresentation, filter: &Option<String>) -> Value {
-    json!(p
-        .nodes
-        .iter()
-        .filter(|n| filter.as_ref().map(|f| &n.node_id == f || n.artifact_id.as_ref() == Some(f)).unwrap_or(true))
-        .map(|n| json!({
-            "id": n.node_id,
-            "parent_id": Value::Null,
-            "kind": n.kind,
-            "label": n.display_name,
-            "order": n.source_line,
-            "source_span": {"file": n.source_file, "line": n.source_line},
-            "artifact_id": n.artifact_id,
-            "ref_ids": [],
-            "children": [],
-            "evidence": n.evidence,
-            "effects": n.effects,
-            "dependencies": n.dependencies,
-            "signature": n.signature,
-        }))
-        .collect::<Vec<_>>())
+fn nodes_from_presentation_and_steps(
+    p: &KnowledgePresentation,
+    project: &crate::sema::SemanticProject,
+    rel: &str,
+    filter: &Option<String>,
+) -> Value {
+    let mut out = Vec::new();
+    for n in &p.nodes {
+        if filter
+            .as_ref()
+            .map(|f| &n.node_id == f || n.artifact_id.as_ref() == Some(f))
+            .unwrap_or(true)
+        {
+            out.push(json!({
+                "id": n.node_id,
+                "parent_id": Value::Null,
+                "kind": n.kind,
+                "label": n.display_name,
+                "order": n.source_line,
+                "source_span": {"file": n.source_file, "line": n.source_line},
+                "artifact_id": n.artifact_id,
+                "ref_ids": [],
+                "children": [],
+                "evidence": n.evidence,
+                "effects": n.effects,
+                "dependencies": n.dependencies,
+                "signature": n.signature,
+            }));
+        }
+    }
+    // F09: project KnowledgeStep kinds (observe/derive/call/iterate/…) into the read model.
+    for step in &project.steps {
+        if step.source.file != rel {
+            continue;
+        }
+        let id = step.id.0.clone();
+        if filter
+            .as_ref()
+            .map(|f| &id == f || &step.reference == f)
+            .unwrap_or(true)
+        {
+            out.push(json!({
+                "id": id,
+                "parent_id": Value::Null,
+                "kind": step.kind,
+                "label": step.reference,
+                "order": step.source.line,
+                "source_span": {
+                    "file": step.source.file,
+                    "line": step.source.line,
+                    "end_line": step.source.end_line
+                },
+                "artifact_id": Value::Null,
+                "ref_ids": step.calls.iter().map(|c| c.as_str()).collect::<Vec<_>>(),
+                "children": [],
+                "evidence": "unverified",
+                "effects": step.effects.values(),
+            }));
+        }
+    }
+    json!(out)
 }
 
 fn refs_from_project(project: &crate::sema::SemanticProject, rel: &str) -> Value {
