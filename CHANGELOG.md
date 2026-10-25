@@ -1,5 +1,41 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+### Fixed
+
+### Changed
+
+## v2.1.3 — 2026-10-25
+
+### Highlights
+
+**知识工作台运行时合同（M00–M06）**：`ModelSelectionV1` / `RunContextV1` / `ModelCallUsageV1` / `DocumentViewV1` / locator / snapshot；严格 selection；usage null≠0；`view document` 只读嵌入；LLM messages + cancel；agent.step selection 继承假模型 e2e；USTC 兼容 live smoke（env 注入）。CLI · wasm · ext **2.1.3**。设计证据仍为 Partial（原生适配器 unavailable；完整宿主 F12 留给应用）。
+
+```bash
+git checkout v2.1.3 && cargo build --release
+marqdo ext add llm    # CDN / Releases → 2.1.3
+```
+
+**核心表面 Δ（Core surface Δ）**：**无增删**（仍 19 个构造）——工作台合同与 View/LLM/Agent 扩展面，不新增 Markdown 标记。
+
+### Added
+
+- **Workbench M00–M06**：capabilities / selection / RunContext / usage / DocumentView / locator / SnapshotManifest；`tests/workbench_contracts`（含 F02 agent.step+resume、F14 并发）；`marqdo view document --out` 只读 HTML 嵌入。
+- **LLM**：`messages=` / `selection=` / `strict_selection`；cancel token；reasoning_content 回退；双端点隔离门禁。
+- **Live**：`tests/workbench_live`（`OPENAI_*` env only；`MARQDO_EXT` 指向仓内 `ext/`）。
+- **Agent skeleton**：子工作簿禁 `llm.llm`，从 env selection `llm.create`。
+
+### Fixed
+
+- **`llm.ask` 升参**：hoist `p` 避免缺参 `missing argument for parameter p`；避免 `~/.marqdo/ext` 陈旧包遮蔽仓内 `ext/`（测试强制 `MARQDO_EXT`）。
+
+### Changed
+
+- CLI / wasm / `ext/VERSION` **同步 2.1.3**。
+
 ## v2.0.0 — 2026-10-22
 
 ### Highlights
