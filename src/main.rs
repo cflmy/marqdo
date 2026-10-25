@@ -529,6 +529,23 @@ enum ViewAction {
         #[arg(short = 'o', long = "out", required = true)]
         out: PathBuf,
     },
+    /// Read-only DocumentViewV1 (never executes). JSON to stdout or `--out`.
+    Document {
+        /// Project root (defaults to cwd / CLI path)
+        #[arg(long)]
+        project: Option<PathBuf>,
+
+        /// Document path relative to project
+        #[arg(long)]
+        document: String,
+
+        #[arg(long)]
+        json: bool,
+
+        /// Optional HTML wrapper for browser inspection (embed fragment only)
+        #[arg(long, value_name = "FILE")]
+        out: Option<PathBuf>,
+    },
 }
 
 fn main() -> ExitCode {
@@ -1103,6 +1120,56 @@ fn try_main(cli: Cli) -> Result<i32> {
                     path: out_path.or(path).unwrap_or_else(|| PathBuf::from(".")),
                     out,
                 })?;
+                Ok(0)
+            }
+            Some(ViewAction::Document {
+                project,
+                document,
+                json,
+                out,
+            }) => {
+                let project = project
+                    .or(path)
+                    .unwrap_or_else(|| PathBuf::from("."));
+                let req = marqdo::workbench::DocumentViewRequest {
+                    project,
+                    document,
+                    revision: None,
+                    generation: None,
+                    node_id: None,
+                    include: vec![
+                        "fragment".into(),
+                        "outline".into(),
+                        "nodes".into(),
+                        "refs".into(),
+                        "diagnostics".into(),
+                    ],
+                };
+                let view = marqdo::workbench::build_document_view(&req).map_err(|e| {
+                    anyhow::anyhow!("{}", e)
+                })?;
+                if let Some(out_path) = out {
+                    let fragment = view
+                        .pointer("/render/fragment")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("");
+                    let title = view
+                        .pointer("/document/title")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("DocumentView");
+                    let html = format!(
+                        "<!doctype html><html><head><meta charset=\"utf-8\"/><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"/><title>{title}</title><style>:root{{--mq-bg:#f7f5f0;--mq-text:#1a1a1a;--mq-muted:#5c5c5c;--mq-border:#d0cbc2;--mq-accent:#0b5fff;--mq-font-body:\"Iowan Old Style\",\"Palatino Linotype\",Palatino,serif;--mq-font-code:ui-monospace,Consolas,monospace}}body{{margin:0;background:var(--mq-bg);color:var(--mq-text);font:16px/1.75 var(--mq-font-body)}}.wrap{{max-width:46rem;margin:0 auto;padding:1.5rem}} .mq-document a{{color:var(--mq-accent)}}</style></head><body><div class=\"wrap\">{fragment}</div></body></html>"
+                    );
+                    std::fs::write(&out_path, html)?;
+                    if json {
+                        println!("{}", serde_json::to_string_pretty(&view)?);
+                    } else {
+                        println!("wrote {}", out_path.display());
+                    }
+                } else {
+                    println!("{}", serde_json::to_string_pretty(&view)?);
+                }
+                let _ = json;
                 Ok(0)
             }
             None => {

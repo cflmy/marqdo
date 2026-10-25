@@ -156,6 +156,7 @@ Prompt artifact helper: `path=` loads a file; `text=` strips `type: prompt` fron
 
 Module convenience: create a default handle and return **answer text**. Pass `path=` to load a prompt document, `prompt=` text, or omit both to use the entry `.mq.md` as a prompt artifact (`type: prompt` body via `sys.module_source`).
 
+**p = `prompt`**
 1. `path`
   **p = > prompt_load path=`path`**
 2. `prompt`
@@ -274,6 +275,7 @@ Prefer declaring `model` / `api_key` / `base_url` in frontmatter Binding, then u
 
 Semantic ask → **LLMResult** (`text`, `model`, `finish`, `backend`, `usage`, `name`, `tool_calls`). Prefer `[text](result)` for the answer string. Omit `prompt=` / `path=` to use the entry document (`sys.module_source` + `prompt_body`). Pass `messages=` for multi-turn history (M01). `selection=` + `strict_selection=True` freeze request identity without env fallback.
 
+**p = `prompt`**
 1. `messages`
   **p = None**
 2. `path`

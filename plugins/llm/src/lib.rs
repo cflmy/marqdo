@@ -363,9 +363,12 @@ fn chat_completions(args: &Value) -> Result<Value, String> {
                     .and_then(|c0| c0.get("message"))
                     .cloned()
                     .unwrap_or(json!({}));
+                // Some gateways (reasoning models) return null content + reasoning_content.
                 let content = msg
                     .get("content")
                     .and_then(|v| v.as_str())
+                    .filter(|s| !s.is_empty())
+                    .or_else(|| msg.get("reasoning_content").and_then(|v| v.as_str()))
                     .unwrap_or("")
                     .to_string();
                 let fr = data

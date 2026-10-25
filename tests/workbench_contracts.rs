@@ -688,3 +688,128 @@ fn m04_f11_ambiguous_same_name() {
     let cands = resp["result"]["candidates"].as_array().unwrap();
     assert!(cands.len() >= 2, "{resp}");
 }
+
+/// F02: agent.step + resume with explicit llm.create selection against a local mock.
+/// Env poison model must not appear in the upstream request body.
+#[test]
+fn m01_f02_agent_step_selection_and_resume() {
+    use std::io::{Read, Write};
+    use std::net::TcpListener;
+    use std::process::Command;
+    use std::sync::{Arc, Mutex};
+    use std::thread;
+
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let ext = root.join("ext");
+
+    let status = Command::new("cargo")
+        .args(["build", "-p", "marqdo_plugin_llm", "-p", "marqdo_plugin_agent", "--locked"])
+        .current_dir(&root)
+        .status()
+        .expect("build plugins");
+    assert!(status.success(), "plugin build failed");
+
+    let llm_so = root.join("target/debug/libllm.so");
+    let agent_so = root.join("target/debug/libagent.so");
+    assert!(llm_so.is_file(), "missing {llm_so:?}");
+    assert!(agent_so.is_file(), "missing {agent_so:?}");
+
+    let seen = Arc::new(Mutex::new(Vec::new()));
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let addr = listener.local_addr().unwrap();
+    let seen_bg = seen.clone();
+    thread::spawn(move || {
+        // Agent may deepen once (READ) then answer — accept a few requests.
+        for _ in 0..4 {
+            let Ok((mut stream, _)) = listener.accept() else {
+                break;
+            };
+            let mut raw = Vec::new();
+            let mut buf = [0u8; 4096];
+            loop {
+                let n = stream.read(&mut buf).unwrap_or(0);
+                if n == 0 {
+                    break;
+                }
+                raw.extend_from_slice(&buf[..n]);
+                if let Some(pos) = raw.windows(4).position(|w| w == b"\r\n\r\n") {
+                    let header = String::from_utf8_lossy(&raw[..pos]);
+                    let cl = header
+                        .lines()
+                        .find_map(|l| l.strip_prefix("Content-Length:"))
+                        .and_then(|v| v.trim().parse::<usize>().ok())
+                        .unwrap_or(0);
+                    let body_start = pos + 4;
+                    while raw.len() < body_start + cl {
+                        let n = stream.read(&mut buf).unwrap_or(0);
+                        if n == 0 {
+                            break;
+                        }
+                        raw.extend_from_slice(&buf[..n]);
+                    }
+                    break;
+                }
+            }
+            let req = String::from_utf8_lossy(&raw).to_string();
+            seen_bg.lock().unwrap().push(req);
+            let body = r#"{"choices":[{"message":{"content":"pong"},"finish_reason":"stop"}],"usage":{"prompt_tokens":3,"completion_tokens":1,"total_tokens":4}}"#;
+            let resp = format!(
+                "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+                body.len(),
+                body
+            );
+            let _ = stream.write_all(resp.as_bytes());
+        }
+    });
+
+    let base = format!("http://{addr}/v1");
+    let output = Command::new(env!("CARGO_BIN_EXE_marqdo"))
+        .args(["run", "tests/ext/workbench-agent-selection.mq.md"])
+        .current_dir(&root)
+        .env("MARQDO_EXT", &ext)
+        .env("MARQDO_LLM_PLUGIN", &llm_so)
+        .env("MARQDO_AGENT_PLUGIN", &agent_so)
+        .env("OPENAI_BASE_URL", &base)
+        .env("OPENAI_API_KEY", "f02-key")
+        .env("OPENAI_MODEL", "f02-selected-model")
+        .output()
+        .expect("run workbench-agent-selection");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert_eq!(
+        output.status.code().unwrap_or(1),
+        0,
+        "stderr={stderr}\nstdout={stdout}"
+    );
+    assert!(
+        stdout.contains("f02-agent-selection-ok"),
+        "stdout={stdout}"
+    );
+    assert!(stdout.contains("resume-save-ok") && stdout.contains("resume-load-ok"));
+
+    let captured = seen.lock().unwrap().join("\n");
+    assert!(
+        !captured.is_empty(),
+        "mock received no HTTP; stdout={stdout}"
+    );
+    // Body may embed the .mq.md source (which mentions the poison string in prose).
+    // Assert the OpenAI `model` field itself — not a raw substring of the whole HTTP dump.
+    let model_field = captured
+        .split("\r\n\r\n")
+        .nth(1)
+        .unwrap_or("")
+        .lines()
+        .next()
+        .unwrap_or("");
+    let body: Value = serde_json::from_str(model_field).unwrap_or_else(|_| {
+        // Some captures concatenate multiple HTTP messages; take last `{...}` blob.
+        let start = captured.rfind('{').expect("json body");
+        serde_json::from_str(&captured[start..]).expect("parse chat body")
+    });
+    assert_eq!(
+        body["model"].as_str(),
+        Some("f02-selected-model"),
+        "upstream model field: {body}"
+    );
+    assert_ne!(body["model"].as_str(), Some("env-poison-model"));
+}

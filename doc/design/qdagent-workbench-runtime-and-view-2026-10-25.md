@@ -1,6 +1,6 @@
 # qdagent 知识工作台所需的多模型运行与 View 嵌入支持
 
-日期：2026-10-25。状态：Partial / in progress（M00–M06 脚手架与合同门禁已落地；F 矩阵仍有缺口，不得整文宣称 Verified；原生非兼容适配器仍 unavailable）。
+日期：2026-10-25。状态：Partial / in progress（M00–M06 合同门禁 + F02 agent.step/resume 假模型 e2e + USTC live selection smoke + DocumentView 浏览器只读核对已落地；F 矩阵未全绿，不得整文宣称 Verified；原生非兼容适配器仍 unavailable）。
 
 源码基线：Marqdo `dc853fb`（2.1.2），qdagent `643dd31`，已同步远端。应用侧配套：[qdagent 多提供商与知识工作台](../../../qdagent/doc/design/multi-provider-and-knowledge-workbench-2026-10-25.md)。跨仓相对链接以兄弟仓库工作区布局为准。
 
@@ -416,18 +416,19 @@ cargo test --offline --locked --test executable_knowledge f1_agent_eng_bind_gate
 | 切片 | 证据 |
 |---|---|
 | M00 | fixtures + JSON Schema 消费；`capabilities`；`force_unloaded` / `force_*_off`（F16） |
-| M01 | strict selection；`RunContextV1` 并行不串扰；llm plugin messages/roles；workbook 禁 `llm.llm` |
+| M01 | strict selection；`RunContextV1` 并行不串扰；llm plugin messages/roles；workbook 禁 `llm.llm`；**F02** `m01_f02_agent_step_selection_and_resume`（mock HTTP + `llm.create` 抗 env poison + resume save/load） |
 | M02 | usage null≠0；revision 替换（F05）；cancel token（F06/F07）；event_sink；web `sse-live` 断连 cancel |
-| M03 | `view.document`；CJK outline/nodes；path escape；静态 a11y 子集；F08 无副作用标记 |
+| M03 | `view.document`；CJK outline/nodes；path escape；静态 a11y 子集；F08 无副作用标记；**浏览器** `workbench-docview.html`（`article.mq-document`、0 script、无 `javascript:`） |
 | M04 | stale / version_unavailable / **ambiguous**；`SnapshotManifestV1` 输出（retention=application）；`artifact.version_mismatch`；embed strict SSE |
 | M05 | extract `:B`；analysis_cache begin/finish；**F14 并发 100** 同 snapshot + 跨 project 隔离 |
 | M06 | CI 预构建 agent+llm + `workbench_contracts`；Go `drainForward` / cancel-token 桥 |
+| Live | `tests/workbench_live.rs`：USTC OpenAI-compatible（`OPENAI_*` env only）`qwen3.8-chat` / `deepseek-flash` selection ask → `pong` + usage；`MARQDO_EXT` 指向仓内 `ext/` 避免 `~/.marqdo/ext` 陈旧遮蔽 |
 
 已知限制（发版前须书面接受或继续补）：
 
-- Agent resume/repair **全路径 e2e**（假模型）仍薄；F02 现有 RunContext 三级继承 + skeleton 禁 `llm.llm` + 子任务 env。
+- F02 repair/plan **全路径**假模型仍薄于 step+resume；RunContext 三级继承 + skeleton 禁 `llm.llm` + 子任务 env 已有。
 - 历史正文由应用按 SnapshotManifest 保留；框架缺快照 → `version_unavailable`（不静默降级）。
-- 完整浏览器 F12 留给 qdagent；原生适配器 / PDF/OCR 仍 unavailable；未调用付费供应商。
+- 完整宿主嵌入 F12 / 产品鉴权留给 qdagent；原生适配器 / PDF/OCR 仍 unavailable。
 
 ### 12.2 历史基线记录（设计起草时）
 
