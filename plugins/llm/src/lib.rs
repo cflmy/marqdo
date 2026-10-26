@@ -98,22 +98,88 @@ fn cancel_requested() -> bool {
     {
         return true;
     }
+    // Web sse-live creates an empty token file up front; only an explicit
+    // body ("1" / "cancelled") means the client asked to stop. Empty ≠ cancel.
     if let Ok(tok) = std::env::var("MARQDO_CANCEL_TOKEN") {
         let path = std::path::Path::new(&tok);
         if path.is_file() {
             if let Ok(body) = std::fs::read_to_string(path) {
                 let t = body.trim();
-                return t.is_empty() || t == "1" || t.eq_ignore_ascii_case("cancelled");
+                return t == "1" || t.eq_ignore_ascii_case("cancelled");
             }
-            return true;
         }
     }
     false
 }
 
-fn parse_sse_events(reader: impl BufRead, echo: bool) -> Result<Vec<Value>, String> {
+/// Mirror host `net::push_openai_delta_events`: append semantic frames to
+/// `MARQDO_EVENT_FORWARD` so subtask/web sse-live can flush tokens before the
+/// lib call returns (OpenAI-style incremental SSE).
+fn forward_event_bus_frame(ev: &Value) {
+    let Ok(path) = std::env::var("MARQDO_EVENT_FORWARD") else {
+        return;
+    };
+    if path.is_empty() {
+        return;
+    }
+    use std::io::Write;
+    if let Ok(mut f) = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&path)
+    {
+        let _ = writeln!(f, "{ev}");
+        let _ = f.flush();
+    }
+}
+
+/// Publish `{type:delta|plan|reasoning|error, text|message}` from one OpenAI chunk.
+/// `content_type` is usually `delta` (answer tokens) or `plan` (parent protocol LLM).
+fn forward_openai_chunk(data: &str, content_type: &str) {
+    let data = data.trim();
+    if data.is_empty() || data == "[DONE]" {
+        return;
+    }
+    let Ok(v) = serde_json::from_str::<Value>(data) else {
+        return;
+    };
+    if let Some(msg) = v.get("error").and_then(|e| {
+        e.get("message")
+            .and_then(|m| m.as_str())
+            .or_else(|| e.as_str())
+    }) {
+        forward_event_bus_frame(&json!({"type": "error", "message": msg}));
+        return;
+    }
+    let reasoning = v
+        .pointer("/choices/0/delta/reasoning_content")
+        .and_then(|c| c.as_str())
+        .unwrap_or("");
+    if !reasoning.is_empty() {
+        forward_event_bus_frame(&json!({"type": "reasoning", "text": reasoning}));
+    }
+    let content = v
+        .pointer("/choices/0/delta/content")
+        .and_then(|c| c.as_str())
+        .unwrap_or("");
+    if !content.is_empty() {
+        let ty = if content_type.is_empty() {
+            "delta"
+        } else {
+            content_type
+        };
+        forward_event_bus_frame(&json!({"type": ty, "text": content}));
+    }
+}
+
+fn parse_sse_events(
+    reader: impl BufRead,
+    echo: bool,
+    content_type: &str,
+) -> Result<Vec<Value>, String> {
     let mut events = Vec::new();
     let mut data_lines: Vec<String> = Vec::new();
+    let mut accumulated = String::new();
     for line in reader.lines() {
         if cancel_requested() {
             events.push(json!({"type": "cancelled", "message": "MARQDO_CANCEL"}));
@@ -128,8 +194,22 @@ fn parse_sse_events(reader: impl BufRead, echo: bool) -> Result<Vec<Value>, Stri
                 let data = data_lines.join("\n");
                 data_lines.clear();
                 if data.trim() == "[DONE]" {
+                    // Parent owns run lifecycle `done`; only forward for answer streams.
+                    if content_type == "delta" || content_type.is_empty() {
+                        let done = json!({"type": "done", "result": accumulated});
+                        forward_event_bus_frame(&done);
+                    }
                     events.push(json!({"type": "done", "data": "[DONE]"}));
                     break;
+                }
+                forward_openai_chunk(&data, content_type);
+                if let Ok(v) = serde_json::from_str::<Value>(&data) {
+                    if let Some(c) = v
+                        .pointer("/choices/0/delta/content")
+                        .and_then(|x| x.as_str())
+                    {
+                        accumulated.push_str(c);
+                    }
                 }
                 events.push(json!({"type": "data", "data": data}));
             }
@@ -142,8 +222,13 @@ fn parse_sse_events(reader: impl BufRead, echo: bool) -> Result<Vec<Value>, Stri
     if !data_lines.is_empty() {
         let data = data_lines.join("\n");
         if data.trim() == "[DONE]" {
+            if content_type == "delta" || content_type.is_empty() {
+                let done = json!({"type": "done", "result": accumulated});
+                forward_event_bus_frame(&done);
+            }
             events.push(json!({"type": "done", "data": "[DONE]"}));
         } else {
+            forward_openai_chunk(&data, content_type);
             events.push(json!({"type": "data", "data": data}));
         }
     }
@@ -252,6 +337,8 @@ fn chat_completions(args: &Value) -> Result<Value, String> {
     let messages = build_messages(args)?;
     let stream = opt_bool(args, "stream", false);
     let echo = opt_bool(args, "echo", false);
+    // Answer tokens → "delta"; parent plan protocol → "plan" (UI process trail).
+    let stream_kind = opt_text(args, "stream_kind").unwrap_or("delta");
     let suffix = opt_text(args, "suffix").unwrap_or("/chat/completions");
     let bearer = opt_text(args, "bearer").unwrap_or("Bearer ");
 
@@ -309,7 +396,8 @@ fn chat_completions(args: &Value) -> Result<Value, String> {
                         "transport": "plugin",
                     }));
                 }
-                let events = parse_sse_events(BufReader::new(r.into_reader()), echo)?;
+                let events =
+                    parse_sse_events(BufReader::new(r.into_reader()), echo, stream_kind)?;
                 Ok(json!({
                     "events": events,
                     "finish": "stop",
@@ -523,6 +611,18 @@ mod tests {
         let _ = std::fs::remove_file(&tok);
         let out = out.unwrap();
         assert_eq!(out["finish"], "cancelled");
+    }
+
+    #[test]
+    fn f06_empty_cancel_token_is_not_cancelled() {
+        // sse-live creates an empty token file; that must NOT abort the turn.
+        let tok = std::env::temp_dir().join(format!("llm-cancel-empty-{}", std::process::id()));
+        std::fs::write(&tok, "").unwrap();
+        std::env::set_var("MARQDO_CANCEL_TOKEN", &tok);
+        std::env::remove_var("MARQDO_CANCEL");
+        assert!(!cancel_requested());
+        std::env::remove_var("MARQDO_CANCEL_TOKEN");
+        let _ = std::fs::remove_file(&tok);
     }
 
     /// F01: two local endpoints receive distinct models/auth — no cross-talk.

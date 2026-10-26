@@ -80,17 +80,19 @@ Extract OpenAI-shaped `choices[0].message.tool_calls` as a list (or empty list).
     + `auth_mode`=None
     + `stream`=False
     + `echo`=False
+    + `stream_kind`="delta"
     + `suffix`=/chat/completions
     + `bearer`="Bearer "
 
 POST `/chat/completions` (or stream SSE). Prefers `plugins/llm` ABI (`llm_chat_completions`) when the native plugin is resolvable; otherwise `lib/net` HTTP/SSE. Non-stream → `{text,usage,finish,tool_calls}`; stream → `{events,finish}`. Soft transport / HTTP failures return `finish=error` packs (never abort the VM).
 
 Pass either `messages=` (role/content list) or legacy `prompt=` (single user message). Optional `selection=` is a ModelSelectionV1 snapshot; `strict_selection=True` refuses env fallbacks inside the plugin.
+`stream_kind` tags live EventBus frames: `delta` (answer tokens) or `plan` (parent protocol — UI process trail, not the bubble).
 
 **p = > plugin.native_path name="llm"**
 1. `p`
   > plugin.load path=`p`
-  *> llm_chat_completions base_url=`base_url` api_key=`api_key` model=`model` prompt=`prompt` messages=`messages` selection=`selection` strict_selection=`strict_selection` auth_mode=`auth_mode` stream=`stream` echo=`echo` suffix=`suffix` bearer=`bearer`*
+  *> llm_chat_completions base_url=`base_url` api_key=`api_key` model=`model` prompt=`prompt` messages=`messages` selection=`selection` strict_selection=`strict_selection` auth_mode=`auth_mode` stream=`stream` echo=`echo` stream_kind=`stream_kind` suffix=`suffix` bearer=`bearer`*
 2. *
   **url = base_url + suffix**
   **auth = bearer + api_key**

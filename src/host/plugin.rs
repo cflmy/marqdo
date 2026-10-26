@@ -6,7 +6,8 @@ use std::collections::HashMap;
 use std::ffi::{CStr, CString};
 use std::os::raw::{c_char, c_int, c_void};
 use std::path::PathBuf;
-use std::sync::{Mutex, OnceLock};
+use std::sync::{Mutex, MutexGuard, OnceLock};
+use std::time::{Duration, Instant};
 
 use libloading::{Library, Symbol};
 
@@ -75,6 +76,8 @@ static GLOBAL_HOST: OnceLock<Mutex<SendPtr<HostContext>>> = OnceLock::new();
 /// Process-wide lib-path hook (same lifetime as GLOBAL_HOST).
 static GLOBAL_LIB_PATH: OnceLock<Mutex<SendLibPath>> = OnceLock::new();
 /// Serialize interpreter re-entry from HTTP worker threads.
+/// HostContext is not Sync — one Marqdo invoke at a time. Short routes must
+/// fail fast (`interpreter busy`) so a long SSE chat cannot freeze the UI.
 static INVOKE_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
 
 fn global_host_slot() -> &'static Mutex<SendPtr<HostContext>> {
@@ -87,6 +90,41 @@ fn global_lib_slot() -> &'static Mutex<SendLibPath> {
 
 fn invoke_lock() -> &'static Mutex<()> {
     INVOKE_LOCK.get_or_init(|| Mutex::new(()))
+}
+
+/// Default wait for short HTTP invokes (`MARQDO_INVOKE_WAIT_MS`, default 1500ms).
+/// Do not raise this process-wide during SSE — concurrent short routes would hang again.
+/// See doc/adr/0008-web-invoke-serialization.md.
+fn invoke_wait_budget() -> Duration {
+    const DEFAULT_MS: u64 = 1500;
+    match std::env::var("MARQDO_INVOKE_WAIT_MS") {
+        Ok(s) => {
+            let ms = s.trim().parse::<u64>().unwrap_or(DEFAULT_MS);
+            Duration::from_millis(ms.max(1))
+        }
+        Err(_) => Duration::from_millis(DEFAULT_MS),
+    }
+}
+
+fn acquire_invoke_lock() -> Result<MutexGuard<'static, ()>, String> {
+    let budget = invoke_wait_budget();
+    let deadline = Instant::now() + budget;
+    let lock = invoke_lock();
+    loop {
+        match lock.try_lock() {
+            Ok(g) => return Ok(g),
+            Err(std::sync::TryLockError::Poisoned(p)) => return Ok(p.into_inner()),
+            Err(std::sync::TryLockError::WouldBlock) => {
+                if Instant::now() >= deadline {
+                    return Err(format!(
+                        "interpreter busy: another request holds the Marqdo invoke lock (waited {}ms)",
+                        budget.as_millis()
+                    ));
+                }
+                std::thread::sleep(Duration::from_millis(15));
+            }
+        }
+    }
 }
 
 /// Hook: resolve bare `lib.member` (and longer paths) in the site module's import tree.
@@ -300,7 +338,13 @@ unsafe extern "C" fn host_query(
     let _invoke_guard;
     let from_worker = CURRENT_HOST.with(|c| c.get().is_null());
     if from_worker {
-        _invoke_guard = invoke_lock().lock().unwrap_or_else(|e| e.into_inner());
+        match acquire_invoke_lock() {
+            Ok(g) => _invoke_guard = g,
+            Err(msg) => {
+                set_err(&msg);
+                return 1;
+            }
+        }
     }
     let ctx = &mut *ctx_ptr;
 

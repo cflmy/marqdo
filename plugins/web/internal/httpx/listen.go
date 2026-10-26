@@ -799,6 +799,13 @@ func (g *gzipResponseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 	return nil, nil, fmt.Errorf("underlying ResponseWriter does not support hijacking")
 }
 
+func (g *gzipResponseWriter) Flush() {
+	_ = g.w.Flush()
+	if f, ok := g.ResponseWriter.(http.Flusher); ok {
+		f.Flush()
+	}
+}
+
 type statusRecorder struct {
 	http.ResponseWriter
 	status int
@@ -814,6 +821,14 @@ func (s *statusRecorder) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 		return h.Hijack()
 	}
 	return nil, nil, fmt.Errorf("underlying ResponseWriter does not support hijacking")
+}
+
+// Flush must be forwarded so sse-live / EventBus token streams are not buffered
+// behind access-log wrapping (otherwise clients see 0 bytes until the invoke ends).
+func (s *statusRecorder) Flush() {
+	if f, ok := s.ResponseWriter.(http.Flusher); ok {
+		f.Flush()
+	}
 }
 
 func writeJSON(w http.ResponseWriter, code int, v any) {

@@ -23,16 +23,27 @@ Load `.env` from cwd (optional `path=`). Does not override existing variables.
 ## collect
     + `events`
 
-Collapse a stream event list to final answer text (`done.result` or `error.message`). Prefer this over raw SSE fields. Alias: `stream_result`.
+Collapse a stream event list to final answer text.
+Accepts semantic events (`delta` / `text` / `done.result` / `error.message`) and
+native-plugin raw SSE frames (`type=data` with OpenAI chunk JSON in `data`).
+Alias: `stream_result`.
 
 **answer = ""**
 
 - [ev](遍历 events 为 ev)
   **t = > json.get value=`ev` key="type"**
   1. `t` == "done"
-    **answer = > json.get value=`ev` key="result"**
+    **done_r = > json.get value=`ev` key="result"**
+    1. `done_r`
+      **answer = `done_r`**
+    2. *
+      **_ = 1**
   2. `t` == "error"
-    **answer = > json.get value=`ev` key="message"**
+    **em = > json.get value=`ev` key="message"**
+    1. `em`
+      **answer = `em`**
+    2. *
+      **_ = 1**
   3. `t` == "delta"
   4. `t` == "text"
     **chunk = > json.get value=`ev` key="text"**
@@ -40,9 +51,45 @@ Collapse a stream event list to final answer text (`done.result` or `error.messa
       **answer = answer + chunk**
     2. *
       **_ = 1**
-  5. *
+  5. `t` == "data"
+    **raw = > json.get value=`ev` key="data"**
+    1. `raw`
+      1. `raw` == "[DONE]"
+        **_ = 1**
+      2. *
+        **parsed = > json.parse text=`raw`**
+        1. `parsed`
+          **choices = > json.get value=`parsed` key="choices"**
+          1. `choices`
+            **c0 = [1](access(choices, "1"))**
+            **delta = > json.get value=`c0` key="delta"**
+            1. `delta`
+              **piece = > json.get value=`delta` key="content"**
+              1. `piece`
+                **answer = answer + piece**
+              2. *
+                **_ = 1**
+            2. *
+              **msg = > json.get value=`c0` key="message"**
+              1. `msg`
+                **piece = > json.get value=`msg` key="content"**
+                1. `piece`
+                  **answer = answer + piece**
+                2. *
+                  **_ = 1**
+              2. *
+                **_ = 1**
+          2. *
+            **_ = 1**
+        2. *
+          **_ = 1**
+    2. *
+      **_ = 1**
+  6. *
     **_ = 1**
 
+1. not `answer`
+  **answer = ""**
 *answer*
 
 ## stream_result
@@ -347,8 +394,10 @@ inside the table is unsafe.
     + `prompt`=None
     + `path`=None
     + `echo`=False
+    + `stream_kind`="delta"
 
 Semantic stream: return the event list (use `llm.collect` to reduce to text). Omit `prompt=` / `path=` to use the entry document.
+`stream_kind=plan` tags EventBus frames for the parent plan protocol (process trail).
 
 1. `path`
   **p = > prompt_load path=`path`**
@@ -361,7 +410,7 @@ Semantic stream: return the event list (use `llm.collect` to reduce to text). Om
   2. *
     **p = > prompt_body src=`raw`**
 
-*> self.complete prompt=`p` stream=True echo=`echo`*
+*> self.complete prompt=`p` stream=True echo=`echo` stream_kind=`stream_kind`*
 
 ## complete_result
     + `prompt`=None
@@ -370,24 +419,26 @@ Semantic stream: return the event list (use `llm.collect` to reduce to text). Om
     + `strict_selection`=False
     + `stream`=False
     + `echo`=False
+    + `stream_kind`="delta"
 
 Transport pack via `ext/ai/llm/openai` (Ollama uses the same OpenAI-compatible path). Non-stream → `{text,usage,finish}`; stream → `{events}`. Prefer `messages=` for multi-turn; optional `selection=` (ModelSelectionV1) with `strict_selection=True` for request-scoped identity (M01).
 
-*> openai.chat_completions base_url=[base_url](access(self, "base_url")) api_key=[api_key](access(self, "api_key")) model=[model](access(self, "model")) prompt=`prompt` messages=`messages` selection=`selection` strict_selection=`strict_selection` stream=`stream` echo=`echo` suffix=[suffix](access(self, "suffix")) bearer=[bearer](access(self, "bearer"))*
+*> openai.chat_completions base_url=[base_url](access(self, "base_url")) api_key=[api_key](access(self, "api_key")) model=[model](access(self, "model")) prompt=`prompt` messages=`messages` selection=`selection` strict_selection=`strict_selection` stream=`stream` echo=`echo` stream_kind=`stream_kind` suffix=[suffix](access(self, "suffix")) bearer=[bearer](access(self, "bearer"))*
 
 ## complete
     + `prompt`
     + `stream`=False
     + `echo`=False
+    + `stream_kind`="delta"
 
 Internal / compatibility primitive. Prefer `ask` / `stream` in new code.
 
 1. `stream`
-  **pack = > self.complete_result prompt=`prompt` stream=True echo=`echo`**
+  **pack = > self.complete_result prompt=`prompt` stream=True echo=`echo` stream_kind=`stream_kind`**
   **_ret = > json.get value=`pack` key="events"**
   *_ret*
 2. *
-  **pack = > self.complete_result prompt=`prompt` stream=False echo=`echo`**
+  **pack = > self.complete_result prompt=`prompt` stream=False echo=`echo` stream_kind=`stream_kind`**
   **_ret = > json.get value=`pack` key="text"**
   *_ret*
 
@@ -395,7 +446,8 @@ Internal / compatibility primitive. Prefer `ask` / `stream` in new code.
     + `prompt`
     + `stream`=False
     + `echo`=False
+    + `stream_kind`="delta"
 
 Alias for `complete` (compat).
 
-*> self.complete prompt=`prompt` stream=`stream` echo=`echo`*
+*> self.complete prompt=`prompt` stream=`stream` echo=`echo` stream_kind=`stream_kind`*

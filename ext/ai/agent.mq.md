@@ -8,6 +8,7 @@ import:
   sys: lib/sys.mq.md
   fs: lib/fs.mq.md
   time: lib/time.mq.md
+  text: lib/text.mq.md
   wb: lib/writeback.mq.md
   subtask: lib/subtask.mq.md
   plugin: lib/plugin.mq.md
@@ -58,30 +59,45 @@ The runbook `.mq.md` is ground truth (code as documentation). Default budgets ke
     + `prompt`
     + `stream`=False
     + `echo`=False
+    + `stream_kind`="delta"
 
 One LLM turn via the semantic surface (`ask` / `stream`+`collect`). Returns `{text,llm_calls,tokens}` for episode metrics; transport failures set `error` + `llm_calls=0` (never abort).
+`stream_kind=plan` publishes protocol tokens onto the process trail (not the answer bubble).
 
 1. `stream`
-  **evs = > model.stream prompt=`prompt` echo=`echo`**
+  **evs = > model.stream prompt=`prompt` echo=`echo` stream_kind=`stream_kind`**
   **text = > llm.collect events=`evs`**
-  **tokens = None**
+  **tokens = 0**
   **err = None**
   **calls = 1**
   1. not `text`
     **e0 = > at value=`evs` index=0**
-    **err = > json.get value=`e0` key="message"**
-    1. `err`
-      **calls = 0**
+    **e0_s = > json.stringify value=`e0`**
+    **e0_map = > text.starts_with text=`e0_s` prefix="{"**
+    1. `e0_map`
+      **err = > json.get value=`e0` key="message"**
+      1. `err`
+        **calls = 0**
+    2. *
+      **_ = 1**
 2. *
   **r = > model.ask prompt=`prompt`**
-  **text = > json.get value=`r` key="text"**
-  **tokens = > json.get value=`r` key="tokens"**
-  **err = > json.get value=`r` key="error"**
-  **fin = > json.get value=`r` key="finish"**
-  1. `tokens`
-    **_ = 1**
+  **r_s = > json.stringify value=`r`**
+  **r_map = > text.starts_with text=`r_s` prefix="{"**
+  1. `r_map`
+    **text = > json.get value=`r` key="text"**
+    **tokens = > json.get value=`r` key="tokens"**
+    **err = > json.get value=`r` key="error"**
+    **fin = > json.get value=`r` key="finish"**
   2. *
-    **tokens = None**
+    **text = > str value=`r`**
+    **tokens = 0**
+    **err = None**
+    **fin = None**
+  1. not `tokens`
+    **tokens = 0**
+  2. *
+    **_ = 1**
   1. `err`
     **calls = 0**
   2. `fin` == "error"
@@ -183,7 +199,7 @@ Allowlist check, then invoke the runbook `##` via `lib/subtask` (`spawn fn=` →
 Build a runnable workbook. `skeleton=single` (default): one worker `step`. `skeleton=dual`: research then write agents. On success the parent chooses DONE; runtime `agent_workbook_solidify` freezes the answer.
 
 **q = > json.quote text=`goal`**
-**esc = > json.parse text={"h":"---\ntitle: agent workbook\nimport:\n  llm: ext/ai/llm.mq.md\n  agent: ext/ai/agent.mq.md\n  json: lib/json.mq.md\n  sys: lib/sys.mq.md\n  wb: lib/writeback.mq.md\n  subtask: lib/subtask.mq.md\n---\n\n# Goal\n\nParent goal is embedded as JSON in # main.\n\n## Solidify\n\nWhen the child returns a good value, parent DECISION: DONE — runtime agent_workbook_solidify freezes the answer as **return** (do not invent long FIND/REPLACE).\n\n# main\n\n> llm.load_env\n\n","s1":"\u002a\u002a\u0060model\u0060 = > llm.create model=\u0060sys.env_get name=\"OPENAI_MODEL\"\u0060 base_url=\u0060sys.env_get name=\"OPENAI_BASE_URL\"\u0060 backend=openai name=workbook\u002a\u002a\n","s2":"\u002a\u002a\u0060tools\u0060 = > table.empty_list\u002a\u002a\n","s3":"\u002a\u002a\u0060worker\u0060 = > agent.agent model=\u0060model\u0060 tools=\u0060tools\u0060 standing=You are a workbook worker. tools=[] means never CALL. Finish the task with a direct final answer; do not invent tools.\u002a\u002a\n","s4":"\u002a\u002a\u0060wrap\u0060 = > json.parse text={\"task\":","s5":"}\u002a\u002a\n","s6":"\u002a\u002a\u0060task\u0060 = > json.get value=\u0060wrap\u0060 key=task\u002a\u002a\n","s7":"\u002a\u002a\u0060out\u0060 = > \u0060worker\u0060.step task=\u0060task\u0060 stream=False\u002a\u002a\n","s7b":"\u002a\u002a\u0060text\u0060 = > json.get value=\u0060out\u0060 key=result\u002a\u002a\n","s8":"\u002a\u002a\u0060text\u0060\u002a\u002a\n","d3":"\u002a\u002a\u0060research\u0060 = > agent.agent model=\u0060model\u0060 tools=\u0060tools\u0060 standing=You gather facts for the goal. Be concise. Do not invent tools.\u002a\u002a\n","d3b":"\u002a\u002a\u0060writer\u0060 = > agent.agent model=\u0060model\u0060 tools=\u0060tools\u0060 standing=You write the final answer from research notes. Do not invent tools.\u002a\u002a\n","d4":"\u002a\u002a\u0060wrap\u0060 = > json.parse text={\"task\":","d5":"}\u002a\u002a\n","d6":"\u002a\u002a\u0060task\u0060 = > json.get value=\u0060wrap\u0060 key=task\u002a\u002a\n","d7":"\u002a\u002a\u0060notes\u0060 = > \u0060research\u0060.step task=\u0060task\u0060 stream=False\u002a\u002a\n","d8":"\u002a\u002a\u0060ns\u0060 = > json.stringify value=\u0060notes\u0060\u002a\u002a\n","d9":"\u002a\u002a\u0060wt\u0060 = Write the final answer. Research notes:\u002a\u002a\n","d10":"\u002a\u002a\u0060wt\u0060 = \u0060wt\u0060 + \u0060ns\u0060\u002a\u002a\n","d11":"\u002a\u002a\u0060out\u0060 = > \u0060writer\u0060.step task=\u0060wt\u0060 stream=False\u002a\u002a\n","d11b":"\u002a\u002a\u0060text\u0060 = > json.get value=\u0060out\u0060 key=result\u002a\u002a\n","d12":"\u002a\u002a\u0060text\u0060\u002a\u002a\n"}**
+**esc = > json.parse text={"h":"---\ntitle: agent workbook\nimport:\n  llm: ext/ai/llm.mq.md\n  agent: ext/ai/agent.mq.md\n  json: lib/json.mq.md\n  sys: lib/sys.mq.md\n  table: lib/table.mq.md\n  wb: lib/writeback.mq.md\n  subtask: lib/subtask.mq.md\n---\n\n# Goal\n\nParent goal is embedded as JSON in # main.\n\n## Solidify\n\nWhen the child returns a good value, parent DECISION: DONE — runtime agent_workbook_solidify freezes the answer as **return** (do not invent long FIND/REPLACE).\n\n# main\n\n> llm.load_env\n\n","s1":"\u002a\u002a\u0060env_model\u0060 = > sys.env_get name=\"OPENAI_MODEL\"\u002a\u002a\n\u002a\u002a\u0060env_base\u0060 = > sys.env_get name=\"OPENAI_BASE_URL\"\u002a\u002a\n\u002a\u002a\u0060env_key\u0060 = > sys.env_get name=\"OPENAI_API_KEY\"\u002a\u002a\n\u002a\u002a\u0060model\u0060 = > llm.create model=\u0060env_model\u0060 base_url=\u0060env_base\u0060 api_key=\u0060env_key\u0060 backend=\"openai-compatible\" name=\"workbook\"\u002a\u002a\n","s2":"\u002a\u002a\u0060tools\u0060 = > table.empty_list\u002a\u002a\n","s3":"\u002a\u002a\u0060worker\u0060 = > agent.agent model=\u0060model\u0060 tools=\u0060tools\u0060 standing=\"You are a workbook worker. tools=[] means never CALL. Finish the task with a direct final answer; do not invent tools.\"\u002a\u002a\n","s4":"\u002a\u002a\u0060wrap\u0060 = > json.parse text={\"task\":","s5":"}\u002a\u002a\n","s6":"\u002a\u002a\u0060task\u0060 = > json.get value=\u0060wrap\u0060 key=\"task\"\u002a\u002a\n","s7":"\u002a\u002a\u0060out\u0060 = > \u0060worker\u0060.step task=\u0060task\u0060 stream=True\u002a\u002a\n","s7b":"\u002a\u002a\u0060text\u0060 = > json.get value=\u0060out\u0060 key=\"result\"\u002a\u002a\n","s8":"\u002a\u0060text\u0060\u002a\n","d3":"\u002a\u002a\u0060research\u0060 = > agent.agent model=\u0060model\u0060 tools=\u0060tools\u0060 standing=\"You gather facts for the goal. Be concise. Do not invent tools.\"\u002a\u002a\n","d3b":"\u002a\u002a\u0060writer\u0060 = > agent.agent model=\u0060model\u0060 tools=\u0060tools\u0060 standing=\"You write the final answer from research notes. Do not invent tools.\"\u002a\u002a\n","d4":"\u002a\u002a\u0060wrap\u0060 = > json.parse text={\"task\":","d5":"}\u002a\u002a\n","d6":"\u002a\u002a\u0060task\u0060 = > json.get value=\u0060wrap\u0060 key=\"task\"\u002a\u002a\n","d7":"\u002a\u002a\u0060notes\u0060 = > \u0060research\u0060.step task=\u0060task\u0060 stream=True\u002a\u002a\n","d8":"\u002a\u002a\u0060ns\u0060 = > json.stringify value=\u0060notes\u0060\u002a\u002a\n","d9":"\u002a\u002a\u0060wt\u0060 = \"Write the final answer. Research notes:\"\u002a\u002a\n","d10":"\u002a\u002a\u0060wt\u0060 = \u0060wt\u0060 + \u0060ns\u0060\u002a\u002a\n","d11":"\u002a\u002a\u0060out\u0060 = > \u0060writer\u0060.step task=\u0060wt\u0060 stream=True\u002a\u002a\n","d11b":"\u002a\u002a\u0060text\u0060 = > json.get value=\u0060out\u0060 key=\"result\"\u002a\u002a\n","d12":"\u002a\u0060text\u0060\u002a\n"}**
 **h = > json.get value=`esc` key="h"**
 **s1 = > json.get value=`esc` key="s1"**
 **s2 = > json.get value=`esc` key="s2"**
@@ -1080,8 +1096,15 @@ Parent Plan-and-Move tools (helpers + whitelist `CALL:lib…`).
   *> lib_catalog*
 4. `name` == scratch_tool_write
   **parsed = > extract_scratch_tool reply=`reply`**
-  **tn = > json.get value=`parsed` key="name"**
-  **tt = > json.get value=`parsed` key="text"**
+  **parsed_s = > json.stringify value=`parsed`**
+  **parsed_map = > text.starts_with text=`parsed_s` prefix="{"**
+  **tn = None**
+  **tt = None**
+  1. `parsed_map`
+    **tn = > json.get value=`parsed` key="name"**
+    **tt = > json.get value=`parsed` key="text"**
+  2. *
+    **_ = 1**
   **errs = > json.parse text={"a":"scratch_tool_write needs NAME line and fenced body","b":"scratch_tool_write needs NAME id"}**
   1. `tn`
     1. `tt`
@@ -1092,9 +1115,17 @@ Parent Plan-and-Move tools (helpers + whitelist `CALL:lib…`).
     *> json.get value=`errs` key="b"*
 5. `name` == corpus_search
   **args = > extract_call_args reply=`reply`**
-  **q = > json.get value=`args` key="query"**
-  **root = > json.get value=`args` key="root"**
-  **limit = > json.get value=`args` key="limit"**
+  **args_s = > json.stringify value=`args`**
+  **args_map = > text.starts_with text=`args_s` prefix="{"**
+  **q = None**
+  **root = None**
+  **limit = None**
+  1. `args_map`
+    **q = > json.get value=`args` key="query"**
+    **root = > json.get value=`args` key="root"**
+    **limit = > json.get value=`args` key="limit"**
+  2. *
+    **_ = 1**
   **cerrs = > json.parse text={"q":"corpus_search needs ARGS.query"}**
   1. not `q`
     *> json.get value=`cerrs` key="q"*
@@ -1109,7 +1140,13 @@ Parent Plan-and-Move tools (helpers + whitelist `CALL:lib…`).
     *> corpus_search query=`q`*
 6. `name` == mcp_list_tools
   **args = > extract_call_args reply=`reply`**
-  **fx = > json.get value=`args` key="fixture"**
+  **args_s = > json.stringify value=`args`**
+  **args_map = > text.starts_with text=`args_s` prefix="{"**
+  **fx = None**
+  1. `args_map`
+    **fx = > json.get value=`args` key="fixture"**
+  2. *
+    **_ = 1**
   **merrs = > json.parse text={"f":"mcp_list_tools needs ARGS.fixture"}**
   1. `fx`
     *> mcp_list_tools fixture=`fx`*
@@ -1117,9 +1154,17 @@ Parent Plan-and-Move tools (helpers + whitelist `CALL:lib…`).
     *> json.get value=`merrs` key="f"*
 7. `name` == mcp_call
   **args = > extract_call_args reply=`reply`**
-  **fx = > json.get value=`args` key="fixture"**
-  **tn = > json.get value=`args` key="name"**
-  **targ = > json.get value=`args` key="arguments"**
+  **args_s = > json.stringify value=`args`**
+  **args_map = > text.starts_with text=`args_s` prefix="{"**
+  **fx = None**
+  **tn = None**
+  **targ = None**
+  1. `args_map`
+    **fx = > json.get value=`args` key="fixture"**
+    **tn = > json.get value=`args` key="name"**
+    **targ = > json.get value=`args` key="arguments"**
+  2. *
+    **_ = 1**
   **xerrs = > json.parse text={"f":"mcp_call needs ARGS.fixture","n":"mcp_call needs ARGS.name"}**
   1. `fx`
     1. `tn`
@@ -1180,14 +1225,28 @@ Parent Plan-and-Move tools (helpers + whitelist `CALL:lib…`).
     + `observation`
 
 Bounded observation for the parent prompt (actionable, short).
+Tolerates missing/non-map observation (empty compact) instead of `json get needs map`.
+Map check via stringify prefix `{` — never hard-get on None / bare text / list.
 
-**obs_path = > json.get value=`observation` key="path"**
-**obs_code = > json.get value=`observation` key="exit_code"**
-**obs_val = > json.get value=`observation` key="value"**
-**obs_slots = > json.get value=`observation` key="slots"**
-**obs_src = > json.get value=`observation` key="source"**
-**obs_stdout = > json.get value=`observation` key="stdout"**
-**obs_stderr = > json.get value=`observation` key="stderr"**
+**obs_path = None**
+**obs_code = None**
+**obs_val = None**
+**obs_slots = None**
+**obs_src = None**
+**obs_stdout = None**
+**obs_stderr = None**
+**obs_s = > json.stringify value=`observation`**
+**obs_map = > text.starts_with text=`obs_s` prefix="{"**
+1. `obs_map`
+  **obs_path = > json.get value=`observation` key="path"**
+  **obs_code = > json.get value=`observation` key="exit_code"**
+  **obs_val = > json.get value=`observation` key="value"**
+  **obs_slots = > json.get value=`observation` key="slots"**
+  **obs_src = > json.get value=`observation` key="source"**
+  **obs_stdout = > json.get value=`observation` key="stdout"**
+  **obs_stderr = > json.get value=`observation` key="stderr"**
+2. *
+  **_ = 1**
 **src_len = 0**
 **has_step = False**
 1. `obs_src`
@@ -1207,97 +1266,102 @@ Bounded observation for the parent prompt (actionable, short).
 |------|------|-----------|------------|-----------------|------------------|
 | Plan-and-Move: CALL/READ then DECISION. Success (exit 0 + has_value) → DONE. solidify_on_done. No long prose. | `obs_path` | `obs_code` | `src_len` | `has_step` | True |
 
-1. `obs_src`
-  **ex = > json.get value=`observation` key="source_excerpt"**
-  1. `ex`
-    **compact = table.put in=`compact` at="source_excerpt" value=`ex`**
+1. `obs_map`
+  1. `obs_src`
+    **ex = > json.get value=`observation` key="source_excerpt"**
+    1. `ex`
+      **compact = table.put in=`compact` at="source_excerpt" value=`ex`**
+    2. *
+      **ex = > workbook_source_excerpt source=`obs_src`**
+      **compact = table.put in=`compact` at="source_excerpt" value=`ex`**
   2. *
-    **ex = > workbook_source_excerpt source=`obs_src`**
-    **compact = table.put in=`compact` at="source_excerpt" value=`ex`**
-2. *
-  **_ = 1**
+    **_ = 1**
 
-1. `obs_stderr`
-  **tail = > json.get value=`observation` key="stderr_tail"**
-  1. `tail`
-    **compact = table.put in=`compact` at="stderr_tail" value=`tail`**
+  1. `obs_stderr`
+    **tail = > json.get value=`observation` key="stderr_tail"**
+    1. `tail`
+      **compact = table.put in=`compact` at="stderr_tail" value=`tail`**
+    2. *
+      **tail = > text_tail_lines text=`obs_stderr`**
+      **compact = table.put in=`compact` at="stderr_tail" value=`tail`**
   2. *
-    **tail = > text_tail_lines text=`obs_stderr`**
-    **compact = table.put in=`compact` at="stderr_tail" value=`tail`**
-2. *
-  **_ = 1**
-1. `obs_stdout`
-  **tail = > json.get value=`observation` key="stdout_tail"**
-  1. `tail`
-    **compact = table.put in=`compact` at="stdout_tail" value=`tail`**
+    **_ = 1**
+  1. `obs_stdout`
+    **tail = > json.get value=`observation` key="stdout_tail"**
+    1. `tail`
+      **compact = table.put in=`compact` at="stdout_tail" value=`tail`**
+    2. *
+      **tail = > text_tail_lines text=`obs_stdout`**
+      **compact = table.put in=`compact` at="stdout_tail" value=`tail`**
   2. *
-    **tail = > text_tail_lines text=`obs_stdout`**
-    **compact = table.put in=`compact` at="stdout_tail" value=`tail`**
-2. *
-  **_ = 1**
+    **_ = 1**
 
-**val_txt = > str value=`obs_val`**
-**val_len = > len value=`val_txt`**
-1. `obs_val`
-  **compact = table.put in=`compact` at="has_value" value=True**
-  **compact = table.put in=`compact` at="value_len" value=`val_len`**
-  1. `val_len` > 200
-    **preview = > text_head_lines text=`val_txt` max_lines=4 max_chars=200**
-    **compact = table.put in=`compact` at="value_preview" value=`preview`**
+  **val_txt = > str value=`obs_val`**
+  **val_len = > len value=`val_txt`**
+  1. `obs_val`
+    **compact = table.put in=`compact` at="has_value" value=True**
+    **compact = table.put in=`compact` at="value_len" value=`val_len`**
+    1. `val_len` > 200
+      **preview = > text_head_lines text=`val_txt` max_lines=4 max_chars=200**
+      **compact = table.put in=`compact` at="value_preview" value=`preview`**
+    2. *
+      **compact = table.put in=`compact` at="value" value=`obs_val`**
   2. *
-    **compact = table.put in=`compact` at="value" value=`obs_val`**
+    **compact = table.put in=`compact` at="has_value" value=False**
+
+  **slots_brief = > table.empty_list**
+  1. `obs_slots`
+    - [slot](遍历 `obs_slots` 为 `slot`)
+      **sk = > json.get value=`slot` key="key"**
+      **sl = > json.get value=`slot` key="line"**
+      **sb = > json.get value=`slot` key="body"**
+      **sb_txt = > str value=`sb`**
+      **sb_len = > len value=`sb_txt`**
+      `brief` =
+
+      | key | line | body_len |
+      |-----|------|----------|
+      | `sk` | `sl` | `sb_len` |
+
+      1. `sk` == error
+        **prev = > text_head_lines text=`sb_txt` max_lines=8 max_chars=400**
+        **brief = table.put in=`brief` at="body_preview" value=`prev`**
+      2. *
+        **_ = 1**
+      **slots_brief = > table.append list=`slots_brief` item=`brief`**
+  2. *
+    **_ = 1**
+  **compact = table.put in=`compact` at="slots" value=`slots_brief`**
+  **detail = > json.get value=`observation` key="slots_detail"**
+  1. `detail`
+    **compact = table.put in=`compact` at="slots_detail" value=`detail`**
+  2. *
+    **_ = 1**
+
+  **tool_result = > json.get value=`observation` key="tool_result"**
+  1. `tool_result`
+    **tr = > str value=`tool_result`**
+    **tr = > text_head_lines text=`tr` max_lines=40 max_chars=3000**
+    **compact = table.put in=`compact` at="tool_result" value=`tr`**
+  2. *
+    **_ = 1**
+
+  **last_error = > json.get value=`observation` key="last_error"**
+  1. `last_error`
+    **err_txt = > str value=`last_error`**
+    **err_len = > len value=`err_txt`**
+    1. `err_len` > 200
+      **prev = > text_head_lines text=`err_txt` max_lines=8 max_chars=400**
+      **compact = table.put in=`compact` at="last_error_preview" value=`prev`**
+      **compact = table.put in=`compact` at="last_error_len" value=`err_len`**
+    2. *
+      **compact = table.put in=`compact` at="last_error" value=`last_error`**
+  2. *
+    **_ = 1**
 2. *
   **compact = table.put in=`compact` at="has_value" value=False**
-
-**slots_brief = > table.empty_list**
-1. `obs_slots`
-  - [slot](遍历 `obs_slots` 为 `slot`)
-    **sk = > json.get value=`slot` key="key"**
-    **sl = > json.get value=`slot` key="line"**
-    **sb = > json.get value=`slot` key="body"**
-    **sb_txt = > str value=`sb`**
-    **sb_len = > len value=`sb_txt`**
-    `brief` =
-
-    | key | line | body_len |
-    |-----|------|----------|
-    | `sk` | `sl` | `sb_len` |
-
-    1. `sk` == error
-      **prev = > text_head_lines text=`sb_txt` max_lines=8 max_chars=400**
-      **brief = table.put in=`brief` at="body_preview" value=`prev`**
-    2. *
-      **_ = 1**
-    **slots_brief = > table.append list=`slots_brief` item=`brief`**
-2. *
-  **_ = 1**
-**compact = table.put in=`compact` at="slots" value=`slots_brief`**
-**detail = > json.get value=`observation` key="slots_detail"**
-1. `detail`
-  **compact = table.put in=`compact` at="slots_detail" value=`detail`**
-2. *
-  **_ = 1**
-
-**tool_result = > json.get value=`observation` key="tool_result"**
-1. `tool_result`
-  **tr = > str value=`tool_result`**
-  **tr = > text_head_lines text=`tr` max_lines=40 max_chars=3000**
-  **compact = table.put in=`compact` at="tool_result" value=`tr`**
-2. *
-  **_ = 1**
-
-**last_error = > json.get value=`observation` key="last_error"**
-1. `last_error`
-  **err_txt = > str value=`last_error`**
-  **err_len = > len value=`err_txt`**
-  1. `err_len` > 200
-    **prev = > text_head_lines text=`err_txt` max_lines=8 max_chars=400**
-    **compact = table.put in=`compact` at="last_error_preview" value=`prev`**
-    **compact = table.put in=`compact` at="last_error_len" value=`err_len`**
-  2. *
-    **compact = table.put in=`compact` at="last_error" value=`last_error`**
-2. *
-  **_ = 1**
+  **empty_slots = > table.empty_list**
+  **compact = table.put in=`compact` at="slots" value=`empty_slots`**
 
 *compact*
 
@@ -1351,6 +1415,14 @@ First matching DECISION / 决定 line wins (ignore later conflicting decisions i
       2. *
         **_ = 1**
 
+1. `found`
+  Take the first token only (`DECISION: RUN please` → RUN).
+  **toks = > split value=`found` sep=" "**
+  **found = > at value=`toks` index=0**
+  **found = > trim value=`found`**
+2. *
+  **_ = 1**
+
 1. `found` == DONE
   *"DONE"*
 2. `found` == CONTINUE
@@ -1371,8 +1443,17 @@ First matching DECISION / 决定 line wins (ignore later conflicting decisions i
   *"REUSE"*
 10. `found` == 新建
   *"NEW"*
-11. *
-  *found*
+11. `found` == PATCH
+  Models sometimes invent `DECISION: PATCH` — treat as CONTINUE.
+  *"CONTINUE"*
+12. *
+  If the reply carries a FIND/REPLACE block, treat unknown labels as CONTINUE.
+  **has_find = > split value=`text` sep="<<<"**
+  **n_find = > len value=`has_find`**
+  1. `n_find` > 1
+    *"CONTINUE"*
+  2. *
+    *found*
 
 ---
 
@@ -1544,7 +1625,13 @@ Parent Plan-and-Move prompt. Short protocol only — no long monologues.
 2. *
   **up = None**
 
-**skill_from_obs = > json.get value=`observation` key="skill_brief"**
+**skill_from_obs = None**
+**obs_probe = > json.stringify value=`observation`**
+**obs_is_map = > text.starts_with text=`obs_probe` prefix="{"**
+1. `obs_is_map`
+  **skill_from_obs = > json.get value=`observation` key="skill_brief"**
+2. *
+  **_ = 1**
 1. `skill_from_obs`
   **skill = skill_from_obs**
 2. *
@@ -1612,22 +1699,20 @@ LLM Plan → CALL/READ/DECISION loop. Returns `{decision,reply,observation,event
     **left = 0**
   3. *
     **ctx = > build_plan_context agent=`agent` goal=`goal` observation=`last_obs` explore_attempt=`explore_attempt` explore_n=`explore_n` phase=`phase`**
+    Plan protocol streams as `stream_kind=plan` (process trail). Answer tokens
+    still come from workbook `worker.step stream=True` (`stream_kind=delta`).
     1. `stream`
-      **evs = > model.stream prompt=`ctx` echo=`echo`**
-      **last_reply = > llm.collect events=`evs`**
-      **evs_all = > plan_merge_deltas events=`evs_all` from=`evs` stream=`stream`**
-      **e0 = > at value=`evs` index=0**
-      **terr = > json.get value=`e0` key="message"**
-      **etype = > json.get value=`e0` key="type"**
-      1. `etype` == "error"
-        **transport_err = `terr`**
-        1. not `transport_err`
-          **transport_err = "llm stream transport error"**
-        **left = 0**
-      2. *
-        **llm_calls = llm_calls + 1**
+      **turn = > model_turn model=`model` prompt=`ctx` stream=True echo=`echo` stream_kind="plan"**
     2. *
       **turn = > model_turn model=`model` prompt=`ctx` stream=False echo=`echo`**
+    **turn_s = > json.stringify value=`turn`**
+    **turn_map = > text.starts_with text=`turn_s` prefix="{"**
+    **terr = None**
+    **last_reply = ""**
+    1. not `turn_map`
+      **transport_err = "model_turn_not_map"**
+      **left = 0**
+    2. *
       **terr = > json.get value=`turn` key="error"**
       1. `terr`
         **transport_err = `terr`**
@@ -1636,6 +1721,14 @@ LLM Plan → CALL/READ/DECISION loop. Returns `{decision,reply,observation,event
         **last_reply = > json.get value=`turn` key="text"**
         **c = > json.get value=`turn` key="llm_calls"**
         **t = > json.get value=`turn` key="tokens"**
+        1. not `c`
+          **c = 0**
+        2. *
+          **_ = 1**
+        1. not `t`
+          **t = 0**
+        2. *
+          **_ = 1**
         **llm_calls = llm_calls + c**
         **tokens = tokens + t**
     1. `transport_err`
@@ -1643,16 +1736,49 @@ LLM Plan → CALL/READ/DECISION loop. Returns `{decision,reply,observation,event
       **last_reply = `transport_err`**
       **left = 0**
     2. *
-      **last_reply = > trim value=`last_reply`**
-      **act = > extract_plan_act reply=`last_reply`**
-      **kind = > json.get value=`act` key="kind"**
-      **name = > json.get value=`act` key="name"**
+      1. not `last_reply`
+        **last_reply = ""**
+      2. *
+        **last_reply = > trim value=`last_reply`**
+      Plan replies often embed CALL: inside PATCH bodies — prefer an explicit
+      DECISION line when present so protocol exit is not stolen by a false CALL.
+      **dec_line = > extract_plan_decision reply=`last_reply`**
+      **kind = "unknown"**
+      **name = None**
+      1. `dec_line`
+        **kind = "decision"**
+        **name = `dec_line`**
+      2. *
+        **act = > extract_plan_act reply=`last_reply`**
+        **act_s = > json.stringify value=`act`**
+        **act_map = > text.starts_with text=`act_s` prefix="{"**
+        1. `act_map`
+          **kind = > json.get value=`act` key="kind"**
+          **name = > json.get value=`act` key="name"**
+        2. *
+          **_ = 1**
+      Live act marker so the UI never goes silent between plan tokens and the next step.
+      1. `stream`
+        `act_ev` =
+
+        | type | kind | name |
+        |------|------|------|
+        | plan_act | `kind` | `name` |
+
+        > sys.stream_publish event=`act_ev`
+      2. *
+        **_ = 1**
       1. `kind` == call
         **evs_all = > plan_append_tool events=`evs_all` type="tool_start" name=`name` kind="call" stream=`stream`**
         **tool_out = > run_parent_tool name=`name` path=`path` observation=`last_obs` reply=`last_reply`**
         **brief = > tool_result_brief value=`tool_out`**
         **evs_all = > plan_append_tool events=`evs_all` type="tool_end" name=`name` kind="call" result=`brief` stream=`stream`**
-        **last_obs = table.put in=`last_obs` at="tool_result" value=`tool_out`**
+        **obs_s = > json.stringify value=`last_obs`**
+        **obs_map = > text.starts_with text=`obs_s` prefix="{"**
+        1. `obs_map`
+          **last_obs = table.put in=`last_obs` at="tool_result" value=`tool_out`**
+        2. *
+          **_ = 1**
         **left = left - 1**
       2. `kind` == read
         **evs_all = > plan_append_tool events=`evs_all` type="tool_start" name=`name` kind="read" stream=`stream`**
@@ -2103,6 +2229,12 @@ Primary author entry (v2 + P4): Adaptive `route` → execute (policy/kb skill) o
       | ok | `task` | `child_val` | `path` | hit | `rmode` | `sk` | `last_obs` | adaptive route hit | `routed` |
 
       **llm_calls = 0**
+      1. `stream`
+        **_ev = > table.empty_list**
+        **_ev = > plan_append_decision events=`_ev` decision="REUSE" stream=True summary="adaptive route hit"**
+        **_ev = > plan_append_round events=`_ev` round=1 workbook=`path` exit_code=`code` result=`child_val` stream=True**
+      2. *
+        **_ = 1**
     2. *
       **route_matched = False**
   2. *
@@ -2341,6 +2473,14 @@ With `stream=True`, the model call uses SSE; `echo=True` prints delta text to st
       **reply = > json.get value=`turn` key="text"**
       **c = > json.get value=`turn` key="llm_calls"**
       **t = > json.get value=`turn` key="tokens"**
+      1. not `c`
+        **c = 0**
+      2. *
+        **_ = 1**
+      1. not `t`
+        **t = 0**
+      2. *
+        **_ = 1**
       **llm_calls = llm_calls + c**
       **tokens = tokens + t**
       **reply = > trim value=`reply`**
@@ -2393,6 +2533,14 @@ With `stream=True`, the model call uses SSE; `echo=True` prints delta text to st
     **reply = > json.get value=`turn2` key="text"**
     **c = > json.get value=`turn2` key="llm_calls"**
     **t = > json.get value=`turn2` key="tokens"**
+    1. not `c`
+      **c = 0**
+    2. *
+      **_ = 1**
+    1. not `t`
+      **t = 0**
+    2. *
+      **_ = 1**
     **llm_calls = llm_calls + c**
     **tokens = tokens + t**
     **out = table.put in=`out` at="denied_tool" value=`tool_name`**
@@ -2410,6 +2558,14 @@ With `stream=True`, the model call uses SSE; `echo=True` prints delta text to st
     **reply = > json.get value=`turn2` key="text"**
     **c = > json.get value=`turn2` key="llm_calls"**
     **t = > json.get value=`turn2` key="tokens"**
+    1. not `c`
+      **c = 0**
+    2. *
+      **_ = 1**
+    1. not `t`
+      **t = 0**
+    2. *
+      **_ = 1**
     **llm_calls = llm_calls + c**
     **tokens = tokens + t**
     **out = table.put in=`out` at="tool" value=`tool_name`**
@@ -2866,17 +3022,28 @@ Reuse lookup: exact → alias → canonicalize → optional local n-gram `near` 
 > plan_echo_decompose workbook=`path` stream=`stream` echo=`echo`
 **last_obs = > inspect_workbook path=`path`**
 **turn = > plan_llm_act_loop agent=`self` goal=`goal` path=`path` observation=`last_obs` phase="decompose" explore_attempt=`explore_attempt` explore_n=`explore_n` stream=`stream` echo=`echo` events=`events`**
-**dec = > json.get value=`turn` key="decision"**
-**last_reply = > json.get value=`turn` key="reply"**
-**last_obs = > json.get value=`turn` key="observation"**
-**events = > json.get value=`turn` key="events"**
+**turn_s = > json.stringify value=`turn`**
+**turn_map = > text.starts_with text=`turn_s` prefix="{"**
+**dec = None**
+**last_reply = None**
+1. `turn_map`
+  **dec = > json.get value=`turn` key="decision"**
+  **last_reply = > json.get value=`turn` key="reply"**
+  **last_obs = > json.get value=`turn` key="observation"**
+  **events = > json.get value=`turn` key="events"**
+2. *
+  **dec = "TRANSPORT_ERROR"**
+  **last_reply = "plan_llm_act_loop_not_map"**
+  **err = `last_reply`**
 
 1. `dec` == "TRANSPORT_ERROR"
   **done = 1**
   **status = "error"**
-  **err = > json.get value=`turn` key="error"**
-  1. not `err`
-    **err = `last_reply`**
+  **err = `last_reply`**
+  1. `turn_map`
+    **e2 = > json.get value=`turn` key="error"**
+    1. `e2`
+      **err = `e2`**
   **summary = "llm transport error"**
   **skip_loop = 1**
 2. `dec` == CONTINUE

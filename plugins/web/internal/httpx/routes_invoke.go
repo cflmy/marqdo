@@ -137,6 +137,11 @@ func (st *state) handleInvoke(w http.ResponseWriter, r *http.Request, route invo
 	if err != nil {
 		code := http.StatusInternalServerError
 		msg := err.Error()
+		if strings.Contains(msg, "interpreter busy") {
+			w.Header().Set("Retry-After", "2")
+			jsonErr(w, http.StatusServiceUnavailable, msg)
+			return
+		}
 		if strings.Contains(msg, "unknown library") ||
 			strings.Contains(msg, "call_lib_path: need") ||
 			strings.Contains(msg, "not allowed") ||
@@ -260,6 +265,10 @@ func (st *state) handleInvokeLiveSSE(w http.ResponseWriter, r *http.Request, rou
 	done := make(chan callResult, 1)
 	go func() {
 		v, e := plugin.CallLibPath(route.FnPath, args)
+		if e != nil && strings.Contains(e.Error(), "interpreter busy") {
+			// Another invoke still holds the lock — surface as failed run, not hang.
+			e = fmt.Errorf("interpreter busy: try again shortly")
+		}
 		done <- callResult{value: v, err: e}
 	}()
 
@@ -339,11 +348,18 @@ func normalizeLiveSSELine(seq uint64, line string) map[string]any {
 		base["seq"] = seq
 		return base
 	}
-	// LLM plugin / net SSE: {type:delta|reasoning, text:...}
-	if t, _ := obj["type"].(string); t == "delta" || t == "reasoning" {
+	// LLM plugin / net SSE: {type:delta|plan|reasoning, text:...}
+	if t, _ := obj["type"].(string); t == "delta" || t == "plan" || t == "reasoning" {
 		text, _ := obj["text"].(string)
 		base["type"] = "message.delta"
 		base["payload"] = map[string]any{"delta": text, "kind": t}
+		return base
+	}
+	// Plan process cards — keep as message.delta for back-compat, but never
+	// promote `result` into payload.delta (that caused full-answer duplication).
+	if t, _ := obj["type"].(string); t == "decompose" || t == "decision" || t == "await" || t == "round" || t == "done" || t == "tool_start" || t == "tool_end" || t == "plan_act" {
+		base["type"] = "message.delta"
+		base["payload"] = obj
 		return base
 	}
 	if text, ok := obj["text"].(string); ok && text != "" {

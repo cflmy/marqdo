@@ -326,8 +326,11 @@ pub fn apply_patch_blocks(
     };
     match apply_patch_blocks_inner(ctx, path, text) {
         Ok(n) => Ok(n),
-        // soft only swallows unique-FIND miss — never parse / multi-match / whole-file.
-        Err(e) if soft && e.contains("FIND not found") => Ok(Value::Int(0)),
+        // soft swallows unique-FIND miss and empty FIND (model protocol mistakes).
+        // Never softens parse / multi-match / whole-file rewrite.
+        Err(e) if soft && (e.contains("FIND not found") || e.contains("empty FIND")) => {
+            Ok(Value::Int(0))
+        }
         Err(e) => Err(e),
     }
 }
