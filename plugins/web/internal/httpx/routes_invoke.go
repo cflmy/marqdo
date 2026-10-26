@@ -122,7 +122,12 @@ func (st *state) handleInvoke(w http.ResponseWriter, r *http.Request, route invo
 
 	// M02: live SSE — stream host_stream_publish events while CallLibPath runs.
 	// return=sse-live|sse_live uses MARQDO_EVENT_FORWARD NDJSON bridge (request-local).
+	// Also auto-upgrade json routes when the OpenAI-compatible body asks stream:true
+	// so token deltas flush before the lib call returns (Q06 / workbench).
 	liveSSE := route.ReturnMode == "sse-live" || route.ReturnMode == "sse_live"
+	if !liveSSE && payloadWantsStream(payload) {
+		liveSSE = true
+	}
 	if liveSSE {
 		st.handleInvokeLiveSSE(w, r, route, args)
 		return
@@ -283,13 +288,7 @@ func (st *state) handleInvokeLiveSSE(w http.ResponseWriter, r *http.Request, rou
 			mu.Lock()
 			offset = drainForward(fwdPath, offset, func(line string) {
 				seq++
-				var obj any
-				if json.Unmarshal([]byte(line), &obj) == nil {
-					writeEvent(map[string]any{
-						"schema": "RuntimeEventV1", "schema_version": 1,
-						"seq": seq, "type": "message.delta", "payload": obj,
-					})
-				}
+				writeEvent(normalizeLiveSSELine(seq, line))
 			})
 			mu.Unlock()
 			if res.err != nil {
@@ -312,17 +311,49 @@ func (st *state) handleInvokeLiveSSE(w http.ResponseWriter, r *http.Request, rou
 			mu.Lock()
 			offset = drainForward(fwdPath, offset, func(line string) {
 				seq++
-				var obj any
-				if json.Unmarshal([]byte(line), &obj) == nil {
-					writeEvent(map[string]any{
-						"schema": "RuntimeEventV1", "schema_version": 1,
-						"seq": seq, "type": "message.delta", "payload": obj,
-					})
-				}
+				writeEvent(normalizeLiveSSELine(seq, line))
 			})
 			mu.Unlock()
 		}
 	}
+}
+
+// normalizeLiveSSELine maps Marqdo EventBus frames (LLM delta/text, workbench
+// envelopes) onto RuntimeEventV1 so chat UIs see message.delta.payload.delta
+// while tokens still arrive before run.completed.
+func normalizeLiveSSELine(seq uint64, line string) map[string]any {
+	base := map[string]any{
+		"schema": "RuntimeEventV1", "schema_version": 1, "seq": seq,
+	}
+	var obj map[string]any
+	if err := json.Unmarshal([]byte(line), &obj); err != nil || obj == nil {
+		base["type"] = "message.delta"
+		base["payload"] = map[string]any{"raw": line}
+		return base
+	}
+	// Already workbench-shaped.
+	if t, _ := obj["type"].(string); t == "message.delta" || t == "turn.started" || t == "model.resolved" || t == "usage.updated" || t == "turn.completed" || t == "turn.failed" {
+		for k, v := range obj {
+			base[k] = v
+		}
+		base["seq"] = seq
+		return base
+	}
+	// LLM plugin / net SSE: {type:delta|reasoning, text:...}
+	if t, _ := obj["type"].(string); t == "delta" || t == "reasoning" {
+		text, _ := obj["text"].(string)
+		base["type"] = "message.delta"
+		base["payload"] = map[string]any{"delta": text, "kind": t}
+		return base
+	}
+	if text, ok := obj["text"].(string); ok && text != "" {
+		base["type"] = "message.delta"
+		base["payload"] = map[string]any{"delta": text}
+		return base
+	}
+	base["type"] = "message.delta"
+	base["payload"] = obj
+	return base
 }
 
 func drainForward(path string, offset int64, onLine func(string)) int64 {

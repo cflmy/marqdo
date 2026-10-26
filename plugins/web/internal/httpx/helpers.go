@@ -198,6 +198,35 @@ func invokeArgsFromPayload(payload map[string]any) map[string]any {
 	return args
 }
 
+// payloadWantsStream detects OpenAI-compatible stream:true on the request body.
+func payloadWantsStream(payload map[string]any) bool {
+	if payload == nil {
+		return false
+	}
+	if v, ok := payload["stream"]; ok {
+		return boolishAny(v)
+	}
+	return false
+}
+
+func boolishAny(v any) bool {
+	switch t := v.(type) {
+	case bool:
+		return t
+	case string:
+		s := strings.ToLower(strings.TrimSpace(t))
+		return s == "1" || s == "true" || s == "yes" || s == "on"
+	case float64:
+		return t != 0
+	case int:
+		return t != 0
+	case int64:
+		return t != 0
+	default:
+		return false
+	}
+}
+
 func readJSONBody(r *http.Request, max int64) (map[string]any, error) {
 	r.Body = http.MaxBytesReader(nil, r.Body, max)
 	defer r.Body.Close()
