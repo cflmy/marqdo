@@ -27,6 +27,13 @@ need curl curl
 need tar tar
 need xz xz-utils
 
+# /tmp is often a small tmpfs; vendor + Rust extract exceed quota. Prefer disk.
+if [ -z "${TMPDIR:-}" ] || [ "$TMPDIR" = /tmp ] || [ "$TMPDIR" = /var/tmp ]; then
+  TMPDIR="${HOME}/.cache/marqdo-ppa/work"
+fi
+mkdir -p "$TMPDIR"
+export TMPDIR
+
 VER="$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1)"
 # Debian revision comes from debian/changelog (e.g. 1.0.2-1ppa2); we append ~series.
 CHG_VER="$(dpkg-parsechangelog -l debian/changelog -S Version)"
@@ -43,7 +50,7 @@ if [[ "$BASE_DEB_VER" != "$VER"-* ]]; then
   fi
 fi
 DEB_VER="${BASE_DEB_VER}~${SERIES}"
-PKG_ROOT="${TMPDIR:-/tmp}/marqdo-ppa/${VER}"
+PKG_ROOT="${TMPDIR}/marqdo-ppa/${VER}"
 BUILD_AREA="${ROOT}/../build-area"
 GPG_KEY="${MARQDO_PPA_GPG_KEY:-505943294D04C803}"
 RUST_VER="${MARQDO_PPA_RUST_VERSION:-1.85.0}"
@@ -212,18 +219,20 @@ PY
     exit 1
   fi
   # Launchpad builds need only rustc + cargo + rust-std (debian/rules PATH).
-  # Skip docs/json-docs/rustfmt/rls — ~1G of dead weight in the orig tarball.
+  # install.sh's --without is a *single* comma-separated valopt; repeating
+  # --without=… keeps only the last flag, so rust-docs still installed and
+  # blew /tmp quota. Prefer explicit --components= instead.
   bash "$INSTALL_SH" \
     --prefix="$PKG_ROOT/third_party/rust" \
-    --without=rust-docs \
-    --without=rust-docs-json-preview \
-    --without=rustfmt-preview \
-    --without=rls-preview \
+    --components="rustc,cargo,rust-std-${RUST_TRIPLE}" \
     --disable-ldconfig
+  # Belt: docs must never ship in .orig (even if component list drifts).
+  rm -rf "$PKG_ROOT/third_party/rust/share/doc"
   rm -rf "$RUST_EXTRACT"
   trap - EXIT
   "$PKG_ROOT/third_party/rust/bin/rustc" --version
   "$PKG_ROOT/third_party/rust/bin/cargo" --version
+  du -sh "$PKG_ROOT/third_party/rust"
 
   cd "$(dirname "$PKG_ROOT")"
   echo "==> packing ${ORIG_NAME} (vendor + third_party/rust)"
