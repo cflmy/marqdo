@@ -281,9 +281,10 @@ marqdo catalog public -o .marqdo
 
 ---
 
-## 现状（v2.1.3）
+## 现状（v2.1.4）
 
-- **知识工作台运行时（v2.1.3）**：ModelSelection / RunContext / usage null≠0 · `view document` 只读嵌入 · LLM selection/messages/cancel · agent.step selection e2e · live smoke · 扩展包同步 **2.1.3**（设计 Partial：原生适配器 unavailable）
+- **默认隔离 HTTP execute（v2.1.4 · ADR 0009）**：`execute` / `sse-live` / `stream:true` → Supervisor worker 池（`--call-lib-path`）；父进程不再占 `INVOKE_LOCK`；`/_runtime/*`；`runtime.isolated_execution=1`；MR-01 金样例；扩展包同步 **2.1.4**
+- **知识工作台运行时（v2.1.3）**：ModelSelection / RunContext / usage null≠0 · `view document` 只读嵌入 · LLM selection/messages/cancel · agent.step selection e2e · live smoke（设计 Partial：原生适配器 unavailable）
 - **可执行知识生产链（v2.1.2）**：证据/闭包失效 · `verify`/`adjudicate` · `reuse_execute` / `eng_bind_execute`+`publish_gate` · `document.extract` · View `KnowledgePresentation`+SSE `page_token` · 上传限流 · 门禁 45 项（100/1000 单元）
 - **可执行知识主链（v2.1.1）**：BoundCall 双后端 · NarrativeRef · 来源/适用期 · `artifact.patch` / `extract_pure` · 整代 `CURRENT` + closure · 发票示例 `113`
 - **链接语法（v2.1.0）**：`[描述](目标)` 描述不执行 · `()` 与 `**代码**` 同权（`加(1)` / `加一 号(31)`）· `access` 取元与 `遍历` 链接循环 · `marqdo labels` 两级检索 / `--baseline` 债务棘轮 · `migrate labels --mark` · 诊断 `label.*` · view 描述正文 + 代码片 + 桩徽章 · **可执行知识 [link-syntax.md](doc/design/link-syntax.md)**（项目索引、LinkInfo、链接图与 lock）
@@ -322,7 +323,7 @@ marqdo catalog public -o .marqdo
 - **浏览器 Marqdo（WASM）**：`marqdo wasm build` + 官方 bridge 自启（作者零业务 JS；桥内可含列表/路由/storage/ws/文件/Canvas/音频/Observer/拖放）；`lib/browser` + GFM；`web.client_embed`；示例 [browser-hello](examples/browser-hello/) · [browser-app](examples/browser-app/) · [browser-media](examples/browser-media/) · [web-client-site](examples/web-client-site/)（[ADR 0002](doc/adr/0002-browser-marqdo-wasm.md) · [D](doc/roadmap/browser-wasm-d.md) · [E](doc/roadmap/browser-wasm-e.md) · [F](doc/roadmap/browser-wasm-f.md)）
 - 选型：[ADR 0001 — Rust](doc/adr/0001-implementation-language.md) · [ADR 0002 — 浏览器 WASM](doc/adr/0002-browser-marqdo-wasm.md)（C0–C5 完结，见 [roadmap/browser-wasm.md](doc/roadmap/browser-wasm.md)）· [ADR 0003 — 异步效应](doc/adr/0003-browser-async-effects.md)
 
-### 如何使用最新 Marqdo（v2.1.3）
+### 如何使用最新 Marqdo（v2.1.4）
 
 **安装解释器（任选其一）**
 
@@ -337,7 +338,7 @@ marqdo catalog public -o .marqdo
 ```bash
 # 1) 源码安装（跟 tag 或 main）
 git clone https://github.com/cflmy/marqdo.git && cd marqdo
-git checkout v2.1.3   # 或留在 main
+git checkout v2.1.4   # 或留在 main
 cargo build --release
 export PATH="$PWD/target/release:$PATH"
 marqdo version
@@ -376,7 +377,7 @@ marqdo wasm build
 # → dist/wasm/ … 见 examples/browser-hello/
 
 # 6) Releases：Windows exe/zip/vsix；Linux CLI zip + native `.so` zip
-#    https://github.com/cflmy/marqdo/releases/tag/v2.1.3
+#    https://github.com/cflmy/marqdo/releases/tag/v2.1.4
 ```
 
 开发期也可用 `cargo run -- …` 代替已安装的 `marqdo`：

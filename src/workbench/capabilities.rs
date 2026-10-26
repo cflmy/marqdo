@@ -89,13 +89,22 @@ pub fn probe_capabilities(params: &Value) -> Value {
         "runtime.cancel".into(),
         json!(if cancel_off { 0 } else { 1 }),
     );
+    // Isolated web runtime (doc/design/isolated-web-runtime-development-2026-10-26.md).
+    // HTTP execute / sse-live defaults to the Supervisor worker pool (ADR 0009).
+    features.insert("runtime.isolated_execution".into(), json!(1));
+    // task_control_v2 / event_replay: host_query("runtime") + /_runtime/* system routes.
+    features.insert("runtime.task_control_v2".into(), json!(1));
+    features.insert("runtime.event_replay".into(), json!(1));
+    features.insert("runtime.read_lane".into(), json!(0));
     #[cfg(feature = "view")]
     {
+        features.insert("view.analysis_cache_v2".into(), json!(1));
         features.insert("view.document".into(), json!(1));
         features.insert("view.reference_resolve".into(), json!(1));
     }
     #[cfg(not(feature = "view"))]
     {
+        features.insert("view.analysis_cache_v2".into(), json!(0));
         features.insert("view.document".into(), json!(0));
         features.insert("view.reference_resolve".into(), json!(0));
     }
@@ -111,6 +120,8 @@ pub fn probe_capabilities(params: &Value) -> Value {
             "ModelSelectionV1",
             "ModelCallUsageV1",
             "RuntimeEventV1",
+            "RuntimeEventV2",
+            "InvokeRequestV2",
             "DocumentViewV1",
             "KnowledgeLocatorV1"
         ]

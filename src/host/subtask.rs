@@ -695,7 +695,9 @@ fn require<'a>(bound: &'a HashMap<String, Value>, key: &str) -> Result<&'a Value
         .ok_or_else(|| format!("host call missing `{key}`"))
 }
 
-/// Propagate run/selection identity when parent has them (api_key stays via process inheritance).
+/// Propagate run/selection identity onto the *child* Command.env map.
+/// Reads parent env only as a fallback when an explicit RunContext was not
+/// applied; never uses parent `setenv`/`set_current_dir` as request state (M-R1).
 fn apply_run_selection_env(cmd: &mut Command) {
     for key in [
         "MARQDO_RUN_ID",
@@ -703,6 +705,13 @@ fn apply_run_selection_env(cmd: &mut Command) {
         "MARQDO_TURN_ID",
         "MARQDO_WORKSPACE_SCOPE",
         "MARQDO_CANCEL_TOKEN",
+        "MARQDO_EVENT_FORWARD",
+        "MARQDO_USAGE_SINK",
+        "MARQDO_CREDENTIAL_REF",
+        "MARQDO_WORKSPACE_ID",
+        "MARQDO_SNAPSHOT_ID",
+        "MARQDO_LEASE_ID",
+        "MARQDO_ATTEMPT_ID",
         "MARQDO_LLM_MODEL",
         "MARQDO_LLM_BASE_URL",
         "OPENAI_MODEL",
@@ -712,6 +721,8 @@ fn apply_run_selection_env(cmd: &mut Command) {
             cmd.env(key, v);
         }
     }
+    // Do not forward process-global MARQDO_CANCEL into children — request cancel
+    // must use MARQDO_CANCEL_TOKEN so leases stay isolated.
 }
 
 #[cfg(test)]

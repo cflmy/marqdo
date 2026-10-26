@@ -239,6 +239,7 @@ func NewHandler(appBag map[string]any, entryDir string) (http.Handler, error) {
 	st.mountGalleryRoutes(mux)
 	st.mountProxyRoutes(mux)
 	st.mountInvokeRoutes(mux)
+	st.mountRuntimeRoutes(mux)
 	st.mountArtifactRoutes(mux)
 	st.mountAuthRoutes(mux)
 

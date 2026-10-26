@@ -19,7 +19,8 @@
 
 | 文档 | 摘要 |
 |------|------|
-| [design/isolated-web-runtime-development-2026-10-26.md](design/isolated-web-runtime-development-2026-10-26.md) | **隔离执行与响应式 Web 运行时（Proposed）**：基于 `1b11fe0` 复核单解释器、SSE 全局状态与缓存；进程池、独立控制/读取、取消、事件恢复、发布一致性、开发包和性能门禁 |
+| [design/isolated-web-runtime-development-2026-10-26.md](design/isolated-web-runtime-development-2026-10-26.md) | **隔离执行与响应式 Web 运行时**：进程池、控制/读取分离、取消、事件恢复、发布一致性；实现见 `src/runtime/` |
+| [adr/0009-isolated-web-runtime.md](adr/0009-isolated-web-runtime.md) | **ADR 0009**：隔离 Web 运行时决策；金样例通过后替代 ADR 0008 的并行性结论 |
 | [跨库缺陷复核（2026-10-26）](../../qdagent/doc/gaps/04-workbench-runtime-and-product-audit-2026-10-26.md) | **最新源码与测试证据**：实际 HTTP 路由、知识发布/阅读断点、旧缺陷处置及 1000 单元编译性能失败；需同级 qdagent checkout |
 | [design/qdagent-workbench-runtime-and-view-2026-10-25.md](design/qdagent-workbench-runtime-and-view-2026-10-25.md) | **qdagent 知识工作台框架支持**：M00–M05 合同落地中（`src/workbench/`、MLSP `capabilities` / `view.document` / `view.reference_resolve`、`tests/workbench_contracts.rs`）；完整 verified 以切片验收证据为准 |
 | [design/view-knowledge-reading-experience-2026-10-24.md](design/view-knowledge-reading-experience-2026-10-24.md) | **View 知识阅读体验重设计（建议）**：正文优先、结构导航、就地知识说明、来源与运行状态、响应式线框、实现契约与验收；含当前呈现和 no-exec 反例 |

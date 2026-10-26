@@ -322,6 +322,42 @@ unsafe extern "C" fn host_query(
         }
     };
 
+    let args_owned: Option<String> = if args_json.is_null() {
+        None
+    } else {
+        CStr::from_ptr(args_json)
+            .to_str()
+            .ok()
+            .map(|s| s.to_string())
+    };
+
+    // Control plane (admit/cancel/events) must not take INVOKE_LOCK or require
+    // an evaluating HostContext — otherwise cancel cannot interrupt a busy run.
+    if name == "runtime" {
+        let raw = args_owned.as_deref().unwrap_or("{}");
+        let args: serde_json::Value = match serde_json::from_str(if raw.trim().is_empty() {
+            "{}"
+        } else {
+            raw
+        }) {
+            Ok(v) => v,
+            Err(e) => {
+                set_err(&format!("runtime args: {e}"));
+                return 1;
+            }
+        };
+        match crate::runtime::host_api::handle(&args) {
+            Ok(j) => {
+                set_out(&j.to_string());
+                return 0;
+            }
+            Err(e) => {
+                set_err(&e);
+                return 1;
+            }
+        }
+    }
+
     let ctx_ptr = CURRENT_HOST.with(|c| c.get());
     let ctx_ptr = if ctx_ptr.is_null() {
         global_host_slot()
@@ -348,15 +384,6 @@ unsafe extern "C" fn host_query(
     }
     let ctx = &mut *ctx_ptr;
 
-    let args_owned: Option<String> = if args_json.is_null() {
-        None
-    } else {
-        CStr::from_ptr(args_json)
-            .to_str()
-            .ok()
-            .map(|s| s.to_string())
-    };
-
     let result = match name {
         "module_source" => agent_rt::module_source(ctx).and_then(|v| value_to_json(&v)),
         "call_site" => agent_rt::call_site(ctx, Some(ctx.current_line)).and_then(|v| value_to_json(&v)),
@@ -364,6 +391,19 @@ unsafe extern "C" fn host_query(
         "cwd" => Ok(serde_json::Value::String(
             ctx.cwd.to_string_lossy().into_owned(),
         )),
+        "entry_path" => {
+            let path = ctx.entry_path.clone().unwrap_or_else(|| ctx.cwd.clone());
+            let abs = if path.is_absolute() {
+                path
+            } else {
+                std::env::current_dir()
+                    .unwrap_or_else(|_| PathBuf::from("."))
+                    .join(path)
+            };
+            Ok(serde_json::Value::String(
+                abs.to_string_lossy().into_owned(),
+            ))
+        }
         "entry_dir" => {
             // Script directory: parent of entry file (for_run also sets ctx.cwd to this).
             let dir = ctx

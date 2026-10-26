@@ -16,15 +16,18 @@ pub mod snapshot;
 pub mod usage;
 
 pub use analysis_cache::{
-    begin_analysis, cache_keys_isolated, cache_stats, finish_analysis, note_analysis,
-    project_source_digest, reset_cache_for_tests, AnalysisTicket,
+    begin_analysis, cache_keys_isolated, cache_stats, compile_count_for, compile_invocations,
+    finish_analysis, get_or_compile, note_analysis, project_source_digest, reset_cache_for_tests,
+    result_hits, test_serial_guard, AnalysisTicket, SnapshotKey,
 };
 pub use capabilities::probe_capabilities;
 #[cfg(feature = "view")]
 pub use document_view::{build_document_view, DocumentViewRequest};
 pub use event_sink::{bind_event_sink, clear_event_sink, emit_event, emit_message_delta};
 pub use locator::{resolve_reference, KnowledgeLocator};
-pub use run_context::{cancel_requested, RunContext};
+pub use run_context::{
+    cancel_requested, cancel_token_body_means_cancel, RequestContext, RunContext,
+};
 pub use selection::{parse_model_selection, ModelSelection};
 pub use snapshot::{build_snapshot_manifest, version_unavailable_result};
 pub use usage::{

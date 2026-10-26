@@ -63,6 +63,11 @@ func ParseFrontmatter(src string) (meta map[string]string, body string) {
 		body = body[i+3:]
 		body = strings.TrimPrefix(body, "\r")
 		body = strings.TrimPrefix(body, "\n")
+		// Drop blank line(s) between closing --- and first content.
+		for strings.HasPrefix(body, "\n") || strings.HasPrefix(body, "\r\n") {
+			body = strings.TrimPrefix(body, "\r\n")
+			body = strings.TrimPrefix(body, "\n")
+		}
 	}
 	for _, line := range strings.Split(fm, "\n") {
 		line = strings.TrimSpace(strings.TrimSuffix(line, "\r"))
@@ -254,6 +259,10 @@ func SystemRoutes() []map[string]any {
 	return []map[string]any{
 		{"method": "GET", "path": "/_part/*", "kind": "system"},
 		{"method": "GET|POST", "path": "/_form/*", "kind": "system"},
+		{"method": "POST", "path": "/_runtime/tasks", "kind": "system"},
+		{"method": "GET", "path": "/_runtime/tasks/{id}", "kind": "system"},
+		{"method": "POST", "path": "/_runtime/tasks/{id}/cancel", "kind": "system"},
+		{"method": "GET", "path": "/_runtime/tasks/{id}/events", "kind": "system"},
 	}
 }
 
@@ -275,8 +284,20 @@ func InspectBag(app map[string]any, declared []ArtifactFile) map[string]any {
 			}
 		}
 		if inv, ok := app["invoke_routes"].(map[string]any); ok {
-			for key := range inv {
-				dec = append(dec, map[string]any{"path": key, "kind": "endpoint"})
+			for key, v := range inv {
+				row := map[string]any{"path": key, "kind": "endpoint"}
+				if m, ok := v.(map[string]any); ok {
+					if c, ok := m["class"].(string); ok && c != "" {
+						row["class"] = c
+					}
+					if method, ok := m["method"].(string); ok && method != "" {
+						row["method"] = method
+					}
+					if fn, ok := m["fn"].(string); ok && fn != "" {
+						row["fn"] = fn
+					}
+				}
+				dec = append(dec, row)
 			}
 		}
 		if art, ok := app["artifact_routes"].(map[string]any); ok {

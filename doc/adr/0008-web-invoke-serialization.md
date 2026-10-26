@@ -2,9 +2,9 @@
 
 | | |
 |---|---|
-| Status | **Accepted**（缺陷已记录；缓解已落地；真并行未决） |
+| Status | **Accepted**（缺陷已记录；缓解已落地；真并行见 [ADR 0009](0009-isolated-web-runtime.md)） |
 | Date | 2026-10-26 |
-| Related | [web-invoke-serialization.md](../design/web-invoke-serialization.md) · ADR [0004](0004-web-plugin-go.md) · ADR [0007](0007-web-document-endpoint.md) · [ext-abi.md](../design/ext-abi.md) · [ext-web-go-rewrite.md](../design/ext-web-go-rewrite.md) |
+| Related | [web-invoke-serialization.md](../design/web-invoke-serialization.md) · [ADR 0009](0009-isolated-web-runtime.md) · ADR [0004](0004-web-plugin-go.md) · ADR [0007](0007-web-document-endpoint.md) · [ext-abi.md](../design/ext-abi.md) · [ext-web-go-rewrite.md](../design/ext-web-go-rewrite.md) |
 
 ## Context
 

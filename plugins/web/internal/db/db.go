@@ -968,6 +968,54 @@ func Update(url, tableName, id string, row any, txnID ...string) (map[string]any
 	return map[string]any{"ok": true, "updated": float64(n)}, nil
 }
 
+// UpdateIf is a conditional update (CAS): SET row WHERE id=? AND expect_col=expect_val.
+// Returns {"ok":true,"updated":N,"matched":N}. Callers treat updated==0 as conflict.
+// Optional txnID routes through an open Begin transaction.
+func UpdateIf(url, tableName, id string, row any, expectCol string, expectVal any, txnID ...string) (map[string]any, error) {
+	tn, err := ident(tableName)
+	if err != nil {
+		return nil, err
+	}
+	ecol, err := ident(expectCol)
+	if err != nil {
+		return nil, err
+	}
+	obj, ok := row.(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("row must be a map")
+	}
+	c, err := connFor(url, optTxn(txnID))
+	if err != nil {
+		return nil, err
+	}
+	var sets []string
+	var vals []any
+	for k, v := range obj {
+		if k == "id" {
+			continue
+		}
+		if _, err := ident(k); err != nil {
+			return nil, err
+		}
+		sets = append(sets, fmt.Sprintf(`"%s" = ?`, k))
+		vals = append(vals, toSQLArg(v))
+	}
+	if len(sets) == 0 {
+		return nil, fmt.Errorf("nothing to update")
+	}
+	vals = append(vals, id, toSQLArg(expectVal))
+	sqlStmt := fmt.Sprintf(
+		`UPDATE "%s" SET %s WHERE "id" = ? AND "%s" = ?`,
+		tn, strings.Join(sets, ", "), ecol,
+	)
+	res, err := c.Exec(sqlStmt, vals...)
+	if err != nil {
+		return nil, err
+	}
+	n, _ := res.RowsAffected()
+	return map[string]any{"ok": true, "updated": float64(n), "matched": float64(n)}, nil
+}
+
 // Delete removes a row by id. Returns {"ok":true,"deleted":N}.
 // Optional txnID routes through an open Begin transaction.
 func Delete(url, tableName, id string, txnID ...string) (map[string]any, error) {

@@ -19,6 +19,12 @@ jobs:
         run: cargo test --test workbench_contracts --locked
       - name: Offline executable-knowledge gate
         run: cargo test --test executable_knowledge --locked
+      - name: Isolated execute MR-01 (dual 60s SSE + short reads)
+        run: |
+          cargo build -p marqdo_plugin_llm --locked
+          bash scripts/build-web-plugin.sh
+          cargo test --test isolated_execute_mr01 --locked -- --nocapture
+        timeout-minutes: 5
       - name: no ignored tests counted as success
         run: |
           if grep -n '#\[ignore\]' tests/executable_knowledge.rs; then

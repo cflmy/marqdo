@@ -240,32 +240,24 @@ pub struct Compilation {
 /// side-effect free: it never loads plugins, evaluates expressions or fetches
 /// sources.
 pub fn compile_project(options: &CompileOptions) -> Result<Compilation> {
+    let t_index = std::time::Instant::now();
     let root = ProjectRoot::new(&options.project_root)?;
     let index = ProjectIndex::build(root.clone())?;
+    let index_ms = t_index.elapsed().as_millis();
+    // Reuse parsed modules from ProjectIndex — same input snapshot, no second parse (M-R5b).
     let mut files = BTreeMap::new();
     let mut diagnostics = Vec::new();
-    for file in root.source_files()? {
-        let text = fs::read_to_string(&file)
-            .with_context(|| format!("read semantic source {}", file.display()))?;
-        match crate::load::parse_source_auto(&text) {
-            Ok(module) => {
-                let module_id = index
-                    .modules()
-                    .iter()
-                    .find_map(|(id, path)| (path == &file).then(|| id.clone()));
-                if let Some(module_id) = module_id {
-                    files.insert(module_id, (file, text, module));
-                }
-            }
-            Err(error) => {
-                diagnostics.push(
-                    Diagnostic::new(Some(&file), Span::new(1, 1), error.to_string())
-                        .with_code("parse.semantic")
-                        .with_severity(Severity::Error),
-                );
-            }
-        }
+    for (module_id, parsed) in index.parsed_modules() {
+        files.insert(
+            module_id.clone(),
+            (
+                parsed.path.clone(),
+                parsed.text.clone(),
+                parsed.module.clone(),
+            ),
+        );
     }
+    let _ = index_ms; // ProjectIndex build duration (M-R5b span)
 
     // Wire import_modules from already-parsed project files so BoundCall path
     // resolve shares `resolve_for_exec` (no plugin load / no re-parse).
@@ -288,12 +280,8 @@ pub fn compile_project(options: &CompileOptions) -> Result<Compilation> {
         collect_functions(&module.functions, &mut Vec::new(), &mut by_path);
         let narrative_links = crate::parse::scan_narrative_links(text);
         let module_prov = super::provenance::parse_module_provenance(text);
-        let module_symbols: Vec<&SymbolDecl> = index
-            .symbols()
-            .iter()
-            .filter(|s| &s.module == module_id)
-            .collect();
-        for symbol in index.symbols().iter().filter(|s| &s.module == module_id) {
+        let module_symbols = index.symbols_in_module(module_id);
+        for symbol in index.symbols_in_module(module_id) {
             let function = by_path.get(&symbol.declaration_path).expect("symbol collected from module");
             let owned_links: Vec<_> = narrative_links
                 .iter()
@@ -1315,12 +1303,44 @@ pub fn write_semantic_projections(out_dir: &Path, compilation: &Compilation) -> 
     fs::create_dir_all(gen_dir.join("verification"))?;
     write_generation_tree(&gen_dir, compilation)?;
 
+    // Publish journal + CAS (M-R6): record expected CURRENT before switching.
+    let expected = fs::read_to_string(out_dir.join("CURRENT"))
+        .ok()
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty());
+    let source_digest = {
+        let mut h = Sha256::new();
+        for a in &compilation.semantics.artifacts {
+            h.update(a.hashes.artifact.0.as_bytes());
+        }
+        format!("sha256:{:x}", h.finalize())
+    };
+    // Staging already written under gen_dir; journal tracks CURRENT switch.
+    let mut journal = crate::runtime::PublishJournal::begin(
+        out_dir,
+        &compilation.semantics.project_id,
+        expected,
+        &build_id,
+        &source_digest,
+    )
+    .map_err(|e| anyhow::anyhow!("publish journal: {e}"))?;
+    // Point journal staging at the generation we just wrote (already complete).
+    journal.staging_dir = gen_dir.clone();
+    journal.generation_dir = gen_dir.clone();
+    journal
+        .mark(out_dir, crate::runtime::publish::PublishPhase::Validated)
+        .map_err(|e| anyhow::anyhow!("publish journal mark: {e}"))?;
+
     // Atomic generation pointer: only publish CURRENT after the tree is complete.
     let current_tmp = out_dir.join("CURRENT.tmp");
     fs::write(&current_tmp, format!("{build_id}\n"))
         .with_context(|| format!("write {}", current_tmp.display()))?;
     fs::rename(&current_tmp, out_dir.join("CURRENT"))
         .with_context(|| format!("publish CURRENT under {}", out_dir.display()))?;
+    journal
+        .mark(out_dir, crate::runtime::publish::PublishPhase::CurrentSwitched)
+        .map_err(|e| anyhow::anyhow!("publish journal current: {e}"))?;
+    let _ = fs::remove_file(out_dir.join("publish_journal.json"));
 
     // Compatibility root: stage a full mirror, then swap names (best-effort for
     // legacy readers that do not follow CURRENT).

@@ -92,24 +92,25 @@ fn tool_calls_from(data: &Value) -> Value {
 }
 
 fn cancel_requested() -> bool {
-    if std::env::var("MARQDO_CANCEL")
-        .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
-        .unwrap_or(false)
-    {
-        return true;
-    }
-    // Web sse-live creates an empty token file up front; only an explicit
-    // body ("1" / "cancelled") means the client asked to stop. Empty ≠ cancel.
+    // Prefer request-scoped token handle. Empty / "0" ≠ cancel (M-R1).
+    // When a token path is set, ignore process-global MARQDO_CANCEL so parallel
+    // tasks cannot cancel each other via shared env.
     if let Ok(tok) = std::env::var("MARQDO_CANCEL_TOKEN") {
-        let path = std::path::Path::new(&tok);
-        if path.is_file() {
-            if let Ok(body) = std::fs::read_to_string(path) {
-                let t = body.trim();
-                return t == "1" || t.eq_ignore_ascii_case("cancelled");
+        if !tok.is_empty() {
+            let path = std::path::Path::new(&tok);
+            if path.is_file() {
+                if let Ok(body) = std::fs::read_to_string(path) {
+                    let t = body.trim();
+                    return t == "1" || t.eq_ignore_ascii_case("cancelled");
+                }
             }
+            return false;
         }
     }
-    false
+    // Legacy single-task CLI only when no token handle is bound.
+    std::env::var("MARQDO_CANCEL")
+        .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
+        .unwrap_or(false)
 }
 
 /// Mirror host `net::push_openai_delta_events`: append semantic frames to

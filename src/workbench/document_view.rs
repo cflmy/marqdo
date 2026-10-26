@@ -92,20 +92,9 @@ pub fn build_document_view(req: &DocumentViewRequest) -> Result<Value, Value> {
     let title = title_from_source(&source, &req.document);
 
     // Semantic projection — compile_project does not load plugins / evaluate.
-    // Hold analysis lock across compile so concurrent same-snapshot reads coalesce (F14).
-    let ticket = crate::workbench::analysis_cache::begin_analysis(&project_root);
-    let options = crate::sema::CompileOptions::for_path(&project_root)
-        .map_err(|e| err("view.compile_failed", format!("{e:#}")))?;
-    let compilation = match crate::sema::compile_project(&options) {
-        Ok(c) => {
-            crate::workbench::analysis_cache::finish_analysis(ticket);
-            c
-        }
-        Err(e) => {
-            crate::workbench::analysis_cache::finish_analysis(ticket);
-            return Err(err("view.compile_failed", format!("{e:#}")));
-        }
-    };
+    // M-R5: Arc<Compilation> single-flight cache; followers reuse the same result.
+    let compilation = crate::workbench::analysis_cache::get_or_compile(&project_root)
+        .map_err(|e| err("view.compile_failed", e))?;
 
     let rel = req.document.replace('\\', "/");
     let mut presentation = KnowledgePresentation::from_project(&compilation.semantics, &rel, &title);

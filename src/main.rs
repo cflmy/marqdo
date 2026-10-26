@@ -120,6 +120,14 @@ enum Commands {
         #[arg(long = "fs-root", value_name = "DIR")]
         fs_root: Option<PathBuf>,
 
+        /// Isolated worker: call `lib.member` on the site entry instead of `# main`.
+        #[arg(long = "call-lib-path", value_name = "LIB.MEMBER")]
+        call_lib_path: Option<String>,
+
+        /// Named args JSON for `--call-lib-path` (file path, or `-` for stdin).
+        #[arg(long = "args-json", value_name = "FILE")]
+        args_json: Option<PathBuf>,
+
         /// Emit diagnostics as JSON on stderr (machine-readable; AI/MLSP 面).
         #[arg(long)]
         json: bool,
@@ -688,6 +696,8 @@ fn try_main(cli: Cli) -> Result<i32> {
             emit_result,
             binds,
             fs_root,
+            call_lib_path,
+            args_json,
             json: _,
             legacy_markup,
         } => {
@@ -708,6 +718,8 @@ fn try_main(cli: Cli) -> Result<i32> {
                     emit_result: emit_result.clone(),
                     binds: bind_pairs.clone(),
                     fs_root: fs_root.clone(),
+                    call_lib_path: call_lib_path.clone(),
+                    args_json: args_json.clone(),
                     ..RunOptions::dump_all()
                 }
             } else {
@@ -723,6 +735,8 @@ fn try_main(cli: Cli) -> Result<i32> {
                     emit_result,
                     binds: bind_pairs,
                     fs_root,
+                    call_lib_path,
+                    args_json,
                     ..RunOptions::default()
                 }
             };

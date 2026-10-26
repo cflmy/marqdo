@@ -8,6 +8,32 @@
 
 ### Changed
 
+## v2.1.4 — 2026-10-26
+
+### Highlights
+
+**默认隔离 HTTP execute（ADR 0009）**：`class=execute` / `sse-live` / `stream:true` 经 Supervisor worker 池（`marqdo run --call-lib-path`），父进程不再 `CallLibPath` 占 `INVOKE_LOCK`；短读 / 未声明非流式仍 `legacy_serial`（ADR 0008）。`/_runtime/*` 控制面；`runtime.isolated_execution=1`；MR-01 双 60s 假 SSE + 短读金样例。CLI · wasm · ext **2.1.4**。
+
+```bash
+git checkout v2.1.4 && cargo build --release
+marqdo ext add web    # CDN / Releases → 2.1.4
+```
+
+**核心表面 Δ（Core surface Δ）**：**无增删**（仍 19 个构造）——隔离运行时与 Web execute 路径，不新增 Markdown 标记。
+
+### Added
+
+- **默认隔离 execute（ADR 0009）**：HTTP `execute` / `sse-live` / `stream:true` 经 Supervisor worker 池（`marqdo run --call-lib-path`），父进程不再 `CallLibPath` 占 `INVOKE_LOCK`；可选 route `class`；`/_runtime/*` 控制面；`runtime.isolated_execution=1`。
+- **MR-01 金样例**：`tests/isolated_execute_mr01.rs` + `tests/ext/isolated-execute-site/`（双 60s 假 SSE + 短读并行；槽满拒绝）；接入 `executable-knowledge` workflow。
+- **Worker CLI**：`marqdo run --call-lib-path` / `--fs-root` / `--args-json` / `--emit-result`；host `runtime` admit/dispatch/cancel/events。
+
+### Fixed
+
+### Changed
+
+- **compile 1000 门禁**：executable-knowledge / workbench 路径恢复与能力探测诚实（isolated 默认开启）。
+- CLI / wasm / `ext/VERSION` **同步 2.1.4**。
+
 ## v2.1.3 — 2026-10-25
 
 ### Highlights

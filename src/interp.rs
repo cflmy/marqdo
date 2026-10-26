@@ -545,6 +545,20 @@ impl Interpreter {
         ])
     }
 
+    /// Pin `module` as site and call `lib.member` (isolated worker / CLI `--call-lib-path`).
+    pub fn run_site_lib_path(
+        &mut self,
+        module: &Module,
+        path: &str,
+        args: Option<&Value>,
+    ) -> std::result::Result<Value, String> {
+        let prev = self.site_module;
+        self.site_module = Some(module as *const Module);
+        let out = self.call_site_lib_path(path, args);
+        self.site_module = prev;
+        out
+    }
+
     /// Resolve `lib.member` on the site (entry) module — used by ABI `call_lib_path`.
     pub(crate) fn call_site_lib_path(
         &mut self,

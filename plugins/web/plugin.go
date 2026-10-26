@@ -80,6 +80,7 @@ extern int web_compose_form(char *args_json, char **out_json, char **err_msg);
 extern int web_app_new(char *args_json, char **out_json, char **err_msg);
 extern int web_app_route(char *args_json, char **out_json, char **err_msg);
 extern int web_db_update(char *args_json, char **out_json, char **err_msg);
+extern int web_db_update_if(char *args_json, char **out_json, char **err_msg);
 extern int web_db_delete(char *args_json, char **out_json, char **err_msg);
 extern int web_db_query(char *args_json, char **out_json, char **err_msg);
 extern int web_db_count(char *args_json, char **out_json, char **err_msg);
@@ -183,6 +184,7 @@ static int register_core(void) {
 	if (host_register((char *)"web_db_select", (char *)"url,table,where,limit,order,offset,txn", web_db_select) != 0) return 1;
 	if (host_register((char *)"web_db_get", (char *)"url,table,id,txn", web_db_get) != 0) return 1;
 	if (host_register((char *)"web_db_update", (char *)"url,table,id,row,txn", web_db_update) != 0) return 1;
+	if (host_register((char *)"web_db_update_if", (char *)"url,table,id,row,expect_col,expect_val,txn", web_db_update_if) != 0) return 1;
 	if (host_register((char *)"web_db_delete", (char *)"url,table,id,txn", web_db_delete) != 0) return 1;
 	if (host_register((char *)"web_db_exec", (char *)"url,sql,args,txn", web_db_exec) != 0) return 1;
 	if (host_register((char *)"web_db_query", (char *)"url,sql,args,txn", web_db_query) != 0) return 1;
@@ -264,7 +266,7 @@ static int register_core(void) {
 	if (host_register((char *)"web_cache_exists", (char *)"url,key", web_cache_exists) != 0) return 1;
 	if (host_register((char *)"web_cache_ttl", (char *)"url,key", web_cache_ttl) != 0) return 1;
 	if (host_register((char *)"web_app_proxy", (char *)"app,path,upstream,stream,strip_prefix,methods,headers_from_env,timeout_ms", web_app_proxy) != 0) return 1;
-	if (host_register((char *)"web_app_invoke", (char *)"app,path,method,fn,body,return", web_app_invoke) != 0) return 1;
+	if (host_register((char *)"web_app_invoke", (char *)"app,path,method,fn,body,return,class", web_app_invoke) != 0) return 1;
 	if (host_register((char *)"web_api_key_check", (char *)"key,authorization,pepper,keys", web_api_key_check) != 0) return 1;
 	if (host_register((char *)"web_render_nodes", (char *)"page,nodes,db,title", web_render_nodes) != 0) return 1;
 	if (host_register((char *)"web_render_document", (char *)"page,body,db,title", web_render_document) != 0) return 1;
@@ -991,6 +993,40 @@ func web_db_update(argsJSON *C.char, outJSON **C.char, errMsg **C.char) C.int {
 		row = map[string]any{}
 	}
 	out, err := db.Update(url, tableName, id, row, txnOpt(args))
+	return replyJSON(outJSON, errMsg, out, err)
+}
+
+//export web_db_update_if
+func web_db_update_if(argsJSON *C.char, outJSON **C.char, errMsg **C.char) C.int {
+	args, err := parseArgs(argsJSON)
+	if err != nil {
+		return replyJSON(outJSON, errMsg, nil, err)
+	}
+	url, err := dbURLOf(args)
+	if err != nil {
+		return replyJSON(outJSON, errMsg, nil, err)
+	}
+	tableName, err := argStrReq(args, "table")
+	if err != nil {
+		return replyJSON(outJSON, errMsg, nil, err)
+	}
+	id, err := argStrReq(args, "id")
+	if err != nil {
+		return replyJSON(outJSON, errMsg, nil, err)
+	}
+	expectCol, err := argStrReq(args, "expect_col")
+	if err != nil {
+		return replyJSON(outJSON, errMsg, nil, err)
+	}
+	expectVal, ok := args["expect_val"]
+	if !ok {
+		return replyJSON(outJSON, errMsg, nil, fmt.Errorf("missing expect_val"))
+	}
+	row := args["row"]
+	if row == nil {
+		row = map[string]any{}
+	}
+	out, err := db.UpdateIf(url, tableName, id, row, expectCol, expectVal, txnOpt(args))
 	return replyJSON(outJSON, errMsg, out, err)
 }
 

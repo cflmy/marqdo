@@ -452,6 +452,7 @@ fn m03_view_document_path_escape_rejected() {
 
 #[test]
 fn m05_project_cache_isolation_f14() {
+    let _serial = marqdo::workbench::test_serial_guard();
     marqdo::workbench::reset_cache_for_tests();
     let a = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("tests/executable_knowledge/baseline/02-extract");
@@ -472,6 +473,7 @@ fn m05_f14_concurrent_100_same_snapshot() {
     use std::sync::{Arc, Barrier};
     use std::thread;
 
+    let _serial = marqdo::workbench::test_serial_guard();
     marqdo::workbench::reset_cache_for_tests();
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("tests/executable_knowledge/baseline/02-extract");
@@ -507,11 +509,22 @@ fn m05_f14_concurrent_100_same_snapshot() {
     assert!(revs.iter().all(|r| r == &revs[0]), "all reads same revision");
     assert!(revs[0].starts_with("sha256:"));
     let (hits, misses, merges) = marqdo::workbench::cache_stats();
-    // At least one miss (leader) and either merges (coalesce) or subsequent hits.
     assert!(misses >= 1, "hits={hits} misses={misses} merges={merges}");
     assert!(
-        merges > 0 || hits > 0,
-        "expected coalesce or reuse: hits={hits} misses={misses} merges={merges}"
+        merges + hits >= 99,
+        "expected coalesce or result reuse across 100 readers: hits={hits} merges={merges}"
+    );
+    assert!(
+        marqdo::workbench::result_hits() >= 99,
+        "followers must reuse Arc<Compilation>, result_hits={}",
+        marqdo::workbench::result_hits()
+    );
+    // Strict compile-once is covered by analysis_cache unit test under serial guard.
+    // Here we only require that this fixture was compiled (other parallel tests may
+    // also touch it) and that readers shared results (result_hits / merges above).
+    assert!(
+        marqdo::workbench::compile_count_for(&root) >= 1,
+        "fixture must have been compiled at least once"
     );
 }
 

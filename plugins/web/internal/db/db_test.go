@@ -100,6 +100,24 @@ func TestInitInsertSelectGet(t *testing.T) {
 	}
 }
 
+func TestUpdateIfCAS(t *testing.T) {
+	url := setupArticles(t)
+	ok, err := db.UpdateIf(url, "articles", "1", map[string]any{"title": "CAS"}, "title", "Alpha")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ok["updated"] != float64(1) {
+		t.Fatalf("cas hit=%v", ok)
+	}
+	miss, err := db.UpdateIf(url, "articles", "1", map[string]any{"title": "Nope"}, "title", "Alpha")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if miss["updated"] != float64(0) {
+		t.Fatalf("cas miss should be 0, got %v", miss)
+	}
+}
+
 func TestUpdateDelete(t *testing.T) {
 	url := setupArticles(t)
 

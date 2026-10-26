@@ -16,15 +16,17 @@ import:
     + `request`="json"
     + `response`="json"
     + `auth`=""
+    + `class`=""
 
 Declared route handle. Prefer `web.route` / Artifact `type: endpoint` discovery via `web.serve`.
+Optional `class`: `execute` | `short` | `read` | `control` (empty → heuristic / `legacy_serial`).
 
 > cap.load
 `out` =
 
-| _type | app | path | method | page | fn | request | response | auth |
-|-------|-----|------|--------|------|----|---------|----------|------|
-| route | `app` | `path` | `method` | `page` | `fn` | `request` | `response` | `auth` |
+| _type | app | path | method | page | fn | request | response | auth | class |
+|-------|-----|------|--------|------|----|---------|----------|------|-------|
+| route | `app` | `path` | `method` | `page` | `fn` | `request` | `response` | `auth` | `class` |
 
 *out*
 
@@ -57,6 +59,7 @@ Register this declared route on an app handle.
   **method = [method](access(self, "method"))**
   **request = [request](access(self, "request"))**
   **response = [response](access(self, "response"))**
-  *> web_app_invoke app=`a` path=`path` method=`method` fn=`fn` body=`request` return=`response`*
+  **class = [class](access(self, "class"))**
+  *> web_app_invoke app=`a` path=`path` method=`method` fn=`fn` body=`request` return=`response` class=`class`*
 3. *
   *> table.put in=None at="ok" value=False*

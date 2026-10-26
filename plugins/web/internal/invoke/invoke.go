@@ -16,9 +16,10 @@ type Options struct {
 	Fn     string
 	Body   string
 	Return string
+	Class  string
 }
 
-// RoutesFromTable normalizes `|路径|方法|函数|正文|返回|` into invoke_routes map keys.
+// RoutesFromTable normalizes `|路径|方法|函数|正文|返回|类别|` into invoke_routes map keys.
 func RoutesFromTable(tableV any) map[string]any {
 	rows, _ := table.AsRows(tableV).([]any)
 	out := map[string]any{}
@@ -47,7 +48,8 @@ func RoutesFromTable(tableV any) map[string]any {
 		if ret == "" {
 			ret = "json"
 		}
-		out[path] = routeEntry(method, fnPath, body, ret)
+		class := strings.ToLower(strings.TrimSpace(col(m, "类别", "class", "Class")))
+		out[path] = routeEntry(method, fnPath, body, ret, class)
 	}
 	return out
 }
@@ -78,12 +80,13 @@ func Register(appBag map[string]any, opts Options) (map[string]any, error) {
 	if ret == "" {
 		ret = "json"
 	}
+	class := strings.ToLower(strings.TrimSpace(opts.Class))
 	out := clone(appBag)
 	routes := map[string]any{}
 	if r, ok := out["invoke_routes"].(map[string]any); ok {
 		routes = clone(r)
 	}
-	routes[key] = routeEntry(method, fnPath, body, ret)
+	routes[key] = routeEntry(method, fnPath, body, ret, class)
 	out["invoke_routes"] = routes
 	return out, nil
 }
@@ -101,22 +104,28 @@ func OptionsFromArgs(args map[string]any) (Options, error) {
 	method, _ := argStr(args, "method", "方法")
 	body, _ := argStr(args, "body", "正文")
 	ret, _ := argStr(args, "return", "返回")
+	class, _ := argStr(args, "class", "类别")
 	return Options{
 		Path:   path,
 		Method: method,
 		Fn:     fnPath,
 		Body:   body,
 		Return: ret,
+		Class:  class,
 	}, nil
 }
 
-func routeEntry(method, fnPath, body, ret string) map[string]any {
-	return map[string]any{
+func routeEntry(method, fnPath, body, ret, class string) map[string]any {
+	m := map[string]any{
 		"method": method,
 		"fn":     fnPath,
 		"body":   body,
 		"return": ret,
 	}
+	if class != "" {
+		m["class"] = class
+	}
+	return m
 }
 
 func col(m map[string]any, keys ...string) string {

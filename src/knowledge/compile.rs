@@ -25,19 +25,29 @@ pub fn compile(opts: KnowledgeOptions) -> Result<KnowledgeGraph> {
     } else {
         opts.path.clone()
     };
+    let t0 = std::time::Instant::now();
     let semantic = crate::sema::compile_project(&crate::sema::CompileOptions {
         project_root: semantic_root,
         entry: opts.path.is_file().then(|| opts.path.clone()),
         lock_mode: crate::sema::LockMode::Off,
     })?;
+    let sema_ms = t0.elapsed().as_millis();
+    let t1 = std::time::Instant::now();
     crate::sema::write_semantic_projections(&opts.out_dir, &semantic)?;
+    let sema_write_ms = t1.elapsed().as_millis();
     let extract_opts = ExtractOptions {
         path: opts.path.clone(),
         out_dir: opts.out_dir.clone(),
     };
+    let t2 = std::time::Instant::now();
     let graph = extract_graph(&extract_opts)?;
+    let extract_ms = t2.elapsed().as_millis();
+    let t3 = std::time::Instant::now();
     write_projections(&opts.out_dir, &graph)?;
+    let retrieve_write_ms = t3.elapsed().as_millis();
+    let t4 = std::time::Instant::now();
     write_publish_manifest(&opts.out_dir, &semantic, &graph)?;
+    let manifest_ms = t4.elapsed().as_millis();
     eprintln!(
         "marqdo knowledge: {} module(s), {} symbol(s), {} capability(ies), {} knowledge → {} (semantic graph/; retrieval ekc/)",
         graph.modules.len(),
@@ -45,6 +55,10 @@ pub fn compile(opts: KnowledgeOptions) -> Result<KnowledgeGraph> {
         graph.capabilities.len(),
         graph.knowledge.len(),
         opts.out_dir.display()
+    );
+    eprintln!(
+        "marqdo knowledge timing_ms: sema={sema_ms} sema_write={sema_write_ms} extract={extract_ms} retrieve_write={retrieve_write_ms} manifest={manifest_ms} total={}",
+        t0.elapsed().as_millis()
     );
     Ok(graph)
 }

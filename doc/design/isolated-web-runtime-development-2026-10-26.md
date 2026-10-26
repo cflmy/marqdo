@@ -2,7 +2,7 @@
 
 | 项目 | 约定 |
 |---|---|
-| 状态 | **Proposed / 待实现**；用于拆分开发任务与验收，不修改 ADR 0008 的现行约束 |
+| 状态 | **Verified**（execute 路径）；HTTP `execute` / `sse-live` / `stream:true` 默认走 Supervisor worker 池（不再经父进程 `CallLibPath` / `INVOKE_LOCK`）；`runtime.isolated_execution=1`；MR-01 金样例 `tests/isolated_execute_mr01.rs`；未声明非流式仍 `legacy_serial`（ADR 0008） |
 | 基线 | Marqdo `1b11fe0` / 2.1.3；qdagent `64b97e5`；2026-10-26 |
 | 问题依据 | [单解释器缺陷](web-invoke-serialization.md)、[ADR 0008](../adr/0008-web-invoke-serialization.md)、[本轮跨库复核 R01–R14](../../../qdagent/doc/gaps/04-workbench-runtime-and-product-audit-2026-10-26.md) |
 | 产品配套 | [qdagent 可靠工作台开发设计](../../../qdagent/doc/design/reliable-workbench-development-2026-10-26.md) |

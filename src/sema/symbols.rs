@@ -92,15 +92,29 @@ pub struct SymbolDecl {
     pub line: u32,
 }
 
+/// Parsed module retained so `compile_project` does not re-parse (M-R5b).
+#[derive(Debug, Clone)]
+pub struct ParsedModule {
+    pub path: PathBuf,
+    pub text: String,
+    pub module: crate::ast::Module,
+}
+
 /// Deterministic read-only view of all declarations in one project.
 #[derive(Debug, Clone)]
 pub struct ProjectIndex {
     project_id: String,
     root: ProjectRoot,
     modules: BTreeMap<ModuleId, PathBuf>,
+    /// path → module id (avoids linear scan per file in compile_project).
+    path_to_module: BTreeMap<PathBuf, ModuleId>,
     symbols: Vec<SymbolDecl>,
     by_id: BTreeMap<SymbolId, usize>,
     by_name: BTreeMap<String, Vec<usize>>,
+    /// module → symbol indexes (avoids filtering the full symbol table per module).
+    symbols_by_module: BTreeMap<ModuleId, Vec<usize>>,
+    /// Shared parsed AST/text for the same input snapshot.
+    parsed: BTreeMap<ModuleId, ParsedModule>,
 }
 
 impl ProjectIndex {
@@ -108,7 +122,9 @@ impl ProjectIndex {
         let project_id = project_id(root.path());
         let files = root.source_files()?;
         let mut modules = BTreeMap::new();
+        let mut path_to_module = BTreeMap::new();
         let mut symbols = Vec::new();
+        let mut parsed = BTreeMap::new();
 
         for file in files {
             let source = fs::read_to_string(&file)
@@ -121,6 +137,7 @@ impl ProjectIndex {
                     file.display()
                 );
             }
+            path_to_module.insert(file.clone(), module_id.clone());
             let module = crate::load::parse_source_auto(&source)
                 .with_context(|| format!("parse source {}", file.display()))?;
             for function in &module.functions {
@@ -134,18 +151,34 @@ impl ProjectIndex {
                     &mut symbols,
                 )?;
             }
+            parsed.insert(
+                module_id.clone(),
+                ParsedModule {
+                    path: file,
+                    text: source,
+                    module,
+                },
+            );
         }
 
         symbols.sort_by(|a, b| a.id.cmp(&b.id));
         let mut by_id = BTreeMap::new();
         let mut by_name: BTreeMap<String, Vec<usize>> = BTreeMap::new();
+        let mut symbols_by_module: BTreeMap<ModuleId, Vec<usize>> = BTreeMap::new();
         for (index, symbol) in symbols.iter().enumerate() {
             if by_id.insert(symbol.id.clone(), index).is_some() {
                 bail!("duplicate symbol id `{}`", symbol.id);
             }
             by_name.entry(symbol.name.clone()).or_default().push(index);
+            symbols_by_module
+                .entry(symbol.module.clone())
+                .or_default()
+                .push(index);
         }
         for indexes in by_name.values_mut() {
+            indexes.sort_by(|a, b| symbols[*a].id.cmp(&symbols[*b].id));
+        }
+        for indexes in symbols_by_module.values_mut() {
             indexes.sort_by(|a, b| symbols[*a].id.cmp(&symbols[*b].id));
         }
 
@@ -153,9 +186,12 @@ impl ProjectIndex {
             project_id,
             root,
             modules,
+            path_to_module,
             symbols,
             by_id,
             by_name,
+            symbols_by_module,
+            parsed,
         })
     }
 
@@ -169,6 +205,21 @@ impl ProjectIndex {
 
     pub fn modules(&self) -> &BTreeMap<ModuleId, PathBuf> {
         &self.modules
+    }
+
+    pub fn module_id_for_path(&self, path: &Path) -> Option<&ModuleId> {
+        self.path_to_module.get(path)
+    }
+
+    pub fn symbols_in_module(&self, module_id: &ModuleId) -> Vec<&SymbolDecl> {
+        self.symbols_by_module
+            .get(module_id)
+            .map(|idxs| idxs.iter().map(|i| &self.symbols[*i]).collect())
+            .unwrap_or_default()
+    }
+
+    pub fn parsed_modules(&self) -> &BTreeMap<ModuleId, ParsedModule> {
+        &self.parsed
     }
 
     pub fn symbols(&self) -> &[SymbolDecl] {

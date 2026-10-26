@@ -38,10 +38,12 @@ Construct a Document handle. Prefer `type: web` Artifact files discovered by `se
     + `request`="json"
     + `response`="json"
     + `auth`=""
+    + `class`=""
 
 Register a declared Document page or Endpoint (`fn` = `lib.member`).
+Optional `class`: `execute` | `short` | `read` | `control`.
 
-**r = > route_mod.route app=`app` path=`path` method=`method` page=`page` fn=`fn` request=`request` response=`response` auth=`auth`**
+**r = > route_mod.route app=`app` path=`path` method=`method` page=`page` fn=`fn` request=`request` response=`response` auth=`auth` class=`class`**
 *> `r`.register app=`app`*
 
 ## render

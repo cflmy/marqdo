@@ -37,6 +37,7 @@ pub mod lex;
 pub mod linalg_ops;
 pub mod load;
 pub mod mlsp;
+pub mod runtime;
 pub mod workbench;
 pub mod parse;
 pub mod project;
@@ -112,6 +113,10 @@ pub struct RunOptions {
     pub binds: Vec<(String, String)>,
     /// Attach CoW session for `ext/ai/sandbox` nested runs.
     pub sandbox_session: Option<String>,
+    /// Isolated worker: call `lib.member` on the site entry instead of `# main`.
+    pub call_lib_path: Option<String>,
+    /// JSON object of named args for [`Self::call_lib_path`] (file path or inline).
+    pub args_json: Option<std::path::PathBuf>,
 }
 
 impl Default for RunOptions {
@@ -135,6 +140,8 @@ impl Default for RunOptions {
             emit_result: None,
             binds: Vec::new(),
             sandbox_session: None,
+            call_lib_path: None,
+            args_json: None,
         }
     }
 }
@@ -229,7 +236,11 @@ pub fn run_file(path: &Path, opts: &RunOptions) -> Result<i32> {
             if opts.trace_eval {
                 eprintln!("=== marqdo: trace-eval ({path_label}) ===");
             }
-            let value = interp.run_module(&module)?;
+            let value = if let Some(lib_path) = &opts.call_lib_path {
+                run_call_lib_path(&mut interp, &module, lib_path, opts)?
+            } else {
+                interp.run_module(&module)?
+            };
             if opts.trace_eval {
                 eprintln!("=== marqdo: end trace-eval ===");
             }
@@ -273,6 +284,45 @@ pub fn run_file(path: &Path, opts: &RunOptions) -> Result<i32> {
     }
 
     Ok(0)
+}
+
+/// Worker mode: resolve `lib.member` on the loaded site module (imports already wired).
+fn run_call_lib_path(
+    interp: &mut Interpreter,
+    module: &crate::ast::Module,
+    lib_path: &str,
+    opts: &RunOptions,
+) -> Result<crate::value::Value> {
+    let args_val = load_args_json(opts)?;
+    // Keep site_module pinned for the duration of the lib call (plugins may re-enter).
+    let value = interp
+        .run_site_lib_path(module, lib_path, args_val.as_ref())
+        .map_err(|e| anyhow::anyhow!(e))?;
+    Ok(value)
+}
+
+fn load_args_json(opts: &RunOptions) -> Result<Option<crate::value::Value>> {
+    let Some(path) = &opts.args_json else {
+        return Ok(None);
+    };
+    let text = if path.as_os_str() == "-" {
+        use std::io::Read;
+        let mut buf = String::new();
+        std::io::stdin()
+            .read_to_string(&mut buf)
+            .map_err(|e| anyhow::anyhow!("args-json stdin: {e}"))?;
+        buf
+    } else {
+        std::fs::read_to_string(path)
+            .map_err(|e| anyhow::anyhow!("args-json {}: {e}", path.display()))?
+    };
+    if text.trim().is_empty() {
+        return Ok(None);
+    }
+    let json: serde_json::Value =
+        serde_json::from_str(&text).map_err(|e| anyhow::anyhow!("args-json parse: {e}"))?;
+    let v = crate::host::json::json_to_value(&json).map_err(|e| anyhow::anyhow!(e))?;
+    Ok(Some(v))
 }
 
 fn emit_result_file(opts: &RunOptions, value: &crate::value::Value) -> Result<()> {

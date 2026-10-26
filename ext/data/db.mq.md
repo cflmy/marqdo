@@ -86,6 +86,19 @@ Like `select` but returns `{ rows, total }` — the total counts rows matching `
 **url = [url](access(self, "url"))**
 *> web_db_update url=`url` table=`table` id=`id` row=`row` txn=`txn`*
 
+## update_if
+    + `table`
+    + `id`
+    + `row`
+    + `expect_col`
+    + `expect_val`
+    + `txn`=None
+
+Conditional update (CAS) for task/revision control: `UPDATE … WHERE id=? AND expect_col=expect_val`. Returns `{ ok, updated, matched }`; `updated=0` means conflict — do not simulate atomicity with read-then-write in `.mq.md`.
+
+**url = [url](access(self, "url"))**
+*> web_db_update_if url=`url` table=`table` id=`id` row=`row` expect_col=`expect_col` expect_val=`expect_val` txn=`txn`*
+
 ## delete
     + `table`
     + `id`
