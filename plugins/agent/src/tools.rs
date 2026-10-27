@@ -369,10 +369,10 @@ pub fn tools_prepare_call(args: &Value) -> Result<Value, String> {
         ));
     }
 
-    let arguments = args
-        .get("arguments")
-        .cloned()
-        .unwrap_or_else(|| json!({}));
+    let arguments = match args.get("arguments") {
+        None | Some(Value::Null) => json!({}),
+        Some(v) => v.clone(),
+    };
     let schema = spec
         .get("input_schema")
         .cloned()
@@ -396,6 +396,17 @@ pub fn tools_prepare_call(args: &Value) -> Result<Value, String> {
         .get("version")
         .and_then(|v| v.as_str())
         .unwrap_or("1");
+    let effect = spec
+        .get("effect")
+        .and_then(|v| v.as_str())
+        .unwrap_or("read");
+    let digest = args_digest(&arguments);
+    let logical_run = opt_text(args, "logical_run_id").unwrap_or("-");
+    let step = opt_text(args, "step_id").unwrap_or("-");
+    let idempotency_key = opt_text(args, "idempotency_key")
+        .map(|s| s.to_string())
+        .unwrap_or_else(|| format!("{logical_run}|{step}|{tool_id}|{digest}"));
+    let needs_ledger = matches!(effect, "write" | "execute" | "external_write");
 
     let call = json!({
         "schema": "ToolCallV1",
@@ -414,11 +425,53 @@ pub fn tools_prepare_call(args: &Value) -> Result<Value, String> {
         "call": call,
         "spec": {
             "id": tool_id,
-            "effect": spec.get("effect").cloned().unwrap_or(json!("read")),
+            "effect": effect,
             "timeout_ms": spec.get("timeout_ms").cloned().unwrap_or(json!(10000)),
             "max_result_bytes": spec.get("max_result_bytes").cloned().unwrap_or(json!(65536)),
         },
+        "args_digest": digest,
+        "idempotency_key": idempotency_key,
+        "needs_ledger": needs_ledger,
         "summary": format!("prepared authorized call to `{tool_id}`"),
+    }))
+}
+
+/// Stable digest of tool arguments for effect ledger idempotency (M-A5a).
+pub fn tools_args_digest(args: &Value) -> Result<Value, String> {
+    let arguments = args
+        .get("arguments")
+        .cloned()
+        .or_else(|| args.get("value").cloned())
+        .unwrap_or_else(|| json!({}));
+    Ok(json!({
+        "ok": true,
+        "args_digest": args_digest(&arguments),
+    }))
+}
+
+fn args_digest(arguments: &Value) -> String {
+    let text = serde_json::to_string(arguments).unwrap_or_else(|_| "{}".into());
+    format!("sha256-lite:{:x}", fnv1a64(&text))
+}
+
+fn fnv1a64(s: &str) -> u64 {
+    let mut h: u64 = 0xcbf29ce484222325;
+    for b in s.as_bytes() {
+        h ^= u64::from(*b);
+        h = h.wrapping_mul(0x100000001b3);
+    }
+    h
+}
+
+/// True when effect_class requires EffectLedger before/after execution.
+pub fn tools_needs_ledger(args: &Value) -> Result<Value, String> {
+    let effect = opt_text(args, "effect")
+        .or_else(|| opt_text(args, "effect_class"))
+        .unwrap_or("read");
+    Ok(json!({
+        "ok": true,
+        "needs_ledger": matches!(effect, "write" | "execute" | "external_write"),
+        "effect": effect,
     }))
 }
 
@@ -689,6 +742,42 @@ mod tests {
         assert_eq!(good["ok"], true);
         assert_eq!(good["call"]["schema"], "ToolCallV1");
         assert_eq!(good["call"]["tool_id"], "tool_find");
+        assert_eq!(good["needs_ledger"], false);
+        assert!(good["args_digest"].as_str().unwrap().starts_with("sha256-lite:"));
+
+        let allow2 = json!(["tool_bind"]);
+        let bind = tools_prepare_call(&json!({
+            "tool_id": "tool_bind",
+            "tools": allow2,
+            "arguments": {"query": "x"},
+            "call_id": "c2",
+            "logical_run_id": "run1",
+            "step_id": "s1"
+        }))
+        .unwrap();
+        assert_eq!(bind["ok"], true);
+        assert_eq!(bind["needs_ledger"], true);
+        assert_eq!(bind["spec"]["effect"], "execute");
+        assert!(bind["idempotency_key"]
+            .as_str()
+            .unwrap()
+            .starts_with("run1|s1|tool_bind|"));
+    }
+
+    #[test]
+    fn needs_ledger_only_for_mutating_effects() {
+        assert_eq!(
+            tools_needs_ledger(&json!({"effect": "read"})).unwrap()["needs_ledger"],
+            false
+        );
+        assert_eq!(
+            tools_needs_ledger(&json!({"effect": "write"})).unwrap()["needs_ledger"],
+            true
+        );
+        assert_eq!(
+            tools_needs_ledger(&json!({"effect": "execute"})).unwrap()["needs_ledger"],
+            true
+        );
     }
 
     #[test]

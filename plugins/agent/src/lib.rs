@@ -843,6 +843,16 @@ kb_ffi!(agent_tools_describe, tools::tools_describe, "agent_tools_describe");
 kb_ffi!(agent_tools_prepare_call, tools::tools_prepare_call, "agent_tools_prepare_call");
 kb_ffi!(agent_tools_wrap_result, tools::tools_wrap_result, "agent_tools_wrap_result");
 kb_ffi!(
+    agent_tools_args_digest,
+    tools::tools_args_digest,
+    "agent_tools_args_digest"
+);
+kb_ffi!(
+    agent_tools_needs_ledger,
+    tools::tools_needs_ledger,
+    "agent_tools_needs_ledger"
+);
+kb_ffi!(
     agent_tools_register_eng_defaults,
     tools::tools_register_eng_defaults,
     "agent_tools_register_eng_defaults"
@@ -961,6 +971,8 @@ pub unsafe extern "C" fn marqdo_plugin_init(host: *const MarqdoHostApi) -> c_int
         ("agent_tools_describe", "id,tools", agent_tools_describe),
         ("agent_tools_prepare_call", "tool_id,arguments,tools", agent_tools_prepare_call),
         ("agent_tools_wrap_result", "ok,status,summary", agent_tools_wrap_result),
+        ("agent_tools_args_digest", "arguments", agent_tools_args_digest),
+        ("agent_tools_needs_ledger", "effect", agent_tools_needs_ledger),
         (
             "agent_tools_register_eng_defaults",
             "",

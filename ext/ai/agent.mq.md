@@ -182,9 +182,17 @@ Find a human-readable call line: `CALL:<name>` or `调用：<name>` / `调用:<n
     + `tools`
     + `name`
     + `arguments`=None
+    + `ledger_dir`=.marqdo/agent-effects
+    + `logical_run_id`=None
+    + `step_id`=None
+    + `call_id`=None
+    + `operation_id`=None
 
-Allowlist + ToolSpec prepare (M-A2), then invoke the runbook `##` via `lib/subtask`.
-Unauthorized / invalid-args calls return ToolResultV1 failure without spawning (0 executions).
+Allowlist and ToolSpec prepare (M-A2), then invoke the runbook section via lib/subtask.
+Unauthorized or invalid-args calls return ToolResultV1 failure without spawning (0 executions).
+Mutating effects (write / execute / external_write) go through EffectLedger (M-A5a).
+State flow is prepared then started then spawn then committed, failed_no_effect, or unknown.
+Read tools skip the ledger. Matching idempotency_key and args_digest that already committed skips re-exec.
 
 **p = > plugin.native_path name="agent"**
 1. `p`
@@ -192,23 +200,98 @@ Unauthorized / invalid-args calls return ToolResultV1 failure without spawning (
 2. *
   **_ = 1**
 
-1. `p`
-  **prep = > agent_tools_prepare_call tool_id=`name` tools=`tools` arguments=`arguments`**
-  **pok = > json.get value=`prep` key="ok"**
-  1. not `pok`
-    *prep*
-  2. *
-    **_ = 1**
+1. not `arguments`
+  **arguments = > table.empty_map**
 2. *
+  **_ = 1**
+
+**prepared = None**
+**needs = False**
+**opid = None**
+**digest = None**
+**idem = None**
+**effect = "read"**
+**receipt = None**
+**raw = None**
+
+1. not `p`
   **allowed = > agent_tool_allowed tools=`tools` name=`name`**
   1. not `allowed`
     **msg = "Tool not allowed:"**
     *msg + name*
   2. *
-    **_ = 1**
+    **id = > subtask.spawn fn=`name`**
+    *> subtask.wait id=`id`*
+
+**prepared = > agent_tools_prepare_call tool_id=`name` tools=`tools` arguments=`arguments` call_id=`call_id` operation_id=`operation_id` logical_run_id=`logical_run_id` step_id=`step_id`**
+**pok = > json.get value=`prepared` key="ok"**
+1. not `pok`
+  *prepared*
+2. *
+  **_ = 1**
+
+**needs = > json.get value=`prepared` key="needs_ledger"**
+**call = > json.get value=`prepared` key="call"**
+**opid = > json.get value=`call` key="operation_id"**
+**digest = > json.get value=`prepared` key="args_digest"**
+**idem = > json.get value=`prepared` key="idempotency_key"**
+**tspec = > json.get value=`prepared` key="spec"**
+**effect = > json.get value=`tspec` key="effect"**
+
+1. `needs`
+  **led = > agent_effects_prepare operation_id=`opid` idempotency_key=`idem` args_digest=`digest` effect_class=`effect` logical_run_id=`logical_run_id` step_id=`step_id` ledger_dir=`ledger_dir`**
+  **rec = > json.get value=`led` key="record"**
+  **st0 = > json.get value=`rec` key="state"**
+  1. `st0` == "committed"
+    **receipt = > json.get value=`rec` key="result_ref"**
+    1. not `receipt`
+      **receipt = "effect:" + `opid`**
+    *> agent_tools_wrap_result ok=True status="succeeded" summary="deduped committed effect; skipped re-exec" structured_content=`rec` effect_receipt_ref=`receipt`*
+  2. *
+    1. `st0` == "reconciled_committed"
+      **receipt = > json.get value=`rec` key="result_ref"**
+      1. not `receipt`
+        **receipt = "effect:" + `opid`**
+      *> agent_tools_wrap_result ok=True status="succeeded" summary="deduped reconciled effect; skipped re-exec" structured_content=`rec` effect_receipt_ref=`receipt`*
+    2. *
+      1. `st0` == "unknown"
+        **receipt = "effect:" + `opid`**
+        *> agent_tools_wrap_result ok=False status="unknown_effect" summary="prior effect unknown; reconcile before retry" structured_content=`rec` effect_receipt_ref=`receipt`*
+      2. *
+        1. `st0` == "started"
+          > agent_effects_transition operation_id=`opid` state="unknown" note="retry saw started without commit; mark unknown" ledger_dir=`ledger_dir`
+          **receipt = "effect:" + `opid`**
+          *> agent_tools_wrap_result ok=False status="unknown_effect" summary="interrupted after started; reconcile before retry" structured_content=`rec` effect_receipt_ref=`receipt`*
+        2. *
+          1. `st0` == "needs_input"
+            **receipt = "effect:" + `opid`**
+            *> agent_tools_wrap_result ok=False status="needs_input" summary="effect needs_input; will not re-exec" structured_content=`rec` effect_receipt_ref=`receipt`*
+          2. *
+            > agent_effects_transition operation_id=`opid` state="started" ledger_dir=`ledger_dir`
+            **_ = 1**
+2. *
+  **_ = 1**
 
 **id = > subtask.spawn fn=`name`**
-*> subtask.wait id=`id`*
+**raw = > subtask.wait id=`id`**
+1. `needs`
+  **raw_s = > json.stringify value=`raw`**
+  1. not `raw`
+    > agent_effects_transition operation_id=`opid` state="unknown" note="empty tool outcome; reconcile required" ledger_dir=`ledger_dir`
+    **receipt = "effect:" + `opid`**
+    *> agent_tools_wrap_result ok=False status="unknown_effect" summary="tool outcome empty after started; ledger=unknown" structured_content=`raw` effect_receipt_ref=`receipt`*
+  2. *
+    **is_err = > text.starts_with text=`raw_s` prefix="Tool not allowed"**
+    1. `is_err`
+      > agent_effects_transition operation_id=`opid` state="failed_no_effect" note="rejected before effect" ledger_dir=`ledger_dir`
+      **receipt = "effect:" + `opid`**
+      *> agent_tools_wrap_result ok=False status="failed" summary=`raw_s` effect_receipt_ref=`receipt`*
+    2. *
+      **receipt = "effect:" + `opid`**
+      > agent_effects_transition operation_id=`opid` state="committed" result_ref=`receipt` ledger_dir=`ledger_dir`
+      *> agent_tools_wrap_result ok=True status="succeeded" summary="tool executed; effect committed" structured_content=`raw` effect_receipt_ref=`receipt`*
+2. *
+  *raw*
 
 ## tools_register
     + `spec`=None
@@ -224,6 +307,19 @@ Register ToolSpecV1 document(s). Unsupported schema keywords are refused.
   > sys.exit code=1
 
 *> agent_tools_register spec=`spec` specs=`specs`*
+
+## tools_clear
+
+Clear the in-process ToolSpec registry (tests / reseeding).
+
+**p = > plugin.native_path name="agent"**
+1. `p`
+  > plugin.load path=`p`
+2. *
+  > print text=ext/ai/agent: native agent plugin not found
+  > sys.exit code=1
+
+*> agent_tools_clear*
 
 ## tools_search
     + `query`=""
@@ -273,8 +369,13 @@ Seed the five engineering tool specs (`tool_find` … `tool_summarize`).
     + `arguments`=None
     + `tools`=None
     + `call_id`=None
+    + `operation_id`=None
+    + `logical_run_id`=None
+    + `step_id`=None
+    + `idempotency_key`=None
 
 Validate schema + authorize; returns ToolCallV1 or ToolResultV1 error (no side effects).
+Also returns `args_digest` / `idempotency_key` / `needs_ledger` for EffectLedger wiring.
 
 **p = > plugin.native_path name="agent"**
 1. `p`
@@ -283,7 +384,7 @@ Validate schema + authorize; returns ToolCallV1 or ToolResultV1 error (no side e
   > print text=ext/ai/agent: native agent plugin not found
   > sys.exit code=1
 
-*> agent_tools_prepare_call tool_id=`tool_id` arguments=`arguments` tools=`tools` call_id=`call_id`*
+*> agent_tools_prepare_call tool_id=`tool_id` arguments=`arguments` tools=`tools` call_id=`call_id` operation_id=`operation_id` logical_run_id=`logical_run_id` step_id=`step_id` idempotency_key=`idempotency_key`*
 
 ## output_build
     + `status`="succeeded"

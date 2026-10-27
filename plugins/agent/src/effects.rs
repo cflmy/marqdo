@@ -531,6 +531,74 @@ mod tests {
     }
 
     #[test]
+    fn ma_t03_unknown_then_reconcile_no_second_commit_path() {
+        // Write "succeeds" locally only after reconcile; retry while unknown must not
+        // look write_auto_resume_safe (MA-T03 watermark gate).
+        let dir = scratch("mat03");
+        let prev = std::env::current_dir().unwrap();
+        std::env::set_current_dir(&dir).unwrap();
+        effects_prepare(&json!({
+            "operation_id": "op_kill",
+            "idempotency_key": "run|s|write_probe|sha256-lite:1",
+            "args_digest": "sha256-lite:1",
+            "effect_class": "write",
+            "ledger_dir": "led",
+            "logical_run_id": "run_kill",
+        }))
+        .unwrap();
+        effects_transition(&json!({
+            "operation_id": "op_kill",
+            "state": "started",
+            "ledger_dir": "led",
+        }))
+        .unwrap();
+        // Crash before commit:
+        effects_transition(&json!({
+            "operation_id": "op_kill",
+            "state": "unknown",
+            "ledger_dir": "led",
+        }))
+        .unwrap();
+        let wm = effects_watermark(&json!({
+            "ledger_dir": "led",
+            "logical_run_id": "run_kill",
+        }))
+        .unwrap();
+        assert_eq!(wm["write_auto_resume_safe"], false);
+
+        // Idempotent re-prepare returns same unknown record (no new op).
+        let again = effects_prepare(&json!({
+            "operation_id": "op_kill",
+            "idempotency_key": "run|s|write_probe|sha256-lite:1",
+            "args_digest": "sha256-lite:1",
+            "effect_class": "write",
+            "ledger_dir": "led",
+            "logical_run_id": "run_kill",
+        }))
+        .unwrap();
+        assert_eq!(again["deduped"], true);
+        assert_eq!(again["record"]["state"], "unknown");
+
+        effects_reconcile(&json!({
+            "operation_id": "op_kill",
+            "outcome": "committed",
+            "ledger_dir": "led",
+            "result_ref": "effect:op_kill",
+        }))
+        .unwrap();
+        let wm2 = effects_watermark(&json!({
+            "ledger_dir": "led",
+            "logical_run_id": "run_kill",
+        }))
+        .unwrap();
+        assert_eq!(wm2["write_auto_resume_safe"], true);
+        assert_eq!(wm2["pending_writes"], 0);
+
+        std::env::set_current_dir(prev).unwrap();
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
     fn illegal_skip_started() {
         let dir = scratch("bad");
         let prev = std::env::current_dir().unwrap();
