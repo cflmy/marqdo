@@ -703,6 +703,12 @@ fn render_csv_view(
         html.push_str("</tr>");
     }
     html.push_str("</table></article>");
+    let text_out = rows
+        .iter()
+        .take(shown)
+        .copied()
+        .collect::<Vec<_>>()
+        .join("\n");
     let completeness = if truncated || rows.len() > CSV_MAX_ROWS + 1 {
         "partial"
     } else {
@@ -713,7 +719,7 @@ fn render_csv_view(
         "schema_version": 1,
         "resource": resource_ref(rel, "text/csv", digest, title, size),
         "renderer": {"id": "csv", "version": "1", "trust": "sanitized"},
-        "render": {"format": "sanitized_html", "fragment": html},
+        "render": {"format": "sanitized_html", "fragment": html, "text": text_out},
         "outline": [],
         "locators": locators,
         "completeness": completeness,
