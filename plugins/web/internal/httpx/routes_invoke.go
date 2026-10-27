@@ -171,11 +171,16 @@ func (st *state) handleInvoke(w http.ResponseWriter, r *http.Request, route invo
 
 	class := resolveInvokeClass(route, liveSSE)
 	switch class {
-	case "execute", "short", "read", "control":
+	case "execute":
 		// Isolated workers: do not take parent INVOKE_LOCK (ADR 0009).
-		// control/read/short use separate admission slots; cancel/events also
-		// available lock-free via /_runtime/*.
 		st.handleInvokeIsolated(w, r, route, args, liveSSE, class)
+		return
+	case "short", "read", "control":
+		// Stay on parent: execute already runs off-process, so parent lock is free.
+		// Putting short/read/control on the 2-slot execute worker pool caused
+		// systemic no_slot (and zombies held slots after observer disconnect).
+		// Product cancel/events prefer /_runtime/* (lock-free).
+		st.handleInvokeParent(w, r, route, args)
 		return
 	default:
 		// legacy_serial: parent CallLibPath (ADR 0008). Never isolate undeclared non-stream.
@@ -453,6 +458,9 @@ func (st *state) streamIsolatedSSE(w http.ResponseWriter, r *http.Request, route
 						"resume":            "/_runtime/tasks/" + taskID + "/events",
 					},
 				})
+				// Observer gone ≠ cancel, but still reap when the worker exits so
+				// execute slots are not held forever by zombies.
+				go reapIsolatedTask(taskID, emitResult, 10*time.Minute)
 			}
 			finish(true)
 			return
@@ -524,23 +532,47 @@ func (st *state) waitIsolatedJSON(w http.ResponseWriter, r *http.Request, route 
 	}
 }
 
-func workerDone(taskID, emitResult string) bool {
-	if emitResult != "" {
-		if st, err := os.Stat(emitResult); err == nil && st.Size() > 0 {
-			return true
+// reapIsolatedTask polls runtime get until the worker exits (or timeout),
+// so supervisor/scheduler slots are released after observer disconnect.
+func reapIsolatedTask(taskID, emitResult string, budget time.Duration) {
+	deadline := time.Now().Add(budget)
+	for time.Now().Before(deadline) {
+		if workerDone(taskID, emitResult) {
+			return
 		}
+		time.Sleep(200 * time.Millisecond)
 	}
-	// Sibling of event file written by Supervisor even if emit_result was omitted.
-	if taskID != "" {
+	// Last-chance cancel so slots can free.
+	_, _ = runtimeQuery("cancel", map[string]any{"task_id": taskID})
+	for i := 0; i < 25; i++ {
+		if workerDone(taskID, emitResult) {
+			return
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+}
+
+func workerDone(taskID, emitResult string) bool {
+	// Always runtime.get when probing completion: get runs try_reap and
+	// releases execute slots. Do not return early on emit_result alone —
+	// that left zombie workers holding both pool slots (no_slot).
+	if taskID == "" {
+		return false
+	}
+	g, err := runtimeQuery("get", map[string]any{"task_id": taskID})
+	if err != nil {
+		// Fallback: result file present (get may fail during early boot).
+		if emitResult != "" {
+			if st, err := os.Stat(emitResult); err == nil && st.Size() > 0 {
+				return true
+			}
+		}
 		if dir := os.Getenv("MARQDO_RUNTIME_DIR"); dir != "" {
 			p := filepath.Join(dir, "events", taskID+".result.json")
 			if st, err := os.Stat(p); err == nil && st.Size() > 0 {
 				return true
 			}
 		}
-	}
-	g, err := runtimeQuery("get", map[string]any{"task_id": taskID})
-	if err != nil {
 		return false
 	}
 	if _, ok := g["exit_code"]; ok {
