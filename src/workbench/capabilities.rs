@@ -117,11 +117,11 @@ pub fn probe_capabilities(params: &Value) -> Value {
         features.insert("view.document".into(), json!(0));
         features.insert("view.reference_resolve".into(), json!(0));
     }
-    // M-A0/M-A1/M-A3: protocol capability bits. error/checkpoint open after emitters land.
+    // M-A0–M-A3: protocol capability bits (tool_schema after M-A2 registry).
     features.insert("agent.error_v1".into(), json!(1));
     features.insert("agent.checkpoint_v2".into(), json!(1));
+    features.insert("agent.tool_schema_v1".into(), json!(1));
     for (k, v) in [
-        ("agent.tool_schema_v1", 0),
         ("agent.output_channels_v1", 0),
         ("agent.context_pack_v2", 0),
     ] {
@@ -249,7 +249,7 @@ mod tests {
         assert_eq!(caps["features"]["llm.messages"], 0);
         assert_eq!(caps["features"]["agent.error_v1"], 1);
         assert_eq!(caps["features"]["agent.checkpoint_v2"], 1);
-        assert_eq!(caps["features"]["agent.tool_schema_v1"], 0);
+        assert_eq!(caps["features"]["agent.tool_schema_v1"], 1);
         assert_eq!(caps["features"]["agent.output_channels_v1"], 0);
         assert_eq!(caps["features"]["agent.context_pack_v2"], 0);
         #[cfg(feature = "view")]

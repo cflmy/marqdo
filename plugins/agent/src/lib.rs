@@ -10,6 +10,7 @@ mod memory;
 mod resume;
 mod route;
 mod sandbox;
+mod tools;
 
 use std::collections::HashMap;
 use std::ffi::CString;
@@ -668,7 +669,7 @@ unsafe extern "C" fn agent_marqdo_skill(
     }
 }
 
-fn tool_names(tools: &serde_json::Value) -> Vec<String> {
+pub(crate) fn tool_names(tools: &serde_json::Value) -> Vec<String> {
     let mut out = Vec::new();
     let rows = match tools {
         serde_json::Value::Array(a) => a.as_slice(),
@@ -832,6 +833,22 @@ kb_ffi!(agent_resume_clear, resume::resume_clear, "agent_resume_clear");
 kb_ffi!(agent_resume_list, resume::resume_list, "agent_resume_list");
 kb_ffi!(agent_error_make, error::make_error, "agent_error_make");
 kb_ffi!(agent_error_decide_retry, error::decide_retry, "agent_error_decide_retry");
+kb_ffi!(agent_tools_register, tools::tools_register, "agent_tools_register");
+kb_ffi!(agent_tools_clear, tools::tools_clear, "agent_tools_clear");
+kb_ffi!(agent_tools_search, tools::tools_search, "agent_tools_search");
+kb_ffi!(agent_tools_describe, tools::tools_describe, "agent_tools_describe");
+kb_ffi!(agent_tools_prepare_call, tools::tools_prepare_call, "agent_tools_prepare_call");
+kb_ffi!(agent_tools_wrap_result, tools::tools_wrap_result, "agent_tools_wrap_result");
+kb_ffi!(
+    agent_tools_register_eng_defaults,
+    tools::tools_register_eng_defaults,
+    "agent_tools_register_eng_defaults"
+);
+kb_ffi!(
+    agent_tools_seed_allowlist,
+    tools::seed_from_allowlist_args,
+    "agent_tools_seed_allowlist"
+);
 kb_ffi!(agent_eng_preflight, eng::eng_preflight, "agent_eng_preflight");
 kb_ffi!(agent_eng_reuse, eng::eng_reuse, "agent_eng_reuse");
 kb_ffi!(agent_eng_bind_execute, eng::eng_bind_execute, "agent_eng_bind_execute");
@@ -883,6 +900,18 @@ pub unsafe extern "C" fn marqdo_plugin_init(host: *const MarqdoHostApi) -> c_int
         ("agent_resume_list", "resume_dir", agent_resume_list),
         ("agent_error_make", "code,message,category", agent_error_make),
         ("agent_error_decide_retry", "error,attempts,effect_class", agent_error_decide_retry),
+        ("agent_tools_register", "spec,specs", agent_tools_register),
+        ("agent_tools_clear", "", agent_tools_clear),
+        ("agent_tools_search", "query,tools", agent_tools_search),
+        ("agent_tools_describe", "id,tools", agent_tools_describe),
+        ("agent_tools_prepare_call", "tool_id,arguments,tools", agent_tools_prepare_call),
+        ("agent_tools_wrap_result", "ok,status,summary", agent_tools_wrap_result),
+        (
+            "agent_tools_register_eng_defaults",
+            "",
+            agent_tools_register_eng_defaults,
+        ),
+        ("agent_tools_seed_allowlist", "tools", agent_tools_seed_allowlist),
         ("agent_kb_add_alias", "kb_dir,slug,alias", agent_kb_add_alias),
         ("agent_kb_promote", "kb_dir,goal,workbook", agent_kb_promote),
         ("agent_kb_quarantine", "kb_dir,slug", agent_kb_quarantine),

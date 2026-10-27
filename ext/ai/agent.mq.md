@@ -181,16 +181,109 @@ Find a human-readable call line: `CALL:<name>` or `调用：<name>` / `调用:<n
 ## run_tool
     + `tools`
     + `name`
+    + `arguments`=None
 
-Allowlist check, then invoke the runbook `##` via `lib/subtask` (`spawn fn=` → `wait`).
+Allowlist + ToolSpec prepare (M-A2), then invoke the runbook `##` via `lib/subtask`.
+Unauthorized / invalid-args calls return ToolResultV1 failure without spawning (0 executions).
 
-**allowed = > agent_tool_allowed tools=`tools` name=`name`**
-1. `allowed`
-  **id = > subtask.spawn fn=`name`**
-  *> subtask.wait id=`id`*
+**p = > plugin.native_path name="agent"**
+1. `p`
+  > plugin.load path=`p`
 2. *
-  **msg = "Tool not allowed:"**
-  *msg + name*
+  **_ = 1**
+
+1. `p`
+  **prep = > agent_tools_prepare_call tool_id=`name` tools=`tools` arguments=`arguments`**
+  **pok = > json.get value=`prep` key="ok"**
+  1. not `pok`
+    *prep*
+  2. *
+    **_ = 1**
+2. *
+  **allowed = > agent_tool_allowed tools=`tools` name=`name`**
+  1. not `allowed`
+    **msg = "Tool not allowed:"**
+    *msg + name*
+  2. *
+    **_ = 1**
+
+**id = > subtask.spawn fn=`name`**
+*> subtask.wait id=`id`*
+
+## tools_register
+    + `spec`=None
+    + `specs`=None
+
+Register ToolSpecV1 document(s). Unsupported schema keywords are refused.
+
+**p = > plugin.native_path name="agent"**
+1. `p`
+  > plugin.load path=`p`
+2. *
+  > print text=ext/ai/agent: native agent plugin not found
+  > sys.exit code=1
+
+*> agent_tools_register spec=`spec` specs=`specs`*
+
+## tools_search
+    + `query`=""
+    + `tools`=None
+
+Search authorized registered tools (summaries only).
+
+**p = > plugin.native_path name="agent"**
+1. `p`
+  > plugin.load path=`p`
+2. *
+  > print text=ext/ai/agent: native agent plugin not found
+  > sys.exit code=1
+
+*> agent_tools_search query=`query` tools=`tools`*
+
+## tools_describe
+    + `id`
+    + `tools`=None
+
+Return full ToolSpecV1 for an authorized tool id.
+
+**p = > plugin.native_path name="agent"**
+1. `p`
+  > plugin.load path=`p`
+2. *
+  > print text=ext/ai/agent: native agent plugin not found
+  > sys.exit code=1
+
+*> agent_tools_describe id=`id` tools=`tools`*
+
+## tools_register_eng_defaults
+
+Seed the five engineering tool specs (`tool_find` … `tool_summarize`).
+
+**p = > plugin.native_path name="agent"**
+1. `p`
+  > plugin.load path=`p`
+2. *
+  > print text=ext/ai/agent: native agent plugin not found
+  > sys.exit code=1
+
+*> agent_tools_register_eng_defaults*
+
+## tools_prepare_call
+    + `tool_id`
+    + `arguments`=None
+    + `tools`=None
+    + `call_id`=None
+
+Validate schema + authorize; returns ToolCallV1 or ToolResultV1 error (no side effects).
+
+**p = > plugin.native_path name="agent"**
+1. `p`
+  > plugin.load path=`p`
+2. *
+  > print text=ext/ai/agent: native agent plugin not found
+  > sys.exit code=1
+
+*> agent_tools_prepare_call tool_id=`tool_id` arguments=`arguments` tools=`tools` call_id=`call_id`*
 
 ## render_workbook_skeleton
     + `goal`
