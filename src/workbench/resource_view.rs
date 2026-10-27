@@ -124,6 +124,13 @@ pub fn build_resource_view(req: &ResourceViewRequest) -> Result<Value, Value> {
         }));
     }
 
+    // PDF / image: framework supplies authorized blob_ref for client visual
+    // preview (PDF.js / ImagePreview). Extract and OCR stay independently
+    // unavailable — never claim text was extracted (F16 / QA-10).
+    if let Some(view) = binary_blob_view(&rel, media, kind, &digest, &title, size) {
+        return Ok(view);
+    }
+
     let truncated = size > req.max_bytes;
     let slice = if truncated {
         &raw[..req.max_bytes]
@@ -163,7 +170,8 @@ pub fn build_resource_view(req: &ResourceViewRequest) -> Result<Value, Value> {
                 "completeness": "partial",
                 "no_exec": true,
                 "diagnostics": [{"code": "unsupported_format", "message": other}],
-                "next_cursor": Value::Null
+                "next_cursor": Value::Null,
+                "capabilities": {"read_only": true, "executed": false, "kind": kind, "preview": false, "extract": false}
             }));
         }
     };
@@ -218,6 +226,22 @@ fn media_type_for(path: &str) -> &'static str {
         "application/json"
     } else if lower.ends_with(".csv") {
         "text/csv"
+    } else if lower.ends_with(".pdf") {
+        "application/pdf"
+    } else if lower.ends_with(".png") {
+        "image/png"
+    } else if lower.ends_with(".jpg") || lower.ends_with(".jpeg") {
+        "image/jpeg"
+    } else if lower.ends_with(".webp") {
+        "image/webp"
+    } else if lower.ends_with(".gif") {
+        "image/gif"
+    } else if lower.ends_with(".docx") {
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    } else if lower.ends_with(".xlsx") {
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    } else if lower.ends_with(".pptx") {
+        "application/vnd.openxmlformats-officedocument.presentationml.presentation"
     } else if lower.ends_with(".rs")
         || lower.ends_with(".ts")
         || lower.ends_with(".tsx")
@@ -249,12 +273,125 @@ fn kind_for(path: &str, media: &str) -> &'static str {
         "json"
     } else if media == "text/csv" {
         "csv"
+    } else if media == "application/pdf" {
+        "pdf"
+    } else if media.starts_with("image/") {
+        "image"
+    } else if media.contains("wordprocessingml") {
+        "docx"
+    } else if media.contains("spreadsheetml") {
+        "xlsx"
+    } else if media.contains("presentationml") {
+        "pptx"
     } else if media == "text/x-code" {
         "code"
     } else if media.starts_with("text/") {
         "text"
     } else {
         "file"
+    }
+}
+
+/// PDF/image → `blob_ref` for client visual preview; Office stays conversion-gated.
+/// Extract/OCR capabilities remain false and must not be implied by a visible page.
+fn binary_blob_view(
+    rel: &str,
+    media: &str,
+    kind: &str,
+    digest: &str,
+    title: &str,
+    size: usize,
+) -> Option<Value> {
+    match kind {
+        "pdf" | "image" => {
+            let (renderer_id, diagnostics) = if kind == "pdf" {
+                (
+                    "pdf_blob",
+                    vec![
+                        json!({"code": "extract.unavailable", "message": "pdf text extract unavailable"}),
+                        json!({"code": "ocr.unavailable", "message": "ocr not claimed; visual page ≠ extracted text"}),
+                    ],
+                )
+            } else {
+                (
+                    "image_blob",
+                    vec![
+                        json!({"code": "extract.unavailable", "message": "image/ocr extract unavailable"}),
+                        json!({"code": "vision.unclaimed", "message": "image preview ≠ model vision support"}),
+                    ],
+                )
+            };
+            Some(json!({
+                "schema": "ResourceViewV1",
+                "schema_version": 1,
+                "resource": resource_ref(rel, media, digest, title, size),
+                "renderer": {"id": renderer_id, "version": "1", "trust": "blob"},
+                "render": {
+                    "format": "blob_ref",
+                    "fragment": Value::Null,
+                    "text": Value::Null,
+                    "blob_ref": {
+                        "path": rel,
+                        "digest": digest,
+                        "media_type": media,
+                        "byte_length": size,
+                        "title": title
+                    }
+                },
+                "outline": [],
+                "locators": if kind == "pdf" {
+                    json!([{"id": "page-1", "kind": "page", "locator": {"page": 1}}])
+                } else {
+                    json!([])
+                },
+                "completeness": "partial",
+                "no_exec": true,
+                "diagnostics": diagnostics,
+                "next_cursor": Value::Null,
+                "capabilities": {
+                    "read_only": true,
+                    "executed": false,
+                    "kind": kind,
+                    "visual_preview": "client",
+                    "extract": false,
+                    "ocr": false
+                }
+            }))
+        }
+        "docx" | "xlsx" | "pptx" => {
+            let text = format!(
+                "Office 文档「{title}」（{media}, {size} bytes）\n\n转换插件未安装；不会伪造预览或提取结果。可下载原件。能力闭环仍要求转换插件落地后按派生格式预览，本卡不是终态替代方案。"
+            );
+            Some(json!({
+                "schema": "ResourceViewV1",
+                "schema_version": 1,
+                "resource": resource_ref(rel, media, digest, title, size),
+                "renderer": {"id": "office_conversion_pending", "version": "1", "trust": "none"},
+                "render": {
+                    "format": "sanitized_html",
+                    "fragment": wrap_pre(&escape_html(&text))
+                },
+                "outline": [],
+                "locators": [],
+                "completeness": "partial",
+                "no_exec": true,
+                "diagnostics": [
+                    {"code": "conversion.unavailable", "message": "office conversion plugin not installed"},
+                    {"code": "extract.unavailable", "message": format!("{kind} extract unavailable")}
+                ],
+                "next_cursor": Value::Null,
+                "capabilities": {
+                    "read_only": true,
+                    "executed": false,
+                    "kind": kind,
+                    "visual_preview": false,
+                    "extract": false,
+                    "ocr": false,
+                    "conversion": false
+                }
+            }))
+        }
+        _ => None,
     }
 }
 
@@ -675,6 +812,59 @@ mod tests {
         assert!(frag.contains("<table"));
         assert!(frag.contains("alice"));
         assert!(!frag.contains("<script"));
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn pdf_blob_ref_without_claiming_extract() {
+        let dir = scratch_dir("pdf");
+        let path = dir.join("doc.pdf");
+        fs::write(&path, b"%PDF-1.4 fake").unwrap();
+        let req = ResourceViewRequest {
+            workspace_root: dir.clone(),
+            path: "doc.pdf".into(),
+            revision: None,
+            max_bytes: 10_000,
+        };
+        let view = build_resource_view(&req).unwrap();
+        assert_eq!(view["no_exec"], true);
+        assert_eq!(view["renderer"]["id"], "pdf_blob");
+        assert_eq!(view["render"]["format"], "blob_ref");
+        assert_eq!(view["resource"]["kind"], "pdf");
+        assert_eq!(view["capabilities"]["ocr"], false);
+        assert_eq!(view["capabilities"]["extract"], false);
+        assert_eq!(view["capabilities"]["visual_preview"], "client");
+        assert_eq!(view["render"]["blob_ref"]["path"], "doc.pdf");
+        assert!(view["render"]["blob_ref"]["digest"].as_str().unwrap().starts_with("sha256:"));
+        let codes: Vec<&str> = view["diagnostics"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter_map(|d| d["code"].as_str())
+            .collect();
+        assert!(codes.contains(&"ocr.unavailable"));
+        assert!(codes.contains(&"extract.unavailable"));
+        assert!(!codes.iter().any(|c| c.contains("preview.unavailable")));
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn image_blob_ref_for_client_preview() {
+        let dir = scratch_dir("img");
+        let path = dir.join("pic.png");
+        fs::write(&path, b"\x89PNG\r\n\x1a\n").unwrap();
+        let req = ResourceViewRequest {
+            workspace_root: dir.clone(),
+            path: "pic.png".into(),
+            revision: None,
+            max_bytes: 10_000,
+        };
+        let view = build_resource_view(&req).unwrap();
+        assert_eq!(view["renderer"]["id"], "image_blob");
+        assert_eq!(view["render"]["format"], "blob_ref");
+        assert_eq!(view["resource"]["kind"], "image");
+        assert_eq!(view["capabilities"]["visual_preview"], "client");
+        assert_eq!(view["capabilities"]["extract"], false);
         let _ = fs::remove_dir_all(&dir);
     }
 }
