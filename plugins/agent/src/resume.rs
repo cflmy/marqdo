@@ -1,6 +1,8 @@
 //! Agent plan/run resume checkpoints under `.marqdo/agent-resume/`.
+//! M-A1: CheckpointV2 atomic write (temp→fsync→rename); legacy load → manual_review.
 
-use std::fs;
+use std::fs::{self, File, OpenOptions};
+use std::io::Write;
 use std::path::{Path, PathBuf};
 
 use serde_json::{json, Value};
@@ -27,7 +29,9 @@ fn resolve_path(rel: &str) -> PathBuf {
 }
 
 fn opt_text<'a>(args: &'a Value, key: &str) -> Option<&'a str> {
-    args.get(key).and_then(|v| v.as_str()).filter(|s| !s.is_empty())
+    args.get(key)
+        .and_then(|v| v.as_str())
+        .filter(|s| !s.is_empty())
 }
 
 fn arg_text<'a>(args: &'a Value, key: &str) -> Result<&'a str, String> {
@@ -43,9 +47,19 @@ fn opt_i64(args: &Value, key: &str, default: i64) -> i64 {
     }
 }
 
-fn resume_root(args: &Value) -> PathBuf {
+/// Host-relative resume roots only — reject absolute client paths (M-A1).
+fn resume_root(args: &Value) -> Result<PathBuf, String> {
     let rel = opt_text(args, "resume_dir").unwrap_or(DEFAULT_RESUME_DIR);
-    resolve_path(rel)
+    let p = PathBuf::from(rel);
+    if p.is_absolute() {
+        return Err(
+            "resume_dir must be host-relative; absolute client paths are rejected".into(),
+        );
+    }
+    if rel.contains("..") {
+        return Err("resume_dir must not contain '..'".into());
+    }
+    Ok(resolve_path(rel))
 }
 
 fn checkpoint_path(root: &Path, id: &str) -> PathBuf {
@@ -70,11 +84,106 @@ fn ensure_dir(root: &Path) -> Result<(), String> {
     fs::create_dir_all(root).map_err(|e| format!("resume mkdir: {e}"))
 }
 
-pub fn resume_save(args: &Value) -> Result<Value, String> {
-    let id = arg_text(args, "id")?;
-    let root = resume_root(args);
-    ensure_dir(&root)?;
-    let path = checkpoint_path(&root, id);
+/// Atomic durable write: unique temp → write → flush/fsync → rename.
+fn atomic_write_json(path: &Path, doc: &Value) -> Result<(), String> {
+    let parent = path
+        .parent()
+        .ok_or_else(|| "checkpoint path has no parent".to_string())?;
+    ensure_dir(parent)?;
+    let tmp_name = format!(
+        ".{}.tmp-{}-{}",
+        path.file_name()
+            .and_then(|s| s.to_str())
+            .unwrap_or("ckpt.json"),
+        std::process::id(),
+        now_rfc3339().replace(':', "")
+    );
+    let tmp = parent.join(tmp_name);
+    let text = serde_json::to_string_pretty(doc).map_err(|e| e.to_string())?;
+    {
+        let mut f = OpenOptions::new()
+            .create(true)
+            .write(true)
+            .truncate(true)
+            .open(&tmp)
+            .map_err(|e| format!("resume temp open: {e}"))?;
+        f.write_all(text.as_bytes())
+            .map_err(|e| format!("resume temp write: {e}"))?;
+        f.flush().map_err(|e| format!("resume temp flush: {e}"))?;
+        f.sync_all()
+            .map_err(|e| format!("resume temp fsync: {e}"))?;
+    }
+    // Best-effort directory fsync (platform may ignore).
+    if let Ok(dir) = File::open(parent) {
+        let _ = dir.sync_all();
+    }
+    fs::rename(&tmp, path).map_err(|e| {
+        let _ = fs::remove_file(&tmp);
+        format!("resume atomic rename: {e}")
+    })?;
+    Ok(())
+}
+
+fn wants_checkpoint_v2(args: &Value) -> bool {
+    matches!(
+        args.get("schema").and_then(|v| v.as_str()),
+        Some("CheckpointV2")
+    ) || args.get("schema_version").and_then(|v| v.as_u64()) == Some(2)
+        || args.get("checkpoint_v2").and_then(|v| v.as_bool()) == Some(true)
+}
+
+fn build_checkpoint_v2(args: &Value, id: &str) -> Value {
+    let committed = now_rfc3339();
+    let mut doc = json!({
+        "schema": "CheckpointV2",
+        "schema_version": 2,
+        "checkpoint_id": args.get("checkpoint_id").cloned().unwrap_or_else(|| json!(id)),
+        "logical_run_id": args.get("logical_run_id").cloned().unwrap_or_else(|| json!(id)),
+        "task_id": args.get("task_id").cloned().unwrap_or_else(|| json!(id)),
+        "attempt_id": args.get("attempt_id").cloned().unwrap_or_else(|| json!("attempt_1")),
+        "step_id": args.get("step_id").cloned().unwrap_or(Value::Null),
+        "parent_checkpoint_id": args.get("parent_checkpoint_id").cloned().unwrap_or(Value::Null),
+        "principal_ref": args.get("principal_ref").cloned().unwrap_or(Value::Null),
+        "workspace_id": args.get("workspace_id").cloned().unwrap_or(Value::Null),
+        "session_id": args.get("session_id").cloned().unwrap_or(Value::Null),
+        "completed_steps": args.get("completed_steps").cloned().unwrap_or_else(|| json!([])),
+        "pending_operation": args.get("pending_operation").cloned().unwrap_or(Value::Null),
+        "deadline": args.get("deadline").cloned().unwrap_or(Value::Null),
+        "committed_at": args.get("committed_at").cloned().unwrap_or_else(|| json!(committed)),
+        // Effect watermark — absent/null means no ledger yet (write auto-resume closed).
+        "effect_ledger_watermark": args.get("effect_ledger_watermark").cloned().unwrap_or(Value::Null),
+        "event_seq": args.get("event_seq").cloned().unwrap_or(Value::Null),
+        "manifest_digest": args.get("manifest_digest").cloned().unwrap_or(Value::Null),
+    });
+    if let Some(obj) = doc.as_object_mut() {
+        // Preserve legacy author fields for dual-read.
+        for key in [
+            "goal", "task", "status", "workbook", "events", "route", "result", "round", "meta",
+            "id",
+        ] {
+            if let Some(v) = args.get(key) {
+                if !v.is_null() {
+                    obj.insert(key.to_string(), v.clone());
+                }
+            }
+        }
+        if !obj.contains_key("id") {
+            obj.insert("id".into(), json!(id));
+        }
+        if !obj.contains_key("updated_at") {
+            obj.insert("updated_at".into(), json!(committed.clone()));
+        }
+        if !obj.contains_key("round") {
+            obj.insert("round".into(), json!(opt_i64(args, "round", 0)));
+        }
+        if !obj.contains_key("status") {
+            obj.insert("status".into(), json!("running"));
+        }
+    }
+    doc
+}
+
+fn build_legacy_doc(args: &Value, id: &str) -> Value {
     let mut doc = json!({
         "id": id,
         "updated_at": now_rfc3339(),
@@ -96,19 +205,61 @@ pub fn resume_save(args: &Value) -> Result<Value, String> {
             obj.insert("status".into(), json!("running"));
         }
     }
-    let text = serde_json::to_string_pretty(&doc).map_err(|e| e.to_string())?;
-    fs::write(&path, text).map_err(|e| format!("resume save: {e}"))?;
+    doc
+}
+
+pub fn resume_save(args: &Value) -> Result<Value, String> {
+    let id = arg_text(args, "id")?;
+    let root = resume_root(args)?;
+    ensure_dir(&root)?;
+    let path = checkpoint_path(&root, id);
+    let v2 = wants_checkpoint_v2(args);
+    let doc = if v2 {
+        build_checkpoint_v2(args, id)
+    } else {
+        build_legacy_doc(args, id)
+    };
+    atomic_write_json(&path, &doc)?;
     Ok(json!({
         "ok": true,
         "id": id,
         "path": path.to_string_lossy(),
-        "updated_at": doc.get("updated_at").cloned().unwrap_or(Value::Null),
+        "schema": doc.get("schema").cloned().unwrap_or(Value::Null),
+        "schema_version": doc.get("schema_version").cloned().unwrap_or(Value::Null),
+        "updated_at": doc.get("updated_at").or_else(|| doc.get("committed_at")).cloned().unwrap_or(Value::Null),
+        "atomic": true,
     }))
+}
+
+fn annotate_recovery(mut doc: Value) -> Value {
+    let is_v2 = doc.get("schema").and_then(|v| v.as_str()) == Some("CheckpointV2")
+        && doc.get("schema_version").and_then(|v| v.as_u64()) == Some(2);
+    let has_ledger = doc
+        .get("effect_ledger_watermark")
+        .map(|v| !v.is_null())
+        .unwrap_or(false);
+    let (recovery_mode, write_auto_resume) = if is_v2 && has_ledger {
+        ("checkpoint_v2", true)
+    } else if is_v2 {
+        // V2 without ledger: read resume OK; write auto-resume still closed.
+        ("checkpoint_v2_read_only", false)
+    } else {
+        // Legacy: no effect info → manual_review; never auto redo writes.
+        ("manual_review", false)
+    };
+    if let Some(obj) = doc.as_object_mut() {
+        obj.insert("recovery_mode".into(), json!(recovery_mode));
+        obj.insert("write_auto_resume".into(), json!(write_auto_resume));
+        if !is_v2 {
+            obj.insert("legacy_adaptation".into(), json!("manual_review"));
+        }
+    }
+    doc
 }
 
 pub fn resume_load(args: &Value) -> Result<Value, String> {
     let id = arg_text(args, "id")?;
-    let root = resume_root(args);
+    let root = resume_root(args)?;
     let path = checkpoint_path(&root, id);
     if !path.is_file() {
         return Ok(json!({
@@ -119,7 +270,31 @@ pub fn resume_load(args: &Value) -> Result<Value, String> {
         }));
     }
     let text = fs::read_to_string(&path).map_err(|e| format!("resume load: {e}"))?;
-    let mut doc: Value = serde_json::from_str(&text).map_err(|e| format!("resume json: {e}"))?;
+    let parsed: Value = match serde_json::from_str(&text) {
+        Ok(v) => v,
+        Err(e) => {
+            return Ok(json!({
+                "ok": false,
+                "found": true,
+                "id": id,
+                "path": path.to_string_lossy(),
+                "error": {
+                    "schema": "AgentErrorV1",
+                    "schema_version": 1,
+                    "code": "checkpoint.corrupt",
+                    "category": "unknown_effect",
+                    "stage": "checkpoint",
+                    "message": format!("corrupt checkpoint json: {e}"),
+                    "retryable": false,
+                    "effect_state": "unknown",
+                    "recovery_action": "manual_review",
+                },
+                "recovery_mode": "manual_review",
+                "write_auto_resume": false,
+            }));
+        }
+    };
+    let mut doc = annotate_recovery(parsed);
     if let Some(obj) = doc.as_object_mut() {
         obj.insert("ok".into(), json!(true));
         obj.insert("found".into(), json!(true));
@@ -130,7 +305,7 @@ pub fn resume_load(args: &Value) -> Result<Value, String> {
 
 pub fn resume_clear(args: &Value) -> Result<Value, String> {
     let id = arg_text(args, "id")?;
-    let root = resume_root(args);
+    let root = resume_root(args)?;
     let path = checkpoint_path(&root, id);
     let existed = path.is_file();
     if existed {
@@ -145,7 +320,7 @@ pub fn resume_clear(args: &Value) -> Result<Value, String> {
 }
 
 pub fn resume_list(args: &Value) -> Result<Value, String> {
-    let root = resume_root(args);
+    let root = resume_root(args)?;
     if !root.is_dir() {
         return Ok(json!({ "ok": true, "items": [], "resume_dir": root.to_string_lossy() }));
     }
@@ -154,6 +329,14 @@ pub fn resume_list(args: &Value) -> Result<Value, String> {
     for ent in rd.flatten() {
         let p = ent.path();
         if p.extension().and_then(|e| e.to_str()) != Some("json") {
+            continue;
+        }
+        // Skip leftover temp files from crashed writers.
+        if p.file_name()
+            .and_then(|s| s.to_str())
+            .map(|s| s.starts_with('.'))
+            .unwrap_or(false)
+        {
             continue;
         }
         let id = p
@@ -178,4 +361,88 @@ pub fn resume_list(args: &Value) -> Result<Value, String> {
         "items": items,
         "resume_dir": root.to_string_lossy(),
     }))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn scratch(label: &str) -> PathBuf {
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let dir = std::env::temp_dir().join(format!("marqdo-resume-{label}-{nanos}"));
+        fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    #[test]
+    fn absolute_resume_dir_rejected() {
+        let err = resume_root(&json!({"resume_dir": "/tmp/evil"})).unwrap_err();
+        assert!(err.contains("host-relative"));
+    }
+
+    #[test]
+    fn atomic_v2_roundtrip_and_legacy_manual_review() {
+        let dir = scratch("v2");
+        // Use relative path via env cwd — chdir into scratch for this test.
+        let prev = std::env::current_dir().unwrap();
+        std::env::set_current_dir(&dir).unwrap();
+        let rel = "ckpts";
+        let saved = resume_save(&json!({
+            "id": "run1",
+            "schema": "CheckpointV2",
+            "schema_version": 2,
+            "goal": "ping",
+            "status": "running",
+            "round": 1,
+            "resume_dir": rel,
+            "attempt_id": "a1",
+        }))
+        .unwrap();
+        assert_eq!(saved["ok"], true);
+        assert_eq!(saved["atomic"], true);
+        assert_eq!(saved["schema"], "CheckpointV2");
+
+        let loaded = resume_load(&json!({"id": "run1", "resume_dir": rel})).unwrap();
+        assert_eq!(loaded["found"], true);
+        assert_eq!(loaded["schema"], "CheckpointV2");
+        assert_eq!(loaded["recovery_mode"], "checkpoint_v2_read_only");
+        assert_eq!(loaded["write_auto_resume"], false);
+
+        // Legacy document without schema.
+        let _ = resume_save(&json!({
+            "id": "legacy1",
+            "goal": "pong",
+            "status": "interrupted",
+            "round": 2,
+            "resume_dir": rel,
+        }))
+        .unwrap();
+        let legacy = resume_load(&json!({"id": "legacy1", "resume_dir": rel})).unwrap();
+        assert_eq!(legacy["recovery_mode"], "manual_review");
+        assert_eq!(legacy["write_auto_resume"], false);
+        assert_eq!(legacy["legacy_adaptation"], "manual_review");
+
+        std::env::set_current_dir(prev).unwrap();
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn corrupt_checkpoint_reports_error() {
+        let dir = scratch("corrupt");
+        let prev = std::env::current_dir().unwrap();
+        std::env::set_current_dir(&dir).unwrap();
+        fs::create_dir_all("ckpts").unwrap();
+        fs::write("ckpts/bad.json", "{not-json").unwrap();
+        let loaded = resume_load(&json!({"id": "bad", "resume_dir": "ckpts"})).unwrap();
+        assert_eq!(loaded["found"], true);
+        assert_eq!(loaded["ok"], false);
+        assert_eq!(loaded["error"]["code"], "checkpoint.corrupt");
+        assert_eq!(loaded["recovery_mode"], "manual_review");
+        std::env::set_current_dir(prev).unwrap();
+        let _ = fs::remove_dir_all(&dir);
+    }
 }

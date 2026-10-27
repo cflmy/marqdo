@@ -677,8 +677,12 @@ Close a stdio MCP client session.
     + `route`=None
     + `result`=None
     + `resume_dir`=.marqdo/agent-resume
+    + `checkpoint_v2`=False
+    + `attempt_id`=None
+    + `effect_ledger_watermark`=None
 
-Persist a plan/run checkpoint as `.marqdo/agent-resume/<id>.json`.
+Persist a plan/run checkpoint as `.marqdo/agent-resume/<id>.json` (atomic write).
+Pass `checkpoint_v2=True` for CheckpointV2 schema. `resume_dir` must be host-relative.
 
 **p = > plugin.native_path name="agent"**
 1. `p`
@@ -687,15 +691,55 @@ Persist a plan/run checkpoint as `.marqdo/agent-resume/<id>.json`.
   > print text=ext/ai/agent: native agent plugin not found
   > sys.exit code=1
 
-*> agent_resume_save id=`id` goal=`goal` task=`task` status=`status` round=`round` workbook=`workbook` events=`events` route=`route` result=`result` resume_dir=`resume_dir`*
+*> agent_resume_save id=`id` goal=`goal` task=`task` status=`status` round=`round` workbook=`workbook` events=`events` route=`route` result=`result` resume_dir=`resume_dir` checkpoint_v2=`checkpoint_v2` attempt_id=`attempt_id` effect_ledger_watermark=`effect_ledger_watermark`*
 
 ## resume_load
     + `id`
     + `resume_dir`=.marqdo/agent-resume
 
 Load a resume checkpoint (or `{ok:false,found:false}`).
+Legacy / missing effect ledger → `recovery_mode=manual_review`, `write_auto_resume=false`.
 
 *> agent_resume_load id=`id` resume_dir=`resume_dir`*
+
+## error_make
+    + `code`
+    + `message`=None
+    + `category`=None
+    + `stage`=agent
+    + `retryable`=None
+    + `effect_state`=none
+    + `recovery_action`=None
+    + `call_id`=None
+
+Build an `AgentErrorV1` document (M-A1).
+
+**p = > plugin.native_path name="agent"**
+1. `p`
+  > plugin.load path=`p`
+2. *
+  > print text=ext/ai/agent: native agent plugin not found
+  > sys.exit code=1
+
+*> agent_error_make code=`code` message=`message` category=`category` stage=`stage` retryable=`retryable` effect_state=`effect_state` recovery_action=`recovery_action` call_id=`call_id`*
+
+## error_decide_retry
+    + `error`
+    + `attempts`=0
+    + `effect_class`=read
+    + `cancelled`=False
+    + `fingerprint_repeats`=0
+
+Bounded recovery decision. Write / unknown effect → `manual_review` (no auto redo).
+
+**p = > plugin.native_path name="agent"**
+1. `p`
+  > plugin.load path=`p`
+2. *
+  > print text=ext/ai/agent: native agent plugin not found
+  > sys.exit code=1
+
+*> agent_error_decide_retry error=`error` attempts=`attempts` effect_class=`effect_class` cancelled=`cancelled` fingerprint_repeats=`fingerprint_repeats`*
 
 ## resume_clear
     + `id`

@@ -183,18 +183,16 @@ fn ma0_agent_reliability_protocol_freeze() {
     assert_eq!(caps["ok"], true, "{caps}");
     let features = &caps["result"]["features"];
     for bit in [
-        "agent.error_v1",
-        "agent.checkpoint_v2",
         "agent.tool_schema_v1",
         "agent.output_channels_v1",
         "agent.context_pack_v2",
     ] {
         assert_eq!(features[bit], 0, "{bit} must stay 0 until emitters land");
     }
-    // M-A3 subset: ResourceView emitter is live under the view feature.
+    // M-A1/M-A3: error + checkpoint + resource view emitters are live.
+    assert_eq!(features["agent.error_v1"], 1);
+    assert_eq!(features["agent.checkpoint_v2"], 1);
     assert_eq!(features["resource.view_v1"], 1);
-    // Unknown/future schema_version must not flip unimplemented agent bits.
-    assert_eq!(features["agent.error_v1"], 0);
 
     let formats = caps["result"]["extract_formats"]
         .as_array()
@@ -222,7 +220,8 @@ fn ma0_agent_reliability_protocol_freeze() {
             "force_cancel_off": true
         }),
     );
-    assert_eq!(down["result"]["features"]["agent.error_v1"], 0);
+    assert_eq!(down["result"]["features"]["agent.error_v1"], 1);
+    assert_eq!(down["result"]["features"]["agent.checkpoint_v2"], 1);
     assert_eq!(down["result"]["features"]["resource.view_v1"], 1);
 }
 

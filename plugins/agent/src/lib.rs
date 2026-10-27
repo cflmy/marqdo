@@ -2,6 +2,7 @@
 
 mod corpus;
 mod eng;
+mod error;
 mod kb;
 mod mcp_client;
 mod mcp_server;
@@ -829,6 +830,8 @@ kb_ffi!(agent_resume_save, resume::resume_save, "agent_resume_save");
 kb_ffi!(agent_resume_load, resume::resume_load, "agent_resume_load");
 kb_ffi!(agent_resume_clear, resume::resume_clear, "agent_resume_clear");
 kb_ffi!(agent_resume_list, resume::resume_list, "agent_resume_list");
+kb_ffi!(agent_error_make, error::make_error, "agent_error_make");
+kb_ffi!(agent_error_decide_retry, error::decide_retry, "agent_error_decide_retry");
 kb_ffi!(agent_eng_preflight, eng::eng_preflight, "agent_eng_preflight");
 kb_ffi!(agent_eng_reuse, eng::eng_reuse, "agent_eng_reuse");
 kb_ffi!(agent_eng_bind_execute, eng::eng_bind_execute, "agent_eng_bind_execute");
@@ -878,6 +881,8 @@ pub unsafe extern "C" fn marqdo_plugin_init(host: *const MarqdoHostApi) -> c_int
         ("agent_resume_load", "id,resume_dir", agent_resume_load),
         ("agent_resume_clear", "id,resume_dir", agent_resume_clear),
         ("agent_resume_list", "resume_dir", agent_resume_list),
+        ("agent_error_make", "code,message,category", agent_error_make),
+        ("agent_error_decide_retry", "error,attempts,effect_class", agent_error_decide_retry),
         ("agent_kb_add_alias", "kb_dir,slug,alias", agent_kb_add_alias),
         ("agent_kb_promote", "kb_dir,goal,workbook", agent_kb_promote),
         ("agent_kb_quarantine", "kb_dir,slug", agent_kb_quarantine),
