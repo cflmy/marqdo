@@ -208,7 +208,12 @@ fn ma0_agent_reliability_protocol_freeze() {
         .iter()
         .find(|f| f["format"] == "json")
         .expect("json row");
-    assert_eq!(json_fmt["available"], false);
+    assert_eq!(json_fmt["available"], true);
+    let csv_fmt = formats
+        .iter()
+        .find(|f| f["format"] == "csv")
+        .expect("csv row");
+    assert_eq!(csv_fmt["available"], true);
 
     // Live contracts list still excludes unimplemented agent schemas.
     let contracts = caps["result"]["contracts"].as_array().unwrap();

@@ -131,6 +131,19 @@ pub fn build_resource_view(req: &ResourceViewRequest) -> Result<Value, Value> {
         &raw[..]
     };
     let text = String::from_utf8_lossy(slice).into_owned();
+
+    // Structured JSON / CSV (M-A5 / Q-A5 subset): bounded parse, no exec.
+    if media == "application/json" {
+        return Ok(render_json_view(
+            &rel, &digest, &title, size, &text, truncated, req.max_bytes, kind,
+        ));
+    }
+    if media == "text/csv" {
+        return Ok(render_csv_view(
+            &rel, &digest, &title, size, &text, truncated, req.max_bytes, kind,
+        ));
+    }
+
     let (renderer_id, format, fragment) = match media {
         "text/markdown" => (
             "markdown",
@@ -201,6 +214,10 @@ fn media_type_for(path: &str) -> &'static str {
         "application/x-marqdo"
     } else if lower.ends_with(".md") || lower.ends_with(".markdown") {
         "text/markdown"
+    } else if lower.ends_with(".json") {
+        "application/json"
+    } else if lower.ends_with(".csv") {
+        "text/csv"
     } else if lower.ends_with(".rs")
         || lower.ends_with(".ts")
         || lower.ends_with(".tsx")
@@ -208,7 +225,6 @@ fn media_type_for(path: &str) -> &'static str {
         || lower.ends_with(".jsx")
         || lower.ends_with(".py")
         || lower.ends_with(".go")
-        || lower.ends_with(".json")
         || lower.ends_with(".toml")
         || lower.ends_with(".yaml")
         || lower.ends_with(".yml")
@@ -229,6 +245,10 @@ fn kind_for(path: &str, media: &str) -> &'static str {
         "marqdo"
     } else if media == "text/markdown" {
         "markdown"
+    } else if media == "application/json" {
+        "json"
+    } else if media == "text/csv" {
+        "csv"
     } else if media == "text/x-code" {
         "code"
     } else if media.starts_with("text/") {
@@ -236,6 +256,224 @@ fn kind_for(path: &str, media: &str) -> &'static str {
     } else {
         "file"
     }
+}
+
+const JSON_OUTLINE_MAX: usize = 40;
+const CSV_MAX_ROWS: usize = 200;
+const CSV_MAX_COLS: usize = 32;
+
+fn render_json_view(
+    rel: &str,
+    digest: &str,
+    title: &str,
+    size: usize,
+    text: &str,
+    truncated: bool,
+    max_bytes: usize,
+    kind: &str,
+) -> Value {
+    let mut diagnostics = Vec::new();
+    if truncated {
+        diagnostics.push(json!({
+            "code": "truncated",
+            "message": format!("preview truncated at {max_bytes} bytes")
+        }));
+    }
+    match serde_json::from_str::<Value>(text) {
+        Ok(val) => {
+            let outline = json_outline(&val, "", 0, &mut 0);
+            let pretty = serde_json::to_string_pretty(&val).unwrap_or_else(|_| text.to_string());
+            let fragment = wrap_pre(&escape_html(&pretty));
+            let completeness = if truncated { "partial" } else { "complete" };
+            json!({
+                "schema": "ResourceViewV1",
+                "schema_version": 1,
+                "resource": resource_ref(rel, "application/json", digest, title, size),
+                "renderer": {"id": "json", "version": "1", "trust": "sanitized"},
+                "render": {"format": "sanitized_html", "fragment": fragment},
+                "outline": outline,
+                "locators": [],
+                "completeness": completeness,
+                "no_exec": true,
+                "diagnostics": diagnostics,
+                "next_cursor": Value::Null,
+                "capabilities": {"read_only": true, "executed": false, "kind": kind}
+            })
+        }
+        Err(e) => {
+            diagnostics.push(json!({
+                "code": "json.parse_error",
+                "message": e.to_string()
+            }));
+            json!({
+                "schema": "ResourceViewV1",
+                "schema_version": 1,
+                "resource": resource_ref(rel, "application/json", digest, title, size),
+                "renderer": {"id": "json", "version": "1", "trust": "sanitized"},
+                "render": {
+                    "format": "sanitized_html",
+                    "fragment": wrap_pre(&escape_html(text))
+                },
+                "outline": [],
+                "locators": [],
+                "completeness": "partial",
+                "no_exec": true,
+                "diagnostics": diagnostics,
+                "next_cursor": Value::Null,
+                "capabilities": {"read_only": true, "executed": false, "kind": kind}
+            })
+        }
+    }
+}
+
+fn json_outline(val: &Value, path: &str, depth: usize, count: &mut usize) -> Vec<Value> {
+    if *count >= JSON_OUTLINE_MAX || depth > 3 {
+        return Vec::new();
+    }
+    match val {
+        Value::Object(map) => {
+            let mut out = Vec::new();
+            for (k, v) in map.iter().take(24) {
+                if *count >= JSON_OUTLINE_MAX {
+                    break;
+                }
+                *count += 1;
+                let child = if path.is_empty() {
+                    k.clone()
+                } else {
+                    format!("{path}.{k}")
+                };
+                let label = format!("{k}: {}", json_type_label(v));
+                let mut node = json!({
+                    "id": child,
+                    "label": label,
+                    "kind": "json_key",
+                    "locator": {"path": child}
+                });
+                if depth < 2 {
+                    let kids = json_outline(v, &child, depth + 1, count);
+                    if !kids.is_empty() {
+                        if let Some(obj) = node.as_object_mut() {
+                            obj.insert("children".into(), json!(kids));
+                        }
+                    }
+                }
+                out.push(node);
+            }
+            out
+        }
+        Value::Array(items) => {
+            *count += 1;
+            vec![json!({
+                "id": path,
+                "label": format!("[{}] ({} items)", path, items.len()),
+                "kind": "json_array",
+                "locator": {"path": path}
+            })]
+        }
+        _ => Vec::new(),
+    }
+}
+
+fn json_type_label(v: &Value) -> &'static str {
+    match v {
+        Value::Null => "null",
+        Value::Bool(_) => "bool",
+        Value::Number(_) => "number",
+        Value::String(_) => "string",
+        Value::Array(_) => "array",
+        Value::Object(_) => "object",
+    }
+}
+
+fn render_csv_view(
+    rel: &str,
+    digest: &str,
+    title: &str,
+    size: usize,
+    text: &str,
+    truncated: bool,
+    max_bytes: usize,
+    kind: &str,
+) -> Value {
+    let mut diagnostics = Vec::new();
+    if truncated {
+        diagnostics.push(json!({
+            "code": "truncated",
+            "message": format!("preview truncated at {max_bytes} bytes")
+        }));
+    }
+    let rows: Vec<&str> = text.lines().collect();
+    let shown = rows.len().min(CSV_MAX_ROWS + 1); // header + data
+    if rows.len() > CSV_MAX_ROWS + 1 {
+        diagnostics.push(json!({
+            "code": "csv.row_limit",
+            "message": format!("showing first {CSV_MAX_ROWS} data rows")
+        }));
+    }
+    let mut html = String::from("<article class=\"mq-resource\"><table class=\"mq-csv\">");
+    let mut locators = Vec::new();
+    for (i, line) in rows.iter().take(shown).enumerate() {
+        let cells = split_csv_line(line);
+        let tag = if i == 0 { "th" } else { "td" };
+        html.push_str("<tr>");
+        for (c, cell) in cells.iter().take(CSV_MAX_COLS).enumerate() {
+            html.push('<');
+            html.push_str(tag);
+            html.push('>');
+            html.push_str(&escape_html(cell));
+            html.push_str("</");
+            html.push_str(tag);
+            html.push('>');
+            if i > 0 && c == 0 {
+                locators.push(json!({
+                    "id": format!("r{i}"),
+                    "kind": "csv_row",
+                    "locator": {"row": i, "col": c + 1}
+                }));
+            }
+        }
+        html.push_str("</tr>");
+    }
+    html.push_str("</table></article>");
+    let completeness = if truncated || rows.len() > CSV_MAX_ROWS + 1 {
+        "partial"
+    } else {
+        "complete"
+    };
+    json!({
+        "schema": "ResourceViewV1",
+        "schema_version": 1,
+        "resource": resource_ref(rel, "text/csv", digest, title, size),
+        "renderer": {"id": "csv", "version": "1", "trust": "sanitized"},
+        "render": {"format": "sanitized_html", "fragment": html},
+        "outline": [],
+        "locators": locators,
+        "completeness": completeness,
+        "no_exec": true,
+        "diagnostics": diagnostics,
+        "next_cursor": Value::Null,
+        "capabilities": {"read_only": true, "executed": false, "kind": kind}
+    })
+}
+
+/// Minimal CSV splitter (no quoted-newline support — preview only).
+fn split_csv_line(line: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    let mut cur = String::new();
+    let mut in_q = false;
+    for ch in line.chars() {
+        match ch {
+            '"' => in_q = !in_q,
+            ',' if !in_q => {
+                out.push(cur.clone());
+                cur.clear();
+            }
+            c => cur.push(c),
+        }
+    }
+    out.push(cur);
+    out
 }
 
 fn wrap_pre(inner: &str) -> String {
@@ -392,6 +630,48 @@ mod tests {
         };
         let errv = build_resource_view(&req).unwrap_err();
         assert_eq!(errv["error"]["code"], "resource.path_escape");
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn json_outline_and_no_exec() {
+        let dir = scratch_dir("json");
+        let path = dir.join("cfg.json");
+        fs::write(&path, r#"{"a":1,"b":{"c":true},"d":[1,2]}"#).unwrap();
+        let req = ResourceViewRequest {
+            workspace_root: dir.clone(),
+            path: "cfg.json".into(),
+            revision: None,
+            max_bytes: 10_000,
+        };
+        let view = build_resource_view(&req).unwrap();
+        assert_eq!(view["no_exec"], true);
+        assert_eq!(view["renderer"]["id"], "json");
+        assert_eq!(view["resource"]["media_type"], "application/json");
+        assert!(view["outline"].as_array().unwrap().len() >= 2);
+        let frag = view["render"]["fragment"].as_str().unwrap();
+        assert!(frag.contains("&quot;a&quot;") || frag.contains("\"a\"") || frag.contains("a"));
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn csv_table_bounded() {
+        let dir = scratch_dir("csv");
+        let path = dir.join("t.csv");
+        fs::write(&path, "name,age\nalice,3\nbob,4\n").unwrap();
+        let req = ResourceViewRequest {
+            workspace_root: dir.clone(),
+            path: "t.csv".into(),
+            revision: None,
+            max_bytes: 10_000,
+        };
+        let view = build_resource_view(&req).unwrap();
+        assert_eq!(view["no_exec"], true);
+        assert_eq!(view["renderer"]["id"], "csv");
+        let frag = view["render"]["fragment"].as_str().unwrap();
+        assert!(frag.contains("<table"));
+        assert!(frag.contains("alice"));
+        assert!(!frag.contains("<script"));
         let _ = fs::remove_dir_all(&dir);
     }
 }

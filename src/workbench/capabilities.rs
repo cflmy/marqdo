@@ -48,8 +48,8 @@ pub fn probe_capabilities(params: &Value) -> Value {
         json!({"format": "docx", "available": false}),
         json!({"format": "ocr", "available": false}),
         // M-A0 freeze: format matrix rows remain unavailable until M-A3/M-A5.
-        json!({"format": "json", "available": false}),
-        json!({"format": "csv", "available": false}),
+        json!({"format": "json", "available": true}),
+        json!({"format": "csv", "available": true}),
         json!({"format": "image", "available": false}),
         json!({"format": "html", "available": false}),
         json!({"format": "svg", "available": false}),
