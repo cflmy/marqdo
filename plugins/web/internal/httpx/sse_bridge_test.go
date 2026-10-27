@@ -45,7 +45,8 @@ func TestLegacySSEBridgeSingleFlight(t *testing.T) {
 	}
 }
 
-// M-R0: disconnect marks cancel; token file must not be deleted while holder waits.
+// M-R0: cancel-token file must not be deleted while bridge holder waits.
+// (sse-live observer disconnect no longer cancels by default — see cancelOnDisconnect.)
 func TestCancelTokenSurvivesUntilHolderExits(t *testing.T) {
 	dir := t.TempDir()
 	tok := filepath.Join(dir, "cancel.tok")

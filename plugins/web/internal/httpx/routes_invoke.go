@@ -38,6 +38,7 @@ type invokeRoute struct {
 	BodyMode   string
 	ReturnMode string
 	Class      string
+	Path       string
 }
 
 func parseInvokeRoute(v any) invokeRoute {
@@ -66,6 +67,7 @@ func (st *state) mountInvokeRoutes(mux *http.ServeMux) {
 	for _, key := range sortedKeys(st.invokeRoutes) {
 		cfg := parseInvokeRoute(st.invokeRoutes[key])
 		path := routePathKey(key)
+		cfg.Path = path
 		method := cfg.Method
 		if method == "" {
 			method = http.MethodPost
@@ -140,6 +142,25 @@ func (st *state) handleInvoke(w http.ResponseWriter, r *http.Request, route invo
 			payload["api_key"] = key
 		}
 	}
+	if last := strings.TrimSpace(r.Header.Get("Last-Event-ID")); last != "" {
+		if _, exists := payload["last_event_id"]; !exists {
+			payload["last_event_id"] = last
+		}
+	}
+	// Merge Go ServeMux path wildcards (e.g. /turns/{id}/events → id / turn_id).
+	if route.Path != "" {
+		pathVals := pathValuesOf(r, route.Path)
+		for k, v := range pathVals {
+			if _, exists := payload[k]; !exists {
+				payload[k] = v
+			}
+		}
+		if id, ok := pathVals["id"]; ok {
+			if _, exists := payload["turn_id"]; !exists {
+				payload["turn_id"] = id
+			}
+		}
+	}
 
 	args := invokeArgsFromPayload(payload)
 
@@ -150,11 +171,11 @@ func (st *state) handleInvoke(w http.ResponseWriter, r *http.Request, route invo
 
 	class := resolveInvokeClass(route, liveSSE)
 	switch class {
-	case "execute":
-		st.handleInvokeIsolated(w, r, route, args, liveSSE)
-		return
-	case "short", "read", "control":
-		st.handleInvokeParent(w, r, route, args)
+	case "execute", "short", "read", "control":
+		// Isolated workers: do not take parent INVOKE_LOCK (ADR 0009).
+		// control/read/short use separate admission slots; cancel/events also
+		// available lock-free via /_runtime/*.
+		st.handleInvokeIsolated(w, r, route, args, liveSSE, class)
 		return
 	default:
 		// legacy_serial: parent CallLibPath (ADR 0008). Never isolate undeclared non-stream.
@@ -243,14 +264,17 @@ func (st *state) handleInvokeParent(w http.ResponseWriter, r *http.Request, rout
 	}
 }
 
-// handleInvokeIsolated runs execute-class invokes on a Supervisor worker (no
-// parent CallLibPath, no process Setenv, no legacySSEBridgeMu).
-func (st *state) handleInvokeIsolated(w http.ResponseWriter, r *http.Request, route invokeRoute, args map[string]any, liveSSE bool) {
+// handleInvokeIsolated runs admits on a Supervisor worker (no parent
+// CallLibPath / Setenv / legacySSEBridgeMu). admissionClass is execute|short|read|control.
+func (st *state) handleInvokeIsolated(w http.ResponseWriter, r *http.Request, route invokeRoute, args map[string]any, liveSSE bool, admissionClass string) {
+	if admissionClass == "" {
+		admissionClass = "execute"
+	}
 	taskID := fmt.Sprintf("exec_%d", time.Now().UnixNano())
 	adm, err := runtimeQuery("admit", map[string]any{
 		"task_id":         taskID,
 		"idempotency_key": taskID,
-		"class":           "execute",
+		"class":           admissionClass,
 		"payload":         map[string]any{"fn": route.FnPath},
 	})
 	if err != nil {
@@ -324,6 +348,14 @@ func (st *state) handleInvokeIsolated(w http.ResponseWriter, r *http.Request, ro
 	st.waitIsolatedJSON(w, r, route, taskID, eventPath, cancelTok, emitResult)
 }
 
+// cancelOnDisconnect reports whether the client opted into legacy
+// disconnect=cancel (header X-Marqdo-Cancel-On-Disconnect: 1|true).
+// Default is false: subscription close must not cancel the task (ADR 0009 / design §7.2).
+func cancelOnDisconnect(r *http.Request) bool {
+	v := strings.TrimSpace(strings.ToLower(r.Header.Get("X-Marqdo-Cancel-On-Disconnect")))
+	return v == "1" || v == "true" || v == "yes"
+}
+
 func (st *state) streamIsolatedSSE(w http.ResponseWriter, r *http.Request, route invokeRoute, taskID, eventPath, cancelTok, emitResult string) {
 	w.Header().Set("Content-Type", "text/event-stream; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-cache")
@@ -384,27 +416,43 @@ func (st *state) streamIsolatedSSE(w http.ResponseWriter, r *http.Request, route
 		}
 	}
 
+	doCancelOnDisconnect := cancelOnDisconnect(r)
+
 	for {
 		select {
 		case <-ctx.Done():
-			_, _ = runtimeQuery("cancel", map[string]any{"task_id": taskID})
-			_ = writeCancelToken(cancelTok)
-			writeEvent(map[string]any{
-				"schema": "RuntimeEventV1", "schema_version": 1, "type": "run.interrupted",
-				"payload": map[string]any{
-					"reason":            "client_disconnect",
-					"cancel_propagated": cancelTok != "",
-					"status":            "stopping",
-					"task_id":           taskID,
-				},
-			})
-			// Brief wait so worker can notice cancel and flush.
-			deadline := time.Now().Add(3 * time.Second)
-			for time.Now().Before(deadline) {
-				if workerDone(taskID, emitResult) {
-					break
+			// Default: observer gone ≠ cancel. Task keeps running; client may
+			// reattach via GET /_runtime/tasks/{id}/events (Last-Event-ID).
+			if doCancelOnDisconnect {
+				_, _ = runtimeQuery("cancel", map[string]any{"task_id": taskID})
+				_ = writeCancelToken(cancelTok)
+				writeEvent(map[string]any{
+					"schema": "RuntimeEventV1", "schema_version": 1, "type": "run.interrupted",
+					"payload": map[string]any{
+						"reason":            "client_disconnect",
+						"cancel_propagated": cancelTok != "",
+						"status":            "stopping",
+						"task_id":           taskID,
+					},
+				})
+				deadline := time.Now().Add(3 * time.Second)
+				for time.Now().Before(deadline) {
+					if workerDone(taskID, emitResult) {
+						break
+					}
+					time.Sleep(50 * time.Millisecond)
 				}
-				time.Sleep(50 * time.Millisecond)
+			} else {
+				writeEvent(map[string]any{
+					"schema": "RuntimeEventV1", "schema_version": 1, "type": "run.interrupted",
+					"payload": map[string]any{
+						"reason":            "client_disconnect",
+						"cancel_propagated": false,
+						"status":            "observer_closed",
+						"task_id":           taskID,
+						"resume":            "/_runtime/tasks/" + taskID + "/events",
+					},
+				})
 			}
 			finish(true)
 			return

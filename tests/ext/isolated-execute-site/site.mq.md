@@ -70,3 +70,16 @@ Short-class read: list models without holding an execute slot.
 | list | True |
 
 *out*
+
+# ping
+    + `payload`=None
+
+Control-class noop: must succeed under dual execute without parent INVOKE_LOCK.
+
+`out` =
+
+| ok | lane |
+|----|------|
+| True | control |
+
+*out*

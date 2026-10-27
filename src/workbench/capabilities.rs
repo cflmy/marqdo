@@ -95,7 +95,8 @@ pub fn probe_capabilities(params: &Value) -> Value {
     // task_control_v2 / event_replay: host_query("runtime") + /_runtime/* system routes.
     features.insert("runtime.task_control_v2".into(), json!(1));
     features.insert("runtime.event_replay".into(), json!(1));
-    features.insert("runtime.read_lane".into(), json!(0));
+    // short/read/control HTTP invokes use isolated admission (no parent INVOKE_LOCK).
+    features.insert("runtime.read_lane".into(), json!(1));
     #[cfg(feature = "view")]
     {
         features.insert("view.analysis_cache_v2".into(), json!(1));

@@ -417,5 +417,226 @@ fn mr01_dual_isolated_execute_and_short_reads() {
     assert!(sok > 10, "expected many short 200s, got ok={sok} fail={sfail}");
     assert_eq!(sfail, 0, "short reads failed: {sfail}");
 
+    assert_eq!(
+        caps["features"]["runtime.read_lane"],
+        1,
+        "read_lane must be on; caps={caps}"
+    );
+
+    let _ = std::fs::remove_dir_all(&runtime_dir);
+}
+
+/// Observer disconnect must not cancel the execute task (default).
+#[test]
+fn disconnect_keeps_running_and_replay() {
+    if TcpListener::bind("127.0.0.1:0").is_err() {
+        eprintln!("skip disconnect-keeps-running: local sockets unavailable");
+        return;
+    }
+    ensure_plugins();
+
+    let secs: u64 = 6;
+    let (base_a, stop_a, join_a) = spawn_fake_sse("A", secs, 10);
+
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let site = root.join("tests/ext/isolated-execute-site");
+    let runtime_dir = std::env::temp_dir().join(format!("mq-disc-rt-{}", std::process::id()));
+    let _ = std::fs::create_dir_all(&runtime_dir);
+
+    let bin = env!("CARGO_BIN_EXE_marqdo");
+    let mut child: Child = Command::new(bin)
+        .args(["run", "serve.mq.md"])
+        .current_dir(&site)
+        .env("MARQDO_EXT", root.join("ext"))
+        .env("MARQDO_WEB_PLUGIN", std::env::var_os("MARQDO_WEB_PLUGIN").unwrap())
+        .env("MARQDO_LLM_PLUGIN", std::env::var_os("MARQDO_LLM_PLUGIN").unwrap())
+        .env("MARQDO_RUNTIME_DIR", &runtime_dir)
+        .env("MARQDO_SITE_PORT", "18221")
+        .env("OPENAI_API_KEY", "mr01-key")
+        .stdout(Stdio::null())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("spawn site");
+
+    let base = "http://127.0.0.1:18221";
+    if !wait_http_ok(&format!("{base}/v1/models"), Duration::from_secs(30)) {
+        let _ = child.kill();
+        panic!("site did not start for disconnect test");
+    }
+
+    let chat_url = format!("{base}/v1/chat/completions");
+    let body = format!(
+        r#"{{"model":"mr01","stream":true,"base_url":"{base_a}","messages":[{{"role":"user","content":"hi"}}]}}"#
+    );
+    // Observer disconnects after ~1.2s; task must keep running.
+    let out = Command::new("curl")
+        .args([
+            "-s",
+            "-N",
+            "--max-time",
+            "1",
+            "-H",
+            "Content-Type: application/json",
+            "-d",
+            &body,
+            &chat_url,
+        ])
+        .output()
+        .expect("curl disconnect");
+    let text = String::from_utf8_lossy(&out.stdout);
+    let mut task_id = String::new();
+    for line in text.lines() {
+        let line = line.trim();
+        if let Some(rest) = line.strip_prefix("data: ") {
+            if let Ok(v) = serde_json::from_str::<serde_json::Value>(rest) {
+                if v.get("type").and_then(|t| t.as_str()) == Some("run.started") {
+                    if let Some(tid) = v.pointer("/payload/task_id").and_then(|x| x.as_str()) {
+                        task_id = tid.to_string();
+                    }
+                }
+            }
+        }
+    }
+    assert!(!task_id.is_empty(), "missing task_id in early SSE; raw={text}");
+
+    // Wait until task finishes (observer already gone).
+    let mut terminal = false;
+    let deadline = Instant::now() + Duration::from_secs(secs + 8);
+    while Instant::now() < deadline {
+        let get_url = format!("{base}/_runtime/tasks/{task_id}");
+        let out = Command::new("curl")
+            .args(["-s", &get_url])
+            .output()
+            .expect("runtime get");
+        let body = String::from_utf8_lossy(&out.stdout);
+        if body.contains("\"completed\"")
+            || body.contains("\"succeeded\"")
+            || body.contains("\"failed\"")
+            || body.contains("\"cancelled\"")
+        {
+            assert!(
+                !body.contains("\"cancelled\""),
+                "disconnect must not cancel task: {body}"
+            );
+            terminal = true;
+            break;
+        }
+        thread::sleep(Duration::from_millis(200));
+    }
+    assert!(terminal, "task {task_id} did not finish after observer disconnect");
+
+    // Replay via events (JSON after_seq=0).
+    let ev_url = format!("{base}/_runtime/tasks/{task_id}/events?after_seq=0");
+    let ev = Command::new("curl")
+        .args(["-s", &ev_url])
+        .output()
+        .expect("events");
+    let ev_body = String::from_utf8_lossy(&ev.stdout);
+    assert!(
+        ev_body.contains('A') || ev_body.contains("delta") || ev_body.contains("event"),
+        "replay empty: {ev_body}"
+    );
+
+    stop_a.store(true, Ordering::Relaxed);
+    let _ = join_a.join();
+    let _ = child.kill();
+    let _ = child.wait();
+    let _ = std::fs::remove_dir_all(&runtime_dir);
+}
+
+/// Control + short reads stay 200 while two execute streams hold slots.
+#[test]
+fn control_under_dual_execute() {
+    if TcpListener::bind("127.0.0.1:0").is_err() {
+        eprintln!("skip control-under-dual-execute: local sockets unavailable");
+        return;
+    }
+    ensure_plugins();
+
+    let secs: u64 = 8;
+    let (base_a, stop_a, join_a) = spawn_fake_sse("A", secs, 10);
+    let (base_b, stop_b, join_b) = spawn_fake_sse("B", secs, 10);
+
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let site = root.join("tests/ext/isolated-execute-site");
+    let runtime_dir = std::env::temp_dir().join(format!("mq-ctl-rt-{}", std::process::id()));
+    let _ = std::fs::create_dir_all(&runtime_dir);
+
+    let bin = env!("CARGO_BIN_EXE_marqdo");
+    let mut child: Child = Command::new(bin)
+        .args(["run", "serve.mq.md"])
+        .current_dir(&site)
+        .env("MARQDO_EXT", root.join("ext"))
+        .env("MARQDO_WEB_PLUGIN", std::env::var_os("MARQDO_WEB_PLUGIN").unwrap())
+        .env("MARQDO_LLM_PLUGIN", std::env::var_os("MARQDO_LLM_PLUGIN").unwrap())
+        .env("MARQDO_RUNTIME_DIR", &runtime_dir)
+        .env("MARQDO_SITE_PORT", "18222")
+        .env("OPENAI_API_KEY", "mr01-key")
+        .stdout(Stdio::null())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("spawn site");
+
+    let base = "http://127.0.0.1:18222";
+    if !wait_http_ok(&format!("{base}/v1/models"), Duration::from_secs(30)) {
+        let _ = child.kill();
+        panic!("site did not start for control test");
+    }
+
+    let chat_url = format!("{base}/v1/chat/completions");
+    let body_tmpl = r#"{"model":"mr01","stream":true,"base_url":"__BASE__","messages":[{"role":"user","content":"hi"}]}"#;
+    let t_a = {
+        let u = chat_url.clone();
+        let b = body_tmpl.to_string();
+        let ba = base_a.clone();
+        thread::spawn(move || {
+            let _ = collect_sse_deltas(&u, &b, &ba);
+        })
+    };
+    let t_b = {
+        let u = chat_url.clone();
+        let b = body_tmpl.to_string();
+        let bb = base_b.clone();
+        thread::spawn(move || {
+            let _ = collect_sse_deltas(&u, &b, &bb);
+        })
+    };
+
+    thread::sleep(Duration::from_secs(1));
+    let mut ok_n = 0u32;
+    let mut fail_n = 0u32;
+    let start = Instant::now();
+    while start.elapsed() < Duration::from_secs(3) {
+        for path in ["/v1/models", "/v1/ping"] {
+            let url = format!("{base}{path}");
+            let t0 = Instant::now();
+            let out = Command::new("curl")
+                .args(["-s", "-o", "/dev/null", "-w", "%{http_code}", &url])
+                .output();
+            let elapsed = t0.elapsed();
+            match out {
+                Ok(o) if String::from_utf8_lossy(&o.stdout) == "200" => {
+                    assert!(
+                        elapsed < Duration::from_millis(1500),
+                        "{path} p95 budget; took {elapsed:?}"
+                    );
+                    ok_n += 1;
+                }
+                _ => fail_n += 1,
+            }
+        }
+        thread::sleep(Duration::from_millis(80));
+    }
+    assert!(ok_n > 4, "expected control/short 200s, ok={ok_n} fail={fail_n}");
+    assert_eq!(fail_n, 0, "control/short failed under dual execute: {fail_n}");
+
+    let _ = t_a.join();
+    let _ = t_b.join();
+    stop_a.store(true, Ordering::Relaxed);
+    stop_b.store(true, Ordering::Relaxed);
+    let _ = join_a.join();
+    let _ = join_b.join();
+    let _ = child.kill();
+    let _ = child.wait();
     let _ = std::fs::remove_dir_all(&runtime_dir);
 }
