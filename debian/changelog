@@ -1,3 +1,10 @@
+marqdo (2.1.5-1ppa1) noble; urgency=medium
+
+  * Marqdo 2.1.5: agent reliability workbench — ResourceView / ToolSpec /
+    CheckpointV2 / EffectLedger; EKC ir.json warm-load; web short/read lanes.
+
+ -- Marqdo Maintainers <noreply@marqdo.com>  Tue, 27 Oct 2026 07:39:08 +0000
+
 marqdo (2.1.4-1ppa1) noble; urgency=medium
 
   * Marqdo 2.1.4: default isolated HTTP execute (ADR 0009) — Supervisor

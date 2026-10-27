@@ -126,9 +126,11 @@ jobs:
             ## Marqdo ${{ github.ref_name }}
 
             ### 亮点 / Highlights
+            - **v2.1.5**：Agent 可靠工作台——ResourceView / ToolSpec / CheckpointV2 / EffectLedger · EKC ir.json 暖机 · Web 短读槽隔离
+            - **v2.1.5**: Agent reliability workbench — ResourceView / ToolSpec / CheckpointV2 / EffectLedger, EKC ir.json warm-load, web short/read lane isolation
+            - **v2.1.5 ext**：扩展包同步 2.1.5 / Ext pack 2.1.5
             - **v2.1.4**：默认隔离 HTTP execute（ADR 0009）——worker 池 / `--call-lib-path` · `/_runtime/*` · MR-01 双流金样例 · `runtime.isolated_execution=1`
             - **v2.1.4**: Default isolated HTTP execute (ADR 0009) — worker pool / `--call-lib-path`, `/_runtime/*`, MR-01 dual-stream gold, `runtime.isolated_execution=1`
-            - **v2.1.4 ext**：扩展包同步 2.1.4 / Ext pack 2.1.4
             - **v2.1.3**：知识工作台运行时——ModelSelection/RunContext/usage · view document 只读嵌入 · LLM selection/messages/cancel · agent selection e2e
             - **v2.1.3**: Workbench runtime — ModelSelection/RunContext/usage, view document read-only embed, LLM selection/messages/cancel, agent selection e2e
             - **v2.1.1**：可执行知识主链——BoundCall · NarrativeRef · 来源/适用期 · patch/extract · 整代 CURRENT + closure · 发票示例 113

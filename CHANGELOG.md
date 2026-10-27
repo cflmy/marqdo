@@ -4,16 +4,41 @@
 
 ### Added
 
+### Fixed
+
+### Changed
+
+## v2.1.5 — 2026-10-27
+
+### Highlights
+
+**Agent 可靠工作台 + EKC 热路径**：ResourceView（JSON/CSV/PDF/image `blob_ref`、locator 页/行）· ToolSpec 授权先于调用 · CheckpointV2 / EffectLedger / ContextPackV2 · EKC `ir.json` 暖机与 `--refresh` · Web 短读/控制面与 execute 槽隔离。CLI · wasm · ext **2.1.5**。
+
+```bash
+git checkout v2.1.5 && cargo build --release
+marqdo ext add web    # CDN / Releases → 2.1.5
+```
+
+**核心表面 Δ（Core surface Δ）**：**无增删**（仍 19 个构造）——工作台协议与 Agent 运行时合同，不新增 Markdown 标记。
+
+### Added
+
+- **ResourceView v1**：有界 JSON/CSV 渲染；PDF/image `blob_ref`；`locator.page` / 行定位；CSV `text` 供 TablePreview。
+- **Agent 合同**：ToolSpec 注册与 authorize-before-call；CheckpointV2 原子 resume；AgentErrorV1；输出通道；ContextPackV2；EffectLedger（含 mutating `run_tool` 水印）。
+- **Workbench fixtures/schemas**：`tests/workbench_contracts` 协议金样例。
 - **EKC `ir.json` 快照**：`marqdo knowledge` 写入 `.marqdo/ekc/graph/ir.json`；查询命令暖机热加载，免全量重编译。
 - **`--refresh`**：`knowledge preflight` / `find` / `reuse` / `impact` / `conflicts` / `stale` / `duplicate` / `verify` 可强制重编译。
 
 ### Fixed
 
 - **工程预检热路径**：`knowledge preflight`（及 find/reuse 等）默认不再每次 `ensure_compiled` 全量 compile，修复聊天「工程预检」墙钟过长。
+- **Web 槽隔离**：`short`/`read`/`control` 不再填满 execute 槽；disconnect≠cancel。
+- **CSV ResourceView**：去掉尾部空行伪影。
 
 ### Changed
 
 - 查询类 knowledge CLI：**缺投影才 compile**；CI / 源变更请先 `marqdo knowledge` 或 `--refresh`。
+- CLI / wasm / `ext/VERSION` **同步 2.1.5**。
 
 ## v2.1.4 — 2026-10-26
 
