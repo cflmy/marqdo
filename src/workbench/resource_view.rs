@@ -155,6 +155,20 @@ pub fn build_resource_view(req: &ResourceViewRequest) -> Result<Value, Value> {
             &rel, &digest, &title, size, &text, truncated, req.max_bytes, kind,
         ));
     }
+    if media == "text/x-code" || media == "text/plain" {
+        return Ok(render_code_view(
+            &rel,
+            media,
+            kind,
+            &digest,
+            &title,
+            size,
+            &text,
+            truncated,
+            req.max_bytes,
+            req.locator.as_ref(),
+        ));
+    }
 
     let (renderer_id, format, fragment) = match media {
         "text/markdown" => (
@@ -162,7 +176,6 @@ pub fn build_resource_view(req: &ResourceViewRequest) -> Result<Value, Value> {
             "sanitized_html",
             wrap_pre(&simple_markdown_to_html(&text)),
         ),
-        "text/x-code" | "text/plain" => ("plaintext", "sanitized_html", wrap_pre(&escape_html(&text))),
         other => {
             return Ok(json!({
                 "schema": "ResourceViewV1",
@@ -412,6 +425,101 @@ fn binary_blob_view(
 const JSON_OUTLINE_MAX: usize = 40;
 const CSV_MAX_ROWS: usize = 200;
 const CSV_MAX_COLS: usize = 32;
+const CODE_LINE_LOCATOR_MAX: usize = 400;
+
+fn outline_to_path_locators(outline: &[Value]) -> Vec<Value> {
+    let mut out = Vec::new();
+    fn walk(nodes: &[Value], out: &mut Vec<Value>) {
+        for n in nodes {
+            if out.len() >= JSON_OUTLINE_MAX {
+                return;
+            }
+            if let Some(path) = n.get("locator").and_then(|l| l.get("path")).and_then(|p| p.as_str()) {
+                out.push(json!({
+                    "id": n.get("id").cloned().unwrap_or_else(|| json!(path)),
+                    "kind": "json_path",
+                    "locator": {"path": path}
+                }));
+            }
+            if let Some(kids) = n.get("children").and_then(|c| c.as_array()) {
+                walk(kids, out);
+            }
+        }
+    }
+    walk(outline, &mut out);
+    out
+}
+
+fn render_code_view(
+    rel: &str,
+    media: &str,
+    kind: &str,
+    digest: &str,
+    title: &str,
+    size: usize,
+    text: &str,
+    truncated: bool,
+    max_bytes: usize,
+    locator: Option<&Value>,
+) -> Value {
+    let mut diagnostics = Vec::new();
+    if truncated {
+        diagnostics.push(json!({
+            "code": "truncated",
+            "message": format!("preview truncated at {max_bytes} bytes")
+        }));
+    }
+    let lines: Vec<&str> = text.lines().collect();
+    if lines.len() > CODE_LINE_LOCATOR_MAX {
+        diagnostics.push(json!({
+            "code": "code.line_locator_capped",
+            "message": format!("line locators capped at {CODE_LINE_LOCATOR_MAX}")
+        }));
+    }
+    let focus_line = locator
+        .and_then(|l| l.get("line"))
+        .and_then(|v| v.as_u64())
+        .filter(|&n| n >= 1)
+        .map(|n| n as usize);
+    let mut locators = Vec::new();
+    for (i, _) in lines.iter().take(CODE_LINE_LOCATOR_MAX).enumerate() {
+        let line = i + 1;
+        locators.push(json!({
+            "id": format!("L{line}"),
+            "kind": "line",
+            "locator": {"line": line}
+        }));
+    }
+    let fragment = wrap_pre(&escape_html(text));
+    let completeness = if truncated { "partial" } else { "complete" };
+    json!({
+        "schema": "ResourceViewV1",
+        "schema_version": 1,
+        "resource": resource_ref(rel, media, digest, title, size),
+        "renderer": {"id": if kind == "code" { "code" } else { "plaintext" }, "version": "1", "trust": "sanitized"},
+        "render": {
+            "format": "sanitized_html",
+            "fragment": fragment,
+            "text": text
+        },
+        "outline": [],
+        "locators": locators,
+        "focus_locator": locator.cloned().unwrap_or(Value::Null),
+        "completeness": completeness,
+        "no_exec": true,
+        "diagnostics": diagnostics,
+        "next_cursor": Value::Null,
+        "capabilities": {
+            "read_only": true,
+            "executed": false,
+            "kind": kind,
+            "line_locator": true,
+            "line_count": lines.len()
+        },
+        "line_count": lines.len(),
+        "focus_line": focus_line
+    })
+}
 
 fn render_json_view(
     rel: &str,
@@ -441,9 +549,13 @@ fn render_json_view(
                 "schema_version": 1,
                 "resource": resource_ref(rel, "application/json", digest, title, size),
                 "renderer": {"id": "json", "version": "1", "trust": "sanitized"},
-                "render": {"format": "sanitized_html", "fragment": fragment},
+                "render": {
+                    "format": "sanitized_html",
+                    "fragment": fragment,
+                    "text": pretty
+                },
                 "outline": outline,
-                "locators": [],
+                "locators": outline_to_path_locators(&outline),
                 "completeness": completeness,
                 "no_exec": true,
                 "diagnostics": diagnostics,
@@ -463,7 +575,8 @@ fn render_json_view(
                 "renderer": {"id": "json", "version": "1", "trust": "sanitized"},
                 "render": {
                     "format": "sanitized_html",
-                    "fragment": wrap_pre(&escape_html(text))
+                    "fragment": wrap_pre(&escape_html(text)),
+                    "text": text
                 },
                 "outline": [],
                 "locators": [],
@@ -865,6 +978,28 @@ mod tests {
         assert!(codes.contains(&"ocr.unavailable"));
         assert!(codes.contains(&"extract.unavailable"));
         assert!(!codes.iter().any(|c| c.contains("preview.unavailable")));
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn code_line_locator_and_focus() {
+        let dir = scratch_dir("code");
+        let path = dir.join("a.rs");
+        fs::write(&path, "fn main() {\n    println!(\"hi\");\n}\n").unwrap();
+        let req = ResourceViewRequest {
+            workspace_root: dir.clone(),
+            path: "a.rs".into(),
+            revision: None,
+            max_bytes: 10_000,
+            locator: Some(json!({"line": 2})),
+        };
+        let view = build_resource_view(&req).unwrap();
+        assert_eq!(view["no_exec"], true);
+        assert_eq!(view["renderer"]["id"], "code");
+        assert_eq!(view["capabilities"]["line_locator"], true);
+        assert_eq!(view["focus_line"], 2);
+        assert_eq!(view["render"]["text"].as_str().unwrap().lines().count(), 3);
+        assert!(view["locators"].as_array().unwrap().len() >= 3);
         let _ = fs::remove_dir_all(&dir);
     }
 
