@@ -6,6 +6,7 @@ import:
   web: ext/web/web.mq.md
   site: ./site.mq.md
   sys: lib/sys.mq.md
+  json: lib/json.mq.md
 ---
 
 # main
@@ -13,7 +14,7 @@ import:
 **port_s = > sys.env_get name="MARQDO_SITE_PORT"**
 **port = 18220**
 1. `port_s`
-  **port = `port_s`**
+  **port = > json.parse text=`port_s`**
 2. *
   **_ = 1**
 

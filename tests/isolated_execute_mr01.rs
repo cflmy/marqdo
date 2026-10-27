@@ -238,6 +238,7 @@ fn mr01_dual_isolated_execute_and_short_reads() {
         .env("MARQDO_WEB_PLUGIN", std::env::var_os("MARQDO_WEB_PLUGIN").unwrap())
         .env("MARQDO_LLM_PLUGIN", std::env::var_os("MARQDO_LLM_PLUGIN").unwrap())
         .env("MARQDO_RUNTIME_DIR", &runtime_dir)
+        .env("MARQDO_SITE_PORT", "18220")
         .env("OPENAI_API_KEY", "mr01-key")
         .stdout(Stdio::null())
         .stderr(Stdio::piped())
@@ -459,9 +460,18 @@ fn disconnect_keeps_running_and_replay() {
         .expect("spawn site");
 
     let base = "http://127.0.0.1:18221";
-    if !wait_http_ok(&format!("{base}/v1/models"), Duration::from_secs(30)) {
+    if !wait_http_ok(&format!("{base}/v1/models"), Duration::from_secs(45)) {
         let _ = child.kill();
-        panic!("site did not start for disconnect test");
+        let err = child
+            .stderr
+            .take()
+            .map(|mut s| {
+                let mut t = String::new();
+                let _ = s.read_to_string(&mut t);
+                t
+            })
+            .unwrap_or_default();
+        panic!("site did not start for disconnect test; stderr={err}");
     }
 
     let chat_url = format!("{base}/v1/chat/completions");
@@ -578,9 +588,18 @@ fn control_under_dual_execute() {
         .expect("spawn site");
 
     let base = "http://127.0.0.1:18222";
-    if !wait_http_ok(&format!("{base}/v1/models"), Duration::from_secs(30)) {
+    if !wait_http_ok(&format!("{base}/v1/models"), Duration::from_secs(45)) {
         let _ = child.kill();
-        panic!("site did not start for control test");
+        let err = child
+            .stderr
+            .take()
+            .map(|mut s| {
+                let mut t = String::new();
+                let _ = s.read_to_string(&mut t);
+                t
+            })
+            .unwrap_or_default();
+        panic!("site did not start for control test; stderr={err}");
     }
 
     let chat_url = format!("{base}/v1/chat/completions");
