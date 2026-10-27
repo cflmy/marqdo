@@ -19,6 +19,8 @@
 
 | 文档 | 摘要 |
 |------|------|
+| [design/agent-reliability-tools-resources-2026-10-27.md](design/agent-reliability-tools-resources-2026-10-27.md) | **Proposed：智能体能力补足**；基于 `16f26d7`，增量设计错误恢复、检查点/效应账本、结构化工具、输出通道、上下文与只读资源视图；含跨仓边界、阶段计划和故障验收 |
+| [research/agent-capabilities-2026-10-27.md](research/agent-capabilities-2026-10-27.md) | **官方能力调研与源码复核**；OpenAI/Claude/Gemini/LangGraph/Deep Agents/MCP，求道当前问题 F01–F20；区分现有能力、设计推导与待实测项 |
 | [design/isolated-web-runtime-development-2026-10-26.md](design/isolated-web-runtime-development-2026-10-26.md) | **隔离执行与响应式 Web 运行时**：进程池、控制/读取分离、取消、事件恢复、发布一致性；实现见 `src/runtime/` |
 | [adr/0009-isolated-web-runtime.md](adr/0009-isolated-web-runtime.md) | **ADR 0009**：隔离 Web 运行时决策；金样例通过后替代 ADR 0008 的并行性结论 |
 | [跨库缺陷复核（2026-10-26）](../../qdagent/doc/gaps/04-workbench-runtime-and-product-audit-2026-10-26.md) | **最新源码与测试证据**：实际 HTTP 路由、知识发布/阅读断点、旧缺陷处置及 1000 单元编译性能失败；需同级 qdagent checkout |
