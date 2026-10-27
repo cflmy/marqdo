@@ -19,6 +19,7 @@
 
 | 文档 | 摘要 |
 |------|------|
+| [roadmap/agent-reliability-crossrepo-2026-10-27.md](roadmap/agent-reliability-crossrepo-2026-10-27.md) | **Proposed：跨仓 Agent 可靠性开发计划**；M-A0–M-A6 ∥ Q-A0–Q-A7 排期、依赖图、F01–F20 映射、MA-T*/QA-* 验收与第一刀切片；协议真源仍见下方设计文档 |
 | [design/agent-reliability-tools-resources-2026-10-27.md](design/agent-reliability-tools-resources-2026-10-27.md) | **Proposed：智能体能力补足**；基于 `16f26d7`，增量设计错误恢复、检查点/效应账本、结构化工具、输出通道、上下文与只读资源视图；含跨仓边界、阶段计划和故障验收 |
 | [research/agent-capabilities-2026-10-27.md](research/agent-capabilities-2026-10-27.md) | **官方能力调研与源码复核**；OpenAI/Claude/Gemini/LangGraph/Deep Agents/MCP，求道当前问题 F01–F20；区分现有能力、设计推导与待实测项 |
 | [design/isolated-web-runtime-development-2026-10-26.md](design/isolated-web-runtime-development-2026-10-26.md) | **隔离执行与响应式 Web 运行时**：进程池、控制/读取分离、取消、事件恢复、发布一致性；实现见 `src/runtime/` |
