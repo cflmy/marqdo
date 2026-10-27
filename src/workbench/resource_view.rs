@@ -13,6 +13,8 @@ pub struct ResourceViewRequest {
     pub path: String,
     pub revision: Option<String>,
     pub max_bytes: usize,
+    /// Optional focus locator from resources/preview (page/line/cell).
+    pub locator: Option<Value>,
 }
 
 impl ResourceViewRequest {
@@ -46,6 +48,7 @@ impl ResourceViewRequest {
                 .and_then(|v| v.as_str())
                 .map(|s| s.to_string()),
             max_bytes,
+            locator: params.get("locator").cloned().filter(|v| !v.is_null()),
         })
     }
 }
@@ -127,7 +130,9 @@ pub fn build_resource_view(req: &ResourceViewRequest) -> Result<Value, Value> {
     // PDF / image: framework supplies authorized blob_ref for client visual
     // preview (PDF.js / ImagePreview). Extract and OCR stay independently
     // unavailable — never claim text was extracted (F16 / QA-10).
-    if let Some(view) = binary_blob_view(&rel, media, kind, &digest, &title, size) {
+    if let Some(view) =
+        binary_blob_view(&rel, media, kind, &digest, &title, size, req.locator.as_ref())
+    {
         return Ok(view);
     }
 
@@ -301,9 +306,15 @@ fn binary_blob_view(
     digest: &str,
     title: &str,
     size: usize,
+    locator: Option<&Value>,
 ) -> Option<Value> {
     match kind {
         "pdf" | "image" => {
+            let focus_page = locator
+                .and_then(|l| l.get("page"))
+                .and_then(|v| v.as_u64())
+                .filter(|&p| p >= 1)
+                .map(|p| p as usize);
             let (renderer_id, diagnostics) = if kind == "pdf" {
                 (
                     "pdf_blob",
@@ -321,6 +332,7 @@ fn binary_blob_view(
                     ],
                 )
             };
+            let page = focus_page.unwrap_or(1);
             Some(json!({
                 "schema": "ResourceViewV1",
                 "schema_version": 1,
@@ -340,10 +352,11 @@ fn binary_blob_view(
                 },
                 "outline": [],
                 "locators": if kind == "pdf" {
-                    json!([{"id": "page-1", "kind": "page", "locator": {"page": 1}}])
+                    json!([{"id": format!("page-{page}"), "kind": "page", "locator": {"page": page}}])
                 } else {
                     json!([])
                 },
+                "focus_locator": locator.cloned().unwrap_or(Value::Null),
                 "completeness": "partial",
                 "no_exec": true,
                 "diagnostics": diagnostics,
@@ -354,7 +367,8 @@ fn binary_blob_view(
                     "kind": kind,
                     "visual_preview": "client",
                     "extract": false,
-                    "ocr": false
+                    "ocr": false,
+                    "page_locator": kind == "pdf"
                 }
             }))
         }
@@ -749,6 +763,7 @@ mod tests {
             path: "note.txt".into(),
             revision: None,
             max_bytes: 10_000,
+            locator: None,
         };
         let view = build_resource_view(&req).unwrap();
         assert_eq!(view["no_exec"], true);
@@ -767,6 +782,7 @@ mod tests {
             path: "../etc/passwd".into(),
             revision: None,
             max_bytes: 10_000,
+            locator: None,
         };
         let errv = build_resource_view(&req).unwrap_err();
         assert_eq!(errv["error"]["code"], "resource.path_escape");
@@ -783,6 +799,7 @@ mod tests {
             path: "cfg.json".into(),
             revision: None,
             max_bytes: 10_000,
+            locator: None,
         };
         let view = build_resource_view(&req).unwrap();
         assert_eq!(view["no_exec"], true);
@@ -804,6 +821,7 @@ mod tests {
             path: "t.csv".into(),
             revision: None,
             max_bytes: 10_000,
+            locator: None,
         };
         let view = build_resource_view(&req).unwrap();
         assert_eq!(view["no_exec"], true);
@@ -825,6 +843,7 @@ mod tests {
             path: "doc.pdf".into(),
             revision: None,
             max_bytes: 10_000,
+            locator: None,
         };
         let view = build_resource_view(&req).unwrap();
         assert_eq!(view["no_exec"], true);
@@ -834,6 +853,7 @@ mod tests {
         assert_eq!(view["capabilities"]["ocr"], false);
         assert_eq!(view["capabilities"]["extract"], false);
         assert_eq!(view["capabilities"]["visual_preview"], "client");
+        assert_eq!(view["capabilities"]["page_locator"], true);
         assert_eq!(view["render"]["blob_ref"]["path"], "doc.pdf");
         assert!(view["render"]["blob_ref"]["digest"].as_str().unwrap().starts_with("sha256:"));
         let codes: Vec<&str> = view["diagnostics"]
@@ -849,6 +869,24 @@ mod tests {
     }
 
     #[test]
+    fn pdf_focus_locator_page() {
+        let dir = scratch_dir("pdf-page");
+        let path = dir.join("doc.pdf");
+        fs::write(&path, b"%PDF-1.4 fake").unwrap();
+        let req = ResourceViewRequest {
+            workspace_root: dir.clone(),
+            path: "doc.pdf".into(),
+            revision: None,
+            max_bytes: 10_000,
+            locator: Some(json!({"page": 3})),
+        };
+        let view = build_resource_view(&req).unwrap();
+        assert_eq!(view["focus_locator"]["page"], 3);
+        assert_eq!(view["locators"][0]["locator"]["page"], 3);
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
     fn image_blob_ref_for_client_preview() {
         let dir = scratch_dir("img");
         let path = dir.join("pic.png");
@@ -858,6 +896,7 @@ mod tests {
             path: "pic.png".into(),
             revision: None,
             max_bytes: 10_000,
+            locator: None,
         };
         let view = build_resource_view(&req).unwrap();
         assert_eq!(view["renderer"]["id"], "image_blob");
