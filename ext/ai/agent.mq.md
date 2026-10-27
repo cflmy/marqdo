@@ -2884,8 +2884,10 @@ Primary author entry (v2 + P4): Adaptive `route` → execute (policy/kb skill) o
   **_ = 1**
 
 1. `resume_id`
-  **_ckpt = resume_save id=`resume_id` goal=`task` task=`task` status=`st` round=1 workbook=`wb_path` result=`res` route=`routed` resume_dir=`resume_dir`**
+  **_wm = > effects_watermark ledger_dir=".marqdo/agent-effects" logical_run_id=`resume_id`**
+  **_ckpt = resume_save id=`resume_id` goal=`task` task=`task` status=`st` round=1 workbook=`wb_path` result=`res` route=`routed` resume_dir=`resume_dir` checkpoint_v2=True attempt_id="attempt_1" effect_ledger_watermark=`_wm`**
   **out = table.put in=`out` at="resume" value=`_ckpt`**
+  **out = table.put in=`out` at="effect_ledger_watermark" value=`_wm`**
 2. *
   **_ = 1**
 
@@ -2899,8 +2901,10 @@ Primary author entry (v2 + P4): Adaptive `route` → execute (policy/kb skill) o
     + `max_reads`=2
     + `sandbox`=False
     + `sandbox_profile`=default
+    + `resume_id`=None
 
 One atomic turn: budgeted context → LLM → optional `READ:` deepen → optional tool via subtask. Returns a *map* (`status`, `task`, `decision`, and on success `result` plus optional `tool` / `tool_result`; on failure `error`). By default (`writeback=True`) persists that map under named slots `ok` / `error` at the call site; pass `writeback=False` to skip.
+Optional `resume_id` scopes EffectLedger idempotency for mutating tools.
 
 With `stream=True`, the model call uses SSE; `echo=True` prints delta text to stdout as it arrives. The returned map is unchanged (final `result` string). Context source/skill start at default budget; up to `max_reads` of `READ:source` / `READ:skill` deepen before CALL/answer.
 `sandbox=True` (O1 opt-in): attach the sandbox profile row on the result map (trial via `## trial` / `run sandbox=`).
@@ -2991,7 +2995,7 @@ With `stream=True`, the model call uses SSE; `echo=True` prints delta text to st
 | ok | `task` | `decision` |
 
 1. `tool_name`
-  **tool_out = > run_tool tools=`tools` name=`tool_name`**
+  **tool_out = > run_tool tools=`tools` name=`tool_name` logical_run_id=`resume_id`**
   **tool_s = > json.stringify value=`tool_out`**
   **deny = > split value=`tool_s` sep="Tool not allowed"**
   **deny_n = > len value=`deny`**
