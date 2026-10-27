@@ -231,17 +231,40 @@ pub fn resume_save(args: &Value) -> Result<Value, String> {
     }))
 }
 
+fn watermark_allows_write_auto(wm: &Value) -> bool {
+    match wm {
+        Value::Null => false,
+        Value::String(s) => !s.is_empty(),
+        Value::Object(obj) => {
+            // Prefer explicit safety bit from effects_watermark; bare digest objects
+            // without the bit are treated as unsafe (open unknown / pending writes).
+            match obj.get("write_auto_resume_safe").and_then(|v| v.as_bool()) {
+                Some(b) => b,
+                None => obj
+                    .get("watermark")
+                    .and_then(|v| v.as_str())
+                    .map(|s| !s.is_empty())
+                    .unwrap_or(false)
+                    && obj.get("open_unknown").and_then(|v| v.as_u64()).unwrap_or(1) == 0
+                    && obj.get("pending_writes").and_then(|v| v.as_u64()).unwrap_or(1) == 0,
+            }
+        }
+        _ => false,
+    }
+}
+
 fn annotate_recovery(mut doc: Value) -> Value {
     let is_v2 = doc.get("schema").and_then(|v| v.as_str()) == Some("CheckpointV2")
         && doc.get("schema_version").and_then(|v| v.as_u64()) == Some(2);
-    let has_ledger = doc
+    let wm = doc
         .get("effect_ledger_watermark")
-        .map(|v| !v.is_null())
-        .unwrap_or(false);
-    let (recovery_mode, write_auto_resume) = if is_v2 && has_ledger {
+        .cloned()
+        .unwrap_or(Value::Null);
+    let ledger_safe = watermark_allows_write_auto(&wm);
+    let (recovery_mode, write_auto_resume) = if is_v2 && ledger_safe {
         ("checkpoint_v2", true)
     } else if is_v2 {
-        // V2 without ledger: read resume OK; write auto-resume still closed.
+        // V2 without a safe ledger watermark: read resume OK; write auto-resume closed.
         ("checkpoint_v2_read_only", false)
     } else {
         // Legacy: no effect info → manual_review; never auto redo writes.
@@ -425,6 +448,48 @@ mod tests {
         assert_eq!(legacy["recovery_mode"], "manual_review");
         assert_eq!(legacy["write_auto_resume"], false);
         assert_eq!(legacy["legacy_adaptation"], "manual_review");
+
+        // V2 + safe watermark → write_auto_resume opens.
+        let _ = resume_save(&json!({
+            "id": "run_safe",
+            "schema": "CheckpointV2",
+            "schema_version": 2,
+            "status": "running",
+            "round": 3,
+            "resume_dir": rel,
+            "attempt_id": "a2",
+            "effect_ledger_watermark": {
+                "schema": "EffectLedgerWatermarkV1",
+                "watermark": "sha256-lite:abc",
+                "write_auto_resume_safe": true,
+                "open_unknown": 0,
+                "pending_writes": 0
+            }
+        }))
+        .unwrap();
+        let safe = resume_load(&json!({"id": "run_safe", "resume_dir": rel})).unwrap();
+        assert_eq!(safe["recovery_mode"], "checkpoint_v2");
+        assert_eq!(safe["write_auto_resume"], true);
+
+        // Unsafe watermark (open unknown) keeps write auto-resume closed.
+        let _ = resume_save(&json!({
+            "id": "run_unsafe",
+            "schema": "CheckpointV2",
+            "schema_version": 2,
+            "status": "running",
+            "round": 4,
+            "resume_dir": rel,
+            "attempt_id": "a3",
+            "effect_ledger_watermark": {
+                "watermark": "sha256-lite:def",
+                "write_auto_resume_safe": false,
+                "open_unknown": 1
+            }
+        }))
+        .unwrap();
+        let unsafe_ck = resume_load(&json!({"id": "run_unsafe", "resume_dir": rel})).unwrap();
+        assert_eq!(unsafe_ck["recovery_mode"], "checkpoint_v2_read_only");
+        assert_eq!(unsafe_ck["write_auto_resume"], false);
 
         std::env::set_current_dir(prev).unwrap();
         let _ = fs::remove_dir_all(&dir);

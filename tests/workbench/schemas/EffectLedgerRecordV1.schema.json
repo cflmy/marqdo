@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "marqdo://contracts/EffectLedgerRecordV1",
+  "title": "EffectLedgerRecordV1",
+  "type": "object",
+  "required": [
+    "schema",
+    "schema_version",
+    "operation_id",
+    "idempotency_key",
+    "args_digest",
+    "effect_class",
+    "state"
+  ],
+  "properties": {
+    "schema": { "const": "EffectLedgerRecordV1" },
+    "schema_version": { "const": 1 },
+    "operation_id": { "type": "string" },
+    "idempotency_key": { "type": "string" },
+    "args_digest": { "type": "string" },
+    "resource_scope": { "type": ["string", "null"] },
+    "expected_revision": { "type": ["string", "null"] },
+    "effect_class": {
+      "type": "string",
+      "enum": ["read", "write", "execute", "external_write", "none"]
+    },
+    "result_ref": { "type": ["string", "null"] },
+    "state": {
+      "type": "string",
+      "enum": [
+        "prepared",
+        "started",
+        "committed",
+        "failed_no_effect",
+        "unknown",
+        "reconciled_committed",
+        "reconciled_no_effect",
+        "needs_input"
+      ]
+    },
+    "logical_run_id": { "type": ["string", "null"] },
+    "step_id": { "type": ["string", "null"] },
+    "attempt_id": { "type": ["string", "null"] }
+  },
+  "additionalProperties": true
+}

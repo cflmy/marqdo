@@ -117,16 +117,12 @@ pub fn probe_capabilities(params: &Value) -> Value {
         features.insert("view.document".into(), json!(0));
         features.insert("view.reference_resolve".into(), json!(0));
     }
-    // M-A0–M-A3: protocol capability bits (tool_schema after M-A2 registry).
+    // M-A0–M-A4: protocol capability bits.
     features.insert("agent.error_v1".into(), json!(1));
     features.insert("agent.checkpoint_v2".into(), json!(1));
     features.insert("agent.tool_schema_v1".into(), json!(1));
-    for (k, v) in [
-        ("agent.output_channels_v1", 0),
-        ("agent.context_pack_v2", 0),
-    ] {
-        features.insert(k.into(), json!(v));
-    }
+    features.insert("agent.output_channels_v1".into(), json!(1));
+    features.insert("agent.context_pack_v2".into(), json!(1));
     #[cfg(feature = "view")]
     {
         features.insert("resource.view_v1".into(), json!(1));
@@ -250,8 +246,8 @@ mod tests {
         assert_eq!(caps["features"]["agent.error_v1"], 1);
         assert_eq!(caps["features"]["agent.checkpoint_v2"], 1);
         assert_eq!(caps["features"]["agent.tool_schema_v1"], 1);
-        assert_eq!(caps["features"]["agent.output_channels_v1"], 0);
-        assert_eq!(caps["features"]["agent.context_pack_v2"], 0);
+        assert_eq!(caps["features"]["agent.output_channels_v1"], 1);
+        assert_eq!(caps["features"]["agent.context_pack_v2"], 1);
         #[cfg(feature = "view")]
         assert_eq!(caps["features"]["resource.view_v1"], 1);
         #[cfg(not(feature = "view"))]

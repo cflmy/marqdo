@@ -285,6 +285,131 @@ Validate schema + authorize; returns ToolCallV1 or ToolResultV1 error (no side e
 
 *> agent_tools_prepare_call tool_id=`tool_id` arguments=`arguments` tools=`tools` call_id=`call_id`*
 
+## output_build
+    + `status`="succeeded"
+    + `text`=""
+    + `format`="markdown"
+    + `answer`=None
+    + `artifacts`=None
+    + `citations`=None
+    + `validation`=None
+    + `finish_reason`=None
+    + `recovery_options`=None
+    + `channels`=None
+    + `allow_passed_without_report`=False
+
+Build an `AgentOutputV1` document (M-A4). `validation.status=passed` requires `report_ref`.
+
+**p = > plugin.native_path name="agent"**
+1. `p`
+  > plugin.load path=`p`
+2. *
+  > print text=ext/ai/agent: native agent plugin not found
+  > sys.exit code=1
+
+*> agent_output_build status=`status` text=`text` format=`format` answer=`answer` artifacts=`artifacts` citations=`citations` validation=`validation` finish_reason=`finish_reason` recovery_options=`recovery_options` channels=`channels` allow_passed_without_report=`allow_passed_without_report`*
+
+## output_apply_policy
+    + `status`="succeeded"
+    + `text`=""
+    + `format`="markdown"
+    + `answer`=None
+    + `artifacts`=None
+    + `citations`=None
+    + `validation`=None
+    + `policy`=None
+    + `schema`=None
+    + `schema_version`=None
+    + `finish_reason`=None
+    + `recovery_options`=None
+    + `channels`=None
+
+Apply `ResponsePolicy` (detail / max_chars / max_output_tokens / artifact_allowed) to an AgentOutputV1 or raw text.
+
+**p = > plugin.native_path name="agent"**
+1. `p`
+  > plugin.load path=`p`
+2. *
+  > print text=ext/ai/agent: native agent plugin not found
+  > sys.exit code=1
+
+*> agent_output_apply_policy status=`status` text=`text` format=`format` answer=`answer` artifacts=`artifacts` citations=`citations` validation=`validation` policy=`policy` schema=`schema` schema_version=`schema_version` finish_reason=`finish_reason` recovery_options=`recovery_options` channels=`channels`*
+
+## output_channel_event
+    + `channel`
+    + `delta`=""
+    + `resource_id`=None
+    + `meta`=None
+
+Split a stream delta by channel. Only `answer` sets `append_to_chat=true`.
+
+**p = > plugin.native_path name="agent"**
+1. `p`
+  > plugin.load path=`p`
+2. *
+  > print text=ext/ai/agent: native agent plugin not found
+  > sys.exit code=1
+
+*> agent_output_channel_event channel=`channel` delta=`delta` resource_id=`resource_id` meta=`meta`*
+
+## output_project_conclusion
+    + `document`=""
+    + `text`=""
+
+Deterministic chat projection from `# 结论` / `# conclusion` (F01 transition). Falls back to the first body paragraph.
+
+**p = > plugin.native_path name="agent"**
+1. `p`
+  > plugin.load path=`p`
+2. *
+  > print text=ext/ai/agent: native agent plugin not found
+  > sys.exit code=1
+
+*> agent_output_project_conclusion document=`document` text=`text`*
+
+## context_pack_build
+    + `items`=None
+    + `budget_tokens`=8000
+    + `output_reserve_pct`=20
+    + `compact_threshold_pct`=70
+    + `goal`=None
+    + `constraints`=None
+
+Assemble `ContextPackV2` with origin/trust/priority. Web/tool items cannot be `trust=trusted`.
+
+**p = > plugin.native_path name="agent"**
+1. `p`
+  > plugin.load path=`p`
+2. *
+  > print text=ext/ai/agent: native agent plugin not found
+  > sys.exit code=1
+
+*> agent_context_pack_build items=`items` budget_tokens=`budget_tokens` output_reserve_pct=`output_reserve_pct` compact_threshold_pct=`compact_threshold_pct` goal=`goal` constraints=`constraints`*
+
+## context_pack_compact
+    + `items`=None
+    + `budget_tokens`=8000
+    + `output_reserve_pct`=20
+    + `compact_threshold_pct`=70
+    + `goal`=None
+    + `constraints`=None
+    + `schema`=None
+    + `schema_version`=None
+    + `available_tokens`=None
+    + `used_tokens`=None
+    + `source_event_range`=None
+
+Compact over-threshold packs; retain goal/constraints/pending_write/plan/trusted anchors (F19).
+
+**p = > plugin.native_path name="agent"**
+1. `p`
+  > plugin.load path=`p`
+2. *
+  > print text=ext/ai/agent: native agent plugin not found
+  > sys.exit code=1
+
+*> agent_context_pack_compact items=`items` budget_tokens=`budget_tokens` output_reserve_pct=`output_reserve_pct` compact_threshold_pct=`compact_threshold_pct` goal=`goal` constraints=`constraints` schema=`schema` schema_version=`schema_version` available_tokens=`available_tokens` used_tokens=`used_tokens` source_event_range=`source_event_range`*
+
 ## render_workbook_skeleton
     + `goal`
     + `skeleton`=single
@@ -856,6 +981,113 @@ List checkpoint ids under `resume_dir`.
 Author entry: load checkpoint for continuation. Returns the checkpoint map (`found`/`round`/`workbook`/…). Callers continue with `plan`/`run` using saved fields; clear when done.
 
 *> resume_load id=`id` resume_dir=`resume_dir`*
+
+## effects_prepare
+    + `operation_id`
+    + `idempotency_key`
+    + `args_digest`
+    + `effect_class`="write"
+    + `resource_scope`=None
+    + `expected_revision`=None
+    + `result_ref`=None
+    + `logical_run_id`=None
+    + `step_id`=None
+    + `attempt_id`=None
+    + `ledger_dir`=.marqdo/agent-effects
+
+Create (or dedupe) an `EffectLedgerRecordV1` in `prepared`. Same idempotency_key + args_digest returns the existing record; same key with different digest is rejected.
+
+**p = > plugin.native_path name="agent"**
+1. `p`
+  > plugin.load path=`p`
+2. *
+  > print text=ext/ai/agent: native agent plugin not found
+  > sys.exit code=1
+
+*> agent_effects_prepare operation_id=`operation_id` idempotency_key=`idempotency_key` args_digest=`args_digest` effect_class=`effect_class` resource_scope=`resource_scope` expected_revision=`expected_revision` result_ref=`result_ref` logical_run_id=`logical_run_id` step_id=`step_id` attempt_id=`attempt_id` ledger_dir=`ledger_dir`*
+
+## effects_transition
+    + `operation_id`
+    + `state`
+    + `result_ref`=None
+    + `note`=None
+    + `reconcile_hint`=None
+    + `ledger_dir`=.marqdo/agent-effects
+
+Advance ledger state (`prepared→started→committed|failed_no_effect|unknown→reconciled_*`).
+
+**p = > plugin.native_path name="agent"**
+1. `p`
+  > plugin.load path=`p`
+2. *
+  > print text=ext/ai/agent: native agent plugin not found
+  > sys.exit code=1
+
+*> agent_effects_transition operation_id=`operation_id` state=`state` result_ref=`result_ref` note=`note` reconcile_hint=`reconcile_hint` ledger_dir=`ledger_dir`*
+
+## effects_get
+    + `operation_id`
+    + `ledger_dir`=.marqdo/agent-effects
+
+Load one ledger record.
+
+**p = > plugin.native_path name="agent"**
+1. `p`
+  > plugin.load path=`p`
+2. *
+  > print text=ext/ai/agent: native agent plugin not found
+  > sys.exit code=1
+
+*> agent_effects_get operation_id=`operation_id` ledger_dir=`ledger_dir`*
+
+## effects_list
+    + `ledger_dir`=.marqdo/agent-effects
+    + `logical_run_id`=None
+    + `state`=None
+
+List ledger records (optional filters).
+
+**p = > plugin.native_path name="agent"**
+1. `p`
+  > plugin.load path=`p`
+2. *
+  > print text=ext/ai/agent: native agent plugin not found
+  > sys.exit code=1
+
+*> agent_effects_list ledger_dir=`ledger_dir` logical_run_id=`logical_run_id` state=`state`*
+
+## effects_watermark
+    + `ledger_dir`=.marqdo/agent-effects
+    + `logical_run_id`=None
+
+Digest committed/open effects for CheckpointV2. `write_auto_resume_safe` is false while unknown or pending writes remain.
+
+**p = > plugin.native_path name="agent"**
+1. `p`
+  > plugin.load path=`p`
+2. *
+  > print text=ext/ai/agent: native agent plugin not found
+  > sys.exit code=1
+
+*> agent_effects_watermark ledger_dir=`ledger_dir` logical_run_id=`logical_run_id`*
+
+## effects_reconcile
+    + `operation_id`
+    + `outcome`
+    + `result_ref`=None
+    + `note`=None
+    + `ledger_dir`=.marqdo/agent-effects
+
+Reconcile an `unknown` record: `outcome` = committed | no_effect | needs_input.
+
+**p = > plugin.native_path name="agent"**
+1. `p`
+  > plugin.load path=`p`
+2. *
+  > print text=ext/ai/agent: native agent plugin not found
+  > sys.exit code=1
+
+*> agent_effects_reconcile operation_id=`operation_id` outcome=`outcome` result_ref=`result_ref` note=`note` ledger_dir=`ledger_dir`*
 
 ---
 

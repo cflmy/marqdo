@@ -1,12 +1,15 @@
 //! Agent plugin (C ABI v2): layout helpers + session bag + context via host_query + agent-kb + v2 memory + adaptive route.
 
+mod context_pack;
 mod corpus;
+mod effects;
 mod eng;
 mod error;
 mod kb;
 mod mcp_client;
 mod mcp_server;
 mod memory;
+mod output;
 mod resume;
 mod route;
 mod sandbox;
@@ -849,6 +852,58 @@ kb_ffi!(
     tools::seed_from_allowlist_args,
     "agent_tools_seed_allowlist"
 );
+kb_ffi!(agent_output_build, output::output_build, "agent_output_build");
+kb_ffi!(
+    agent_output_apply_policy,
+    output::output_apply_policy,
+    "agent_output_apply_policy"
+);
+kb_ffi!(
+    agent_output_channel_event,
+    output::output_channel_event,
+    "agent_output_channel_event"
+);
+kb_ffi!(
+    agent_output_project_conclusion,
+    output::output_project_conclusion,
+    "agent_output_project_conclusion"
+);
+kb_ffi!(
+    agent_context_pack_build,
+    context_pack::context_pack_build,
+    "agent_context_pack_build"
+);
+kb_ffi!(
+    agent_context_pack_compact,
+    context_pack::context_pack_compact,
+    "agent_context_pack_compact"
+);
+kb_ffi!(
+    agent_effects_prepare,
+    effects::effects_prepare,
+    "agent_effects_prepare"
+);
+kb_ffi!(
+    agent_effects_transition,
+    effects::effects_transition,
+    "agent_effects_transition"
+);
+kb_ffi!(agent_effects_get, effects::effects_get, "agent_effects_get");
+kb_ffi!(
+    agent_effects_list,
+    effects::effects_list,
+    "agent_effects_list"
+);
+kb_ffi!(
+    agent_effects_watermark,
+    effects::effects_watermark,
+    "agent_effects_watermark"
+);
+kb_ffi!(
+    agent_effects_reconcile,
+    effects::effects_reconcile,
+    "agent_effects_reconcile"
+);
 kb_ffi!(agent_eng_preflight, eng::eng_preflight, "agent_eng_preflight");
 kb_ffi!(agent_eng_reuse, eng::eng_reuse, "agent_eng_reuse");
 kb_ffi!(agent_eng_bind_execute, eng::eng_bind_execute, "agent_eng_bind_execute");
@@ -912,6 +967,54 @@ pub unsafe extern "C" fn marqdo_plugin_init(host: *const MarqdoHostApi) -> c_int
             agent_tools_register_eng_defaults,
         ),
         ("agent_tools_seed_allowlist", "tools", agent_tools_seed_allowlist),
+        ("agent_output_build", "status,text,validation", agent_output_build),
+        (
+            "agent_output_apply_policy",
+            "status,text,policy",
+            agent_output_apply_policy,
+        ),
+        (
+            "agent_output_channel_event",
+            "channel,delta",
+            agent_output_channel_event,
+        ),
+        (
+            "agent_output_project_conclusion",
+            "document",
+            agent_output_project_conclusion,
+        ),
+        (
+            "agent_context_pack_build",
+            "items,budget_tokens",
+            agent_context_pack_build,
+        ),
+        (
+            "agent_context_pack_compact",
+            "items,budget_tokens",
+            agent_context_pack_compact,
+        ),
+        (
+            "agent_effects_prepare",
+            "operation_id,idempotency_key,args_digest",
+            agent_effects_prepare,
+        ),
+        (
+            "agent_effects_transition",
+            "operation_id,state",
+            agent_effects_transition,
+        ),
+        ("agent_effects_get", "operation_id", agent_effects_get),
+        ("agent_effects_list", "ledger_dir", agent_effects_list),
+        (
+            "agent_effects_watermark",
+            "ledger_dir",
+            agent_effects_watermark,
+        ),
+        (
+            "agent_effects_reconcile",
+            "operation_id,outcome",
+            agent_effects_reconcile,
+        ),
         ("agent_kb_add_alias", "kb_dir,slug,alias", agent_kb_add_alias),
         ("agent_kb_promote", "kb_dir,goal,workbook", agent_kb_promote),
         ("agent_kb_quarantine", "kb_dir,slug", agent_kb_quarantine),

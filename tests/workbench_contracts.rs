@@ -136,6 +136,12 @@ fn ma0_agent_reliability_protocol_freeze() {
     assert_eq!(legacy["id"], "legacy_resume_01");
 
     let ledger = fixture("effect_ledger_v1.json");
+    assert_required(
+        &ledger,
+        &schema("EffectLedgerRecordV1.schema.json"),
+        "effect_ledger",
+    );
+    assert_eq!(ledger["schema"], "EffectLedgerRecordV1");
     assert_eq!(ledger["state"], "prepared");
     assert_eq!(ledger["effect_class"], "write");
 
@@ -182,13 +188,12 @@ fn ma0_agent_reliability_protocol_freeze() {
     let caps = mlsp("capabilities", serde_json::json!({}));
     assert_eq!(caps["ok"], true, "{caps}");
     let features = &caps["result"]["features"];
-    for bit in ["agent.output_channels_v1", "agent.context_pack_v2"] {
-        assert_eq!(features[bit], 0, "{bit} must stay 0 until emitters land");
-    }
-    // M-A1–M-A3: error + checkpoint + tool schema + resource view emitters are live.
+    // M-A1–M-A4: agent reliability emitters are live.
     assert_eq!(features["agent.error_v1"], 1);
     assert_eq!(features["agent.checkpoint_v2"], 1);
     assert_eq!(features["agent.tool_schema_v1"], 1);
+    assert_eq!(features["agent.output_channels_v1"], 1);
+    assert_eq!(features["agent.context_pack_v2"], 1);
     assert_eq!(features["resource.view_v1"], 1);
 
     let formats = caps["result"]["extract_formats"]
@@ -220,6 +225,8 @@ fn ma0_agent_reliability_protocol_freeze() {
     assert_eq!(down["result"]["features"]["agent.error_v1"], 1);
     assert_eq!(down["result"]["features"]["agent.checkpoint_v2"], 1);
     assert_eq!(down["result"]["features"]["agent.tool_schema_v1"], 1);
+    assert_eq!(down["result"]["features"]["agent.output_channels_v1"], 1);
+    assert_eq!(down["result"]["features"]["agent.context_pack_v2"], 1);
     assert_eq!(down["result"]["features"]["resource.view_v1"], 1);
 }
 
