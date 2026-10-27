@@ -9,12 +9,12 @@ use marqdo::diagnostics::{Diagnostic, Span};
 use marqdo::ext_cli::{add_ext, list_ext, remove_ext};
 use marqdo::input_feed::load_stdin_file;
 use marqdo::knowledge::{
-    compile_policy, conflicts_json, ensure_compiled, find, find_conflicts, find_duplicates,
-    find_json, find_stale, format_conflicts_text, format_duplicates_text, format_find_text,
-    format_impact_text, format_preflight_yaml, format_reuse_text, format_stale_text,
-    format_verify_text, impact, impact_json, learn, preflight, preflight_json, record_decision,
-    resolve, reuse_json, stale_json, verify, verify_json, write_knowledge, KnowledgeOptions,
-    LearnInput, ReuseBudget,
+    compile_policy, conflicts_json, find, find_conflicts, find_duplicates, find_json, find_stale,
+    format_conflicts_text, format_duplicates_text, format_find_text, format_impact_text,
+    format_preflight_yaml, format_reuse_text, format_stale_text, format_verify_text, graph_for_query,
+    impact, impact_json, learn, preflight_from_reuse, preflight_json, record_decision, resolve,
+    reuse_json, stale_json, verify, verify_json, write_knowledge, KnowledgeOptions, LearnInput,
+    ReuseBudget,
 };
 use marqdo::view::{
     serve, serve_debug, write_capture, write_static, CaptureOptions, DebugOptions, OutputOptions,
@@ -265,6 +265,10 @@ enum Commands {
 
         #[arg(long, global = true)]
         json: bool,
+
+        /// Force a full knowledge recompile before query actions (preflight, …)
+        #[arg(long, global = true)]
+        refresh: bool,
     },
     /// Find engineering capabilities / symbols / knowledge
     Find {
@@ -282,6 +286,10 @@ enum Commands {
 
         #[arg(long)]
         json: bool,
+
+        /// Force a full knowledge recompile before querying
+        #[arg(long)]
+        refresh: bool,
     },
     /// Engineering First Information: REUSE / ADAPT / CREATE
     Reuse {
@@ -306,6 +314,10 @@ enum Commands {
 
         #[arg(long)]
         json: bool,
+
+        /// Force a full knowledge recompile before querying
+        #[arg(long)]
+        refresh: bool,
     },
     /// Knowledge impact of changed paths
     Impact {
@@ -320,6 +332,10 @@ enum Commands {
 
         #[arg(long)]
         json: bool,
+
+        /// Force a full knowledge recompile before querying
+        #[arg(long)]
+        refresh: bool,
     },
     /// Detect knowledge conflicts / possible duplicates edges
     Conflicts {
@@ -335,6 +351,10 @@ enum Commands {
         /// Exit non-zero when conflicts found (CI gate; default remains report-only)
         #[arg(long)]
         fail: bool,
+
+        /// Force a full knowledge recompile before querying
+        #[arg(long)]
+        refresh: bool,
     },
     /// List stale / deprecated / superseded knowledge
     Stale {
@@ -350,6 +370,10 @@ enum Commands {
         /// Exit non-zero when stale items found (CI gate; default remains report-only)
         #[arg(long)]
         fail: bool,
+
+        /// Force a full knowledge recompile before querying
+        #[arg(long)]
+        refresh: bool,
     },
     /// Detect duplicate capabilities via symbol fingerprints
     Duplicate {
@@ -368,6 +392,10 @@ enum Commands {
 
         #[arg(long)]
         json: bool,
+
+        /// Force a full knowledge recompile before querying
+        #[arg(long)]
+        refresh: bool,
     },
     /// Verify code ↔ knowledge consistency (EKC structural; exit 1 only on errors)
     Verify {
@@ -383,6 +411,10 @@ enum Commands {
         /// Also fail on warnings (does not change default success-when-no-errors)
         #[arg(long)]
         fail_on_warning: bool,
+
+        /// Force a full knowledge recompile before querying
+        #[arg(long)]
+        refresh: bool,
     },
     /// Official extension installer (`list` / `add` / `remove`)
     Ext {
@@ -1235,6 +1267,7 @@ fn try_main(cli: Cli) -> Result<i32> {
             path,
             out,
             json,
+            refresh,
         } => {
             let path = path.unwrap_or_else(|| PathBuf::from("."));
             match action.unwrap_or(KnowledgeAction::Compile) {
@@ -1479,14 +1512,15 @@ fn try_main(cli: Cli) -> Result<i32> {
                     min_candidates,
                     allow_create_after,
                 } => {
-                    let graph = ensure_compiled(&path, &out)?;
+                    let graph = graph_for_query(&path, &out, refresh)?;
                     let budget = ReuseBudget {
                         min_candidates,
                         allow_create_after,
                         ..ReuseBudget::default()
                     };
-                    let pf = preflight(&graph, &task, &budget, Some(&out))?;
-                    let _ = compile_policy(&out, &task, &resolve(&graph, &task, &budget));
+                    let reuse = resolve(&graph, &task, &budget);
+                    let pf = preflight_from_reuse(&graph, &task, &reuse, Some(&out))?;
+                    let _ = compile_policy(&out, &task, &reuse);
                     if json {
                         println!("{}", preflight_json(&pf));
                     } else {
@@ -1554,9 +1588,10 @@ fn try_main(cli: Cli) -> Result<i32> {
             out,
             limit,
             json,
+            refresh,
         } => {
             let path = path.unwrap_or_else(|| PathBuf::from("."));
-            let graph = ensure_compiled(&path, &out)?;
+            let graph = graph_for_query(&path, &out, refresh)?;
             let hits = find(&graph, &query, limit);
             if json {
                 println!("{}", find_json(&query, &hits));
@@ -1573,9 +1608,10 @@ fn try_main(cli: Cli) -> Result<i32> {
             min_candidates,
             allow_create_after,
             json,
+            refresh,
         } => {
             let path = path.unwrap_or_else(|| PathBuf::from("."));
-            let graph = ensure_compiled(&path, &out)?;
+            let graph = graph_for_query(&path, &out, refresh)?;
             let budget = ReuseBudget {
                 min_candidates,
                 allow_create_after,
@@ -1584,7 +1620,7 @@ fn try_main(cli: Cli) -> Result<i32> {
             let result = resolve(&graph, &task, &budget);
             let _ = compile_policy(&out, &task, &result);
             if do_preflight {
-                let _ = preflight(&graph, &task, &budget, Some(&out))?;
+                let _ = preflight_from_reuse(&graph, &task, &result, Some(&out))?;
             }
             if json {
                 println!("{}", reuse_json(&task, &result));
@@ -1598,8 +1634,9 @@ fn try_main(cli: Cli) -> Result<i32> {
             root,
             out,
             json,
+            refresh,
         } => {
-            let graph = ensure_compiled(&root, &out)?;
+            let graph = graph_for_query(&root, &out, refresh)?;
             let path_strs: Vec<String> = paths
                 .iter()
                 .map(|p| p.to_string_lossy().replace('\\', "/"))
@@ -1617,9 +1654,10 @@ fn try_main(cli: Cli) -> Result<i32> {
             out,
             json,
             fail,
+            refresh,
         } => {
             let path = path.unwrap_or_else(|| PathBuf::from("."));
-            let graph = ensure_compiled(&path, &out)?;
+            let graph = graph_for_query(&path, &out, refresh)?;
             let items = find_conflicts(&graph);
             if json {
                 println!("{}", conflicts_json(&items));
@@ -1633,9 +1671,10 @@ fn try_main(cli: Cli) -> Result<i32> {
             out,
             json,
             fail,
+            refresh,
         } => {
             let path = path.unwrap_or_else(|| PathBuf::from("."));
-            let graph = ensure_compiled(&path, &out)?;
+            let graph = graph_for_query(&path, &out, refresh)?;
             let items = find_stale(&graph, &path);
             if json {
                 println!("{}", stale_json(&items));
@@ -1650,9 +1689,10 @@ fn try_main(cli: Cli) -> Result<i32> {
             threshold,
             fail,
             json,
+            refresh,
         } => {
             let path = path.unwrap_or_else(|| PathBuf::from("."));
-            let graph = ensure_compiled(&path, &out)?;
+            let graph = graph_for_query(&path, &out, refresh)?;
             let pairs = find_duplicates(&graph.symbols, threshold);
             if json {
                 println!(
@@ -1682,9 +1722,10 @@ fn try_main(cli: Cli) -> Result<i32> {
             out,
             json,
             fail_on_warning,
+            refresh,
         } => {
             let path = path.unwrap_or_else(|| PathBuf::from("."));
-            let graph = ensure_compiled(&path, &out)?;
+            let graph = graph_for_query(&path, &out, refresh)?;
             let issues = verify(&graph);
             if json {
                 println!("{}", verify_json(&issues));

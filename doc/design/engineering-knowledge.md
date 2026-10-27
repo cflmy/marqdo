@@ -53,22 +53,23 @@ Marqdo 把仓库投影为 **可查询、可验证、可复用** 的工程知识�
 
 落盘（G01 分离后）：
 - **权威语义图**：`.marqdo/graph/edges.json` · `nodes.json`（`SemanticProject`，含 `authority` 字段）· `steps.json`
-- **EKC 检索投影**（非执行依据）：`.marqdo/ekc/graph/graph.json` · `edges.json` · `index.json`
+- **EKC 检索投影**（非执行依据）：`.marqdo/ekc/graph/graph.json` · `edges.json` · `index.json` · **`ir.json`**（完整 IR 快照，供查询热路径）
 
 ## 5. CLI
 
 ```bash
-marqdo knowledge [PATH] -o .marqdo          # compile（默认）
-marqdo knowledge preflight "task"
+marqdo knowledge [PATH] -o .marqdo          # compile（默认；写投影 + ir.json）
+marqdo knowledge preflight "task"           # 暖机读 ir.json；缺图才 compile
+marqdo knowledge preflight "task" --refresh # 强制全量重编译后再预检
 marqdo knowledge record REUSE
 marqdo knowledge learn --task ... --failure ...
-marqdo find "authentication"
+marqdo find "authentication"                # 同上：缺图才 compile；--refresh 强制
 marqdo reuse "implement oauth login"
 marqdo impact path/to/file.mq.md
 marqdo conflicts | stale | duplicate [--fail] | verify
 ```
 
-统一 `--json`。`duplicate` 默认阈值 `0.75`；`--fail` 作 CI Gate。
+统一 `--json`。查询类命令（`preflight` / `find` / `reuse` / `impact` / `conflicts` / `stale` / `duplicate` / `verify`）默认 **读已编译投影**；CI 或源变更后应先 `marqdo knowledge` 或加 `--refresh`。`duplicate` 默认阈值 `0.75`；`--fail` 作 CI Gate。
 
 ## 6. Reuse 协议
 

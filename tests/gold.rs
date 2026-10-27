@@ -1432,6 +1432,49 @@ fn knowledge_preflight_writes_context_pack() {
 }
 
 #[test]
+fn knowledge_preflight_warm_loads_ir_without_recompile() {
+    let dir = tempfile_dir("mq-pf-warm");
+    let out = dir.to_str().unwrap();
+    let (code, _, stderr) = run(&["knowledge", "tests/engineering", "-o", out]);
+    assert_eq!(code, 0, "{stderr}");
+    assert!(
+        dir.join("ekc/graph/ir.json").exists(),
+        "expected ir.json snapshot after compile"
+    );
+    let gens = dir.join("generations");
+    let before: Vec<_> = if gens.exists() {
+        std::fs::read_dir(&gens).unwrap().flatten().collect()
+    } else {
+        Vec::new()
+    };
+    let (code2, stdout, stderr2) = run(&[
+        "knowledge",
+        "tests/engineering",
+        "preflight",
+        "resolve configuration",
+        "-o",
+        out,
+        "--json",
+    ]);
+    assert_eq!(code2, 0, "{stderr2}\n{stdout}");
+    assert!(stdout.contains("create_allowed"), "{stdout}");
+    assert!(
+        !stderr2.contains("marqdo knowledge timing_ms:"),
+        "warm preflight must not full-compile: {stderr2}"
+    );
+    let after: Vec<_> = if gens.exists() {
+        std::fs::read_dir(&gens).unwrap().flatten().collect()
+    } else {
+        Vec::new()
+    };
+    assert_eq!(
+        before.len(),
+        after.len(),
+        "warm preflight must not create a new generations/ tree"
+    );
+}
+
+#[test]
 fn catalog_hooks_knowledge_by_default() {
     let dir = tempfile_dir("mq-cat-ekc");
     let (code, _, stderr) = run(&[

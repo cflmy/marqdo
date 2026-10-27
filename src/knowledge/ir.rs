@@ -1,5 +1,6 @@
 //! Engineering Knowledge IR (L0–L4) — projections of `.mq.md`, not a second source of truth.
 
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_json::{json, Value};
 use std::collections::BTreeMap;
 
@@ -11,6 +12,19 @@ pub enum Lifecycle {
     Stable,
     Deprecated,
     Superseded,
+}
+
+impl Serialize for Lifecycle {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.serialize_str(self.as_str())
+    }
+}
+
+impl<'de> Deserialize<'de> for Lifecycle {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let s = String::deserialize(deserializer)?;
+        Ok(Self::parse(&s))
+    }
 }
 
 impl Lifecycle {
@@ -35,7 +49,7 @@ impl Lifecycle {
     }
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Evidence {
     pub sources: Vec<String>,
     pub tests: Vec<String>,
@@ -55,7 +69,7 @@ impl Evidence {
 }
 
 /// Graded confidence with explanation (not a bare float).
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Confidence {
     pub level: String, // high | medium | low
     pub implementation: String,
@@ -87,7 +101,7 @@ impl Confidence {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RepositoryInfo {
     pub title: String,
     pub root: String,
@@ -98,7 +112,7 @@ pub struct RepositoryInfo {
     pub knowledge_count: usize,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ModuleInfo {
     pub id: String,
     pub resource: String,
@@ -111,7 +125,7 @@ pub struct ModuleInfo {
     pub status: Lifecycle,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SymbolInfo {
     pub id: String,
     pub name: String,
@@ -135,7 +149,7 @@ pub struct SymbolInfo {
     pub confidence: Confidence,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CapabilityInfo {
     pub id: String,
     pub name: String,
@@ -215,7 +229,20 @@ impl KnowledgeKind {
     }
 }
 
-#[derive(Debug, Clone)]
+impl Serialize for KnowledgeKind {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.serialize_str(self.as_str())
+    }
+}
+
+impl<'de> Deserialize<'de> for KnowledgeKind {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let s = String::deserialize(deserializer)?;
+        Ok(Self::parse(&s))
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct KnowledgeItem {
     pub id: String,
     pub kind: KnowledgeKind,
@@ -269,9 +296,40 @@ impl EdgeKind {
             Self::RelatedTo => "related_to",
         }
     }
+
+    pub fn parse(s: &str) -> Self {
+        match s.trim() {
+            "implements" => Self::Implements,
+            "uses" => Self::Uses,
+            "depends_on" => Self::DependsOn,
+            "tested_by" => Self::TestedBy,
+            "documented_by" => Self::DocumentedBy,
+            "constrained_by" => Self::ConstrainedBy,
+            "decided_by" => Self::DecidedBy,
+            "supersedes" => Self::Supersedes,
+            "conflicts_with" => Self::ConflictsWith,
+            "deprecated_by" => Self::DeprecatedBy,
+            "derived_from" => Self::DerivedFrom,
+            "failed_by" => Self::FailedBy,
+            _ => Self::RelatedTo,
+        }
+    }
 }
 
-#[derive(Debug, Clone)]
+impl Serialize for EdgeKind {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.serialize_str(self.as_str())
+    }
+}
+
+impl<'de> Deserialize<'de> for EdgeKind {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let s = String::deserialize(deserializer)?;
+        Ok(Self::parse(&s))
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Edge {
     pub from: String,
     pub to: String,
@@ -336,7 +394,7 @@ pub struct ReuseResult {
     pub recommended: Vec<String>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct KnowledgeGraph {
     pub repository: RepositoryInfo,
     pub modules: Vec<ModuleInfo>,

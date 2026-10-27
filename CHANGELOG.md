@@ -4,9 +4,16 @@
 
 ### Added
 
+- **EKC `ir.json` 快照**：`marqdo knowledge` 写入 `.marqdo/ekc/graph/ir.json`；查询命令暖机热加载，免全量重编译。
+- **`--refresh`**：`knowledge preflight` / `find` / `reuse` / `impact` / `conflicts` / `stale` / `duplicate` / `verify` 可强制重编译。
+
 ### Fixed
 
+- **工程预检热路径**：`knowledge preflight`（及 find/reuse 等）默认不再每次 `ensure_compiled` 全量 compile，修复聊天「工程预检」墙钟过长。
+
 ### Changed
+
+- 查询类 knowledge CLI：**缺投影才 compile**；CI / 源变更请先 `marqdo knowledge` 或 `--refresh`。
 
 ## v2.1.4 — 2026-10-26
 

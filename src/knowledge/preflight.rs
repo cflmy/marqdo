@@ -33,6 +33,16 @@ pub fn preflight(
     out_dir: Option<&Path>,
 ) -> Result<PreflightResult> {
     let reuse = resolve(graph, task, budget);
+    preflight_from_reuse(graph, task, &reuse, out_dir)
+}
+
+/// Build a Context Pack from an already-resolved reuse result (avoids a second `resolve`).
+pub fn preflight_from_reuse(
+    graph: &KnowledgeGraph,
+    task: &str,
+    reuse: &crate::knowledge::ir::ReuseResult,
+    out_dir: Option<&Path>,
+) -> Result<PreflightResult> {
     let intent = reuse
         .capability
         .clone()
@@ -46,7 +56,7 @@ pub fn preflight(
         .map(|c| c.title.clone())
         .collect();
 
-    let pack = render_context_pack(task, &intent, &reuse, graph);
+    let pack = render_context_pack(task, &intent, reuse, graph);
     let mut context_path = None;
     if let Some(out) = out_dir {
         let contexts = out.join("agent/contexts");

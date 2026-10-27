@@ -114,7 +114,23 @@ pub fn ekc_graph_dir(out_dir: &Path) -> std::path::PathBuf {
     out_dir.join("ekc").join("graph")
 }
 
+/// Path of the full IR snapshot used by warm query paths (preflight/find/reuse).
+pub fn ir_snapshot_path(out_dir: &Path) -> std::path::PathBuf {
+    ekc_graph_dir(out_dir).join("ir.json")
+}
+
+/// Load a previously compiled KnowledgeGraph without re-extracting sources.
+/// Prefers `ekc/graph/ir.json`. Does **not** walk the source tree.
 pub fn load_graph(out_dir: &Path) -> Result<KnowledgeGraph> {
+    let ir_path = ir_snapshot_path(out_dir);
+    if ir_path.exists() {
+        let raw = fs::read_to_string(&ir_path)
+            .with_context(|| format!("read {}", ir_path.display()))?;
+        let graph: KnowledgeGraph = serde_json::from_str(&raw)
+            .with_context(|| format!("parse {}", ir_path.display()))?;
+        return Ok(graph);
+    }
+
     let graph_path = ekc_graph_dir(out_dir).join("graph.json");
     let edges_path = ekc_graph_dir(out_dir).join("edges.json");
     if !graph_path.exists() {
@@ -123,47 +139,19 @@ pub fn load_graph(out_dir: &Path) -> Result<KnowledgeGraph> {
             graph_path.display()
         );
     }
-    // Prefer re-extract for freshness when source path known; for query commands
-    // we rebuild from JSON snapshot fields + re-scan if catalog sibling exists.
-    // Snapshot load: reconstruct minimal IR from written pages + edges.json.
+
+    // Legacy projections without ir.json: edges-only fallback (no source walk).
     let edges_raw = fs::read_to_string(&edges_path).unwrap_or_else(|_| "{\"edges\":[]}".into());
     let edges_v: serde_json::Value = serde_json::from_str(&edges_raw)?;
     let graph_raw = fs::read_to_string(&graph_path)?;
     let graph_v: serde_json::Value = serde_json::from_str(&graph_raw)?;
 
-    // Re-compile from recorded root if present in graph.json
-    if let Some(root) = graph_v
-        .pointer("/repository/root")
-        .and_then(|v| v.as_str())
-    {
-        let root_path = Path::new(root);
-        if root_path.exists() {
-            return extract_graph(&ExtractOptions {
-                path: root_path.to_path_buf(),
-                out_dir: out_dir.to_path_buf(),
-            });
-        }
-    }
-
-    // Fallback: empty-ish graph with edges only
     let mut edges = Vec::new();
     if let Some(arr) = edges_v.get("edges").and_then(|e| e.as_array()) {
         for e in arr {
-            let kind = match e.get("kind").and_then(|k| k.as_str()).unwrap_or("") {
-                "implements" => crate::knowledge::ir::EdgeKind::Implements,
-                "uses" => crate::knowledge::ir::EdgeKind::Uses,
-                "depends_on" => crate::knowledge::ir::EdgeKind::DependsOn,
-                "tested_by" => crate::knowledge::ir::EdgeKind::TestedBy,
-                "documented_by" => crate::knowledge::ir::EdgeKind::DocumentedBy,
-                "constrained_by" => crate::knowledge::ir::EdgeKind::ConstrainedBy,
-                "decided_by" => crate::knowledge::ir::EdgeKind::DecidedBy,
-                "supersedes" => crate::knowledge::ir::EdgeKind::Supersedes,
-                "conflicts_with" => crate::knowledge::ir::EdgeKind::ConflictsWith,
-                "deprecated_by" => crate::knowledge::ir::EdgeKind::DeprecatedBy,
-                "derived_from" => crate::knowledge::ir::EdgeKind::DerivedFrom,
-                "failed_by" => crate::knowledge::ir::EdgeKind::FailedBy,
-                _ => crate::knowledge::ir::EdgeKind::RelatedTo,
-            };
+            let kind = crate::knowledge::ir::EdgeKind::parse(
+                e.get("kind").and_then(|k| k.as_str()).unwrap_or(""),
+            );
             edges.push(crate::knowledge::ir::Edge {
                 from: e.get("from").and_then(|v| v.as_str()).unwrap_or("").into(),
                 to: e.get("to").and_then(|v| v.as_str()).unwrap_or("").into(),
@@ -204,12 +192,25 @@ pub fn load_graph(out_dir: &Path) -> Result<KnowledgeGraph> {
     })
 }
 
+/// Force a full knowledge compile (write path / `--refresh`).
 pub fn ensure_compiled(path: &Path, out_dir: &Path) -> Result<KnowledgeGraph> {
-    // Always refresh from source when path is given.
     compile(KnowledgeOptions {
         path: path.to_path_buf(),
         out_dir: out_dir.to_path_buf(),
     })
+}
+
+/// Query path loader: compile if missing (or `refresh`), else hot-load `ir.json`.
+pub fn graph_for_query(path: &Path, out_dir: &Path, refresh: bool) -> Result<KnowledgeGraph> {
+    if refresh {
+        return ensure_compiled(path, out_dir);
+    }
+    let has_ir = ir_snapshot_path(out_dir).exists();
+    let has_graph = ekc_graph_dir(out_dir).join("graph.json").exists();
+    if has_ir || has_graph {
+        return load_graph(out_dir);
+    }
+    ensure_compiled(path, out_dir)
 }
 
 fn write_projections(out_dir: &Path, graph: &KnowledgeGraph) -> Result<()> {
@@ -299,6 +300,9 @@ fn write_projections(out_dir: &Path, graph: &KnowledgeGraph) -> Result<()> {
     fs::write(ekc.join("graph.json"), graph_json)?;
     let edges_json = serde_json::to_string_pretty(&graph.to_edges_json())?;
     fs::write(ekc.join("edges.json"), edges_json)?;
+    // Full IR snapshot for warm query paths (preflight/find/reuse) — no re-extract.
+    let ir_json = serde_json::to_string(&graph)?;
+    fs::write(ekc.join("ir.json"), ir_json)?;
 
     // Search index
     let index = json!({

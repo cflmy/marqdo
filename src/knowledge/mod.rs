@@ -20,7 +20,10 @@ pub mod preflight;
 pub mod reuse;
 pub mod util;
 
-pub use compile::{compile, ekc_graph_dir, ensure_compiled, load_graph, KnowledgeOptions};
+pub use compile::{
+    compile, ekc_graph_dir, ensure_compiled, graph_for_query, ir_snapshot_path, load_graph,
+    KnowledgeOptions,
+};
 pub use duplicate::{find_duplicates, format_duplicates_text};
 pub use find::{find, find_json, format_find_text};
 pub use impact::{format_impact_text, impact, impact_json};
@@ -32,7 +35,9 @@ pub use lifecycle::{
 };
 pub use metrics::{load_metrics, record_decision, save_metrics, ReuseMetrics};
 pub use policy::compile_policy;
-pub use preflight::{format_preflight_yaml, preflight, preflight_json, PreflightResult};
+pub use preflight::{
+    format_preflight_yaml, preflight, preflight_from_reuse, preflight_json, PreflightResult,
+};
 pub use reuse::{format_reuse_text, resolve, reuse_json, ReuseBudget};
 
 use std::path::{Path, PathBuf};
