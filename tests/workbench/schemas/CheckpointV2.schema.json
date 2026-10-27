@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "marqdo://contracts/CheckpointV2",
+  "title": "CheckpointV2",
+  "type": "object",
+  "required": ["schema", "schema_version", "checkpoint_id", "logical_run_id", "task_id", "attempt_id", "committed_at"],
+  "properties": {
+    "schema": { "const": "CheckpointV2" },
+    "schema_version": { "const": 2 },
+    "checkpoint_id": { "type": "string" },
+    "logical_run_id": { "type": "string" },
+    "task_id": { "type": "string" },
+    "attempt_id": { "type": "string" },
+    "step_id": { "type": ["string", "null"] },
+    "parent_checkpoint_id": { "type": ["string", "null"] },
+    "principal_ref": { "type": ["string", "null"] },
+    "workspace_id": { "type": ["string", "null"] },
+    "session_id": { "type": ["string", "null"] },
+    "completed_steps": { "type": "array" },
+    "pending_operation": {},
+    "deadline": { "type": ["string", "null"] },
+    "committed_at": { "type": "string" }
+  },
+  "additionalProperties": true
+}

@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "marqdo://contracts/AgentErrorV1",
+  "title": "AgentErrorV1",
+  "type": "object",
+  "required": ["schema", "schema_version", "code", "category", "stage", "message", "retryable", "effect_state", "recovery_action"],
+  "properties": {
+    "schema": { "const": "AgentErrorV1" },
+    "schema_version": { "const": 1 },
+    "code": { "type": "string" },
+    "category": { "type": "string" },
+    "stage": { "type": "string" },
+    "message": { "type": "string" },
+    "retryable": { "type": "boolean" },
+    "retry_after_ms": { "type": ["integer", "null"] },
+    "effect_state": { "type": "string" },
+    "recovery_action": { "type": "string" },
+    "call_id": { "type": ["string", "null"] },
+    "details_ref": { "type": ["string", "null"] }
+  },
+  "additionalProperties": true
+}

@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "marqdo://contracts/ToolCallV1",
+  "title": "ToolCallV1",
+  "type": "object",
+  "required": ["schema", "schema_version", "call_id", "tool_id", "tool_version", "arguments", "operation_id"],
+  "properties": {
+    "schema": { "const": "ToolCallV1" },
+    "schema_version": { "const": 1 },
+    "call_id": { "type": "string" },
+    "tool_id": { "type": "string" },
+    "tool_version": { "type": "string" },
+    "arguments": { "type": "object" },
+    "operation_id": { "type": "string" },
+    "parent_span_id": { "type": ["string", "null"] }
+  },
+  "additionalProperties": true
+}

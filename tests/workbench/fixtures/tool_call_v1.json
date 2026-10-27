@@ -1,0 +1,10 @@
+{
+  "schema": "ToolCallV1",
+  "schema_version": 1,
+  "call_id": "call_01",
+  "tool_id": "workspace.read",
+  "tool_version": "1",
+  "arguments": {"resource_id": "res_01", "start_line": 1, "max_lines": 40},
+  "operation_id": "op_01",
+  "parent_span_id": "span_01"
+}

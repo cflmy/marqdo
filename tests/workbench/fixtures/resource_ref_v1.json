@@ -1,0 +1,14 @@
+{
+  "schema": "ResourceRefV1",
+  "schema_version": 1,
+  "resource_id": "res_01",
+  "workspace_id": "ws_01",
+  "kind": "file",
+  "media_type": "text/markdown",
+  "revision": "sha256:example",
+  "digest": "sha256:example",
+  "title": "设计说明",
+  "size": 12,
+  "origin": "workspace",
+  "locator": null
+}

@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "marqdo://contracts/ToolResultV1",
+  "title": "ToolResultV1",
+  "type": "object",
+  "required": ["schema", "schema_version", "ok", "status", "summary"],
+  "properties": {
+    "schema": { "const": "ToolResultV1" },
+    "schema_version": { "const": 1 },
+    "ok": { "type": "boolean" },
+    "status": { "type": "string" },
+    "summary": { "type": "string" },
+    "structured_content": {},
+    "resources": { "type": "array" },
+    "citations": { "type": "array" },
+    "error": {},
+    "usage": {},
+    "truncated": { "type": "boolean" },
+    "next_cursor": { "type": ["string", "null"] },
+    "effect_receipt_ref": { "type": ["string", "null"] }
+  },
+  "additionalProperties": true
+}

@@ -1,0 +1,15 @@
+{
+  "schema": "AgentErrorV1",
+  "schema_version": 99,
+  "code": "tool.timeout",
+  "category": "transient",
+  "stage": "tool",
+  "message": "读取资源超时",
+  "retryable": true,
+  "retry_after_ms": 1200,
+  "effect_state": "none",
+  "recovery_action": "retry_step",
+  "call_id": "call_01",
+  "details_ref": "resource:diagnostic_01",
+  "future_field": true
+}

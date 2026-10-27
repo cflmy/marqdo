@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "marqdo://contracts/ToolSpecV1",
+  "title": "ToolSpecV1",
+  "type": "object",
+  "required": ["schema", "schema_version", "id", "version", "description", "input_schema", "effect", "scopes", "timeout_ms", "availability"],
+  "properties": {
+    "schema": { "const": "ToolSpecV1" },
+    "schema_version": { "const": 1 },
+    "id": { "type": "string" },
+    "version": { "type": "string" },
+    "description": { "type": "string" },
+    "input_schema": { "type": "object" },
+    "output_schema_ref": { "type": ["string", "null"] },
+    "effect": { "type": "string" },
+    "scopes": { "type": "array" },
+    "timeout_ms": { "type": "integer" },
+    "max_result_bytes": { "type": ["integer", "null"] },
+    "idempotency": { "type": "string" },
+    "concurrency_group": { "type": ["string", "null"] },
+    "availability": { "type": "string" }
+  },
+  "additionalProperties": true
+}

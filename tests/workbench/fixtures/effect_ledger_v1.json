@@ -1,0 +1,12 @@
+{
+  "schema": "EffectLedgerRecordV1",
+  "schema_version": 1,
+  "operation_id": "op_01",
+  "idempotency_key": "idem_01",
+  "args_digest": "sha256:args",
+  "resource_scope": "workspace:ws_01",
+  "expected_revision": "sha256:example",
+  "effect_class": "write",
+  "result_ref": null,
+  "state": "prepared"
+}

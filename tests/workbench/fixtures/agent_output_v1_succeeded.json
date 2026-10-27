@@ -1,0 +1,11 @@
+{
+  "schema": "AgentOutputV1",
+  "schema_version": 1,
+  "status": "succeeded",
+  "answer": {"format": "markdown", "text": "已整理为三点，完整笔记见右侧。"},
+  "artifacts": [{"resource_id": "res_note_01", "revision": "sha256:example"}],
+  "citations": [],
+  "validation": {"status": "passed", "report_ref": "resource:verify_01"},
+  "finish_reason": "completed",
+  "recovery_options": []
+}

@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "marqdo://contracts/ContextPackV2",
+  "title": "ContextPackV2",
+  "type": "object",
+  "required": ["schema", "schema_version", "items"],
+  "properties": {
+    "schema": { "const": "ContextPackV2" },
+    "schema_version": { "const": 2 },
+    "items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["origin", "trust", "resource_ref", "revision", "token_estimate", "priority"]
+      }
+    }
+  },
+  "additionalProperties": true
+}

@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "marqdo://contracts/AgentOutputV1",
+  "title": "AgentOutputV1",
+  "type": "object",
+  "required": ["schema", "schema_version", "status", "answer", "finish_reason"],
+  "properties": {
+    "schema": { "const": "AgentOutputV1" },
+    "schema_version": { "const": 1 },
+    "status": { "enum": ["succeeded", "partial", "failed", "needs_input", "cancelled"] },
+    "answer": { "type": "object" },
+    "artifacts": { "type": "array" },
+    "citations": { "type": "array" },
+    "validation": { "type": "object" },
+    "finish_reason": { "type": "string" },
+    "recovery_options": { "type": "array" }
+  },
+  "additionalProperties": true
+}

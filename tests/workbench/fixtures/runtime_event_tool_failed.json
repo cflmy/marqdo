@@ -1,0 +1,24 @@
+{
+  "schema": "RuntimeEventV2",
+  "schema_version": 2,
+  "event_id": "evt_01",
+  "seq": 7,
+  "task_id": "task_01",
+  "run_id": "run_01",
+  "attempt_id": "attempt_01",
+  "type": "tool.failed",
+  "payload": {
+    "schema": "AgentErrorV1",
+    "schema_version": 1,
+    "code": "tool.timeout",
+    "category": "transient",
+    "stage": "tool",
+    "message": "读取资源超时",
+    "retryable": true,
+    "retry_after_ms": 1200,
+    "effect_state": "none",
+    "recovery_action": "retry_step",
+    "call_id": "call_01",
+    "details_ref": "resource:diagnostic_01"
+  }
+}

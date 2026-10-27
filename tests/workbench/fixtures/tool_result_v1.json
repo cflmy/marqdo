@@ -1,0 +1,15 @@
+{
+  "schema": "ToolResultV1",
+  "schema_version": 1,
+  "ok": true,
+  "status": "succeeded",
+  "summary": "已读取 12 行",
+  "structured_content": {"lines": ["a", "b"]},
+  "resources": [{"resource_id": "res_01", "revision": "sha256:example"}],
+  "citations": [],
+  "error": null,
+  "usage": {"elapsed_ms": 12},
+  "truncated": false,
+  "next_cursor": null,
+  "effect_receipt_ref": null
+}

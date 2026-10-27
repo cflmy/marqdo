@@ -1,0 +1,14 @@
+{
+  "schema": "ContextPackV2",
+  "schema_version": 2,
+  "items": [
+    {
+      "origin": "user",
+      "trust": "user",
+      "resource_ref": "res_01",
+      "revision": "sha256:example",
+      "token_estimate": 120,
+      "priority": 1
+    }
+  ]
+}

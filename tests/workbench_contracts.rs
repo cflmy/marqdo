@@ -100,6 +100,179 @@ fn m00_fixtures_consume_and_capabilities() {
     assert_eq!(down["result"]["features"]["runtime.cancel"], 0);
 }
 
+/// M-A0: freeze Agent reliability protocol fixtures; capability bits stay 0.
+#[test]
+fn ma0_agent_reliability_protocol_freeze() {
+    let err = fixture("agent_error_v1.json");
+    assert_required(&err, &schema("AgentErrorV1.schema.json"), "agent_error");
+    assert_eq!(err["schema"], "AgentErrorV1");
+    assert_eq!(err["schema_version"], 1);
+
+    let degrade = fixture("agent_error_v1_unknown_version.json");
+    assert_eq!(degrade["schema"], "AgentErrorV1");
+    assert_eq!(degrade["schema_version"], 99);
+    assert_eq!(degrade["future_field"], true);
+
+    let tool = fixture("tool_spec_v1.json");
+    assert_required(&tool, &schema("ToolSpecV1.schema.json"), "tool_spec");
+    assert_required(
+        &fixture("tool_call_v1.json"),
+        &schema("ToolCallV1.schema.json"),
+        "tool_call",
+    );
+    assert_required(
+        &fixture("tool_result_v1.json"),
+        &schema("ToolResultV1.schema.json"),
+        "tool_result",
+    );
+
+    let ckpt = fixture("checkpoint_v2.json");
+    assert_required(&ckpt, &schema("CheckpointV2.schema.json"), "checkpoint");
+    assert_eq!(ckpt["schema_version"], 2);
+
+    let legacy = fixture("checkpoint_legacy_resume.json");
+    assert!(legacy.get("schema").is_none());
+    assert!(legacy.get("effect_class").is_none());
+    assert_eq!(legacy["id"], "legacy_resume_01");
+
+    let ledger = fixture("effect_ledger_v1.json");
+    assert_eq!(ledger["state"], "prepared");
+    assert_eq!(ledger["effect_class"], "write");
+
+    let out_ok = fixture("agent_output_v1_succeeded.json");
+    assert_required(&out_ok, &schema("AgentOutputV1.schema.json"), "agent_output_ok");
+    assert_eq!(out_ok["status"], "succeeded");
+    let out_fail = fixture("agent_output_v1_failed.json");
+    assert_required(
+        &out_fail,
+        &schema("AgentOutputV1.schema.json"),
+        "agent_output_fail",
+    );
+    assert_eq!(out_fail["status"], "failed");
+
+    let pack = fixture("context_pack_v2.json");
+    assert_required(&pack, &schema("ContextPackV2.schema.json"), "context_pack");
+    assert_eq!(pack["schema_version"], 2);
+    let item = &pack["items"][0];
+    for key in [
+        "origin",
+        "trust",
+        "resource_ref",
+        "revision",
+        "token_estimate",
+        "priority",
+    ] {
+        assert!(item.get(key).is_some(), "context item missing {key}");
+    }
+
+    assert_required(
+        &fixture("resource_ref_v1.json"),
+        &schema("ResourceRefV1.schema.json"),
+        "resource_ref",
+    );
+    let view = fixture("resource_view_v1.json");
+    assert_required(&view, &schema("ResourceViewV1.schema.json"), "resource_view");
+    assert_eq!(view["no_exec"], true);
+
+    let tev = fixture("runtime_event_tool_failed.json");
+    assert_eq!(tev["schema"], "RuntimeEventV2");
+    assert_eq!(tev["type"], "tool.failed");
+    assert_eq!(tev["payload"]["schema"], "AgentErrorV1");
+
+    let caps = mlsp("capabilities", serde_json::json!({}));
+    assert_eq!(caps["ok"], true, "{caps}");
+    let features = &caps["result"]["features"];
+    for bit in [
+        "agent.error_v1",
+        "agent.checkpoint_v2",
+        "agent.tool_schema_v1",
+        "agent.output_channels_v1",
+        "agent.context_pack_v2",
+    ] {
+        assert_eq!(features[bit], 0, "{bit} must stay 0 until emitters land");
+    }
+    // M-A3 subset: ResourceView emitter is live under the view feature.
+    assert_eq!(features["resource.view_v1"], 1);
+    // Unknown/future schema_version must not flip unimplemented agent bits.
+    assert_eq!(features["agent.error_v1"], 0);
+
+    let formats = caps["result"]["extract_formats"]
+        .as_array()
+        .expect("extract_formats");
+    let pdf = formats
+        .iter()
+        .find(|f| f["format"] == "pdf")
+        .expect("pdf row");
+    assert_eq!(pdf["available"], false);
+    let json_fmt = formats
+        .iter()
+        .find(|f| f["format"] == "json")
+        .expect("json row");
+    assert_eq!(json_fmt["available"], false);
+
+    // Live contracts list still excludes unimplemented agent schemas.
+    let contracts = caps["result"]["contracts"].as_array().unwrap();
+    assert!(!contracts.iter().any(|c| c.as_str() == Some("AgentErrorV1")));
+
+    let down = mlsp(
+        "capabilities",
+        serde_json::json!({
+            "force_unloaded": true,
+            "force_stream_off": true,
+            "force_cancel_off": true
+        }),
+    );
+    assert_eq!(down["result"]["features"]["agent.error_v1"], 0);
+    assert_eq!(down["result"]["features"]["resource.view_v1"], 1);
+}
+
+#[test]
+fn ma3_resource_view_static_no_exec() {
+    use std::io::Write;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    let nanos = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
+    let dir = std::env::temp_dir().join(format!("marqdo-ma3-rv-{nanos}"));
+    std::fs::create_dir_all(&dir).unwrap();
+    let md = dir.join("readme.md");
+    {
+        let mut f = std::fs::File::create(&md).unwrap();
+        writeln!(f, "# Hello\n\n<script>x</script>").unwrap();
+    }
+
+    let resp = mlsp(
+        "resource.view",
+        serde_json::json!({
+            "workspace_root": dir.to_string_lossy(),
+            "path": "readme.md",
+            "mode": "read"
+        }),
+    );
+    assert_eq!(resp["ok"], true, "{resp}");
+    let view = &resp["result"];
+    assert_required(view, &schema("ResourceViewV1.schema.json"), "resource_view_live");
+    assert_eq!(view["no_exec"], true);
+    assert_eq!(view["schema"], "ResourceViewV1");
+    let frag = view["render"]["fragment"].as_str().unwrap();
+    assert!(frag.contains("Hello"));
+    assert!(frag.contains("&lt;script&gt;") || !frag.contains("<script>"));
+
+    let escape = mlsp(
+        "resource.view",
+        serde_json::json!({
+            "workspace_root": dir.to_string_lossy(),
+            "path": "../outside.txt",
+            "mode": "read"
+        }),
+    );
+    assert_eq!(escape["ok"], false, "{escape}");
+
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
 #[test]
 fn m00_strict_selection_rejects_missing() {
     let bad = serde_json::json!({"schema_version": 1, "model_id": "x"});

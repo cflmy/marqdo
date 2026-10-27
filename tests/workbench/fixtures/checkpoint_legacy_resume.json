@@ -1,0 +1,13 @@
+{
+  "id": "legacy_resume_01",
+  "updated_at": "2026-10-27T02:49:00Z",
+  "goal": "回答用户问题",
+  "task": "你好",
+  "status": "interrupted",
+  "workbook": ".marqdo/agent-kb/resources/你好.mq.md",
+  "events": [],
+  "route": {},
+  "result": null,
+  "round": 1,
+  "meta": {}
+}

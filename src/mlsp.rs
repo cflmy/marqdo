@@ -77,6 +77,13 @@ fn dispatch(req: &Value) -> Result<Value, Value> {
             "mlsp.unsupported",
             "view.document requires the view feature",
         )),
+        #[cfg(feature = "view")]
+        Some("resource.view") => resource_view(&params),
+        #[cfg(not(feature = "view"))]
+        Some("resource.view") => Err(err(
+            "mlsp.unsupported",
+            "resource.view requires the view feature",
+        )),
         Some("view.reference_resolve") => crate::workbench::resolve_reference(&params),
         // `<TAB>` M9: occlusion label search (two-tier vocabulary).
         Some("labels.search") => labels_search(&params),
@@ -84,7 +91,7 @@ fn dispatch(req: &Value) -> Result<Value, Value> {
         Some("session.summary") => session_summary(),
         other => Err(err(
             "mlsp.unknown_method",
-            format!("未知方法 {other:?}；可用：locate / syntax / validate / repair_targets / repair_apply / schema / artifact.find / artifact.inspect / link.resolve / artifact.verify / artifact.impact / artifact.bind / artifact.execute / artifact.reuse_execute / artifact.patch / artifact.extract_pure / document.extract / capabilities / view.document / view.reference_resolve"),
+            format!("未知方法 {other:?}；可用：locate / syntax / validate / repair_targets / repair_apply / schema / artifact.find / artifact.inspect / link.resolve / artifact.verify / artifact.impact / artifact.bind / artifact.execute / artifact.reuse_execute / artifact.patch / artifact.extract_pure / document.extract / capabilities / view.document / resource.view / view.reference_resolve"),
         )),
     }
 }
@@ -94,6 +101,13 @@ fn view_document(params: &Value) -> Result<Value, Value> {
     let req = crate::workbench::DocumentViewRequest::from_params(params)
         .map_err(|e| err("mlsp.bad_request", e))?;
     crate::workbench::build_document_view(&req)
+}
+
+#[cfg(feature = "view")]
+fn resource_view(params: &Value) -> Result<Value, Value> {
+    let req = crate::workbench::ResourceViewRequest::from_params(params)
+        .map_err(|e| err("mlsp.bad_request", e))?;
+    crate::workbench::build_resource_view(&req)
 }
 
 fn artifact_extract_pure(params: &Value) -> Result<Value, Value> {

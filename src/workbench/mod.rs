@@ -10,6 +10,8 @@ pub mod capabilities;
 pub mod document_view;
 pub mod event_sink;
 pub mod locator;
+#[cfg(feature = "view")]
+pub mod resource_view;
 pub mod run_context;
 pub mod selection;
 pub mod snapshot;
@@ -24,6 +26,8 @@ pub use capabilities::probe_capabilities;
 #[cfg(feature = "view")]
 pub use document_view::{build_document_view, DocumentViewRequest};
 pub use event_sink::{bind_event_sink, clear_event_sink, emit_event, emit_message_delta};
+#[cfg(feature = "view")]
+pub use resource_view::{build_resource_view, ResourceViewRequest};
 pub use locator::{resolve_reference, KnowledgeLocator};
 pub use run_context::{
     cancel_requested, cancel_token_body_means_cancel, RequestContext, RunContext,

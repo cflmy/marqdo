@@ -47,6 +47,14 @@ pub fn probe_capabilities(params: &Value) -> Value {
         json!({"format": "pdf", "available": false}),
         json!({"format": "docx", "available": false}),
         json!({"format": "ocr", "available": false}),
+        // M-A0 freeze: format matrix rows remain unavailable until M-A3/M-A5.
+        json!({"format": "json", "available": false}),
+        json!({"format": "csv", "available": false}),
+        json!({"format": "image", "available": false}),
+        json!({"format": "html", "available": false}),
+        json!({"format": "svg", "available": false}),
+        json!({"format": "xlsx", "available": false}),
+        json!({"format": "pptx", "available": false}),
     ];
 
     let loaded_plugins = probe_loaded_plugins(params);
@@ -108,6 +116,25 @@ pub fn probe_capabilities(params: &Value) -> Value {
         features.insert("view.analysis_cache_v2".into(), json!(0));
         features.insert("view.document".into(), json!(0));
         features.insert("view.reference_resolve".into(), json!(0));
+    }
+    // M-A0/M-A3: freeze protocol names. resource.view_v1 flips on when view feature ships
+    // the static ResourceView emitter; other agent bits stay 0 until their emitters land.
+    for (k, v) in [
+        ("agent.error_v1", 0),
+        ("agent.checkpoint_v2", 0),
+        ("agent.tool_schema_v1", 0),
+        ("agent.output_channels_v1", 0),
+        ("agent.context_pack_v2", 0),
+    ] {
+        features.insert(k.into(), json!(v));
+    }
+    #[cfg(feature = "view")]
+    {
+        features.insert("resource.view_v1".into(), json!(1));
+    }
+    #[cfg(not(feature = "view"))]
+    {
+        features.insert("resource.view_v1".into(), json!(0));
     }
 
     json!({
@@ -221,5 +248,14 @@ mod tests {
         assert_eq!(caps["features"]["runtime.event_stream"], 0);
         assert_eq!(caps["features"]["runtime.cancel"], 0);
         assert_eq!(caps["features"]["llm.messages"], 0);
+        assert_eq!(caps["features"]["agent.error_v1"], 0);
+        assert_eq!(caps["features"]["agent.checkpoint_v2"], 0);
+        assert_eq!(caps["features"]["agent.tool_schema_v1"], 0);
+        assert_eq!(caps["features"]["agent.output_channels_v1"], 0);
+        assert_eq!(caps["features"]["agent.context_pack_v2"], 0);
+        #[cfg(feature = "view")]
+        assert_eq!(caps["features"]["resource.view_v1"], 1);
+        #[cfg(not(feature = "view"))]
+        assert_eq!(caps["features"]["resource.view_v1"], 0);
     }
 }

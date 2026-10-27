@@ -1,0 +1,11 @@
+{
+  "schema": "AgentOutputV1",
+  "schema_version": 1,
+  "status": "failed",
+  "answer": {"format": "markdown", "text": "文档门禁未通过，草稿仍可打开。"},
+  "artifacts": [],
+  "citations": [],
+  "validation": {"status": "failed", "report_ref": "resource:verify_fail"},
+  "finish_reason": "validation_failed",
+  "recovery_options": [{"action": "repair_once", "label": "修复后重试"}]
+}

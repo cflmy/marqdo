@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "marqdo://contracts/ResourceViewV1",
+  "title": "ResourceViewV1",
+  "type": "object",
+  "required": ["schema", "schema_version", "resource", "renderer", "completeness", "no_exec"],
+  "properties": {
+    "schema": { "const": "ResourceViewV1" },
+    "schema_version": { "const": 1 },
+    "resource": { "type": "object" },
+    "renderer": { "type": "object" },
+    "render": { "type": "object" },
+    "outline": { "type": "array" },
+    "locators": { "type": "array" },
+    "completeness": { "type": "string" },
+    "no_exec": { "const": true },
+    "diagnostics": { "type": "array" },
+    "next_cursor": { "type": ["string", "null"] }
+  },
+  "additionalProperties": true
+}

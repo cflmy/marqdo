@@ -1,0 +1,24 @@
+{
+  "schema": "ResourceViewV1",
+  "schema_version": 1,
+  "resource": {
+    "resource_id": "res_01",
+    "workspace_id": "ws_01",
+    "kind": "file",
+    "revision": "sha256:example",
+    "media_type": "text/markdown",
+    "title": "设计说明",
+    "digest": "sha256:example",
+    "size": 12,
+    "origin": "workspace",
+    "locator": null
+  },
+  "renderer": {"id": "markdown", "version": "1", "trust": "sanitized"},
+  "render": {"format": "sanitized_html", "fragment": "<p>正文</p>"},
+  "outline": [],
+  "locators": [],
+  "completeness": "complete",
+  "no_exec": true,
+  "diagnostics": [],
+  "next_cursor": null
+}

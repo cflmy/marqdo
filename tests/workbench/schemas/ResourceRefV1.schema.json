@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "marqdo://contracts/ResourceRefV1",
+  "title": "ResourceRefV1",
+  "type": "object",
+  "required": ["schema", "schema_version", "resource_id", "workspace_id", "kind", "media_type", "revision", "digest", "title", "size", "origin"],
+  "properties": {
+    "schema": { "const": "ResourceRefV1" },
+    "schema_version": { "const": 1 },
+    "resource_id": { "type": "string" },
+    "workspace_id": { "type": "string" },
+    "kind": { "type": "string" },
+    "media_type": { "type": "string" },
+    "revision": { "type": "string" },
+    "digest": { "type": "string" },
+    "title": { "type": "string" },
+    "size": { "type": "integer" },
+    "origin": { "type": "string" },
+    "locator": {}
+  },
+  "additionalProperties": true
+}
