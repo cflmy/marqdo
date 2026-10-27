@@ -403,7 +403,10 @@ fn render_csv_view(
             "message": format!("preview truncated at {max_bytes} bytes")
         }));
     }
-    let rows: Vec<&str> = text.lines().collect();
+    let mut rows: Vec<&str> = text.lines().collect();
+    while rows.last().is_some_and(|l| l.trim().is_empty()) {
+        rows.pop();
+    }
     let shown = rows.len().min(CSV_MAX_ROWS + 1); // header + data
     if rows.len() > CSV_MAX_ROWS + 1 {
         diagnostics.push(json!({
