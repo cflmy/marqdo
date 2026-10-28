@@ -211,6 +211,10 @@ fn parse_sse_events(
                     {
                         accumulated.push_str(c);
                     }
+                    // Preserve provider usage as a first-class event for llm.collect_usage.
+                    if let Some(u) = v.get("usage").filter(|u| u.is_object()) {
+                        events.push(json!({"type": "usage", "usage": u}));
+                    }
                 }
                 events.push(json!({"type": "data", "data": data}));
             }
@@ -365,6 +369,11 @@ fn chat_completions(args: &Value) -> Result<Value, String> {
     }
     if stream {
         req_body.insert("stream".into(), Value::Bool(true));
+        // OpenAI / DeepSeek / compatible: final SSE chunk carries usage only when requested.
+        req_body.insert(
+            "stream_options".into(),
+            json!({ "include_usage": true }),
+        );
     }
     let body = Value::Object(req_body).to_string();
     let auth = format!("{bearer}{api_key}");

@@ -92,6 +92,35 @@ Alias: `stream_result`.
   **answer = ""**
 *answer*
 
+## collect_usage
+    + `events`
+
+Best-effort `total_tokens` from stream frames (requires `stream_options.include_usage`).
+
+**tokens = None**
+1. `events`
+  - [ev](遍历 events 为 ev)
+    **t = > json.get value=`ev` key="type"**
+    **raw = None**
+    1. `t` == "data"
+      **raw = > json.get value=`ev` key="data"**
+    2. *
+      **u0 = > json.get value=`ev` key="usage"**
+      1. `u0`
+        **tt0 = > json.get value=`u0` key="total_tokens"**
+        1. `tt0` != None
+          **tokens = `tt0`**
+    1. `raw`
+      1. not `raw` == "[DONE]"
+        **parsed = > json.parse text=`raw`**
+        1. `parsed`
+          **u = > json.get value=`parsed` key="usage"**
+          1. `u`
+            **tt = > json.get value=`u` key="total_tokens"**
+            1. `tt` != None
+              **tokens = `tt`**
+*tokens*
+
 ## stream_result
     + `events`
 

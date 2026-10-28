@@ -115,6 +115,13 @@ Pass either `messages=` (role/content list) or legacy `prompt=` (single user mes
 
   1. `stream`
     **req = > table.put in=`req` at="stream" value=True**
+    `stream_opts` =
+
+    | include_usage |
+    |---------------|
+    | True |
+
+    **req = > table.put in=`req` at="stream_options" value=`stream_opts`**
     **body = > json.stringify value=`req`**
     **resp = > net.http_post_sse url=`url` body=`body` headers=`headers` echo=`echo`**
     **st = > json.get value=`resp` key="status"**

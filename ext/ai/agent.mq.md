@@ -67,7 +67,11 @@ One LLM turn via the semantic surface (`ask` / `stream`+`collect`). Returns `{te
 1. `stream`
   **evs = > model.stream prompt=`prompt` echo=`echo` stream_kind=`stream_kind`**
   **text = > llm.collect events=`evs`**
-  **tokens = 0**
+  **tokens = > llm.collect_usage events=`evs`**
+  1. `tokens` == None
+    **tokens = 0**
+  2. *
+    **_ = 1**
   **err = None**
   **calls = 1**
   1. not `text`
@@ -89,12 +93,16 @@ One LLM turn via the semantic surface (`ask` / `stream`+`collect`). Returns `{te
     **tokens = > json.get value=`r` key="tokens"**
     **err = > json.get value=`r` key="error"**
     **fin = > json.get value=`r` key="finish"**
+    1. `tokens` == None
+      **usage = > json.get value=`r` key="usage"**
+      1. `usage`
+        **tokens = > json.get value=`usage` key="total_tokens"**
   2. *
     **text = > str value=`r`**
     **tokens = 0**
     **err = None**
     **fin = None**
-  1. not `tokens`
+  1. `tokens` == None
     **tokens = 0**
   2. *
     **_ = 1**
@@ -2813,19 +2821,31 @@ Primary author entry (v2 + P4): Adaptive `route` → execute (policy/kb skill) o
     2. *
       **out = > `self`.plan goal=`task` kb_dir=`kb_dir` writeback=`writeback` reuse=`reuse` near_match=`near_match` near_threshold=`near_threshold` promote=`promote` improve_every=`improve_every` explore_n=`explore_n` max_rounds=`max_rounds` stream=`stream` echo=`echo` trace=`trace` force=`force`**
       **exec_mode = "explore"**
-      **llm_calls = 1**
+      **llm_calls = > json.get value=`out` key="llm_calls"**
+      **tokens = > json.get value=`out` key="tokens"**
+      1. `llm_calls` == None
+        **llm_calls = 1**
+      1. `tokens` == None
+        **tokens = 0**
   2. *
     **out = > `self`.plan goal=`task` kb_dir=`kb_dir` writeback=`writeback` reuse=`reuse` near_match=`near_match` near_threshold=`near_threshold` promote=`promote` improve_every=`improve_every` explore_n=`explore_n` max_rounds=`max_rounds` stream=`stream` echo=`echo` trace=`trace` force=`force`**
     **cache = > json.get value=`out` key="cache"**
     1. `cache` == "hit"
       **exec_mode = "compiled"**
       **llm_calls = 0**
+      **tokens = 0**
     2. `cache` == "soft-hit"
       **exec_mode = "near"**
       **llm_calls = 0**
+      **tokens = 0**
     3. *
       **exec_mode = "explore"**
-      **llm_calls = 1**
+      **llm_calls = > json.get value=`out` key="llm_calls"**
+      **tokens = > json.get value=`out` key="tokens"**
+      1. `llm_calls` == None
+        **llm_calls = 1**
+      1. `tokens` == None
+        **tokens = 0**
 
 **st = > json.get value=`out` key="status"**
 **res = > json.get value=`out` key="result"**
@@ -3492,6 +3512,8 @@ Reuse lookup: exact → alias → canonicalize → optional local n-gram `near` 
 **status = "error"**
 **err = "max_rounds exhausted"**
 **skip_loop = None**
+**plan_llm_calls = 0**
+**plan_tokens = 0**
 
 > plan_echo_decompose workbook=`path` stream=`stream` echo=`echo`
 **last_obs = > inspect_workbook path=`path`**
@@ -3505,6 +3527,12 @@ Reuse lookup: exact → alias → canonicalize → optional local n-gram `near` 
   **last_reply = > json.get value=`turn` key="reply"**
   **last_obs = > json.get value=`turn` key="observation"**
   **events = > json.get value=`turn` key="events"**
+  **_c = > json.get value=`turn` key="llm_calls"**
+  **_t = > json.get value=`turn` key="tokens"**
+  1. `_c` != None
+    **plan_llm_calls = plan_llm_calls + _c**
+  1. `_t` != None
+    **plan_tokens = plan_tokens + _t**
 2. *
   **dec = "TRANSPORT_ERROR"**
   **last_reply = "plan_llm_act_loop_not_map"**
@@ -3553,11 +3581,27 @@ Reuse lookup: exact → alias → canonicalize → optional local n-gram `near` 
     2. *
       **_ = 1**
 5. *
-  **done = 1**
-  **status = "error"**
-  **err = "unrecognized plan decision"**
-  **summary = last_reply**
-  **skip_loop = 1**
+  Free-form parent reply with no DECISION/CALL/READ (dec=unknown): accept as DONE
+  when there is prose — chat soft-recover depends on result/summary surviving.
+  1. `dec` == "unknown"
+    1. `last_reply`
+      **done = 1**
+      **status = "ok"**
+      **err = None**
+      **summary = `last_reply`**
+      **skip_loop = 1**
+    2. *
+      **done = 1**
+      **status = "error"**
+      **err = "unrecognized plan decision"**
+      **summary = last_reply**
+      **skip_loop = 1**
+  2. *
+    **done = 1**
+    **status = "error"**
+    **err = "unrecognized plan decision"**
+    **summary = last_reply**
+    **skip_loop = 1**
 
 1. `skip_loop`
   **left = 0**
@@ -3606,6 +3650,12 @@ Deterministic success stop (loop engineering): when the child already returned a
       **last_reply = > json.get value=`turn` key="reply"**
       **last_obs = > json.get value=`turn` key="observation"**
       **events = > json.get value=`turn` key="events"**
+      **_c = > json.get value=`turn` key="llm_calls"**
+      **_t = > json.get value=`turn` key="tokens"**
+      1. `_c` != None
+        **plan_llm_calls = plan_llm_calls + _c**
+      1. `_t` != None
+        **plan_tokens = plan_tokens + _t**
       1. `dec` == DONE
         > agent_workbook_solidify path=`path` observation=`last_obs`
         **done = 1**
@@ -3626,11 +3676,25 @@ Deterministic success stop (loop engineering): when the child already returned a
       3. `dec` == RUN
         **left = left - 1**
       4. *
-        **done = 1**
-        **status = "error"**
-        **err = "unrecognized plan decision"**
-        **summary = last_reply**
-        **left = 0**
+        1. `dec` == "unknown"
+          1. `last_reply`
+            **done = 1**
+            **status = "ok"**
+            **err = None**
+            **summary = `last_reply`**
+            **left = 0**
+          2. *
+            **done = 1**
+            **status = "error"**
+            **err = "unrecognized plan decision"**
+            **summary = last_reply**
+            **left = 0**
+        2. *
+          **done = 1**
+          **status = "error"**
+          **err = "unrecognized plan decision"**
+          **summary = last_reply**
+          **left = 0**
 
 1. `status` == "ok"
   1. `promote`
@@ -3643,9 +3707,9 @@ Deterministic success stop (loop engineering): when the child already returned a
 
 `out` =
 
-| status | goal | workbook | rounds | cache |
-|--------|------|----------|--------|-------|
-| `status` | `goal` | `path` | `round` | `cache` |
+| status | goal | workbook | rounds | cache | llm_calls | tokens |
+|--------|------|----------|--------|-------|-----------|--------|
+| `status` | `goal` | `path` | `round` | `cache` | `plan_llm_calls` | `plan_tokens` |
 
 1. `summary`
   **out = table.put in=`out` at="summary" value=`summary`**
