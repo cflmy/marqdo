@@ -126,6 +126,9 @@ jobs:
             ## Marqdo ${{ github.ref_name }}
 
             ### 亮点 / Highlights
+            - **v2.2.1**：view / 静态导出——修复 occlusion 与中等宽度下大纲侧栏掉到正文下方
+            - **v2.2.1**: view / static export — fix outline rail nested under document (occlusion + mid-width layout)
+            - **v2.2.1 ext**：扩展包同步 2.2.1 / Ext pack 2.2.1
             - **v2.2.0**：函数级调用 `marqdo call`——同一份 .mq.md 就是文档、知识和工具；Tree/Bytecode 执行被点名的函数；外部调用默认只跑纯函数
             - **v2.2.0**: `marqdo call` runs one function in any .mq.md — the file is the document, the knowledge and the tool; Tree and Bytecode execute that function; external calls stay pure
             - **v2.2.0 ext**：扩展包同步 2.2.0 / Ext pack 2.2.0

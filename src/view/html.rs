@@ -237,6 +237,11 @@ a:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
   min-width: 0;
   overflow: auto;
   background: var(--bg);
+  /* Content-pane width (excludes file nav) drives outline stacking — not the
+   * viewport. A 960px viewport media query wrongly put Functions/Variables
+   * under a tall Structure while the left nav was still visible. */
+  container-type: inline-size;
+  container-name: mq-panel;
 }
 main.panel {
   padding: 2rem 2.25rem 3.5rem;
@@ -719,9 +724,17 @@ body.notebook-page .exec-clear:hover { border-color: var(--nb-accent); color: va
   gap: 0.75rem;
   align-items: start;
 }
-@media (max-width: 960px) {
+/* Stack only when the *panel* is too narrow for Structure + outline rail.
+ * Prefer keeping the rail beside the doc at tablet widths (matches ≤800px
+ * shell collapse in doc/design/view.md). When stacked, pull the rail above
+ * so it is not buried under a long document. */
+@container mq-panel (max-width: 32rem) {
   .struct-wrap { grid-template-columns: 1fr; }
-  .outline-rail, .outline-panel { position: static; }
+  .outline-rail {
+    order: -1;
+    position: static;
+  }
+  .outline-panel { position: static; }
 }
 .outline-rail {
   position: sticky;
@@ -4526,6 +4539,25 @@ mod plan_card_tests {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn outline_rail_stacks_by_panel_container_not_960_viewport() {
+        let css = stylesheet();
+        assert!(
+            css.contains("container-name: mq-panel"),
+            "panel-wrap should be a size container for outline layout"
+        );
+        assert!(
+            css.contains("@container mq-panel (max-width: 32rem)"),
+            "outline must stack from panel width, not a mid-width viewport media query"
+        );
+        assert!(
+            !css.contains("@media (max-width: 960px) {\n  .struct-wrap"),
+            "960px viewport media wrongly buried the outline under Structure"
+        );
+        let html = layout("t", "<p>nav</p>", "<p>main</p>");
+        assert!(html.contains("container-name: mq-panel"), "{html}");
+    }
 
     #[test]
     fn notebook_ui_has_controls() {

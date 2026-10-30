@@ -916,6 +916,17 @@ fn render_line_block(
                 if let Some(body) = writeback_body {
                     s.push_str(&crate::view::render::render_output_card(line_no, body));
                 }
+                // Must close `.doc-block` — an early return left the wrapper open and
+                // nested the Functions/Variables outline under the document surface.
+                let band_annots: Vec<ViewAnnot> = annots
+                    .iter()
+                    .filter(|a| !is_noisy_result_chip(a))
+                    .map(|a| (*a).clone())
+                    .collect();
+                if !band_annots.is_empty() {
+                    s.push_str(&render_annot_band(&band_annots, MAX_VISIBLE_ANNOTS));
+                }
+                s.push_str("</div>");
                 return s;
             }
             if bits.is_empty() {
@@ -1541,6 +1552,52 @@ When we meet `who`, we **print text="Hi, `who`!"** and close with*None*.
         assert_eq!(
             bind_overflow, 0,
             "default frame who/print/return must not overflow: {html}"
+        );
+    }
+}
+
+#[cfg(test)]
+mod occl_render_tests {
+    use super::render_module_document;
+
+    fn div_balance(html: &str) -> i32 {
+        let mut depth = 0i32;
+        let b = html.as_bytes();
+        let mut i = 0usize;
+        while i + 3 < b.len() {
+            if b[i] == b'<' {
+                if i + 4 <= b.len() && &b[i..i + 4] == b"<div" && (b.get(i + 4) == Some(&b' ') || b.get(i + 4) == Some(&b'>')) {
+                    depth += 1;
+                } else if i + 6 <= b.len() && &b[i..i + 6] == b"</div>" {
+                    depth -= 1;
+                }
+            }
+            i += 1;
+        }
+        depth
+    }
+
+    #[test]
+    fn occlusion_line_closes_doc_block() {
+        let src = r#"---
+markup: occlusion
+---
+
+# main
+
+`v` = [描述](1)
+"#;
+        let module = crate::parse::parse_source(src).unwrap();
+        let html = render_module_document(&module, src, &[]);
+        assert!(html.contains("doc-occl"), "{html}");
+        assert_eq!(
+            div_balance(&html),
+            0,
+            "occlusion must not leave .doc-block open: {html}"
+        );
+        assert!(
+            html.contains("doc-occl") && html.contains("</div></div>"),
+            "doc-block around occlusion must close: {html}"
         );
     }
 }

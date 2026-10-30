@@ -1,3 +1,10 @@
+marqdo (2.2.1-1ppa1) noble; urgency=medium
+
+  * Marqdo 2.2.1: fix view/static-export outline rail under document
+    (occlusion doc-block close + panel container query layout).
+
+ -- Marqdo Maintainers <noreply@marqdo.com>  Fri, 30 Oct 2026 11:45:00 +0800
+
 marqdo (2.2.0-1ppa1) noble; urgency=medium
 
   * Marqdo 2.2.0: marqdo call runs one named function in any .mq.md.

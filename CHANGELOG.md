@@ -8,6 +8,19 @@
 
 ### Changed
 
+## v2.2.1 — 2026-10-30
+
+### Highlights
+
+**view / 静态导出大纲侧栏修复**：带遮蔽（occlusion）语句的文档页里，Functions / Variables 右侧栏会掉到正文下面；中等窗口宽度下也会被错误叠成单列。CLI · wasm · ext **2.2.1**。
+
+**核心表面 Δ（Core surface Δ）**：**无增删**（仍 19 个构造）——布局与 HTML 闭合修复，不改 Markdown 标记。
+
+### Fixed
+
+- **`marqdo view` / `view output`**：occlusion 行提前返回时未关闭 `.doc-block`，把 `#outline-rail` 嵌进 `document-surface`，侧栏排到文档下方；现已闭合并保留标注带。
+- **view 壳 CSS**：大纲折叠改为按主栏 `@container mq-panel` 宽度（32rem），不再用视口 `960px` 媒体查询把右侧栏压到正文下；极窄时大纲上移到文档上方。
+
 ## v2.2.0 — 2026-10-30
 
 ### Highlights
