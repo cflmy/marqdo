@@ -119,8 +119,13 @@ pub struct ProjectIndex {
 
 impl ProjectIndex {
     pub fn build(root: ProjectRoot) -> Result<Self> {
-        let project_id = project_id(root.path());
         let files = root.source_files()?;
+        Self::from_files(root, files)
+    }
+
+    /// Index exactly `files` (already chosen by the caller). Paths must sit under `root`.
+    pub fn from_files(root: ProjectRoot, files: Vec<PathBuf>) -> Result<Self> {
+        let project_id = project_id(root.path());
         let mut modules = BTreeMap::new();
         let mut path_to_module = BTreeMap::new();
         let mut symbols = Vec::new();

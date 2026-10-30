@@ -21,7 +21,7 @@ Marqdo = **Markdown markers as syntax**. A `.mq.md` file is both documentation a
 These rules are the **current default**. Do **not** teach Classic `[key](map)` index or “bold is return of print”. Classic migration only: [migration-classic.md](migration-classic.md).
 
 1. **File suffix** `.mq.md`. Print with `> print text=…` / `> 打印 内容=…` — never use `**…**` to print.
-2. **`**…**` = code / return expression.** `*…*` = statement (bind / expr). Closing markers touch the last token (no trailing space).
+2. **`**…**` = statement** (assign / call / expression). `*…*` = return. Closing markers touch the last token (no trailing space).
 3. **`[描述](payload)` = occlusion:** `[]` is prose (never executed); `()` is the only executed part. Empty `()` → `None` stub.
 4. **Read collections with `access(coll, key)`** (aliases `取` / `取值`). **Never** use `[key](map)` as index under default Occlusion.
 5. **Foreach:** `- [描述](遍历 coll 为 item)` (`遍历`/`for`, `为`/`as`/`in`). Prefer explicit traversal when generating new code.
@@ -34,8 +34,8 @@ These rules are the **current default**. Do **not** teach Classic `[key](map)` i
 | Marker | Meaning (v2.1) |
 |--------|----------------|
 | `#` / `##`+ | Object/type · function/method |
-| `*…*` | Statement |
-| `**…**` | Return / code expression |
+| `**…**` | Statement (assign / call / expression) |
+| `*…*` | Return |
 | `[描述](payload)` | Occlusion step (payload executes) |
 | `access(c, k)` | Collection read |
 | `> fn …` | Call |
@@ -56,6 +56,24 @@ Executable-knowledge gate: [`tests/executable_knowledge/`](../../tests/executabl
 7. **One language per file.** Sandbox trial before promoting Agent-generated trees.
 8. Browser: Marqdo on WASM + `lib/browser` tables; do not hand-write business JS.
 
+
+## Call one function
+
+```markdown
+# 计算器
+
+## 加法
+
+计算两个数字`a`和`b`的和。
+
+*[计算结果](a + b)*
+```
+
+```
+marqdo call calculator.mq.md 计算器.加法 a=2 b=3
+```
+
+prints `5`. The same command works on any `.mq.md`; the file does not need a special skill name.
 
 ## Minimal program
 
@@ -96,13 +114,13 @@ Chinese builtins (same functions, no import):
 ## Statements, returns, branches
 
 ```markdown
-*x = 1*
-*y = x + 2*
+**x = 1**
+**y = x + 2**
 
 ## add_one
     + `n`
 
-**n + 1**
+*n + 1*
 ```
 
 ```markdown
@@ -130,9 +148,9 @@ import:
 
 # main
 
-*xs = > text.split value="a,b,c" sep=","*
+**xs = > text.split value="a,b,c" sep=","**
 > print text=`xs`
-*t = > clock.now_unix*
+**t = > clock.now_unix**
 ```
 
 - Import **English** or **Chinese** library file; call that file’s API names via `lib.member` (do not mix languages).
@@ -191,8 +209,8 @@ Install: `marqdo ext add quantum` (ZH id: `量子`). Build: `cargo build --relea
 **Q8 themes (circuit / probs / bloch):** `theme="dark"|"light"|"bw"` (ZH `主题=`; **default `dark`** — slate lab look, gate-family colors, label chips so wires never cross `q0` text). View plot chrome follows `data-theme` on the SVG. Advanced kinds (hinton/…) still Q8c pending full re-skin.
 
 ```markdown
-*_ = > `qc`.draw kind="circuit" theme="dark"*
-*_ = > `qc`.draw kind="probs" theme="light"*
+**_ = > `qc`.draw kind="circuit" theme="dark"**
+**_ = > `qc`.draw kind="probs" theme="light"**
 ```
 
 Design: [ext-quantum.md](../../doc/design/ext-quantum.md) · Q7: [ext-quantum-q7.md](../../doc/design/ext-quantum-q7.md) · Q8 viz: [ext-quantum-viz-style.md](../../doc/design/ext-quantum-viz-style.md) · examples: [quantum-bell](../../examples/quantum-bell/) · [quantum-entanglement](../../examples/quantum-entanglement/).
@@ -223,8 +241,8 @@ Design: [ext-quantum.md](../../doc/design/ext-quantum.md) · Q7: [ext-quantum-q7
 | `# main` then prose then code with no blank line | Blank line before code |
 | `if x > 0:` | `1. `x` > 0` |
 | `* > print text=hi *` | `> print text=hi` |
-| `` *`a` = 1 * `` (trailing space + backticks) | `*a = 1*` — bare bind, no trailing space before `*` / `**` |
-| `*xs = > text.split value=a,b sep=,*` (bare text args) | `*xs = > text.split value="a,b" sep=","*` — quote text literals; bare words are variables |
+| `` *`a` = 1 * `` (trailing space + backticks) | `**a = 1**` — bare bind, no trailing space before `*` / `**` |
+| `*xs = > text.split value=a,b sep=,*` (italic is return, and bare text args) | `**xs = > text.split value="a,b" sep=","**` — statement; quote text literals |
 | Forgetting empty return after nested `##` helper when outer continues | Add `*None*` / `**` / `****` (not `---`) |
 | Import `lib/text` then call bare `split` | `> text.split …` (qualified) |
 | Import `lib/text` then call `拆分` | Match file language (`text.split`, not 文本) |

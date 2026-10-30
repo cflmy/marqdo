@@ -4,6 +4,8 @@
 
 Marqdo 把 Markdown **标记当作编程语法**：同一个 `.mq.md` 文件，既是给人读的文稿，也是给机器跑的程序。写文档的过程就是在写可执行逻辑——大型项目里，说明、示例与实现不再分叉成三份真相。它不是「又一个 Markdown 编程语言」，而是**文档原生的编程运行时（Document-native runtime）**——一门关于**可执行知识（Executable Knowledge）**的语言。
 
+v2.2.0 起，`marqdo call` 可以直接调用这份文件里的一个函数。读的是同一页说明，跑的是同一个实现。知识因此可以当工具用，测试也不必再包一层 `# main`。
+
 欢迎访问 [marqdo 官方网站](https://www.marqdo.com/) 阅读更多特性与可执行文档。
 
 **链接语法**：[doc/design/link-syntax.md](doc/design/link-syntax.md) · 语法宪法：[doc/design/markdown-mapping.md](doc/design/markdown-mapping.md) · 对象：[objects.md](doc/design/objects.md) · 调用实参：[call-arguments.md](doc/design/call-arguments.md) · 用户站：[user-site.md](doc/design/user-site.md) · 浏览：[view.md](doc/design/view.md) · 调试：[view-debug.md](doc/design/view-debug.md) · OKF 清单：[catalog-cli.md](doc/design/catalog-cli.md) · Engineering Knowledge：[engineering-knowledge.md](doc/design/engineering-knowledge.md) · VS Code 扩展：[vscode-extension.md](doc/design/vscode-extension.md)（分支 **`vscode-extension`**；提交约定 [vscode-extension-commit.md](doc/design/vscode-extension-commit.md)） · **AI Skill**：[skills/marqdo/](skills/marqdo/)（说明 [ai-skill.md](doc/design/ai-skill.md)） · 官方扩展：[ext-llm.md](doc/design/ext-llm.md)（`ext/llm`）· [ext-agent.md](doc/design/ext-agent.md)（智能体开发框架）· [ext-cli.md](doc/design/ext-cli.md)（`marqdo ext list/add/remove`） · 原生插件 ABI：[ext-abi.md](doc/design/ext-abi.md)（`lib/plugin`） · 金样例：[tests/](tests/) · 用户文档：[public/](public/) · 变更：[CHANGELOG.md](CHANGELOG.md)
@@ -29,6 +31,7 @@ Marqdo 把 Markdown **标记当作编程语法**：同一个 `.mq.md` 文件，�
 | 真正的核心优势 | 说明 |
 |------|------|
 | **知识-代码一致性**<br>Knowledge-Code Coherence | 说明、数据、示例与实现**同一份源文件**：文档里的表格就是程序的数据，文档里的调用就是真实执行。「文档过期」不再是悄悄漂移，而是可被机器发现的**知识不一致**——知识陈述本身可以被测试。 |
+| **函数即工具**<br>`marqdo call` | 最小可执行单位是文件中的函数，不只是整份文件。人阅读函数旁边的叙述；开发者、测试和 Agent 用 `marqdo call 文件 函数 名字=值` 执行它。知识复用、工具调用、函数级测试和局部改进是同一入口的四种用法。 |
 | **默认安全，AI 友好** | 无标记文字默认是叙述（注释），只有显式标记才进入执行。AI 自由发挥**不会污染**文档与代码的边界——这比「自然语言编程」安全得多，是 AI 原生语言的重要前提。 |
 | **multi-view artifact**<br>`.mq.md` 双后缀即开放接口 | `.mq` 告诉解释器「可执行」，`.md` 告诉整个 Markdown 生态「仍是文档」。GitHub 直接读、VS Code 直接改、搜索引擎直接索引、LLM 直接理解、Marqdo 直接运行。**Marqdo 不占有知识，只是给 Markdown 增加执行语义。** |
 | **表格即数据结构** | 程序的数据结构直接就是文档的数据结构：单列竖表 → `List`；横表（1 数据行）→ `Map`；横表（多数据行）→ `Map` of `List`（列向聚合）；首列写 `@` / `行` / `row` → 行向记录 `List` of `Map`。取元使用 `access(集合, "键")`，链接 `[描述](表达式)` 只承载叙述与执行体。这是 literate programming 的下一步。 |
@@ -281,8 +284,9 @@ marqdo catalog public -o .marqdo
 
 ---
 
-## 现状（v2.1.5）
+## 现状（v2.2.0）
 
+- **函数级调用（v2.2.0）**：`marqdo call <文件.mq.md> <函数> 名字=值`。同一份文档给人读，也按函数执行；Tree 与 Bytecode 都跑被点名的函数，不回退到 `# main`。默认只执行纯函数。`--json` 给 Agent 读取结果或诊断。说明与价值见 [22-函数调用](public/features/22-函数调用.mq.md)。示例：`marqdo call examples/calculator.mq.md 计算器.加法 a=2 b=3` → `5`。扩展包同步 **2.2.0**
 - **Agent 可靠工作台（v2.1.5）**：ResourceView（JSON/CSV/PDF/image）· ToolSpec 授权先于调用 · CheckpointV2 / EffectLedger / ContextPackV2 · EKC `ir.json` 暖机与 `--refresh` · Web 短读/控制与 execute 槽隔离；扩展包同步 **2.1.5**
 - **默认隔离 HTTP execute（v2.1.4 · ADR 0009）**：`execute` / `sse-live` / `stream:true` → Supervisor worker 池（`--call-lib-path`）；父进程不再占 `INVOKE_LOCK`；`/_runtime/*`；`runtime.isolated_execution=1`；MR-01 金样例
 - **知识工作台运行时（v2.1.3）**：ModelSelection / RunContext / usage null≠0 · `view document` 只读嵌入 · LLM selection/messages/cancel · agent.step selection e2e · live smoke（设计 Partial：原生适配器 unavailable）
@@ -325,7 +329,7 @@ marqdo catalog public -o .marqdo
 - **浏览器 Marqdo（WASM）**：`marqdo wasm build` + 官方 bridge 自启（作者零业务 JS；桥内可含列表/路由/storage/ws/文件/Canvas/音频/Observer/拖放）；`lib/browser` + GFM；`web.client_embed`；示例 [browser-hello](examples/browser-hello/) · [browser-app](examples/browser-app/) · [browser-media](examples/browser-media/) · [web-client-site](examples/web-client-site/)（[ADR 0002](doc/adr/0002-browser-marqdo-wasm.md) · [D](doc/roadmap/browser-wasm-d.md) · [E](doc/roadmap/browser-wasm-e.md) · [F](doc/roadmap/browser-wasm-f.md)）
 - 选型：[ADR 0001 — Rust](doc/adr/0001-implementation-language.md) · [ADR 0002 — 浏览器 WASM](doc/adr/0002-browser-marqdo-wasm.md)（C0–C5 完结，见 [roadmap/browser-wasm.md](doc/roadmap/browser-wasm.md)）· [ADR 0003 — 异步效应](doc/adr/0003-browser-async-effects.md)
 
-### 如何使用最新 Marqdo（v2.1.5）
+### 如何使用最新 Marqdo（v2.2.0）
 
 **安装解释器（任选其一）**
 
@@ -340,14 +344,16 @@ marqdo catalog public -o .marqdo
 ```bash
 # 1) 源码安装（跟 tag 或 main）
 git clone https://github.com/cflmy/marqdo.git && cd marqdo
-git checkout v2.1.5   # 或留在 main
+git checkout v2.2.0   # 或留在 main
 cargo build --release
 export PATH="$PWD/target/release:$PATH"
 marqdo version
 marqdo version --check
 
-# 2) 跑解释器 / 文档站 / catalog
+# 2) 跑整个文件，或只调用其中一个函数
 marqdo run tests/structure/hello.mq.md
+marqdo call examples/calculator.mq.md 计算器.加法 a=2 b=3
+marqdo call examples/calculator.mq.md 计算器.加法 a=2 b=3 --json
 marqdo run tests/structure/hello.mq.md --backend bytecode
 marqdo view public --no-open
 marqdo debug public --no-open
@@ -379,7 +385,7 @@ marqdo wasm build
 # → dist/wasm/ … 见 examples/browser-hello/
 
 # 6) Releases：Windows exe/zip/vsix；Linux CLI zip + native `.so` zip
-#    https://github.com/cflmy/marqdo/releases/tag/v2.1.5
+#    https://github.com/cflmy/marqdo/releases/tag/v2.2.0
 ```
 
 开发期也可用 `cargo run -- …` 代替已安装的 `marqdo`：

@@ -102,7 +102,6 @@ impl Vm {
     }
 
     pub fn run(&mut self, program: &Program) -> Result<Value> {
-        let mut stack: Vec<Value> = Vec::new();
         let entry = program.entry;
         let arity = program.functions[entry].params.len();
         if arity != 0 {
@@ -113,14 +112,53 @@ impl Vm {
                 .unwrap_or(Span::new(1, 1));
             return Err(self.err_at(span, "bytecode: entry function needs arguments"));
         }
+        self.execute(program, entry, &[])
+    }
+
+    /// Run `fn_idx` with named arguments already bound to local slots.
+    /// Does not fall back to [`Program::entry`].
+    pub fn call_function(
+        &mut self,
+        program: &Program,
+        fn_idx: usize,
+        args: &[(String, Value)],
+    ) -> Result<Value> {
+        if fn_idx >= program.functions.len() {
+            return Err(self.err_at(
+                Span::new(1, 1),
+                format!("bytecode: function index {fn_idx} is out of range"),
+            ));
+        }
+        self.execute(program, fn_idx, args)
+    }
+
+    fn execute(
+        &mut self,
+        program: &Program,
+        fn_idx: usize,
+        args: &[(String, Value)],
+    ) -> Result<Value> {
+        let mut stack: Vec<Value> = Vec::new();
+        let mut slots = vec![Value::None; program.functions[fn_idx].locals.len().max(1)];
+        for (name, value) in args {
+            if let Some(i) = program.functions[fn_idx]
+                .locals
+                .iter()
+                .position(|local| local == name)
+            {
+                if i < slots.len() {
+                    slots[i] = value.clone();
+                }
+            }
+        }
         let mut frames = vec![Frame {
-            fn_idx: entry,
+            fn_idx,
             ip: 0,
-            slots: vec![Value::None; program.functions[entry].locals.len().max(1)],
+            slots,
             retag_matrix: None,
         }];
         self.host
-            .push_call_frame(&program.functions[entry].name.clone());
+            .push_call_frame(&program.functions[fn_idx].name.clone());
 
         loop {
             let frame = frames.last_mut().unwrap();

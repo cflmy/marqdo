@@ -33,6 +33,16 @@ struct FlatFun {
 }
 
 pub fn compile_module(path: Option<&Path>, module: &Module) -> Result<Program> {
+    compile_with(path, module, true)
+}
+
+/// Compile every function even when the file has no single program entry.
+/// `Program::entry` is then only a placeholder; callers must use [`Vm::call_function`].
+pub fn compile_for_call(path: Option<&Path>, module: &Module) -> Result<Program> {
+    compile_with(path, module, false)
+}
+
+fn compile_with(path: Option<&Path>, module: &Module, require_entry: bool) -> Result<Program> {
     let mut flat = Vec::new();
     let mut next_scope = 1u32;
     let _exports = collect_module_tree(module, &mut flat, 0, &mut next_scope);
@@ -40,7 +50,7 @@ pub fn compile_module(path: Option<&Path>, module: &Module) -> Result<Program> {
         bail!("bytecode: no functions to compile");
     }
 
-    let entry = flat
+    let chosen = flat
         .iter()
         .position(|f| f.name == "main" && f.parent.is_none())
         .or_else(|| {
@@ -55,8 +65,14 @@ pub fn compile_module(path: Option<&Path>, module: &Module) -> Result<Program> {
             } else {
                 None
             }
-        })
-        .ok_or_else(|| anyhow::anyhow!("bytecode: no `# main` object"))?;
+        });
+    let entry = match chosen {
+        Some(index) => index,
+        None if !require_entry => 0,
+        None => bail!("bytecode: no `# main` object"),
+    };
+    // Imports are compiled first, so a missing entry must take paths from the file's own functions.
+    let path_owner = if chosen.is_some() { entry } else { flat.len() - 1 };
 
     let mut objects = Vec::new();
     let mut methods = Vec::new();
@@ -95,6 +111,7 @@ pub fn compile_module(path: Option<&Path>, module: &Module) -> Result<Program> {
 
     let parents: Vec<Option<usize>> = flat.iter().map(|f| f.parent).collect();
     let children: Vec<Vec<usize>> = flat.iter().map(|f| f.children.clone()).collect();
+    let path_index = flat[path_owner].path_index.clone();
 
     Ok(Program {
         functions,
@@ -104,6 +121,7 @@ pub fn compile_module(path: Option<&Path>, module: &Module) -> Result<Program> {
         methods,
         parents,
         children,
+        path_index,
     })
 }
 

@@ -67,7 +67,7 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 /// Host capability flags. Default: all enabled.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct HostCaps {
     pub fs_write: bool,
     pub exec: bool,

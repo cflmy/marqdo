@@ -8,6 +8,43 @@
 
 ### Changed
 
+## v2.2.0 — 2026-10-30
+
+### Highlights
+
+**函数级调用 `marqdo call`**：同一份 `.mq.md` 已经是文档、知识和程序。这一版补上从外部调用其中某个函数的入口。人继续读这一页；开发者、测试和 Agent 用同一条命令传入参数并执行。知识复用、把函数当工具、逐个函数做测试、改完再跑，都是这一入口的用法，不是另一套 Skill 系统。CLI · wasm · ext **2.2.0**。
+
+```bash
+marqdo call examples/calculator.mq.md 计算器.加法 a=2 b=3
+# 5
+marqdo call examples/calculator.mq.md 计算器.加法 a=2 b=3 --json
+```
+
+**作用**：最小可执行单位从「整份文件」扩展到「文件里的一个函数」。不必为了试一个函数再写 `# main`、打印和包装程序。
+
+**价值**：说明和实现仍在同一页。Agent 读函数旁边的叙述，定位函数，传入参数，得到可检查的结果。正式发布和权限仍走已有的项目验证；`call` 默认不开放写文件、进程、网络和插件。
+
+说明页：[public/features/22-函数调用.mq.md](public/features/22-函数调用.mq.md) · [public/features/22-call.mq.md](public/features/22-call.mq.md)
+
+**核心表面 Δ（Core surface Δ）**：**无增删**（仍 19 个构造）——新增的是 CLI 入口，不新增 Markdown 标记。`**…**` 仍是语句，`*…*` 仍是返回。
+
+### Added
+
+- **`marqdo call <文件.mq.md> <函数> [名字=值 ...]`**：加载该文件及其 import，按显示路径、SymbolId 或唯一短名定位函数，用现有签名和契约绑定参数，再用现有运行时执行。
+- **`--json`**：成功 `{"ok":true,"result":...}`，失败 `{"ok":false,"error":...}`，错误带诊断 `code`。`--backend tree|bytecode` 与 `marqdo run` 相同；指定函数时两个后端都不会改去跑 `# main`。
+- **默认纯函数**：效应含写入、网络、进程或插件时，执行前返回 `artifact.effect_denied`，副作用不会发生。
+- **参照文档** `examples/calculator.mq.md`，以及用户说明页 `public/features/22-*`。
+
+### Fixed
+
+- 官方语法说明与 Agent 语法卡的标记极性与解析器对齐：粗体是语句，斜体是返回。同步测试会实际运行说明里的调用示例。
+- Bytecode 的 `marqdo run --call-lib-path` 执行被点名的导入函数，不再忽略该参数去跑入口。
+- 隔离运行时冒烟测试补上 `InvokeContext.fs_root`，`--tests` 可以编过。
+
+### Changed
+
+- CLI / wasm / `ext/VERSION` **同步 2.2.0**。扩展包版本号对齐；这一版的新能力在 CLI。
+
 ## v2.1.5 — 2026-10-27
 
 ### Highlights

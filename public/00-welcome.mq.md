@@ -17,7 +17,9 @@ The language is still early: structural markers, English/Chinese builtin aliases
 
 中文文档请看同目录的 [`00-欢迎.mq.md`](00-欢迎.mq.md)（叙述与内置均用中文）。
 
-Want a quick hello? Calls only run when they sit in the entry `# main` — `##` children are methods until something calls them. Try **greet who="marqdo"**. Names can include spaces: **greet who="marqdo user"**.
+Want a quick hello? `marqdo run` executes the entry `# main`. Try **greet who="marqdo"**. Names can include spaces: **greet who="marqdo user"**.
+
+This version also runs one function on its own. `marqdo call` takes the file, the function and named arguments. The page you read is the program that runs. What that is for, and why it matters, is in [features/22-call.mq.md](features/22-call.mq.md).
 
 Beyond the basics, Marqdo ships table, time, text, files, system, math, foreign, and more. Math and foreign deserve a special mention.
 

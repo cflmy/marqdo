@@ -3,8 +3,10 @@
 mod compile;
 mod vm;
 
-pub use compile::compile_module;
+pub use compile::{compile_for_call, compile_module};
 pub use vm::Vm;
+
+use std::collections::HashMap;
 
 use crate::diagnostics::Span;
 use crate::value::Value;
@@ -100,6 +102,8 @@ pub struct Program {
     pub parents: Vec<Option<usize>>,
     /// Parallel to `functions`: child fn indices.
     pub children: Vec<Vec<usize>>,
+    /// Dotted path (`计算器.加法`, `inc.加一`) → function index. Entry module exports plus imports.
+    pub path_index: HashMap<Vec<String>, usize>,
 }
 
 impl Program {

@@ -1,3 +1,12 @@
+marqdo (2.2.0-1ppa1) noble; urgency=medium
+
+  * Marqdo 2.2.0: marqdo call runs one named function in any .mq.md.
+    The same file stays the document, the knowledge and the program.
+    Tree and bytecode both execute that function. External calls stay
+    pure: write, process, network and plugin stay off by default.
+
+ -- Marqdo Maintainers <noreply@marqdo.com>  Fri, 30 Oct 2026 09:20:00 +0800
+
 marqdo (2.1.5-1ppa2) noble; urgency=medium
 
   * Rebuild 2.1.5 against Launchpad (previous 1ppa1 failed with no build log).

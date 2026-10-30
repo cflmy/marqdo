@@ -1347,7 +1347,7 @@ Write a scratch tool workbook under `.marqdo/agent-runs/tools/<name>.mq.md`.
 
 Protected v2.1 Occlusion card always prepended to skill_brief (M05). Must not be truncated by budget.
 
-**esc = > json.parse text={"card":"## CORE SYNTAX (v2.1 Occlusion)\n1. Print with > print / > 打印 — never use bold markers to print.\n2. Bold markers = return/code; italic markers = statement.\n3. [desc](payload) = occlusion; brackets never execute.\n4. Read with access(coll, key) — never Classic [key](map) index.\n5. Foreach: - [desc](for coll as item). import + one language per file.\n6. # type · ## function · + params · numbered branches · - loops.\n"}**
+**esc = > json.parse text={"card":"## CORE SYNTAX (v2.1 Occlusion)\n1. Print with > print / > 打印 — never use bold markers to print.\n2. Bold markers = statement; italic markers = return.\n3. [desc](payload) = occlusion; brackets never execute.\n4. Read with access(coll, key) — never Classic [key](map) index.\n5. Foreach: - [desc](for coll as item). import + one language per file.\n6. # type · ## function · + params · numbered branches · - loops.\n"}**
 *> json.get value=`esc` key="card"*
 
 ---

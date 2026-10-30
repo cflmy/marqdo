@@ -833,28 +833,22 @@ fn artifact_execute(params: &Value) -> Result<Value, Value> {
     let denied: Vec<String> = artifact.effects.values().into_iter().filter(|effect| effect != "pure" && !allowed.contains(&effect.as_str())).collect();
     if !denied.is_empty() { return Err(json!({"code":"artifact.effect_denied","message":"效果策略拒绝执行","denied":denied,"effects":artifact.effects.values()})); }
     let path = compilation.semantics.root.join(&artifact.source.file);
-    let module = load::load_module(&path).map_err(|e| diagnostic_err("artifact.load", &e))?;
     let input = params.get("inputs").cloned().unwrap_or_else(|| json!({}));
     let object = input.as_object().ok_or_else(|| err("mlsp.bad_request", "inputs 必须是 JSON 对象"))?;
     let mut args = Vec::new();
     for (name, value) in object { args.push((name.clone(), crate::host::json::json_to_value(value).map_err(|e| err("mlsp.bad_input", e))?)); }
     let caps = crate::host::HostCaps { fs_write: allowed.contains(&"fs.write"), exec: allowed.iter().any(|e| matches!(*e, "process.exec" | "plugin.call" | "llm.call")), net: allowed.iter().any(|e| matches!(*e, "network.read" | "network.write" | "llm.call")), plugin: allowed.contains(&"plugin.call") };
-    let host = crate::host::HostContext::for_capture(Some(&path), caps);
-    let mut interpreter = crate::interp::Interpreter::with_capture(Some(&path), false).with_host(host);
-    // Bind by source line / declaration identity — never by bare display_name suffix (G07).
-    let fun = find_function_at_line(&module.functions, artifact.source.line).ok_or_else(|| {
-        err(
-            "artifact.unresolved",
-            format!(
-                "无法在 {}:{} 定位绑定函数 {}",
-                artifact.source.file, artifact.source.line, artifact.display_name
-            ),
-        )
-    })?;
-    let value = interpreter
-        .invoke_bound_function(&module, fun, &args)
-        .map_err(|e| diagnostic_err("artifact.execution_failed", &e))?;
-    let stdout = std::mem::take(&mut interpreter.captured_stdout);
+    // Same line identity, argument binding, and runtime as `marqdo call`.
+    let (value, stdout) = crate::call::execute_source_function(
+        &path,
+        artifact.source.line,
+        &artifact.display_name,
+        &args,
+        caps,
+        crate::Backend::Tree,
+        false,
+    )
+    .map_err(|e| diagnostic_err("artifact.execution_failed", &e))?;
     Ok(json!({
         "schema_version": 1,
         "artifact_id": artifact.artifact_id.0,
@@ -864,21 +858,6 @@ fn artifact_execute(params: &Value) -> Result<Value, Value> {
         "stdout": stdout,
         "effects": artifact.effects.values(),
     }))
-}
-
-fn find_function_at_line<'a>(
-    functions: &'a [crate::ast::Function],
-    line: u32,
-) -> Option<&'a crate::ast::Function> {
-    for fun in functions {
-        if fun.span.line == line {
-            return Some(fun);
-        }
-        if let Some(found) = find_function_at_line(&fun.children, line) {
-            return Some(found);
-        }
-    }
-    None
 }
 
 fn err(code: &str, message: impl Into<String>) -> Value {

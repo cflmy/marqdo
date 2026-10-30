@@ -151,6 +151,13 @@ impl Interpreter {
         bail_at(self.path.as_deref(), self.current_span, message)
     }
 
+    fn err_code(&self, code: &str, message: impl Into<String>) -> anyhow::Error {
+        anyhow::Error::new(
+            crate::diagnostics::Diagnostic::new(self.path.as_deref(), self.current_span, message)
+                .with_code(code),
+        )
+    }
+
     fn emit_line(&mut self, text: &str) {
         if self.capture {
             self.captured_stdout.push_str(text);
@@ -361,6 +368,68 @@ impl Interpreter {
         args: &[(String, Value)],
     ) -> Result<Value> {
         self.run_function(module, fun, Env::new(), args, false)
+    }
+
+    /// Bind named arguments for an external call. Unknown names, missing
+    /// required parameters, and contract mismatches are errors. Defaults run.
+    pub fn bind_external_args(
+        &mut self,
+        module: &Module,
+        fun: &Function,
+        args: &[(String, Value)],
+    ) -> Result<Vec<(String, Value)>> {
+        self.current_span = fun.span;
+        self.host.current_line = fun.span.line;
+        let mut named: HashMap<String, Value> = HashMap::new();
+        for (k, v) in args {
+            if named.insert(k.clone(), v.clone()).is_some() {
+                return Err(self.err_code(
+                    "call.duplicate_arg",
+                    format!("duplicate named argument `{k}`"),
+                ));
+            }
+        }
+        for k in named.keys() {
+            if !fun.params.iter().any(|p| &p.name == k) {
+                return Err(self.err_code(
+                    "call.unknown_arg",
+                    format!("unknown argument `{k}`"),
+                ));
+            }
+        }
+        let ev: Vec<EvArg> = named
+            .into_iter()
+            .map(|(k, v)| EvArg::Named(k, v))
+            .collect();
+        let mut env = Env::new();
+        let bound = bind_function_args(self, module, fun, &mut env, &fun.params, &ev, false)
+            .map_err(|m| {
+                if m.starts_with("missing argument") {
+                    self.err_code("call.missing_arg", m)
+                } else if m.starts_with("duplicate named argument") {
+                    self.err_code("call.duplicate_arg", m)
+                } else {
+                    self.err(m)
+                }
+            })?;
+        if let Some(c) = &fun.contract {
+            if let Some(d) = crate::contract::call_arg_diag(
+                c,
+                &fun.name,
+                &bound,
+                self.path.as_deref(),
+                fun.span,
+            ) {
+                return Err(d.into());
+            }
+        }
+        let mut out = Vec::new();
+        for p in &fun.params {
+            if let Some(v) = bound.get(&p.name) {
+                out.push((p.name.clone(), v.clone()));
+            }
+        }
+        Ok(out)
     }
 
     /// Call a function using (and updating) [`Self::entry_bindings`] from `# main`.
@@ -1450,36 +1519,8 @@ impl Interpreter {
         path: &[String],
         ev_args: &[EvArg],
     ) -> Result<Value> {
+        let (lib, node) = locate_import_function(module, path).map_err(|m| self.err(m))?;
         let display = path.join(".");
-        if path.len() < 2 {
-            return Err(self.err(format!("library path `{display}`: need at least `lib.member`")));
-        }
-        let lib_name = &path[0];
-        let lib = module.import_modules.get(lib_name).ok_or_else(|| {
-            self.err(format!("unknown library `{lib_name}` (import it in frontmatter)"))
-        })?;
-
-        let mut parent_is_object = false;
-        let mut node = lib
-            .functions
-            .iter()
-            .find(|f| f.name == path[1])
-            .ok_or_else(|| self.err(format!("unknown `{display}`")))?;
-        for seg in &path[2..] {
-            parent_is_object = node.is_object();
-            node = node
-                .children
-                .iter()
-                .find(|c| c.name == *seg)
-                .ok_or_else(|| self.err(format!("unknown `{display}`")))?;
-        }
-
-        if parent_is_object && !node.is_object() && crate::ast::function_uses_receiver(node) {
-            return Err(self.err(format!(
-                "`{display}` is an instance method; call it as `var`.{}",
-                node.name
-            )));
-        }
 
         let bound = {
             let mut dummy_env = Env::new();
@@ -1611,6 +1652,44 @@ fn tag_instance(type_name: &str, value: Value) -> Value {
             ("value".into(), other),
         ]),
     }
+}
+
+/// `lib.member` / `lib.Type.member` against frontmatter imports. Does not execute.
+pub(crate) fn locate_import_function<'a>(
+    module: &'a Module,
+    path: &[String],
+) -> Result<(&'a Module, &'a Function), String> {
+    let display = path.join(".");
+    if path.len() < 2 {
+        return Err(format!(
+            "library path `{display}`: need at least `lib.member`"
+        ));
+    }
+    let lib = module
+        .import_modules
+        .get(&path[0])
+        .ok_or_else(|| format!("unknown library `{}` (import it in frontmatter)", path[0]))?;
+    let mut parent_is_object = false;
+    let mut node = lib
+        .functions
+        .iter()
+        .find(|f| f.name == path[1])
+        .ok_or_else(|| format!("unknown `{display}`"))?;
+    for seg in &path[2..] {
+        parent_is_object = node.is_object();
+        node = node
+            .children
+            .iter()
+            .find(|c| c.name == *seg)
+            .ok_or_else(|| format!("unknown `{display}`"))?;
+    }
+    if parent_is_object && !node.is_object() && crate::ast::function_uses_receiver(node) {
+        return Err(format!(
+            "`{display}` is an instance method; call it as `var`.{}",
+            node.name
+        ));
+    }
+    Ok((lib, node))
 }
 
 /// Bind evaluated args onto parameter names. Err is a plain message (caller adds span/path).

@@ -12,6 +12,7 @@ pub mod binding;
 pub mod browser_session;
 pub mod builtin;
 pub mod bytecode;
+pub mod call;
 pub mod capture;
 #[cfg(feature = "cli")]
 pub mod catalog;
@@ -260,6 +261,23 @@ pub fn run_file(path: &Path, opts: &RunOptions) -> Result<i32> {
                 host.fs_root = Some(root.clone());
                 host.cwd = root.clone();
             }
+            let bound_call = if let Some(lib_path) = &opts.call_lib_path {
+                let named = named_call_args(opts)?;
+                let segments: Vec<String> = lib_path
+                    .split('.')
+                    .filter(|s| !s.is_empty())
+                    .map(|s| s.to_string())
+                    .collect();
+                let (lib, fun) = crate::interp::locate_import_function(&module, &segments)
+                    .map_err(|m| anyhow::anyhow!(m))?;
+                let mut binder = Interpreter::with_capture(Some(path), false).with_host(
+                    HostContext::for_capture(Some(path), opts.host_caps()),
+                );
+                let bound = binder.bind_external_args(lib, fun, &named)?;
+                Some((lib_path.clone(), bound))
+            } else {
+                None
+            };
             let mut vm = Vm::new(Some(path))
                 .with_stdin(stdin_lines)
                 .with_trace(opts.trace_eval)
@@ -267,7 +285,21 @@ pub fn run_file(path: &Path, opts: &RunOptions) -> Result<i32> {
             if opts.trace_eval {
                 eprintln!("=== marqdo: trace-eval ({path_label}) ===");
             }
-            let value = vm.run(&program)?;
+            let value = if let Some((lib_path, bound)) = bound_call {
+                let key: Vec<String> = lib_path
+                    .split('.')
+                    .filter(|s| !s.is_empty())
+                    .map(|s| s.to_string())
+                    .collect();
+                let idx = program.path_index.get(&key).copied().ok_or_else(|| {
+                    anyhow::anyhow!(
+                        "bytecode: `{lib_path}` did not compile to a function; refusing to run the program entry"
+                    )
+                })?;
+                vm.call_function(&program, idx, &bound)?
+            } else {
+                vm.run(&program)?
+            };
             if opts.trace_eval {
                 eprintln!("=== marqdo: end trace-eval ===");
             }
@@ -299,6 +331,16 @@ fn run_call_lib_path(
         .run_site_lib_path(module, lib_path, args_val.as_ref())
         .map_err(|e| anyhow::anyhow!(e))?;
     Ok(value)
+}
+
+fn named_call_args(opts: &RunOptions) -> Result<Vec<(String, crate::value::Value)>> {
+    let Some(value) = load_args_json(opts)? else {
+        return Ok(Vec::new());
+    };
+    match value {
+        crate::value::Value::Map(pairs) => Ok(pairs),
+        _ => bail!("args-json must be a JSON object"),
+    }
 }
 
 fn load_args_json(opts: &RunOptions) -> Result<Option<crate::value::Value>> {

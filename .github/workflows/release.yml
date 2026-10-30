@@ -126,6 +126,9 @@ jobs:
             ## Marqdo ${{ github.ref_name }}
 
             ### 亮点 / Highlights
+            - **v2.2.0**：函数级调用 `marqdo call`——同一份 .mq.md 就是文档、知识和工具；Tree/Bytecode 执行被点名的函数；外部调用默认只跑纯函数
+            - **v2.2.0**: `marqdo call` runs one function in any .mq.md — the file is the document, the knowledge and the tool; Tree and Bytecode execute that function; external calls stay pure
+            - **v2.2.0 ext**：扩展包同步 2.2.0 / Ext pack 2.2.0
             - **v2.1.5**：Agent 可靠工作台——ResourceView / ToolSpec / CheckpointV2 / EffectLedger · EKC ir.json 暖机 · Web 短读槽隔离
             - **v2.1.5**: Agent reliability workbench — ResourceView / ToolSpec / CheckpointV2 / EffectLedger, EKC ir.json warm-load, web short/read lane isolation
             - **v2.1.5 ext**：扩展包同步 2.1.5 / Ext pack 2.1.5

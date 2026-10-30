@@ -124,6 +124,7 @@ fn mr07_supervisor_dry_run_slots_and_publish_recover() {
             selection_ref: None,
             capabilities_ref: None,
             deadline_at: "2099-01-01T00:00:00Z".into(),
+            fs_root: Some(root.display().to_string()),
         },
     };
     let a = sup.dispatch(req("a")).unwrap();

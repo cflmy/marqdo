@@ -137,6 +137,26 @@ enum Commands {
         #[arg(long)]
         legacy_markup: bool,
     },
+    /// Call one function in a `.mq.md` file: `marqdo call <file> <function> name=value`.
+    Call {
+        /// Source file.
+        file: PathBuf,
+
+        /// Function display path, for example `计算器.加法`.
+        function: String,
+
+        /// Named arguments `name=value` (integer, decimal, quoted text, True/False/None).
+        /// A value may be negative (`a=-2`). `--json` and `--backend` remain flags.
+        args: Vec<String>,
+
+        /// Print one JSON object: `{"ok":true,"result":...}` or `{"ok":false,"error":...}`.
+        #[arg(long)]
+        json: bool,
+
+        /// Runtime. Both backends execute the named function.
+        #[arg(long, value_enum, default_value_t = BackendCli::Tree)]
+        backend: BackendCli,
+    },
     /// Static contract cross-check (渐进式契约): drift, unknown types, misplaced tables
     Check {
         /// Program path (.mq.md)
@@ -783,6 +803,47 @@ fn try_main(cli: Cli) -> Result<i32> {
                 marqdo::run_file(&path, &opts)?;
             }
             Ok(0)
+        }
+        Commands::Call {
+            file,
+            function,
+            args,
+            json,
+            backend,
+        } => {
+            let outcome = (|| -> Result<marqdo::value::Value> {
+                let parsed = marqdo::call::parse_call_args(&args)?;
+                marqdo::call::call_file(&file, &function, &parsed, backend.into())
+            })();
+            match outcome {
+                Ok(value) => {
+                    if json {
+                        let result = marqdo::value_as_json(&value)
+                            .map_err(|e| anyhow::anyhow!(e))?;
+                        println!(
+                            "{}",
+                            serde_json::json!({"ok": true, "result": result})
+                        );
+                    } else {
+                        println!("{}", value.as_display());
+                    }
+                    Ok(0)
+                }
+                Err(err) => {
+                    let diag = Diagnostic::find(&err).cloned().unwrap_or_else(|| {
+                        Diagnostic::new(None, Span::new(0, 0), format!("{err:#}")).with_code("call.failed")
+                    });
+                    if json {
+                        println!(
+                            "{}",
+                            serde_json::json!({"ok": false, "error": diag.to_json()})
+                        );
+                    } else {
+                        eprintln!("error: {diag}");
+                    }
+                    Ok(1)
+                }
+            }
         }
         Commands::Check {
             file,

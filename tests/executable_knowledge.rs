@@ -1417,6 +1417,56 @@ fn m05_skill_front_has_occlusion_core_not_classic_index() {
         root.join("skills/marqdo/migration-classic.md").is_file(),
         "Classic rules must live in migration-classic.md"
     );
+    for rel in ["skills/marqdo/SKILL.md", ".cursor/skills/marqdo/SKILL.md"] {
+        let text = std::fs::read_to_string(root.join(rel)).unwrap();
+        let core = text.split("## Minimal program").next().unwrap_or(&text);
+        assert!(
+            core.contains("| `**…**` | Statement") && core.contains("| `*…*` | Return |"),
+            "{rel} marker table must match the parser: bold statement, italic return"
+        );
+        assert!(
+            !core.contains("= code / return expression") && !core.contains("| `*…*` | Statement"),
+            "{rel} still teaches the inverted marker polarity"
+        );
+    }
+    let skill = std::fs::read_to_string(root.join("skills/marqdo/SKILL.md")).unwrap();
+    let golden = fence_after(&skill, "## Call one function");
+    let dir = std::env::temp_dir().join(format!("mq-skill-call-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    let file = dir.join("calculator.mq.md");
+    std::fs::write(&file, golden).unwrap();
+    let out = std::process::Command::new(env!("CARGO_BIN_EXE_marqdo"))
+        .args([
+            "call",
+            file.to_str().unwrap(),
+            "计算器.加法",
+            "a=2",
+            "b=3",
+        ])
+        .output()
+        .unwrap();
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "skill golden failed\nstderr={}\nstdout={}\nsource=\n{golden}",
+        String::from_utf8_lossy(&out.stderr),
+        String::from_utf8_lossy(&out.stdout)
+    );
+    assert_eq!(String::from_utf8_lossy(&out.stdout).trim(), "5");
+}
+
+fn fence_after<'a>(body: &'a str, heading: &str) -> &'a str {
+    let rest = body
+        .split_once(heading)
+        .unwrap_or_else(|| panic!("missing {heading}"))
+        .1;
+    let start = rest
+        .find("```markdown\n")
+        .unwrap_or_else(|| panic!("{heading} has no markdown fence"));
+    let rest = &rest[start + "```markdown\n".len()..];
+    let end = rest.find("\n```").expect("fence end");
+    rest[..end].trim()
 }
 
 #[test]
@@ -1642,6 +1692,14 @@ fn m05_skill_core_card_has_access_not_classic_index() {
     assert!(
         agent.contains("## skill_core_card") && agent.contains("access(coll, key)"),
         "skill_core_card must teach access()"
+    );
+    assert!(
+        agent.contains("Bold markers = statement; italic markers = return."),
+        "skill card must match parser polarity"
+    );
+    assert!(
+        !agent.contains("italic markers = statement"),
+        "skill card still teaches inverted markers"
     );
     assert!(
         !agent.contains("never **bold** to print") || agent.contains("never use bold markers"),

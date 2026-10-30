@@ -8,7 +8,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
 use serde_json::{json, Value};
 use sha2::{Digest as _, Sha256};
 
@@ -240,10 +240,20 @@ pub struct Compilation {
 /// side-effect free: it never loads plugins, evaluates expressions or fetches
 /// sources.
 pub fn compile_project(options: &CompileOptions) -> Result<Compilation> {
-    let t_index = std::time::Instant::now();
     let root = ProjectRoot::new(&options.project_root)?;
-    let index = ProjectIndex::build(root.clone())?;
-    let index_ms = t_index.elapsed().as_millis();
+    compile_index(ProjectIndex::build(root)?)
+}
+
+/// Compile `entry` and the modules it imports. Sibling files in the directory are not included.
+pub fn compile_file_closure(entry: &Path) -> Result<Compilation> {
+    let files = import_closure(entry)?;
+    let ancestor = common_ancestor(&files)?;
+    let root = ProjectRoot::new(&ancestor)?;
+    compile_index(ProjectIndex::from_files(root, files)?)
+}
+
+fn compile_index(index: ProjectIndex) -> Result<Compilation> {
+    let root = index.root().clone();
     // Reuse parsed modules from ProjectIndex — same input snapshot, no second parse (M-R5b).
     let mut files = BTreeMap::new();
     let mut diagnostics = Vec::new();
@@ -257,8 +267,6 @@ pub fn compile_project(options: &CompileOptions) -> Result<Compilation> {
             ),
         );
     }
-    let _ = index_ms; // ProjectIndex build duration (M-R5b span)
-
     // Wire import_modules from already-parsed project files so BoundCall path
     // resolve shares `resolve_for_exec` (no plugin load / no re-parse).
     attach_project_imports(&mut files);
@@ -347,6 +355,56 @@ pub fn compile_project(options: &CompileOptions) -> Result<Compilation> {
         },
         diagnostics,
     })
+}
+
+fn import_closure(entry: &Path) -> Result<Vec<PathBuf>> {
+    let mut out = Vec::new();
+    let mut seen = std::collections::HashSet::new();
+    fn walk(path: &Path, out: &mut Vec<PathBuf>, seen: &mut std::collections::HashSet<PathBuf>) -> Result<()> {
+        if !path.is_file() {
+            return Ok(());
+        }
+        let canon = path.canonicalize().with_context(|| format!("resolve {}", path.display()))?;
+        if !seen.insert(canon.clone()) {
+            return Ok(());
+        }
+        out.push(canon.clone());
+        let source = fs::read_to_string(&canon).with_context(|| format!("read {}", canon.display()))?;
+        let module = crate::load::parse_source_auto(&source)
+            .with_context(|| format!("parse {}", canon.display()))?;
+        let base = canon.parent().unwrap_or_else(|| Path::new("."));
+        for imp in &module.imports {
+            let dep = crate::load::resolve_import(base, &imp.path)
+                .with_context(|| format!("import `{}` from {}", imp.path, canon.display()))?;
+            walk(&dep, out, seen)?;
+        }
+        Ok(())
+    }
+    if !entry.is_file() {
+        bail!("call target {} is not a file", entry.display());
+    }
+    walk(entry, &mut out, &mut seen)?;
+    out.sort();
+    Ok(out)
+}
+
+fn common_ancestor(files: &[PathBuf]) -> Result<PathBuf> {
+    let Some(first) = files.first() else {
+        bail!("call target has no source files");
+    };
+    let mut ancestor = first
+        .parent()
+        .map(|p| p.to_path_buf())
+        .unwrap_or_else(|| PathBuf::from("."));
+    for file in files.iter().skip(1) {
+        while !file.starts_with(&ancestor) {
+            ancestor = ancestor
+                .parent()
+                .map(|p| p.to_path_buf())
+                .ok_or_else(|| anyhow::anyhow!("source files have no common directory"))?;
+        }
+    }
+    Ok(ancestor)
 }
 
 fn module_artifact(index: &ProjectIndex, module: &ModuleId, path: &Path, text: &str) -> SemanticArtifact {
