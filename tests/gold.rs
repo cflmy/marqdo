@@ -1858,6 +1858,41 @@ fn lib_json_roundtrip() {
 }
 
 #[test]
+fn lib_json_vsafe_max_safe_ok() {
+    assert_out(
+        "tests/lib/json-vsafe-max-safe-ok.mq.md",
+        "9007199254740991\n{\"n\":9007199254740991}",
+    );
+}
+
+#[test]
+fn lib_json_vsafe_string_ok() {
+    assert_out(
+        "tests/lib/json-vsafe-string-ok.mq.md",
+        "1152921504606846977",
+    );
+}
+
+#[test]
+fn lib_json_vsafe_refuse() {
+    // Span points at lib/json.mq.md `parse` body while path stays the caller file.
+    assert_err(
+        "tests/lib/json-vsafe-refuse.mq.md",
+        "16:1",
+        "json: integer outside V_safe",
+    );
+}
+
+#[test]
+fn lib_json_vsafe_stringify_refuse() {
+    assert_err(
+        "tests/lib/json-vsafe-stringify-refuse.mq.md",
+        "24:1",
+        "json: integer outside V_safe",
+    );
+}
+
+#[test]
 fn lib_table_collections() {
     assert_out(
         "tests/lib/table-collections.mq.md",
@@ -3577,6 +3612,58 @@ fn lib_foreign_session_python() {
         return;
     }
     assert_out("tests/lib/foreign-session-python.mq.md", "42\n5");
+}
+
+#[test]
+fn lib_foreign_session_vsafe_refuse() {
+    if !node_available() {
+        eprintln!("skip lib_foreign_session_vsafe_refuse: no node on PATH");
+        return;
+    }
+    // Span points at lib/foreign.mq.md session_set body.
+    assert_err(
+        "tests/lib/foreign-session-vsafe-refuse.mq.md",
+        "206:1",
+        "json: integer outside V_safe",
+    );
+}
+
+#[test]
+fn lib_foreign_vsafe_refuse() {
+    if !python_available() {
+        eprintln!("skip lib_foreign_vsafe_refuse: no python on PATH");
+        return;
+    }
+    assert_err(
+        "tests/lib/foreign-vsafe-refuse.mq.md",
+        "16:1",
+        "json: integer outside V_safe",
+    );
+}
+
+#[test]
+fn lib_foreign_vsafe_postarith_refuse() {
+    if !python_available() {
+        eprintln!("skip lib_foreign_vsafe_postarith_refuse: no python on PATH");
+        return;
+    }
+    assert_err(
+        "tests/lib/foreign-vsafe-postarith-refuse.mq.md",
+        "16:1",
+        "json: integer outside V_safe",
+    );
+}
+
+#[test]
+fn lib_foreign_vsafe_string_ok() {
+    if !node_available() {
+        eprintln!("skip lib_foreign_vsafe_string_ok: no node on PATH");
+        return;
+    }
+    assert_out(
+        "tests/lib/foreign-vsafe-string-ok.mq.md",
+        "{\"out\":\"1152921504606846978\"}",
+    );
 }
 
 #[test]

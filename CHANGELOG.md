@@ -8,6 +8,28 @@
 
 ### Changed
 
+## v2.2.2 — 2026-11-01
+
+### Highlights
+
+**\(V_{\mathsf{safe}}\) JSON 整数契约落地**：外联 / `json.parse` / `json.stringify` / `session_set` 等共用映射对齐 Lean ForeignJSON——`|n| > 2^{53}-1` 的 JSON 整数显式拒绝（错误前缀 `json: integer outside V_safe`），禁止 Node 路径静默扭曲；宽整数仍用十进制字符串 + 对端 `BigInt`。CLI · wasm · ext **2.2.2**。
+
+**核心表面 Δ（Core surface Δ）**：**无增删**（仍 19 个构造）——宿主 JSON 契约与测试，不改 Markdown 标记。
+
+### Added
+
+- **`doc/design/v-safe-json.md`**：宿主 ↔ Lean \(V_{\mathsf{safe}}\) 契约锁定（`MAX_SAFE`、encode/decode refuse、嵌套、float 为宿主扩展）。
+- **回归**：`tests/lib/json-vsafe-*`、`foreign-vsafe-*`、`foreign-session-vsafe-refuse`（含算术后越界 refuse）。
+
+### Fixed
+
+- **`src/host/json.rs`**：对域外整数与 `u64 > i64::MAX` 显式失败；不再经 `f64`/`Text` 静默降级。
+- **`doc/design/foreign-kernel.md`**：Int→number 仅当 `|n| ≤ 2^{53}-1`；宽整数走 string 桥。
+
+### Changed
+
+- 外联 JSON 桥与 `lib/json` 行为：OOD 整数从「可能静默失真」改为「诊断失败」。
+
 ## v2.2.1 — 2026-10-30
 
 ### Highlights

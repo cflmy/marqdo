@@ -1,6 +1,20 @@
 //! JSON host primitives + Value↔JSON mapping.
+//!
+//! Integer gate matches Lean \(V_{\mathsf{safe}}\) (`doc/design/v-safe-json.md`):
+//! JSON integers with `|n| > 2^53-1` refuse on encode and decode.
 
 use crate::value::Value;
+
+/// JavaScript `Number.MAX_SAFE_INTEGER` / Lean `ForeignJSON.maxSafe`.
+pub const MAX_SAFE_INT: i64 = 9_007_199_254_740_991; // 2^53 - 1
+
+pub fn in_safe_int(n: i64) -> bool {
+    (-MAX_SAFE_INT..=MAX_SAFE_INT).contains(&n)
+}
+
+fn ood_int_err(n: impl std::fmt::Display) -> String {
+    format!("json: integer outside V_safe (±(2^53-1)): {n}")
+}
 
 pub fn parse(text: &Value) -> Result<Value, String> {
     let s = match text {
@@ -70,11 +84,18 @@ pub(crate) fn json_to_value(v: &serde_json::Value) -> Result<Value, String> {
         serde_json::Value::Bool(b) => Value::Bool(*b),
         serde_json::Value::Number(n) => {
             if let Some(i) = n.as_i64() {
+                if !in_safe_int(i) {
+                    return Err(ood_int_err(i));
+                }
                 Value::Int(i)
+            } else if let Some(u) = n.as_u64() {
+                // Always > i64::MAX ⇒ outside V_safe; never coerce via f64/Text.
+                return Err(ood_int_err(u));
             } else if let Some(f) = n.as_f64() {
+                // Host extension: non-integer JSON numbers → Num (not in Lean SafeVal).
                 Value::Num(f)
             } else {
-                Value::Text(n.to_string())
+                return Err(format!("json: unsupported number: {n}"));
             }
         }
         serde_json::Value::String(s) => Value::Text(s.clone()),
@@ -99,7 +120,12 @@ pub(crate) fn value_to_json(v: &Value) -> Result<serde_json::Value, String> {
     Ok(match v {
         Value::None => serde_json::Value::Null,
         Value::Bool(b) => serde_json::Value::Bool(*b),
-        Value::Int(n) => serde_json::Value::Number((*n).into()),
+        Value::Int(n) => {
+            if !in_safe_int(*n) {
+                return Err(ood_int_err(*n));
+            }
+            serde_json::Value::Number((*n).into())
+        }
         Value::Num(n) => serde_json::Number::from_f64(*n)
             .map(serde_json::Value::Number)
             .unwrap_or(serde_json::Value::Null),
@@ -158,5 +184,84 @@ mod tests {
     fn quote_escapes_text() {
         let q = quote(&Value::Text("a\"b".into())).unwrap();
         assert_eq!(q, Value::Text("\"a\\\"b\"".into()));
+    }
+
+    #[test]
+    fn roundtrip_max_safe() {
+        for n in [MAX_SAFE_INT, -MAX_SAFE_INT, 0_i64, 1, -1] {
+            let j = value_to_json(&Value::Int(n)).unwrap();
+            let v = json_to_value(&j).unwrap();
+            assert_eq!(v, Value::Int(n));
+        }
+    }
+
+    #[test]
+    fn refuse_ood_encode() {
+        for n in [
+            MAX_SAFE_INT + 1,
+            -MAX_SAFE_INT - 1,
+            1_i64 << 53,                 // 2^53
+            1_i64 << 60,                 // 2^60
+            (1_i64 << 60) + 1,           // 2^60+1
+        ] {
+            let err = value_to_json(&Value::Int(n)).unwrap_err();
+            assert!(
+                err.contains("outside V_safe"),
+                "encode {n}: {err}"
+            );
+        }
+    }
+
+    #[test]
+    fn refuse_ood_decode() {
+        for n in [
+            MAX_SAFE_INT + 1,
+            -MAX_SAFE_INT - 1,
+            1_i64 << 53,
+            1_i64 << 60,
+            (1_i64 << 60) + 1,
+        ] {
+            let raw = format!("{n}");
+            let j: serde_json::Value = serde_json::from_str(&raw).unwrap();
+            let err = json_to_value(&j).unwrap_err();
+            assert!(
+                err.contains("outside V_safe"),
+                "decode {n}: {err}"
+            );
+        }
+    }
+
+    #[test]
+    fn refuse_nested_ood() {
+        let j: serde_json::Value =
+            serde_json::from_str("{\"a\":[1152921504606846977]}").unwrap();
+        let err = json_to_value(&j).unwrap_err();
+        assert!(err.contains("outside V_safe"), "{err}");
+    }
+
+    #[test]
+    fn decimal_string_ok() {
+        let j = serde_json::Value::String("1152921504606846977".into());
+        assert_eq!(
+            json_to_value(&j).unwrap(),
+            Value::Text("1152921504606846977".into())
+        );
+    }
+
+    #[test]
+    fn float_host_extension_ok() {
+        let j: serde_json::Value = serde_json::from_str("1.5").unwrap();
+        match json_to_value(&j).unwrap() {
+            Value::Num(f) => assert!((f - 1.5).abs() < 1e-12),
+            other => panic!("expected Num, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn refuse_u64_above_i64_max() {
+        // 2^63 as JSON integer: as_i64 fails, as_u64 succeeds.
+        let j: serde_json::Value = serde_json::from_str("9223372036854775808").unwrap();
+        let err = json_to_value(&j).unwrap_err();
+        assert!(err.contains("outside V_safe"), "{err}");
     }
 }

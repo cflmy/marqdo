@@ -214,18 +214,22 @@ template = ["php", "-r", "{inline}"]
 
 ### 4.1 值映射
 
+Canonical integer contract: [`v-safe-json.md`](v-safe-json.md) (Lean \(V_{\mathsf{safe}}\): `|n| ≤ 2^{53}-1`).
+
 | Marqdo | JSON |
 |---|---|
 | None | null |
 | Bool | bool |
-| Int | number |
-| Num | number（NaN/Inf → null） |
-| Text | string |
-| List | array |
-| Map | object |
+| Int | number **仅当** `|n| ≤ 2^{53}-1`；越界 → 显式失败（禁止静默扭曲） |
+| Num | number（NaN/Inf → null）；float 为宿主扩展，∉ mechanized \(V_{\mathsf{safe}}\) |
+| Text | string（宽整数用十进制字符串过桥，对端 `BigInt` / Python `int`） |
+| List | array（子树递归；任一越界整数使整体失败） |
+| Map | object（同上） |
 | Formula | 矩阵 → 二维数组；其它 → 数字或字符串 |
 | Code | 源码字符串 |
 | Secret | JSON 中 `<secret>`；`env` 显式交付时取真实值 |
+
+错误前缀：`json: integer outside V_safe (±(2^53-1)): <n>`。
 
 ### 4.2 输入
 

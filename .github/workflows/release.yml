@@ -126,6 +126,9 @@ jobs:
             ## Marqdo ${{ github.ref_name }}
 
             ### 亮点 / Highlights
+            - **v2.2.2**：\(V_{\mathsf{safe}}\) JSON 整数——外联/`json` 拒绝域外整数，禁止静默扭曲；宽整数用十进制字符串
+            - **v2.2.2**: \(V_{\mathsf{safe}}\) JSON integers — foreign/`json` refuse OOD ints (no silent distortion); wide ints via decimal strings
+            - **v2.2.2 ext**：扩展包同步 2.2.2 / Ext pack 2.2.2
             - **v2.2.1**：view / 静态导出——修复 occlusion 与中等宽度下大纲侧栏掉到正文下方
             - **v2.2.1**: view / static export — fix outline rail nested under document (occlusion + mid-width layout)
             - **v2.2.1 ext**：扩展包同步 2.2.1 / Ext pack 2.2.1
