@@ -8,6 +8,33 @@
 
 ### Changed
 
+## v2.3.0 — 2026-11-01
+
+### Highlights
+
+**Foreign Strong（session / value / replay）**：会话句柄改为不透明 `handle`（不可 JSON 过桥、禁止 text 伪造）；`close` 仿射消费（双 close / use-after-close 故障）；`replay_check` 对照 oracle journal（旧 `replay_snapshot` 仅重跑保留）；GFM 表行 arity 与列长映射拒绝静默补空；Ω 返回域外整数故障。对齐 PLDI Strong 叙事与 Lean SessionReg / \(V_{\mathsf{safe}}\)。CLI · wasm · ext **2.3.0**。
+
+**核心表面 Δ（Core surface Δ）**：**无增删**（仍 19 个构造）——破坏面在宿主 foreign/session/JSON 与表解析纪律，不增 Markdown 标记。
+
+### Added
+
+- **`Value::Handle`**：`session_open` 返回句柄；session 操作拒绝 text 伪造。
+- **`DocumentSession::replay_check`** + API `/api/session/snapshot/replay_check`；snapshot 录音字段 + **`oracle_journal`**（与 execution journal 分名）。
+- **API** `/api/session/oracle_journal`。
+- **文档**：`doc/design/foreign-strong-correspondence.md`；`v-safe-json.md` 补 Handle / 列 arity / Ω 门。
+- **回归**：`foreign-session-{use-before-open,use-after-close,double-close,cold-replay-empty,isolation,handle-no-serialize,result-vsafe-refuse}`；`tests/errors/table-arity.mq.md`。
+
+### Fixed
+
+- 不等宽 GFM 表不再静默补空单元格；解析报 `table row arity mismatch`。
+- Py/Node session bootstrap：Ω 结果 OOD 整数不再 `default=str` 偷渡，宿主升级为故障。
+
+### Changed
+
+- **`session_close`**：未知 / 已关闭句柄 → 故障（不再返回 `False`）。
+- **`session_list`**：`id` 字段为 `handle`。
+- Snapshot export 含 `ok`/`code`/`stdout`/`result`/`source_hash` 与 `oracle_journal`。
+
 ## v2.2.2 — 2026-11-01
 
 ### Highlights

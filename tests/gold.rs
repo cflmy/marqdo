@@ -828,6 +828,15 @@ fn error_bad_arity() {
 }
 
 #[test]
+fn error_table_arity() {
+    assert_err(
+        "tests/errors/table-arity.mq.md",
+        "13:1",
+        "table row arity mismatch",
+    );
+}
+
+#[test]
 fn error_syntax_bad_line() {
     assert_err(
         "tests/errors/syntax-bad-line.mq.md",
@@ -3623,8 +3632,92 @@ fn lib_foreign_session_vsafe_refuse() {
     // Span points at lib/foreign.mq.md session_set body.
     assert_err(
         "tests/lib/foreign-session-vsafe-refuse.mq.md",
-        "206:1",
+        "207:1",
         "json: integer outside V_safe",
+    );
+}
+
+#[test]
+fn lib_foreign_session_use_after_close() {
+    if !node_available() {
+        eprintln!("skip lib_foreign_session_use_after_close: no node on PATH");
+        return;
+    }
+    assert_err(
+        "tests/lib/foreign-session-use-after-close.mq.md",
+        "198:1",
+        "foreign session",
+    );
+}
+
+#[test]
+fn lib_foreign_session_double_close() {
+    if !node_available() {
+        eprintln!("skip lib_foreign_session_double_close: no node on PATH");
+        return;
+    }
+    assert_err(
+        "tests/lib/foreign-session-double-close.mq.md",
+        "231:1",
+        "foreign session",
+    );
+}
+
+#[test]
+fn lib_foreign_session_use_before_open() {
+    // Text fabrication is refused before registry lookup (opaque handle discipline).
+    assert_err(
+        "tests/lib/foreign-session-use-before-open.mq.md",
+        "198:1",
+        "session id must be a handle",
+    );
+}
+
+#[test]
+fn lib_foreign_session_handle_no_serialize() {
+    if !node_available() {
+        eprintln!("skip lib_foreign_session_handle_no_serialize: no node on PATH");
+        return;
+    }
+    assert_err(
+        "tests/lib/foreign-session-handle-no-serialize.mq.md",
+        "24:1",
+        "session handle cannot be serialized",
+    );
+}
+
+#[test]
+fn lib_foreign_session_result_vsafe_refuse() {
+    if !python_available() {
+        eprintln!("skip lib_foreign_session_result_vsafe_refuse: no python on PATH");
+        return;
+    }
+    assert_err(
+        "tests/lib/foreign-session-result-vsafe-refuse.mq.md",
+        "198:1",
+        "json: integer outside V_safe",
+    );
+}
+
+#[test]
+fn lib_foreign_session_isolation() {
+    if !node_available() {
+        eprintln!("skip lib_foreign_session_isolation: no node on PATH");
+        return;
+    }
+    assert_out("tests/lib/foreign-session-isolation.mq.md", "41\nFalse");
+}
+
+#[test]
+fn lib_foreign_session_cold_replay_empty() {
+    if !node_available() {
+        eprintln!("skip lib_foreign_session_cold_replay_empty: no node on PATH");
+        return;
+    }
+    assert_err(
+        "tests/lib/foreign-session-cold-replay-empty.mq.md",
+        "198:1",
+        "foreign session",
     );
 }
 

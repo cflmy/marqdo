@@ -109,6 +109,7 @@ pub fn type_of(v: &Value) -> &'static str {
         Value::Num(_) => "num",
         Value::Text(_) => "text",
         Value::Secret(_) => "secret",
+        Value::Handle(_) => "handle",
         Value::List(_) => "list",
         Value::Map(_) => "map",
         Value::Formula(_) => "formula",

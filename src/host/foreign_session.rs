@@ -22,8 +22,35 @@ const MAX_PROCESS_STDERR: usize = 1_048_576;
 
 const PY_BOOTSTRAP: &str = r#"import sys, json, io, ast, traceback, contextlib
 _out = sys.stdout
+_MAX_SAFE = 9007199254740991
+def _sanitize(o):
+    if o is None or isinstance(o, bool):
+        return o
+    if isinstance(o, int):
+        if abs(o) > _MAX_SAFE:
+            raise ValueError("json: integer outside V_safe (±(2^53-1)): %s" % o)
+        return o
+    if isinstance(o, float):
+        return o
+    if isinstance(o, str):
+        return o
+    if isinstance(o, (list, tuple)):
+        return [_sanitize(x) for x in o]
+    if isinstance(o, dict):
+        return {str(k): _sanitize(v) for k, v in o.items()}
+    raise TypeError("not JSON-safe: %s" % type(o).__name__)
 def _send(o):
-    _out.write(json.dumps(o, ensure_ascii=False, default=str) + "\n")
+    try:
+        line = json.dumps(_sanitize(o), ensure_ascii=False)
+    except Exception as e:
+        rid = o.get("id") if isinstance(o, dict) else None
+        line = json.dumps({
+            "id": rid, "ok": False,
+            "stdout": (o.get("stdout") if isinstance(o, dict) else "") or "",
+            "stderr": (o.get("stderr") if isinstance(o, dict) else "") or "",
+            "result": None, "error": str(e),
+        }, ensure_ascii=False)
+    _out.write(line + "\n")
     _out.flush()
 _g = {"__name__": "__main__", "marqdo_input": None}
 for _line in sys.stdin:
@@ -81,10 +108,40 @@ const JS_BOOTSTRAP: &str = r#"const readline = require("readline");
 const util = require("util");
 const vm = require("vm");
 const out = process.stdout.write.bind(process.stdout);
+const MAX_SAFE = Number.MAX_SAFE_INTEGER;
 globalThis.require = require;
 const rl = readline.createInterface({ input: process.stdin, crlfDelay: Infinity });
-function send(o) { out(JSON.stringify(o) + "\n"); }
-function toJSON(v) { try { return JSON.parse(JSON.stringify(v)); } catch (e) { return String(v); } }
+function sanitize(v) {
+  if (v === null || typeof v === "boolean" || typeof v === "string") return v;
+  if (typeof v === "number") {
+    if (Number.isInteger(v) && Math.abs(v) > MAX_SAFE)
+      throw new Error("json: integer outside V_safe (±(2^53-1)): " + v);
+    return v;
+  }
+  if (typeof v === "bigint") {
+    if (v > BigInt(MAX_SAFE) || v < -BigInt(MAX_SAFE))
+      throw new Error("json: integer outside V_safe (±(2^53-1)): " + v.toString());
+    return Number(v);
+  }
+  if (Array.isArray(v)) return v.map(sanitize);
+  if (v && typeof v === "object") {
+    const o = {};
+    for (const k of Object.keys(v)) o[k] = sanitize(v[k]);
+    return o;
+  }
+  throw new Error("not JSON-safe: " + (typeof v));
+}
+function send(o) {
+  try { out(JSON.stringify(sanitize(o)) + "\n"); }
+  catch (e) {
+    out(JSON.stringify({
+      id: o && o.id !== undefined ? o.id : null, ok: false,
+      stdout: (o && o.stdout) || "", stderr: (o && o.stderr) || "",
+      result: null, error: String(e && e.message ? e.message : e)
+    }) + "\n");
+  }
+}
+function toJSON(v) { return sanitize(v); }
 async function capture(fn) {
   const logs = [], errs = [];
   const ow = process.stdout.write.bind(process.stdout);
@@ -179,6 +236,15 @@ fn opt_text(v: Option<&Value>) -> Result<Option<String>, String> {
         Some(Value::Text(s)) => Ok(Some(s.clone())),
         Some(Value::Secret(s)) => Ok(Some(s.clone())),
         Some(_) => Err("value must be text".into()),
+    }
+}
+
+/// Session ids are opaque handles — text fabrications are refused.
+fn as_session_id<'a>(id: &'a Value) -> Result<&'a str, String> {
+    match id {
+        Value::Handle(s) => Ok(s.as_str()),
+        Value::Text(_) => Err("session id must be a handle (not text)".into()),
+        _ => Err("session id must be a handle".into()),
     }
 }
 
@@ -418,7 +484,7 @@ pub fn open(
     };
     ctx.foreign_sessions.insert(id.clone(), session);
     let _ = timeout;
-    Ok(Value::Text(id))
+    Ok(Value::Handle(id))
 }
 
 fn session_dead_stderr(ctx: &HostContext, id: &str) -> String {
@@ -453,7 +519,7 @@ pub fn eval_with_stdin(
     timeout: Option<&Value>,
 ) -> Result<Value, String> {
     ensure_config(ctx);
-    let id = as_text(id, "id")?.to_string();
+    let id = as_session_id(id)?.to_string();
     if !ctx.foreign_sessions.contains_key(&id) {
         return Err(format!("foreign session `{id}` not found"));
     }
@@ -544,6 +610,10 @@ pub fn eval_with_stdin(
         .and_then(|v| v.as_str())
         .unwrap_or("")
         .to_string();
+    // Ω ∉ V_safe is a language fault, not a soft cell failure.
+    if error.contains("outside V_safe") {
+        return Err(error);
+    }
     let result = reply
         .get("result")
         .map(json_to_value)
@@ -650,7 +720,7 @@ fn kill_session(ctx: &mut HostContext, id: &str) {
 /// Interrupt the current evaluation without destroying the kernel. Python
 /// reports KeyboardInterrupt through the normal result frame.
 pub fn interrupt(ctx: &mut HostContext, id: &Value) -> Result<Value, String> {
-    let id = as_text(id, "id")?.to_string();
+    let id = as_session_id(id)?.to_string();
     let session = ctx
         .foreign_sessions
         .get_mut(&id)
@@ -675,7 +745,7 @@ pub fn set(
     name: &Value,
     value: &Value,
 ) -> Result<Value, String> {
-    let id = as_text(id, "id")?.to_string();
+    let id = as_session_id(id)?.to_string();
     let name = as_text(name, "name")?.to_string();
     if !valid_name(&name) {
         return Err("session_set: name must be an identifier".into());
@@ -695,7 +765,7 @@ pub fn set(
 }
 
 pub fn get(ctx: &mut HostContext, id: &Value, name: &Value) -> Result<Value, String> {
-    let id = as_text(id, "id")?.to_string();
+    let id = as_session_id(id)?.to_string();
     let name = as_text(name, "name")?.to_string();
     if !valid_name(&name) {
         return Err("session_get: name must be an identifier".into());
@@ -716,7 +786,7 @@ pub fn get(ctx: &mut HostContext, id: &Value, name: &Value) -> Result<Value, Str
 }
 
 pub fn names(ctx: &mut HostContext, id: &Value) -> Result<Value, String> {
-    let id = as_text(id, "id")?.to_string();
+    let id = as_session_id(id)?.to_string();
     let request = serde_json::json!({"id": 1, "op": "names"});
     let reply = send_and_wait(ctx, &id, &request, Duration::from_secs(10))?;
     if !reply.get("ok").and_then(|v| v.as_bool()).unwrap_or(false) {
@@ -733,10 +803,14 @@ pub fn names(ctx: &mut HostContext, id: &Value) -> Result<Value, String> {
 }
 
 pub fn close(ctx: &mut HostContext, id: &Value) -> Result<Value, String> {
-    let id = as_text(id, "id")?.to_string();
-    let existed = ctx.foreign_sessions.contains_key(&id);
+    let id = as_session_id(id)?.to_string();
+    // Affine close: consuming an absent / already-closed handle is a fault
+    // (same surface as eval/set/get after close).
+    if !ctx.foreign_sessions.contains_key(&id) {
+        return Err(format!("foreign session `{id}` not found"));
+    }
     kill_session(ctx, &id);
-    Ok(Value::Bool(existed))
+    Ok(Value::Bool(true))
 }
 
 pub fn list(ctx: &HostContext) -> Result<Value, String> {
@@ -745,7 +819,7 @@ pub fn list(ctx: &HostContext) -> Result<Value, String> {
     let mut out = Vec::new();
     for s in sessions {
         out.push(Value::Map(vec![
-            ("id".into(), Value::Text(s.id.clone())),
+            ("id".into(), Value::Handle(s.id.clone())),
             ("lang".into(), Value::Text(s.lang.clone())),
             ("cmd".into(), Value::Text(s.cmd.clone())),
             ("evals".into(), Value::Int(s.evals as i64)),

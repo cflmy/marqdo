@@ -208,6 +208,16 @@ pub fn api_replay_snapshot(root: &Path, body: &str) -> serde_json::Value {
     with_session(root, body, "replay", |s| s.replay_snapshot(&snapshot))
 }
 
+pub fn api_replay_check(root: &Path, body: &str) -> serde_json::Value {
+    let v = body_value(body);
+    let snapshot = v.get("snapshot").cloned().unwrap_or(serde_json::Value::Null);
+    let snapshot = match json_to_value(&snapshot) {
+        Ok(v) => v,
+        Err(e) => return err(e),
+    };
+    with_session(root, body, "replay_check", |s| s.replay_check(&snapshot))
+}
+
 pub fn api_clear_cell(root: &Path, body: &str) -> serde_json::Value {
     let v = body_value(body);
     let cell = v.get("cell").and_then(|x| x.as_str()).unwrap_or("");
@@ -350,6 +360,10 @@ pub fn api_state_pull(root: &Path, body: &str) -> serde_json::Value {
 
 pub fn api_journal(root: &Path, body: &str) -> serde_json::Value {
     with_session(root, body, "journal", |s| Ok(s.journal_json()))
+}
+
+pub fn api_oracle_journal(root: &Path, body: &str) -> serde_json::Value {
+    with_session(root, body, "oracle_journal", |s| Ok(s.oracle_journal_json()))
 }
 
 #[cfg(test)]

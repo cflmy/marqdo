@@ -138,6 +138,22 @@ pub(crate) fn value_to_json(v: &Value) -> Result<serde_json::Value, String> {
             serde_json::Value::Array(arr)
         }
         Value::Map(entries) => {
+            // Column-table maps (all fields lists): refuse unequal list lengths.
+            let list_lens: Vec<usize> = entries
+                .iter()
+                .filter_map(|(_, v)| match v {
+                    Value::List(xs) => Some(xs.len()),
+                    _ => None,
+                })
+                .collect();
+            if list_lens.len() == entries.len() && list_lens.len() >= 2 {
+                let n0 = list_lens[0];
+                if list_lens.iter().any(|&n| n != n0) {
+                    return Err(
+                        "json: table column arity mismatch (unequal list lengths)".into(),
+                    );
+                }
+            }
             let mut map = serde_json::Map::new();
             for (k, v) in entries {
                 map.insert(k.clone(), value_to_json(v)?);
@@ -173,6 +189,9 @@ pub(crate) fn value_to_json(v: &Value) -> Result<serde_json::Value, String> {
         },
         Value::Code(c) => serde_json::Value::String(c.source.clone()),
         Value::Secret(_) => serde_json::Value::String("<secret>".into()),
+        Value::Handle(_) => {
+            return Err("json: session handle cannot be serialized".into());
+        }
     })
 }
 
@@ -263,5 +282,24 @@ mod tests {
         let j: serde_json::Value = serde_json::from_str("9223372036854775808").unwrap();
         let err = json_to_value(&j).unwrap_err();
         assert!(err.contains("outside V_safe"), "{err}");
+    }
+
+    #[test]
+    fn refuse_session_handle_encode() {
+        let err = value_to_json(&Value::Handle("s1".into())).unwrap_err();
+        assert!(
+            err.contains("session handle cannot be serialized"),
+            "{err}"
+        );
+    }
+
+    #[test]
+    fn refuse_unequal_column_table_encode() {
+        let ragged = Value::Map(vec![
+            ("a".into(), Value::List(vec![Value::Int(1), Value::Int(2)])),
+            ("b".into(), Value::List(vec![Value::Int(3)])),
+        ]);
+        let err = value_to_json(&ragged).unwrap_err();
+        assert!(err.contains("arity mismatch"), "{err}");
     }
 }

@@ -177,8 +177,9 @@ view has no persistent kernel state.
     + `cwd`=None
     + `timeout`=None
 
-Start a persistent Python/Node kernel; returns a session id. `timeout` is the
-default per-eval timeout.
+Start a persistent Python/Node kernel; returns an opaque `handle` value.
+Text fabrications are refused by session ops; handles cannot cross the JSON
+bridge. `timeout` is the default per-eval timeout.
 
 *> host_foreign_session_open lang=`lang` cmd=`cmd` env=`env` cwd=`cwd` timeout=`timeout`*
 
@@ -223,7 +224,9 @@ List kernel variable names.
 ## session_close
     + `id`
 
-Kill and remove a session; returns whether it existed.
+Consume (affine close) a live session handle: kill and remove it. Returns
+`True` on success. Closing an unknown or already-closed id is a fault
+(`foreign session … not found`), matching use-after-close on eval/set/get.
 
 *> host_foreign_session_close id=`id`*
 

@@ -30,10 +30,22 @@ MAX_SAFE = 9007199254740991   # 2^53 - 1
 
 - `Value::Int(n)` with `|n| ≤ MAX_SAFE` → JSON number.
 - `Value::Int(n)` with `|n| > MAX_SAFE` → **refuse** (error).
+- `Value::Handle(_)` → **refuse** (`json: session handle cannot be serialized`).
+- Column-table `Map` whose fields are all `List` with **unequal lengths** →
+  **refuse** (`json: table column arity mismatch`).
 - Nested `List` / `Map`: any child refuse fails the whole tree.
+- GFM table **parse** also refuses unequal row width
+  (`table row arity mismatch`) before a value is built.
 - Wide integers that must cross a language boundary: author converts to a
   **decimal string** (∈ \(V_{\mathsf{safe}}\)); the foreign program may use
   `BigInt` / Python `int` on that string.
+
+## Foreign oracle (`session_eval` / `session_get`)
+
+Python/Node session bootstraps sanitize results with the same integer gate
+before JSON emission. An Ω response containing an OOD integer is a **fault**
+(host `Err`), not a soft `ok:false` cell record. Stdout text that authors
+`json.parse` themselves is still gated by host `json_to_value`.
 
 ## Decode (`json_to_value`)
 

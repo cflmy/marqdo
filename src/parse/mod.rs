@@ -891,6 +891,24 @@ impl<'a> Cursor<'a> {
         if !header_done {
             bail!("expected GFM table after empty assignment");
         }
+        // Strong / Surface: unequal row arity is stuck — no silent pad/truncate.
+        for (line_no, cells) in &data_rows {
+            if cells.len() != header.len() {
+                return Err(Diagnostic::new(
+                    None,
+                    Span {
+                        line: *line_no,
+                        col: 1,
+                    },
+                    format!(
+                        "table row arity mismatch: expected {} columns, got {}",
+                        header.len(),
+                        cells.len()
+                    ),
+                )
+                .into());
+            }
+        }
         let row_oriented = header
             .first()
             .map(|h| is_row_table_marker(h))

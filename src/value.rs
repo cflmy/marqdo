@@ -29,6 +29,8 @@ pub enum Value {
     Code(CodeBlock),
     /// Sensitive text from `${secret.*}` — Display shows `<secret>`; reveal on Text concat.
     Secret(String),
+    /// Opaque foreign-session handle. Not JSON-serializable; not printable structure.
+    Handle(String),
 }
 
 impl Value {
@@ -40,6 +42,7 @@ impl Value {
             Value::Num(n) => *n != 0.0 && !n.is_nan(),
             Value::Text(s) => !s.is_empty(),
             Value::Secret(s) => !s.is_empty(),
+            Value::Handle(s) => !s.is_empty(),
             Value::List(xs) => !xs.is_empty(),
             Value::Map(xs) => !xs.is_empty(),
             Value::Formula(_) => true,
@@ -64,6 +67,7 @@ impl Value {
             Value::Num(n) => crate::formula::format_num(*n),
             Value::Text(s) => s.clone(),
             Value::Secret(_) => "<secret>".into(),
+            Value::Handle(_) => "<handle>".into(),
             Value::List(xs) => {
                 let parts: Vec<String> = xs.iter().map(|v| v.as_display()).collect();
                 format!("[{}]", parts.join(", "))
