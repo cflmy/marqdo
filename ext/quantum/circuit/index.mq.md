@@ -35,9 +35,18 @@ Apply CNOT from 0 to 1:
 Call example (plain text):
   marqdo call ext/quantum/circuit/index.mq.md cnot circuit=$qc control=0 target=1 --effects plugin --session s --toget qc --json
 
-Then open ext/quantum/simulate/index.mq.md for probabilities. Author programs may
-import this file and construct the circuit object named circuit (method chain h,
-cx, …). Agents should prefer marqdo call on the ## tools above.
+If you were given only this file, probabilities are not a ## tool here. After the
+CNOT line, call simulate on the same session (do not invent a probabilities
+tool on this file):
+
+Call example (plain text):
+  marqdo call ext/quantum/simulate/index.mq.md probabilities circuit=$qc --effects plugin --session s --json
+
+Author programs may import this file and construct the circuit object named
+circuit (method chain h, cx, …). Agents should prefer marqdo call on the ##
+tools above, then simulate for amplitudes or probabilities.
+
+*None*
 
 ## new
 Create a state-vector circuit of width `qubits`=1 by default. Optional

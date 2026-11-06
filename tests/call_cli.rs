@@ -264,6 +264,101 @@ fn quantum_index_bell_via_call() {
 }
 
 #[test]
+fn quantum_zh_index_bell_via_call() {
+    let file = root().join("ext/quantum/量子/索引.mq.md");
+    let out = run(&[
+        "call",
+        "--effects",
+        "plugin",
+        "--json",
+        file.to_str().unwrap(),
+        "贝尔态",
+    ]);
+    assert_eq!(out.status.code(), Some(0), "{}", text(&out.stdout));
+    let body: serde_json::Value = serde_json::from_str(&text(&out.stdout)).unwrap();
+    assert_eq!(body["ok"], true, "{body}");
+    let p00 = body["result"]["00"].as_f64().unwrap();
+    let p11 = body["result"]["11"].as_f64().unwrap();
+    assert!((p00 - 0.5).abs() < 0.05, "{body}");
+    assert!((p11 - 0.5).abs() < 0.05, "{body}");
+}
+
+#[test]
+fn quantum_bell_stepwise_session_matches_index() {
+    let dir = std::env::temp_dir().join(format!("mq-call-bell-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&dir);
+    fs::create_dir_all(&dir).unwrap();
+    let circuit = root().join("ext/quantum/circuit/index.mq.md");
+    let simulate = root().join("ext/quantum/simulate/index.mq.md");
+    let sess = "bell-steps";
+    let steps: &[(&str, &str, &[&str])] = &[
+        (
+            circuit.to_str().unwrap(),
+            "new",
+            &["qubits=2", "--toget", "qc"],
+        ),
+        (
+            circuit.to_str().unwrap(),
+            "hadamard",
+            &["circuit=$qc", "qubit=0", "--toget", "qc"],
+        ),
+        (
+            circuit.to_str().unwrap(),
+            "cnot",
+            &["circuit=$qc", "control=0", "target=1", "--toget", "qc"],
+        ),
+    ];
+    for (file, function, extra) in steps {
+        let mut args = vec![
+            "call",
+            "--effects",
+            "plugin",
+            "--session",
+            sess,
+            "--json",
+            file,
+            function,
+        ];
+        args.extend_from_slice(extra);
+        let out = Command::new(bin())
+            .env("MARQDO_CALL_SESSION_DIR", &dir)
+            .args(&args)
+            .current_dir(root())
+            .output()
+            .unwrap();
+        assert_eq!(
+            out.status.code(),
+            Some(0),
+            "{function} {}",
+            text(&out.stdout)
+        );
+    }
+    let out = Command::new(bin())
+        .env("MARQDO_CALL_SESSION_DIR", &dir)
+        .args([
+            "call",
+            "--effects",
+            "plugin",
+            "--session",
+            sess,
+            "--json",
+            simulate.to_str().unwrap(),
+            "probabilities",
+            "circuit=$qc",
+        ])
+        .current_dir(root())
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(0), "{}", text(&out.stdout));
+    let body: serde_json::Value = serde_json::from_str(&text(&out.stdout)).unwrap();
+    assert_eq!(body["ok"], true, "{body}");
+    let p00 = body["result"]["00"].as_f64().unwrap();
+    let p11 = body["result"]["11"].as_f64().unwrap();
+    assert!((p00 - 0.5).abs() < 0.05, "{body}");
+    assert!((p11 - 0.5).abs() < 0.05, "{body}");
+}
+
+#[test]
 fn toget_persists_serializable_value() {
     let dir = std::env::temp_dir().join(format!("mq-call-sess-{}", std::process::id()));
     let _ = fs::remove_dir_all(&dir);

@@ -86,3 +86,4 @@ marqdo call <FILE> <FUNCTION> [k=v…]
 | 日期 | 说明 |
 |------|------|
 | 2026-11-06 | 初稿：012 试点契约、call effects/toget、quantum 模块树 |
+| 2026-11-06 | quantum 中文树收进 `ext/quantum/量子/`；根 skill 增加「选哪条路」；`ext add` 拒绝装进源码树 |
