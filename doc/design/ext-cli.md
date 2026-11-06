@@ -93,7 +93,7 @@ web.plugin         # absolute path hint
 |----|-----------------------------|
 | `llm` | `ai/llm.mq.md`, `ai/大模型.mq.md` |
 | `agent` | `ai/agent.mq.md`, `ai/智能体.mq.md`, **native `agent`** |
-| `web` | `web/web.mq.md`, `web/网页.mq.md`, **native `web`** |
+| `web` | `web/index.mq.md` + facade/modules + `layout/` · `布局/` + `网页.mq.md`, **native `web`** |
 | `quantum` | `quantum/`（含 `量子/` 中文树）, **native `quantum`** |
 
 ## Release assets (native)

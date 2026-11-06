@@ -186,8 +186,10 @@ Install: `marqdo ext add web` (ZH id: `网页`). See ADR 0007 · [ext-web-artifa
 
 **Do not degrade:** Document/Endpoint metadata; facade `web.page|route|serve|render|inspect`; View `|type|slot|value|attrs|style|` only; no `compose_*` / `configure` / author `ensure_plugin`. DB → `ext/data`; auth → `ext/security`; net → `ext/net`.
 
-- EN: `import web:ext/web/web.mq.md`
-- ZH: `导入 网页:ext/web/网页.mq.md`
+- **Root skill (agents first):** [`ext/web/index.mq.md`](../../ext/web/index.mq.md) · ZH [`ext/web/网页.mq.md`](../../ext/web/网页.mq.md)
+- **Layout law (in-package):** file-partition pages (nav/sidebar/footer/…) until simple; no HTML/CSS injection as default — [`ext/web/layout/index.mq.md`](../../ext/web/layout/index.mq.md) · [ext-web-layout-paradigm.md](../../doc/design/ext-web-layout-paradigm.md)
+- EN author facade: `import web:ext/web/web.mq.md`
+- Agent: `marqdo call ext/web/layout/index.mq.md rules --json` then facade tools with `--effects plugin`
 
 Design: [ext-web-artifact.md](../../doc/design/ext-web-artifact.md) · example: [examples/marqdo-blog/](../../examples/marqdo-blog/).
 

@@ -6,7 +6,7 @@
 | 日期 | 2026-11-06 |
 | 愿景 | [doc/next/012.md](../next/012.md)（手写真相源，本文不修改它） |
 | 契约摘要 | [ext-index-skill-tools.md](ext-index-skill-tools.md) |
-| 试点 | [`ext/quantum/`](../../ext/quantum/) |
+| 试点 | [`ext/quantum/`](../../ext/quantum/)（完成）· [`ext/web/`](../../ext/web/)（迁移中，含[布局范式](ext-web-layout-paradigm.md)） |
 | 相关 | [ext-cli.md](ext-cli.md) · [ext-abi.md](ext-abi.md) · [ext-quantum.md](ext-quantum.md) · [lib-code-as-docs.md](lib-code-as-docs.md) · [stdlib-i18n.md](stdlib-i18n.md) |
 
 ---
@@ -208,10 +208,12 @@ MARQDO_EXT_SOURCE=/path/to/repo/ext \
 ## 13. 推广顺序（建议）
 
 1. **已完成试点**：`ext/quantum/`（含 `量子/`）  
-2. **下一优先**：结构已分文件、且强依赖 `marqdo call` 的包（如 `linalg` 公式面、`ai` agent 面）  
-3. **较大包**（`web`）：先拆根 skill + 明确系统路由/`web.inspect`，再按模块补 For AI 段；勿回退 compose 碎片 DSL  
+2. **进行中**：`ext/web/` — 根 `index` + `layout` 布局铁律（文件划分、反 HTML 注入）已入库；facade 路径保持兼容；模块叙述与 call 金样继续补齐  
+3. **下一优先**：`linalg` 公式面、`ai` agent 面  
+4. **`ext/net` / `ext/data` / `ext/security`**：随 web 站点场景补根 skill，勿把 DB/鉴权 API 塞回 `web` facade  
 
-每迁一包：更新本文件「试点/推广」表与该包 `doc/design/ext-*.md` 布局节，并加 call 金样。
+每迁一包：更新本文件「试点/推广」表与该包 `doc/design/ext-*.md` 布局节，并加 call 金样。  
+**Web 特有**：布局工程必须写进包内 skill（见 [ext-web-layout-paradigm.md](ext-web-layout-paradigm.md)），不能只放在外部 README。
 
 ---
 

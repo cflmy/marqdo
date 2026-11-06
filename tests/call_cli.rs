@@ -244,6 +244,29 @@ fn plugin_effects_flag_allows_quantum_ensure() {
 }
 
 #[test]
+fn web_layout_rules_via_call() {
+    let file = root().join("ext/web/layout/index.mq.md");
+    let out = run(&["call", "--json", file.to_str().unwrap(), "rules"]);
+    assert_eq!(out.status.code(), Some(0), "{}", text(&out.stdout));
+    let body: serde_json::Value = serde_json::from_str(&text(&out.stdout)).unwrap();
+    assert_eq!(body["ok"], true, "{body}");
+    let keys = body["result"]["key"].as_array().expect("key list");
+    assert!(
+        keys.iter().any(|k| k.as_str() == Some("paradigm")),
+        "{body}"
+    );
+}
+
+#[test]
+fn web_zh_layout_rules_via_call() {
+    let file = root().join("ext/web/网页.mq.md");
+    let out = run(&["call", "--json", file.to_str().unwrap(), "布局规则"]);
+    assert_eq!(out.status.code(), Some(0), "{}", text(&out.stdout));
+    let body: serde_json::Value = serde_json::from_str(&text(&out.stdout)).unwrap();
+    assert_eq!(body["ok"], true, "{body}");
+}
+
+#[test]
 fn quantum_index_bell_via_call() {
     let file = root().join("ext/quantum/index.mq.md");
     let out = run(&[

@@ -37,8 +37,20 @@ pub const CATALOG: &[ExtPackage] = &[
     },
     ExtPackage {
         id: "web",
-        description: "Dynamic website toolkit (ext/web) — Go libweb (page/db/bind/admin)",
-        mq_files: &["web/web.mq.md", "web/网页.mq.md"],
+        description: "Dynamic website toolkit (ext/web) — Document/Endpoint + layout skill",
+        mq_files: &[
+            "web/index.mq.md",
+            "web/web.mq.md",
+            "web/网页.mq.md",
+            "web/_capability.mq.md",
+            "web/page.mq.md",
+            "web/route.mq.md",
+            "web/component.mq.md",
+            "web/dom.mq.md",
+            "web/client.mq.md",
+            "web/layout/index.mq.md",
+            "web/布局/索引.mq.md",
+        ],
         native_crate: Some("marqdo_plugin_web"),
     },
     ExtPackage {

@@ -7,7 +7,7 @@
 | ADR | [0007-web-document-endpoint.md](../adr/0007-web-document-endpoint.md) |
 | 讨论稿 | [doc/next/007.md](../next/007.md)（superseded） |
 | 安装 | `marqdo ext add web`（`web` / `网页`） |
-| 相关 | [binding.md](binding.md) · [ext-web.md](ext-web.md) · [stdlib-i18n.md](stdlib-i18n.md) · [layers.md](layers.md) |
+| 相关 | [binding.md](binding.md) · [ext-web.md](ext-web.md) · [ext-web-layout-paradigm.md](ext-web-layout-paradigm.md) · [ext-skill-tools-paradigm.md](ext-skill-tools-paradigm.md) · [stdlib-i18n.md](stdlib-i18n.md) · [layers.md](layers.md) |
 
 ---
 
@@ -33,12 +33,16 @@
 
 ```text
 ext/web/
-  web.mq.md · 网页.mq.md     # facade: page route serve render inspect
+  index.mq.md · 网页.mq.md   # 根 skill（智能体先读；含布局铁律）
+  layout/ · 布局/            # 文件划分布局工程 tools
+  web.mq.md                  # EN facade: page route serve render inspect
   page.mq.md · route.mq.md · component.mq.md · dom.mq.md · client.mq.md
 ext/net/     http.mq.md · websocket.mq.md · url.mq.md
 ext/data/    db.mq.md · cache.mq.md · storage.mq.md
 ext/security/ auth.mq.md · oidc.mq.md · rbac.mq.md
 ```
+
+**布局工程**（反 HTML/CSS 注入）：见 [ext-web-layout-paradigm.md](ext-web-layout-paradigm.md)；包内 `ext/web/layout/index.mq.md`。
 
 作者入口通常：
 
@@ -191,6 +195,7 @@ Middleware 一等：`web.use` / `route.use`，表驱动；**禁止** `configure(
 | A6 | 禁止恢复 `compose_*` / `app.configure` / god page 变异堆 |
 | A7 | 能力只许迁移/提升；删除须本设计明示 + tests 同步 |
 | A8 | 设计未锁定处停工提问，禁止自行发明 DSL |
+| A9 | **文件划分布局**：页面拆到简单组件文件为止；默认禁止整页 HTML/CSS 注入（`dom.raw`/`page.css` 仅逃逸舱） |
 
 ---
 
