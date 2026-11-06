@@ -81,7 +81,7 @@ math 是**高中符号与曲线**；quantum 是**离散希尔伯特空间上的�
 
 ## 3. 布局与安装
 
-Skill / tools 树（012 试点，见 [ext-index-skill-tools.md](ext-index-skill-tools.md)）：
+Skill / tools 树（012 试点；契约 [ext-index-skill-tools.md](ext-index-skill-tools.md)，范式 [ext-skill-tools-paradigm.md](ext-skill-tools-paradigm.md)）：
 
 ```text
 ext/quantum/                      # 一个扩展包（同 web/ai：中英同目录）

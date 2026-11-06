@@ -2,9 +2,10 @@
 
 | | |
 |---|---|
-| 状态 | **Active** |
+| 状态 | **Active**（契约卡；完整开发范式见下行） |
 | 日期 | 2026-11-06 |
 | 愿景 | [doc/next/012.md](../next/012.md)（手写真相源，本文不修改它） |
+| 范式长文 | [ext-skill-tools-paradigm.md](ext-skill-tools-paradigm.md)（布局、陷阱、验收清单、推广顺序） |
 | 试点 | `ext/quantum/` |
 | 相关 | [ext-abi.md](ext-abi.md) · [ext-quantum.md](ext-quantum.md) · [lib-code-as-docs.md](lib-code-as-docs.md) · [function-as-table-semantics.md](function-as-table-semantics.md) |
 
@@ -12,7 +13,7 @@
 
 ## 0. 一句话
 
-扩展包里**每一份** `.mq.md` 同时是可执行代码、可读 SKILL、以及可 `marqdo call` 的 tools 面；**函数即工具**，`###` 即子工具；禁止第二套 catalog / OpenAPI 真相源。
+扩展包里**每一份** `.mq.md` 同时是可执行代码、可读 SKILL、以及可 `marqdo call` 的 tools 面；**函数即工具**，`###` 即子工具；禁止第二套 catalog / OpenAPI 真相源。开发新包或迁包时以 [ext-skill-tools-paradigm.md](ext-skill-tools-paradigm.md) 的验收清单为准。
 
 ---
 
@@ -87,3 +88,4 @@ marqdo call <FILE> <FUNCTION> [k=v…]
 |------|------|
 | 2026-11-06 | 初稿：012 试点契约、call effects/toget、quantum 模块树 |
 | 2026-11-06 | quantum 中文树收进 `ext/quantum/量子/`；根 skill 增加「选哪条路」；`ext add` 拒绝装进源码树 |
+| 2026-11-06 | 链到 [ext-skill-tools-paradigm.md](ext-skill-tools-paradigm.md) 作为开发范式长文 |

@@ -196,6 +196,7 @@ Design: [ext-web-artifact.md](../../doc/design/ext-web-artifact.md) · example: 
 Install: `marqdo ext add quantum` (ZH id: `量子`). Build: `cargo build --release -p marqdo_plugin_quantum`, then **`marqdo ext add quantum` again** so view loads the new `libquantum.so` (stale plugin = old black/white circuits).
 
 - **Root skill (read first):** [`ext/quantum/index.mq.md`](../../ext/quantum/index.mq.md) — explains every module and exact `marqdo call` commands for agents with no other context.
+- **Ext paradigm:** [`doc/design/ext-skill-tools-paradigm.md`](../../doc/design/ext-skill-tools-paradigm.md) — code=doc=skill=tools; checklist for new packs.
 - **Modules:** `circuit/` · `gate/` · `simulate/` · `state/` · `density/` · `viz/` · `_capability/` (each has `index.mq.md`). ZH package: `ext/quantum/量子/`（根 `索引.mq.md`，模块同名中文目录）.
 - **Agent:** `marqdo call ext/quantum/<module>/index.mq.md <fn> … --effects plugin` (`--toget` / `$name`). Narration: `marqdo check --narrative-ratio FILE`.
 - **Author import example:** `circuit: ext/quantum/circuit/index.mq.md` then `circuit.circuit` / method chain.
