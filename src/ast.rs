@@ -22,6 +22,7 @@ pub struct Use {
 
 #[derive(Debug, Clone)]
 pub struct Module {
+    pub source: crate::diagnostics::SourceIdentity,
     pub imports: Vec<Import>,
     pub uses: Vec<Use>,
     pub functions: Vec<Function>,
@@ -36,6 +37,7 @@ pub struct Module {
 impl Default for Module {
     fn default() -> Self {
         Self {
+            source: Default::default(),
             imports: Vec::new(),
             uses: Vec::new(),
             functions: Vec::new(),
@@ -46,9 +48,31 @@ impl Default for Module {
     }
 }
 
+/// Parameter names have distinct slots. Function lookup retains its existing
+/// first-match/ambiguity rules rather than narrowing accepted declaration trees.
+pub(crate) fn validate_parameters(module:&Module) -> Result<(),crate::diagnostics::Diagnostic> {
+    fn siblings(module:&Module,functions:&[Function]) -> Result<(),crate::diagnostics::Diagnostic> {
+        for fun in functions {
+            let mut params=std::collections::HashSet::new();
+            for param in &fun.params {
+                if !params.insert(&param.name) {
+                    return Err(crate::diagnostics::Diagnostic::new(module.source.path.as_deref(),param.span,format!("duplicate parameter `{}`",param.name)).with_source(&module.source));
+                }
+            }
+            siblings(module,&fun.children)?;
+        }
+        Ok(())
+    }
+    siblings(module,&module.functions)?;
+    let mut imports=module.import_modules.iter().collect::<Vec<_>>();imports.sort_by_key(|(name,_)|*name);
+    for (_,child) in imports { validate_parameters(child)?; }
+    Ok(())
+}
+
 #[derive(Debug, Clone)]
 pub struct Param {
     pub name: String,
+    pub span: Span,
     pub default: Option<Expr>,
     /// True when collected by v0.3 body/prose inference (not an explicit `+` line).
     pub inferred: bool,
@@ -91,6 +115,16 @@ pub fn function_uses_receiver(fun: &Function) -> bool {
         matches!(name, "self" | "自")
     }
 
+    fn call_uses_receiver(call: &CallExpr) -> bool {
+        call.receiver.as_deref().is_some_and(is_receiver)
+            || call.path.as_ref().is_some_and(|path| {
+                path.first().is_some_and(|name| is_receiver(name))
+            })
+            || call.args.iter().any(|arg| match arg {
+                Arg::Positional(value) | Arg::Named { value, .. } => expr_uses_receiver(value),
+            })
+    }
+
     fn expr_uses_receiver(expr: &Expr) -> bool {
         match expr {
             Expr::Var(name) => is_receiver(name),
@@ -102,12 +136,7 @@ pub fn function_uses_receiver(fun: &Function) -> bool {
             Expr::Binary { left, right, .. } => {
                 expr_uses_receiver(left) || expr_uses_receiver(right)
             }
-            Expr::Call(call) => {
-                call.receiver.as_deref().is_some_and(is_receiver)
-                    || call.args.iter().any(|arg| match arg {
-                        Arg::Positional(value) | Arg::Named { value, .. } => expr_uses_receiver(value),
-                    })
-            }
+            Expr::Call(call) => call_uses_receiver(call),
             Expr::List(items) => items.iter().any(expr_uses_receiver),
             Expr::Map(entries) => entries.iter().any(|(_, value)| expr_uses_receiver(value)),
             Expr::Index { base, label } => {
@@ -124,12 +153,7 @@ pub fn function_uses_receiver(fun: &Function) -> bool {
             Stmt::Assign { value, .. } | Stmt::Return { value, .. } | Stmt::Expr { value, .. } => {
                 expr_uses_receiver(value)
             }
-            Stmt::Call { call, .. } => {
-                call.receiver.as_deref().is_some_and(is_receiver)
-                    || call.args.iter().any(|arg| match arg {
-                        Arg::Positional(value) | Arg::Named { value, .. } => expr_uses_receiver(value),
-                    })
-            }
+            Stmt::Call { call, .. } => call_uses_receiver(call),
             Stmt::Branch { arms, .. } => arms.iter().any(|arm| {
                 arm.condition.as_ref().is_some_and(expr_uses_receiver)
                     || arm.body.iter().any(stmt_uses_receiver)
@@ -143,7 +167,8 @@ pub fn function_uses_receiver(fun: &Function) -> bool {
         }
     }
 
-    fun.body.iter().any(stmt_uses_receiver)
+    fun.params.iter().any(|param| param.default.as_ref().is_some_and(expr_uses_receiver))
+        || fun.body.iter().any(stmt_uses_receiver)
 }
 
 /// Source line of a statement (every variant carries a span).
@@ -257,6 +282,15 @@ pub struct CallExpr {
 }
 
 impl CallExpr {
+    /// Shared execution preparation: normalize bare aliases before testing
+    /// modifier conflicts, matching the source evaluator's binding order.
+    pub fn for_evaluation(&self) -> Result<CallExpr,String> {
+        let mut call=self.clone();
+        if call.path.is_none() && call.receiver.is_none(){
+            call.callee=crate::aliases::normalize_call_callee_and_args(&call.callee,&mut call.args);
+        }
+        call.with_modifiers_expanded()
+    }
     /// Fold `pre_modifiers` into leading `name=True` named args (conflicts → Err).
     pub fn with_modifiers_expanded(&self) -> Result<CallExpr, String> {
         let mut call = self.clone();

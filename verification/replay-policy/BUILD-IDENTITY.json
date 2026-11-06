@@ -1,0 +1,12 @@
+{
+  "policy_sha256": "27b416847d06b130a066e0eb967a9b30c678e953c51d2ebe2bed9a8444ee0238",
+  "source_sha256": {
+    "ReplayPolicy/Cursor.lean": "cbc4c7d6769824148f3612e3fd3c23c0180d87b848fdec045ae2eeef08379048",
+    "Main.lean": "a133dd67e11d0fcd785badfcecb158937aaf484389e0d428af702fa0a4221e4a",
+    "ReplayPolicy.lean": "bd90ab6aed058d8983e7bbf8957d6f809930a11465fff3eac06d3ed257fa1213",
+    "lakefile.lean": "72f74dda45a2acb8c50266d642ceb48bf07669d7d79f73de113aa50d5cb62072",
+    "lean-toolchain": "ca5f1f601d34c49079e38d7e7041eb0f2a9c227fbc1df0f404820069a052330c",
+    "build_policy.py": "3bfb734e848a3aa4cc5fb9592dd86882ec0fd24f6134bceeae5c20aae1ef2fc3"
+  },
+  "binary_sha256": "06843ebb5fc4ae35491b9cc125cb7053122a2b99970555b72cd23eec8129ec8b"
+}

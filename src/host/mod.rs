@@ -23,6 +23,7 @@ mod hash;
 mod html_ops;
 pub(crate) mod json;
 mod log;
+pub(crate) mod oracle;
 pub mod math;
 mod net;
 mod path;
@@ -106,6 +107,7 @@ pub struct HostContext {
     /// LCG state for `random` / `random_int`.
     pub rng: u64,
     pub plots: Vec<PlotArtifact>,
+    pub oracle_observations: Vec<crate::value::Value>,
     /// lang → interpreter argv (from `set_cmd`).
     pub foreign_cmds: HashMap<String, Vec<String>>,
     /// Process-local language registrations (`register` / `set_cmd`).
@@ -120,6 +122,12 @@ pub struct HostContext {
     /// Monotonic session id counter.
     #[cfg(feature = "exec-host")]
     pub foreign_session_seq: u64,
+    #[cfg(feature = "exec-host")]
+    pub foreign_protocol_steps: Vec<foreign_session::ProtocolStep>,
+    #[cfg(feature = "exec-host")]
+    pub foreign_replay_expected: Option<foreign_session::validation::ReplayCursor>,
+    #[cfg(feature = "exec-host")]
+    pub foreign_replay_divergence: Option<String>,
     /// Loaded native plugins (ABI v1/v2).
     pub plugins: PluginState,
     /// Entry `.mq.md` source text (for ABI host_query / context injection).
@@ -154,6 +162,7 @@ impl Default for HostContext {
             sleep_limit_ms: Some(30_000),
             rng: 0xC0FF_EE42_CAFE_BABE,
             plots: Vec::new(),
+            oracle_observations: Vec::new(),
             foreign_cmds: HashMap::new(),
             foreign_specs: HashMap::new(),
             foreign_config_specs: HashMap::new(),
@@ -162,6 +171,12 @@ impl Default for HostContext {
             foreign_sessions: HashMap::new(),
             #[cfg(feature = "exec-host")]
             foreign_session_seq: 0,
+            #[cfg(feature = "exec-host")]
+            foreign_protocol_steps: Vec::new(),
+            #[cfg(feature = "exec-host")]
+            foreign_replay_expected: None,
+            #[cfg(feature = "exec-host")]
+            foreign_replay_divergence: None,
             plugins: PluginState::default(),
             entry_source: None,
             entry_path: None,

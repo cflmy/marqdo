@@ -6,7 +6,6 @@ use std::path::{Path, PathBuf};
 
 use crate::ast::{
     Arg, BinaryOp, CallExpr, Expr, Function, IndexKey, InterpPart, Literal, Module, Param, Stmt,
-    UnaryOp,
 };
 use crate::builtin::{
     builtin_at, builtin_footnote_get, builtin_int, builtin_iter_items, builtin_join,
@@ -14,7 +13,7 @@ use crate::builtin::{
     builtin_type,
 };
 use crate::debug::{emit_trace, DebugController};
-use crate::diagnostics::{bail_at, Span};
+use crate::diagnostics::{Diagnostic, DiagnosticFrame, SourceIdentity, Span};
 use crate::host::{call_host, HostContext};
 use crate::input_feed::InputFeed;
 use crate::capture::{
@@ -39,6 +38,9 @@ pub struct Interpreter {
     /// Active loops: `(loop_id, iter_index_0based)`.
     loop_stack: Vec<(u32, u32)>,
     current_span: Span,
+    current_source: SourceIdentity,
+    current_module: Option<*const Module>,
+    diagnostic_frames: Vec<DiagnosticFrame>,
     input: InputFeed,
     host: HostContext,
     debug: Option<Arc<DebugController>>,
@@ -100,6 +102,9 @@ impl Interpreter {
             next_loop_id: 1,
             loop_stack: Vec::new(),
             current_span: Span::new(1, 1),
+            current_source: SourceIdentity { path: path.map(Path::to_path_buf), sha256: None },
+            current_module: None,
+            diagnostic_frames: Vec::new(),
             input: InputFeed::new(false, Vec::new()),
             host: HostContext::for_run(path, Default::default(), Vec::new()),
             debug: None,
@@ -121,6 +126,9 @@ impl Interpreter {
             next_loop_id: 1,
             loop_stack: Vec::new(),
             current_span: Span::new(1, 1),
+            current_source: SourceIdentity { path: path.map(Path::to_path_buf), sha256: None },
+            current_module: None,
+            diagnostic_frames: Vec::new(),
             input: InputFeed::new(true, Vec::new()),
             host: HostContext::for_capture(path, Default::default()),
             debug: None,
@@ -147,14 +155,36 @@ impl Interpreter {
         std::mem::take(&mut self.host.plots)
     }
 
+    #[cfg(all(test, feature = "exec-host"))]
+    pub(crate) fn foreign_source_evidence(&mut self) -> (Vec<Value>, Vec<Value>, Vec<crate::host::foreign_session::ProtocolStep>) {
+        crate::source_refinement_tests::boundary_evidence(&mut self.host)
+    }
+
+    #[cfg(all(test, feature = "exec-host"))]
+    pub(crate) fn application_evidence(&self) -> (Vec<Value>, Vec<crate::host::foreign_session::ProtocolStep>, usize) {
+        (self.host.oracle_observations.clone(), self.host.foreign_protocol_steps.clone(), self.host.foreign_sessions.len())
+    }
+
+    #[cfg(all(test, feature = "exec-host"))]
+    pub(crate) fn causal_replay_evidence(&mut self) -> serde_json::Value {
+        crate::causal_replay_tests::evidence(&mut self.host)
+    }
+
+    #[cfg(test)]
+    pub(crate) fn diagnostic_scope_state(&self) -> (SourceIdentity, usize, Vec<String>, Vec<u32>, bool) {
+        (self.current_source.clone(), self.diagnostic_frames.len(), self.host.call_stack.clone(),
+         self.host.call_site_lines.clone(), self.current_module.is_some())
+    }
+
     fn err(&self, message: impl Into<String>) -> anyhow::Error {
-        bail_at(self.path.as_deref(), self.current_span, message)
+        Diagnostic::new(self.current_source.path.as_deref(), self.current_span, message)
+            .with_source(&self.current_source).with_frames(&self.diagnostic_frames).into()
     }
 
     fn err_code(&self, code: &str, message: impl Into<String>) -> anyhow::Error {
         anyhow::Error::new(
-            crate::diagnostics::Diagnostic::new(self.path.as_deref(), self.current_span, message)
-                .with_code(code),
+            Diagnostic::new(self.current_source.path.as_deref(), self.current_span, message)
+                .with_source(&self.current_source).with_frames(&self.diagnostic_frames).with_code(code),
         )
     }
 
@@ -367,12 +397,29 @@ impl Interpreter {
         fun: &Function,
         args: &[(String, Value)],
     ) -> Result<Value> {
-        self.run_function(module, fun, Env::new(), args, false)
+        let previous=self.site_module;
+        self.site_module=Some(module as *const Module);
+        let result=self.run_function(module, fun, Env::new(), args, false);
+        self.site_module=previous;
+        result
     }
 
     /// Bind named arguments for an external call. Unknown names, missing
     /// required parameters, and contract mismatches are errors. Defaults run.
     pub fn bind_external_args(
+        &mut self,
+        module: &Module,
+        fun: &Function,
+        args: &[(String, Value)],
+    ) -> Result<Vec<(String, Value)>> {
+        let previous=self.site_module;
+        self.site_module=Some(module as *const Module);
+        let result=self.in_function_source(module, fun, |this| this.bind_external_args_inner(module, fun, args));
+        self.site_module=previous;
+        result
+    }
+
+    fn bind_external_args_inner(
         &mut self,
         module: &Module,
         fun: &Function,
@@ -403,7 +450,9 @@ impl Interpreter {
             .collect();
         let mut env = Env::new();
         let bound = bind_function_args(self, module, fun, &mut env, &fun.params, &ev, false)
-            .map_err(|m| {
+            .map_err(|error| {
+                if Diagnostic::find(&error).is_some() { return error; }
+                let m = error.to_string();
                 if m.starts_with("missing argument") {
                     self.err_code("call.missing_arg", m)
                 } else if m.starts_with("duplicate named argument") {
@@ -417,7 +466,7 @@ impl Interpreter {
                 c,
                 &fun.name,
                 &bound,
-                self.path.as_deref(),
+                self.current_source.path.as_deref(),
                 fun.span,
             ) {
                 return Err(d.into());
@@ -430,6 +479,10 @@ impl Interpreter {
             }
         }
         Ok(out)
+    }
+
+    fn argument_error(&self, error: anyhow::Error) -> anyhow::Error {
+        if Diagnostic::find(&error).is_some() { error } else { self.err(error.to_string()) }
     }
 
     /// Call a function using (and updating) [`Self::entry_bindings`] from `# main`.
@@ -691,13 +744,66 @@ impl Interpreter {
         &mut self,
         module: &Module,
         fun: &Function,
+        env: Env,
+        args: &[(String, Value)],
+        capture_entry_env: bool,
+    ) -> Result<Value> {
+        self.in_function_source(module, fun, |this| {
+            this.run_function_inner(module, fun, env, args, capture_entry_env)
+        })
+    }
+
+    fn in_function_source<T>(
+        &mut self,
+        module: &Module,
+        fun: &Function,
+        run: impl FnOnce(&mut Self) -> Result<T>,
+    ) -> Result<T> {
+        let mut source = module.source.clone();
+        if source.path.is_none() {
+            if self.diagnostic_frames.is_empty() {
+                source.path = self.path.clone();
+            } else if self.current_module == Some(module as *const Module) {
+                source.path = self.current_source.path.clone();
+            }
+        }
+        let caller = (!self.diagnostic_frames.is_empty()).then(|| self.current_source.at(self.current_span));
+        let previous_source = std::mem::replace(&mut self.current_source, source);
+        let previous_module = self.current_module.replace(module as *const Module);
+        let previous_span = std::mem::replace(&mut self.current_span, fun.span);
+        let previous_line = self.host.current_line;
+        self.diagnostic_frames.push(DiagnosticFrame {
+            function: fun.name.clone(), declaration: self.current_source.at(fun.span), call_site: caller,
+        });
+        let result = run(self)
+            .map_err(|error| {
+                if let Some(mut diagnostic) = Diagnostic::find(&error).cloned() {
+                    if diagnostic.source_sha256.is_none() && diagnostic.path == self.current_source.path {
+                        diagnostic.source_sha256 = self.current_source.sha256.clone();
+                    }
+                    if diagnostic.frames.is_empty() { diagnostic.frames = self.diagnostic_frames.clone(); }
+                    diagnostic.into()
+                } else { self.err(error.to_string()) }
+            });
+        self.diagnostic_frames.pop();
+        self.current_source = previous_source;
+        self.current_module = previous_module;
+        self.current_span = previous_span;
+        self.host.current_line = previous_line;
+        result
+    }
+
+    fn run_function_inner(
+        &mut self,
+        module: &Module,
+        fun: &Function,
         mut env: Env,
         args: &[(String, Value)],
         capture_entry_env: bool,
     ) -> Result<Value> {
         if self.trace {
             emit_trace(
-                self.path.as_deref(),
+                self.current_source.path.as_deref(),
                 Some(fun.span),
                 "enter_fn",
                 &[("fn", fun.name.as_str())],
@@ -706,12 +812,23 @@ impl Interpreter {
         for (k, v) in args {
             env.set(k.clone(), v.clone());
         }
+        // Raw/named entry APIs and document metadata must use the same default
+        // semantics as ordinary calls. Already bound defaults are supplied
+        // values here and therefore never execute a second time.
+        let supplied=env.vars.iter().map(|(name,value)|EvArg::Named(name.clone(),value.clone())).collect::<Vec<_>>();
+        let completed=bind_function_args(self,module,fun,&mut env,&fun.params,&supplied,true)?;
+        for (name,value) in completed { env.set(name,value); }
         for p in &fun.params {
             if env.get(&p.name).is_none() {
                 env.set(p.name.clone(), Value::None);
             }
         }
 
+        if let Some(contract)=&fun.contract {
+            if let Some(diag)=crate::contract::call_arg_diag(contract,&fun.name,&env.vars,self.current_source.path.as_deref(),fun.span) {
+                return Err(diag.into());
+            }
+        }
         let ret = Value::None;
         self.push_view_call(fun, &env);
         self.host.push_call_frame(&fun.name);
@@ -732,7 +849,7 @@ impl Interpreter {
         if self.trace {
             let display = ret.as_display();
             emit_trace(
-                self.path.as_deref(),
+                self.current_source.path.as_deref(),
                 Some(fun.span),
                 "leave_fn",
                 &[("fn", fun.name.as_str()), ("value", display.as_str())],
@@ -762,7 +879,7 @@ impl Interpreter {
                 // 契约边界 3（T2.2）：表绑定 vs 字段契约。
                 if let Some(c) = fun.var_contracts.get(name) {
                     if let Some(d) =
-                        crate::contract::fields_diag(c, name, &v, self.path.as_deref(), *span)
+                        crate::contract::fields_diag(c, name, &v, self.current_source.path.as_deref(), *span)
                     {
                         return Err(d.into());
                     }
@@ -770,7 +887,7 @@ impl Interpreter {
                 if self.trace {
                     let display = v.as_display();
                     emit_trace(
-                        self.path.as_deref(),
+                        self.current_source.path.as_deref(),
                         Some(*span),
                         "stmt",
                         &[
@@ -801,7 +918,7 @@ impl Interpreter {
                 // 契约边界 2（T2.2）：返回值 vs 返回契约。
                 if let Some(c) = &fun.contract {
                     if let Some(d) =
-                        crate::contract::return_diag(c, &fun.name, &v, self.path.as_deref(), *span)
+                        crate::contract::return_diag(c, &fun.name, &v, self.current_source.path.as_deref(), *span)
                     {
                         return Err(d.into());
                     }
@@ -809,7 +926,7 @@ impl Interpreter {
                 if self.trace {
                     let display = v.as_display();
                     emit_trace(
-                        self.path.as_deref(),
+                        self.current_source.path.as_deref(),
                         Some(*span),
                         "stmt",
                         &[("kind", "return"), ("value", display.as_str())],
@@ -833,7 +950,7 @@ impl Interpreter {
                 self.current_span = *span;
                 if self.trace {
                     emit_trace(
-                        self.path.as_deref(),
+                        self.current_source.path.as_deref(),
                         Some(*span),
                         "stmt",
                         &[("kind", "call"), ("callee", call.callee.as_str())],
@@ -865,7 +982,7 @@ impl Interpreter {
                 self.current_span = *span;
                 if self.trace {
                     emit_trace(
-                        self.path.as_deref(),
+                        self.current_source.path.as_deref(),
                         Some(*span),
                         "stmt",
                         &[("kind", "expr")],
@@ -901,7 +1018,7 @@ impl Interpreter {
                 self.current_span = *span;
                 if self.trace {
                     emit_trace(
-                        self.path.as_deref(),
+                        self.current_source.path.as_deref(),
                         Some(*span),
                         "stmt",
                         &[("kind", "branch")],
@@ -934,7 +1051,7 @@ impl Interpreter {
                 self.current_span = *span;
                 if self.trace {
                     emit_trace(
-                        self.path.as_deref(),
+                        self.current_source.path.as_deref(),
                         Some(*span),
                         "stmt",
                         &[("kind", "while")],
@@ -946,7 +1063,10 @@ impl Interpreter {
                     None
                 };
                 let mut guard = 0u32;
-                while self.eval_expr(module, fun, env, condition)?.truthy() {
+                loop {
+                    self.current_span=*span;
+                    self.host.current_line=span.line;
+                    if !self.eval_expr(module,fun,env,condition)?.truthy(){break;}
                     guard += 1;
                     if guard > 1_000_000 {
                         return Err(self.err("while loop exceeded iteration limit"));
@@ -984,7 +1104,7 @@ impl Interpreter {
                 self.current_span = *span;
                 if self.trace {
                     emit_trace(
-                        self.path.as_deref(),
+                        self.current_source.path.as_deref(),
                         Some(*span),
                         "stmt",
                         &[
@@ -1113,15 +1233,8 @@ impl Interpreter {
                 Ok(Value::Text(s))
             }
             Expr::Unary { op, expr } => {
-                let v = self.eval_expr(module, fun, env, expr)?;
-                match op {
-                    UnaryOp::Not => Ok(Value::Bool(!v.truthy())),
-                    UnaryOp::Neg => match v {
-                        Value::Int(n) => Ok(Value::Int(-n)),
-                        Value::Num(n) => Ok(Value::Num(-n)),
-                        _ => Err(self.err("unary `-` needs int or num")),
-                    },
-                }
+                let value=self.eval_expr(module,fun,env,expr)?;
+                crate::builtin::eval_unary(*op,&value).map_err(|message|self.err(message))
             }
             Expr::Binary { op, left, right } => {
                 let l = self.eval_expr(module, fun, env, left)?;
@@ -1153,7 +1266,7 @@ impl Interpreter {
                 {
                     return Ok(v);
                 }
-                eval_binary(*op, &l, &r).map_err(|e| self.err(e.to_string()))
+                crate::builtin::eval_binary(*op, &l, &r).map_err(|e| self.err(e.to_string()))
             }
             Expr::Call(call) => self.eval_call(module, fun, env, call),
             Expr::List(items) => {
@@ -1182,7 +1295,7 @@ impl Interpreter {
                             name,
                             &key,
                             &Value::None,
-                            self.path.as_deref(),
+                            self.current_source.path.as_deref(),
                             self.current_span,
                         ) {
                             return Err(d.into());
@@ -1197,7 +1310,7 @@ impl Interpreter {
                             name,
                             &key,
                             &out,
-                            self.path.as_deref(),
+                            self.current_source.path.as_deref(),
                             self.current_span,
                         ) {
                             return Err(d.into());
@@ -1359,21 +1472,21 @@ impl Interpreter {
     fn eval_bound_function_call(
         &mut self,
         module: &Module,
-        caller: &Function,
-        env: &mut Env,
+        _caller: &Function,
+        _env: &mut Env,
         target: &Function,
         ev_args: &[EvArg],
     ) -> Result<Value> {
         let bound =
-            bind_function_args(self, module, caller, env, &target.params, ev_args, false)
-                .map_err(|m| self.err(m))?;
+            bind_function_args(self, module, target, &mut Env::new(), &target.params, ev_args, false)
+                .map_err(|e| self.argument_error(e))?;
         if let Some(c) = &target.contract {
-            if let Some(d) = crate::contract::call_arg_diag(
+            if let Some(d) = crate::contract::call_arg_diag_in(
                 c,
                 &target.name,
                 &bound,
-                self.path.as_deref(),
-                self.current_span,
+                &self.current_source.at(self.current_span),
+                &module.source,
             ) {
                 return Err(d.into());
             }
@@ -1387,7 +1500,7 @@ impl Interpreter {
         self.host.pop_call_site_line();
         let result = result?;
         if target.is_object() {
-            Ok(tag_instance(&target.name, result))
+            Ok(crate::value::tag_instance(&target.name, &self.object_module_path(module), result))
         } else {
             Ok(result)
         }
@@ -1520,7 +1633,6 @@ impl Interpreter {
         ev_args: &[EvArg],
     ) -> Result<Value> {
         let (lib, node) = locate_import_function(module, path).map_err(|m| self.err(m))?;
-        let display = path.join(".");
 
         let bound = {
             let mut dummy_env = Env::new();
@@ -1533,16 +1645,16 @@ impl Interpreter {
                 ev_args,
                 false,
             )
-            .map_err(|m| self.err(m))?
+            .map_err(|e| self.argument_error(e))?
         };
         // 契约边界 1（T2.2）：库路径调用的实参 vs 形参契约。
         if let Some(c) = &node.contract {
-            if let Some(d) = crate::contract::call_arg_diag(
+            if let Some(d) = crate::contract::call_arg_diag_in(
                 c,
-                &display,
+                &node.name,
                 &bound,
-                self.path.as_deref(),
-                self.current_span,
+                &self.current_source.at(self.current_span),
+                &lib.source,
             ) {
                 return Err(d.into());
             }
@@ -1557,7 +1669,7 @@ impl Interpreter {
         self.host.pop_call_site_line();
         let result = result?;
         if node.is_object() {
-            Ok(tag_instance(&node.name, result))
+            Ok(crate::value::tag_instance(&node.name, &self.object_module_path(lib), result))
         } else {
             Ok(result)
         }
@@ -1566,7 +1678,7 @@ impl Interpreter {
     fn eval_method_call(
         &mut self,
         module: &Module,
-        fun: &Function,
+        _fun: &Function,
         env: &mut Env,
         recv_name: &str,
         method: &str,
@@ -1577,12 +1689,19 @@ impl Interpreter {
             .cloned()
             .ok_or_else(|| self.err(format!("undefined variable `{recv_name}`")))?;
         let type_name = instance_type_name(&recv).map_err(|m| self.err(m))?;
-        if find_object_type(module, &type_name).is_none() {
-            return Err(self.err(format!("unknown object type `{type_name}`")));
-        }
-        let (owner, _obj, target) = find_method_along_bases(module, &type_name, method)
+        // The active root is immutable for this invocation; site_module is
+        // installed/restored by the public run/call entry points.
+        let root=unsafe { self.site_module.map(|root| &*root) }.unwrap_or(module);
+        let namespace=crate::value::instance_module(&recv).map_err(|m|self.err(m))?;
+        let (class_owner,class)=if let Some(namespace)=namespace {
+            crate::inherit::object_at_namespace(root,&namespace,&type_name)
+                .ok_or_else(||self.err(format!("unknown object type `{type_name}` in module `{}`",namespace.join("."))))?
+        } else {
+            crate::inherit::resolve_object(module,&type_name).map_err(|m|self.err(m))?
+        };
+        let (owner, _obj, target) = find_method_along_bases(class_owner, class, method)
             .ok_or_else(|| {
-                let chain = crate::inherit::inheritance_chain(module, &type_name)
+                let chain = crate::inherit::inheritance_chain(class_owner, &type_name)
                     .into_iter()
                     .map(|o| o.name.as_str())
                     .collect::<Vec<_>>()
@@ -1591,16 +1710,19 @@ impl Interpreter {
                     "unknown method `{type_name}.{method}` (searched {chain})"
                 ))
             })?;
-        let bound = bind_function_args(self, module, fun, env, &target.params, ev_args, false)
-            .map_err(|m| self.err(m))?;
+        let mut receiver_env = Env::new();
+        receiver_env.set("self".into(), recv.clone());
+        receiver_env.set("自".into(), recv.clone());
+        let bound = bind_function_args(self, owner, target, &mut receiver_env, &target.params, ev_args, false)
+            .map_err(|e| self.argument_error(e))?;
         // 契约边界 1（T2.2）：方法调用的实参 vs 形参契约。
         if let Some(c) = &target.contract {
-            if let Some(d) = crate::contract::call_arg_diag(
+            if let Some(d) = crate::contract::call_arg_diag_in(
                 c,
                 &target.name,
                 &bound,
-                self.path.as_deref(),
-                self.current_span,
+                &self.current_source.at(self.current_span),
+                &owner.source,
             ) {
                 return Err(d.into());
             }
@@ -1616,10 +1738,15 @@ impl Interpreter {
         self.host.pop_call_site_line();
         let result = result?;
         if crate::linalg_ops::is_matrix_value(&recv) {
-            Ok(crate::linalg_ops::retag_matrix_like(&type_name, result))
+            Ok(crate::value::preserve_instance_module(&recv,crate::linalg_ops::retag_matrix_like(&type_name, result)))
         } else {
             Ok(result)
         }
+    }
+
+    fn object_module_path(&self, module:&Module) -> Vec<String> {
+        let root=unsafe { self.site_module.map(|root| &*root) }.unwrap_or(module);
+        crate::inherit::module_namespace(root,module).unwrap_or_default()
     }
 }
 
@@ -1634,23 +1761,6 @@ fn instance_type_name(v: &Value) -> std::result::Result<String, String> {
             })
             .ok_or_else(|| "method receiver needs a map with `_type`".into()),
         _ => Err("method receiver must be an object map".into()),
-    }
-}
-
-fn tag_instance(type_name: &str, value: Value) -> Value {
-    match value {
-        Value::Map(mut entries) => {
-            // Always stamp the constructed type so explicit `` `self` = > Parent ``
-            // in a child constructor still yields the most specific `_type`.
-            entries.retain(|(k, _)| k != "_type");
-            entries.insert(0, ("_type".into(), Value::Text(type_name.into())));
-            Value::Map(entries)
-        }
-        Value::None => Value::Map(vec![("_type".into(), Value::Text(type_name.into()))]),
-        other => Value::Map(vec![
-            ("_type".into(), Value::Text(type_name.into())),
-            ("value".into(), other),
-        ]),
     }
 }
 
@@ -1696,12 +1806,12 @@ pub(crate) fn locate_import_function<'a>(
 fn bind_function_args(
     interp: &mut Interpreter,
     module: &Module,
-    caller: &Function,
-    caller_env: &mut Env,
+    target: &Function,
+    initial_env: &mut Env,
     params: &[Param],
     args: &[EvArg],
     allow_missing: bool,
-) -> std::result::Result<HashMap<String, Value>, String> {
+) -> Result<HashMap<String, Value>> {
     let mut named: HashMap<String, Value> = HashMap::new();
     let mut positionals = Vec::new();
     for a in args {
@@ -1709,7 +1819,7 @@ fn bind_function_args(
             EvArg::Positional(v) => positionals.push(v.clone()),
             EvArg::Named(k, v) => {
                 if named.contains_key(k) {
-                    return Err(format!("duplicate named argument `{k}`"));
+                    return Err(anyhow::anyhow!("duplicate named argument `{k}`"));
                 }
                 named.insert(k.clone(), v.clone());
             }
@@ -1719,6 +1829,13 @@ fn bind_function_args(
     let mut out: HashMap<String, Value> = HashMap::new();
     let mut used_named = HashSet::new();
     let mut pos_i = 0usize;
+    let mut defaults_env = Env::new();
+    // Only an explicit receiver crosses into a method's default environment.
+    for name in ["self", "自"] {
+        if let Some(value) = initial_env.get(name) {
+            defaults_env.set(name.into(), value.clone());
+        }
+    }
 
     for p in params {
         if let Some(v) = named.get(&p.name) {
@@ -1727,26 +1844,44 @@ fn bind_function_args(
         } else if pos_i < positionals.len() {
             out.insert(p.name.clone(), positionals[pos_i].clone());
             pos_i += 1;
-        } else if let Some(def) = &p.default {
-            let v = interp
-                .eval_expr(module, caller, caller_env, def)
-                .map_err(|e| e.to_string())?;
-            out.insert(p.name.clone(), v);
-        } else if !allow_missing {
-            return Err(format!("missing argument for parameter `{}`", p.name));
+        } else if p.default.is_none() && !allow_missing {
+            return Err(anyhow::anyhow!("missing argument for parameter `{}`", p.name));
         }
     }
-
     if pos_i < positionals.len() {
-        return Err(format!(
-            "too many positional arguments ({} extra)",
-            positionals.len() - pos_i
-        ));
+        return Err(anyhow::anyhow!("too many positional arguments ({} extra)", positionals.len() - pos_i));
     }
-
     for (k, v) in named {
-        if !used_named.contains(&k) && !out.contains_key(&k) {
-            out.insert(k, v);
+        if !used_named.contains(&k) && !out.contains_key(&k) { out.insert(k, v); }
+    }
+    for (name, value) in &out { defaults_env.set(name.clone(), value.clone()); }
+    for name in ["self", "自"] {
+        if let Some(value)=initial_env.get(name) { defaults_env.set(name.into(),value.clone()); }
+    }
+    for p in params {
+        if out.contains_key(&p.name) { continue; }
+        if let Some(def) = &p.default {
+            let mut evaluate=|this:&mut Interpreter| {
+                let previous_span=this.current_span;
+                let previous_line=this.host.current_line;
+                this.current_span=p.span;
+                this.host.current_line=p.span.line;
+                let result=this.eval_expr(module,target,&mut defaults_env,def);
+                this.current_span=previous_span;
+                this.host.current_line=previous_line;
+                result
+            };
+            let v = if interp.current_module == Some(module as *const Module)
+                && interp.diagnostic_frames.last().is_some_and(|frame| frame.declaration.span == target.span)
+            {
+                evaluate(interp)?
+            } else {
+                interp.in_function_source(module, target, evaluate)?
+            };
+            out.insert(p.name.clone(), v);
+        }
+        if let Some(value) = out.get(&p.name) {
+            defaults_env.set(p.name.clone(), value.clone());
         }
     }
 
@@ -1759,50 +1894,9 @@ fn bind_args(
     args: &[EvArg],
     allow_missing: bool,
 ) -> std::result::Result<HashMap<String, Value>, String> {
-    let mut named: HashMap<String, Value> = HashMap::new();
-    let mut positionals = Vec::new();
-    for a in args {
-        match a {
-            EvArg::Positional(v) => positionals.push(v.clone()),
-            EvArg::Named(k, v) => {
-                if named.contains_key(k) {
-                    return Err(format!("duplicate named argument `{k}`"));
-                }
-                named.insert(k.clone(), v.clone());
-            }
-        }
-    }
-
-    let mut out: HashMap<String, Value> = HashMap::new();
-    let mut used_named = HashSet::new();
-    let mut pos_i = 0usize;
-
-    for p in params {
-        if let Some(v) = named.get(p) {
-            out.insert(p.clone(), v.clone());
-            used_named.insert(p.clone());
-        } else if pos_i < positionals.len() {
-            out.insert(p.clone(), positionals[pos_i].clone());
-            pos_i += 1;
-        } else if !allow_missing {
-            return Err(format!("missing argument for parameter `{p}`"));
-        }
-    }
-
-    if pos_i < positionals.len() {
-        return Err(format!(
-            "too many positional arguments ({} extra)",
-            positionals.len() - pos_i
-        ));
-    }
-
-    for (k, v) in named {
-        if !used_named.contains(&k) && !out.contains_key(&k) {
-            out.insert(k, v);
-        }
-    }
-
-    Ok(out)
+    let names=args.iter().map(|a|match a{EvArg::Positional(_)=>None,EvArg::Named(name,_)=>Some(name.clone())}).collect::<Vec<_>>();
+    let values=args.iter().map(|a|match a{EvArg::Positional(value)|EvArg::Named(_,value)=>value.clone()}).collect::<Vec<_>>();
+    crate::arguments::bind(params,&names,&values,allow_missing)
 }
 
 fn collect_decl_reads(expr: &Expr, out: &mut std::collections::HashSet<String>) {
@@ -1870,49 +1964,21 @@ fn find_top<'a>(module: &'a Module, name: &str) -> Option<&'a Function> {
 }
 
 /// Resolve `#` object type by name in the entry module or any imported library.
-fn find_object_type<'a>(module: &'a Module, name: &str) -> Option<(&'a Module, &'a Function)> {
-    fn search<'a>(
-        module: &'a Module,
-        name: &str,
-        seen: &mut std::collections::HashSet<*const Module>,
-    ) -> Option<(&'a Module, &'a Function)> {
-        let key = module as *const Module;
-        if !seen.insert(key) {
-            return None;
-        }
-        if let Some(f) = module
-            .functions
-            .iter()
-            .find(|f| f.name == name && f.is_object())
-        {
-            return Some((module, f));
-        }
-        for lib in module.import_modules.values() {
-            if let Some(hit) = search(lib, name, seen) {
-                return Some(hit);
-            }
-        }
-        None
-    }
-    let mut seen = std::collections::HashSet::new();
-    search(module, name, &mut seen)
-}
-
 /// Resolve `` `obj`.method `` along the inheritance chain (`_type` first, then bases).
 fn find_method_along_bases<'a>(
     module: &'a Module,
-    type_name: &str,
+    object: &'a Function,
     method: &str,
 ) -> Option<(&'a Module, &'a Function, &'a Function)> {
-    let mut cur = type_name.to_string();
+    let mut owner=module;
+    let mut obj=object;
     let mut seen = std::collections::HashSet::new();
-    while seen.insert(cur.clone()) {
-        let (owner, obj) = find_object_type(module, &cur)?;
+    while seen.insert((owner as *const Module,obj as *const Function)) {
         if let Some(target) = obj.children.iter().find(|c| c.name == method) {
             return Some((owner, obj, target));
         }
         match &obj.base {
-            Some(b) => cur = b.clone(),
+            Some(base) => { (owner,obj)=crate::inherit::resolve_object(owner,base).ok()?; },
             None => break,
         }
     }
@@ -1961,71 +2027,6 @@ fn lit_to_value(lit: &Literal) -> Value {
         Literal::Int(n) => Value::Int(*n),
         Literal::Num(n) => Value::Num(*n),
         Literal::Text(s) => Value::Text(s.clone()),
-    }
-}
-
-fn eval_binary(op: BinaryOp, l: &Value, r: &Value) -> Result<Value> {
-    match op {
-        BinaryOp::Add => match (l, r) {
-            (Value::Int(a), Value::Int(b)) => Ok(Value::Int(a + b)),
-            (Value::Num(a), Value::Num(b)) => Ok(Value::Num(a + b)),
-            (Value::Int(a), Value::Num(b)) => Ok(Value::Num(*a as f64 + b)),
-            (Value::Num(a), Value::Int(b)) => Ok(Value::Num(a + *b as f64)),
-            (Value::Text(a), Value::Text(b)) => Ok(Value::Text(format!("{a}{b}"))),
-            (Value::Text(a), Value::Secret(b)) => Ok(Value::Text(format!("{a}{b}"))),
-            (Value::Secret(a), Value::Text(b)) => Ok(Value::Text(format!("{a}{b}"))),
-            (Value::Secret(a), Value::Secret(b)) => Ok(Value::Text(format!("{a}{b}"))),
-            (Value::Text(a), b) => Ok(Value::Text(format!("{a}{}", b.as_display()))),
-            (a, Value::Text(b)) => Ok(Value::Text(format!("{}{b}", a.as_display()))),
-            _ => bail!("`+` needs ints, nums, or text"),
-        },
-        BinaryOp::Sub => match (l, r) {
-            (Value::Int(a), Value::Int(b)) => Ok(Value::Int(a - b)),
-            (Value::Num(a), Value::Num(b)) => Ok(Value::Num(a - b)),
-            (Value::Int(a), Value::Num(b)) => Ok(Value::Num(*a as f64 - b)),
-            (Value::Num(a), Value::Int(b)) => Ok(Value::Num(a - *b as f64)),
-            _ => bail!("`-` needs ints or nums"),
-        },
-        BinaryOp::Mul => match (l, r) {
-            (Value::Int(a), Value::Int(b)) => Ok(Value::Int(a * b)),
-            (Value::Num(a), Value::Num(b)) => Ok(Value::Num(a * b)),
-            (Value::Int(a), Value::Num(b)) => Ok(Value::Num(*a as f64 * b)),
-            (Value::Num(a), Value::Int(b)) => Ok(Value::Num(a * *b as f64)),
-            _ => bail!("`*` needs ints or nums"),
-        },
-        BinaryOp::Div => match (l, r) {
-            (Value::Int(_), Value::Int(0)) => bail!("division by zero"),
-            (Value::Int(a), Value::Int(b)) => Ok(Value::Int(a / b)),
-            (Value::Num(_), Value::Num(b)) if *b == 0.0 => bail!("division by zero"),
-            (Value::Int(_), Value::Num(b)) if *b == 0.0 => bail!("division by zero"),
-            (Value::Num(_), Value::Int(0)) => bail!("division by zero"),
-            (Value::Num(a), Value::Num(b)) => Ok(Value::Num(a / b)),
-            (Value::Int(a), Value::Num(b)) => Ok(Value::Num(*a as f64 / b)),
-            (Value::Num(a), Value::Int(b)) => Ok(Value::Num(a / *b as f64)),
-            _ => bail!("`/` needs ints or nums"),
-        },
-        BinaryOp::Eq => Ok(Value::Bool(l == r)),
-        BinaryOp::Ne => Ok(Value::Bool(l != r)),
-        BinaryOp::Lt => cmp_ord(l, r, |o| o.is_lt()),
-        BinaryOp::Le => cmp_ord(l, r, |o| o.is_le()),
-        BinaryOp::Gt => cmp_ord(l, r, |o| o.is_gt()),
-        BinaryOp::Ge => cmp_ord(l, r, |o| o.is_ge()),
-        BinaryOp::And | BinaryOp::Or => unreachable!("handled above"),
-    }
-}
-
-fn cmp_ord(l: &Value, r: &Value, f: impl Fn(std::cmp::Ordering) -> bool) -> Result<Value> {
-    match (l, r) {
-        (Value::Int(a), Value::Int(b)) => Ok(Value::Bool(f(a.cmp(b)))),
-        (Value::Num(a), Value::Num(b)) => Ok(Value::Bool(f(a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal)))),
-        (Value::Int(a), Value::Num(b)) => {
-            Ok(Value::Bool(f((*a as f64).partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))))
-        }
-        (Value::Num(a), Value::Int(b)) => {
-            Ok(Value::Bool(f(a.partial_cmp(&(*b as f64)).unwrap_or(std::cmp::Ordering::Equal))))
-        }
-        (Value::Text(a), Value::Text(b)) => Ok(Value::Bool(f(a.cmp(b)))),
-        _ => bail!("comparison needs two ints/nums or two texts"),
     }
 }
 

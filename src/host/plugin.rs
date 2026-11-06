@@ -194,6 +194,17 @@ impl Clone for PluginState {
 }
 
 impl PluginState {
+    /// Exercise the real JSON/C ABI without loading an external shared library.
+    #[cfg(test)]
+    pub(crate) fn register_binding_probe(&mut self) {
+        unsafe extern "C" fn echo(args: *const c_char, out: *mut *mut c_char, _err: *mut *mut c_char) -> c_int {
+            if args.is_null() || out.is_null() { return 1; }
+            let Ok(input)=CStr::from_ptr(args).to_str() else { return 1; };
+            *out=host_strdup(input);
+            if (*out).is_null() {1} else {0}
+        }
+        self.fns.insert("binding_probe".into(),RegisteredFn{params:vec!["a".into(),"b".into()],fn_ptr:echo});
+    }
     pub fn get(&self, name: &str) -> Option<&RegisteredFn> {
         self.fns.get(name)
     }

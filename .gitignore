@@ -79,6 +79,9 @@ plugins/*/tmp/
 # Plot SVGs emitted beside tests / notebooks when demos run
 /tests/**/*-plot-*.svg
 
+# Lean Lake build outputs (sources under verification/ stay tracked)
+**/.lake/
+
 # PLDI / thesis harness scratch must never land in this tree
 .lx*-tmp/
 

@@ -857,6 +857,11 @@ fn collect_call_sites(function: &Function) -> Vec<(usize, CallExpr, u32)> {
             }
         }
     }
+    // Omitted arguments execute these expressions before the body. Leaving
+    // them out lets the pure-call policy miss both direct and transitive effects.
+    for param in &function.params {
+        if let Some(default) = &param.default { expr(default, function.span.line, &mut calls); }
+    }
     statements(&function.body, &mut calls);
     calls
 }

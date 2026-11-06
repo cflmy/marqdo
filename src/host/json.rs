@@ -16,14 +16,95 @@ fn ood_int_err(n: impl std::fmt::Display) -> String {
     format!("json: integer outside V_safe (±(2^53-1)): {n}")
 }
 
+/// The integer boundary is semantic, not a property of JSON spelling or the
+/// host's Int/Num tag. Exponent notation must not bypass it.
+fn checked_number(n: f64) -> Result<serde_json::Value, String> {
+    if !n.is_finite() { return Err("json: non-finite number outside V_safe".into()); }
+    if n.fract() == 0.0 && n.abs() > MAX_SAFE_INT as f64 { return Err(ood_int_err(n)); }
+    Ok(serde_json::Value::Number(serde_json::Number::from_f64(n)
+        .ok_or("json: non-finite number outside V_safe")?))
+}
+
+#[derive(Debug)]
+pub(crate) enum DecodeError { Syntax(String), Domain(String) }
+
+struct BoundaryValue(Value);
+impl<'de> serde::Deserialize<'de> for BoundaryValue {
+    fn deserialize<D: serde::Deserializer<'de>>(de: D) -> Result<Self, D::Error> {
+        struct BoundaryVisitor;
+        impl<'de> serde::de::Visitor<'de> for BoundaryVisitor {
+            type Value = BoundaryValue;
+            fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result { f.write_str("a boundary JSON value") }
+            fn visit_unit<E: serde::de::Error>(self) -> Result<Self::Value,E> { Ok(BoundaryValue(Value::None)) }
+            fn visit_bool<E: serde::de::Error>(self, v: bool) -> Result<Self::Value,E> { Ok(BoundaryValue(Value::Bool(v))) }
+            fn visit_i64<E: serde::de::Error>(self, n: i64) -> Result<Self::Value,E> {
+                if !in_safe_int(n) { return Err(E::custom(ood_int_err(n))); }
+                Ok(BoundaryValue(Value::Int(n)))
+            }
+            fn visit_u64<E: serde::de::Error>(self, n: u64) -> Result<Self::Value,E> {
+                if n > MAX_SAFE_INT as u64 { return Err(E::custom(ood_int_err(n))); }
+                Ok(BoundaryValue(Value::Int(n as i64)))
+            }
+            fn visit_f64<E: serde::de::Error>(self, n: f64) -> Result<Self::Value,E> {
+                checked_number(n).map_err(E::custom)?;
+                Ok(BoundaryValue(Value::Num(n)))
+            }
+            fn visit_str<E: serde::de::Error>(self, v: &str) -> Result<Self::Value,E> { Ok(BoundaryValue(Value::Text(v.into()))) }
+            fn visit_string<E: serde::de::Error>(self, v: String) -> Result<Self::Value,E> { Ok(BoundaryValue(Value::Text(v))) }
+            fn visit_seq<A: serde::de::SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value,A::Error> {
+                let mut xs = Vec::new();
+                while let Some(BoundaryValue(v)) = seq.next_element()? { xs.push(v); }
+                Ok(BoundaryValue(Value::List(xs)))
+            }
+            fn visit_map<A: serde::de::MapAccess<'de>>(self, mut map: A) -> Result<Self::Value,A::Error> {
+                use serde::de::Error;
+                let mut fields = Vec::new();
+                let mut keys = std::collections::HashSet::new();
+                while let Some(key) = map.next_key::<String>()? {
+                    if !keys.insert(key.clone()) { return Err(A::Error::custom("json: duplicate object key outside V_safe")); }
+                    let BoundaryValue(v) = map.next_value()?;
+                    fields.push((key, v));
+                }
+                // Preserve the pre-existing JSON object's canonical key order.
+                fields.sort_by(|a, b| a.0.cmp(&b.0));
+                let value = Value::Map(fields);
+                value_to_json(&value).map_err(A::Error::custom)?;
+                Ok(BoundaryValue(value))
+            }
+        }
+        de.deserialize_any(BoundaryVisitor)
+    }
+}
+
+pub(crate) fn decode_text(text: &str) -> Result<Value, DecodeError> {
+    use serde::Deserialize;
+    let classify = |error: serde_json::Error| {
+        let message = error.to_string();
+        // serde_json categorizes its own numeric-overflow diagnostic as Syntax.
+        // It is a domain refusal for a grammar-valid unbounded JSON number.
+        // Match this trusted decoder diagnostic, never foreign program output.
+        if message.starts_with("number out of range at line ") {
+            return DecodeError::Domain(format!("json: number outside V_safe: {message}"));
+        }
+        match error.classify() {
+            serde_json::error::Category::Data => DecodeError::Domain(message),
+            _ => DecodeError::Syntax(message),
+        }
+    };
+    let mut de = serde_json::Deserializer::from_str(text);
+    let value = BoundaryValue::deserialize(&mut de).map_err(classify)?;
+    de.end().map_err(classify)?;
+    Ok(value.0)
+}
+
 pub fn parse(text: &Value) -> Result<Value, String> {
     let s = match text {
         Value::Text(s) => s.as_str(),
         _ => return Err("json parse needs text".into()),
     };
-    let v: serde_json::Value =
-        serde_json::from_str(s).map_err(|e| format!("json parse: {e}"))?;
-    json_to_value(&v)
+    decode_text(s).map_err(|e| match e {
+        DecodeError::Syntax(e) | DecodeError::Domain(e) => format!("json parse: {e}"),
+    })
 }
 
 pub fn stringify(value: &Value, indent: Option<&Value>) -> Result<Value, String> {
@@ -93,6 +174,7 @@ pub(crate) fn json_to_value(v: &serde_json::Value) -> Result<Value, String> {
                 return Err(ood_int_err(u));
             } else if let Some(f) = n.as_f64() {
                 // Host extension: non-integer JSON numbers → Num (not in Lean SafeVal).
+                checked_number(f)?;
                 Value::Num(f)
             } else {
                 return Err(format!("json: unsupported number: {n}"));
@@ -126,9 +208,7 @@ pub(crate) fn value_to_json(v: &Value) -> Result<serde_json::Value, String> {
             }
             serde_json::Value::Number((*n).into())
         }
-        Value::Num(n) => serde_json::Number::from_f64(*n)
-            .map(serde_json::Value::Number)
-            .unwrap_or(serde_json::Value::Null),
+        Value::Num(n) => checked_number(*n)?,
         Value::Text(s) => serde_json::Value::String(s.clone()),
         Value::List(xs) => {
             let mut arr = Vec::with_capacity(xs.len());
@@ -169,7 +249,7 @@ pub(crate) fn value_to_json(v: &Value) -> Result<serde_json::Value, String> {
                         cells.push(
                             serde_json::Number::from_f64(n)
                                 .map(serde_json::Value::Number)
-                                .unwrap_or(serde_json::Value::Null),
+                                .ok_or_else(|| "json: non-finite number outside V_safe".to_string())?,
                         );
                     }
                     arr.push(serde_json::Value::Array(cells));
@@ -181,7 +261,7 @@ pub(crate) fn value_to_json(v: &Value) -> Result<serde_json::Value, String> {
                 if let crate::formula::Expr::Num(n) = s {
                     serde_json::Number::from_f64(n)
                         .map(serde_json::Value::Number)
-                        .unwrap_or(serde_json::Value::Null)
+                        .ok_or_else(|| "json: non-finite number outside V_safe".to_string())?
                 } else {
                     serde_json::Value::String(e.as_display())
                 }
@@ -302,4 +382,40 @@ mod tests {
         let err = value_to_json(&ragged).unwrap_err();
         assert!(err.contains("arity mismatch"), "{err}");
     }
+    #[test]
+    fn refuse_nonfinite_in_nested_payloads() {
+        for n in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            for v in [Value::Num(n), Value::List(vec![Value::Num(n)]),
+                Value::Map(vec![("x".into(), Value::Num(n))])] {
+                assert!(value_to_json(&v).unwrap_err().contains("outside V_safe"));
+            }
+        }
+    }
+
+    #[test]
+    fn exponent_and_float_tags_cannot_bypass_integer_domain() {
+        for text in ["9007199254740992.0", "9.007199254740992e15", "1e100", "1e9999", "-9.007199254740992e15"] {
+            assert!(parse(&Value::Text(text.into())).unwrap_err().contains("outside V_safe"), "{text}");
+        }
+        for n in [9_007_199_254_740_992.0, -9_007_199_254_740_992.0, 1e100] {
+            assert!(value_to_json(&Value::List(vec![Value::Num(n)])).unwrap_err().contains("outside V_safe"));
+        }
+        for text in ["1.5", "-0.0", "9.007199254740991e15"] {
+            assert!(parse(&Value::Text(text.into())).is_ok(), "valid extension {text}");
+        }
+    }
+
+    #[test]
+    fn strict_decode_refuses_duplicate_keys_and_ragged_columns() {
+        for text in [r#"{"a":1,"a":2}"#, r#"[{"x":null,"x":true}]"#,
+            r#"{"a":[1],"b":[2,3]}"#] {
+            assert!(matches!(decode_text(text), Err(DecodeError::Domain(_))), "{text}");
+        }
+        for text in [r#"{"a":[1],"b":"metadata"}"#, r#"{"a":[],"b":[]}"#,
+            r#"{"__proto__":{"safe":true},"constructor":"data"}"#] {
+            assert!(decode_text(text).is_ok(), "{text}");
+        }
+        assert!(matches!(decode_text("not JSON"), Err(DecodeError::Syntax(_))));
+    }
+
 }

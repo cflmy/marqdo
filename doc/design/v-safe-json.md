@@ -24,7 +24,7 @@ MAX_SAFE = 9007199254740991   # 2^53 - 1
 | `array` | `List` |
 | `object` | `Map` |
 
-**Host extension (not in Lean `SafeVal`):** JSON non-integer numbers → `Value::Num(f64)` (NaN/Inf encode as `null`). Floats are documented host behavior; they are **not** claimed as mechanized \(V_{\mathsf{safe}}\) fidelity.
+**Host extension (not in Lean `SafeVal`):** JSON non-integer numbers → `Value::Num(f64)`. Non-finite numbers (NaN/Inf) are refused on encode and in Python/Node oracle responses, including nested payloads. Floats are documented host behavior; they are **not** claimed as mechanized \(V_{\mathsf{safe}}\) fidelity.
 
 ## Encode (`value_to_json`)
 
@@ -76,3 +76,15 @@ json: integer outside V_safe (±(2^53-1)): <n>
 - Not automatic BigInt promotion inside Node/Python bootstraps.
 - Document-level `Value::Int` may still hold i64 values that are OOD for JSON;
   the gate fires when those values enter JSON encode/decode.
+
+## Strict request boundary update
+
+The numeric gate applies to the represented value, including integer-valued
+floats and exponent notation. `9007199254740992.0` and
+`9.007199254740992e15` are refused; fractions such as `1.5` remain in the host
+extension. `serde_json` uses `float_roundtrip` to avoid endpoint decoding loss.
+The strict text decoder rejects duplicate object keys and unequal column maps
+before information is lost. One-shot, call_many and persistent input paths
+use recursive domain admission; code, handle and secret values are not copied
+implicitly. Auto-detection may leave non-JSON output as text, but valid JSON
+outside the domain is a refusal, including in batch results.

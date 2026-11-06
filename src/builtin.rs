@@ -1,6 +1,28 @@
 //! Built-in helpers shared by tree-walk and bytecode.
 
+mod primitives;
+pub use primitives::{eval_binary,eval_unary};
+
 use crate::value::Value;
+
+/// Machine integer arithmetic has one profile-independent failure contract.
+/// Overflow must remain a language diagnostic in debug, release and Wasm.
+pub fn checked_int_binary(op: crate::ast::BinaryOp, left: i64, right: i64) -> Result<i64, String> {
+    use crate::ast::BinaryOp;
+    if matches!(op, BinaryOp::Div) && right == 0 { return Err("division by zero".into()); }
+    let result = match op {
+        BinaryOp::Add => left.checked_add(right),
+        BinaryOp::Sub => left.checked_sub(right),
+        BinaryOp::Mul => left.checked_mul(right),
+        BinaryOp::Div => left.checked_div(right),
+        _ => return Err("not an integer arithmetic operation".into()),
+    };
+    result.ok_or_else(|| "integer overflow".into())
+}
+
+pub fn checked_int_neg(value: i64) -> Result<i64, String> {
+    value.checked_neg().ok_or_else(|| "integer overflow".into())
+}
 
 /// `len`: text → Unicode scalar count; list → element count.
 pub fn builtin_len(v: &Value) -> Result<i64, String> {
@@ -20,7 +42,13 @@ pub fn builtin_str(v: &Value) -> Value {
 pub fn builtin_int(v: &Value) -> Result<i64, String> {
     match v {
         Value::Int(n) => Ok(*n),
-        Value::Num(n) => Ok(*n as i64),
+        Value::Num(n) => {
+            // The upper bound is exclusive: i64::MAX rounds to 2^63 as f64.
+            if !n.is_finite() || *n < -9223372036854775808.0 || *n >= 9223372036854775808.0 {
+                return Err("int conversion outside signed 64-bit domain".into());
+            }
+            Ok(*n as i64)
+        }
         Value::Bool(true) => Ok(1),
         Value::Bool(false) => Ok(0),
         Value::Text(s) => {

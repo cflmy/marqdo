@@ -15,7 +15,7 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use crate::foreign::registry::{self, LangSpec};
 use crate::foreign::split_cmd_line;
-use crate::host::json::{json_to_value, value_to_json};
+use crate::host::json::value_to_json;
 use crate::host::{HostCaps, HostContext};
 use crate::value::{CodeBlock, Value};
 
@@ -158,6 +158,7 @@ pub(crate) struct Execution {
     pub lang: String,
     pub cmd: String,
     pub script: String,
+    pub diagnostic_source: String,
 }
 
 impl Execution {
@@ -180,6 +181,7 @@ impl Execution {
             ("result_error".into(), Value::Text(result_error)),
             ("error".into(), Value::Text(self.error.clone())),
             ("script".into(), Value::Text(self.script.clone())),
+            ("diagnostic_source".into(), Value::Text(self.diagnostic_source.clone())),
             ("cached".into(), Value::Bool(false)),
         ])
     }
@@ -588,10 +590,11 @@ fn prepare_invoke(args: &InvokeArgs<'_>) -> Result<PreparedInvoke, String> {
     let stdin = opt_text(args.stdin)?;
     let input_json = match args.input {
         None | Some(Value::None) => None,
-        Some(v) => Some(
-            serde_json::to_string(&value_to_json(v)?)
-                .map_err(|e| format!("input JSON encode: {e}"))?,
-        ),
+        Some(v) => {
+            super::oracle::admit(v)?;
+            Some(serde_json::to_string(&value_to_json(v)?)
+                .map_err(|e| format!("input JSON encode: {e}"))?)
+        },
     };
     if stdin.is_some() && input_json.is_some() {
         return Err("stdin and input are mutually exclusive".into());
@@ -620,7 +623,7 @@ pub fn invoke(ctx: &mut HostContext, args: InvokeArgs<'_>) -> Result<Value, Stri
     ensure_config(ctx);
     let prepared = prepare_invoke(&args)?;
     let exec = execute_job(ctx, &prepared.job)?;
-    let (result, result_error) = parse_output(&exec.stdout, &prepared.output);
+    let (result, result_error) = parse_output(&exec.stdout, &prepared.output)?;
     Ok(exec.record(result, result_error))
 }
 
@@ -636,13 +639,10 @@ pub fn call(ctx: &mut HostContext, args: InvokeArgs<'_>) -> Result<Value, String
     if exec.stdout.trim().is_empty() {
         return Ok(Value::None);
     }
-    match serde_json::from_str::<serde_json::Value>(&exec.stdout) {
-        Ok(j) => json_to_value(&j),
-        Err(e) => Err(format!(
-            "foreign call: stdout is not JSON: {e}; stdout: {}",
-            tail(exec.stdout.trim(), 512)
-        )),
-    }
+    super::json::decode_text(&exec.stdout).map_err(|e| match e {
+        super::json::DecodeError::Domain(e) => e,
+        super::json::DecodeError::Syntax(e) => format!("foreign call: stdout is not JSON: {e}; stdout: {}", tail(exec.stdout.trim(), 512)),
+    })
 }
 
 fn present(v: Option<&Value>) -> Option<&Value> {
@@ -752,17 +752,18 @@ fn error_record(ctx: &HostContext, job: &Job, error: String) -> Value {
         lang: job.lang.clone(),
         cmd: display_for_job(ctx, job, None),
         script: String::new(),
+        diagnostic_source: String::new(),
     }
     .record(Value::None, String::new())
 }
 
-fn run_prepared(env: &ForeignEnv, items: Vec<PreparedMany>, concurrency: usize) -> Vec<(usize, Value)> {
+fn run_prepared(env: &ForeignEnv, items: Vec<PreparedMany>, concurrency: usize) -> Result<Vec<(usize, Value)>, String> {
     if items.is_empty() {
-        return Vec::new();
+        return Ok(Vec::new());
     }
     let workers = concurrency.max(1).min(items.len());
     let queue = Arc::new(Mutex::new(VecDeque::from(items)));
-    let results: Arc<Mutex<Vec<(usize, Value)>>> = Arc::new(Mutex::new(Vec::new()));
+    let results: Arc<Mutex<Vec<(usize, Result<Value, String>)>>> = Arc::new(Mutex::new(Vec::new()));
     thread::scope(|scope| {
         for _ in 0..workers {
             let queue = Arc::clone(&queue);
@@ -782,11 +783,10 @@ fn run_prepared(env: &ForeignEnv, items: Vec<PreparedMany>, concurrency: usize) 
                     execute_job(&ctx, &item.job)
                 })) {
                     Ok(Ok(exec)) => {
-                        let (result, result_error) = parse_output(&exec.stdout, &item.output);
-                        exec.record(result, result_error)
+                        parse_output(&exec.stdout, &item.output).map(|(result, error)| exec.record(result, error))
                     }
-                    Ok(Err(e)) => error_record(&ctx, &item.job, e),
-                    Err(_) => error_record(&ctx, &item.job, "foreign worker panicked".into()),
+                    Ok(Err(e)) => Ok(error_record(&ctx, &item.job, e)),
+                    Err(_) => Ok(error_record(&ctx, &item.job, "foreign worker panicked".into())),
                 };
                 if let Ok(mut out) = results.lock() {
                     out.push((item.idx, value));
@@ -799,7 +799,7 @@ fn run_prepared(env: &ForeignEnv, items: Vec<PreparedMany>, concurrency: usize) 
         Err(shared) => shared.lock().map(|m| m.clone()).unwrap_or_default(),
     };
     out.sort_by_key(|(i, _)| *i);
-    out
+    out.into_iter().map(|(i, result)| result.map(|value| (i, value)).map_err(|e| format!("foreign[{i}]: {e}"))).collect()
 }
 
 /// Build a prepared job for one `runs` item (code value or option map).
@@ -851,7 +851,7 @@ pub fn run_many(
         requested
     };
     let env = ForeignEnv::from_ctx(ctx);
-    let results = run_prepared(&env, prepared, concurrency);
+    let results = run_prepared(&env, prepared, concurrency)?;
     Ok(Value::List(results.into_iter().map(|(_, v)| v).collect()))
 }
 
@@ -879,6 +879,7 @@ pub fn call_many(
     };
     let mut prepared = Vec::with_capacity(n);
     for (idx, input) in list.iter().enumerate() {
+        super::oracle::admit(input)?;
         let json = serde_json::to_string(&value_to_json(input)?)
             .map_err(|e| format!("call_many input JSON encode: {e}"))?;
         let mut job = base.job.clone();
@@ -891,7 +892,7 @@ pub fn call_many(
         });
     }
     let env = ForeignEnv::from_ctx(ctx);
-    let records = run_prepared(&env, prepared, concurrency);
+    let records = run_prepared(&env, prepared, concurrency)?;
     let mut results = Vec::with_capacity(records.len());
     let mut errors = Vec::new();
     for (idx, record) in records {
@@ -936,34 +937,15 @@ fn resolve_invoke_source(args: &InvokeArgs<'_>) -> Result<(String, String), Stri
     ))
 }
 
-fn parse_output(stdout: &str, mode: &str) -> (Value, String) {
-    match mode {
-        "text" => (Value::None, String::new()),
-        "lines" => (
-            Value::List(stdout.lines().map(|l| Value::Text(l.to_string())).collect()),
-            String::new(),
-        ),
-        "json" => {
-            if stdout.trim().is_empty() {
-                return (Value::None, String::new());
-            }
-            match serde_json::from_str::<serde_json::Value>(stdout) {
-                Ok(j) => match json_to_value(&j) {
-                    Ok(v) => (v, String::new()),
-                    Err(e) => (Value::None, e),
-                },
-                Err(e) => (Value::None, format!("stdout is not JSON: {e}")),
-            }
-        }
-        _ => {
-            if stdout.trim().is_empty() {
-                return (Value::None, String::new());
-            }
-            match serde_json::from_str::<serde_json::Value>(stdout) {
-                Ok(j) => (json_to_value(&j).unwrap_or(Value::None), String::new()),
-                Err(_) => (Value::None, String::new()),
-            }
-        }
+fn parse_output(stdout: &str, mode: &str) -> Result<(Value, String), String> {
+    if mode == "text" { return Ok((Value::None, String::new())); }
+    if mode == "lines" { return Ok((Value::List(stdout.lines().map(|s| Value::Text(s.into())).collect()), String::new())); }
+    if stdout.trim().is_empty() { return Ok((Value::None, String::new())); }
+    match super::json::decode_text(stdout) {
+        Ok(v) => Ok((v, String::new())),
+        Err(super::json::DecodeError::Domain(e)) => Err(e),
+        Err(super::json::DecodeError::Syntax(e)) if mode == "json" => Ok((Value::None, format!("stdout is not JSON: {e}"))),
+        Err(super::json::DecodeError::Syntax(_)) => Ok((Value::None, String::new())),
     }
 }
 
@@ -1734,6 +1716,7 @@ fn execute_job(ctx: &HostContext, job: &Job) -> Result<Execution, String> {
                 lang: job.lang.clone(),
                 cmd: display_for_job(ctx, job, None),
                 script: String::new(),
+        diagnostic_source: String::new(),
             });
         }
     };
@@ -1803,6 +1786,7 @@ fn execute_job(ctx: &HostContext, job: &Job) -> Result<Execution, String> {
         lang: job.lang.clone(),
         cmd,
         script: script_keep,
+        diagnostic_source: script_path.display().to_string(),
     })
 }
 
@@ -1837,7 +1821,7 @@ pub fn invoke_for_view(
         cmd_override: cmd_override.map(str::to_string),
     };
     let exec = execute_job(&ctx, &job)?;
-    let (result, result_error) = parse_output(&exec.stdout, "auto");
+    let (result, result_error) = parse_output(&exec.stdout, "auto")?;
     Ok(exec.record(result, result_error))
 }
 
@@ -1886,13 +1870,13 @@ mod tests {
 
     #[test]
     fn output_modes() {
-        let (v, e) = parse_output("42", "auto");
+        let (v, e) = parse_output("42", "auto").unwrap();
         assert!(e.is_empty());
         assert_eq!(v, Value::Int(42));
-        let (v, e) = parse_output("a\nb\n", "lines");
+        let (v, e) = parse_output("a\nb\n", "lines").unwrap();
         assert!(e.is_empty());
         assert_eq!(v, Value::List(vec![Value::Text("a".into()), Value::Text("b".into())]));
-        let (v, e) = parse_output("not json", "json");
+        let (v, e) = parse_output("not json", "json").unwrap();
         assert!(v == Value::None);
         assert!(!e.is_empty());
     }
@@ -1965,4 +1949,19 @@ mod tests {
         assert_eq!(map_get(&records[1], "ok"), Some(&Value::Bool(false)));
         assert_eq!(map_get(&records[2], "stdout").and_then(|v| v.reveal_text()), Some("c\n"));
     }
+    #[test]
+    fn structured_output_domain_errors_are_not_none_or_success_records() {
+        for mode in ["auto", "json"] {
+            for bad in ["9007199254740992", "9.007199254740992e15", "1e9999", r#"{"x":1,"x":2}"#, r#"{"a":[],"b":[1]}"#] {
+                assert!(parse_output(bad, mode).is_err(), "{mode}: {bad}");
+            }
+        }
+        let ctx = HostContext::default();
+        let env = ForeignEnv::from_ctx(&ctx);
+        let items = (0..2).map(|idx| PreparedMany {
+            idx, job: Job::simple("python", "print('{\"x\":1,\"x\":2}')", None), output: "auto".into(),
+        }).collect();
+        assert!(run_prepared(&env, items, 2).unwrap_err().contains("duplicate"));
+    }
+
 }

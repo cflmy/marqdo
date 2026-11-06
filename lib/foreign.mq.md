@@ -249,3 +249,20 @@ List live sessions with id/lang/cmd/evals/alive/started_ms.
 List configured foreign languages.
 
 *> host_foreign_langs*
+
+## oracle_journal
+
+Return this document evaluation's admitted eval/get/decode observations as
+ordinary records with index, channel, value. Opening, setting and closing do
+not append observations.
+
+*> host_oracle_journal *
+
+## replay_check
+    + `expected`
+    + `observed`
+
+Compare two oracle journals without executing foreign code. Returns ok and
+the least mismatching index, with the expected and observed records.
+
+*> host_oracle_replay_check expected=`expected` observed=`observed`*

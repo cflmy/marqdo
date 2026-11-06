@@ -23,6 +23,58 @@ impl fmt::Display for Span {
     }
 }
 
+/// Identity of the exact text that was parsed, including recorded revisions.
+/// A path is a label; the digest is never recomputed from a later disk version.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct SourceIdentity {
+    pub path: Option<PathBuf>,
+    pub sha256: Option<String>,
+}
+
+impl SourceIdentity {
+    pub fn from_source(path: Option<&Path>, text: &str) -> Self {
+        use sha2::{Digest, Sha256};
+        Self {
+            path: path.map(Path::to_path_buf),
+            sha256: Some(format!("{:x}", Sha256::digest(text.as_bytes()))),
+        }
+    }
+
+    pub fn at(&self, span: Span) -> SourceLocation {
+        SourceLocation {
+            source: self.clone(),
+            span,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SourceLocation {
+    pub source: SourceIdentity,
+    pub span: Span,
+}
+
+impl SourceLocation {
+    pub fn to_json(&self) -> serde_json::Value {
+        serde_json::json!({"file": self.source.path.as_ref().map(|p| display_path(p)),
+            "source_sha256": self.source.sha256, "line": self.span.line, "col": self.span.col})
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DiagnosticFrame {
+    pub function: String,
+    pub declaration: SourceLocation,
+    pub call_site: Option<SourceLocation>,
+}
+
+impl DiagnosticFrame {
+    pub fn to_json(&self) -> serde_json::Value {
+        serde_json::json!({"function": self.function, "declaration": self.declaration.to_json(),
+            "call_site": self.call_site.as_ref().map(SourceLocation::to_json)})
+    }
+}
+
 /// Format a path for user-facing diagnostics.
 ///
 /// Strips the Windows extended-length prefix (`\\?\` / `\\?\UNC\`) that
@@ -75,6 +127,9 @@ pub struct Diagnostic {
     pub doc_anchor: Option<String>,
     pub doc_quote: Option<String>,
     pub contract_ref: Option<ContractRef>,
+    pub source_sha256: Option<String>,
+    /// Ordered outermost to innermost; every site retains its own source.
+    pub frames: Vec<DiagnosticFrame>,
 }
 
 impl Diagnostic {
@@ -89,6 +144,8 @@ impl Diagnostic {
             doc_anchor: None,
             doc_quote: None,
             contract_ref: None,
+            source_sha256: None,
+            frames: Vec::new(),
         }
     }
 
@@ -98,6 +155,17 @@ impl Diagnostic {
 
     pub fn with_code(mut self, code: impl Into<String>) -> Self {
         self.code = code.into();
+        self
+    }
+
+    pub fn with_source(mut self, source: &SourceIdentity) -> Self {
+        self.path = source.path.clone();
+        self.source_sha256 = source.sha256.clone();
+        self
+    }
+
+    pub fn with_frames(mut self, frames: &[DiagnosticFrame]) -> Self {
+        self.frames = frames.to_vec();
         self
     }
 
@@ -132,10 +200,25 @@ impl Diagnostic {
     }
 
     pub fn format_message(&self) -> String {
-        match &self.path {
+        let mut message = match &self.path {
             Some(p) => format!("{}:{}: {}", display_path(p), self.span, self.message),
             None => format!("{}: {}", self.span, self.message),
+        };
+        for frame in self.frames.iter().rev() {
+            if let Some(site) = &frame.call_site {
+                let file = site
+                    .source
+                    .path
+                    .as_ref()
+                    .map(|p| display_path(p))
+                    .unwrap_or_else(|| "<unknown>".into());
+                message.push_str(&format!(
+                    "\n  called {} from {}:{}",
+                    frame.function, file, site.span
+                ));
+            }
         }
+        message
     }
 
     /// Machine-readable form（AI/MLSP 面；`run --json` 出口）。
@@ -153,6 +236,8 @@ impl Diagnostic {
                 "line": self.span.line,
                 "col": self.span.col,
             },
+            "source_sha256": self.source_sha256,
+            "frames": self.frames.iter().map(DiagnosticFrame::to_json).collect::<Vec<_>>(),
             "doc_anchor": self.doc_anchor,
             "doc_quote": self.doc_quote,
             "contract_ref": self.contract_ref.as_ref().map(|c| json!({

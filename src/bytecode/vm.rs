@@ -5,14 +5,13 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 
 use crate::builtin::{
-    builtin_at, builtin_footnote_get, builtin_int, builtin_iter_items, builtin_join,
-    builtin_len, builtin_split, builtin_str, builtin_trim,
-    builtin_type,
+    builtin_at, builtin_footnote_get, builtin_int, builtin_iter_items, builtin_join, builtin_len,
+    builtin_split, builtin_str, builtin_trim, builtin_type,
 };
-use crate::host::{call_host, HostContext, HostFn};
-use crate::bytecode::{Op, Program};
+use crate::bytecode::{FnChunk, Op, Program};
 use crate::debug::emit_trace;
-use crate::diagnostics::{bail_at, Span};
+use crate::diagnostics::{Diagnostic, DiagnosticFrame, SourceIdentity, Span};
+use crate::host::{call_host, HostContext, HostFn};
 use crate::input_feed::InputFeed;
 use crate::value::Value;
 use std::collections::HashMap;
@@ -24,14 +23,32 @@ pub struct Vm {
     input: InputFeed,
     trace: bool,
     host: HostContext,
+    current_source: SourceIdentity,
+    current_scope: Option<u32>,
+    diagnostic_frames: Vec<DiagnosticFrame>,
 }
 
 struct Frame {
     fn_idx: usize,
     ip: usize,
-    slots: Vec<Value>,
+    slots: Vec<Option<Value>>,
+    provided: Vec<bool>,
+    loop_counts: HashMap<usize,u32>,
+    receiver: Option<Value>,
+    defaults_active: bool,
     /// When set, retag matrix-like return to this `_type` (method chaining).
-    retag_matrix: Option<String>,
+    retag_matrix: Option<(String, Option<Vec<String>>)>,
+    has_call_site: bool,
+    retag_instance: Option<usize>,
+}
+
+impl Frame {
+    fn read(&self, fun: &FnChunk, index: usize) -> Option<Value> {
+        let name=&fun.locals[index];
+        let overlay=self.defaults_active && self.receiver.is_some() && (name=="self" || name=="自") &&
+            (index>=fun.params.len() || self.provided.get(index).copied().unwrap_or(false) || self.slots[index].is_none());
+        if overlay {self.receiver.clone()} else {self.slots[index].clone()}
+    }
 }
 
 impl Vm {
@@ -43,6 +60,12 @@ impl Vm {
             input: InputFeed::new(false, Vec::new()),
             trace: false,
             host: HostContext::for_run(path, Default::default(), Vec::new()),
+            current_source: SourceIdentity {
+                path: path.map(Path::to_path_buf),
+                sha256: None,
+            },
+            current_scope: None,
+            diagnostic_frames: Vec::new(),
         }
     }
 
@@ -54,6 +77,12 @@ impl Vm {
             input: InputFeed::new(true, Vec::new()),
             trace: false,
             host: HostContext::for_capture(path, Default::default()),
+            current_source: SourceIdentity {
+                path: path.map(Path::to_path_buf),
+                sha256: None,
+            },
+            current_scope: None,
+            diagnostic_frames: Vec::new(),
         }
     }
 
@@ -74,6 +103,50 @@ impl Vm {
 
     pub fn take_plots(&mut self) -> Vec<crate::host::PlotArtifact> {
         std::mem::take(&mut self.host.plots)
+    }
+
+    #[cfg(all(test, feature = "exec-host"))]
+    pub(crate) fn foreign_source_evidence(
+        &mut self,
+    ) -> (
+        Vec<Value>,
+        Vec<Value>,
+        Vec<crate::host::foreign_session::ProtocolStep>,
+    ) {
+        crate::source_refinement_tests::boundary_evidence(&mut self.host)
+    }
+
+    #[cfg(test)]
+    pub(crate) fn diagnostic_scope_state(
+        &self,
+    ) -> (SourceIdentity, usize, Vec<String>, Vec<u32>, Option<u32>) {
+        (
+            self.current_source.clone(),
+            self.diagnostic_frames.len(),
+            self.host.call_stack.clone(),
+            self.host.call_site_lines.clone(),
+            self.current_scope,
+        )
+    }
+
+    #[cfg(all(test, feature = "exec-host"))]
+    pub(crate) fn causal_replay_evidence(&mut self) -> serde_json::Value {
+        crate::causal_replay_tests::evidence(&mut self.host)
+    }
+
+    #[cfg(all(test, feature = "exec-host"))]
+    pub(crate) fn application_evidence(
+        &self,
+    ) -> (
+        Vec<Value>,
+        Vec<crate::host::foreign_session::ProtocolStep>,
+        usize,
+    ) {
+        (
+            self.host.oracle_observations.clone(),
+            self.host.foreign_protocol_steps.clone(),
+            self.host.foreign_sessions.len(),
+        )
     }
 
     fn emit_line(&mut self, text: &str) {
@@ -98,21 +171,34 @@ impl Vm {
     }
 
     fn err_at(&self, span: Span, message: impl Into<String>) -> anyhow::Error {
-        bail_at(self.path.as_deref(), span, message)
+        Diagnostic::new(self.current_source.path.as_deref(), span, message)
+            .with_source(&self.current_source)
+            .with_frames(&self.diagnostic_frames)
+            .into()
+    }
+
+    fn push_source_frame(&mut self, callee: &FnChunk, call_span: Option<Span>) {
+        let mut source = callee.source.clone();
+        if source.path.is_none() {
+            if self.diagnostic_frames.is_empty() {
+                source.path = self.path.clone();
+            } else if self.current_scope == Some(callee.module_scope) {
+                source.path = self.current_source.path.clone();
+            }
+        }
+        self.diagnostic_frames.push(DiagnosticFrame {
+            function: callee.name.clone(),
+            declaration: source.at(callee.declaration_span),
+            call_site: call_span.map(|span| self.current_source.at(span)),
+        });
     }
 
     pub fn run(&mut self, program: &Program) -> Result<Value> {
-        let entry = program.entry;
-        let arity = program.functions[entry].params.len();
-        if arity != 0 {
-            let span = program.functions[entry]
-                .spans
-                .first()
-                .copied()
-                .unwrap_or(Span::new(1, 1));
-            return Err(self.err_at(span, "bytecode: entry function needs arguments"));
-        }
-        self.execute(program, entry, &[])
+        // Entry execution, like Interpreter::run_function, seeds unbound locals
+        // with None. Inferred prose parameters do not require a program caller.
+        let mut seen=std::collections::HashSet::new();
+        let metadata=program.entry_metadata.iter().filter(|(name,_)|seen.insert(name.clone())).cloned().collect::<Vec<_>>();
+        self.execute(program, program.entry, &metadata)
     }
 
     /// Run `fn_idx` with named arguments already bound to local slots.
@@ -138,8 +224,34 @@ impl Vm {
         fn_idx: usize,
         args: &[(String, Value)],
     ) -> Result<Value> {
+        program.verify().map_err(|error|self.err_at(Span::new(1,1),error))?;
+        let previous_source = self.current_source.clone();
+        let previous_scope = self.current_scope;
+        let previous_depth = self.diagnostic_frames.len();
+        let previous_calls = self.host.call_stack.clone();
+        let previous_sites = self.host.call_site_lines.clone();
+        let previous_line = self.host.current_line;
+        // Scope numbers belong to one compiled program; never carry them into
+        // a new external invocation, even when it preserves an outer prefix.
+        self.current_scope = None;
+        let result = self.execute_inner(program, fn_idx, args);
+        self.diagnostic_frames.truncate(previous_depth);
+        self.current_source = previous_source;
+        self.current_scope = previous_scope;
+        self.host.call_stack = previous_calls;
+        self.host.call_site_lines = previous_sites;
+        self.host.current_line = previous_line;
+        result
+    }
+
+    fn execute_inner(
+        &mut self,
+        program: &Program,
+        fn_idx: usize,
+        args: &[(String, Value)],
+    ) -> Result<Value> {
         let mut stack: Vec<Value> = Vec::new();
-        let mut slots = vec![Value::None; program.functions[fn_idx].locals.len().max(1)];
+        let mut slots = vec![None; program.functions[fn_idx].locals.len().max(1)];
         for (name, value) in args {
             if let Some(i) = program.functions[fn_idx]
                 .locals
@@ -147,45 +259,89 @@ impl Vm {
                 .position(|local| local == name)
             {
                 if i < slots.len() {
-                    slots[i] = value.clone();
+                    slots[i] = Some(value.clone());
                 }
             }
         }
         let mut frames = vec![Frame {
             fn_idx,
+            loop_counts: HashMap::new(),
+            receiver: None, defaults_active: true,
             ip: 0,
+            provided: initial_presence(&slots,program.functions[fn_idx].params.len()),
             slots,
             retag_matrix: None,
+            has_call_site: false,
+            retag_instance: None,
         }];
+        self.push_source_frame(&program.functions[fn_idx], None);
         self.host
             .push_call_frame(&program.functions[fn_idx].name.clone());
 
+        let mut source_owner = None;
         loop {
             let frame = frames.last_mut().unwrap();
             let fun = &program.functions[frame.fn_idx];
+            if source_owner != Some(frame.fn_idx) {
+                self.current_source = self
+                    .diagnostic_frames
+                    .last()
+                    .expect("active source frame")
+                    .declaration
+                    .source
+                    .clone();
+                self.current_scope = Some(fun.module_scope);
+                source_owner = Some(frame.fn_idx);
+            }
             if frame.ip >= fun.code.len() {
                 let span = fun.spans.last().copied().unwrap_or(Span::new(1, 1));
                 return Err(self.err_at(span, format!("bytecode: ip out of range in {}", fun.name)));
             }
             let ip = frame.ip;
-            let op = fun.code[ip];
+            let mut op = fun.code[ip];
             let span = fun.spans.get(ip).copied().unwrap_or(Span::new(1, 1));
             frame.ip += 1;
             self.host.current_line = span.line;
 
+            let mut print_returns_none=false;
+            let mut method_name_override=None;
+            let mut constructor_tag=None;
+            if let Op::PathCallArgs(owner,layout)=op {
+                let call=&fun.calls[owner];
+                let Some(super::CallDispatch::Path{receiver,check_receiver,fallback})=&call.dispatch else{unreachable!("verified path dispatch")};
+                let value=if *check_receiver {fun.locals.iter().position(|n|n==receiver).and_then(|slot|frame.read(fun,slot))}else{None};
+                if let Some(value)=value {
+                    stack.push(value);method_name_override=Some(call.source.callee.clone());op=Op::MethodCallArgs(0,layout);
+                } else {match fallback {
+                    super::PathFallback::User{target,tag_instance}=>{op=Op::CallArgs(*target,layout);if *tag_instance{constructor_tag=Some(*target);}},
+                    super::PathFallback::Error{message}=>return Err(self.err_at(span,message)),
+                }}
+            }
+            if let Op::BuiltinCallArgs(name,layout)=op {
+                let name=fun.constants[name].as_display();let names=&fun.call_layouts[layout];
+                let values=take_actuals(&mut stack,names.len()).map_err(|m|self.err_at(span,m))?;
+                let (params,allow_missing)=crate::arguments::builtin_signature(&name).ok_or_else(||self.err_at(span,"unknown builtin signature"))?;
+                let parameters=params.iter().map(|p|p.to_string()).collect::<Vec<_>>();
+                let bound=crate::arguments::bind(&parameters,names,&values,allow_missing).map_err(|m|self.err_at(span,m))?;
+                for param in params {
+                    stack.push(bound.get(*param).cloned().unwrap_or_else(||Value::Text(String::new())));
+                }
+                op=match name.as_str(){"print"=>{print_returns_none=true;Op::Print},"input"=>Op::Input,"len"=>Op::Len,"str"=>Op::Str,"int"=>Op::Int,"type"=>Op::TypeOf,"trim"=>Op::Trim,"split"=>Op::Split,"join"=>Op::Join,"at"=>Op::GetIndex,"call_fn"=>Op::CallFn,_=>unreachable!()};
+            }
+
             if self.trace {
                 match op {
-                    Op::Print | Op::Input | Op::Call(_, _) | Op::Return => {
+                    Op::Print | Op::Input | Op::Call(_, _) | Op::CallArgs(_, _) | Op::Return => {
                         let kind = match op {
                             Op::Print => "print",
                             Op::Input => "input",
-                            Op::Call(_, _) => "call",
+                            Op::Call(_, _) | Op::CallArgs(_, _) => "call",
                             Op::Return => "return",
                             _ => unreachable!(),
                         };
                         let ip_s = ip.to_string();
                         emit_trace(
-                            self.path.as_deref(),
+                            self.current_source.path.as_deref(),
                             Some(span),
                             "op",
                             &[
@@ -200,6 +356,61 @@ impl Vm {
             }
 
             match op {
+                Op::CheckArguments => {
+                    if let Some(contract)=&fun.contract {
+                        let bound=fun.locals.iter().zip(&frame.slots).filter_map(|(name,value)|
+                            value.clone().map(|value|(name.clone(),value))).collect();
+                        // Internal call errors identify the authored call site, like Tree.
+                        let site=self.diagnostic_frames.last().and_then(|f|f.call_site.as_ref());
+                        let call_site=site.cloned().unwrap_or_else(||self.current_source.at(span));
+                        if let Some(diag)=crate::contract::call_arg_diag_in(contract,&fun.name,&bound,&call_site,&fun.source) {
+                            let depth=self.diagnostic_frames.len()-usize::from(site.is_some());
+                            return Err(diag.with_frames(&self.diagnostic_frames[..depth]).into());
+                        }
+                    }
+                }
+                Op::CheckReturn => {
+                    if let Some(contract)=&fun.contract {
+                        let value=stack.last().cloned().unwrap_or(Value::None);
+                        if let Some(diag)=crate::contract::return_diag(contract,&fun.name,&value,self.current_source.path.as_deref(),span) {
+                            return Err(diag.into());
+                        }
+                    }
+                }
+                Op::CheckBinding(slot) => {
+                    let name=&fun.locals[slot];
+                    if let Some(contract)=fun.var_contracts.get(name) {
+                        let value=stack.last().cloned().unwrap_or(Value::None);
+                        if let Some(diag)=crate::contract::fields_diag(contract,name,&value,self.current_source.path.as_deref(),span) {
+                            return Err(diag.into());
+                        }
+                    }
+                }
+                Op::RestoreReceiver => {
+                    if let Some(receiver)=&frame.receiver {
+                        for (index,name) in fun.locals.iter().enumerate() {
+                            if name=="self" || name=="自" {frame.slots[index]=Some(receiver.clone());}
+                        }
+                    }
+                    frame.defaults_active=false;
+                }
+                Op::CheckFrameArguments => {
+                    if let Some(contract)=&fun.contract {
+                        let bound=fun.locals.iter().zip(&frame.slots).filter_map(|(name,value)|value.clone().map(|value|(name.clone(),value))).collect();
+                        if let Some(diag)=crate::contract::call_arg_diag(contract,&fun.name,&bound,self.current_source.path.as_deref(),fun.declaration_span){return Err(diag.with_source(&self.current_source).with_frames(&self.diagnostic_frames).into());}
+                    }
+                }
+                Op::ResetLoop(id) => {frame.loop_counts.insert(id,0);}
+                Op::CheckLoop(id) => {
+                    let counter=frame.loop_counts.get_mut(&id).ok_or_else(||self.err_at(span,"uninitialized loop counter"))?;
+                    if *counter>=1_000_000 {return Err(self.err_at(span,"while loop exceeded iteration limit"));}
+                    *counter+=1;
+                }
+                Op::FillMissingParameters => {
+                    for index in 0..fun.params.len() {
+                        if frame.slots[index].is_none() { frame.slots[index]=Some(Value::None); }
+                    }
+                }
                 Op::Constant(i) => stack.push(fun.constants[i as usize].clone()),
                 Op::True => stack.push(Value::Bool(true)),
                 Op::False => stack.push(Value::Bool(false)),
@@ -208,7 +419,10 @@ impl Vm {
                     stack.pop();
                 }
                 Op::GetLocal(i) => {
-                    let v = frames.last().unwrap().slots[i as usize].clone();
+                    let current=frames.last().unwrap();
+                    let index=i as usize;let name=&fun.locals[index];
+                    let value=current.read(fun,index);
+                    let v=value.ok_or_else(||self.err_at(span,format!("undefined variable `{name}`")))?;
                     stack.push(v);
                 }
                 Op::SetLocal(i) => {
@@ -216,130 +430,32 @@ impl Vm {
                     let slot = i as usize;
                     let fr = frames.last_mut().unwrap();
                     if fr.slots.len() <= slot {
-                        fr.slots.resize(slot + 1, Value::None);
+                        fr.slots.resize(slot + 1, None);
                     }
-                    fr.slots[slot] = v;
+                    fr.slots[slot] = Some(v);
                 }
-                Op::Add => {
-                    let b = pop(&mut stack).map_err(|m| self.err_at(span, m))?;
-                    let a = pop(&mut stack).map_err(|m| self.err_at(span, m))?;
-                    if let Some(v) = crate::linalg_ops::try_matrix_binary(
-                        &mut self.host,
-                        crate::ast::BinaryOp::Add,
-                        &a,
-                        &b,
-                    )
-                    .map_err(|m| self.err_at(span, m))?
-                    {
-                        stack.push(v);
-                    } else {
-                        stack.push(add(a, b).map_err(|m| self.err_at(span, m))?);
-                    }
+                Op::Add | Op::Sub | Op::Mul | Op::Div | Op::Equal | Op::NotEqual |
+                Op::Greater | Op::GreaterEqual | Op::Less | Op::Lessequal => {
+                    use crate::ast::BinaryOp;
+                    let operation=match op {
+                        Op::Add=>BinaryOp::Add,Op::Sub=>BinaryOp::Sub,Op::Mul=>BinaryOp::Mul,Op::Div=>BinaryOp::Div,
+                        Op::Equal=>BinaryOp::Eq,Op::NotEqual=>BinaryOp::Ne,Op::Greater=>BinaryOp::Gt,
+                        Op::GreaterEqual=>BinaryOp::Ge,Op::Less=>BinaryOp::Lt,Op::Lessequal=>BinaryOp::Le,
+                        _=>unreachable!(),
+                    };
+                    let right=pop(&mut stack).map_err(|m|self.err_at(span,m))?;
+                    let left=pop(&mut stack).map_err(|m|self.err_at(span,m))?;
+                    let value=if let Some(value)=crate::linalg_ops::try_matrix_binary(&mut self.host,operation,&left,&right)
+                        .map_err(|m|self.err_at(span,m))? {value} else {
+                        crate::builtin::eval_binary(operation,&left,&right).map_err(|m|self.err_at(span,m))?
+                    };
+                    stack.push(value);
                 }
-                Op::Sub => {
-                    let b = pop(&mut stack).map_err(|m| self.err_at(span, m))?;
-                    let a = pop(&mut stack).map_err(|m| self.err_at(span, m))?;
-                    if let Some(v) = crate::linalg_ops::try_matrix_binary(
-                        &mut self.host,
-                        crate::ast::BinaryOp::Sub,
-                        &a,
-                        &b,
-                    )
-                    .map_err(|m| self.err_at(span, m))?
-                    {
-                        stack.push(v);
-                    } else {
-                        match (a, b) {
-                            (Value::Int(x), Value::Int(y)) => stack.push(Value::Int(x - y)),
-                            (Value::Num(x), Value::Num(y)) => stack.push(Value::Num(x - y)),
-                            (Value::Int(x), Value::Num(y)) => {
-                                stack.push(Value::Num(x as f64 - y))
-                            }
-                            (Value::Num(x), Value::Int(y)) => {
-                                stack.push(Value::Num(x - y as f64))
-                            }
-                            _ => return Err(self.err_at(span, "`-` needs ints or nums")),
-                        }
-                    }
+                Op::Negate | Op::Not => {
+                    let value=pop(&mut stack).map_err(|m|self.err_at(span,m))?;
+                    let operation=if matches!(op,Op::Negate){crate::ast::UnaryOp::Neg}else{crate::ast::UnaryOp::Not};
+                    stack.push(crate::builtin::eval_unary(operation,&value).map_err(|m|self.err_at(span,m))?);
                 }
-                Op::Mul => {
-                    let b = pop(&mut stack).map_err(|m| self.err_at(span, m))?;
-                    let a = pop(&mut stack).map_err(|m| self.err_at(span, m))?;
-                    if let Some(v) = crate::linalg_ops::try_matrix_binary(
-                        &mut self.host,
-                        crate::ast::BinaryOp::Mul,
-                        &a,
-                        &b,
-                    )
-                    .map_err(|m| self.err_at(span, m))?
-                    {
-                        stack.push(v);
-                    } else {
-                        match (a, b) {
-                            (Value::Int(x), Value::Int(y)) => stack.push(Value::Int(x * y)),
-                            (Value::Num(x), Value::Num(y)) => stack.push(Value::Num(x * y)),
-                            (Value::Int(x), Value::Num(y)) => {
-                                stack.push(Value::Num(x as f64 * y))
-                            }
-                            (Value::Num(x), Value::Int(y)) => {
-                                stack.push(Value::Num(x * y as f64))
-                            }
-                            _ => return Err(self.err_at(span, "`*` needs ints or nums")),
-                        }
-                    }
-                }
-                Op::Div => {
-                    let b = pop(&mut stack).map_err(|m| self.err_at(span, m))?;
-                    let a = pop(&mut stack).map_err(|m| self.err_at(span, m))?;
-                    match (a, b) {
-                        (Value::Int(_), Value::Int(0)) => {
-                            return Err(self.err_at(span, "division by zero"));
-                        }
-                        (Value::Int(x), Value::Int(y)) => stack.push(Value::Int(x / y)),
-                        (Value::Num(_), Value::Num(y)) if y == 0.0 => {
-                            return Err(self.err_at(span, "division by zero"));
-                        }
-                        (Value::Int(_), Value::Num(y)) if y == 0.0 => {
-                            return Err(self.err_at(span, "division by zero"));
-                        }
-                        (Value::Num(_), Value::Int(0)) => {
-                            return Err(self.err_at(span, "division by zero"));
-                        }
-                        (Value::Num(x), Value::Num(y)) => stack.push(Value::Num(x / y)),
-                        (Value::Int(x), Value::Num(y)) => {
-                            stack.push(Value::Num(x as f64 / y))
-                        }
-                        (Value::Num(x), Value::Int(y)) => {
-                            stack.push(Value::Num(x / y as f64))
-                        }
-                        _ => return Err(self.err_at(span, "`/` needs ints or nums")),
-                    }
-                }
-                Op::Negate => match pop(&mut stack).map_err(|m| self.err_at(span, m))? {
-                    Value::Int(n) => stack.push(Value::Int(-n)),
-                    Value::Num(n) => stack.push(Value::Num(-n)),
-                    _ => return Err(self.err_at(span, "unary `-` needs int or num")),
-                },
-                Op::Not => {
-                    let v = pop(&mut stack).map_err(|m| self.err_at(span, m))?;
-                    stack.push(Value::Bool(!v.truthy()));
-                }
-                Op::Equal => {
-                    let b = pop(&mut stack).map_err(|m| self.err_at(span, m))?;
-                    let a = pop(&mut stack).map_err(|m| self.err_at(span, m))?;
-                    stack.push(Value::Bool(a == b));
-                }
-                Op::NotEqual => {
-                    let b = pop(&mut stack).map_err(|m| self.err_at(span, m))?;
-                    let a = pop(&mut stack).map_err(|m| self.err_at(span, m))?;
-                    stack.push(Value::Bool(a != b));
-                }
-                Op::Greater => cmp(&mut stack, |o| o.is_gt()).map_err(|m| self.err_at(span, m))?,
-                Op::GreaterEqual => {
-                    cmp(&mut stack, |o| o.is_ge()).map_err(|m| self.err_at(span, m))?
-                }
-                Op::Less => cmp(&mut stack, |o| o.is_lt()).map_err(|m| self.err_at(span, m))?,
-                Op::Lessequal => cmp(&mut stack, |o| o.is_le()).map_err(|m| self.err_at(span, m))?,
                 Op::Jump(t) => {
                     frames.last_mut().unwrap().ip = t as usize;
                 }
@@ -444,7 +560,7 @@ impl Vm {
                     let v = pop(&mut stack).map_err(|m| self.err_at(span, m))?;
                     stack.push(builtin_iter_items(&v).map_err(|m| self.err_at(span, m))?);
                 }
-                Op::FootnoteGet => {
+                Op::FootnoteGet | Op::ContractFootnoteGet(_) => {
                     let label = pop(&mut stack).map_err(|m| self.err_at(span, m))?;
                     let base = pop(&mut stack).map_err(|m| self.err_at(span, m))?;
                     let label = match label {
@@ -453,10 +569,27 @@ impl Vm {
                             return Err(self.err_at(span, "footnote label must be text"));
                         }
                     };
-                    stack.push(
-                        builtin_footnote_get(&base, &label).map_err(|m| self.err_at(span, m))?,
-                    );
+                    let contract=if let Op::ContractFootnoteGet(slot)=op {
+                        let name=&fun.locals[slot];fun.var_contracts.get(name).map(|c|(name,c))
+                    } else {None};
+                    if let Some((name,c))=contract {
+                        if let Some(diag)=crate::contract::index_diag(c,name,&label,&Value::None,self.current_source.path.as_deref(),span) {return Err(diag.into());}
+                    }
+                    let value=builtin_footnote_get(&base,&label).map_err(|m|self.err_at(span,m))?;
+                    if let Some((name,c))=contract {
+                        if let Some(diag)=crate::contract::index_diag(c,name,&label,&value,self.current_source.path.as_deref(),span) {return Err(diag.into());}
+                    }
+                    stack.push(value);
                 }
+                Op::HostCallArgs(id, layout) => {
+                    let hf=HostFn::from_u16(id).ok_or_else(||self.err_at(span,"unknown host id"))?;
+                    let names=&fun.call_layouts[layout];let values=take_actuals(&mut stack,names.len()).map_err(|m|self.err_at(span,m))?;
+                    let params=hf.all_params().iter().map(|p|p.to_string()).collect::<Vec<_>>();
+                    let bound=crate::arguments::bind(&params,names,&values,true).map_err(|m|self.err_at(span,m))?;
+                    for req in hf.required_params(){if !bound.contains_key(*req){return Err(self.err_at(span,format!("{} requires `{req}`",hf.name())));}}
+                    stack.push(call_host(&mut self.host,hf,&bound).map_err(|m|self.err_at(span,m))?);
+                }
+                Op::BuiltinCallArgs(_,_)=>unreachable!("builtin dispatch was prepared above"),
                 Op::HostCall(id, argc) => {
                     let hf = HostFn::from_u16(id)
                         .ok_or_else(|| self.err_at(span, format!("unknown host id {id}")))?;
@@ -476,71 +609,105 @@ impl Vm {
                     }
                     for req in hf.required_params() {
                         if !bound.contains_key(*req) {
-                            return Err(self.err_at(
-                                span,
-                                format!("{} requires `{req}`", hf.name()),
-                            ));
+                            return Err(
+                                self.err_at(span, format!("{} requires `{req}`", hf.name()))
+                            );
                         }
                     }
                     let result =
                         call_host(&mut self.host, hf, &bound).map_err(|m| self.err_at(span, m))?;
                     stack.push(result);
                 }
-                Op::Call(fid, argc) => {
+                Op::RejectDuplicateArgument(index) => {
+                    let name=fun.constants[index].as_display();
+                    return Err(self.err_at(span,format!("duplicate named argument `{name}`")));
+                }
+                Op::RejectArgumentExpansion(index) => {
+                    return Err(self.err_at(span,fun.constants[index].as_display()));
+                }
+                Op::RejectCallResolution(index)=>return Err(self.err_at(span,fun.constants[index].as_display())),
+                Op::PathCallArgs(_,_)=>unreachable!("path dispatch was selected above"),
+                Op::JumpIfProvided(index, target) => {
+                    if frame.provided.get(index as usize).copied().unwrap_or(false) {
+                        frame.ip = target as usize;
+                    }
+                }
+                Op::Call(_, _) | Op::CallArgs(_, _) => {
+                    let (fid, argc) = match op {
+                        Op::Call(fid, argc) => (fid, argc as usize),
+                        Op::CallArgs(fid, layout) => (fid, layout),
+                        _ => unreachable!(),
+                    };
                     let fid = fid as usize;
-                    let argc = argc as usize;
                     let callee = &program.functions[fid];
-                    if callee.params.len() != argc {
-                        return Err(self.err_at(span, "call argument count mismatch"));
-                    }
-                    let mut slots = vec![Value::None; callee.locals.len().max(argc).max(1)];
-                    for i in (0..argc).rev() {
-                        slots[i] = pop(&mut stack).map_err(|m| self.err_at(span, m))?;
-                    }
+                    let layout = if matches!(op, Op::CallArgs(_, _)) {
+                        fun.call_layouts[argc as usize].clone()
+                    } else { vec![None; argc as usize] };
+                    let mut values = Vec::new();
+                    for _ in &layout { values.push(pop(&mut stack).map_err(|m| self.err_at(span, m))?); }
+                    values.reverse();
+                    let (slots, provided) = bind_call_values(callee, &layout, values).map_err(|m| self.err_at(span, m))?;
                     let fname = program.functions[fid].name.clone();
                     frames.push(Frame {
                         fn_idx: fid,
+                        loop_counts: HashMap::new(),
+            receiver: None, defaults_active: true,
                         ip: 0,
+                        provided,
                         slots,
                         retag_matrix: None,
+                        has_call_site: true,
+                        retag_instance: constructor_tag,
                     });
+                    self.push_source_frame(callee, Some(span));
                     self.host.push_call_frame(&fname);
                     self.host.push_call_site_line(span.line);
                 }
                 Op::TagInstance(idx) => {
-                    let type_name = match fun.constants.get(idx as usize) {
-                        Some(Value::Text(s)) => s.clone(),
-                        _ => {
-                            return Err(self.err_at(span, "TagInstance needs type name constant"));
-                        }
-                    };
+                    let class = program.functions.get(idx).ok_or_else(|| self.err_at(span,"TagInstance needs an object function"))?;
                     let v = pop(&mut stack).map_err(|m| self.err_at(span, m))?;
-                    stack.push(tag_instance_value(&type_name, v));
+                    stack.push(crate::value::tag_instance(&class.name, &class.module_path, v));
                 }
-                Op::MethodCall(name_idx, argc) => {
-                    let argc = argc as usize;
-                    let method_name = match fun.constants.get(name_idx as usize) {
+                Op::MethodCall(_, _) | Op::MethodCallArgs(_, _) => {
+                    let (name_idx, argc) = match op {
+                        Op::MethodCall(name, argc) => (name, argc as usize),
+                        Op::MethodCallArgs(name, layout) => (name, layout),
+                        _ => unreachable!(),
+                    };
+                    let layout = if matches!(op, Op::MethodCallArgs(_, _)) {
+                        fun.call_layouts[argc as usize].clone()
+                    } else { vec![None; argc as usize] };
+                    let argc = layout.len();
+                    let method_name = if let Some(name)=method_name_override {name} else {match fun.constants.get(name_idx as usize) {
                         Some(Value::Text(s)) => s.clone(),
                         _ => {
                             return Err(self.err_at(span, "MethodCall needs method name constant"));
                         }
-                    };
+                    }};
                     let recv = pop(&mut stack).map_err(|m| self.err_at(span, m))?;
                     let mut vals = Vec::with_capacity(argc);
                     for _ in 0..argc {
                         vals.push(pop(&mut stack).map_err(|m| self.err_at(span, m))?);
                     }
                     vals.reverse();
-                    let type_name = instance_type_name_bc(&recv).map_err(|m| self.err_at(span, m))?;
-                    let start_oi = program
-                        .objects
-                        .iter()
-                        .position(|(n, _)| n == &type_name)
+                    let type_name =
+                        instance_type_name_bc(&recv).map_err(|m| self.err_at(span, m))?;
+                    let namespace=crate::value::instance_module(&recv).map_err(|m| self.err_at(span,m))?;
+                    let start_oi = if let Some(namespace)=&namespace {
+                        program.objects.iter().position(|(name,id)| name==&type_name && &program.functions[*id].module_path==namespace)
+                    } else {
+                        let local=program.objects.iter().position(|(name,id)| name==&type_name && program.functions[*id].module_scope==fun.module_scope);
+                        if local.is_some() { local } else {
+                            let candidates=program.objects.iter().enumerate().filter(|(_, (name,_))| name==&type_name).map(|(index,_)|index).collect::<Vec<_>>();
+                            if candidates.len()>1 { return Err(self.err_at(span,format!("ambiguous object type `{type_name}`: a module tag is required"))); }
+                            candidates.first().copied()
+                        }
+                    }
                         .ok_or_else(|| {
                             self.err_at(span, format!("unknown object type `{type_name}`"))
                         })?;
-                    let method_fid = resolve_method_fid(program, start_oi, &method_name).ok_or_else(
-                        || {
+                    let method_fid = resolve_method_fid(program, start_oi, &method_name)
+                        .ok_or_else(|| {
                             let mut chain = Vec::new();
                             let mut oi = Some(start_oi);
                             let mut seen = std::collections::HashSet::new();
@@ -562,35 +729,36 @@ impl Vm {
                                     chain.join(" → ")
                                 ),
                             )
-                        },
-                    )?;
+                        })?;
                     let callee = &program.functions[method_fid];
-                    if callee.params.len() != argc {
-                        return Err(self.err_at(span, "method argument count mismatch"));
-                    }
-                    let mut slots = vec![Value::None; callee.locals.len().max(1)];
-                    for (i, v) in vals.into_iter().enumerate() {
-                        slots[i] = v;
-                    }
-                    for (i, name) in callee.locals.iter().enumerate() {
-                        if name == "自" || name == "self" {
-                            slots[i] = recv.clone();
-                        }
-                    }
+                    let (slots, provided) = bind_call_values(callee, &layout, vals).map_err(|m| self.err_at(span, m))?;
                     let retag_matrix = if crate::linalg_ops::is_matrix_value(&recv) {
-                        Some(type_name.clone())
+                        Some((type_name.clone(), namespace))
                     } else {
                         None
                     };
                     let fname = callee.name.clone();
                     frames.push(Frame {
                         fn_idx: method_fid,
+                        loop_counts: HashMap::new(),
+                        receiver: Some(recv.clone()), defaults_active: true,
                         ip: 0,
+                        provided,
                         slots,
                         retag_matrix,
+                        has_call_site: true,
+                        retag_instance: None,
                     });
+                    self.push_source_frame(callee, Some(span));
                     self.host.push_call_frame(&fname);
                     self.host.push_call_site_line(span.line);
+                }
+                Op::PluginCallArgs(name_idx,layout) => {
+                    let name=fun.constants[name_idx].as_display();let names=&fun.call_layouts[layout];
+                    let values=take_actuals(&mut stack,names.len()).map_err(|m|self.err_at(span,m))?;
+                    let reg=self.host.plugins.get(&name).cloned().ok_or_else(||self.err_at(span,format!("unknown function `{name}`")))?;
+                    let bound=crate::arguments::bind(&reg.params,names,&values,false).map_err(|m|self.err_at(span,m))?;
+                    stack.push(crate::host::plugin::call_registered(&mut self.host,&name,&bound).map_err(|m|self.err_at(span,m))?);
                 }
                 Op::PluginCall(name_idx, argc) => {
                     let argc = argc as usize;
@@ -628,14 +796,9 @@ impl Vm {
                             vals.push(pop(&mut stack).map_err(|m| self.err_at(span, m))?);
                         }
                         vals.reverse();
-                        let reg = self
-                            .host
-                            .plugins
-                            .get(&raw_name)
-                            .cloned()
-                            .ok_or_else(|| {
-                                self.err_at(span, format!("unknown function `{raw_name}`"))
-                            })?;
+                        let reg = self.host.plugins.get(&raw_name).cloned().ok_or_else(|| {
+                            self.err_at(span, format!("unknown function `{raw_name}`"))
+                        })?;
                         if reg.params.len() != vals.len() {
                             return Err(self.err_at(
                                 span,
@@ -666,39 +829,58 @@ impl Vm {
                         .map_err(|m| self.err_at(span, m))?;
                     let callee = &program.functions[fid];
                     if !callee.params.is_empty() {
-                        return Err(self.err_at(
-                            span,
-                            format!("call_fn: `{name}` must have no parameters"),
-                        ));
+                        return Err(
+                            self.err_at(span, format!("call_fn: `{name}` must have no parameters"))
+                        );
                     }
-                    let slots = vec![Value::None; callee.locals.len().max(1)];
+                    let slots = vec![None; callee.locals.len().max(1)];
                     let fname = callee.name.clone();
                     frames.push(Frame {
                         fn_idx: fid,
+                        loop_counts: HashMap::new(),
+            receiver: None, defaults_active: true,
                         ip: 0,
+                        provided: Vec::new(),
                         slots,
                         retag_matrix: None,
+                        has_call_site: true,
+                        retag_instance: None,
                     });
+                    self.push_source_frame(callee, Some(span));
                     self.host.push_call_frame(&fname);
                     self.host.push_call_site_line(span.line);
                 }
                 Op::Return => {
                     let ret = pop(&mut stack).unwrap_or(Value::None);
                     let frame = frames.pop();
+                    let constructor=frame.as_ref().and_then(|f|f.retag_instance);
+                    self.diagnostic_frames.pop();
                     self.host.pop_call_frame();
-                    self.host.pop_call_site_line();
+                    if frame.as_ref().is_some_and(|f| f.has_call_site) {
+                        self.host.pop_call_site_line();
+                    }
                     let ret = match frame.and_then(|f| f.retag_matrix) {
-                        Some(ty) => crate::linalg_ops::retag_matrix_like(&ty, ret),
+                        Some((ty,namespace)) => {
+                            let result=crate::linalg_ops::retag_matrix_like(&ty,ret);
+                            if let Some(namespace)=namespace { crate::value::tag_instance(&ty,&namespace,result) } else { result }
+                        },
                         None => ret,
                     };
+                    let ret=if let Some(id)=constructor {let class=&program.functions[id];crate::value::tag_instance(&class.name,&class.module_path,ret)}else{ret};
                     if frames.is_empty() {
                         return Ok(ret);
                     }
                     stack.push(ret);
                 }
             }
+            if print_returns_none{stack.push(Value::None);}
         }
     }
+}
+
+fn take_actuals(stack:&mut Vec<Value>,count:usize)->Result<Vec<Value>,String>{
+    if stack.len()<count{return Err("bytecode argument stack underflow".into());}
+    Ok(stack.split_off(stack.len()-count))
 }
 
 fn resolve_method_fid(program: &Program, start_oi: usize, method_name: &str) -> Option<usize> {
@@ -716,9 +898,12 @@ fn resolve_method_fid(program: &Program, start_oi: usize, method_name: &str) -> 
         {
             return Some(*fid);
         }
-        oi = program.object_bases.get(i).copied().flatten().and_then(|base_flat| {
-            program.objects.iter().position(|(_, f)| *f == base_flat)
-        });
+        oi = program
+            .object_bases
+            .get(i)
+            .copied()
+            .flatten()
+            .and_then(|base_flat| program.objects.iter().position(|(_, f)| *f == base_flat));
     }
     None
 }
@@ -727,44 +912,6 @@ fn pop(stack: &mut Vec<Value>) -> Result<Value, String> {
     stack
         .pop()
         .ok_or_else(|| "bytecode: stack underflow".to_string())
-}
-
-fn add(a: Value, b: Value) -> Result<Value, String> {
-    match (a, b) {
-        (Value::Int(x), Value::Int(y)) => Ok(Value::Int(x + y)),
-        (Value::Num(x), Value::Num(y)) => Ok(Value::Num(x + y)),
-        (Value::Int(x), Value::Num(y)) => Ok(Value::Num(x as f64 + y)),
-        (Value::Num(x), Value::Int(y)) => Ok(Value::Num(x + y as f64)),
-        (Value::Text(x), Value::Text(y)) => Ok(Value::Text(format!("{x}{y}"))),
-        (Value::Text(x), Value::Secret(y)) => Ok(Value::Text(format!("{x}{y}"))),
-        (Value::Secret(x), Value::Text(y)) => Ok(Value::Text(format!("{x}{y}"))),
-        (Value::Secret(x), Value::Secret(y)) => Ok(Value::Text(format!("{x}{y}"))),
-        (Value::Text(x), y) => Ok(Value::Text(format!("{x}{}", y.as_display()))),
-        (x, Value::Text(y)) => Ok(Value::Text(format!("{}{y}", x.as_display()))),
-        (Value::Int(x), y) => Ok(Value::Text(format!("{}{}", x, y.as_display()))),
-        (x, Value::Int(y)) => Ok(Value::Text(format!("{}{y}", x.as_display()))),
-        _ => Err("`+` needs ints, nums, or text".into()),
-    }
-}
-
-
-fn cmp(stack: &mut Vec<Value>, pred: impl Fn(std::cmp::Ordering) -> bool) -> Result<(), String> {
-    let b = pop(stack)?;
-    let a = pop(stack)?;
-    let ord = match (&a, &b) {
-        (Value::Int(x), Value::Int(y)) => x.cmp(y),
-        (Value::Num(x), Value::Num(y)) => x.partial_cmp(y).unwrap_or(std::cmp::Ordering::Equal),
-        (Value::Int(x), Value::Num(y)) => {
-            (*x as f64).partial_cmp(y).unwrap_or(std::cmp::Ordering::Equal)
-        }
-        (Value::Num(x), Value::Int(y)) => {
-            x.partial_cmp(&(*y as f64)).unwrap_or(std::cmp::Ordering::Equal)
-        }
-        (Value::Text(x), Value::Text(y)) => x.cmp(y),
-        _ => return Err("comparison needs two ints/nums or two texts".into()),
-    };
-    stack.push(Value::Bool(pred(ord)));
-    Ok(())
 }
 
 fn instance_type_name_bc(v: &Value) -> Result<String, String> {
@@ -781,42 +928,24 @@ fn instance_type_name_bc(v: &Value) -> Result<String, String> {
     }
 }
 
-fn tag_instance_value(type_name: &str, value: Value) -> Value {
-    match value {
-        Value::Map(mut entries) => {
-            // Always stamp the constructed type so an explicit `` `self` = > Parent ``
-            // inside a child constructor still yields the most specific `_type`.
-            entries.retain(|(k, _)| k != "_type");
-            entries.insert(0, ("_type".into(), Value::Text(type_name.into())));
-            Value::Map(entries)
-        }
-        Value::None => Value::Map(vec![("_type".into(), Value::Text(type_name.into()))]),
-        other => Value::Map(vec![
-            ("_type".into(), Value::Text(type_name.into())),
-            ("value".into(), other),
-        ]),
-    }
+fn resolve_fn_dynamic(program: &Program, current: usize, name: &str) -> Result<usize, String> {
+    super::names::lookup(program,current,name).ok_or_else(||format!("call_fn: unknown function `{name}`"))
 }
 
-fn resolve_fn_dynamic(program: &Program, current: usize, name: &str) -> Result<usize, String> {
-    for &cid in &program.children[current] {
-        if program.functions[cid].name == name {
-            return Ok(cid);
-        }
+/// Bind already evaluated actuals; no expression or foreign effect runs here.
+fn bind_call_values(callee: &FnChunk, layout: &[Option<String>], values: Vec<Value>)
+    -> std::result::Result<(Vec<Option<Value>>, Vec<bool>), String> {
+    if layout.len()!=values.len(){return Err("argument layout/value count mismatch".into());}
+    let plan=crate::arguments::plan_with_omissions(&callee.params,layout,&callee.defaults)?;
+    let mut slots = vec![None; callee.locals.len().max(1)];
+    for (name,actual) in plan.assignments {
+        if let Some(index)=callee.locals.iter().position(|local|local==&name){slots[index]=Some(values[actual].clone());}
     }
-    let mut parent = program.parents[current];
-    while let Some(pid) = parent {
-        for &cid in &program.children[pid] {
-            if program.functions[cid].name == name {
-                return Ok(cid);
-            }
-        }
-        parent = program.parents[pid];
-    }
-    for (i, f) in program.functions.iter().enumerate() {
-        if program.parents[i].is_none() && f.name == name {
-            return Ok(i);
-        }
-    }
-    Err(format!("call_fn: unknown function `{name}`"))
+    let provided=initial_presence(&slots,callee.params.len());
+    Ok((slots, provided))
+}
+
+/// Presence is derived once, before defaults, rather than independently rebound.
+fn initial_presence(slots:&[Option<Value>],parameters:usize)->Vec<bool> {
+    slots.iter().take(parameters).map(Option::is_some).collect()
 }

@@ -1,0 +1,1960 @@
+[
+  {
+    "version": 1,
+    "id": "invoice-17-17-python",
+    "family": "invoice",
+    "seed": 17,
+    "size": 17,
+    "producer": "python",
+    "consumer": "node",
+    "input": [
+      {
+        "id": "9007199254740993",
+        "region": "",
+        "units": 3,
+        "cents": 4972,
+        "discount": 3333,
+        "status": "posted"
+      },
+      {
+        "id": "9007199254740993",
+        "region": "__proto__",
+        "units": -1,
+        "cents": 8851,
+        "discount": 3333,
+        "status": "void"
+      },
+      {
+        "id": "9007199254740993",
+        "region": "华东",
+        "units": -3,
+        "cents": 4079,
+        "discount": 10000,
+        "status": "posted"
+      },
+      {
+        "id": "9007199254740994",
+        "region": "😀",
+        "units": 1,
+        "cents": 8219,
+        "discount": 3333,
+        "status": "posted"
+      },
+      {
+        "id": "9007199254740994",
+        "region": "😀",
+        "units": -1,
+        "cents": 9031,
+        "discount": 0,
+        "status": "posted"
+      },
+      {
+        "id": "9007199254740994",
+        "region": "EU",
+        "units": 0,
+        "cents": 2473,
+        "discount": 500,
+        "status": "posted"
+      },
+      {
+        "id": "9007199254740995",
+        "region": "__proto__",
+        "units": 5,
+        "cents": 2024,
+        "discount": 0,
+        "status": "posted"
+      },
+      {
+        "id": "9007199254740995",
+        "region": "__proto__",
+        "units": 3,
+        "cents": 1342,
+        "discount": 10000,
+        "status": "posted"
+      },
+      {
+        "id": "9007199254740995",
+        "region": "",
+        "units": -1,
+        "cents": 6696,
+        "discount": 3333,
+        "status": "void"
+      },
+      {
+        "id": "9007199254740996",
+        "region": "华东",
+        "units": 3,
+        "cents": 6099,
+        "discount": 0,
+        "status": "posted"
+      },
+      {
+        "id": "9007199254740996",
+        "region": "__proto__",
+        "units": -3,
+        "cents": 7820,
+        "discount": 3333,
+        "status": "posted"
+      },
+      {
+        "id": "9007199254740996",
+        "region": "",
+        "units": -3,
+        "cents": 6644,
+        "discount": 500,
+        "status": "posted"
+      },
+      {
+        "id": "9007199254740997",
+        "region": "华东",
+        "units": 5,
+        "cents": 3504,
+        "discount": 500,
+        "status": "posted"
+      },
+      {
+        "id": "9007199254740997",
+        "region": "",
+        "units": 2,
+        "cents": 953,
+        "discount": 3333,
+        "status": "posted"
+      },
+      {
+        "id": "9007199254740997",
+        "region": "华东",
+        "units": 1,
+        "cents": 3158,
+        "discount": 500,
+        "status": "posted"
+      },
+      {
+        "id": "9007199254740998",
+        "region": "__proto__",
+        "units": 7,
+        "cents": 5040,
+        "discount": 3333,
+        "status": "void"
+      },
+      {
+        "id": "9007199254740998",
+        "region": "__proto__",
+        "units": -1,
+        "cents": 5441,
+        "discount": 0,
+        "status": "posted"
+      }
+    ],
+    "bridge": [
+      {
+        "id": "9007199254740993",
+        "region": "",
+        "units": 3,
+        "cents": 4972,
+        "discount": 3333
+      },
+      {
+        "id": "9007199254740994",
+        "region": "😀",
+        "units": 1,
+        "cents": 8219,
+        "discount": 3333
+      },
+      {
+        "id": "9007199254740995",
+        "region": "__proto__",
+        "units": 5,
+        "cents": 2024,
+        "discount": 0
+      },
+      {
+        "id": "9007199254740996",
+        "region": "华东",
+        "units": 3,
+        "cents": 6099,
+        "discount": 0
+      },
+      {
+        "id": "9007199254740997",
+        "region": "华东",
+        "units": 5,
+        "cents": 3504,
+        "discount": 500
+      },
+      {
+        "id": "9007199254740998",
+        "region": "__proto__",
+        "units": -1,
+        "cents": 5441,
+        "discount": 0
+      }
+    ],
+    "answer": [
+      {
+        "region": "__proto__",
+        "invoices": 2,
+        "net_cents": 4679
+      },
+      {
+        "region": "华东",
+        "invoices": 2,
+        "net_cents": 34941
+      },
+      {
+        "region": "",
+        "invoices": 1,
+        "net_cents": 9944
+      },
+      {
+        "region": "😀",
+        "invoices": 1,
+        "net_cents": 5479
+      }
+    ]
+  },
+  {
+    "version": 1,
+    "id": "invoice-17-17-node",
+    "family": "invoice",
+    "seed": 17,
+    "size": 17,
+    "producer": "node",
+    "consumer": "python",
+    "input": [
+      {
+        "id": "9007199254740993",
+        "region": "",
+        "units": 3,
+        "cents": 4972,
+        "discount": 3333,
+        "status": "posted"
+      },
+      {
+        "id": "9007199254740993",
+        "region": "__proto__",
+        "units": -1,
+        "cents": 8851,
+        "discount": 3333,
+        "status": "void"
+      },
+      {
+        "id": "9007199254740993",
+        "region": "华东",
+        "units": -3,
+        "cents": 4079,
+        "discount": 10000,
+        "status": "posted"
+      },
+      {
+        "id": "9007199254740994",
+        "region": "😀",
+        "units": 1,
+        "cents": 8219,
+        "discount": 3333,
+        "status": "posted"
+      },
+      {
+        "id": "9007199254740994",
+        "region": "😀",
+        "units": -1,
+        "cents": 9031,
+        "discount": 0,
+        "status": "posted"
+      },
+      {
+        "id": "9007199254740994",
+        "region": "EU",
+        "units": 0,
+        "cents": 2473,
+        "discount": 500,
+        "status": "posted"
+      },
+      {
+        "id": "9007199254740995",
+        "region": "__proto__",
+        "units": 5,
+        "cents": 2024,
+        "discount": 0,
+        "status": "posted"
+      },
+      {
+        "id": "9007199254740995",
+        "region": "__proto__",
+        "units": 3,
+        "cents": 1342,
+        "discount": 10000,
+        "status": "posted"
+      },
+      {
+        "id": "9007199254740995",
+        "region": "",
+        "units": -1,
+        "cents": 6696,
+        "discount": 3333,
+        "status": "void"
+      },
+      {
+        "id": "9007199254740996",
+        "region": "华东",
+        "units": 3,
+        "cents": 6099,
+        "discount": 0,
+        "status": "posted"
+      },
+      {
+        "id": "9007199254740996",
+        "region": "__proto__",
+        "units": -3,
+        "cents": 7820,
+        "discount": 3333,
+        "status": "posted"
+      },
+      {
+        "id": "9007199254740996",
+        "region": "",
+        "units": -3,
+        "cents": 6644,
+        "discount": 500,
+        "status": "posted"
+      },
+      {
+        "id": "9007199254740997",
+        "region": "华东",
+        "units": 5,
+        "cents": 3504,
+        "discount": 500,
+        "status": "posted"
+      },
+      {
+        "id": "9007199254740997",
+        "region": "",
+        "units": 2,
+        "cents": 953,
+        "discount": 3333,
+        "status": "posted"
+      },
+      {
+        "id": "9007199254740997",
+        "region": "华东",
+        "units": 1,
+        "cents": 3158,
+        "discount": 500,
+        "status": "posted"
+      },
+      {
+        "id": "9007199254740998",
+        "region": "__proto__",
+        "units": 7,
+        "cents": 5040,
+        "discount": 3333,
+        "status": "void"
+      },
+      {
+        "id": "9007199254740998",
+        "region": "__proto__",
+        "units": -1,
+        "cents": 5441,
+        "discount": 0,
+        "status": "posted"
+      }
+    ],
+    "bridge": [
+      {
+        "id": "9007199254740993",
+        "region": "",
+        "units": 3,
+        "cents": 4972,
+        "discount": 3333
+      },
+      {
+        "id": "9007199254740994",
+        "region": "😀",
+        "units": 1,
+        "cents": 8219,
+        "discount": 3333
+      },
+      {
+        "id": "9007199254740995",
+        "region": "__proto__",
+        "units": 5,
+        "cents": 2024,
+        "discount": 0
+      },
+      {
+        "id": "9007199254740996",
+        "region": "华东",
+        "units": 3,
+        "cents": 6099,
+        "discount": 0
+      },
+      {
+        "id": "9007199254740997",
+        "region": "华东",
+        "units": 5,
+        "cents": 3504,
+        "discount": 500
+      },
+      {
+        "id": "9007199254740998",
+        "region": "__proto__",
+        "units": -1,
+        "cents": 5441,
+        "discount": 0
+      }
+    ],
+    "answer": [
+      {
+        "region": "__proto__",
+        "invoices": 2,
+        "net_cents": 4679
+      },
+      {
+        "region": "华东",
+        "invoices": 2,
+        "net_cents": 34941
+      },
+      {
+        "region": "",
+        "invoices": 1,
+        "net_cents": 9944
+      },
+      {
+        "region": "😀",
+        "invoices": 1,
+        "net_cents": 5479
+      }
+    ]
+  },
+  {
+    "version": 1,
+    "id": "routes-17-17-python",
+    "family": "routes",
+    "seed": 17,
+    "size": 17,
+    "producer": "python",
+    "consumer": "node",
+    "input": {
+      "source": "A",
+      "nodes": [
+        "A",
+        "B",
+        "C",
+        "D",
+        "😀",
+        "",
+        "孤岛"
+      ],
+      "edges": [
+        {
+          "from": "A",
+          "to": "B",
+          "weight": 0
+        },
+        {
+          "from": "A",
+          "to": "B",
+          "weight": 9
+        },
+        {
+          "from": "B",
+          "to": "C",
+          "weight": 2
+        },
+        {
+          "from": "A",
+          "to": "A",
+          "weight": 0
+        },
+        {
+          "from": "C",
+          "to": "D",
+          "weight": -1
+        },
+        {
+          "from": "😀",
+          "to": "D",
+          "weight": 8
+        },
+        {
+          "from": "C",
+          "to": "C",
+          "weight": 4
+        },
+        {
+          "from": "",
+          "to": "",
+          "weight": 16
+        },
+        {
+          "from": "",
+          "to": "C",
+          "weight": 2
+        },
+        {
+          "from": "A",
+          "to": "B",
+          "weight": 11
+        },
+        {
+          "from": "",
+          "to": "D",
+          "weight": 7
+        },
+        {
+          "from": "😀",
+          "to": "C",
+          "weight": 19
+        },
+        {
+          "from": "",
+          "to": "",
+          "weight": 11
+        },
+        {
+          "from": "B",
+          "to": "😀",
+          "weight": 0
+        },
+        {
+          "from": "B",
+          "to": "B",
+          "weight": 3
+        },
+        {
+          "from": "",
+          "to": "😀",
+          "weight": 16
+        },
+        {
+          "from": "",
+          "to": "B",
+          "weight": 9
+        }
+      ]
+    },
+    "bridge": {
+      "source": "A",
+      "nodes": [
+        "A",
+        "B",
+        "C",
+        "D",
+        "孤岛",
+        "",
+        "😀"
+      ],
+      "edges": [
+        {
+          "from": "A",
+          "to": "A",
+          "weight": 0
+        },
+        {
+          "from": "A",
+          "to": "B",
+          "weight": 0
+        },
+        {
+          "from": "B",
+          "to": "B",
+          "weight": 3
+        },
+        {
+          "from": "B",
+          "to": "C",
+          "weight": 2
+        },
+        {
+          "from": "B",
+          "to": "😀",
+          "weight": 0
+        },
+        {
+          "from": "C",
+          "to": "C",
+          "weight": 4
+        },
+        {
+          "from": "",
+          "to": "B",
+          "weight": 9
+        },
+        {
+          "from": "",
+          "to": "C",
+          "weight": 2
+        },
+        {
+          "from": "",
+          "to": "D",
+          "weight": 7
+        },
+        {
+          "from": "",
+          "to": "",
+          "weight": 11
+        },
+        {
+          "from": "",
+          "to": "😀",
+          "weight": 16
+        },
+        {
+          "from": "😀",
+          "to": "C",
+          "weight": 19
+        },
+        {
+          "from": "😀",
+          "to": "D",
+          "weight": 8
+        }
+      ]
+    },
+    "answer": [
+      {
+        "node": "A",
+        "distance": 0
+      },
+      {
+        "node": "B",
+        "distance": 0
+      },
+      {
+        "node": "C",
+        "distance": 2
+      },
+      {
+        "node": "D",
+        "distance": 8
+      },
+      {
+        "node": "孤岛",
+        "distance": null
+      },
+      {
+        "node": "",
+        "distance": null
+      },
+      {
+        "node": "😀",
+        "distance": 0
+      }
+    ]
+  },
+  {
+    "version": 1,
+    "id": "routes-17-17-node",
+    "family": "routes",
+    "seed": 17,
+    "size": 17,
+    "producer": "node",
+    "consumer": "python",
+    "input": {
+      "source": "A",
+      "nodes": [
+        "A",
+        "B",
+        "C",
+        "D",
+        "😀",
+        "",
+        "孤岛"
+      ],
+      "edges": [
+        {
+          "from": "A",
+          "to": "B",
+          "weight": 0
+        },
+        {
+          "from": "A",
+          "to": "B",
+          "weight": 9
+        },
+        {
+          "from": "B",
+          "to": "C",
+          "weight": 2
+        },
+        {
+          "from": "A",
+          "to": "A",
+          "weight": 0
+        },
+        {
+          "from": "C",
+          "to": "D",
+          "weight": -1
+        },
+        {
+          "from": "😀",
+          "to": "D",
+          "weight": 8
+        },
+        {
+          "from": "C",
+          "to": "C",
+          "weight": 4
+        },
+        {
+          "from": "",
+          "to": "",
+          "weight": 16
+        },
+        {
+          "from": "",
+          "to": "C",
+          "weight": 2
+        },
+        {
+          "from": "A",
+          "to": "B",
+          "weight": 11
+        },
+        {
+          "from": "",
+          "to": "D",
+          "weight": 7
+        },
+        {
+          "from": "😀",
+          "to": "C",
+          "weight": 19
+        },
+        {
+          "from": "",
+          "to": "",
+          "weight": 11
+        },
+        {
+          "from": "B",
+          "to": "😀",
+          "weight": 0
+        },
+        {
+          "from": "B",
+          "to": "B",
+          "weight": 3
+        },
+        {
+          "from": "",
+          "to": "😀",
+          "weight": 16
+        },
+        {
+          "from": "",
+          "to": "B",
+          "weight": 9
+        }
+      ]
+    },
+    "bridge": {
+      "source": "A",
+      "nodes": [
+        "A",
+        "B",
+        "C",
+        "D",
+        "孤岛",
+        "",
+        "😀"
+      ],
+      "edges": [
+        {
+          "from": "A",
+          "to": "A",
+          "weight": 0
+        },
+        {
+          "from": "A",
+          "to": "B",
+          "weight": 0
+        },
+        {
+          "from": "B",
+          "to": "B",
+          "weight": 3
+        },
+        {
+          "from": "B",
+          "to": "C",
+          "weight": 2
+        },
+        {
+          "from": "B",
+          "to": "😀",
+          "weight": 0
+        },
+        {
+          "from": "C",
+          "to": "C",
+          "weight": 4
+        },
+        {
+          "from": "",
+          "to": "B",
+          "weight": 9
+        },
+        {
+          "from": "",
+          "to": "C",
+          "weight": 2
+        },
+        {
+          "from": "",
+          "to": "D",
+          "weight": 7
+        },
+        {
+          "from": "",
+          "to": "",
+          "weight": 11
+        },
+        {
+          "from": "",
+          "to": "😀",
+          "weight": 16
+        },
+        {
+          "from": "😀",
+          "to": "C",
+          "weight": 19
+        },
+        {
+          "from": "😀",
+          "to": "D",
+          "weight": 8
+        }
+      ]
+    },
+    "answer": [
+      {
+        "node": "A",
+        "distance": 0
+      },
+      {
+        "node": "B",
+        "distance": 0
+      },
+      {
+        "node": "C",
+        "distance": 2
+      },
+      {
+        "node": "D",
+        "distance": 8
+      },
+      {
+        "node": "孤岛",
+        "distance": null
+      },
+      {
+        "node": "",
+        "distance": null
+      },
+      {
+        "node": "😀",
+        "distance": 0
+      }
+    ]
+  },
+  {
+    "version": 1,
+    "id": "concordance-17-17-python",
+    "family": "concordance",
+    "seed": 17,
+    "size": 17,
+    "producer": "python",
+    "consumer": "node",
+    "input": [
+      {
+        "id": "9007199254740993",
+        "text": "café café A __proto__ 😀 CAFÉ alpha CAFÉ constructor ß constructor constructor"
+      },
+      {
+        "id": "9007199254740994",
+        "text": "alpha Ä"
+      },
+      {
+        "id": "9007199254740995",
+        "text": "constructor\n😀"
+      },
+      {
+        "id": "9007199254740996",
+        "text": "😀\nconstructor\n\ncafé\nÄ"
+      },
+      {
+        "id": "9007199254740997",
+        "text": "alpha A constructor constructor alpha Ä café Ä __proto__ café"
+      },
+      {
+        "id": "9007199254740998",
+        "text": "😀 Ä ß A CAFÉ"
+      },
+      {
+        "id": "9007199254740999",
+        "text": "alpha\nÄ\nÄ\nCAFÉ\n__proto__\nconstructor\n😀\nalpha"
+      },
+      {
+        "id": "9007199254741000",
+        "text": "café\tcafé\tA\tÄ\t😀\t__proto__\tcafé\tÄ\talpha\tÄ"
+      },
+      {
+        "id": "9007199254741001",
+        "text": "\t__proto__\tcafé\tÄ\talpha\talpha\tÄ"
+      },
+      {
+        "id": "9007199254741002",
+        "text": "ß\nalpha\nalpha\nconstructor\nA\nalpha"
+      },
+      {
+        "id": "9007199254741003",
+        "text": "A\nCAFÉ\nconstructor\n😀\nconstructor\nalpha\nconstructor\nÄ\nalpha\nÄ"
+      },
+      {
+        "id": "9007199254741004",
+        "text": "CAFÉ\talpha\tß\t😀\t😀\talpha\tCAFÉ\talpha\t😀\tconstructor\tÄ\tconstructor\t😀"
+      },
+      {
+        "id": "9007199254741005",
+        "text": "😀 😀 ß"
+      },
+      {
+        "id": "9007199254741006",
+        "text": "CAFÉ ß constructor alpha 😀 alpha 😀 😀 Ä constructor alpha A"
+      },
+      {
+        "id": "9007199254741007",
+        "text": "café\nA\nalpha\nCAFÉ\nß\nß\nÄ\nA\nÄ"
+      },
+      {
+        "id": "9007199254741008",
+        "text": "ß\nconstructor\nA\n😀\nß\nCAFÉ\nA"
+      },
+      {
+        "id": "9007199254741009",
+        "text": "alpha café café Ä Ä  Ä A __proto__ café CAFÉ __proto__ __proto__"
+      }
+    ],
+    "bridge": [
+      {
+        "id": "9007199254740993",
+        "tokens": [
+          "café",
+          "café",
+          "a",
+          "__proto__",
+          "😀",
+          "cafÉ",
+          "alpha",
+          "cafÉ",
+          "constructor",
+          "ß",
+          "constructor",
+          "constructor"
+        ]
+      },
+      {
+        "id": "9007199254740994",
+        "tokens": [
+          "alpha",
+          "Ä"
+        ]
+      },
+      {
+        "id": "9007199254740995",
+        "tokens": [
+          "constructor",
+          "😀"
+        ]
+      },
+      {
+        "id": "9007199254740996",
+        "tokens": [
+          "😀",
+          "constructor",
+          "",
+          "café",
+          "Ä"
+        ]
+      },
+      {
+        "id": "9007199254740997",
+        "tokens": [
+          "alpha",
+          "a",
+          "constructor",
+          "constructor",
+          "alpha",
+          "Ä",
+          "café",
+          "Ä",
+          "__proto__",
+          "café"
+        ]
+      },
+      {
+        "id": "9007199254740998",
+        "tokens": [
+          "😀",
+          "Ä",
+          "ß",
+          "a",
+          "cafÉ"
+        ]
+      },
+      {
+        "id": "9007199254740999",
+        "tokens": [
+          "alpha",
+          "Ä",
+          "Ä",
+          "cafÉ",
+          "__proto__",
+          "constructor",
+          "😀",
+          "alpha"
+        ]
+      },
+      {
+        "id": "9007199254741000",
+        "tokens": [
+          "café",
+          "café",
+          "a",
+          "Ä",
+          "😀",
+          "__proto__",
+          "café",
+          "Ä",
+          "alpha",
+          "Ä"
+        ]
+      },
+      {
+        "id": "9007199254741001",
+        "tokens": [
+          "",
+          "__proto__",
+          "café",
+          "Ä",
+          "alpha",
+          "alpha",
+          "Ä"
+        ]
+      },
+      {
+        "id": "9007199254741002",
+        "tokens": [
+          "ß",
+          "alpha",
+          "alpha",
+          "constructor",
+          "a",
+          "alpha"
+        ]
+      },
+      {
+        "id": "9007199254741003",
+        "tokens": [
+          "a",
+          "cafÉ",
+          "constructor",
+          "😀",
+          "constructor",
+          "alpha",
+          "constructor",
+          "Ä",
+          "alpha",
+          "Ä"
+        ]
+      },
+      {
+        "id": "9007199254741004",
+        "tokens": [
+          "cafÉ",
+          "alpha",
+          "ß",
+          "😀",
+          "😀",
+          "alpha",
+          "cafÉ",
+          "alpha",
+          "😀",
+          "constructor",
+          "Ä",
+          "constructor",
+          "😀"
+        ]
+      },
+      {
+        "id": "9007199254741005",
+        "tokens": [
+          "😀",
+          "😀",
+          "ß"
+        ]
+      },
+      {
+        "id": "9007199254741006",
+        "tokens": [
+          "cafÉ",
+          "ß",
+          "constructor",
+          "alpha",
+          "😀",
+          "alpha",
+          "😀",
+          "😀",
+          "Ä",
+          "constructor",
+          "alpha",
+          "a"
+        ]
+      },
+      {
+        "id": "9007199254741007",
+        "tokens": [
+          "café",
+          "a",
+          "alpha",
+          "cafÉ",
+          "ß",
+          "ß",
+          "Ä",
+          "a",
+          "Ä"
+        ]
+      },
+      {
+        "id": "9007199254741008",
+        "tokens": [
+          "ß",
+          "constructor",
+          "a",
+          "😀",
+          "ß",
+          "cafÉ",
+          "a"
+        ]
+      },
+      {
+        "id": "9007199254741009",
+        "tokens": [
+          "alpha",
+          "café",
+          "café",
+          "Ä",
+          "Ä",
+          "",
+          "Ä",
+          "a",
+          "__proto__",
+          "café",
+          "cafÉ",
+          "__proto__",
+          "__proto__"
+        ]
+      }
+    ],
+    "answer": [
+      {
+        "word": "__proto__",
+        "occurrences": 8,
+        "documents": 6
+      },
+      {
+        "word": "a",
+        "occurrences": 12,
+        "documents": 10
+      },
+      {
+        "word": "alpha",
+        "occurrences": 22,
+        "documents": 12
+      },
+      {
+        "word": "cafÉ",
+        "occurrences": 11,
+        "documents": 9
+      },
+      {
+        "word": "café",
+        "occurrences": 13,
+        "documents": 7
+      },
+      {
+        "word": "constructor",
+        "occurrences": 17,
+        "documents": 10
+      },
+      {
+        "word": "Ä",
+        "occurrences": 21,
+        "documents": 12
+      },
+      {
+        "word": "ß",
+        "occurrences": 10,
+        "documents": 8
+      },
+      {
+        "word": "",
+        "occurrences": 3,
+        "documents": 3
+      },
+      {
+        "word": "😀",
+        "occurrences": 17,
+        "documents": 11
+      }
+    ]
+  },
+  {
+    "version": 1,
+    "id": "concordance-17-17-node",
+    "family": "concordance",
+    "seed": 17,
+    "size": 17,
+    "producer": "node",
+    "consumer": "python",
+    "input": [
+      {
+        "id": "9007199254740993",
+        "text": "café café A __proto__ 😀 CAFÉ alpha CAFÉ constructor ß constructor constructor"
+      },
+      {
+        "id": "9007199254740994",
+        "text": "alpha Ä"
+      },
+      {
+        "id": "9007199254740995",
+        "text": "constructor\n😀"
+      },
+      {
+        "id": "9007199254740996",
+        "text": "😀\nconstructor\n\ncafé\nÄ"
+      },
+      {
+        "id": "9007199254740997",
+        "text": "alpha A constructor constructor alpha Ä café Ä __proto__ café"
+      },
+      {
+        "id": "9007199254740998",
+        "text": "😀 Ä ß A CAFÉ"
+      },
+      {
+        "id": "9007199254740999",
+        "text": "alpha\nÄ\nÄ\nCAFÉ\n__proto__\nconstructor\n😀\nalpha"
+      },
+      {
+        "id": "9007199254741000",
+        "text": "café\tcafé\tA\tÄ\t😀\t__proto__\tcafé\tÄ\talpha\tÄ"
+      },
+      {
+        "id": "9007199254741001",
+        "text": "\t__proto__\tcafé\tÄ\talpha\talpha\tÄ"
+      },
+      {
+        "id": "9007199254741002",
+        "text": "ß\nalpha\nalpha\nconstructor\nA\nalpha"
+      },
+      {
+        "id": "9007199254741003",
+        "text": "A\nCAFÉ\nconstructor\n😀\nconstructor\nalpha\nconstructor\nÄ\nalpha\nÄ"
+      },
+      {
+        "id": "9007199254741004",
+        "text": "CAFÉ\talpha\tß\t😀\t😀\talpha\tCAFÉ\talpha\t😀\tconstructor\tÄ\tconstructor\t😀"
+      },
+      {
+        "id": "9007199254741005",
+        "text": "😀 😀 ß"
+      },
+      {
+        "id": "9007199254741006",
+        "text": "CAFÉ ß constructor alpha 😀 alpha 😀 😀 Ä constructor alpha A"
+      },
+      {
+        "id": "9007199254741007",
+        "text": "café\nA\nalpha\nCAFÉ\nß\nß\nÄ\nA\nÄ"
+      },
+      {
+        "id": "9007199254741008",
+        "text": "ß\nconstructor\nA\n😀\nß\nCAFÉ\nA"
+      },
+      {
+        "id": "9007199254741009",
+        "text": "alpha café café Ä Ä  Ä A __proto__ café CAFÉ __proto__ __proto__"
+      }
+    ],
+    "bridge": [
+      {
+        "id": "9007199254740993",
+        "tokens": [
+          "café",
+          "café",
+          "a",
+          "__proto__",
+          "😀",
+          "cafÉ",
+          "alpha",
+          "cafÉ",
+          "constructor",
+          "ß",
+          "constructor",
+          "constructor"
+        ]
+      },
+      {
+        "id": "9007199254740994",
+        "tokens": [
+          "alpha",
+          "Ä"
+        ]
+      },
+      {
+        "id": "9007199254740995",
+        "tokens": [
+          "constructor",
+          "😀"
+        ]
+      },
+      {
+        "id": "9007199254740996",
+        "tokens": [
+          "😀",
+          "constructor",
+          "",
+          "café",
+          "Ä"
+        ]
+      },
+      {
+        "id": "9007199254740997",
+        "tokens": [
+          "alpha",
+          "a",
+          "constructor",
+          "constructor",
+          "alpha",
+          "Ä",
+          "café",
+          "Ä",
+          "__proto__",
+          "café"
+        ]
+      },
+      {
+        "id": "9007199254740998",
+        "tokens": [
+          "😀",
+          "Ä",
+          "ß",
+          "a",
+          "cafÉ"
+        ]
+      },
+      {
+        "id": "9007199254740999",
+        "tokens": [
+          "alpha",
+          "Ä",
+          "Ä",
+          "cafÉ",
+          "__proto__",
+          "constructor",
+          "😀",
+          "alpha"
+        ]
+      },
+      {
+        "id": "9007199254741000",
+        "tokens": [
+          "café",
+          "café",
+          "a",
+          "Ä",
+          "😀",
+          "__proto__",
+          "café",
+          "Ä",
+          "alpha",
+          "Ä"
+        ]
+      },
+      {
+        "id": "9007199254741001",
+        "tokens": [
+          "",
+          "__proto__",
+          "café",
+          "Ä",
+          "alpha",
+          "alpha",
+          "Ä"
+        ]
+      },
+      {
+        "id": "9007199254741002",
+        "tokens": [
+          "ß",
+          "alpha",
+          "alpha",
+          "constructor",
+          "a",
+          "alpha"
+        ]
+      },
+      {
+        "id": "9007199254741003",
+        "tokens": [
+          "a",
+          "cafÉ",
+          "constructor",
+          "😀",
+          "constructor",
+          "alpha",
+          "constructor",
+          "Ä",
+          "alpha",
+          "Ä"
+        ]
+      },
+      {
+        "id": "9007199254741004",
+        "tokens": [
+          "cafÉ",
+          "alpha",
+          "ß",
+          "😀",
+          "😀",
+          "alpha",
+          "cafÉ",
+          "alpha",
+          "😀",
+          "constructor",
+          "Ä",
+          "constructor",
+          "😀"
+        ]
+      },
+      {
+        "id": "9007199254741005",
+        "tokens": [
+          "😀",
+          "😀",
+          "ß"
+        ]
+      },
+      {
+        "id": "9007199254741006",
+        "tokens": [
+          "cafÉ",
+          "ß",
+          "constructor",
+          "alpha",
+          "😀",
+          "alpha",
+          "😀",
+          "😀",
+          "Ä",
+          "constructor",
+          "alpha",
+          "a"
+        ]
+      },
+      {
+        "id": "9007199254741007",
+        "tokens": [
+          "café",
+          "a",
+          "alpha",
+          "cafÉ",
+          "ß",
+          "ß",
+          "Ä",
+          "a",
+          "Ä"
+        ]
+      },
+      {
+        "id": "9007199254741008",
+        "tokens": [
+          "ß",
+          "constructor",
+          "a",
+          "😀",
+          "ß",
+          "cafÉ",
+          "a"
+        ]
+      },
+      {
+        "id": "9007199254741009",
+        "tokens": [
+          "alpha",
+          "café",
+          "café",
+          "Ä",
+          "Ä",
+          "",
+          "Ä",
+          "a",
+          "__proto__",
+          "café",
+          "cafÉ",
+          "__proto__",
+          "__proto__"
+        ]
+      }
+    ],
+    "answer": [
+      {
+        "word": "__proto__",
+        "occurrences": 8,
+        "documents": 6
+      },
+      {
+        "word": "a",
+        "occurrences": 12,
+        "documents": 10
+      },
+      {
+        "word": "alpha",
+        "occurrences": 22,
+        "documents": 12
+      },
+      {
+        "word": "cafÉ",
+        "occurrences": 11,
+        "documents": 9
+      },
+      {
+        "word": "café",
+        "occurrences": 13,
+        "documents": 7
+      },
+      {
+        "word": "constructor",
+        "occurrences": 17,
+        "documents": 10
+      },
+      {
+        "word": "Ä",
+        "occurrences": 21,
+        "documents": 12
+      },
+      {
+        "word": "ß",
+        "occurrences": 10,
+        "documents": 8
+      },
+      {
+        "word": "",
+        "occurrences": 3,
+        "documents": 3
+      },
+      {
+        "word": "😀",
+        "occurrences": 17,
+        "documents": 11
+      }
+    ]
+  },
+  {
+    "version": 1,
+    "id": "wine-17-31-python",
+    "family": "wine",
+    "seed": 17,
+    "size": 31,
+    "producer": "python",
+    "consumer": "node",
+    "input": "\"fixed acidity\";\"volatile acidity\";\"citric acid\";\"residual sugar\";\"chlorides\";\"free sulfur dioxide\";\"total sulfur dioxide\";\"density\";\"pH\";\"sulphates\";\"alcohol\";\"quality\"\n7.4;0.7;0;1.9;0.076;11;34;0.9978;3.51;0.56;9.4;5\n7.8;0.88;0;2.6;0.098;25;67;0.9968;3.2;0.68;9.8;5\n7.8;0.76;0.04;2.3;0.092;15;54;0.997;3.26;0.65;9.8;5\n11.2;0.28;0.56;1.9;0.075;17;60;0.998;3.16;0.58;9.8;6\n7.4;0.7;0;1.9;0.076;11;34;0.9978;3.51;0.56;9.4;5\n7.4;0.66;0;1.8;0.075;13;40;0.9978;3.51;0.56;9.4;5\n7.9;0.6;0.06;1.6;0.069;15;59;0.9964;3.3;0.46;9.4;5\n7.3;0.65;0;1.2;0.065;15;21;0.9946;3.39;0.47;10;7\n7.8;0.58;0.02;2;0.073;9;18;0.9968;3.36;0.57;9.5;7\n7.5;0.5;0.36;6.1;0.071;17;102;0.9978;3.35;0.8;10.5;5\n6.7;0.58;0.08;1.8;0.097;15;65;0.9959;3.28;0.54;9.2;5\n7.5;0.5;0.36;6.1;0.071;17;102;0.9978;3.35;0.8;10.5;5\n5.6;0.615;0;1.6;0.089;16;59;0.9943;3.58;0.52;9.9;5\n7.8;0.61;0.29;1.6;0.114;9;29;0.9974;3.26;1.56;9.1;5\n8.9;0.62;0.18;3.8;0.176;52;145;0.9986;3.16;0.88;9.2;5\n8.9;0.62;0.19;3.9;0.17;51;148;0.9986;3.17;0.93;9.2;5\n8.5;0.28;0.56;1.8;0.092;35;103;0.9969;3.3;0.75;10.5;7\n8.1;0.56;0.28;1.7;0.368;16;56;0.9968;3.11;1.28;9.3;5\n7.4;0.59;0.08;4.4;0.086;6;29;0.9974;3.38;0.5;9;4\n7.9;0.32;0.51;1.8;0.341;17;56;0.9969;3.04;1.08;9.2;6\n8.9;0.22;0.48;1.8;0.077;29;60;0.9968;3.39;0.53;9.4;6\n7.6;0.39;0.31;2.3;0.082;23;71;0.9982;3.52;0.65;9.7;5\n7.9;0.43;0.21;1.6;0.106;10;37;0.9966;3.17;0.91;9.5;5\n8.5;0.49;0.11;2.3;0.084;9;67;0.9968;3.17;0.53;9.4;5\n6.9;0.4;0.14;2.4;0.085;21;40;0.9968;3.43;0.63;9.7;6\n6.3;0.39;0.16;1.4;0.08;11;23;0.9955;3.34;0.56;9.3;5\n7.6;0.41;0.24;1.8;0.08;4;11;0.9962;3.28;0.59;9.5;5\n7.9;0.43;0.21;1.6;0.106;10;37;0.9966;3.17;0.91;9.5;5\n7.1;0.71;0;1.9;0.08;14;35;0.9972;3.47;0.55;9.4;5\n7.8;0.645;0;2;0.082;8;16;0.9964;3.38;0.59;9.8;6\n6.7;0.675;0.07;2.4;0.089;17;82;0.9958;3.35;0.54;10.1;5\n",
+    "bridge": [
+      {
+        "quality": 5,
+        "density_ppm": 997800,
+        "ph_cent": 351
+      },
+      {
+        "quality": 5,
+        "density_ppm": 996800,
+        "ph_cent": 320
+      },
+      {
+        "quality": 5,
+        "density_ppm": 997000,
+        "ph_cent": 326
+      },
+      {
+        "quality": 6,
+        "density_ppm": 998000,
+        "ph_cent": 316
+      },
+      {
+        "quality": 5,
+        "density_ppm": 997800,
+        "ph_cent": 351
+      },
+      {
+        "quality": 5,
+        "density_ppm": 997800,
+        "ph_cent": 351
+      },
+      {
+        "quality": 5,
+        "density_ppm": 996400,
+        "ph_cent": 330
+      },
+      {
+        "quality": 7,
+        "density_ppm": 994600,
+        "ph_cent": 339
+      },
+      {
+        "quality": 7,
+        "density_ppm": 996800,
+        "ph_cent": 336
+      },
+      {
+        "quality": 5,
+        "density_ppm": 997800,
+        "ph_cent": 335
+      },
+      {
+        "quality": 5,
+        "density_ppm": 995900,
+        "ph_cent": 328
+      },
+      {
+        "quality": 5,
+        "density_ppm": 997800,
+        "ph_cent": 335
+      },
+      {
+        "quality": 5,
+        "density_ppm": 994300,
+        "ph_cent": 358
+      },
+      {
+        "quality": 5,
+        "density_ppm": 997400,
+        "ph_cent": 326
+      },
+      {
+        "quality": 5,
+        "density_ppm": 998600,
+        "ph_cent": 316
+      },
+      {
+        "quality": 5,
+        "density_ppm": 998600,
+        "ph_cent": 317
+      },
+      {
+        "quality": 7,
+        "density_ppm": 996900,
+        "ph_cent": 330
+      },
+      {
+        "quality": 5,
+        "density_ppm": 996800,
+        "ph_cent": 311
+      },
+      {
+        "quality": 4,
+        "density_ppm": 997400,
+        "ph_cent": 338
+      },
+      {
+        "quality": 6,
+        "density_ppm": 996900,
+        "ph_cent": 304
+      },
+      {
+        "quality": 6,
+        "density_ppm": 996800,
+        "ph_cent": 339
+      },
+      {
+        "quality": 5,
+        "density_ppm": 998200,
+        "ph_cent": 352
+      },
+      {
+        "quality": 5,
+        "density_ppm": 996600,
+        "ph_cent": 317
+      },
+      {
+        "quality": 5,
+        "density_ppm": 996800,
+        "ph_cent": 317
+      },
+      {
+        "quality": 6,
+        "density_ppm": 996800,
+        "ph_cent": 343
+      },
+      {
+        "quality": 5,
+        "density_ppm": 995500,
+        "ph_cent": 334
+      },
+      {
+        "quality": 5,
+        "density_ppm": 996200,
+        "ph_cent": 328
+      },
+      {
+        "quality": 5,
+        "density_ppm": 996600,
+        "ph_cent": 317
+      },
+      {
+        "quality": 5,
+        "density_ppm": 997200,
+        "ph_cent": 347
+      },
+      {
+        "quality": 6,
+        "density_ppm": 996400,
+        "ph_cent": 338
+      },
+      {
+        "quality": 5,
+        "density_ppm": 995800,
+        "ph_cent": 335
+      }
+    ],
+    "answer": [
+      {
+        "quality": 4,
+        "count": 1,
+        "sum_density_ppm": 997400,
+        "min_ph_cent": 338,
+        "max_ph_cent": 338
+      },
+      {
+        "quality": 5,
+        "count": 22,
+        "sum_density_ppm": 21933700,
+        "min_ph_cent": 311,
+        "max_ph_cent": 358
+      },
+      {
+        "quality": 6,
+        "count": 5,
+        "sum_density_ppm": 4984900,
+        "min_ph_cent": 304,
+        "max_ph_cent": 343
+      },
+      {
+        "quality": 7,
+        "count": 3,
+        "sum_density_ppm": 2988300,
+        "min_ph_cent": 330,
+        "max_ph_cent": 339
+      }
+    ]
+  },
+  {
+    "version": 1,
+    "id": "wine-17-31-node",
+    "family": "wine",
+    "seed": 17,
+    "size": 31,
+    "producer": "node",
+    "consumer": "python",
+    "input": "\"fixed acidity\";\"volatile acidity\";\"citric acid\";\"residual sugar\";\"chlorides\";\"free sulfur dioxide\";\"total sulfur dioxide\";\"density\";\"pH\";\"sulphates\";\"alcohol\";\"quality\"\n7.4;0.7;0;1.9;0.076;11;34;0.9978;3.51;0.56;9.4;5\n7.8;0.88;0;2.6;0.098;25;67;0.9968;3.2;0.68;9.8;5\n7.8;0.76;0.04;2.3;0.092;15;54;0.997;3.26;0.65;9.8;5\n11.2;0.28;0.56;1.9;0.075;17;60;0.998;3.16;0.58;9.8;6\n7.4;0.7;0;1.9;0.076;11;34;0.9978;3.51;0.56;9.4;5\n7.4;0.66;0;1.8;0.075;13;40;0.9978;3.51;0.56;9.4;5\n7.9;0.6;0.06;1.6;0.069;15;59;0.9964;3.3;0.46;9.4;5\n7.3;0.65;0;1.2;0.065;15;21;0.9946;3.39;0.47;10;7\n7.8;0.58;0.02;2;0.073;9;18;0.9968;3.36;0.57;9.5;7\n7.5;0.5;0.36;6.1;0.071;17;102;0.9978;3.35;0.8;10.5;5\n6.7;0.58;0.08;1.8;0.097;15;65;0.9959;3.28;0.54;9.2;5\n7.5;0.5;0.36;6.1;0.071;17;102;0.9978;3.35;0.8;10.5;5\n5.6;0.615;0;1.6;0.089;16;59;0.9943;3.58;0.52;9.9;5\n7.8;0.61;0.29;1.6;0.114;9;29;0.9974;3.26;1.56;9.1;5\n8.9;0.62;0.18;3.8;0.176;52;145;0.9986;3.16;0.88;9.2;5\n8.9;0.62;0.19;3.9;0.17;51;148;0.9986;3.17;0.93;9.2;5\n8.5;0.28;0.56;1.8;0.092;35;103;0.9969;3.3;0.75;10.5;7\n8.1;0.56;0.28;1.7;0.368;16;56;0.9968;3.11;1.28;9.3;5\n7.4;0.59;0.08;4.4;0.086;6;29;0.9974;3.38;0.5;9;4\n7.9;0.32;0.51;1.8;0.341;17;56;0.9969;3.04;1.08;9.2;6\n8.9;0.22;0.48;1.8;0.077;29;60;0.9968;3.39;0.53;9.4;6\n7.6;0.39;0.31;2.3;0.082;23;71;0.9982;3.52;0.65;9.7;5\n7.9;0.43;0.21;1.6;0.106;10;37;0.9966;3.17;0.91;9.5;5\n8.5;0.49;0.11;2.3;0.084;9;67;0.9968;3.17;0.53;9.4;5\n6.9;0.4;0.14;2.4;0.085;21;40;0.9968;3.43;0.63;9.7;6\n6.3;0.39;0.16;1.4;0.08;11;23;0.9955;3.34;0.56;9.3;5\n7.6;0.41;0.24;1.8;0.08;4;11;0.9962;3.28;0.59;9.5;5\n7.9;0.43;0.21;1.6;0.106;10;37;0.9966;3.17;0.91;9.5;5\n7.1;0.71;0;1.9;0.08;14;35;0.9972;3.47;0.55;9.4;5\n7.8;0.645;0;2;0.082;8;16;0.9964;3.38;0.59;9.8;6\n6.7;0.675;0.07;2.4;0.089;17;82;0.9958;3.35;0.54;10.1;5\n",
+    "bridge": [
+      {
+        "quality": 5,
+        "density_ppm": 997800,
+        "ph_cent": 351
+      },
+      {
+        "quality": 5,
+        "density_ppm": 996800,
+        "ph_cent": 320
+      },
+      {
+        "quality": 5,
+        "density_ppm": 997000,
+        "ph_cent": 326
+      },
+      {
+        "quality": 6,
+        "density_ppm": 998000,
+        "ph_cent": 316
+      },
+      {
+        "quality": 5,
+        "density_ppm": 997800,
+        "ph_cent": 351
+      },
+      {
+        "quality": 5,
+        "density_ppm": 997800,
+        "ph_cent": 351
+      },
+      {
+        "quality": 5,
+        "density_ppm": 996400,
+        "ph_cent": 330
+      },
+      {
+        "quality": 7,
+        "density_ppm": 994600,
+        "ph_cent": 339
+      },
+      {
+        "quality": 7,
+        "density_ppm": 996800,
+        "ph_cent": 336
+      },
+      {
+        "quality": 5,
+        "density_ppm": 997800,
+        "ph_cent": 335
+      },
+      {
+        "quality": 5,
+        "density_ppm": 995900,
+        "ph_cent": 328
+      },
+      {
+        "quality": 5,
+        "density_ppm": 997800,
+        "ph_cent": 335
+      },
+      {
+        "quality": 5,
+        "density_ppm": 994300,
+        "ph_cent": 358
+      },
+      {
+        "quality": 5,
+        "density_ppm": 997400,
+        "ph_cent": 326
+      },
+      {
+        "quality": 5,
+        "density_ppm": 998600,
+        "ph_cent": 316
+      },
+      {
+        "quality": 5,
+        "density_ppm": 998600,
+        "ph_cent": 317
+      },
+      {
+        "quality": 7,
+        "density_ppm": 996900,
+        "ph_cent": 330
+      },
+      {
+        "quality": 5,
+        "density_ppm": 996800,
+        "ph_cent": 311
+      },
+      {
+        "quality": 4,
+        "density_ppm": 997400,
+        "ph_cent": 338
+      },
+      {
+        "quality": 6,
+        "density_ppm": 996900,
+        "ph_cent": 304
+      },
+      {
+        "quality": 6,
+        "density_ppm": 996800,
+        "ph_cent": 339
+      },
+      {
+        "quality": 5,
+        "density_ppm": 998200,
+        "ph_cent": 352
+      },
+      {
+        "quality": 5,
+        "density_ppm": 996600,
+        "ph_cent": 317
+      },
+      {
+        "quality": 5,
+        "density_ppm": 996800,
+        "ph_cent": 317
+      },
+      {
+        "quality": 6,
+        "density_ppm": 996800,
+        "ph_cent": 343
+      },
+      {
+        "quality": 5,
+        "density_ppm": 995500,
+        "ph_cent": 334
+      },
+      {
+        "quality": 5,
+        "density_ppm": 996200,
+        "ph_cent": 328
+      },
+      {
+        "quality": 5,
+        "density_ppm": 996600,
+        "ph_cent": 317
+      },
+      {
+        "quality": 5,
+        "density_ppm": 997200,
+        "ph_cent": 347
+      },
+      {
+        "quality": 6,
+        "density_ppm": 996400,
+        "ph_cent": 338
+      },
+      {
+        "quality": 5,
+        "density_ppm": 995800,
+        "ph_cent": 335
+      }
+    ],
+    "answer": [
+      {
+        "quality": 4,
+        "count": 1,
+        "sum_density_ppm": 997400,
+        "min_ph_cent": 338,
+        "max_ph_cent": 338
+      },
+      {
+        "quality": 5,
+        "count": 22,
+        "sum_density_ppm": 21933700,
+        "min_ph_cent": 311,
+        "max_ph_cent": 358
+      },
+      {
+        "quality": 6,
+        "count": 5,
+        "sum_density_ppm": 4984900,
+        "min_ph_cent": 304,
+        "max_ph_cent": 343
+      },
+      {
+        "quality": 7,
+        "count": 3,
+        "sum_density_ppm": 2988300,
+        "min_ph_cent": 330,
+        "max_ph_cent": 339
+      }
+    ]
+  }
+]

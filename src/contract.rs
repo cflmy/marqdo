@@ -128,20 +128,20 @@ fn instance_type_name(v: &Value) -> Option<String> {
         })
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ParamContract {
     pub name: String,
     pub ty: Ty,
     pub desc: String,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ReturnContract {
     pub ty: Ty,
     pub desc: String,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FieldContract {
     pub name: String,
     pub ty: Ty,
@@ -150,7 +150,7 @@ pub struct FieldContract {
 }
 
 /// 一份契约（一个契约表块；同单元多表由 [`merge_contract`] 合并）。
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Contract {
     pub params: Vec<ParamContract>,
     pub returns: Option<ReturnContract>,
@@ -503,6 +503,22 @@ pub fn call_arg_diag(
         }
     }
     None
+}
+
+/// Argument blame belongs to the caller; contract evidence belongs to the
+/// declaration. Import aliases must not relocate a contract into the caller.
+pub fn call_arg_diag_in(
+    c: &Contract, unit: &str, bound: &HashMap<String, Value>,
+    call_site: &crate::diagnostics::SourceLocation,
+    declaration: &crate::diagnostics::SourceIdentity,
+) -> Option<Diagnostic> {
+    let mut diag=call_arg_diag(c,unit,bound,call_site.source.path.as_deref(),call_site.span)?
+        .with_source(&call_site.source);
+    let old=c.anchor(call_site.source.path.as_deref());
+    let new=c.anchor(declaration.path.as_deref());
+    diag.doc_anchor=Some(new.clone());
+    diag.suggestion=diag.suggestion.map(|text|text.replace(&old,&new));
+    Some(diag)
 }
 
 /// 边界 2：返回值 vs 返回契约。

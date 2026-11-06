@@ -26,10 +26,22 @@ pub fn load_module_with_ctx(path: &Path, ctx: &BindingContext) -> Result<Module>
     load_module_inner(path, &mut visited, ctx)
 }
 
+/// Load recorded entry text at its original path. Imports and metadata retain
+/// normal file-relative resolution; the user's source file is never rewritten.
+pub(crate) fn load_module_with_source(path: &Path, source: &str, ctx: &BindingContext) -> Result<Module> {
+    load_module_inner_source(path, &mut HashSet::new(), ctx, Some(source))
+}
+
 fn load_module_inner(
     path: &Path,
     visited: &mut HashSet<PathBuf>,
     ctx: &BindingContext,
+) -> Result<Module> {
+    load_module_inner_source(path, visited, ctx, None)
+}
+
+fn load_module_inner_source(
+    path: &Path, visited: &mut HashSet<PathBuf>, ctx: &BindingContext, source_override: Option<&str>,
 ) -> Result<Module> {
     let canon = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
     if !visited.insert(canon.clone()) {
@@ -37,11 +49,14 @@ fn load_module_inner(
     }
 
     let result = (|| {
-        let source = read_module_source(path)
-            .with_context(|| format!("failed to read {}", path.display()))?;
+        let source = match source_override {
+            Some(source) => source.to_string(),
+            None => read_module_source(path).with_context(|| format!("failed to read {}", path.display()))?,
+        };
         let markup = frontmatter_markup(&source);
         let mut module = crate::parse::expr::with_markup(markup, || parse_source(&source))
             .map_err(|e| attach_path(path, e))?;
+        module.source.path = Some(path.to_path_buf());
 
         // Resolve Artifact Metadata bindings (entry and imports share the same ctx).
         let file_ctx = BindingContext {
@@ -343,6 +358,7 @@ fn load_module_from_source_inner(
         let markup = frontmatter_markup(source);
         let mut module = crate::parse::expr::with_markup(markup, || parse_source(source))
             .map_err(|e| label_error(label, e))?;
+        module.source.path = Some(PathBuf::from(label));
         module.metadata = resolve_metadata(&module.metadata_raw, ctx, Span::new(1, 1))
             .map_err(|e| label_error(label, e))?;
         let imports = module.imports.clone();
@@ -429,4 +445,22 @@ mod tests {
             "{msg}"
         );
     }
+    #[test]
+    fn recorded_source_resolves_relative_imports_without_rewriting_files() {
+        let root=std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let dir=root.join(format!("target/load-recorded-{}-{}",std::process::id(),std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()));
+        std::fs::create_dir_all(&dir).unwrap();let entry=dir.join("main.mq.md");
+        let original="# main\n\n> print text=original\n";
+        std::fs::write(&entry,original).unwrap();std::fs::write(dir.join("dep.mq.md"),"# helper\n\n> print text=dependency\n").unwrap();
+        let recorded="---\nimport:\n  dep: dep.mq.md\n---\n# main\n\n> print text=recorded\n";
+        let ctx=BindingContext::from_binds(&[],cwd_for_path(Some(&entry)));
+        let module=load_module_with_source(&entry,recorded,&ctx).unwrap();
+        assert!(module.import_modules.contains_key("dep"));
+        assert_eq!(std::fs::read_to_string(&entry).unwrap(),original);
+        let cyclic="---\nimport:\n  again: main.mq.md\n---\n# main\n";
+        assert!(load_module_with_source(&entry,cyclic,&ctx).unwrap_err().to_string().contains("circular import"));
+        assert_eq!(std::fs::read_to_string(&entry).unwrap(),original);
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
 }

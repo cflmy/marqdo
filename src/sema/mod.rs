@@ -5,6 +5,7 @@
 //! the meaning of the same source text.
 
 pub mod bind;
+pub(crate) mod resolution;
 pub mod extract;
 pub mod ir;
 pub mod lock;

@@ -26,7 +26,9 @@ use crate::parse::expr::parse_expr as parse_expr_str;
 /// Parse full source (with optional frontmatter) into a module AST.
 pub fn parse_source(source: &str) -> Result<Module> {
     let lines = classify_source(source);
-    parse_classified(&lines)
+    let mut module = parse_classified(&lines)?;
+    module.source = crate::diagnostics::SourceIdentity::from_source(None, source);
+    Ok(module)
 }
 
 pub fn parse_classified(lines: &[ClassifiedLine]) -> Result<Module> {
@@ -63,14 +65,17 @@ pub fn parse_classified(lines: &[ClassifiedLine]) -> Result<Module> {
             bail!("import bind `{}` conflicts with top-level name", u.bind);
         }
     }
-    Ok(Module {
+    let module=Module {
+        source: Default::default(),
         imports,
         uses,
         functions,
         import_modules: std::collections::HashMap::new(),
         metadata_raw,
         metadata: Vec::new(),
-    })
+    };
+    crate::ast::validate_parameters(&module)?;
+    Ok(module)
 }
 
 struct Cursor<'a> {
@@ -320,7 +325,7 @@ impl<'a> Cursor<'a> {
             if self.peek_is_prose() {
                 break;
             }
-            if let Some(param) = parse_param_line(trimmed) {
+            if let Some(param) = parse_param_line(trimmed, Span::new(l.line_no,1)) {
                 if fun.body.is_empty() {
                     fun.params.push(param);
                     self.bump();
@@ -1278,7 +1283,7 @@ fn parse_backtick_ident(s: &str) -> Option<String> {
     Some(name.to_string())
 }
 
-fn parse_param_line(trimmed: &str) -> Option<crate::ast::Param> {
+fn parse_param_line(trimmed: &str, span:Span) -> Option<crate::ast::Param> {
     use crate::ast::Param;
     let rest = trimmed.strip_prefix('+')?.trim();
     if rest.is_empty() || !rest.starts_with('`') {
@@ -1303,6 +1308,7 @@ fn parse_param_line(trimmed: &str) -> Option<crate::ast::Param> {
     };
     Some(Param {
         name,
+        span,
         default,
         inferred: false,
     })
@@ -2104,6 +2110,17 @@ fn merge_inferred_params(
     let mut needs_input = HashSet::new();
     let mut bound = HashSet::new();
     let mut assign_decls = Vec::new();
+    // Defaults execute before the body. Reads used only there still require
+    // declared inputs; later body assignments cannot satisfy those reads.
+    for param in &fun.params {
+        if let Some(default)=&param.default { collect_reads_expr(default,&mut needs_input); }
+    }
+    for (_,default,_) in prose_decls {
+        if let Some(default)=default {
+            let parsed=parse_expr_prefer_var(default).or_else(|_|parse_value_or_interp(default))?;
+            collect_reads_expr(&parsed,&mut needs_input);
+        }
+    }
     collect_names_needing_input(
         &fun.body,
         &mut bound,
@@ -2131,7 +2148,7 @@ fn merge_inferred_params(
     }
     events.sort_by_key(|e| (e.0, e.1));
 
-    for (_line, _ord, name, default_txt) in events {
+    for (line, _ord, name, default_txt) in events {
         if name == "self" || name == "自" {
             continue;
         }
@@ -2153,6 +2170,7 @@ fn merge_inferred_params(
         };
         fun.params.push(Param {
             name,
+            span:Span::new(line,1),
             default,
             inferred: true,
         });

@@ -2,6 +2,17 @@
 
 mod compile;
 mod vm;
+mod verify;
+mod expression;
+mod statement;
+mod call;
+mod source;
+mod names;
+pub use source::SourceFunction;
+pub use call::{CallEmission, CallStage, CallDispatch, PathFallback};
+pub use statement::{StatementRule,StatementEmission};
+pub use expression::{ExpressionRule,ExpressionEmission,value_evidence as expression_value_evidence};
+pub use verify::StackCertificate;
 
 pub use compile::{compile_for_call, compile_module};
 pub use vm::Vm;
@@ -13,13 +24,13 @@ use crate::value::Value;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Op {
-    Constant(u16),
+    Constant(usize),
     True,
     False,
     None_,
     Pop,
-    GetLocal(u8),
-    SetLocal(u8),
+    GetLocal(usize),
+    SetLocal(usize),
     Add,
     Sub,
     Mul,
@@ -33,14 +44,14 @@ pub enum Op {
     Less,
     Lessequal,
     /// Absolute jump to instruction index.
-    Jump(u16),
-    JumpIfFalse(u16),
+    Jump(usize),
+    JumpIfFalse(usize),
     Print,
     /// Pop prompt text, print it (no newline), read one stdin line → push Text.
     Input,
-    BuildList(u16),
+    BuildList(usize),
     /// Stack (bottom→top): k0, v0, k1, v1, … (n pairs); push Map.
-    BuildMap(u16),
+    BuildMap(usize),
     /// Pop value → push `len` (text/list).
     Len,
     /// Pop value → push display text.
@@ -61,25 +72,73 @@ pub enum Op {
     /// Pop footnote label text, then base → push indexed value (1-based list / map key).
     FootnoteGet,
     /// Call function by index; argc values are on the stack (param order).
-    Call(u16, u8),
+    Call(usize, usize),
+    /// Evaluated actuals in authored order; layout preserves optional names.
+    CallArgs(usize, usize),
+    /// Runtime binding fault after all explicit actual effects.
+    RejectDuplicateArgument(usize),
+    /// Modifier/argument preparation failed before any actual is evaluated.
+    RejectArgumentExpansion(usize),
+    /// Skip a callee default when the parameter was explicitly supplied.
+    JumpIfProvided(usize, usize),
+    /// Entry/raw-call parameters without a value retain language None after defaults.
+    FillMissingParameters,
+    ResetLoop(usize),
+    CheckLoop(usize),
+    CheckArguments,
+    RestoreReceiver,
+    CheckFrameArguments,
+    CheckReturn,
+    /// Check the stack top against the named local's field contract.
+    CheckBinding(usize),
+    /// Checked footnote access; operand identifies the contracted base local.
+    ContractFootnoteGet(usize),
     /// Pop function name text → call zero-arg top-level or lexically visible function.
     CallFn,
-    /// After a constructor Call: tag top-of-stack map with `_type` = constants[idx].
-    TagInstance(u16),
+    /// After a constructor call: stamp name and module of functions[idx].
+    TagInstance(usize),
     /// Method call: stack has argc args (param order) then receiver on top.
     /// constants[name_idx] is method name text; resolve via receiver `_type`.
-    MethodCall(u16, u8),
+    MethodCall(usize, usize),
+    /// Resolve the receiver first, then bind against that method's signature.
+    MethodCallArgs(usize, usize),
     /// Plugin call: stack has argc args in registered param order; name in constants.
-    PluginCall(u16, u8),
+    PluginCall(usize, usize),
     /// Host primitive: pop `argc` args (param order), push result.
-    HostCall(u16, u8),
+    HostCall(u16, usize),
+    /// Native dispatch with authored argument labels; binding happens at runtime.
+    BuiltinCallArgs(usize, usize),
+    HostCallArgs(u16, usize),
+    PluginCallArgs(usize, usize),
+    /// Two-component paths inspect actual receiver presence before static fallback.
+    PathCallArgs(usize, usize),
+    RejectCallResolution(usize),
     Return,
 }
 
 #[derive(Debug, Clone)]
 pub struct FnChunk {
+    /// Captured directly from the loaded declaration before emission.
+    pub source_ast: SourceFunction,
+    pub module_scope: u32,
+    pub module_path: Vec<String>,
+    pub source: crate::diagnostics::SourceIdentity,
+    pub declaration_span: Span,
     pub name: String,
     pub params: Vec<String>,
+    pub contract: Option<crate::contract::Contract>,
+    pub var_contracts: HashMap<String, crate::contract::Contract>,
+    pub receiver_aliases: bool,
+    pub defaults: Vec<bool>,
+    pub default_expressions: Vec<Option<usize>>,
+    pub call_layouts: Vec<Vec<Option<String>>>,
+    pub calls: Vec<CallEmission>,
+    /// Source names are reserved before synthetic slots are allocated.
+    pub source_local_count: usize,
+    pub expressions: Vec<ExpressionEmission>,
+    pub statements: Vec<StatementEmission>,
+    pub statement_roots: Vec<usize>,
+    pub body_start: usize,
     pub code: Vec<Op>,
     /// Parallel to `code`: source location for diagnostics / debug.
     pub spans: Vec<Span>,
@@ -92,6 +151,8 @@ pub struct FnChunk {
 pub struct Program {
     pub functions: Vec<FnChunk>,
     pub entry: usize,
+    /// Applied by run(), not by named or nested calls to the entry function.
+    pub entry_metadata: Vec<(String, Value)>,
     /// Top-level object name → function index (level-1).
     pub objects: Vec<(String, usize)>,
     /// Parallel to `objects`: base object flat index (`# Child = > Parent`).

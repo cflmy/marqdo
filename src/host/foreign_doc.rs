@@ -19,6 +19,10 @@ use crate::host::foreign_session;
 use crate::host::HostContext;
 use crate::value::Value;
 
+mod control;
+pub mod packing;
+pub use control::DocumentControl;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CellStatus {
     Never,
@@ -92,6 +96,8 @@ pub struct JournalRecord {
 /// One recorded Ω step: what a later `replay_check` compares against.
 #[derive(Debug, Clone)]
 pub struct OracleRecord {
+    pub value: Value,
+    pub stdin: String,
     pub seq: u64,
     pub cell: String,
     pub kernel: String,
@@ -103,7 +109,34 @@ pub struct OracleRecord {
     pub result: Value,
 }
 
+impl OracleRecord {
+    fn to_value(&self) -> Value {
+                    Value::Map(vec![
+                        ("value".into(), self.value.clone()),
+                        ("seq".into(), Value::Int(self.seq as i64)),
+                        ("stdin".into(), Value::Text(self.stdin.clone())),
+                        ("cell".into(), Value::Text(self.cell.clone())),
+                        ("kernel".into(), Value::Text(self.kernel.clone())),
+                        ("lang".into(), Value::Text(self.lang.clone())),
+                        ("source_hash".into(), Value::Text(self.source_hash.clone())),
+                        ("ok".into(), Value::Bool(self.ok)),
+                        ("code".into(), Value::Int(self.code)),
+                        ("stdout".into(), Value::Text(self.stdout.clone())),
+                        ("result".into(), self.result.clone()),
+                    ])
+    }
+}
+
 pub struct DocumentSession {
+    pub control: DocumentControl,
+    replay_controls: Vec<control::ControlEvent>,
+    replay_boundary: Option<replay::ReplayBoundary>,
+    source_hash: String,
+    initial_values: Vec<(String, String, Value)>,
+    initial_image: Value,
+    action_history: Vec<replay::HistoryEntry>,
+    action_depth: usize,
+    replay_fresh: bool,
     pub path: PathBuf,
     root: PathBuf,
     pub persistent: bool,
@@ -347,15 +380,29 @@ fn has_nested_plan(module: &crate::ast::Module, entry_name: &str) -> bool {
         .unwrap_or(false)
 }
 
+mod replay;
+
 impl DocumentSession {
+    pub(crate) fn adopt_control(&mut self, control: DocumentControl) {
+        self.control = control;
+        for (name, id) in &self.kernel_sessions {
+            if let Some(session) = self.host.foreign_sessions.get(id) {
+                self.control.register(name, session.interrupt_handle.clone());
+            }
+        }
+    }
     pub fn open(path: &Path, root: &Path) -> Result<Self, String> {
         let source = std::fs::read_to_string(path)
             .map_err(|e| format!("read {}: {e}", path.display()))?;
+        Self::open_source(path, root, &source, true)
+    }
+
+    fn open_source(path: &Path, root: &Path, source: &str, initialize: bool) -> Result<Self, String> {
         let bind_ctx = crate::binding::BindingContext::from_binds(
             &[],
             crate::binding::cwd_for_path(Some(path)),
         );
-        let module = crate::load::load_module_with_ctx(path, &bind_ctx)
+        let module = crate::load::load_module_with_source(path, source, &bind_ctx)
             .map_err(|e| format!("load {}: {e}", path.display()))?;
         let entry = module
             .functions
@@ -479,9 +526,20 @@ impl DocumentSession {
         host.cwd = doc_dir.to_path_buf();
         host.fs_root = Some(root.to_path_buf());
         host.entry_path = Some(path.to_path_buf());
-        host.entry_source = Some(source);
+        host.entry_metadata = module.metadata.clone();
+        let source_hash = hash_source(&source);
+        host.entry_source = Some(source.to_string());
 
         let mut session = Self {
+            control: DocumentControl::default(),
+            replay_controls: Vec::new(),
+            replay_boundary: None,
+            source_hash,
+            initial_values: Vec::new(),
+            initial_image: Value::None,
+            action_history: Vec::new(),
+            action_depth: 0,
+            replay_fresh: false,
             path: path.to_path_buf(),
             root: root.to_path_buf(),
             persistent,
@@ -507,13 +565,10 @@ impl DocumentSession {
                 let value = col_value(&row, &["值", "Value", "value", "数据"])
                     .ok_or_else(|| format!("foreign.session values[{name}]: missing 值/Value"))?
                     .clone();
-                let id = session.ensure_kernel_session(&kernel)?;
-                foreign_session::set(
-                    &mut session.host,
-                    &Value::Handle(id),
-                    &Value::Text(name),
-                    &value,
-                )?;
+                if session.kernel(&kernel).is_none() { return Err(format!("unknown kernel `{kernel}`")); }
+                if !foreign_session::valid_name(&name) { return Err("initial value: name must be an identifier".into()); }
+                super::oracle::admit(&value)?;
+                session.initial_values.push((kernel, name, value));
             }
         }
         if let Some(rows) = plan_inputs {
@@ -528,12 +583,22 @@ impl DocumentSession {
                 }
             }
         }
+        session.initial_image = session.plan_image();
+        if initialize { session.initialize_values()?; }
+        session.replay_fresh = true;
         Ok(session)
     }
 
     /// Re-read the document, preserving kernels/state/journal. Changed cells become dirty.
-    pub fn reload(&mut self, root: &Path) -> Result<(), String> {
-        let mut fresh = Self::open(&self.path, root)?;
+    fn reload_source(&mut self, source: &str, root: &Path) -> Result<(), String> {
+        let fresh = Self::open_source(&self.path, root, source, false)?;
+        self.install_reload(fresh)
+    }
+
+    fn install_reload(&mut self, mut fresh: Self) -> Result<(), String> {
+        let new_source = fresh.host.entry_source.clone();
+        let new_metadata = fresh.host.entry_metadata.clone();
+        let old_kernels = self.kernels.clone();
         let old: HashMap<String, Cell> = self
             .cells
             .iter()
@@ -546,6 +611,9 @@ impl DocumentSession {
                 c.last_ms = o.last_ms;
                 c.last_ok = o.last_ok;
                 c.last_error = o.last_error.clone();
+                c.last_stdout = o.last_stdout.clone();
+                c.last_code = o.last_code;
+                c.last_result = o.last_result.clone();
                 c.status = if o.source_hash != c.source_hash || o.kernel != c.kernel {
                     CellStatus::Dirty
                 } else if o.status == CellStatus::Running {
@@ -556,13 +624,26 @@ impl DocumentSession {
             }
         }
         fresh.host = std::mem::replace(&mut self.host, HostContext::default());
+        fresh.host.entry_source = new_source;
+        fresh.host.entry_metadata = new_metadata;
+        fresh.initial_image = self.initial_image.clone();
+        fresh.action_history = std::mem::take(&mut self.action_history);
+        fresh.control = self.control.clone();
+        fresh.replay_controls = std::mem::take(&mut self.replay_controls);
+        fresh.replay_boundary = self.replay_boundary.take();
+        fresh.action_depth = self.action_depth;
+        fresh.generation = self.generation + 1;
         fresh.kernel_sessions = std::mem::take(&mut self.kernel_sessions);
         fresh.value_store = std::mem::take(&mut self.value_store);
         fresh.journal = std::mem::take(&mut self.journal);
+        fresh.oracle_journal = std::mem::take(&mut self.oracle_journal);
         fresh.seq = self.seq;
+        fresh.replay_fresh = false;
         fresh.cursor = self.cursor.min(fresh.order.len());
         fresh.opened_ms = self.opened_ms;
-        let known: HashSet<String> = fresh.kernels.iter().map(|k| k.name.clone()).collect();
+        let known: HashSet<String> = fresh.kernels.iter().filter(|k|
+            old_kernels.iter().any(|old| old.name == k.name && old.lang == k.lang && old.cmd == k.cmd)
+        ).map(|k| k.name.clone()).collect();
         let orphans: Vec<String> = fresh
             .kernel_sessions
             .keys()
@@ -596,6 +677,7 @@ impl DocumentSession {
     }
 
     fn ensure_kernel_session(&mut self, kernel_name: &str) -> Result<String, String> {
+        self.replay_fresh = false;
         if let Some(id) = self.kernel_sessions.get(kernel_name) {
             if self.host.foreign_sessions.contains_key(id) {
                 return Ok(id.clone());
@@ -619,12 +701,20 @@ impl DocumentSession {
             Value::Handle(s) => s,
             _ => return Err("session_open returned non-handle id".into()),
         };
-        self.kernel_sessions
-            .insert(kernel_name.to_string(), id.clone());
+        for (kernel, name, value) in self.initial_values.clone() {
+            if kernel == kernel_name {
+                if let Err(error) = foreign_session::set(&mut self.host, &Value::Handle(id.clone()), &Value::Text(name), &value) {
+                    let _ = foreign_session::close(&mut self.host, &Value::Handle(id.clone()));
+                    return Err(error);
+                }
+            }
+        }
+        self.kernel_sessions.insert(kernel_name.to_string(), id.clone());
+        self.control.register(kernel_name, self.host.foreign_sessions[&id].interrupt_handle.clone());
         Ok(id)
     }
 
-    fn record_result(&mut self, cell: &str, kernel: &str, record: &Value) -> Result<(), String> {
+    fn record_result(&mut self, cell: &str, kernel: &str, record: &Value, stdin: Option<&str>) -> Result<(), String> {
         let field = |k: &str| match record {
             Value::Map(entries) => entries
                 .iter()
@@ -656,9 +746,10 @@ impl DocumentSession {
                 )
             })
             .unwrap_or_default();
-        let last_result = field("result")
-            .filter(|v| !matches!(v, Value::None))
-            .unwrap_or_else(|| {
+        // An explicit null is a semantic result, even when stdout is nonempty.
+        // Keep display output separate; only legacy records lacking the field
+        // can use their stdout as a fallback.
+        let last_result = field("result").unwrap_or_else(|| {
                 field("stdout")
                     .and_then(|v| v.reveal_text().map(|s| Value::Text(s.to_string())))
                     .unwrap_or(Value::None)
@@ -686,7 +777,11 @@ impl DocumentSession {
             timestamp_ms: now_ms(),
             error,
         });
+        let value = super::oracle::eval_observation(record)?;
+        super::oracle::append(&mut self.host, "eval", &value)?;
         self.oracle_journal.push(OracleRecord {
+            value,
+            stdin: stdin.unwrap_or_default().to_string(),
             seq: self.seq,
             cell: cell.to_string(),
             kernel: kernel.to_string(),
@@ -697,6 +792,7 @@ impl DocumentSession {
             stdout,
             result: last_result,
         });
+        self.check_replay_cell_boundary();
         Ok(())
     }
 
@@ -704,12 +800,13 @@ impl DocumentSession {
         self.run_cell_with_stdin(cell_name, kernel_override, None)
     }
 
-    pub fn run_cell_with_stdin(
+    fn run_cell_with_stdin_inner(
         &mut self,
         cell_name: &str,
         kernel_override: Option<&str>,
         stdin: Option<&str>,
     ) -> Result<Value, String> {
+        self.replay_fresh = false;
         let ci = self
             .cell_index(cell_name)
             .ok_or_else(|| format!("unknown cell `{cell_name}`"))?;
@@ -736,7 +833,7 @@ impl DocumentSession {
             );
             return match result {
                 Ok(record) => {
-                    self.record_result(cell_name, "one-shot", &record)?;
+                    self.record_result(cell_name, "one-shot", &record, stdin)?;
                     Ok(record)
                 }
                 Err(e) => {
@@ -772,6 +869,7 @@ impl DocumentSession {
         self.cells[ci].status = CellStatus::Running;
         let result = (|| -> Result<Value, String> {
             let id = self.ensure_kernel_session(&kernel)?;
+            if self.control.cancelled() { return Err("document action interrupted before evaluation".into()); }
             let source = Value::Text(self.cells[ci].source.clone());
             let record = foreign_session::eval_with_stdin(
                 &mut self.host,
@@ -782,7 +880,7 @@ impl DocumentSession {
                 stdin,
                 None,
             )?;
-            self.record_result(cell_name, &kernel, &record)?;
+            self.record_result(cell_name, &kernel, &record, stdin)?;
             Ok(record)
         })();
         if result.is_err() {
@@ -795,7 +893,7 @@ impl DocumentSession {
         self.step_with_stdin(None)
     }
 
-    pub fn step_with_stdin(&mut self, stdin: Option<&str>) -> Result<Value, String> {
+    fn step_with_stdin_inner(&mut self, stdin: Option<&str>) -> Result<Value, String> {
         if self.cursor >= self.order.len() {
             return Ok(Value::Map(vec![
                 ("done".into(), Value::Bool(true)),
@@ -830,7 +928,7 @@ impl DocumentSession {
         self.run_all_with_inputs(restart, stdin, None)
     }
 
-    pub fn run_all_with_inputs(
+    fn run_all_with_inputs_inner(
         &mut self,
         restart: bool,
         stdin: Option<&str>,
@@ -843,6 +941,9 @@ impl DocumentSession {
         let mut records = Vec::new();
         let mut failed = 0i64;
         for name in self.order.clone() {
+            if self.control.cancelled() { break; }
+            if !self.replay_batch_can_continue() { break; }
+            let seq_before = self.seq;
             let cell_stdin = inputs
                 .and_then(|m| m.get(&name))
                 .map(String::as_str)
@@ -879,19 +980,27 @@ impl DocumentSession {
                 other => vec![("result".into(), other)],
             };
             m.push(("cell".into(), Value::Text(name)));
-            records.push(Value::Map(m));
+            let record = Value::Map(m);
+            self.check_replay_batch_record(&record, seq_before);
+            records.push(record);
             self.cursor += 1;
         }
-        Ok(Value::Map(vec![
-            ("ok".into(), Value::Bool(failed == 0)),
-            ("ran".into(), Value::Int(self.order.len() as i64)),
+        let mut summary = vec![
+            ("ok".into(), Value::Bool(failed == 0 && !self.control.cancelled())),
+            ("ran".into(), Value::Int(records.len() as i64)),
             ("failed".into(), Value::Int(failed)),
             ("records".into(), Value::List(records)),
-        ]))
+        ];
+        if self.control.cancelled() {
+            summary.push(("cancelled".into(), Value::Bool(true)));
+            summary.push(("remaining".into(), Value::Int((self.order.len() - self.cursor) as i64)));
+        }
+        Ok(Value::Map(summary))
     }
 
-    pub fn interrupt(&mut self) -> Result<Value, String> {
-        let ids: Vec<String> = self.kernel_sessions.keys().cloned().collect();
+    fn interrupt_inner(&mut self) -> Result<Value, String> {
+        let mut ids: Vec<String> = self.kernel_sessions.keys().cloned().collect();
+        ids.sort();
         let mut out = Vec::new();
         for name in ids {
             if let Some(id) = self.kernel_sessions.get(&name) {
@@ -904,7 +1013,7 @@ impl DocumentSession {
         Ok(Value::List(out))
     }
 
-    pub fn restart_kernel(&mut self, name: &str) -> Result<Value, String> {
+    fn restart_kernel_inner(&mut self, name: &str) -> Result<Value, String> {
         if let Some(id) = self.kernel_sessions.remove(name) {
             let _ = foreign_session::close(&mut self.host, &Value::Handle(id));
         }
@@ -917,8 +1026,9 @@ impl DocumentSession {
         Ok(Value::Bool(true))
     }
 
-    pub fn restart_all(&mut self) -> Result<Value, String> {
-        let names: Vec<String> = self.kernel_sessions.keys().cloned().collect();
+    fn restart_all_inner(&mut self) -> Result<Value, String> {
+        let mut names: Vec<String> = self.kernel_sessions.keys().cloned().collect();
+        names.sort();
         for name in names {
             self.restart_kernel(&name)?;
         }
@@ -929,7 +1039,7 @@ impl DocumentSession {
         Ok(Value::Bool(true))
     }
 
-    pub fn assign_kernel(&mut self, cell: &str, kernel: &str) -> Result<Value, String> {
+    fn assign_kernel_inner(&mut self, cell: &str, kernel: &str) -> Result<Value, String> {
         let ci = self
             .cell_index(cell)
             .ok_or_else(|| format!("unknown cell `{cell}`"))?;
@@ -950,7 +1060,7 @@ impl DocumentSession {
         Ok(Value::None)
     }
 
-    pub fn add_cell(
+    fn add_cell_inner(
         &mut self,
         cell: &str,
         lang: &str,
@@ -995,7 +1105,7 @@ impl DocumentSession {
         Ok(Value::Bool(true))
     }
 
-    pub fn remove_cell(&mut self, cell: &str) -> Result<Value, String> {
+    fn remove_cell_inner(&mut self, cell: &str) -> Result<Value, String> {
         let Some(i) = self.cell_index(cell) else {
             return Err(format!("unknown cell `{cell}`"));
         };
@@ -1006,13 +1116,13 @@ impl DocumentSession {
         Ok(Value::Bool(true))
     }
 
-    pub fn set_value(&mut self, kernel: &str, name: &str, value: Value) -> Result<Value, String> {
+    fn set_value_inner(&mut self, kernel: &str, name: &str, value: Value) -> Result<Value, String> {
         let out = self.push_value(kernel, name, value)?;
         self.generation += 1;
         Ok(out)
     }
 
-    pub fn state_list(&mut self) -> Result<Value, String> {
+    fn state_list_inner(&mut self) -> Result<Value, String> {
         let marqdo = self
             .value_store
             .iter()
@@ -1043,7 +1153,10 @@ impl DocumentSession {
         ]))
     }
 
-    pub fn push_value(&mut self, kernel: &str, name: &str, value: Value) -> Result<Value, String> {
+    fn push_value_inner(&mut self, kernel: &str, name: &str, value: Value) -> Result<Value, String> {
+        if self.kernel(kernel).is_none() { return Err(format!("unknown kernel `{kernel}`")); }
+        if !foreign_session::valid_name(name) { return Err("session_set: name must be an identifier".into()); }
+        super::oracle::admit(&value)?;
         let id = self.ensure_kernel_session(kernel)?;
         foreign_session::set(
             &mut self.host,
@@ -1055,13 +1168,16 @@ impl DocumentSession {
         Ok(Value::None)
     }
 
-    pub fn pull_value(&mut self, kernel: &str, name: &str) -> Result<Value, String> {
+    fn pull_value_inner(&mut self, kernel: &str, name: &str) -> Result<Value, String> {
+        if self.kernel(kernel).is_none() { return Err(format!("unknown kernel `{kernel}`")); }
+        if !foreign_session::valid_name(name) { return Err("session_get: name must be an identifier".into()); }
         let id = self.ensure_kernel_session(kernel)?;
         let value = foreign_session::get(
             &mut self.host,
             &Value::Handle(id),
             &Value::Text(name.to_string()),
         )?;
+        super::oracle::append(&mut self.host, "get", &value)?;
         self.value_store
             .insert(name.to_string(), value.clone());
         Ok(value)
@@ -1137,7 +1253,7 @@ impl DocumentSession {
     }
 
     /// Clear one cell's displayed output/record; kernels and live state survive.
-    pub fn clear_cell(&mut self, cell: &str) -> Result<Value, String> {
+    fn clear_cell_inner(&mut self, cell: &str) -> Result<Value, String> {
         let i = self
             .cell_index(cell)
             .ok_or_else(|| format!("unknown cell `{cell}`"))?;
@@ -1159,36 +1275,7 @@ impl DocumentSession {
     /// Clear displayed outputs and per-cell records; kernels and live state survive.
     /// Export plan, explicit values, kernel values and journal as JSON-safe data.
     pub fn export_snapshot(&mut self) -> Result<Value, String> {
-        let mut kernels = Vec::new();
-        for decl in self.kernels.clone() {
-            let mut values = Vec::new();
-            if let Some(id) = self.kernel_sessions.get(&decl.name).cloned() {
-                if let Ok(Value::List(names)) =
-                    foreign_session::names(&mut self.host, &Value::Handle(id.clone()))
-                {
-                    for name in names {
-                        if let Value::Text(n) = &name {
-                            if let Ok(v) = foreign_session::get(
-                                &mut self.host,
-                                &Value::Handle(id.clone()),
-                                &Value::Text(n.clone()),
-                            ) {
-                                values.push(Value::Map(vec![
-                                    ("name".into(), Value::Text(n.clone())),
-                                    ("value".into(), v),
-                                ]));
-                            }
-                        }
-                    }
-                }
-            }
-            kernels.push(Value::Map(vec![
-                ("name".into(), Value::Text(decl.name.clone())),
-                ("lang".into(), Value::Text(decl.lang.clone())),
-                ("cmd".into(), Value::Text(decl.cmd.clone().unwrap_or_default())),
-                ("values".into(), Value::List(values)),
-            ]));
-        }
+        let kernels = self.tracked("inspect",Value::Map(Vec::new()), |session| session.inspect_kernels())?;
         let cells = self
             .cells
             .iter()
@@ -1213,23 +1300,30 @@ impl DocumentSession {
             .collect();
         let journal = self.journal_json();
         Ok(Value::Map(vec![
-            ("version".into(), Value::Int(1)),
+            ("document_hash".into(), Value::Text(self.source_hash.clone())),
+            ("version".into(), Value::Int(5)),
+            ("initial_image".into(), self.initial_image.clone()),
+            ("action_count".into(), Value::Int(self.action_history.len() as i64)),
+            ("actions".into(), self.action_history_json()),
+            ("observation_journal".into(), Value::List(self.host.oracle_observations.clone())),
+            ("oracle_count".into(), Value::Int(self.complete_oracle_rows().len() as i64)),
             ("path".into(), Value::Text(self.path.display().to_string())),
             ("persistent".into(), Value::Bool(self.persistent)),
             ("generation".into(), Value::Int(self.generation as i64)),
-            ("kernels".into(), Value::List(kernels)),
+            ("kernels".into(), kernels),
             ("cells".into(), Value::List(cells)),
             ("order".into(), Value::List(
                 self.order.iter().cloned().map(Value::Text).collect(),
             )),
             ("journal".into(), journal),
-            ("oracle_journal".into(), self.oracle_journal_json()),
+            ("oracle_journal".into(), Value::List(self.complete_oracle_rows())),
         ]))
     }
 
     /// Import JSON-safe values from an exported snapshot. Source identity and
     /// cell names must already match; no arbitrary objects are deserialized.
-    pub fn import_snapshot(&mut self, snapshot: &Value) -> Result<Value, String> {
+    fn import_snapshot_inner(&mut self, snapshot: &Value) -> Result<Value, String> {
+        replay::validate_control(snapshot)?;
         let Value::Map(fields) = snapshot else {
             return Err("snapshot must be a map".into());
         };
@@ -1242,6 +1336,27 @@ impl DocumentSession {
         let Some(Value::List(kernels)) = field("kernels") else {
             return Err("snapshot: missing kernels".into());
         };
+        if field("document_hash") != Some(Value::Text(self.source_hash.clone())) {
+            return Err("snapshot: document hash differs".into());
+        }
+        // Validate all crossing payloads before mutating any live foreign store.
+        for kernel in &kernels {
+            let Value::Map(kfields) = kernel else { return Err("snapshot: malformed kernel".into()) };
+            let Some((_, Value::Text(name))) = kfields.iter().find(|(k, _)| k == "name")
+                else { return Err("snapshot: kernel name missing".into()) };
+            if self.kernel(name).is_none() { return Err(format!("snapshot: unknown kernel `{name}`")); }
+            let Some((_, Value::List(values))) = kfields.iter().find(|(k, _)| k == "values")
+                else { return Err("snapshot: values missing".into()) };
+            for item in values {
+                let Value::Map(vfields) = item else { return Err("snapshot: malformed value".into()) };
+                let Some((_, Value::Text(name))) = vfields.iter().find(|(k, _)| k == "name")
+                    else { return Err("snapshot: value name missing".into()) };
+                if !foreign_session::valid_name(name) { return Err("snapshot: invalid value name".into()); }
+                let Some((_, value)) = vfields.iter().find(|(k, _)| k == "value")
+                    else { return Err("snapshot: value missing".into()) };
+                super::oracle::admit(value)?;
+            }
+        }
         let mut restored = 0i64;
         for kernel in kernels {
             let Value::Map(kfields) = kernel else { continue };
@@ -1299,6 +1414,7 @@ impl DocumentSession {
                 }
             }
         }
+        self.replay_fresh = false;
         self.generation += 1;
         Ok(Value::Int(restored))
     }
@@ -1306,7 +1422,7 @@ impl DocumentSession {
     /// Replay recorded cells in order, using the snapshot's per-cell stdin.
     /// Re-runs only; does not compare against the recording. Prefer
     /// [`Self::replay_check`] when equivalence against a recording matters.
-    pub fn replay_snapshot(&mut self, snapshot: &Value) -> Result<Value, String> {
+    fn replay_snapshot_inner(&mut self, snapshot: &Value) -> Result<Value, String> {
         let Value::Map(fields) = snapshot else {
             return Err("snapshot must be a map".into());
         };
@@ -1331,11 +1447,13 @@ impl DocumentSession {
             if self.cell_index(&name).is_none() {
                 continue;
             }
+            if !self.replay_batch_can_continue() { break; }
             let stdin = getc("stdin").and_then(|v| match v {
                 Value::Text(s) if !s.is_empty() => Some(s),
                 _ => None,
             });
             let record = self.run_cell_with_stdin(&name, None, stdin.as_deref())?;
+            self.check_replay_batch_record(&record, self.seq.saturating_sub(1));
             let mut m = match record {
                 Value::Map(m) => m,
                 other => vec![("result".into(), other)],
@@ -1350,165 +1468,14 @@ impl DocumentSession {
         ]))
     }
 
-    /// Replay cells and compare each step against the snapshot recording.
-    ///
-    /// Expected fields per cell (when present): `ok`, `code`, `stdout`, `result`.
-    /// A difference is localized to the first mismatched field on that cell.
-    /// Cells without any recording fields are skipped for comparison but still run.
-    pub fn replay_check(&mut self, snapshot: &Value) -> Result<Value, String> {
-        let Value::Map(fields) = snapshot else {
-            return Err("snapshot must be a map".into());
-        };
-        let cells = fields
-            .iter()
-            .find(|(k, _)| k == "cells")
-            .and_then(|(_, v)| match v {
-                Value::List(xs) => Some(xs.clone()),
-                _ => None,
-            })
-            .ok_or_else(|| "snapshot: missing cells".to_string())?;
-        let mut checks = Vec::new();
-        let mut matched = 0i64;
-        let mut mismatched = 0i64;
-        let mut skipped = 0i64;
-        for item in cells {
-            let Value::Map(cfields) = item else { continue };
-            let getc = |name: &str| {
-                cfields
-                    .iter()
-                    .find(|(k, _)| k == name)
-                    .map(|(_, v)| v.clone())
-            };
-            let Some(Value::Text(name)) = getc("name") else { continue };
-            if self.cell_index(&name).is_none() {
-                continue;
-            }
-            let has_recording = getc("ok").is_some()
-                || getc("code").is_some()
-                || getc("stdout").is_some()
-                || getc("result").is_some();
-            let stdin = getc("stdin").and_then(|v| match v {
-                Value::Text(s) if !s.is_empty() => Some(s),
-                _ => None,
-            });
-            let record = self.run_cell_with_stdin(&name, None, stdin.as_deref())?;
-            let observed_ok = match &record {
-                Value::Map(m) => matches!(
-                    m.iter().find(|(k, _)| k == "ok").map(|(_, v)| v),
-                    Some(Value::Bool(true))
-                ),
-                _ => false,
-            };
-            let observed_code = match &record {
-                Value::Map(m) => match m.iter().find(|(k, _)| k == "code").map(|(_, v)| v) {
-                    Some(Value::Int(n)) => *n,
-                    _ => 0,
-                },
-                _ => 0,
-            };
-            let observed_stdout = match &record {
-                Value::Map(m) => m
-                    .iter()
-                    .find(|(k, _)| k == "stdout")
-                    .and_then(|(_, v)| v.reveal_text().map(|s| s.to_string()))
-                    .unwrap_or_default(),
-                _ => String::new(),
-            };
-            // Match record_result: prefer explicit result, else stdout as text.
-            let observed_result = match &record {
-                Value::Map(m) => {
-                    let explicit = m
-                        .iter()
-                        .find(|(k, _)| k == "result")
-                        .map(|(_, v)| v.clone())
-                        .filter(|v| !matches!(v, Value::None));
-                    explicit.unwrap_or_else(|| {
-                        m.iter()
-                            .find(|(k, _)| k == "stdout")
-                            .and_then(|(_, v)| v.reveal_text().map(|s| Value::Text(s.to_string())))
-                            .unwrap_or(Value::None)
-                    })
-                }
-                _ => Value::None,
-            };
-            if !has_recording {
-                skipped += 1;
-                checks.push(Value::Map(vec![
-                    ("cell".into(), Value::Text(name)),
-                    ("match".into(), Value::Bool(true)),
-                    ("compared".into(), Value::Bool(false)),
-                    ("diff".into(), Value::Text(String::new())),
-                ]));
-                continue;
-            }
-            let mut diff = String::new();
-            if let Some(Value::Bool(exp_ok)) = getc("ok") {
-                if exp_ok != observed_ok {
-                    diff = format!("ok: expected {exp_ok}, got {observed_ok}");
-                }
-            }
-            if diff.is_empty() {
-                if let Some(Value::Int(exp_code)) = getc("code") {
-                    if exp_code != observed_code {
-                        diff = format!("code: expected {exp_code}, got {observed_code}");
-                    }
-                }
-            }
-            if diff.is_empty() {
-                if let Some(Value::Text(exp_stdout)) = getc("stdout") {
-                    if exp_stdout != observed_stdout {
-                        diff = format!(
-                            "stdout: expected {:?}, got {:?}",
-                            exp_stdout, observed_stdout
-                        );
-                    }
-                }
-            }
-            if diff.is_empty() {
-                if let Some(exp_result) = getc("result") {
-                    if exp_result != observed_result {
-                        diff = format!(
-                            "result: expected {}, got {}",
-                            exp_result.as_display(),
-                            observed_result.as_display()
-                        );
-                    }
-                }
-            }
-            let is_match = diff.is_empty();
-            if is_match {
-                matched += 1;
-            } else {
-                mismatched += 1;
-            }
-            checks.push(Value::Map(vec![
-                ("cell".into(), Value::Text(name)),
-                ("match".into(), Value::Bool(is_match)),
-                ("compared".into(), Value::Bool(true)),
-                ("diff".into(), Value::Text(diff)),
-                ("observed_ok".into(), Value::Bool(observed_ok)),
-                ("observed_code".into(), Value::Int(observed_code)),
-                ("observed_stdout".into(), Value::Text(observed_stdout)),
-                ("observed_result".into(), observed_result),
-            ]));
-        }
-        Ok(Value::Map(vec![
-            ("ok".into(), Value::Bool(mismatched == 0)),
-            ("matched".into(), Value::Int(matched)),
-            ("mismatched".into(), Value::Int(mismatched)),
-            ("skipped".into(), Value::Int(skipped)),
-            ("checks".into(), Value::List(checks)),
-        ]))
-    }
-
     /// Explicitly persist the last cell result through lib/writeback.
-    pub fn persist_cell(&mut self, cell: &str, key: &str) -> Result<Value, String> {
+    fn persist_cell_inner(&mut self, cell: &str, key: &str) -> Result<Value, String> {
         let i = self
             .cell_index(cell)
             .ok_or_else(|| format!("unknown cell `{cell}`"))?;
         let value = self.cells[i].last_result.clone();
-        if matches!(value, Value::None) {
-            return Err(format!("cell `{cell}` has no result to persist"));
+        if self.cells[i].runs == 0 || !self.cells[i].last_ok {
+            return Err(format!("cell `{cell}` has no successful result to persist"));
         }
         let key = if key.is_empty() { cell } else { key };
         let line = self.cells[i].line_end.max(self.cells[i].line_start);
@@ -1523,7 +1490,7 @@ impl DocumentSession {
         Ok(Value::Bool(true))
     }
 
-    pub fn clear_outputs(&mut self) -> Value {
+    fn clear_outputs_inner(&mut self) -> Value {
         for cell in &mut self.cells {
             cell.runs = 0;
             cell.last_ms = 0;
@@ -1564,27 +1531,11 @@ impl DocumentSession {
     }
 
     pub fn oracle_journal_json(&self) -> Value {
-        Value::List(
-            self.oracle_journal
-                .iter()
-                .map(|j| {
-                    Value::Map(vec![
-                        ("seq".into(), Value::Int(j.seq as i64)),
-                        ("cell".into(), Value::Text(j.cell.clone())),
-                        ("kernel".into(), Value::Text(j.kernel.clone())),
-                        ("lang".into(), Value::Text(j.lang.clone())),
-                        ("source_hash".into(), Value::Text(j.source_hash.clone())),
-                        ("ok".into(), Value::Bool(j.ok)),
-                        ("code".into(), Value::Int(j.code)),
-                        ("stdout".into(), Value::Text(j.stdout.clone())),
-                        ("result".into(), j.result.clone()),
-                    ])
-                })
-                .collect(),
-        )
+        Value::List(self.oracle_journal.iter().map(OracleRecord::to_value).collect())
     }
 
-    pub fn close(&mut self) {
+    fn close_inner(&mut self) {
+        self.replay_fresh = false;
         let ids: Vec<String> = self.kernel_sessions.values().cloned().collect();
         for id in ids {
             let _ = foreign_session::close(&mut self.host, &Value::Handle(id));
@@ -1950,6 +1901,10 @@ console.log(globalThis.kept);
         let snap = a.export_snapshot().unwrap();
         a.close();
         let mut b = DocumentSession::open(&path, &root).unwrap();
+        let mut wrong_source = snap.clone();
+        replace_field(&mut wrong_source, "document_hash", Value::Text("different-document".into()));
+        assert!(b.import_snapshot(&wrong_source).unwrap_err().contains("hash"));
+        assert!(b.kernel_sessions.is_empty());
         let restored = b.import_snapshot(&snap).unwrap();
         assert!(matches!(restored, Value::Int(n) if n > 0));
         let rate = b.pull_value("分析", "rate").unwrap();
@@ -2142,7 +2097,14 @@ import:
             field(&record, "stdout").and_then(|v| v.reveal_text().map(|s| s.to_string())),
             Some("hello node\n".to_string())
         );
+        s.run_cell_with_stdin("a", None, Some("second input 中文")).unwrap();
+        let snapshot = s.export_snapshot().unwrap();
         s.close();
+        let mut fresh = DocumentSession::open(&path, &root).unwrap();
+        let replay = fresh.replay_check(&snapshot).unwrap();
+        assert_eq!(field(&replay, "ok"), Some(Value::Bool(true)));
+        assert_eq!(field(&replay, "matched"), Some(Value::Int(2)));
+        fresh.close();
         let _ = std::fs::remove_file(&path);
     }
 
@@ -2192,7 +2154,14 @@ print(sys.stdin.read().strip())
             field(&record, "stdout").and_then(|v| v.reveal_text().map(|s| s.to_string())),
             Some("hello persistent\n".to_string())
         );
+        s.run_cell_with_stdin("a", None, Some("second input 中文")).unwrap();
+        let snapshot = s.export_snapshot().unwrap();
         s.close();
+        let mut fresh = DocumentSession::open(&path, &root).unwrap();
+        let replay = fresh.replay_check(&snapshot).unwrap();
+        assert_eq!(field(&replay, "ok"), Some(Value::Bool(true)));
+        assert_eq!(field(&replay, "matched"), Some(Value::Int(2)));
+        fresh.close();
         let _ = std::fs::remove_file(&path);
     }
 
@@ -2297,11 +2266,13 @@ console.log("after error");
         let r = s.run_cell("a", None).unwrap();
         assert_eq!(field(&r, "ok"), Some(Value::Bool(true)));
         assert_eq!(s.cells[0].status, CellStatus::Clean);
+        let before = s.oracle_journal_json();
         let src2 = "# main\n\n`a` =\n```node\nconsole.log(2);\n```\n";
         std::fs::write(&path, src2).unwrap();
         s.reload(&root).unwrap();
         assert_eq!(s.cells[0].status, CellStatus::Dirty);
         assert!(s.cells[0].source.contains("console.log(2)"));
+        assert_eq!(s.oracle_journal_json(), before, "reload must retain observations of the old source");
         s.close();
         let _ = std::fs::remove_file(&path);
     }
@@ -2374,13 +2345,13 @@ console.log("after error");
         // Tamper with the recording for cell 读取.
         if let Value::Map(ref mut fields) = snap {
             if let Some((_, Value::List(cells))) =
-                fields.iter_mut().find(|(k, _)| k == "cells")
+                fields.iter_mut().find(|(k, _)| k == "oracle_journal")
             {
                 for cell in cells.iter_mut() {
                     let Value::Map(cfields) = cell else { continue };
                     let name = cfields
                         .iter()
-                        .find(|(k, _)| k == "name")
+                        .find(|(k, _)| k == "cell")
                         .and_then(|(_, v)| v.reveal_text().map(|s| s.to_string()));
                     if name.as_deref() == Some("读取") {
                         if let Some((_, v)) = cfields.iter_mut().find(|(k, _)| k == "stdout") {
@@ -2391,10 +2362,12 @@ console.log("after error");
             }
         }
 
+        replay::sync_expected_cells(&mut snap).unwrap();
         let mut b = DocumentSession::open(&path, &root).unwrap();
         let check = b.replay_check(&snap).unwrap();
         assert_eq!(field(&check, "ok"), Some(Value::Bool(false)));
         assert_eq!(field(&check, "mismatched"), Some(Value::Int(1)));
+        assert_eq!(field(&check, "skipped"), Some(Value::Int(1)));
         let Some(Value::List(checks)) = field(&check, "checks") else {
             panic!("missing checks");
         };
@@ -2412,4 +2385,168 @@ console.log("after error");
         assert!(diff.contains("stdout"), "diff should localize to stdout: {diff}");
         b.close();
     }
+    fn snapshot_list_mut<'a>(snap: &'a mut Value, key: &str) -> &'a mut Vec<Value> {
+        let Value::Map(m) = snap else { panic!("map") };
+        let (_, Value::List(xs)) = m.iter_mut().find(|(k, _)| k == key).unwrap()
+            else { panic!("list") };
+        xs
+    }
+
+    fn replace_field(v: &mut Value, key: &str, value: Value) {
+        let Value::Map(m) = v else { panic!("map") };
+        m.iter_mut().find(|(k, _)| k == key).unwrap().1 = value;
+    }
+
+    #[test]
+    fn replay_check_rejects_incomplete_recordings_before_execution() {
+        assert!(node_available(), "replay experiment requires node");
+        let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let path = root.join("tests/notebook/shared.mq.md");
+        let mut a = DocumentSession::open(&path, &root).unwrap();
+        a.run_all(true).unwrap();
+        let original = a.export_snapshot().unwrap();
+        a.close();
+        let cases = ["empty", "truncate", "insert", "duplicate", "reorder", "unknown",
+            "missing_cell", "non_map", "missing_outcome", "wrong_bool", "wrong_code",
+            "wrong_stdout", "missing_result", "source", "routing", "plan", "version",
+            "missing_oracle", "duplicate_field", "stdin_type"];
+        for case in cases {
+            let mut snap = original.clone();
+            match case {
+                "empty" => snapshot_list_mut(&mut snap, "oracle_journal").clear(),
+                "truncate" => { snapshot_list_mut(&mut snap, "oracle_journal").pop(); }
+                "insert" | "duplicate" => {
+                    let xs = snapshot_list_mut(&mut snap, "oracle_journal");
+                    xs.push(xs[0].clone());
+                }
+                "reorder" => snapshot_list_mut(&mut snap, "oracle_journal").swap(0, 1),
+                "unknown" => replace_field(&mut snapshot_list_mut(&mut snap, "oracle_journal")[0], "cell", Value::Text("unknown".into())),
+                "missing_cell" => { snapshot_list_mut(&mut snap, "cells").pop(); }
+                "non_map" => snapshot_list_mut(&mut snap, "oracle_journal")[0] = Value::None,
+                "missing_outcome" | "missing_result" => {
+                    let Value::Map(m) = &mut snapshot_list_mut(&mut snap, "oracle_journal")[0] else { panic!() };
+                    m.retain(|(k, _)| k != if case == "missing_result" { "result" } else { "ok" });
+                }
+                "wrong_bool" | "wrong_code" | "wrong_stdout" | "stdin_type" => {
+                    let key = match case { "wrong_bool" => "ok", "wrong_code" => "code", "wrong_stdout" => "stdout", _ => "stdin" };
+                    replace_field(&mut snapshot_list_mut(&mut snap, "oracle_journal")[0], key, Value::None);
+                }
+                "source" => replace_field(&mut snapshot_list_mut(&mut snap, "cells")[0], "source", Value::Text("console.log(42)".into())),
+                "routing" => replace_field(&mut snapshot_list_mut(&mut snap, "oracle_journal")[0], "kernel", Value::Text("绘图".into())),
+                "plan" => snapshot_list_mut(&mut snap, "order").swap(0, 1),
+                "version" => replace_field(&mut snap, "version", Value::Int(1)),
+                "missing_oracle" => { let Value::Map(m) = &mut snap else { panic!() }; m.retain(|(k, _)| k != "oracle_journal"); }
+                "duplicate_field" => { let Value::Map(m) = &mut snapshot_list_mut(&mut snap, "oracle_journal")[0] else { panic!() }; m.push(m[0].clone()); }
+                _ => unreachable!(),
+            }
+            let mut b = DocumentSession::open(&path, &root).unwrap();
+            let result = b.replay_check(&snap);
+            assert!(result.is_err(), "{case}: {result:?}");
+            assert!(b.oracle_journal.is_empty(), "{case}: executed before validation");
+            assert!(b.kernel_sessions.is_empty(), "{case}: started a kernel before validation");
+            println!("E1 {case}: rejected before execution: {}", result.unwrap_err());
+            b.close();
+        }
+    }
+
+    #[test]
+    fn replay_check_uses_oracle_not_cell_summary_or_execution_journal() {
+        assert!(node_available());
+        let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let path = root.join("tests/notebook/shared.mq.md");
+        let mut a = DocumentSession::open(&path, &root).unwrap();
+        a.run_all(true).unwrap();
+        // Repeat the read: a per-cell summary cannot represent this history.
+        a.run_cell("读取", None).unwrap();
+        let mut snap = a.export_snapshot().unwrap();
+        a.close();
+        snapshot_list_mut(&mut snap, "journal").clear();
+        for c in snapshot_list_mut(&mut snap, "cells") {
+            replace_field(c, "stdout", Value::Text("irrelevant-summary".into()));
+        }
+        let mut b = DocumentSession::open(&path, &root).unwrap();
+        let check = b.replay_check(&snap).unwrap();
+        assert_eq!(field(&check, "ok"), Some(Value::Bool(true)));
+        assert_eq!(field(&check, "matched"), Some(Value::Int(4)));
+        assert_eq!(field(&check, "skipped"), Some(Value::Int(0)));
+        assert!(b.replay_check(&snap).unwrap_err().contains("fresh"));
+        b.close();
+    }
+
+    #[test]
+    fn replay_check_accepts_declared_initial_values_but_rejects_external_changes() {
+        assert!(node_available());
+        let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let path = root.join(format!("target/replay-initial-{}.mq.md", std::process::id()));
+        let source = std::fs::read_to_string(root.join("tests/notebook/shared.mq.md")).unwrap()
+            .replace("`会话` = > foreign.session kernels=`内核表` cells=`会话表`",
+                "`初始` =\n\n| 内核 | 名称 | 值 |\n|---|---|---|\n| 分析 | seed | 41 |\n\n`会话` = > foreign.session kernels=`内核表` cells=`会话表` values=`初始`");
+        std::fs::write(&path, source).unwrap();
+        let mut a = DocumentSession::open(&path, &root).unwrap();
+        assert!(!a.kernel_sessions.is_empty(), "fixture must initialize a live kernel");
+        a.run_all(false).unwrap();
+        let snap = a.export_snapshot().unwrap();
+        a.close();
+        let mut b = DocumentSession::open(&path, &root).unwrap();
+        let check = b.replay_check(&snap).unwrap();
+        assert_eq!(field(&check, "ok"), Some(Value::Bool(true)));
+        b.close();
+        let mut warm = DocumentSession::open(&path, &root).unwrap();
+        warm.set_value("分析", "seed", Value::Int(99)).unwrap();
+        assert!(warm.replay_check(&snap).unwrap_err().contains("fresh"));
+        warm.close();
+        std::fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn snapshot_introspection_does_not_pollute_document_observations() {
+        assert!(node_available());
+        let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let path = root.join("tests/notebook/shared.mq.md");
+        let mut s = DocumentSession::open(&path, &root).unwrap();
+        s.run_all(false).unwrap();
+        let before = s.host.oracle_observations.clone();
+        assert_eq!(before.len(), 3);
+        s.export_snapshot().unwrap();
+        s.export_snapshot().unwrap();
+        assert_eq!(s.host.oracle_observations, before, "snapshot get/names are metadata, not document actions");
+        // The cell trace projects to exactly the same language observations.
+        let projected: Vec<Value> = s.oracle_journal.iter().enumerate().map(|(i,r)|
+            Value::Map(vec![("index".into(), Value::Int(i as i64)),
+                ("channel".into(), Value::Text("eval".into())), ("value".into(), r.value.clone())])).collect();
+        assert_eq!(before, projected);
+        s.pull_value("分析", "shared").unwrap();
+        assert_eq!(s.host.oracle_observations.len(), before.len() + 1, "explicit user get must be observed");
+        s.close();
+    }
+
+    #[test]
+    fn replay_check_compares_failed_cell_diagnostics() {
+        let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let path = root.join(format!("target/replay-failure-{}.mq.md", std::process::id()));
+        let source = "# main\n\n`a` =\n```python\nraise ValueError('ordinary error')\n```\n";
+        std::fs::write(&path, source).unwrap();
+        let mut a = DocumentSession::open(&path, &root).unwrap();
+        let record = a.run_cell("a", None).unwrap();
+        assert_eq!(field(&record, "ok"), Some(Value::Bool(false)));
+        let mut snap = a.export_snapshot().unwrap();
+        a.close();
+        let mut b = DocumentSession::open(&path, &root).unwrap();
+        let initial_check = b.replay_check(&snap).unwrap();
+        assert_eq!(field(&initial_check, "ok"), Some(Value::Bool(true)), "{initial_check:?}");
+        b.close();
+        let rows = snapshot_list_mut(&mut snap, "oracle_journal");
+        let Value::Map(fields) = &mut rows[0] else { panic!() };
+        let (_, value) = fields.iter_mut().find(|(k,_)| k == "value").unwrap();
+        replace_field(value, "error", Value::Text("different failure".into()));
+        replay::sync_expected_cells(&mut snap).unwrap();
+        let mut c = DocumentSession::open(&path, &root).unwrap();
+        let check = c.replay_check(&snap).unwrap();
+        assert_eq!(field(&check, "ok"), Some(Value::Bool(false)));
+        let Some(Value::List(checks)) = field(&check, "checks") else { panic!() };
+        assert!(field(&checks[0], "diff").unwrap().as_display().contains("value"));
+        c.close();
+        std::fs::remove_file(path).unwrap();
+    }
+
 }

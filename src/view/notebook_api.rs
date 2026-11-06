@@ -1,15 +1,34 @@
 //! Live-view notebook session APIs.
 
+#[cfg(all(test, unix))]
+mod interrupt_http_tests;
+
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex, OnceLock};
+use std::sync::{Arc, Mutex, OnceLock, MutexGuard, TryLockError};
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use crate::host::json::{json_to_value, value_to_json};
 use crate::host::foreign_doc::DocumentSession;
 use crate::value::Value;
 
-fn sessions() -> &'static Mutex<HashMap<String, Arc<Mutex<DocumentSession>>>> {
-    static S: OnceLock<Mutex<HashMap<String, Arc<Mutex<DocumentSession>>>>> = OnceLock::new();
+struct ApiSession {
+    closed: AtomicBool,
+    document: OnceLock<Result<Mutex<DocumentSession>, String>>,
+    control: crate::host::foreign_doc::DocumentControl,
+}
+impl ApiSession {
+    fn mutex(&self) -> Result<&Mutex<DocumentSession>, String> {
+        self.document.wait().as_ref().map_err(Clone::clone)
+    }
+    fn lock(&self) -> Result<MutexGuard<'_, DocumentSession>, String> {
+        let guard = self.mutex()?.lock().map_err(|_| "session lock poisoned".to_string())?;
+        if self.closed.load(Ordering::Acquire) { return Err("session closed".into()); }
+        Ok(guard)
+    }
+}
+fn sessions() -> &'static Mutex<HashMap<String, Arc<ApiSession>>> {
+    static S: OnceLock<Mutex<HashMap<String, Arc<ApiSession>>>> = OnceLock::new();
     S.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
@@ -17,7 +36,7 @@ fn body_value(body: &str) -> serde_json::Value {
     serde_json::from_str(body).unwrap_or(serde_json::Value::Null)
 }
 
-fn path_of(root: &Path, v: &serde_json::Value) -> Result<(String, PathBuf), String> {
+fn requested_path(root: &Path, v: &serde_json::Value) -> Result<(String, PathBuf), String> {
     let rel = v
         .get("path")
         .and_then(|p| p.as_str())
@@ -28,21 +47,37 @@ fn path_of(root: &Path, v: &serde_json::Value) -> Result<(String, PathBuf), Stri
         return Err("missing path".into());
     }
     let abs = root.join(rel.replace('/', std::path::MAIN_SEPARATOR_STR));
+    Ok((rel, abs))
+}
+
+fn path_of(root: &Path, v: &serde_json::Value) -> Result<(String, PathBuf), String> {
+    let (rel, abs) = requested_path(root, v)?;
     if !abs.is_file() {
         return Err(format!("file not found: {rel}"));
     }
     Ok((rel, abs))
 }
 
-fn get_or_open(root: &Path, abs: &Path) -> Result<Arc<Mutex<DocumentSession>>, String> {
+fn get_or_open(root: &Path, abs: &Path) -> Result<Arc<ApiSession>, String> {
     let key = abs.display().to_string();
-    let mut map = sessions().lock().map_err(|_| "session lock poisoned".to_string())?;
-    if let Some(s) = map.get(&key) {
-        return Ok(Arc::clone(s));
+    let arc = {
+        let mut map = sessions().lock().map_err(|_| "session lock poisoned".to_string())?;
+        Arc::clone(map.entry(key.clone()).or_insert_with(|| Arc::new(ApiSession {
+            closed: AtomicBool::new(false),
+            control: Default::default(), document: OnceLock::new(),
+        })))
+    };
+    // Kernel startup may block. It must never hold the registry lock needed by
+    // interrupt requests for an unrelated already-running document.
+    let initialized = arc.document.get_or_init(|| DocumentSession::open(abs, root).map(|mut session| {
+        session.adopt_control(arc.control.clone());
+        Mutex::new(session)
+    }));
+    if let Err(error) = initialized {
+        let mut map = sessions().lock().map_err(|_| "session lock poisoned".to_string())?;
+        if map.get(&key).is_some_and(|old| Arc::ptr_eq(old, &arc)) { map.remove(&key); }
+        return Err(error.clone());
     }
-    let session = DocumentSession::open(abs, root)?;
-    let arc = Arc::new(Mutex::new(session));
-    map.insert(key, Arc::clone(&arc));
     Ok(arc)
 }
 
@@ -137,6 +172,7 @@ pub fn api_close(root: &Path, body: &str) -> serde_json::Value {
         .and_then(|mut m| m.remove(&key));
     if let Some(arc) = removed {
         if let Ok(mut s) = arc.lock() {
+            arc.closed.store(true, Ordering::Release);
             s.close();
         }
     }
@@ -181,17 +217,54 @@ pub fn api_persist_cell(root: &Path, body: &str) -> serde_json::Value {
 }
 
 pub fn api_interrupt(root: &Path, body: &str) -> serde_json::Value {
-    with_session(root, body, "interrupted", |s| s.interrupt())
+    let v = body_value(body);
+    // A control request addresses an existing loaded session. It neither reads
+    // the source again nor creates a process as a side effect of cancellation.
+    let (_, abs) = match requested_path(root, &v) { Ok(p) => p, Err(e) => return err(e) };
+    let session = match sessions().lock() {
+        Ok(map) => match map.get(&abs.display().to_string()) { Some(s) => s.clone(), None => return err("no open session".into()) },
+        Err(_) => return err("session lock poisoned".into()),
+    };
+    if session.closed.load(Ordering::Acquire) { return err("session closed".into()); }
+    let mutex = match session.document.get() {
+        Some(Ok(mutex)) => mutex, Some(Err(error)) => return err(error.clone()),
+        None => return err("session is still opening; no evaluation is active".into()),
+    };
+    let result = match mutex.try_lock() {
+        Ok(mut document) => if session.closed.load(Ordering::Acquire) { err("session closed".into()) } else { match document.interrupt() {
+            Ok(value) => ok_session(&document, serde_json::json!({ "interrupted": json_value(&value), "in_flight": false })),
+            Err(error) => err(error),
+        } },
+        Err(TryLockError::WouldBlock) => match session.control.interrupt() {
+            Ok(value) => {
+                let receipt = json_value(&value);
+                let accepted = receipt["results"].as_array().is_some_and(|rows| rows.iter().all(|row| row["accepted"] == true));
+                if accepted { serde_json::json!({ "ok": true, "interrupted": receipt, "in_flight": true }) }
+                else { serde_json::json!({ "ok": false, "error": "interrupt delivery failed", "interrupted": receipt, "in_flight": true }) }
+            },
+            Err(error) => err(error),
+        },
+        Err(TryLockError::Poisoned(_)) => err("session lock poisoned".into()),
+    };
+    result
 }
 
 pub fn api_export_snapshot(root: &Path, body: &str) -> serde_json::Value {
-    with_session(root, body, "snapshot", |s| s.export_snapshot())
+    let v = body_value(body);
+    let compact = match v.get("compact") { None | Some(serde_json::Value::Bool(false)) => false,
+        Some(serde_json::Value::Bool(true)) => true, _ => return err("compact must be boolean".into()) };
+    with_session(root, body, "snapshot", |s| {
+        let snapshot = s.export_snapshot()?;
+        if compact { crate::host::foreign_doc::packing::pack(&snapshot) } else { Ok(snapshot) }
+    })
 }
 
 pub fn api_import_snapshot(root: &Path, body: &str) -> serde_json::Value {
     let v = body_value(body);
     let snapshot = v.get("snapshot").cloned().unwrap_or(serde_json::Value::Null);
-    let snapshot = match json_to_value(&snapshot) {
+    let snapshot = match json_to_value(&snapshot).and_then(|value| if crate::host::foreign_doc::packing::is_packed(&value) {
+        crate::host::foreign_doc::packing::unpack(&value)
+    } else { Ok(value) }) {
         Ok(v) => v,
         Err(e) => return err(e),
     };
@@ -201,7 +274,9 @@ pub fn api_import_snapshot(root: &Path, body: &str) -> serde_json::Value {
 pub fn api_replay_snapshot(root: &Path, body: &str) -> serde_json::Value {
     let v = body_value(body);
     let snapshot = v.get("snapshot").cloned().unwrap_or(serde_json::Value::Null);
-    let snapshot = match json_to_value(&snapshot) {
+    let snapshot = match json_to_value(&snapshot).and_then(|value| if crate::host::foreign_doc::packing::is_packed(&value) {
+        crate::host::foreign_doc::packing::unpack(&value)
+    } else { Ok(value) }) {
         Ok(v) => v,
         Err(e) => return err(e),
     };
@@ -209,13 +284,28 @@ pub fn api_replay_snapshot(root: &Path, body: &str) -> serde_json::Value {
 }
 
 pub fn api_replay_check(root: &Path, body: &str) -> serde_json::Value {
-    let v = body_value(body);
-    let snapshot = v.get("snapshot").cloned().unwrap_or(serde_json::Value::Null);
-    let snapshot = match json_to_value(&snapshot) {
-        Ok(v) => v,
-        Err(e) => return err(e),
+    // Decode before serde_json::Value can overwrite duplicate recording fields.
+    let request = match crate::host::json::parse(&Value::Text(body.to_string())) {
+        Ok(value) => value,
+        Err(error) => return err(error),
     };
-    with_session(root, body, "replay_check", |s| s.replay_check(&snapshot))
+    let v = match value_to_json(&request) { Ok(v) => v, Err(e) => return err(e) };
+    let (_, abs) = match path_of(root, &v) { Ok(path) => path, Err(e) => return err(e) };
+    let Value::Map(fields) = request else { return err("request must be a map".into()) };
+    let Some((_, snapshot)) = fields.iter().find(|(k,_)| k == "snapshot") else { return err("missing snapshot".into()) };
+    let check = match DocumentSession::check_snapshot_isolated(&abs, root, snapshot) {
+        Ok(check) => check, Err(error) => return err(error),
+    };
+    let existing = match sessions().lock() {
+        Ok(map) => map.get(&abs.display().to_string()).cloned(),
+        Err(_) => return err("session lock poisoned".into()),
+    };
+    let extra = serde_json::json!({"replay_check": json_value(&check)});
+    if let Some(arc) = existing {
+        match arc.lock() { Ok(session) => ok_session(&session, extra), Err(_) => err("session lock poisoned".into()) }
+    } else {
+        serde_json::json!({"ok": true, "replay_check": json_value(&check)})
+    }
 }
 
 pub fn api_clear_cell(root: &Path, body: &str) -> serde_json::Value {
@@ -442,4 +532,78 @@ mod tests {
         );
         let _ = api_close(&root, open_body());
     }
+}
+
+#[cfg(test)]
+mod replay_api_tests {
+    use super::*;
+    #[test]
+    fn closed_api_session_cannot_be_reactivated_after_path_reopen() {
+        let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let relative = format!("target/api-close-capability-{}.mq.md", std::process::id());
+        let path = root.join(&relative);
+        std::fs::write(&path, "---\nimport:\n  foreign: lib/foreign.mq.md\n---\n# main\n\n`会话` = > foreign.session\n\n`a` =\n```python\nn = 1\n```\n").unwrap();
+        let old = get_or_open(&root, &path).unwrap();
+        old.lock().unwrap().run_all(false).unwrap();
+        let body = serde_json::json!({"path": relative}).to_string();
+        assert_eq!(api_close(&root, &body)["ok"], true);
+        let fresh = get_or_open(&root, &path).unwrap();
+        assert!(!Arc::ptr_eq(&old, &fresh));
+        assert!(old.lock().is_err());
+        fresh.lock().unwrap().run_all(false).unwrap();
+        assert_eq!(api_close(&root, &body)["ok"], true);
+        std::fs::remove_file(path).unwrap();
+    }
+    #[test]
+    fn strict_replay_endpoint_uses_isolation_and_preserves_warm_session() {
+        let root=PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let relative=format!("target/api-replay-isolated-{}.mq.md",std::process::id());let path=root.join(&relative);
+        std::fs::write(&path,"---\nimport:\n  foreign: lib/foreign.mq.md\n---\n# main\n\n`会话` = > foreign.session\n\n`a` =\n```python\nstate = globals().get('state',0) + 1\nprint(state)\n```\n").unwrap();
+        let arc=get_or_open(&root,&path).unwrap();
+        let (snapshot,kernel)={let mut live=arc.lock().unwrap();live.run_all(false).unwrap();let snapshot=live.export_snapshot().unwrap();let kernel=live.cells[0].kernel.clone();live.set_value(&kernel,"state",Value::Int(99)).unwrap();(snapshot,kernel)};
+        let before={let live=arc.lock().unwrap();live.summary()};
+        let body=serde_json::json!({"path":relative,"snapshot":value_to_json(&snapshot).unwrap()}).to_string();
+        let response=api_replay_check(&root,&body);
+        assert_eq!(response["ok"],true,"{response}");assert_eq!(response["replay_check"]["ok"],true,"{response}");
+        assert_eq!(arc.lock().unwrap().summary(),before,"verification mutated live state");
+        let duplicate=body.replacen("\"snapshot\":", "\"snapshot\":null,\"snapshot\":",1);
+        let bad=api_replay_check(&root,&duplicate);assert_eq!(bad["ok"],false);assert!(bad["error"].as_str().unwrap().contains("duplicate"));
+        assert_eq!(arc.lock().unwrap().summary(),before);
+        assert_eq!(arc.lock().unwrap().pull_value(&kernel,"state").unwrap(),Value::Int(99),"isolated verification reset the user's actual kernel");
+        sessions().lock().unwrap().remove(&path.display().to_string());arc.lock().unwrap().close();std::fs::remove_file(path).unwrap();
+    }
+    #[cfg(unix)]
+    #[test]
+    fn malformed_replay_does_not_start_declared_seed_kernel() {
+        use std::os::unix::fs::PermissionsExt;
+        let root=PathBuf::from(env!("CARGO_MANIFEST_DIR"));let pid=std::process::id();
+        let relative=format!("target/api-replay-seeded-{pid}.mq.md");let path=root.join(&relative);
+        let wrapper=root.join(format!("target/api-replay-wrapper-{pid}.py"));let marker=root.join(format!("target/api-replay-marker-{pid}"));
+        let marker_literal=serde_json::to_string(&marker.display().to_string()).unwrap();
+        let script=format!("#!/usr/bin/python3\nimport os,sys\nfrom pathlib import Path\nPath({marker_literal}).write_text('started')\nos.execv(sys.executable,[sys.executable]+sys.argv[1:])\n");
+        std::fs::write(&wrapper,script).unwrap();std::fs::set_permissions(&wrapper,std::fs::Permissions::from_mode(0o755)).unwrap();
+        let command=serde_json::to_string(&wrapper.display().to_string()).unwrap();
+        let source=format!("---\nimport:\n  foreign: lib/foreign.mq.md\n---\n# main\n\n`kernels` =\n| 名称 | 语言 | 命令 |\n|---|---|---|\n| py | python | {command} |\n\n`units` =\n| 单元 | 内核 |\n|---|---|\n| a | py |\n\n`initial` =\n| 内核 | 名称 | 值 |\n|---|---|---|\n| py | n | 1 |\n\n`会话` = > foreign.session kernels=`kernels` cells=`units` values=`initial`\n\n`a` =\n```python\nprint(n)\n```\n");
+        std::fs::write(&path,source).unwrap();let mut recording=DocumentSession::open(&path,&root).unwrap();
+        recording.run_all(false).unwrap();let snapshot=recording.export_snapshot().unwrap();recording.close();assert!(marker.exists());std::fs::remove_file(&marker).unwrap();
+        let valid=value_to_json(&snapshot).unwrap();let mut malformed=valid.clone();malformed["actions"].as_array_mut().unwrap().pop();
+        let cold = api_interrupt(&root, &serde_json::json!({"path":relative}).to_string());
+        assert_eq!(cold["ok"], false); assert!(!marker.exists(), "cold interrupt started a kernel");
+        let body=serde_json::json!({"path":relative,"snapshot":malformed}).to_string();let response=api_replay_check(&root,&body);
+        assert_eq!(response["ok"],false,"{response}");assert!(!marker.exists(),"malformed suffix started a seed kernel before preflight");
+        assert!(!sessions().lock().unwrap().contains_key(&path.display().to_string()));
+        let packed = crate::host::foreign_doc::packing::pack(&snapshot).unwrap();
+        let mut corrupt = value_to_json(&packed).unwrap(); corrupt["sha256"] = "bad".into();
+        let response = api_replay_check(&root, &serde_json::json!({"path":relative,"snapshot":corrupt}).to_string());
+        assert_eq!(response["ok"], false); assert!(!marker.exists(), "corrupt DAG started a seed kernel");
+        let mut controls = valid.clone();
+        controls["actions"][0]["controls"] = serde_json::json!([{"after_us":-1,"results":[]}]);
+        let response = api_replay_check(&root, &serde_json::json!({"path":relative,"snapshot":controls}).to_string());
+        assert_eq!(response["ok"], false); assert!(!marker.exists(), "invalid control started a seed kernel");
+        let response=api_replay_check(&root,&serde_json::json!({"path":relative,"snapshot":valid}).to_string());
+        assert_eq!(response["replay_check"]["ok"],true,"{response}");assert!(marker.exists());
+        assert!(!sessions().lock().unwrap().contains_key(&path.display().to_string()));
+        std::fs::remove_file(path).unwrap();std::fs::remove_file(wrapper).unwrap();std::fs::remove_file(marker).unwrap();
+    }
+
 }

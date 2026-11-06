@@ -508,6 +508,20 @@ impl<'a> Parser<'a> {
             });
         }
         if self.eat("-") {
+            // The magnitude of i64::MIN is not itself a positive i64 literal.
+            // Recognize its signed token before recursively parsing a unary
+            // operand; decimal literals keep their floating-point type.
+            let start = self.i;
+            self.skip_ws();
+            let digits = self.rest().bytes().take_while(u8::is_ascii_digit).count();
+            let end = self.i + digits;
+            if &self.src[self.i..end] == "9223372036854775808"
+                && !self.src[end..].starts_with(['.', 'e', 'E'])
+            {
+                self.i = end;
+                return Ok(Expr::Literal(Literal::Int(i64::MIN)));
+            }
+            self.i = start;
             let expr = self.parse_unary()?;
             return Ok(Expr::Unary {
                 op: UnaryOp::Neg,

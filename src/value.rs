@@ -4,6 +4,44 @@ use std::fmt;
 
 use crate::formula::Expr as FormulaExpr;
 
+/// An object's defining module instance, expressed as import binding segments.
+/// This is ordinary copied data, not an unforgeable session capability.
+pub(crate) const OBJECT_MODULE_KEY: &str = "_type_module";
+
+pub(crate) fn instance_module(value: &Value) -> Result<Option<Vec<String>>, String> {
+    let Value::Map(fields) = value else { return Ok(None); };
+    let Some((_, module)) = fields.iter().find(|(key, _)| key == OBJECT_MODULE_KEY) else { return Ok(None); };
+    let Value::List(segments) = module else { return Err("object module tag must be a list of text segments".into()); };
+    segments.iter().map(|segment| match segment {
+        Value::Text(name) => Ok(name.clone()),
+        _ => Err("object module tag must be a list of text segments".into()),
+    }).collect::<Result<Vec<_>,_>>().map(Some)
+}
+
+pub(crate) fn tag_instance(type_name: &str, module: &[String], value: Value) -> Value {
+    let mut fields = match value {
+        Value::Map(fields) => fields,
+        Value::None => Vec::new(),
+        other => vec![("value".into(),other)],
+    };
+    fields.retain(|(key,_)| key != "_type" && key != OBJECT_MODULE_KEY);
+    fields.insert(0,("_type".into(),Value::Text(type_name.into())));
+    fields.insert(1,(OBJECT_MODULE_KEY.into(),Value::List(module.iter().cloned().map(Value::Text).collect())));
+    Value::Map(fields)
+}
+
+pub(crate) fn preserve_instance_module(receiver: &Value, value: Value) -> Value {
+    let Ok(Some(module)) = instance_module(receiver) else { return value; };
+    match value {
+        Value::Map(mut fields) => {
+            fields.retain(|(key,_)| key != OBJECT_MODULE_KEY);
+            fields.insert(1.min(fields.len()),(OBJECT_MODULE_KEY.into(),Value::List(module.into_iter().map(Value::Text).collect())));
+            Value::Map(fields)
+        }
+        other => other,
+    }
+}
+
 /// Bound Markdown code fence (`type` → `code`).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CodeBlock {
@@ -75,6 +113,7 @@ impl Value {
             Value::Map(pairs) => {
                 let parts: Vec<String> = pairs
                     .iter()
+                    .filter(|(key,_)| key != OBJECT_MODULE_KEY)
                     .map(|(k, v)| format!("{k}: {}", v.as_display()))
                     .collect();
                 format!("{{{}}}", parts.join(", "))

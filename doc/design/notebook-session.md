@@ -1,5 +1,35 @@
 # 文档会话（View Cells）
 
+## 2026-11-02：并发控制与完整历史 v5
+
+以下为当前实现；后文保留首版设计与当时的状态表。
+
+- HTTP `kernel/interrupt` 查找已存在的会话，经独立控制器发送请求，不等待单元执行锁或其他文档的初始化。未打开、尚在初始化的会话返回错误，不启动新内核。已加载文档的源码文件被删除后仍可取消正在执行的单元。
+- 内核的中断能力绑定其持有的子进程，并在回收前撤销；旧能力不能指向后来启动的内核。引导阶段的取消被暂存，收到 ready 后投递。逻辑取消输入会合并重复信号；投递错误明确返回。Windows 尚无对应的保状态中断实现。
+- 取消使 Run All 在当前单元结束后停止，返回实际 `ran`、`remaining` 和 `cancelled`；不会继续运行后续单元。内核没有退出时，取消前已发生的状态修改保留。close 撤销 API 会话，重新打开不会激活旧引用。
+- 完整历史 v5 将并发取消作为所在操作的 `controls` 输入记录：操作起点之后的微秒偏移及各内核的真实接收结果。严格回放按输入重新投递并重新观察回执；操作先结束时撤销剩余定时请求，不能流入下一操作。实际回执或观察不匹配就报告差异。v4 无控制输入的历史仍可检查；v4 中出现 controls 字段会被拒绝。
+- 严格检查先完成纯验证，再启动回放内核。实际执行中，每次协议请求必须先与预期请求一致；实际回复和每个单元的观察、批次结果也立即比较。首个差异后停止依赖后缀，包括同一个 Run All 内的后续单元。未执行的观察标记 `compared=false`，不冒充已比较的第二个差异。
+
+快照导出支持可选 `compact:true`。默认仍为完整 JSON；紧凑格式
+`marqdo.history.dag` v1 对相同子值做自底向上共享，整数使用十进制文本、
+浮点数保存 IEEE 位模式，保留映射顺序和全部历史字段。导入和严格回放会自动
+识别格式。SHA-256 校验只检测内容一致性，不提供来源认证。
+解码要求规范节点、向后引用、全部可达和唯一键，并在展开前检查最多
+1,000,000 个节点、8,000,000 个展开值、512 MiB 保守展开预算、128 层深度；
+展开后再次检查安全值域。此格式减少导出字节数，尚未减少录制时内存，也不保证更快。
+
+实际取消实验覆盖 Unix 上同步 Python/Node 持久会话；不能推导任意外部代码均有界停止。
+[Python 3.14 信号文档](https://docs.python.org/3.14/library/signal.html#execution-of-python-signal-handlers)
+说明纯 C 计算可延迟信号处理；
+[Node 22.22.1 vm 文档](https://nodejs.org/download/release/v22.22.1/docs/api/vm.html#timeout-interactions-with-asynchronous-tasks-and-promises)
+说明异步任务可能逃出同步求值的中断范围。完整源码 elaboration、控制适配器、
+真实时钟与信号调度到形式模型的 refinement 仍需完成，不能以这些测试代替。
+
+相关实现：`foreign_session/control.rs`、`foreign_doc/control.rs`、
+`foreign_doc/packing.rs`、`foreign_doc/replay.rs` 与 `view/notebook_api.rs`。
+真实 TCP/HTTP 取消、逐单元副作用屏障和独立快照消费记录位于论文
+`PLDI/experiments/reviewer-v5/`。
+
 | | |
 |---|---|
 | 状态 | **D1–D3 首版已实现；D4/D5 待做** |

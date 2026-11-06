@@ -45,14 +45,18 @@ fn run_with_env(args: &[&str], env: &[(&str, &str)]) -> (i32, String, String) {
 }
 
 fn assert_out(path: &str, expect: &str) {
-    let (code, stdout, stderr) = run(&["run", path]);
-    assert_eq!(code, 0, "{path} stderr={stderr}");
-    assert_eq!(stdout.trim_end(), expect.trim_end(), "{path}");
+    for backend in ["tree", "bytecode"] {
+        let (code, stdout, stderr) = run(&["run", path, "--backend", backend]);
+        assert_eq!(code, 0, "{path} {backend} stderr={stderr}");
+        assert_eq!(stdout.trim_end(), expect.trim_end(), "{path} {backend}");
+    }
 }
 
 fn assert_run_ok(path: &str) {
-    let (code, _stdout, stderr) = run(&["run", path]);
-    assert_eq!(code, 0, "{path} stderr={stderr}");
+    for backend in ["tree", "bytecode"] {
+        let (code, _stdout, stderr) = run(&["run", path, "--backend", backend]);
+        assert_eq!(code, 0, "{path} {backend} stderr={stderr}");
+    }
 }
 
 /// Skip live LLM/agent tests when no real API key is configured.
@@ -186,6 +190,21 @@ fn assert_err(path: &str, line_col: &str, substr: &str) {
             stderr.contains(substr),
             "{path} backend={backend} stderr missing {substr:?}: {stderr}"
         );
+    }
+}
+
+/// Imported faults have an actual library origin and a separate authored call site.
+fn assert_import_err(path: &str, library: &str, origin: &str, caller: &str, substr: &str) {
+    for backend in ["tree", "bytecode"] {
+        let (code, stdout, stderr) = run(&["run", path, "--backend", backend]);
+        assert_ne!(code, 0, "{path} backend={backend} unexpectedly succeeded stdout={stdout}");
+        let origin = format!("{library}:{origin}:");
+        assert!(stderr.lines().next().unwrap_or("").contains(&origin),
+            "{path} backend={backend} missing actual library origin {origin:?}: {stderr}");
+        let caller = format!(" from {path}:{caller}");
+        assert!(stderr.lines().skip(1).any(|line| line.starts_with("  called ") && line.ends_with(&caller)),
+            "{path} backend={backend} missing authored call site {caller:?}: {stderr}");
+        assert!(stderr.contains(substr), "{path} backend={backend} stderr missing {substr:?}: {stderr}");
     }
 }
 
@@ -1228,13 +1247,28 @@ fn bytecode_paragraph_comment() {
 
 #[test]
 fn trace_eval_json_tree() {
-    let (code, stdout, stderr) = run(&["run", "tests/structure/hello.mq.md", "--trace-eval"]);
+    let (code, stdout, stderr) = run(&["run", "tests/structure/hello.mq.md", "--backend", "tree", "--trace-eval"]);
     assert_eq!(code, 0, "{stderr}");
     assert_eq!(stdout.trim_end(), "Hello World!");
     assert!(stderr.contains("\"event\":\"enter_fn\""), "{stderr}");
     assert!(stderr.contains("\"event\":\"stmt\""), "{stderr}");
     assert!(stderr.contains("\"span\":\"5:1\""), "{stderr}");
     assert!(stderr.contains("\"event\":\"leave_fn\""), "{stderr}");
+}
+
+#[test]
+fn structure_self_method_paths_are_instance_methods() {
+    assert_out("tests/structure/self-method-paths.mq.md", "41\n41\n7");
+}
+
+#[test]
+fn structure_lexical_siblings_recursion_and_shadowing() {
+    assert_out("tests/structure/lexical-sibling-calls.mq.md", "120\n41\n99");
+}
+
+#[test]
+fn error_lexical_private_descendant_is_not_visible() {
+    assert_err("tests/errors/lexical-private-descendant.mq.md", "6:1", "unknown function `concealed`");
 }
 
 #[test]
@@ -1884,19 +1918,23 @@ fn lib_json_vsafe_string_ok() {
 
 #[test]
 fn lib_json_vsafe_refuse() {
-    // Span points at lib/json.mq.md `parse` body while path stays the caller file.
-    assert_err(
+    // Check both the actual library body and the user call, without mixing them.
+    assert_import_err(
         "tests/lib/json-vsafe-refuse.mq.md",
+        "lib/json.mq.md",
         "16:1",
+        "10:1",
         "json: integer outside V_safe",
     );
 }
 
 #[test]
 fn lib_json_vsafe_stringify_refuse() {
-    assert_err(
+    assert_import_err(
         "tests/lib/json-vsafe-stringify-refuse.mq.md",
+        "lib/json.mq.md",
         "24:1",
+        "11:1",
         "json: integer outside V_safe",
     );
 }
@@ -3630,9 +3668,11 @@ fn lib_foreign_session_vsafe_refuse() {
         return;
     }
     // Span points at lib/foreign.mq.md session_set body.
-    assert_err(
+    assert_import_err(
         "tests/lib/foreign-session-vsafe-refuse.mq.md",
+        "lib/foreign.mq.md",
         "207:1",
+        "12:1",
         "json: integer outside V_safe",
     );
 }
@@ -3643,9 +3683,11 @@ fn lib_foreign_session_use_after_close() {
         eprintln!("skip lib_foreign_session_use_after_close: no node on PATH");
         return;
     }
-    assert_err(
+    assert_import_err(
         "tests/lib/foreign-session-use-after-close.mq.md",
+        "lib/foreign.mq.md",
         "198:1",
+        "12:1",
         "foreign session",
     );
 }
@@ -3656,9 +3698,11 @@ fn lib_foreign_session_double_close() {
         eprintln!("skip lib_foreign_session_double_close: no node on PATH");
         return;
     }
-    assert_err(
+    assert_import_err(
         "tests/lib/foreign-session-double-close.mq.md",
+        "lib/foreign.mq.md",
         "231:1",
+        "12:1",
         "foreign session",
     );
 }
@@ -3666,9 +3710,11 @@ fn lib_foreign_session_double_close() {
 #[test]
 fn lib_foreign_session_use_before_open() {
     // Text fabrication is refused before registry lookup (opaque handle discipline).
-    assert_err(
+    assert_import_err(
         "tests/lib/foreign-session-use-before-open.mq.md",
+        "lib/foreign.mq.md",
         "198:1",
+        "10:1",
         "session id must be a handle",
     );
 }
@@ -3679,9 +3725,11 @@ fn lib_foreign_session_handle_no_serialize() {
         eprintln!("skip lib_foreign_session_handle_no_serialize: no node on PATH");
         return;
     }
-    assert_err(
+    assert_import_err(
         "tests/lib/foreign-session-handle-no-serialize.mq.md",
+        "lib/json.mq.md",
         "24:1",
+        "12:1",
         "session handle cannot be serialized",
     );
 }
@@ -3692,9 +3740,11 @@ fn lib_foreign_session_result_vsafe_refuse() {
         eprintln!("skip lib_foreign_session_result_vsafe_refuse: no python on PATH");
         return;
     }
-    assert_err(
+    assert_import_err(
         "tests/lib/foreign-session-result-vsafe-refuse.mq.md",
+        "lib/foreign.mq.md",
         "198:1",
+        "11:1",
         "json: integer outside V_safe",
     );
 }
@@ -3714,9 +3764,11 @@ fn lib_foreign_session_cold_replay_empty() {
         eprintln!("skip lib_foreign_session_cold_replay_empty: no node on PATH");
         return;
     }
-    assert_err(
+    assert_import_err(
         "tests/lib/foreign-session-cold-replay-empty.mq.md",
+        "lib/foreign.mq.md",
         "198:1",
+        "13:1",
         "foreign session",
     );
 }
@@ -3727,9 +3779,11 @@ fn lib_foreign_vsafe_refuse() {
         eprintln!("skip lib_foreign_vsafe_refuse: no python on PATH");
         return;
     }
-    assert_err(
+    assert_import_err(
         "tests/lib/foreign-vsafe-refuse.mq.md",
+        "lib/json.mq.md",
         "16:1",
+        "21:1",
         "json: integer outside V_safe",
     );
 }
@@ -3740,9 +3794,11 @@ fn lib_foreign_vsafe_postarith_refuse() {
         eprintln!("skip lib_foreign_vsafe_postarith_refuse: no python on PATH");
         return;
     }
-    assert_err(
+    assert_import_err(
         "tests/lib/foreign-vsafe-postarith-refuse.mq.md",
+        "lib/json.mq.md",
         "16:1",
+        "22:1",
         "json: integer outside V_safe",
     );
 }

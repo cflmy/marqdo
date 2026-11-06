@@ -220,6 +220,8 @@ pub enum HostFn {
     ForeignSessionInterrupt = 211,
     /// `<TAB>` M7: `access(集合, 键)` — polymorphic collection access (legacy index).
     Access = 212,
+    OracleJournal = 213,
+    OracleReplayCheck = 214,
 }
 
 /// Single source of truth for every host function. `<TAB>` slimming
@@ -438,6 +440,8 @@ pub const HOST_FN_TABLE: &[HostFnDef] = &[
     HostFnDef { id: 210, f: HostFn::ForeignSessionList, name: "host_foreign_session_list", required: &[], optional: &[] },
     HostFnDef { id: 211, f: HostFn::ForeignSessionInterrupt, name: "host_foreign_session_interrupt", required: &["id"], optional: &[] },
     HostFnDef { id: 212, f: HostFn::Access, name: "host_access", required: &["value", "key"], optional: &[] },
+    HostFnDef { id: 213, f: HostFn::OracleJournal, name: "host_oracle_journal", required: &[], optional: &[] },
+    HostFnDef { id: 214, f: HostFn::OracleReplayCheck, name: "host_oracle_replay_check", required: &["expected", "observed"], optional: &[] },
 ];
 
 
@@ -466,6 +470,8 @@ impl HostFn {
             "host_cwd" => Self::Cwd,
             "host_exit" => Self::Exit,
             "host_exec" => Self::Exec,
+            "host_oracle_journal" => Self::OracleJournal,
+            "host_oracle_replay_check" => Self::OracleReplayCheck,
             "host_json_parse" => Self::JsonParse,
             "host_json_stringify" => Self::JsonStringify,
             "host_json_get" => Self::JsonGet,
@@ -748,7 +754,13 @@ pub fn call_host(
             bound.get("args"),
             bound.get("capture"),
         ),
-        HostFn::JsonParse => json::parse(require(bound, "text")?),
+        HostFn::OracleJournal => Ok(Value::List(ctx.oracle_observations.clone())),
+        HostFn::OracleReplayCheck => super::oracle::replay_check(require(bound, "expected")?, require(bound, "observed")?),
+        HostFn::JsonParse => {
+            let value = json::parse(require(bound, "text")?)?;
+            super::oracle::append(ctx, "decode", &value)?;
+            Ok(value)
+        },
         HostFn::JsonStringify => {
             json::stringify(require(bound, "value")?, bound.get("indent"))
         }
@@ -1127,7 +1139,7 @@ pub fn call_host(
         HostFn::ForeignSessionEval => {
             #[cfg(feature = "exec-host")]
             {
-                crate::host::foreign_session::eval_with_stdin(
+                let record = crate::host::foreign_session::eval_with_stdin(
                     ctx,
                     require(bound, "id")?,
                     bound.get("code"),
@@ -1135,7 +1147,10 @@ pub fn call_host(
                     bound.get("input"),
                     bound.get("stdin").and_then(|v| v.reveal_text()),
                     bound.get("timeout"),
-                )
+                )?;
+                let value = super::oracle::eval_observation(&record)?;
+                super::oracle::append(ctx, "eval", &value)?;
+                Ok(record)
             }
             #[cfg(not(feature = "exec-host"))]
             {
@@ -1162,11 +1177,13 @@ pub fn call_host(
         HostFn::ForeignSessionGet => {
             #[cfg(feature = "exec-host")]
             {
-                crate::host::foreign_session::get(
+                let value = crate::host::foreign_session::get(
                     ctx,
                     require(bound, "id")?,
                     require(bound, "name")?,
-                )
+                )?;
+                super::oracle::append(ctx, "get", &value)?;
+                Ok(value)
             }
             #[cfg(not(feature = "exec-host"))]
             {
@@ -1177,7 +1194,9 @@ pub fn call_host(
         HostFn::ForeignSessionNames => {
             #[cfg(feature = "exec-host")]
             {
-                crate::host::foreign_session::names(ctx, require(bound, "id")?)
+                let value = crate::host::foreign_session::names(ctx, require(bound, "id")?)?;
+                super::oracle::append(ctx, "decode", &value)?;
+                Ok(value)
             }
             #[cfg(not(feature = "exec-host"))]
             {

@@ -4,6 +4,7 @@
 //! CLI also offers `view` for AST-backed browsing.
 
 pub mod aliases;
+mod arguments;
 pub mod artifact;
 pub mod label;
 pub mod migrate;
@@ -45,6 +46,16 @@ pub mod project;
 pub mod repair;
 pub mod sema;
 pub mod value;
+#[cfg(all(test, feature = "exec-host"))]
+mod source_refinement_tests;
+#[cfg(all(test, feature = "exec-host"))]
+mod application_tests;
+#[cfg(all(test, feature = "exec-host"))]
+mod causal_replay_tests;
+#[cfg(test)]
+mod source_map_tests;
+#[cfg(test)]
+mod frontend_elaboration_tests;
 #[cfg(feature = "net-host")]
 pub mod version_check;
 #[cfg(feature = "view")]

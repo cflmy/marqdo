@@ -100,12 +100,11 @@ pub(crate) fn execute_source_function(
         }
         Backend::Bytecode => {
             let program = compile_for_call(Some(path), &module)?;
-            let key: Vec<String> = display_name
-                .split('.')
-                .filter(|s| !s.is_empty())
-                .map(|s| s.to_string())
-                .collect();
-            let idx = program.path_index.get(&key).copied().ok_or_else(|| {
+            // Source binding is authoritative even when declaration paths repeat.
+            let idx = program.functions.iter().position(|chunk|
+                chunk.module_scope == 0 && chunk.declaration_span == fun.span
+                    && chunk.name == fun.name && chunk.source.sha256 == module.source.sha256
+            ).ok_or_else(|| {
                 call_diag(
                     Some(path),
                     line,
