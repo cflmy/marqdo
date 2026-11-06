@@ -8,6 +8,29 @@
 
 ### Changed
 
+## v2.4.0 — 2026-11-06
+
+### Highlights
+
+**Oracle journal 作语言值**：`foreign.oracle_journal` / `foreign.replay_check` 把观测与纯比较暴露为普通 Marqdo 值（非仅 notebook API）；handle/code 不得入 journal；`copy` 拒绝 code。Bytecode / frontend / foreign session 模块化与 applications 金样例；`verification/replay-policy` Lean 策略身份。CLI · wasm · ext **2.4.0**。
+
+**核心表面 Δ（Core surface Δ）**：**无增删**（仍 19 个构造）——变更在 `lib/foreign` 宿主表面与实现结构，不增 Markdown 标记。
+
+### Added
+
+- **`foreign.oracle_journal` / `foreign.replay_check`**：文档级观测列表与纯 journal 比较（`doc/design/oracle-journal-values.md`）。
+- **回归**：`foreign-oracle-{journal,names,failure}`、`foreign-{,session-}copy-code-refuse`、`tests/oracle_journal.rs`、applications 四场景、`verification/replay-policy`。
+- **文档**：`oracle-journal-values.md`；frontend-call / foreign-library 方向笔记。
+
+### Fixed
+
+- **view notebook API**：`OnceLock` 初始化等待兼容 MSRV **1.81**（不再调用 ≥1.84 的 `wait`）。
+- JSON `float_roundtrip` 特征，减少外联浮点往返失真。
+
+### Changed
+
+- Bytecode compile/VM、foreign_doc/session、sema resolution、notebook interrupt 路径拆模块（行为对齐既有 Strong 契约）。
+
 ## v2.3.0 — 2026-11-01
 
 ### Highlights

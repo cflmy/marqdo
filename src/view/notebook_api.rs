@@ -19,7 +19,13 @@ struct ApiSession {
 }
 impl ApiSession {
     fn mutex(&self) -> Result<&Mutex<DocumentSession>, String> {
-        self.document.wait().as_ref().map_err(Clone::clone)
+        // `OnceLock::wait` needs Rust ≥1.84; MSRV is 1.81 — poll until init.
+        loop {
+            match self.document.get() {
+                Some(slot) => return slot.as_ref().map_err(Clone::clone),
+                None => std::thread::yield_now(),
+            }
+        }
     }
     fn lock(&self) -> Result<MutexGuard<'_, DocumentSession>, String> {
         let guard = self.mutex()?.lock().map_err(|_| "session lock poisoned".to_string())?;
