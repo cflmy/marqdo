@@ -3,7 +3,7 @@ markup: occlusion
 title: quantum noise smoke
 description: bitflip p=1 after I flips |0> to |1| for all shots.
 import:
-  quantum: ext/quantum/quantum.mq.md
+  quantum: ext/quantum/circuit/index.mq.md
 ---
 
 # main

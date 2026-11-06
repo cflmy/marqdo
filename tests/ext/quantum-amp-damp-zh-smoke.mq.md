@@ -3,7 +3,7 @@ markup: occlusion
 title: quantum amplitude damping zh smoke
 description: 泡利X 后 振幅阻尼 p=1 全部落回 |0⟩.
 导入:
-  量子: ext/quantum/量子.mq.md
+  量子: ext/quantum/量子/电路/索引.mq.md
 ---
 
 # main

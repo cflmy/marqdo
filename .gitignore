@@ -87,6 +87,8 @@ plugins/*/tmp/
 
 # Local ABI plugin copies (use `marqdo ext add quantum` / cargo build)
 /ext/native/
+# Install-root path hints from `marqdo ext add` — never belong in the source tree
+/ext/*.plugin
 
 # Go web plugin c-shared build output (./scripts/build-web-plugin.sh)
 /plugins/web/build/

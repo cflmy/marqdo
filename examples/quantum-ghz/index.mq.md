@@ -3,7 +3,8 @@ markup: occlusion
 title: GHZ state
 description: 3-qubit GHZ; |000⟩/|111⟩ ≈ 1/2; probs + H matrix heatmap.
 import:
-  quantum: ext/quantum/quantum.mq.md
+  quantum: ext/quantum/circuit/index.mq.md
+  gate: ext/quantum/gate/index.mq.md
 ---
 
 # GHZ
@@ -24,7 +25,7 @@ H on qubit 0, CX(0→1), CX(0→2). Ideal: |000⟩ and |111⟩ each with probabi
 **p = > qc.probabilities**
 **_ = > qc.draw path="ghz.svg"**
 **_ = > qc.draw kind="probs" path="ghz-probs.svg"**
-**H = > quantum.gate name="H"**
+**H = > gate.gate name="H"**
 **_ = > H.draw kind="matrix" path="ghz-h-matrix.svg"**
 
 > print text=`p`

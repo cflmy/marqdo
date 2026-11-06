@@ -3,7 +3,7 @@ markup: occlusion
 title: Bell state
 description: H then CX; probabilities ≈ 1/2; circuit SVG.
 import:
-  quantum: ext/quantum/quantum.mq.md
+  quantum: ext/quantum/circuit/index.mq.md
   math: lib/math.mq.md
   json: lib/json.mq.md
 ---

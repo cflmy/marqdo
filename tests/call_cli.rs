@@ -217,3 +217,91 @@ fn impure_calls_do_not_run() {
         "denied write must not create sent.txt"
     );
 }
+
+#[test]
+fn nested_subtool_path_resolves() {
+    let file = root().join("tests/call/nested.mq.md");
+    for backend in ["tree", "bytecode"] {
+        assert_value(&file, "outer.helper", &["n=3"], backend, "6");
+        assert_value(&file, "helper", &["n=4"], backend, "8");
+    }
+}
+
+#[test]
+fn plugin_effects_flag_allows_quantum_ensure() {
+    let file = root().join("ext/quantum/_capability/index.mq.md");
+    let out = run(&[
+        "call",
+        "--effects",
+        "plugin",
+        "--json",
+        file.to_str().unwrap(),
+        "load",
+    ]);
+    assert_eq!(out.status.code(), Some(0), "{}", text(&out.stdout));
+    let body: serde_json::Value = serde_json::from_str(&text(&out.stdout)).unwrap();
+    assert_eq!(body["ok"], true, "{body}");
+}
+
+#[test]
+fn quantum_index_bell_via_call() {
+    let file = root().join("ext/quantum/index.mq.md");
+    let out = run(&[
+        "call",
+        "--effects",
+        "plugin",
+        "--json",
+        file.to_str().unwrap(),
+        "bell_phi_plus",
+    ]);
+    assert_eq!(out.status.code(), Some(0), "{}", text(&out.stdout));
+    let body: serde_json::Value = serde_json::from_str(&text(&out.stdout)).unwrap();
+    assert_eq!(body["ok"], true, "{body}");
+    let p00 = body["result"]["00"].as_f64().unwrap();
+    let p11 = body["result"]["11"].as_f64().unwrap();
+    assert!((p00 - 0.5).abs() < 0.05, "{body}");
+    assert!((p11 - 0.5).abs() < 0.05, "{body}");
+}
+
+#[test]
+fn toget_persists_serializable_value() {
+    let dir = std::env::temp_dir().join(format!("mq-call-sess-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&dir);
+    fs::create_dir_all(&dir).unwrap();
+    let file = root().join("tests/call/nested.mq.md");
+    let sess = "toget-demo";
+    let out1 = Command::new(bin())
+        .env("MARQDO_CALL_SESSION_DIR", &dir)
+        .args([
+            "call",
+            "--session",
+            sess,
+            "--toget",
+            "x",
+            "--json",
+            file.to_str().unwrap(),
+            "helper",
+            "n=5",
+        ])
+        .current_dir(root())
+        .output()
+        .unwrap();
+    assert_eq!(out1.status.code(), Some(0), "{}", text(&out1.stdout));
+    let out2 = Command::new(bin())
+        .env("MARQDO_CALL_SESSION_DIR", &dir)
+        .args([
+            "call",
+            "--session",
+            sess,
+            "--json",
+            file.to_str().unwrap(),
+            "helper",
+            "n=$x",
+        ])
+        .current_dir(root())
+        .output()
+        .unwrap();
+    assert_eq!(out2.status.code(), Some(0), "{}", text(&out2.stdout));
+    let body: serde_json::Value = serde_json::from_str(&text(&out2.stdout)).unwrap();
+    assert_eq!(body["result"], 20, "{body}");
+}

@@ -44,7 +44,24 @@ pub const CATALOG: &[ExtPackage] = &[
     ExtPackage {
         id: "quantum",
         description: "Quantum circuit simulator (ext/quantum) — gates/state vector",
-        mq_files: &["quantum/quantum.mq.md", "quantum/量子.mq.md"],
+        mq_files: &[
+            "quantum/index.mq.md",
+            "quantum/_capability/index.mq.md",
+            "quantum/circuit/index.mq.md",
+            "quantum/gate/index.mq.md",
+            "quantum/simulate/index.mq.md",
+            "quantum/state/index.mq.md",
+            "quantum/density/index.mq.md",
+            "quantum/viz/index.mq.md",
+            "quantum/量子/索引.mq.md",
+            "quantum/量子/能力/索引.mq.md",
+            "quantum/量子/电路/索引.mq.md",
+            "quantum/量子/门/索引.mq.md",
+            "quantum/量子/模拟/索引.mq.md",
+            "quantum/量子/态/索引.mq.md",
+            "quantum/量子/密度/索引.mq.md",
+            "quantum/量子/可视化/索引.mq.md",
+        ],
         native_crate: Some("marqdo_plugin_quantum"),
     },
     ExtPackage {
@@ -406,6 +423,20 @@ fn ensure_native_plugin(crate_name: &str) -> Result<PathBuf> {
     )
 }
 
+fn same_path(a: &Path, b: &Path) -> bool {
+    match (a.canonicalize(), b.canonicalize()) {
+        (Ok(x), Ok(y)) => x == y,
+        _ => a == b,
+    }
+}
+
+/// True when `install_root` is also a source `ext/` tree (dev layout). Copying
+/// there truncates `.mq.md` on Linux (`fs::copy` same-file) and drops `.plugin`
+/// junk into the repo.
+fn install_root_is_source_tree(root: &Path) -> bool {
+    source_ext_roots().iter().any(|s| same_path(root, s))
+}
+
 pub fn add_ext(id: &str) -> Result<()> {
     let pkg = find_package(id).with_context(|| {
         format!(
@@ -418,6 +449,14 @@ pub fn add_ext(id: &str) -> Result<()> {
         )
     })?;
     let root = install_root()?;
+    if install_root_is_source_tree(&root) {
+        bail!(
+            "refusing to install into extension *source* tree {} \
+(set MARQDO_EXT to an install directory such as ~/.marqdo/ext, \
+and use MARQDO_EXT_SOURCE for the repo ext/ when needed)",
+            root.display()
+        );
+    }
     fs::create_dir_all(&root)
         .with_context(|| format!("create install root {}", root.display()))?;
 
@@ -432,6 +471,12 @@ pub fn add_ext(id: &str) -> Result<()> {
     for f in pkg.mq_files {
         let src = find_source_file(f)?;
         let dest = root.join(f);
+        if same_path(&src, &dest) {
+            bail!(
+                "refusing same-file copy {} (install root overlaps source)",
+                src.display()
+            );
+        }
         if let Some(parent) = dest.parent() {
             fs::create_dir_all(parent)
                 .with_context(|| format!("create {}", parent.display()))?;

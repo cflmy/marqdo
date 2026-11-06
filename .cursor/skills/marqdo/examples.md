@@ -1,7 +1,5 @@
 # Marqdo examples (AI)
 
-v0.3: `**…**` = code (assign / call); `*…*` = return. Prefer `[key](coll)` over footnote get. Bracket calls: `礼貌 [问候] x`.
-
 ## 1. Hello (English)
 
 ```markdown
@@ -18,7 +16,7 @@ v0.3: `**…**` = code (assign / call); `*…*` = return. Prefer `[key](coll)` o
 > 打印 内容=你好，世界！
 ```
 
-## 3. Function + named call + empty return
+## 3. Function + named call + body end
 
 ```markdown
 # main
@@ -32,24 +30,22 @@ Greeting via a nested function:
 
 > print text=Hello, `who`!
 
-*None*
+---
 ```
-
-Or end with a whole-line empty bold return: `**` / `****`. Lone `---` is a thematic break (skipped), not function end.
 
 ## 4. Bindings and return
 
 ```markdown
 # main
 
-**a = 2**
-**b = add_one n=`a`**
-**打印 内容=`b`**
+*a = 2*
+*b = > add_one n=`a`*
+> print text=`b`
 
 ## add_one
     + `n`
 
-*n + 1*
+**n + 1**
 ```
 
 ## 5. Branch with else
@@ -57,7 +53,7 @@ Or end with a whole-line empty bold return: `**` / `****`. Lone `---` is a thema
 ```markdown
 # main
 
-**n = 0**
+*n = 0*
 
 1. `n` > 0
   > print text=positive
@@ -82,7 +78,8 @@ Or end with a whole-line empty bold return: `**` / `****`. Lone `---` is a thema
   > print text=`果`
 ```
 
-## 6b. Map table + link-index get
+
+## 6b. Map table + footnote get
 
 ```markdown
 # main
@@ -93,20 +90,13 @@ Or end with a whole-line empty bold return: `**` / `****`. Lone `---` is a thema
 |------|------|
 | 水果 | 蔬菜 |
 
-**种 = [苹果](分类)**
-**打印 内容=`种`**
+*种 = 分类[^苹果]*
+> print text=`种`
 
-`篮子` =
-
-| 果 |
-|----|
-| 苹果 |
-
-**第一 = [1](篮子)**
-**打印 内容=`第一`**
+*第一 = 篮子[^1]*
 ```
 
-One column → list; ≥2 columns + one data row → map; ≥2 columns + many rows → map of lists. Prefer `[key](coll)` (lists are 1-based). Legacy `` coll[^key] `` still parses. Foreach on a map walks **keys**.
+One column → list; ≥2 columns + one data row → map; ≥2 columns + many rows → map of lists. Data cells are expressions (same as call-arg values): bare words, numbers, `` `var` ``, quoted strings; URLs and `gpt-4o-mini` stay text via path/hyphen folding. Footnotes: lists use 1-based digit indices; maps use key text (including digit keys like `[^00]`). Foreach on a map walks **keys**.
 
 Row-oriented records (SQL-like): first header `@` / `行` / `row` → list of maps (marker column excluded):
 
@@ -117,27 +107,10 @@ Row-oriented records (SQL-like): first header `@` / `行` / `row` → list of ma
 |----|------|------|
 | 1 | 苹果 | 2 |
 
-**名 = [品名]([1](订单))**
+*名 = 订单[^1][^品名]*
 ```
 
-## 6c. Bracket-marked call + modifiers
-
-```markdown
-# main
-
-**打印 内容=(礼貌 [问候] "Marqdo")**
-
-## 问候
-    + `谁`
-    + `礼貌`=False
-
-**出 = `礼貌` + ", " + `谁` + "!"**
-*出*
-```
-
-`礼貌 [问候] …` → `礼貌=True`. `]` immediately followed by `(` is index, not a call.
-
-## 6d. Browser effects — tables + lib/browser (not json.set)
+## 6c. Browser effects — tables + lib/browser (not json.set)
 
 ```markdown
 ---
@@ -156,63 +129,12 @@ import:
 **`wire`**
 
 ## bump
-**count = count + 1**
-**label = str count**
+*`count` = count + 1*
+*`label` = > str count*
 **> browser.set_text sel="#count" text=label**
 ```
 
 Do **not** build effect maps with `json.set` chains. See [marqdo-dev](../marqdo-dev/SKILL.md).
-
-## 6e. Agent / LLM result maps — GFM first (positive)
-
-Return and soft-error packs are **tables**, not `json.set` pipelines. Full style contract: [marqdo-dev](../marqdo-dev/SKILL.md) §2.
-
-```markdown
----
-import:
-  table: lib/table.mq.md
----
-
-## step_ok
-    + `task`
-    + `reply`
-
-`out` =
-
-| status | task | result |
-|--------|------|--------|
-| ok | `task` | `reply` |
-
-*out*
-
-## step_err
-    + `task`
-    + `err`
-
-`out` =
-
-| status | task | error |
-|--------|------|-------|
-| error | `task` | `err` |
-
-*out*
-
-## soft_http_pack
-    + `msg`
-    + `usage0`
-
-**empty_tc = > table.empty_list**
-
-`pack` =
-
-| finish | text | error | usage | tool_calls |
-|--------|------|-------|-------|------------|
-| error | "" | `msg` | `usage0` | `empty_tc` |
-
-*pack*
-```
-
-Do **not** mirror legacy `ext/ai/agent.mq.md` `json.parse`+`json.set` chains when adding new arms — convert the shape to a table.
 
 ## 7. Import text stdlib
 
@@ -225,43 +147,8 @@ import:
 
 # main
 
-**parts = [text.str_split] s="a,b,c" sep=","**
-**打印 内容=`parts`**
-```
-
-## 7b. Mid M1 — regex + encoding (no plugin)
-
-```markdown
----
-import:
-  re: lib/re.mq.md
-  enc: lib/encoding.mq.md
----
-
-# main
-
-**`ok` = [re.is_match] text="a@b.c" pattern="@"**
-**`b64` = [enc.base64_encode] text="hi"**
-**打印 内容=`ok`**
-**打印 内容=`b64`**
-```
-
-## 7c. Mid M6 — log + uuid
-
-```markdown
----
-import:
-  log: lib/log.mq.md
-  uuid: lib/uuid.mq.md
----
-
-# main
-
-> log.info text="start"
-> log.set_level level="debug"
-> log.debug text="detail"
-**id = [uuid.v4]**
-**打印 内容=`id`**
+*parts = > split value=a,b,c sep=,*
+> print text=`parts`
 ```
 
 ## 8. Comment paragraphs (blank-line rule)
@@ -270,7 +157,7 @@ import:
 # main
 
 This whole paragraph is a comment, including lines that look like code:
-**not_executed = 1**
+*not_executed = 1*
 > print text=also still comment
 
 After a blank line, code runs:
@@ -289,13 +176,13 @@ import:
 
 # main
 
-**t = > num value=3.5**
-**打印 内容=`t`**
+*t = > num value=3.5*
+> print text=`t`
 ```
 
 ## 10. Object handle + method
 
-See `tests/structure/object-handle.mq.md` and `ext/ai/llm.mq.md`: `# Type` constructs a map with `_type`; methods use `` > `obj`.method `` and read `self` / `自`.
+See `tests/structure/object-handle.mq.md` and `ext/llm.mq.md`: `# Type` constructs a map with `_type`; methods use `` > `obj`.method `` and read `self` / `自`.
 
 ## 10b. Object inheritance
 
@@ -305,16 +192,16 @@ See `tests/structure/object-handle.mq.md` and `ext/ai/llm.mq.md`: `# Type` const
 ## hello
     + `who`
 
-**msg = "Hello, `who`!"**
-*msg*
+*msg = "Hello, `who`!"*
+**msg**
 
 # Loud = > Greeter
 
 ## hello
     + `who`
 
-**msg = "HELLO, `who`!"**
-*msg*
+*msg = "HELLO, `who`!"*
+**msg**
 ```
 
 `_type` stays the most specific name (`Loud`). Methods walk the base chain; same-name `##` on the child overrides. **No implicit super** — if the child needs parent fields, call the parent explicitly:
@@ -323,9 +210,9 @@ See `tests/structure/object-handle.mq.md` and `ext/ai/llm.mq.md`: `# Type` const
 # Child = > Parent
     + `name`
 
-**self = > Parent name=`name`**
-**self = [table.put] in=`self` at="extra" value=1**
-*self*
+*self = > Parent name=`name`*
+*self = > json.set map=`self` key=extra value=1*
+**self**
 ```
 
 ## 11. Agent layout (ABI)
@@ -340,9 +227,9 @@ import:
 
 > load_native
 
-**ws = > agent**
-**n = > `ws`.ensure_layout**
-**打印 内容=`n`**
+*ws = > agent*
+*n = > `ws`.ensure_layout*
+> print text=`n`
 ```
 
 Requires `MARQDO_AGENT_PLUGIN` pointing at the built `agent` shared library (see `doc/design/ext-agent.md`).
@@ -350,14 +237,14 @@ Requires `MARQDO_AGENT_PLUGIN` pointing at the built `agent` shared library (see
 ## 12. What not to emit
 
 ```markdown
-# BAD — bare bold that is not code-shaped (decorative OK); do not use bold/italic as print
+# BAD — bold is return, not print
 **Hello**
 
 # BAD — Python control keywords
 if x > 0:
   print(x)
 
-# BAD — wrapping a call in italics as if it were a statement
+# BAD — wrapping a call in italics
 *> print text=hi*
 
 # BAD — old branch syntax (removed)
@@ -374,58 +261,48 @@ if x > 0:
   > print text=y-pos
 2. *
   > print text=y-other
-
-# GOOD — print / return
-**打印 内容="hi"**
-*n + 1*
 ```
 
-## 13. Dynamic site (ext/web, minimal)
+## 13. Dynamic site (Web Artifact, minimal)
+
+`index.mq.md`:
 
 ```markdown
 ---
-title: hello-site
+type: web
+title: Hello
+route: /
+method: GET
+---
+
+# Hello
+
+Executable document as a page.
+```
+
+`serve.mq.md`:
+
+```markdown
+---
 import:
   web: ext/web/web.mq.md
-  db: db/index.mq.md
 ---
 
 # main
 
-`shell` =
-
-| 组件 | 样式 |
-|------|------|
-| nav | |
-
-`main` =
-
-| 属性 | 值 | 样式 |
-|------|-----|------|
-| title | posts.title | |
-| body | posts.summary | |
-
-**store = > db.open**
-**css = "body{font-family:sans-serif}"**
-**page = > web.page title="Hello"**
-**page = > page.compose_components components=`shell`**
-**page = > page.compose_main main=`main`**
-**page = > page.css css=`css`**
-**app = > web.app page=`page` port=8080**
-**app = > app.static prefix="/static" dir="static"**
-> listen app=`app`
+> web.serve root="." host="127.0.0.1" port=8080
 ```
 
-- Import `ext/web/web.mq.md` **or** `ext/web/网页.mq.md` — not both; match API language to the file.
-- Full blog/CMS patterns: `examples/marqdo-blog/` (routes, SEO, RSS, auth, upload, WS).
-- Run after `marqdo ext add web` and building `marqdo_plugin_web`.
+- Import `ext/web/web.mq.md` **or** `ext/web/网页.mq.md` — not both.
+- Full Artifact blog: `examples/marqdo-blog/` (`pages/` · `api/` · `db/` · `data_source`).
+- Design: `doc/design/ext-web-artifact.md` · ADR 0007. No `compose_*` / `configure`.
 
 ## 14. Quantum entanglement lab (ext/quantum Q7/Q8)
 
 ```markdown
 ---
 import:
-  quantum: ext/quantum/quantum.mq.md
+  quantum: ext/quantum/circuit/index.mq.md
 ---
 
 # main
@@ -437,43 +314,15 @@ import:
 | 1 | H | 0 |
 | 2 | CX | 0,1 |
 
-**qc = > quantum.circuit qubits=2 steps=`steps`**
-**rho = > `qc`.density**
-**red = > `rho`.partial_trace keep=0**
-**sch = > `qc`.schmidt cut=1**
-**_ = > `qc`.draw kind="circuit" theme="dark"**
-**_ = > `qc`.draw kind="hinton"**
-**打印 内容=`red`**
+*qc = > quantum.circuit qubits=2 steps=`steps`*
+*rho = > `qc`.density*
+*red = > `rho`.partial_trace keep=0*
+*sch = > `qc`.schmidt cut=1*
+*_ = > `qc`.draw kind="circuit" theme="dark"*
+*_ = > `qc`.draw kind="hinton"*
+> print text=`red`
 ```
 
 - Full lab: `examples/quantum-entanglement/`. Bell-only: `examples/quantum-bell/`.
 - `theme="dark"|"light"|"bw"` (default dark) on `circuit` / `probs` / `bloch`. Quote `kind=` / `theme=`.
 - After rebuilding the plugin: `marqdo ext add quantum` so view loads the new native lib.
-
-## 15. Linear algebra (ext/linalg)
-
-```markdown
----
-import:
-  la: ext/linalg/linalg.mq.md
----
-
-# main
-
-**`A` = > la.symbol name="A" rows=2 cols=2**
-**`B` = > la.symbol name="B" rows=2 cols=2**
-**`C` = `A` + `B`**
-**`P` = `A` * `B`**
-```
-
-Prefer:
-
-```markdown
-**`env` = > la.declare table=`shapes`**
-**`P` = [A](env) * [B](env)**
-**`t` = > `P`.T_ascii**
-```
-
-- Infix `+` / `-` / `*`；`ascii` / `T_ascii` 默认化简（`raw=True` 可关）。
-- Formula-doc design: [ext-linalg-formula-doc.md](../../doc/design/ext-linalg-formula-doc.md).
-- Examples: `examples/linalg-transpose/`, `examples/linalg-svd/`, `examples/linalg-least-squares/`.

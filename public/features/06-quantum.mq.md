@@ -3,7 +3,8 @@ markup: occlusion
 title: Quantum circuits (ext/quantum)
 description: Official quantum simulator — tables, gates, Q7 density, Q8 themed SVG
 import:
-  quantum: ext/quantum/quantum.mq.md
+  quantum: ext/quantum/circuit/index.mq.md
+  gate: ext/quantum/gate/index.mq.md
 ---
 
 # main
@@ -27,7 +28,7 @@ Q8: `draw theme="dark"|"light"|"bw"` (default dark lab look) on circuit / probs 
 **`qc` = > quantum.circuit qubits=3 steps=`steps`**
 **`p` = > `qc`.probabilities**
 **`_` = > `qc`.draw kind="probs" theme="dark"**
-**`H` = > quantum.gate name="H"**
+**`H` = > gate.gate name="H"**
 **`__` = > `H`.draw kind="matrix"**
 
 > print text=`p`

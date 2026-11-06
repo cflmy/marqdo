@@ -3,7 +3,7 @@ markup: occlusion
 title: quantum linalg smoke
 description: Q7a density / partial_trace / expect / schmidt / purity
 import:
-  quantum: ext/quantum/quantum.mq.md
+  quantum: ext/quantum/circuit/index.mq.md
   math: lib/math.mq.md
 ---
 

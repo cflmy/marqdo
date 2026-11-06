@@ -3,7 +3,7 @@ markup: occlusion
 title: Entanglement lab
 description: Bell state — density, partial trace, Schmidt, themed SVG (Q7/Q8).
 import:
-  quantum: ext/quantum/quantum.mq.md
+  quantum: ext/quantum/circuit/index.mq.md
   math: lib/math.mq.md
 ---
 

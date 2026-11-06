@@ -12,13 +12,13 @@ marqdo view PATH          # docs browser, default port 7429
 marqdo debug PATH         # debugger UI, default port 7430
 marqdo catalog PATH -o .marqdo
 marqdo ext list
-marqdo ext add llm|agent|web|quantum|linalg
-marqdo ext remove llm|agent|web|quantum|linalg
+marqdo ext add llm|agent|web|quantum
+marqdo ext remove llm|agent|web|quantum
 ```
 
 Diagnostics look like `path:line:col: message` (1-based line/col).
 
-**v0.3 surface:** `**…**` = code; `*…*` = return; parameters `` + `name` `` (or prose-inferred); branches `` 1. `cond` `` / `` 2. * `` (same-indent restart at `1.` = **new** branch statement); loops `` - [item](coll) ``; get `` [key](coll) ``; bracket calls `` mod [fn] args ``. See `doc/design/markdown-mapping-v0.3.md`.
+**v0.2 surface:** parameters `` + `name` ``; branches `` 1. `cond` `` / `` 2. * `` (same-indent restart at `1.` = **new** branch statement); loops `` - [item](coll) `` or `` - [`item`](`coll`) ``; identifiers in backticks (foreach header may omit ticks). See `doc/design/markdown-mapping.md`.
 
 Stdlib search order for `lib/…` imports: `MARQDO_LIB`, `./lib`, directory of the `marqdo` executable (and a few parents). Prefer the **bundle zip** (`marqdo.exe` + `lib/`) over a bare exe.
 
@@ -44,15 +44,6 @@ Import one file; use **that** file’s function names.
 |-----------|-----------|-------------------------|
 | `lib/text.mq.md` | `lib/文本.mq.md` | text helpers / 去空白·拆分·拼接… |
 | `lib/table.mq.md` | `lib/表.mq.md` | `put`/`改` + list/map（见 `doc/design/stdlib-table.md`） |
-| `lib/re.mq.md` | `lib/正则.mq.md` | Mid：`is_match`/`find`/`replace`/… |
-| `lib/encoding.mq.md` | `lib/编码.mq.md` | Mid：base64/hex |
-| `lib/path.mq.md` | `lib/路径.mq.md` | Mid：join/normalize/… |
-| `lib/hash.mq.md` | `lib/哈希.mq.md` | Mid：sha256/hmac/… |
-| `lib/secrets.mq.md` | `lib/机密.mq.md` | Mid：token_hex/urlsafe |
-| `lib/csv.mq.md` | `lib/逗号表.mq.md` | Mid：parse/stringify |
-| `lib/cli.mq.md` | `lib/命令行.mq.md` | Mid：`parse` flags |
-| `lib/log.mq.md` | `lib/日志.mq.md` | Mid：level-filtered one-line logs |
-| `lib/uuid.mq.md` | `lib/标识.mq.md` | Mid：UUID v4 |
 | `lib/browser.mq.md` | `lib/浏览器.mq.md` | WASM client effect helpers（GFM + `set_text`/`canvas`/…；见 marqdo-dev） |
 | `lib/fs.mq.md` | `lib/文件.mq.md` | filesystem |
 | `lib/sys.mq.md` | `lib/系统.mq.md` | process / cwd / load_dotenv |
@@ -65,29 +56,28 @@ Import one file; use **that** file’s function names.
 | `ext/llm.mq.md` | `ext/大模型.mq.md` | `# llm` / `# 大模型` object + chat methods |
 | `ext/agent.mq.md` | `ext/智能体.mq.md` | document-driven **step** / **plan** + OKF；示例 `examples/agent-pong` · `agent-okf-flywheel`；Wave B：[agent-framework-2026-09.md](../../doc/research/agent-framework-2026-09.md) |
 | `ext/web/web.mq.md` | `ext/web/网页.mq.md` | dynamic sites — see **ext/web** section below |
-| `ext/quantum/quantum.mq.md` | `ext/quantum/量子.mq.md` | circuits + Q7 density/viz + Q8 themes — see **ext/quantum** below |
-| `ext/linalg/linalg.mq.md` | `ext/linalg/线性代数.mq.md` | formula MatExpr + factorize/draw — see **ext/linalg** below |
+| `ext/quantum/index.mq.md` + modules | `ext/quantum/量子/索引.mq.md` + modules | circuits + Q7 density/viz + Q8 themes — see **ext/quantum** below |
 
 Open the imported `.mq.md` under `lib/` or `ext/` to see exact `##` / `#` names and parameters. Gold tests: `tests/lib/`, `tests/structure/`, `tests/ext/`.
 
-## ext/web (dynamic sites)
+## ext/web (Artifact sites · ADR 0007)
 
-Install: `marqdo ext add web` (`网页`). Native: `cargo build --release -p marqdo_plugin_web`.
+Install: `marqdo ext add web` (`网页`). Native: `bash scripts/build-web-plugin.sh`.
 
-| EN import | ZH import | Core types |
-|-----------|-----------|------------|
-| `ext/web/web.mq.md` | `ext/web/网页.mq.md` | `# page` `# style` `# db` `# form` `# app` `# auth` `# cache` `# storage` |
+| EN import | ZH import | Surface |
+|-----------|-----------|---------|
+| `ext/web/web.mq.md` | `ext/web/网页.mq.md` | facade: `page` · `route` · `serve` · `render` · `inspect` · `use` |
 
-| Area | EN methods (representative) | Notes |
-|------|----------------------------|-------|
-| Page | `compose_components`, `compose_main`, `render`, `meta`, `paginate` | GFM tables; cells are literal path strings |
-| DB | `init`, `insert`, `select`, `paginate`, `get`, `update`, `delete`, `migrate`, `fts`, `search`, `count`, `事务`/`txn` | init supports `unique`/`index`/`fk`; auto `created_at`/`updated_at` |
-| App | `route`, `static`, `configure`, `listen`, `auth`, `gate`, `upload`, `download`, `gallery`, `route_rss`, `redirect`, `error_page`, `sitemap`, `robots` | W0–W7 + P3 complete |
-| Auth | `login`, `check`, `logout`, `hash_password` | argon2 + CSRF + SQLite sessions; `role` for RBAC |
+| Kind | Metadata | Notes |
+|------|----------|-------|
+| Document | `type: web` / `类型: 网页` | `route` · `data_source` · `data_order` · `data_where` |
+| Endpoint | `type: endpoint` / `类型: 端点` | `path` · `method` · `# main` handler · `request`/`response` |
+| View | `|type|slot|value|attrs|style|` | `web.render nodes=` |
+| Resource | `ext/data` · `ext/security` · `ext/net` | db/cache/storage · auth/rbac/oidc · websocket |
 
-Drivers (Postgres / Redis / S3): `db url=postgres://…`, `cache url=memory:`, `storage url=file:…` — see `doc/design/ext-web-drivers.md`.
+Do **not** use `compose_*` / `app.configure` / author `ensure_plugin`.
 
-Example project: `examples/marqdo-blog/`. Capability matrix: `doc/design/web-net-capabilities.md`.
+Example: `examples/marqdo-blog/`. Design: `doc/design/ext-web-artifact.md`. Historical matrix: `doc/design/web-net-capabilities.md`.
 
 ## ext/quantum (circuits + Q7/Q8)
 
@@ -95,7 +85,7 @@ Install: `marqdo ext add quantum` (`量子`). Native: `cargo build --release -p 
 
 | EN import | ZH import | Core types |
 |-----------|-----------|------------|
-| `ext/quantum/quantum.mq.md` | `ext/quantum/量子.mq.md` | `# circuit` `# gate` `# density` |
+| `ext/quantum/circuit/index.mq.md` (etc.) | `ext/quantum/量子/电路/索引.mq.md` (etc.) | `# circuit` / `# 电路` · `# gate` / `# 门` · `# density` / `# 密度` + call tools |
 
 | Area | EN APIs | Notes |
 |------|---------|-------|
@@ -107,16 +97,6 @@ Install: `marqdo ext add quantum` (`量子`). Native: `cargo build --release -p 
 | Themes (Q8) | `theme="dark"\|"light"\|"bw"` (ZH `主题=`) | default **dark**; circuit/probs/bloch themed; SVG `data-theme` |
 
 Examples: `examples/quantum-bell/`, `examples/quantum-entanglement/`. Design: `doc/design/ext-quantum.md` · Q7: `doc/design/ext-quantum-q7.md` · Q8: `doc/design/ext-quantum-viz-style.md`.
-
-## ext/linalg (formula-first linear algebra)
-
-Install: `marqdo ext add linalg` (`线性代数`). Native: `cargo build --release -p marqdo_plugin_linalg`, then re-run `ext add`.
-
-| EN import | ZH import | Notes |
-|-----------|-----------|-------|
-| `ext/linalg/linalg.mq.md` | `ext/linalg/线性代数.mq.md` | Top-level `symbol`/`mul`/`factorize`/`draw` |
-
-Examples: `examples/linalg-svd/`, `examples/linalg-least-squares/`. Design: `doc/design/ext-linalg.md` · formula-doc: `doc/design/ext-linalg-formula-doc.md` · roadmap: `doc/roadmap/ext-linalg.md`.
 
 ## Formula + plot (math)
 
@@ -185,8 +165,7 @@ See `doc/design/call-arguments.md`.
 
 | Doc | Topic |
 |-----|--------|
-| `doc/design/markdown-mapping-v0.3.md` | Syntax constitution (runtime) |
-| `doc/design/markdown-mapping.md` | Legacy v0.2 notes |
+| `doc/design/markdown-mapping.md` | Syntax constitution |
 | `doc/design/objects.md` | `#` objects / `##` methods |
 | `doc/design/keywords.md` | Builtins / keywords |
 | `doc/design/return-hr-and-code-surface.md` | Function end / surfaces |
@@ -201,6 +180,4 @@ See `doc/design/call-arguments.md`.
 | `doc/design/ext-quantum.md` | `ext/quantum` circuits |
 | `doc/design/ext-quantum-q7.md` | Q7 density linear algebra + advanced SVG |
 | `doc/design/ext-quantum-viz-style.md` | Q8 themed SVG (`dark`/`light`/`bw`; circuit/probs/bloch) |
-| `doc/design/ext-linalg.md` | `ext/linalg` formula MatExpr + factorize/draw |
-| `doc/design/ext-linalg-formula-doc.md` | 公式文档面：跑通即正确 · 代数/计算两面 |
 | `doc/design/view-debug.md` | view / debug hosts |

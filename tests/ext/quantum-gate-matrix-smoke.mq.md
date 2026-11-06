@@ -3,14 +3,15 @@ markup: occlusion
 title: quantum gate matches_matrix smoke
 description: Named H matches an explicit 2x2 nested list.
 import:
-  quantum: ext/quantum/quantum.mq.md
+  quantum: ext/quantum/circuit/index.mq.md
+  gate: ext/quantum/gate/index.mq.md
   json: lib/json.mq.md
 ---
 
 # main
 
 **H_matrix = > json.parse text=[[0.7071067811865475,0.7071067811865475],[0.7071067811865475,-0.7071067811865475]]**
-**H = > quantum.gate name="H"**
+**H = > gate.gate name="H"**
 **ok = > `H`.matches_matrix matrix=`H_matrix`**
 
 1. `ok`

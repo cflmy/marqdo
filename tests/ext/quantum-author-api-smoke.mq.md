@@ -3,7 +3,7 @@ markup: occlusion
 title: quantum author API smoke
 description: barrier, measure, append, state, draw meters.
 import:
-  quantum: ext/quantum/quantum.mq.md
+  quantum: ext/quantum/circuit/index.mq.md
 ---
 
 # main

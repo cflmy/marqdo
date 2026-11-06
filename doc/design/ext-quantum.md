@@ -72,7 +72,7 @@ math 是**高中符号与曲线**；quantum 是**离散希尔伯特空间上的�
 
 1. **仅 ABI 插件接入**：`plugins/quantum` → `libquantum.so`；L1 在 `ext/quantum/*.mq.md`。  
 2. **`ext/quantum/**` 禁止 `host_*`**；经 `plugin.native_path` + `plugin.load`（同 web/agent）。  
-3. **中英分文件**：`quantum.mq.md` / `量子.mq.md`，**禁止**混排 API（[stdlib-i18n.md](stdlib-i18n.md)）。  
+3. **中英分文件**：同一包 `ext/quantum/` 内英文模块树 + `量子/` 中文树，**禁止**混排 API（[stdlib-i18n.md](stdlib-i18n.md)）。  
 4. **不改核心语法**；电路表单元格保持字面量；门名/比特下标由类方法解析。  
 5. **模拟器有硬上限**（默认 ≤ 12 qubits）；超限报错，不静默截断。  
 6. **view 必须有专项展示**（结构卡 + 执行区 SVG），禁止只 dump JSON。
@@ -81,15 +81,29 @@ math 是**高中符号与曲线**；quantum 是**离散希尔伯特空间上的�
 
 ## 3. 布局与安装
 
+Skill / tools 树（012 试点，见 [ext-index-skill-tools.md](ext-index-skill-tools.md)）：
+
 ```text
-ext/quantum/
-  quantum.mq.md          # 英文类 API
-  量子.mq.md             # 中文类 API
+ext/quantum/                      # 一个扩展包（同 web/ai：中英同目录）
+  index.mq.md                     # EN 根 SKILL
+  circuit/ · gate/ · simulate/ · state/ · density/ · viz/
+  _capability/index.mq.md
+  量子/                           # ZH 根与模块（同等 skill 标准）
+    索引.mq.md
+    电路/ · 门/ · 模拟/ · 态/ · 密度/ · 可视化/ · 能力/
 plugins/quantum/
   Cargo.toml
-  src/lib.rs             # ABI v2：线性代数 / 施门 / 画 SVG
-examples/quantum-bell/   # 规范示例（Q3）
+  src/lib.rs                      # ABI v2
+examples/quantum-bell/
 tests/ext/quantum-*.mq.md
+```
+
+安装产物（`~/.marqdo/ext` 或 `MARQDO_EXT`，**不是**仓库 `ext/` 源码树）：
+
+```text
+quantum/...
+native/libquantum.so
+quantum.plugin                    # 绝对路径提示；勿提交
 ```
 
 ```bash
@@ -102,11 +116,11 @@ marqdo ext add quantum
 ```markdown
 ---
 import:
-  quantum: ext/quantum/quantum.mq.md
+  quantum: ext/quantum/circuit/index.mq.md
 ---
 ```
 
-或中文：`导入 量子:ext/quantum/量子.mq.md`。
+或中文：`导入 量子:ext/quantum/量子/电路/索引.mq.md`（根 skill：`ext/quantum/量子/索引.mq.md`）。
 
 ---
 
@@ -152,7 +166,7 @@ $$
 
 ## 5. 作者面 API（锁定草图）
 
-### 5.1 英文 `ext/quantum/quantum.mq.md`
+### 5.1 英文 `ext/quantum/circuit/index.mq.md`
 
 ```markdown
 # gate
@@ -199,7 +213,7 @@ $$
 
 门方法返回**更新后的 circuit 句柄**（与 web `compose_*` 相同：`` `qc` = > `qc`.h qubit=0 *``）。
 
-### 5.2 中文 `ext/quantum/量子.mq.md`
+### 5.2 中文 `ext/quantum/量子/`（根 `索引.mq.md`）
 
 | 英文 | 中文 |
 |------|------|
@@ -343,7 +357,7 @@ Q5  教学噪声 + barrier/measure/append/state — 见 [ext-quantum-q5.md](ext-
 ---
 title: Bell state
 import:
-  quantum: ext/quantum/quantum.mq.md
+  quantum: ext/quantum/circuit/index.mq.md
 ---
 
 # Bell |Φ+⟩

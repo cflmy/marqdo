@@ -3,7 +3,7 @@ markup: occlusion
 title: quantum amplitude damping smoke
 description: X then amplitude_damping p=1 returns all shots to |0>.
 import:
-  quantum: ext/quantum/quantum.mq.md
+  quantum: ext/quantum/circuit/index.mq.md
 ---
 
 # main

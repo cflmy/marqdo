@@ -3,7 +3,7 @@ markup: occlusion
 title: quantum bell smoke
 description: H+CX Bell state probabilities ≈ 1/2 each.
 import:
-  quantum: ext/quantum/quantum.mq.md
+  quantum: ext/quantum/circuit/index.mq.md
   math: lib/math.mq.md
 ---
 

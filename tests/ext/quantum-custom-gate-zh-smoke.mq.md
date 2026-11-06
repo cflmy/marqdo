@@ -3,7 +3,8 @@ markup: occlusion
 title: quantum custom gate zh from formula
 description: $$ 矩阵 $$ → 门 矩阵= → 施加.
 导入:
-  量子: ext/quantum/量子.mq.md
+  量子: ext/quantum/量子/电路/索引.mq.md
+  门: ext/quantum/量子/门/索引.mq.md
   math: lib/math.mq.md
 ---
 
@@ -14,7 +15,7 @@ $$
 \frac{1}{\sqrt{2}}\begin{pmatrix}1&1\\1&-1\end{pmatrix}
 $$
 
-**U = > 量子.门 矩阵=`H矩阵` 名="U"**
+**U = > 门.门 矩阵=`H矩阵` 名="U"**
 **qc = > 量子.电路 比特数=1**
 **qc = > `qc`.施加 门=`U` 比特=0**
 **p = > `qc`.概率**

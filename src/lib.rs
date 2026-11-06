@@ -14,7 +14,9 @@ pub mod browser_session;
 pub mod builtin;
 pub mod bytecode;
 pub mod call;
+pub mod call_session;
 pub mod capture;
+pub mod narrative_ratio;
 #[cfg(feature = "cli")]
 pub mod catalog;
 #[cfg(feature = "cli")]

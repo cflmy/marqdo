@@ -88,7 +88,7 @@
 
 ## 4. 作者面 API
 
-### 4.1 英文（`ext/quantum/quantum.mq.md`）
+### 4.1 英文（`ext/quantum/circuit/index.mq.md`）
 
 在既有 `# circuit` / `# gate` 之外增加（或扩展方法）：
 

@@ -3,7 +3,7 @@ markup: occlusion
 title: quantum zh API smoke
 description: Chinese 量子.电路 泡利Z sandwich.
 导入:
-  量子: ext/quantum/量子.mq.md
+  量子: ext/quantum/量子/电路/索引.mq.md
   math: lib/math.mq.md
 ---
 

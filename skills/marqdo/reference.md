@@ -56,7 +56,7 @@ Import one file; use **that** file’s function names.
 | `ext/llm.mq.md` | `ext/大模型.mq.md` | `# llm` / `# 大模型` object + chat methods |
 | `ext/agent.mq.md` | `ext/智能体.mq.md` | document-driven **step** / **plan** + OKF；示例 `examples/agent-pong` · `agent-okf-flywheel`；Wave B：[agent-framework-2026-09.md](../../doc/research/agent-framework-2026-09.md) |
 | `ext/web/web.mq.md` | `ext/web/网页.mq.md` | dynamic sites — see **ext/web** section below |
-| `ext/quantum/quantum.mq.md` | `ext/quantum/量子.mq.md` | circuits + Q7 density/viz + Q8 themes — see **ext/quantum** below |
+| `ext/quantum/index.mq.md` + modules | `ext/quantum/量子/索引.mq.md` + modules | circuits + Q7 density/viz + Q8 themes — see **ext/quantum** below |
 
 Open the imported `.mq.md` under `lib/` or `ext/` to see exact `##` / `#` names and parameters. Gold tests: `tests/lib/`, `tests/structure/`, `tests/ext/`.
 
@@ -85,7 +85,7 @@ Install: `marqdo ext add quantum` (`量子`). Native: `cargo build --release -p 
 
 | EN import | ZH import | Core types |
 |-----------|-----------|------------|
-| `ext/quantum/quantum.mq.md` | `ext/quantum/量子.mq.md` | `# circuit` `# gate` `# density` |
+| `ext/quantum/circuit/index.mq.md` (etc.) | `ext/quantum/量子/电路/索引.mq.md` (etc.) | `# circuit` / `# 电路` · `# gate` / `# 门` · `# density` / `# 密度` + call tools |
 
 | Area | EN APIs | Notes |
 |------|---------|-------|

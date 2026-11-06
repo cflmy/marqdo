@@ -7,7 +7,7 @@ description: >-
   importing lib/* or ext/web or ext/quantum, running marqdo CLI, building dynamic
   sites with ext/web, quantum circuits with ext/quantum, or when the user
   mentions Marqdo, mq.md, markup-as-syntax, code-as-documentation, web/网页, or
-  quantum/量子 extension.
+  quantum/量子 extension (ZH under ext/quantum/量子/).
 ---
 
 # Marqdo development
@@ -136,7 +136,7 @@ Chinese builtins (same functions, no import):
 
 ## Frontmatter imports + stdlib
 
-Imports use nested YAML `import:` (`导入:` equivalent): file (`.mq.md`) or short name (`lib.member`). Members are **not** flattened into the caller. Call with a bare dotted path:
+Imports use nested YAML `import:` (`导入` equivalent): file (`.mq.md`) or short name (`lib.member`). Members are **not** flattened into the caller. Call with a bare dotted path:
 
 ```markdown
 ---
@@ -195,12 +195,14 @@ Design: [ext-web-artifact.md](../../doc/design/ext-web-artifact.md) · example: 
 
 Install: `marqdo ext add quantum` (ZH id: `量子`). Build: `cargo build --release -p marqdo_plugin_quantum`, then **`marqdo ext add quantum` again** so view loads the new `libquantum.so` (stale plugin = old black/white circuits).
 
-- EN: `import quantum:ext/quantum/quantum.mq.md`
-- ZH: `导入 量子:ext/quantum/量子.mq.md`
+- **Root skill (read first):** [`ext/quantum/index.mq.md`](../../ext/quantum/index.mq.md) — explains every module and exact `marqdo call` commands for agents with no other context.
+- **Modules:** `circuit/` · `gate/` · `simulate/` · `state/` · `density/` · `viz/` · `_capability/` (each has `index.mq.md`). ZH package: `ext/quantum/量子/`（根 `索引.mq.md`，模块同名中文目录）.
+- **Agent:** `marqdo call ext/quantum/<module>/index.mq.md <fn> … --effects plugin` (`--toget` / `$name`). Narration: `marqdo check --narrative-ratio FILE`.
+- **Author import example:** `circuit: ext/quantum/circuit/index.mq.md` then `circuit.circuit` / method chain.
 
 **Hard rules:** `ext/**` never calls `host_*`; hot path is ABI plugin; ≤12 qubits for statevector; density-matrix ops ≤6 qubits; one language file per program; quote draw string args (`kind="…"`, `theme="…"`).
 
-**Core:** `# circuit` / `# gate` / `# density` — table `steps=` or method chain; `simulate` / `probabilities` / `run` / `draw`.
+**Core:** domain skills above (`# circuit` / `# gate` / `# density` on module files) — table `steps=` or method chain; `simulate` / `probabilities` / `run` / `draw`.
 
 **Q7 linear algebra:** `density`, `partial_trace`, `eig`, `expect` (Pauli string, left=high bit), `purity`, `kron`, `schmidt`, `fidelity`.
 
@@ -221,7 +223,7 @@ Design: [ext-quantum.md](../../doc/design/ext-quantum.md) · Q7: [ext-quantum-q7
 
 - `invoke` returns a record (`ok`, `code`, `stdout`, `stderr`, `ms`, `timed_out`, `truncated`, `result`); pass `input` for JSON stdin and `output="json"` for a parsed result.
 - `call` is JSON-in / JSON-out; `call_many` fans out one program over a list with ordered results.
-- `session_open` returns an opaque `handle` (not text; not JSON-serializable). `session_eval` / `set` / `get` borrow the handle; `session_close` consumes it (double-close / use-after-close fault). Prefer `foreign.replay_check` / language-level `foreign.oracle_journal` when comparing recordings (`replay_snapshot` only re-runs). JSON integers outside \(\pm(2^{53}-1)\) and ragged table columns are refused (`doc/design/v-safe-json.md`, `foreign-strong-correspondence.md`, `oracle-journal-values.md`).
+- `session_open` starts a persistent Python/Node kernel; `session_eval` evaluates source; `session_set` / `session_get` bridge values explicitly as JSON. Close it with `session_close`.
 - A view document opts into kernel state with `会话 = > foreign.session kernels=... cells=...`; the table names are free. `view` consumes only the `会话` handle and never scans source lines or reserved table names. Without `会话`, cells are stateless one-shot runs; no kernel is created. Clearing outputs calls `/api/session/clear` and keeps persistent kernel state. There is no separate notebook CLI mode or command, and no new Markdown marker exists.
 - The same source remains the authority; state crossing kernels is explicit, never implicitly mirrored.
 

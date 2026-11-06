@@ -3,7 +3,7 @@ markup: occlusion
 title: quantum author API zh smoke
 description: 屏障 / 测量 / 追加 / 态 / 绘图.
 导入:
-  量子: ext/quantum/量子.mq.md
+  量子: ext/quantum/量子/电路/索引.mq.md
 ---
 
 # main

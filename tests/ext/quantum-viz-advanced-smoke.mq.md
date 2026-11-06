@@ -3,7 +3,7 @@ markup: occlusion
 title: quantum viz advanced smoke
 description: Q7b hinton / qsphere / multibloch SVG markers
 import:
-  quantum: ext/quantum/quantum.mq.md
+  quantum: ext/quantum/circuit/index.mq.md
 ---
 
 # main

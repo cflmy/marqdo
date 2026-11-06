@@ -302,7 +302,7 @@ import:
 ```markdown
 ---
 import:
-  quantum: ext/quantum/quantum.mq.md
+  quantum: ext/quantum/circuit/index.mq.md
 ---
 
 # main

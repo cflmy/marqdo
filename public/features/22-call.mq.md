@@ -34,7 +34,7 @@ Those four uses are one call. Knowledge becomes a tool because knowledge can alr
 
 The command keeps a boundary.
 
-An external call runs a pure function. Writing files, starting a process, using the network or loading a plugin is refused before the function runs, so the side effect does not happen. Wider permission stays on the checks the project already has. An instance method needs its receiver; this command does not invent one.
+An external call defaults to a pure function. Writing files, starting a process, using the network or loading a plugin is refused before the function runs. Pass `--effects plugin` when the tool needs an ABI plugin (for example `ext/quantum`). Session bindings use `--session` and `--toget name` (or trailing `toget name`); later calls may pass `$name`. Nested sub-tools use a dotted path such as `outer.helper`. An instance method needs its receiver; this command does not invent one.
 
 The function must resolve to exactly one declaration. No match, or one short name that hits two functions, is a structured error. The command does not pick the first hit. Arguments bind through the signature and contract that the function already has. Missing, unknown and ill-typed arguments are diagnostics.
 

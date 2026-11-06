@@ -142,11 +142,12 @@ enum Commands {
         /// Source file.
         file: PathBuf,
 
-        /// Function display path, for example `计算器.加法`.
+        /// Function display path, for example `计算器.加法` or nested `parent.child`.
         function: String,
 
-        /// Named arguments `name=value` (integer, decimal, quoted text, True/False/None).
-        /// A value may be negative (`a=-2`). `--json` and `--backend` remain flags.
+        /// Named arguments `name=value` (integer, decimal, quoted text, True/False/None, JSON, `$name`).
+        /// A value may be negative (`a=-2`). Trailing `toget <name>` stores the result in the session.
+        /// `--json` and `--backend` remain flags.
         args: Vec<String>,
 
         /// Print one JSON object: `{"ok":true,"result":...}` or `{"ok":false,"error":...}`.
@@ -156,6 +157,18 @@ enum Commands {
         /// Runtime. Both backends execute the named function.
         #[arg(long, value_enum, default_value_t = BackendCli::Tree)]
         backend: BackendCli,
+
+        /// Side effects this call may perform (`none` = pure only; `plugin` allows ABI plugins).
+        #[arg(long, default_value = "none")]
+        effects: String,
+
+        /// Call-session id for `toget` / `$name` (default: env `MARQDO_CALL_SESSION` or `default`).
+        #[arg(long)]
+        session: Option<String>,
+
+        /// Store the return value under this name in the call session (also: trailing `toget NAME`).
+        #[arg(long)]
+        toget: Option<String>,
     },
     /// Static contract cross-check (渐进式契约): drift, unknown types, misplaced tables
     Check {
@@ -170,6 +183,10 @@ enum Commands {
         /// Also check prose above `>` calls (implicit occlusion; fuzzy, off by default)
         #[arg(long)]
         implicit_labels: bool,
+
+        /// Require narration ≥ 50% in each function unit (ext skill contract).
+        #[arg(long)]
+        narrative_ratio: bool,
 
         /// Parse an unmarked file with the legacy grammar for migration review.
         #[arg(long)]
@@ -810,10 +827,41 @@ fn try_main(cli: Cli) -> Result<i32> {
             args,
             json,
             backend,
+            effects,
+            session,
+            toget,
         } => {
             let outcome = (|| -> Result<marqdo::value::Value> {
-                let parsed = marqdo::call::parse_call_args(&args)?;
-                marqdo::call::call_file(&file, &function, &parsed, backend.into())
+                let effects = marqdo::call::CallEffects::parse(&effects)?;
+                let (arg_tokens, trailing_toget) = marqdo::call::split_toget(&args)?;
+                let toget = toget.or(trailing_toget);
+                let parsed = marqdo::call::parse_call_args(&arg_tokens)?;
+                let session = session.or_else(|| {
+                    if toget.is_some()
+                        || parsed.iter().any(|(_, v)| {
+                            matches!(
+                                v,
+                                marqdo::value::Value::Text(t)
+                                    if t.starts_with('$') || t.starts_with('@')
+                            )
+                        })
+                    {
+                        Some(marqdo::call_session::default_session_id())
+                    } else {
+                        None
+                    }
+                });
+                marqdo::call::call_file_with(
+                    &file,
+                    &function,
+                    &parsed,
+                    backend.into(),
+                    marqdo::call::CallOptions {
+                        effects,
+                        session,
+                        toget,
+                    },
+                )
             })();
             match outcome {
                 Ok(value) => {
@@ -849,15 +897,19 @@ fn try_main(cli: Cli) -> Result<i32> {
             file,
             json,
             implicit_labels,
+            narrative_ratio,
             legacy_markup,
         } => {
-            let diags = if legacy_markup {
+            let mut diags = if legacy_markup {
                 marqdo::parse::expr::with_markup(marqdo::parse::expr::Markup::Classic, || {
                     marqdo::check::check_path_opts(&file, implicit_labels)
                 })?
             } else {
                 marqdo::check::check_path_opts(&file, implicit_labels)?
             };
+            if narrative_ratio {
+                diags.extend(marqdo::narrative_ratio::check_file(&file)?);
+            }
             let mut errors = 0i32;
             for d in &diags {
                 if matches!(d.severity, marqdo::diagnostics::Severity::Error) {
