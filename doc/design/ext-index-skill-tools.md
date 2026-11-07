@@ -6,7 +6,7 @@
 | 日期 | 2026-11-06 |
 | 愿景 | [doc/next/012.md](../next/012.md)（手写真相源，本文不修改它） |
 | 范式长文 | [ext-skill-tools-paradigm.md](ext-skill-tools-paradigm.md)（布局、陷阱、验收清单、推广顺序） |
-| 试点 | `ext/quantum/` |
+| 试点 | `ext/quantum/`；[手册闭环与当前契约位置修正](ext-quantum-handbook.md) |
 | 相关 | [ext-abi.md](ext-abi.md) · [ext-quantum.md](ext-quantum.md) · [lib-code-as-docs.md](lib-code-as-docs.md) · [function-as-table-semantics.md](function-as-table-semantics.md) |
 
 ---
@@ -26,7 +26,7 @@
 | 代码 | 标记可执行；实现可薄委托 ABI / 兄弟模块 |
 | SKILL | `#` 下写清领域、何时用、**For AI agents → `marqdo call` 本文件** |
 | tools | `##` / `###` 即工具树；无旁路 schema |
-| 版式 | **形参契约表紧贴标题下**；**返回契约表在体末**（返回标记前） |
+| 版式 | **形参契约表紧贴标题下**；**返回契约表也在首条执行语句之前**（当前解析器只在此提取契约） |
 | 叙述 | 每个函数单元叙述占比 **≥ 50%**；公式与约定写进人话 |
 | 禁止 | `+` 清单当主表面；ABI 名罗列充文档；「内部文件免检」 |
 

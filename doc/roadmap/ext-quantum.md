@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | 状态 | **Q0–Q7 完结 · Q8a/Q8b 完结 · Q8c 待做** |
-| 日期 | 2026-08-28 |
+| 日期 | 2026-08-28 · 2026-11-08 手册闭环 |
 | **锁定设计** | [design/ext-quantum.md](../design/ext-quantum.md) |
 | 相关 | [ext-cli.md](../design/ext-cli.md) · [ext-abi.md](../design/ext-abi.md) · [stdlib-math.md](../design/stdlib-math.md) · [view.md](../design/view.md) |
 | 安装 | `marqdo ext add quantum`（`quantum` / `量子`） |
@@ -41,6 +41,8 @@
 
 ---
 
+2026-11-08：双语 index 已补完整实验、开发路线与真实契约；新增手册源示例的双后端测试。使用与开发从[根入口](../../ext/quantum/index.mq.md)开始，修改动机见[手册优化记录](../design/ext-quantum-handbook.md)。
+
 ## 3. 已收敛的原开放点
 
 | 原疑问 | 锁定结论（见设计文） |
@@ -48,7 +50,7 @@
 | 并进 math？ | **否**，独立 `ext/quantum` |
 | 电路表 | **要做**（Q3），与方法链等价 |
 | view 图 | 自绘 SVG；优先 `host_query("record_plot")`；不依赖 web |
-| 自由函数面 | **不**与对象面并行 |
+| 自由函数面 | 普通函数供 `call`，对象方法保留作者链；共用既有 ABI，见[手册修正](../design/ext-quantum-handbook.md) |
 
 ---
 

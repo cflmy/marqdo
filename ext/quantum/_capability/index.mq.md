@@ -8,22 +8,25 @@ import:
   sys: lib/sys.mq.md
 ---
 
-Capability
+Native capability — diagnose plugin discovery, then return to a domain module.
 
-This file is still a skill and a tool surface. It exists so the quantum package
-can load the native ABI plugin once. Everyday author programs and agents should
-call domain modules which invoke load for you. Reach for this page when checking
-whether the plugin is installed, not when building a Bell state.
+This boundary locates and loads the ABI v2 quantum library. Domain tools call
+load themselves, so normal experiments do not need a separate setup call.
+The Chinese capability file is an equivalent language facade of this boundary.
 
-## For AI agents
+```sh
+marqdo call ext/quantum/_capability/index.mq.md load --effects plugin --json
+```
 
-If you were given only this file, use it only to check the plugin. Day-to-day work
-should call circuit or simulate modules instead.
+Success returns null. Missing native libraries cause a nonzero exit with an
+installation hint; this helper uses sys.exit, so callers must also inspect
+process status instead of assuming every failure is a JSON envelope. Install
+with marqdo ext add quantum, or build marqdo_plugin_quantum in the source repo.
+MARQDO_QUANTUM_PLUGIN may point to a specific shared library for development.
 
-Call example (plain text):
-  marqdo call ext/quantum/_capability/index.mq.md load --effects plugin --json
-
-*None*
+Only this boundary imports lib/plugin. Do not add plugin loaders or host_*
+operations to domain code. If discovery changes, validate both language roots
+and tests/call_cli.rs before returning to [circuit](../circuit/index.mq.md).
 
 ## load
 

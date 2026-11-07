@@ -6,6 +6,7 @@
 | 日期 | 2026-08-12（初版）· 2026-08-28（Q7 · Q8 viz） |
 | 相关 | [stdlib-math.md](stdlib-math.md) · [ext-abi.md](ext-abi.md) · [ext-cli.md](ext-cli.md) · [ext-web.md](ext-web.md) · [view.md](view.md) · [stdlib-i18n.md](stdlib-i18n.md) · [roadmap/ext-quantum.md](../roadmap/ext-quantum.md) |
 | 安装（目标） | `marqdo ext add quantum`（中英：`quantum` / `量子`） |
+| 当前手册 | [根入口](../../ext/quantum/index.mq.md) · [中文入口](../../ext/quantum/量子/索引.mq.md) · [2026-11-08 优化记录](ext-quantum-handbook.md) |
 | 本文目的 | 锁定**作者面**、**模拟语义**、**view 可视化**与**分期**；指导 ABI 插件实现 |
 
 ---
