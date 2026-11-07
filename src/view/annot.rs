@@ -865,9 +865,17 @@ pub fn render_annot_band(annots: &[ViewAnnot], max_visible: usize) -> String {
             .arm_index
             .map(|c| format!(r#" data-arm-index="{c}""#))
             .unwrap_or_default();
+        // All call/iteration chips share the same source span, even when the
+        // rendered mark carries another frame's annotation ID.
+        let source_attr = format!(
+            " data-anchor-line=\"{}\"{}{}",
+            a.anchor_line,
+            a.anchor_byte_start.map(|n| format!(" data-anchor-byte-start=\"{n}\"")).unwrap_or_default(),
+            a.anchor_byte_end.map(|n| format!(" data-anchor-byte-end=\"{n}\"")).unwrap_or_default(),
+        );
         let hidden_attr = if frame_miss { " hidden" } else { "" };
         s.push_str(&format!(
-            r#"<button type="button" class="{classes}" data-annot-id="{id}" data-annot-kind="{kind}"{call}{loop_id}{iter}{arm}{hidden} title="{detail}">
+            r#"<button type="button" class="{classes}" data-annot-id="{id}" data-annot-kind="{kind}"{call}{loop_id}{iter}{arm}{source}{hidden} title="{detail}">
 <span class="annot-label">{label}</span>
 <span class="annot-value">{value}</span>
 </button>"#,
@@ -878,6 +886,7 @@ pub fn render_annot_band(annots: &[ViewAnnot], max_visible: usize) -> String {
             loop_id = loop_attr,
             iter = iter_attr,
             arm = arm_attr,
+            source = source_attr,
             hidden = hidden_attr,
             detail = escape(&a.detail),
             label = escape(&a.label),

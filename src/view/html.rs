@@ -1715,11 +1715,11 @@ pub fn layout(title: &str, nav: &str, main: &str) -> String {
 <div class="reader-ornament reader-blossom-bottom" aria-hidden="true"></div>
 <footer class="reader-footer"><span>MARQDO</span><span>代码即文档 · 文档即知识库 · 知识即可执行</span></footer>
 <div class="reader-dock" role="toolbar" aria-label="文档操作">
-<button type="button" class="icon-button" data-reader-action="reload" aria-label="重新加载">{reload_icon}</button>
-<button type="button" class="icon-button" data-reader-action="settings" aria-label="阅读设置">{settings_icon}</button>
-<button type="button" class="reader-play icon-button" data-reader-action="run" aria-label="运行文档">{play_icon}</button>
-<button type="button" class="icon-button" data-reader-action="clear" aria-label="清理输出">{clear_icon}</button>
-<button type="button" class="icon-button" data-reader-action="more" aria-label="更多操作">{more_icon}</button>
+<button type="button" class="icon-button" data-reader-action="reload" aria-label="重新加载"><span class="reader-dock-icon">{reload_icon}</span><span class="reader-dock-label" aria-hidden="true">刷新</span></button>
+<button type="button" class="icon-button" data-reader-action="settings" aria-label="阅读设置"><span class="reader-dock-icon">{settings_icon}</span><span class="reader-dock-label" aria-hidden="true">设置</span></button>
+<button type="button" class="reader-play icon-button" data-reader-action="run" aria-label="运行文档"><span class="reader-dock-icon">{play_icon}</span><span class="reader-dock-label" aria-hidden="true">运行</span></button>
+<button type="button" class="icon-button" data-reader-action="clear" aria-label="清理输出"><span class="reader-dock-icon">{clear_icon}</span><span class="reader-dock-label" aria-hidden="true">清理</span></button>
+<button type="button" class="icon-button" data-reader-action="more" aria-label="更多操作"><span class="reader-dock-icon">{more_icon}</span><span class="reader-dock-label" aria-hidden="true">更多</span></button>
 </div>
 <div class="reader-toast" role="status" aria-live="polite" hidden></div>
 <dialog id="reader-dialog" class="reader-dialog" aria-labelledby="reader-dialog-title"><div class="reader-dialog-head"><h2 id="reader-dialog-title"></h2><button type="button" class="icon-button" data-reader-action="close-dialog" aria-label="关闭">×</button></div><div id="reader-dialog-content"></div></dialog>

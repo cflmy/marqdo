@@ -6,7 +6,7 @@ description: Local browse and static export from the interpreter
 
 # main
 
-Version 2.5.0: `marqdo view` and `view output` share a warm paper reader with a new
+Version 2.5.1: `marqdo view` and `view output` share a warm paper reader with a new
 Marqdo logo, serif document text, botanical ornaments, navigation, search and a
 floating action toolbar. Wide screens place real execution notes in the margins;
 compact screens keep them below the corresponding paragraph. Click a note to
@@ -16,6 +16,10 @@ Static exports embed decorations, KaTeX and math fonts for offline reading. The
 play button runs the document in live view; static pages retain their captured
 results and explain how to start a live view. Ordinary document reruns update
 prose, bindings and notes from the same execution capture.
+
+Annotations follow the exact source span across calls and loop iterations. Flowing
+curves and staggered margin notes avoid source text and neighboring connections.
+The floating toolbar labels its actions: refresh, settings, run, clear and more.
 
 Local: `marqdo view public`
 

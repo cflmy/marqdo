@@ -126,6 +126,9 @@ jobs:
             ## Marqdo ${{ github.ref_name }}
 
             ### 亮点 / Highlights
+            - **v2.5.1**：View 连线优化——真实源码锚点、连续 S 形曲线、错落与避让；工具栏文字标签；保留深浅色配色
+            - **v2.5.1**: View annotation refinement — exact source anchors, flowing S-curves, staggered notes and collision avoidance; labeled toolbar; preserved themes
+            - **v2.5.1 ext**：扩展包同步 2.5.1 / Ext pack 2.5.1
             - **v2.5.0**：View 阅读界面重构——暖白金色主题、新 Logo、左右执行标注、导航搜索与悬浮工具栏；离线公式；重跑同次捕获刷新
             - **v2.5.0**: View reader redesign — warm paper theme, new logo, margin execution notes, navigation/search and floating controls; offline math; same-capture live refresh
             - **v2.5.0 ext**：扩展包同步 2.5.0 / Ext pack 2.5.0
