@@ -6,7 +6,16 @@ description: Local browse and static export from the interpreter
 
 # main
 
-Milestone: `marqdo view` and `view output` (v1.4.1 mid→mid annot leaders + document surface).
+Version 2.5.0: `marqdo view` and `view output` share a warm paper reader with a new
+Marqdo logo, serif document text, botanical ornaments, navigation, search and a
+floating action toolbar. Wide screens place real execution notes in the margins;
+compact screens keep them below the corresponding paragraph. Click a note to
+inspect its full captured value. Call and loop frame selectors remain available.
+
+Static exports embed decorations, KaTeX and math fonts for offline reading. The
+play button runs the document in live view; static pages retain their captured
+results and explain how to start a live view. Ordinary document reruns update
+prose, bindings and notes from the same execution capture.
 
 Local: `marqdo view public`
 

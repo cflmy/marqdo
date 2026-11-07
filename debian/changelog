@@ -1,3 +1,10 @@
+marqdo (2.5.0-1ppa1) noble; urgency=medium
+
+  * Marqdo 2.5.0: redesigned document reader, margin execution annotations,
+    offline math/assets, navigation/search, and consistent live result refresh.
+
+ -- Marqdo Maintainers <cflmy@users.noreply.github.com>  Sat, 07 Nov 2026 10:00:00 +0800
+
 marqdo (2.4.0-1ppa1) noble; urgency=medium
 
   * Marqdo 2.4.0: oracle journal as language values (foreign.oracle_journal /

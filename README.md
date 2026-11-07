@@ -284,7 +284,9 @@ marqdo catalog public -o .marqdo
 
 ---
 
-## 现状（v2.4.0）
+## 现状（v2.5.0）
+
+- **View 阅读界面（v2.5.0）**：暖白金色主题、新 Logo 与花枝装饰；真实执行信息左右引出、窄屏内联；导航/搜索/阅读设置/工具栏；重跑同步刷新与离线公式。CLI · wasm · ext 同步 **2.5.0**。
 
 - **Oracle journal 语言值（v2.4.0）**：`foreign.oracle_journal` / `foreign.replay_check` 作普通值；handle/code 拒入 journal；bytecode/frontend 硬化；扩展包同步 **2.4.0**
 - **Foreign Strong（v2.3.0）**：会话 `handle`（不可过桥）· 仿射 close · `replay_check`/oracle journal · 表 arity refuse · Ω∈\(V_{\mathsf{safe}}\)。扩展包同步 **2.3.0**
@@ -333,7 +335,7 @@ marqdo catalog public -o .marqdo
 - **浏览器 Marqdo（WASM）**：`marqdo wasm build` + 官方 bridge 自启（作者零业务 JS；桥内可含列表/路由/storage/ws/文件/Canvas/音频/Observer/拖放）；`lib/browser` + GFM；`web.client_embed`；示例 [browser-hello](examples/browser-hello/) · [browser-app](examples/browser-app/) · [browser-media](examples/browser-media/) · [web-client-site](examples/web-client-site/)（[ADR 0002](doc/adr/0002-browser-marqdo-wasm.md) · [D](doc/roadmap/browser-wasm-d.md) · [E](doc/roadmap/browser-wasm-e.md) · [F](doc/roadmap/browser-wasm-f.md)）
 - 选型：[ADR 0001 — Rust](doc/adr/0001-implementation-language.md) · [ADR 0002 — 浏览器 WASM](doc/adr/0002-browser-marqdo-wasm.md)（C0–C5 完结，见 [roadmap/browser-wasm.md](doc/roadmap/browser-wasm.md)）· [ADR 0003 — 异步效应](doc/adr/0003-browser-async-effects.md)
 
-### 如何使用最新 Marqdo（v2.4.0）
+### 如何使用最新 Marqdo（v2.5.0）
 
 **安装解释器（任选其一）**
 
@@ -348,7 +350,7 @@ marqdo catalog public -o .marqdo
 ```bash
 # 1) 源码安装（跟 tag 或 main）
 git clone https://github.com/cflmy/marqdo.git && cd marqdo
-git checkout v2.4.0   # 或留在 main
+git checkout v2.5.0   # 或留在 main
 cargo build --release
 export PATH="$PWD/target/release:$PATH"
 marqdo version
@@ -389,7 +391,7 @@ marqdo wasm build
 # → dist/wasm/ … 见 examples/browser-hello/
 
 # 6) Releases：Windows exe/zip/vsix；Linux CLI zip + native `.so` zip
-#    https://github.com/cflmy/marqdo/releases/tag/v2.4.0
+#    https://github.com/cflmy/marqdo/releases/tag/v2.5.0
 ```
 
 开发期也可用 `cargo run -- …` 代替已安装的 `marqdo`：

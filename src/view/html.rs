@@ -1,4 +1,4 @@
-//! HTML shell for `marqdo view` — Apple-inspired monochrome, system fonts only.
+//! Shared live/static reader shell with an offline, botanical editorial theme.
 
 use std::path::{Component, Path, PathBuf};
 
@@ -1660,6 +1660,10 @@ code.expr {
 "#
 }
 
+fn reader_icon(path: &str) -> String {
+    format!(r#"<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{}"/></svg>"#, path)
+}
+
 pub fn layout(title: &str, nav: &str, main: &str) -> String {
     format!(
         r##"<!DOCTYPE html>
@@ -1668,29 +1672,34 @@ pub fn layout(title: &str, nav: &str, main: &str) -> String {
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>{title} · marqdo</title>
-<link rel="icon" href="https://s3.cflmy.cn/logo/Logo.ico" type="image/x-icon"/>
-<link rel="shortcut icon" href="https://s3.cflmy.cn/logo/Logo.ico" type="image/x-icon"/>
-<link rel="apple-touch-icon" href="https://s3.cflmy.cn/logo/Logo.png"/>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" crossorigin="anonymous"/>
+<link rel="icon" href="{reader_logo}" type="image/svg+xml"/>
+<!-- katex.min.css: bundled for offline reading -->
+<style>{katex_css}</style>
 <style>{css}</style>
 </head>
-<body>
+<body class="reader-page">
 <input type="checkbox" id="nav-toggle"/>
 <label class="backdrop" for="nav-toggle" aria-hidden="true"></label>
-<header class="topbar">
-  <label class="nav-btn" for="nav-toggle" aria-label="Menu">☰</label>
-  <div class="brand-row">
-    <img class="logo" src="https://s3.cflmy.cn/logo/Logo.png" width="28" height="28" alt="marqdo"/>
-    <p class="brand">marqdo</p>
-  </div>
+<header class="reader-header">
+  <button type="button" class="reader-menu icon-button" data-reader-action="files" aria-label="文件目录" aria-expanded="false">{menu_icon}</button>
+  <a class="reader-brand" href="#" aria-label="Marqdo，返回顶部"><img src="{reader_logo}" width="46" height="46" alt=""/><span>Marqdo<small>EXECUTABLE KNOWLEDGE</small></span></a>
+  <button type="button" class="reader-search icon-button" data-reader-action="search" aria-label="搜索文档">{search_icon}</button>
+  <nav class="reader-tabs" aria-label="阅读导航">
+    <button type="button" class="is-active" data-reader-action="document" aria-current="page">文档</button>
+    <button type="button" data-reader-action="functions">函数</button>
+    <button type="button" data-reader-action="variables">变量</button>
+    <button type="button" data-reader-action="memory">内存</button>
+    <button type="button" data-reader-action="execution">运行</button>
+  </nav>
 </header>
+<div class="reader-ornament reader-blossom-top" aria-hidden="true"></div>
 <div class="shell">
 <aside class="nav">
   <div class="nav-brand">
     <div class="brand-row">
-      <img class="logo" src="https://s3.cflmy.cn/logo/Logo.png" width="32" height="32" alt="marqdo"/>
+      <img class="logo" src="{reader_logo}" width="32" height="32" alt="marqdo"/>
       <div>
-        <p class="brand">marqdo</p>
+        <p class="brand">Marqdo</p>
         <p class="tagline">view</p>
       </div>
     </div>
@@ -1703,6 +1712,22 @@ pub fn layout(title: &str, nav: &str, main: &str) -> String {
 </main>
 </div>
 </div>
+<div class="reader-ornament reader-blossom-bottom" aria-hidden="true"></div>
+<footer class="reader-footer"><span>MARQDO</span><span>代码即文档 · 文档即知识库 · 知识即可执行</span></footer>
+<div class="reader-dock" role="toolbar" aria-label="文档操作">
+<button type="button" class="icon-button" data-reader-action="reload" aria-label="重新加载">{reload_icon}</button>
+<button type="button" class="icon-button" data-reader-action="settings" aria-label="阅读设置">{settings_icon}</button>
+<button type="button" class="reader-play icon-button" data-reader-action="run" aria-label="运行文档">{play_icon}</button>
+<button type="button" class="icon-button" data-reader-action="clear" aria-label="清理输出">{clear_icon}</button>
+<button type="button" class="icon-button" data-reader-action="more" aria-label="更多操作">{more_icon}</button>
+</div>
+<div class="reader-toast" role="status" aria-live="polite" hidden></div>
+<dialog id="reader-dialog" class="reader-dialog" aria-labelledby="reader-dialog-title"><div class="reader-dialog-head"><h2 id="reader-dialog-title"></h2><button type="button" class="icon-button" data-reader-action="close-dialog" aria-label="关闭">×</button></div><div id="reader-dialog-content"></div></dialog>
+<style>{reader_css}
+.reader-hero h1::after {{ background-image:url("{reader_feather}"); }}
+.reader-blossom-top, .reader-blossom-bottom {{ background-image: url("{reader_blossom}"); }}
+</style>
+<script>{reader_js}</script>
 <dialog class="var-dialog" id="var-dialog" aria-labelledby="var-dialog-title">
   <div class="var-dialog-sheet">
     <div class="var-dialog-head">
@@ -1712,9 +1737,9 @@ pub fn layout(title: &str, nav: &str, main: &str) -> String {
     <div class="var-dialog-body" id="var-dialog-body"></div>
   </div>
 </dialog>
-<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js" crossorigin="anonymous"></script>
-<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js" crossorigin="anonymous"
-  onload="renderMathInElement(document.body,{{delimiters:[{{left:'$$',right:'$$',display:true}},{{left:'\\(',right:'\\)',display:false}}],ignoredTags:['script','noscript','style','textarea','pre','code','kbd']}});"></script>
+<script>{katex_js}</script>
+<script>{katex_render_js}</script>
+<script>document.addEventListener('DOMContentLoaded', function () {{ renderMathInElement(document.body, {{delimiters:[{{left:'$$',right:'$$',display:true}},{{left:'\\(',right:'\\)',display:false}}], ignoredTags:['script','noscript','style','textarea','pre','code','kbd']}}); if(window.MarqdoReader) window.MarqdoReader.refreshAnnotations(); }});</script>
 <script defer src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js" crossorigin="anonymous"
   onload="document.querySelectorAll('pre.code-body code').forEach(function(el){{hljs.highlightElement(el);}});"></script>
 <script>
@@ -2586,177 +2611,13 @@ pub fn layout(title: &str, nav: &str, main: &str) -> String {
     }});
   }}
 
-  function ensureBlockLeaders(block) {{
-    var leaders = block.querySelector(":scope > .annot-leaders");
-    if (!leaders) {{
-      leaders = document.createElement("div");
-      leaders.className = "annot-leaders";
-      leaders.setAttribute("aria-hidden", "true");
-      block.insertBefore(leaders, block.firstChild);
-    }}
-    return leaders;
-  }}
-
-  function leaderColor(kind) {{
-    if (kind === "bind") return "#5ac8fa";
-    if (kind === "return") return "#30d158";
-    if (kind === "call" || kind === "expr" || kind === "code") return "#ff9f0a";
-    if (kind === "branch") return "#bf5af2";
-    if (kind === "loop") return "#64d2ff";
-    return "#8e8e93";
-  }}
-
   function initAnnotLeaders() {{
-    var bands = document.querySelectorAll("[data-annot-band]");
-    if (!bands.length) return;
-    var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    var narrow = window.matchMedia && window.matchMedia("(max-width: 640px)").matches;
-
-    function layoutBand(band) {{
-      var block = band.closest(".doc-block");
-      if (!block) return;
-      var leaders = ensureBlockLeaders(block);
-      leaders.innerHTML = "";
-      var chipsEl = band.querySelector(".annot-chips");
-      var chips = Array.prototype.slice.call(
-        band.querySelectorAll(".annot-chip:not(.annot-chip-overflow):not([hidden]):not(.is-frame-hidden)")
-      );
-      // Pair chips with anchors; reorder DOM left→right under underlines so
-      // L-leaders do not cross (crowded reverse order looked like missing lines).
-      var items = [];
-      chips.forEach(function (chip) {{
-        var id = chip.getAttribute("data-annot-id") || "";
-        var kind = chip.getAttribute("data-annot-kind") || "";
-        var anchor = id
-          ? (block.querySelector('.mq-anchor[data-annot-id="' + id + '"]')
-            || document.querySelector('.mq-anchor[data-annot-id="' + id + '"]'))
-          : null;
-        // Fallback: match mark kind on this block (frame chips may share a span).
-        if (!anchor) {{
-          var cls = kind === "bind" ? "mq-decl"
-            : kind === "return" ? "mq-return"
-            : (kind === "call" || kind === "expr" || kind === "code") ? "mq-code"
-            : "";
-          if (cls) anchor = block.querySelector(".mq-anchor." + cls);
-        }}
-        if (!anchor) return;
-        if (id) anchor.setAttribute("data-annot-id", id);
-        items.push({{
-          chip: chip,
-          anchor: anchor,
-          kind: kind,
-          x: anchor.getBoundingClientRect().left
-        }});
-      }});
-      items.sort(function (a, b) {{ return a.x - b.x; }});
-      if (chipsEl && items.length) {{
-        items.forEach(function (it) {{ chipsEl.appendChild(it.chip); }});
-        var more = band.querySelector("[data-annot-more]");
-        if (more) chipsEl.appendChild(more);
-      }}
-      if (reduce || narrow || items.length > MAX_VISIBLE_ANNOTS) {{
-        block.classList.add("is-keyed");
-        band.classList.add("is-keyed");
-        items.forEach(function (it, i) {{
-          it.chip.setAttribute("data-annot-key", String(i + 1));
-        }});
-        return;
-      }}
-      block.classList.remove("is-keyed");
-      band.classList.remove("is-keyed");
-      // Mid-bottom of mark → mid-top of chip: vertical, horizontal rail, short stub.
-      var blockRect = block.getBoundingClientRect();
-      var bw = Math.max(1, block.offsetWidth);
-      var bh = Math.max(1, block.offsetHeight);
-      var svgNS = "http://www.w3.org/2000/svg";
-      var svg = document.createElementNS(svgNS, "svg");
-      svg.setAttribute("width", String(bw));
-      svg.setAttribute("height", String(bh));
-      svg.setAttribute("viewBox", "0 0 " + bw + " " + bh);
-      svg.setAttribute("aria-hidden", "true");
-      items.forEach(function (it) {{
-        var a = it.anchor.getBoundingClientRect();
-        var c = it.chip.getBoundingClientRect();
-        var x0 = a.left + a.width / 2 - blockRect.left;
-        var y0 = a.bottom - blockRect.top + 1;
-        var x1 = c.left + c.width / 2 - blockRect.left;
-        var y1 = c.top - blockRect.top;
-        if (y1 < y0 + 8) {{
-          y1 = y0 + 12;
-        }}
-        // Short stub into chip top-center; rail sits above that.
-        var stub = Math.min(10, Math.max(6, (y1 - y0) * 0.28));
-        var yRail = y1 - stub;
-        if (yRail < y0 + 4) {{
-          yRail = (y0 + y1) / 2;
-        }}
-        var path = document.createElementNS(svgNS, "path");
-        path.setAttribute("class", "annot-leader annot-" + it.kind);
-        path.setAttribute("stroke", leaderColor(it.kind));
-        // Orthogonal: down from mark mid → across → short down to chip mid.
-        path.setAttribute(
-          "d",
-          "M " + x0.toFixed(1) + " " + y0.toFixed(1) +
-            " L " + x0.toFixed(1) + " " + yRail.toFixed(1) +
-            " L " + x1.toFixed(1) + " " + yRail.toFixed(1) +
-            " L " + x1.toFixed(1) + " " + y1.toFixed(1)
-        );
-        svg.appendChild(path);
-      }});
-      leaders.appendChild(svg);
-    }}
-
-    function layoutAll() {{
-      bands.forEach(layoutBand);
-    }}
-    layoutAll();
-    // Second pass after fonts/layout settle (first paint often has zero chip width).
-    requestAnimationFrame(function () {{ layoutAll(); }});
-    if (document.documentElement.dataset.annotLeadersRo === "1") return;
-    document.documentElement.dataset.annotLeadersRo = "1";
-    if (typeof ResizeObserver !== "undefined") {{
-      var ro = new ResizeObserver(function () {{ layoutAll(); }});
-      bands.forEach(function (b) {{
-        ro.observe(b);
-        var blk = b.closest(".doc-block");
-        if (blk) ro.observe(blk);
-      }});
-      var surface = document.querySelector(".document-surface");
-      if (surface) ro.observe(surface);
-    }}
-    window.addEventListener("resize", layoutAll);
-
-    document.querySelectorAll("[data-annot-more]").forEach(function (btn) {{
-      if (btn.dataset.bound === "1") return;
-      btn.dataset.bound = "1";
-      btn.addEventListener("click", function () {{
-        var band = btn.closest("[data-annot-band]");
-        if (!band) return;
-        band.classList.add("is-expanded");
-        btn.hidden = true;
-        layoutAll();
-      }});
-    }});
-    document.querySelectorAll(".annot-chip").forEach(function (chip) {{
-      if (chip.dataset.focusBound === "1") return;
-      chip.dataset.focusBound = "1";
-      chip.addEventListener("mouseenter", function () {{
-        var id = chip.getAttribute("data-annot-id");
-        if (!id) return;
-        var a = document.querySelector('.mq-anchor[data-annot-id="' + id + '"]');
-        if (a) a.classList.add("is-focus");
-        chip.classList.add("is-focus");
-      }});
-      chip.addEventListener("mouseleave", function () {{
-        var id = chip.getAttribute("data-annot-id");
-        if (!id) return;
-        var a = document.querySelector('.mq-anchor[data-annot-id="' + id + '"]');
-        if (a) a.classList.remove("is-focus");
-        chip.classList.remove("is-focus");
-      }});
-    }});
+    if (window.MarqdoReader) window.MarqdoReader.refreshAnnotations();
   }}
 
+  window.marqdoInitDocument = function () {{
+    initForeignCards(); initCallPickers(); initLoopPickers(); initAnnotLeaders();
+  }};
   if (document.readyState === "loading") {{
     document.addEventListener("DOMContentLoaded", function () {{
       initForeignCards();
@@ -2821,6 +2682,21 @@ pub fn layout(title: &str, nav: &str, main: &str) -> String {
 "##,
         title = escape(title),
         css = stylesheet(),
+        katex_css = include_str!("assets/vendor/katex.min.css"),
+        katex_js = include_str!("assets/vendor/katex.min.js"),
+        katex_render_js = include_str!("assets/vendor/auto-render.min.js"),
+        reader_feather = include_str!("assets/feather.uri"),
+        reader_css = include_str!("reader.css"),
+        reader_js = include_str!("reader.js"),
+        reader_logo = include_str!("assets/logo.uri"),
+        reader_blossom = include_str!("assets/blossom.uri"),
+        menu_icon = reader_icon("M4 6h16M4 12h16M4 18h16"),
+        search_icon = reader_icon("M21 21l-5-5M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0"),
+        reload_icon = reader_icon("M20 7V3l-3 3a8 8 0 1 0 2 11M20 3h-5"),
+        settings_icon = reader_icon("M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M5 19l2-2M17 7l2-2"),
+        play_icon = reader_icon("m9 5 11 7-11 7z"),
+        clear_icon = reader_icon("m14 3 4 2-4 8M5 12l8 2 2 6H3zM7 15l-1 4M10 16l-1 4"),
+        more_icon = reader_icon("M5 12h.01M12 12h.01M19 12h.01"),
         nav = nav,
         main = main
     )
@@ -3694,8 +3570,8 @@ body.notebook-page .wb-source-text { color: var(--nb-text); }
     }
     try { localStorage.setItem(THEME_KEY, theme); } catch (e) {}
   }
-  var savedTheme = "dark";
-  try { savedTheme = localStorage.getItem(THEME_KEY) || "dark"; } catch (e) {}
+  var savedTheme = "light";
+  try { savedTheme = localStorage.getItem(THEME_KEY) || "light"; } catch (e) {}
   applyTheme(savedTheme);
   var live = !!window.MARQDO_VIEW_LIVE;
   var path = window.MARQDO_FILE_PATH || "";
@@ -3924,11 +3800,12 @@ body.notebook-page .wb-source-text { color: var(--nb-text); }
     }
     var block = document.getElementById("exec-block");
     if (block) block.hidden = false;
+    if (window.MarqdoReader) window.MarqdoReader.applyExecution(data);
   }
   function runAll(restart) {
     status(restart ? "restarting…" : "running all…");
     if (!state.persistent && Object.keys(state.cells).length === 0) {
-      post("api/session/run_document", {}).then(function (r) {
+      post("api/session/run_document", { stdin: cellStdin() }).then(function (r) {
         renderDocumentResult(r);
         status(r.ok ? "document run done" : (r.error || "document run failed"));
       }).catch(function (e) { status(String(e)); });
@@ -4291,7 +4168,7 @@ window.MARQDO_VIEW_PAGE_TOKEN = {page_token_js};
 <h1 class="page">{title}<span class="status-pill {status}">{status_label}</span></h1>
 <p class="meta">{rel}</p>
 {notebook}
-<section class="block structure-block" id="structure">
+<section class="block structure-block" id="document-section">
   <h2>文档</h2>
   {structure_block}
 </section>

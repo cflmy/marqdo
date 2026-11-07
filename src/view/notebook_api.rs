@@ -110,19 +110,42 @@ fn err(error: String) -> serde_json::Value {
 
 pub fn api_run_document(root: &Path, body: &str) -> serde_json::Value {
     let v = body_value(body);
-    let (_rel, abs) = match path_of(root, &v) {
+    let (rel, abs) = match path_of(root, &v) {
         Ok(p) => p,
         Err(e) => return err(e),
+    };
+    let source = match std::fs::read_to_string(&abs) {
+        Ok(source) => source,
+        Err(e) => return err(e.to_string()),
     };
     let mut opts = crate::RunOptions::default();
     opts.fs_root = Some(root.to_path_buf());
     opts.sleep_limit_ms = Some(30_000);
+    opts.stdin_lines = crate::input_feed::split_stdin_text(v["stdin"].as_str().unwrap_or(""));
     match crate::run_file_capture(&abs, &opts) {
-        Ok(cap) => serde_json::json!({
-            "ok": true,
-            "stdout": cap.stdout,
-            "value": json_value(&cap.value),
-        }),
+        Ok(cap) => {
+            // Render annotations from this exact capture: fetching /api/view-trace
+            // would execute the program a second time and could change its result.
+            let (structure_html, trace_json) = match crate::load::parse_source_auto(&source) {
+                Ok(module) => {
+                    let annots = crate::view::annot::build_view_annots(&module, &source, &cap);
+                    (
+                        crate::view::render::render_module_structure_with_annots(&module, &source, &annots),
+                        crate::view::annot::view_execution_report_json(&rel, true, &cap),
+                    )
+                }
+                Err(_) => (String::new(), String::new()),
+            };
+            serde_json::json!({
+                "ok": true,
+                "stdout": cap.stdout,
+                "value": json_value(&cap.value),
+                "structure_html": structure_html,
+                "trace_json": trace_json,
+                "bindings_html": crate::view::render::render_bindings_html(&cap.bindings),
+                "page_token": crate::view::page_token_from_source(&rel, &source),
+            })
+        }
         Err(e) => serde_json::json!({ "ok": false, "error": format!("{e:#}") }),
     }
 }
@@ -612,4 +635,28 @@ mod replay_api_tests {
         std::fs::remove_file(path).unwrap();std::fs::remove_file(wrapper).unwrap();std::fs::remove_file(marker).unwrap();
     }
 
+}
+
+#[cfg(test)]
+mod reader_run_tests {
+    use super::*;
+
+    #[test]
+    fn document_run_returns_matching_prose_trace_and_bindings() {
+        let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let rel = format!("target/reader-run-{}.mq.md", std::process::id());
+        let path = root.join(&rel);
+        std::fs::write(&path, "# main\n\n**n = 1**\n**n = n + 1**\n> print text=`n`\n*n*\n").unwrap();
+        let result = api_run_document(&root, &serde_json::json!({"path": rel}).to_string());
+        let _ = std::fs::remove_file(path);
+        assert_eq!(result["ok"], true, "{result}");
+        assert_eq!(result["stdout"].as_str().unwrap().trim(), "2");
+        let trace: serde_json::Value = serde_json::from_str(result["trace_json"].as_str().unwrap()).unwrap();
+        let writes: Vec<_> = trace["events"].as_array().unwrap().iter()
+            .filter(|e| e["name"] == "n").filter_map(|e| e["value_after"].as_str()).collect();
+        assert!(writes.contains(&"1") && writes.contains(&"2"), "{trace}");
+        assert!(result["structure_html"].as_str().unwrap().contains("data-annot-band"));
+        assert!(result["bindings_html"].as_str().unwrap().contains("n"));
+        assert!(!result["page_token"].as_str().unwrap().is_empty());
+    }
 }

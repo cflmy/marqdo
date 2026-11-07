@@ -126,6 +126,9 @@ jobs:
             ## Marqdo ${{ github.ref_name }}
 
             ### 亮点 / Highlights
+            - **v2.5.0**：View 阅读界面重构——暖白金色主题、新 Logo、左右执行标注、导航搜索与悬浮工具栏；离线公式；重跑同次捕获刷新
+            - **v2.5.0**: View reader redesign — warm paper theme, new logo, margin execution notes, navigation/search and floating controls; offline math; same-capture live refresh
+            - **v2.5.0 ext**：扩展包同步 2.5.0 / Ext pack 2.5.0
             - **v2.4.0**：Oracle journal 作语言值——`foreign.oracle_journal`/`replay_check`；bytecode/frontend 硬化；MSRV 1.81
             - **v2.4.0**: Oracle journal as language values — foreign.oracle_journal/replay_check; bytecode/frontend hardening; MSRV 1.81
             - **v2.4.0 ext**：扩展包同步 2.4.0 / Ext pack 2.4.0
