@@ -2,6 +2,7 @@ package render
 
 import (
 	"fmt"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -11,7 +12,20 @@ import (
 )
 
 func TestAnlianPostsResolve(t *testing.T) {
-	url := "sqlite:/home/cflmy/work/marqdo/examples/anlian-mq/data/anlian-mq.db"
+	url := "sqlite:" + filepath.Join(t.TempDir(), "anlian.db")
+	fields := []any{
+		map[string]any{"name": "title", "type": "text", "nullable": false},
+		map[string]any{"name": "summary", "type": "text"},
+		map[string]any{"name": "board", "type": "text"},
+		map[string]any{"name": "slug", "type": "text"},
+	}
+	if _, err := db.Init(url, "posts", fields); err != nil {
+		t.Fatal(err)
+	}
+	rows := []any{map[string]any{"title": "欢迎", "summary": "Portable test fixture", "board": "demo", "slug": "welcome"}}
+	if _, err := db.Insert(url, "posts", rows); err != nil {
+		t.Fatal(err)
+	}
 	card := map[string]any{
 		"属性": []any{"title", "body", "meta", "href"},
 		"值":  []any{"posts.title", "posts.summary", "posts.board", "posts.slug"},

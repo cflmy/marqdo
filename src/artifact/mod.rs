@@ -84,6 +84,52 @@ fn meta_get<'a>(metadata: &'a [(String, Value)], key: &str) -> Option<&'a Value>
     metadata.iter().find(|(k, _)| k == key).map(|(_, v)| v)
 }
 
+/// A Web/Endpoint declaration without a runnable local entry has no executable
+/// body. Both backends return the same summary instead of inventing bytecode.
+pub fn declaration_summary(module: &crate::ast::Module) -> Option<Value> {
+    if module.functions.iter().any(|f| f.name == "main")
+        || module
+            .functions
+            .iter()
+            .filter(|f| f.is_object() && f.params.is_empty())
+            .count()
+            == 1
+    {
+        return None;
+    }
+    let kind = classify(&module.metadata)?;
+    let kind_name = match kind {
+        ArtifactKind::Web => "web",
+        ArtifactKind::Endpoint => "endpoint",
+        _ => return None,
+    };
+    let mut fields = vec![
+        ("kind".into(), Value::Text(kind_name.into())),
+        ("method".into(), Value::Text(http_method(&module.metadata))),
+    ];
+    let target = if kind == ArtifactKind::Web {
+        web_route(&module.metadata)
+    } else {
+        endpoint_path(&module.metadata)
+    };
+    if let Some(target) = target {
+        fields.push((
+            if kind == ArtifactKind::Web {
+                "route"
+            } else {
+                "path"
+            }
+            .into(),
+            Value::Text(target),
+        ));
+    }
+    Some(Value::Map(vec![
+        ("ok".into(), Value::Bool(true)),
+        ("value".into(), Value::Map(fields)),
+        ("error".into(), Value::None),
+    ]))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -1,134 +1,247 @@
 ---
 markup: occlusion
 title: ext/web
-description: >-
-  Web Artifact root skill (ADR 0007). Read this first. Layout is file-partitioned;
-  tools run with marqdo call. No HTML/CSS injection as the default page method.
+description: Executable web handbook: decompose layout down to Markdown leaves.
 import:
   layout: ext/web/layout/index.mq.md
-  page: ext/web/page.mq.md
-  route: ext/web/route.mq.md
-  component: ext/web/component.mq.md
-  dom: ext/web/dom.mq.md
-  client: ext/web/client.mq.md
   web: ext/web/web.mq.md
 ---
 
-This file is the root skill for the Marqdo web package. If you are an AI agent
-with no other Marqdo context, follow Choose a path, then Layout law, then How to
-execute any tool. Do not invent MCP wrappers, raw HTML homepages, or a second
-API. The Markdown ## headings are the tools. Author programs may still
-`import web:ext/web/web.mq.md` for the facade; agents should start here.
+Web handbook — split page structure first, author content second, then preview,
+serve and verify. Ordinary .mq.md functions are the tools; no separate Skill
+compiler or manifest is needed. Install with marqdo ext add web. In this source
+repo build with bash scripts/build-web-plugin.sh and optionally select its
+absolute path with MARQDO_WEB_PLUGIN. Keep installation outside source ext.
 
-## Choose a path
+Start with executable evidence
 
-Pick one row. Do not mix English and Chinese tool names or trees.
+Run these from the repository root; installed users replace FILE with its actual
+installed path. Preserve the inner text quotes and protect dollar references
+from shell expansion. Inspect process status and ok before consuming result.
 
-| If you need | Do this |
-|-------------|---------|
-| Layout rules before writing files | Call `layout.rules` on `ext/web/layout/index.mq.md` (command below). |
-| Preview HTML for a Document / View table | Call `web.render` via facade path or import `web` tools with `--effects plugin`. |
-| Serve a site root | Author `serve.mq.md` calling `web.serve`, or call serve with `root=` · `port=`. |
-| Chinese tool names | Open `ext/web/网页.mq.md` and stay in Chinese names. |
+```sh
+marqdo call ext/web/index.mq.md layout_rules --json
+marqdo call ext/web/index.mq.md preview_markdown 'body="# Readable page"' 'title="Preview"' --effects plugin --json
+marqdo call ext/web/index.mq.md preview_nodes 'nodes=[{"type":"row","value":[{"type":"markdown","value":"## Left"},{"type":"markdown","value":"## Right"}]}]' --effects plugin --json
+```
 
-Agents use `##` tools with `marqdo call`. `# page` / `# route` / `# app` objects
-are for author programs. Escape hatches `dom.raw` and `page.css` are not the
-default path for building a homepage.
+The engineering method: recursively decompose to Markdown leaves
 
-*None*
+Split home into navigation, main and footer. Split a two-region footer into
+brand and links. If links still contains two columns, split it again into docs
+and community. Continue while a block needs independent internal layout. Stop
+at one simple Markdown responsibility, not at one file per paragraph.
 
-## Layout law
+```text
+site/
+  index.mq.md                 Document selects the layout root
+  components/index.mq.md      stack navigation, main, footer
+    nav/index.mq.md
+    nav/content.md            ordinary Markdown links
+    main/index.mq.md
+    main/content.md           ordinary Markdown prose
+    footer/index.mq.md        columns: brand, links
+      brand/index.mq.md
+      brand/content.md        brand and copyright
+      links/index.mq.md       columns: docs, community
+        docs/index.mq.md
+        docs/content.md
+        community/index.mq.md
+        community/content.md
+  pages/about.mq.md           another declared page
+  api/ping.mq.md              Endpoint
+  preview.mq.md               assemble and render offline
+  serve.mq.md                 process launcher, no page content
+```
 
-Web pages are built by file partition, not by injecting HTML. Split a homepage
-into files for navigation, sidebar, main, and footer. If a region is still
-complex (two-column footer, dense styles), split again until each file is
-simple: one duty, one View table or short Markdown. Bind values, database
-fields, and named styles through the unified View columns type, slot, value,
-attrs, and style only. Forbidden as the default method: whole-page HTML
-strings, CSS injection bags, restored compose fragments, and json.set DOM glue.
-Escape hatch only: dom.raw / page.css, and only with a written reason.
+A parent index imports children, combines their rows and declares one layout
+relationship. A terminal content.md is plain Markdown. Split again if a parent
+contains long content, multiple layout responsibilities or HTML tags. A leaf
+does not decide its external placement. Cutting a large HTML string into files
+still hides the structure in strings. Forms, data sources and interaction need
+their own responsibilities; they do not justify restoring an HTML page shell.
 
-Full text: doc/design/ext-web-layout-paradigm.md. In-package tools live at
-ext/web/layout/index.mq.md.
+Follow the real project
 
-Minimal commands to load the law (no plugin required):
+The [English reference](../../examples/web-layout-handbook/index.mq.md) implements
+this tree. Follow its [component root](../../examples/web-layout-handbook/components/index.mq.md)
+to footer grandchildren. The [Chinese reference](../../examples/web-layout-handbook-zh/index.mq.md)
+uses the same representation and renderer. Preview from the repo root, then
+change into the site directory to start the process:
 
-Call example (plain text):
-  marqdo call ext/web/layout/index.mq.md rules --json
-  marqdo call ext/web/layout/index.mq.md view_schema --json
+```text
+marqdo run examples/web-layout-handbook/preview.mq.md
+cd examples/web-layout-handbook
+marqdo run serve.mq.md
+```
 
-*None*
+Check /, /about and /api/ping. The first is a genuinely nested layout, the second
+an ordinary Document, and the third JSON. Wide layouts show columns; narrow
+layouts collapse without authored HTML or CSS.
 
-## How to execute any tool
+One View representation for both parents and leaves
 
-Call example (plain text):
-  marqdo call FILE FUNCTION name=value name=value --effects plugin --json
+Public columns remain type, slot, value, attrs, style, with Chinese aliases
+类型、槽、值、属性、样式. Use @ record tables for lists of node maps. A row/column
+container holds child rows in value. nav/header/footer/section/aside supply
+semantic regions. A markdown value is content text. Merging defines sibling
+order, not geometry: use columns to establish side-by-side placement. A style
+cell references class names; it neither defines CSS nor silently compiles a theme.
+Runtime defaults supply the basic responsive geometry.
 
-FILE is under `ext/web/`, usually `index.mq.md` or a module path. FUNCTION is the
-exact ## heading. Nested ### use `parent.child`. Pass `--effects plugin` for
-anything that loads the native web plugin (`render`, `serve`, `inspect`, …).
-Layout helpers `rules` / `view_schema` / `accept_component` are pure and may omit
-plugin effects. Use `--session` / `--toget` / `$name` to chain handles. Do not
-call `ensure_plugin` or `host_*`; facades load the plugin.
+Short leaves can pass Markdown directly; longer leaves read a content.md as in
+the reference. Parents retain structural values rather than rendering children
+before composition. This small executable program demonstrates the relationship;
+real sites put each responsibility into the files shown above.
 
-Verify layout skill (no plugin):
+```marqdo
+---
+markup: occlusion
+import:
+  component: ext/web/component/index.mq.md
+  layout: ext/web/layout/index.mq.md
+  web: ext/web/web.mq.md
+---
 
-Call example (plain text):
-  marqdo call ext/web/layout/index.mq.md rules --json
+# main
 
-*None*
+**left = component.markdown text="### Brand" slot="brand"**
+**right = component.markdown text="[About](/about)" slot="links"**
+**siblings = component.merge a=`left` b=`right`**
+**footer = layout.columns children=`siblings` slot="footer"**
+**html = web.render nodes=`footer` title="Column preview"**
+> print text=`html`
+```
 
-## Package layout
+Document, Endpoint and lifecycle boundaries
 
-| Path | Role |
-|------|------|
-| `ext/web/index.mq.md` | This root skill |
-| `ext/web/layout/index.mq.md` | File-partition layout engineering tools |
-| `ext/web/web.mq.md` | Author facade: page · route · serve · render · inspect · use |
-| `ext/web/page.mq.md` | Document handle · render |
-| `ext/web/route.mq.md` | Declared routes |
-| `ext/web/component.mq.md` | View fragments · merge |
-| `ext/web/dom.mq.md` | Markdown DOM; raw is escape hatch |
-| `ext/web/client.mq.md` | WASM embed · patches |
-| `ext/web/_capability.mq.md` | Plugin load only |
-| `ext/web/网页.mq.md` | Chinese facade / skill mirror |
+Ordinary Documents declare type: web, route and title around Markdown body,
+retaining the existing Markdown/data-source path. A composed Document also
+declares view: main: its # main returns View rows. serve executes that assembly
+once at startup and uses the same renderer as offline preview. Restart after
+content changes. Automatic data_source binding uses ordinary Documents and
+cannot be mixed with startup assembly. Assembly returns structure; it must not render again or launch
+a server. Request-time interaction belongs in Endpoints with type, path, method,
+request and response metadata. Startup assembly is not an automatic request-time
+template/data-binding system.
 
-Related packages (not this facade): `ext/data`, `ext/security`, `ext/net`.
+serve is a blocking lifecycle operation for a launcher run with marqdo run.
+call is for pure construction, previews and inspection; --effects plugin does
+not grant network or filesystem writes, so call serve is not a launch workflow.
+inspect with root scans disk declarations without listening; an empty app in a
+fresh process cannot inspect another process's private state.
 
-*None*
+```sh
+marqdo call ext/web/web.mq.md inspect 'root="examples/web-layout-handbook"' --effects plugin --json
+```
 
-## layout module
+Open the module for the next responsibility
 
-File path: `ext/web/layout/index.mq.md`
+[layout](layout/index.mq.md) supplies decomposition, stack and columns;
+[component](component/index.mq.md) supplies Markdown leaves and semantic wrappers;
+[page](page/index.mq.md) supplies handles and offline render;
+[route](route/index.mq.md) is for explicit advanced registration, while whole
+sites normally use Metadata. [dom](dom/index.mq.md) converts content, retaining
+raw HTML only at a compatibility boundary. [client](client/index.mq.md) loads
+the official Marqdo WASM bridge; business effects stay in lib/browser.
+[_capability](_capability/index.mq.md) diagnoses loading. The [facade](web.mq.md)
+keeps serve/render/inspect and the app API. Data, auth and HTTP clients belong
+to ext/data, ext/security and ext/net. [Chinese handbook](网页/索引.mq.md).
 
-Call example (plain text):
-  marqdo call ext/web/layout/index.mq.md rules --json
-  marqdo call ext/web/layout/index.mq.md accept_component name="nav" duty="top links only" --json
+Develop and accept a change
 
-Main ## tools: rules, view_schema, merge_nodes, accept_component.
+Compose Markdown, stack and columns before inventing a primitive. Only genuinely
+new structural capability needs plugins/web/internal/artifact and ABI changes;
+ordinary pages need no new host primitive. Keep bilingual helpers and the five
+columns aligned. Put parameter contracts after headings and return contracts
+before execution. ## is a callable heading, not ordinary document sectioning.
+Update src/ext_cli.rs if adding package files. Preserve ordinary Documents and
+Endpoints when changing startup assembly.
 
-*None*
+```text
+cargo test --locked --test web_handbook
+cargo test --locked --test call_cli web_
+cargo test --locked --test gold ext_web -- --test-threads=1
+```
 
-## facade module
+Handbook tests execute the bilingual sh fences and author examples directly,
+then preview and serve the real reference tree to check structure, routes and
+API behavior. Narration ratio is a minimum, not proof of usability. A checklist
+cannot truthfully accept a component without inspecting its implementation.
+This package does not automatically decompose arbitrary pages or implement a
+full CSS compiler through the style cell; explicit design remains the author's
+responsibility, made followable and testable by these indexes.
 
-File path: `ext/web/web.mq.md`
-
-Author import: `web: ext/web/web.mq.md`. Agent call examples:
-
-Call example (plain text):
-  marqdo call ext/web/web.mq.md inspect --effects plugin --json
-
-Main ## tools: page, route, render, use, inspect, serve, client_embed, …
-
-*None*
-
-## layout_rules
-
-Root convenience: same payload as `layout.rules` so agents who only opened this
-file can still fetch the law.
+## site_playbook
 
 | 返回 | 类型 | 说明 |
 |------|------|------|
-| result | any | layout rule map |
+| result | any | Development workflow and stopping rule |
+
+Return the workflow and stopping rule without creating files or claiming to
+accept a particular site. Define the region tree, author parents and Markdown
+leaves, then start and test the declared HTTP surface.
+
+`workflow` =
+
+| key | value |
+|-----|-------|
+| goal | build a site as executable documents |
+| step_A | draw region tree before content |
+| step_B | recursively split components to Markdown leaves |
+| step_C | declare home Document and view main for composed structure |
+| step_D | declare more Documents with their own routes |
+| step_E | declare Endpoint handlers for request-time work |
+| step_F | run serve.mq.md from the site directory |
+| step_G | compare preview and live output; test routes and browser geometry |
+| stopping_rule | one Markdown responsibility and no internal layout |
+
+*workflow*
+
+## layout_rules
+
+| 返回 | 类型 | 说明 |
+|------|------|------|
+| result | any | Development workflow and stopping rule |
+
+Reuse the layout module convention without a second rule catalog. No
+parameters or plugin. Actual acceptance still inspects leaf responsibilities,
+parent relationships and the running result.
 
 *> layout.rules*
+
+## preview_markdown
+
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| body | text | Markdown content |
+| title | text | Document title |
+
+| 返回 | 类型 | 说明 |
+|------|------|------|
+| result | text | HTML document |
+
+Render Markdown `body`="" with default `title`="Preview" .
+Return HTML text without writing files or registering routes. For a complex
+page split the layout first; raw HTML strings are not the content strategy.
+This tool needs the native plugin.
+
+*> web.render body=`body` title=`title`*
+
+## preview_nodes
+
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| nodes | list | Nested View rows |
+| title | text | Document title |
+
+| 返回 | 类型 | 说明 |
+|------|------|------|
+| result | text | HTML document |
+
+Render decomposed `nodes` with default `title`="Preview" .
+Parent values retain child rows, while leaf values hold Markdown. Returning
+HTML starts no server. The same renderer serves composed Documents, so this
+preview checks that column relationships survive assembly.
+
+*> web.render nodes=`nodes` title=`title`*

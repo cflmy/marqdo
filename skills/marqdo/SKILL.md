@@ -186,8 +186,10 @@ Install: `marqdo ext add web` (ZH id: `网页`). See ADR 0007 · [ext-web-artifa
 
 **Do not degrade:** Document/Endpoint metadata; facade `web.page|route|serve|render|inspect`; View `|type|slot|value|attrs|style|` only; no `compose_*` / `configure` / author `ensure_plugin`. DB → `ext/data`; auth → `ext/security`; net → `ext/net`.
 
-- **Root skill (agents first):** [`ext/web/index.mq.md`](../../ext/web/index.mq.md) · ZH [`ext/web/网页.mq.md`](../../ext/web/网页.mq.md)
+- **Root skill (agents first):** [`ext/web/index.mq.md`](../../ext/web/index.mq.md) · ZH [`ext/web/网页/索引.mq.md`](../../ext/web/网页/索引.mq.md)（作者门面仍为 `网页.mq.md`）
 - **Layout law (in-package):** file-partition pages (nav/sidebar/footer/…) until simple; no HTML/CSS injection as default — [`ext/web/layout/index.mq.md`](../../ext/web/layout/index.mq.md) · [ext-web-layout-paradigm.md](../../doc/design/ext-web-layout-paradigm.md)
+- **Recursive practice:** home → nav/main/footer → footer brand/links → links docs/community; continue until a leaf is plain Markdown. Parents import children and declare one relationship. Use `component.markdown`, `component.wrap`, `layout.stack`, and `layout.columns`; merge alone gives siblings, not columns.
+- **Runnable reference:** [web-layout-handbook](../../examples/web-layout-handbook/index.mq.md) and [Chinese reference](../../examples/web-layout-handbook-zh/index.mq.md). A composed Document declares `view: main` and returns node rows at startup; ordinary Documents keep their Markdown/data-source path. Use `inspect root=...` for disk routes, and `run` for a live server.
 - EN author facade: `import web:ext/web/web.mq.md`
 - Agent: `marqdo call ext/web/layout/index.mq.md rules --json` then facade tools with `--effects plugin`
 

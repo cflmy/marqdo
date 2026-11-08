@@ -235,6 +235,13 @@ pub fn run_file(path: &Path, opts: &RunOptions) -> Result<i32> {
         println!("=== marqdo: end sema ===");
     }
 
+    if opts.call_lib_path.is_none() {
+        if let Some(value) = crate::artifact::declaration_summary(&module) {
+            emit_result_file(opts, &value)?;
+            return Ok(0);
+        }
+    }
+
     match opts.backend {
         Backend::Tree => {
             let mut host = HostContext::for_run(Some(path), opts.host_caps(), opts.argv.clone());
@@ -400,6 +407,16 @@ pub fn run_file_capture(path: &Path, opts: &RunOptions) -> Result<RunCapture> {
     let stdin_lines = crate::input_feed::effective_stdin(&source, &opts.stdin_lines);
     let bind_ctx = BindingContext::from_binds(&opts.binds, cwd_for_path(Some(path)));
     let module = load_module_with_ctx(path, &bind_ctx)?;
+    if let Some(value) = crate::artifact::declaration_summary(&module) {
+        return Ok(RunCapture {
+            stdout: String::new(),
+            value,
+            plots: Vec::new(),
+            bindings: Default::default(),
+            view_trace: Default::default(),
+        });
+    }
+
     match opts.backend {
         Backend::Tree => {
             let mut host = HostContext::for_capture(Some(path), opts.host_caps());
@@ -464,6 +481,16 @@ pub fn run_source(source: &str, opts: &RunOptions) -> Result<RunCapture> {
     }
     let stdin_lines = crate::input_feed::effective_stdin(source, &opts.stdin_lines);
     let module = load_module_from_source(source)?;
+    if let Some(value) = crate::artifact::declaration_summary(&module) {
+        return Ok(RunCapture {
+            stdout: String::new(),
+            value,
+            plots: Vec::new(),
+            bindings: Default::default(),
+            view_trace: Default::default(),
+        });
+    }
+
     match opts.backend {
         Backend::Tree => {
             let mut host = HostContext::for_capture(None, opts.host_caps());

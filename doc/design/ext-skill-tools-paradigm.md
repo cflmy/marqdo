@@ -210,7 +210,7 @@ Quantum 的完整实验、开发路线与源码示例门禁，见 [2026-11-08 �
 ## 13. 推广顺序（建议）
 
 1. **已完成试点**：`ext/quantum/`（含 `量子/`）  
-2. **进行中**：`ext/web/` — 根 `index` + `layout` 布局铁律（文件划分、反 HTML 注入）已入库；facade 路径保持兼容；模块叙述与 call 金样继续补齐  
+2. **进行中**：`ext/web/` — 根 `index` + `layout` + 模块树 `page|route|…/index.mq.md` + 中文 `网页/`；作者门面 `web.mq.md`/`网页.mq.md` 保持兼容；call 金样与站点示例对齐继续补齐
 3. **下一优先**：`linalg` 公式面、`ai` agent 面  
 4. **`ext/net` / `ext/data` / `ext/security`**：随 web 站点场景补根 skill，勿把 DB/鉴权 API 塞回 `web` facade  
 
@@ -223,4 +223,5 @@ Quantum 的完整实验、开发路线与源码示例门禁，见 [2026-11-08 �
 
 | 日期 | 说明 |
 |------|------|
+| 2026-11-06 | web：模块树 + `网页/` 镜像 + page session call 金样推进 |
 | 2026-11-06 | 初版：由 quantum 试点归纳的整包开发范式与验收清单 |

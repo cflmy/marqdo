@@ -1272,7 +1272,6 @@ func resolveFormData(page map[string]any, dbURL string) map[string]any {
 	return nil
 }
 
-
 func pushIntro(buf *strings.Builder, intro string) {
 	pushIntroAndForm(buf, intro, nil)
 }
@@ -1364,6 +1363,12 @@ func renderFragment(page map[string]any, dbURL, slot string) string {
 
 // RenderPage builds full-page HTML (or a part fragment when partID is set).
 func RenderPage(page map[string]any, dbURL string, partID string) string {
+	// Explicit View Documents already own their structure and document shell.
+	if partID == "" && page != nil {
+		if html, ok := page["artifact_html"].(string); ok {
+			return html
+		}
+	}
 	if page == nil {
 		page = map[string]any{}
 	}

@@ -26,6 +26,7 @@ import (
 	"github.com/marqdo/marqdo/plugins/web/internal/httpx"
 	"github.com/marqdo/marqdo/plugins/web/internal/middleware"
 	"github.com/marqdo/marqdo/plugins/web/internal/page"
+	"github.com/marqdo/marqdo/plugins/web/internal/plugin"
 )
 
 //export web_render_nodes
@@ -123,27 +124,32 @@ func web_serve_root(argsJSON *C.char, outJSON **C.char, errMsg **C.char) C.int {
 			}
 		}
 	}
-	homeArgs := map[string]any{"title": "Marqdo"}
-	var homeMeta map[string]string
+	documentPage := func(f artifact.ArtifactFile) (map[string]any, error) {
+		title := f.Meta["title"]
+		if title == "" {
+			title = f.Meta["标题"]
+		}
+		body, structured, err := artifact.RenderFile(f, plugin.RunArtifact)
+		if err != nil {
+			return nil, err
+		}
+		pg := page.New(map[string]any{"title": title, "intro": body})
+		stampArtifactData(pg, f.Meta)
+		if structured {
+			pg["artifact_html"] = artifact.RenderHTMLPage(title, body)
+		}
+		return pg, nil
+	}
+	home := page.New(map[string]any{"title": "Marqdo"})
 	for _, f := range files {
-		if f.Kind == "web" && (f.Route == "/" || f.Rel == "index.mq.md") {
-			title := f.Meta["title"]
-			if title == "" {
-				title = f.Meta["标题"]
+		if f.Kind == "web" && f.Route == "/" {
+			home, err = documentPage(f)
+			if err != nil {
+				return replyJSON(outJSON, errMsg, nil, err)
 			}
-			if title == "" {
-				title = "Marqdo"
-			}
-			homeArgs = map[string]any{
-				"title": title,
-				"intro": artifact.MarkdownHTML(f.Body),
-			}
-			homeMeta = f.Meta
 			break
 		}
 	}
-	home := page.New(homeArgs)
-	stampArtifactData(home, homeMeta)
 	a := app.New(map[string]any{
 		"page": home,
 		"db":   args["db"],
@@ -156,15 +162,10 @@ func web_serve_root(argsJSON *C.char, outJSON **C.char, errMsg **C.char) C.int {
 			if f.Route == "/" {
 				continue
 			}
-			title := f.Meta["title"]
-			if title == "" {
-				title = f.Meta["标题"]
+			pg, err := documentPage(f)
+			if err != nil {
+				return replyJSON(outJSON, errMsg, nil, err)
 			}
-			pg := page.New(map[string]any{
-				"title": title,
-				"intro": artifact.MarkdownHTML(f.Body),
-			})
-			stampArtifactData(pg, f.Meta)
 			out, err := app.Route(a, f.Route, pg)
 			if err != nil {
 				return replyJSON(outJSON, errMsg, nil, err)
@@ -229,6 +230,13 @@ func web_inspect(argsJSON *C.char, outJSON **C.char, errMsg **C.char) C.int {
 	args, err := parseArgs(argsJSON)
 	if err != nil {
 		return replyJSON(outJSON, errMsg, nil, err)
+	}
+	if root, ok := argStr(args, "root"); ok && root != "" {
+		files, err := artifact.ScanRoot(root)
+		if err != nil {
+			return replyJSON(outJSON, errMsg, nil, err)
+		}
+		return replyJSON(outJSON, errMsg, artifact.InspectBag(nil, files), nil)
 	}
 	a := asPageMap(args["app"])
 	if a != nil {

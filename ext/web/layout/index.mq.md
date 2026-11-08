@@ -1,71 +1,72 @@
 ---
 markup: occlusion
 title: ext/web/layout
-description: >-
-  Web layout engineering skill — partition pages into files until every piece is
-  simple. View tables only; HTML/CSS injection is escape hatch, not the method.
+description: Split structure first, recursively down to simple Markdown leaves.
 import:
-  component: ext/web/component.mq.md
+  component: ext/web/component/index.mq.md
 ---
 
-Layout is how Marqdo web stays maintainable. A homepage is not one HTML blob. It
-is a directory of Documents and component files: nav, sidebar, main, footer.
-When a region is still complex (for example a two-column footer with brand and
-link groups), split again until each file has one job and one simple View table
-or short Markdown. Bind values, data, and named styles through
-`|type|slot|value|attrs|style|`. Do not reach for `dom.raw` or giant CSS strings
-to "finish faster" — that bypasses binding and becomes unreadable.
+Engineering practice: draw the region tree before writing content. Home splits
+into navigation, main and footer. Footer splits into brand and links; if links
+has two columns, split again into docs and community. Continue while a region
+needs independent internal layout. Stop at one readable Markdown responsibility,
+not at an arbitrary number of files or one file per sentence.
 
-Canonical design: `doc/design/ext-web-layout-paradigm.md`.
+Follow the real [reference site](../../../examples/web-layout-handbook/index.mq.md).
+Parent index.mq.md files import children and declare one layout relationship;
+leaf content.md files contain ordinary Markdown. Splitting an HTML string into
+several files does not make the structure document-native.
 
-## For AI agents
+```sh
+marqdo call ext/web/layout/index.mq.md rules --json
+marqdo call ext/web/layout/index.mq.md columns 'children=[{"type":"markdown","value":"Left"},{"type":"markdown","value":"Right"}]' 'slot="footer"' --json
+```
 
-If you were given only this file, load the rules before writing any site file.
-Always pass `--effects plugin` when a later step needs the native web plugin;
-these tools are pure documentation helpers and need no plugin.
+columns preserves child rows in value and renders a responsive grid; narrow
+screens collapse automatically. stack preserves top-to-bottom region order.
+The style column references class names, not raw CSS or a theme definition.
+Merging alone creates siblings, not columns. Use component.markdown for content
+and component.wrap for semantic regions such as nav or footer.
 
-Call example (plain text):
-  marqdo call ext/web/layout/index.mq.md rules --json
-  marqdo call ext/web/layout/index.mq.md view_schema --json
-
-When authoring: create `components/*.mq.md` (and nested folders) first, then a
-thin `type: web` page that states route and main intent. Prefer
-`component.merge` to concatenate View tables. Never make `dom.raw` the home
-page implementation.
-
-*None*
+Development and acceptance: name each leaf by one content responsibility. If a
+parent contains long prose or HTML tags, split further. Preview with page.render,
+then serve and verify home, about and the API. New structural kinds belong in
+plugins/web/internal/artifact with bilingual helpers and web_handbook tests.
 
 ## rules
 
-Return the layout engineering rules as a readable map for agents and checklists.
-No parameters. This tool does not load the plugin.
-
 | 返回 | 类型 | 说明 |
 |------|------|------|
-| result | any | rule map |
+| result | any | Result |
+
+Return the engineering convention and stopping rule. No parameters or plugin.
+This is guidance rather than evidence that a particular source file passes;
+acceptance also requires reading the leaves and exercising the resulting page.
 
 `out` =
 
 | key | value |
 |-----|-------|
-| paradigm | file-partitioned layout |
-| partition | homepage splits into nav, sidebar, main, footer files |
-| until_simple | split again when a file has multiple jobs or dense styles |
-| view_schema | only type slot value attrs style columns |
-| forbid_default | HTML string pages; CSS injection; compose_*; json.set DOM bags |
-| escape_hatch | dom.raw / page.css only with a written why |
-| data_bind | values, db, and named styles via tables |
+| paradigm | recursive file-partitioned layout |
+| partition | home to nav/main/footer; footer to brand/links; links to docs/community |
+| until_simple | one simple Markdown responsibility with no independent internal layout |
+| view_schema | type slot value attrs style; parent value holds child rows |
+| parent | import child components and choose one relationship |
+| leaf | ordinary Markdown content without an HTML shell |
+| geometry | merge gives siblings; stack and columns give placement |
+| verify | offline render; live routes; narrow and wide browser geometry |
 
 *out*
 
 ## view_schema
 
-Return the only allowed View table column names (English). Chinese aliases are
-`类型|槽|值|属性|样式`. No parameters.
-
 | 返回 | 类型 | 说明 |
 |------|------|------|
-| result | any | column list |
+| result | list | Public column names |
+
+Return the five public View columns. A container value holds more rows of
+the same schema; a Markdown value holds content text. This keeps recursive
+layout within one representation instead of adding a private fragment dialect.
 
 `cols` =
 
@@ -81,39 +82,79 @@ Return the only allowed View table column names (English). Chinese aliases are
 
 ## merge_nodes
 
-Concatenate View node tables `a` and `b`. Use after splitting regions into files
-so a page can assemble simple parts without HTML.
-
 | 参数 | 类型 | 说明 |
 |------|------|------|
-| a | any | first View table |
-| b | any | second View table |
+| a | list | First node records |
+| b | list | Second node records |
 
 | 返回 | 类型 | 说明 |
 |------|------|------|
-| result | any | concatenated View nodes |
+| result | list | Ordered sibling nodes |
+
+Concatenate `a` and `b` as siblings. This helper preserves structure and order
+but does not imply geometry; use columns for side-by-side placement or stack
+for a vertical page. The @ record lists retain nested values throughout.
 
 *> component.merge a=`a` b=`b`*
 
-## accept_component
-
-Documentary gate for authors and agents. Pass component `name` (file stem) and
-single-duty `duty` (one short sentence). Returns an accept map reminding that
-the file must stay single-duty. Does not write disk.
+## stack
 
 | 参数 | 类型 | 说明 |
 |------|------|------|
-| name | text | component name, for example nav |
-| duty | text | one-job description |
+| children | list | Child component records |
+| slot | text | Parent region name |
+| style | text | Optional class name |
 
 | 返回 | 类型 | 说明 |
 |------|------|------|
-| result | any | accept checklist row |
+| result | list | Parent container rows |
+
+Declare one vertical relationship for `children`. Default `slot`="" and
+`style`="" . The parent owns placement while each imported child owns content
+or its next decomposition level. Return View rows so another parent can wrap
+them without first serializing any HTML.
+
+*> component.wrap children=`children` kind="column" slot=`slot` style=`style`*
+
+## columns
+
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| children | list | Child component records |
+| slot | text | Parent region name |
+| style | text | Optional class name |
+
+| 返回 | 类型 | 说明 |
+|------|------|------|
+| result | list | Parent container rows |
+
+Declare one responsive multi-column relationship for `children`. Default `slot`="" and
+`style`="" . The parent owns placement while each imported child owns content
+or its next decomposition level. Return View rows so another parent can wrap
+them without first serializing any HTML.
+
+*> component.wrap children=`children` kind="row" slot=`slot` style=`style`*
+
+## accept_component
+
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| name | text | Component name |
+| duty | text | One responsibility |
+
+| 返回 | 类型 | 说明 |
+|------|------|------|
+| result | any | Result |
+
+Return a review checklist for component `name` and stated `duty`. Two strings
+cannot establish source quality or a working layout, so this tool does not
+return an unconditional ok=True. Verify the actual source and rendered page
+before accepting the component. It never writes or scans files.
 
 `row` =
 
-| ok | name | duty | must | reject_if |
-|----|------|------|------|-----------|
-| True | `name` | `duty` | one View table or short Markdown; named styles only | mixes nav+footer · embeds raw HTML as main body · private table dialects |
+| status | name | duty | check |
+|--------|------|------|-------|
+| checklist | `name` | `duty` | one Markdown leaf or one parent relationship; no raw HTML shell |
 
 *row*

@@ -81,6 +81,7 @@ Welcome to the executable web.
 | `type` | `类型` | `web` / `网页` |
 | `route` | `路由` | 路径，可含 `{param}` |
 | `method` | `方法` | 默认 `GET` |
+| `view` | `视图` | 可选 main：启动时执行主程序，返回递归 View 节点；不与自动 data_source 绑定混用 |
 | `title` | `标题` | 文档标题 / `<title>` |
 | `data_source` | `数据源` | 表名 |
 | `data_order` | `排序` | 如 `-created_at` |
@@ -96,6 +97,8 @@ Welcome to the executable web.
 | text | kicker | AI Native | | eyebrow |
 | title | title | Marqdo | | title |
 ```
+
+2026-11-08：View 已支持 row/column 容器与 markdown 叶子，容器值保持子表；显式 `view: main` Document 通过普通函数装配。完整工程见[布局实践](ext-web-layout-paradigm.md)，实现边界见[优化说明](ext-web-handbook.md)。
 
 `page.render nodes=` 是**唯一**主装配路径。禁止 `compose_main` / `compose_intro` 等碎片 DSL。
 

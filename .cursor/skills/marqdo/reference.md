@@ -55,7 +55,7 @@ Import one file; use **that** file’s function names.
 | `lib/foreign.mq.md` | `lib/外联.mq.md` | run foreign fenced blocks |
 | `ext/llm.mq.md` | `ext/大模型.mq.md` | `# llm` / `# 大模型` object + chat methods |
 | `ext/agent.mq.md` | `ext/智能体.mq.md` | document-driven **step** / **plan** + OKF；示例 `examples/agent-pong` · `agent-okf-flywheel`；Wave B：[agent-framework-2026-09.md](../../doc/research/agent-framework-2026-09.md) |
-| `ext/web/web.mq.md` | `ext/web/网页.mq.md` | dynamic sites — see **ext/web** section below |
+| `ext/web/index.mq.md` · `web.mq.md` | `ext/web/网页/索引.mq.md` · `网页.mq.md` | dynamic sites — see **ext/web** section below |
 | `ext/quantum/index.mq.md` + modules | `ext/quantum/量子/索引.mq.md` + modules | circuits + Q7 density/viz + Q8 themes — see **ext/quantum** below |
 
 Open the imported `.mq.md` under `lib/` or `ext/` to see exact `##` / `#` names and parameters. Gold tests: `tests/lib/`, `tests/structure/`, `tests/ext/`.
@@ -63,6 +63,14 @@ Open the imported `.mq.md` under `lib/` or `ext/` to see exact `##` / `#` names 
 ## ext/web (Artifact sites · ADR 0007)
 
 Install: `marqdo ext add web` (`网页`). Native: `bash scripts/build-web-plugin.sh`.
+
+Layout practice: split home into nav/main/footer; split footer into brand/links,
+then links into docs/community until content leaves are ordinary Markdown.
+Use `component.markdown|wrap`, `layout.stack|columns`, and @ record lists.
+A parent value holds child rows of the same five-column View schema.
+Explicit `view: main` Documents assemble once at startup; `inspect root=...`
+scans disk declarations. See the Web root handbook and reference layout site.
+
 
 | EN import | ZH import | Surface |
 |-----------|-----------|---------|

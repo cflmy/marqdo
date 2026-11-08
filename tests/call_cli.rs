@@ -258,12 +258,100 @@ fn web_layout_rules_via_call() {
 }
 
 #[test]
+fn web_index_site_playbook_via_call() {
+    let file = root().join("ext/web/index.mq.md");
+    let out = run(&["call", "--json", file.to_str().unwrap(), "site_playbook"]);
+    assert_eq!(out.status.code(), Some(0), "{}", text(&out.stdout));
+    let body: serde_json::Value = serde_json::from_str(&text(&out.stdout)).unwrap();
+    assert_eq!(body["ok"], true, "{body}");
+    let keys = body["result"]["key"].as_array().expect("key list");
+    assert!(
+        keys.iter().any(|k| k.as_str() == Some("step_F")),
+        "{body}"
+    );
+}
+
+#[test]
 fn web_zh_layout_rules_via_call() {
-    let file = root().join("ext/web/网页.mq.md");
+    let file = root().join("ext/web/网页/索引.mq.md");
     let out = run(&["call", "--json", file.to_str().unwrap(), "布局规则"]);
     assert_eq!(out.status.code(), Some(0), "{}", text(&out.stdout));
     let body: serde_json::Value = serde_json::from_str(&text(&out.stdout)).unwrap();
     assert_eq!(body["ok"], true, "{body}");
+}
+
+#[test]
+fn web_component_merge_via_call() {
+    let file = root().join("ext/web/component/index.mq.md");
+    let a = r#"[{"type":"text","slot":"main","value":"A","attrs":"","style":""}]"#;
+    let b = r#"[{"type":"text","slot":"main","value":"B","attrs":"","style":""}]"#;
+    let out = run(&[
+        "call",
+        "--json",
+        file.to_str().unwrap(),
+        "merge",
+        &format!("a={a}"),
+        &format!("b={b}"),
+    ]);
+    assert_eq!(out.status.code(), Some(0), "{}", text(&out.stdout));
+    let body: serde_json::Value = serde_json::from_str(&text(&out.stdout)).unwrap();
+    assert_eq!(body["ok"], true, "{body}");
+}
+
+#[test]
+fn web_page_new_render_session_via_call() {
+    let dir = std::env::temp_dir().join(format!("mq-call-web-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&dir);
+    fs::create_dir_all(&dir).unwrap();
+    let page = root().join("ext/web/page/index.mq.md");
+    let sess = "web-page";
+    let out_new = Command::new(bin())
+        .env("MARQDO_CALL_SESSION_DIR", &dir)
+        .args([
+            "call",
+            "--effects",
+            "plugin",
+            "--session",
+            sess,
+            "--toget",
+            "pg",
+            "--json",
+            page.to_str().unwrap(),
+            "new",
+            "title=\"Demo\"",
+            "body=\"# Hi\"",
+        ])
+        .current_dir(root())
+        .output()
+        .unwrap();
+    assert_eq!(out_new.status.code(), Some(0), "{}", text(&out_new.stdout));
+    let body_new: serde_json::Value = serde_json::from_str(&text(&out_new.stdout)).unwrap();
+    assert_eq!(body_new["ok"], true, "{body_new}");
+    let out_render = Command::new(bin())
+        .env("MARQDO_CALL_SESSION_DIR", &dir)
+        .args([
+            "call",
+            "--effects",
+            "plugin",
+            "--session",
+            sess,
+            "--json",
+            page.to_str().unwrap(),
+            "render",
+            "page=$pg",
+        ])
+        .current_dir(root())
+        .output()
+        .unwrap();
+    assert_eq!(
+        out_render.status.code(),
+        Some(0),
+        "{}",
+        text(&out_render.stdout)
+    );
+    let body_render: serde_json::Value =
+        serde_json::from_str(&text(&out_render.stdout)).unwrap();
+    assert_eq!(body_render["ok"], true, "{body_render}");
 }
 
 #[test]

@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"github.com/marqdo/marqdo/plugins/web/internal/render"
-	"github.com/marqdo/marqdo/plugins/web/internal/table"
 )
 
 // MetaType returns canonical kind: web | endpoint | "" from flat frontmatter map.
@@ -92,19 +91,77 @@ func ParseFrontmatter(src string) (meta map[string]string, body string) {
 	return meta, body
 }
 
-// RenderNodes turns a unified View table into an HTML fragment.
-// Columns: type|slot|value|attrs|style (ZH: 类型|槽|值|属性|样式).
+// RenderNodes renders the existing five-column View schema recursively. Container
+// value cells hold more View rows; markdown leaves hold ordinary Markdown text.
 func RenderNodes(nodes any) (string, error) {
-	raw := table.AsRows(nodes)
-	list, _ := raw.([]any)
 	var b strings.Builder
-	b.WriteString(`<div class="mq-view">`)
-	for _, item := range list {
+	b.WriteString(`<style>` + LayoutCSS + `</style><div class="mq-view">`)
+	if err := renderNodes(&b, nodes, 0); err != nil {
+		return "", err
+	}
+	b.WriteString(`</div>`)
+	return b.String(), nil
+}
+
+// Fixed runtime geometry, shared by offline previews and served Documents.
+// Authors choose row/column instead of embedding CSS or HTML in content cells.
+const LayoutCSS = `.mq-view{max-width:72rem;margin:auto;padding:1.5rem;line-height:1.6;font-family:system-ui,sans-serif}.mq-view *{box-sizing:border-box}.mq-view .mq-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,16rem),1fr));gap:1.5rem}.mq-view .mq-column{display:flex;flex-direction:column;gap:1.5rem}.mq-view .mq-node{min-width:0}.mq-view nav,.mq-view footer{padding-block:1rem}.mq-view footer{border-top:1px solid #d5dce5}.mq-view a{color:#2457a7}.mq-view img{max-width:100%;height:auto}.mq-view pre{overflow:auto}`
+
+// Preserve typed value cells when normalizing column tables. General AsRows
+// treats @ cells as text, which would stringify nested component tables.
+func viewRows(nodes any) ([]any, error) {
+	switch v := nodes.(type) {
+	case nil:
+		return nil, nil
+	case []any:
+		return v, nil
+	case map[string]any:
+		if _, ok := v["type"].(string); ok {
+			return []any{v}, nil
+		}
+		if _, ok := v["类型"].(string); ok {
+			return []any{v}, nil
+		}
+		n := -1
+		for _, cell := range v {
+			col, ok := cell.([]any)
+			if !ok {
+				return nil, fmt.Errorf("View: expected a row or column table")
+			}
+			if n < 0 {
+				n = len(col)
+			} else if n != len(col) {
+				return nil, fmt.Errorf("View: column lengths differ")
+			}
+		}
+		rows := []any{}
+		for i := 0; i < n; i++ {
+			row := map[string]any{}
+			for key, cell := range v {
+				row[key] = cell.([]any)[i]
+			}
+			rows = append(rows, row)
+		}
+		return rows, nil
+	default:
+		return nil, fmt.Errorf("View: expected rows, got %T", nodes)
+	}
+}
+
+func renderNodes(b *strings.Builder, nodes any, depth int) error {
+	if depth > 64 {
+		return fmt.Errorf("View: nesting exceeds 64 levels")
+	}
+	rows, err := viewRows(nodes)
+	if err != nil {
+		return err
+	}
+	for i, item := range rows {
 		row, ok := item.(map[string]any)
 		if !ok {
-			continue
+			return fmt.Errorf("View row %d: expected a map", i+1)
 		}
-		ty := first(row, "type", "类型")
+		ty := strings.ToLower(first(row, "type", "类型"))
 		slot := first(row, "slot", "槽")
 		val := first(row, "value", "值")
 		attrs := first(row, "attrs", "属性")
@@ -116,23 +173,92 @@ func RenderNodes(nodes any) (string, error) {
 		if slot != "" {
 			class += " slot-" + html.EscapeString(slot)
 		}
-		switch strings.ToLower(ty) {
+		tag := ""
+		switch ty {
+		case "row", "横排":
+			tag = "div"
+			class += " mq-row"
+		case "column", "纵排":
+			tag = "div"
+			class += " mq-column"
+		case "nav", "导航":
+			tag = "nav"
+		case "header", "页头":
+			tag = "header"
+		case "footer", "页脚":
+			tag = "footer"
+		case "section", "区域":
+			tag = "section"
+		case "aside", "侧栏":
+			tag = "aside"
+		}
+		if tag != "" {
+			children := row["value"]
+			if children == nil {
+				children = row["值"]
+			}
+			if children == nil {
+				return fmt.Errorf("View row %d (%s): missing child rows in value", i+1, ty)
+			}
+			b.WriteString(`<` + tag + ` class="` + class + `">`)
+			if err := renderNodes(b, children, depth+1); err != nil {
+				return fmt.Errorf("View %s/%s: %w", ty, slot, err)
+			}
+			b.WriteString(`</` + tag + `>`)
+			continue
+		}
+		switch ty {
+		case "markdown", "正文":
+			b.WriteString(`<div class="` + class + `">` + render.MarkdownToHTML(val) + `</div>`)
 		case "title", "标题":
 			b.WriteString(`<h1 class="` + class + `">` + inline(val) + `</h1>`)
 		case "link", "链接":
-			href := attrs
-			if href == "" {
-				href = "#"
+			if attrs == "" {
+				attrs = "#"
 			}
-			b.WriteString(`<a class="` + class + `" href="` + html.EscapeString(href) + `">` + inline(val) + `</a>`)
+			b.WriteString(`<a class="` + class + `" href="` + html.EscapeString(attrs) + `">` + inline(val) + `</a>`)
 		case "html", "原文":
 			b.WriteString(`<div class="` + class + `">` + val + `</div>`)
-		default: // text
+		default:
+			value := row["value"]
+			if value == nil {
+				value = row["值"]
+			}
+			switch value.(type) {
+			case []any, map[string]any:
+				return fmt.Errorf("View row %d: unknown structural type %q", i+1, ty)
+			}
 			b.WriteString(`<p class="` + class + `">` + inline(val) + `</p>`)
 		}
 	}
-	b.WriteString(`</div>`)
-	return b.String(), nil
+	return nil
+}
+
+// RenderFile explicitly opts a Document into startup-time component assembly.
+// Documents without view: main retain their existing Markdown/data-source path.
+func RenderFile(f ArtifactFile, run func(string, map[string]any) (any, error)) (string, bool, error) {
+	view := metaString(f.Meta, "view", "视图")
+	if view == "" {
+		return MarkdownHTML(f.Body), false, nil
+	}
+	if view != "main" {
+		return "", false, fmt.Errorf("%s: view/视图 must be main", f.Rel)
+	}
+	if metaString(f.Meta, "data_source", "数据源") != "" {
+		return "", false, fmt.Errorf("%s: view main is startup assembly; use an ordinary Document for automatic data_source binding", f.Rel)
+	}
+	nodes, err := run(f.Path, nil)
+	if err != nil {
+		return "", false, fmt.Errorf("%s: view main: %w", f.Rel, err)
+	}
+	if nodes == nil {
+		return "", false, fmt.Errorf("%s: view main must return View rows", f.Rel)
+	}
+	html, err := RenderNodes(nodes)
+	if err != nil {
+		return "", false, fmt.Errorf("%s: %w", f.Rel, err)
+	}
+	return html, true, nil
 }
 
 func inline(s string) string {
@@ -159,7 +285,7 @@ func RenderHTMLPage(title, innerHTML string) string {
 	if t == "" {
 		t = "Marqdo"
 	}
-	return "<!DOCTYPE html><html><head><meta charset=\"utf-8\"><title>" + t +
+	return "<!DOCTYPE html><html><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><title>" + t +
 		"</title></head><body class=\"mq-document\"><main>" + innerHTML + "</main></body></html>"
 }
 
@@ -313,6 +439,7 @@ func InspectBag(app map[string]any, declared []ArtifactFile) map[string]any {
 		}
 	}
 	return map[string]any{
+		"_type":    "web_inspection",
 		"declared": dec,
 		"system":   SystemRoutes(),
 	}
