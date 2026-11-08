@@ -25,6 +25,19 @@ import:
 **模型 = > llm.llm**
 **助手 = > agent.agent model=`模型` tools=`工具表` standing="you are a readable Marqdo agent"**
 
+The allowlist names what the agent may call; ToolSpec registration declares the
+actual capability. This deterministic read tool takes no arguments and keeps
+this smoke test independent of a real clock or mutating effect ledger.
+
+`spec` =
+
+| id | version | description | effect |
+|----|---------|-------------|--------|
+| 获取时间 | "1" | deterministic smoke value | read |
+
+> agent.tools_clear
+> agent.tools_register spec=`spec`
+
 **id = > json.get value=`助手` key="id"**
 
 **ctx = > agent.build_step_context agent=`助手` task="probe"**

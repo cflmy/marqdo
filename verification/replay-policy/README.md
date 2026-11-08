@@ -5,6 +5,22 @@ reply acceptance and final-history exhaustion. The Rust transport adapter does
 not contain a second implementation of these decisions. Ordinary recording
 does not start a policy process.
 
+The JSON-lines transport sends a complete `PolicyCommand` record on every
+operation: `op`, `steps`, and `value` are always present. Lean structure defaults
+are not missing-field defaults for the derived JSON decoder. In particular,
+initialization and finish still need an empty `value`, while prepare/receive
+still need an empty `steps` array:
+
+```jsonl
+{"op":"init","steps":[],"value":""}
+{"op":"finish","steps":[],"value":""}
+```
+
+The Rust adapter uses one typed wire record for all four operations. Transport
+failures stop the companion and include its exit status and a bounded stderr
+tail, so a decoder error is not reduced to a closed-channel message. Neither
+this transport nor its diagnostics replace Lean's replay verdict.
+
 Build the companion before building or testing strict replay:
 
 ```sh

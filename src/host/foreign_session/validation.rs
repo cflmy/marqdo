@@ -1,7 +1,7 @@
 //! Production adapter to the executable Lean replay policy.
 //! All replay decisions come from ReplayPolicy.Cursor, with no Rust fallback.
 use super::ProtocolStep;
-use serde_json::{json, Value};
+use serde_json::Value;
 use std::collections::VecDeque;
 mod policy;
 
@@ -62,10 +62,10 @@ impl ReplayCursor {
         self.stopped = Some(error.clone());
         error
     }
-    fn command(&mut self, command: Value) -> Result<(), Divergence> {
+    fn command(&mut self, op: &str, value: &str) -> Result<(), Divergence> {
         if let Some(error) = &self.stopped { return Err(error.clone()) }
         let result = self.client.as_mut().ok_or_else(|| "no policy process".to_string())
-            .and_then(|client| client.exchange(command));
+            .and_then(|client| client.exchange(op, value));
         let reply = result.map_err(|e| self.unavailable(e))?;
         self.progress = (reply.matched, reply.remaining);
         if reply.allow { return Ok(()) }
@@ -82,15 +82,15 @@ impl ReplayCursor {
         Err(error)
     }
     fn prepare(&mut self, session: &str, request: &Value) -> Result<DispatchPermit, Divergence> {
-        self.command(json!({"op":"prepare", "value":policy::request_key(session,request)}))?;
+        self.command("prepare", &policy::request_key(session,request))?;
         Ok(DispatchPermit { session: session.into(), request: request.clone() })
     }
     pub(super) fn accept_response(&mut self, response: &Result<Value,String>) -> Result<(), Divergence> {
-        self.command(json!({"op":"receive", "value":policy::response_key(response)}))
+        self.command("receive", &policy::response_key(response))
     }
     pub fn progress(&self) -> (usize,usize) { self.progress }
     /// Called only at the outer action boundary; consumes the cursor.
-    pub fn finish(mut self) -> Result<(),Divergence> { self.command(json!({"op":"finish"})) }
+    pub fn finish(mut self) -> Result<(),Divergence> { self.command("finish", "") }
 }
 pub(super) fn prepare(cursor: Option<&mut ReplayCursor>, session: &str, request: &Value)
     -> Result<DispatchPermit,Divergence> {
