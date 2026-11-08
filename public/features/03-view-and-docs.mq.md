@@ -6,7 +6,11 @@ description: Local browse and static export from the interpreter
 
 # main
 
-Version 2.5.1: `marqdo view` and `view output` share a warm paper reader with a new
+Version 2.6.0 keeps action descriptions in the sentence and moves their implementation to side notes. Empty parentheses explicitly mark missing logic. Multiple actions and returns keep their original prose, while ordinary links remain navigation. On compact screens, native disclosures keep the implementation readable even without JavaScript.
+
+Executable knowledge now presents inputs, returns, effects, dependencies and separate verification facts. Technical identities and digests stay folded. Source explanations are distinct from captured results; a pure effect summary or linked source is not proof that a program ran or its content was verified.
+
+The reader introduced in 2.5.1: `marqdo view` and `view output` share a warm paper reader with a new
 Marqdo logo, serif document text, botanical ornaments, navigation, search and a
 floating action toolbar. Wide screens place real execution notes in the margins;
 compact screens keep them below the corresponding paragraph. Click a note to

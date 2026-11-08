@@ -288,7 +288,11 @@ marqdo catalog public -o .marqdo
 
 ---
 
-## 现状（v2.5.1）
+## 现状（v2.6.0）
+
+- **标准库与拓展库手册（v2.6.0）**：61 份公开标准库、650 个函数；源码内参数/返回契约、叙述形参、句中遮蔽调用与真实工程。新增文件/字节/集合/Result/文档/HTTP/任务/TOML/时区工作流；多文件拓展库以 index 组织。
+- **View 可读动作与知识（v2.6.0）**：正文读动作，侧注看实现，运行标注看实际结果；空逻辑明确提示待补。知识说明先看输入、返回、依赖和依据，技术身份按需展开。
+- **Quantum / Web 工程实践（v2.6.0）**：可执行实验、会话句柄与双语门面；网页先递归拆布局，直到叶子可以直接用 Markdown 表达。CLI · wasm · ext · VS Code 扩展同步 **2.6.0**。
 
 - **View 连线与工具栏（v2.5.1）**：真实源码锚点、连续 S 形曲线、错落标注与连线避让；底部工具栏增加文字标签。深浅色配色保持一致。CLI · wasm · ext 同步 **2.5.1**。
 
@@ -341,7 +345,7 @@ marqdo catalog public -o .marqdo
 - **浏览器 Marqdo（WASM）**：`marqdo wasm build` + 官方 bridge 自启（作者零业务 JS；桥内可含列表/路由/storage/ws/文件/Canvas/音频/Observer/拖放）；`lib/browser` + GFM；`web.client_embed`；示例 [browser-hello](examples/browser-hello/) · [browser-app](examples/browser-app/) · [browser-media](examples/browser-media/) · [web-client-site](examples/web-client-site/)（[ADR 0002](doc/adr/0002-browser-marqdo-wasm.md) · [D](doc/roadmap/browser-wasm-d.md) · [E](doc/roadmap/browser-wasm-e.md) · [F](doc/roadmap/browser-wasm-f.md)）
 - 选型：[ADR 0001 — Rust](doc/adr/0001-implementation-language.md) · [ADR 0002 — 浏览器 WASM](doc/adr/0002-browser-marqdo-wasm.md)（C0–C5 完结，见 [roadmap/browser-wasm.md](doc/roadmap/browser-wasm.md)）· [ADR 0003 — 异步效应](doc/adr/0003-browser-async-effects.md)
 
-### 如何使用最新 Marqdo（v2.5.1）
+### 如何使用最新 Marqdo（v2.6.0）
 
 **安装解释器（任选其一）**
 
@@ -356,7 +360,7 @@ marqdo catalog public -o .marqdo
 ```bash
 # 1) 源码安装（跟 tag 或 main）
 git clone https://github.com/cflmy/marqdo.git && cd marqdo
-git checkout v2.5.1   # 或留在 main
+git checkout v2.6.0   # 或留在 main
 cargo build --release
 export PATH="$PWD/target/release:$PATH"
 marqdo version
@@ -397,7 +401,7 @@ marqdo wasm build
 # → dist/wasm/ … 见 examples/browser-hello/
 
 # 6) Releases：Windows exe/zip/vsix；Linux CLI zip + native `.so` zip
-#    https://github.com/cflmy/marqdo/releases/tag/v2.5.1
+#    https://github.com/cflmy/marqdo/releases/tag/v2.6.0
 ```
 
 开发期也可用 `cargo run -- …` 代替已安装的 `marqdo`：

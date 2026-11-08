@@ -126,59 +126,14 @@ jobs:
             ## Marqdo ${{ github.ref_name }}
 
             ### 亮点 / Highlights
-            - **v2.5.1**：View 连线优化——真实源码锚点、连续 S 形曲线、错落与避让；工具栏文字标签；保留深浅色配色
-            - **v2.5.1**: View annotation refinement — exact source anchors, flowing S-curves, staggered notes and collision avoidance; labeled toolbar; preserved themes
-            - **v2.5.1 ext**：扩展包同步 2.5.1 / Ext pack 2.5.1
-            - **v2.5.0**：View 阅读界面重构——暖白金色主题、新 Logo、左右执行标注、导航搜索与悬浮工具栏；离线公式；重跑同次捕获刷新
-            - **v2.5.0**: View reader redesign — warm paper theme, new logo, margin execution notes, navigation/search and floating controls; offline math; same-capture live refresh
-            - **v2.5.0 ext**：扩展包同步 2.5.0 / Ext pack 2.5.0
-            - **v2.4.0**：Oracle journal 作语言值——`foreign.oracle_journal`/`replay_check`；bytecode/frontend 硬化；MSRV 1.81
-            - **v2.4.0**: Oracle journal as language values — foreign.oracle_journal/replay_check; bytecode/frontend hardening; MSRV 1.81
-            - **v2.4.0 ext**：扩展包同步 2.4.0 / Ext pack 2.4.0
-            - **v2.3.0**：Foreign Strong——不透明 `handle`、仿射 close、`replay_check`/oracle journal、表 arity refuse、Ω∈V_safe
-            - **v2.3.0**: Foreign Strong — opaque handle, affine close, replay_check/oracle journal, table arity refuse, Ω∈V_safe
-            - **v2.3.0 ext**：扩展包同步 2.3.0 / Ext pack 2.3.0
-            - **v2.2.1**：view / 静态导出——修复 occlusion 与中等宽度下大纲侧栏掉到正文下方
-            - **v2.2.1**: view / static export — fix outline rail nested under document (occlusion + mid-width layout)
-            - **v2.2.1 ext**：扩展包同步 2.2.1 / Ext pack 2.2.1
-            - **v2.2.0**：函数级调用 `marqdo call`——同一份 .mq.md 就是文档、知识和工具；Tree/Bytecode 执行被点名的函数；外部调用默认只跑纯函数
-            - **v2.2.0**: `marqdo call` runs one function in any .mq.md — the file is the document, the knowledge and the tool; Tree and Bytecode execute that function; external calls stay pure
-            - **v2.2.0 ext**：扩展包同步 2.2.0 / Ext pack 2.2.0
-            - **v2.1.5**：Agent 可靠工作台——ResourceView / ToolSpec / CheckpointV2 / EffectLedger · EKC ir.json 暖机 · Web 短读槽隔离
-            - **v2.1.5**: Agent reliability workbench — ResourceView / ToolSpec / CheckpointV2 / EffectLedger, EKC ir.json warm-load, web short/read lane isolation
-            - **v2.1.5 ext**：扩展包同步 2.1.5 / Ext pack 2.1.5
-            - **v2.1.4**：默认隔离 HTTP execute（ADR 0009）——worker 池 / `--call-lib-path` · `/_runtime/*` · MR-01 双流金样例 · `runtime.isolated_execution=1`
-            - **v2.1.4**: Default isolated HTTP execute (ADR 0009) — worker pool / `--call-lib-path`, `/_runtime/*`, MR-01 dual-stream gold, `runtime.isolated_execution=1`
-            - **v2.1.3**：知识工作台运行时——ModelSelection/RunContext/usage · view document 只读嵌入 · LLM selection/messages/cancel · agent selection e2e
-            - **v2.1.3**: Workbench runtime — ModelSelection/RunContext/usage, view document read-only embed, LLM selection/messages/cancel, agent selection e2e
-            - **v2.1.1**：可执行知识主链——BoundCall · NarrativeRef · 来源/适用期 · patch/extract · 整代 CURRENT + closure · 发票示例 113
-            - **v2.1.1**: Executable-knowledge spine — BoundCall, NarrativeRef, sources, patch/extract, generation CURRENT + closure, invoice example 113
-            - **v1.5.2**：外联 v3 P0/P1——raw stdin + 每 cell 输入 · plan API · snapshot · `view capture` · Persist
-            - **v1.5.2**: Foreign v3 P0/P1 — raw stdin + per-cell inputs, plan API, snapshot export/import/replay, `view capture`, Persist
-            - **v1.5.2 ext**：扩展包同步 1.5.2 / Ext pack 1.5.2
-            - **v1.5.1**：view 静态/动态统一 + 外联值传递——共用执行路径 · 构建时运行注入 stdout · `foreign.session` 值传递 · cell stdin
-            - **v1.5.1**: View static/live unified + foreign value passing — shared execution path, build-time run with stdout injection, `foreign.session` value passing, cell stdin
-            - **v1.5.0**：外联 v2 + 文档原生 Notebook——invoke/JSON call/并行/持久 Python·Node/状态桥 · cell 单步 · 高对比 view
-            - **v1.5.0**: Foreign v2 + document-native notebooks — invoke, JSON calls, fan-out, persistent Python/Node, state bridge, cell stepping, high-contrast view
-            - **v1.5.0 ext**：扩展包同步 1.5.0 / Ext pack 1.5.0
-            - **v1.4.6**：裸自增升参——首次粗体赋值左值即声明；`n = n + 1` 无反引号也是必选形参
-            - **v1.4.6**: Bare self-increment is a required parameter — first bold assignment LHS is a declaration
-            - **v1.4.5**：Streamable HTTP MCP + web invoke Bearer/401 · openai/agent json.get 硬化
-            - **v1.4.5**: Streamable HTTP MCP + web invoke Bearer/401; openai/agent json.get hardening
-            - **v1.4.2**：Agent/LLM 优化 O1–O5——sandbox trial · promote proof · step_route/EFI/cost · lint · quarantine
-            - **v1.4.2**: Agent/LLM optimize O1–O5 — sandbox trial, promote proof, step_route/EFI/cost, lint, quarantine
-            - **v1.4.1**：view 标注连线——SVG mid→mid（underline 底中 → chip 顶中）· 帧 chip id 对齐 · L→R 密度
-            - **v1.4.1**: View annot leaders — SVG mid→mid (mark bottom-center → chip top-center), frame chip id unify, L→R density
-            - **v1.4.0**：叙述统一——`% marqdo: var=` · 臂/循环体叙述 · foreach 中英糖 · 图片自写回 · view 推断形参
-            - **v1.4.0**: Prose-unified control flow — formula meta bind, arm/loop narrative, foreach sugar, image writeback, inferred-param view
-            - **v1.3.3**：view 文档面 Structure——叙述保真 · 标记面 · 调用/循环帧 · `#mq-view-trace` · 静态站同源
-            - **v1.3.3**: Browse document-surface Structure — narration, markers, call/loop frames, `#mq-view-trace`, static site parity
-            - **v1.3.0**：Engineering Knowledge Compiler——L0–L4 · `reuse`/`find`/`duplicate` · Agent preflight（REUSE→ADAPT→CREATE）
-            - **v1.3.0**: Engineering Knowledge Compiler — L0–L4 catalog, reuse/find/duplicate, Agent preflight (REUSE→ADAPT→CREATE)
-            - **v1.2.0**：Web Artifact（ADR 0007）——Document/Endpoint · `web.serve`/`render`/`inspect` · `ext/data|security|net` · 移除 `compose_*`/`configure`
-            - **v1.2.0**: Web Artifact (ADR 0007) — Document/Endpoint, web.serve/render/inspect, ext/data|security|net, compose_*/configure removed
-            - **Linux 包必出**：`*-native-x86_64-unknown-linux-gnu.zip` + Linux CLI bundle
-            - Details: [CHANGELOG](https://github.com/cflmy/marqdo/blob/main/CHANGELOG.md) · [ext-ai-optimize](https://github.com/cflmy/marqdo/blob/main/doc/roadmap/ext-ai-optimize.md)
+            - **2.6.0**：标准库与拓展库成为可执行手册；650 个公开标准库函数，标题下契约、叙述形参与句中调用。
+            - **2.6.0**: Executable library handbooks, 650 public standard-library functions, inline actions and source contracts.
+            - 文件/字节/集合/Result/文档/HTTP/任务/TOML/时区工程能力；Quantum 实验与 Web 递归 Markdown 布局。
+            - File, binary, collection, document and task workflows; executable Quantum experiments and recursive Web layouts.
+            - View 正文读动作，左右侧注看逻辑；空逻辑明确提示；知识区按输入、返回和依据组织。
+            - View keeps action text in prose, implementation in margin notes, and readable knowledge facts separate from execution.
+            - CLI · wasm · ext · VS Code extension: **2.6.0**. Core surface unchanged: **19 constructs**.
+            - Linux CLI and native plugin zips are required; see CHANGELOG for exact platform/effect boundaries.
 
             ### Downloads
 
