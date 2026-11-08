@@ -12,6 +12,10 @@ v2.2.0 起，`marqdo call` 可以直接调用这份文件里的一个函数。�
 
 ---
 
+标准库单文件本身就是手册：直接阅读[文件库](lib/文件.mq.md)、[集合库](lib/表.mq.md)等源码，按函数标题下的参数表、返回契约和动作说明调用；[工程实践](examples/stdlib-handbook/索引.mq.md)演示文件整理、CSV 汇总与文档维护。
+开发标准库和拓展库请直接阅读[可执行库开发指南](doc/library-development.mq.md)：契约表、叙述式实现、遮蔽调用与多文件工程组织均有可运行示范。
+
+
 ## 核心优势：可执行知识（Executable Knowledge）
 
 > **Knowledge That Can Run —— 知识即可执行。**

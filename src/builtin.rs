@@ -138,7 +138,7 @@ pub fn builtin_at(value: &Value, index: &Value) -> Result<Value, String> {
         Value::Int(n) => *n,
         _ => return Err("at needs int index".into()),
     };
-    if i < 0 || (i as usize) >= xs.len() {
+    if i < 0 || i >= xs.len() as i64 {
         return Ok(Value::None);
     }
     Ok(xs[i as usize].clone())

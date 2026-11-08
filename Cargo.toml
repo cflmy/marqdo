@@ -49,6 +49,8 @@ zip = { version = "=0.6.6", default-features = false, features = ["deflate"], op
 libloading = { version = "=0.8.6", optional = true }
 include_dir = "0.7"
 libc = { version = "0.2", optional = true }
+chrono-tz = "=0.10.0"
+toml = "=0.8.23"
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 # Custom entropy — no `js`/wasm-bindgen imports (raw mq_* ABI + marqdo-bridge.js).

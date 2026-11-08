@@ -140,15 +140,17 @@ Matching surrounding **legacy** `json.set` in `ext/ai/*.mq.md` is **not** compli
 3. `##` handlers: short prose OK; data as tables; return via `browser.*` / `web.*` / one `table.put`.
 4. Blank line between comment paragraphs and code.
 5. Run `marqdo run path.mq.md` from repo root.
-6. **Calls in narrative:** prefer `**结果 = 某函数 名=`x`**` (no `>` on the RHS). Bracket form `礼貌 [问候] "x"` / `**出 = [put] …**` is fine when modifiers help. Use `> …` for standalone step lists. See `examples/code-as-docs/`.
+6. **Calls in narrative:** explain the action in its sentence, for example `` 读取之后得到**结果 = [读取文件](文件.读文本(路径=`路径`))**。 `` Return in the sentence with `` 完成后返回*结果*。 `` Keep real control structures and data tables separate when that improves reading. The label describes intent; the payload contains the actual call. See the executable library development guide.
 7. **Do not use `##` inside `# main` for document sectioning** — those become nested functions. Use paragraphs / `---` breaks instead.
-8. **Index:** prefer `[键](集合)` / `` [`名`](集合) `` over footnote `` m[^k] ``.
+8. **Index:** use `access(collection, key)` (or `取`); `[描述](payload)` is executable occlusion, never an index by label.
 
 Browser client programs: prefer nested `import:` with `browser: lib/browser.mq.md` (no native plugin). Server sites: Artifact Metadata (`type: web|endpoint`) + `ext/web` facade + `ext/data` / `ext/security` / `ext/net` — see [ext-web-artifact.md](../../doc/design/ext-web-artifact.md). **Never** restore `compose_*` / `app.configure`.
 
 ## Developing libraries (`lib/*`, `ext/*`)
 
-Canonical thin-template + waves: [lib-code-as-docs.md](../../doc/design/lib-code-as-docs.md) · [roadmap/lib-ext-code-as-docs.md](../../doc/roadmap/lib-ext-code-as-docs.md).
+Start with the [executable library development guide](../../../doc/library-development.mq.md): parameter/return tables below headings, prose >50%, inline assignments/returns and occlusion labels. Single-file stdlib needs no index; multi-file extensions organize through index.mq.md.
+
+Design background + waves: [lib-code-as-docs.md](../../doc/design/lib-code-as-docs.md) · [roadmap/lib-ext-code-as-docs.md](../../doc/roadmap/lib-ext-code-as-docs.md).
 
 ### Goals
 
@@ -156,14 +158,20 @@ Canonical thin-template + waves: [lib-code-as-docs.md](../../doc/design/lib-code
 - One concern per helper; name the effect (`set_text`, `canvas`, …), do not expose bag surgery.
 - EN + ZH pair when shipping user-facing libs (`lib/browser.mq.md` ↔ `lib/浏览器.mq.md`, `ext/web` ↔ `ext/web/网页.mq.md`).
 - `ext/**` never calls `host_*` — use plugins / public lib only (`doc/design/ext-agent.md`).
-- Collection get: **`[key](coll)`** (no new footnote indexes). Calls in examples may use `修饰 [fn] …` or classic `>` / bold.
+- Collection get: **`access(coll, key)`**; bracket labels are inert descriptions. Calls in examples may use `修饰 [fn] …` or classic `>` / bold.
 
 ### Library checklist
 
-- [ ] Purpose sentence + prose params + one example + short body
+- [ ] Single-file stdlib is its own handbook; no forced index/module guide directory
+- [ ] Parameter/type/default table directly below the function heading, then return contract
+- [ ] Prose parameters; remove legacy `+` declarations in standard library sources
+- [ ] Explain purpose, real input shape, output, failure and limits; narrative >50% per function
+- [ ] Put assignments, occlusion calls and returns in explanatory sentences where natural; reserve separate blocks for real structure
+- [ ] Use `[action](actual code)` inside return/statement markers for opaque host calls
+- [ ] One actual example + short implementation; never pad prose to satisfy the ratio
 - [ ] Public examples use **tables + helpers**, not json glue
-- [ ] Index with `[k](c)`; foreach `- [item](coll)`
-- [ ] Helpers documented with a one-line purpose above `##`
+- [ ] Read with `access(c, k)`; foreach `- [description](遍历 coll 为 item)`
+- [ ] Function heading names the tool; tables and task explanation follow it
 - [ ] Defaults on params; omit `None` fields in merged maps
 - [ ] No `json.set` chains in new code — use `table.put` / `table.merge` / GFM
 - [ ] `marqdo run` on a tiny demo under `examples/` or inline smoke

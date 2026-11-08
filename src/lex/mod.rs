@@ -188,6 +188,24 @@ pub fn matching_bold_close_inline(trimmed: &str) -> Option<usize> {
     matching_bold_close_opts(trimmed, false)
 }
 
+// An occlusion label is prose: stars, quotes and backticks inside it are not
+// statement/return delimiters. Payload nesting is tracked by the callers.
+fn occlusion_payload_start(bytes: &[u8], start: usize) -> Option<usize> {
+    if bytes.get(start) != Some(&b'[') {
+        return None;
+    }
+    let mut i = start + 1;
+    while i < bytes.len() {
+        match bytes[i] {
+            b'\\' => i += 2,
+            b']' => return (bytes.get(i + 1) == Some(&b'(')).then_some(i + 1),
+            b'\n' | b'\r' => return None,
+            _ => i += 1,
+        }
+    }
+    None
+}
+
 fn matching_bold_close_opts(trimmed: &str, require_eol: bool) -> Option<usize> {
     let Some(rest) = trimmed.strip_prefix("**") else {
         return None;
@@ -196,6 +214,7 @@ fn matching_bold_close_opts(trimmed: &str, require_eol: bool) -> Option<usize> {
     let mut i = 0usize;
     let mut in_bt = false;
     let mut in_str = false;
+    let mut nesting = Vec::new();
     while i + 1 < bytes.len() {
         let c = bytes[i];
         if in_str {
@@ -216,7 +235,27 @@ fn matching_bold_close_opts(trimmed: &str, require_eol: bool) -> Option<usize> {
             i += 1;
             continue;
         }
+        if c == b'[' {
+            if let Some(payload) = occlusion_payload_start(bytes, i) {
+                i = payload;
+                continue;
+            }
+        }
         match c {
+            b'(' | b'[' | b'{' => {
+                nesting.push(match c {
+                    b'(' => b')',
+                    b'[' => b']',
+                    _ => b'}',
+                });
+                i += 1;
+            }
+            b')' | b']' | b'}' => {
+                if nesting.last() == Some(&c) {
+                    nesting.pop();
+                }
+                i += 1;
+            }
             b'`' => {
                 in_bt = true;
                 i += 1;
@@ -225,7 +264,7 @@ fn matching_bold_close_opts(trimmed: &str, require_eol: bool) -> Option<usize> {
                 in_str = true;
                 i += 1;
             }
-            b'*' if bytes[i + 1] == b'*' => {
+            b'*' if bytes[i + 1] == b'*' && nesting.is_empty() => {
                 let after = i + 2;
                 if !require_eol || rest[after..].trim().is_empty() {
                     return Some(2 + i);
@@ -260,6 +299,7 @@ fn matching_italic_close_opts(trimmed: &str, require_eol: bool) -> Option<usize>
     let mut i = 1usize; // skip opening *
     let mut in_bt = false;
     let mut in_str = false;
+    let mut nesting = Vec::new();
     while i < bytes.len() {
         let c = bytes[i];
         if in_str {
@@ -280,7 +320,27 @@ fn matching_italic_close_opts(trimmed: &str, require_eol: bool) -> Option<usize>
             i += 1;
             continue;
         }
+        if c == b'[' {
+            if let Some(payload) = occlusion_payload_start(bytes, i) {
+                i = payload;
+                continue;
+            }
+        }
         match c {
+            b'(' | b'[' | b'{' => {
+                nesting.push(match c {
+                    b'(' => b')',
+                    b'[' => b']',
+                    _ => b'}',
+                });
+                i += 1;
+            }
+            b')' | b']' | b'}' => {
+                if nesting.last() == Some(&c) {
+                    nesting.pop();
+                }
+                i += 1;
+            }
             b'`' => {
                 in_bt = true;
                 i += 1;
@@ -289,7 +349,7 @@ fn matching_italic_close_opts(trimmed: &str, require_eol: bool) -> Option<usize>
                 in_str = true;
                 i += 1;
             }
-            b'*' => {
+            b'*' if nesting.is_empty() => {
                 if !require_eol || trimmed[i + 1..].trim().is_empty() {
                     return Some(i);
                 }
@@ -721,5 +781,17 @@ mod tests {
         assert_eq!(lines[2].kind, LineKind::Comment, "bad terminator → comment");
         assert_eq!(lines[3].kind, LineKind::Code, "call recovers after bad line");
         assert_eq!(lines[4].kind, LineKind::Code, "assign recovers after bad line");
+    }
+}
+
+#[cfg(test)]
+mod inline_occlusion_boundaries {
+    use super::*;
+    #[test]
+    fn prose_stars_and_payload_products_keep_the_real_return_boundary() {
+        let source = r#"*[multiply x*y and keep "raw" text](2 * (3 + 1))* after the result"#;
+        assert_eq!(matching_italic_close_inline(source), source.find("* after"));
+        let source = r#"**answer = [render **literal** marker](helper(text="**", value=(2 * 3)))** then continue"#;
+        assert_eq!(matching_bold_close_inline(source), source.find("** then"));
     }
 }

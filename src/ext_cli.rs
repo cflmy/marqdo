@@ -22,6 +22,9 @@ pub const CATALOG: &[ExtPackage] = &[
         id: "llm",
         description: "OpenAI-compatible chat object (ext/ai/llm)",
         mq_files: &[
+            "ai/index.mq.md",
+            "ai/索引.mq.md",
+            "ai/llm/index.mq.md",
             "ai/llm.mq.md",
             "ai/大模型.mq.md",
             "ai/llm/openai.mq.md",
@@ -32,13 +35,32 @@ pub const CATALOG: &[ExtPackage] = &[
     ExtPackage {
         id: "agent",
         description: "Agent development framework (ext/ai/agent)",
-        mq_files: &["ai/agent.mq.md", "ai/智能体.mq.md"],
+        mq_files: &[
+            "ai/agent.mq.md",
+            "ai/智能体.mq.md",
+            "ai/sandbox.mq.md",
+            "ai/沙盒.mq.md",
+            "ai/policies/step-route.mq.md",
+        ],
         native_crate: Some("marqdo_plugin_agent"),
     },
     ExtPackage {
         id: "web",
         description: "Dynamic website toolkit (ext/web) — Document/Endpoint + layout skill",
         mq_files: &[
+            "data/index.mq.md",
+            "data/cache.mq.md",
+            "data/db.mq.md",
+            "data/form.mq.md",
+            "data/storage.mq.md",
+            "security/index.mq.md",
+            "security/auth.mq.md",
+            "security/rbac.mq.md",
+            "security/oidc.mq.md",
+            "net/index.mq.md",
+            "net/http.mq.md",
+            "net/url.mq.md",
+            "net/websocket.mq.md",
             "web/index.mq.md",
             "web/web.mq.md",
             "web/网页.mq.md",
@@ -86,7 +108,12 @@ pub const CATALOG: &[ExtPackage] = &[
     ExtPackage {
         id: "linalg",
         description: "Formula-first linear algebra (ext/linalg) — MatExpr simplify/display",
-        mq_files: &["linalg/linalg.mq.md", "linalg/线性代数.mq.md"],
+        mq_files: &[
+            "linalg/index.mq.md",
+            "linalg/索引.mq.md",
+            "linalg/linalg.mq.md",
+            "linalg/线性代数.mq.md",
+        ],
         native_crate: Some("marqdo_plugin_linalg"),
     },
 ];

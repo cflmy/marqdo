@@ -302,6 +302,11 @@ fn spawn_file(
     ));
     let mut cmd = Command::new(&exe);
     cmd.arg("run").arg(&file);
+    if !ctx.caps.fs_write { cmd.arg("--deny-fs-write"); }
+    if !ctx.caps.exec { cmd.arg("--deny-exec"); }
+    if !ctx.caps.net { cmd.arg("--deny-net"); }
+    if !ctx.caps.plugin { cmd.arg("--deny-plugin"); }
+    if let Some(root) = &ctx.fs_root { cmd.arg("--fs-root").arg(root); }
     cmd.arg("--emit-result").arg(&result_path);
     cmd.current_dir(&ctx.cwd);
     cmd.stdin(Stdio::null());
@@ -340,18 +345,10 @@ fn spawn_file(
         let mut stdout_pipe = child.stdout.take();
         let mut stderr_pipe = child.stderr.take();
         let stdout = thread::spawn(move || {
-            let mut buf = Vec::new();
-            if let Some(ref mut r) = stdout_pipe {
-                let _ = r.read_to_end(&mut buf);
-            }
-            String::from_utf8_lossy(&buf).into_owned()
+            stdout_pipe.as_mut().map(capture_file_io).unwrap_or_default()
         });
         let stderr = thread::spawn(move || {
-            let mut buf = Vec::new();
-            if let Some(ref mut r) = stderr_pipe {
-                let _ = r.read_to_end(&mut buf);
-            }
-            String::from_utf8_lossy(&buf).into_owned()
+            stderr_pipe.as_mut().map(capture_file_io).unwrap_or_default()
         });
         (Some(stdout), Some(stderr))
     } else {
@@ -677,6 +674,54 @@ pub fn wait_all(ctx: &mut HostContext) -> Result<Value, String> {
         results.push(join(ctx, &Value::Int(id as i64))?);
     }
     Ok(Value::List(results))
+}
+
+fn capture_file_io(reader:&mut impl Read)->String {
+    let mut kept=Vec::new(); let mut buffer=[0u8;8192];
+    loop { match reader.read(&mut buffer) {
+        Ok(0)|Err(_)=>break,
+        Ok(n)=>{ let take=(FILE_IO_CAP+4-kept.len()).min(n);kept.extend_from_slice(&buffer[..take]); }
+    }}
+    clip_io(&String::from_utf8_lossy(&kept))
+}
+
+/// Timeout leaves the handle available unless cancel=True. Process cancellation
+/// reaps the OS child; function-thread cancellation is logical, as in kill().
+pub(super) fn wait_timeout(ctx:&mut HostContext,id:&Value,timeout_ms:u64,cancel:bool)->Result<Value,String>{
+    let start=std::time::Instant::now();
+    loop{
+        let status=poll(ctx,id)?;
+        let running=matches!(&status,Value::Map(fields) if fields.iter().any(|(k,v)|k=="status"&&v==&Value::Text("running".into())));
+        if !running{return join(ctx,id)}
+        if start.elapsed()>=Duration::from_millis(timeout_ms){if cancel{kill(ctx,id)?;}return Err("timed_out: subtask wait deadline exceeded".into())}
+        thread::sleep(Duration::from_millis(5));
+    }
+}
+pub(super) fn run_many(ctx:&mut HostContext,tasks:&Value,limit:usize,timeout_ms:u64)->Result<Value,String>{
+    let Value::List(tasks)=tasks else{return Err("tasks must be record list".into())};
+    if !(1..=64).contains(&limit){return Err("limit must be 1..64".into())}
+    if tasks.len()>10000{return Err("batch exceeds 10000 tasks".into())}
+    // Validate the entire batch before starting any process.
+    let jobs=tasks.iter().map(|task|{let Value::Map(fields)=task else{return Err("task must contain path and optional args".to_string())};
+        let mut job=HashMap::new();for (key,value) in fields{if !matches!(key.as_str(),"path"|"args"){return Err(format!("unsupported batch field {key}"))}job.insert(key.clone(),value.clone());}
+        let path=job.get("path").ok_or("task missing path")?;ctx.resolve_path(as_text(path,"path")?)?;Ok(job)
+    }).collect::<Result<Vec<_>,String>>()?;
+    let mut active:Vec<(usize,Value,std::time::Instant)>=Vec::new();let mut next=0;let mut out=vec![Value::None;jobs.len()];
+    while next<jobs.len()||!active.is_empty(){
+        while next<jobs.len()&&active.len()<limit{
+            match spawn(ctx,&jobs[next]){Ok(id)=>active.push((next,id,std::time::Instant::now())),Err(error)=>out[next]=super::result::capture("subtask.run_many",Err(error))};next+=1;
+        }
+        let mut i=0;
+        while i<active.len(){
+            let (_,id,start)=&active[i];let status=poll(ctx,id)?;
+            let running=matches!(&status,Value::Map(fields) if fields.iter().any(|(k,v)|k=="status"&&v==&Value::Text("running".into())));
+            if !running{let(index,id,_)=active.remove(i);out[index]=super::result::capture("subtask.run_many",join(ctx,&id));}
+            else if start.elapsed()>=Duration::from_millis(timeout_ms){let(index,id,_)=active.remove(i);let _=kill(ctx,&id);out[index]=super::result::capture("subtask.run_many",Err("timed_out: batch task deadline exceeded".into()));}
+            else{i+=1;}
+        }
+        if !active.is_empty(){thread::sleep(Duration::from_millis(5));}
+    }
+    Ok(Value::List(out))
 }
 
 fn clip_io(s: &str) -> String {

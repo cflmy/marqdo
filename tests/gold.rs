@@ -198,7 +198,24 @@ fn assert_import_err(path: &str, library: &str, origin: &str, caller: &str, subs
     for backend in ["tree", "bytecode"] {
         let (code, stdout, stderr) = run(&["run", path, "--backend", backend]);
         assert_ne!(code, 0, "{path} backend={backend} unexpectedly succeeded stdout={stdout}");
-        let origin = format!("{library}:{origin}:");
+        let source = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(library);
+        let module = marqdo::load::load_module(&source).expect("load actual library origin");
+        let mut lines = Vec::new();
+        for function in &module.functions {
+            marqdo::ast::walk_stmts(function, &mut |statement| {
+                if let marqdo::ast::Stmt::Return { value, span } = statement {
+                    let mut payload = value;
+                    while let marqdo::ast::Expr::Occluded { payload: Some(inner), .. } = payload {
+                        payload = inner;
+                    }
+                    if let marqdo::ast::Expr::Call(call) = payload {
+                        if call.callee == origin { lines.push(span.line); }
+                    }
+                }
+            });
+        }
+        assert_eq!(lines.len(), 1, "expected one instruction {origin} in {library}");
+        let origin = format!("{library}:{}:1:", lines[0]);
         assert!(stderr.lines().next().unwrap_or("").contains(&origin),
             "{path} backend={backend} missing actual library origin {origin:?}: {stderr}");
         let caller = format!(" from {path}:{caller}");
@@ -1575,16 +1592,21 @@ fn ext_mq_md_never_calls_host() {
 #[test]
 fn catalog_includes_agent_kb_concepts() {
     let dir = tempfile_dir("mq-cat-kb");
-    // Ensure a concept exists under tests/ext agent-kb (offline reuse test leaves one).
-    let (code, _, stderr) = run(&[
-        "run",
-        "tests/ext/agent-kb-reuse.mq.md",
-    ]);
+    // Own the seed and scan root: other agent tests may create/delete their
+    // private .marqdo files concurrently under tests/ext.
+    ensure_agent_plugin_built();
+    let scan = tempfile_dir("mq-cat-kb-source");
+    let seed = scan.join("seed.mq.md");
+    std::fs::copy(
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/ext/agent-kb-reuse.mq.md"),
+        &seed,
+    ).unwrap();
+    let (code, _, stderr) = run(&["run", seed.to_str().unwrap()]);
     assert_eq!(code, 0, "seed kb via reuse test: {stderr}");
 
     let (code, _, stderr) = run(&[
         "catalog",
-        "tests/ext",
+        scan.to_str().unwrap(),
         "-o",
         dir.to_str().unwrap(),
         "--no-knowledge",
@@ -1922,7 +1944,7 @@ fn lib_json_vsafe_refuse() {
     assert_import_err(
         "tests/lib/json-vsafe-refuse.mq.md",
         "lib/json.mq.md",
-        "16:1",
+        "host_json_parse",
         "10:1",
         "json: integer outside V_safe",
     );
@@ -1933,7 +1955,7 @@ fn lib_json_vsafe_stringify_refuse() {
     assert_import_err(
         "tests/lib/json-vsafe-stringify-refuse.mq.md",
         "lib/json.mq.md",
-        "24:1",
+        "host_json_stringify",
         "11:1",
         "json: integer outside V_safe",
     );
@@ -3671,7 +3693,7 @@ fn lib_foreign_session_vsafe_refuse() {
     assert_import_err(
         "tests/lib/foreign-session-vsafe-refuse.mq.md",
         "lib/foreign.mq.md",
-        "207:1",
+        "host_foreign_session_set",
         "12:1",
         "json: integer outside V_safe",
     );
@@ -3686,7 +3708,7 @@ fn lib_foreign_session_use_after_close() {
     assert_import_err(
         "tests/lib/foreign-session-use-after-close.mq.md",
         "lib/foreign.mq.md",
-        "198:1",
+        "host_foreign_session_eval",
         "12:1",
         "foreign session",
     );
@@ -3701,7 +3723,7 @@ fn lib_foreign_session_double_close() {
     assert_import_err(
         "tests/lib/foreign-session-double-close.mq.md",
         "lib/foreign.mq.md",
-        "231:1",
+        "host_foreign_session_close",
         "12:1",
         "foreign session",
     );
@@ -3713,7 +3735,7 @@ fn lib_foreign_session_use_before_open() {
     assert_import_err(
         "tests/lib/foreign-session-use-before-open.mq.md",
         "lib/foreign.mq.md",
-        "198:1",
+        "host_foreign_session_eval",
         "10:1",
         "session id must be a handle",
     );
@@ -3728,7 +3750,7 @@ fn lib_foreign_session_handle_no_serialize() {
     assert_import_err(
         "tests/lib/foreign-session-handle-no-serialize.mq.md",
         "lib/json.mq.md",
-        "24:1",
+        "host_json_stringify",
         "12:1",
         "session handle cannot be serialized",
     );
@@ -3743,7 +3765,7 @@ fn lib_foreign_session_result_vsafe_refuse() {
     assert_import_err(
         "tests/lib/foreign-session-result-vsafe-refuse.mq.md",
         "lib/foreign.mq.md",
-        "198:1",
+        "host_foreign_session_eval",
         "11:1",
         "json: integer outside V_safe",
     );
@@ -3767,7 +3789,7 @@ fn lib_foreign_session_cold_replay_empty() {
     assert_import_err(
         "tests/lib/foreign-session-cold-replay-empty.mq.md",
         "lib/foreign.mq.md",
-        "198:1",
+        "host_foreign_session_eval",
         "13:1",
         "foreign session",
     );
@@ -3782,7 +3804,7 @@ fn lib_foreign_vsafe_refuse() {
     assert_import_err(
         "tests/lib/foreign-vsafe-refuse.mq.md",
         "lib/json.mq.md",
-        "16:1",
+        "host_json_parse",
         "21:1",
         "json: integer outside V_safe",
     );
@@ -3797,7 +3819,7 @@ fn lib_foreign_vsafe_postarith_refuse() {
     assert_import_err(
         "tests/lib/foreign-vsafe-postarith-refuse.mq.md",
         "lib/json.mq.md",
-        "16:1",
+        "host_json_parse",
         "22:1",
         "json: integer outside V_safe",
     );

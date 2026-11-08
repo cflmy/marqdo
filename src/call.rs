@@ -19,62 +19,94 @@ use crate::sema::{compile_file_closure, SemanticArtifact, SemanticProject};
 use crate::value::Value;
 use crate::Backend;
 
-/// Which host side effects `marqdo call` may perform.
+/// Explicit effect grants. Writes imply reads; unrelated effects stay denied.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum CallEffects {
-    /// Refuse any non-pure artifact (historical default).
-    #[default]
-    None,
-    /// Allow `plugin.call` (and accompanying `output.write` from load helpers).
-    Plugin,
-}
+pub struct CallEffects(u32);
 
 impl CallEffects {
+    #[allow(non_upper_case_globals)]
+    pub const None: Self = Self(0);
+    #[allow(non_upper_case_globals)]
+    pub const Plugin: Self = Self((1 << 2) | (1 << 6) | (1 << 7) | (1 << 8) | (1 << 11));
+    const NAMES: &'static [&'static str] = &[
+        "fs.read",
+        "fs.write",
+        "plugin.call",
+        "network.read",
+        "network.write",
+        "process.exec",
+        "output.write",
+        "time.read",
+        "random.read",
+        "environment.read",
+        "environment.write",
+        "process.control",
+        "user.input",
+    ];
     pub fn parse(s: &str) -> Result<Self> {
-        match s.trim().to_ascii_lowercase().as_str() {
-            "none" | "" => Ok(Self::None),
-            "plugin" => Ok(Self::Plugin),
-            other => Err(call_diag(
-                None,
-                0,
-                "call.bad_effects",
-                format!("unknown --effects `{other}` (expected none|plugin)"),
-            )),
+        let mut out = Self::None;
+        for name in s.split(',').map(str::trim) {
+            match name {
+                "none" | "" => {}
+                "plugin" => out.0 |= Self::Plugin.0,
+                "read" => out.0 |= 1,
+                "write" => out.0 |= 3,
+                _ => {
+                    let index = Self::NAMES.iter().position(|v| *v == name)
+                        .ok_or_else(|| call_diag(None, 0, "call.bad_effects",
+                            format!("unknown effect `{name}`; use none, plugin or comma-separated effect names")))?;
+                    out.0 |= 1 << index;
+                }
+            }
         }
-    }
-
-    pub fn as_str(self) -> &'static str {
-        match self {
-            Self::None => "none",
-            Self::Plugin => "plugin",
+        if out.0 & (1 << 1) != 0 {
+            out.0 |= 1;
         }
+        if out.0 & (1 << 4) != 0 {
+            out.0 |= 1 << 3;
+        }
+        Ok(out)
     }
-
+    pub fn as_str(self) -> String {
+        if self == Self::None {
+            return "none".into();
+        }
+        if self == Self::Plugin {
+            return "plugin".into();
+        }
+        Self::NAMES
+            .iter()
+            .enumerate()
+            .filter(|(i, _)| self.0 & (1 << i) != 0)
+            .map(|(_, name)| *name)
+            .collect::<Vec<_>>()
+            .join(",")
+    }
+    /// File/network/process writes must never be repeated to rebuild a handle.
+    pub(crate) fn needs_snapshot(self) -> bool {
+        [
+            "fs.write",
+            "network.write",
+            "process.exec",
+            "environment.write",
+        ]
+        .iter()
+        .any(|effect| self.allows(effect))
+    }
     fn host_caps(self) -> HostCaps {
-        match self {
-            Self::None => HostCaps {
-                fs_write: false,
-                exec: false,
-                net: false,
-                plugin: false,
-            },
-            Self::Plugin => HostCaps {
-                fs_write: false,
-                exec: false,
-                net: false,
-                plugin: true,
-            },
+        HostCaps {
+            fs_write: self.allows("fs.write"),
+            exec: self.allows("process.exec"),
+            net: self.allows("network.read") || self.allows("network.write"),
+            plugin: self.allows("plugin.call"),
         }
     }
-
     fn allows(self, effect: &str) -> bool {
-        match self {
-            Self::None => effect == "pure",
-            Self::Plugin => matches!(
-                effect,
-                "pure" | "plugin.call" | "output.write" | "time.read" | "random.read"
-            ),
-        }
+        effect == "pure"
+            || Self::NAMES
+                .iter()
+                .position(|v| *v == effect)
+                .is_some_and(|i| self.0 & (1 << i) != 0)
     }
 }
 
@@ -82,6 +114,7 @@ impl CallEffects {
 #[derive(Debug, Clone, Default)]
 pub struct CallOptions {
     pub effects: CallEffects,
+    pub fs_root: Option<std::path::PathBuf>,
     pub session: Option<String>,
     pub toget: Option<String>,
 }
@@ -104,19 +137,16 @@ pub fn call_file_with(
     backend: Backend,
     opts: CallOptions,
 ) -> Result<Value> {
-    let path = path
-        .canonicalize()
-        .map_err(|e| {
-            call_diag(
-                None,
-                1,
-                "call.compile",
-                format!("failed to read {}: {e}", path.display()),
-            )
-        })?;
+    let path = path.canonicalize().map_err(|e| {
+        call_diag(
+            None,
+            1,
+            "call.compile",
+            format!("failed to read {}: {e}", path.display()),
+        )
+    })?;
 
-    let mut session = if opts.session.is_some() || opts.toget.is_some() || args_need_session(args)
-    {
+    let mut session = if opts.session.is_some() || opts.toget.is_some() || args_need_session(args) {
         let id = opts
             .session
             .clone()
@@ -135,7 +165,14 @@ pub fn call_file_with(
     // Record uses original arg texts (with $refs) so replay can re-resolve.
     let record_args = args.to_vec();
 
-    let value = call_file_raw(&path, function, &resolved, opts.effects, backend)?;
+    let value = call_file_raw_with_root(
+        &path,
+        function,
+        &resolved,
+        opts.effects,
+        backend,
+        opts.fs_root.as_deref(),
+    )?;
 
     if let Some(ref mut sess) = session {
         crate::call_session::record_step(
@@ -144,6 +181,7 @@ pub fn call_file_with(
             function,
             &record_args,
             opts.effects,
+            opts.fs_root.as_deref(),
             opts.toget.as_deref(),
             &value,
         )?;
@@ -161,6 +199,17 @@ pub fn call_file_raw(
     effects: CallEffects,
     backend: Backend,
 ) -> Result<Value> {
+    call_file_raw_with_root(path, function, args, effects, backend, None)
+}
+
+pub(crate) fn call_file_raw_with_root(
+    path: &Path,
+    function: &str,
+    args: &[(String, Value)],
+    effects: CallEffects,
+    backend: Backend,
+    fs_root: Option<&Path>,
+) -> Result<Value> {
     let path = if path.is_absolute() {
         path.to_path_buf()
     } else {
@@ -176,7 +225,7 @@ pub fn call_file_raw(
     let compilation = compile_file_closure(&path).map_err(|e| preserve_diag(&path, e))?;
     let artifact = locate_artifact(&compilation.semantics, &path, function)?;
     deny_unsafe(&path, artifact, effects)?;
-    execute_source_function(
+    execute_source_function_with_root(
         &path,
         artifact.source.line,
         &artifact.display_name,
@@ -184,14 +233,14 @@ pub fn call_file_raw(
         effects.host_caps(),
         backend,
         true,
+        fs_root,
     )
     .map(|(value, _stdout)| value)
 }
 
 fn args_need_session(args: &[(String, Value)]) -> bool {
-    args.iter().any(|(_, v)| {
-        matches!(v, Value::Text(t) if t.starts_with('$') || t.starts_with('@'))
-    })
+    args.iter()
+        .any(|(_, v)| matches!(v, Value::Text(t) if t.starts_with('$') || t.starts_with('@')))
 }
 
 /// Run the function declared at `line` in `path`.
@@ -203,6 +252,28 @@ pub(crate) fn execute_source_function(
     caps: HostCaps,
     backend: Backend,
     strict_args: bool,
+) -> Result<(Value, String)> {
+    execute_source_function_with_root(
+        path,
+        line,
+        display_name,
+        args,
+        caps,
+        backend,
+        strict_args,
+        None,
+    )
+}
+
+fn execute_source_function_with_root(
+    path: &Path,
+    line: u32,
+    display_name: &str,
+    args: &[(String, Value)],
+    caps: HostCaps,
+    backend: Backend,
+    strict_args: bool,
+    fs_root: Option<&Path>,
 ) -> Result<(Value, String)> {
     let module = load_module(path)?;
     let fun = find_function_at_line(&module.functions, line).ok_or_else(|| {
@@ -225,8 +296,16 @@ pub(crate) fn execute_source_function(
             ),
         ));
     }
-    let mut interp = Interpreter::with_capture(Some(path), false)
-        .with_host(HostContext::for_capture(Some(path), caps));
+    let mut host = HostContext::for_capture(Some(path), caps);
+    if let Some(root) = fs_root {
+        let root = root.canonicalize()?;
+        if !root.is_dir() {
+            anyhow::bail!("call.fs_root: root must be a directory");
+        }
+        host.cwd = root.clone();
+        host.fs_root = Some(root);
+    }
+    let mut interp = Interpreter::with_capture(Some(path), false).with_host(host);
     let bound;
     let invoke_args: &[(String, Value)] = if strict_args {
         bound = interp.bind_external_args(&module, fun, args)?;
@@ -258,8 +337,13 @@ pub(crate) fn execute_source_function(
                         format!("bytecode 没有编译出 `{display_name}`；拒绝改去执行程序入口"),
                     )
                 })?;
-            let mut vm =
-                Vm::with_capture(Some(path)).with_host(HostContext::for_capture(Some(path), caps));
+            let mut host = HostContext::for_capture(Some(path), caps);
+            if let Some(root) = fs_root {
+                let root = root.canonicalize()?;
+                host.cwd = root.clone();
+                host.fs_root = Some(root);
+            }
+            let mut vm = Vm::with_capture(Some(path)).with_host(host);
             let value = vm.call_function(&program, idx, invoke_args)?;
             Ok((value, vm.captured_stdout))
         }
@@ -308,7 +392,12 @@ pub fn parse_call_args(tokens: &[String]) -> Result<Vec<(String, Value)>> {
             ));
         }
         let value = parse_literal(raw).map_err(|message| {
-            call_diag(None, 0, "call.bad_value", format!("参数 `{name}`: {message}"))
+            call_diag(
+                None,
+                0,
+                "call.bad_value",
+                format!("参数 `{name}`: {message}"),
+            )
         })?;
         out.push((name.to_string(), value));
     }
@@ -356,8 +445,7 @@ fn locate_artifact<'a>(
             .copied()
             .filter(|artifact| {
                 artifact.kind == "function"
-                    && (artifact.display_name.ends_with(&suffix)
-                        || artifact.display_name == query)
+                    && (artifact.display_name.ends_with(&suffix) || artifact.display_name == query)
             })
             .collect()
     };

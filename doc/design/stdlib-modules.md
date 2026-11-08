@@ -1,5 +1,7 @@
 # 标准库 L1 模块
 
+直接阅读并导入标准库单文件，例如 [文件](../../lib/文件.mq.md)和[表](../../lib/表.mq.md)。每个文件自身就是手册，函数标题下给出参数表、返回契约和动作说明；不要求额外 index。模块分层与历史波次见下表，当前规范见[标准库说明](stdlib-handbook.md)。
+
 | | |
 |---|---|
 | 状态 | **核心已落地**；**Mid M1–M6 已落地**；**Mid2 规划中** · [stdlib-mid2.md](stdlib-mid2.md) / [roadmap/stdlib-mid2.md](../roadmap/stdlib-mid2.md) |

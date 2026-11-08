@@ -125,7 +125,7 @@ fn from_hex(b: u8) -> Result<u8, String> {
     }
 }
 
-fn encode_base64(input: &[u8]) -> String {
+pub(super) fn encode_base64(input: &[u8]) -> String {
     let mut out = String::with_capacity((input.len() + 2) / 3 * 4);
     let mut i = 0;
     while i + 3 <= input.len() {
@@ -153,7 +153,7 @@ fn encode_base64(input: &[u8]) -> String {
     out
 }
 
-fn decode_base64(input: &str) -> Result<Vec<u8>, String> {
+pub(super) fn decode_base64(input: &str) -> Result<Vec<u8>, String> {
     let raw = input.as_bytes();
     if raw.len() % 4 != 0 {
         return Err("base64_decode: length must be multiple of 4".into());

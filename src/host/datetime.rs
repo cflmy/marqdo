@@ -1,10 +1,11 @@
-//! Calendar / timezone subset for Mid2 M7 (`lib/datetime`).
+//! Calendar moments with fixed offsets or embedded IANA timezone rules.
 //!
-//! Moments are plain maps: `{unix, zone, iso}`. Zone is a fixed offset (`+08:00`)
-//! or alias (`UTC`); a few fixed-offset IANA names are accepted. Full tzdb is out of scope.
+//! Moments retain `{unix, zone, iso}`; `zone` is the numeric offset.
+//! Named zones additionally retain `timezone`, so future instants and calendar
+//! arithmetic recompute offsets using embedded IANA/DST rules.
 
 use crate::host::as_text;
-use chrono::{DateTime, Duration, FixedOffset, NaiveDate, NaiveDateTime, TimeZone, Utc};
+use chrono::{DateTime, Duration, FixedOffset, NaiveDate, NaiveDateTime, TimeZone, Utc, Offset, LocalResult};
 
 use crate::value::Value;
 
@@ -126,7 +127,11 @@ fn unix_of_value(v: &Value) -> Result<(i64, FixedOffset), String> {
                 }
             }
             let unix = unix.ok_or_else(|| "datetime map needs unix".to_string())?;
-            Ok((unix, zone_of_moment(entries)?))
+            let offset = if let Some((_, Value::Text(zone))) = entries.iter().find(|(k,_)|k=="timezone") {
+                let zone: chrono_tz::Tz = zone.parse().map_err(|_| format!("unknown IANA timezone {zone}"))?;
+                zone.timestamp_opt(unix,0).single().ok_or("invalid timestamp")?.offset().fix()
+            } else { zone_of_moment(entries)? };
+            Ok((unix, offset))
         }
         Value::Text(s) => {
             // Treat bare ISO/RFC3339 text as a moment.
@@ -151,11 +156,10 @@ pub fn now() -> Result<Value, String> {
 
 pub fn from_unix(unix: &Value, zone: Option<&Value>) -> Result<Value, String> {
     let secs = as_i64(unix, "unix")?;
-    let off = match zone {
-        None | Some(Value::None) => FixedOffset::east_opt(0).unwrap(),
-        Some(z) => parse_zone(as_text(z, "zone")?)?,
-    };
-    moment(secs, off)
+    match zone {
+        None | Some(Value::None) => moment(secs, FixedOffset::east_opt(0).unwrap()),
+        Some(zone) => moment_in_zone(secs, as_text(zone,"zone")?),
+    }
 }
 
 pub fn to_unix(dt: &Value) -> Result<Value, String> {
@@ -241,20 +245,56 @@ pub fn add(
     let hours = optional_i64(hours, "hours")?;
     let minutes = optional_i64(minutes, "minutes")?;
     let seconds = optional_i64(seconds, "seconds")?;
-    let delta = Duration::days(days)
-        + Duration::hours(hours)
-        + Duration::minutes(minutes)
-        + Duration::seconds(seconds);
-    let new_secs = secs
-        .checked_add(delta.num_seconds())
-        .ok_or_else(|| "datetime.add overflow".to_string())?;
-    moment(new_secs, zone)
+    let delta = days.checked_mul(86400).and_then(|n|hours.checked_mul(3600).and_then(|h|n.checked_add(h)))
+        .and_then(|n|minutes.checked_mul(60).and_then(|m|n.checked_add(m))).and_then(|n|n.checked_add(seconds))
+        .ok_or("datetime.add overflow")?;
+    let new_secs = secs.checked_add(delta).ok_or("datetime.add overflow")?;
+    if let Some(zone) = named_zone(dt) { moment_in_zone(new_secs,zone) } else { moment(new_secs,zone) }
 }
 
 pub fn in_zone(dt: &Value, zone: &Value) -> Result<Value, String> {
     let (secs, _) = unix_of_value(dt)?;
-    let off = parse_zone(as_text(zone, "zone")?)?;
-    moment(secs, off)
+    moment_in_zone(secs, as_text(zone,"zone")?)
+}
+
+fn named_zone(dt:&Value)->Option<&str>{
+    let Value::Map(fields)=dt else{return None};
+    fields.iter().find_map(|(k,v)|if k=="timezone"{if let Value::Text(zone)=v{Some(zone.as_str())}else{None}}else{None})
+}
+fn moment_in_zone(unix:i64,zone:&str)->Result<Value,String>{
+    if let Ok(tz)=zone.parse::<chrono_tz::Tz>(){
+        let local=tz.timestamp_opt(unix,0).single().ok_or("invalid timestamp")?;
+        let mut value=moment(unix,local.offset().fix())?;
+        if let Value::Map(fields)=&mut value{fields.push(("timezone".into(),Value::Text(zone.into())));}
+        Ok(value)
+    }else{moment(unix,parse_zone(zone)?)}
+}
+fn choose_local(tz:chrono_tz::Tz,local:NaiveDateTime,ambiguity:&str)->Result<i64,String>{
+    if !matches!(ambiguity,"reject"|"earliest"|"latest"){return Err("ambiguity must be reject/earliest/latest".into())}
+    match tz.from_local_datetime(&local){
+        LocalResult::Single(dt)=>Ok(dt.timestamp()),
+        LocalResult::None=>Err("nonexistent_time: local time is in a DST gap".into()),
+        LocalResult::Ambiguous(a,b)=>match ambiguity{
+            "earliest"=>Ok(a.timestamp().min(b.timestamp())),
+            "latest"=>Ok(a.timestamp().max(b.timestamp())),
+            _=>Err("ambiguous_time: DST fold; select earliest or latest".into()),
+        }
+    }
+}
+pub(super) fn local(text:&Value,zone:&Value,ambiguity:&Value)->Result<Value,String>{
+    let source=as_text(text,"text")?.replace('T'," ");
+    let local=NaiveDateTime::parse_from_str(&source,"%Y-%m-%d %H:%M:%S").map_err(|e|format!("datetime.parse_local: {e}"))?;
+    let zone=as_text(zone,"zone")?;let tz:chrono_tz::Tz=zone.parse().map_err(|_|"unknown IANA timezone")?;
+    moment_in_zone(choose_local(tz,local,as_text(ambiguity,"ambiguity")?)?,zone)
+}
+pub(super) fn calendar_add(dt:&Value,days:&Value,ambiguity:&Value)->Result<Value,String>{
+    let (unix,_)=unix_of_value(dt)?;let days=as_i64(days,"days")?;
+    let Some(zone)=named_zone(dt) else{return add(dt,Some(&Value::Int(days)),None,None,None)};
+    let tz:chrono_tz::Tz=zone.parse().map_err(|_|"unknown IANA timezone")?;
+    let local=tz.timestamp_opt(unix,0).single().ok_or("invalid timestamp")?.naive_local();
+    let duration=Duration::try_days(days).ok_or("calendar day overflow")?;
+    let next=local.checked_add_signed(duration).ok_or("calendar date overflow")?;
+    moment_in_zone(choose_local(tz,next,as_text(ambiguity,"ambiguity")?)?,zone)
 }
 
 #[cfg(test)]

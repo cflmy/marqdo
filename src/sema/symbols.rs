@@ -143,8 +143,9 @@ impl ProjectIndex {
                 );
             }
             path_to_module.insert(file.clone(), module_id.clone());
-            let module = crate::load::parse_source_auto(&source)
+            let mut module = crate::load::parse_source_auto(&source)
                 .with_context(|| format!("parse source {}", file.display()))?;
+            module.source.path = Some(file.clone());
             for function in &module.functions {
                 collect_symbols(
                     &project_id,

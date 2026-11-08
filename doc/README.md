@@ -27,6 +27,7 @@
 | [跨库缺陷复核（2026-10-26）](../../qdagent/doc/gaps/04-workbench-runtime-and-product-audit-2026-10-26.md) | **最新源码与测试证据**：实际 HTTP 路由、知识发布/阅读断点、旧缺陷处置及 1000 单元编译性能失败；需同级 qdagent checkout |
 | [design/qdagent-workbench-runtime-and-view-2026-10-25.md](design/qdagent-workbench-runtime-and-view-2026-10-25.md) | **qdagent 知识工作台框架支持**：M00–M05 合同落地中（`src/workbench/`、MLSP `capabilities` / `view.document` / `view.reference_resolve`、`tests/workbench_contracts.rs`）；完整 verified 以切片验收证据为准 |
 | [design/view-knowledge-reading-experience-2026-10-24.md](design/view-knowledge-reading-experience-2026-10-24.md) | **View 知识阅读体验重设计（建议）**：正文优先、结构导航、就地知识说明、来源与运行状态、响应式线框、实现契约与验收；含当前呈现和 no-exec 反例 |
+| [design/view-readable-actions.md](design/view-readable-actions.md) | **View 阅读优化实现**：动作留在正文、实际逻辑引到侧注、空逻辑明确标识；语法阅读指南、输入输出与依据卡片、单文件依赖分析及浏览器验收 |
 | [roadmap/qdagent-knowledge-support-gaps-2026-10-24.md](roadmap/qdagent-knowledge-support-gaps-2026-10-24.md) | **求道知识沉淀与文档编译支撑缺口**：2.1.1 源码复核、来源/依赖失效反例、验证与 Agent 协议、语法提示词、导入底座及跨库分工 |
 | [design/document-native-development-guide.md](design/document-native-development-guide.md) | **下一阶段开发指导**：语法审查裁决、正文→命名→复用工作流、AI 上下文与局部编辑、渐进严格、作者成本及 S0–S6 验收 |
 | [design/core-surface.md](design/core-surface.md) | **核心构造清单**：v2.1 默认链接/循环说明与构造守卫；不是全部实现状态清单 |
@@ -48,6 +49,7 @@
 | [design/keywords.md](design/keywords.md) | **英文最小关键字 / 内置函数** |
 | [design/keywords-i18n.md](design/keywords-i18n.md) | **内核中英双名（无需导入；少而精）** |
 | [design/module-namespace.md](design/module-namespace.md) | **模块命名空间：导入绑定库名、`库.成员` / `use`（M1+M2 已落地）** |
+| [library-development.mq.md](library-development.mq.md) | **可执行库开发指南**：单文件标准库、多文件拓展库、叙述超过 50%、标题下参数与返回表、句中赋值/返回和遮蔽调用；含真实调用及失败场景 |
 | [design/stdlib.md](design/stdlib.md) | **标准库：内置 + `lib/` + 错误约定** |
 | [design/stdlib-i18n.md](design/stdlib-i18n.md) | **标准库中英命名：靠库文件名区分，无 lang 开关** |
 | [design/stdlib-modules.md](design/stdlib-modules.md) | **L1：文件/系统/时间/JSON/网络/数学/外联/插件** |

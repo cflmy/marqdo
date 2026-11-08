@@ -62,6 +62,17 @@ pub fn append_text(ctx: &HostContext, path: &Value, text: &Value) -> Result<Valu
         return Err("append_text denied by host policy".into());
     }
     let p = ctx.resolve_path(text_path(path)?)?;
+    if ctx.sandbox_session.is_some() {
+        let mut current = match read_text(ctx,path) {
+            Ok(Value::Text(text)) => text,
+            Err(_) if !matches!(exists(ctx,path),Ok(Value::Bool(true))) => String::new(),
+            Err(e) => return Err(e),
+            _ => return Err("append_text needs UTF-8".into()),
+        };
+        current.push_str(text_body(text)?);
+        crate::host::sandbox_fs::cow_write_text(ctx,&p,&current)?;
+        return Ok(Value::None);
+    }
     use std::io::Write;
     let mut f = fs::OpenOptions::new()
         .create(true)
@@ -99,6 +110,7 @@ pub fn make_dir(ctx: &HostContext, path: &Value) -> Result<Value, String> {
     if !ctx.allow_fs_write() {
         return Err("make_dir denied by host policy".into());
     }
+    if ctx.sandbox_session.is_some() { return Err("unsupported: make_dir directory state in CoW sandbox".into()); }
     let p = ctx.resolve_path(text_path(path)?)?;
     fs::create_dir_all(&p).map_err(|e| format!("make_dir {}: {e}", p.display()))?;
     Ok(Value::None)
@@ -109,6 +121,7 @@ pub fn make_dirs(ctx: &HostContext, path: &Value) -> Result<Value, String> {
     if !ctx.allow_fs_write() {
         return Err("make_dirs denied by host policy".into());
     }
+    if ctx.sandbox_session.is_some() { return Err("unsupported: make_dirs directory state in CoW sandbox".into()); }
     let p = ctx.resolve_path(text_path(path)?)?;
     fs::create_dir_all(&p).map_err(|e| format!("make_dirs {}: {e}", p.display()))?;
     Ok(Value::None)
@@ -119,6 +132,9 @@ pub fn remove(ctx: &HostContext, path: &Value) -> Result<Value, String> {
         return Err("remove denied by host policy".into());
     }
     let p = ctx.resolve_path(text_path(path)?)?;
+    if ctx.sandbox_session.is_some() && p.is_dir() {
+        return Err("unsupported: recursive directory removal in CoW sandbox".into());
+    }
     if crate::host::sandbox_fs::cow_remove(ctx, &p)? {
         return Ok(Value::None);
     }
@@ -135,6 +151,7 @@ pub fn remove_tree(ctx: &HostContext, path: &Value) -> Result<Value, String> {
     if !ctx.allow_fs_write() {
         return Err("remove_tree denied by host policy".into());
     }
+    if ctx.sandbox_session.is_some() { return Err("unsupported: remove_tree directory state in CoW sandbox".into()); }
     let p = ctx.resolve_path(text_path(path)?)?;
     if !p.exists() {
         return Err(format!("remove_tree: not found: {}", p.display()));
@@ -210,6 +227,18 @@ pub fn copy_file(ctx: &HostContext, src: &Value, dest: &Value) -> Result<Value, 
     }
     let from = ctx.resolve_path(text_path(src)?)?;
     let to = ctx.resolve_path(text_path(dest)?)?;
+    if from == to { return Err("conflict: copy source equals destination".into()); }
+    if ctx.sandbox_session.is_some() {
+        use std::io::Read;
+        let bytes = match crate::host::sandbox_fs::cow_read_bytes(ctx,&from)? {
+            Some(bytes) => bytes,
+            None => { let mut bytes=Vec::new();fs::File::open(&from).map_err(|e|e.to_string())?
+                .take(64*1024*1024+1).read_to_end(&mut bytes).map_err(|e|e.to_string())?;bytes },
+        };
+        if bytes.len()>64*1024*1024 { return Err("resource_limit: CoW copy exceeds 64 MiB".into()); }
+        crate::host::sandbox_fs::cow_write_bytes(ctx,&to,&bytes)?;
+        return Ok(Value::None);
+    }
     if let Some(parent) = to.parent() {
         fs::create_dir_all(parent).map_err(|e| format!("copy_file mkdir: {e}"))?;
     }
@@ -223,6 +252,12 @@ pub fn move_path(ctx: &HostContext, src: &Value, dest: &Value) -> Result<Value, 
     }
     let from = ctx.resolve_path(text_path(src)?)?;
     let to = ctx.resolve_path(text_path(dest)?)?;
+    if from == to { return Ok(Value::None); }
+    if ctx.sandbox_session.is_some() {
+        copy_file(ctx,src,dest)?;
+        crate::host::sandbox_fs::cow_remove(ctx,&from)?;
+        return Ok(Value::None);
+    }
     if let Some(parent) = to.parent() {
         fs::create_dir_all(parent).map_err(|e| format!("move mkdir: {e}"))?;
     }
@@ -248,6 +283,13 @@ pub fn make_temp(ctx: &HostContext, prefix: Option<&Value>) -> Result<Value, Str
         .unwrap_or(0);
     let name = format!("{pref}-{stamp}");
     let p = ctx.resolve_path(&name)?;
+    if ctx.sandbox_session.is_some() {
+        if matches!(exists(ctx,&Value::Text(name.clone()))?,Value::Bool(true)) {
+            return Err("conflict: temporary path exists".into());
+        }
+        crate::host::sandbox_fs::cow_write_bytes(ctx,&p,&[])?;
+        return Ok(Value::Text(name));
+    }
     if let Some(parent) = p.parent() {
         fs::create_dir_all(parent).map_err(|e| format!("make_temp mkdir: {e}"))?;
     }
@@ -264,28 +306,28 @@ pub fn text_patch(ctx: &HostContext, path: &Value, find: &Value, replace: &Value
     if !ctx.allow_fs_write() {
         return Err("text_patch denied by host policy".into());
     }
-    let p = ctx.resolve_path(text_path(path)?)?;
+    let display = text_path(path)?;
     let find = text_body(find)?;
     let replace = text_body(replace)?;
     if find.is_empty() {
         return Err("text_patch: find must be non-empty".into());
     }
-    let src = fs::read_to_string(&p).map_err(|e| format!("text_patch {}: {e}", p.display()))?;
+    let Value::Text(src) = read_text(ctx,path)? else { return Err("text_patch needs text".into()); };
     let count = src.matches(find).count();
     if count == 0 {
         return Err(format!(
             "text_patch: find not found in {}",
-            p.display()
+            display
         ));
     }
     if count > 1 {
         return Err(format!(
             "text_patch: find matched {count} times in {} (must be unique)",
-            p.display()
+            display
         ));
     }
     let next = src.replacen(find, replace, 1);
-    fs::write(&p, next).map_err(|e| format!("text_patch write {}: {e}", p.display()))?;
+    write_text(ctx,path,&Value::Text(next))?;
     Ok(Value::Int(1))
 }
 
@@ -362,8 +404,8 @@ fn apply_patch_blocks_inner(
     if blocks.is_empty() {
         return Ok(Value::Int(0));
     }
-    let p = ctx.resolve_path(text_path(path)?)?;
-    let mut src = fs::read_to_string(&p).map_err(|e| format!("apply_patch_blocks {}: {e}", p.display()))?;
+    let display = text_path(path)?;
+    let Value::Text(mut src) = read_text(ctx,path)? else { return Err("apply_patch_blocks needs text".into()); };
     let mut applied = 0i64;
     for (find, replace) in blocks {
         if find.is_empty() {
@@ -379,19 +421,19 @@ fn apply_patch_blocks_inner(
         if count == 0 {
             return Err(format!(
                 "apply_patch_blocks: FIND not found in {}",
-                p.display()
+                display
             ));
         }
         if count > 1 {
             return Err(format!(
                 "apply_patch_blocks: FIND matched {count} times in {} (must be unique)",
-                p.display()
+                display
             ));
         }
         src = src.replacen(&find, &replace, 1);
         applied += 1;
     }
-    fs::write(&p, src).map_err(|e| format!("apply_patch_blocks write {}: {e}", p.display()))?;
+    write_text(ctx,path,&Value::Text(src))?;
     Ok(Value::Int(applied))
 }
 

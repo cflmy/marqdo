@@ -222,6 +222,74 @@ pub enum HostFn {
     Access = 212,
     OracleJournal = 213,
     OracleReplayCheck = 214,
+    ListRange = 215,
+    ListEnumerate = 216,
+    ListPluck = 217,
+    ListProject = 218,
+    ListWhere = 219,
+    ListGroupBy = 220,
+    ListUniqueBy = 221,
+    ListAggregate = 222,
+    ListSortKeys = 223,
+    ListRename = 224,
+    TableFromColumns = 225,
+    TableToColumns = 226,
+    ListJoin = 227,
+    TableCast = 228,
+    FsTryReadText = 229,
+    FsTryWriteText = 230,
+    TryJsonParse = 231,
+    TryCsvParse = 232,
+    BytesFromText = 233,
+    BytesFromBase64 = 234,
+    BytesToText = 235,
+    BytesToBase64 = 236,
+    BytesLen = 237,
+    BytesSlice = 238,
+    FsReadBytes = 239,
+    FsWriteBytes = 240,
+    FsReadChunk = 241,
+    FsAppendBytes = 242,
+    FsAtomicWrite = 243,
+    FsWriteChanged = 244,
+    FsWriteChecked = 245,
+    FsReadLines = 246,
+    FsWriteLines = 247,
+    FsRemoveFile = 248,
+    FsRemoveEmptyDir = 249,
+    FsTempDir = 250,
+    FsFileHash = 251,
+    FsFind = 252,
+    FsCopyTree = 253,
+    FsSyncTree = 254,
+    FsRenameMany = 255,
+    PathRelative = 256,
+    PathWithExtension = 257,
+    DocumentSections = 258,
+    DocumentSection = 259,
+    DocumentReplaceSection = 260,
+    DocumentTables = 261,
+    DocumentReplaceTable = 262,
+    DocumentLinks = 263,
+    DocumentCodeBlocks = 264,
+    HttpRequestResult = 265,
+    HttpDownload = 266,
+    TomlStringify = 267,
+    TomlTryParse = 268,
+    DatetimeLocal = 269,
+    DatetimeCalendarAdd = 270,
+    SubtaskWaitTimeout = 271,
+    SubtaskCancelAll = 272,
+    SubtaskRunMany = 273,
+    HttpGetResult = 274,
+    ZipPack = 275,
+    ZipUnpack = 276,
+    TableTryCast = 277,
+    TableValidate = 278,
+    ListUnion = 279,
+    ListIntersection = 280,
+    ListDifference = 281,
+    TableSummarize = 282,
 }
 
 /// Single source of truth for every host function. `<TAB>` slimming
@@ -442,6 +510,74 @@ pub const HOST_FN_TABLE: &[HostFnDef] = &[
     HostFnDef { id: 212, f: HostFn::Access, name: "host_access", required: &["value", "key"], optional: &[] },
     HostFnDef { id: 213, f: HostFn::OracleJournal, name: "host_oracle_journal", required: &[], optional: &[] },
     HostFnDef { id: 214, f: HostFn::OracleReplayCheck, name: "host_oracle_replay_check", required: &["expected", "observed"], optional: &[] },
+    HostFnDef { id: 215, f: HostFn::ListRange, name: "host_table_range", required: &["start", "end"], optional: &["step"] },
+    HostFnDef { id: 216, f: HostFn::ListEnumerate, name: "host_table_enumerate", required: &["list"], optional: &["start"] },
+    HostFnDef { id: 217, f: HostFn::ListPluck, name: "host_table_pluck", required: &["list", "key"], optional: &[] },
+    HostFnDef { id: 218, f: HostFn::ListProject, name: "host_table_project", required: &["list", "keys"], optional: &[] },
+    HostFnDef { id: 219, f: HostFn::ListWhere, name: "host_table_where", required: &["list", "key", "value"], optional: &["op"] },
+    HostFnDef { id: 220, f: HostFn::ListGroupBy, name: "host_table_group_by", required: &["list", "key"], optional: &[] },
+    HostFnDef { id: 221, f: HostFn::ListUniqueBy, name: "host_table_unique_by", required: &["list", "key"], optional: &[] },
+    HostFnDef { id: 222, f: HostFn::ListAggregate, name: "host_table_aggregate", required: &["list"], optional: &["key", "op"] },
+    HostFnDef { id: 223, f: HostFn::ListSortKeys, name: "host_table_sort_keys", required: &["list", "keys"], optional: &["descending"] },
+    HostFnDef { id: 224, f: HostFn::ListRename, name: "host_table_rename", required: &["list", "fields"], optional: &[] },
+    HostFnDef { id: 225, f: HostFn::TableFromColumns, name: "host_table_from_columns", required: &["columns"], optional: &[] },
+    HostFnDef { id: 226, f: HostFn::TableToColumns, name: "host_table_to_columns", required: &["rows"], optional: &[] },
+    HostFnDef { id: 227, f: HostFn::ListJoin, name: "host_table_join", required: &["a", "b", "key", "right_key"], optional: &["mode"] },
+    HostFnDef { id: 228, f: HostFn::TableCast, name: "host_table_cast", required: &["rows", "schema"], optional: &[] },
+    HostFnDef { id: 229, f: HostFn::FsTryReadText, name: "host_fs_try_read_text", required: &["path"], optional: &[] },
+    HostFnDef { id: 230, f: HostFn::FsTryWriteText, name: "host_fs_try_write_text", required: &["path", "text"], optional: &[] },
+    HostFnDef { id: 231, f: HostFn::TryJsonParse, name: "host_try_json_parse", required: &["text"], optional: &[] },
+    HostFnDef { id: 232, f: HostFn::TryCsvParse, name: "host_try_csv_parse", required: &["text"], optional: &[] },
+    HostFnDef { id: 233, f: HostFn::BytesFromText, name: "host_bytes_from_text", required: &["text"], optional: &[] },
+    HostFnDef { id: 234, f: HostFn::BytesFromBase64, name: "host_bytes_from_base64", required: &["text"], optional: &[] },
+    HostFnDef { id: 235, f: HostFn::BytesToText, name: "host_bytes_to_text", required: &["data"], optional: &[] },
+    HostFnDef { id: 236, f: HostFn::BytesToBase64, name: "host_bytes_to_base64", required: &["data"], optional: &[] },
+    HostFnDef { id: 237, f: HostFn::BytesLen, name: "host_bytes_len", required: &["data"], optional: &[] },
+    HostFnDef { id: 238, f: HostFn::BytesSlice, name: "host_bytes_slice", required: &["data", "start", "end"], optional: &[] },
+    HostFnDef { id: 239, f: HostFn::FsReadBytes, name: "host_fs_read_bytes", required: &["path"], optional: &["max_bytes"] },
+    HostFnDef { id: 240, f: HostFn::FsWriteBytes, name: "host_fs_write_bytes", required: &["path", "data"], optional: &[] },
+    HostFnDef { id: 241, f: HostFn::FsReadChunk, name: "host_fs_read_chunk", required: &["path"], optional: &["offset", "size"] },
+    HostFnDef { id: 242, f: HostFn::FsAppendBytes, name: "host_fs_append_bytes", required: &["path", "data"], optional: &[] },
+    HostFnDef { id: 243, f: HostFn::FsAtomicWrite, name: "host_fs_atomic_write", required: &["path", "text"], optional: &[] },
+    HostFnDef { id: 244, f: HostFn::FsWriteChanged, name: "host_fs_write_changed", required: &["path", "text"], optional: &[] },
+    HostFnDef { id: 245, f: HostFn::FsWriteChecked, name: "host_fs_write_checked", required: &["path", "text", "expected_sha256"], optional: &[] },
+    HostFnDef { id: 246, f: HostFn::FsReadLines, name: "host_fs_read_lines", required: &["path"], optional: &["max_bytes"] },
+    HostFnDef { id: 247, f: HostFn::FsWriteLines, name: "host_fs_write_lines", required: &["path", "lines"], optional: &[] },
+    HostFnDef { id: 248, f: HostFn::FsRemoveFile, name: "host_fs_remove_file", required: &["path"], optional: &[] },
+    HostFnDef { id: 249, f: HostFn::FsRemoveEmptyDir, name: "host_fs_remove_empty_dir", required: &["path"], optional: &[] },
+    HostFnDef { id: 250, f: HostFn::FsTempDir, name: "host_fs_temp_dir", required: &[], optional: &["prefix"] },
+    HostFnDef { id: 251, f: HostFn::FsFileHash, name: "host_fs_file_hash", required: &["path"], optional: &[] },
+    HostFnDef { id: 252, f: HostFn::FsFind, name: "host_fs_find", required: &["path"], optional: &["pattern", "exclude", "max_depth", "kind"] },
+    HostFnDef { id: 253, f: HostFn::FsCopyTree, name: "host_fs_copy_tree", required: &["src", "dest"], optional: &["overwrite", "exclude", "dry_run"] },
+    HostFnDef { id: 254, f: HostFn::FsSyncTree, name: "host_fs_sync_tree", required: &["src", "dest"], optional: &["overwrite", "exclude", "dry_run"] },
+    HostFnDef { id: 255, f: HostFn::FsRenameMany, name: "host_fs_rename_many", required: &["moves"], optional: &["dry_run"] },
+    HostFnDef { id: 256, f: HostFn::PathRelative, name: "host_path_relative", required: &["path", "base"], optional: &[] },
+    HostFnDef { id: 257, f: HostFn::PathWithExtension, name: "host_path_with_extension", required: &["path", "extension"], optional: &[] },
+    HostFnDef { id: 258, f: HostFn::DocumentSections, name: "host_document_sections", required: &["text"], optional: &[] },
+    HostFnDef { id: 259, f: HostFn::DocumentSection, name: "host_document_section", required: &["text", "title"], optional: &[] },
+    HostFnDef { id: 260, f: HostFn::DocumentReplaceSection, name: "host_document_replace_section", required: &["text", "title", "body"], optional: &["expected_sha256"] },
+    HostFnDef { id: 261, f: HostFn::DocumentTables, name: "host_document_tables", required: &["text"], optional: &[] },
+    HostFnDef { id: 262, f: HostFn::DocumentReplaceTable, name: "host_document_replace_table", required: &["text", "index", "headers", "rows"], optional: &["expected_sha256"] },
+    HostFnDef { id: 263, f: HostFn::DocumentLinks, name: "host_document_links", required: &["text"], optional: &[] },
+    HostFnDef { id: 264, f: HostFn::DocumentCodeBlocks, name: "host_document_code_blocks", required: &["text"], optional: &[] },
+    HostFnDef { id: 265, f: HostFn::HttpRequestResult, name: "host_http_request_result", required: &["method", "url"], optional: &["body", "headers", "timeout_ms", "max_bytes", "response"] },
+    HostFnDef { id: 266, f: HostFn::HttpDownload, name: "host_http_download", required: &["url", "path"], optional: &["headers", "timeout_ms", "max_bytes"] },
+    HostFnDef { id: 267, f: HostFn::TomlStringify, name: "host_toml_stringify", required: &["value"], optional: &[] },
+    HostFnDef { id: 268, f: HostFn::TomlTryParse, name: "host_toml_try_parse", required: &["text"], optional: &[] },
+    HostFnDef { id: 269, f: HostFn::DatetimeLocal, name: "host_datetime_local", required: &["text", "zone"], optional: &["ambiguity"] },
+    HostFnDef { id: 270, f: HostFn::DatetimeCalendarAdd, name: "host_datetime_calendar_add", required: &["dt", "days"], optional: &["ambiguity"] },
+    HostFnDef { id: 271, f: HostFn::SubtaskWaitTimeout, name: "host_subtask_wait_timeout", required: &["id"], optional: &["timeout_ms", "cancel"] },
+    HostFnDef { id: 272, f: HostFn::SubtaskCancelAll, name: "host_subtask_cancel_all", required: &[], optional: &[] },
+    HostFnDef { id: 273, f: HostFn::SubtaskRunMany, name: "host_subtask_run_many", required: &["tasks"], optional: &["limit", "timeout_ms"] },
+    HostFnDef { id: 274, f: HostFn::HttpGetResult, name: "host_http_get_result", required: &["url"], optional: &["headers", "timeout_ms", "max_bytes", "response"] },
+    HostFnDef { id: 275, f: HostFn::ZipPack, name: "host_zip_pack", required: &["src", "dest"], optional: &["max_bytes"] },
+    HostFnDef { id: 276, f: HostFn::ZipUnpack, name: "host_zip_unpack", required: &["src", "dest"], optional: &["max_bytes"] },
+    HostFnDef { id: 277, f: HostFn::TableTryCast, name: "host_table_try_cast", required: &["rows", "schema"], optional: &[] },
+    HostFnDef { id: 278, f: HostFn::TableValidate, name: "host_table_validate", required: &["rows", "schema"], optional: &[] },
+    HostFnDef { id: 279, f: HostFn::ListUnion, name: "host_table_union", required: &["a", "b"], optional: &[] },
+    HostFnDef { id: 280, f: HostFn::ListIntersection, name: "host_table_intersection", required: &["a", "b"], optional: &[] },
+    HostFnDef { id: 281, f: HostFn::ListDifference, name: "host_table_difference", required: &["a", "b"], optional: &[] },
+    HostFnDef { id: 282, f: HostFn::TableSummarize, name: "host_table_summarize", required: &["list", "key", "field"], optional: &["op"] },
 ];
 
 
@@ -452,6 +588,74 @@ impl HostFn {
 
     pub fn from_name(name: &str) -> Option<Self> {
         Some(match name {
+            "host_table_summarize" => Self::TableSummarize,
+            "host_table_difference" => Self::ListDifference,
+            "host_table_intersection" => Self::ListIntersection,
+            "host_table_union" => Self::ListUnion,
+            "host_table_validate" => Self::TableValidate,
+            "host_table_try_cast" => Self::TableTryCast,
+            "host_zip_unpack" => Self::ZipUnpack,
+            "host_zip_pack" => Self::ZipPack,
+            "host_http_get_result" => Self::HttpGetResult,
+            "host_subtask_run_many" => Self::SubtaskRunMany,
+            "host_subtask_cancel_all" => Self::SubtaskCancelAll,
+            "host_subtask_wait_timeout" => Self::SubtaskWaitTimeout,
+            "host_datetime_calendar_add" => Self::DatetimeCalendarAdd,
+            "host_datetime_local" => Self::DatetimeLocal,
+            "host_toml_try_parse" => Self::TomlTryParse,
+            "host_toml_stringify" => Self::TomlStringify,
+            "host_http_download" => Self::HttpDownload,
+            "host_http_request_result" => Self::HttpRequestResult,
+            "host_document_code_blocks" => Self::DocumentCodeBlocks,
+            "host_document_links" => Self::DocumentLinks,
+            "host_document_replace_table" => Self::DocumentReplaceTable,
+            "host_document_tables" => Self::DocumentTables,
+            "host_document_replace_section" => Self::DocumentReplaceSection,
+            "host_document_section" => Self::DocumentSection,
+            "host_document_sections" => Self::DocumentSections,
+            "host_path_with_extension" => Self::PathWithExtension,
+            "host_path_relative" => Self::PathRelative,
+            "host_fs_rename_many" => Self::FsRenameMany,
+            "host_fs_sync_tree" => Self::FsSyncTree,
+            "host_fs_copy_tree" => Self::FsCopyTree,
+            "host_fs_find" => Self::FsFind,
+            "host_fs_file_hash" => Self::FsFileHash,
+            "host_fs_temp_dir" => Self::FsTempDir,
+            "host_fs_remove_empty_dir" => Self::FsRemoveEmptyDir,
+            "host_fs_remove_file" => Self::FsRemoveFile,
+            "host_fs_write_lines" => Self::FsWriteLines,
+            "host_fs_read_lines" => Self::FsReadLines,
+            "host_fs_write_checked" => Self::FsWriteChecked,
+            "host_fs_write_changed" => Self::FsWriteChanged,
+            "host_fs_atomic_write" => Self::FsAtomicWrite,
+            "host_fs_append_bytes" => Self::FsAppendBytes,
+            "host_fs_read_chunk" => Self::FsReadChunk,
+            "host_fs_write_bytes" => Self::FsWriteBytes,
+            "host_fs_read_bytes" => Self::FsReadBytes,
+            "host_bytes_slice" => Self::BytesSlice,
+            "host_bytes_len" => Self::BytesLen,
+            "host_bytes_to_base64" => Self::BytesToBase64,
+            "host_bytes_to_text" => Self::BytesToText,
+            "host_bytes_from_base64" => Self::BytesFromBase64,
+            "host_bytes_from_text" => Self::BytesFromText,
+            "host_try_csv_parse" => Self::TryCsvParse,
+            "host_try_json_parse" => Self::TryJsonParse,
+            "host_fs_try_write_text" => Self::FsTryWriteText,
+            "host_fs_try_read_text" => Self::FsTryReadText,
+            "host_table_cast" => Self::TableCast,
+            "host_table_join" => Self::ListJoin,
+            "host_table_to_columns" => Self::TableToColumns,
+            "host_table_from_columns" => Self::TableFromColumns,
+            "host_table_rename" => Self::ListRename,
+            "host_table_sort_keys" => Self::ListSortKeys,
+            "host_table_aggregate" => Self::ListAggregate,
+            "host_table_unique_by" => Self::ListUniqueBy,
+            "host_table_group_by" => Self::ListGroupBy,
+            "host_table_where" => Self::ListWhere,
+            "host_table_project" => Self::ListProject,
+            "host_table_pluck" => Self::ListPluck,
+            "host_table_enumerate" => Self::ListEnumerate,
+            "host_table_range" => Self::ListRange,
             "host_read_text" => Self::ReadText,
             "host_write_text" => Self::WriteText,
             "host_append_text" => Self::AppendText,
@@ -664,6 +868,281 @@ impl HostFn {
         })
     }
 
+    /// Effects belong to resolved host identities, never import spellings.
+    /// Exhaustive match forces every new primitive to declare its effects.
+    pub fn effects(self) -> &'static [&'static str] {
+        match self {
+            Self::TableSummarize => &["pure"],
+            Self::DotenvLoad => &["fs.read", "environment.write"],
+            Self::ForeignLoadConfig => &["fs.read"],
+            Self::ExtNativePath => &["plugin.call"],
+            Self::ListDifference => &["pure"],
+            Self::ListIntersection => &["pure"],
+            Self::ListUnion => &["pure"],
+            Self::TableValidate => &["pure"],
+            Self::TableTryCast => &["pure"],
+            Self::ZipUnpack => &["fs.write"],
+            Self::ZipPack => &["fs.write"],
+            Self::HttpGetResult => &["network.read"],
+            Self::SubtaskRunMany => &["process.exec"],
+            Self::SubtaskCancelAll => &["process.exec"],
+            Self::SubtaskWaitTimeout => &["process.exec"],
+            Self::DatetimeCalendarAdd => &["pure"],
+            Self::DatetimeLocal => &["pure"],
+            Self::TomlTryParse => &["pure"],
+            Self::TomlStringify => &["pure"],
+            Self::HttpDownload => &["network.read", "fs.write"],
+            Self::HttpRequestResult => &["network.write"],
+            Self::DocumentCodeBlocks => &["pure"],
+            Self::DocumentLinks => &["pure"],
+            Self::DocumentReplaceTable => &["pure"],
+            Self::DocumentTables => &["pure"],
+            Self::DocumentReplaceSection => &["pure"],
+            Self::DocumentSection => &["pure"],
+            Self::DocumentSections => &["pure"],
+            Self::PathWithExtension => &["pure"],
+            Self::PathRelative => &["pure"],
+            Self::FsRenameMany => &["fs.write"],
+            Self::FsSyncTree => &["fs.write"],
+            Self::FsCopyTree => &["fs.write"],
+            Self::FsFind => &["fs.read"],
+            Self::FsFileHash => &["fs.read"],
+            Self::FsTempDir => &["fs.write"],
+            Self::FsRemoveEmptyDir => &["fs.write"],
+            Self::FsRemoveFile => &["fs.write"],
+            Self::FsWriteLines => &["fs.write"],
+            Self::FsReadLines => &["fs.read"],
+            Self::FsWriteChecked => &["fs.write"],
+            Self::FsWriteChanged => &["fs.write"],
+            Self::FsAtomicWrite => &["fs.write"],
+            Self::FsAppendBytes => &["fs.write"],
+            Self::FsReadChunk => &["fs.read"],
+            Self::FsWriteBytes => &["fs.write"],
+            Self::FsReadBytes => &["fs.read"],
+            Self::BytesSlice => &["pure"],
+            Self::BytesLen => &["pure"],
+            Self::BytesToBase64 => &["pure"],
+            Self::BytesToText => &["pure"],
+            Self::BytesFromBase64 => &["pure"],
+            Self::BytesFromText => &["pure"],
+            Self::TryCsvParse => &["pure"],
+            Self::TryJsonParse => &["pure"],
+            Self::FsTryWriteText => &["fs.write"],
+            Self::FsTryReadText => &["fs.read"],
+            Self::TableCast => &["pure"],
+            Self::ListJoin => &["pure"],
+            Self::TableToColumns => &["pure"],
+            Self::TableFromColumns => &["pure"],
+            Self::ListRename => &["pure"],
+            Self::ListSortKeys => &["pure"],
+            Self::ListAggregate => &["pure"],
+            Self::ListUniqueBy => &["pure"],
+            Self::ListGroupBy => &["pure"],
+            Self::ListWhere => &["pure"],
+            Self::ListProject => &["pure"],
+            Self::ListPluck => &["pure"],
+            Self::ListEnumerate => &["pure"],
+            Self::ListRange => &["pure"],
+            Self::ReadText
+            | Self::Exists
+            | Self::ListDir
+            | Self::FsStat
+            | Self::FsWalk
+            | Self::WritebackGet
+            | Self::WritebackList
+            | Self::WritebackScanPath => &["fs.read"],
+            Self::WriteText
+            | Self::AppendText
+            | Self::MakeDir
+            | Self::Remove
+            | Self::FsCopyFile
+            | Self::FsMove
+            | Self::FsMakeTemp
+            | Self::FsMakeDirs
+            | Self::FsRemoveTree
+            | Self::TextPatch
+            | Self::ApplyPatchBlocks
+            | Self::WritebackRecord
+            | Self::WritebackClear
+            | Self::WritebackEnsure => &["fs.write"],
+            Self::HttpGet => &["network.read"],
+            Self::HttpRequest => &["network.write"],
+            Self::HttpPost | Self::HttpPostSse => &["network.write"],
+            Self::Exec
+            | Self::SubtaskSpawn
+            | Self::SubtaskPoll
+            | Self::SubtaskJoin
+            | Self::SubtaskKill
+            | Self::SubtaskWaitAll
+            | Self::ForeignRun
+            | Self::ForeignRunLang
+            | Self::ForeignInvoke
+            | Self::ForeignProbe
+            | Self::ForeignCall
+            | Self::ForeignRunMany
+            | Self::ForeignCallMany
+            | Self::ForeignSessionOpen
+            | Self::ForeignSessionEval
+            | Self::ForeignSessionSet
+            | Self::ForeignSessionGet
+            | Self::ForeignSessionNames
+            | Self::ForeignSessionClose
+            | Self::ForeignSessionList
+            | Self::ForeignSessionInterrupt => &["process.exec"],
+            Self::PluginLoad | Self::PluginUnload => &["plugin.call"],
+            Self::LogLine
+            | Self::StreamPublish
+            | Self::Plot
+            | Self::PlotPoints
+            | Self::PlotConic => &["output.write"],
+            Self::NowUnix | Self::NowMs | Self::DatetimeNow => &["time.read"],
+            Self::Random
+            | Self::RandomInt
+            | Self::SecretsTokenHex
+            | Self::SecretsTokenUrlsafe
+            | Self::UuidV4 => &["random.read"],
+            Self::EnvGet => &["environment.read"],
+            Self::EnvSet => &["environment.write"],
+            Self::Exit | Self::SleepMs => &["process.control"],
+            Self::FormatTime
+            | Self::ParseTime
+            | Self::Args
+            | Self::Cwd
+            | Self::JsonParse
+            | Self::JsonStringify
+            | Self::JsonGet
+            | Self::JsonKeys
+            | Self::UrlEncode
+            | Self::Pi
+            | Self::EConst
+            | Self::Num
+            | Self::MathAdd
+            | Self::MathSub
+            | Self::MathMul
+            | Self::MathDiv
+            | Self::MathPow
+            | Self::MathNeg
+            | Self::MathSin
+            | Self::MathCos
+            | Self::MathTan
+            | Self::MathAsin
+            | Self::MathAcos
+            | Self::MathAtan
+            | Self::MathSqrt
+            | Self::MathAbs
+            | Self::MathLn
+            | Self::MathExp
+            | Self::MathFloor
+            | Self::MathCeil
+            | Self::MathMin
+            | Self::MathMax
+            | Self::Seed
+            | Self::Formula
+            | Self::Simplify
+            | Self::Expand
+            | Self::Diff
+            | Self::Subs
+            | Self::Eval
+            | Self::Solve
+            | Self::ForeignSetCmd
+            | Self::ForeignLangs
+            | Self::JsonQuote
+            | Self::PluginList
+            | Self::MapSet
+            | Self::ListAppend
+            | Self::OuterCallLine
+            | Self::OpenAiSseParse
+            | Self::CollectionPut
+            | Self::ListPrepend
+            | Self::ListConcat
+            | Self::ListInsert
+            | Self::ListSetAt
+            | Self::ListRemoveAt
+            | Self::ListSlice
+            | Self::ListContains
+            | Self::ListIndexOf
+            | Self::ListReverse
+            | Self::ListFirst
+            | Self::ListLast
+            | Self::MapGet
+            | Self::MapDelete
+            | Self::MapHas
+            | Self::MapKeys
+            | Self::MapValues
+            | Self::MapItems
+            | Self::MapMerge
+            | Self::MapSize
+            | Self::CollectionClear
+            | Self::CookieParse
+            | Self::MultipartParse
+            | Self::MarkdownParse
+            | Self::ReIsMatch
+            | Self::ReFind
+            | Self::ReFindAll
+            | Self::ReReplace
+            | Self::ReSplit
+            | Self::EncodingBase64Encode
+            | Self::EncodingBase64Decode
+            | Self::EncodingHexEncode
+            | Self::EncodingHexDecode
+            | Self::PathJoin
+            | Self::PathSplit
+            | Self::PathFileName
+            | Self::PathParent
+            | Self::PathExtension
+            | Self::PathNormalize
+            | Self::PathIsAbsolute
+            | Self::HashSha256
+            | Self::HashSha1
+            | Self::HashMd5
+            | Self::HashHmacSha256
+            | Self::TextContains
+            | Self::TextStartsWith
+            | Self::TextEndsWith
+            | Self::TextReplace
+            | Self::TextToUpper
+            | Self::TextToLower
+            | Self::TextRepeat
+            | Self::TextPad
+            | Self::CsvParse
+            | Self::CsvStringify
+            | Self::ListSort
+            | Self::ListSortBy
+            | Self::ListUnique
+            | Self::ListChunk
+            | Self::ListZip
+            | Self::ListFlatten
+            | Self::CliParse
+            | Self::LogSetLevel
+            | Self::DatetimeFromUnix
+            | Self::DatetimeToUnix
+            | Self::DatetimeParse
+            | Self::DatetimeFormat
+            | Self::DatetimeAdd
+            | Self::DatetimeInZone
+            | Self::UrlParse
+            | Self::UrlQueryParse
+            | Self::UrlQueryStringify
+            | Self::TomlParse
+            | Self::HtmlEscape
+            | Self::HtmlUnescape
+            | Self::EncodingBase32Encode
+            | Self::EncodingBase32Decode
+            | Self::StatsMean
+            | Self::StatsMedian
+            | Self::StatsStdev
+            | Self::Meta
+            | Self::MetaGet
+            | Self::ModuleSource
+            | Self::ArtifactKind
+            | Self::ForeignRegister
+            | Self::ForeignUnset
+            | Self::Access
+            | Self::OracleJournal
+            | Self::OracleReplayCheck => &["pure"],
+        }
+    }
+
     pub fn as_u16(self) -> u16 {
         self as u16
     }
@@ -705,6 +1184,74 @@ pub fn call_host(
     bound: &HashMap<String, Value>,
 ) -> Result<Value, String> {
     match fn_id {
+        HostFn::TableSummarize => super::collection_ops::call(ctx, fn_id, bound),
+        HostFn::ListDifference => super::collection_ops::call(ctx, fn_id, bound),
+        HostFn::ListIntersection => super::collection_ops::call(ctx, fn_id, bound),
+        HostFn::ListUnion => super::collection_ops::call(ctx, fn_id, bound),
+        HostFn::TableValidate => super::collection_ops::call(ctx, fn_id, bound),
+        HostFn::TableTryCast => super::collection_ops::call(ctx, fn_id, bound),
+        HostFn::ZipUnpack => super::archive::call(ctx, fn_id, bound),
+        HostFn::ZipPack => super::archive::call(ctx, fn_id, bound),
+        HostFn::HttpGetResult => super::net_ops::call(ctx, fn_id, bound),
+        HostFn::SubtaskRunMany => super::task_ops::call(ctx, fn_id, bound),
+        HostFn::SubtaskCancelAll => super::task_ops::call(ctx, fn_id, bound),
+        HostFn::SubtaskWaitTimeout => super::task_ops::call(ctx, fn_id, bound),
+        HostFn::DatetimeCalendarAdd => super::data_ops::call(ctx, fn_id, bound),
+        HostFn::DatetimeLocal => super::data_ops::call(ctx, fn_id, bound),
+        HostFn::TomlTryParse => super::data_ops::call(ctx, fn_id, bound),
+        HostFn::TomlStringify => super::data_ops::call(ctx, fn_id, bound),
+        HostFn::HttpDownload => super::net_ops::call(ctx, fn_id, bound),
+        HostFn::HttpRequestResult => super::net_ops::call(ctx, fn_id, bound),
+        HostFn::DocumentCodeBlocks => super::document::call(ctx, fn_id, bound),
+        HostFn::DocumentLinks => super::document::call(ctx, fn_id, bound),
+        HostFn::DocumentReplaceTable => super::document::call(ctx, fn_id, bound),
+        HostFn::DocumentTables => super::document::call(ctx, fn_id, bound),
+        HostFn::DocumentReplaceSection => super::document::call(ctx, fn_id, bound),
+        HostFn::DocumentSection => super::document::call(ctx, fn_id, bound),
+        HostFn::DocumentSections => super::document::call(ctx, fn_id, bound),
+        HostFn::PathWithExtension => super::fs_ops::call(ctx, fn_id, bound),
+        HostFn::PathRelative => super::fs_ops::call(ctx, fn_id, bound),
+        HostFn::FsRenameMany => super::fs_ops::call(ctx, fn_id, bound),
+        HostFn::FsSyncTree => super::fs_ops::call(ctx, fn_id, bound),
+        HostFn::FsCopyTree => super::fs_ops::call(ctx, fn_id, bound),
+        HostFn::FsFind => super::fs_ops::call(ctx, fn_id, bound),
+        HostFn::FsFileHash => super::fs_ops::call(ctx, fn_id, bound),
+        HostFn::FsTempDir => super::fs_ops::call(ctx, fn_id, bound),
+        HostFn::FsRemoveEmptyDir => super::fs_ops::call(ctx, fn_id, bound),
+        HostFn::FsRemoveFile => super::fs_ops::call(ctx, fn_id, bound),
+        HostFn::FsWriteLines => super::fs_ops::call(ctx, fn_id, bound),
+        HostFn::FsReadLines => super::fs_ops::call(ctx, fn_id, bound),
+        HostFn::FsWriteChecked => super::fs_ops::call(ctx, fn_id, bound),
+        HostFn::FsWriteChanged => super::fs_ops::call(ctx, fn_id, bound),
+        HostFn::FsAtomicWrite => super::fs_ops::call(ctx, fn_id, bound),
+        HostFn::FsAppendBytes => super::fs_ops::call(ctx, fn_id, bound),
+        HostFn::FsReadChunk => super::fs_ops::call(ctx, fn_id, bound),
+        HostFn::FsWriteBytes => super::fs_ops::call(ctx, fn_id, bound),
+        HostFn::FsReadBytes => super::fs_ops::call(ctx, fn_id, bound),
+        HostFn::BytesSlice => super::fs_ops::call(ctx, fn_id, bound),
+        HostFn::BytesLen => super::fs_ops::call(ctx, fn_id, bound),
+        HostFn::BytesToBase64 => super::fs_ops::call(ctx, fn_id, bound),
+        HostFn::BytesToText => super::fs_ops::call(ctx, fn_id, bound),
+        HostFn::BytesFromBase64 => super::fs_ops::call(ctx, fn_id, bound),
+        HostFn::BytesFromText => super::fs_ops::call(ctx, fn_id, bound),
+        HostFn::TryCsvParse => super::fs_ops::call(ctx, fn_id, bound),
+        HostFn::TryJsonParse => super::fs_ops::call(ctx, fn_id, bound),
+        HostFn::FsTryWriteText => super::fs_ops::call(ctx, fn_id, bound),
+        HostFn::FsTryReadText => super::fs_ops::call(ctx, fn_id, bound),
+        HostFn::TableCast => super::collection_ops::call(ctx, fn_id, bound),
+        HostFn::ListJoin => super::collection_ops::call(ctx, fn_id, bound),
+        HostFn::TableToColumns => super::collection_ops::call(ctx, fn_id, bound),
+        HostFn::TableFromColumns => super::collection_ops::call(ctx, fn_id, bound),
+        HostFn::ListRename => super::collection_ops::call(ctx, fn_id, bound),
+        HostFn::ListSortKeys => super::collection_ops::call(ctx, fn_id, bound),
+        HostFn::ListAggregate => super::collection_ops::call(ctx, fn_id, bound),
+        HostFn::ListUniqueBy => super::collection_ops::call(ctx, fn_id, bound),
+        HostFn::ListGroupBy => super::collection_ops::call(ctx, fn_id, bound),
+        HostFn::ListWhere => super::collection_ops::call(ctx, fn_id, bound),
+        HostFn::ListProject => super::collection_ops::call(ctx, fn_id, bound),
+        HostFn::ListPluck => super::collection_ops::call(ctx, fn_id, bound),
+        HostFn::ListEnumerate => super::collection_ops::call(ctx, fn_id, bound),
+        HostFn::ListRange => super::collection_ops::call(ctx, fn_id, bound),
         HostFn::Access => {
             let base = require(bound, "value")?;
             let key = match require(bound, "key")? {

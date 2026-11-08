@@ -219,12 +219,12 @@ control the other. The resulting amplitudes correlate 00 with 11.
 Return the circuit so a caller can apply another gate, attach noise, draw it
 or independently test entanglement. Every step keeps the returned new value.
 
-**qc = circuit.new qubits=2 steps=None**
+We retain **`qc` = [New](circuit.new(qubits=2, steps=None))**.
 
 Make two equal paths on the low wire, then propagate the path label to the other wire.
 
-**qc = circuit.hadamard circuit=`qc` qubit=0**
-*> circuit.cnot circuit=`qc` control=0 target=1*
+We retain **`qc` = [Hadamard](circuit.hadamard(circuit=`qc`, qubit=0))**.
+Return *[Cnot](circuit.cnot(circuit=`qc`, control=0, target=1))*.
 
 ## bell_phi_plus
 
@@ -237,8 +237,8 @@ returns only ideal probabilities. Expect equal weights on 00 and 11 and zero
 elsewhere. Computational-basis correlation alone does not prove entanglement;
 use bell_analysis for reduced purity, ZZ expectation and Schmidt evidence.
 
-**qc = > bell_circuit**
-*> simulate.probabilities circuit=`qc`*
+We retain **`qc` = [Bell circuit](bell_circuit())**.
+Return *[Probabilities](simulate.probabilities(circuit=`qc`))*.
 
 ## bell_analysis
 
@@ -253,23 +253,24 @@ or persistent session for the intermediate observations. Expect joint purity
 one, reduced purity one-half, ZZ one and Schmidt entropy ln(2), within 1e-9.
 All paths here describe ideal evolution rather than noisy trajectory averages.
 
-**qc = > bell_circuit**
-**probs = simulate.probabilities circuit=`qc`**
+We retain **`qc` = [Bell circuit](bell_circuit())**.
+We retain **`probs` = [Probabilities](simulate.probabilities(circuit=`qc`))**.
 
 Build the joint density and compute purity. A pure joint state need not
 have pure subsystems. Keep only the low wire and test the mixedness that
 appears when information about the other wire is discarded.
 
-**rho = density.from_state state=`qc`**
-**whole = density.purity density=`rho`**
+We retain **`rho` = [From state](density.from_state(state=`qc`))**.
+We retain **`whole` = [Purity](density.purity(density=`rho`))**.
+
 `kept` =
 
 | qubit |
 |-------|
 | 0 |
 
-**reduced = density.partial_trace density=`rho` keep=`kept`**
-**local = density.purity density=`reduced`**
+We retain **`reduced` = [Partial trace](density.partial_trace(density=`rho`, keep=`kept`))**.
+We retain **`local` = [Purity](density.purity(density=`reduced`))**.
 
 ZZ measures correlation and is not an entanglement witness by itself.
 The Schmidt decomposition supplies pure-state coefficients and entropy.
@@ -277,8 +278,8 @@ Together these observations distinguish a Bell pure state from a classical
 mixture with identical basis probabilities. Keep the measured values in the
 return table rather than hiding them behind a pass label with an implicit threshold.
 
-**correlation = density.expect density=`rho` obs="ZZ"**
-**split = state.schmidt state=`qc` cut=1**
+We retain **`correlation` = [Expect](density.expect(density=`rho`, obs="ZZ"))**.
+We retain **`split` = [Schmidt](state.schmidt(state=`qc`, cut=1))**.
 
 `report` =
 
@@ -286,4 +287,4 @@ return table rather than hiding them behind a pass label with an implicit thresh
 |---------------|--------|----------------|----|---------|
 | `probs` | `whole` | `local` | `correlation` | `split` |
 
-*report*
+Return *report*.

@@ -26,10 +26,12 @@ pub fn render_module_document(module: &Module, source: &str, annots: &[ViewAnnot
     let special = index_special_assigns(module, source);
     let skip_body = special_body_lines(&special);
     let stmt_lines = index_stmt_lines(module);
+    let occluded_lines = index_occluded_lines(module);
     let writebacks = writeback::writeback_map(source);
     let taken_arms = taken_arms_by_branch_line(annots);
 
     let mut out = String::from(r#"<div class="document-surface">"#);
+    out.push_str(&render_syntax_guide());
 
     if !module.imports.is_empty() || !module.uses.is_empty() {
         out.push_str(r#"<div class="doc-imports">"#);
@@ -62,10 +64,11 @@ pub fn render_module_document(module: &Module, source: &str, annots: &[ViewAnnot
             .map(|(_, t)| t.as_str())
             .collect::<Vec<_>>()
             .join(" ");
+        let source_anchors=para.iter().skip(1).map(|(line,_)|format!(r#"<span class="source-line-anchor" id="stmt-{line}" aria-hidden="true"></span>"#)).collect::<String>();
         para.clear();
         let md = comment_markdown_to_html(&text);
         out.push_str(&format!(
-            r#"<div class="doc-block" data-line="{line}"><div class="doc-prose">{md}</div></div>"#,
+            r#"<div class="doc-block" data-line="{line}" id="stmt-{line}">{source_anchors}<div class="doc-prose">{md}</div></div>"#,
             line = first_line,
             md = md
         ));
@@ -157,6 +160,7 @@ pub fn render_module_document(module: &Module, source: &str, annots: &[ViewAnnot
                         special.get(&l.line_no),
                         writebacks.get(&l.line_no),
                         None,
+                        &occluded_lines,
                     ));
                 } else if !trimmed.is_empty() {
                     para.push((l.line_no, trimmed.to_string()));
@@ -190,6 +194,7 @@ pub fn render_module_document(module: &Module, source: &str, annots: &[ViewAnnot
                         &writebacks,
                         &taken_arms,
                         annots,
+                        &occluded_lines,
                     );
                     out.push_str(&html);
                     i = next;
@@ -205,6 +210,7 @@ pub fn render_module_document(module: &Module, source: &str, annots: &[ViewAnnot
                     special.get(&l.line_no),
                     writebacks.get(&l.line_no),
                     None,
+                    &occluded_lines,
                 ));
                 i += 1;
             }
@@ -295,7 +301,7 @@ fn render_table_block(
     }
     let first_line = rows[0].0;
     let mut html = format!(
-        r#"<div class="doc-block doc-table-wrap" data-line="{line}"><table class="doc-table">"#,
+        r#"<div class="doc-block doc-table-wrap" data-line="{line}" id="stmt-{line}"><table class="doc-table">"#,
         line = first_line
     );
     let mut header_done = false;
@@ -370,6 +376,7 @@ fn render_list_block(
     writebacks: &HashMap<u32, String>,
     taken_arms: &HashMap<u32, usize>,
     all_annots: &[ViewAnnot],
+    occluded_lines: &HashSet<u32>,
 ) -> (String, usize) {
     let base_indent = indent_level(&lines[start].text);
     let tag = match kind {
@@ -407,8 +414,7 @@ fn render_list_block(
         let frames: Vec<&ViewAnnot> = all_annots
             .iter()
             .filter(|a| {
-                a.kind == crate::view::annot::AnnotKind::LoopFrame
-                    && a.anchor_line == branch_line
+                a.kind == crate::view::annot::AnnotKind::LoopFrame && a.anchor_line == branch_line
             })
             .collect();
         if frames.len() >= 2 {
@@ -483,7 +489,7 @@ fn render_list_block(
                     _ => "",
                 };
                 html.push_str(&format!(
-                    r#"<li class="doc-list-item {arm_cls}" data-line="{line}" data-arm-index="{arm_idx}" style="--doc-indent:{indent}">"#,
+                    r#"<li class="doc-list-item {arm_cls}" data-line="{line}" id="stmt-{line}" data-arm-index="{arm_idx}" style="--doc-indent:{indent}">"#,
                     arm_cls = arm_cls,
                     line = lines[i].line_no,
                     arm_idx = arm_index,
@@ -491,7 +497,12 @@ fn render_list_block(
                 ));
                 html.push_str(&format!(
                     r#"<div class="doc-list-head">{}</div>"#,
-                    render_surface_line(lines[i].line_no, head, by_line)
+                    render_surface_line(
+                        lines[i].line_no,
+                        head,
+                        by_line,
+                        occluded_lines.contains(&lines[i].line_no)
+                    )
                 ));
                 // Annots for this line; Branch chips on the arm they refer to (filtered by call frame in JS).
                 let mut head_annots: Vec<ViewAnnot> = Vec::new();
@@ -515,9 +526,12 @@ fn render_list_block(
                         }
                     }
                 }
-                if !head_annots.is_empty() {
-                    html.push_str(&render_annot_band(&head_annots, MAX_VISIBLE_ANNOTS));
-                }
+                let notes = if occluded_lines.contains(&lines[i].line_no) {
+                    render_logic_notes(lines[i].line_no, head, &[])
+                } else {
+                    String::new()
+                };
+                html.push_str(&render_document_band(&head_annots, &notes));
                 // Body: following lines with greater indent until next sibling.
                 i += 1;
                 html.push_str(r#"<div class="doc-list-body">"#);
@@ -525,9 +539,7 @@ fn render_list_block(
                     let t2 = lines[i].text.trim_end_matches(['\r', '\n']);
                     if t2.trim().is_empty() {
                         // allow blank inside body
-                        if i + 1 < lines.len()
-                            && indent_level(&lines[i + 1].text) > base_indent
-                        {
+                        if i + 1 < lines.len() && indent_level(&lines[i + 1].text) > base_indent {
                             i += 1;
                             continue;
                         }
@@ -550,6 +562,7 @@ fn render_list_block(
                             writebacks,
                             taken_arms,
                             all_annots,
+                            occluded_lines,
                         );
                         html.push_str(&inner);
                         i = next;
@@ -573,6 +586,7 @@ fn render_list_block(
                         special.get(&lines[i].line_no),
                         writebacks.get(&lines[i].line_no),
                         Some(ind2),
+                        occluded_lines,
                     ));
                     i += 1;
                 }
@@ -593,23 +607,25 @@ fn render_surface_line(
     line_no: u32,
     head: &str,
     by_line: &HashMap<u32, Vec<&ViewAnnot>>,
+    occluded: bool,
 ) -> String {
+    if occluded && !occlusion_spans(head).is_empty() {
+        return format!(
+            r#"<mark class="mq-anchor mq-control" data-line="{line_no}" data-byte-start="0" data-byte-end="{}" title="循环或条件：实际控制逻辑见侧注">{}</mark>"#,
+            head.len(),
+            render_occlusion_text(line_no, head, 0)
+        );
+    }
     let bits = scan_prose_line(head);
     if bits.is_empty() {
         // Else arm "*" or plain condition text.
         if head.trim() == "*" {
             return r#"<span class="mq-else">else</span>"#.into();
         }
-        format!(
-            r#"<span class="doc-cond">{}</span>"#,
-            escape(head)
-        )
+        format!(r#"<span class="doc-cond">{}</span>"#, escape(head))
     } else {
-        let annots = by_line
-            .get(&line_no)
-            .map(|v| v.as_slice())
-            .unwrap_or(&[]);
-        render_prose_with_marks(line_no, head, &bits, annots)
+        let annots = by_line.get(&line_no).map(|v| v.as_slice()).unwrap_or(&[]);
+        render_prose_with_marks(line_no, head, &bits, annots, false)
     }
 }
 
@@ -635,7 +651,7 @@ fn render_fun_heading(fun: &Function, annots: &[ViewAnnot]) -> String {
         r##"<div class="doc-fun" id="fn-{line}" data-fn="{name}" data-fn-path="{name}" data-line="{line}">
 <div class="doc-fun-bar">
 <h3 class="doc-fun-title">{name}</h3>
-<a class="knowledge-explain" href="#knowledge-{name}" data-node="{name}">说明</a>"##,
+<a class="knowledge-explain" href="#knowledge-fn-{line}" data-node="{name}">说明</a>"##,
         line = fun.span.line,
         name = escape(&fun.name),
     );
@@ -645,7 +661,9 @@ fn render_fun_heading(fun: &Function, annots: &[ViewAnnot]) -> String {
         .filter(|a| a.kind == crate::view::annot::AnnotKind::CallFrame && a.label == fun.name)
         .collect();
     if call_labels.len() >= 2 {
-        s.push_str(r#"<label class="call-picker-label">调用 <select class="call-picker" data-fn=""#);
+        s.push_str(
+            r#"<label class="call-picker-label">调用 <select class="call-picker" data-fn=""#,
+        );
         s.push_str(&escape(&fun.name));
         s.push_str(r#"">"#);
         for (i, a) in call_labels.iter().enumerate() {
@@ -678,11 +696,7 @@ fn render_fun_heading(fun: &Function, annots: &[ViewAnnot]) -> String {
             .unwrap_or_default();
         s.push_str(r#"<div class="params">"#);
         for p in &fun.params {
-            let cls = if p.inferred {
-                "chip inferred"
-            } else {
-                "chip"
-            };
+            let cls = if p.inferred { "chip inferred" } else { "chip" };
             let title = if p.inferred {
                 "inferred from prose / body"
             } else {
@@ -725,155 +739,173 @@ fn parse_args_brief(brief: &str) -> HashMap<String, String> {
     m
 }
 
-/// Split a statement line holding one occlusion `[描述](实现)`.
-///
-/// Returns `(prefix, label, payload, suffix)`. Display-only: the parser already
-/// validated the real structure, this just decides how to paint it.
-fn split_occlusion(line: &str) -> Option<(String, String, String, String)> {
-    let chars: Vec<char> = line.chars().collect();
-    let mut i = 0usize;
-    let mut in_bt = false;
-    let mut in_str = false;
-    while i < chars.len() {
-        let c = chars[i];
-        if in_str {
-            if c == '\\' {
-                i += 2;
-                continue;
+/// Display-only source spans. The AST decides whether this line contains an occlusion.
+/// Scan only executable fragments, preserving quoted links as literal data.
+struct OcclusionSpan<'a> { start: usize, end: usize, label: &'a str, payload: &'a str }
+fn occlusion_spans(text: &str) -> Vec<OcclusionSpan<'_>> {
+    let bytes = text.as_bytes();
+    let mut out = Vec::new();
+    let mut i = 0;
+    while i < bytes.len() {
+        if matches!(bytes[i], b'"' | b'\'' | b'`') {
+            let quote = bytes[i];
+            i += 1;
+            while i < bytes.len() {
+                if bytes[i] == b'\\' {
+                    i += 2;
+                } else if bytes[i] == quote {
+                    i += 1;
+                    break;
+                } else {
+                    i += 1;
+                }
             }
-            if c == '"' {
-                in_str = false;
-            }
+            continue;
+        }
+        if bytes[i] == b'\\' {
+            i += 2;
+            continue;
+        }
+        if bytes[i] != b'[' || bytes.get(i + 1) == Some(&b'^') {
             i += 1;
             continue;
         }
-        if in_bt {
-            if c == '`' {
-                in_bt = false;
-            }
-            i += 1;
-            continue;
-        }
-        match c {
-            '`' => in_bt = true,
-            '"' => in_str = true,
-            '[' if chars.get(i + 1) != Some(&'^') => {
-                if let Some(close) = match_delim(&chars, i, '[', ']') {
-                    if chars.get(close + 1) == Some(&'(') {
-                        if let Some(paren) = match_delim(&chars, close + 1, '(', ')') {
-                            let mut prefix: String = chars[..i].iter().collect();
-                            let label: String = chars[i + 1..close].iter().collect();
-                            let payload: String = chars[close + 2..paren].iter().collect();
-                            let suffix: String = chars[paren + 1..].iter().collect();
-                            // `**名 = [..](..)**` reads as bold code: drop the
-                            // emphasis markers so the label reads as prose.
-                            if let Some(p) = prefix.strip_suffix("**") {
-                                prefix = p.to_string();
-                            }
-                            prefix = prefix.trim_end().to_string();
-                            if let Some(p) = prefix.strip_prefix("**") {
-                                prefix = p.to_string();
-                            }
-                            let suffix = suffix.strip_prefix("**").unwrap_or(&suffix).to_string();
-                            return Some((
-                                prefix,
-                                label.trim().to_string(),
-                                payload.trim().to_string(),
-                                suffix.trim().to_string(),
-                            ));
-                        }
+        let start = i;
+        let mut j = i + 1;
+        let mut depth = 1;
+        while j < bytes.len() {
+            match bytes[j] {
+                b'\\' => {
+                    j += 2;
+                    continue;
+                }
+                b'[' => depth += 1,
+                b']' => {
+                    depth -= 1;
+                    if depth == 0 {
+                        break;
                     }
                 }
+                _ => {}
             }
-            _ => {}
+            j += 1;
         }
-        i += 1;
-    }
-    None
-}
-
-fn match_delim(chars: &[char], start: usize, open: char, close: char) -> Option<usize> {
-    let mut depth = 0i32;
-    let mut i = start;
-    let mut in_bt = false;
-    let mut in_str = false;
-    while i < chars.len() {
-        let c = chars[i];
-        if in_str {
-            if c == '\\' {
-                i += 2;
-                continue;
-            }
-            if c == '"' {
-                in_str = false;
-            }
+        if depth != 0 || bytes.get(j + 1) != Some(&b'(') {
             i += 1;
             continue;
         }
-        if in_bt {
-            if c == '`' {
-                in_bt = false;
-            }
-            i += 1;
-            continue;
-        }
-        match c {
-            '`' => in_bt = true,
-            '"' => in_str = true,
-            c if c == open => depth += 1,
-            c if c == close => {
-                depth -= 1;
-                if depth == 0 {
-                    return Some(i);
+        let label_end = j;
+        j += 2;
+        let payload_start = j;
+        depth = 1;
+        while j < bytes.len() {
+            match bytes[j] {
+                b'"' | b'\'' | b'`' => {
+                    let quote = bytes[j];
+                    j += 1;
+                    while j < bytes.len() {
+                        if bytes[j] == b'\\' {
+                            j += 2;
+                        } else if bytes[j] == quote {
+                            j += 1;
+                            break;
+                        } else {
+                            j += 1;
+                        }
+                    }
+                    continue;
                 }
+                b'(' => depth += 1,
+                b')' => {
+                    depth -= 1;
+                    if depth == 0 {
+                        break;
+                    }
+                }
+                _ => {}
             }
-            _ => {}
+            j += 1;
         }
-        i += 1;
+        if depth == 0 {
+            out.push(OcclusionSpan {
+                start,
+                end: j + 1,
+                label: &text[start + 1..label_end],
+                payload: text[payload_start..j].trim(),
+            });
+            i = j + 1;
+        } else {
+            i += 1;
+        }
     }
-    None
+    out
 }
-
-/// Render one occlusion line: description as prose, payload as a code chip,
-/// stubs get a badge. `<TAB>` M8
-fn render_occlusion_line(line_no: u32, line: &str) -> Option<String> {
-    let (prefix, label, payload, suffix) = split_occlusion(line)?;
-    let stub = payload.is_empty();
-    // The rest of the view drops backticks (see the `mq-anchor` marks), so the
-    // assignment head reads as `留存 =` rather than `` `留存` = ``.
-    let head = prefix
-        .trim_end()
-        .trim_end_matches('=')
-        .trim()
-        .trim_matches('`')
-        .to_string();
-    let mut html = format!(r#"<div class="doc-line doc-occl" data-line="{line_no}">"#);
-    if !head.is_empty() {
-        html.push_str(&format!(
-            r#"<span class="occl-pre">{} =</span>"#,
-            escape(&head)
-        ));
+fn logic_id(line: u32, at: usize) -> String {
+    format!("logic-{line}-{at}")
+}
+fn render_occlusion_text(line: u32, text: &str, base: usize) -> String {
+    let mut html = String::new();
+    let mut cursor = 0;
+    for span in occlusion_spans(text) {
+        html.push_str(&escape(&text[cursor..span.start]));
+        let id = logic_id(line, base + span.start);
+        let label = if span.label.is_empty() {
+            "未命名动作"
+        } else {
+            span.label
+        };
+        html.push_str(&format!(r#"<button type="button" class="occl-label" id="{id}-source" data-logic-id="{id}" aria-controls="{id}-note" title="查看实际逻辑（阅读不会执行）">{}</button>"#,escape(label)));
+        if span.payload.is_empty() {
+            html.push_str(r#"<span class="occl-stub">待补充实际逻辑</span>"#);
+        }
+        cursor = span.end;
     }
-    html.push_str(&format!(
-        r#"<span class="occl-label">{}</span>"#,
-        escape(&label)
-    ));
-    if stub {
-        html.push_str(r#"<span class="occl-stub" title="空载荷：未接通或待补返回值">桩</span>"#);
-    } else {
-        html.push_str(&format!(
-            r#"<code class="occl-code">{}</code>"#,
-            escape(&payload)
-        ));
+    html.push_str(&escape(&text[cursor..]));
+    html
+}
+fn render_logic_notes(line: u32, text: &str, bits: &[ProseBit]) -> String {
+    let mut notes = String::new();
+    let fragments: Vec<(usize, usize, &str)> =
+        if bits.iter().all(|bit| matches!(bit, ProseBit::Decl { .. })) {
+            vec![(0, text.len(), text)]
+        } else {
+            bits.iter()
+                .filter_map(|bit| match bit {
+                    ProseBit::BoldCode { inner, .. } | ProseBit::ItalicReturn { inner, .. } => {
+                        Some((bit_at(bit), prose_bit_end(text, bit), inner.as_str()))
+                    }
+                    _ => None,
+                })
+                .collect()
+        };
+    for (start, end, fragment) in fragments {
+        for span in occlusion_spans(fragment) {
+            let id = logic_id(line, start + span.start);
+            let payload = if span.payload.is_empty() {
+                "待补充实际逻辑；当前空遮蔽返回 None。"
+            } else {
+                span.payload
+            };
+            notes.push_str(&format!(r#"<details class="annot-chip annot-implementation" id="{id}-note" data-annot-id="{id}" data-annot-kind="implementation" data-anchor-line="{line}" data-anchor-byte-start="{start}" data-anchor-byte-end="{end}"><summary class="annot-label">实际逻辑 · {label}</summary><code class="annot-value occl-code">{payload}</code><small class="logic-hint">源码说明 · 不是运行结果</small></details>"#,label=escape(span.label),payload=escape(payload)));
+        }
     }
-    if !suffix.is_empty() {
-        html.push_str(&format!(
-            r#"<span class="occl-pre">{}</span>"#,
-            escape(&suffix)
-        ));
+    notes
+}
+fn render_document_band(annots: &[ViewAnnot], notes: &str) -> String {
+    let band = render_annot_band(annots, MAX_VISIBLE_ANNOTS);
+    if notes.is_empty() {
+        return band;
     }
-    html.push_str("</div>");
-    Some(html)
+    if band.is_empty() {
+        return format!(
+            r#"<div class="annot-band" data-annot-band><div class="annot-chips">{notes}</div></div>"#
+        );
+    }
+    band.replacen(
+        r#"<div class="annot-chips">"#,
+        &format!(r#"<div class="annot-chips">{notes}"#),
+        1,
+    )
 }
 
 fn render_line_block(
@@ -884,6 +916,7 @@ fn render_line_block(
     special: Option<&SpecialAssign>,
     writeback_body: Option<&String>,
     indent: Option<usize>,
+    occluded_lines: &HashSet<u32>,
 ) -> String {
     let indent_style = indent
         .map(|n| format!(r#" style="--doc-indent:{n}""#))
@@ -900,37 +933,19 @@ fn render_line_block(
             s.push_str(&render_formula_assign_card(name, tex));
         }
         Some(SpecialAssign::Code {
-            name,
-            lang,
-            source,
-            ..
+            name, lang, source, ..
         }) => {
             s.push_str(&render_code_assign_card(name, lang, source));
         }
         None => {
             let trimmed = text.trim_start();
-            // `<TAB>` M8: an occlusion line is painted as description + code chip
-            // regardless of annotation bits (the annotator always emits spans).
-            if let Some(html) = render_occlusion_line(line_no, trimmed) {
-                s.push_str(&html);
-                if let Some(body) = writeback_body {
-                    s.push_str(&crate::view::render::render_output_card(line_no, body));
-                }
-                // Must close `.doc-block` — an early return left the wrapper open and
-                // nested the Functions/Variables outline under the document surface.
-                let band_annots: Vec<ViewAnnot> = annots
-                    .iter()
-                    .filter(|a| !is_noisy_result_chip(a))
-                    .map(|a| (*a).clone())
-                    .collect();
-                if !band_annots.is_empty() {
-                    s.push_str(&render_annot_band(&band_annots, MAX_VISIBLE_ANNOTS));
-                }
-                s.push_str("</div>");
-                return s;
-            }
-            if bits.is_empty() {
-                if let Some(rest) = trimmed.strip_prefix("> ") {
+            if bits.is_empty()
+                || (occluded_lines.contains(&line_no)
+                    && bits.iter().all(|bit| matches!(bit, ProseBit::Decl { .. })))
+            {
+                if occluded_lines.contains(&line_no) && !occlusion_spans(text).is_empty() {
+                    s.push_str(&format!(r#"<div class="doc-line doc-occl"><mark class="mq-anchor mq-code" data-line="{line_no}" data-byte-start="0" data-byte-end="{}">{}</mark></div>"#,text.len(),render_occlusion_text(line_no,text,0)));
+                } else if let Some(rest) = trimmed.strip_prefix("> ") {
                     let aid = match_annot_for_line(annots)
                         .map(|a| a.id.as_str())
                         .unwrap_or("");
@@ -958,7 +973,13 @@ fn render_line_block(
                 }
             } else {
                 s.push_str(r#"<div class="doc-line doc-prose-line">"#);
-                s.push_str(&render_prose_with_marks(line_no, text, bits, annots));
+                s.push_str(&render_prose_with_marks(
+                    line_no,
+                    text,
+                    bits,
+                    annots,
+                    occluded_lines.contains(&line_no),
+                ));
                 s.push_str("</div>");
             }
         }
@@ -979,9 +1000,12 @@ fn render_line_block(
             .map(|a| (*a).clone())
             .collect()
     };
-    if !band_annots.is_empty() {
-        s.push_str(&render_annot_band(&band_annots, MAX_VISIBLE_ANNOTS));
-    }
+    let notes = if special.is_none() && occluded_lines.contains(&line_no) {
+        render_logic_notes(line_no, text, bits)
+    } else {
+        String::new()
+    };
+    s.push_str(&render_document_band(&band_annots, &notes));
 
     s.push_str("</div>");
     s
@@ -1040,12 +1064,37 @@ fn render_narrative_fence(lines: &[ClassifiedLine], start: usize) -> (String, us
     (html, j)
 }
 
+/// Preserve ordinary Markdown links/emphasis outside executable marks. Raw HTML
+/// stays literal here, as it did in mixed executable prose before this renderer.
+fn render_narrative_inline(text: &str) -> String {
+    let inner = text.trim();
+    if inner.is_empty() {
+        return escape(text);
+    }
+    let start = text.find(inner).unwrap();
+    let end = start + inner.len();
+    let parser = pulldown_cmark::Parser::new(inner).map(|event| match event {
+        pulldown_cmark::Event::Html(html) => pulldown_cmark::Event::Text(html),
+        other => other,
+    });
+    let mut html = String::new();
+    pulldown_cmark::html::push_html(&mut html, parser);
+    let Some(body) = html
+        .strip_prefix("<p>")
+        .and_then(|s| s.strip_suffix("</p>\n"))
+    else {
+        return escape(text);
+    };
+    format!("{}{}{}", escape(&text[..start]), body, escape(&text[end..]))
+}
+
 /// Render prose with markers stripped; show surface inner text only.
 fn render_prose_with_marks(
     line_no: u32,
     text: &str,
     bits: &[ProseBit],
     annots: &[&ViewAnnot],
+    occluded: bool,
 ) -> String {
     let mut html = String::new();
     let mut cursor = 0usize;
@@ -1053,7 +1102,7 @@ fn render_prose_with_marks(
         let start = bit_at(bit);
         let end = prose_bit_end(text, bit);
         if start > cursor {
-            html.push_str(&escape(&text[cursor..start]));
+            html.push_str(&render_narrative_inline(&text[cursor..start]));
         }
         if start < end && end <= text.len() {
             let (cls, display) = bit_display(bit);
@@ -1061,19 +1110,20 @@ fn render_prose_with_marks(
                 .map(|a| a.id.as_str())
                 .unwrap_or("");
             html.push_str(&format!(
-                r#"<mark class="mq-anchor mq-{cls}" data-line="{line}" data-byte-start="{start}" data-byte-end="{end}" data-annot-id="{aid}">{inner}</mark>"#,
+                r#"<mark class="mq-anchor mq-{cls}" data-line="{line}" data-byte-start="{start}" data-byte-end="{end}" data-annot-id="{aid}" data-syntax="{cls}" title="{hint}" tabindex="0">{inner}</mark>"#,
                 cls = cls,
+                hint = match bit {ProseBit::Decl{..}=>"参数或变量声明",ProseBit::BoldCode{..}=>"语句：计算、赋值或调用",ProseBit::ItalicReturn{..}=>"返回：把结果交给调用方"},
                 line = line_no,
                 start = start,
                 end = end,
                 aid = escape(annot_id),
-                inner = escape(&display),
+                inner = if occluded && !matches!(bit,ProseBit::Decl{..}) {render_occlusion_text(line_no,&display,start)}else{escape(&display)},
             ));
         }
         cursor = end.max(cursor);
     }
     if cursor < text.len() {
-        html.push_str(&escape(&text[cursor..]));
+        html.push_str(&render_narrative_inline(&text[cursor..]));
     }
     html
 }
@@ -1163,6 +1213,46 @@ fn index_stmt_lines(module: &Module) -> HashSet<u32> {
     s
 }
 
+
+fn index_occluded_lines(module: &Module) -> HashSet<u32> {
+    use crate::ast::{Arg, Expr};
+    fn expr(e: &Expr) -> bool {
+        match e {
+            Expr::Occluded { .. } => true,
+            Expr::Unary { expr: e, .. } => expr(e),
+            Expr::Binary { left, right, .. } => expr(left) || expr(right),
+            Expr::Call(c) => c.args.iter().any(|a| match a {
+                Arg::Positional(e) | Arg::Named { value: e, .. } => expr(e),
+            }),
+            Expr::List(xs) => xs.iter().any(expr),
+            Expr::Map(xs) => xs.iter().any(|(_, e)| expr(e)),
+            Expr::Index { base, .. } => expr(base),
+            _ => false,
+        }
+    }
+    let mut lines = HashSet::new();
+    for f in &module.functions {
+        crate::ast::walk_stmts(f, &mut |s| {
+            let has = match s {
+                Stmt::Assign { value, .. }
+                | Stmt::Return { value, .. }
+                | Stmt::Expr { value, .. } => expr(value),
+                Stmt::Call { call, .. } => call.args.iter().any(|a| match a {
+                    Arg::Positional(e) | Arg::Named { value: e, .. } => expr(e),
+                }),
+                Stmt::ForEach { .. } => true,
+                Stmt::While { condition, .. } => expr(condition),
+                Stmt::Branch { arms, .. } => {
+                    arms.iter().any(|a| a.condition.as_ref().is_some_and(expr))
+                }
+            };
+            if has {
+                lines.insert(crate::ast::stmt_line(s));
+            }
+        });
+    }
+    lines
+}
 
 fn index_special_assigns(module: &Module, source: &str) -> HashMap<u32, SpecialAssign> {
     let src_lines: Vec<&str> = source.lines().collect();
@@ -1602,47 +1692,101 @@ markup: occlusion
     }
 }
 
+
+/// Explain the existing core surface, including compatibility constructs, without executing it.
+fn render_syntax_guide() -> String {
+    let mut html = String::from(
+        r#"<details class="reader-syntax-guide" id="reader-syntax-guide"><summary>怎样读这份可执行文档</summary><p>正文说明意图，标记指出哪些片段会执行。遮蔽只在正文显示动作说明，实际逻辑放在侧注；阅读、展开与定位都不会运行代码。</p><div class="knowledge-table-wrap"><table><thead><tr><th>标记</th><th>阅读含义</th></tr></thead><tbody>"#,
+    );
+    for (id, surface) in crate::parse::CORE_CONSTRUCTS {
+        let meaning=match *id {
+            "narrative"=>"作者的解释，按普通 Markdown 阅读。", "blank"=>"分隔叙述与结构，不是计算步骤。",
+            "heading-unit"=>"一级标题声明对象或入口，更深标题声明函数；说明按钮可查看输入、返回与依据。",
+            "call-line"=>"调用函数；实际执行结果另有标注。", "branch-list"=>"按条件选择分支，不是普通编号说明。",
+            "loop-list"=>"重复或遍历结构；迭代选择器只切换已有运行记录。", "param"=>"兼容的显式形参；新库优先在叙述中声明参数，标题下的表格解释契约。",
+            "table"=>"未绑定的契约表是说明；绑定表按列、行和 @ 形态构成数据。", "fence"=>"代码块；绑定的外语代码与普通示例区分展示，数学公式另有公式卡片。",
+            "hr"=>"分隔内容，不能把分隔线当作函数返回。", "writeback"=>"程序写回的结果，区别于作者原始正文。",
+            "ident"=>"叙述中的参数或变量；默认值跟在名称之后。", "bold-code"=>"执行语句：赋值、调用或计算；不是打印，也不是返回。",
+            "italic-return"=>"返回表达式；句中以返回、Return 等明确引出。", "empty-return"=>"显式返回空值或结束当前函数。",
+            "link-index"=>"默认模式是 [动作](实现) 遮蔽，正文只显示动作；空括号表示待补充实际逻辑。classic 模式才解释为旧链接取元。",
+            "bracket-call"=>"兼容的带修饰调用；不能把任意普通链接当作执行授权。", "footnote-index"=>"兼容的脚注取元；当前库优先用 access 读取集合。",
+            "soft-emphasis"=>"普通强调仍属于文字；界面按真实解析结果区分强调、语句与返回。", _=>"按源码中的真实结构阅读。"
+        };
+        html.push_str(&format!(
+            r#"<tr data-construct-id="{}"><td><code>{}</code></td><td>{}</td></tr>"#,
+            escape(id),
+            escape(surface),
+            escape(meaning)
+        ));
+    }
+    html.push_str("</tbody></table></div></details>");
+    html
+}
+
 #[cfg(test)]
-mod occl_split_tests {
-    use super::split_occlusion;
-
-    #[test]
-    fn splits_bare_assignment_occlusion() {
-        let (head, label, payload, rest) =
-            split_occlusion("`留存` = [客户留存率，模拟数据](0.42)").unwrap();
-        assert_eq!(head, "`留存` =");
-        assert_eq!(label, "客户留存率，模拟数据");
-        assert_eq!(payload, "0.42");
-        assert_eq!(rest, "");
+mod readable_occlusion_tests {
+    use super::*;
+    fn render(source: &str) -> String {
+        let module = crate::load::parse_source_auto(source).unwrap();
+        render_module_document(&module, source, &[])
     }
-
     #[test]
-    fn splits_bold_assignment_occlusion_without_markers() {
-        let (head, label, payload, _) =
-            split_occlusion("**留存 = [客户留存率，模拟数据](0.42)**").unwrap();
-        assert_eq!(head, "留存 =");
-        assert_eq!(label, "客户留存率，模拟数据");
-        assert_eq!(payload, "0.42");
+    fn prose_keeps_multiple_actions_and_returns_without_exposing_payloads() {
+        let html=render("# main\n\n先**a = [读取甲](1 + 2)**，接着**b = [读取乙](3 + 4)**，最后返回*[合计](a + b)*。\n");
+        let line = html
+            .split("doc-line doc-prose-line\"")
+            .nth(1)
+            .unwrap()
+            .split("</div>")
+            .next()
+            .unwrap();
+        for text in ["先", "读取甲", "接着", "读取乙", "最后返回", "合计"] {
+            assert!(line.contains(text), "{line}");
+        }
+        for code in ["1 + 2", "3 + 4", "a + b", "[读取甲]"] {
+            assert!(!line.contains(code), "payload leaked into prose: {line}");
+        }
+        assert_eq!(
+            html.matches("class=\"annot-chip annot-implementation\"")
+                .count(),
+            3
+        );
+        assert!(html.contains("data-syntax=\"return\""));
+        assert!(html.contains(">1 + 2</code>") && html.contains(">a + b</code>"));
     }
-
     #[test]
-    fn splits_stub_and_nested_payload() {
-        let (_, label, payload, _) =
-            split_occlusion("`待接` = [搜索接入，待开发]()").unwrap();
-        assert_eq!(label, "搜索接入，待开发");
-        assert!(payload.is_empty());
-
-        let (_, label, payload, _) =
-            split_occlusion("`取第一` = [第一颗](access(`篮子`, \"1\"))").unwrap();
-        assert_eq!(label, "第一颗");
-        assert_eq!(payload, "access(`篮子`, \"1\")");
+    fn empty_logic_quotes_nested_parentheses_and_html_are_safe() {
+        let html =
+            render("# main\n\n得到**a = [括号](str(value=\") <tag>\"))**，再**b = [待接]()**。\n");
+        assert!(html.contains("待补充实际逻辑"));
+        assert!(html.contains("&lt;tag&gt;") && !html.contains("<tag>"));
+        assert!(html.contains("str(value=&quot;) &lt;tag&gt;&quot;)"));
+        assert!(html.contains("当前空遮蔽返回 None"));
     }
-
     #[test]
-    fn ignores_index_and_plain_lines() {
-        // Link-index (classic) and ordinary statements are not occlusions.
-        assert!(split_occlusion("**v = [键](`表`)**").is_some()); // shape matches; parser decides meaning
-        assert!(split_occlusion("**甲 = 加(1 2)**").is_none());
-        assert!(split_occlusion("> print text=x").is_none());
+    fn navigation_and_quoted_links_are_not_executable_occlusions() {
+        let html=render("# main\n\n参阅 [普通链接](https://example.com/guide)。\n\n得到**literal = \"[数据链接](should_stay_text)\"**，以及**value = [真实动作](5)**，参阅 [混合链接](https://example.com/mixed)。\n");
+        assert!(html.contains("href=\"https://example.com/guide\""));
+        assert!(html.contains("href=\"https://example.com/mixed\""));
+        assert_eq!(
+            html.matches("class=\"annot-chip annot-implementation\"")
+                .count(),
+            1
+        );
+        assert!(html.contains("[数据链接](should_stay_text)"));
+        let classic = render("---\nmarkup: classic\n---\n# main\n\n**value = [key](`record`)**\n");
+        assert!(!classic.contains("class=\"annot-chip annot-implementation\""));
+    }
+    #[test]
+    fn semantic_loop_labels_and_every_core_construct_are_explained() {
+        let html=render("# main\n\n`items` =\n\n| n |\n|---|\n| 1 |\n| 2 |\n\n- [逐项处理](遍历 items 为 item)\n  **out = item + 1**\n");
+        assert!(html.contains("逐项处理</button>"));
+        assert!(html.contains("遍历 items 为 item</code>"));
+        for (id, _) in crate::parse::CORE_CONSTRUCTS {
+            assert!(
+                html.contains(&format!("data-construct-id=\"{id}\"")),
+                "missing {id}"
+            );
+        }
     }
 }

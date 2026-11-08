@@ -290,12 +290,32 @@ fn scan_backtick_decl(line: &str, start: usize) -> Option<(ProseBit, usize)> {
     let after_tick = start + 1 + end + 1;
     let after = line.get(after_tick..)?;
     if let Some(stripped) = after.strip_prefix('=') {
-        let def_end = stripped
-            .find(|c: char| {
-                c.is_whitespace()
-                    || matches!(c, '，' | '。' | '；' | '、' | ',' | ';' | '*' | '`')
-            })
-            .unwrap_or(stripped.len());
+        // Quoted defaults may contain prose delimiters, glob stars or spaces.
+        // Keep the same quoted literal accepted by explicit parameter defaults.
+        let def_end = if let Some(quote @ ('"' | '\'')) = stripped.chars().next() {
+            let mut escaped = false;
+            stripped
+                .char_indices()
+                .skip(1)
+                .find_map(|(i, ch)| {
+                    if escaped {
+                        escaped = false;
+                    } else if ch == '\\' {
+                        escaped = true;
+                    } else if ch == quote {
+                        return Some(i + ch.len_utf8());
+                    }
+                    None
+                })
+                .unwrap_or(stripped.len())
+        } else {
+            stripped
+                .find(|c: char| {
+                    c.is_whitespace()
+                        || matches!(c, '，' | '。' | '；' | '、' | ',' | ';' | '*' | '`')
+                })
+                .unwrap_or(stripped.len())
+        };
         let default = stripped[..def_end].to_string();
         let next = after_tick + 1 + def_end;
         return Some((
@@ -367,6 +387,27 @@ mod tests {
             }
             _ => panic!("{:?}", bits[0]),
         }
+    }
+
+    #[test]
+    fn quoted_defaults_keep_delimiters_and_escaped_quotes() {
+        let line = r#"输入 `pattern`="**"；`mime`="text/plain;charset=utf-8"；`label`="a, b \"quoted\""。"#;
+        let bits = scan_prose_line(line);
+        let defaults: Vec<_> = bits
+            .iter()
+            .filter_map(|bit| match bit {
+                ProseBit::Decl { name, default, .. } => Some((name.as_str(), default.as_deref())),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(
+            defaults,
+            vec![
+                ("pattern", Some(r#""**""#)),
+                ("mime", Some(r#""text/plain;charset=utf-8""#)),
+                ("label", Some(r#""a, b \"quoted\"""#))
+            ]
+        );
     }
 
     #[test]

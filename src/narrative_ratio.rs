@@ -94,44 +94,86 @@ fn collect_starts(fns: &[Function], out: &mut Vec<(String, u32, usize)>) {
 
 /// Split a function unit's source into narrative vs code character counts.
 ///
-/// Code: lines that are primarily executable markers (`>`, `**`, `*…*`, `+`, tables with `|`,
-/// fences, `#`/`##` headings themselves). Narrative: remaining prose (including formula fences
-/// content is counted as narrative — formulas are documentation).
+/// Count executable inline payloads separately from the sentences containing them.
+/// Occlusion labels and unbound contract/documentation tables are narration;
+/// bound data tables, expression payloads, code fences and structure markers are code.
+/// Display formulas retain the existing documentation treatment.
 pub fn split_narrative_code(chunk: &str) -> (usize, usize) {
+    use crate::parse::{scan_md_links_in_line, scan_prose_line, ProseBit};
     let mut narrative = 0usize;
     let mut code = 0usize;
     let mut in_fence = false;
     let mut fence_is_formula = false;
+    let mut pending_table = false;
+    let mut data_table = false;
     for line in chunk.lines() {
         let trimmed = line.trim();
+        let count = line.chars().count();
         if trimmed.starts_with("```") || trimmed.starts_with("~~~") {
             in_fence = !in_fence;
             fence_is_formula = trimmed.contains("$$") || trimmed == "$$";
-            // Fence markers themselves are markup/code budget.
-            code += line.chars().count();
+            code += count;
             continue;
         }
         if in_fence {
-            // Math/display fences count as narration; language fences as code.
             if fence_is_formula {
-                narrative += line.chars().count();
+                narrative += count;
             } else {
-                code += line.chars().count();
+                code += count;
             }
             continue;
         }
         if trimmed.is_empty() {
+            data_table = false;
             continue;
         }
-        // Standalone $$ formula blocks (Marqdo formula assignment bodies).
-        if trimmed == "$$" || trimmed.starts_with("$$") {
-            narrative += line.chars().count();
+        if trimmed.starts_with('|') {
+            if pending_table {
+                data_table = true;
+                pending_table = false;
+            }
+            if data_table {
+                code += count;
+            } else {
+                narrative += count;
+            }
             continue;
         }
-        if is_code_line(trimmed) {
-            code += line.chars().count();
+        data_table = false;
+        pending_table = (trimmed.starts_with('`') && trimmed.ends_with('='))
+            || (trimmed.starts_with("**")
+                && trimmed.ends_with("**")
+                && trimmed[2..trimmed.len() - 2].trim_end().ends_with('='));
+        if trimmed.starts_with("$$") {
+            narrative += count;
+            continue;
+        }
+        let mut inline_code = 0;
+        for bit in scan_prose_line(line) {
+            let (inner, markers) = match bit {
+                ProseBit::BoldCode { inner, .. } => (inner, 4),
+                ProseBit::ItalicReturn { inner, .. } => (inner, 2),
+                ProseBit::Decl { .. } => continue,
+            };
+            let labels: usize = scan_md_links_in_line(&inner, 0)
+                .iter()
+                .map(|link| link.label.chars().count())
+                .sum();
+            inline_code += (inner.chars().count() + markers).saturating_sub(labels);
+        }
+        if inline_code > 0 {
+            let actual = inline_code.min(count);
+            code += actual;
+            narrative += count - actual;
+        } else if is_code_line(trimmed) || pending_table {
+            let labels: usize = scan_md_links_in_line(line, 0)
+                .iter()
+                .map(|link| link.label.chars().count())
+                .sum();
+            narrative += labels.min(count);
+            code += count.saturating_sub(labels);
         } else {
-            narrative += line.chars().count();
+            narrative += count;
         }
     }
     (narrative, code)
@@ -200,10 +242,7 @@ This paragraph keeps narration above half even with a small table.
 *None*
 "#;
         let (n, c) = split_narrative_code(chunk);
-        assert!(
-            (n as f64) / ((n + c) as f64) >= 0.5,
-            "n={n} c={c}"
-        );
+        assert!((n as f64) / ((n + c) as f64) >= 0.5, "n={n} c={c}");
     }
 
     #[test]
@@ -214,9 +253,30 @@ This paragraph keeps narration above half even with a small table.
 *> quantum_h circuit=`self` qubit=`qubit`*
 "#;
         let (n, c) = split_narrative_code(chunk);
-        assert!(
-            (n as f64) / ((n + c) as f64) < 0.5,
-            "n={n} c={c}"
+        assert!((n as f64) / ((n + c) as f64) < 0.5, "n={n} c={c}");
+    }
+}
+
+#[cfg(test)]
+mod inline_measurement_tests {
+    use super::*;
+    #[test]
+    fn inline_expressions_are_not_all_prose() {
+        let (n, c) =
+            split_narrative_code("Now **out = [Read the value](lookup(key=\"selected\"))**.");
+        assert_eq!(
+            n,
+            "Now .".chars().count() + "Read the value".chars().count()
         );
+        assert!(c > n);
+    }
+    #[test]
+    fn bound_data_is_code_but_contracts_are_narration() {
+        let table = "| field | value |\n|---|---|\n| example | item |";
+        let (n, c) = split_narrative_code(table);
+        assert!(n > 0 && c == 0);
+        let (n, c) = split_narrative_code(&format!("`record` =\n\n{table}"));
+        assert_eq!(n, 0);
+        assert!(c > 0);
     }
 }

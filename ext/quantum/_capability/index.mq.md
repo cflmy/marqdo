@@ -30,6 +30,10 @@ and tests/call_cli.rs before returning to [circuit](../circuit/index.mq.md).
 
 ## load
 
+| 返回 | 类型 | 说明 |
+|------|------|------|
+| result | any | null after a successful load |
+
 Locate the ABI v2 quantum shared library through plugin.native_path, then
 plugin.load it. If the library is missing, print a short install hint and exit
 non-zero so CI and agents fail loudly. After a successful load, later quantum
@@ -39,14 +43,10 @@ start of each tool that needs the simulator.
 
 This tool takes no parameters.
 
-| 返回 | 类型 | 说明 |
-|------|------|------|
-| result | any | null after a successful load |
-
-**p = > plugin.native_path name="quantum"**
+We retain **`p` = [Locate the installed native plugin](plugin.native_path(name="quantum"))**.
 1. `p`
-  > plugin.load path=`p`
+  We **[Load the native plugin required by this operation](plugin.load(path=`p`))**.
 2. *
-  > print text=ext/quantum: native quantum plugin not found (build marqdo_plugin_quantum or marqdo ext add quantum)
-  > sys.exit code=1
-****
+  We **[Print the prepared message](print(text="ext/quantum: native quantum plugin not found (build marqdo_plugin_quantum or marqdo ext add quantum)"))**.
+  We **[End this run with the selected exit status](sys.exit(code=1))**.
+Return *None*.

@@ -41,7 +41,10 @@ pub fn lookup_local<'a>(module: &'a Module, current: &'a Function, name: &str) -
     super::resolution::lookup(&super::resolution::AstView::default(), &module, current, name)
 }
 pub fn resolve_for_exec<'a>(module: &'a Module, current: &'a Function, call: &CallExpr) -> ExecTarget<'a> {
-    super::resolution::resolve(&super::resolution::AstView::default(), &module, current, call)
+    match call.for_evaluation() {
+        Ok(normalized) => super::resolution::resolve(&super::resolution::AstView::default(), &module, current, &normalized),
+        Err(message) => ExecTarget::Unresolved { message, span_hint: None },
+    }
 }
 
 pub fn is_static_bound(target: &ExecTarget<'_>) -> bool {

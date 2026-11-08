@@ -26,45 +26,57 @@ preserve tests/ext/web-artifact-render-smoke.mq.md and the handbook tests.
 
 ## new
 
-| 参数 | 类型 | 说明 |
-|------|------|------|
-| title | text | document title |
-| route | text | path |
-| method | text | HTTP method |
-| body | text | Markdown body |
-| nodes | any | View table or None |
-| data_source | text | table name |
-| data_order | text | order key |
-| data_where | text | filters |
-
-Construct a Document handle with `title`="", `route`="/", `method`="GET",
-`body`="", optional View `nodes`=None, and flat `data_source`="", `data_order`="",
-`data_where`="" keys. Prefer Artifact discovery via serve for production pages;
-use this tool for previews and stepwise agent sessions. nodes must be the
-unified View schema, never a private dialect or an HTML string shell.
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| title | text | "" | document title |
+| route | text | "/" | path |
+| method | text | "GET" | HTTP method |
+| body | text | "" | Markdown body |
+| nodes | any | None | View table or None |
+| data_source | text | "" | table name |
+| data_order | text | "" | order key |
+| data_where | text | "" | filters |
 
 | 返回 | 类型 | 说明 |
 |------|------|------|
 | result | any | page handle |
 
-> cap.load
+Use `title`="", `route`="/", `method`="GET", `body`="", `nodes`=None, `data_source`="", `data_order`="", `data_where`="" as the inputs for this operation.
+
+Construct a Document handle with `title`="", `route`="/", `method`="GET",
+
+`body`="", optional View `nodes`=None, and flat `data_source`="", `data_order`="",
+
+`data_where`="" keys. Prefer Artifact discovery via serve for production pages;
+use this tool for previews and stepwise agent sessions. nodes must be the
+unified View schema, never a private dialect or an HTML string shell.
+
+We **[Load the native plugin required by this operation](cap.load())**.
+
 `out` =
 
 | _type | title | route | method | body | nodes | data_source | data_order | data_where |
 |-------|-------|-------|--------|------|-------|-------------|------------|------------|
 | page | `title` | `route` | `method` | `body` | `nodes` | `data_source` | `data_order` | `data_where` |
 
-*out*
+Return *out*.
 
 ## render
 
-| 参数 | 类型 | 说明 |
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| page | any | required | Document handle |
+| nodes | any | None | View table or None |
+| db | any | None | optional database handle |
+
+| 返回 | 类型 | 说明 |
 |------|------|------|
-| page | any | Document handle |
-| nodes | any | View table or None |
-| db | any | optional database handle |
+| result | any | HTML or render payload |
+
+Use `page`, `nodes`=None, `db`=None as the inputs for this operation.
 
 Render Document handle `page` to HTML for preview or response. Optional
+
 `nodes`=None is the unified View table; when None, uses the page's own nodes or
 Markdown body. Optional `db`=None is retained for facade compatibility. This offline renderer
 does not populate data_source; automatic row binding belongs to served ordinary
@@ -74,64 +86,65 @@ handmade HTML string as the page shell. This is the sole compose path (ADR
 0007); there is no compose_main or fragment DSL. Agents should call this free
 tool (not a method chain) under `--effects plugin`.
 
-| 返回 | 类型 | 说明 |
-|------|------|------|
-| result | any | HTML or render payload |
-
-> cap.load
-**n = nodes**
+We **[Load the native plugin required by this operation](cap.load())**.
+We retain **n = nodes**.
 1. `n` == None
-  **n = [nodes](access(page, "nodes"))**
+  We retain **`n` = [Read nodes field](access(`page`, "nodes"))**.
 2. *
   **_ = 1**
-**title = [title](access(page, "title"))**
+We retain **`title` = [Read title field](access(`page`, "title"))**.
 1. `n`
-  *> web_render_nodes page=`page` nodes=`n` db=`db` title=`title`*
+  Return *[Render Document handle page to HTML for preview or response](web_render_nodes(page=`page`, nodes=`n`, db=`db`, title=`title`))*.
 2. *
-  **body = [body](access(page, "body"))**
-  *> web_render_document page=`page` body=`body` db=`db` title=`title`*
+  We retain **`body` = [Read body field](access(`page`, "body"))**.
+  Return *[Render Document handle page to HTML for preview or response](web_render_document(page=`page`, body=`body`, db=`db`, title=`title`))*.
 
 # page
 
-| 参数 | 类型 | 说明 |
-|------|------|------|
-| title | any | See prose default / 见叙述默认值 |
-| route | any | See prose default / 见叙述默认值 |
-| method | any | See prose default / 见叙述默认值 |
-| body | any | See prose default / 见叙述默认值 |
-| nodes | any | See prose default / 见叙述默认值 |
-| data_source | any | See prose default / 见叙述默认值 |
-| data_order | any | See prose default / 见叙述默认值 |
-| data_where | any | See prose default / 见叙述默认值 |
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| title | any | "" | Document title used by preview and page rendering |
+| route | any | "/" | Declared URL path at which this Document may be mounted |
+| method | any | "GET" | HTTP request method for the declared route |
+| body | any | "" | Markdown document content; complex sites use recursively split components |
+| nodes | any | None | Nested View records, or None to retain document-body rendering |
+| data_source | any | "" | Document data source declaration; empty means no automatic source |
+| data_order | any | "" | Ordering declaration for the selected document data source |
+| data_where | any | "" | Filter declaration for the selected document data source |
 
-Inputs: `title`="", `route`="/", `method`="GET", `body`="", `nodes`=None, `data_source`="", `data_order`="", `data_where`=""
+| 返回 | 类型 | 说明 |
+|------|------|------|
+| result | any | Document handle retaining title, route, method, body, nodes and data declarations |
+
+Use `title`="", `route`="/", `method`="GET", `body`="", `nodes`=None, `data_source`="", `data_order`="", `data_where`="" as the inputs for this operation.
 
 Web Document handle for author method chains. Prefer constructing from Artifact
 Metadata via `web.page` facade or the free `new` tool above. View tables use
 only `|type|slot|value|attrs|style|` (ZH `|类型|槽|值|属性|样式|`). Do not pass a
 raw HTML string as the primary `body` for a full site shell.
 
-| 返回 | 类型 | 说明 |
-|------|------|------|
-| result | any | Constructed value / 构造结果 |
+We **[Load the native plugin required by this operation](cap.load())**.
 
-> cap.load
 `out` =
 
 | _type | title | route | method | body | nodes | data_source | data_order | data_where |
 |-------|-------|-------|--------|------|-------|-------------|------------|------------|
 | page | `title` | `route` | `method` | `body` | `nodes` | `data_source` | `data_order` | `data_where` |
 
-*out*
+Return *out*.
 
 ## render
 
-| 参数 | 类型 | 说明 |
-|------|------|------|
-| nodes | any | View table or None |
-| db | any | optional database handle |
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| nodes | any | None | View table or None |
+| db | any | None | optional database handle |
 
-Inputs: `nodes`=None, `db`=None
+| 返回 | 类型 | 说明 |
+|------|------|------|
+| result | any | HTML or render payload |
+
+Use `nodes`=None, `db`=None as the inputs for this operation.
 
 Render this Document to HTML for preview or response. Optional `nodes` is the
 unified View table (type/slot/value/attrs/style). When `nodes` is None, the
@@ -141,39 +154,35 @@ file-partitioned components via component.merge — do not pass a handmade HTML
 string as the page shell. This is the sole compose path (ADR 0007); there is no
 compose_main or fragment DSL.
 
-| 返回 | 类型 | 说明 |
-|------|------|------|
-| result | any | HTML or render payload |
-
-> cap.load
-**n = nodes**
+We **[Load the native plugin required by this operation](cap.load())**.
+We retain **n = nodes**.
 1. `n` == None
-  **n = [nodes](access(self, "nodes"))**
+  We retain **`n` = [Read nodes field](access(`self`, "nodes"))**.
 2. *
   **_ = 1**
-**title = [title](access(self, "title"))**
+We retain **`title` = [Read title field](access(`self`, "title"))**.
 1. `n`
-  *> web_render_nodes page=`self` nodes=`n` db=`db` title=`title`*
+  Return *[Render this Document to HTML for preview or response](web_render_nodes(page=`self`, nodes=`n`, db=`db`, title=`title`))*.
 2. *
-  **body = [body](access(self, "body"))**
-  *> web_render_document page=`self` body=`body` db=`db` title=`title`*
+  We retain **`body` = [Read body field](access(`self`, "body"))**.
+  Return *[Render this Document to HTML for preview or response](web_render_document(page=`self`, body=`body`, db=`db`, title=`title`))*.
 
 ## css
 
-| 参数 | 类型 | 说明 |
-|------|------|------|
-| css | text | raw CSS (escape hatch) |
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| css | text | required | raw CSS (escape hatch) |
 
-Inputs: `css`
+| 返回 | 类型 | 说明 |
+|------|------|------|
+| result | any | updated page handle |
+
+Use `css` as the inputs for this operation.
 
 Escape hatch — append raw CSS string `css` to this page. Named style tables and
 the View style column remain the default theme path. Use this only when a host
 constraint cannot be expressed as a named style row, and write that reason next
 to the call. Forbidden as the primary way to style nav, sidebar, or footer.
 
-| 返回 | 类型 | 说明 |
-|------|------|------|
-| result | any | updated page handle |
-
-> cap.load
-*> web_page_css page=`self` css=`css`*
+We **[Load the native plugin required by this operation](cap.load())**.
+Return *[Escape hatch — append raw CSS string css to this page](web_page_css(page=`self`, css=`css`))*.

@@ -60,90 +60,9 @@ pub struct FileViewModel {
 /// View deliberately compiles semantics without running the target, so a page
 /// can show binding/effect/verification facts even in `--no-exec` exports.
 ///
-/// V0: skip module/type container cards by default; rename lock digest accurately.
+/// The reader groups facts by source unit and folds raw identifiers into technical detail.
 pub fn render_knowledge_html(project: &crate::sema::SemanticProject, rel: &str) -> String {
-    let artifacts: Vec<_> = project
-        .artifacts
-        .iter()
-        .filter(|artifact| {
-            artifact.source.file == rel && artifact.kind != "module" && artifact.kind != "type"
-        })
-        .collect();
-    let steps: Vec<_> = project.steps.iter().filter(|step| step.source.file == rel).collect();
-    if artifacts.is_empty() && steps.is_empty() {
-        return String::new();
-    }
-    let mut out = String::from(r#"<div class="knowledge-panel" aria-label="Executable knowledge">"#);
-    if !steps.is_empty() {
-        out.push_str(r#"<article class="knowledge-card knowledge-steps"><h3>文档中的步骤</h3><p class="knowledge-hint">结构步骤（非实际执行时序）</p><ol class="knowledge-step-list">"#);
-        for step in &steps {
-            let label = project
-                .refs
-                .iter()
-                .find(|r| r.id == step.reference)
-                .map(|r| r.label.as_str())
-                .unwrap_or(step.reference.as_str());
-            let line = step.source.line;
-            let target_ids = if step.calls.is_empty() {
-                String::new()
-            } else {
-                format!(
-                    r#" <span class="knowledge-step-targets">→ {}</span>"#,
-                    escape(&step.calls.iter().map(|id| id.as_str()).collect::<Vec<_>>().join(", "))
-                )
-            };
-            // Structure pane uses #stmt-{line}; jump there for source navigation.
-            out.push_str(&format!(
-                "<li class=\"knowledge-step\" data-step-kind=\"{0}\" data-line=\"{1}\"><a href=\"#stmt-{1}\"><code class=\"ks-kind\">{0}</code> {2}</a>{3}</li>",
-                escape(&step.kind),
-                line,
-                escape(label),
-                target_ids,
-            ));
-        }
-        out.push_str("</ol></article>");
-    }
-    for artifact in artifacts {
-        let target = artifact.symbol_id.as_ref().map(|id| id.as_str()).unwrap_or(artifact.artifact_id.0.as_str());
-        let signature = artifact.signature.as_ref().map(|sig| {
-            let params = sig.params.iter().map(|param| format!("{}: {}{}", param.name, param.ty, if param.required { "" } else { "?" })).collect::<Vec<_>>().join(", ");
-            format!("({params}) → {}", sig.returns)
-        }).unwrap_or_else(|| "declaration".into());
-        let effects = artifact.effects.values().join(", ");
-        let deps = if artifact.dependencies.is_empty() { "none".to_string() } else { artifact.dependencies.iter().map(|id| id.0.as_str()).collect::<Vec<_>>().join(", ") };
-        // Short digest for display; full value in title for copy.
-        let digest = &artifact.hashes.artifact.0;
-        let digest_short = if digest.len() > 20 {
-            format!("{}…", &digest[..20])
-        } else {
-            digest.clone()
-        };
-        let evidence_note = match artifact.verification.evidence.as_str() {
-            "sourced" => "已关联来源，内容尚未核验",
-            "verified" => "证据已核验",
-            "unverified" => "尚无来源记录",
-            other => other,
-        };
-        out.push_str(&format!(
-            r#"<article class="knowledge-card" id="knowledge-{name}"><h3>{name} <span class="ks-kind">{kind}</span></h3><dl><dt>Target</dt><dd><code>{target}</code></dd><dt>Signature</dt><dd><code>{sig}</code></dd><dt>Effects</dt><dd>{effects}</dd><dt>Verification</dt><dd>parse: {parse}; resolve: {resolve}; contract: {contract}; tests: {tests}; evidence: {evidence}（{evidence_note}）</dd><dt>制品摘要</dt><dd><code title="{digest}">{digest_short}</code> <span class="knowledge-hint">（未检查锁定状态）</span></dd><dt>Depends on</dt><dd><code>{deps}</code></dd><dt>Execution</dt><dd>尚无该知识的运行记录（知识预览不执行）。</dd></dl></article>"#,
-            name = escape(&artifact.display_name),
-            kind = escape(&artifact.kind),
-            target = escape(target),
-            sig = escape(&signature),
-            effects = escape(&effects),
-            parse = escape(&artifact.verification.parse),
-            resolve = escape(&artifact.verification.resolve),
-            contract = escape(&artifact.verification.contract),
-            tests = escape(&artifact.verification.tests),
-            evidence = escape(&artifact.verification.evidence),
-            evidence_note = escape(evidence_note),
-            digest = escape(digest),
-            digest_short = escape(&digest_short),
-            deps = escape(&deps),
-        ));
-    }
-    out.push_str("</div>");
-    out
+    crate::view::knowledge_reading::render(project, rel, None)
 }
 
 /// Collect prompt strings from every `input` / `输入` call in the module (pre-order).
@@ -1336,7 +1255,7 @@ fn occl_card(name: Option<&str>, label: &str, payload: Option<&Expr>) -> String 
             escape(&expr_display(e))
         ),
         None => String::from(
-            "<span class=\"occl-stub\" title=\"空载荷：未接通或待补返回值\">桩</span>",
+            "<span class=\"occl-stub\" title=\"空遮蔽当前返回 None\">待补充实际逻辑</span>",
         ),
     };
     format!(

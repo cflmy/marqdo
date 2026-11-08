@@ -48,10 +48,16 @@ new implementation only with itself. Draw a single wire through
 
 ## kron
 
-| 参数 | 类型 | 说明 |
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| a | any | required | left factor state or matrix |
+| b | any | required | right factor state or matrix |
+
+| 返回 | 类型 | 说明 |
 |------|------|------|
-| a | any | left factor state or matrix |
-| b | any | right factor state or matrix |
+| result | any | tensor product |
+
+Use `a`, `b` as the inputs for this operation.
 
 The Kronecker product of `a` and `b` builds a larger space from two smaller
 ones. For state vectors this writes product states; for matrices it enlarges
@@ -60,46 +66,47 @@ operators.
 Pass handles the plugin already understands. For a pure-state product, convert circuits with simulate.state first. Matrix
 factors take the operator branch; raw amplitude lists are not accepted as states.
 
-| 返回 | 类型 | 说明 |
-|------|------|------|
-| result | any | tensor product |
-
-> cap.load
-*> quantum_kron a=`a` b=`b`*
+We **[Load the native plugin required by this operation](cap.load())**.
+Return *[The Kronecker product of a and b builds a larger space from two smaller ones](quantum_kron(a=`a`, b=`b`))*.
 
 ## fidelity
 
-| 参数 | 类型 | 说明 |
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| a | any | required | first pure state or circuit |
+| b | any | required | second pure state or circuit |
+
+| 返回 | 类型 | 说明 |
 |------|------|------|
-| a | any | first pure state or circuit |
-| b | any | second pure state or circuit |
+| result | number | fidelity in the unit interval |
+
+Use `a`, `b` as the inputs for this operation.
 
 Pure-state fidelity between `a` and `b` is the squared absolute overlap. It is
 one when the states coincide and zero when they are orthogonal. You may pass a
 circuit handle; the plugin uses the ideal simulated state. Teaching noise is
 ignored.
 
-| 返回 | 类型 | 说明 |
-|------|------|------|
-| result | number | fidelity in the unit interval |
-
-> cap.load
-*> quantum_fidelity a=`a` b=`b`*
+We **[Load the native plugin required by this operation](cap.load())**.
+Return *[Pure-state fidelity between a and b is the squared absolute overlap](quantum_fidelity(a=`a`, b=`b`))*.
 
 ## schmidt
 
-| 参数 | 类型 | 说明 |
-|------|------|------|
-| state | any | pure state or circuit |
-| cut | number | qubits in subsystem A low bits |
-
-Schmidt decomposition of `state` across a cut. Subsystem A owns the lowest
-`cut`=1 qubits by default. Qubit 0 is the rightmost bit. Singular values show
-entanglement across the bipartition.
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| state | any | required | pure state or circuit |
+| cut | number | 1 | qubits in subsystem A low bits |
 
 | 返回 | 类型 | 说明 |
 |------|------|------|
 | result | any | singular values and factors |
 
-> cap.load
-*> quantum_schmidt state=`state` cut=`cut`*
+Use `state`, `cut`=1 as the inputs for this operation.
+
+Schmidt decomposition of `state` across a cut. Subsystem A owns the lowest
+
+`cut`=1 qubits by default. Qubit 0 is the rightmost bit. Singular values show
+entanglement across the bipartition.
+
+We **[Load the native plugin required by this operation](cap.load())**.
+Return *[Schmidt decomposition of state across a cut. Subsystem A owns the lowest entanglement across the bipartition.](quantum_schmidt(state=`state`, cut=`cut`))*.

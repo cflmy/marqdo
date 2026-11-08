@@ -62,107 +62,124 @@ For input preparation follow [circuit](../circuit/index.mq.md),
 
 ## draw_circuit
 
-| 参数 | 类型 | 说明 |
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| circuit | any | required | circuit to render |
+| theme | text | "dark" | dark light or bw |
+| path | any | None | optional output path or None |
+
+| 返回 | 类型 | 说明 |
 |------|------|------|
-| circuit | any | circuit to render |
-| path | any | optional output path or None |
-| theme | text | dark light or bw |
+| result | any | drawing result |
+
+Use `circuit`, `theme`="dark", `path`=None as the inputs for this operation.
 
 Render `circuit` as gate rails and barriers. Choose `theme`="dark" by default;
 light and bw preserve the same geometry. Optional `path`=None returns SVG
 without a file. A nonempty path is available to author programs under run.
 
+We **[Load the native plugin required by this operation](cap.load())**.
+Return *[Render circuit as gate rails and barriers](quantum_draw_circuit(circuit=`circuit`, path=`path`, kind="circuit", qubit=0, theme=`theme`))*.
+
+## draw_probs
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| circuit | any | required | circuit to render |
+| theme | text | "dark" | dark light or bw |
+| path | any | None | optional output path or None |
+
 | 返回 | 类型 | 说明 |
 |------|------|------|
 | result | any | drawing result |
 
-> cap.load
-*> quantum_draw_circuit circuit=`circuit` path=`path` kind="circuit" qubit=0 theme=`theme`*
-
-## draw_probs
-
-| 参数 | 类型 | 说明 |
-|------|------|------|
-| circuit | any | circuit to render |
-| path | any | optional output path or None |
-| theme | text | dark light or bw |
+Use `circuit`, `theme`="dark", `path`=None as the inputs for this operation.
 
 Plot ideal basis probabilities of `circuit`. Default `theme`="dark" supports
 light and bw alternatives. Optional `path`=None returns SVG without a file.
 The bars ignore teaching noise, just like simulate.probabilities.
 
-| 返回 | 类型 | 说明 |
-|------|------|------|
-| result | any | drawing result |
-
-> cap.load
-*> quantum_draw_circuit circuit=`circuit` path=`path` kind="probs" qubit=0 theme=`theme`*
+We **[Load the native plugin required by this operation](cap.load())**.
+Return *[Plot ideal basis probabilities of circuit](quantum_draw_circuit(circuit=`circuit`, path=`path`, kind="probs", qubit=0, theme=`theme`))*.
 
 ## draw_bloch
 
-| 参数 | 类型 | 说明 |
-|------|------|------|
-| circuit | any | circuit source |
-| path | any | optional output path or None |
-| qubit | number | which wire |
-| theme | text | dark light or bw |
-
-Show the reduced Bloch sphere of wire `qubit`=0 from `circuit`. Default
-`theme`="dark"; optional `path`=None returns SVG without a file. A multi-qubit
-circuit still produces one reduced wire picture, not a joint-state sphere.
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| qubit | number | 0 | which wire |
+| circuit | any | required | circuit source |
+| theme | text | "dark" | dark light or bw |
+| path | any | None | optional output path or None |
 
 | 返回 | 类型 | 说明 |
 |------|------|------|
 | result | any | drawing result |
 
-> cap.load
-*> quantum_draw_circuit circuit=`circuit` path=`path` kind="bloch" qubit=`qubit` theme=`theme`*
+Use `qubit`=0, `circuit`, `theme`="dark", `path`=None as the inputs for this operation.
+
+Show the reduced Bloch sphere of wire `qubit`=0 from `circuit`. Default
+
+`theme`="dark"; optional `path`=None returns SVG without a file. A multi-qubit
+circuit still produces one reduced wire picture, not a joint-state sphere.
+
+We **[Load the native plugin required by this operation](cap.load())**.
+Return *[Show the reduced Bloch sphere of wire qubit=0 from circuit. Default circuit still produces one reduced wire picture, not a joint-state sphere.](quantum_draw_circuit(circuit=`circuit`, path=`path`, kind="bloch", qubit=`qubit`, theme=`theme`))*.
 
 ## draw_density
 
-| 参数 | 类型 | 说明 |
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| density | any | required | density operator |
+| kind | text | "hinton" | hinton city density or paulivec |
+| path | any | None | optional output path or None |
+
+| 返回 | 类型 | 说明 |
 |------|------|------|
-| density | any | density operator |
-| path | any | optional output path or None |
-| kind | text | hinton city density or paulivec |
+| result | any | drawing result |
+
+Use `density`, `kind`="hinton", `path`=None as the inputs for this operation.
 
 Plot `density` using `kind`="hinton" by default. Alternatives are city,
 density and paulivec. Optional `path`=None returns SVG without a file.
 Use the density module to construct the mixed-state input before drawing.
 
+We **[Load the native plugin required by this operation](cap.load())**.
+Return *[Plot density using kind="hinton" by default](quantum_density_draw(density=`density`, path=`path`, kind=`kind`))*.
+
+## draw_gate
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| gate | any | required | gate handle |
+| kind | text | "gate" | gate or matrix |
+| path | any | None | optional output path or None |
+
 | 返回 | 类型 | 说明 |
 |------|------|------|
 | result | any | drawing result |
 
-> cap.load
-*> quantum_density_draw density=`density` path=`path` kind=`kind`*
-
-## draw_gate
-
-| 参数 | 类型 | 说明 |
-|------|------|------|
-| gate | any | gate handle |
-| path | any | optional output path or None |
-| kind | text | gate or matrix |
+Use `gate`, `kind`="gate", `path`=None as the inputs for this operation.
 
 Plot `gate` using `kind`="gate" by default. Choose matrix for a complex-entry
 heatmap. Optional `path`=None returns SVG without a file. This observes the
 operator rather than applying it or changing any circuit.
 
-| 返回 | 类型 | 说明 |
-|------|------|------|
-| result | any | drawing result |
-
-> cap.load
-*> quantum_gate_draw gate=`gate` path=`path` kind=`kind`*
+We **[Load the native plugin required by this operation](cap.load())**.
+Return *[Plot gate using kind="gate" by default](quantum_gate_draw(gate=`gate`, path=`path`, kind=`kind`))*.
 
 ## draw_state
 
-| 参数 | 类型 | 说明 |
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| circuit | any | required | Circuit evolved ideally |
+| kind | text | "qsphere" | qsphere or multibloch |
+| path | any | None | SVG output path or None |
+
+| 返回 | 类型 | 说明 |
 |------|------|------|
-| circuit | any | Circuit evolved ideally |
-| kind | text | qsphere or multibloch |
-| path | any | SVG output path or None |
+| result | any | quantum_svg with kind and svg |
+
+Use `circuit`, `kind`="qsphere", `path`=None as the inputs for this operation.
 
 Observe the ideal state of `circuit` as a basis-amplitude/phase sphere or one
 reduced Bloch sphere per wire. Default `kind`="qsphere"; use multibloch for the
@@ -171,9 +188,5 @@ local Bloch vectors alone cannot certify joint entanglement. Both advanced
 figures currently use fixed styling; theme support remains Q8c work and is
 not offered as a nonfunctional parameter here.
 
-| 返回 | 类型 | 说明 |
-|------|------|------|
-| result | any | quantum_svg with kind and svg |
-
-> cap.load
-*> quantum_draw_circuit circuit=`circuit` path=`path` kind=`kind` qubit=0 theme="dark"*
+We **[Load the native plugin required by this operation](cap.load())**.
+Return *[Observe the ideal state of circuit as a basis-amplitude/phase sphere or one reduced Bloch sphere per wire](quantum_draw_circuit(circuit=`circuit`, path=`path`, kind=`kind`, qubit=0, theme="dark"))*.

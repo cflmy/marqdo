@@ -26,7 +26,7 @@ These rules are the **current default**. Do **not** teach Classic `[key](map)` i
 4. **Read collections with `access(coll, key)`** (aliases `取` / `取值`). **Never** use `[key](map)` as index under default Occlusion.
 5. **Foreach:** `- [描述](遍历 coll 为 item)` (`遍历`/`for`, `为`/`as`/`in`). Prefer explicit traversal when generating new code.
 6. **Import / call:** frontmatter `import:` / `导入:`; call `lib.member`. One language (EN or ZH) per file.
-7. **Control flow:** `#` object/type, `##`+ function, `+` params, `1.`/`2.` branches, `-` loops, `N. *` else. No invented `if`/`for`/`def`/`return` keywords.
+7. **Control flow:** `#` object/type, `##`+ function, prose params (legacy `+` remains parseable), `1.`/`2.` branches, `-` loops, `N. *` else. No invented `if`/`for`/`def`/`return` keywords.
 8. **Prose vs code:** blank line separates comment paragraphs from executable lines.
 9. **GFM tables** for data; prefer `table.put` over `json.set` chains. `ext/**` never calls `host_*`.
 10. Body narrative `[描述](target)` is lazy (NarrativeRef) — reading does not execute side effects.
@@ -48,7 +48,7 @@ Executable-knowledge gate: [`tests/executable_knowledge/`](../../tests/executabl
 ## Hard rules (do not violate)
 
 1. Obey **CORE SYNTAX** above — Occlusion is default; do not emit Classic index links.
-2. **Identifiers:** params `` + `name` ``; inside `*…*` / `**…**` bare ids are variables. Quote text literals. Standalone `>` calls: backticks where bare would be text.
+2. **Identifiers:** declare library parameters in prose as `` input `name` `` (defaults follow `=`); inside `*…*` / `**…**` bare ids are variables. Quote text literals. Standalone `>` calls: backticks where bare would be text.
 3. **Structure lines** (`#` `>` `+` `-` `|`) are not wrapped in italics.
 4. **Paths:** bare `/` in expressions is division; in call args / table cells unspaced `a/b` is path text. Ratios as text need quotes (`"1/5"`).
 5. End side-effect-only helpers with `*None*` / `*空*` / `**` / `****` when the outer function continues. Lone `---` is a thematic break, not function end.
@@ -135,6 +135,9 @@ Chinese builtins (same functions, no import):
 ```
 
 ## Frontmatter imports + stdlib
+
+A standard library is normally one `lib/*.mq.md` file: read/import/call that file directly. It is its own manual and skill; no `index.mq.md` or module handbook directory is required. Each function puts parameter/default and return tables directly below its heading, explains purpose, failures and limits, and keeps narrative above 50%. Use prose parameters, not legacy `+` declarations. Describe opaque instructions with `[what it does](actual code)` inside statement/return markers; labels do not execute. Multi-file extensions use an index to organize their files. File tools require explicit `--effects fs.read` or `--effects fs.write` with `--fs-root`; real workflows live in `examples/stdlib-handbook`. Read the [executable authoring guide](../../doc/library-development.mq.md) for inline prose and complete runnable examples.
+
 
 Imports use nested YAML `import:` (`导入` equivalent): file (`.mq.md`) or short name (`lib.member`). Members are **not** flattened into the caller. Call with a bare dotted path:
 

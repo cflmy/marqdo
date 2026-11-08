@@ -16,7 +16,7 @@ fn path_segments(at: &Value) -> Result<Vec<PathSeg>, String> {
             if *n < 1 {
                 return Err("put path index must be >= 1 (1-based)".into());
             }
-            Ok(vec![PathSeg::Index1(*n as usize)])
+            Ok(vec![PathSeg::Index1(usize::try_from(*n).map_err(|_| "put path index exceeds target size")?)])
         }
         Value::List(xs) => {
             if xs.is_empty() {
@@ -32,7 +32,7 @@ fn path_segments(at: &Value) -> Result<Vec<PathSeg>, String> {
                                 "put path segment {i}: index must be >= 1 (1-based)"
                             ));
                         }
-                        out.push(PathSeg::Index1(*n as usize));
+                        out.push(PathSeg::Index1(usize::try_from(*n).map_err(|_| "put path index exceeds target size")?));
                     }
                     _ => {
                         return Err(format!(
@@ -284,7 +284,7 @@ pub fn list_insert(list: &Value, index: i64, item: &Value) -> Result<Value, Stri
         Value::None => vec![],
         _ => return Err("list_insert needs list".into()),
     };
-    if index < 0 || index as usize > xs.len() {
+    if index < 0 || index > xs.len() as i64 {
         return Err(format!(
             "list_insert index {index} out of range (len {})",
             xs.len()
@@ -298,7 +298,7 @@ pub fn list_set_at(list: &Value, index: i64, item: &Value) -> Result<Value, Stri
     let Value::List(xs) = list else {
         return Err("list_set_at needs list".into());
     };
-    if index < 0 || index as usize >= xs.len() {
+    if index < 0 || index >= xs.len() as i64 {
         return Err(format!(
             "list_set_at index {index} out of range (len {})",
             xs.len()
@@ -313,7 +313,7 @@ pub fn list_remove_at(list: &Value, index: i64) -> Result<Value, String> {
     let Value::List(xs) = list else {
         return Err("list_remove_at needs list".into());
     };
-    if index < 0 || index as usize >= xs.len() {
+    if index < 0 || index >= xs.len() as i64 {
         return Err(format!(
             "list_remove_at index {index} out of range (len {})",
             xs.len()
@@ -385,16 +385,33 @@ pub fn list_last(list: &Value) -> Result<Value, String> {
     }
 }
 
-fn cmp_value(a: &Value, b: &Value) -> std::cmp::Ordering {
+/// Total type order avoids cyclic comparisons between numeric and text keys.
+pub(super) fn cmp_value(a: &Value, b: &Value) -> std::cmp::Ordering {
     use std::cmp::Ordering;
-    match (a, b) {
-        (Value::Int(x), Value::Int(y)) => x.cmp(y),
-        (Value::Num(x), Value::Num(y)) => x.partial_cmp(y).unwrap_or(Ordering::Equal),
-        (Value::Int(x), Value::Num(y)) => (*x as f64).partial_cmp(y).unwrap_or(Ordering::Equal),
-        (Value::Num(x), Value::Int(y)) => x.partial_cmp(&(*y as f64)).unwrap_or(Ordering::Equal),
-        (Value::Text(x), Value::Text(y)) => x.cmp(y),
-        (Value::Bool(x), Value::Bool(y)) => x.cmp(y),
-        _ => a.as_display().cmp(&b.as_display()),
+    fn rank(v:&Value)->u8{match v{
+        Value::Int(_)|Value::Num(_)=>0,Value::Text(_)=>1,Value::Bool(_)=>2,
+        Value::None=>3,Value::List(_)=>4,Value::Map(_)=>5,Value::Formula(_)=>6,
+        Value::Code(_)=>7,Value::Secret(_)=>8,Value::Handle(_)=>9,
+    }}
+    fn int_float(integer:i64,number:f64)->Ordering{
+        if number.is_nan(){return Ordering::Less}
+        if number >= -(i64::MIN as f64){return Ordering::Less}
+        if number < i64::MIN as f64{return Ordering::Greater}
+        let truncated=number as i64;
+        match integer.cmp(&truncated){Ordering::Equal=>0.0f64.partial_cmp(&number.fract()).unwrap_or(Ordering::Equal),other=>other}
+    }
+    let order=rank(a).cmp(&rank(b));if !order.is_eq(){return order}
+    match (a,b){
+        (Value::Int(a),Value::Int(b))=>a.cmp(b),
+        (Value::Num(a),Value::Num(b))=>match(a.is_nan(),b.is_nan()){
+            (true,false)=>Ordering::Greater,(false,true)=>Ordering::Less,
+            _=>a.partial_cmp(b).unwrap_or_else(||a.total_cmp(b)),
+        },
+        (Value::Int(a),Value::Num(b))=>int_float(*a,*b),
+        (Value::Num(a),Value::Int(b))=>int_float(*b,*a).reverse(),
+        (Value::Text(a),Value::Text(b))=>a.cmp(b),
+        (Value::Bool(a),Value::Bool(b))=>a.cmp(b),
+        _=>a.as_display().cmp(&b.as_display()),
     }
 }
 
@@ -447,9 +464,12 @@ pub fn list_sort_by(list: &Value, key: &Value) -> Result<Value, String> {
 pub fn list_unique(list: &Value) -> Result<Value, String> {
     match list {
         Value::List(xs) => {
-            let mut out = Vec::new();
+            let mut out: Vec<Value> = Vec::new();
+            let mut seen: std::collections::HashMap<String, Vec<usize>> = std::collections::HashMap::new();
             for x in xs {
-                if !out.iter().any(|y| y == x) {
+                let bucket = seen.entry(super::collection_ops::fingerprint(x)).or_default();
+                if !bucket.iter().any(|i| out[*i] == *x) {
+                    bucket.push(out.len());
                     out.push(x.clone());
                 }
             }
@@ -462,7 +482,7 @@ pub fn list_unique(list: &Value) -> Result<Value, String> {
 
 pub fn list_chunk(list: &Value, size: &Value) -> Result<Value, String> {
     let n = match size {
-        Value::Int(i) if *i > 0 => *i as usize,
+        Value::Int(i) if *i > 0 => usize::try_from(*i).unwrap_or(usize::MAX),
         Value::Int(_) => return Err("chunk size must be positive".into()),
         _ => return Err("chunk size needs int".into()),
     };
@@ -568,5 +588,29 @@ mod tests {
         let m = collection_put(&Value::None, &Value::Text("k".into()), &Value::Text("v".into()))
             .unwrap();
         assert!(matches!(m, Value::Map(_)));
+    }
+}
+
+#[cfg(test)]
+mod task_scale_tests {
+    use super::*;
+    #[test]
+    fn unique_preserves_signed_zero_nan_and_nested_equality(){
+        let xs=Value::List(vec![Value::Num(-0.0),Value::Num(0.0),Value::Num(f64::NAN),Value::Num(f64::NAN),Value::Int(0),Value::List(vec![Value::Num(-0.0)]),Value::List(vec![Value::Num(0.0)])]);
+        let Value::List(out)=list_unique(&xs).unwrap()else{panic!()};
+        assert_eq!(out.len(),5);assert_eq!(out[0],Value::Num(-0.0));assert_eq!(out[3],Value::Int(0));
+    }
+    #[test]
+    fn mixed_order_is_transitive_and_exact_at_integer_float_boundary(){
+        let values=[Value::Int(2),Value::Int(10),Value::Text("11".into()),Value::Int(i64::MAX),Value::Num(i64::MAX as f64),Value::Num(f64::NAN),Value::Num(-0.0),Value::Bool(false),Value::None];
+        for a in &values{for b in &values{for c in &values{
+            if cmp_value(a,b).is_le()&&cmp_value(b,c).is_le(){assert!(cmp_value(a,c).is_le(),"{a:?} {b:?} {c:?}");}
+        }}}
+        assert!(cmp_value(&Value::Int(i64::MAX),&Value::Num(i64::MAX as f64)).is_lt());
+    }
+    #[test]
+    fn bulk_unique_handles_one_hundred_thousand_values(){
+        let xs=Value::List((0..100_000).map(|n|Value::Int(n%50_000)).collect());
+        let Value::List(out)=list_unique(&xs).unwrap()else{panic!()};assert_eq!(out.len(),50_000);
     }
 }

@@ -2504,7 +2504,7 @@ pub fn layout(title: &str, nav: &str, main: &str) -> String {
     var root = scope || document.getElementById("structure") || document;
     root.querySelectorAll("[data-annot-band]").forEach(function (band) {{
       band.classList.remove("is-expanded");
-      var chips = band.querySelectorAll(".annot-chip");
+      var chips = band.querySelectorAll(".annot-chip:not(.annot-implementation)");
       var visible = [];
       chips.forEach(function (chip) {{
         chip.classList.remove("annot-chip-overflow");
@@ -4210,7 +4210,7 @@ window.MARQDO_VIEW_PAGE_TOKEN = {page_token_js};
                 String::new()
             } else {
                 format!(
-                    "<details class=\"block knowledge-block\"><summary>可执行知识（辅助）</summary>{}</details>",
+                    "<details class=\"block knowledge-block\" id=\"knowledge-section\"><summary>可执行知识 · 输入、返回与依据</summary>{}</details>",
                     vm.knowledge_html
                 )
             }

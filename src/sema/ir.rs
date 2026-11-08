@@ -323,6 +323,24 @@ fn compile_index(index: ProjectIndex) -> Result<Compilation> {
         }
     }
     close_effect_dependencies(&mut artifacts);
+    let resolved_effects: BTreeMap<_,_> = artifacts.iter()
+        .map(|artifact|(artifact.artifact_id.clone(),artifact.effects.clone())).collect();
+    for bound in &mut bound_calls {
+        if let Some(effects) = resolved_effects.get(&ArtifactId(bound.target.as_str().into())) {
+            bound.required_effects = effects.clone();
+        }
+    }
+    let mut callsite_effects: BTreeMap<(String,u32),EffectSet> = BTreeMap::new();
+    for bound in &bound_calls {
+        callsite_effects.entry((bound.source.file.clone(),bound.source.line))
+            .or_default().extend(&bound.required_effects);
+    }
+    for step in &mut steps {
+        if let Some(effects) = callsite_effects.get(&(step.source.file.clone(),step.source.line)) {
+            step.effects.extend(effects);
+        }
+        if step.effects.0.is_empty() { step.effects = EffectSet::pure(); }
+    }
     close_closure_digests(&mut artifacts);
     artifacts.sort_by(|a, b| a.artifact_id.0.cmp(&b.artifact_id.0));
     refs.sort_by(|a, b| a.id.cmp(&b.id));
@@ -455,6 +473,10 @@ fn attach_project_imports(files: &mut BTreeMap<ModuleId, (PathBuf, String, Modul
             let key = path_key(&resolved);
             if let Some(dep) = by_path.get(&key) {
                 import_modules.insert(imp.bind.clone(), dep.clone());
+            } else if let Ok(dep) = crate::load::load_module(&resolved) {
+                // External standard libraries are outside a project-only index,
+                // but their resolved bodies still determine effects.
+                import_modules.insert(imp.bind.clone(), dep);
             }
         }
         module.import_modules = import_modules;
@@ -511,7 +533,7 @@ fn artifact_for_function(
     Vec<super::provenance::ProvenanceDiag>,
 ) {
     let calls = collect_call_sites(function);
-    let mut effects = direct_effects(&calls);
+    let mut effects = direct_effects(index, ast_module, function, &calls);
     let mut dependencies = Vec::new();
     let mut bound_calls = Vec::new();
     let mut dynamic_calls = Vec::new();
@@ -561,11 +583,10 @@ fn artifact_for_function(
                 .unwrap_or_else(|| named.resolution.clone()),
             target: target.clone(),
         });
-        let step_effects = named
-            .call
-            .as_ref()
-            .map(effects_for_call)
-            .unwrap_or_else(EffectSet::pure);
+        let mut step_effects = EffectSet::default();
+        for (_, call, line) in &calls {
+            if *line == named.line { step_effects.extend(&effects_for_call(ast_module,function,call,Some(index))); }
+        }
         steps.push(KnowledgeStep {
             id: ArtifactId(format!("{}#step-{}", symbol.id.as_str(), step_n)),
             reference: ref_id,
@@ -719,7 +740,7 @@ fn classify_call(
             };
             CallClass::Bound {
                 target,
-                effects: effects_for_call(call),
+                effects: EffectSet::default(),
             }
         }
         ExecTarget::Import { bind, lib, fun, path } => {
@@ -754,7 +775,7 @@ fn classify_call(
             };
             CallClass::Bound {
                 target,
-                effects: effects_for_call(call),
+                effects: EffectSet::default(),
             }
         }
         ExecTarget::Builtin(_) | ExecTarget::Host(_) => CallClass::Other,
@@ -1037,35 +1058,50 @@ fn call_name(call: &CallExpr) -> String {
     call_display(call)
 }
 
-fn effects_for_call(call: &CallExpr) -> EffectSet {
-    let name = call_name(call).to_ascii_lowercase();
+fn effects_for_call(module: &Module, current: &Function, call: &CallExpr, index: Option<&ProjectIndex>) -> EffectSet {
     let mut effects = EffectSet::default();
-    let effect = if name.starts_with("fs.") || name.contains("writeback") { if name.contains("write") || name.contains("remove") || name.contains("move") || name.contains("mkdir") { "fs.write" } else { "fs.read" } }
-    else if name.starts_with("http.") || name.starts_with("net.") { if name.contains("post") || name.contains("put") || name.contains("delete") { "network.write" } else { "network.read" } }
-    else if name.starts_with("foreign.") || name.starts_with("subtask.") || name == "exec" { "process.exec" }
-    else if name.starts_with("plugin.") { "plugin.call" }
-    else if name.starts_with("llm.") || name.starts_with("openai.") { "llm.call" }
-    else if name.starts_with("time.") || name.starts_with("datetime.") { "time.read" }
-    else if name.starts_with("random.") || name.starts_with("uuid.") { "random.read" }
-    else if name.starts_with("input") { "user.input" }
-    else if name.starts_with("print") || name.starts_with("log.") { "output.write" }
-    else if is_observe_call(call) {
-        return EffectSet::pure();
-    } else if call.path.is_some() || (call.path.is_none() && call.receiver.is_none()) {
-        // Local bare name or import path: effects filled by BoundCall dependency
-        // closure. Do not guess pure / unknown here.
-        return EffectSet::default();
-    } else {
-        // Receiver / unresolved dynamic — unknown (G06).
-        return EffectSet::unknown();
-    };
-    effects.add(effect);
+    match resolve_for_exec(module, current, call) {
+        ExecTarget::Host(host) => {
+            for effect in host.effects() { effects.add(*effect); }
+        }
+        ExecTarget::Builtin("print") => effects.add("output.write"),
+        ExecTarget::Builtin("input") => effects.add("user.input"),
+        ExecTarget::Builtin(_) => return EffectSet::pure(),
+        ExecTarget::Local(_) => {},
+        ExecTarget::Import { lib, fun, .. } => {
+            if index.is_some_and(|index| lib.source.path.as_ref().is_some_and(|path| index.module_id_for_path(path).is_some())) {
+                // Project-indexed dependencies close by edges, not shallow AST clones.
+                return EffectSet::default();
+            }
+            return imported_effects(lib, fun, &mut std::collections::HashSet::new());
+        },
+        ExecTarget::Dynamic { reason: DynamicReason::Plugin, .. } => effects.add("plugin.call"),
+        ExecTarget::Dynamic { .. } | ExecTarget::Unresolved { .. } => return EffectSet::unknown(),
+    }
     effects
 }
 
-fn direct_effects(calls: &[(usize, CallExpr, u32)]) -> EffectSet {
+fn imported_effects(
+    module: &Module, function: &Function,
+    visiting: &mut std::collections::HashSet<(Option<PathBuf>, u32)>,
+) -> EffectSet {
+    let identity = (module.source.path.clone(), function.span.line);
+    if !visiting.insert(identity.clone()) { return EffectSet::default(); }
     let mut effects = EffectSet::default();
-    for (_, call, _) in calls { effects.extend(&effects_for_call(call)); }
+    for (_, call, _) in collect_call_sites(function) {
+        match resolve_for_exec(module, function, &call) {
+            ExecTarget::Local(fun) => effects.extend(&imported_effects(module, fun, visiting)),
+            ExecTarget::Import { lib, fun, .. } => effects.extend(&imported_effects(lib, fun, visiting)),
+            _ => effects.extend(&effects_for_call(module, function, &call, None)),
+        }
+    }
+    visiting.remove(&identity);
+    effects
+}
+
+fn direct_effects(index: &ProjectIndex, module: &Module, current: &Function, calls: &[(usize, CallExpr, u32)]) -> EffectSet {
+    let mut effects = EffectSet::default();
+    for (_, call, _) in calls { effects.extend(&effects_for_call(module, current, call, Some(index))); }
     effects
 }
 
@@ -1516,7 +1552,7 @@ mod tests {
     #[test]
     fn compilation_is_deterministic_and_preserves_contract_effects() {
         let root = root();
-        fs::write(root.join("main.mq.md"), "# main\n\n| 参数 | 类型 |\n| --- | --- |\n| path | text |\n\n## save\n\n> fs.write_text `path` ok\n\n*1*").unwrap();
+        fs::write(root.join("main.mq.md"), "---\nimport:\n  fs: lib/fs.mq.md\n---\n# main\n\n| 参数 | 类型 |\n| --- | --- |\n| path | text |\n\n## save\n\n> fs.write_text `path` ok\n\n*1*").unwrap();
         let options = CompileOptions::for_path(&root).unwrap();
         let first = compile_project(&options).unwrap();
         let second = compile_project(&options).unwrap();
@@ -1545,6 +1581,8 @@ mod tests {
             root.join("main.mq.md"),
             r#"---
 markup: occlusion
+import:
+  fs: lib/fs.mq.md
 ---
 
 ## save

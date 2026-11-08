@@ -2470,7 +2470,34 @@ fn split_table_row(line: &str) -> Vec<String> {
     let t = line.trim();
     let t = t.strip_prefix('|').unwrap_or(t);
     let t = t.strip_suffix('|').unwrap_or(t);
-    t.split('|').map(|c| c.trim().to_string()).collect()
+    // GFM escaped pipes belong to a cell, including inside a quoted value.
+    // Preserve other escapes for the expression parser (e.g. \n in text).
+    let mut cells = Vec::new();
+    let mut cell = String::new();
+    let mut chars = t.chars().peekable();
+    while let Some(ch) = chars.next() {
+        if ch == '\\' {
+            match chars.peek().copied() {
+                Some('|') => {
+                    chars.next();
+                    cell.push('|');
+                }
+                Some('\\') => {
+                    chars.next();
+                    cell.push('\\');
+                    cell.push('\\');
+                }
+                _ => cell.push(ch),
+            }
+        } else if ch == '|' {
+            cells.push(cell.trim().to_string());
+            cell.clear();
+        } else {
+            cell.push(ch);
+        }
+    }
+    cells.push(cell.trim().to_string());
+    cells
 }
 
 #[cfg(test)]
@@ -2886,3 +2913,21 @@ pub const CORE_CONSTRUCTS: &[(&str, &str)] = &[
     ("footnote-index", "集合[^键]"),
     ("soft-emphasis", "*仅* / **说明**"),
 ];
+
+#[cfg(test)]
+mod escaped_gfm_cell_tests {
+    use super::*;
+    #[test]
+    fn escaped_pipes_do_not_create_columns() {
+        assert_eq!(
+            split_table_row(r#"| "source\|skill" | "line\n" |"#),
+            [r#""source|skill""#, r#""line\n""#]
+        );
+        assert_eq!(split_table_row(r"| a\\| b |"), [r"a\\", "b"]);
+        let module = parse_source(
+            "## value\n\n`items` =\n\n| line |\n|---|\n| \"source\\|skill\" |\n\n*items*\n",
+        )
+        .unwrap();
+        assert!(format!("{:?}", module.functions[0].body).contains("source|skill"));
+    }
+}

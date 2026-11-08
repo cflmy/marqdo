@@ -182,6 +182,8 @@ Return the workflow and stopping rule without creating files or claiming to
 accept a particular site. Define the region tree, author parents and Markdown
 leaves, then start and test the declared HTTP surface.
 
+The returned rows are a planning aid, not a generated site or a validation certificate. Start with the component tree, give each parent one placement decision, then write the leaves as ordinary Markdown. Declare request-time handlers separately from startup assembly. Preview the composed result before starting the server, and compare real routes and narrow-screen geometry against that same source tree.
+
 `workflow` =
 
 | key | value |
@@ -196,7 +198,7 @@ leaves, then start and test the declared HTTP surface.
 | step_G | compare preview and live output; test routes and browser geometry |
 | stopping_rule | one Markdown responsibility and no internal layout |
 
-*workflow*
+Return *workflow*.
 
 ## layout_rules
 
@@ -208,40 +210,44 @@ Reuse the layout module convention without a second rule catalog. No
 parameters or plugin. Actual acceptance still inspects leaf responsibilities,
 parent relationships and the running result.
 
-*> layout.rules*
+Return *[Rules](layout.rules())*.
 
 ## preview_markdown
 
-| 参数 | 类型 | 说明 |
-|------|------|------|
-| body | text | Markdown content |
-| title | text | Document title |
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| body | text | "" | Markdown content |
+| title | text | "Preview" | Document title |
 
 | 返回 | 类型 | 说明 |
 |------|------|------|
 | result | text | HTML document |
+
+Use `body`="", `title`="Preview" as the inputs for this operation.
 
 Render Markdown `body`="" with default `title`="Preview" .
 Return HTML text without writing files or registering routes. For a complex
 page split the layout first; raw HTML strings are not the content strategy.
 This tool needs the native plugin.
 
-*> web.render body=`body` title=`title`*
+Return *[Render](web.render(body=`body`, title=`title`))*.
 
 ## preview_nodes
 
-| 参数 | 类型 | 说明 |
-|------|------|------|
-| nodes | list | Nested View rows |
-| title | text | Document title |
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| nodes | list | required | Nested View rows |
+| title | text | "Preview" | Document title |
 
 | 返回 | 类型 | 说明 |
 |------|------|------|
 | result | text | HTML document |
+
+Use `nodes`, `title`="Preview" as the inputs for this operation.
 
 Render decomposed `nodes` with default `title`="Preview" .
 Parent values retain child rows, while leaf values hold Markdown. Returning
 HTML starts no server. The same renderer serves composed Documents, so this
 preview checks that column relationships survive assembly.
 
-*> web.render nodes=`nodes` title=`title`*
+Return *[Render](web.render(nodes=`nodes`, title=`title`))*.

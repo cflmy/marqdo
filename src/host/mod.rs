@@ -276,21 +276,46 @@ impl HostContext {
             self.cwd.join(p)
         };
         if let Some(root) = &self.fs_root {
-            let root_canon = root.canonicalize().unwrap_or_else(|_| root.clone());
-            let check = abs.canonicalize().unwrap_or_else(|_| abs.clone());
-            if !path_under_root(&check, &root_canon) && !path_under_root(&abs, root) {
-                if let Some(parent) = abs.parent() {
-                    let parent_ok = parent
-                        .canonicalize()
-                        .map(|p| path_under_root(&p, &root_canon))
-                        .unwrap_or_else(|_| path_under_root(parent, root));
-                    if !parent_ok {
-                        return Err(format!("path escapes sandbox root: {}", abs.display()));
-                    }
-                } else {
-                    return Err(format!("path escapes sandbox root: {}", abs.display()));
+            let abs = if abs.is_absolute() { abs } else {
+                std::env::current_dir().map_err(|e|e.to_string())?.join(abs)
+            };
+            let root = root.canonicalize().map_err(|e| format!("filesystem root: {e}"))?;
+            // Normalize before checking, including destinations that do not exist yet.
+            let mut lexical = PathBuf::new();
+            for component in abs.components() {
+                match component {
+                    std::path::Component::CurDir => {},
+                    std::path::Component::ParentDir => { lexical.pop(); },
+                    component => lexical.push(component.as_os_str()),
                 }
             }
+            if !lexical.is_absolute() {
+                lexical = std::env::current_dir().map_err(|e| e.to_string())?.join(lexical);
+            }
+            if !lexical.starts_with(&root) {
+                return Err(format!("path escapes sandbox root: {}", abs.display()));
+            }
+            // The nearest existing ancestor must also be inside root: a symlink
+            // cannot authorize writes through a not-yet-existing descendant.
+            let mut ancestor = lexical.as_path();
+            loop {
+                match ancestor.canonicalize() {
+                    Ok(real) => {
+                        if !real.starts_with(&root) {
+                            return Err(format!("path escapes sandbox root: {}", abs.display()));
+                        }
+                        break;
+                    }
+                    Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                        if ancestor.symlink_metadata().is_ok() {
+                            return Err(format!("unresolvable symlink: {}", ancestor.display()));
+                        }
+                        ancestor = ancestor.parent().ok_or_else(|| "invalid file path".to_string())?;
+                    }
+                    Err(e) => return Err(format!("resolve path {}: {e}", abs.display())),
+                }
+            }
+            return Ok(lexical);
         }
         Ok(abs)
     }
@@ -320,3 +345,19 @@ pub fn flush_auto_plots(source_path: Option<&Path>, plots: &[PlotArtifact]) -> R
     }
     Ok(())
 }
+
+mod collection_ops;
+
+mod result;
+
+mod fs_ops;
+
+mod document;
+
+mod net_ops;
+
+mod data_ops;
+
+mod task_ops;
+
+mod archive;

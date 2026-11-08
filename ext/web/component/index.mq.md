@@ -32,49 +32,55 @@ Never put rendered HTML strings in parent value cells to simulate nesting.
 
 ## nodes
 
-| 参数 | 类型 | 说明 |
-|------|------|------|
-| table | any | View table |
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| table | any | required | View table |
 
 | 返回 | 类型 | 说明 |
 |------|------|------|
-| result | any | Result |
+| result | any | The supplied View table unchanged, preserving its original list or column-table shape |
+
+Use `table` as the inputs for this operation.
 
 Return View `table` unchanged. This preserves the existing identity helper for
 column tables as well as record lists. Prefer @ record lists for reusable
 components, because list composition can retain typed nested value cells.
 
-*table*
+Return *table*.
 
 ## merge
 
-| 参数 | 类型 | 说明 |
-|------|------|------|
-| a | list | First node record list |
-| b | list | Second node record list |
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| a | list | required | First node record list |
+| b | list | required | Second node record list |
 
 | 返回 | 类型 | 说明 |
 |------|------|------|
 | result | list | Ordered sibling rows |
+
+Use `a`, `b` as the inputs for this operation.
 
 Concatenate `a` and `b` without rendering or flattening child containers.
 Both inputs must be lists of View rows, normally @ record tables. To place
 two components side by side, concatenate their wrapped columns then use
 layout.columns; concatenation alone only establishes sibling order.
 
-*> table.concat a=`a` b=`b`*
+Return *[Concat](table.concat(a=`a`, b=`b`))*.
 
 ## markdown
 
-| 参数 | 类型 | 说明 |
-|------|------|------|
-| text | text | Plain Markdown content |
-| slot | text | Stable component name |
-| style | text | Optional class name |
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| text | text | required | Plain Markdown content |
+| slot | text | "" | Stable component name |
+| style | text | "" | Optional class name |
 
 | 返回 | 类型 | 说明 |
 |------|------|------|
 | result | list | One Markdown leaf |
+
+Use `text`, `slot`="", `style`="" as the inputs for this operation.
 
 Make a leaf from Markdown `text`. Default `slot`="" and `style`="" keep
 content independent of placement and theme. The returned list contains one
@@ -87,20 +93,22 @@ plugin is loaded here, and no HTML is inserted into the authored component.
 |---|------|------|-------|-------|-------|
 | 1 | markdown | `slot` | `text` | "" | `style` |
 
-*nodes*
+Return *nodes*.
 
 ## wrap
 
-| 参数 | 类型 | 说明 |
-|------|------|------|
-| children | list | Child node records |
-| kind | text | Container kind |
-| slot | text | Stable region name |
-| style | text | Optional class name |
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| children | list | required | Child node records |
+| kind | text | "column" | Container kind |
+| slot | text | "" | Stable region name |
+| style | text | "" | Optional class name |
 
 | 返回 | 类型 | 说明 |
 |------|------|------|
 | result | list | One parent containing its child rows |
+
+Use `children`, `kind`="column", `slot`="", `style`="" as the inputs for this operation.
 
 Wrap `children` in one structural row. Default `kind`="column", `slot`=""
 and `style`="" . Use row or column for geometry, nav/header/footer/section/aside
@@ -114,4 +122,4 @@ this pure constructor does not claim to validate a full site.
 |---|------|------|-------|-------|-------|
 | 1 | `kind` | `slot` | `children` | "" | `style` |
 
-*nodes*
+Return *nodes*.

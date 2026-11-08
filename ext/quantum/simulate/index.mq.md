@@ -51,85 +51,95 @@ For entanglement go to [state](../state/index.mq.md); for mixed states use
 
 ## simulate
 
-| 参数 | 类型 | 说明 |
-|------|------|------|
-| circuit | any | circuit to evolve |
-
-Return ideal state-vector amplitudes for `circuit` as re/im entries. Noise
-channels attached to the circuit are ignored here.
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| circuit | any | required | circuit to evolve |
 
 | 返回 | 类型 | 说明 |
 |------|------|------|
 | result | any | amplitude list |
 
-> cap.load
-*> quantum_simulate circuit=`circuit`*
+Use `circuit` as the inputs for this operation.
+
+Return ideal state-vector amplitudes for `circuit` as re/im entries. Noise
+channels attached to the circuit are ignored here.
+
+We **[Load the native plugin required by this operation](cap.load())**.
+Return *[Return ideal state-vector amplitudes for circuit as re/im entries. Noise channels attached to the circuit are ignored here.](quantum_simulate(circuit=`circuit`))*.
 
 ## state
 
-| 参数 | 类型 | 说明 |
-|------|------|------|
-| circuit | any | circuit to evolve |
-
-Same ideal amplitudes as simulate for `circuit`, packaged as the plugin state
-object. Prefer this when later fidelity or density tools expect a state handle.
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| circuit | any | required | circuit to evolve |
 
 | 返回 | 类型 | 说明 |
 |------|------|------|
 | result | any | ideal state |
 
-> cap.load
-*> quantum_state circuit=`circuit`*
+Use `circuit` as the inputs for this operation.
+
+Same ideal amplitudes as simulate for `circuit`, packaged as the plugin state
+object. Prefer this when later fidelity or density tools expect a state handle.
+
+We **[Load the native plugin required by this operation](cap.load())**.
+Return *[Same ideal amplitudes as simulate for circuit, packaged as the plugin state object. Prefer this when later fidelity or density tools expect a state handle.](quantum_state(circuit=`circuit`))*.
 
 ## probabilities
 
-| 参数 | 类型 | 说明 |
-|------|------|------|
-| circuit | any | circuit to read |
-
-Map basis label to probability for the ideal state of `circuit`. Labels use
-qubit 0 as the rightmost bit. Noise is ignored.
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| circuit | any | required | circuit to read |
 
 | 返回 | 类型 | 说明 |
 |------|------|------|
 | result | any | probability map |
 
-> cap.load
-*> quantum_probabilities circuit=`circuit`*
+Use `circuit` as the inputs for this operation.
+
+Map basis label to probability for the ideal state of `circuit`. Labels use
+qubit 0 as the rightmost bit. Noise is ignored.
+
+We **[Load the native plugin required by this operation](cap.load())**.
+Return *[Map basis label to probability for the ideal state of circuit. Labels use qubit 0 as the rightmost bit. Noise is ignored.](quantum_probabilities(circuit=`circuit`))*.
 
 ## run
 
-| 参数 | 类型 | 说明 |
-|------|------|------|
-| circuit | any | circuit to sample |
-| shots | number | sample count |
-| seed | number | RNG seed |
-
-Sample computational-basis outcomes from `circuit`. Defaults are `shots`=1024
-and `seed`=1 so replays are deterministic. Teaching noise is applied when set.
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| circuit | any | required | circuit to sample |
+| shots | number | 1024 | sample count |
+| seed | number | 1 | RNG seed |
 
 | 返回 | 类型 | 说明 |
 |------|------|------|
 | result | any | counts or shot result |
 
-> cap.load
-*> quantum_run circuit=`circuit` shots=`shots` seed=`seed`*
+Use `circuit`, `shots`=1024, `seed`=1 as the inputs for this operation.
+
+Sample computational-basis outcomes from `circuit`. Defaults are `shots`=1024
+and `seed`=1 so replays are deterministic. Teaching noise is applied when set.
+
+We **[Load the native plugin required by this operation](cap.load())**.
+Return *[Sample computational-basis outcomes from circuit. Defaults are shots=1024 and seed=1 so replays are deterministic. Teaching noise is applied when set.](quantum_run(circuit=`circuit`, shots=`shots`, seed=`seed`))*.
 
 ## noise
 
-| 参数 | 类型 | 说明 |
-|------|------|------|
-| circuit | any | circuit to annotate |
-| kind | text | noise family name |
-| p | number | strength in the unit interval |
-
-Attach teaching noise of kind `kind` with strength `p` on `circuit`. Ideal
-simulate and probability tools ignore it. Keep p small unless demonstrating
-decoherence. Supported kinds include bitflip, depolarizing, and amplitude_damping.
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| kind | text | required | noise family name |
+| p | number | required | strength in the unit interval |
+| circuit | any | required | circuit to annotate |
 
 | 返回 | 类型 | 说明 |
 |------|------|------|
 | result | any | circuit with noise metadata |
 
-> cap.load
-*> quantum_noise circuit=`circuit` kind=`kind` p=`p`*
+Use `kind`, `p`, `circuit` as the inputs for this operation.
+
+Attach teaching noise of kind `kind` with strength `p` on `circuit`. Ideal
+simulate and probability tools ignore it. Keep p small unless demonstrating
+decoherence. Supported kinds include bitflip, depolarizing, and amplitude_damping.
+
+We **[Load the native plugin required by this operation](cap.load())**.
+Return *[Attach teaching noise of kind kind with strength p on circuit](quantum_noise(circuit=`circuit`, kind=`kind`, p=`p`))*.

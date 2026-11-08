@@ -9,32 +9,41 @@ import:
 ---
 
 ## resolve
-    + `model`=None
-    + `base_url`=None
-    + `api_key`=None
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| model | any | None | Model resource or provider model identifier, as required by this operation |
+| base_url | any | None | Provider API base URL |
+| api_key | any | None | Provider credential from trusted runtime configuration |
+
+| 返回 | 类型 | 说明 |
+|---|---|---|
+| result | any | Resolve Ollama handle fields: default host `http://127.0.0.1:11434/v1`, key `ollama`, model `llama3.2`. |
+
+Use `model`=None, `base_url`=None, `api_key`=None as the inputs for this operation.
 
 Resolve Ollama handle fields: default host `http://127.0.0.1:11434/v1`, key `ollama`, model `llama3.2`.
 
 1. `api_key`
-  **key = api_key**
+  We retain **key = api_key**.
 2. *
-  **key = "ollama"**
+  We retain **key = "ollama"**.
 
 1. `base_url`
-  **url = base_url**
+  We retain **url = base_url**.
 2. *
-  **url = > sys.env_get name="OLLAMA_HOST"**
+  We retain **`url` = [Env get](sys.env_get(name="OLLAMA_HOST"))**.
   1. not `url`
-    **url = "http://127.0.0.1:11434/v1"**
+    We retain **url = "http://127.0.0.1:11434/v1"**.
   2. *
     **_ = 1**
 
 1. `model`
-  **mdl = model**
+  We retain **mdl = model**.
 2. *
-  **mdl = > sys.env_get name="MARQDO_LLM_MODEL"**
+  We retain **`mdl` = [Env get](sys.env_get(name="MARQDO_LLM_MODEL"))**.
   1. not `mdl`
-    **mdl = "llama3.2"**
+    We retain **mdl = "llama3.2"**.
   2. *
     **_ = 1**
 
@@ -44,14 +53,25 @@ Resolve Ollama handle fields: default host `http://127.0.0.1:11434/v1`, key `oll
 |---------|---------|----------|-------|
 | ollama | `key` | `url` | `mdl` |
 
-*cfg*
+Return *cfg*.
 
 ## chat_completions
-    + `base_url`
-    + `api_key`
-    + `model`
-    + `prompt`
-    + `stream`=False
-    + `echo`=False
 
-*> openai.chat_completions base_url=`base_url` api_key=`api_key` model=`model` prompt=`prompt` stream=`stream` echo=`echo`*
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| base_url | any | required | Provider API base URL |
+| api_key | any | required | Provider credential from trusted runtime configuration |
+| model | any | required | Model resource or provider model identifier, as required by this operation |
+| prompt | any | required | Prompt text or structured prompt expected by this adapter |
+| stream | any | False | Whether to preserve streaming behavior or emit stream events |
+| echo | any | False | Whether to print the documented incremental output |
+
+| 返回 | 类型 | 说明 |
+|---|---|---|
+| result | any | Send the prepared chat request through this provider adapter and retain its usage, stream and failure conventions. |
+
+Use `base_url`, `api_key`, `model`, `prompt`, `stream`=False, `echo`=False as the inputs for this operation.
+
+Send the prepared chat request through this provider adapter and retain its usage, stream and failure conventions.
+
+Return *[Chat completions](openai.chat_completions(base_url=`base_url`, api_key=`api_key`, model=`model`, prompt=`prompt`, stream=`stream`, echo=`echo`))*.

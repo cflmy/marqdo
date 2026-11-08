@@ -277,6 +277,25 @@ pub fn inspect(id: &str) -> Result<serde_json::Value, String> {
     })
 }
 
+/// Byte-preserving overlay access shared by text and byte APIs.
+pub(super) fn cow_read_bytes(ctx: &HostContext, abs: &Path) -> Result<Option<Vec<u8>>, String> {
+    let Some(id) = ctx.sandbox_session.as_deref() else { return Ok(None); };
+    with_session(id, |session| {
+        let rel = rel_from_root(&session.root, abs)?;
+        if session.whiteout.contains(&rel) { return Err(format!("not found (sandbox whiteout): {rel}")); }
+        Ok(session.upper.get(&rel).cloned())
+    })
+}
+pub(super) fn cow_write_bytes(ctx: &HostContext, abs: &Path, bytes: &[u8]) -> Result<bool, String> {
+    let Some(id) = ctx.sandbox_session.as_deref() else { return Ok(false); };
+    with_session_mut(id, |session| {
+        let rel = rel_from_root(&session.root, abs)?;
+        session.whiteout.remove(&rel);
+        session.upper.insert(rel, bytes.to_vec());
+        Ok(true)
+    })
+}
+
 /// Read file bytes through CoW for an active host sandbox session (lib/fs).
 pub fn cow_read_text(ctx: &HostContext, abs: &Path) -> Result<Option<String>, String> {
     let Some(id) = ctx.sandbox_session.as_deref() else {

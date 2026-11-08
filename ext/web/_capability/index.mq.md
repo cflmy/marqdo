@@ -22,6 +22,10 @@ Only this boundary imports lib/plugin, including through the Chinese facade.
 
 ## load
 
+| 返回 | 类型 | 说明 |
+|------|------|------|
+| result | any | null after a successful load |
+
 Locate the ABI v2 web shared library through plugin.native_path, then
 plugin.load it. If the library is missing, print a short install hint and exit
 non-zero so CI and agents fail loudly. After a successful load, later web star
@@ -31,14 +35,10 @@ of each tool that needs the native server or renderer.
 
 This tool takes no parameters.
 
-| 返回 | 类型 | 说明 |
-|------|------|------|
-| result | any | null after a successful load |
-
-**p = > plugin.native_path name="web"**
+We retain **`p` = [Locate the installed native plugin](plugin.native_path(name="web"))**.
 1. `p`
-  > plugin.load path=`p`
+  We **[Load the native plugin required by this operation](plugin.load(path=`p`))**.
 2. *
-  > print text=ext/web: native web plugin not found (build plugins/web or marqdo ext add web)
-  > sys.exit code=1
-****
+  We **[Print the prepared message](print(text="ext/web: native web plugin not found (build plugins/web or marqdo ext add web)"))**.
+  We **[End this run with the selected exit status](sys.exit(code=1))**.
+Return *None*.

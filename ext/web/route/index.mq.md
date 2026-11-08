@@ -25,44 +25,55 @@ changes; never introduce undeclared user URLs as a hidden convenience.
 
 ## new
 
-| 参数 | 类型 | 说明 |
-|------|------|------|
-| app | any | app handle |
-| path | text | URL path |
-| method | text | HTTP method |
-| page | any | Document or None |
-| fn | text | endpoint member |
-| request | text | request kind |
-| response | text | response kind |
-| auth | text | auth tag |
-| class | text | route class |
-
-Build a declared route handle for `app` at `path` with `method`="GET" .
-`page`=None holds a Document; `fn`="" names an Endpoint lib.member.
-`request`="json", `response`="json", `auth`="", and `class`="" document the
-contract. Optional class values: execute, short, read, control (empty →
-heuristic / legacy_serial). This tool does not register yet — call `register`
-or use the facade `web.route` which registers in one step.
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| app | any | required | app handle |
+| path | text | required | URL path |
+| method | text | "GET" | HTTP method |
+| page | any | None | Document or None |
+| fn | text | "" | endpoint member |
+| request | text | "json" | request kind |
+| response | text | "json" | response kind |
+| auth | text | "" | auth tag |
+| class | text | "" | route class |
 
 | 返回 | 类型 | 说明 |
 |------|------|------|
 | result | any | route handle |
 
-> cap.load
+Use `app`, `path`, `method`="GET", `page`=None, `fn`="", `request`="json", `response`="json", `auth`="", `class`="" as the inputs for this operation.
+
+Build a declared route handle for `app` at `path` with `method`="GET" .
+
+`page`=None holds a Document; `fn`="" names an Endpoint lib.member.
+
+`request`="json", `response`="json", `auth`="", and `class`="" document the
+contract. Optional class values: execute, short, read, control (empty →
+heuristic / legacy_serial). This tool does not register yet — call `register`
+or use the facade `web.route` which registers in one step.
+
+We **[Load the native plugin required by this operation](cap.load())**.
+
 `out` =
 
 | _type | app | path | method | page | fn | request | response | auth | class |
 |-------|-----|------|--------|------|----|---------|----------|------|-------|
 | route | `app` | `path` | `method` | `page` | `fn` | `request` | `response` | `auth` | `class` |
 
-*out*
+Return *out*.
 
 ## register
 
-| 参数 | 类型 | 说明 |
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| route | any | required | route handle |
+| app | any | None | app or None |
+
+| 返回 | 类型 | 说明 |
 |------|------|------|
-| route | any | route handle |
-| app | any | app or None |
+| result | any | registration result |
+
+Use `route`, `app`=None as the inputs for this operation.
 
 Register declared route handle `route` on an app. Optional `app`=None falls back
 to the app stored on the route object so stepwise agent sessions can omit it.
@@ -73,108 +84,111 @@ free tool under `--effects plugin` rather than a method chain when driving
 registration from `marqdo call`. Soft-fails with ok=False when neither page nor
 fn is present, so callers can detect incomplete declarations early.
 
-| 返回 | 类型 | 说明 |
-|------|------|------|
-| result | any | registration result |
-
-> cap.load
-**a = app**
+We **[Load the native plugin required by this operation](cap.load())**.
+We retain **a = app**.
 1. `a` == None
-  **a = [app](access(route, "app"))**
+  We retain **`a` = [Read app field](access(`route`, "app"))**.
 2. *
   **_ = 1**
-**page = [page](access(route, "page"))**
-**fn = [fn](access(route, "fn"))**
+We retain **`page` = [Read page field](access(`route`, "page"))**.
+We retain **`fn` = [Read fn field](access(`route`, "fn"))**.
 1. `page`
-  **path = [path](access(route, "path"))**
-  *> web_app_route app=`a` path=`path` page=`page`*
+  We retain **`path` = [Read path field](access(`route`, "path"))**.
+  Return *[Register declared route handle route on an app](web_app_route(app=`a`, path=`path`, page=`page`))*.
 2. `fn`
-  **path = [path](access(route, "path"))**
-  **method = [method](access(route, "method"))**
-  **request = [request](access(route, "request"))**
-  **response = [response](access(route, "response"))**
-  **class = [class](access(route, "class"))**
-  *> web_app_invoke app=`a` path=`path` method=`method` fn=`fn` body=`request` return=`response` class=`class`*
+  We retain **`path` = [Read path field](access(`route`, "path"))**.
+  We retain **`method` = [Read method field](access(`route`, "method"))**.
+  We retain **`request` = [Read request field](access(`route`, "request"))**.
+  We retain **`response` = [Read response field](access(`route`, "response"))**.
+  We retain **`class` = [Read class field](access(`route`, "class"))**.
+  Return *[Register declared route handle route on an app](web_app_invoke(app=`a`, path=`path`, method=`method`, fn=`fn`, body=`request`, return=`response`, class=`class`))*.
 3. *
-  *> table.put in=None at="ok" value=False*
+  Return *[Set the ok field in the new record](table.put(in=None, at="ok", value=False))*.
 
 ## use
 
-| 参数 | 类型 | 说明 |
-|------|------|------|
-| route | any | route handle |
-| middleware | any | middleware table |
-
-Attach middleware table `middleware` to declared route handle `route`
-(`|header|value|` or named capability rows). Prefer first-class middleware tables
-over configure junk drawers. Call this free tool with `--effects plugin`.
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| middleware | any | required | middleware table |
+| route | any | required | route handle |
 
 | 返回 | 类型 | 说明 |
 |------|------|------|
 | result | any | use result |
 
-> cap.load
-*> web_route_use route=`route` middleware=`middleware`*
+Use `middleware`, `route` as the inputs for this operation.
+
+Attach middleware table `middleware` to declared route handle `route`
+(`|header|value|` or named capability rows). Prefer first-class middleware tables
+over configure junk drawers. Call this free tool with `--effects plugin`.
+
+We **[Load the native plugin required by this operation](cap.load())**.
+Return *[Attach middleware table middleware to declared route handle route (|header|value| or named capability rows)](web_route_use(route=`route`, middleware=`middleware`))*.
 
 # route
 
-| 参数 | 类型 | 说明 |
-|------|------|------|
-| app | any | See prose default / 见叙述默认值 |
-| path | any | See prose default / 见叙述默认值 |
-| method | any | See prose default / 见叙述默认值 |
-| page | any | See prose default / 见叙述默认值 |
-| fn | any | See prose default / 见叙述默认值 |
-| request | any | See prose default / 见叙述默认值 |
-| response | any | See prose default / 见叙述默认值 |
-| auth | any | See prose default / 见叙述默认值 |
-| class | any | See prose default / 见叙述默认值 |
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| app | any | required | Application handle created by the public web app constructor |
+| path | any | required | URL path declared for this route |
+| method | any | "GET" | HTTP request method for the declared route |
+| page | any | None | Initial Document/page resource, or None for explicit later route mounts |
+| fn | any | "" | Endpoint member path; empty when mounting a Document page |
+| request | any | "json" | Request body format passed to the native Endpoint dispatcher |
+| response | any | "json" | Response format passed to the native Endpoint dispatcher |
+| auth | any | "" | Explicit route authentication policy label |
+| class | any | "" | Execution class: execute, short, read or control; empty keeps native heuristics |
 
-Inputs: `app`, `path`, `method`="GET", `page`=None, `fn`="", `request`="json", `response`="json", `auth`="", `class`=""
+| 返回 | 类型 | 说明 |
+|------|------|------|
+| result | any | Declared route handle retaining app, path, method, page or endpoint and dispatch fields |
+
+Use `app`, `path`, `method`="GET", `page`=None, `fn`="", `request`="json", `response`="json", `auth`="", `class`="" as the inputs for this operation.
 
 Declared route handle for author method chains. Prefer `web.route` / Artifact
 `type: endpoint` discovery via `web.serve`. Optional `class`: `execute` |
 `short` | `read` | `control` (empty → heuristic / `legacy_serial`).
 
-| 返回 | 类型 | 说明 |
-|------|------|------|
-| result | any | Constructed value / 构造结果 |
+We **[Load the native plugin required by this operation](cap.load())**.
 
-> cap.load
 `out` =
 
 | _type | app | path | method | page | fn | request | response | auth | class |
 |-------|-----|------|--------|------|----|---------|----------|------|-------|
 | route | `app` | `path` | `method` | `page` | `fn` | `request` | `response` | `auth` | `class` |
 
-*out*
+Return *out*.
 
 ## use
 
-| 参数 | 类型 | 说明 |
-|------|------|------|
-| middleware | any | middleware table |
-
-Inputs: `middleware`
-
-Attach middleware table to this route (`|header|value|` or named capability
-rows). Prefer explicit tables authors can read; do not restore a configure bag
-for headers and cors.
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| middleware | any | required | middleware table |
 
 | 返回 | 类型 | 说明 |
 |------|------|------|
 | result | any | use result |
 
-> cap.load
-*> web_route_use route=`self` middleware=`middleware`*
+Use `middleware` as the inputs for this operation.
+
+Attach middleware table to this route (`|header|value|` or named capability
+rows). Prefer explicit tables authors can read; do not restore a configure bag
+for headers and cors.
+
+We **[Load the native plugin required by this operation](cap.load())**.
+Return *[Attach middleware table to this route (|header|value| or named capability rows)](web_route_use(route=`self`, middleware=`middleware`))*.
 
 ## register
 
-| 参数 | 类型 | 说明 |
-|------|------|------|
-| app | any | app or None |
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| app | any | None | app or None |
 
-Inputs: `app`=None
+| 返回 | 类型 | 说明 |
+|------|------|------|
+| result | any | registration result |
+
+Use `app`=None as the inputs for this operation.
 
 Register this declared route on an app handle. When optional `app` is None, use
 the app stored on this route object so author chains can omit the argument after
@@ -187,27 +201,23 @@ page nor fn is set, so callers can detect an incomplete declaration without a
 hard crash. Never invents an undeclared path — registration only publishes what
 this handle already carries.
 
-| 返回 | 类型 | 说明 |
-|------|------|------|
-| result | any | registration result |
-
-> cap.load
-**a = app**
+We **[Load the native plugin required by this operation](cap.load())**.
+We retain **a = app**.
 1. `a` == None
-  **a = [app](access(self, "app"))**
+  We retain **`a` = [Read app field](access(`self`, "app"))**.
 2. *
   **_ = 1**
-**page = [page](access(self, "page"))**
-**fn = [fn](access(self, "fn"))**
+We retain **`page` = [Read page field](access(`self`, "page"))**.
+We retain **`fn` = [Read fn field](access(`self`, "fn"))**.
 1. `page`
-  **path = [path](access(self, "path"))**
-  *> web_app_route app=`a` path=`path` page=`page`*
+  We retain **`path` = [Read path field](access(`self`, "path"))**.
+  Return *[Register this declared route on an app handle](web_app_route(app=`a`, path=`path`, page=`page`))*.
 2. `fn`
-  **path = [path](access(self, "path"))**
-  **method = [method](access(self, "method"))**
-  **request = [request](access(self, "request"))**
-  **response = [response](access(self, "response"))**
-  **class = [class](access(self, "class"))**
-  *> web_app_invoke app=`a` path=`path` method=`method` fn=`fn` body=`request` return=`response` class=`class`*
+  We retain **`path` = [Read path field](access(`self`, "path"))**.
+  We retain **`method` = [Read method field](access(`self`, "method"))**.
+  We retain **`request` = [Read request field](access(`self`, "request"))**.
+  We retain **`response` = [Read response field](access(`self`, "response"))**.
+  We retain **`class` = [Read class field](access(`self`, "class"))**.
+  Return *[Register this declared route on an app handle](web_app_invoke(app=`a`, path=`path`, method=`method`, fn=`fn`, body=`request`, return=`response`, class=`class`))*.
 3. *
-  *> table.put in=None at="ok" value=False*
+  Return *[Set the ok field in the new record](table.put(in=None, at="ok", value=False))*.

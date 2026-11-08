@@ -72,6 +72,8 @@
     if (name === 'close-dialog') { dialog.close(); return; }
     if (name === 'document') { if (dialog.open) dialog.close(); scrollTo(document.getElementById('document-section') || document.querySelector('main')); return; }
     if (name === 'search') { showSearch(); return; }
+    if (name === 'knowledge') { openDialog('可执行知识', name); movePanel(document.querySelector('.knowledge-panel')); return; }
+    if (name === 'syntax') { var guide=document.getElementById('reader-syntax-guide'); if(guide) {guide.open=true;scrollTo(guide);} return; }
     if (name === 'functions' || name === 'variables') {
       var panel = document.getElementById(name === 'functions' ? 'fn-outline' : 'vars-panel');
       openDialog(name === 'functions' ? '函数目录' : '文档变量', name); movePanel(panel); return;
@@ -79,10 +81,27 @@
     if (name === 'memory') {
       openDialog('执行内存与调用轨迹', name);
       var hint = document.createElement('p'); hint.textContent = window.MARQDO_VIEW_LIVE ? '当前文档已捕获的绑定与调用轨迹；会话状态可在高级工具中查看。' : '以下为导出时保存的执行快照。'; content.appendChild(hint);
-      var pre = document.createElement('pre');
-      try { pre.textContent = JSON.stringify(JSON.parse((document.getElementById('mq-view-trace') || {}).textContent || '{}'), null, 2); }
-      catch (_) { pre.textContent = '当前没有可用执行快照。'; }
-      content.appendChild(pre); return;
+      var report;
+      try { report=JSON.parse((document.getElementById('mq-view-trace') || {}).textContent || '{}'); }
+      catch (_) { report={}; }
+      if(typeof report.ok!=='boolean') {
+        var empty=document.createElement('p');empty.textContent='本页没有捕获执行记录；静态知识分析不会自动产生运行结果。';content.appendChild(empty);return;
+      }
+      var status=document.createElement('p');status.className='reader-run-summary';
+      status.textContent=(report.ok?'这次运行成功':'这次运行失败')+' · '+(report.calls||[]).length+' 次调用 · '+(report.loops||[]).length+' 个循环记录';content.appendChild(status);
+      function reportTable(title,headers,rows) {
+        var heading=document.createElement('h3');heading.textContent=title;content.appendChild(heading);
+        var wrap=document.createElement('div');wrap.className='knowledge-table-wrap';
+        var table=document.createElement('table'),head=document.createElement('tr');
+        headers.forEach(function(text){var cell=document.createElement('th');cell.textContent=text;head.appendChild(cell);});table.appendChild(head);
+        rows.forEach(function(row){var tr=document.createElement('tr');row.forEach(function(text){var cell=document.createElement('td');cell.textContent=text;tr.appendChild(cell);});table.appendChild(tr);});
+        wrap.appendChild(table);content.appendChild(wrap);
+      }
+      var bindings=report.bindings_final||{};
+      reportTable('最终绑定',['名称','值'],Object.keys(bindings).map(function(key){return [key,String(bindings[key])];}));
+      reportTable('调用记录',['函数','源码位置','输入'],(report.calls||[]).map(function(call){return [call.fn,'第 '+call.fn_line+' 行',call.args_brief||'无实参'];}));
+      var details=document.createElement('details'),summary=document.createElement('summary');summary.textContent='完整执行报告（技术详情）';details.appendChild(summary);
+      var pre=document.createElement('pre');pre.textContent=JSON.stringify(report,null,2);details.appendChild(pre);content.appendChild(details);return;
     }
     if (name === 'execution') { scrollTo(document.getElementById('exec-block')); return; }
     if (name === 'run') {
@@ -104,6 +123,8 @@
     }
     if (name === 'more') {
       openDialog('文档工具', name);
+      option('可执行知识', function () { action('knowledge'); });
+      option('语法与阅读说明', function () { dialog.close(); action('syntax'); });
       option('文件目录', function () { dialog.close(); action('files'); });
       option('查看完整源码', function () { var source = document.querySelector('.source-block'); if (source) { source.open = true; scrollTo(source); } });
       option('高级运行工具', function () { document.body.classList.toggle('reader-tools'); dialog.close(); scrollTo(document.getElementById('notebook-bar')); });
@@ -170,6 +191,7 @@
       band.classList.remove('is-keyed');
       band.querySelectorAll('.annot-chip').forEach(function (chip) {
         chip.classList.remove('is-margin-note');
+        if(chip.classList.contains('annot-implementation')) chip.open=false;
         ['left', 'top', 'width'].forEach(function (key) { chip.style.removeProperty(key); });
         delete chip.dataset.readerAnchor; delete chip.dataset.readerSide;
       });
@@ -379,6 +401,7 @@
         var fragments = anchorFragments(item.anchor);
         var width = Math.max(140, Math.min(190, Math.min.apply(Math, space) * .58));
         item.chip.classList.add('is-margin-note'); item.chip.style.width = width + 'px';
+        if(item.chip.classList.contains('annot-implementation')) item.chip.open=true;
         var height = item.chip.offsetHeight, stagger = [-58, 44, -34, 68][index % 4];
         var choices = nextY.map(function (y, side) {
           var fragment = side === 0 ? fragments[0] : fragments[fragments.length - 1];
@@ -439,14 +462,32 @@
     dialog = document.getElementById('reader-dialog'); content = document.getElementById('reader-dialog-content');
     dialog.addEventListener('close', function () { restorePanels(); refreshAnnotations(); });
     document.addEventListener('click', function (ev) {
+      var logic=ev.target.closest('[data-logic-id]');
+      if(logic) {
+        ev.preventDefault();
+        var note=document.getElementById(logic.dataset.logicId+'-note');
+        openDialog('实际逻辑 · '+logic.textContent,'logic');
+        var hint=document.createElement('p');hint.className='knowledge-hint';hint.textContent='这里展示源码实现，阅读不会执行；运行结果另有标注。';content.appendChild(hint);
+        var code=document.createElement('pre');code.textContent=note ? note.querySelector('.annot-value').textContent : '此片段的逻辑详情暂不可用。';content.appendChild(code);return;
+      }
+      var knowledge=ev.target.closest('.knowledge-explain, [data-knowledge-link]');
+      if(knowledge) {
+        var target=document.getElementById((knowledge.getAttribute('href')||'').slice(1));
+        if(target){ev.preventDefault();if(dialog.open)dialog.close();var parent=target;while(parent){if(parent.tagName==='DETAILS')parent.open=true;parent=parent.parentElement;}scrollTo(target);}return;
+      }
+      var sourceLink=ev.target.closest('.knowledge-source-link,.knowledge-step a');
+      if(sourceLink && dialog.open) dialog.close();
       var button = ev.target.closest('[data-reader-action]'); if (button) action(button.dataset.readerAction);
       var chip = ev.target.closest('.annot-chip');
-      if (chip) { openDialog(chip.querySelector('.annot-label').textContent, 'annotation'); var pre = document.createElement('pre'); pre.textContent = chip.title || chip.textContent; content.appendChild(pre); }
+      if (chip && !chip.classList.contains('annot-implementation')) { openDialog(chip.querySelector('.annot-label').textContent, 'annotation'); var pre = document.createElement('pre'); pre.textContent = chip.title || chip.textContent; content.appendChild(pre); }
       if (ev.target.closest('.reader-brand')) { ev.preventDefault(); window.scrollTo({top:0,behavior:'auto'}); }
       if (dialog.open && ev.target.closest('.outline-panel a')) { dialog.close(); }
     });
     function focusNote(ev, focus) {
-      var chip = ev.target.closest('.annot-chip'); if (!chip || ev.relatedTarget && chip.contains(ev.relatedTarget)) return;
+      var trigger=ev.target.closest('.annot-chip,[data-logic-id]');
+      if(!trigger || ev.relatedTarget && trigger.contains(ev.relatedTarget)) return;
+      var chip=trigger.matches('.annot-chip') ? trigger : document.getElementById(trigger.dataset.logicId+'-note');
+      if(!chip) return;
       var owner = noteOwner(chip.closest('[data-annot-band]'));
       var anchor = findAnchor(owner,chip); if (anchor) anchor.classList.toggle('is-focus', focus);
       chip.classList.toggle('is-focus',focus);

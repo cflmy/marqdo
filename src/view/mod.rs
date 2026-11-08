@@ -7,6 +7,7 @@ mod debug_page;
 mod document;
 mod html;
 mod knowledge_present;
+mod knowledge_reading;
 mod notebook_api;
 mod output;
 mod render;
@@ -410,30 +411,28 @@ pub(crate) fn build_file_view_with_exec(
 ) -> Result<FileViewModel> {
     let mut source = fs::read_to_string(abs).with_context(|| format!("read {}", abs.display()))?;
     // Structure shows this file only — do not merge imported lib bodies into the tree.
-    let (mut structure, mut module_opt, input_prompts) = match crate::load::parse_source_auto(&source) {
-        Ok(module) => {
-            let prompts = collect_input_prompts(&module);
-            (
-                render_module_structure(&module, &source),
-                Some(module),
-                prompts,
-            )
-        }
-        Err(e) => (
-            format!(
-                "<div class=\"err\">parse/load error: {}</div>",
-                escape(&tidy_user_error(&format!("{e:#}"), abs, rel))
+    let (mut structure, mut module_opt, input_prompts) =
+        match crate::load::parse_source_auto(&source) {
+            Ok(module) => {
+                let prompts = collect_input_prompts(&module);
+                (
+                    render_module_structure(&module, &source),
+                    Some(module),
+                    prompts,
+                )
+            }
+            Err(e) => (
+                format!(
+                    "<div class=\"err\">parse/load error: {}</div>",
+                    escape(&tidy_user_error(&format!("{e:#}"), abs, rel))
+                ),
+                None,
+                Vec::new(),
             ),
-            None,
-            Vec::new(),
-        ),
-    };
+        };
     let effective = effective_stdin(&source, stdin_lines);
     let awaiting_input = awaiting_preset_input(&input_prompts, stdin_lines, &source);
-    let show_stream = module_opt
-        .as_ref()
-        .map(uses_stream_panel)
-        .unwrap_or(false);
+    let show_stream = module_opt.as_ref().map(uses_stream_panel).unwrap_or(false);
     // Live + LLM/agent import + has `input` + stdin ready → stream via client `/api/run`.
     let auto_stream = live
         && show_stream
@@ -447,41 +446,40 @@ pub(crate) fn build_file_view_with_exec(
     // Optional: sandbox to the whole view tree so sibling folders are reachable.
     opts.fs_root = Some(root.root.clone());
     let mut captured: Option<crate::capture::RunCapture> = None;
-    let (stdout, stderr, ok, plots, mut bindings_html) =
-        if !execute {
-            (
-                String::new(),
-                "execution skipped (--no-exec)".into(),
-                true,
-                Vec::new(),
-                String::from(r#"<p class="vars-skipped">skipped</p>"#),
-            )
-        } else if awaiting_input || auto_stream {
-            (
-                String::new(),
-                String::new(),
-                true,
-                Vec::new(),
-                String::new(),
-            )
-        } else {
-            match run_file_capture(abs, &opts) {
-                Ok(cap) => {
-                    let stdout = cap.stdout.clone();
-                    let plots = cap.plots.iter().map(|p| p.svg.clone()).collect();
-                    let bindings_html = render_bindings_html(&cap.bindings);
-                    captured = Some(cap);
-                    (stdout, String::new(), true, plots, bindings_html)
-                }
-                Err(e) => (
-                    String::new(),
-                    tidy_user_error(&format!("{e:#}"), abs, rel),
-                    false,
-                    Vec::new(),
-                    String::new(),
-                ),
+    let (stdout, stderr, ok, plots, mut bindings_html) = if !execute {
+        (
+            String::new(),
+            "execution skipped (--no-exec)".into(),
+            true,
+            Vec::new(),
+            String::from(r#"<p class="vars-skipped">skipped</p>"#),
+        )
+    } else if awaiting_input || auto_stream {
+        (
+            String::new(),
+            String::new(),
+            true,
+            Vec::new(),
+            String::new(),
+        )
+    } else {
+        match run_file_capture(abs, &opts) {
+            Ok(cap) => {
+                let stdout = cap.stdout.clone();
+                let plots = cap.plots.iter().map(|p| p.svg.clone()).collect();
+                let bindings_html = render_bindings_html(&cap.bindings);
+                captured = Some(cap);
+                (stdout, String::new(), true, plots, bindings_html)
             }
-        };
+            Err(e) => (
+                String::new(),
+                tidy_user_error(&format!("{e:#}"), abs, rel),
+                false,
+                Vec::new(),
+                String::new(),
+            ),
+        }
+    };
     // Re-read after run so writeback slots / workbook edits show in Structure.
     if execute && !awaiting_input && !auto_stream {
         if let Ok(next) = fs::read_to_string(abs) {
@@ -514,46 +512,60 @@ pub(crate) fn build_file_view_with_exec(
     // Analysis is intentionally independent from capture/run.  If a document
     // has side effects, its facts remain visible while its values stay absent.
     let title_guess = crate::view::title_from_source(&source, rel);
-    let (knowledge_html, knowledge_error, page_token) =
-        match crate::sema::compile_project(&crate::sema::CompileOptions {
+    let analysis = if root.only_file.is_some() {
+        crate::sema::compile_file_closure(abs)
+    } else {
+        crate::sema::compile_project(&crate::sema::CompileOptions {
             project_root: root.root.clone(),
             entry: Some(abs.to_path_buf()),
             lock_mode: crate::sema::LockMode::Off,
-        }) {
-            Ok(compilation) => {
-                let html = render_knowledge_html(&compilation.semantics, rel);
-                // V1: also materialize structured presentation (JSON available to page scripts).
-                let mut presentation = crate::view::KnowledgePresentation::from_project(
-                    &compilation.semantics,
-                    rel,
-                    &title_guess,
-                );
-                presentation.page_token = crate::view::page_token_from_source(rel, &source);
-                let json = presentation.to_json().to_string();
-                let with_model = if html.is_empty() {
-                    format!(
-                        r#"<script type="application/json" id="mq-knowledge-presentation">{json}</script>"#,
-                        json = json.replace("</", "<\\/")
-                    )
-                } else {
-                    format!(
-                        r#"{html}<script type="application/json" id="mq-knowledge-presentation">{json}</script>"#,
-                        html = html,
-                        json = json.replace("</", "<\\/")
-                    )
-                };
-                (
-                    with_model,
-                    String::new(),
-                    presentation.page_token.clone(),
+        })
+    };
+    let (knowledge_html, knowledge_error, page_token) = match analysis {
+        Ok(compilation) => {
+            // Dependency closures may have a wider root than the reader's file directory.
+            let semantic_rel = abs
+                .strip_prefix(&compilation.semantics.root)
+                .unwrap_or(abs)
+                .to_string_lossy()
+                .replace('\\', "/");
+            let html = crate::view::knowledge_reading::render(
+                &compilation.semantics,
+                &semantic_rel,
+                module_opt.as_ref(),
+            );
+            // V1: also materialize structured presentation (JSON available to page scripts).
+            let mut presentation = crate::view::KnowledgePresentation::from_project(
+                &compilation.semantics,
+                &semantic_rel,
+                &title_guess,
+            );
+            presentation.document_id = rel.to_string();
+            presentation.page_token = crate::view::page_token_from_source(rel, &source);
+            let json = presentation.to_json().to_string();
+            let with_model = if html.is_empty() {
+                format!(
+                    r#"<script type="application/json" id="mq-knowledge-presentation">{json}</script>"#,
+                    json = json.replace("</", "<\\/")
                 )
-            }
-            Err(e) => (
-                String::new(),
-                format!("知识关系暂不可用：{}", tidy_user_error(&format!("{e:#}"), abs, rel)),
-                crate::view::page_token_from_source(rel, &source),
+            } else {
+                format!(
+                    r#"{html}<script type="application/json" id="mq-knowledge-presentation">{json}</script>"#,
+                    html = html,
+                    json = json.replace("</", "<\\/")
+                )
+            };
+            (with_model, String::new(), presentation.page_token.clone())
+        }
+        Err(e) => (
+            String::new(),
+            format!(
+                "知识关系暂不可用：{}",
+                tidy_user_error(&format!("{e:#}"), abs, rel)
             ),
-        };
+            crate::view::page_token_from_source(rel, &source),
+        ),
+    };
     let page_token = if page_token.is_empty() {
         crate::view::page_token_from_source(rel, &source)
     } else {

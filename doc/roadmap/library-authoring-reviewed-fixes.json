@@ -1,0 +1,50 @@
+[
+  {
+    "after": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+    "before": "754acb518e0d5f0c5c6f6ae6d48c94a1df69ddbdfff13395114786cbe63edf5e",
+    "difference": "removed ext/ai/policies/step-route.mq.md \"Step class → backend\"",
+    "reason": "修复说明标题被误认成对象、路由表未绑定且 main 返回未定义 routes；真实 routes 工具返回原策略数据，沙盒行文件后缀显式写为文字。双后端验证 lookup 和默认后端。"
+  },
+  {
+    "after": "62bd87e62802aeaefbc635715481451d5eee3b918aefe8db9c816039ef91b04f",
+    "before": "f6c5aecc836c461f7593ffabe9cc2c236a3738a90c49c9c2b5c12a767d97c94c",
+    "difference": "ext/ai/policies/step-route.mq.md \"main\" changed body",
+    "reason": "修复说明标题被误认成对象、路由表未绑定且 main 返回未定义 routes；真实 routes 工具返回原策略数据，沙盒行文件后缀显式写为文字。双后端验证 lookup 和默认后端。"
+  },
+  {
+    "after": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa",
+    "before": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
+    "difference": "ext/ai/智能体.mq.md \"智能体\" changed receiver",
+    "reason": "修复单步说明中的 返回 *map* 被当作提前返回，使实现落入构造器且无法执行的问题；正文保留自然语言说明，单步实际完成上下文、模型调用和结果处理。离线模型替身在双后端验证。"
+  },
+  {
+    "after": "888398739b40074de2e2f93943516541eec872cecc284835968650b3ef72a24d",
+    "before": "a7553f00f8f05c97c2c44299fd2fcd4641c8f5e9acbb6a246874b096a2acdc0a",
+    "difference": "ext/ai/智能体.mq.md \"智能体\" changed body",
+    "reason": "修复单步说明中的 返回 *map* 被当作提前返回，使实现落入构造器且无法执行的问题；正文保留自然语言说明，单步实际完成上下文、模型调用和结果处理。离线模型替身在双后端验证。"
+  },
+  {
+    "after": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
+    "before": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa",
+    "difference": "ext/ai/智能体.mq.md \"智能体.单步\" changed receiver",
+    "reason": "修复单步说明中的 返回 *map* 被当作提前返回，使实现落入构造器且无法执行的问题；正文保留自然语言说明，单步实际完成上下文、模型调用和结果处理。离线模型替身在双后端验证。"
+  },
+  {
+    "after": "e3853fac627ca88f1557132aabb6b818ecc805ab53e6feacb3b08c77e503ece4",
+    "before": "aae371909b83bdaec63671897c5581a8ba7f14a5e113bd825fca0576df403e2b",
+    "difference": "ext/ai/智能体.mq.md \"智能体.单步\" changed body",
+    "reason": "修复单步说明中的 返回 *map* 被当作提前返回，使实现落入构造器且无法执行的问题；正文保留自然语言说明，单步实际完成上下文、模型调用和结果处理。离线模型替身在双后端验证。"
+  },
+  {
+    "after": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa",
+    "before": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
+    "difference": "ext/data/db.mq.md \"txn\" changed receiver",
+    "reason": "事务构造器原来返回未绑定的 self；改为保留调用者传入的真实 txn 和 url 句柄，不额外开始事务。双后端验证构造、提交、回滚与事务外读取。"
+  },
+  {
+    "after": "0a51bc7e7fe4577f32aae9a76ea461213c3547ea9e937f280e17b6e8075194c5",
+    "before": "92096850522e76cff3350d582b57ae3124fd400635ad25fd63f208a1994514f0",
+    "difference": "ext/data/db.mq.md \"txn\" changed body",
+    "reason": "事务构造器原来返回未绑定的 self；改为保留调用者传入的真实 txn 和 url 句柄，不额外开始事务。双后端验证构造、提交、回滚与事务外读取。"
+  }
+]

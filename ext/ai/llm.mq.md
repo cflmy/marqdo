@@ -13,68 +13,88 @@ import:
   openai: ext/ai/llm/openai.mq.md
 ---
 
+Choose the public model resource here for ask, stream and collected response behavior. [The AI entry](index.mq.md) provides an offline event workflow; [the adapter entry](llm/index.mq.md) owns provider configuration and transport shapes. Agents and workbook orchestration belong in agent.mq.md. A created handle is configuration, not proof that authentication or a model request succeeded. Keep transport errors, semantic events and usage counters visible when extending this file.
+
 ## load_env
-    + `path`=None
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| path | any | None | Explicit filesystem path; honor the documented filesystem root and operation effects |
+
+| 返回 | 类型 | 说明 |
+|---|---|---|
+| result | any | Load `.env` from cwd (optional `path=`). Does not override existing variables. |
+
+Use `path`=None as the inputs for this operation.
 
 Load `.env` from cwd (optional `path=`). Does not override existing variables.
 
-*> sys.load_dotenv path=`path`*
+Return *[Load dotenv](sys.load_dotenv(path=`path`))*.
 
 ## collect
-    + `events`
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| events | any | required | Ordered semantic or provider stream-event records |
+
+| 返回 | 类型 | 说明 |
+|---|---|---|
+| result | any | Collapse a stream event list to final answer text. Accepts semantic events (`delta` / `text` / `done.result` / `error.message`) and native-plugin raw SSE frames (`type=data` with OpenAI chunk JSON in `data`). Alias: `stream_result`. |
+
+Use `events` as the inputs for this operation.
 
 Collapse a stream event list to final answer text.
 Accepts semantic events (`delta` / `text` / `done.result` / `error.message`) and
 native-plugin raw SSE frames (`type=data` with OpenAI chunk JSON in `data`).
 Alias: `stream_result`.
 
-**answer = ""**
+We retain **answer = ""**.
 
 - [ev](遍历 events 为 ev)
-  **t = > json.get value=`ev` key="type"**
+  We retain **`t` = [Read the type field](json.get(value=`ev`, key="type"))**.
   1. `t` == "done"
-    **done_r = > json.get value=`ev` key="result"**
+    We retain **`done_r` = [Read the result field](json.get(value=`ev`, key="result"))**.
     1. `done_r`
-      **answer = `done_r`**
+      We retain **answer = `done_r`**.
     2. *
       **_ = 1**
   2. `t` == "error"
-    **em = > json.get value=`ev` key="message"**
+    We retain **`em` = [Read the message field](json.get(value=`ev`, key="message"))**.
     1. `em`
-      **answer = `em`**
+      We retain **answer = `em`**.
     2. *
       **_ = 1**
   3. `t` == "delta"
   4. `t` == "text"
-    **chunk = > json.get value=`ev` key="text"**
+    We retain **`chunk` = [Read the text field](json.get(value=`ev`, key="text"))**.
     1. `chunk`
-      **answer = answer + chunk**
+      We retain **answer = answer + chunk**.
     2. *
       **_ = 1**
   5. `t` == "data"
-    **raw = > json.get value=`ev` key="data"**
+    We retain **`raw` = [Read the data field](json.get(value=`ev`, key="data"))**.
     1. `raw`
       1. `raw` == "[DONE]"
         **_ = 1**
       2. *
-        **parsed = > json.parse text=`raw`**
+        We retain **`parsed` = [Parse the JSON transport text](json.parse(text=`raw`))**.
         1. `parsed`
-          **choices = > json.get value=`parsed` key="choices"**
+          We retain **`choices` = [Read the choices field](json.get(value=`parsed`, key="choices"))**.
           1. `choices`
-            **c0 = [1](access(choices, "1"))**
-            **delta = > json.get value=`c0` key="delta"**
+            We retain **`c0` = [Read 1 field](access(`choices`, "1"))**.
+            We retain **`delta` = [Read the delta field](json.get(value=`c0`, key="delta"))**.
             1. `delta`
-              **piece = > json.get value=`delta` key="content"**
+              We retain **`piece` = [Read the content field](json.get(value=`delta`, key="content"))**.
               1. `piece`
-                **answer = answer + piece**
+                We retain **answer = answer + piece**.
               2. *
                 **_ = 1**
             2. *
-              **msg = > json.get value=`c0` key="message"**
+              We retain **`msg` = [Read the message field](json.get(value=`c0`, key="message"))**.
               1. `msg`
-                **piece = > json.get value=`msg` key="content"**
+                We retain **`piece` = [Read the content field](json.get(value=`msg`, key="content"))**.
                 1. `piece`
-                  **answer = answer + piece**
+                  We retain **answer = answer + piece**.
                 2. *
                   **_ = 1**
               2. *
@@ -89,173 +109,272 @@ Alias: `stream_result`.
     **_ = 1**
 
 1. not `answer`
-  **answer = ""**
-*answer*
+  We retain **answer = ""**.
+Return *answer*.
 
 ## collect_usage
-    + `events`
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| events | any | required | Ordered semantic or provider stream-event records |
+
+| 返回 | 类型 | 说明 |
+|---|---|---|
+| result | any | Best-effort `total_tokens` from stream frames (requires `stream_options.include_usage`). |
+
+Use `events` as the inputs for this operation.
 
 Best-effort `total_tokens` from stream frames (requires `stream_options.include_usage`).
 
-**tokens = None**
+We retain **tokens = None**.
 1. `events`
   - [ev](遍历 events 为 ev)
-    **t = > json.get value=`ev` key="type"**
-    **raw = None**
+    We retain **`t` = [Read the type field](json.get(value=`ev`, key="type"))**.
+    We retain **raw = None**.
     1. `t` == "data"
-      **raw = > json.get value=`ev` key="data"**
+      We retain **`raw` = [Read the data field](json.get(value=`ev`, key="data"))**.
     2. *
-      **u0 = > json.get value=`ev` key="usage"**
+      We retain **`u0` = [Read the usage field](json.get(value=`ev`, key="usage"))**.
       1. `u0`
-        **tt0 = > json.get value=`u0` key="total_tokens"**
+        We retain **`tt0` = [Read the total_tokens field](json.get(value=`u0`, key="total_tokens"))**.
         1. `tt0` != None
-          **tokens = `tt0`**
+          We retain **tokens = `tt0`**.
     1. `raw`
       1. not `raw` == "[DONE]"
-        **parsed = > json.parse text=`raw`**
+        We retain **`parsed` = [Parse the JSON transport text](json.parse(text=`raw`))**.
         1. `parsed`
-          **u = > json.get value=`parsed` key="usage"**
+          We retain **`u` = [Read the usage field](json.get(value=`parsed`, key="usage"))**.
           1. `u`
-            **tt = > json.get value=`u` key="total_tokens"**
+            We retain **`tt` = [Read the total_tokens field](json.get(value=`u`, key="total_tokens"))**.
             1. `tt` != None
-              **tokens = `tt`**
-*tokens*
+              We retain **tokens = `tt`**.
+Return *tokens*.
 
 ## stream_result
-    + `events`
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| events | any | required | Ordered semantic or provider stream-event records |
+
+| 返回 | 类型 | 说明 |
+|---|---|---|
+| result | any | Compatibility alias for `collect`. |
+
+Use `events` as the inputs for this operation.
 
 Compatibility alias for `collect`.
 
-*> collect events=`events`*
+Return *[Collect](collect(events=`events`))*.
 
 ## usage_from
-    + `data`
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| data | any | required | Structured input supplied to this adapter or resource |
+
+| 返回 | 类型 | 说明 |
+|---|---|---|
+| result | any | Extract `{prompt_tokens,completion_tokens,total_tokens}` from an OpenAI-shaped response map (or empty zeros). |
+
+Use `data` as the inputs for this operation.
 
 Extract `{prompt_tokens,completion_tokens,total_tokens}` from an OpenAI-shaped response map (or empty zeros).
 
-*> openai.usage_from data=`data`*
+Return *[Usage from](openai.usage_from(data=`data`))*.
 
 ## create
-    + `model`=None
-    + `base_url`=None
-    + `api_key`=None
-    + `backend`=openai-compatible
-    + `name`=None
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| model | any | None | Model resource or provider model identifier, as required by this operation |
+| base_url | any | None | Provider API base URL |
+| api_key | any | None | Provider credential from trusted runtime configuration |
+| backend | any | "openai-compatible" | Configured execution or provider backend |
+| name | any | None | Name registered or looked up by this operation |
+
+| 返回 | 类型 | 说明 |
+|---|---|---|
+| result | any | Factory for an LLM handle (same as constructing `# llm`). Env fallbacks apply inside the constructor. Optional `name=` tags the handle (`fast` / `reasoning`). |
+
+Use `model`=None, `base_url`=None, `api_key`=None, `backend`="openai-compatible", `name`=None as the inputs for this operation.
 
 Factory for an LLM handle (same as constructing `# llm`). Env fallbacks apply inside the constructor. Optional `name=` tags the handle (`fast` / `reasoning`).
 
-**h = > llm model=`model` base_url=`base_url` api_key=`api_key` backend=`backend` name=`name`**
-*h*
+We retain **`h` = [Llm](llm(model=`model`, base_url=`base_url`, api_key=`api_key`, backend=`backend`, name=`name`))**.
+Return *h*.
 
 ## fast
-    + `model`=None
-    + `base_url`=None
-    + `api_key`=None
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| model | any | None | Model resource or provider model identifier, as required by this operation |
+| base_url | any | None | Provider API base URL |
+| api_key | any | None | Provider credential from trusted runtime configuration |
+
+| 返回 | 类型 | 说明 |
+|---|---|---|
+| result | any | Named small/fast handle. Model from arg, else `MARQDO_LLM_FAST_MODEL`, else default create model. |
+
+Use `model`=None, `base_url`=None, `api_key`=None as the inputs for this operation.
 
 Named small/fast handle. Model from arg, else `MARQDO_LLM_FAST_MODEL`, else default create model.
 
 1. `model`
-  **mdl = `model`**
+  We retain **mdl = `model`**.
 2. *
-  **mdl = > sys.env_get name="MARQDO_LLM_FAST_MODEL"**
+  We retain **`mdl` = [Env get](sys.env_get(name="MARQDO_LLM_FAST_MODEL"))**.
 
-*> create model=`mdl` base_url=`base_url` api_key=`api_key` name="fast" backend="openai-compatible"*
+Return *[Create](create(model=`mdl`, base_url=`base_url`, api_key=`api_key`, name="fast", backend="openai-compatible"))*.
 
 ## reasoning
-    + `model`=None
-    + `base_url`=None
-    + `api_key`=None
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| model | any | None | Model resource or provider model identifier, as required by this operation |
+| base_url | any | None | Provider API base URL |
+| api_key | any | None | Provider credential from trusted runtime configuration |
+
+| 返回 | 类型 | 说明 |
+|---|---|---|
+| result | any | Named strong/reasoning handle. Model from arg, else `MARQDO_LLM_REASONING_MODEL`, else default create model. |
+
+Use `model`=None, `base_url`=None, `api_key`=None as the inputs for this operation.
 
 Named strong/reasoning handle. Model from arg, else `MARQDO_LLM_REASONING_MODEL`, else default create model.
 
 1. `model`
-  **mdl = `model`**
+  We retain **mdl = `model`**.
 2. *
-  **mdl = > sys.env_get name="MARQDO_LLM_REASONING_MODEL"**
+  We retain **`mdl` = [Env get](sys.env_get(name="MARQDO_LLM_REASONING_MODEL"))**.
 
-*> create model=`mdl` base_url=`base_url` api_key=`api_key` name="reasoning" backend="openai-compatible"*
+Return *[Create](create(model=`mdl`, base_url=`base_url`, api_key=`api_key`, name="reasoning", backend="openai-compatible"))*.
 
 ## prompt_body
-    + `src`
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| src | any | required | Prompt source or source-reference value |
+
+| 返回 | 类型 | 说明 |
+|---|---|---|
+| result | any | If `src` starts with YAML frontmatter declaring `type: prompt` / `类型: 提示`, return the body after the closing `---`; otherwise return `src` unchanged. |
+
+Use `src` as the inputs for this operation.
 
 If `src` starts with YAML frontmatter declaring `type: prompt` / `类型: 提示`, return the body after the closing `---`; otherwise return `src` unchanged.
 
-**sw = > text.starts_with text=`src` prefix="---"**
+We retain **`sw` = [Starts with](text.starts_with(text=`src`, prefix="---"))**.
 1. not `sw`
-  *src*
+  Return *src*.
 2. *
-  **parts = > split value=`src` sep="\n---\n"**
-  **n = > len value=`parts`**
+  We retain **`parts` = [Split](split(value=`src`, sep="\n---\n"))**.
+  We retain **`n` = [Len](len(value=`parts`))**.
   1. `n` < 2
-    *src*
+    Return *src*.
   2. *
-    **fm = > at value=`parts` index=0**
-    **is_p = > text.contains text=`fm` sub="type: prompt"**
+    We retain **`fm` = [At](at(value=`parts`, index=0))**.
+    We retain **`is_p` = [Contains](text.contains(text=`fm`, sub="type: prompt"))**.
     1. not `is_p`
-      **is_p = > text.contains text=`fm` sub="类型: 提示"**
+      We retain **`is_p` = [Contains](text.contains(text=`fm`, sub="类型: 提示"))**.
     2. *
       **_ = 1**
     1. `is_p`
-      **body = > at value=`parts` index=1**
-      *> text.str_trim s=`body`*
+      We retain **`body` = [At](at(value=`parts`, index=1))**.
+      Return *[Str trim](text.str_trim(s=`body`))*.
     2. *
-      *src*
+      Return *src*.
 
 ## prompt_load
-    + `path`
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| path | any | required | Explicit filesystem path; honor the documented filesystem root and operation effects |
+
+| 返回 | 类型 | 说明 |
+|---|---|---|
+| result | any | Load a prompt artifact (`.mq.md` / `.md`) from disk for `ask`. |
+
+Use `path` as the inputs for this operation.
 
 Load a prompt artifact (`.mq.md` / `.md`) from disk for `ask`.
 
-**raw = > fs.read_text path=`path`**
-*> prompt_body src=`raw`*
+We retain **`raw` = [Read UTF-8 text from the selected file](fs.read_text(path=`path`))**.
+Return *[Prompt body](prompt_body(src=`raw`))*.
 
 ## prompt
-    + `path`=None
-    + `text`=None
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| path | any | None | Explicit filesystem path; honor the documented filesystem root and operation effects |
+| text | any | None | Text supplied to the transformation or adapter |
+
+| 返回 | 类型 | 说明 |
+|---|---|---|
+| result | any | Prompt artifact helper: `path=` loads a file; `text=` strips `type: prompt` frontmatter from an in-memory string. |
+
+Use `path`=None, `text`=None as the inputs for this operation.
 
 Prompt artifact helper: `path=` loads a file; `text=` strips `type: prompt` frontmatter from an in-memory string.
 
 1. `path`
-  *> prompt_load path=`path`*
+  Return *[Prompt load](prompt_load(path=`path`))*.
 2. `text`
-  *> prompt_body src=`text`*
+  Return *[Prompt body](prompt_body(src=`text`))*.
 3. *
-  > print text=ext/ai/llm.prompt: pass path= or text=
-  > sys.exit code=1
+  We **[Print the prepared message](print(text="ext/ai/llm.prompt: pass", path="or", text=""))**.
+  We **[End this run with the selected exit status](sys.exit(code=1))**.
 
 ## ask
-    + `prompt`=None
-    + `path`=None
-    + `model`=None
-    + `base_url`=None
-    + `api_key`=None
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| prompt | any | None | Prompt text or structured prompt expected by this adapter |
+| path | any | None | Explicit filesystem path; honor the documented filesystem root and operation effects |
+| model | any | None | Model resource or provider model identifier, as required by this operation |
+| base_url | any | None | Provider API base URL |
+| api_key | any | None | Provider credential from trusted runtime configuration |
+
+| 返回 | 类型 | 说明 |
+|---|---|---|
+| result | any | Module convenience: create a default handle and return **answer text**. Pass `path=` to load a prompt document, `prompt=` text, or omit both to use the entry `.mq.md` as a prompt artifact (`type: prompt` body via `sys.module_source`). |
+
+Use `prompt`=None, `path`=None, `model`=None, `base_url`=None, `api_key`=None as the inputs for this operation.
 
 Module convenience: create a default handle and return **answer text**. Pass `path=` to load a prompt document, `prompt=` text, or omit both to use the entry `.mq.md` as a prompt artifact (`type: prompt` body via `sys.module_source`).
 
-**p = `prompt`**
+We retain **p = `prompt`**.
 1. `path`
-  **p = > prompt_load path=`path`**
+  We retain **`p` = [Prompt load](prompt_load(path=`path`))**.
 2. `prompt`
-  **p = `prompt`**
+  We retain **p = `prompt`**.
 3. *
-  **raw = > sys.module_source**
+  We retain **`raw` = [Module source](sys.module_source())**.
   1. not `raw`
-    > print text=ext/ai/llm.ask: pass prompt= or path= (or run a prompt document as entry)
-    > sys.exit code=1
+    We **[Print the prepared message](print(text="ext/ai/llm.ask: pass", prompt="or", path="(or run a prompt document as entry)"))**.
+    We **[End this run with the selected exit status](sys.exit(code=1))**.
   2. *
-    **p = > prompt_body src=`raw`**
+    We retain **`p` = [Prompt body](prompt_body(src=`raw`))**.
 
-**m = > create model=`model` base_url=`base_url` api_key=`api_key`**
-**r = > m.ask prompt=`p`**
-**_ret = > json.get value=`r` key="text"**
-*_ret*
+We retain **`m` = [Create](create(model=`model`, base_url=`base_url`, api_key=`api_key`))**.
+We retain **`r` = [Ask](m.ask(prompt=`p`))**.
+We retain **`_ret` = [Read the text field](json.get(value=`r`, key="text"))**.
+Return *_ret*.
 
 # llm
-    + `model`=None
-    + `base_url`=None
-    + `api_key`=None
-    + `backend`=openai-compatible
-    + `name`=None
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| model | any | None | Model resource or provider model identifier, as required by this operation |
+| base_url | any | None | Provider API base URL |
+| api_key | any | None | Provider credential from trusted runtime configuration |
+| backend | any | "openai-compatible" | Configured execution or provider backend |
+| name | any | None | Name registered or looked up by this operation |
+
+| 返回 | 类型 | 说明 |
+|---|---|---|
+| result | any | LLM handle — intelligence primitive, not an HTTP client. Resolution: explicit args → entry-scope / Artifact Metadata (`sys.meta_get`) → `sys.env_get` → defaults. Prefer declaring `model` / `api_key` / `base_url` in frontmatter Binding, then use the lifted names. |
+
+Use `model`=None, `base_url`=None, `api_key`=None, `backend`="openai-compatible", `name`=None as the inputs for this operation.
 
 LLM handle — intelligence primitive, not an HTTP client.
 
@@ -263,13 +382,13 @@ Resolution: explicit args → entry-scope / Artifact Metadata (`sys.meta_get`) �
 Prefer declaring `model` / `api_key` / `base_url` in frontmatter Binding, then use the lifted names.
 
 1. `api_key`
-  **key = `api_key`**
+  We retain **key = `api_key`**.
 2. *
-  **key = > sys.meta_get key="api_key"**
+  We retain **`key` = [Meta get](sys.meta_get(key="api_key"))**.
   1. not `key`
-    **key = > sys.env_get name="OPENAI_API_KEY"**
+    We retain **`key` = [Env get](sys.env_get(name="OPENAI_API_KEY"))**.
     1. not `key`
-      **key = > sys.env_get name="MARQDO_LLM_API_KEY"**
+      We retain **`key` = [Env get](sys.env_get(name="MARQDO_LLM_API_KEY"))**.
     2. *
       **_ = 1**
   2. *
@@ -277,62 +396,62 @@ Prefer declaring `model` / `api_key` / `base_url` in frontmatter Binding, then u
 
 1. `backend` == ollama
   1. not `key`
-    **key = "ollama"**
+    We retain **key = "ollama"**.
   2. *
     **_ = 1**
 2. not `key`
-  > print text=ext/ai/llm: set OPENAI_API_KEY or MARQDO_LLM_API_KEY (or pass api_key= / metadata api_key)
-  > sys.exit code=1
+  We **[Print the prepared message](print(text="ext/ai/llm: set OPENAI_API_KEY or MARQDO_LLM_API_KEY (or pass api_key= / metadata api_key)"))**.
+  We **[End this run with the selected exit status](sys.exit(code=1))**.
 3. *
   **_ = 1**
 
 1. `base_url`
-  **url = `base_url`**
+  We retain **url = `base_url`**.
 2. *
-  **url = > sys.meta_get key="base_url"**
+  We retain **`url` = [Meta get](sys.meta_get(key="base_url"))**.
   1. `url`
     **_ = 1**
   2. `backend` == ollama
-    **url = > sys.env_get name="OLLAMA_HOST"**
+    We retain **`url` = [Env get](sys.env_get(name="OLLAMA_HOST"))**.
     1. not `url`
-      **url = "http://127.0.0.1:11434/v1"**
+      We retain **url = "http://127.0.0.1:11434/v1"**.
     2. *
       **_ = 1**
   3. *
-    **url = > sys.env_get name="OPENAI_BASE_URL"**
+    We retain **`url` = [Env get](sys.env_get(name="OPENAI_BASE_URL"))**.
     1. not `url`
-      **url = > sys.env_get name="MARQDO_LLM_BASE_URL"**
+      We retain **`url` = [Env get](sys.env_get(name="MARQDO_LLM_BASE_URL"))**.
     2. *
       **_ = 1**
     1. not `url`
-      **url = "https://api.openai.com/v1"**
+      We retain **url = "https://api.openai.com/v1"**.
     2. *
       **_ = 1**
 
 1. `model`
-  **mdl = `model`**
+  We retain **mdl = `model`**.
 2. *
-  **mdl = > sys.meta_get key="model"**
+  We retain **`mdl` = [Meta get](sys.meta_get(key="model"))**.
   1. `mdl`
     **_ = 1**
   2. *
-    **mdl = > sys.env_get name="OPENAI_MODEL"**
+    We retain **`mdl` = [Env get](sys.env_get(name="OPENAI_MODEL"))**.
     1. not `mdl`
-      **mdl = > sys.env_get name="MARQDO_LLM_MODEL"**
+      We retain **`mdl` = [Env get](sys.env_get(name="MARQDO_LLM_MODEL"))**.
     2. *
       **_ = 1**
     1. not `mdl`
       1. `backend` == ollama
-        **mdl = "llama3.2"**
+        We retain **mdl = "llama3.2"**.
       2. *
-        **mdl = "gpt-4o-mini"**
+        We retain **mdl = "gpt-4o-mini"**.
     2. *
       **_ = 1**
 
 1. `name`
-  **nm = `name`**
+  We retain **nm = `name`**.
 2. *
-  **nm = None**
+  We retain **nm = None**.
 
 `h` =
 
@@ -340,49 +459,58 @@ Prefer declaring `model` / `api_key` / `base_url` in frontmatter Binding, then u
 |-------|---------|---------|----------|-------|--------|--------|------|
 | llm | `backend` | `key` | `url` | `mdl` | /chat/completions | "Bearer " | `nm` |
 
-*h*
+Return *h*.
 
 ## ask
-    + `prompt`=None
-    + `path`=None
-    + `messages`=None
-    + `selection`=None
-    + `strict_selection`=False
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| prompt | any | None | Prompt text or structured prompt expected by this adapter |
+| path | any | None | Explicit filesystem path; honor the documented filesystem root and operation effects |
+| messages | any | None | Ordered chat message records |
+| selection | any | None | Explicit runtime/model selection |
+| strict_selection | any | False | Whether an unresolved selection is an error |
+
+| 返回 | 类型 | 说明 |
+|---|---|---|
+| result | any | Semantic ask → **LLMResult** (`text`, `model`, `finish`, `backend`, `usage`, `name`, `tool_calls`). Prefer `[text](result)` for the answer string. Omit `prompt=` / `path=` to use the entry document (`sys.module_source` + `prompt_body`). Pass `messages=` for multi-turn history (M01). `selection=` + `strict_selection=True` freeze request identity without env fallback. |
+
+Use `prompt`=None, `path`=None, `messages`=None, `selection`=None, `strict_selection`=False as the inputs for this operation.
 
 Semantic ask → **LLMResult** (`text`, `model`, `finish`, `backend`, `usage`, `name`, `tool_calls`). Prefer `[text](result)` for the answer string. Omit `prompt=` / `path=` to use the entry document (`sys.module_source` + `prompt_body`). Pass `messages=` for multi-turn history (M01). `selection=` + `strict_selection=True` freeze request identity without env fallback.
 
-**p = `prompt`**
+We retain **p = `prompt`**.
 1. `messages`
-  **p = None**
+  We retain **p = None**.
 2. `path`
-  **p = > prompt_load path=`path`**
+  We retain **`p` = [Prompt load](prompt_load(path=`path`))**.
 3. `prompt`
-  **p = `prompt`**
+  We retain **p = `prompt`**.
 4. *
-  **raw = > sys.module_source**
+  We retain **`raw` = [Module source](sys.module_source())**.
   1. not `raw`
-    **p = ""**
+    We retain **p = ""**.
   2. *
-    **p = > prompt_body src=`raw`**
-**pack = > self.complete_result prompt=`p` messages=`messages` selection=`selection` strict_selection=`strict_selection` stream=False echo=False**
-**text = > json.get value=`pack` key="text"**
-**usage = > json.get value=`pack` key="usage"**
-**finish = > json.get value=`pack` key="finish"**
-**err = > json.get value=`pack` key="error"**
-**tc = > json.get value=`pack` key="tool_calls"**
+    We retain **`p` = [Prompt body](prompt_body(src=`raw`))**.
+We retain **`pack` = [Complete result](self.complete_result(prompt=`p`, messages=`messages`, selection=`selection`, strict_selection=`strict_selection`, stream=False, echo=False))**.
+We retain **`text` = [Read the text field](json.get(value=`pack`, key="text"))**.
+We retain **`usage` = [Read the usage field](json.get(value=`pack`, key="usage"))**.
+We retain **`finish` = [Read the finish field](json.get(value=`pack`, key="finish"))**.
+We retain **`err` = [Read the error field](json.get(value=`pack`, key="error"))**.
+We retain **`tc` = [Read the tool_calls field](json.get(value=`pack`, key="tool_calls"))**.
 1. not `tc`
-  **tc = > table.empty_list**
+  We retain **`tc` = [Empty list](table.empty_list())**.
 2. *
   **_ = 1**
 1. not `text`
-  **text = ""**
+  We retain **text = ""**.
 2. *
   **_ = 1**
 1. not `finish`
   1. `err`
-    **finish = "error"**
+    We retain **finish = "error"**.
   2. *
-    **finish = "stop"**
+    We retain **finish = "stop"**.
 2. *
   **_ = 1**
 
@@ -390,26 +518,26 @@ Hoist receiver fields before the result table — table cells can shadow `self` 
 column names (`model`, `usage`), so `[model](self)` / `[total_tokens](usage)`
 inside the table is unsafe.
 
-**mdl = > json.get value=`self` key="model"**
-**b = > json.get value=`self` key="backend"**
-**nm = > json.get value=`self` key="name"**
+We retain **`mdl` = [Read the model field](json.get(value=`self`, key="model"))**.
+We retain **`b` = [Read the backend field](json.get(value=`self`, key="backend"))**.
+We retain **`nm` = [Read the name field](json.get(value=`self`, key="name"))**.
 1. `usage`
-  **tt = > json.get value=`usage` key="total_tokens"**
-  **ustate = > json.get value=`usage` key="usage_state"**
+  We retain **`tt` = [Read the total_tokens field](json.get(value=`usage`, key="total_tokens"))**.
+  We retain **`ustate` = [Read the usage_state field](json.get(value=`usage`, key="usage_state"))**.
 2. *
-  **tt = None**
-  **ustate = "unknown"**
+  We retain **tt = None**.
+  We retain **ustate = "unknown"**.
 1. `ustate` == "unknown"
   Keep null — never coerce missing usage to zero tokens (M02 / F04).
-  **tt = None**
+  We retain **tt = None**.
 2. not `tt`
-  **tt = None**
+  We retain **tt = None**.
 3. *
   **_ = 1**
 1. `err`
-  **calls = 0**
+  We retain **calls = 0**.
 2. *
-  **calls = 1**
+  We retain **calls = 1**.
 
 `result` =
 
@@ -417,66 +545,102 @@ inside the table is unsafe.
 |------|-------|--------|---------|-------|------|-----------|--------|------------|-------|-----------|
 | `text` | `mdl` | `finish` | `b` | `usage` | `nm` | `calls` | `tt` | `tc` | `err` | `selection` |
 
-*result*
+Return *result*.
 
 ## stream
-    + `prompt`=None
-    + `path`=None
-    + `echo`=False
-    + `stream_kind`="delta"
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| prompt | any | None | Prompt text or structured prompt expected by this adapter |
+| path | any | None | Explicit filesystem path; honor the documented filesystem root and operation effects |
+| echo | any | False | Whether to print the documented incremental output |
+| stream_kind | any | "delta" | Streaming event projection selected by the caller |
+
+| 返回 | 类型 | 说明 |
+|---|---|---|
+| result | any | Semantic stream: return the event list (use `llm.collect` to reduce to text). Omit `prompt=` / `path=` to use the entry document. |
+
+Use `prompt`=None, `path`=None, `echo`=False, `stream_kind`="delta" as the inputs for this operation.
 
 Semantic stream: return the event list (use `llm.collect` to reduce to text). Omit `prompt=` / `path=` to use the entry document.
 `stream_kind=plan` tags EventBus frames for the parent plan protocol (process trail).
 
 1. `path`
-  **p = > prompt_load path=`path`**
+  We retain **`p` = [Prompt load](prompt_load(path=`path`))**.
 2. `prompt`
-  **p = `prompt`**
+  We retain **p = `prompt`**.
 3. *
-  **raw = > sys.module_source**
+  We retain **`raw` = [Module source](sys.module_source())**.
   1. not `raw`
-    **p = ""**
+    We retain **p = ""**.
   2. *
-    **p = > prompt_body src=`raw`**
+    We retain **`p` = [Prompt body](prompt_body(src=`raw`))**.
 
-*> self.complete prompt=`p` stream=True echo=`echo` stream_kind=`stream_kind`*
+Return *[Complete](self.complete(prompt=`p`, stream=True, echo=`echo`, stream_kind=`stream_kind`))*.
 
 ## complete_result
-    + `prompt`=None
-    + `messages`=None
-    + `selection`=None
-    + `strict_selection`=False
-    + `stream`=False
-    + `echo`=False
-    + `stream_kind`="delta"
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| prompt | any | None | Prompt text or structured prompt expected by this adapter |
+| messages | any | None | Ordered chat message records |
+| selection | any | None | Explicit runtime/model selection |
+| strict_selection | any | False | Whether an unresolved selection is an error |
+| stream | any | False | Whether to preserve streaming behavior or emit stream events |
+| echo | any | False | Whether to print the documented incremental output |
+| stream_kind | any | "delta" | Streaming event projection selected by the caller |
+
+| 返回 | 类型 | 说明 |
+|---|---|---|
+| result | any | Transport pack via `ext/ai/llm/openai` (Ollama uses the same OpenAI-compatible path). Non-stream → `{text,usage,finish}`; stream → `{events}`. Prefer `messages=` for multi-turn; optional `selection=` (ModelSelectionV1) with `strict_selection=True` for request-scoped identity (M01). |
+
+Use `prompt`=None, `messages`=None, `selection`=None, `strict_selection`=False, `stream`=False, `echo`=False, `stream_kind`="delta" as the inputs for this operation.
 
 Transport pack via `ext/ai/llm/openai` (Ollama uses the same OpenAI-compatible path). Non-stream → `{text,usage,finish}`; stream → `{events}`. Prefer `messages=` for multi-turn; optional `selection=` (ModelSelectionV1) with `strict_selection=True` for request-scoped identity (M01).
 
-*> openai.chat_completions base_url=[base_url](access(self, "base_url")) api_key=[api_key](access(self, "api_key")) model=[model](access(self, "model")) prompt=`prompt` messages=`messages` selection=`selection` strict_selection=`strict_selection` stream=`stream` echo=`echo` stream_kind=`stream_kind` suffix=[suffix](access(self, "suffix")) bearer=[bearer](access(self, "bearer"))*
+Return *[Chat completions](openai.chat_completions(base_url=[base_url](access(`self`, "base_url")), api_key=[api_key](access(`self`, "api_key")), model=[model](access(`self`, "model")), prompt=`prompt`, messages=`messages`, selection=`selection`, strict_selection=`strict_selection`, stream=`stream`, echo=`echo`, stream_kind=`stream_kind`, suffix=[suffix](access(`self`, "suffix")), bearer=[bearer](access(`self`, "bearer"))))*.
 
 ## complete
-    + `prompt`
-    + `stream`=False
-    + `echo`=False
-    + `stream_kind`="delta"
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| prompt | any | required | Prompt text or structured prompt expected by this adapter |
+| stream | any | False | Whether to preserve streaming behavior or emit stream events |
+| echo | any | False | Whether to print the documented incremental output |
+| stream_kind | any | "delta" | Streaming event projection selected by the caller |
+
+| 返回 | 类型 | 说明 |
+|---|---|---|
+| result | any | Internal / compatibility primitive. Prefer `ask` / `stream` in new code. |
+
+Use `prompt`, `stream`=False, `echo`=False, `stream_kind`="delta" as the inputs for this operation.
 
 Internal / compatibility primitive. Prefer `ask` / `stream` in new code.
 
 1. `stream`
-  **pack = > self.complete_result prompt=`prompt` stream=True echo=`echo` stream_kind=`stream_kind`**
-  **_ret = > json.get value=`pack` key="events"**
-  *_ret*
+  We retain **`pack` = [Complete result](self.complete_result(prompt=`prompt`, stream=True, echo=`echo`, stream_kind=`stream_kind`))**.
+  We retain **`_ret` = [Read the events field](json.get(value=`pack`, key="events"))**.
+  Return *_ret*.
 2. *
-  **pack = > self.complete_result prompt=`prompt` stream=False echo=`echo` stream_kind=`stream_kind`**
-  **_ret = > json.get value=`pack` key="text"**
-  *_ret*
+  We retain **`pack` = [Complete result](self.complete_result(prompt=`prompt`, stream=False, echo=`echo`, stream_kind=`stream_kind`))**.
+  We retain **`_ret` = [Read the text field](json.get(value=`pack`, key="text"))**.
+  Return *_ret*.
 
 ## chat
-    + `prompt`
-    + `stream`=False
-    + `echo`=False
-    + `stream_kind`="delta"
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| prompt | any | required | Prompt text or structured prompt expected by this adapter |
+| stream | any | False | Whether to preserve streaming behavior or emit stream events |
+| echo | any | False | Whether to print the documented incremental output |
+| stream_kind | any | "delta" | Streaming event projection selected by the caller |
+
+| 返回 | 类型 | 说明 |
+|---|---|---|
+| result | any | Alias for `complete` (compat). |
+
+Use `prompt`, `stream`=False, `echo`=False, `stream_kind`="delta" as the inputs for this operation.
 
 Alias for `complete` (compat).
 
-*> self.complete prompt=`prompt` stream=`stream` echo=`echo` stream_kind=`stream_kind`*
+Return *[Complete](self.complete(prompt=`prompt`, stream=`stream`, echo=`echo`, stream_kind=`stream_kind`))*.

@@ -169,3 +169,46 @@ body.reader-page .nav { visibility:hidden; }
 body.reader-page #nav-toggle:checked ~ .shell .nav { visibility:visible; }
 
 @media print { body.reader-page .document-surface { padding-bottom:0; } }
+
+/* Action text belongs to the sentence; its implementation belongs to a note. */
+body.reader-page .doc-line { font:19px/1.8 var(--serif); overflow-wrap:anywhere; }
+body.reader-page .mq-anchor:has(.occl-label) { background:transparent; border:0; padding:0; }
+body.reader-page button.occl-label { display:inline; appearance:none; font:inherit; color:var(--olive); background:transparent; border:0; border-bottom:1px dotted var(--gold); border-radius:0; padding:0 1px; cursor:pointer; text-align:inherit; }
+body.reader-page button.occl-label:hover { background:var(--fill); }
+body.reader-page .occl-stub { display:inline; font:11px/1.5 var(--sans); border:1px solid var(--gold); border-radius:5px; padding:2px 5px; margin-left:6px; color:var(--focus); white-space:normal; }
+body.reader-page details.annot-implementation { display:block; padding:8px 12px; border-radius:7px; border:1px solid var(--line); margin:5px 0; }
+body.reader-page .annot-implementation > summary { cursor:pointer; font:12px/1.6 var(--sans); color:var(--olive); }
+body.reader-page .annot-implementation .occl-code { display:block; text-align:left; white-space:pre-wrap; overflow-wrap:anywhere; font:12px/1.7 var(--mono); padding:6px 0; border:0; border-radius:0; background:transparent; }
+body.reader-page details.annot-implementation.is-margin-note { padding:5px 0; border:0; margin:0; }
+body.reader-page .is-margin-note.annot-implementation > summary { font:15px/1.5 var(--serif); }
+.logic-hint { display:block; color:var(--muted); font:10px/1.6 var(--sans); margin-top:5px; }
+.reader-syntax-guide { font:13px/1.7 var(--sans); border:1px solid var(--line); padding:12px 16px; border-radius:9px; margin:0 0 28px; color:var(--muted); }
+.reader-syntax-guide > summary { cursor:pointer; color:var(--olive); }
+.reader-syntax-guide p { margin:12px 0; }
+.knowledge-table-wrap { max-width:100%; overflow-x:auto; }
+.reader-syntax-guide table,.knowledge-panel table { width:100%; border-collapse:collapse; font:12px/1.65 var(--sans); }
+.reader-syntax-guide th,.reader-syntax-guide td,.knowledge-panel th,.knowledge-panel td { padding:9px 10px; border-bottom:1px solid var(--line); text-align:left; vertical-align:top; }
+.reader-syntax-guide td:first-child { min-width:115px; }
+.reader-page .knowledge-block { border-top:1px solid var(--line); padding-top:22px; font:14px/1.7 var(--sans); }
+.reader-page .knowledge-block > summary { color:var(--olive); font:18px/1.6 var(--serif); }
+.knowledge-intro { margin:20px 0; }.knowledge-intro h3 { font:22px/1.5 var(--serif); margin:0 0 8px; }
+.knowledge-intro p { margin:7px 0; }
+.knowledge-card { margin:12px 0; border:1px solid var(--line); border-radius:10px; overflow:hidden; font:13px/1.75 var(--sans); }
+.knowledge-card > summary { display:flex; align-items:baseline; flex-wrap:wrap; gap:10px; padding:14px 18px; cursor:pointer; background:var(--fill); }
+.knowledge-card > summary::before { content:'›'; color:var(--gold); }.knowledge-card[open] > summary::before { content:'⌄'; }
+.knowledge-unit-name { font:18px/1.6 var(--serif); overflow-wrap:anywhere; }.knowledge-unit-kind { font:11px/1.5 var(--sans); color:var(--muted); }
+.knowledge-unit-body { padding:16px 18px; }.knowledge-unit-body h4 { margin:20px 0 8px; font:600 13px/1.6 var(--sans); color:var(--olive); }
+.knowledge-unit-body p { margin:6px 0; }.knowledge-source-link { color:var(--olive); border-bottom:1px dotted var(--gold); font-size:12px; }
+.knowledge-status { display:grid; grid-template-columns:100px minmax(0,1fr); gap:7px 12px; margin:8px 0; }.knowledge-status dt { color:var(--muted); }.knowledge-status dd { margin:0; }
+.knowledge-panel code { white-space:pre-wrap; overflow-wrap:anywhere; font:11px/1.65 var(--mono); }
+.knowledge-dependencies { padding-left:20px; }.knowledge-dependencies a { border-bottom:1px dotted var(--gold); }
+.knowledge-steps,.knowledge-technical { border-top:1px solid var(--line); margin-top:18px; padding-top:12px; }
+.knowledge-steps > summary,.knowledge-technical > summary { font:12px/1.7 var(--sans); cursor:pointer; color:var(--muted); }
+.knowledge-step { padding:5px 0; overflow-wrap:anywhere; }.knowledge-step-kind { display:inline-block; color:var(--olive); min-width:4em; margin-right:8px; }
+.knowledge-technical dl { font-size:11px; }.knowledge-technical dd { margin:4px 0 14px; overflow-wrap:anywhere; }
+.reader-dialog:has(.knowledge-panel) { width:min(850px,calc(100vw - 32px)); }
+@media(max-width:600px) { body.reader-page .doc-line { font-size:17px; }.knowledge-unit-body { padding:12px; }.knowledge-status { grid-template-columns:80px minmax(0,1fr); }.knowledge-card > summary { padding:12px; }.knowledge-table-wrap th,.knowledge-table-wrap td { min-width:65px; }.reader-syntax-guide { padding:10px; } }
+@media print { .annot-implementation { break-inside:avoid; }.reader-syntax-guide { display:none; }.knowledge-technical { overflow-wrap:anywhere; } }
+.reader-dialog .knowledge-table-wrap table { width:100%; border-collapse:collapse; font:12px/1.7 var(--sans); }
+.reader-dialog .knowledge-table-wrap th,.reader-dialog .knowledge-table-wrap td { text-align:left; padding:8px 10px; border-bottom:1px solid var(--line); vertical-align:top; overflow-wrap:anywhere; }
+.reader-run-summary { color:var(--olive); }.reader-dialog > details { margin:16px 0; }

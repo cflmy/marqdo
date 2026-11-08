@@ -35,6 +35,10 @@ pub struct CallStep {
     pub function: String,
     pub args: BTreeMap<String, serde_json::Value>,
     pub effects: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub result: Option<serde_json::Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fs_root: Option<PathBuf>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub toget: Option<String>,
 }
@@ -97,18 +101,22 @@ pub fn resolve_args(
         live.insert(k.clone(), json_to_value(v).map_err(|e| anyhow::anyhow!(e))?);
     }
     let needs_replay = args.iter().any(|(_, v)| {
-        matches!(v, Value::Text(t) if t.starts_with('$') || t.starts_with('@'))
-            && {
-                let name = v_text_ref(v);
-                session.journal_bindings.contains_key(name)
-                    || (!session.bindings.contains_key(name)
-                        && session.steps.iter().any(|s| s.toget.as_deref() == Some(name)))
-            }
+        matches!(v, Value::Text(t) if t.starts_with('$') || t.starts_with('@')) && {
+            let name = v_text_ref(v);
+            session.journal_bindings.contains_key(name)
+                || (!session.bindings.contains_key(name)
+                    && session
+                        .steps
+                        .iter()
+                        .any(|s| s.toget.as_deref() == Some(name)))
+        }
     });
-    if needs_replay || args.iter().any(|(_, v)| {
-        matches!(v, Value::Text(t) if (t.starts_with('$') || t.starts_with('@'))
+    if needs_replay
+        || args.iter().any(|(_, v)| {
+            matches!(v, Value::Text(t) if (t.starts_with('$') || t.starts_with('@'))
             && session.journal_bindings.contains_key(&t[1..]))
-    }) {
+        })
+    {
         live = replay_live(session, backend)?;
     }
     let mut out = Vec::with_capacity(args.len());
@@ -150,9 +158,12 @@ fn resolve_one(
     }
     // Last resort: full replay
     let live = replay_live(session, backend)?;
-    live.get(key)
-        .cloned()
-        .ok_or_else(|| anyhow::anyhow!("call.session_unbound: `${key}` not in session {}", session.session))
+    live.get(key).cloned().ok_or_else(|| {
+        anyhow::anyhow!(
+            "call.session_unbound: `${key}` not in session {}",
+            session.session
+        )
+    })
 }
 
 fn replay_live(session: &CallSession, backend: Backend) -> Result<BTreeMap<String, Value>> {
@@ -179,13 +190,20 @@ fn replay_live(session: &CallSession, backend: Backend) -> Result<BTreeMap<Strin
             args.push((k.clone(), val));
         }
         let effects = CallEffects::parse(&step.effects)?;
-        let value = call::call_file_raw(
-            Path::new(&step.file),
-            &step.function,
-            &args,
-            effects,
-            backend,
-        )?;
+        let value = if effects.needs_snapshot() {
+            let result = step.result.as_ref().ok_or_else(|| anyhow::anyhow!(
+                "call.session_replay: effectful step has no durable result; refusing to repeat {}", step.effects))?;
+            json_to_value(result).map_err(|e| anyhow::anyhow!(e))?
+        } else {
+            call::call_file_raw_with_root(
+                Path::new(&step.file),
+                &step.function,
+                &args,
+                effects,
+                backend,
+                step.fs_root.as_deref(),
+            )?
+        };
         if let Some(name) = &step.toget {
             live.insert(name.clone(), value);
         }
@@ -199,6 +217,7 @@ pub fn record_step(
     function: &str,
     args: &[(String, Value)],
     effects: CallEffects,
+    fs_root: Option<&Path>,
     toget: Option<&str>,
     result: &Value,
 ) -> Result<()> {
@@ -229,7 +248,13 @@ pub fn record_step(
         file: file_s,
         function: function.to_string(),
         args: arg_map,
-        effects: effects.as_str().to_string(),
+        effects: effects.as_str(),
+        result: if is_json_friendly(result) {
+            value_to_json(result).ok()
+        } else {
+            None
+        },
+        fs_root: fs_root.map(|p| p.canonicalize()).transpose()?,
         toget: toget.map(|s| s.to_string()),
     };
     session.steps.push(step);
@@ -267,7 +292,8 @@ fn is_json_friendly(v: &Value) -> bool {
 
 /// Dump journal steps as a minimal Marqdo script for later `marqdo run`.
 pub fn dump_replay_script(session: &CallSession) -> String {
-    let mut out = String::from("# main\n\n# Replayed from call-session journal. Review before trusting.\n\n");
+    let mut out =
+        String::from("# main\n\n# Replayed from call-session journal. Review before trusting.\n\n");
     for (i, step) in session.steps.iter().enumerate() {
         out.push_str(&format!(
             "> print text=\"step {i}: call {} {} effects={}\"\n",
@@ -283,4 +309,47 @@ pub fn dump_replay_script(session: &CallSession) -> String {
 
 pub fn default_session_id() -> String {
     std::env::var("MARQDO_CALL_SESSION").unwrap_or_else(|_| "default".into())
+}
+
+#[cfg(test)]
+mod write_snapshot_tests {
+    use super::*;
+    #[test]
+    fn replay_uses_durable_write_results_instead_of_repeating_io() {
+        let dir = std::env::temp_dir().join(format!("mq-write-replay-{}", std::process::id()));
+        fs::create_dir_all(&dir).unwrap();
+        fs::write(dir.join("log.txt"), "once").unwrap();
+        for backend in [Backend::Tree, Backend::Bytecode] {
+            let step = CallStep {
+                file: Path::new(env!("CARGO_MANIFEST_DIR"))
+                    .join("lib/fs.mq.md")
+                    .to_string_lossy()
+                    .into(),
+                function: "append_text".into(),
+                args: BTreeMap::from([
+                    ("path".into(), serde_json::json!("log.txt")),
+                    ("text".into(), serde_json::json!("once")),
+                ]),
+                effects: "fs.write".into(),
+                result: Some(serde_json::Value::Null),
+                fs_root: Some(dir.clone()),
+                toget: Some("written".into()),
+            };
+            let mut session = CallSession {
+                steps: vec![step],
+                ..Default::default()
+            };
+            assert_eq!(
+                replay_live(&session, backend).unwrap()["written"],
+                Value::None
+            );
+            assert_eq!(fs::read_to_string(dir.join("log.txt")).unwrap(), "once");
+            session.steps[0].result = None;
+            assert!(replay_live(&session, backend)
+                .unwrap_err()
+                .to_string()
+                .contains("refusing to repeat"));
+        }
+        fs::remove_dir_all(dir).unwrap();
+    }
 }

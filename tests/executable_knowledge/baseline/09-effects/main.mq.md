@@ -2,6 +2,8 @@
 markup: occlusion
 title: S2 G06 效应传递与未知不纯
 status: implemented
+import:
+  fs: lib/fs.mq.md
 ---
 
 ## save

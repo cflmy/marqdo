@@ -120,6 +120,19 @@ enum Commands {
         #[arg(long = "fs-root", value_name = "DIR")]
         fs_root: Option<PathBuf>,
 
+        /// Deny filesystem writes in this run and its file subtasks.
+        #[arg(long)]
+        deny_fs_write: bool,
+        /// Deny process execution.
+        #[arg(long)]
+        deny_exec: bool,
+        /// Deny network access.
+        #[arg(long)]
+        deny_net: bool,
+        /// Deny native plugin loading.
+        #[arg(long)]
+        deny_plugin: bool,
+
         /// Isolated worker: call `lib.member` on the site entry instead of `# main`.
         #[arg(long = "call-lib-path", value_name = "LIB.MEMBER")]
         call_lib_path: Option<String>,
@@ -158,9 +171,13 @@ enum Commands {
         #[arg(long, value_enum, default_value_t = BackendCli::Tree)]
         backend: BackendCli,
 
-        /// Side effects this call may perform (`none` = pure only; `plugin` allows ABI plugins).
+        /// Comma-separated effect grants: none, plugin, fs.read, fs.write, output.write, etc.
         #[arg(long, default_value = "none")]
         effects: String,
+
+        /// Directory available to file tools; defaults to the called file directory.
+        #[arg(long)]
+        fs_root: Option<PathBuf>,
 
         /// Call-session id for `toget` / `$name` (default: env `MARQDO_CALL_SESSION` or `default`).
         #[arg(long)]
@@ -769,6 +786,10 @@ fn try_main(cli: Cli) -> Result<i32> {
             args_json,
             json: _,
             legacy_markup,
+            deny_fs_write,
+            deny_exec,
+            deny_net,
+            deny_plugin,
         } => {
             let path = file.unwrap_or_else(|| PathBuf::from("index.mq.md"));
             let stdin_lines = match stdin_file {
@@ -809,6 +830,10 @@ fn try_main(cli: Cli) -> Result<i32> {
                     ..RunOptions::default()
                 }
             };
+            opts.allow_fs_write = !deny_fs_write;
+            opts.allow_exec = !deny_exec;
+            opts.allow_net = !deny_net;
+            opts.allow_plugin = !deny_plugin;
             if dump_all {
                 opts.backend = backend.into();
             }
@@ -828,6 +853,7 @@ fn try_main(cli: Cli) -> Result<i32> {
             json,
             backend,
             effects,
+            fs_root,
             session,
             toget,
         } => {
@@ -858,6 +884,7 @@ fn try_main(cli: Cli) -> Result<i32> {
                     backend.into(),
                     marqdo::call::CallOptions {
                         effects,
+                        fs_root,
                         session,
                         toget,
                     },

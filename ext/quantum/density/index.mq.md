@@ -46,142 +46,156 @@ independent matrices in tests/ext/quantum-linalg-smoke.mq.md.
 
 ## from_state
 
-| 参数 | 类型 | 说明 |
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| state | any | required | pure state or circuit |
+
+| 返回 | 类型 | 说明 |
 |------|------|------|
-| state | any | pure state or circuit |
+| result | any | density handle |
+
+Use `state` as the inputs for this operation.
 
 Form rho as the outer product of a pure `state` (or the ideal state of a
 circuit). Use this when you trust the pure-state picture and want mixed-state
 tools without writing a matrix by hand.
 
+We **[Load the native plugin required by this operation](cap.load())**.
+Return *[Form rho as the outer product of a pure state (or the ideal state of a circuit)](quantum_density_from_state(state=`state`))*.
+
+## from_matrix
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| matrix | any | required | Hermitian matrix |
+
 | 返回 | 类型 | 说明 |
 |------|------|------|
 | result | any | density handle |
 
-> cap.load
-*> quantum_density_from_state state=`state`*
-
-## from_matrix
-
-| 参数 | 类型 | 说明 |
-|------|------|------|
-| matrix | any | Hermitian matrix |
+Use `matrix` as the inputs for this operation.
 
 Build rho from an explicit Hermitian `matrix`. Pair with formula blocks in the
 lecture so the matrix on the page is the matrix in the simulator. Size is
 limited by the plugin.
 
-| 返回 | 类型 | 说明 |
-|------|------|------|
-| result | any | density handle |
-
-> cap.load
-*> quantum_density_from_matrix matrix=`matrix`*
+We **[Load the native plugin required by this operation](cap.load())**.
+Return *[Build rho from an explicit Hermitian matrix](quantum_density_from_matrix(matrix=`matrix`))*.
 
 ## purity
 
-| 参数 | 类型 | 说明 |
-|------|------|------|
-| density | any | density operator |
-
-Compute the trace of rho squared for `density`. Values near one mean nearly
-pure; lower values mean classical mixing or traced-out entanglement.
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| density | any | required | density operator |
 
 | 返回 | 类型 | 说明 |
 |------|------|------|
 | result | number | purity |
 
-> cap.load
-*> quantum_density_purity density=`density`*
+Use `density` as the inputs for this operation.
+
+Compute the trace of rho squared for `density`. Values near one mean nearly
+pure; lower values mean classical mixing or traced-out entanglement.
+
+We **[Load the native plugin required by this operation](cap.load())**.
+Return *[Compute the trace of rho squared for density. Values near one mean nearly pure; lower values mean classical mixing or traced-out entanglement.](quantum_density_purity(density=`density`))*.
 
 ## partial_trace
 
-| 参数 | 类型 | 说明 |
-|------|------|------|
-| density | any | joint density |
-| keep | any | qubit index list to keep |
-
-Keep listed qubits in `keep` and trace out the rest of `density`. Indices use
-LSB equals zero. The result is generally mixed even when the joint state was
-pure.
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| keep | any | required | qubit index list to keep |
+| density | any | required | joint density |
 
 | 返回 | 类型 | 说明 |
 |------|------|------|
 | result | any | reduced density |
 
-> cap.load
-*> quantum_density_partial_trace density=`density` keep=`keep`*
+Use `keep`, `density` as the inputs for this operation.
+
+Keep listed qubits in `keep` and trace out the rest of `density`. Indices use
+LSB equals zero. The result is generally mixed even when the joint state was
+pure.
+
+We **[Load the native plugin required by this operation](cap.load())**.
+Return *[Keep listed qubits in keep and trace out the rest of density](quantum_density_partial_trace(density=`density`, keep=`keep`))*.
 
 ## expect
 
-| 参数 | 类型 | 说明 |
-|------|------|------|
-| density | any | density operator |
-| obs | any | Pauli string or matrix |
-
-Expectation of observable `obs` on `density`. Pauli strings use left equals
-high bit. Pass a matrix when the observable is not a Pauli product.
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| obs | any | required | Pauli string or matrix |
+| density | any | required | density operator |
 
 | 返回 | 类型 | 说明 |
 |------|------|------|
 | result | number | expectation value |
 
-> cap.load
-*> quantum_density_expect density=`density` obs=`obs`*
+Use `obs`, `density` as the inputs for this operation.
+
+Expectation of observable `obs` on `density`. Pauli strings use left equals
+high bit. Pass a matrix when the observable is not a Pauli product.
+
+We **[Load the native plugin required by this operation](cap.load())**.
+Return *[Expectation of observable obs on density. Pauli strings use left equals high bit. Pass a matrix when the observable is not a Pauli product.](quantum_density_expect(density=`density`, obs=`obs`))*.
 
 ## eig
 
-| 参数 | 类型 | 说明 |
-|------|------|------|
-| density | any | Hermitian density |
-
-Hermitian spectrum of `density` as eigenvalues and eigenvectors. Useful when a
-lecture needs the eigenbasis of rho.
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| density | any | required | Hermitian density |
 
 | 返回 | 类型 | 说明 |
 |------|------|------|
 | result | any | eigenvalues and eigenvectors |
 
-> cap.load
-*> quantum_density_eig density=`density`*
+Use `density` as the inputs for this operation.
+
+Hermitian spectrum of `density` as eigenvalues and eigenvectors. Useful when a
+lecture needs the eigenbasis of rho.
+
+We **[Load the native plugin required by this operation](cap.load())**.
+Return *[Hermitian spectrum of density as eigenvalues and eigenvectors. Useful when a lecture needs the eigenbasis of rho.](quantum_density_eig(density=`density`))*.
 
 ## matrix
 
-| 参数 | 类型 | 说明 |
-|------|------|------|
-| density | any | Density handle / 密度句柄 |
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| density | any | required | Density handle / 密度句柄 |
 
 | 返回 | 类型 | 说明 |
 |------|------|------|
 | result | any | Nested complex entries with re and im |
 
+Use `density` as the inputs for this operation.
+
 Export the explicit nested complex matrix of `density`. Reading entries does not
 change the density operator. Use the exported entries for an independent trace
 check or further linear algebra; the caller remains responsible for physicality.
 
-> cap.load
-*> quantum_density_matrix density=`density`*
+We **[Load the native plugin required by this operation](cap.load())**.
+Return *[Export the explicit nested complex matrix of density](quantum_density_matrix(density=`density`))*.
 
 # density
 
-| 参数 | 类型 | 说明 |
-|------|------|------|
-| state | any | Default None |
-| matrix | any | Default None |
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| state | any | None | Default None |
+| matrix | any | None | Default None |
 
 | 返回 | 类型 | 说明 |
 |------|------|------|
 | result | any | Returned value |
 
-Inputs: `state`=None, `matrix`=None (input).
+Use `state`=None, `matrix`=None as the inputs for this operation.
 
 Construct a density operator from a pure state or circuit (state=) or from an explicit Hermitian matrix=. Density operations support at most six qubits. Pure and mixed states share this object surface for purity, partial trace, and expectation.
 
-> cap.load
+We **[Load the native plugin required by this operation](cap.load())**.
 1. `matrix`
-  *> quantum_density_from_matrix matrix=`matrix`*
+  Return *[Construct a density operator from a pure state or circuit (state=) or from an explicit Hermitian matrix=](quantum_density_from_matrix(matrix=`matrix`))*.
 2. *
-  *> quantum_density_from_state state=`state`*
+  Return *[Construct a density operator from a pure state or circuit (state=) or from an explicit Hermitian matrix=](quantum_density_from_state(state=`state`))*.
 
 ## matrix
 
@@ -191,7 +205,7 @@ Construct a density operator from a pure state or circuit (state=) or from an ex
 
 Return the explicit matrix of this density operator so authors can inspect entries or hand the array to further linear-algebra steps outside the quantum package.
 
-*> quantum_density_matrix density=`self`*
+Return *[Return the explicit matrix of this density operator so authors can inspect entries or hand the array to further linear-algebra steps outside the quantum package](quantum_density_matrix(density=`self`))*.
 
 ## purity
 
@@ -201,23 +215,23 @@ Return the explicit matrix of this density operator so authors can inspect entri
 
 Compute Tr(ρ²). Values near one mean a pure state; mixed states are strictly less than one. Use this as a quick entanglement or decoherence check after a partial trace.
 
-*> quantum_density_purity density=`self`*
+Return *[Compute Tr(ρ²)](quantum_density_purity(density=`self`))*.
 
 ## partial_trace
 
-| 参数 | 类型 | 说明 |
-|------|------|------|
-| keep | any | Required |
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| keep | any | required | Required |
 
 | 返回 | 类型 | 说明 |
 |------|------|------|
 | result | any | Density operator handle |
 
-Inputs: `keep` (input).
+Use `keep` as the inputs for this operation.
 
 Trace out every qubit except those listed in keep (LSB index 0). Returns the reduced density on the kept subsystem for entanglement lectures and purity checks.
 
-*> quantum_density_partial_trace density=`self` keep=`keep`*
+Return *[Trace out every qubit except those listed in keep (LSB index 0). Returns the reduced density on the kept subsystem for entanglement lectures and purity checks.](quantum_density_partial_trace(density=`self`, keep=`keep`))*.
 
 ## eig
 
@@ -227,37 +241,37 @@ Trace out every qubit except those listed in keep (LSB index 0). Returns the red
 
 Compute the Hermitian spectrum of this density operator as eigenvalues and eigenvectors. Handy for lecture plots and for verifying that a constructed rho is physical.
 
-*> quantum_density_eig density=`self`*
+Return *[Compute the Hermitian spectrum of this density operator as eigenvalues and eigenvectors](quantum_density_eig(density=`self`))*.
 
 ## expect
 
-| 参数 | 类型 | 说明 |
-|------|------|------|
-| obs | any | Required |
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| obs | any | required | Required |
 
 | 返回 | 类型 | 说明 |
 |------|------|------|
 | result | number | Scalar observation |
 
-Inputs: `obs` (input).
+Use `obs` as the inputs for this operation.
 
 Expectation value of observable obs on this density. obs may be a Pauli string with the left end as the high bit, or an explicit matrix matching the density dimension.
 
-*> quantum_density_expect density=`self` obs=`obs`*
+Return *[Expectation value of observable obs on this density](quantum_density_expect(density=`self`, obs=`obs`))*.
 
 ## draw
 
-| 参数 | 类型 | 说明 |
-|------|------|------|
-| path | any | Default None |
-| kind | any | Default hinton |
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| path | any | None | Default None |
+| kind | any | "hinton" | Default hinton |
 
 | 返回 | 类型 | 说明 |
 |------|------|------|
 | result | any | quantum_svg with kind and svg |
 
-Inputs: `path`=None, `kind`="hinton" (input).
+Use `path`=None, `kind`="hinton" as the inputs for this operation.
 
 Draw a Hinton diagram, city plot, density grid, or Pauli vector for this density. Optional path writes SVG; kind selects which visual metaphor the lecture uses.
 
-*> quantum_density_draw density=`self` path=`path` kind=`kind`*
+Return *[Draw a Hinton diagram, city plot, density grid, or Pauli vector for this density](quantum_density_draw(density=`self`, path=`path`, kind=`kind`))*.

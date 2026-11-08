@@ -12,25 +12,20 @@ its headings are tools. The canonical path checker lives in the host as
 marqdo check --narrative-ratio so directory dogfood does not need filesystem
 effects inside a pure call.
 
-## For AI agents
-
-If you are an AI agent, run marqdo check --narrative-ratio on each extension
-file you edit. Do not invent a second schema. Call remind on this file when you
-need a short machine-readable reminder of the rule. Each double-hash heading is
-a tool.
-
-*None*
+For AI agents: run marqdo check --narrative-ratio on edited library files.
+This is a readability signal; parsing, contracts, executable examples and real
+behavior tests provide correctness evidence. Headings name actual tools only.
 
 ## remind
+
+| 返回 | 类型 | 说明 |
+|------|------|------|
+| result | any | rule reminder map |
 
 Return a small map stating the narration threshold and the CLI to run. Takes no
 parameters. Use this when an agent needs a tool-shaped reminder without opening
 design docs. The threshold is one half. Contract tables count as narration;
 call lines and bold statements count as code.
-
-| 返回 | 类型 | 说明 |
-|------|------|------|
-| result | any | rule reminder map |
 
 `out` =
 
@@ -38,4 +33,4 @@ call lines and bold statements count as code.
 |-----------|-----|--------|
 | 0.5 | marqdo check --narrative-ratio FILE | narration |
 
-*out*
+Return *out*.
