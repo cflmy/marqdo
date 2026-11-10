@@ -1,7 +1,8 @@
-marqdo (2.7.1-1ppa1) noble; urgency=medium
+marqdo (2.7.1-1ppa2) noble; urgency=medium
 
   * Release 2.7.1; see the reviewed upstream CHANGELOG.
   * Stop reapplying the engineering compatibility fix already in upstream.
+  * Include cached orig bytes until publication is confirmed by Launchpad.
 
  -- Marqdo Maintainers <cflmy@users.noreply.github.com>  Wed, 11 Nov 2026 00:03:29 +0800
 

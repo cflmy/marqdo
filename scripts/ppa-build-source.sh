@@ -115,11 +115,13 @@ rm -rf "$PKG_ROOT"
 mkdir -p "$PKG_ROOT" "$BUILD_AREA" "$RUST_CACHE"
 
 REUSE_ORIG=0
+ORIG_PUBLISHED=0
 ORIG_SRC=""
 if [ "$FORCE_ORIG" != "1" ]; then
   # Prefer the bytes already accepted by Launchpad (rewriting .orig is rejected).
   if download_published_orig "$RUST_CACHE/$ORIG_NAME"; then
     ORIG_SRC="$RUST_CACHE/$ORIG_NAME"
+    ORIG_PUBLISHED=1
   elif ORIG_SRC="$(resolve_existing_orig)"; then
     echo "warning: could not fetch PPA ${ORIG_NAME}; using local ${ORIG_SRC}" >&2
     echo "warning: if its sha256 differs from the archive, Launchpad will reject the upload" >&2
@@ -223,8 +225,9 @@ ln -sfn "$BUILD_AREA/$ORIG_NAME" "$(dirname "$PKG_ROOT")/$ORIG_NAME"
 ls -lh "$BUILD_AREA/$ORIG_NAME"
 
 cd "$PKG_ROOT"
-# -sd: debian-only upload (reuse published orig). -sa: include orig (new upstream).
-if [ "$REUSE_ORIG" -eq 1 ]; then
+# Local cache reuse does not prove Launchpad already has the orig archive.
+# Include its unchanged bytes until the published download succeeds.
+if [ "$ORIG_PUBLISHED" -eq 1 ]; then
   DEBUILD_ORIG_FLAG="-sd"
   echo "==> debuild -S ${DEBUILD_ORIG_FLAG} (key ${GPG_KEY}; not re-uploading .orig)"
 else
