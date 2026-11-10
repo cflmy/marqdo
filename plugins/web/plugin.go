@@ -163,6 +163,7 @@ extern int web_render_nodes(char *args_json, char **out_json, char **err_msg);
 extern int web_render_document(char *args_json, char **out_json, char **err_msg);
 extern int web_dom_markdown(char *args_json, char **out_json, char **err_msg);
 extern int web_serve_root(char *args_json, char **out_json, char **err_msg);
+extern int web_prepare_root(char *args_json, char **out_json, char **err_msg);
 extern int web_inspect(char *args_json, char **out_json, char **err_msg);
 extern int web_app_use(char *args_json, char **out_json, char **err_msg);
 extern int web_route_use(char *args_json, char **out_json, char **err_msg);
@@ -272,6 +273,7 @@ static int register_core(void) {
 	if (host_register((char *)"web_render_document", (char *)"page,body,db,title", web_render_document) != 0) return 1;
 	if (host_register((char *)"web_dom_markdown", (char *)"text", web_dom_markdown) != 0) return 1;
 	if (host_register((char *)"web_serve_root", (char *)"root,host,port,db,static_dir,middleware", web_serve_root) != 0) return 1;
+	if (host_register((char *)"web_prepare_root", (char *)"root,host,port,db,static_dir,middleware", web_prepare_root) != 0) return 1;
 	if (host_register((char *)"web_inspect", (char *)"app,root", web_inspect) != 0) return 1;
 	if (host_register((char *)"web_app_use", (char *)"app,middleware", web_app_use) != 0) return 1;
 	if (host_register((char *)"web_route_use", (char *)"route,middleware", web_route_use) != 0) return 1;

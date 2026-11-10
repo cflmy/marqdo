@@ -495,28 +495,38 @@ fn append_eof(source: &str, block: &str) -> String {
     trimmed
 }
 
+fn entry_target(path: &std::path::Path) -> Result<std::path::PathBuf,String> {
+    if path.is_absolute() { return Ok(path.to_path_buf()); }
+    // Entry paths originate at the caller's process cwd, as in the runner.
+    std::env::current_dir().map(|base|base.join(path)).map_err(|e|format!("writeback entry path: {e}"))
+}
+fn entry_path_text(path: &std::path::Path) -> Result<Value,String> {
+    let path=entry_target(path)?;
+    Ok(Value::Text(path.to_str().ok_or("writeback path must be UTF-8")?.to_string()))
+}
 fn persist(ctx: &mut HostContext, source: &str) -> Result<(), String> {
     if !ctx.allow_fs_write() {
         return Err("writeback disabled (fs_write capability off)".into());
     }
-    let path = ctx
-        .entry_path
-        .as_ref()
-        .ok_or_else(|| "writeback: no entry file".to_string())?;
-    std::fs::write(path, source).map_err(|e| format!("writeback write {}: {e}", path.display()))?;
-    ctx.entry_source = Some(source.to_string());
+    let path=ctx.entry_path.as_ref().ok_or("writeback: no entry file")?;
+    let path=entry_path_text(path)?;
+    // Use the same root, symlink and CoW rules as ordinary native file writes.
+    super::fs::write_text(ctx,&path,&Value::Text(source.to_string()))?;
+    ctx.entry_source=Some(source.to_string());
     Ok(())
 }
-
 fn load_entry_source(ctx: &HostContext) -> Result<String, String> {
-    if let Some(path) = &ctx.entry_path {
-        if let Ok(text) = std::fs::read_to_string(path) {
-            return Ok(text);
+    if let Some(path)=&ctx.entry_path {
+        let target=entry_target(path)?;
+        match super::fs::read_text(ctx,&entry_path_text(path)?) {
+            Ok(Value::Text(text))=>return Ok(text),
+            Ok(_)=>return Err("writeback entry source must be text".into()),
+            // In-memory entry buffers may intentionally precede file creation.
+            Err(_) if !target.exists()=>{},
+            Err(error)=>return Err(error),
         }
     }
-    ctx.entry_source
-        .clone()
-        .ok_or_else(|| "writeback: no entry source".to_string())
+    ctx.entry_source.clone().ok_or_else(||"writeback: no entry source".to_string())
 }
 
 fn with_writeback_lock<T>(f: impl FnOnce() -> Result<T, String>) -> Result<T, String> {

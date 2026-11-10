@@ -28,7 +28,7 @@ func sameOrigin(r *http.Request) bool {
 	return err == nil && strings.EqualFold(u.Host, r.Host)
 }
 
-func (st *state) mountWSRoutes(mux *http.ServeMux) {
+func (st *state) mountWSRoutes(mux routeRegistrar) {
 	for _, path := range sortedKeys(st.wsRoutes) {
 		spec := ws.ParseRouteSpec(st.wsRoutes[path]) // mode + optional room_key / on_message
 		routePath := path

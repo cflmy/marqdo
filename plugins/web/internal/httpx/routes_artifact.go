@@ -33,7 +33,7 @@ func parseArtifactRoute(v any) artifactRoute {
 	}
 }
 
-func (st *state) mountArtifactRoutes(mux *http.ServeMux) {
+func (st *state) mountArtifactRoutes(mux routeRegistrar) {
 	for _, key := range sortedKeys(st.artifactRoutes) {
 		cfg := parseArtifactRoute(st.artifactRoutes[key])
 		if cfg.File == "" || cfg.Path == "" {
@@ -131,7 +131,7 @@ func (st *state) handleArtifact(w http.ResponseWriter, r *http.Request, route ar
 		}
 	}
 
-	value, err := plugin.RunArtifact(route.File, payload)
+	value, err := plugin.RunArtifactAtRoot(route.File, payload, st.entryDir)
 	if err != nil {
 		jsonErr(w, http.StatusInternalServerError, err.Error())
 		return

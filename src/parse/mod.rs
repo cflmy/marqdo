@@ -13,6 +13,7 @@ pub use prose::{
 };
 
 use anyhow::{bail, Result};
+use std::collections::HashSet;
 
 use crate::ast::{
     BranchArm, Expr, Function, Import, IndexKey, Literal, Module, Param, Stmt, Use,
@@ -44,7 +45,7 @@ pub fn parse_classified(lines: &[ClassifiedLine]) -> Result<Module> {
             continue;
         }
         if is_heading(trimmed) {
-            functions.push(cur.parse_function(1)?);
+            functions.push(cur.parse_function(1, &HashSet::new())?);
         } else if line.kind == LineKind::Comment {
             // Intro paragraphs may still contain return-shaped italics (`返回*值*`)
             // or leftover soft emphasis; executable prose belongs inside functions.
@@ -76,6 +77,18 @@ pub fn parse_classified(lines: &[ClassifiedLine]) -> Result<Module> {
     };
     crate::ast::validate_parameters(&module)?;
     Ok(module)
+}
+
+/// Parse one GFM table with the source language's cell and shape rules.
+/// Document readers reject nonliteral expressions before using the value.
+pub(crate) fn parse_gfm_table(source: &str) -> Result<Expr> {
+    let lines = classify_source(source);
+    let mut cursor = Cursor::new(&lines);
+    let table = cursor.consume_table()?;
+    if cursor.skip_noise() {
+        bail!("unexpected content after the selected GFM table");
+    }
+    Ok(table)
 }
 
 struct Cursor<'a> {
@@ -282,7 +295,7 @@ impl<'a> Cursor<'a> {
         Ok(())
     }
 
-    fn parse_function(&mut self, min_level: u8) -> Result<Function> {
+    fn parse_function(&mut self, min_level: u8, inherited: &HashSet<String>) -> Result<Function> {
         let line = self.bump().unwrap();
         let (level, raw_name) = parse_heading(line.text.trim())
             .ok_or_else(|| anyhow::anyhow!("{}:1: expected heading", line.line_no))?;
@@ -317,7 +330,13 @@ impl<'a> Cursor<'a> {
             if is_heading(trimmed) {
                 let (nl, _) = parse_heading(trimmed).unwrap();
                 if nl > level {
-                    fun.children.push(self.parse_function(level + 1)?);
+                    let mut visible = inherited.clone();
+                    let mut unused_reads = HashSet::new();
+                    let mut unused_declarations = Vec::new();
+                    collect_names_needing_input(&fun.body, &mut visible, &mut unused_reads, &HashSet::new(), &mut unused_declarations);
+                    visible.extend(prose_decls.iter().map(|(name, _, _)| name.clone()));
+                    visible.extend(fun.params.iter().map(|param| param.name.clone()));
+                    fun.children.push(self.parse_function(level + 1, &visible)?);
                     continue;
                 }
                 break;
@@ -369,7 +388,13 @@ impl<'a> Cursor<'a> {
             if is_heading(trimmed) {
                 let (nl, _) = parse_heading(trimmed).unwrap();
                 if nl > level {
-                    fun.children.push(self.parse_function(level + 1)?);
+                    let mut visible = inherited.clone();
+                    let mut unused_reads = HashSet::new();
+                    let mut unused_declarations = Vec::new();
+                    collect_names_needing_input(&fun.body, &mut visible, &mut unused_reads, &HashSet::new(), &mut unused_declarations);
+                    visible.extend(prose_decls.iter().map(|(name, _, _)| name.clone()));
+                    visible.extend(fun.params.iter().map(|param| param.name.clone()));
+                    fun.children.push(self.parse_function(level + 1, &visible)?);
                     continue;
                 }
                 break;
@@ -445,7 +470,7 @@ impl<'a> Cursor<'a> {
 
         // 契约提取（T2.1）必须在升参推断**之前**：契约表的单元不污染推断。
         extract_function_contract(&mut fun, self.lines)?;
-        merge_inferred_params(&mut fun, &prose_decls)?;
+        merge_inferred_params(&mut fun, &prose_decls, inherited)?;
         Ok(fun)
     }
 
@@ -2104,11 +2129,15 @@ fn extract_function_contract(fun: &mut Function, lines: &[ClassifiedLine]) -> Re
 fn merge_inferred_params(
     fun: &mut Function,
     prose_decls: &[(String, Option<String>, u32)],
+    inherited: &HashSet<String>,
 ) -> Result<()> {
     use std::collections::HashSet;
 
     let mut needs_input = HashSet::new();
-    let mut bound = HashSet::new();
+    // Captured entry/object bindings are available before the child body.
+    // An explicit prose input still shadows an outer binding of the same name.
+    let explicit: HashSet<_> = prose_decls.iter().map(|(name, _, _)| name.clone()).collect();
+    let mut bound: HashSet<_> = inherited.difference(&explicit).cloned().collect();
     let mut assign_decls = Vec::new();
     // Defaults execute before the body. Reads used only there still require
     // declared inputs; later body assignments cannot satisfy those reads.
@@ -2128,6 +2157,8 @@ fn merge_inferred_params(
         &HashSet::new(),
         &mut assign_decls,
     );
+
+    needs_input.retain(|name| !inherited.contains(name) || explicit.contains(name));
 
     // Declaration order is source order: backtick mentions and first assignment
     // left-hand sides. An assignment promotes only when its right-hand side (or a
@@ -2211,7 +2242,7 @@ fn collect_names_needing_input(
                 let mut reads = std::collections::HashSet::new();
                 collect_reads_expr(value, &mut reads);
                 for r in reads {
-                    if !bound.contains(&r) {
+                    if !bound.contains(&r) && !loop_items.contains(&r) {
                         needs.insert(r);
                     }
                 }
@@ -2220,7 +2251,7 @@ fn collect_names_needing_input(
                 let mut reads = std::collections::HashSet::new();
                 collect_reads_call(call, &mut reads);
                 for r in reads {
-                    if !bound.contains(&r) {
+                    if !bound.contains(&r) && !loop_items.contains(&r) {
                         needs.insert(r);
                     }
                 }
@@ -2229,7 +2260,7 @@ fn collect_names_needing_input(
                 let mut reads = std::collections::HashSet::new();
                 collect_reads_expr(value, &mut reads);
                 for r in reads {
-                    if !bound.contains(&r) {
+                    if !bound.contains(&r) && !loop_items.contains(&r) {
                         needs.insert(r);
                     }
                 }
@@ -2242,7 +2273,7 @@ fn collect_names_needing_input(
                         let mut reads = std::collections::HashSet::new();
                         collect_reads_expr(c, &mut reads);
                         for r in reads {
-                            if !bound.contains(&r) {
+                            if !bound.contains(&r) && !loop_items.contains(&r) {
                                 needs.insert(r);
                             }
                         }
@@ -2929,5 +2960,32 @@ mod escaped_gfm_cell_tests {
         )
         .unwrap();
         assert!(format!("{:?}", module.functions[0].body).contains("source|skill"));
+    }
+}
+
+#[cfg(test)]
+mod lexical_input_tests {
+    use super::*;
+    #[test]
+    fn child_updates_capture_existing_entry_state_without_extra_inputs() {
+        let source="# main\n\n**count = 0**\n\n## bump\n\nWe **count = count + 1** and return *count*.\n";
+        let module=parse_source(source).unwrap();
+        assert!(module.functions[0].children[0].params.is_empty());
+    }
+    #[test]
+    fn explicit_prose_inputs_can_shadow_parent_bindings() {
+        let source="# main\n\n**count = 0**\n\n## add\n\nUse `count` for this independent call.\nReturn *(count + 1)*.\n";
+        let module=parse_source(source).unwrap();
+        let params=&module.functions[0].children[0].params;
+        assert_eq!(params.len(),1);
+        assert_eq!(params[0].name,"count");
+    }
+    #[test]
+    fn reading_a_loop_item_in_a_branch_does_not_promote_a_later_local() {
+        let source="## select\n\nUse `values`.\n- [Inspect values](for values as item)\n  1. `item` != \"\"\n    We **output = item**.\n\nWe **item = \"done\"** and return *item*.\n";
+        let module=parse_source(source).unwrap();
+        let params=&module.functions[0].params;
+        assert_eq!(params.len(),1);
+        assert_eq!(params[0].name,"values");
     }
 }

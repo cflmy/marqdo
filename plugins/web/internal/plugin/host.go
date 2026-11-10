@@ -53,7 +53,15 @@ func CallLibPath(path string, args map[string]any) (any, error) {
 // RunArtifact loads and runs a Document/Endpoint `.mq.md` (ADR 0007).
 // Request fields are passed as Metadata Binding overlays (`arg` / `--bind`).
 func RunArtifact(path string, args map[string]any) (any, error) {
+	return RunArtifactAtRoot(path, args, "")
+}
+
+// RunArtifactAtRoot retains a selected site directory within the host's grant.
+func RunArtifactAtRoot(path string, args map[string]any, root string) (any, error) {
 	payload := map[string]any{"path": path}
+	if root != "" {
+		payload["root"] = root
+	}
 	if len(args) > 0 {
 		payload["args"] = args
 	}

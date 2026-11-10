@@ -18,14 +18,15 @@ smoke.sh             # curl checks against a running serve
 
 ## Run
 
-```bash
-bash scripts/build-web-plugin.sh
-export MARQDO_EXT=$PWD/ext   # if ~/.marqdo/ext is stale
-export MARQDO_WEB_PLUGIN=$PWD/plugins/web/build/libweb.so
-cd examples/marqdo-blog && marqdo run serve.mq.md
-# other terminal:
-bash examples/marqdo-blog/smoke.sh
+从仓库根使用当前 CLI 和开发手册准备原生插件，再调用启动函数：
+
+```sh
+target/debug/marqdo call skills/marqdo-dev/index.mq.md prepare_web --effects plugin --fs-root . --require-ok --json
+target/debug/marqdo call examples/marqdo-blog/serve.mq.md main --effects plugin,fs.write,network.write --fs-root examples/marqdo-blog --require-ok --json
 ```
+
+默认数据库按授权站点根解析到 data/blog.db，重启保留已有文章。准备工程插件见开发入口的 prepare_engineering；验收使用独占副本，不删除现有数据库。
+
 
 | Path | Artifact |
 |------|----------|

@@ -80,7 +80,7 @@
 | [design/ext-cdn.md](design/ext-cdn.md) | **扩展 CDN（R2 / ext.marqdo.com）与分开发版** |
 | [design/ubuntu-ppa.md](design/ubuntu-ppa.md) | **Ubuntu PPA 打包与上传** |
 | [design/ext-web.md](design/ext-web.md) | **官方扩展 `ext/web`（页面/库表/绑定/后台；ABI + CLI；设计锁定）** |
-| [design/ext-web-go-rewrite.md](design/ext-web-go-rewrite.md) | **`plugins/web` Go 全量重写**（多语言 ABI · 网页制备完备 · anlian 验收） |
+| [design/ext-web-go-rewrite.md](design/ext-web-go-rewrite.md) | **`plugins/web` Go 全量重写**（多语言 ABI · 网页制备完备 · 独立工作流验收） |
 | [adr/0004-web-plugin-go.md](adr/0004-web-plugin-go.md) | **Accepted：web 原生插件实现语言为 Go** |
 | [research/ext-web-customization-limits.md](research/ext-web-customization-limits.md) | **`ext/web` 定制限制踩坑盘点**（路由/壳 CSS/鉴权/样式/部署） |
 | [design/ext-web-customization/](design/ext-web-customization/) | **对应解决设计**（C0–C4：前缀可让出、shell_css、gate、布局…） |

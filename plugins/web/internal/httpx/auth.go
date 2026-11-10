@@ -6,11 +6,13 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 
 	"github.com/marqdo/marqdo/plugins/web/internal/app"
 	"github.com/marqdo/marqdo/plugins/web/internal/auth"
+	"github.com/marqdo/marqdo/plugins/web/internal/db"
 	"github.com/marqdo/marqdo/plugins/web/internal/password"
 	"github.com/marqdo/marqdo/plugins/web/internal/ratelimit"
 	"github.com/marqdo/marqdo/plugins/web/internal/rbac"
@@ -372,7 +374,7 @@ func (st *state) hasPageRoute(path string) bool {
 	return ok
 }
 
-func (st *state) mountAuthRoutes(mux *http.ServeMux) {
+func (st *state) mountAuthRoutes(mux routeRegistrar) {
 	st.mountOIDCRoutes(mux)
 	if st.auth.users == nil && !(st.auth.rbac && st.auth.register) && !st.oidcEnabled() {
 		return
@@ -416,6 +418,9 @@ func (st *state) mountAuthRoutes(mux *http.ServeMux) {
 		if adminHome == "" {
 			adminHome = "/admin"
 		}
+		// The canonical no-slash path must be registered too: the global
+		// trailing-slash normalizer otherwise triggers a ServeMux redirect loop.
+		mux.HandleFunc("GET "+adminHome, st.handleAdminHome)
 		mux.HandleFunc("GET "+adminHome+"/{$}", st.handleAdminHome)
 	}
 }
@@ -501,7 +506,6 @@ func (st *state) handleLoginPost(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, dest, http.StatusSeeOther)
 }
 
-
 // tryLogin: GFM users first, then web_users when RBAC is on.
 func (st *state) tryLogin(username, password string) map[string]any {
 	if st.auth.users != nil {
@@ -558,8 +562,45 @@ func (st *state) handleLogout(w http.ResponseWriter, r *http.Request) {
 }
 
 func (st *state) handleAdminHome(w http.ResponseWriter, r *http.Request) {
+	// Only explicitly mounted forms expose their associated business tables.
+	// Never enumerate session/credential tables just because they share a DB.
+	var body strings.Builder
+	body.WriteString(`<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Admin</title></head><body><h1>Admin</h1><p>Mounted forms and their current business records (up to 100 rows per table).</p><nav><a href="/">Site</a></nav>`)
+	seen := map[string]bool{}
+	for _, id := range sortedKeys(st.forms) {
+		selected, ok := st.forms[id].(map[string]any)
+		if !ok {
+			continue
+		}
+		tableName, _ := selected["table"].(string)
+		fmt.Fprintf(&body, `<section><h2>%s</h2><p><a href="/_form/%s">Open form</a></p>`, esc(id), esc(url.PathEscape(id)))
+		if tableName != "" && st.dbURL != "" && !seen[tableName] {
+			current, err := db.Select(st.dbURL, tableName, 100, db.SelectOpts{})
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			var data strings.Builder
+			encoder := json.NewEncoder(&data)
+			encoder.SetIndent("", "  ")
+			encoder.SetEscapeHTML(false)
+			if err := encoder.Encode(current["rows"]); err != nil {
+				http.Error(w, "cannot encode admin records", http.StatusInternalServerError)
+				return
+			}
+			// Escape once for HTML, preserving readable literal angle brackets
+			// instead of displaying JSON's optional Unicode escape sequences.
+			fmt.Fprintf(&body, `<h3>%s</h3><pre style="white-space:pre-wrap;overflow-wrap:anywhere">%s</pre>`, esc(tableName), esc(data.String()))
+			seen[tableName] = true
+		}
+		body.WriteString("</section>")
+	}
+	if len(st.forms) == 0 {
+		body.WriteString("<p>No forms are mounted.</p>")
+	}
+	body.WriteString("</body></html>")
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_, _ = io.WriteString(w, "<!doctype html><html><body><h1>Admin</h1><p>Site administration.</p></body></html>")
+	_, _ = io.WriteString(w, body.String())
 }
 
 func loginDest(r *http.Request, fallback string) string {

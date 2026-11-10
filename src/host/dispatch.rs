@@ -290,6 +290,8 @@ pub enum HostFn {
     ListIntersection = 280,
     ListDifference = 281,
     TableSummarize = 282,
+    DocumentTable = 283,
+    FsResolve = 284,
 }
 
 /// Single source of truth for every host function. `<TAB>` slimming
@@ -578,6 +580,8 @@ pub const HOST_FN_TABLE: &[HostFnDef] = &[
     HostFnDef { id: 280, f: HostFn::ListIntersection, name: "host_table_intersection", required: &["a", "b"], optional: &[] },
     HostFnDef { id: 281, f: HostFn::ListDifference, name: "host_table_difference", required: &["a", "b"], optional: &[] },
     HostFnDef { id: 282, f: HostFn::TableSummarize, name: "host_table_summarize", required: &["list", "key", "field"], optional: &["op"] },
+    HostFnDef { id: 283, f: HostFn::DocumentTable, name: "host_document_table", required: &["text"], optional: &["title", "index"] },
+    HostFnDef { id: 284, f: HostFn::FsResolve, name: "host_fs_resolve", required: &["path"], optional: &[] },
 ];
 
 
@@ -610,6 +614,8 @@ impl HostFn {
             "host_document_links" => Self::DocumentLinks,
             "host_document_replace_table" => Self::DocumentReplaceTable,
             "host_document_tables" => Self::DocumentTables,
+            "host_document_table" => Self::DocumentTable,
+            "host_fs_resolve" => Self::FsResolve,
             "host_document_replace_section" => Self::DocumentReplaceSection,
             "host_document_section" => Self::DocumentSection,
             "host_document_sections" => Self::DocumentSections,
@@ -897,6 +903,8 @@ impl HostFn {
             Self::DocumentLinks => &["pure"],
             Self::DocumentReplaceTable => &["pure"],
             Self::DocumentTables => &["pure"],
+            Self::DocumentTable => &["pure"],
+            Self::FsResolve => &["fs.read"],
             Self::DocumentReplaceSection => &["pure"],
             Self::DocumentSection => &["pure"],
             Self::DocumentSections => &["pure"],
@@ -1206,6 +1214,7 @@ pub fn call_host(
         HostFn::DocumentLinks => super::document::call(ctx, fn_id, bound),
         HostFn::DocumentReplaceTable => super::document::call(ctx, fn_id, bound),
         HostFn::DocumentTables => super::document::call(ctx, fn_id, bound),
+        HostFn::DocumentTable => super::document::call(ctx, fn_id, bound),
         HostFn::DocumentReplaceSection => super::document::call(ctx, fn_id, bound),
         HostFn::DocumentSection => super::document::call(ctx, fn_id, bound),
         HostFn::DocumentSections => super::document::call(ctx, fn_id, bound),
@@ -1275,6 +1284,7 @@ pub fn call_host(
         HostFn::FsMakeDirs => fs::make_dirs(ctx, require(bound, "path")?),
         HostFn::FsRemoveTree => fs::remove_tree(ctx, require(bound, "path")?),
         HostFn::FsStat => fs::stat(ctx, require(bound, "path")?),
+        HostFn::FsResolve => fs::resolve(ctx, require(bound, "path")?),
         HostFn::FsWalk => fs::walk(ctx, require(bound, "path")?),
         HostFn::NowUnix => time::now_unix(),
         HostFn::NowMs => time::now_ms(),

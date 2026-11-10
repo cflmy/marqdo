@@ -4,6 +4,10 @@ markup: occlusion
 
 ## 侧栏
 
+| 返回 | 类型 | 说明 |
+|---|---|---|
+| result | any | The value explicitly returned below; conditional returns follow the selected branch |
+
 右侧归档面板：文章入口、标签、实时小部件。
 
 `侧栏` =
@@ -16,4 +20,4 @@ markup: occlusion
 | 发布文章 | /admin/new | |
 | 实时终端 | /#live | |
 
-*`侧栏`*
+After these steps, return *侧栏*.

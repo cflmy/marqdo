@@ -8,12 +8,16 @@ import:
 
 # main
 
+| 返回 | 类型 | 说明 |
+|---|---|---|
+| result | any | None; execute this page's documented steps in order and observe their output or stated effects |
+
 Shared JSON helpers for EN and ZH docs. Prefer parse, stringify, and quote.
 Build maps with tables or table.put — not json.set chains.
 
-**`obj` = [json.parse] text="{}"**
-**`ty` = [type] `obj`**
+We first **obj = [Compute obj](json.parse(text="{}"))** for the next step.
+We first **ty = [Compute ty](type(`obj`))** for the next step.
 **打印 内容=`ty`**
 
-**`out` = [json.stringify] value=`obj`**
+We first **out = [Compute out](json.stringify(value=`obj`))** for the next step.
 **打印 内容=`out`**

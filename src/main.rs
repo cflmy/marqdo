@@ -175,6 +175,16 @@ enum Commands {
         #[arg(long, default_value = "none")]
         effects: String,
 
+        /// Literal named arguments as a JSON object; '-' reads stdin (no shell/argv size limit).
+        /// JSON strings never resolve call-session $name or @name references.
+        #[arg(long, value_name = "FILE_OR_STDIN")]
+        args_json: Option<PathBuf>,
+
+        /// Return a failing exit status when the function returns Result {ok:false}.
+        /// The JSON result is preserved; no effect is retried or rolled back.
+        #[arg(long)]
+        require_ok: bool,
+
         /// Directory available to file tools; defaults to the called file directory.
         #[arg(long)]
         fs_root: Option<PathBuf>,
@@ -850,6 +860,8 @@ fn try_main(cli: Cli) -> Result<i32> {
             file,
             function,
             args,
+            args_json,
+            require_ok,
             json,
             backend,
             effects,
@@ -861,16 +873,32 @@ fn try_main(cli: Cli) -> Result<i32> {
                 let effects = marqdo::call::CallEffects::parse(&effects)?;
                 let (arg_tokens, trailing_toget) = marqdo::call::split_toget(&args)?;
                 let toget = toget.or(trailing_toget);
-                let parsed = marqdo::call::parse_call_args(&arg_tokens)?;
+                let literal_args = args_json.is_some();
+                let parsed = if let Some(input) = args_json {
+                    use std::io::Read;
+                    if !arg_tokens.is_empty() {
+                        anyhow::bail!("--args-json cannot be combined with name=value arguments");
+                    }
+                    let mut source = String::new();
+                    if input.as_os_str() == "-" {
+                        std::io::stdin().take(64 * 1024 * 1024 + 1).read_to_string(&mut source)?;
+                    } else {
+                        std::fs::File::open(&input)?.take(64 * 1024 * 1024 + 1).read_to_string(&mut source)?;
+                    }
+                    if source.len() > 64 * 1024 * 1024 { anyhow::bail!("--args-json exceeds 64 MiB"); }
+                    marqdo::call::parse_call_args_json(&source)?
+                } else {
+                    marqdo::call::parse_call_args(&arg_tokens)?
+                };
                 let session = session.or_else(|| {
                     if toget.is_some()
-                        || parsed.iter().any(|(_, v)| {
+                        || (!literal_args && parsed.iter().any(|(_, v)| {
                             matches!(
                                 v,
                                 marqdo::value::Value::Text(t)
                                     if t.starts_with('$') || t.starts_with('@')
                             )
-                        })
+                        }))
                     {
                         Some(marqdo::call_session::default_session_id())
                     } else {
@@ -887,6 +915,7 @@ fn try_main(cli: Cli) -> Result<i32> {
                         fs_root,
                         session,
                         toget,
+                        literal_args,
                     },
                 )
             })();
@@ -902,7 +931,10 @@ fn try_main(cli: Cli) -> Result<i32> {
                     } else {
                         println!("{}", value.as_display());
                     }
-                    Ok(0)
+                    let failed = require_ok && matches!(&value,
+                        marqdo::value::Value::Map(fields) if fields.iter().any(|(k,v)|
+                            k == "ok" && matches!(v, marqdo::value::Value::Bool(false))));
+                    Ok(if failed { 1 } else { 0 })
                 }
                 Err(err) => {
                     let diag = Diagnostic::find(&err).cloned().unwrap_or_else(|| {

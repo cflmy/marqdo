@@ -702,3 +702,34 @@ Build the download effect record. The browser bridge consumes this record; this 
 | `body` | `filename` | `mime` |
 
 Return *[Set the download field in the new record](table.put(in=None, at="download", value=`spec`))*.
+
+## render_list
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| sel | text | required | CSS selector of the existing list container |
+| items | list | required | Literal text or records with tag, text or children, class and attrs |
+| tag | text | "li" | Element name consumed by the official bridge, normally li |
+
+| 返回 | 类型 | 说明 |
+|---|---|---|
+| result | map | Pure render_list instruction for the official browser bridge |
+
+Use `sel`, `items` and `tag`="li" to replace one dynamic list while preserving its parent layout. Each record can keep plain text and a data-id attribute for delegated events. The official bridge already supports this effect and escapes ordinary text, so a title containing quotes or angle brackets need not become an HTML string. Constructing this instruction does not update a DOM or prove that the selector exists. Only pass application-owned element names and attribute keys; the underlying bridge also accepts an explicit html escape hatch for specialized integrations. Initial page structure still belongs in the Document's component tree, and incoming business values should remain text records.
+
+Records also accept tag and children, a list of the same text/control records. A li can retain a span label beside a button with data-id, so delegated deletion needs no author HTML. Do not combine children with text or html. Nesting is limited to 32 levels and 10000 records; element/attribute names are checked and event attributes or active URL schemes are rejected. Keep business values in text; the existing html field remains an explicit compatibility escape hatch.
+
+For a row with a delete action, pass children as structured data. This pure call returns the instruction without loading a server plugin or performing browser IO; the real example uses the same shape in [browser-app](../examples/browser-app/static/app.mq.md). Arbitrary attributes, element names and legacy html remain author-controlled capabilities, so application data belongs only in text or scalar values. The renderer's structural checks do not turn explicit raw HTML into untrusted-content sanitization.
+
+```sh
+marqdo call lib/browser.mq.md render_list 'sel="#items"' 'items=[{"tag":"li","children":[{"tag":"span","text":"A <tag> & literal"},{"tag":"button","text":"Delete","attrs":{"type":"button","data-id":"1"}}]}]' --effects none --json
+```
+
+`spec` =
+
+| tag | items |
+|---|---|
+| `tag` | `items` |
+
+We **targets = [Select the existing list container](table.put(in=None, at=`sel`, value=`spec`))**.
+Return *[Describe the native bridge list update](table.put(in=None, at="render_list", value=`targets`))*.

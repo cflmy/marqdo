@@ -4,6 +4,10 @@ markup: occlusion
 
 ## 导航
 
+| 返回 | 类型 | 说明 |
+|---|---|---|
+| result | any | The value explicitly returned below; conditional returns follow the selected branch |
+
 站点顶部导航。首项是站点名（渐变 Logo 由主题 CSS 处理），`后台` 指向需要登录的 `/admin`。
 
 `导航` =
@@ -16,4 +20,4 @@ markup: occlusion
 | 关于 | /about | |
 | 后台 | /admin | |
 
-*`导航`*
+After these steps, return *导航*.

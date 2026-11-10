@@ -7,7 +7,7 @@ import:
   sys: lib/sys.mq.md
 ---
 
-This file constructs the application Result record only; it does not implement an HTTP transport. For real HTTP requests, response limits and downloads, import lib/net.mq.md. The [network entry](index.mq.md) distinguishes pure URL transformations from native WebSocket exchanges. Keep these responsibilities explicit when extending the package so a readable tool name never implies a missing capability.
+This file constructs application Result records and binds explicit server redirects; it does not implement an HTTP client. For real HTTP requests, response limits and downloads, import lib/net.mq.md. The [network entry](index.mq.md) distinguishes pure URL transformations from native WebSocket exchanges. Keep these responsibilities explicit when extending the package so a readable tool name never implies a missing capability.
 
 ## _load
 
@@ -48,3 +48,21 @@ Unified Result map `{ok, value, error}`.
 | `ok` | `value` | `error` |
 
 Return *out*.
+
+## redirect
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| app | any | required | Prepared web application |
+| from | text | required | Explicit source route |
+| to | text | required | Redirect destination |
+| permanent | bool | False | False uses a temporary redirect; True uses the native permanent status |
+
+| 返回 | 类型 | 说明 |
+|---|---|---|
+| result | map | Updated app with the declared server redirect |
+
+Use `app`, `from`, `to` and `permanent`=False before web.listen. This is a server route policy owned by the network resource, not a client-side history operation. Keep the returned app because binding produces a new value. Redirecting a legacy entry path can coexist with Document and Endpoint discovery without rebuilding the application through removed configure methods. The native runtime validates declared source paths. No listener starts here, and constructing a redirect does not verify that its destination page exists.
+
+We **[Load the existing native HTTP runtime](_load())**.
+Return *[Bind this declared HTTP redirect](web_app_redirect(app=`app`, from=`from`, to=`to`, permanent=`permanent`))*.

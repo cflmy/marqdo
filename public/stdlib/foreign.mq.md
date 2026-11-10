@@ -9,6 +9,10 @@ stdin: 21
 
 # main
 
+| 返回 | 类型 | 说明 |
+|---|---|---|
+| result | any | None; execute this page's documented steps in order and observe their output or stated effects |
+
 `lib/foreign` runs code fences and inline sources with local interpreters. v2 keeps the Markdown surface unchanged while adding structured records, JSON in/out, parallel fan-out, persistent Python/Node kernels and an explicit state bridge.
 
 The same file is still a document: a bound fence is readable Markdown, and `foreign.*` turns it into an executable unit.
@@ -17,10 +21,10 @@ The same file is still a document: a bound fence is readable Markdown, and `fore
 
 Probe before you run.
 
-**node = > foreign.probe lang="node"**
+We first **node = [Compute node](foreign.probe(lang="node"))** for the next step.
 
-> print text=[ok](access(`node`, "ok"))
-> print text=[version](access(`node`, "version"))
+We now **[Display this step's result](> print text=[ok](access(`node`, "ok")))**.
+We now **[Display this step's result](> print text=[version](access(`node`, "version")))**.
 
 `probe` returns `{lang, cmd, path, ok, version, error}`. Omit `lang` to inspect every known language.
 
@@ -30,14 +34,14 @@ A structured record, not just stdout.
 
 `marker` =
 ```node
-console.log("hello from a foreign kernel");
+console.log(new Intl.NumberFormat("en-US", {style:"currency", currency:"CNY"}).format(950));
 ```
 
-**record = > foreign.invoke code=`marker`**
+We first **record = [Compute record](foreign.invoke(code=`marker`))** for the next step.
 
-> print text=[ok](access(`record`, "ok"))
-> print text=[stdout](access(`record`, "stdout"))
-> print text=[code](access(`record`, "code"))
+We now **[Display this step's result](> print text=[ok](access(`record`, "ok")))**.
+We now **[Display this step's result](> print text=[stdout](access(`record`, "stdout")))**.
+We now **[Display this step's result](> print text=[code](access(`record`, "code")))**.
 
 `invoke` never throws on a process failure. Read `ok`, `code`, `stdout`, `stderr`, `ms`, `timed_out`, `truncated`, `result` and `error` from one record.
 
@@ -45,18 +49,18 @@ console.log("hello from a foreign kernel");
 
 JSON in, JSON out.
 
-`double` =
+`format_money` =
 ```node
 let input = "";
 process.stdin.on("data", chunk => { input += chunk; });
 process.stdin.on("end", () => {
-  console.log(JSON.stringify(JSON.parse(input) * 2));
+  console.log(JSON.stringify(new Intl.NumberFormat("en-US", {style:"currency", currency:"CNY"}).format(JSON.parse(input))));
 });
 ```
 
-**single = > foreign.call code=`double` input=21**
+We first **single = [Compute single](foreign.call(code=`format_money`, input=21))** for the next step.
 
-> print text=`single`
+We now **[Display this step's result](> print text=`single`)**.
 
 The input is encoded as JSON on stdin; the last stdout value is parsed as JSON. Use `output="json"` with `invoke` when you also want the raw record.
 
@@ -73,9 +77,10 @@ Parallel fan-out.
 | 3 |
 | 4 |
 
-**doubled = > foreign.call_many code=`double` inputs=`numbers` concurrency=4**
+This single-column bound table is a native list of numbers, ready for the batch call.
+We **formatted_batch = [Format each amount while retaining input order](foreign.call_many(code=`format_money`, inputs=`numbers`, concurrency=4))**.
 
-> print text=`doubled`
+We now **[Display this step's result](> print text=`formatted_batch`)**.
 
 `call_many` applies one program to every input, runs independently, preserves input order, and returns parsed JSON results. `run_many` does the same for full invoke-option maps.
 
@@ -83,13 +88,13 @@ Parallel fan-out.
 
 A persistent kernel.
 
-**session = > foreign.session_open lang="node"**
+We first **session = [Compute session](foreign.session_open(lang="node"))** for the next step.
 
-**first = > foreign.session_eval id=`session` source="let total = 0; for (let i = 1; i <= 5; i += 1) total += i;"**
+We first **first = [Compute first](foreign.session_eval(id=`session`, source="var money = new Intl.NumberFormat(\"en-US\", {style:\"currency\", currency:\"CNY\"});"))** for the next step.
 
-**second = > foreign.session_eval id=`session` source="total * 2"**
+We first **second = [Compute second](foreign.session_eval(id=`session`, source="money.format(21)"))** for the next step.
 
-> print text=[result](access(`second`, "result"))
+We now **[Display this step's result](> print text=[result](access(`second`, "result")))**.
 
 Variables created in the first evaluation survive into the second. The kernel is not a shell: use `session_eval`, `session_get`, `session_names`, then `session_close`.
 
@@ -97,13 +102,13 @@ Variables created in the first evaluation survive into the second. The kernel is
 
 The explicit state bridge.
 
-**> foreign.session_set id=`session` name="rate" value=0.08**
+We **[Copy the explicit rate into the existing kernel](foreign.session_set(id=`session`, name="rate", value=0.08))**.
 
-**rate = > foreign.session_get id=`session` name="rate"**
+We first **rate = [Compute rate](foreign.session_get(id=`session`, name="rate"))** for the next step.
 
-> print text=`rate`
+We now **[Display this step's result](> print text=`rate`)**.
 
-**> foreign.session_close id=`session`**
+After reading the copied value, we **[Close this persistent formatting kernel](foreign.session_close(id=`session`))**.
 
 This is a JSON copy, not shared memory. The kernel receives a value; Marqdo receives a value. There is no implicit mirroring and no hidden global namespace.
 
@@ -118,8 +123,8 @@ Cells in view.
 
 | 名称 | 语言 | 命令 | 说明 |
 |------|------|------|------|
-| 分析 | python | | shared analysis |
-| 复核 | python | | isolated review |
+| 分析 | node | | shared analysis |
+| 复核 | node | | isolated review |
 
 `分析单元` =
 
@@ -132,7 +137,7 @@ Cells in view.
 `会话` = > foreign.session kernels=`分析内核` cells=`分析单元`
 ```
 
-`view` consumes the `会话` handle and adds Run All, Step, kernel switching, a journal and per-cell state. Without `会话`, view cells are stateless one-shot runs: same shell, no persistent kernel. There is no second CLI mode. See the complete Python walkthrough in [`features/19-foreign-view-cells.mq.md`](../features/19-foreign-view-cells.mq.md).
+`view` consumes the `会话` handle and adds Run All, Step, kernel switching, a journal and per-cell state. Without `会话`, view cells are stateless one-shot runs: same shell, no persistent kernel. There is no second CLI mode. See the native-first Intl workflow in [`features/19-foreign-view-cells.mq.md`](../features/19-foreign-view-cells.mq.md).
 
 ---
 
@@ -144,7 +149,7 @@ Safety defaults.
 | Shell | no shell; arguments are split explicitly |
 | Output | bounded, with truncated |
 | Timeout | process group killed on Unix / taskkill /T on Windows |
-| CWD | file sandbox root; no implicit escape |
+| CWD | starts at the granted root; the child retains normal OS authority |
 | Parallelism | capped fan-out; each item isolated |
 
 Read the full API in [../../lib/foreign.mq.md](../../lib/foreign.mq.md) and the design in [../../doc/design/foreign-kernel.md](../../doc/design/foreign-kernel.md).

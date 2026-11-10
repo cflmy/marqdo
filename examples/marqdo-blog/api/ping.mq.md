@@ -11,10 +11,14 @@ description: Health ping — documentation is the API (ADR 0007).
 
 # main
 
+| 返回 | 类型 | 说明 |
+|---|---|---|
+| result | any | Result or browser effect record assembled below |
+
 `out` =
 
 | ok | service |
 |----|---------|
 | True | marqdo-blog |
 
-*out*
+After these steps, return *out*.

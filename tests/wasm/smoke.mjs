@@ -18,12 +18,12 @@ const root = path.resolve(__dirname, "../..");
 
 const wasmPath =
   process.argv[2] ||
-  path.join(root, "examples/browser-hello/marqdo_wasm.wasm");
-const srcPath = path.join(root, "examples/browser-hello/counter.mq.md");
+  path.join(root, ".marqdo/browser-handbook-assets/marqdo_wasm.wasm");
+const srcPath = path.join(root, "tests/wasm/counter.mq.md");
 
 if (!fs.existsSync(wasmPath)) {
   console.error("missing wasm:", wasmPath);
-  console.error("build: marqdo wasm build -o examples/browser-hello");
+  console.error("build: marqdo call skills/marqdo-dev/index.mq.md build_browser --effects plugin,process.exec,fs.write --fs-root . --json");
   process.exit(2);
 }
 

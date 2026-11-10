@@ -19,6 +19,19 @@ SERIES="${1:-noble}"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
+# File authoring uses the interpreter being released, including in package staging.
+MARQDO_TOOL="${MARQDO_BIN:-$ROOT/target/debug/marqdo}"
+if [ ! -x "$MARQDO_TOOL" ]; then
+  MARQDO_TOOL="$ROOT/target/release/marqdo"
+fi
+if [ ! -x "$MARQDO_TOOL" ]; then
+  MARQDO_TOOL="$(command -v marqdo || true)"
+fi
+if [ -z "$MARQDO_TOOL" ] || [ ! -x "$MARQDO_TOOL" ]; then
+  echo "error: build Marqdo or set MARQDO_BIN before packaging" >&2
+  exit 1
+fi
+
 need() { command -v "$1" >/dev/null || { echo "missing tool: $1 (sudo apt install $2)"; exit 1; }; }
 need cargo cargo
 need debuild devscripts
@@ -34,22 +47,11 @@ fi
 mkdir -p "$TMPDIR"
 export TMPDIR
 
-VER="$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1)"
-# Debian revision comes from debian/changelog (e.g. 1.0.2-1ppa2); we append ~series.
-CHG_VER="$(dpkg-parsechangelog -l debian/changelog -S Version)"
-# Strip any previous ~series suffix from changelog version
-BASE_DEB_VER="${CHG_VER%%~*}"
-# If changelog still has old upstream, prefer Cargo VER for the upstream part
-if [[ "$BASE_DEB_VER" != "$VER"-* ]]; then
-  # keep debian revision suffix after first '-' following VER if possible
-  REV="${BASE_DEB_VER#*-}"
-  if [[ "$BASE_DEB_VER" == *"-"* ]]; then
-    BASE_DEB_VER="${VER}-${REV}"
-  else
-    BASE_DEB_VER="${VER}-1ppa1"
-  fi
-fi
-DEB_VER="${BASE_DEB_VER}~${SERIES}"
+# The callable handbook owns metadata parsing; stdout contains the exact text.
+VER="$("$MARQDO_TOOL" call "$ROOT/skills/marqdo-release/package.mq.md" upstream \
+  --require-ok --effects fs.read --fs-root "$ROOT")"
+DEB_VER="$("$MARQDO_TOOL" call "$ROOT/skills/marqdo-release/package.mq.md" debian_version \
+  "series=\"$SERIES\"" --require-ok --effects fs.read --fs-root "$ROOT")"
 PKG_ROOT="${TMPDIR}/marqdo-ppa/${VER}"
 BUILD_AREA="${ROOT}/../build-area"
 GPG_KEY="${MARQDO_PPA_GPG_KEY:-505943294D04C803}"
@@ -161,43 +163,13 @@ else
   cd "$PKG_ROOT"
   echo "==> cargo vendor (Launchpad offline)"
   mkdir -p .cargo
-  cargo vendor --locked vendor >/tmp/marqdo-cargo-vendor.conf
-  cat > .cargo/config.toml <<'EOF'
-[source.crates-io]
-replace-with = "vendored-sources"
-
-[source.vendored-sources]
-directory = "vendor"
-EOF
+  cargo vendor --locked vendor
+  "$MARQDO_TOOL" call "$ROOT/skills/marqdo-release/package.mq.md" vendor_config \
+    --require-ok --effects fs.write --fs-root "$PKG_ROOT" --json
   # dh_clean removes *.orig; drop those paths from vendor checksums so a
   # stray clean (or older rules) cannot break `cargo --offline` on Launchpad.
-  python3 - <<'PY'
-from __future__ import annotations
-
-import json
-from pathlib import Path
-
-root = Path("vendor")
-if not root.is_dir():
-    raise SystemExit("vendor/ missing after cargo vendor")
-n_files = 0
-n_json = 0
-for checksum in root.rglob(".cargo-checksum.json"):
-    data = json.loads(checksum.read_text(encoding="utf-8"))
-    files = data.get("files") or {}
-    drop = [name for name in files if name.endswith(".orig") or name.endswith(".rej")]
-    if not drop:
-        continue
-    for name in drop:
-        del files[name]
-        path = checksum.parent / name
-        if path.is_file():
-            path.unlink()
-            n_files += 1
-    checksum.write_text(json.dumps(data, indent=4) + "\n", encoding="utf-8")
-    n_json += 1
-print(f"stripped {n_files} *.orig/*.rej from {n_json} vendor checksums")
-PY
+  "$MARQDO_TOOL" call "$ROOT/skills/marqdo-release/package.mq.md" sanitize_vendor \
+    --require-ok --effects fs.write --fs-root "$PKG_ROOT" --json
 
   echo "==> bundle Rust ${RUST_VER} (${RUST_TRIPLE}) for Launchpad"
   if [ ! -f "$RUST_TARBALL" ]; then
@@ -243,21 +215,9 @@ PY
 fi
 
 cd "$PKG_ROOT"
-python3 - <<PY
-from pathlib import Path
-import re
-p = Path("debian/changelog")
-text = p.read_text(encoding="utf-8")
-text2 = re.sub(
-    r"^marqdo \([^)]+\) [^;]+;",
-    "marqdo (${DEB_VER}) ${SERIES};",
-    text,
-    count=1,
-    flags=re.M,
-)
-p.write_text(text2, encoding="utf-8")
-print("changelog:", p.read_text(encoding="utf-8").splitlines()[0])
-PY
+"$MARQDO_TOOL" call "$ROOT/skills/marqdo-release/package.mq.md" changelog \
+  "version=\"$DEB_VER\"" "series=\"$SERIES\"" \
+  --require-ok --effects fs.write --fs-root "$PKG_ROOT" --json
 
 ln -sfn "$BUILD_AREA/$ORIG_NAME" "$(dirname "$PKG_ROOT")/$ORIG_NAME"
 ls -lh "$BUILD_AREA/$ORIG_NAME"

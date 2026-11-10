@@ -26,6 +26,51 @@ We retain **`p` = [Locate the installed native plugin](plugin.native_path(name="
   We **[End this run with the selected exit status](sys.exit(code=1))**.
 Return *None*.
 
+
+## reference
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| id | text | required | Exact id explicitly registered with mount |
+
+| 返回 | 类型 | 说明 |
+|---|---|---|
+| result | map | Pure form_ref Resource for component.resource |
+
+Use `id` to reference the same mounted form that handles submissions. This constructor does not create a form, load a plugin or register a route. Serving resolves the id after preparing the request's actual CSRF token and return path. An unknown id is a real request error; it cannot become an empty successful form.
+
+The form's field/rule resource remains the single source for rendering and validation. Error responses retain the current CSRF token so the user can correct a field and resubmit. Authorization belongs to mount's optional role gate and the server's authentication policy, not the visibility of this node.
+
+`resource` =
+
+| _type | id |
+|---|---|
+| form_ref | `id` |
+
+Return *resource* for explicit placement in the existing View schema.
+
+## mount
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| app | any | required | Prepared web application with its actual database |
+| id | text | required | Explicit system-form identifier used by reference |
+| form | any | required | Form resource containing fields, rules and submission action |
+| roles | any | None | None keeps public form behavior; otherwise gate the actual system form route |
+
+| 返回 | 类型 | 说明 |
+|---|---|---|
+| result | any | Updated app with this form and optional server role gate |
+
+Use `app`, `id`, `form` and `roles`=None before listening. Keep the returned app. The native system form route uses the same resource to validate and submit; component.resource only places its reference in the readable page layout. No user route is implicitly registered. System endpoints remain visible through web.inspect.
+
+For a private form, provide roles explicitly so the actual /_form/id GET and POST path is gated as well as any containing page. Merely hiding a form or gating its presentation URL is insufficient. Configure authentication separately. A public creation example can retain roles=None. Existing sessions must submit the correct CSRF token; field-validation retries keep that token in the response.
+
+We **[Load the existing form implementation](_load())** and **mounted = [Bind this form to its explicit system id](web_app_mount_form(app=`app`, id=`id`, form=`form`))**.
+1. `roles` != None
+  We **mounted = [Protect the actual system form endpoint](web_app_gate(app=`mounted`, path="/_form/" + id, roles=`roles`, permissions="", match="exact", on_deny="redirect", exclude=None))**.
+Return *mounted* after the explicit form resource and policy are attached.
+
 # form
 
 | 参数 | 类型 | 默认 | 说明 |

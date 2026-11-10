@@ -63,7 +63,7 @@ func parseInvokeRoute(v any) invokeRoute {
 	}
 }
 
-func (st *state) mountInvokeRoutes(mux *http.ServeMux) {
+func (st *state) mountInvokeRoutes(mux routeRegistrar) {
 	for _, key := range sortedKeys(st.invokeRoutes) {
 		cfg := parseInvokeRoute(st.invokeRoutes[key])
 		path := routePathKey(key)

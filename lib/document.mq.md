@@ -1,8 +1,10 @@
 ---
 markup: occlusion
+import:
+  fs: lib/fs.mq.md
 ---
 
-Inert document operations share the renderer Markdown parser. Every function is pure.
+Document transforms share the renderer Markdown parser. read_table composes explicit native filesystem reading with literal data selection.
 
 Inspect and transform Markdown without executing its contents.
 
@@ -153,3 +155,39 @@ Effects: pure.
 List code fence language and literal source with byte spans; never run foreign or Marqdo code.
 
 Return *[List code fence language and literal source with byte spans; never run foreign or Marqdo code](> host_document_code_blocks text=`text`)*.
+
+## table
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| text | text | required | Markdown containing the literal GFM data table |
+| title | any | None | Exact unique section title, or None for the whole document |
+| index | number | 0 | Zero-based table index within the selected section |
+
+| 返回 | 类型 | 说明 |
+|---|---|---|
+| result | any | Native literal table value, preserving the source language's record/list/column shape |
+
+Use `text`, `title`=None and `index`=0 to obtain actual data from a Markdown resource. The existing tables function supplies inert headers and cell text for document inspection; this operation reads the selected table with the same literal cell and shape rules as Marqdo source. Booleans, numbers, None and quoted text therefore retain their types. An @, 行 or row marker selects record rows, one-column tables become lists, and ordinary multi-column tables retain their native map shape.
+
+The renderer's parser locates real tables and skips fenced examples. Duplicate section titles, missing tables, duplicate headers and row-width mismatches produce diagnostics. Variables, interpolated values and executable expressions are rejected; surrounding prose, imports and code fences are never executed. This keeps large schemas, seed rows and style declarations readable as Markdown data leaves while small callable functions explain their use. Construction is pure and performs no file, process, plugin or network operation.
+
+Return *[Read the selected literal table with the native language rules](host_document_table(text=`text`, title=`title`, index=`index`))*.
+
+
+## read_table
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| path | text | required | UTF-8 Markdown data path under --fs-root |
+| title | any | None | Exact unique section title, or None for the whole document |
+| index | number | 0 | Zero-based table index within the selected section |
+
+| 返回 | 类型 | 说明 |
+|---|---|---|
+| result | any | Actual literal table value loaded through native fs.read |
+
+Use `path`, `title`=None and `index`=0 for a separate Markdown data leaf. The filesystem reader validates the granted root and UTF-8; table then selects one real data table and preserves its native types and shape. Requires fs.read. A resource file can explain its schema and examples beside the data without being loaded as a program. Missing paths, ambiguous headings, invalid cells and structural mismatches remain diagnostics. This function writes nothing and executes no imports, bold statements or foreign fences from the file.
+
+We **source = [Read this selected Markdown resource natively](fs.read_text(path=`path`))**.
+Return *[Obtain its literal data without running the document](table(text=`source`, title=`title`, index=`index`))*.

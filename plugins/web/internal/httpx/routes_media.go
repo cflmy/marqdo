@@ -47,7 +47,7 @@ func parseDownloadRoute(v any) downloadRoute {
 	}
 }
 
-func (st *state) mountUploadRoutes(mux *http.ServeMux) {
+func (st *state) mountUploadRoutes(mux routeRegistrar) {
 	for _, path := range sortedKeys(st.uploadRoutes) {
 		routePath := path
 		cfg := parseUploadRoute(st.uploadRoutes[path])
@@ -57,7 +57,7 @@ func (st *state) mountUploadRoutes(mux *http.ServeMux) {
 	}
 }
 
-func (st *state) mountDownloadRoutes(mux *http.ServeMux) {
+func (st *state) mountDownloadRoutes(mux routeRegistrar) {
 	for _, path := range sortedKeys(st.downloadRoutes) {
 		routePath := path
 		cfg := parseDownloadRoute(st.downloadRoutes[path])
@@ -68,7 +68,7 @@ func (st *state) mountDownloadRoutes(mux *http.ServeMux) {
 	}
 }
 
-func (st *state) mountGalleryRoutes(mux *http.ServeMux) {
+func (st *state) mountGalleryRoutes(mux routeRegistrar) {
 	for _, path := range sortedKeys(st.galleryRoutes) {
 		cfg, _ := st.galleryRoutes[path].(map[string]any)
 		mux.HandleFunc("GET "+path, func(w http.ResponseWriter, r *http.Request) {

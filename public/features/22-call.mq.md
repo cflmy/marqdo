@@ -6,6 +6,10 @@ description: v2.2.0 marqdo call runs a function inside any .mq.md. The explanati
 
 # main
 
+| 返回 | 类型 | 说明 |
+|---|---|---|
+| result | any | None; execute this page's documented steps in order and observe their output or stated effects |
+
 v2.2.0 adds one command: `marqdo call`. It adds no Markdown marker and no skill system. An ordinary .mq.md file is already a document, a piece of knowledge and a program. What was missing is a way to call one of its functions from outside.
 
 The usual command runs the whole file. Functions inside it run only when the entry calls them. Trying one calculation meant writing an entry, a print and a check. The smallest unit you can execute is now a function.
@@ -42,18 +46,40 @@ After editing a function, call it again with the inputs that failed. A passing c
 
 # calculator
 
+| 返回 | 类型 | 说明 |
+|---|---|---|
+| result | any | Object/type namespace for the child functions below; call the intended child directly |
+
 This is an ordinary Marqdo document.
 
 It holds a little reusable arithmetic.
 
 ## add
 
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| a | any | required | Left operand supplied to this calculation |
+| b | any | required | Right operand supplied to this calculation |
+
+| 返回 | 类型 | 说明 |
+|---|---|---|
+| result | any | The value explicitly returned below; conditional returns follow the selected branch |
+
 Add the numbers `a` and `b`.
 
-*[result](a + b)*
+After these steps, return *[result]((`a` + `b`))*.
 
 ## multiply
 
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| a | any | required | Left operand supplied to this calculation |
+| b | any | required | Right operand supplied to this calculation |
+
+| 返回 | 类型 | 说明 |
+|---|---|---|
+| result | any | The value explicitly returned below; conditional returns follow the selected branch |
+
 Multiply the numbers `a` and `b`.
 
-*[result](a * b)*
+After these steps, return *[result]((`a` * `b`))*.

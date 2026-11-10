@@ -3,6 +3,7 @@ package render
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/marqdo/marqdo/plugins/web/internal/assets"
@@ -846,6 +847,15 @@ func resolveLayout(page map[string]any) string {
 	return normalizeLayout(raw)
 }
 
+// DocumentHead reuses ordinary Document metadata, links and native head boot
+// helpers without adding application configuration or a second HTML dialect.
+func DocumentHead(title string, meta map[string]any, links []assets.HeadLink) string {
+	if title == "" {
+		title = "Marqdo"
+	}
+	return headHTML(map[string]any{"meta": meta, "head": assets.HeadLinksToJSON(links)}, title)
+}
+
 func headHTML(page map[string]any, defaultTitle string) string {
 	pageTitle := defaultTitle
 	if meta, ok := page["meta"].(map[string]any); ok {
@@ -859,7 +869,13 @@ func headHTML(page map[string]any, defaultTitle string) string {
 		s.WriteString(fmt.Sprintf(`<meta name="csrf-token" content="%s"/>`, esc(strings.TrimSpace(csrf))))
 	}
 	if meta, ok := page["meta"].(map[string]any); ok {
-		for k, v := range meta {
+		keys := make([]string, 0, len(meta))
+		for key := range meta {
+			keys = append(keys, key)
+		}
+		sort.Strings(keys)
+		for _, k := range keys {
+			v := meta[k]
 			if k == "title" {
 				continue
 			}
@@ -1359,6 +1375,39 @@ func renderFragment(page map[string]any, dbURL, slot string) string {
 		}
 		return fmt.Sprintf(`<main class="main" data-slot="main">%s</main>`, body.String())
 	}
+}
+
+// RenderQueryRows projects native database records into existing card/article
+// rendering. Query failures remain with the Resource caller, never empty success.
+func RenderQueryRows(rows any, detail bool, prefix string) string {
+	raw, _ := rows.([]any)
+	var body strings.Builder
+	if !detail {
+		body.WriteString(`<section class="content cards">`)
+	}
+	for _, row := range raw {
+		item := projectArtifactRow(row)
+		if item == nil {
+			continue
+		}
+		if detail {
+			if object, ok := row.(map[string]any); ok {
+				if full, exists := object["body"]; exists {
+					item["body"] = text(full)
+				}
+				if full, exists := object["content"]; exists {
+					item["body"] = text(full)
+				}
+			}
+			body.WriteString(renderArticle(item))
+			break
+		}
+		body.WriteString(renderCard(map[string]any{"link_prefix": prefix}, item))
+	}
+	if !detail {
+		body.WriteString("</section>")
+	}
+	return body.String()
 }
 
 // RenderPage builds full-page HTML (or a part fragment when partID is set).

@@ -70,9 +70,8 @@ uses the same representation and renderer. Preview from the repo root, then
 change into the site directory to start the process:
 
 ```text
-marqdo run examples/web-layout-handbook/preview.mq.md
-cd examples/web-layout-handbook
-marqdo run serve.mq.md
+marqdo call examples/web-layout-handbook/preview.mq.md main --effects plugin,fs.read,output.write --fs-root examples/web-layout-handbook --json
+marqdo call ext/web/web.mq.md serve 'root="examples/web-layout-handbook"' --effects plugin,fs.read,network.write --fs-root examples/web-layout-handbook --json
 ```
 
 Check /, /about and /api/ping. The first is a genuinely nested layout, the second
@@ -117,7 +116,7 @@ Document, Endpoint and lifecycle boundaries
 
 Ordinary Documents declare type: web, route and title around Markdown body,
 retaining the existing Markdown/data-source path. A composed Document also
-declares view: main: its # main returns View rows. serve executes that assembly
+declares view: main: its ordinary main function returns View rows. serve executes that assembly
 once at startup and uses the same renderer as offline preview. Restart after
 content changes. Automatic data_source binding uses ordinary Documents and
 cannot be mixed with startup assembly. Assembly returns structure; it must not render again or launch
@@ -125,9 +124,17 @@ a server. Request-time interaction belongs in Endpoints with type, path, method,
 request and response metadata. Startup assembly is not an automatic request-time
 template/data-binding system.
 
-serve is a blocking lifecycle operation for a launcher run with marqdo run.
-call is for pure construction, previews and inspection; --effects plugin does
-not grant network or filesystem writes, so call serve is not a launch workflow.
+serve is a blocking lifecycle operation callable with marqdo call. Grant
+plugin,fs.read,network.write for a site that reads Markdown and listens. For
+additional resources, compose web.prepare, resource-owned bindings and
+web.listen in an ordinary callable launcher. Keep each returned app value.
+For current database rows, forms and session-aware navigation, place the typed resources from
+ext/data and component.navigation inside the same View tree. Pure document_head resources
+preserve SEO and font links in previews as well as responses; they never become body content.
+See [the request-resource design](../../doc/design/web-view-resources.md) and the real
+[network site](../../examples/web-net-site/index.mq.md).
+The network library owns WebSocket routes; the security library owns login
+and session policy. Preparing a site opens no listener.
 inspect with root scans disk declarations without listening; an empty app in a
 fresh process cannot inspect another process's private state.
 
@@ -142,7 +149,8 @@ Open the module for the next responsibility
 [page](page/index.mq.md) supplies handles and offline render;
 [route](route/index.mq.md) is for explicit advanced registration, while whole
 sites normally use Metadata. [dom](dom/index.mq.md) converts content, retaining
-raw HTML only at a compatibility boundary. [client](client/index.mq.md) loads
+raw HTML only at a compatibility boundary. [head](head.mq.md) contributes pure SEO/font/resource declarations to the real document head;
+[client](client/index.mq.md) loads
 the official Marqdo WASM bridge; business effects stay in lib/browser.
 [_capability](_capability/index.mq.md) diagnoses loading. The [facade](web.mq.md)
 keeps serve/render/inspect and the app API. Data, auth and HTTP clients belong
@@ -159,9 +167,8 @@ Update src/ext_cli.rs if adding package files. Preserve ordinary Documents and
 Endpoints when changing startup assembly.
 
 ```text
-cargo test --locked --test web_handbook
-cargo test --locked --test call_cli web_
-cargo test --locked --test gold ext_web -- --test-threads=1
+marqdo call skills/marqdo-dev/index.mq.md test 'targets=["web_handbook"]' --effects plugin,process.exec --require-ok --json
+marqdo call skills/marqdo-dev/index.mq.md test 'targets=["call_cli","gold"]' 'filter="web"' --effects plugin,process.exec --require-ok --json
 ```
 
 Handbook tests execute the bilingual sh fences and author examples directly,
@@ -194,7 +201,7 @@ The returned rows are a planning aid, not a generated site or a validation certi
 | step_C | declare home Document and view main for composed structure |
 | step_D | declare more Documents with their own routes |
 | step_E | declare Endpoint handlers for request-time work |
-| step_F | run serve.mq.md from the site directory |
+| step_F | call the blocking serve function with explicit site root and effects |
 | step_G | compare preview and live output; test routes and browser geometry |
 | stopping_rule | one Markdown responsibility and no internal layout |
 

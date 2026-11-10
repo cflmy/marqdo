@@ -1,6 +1,6 @@
 ---
 markup: occlusion
-title: 库开发指南：源码即手册，手册即 SKILL，函数即工具
+title: Marqdo 编程规范：源码即手册，手册即 SKILL，函数即工具
 description: 标准库与拓展库的叙述式开发规范，包含可以直接调用的真实示例。
 import:
   文件: lib/文件.mq.md
@@ -8,7 +8,7 @@ import:
 
 库开发指南：让说明、调用和实现长在同一份源码里。
 
-本文件供人和 AI 开发标准库、拓展库时直接阅读。目标是把库文件交给一个没有读过
+本文件供人和 AI 编写 Marqdo 程序、标准库、拓展库以及可执行 SKILL 时直接阅读。目标是把库文件交给一个没有读过
 完整语法手册的模型，它仍能判断何时使用、提供哪些输入、如何调用、如何消费结果，
 以及遇到失败时怎么办。完成这些任务所需的信息必须在库文件中，不依赖聊天历史、
 隐藏提示词、另一份签名清单或模型猜测。修改实现所需的最少标记也在本文就地示范。
@@ -64,6 +64,10 @@ ext/sample/
 ---
 
 二、标题下面立即交代参数与返回。
+
+普通网页正文、内容叶子与静态文档可以继续使用内容标题；它们没有调用契约，不能为了
+满足函数格式而插入虚假的参数或返回值表。需要执行任务的 SKILL 应把操作写入 mq.md，
+SKILL.md 只保留发现入口、适用范围和必要约束，避免两份独立维护的长命令清单。
 
 每个真正可调用的函数使用函数标题。紧接标题先写参数表，再写返回表；没有参数时直接
 放返回表。表格必须位于第一条执行语句之前。正文中的普通小节使用说明段和分隔线，
@@ -142,6 +146,13 @@ ext/sample/
 调用产生的值先计算并命名，再在单元格中引用，不能假定表格里任意一段函数文本会执行。
 普通值用列表和记录传递；读取集合使用 access，不能把描述标签误当作集合键。
 
+命令参数也作为数据写入表格：`"-p"`、`"--offline"` 等文本必须带引号；
+裸写 `-p` 会被当成表达式而不是命令选项。已计算的路径使用反引号引用变量，
+不要再拼接整段 shell 源码。需要同时被 call 与 View 使用的过程用普通函数标题，
+例如 `## main`；`# main` 是对象入口，不能假定两者具有相同的调用语义。
+整数除法会保留整数语义；计算平均值优先使用统计库的 mean，或明确采用浮点输入，
+并在非整除样例中验证结果，避免演示数据恰好整除掩盖精度问题。
+
 不可变更新要保存返回的新值。少量动态键用表库的具名助手；解析与序列化才使用 JSON。
 不要用长串 json.set/json.append 来拼原本一张表就能读懂的数据，也不要为每个数字或
 单个字段创建层层转发的空壳函数。只有当一段逻辑需要解释、复用或独立验证时才提取职责。
@@ -158,6 +169,13 @@ ext/sample/
 ---
 
 六、把运行边界和工程验收写在开发者找得到的位置。
+
+实际开发也使用这些能力：读取、搜索、撰写和原子修订通过固有文件库完成；JSON、表格、
+散列和网络读取优先组合标准库。不要为已有能力再生成 Python 或 shell 程序。缺少能力时，
+把可复用的边界补成拓展插件，或者通过明确参数数组外联已有工具；决策、条件和重试仍在
+mq.md 中表达。开发与发版入口分别位于 skills/marqdo-dev 和 skills/marqdo-release，操作用
+marqdo call 执行。大段源码通过 --args-json 文件或标准输入传输，保留换行、引号和字面数据。
+外部自动化可以加 --require-ok，让失败 Result 产生非零退出码，避免继续执行依赖步骤。
 
 有副作用的能力写明授权、根目录、平台、超时、资源上限以及重试与清理责任。
 返回可恢复结果时先检查其中的 ok，再读取 value 或 error；CLI 外层的 ok 只说明调用
@@ -177,8 +195,8 @@ ext/sample/
 默认参数、结构化返回以及可恢复读取；修改库时还应运行该库本身相关的回归。
 
 ```sh
-marqdo check doc/library-development.mq.md --narrative-ratio
-cargo test --test stdlib_tasks library_development_guide_examples_match_their_contracts
+marqdo call skills/marqdo-dev/index.mq.md check 'path="doc/library-development.mq.md"' --require-ok --effects plugin --fs-root . --json
+marqdo call skills/marqdo-dev/index.mq.md test 'targets=["stdlib_tasks"]' 'filter="library_development_guide_examples_match_their_contracts"' --require-ok --effects plugin --fs-root . --json
 ```
 
 现有能力可直接参考 [文件库](../lib/文件.mq.md)、[表库](../lib/表.mq.md)、

@@ -4032,6 +4032,12 @@ pub fn page_file(files: &[PathBuf], rel: &str, vm: &FileViewModel, links: &LinkM
             "stream",
             "Streaming in the panel below…".to_string(),
         )
+    } else if vm.library_document {
+        (
+            "pending",
+            "module",
+            "这是可调用模块，未自动执行。通过 marqdo call 选择函数并提供参数。".to_string(),
+        )
     } else if vm.ok {
         (
             "ok",
@@ -4047,7 +4053,7 @@ pub fn page_file(files: &[PathBuf], rel: &str, vm: &FileViewModel, links: &LinkM
     } else {
         ("fail", "fail", escape(&vm.stderr))
     };
-    let stdin_panel = if vm.input_prompts.is_empty() {
+    let stdin_panel = if vm.library_document || vm.input_prompts.is_empty() {
         String::new()
     } else {
         let placeholder = vm.input_prompts.join("\n");

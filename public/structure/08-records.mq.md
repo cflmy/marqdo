@@ -6,6 +6,10 @@ description: First header @ / row makes a list of maps
 
 # main
 
+| 返回 | 类型 | 说明 |
+|---|---|---|
+| result | any | None; execute this page's documented steps in order and observe their output or stated effects |
+
 When the first header is `@` or `row`, each data row is a map (marker column is not a field). Nested get: `[field]([1](orders))`.
 
 `orders` =
@@ -15,10 +19,10 @@ When the first header is `@` or `row`, each data row is a map (marker column is 
 | 1 | apple | 2 |
 | 2 | pear | 3 |
 
-**`n` = [name](access([1](access(orders, "1")), "name"))**
+We first **n = [name](access([1](access(`orders`, "1")), "name"))** for the next step.
 
-> print text=`n`
+We now **[Display this step's result](> print text=`n`)**.
 
-**`q` = [qty](access([2](access(orders, "2")), "qty"))**
+We first **q = [qty](access([2](access(`orders`, "2")), "qty"))** for the next step.
 
-> print text=`q`
+We now **[Display this step's result](> print text=`q`)**.

@@ -1,6 +1,6 @@
 // Package apikey implements Bearer API key verification (G-API1).
 //
-// Hash formula: sha256 hex of pepper + ":" + key (documented for anlian apikeys).
+// Hash formula: sha256 hex of pepper + ":" + key.
 package apikey
 
 import (

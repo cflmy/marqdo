@@ -11,7 +11,7 @@ fn wasm_artifact() -> Option<PathBuf> {
     cands.push(PathBuf::from(
         "target/wasm32-unknown-unknown/release-wasm/marqdo_wasm.wasm",
     ));
-    cands.push(PathBuf::from("examples/browser-hello/marqdo_wasm.wasm"));
+    cands.push(PathBuf::from(".marqdo/browser-handbook-assets/marqdo_wasm.wasm"));
     cands.into_iter().find(|p| p.is_file())
 }
 
@@ -29,11 +29,11 @@ fn wasm_node_abi_smoke() {
                 return;
             }
             let status = Command::new(env!("CARGO_BIN_EXE_marqdo"))
-                .args(["wasm", "build", "-o", "examples/browser-hello"])
+                .args(["wasm", "build", "-o", ".marqdo/browser-handbook-assets"])
                 .status()
                 .expect("marqdo wasm build");
             assert!(status.success(), "marqdo wasm build failed");
-            PathBuf::from("examples/browser-hello/marqdo_wasm.wasm")
+            PathBuf::from(".marqdo/browser-handbook-assets/marqdo_wasm.wasm")
         }
     };
     assert!(wasm.is_file(), "missing {}", wasm.display());

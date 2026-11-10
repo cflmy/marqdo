@@ -26,6 +26,28 @@ We retain **`p` = [Locate the installed native plugin](plugin.native_path(name="
   We **[End this run with the selected exit status](sys.exit(code=1))**.
 Return *None*.
 
+## route
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| app | any | required | Prepared application returned by web.prepare |
+| path | text | required | Declared WebSocket path, including optional path captures |
+| mode | text | "echo" | echo, drain, broadcast or room |
+| room_key | text | "" | Room template required by room mode |
+| presence | bool | False | Publish native room presence messages |
+| require_auth | any | None | None keeps private broadcast/room defaults; False explicitly opens a local demo |
+| on_message | text | "" | Optional declared Marqdo callback member |
+
+| 返回 | 类型 | 说明 |
+|---|---|---|
+| result | map | Updated app with this explicitly declared WebSocket route |
+
+Use `app`, `path`, `mode`="echo", `room_key`="", `presence`=False, `require_auth`=None and `on_message`="" to bind a server transport before web.listen. This function belongs to the network resource; it does not change Document layout or start a socket. Retain the returned app because native resource updates produce a new value. Room mode requires a room_key template; captures such as {id} select the room at request time. Broadcast and room routes require login unless the caller explicitly opts out. Public local demos should say why require_auth=False is intentional. Presence and callbacks retain the native transport's bounded message handling; they are not a client subscription object.
+
+We **[Load the native transport implementation](_load())**.
+Return *[Register this declared WebSocket transport](web_app_route_ws(app=`app`, path=`path`, echo=None, mode=`mode`, room_key=`room_key`, on_message=`on_message`, presence=`presence`, require_auth=`require_auth`))*.
+
+
 # ws
 
 | 参数 | 类型 | 默认 | 说明 |

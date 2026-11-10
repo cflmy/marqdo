@@ -9,17 +9,22 @@ import:
 
 # Regex and encoding in lib/
 
+
 Mid-tier stdlib: everyday primitives stay in `lib/`, not ABI plugins.
 
 # main
 
-**`ok` = > re.is_match text="user@example.com" pattern="^[^@]+@[^@]+$"**
-**`tok` = > enc.base64_encode text="marqdo"**
-**`hex` = > enc.hex_encode text="ok"**
-> print text=`ok`
-> print text=`tok`
-> print text=`hex`
+| 返回 | 类型 | 说明 |
+|---|---|---|
+| result | any | None; execute this page's documented steps in order and observe their output or stated effects |
+
+We first **ok = [Compute ok](re.is_match(text="user@example.com", pattern="^[^@]+@[^@]+$"))** for the next step.
+We first **tok = [Compute tok](enc.base64_encode(text="marqdo"))** for the next step.
+We first **hex = [Compute hex](enc.hex_encode(text="ok"))** for the next step.
+We now **[Display this step's result](> print text=`ok`)**.
+We now **[Display this step's result](> print text=`tok`)**.
+We now **[Display this step's result](> print text=`hex`)**.
 1. `ok`
-  > print text=mid-m1-ok
+  We now **[Display this step's result](> print text="mid-m1-ok")**.
 2. *
-  > print text=mid-m1-fail
+  We now **[Display this step's result](> print text="mid-m1-fail")**.

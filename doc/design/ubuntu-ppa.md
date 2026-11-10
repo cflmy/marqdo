@@ -1,85 +1,49 @@
-# Ubuntu PPA packaging (Marqdo)
+# Ubuntu PPA: executable packaging and publication
 
-| | |
+The maintained entry is [the release handbook](../../skills/marqdo-release/index.mq.md). [ubuntu.mq.md](../../skills/marqdo-release/ubuntu.mq.md) provides publication and observation tasks; [package.mq.md](../../skills/marqdo-release/package.mq.md) owns native metadata and staged file preparation. Their source contracts replace a separate command playbook.
+
+The PPA is ppa:cflmy/marqdo. Apt installs the interpreter; extensions remain independently installed by marqdo ext add. Upload acceptance alone is incomplete: the exact source must be published, its amd64 build must succeed and apt must expose the same Debian version.
+
+## Exact version and artifact
+
+| Value | Meaning |
 |---|---|
-| Status | **Active** — `ppa:cflmy/marqdo`; noble builds need bundled Rust (Cargo.lock v4) |
-| Maintainer | cflmy \<pingan@cflmy.cn\> |
-| GPG | `505943294D04C803` (fingerprint `52A1…C803`) |
-| PPA | `ppa:cflmy/marqdo` |
+| X.Y.Z | Cargo package.version and the authorized upstream |
+| 1ppaN | Reviewed debian/changelog packaging revision |
+| ~SERIES | Explicit Ubuntu target, normally noble |
+| marqdo_X.Y.Z-1ppaN~SERIES_source.changes | Exact signed source artifact |
+| ext/VERSION | Independent extension-pack version |
 
-## Goal
+Native upstream and debian_version tasks parse the actual files. The latter retains the reviewed revision, removes its old series suffix and selects the current upstream/target series. A packaging-only reupload needs an explicit changelog revision edit. Upload selects the exact computed filename, never the newest unrelated package from a previous release or another series.
 
-Users install with:
+## Callable workflow
 
-```bash
-sudo add-apt-repository ppa:cflmy/marqdo
-sudo apt update
-sudo apt install marqdo
+Run from the checkout root after the user has authorized this CLI/full release. Replace X.Y.Z with that version:
+```sh
+marqdo call skills/marqdo-release/ubuntu.mq.md ship 'version="X.Y.Z"' 'series="noble"' --require-ok --effects plugin,fs.read --fs-root . --json
+marqdo call skills/marqdo-release/ubuntu.mq.md status 'version="X.Y.Z"' 'series="noble"' --require-ok --effects plugin,net --fs-root . --json
+marqdo call skills/marqdo-release/index.mq.md finish 'version="X.Y.Z"' 'mode="full"' --require-ok --effects plugin,net,fs.write --fs-root . --json
 ```
 
-CLI and extension packs stay independent: the `.deb` ships the **interpreter**; `marqdo ext add …` still pulls from **https://ext.marqdo.com** (then GitHub / proxy).
+Status is observational: inspect complete as well as Result.ok. Finish turns incomplete publication into a failed Result, allowing --require-ok to stop automation while keeping evidence. A green GitHub run does not establish Launchpad completion or apt availability.
 
-## Why bundled Rust?
+## Native files and existing tools
 
-Ubuntu **noble** ships cargo/rustc **1.75**, which cannot parse **Cargo.lock version 4** (`lock file version 4 requires -Znext-lockfile-bump`). Launchpad builders also have **no network**, so `ppa-build-source.sh` vendors crates **and** installs a modern toolchain into `third_party/rust` inside the `.orig.tar.xz`. `debian/rules` prefers that toolchain over distro cargo.
+Marqdo reads version metadata and writes the staged Cargo configuration, Debian changelog and vendor-checksum repairs. Native filesystem, TOML and JSON functions carry the data. No generated Python reader or writer is used. Vendor repair removes backup entries that Debian cleaning would delete while retaining package digests and ordinary source hashes.
 
-## One-time Launchpad setup
+The existing Debian boundary uses Cargo vendor, tar/xz, the configured Rust installation, debuild, GPG and dput. The source archive includes vendored crates and the selected Rust toolchain for an offline build. Its script chooses a fixed default toolchain and exposes the existing override; it does not assume the build host compiler is sufficient.
 
-1. Create PPA: https://launchpad.net/~cflmy/+activate-ppa → name e.g. `marqdo`
-2. OpenPGP key already on Launchpad (done)
-3. Sign Ubuntu Code of Conduct if Launchpad asks
-4. Enable the Ubuntu **series** you upload for (e.g. noble) under PPA → Change details
-5. On the build machine:
+A new upstream may create an orig archive. Once Launchpad accepts that upstream, reuse the identical bytes and upload only the Debian revision. Never rebuild an accepted orig archive to work around a checksum rejection. A failed stage remains available for inspection.
 
-```bash
-sudo apt install build-essential debhelper devscripts dput lintian \
-  dpkg-dev quilt cargo rustc pkg-config curl xz-utils
-```
+## Recovery evidence
 
-## Package layout
+| Failure | Required action |
+|---|---|
+| sudo/GPG interaction unavailable | Complete the same concrete Debian boundary in the user's terminal, keeping version and series |
+| Complete package version already used | Review and increment the Debian revision before another authorized upload |
+| orig bytes differ | Retrieve and reuse the previously accepted archive |
+| Offline vendor checksum failure | Inspect sanitize_vendor evidence and the retained staged tree |
+| Source accepted, build pending/failed | Inspect the actual Launchpad build |
+| Build green, apt metadata stale | Repeat apt observation for the exact version |
 
-| File | Role |
-|------|------|
-| `debian/control` | Metadata (amd64; no distro cargo BD) |
-| `debian/changelog` | Upload revisions (`1ppaN`) |
-| `debian/rules` | `dh` + bundled/system cargo build |
-| `scripts/ppa-build-source.sh` | Vendor + bundle Rust + `debuild -S` |
-| `scripts/ppa-ship.sh` | apt deps + build + `dput` |
-
-## Versioning
-
-- Upstream SemVer: `Cargo.toml` / git tag `vX.Y.Z`
-- Debian revision: `X.Y.Z-1ppaN~SERIES` (SERIES = `noble`, …) — bump `1ppaN` on packaging-only reuploads
-- **Ext pack** SemVer (`ext/VERSION`) is **not** the deb version
-
-## One-shot (recommended)
-
-```bash
-cd ~/work/marqdo
-./scripts/ppa-ship.sh noble          # tools → debuild -S → dput
-./scripts/ppa-ship.sh noble -n       # build only
-```
-
-If automation cannot enter sudo/GPG, tell the user these commands (do not invent alternatives):
-
-```bash
-./scripts/ppa-build-source.sh noble
-dput ppa:cflmy/marqdo ../build-area/marqdo_*~noble_source.changes
-```
-
-Watch: https://launchpad.net/~cflmy/+archive/ubuntu/marqdo/+builds
-
-## Failure notes
-
-| Symptom | Fix |
-|---------|-----|
-| `lock file version 4 requires -Znext-lockfile-bump` | Rebuild with current `ppa-build-source.sh` (bundles Rust); bump `1ppaN` |
-| `failed to calculate checksum of: …/vendor/…/Cargo.toml.orig` | `dh_clean` purged `*.orig`; fixed via `dh_clean -Xvendor/` (+ strip `.orig` only when **creating a new** orig); bump `1ppaN` with **`-sd`** |
-| `orig.tar.xz already exists … different contents` | Never rewrite an uploaded upstream `.orig`; reuse PPA file (`ppa-build-source.sh` downloads it) and `debuild -S -sd` |
-| Same version rejected by Launchpad | Bump `debian/changelog` (`1ppa2`, …) |
-| Wrong series | Enable series on PPA; rebuild with that series name |
-
-## Out of scope (v1 deb)
-
-- Shipping `ext/native/*.so` inside the deb (use CDN `ext add`)
-- WASM / VSIX / non-amd64
+Public apt observation reads Packages.gz with native HTTP bytes and the bounded gzip boundary, then inspects actual package records. Isolated fixtures cover metadata selection, configuration writing and vendor-checksum preservation without uploading to a PPA.

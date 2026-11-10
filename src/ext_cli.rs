@@ -19,6 +19,12 @@ pub struct ExtPackage {
 
 pub const CATALOG: &[ExtPackage] = &[
     ExtPackage {
+        id: "engineering",
+        description: "Native process, authenticated service and archive boundaries for executable handbooks",
+        mq_files: &["engineering/index.mq.md", "engineering/索引.mq.md"],
+        native_crate: Some("marqdo_plugin_engineering"),
+    },
+    ExtPackage {
         id: "llm",
         description: "OpenAI-compatible chat object (ext/ai/llm)",
         mq_files: &[
@@ -52,17 +58,28 @@ pub const CATALOG: &[ExtPackage] = &[
             "data/cache.mq.md",
             "data/db.mq.md",
             "data/form.mq.md",
+            "data/表单.mq.md",
+            "data/admin.mq.md",
+            "data/后台.mq.md",
+            "data/view.mq.md",
+            "data/视图.mq.md",
+            "data/api.mq.md",
             "data/storage.mq.md",
             "security/index.mq.md",
             "security/auth.mq.md",
+            "security/鉴权.mq.md",
+            "security/tenant.mq.md",
             "security/rbac.mq.md",
             "security/oidc.mq.md",
             "net/index.mq.md",
             "net/http.mq.md",
             "net/url.mq.md",
             "net/websocket.mq.md",
+            "net/实时.mq.md",
             "web/index.mq.md",
             "web/web.mq.md",
+            "web/head.mq.md",
+            "web/页头.mq.md",
             "web/网页.mq.md",
             "web/_capability/index.mq.md",
             "web/page/index.mq.md",
@@ -169,6 +186,7 @@ pub fn native_short_name(crate_or_id: &str) -> &str {
         "marqdo_plugin_llm" | "llm" => "llm",
         "marqdo_plugin_quantum" | "quantum" => "quantum",
         "marqdo_plugin_linalg" | "linalg" => "linalg",
+        "marqdo_plugin_engineering" | "engineering" => "engineering",
         other => other,
     }
 }
@@ -190,6 +208,7 @@ pub fn native_env_var(short: &str) -> &'static str {
         "llm" => "MARQDO_LLM_PLUGIN",
         "quantum" => "MARQDO_QUANTUM_PLUGIN",
         "linalg" => "MARQDO_LINALG_PLUGIN",
+        "engineering" => "MARQDO_ENGINEERING_PLUGIN",
         _ => "MARQDO_AGENT_PLUGIN",
     }
 }
@@ -605,7 +624,7 @@ pub fn remove_ext(id: &str) -> Result<()> {
 /// point at a freshly built plugin path.
 pub fn installed_native_path(name: &str) -> Option<PathBuf> {
     let short = native_short_name(name);
-    if !matches!(short, "agent" | "web" | "llm" | "quantum" | "linalg") {
+    if !CATALOG.iter().any(|package| package.id == short && package.native_crate.is_some()) {
         return None;
     }
     let lib_name = native_lib_filename(short);
@@ -650,6 +669,7 @@ pub fn path_is_trusted_plugin(path: &Path) -> bool {
         "MARQDO_LLM_PLUGIN",
         "MARQDO_QUANTUM_PLUGIN",
         "MARQDO_LINALG_PLUGIN",
+        "MARQDO_ENGINEERING_PLUGIN",
     ] {
         if let Ok(p) = env::var(key) {
             let p = PathBuf::from(p);
@@ -659,7 +679,7 @@ pub fn path_is_trusted_plugin(path: &Path) -> bool {
             }
         }
     }
-    for short in ["agent", "web", "llm", "quantum", "linalg"] {
+    for short in CATALOG.iter().filter_map(|p| p.native_crate).map(native_short_name) {
         if let Ok(found) = find_native_plugin(short) {
             let found = found.canonicalize().unwrap_or(found);
             if found == path {

@@ -90,7 +90,7 @@ func parseHeadersFromEnvStr(s string) []envHeader {
 	return out
 }
 
-func (st *state) mountProxyRoutes(mux *http.ServeMux) {
+func (st *state) mountProxyRoutes(mux routeRegistrar) {
 	for _, key := range sortedKeys(st.proxyRoutes) {
 		cfg := parseProxyRoute(st.proxyRoutes[key])
 		path := routePathKey(key)

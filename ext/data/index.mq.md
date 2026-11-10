@@ -6,12 +6,18 @@ import:
   db_api: ext/data/db.mq.md
   fs: lib/fs.mq.md
   path: lib/path.mq.md
+  result: lib/result.mq.md
 ---
 
 Start here when a program needs persistent records, short-lived values, object storage or forms.
 The public resource files remain the implementation: [database](db.mq.md) owns schemas and
 transactions, [cache](cache.mq.md) owns expiry, [storage](storage.mq.md) owns blobs and upload
 validation, and [forms](form.mq.md) separates validation, rendering and submission.
+[View queries](view.mq.md) (中文：[视图](视图.mq.md)) retain current records inside recursive View nodes.
+[Native administration](admin.mq.md) exposes only mounted forms and their business tables.
+中文作者可以使用[表单](表单.mq.md)构造、定义字段规则、引用与挂载资源，使用[后台](后台.mq.md)启用同一个原生管理入口。
+[JSON query routes](api.mq.md) bind read-only database responses to a prepared site;
+pair tenant-scoped queries with the explicit security tenant resource.
 
 These modules use the native web plugin. In this source checkout build it with
 scripts/build-web-plugin.sh; installed packages follow the web package installation route.
@@ -22,7 +28,7 @@ Neither example needs a cloud account, credentials or an external service.
 
 ```sh
 marqdo call ext/data/index.mq.md memory_cache 'key="manual"' 'value="ready"' --effects plugin --json
-marqdo call ext/data/index.mq.md transaction_roundtrip "root=\"$MQ_WORK\"" --effects plugin,fs.write --fs-root "$MQ_WORK" --json
+marqdo call ext/data/index.mq.md transaction_roundtrip --effects plugin,fs.write --fs-root "$MQ_WORK" --json
 ```
 
 A resource constructor creates an object; its methods need that actual receiver. Use the free
@@ -62,19 +68,22 @@ so another operation does not inherit it. Return *stored* as observed, including
 
 | 参数 | 类型 | 默认 | 说明 |
 |---|---|---|---|
-| root | text | required | Absolute disposable root, matching --fs-root; native resource URLs need an absolute path |
+| root | text | "." | Expected filesystem root; the default uses the actual --fs-root context |
 
 | 返回 | 类型 | 说明 |
 |---|---|---|
 | result | map | The committed row list and native commit/rollback outcomes; the second insert is rolled back |
 
-Use the absolute `root` supplied for --fs-root. This isolated-file example shows the whole ownership sequence: create a schema, begin a transaction,
+Use `root`="." for the actual --fs-root context, or pass the same absolute root explicitly. This isolated-file example shows the whole ownership sequence: create a schema, begin a transaction,
 write through its receiver, finish it, and read outside it. A second transaction is explicitly
 rolled back. The standalone txn constructor wraps the actual native identifier and connection URL;
 it does not begin another transaction or invent an identifier.
 
+We **actual_root = [Resolve the actual granted filesystem root](fs.resolve(path="."))** and **expected_root = [Check the optional explicit root](fs.resolve(path=`root`))**.
+1. `actual_root` != `expected_root`
+  Return *[Keep an inconsistent resource root explicit](result.error(code="data.root", message="root must match the granted filesystem root", operation="transaction_roundtrip"))*.
 First **directory = [Create an owned temporary directory under the granted root](fs.temp_dir(prefix="data-manual"))**.
-The filesystem helper returns a root-relative name. We retain **work_dir = [Resolve that owned name against the explicit root](path.join(a=`root`, b=`directory`))**
+The filesystem helper returns a root-relative name. We retain **work_dir = [Resolve the owned name through the actual filesystem context](fs.resolve(path=`directory`))**
 and **[Check that this absolute directory is inside the granted filesystem root](fs.stat(path=`work_dir`))**
 before giving any path to the native database. We select **database_path = [Choose the SQLite file inside that directory](path.join(a=`work_dir`, b="manual.db"))**
 and select **database_url = "sqlite:" + database_path** before creating

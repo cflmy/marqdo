@@ -2,11 +2,34 @@
 
 ## Unreleased
 
+## v2.7.0 — 2026-11-10
+
+### Highlights / 亮点
+
+源码手册进入真实开发与用户站点：原生文件操作、可调用开发/发版流程、递归 View 站点及当前请求资源。CLI、WASM、拓展包与编辑器版本统一为 2.7.0。详见 [完整双语发布说明](doc/releases/v2.7.0.md)。
+
+Executable source handbooks now drive actual development and user sites: native file operations, callable release tasks, recursive View Documents and current request resources. CLI, WASM, extension packs and editor version are 2.7.0.
+
+**核心表面 Δ / Core surface Δ**：无增删，仍为 19 个核心构造；沿用既有 Markdown 标记与插件 ABI。
+
 ### Added
+
+- Native development and release handbooks, bounded engineering plugin boundaries, literal CLI JSON file/stdin arguments and --require-ok failure propagation.
+- 原生文档表读取与保留正文的修改；纯 head 资源，以及当前请求的数据查询、表单与会话导航资源。
+- Both-language recursive user sites, source-aware route inspection, retained theme declarations and actual browser acceptance.
+- Structured nested list/control records in the official bridge, documented in EN/ZH browser libraries and the callable browser-app.
 
 ### Fixed
 
+- Occlusion receivers, nested and hyphenated-path calls, prose literal defaults and exact CLI argument/session replay semantics.
+- 授权站点根下的文件/SQLite 定位；嵌套 Document 与 Endpoint 回调上下文；表单重试 CSRF、成功跳转、管理入口与片段选择。
+- Browser duplicate-item deletion, literal content rendering, Back/Forward history and asynchronous outcome reporting.
+
 ### Changed
+
+- SKILL discovery delegates to executable handbooks; ordinary file IO and orchestration use Marqdo instead of Python release scripts.
+- 中英文用户站点保留原始主题、当前文章与管理能力；移除无关的暗恋工程和过时独立浏览器演示，保留底层测试夹具。
+- Native packs include the engineering plugin. Main excludes editor sources; immutable tags, both-platform builds and independent GitHub/CDN/Ubuntu verification remain release obligations.
 
 ## v2.6.0 — 2026-11-08
 
@@ -1160,6 +1183,8 @@ marqdo run tests/markup-v03/inc-prose.mq.md
 ## v0.4.0 — 2026-09-13
 
 ### Highlights
+
+历史说明（2026-11-10）：本节的 anlian-mq 是当时发布内容记录，现已移出仓库，旧启动命令不适用于当前工作树。当前完整站点见 examples/web-site 与 examples/web-site-zh。
 
 **Go `libweb` 默认落地（W-G0–W-G14）**：官方网页原生插件改为 Go C ABI；CLI / gold / Release 走 `scripts/build-web-plugin.sh`；Rust 源码归档。另附 **anlian-mq** 验收站与表单插槽 / `MARQDO_EXT` 提示修复。
 

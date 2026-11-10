@@ -74,7 +74,7 @@ func (st *state) oidcFallbackNext(r *http.Request) string {
 	return "/"
 }
 
-func (st *state) mountOIDCRoutes(mux *http.ServeMux) {
+func (st *state) mountOIDCRoutes(mux routeRegistrar) {
 	if !st.oidcEnabled() {
 		return
 	}

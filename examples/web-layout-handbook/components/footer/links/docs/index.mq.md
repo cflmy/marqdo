@@ -15,5 +15,5 @@ This leaf owns only the footer/links/docs Markdown content; its parent owns plac
 Edit adjacent content.md to change prose. Add a child directory when a second
 layout responsibility appears instead of introducing HTML into the content.
 
-**body = fs.read_text path="components/footer/links/docs/content.md"**
-*> component.markdown text=`body` slot="footer-links-docs"*
+We first **body = [Compute body](fs.read_text(path="components/footer/links/docs/content.md"))** for the next step.
+After these steps, return *component.markdown(text=`body`, slot="footer-links-docs")*.

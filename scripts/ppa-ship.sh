@@ -47,7 +47,7 @@ fi
 PPA_TARGET="${MARQDO_PPA:-ppa:cflmy/marqdo}"
 PKGS=(build-essential debhelper devscripts dput lintian
       dpkg-dev quilt cargo rustc pkg-config libssl-dev ca-certificates
-      python3 xz-utils)
+      xz-utils)
 
 need_apt=0
 for bin in debuild dput dpkg-parsechangelog cargo gpg; do
@@ -72,16 +72,20 @@ fi
 echo "==> building source package for series=${SERIES}"
 run_user "$ROOT/scripts/ppa-build-source.sh" "$SERIES"
 
-VER="$(sed -n 's/^version = "\(.*\)"/\1/p' "$ROOT/Cargo.toml" | head -1)"
-BUILD_AREA="$(cd "$ROOT/.." && pwd)/build-area"
-# Prefer changes matching this series; fall back to newest source.changes
-CHANGES="$(ls -1t "$BUILD_AREA"/marqdo_*"~${SERIES}"_source.changes 2>/dev/null | head -1 || true)"
-if [ -z "${CHANGES:-}" ]; then
-  CHANGES="$(ls -1t "$BUILD_AREA"/marqdo_*_source.changes 2>/dev/null | head -1 || true)"
+# The native handbook selects the exact current-version artifact.
+MARQDO_TOOL="${MARQDO_BIN:-$ROOT/target/debug/marqdo}"
+if [ ! -x "$MARQDO_TOOL" ]; then MARQDO_TOOL="$ROOT/target/release/marqdo"; fi
+if [ ! -x "$MARQDO_TOOL" ]; then MARQDO_TOOL="$(command -v marqdo || true)"; fi
+if [ -z "$MARQDO_TOOL" ] || [ ! -x "$MARQDO_TOOL" ]; then
+  echo "error: build Marqdo or set MARQDO_BIN before packaging" >&2
+  exit 1
 fi
-if [ -z "${CHANGES:-}" ] || [ ! -f "$CHANGES" ]; then
-  echo "error: no *_source.changes under $BUILD_AREA" >&2
-  ls -la "$BUILD_AREA" 2>/dev/null || true
+DEB_VER="$(run_user "$MARQDO_TOOL" call "$ROOT/skills/marqdo-release/package.mq.md" debian_version \
+  "series=\"$SERIES\"" --require-ok --effects fs.read --fs-root "$ROOT")"
+BUILD_AREA="$(cd "$ROOT/.." && pwd)/build-area"
+CHANGES="$BUILD_AREA/marqdo_${DEB_VER}_source.changes"
+if [ ! -f "$CHANGES" ]; then
+  echo "error: expected source artifact is missing: $CHANGES" >&2
   exit 1
 fi
 

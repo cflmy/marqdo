@@ -6,6 +6,10 @@ description: Marqdo 如何以一份可执行源为唯一权威，把它投影成
 
 # main
 
+| 返回 | 类型 | 说明 |
+|---|---|---|
+| result | any | 空值；按顺序执行本页的演示步骤，观察输出或已说明的副作用。 |
+
 Marqdo 的宪法是「代码即文档，文档即知识库」。`.mq.md` 不是程序截图：它同时是可读源码、可执行单元和知识页。
 
 这个承诺只有在知识始终从源派生时才成立。OKF 提供可移植知识包的形态；EKC 提供工程化投影。二者都不成为第二份权威。
@@ -21,7 +25,7 @@ OKF（Open Knowledge Format）用 Markdown + YAML frontmatter 表示知识：一
 ```yaml
 type: Capability
 title: 持久外联内核
-description: 在命名内核中运行 Python 或 Node 并保留状态
+description: 向显式声明的本地内核传递原生数据并保留状态
 resource: public/features/19-外联视图单元.mq.md
 status: stable
 verified:
@@ -63,7 +67,7 @@ EKC 把仓库投影成工程知识系统，并在 Agent 写新代码前提供 pr
 |---|---|---|
 | L0 Repository | 语言、规模、根目录 | 仓库总览 |
 | L1 Module | imports、exports、职责 | 外联内核模块 |
-| L2 Symbol | 签名、调用、指纹 | Python 分析函数 |
+| L2 Symbol | 签名、调用、指纹 | 外部源码中的函数 |
 | L3 Capability | 工程能做什么 | 运行持久外联内核 |
 | L4 Knowledge | 决策、约束、失败 | 为什么状态桥必须显式 |
 
@@ -119,7 +123,7 @@ marqdo knowledge verify
 
 一个知识页说“这个工程能分析订单”，就必须指向一个真正能跑的 `.mq.md` 资源。这是 OKF 形态的笔记与可执行知识系统的区别。
 
-在外联示例里，页面本身就是证明：Python 调用、持久内核和状态桥都从读者正在看的同一份 Markdown 源运行。没有另一个会漂移的演示项目。
+外联示例先用 Marqdo 固有能力分析订单，再把本地化展示交给 Node Intl。显式导入指向共享的可调用报表手册，页面本身声明实际的视图内核、原生值与单元。验收仍要检查逐单元的真实结果，不能把一份可序列化计划当作单元已经运行成功的证明。
 
 ---
 

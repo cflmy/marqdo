@@ -1,0 +1,26 @@
+[package]
+name = "marqdo_plugin_engineering"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "OS, authenticated service and archive boundaries for executable Marqdo engineering handbooks"
+publish = false
+
+[lib]
+name = "engineering"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+marqdo-plugin-sdk = { path = "../../crates/marqdo-plugin-sdk" }
+serde_json = "1"
+ureq = { version = "=2.9.7", default-features = false, features = ["tls", "gzip"] }
+sha2 = "=0.10.9"
+hmac = "=0.12.1"
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+zip = { version = "=0.6.6", default-features = false, features = ["deflate"] }
+libc = "0.2"
+flate2 = "1"
+base64 = "0.22"
+
+# Reuse the real compiler for source analysis; no second syntax recognizer.
+marqdo = { path = "../.." }

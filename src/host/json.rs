@@ -97,6 +97,41 @@ pub(crate) fn decode_text(text: &str) -> Result<Value, DecodeError> {
     Ok(value.0)
 }
 
+
+/// The call protocol envelope is not a runtime column table. Validate each
+/// actual argument with BoundaryValue while keeping duplicate-key detection.
+pub(crate) fn decode_arguments(text: &str) -> Result<Vec<(String, Value)>, String> {
+    use serde::Deserialize;
+    struct Arguments(Vec<(String, Value)>);
+    impl<'de> serde::Deserialize<'de> for Arguments {
+        fn deserialize<D: serde::Deserializer<'de>>(de: D) -> Result<Self,D::Error> {
+            struct Visitor;
+            impl<'de> serde::de::Visitor<'de> for Visitor {
+                type Value = Arguments;
+                fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+                    f.write_str("a JSON object of named arguments")
+                }
+                fn visit_map<A: serde::de::MapAccess<'de>>(self, mut map: A) -> Result<Arguments,A::Error> {
+                    use serde::de::Error;
+                    let mut args = Vec::new();
+                    let mut keys = std::collections::HashSet::new();
+                    while let Some(key) = map.next_key::<String>()? {
+                        if !keys.insert(key.clone()) { return Err(A::Error::custom("duplicate argument name")); }
+                        let BoundaryValue(value) = map.next_value()?;
+                        args.push((key, value));
+                    }
+                    Ok(Arguments(args))
+                }
+            }
+            de.deserialize_map(Visitor)
+        }
+    }
+    let mut de = serde_json::Deserializer::from_str(text);
+    let args = Arguments::deserialize(&mut de).map_err(|e| e.to_string())?;
+    de.end().map_err(|e| e.to_string())?;
+    Ok(args.0)
+}
+
 pub fn parse(text: &Value) -> Result<Value, String> {
     let s = match text {
         Value::Text(s) => s.as_str(),

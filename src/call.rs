@@ -117,6 +117,8 @@ pub struct CallOptions {
     pub fs_root: Option<std::path::PathBuf>,
     pub session: Option<String>,
     pub toget: Option<String>,
+    /// JSON transport values are literal data, including leading $ and @.
+    pub literal_args: bool,
 }
 
 /// Call `function` in `path` with named arguments (pure-only, no session).
@@ -146,7 +148,7 @@ pub fn call_file_with(
         )
     })?;
 
-    let mut session = if opts.session.is_some() || opts.toget.is_some() || args_need_session(args) {
+    let mut session = if opts.session.is_some() || opts.toget.is_some() || (!opts.literal_args && args_need_session(args)) {
         let id = opts
             .session
             .clone()
@@ -156,7 +158,9 @@ pub fn call_file_with(
         None
     };
 
-    let resolved = if let Some(ref mut sess) = session {
+    let resolved = if opts.literal_args {
+        args.to_vec()
+    } else if let Some(ref mut sess) = session {
         crate::call_session::resolve_args(sess, args, backend)?
     } else {
         args.to_vec()
@@ -185,6 +189,9 @@ pub fn call_file_with(
             opts.toget.as_deref(),
             &value,
         )?;
+        if let Some(step) = sess.steps.last_mut() {
+            step.literal_args = opts.literal_args;
+        }
         crate::call_session::save_session(sess)?;
     }
 
@@ -276,6 +283,7 @@ fn execute_source_function_with_root(
     fs_root: Option<&Path>,
 ) -> Result<(Value, String)> {
     let module = load_module(path)?;
+    let source = std::fs::read_to_string(path)?;
     let fun = find_function_at_line(&module.functions, line).ok_or_else(|| {
         call_diag(
             Some(path),
@@ -297,6 +305,7 @@ fn execute_source_function_with_root(
         ));
     }
     let mut host = HostContext::for_capture(Some(path), caps);
+    host.set_entry_source(Some(path), &source);
     if let Some(root) = fs_root {
         let root = root.canonicalize()?;
         if !root.is_dir() {
@@ -338,6 +347,7 @@ fn execute_source_function_with_root(
                     )
                 })?;
             let mut host = HostContext::for_capture(Some(path), caps);
+            host.set_entry_source(Some(path), &source);
             if let Some(root) = fs_root {
                 let root = root.canonicalize()?;
                 host.cwd = root.clone();
@@ -402,6 +412,13 @@ pub fn parse_call_args(tokens: &[String]) -> Result<Vec<(String, Value)>> {
         out.push((name.to_string(), value));
     }
     Ok(out)
+}
+
+/// Decode a JSON object of literal arguments with the standard safe-JSON domain.
+/// Unlike command-line $name syntax, JSON strings remain data during replay.
+pub fn parse_call_args_json(source: &str) -> Result<Vec<(String, Value)>> {
+    crate::host::json::decode_arguments(source)
+        .map_err(|message| call_diag(None, 0, "call.bad_value", message))
 }
 
 fn locate_artifact<'a>(
@@ -526,6 +543,8 @@ fn parse_literal(raw: &str) -> Result<Value, String> {
     if raw.starts_with('$') || raw.starts_with('@') {
         return Ok(Value::Text(raw.to_string()));
     }
+    // Preserve the existing name=value raw-quoted text transport. Escaped,
+    // structured and multiline data uses the explicit --args-json channel.
     if raw.len() >= 2 {
         let bytes = raw.as_bytes();
         if (bytes[0] == b'"' && bytes[raw.len() - 1] == b'"')

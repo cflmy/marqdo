@@ -9,9 +9,14 @@ import:
 
 # GHZ
 
+
 H on qubit 0, CX(0→1), CX(0→2). Ideal: |000⟩ and |111⟩ each with probability 1/2.
 
 # main
+
+| 返回 | 类型 | 说明 |
+|---|---|---|
+| result | any | None; execute this page's documented steps in order and observe their output or stated effects |
 
 `steps` =
 
@@ -21,11 +26,11 @@ H on qubit 0, CX(0→1), CX(0→2). Ideal: |000⟩ and |111⟩ each with probabi
 | 2 | CX | 0,1 |
 | 3 | CX | 0,2 |
 
-**qc = > quantum.circuit qubits=3 steps=`steps`**
-**p = > qc.probabilities**
-**_ = > qc.draw path="ghz.svg"**
-**_ = > qc.draw kind="probs" path="ghz-probs.svg"**
-**H = > gate.gate name="H"**
-**_ = > H.draw kind="matrix" path="ghz-h-matrix.svg"**
+We first **qc = [Compute qc](quantum.circuit(qubits=3, steps=`steps`))** for the next step.
+We first **p = [Compute p](qc.probabilities())** for the next step.
+We first **_ = [Compute _](qc.draw(path="ghz.svg"))** for the next step.
+We first **_ = [Compute _](qc.draw(kind="probs", path="ghz-probs.svg"))** for the next step.
+We first **H = [Compute H](gate.gate(name="H"))** for the next step.
+We first **_ = [Compute _](H.draw(kind="matrix", path="ghz-h-matrix.svg"))** for the next step.
 
-> print text=`p`
+We now **[Display this step's result](> print text=`p`)**.

@@ -17,8 +17,8 @@ import:
 若子块仍含独立分栏，就继续沿对应目录的 index.mq.md 分解。
 不要把渲染后的字符串放回值列，子节点在整个装配过程中保持结构。
 
-**brand_nodes = > brand.节点**
-**links_nodes = > links.节点**
-**siblings = 组件.合并 甲=`brand_nodes` 乙=`links_nodes`**
-**footer_columns = 布局.分栏 子节点=`siblings` 槽="footer"**
-*> 组件.包裹 子节点=`footer_columns` 种类="footer" 槽="footer"*
+We first **brand_nodes = [Compute brand_nodes](brand.节点())** for the next step.
+We first **links_nodes = [Compute links_nodes](links.节点())** for the next step.
+We first **siblings = [Compute siblings](组件.合并(甲=`brand_nodes`, 乙=`links_nodes`))** for the next step.
+We first **footer_columns = [Compute footer_columns](布局.分栏(子节点=`siblings`, 槽="footer"))** for the next step.
+After these steps, return *组件.包裹(子节点=`footer_columns`, 种类="footer", 槽="footer")*.

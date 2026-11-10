@@ -6,6 +6,7 @@ description: Tiny project demonstrating Capability Catalog + reuse + decisions.
 
 # Engineering Knowledge demo
 
+
 This folder is a miniature “large engineering” slice: config resolution already exists.
 Before generating a new loader, run:
 
@@ -18,5 +19,9 @@ marqdo duplicate examples/engineering-knowledge -o examples/engineering-knowledg
 Expected: **REUSE config.resolve**, not a new `load_configuration`.
 
 # main
+
+| 返回 | 类型 | 说明 |
+|---|---|---|
+| result | any | None; execute this page's documented steps in order and observe their output or stated effects |
 
 * "see README via catalog/reuse CLI"

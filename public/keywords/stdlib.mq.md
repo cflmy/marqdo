@@ -6,30 +6,34 @@ description: Host builtins for strings and tables
 
 # main
 
+| 返回 | 类型 | 说明 |
+|---|---|---|
+| result | any | None; execute this page's documented steps in order and observe their output or stated effects |
+
 Length and type:
 
-**`s` = "hello"**
+We first **s = "hello"** for the next step.
 
-**`n` = > len `s`**
+We first **n = [Compute n](len(`s`))** for the next step.
 
-> print text=`n`
+We now **[Display this step's result](> print text=`n`)**.
 
-**`ty` = > type `s`**
+We first **ty = [Compute ty](type(`s`))** for the next step.
 
-> print text=`ty`
+We now **[Display this step's result](> print text=`ty`)**.
 
 Trim, split, join, and index:
 
-**`t` = > trim value="  hi  "**
+We first **t = [Compute t](trim(value="  hi  "))** for the next step.
 
-**`parts` = > split value="a,b" sep=","**
+We first **parts = [Compute parts](split(value="a,b", sep=","))** for the next step.
 
-**`mid` = > at value=`parts` index=0**
+We first **mid = [Compute mid](at(value=`parts`, index=0))** for the next step.
 
-**`j` = > join value=`parts` sep="-"**
+We first **j = [Compute j](join(value=`parts`, sep="-"))** for the next step.
 
-> print text=`t`
+We now **[Display this step's result](> print text=`t`)**.
 
-> print text=`mid`
+We now **[Display this step's result](> print text=`mid`)**.
 
-> print text=`j`
+We now **[Display this step's result](> print text=`j`)**.

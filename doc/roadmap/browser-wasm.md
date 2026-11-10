@@ -1,5 +1,8 @@
 # 路线图：浏览器 Marqdo（WASM）
 
+> 2.7.0 维护说明：独立的 browser-hello 与 browser-media 演示已删除。下文保留既有能力设计与宿主边界，当前可运行工程使用 browser-app；底层计数器冒烟夹具位于 tests/wasm/counter.mq.md。Canvas、音频等仍是 lib/browser 的宿主能力，不宣称当前 browser-app 演示包含这些交互。
+
+
 | | |
 |---|---|
 | 状态 | **Completed**（路线 C 首版功能完备；续作见 [browser-wasm-d.md](browser-wasm-d.md)） |
@@ -23,7 +26,7 @@
 | ABI crate | `crates/marqdo-wasm` |
 | 官方 bridge | `crates/marqdo-wasm/js/marqdo-bridge.js` |
 | CLI | `marqdo wasm build -o DIR` |
-| 示例 | `examples/browser-hello/` |
+| 示例 | `examples/browser-app/` |
 | 冒烟 | `tests/wasm/smoke.mjs` · `tests/wasm_smoke.rs` |
 | L1 | `web.client_embed` / `网页.客户端挂载` |
 

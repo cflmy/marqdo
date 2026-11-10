@@ -345,7 +345,14 @@ func web_listen(argsJSON *C.char, outJSON **C.char, errMsg **C.char) C.int {
 	if len(appBag) == 0 {
 		appBag = args
 	}
-	out, err := httpx.Listen(appBag, entryDir())
+	root := entryDir()
+	if artifactRoot, ok := appBag["artifact_root"].(string); ok && artifactRoot != "" {
+		root = artifactRoot
+	}
+	if _, err := httpx.InspectApp(appBag); err != nil {
+		return replyJSON(outJSON, errMsg, nil, err)
+	}
+	out, err := httpx.Listen(appBag, root)
 	return replyJSON(outJSON, errMsg, out, err)
 }
 

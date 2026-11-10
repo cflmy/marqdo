@@ -1,131 +1,72 @@
 ---
 markup: occlusion
-title: web-net-site
-description: Home + /about + /new (form) + /tools (net lib) + /admin (auth) + /live (WebSocket).
+type: web
+view: main
+route: /
+title: Marqdo Net Site
 import:
+  layout: components/index.mq.md
+  home: components/home.mq.md
+  database: db/index.mq.md
+  forms: forms.mq.md
+  styles: styles/shell.mq.md
   web: ext/web/web.mq.md
-  net: lib/net.mq.md
-  text: lib/text.mq.md
-  shell: styles/shell.mq.md
-  nav: components/nav.mq.md
-  side: components/side.mq.md
-  foot: components/foot.mq.md
-  articles: db/articles.mq.md
-  db: db/index.mq.md
+  form: ext/data/form.mq.md
+  admin: ext/data/admin.mq.md
+  auth: ext/security/auth.mq.md
+  socket: ext/net/websocket.mq.md
+  fs: lib/fs.mq.md
+  result: lib/result.mq.md
 ---
 
-# main
+Read this entry, then the layout index, content leaves, database entry, form resource and browser client. Home, About, Publish and Tools are declared Documents. Native administration remains enabled and login-gated. The /live socket is a separate network resource. No page uses the removed compose APIs or a raw HTML shell.
 
-`home` =
+## main
 
-| 组件 | 样式 |
-|------|------|
-| nav.`nav` | shell.`topnav` |
-| side.`side` | shell.`side_panel` |
-| foot.`foot` | |
+| 返回 | 类型 | 说明 |
+|---|---|---|
+| result | list | Shared recursive frame around introduction, echo controls and current articles |
 
-`index` =
+This startup function describes structure, reading only the terminal Markdown leaves. The database query remains a typed resource resolved per request, while the client uses native controls and the official bridge. Rendering the page cannot initialize or clear business records. Follow each component import to edit one responsibility instead of reproducing the complete page.
 
-| 属性 | 值 | 样式 |
-|------|-----|------|
-| title | articles.`articles`.title | shell.`card_title` |
-| body | articles.`articles`.body | shell.`card_body` |
+We **body = [Assemble the three independent home responsibilities](home.nodes())**.
+Return *[Place them in the shared recursive site frame](layout.frame(body=`body`))*.
 
-Home intro also embeds the live WebSocket widget (HTML is served raw).
+## serve
 
-**store = > db.open**
-**page = > web.page title="Marqdo Net Site" intro="<h1>Net Site</h1><p>Articles from SQLite, a live WebSocket widget, login-gated admin, and net-library parsing tools.</p><h2 id=\"live\">Live WebSocket</h2><p id=\"live-status\">connecting…</p><input id=\"live-msg\" placeholder=\"type a message…\"><button id=\"live-send\" disabled>send</button><div id=\"live-out\"></div><script src=\"/static/live.js\"></script>"**
-**page = > page.compose_components components=home**
-**page = > page.compose_main main=index**
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| root | text | "examples/web-net-site" | Explicit discovery directory relative to the checkout |
+| port | number | 18083 | Local demonstration listen port |
+| url | any | None | None chooses the site-root SQLite file; tests use an owned temporary URI |
 
-About page: same shell.
+| 返回 | 类型 | 说明 |
+|---|---|---|
+| result | map | Blocking listener with retained article data, forms, authentication and echo |
 
-**about = > web.page title="About" intro="<h1>About</h1><p>Demonstrates the network-extended web library: sessions, auth, WebSocket, multipart/cookie parsing.</p>"**
-**about = > about.compose_components components=home**
+Use `root`="examples/web-net-site", `port`=18083 and `url`=None from the checkout, with --fs-root examples/web-net-site and plugin,fs.write,network.write. Build current browser assets into public/generated through the development handbook first. Missing runtime assets stop before listening rather than leaving the widget apparently ready.
 
-<!-- Tools page (lib/net parsing) -->
+Initialization preserves existing articles and seeds only an empty table. Theme compilation uses the original property declarations and writes only the explicit generated stylesheet. Discovery assembles the readable Documents, then the workflow enables native administration, attaches local fixture credentials, mounts the public article form and binds anonymous loopback echo. Real deployment must replace fixture credentials and its network policy. Keep each returned app before listening.
 
-Parse a `Cookie` request header with the standard library.
+`assets` =
 
-**parsed_req = > net.cookie_parse text="session=abc123; theme=dark"**
-**req_cookie = [1](access(parsed_req, "1"))**
+| file |
+|---|
+| public/generated/marqdo_wasm.wasm |
+| public/generated/marqdo-bridge.js |
 
-Parse a `Set-Cookie` response header.
+- [Require the actual runtime resources before serving](for assets as file)
+  1. not [The selected runtime asset exists](fs.exists(path=`file`))
+    Return *[Explain the required browser preparation](result.error(code="net_site.browser_assets", message="build current browser assets into public/generated before serve", operation="serve"))*.
+We **store = [Initialize the retained article database](database.open(url=`url`))** and **css = [Compile the actual declarative theme](styles.css())** and **[Create only the generated resource directory](fs.make_dirs(path="public/generated"))** and **[Write that explicit stylesheet through native IO](fs.atomic_write(path="public/generated/theme.css", text=`css`))**.
+We **app = [Discover all declared Documents and the static root](web.prepare(root=`root`, host="127.0.0.1", port=`port`, db=`store`, static_dir="public"))** and **app = [Retain the existing native administration capability](admin.enable(app=`app`))**.
 
-**parsed_resp = > net.cookie_parse text="id=42; Path=/; HttpOnly; SameSite=Lax" is_response=True**
-**resp_cookie = [1](access(parsed_resp, "1"))**
+`users` =
 
-Parse a `multipart/form-data` body.
+| @ | username | password | role |
+|---|---|---|---|
+| 1 | admin | secret | admin |
 
-`_b` = net-boundary
-
-`_body` = "--`_b`\nContent-Disposition: form-data; name=\"title\"\n\nHello\n--`_b`\nContent-Disposition: form-data; name=\"cover\"; filename=\"pic.png\"\nContent-Type: image/png\n\n<bytes>\n--`_b`--\n"
-
-**mp = > net.multipart_parse body=`_body` boundary=`_b`**
-**mp_title = [1](access(mp, "1"))**
-**mp_cover = [2](access(mp, "2"))**
-
-Build the tools page as one HTML intro (intro is served raw).
-
-`tools_parts` =
-
-| 段 |
-|----|
-| <h1>Net tools</h1><p>Parsing demos powered by lib/net: cookie_parse and multipart_parse.</p><section class="content cards"> |
-| <article><h2>Cookie request</h2><p> |
-| [name](`req_cookie`)=[value](`req_cookie`) |
-| </p></article><article><h2>Set-Cookie response</h2><p> |
-| [name](`resp_cookie`)=[value](`resp_cookie`) · HttpOnly=[http_only](`resp_cookie`) |
-| </p></article><article><h2>Multipart field</h2><p> |
-| [name](`mp_title`)=[value](`mp_title`) |
-| </p></article><article><h2>Multipart file</h2><p> |
-| [name](`mp_cover`) · [filename](`mp_cover`) · [content_type](`mp_cover`) |
-| </p></article></section> |
-
-**tools_intro = > text.str_join xs=`tools_parts` sep=""**
-**tools = > web.page title="Tools" intro=`tools_intro`**
-**tools = > tools.compose_components components=home**
-
-Article create form: field table + rules table.
-
-`article_fields` =
-
-| 字段 | 标签 | 类型 | 必填 | 默认 |
-|------|------|------|------|------|
-| title | Title | text | true | |
-| body | Body | textarea | false | |
-
-`article_rules` =
-
-| 字段 | 规则 | 消息 |
-|------|------|------|
-| title | required | Title is required |
-| title | max:120 | Title is too long |
-| body | max:8000 | Body is too long |
-
-**article_form = > web.form table="articles" action="insert"**
-**article_form = > article_form.fields fields=article_fields**
-**article_form = > article_form.rules rules=article_rules**
-
-New article page: form embedded in the main slot.
-
-**new = > web.page title="Publish" intro="<h1>Publish</h1><p>Form inserts into articles.</p>"**
-**new = > new.compose_components components=home**
-**new = > new.compose_form id="article" form=article_form**
-
-Admin users table (english + chinese column headers both work).
-
-`admins` =
-
-| 行 | username | password |
-|----|----------|----------|
-| 1 | admin | secret |
-
-**app = > web.app page=page db=store admin=True host="127.0.0.1" port=18083**
-**app = > app.route path="/about" page=about**
-**app = > app.route path="/new" page=new**
-**app = > app.route path="/tools" page=tools**
-**app = > app.static dir="public" mount="/static"**
-**app = > app.route_ws path="/live" echo=True**
-**app = > app.auth users=`admins` session_ttl=3600**
-> `app`.listen
+We **app = [Attach actual login sessions and the native admin gate](auth.attach(app=`app`, users=`users`, login_path="/admin/login", login_redirect="/admin", logout_redirect="/"))** and **article = [Build the shared validation resource](forms.article())** and **app = [Mount the public creation form explicitly](form.mount(app=`app`, id="article", form=`article`))**.
+We **app = [Bind the original local WebSocket echo route](socket.route(app=`app`, path="/live", mode="echo", require_auth=False))**.
+Return *[Listen only after data, resources and policy are ready](web.listen(app=`app`))*.

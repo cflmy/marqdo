@@ -56,4 +56,3 @@ func TestResolveSessionReplacesStaleCookie(t *testing.T) {
 		t.Fatalf("live session should not Set-Cookie again")
 	}
 }
-

@@ -6,6 +6,10 @@ description: How to import official lib modules
 
 # main
 
+| 返回 | 类型 | 说明 |
+|---|---|---|
+| result | any | None; execute this page's documented steps in order and observe their output or stated effects |
+
 Version 2.6.0: each standard library is normally one lib/name.mq.md source file, which is its own handbook. No extra index is required. Read the parameter/default and return tables below its headings to call it; multi-file extensions use indexes to organize modules. The 61 public sources provide 650 functions.
 
 Import with a nested YAML import mapping. File, network and process effects still need authorization at the execution entry. marqdo call defaults to pure functions; file operations require explicit --effects and --fs-root. Contract documentation never grants permission.
@@ -26,4 +30,4 @@ Official optional extensions live under ext/ (not stdlib): ext/llm, ext/agent �
 
 Sibling pages in this folder document each module. Chinese overview: 00-索引.mq.md.
 
-> print text=stdlib overview ok
+We now **[Display this step's result](> print text="stdlib overview ok")**.

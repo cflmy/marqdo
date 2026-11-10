@@ -35,6 +35,8 @@ pub struct CallStep {
     pub function: String,
     pub args: BTreeMap<String, serde_json::Value>,
     pub effects: String,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub literal_args: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub result: Option<serde_json::Value>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -42,6 +44,8 @@ pub struct CallStep {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub toget: Option<String>,
 }
+
+fn is_false(value: &bool) -> bool { !*value }
 
 fn sessions_root() -> PathBuf {
     if let Ok(p) = std::env::var("MARQDO_CALL_SESSION_DIR") {
@@ -179,7 +183,7 @@ fn replay_live(session: &CallSession, backend: Backend) -> Result<BTreeMap<Strin
         for (k, jv) in &step.args {
             let mut val = json_to_value(jv).map_err(|e| anyhow::anyhow!(e))?;
             if let Value::Text(t) = &val {
-                if t.starts_with('$') || t.starts_with('@') {
+                if !step.literal_args && (t.starts_with('$') || t.starts_with('@')) {
                     let key = &t[1..];
                     val = live
                         .get(key)
@@ -249,6 +253,7 @@ pub fn record_step(
         function: function.to_string(),
         args: arg_map,
         effects: effects.as_str(),
+        literal_args: false,
         result: if is_json_friendly(result) {
             value_to_json(result).ok()
         } else {
@@ -321,6 +326,7 @@ mod write_snapshot_tests {
         fs::write(dir.join("log.txt"), "once").unwrap();
         for backend in [Backend::Tree, Backend::Bytecode] {
             let step = CallStep {
+                literal_args: false,
                 file: Path::new(env!("CARGO_MANIFEST_DIR"))
                     .join("lib/fs.mq.md")
                     .to_string_lossy()

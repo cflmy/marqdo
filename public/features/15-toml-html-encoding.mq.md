@@ -10,17 +10,22 @@ import:
 
 # Config and safe text without plugins
 
+
 Parse a TOML subset for tools, escape HTML before assembly, encode with base32.
 
 # main
 
-**cfg = > toml.parse text="app = \"demo\"\n[server]\nport = 8080\n"**
-> print text=[app](access(`cfg`, "app"))
-**srv = [server](access(`cfg`, "server"))**
-> print text=[port](access(`srv`, "port"))
+| 返回 | 类型 | 说明 |
+|---|---|---|
+| result | any | None; execute this page's documented steps in order and observe their output or stated effects |
 
-**safe = > html.escape text="<tag>"**
-> print text=`safe`
+We first **cfg = [Compute cfg](toml.parse(text="app = \"demo\"\n[server]\nport = 8080\n"))** for the next step.
+We now **[Display this step's result](> print text=[app](access(`cfg`, "app")))**.
+We first **srv = [server](access(`cfg`, "server"))** for the next step.
+We now **[Display this step's result](> print text=[port](access(`srv`, "port")))**.
 
-**b = > enc.base32_encode text="ok"**
-> print text=`b`
+We first **safe = [Compute safe](html.escape(text="<tag>"))** for the next step.
+We now **[Display this step's result](> print text=`safe`)**.
+
+We first **b = [Compute b](enc.base32_encode(text="ok"))** for the next step.
+We now **[Display this step's result](> print text=`b`)**.

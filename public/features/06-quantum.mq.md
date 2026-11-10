@@ -9,6 +9,10 @@ import:
 
 # main
 
+| 返回 | 类型 | 说明 |
+|---|---|---|
+| result | any | None; execute this page's documented steps in order and observe their output or stated effects |
+
 Optional package (not stdlib). Install: `marqdo ext add quantum` (or build `marqdo_plugin_quantum`).
 
 GHZ (3 qubits): H on q0, then CX 0→1 and 0→2. Ideal |000⟩ / |111⟩ each ≈ 1/2.
@@ -25,11 +29,11 @@ Q8: `draw theme="dark"|"light"|"bw"` (default dark lab look) on circuit / probs 
 | 2 | CX | 0,1 |
 | 3 | CX | 0,2 |
 
-**`qc` = > quantum.circuit qubits=3 steps=`steps`**
-**`p` = > `qc`.probabilities**
-**`_` = > `qc`.draw kind="probs" theme="dark"**
-**`H` = > gate.gate name="H"**
-**`__` = > `H`.draw kind="matrix"**
+We first **qc = [Compute qc](quantum.circuit(qubits=3, steps=`steps`))** for the next step.
+We first **p = [Compute p](> `qc`.probabilities)** for the next step.
+We first **_ = [Compute _](> `qc`.draw kind="probs" theme="dark")** for the next step.
+We first **H = [Compute H](gate.gate(name="H"))** for the next step.
+We first **__ = [Compute __](> `H`.draw kind="matrix")** for the next step.
 
-> print text=`p`
-> print text=quantum-feature-ok
+We now **[Display this step's result](> print text=`p`)**.
+We now **[Display this step's result](> print text="quantum-feature-ok")**.

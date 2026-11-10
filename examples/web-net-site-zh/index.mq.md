@@ -1,113 +1,71 @@
 ---
 markup: occlusion
-title: 网络扩展站（中文）
-description: 首页 + /about + /new（表单）+ /tools（lib/net）+ /admin（登录鉴权）+ /live（WebSocket）。
-导入:
+type: web
+view: main
+route: /
+title: 网络扩展站
+import:
+  布局: components/index.mq.md
+  首页: components/home.mq.md
+  数据库: db/index.mq.md
+  表单定义: forms.mq.md
+  主题: styles/shell.mq.md
   网页: ext/web/网页.mq.md
-  net: lib/网络.mq.md
-  text: lib/text.mq.md
-  shell: styles/shell.mq.md
-  nav: components/nav.mq.md
-  side: components/side.mq.md
-  foot: components/foot.mq.md
-  articles: db/articles.mq.md
-  db: db/index.mq.md
+  表单: ext/data/表单.mq.md
+  后台: ext/data/后台.mq.md
+  鉴权: ext/security/鉴权.mq.md
+  实时: ext/net/实时.mq.md
+  文件: lib/文件.mq.md
+  result: lib/result.mq.md
 ---
 
-# main
+从本入口依次阅读组件入口、Markdown 内容叶子、数据库、表单资源与浏览器客户端。首页、关于、发布与工具页都是显式路由 Document；后台保留原生登录门禁，/live 单独归网络资源管理。页面不再依赖已移除的装配接口，启动也不会拼接整页 HTML。
 
-`首页` =
+## main
 
-| 组件 | 样式 |
-|------|------|
-| nav.`导航` | shell.`顶栏` |
-| side.`侧栏` | shell.`侧栏面板` |
-| foot.`页脚` | |
+| 返回 | 类型 | 说明 |
+|---|---|---|
+| 结果 | list | 共享递归布局内的介绍、实时控件与请求期间的文章列表 |
 
-`列表` =
+启动装配只读取终端 Markdown 内容，数据库查询保留为请求资源。发布后下一次访问就能看到新文章，无需重启或重新创建页面。客户端使用原生控件和官方桥；布局本身不初始化数据库或清除业务数据。编辑一块内容时沿组件导入找到对应叶子，不在首页复制导航、侧栏和页脚。
 
-| 属性 | 值 | 样式 |
-|------|-----|------|
-| title | articles.`articles`.title | shell.`卡片标题` |
-| body | articles.`articles`.body | shell.`卡片正文` |
+我们先 **正文 = [组合首页三个独立职责](首页.节点())**，随后返回 *[安放到共享的递归布局](布局.框架(正文=`正文`))*。
 
-`文章字段` =
+## serve
 
-| 字段 | 标签 | 类型 | 必填 | 默认 |
-|------|------|------|------|------|
-| title | 标题 | text | true | |
-| body | 正文 | textarea | false | |
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| root | text | "examples/web-net-site-zh" | 相对仓库的显式站点发现目录 |
+| port | number | 18084 | 本机回环监听端口 |
+| url | any | None | None 使用站点根的 SQLite；验收指定独占临时 URI |
 
-`文章规则` =
+| 返回 | 类型 | 说明 |
+|---|---|---|
+| 结果 | map | 保留文章、表单、鉴权与回显资源的阻塞监听结果 |
 
-| 字段 | 规则 | 消息 |
-|------|------|------|
-| title | required | 标题不能为空 |
-| title | max:120 | 标题太长 |
-| body | max:8000 | 正文太长 |
+从仓库根使用`root`="examples/web-net-site-zh"、`port`=18084、`url`=None，授予 plugin,fs.write,network.write，并设置 --fs-root examples/web-net-site-zh。先通过开发手册把当前浏览器产物放进 public/generated。缺少运行时文件时停止，不呈现看似可用的空控件。
 
-**store = > db.打开**
-**page = > 网页.页面 标题="网络扩展站" 引言="<h1>网络扩展站</h1><p>SQLite 文章列表、WebSocket 实时小部件、登录门禁后台、以及标准库 lib/net 的解析工具。</p><h2 id=\"live\">实时 WebSocket</h2><p id=\"live-status\">connecting…</p><input id=\"live-msg\" placeholder=\"输入一条消息…\"><button id=\"live-send\" disabled>发送</button><div id=\"live-out\"></div><script src=\"/static/live.js\"></script>"**
-**page = > page.组件装配 组件=`首页`**
-**page = > page.主体装配 主体=`列表`**
+数据库只为空表播种，已有文章保留。主题由原始属性表编译后显式写到生成目录，再发现页面并按顺序启用后台、绑定鉴权、挂载公开文章表单、绑定回显。每一步保留新应用，最后才监听。本地 admin/secret 是演示夹具，真实部署必须替换账户来源与网络策略；公开回显只绑定回环地址。服务阻塞于当前进程，关闭由调用者负责。显式 url 用于隔离验收，SQLite 路径仍经过授权根检查；不能为测试删除示例原有 data 目录。主题是可再生文件，写入失败会阻止后续监听，单文件原子替换不意味着数据库和样式之间存在事务。
 
-**about = > 网页.页面 标题="关于" 引言="<h1>关于</h1><p>演示网络扩展后的 web 库：会话、登录鉴权、WebSocket、multipart/cookie 解析。</p>"**
-**about = > about.组件装配 组件=`首页`**
+`产物` =
 
-<!-- 工具页：用 lib/net 解析展示 -->
+| 文件 |
+|---|
+| public/generated/marqdo_wasm.wasm |
+| public/generated/marqdo-bridge.js |
 
-**解析请求 = > net.解析Cookie 内容="session=abc123; theme=dark"**
-**请求块 = [1](access(解析请求, "1"))**
+- [在启动前确认实际运行时文件](for 产物 as 路径)
+  1. not [运行时资源确实存在](文件.存在(路径=`路径`))
+    返回 *[指出所需浏览器准备](result.error(code="net_site.browser_assets", message="请先把当前 WASM 与官方桥构建到 public/generated", operation="serve"))*。
+我们 **存储 = [打开并保留文章数据库](数据库.打开(url=`url`))**，**样式 = [编译既有的声明式主题](主题.编译())**，并 **[建立明确的生成目录](文件.建目录(路径="public/generated"))**、**[原生写入本次主题](文件.原子写文本(路径="public/generated/theme.css", 内容=`样式`))**。
+我们 **应用 = [发现已声明页面并保留站点上下文](网页.准备站点(根=`root`, 主机="127.0.0.1", 端口=`port`, 数据库=`存储`, 静态目录="public"))** 和 **应用 = [保留原生后台能力](后台.启用(应用=`应用`))**。
 
-**解析响应 = > net.解析Cookie 内容="id=42; Path=/; HttpOnly; SameSite=Lax" 是响应头=True**
-**响应块 = [1](access(解析响应, "1"))**
+`用户` =
 
-`边界` = ----b
+| @ | username | password | role |
+|---|---|---|---|
+| 1 | admin | secret | admin |
 
-`正文` = "--`边界`\nContent-Disposition: form-data; name=\"title\"\n\n你好\n--`边界`\nContent-Disposition: form-data; name=\"封面\"; filename=\"pic.png\"\nContent-Type: image/png\n\n<字节>\n--`边界`--\n"
-
-**多部分 = > net.解析多部分 正文=`正文` 边界=`边界`**
-**字段块 = [1](access(多部分, "1"))**
-**文件块 = [2](access(多部分, "2"))**
-
-`工具段` =
-
-| 段 |
-|----|
-| <h1>网络工具</h1><p>由 lib/net 提供的解析演示：解析Cookie 与 解析多部分。</p><section class="content cards"> |
-| <article><h2>Cookie 请求头</h2><p> |
-| [name](`请求块`)=[value](`请求块`) |
-| </p></article><article><h2>Set-Cookie 响应头</h2><p> |
-| [name](`响应块`)=[value](`响应块`) · HttpOnly=[http_only](`响应块`) |
-| </p></article><article><h2>多部分字段</h2><p> |
-| [name](`字段块`)=[value](`字段块`) |
-| </p></article><article><h2>多部分文件</h2><p> |
-| [name](`文件块`) · [filename](`文件块`) · [content_type](`文件块`) |
-| </p></article></section> |
-
-**工具引言 = > text.str_join xs=`工具段` sep=""**
-**tools = > 网页.页面 标题="工具" 引言=`工具引言`**
-**tools = > tools.组件装配 组件=`首页`**
-
-**article_form = > 网页.表单 表="articles" 动作="插入"**
-**article_form = > article_form.字段 字段=`文章字段`**
-**article_form = > article_form.规则 规则=`文章规则`**
-
-**new = > 网页.页面 标题="发布" 引言="<h1>发布</h1><p>表单插入到 articles 表。</p>"**
-**new = > new.组件装配 组件=`首页`**
-**new = > new.表单装配 id="article" 表单=article_form**
-
-`管理员` =
-
-| 行 | 用户名 | 密码 |
-|----|--------|------|
-| 1 | admin | secret |
-
-**app = > 网页.应用 页面=page 数据库=store 后台=True 主机="127.0.0.1" 端口=18084**
-**app = > app.路由 路径="/about" 页面=about**
-**app = > app.路由 路径="/new" 页面=new**
-**app = > app.路由 路径="/tools" 页面=tools**
-**app = > app.静态 目录="public" 挂载="/static"**
-**app = > app.路由实时 路径="/live" 回显=True**
-**app = > app.鉴权 用户表=`管理员` 会话时长=3600**
-> `app`.监听
+我们 **应用 = [绑定真实登录会话与后台门禁](鉴权.绑定(应用=`应用`, 用户=`用户`, 登录路径="/admin/login", 登录返回="/admin", 退出返回="/"))**，**文章 = [构造共享校验资源](表单定义.文章())** 和 **应用 = [明确挂载公开发布表单](表单.挂载(应用=`应用`, 标识="article", 资源=`文章`))**。
+接着 **应用 = [绑定本地演示的公开回显资源](实时.绑定(应用=`应用`, 路径="/live", 模式="echo", 需要登录=False))**。
+全部资源就绪后返回 *[在保留的站点根中开始监听](网页.监听(应用=`应用`))*。

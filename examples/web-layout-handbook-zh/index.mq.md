@@ -10,7 +10,11 @@ import:
 
 # main
 
+| 返回 | 类型 | 说明 |
+|---|---|---|
+| result | any | The value explicitly returned below; conditional returns follow the selected branch |
+
 页面只选择布局根，具体拆分沿 components/index.mq.md 继续。
 此主程序返回结构而不是 HTML；view 元数据让服务在启动时执行它。
 
-*> home.节点*
+After these steps, return *home.节点()*.

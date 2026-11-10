@@ -1,66 +1,41 @@
-# Extension CDN (Cloudflare R2 → https://ext.marqdo.com)
+# Extension CDN: native publication and byte parity
 
-| | |
+This page describes storage. The executable tasks are in [the release entry](../../skills/marqdo-release/index.mq.md), [assets.mq.md](../../skills/marqdo-release/assets.mq.md) and [asset_io.mq.md](../../skills/marqdo-release/asset_io.mq.md). Read the source contracts before calling them. Version, mode and publication authorization come from the user; inspecting an existing release grants no new remote write.
+
+## Versioned packs
+
+Extension versions come from ext/VERSION and can advance independently of the interpreter. An extension release uses its own ext-vX.Y.Z tag and three packs. A full release also includes the CLI, source, WASM and editor deliverables listed in model.mq.md.
+
+| Object | Meaning |
 |---|---|
-| Status | **Accepted** — download prefer CDN; upload via `scripts/upload-ext-r2.py` |
-| Date | 2026-09-17 |
-| Related | [ext-cli.md](ext-cli.md) · [marqdo-release](../../.cursor/skills/marqdo-release/SKILL.md) |
+| vX.Y.Z/marqdo-X.Y.Z-ext.zip | Readable extension sources |
+| vX.Y.Z/marqdo-X.Y.Z-native-x86_64-pc-windows-msvc.zip | Windows plugins |
+| vX.Y.Z/marqdo-X.Y.Z-native-x86_64-unknown-linux-gnu.zip | Linux plugins |
+| vX.Y.Z/VERSION | Version echo for this pack set |
+| latest/marqdo-X.Y.Z-*.zip | Identical current pack bytes |
+| latest/VERSION | Recommended current extension version |
 
-## Why
+Public reads use https://ext.marqdo.com. [src/ext_cli.rs](../../src/ext_cli.rs) is authoritative for client override variables, version resolution and download fallback order. Ordinary installation does not need storage credentials.
 
-CLI (语法解释器) and official **extension packs** (`ext/` L1 + native plugins) update on different cadences. Users behind unstable GitHub links should get packs from a stable object store first.
+## Callable publication
 
-## Public URL layout
+After GitHub contains every required asset, download to dist/release-X.Y.Z. Validation checks names, GitHub size/SHA256, archive CRCs, versions and native capabilities. Source-declared plugins require matching libraries on both native platforms. Independently valid ZIPs cannot hide a missing DLL or shared library.
 
-Bucket: `marqdo` · Custom domain: **https://ext.marqdo.com**
+Run from the checkout root with the version already chosen by the user; use the actual full or ext mode:
+```sh
+marqdo call skills/marqdo-release/assets.mq.md download 'version="X.Y.Z"' 'mode="ext"' --require-ok --effects plugin,net,fs.write --fs-root . --json
+marqdo call skills/marqdo-release/assets.mq.md publish 'version="X.Y.Z"' 'mode="ext"' --require-ok --effects plugin,net,fs.write --fs-root . --json
+marqdo call skills/marqdo-release/index.mq.md finish 'version="X.Y.Z"' 'mode="ext"' --require-ok --effects plugin,net,fs.write --fs-root . --json
+```
 
-| Key | Meaning |
-|-----|---------|
-| `v{VER}/marqdo-{VER}-ext.zip` | L1 sources |
-| `v{VER}/marqdo-{VER}-native-{triple}.zip` | Prebuilt plugins |
-| `v{VER}/VERSION` | Pack SemVer echo |
-| `latest/VERSION` | Recommended pack SemVer (plain text) |
-| `latest/marqdo-…zip` | Same assets mirrored for convenience |
+Publication rechecks all three packs and their combined capability matrix before the first PUT. All three versioned ZIPs and three latest ZIPs are written before either VERSION pointer. A failed ZIP stops the sequence. Historical versions are retained.
 
-`{VER}` is the **extension pack** version (`ext/VERSION`), which **may differ** from CLI `Cargo.toml` version.
+Finish reads both public pointers and compares downloaded versioned/latest bytes with GitHub SHA256 values. HTTP 200 or one sample URL is insufficient. Edge propagation may leave verification incomplete; repeat observation rather than rebuilding unrelated archives or claiming completion from an upload response.
 
-## Client download order (`marqdo ext add`)
+## Explicit boundaries
 
-1. `MARQDO_EXT_DOWNLOAD_BASE` (optional override)
-2. **CDN** `https://ext.marqdo.com/v{VER}/…` (override host with `MARQDO_EXT_CDN`)
-3. GitHub Releases
-4. `https://proxy.cflmy.top/github.com/…`
+Filesystem operations, hashing, public HTTP downloads, release decisions and upload order are Marqdo code. The engineering extension supplies bounded ZIP inspection and private R2 Signature V4 transport. No Python uploader is part of this path; older standalone scripts remain compatibility utilities.
 
-Pack SemVer resolution (`release_version()`):
+The native boundary resolves credentials privately from existing stores or environment. Missing credentials fail explicitly. Never put access keys or secrets in tool parameters, source or reports. A plugin grant has normal OS authority; --fs-root does not sandbox native plugins or child processes.
 
-1. `MARQDO_EXT_VERSION`
-2. CDN `GET …/latest/VERSION` (short timeout)
-3. Embedded `ext/VERSION` at build time
-4. CLI `CARGO_PKG_VERSION`
-
-## Separate ext release (no CLI bump)
-
-1. Bump `ext/VERSION` (e.g. `1.0.3`) — leave root `Cargo.toml` alone if CLI unchanged.
-2. Build native zips (CI Linux/Windows jobs or local `scripts/build-web-plugin.sh` + cargo plugins).
-3. Package `marqdo-{VER}-ext.zip` and `marqdo-{VER}-native-*.zip`.
-4. Upload **both**:
-   - R2: `python3 scripts/upload-ext-r2.py --version VER --from-dir dist/`
-   - GitHub: attach to a GitHub Release (tag `ext-vVER` **or** reuse latest CLI release assets)
-5. Confirm `https://ext.marqdo.com/latest/VERSION` and a sample zip URL return 200.
-
-## Full product release (CLI + ext)
-
-Keep `ext/VERSION` equal to (or compatible with) CLI SemVer unless documenting a deliberate skew. CI still publishes GitHub assets; **after** CI green, run `upload-ext-r2.py` so CDN is populated (or add a CI step with R2 secrets).
-
-## Credentials
-
-| Where | What |
-|-------|------|
-| Local | `~/.marqdo/r2.env` (`chmod 600`) — see `.env.r2.example` |
-| CI (optional) | GitHub Actions secrets: `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_ENDPOINT`, `R2_BUCKET` |
-
-**Never** commit Account API tokens or S3 secret keys. If a token was pasted into chat, **rotate** it in the Cloudflare dashboard.
-
-## Object ACL
-
-Custom domain public reads require the bucket/objects to be publicly readable (R2 public bucket / r2.dev / custom domain). Uploads use S3 API credentials; downloads by `ext add` are anonymous HTTPS GETs.
+Isolated loopback tests use fake credentials to verify ZIP-before-VERSION ordering and failure stops. Read-only verification of the published 2.6.0 release has also exercised the actual GitHub/CDN parity path without republishing its assets.

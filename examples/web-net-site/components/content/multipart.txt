@@ -1,0 +1,10 @@
+--net-boundary
+Content-Disposition: form-data; name="title"
+
+Hello
+--net-boundary
+Content-Disposition: form-data; name="cover"; filename="pic.png"
+Content-Type: image/png
+
+<bytes>
+--net-boundary--

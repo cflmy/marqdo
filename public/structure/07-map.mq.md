@@ -6,6 +6,10 @@ description: Multi-column tables are maps; link-index get
 
 # main
 
+| 返回 | 类型 | 说明 |
+|---|---|---|
+| result | any | None; execute this page's documented steps in order and observe their output or stated effects |
+
 A multi-column table with one data row is a map. Read values with `[key](map)`.
 
 `kinds` =
@@ -14,10 +18,10 @@ A multi-column table with one data row is a map. Read values with `[key](map)`.
 |-------|----------|
 | fruit | vegetable |
 
-**`k` = [apple](access(kinds, "apple"))**
+We first **k = [apple](access(`kinds`, "apple"))** for the next step.
 
-> print text=`k`
+We now **[Display this step's result](> print text=`k`)**.
 
-**`k` = [cucumber](access(kinds, "cucumber"))**
+We first **k = [cucumber](access(`kinds`, "cucumber"))** for the next step.
 
-> print text=`k`
+We now **[Display this step's result](> print text=`k`)**.

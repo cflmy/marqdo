@@ -407,7 +407,7 @@ impl DocumentSession {
         let entry = module
             .functions
             .iter()
-            .find(|f| f.name == "main" && f.is_object())
+            .find(|f| f.name == "main")
             .or_else(|| {
                 let objs: Vec<_> = module.functions.iter().filter(|f| f.is_object()).collect();
                 if objs.len() == 1 {
@@ -416,7 +416,7 @@ impl DocumentSession {
                     None
                 }
             })
-            .ok_or_else(|| "notebook: no `# main` (or sole object) to index".to_string())?;
+            .ok_or_else(|| "notebook: no `main` entry (or sole object) to index".to_string())?;
         let mut cells = Vec::new();
         let mut seen = HashSet::new();
         collect_cells(&entry.body, &mut cells, &mut seen)?;

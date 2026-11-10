@@ -5,6 +5,8 @@ description: Browser Runtime helpers (WASM bridge). Prefer lib/browser for effec
 import:
   cap: ext/web/_capability/index.mq.md
   table: lib/table.mq.md
+  component: ext/web/component/index.mq.md
+  html: lib/html.mq.md
 ---
 
 Browser helpers describe the official Marqdo WASM bridge and small effects.
@@ -44,6 +46,7 @@ HTML snippet that loads the official browser Marqdo bridge (route C/D). Defaults
 `source`="", `boot`=True . With boot and non-empty source, auto-mounts. No author
 JS. Not a substitute for file-partitioned Document layout.
 
+We **bridge = [Escape the bridge URL as an attribute value](html.escape(text=`bridge`))** and **wasm = [Escape the WASM URL as an attribute value](html.escape(text=`wasm`))** and **source = [Escape the client source URL as an attribute value](html.escape(text=`source`))**.
 1. `boot`
     1. `source` != ""
         Return *"<script type=\"module\" src=\"" + bridge + "\" data-mq-wasm=\"" + wasm + "\" data-mq-source-url=\"" + source + "\"></script>"*.
@@ -101,3 +104,30 @@ We retain **`spec` = [Set the html field in the new record](table.put(in=None, a
   **_ = 1**
 We retain **`m` = [Return the updated structured value](table.put(in=None, at=`sel`, value=`spec`))**.
 Return *[Set the dom field in the new record](table.put(in=None, at="dom", value=`m`))*.
+
+## nodes
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| bridge | text | "/static/marqdo-bridge.js" | URL of the official browser bridge |
+| wasm | text | "/static/marqdo_wasm.wasm" | URL of the built WASM artifact |
+| source | text | "" | Optional Marqdo client program URL |
+| boot | bool | True | Whether the bridge automatically mounts the client |
+
+| 返回 | 类型 | 说明 |
+|---|---|---|
+| result | list | Structured script Resource rows for a component Document |
+
+Use `bridge`="/static/marqdo-bridge.js", `wasm`="/static/marqdo_wasm.wasm", `source`="" and `boot`=True in a component tree. The resource references the official bridge as a module and retains the WASM and source addresses as typed attributes. Boot with a nonempty source mounts that Marqdo program; boot=False declares the bridge without automatic mounting. This pure tool creates no server, downloads nothing and writes no JavaScript or HTML. Build the current WASM artifact and mount the actual static directory before serving the page. Prefer these rows to embed when a Document already returns View nodes; embed remains a compatibility string adapter.
+
+`attributes` =
+
+| type | data-mq-wasm |
+|---|---|
+| module | `wasm` |
+
+1. `boot` and `source` != ""
+  We **attributes = [Declare the client program to mount](table.put(in=`attributes`, at="data-mq-source-url", value=`source`))**.
+1. not `boot`
+  We **attributes = [Keep automatic mounting disabled](table.put(in=`attributes`, at="data-mq-no-boot", value="1"))**.
+Return *[Declare the official bridge as a structured resource](component.asset(url=`bridge`, attrs=`attributes`, slot="marqdo-runtime"))*.

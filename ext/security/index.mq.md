@@ -7,6 +7,9 @@ import:
 
 Use [auth](auth.mq.md) for credential/session operations, [rbac](rbac.mq.md) for role permissions,
 and [OIDC](oidc.mq.md) for attaching an external identity provider to an existing web app.
+[Tenant selection](tenant.mq.md) supplies explicit request context for scoped data queries;
+it does not authenticate a subject or prove tenant membership.
+中文服务工作流使用[鉴权绑定](鉴权.mq.md)，与 auth.attach 保持相同策略及默认值。
 Endpoint authorization remains explicit in the web artifact metadata; a script permission check
 does not automatically protect an HTTP route.
 

@@ -124,7 +124,9 @@ fn parse_call_arg_value_mode(input: &str, prefer_var: bool, allow_call: bool) ->
             Err(_) => Ok(parse_interp(s)),
         };
     }
-    if has_hyphenated_prose(s) {
+    // Nested calls may contain hyphenated paths in their own quoted args.
+    // The inner argument parser still preserves plain hyphenated prose.
+    if has_hyphenated_prose(s) && !(allow_call && s.contains('(')) {
         return Ok(parse_interp(s));
     }
     match parse_expr_opts(s, prefer_var, allow_call) {
@@ -576,6 +578,16 @@ impl<'a> Parser<'a> {
             let name = self.src[start..self.i].to_string();
             if !self.eat("`") {
                 bail!("unterminated `name`");
+            }
+            // Parse a quoted receiver's explicit method before its value.
+            if self.allow_paren_call && self.rest().starts_with('.') {
+                let call_start = start - 1;
+                if let Some((call, used)) = try_paren_call(&self.src[call_start..], self.prefer_var)? {
+                    if call.receiver.is_some() {
+                        self.i = call_start + used;
+                        return Ok(Expr::Call(call));
+                    }
+                }
             }
             return self.parse_index_chain(Expr::Var(name));
         }
@@ -1109,11 +1121,13 @@ pub fn parse_call_tail(s: &str, prefer_var: bool) -> Result<(CallExpr, usize)> {
     }
 
     let callee_tok = {
-        let mut parts = s.split_whitespace();
-        parts
-            .next()
-            .ok_or_else(|| anyhow::anyhow!("missing callee"))?
-            .to_string()
+        let mut quoted = false;
+        let end = s.char_indices().find_map(|(i,c)| {
+            if c == '`' { quoted = !quoted; }
+            (!quoted && (c.is_whitespace() || c == ')')).then_some(i)
+        }).unwrap_or(s.len());
+        if end == 0 { bail!("missing callee"); }
+        s[..end].to_string()
     };
 
     let (receiver, callee, path) = split_callee(&callee_tok);
@@ -1435,7 +1449,7 @@ fn try_named_arg(s: &str) -> Option<(String, &str)> {
             }
             return Some((key.to_string(), &s[i + 1..]));
         }
-        if c.is_whitespace() {
+        if c.is_whitespace() || matches!(c, '(' | ')' | '[' | ']' | '{' | '}' | ',' | '"' | '\'' | '`') {
             return None;
         }
     }
@@ -1694,6 +1708,31 @@ pub fn parse_call_after_gt(after_gt: &str, prefer_var: bool) -> Result<CallExpr>
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn occlusion_keeps_receiver_calls_and_closing_delimiters_separate() {
+        for source in ["[Read probabilities](`c`.probabilities())",
+"[Read probabilities](> `c`.probabilities)",
+"[Set angle](`c`.rotate(angle=access(m, \"angle\")))"] {
+            let e = parse_expr_markup(source,true,Markup::Occlusion).unwrap();
+            let Expr::Occluded { payload: Some(payload), .. } = e else { panic!("{source}") };
+            let Expr::Call(call) = *payload else { panic!("{source}") };
+            assert_eq!(call.receiver.as_deref(),Some("c"));
+            assert!(!call.callee.contains(')'));
+        }
+        assert!(parse_expr_markup("[Read file size](access(fs.stat(path=\"a\"), \"size\"))",
+                                  true,Markup::Occlusion).is_ok());
+    }
+
+
+
+    #[test]
+    fn nested_call_with_a_hyphenated_file_path_stays_executable() {
+        let e = parse_expr_prefer_var("toml.parse(text=fs.read_text(path=\"crates/marqdo-wasm/Cargo.toml\"))").unwrap();
+        let Expr::Call(c) = e else { panic!("expected outer call") };
+        let crate::ast::Arg::Named { value, .. } = &c.args[0] else { panic!("expected named argument") };
+        assert!(matches!(value, Expr::Call(_)), "{value:?}");
+    }
 
     #[test]
     fn bare_var_footnote_index() {

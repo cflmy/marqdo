@@ -35,10 +35,6 @@ func web_render_nodes(argsJSON *C.char, outJSON **C.char, errMsg **C.char) C.int
 	if err != nil {
 		return replyJSON(outJSON, errMsg, nil, err)
 	}
-	frag, err := artifact.RenderNodes(args["nodes"])
-	if err != nil {
-		return replyJSON(outJSON, errMsg, nil, err)
-	}
 	pg := asPageMap(args["page"])
 	title := ""
 	if pg != nil {
@@ -49,7 +45,8 @@ func web_render_nodes(argsJSON *C.char, outJSON **C.char, errMsg **C.char) C.int
 	if t, ok := argStr(args, "title"); ok && t != "" {
 		title = t
 	}
-	return replyJSON(outJSON, errMsg, artifact.RenderHTMLPage(title, frag), nil)
+	html, err := artifact.RenderViewDocument(title, args["nodes"], nil)
+	return replyJSON(outJSON, errMsg, html, err)
 }
 
 //export web_render_document
@@ -88,26 +85,23 @@ func web_dom_markdown(argsJSON *C.char, outJSON **C.char, errMsg **C.char) C.int
 	return replyJSON(outJSON, errMsg, artifact.MarkdownHTML(text), nil)
 }
 
-//export web_serve_root
-func web_serve_root(argsJSON *C.char, outJSON **C.char, errMsg **C.char) C.int {
-	args, err := parseArgs(argsJSON)
-	if err != nil {
-		return replyJSON(outJSON, errMsg, nil, err)
-	}
+// prepareArtifactApp shares discovery and startup assembly between direct serving
+// and resource composition. Listening starts only after resources have been bound.
+func prepareArtifactApp(args map[string]any) (map[string]any, error) {
 	root, _ := argStr(args, "root")
 	if root == "" {
 		root = "."
 	}
 	abs, err := filepath.Abs(root)
 	if err != nil {
-		return replyJSON(outJSON, errMsg, nil, err)
+		return nil, err
 	}
 	if st, err := os.Stat(abs); err != nil || !st.IsDir() {
-		return replyJSON(outJSON, errMsg, nil, fmt.Errorf("web.serve: root not a directory: %s", abs))
+		return nil, fmt.Errorf("web.prepare: root not a directory: %s", abs)
 	}
 	files, err := artifact.ScanRoot(abs)
 	if err != nil {
-		return replyJSON(outJSON, errMsg, nil, err)
+		return nil, err
 	}
 	host, _ := argStr(args, "host")
 	if host == "" {
@@ -129,14 +123,23 @@ func web_serve_root(argsJSON *C.char, outJSON **C.char, errMsg **C.char) C.int {
 		if title == "" {
 			title = f.Meta["标题"]
 		}
-		body, structured, err := artifact.RenderFile(f, plugin.RunArtifact)
+		nodes, structured, err := artifact.AssembleView(f, func(path string, args map[string]any) (any, error) {
+			return plugin.RunArtifactAtRoot(path, args, abs)
+		})
 		if err != nil {
 			return nil, err
 		}
-		pg := page.New(map[string]any{"title": title, "intro": body})
+		pg := page.New(map[string]any{"title": title, "intro": artifact.MarkdownHTML(f.Body)})
 		stampArtifactData(pg, f.Meta)
 		if structured {
-			pg["artifact_html"] = artifact.RenderHTMLPage(title, body)
+			// Validate structure and Resource contracts without querying or posting.
+			if _, err := artifact.CollectDocumentHead(nodes); err != nil {
+				return nil, fmt.Errorf("%s: %w", f.Rel, err)
+			}
+			if _, err := artifact.RenderNodesWithResources(nodes, httpx.ValidateViewResource); err != nil {
+				return nil, fmt.Errorf("%s: %w", f.Rel, err)
+			}
+			pg["artifact_nodes"] = nodes
 		}
 		return pg, nil
 	}
@@ -145,7 +148,7 @@ func web_serve_root(argsJSON *C.char, outJSON **C.char, errMsg **C.char) C.int {
 		if f.Kind == "web" && f.Route == "/" {
 			home, err = documentPage(f)
 			if err != nil {
-				return replyJSON(outJSON, errMsg, nil, err)
+				return nil, err
 			}
 			break
 		}
@@ -164,11 +167,11 @@ func web_serve_root(argsJSON *C.char, outJSON **C.char, errMsg **C.char) C.int {
 			}
 			pg, err := documentPage(f)
 			if err != nil {
-				return replyJSON(outJSON, errMsg, nil, err)
+				return nil, err
 			}
 			out, err := app.Route(a, f.Route, pg)
 			if err != nil {
-				return replyJSON(outJSON, errMsg, nil, err)
+				return nil, err
 			}
 			a = out
 			continue
@@ -209,20 +212,49 @@ func web_serve_root(argsJSON *C.char, outJSON **C.char, errMsg **C.char) C.int {
 	if mw := args["middleware"]; mw != nil {
 		out, err := middleware.Configure(a, map[string]any{"security": mw})
 		if err != nil {
-			return replyJSON(outJSON, errMsg, nil, err)
+			return nil, err
 		}
 		a = out
 	}
 	if sd, ok := argStr(args, "static_dir"); ok && sd != "" {
 		out, err := app.Static(a, sd, "/static")
 		if err != nil {
-			return replyJSON(outJSON, errMsg, nil, err)
+			return nil, err
 		}
 		a = out
 	}
+	a["artifact_declared"] = artifact.InspectBag(nil, files)["declared"]
 	a["inspect"] = artifact.InspectBag(a, files)
-	_, err = httpx.Listen(a, abs)
-	return replyJSON(outJSON, errMsg, map[string]any{"ok": true, "value": a["inspect"], "error": nil}, err)
+	a["artifact_root"] = abs
+	return a, nil
+}
+
+//export web_prepare_root
+func web_prepare_root(argsJSON *C.char, outJSON **C.char, errMsg **C.char) C.int {
+	args, err := parseArgs(argsJSON)
+	if err != nil {
+		return replyJSON(outJSON, errMsg, nil, err)
+	}
+	a, err := prepareArtifactApp(args)
+	return replyJSON(outJSON, errMsg, a, err)
+}
+
+//export web_serve_root
+func web_serve_root(argsJSON *C.char, outJSON **C.char, errMsg **C.char) C.int {
+	args, err := parseArgs(argsJSON)
+	if err != nil {
+		return replyJSON(outJSON, errMsg, nil, err)
+	}
+	a, err := prepareArtifactApp(args)
+	if err != nil {
+		return replyJSON(outJSON, errMsg, nil, err)
+	}
+	inspection, err := httpx.InspectApp(a)
+	if err != nil {
+		return replyJSON(outJSON, errMsg, nil, err)
+	}
+	_, err = httpx.Listen(a, a["artifact_root"].(string))
+	return replyJSON(outJSON, errMsg, map[string]any{"ok": true, "value": inspection, "error": nil}, err)
 }
 
 //export web_inspect
@@ -239,12 +271,11 @@ func web_inspect(argsJSON *C.char, outJSON **C.char, errMsg **C.char) C.int {
 		return replyJSON(outJSON, errMsg, artifact.InspectBag(nil, files), nil)
 	}
 	a := asPageMap(args["app"])
-	if a != nil {
-		if insp, ok := a["inspect"].(map[string]any); ok {
-			return replyJSON(outJSON, errMsg, insp, nil)
-		}
+	if a == nil {
+		return replyJSON(outJSON, errMsg, artifact.InspectBag(nil, nil), nil)
 	}
-	return replyJSON(outJSON, errMsg, artifact.InspectBag(a, nil), nil)
+	inspection, err := httpx.InspectApp(a)
+	return replyJSON(outJSON, errMsg, inspection, err)
 }
 
 //export web_app_use

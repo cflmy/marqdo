@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/marqdo/marqdo/plugins/web/internal/app"
+	"github.com/marqdo/marqdo/plugins/web/internal/artifact"
 	"github.com/marqdo/marqdo/plugins/web/internal/assets"
 	"github.com/marqdo/marqdo/plugins/web/internal/db"
 	"github.com/marqdo/marqdo/plugins/web/internal/form"
@@ -129,6 +130,23 @@ func NewHandler(appBag map[string]any, entryDir string) (http.Handler, error) {
 	}
 
 	mux := http.NewServeMux()
+	st.registerRoutes(mux, staticDir, staticMount, true)
+
+	handler := withMiddleware(mux, mw)
+	handler = withRBAC(handler, authCfg.gates, authCfg.loginPath)
+	handler = withTenant(handler, st.tenant)
+	handler = withStripTrailingSlash(handler)
+	return handler, nil
+}
+
+// routeRegistrar is shared by the real server and its read-only inventory.
+// Recording registrations does not invoke any captured handler.
+type routeRegistrar interface {
+	Handle(string, http.Handler)
+	HandleFunc(string, func(http.ResponseWriter, *http.Request))
+}
+
+func (st *state) registerRoutes(mux routeRegistrar, staticDir, staticMount string, logSetup bool) {
 	mux.HandleFunc("GET /{$}", st.handleHome)
 	// Part slot uses {part} (not {id}) so dynamic routes like /desk/posts/{id}
 	// do not collide with Go ServeMux duplicate wildcard names.
@@ -137,10 +155,10 @@ func NewHandler(appBag map[string]any, entryDir string) (http.Handler, error) {
 	mux.HandleFunc("POST /_form/{id}", st.handleFormPost)
 	mux.HandleFunc("POST /_md", st.handleMarkdownPreview)
 
-	paths := sortedKeys(routes)
+	paths := sortedKeys(st.routes)
 	for _, p := range paths {
 		routePath := p
-		pageV, _ := routes[routePath].(map[string]any)
+		pageV, _ := st.routes[routePath].(map[string]any)
 		if pageV == nil {
 			pageV = map[string]any{}
 		}
@@ -158,7 +176,7 @@ func NewHandler(appBag map[string]any, entryDir string) (http.Handler, error) {
 		}
 	}
 
-	for _, jr := range mw.JSONRoutes {
+	for _, jr := range st.mw.JSONRoutes {
 		route := jr
 		pattern := route.Method + " " + route.Path
 		mux.HandleFunc(pattern, func(w http.ResponseWriter, r *http.Request) {
@@ -168,16 +186,20 @@ func NewHandler(appBag map[string]any, entryDir string) (http.Handler, error) {
 
 	// Icon routes before the static prefix so /static/favicon.svg does not
 	// conflict with Go 1.22+ ServeMux method/path overlap rules.
-	for _, ir := range iconRoutes {
+	for _, ir := range st.iconRoutes {
 		url := ir.URL
 		path := ir.Path
 		ct := ir.ContentType
 		if staticDir != "" && (url == staticMount || strings.HasPrefix(url, staticMount+"/")) {
 			// FileServer under staticMount already serves these paths.
-			fmt.Fprintf(os.Stderr, "marqdo web icon: %s → static %s (via %s)\n", url, path, staticMount)
+			if logSetup {
+				fmt.Fprintf(os.Stderr, "marqdo web icon: %s → static %s (via %s)\n", url, path, staticMount)
+			}
 			continue
 		}
-		fmt.Fprintf(os.Stderr, "marqdo web icon: %s → %s (%s)\n", url, path, ct)
+		if logSetup {
+			fmt.Fprintf(os.Stderr, "marqdo web icon: %s → %s (%s)\n", url, path, ct)
+		}
 		mux.HandleFunc("GET "+url, func(w http.ResponseWriter, r *http.Request) {
 			st.serveIcon(w, path, ct)
 		})
@@ -187,7 +209,9 @@ func NewHandler(appBag map[string]any, entryDir string) (http.Handler, error) {
 	}
 
 	if staticDir != "" {
-		fmt.Fprintf(os.Stderr, "marqdo web static: %s → %s\n", staticMount, staticDir)
+		if logSetup {
+			fmt.Fprintf(os.Stderr, "marqdo web static: %s → %s\n", staticMount, staticDir)
+		}
 		fs := http.StripPrefix(staticMount, http.FileServer(http.Dir(staticDir)))
 		// Register without method so GET+HEAD share one pattern (avoids conflicts
 		// with more-specific GET/HEAD icon paths under the same prefix).
@@ -245,11 +269,6 @@ func NewHandler(appBag map[string]any, entryDir string) (http.Handler, error) {
 
 	mux.HandleFunc("/{path...}", st.handleNotFound)
 
-	handler := withMiddleware(mux, mw)
-	handler = withRBAC(handler, authCfg.gates, authCfg.loginPath)
-	handler = withTenant(handler, st.tenant)
-	handler = withStripTrailingSlash(handler)
-	return handler, nil
 }
 
 // Listen binds host:port from the app bag and serves until interrupt/kill.
@@ -392,7 +411,19 @@ func (st *state) writePage(w http.ResponseWriter, r *http.Request, page map[stri
 		p["_auth_next"] = next
 	}
 	setCookie := st.attachCSRF(p, r)
-	html := render.RenderPage(p, st.dbURL, "")
+	html := ""
+	if nodes, ok := p["artifact_nodes"]; ok {
+		document, err := artifact.RenderViewDocument(strOpt(p, "title", ""), nodes, func(resource map[string]any) (string, error) {
+			return st.renderViewResource(resource, p, r)
+		})
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		html = document
+	} else {
+		html = render.RenderPage(p, st.dbURL, "")
+	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	appendSetCookie(w, setCookie)
 	_, _ = io.WriteString(w, html)
@@ -401,7 +432,32 @@ func (st *state) writePage(w http.ResponseWriter, r *http.Request, page map[stri
 func (st *state) writePart(w http.ResponseWriter, r *http.Request, page map[string]any, id string) {
 	p := st.preparePage(page, r)
 	setCookie := st.attachCSRF(p, r)
-	html := render.RenderPage(p, st.dbURL, id)
+	html := ""
+	if nodes, ok := p["artifact_nodes"]; ok {
+		selected, found, err := artifact.FindSlot(nodes, id)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		if !found {
+			if id != "main" {
+				http.NotFound(w, r)
+				return
+			}
+			// Keep the existing main-fragment fallback for a View without a
+			// named main region; never expose the Document's program source.
+			selected = nodes
+		}
+		html, err = artifact.RenderNodesWithResources(selected, func(resource map[string]any) (string, error) {
+			return st.renderViewResource(resource, p, r)
+		})
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+	} else {
+		html = render.RenderPage(p, st.dbURL, id)
+	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	appendSetCookie(w, setCookie)
 	_, _ = io.WriteString(w, html)
@@ -500,7 +556,11 @@ func (st *state) handleFormGet(w http.ResponseWriter, r *http.Request) {
 		_, _ = io.WriteString(w, fmt.Sprintf("<p>unknown form %s</p>", id))
 		return
 	}
-	html := form.Render(frm, id, nil, nil, "")
+	page := map[string]any{}
+	setCookie := st.attachCSRF(page, r)
+	csrf, _ := page["_csrf"].(string)
+	html := form.Render(frm, id, nil, nil, csrf)
+	appendSetCookie(w, setCookie)
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	_, _ = io.WriteString(w, html)
 }
@@ -521,6 +581,19 @@ func (st *state) handleFormPost(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
+	}
+	csrf := ""
+	if st.auth.users != nil || st.auth.rbac || st.oidcEnabled() {
+		sid, token, setCookie := resolveSession(r)
+		appendSetCookie(w, setCookie)
+		csrf = token
+		_, hadCookie := session.IDFromCookie(r.Header.Get("Cookie"))
+		if hadCookie || r.FormValue("_csrf") != "" {
+			if !session.ValidateCSRF(sid, r.FormValue("_csrf")) {
+				http.Error(w, "Invalid or missing CSRF token", http.StatusForbidden)
+				return
+			}
+		}
 	}
 	data := map[string]any{}
 	for k, vs := range r.PostForm {
@@ -547,13 +620,13 @@ func (st *state) handleFormPost(w http.ResponseWriter, r *http.Request) {
 		// Prefer an explicit form redirect (e.g. cancel_href list URL) over the
 		// composing page path stamped as _mq_return.
 		redir := strOpt(res, "redirect", "/")
-		if (redir == "" || redir == "/") && ctx.ReturnPath != "" {
+		if (redir == "" || redir == "/") && ctx.ReturnPath != "" && strOpt(frm, "cancel_href", "") == "" {
 			redir = ctx.ReturnPath
 		}
 		http.Redirect(w, r, redir, http.StatusSeeOther)
 		return
 	}
-	html := form.RenderBodyCtx(frm, id, data, res["errors"], "", ctx)
+	html := form.RenderBodyCtx(frm, id, data, res["errors"], csrf, ctx)
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	_, _ = io.WriteString(w, html)
 }

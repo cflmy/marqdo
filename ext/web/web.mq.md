@@ -25,8 +25,8 @@ marqdo call ext/web/web.mq.md inspect 'root="examples/web-layout-handbook"' --ef
 
 inspect with root scans declared metadata without starting a server. To inspect
 an in-memory app, pass its actual handle; an empty fresh process cannot inspect
-another process. serve is a blocking lifecycle operation: write a launcher and
-use marqdo run, not call. Explicit view: main Documents assemble once at startup
+another process. serve is a blocking lifecycle operation. Call it directly with explicit effects,
+or compose prepare, resource bindings and listen in an ordinary callable launcher. Explicit view: main Documents assemble once at startup
 through normal functions and imports. Restart after changing their content.
 
 Develop layout structure in layout/component and the Go artifact renderer;
@@ -149,23 +149,21 @@ Return *[Attach first-class middleware to app](web_app_use(app=`app`, middleware
 
 | 参数 | 类型 | 默认 | 说明 |
 |---|---|---|---|
-| app | any | None | app or None |
-| root | text | "" | Site directory to inspect without listening |
+| app | any | None | Current prepared application after all explicit Resource bindings |
+| root | text | "" | Optional metadata-only scan directory; takes precedence over app |
 
 | 返回 | 类型 | 说明 |
-|------|------|------|
-| result | any | {declared, system} |
+|---|---|---|
+| result | map | scope, declared and system; registered reports actual configured handlers, metadata reports file declarations and runtime templates |
 
-Use `app`=None, `root`="" as the inputs for this operation.
+Use `app`=None and `root`="" deliberately. After prepare and Resource bindings, pass the retained app before listen to inspect its current routes. The registrar is shared with the actual HTTP server, so later WebSocket, JSON query, form, login, administration and static bindings appear without using a stale startup snapshot. Duplicate or conflicting registrations retain their native diagnostic.
 
-Return declared versus system route tables for introspection. System routes such
-as /_part and /_form must appear here. Use this to verify a site after serve or
-manual registration. Optional `app`=None selects which application to inspect.
+Supplying root scans Artifact metadata only. It does not execute the launcher or Documents, so it cannot observe Resource bindings performed by those functions. scope=metadata makes that limitation explicit; scope=registered reports the handler registrations of the supplied app. Neither scope proves that a server is listening, a database is available or authentication succeeds.
 
-Optional `root`="" scans a site directory when supplied; it does not start a server.
+The operation needs plugin. It does not invoke request handlers, create sessions, reset runtime state, open a database or start a listener. Credentials and unrelated app fields are not returned. System routes include the actual configured parameterized form/part paths and session paths; declared routes retain their source identity when available.
 
-We **[Load the native plugin required by this operation](cap.load())**.
-Return *[Return declared versus system route tables for introspection](web_inspect(app=`app`, root=`root`))*.
+We **[Load the maintained native inspection boundary](cap.load())**.
+Return *[Observe the current declarations and registered runtime handlers](web_inspect(app=`app`, root=`root`))*.
 
 ## serve
 
@@ -191,7 +189,7 @@ simple). Optional `db`=None, `static_dir`="", and `middleware`=None bind
 resources without stuffing them into this facade as author APIs.
 
 We **[Load the native plugin required by this operation](cap.load())**.
-Return *[Scan root="](web_serve_root(root=`root`, host=`host`, port=`port`, db=`db`, static_dir=`static_dir`, middleware=`middleware`))*.
+Return *[Discover the site and listen on its configured address](web_serve_root(root=`root`, host=`host`, port=`port`, db=`db`, static_dir=`static_dir`, middleware=`middleware`))*.
 
 ## client_embed
 
@@ -317,6 +315,43 @@ head needs as data rather than injecting opaque HTML head strings.
 
 We **[Load the native plugin required by this operation](cap.load())**.
 Return *[Build head resource rows (link, script, icon) from a table. Prefer declaring head needs as data rather than injecting opaque HTML head strings.](web_head(table=`table`))*.
+
+## prepare
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| root | text | "." | Site directory containing declared Documents and Endpoints |
+| host | text | "127.0.0.1" | Explicit listen address retained for later listen |
+| port | number | 18081 | Port retained for later listen |
+| db | any | None | Existing database Resource or None |
+| static_dir | text | "" | Optional static directory resolved under the site |
+| middleware | any | None | Optional security header table |
+
+| 返回 | 类型 | 说明 |
+|---|---|---|
+| result | map | Prepared app resource; no socket is opened |
+
+Use `root`=".", `host`="127.0.0.1", `port`=18081, `db`=None, `static_dir`="" and `middleware`=None to discover the same Documents and Endpoints as serve. Startup View assembly runs once here. Bind additional resources to the returned app, retaining each returned app value, before calling listen. The original absolute site root travels with the app so relative endpoint callbacks and static files keep their site context. This is a lifecycle boundary, not an alternative routing language. Reading metadata or evaluating a Document can fail before any listener starts.
+
+We **[Load the existing native web implementation](cap.load())**.
+Return *[Discover routes without starting a listener](web_prepare_root(root=`root`, host=`host`, port=`port`, db=`db`, static_dir=`static_dir`, middleware=`middleware`))*.
+
+
+## listen
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| app | any | required | Prepared app after explicit resource bindings |
+
+| 返回 | 类型 | 说明 |
+|---|---|---|
+| result | map | Blocking native listener result |
+
+Use `app` after prepare and the resource-owned binding functions. This call opens the configured host and port and blocks for the server lifetime. It works in an ordinary callable launcher reached by marqdo call; grant plugin, filesystem and network effects required by that launcher. Returning a resource description does not start the server. A separate terminal or supervised test process owns shutdown; call does not turn this listener into a background daemon. Relative paths use the site root retained by prepare.
+
+We **[Load the existing native web implementation](cap.load())**.
+Return *[Serve the prepared site with its bound resources](web_listen(app=`app`))*.
+
 
 # app
 

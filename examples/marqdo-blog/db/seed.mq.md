@@ -1,57 +1,44 @@
 ---
 markup: occlusion
+title: 博客演示种子调用手册
+import:
+  document: lib/document.mq.md
 ---
+
+本文件负责可调用的说明与编排，[seed.tables.md](seed.tables.md)负责可独立阅读的 Markdown 常量。调用时把 --fs-root 指向 examples/marqdo-blog，读取需要 fs.read；连接数据库或编译样式时还需要 plugin。
 
 ## posts
 
-种子文章。首页与详情页的初始数据。created_at 用于按时间倒序展示；tag 是主标签 slug。
+| 返回 | 类型 | 说明 |
+|---|---|---|
+| result | any | 与原字面表一致的数据类型和记录/列式形态 |
 
-`posts` =
+六篇演示文章覆盖文档、路由、原生集合、实时通信、会话和数据库。日期用于稳定排序，正文保持 Markdown 数据；这些常量不会自行写入数据库。
 
-| 行 | title | slug | summary | content | tag | created_at | updated_at |
-|----|-------|------|---------|---------|-----|------------|------------|
-| 1 | 你好，Marqdo 博客 | hello-marqdo | 用 Marqdo 的 web 扩展库搭建的第一个博客。表格即组件、文档即代码。 | 这是一篇介绍博客系统的文章。它由 Marqdo 脚本在启动时写入 SQLite，通过 ext/web 的组件装配渲染成页面。 | marqdo | 2026-08-01 | 2026-08-02 |
-| 2 | 动态路由与文章详情 | dynamic-routing | 如何用 /post/{slug} 动态路由渲染单篇文章。 | 本文说明动态路由机制：作者面注册带 {slug} 占位符的路由，请求时把路径参数注入页面查询条件。 | web | 2026-08-05 | 2026-08-05 |
-| 3 | 用 GFM 表格表达数据 | gfm-tables | Marqdo 的字典操作不依赖 json 库，GFM 表格即可完成。 | 表格即数据、表格即组件。这篇文章展示如何在 .mq.md 里用横向表写种子数据，用脚注索引读取字段。 | tutorial | 2026-08-10 | 2026-08-11 |
-| 4 | WebSocket 实时小部件 | websocket-live | 给博客加一个实时回显的 WebSocket 端点。 | 通过 app.路由实时 注册 /live 端点，配合 public/live.js 在首页显示实时连接状态。 | realtime | 2026-08-15 | 2026-08-15 |
-| 5 | 会话与登录鉴权 | session-auth | 后台用 session 门禁保护，只有登录用户能发布文章。 | 用 app.鉴权 配置管理员用户表，/admin 下的 CRUD 页面都需要有效会话。 | web | 2026-08-18 | 2026-08-20 |
-| 6 | 数据库与 CRUD | database-crud | 博客的文章、标签、关联全部由 SQLite 支撑。 | db.初始化 建表、db.插入 写种子、后台表单增删改。文章与标签通过 post_tags 关联。 | database | 2026-08-20 | 2026-08-21 |
+从站点根目录授予 fs.read 后调用。实际常量位于 [seed.tables.md](seed.tables.md#posts)；读取过程保留数值、布尔、空值和表格形态，并检查标题与行列结构。数据文件中的说明不会作为程序运行。
 
-*`posts`*
+完成后返回*[读取posts的实际 Markdown 常量](document.read_table(path="db/seed.tables.md", title="posts"))*.
 
 ## tags
 
-种子标签。
+| 返回 | 类型 | 说明 |
+|---|---|---|
+| result | any | 与原字面表一致的数据类型和记录/列式形态 |
 
-`tags` =
+演示标签保留原始顺序与 slug，便于在独立空库中验证文章关联。读取这些行没有插入或删除效果；现有用户标签应由显式迁移管理。
 
-| 行 | name | slug |
-|----|------|------|
-| 1 | Marqdo | marqdo |
-| 2 | Web | web |
-| 3 | 教程 | tutorial |
-| 4 | 数据库 | database |
-| 5 | 实时 | realtime |
+从站点根目录授予 fs.read 后调用。实际常量位于 [seed.tables.md](seed.tables.md#tags)；读取过程保留数值、布尔、空值和表格形态，并检查标题与行列结构。数据文件中的说明不会作为程序运行。
 
-*`tags`*
+完成后返回*[读取tags的实际 Markdown 常量](document.read_table(path="db/seed.tables.md", title="tags"))*.
 
 ## post_tags
 
-种子文章-标签关联。
+| 返回 | 类型 | 说明 |
+|---|---|---|
+| result | any | 与原字面表一致的数据类型和记录/列式形态 |
 
-`post_tags` =
+关联行保持文章与标签的演示对应关系。它们适用于按同一顺序初始化的空库；已有数据需要重新映射 id，读取函数不会清空或重建任何表。
 
-| 行 | post_id | tag_id |
-|----|---------|--------|
-| 1 | 1 | 1 |
-| 2 | 1 | 2 |
-| 3 | 2 | 2 |
-| 4 | 3 | 1 |
-| 5 | 3 | 3 |
-| 6 | 4 | 5 |
-| 7 | 4 | 2 |
-| 8 | 5 | 2 |
-| 9 | 6 | 4 |
-| 10 | 6 | 1 |
+从站点根目录授予 fs.read 后调用。实际常量位于 [seed.tables.md](seed.tables.md#post_tags)；读取过程保留数值、布尔、空值和表格形态，并检查标题与行列结构。数据文件中的说明不会作为程序运行。
 
-*`post_tags`*
+完成后返回*[读取post_tags的实际 Markdown 常量](document.read_table(path="db/seed.tables.md", title="post_tags"))*.

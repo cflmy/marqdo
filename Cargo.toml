@@ -1,6 +1,6 @@
 [package]
 name = "marqdo"
-version = "2.6.0"
+version = "2.7.0"
 edition = "2021"
 license = "Apache-2.0"
 description = "Marqdo — Markdown markers as an interpreted programming language"
@@ -60,6 +60,7 @@ getrandom = { version = "=0.2.17", default-features = false, features = ["custom
 [workspace]
 members = [
     "plugins/demo",
+    "plugins/engineering",
     "plugins/agent",
     "plugins/llm",
     "plugins/quantum",

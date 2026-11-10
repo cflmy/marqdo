@@ -430,9 +430,18 @@ pub(crate) fn build_file_view_with_exec(
                 Vec::new(),
             ),
         };
+    // Named tools are readable modules, not failed programs. Preserve actual
+    // execution for main, object entries and Artifact declarations.
+    let library_document = module_opt.as_ref().is_some_and(|module| {
+        !module.functions.is_empty()
+            && module.functions.iter().all(|f| !f.is_object() && f.name != "main")
+            && !module.metadata_raw.iter().any(|(key, _)| key == "type" || key == "类型")
+    });
     let effective = effective_stdin(&source, stdin_lines);
-    let awaiting_input = awaiting_preset_input(&input_prompts, stdin_lines, &source);
-    let show_stream = module_opt.as_ref().map(uses_stream_panel).unwrap_or(false);
+    let awaiting_input = !library_document
+        && awaiting_preset_input(&input_prompts, stdin_lines, &source);
+    let show_stream = !library_document
+        && module_opt.as_ref().map(uses_stream_panel).unwrap_or(false);
     // Live + LLM/agent import + has `input` + stdin ready → stream via client `/api/run`.
     let auto_stream = live
         && show_stream
@@ -453,6 +462,14 @@ pub(crate) fn build_file_view_with_exec(
             true,
             Vec::new(),
             String::from(r#"<p class="vars-skipped">skipped</p>"#),
+        )
+    } else if library_document {
+        (
+            String::new(),
+            String::new(),
+            true,
+            Vec::new(),
+            String::from(r#"<p class="vars-skipped">Choose a named function with marqdo call.</p>"#),
         )
     } else if awaiting_input || auto_stream {
         (
@@ -481,7 +498,7 @@ pub(crate) fn build_file_view_with_exec(
         }
     };
     // Re-read after run so writeback slots / workbook edits show in Structure.
-    if execute && !awaiting_input && !auto_stream {
+    if execute && !library_document && !awaiting_input && !auto_stream {
         if let Ok(next) = fs::read_to_string(abs) {
             source = next;
         }
@@ -579,6 +596,7 @@ pub(crate) fn build_file_view_with_exec(
         stdout,
         stderr,
         ok,
+        library_document,
         preset_stdin: effective.join("\n"),
         input_prompts,
         awaiting_input,

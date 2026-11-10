@@ -6,19 +6,23 @@ description: True / False / None and and / or / not
 
 # main
 
+| 返回 | 类型 | 说明 |
+|---|---|---|
+| result | any | None; execute this page's documented steps in order and observe their output or stated effects |
+
 Keywords: `True`, `False`, `None`, and `and` / `or` / `not`.
 
-**`a` = True**
-**`b` = False**
+We first **a = True** for the next step.
+We first **b = False** for the next step.
 
 1. `a` and not `b`
-  > print text=ok
+  We now **[Display this step's result](> print text="ok")**.
 2. *
-  > print text=fail
+  We now **[Display this step's result](> print text="fail")**.
 
-**`probe` = 1**
+We first **probe = 1** for the next step.
 
 1. None
-  > print text=none-truthy
+  We now **[Display this step's result](> print text="none-truthy")**.
 2. *
-  > print text=none-falsy
+  We now **[Display this step's result](> print text="none-falsy")**.

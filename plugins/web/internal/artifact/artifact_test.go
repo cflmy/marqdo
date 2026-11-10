@@ -142,3 +142,48 @@ func TestViewDocumentRejectsAnEmptyAssemblyAndAutomaticDataSource(t *testing.T) 
 		t.Fatalf("data source silently ignored: %v", err)
 	}
 }
+
+func TestInteractiveControlsUseTypedAttributesAndEscapedText(t *testing.T) {
+ nodes := []any{map[string]any{"type":"form", "attrs":map[string]any{"id":"editor", "method":"post", "action":"/save"}, "value":[]any{
+  map[string]any{"type":"label", "value":"Title", "attrs":map[string]any{"for":"title"}},
+  map[string]any{"type":"input", "value":`"><script>alert(1)</script>`, "attrs":map[string]any{"id":"title", "name":"title", "required":true, "disabled":false, "maxlength":float64(120)}},
+  map[string]any{"type":"textarea", "value":"</textarea><script>x</script>", "attrs":map[string]any{"id":"doc", "rows":float64(16), "aria-label":"Document"}},
+  map[string]any{"type":"button", "value":"Save & return", "attrs":map[string]any{"type":"submit", "data-action":"save"}},
+  map[string]any{"类型":"预格式", "值":"<waiting>", "属性":map[string]any{"id":"log","hidden":false}},
+ }}}
+ got,err := RenderNodes(nodes)
+ if err != nil { t.Fatal(err) }
+ for _, expected := range []string{`<form`,`action="/save"`,`for="title"`,`maxlength="120"`,` required`,`rows="16"`,`aria-label="Document"`,`data-action="save"`,`Save &amp; return`,`&lt;/textarea&gt;`,`&lt;waiting&gt;`} {
+  if !strings.Contains(got,expected) { t.Fatalf("missing %s: %s",expected,got) }
+ }
+ if strings.Contains(got,"<script>") || strings.Contains(got," disabled") || strings.Contains(got," hidden") || strings.Contains(got,"map[") { t.Fatalf("control values leaked into markup: %s",got) }
+}
+func TestAttributeRecordsApplyToContainersAndLinks(t *testing.T) {
+ got,err:=RenderNodes([]any{map[string]any{"type":"section","attrs":map[string]any{"id":"view-detail","hidden":true},"value":[]any{
+  map[string]any{"type":"link","value":"Open","attrs":map[string]any{"href":"/a?x=1&y=2","title":"Detail"}},
+ }}})
+ if err != nil || !strings.Contains(got,`id="view-detail"`) || !strings.Contains(got," hidden") || !strings.Contains(got,`href="/a?x=1&amp;y=2"`) { t.Fatalf("%v: %s",err,got) }
+ for _,attrs:=range []map[string]any{
+  {"onclick":"alert(1)"},{"style":"position:fixed"},{"data-x\" onload":"x"},{"href":"javascript:alert(1)"},{"required":"true"},{"title":[]any{"nested"}},
+ } {
+  if _,err:=RenderNodes([]any{map[string]any{"type":"button","value":"Run","attrs":attrs}});err==nil { t.Fatalf("accepted invalid attributes: %v",attrs) }
+ }
+}
+
+func TestResourcesStayStructuredAndEscapeTheirURLs(t *testing.T) {
+ got,err:=RenderNodes([]any{
+  map[string]any{"type":"script","value":"/static/marqdo-bridge.js","attrs":map[string]any{"type":"module","data-mq-wasm":"/static/runtime.wasm","data-mq-source-url":"/static/client.mq.md"}},
+  map[string]any{"type":"stylesheet","value":"/static/theme.css?x=1&y=2"},
+ })
+ if err!=nil {t.Fatal(err)}
+ for _,want:=range []string{`<script src="/static/marqdo-bridge.js"`,`type="module"`,`data-mq-source-url="/static/client.mq.md"`,`<link rel="stylesheet" href="/static/theme.css?x=1&amp;y=2"`} {
+  if !strings.Contains(got,want) {t.Fatalf("missing %s: %s",want,got)}
+ }
+ for _,node:=range []map[string]any{
+  {"type":"script","value":"javascript:alert(1)"},
+  {"type":"script","value":"/static/a.js","attrs":map[string]any{"src":"/other.js"}},
+  {"type":"stylesheet","value":"/theme.css","attrs":map[string]any{"rel":"preload"}},
+ } {
+  if _,err:=RenderNodes([]any{node});err==nil {t.Fatalf("accepted invalid resource: %v",node)}
+ }
+}

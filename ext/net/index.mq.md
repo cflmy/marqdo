@@ -10,6 +10,7 @@ This package provides [URL encoding](url.mq.md), the small [HTTP result construc
 and a native [WebSocket request/response resource](websocket.mq.md). For HTTP clients with
 status, timeout, response limits and downloads, read the standard library net.mq.md directly.
 The HTTP leaf here constructs a result record; its name does not imply an implemented HTTP client.
+绑定服务端运输使用 websocket.route；中文入口是[实时绑定](实时.mq.md)，它与一次客户端 exchange 的生命周期不同。
 
 URL encoding is pure and needs no plugin. This command is ready to run from the repository root:
 

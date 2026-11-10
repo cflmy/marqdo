@@ -30,6 +30,8 @@ pub struct FileViewModel {
     pub stdout: String,
     pub stderr: String,
     pub ok: bool,
+    /// A callable-only module has no automatic program entry.
+    pub library_document: bool,
     /// Text shown in the live-view preset stdin box.
     pub preset_stdin: String,
     /// One entry per `input` / `输入` call (prompt text; may be empty).

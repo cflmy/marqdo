@@ -9,16 +9,21 @@ import:
 
 # Digests and secure tokens
 
+
 Integrity digests and cryptographic tokens stay in `lib/` — do not use `math.random` for secrets.
 
 # main
 
-**`d` = > hash.sha256 text="marqdo"**
-**`t` = > sec.token_hex n=8**
-**`L` = > len `t`**
-> print text=`d`
-> print text=`L`
+| 返回 | 类型 | 说明 |
+|---|---|---|
+| result | any | None; execute this page's documented steps in order and observe their output or stated effects |
+
+We first **d = [Compute d](hash.sha256(text="marqdo"))** for the next step.
+We first **t = [Compute t](sec.token_hex(n=8))** for the next step.
+We first **L = [Compute L](len(`t`))** for the next step.
+We now **[Display this step's result](> print text=`d`)**.
+We now **[Display this step's result](> print text=`L`)**.
 1. `L` == 16
-  > print text=mid-m3-ok
+  We now **[Display this step's result](> print text="mid-m3-ok")**.
 2. *
-  > print text=mid-m3-fail
+  We now **[Display this step's result](> print text="mid-m3-fail")**.

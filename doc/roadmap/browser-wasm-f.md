@@ -1,5 +1,8 @@
 # 路线图：浏览器 Marqdo 路线 F（进阶宿主能力）
 
+> 2.7.0 维护说明：独立的 browser-hello 与 browser-media 演示已删除。下文保留既有能力设计与宿主边界，当前可运行工程使用 browser-app；底层计数器冒烟夹具位于 tests/wasm/counter.mq.md。Canvas、音频等仍是 lib/browser 的宿主能力，不宣称当前 browser-app 演示包含这些交互。
+
+
 | | |
 |---|---|
 | 状态 | **Completed**（F1–F5；F6 Service Worker 可选未做） |
@@ -23,4 +26,4 @@
 | **F5** | drag/drop wire + `data-drag` / `drop_text` | **done** |
 | **F6** | Service Worker / 离线缓存 | optional / skipped |
 
-示例：[examples/browser-media/](../../examples/browser-media/) · 助手：`lib/browser.mq.md`。
+示例：[examples/browser-app/](../../examples/browser-app/) · 助手：`lib/browser.mq.md`。

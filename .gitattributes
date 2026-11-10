@@ -1,0 +1,3 @@
+# Multipart protocol examples retain required CRLF bytes in every checkout.
+examples/web-net-site/components/content/multipart.txt -text whitespace=cr-at-eol
+examples/web-net-site-zh/components/content/multipart.txt -text whitespace=cr-at-eol

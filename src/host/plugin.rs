@@ -530,10 +530,26 @@ unsafe extern "C" fn host_query(
                 .get("path")
                 .and_then(|v| v.as_str())
                 .ok_or_else(|| "run_artifact requires `path`".to_string())?;
-            let p = std::path::PathBuf::from(path);
+            let p = ctx.resolve_path(path)?;
             if !p.is_file() {
                 return Err(format!("run_artifact: not a file: {path}"));
             }
+            // A web site may narrow an existing filesystem grant. Child
+            // Documents keep that explicit root instead of defaulting to pages/.
+            let fs_root = match args.get("root") {
+                None | Some(serde_json::Value::Null) => ctx.fs_root.clone(),
+                Some(serde_json::Value::String(root)) => {
+                    let selected = ctx.resolve_path(root)?;
+                    if !selected.is_dir() { return Err("run_artifact: root is not a directory".into()); }
+                    let actual = p.canonicalize().map_err(|_| "run_artifact: cannot resolve source")?;
+                    let base = selected.canonicalize().map_err(|_| "run_artifact: cannot resolve root")?;
+                    if !actual.starts_with(&base) {
+                        return Err("run_artifact: source is outside selected site root".into());
+                    }
+                    Some(selected)
+                }
+                Some(_) => return Err("run_artifact: root must be text".into()),
+            };
             let mut binds: Vec<(String, String)> = Vec::new();
             if let Some(obj) = args.get("args").and_then(|v| v.as_object()) {
                 for (k, v) in obj {
@@ -547,6 +563,7 @@ unsafe extern "C" fn host_query(
             }
             let opts = crate::RunOptions {
                 binds,
+                fs_root,
                 allow_fs_write: ctx.caps.fs_write,
                 allow_exec: ctx.caps.exec,
                 allow_net: ctx.caps.net,

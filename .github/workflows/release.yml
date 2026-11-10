@@ -38,7 +38,7 @@ jobs:
         run: |
           export PATH="/c/ProgramData/mingw64/mingw64/bin:/c/ProgramData/chocolatey/lib/mingw/tools/install/mingw64/bin:$PATH"
           cargo build --release
-          cargo build --release -p marqdo_plugin_agent -p marqdo_plugin_quantum -p marqdo_plugin_linalg -p marqdo_plugin_llm
+          cargo build --release -p marqdo_plugin_agent -p marqdo_plugin_quantum -p marqdo_plugin_linalg -p marqdo_plugin_llm -p marqdo_plugin_engineering
           bash ./scripts/build-web-plugin.sh
 
       - name: Checkout extension sources (branch vscode-extension only)
@@ -88,6 +88,7 @@ jobs:
           Copy-Item target/release/quantum.dll "$stageNative/native/quantum.dll"
           Copy-Item target/release/linalg.dll "$stageNative/native/linalg.dll"
           Copy-Item target/release/llm.dll "$stageNative/native/llm.dll"
+          Copy-Item target/release/engineering.dll "$stageNative/native/engineering.dll"
           if (Test-Path "dist/$nativeZip") { Remove-Item "dist/$nativeZip" -Force }
           Compress-Archive -Path "$stageNative/*" -DestinationPath "dist/$nativeZip" -Force
           $stage = "dist/stage-bundle"
@@ -102,6 +103,7 @@ jobs:
           Copy-Item target/release/quantum.dll "$stage/ext/native/quantum.dll"
           Copy-Item target/release/linalg.dll "$stage/ext/native/linalg.dll"
           Copy-Item target/release/llm.dll "$stage/ext/native/llm.dll"
+          Copy-Item target/release/engineering.dll "$stage/ext/native/engineering.dll"
           if (Test-Path "dist/$zip") { Remove-Item "dist/$zip" -Force }
           Compress-Archive -Path "$stage/*" -DestinationPath "dist/$zip" -Force
           $stageLib = "dist/stage-stdlib"
@@ -122,34 +124,7 @@ jobs:
       - name: Upload release assets
         uses: softprops/action-gh-release@v2
         with:
-          body: |
-            ## Marqdo ${{ github.ref_name }}
-
-            ### 亮点 / Highlights
-            - **2.6.0**：标准库与拓展库成为可执行手册；650 个公开标准库函数，标题下契约、叙述形参与句中调用。
-            - **2.6.0**: Executable library handbooks, 650 public standard-library functions, inline actions and source contracts.
-            - 文件/字节/集合/Result/文档/HTTP/任务/TOML/时区工程能力；Quantum 实验与 Web 递归 Markdown 布局。
-            - File, binary, collection, document and task workflows; executable Quantum experiments and recursive Web layouts.
-            - View 正文读动作，左右侧注看逻辑；空逻辑明确提示；知识区按输入、返回和依据组织。
-            - View keeps action text in prose, implementation in margin notes, and readable knowledge facts separate from execution.
-            - CLI · wasm · ext · VS Code extension: **2.6.0**. Core surface unchanged: **19 constructs**.
-            - Linux CLI and native plugin zips are required; see CHANGELOG for exact platform/effect boundaries.
-
-            ### Downloads
-
-            | Asset | Contents |
-            |-------|----------|
-            | `marqdo-*-windows-msvc.exe` | CLI with **embedded** official stdlib |
-            | `marqdo-*-windows-msvc.zip` | `marqdo.exe` + `lib/` + `ext/`（含 native DLL） |
-            | `marqdo-*-native-*.zip` | 预编译 `web`/`agent`/`quantum`/`linalg`/`llm`（Windows DLL + **Linux .so 必出**） |
-            | `marqdo-*-unknown-linux-gnu.zip` | Linux CLI + `lib/` + `ext/` + native `.so` |
-            | `marqdo-*-stdlib.zip` | `lib/` only |
-            | `marqdo-*-ext.zip` | Official `ext/` L1 sources |
-            | `marqdo-*-source.zip` | Source snapshot (`git archive`) |
-            | `marqdo-*.vsix` | VS Code / Cursor extension |
-            | `marqdo-*-public.zip` | Static user docs site |
-
-            Extension workflow: [vscode-extension-commit.md](https://github.com/cflmy/marqdo/blob/main/doc/design/vscode-extension-commit.md)
+          body_path: doc/releases/${{ github.ref_name }}.md
           files: |
             dist/${{ env.EXE }}
             dist/${{ env.ZIP }}
@@ -186,7 +161,7 @@ jobs:
         run: |
           set -euo pipefail
           cargo build --release
-          cargo build --release -p marqdo_plugin_agent -p marqdo_plugin_quantum -p marqdo_plugin_linalg -p marqdo_plugin_llm
+          cargo build --release -p marqdo_plugin_agent -p marqdo_plugin_quantum -p marqdo_plugin_linalg -p marqdo_plugin_llm -p marqdo_plugin_engineering
           bash ./scripts/build-web-plugin.sh
 
       - name: Package Linux native zip + CLI bundle
@@ -195,7 +170,7 @@ jobs:
           VER="${GITHUB_REF_NAME#v}"
           TARGET="x86_64-unknown-linux-gnu"
           mkdir -p dist/stage-native/native
-          for lib in libweb.so libagent.so libquantum.so liblinalg.so libllm.so; do
+          for lib in libweb.so libagent.so libquantum.so liblinalg.so libllm.so libengineering.so; do
             src="target/release/${lib}"
             if [[ ! -f "$src" && "$lib" == libweb.so ]]; then
               src="plugins/web/build/libweb.so"

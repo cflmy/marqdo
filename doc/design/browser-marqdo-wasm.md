@@ -1,5 +1,8 @@
 # 浏览器 Marqdo（WASM 解释器）设计
 
+> 2.7.0 维护说明：独立的 browser-hello 与 browser-media 演示已删除。下文保留既有能力设计与宿主边界，当前可运行工程使用 browser-app；底层计数器冒烟夹具位于 tests/wasm/counter.mq.md。Canvas、音频等仍是 lib/browser 的宿主能力，不宣称当前 browser-app 演示包含这些交互。
+
+
 | | |
 |---|---|
 | 状态 | **Accepted（设计锁定）** · 实现见路线图 C0–C5 |
@@ -124,7 +127,7 @@ source: &str (+ optional import map)
 | `marqdo`（根） | 核心；feature-gate |
 | `crates/marqdo-wasm` | `cdylib`：`mq_*` ABI + `js/marqdo-bridge.js` |
 | `ext/web` 或 `web/browser` | L1：`浏览器.运行` / `交互装配`（C3+） |
-| `examples/browser-hello/` | 静态页 + wasm 冒烟 |
+| `examples/browser-app/` | 静态页 + wasm 冒烟 |
 | `tests/browser/` 或金样脚本 | Node/wasmtime 跑 `run_source` 对齐 |
 
 发行：`marqdo wasm build`（C2 CLI 糖）或 `wasm-pack build crates/marqdo-wasm`。
@@ -210,7 +213,7 @@ L1 `浏览器.交互装配`（ext）可后置；C3 以 bridge + 返回 wire 表�
 
 Bridge：`applyEffects(exports, value)` — 先 DOM，再调度异步；**不**在 WASM 内阻塞。
 
-示例见 `examples/browser-hello/fetch.mq.md`。
+示例见 `examples/browser-app/static/app.mq.md`。
 
 ---
 
@@ -251,7 +254,7 @@ marqdo wasm build -o static   # marqdo_wasm.wasm + marqdo-bridge.js
 # app.static dir=static
 ```
 
-业务页再 `boot` 自己的 `.mq.md`（见 `examples/browser-hello/`）。
+业务页再 `boot` 自己的 `.mq.md`（见 `examples/browser-app/`）。
 
 ---
 
@@ -261,7 +264,7 @@ marqdo wasm build -o static   # marqdo_wasm.wasm + marqdo-bridge.js
 |----|------|
 | 单元 | `run_source("…# main\n> print…")` native 与 wasm 同测 |
 | 金样子集 | `tests/structure/hello.mq.md` 等无 fs/net/plugin 的样例 |
-| 浏览器冒烟 | `examples/browser-hello`：按钮点击 → Marqdo 函数 → 改 DOM 文本 |
+| 浏览器冒烟 | `examples/browser-app`：按钮点击 → Marqdo 函数 → 改 DOM 文本 |
 | 回归 | CI：`cargo test` native；另 job `wasm-pack build` / `cargo check --target wasm32-unknown-unknown --no-default-features --features wasm-core` |
 
 ---

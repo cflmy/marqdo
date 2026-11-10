@@ -8,6 +8,10 @@ import:
 
 # main
 
+| 返回 | 类型 | 说明 |
+|---|---|---|
+| result | any | None; execute this page's documented steps in order and observe their output or stated effects |
+
 Import lib/math.mq.md. Runtime types: num (float) and formula (symbolic tree). Bind a formula with an empty-RHS assign followed by a `$$…$$` fence (same shape as table assigns). In view, Structure renders that fence with KaTeX.
 
 `f` =
@@ -23,18 +27,18 @@ Plotting (already in the library): plot / plot_points / plot_conic return SVG te
 
 diff / simplify / expand / partial subs return formula values so you can chain (e.g. differentiate twice, then plot or eval).
 
-**`ty` = [type] `f`**
+We first **ty = [Compute ty](type(`f`))** for the next step.
 
-> print text=`ty`
+We now **[Display this step's result](> print text=`ty`)**.
 
-**`df` = [math.diff] formula=`f` var="x"**
+We first **df = [Compute df](math.diff(formula=`f`, var="x"))** for the next step.
 
-> print text=`df`
+We now **[Display this step's result](> print text=`df`)**.
 
-**`roots` = [math.solve] formula=`f` var="x"**
+We first **roots = [Compute roots](math.solve(formula=`f`, var="x"))** for the next step.
 
-> print text=`roots`
+We now **[Display this step's result](> print text=`roots`)**.
 
-**`_svg` = [math.plot] formula=`f` var="x" min=-3 max=3**
+We first **_svg = [Compute _svg](math.plot(formula=`f`, var="x", min=-3, max=3))** for the next step.
 
-> print text=plot-ok
+We now **[Display this step's result](> print text="plot-ok")**.

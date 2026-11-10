@@ -7,13 +7,15 @@
 | 相关 | [ext-web.md](ext-web.md) · [ext-web-net.md](ext-web-net.md) · [web-net-capabilities.md](web-net-capabilities.md) · [ext-web-drivers.md](ext-web-drivers.md) · [web-assets-and-images.md](web-assets-and-images.md) · [ext-hosting-fill.md](ext-hosting-fill.md) · [ext-abi.md](ext-abi.md) · [ext-cli.md](ext-cli.md) · [web-asgi-servers-and-marqdo.md](web-asgi-servers-and-marqdo.md) |
 | 实现目录 | `plugins/web/`（**Go module**；产物仍为 `libweb.so` / `web.dll` / `libweb.dylib`） |
 | 作者面 | `ext/web/web.mq.md` · `ext/web/网页.mq.md`（**ABI 名与方法面保持兼容**；非另起一套 API） |
-| 验收应用 | 工作区 `anlian`（暗恋见君）：用 Marqdo 前后端脚本完整重写；**PostgreSQL + Redis 外接** |
+| 当前验收 | 仓库内独立示例与临时夹具；完整站点、网络站点、浏览器与数据资源分别验证 |
+
+本文件记录 Go 原生层重写时期的 ABI 与实施背景。2026-11-10 起不再以外部业务工程作为仓库交付项；当前作者规范与可调用入口以 [Web Artifact 设计](ext-web-artifact.md)、[网页手册](../../ext/web/index.mq.md)和[编程规范](../library-development.mq.md)为准。下方旧 compose/类链清单是历史对照，不能当作当前推荐 API。
 
 ---
 
 ## 0. 一句话
 
-用 **Go** 重写官方网络拓展库原生层（`plugins/web`），在 **C ABI v2 全量兼容** 前提下提供「网页制备」所需的全部服务端能力；`ext/web` 继续用 GFM 表 + `#` 类做作者面；应用（含暗恋见君）的前后端脚本全部用 Marqdo 书写。此举同时验证 **多语言 ABI 插件生态**（首个非 Rust 官方插件）。
+用 **Go** 重写官方网络拓展库原生层（`plugins/web`），在 **C ABI v2 全量兼容** 前提下提供「网页制备」所需的全部服务端能力；`ext/web` 继续用 GFM 表 + `#` 类做作者面；应用的前后端脚本全部用 Marqdo 书写。此举同时验证 **多语言 ABI 插件生态**（首个非 Rust 官方插件）。
 
 **不是**最小 hello 插件；**不是**在旧 Rust 代码上打补丁（对齐 [ext-web.md](ext-web.md) **C5**）。
 
@@ -36,7 +38,7 @@
 2. **作者面可用**：现有 `ext/web` 示例与 `tests/ext/web-*`（含 live-server）在换 Go `.so` 后通过；无需作者改业务脚本（除非文档标明的 **G 增强**）。
 3. **网页制备完备**：单站点可完成页面装配、样式/头/图、库表、表单、路由、中间件、鉴权/RBAC、上传下载、SEO/RSS/sitemap、WS、缓存、对象存储、反代、invoke——即 W0–W8 + P3 + C0–C4 + H1/H2 能力面。
 4. **驱动外接**：`postgres://`、`redis://`、`s3://` 为正式一等能力（与 [ext-web-drivers.md](ext-web-drivers.md) 一致）；SQLite / memory / file 仍支持本地与测试。
-5. **暗恋见君可写完**：用 Marqdo 后端脚本 + 浏览器 WASM 前端脚本重写 anlian 核心模块（见 §8）；运行时仅依赖 `marqdo` + `libweb` + **外接 PostgreSQL + Redis**（可选 S3/RustFS）。
+5. **通用工作流可验证**：使用仓库内独立站点和临时夹具覆盖数据、鉴权、表单与实时能力（见 §8）；SQLite 提供本地验收，PostgreSQL、Redis 和对象存储按各自可用环境另行验证。
 6. **安装路径不变**：`marqdo ext add web`、`plugin.native_path name=web`、`MARQDO_WEB_PLUGIN`、产物文件名 `libweb.so` 等与 [ext-cli.md](ext-cli.md) 兼容。
 
 ### 1.3 非目标
@@ -56,7 +58,7 @@
 
 ```text
 ┌──────────────────────────────────────────────────────────────────┐
-│  应用（anlian / 任意站点）                                         │
+│  应用（独立业务站点）                                         │
 │  · 后端 .mq.md：路由、业务、装配、invoke 处理函数                    │
 │  · 前端 .mq.md：WASM + lib/browser（作者零业务 JS）                 │
 └────────────────────────────┬─────────────────────────────────────┘
@@ -284,41 +286,36 @@ Where 语义：等值 map、filter 表、OR / IN / BETWEEN、分页 offset/limit
 
 ---
 
-## 7. G 增强（完备网页制备 + anlian；兼容之上增量）
+## 7. G 增强（完备网页制备；兼容之上增量）
 
 > 以下为 **新增能力**，不替代 §5。作者面用新方法/新 configure 键；旧脚本不受影响。
 
 | ID | 能力 | 动机 | 作者面草案 |
 |----|------|------|------------|
-| **G-WS1** | **命名房间** WS：`join`/`leave`/`publish`；组名 ASCII（如 `chat.room.{id}`） | anlian 公聊/私聊 | `app.route_ws` 增 `mode=room` + `room_key`；或 `ws.room_*` ABI |
+| **G-WS1** | **命名房间** WS：`join`/`leave`/`publish`；组名 ASCII（如 `chat.room.{id}`） | 独立聊天室 | `app.route_ws` 增 `mode=room` + `room_key`；或 `ws.room_*` ABI |
 | **G-WS2** | 房间消息钩子：先 `invoke`/落库再广播 | 「先写 PG 再推送」 | configure 或 route 表 `on_message=lib.member` |
 | **G-SESS1** | Session 后端可选 `redis://` | 多进程/多实例 | `web_session_new` url 或 auth 配置 `session=redis://` |
 | **G-CACHE1** | Redis pub/sub 可选作 WS 扇出后端 | 多进程 WS | `configure ws_backend=redis` |
-| **G-API1** | Bearer API Key 校验原语（hash+pepper+scopes） | anlian `apikeys` | `web_api_key_check` + `# auth` 或独立小类；**业务 scopes 仍在 .mq.md** |
-| **G-MAIL0** | （可选后续）SMTP 发送原语 | 邮箱验证码 | 不阻塞首版对等；列入 anlian 二期 |
+| **G-API1** | Bearer API Key 校验原语（hash+pepper+scopes） | API 密钥资源 | `web_api_key_check` + `# auth` 或独立小类；**业务 scopes 仍在 .mq.md** |
+| **G-MAIL0** | （可选后续）SMTP 发送原语 | 邮箱验证码 | 不阻塞首版对等；另列后续能力 |
 
 **明确仍属应用层（不进插件）**：反垃圾策略、草稿定时发布约定、好友关系、专题 `topic_bundles` 静态交互内容（静态挂载 + 前端 Marqdo/既有 JS 资产）。
 
 ---
 
-## 8. 暗恋见君验收矩阵（检测「能不能写完」）
+## 8. 独立工作流与隔离验收
 
-外部依赖（允许）：**PostgreSQL**、**Redis**；可选对象存储。
+仓库交付不依赖某个外部业务工程的源码或个人数据库。各能力保留在原生实现与领域资源中，通过维护中的独立示例验证；移出业务工程不构成删除通用功能的理由。
 
-| 模块 | Marqdo 后端 | Marqdo 前端 | 插件依赖 | 验收 |
-|------|-------------|-------------|----------|------|
-| 站点壳 / 首页 | `# page` + db | 局部刷新可选 WASM | listen、static、cache | 首页可开 |
-| posts 帖子/评论/板块 | route + form + db | 发帖表单 WASM 可选 | CRUD、CSRF、upload | CRUD+列表详情 |
-| news | 同上 | 同上 | 同上 | 列表详情 |
-| accounts | auth + session +（二期 mail） | 登录表单 | argon2、session、gate | 注册登录 |
-| profiles | db + storage | 头像上传 | storage/upload | 资料页 |
-| search | db.search 或 PG 查询 + cache | — | db/cache | 关键词搜索 |
-| chat | route_ws + G-WS1/2 + db | WS 客户端脚本 | Redis + WS rooms | 公聊+私聊实时 |
-| apikeys | G-API1 + db | 管理页 | — | Bearer 调 API |
-| webmaster | sitemap/robots | — | 已有 ABI | `/sitemap.xml` |
-| topics | `app.static` → bundles | 既有静态交互 | static | 专题可访问 |
+| 工作流 | 当前来源 | 实际核对 |
+|---|---|---|
+| 完整动态站点 | examples/web-site、examples/web-site-zh | 原主题规则、摘要与详情、当前记录、表单重试、会话导航及后台门禁 |
+| 网络资源 | examples/web-net-site、examples/web-net-site-zh | Cookie/multipart、WebSocket 回显、真实表单与后台 |
+| 客户端状态 | examples/web-spa-app、examples/web-collab-doc | 当前 WASM、历史记录、编辑、多标签实时协作 |
+| 数据与租户 | tests/example_databases.rs、tests/web_handbook.rs | 独占临时数据库、已有记录保留、租户条件 |
+| 原生插件 | plugins/web 内部测试 | 独立夹具下验证数据库、会话、运输、资源及渲染边界 |
 
-**「写完」定义**：上述模块在 Marqdo 仓库或 `anlian` 旁路目录有可运行 `.mq.md` 站点；gold/手工脚本能走通主路径；不依赖 Django/Channels/Daphne/gunicorn。
+开发与验收由 skills/marqdo-dev/index.mq.md 编排，使用 marqdo call。完整示例的浏览器用例和 HTTP 用例不能替代 Postgres、Redis、OIDC 或外部服务的真实环境证据；未运行的边界仍需明确保留为未验证。
 
 ---
 
@@ -400,7 +397,7 @@ scripts/build-web-plugin.sh   # go build -buildmode=c-shared -o …/libweb.so
 | **W-G11** | 定制 C2–C4 shell/layout/style/nav | ✅ `web-c2`–`c4` |
 | **W-G12** | G 增强 WS rooms + Redis session/pubsub + API key 原语 | ✅ 单测 + `web-g12-api-key-smoke` |
 | **W-G13** | 默认切换 Go `libweb`；归档 Rust；更新发版与 ext CLI | ✅ 离线+live gold（7 个 `*_live`）对 Go 全绿；`ext add`/`gold`/`release` 走 `scripts/build-web-plugin.sh`；Rust 移出 workspace；gold 强制 `MARQDO_WEB_PLUGIN` 避免 `~/.marqdo` 旧 so |
-| **W-G14** | anlian Marqdo 重写主路径（可分仓或 `examples/anlian-mq/`） | ✅ `examples/anlian-mq/`（本地 SQLite + 粉玻璃主题 + 主路由/登录/片段；外接 PG/Redis 仍为增强路径） |
+| **W-G14** | 历史业务站点主路径演示 | 历史演示工程已移出仓库；当前独立验收见 §8 |
 
 每波次：**先补 Go 实现 → 跑对应 gold → 再进入下一波**。禁止跨波次留下「注册了但返回 stub 错误」的 ABI（除 W-G0 明确的未实现探测）。
 
@@ -414,7 +411,7 @@ scripts/build-web-plugin.sh   # go build -buildmode=c-shared -o …/libweb.so
 | 金样例 | 现有 `tests/ext/web-*.mq.md`；构建脚本产出 `libweb.so` 后跑 |
 | Live | 现有 `*-live-server.mq.md` + curl |
 | 回归门禁 | CI：安装 Go → `scripts/build-web-plugin.sh` → `cargo test` 相关 web 项 |
-| anlian | 独立 smoke：登录、发帖、WS 发言、API key |
+| 独立站点 | 登录、表单、WebSocket 与 API 使用可控夹具分别验收 |
 
 ---
 
@@ -450,6 +447,6 @@ scripts/build-web-plugin.sh   # go build -buildmode=c-shared -o …/libweb.so
 1. **全量重写** `plugins/web` 为 Go，**不是**最小闭环。  
 2. **既有网络拓展能力（§5）重写后必须仍可用**；作者面默认兼容。  
 3. **PostgreSQL / Redis 外接** 为一等公民；Marqdo 承担应用前后端脚本。  
-4. **暗恋见君** 为完备性验收，不是缩小插件范围的借口。  
+4. 完备性通过独立工作流和原生测试验证，不以外部业务工程缩小插件能力范围。
 5. **多语言 ABI 生态** 以本插件为样板（G7）。  
 6. 开发严格按 **§10 波次** 推进；本文件为唯一施工图。

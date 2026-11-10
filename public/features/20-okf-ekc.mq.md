@@ -6,6 +6,10 @@ description: How Marqdo keeps one executable source of truth while projecting it
 
 # main
 
+| 返回 | 类型 | 说明 |
+|---|---|---|
+| result | any | None; execute this page's documented steps in order and observe their output or stated effects |
+
 Marqdo's constitution is code as documentation and documentation as knowledge. A `.mq.md` file is not a screenshot of a program: it is the readable source, the executable unit and the knowledge page at the same time.
 
 That claim matters only if the knowledge stays derived from the source. OKF gives us the shape of a portable knowledge bundle; EKC gives us the engineering projection. Neither becomes a second source of truth.
@@ -21,7 +25,7 @@ A concept page can therefore point at the exact file that proves it:
 ```yaml
 type: Capability
 title: Persistent foreign kernels
-description: Run Python or Node in a named, stateful kernel
+description: Run an explicitly declared local kernel with native data
 resource: public/features/19-foreign-view-cells.mq.md
 status: stable
 verified:
@@ -63,7 +67,7 @@ EKC projects the repository into an engineering knowledge system, then exposes i
 |---|---|---|
 | L0 Repository | language, size, roots | repository summary |
 | L1 Module | imports, exports, responsibility | a foreign kernel module |
-| L2 Symbol | signature, calls, fingerprint | a Python analysis function |
+| L2 Symbol | signature, calls, fingerprint | a function in external source code |
 | L3 Capability | what the project can do | run a persistent foreign kernel |
 | L4 Knowledge | decisions, constraints, failures | why the bridge is explicit |
 
@@ -119,7 +123,7 @@ Every claimed capability has an executable resource.
 
 A knowledge page that says “this project can analyze orders” must point to a `.mq.md` resource that actually runs. That is the difference between an OKF-shaped note and an executable knowledge system.
 
-In the foreign example, the page itself is the proof: the Python call, the persistent kernel and the state bridge all run from the same Markdown source that a reader is looking at. There is no separate demo project to drift out of sync.
+The foreign example computes its order report in native Marqdo and uses Node Intl for locale-aware presentation. Explicit imports point to the shared callable report handbook, while the page declares the actual view kernels, values and cells. Inspect the real per-cell results; a serialized plan alone does not establish that its cells ran successfully.
 
 ---
 

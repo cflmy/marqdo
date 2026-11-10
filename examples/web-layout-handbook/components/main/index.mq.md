@@ -15,5 +15,5 @@ This leaf owns only the main Markdown content; its parent owns placement.
 Edit adjacent content.md to change prose. Add a child directory when a second
 layout responsibility appears instead of introducing HTML into the content.
 
-**body = fs.read_text path="components/main/content.md"**
-*> component.markdown text=`body` slot="main"*
+We first **body = [Compute body](fs.read_text(path="components/main/content.md"))** for the next step.
+After these steps, return *component.markdown(text=`body`, slot="main")*.

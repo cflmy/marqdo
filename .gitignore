@@ -42,11 +42,7 @@ spike/.pytest_cache/
 *.pyc
 
 # Built browser WASM (rebuild via crates/marqdo-wasm README)
-/examples/browser-hello/marqdo_wasm.wasm
-/examples/browser-hello/pkg/
 /examples/web-client-site/static/marqdo_wasm.wasm
-/examples/browser-app/marqdo_wasm.wasm
-/examples/browser-media/marqdo_wasm.wasm
 
 # Local sqlite / scratch
 /data/
@@ -61,7 +57,6 @@ plugins/*/tmp/
 /examples/web-net-site/data/
 /examples/web-net-site-zh/data/
 /examples/marqdo-blog/data/
-/examples/anlian-mq/data/
 
 # Quantum draw/SVG runtime outputs (sources & gold .mq.md stay tracked)
 /tests/ext/quantum-*.svg
@@ -109,3 +104,22 @@ tests/ext/_sbx_cow/
 tests/ext/_sbx_*/
 examples/**/_example_sbx/
 .secrets/
+
+# Generated runtime resources for callable browser handbook examples
+/examples/web-spa-app/static/marqdo_wasm.wasm
+/examples/web-spa-app/static/marqdo-bridge.js
+/examples/web-collab-doc/static/marqdo_wasm.wasm
+/examples/web-collab-doc/static/marqdo-bridge.js
+
+# Native browser runtime and compiled theme produced by the network-site handbook.
+/examples/web-net-site/public/generated/
+/examples/web-net-site-zh/public/generated/
+
+# Generated literary-site theme resources (the declarative sources stay tracked).
+/examples/web-site/public/generated/
+/examples/web-site-zh/public/generated/
+
+# Native browser-effects example generated resources.
+/examples/browser-app/static/marqdo_wasm.wasm
+/examples/browser-app/static/marqdo-bridge.js
+/examples/browser-app/static/theme.css

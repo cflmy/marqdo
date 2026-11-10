@@ -1,19 +1,20 @@
 ---
 markup: occlusion
+title: nav Markdown component
+import:
+  component: ext/web/component/index.mq.md
+  fs: lib/fs.mq.md
 ---
+
+This leaf module owns nav content and its semantic region. Parent layout only places the returned nodes. Edit the adjacent Markdown leaf to change wording or links; the component does not query records, authenticate users or generate a raw HTML string.
 
 ## nav
 
-Site top navigation. The Admin tab points at the login-gated admin page.
+| 返回 | 类型 | 说明 |
+|---|---|---|
+| result | list | One nav region containing terminal Markdown content |
 
-`nav` =
+Read the Markdown leaf relative to the granted site root with fs.read. Its links keep the original example's destinations; actual routing and access policy remain in the serving entry. This region is already simple enough to express as Markdown, so further wrappers or a custom table dialect would add no responsibility. The semantic container and class preserve its role for the native layout and theme.
 
-| 属性 | 值 | 样式 |
-|------|-----|------|
-| Home | / | |
-| About | /about | |
-| Publish | /new | |
-| Tools | /tools | |
-| Admin | /admin | |
-
-*`nav`*
+We **text = [Read this region's terminal Markdown](fs.read_text(path="components/content/nav.md"))** and **leaf = [Retain content as native Markdown](component.markdown(text=`text`, slot="nav-content"))**.
+Return *[Place that leaf in its semantic region](component.wrap(children=`leaf`, kind="nav", slot="nav", style="topnav"))*.

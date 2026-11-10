@@ -13,7 +13,7 @@ import (
 
 // System runtime control routes (M-R3 / M-R4). Cancel and event replay do not
 // enter the Marqdo interpreter lock.
-func (st *state) mountRuntimeRoutes(mux *http.ServeMux) {
+func (st *state) mountRuntimeRoutes(mux routeRegistrar) {
 	mux.HandleFunc("POST /_runtime/tasks", st.handleRuntimeAdmit)
 	mux.HandleFunc("GET /_runtime/tasks/{id}", st.handleRuntimeGet)
 	mux.HandleFunc("POST /_runtime/tasks/{id}/cancel", st.handleRuntimeCancel)

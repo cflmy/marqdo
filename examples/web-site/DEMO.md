@@ -1,40 +1,27 @@
-# Demo walkthrough (`examples/web-site`)
+# Complete-site walkthrough
 
-Aligned with The Web Conference **Demo** expectations: implemented system,
-**hands-on** interaction, clear venue script, reproducible from the repo.
+Start through the callable workflow in [README](README.md). For a fresh owned database the site seeds eight articles; an existing database retains its actual rows and must not be reset merely to reproduce that count.
 
-## Run
+| Step | Actual action | Evidence to inspect |
+|---|---|---|
+| 1 | Open Home | Original theme, Markdown introduction, badges, reading steps and summary cards |
+| 2 | Open a card | Declared /post/{slug} route; full Markdown body rather than its summary |
+| 3 | Read index and follow components/index | Actual parent/child tree, terminal Markdown and typed data/form/navigation resources |
+| 4 | Submit New with an empty title | Actual server rule message; retry retains current CSRF |
+| 5 | Submit title, slug, summary and body | New row appears on Home and in the gated desk without restart |
+| 6 | Follow Login, use admin/demo, open Admin | Real route gate; separate desk navigation, no public rail, shared form and current cards |
+| 7 | Return Home and log out | Session-specific links switch with the real identity; direct Admin access redirects again |
+| 8 | Narrow the browser | The original 860px breakpoint puts main before the side rail without overflow |
 
-```bash
-./scripts/build-web-plugin.sh
-marqdo run examples/web-site/index.mq.md
+Source responsibilities remain separate. Route metadata lives in each Document, form data is [forms.tables.md](forms.tables.md), current data behavior is [components/articles](components/articles.mq.md), SEO/fonts are [components/head](components/head.mq.md), and theme source plus explicit View mapping begins at [styles/index](styles/index.mq.md). No compose mutation chain or author page HTML is required.
+
+The callable [verification tool](verify.mq.md) compares 412 original declaration rows and returns actual baseline/projected CSS hashes. It does not replace visual or HTTP acceptance. The real-browser suite deliberately aborts external font requests and verifies declared font families and local fallback rendering; it makes no claim about external service delivery.
+
+Use native file discovery for author-asset checks, excluding the explicitly generated stylesheet directory:
+
+```sh
+target/debug/marqdo call lib/fs.mq.md find 'path="."' 'pattern="**/*.js"' 'exclude=["public/generated/**"]' --effects fs.read --fs-root examples/web-site --json
+target/debug/marqdo call lib/fs.mq.md find 'path="."' 'pattern="**/*.css"' 'exclude=["public/generated/**"]' --effects fs.read --fs-root examples/web-site --json
 ```
 
-Open http://127.0.0.1:18081/
-
-## Venue script (≈3 minutes)
-
-| Step | Action | What reviewers should notice |
-|------|--------|------------------------------|
-| 1 | Home | Claim badges + steps; **8 seed cards** with summaries |
-| 2 | Click a card | `/post/{slug}` detail from the same table (`detail=True`) |
-| 3 | Open `index.mq.md` beside the browser | Narrative = program; field/rule/route/intro tables |
-| 4 | `/new` empty title → submit | Server validation from **rule table** (no author JS) |
-| 5 | `/new` valid title+slug → submit | Row appears on Home and Admin |
-| 6 | Top-nav **Login** (`admin` / `demo`) → **Admin** | Session gate; desk shell + create form |
-| 7 | Terminal check | `find examples/web-site \( -name '*.js' -o -name '*.css' \)` → **0** |
-
-## Authoring contract
-
-| Surface | Source |
-|---------|--------|
-| Routes / forms / admin | GFM tables in `index.mq.md` |
-| Styles | `styles/shell.mq.md` → `web.make_style` (ink / wine / gold; `shell_css=off`) |
-| Intro | `| front | back | style |` → `page.compose_intro` (same bind as main) |
-| Fonts | `page.head` table → Google Fonts (Noto Serif SC + Ma Shan Zheng) |
-| Author `.js` / `.css` | **None** |
-
-## Video
-
-Same beats as above; English captions preferred. See thesis
-`www-2027-demo/VIDEO.md` for length / upload tips.
+Both author-asset lists are empty. This says nothing about generated runtime resources or native rendering internals, which are separate declared boundaries.

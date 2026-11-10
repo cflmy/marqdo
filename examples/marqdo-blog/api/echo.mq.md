@@ -10,11 +10,15 @@ auth: none
 
 # main
 
+| 返回 | 类型 | 说明 |
+|---|---|---|
+| result | any | Result or browser effect record assembled below |
+
 Echo request fields bound via Artifact Metadata (`arg` overlays).
 
-**msg = message**
+We first **msg = `message`** for the next step.
 1. not `msg`
-  **msg = ""**
+  We first **msg = ""** for the next step.
 2. *
 
 `out` =
@@ -23,4 +27,4 @@ Echo request fields bound via Artifact Metadata (`arg` overlays).
 |----|---------|
 | True | `msg` |
 
-*out*
+After these steps, return *out*.

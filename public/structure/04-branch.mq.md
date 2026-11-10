@@ -1,18 +1,22 @@
 ---
 markup: occlusion
 title: Branch
-description: `+` arms; a lone `*` arm is else
+description: Ordered branches select one case and retain an explicit fallback
 ---
 
 # main
 
-Italic lines are statements. Branches use `+`; a head that is only `*` is the else arm.
+| 返回 | 类型 | 说明 |
+|---|---|---|
+| result | any | None; execute this page's documented steps in order and observe their output or stated effects |
 
-**`x` = 0**
+Bold markers execute statements and single italics return a value. Ordered list items select a branch; the final asterisk condition is the fallback when earlier conditions do not match.
+
+We first **x = 0** for the next step.
 
 1. `x` > 0
-  > print text=positive
+  We now **[Display this step's result](> print text="positive")**.
 2. `x` < 0
-  > print text=negative
+  We now **[Display this step's result](> print text="negative")**.
 3. *
-  > print text=zero
+  We now **[Display this step's result](> print text="zero")**.

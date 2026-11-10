@@ -617,7 +617,7 @@ Return *[Compute SHA-256 with a 64 KiB read buffer; supports binary and large fi
 | pattern | text | "**" | Relative path glob supporting *, ** and ? |
 | exclude | any | None | Glob pattern list pruned during traversal; None excludes nothing |
 | max_depth | number | 64 | Maximum traversal depth |
-| kind | text | "file" | Entry kind filter: file, dir or any |
+| kind | text | "file" | Entry kind filter: file, dir or all (files and directories) |
 
 | 返回 | 类型 | 说明 |
 |------|------|------|
@@ -771,3 +771,17 @@ Serialize then atomically replace the file; formatting and comments are not pres
 
 We retain **`body` = [Stringify](csv.stringify(rows=`value`))**.
 Return *[Atomic write](atomic_write(path=`path`, text=`body`))*.
+
+## resolve
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| path | text | required | Path relative to the granted filesystem root, or an absolute path inside it |
+
+| 返回 | 类型 | 说明 |
+|---|---|---|
+| result | text | Normalized absolute logical path after the native root and symlink checks |
+
+Use `path` to obtain an absolute address before giving a local file to another resource, such as a SQLite URL. The host resolves it using the same filesystem context as read_text and temp_dir, so a different process working directory does not change the selected root. The destination may not exist yet; its nearest existing ancestor still undergoes the native root and symlink checks. Requires fs.read and creates no file. The returned path remains logical, including permitted links; external plugins and processes retain their own operating-system authority.
+
+Return *[Resolve the path through the native filesystem context](host_fs_resolve(path=`path`))*.

@@ -292,7 +292,7 @@ fn scan_backtick_decl(line: &str, start: usize) -> Option<(ProseBit, usize)> {
     if let Some(stripped) = after.strip_prefix('=') {
         // Quoted defaults may contain prose delimiters, glob stars or spaces.
         // Keep the same quoted literal accepted by explicit parameter defaults.
-        let def_end = if let Some(quote @ ('"' | '\'')) = stripped.chars().next() {
+        let mut def_end = if let Some(quote @ ('"' | '\'')) = stripped.chars().next() {
             let mut escaped = false;
             stripped
                 .char_indices()
@@ -316,6 +316,13 @@ fn scan_backtick_decl(line: &str, start: usize) -> Option<(ProseBit, usize)> {
                 })
                 .unwrap_or(stripped.len())
         };
+        // English sentence punctuation belongs to narration after a literal.
+        // Keep quoted strings, dotted names and decimal syntax unchanged.
+        if let Some(literal) = stripped[..def_end].strip_suffix('.') {
+            if matches!(literal, "True" | "False" | "true" | "false" | "None" | "真" | "假" | "无" | "空") {
+                def_end -= 1;
+            }
+        }
         let default = stripped[..def_end].to_string();
         let next = after_tick + 1 + def_end;
         return Some((
@@ -386,6 +393,25 @@ mod tests {
                 assert_eq!(default.as_deref(), Some("False"));
             }
             _ => panic!("{:?}", bits[0]),
+        }
+    }
+
+    #[test]
+    fn sentence_period_after_boolean_or_none_is_not_part_of_the_default() {
+        for (line, expected) in [
+            ("Use `flag`=False. Continue.", "False"),
+            ("Use `flag`=True.", "True"),
+            ("Use `value`=None.", "None"),
+            ("使用`值`=假. 继续。", "假"),
+            ("Use `text`=\"False.\".", "\"False.\""),
+            ("Use `text`=module.value.", "module.value."),
+            ("Use `rate`=0.5.", "0.5."),
+        ] {
+            let bits = scan_prose_line(line);
+            match &bits[..] {
+                [ProseBit::Decl { default: Some(actual), .. }] => assert_eq!(actual, expected, "{line}"),
+                _ => panic!("unexpected prose scan: {bits:?}"),
+            }
         }
     }
 

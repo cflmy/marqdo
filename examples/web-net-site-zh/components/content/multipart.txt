@@ -1,0 +1,10 @@
+--net-boundary
+Content-Disposition: form-data; name="title"
+
+你好
+--net-boundary
+Content-Disposition: form-data; name="cover"; filename="pic.png"
+Content-Type: image/png
+
+<字节>
+--net-boundary--

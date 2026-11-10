@@ -32,6 +32,24 @@ fn text_body(v: &Value) -> Result<&str, String> {
     }
 }
 
+/// Return the logical absolute path checked by native filesystem operations.
+pub fn resolve(ctx: &HostContext, path: &Value) -> Result<Value, String> {
+    let checked = ctx.resolve_path(text_path(path)?)?;
+    let absolute = if checked.is_absolute() { checked } else {
+        std::env::current_dir().map_err(|error| error.to_string())?.join(checked)
+    };
+    let mut normalized = std::path::PathBuf::new();
+    for component in absolute.components() {
+        match component {
+            std::path::Component::CurDir => {},
+            std::path::Component::ParentDir => { normalized.pop(); },
+            component => normalized.push(component.as_os_str()),
+        }
+    }
+    normalized.to_str().map(|value| Value::Text(value.to_owned()))
+        .ok_or_else(|| "resolved filesystem path is not UTF-8".into())
+}
+
 pub fn read_text(ctx: &HostContext, path: &Value) -> Result<Value, String> {
     let p = ctx.resolve_path(text_path(path)?)?;
     if let Some(hit) = crate::host::sandbox_fs::cow_read_text(ctx, &p)? {

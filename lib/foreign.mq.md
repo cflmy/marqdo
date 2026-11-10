@@ -22,7 +22,7 @@ For development, keep EN/ZH behavior aligned and compose public libraries first.
 
 | 参数 | 类型 | 默认 | 说明 |
 |---|---|---|---|
-| lang | text | required | Registered interpreter language identifier, such as python |
+| lang | text | required | Registered interpreter language identifier, such as node |
 | cmd | any | required | Executable command or interpreter override |
 | args | any | None | Argument list passed to the called command or function |
 
@@ -286,31 +286,44 @@ Return *[Apply one code/function to each input in parallel; returns parsed JSON 
 
 | 参数 | 类型 | 默认 | 说明 |
 |---|---|---|---|
-| kernels | any | None | Kernel/session specifications for persistent interpreters |
-| cells | any | None | Code cells to evaluate in a persistent interpreter |
-| values | any | None | Variable/value record to inject into a session |
-| inputs | any | None | Input values for the batched calls |
+| kernels | any | None | Kernel rows: name/language and optional command/environment settings |
+| cells | any | None | Cell-to-kernel routing rows; referenced code fences belong to the document |
+| values | any | None | Rows naming a kernel, variable name and native value to copy |
+| inputs | any | None | Optional declared per-cell input values |
 
 | 返回 | 类型 | 说明 |
 |---|---|---|
-| result | any | Declare a document view session |
+| result | map | Plain view plan with kind, kernels, cells, values and inputs |
 
-Use `kernels`=None, `cells`=None, `values`=None, `inputs`=None as the inputs for this operation.
+Use `kernels`=None, `cells`=None, `values`=None and `inputs`=None to
+declare a view session from ordinary data tables. The returned map has
+kind="foreign-session" and the four supplied specifications. This pure task
+does not launch an interpreter, create a live kernel or read another file.
+View later consumes the plan and the document's bound code fences. Bind the plan
+to `会话` in the entry procedure: View uses this documented binding to distinguish
+a declared plan from ordinary maps and low-level live session handles. A normal
+`## main` function can be called directly and indexed by View; the separate native
+report example shows the complete declarations.
 
-Effects: pure.
+Kernel rows identify languages explicitly; the native-first public workflow
+uses Node only for Intl formatting after Marqdo has computed its data. A values
+row copies a JSON-safe native value into a named kernel variable. Cells in the
+same kernel share state, while separate kernel rows preserve isolation.
+Missing or invalid runtime declarations remain the View/session diagnostic.
 
-Declare a document view session. `kernels` and `cells` are ordinary tables:
-kernels are `|名称|语言|命令|` (ZH or EN), cells are `|单元|内核|`.
-Returns a foreign session handle consumed by `view`; without this handle the
-view has no persistent kernel state.
+This result is a serializable plan, so it can be returned by marqdo call.
+A live session_open handle is a different resource and cannot be reconstructed
+from a JSON string. For a low-level multi-evaluation task, open, use and close
+that handle within one callable workflow; format_summary in the native report
+example demonstrates that lifetime and its real failure exits.
 
-We retain **`p` = [Empty map](table.empty_map())**.
-We retain **`p` = [Set the kind field in the new record](table.put(in=`p`, at="kind", value="foreign-session"))**.
-We retain **`p` = [Set the kernels field in the new record](table.put(in=`p`, at="kernels", value=`kernels`))**.
-We retain **`p` = [Set the cells field in the new record](table.put(in=`p`, at="cells", value=`cells`))**.
-We retain **`p` = [Set the values field in the new record](table.put(in=`p`, at="values", value=`values`))**.
-We retain **`p` = [Set the inputs field in the new record](table.put(in=`p`, at="inputs", value=`inputs`))**.
-Return *p*.
+`plan` =
+
+| kind | kernels | cells | values | inputs |
+|---|---|---|---|---|
+| "foreign-session" | `kernels` | `cells` | `values` | `inputs` |
+
+After declaring the explicit view inputs we return *plan*.
 
 ## session_open
 
@@ -340,7 +353,7 @@ Return *[Start a persistent Python/Node kernel; returns an opaque handle value](
 
 | 参数 | 类型 | 默认 | 说明 |
 |---|---|---|---|
-| id | any | required | Identifier returned by the corresponding create/spawn operation |
+| id | any | required | Opaque session_open handle retained in this process; never rebuild it from id text |
 | code | any | None | Bound code-fence value; supply lang and source for inline text |
 | source | any | None | Source text to run with the selected interpreter |
 | input | any | None | Structured value JSON-encoded on stdin; cannot combine with stdin |
@@ -349,15 +362,23 @@ Return *[Start a persistent Python/Node kernel; returns an opaque handle value](
 
 | 返回 | 类型 | 说明 |
 |---|---|---|
-| result | any | Evaluate code (a code value) or source text in session id; returns a record with id/alive |
+| result | any | Evaluation record: ok/code/result/stdout/stderr/alive/timed_out/ms and diagnostic metadata |
 
 Use `id`, `code`=None, `source`=None, `input`=None, `stdin`=None, `timeout`=None as the inputs for this operation.
 
 Effects: process.exec.
 
 Evaluate code (a code value) or source text in session id; returns a record
-with id/alive. `input` is JSON-encoded for the kernel; `stdin` is raw program
-stdin for this evaluation.
+with ok/code/result/stdout/stderr/alive/timed_out/ms. Inspect ok before result:
+code is zero on success and -1 on a kernel failure. stdout and stderr preserve
+captured text; error explains a failed evaluation. alive says whether the kernel
+can still be used. An ordinary language exception can leave it alive; process
+death or timeout may retire it. Close only the live original handle. The record's
+text id is diagnostic identity and cannot replace that opaque handle.
+
+`input` is JSON-encoded for the kernel; `stdin` is raw program stdin for this
+evaluation. JSON-unsafe values remain diagnostics, never guessed text. Effects
+require process.exec, and the timeout is seconds while ms reports elapsed time.
 
 Return *[Evaluate code (a code value) or source text in session id; returns a record with id/alive](> host_foreign_session_eval id=`id` code=`code` source=`source` input=`input` stdin=`stdin` timeout=`timeout`)*.
 
@@ -365,7 +386,7 @@ Return *[Evaluate code (a code value) or source text in session id; returns a re
 
 | 参数 | 类型 | 默认 | 说明 |
 |---|---|---|---|
-| id | any | required | Identifier returned by the corresponding create/spawn operation |
+| id | any | required | Opaque session_open handle retained in this process; never rebuild it from id text |
 | name | text | required | Name to resolve, register or look up |
 | value | any | required | Value to transform or store, without mutating the input |
 
@@ -385,7 +406,7 @@ Return *[Set one kernel variable from a Marqdo value (JSON copy)](> host_foreign
 
 | 参数 | 类型 | 默认 | 说明 |
 |---|---|---|---|
-| id | any | required | Identifier returned by the corresponding create/spawn operation |
+| id | any | required | Opaque session_open handle retained in this process; never rebuild it from id text |
 | name | text | required | Name to resolve, register or look up |
 
 | 返回 | 类型 | 说明 |
@@ -404,7 +425,7 @@ Return *[Read one kernel variable as a Marqdo value](> host_foreign_session_get 
 
 | 参数 | 类型 | 默认 | 说明 |
 |---|---|---|---|
-| id | any | required | Identifier returned by the corresponding create/spawn operation |
+| id | any | required | Opaque session_open handle retained in this process; never rebuild it from id text |
 
 | 返回 | 类型 | 说明 |
 |---|---|---|
@@ -422,7 +443,7 @@ Return *[List kernel variable names](> host_foreign_session_names id=`id`)*.
 
 | 参数 | 类型 | 默认 | 说明 |
 |---|---|---|---|
-| id | any | required | Identifier returned by the corresponding create/spawn operation |
+| id | any | required | Opaque session_open handle retained in this process; never rebuild it from id text |
 
 | 返回 | 类型 | 说明 |
 |---|---|---|
@@ -442,7 +463,7 @@ Return *[Consume (affine close) a live session handle: kill and remove it](> hos
 
 | 参数 | 类型 | 默认 | 说明 |
 |---|---|---|---|
-| id | any | required | Identifier returned by the corresponding create/spawn operation |
+| id | any | required | Opaque session_open handle retained in this process; never rebuild it from id text |
 
 | 返回 | 类型 | 说明 |
 |---|---|---|

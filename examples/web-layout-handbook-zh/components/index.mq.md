@@ -18,9 +18,9 @@ import:
 若子块仍含独立分栏，就继续沿对应目录的 index.mq.md 分解。
 不要把渲染后的字符串放回值列，子节点在整个装配过程中保持结构。
 
-**nav_nodes = > nav.节点**
-**content_nodes = > content.节点**
-**footer_nodes = > footer.节点**
-**upper_regions = 组件.合并 甲=`nav_nodes` 乙=`content_nodes`**
-**home_regions = 组件.合并 甲=`upper_regions` 乙=`footer_nodes`**
-*> 布局.纵排 子节点=`home_regions` 槽="home"*
+We first **nav_nodes = [Compute nav_nodes](nav.节点())** for the next step.
+We first **content_nodes = [Compute content_nodes](content.节点())** for the next step.
+We first **footer_nodes = [Compute footer_nodes](footer.节点())** for the next step.
+We first **upper_regions = [Compute upper_regions](组件.合并(甲=`nav_nodes`, 乙=`content_nodes`))** for the next step.
+We first **home_regions = [Compute home_regions](组件.合并(甲=`upper_regions`, 乙=`footer_nodes`))** for the next step.
+After these steps, return *布局.纵排(子节点=`home_regions`, 槽="home")*.

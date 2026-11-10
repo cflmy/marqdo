@@ -125,3 +125,31 @@ fn knowledge_cards_use_real_contracts_and_keep_verification_states_separate() {
         structure.contains("由作者补充具体业务</button><span class=\"occl-stub\">待补充实际逻辑")
     );
 }
+
+#[test]
+fn automatic_reader_marks_callable_modules_without_executing_tools_or_hiding_program_errors() {
+    let temp = Scratch::new();
+    let source = temp.0.join("tools.mq.md");
+    fs::write(&source, "---\nmarkup: occlusion\nimport:\n  fs: lib/fs.mq.md\n---\n\n## write_marker\n\nWe **[Write only when explicitly called](fs.write_text(path=\"must-not-exist\", text=\"unexpected automatic call\"))**.\nReturn *None*.\n\n## ask\n\nReturn *[Read only when called](input(prompt=\"Tool input\"))*.\n").unwrap();
+    let render = |file: &std::path::Path, output: &std::path::Path| {
+        let out = Command::new(env!("CARGO_BIN_EXE_marqdo"))
+            .current_dir(env!("CARGO_MANIFEST_DIR"))
+            .args(["view", "output", "--out"]).arg(output).arg(file).output().unwrap();
+        assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+        let mut paths = Vec::new(); html_files(output, &mut paths);
+        paths.iter().map(|p| fs::read_to_string(p).unwrap())
+            .find(|s| s.contains("id=\"structure\"")).unwrap()
+    };
+    let html = render(&source, &temp.0.join("library-out"));
+    assert!(html.contains(">module</span>"), "module status was lost");
+    assert!(html.contains("这是可调用模块，未自动执行"));
+    assert!(!html.contains(">fail</span>"), "a callable library became a failed program");
+    assert!(!temp.0.join("must-not-exist").exists());
+    assert!(!html.contains("<form class=\"stdin-form\""), "a helper's input prompted during library reading");
+
+    let broken = temp.0.join("broken.mq.md");
+    fs::write(&broken, "---\nmarkup: occlusion\n---\n\n## main\n\nReturn *[Real program failure](1 / 0)*.\n").unwrap();
+    let html = render(&broken, &temp.0.join("broken-out"));
+    assert!(html.contains(">fail</span>"), "a real entry failure was hidden");
+    assert!(!html.contains(">module</span>"));
+}

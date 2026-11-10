@@ -228,28 +228,52 @@ function applyStyle(el, styleVal) {
 }
 
 export function renderListItems(spec) {
-  const tag = String(spec.tag || "li");
+  const rootTag = String(spec.tag || "li");
   const items = Array.isArray(spec.items) ? spec.items : [];
-  return items
-    .map((it) => {
-      if (it == null) return "";
-      if (typeof it === "string" || typeof it === "number") {
-        return `<${tag}>${escapeHtml(String(it))}</${tag}>`;
-      }
-      if (!isPlainObject(it)) return "";
-      const text = it.text != null ? String(it.text) : it.html != null ? null : "";
-      const cls = it.class != null ? ` class="${escapeAttr(String(it.class))}"` : "";
-      let attrs = "";
-      if (isPlainObject(it.attrs)) {
-        for (const [k, v] of Object.entries(it.attrs)) {
-          if (v === null || v === false) continue;
-          attrs += ` ${escapeAttr(k)}="${escapeAttr(String(v))}"`;
+  let count = 0;
+  const render = (item, fallbackTag, depth) => {
+    if (depth > 32 || ++count > 10000) throw new Error("render_list: structural limit exceeded");
+    if (item == null) return "";
+    if (typeof item !== "string" && typeof item !== "number" && !isPlainObject(item)) return "";
+    const record = isPlainObject(item) ? item : { text: String(item) };
+    const tag = String(record.tag || fallbackTag);
+    if (!/^[a-z][a-z0-9-]*$/i.test(tag) ||
+        /^(script|style|iframe|object|embed|link|meta|base)$/i.test(tag)) {
+      throw new Error("render_list: unsupported element name");
+    }
+    let attrs = record.class != null ? ` class="${escapeAttr(String(record.class))}"` : "";
+    if (isPlainObject(record.attrs)) {
+      for (const [key, value] of Object.entries(record.attrs)) {
+        if (!/^[a-z_:][a-z0-9_.:-]*$/i.test(key) || /^on/i.test(key)) {
+          throw new Error("render_list: invalid attribute name");
         }
+        if (value === null || value === false) continue;
+        if (!["string", "number", "boolean"].includes(typeof value)) throw new Error("render_list: attributes must be scalar");
+        if (/^(href|src|action|formaction)$/i.test(key) &&
+            /^[\s\u0000-\u0020]*(javascript|vbscript|data)[\s\u0000-\u0020]*:/i.test(String(value))) {
+          throw new Error("render_list: unsupported URL");
+        }
+        attrs += ` ${key}="${escapeAttr(String(value))}"`;
       }
-      const inner = it.html != null ? String(it.html) : escapeHtml(text ?? "");
-      return `<${tag}${cls}${attrs}>${inner}</${tag}>`;
-    })
-    .join("");
+    }
+    let inner;
+    if (record.children != null) {
+      if (!Array.isArray(record.children) || record.text != null || record.html != null) {
+        throw new Error("render_list: children must be an unambiguous record list");
+      }
+      inner = record.children.map(child => render(child, "span", depth + 1)).join("");
+    } else {
+      // Preserve the existing explicit HTML escape hatch. Ordinary business
+      // values use text/children and never become source or markup.
+      inner = record.html != null ? String(record.html) : escapeHtml(String(record.text ?? ""));
+    }
+    if (/^(input|img|br|hr|area|col|source|wbr)$/i.test(tag)) {
+      if (inner) throw new Error("render_list: void elements cannot have content");
+      return `<${tag}${attrs}>`;
+    }
+    return `<${tag}${attrs}>${inner}</${tag}>`;
+  };
+  return items.map(item => render(item, rootTag, 0)).join("");
 }
 
 function escapeHtml(s) {

@@ -114,7 +114,7 @@ func (st *state) writeRegisterFailure(w http.ResponseWriter, r *http.Request, ms
 	_, _ = io.WriteString(w, registerPageHTML(st.auth.registerPath, &loc, csrf))
 }
 
-func (st *state) mountExtraLoginPosts(mux *http.ServeMux, already map[string]bool) {
+func (st *state) mountExtraLoginPosts(mux routeRegistrar, already map[string]bool) {
 	for path, pageV := range st.routes {
 		if already[path] {
 			continue

@@ -1,34 +1,57 @@
 ---
 markup: occlusion
-title: Foreign kernels v2 — Python analysis in view
-description: Kernel state, Marqdo-to-kernel values and view cells — without a stdin-only demo
+title: Native analysis and an explicit Intl formatting boundary
 import:
   foreign: lib/foreign.mq.md
+  table: lib/table.mq.md
+  result: lib/result.mq.md
+  native: ../../examples/foreign-native-report/index.mq.md
 ---
 
-# main
+This page keeps order analysis in Marqdo and uses Node Intl only for locale-aware
+currency formatting. Read [the actual native report tools](../../examples/foreign-native-report/index.mq.md)
+for their independently callable input and return contracts. That single module
+contains grouping, population statistics and the bounded persistent formatter.
 
-This page shows the foreign runtime as a language feature: a persistent kernel, explicit state from Marqdo values, and view cells that share kernel state. It never asks the reader to type JSON into stdin.
+Call this page's main with process.exec for a full workflow, or call analyze_orders
+in that module with no effects for native analysis alone. View evaluates the same
+cells with shared state and isolated kernels. No Python interpreter is needed.
 
----
+## main
 
-Probe the interpreter first. The result is ordinary Marqdo data.
+| 返回 | 类型 | 说明 |
+|---|---|---|
+| result | map | View-session plan plus the native report and checked localized formatting |
 
-**python = > foreign.probe lang="python"**
+This complete page uses six ordinary orders: their native total is 950, count
+is six, and the four regional rows retain count, total, mean and normalized span.
+The pure analysis is independently callable in the linked module. Formatting is a separate
+capability with an explicit process.exec grant and an installed Node runtime.
+The successful return contains report and formatting alongside the view-session
+plan; it contains no live kernel handle and can be returned by marqdo call.
 
-> print text=[ok](access(`python`, "ok"))
-> print text=[version](access(`python`, "version"))
+The view gets the same native report copied into two named kernels. Its cells
+perform presentation rather than reimplementing native grouping or arithmetic.
+Run All first initializes the formatter in the analysis kernel, then a second
+cell reuses it. The review kernel receives its own report copy and formatter.
+This demonstrates both shared state and kernel isolation. Running the dependent
+formatting cell before its initializer should show the real missing-state error.
 
----
+Static View export evaluates those same cells and embeds actual stdout.
+Interactive View retains their kernels for later runs. The low-level formatter
+used to check the public return is opened and closed separately, so it cannot
+secretly supply state to the view kernels. No stdin, notebook command, generated
+file-reader program or package installation is hidden in this example.
+If Node or formatting fails, the page returns that failure before declaring a
+ready view. Native-only consumers can still call analyze_orders with no effects.
+The table cells below are data, while the three bound node fences are explicit
+foreign code. The distinction is visible without translating a Python workflow
+into another ad hoc command sequence.
 
-Marqdo values into a kernel.
+`orders` =
 
-The `订单` table is a normal Marqdo value. `foreign.session_set` copies it into the Python kernel as JSON; no shell and no stdin.
-
-`订单` =
-
-| @ | 区域 | 金额 |
-|---|------|------|
+| @ | region | amount |
+|---|---|---|
 | 1 | 华东 | 120 |
 | 2 | 华东 | 300 |
 | 3 | 华南 | 90 |
@@ -36,119 +59,58 @@ The `订单` table is a normal Marqdo value. `foreign.session_set` copies it int
 | 5 | 华北 | 220 |
 | 6 | 西部 | 80 |
 
-**内核会话 = > foreign.session_open lang="python"**
+We **report = [Perform all analysis in Marqdo](native.analyze_orders(orders=`orders`))** and **formatted = [Use the genuine external formatting boundary](native.format_summary(report=`report`))**.
+1. not access(`formatted`, "ok")
+  Return *formatted* before declaring an executable view ready.
 
-**> foreign.session_set id=`内核会话` name="orders" value=`订单`**
-
-`total_code` =
-```python
-round(sum(float(row["金额"]) for row in orders), 2)
-```
-
-**total = > foreign.session_eval id=`内核会话` code=`total_code`**
-
-> print text=[result](access(`total`, "result"))
-
-The low-level kernel session is managed entirely by `foreign`; the table crossed the boundary as an explicit JSON copy.
-
----
-
-Kernel state persists.
-
-Two evaluations share the same kernel. The second sees the first variable.
-
-`set_values_code` =
-```python
-values = [3, 4, 5]
-```
-
-**> foreign.session_eval id=`内核会话` code=`set_values_code`**
-
-`square_sum_code` =
-```python
-sum(value * value for value in values)
-```
-
-**square_sum = > foreign.session_eval id=`内核会话` code=`square_sum_code`**
-
-> print text=[result](access(`square_sum`, "result"))
-
-**> foreign.session_close id=`内核会话`**
-
-This is kernel state, not a one-shot process. It is created, queried and closed through `foreign`.
-
----
-
-View cells share state.
-
-`foreign.session` declares a view session from ordinary tables. The table names are free; this document uses `分析内核` and `分析单元`.
-
-`分析内核` =
+`kernels` =
 
 | @ | 名称 | 语言 |
-|---|------|------|
-| 1 | 分析 | python |
-| 2 | 复核 | python |
+|---|---|---|
+| 1 | 分析 | node |
+| 2 | 复核 | node |
 
-`分析单元` =
+`cells` =
 
 | @ | 单元 | 内核 |
-|---|------|------|
+|---|---|---|
 | 1 | 计算 | 分析 |
-| 2 | 复核 | 复核 |
+| 2 | 格式化 | 分析 |
+| 3 | 复核 | 复核 |
 
-`初始值` =
+`initial` =
 
-| 内核 | 名称 | 值 |
-|------|------|----|
-| 分析 | orders | `订单` |
-| 复核 | orders | `订单` |
+| @ | 内核 | 名称 | 值 |
+|---|---|---|---|
+| 1 | 分析 | report | `report` |
+| 2 | 复核 | report | `report` |
 
-`会话` = > foreign.session kernels=`分析内核` cells=`分析单元` values=`初始值`
+We **会话 = [Declare the view with native values and explicit kernels](foreign.session(kernels=`kernels`, cells=`cells`, values=`initial`))**.
 
 `计算` =
-```python
-import json
-import statistics
+```node
+var money = new Intl.NumberFormat("en-US", {style:"currency", currency:"CNY"});
+console.log(JSON.stringify(report));
+```
 
-by_region = {}
-for row in orders:
-    by_region.setdefault(row["区域"], []).append(float(row["金额"]))
-
-summary = []
-for region, values in sorted(by_region.items()):
-    mean = statistics.mean(values)
-    sd = statistics.pstdev(values) or 1.0
-    summary.append({
-        "region": region,
-        "orders": len(values),
-        "total": round(sum(values), 2),
-        "mean": round(mean, 2),
-        "z_span": round((max(values) - mean) / sd, 3),
-    })
-
-print(json.dumps({
-    "regions": summary,
-    "total": round(sum(float(row["金额"]) for row in orders), 2),
-    "count": len(orders),
-}, ensure_ascii=False))
+`格式化` =
+```node
+console.log(money.format(report.total));
+console.log(money.format(report.average));
 ```
 
 `复核` =
-```python
-import json
-
-print(json.dumps({
-    "kernel": "复核",
-    "count": len(orders),
-    "total": round(sum(float(row["金额"]) for row in orders), 2),
-}, ensure_ascii=False))
+```node
+var reviewMoney = new Intl.NumberFormat("en-US", {style:"currency", currency:"CNY"});
+console.log(JSON.stringify({count:report.count, total:reviewMoney.format(report.total)}));
 ```
 
-`查看` consumes the `会话` handle. Run All runs `计算` in the `分析` kernel and `复核` in the `复核` kernel; the static export runs the same cells and embeds their real outputs.
+We **formatting = [Retain the checked persistent-kernel result](access(formatted, "value"))**.
 
-The important language point:
+`evidence` =
 
-The `初始值` table passes the same Marqdo `订单` value into both kernels. Kernel state lives in `foreign`. View only renders the handle and its cells. `run` still executes the same document as a program.
+| report | formatting |
+|---|---|
+| `report` | `formatting` |
 
-There is no separate notebook CLI, no stdin requirement in this example, and no hidden language switch.
+Return *[The executable view plan with native analysis evidence](table.merge(a=`会话`, b=`evidence`))*.

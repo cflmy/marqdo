@@ -98,7 +98,9 @@ Welcome to the executable web.
 | title | title | Marqdo | | title |
 ```
 
-2026-11-08：View 已支持 row/column 容器与 markdown 叶子，容器值保持子表；显式 `view: main` Document 通过普通函数装配。完整工程见[布局实践](ext-web-layout-paradigm.md)，实现边界见[优化说明](ext-web-handbook.md)。
+2026-11-08：View 已支持 row/column 容器与 markdown 叶子，容器值保持子表；显式 `view: main` Document 通过普通函数装配。
+
+2026-11-10：同一五列 View 可放置具型 Resource 节点；结构仍只在启动时装配，数据查询、已挂载表单与会话导航在请求期间解析。无新增 frontmatter 或核心标记；见 [请求资源](web-view-resources.md)。普通离线渲染缺少请求上下文时明确报错，不伪造动态内容。完整工程见[布局实践](ext-web-layout-paradigm.md)，实现边界见[优化说明](ext-web-handbook.md)。
 
 `page.render nodes=` 是**唯一**主装配路径。禁止 `compose_main` / `compose_intro` 等碎片 DSL。
 

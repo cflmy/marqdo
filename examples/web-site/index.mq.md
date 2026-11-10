@@ -1,223 +1,60 @@
 ---
 markup: occlusion
-title: web-site
-description: >-
-  WWW Demo sample — GFM tables for shell, schema, forms, styles, and admin.
-  Author business JavaScript: none. Author hand-written .css: none.
+type: web
+view: main
+route: /
+title: Marqdo Web Site
 import:
+  layout: components/index.mq.md
+  intro: components/intro.mq.md
+  articles: components/articles.mq.md
+  database: db/index.mq.md
+  forms: forms.mq.md
+  theme: styles/index.mq.md
   web: ext/web/web.mq.md
-  shell: styles/shell.mq.md
-  nav: components/nav.mq.md
-  side: components/side.mq.md
-  foot: components/foot.mq.md
-  desk: components/desk.mq.md
-  articles: db/articles.mq.md
-  db: db/index.mq.md
+  form: ext/data/form.mq.md
+  auth: ext/security/auth.mq.md
+  fs: lib/fs.mq.md
+  table: lib/table.mq.md
 ---
 
-# main
+This entry is the executable site handbook. Follow components/index for public and administration geometry, then Markdown leaves, current article resources, the form and database. Five declared Documents retain Home, About, New, Admin and slug detail. Session navigation and server access policy remain separate; the custom desk does not enable the unrelated native administration landing page.
 
-This Markdown file is both the **site documentation** and the **running app**.
-Routes, forms, validation, admin pages, and look-and-feel are **GFM tables** —
-no hand-written business JavaScript and no author .css file.
+## main
 
-`home` =
+| 返回 | 类型 | 说明 |
+|---|---|---|
+| result | list | Public frame containing the readable introduction and current article cards |
 
-| src | style |
-|-----|-------|
-| nav.`nav` | shell.`topnav` |
-| side.`side` | shell.`side_panel` |
-| foot.`foot` | shell.`footer` |
+Startup assembly reads terminal Markdown and constructs a typed query, without querying or initializing a database. The retained application resource supplies current articles at request time. Shared layout preserves navigation, side rail, footer, SEO, fonts and the compiled literary theme. Follow each imported responsibility rather than rebuilding the complete page here.
 
-Public shell (nav + side + foot). Desk shell drops the public side rail.
+We **introduction = [Read the terminal home introduction](intro.nodes(name="home"))** and **cards = [Describe the current article cards](articles.cards())** and **body = [Keep the introduction before the records](table.concat(a=`introduction`, b=`cards`))**.
+Return *[Place home inside the shared public frame](layout.frame(body=`body`, homepage=True))*.
 
-`desk_shell` =
+## serve
 
-| src | style |
-|-----|-------|
-| desk.`nav` | shell.`topnav` |
-| desk.`foot` | shell.`footer` |
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| root | text | "examples/web-site" | Explicit site discovery directory from the checkout |
+| port | number | 18081 | Loopback demonstration port |
+| url | any | None | None uses retained site-root SQLite; tests supply an owned URI |
 
-List cards: summary + slug link (click through to detail).
+| 返回 | 类型 | 说明 |
+|---|---|---|
+| result | map | Blocking listener after real data, form, authentication and desk policy bindings |
 
-`index` =
+Use `root`="examples/web-site", `port`=18081 and `url`=None from the checkout with --fs-root examples/web-site and plugin,fs.write,network.write. Database initialization preserves existing rows and seeds only an empty table. The original declaration leaves remain unchanged; styles/index projects their selectors onto the recursive View layout and restores the named style properties previously attached by removed compose APIs.
 
-| front | back | style |
-|-------|------|-------|
-| title | articles.`articles`.title | shell.`card_title` |
-| body | articles.`articles`.summary | shell.`card_body` |
-| href | articles.`articles`.slug | |
+Theme output is explicitly generated under public/generated before discovery. Preparation reads declared Documents but opens no listener. Mount the same public article form used by New and the desk, attach local fixture authentication, and protect the actual /admin path before listening. Keep every returned application. The admin/demo credentials are local demonstration data; replace the user store and network policy for a real deployment. Shutdown belongs to the supervising caller, not a hidden background process.
 
-Detail bind for /post/{slug} (full Markdown body).
+We **store = [Initialize the retained article database](database.open(url=`url`))** and **css = [Compile the actual View theme projection](theme.css())** and **[Create only the explicit generated resource directory](fs.make_dirs(path="public/generated"))** and **[Write the compiled theme through native IO](fs.atomic_write(path="public/generated/theme.css", text=`css`))**.
+We **app = [Discover the five declared site Documents](web.prepare(root=`root`, host="127.0.0.1", port=`port`, db=`store`, static_dir="public"))** and **article = [Construct one shared server-validation resource](forms.article())** and **app = [Mount the public article submission explicitly](form.mount(app=`app`, id="article", form=`article`))**.
 
-`detail` =
+`users` =
 
-| front | back | style |
-|-------|------|-------|
-| title | articles.`articles`.title | shell.`card_title` |
-| body | articles.`articles`.body | |
+| @ | username | password | role |
+|---|---|---|---|
+| 1 | admin | demo | admin |
 
-`by_slug` =
-
-| field | op | value |
-|-------|-----|-------|
-| slug | = | {slug} |
-
-Home intro — same bind shape as main (front / back / style).
-
-`home_intro` =
-
-| front | back | style |
-|-------|------|-------|
-| kicker | WWW demo · tables as the full stack | shell.`kicker` |
-| title | Marqdo | shell.`intro_title` |
-| lede | "One executable Markdown artifact declares routes, forms, admin pages, and styles — no hand-written business JavaScript, no author .css. Click a card for the full article, then try the three steps below." | shell.`lede` |
-| claim | 0 author JS | shell.`claim` |
-| claim | 0 author .css | shell.`claim` |
-| claim | GFM tables | shell.`claim` |
-| step | "Click any card — /post/{slug} opens the detail page from the same articles table." | shell.`step` |
-| step | "Open [New](/new) and submit with an empty title (validation from a rule table)." | shell.`step` |
-| step | "Open top-nav **Login** (admin / demo), then **Admin** — gated desk with create form + list." | shell.`step` |
-
-`about_intro` =
-
-| front | back | style |
-|-------|------|-------|
-| kicker | about | shell.`kicker` |
-| title | About | shell.`intro_title` |
-| lede | "Documentation and the deployed site stay one .mq.md artifact. Layout and theme are GFM style tables in styles/shell.mq.md — structure without hand-written CSS or business JavaScript." | shell.`lede` |
-| claim | docs = program | shell.`claim` |
-| claim | server-side rules | shell.`claim` |
-| claim | hands-on | shell.`claim` |
-
-`new_intro` =
-
-| front | back | style |
-|-------|------|-------|
-| kicker | form · try validation | shell.`kicker` |
-| title | New article | shell.`intro_title` |
-| lede | "Leave Title empty and submit — the error comes from the rule table, not client JavaScript. Then fill title, slug, and summary to create a row shared with Admin and the card grid." | shell.`lede` |
-
-`admin_intro` =
-
-| front | back | style |
-|-------|------|-------|
-| kicker | desk · you are in admin | shell.`kicker` |
-| title | Admin | shell.`intro_title` |
-| lede | "This is the management desk (login required): same articles schema as the public site, assembled as list + create form — not a separate SPA. Use Site in the topnav to return, or Logout to end the session." | shell.`lede` |
-| claim | login-gated | shell.`claim` |
-| claim | table-declared | shell.`claim` |
-| claim | "create + list" | shell.`claim` |
-
-`post_intro` =
-
-| front | back | style |
-|-------|------|-------|
-| kicker | article · table-bound detail | shell.`kicker` |
-
-Article create form: field table + rules table (server-side validation).
-
-`article_fields` =
-
-| name | label | type | required | default |
-|------|-------|------|----------|---------|
-| title | Title | text | true | |
-| slug | Slug | text | true | |
-| summary | Summary | textarea | false | |
-| body | Body | textarea | false | |
-
-`article_rules` =
-
-| field | rule | message |
-|-------|------|---------|
-| title | required | Title is required |
-| title | max:120 | Title is too long |
-| slug | required | Slug is required |
-| slug | max:80 | Slug is too long |
-| summary | max:500 | Summary is too long |
-| body | max:8000 | Body is too long |
-
-SEO / Open Graph for the home page (still a table).
-
-`home_meta` =
-
-| key | value |
-|-----|-------|
-| description | Tables as the full stack — Marqdo Web demo with zero author business JavaScript. |
-| og:type | website |
-| og:title | Marqdo Web Site |
-
-Neat CJK sans for body; Great Vibes for English display.
-
-`fonts` =
-
-| rel | href | crossorigin |
-|-----|------|-------------|
-| preconnect | https://fonts.googleapis.com | |
-| preconnect | https://fonts.gstatic.com | anonymous |
-| stylesheet | https://fonts.googleapis.com/css2?family=Great+Vibes&family=Noto+Sans+SC:wght@300;400;500;700&family=Noto+Serif+SC:wght@400;600&display=swap | |
-
-**store = > db.open**
-**site_css = > shell.css**
-
-**page = > web.page title="Marqdo Web Site" shell_css="off"**
-**page = > page.compose_intro intro=home_intro**
-**page = > page.meta meta=home_meta**
-**page = > page.head table=fonts**
-**page = > page.css css=site_css**
-**page = > page.compose_components components=home**
-**page = > page.compose_main main=index**
-**page = > page.link_prefix prefix="/post/"**
-
-**about = > web.page title="About · Marqdo Web" shell_css="off"**
-**about = > about.compose_intro intro=about_intro**
-**about = > about.head table=fonts**
-**about = > about.css css=site_css**
-**about = > about.compose_components components=home**
-
-**article_form = > web.form table="articles" action="insert"**
-**article_form = > article_form.fields fields=article_fields**
-**article_form = > article_form.rules rules=article_rules**
-
-**new = > web.page title="New article · Marqdo Web" shell_css="off"**
-**new = > new.compose_intro intro=new_intro**
-**new = > new.head table=fonts**
-**new = > new.css css=site_css**
-**new = > new.compose_components components=home**
-**new = > new.compose_form id="article" form=article_form**
-
-**desk = > web.page title="Admin · Marqdo Web" shell_css="off"**
-**desk = > desk.chrome body_class="is-desk"**
-**desk = > desk.compose_intro intro=admin_intro**
-**desk = > desk.head table=fonts**
-**desk = > desk.css css=site_css**
-**desk = > desk.compose_components components=desk_shell**
-**desk = > desk.compose_form id="article" form=article_form**
-**desk = > desk.compose_main main=index**
-**desk = > desk.link_prefix prefix="/post/"**
-
-**post = > web.page title="Article · Marqdo Web" shell_css="off"**
-**post = > post.compose_intro intro=post_intro**
-**post = > post.head table=fonts**
-**post = > post.css css=site_css**
-**post = > post.compose_components components=home**
-**post = > post.compose_main main=detail**
-**post = > post.query query=by_slug**
-**post = > post.detail detail=True**
-
-Demo credentials (table-declared users — host session auth, no author JS).
-
-`admins` =
-
-| username | password | role |
-|----------|----------|------|
-| admin | demo | admin |
-
-**app = > web.app page=page db=store admin=False host="127.0.0.1" port=18081 shell_css="off" login_redirect="/admin" logout_redirect="/"**
-**app = > app.route path="/about" page=about**
-**app = > app.route path="/new" page=new**
-**app = > app.route path="/admin" page=desk**
-**app = > app.route path="/post/{slug}" page=post**
-**app = > app.auth users=admins session_ttl=3600 login_path="/login" login_redirect="/admin" logout_redirect="/"**
-**app = > app.gate path="/admin" roles="admin" match="prefix" on_deny="redirect" exclude="/login"**
-> `app`.listen
+We **app = [Attach native login sessions](auth.attach(app=`app`, users=`users`, login_path="/login", login_redirect="/admin", logout_redirect="/"))** and **app = [Protect direct requests to the custom desk](auth.gate(app=`app`, path="/admin", roles="admin", match="prefix", on_deny="redirect", exclude="/login"))**.
+Return *[Listen after actual resources and policy are ready](web.listen(app=`app`))*.

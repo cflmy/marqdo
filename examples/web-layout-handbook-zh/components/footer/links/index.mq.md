@@ -17,7 +17,7 @@ import:
 若子块仍含独立分栏，就继续沿对应目录的 index.mq.md 分解。
 不要把渲染后的字符串放回值列，子节点在整个装配过程中保持结构。
 
-**docs_nodes = > docs.节点**
-**community_nodes = > community.节点**
-**siblings = 组件.合并 甲=`docs_nodes` 乙=`community_nodes`**
-*> 布局.分栏 子节点=`siblings` 槽="footer-links"*
+We first **docs_nodes = [Compute docs_nodes](docs.节点())** for the next step.
+We first **community_nodes = [Compute community_nodes](community.节点())** for the next step.
+We first **siblings = [Compute siblings](组件.合并(甲=`docs_nodes`, 乙=`community_nodes`))** for the next step.
+After these steps, return *布局.分栏(子节点=`siblings`, 槽="footer-links")*.

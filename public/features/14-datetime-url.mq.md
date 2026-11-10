@@ -9,13 +9,18 @@ import:
 
 # Time and addresses without plugins
 
+
 Moments are maps `{unix, zone, iso}`. Parse HTTPS URLs and round-trip query strings in `lib/url` (segment encoding stays in `net.url_encode`).
 
 # main
 
-**epoch = > dt.from_unix unix=0 zone="Asia/Shanghai"**
-> print text=[iso](access(`epoch`, "iso"))
+| 返回 | 类型 | 说明 |
+|---|---|---|
+| result | any | None; execute this page's documented steps in order and observe their output or stated effects |
 
-**u = > url.parse text="https://example.com/path?q=1#top"**
-> print text=[host](access(`u`, "host"))
-> print text=[query](access(`u`, "query"))
+We first **epoch = [Compute epoch](dt.from_unix(unix=0, zone="Asia/Shanghai"))** for the next step.
+We now **[Display this step's result](> print text=[iso](access(`epoch`, "iso")))**.
+
+We first **u = [Compute u](url.parse(text="https://example.com/path?q=1#top"))** for the next step.
+We now **[Display this step's result](> print text=[host](access(`u`, "host")))**.
+We now **[Display this step's result](> print text=[query](access(`u`, "query")))**.
