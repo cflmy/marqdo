@@ -1,0 +1,18 @@
+Description: Use stable Option map_or in the engineering release boundary
+Author: Marqdo Maintainers <cflmy@users.noreply.github.com>
+Forwarded: not-needed
+Last-Update: 2026-11-10
+
+diff --git a/plugins/engineering/src/lib.rs b/plugins/engineering/src/lib.rs
+index 6891f01..f0c5ffc 100644
+--- a/plugins/engineering/src/lib.rs
++++ b/plugins/engineering/src/lib.rs
+@@ -283,7 +283,7 @@ fn r2_settings(root:&Path)->Result<BTreeMap<String,String>,String> {
+         }
+     }
+     for k in ["R2_ENDPOINT","R2_BUCKET","R2_ACCESS_KEY_ID","R2_SECRET_ACCESS_KEY"] {
+-        if settings.get(k).is_none_or(String::is_empty) {return Err(format!("missing {k}; configure ~/.marqdo/r2.env"));}
++        if settings.get(k).map_or(true, String::is_empty) {return Err(format!("missing {k}; configure ~/.marqdo/r2.env"));}
+     }
+     Ok(settings)
+ }

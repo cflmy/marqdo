@@ -283,7 +283,7 @@ fn r2_settings(root:&Path)->Result<BTreeMap<String,String>,String> {
         }
     }
     for k in ["R2_ENDPOINT","R2_BUCKET","R2_ACCESS_KEY_ID","R2_SECRET_ACCESS_KEY"] {
-        if settings.get(k).is_none_or(String::is_empty) {return Err(format!("missing {k}; configure ~/.marqdo/r2.env"));}
+        if settings.get(k).map_or(true, String::is_empty) {return Err(format!("missing {k}; configure ~/.marqdo/r2.env"));}
     }
     Ok(settings)
 }
