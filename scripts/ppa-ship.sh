@@ -70,7 +70,7 @@ else
 fi
 
 echo "==> building source package for series=${SERIES}"
-run_user "$ROOT/scripts/ppa-build-source.sh" "$SERIES"
+run_user bash "$ROOT/scripts/ppa-build-source.sh" "$SERIES"
 
 # The native handbook selects the exact current-version artifact.
 MARQDO_TOOL="${MARQDO_BIN:-$ROOT/target/debug/marqdo}"
