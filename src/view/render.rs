@@ -1761,7 +1761,7 @@ mod tests {
         let module = crate::parse::parse_source(src).unwrap();
         let html = render_module_structure(&module, src);
         assert!(
-            html.contains("<a href=\"https://github.com/cflmy/marqdo\">仓库</a>"),
+            html.contains("href=\"https://github.com/cflmy/marqdo\"") && html.contains(">仓库</a>"),
             "{html}"
         );
         assert!(html.contains("<code>code</code>"), "{html}");

@@ -55,22 +55,23 @@ pub fn render_module_document(module: &Module, source: &str, annots: &[ViewAnnot
     let body_start = skip_frontmatter_end(&lines).unwrap_or(1);
     let mut para: Vec<(u32, String)> = Vec::new();
     let flush_para = |para: &mut Vec<(u32, String)>, out: &mut String| {
-        if para.is_empty() {
-            return;
-        }
+        if para.is_empty() { return; }
         let first_line = para[0].0;
-        let text = para
-            .iter()
-            .map(|(_, t)| t.as_str())
-            .collect::<Vec<_>>()
-            .join(" ");
-        let source_anchors=para.iter().skip(1).map(|(line,_)|format!(r#"<span class="source-line-anchor" id="stmt-{line}" aria-hidden="true"></span>"#)).collect::<String>();
+        let source_anchors = para.iter().skip(1).map(|(line,_)|
+            format!(r#"<span class="source-line-anchor" id="stmt-{line}" aria-hidden="true"></span>"#)).collect::<String>();
+        let mut replacements = Vec::new();
+        let mut notes = String::new();
+        let text = para.iter().map(|(line, text)| {
+            let fragment = super::logic::narrative(*line, text, 0);
+            replacements.extend(fragment.replacements);
+            notes.push_str(&fragment.notes);
+            fragment.markdown
+        }).collect::<Vec<_>>().join(" ");
         para.clear();
-        let md = comment_markdown_to_html(&text);
+        let md = super::logic::replace(comment_markdown_to_html(&text), &replacements);
+        let band = render_document_band(&[], &notes);
         out.push_str(&format!(
-            r#"<div class="doc-block" data-line="{line}" id="stmt-{line}">{source_anchors}<div class="doc-prose">{md}</div></div>"#,
-            line = first_line,
-            md = md
+            r#"<div class="doc-block" data-line="{first_line}" id="stmt-{first_line}">{source_anchors}<div class="doc-prose">{md}</div>{band}</div>"#
         ));
     };
 
@@ -218,7 +219,7 @@ pub fn render_module_document(module: &Module, source: &str, annots: &[ViewAnnot
     }
     flush_para(&mut para, &mut out);
     out.push_str("</div>");
-    out
+    super::logic::link_definitions(out, module)
 }
 
 #[derive(Clone, Copy)]
@@ -305,60 +306,39 @@ fn render_table_block(
         line = first_line
     );
     let mut header_done = false;
-    for (idx, (_ln, row)) in rows.iter().enumerate() {
-        if looks_like_table_sep(row) {
-            continue;
-        }
-        let cells: Vec<&str> = row
-            .trim()
-            .trim_matches('|')
-            .split('|')
-            .map(|c| c.trim())
-            .collect();
+    let mut notes = String::new();
+    for (idx, (line, row)) in rows.iter().enumerate() {
+        if looks_like_table_sep(row) { continue; }
+        let cells: Vec<&str> = row.trim().trim_matches('|').split('|').map(str::trim).collect();
+        let rendered: Vec<String> = cells.iter().map(|cell| {
+            let base = cell.as_ptr() as usize - row.as_ptr() as usize;
+            notes.push_str(&super::logic::narrative(*line, cell, base).notes);
+            render_narrative_inline(*line, cell, base)
+        }).collect();
         if !header_done {
             html.push_str("<thead><tr>");
-            for c in &cells {
-                html.push_str(&format!("<th>{}</th>", escape(c)));
-            }
+            for cell in &rendered { html.push_str(&format!("<th>{cell}</th>")); }
             html.push_str("</tr></thead><tbody>");
             header_done = true;
-            // If next is sep, skip handled above; if only one data row treated as header+body empty ok
-            if idx + 1 < rows.len() && looks_like_table_sep(&rows[idx + 1].1) {
-                continue;
-            }
-            // Single-row table without sep: also emit as body
+            if idx + 1 < rows.len() && looks_like_table_sep(&rows[idx + 1].1) { continue; }
             if rows.len() == 1 {
                 html.push_str("<tr>");
-                for c in &cells {
-                    html.push_str(&format!("<td>{}</td>", escape(c)));
-                }
+                for cell in &cells { html.push_str(&format!("<td>{}</td>", escape(cell))); }
                 html.push_str("</tr>");
             }
             continue;
         }
         html.push_str("<tr>");
-        for c in &cells {
-            html.push_str(&format!("<td>{}</td>", escape(c)));
-        }
+        for cell in &rendered { html.push_str(&format!("<td>{cell}</td>")); }
         html.push_str("</tr>");
     }
-    if header_done {
-        html.push_str("</tbody>");
-    }
+    if header_done { html.push_str("</tbody>"); }
     html.push_str("</table>");
-    // Annots on first table line (bind of collection).
-    if let Some(list) = by_line.get(&first_line) {
-        // A table is already its own readable value; a call chip would collapse
-        // the whole collection into an ellipsis. Keep only non-call chips.
-        let owned: Vec<ViewAnnot> = list
-            .iter()
-            .filter(|a| a.kind != crate::view::annot::AnnotKind::Call)
-            .map(|a| (*a).clone())
-            .collect();
-        if !owned.is_empty() {
-            html.push_str(&render_annot_band(&owned, MAX_VISIBLE_ANNOTS));
-        }
-    }
+    // The table is already a readable collection; retain only non-call results.
+    let owned: Vec<ViewAnnot> = by_line.get(&first_line).into_iter().flatten()
+        .filter(|a| a.kind != crate::view::annot::AnnotKind::Call)
+        .map(|a| (**a).clone()).collect();
+    html.push_str(&render_document_band(&owned, &notes));
     if let Some(body) = writebacks.get(&first_line) {
         html.push_str(&crate::view::render::render_output_card(first_line, body));
     }
@@ -526,11 +506,7 @@ fn render_list_block(
                         }
                     }
                 }
-                let notes = if occluded_lines.contains(&lines[i].line_no) {
-                    render_logic_notes(lines[i].line_no, head, &[])
-                } else {
-                    String::new()
-                };
+                let notes = render_logic_notes(lines[i].line_no, head, &scan_prose_line(head), occluded_lines.contains(&lines[i].line_no));
                 html.push_str(&render_document_band(&head_annots, &notes));
                 // Body: following lines with greater indent until next sibling.
                 i += 1;
@@ -622,7 +598,7 @@ fn render_surface_line(
         if head.trim() == "*" {
             return r#"<span class="mq-else">else</span>"#.into();
         }
-        format!(r#"<span class="doc-cond">{}</span>"#, escape(head))
+        format!(r#"<span class="doc-cond">{}</span>"#, render_narrative_inline(line_no, head, 0))
     } else {
         let annots = by_line.get(&line_no).map(|v| v.as_slice()).unwrap_or(&[]);
         render_prose_with_marks(line_no, head, &bits, annots, false)
@@ -741,155 +717,56 @@ fn parse_args_brief(brief: &str) -> HashMap<String, String> {
 
 /// Display-only source spans. The AST decides whether this line contains an occlusion.
 /// Scan only executable fragments, preserving quoted links as literal data.
-struct OcclusionSpan<'a> { start: usize, end: usize, label: &'a str, payload: &'a str }
-fn occlusion_spans(text: &str) -> Vec<OcclusionSpan<'_>> {
-    let bytes = text.as_bytes();
-    let mut out = Vec::new();
-    let mut i = 0;
-    while i < bytes.len() {
-        if matches!(bytes[i], b'"' | b'\'' | b'`') {
-            let quote = bytes[i];
-            i += 1;
-            while i < bytes.len() {
-                if bytes[i] == b'\\' {
-                    i += 2;
-                } else if bytes[i] == quote {
-                    i += 1;
-                    break;
-                } else {
-                    i += 1;
-                }
-            }
-            continue;
-        }
-        if bytes[i] == b'\\' {
-            i += 2;
-            continue;
-        }
-        if bytes[i] != b'[' || bytes.get(i + 1) == Some(&b'^') {
-            i += 1;
-            continue;
-        }
-        let start = i;
-        let mut j = i + 1;
-        let mut depth = 1;
-        while j < bytes.len() {
-            match bytes[j] {
-                b'\\' => {
-                    j += 2;
-                    continue;
-                }
-                b'[' => depth += 1,
-                b']' => {
-                    depth -= 1;
-                    if depth == 0 {
-                        break;
-                    }
-                }
-                _ => {}
-            }
-            j += 1;
-        }
-        if depth != 0 || bytes.get(j + 1) != Some(&b'(') {
-            i += 1;
-            continue;
-        }
-        let label_end = j;
-        j += 2;
-        let payload_start = j;
-        depth = 1;
-        while j < bytes.len() {
-            match bytes[j] {
-                b'"' | b'\'' | b'`' => {
-                    let quote = bytes[j];
-                    j += 1;
-                    while j < bytes.len() {
-                        if bytes[j] == b'\\' {
-                            j += 2;
-                        } else if bytes[j] == quote {
-                            j += 1;
-                            break;
-                        } else {
-                            j += 1;
-                        }
-                    }
-                    continue;
-                }
-                b'(' => depth += 1,
-                b')' => {
-                    depth -= 1;
-                    if depth == 0 {
-                        break;
-                    }
-                }
-                _ => {}
-            }
-            j += 1;
-        }
-        if depth == 0 {
-            out.push(OcclusionSpan {
-                start,
-                end: j + 1,
-                label: &text[start + 1..label_end],
-                payload: text[payload_start..j].trim(),
-            });
-            i = j + 1;
-        } else {
-            i += 1;
-        }
-    }
-    out
-}
-fn logic_id(line: u32, at: usize) -> String {
-    format!("logic-{line}-{at}")
+fn occlusion_spans(text: &str) -> Vec<super::logic::Span<'_>> {
+    super::logic::spans(text, true)
 }
 fn render_occlusion_text(line: u32, text: &str, base: usize) -> String {
     let mut html = String::new();
     let mut cursor = 0;
     for span in occlusion_spans(text) {
         html.push_str(&escape(&text[cursor..span.start]));
-        let id = logic_id(line, base + span.start);
-        let label = if span.label.is_empty() {
-            "未命名动作"
-        } else {
-            span.label
-        };
-        html.push_str(&format!(r#"<button type="button" class="occl-label" id="{id}-source" data-logic-id="{id}" aria-controls="{id}-note" title="查看实际逻辑（阅读不会执行）">{}</button>"#,escape(label)));
-        if span.payload.is_empty() {
-            html.push_str(r#"<span class="occl-stub">待补充实际逻辑</span>"#);
-        }
+        html.push_str(&super::logic::source(line, &span, base));
         cursor = span.end;
     }
     html.push_str(&escape(&text[cursor..]));
     html
 }
-fn render_logic_notes(line: u32, text: &str, bits: &[ProseBit]) -> String {
+fn render_logic_notes(line: u32, text: &str, bits: &[ProseBit], occluded: bool) -> String {
     let mut notes = String::new();
-    let fragments: Vec<(usize, usize, &str)> =
-        if bits.iter().all(|bit| matches!(bit, ProseBit::Decl { .. })) {
-            vec![(0, text.len(), text)]
-        } else {
-            bits.iter()
-                .filter_map(|bit| match bit {
-                    ProseBit::BoldCode { inner, .. } | ProseBit::ItalicReturn { inner, .. } => {
-                        Some((bit_at(bit), prose_bit_end(text, bit), inner.as_str()))
-                    }
-                    _ => None,
-                })
-                .collect()
-        };
-    for (start, end, fragment) in fragments {
-        for span in occlusion_spans(fragment) {
-            let id = logic_id(line, start + span.start);
-            let payload = if span.payload.is_empty() {
-                "待补充实际逻辑；当前空遮蔽返回 None。"
-            } else {
-                span.payload
-            };
-            notes.push_str(&format!(r#"<details class="annot-chip annot-implementation" id="{id}-note" data-annot-id="{id}" data-annot-kind="implementation" data-anchor-line="{line}" data-anchor-byte-start="{start}" data-anchor-byte-end="{end}"><summary class="annot-label">实际逻辑 · {label}</summary><code class="annot-value occl-code">{payload}</code><small class="logic-hint">源码说明 · 不是运行结果</small></details>"#,label=escape(span.label),payload=escape(payload)));
+    if occluded && bits.iter().all(|bit| matches!(bit, ProseBit::Decl { .. })) {
+        for span in occlusion_spans(text) {
+            notes.push_str(&super::logic::note(line, &span, 0, true));
         }
+        return notes;
+    }
+    let mut cursor = 0;
+    for bit in bits {
+        let start = bit_at(bit);
+        let end = prose_bit_end(text, bit);
+        if start > cursor {
+            notes.push_str(&super::logic::narrative(line, &text[cursor..start], cursor).notes);
+        }
+        if occluded {
+            if let ProseBit::BoldCode { inner, .. } | ProseBit::ItalicReturn { inner, .. } = bit {
+                for span in occlusion_spans(inner) {
+                    notes.push_str(&super::logic::note(line, &span, inner_offset(text, bit), true));
+                }
+            }
+        }
+        cursor = end.max(cursor);
+    }
+    if cursor < text.len() {
+        notes.push_str(&super::logic::narrative(line, &text[cursor..], cursor).notes);
     }
     notes
+}
+fn inner_offset(text: &str, bit: &ProseBit) -> usize {
+    let start = bit_at(bit);
+    match bit {
+        ProseBit::BoldCode { inner, .. } | ProseBit::ItalicReturn { inner, .. } =>
+            start + text[start..prose_bit_end(text, bit)].find(inner).unwrap_or(0),
+        _ => start,
+    }
 }
 fn render_document_band(annots: &[ViewAnnot], notes: &str) -> String {
     let band = render_annot_band(annots, MAX_VISIBLE_ANNOTS);
@@ -1000,8 +877,8 @@ fn render_line_block(
             .map(|a| (*a).clone())
             .collect()
     };
-    let notes = if special.is_none() && occluded_lines.contains(&line_no) {
-        render_logic_notes(line_no, text, bits)
+    let notes = if special.is_none() {
+        render_logic_notes(line_no, text, bits, occluded_lines.contains(&line_no))
     } else {
         String::new()
     };
@@ -1066,15 +943,16 @@ fn render_narrative_fence(lines: &[ClassifiedLine], start: usize) -> (String, us
 
 /// Preserve ordinary Markdown links/emphasis outside executable marks. Raw HTML
 /// stays literal here, as it did in mixed executable prose before this renderer.
-fn render_narrative_inline(text: &str) -> String {
+fn render_narrative_inline(line: u32, text: &str, base: usize) -> String {
     let inner = text.trim();
     if inner.is_empty() {
         return escape(text);
     }
     let start = text.find(inner).unwrap();
     let end = start + inner.len();
-    let parser = pulldown_cmark::Parser::new(inner).map(|event| match event {
-        pulldown_cmark::Event::Html(html) => pulldown_cmark::Event::Text(html),
+    let fragment = super::logic::narrative(line, inner, base + start);
+    let parser = pulldown_cmark::Parser::new(&fragment.markdown).map(|event| match event {
+        pulldown_cmark::Event::Html(html) | pulldown_cmark::Event::InlineHtml(html) => pulldown_cmark::Event::Text(html),
         other => other,
     });
     let mut html = String::new();
@@ -1085,7 +963,7 @@ fn render_narrative_inline(text: &str) -> String {
     else {
         return escape(text);
     };
-    format!("{}{}{}", escape(&text[..start]), body, escape(&text[end..]))
+    format!("{}{}{}", escape(&text[..start]), super::logic::replace(body.to_string(), &fragment.replacements), escape(&text[end..]))
 }
 
 /// Render prose with markers stripped; show surface inner text only.
@@ -1102,7 +980,7 @@ fn render_prose_with_marks(
         let start = bit_at(bit);
         let end = prose_bit_end(text, bit);
         if start > cursor {
-            html.push_str(&render_narrative_inline(&text[cursor..start]));
+            html.push_str(&render_narrative_inline(line_no, &text[cursor..start], cursor));
         }
         if start < end && end <= text.len() {
             let (cls, display) = bit_display(bit);
@@ -1117,13 +995,13 @@ fn render_prose_with_marks(
                 start = start,
                 end = end,
                 aid = escape(annot_id),
-                inner = if occluded && !matches!(bit,ProseBit::Decl{..}) {render_occlusion_text(line_no,&display,start)}else{escape(&display)},
+                inner = if occluded && !matches!(bit,ProseBit::Decl{..}) {render_occlusion_text(line_no,&display,inner_offset(text, bit))}else{escape(&display)},
             ));
         }
         cursor = end.max(cursor);
     }
     if cursor < text.len() {
-        html.push_str(&render_narrative_inline(&text[cursor..]));
+        html.push_str(&render_narrative_inline(line_no, &text[cursor..], cursor));
     }
     html
 }
@@ -1480,7 +1358,7 @@ mod tests {
         let module = crate::parse::parse_source(src).unwrap();
         let html = render_module_document(&module, src, &[]);
         assert!(
-            html.contains("<a href=\"https://github.com/cflmy/marqdo\">仓库</a>"),
+            html.contains("href=\"https://github.com/cflmy/marqdo\"") && html.contains(">仓库</a>") && html.contains("data-logic-kind=\"link\""),
             "{html}"
         );
     }
@@ -1708,7 +1586,7 @@ fn render_syntax_guide() -> String {
             "hr"=>"分隔内容，不能把分隔线当作函数返回。", "writeback"=>"程序写回的结果，区别于作者原始正文。",
             "ident"=>"叙述中的参数或变量；默认值跟在名称之后。", "bold-code"=>"执行语句：赋值、调用或计算；不是打印，也不是返回。",
             "italic-return"=>"返回表达式；句中以返回、Return 等明确引出。", "empty-return"=>"显式返回空值或结束当前函数。",
-            "link-index"=>"默认模式是 [动作](实现) 遮蔽，正文只显示动作；空括号表示待补充实际逻辑。classic 模式才解释为旧链接取元。",
+            "link-index"=>"正文显示描述，侧注按函数与参数、可跳转链接、结构化内容展示括号内的细节；空括号表示待补充实际逻辑。阅读不会执行调用。classic 模式保留旧链接取元。",
             "bracket-call"=>"兼容的带修饰调用；不能把任意普通链接当作执行授权。", "footnote-index"=>"兼容的脚注取元；当前库优先用 access 读取集合。",
             "soft-emphasis"=>"普通强调仍属于文字；界面按真实解析结果区分强调、语句与返回。", _=>"按源码中的真实结构阅读。"
         };
@@ -1764,6 +1642,15 @@ mod readable_occlusion_tests {
         assert!(html.contains("当前空遮蔽返回 None"));
     }
     #[test]
+    fn table_links_and_prose_content_are_readable_with_exact_source_notes() {
+        let html = render("# main\n\n| 内容 | 说明 |\n| --- | --- |\n| [指南](guide.mq.md) | [解释](plain explanatory text with **emphasis**) |\n\n*None*\n");
+        assert!(html.contains(">指南</a>"));
+        assert!(html.contains("<strong>emphasis</strong>"));
+        assert_eq!(html.matches("class=\"annot-chip annot-implementation\"").count(), 2);
+        assert_eq!(html.matches("data-logic-kind=\"link\"").count(), 1);
+        assert_eq!(html.matches("data-logic-kind=\"content\"").count(), 1);
+    }
+    #[test]
     fn navigation_and_quoted_links_are_not_executable_occlusions() {
         let html=render("# main\n\n参阅 [普通链接](https://example.com/guide)。\n\n得到**literal = \"[数据链接](should_stay_text)\"**，以及**value = [真实动作](5)**，参阅 [混合链接](https://example.com/mixed)。\n");
         assert!(html.contains("href=\"https://example.com/guide\""));
@@ -1771,9 +1658,11 @@ mod readable_occlusion_tests {
         assert_eq!(
             html.matches("class=\"annot-chip annot-implementation\"")
                 .count(),
-            1
+            3
         );
         assert!(html.contains("[数据链接](should_stay_text)"));
+        assert_eq!(html.matches("data-logic-kind=\"link\"").count(), 2);
+        assert_eq!(html.matches("文档引用 · 阅读不会执行").count(), 2);
         let classic = render("---\nmarkup: classic\n---\n# main\n\n**value = [key](`record`)**\n");
         assert!(!classic.contains("class=\"annot-chip annot-implementation\""));
     }

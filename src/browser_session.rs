@@ -124,9 +124,53 @@ import:
 
     #[test]
     fn fetch_mq_load_returns_fetch_effect() {
-        let src = std::fs::read_to_string("examples/browser-hello/fetch.mq.md")
-            .expect("fetch.mq.md");
-        let (mut sess, wire) = BrowserSession::boot(&src).expect("boot");
+        // A protocol regression must not depend on a retired public example.
+        let src = r###"---
+markup: occlusion
+title: browser fetch (C4)
+description: fetch/after effects via lib/browser — no json glue
+import:
+  browser: lib/browser.mq.md
+---
+
+# main
+
+`wire` =
+
+| @ | 选择器 | 事件 | 调用 |
+|---|--------|------|------|
+| 1 | "#load" | click | load |
+| 2 | "#ping" | click | ping |
+
+*`wire`*
+
+## load
+**`msg` = > browser.set_text sel="#status" text="loading…"**
+**`req` = > browser.fetch url="https://httpbin.org/uuid" then="on_uuid"**
+*> browser.merge a=msg b=req*
+
+## on_uuid
+    + `ok`
+    + `status`
+    + `body`=""
+    + `error`=""
+
+1. ok
+    *> browser.set_text sel="#status" text=body*
+2. *
+    *> browser.set_text sel="#status" text="fetch failed"*
+
+## ping
+**`msg` = > browser.set_text sel="#status" text="wait 600ms…"**
+**`t` = > browser.after ms=600 then="on_ping"**
+*> browser.merge a=msg b=t*
+
+## on_ping
+    + `ok`=True
+
+*> browser.set_text sel="#status" text="pong"*
+"###;
+        let (mut sess, wire) = BrowserSession::boot(src).expect("boot");
         assert!(matches!(wire, Value::List(_)));
         let v = sess.call("load", "{}").expect("load");
         let j = value_as_json(&v).unwrap();

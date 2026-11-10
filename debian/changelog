@@ -1,3 +1,9 @@
+marqdo (2.7.1-1ppa1) noble; urgency=medium
+
+  * Release 2.7.1; see the reviewed upstream CHANGELOG.
+
+ -- Marqdo Maintainers <cflmy@users.noreply.github.com>  Wed, 11 Nov 2026 00:03:29 +0800
+
 marqdo (2.7.0-1ppa2) noble; urgency=medium
 
   * Repair engineering plugin compatibility for this 2.7.0 release.

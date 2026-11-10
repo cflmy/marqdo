@@ -118,6 +118,7 @@ jobs:
           echo "VSIX=$vsix" >> $env:GITHUB_ENV
           echo "SOURCE=$source" >> $env:GITHUB_ENV
           echo "PUBLIC=$public" >> $env:GITHUB_ENV
+          echo "PUBLISH_EXT=$((Get-Content ext/VERSION -Raw).Trim() -eq $ver)" >> $env:GITHUB_ENV
           echo "EXT=$extZip" >> $env:GITHUB_ENV
           echo "NATIVE=$nativeZip" >> $env:GITHUB_ENV
 
@@ -129,11 +130,20 @@ jobs:
             dist/${{ env.EXE }}
             dist/${{ env.ZIP }}
             dist/${{ env.STDLIB }}
-            dist/${{ env.EXT }}
-            dist/${{ env.NATIVE }}
             dist/${{ env.VSIX }}
             dist/${{ env.SOURCE }}
             dist/${{ env.PUBLIC }}
+          fail_on_unmatched_files: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload independently versioned extension assets
+        if: env.PUBLISH_EXT == 'True'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/${{ env.EXT }}
+            dist/${{ env.NATIVE }}
           fail_on_unmatched_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -169,6 +179,9 @@ jobs:
           set -euo pipefail
           VER="${GITHUB_REF_NAME#v}"
           TARGET="x86_64-unknown-linux-gnu"
+          if [[ "$(tr -d '[:space:]' < ext/VERSION)" == "$VER" ]]; then
+            echo "PUBLISH_EXT=true" >> "$GITHUB_ENV"
+          fi
           mkdir -p dist/stage-native/native
           for lib in libweb.so libagent.so libquantum.so liblinalg.so libllm.so libengineering.so; do
             src="target/release/${lib}"
@@ -197,8 +210,16 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            dist/${{ env.NATIVE }}
             dist/${{ env.LINUX_ZIP }}
+          fail_on_unmatched_files: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload independently versioned Linux native pack
+        if: env.PUBLISH_EXT == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/${{ env.NATIVE }}
           fail_on_unmatched_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

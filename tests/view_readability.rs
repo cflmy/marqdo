@@ -153,3 +153,20 @@ fn automatic_reader_marks_callable_modules_without_executing_tools_or_hiding_pro
     assert!(html.contains(">fail</span>"), "a real entry failure was hidden");
     assert!(!html.contains(">module</span>"));
 }
+
+#[test]
+fn typed_details_keep_calls_links_and_content_readable_without_executing() {
+    let temp = Scratch::new();
+    let source = temp.0.join("details.mq.md");
+    fs::write(&source, include_str!("../examples/view-details.mq.md")).unwrap();
+    fs::write(temp.0.join("view-reading.mq.md"), "## next\n\nReturn *1*.\n").unwrap();
+    export(&temp.0, &temp.0.join("out"));
+    let html = fs::read_to_string(temp.0.join("out/pages/details.mq.md.html")).unwrap();
+    for fragment in ["data-logic-kind=\"call\"", "<dt>单价</dt>", "<dt>数量</dt>",
+        "class=\"logic-definition\"", "class=\"logic-values\"", "<dt>名称</dt>",
+        "data-logic-kind=\"empty\"", "待补充实际逻辑",
+        "href=\"view-reading.mq.md.html\"", "href=\"https://github.com/cflmy/marqdo\""] {
+        assert!(html.contains(fragment), "missing typed reading detail: {fragment}");
+    }
+    assert!(!html.contains("class=\"annot-chip annot-bind"), "reading acquired runtime results");
+}

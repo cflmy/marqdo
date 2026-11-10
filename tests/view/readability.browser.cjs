@@ -64,7 +64,7 @@ let browser;
   // Read-only no-script fallback still exposes native details and real source text.
   const context=await browser.newContext({javaScriptEnabled:false,viewport:{width:390,height:900}});
   const plain=await context.newPage();await plain.goto(process.argv[2]);
-  const note=plain.locator('.annot-implementation').first();await note.locator('summary').click();
+  const note=plain.locator('.annot-implementation').first();await note.locator(':scope > summary').click();
   assert(await note.locator('.annot-value').isVisible());
   assert.equal(await plain.locator('.occl-stub').count(),1);
   await context.close();

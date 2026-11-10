@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+## v2.7.1 — 2026-11-11
+
+CLI 修复发布：View 实际逻辑的手动开合不再被布局重排或运行结果刷新覆盖；函数、链接、列表和记录按内容排版，手机详情整行展示。核心仍为 19 个构造；拓展库保留 2.7.0。
+
+CLI fix release: implementation disclosures retain mouse/keyboard choices across resize, nested source reading and live replacement. Typed call/link/value details preserve real navigation and read-only inspection. Independent extension packs remain 2.7.0.
+
+详见 [双语发布说明](doc/releases/v2.7.1.md)。旧静态站点需要用新 CLI 重新导出。
+
 ## v2.7.0 — 2026-11-10
 
 ### Highlights / 亮点

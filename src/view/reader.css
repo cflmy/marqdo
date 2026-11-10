@@ -212,3 +212,57 @@ body.reader-page .is-margin-note.annot-implementation > summary { font:15px/1.5 
 .reader-dialog .knowledge-table-wrap table { width:100%; border-collapse:collapse; font:12px/1.7 var(--sans); }
 .reader-dialog .knowledge-table-wrap th,.reader-dialog .knowledge-table-wrap td { text-align:left; padding:8px 10px; border-bottom:1px solid var(--line); vertical-align:top; overflow-wrap:anywhere; }
 .reader-run-summary { color:var(--olive); }.reader-dialog > details { margin:16px 0; }
+
+
+/* Expanded details need reading room; collapsed neighbours keep their own height. */
+body.reader-page .annot-chips:has(> .annot-implementation) { align-items:flex-start; }
+body.reader-page .annot-implementation[open]:not(.is-margin-note) { flex-basis:100%; width:100%; }
+body.reader-page .annot-implementation > summary { list-style:none; }
+body.reader-page .annot-implementation > summary::-webkit-details-marker { display:none; }
+body.reader-page .annot-implementation > summary::before { content:'›'; float:right; margin-left:12px; color:var(--gold); }
+body.reader-page .annot-implementation[open] > summary::before { content:'⌄'; }
+.logic-body pre { white-space:pre-wrap; overflow-wrap:anywhere; font:12px/1.7 var(--mono); margin:8px 0; }
+@media(max-width:600px) {
+  body.reader-page .annot-chips:has(> .annot-implementation) { flex-direction:column; align-items:stretch; }
+  body.reader-page .annot-chips > .annot-implementation { width:100%; max-width:none; flex:none; }
+}
+
+/* Describe the intent in the sentence; read typed details beside it. */
+body.reader-page a.occl-label { color:var(--olive); border-bottom:1px dotted var(--gold); text-decoration:none; padding:0 1px; }
+body.reader-page a.occl-label:hover { background:var(--fill); }
+.occl-label:focus-visible,.logic-definition:focus-visible,.logic-link-target:focus-visible { outline:2px solid var(--gold); outline-offset:4px; }
+.logic-kind { display:block; font:10px/1.5 var(--sans); letter-spacing:.06em; color:var(--muted); }
+.logic-note-label { font:15px/1.6 var(--serif); }
+.logic-body { min-width:0; text-align:left; font:12px/1.7 var(--sans); color:var(--ink); overflow-wrap:anywhere; }
+body.reader-page .annot-implementation .logic-body { display:block; white-space:normal; padding:8px 0 0; max-height:none; }
+body.reader-page .annot-implementation.is-margin-note .logic-body { max-height:320px; overflow:auto; scrollbar-width:thin; }
+.logic-call { border-left:2px solid var(--gold); padding:2px 0 2px 10px; }
+.logic-call-name { color:var(--olive); font:600 12px/1.6 var(--mono); white-space:normal; overflow-wrap:anywhere; }
+.logic-definition { color:var(--olive); text-decoration:none; border-bottom:1px dotted var(--gold); }
+.logic-arguments { margin:8px 0 0; padding:0; }
+.logic-argument { display:grid; grid-template-columns:minmax(45px,.7fr) minmax(0,1.3fr); gap:4px 8px; padding:5px 0; border-top:1px solid var(--line); }
+.logic-argument dt { color:var(--muted); overflow-wrap:anywhere; font:11px/1.65 var(--mono); }
+.logic-argument dd { margin:0; min-width:0; }
+.logic-argument .logic-argument { display:block; }
+.logic-string { white-space:pre-wrap; }
+.logic-expression { white-space:pre-wrap; font:12px/1.7 var(--mono); color:var(--ink); }
+.logic-values { padding-left:19px; margin:4px 0; }
+.logic-values > li { margin:3px 0; padding-left:2px; }
+.logic-no-args,.logic-empty-value { font-size:11px; color:var(--muted); }
+.logic-body p { margin:5px 0; }
+.logic-body .logic-link-target { display:block; border:1px solid var(--line); border-radius:7px; padding:9px 10px; color:var(--olive); text-decoration:none; background:var(--fill); }
+.logic-link-address { display:block; font:11px/1.7 var(--mono); overflow-wrap:anywhere; }
+.logic-link-open { display:block; margin-top:5px; font:11px/1.6 var(--sans); }
+.logic-body .logic-source { margin-top:10px; border-top:1px solid var(--line); padding-top:6px; color:var(--muted); }
+.logic-source > summary { cursor:pointer; font:10px/1.7 var(--sans); }
+.logic-source pre { margin:5px 0 0; white-space:pre-wrap; overflow-wrap:anywhere; }
+.logic-nested-label { color:var(--olive); }
+.logic-content > :first-child { margin-top:0; }
+.reader-dialog .logic-body { font-size:14px; }
+.reader-dialog .logic-call-name { font-size:15px; }
+.reader-dialog .logic-argument { grid-template-columns:minmax(70px,.6fr) minmax(0,1.4fr); padding:9px 0; }
+.reader-dialog .logic-body .occl-code { white-space:pre-wrap; overflow-wrap:anywhere; font:12px/1.7 var(--mono); }
+@media(max-width:600px) {
+  .logic-note-label { font-size:14px; }
+  .reader-dialog .logic-argument { grid-template-columns:minmax(55px,.6fr) minmax(0,1.4fr); }
+}

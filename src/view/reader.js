@@ -2,6 +2,28 @@
 (function () {
   'use strict';
   var dialog, content, returnNodes = [], pending = false, toastTimer;
+  // User choices belong to the document, not to one temporary layout or DOM.
+  var disclosureChoices = new Map(), layoutToggles = new WeakMap();
+  function disclosureKey(node) {
+    var note=node.closest('.annot-implementation');
+    if(!note || !note.dataset.annotId) return null;
+    return note.dataset.annotId+(node===note ? '' : ':source');
+  }
+  function setDisclosure(node, open) {
+    if(node.open===open) return;
+    layoutToggles.set(node,open);
+    node.open=open;
+  }
+  function implementationOpen(note, margin) {
+    var key=disclosureKey(note);
+    return disclosureChoices.has(key) ? disclosureChoices.get(key) : margin;
+  }
+  function restoreDisclosures(root) {
+    root.querySelectorAll('.annot-implementation, .annot-implementation .logic-source').forEach(function(node){
+      var key=disclosureKey(node);
+      if(disclosureChoices.has(key)) setDisclosure(node,disclosureChoices.get(key));
+    });
+  }
   function toast(message) {
     var el = document.querySelector('.reader-toast');
     el.textContent = message; el.hidden = false;
@@ -142,7 +164,7 @@
     var anchors = Array.from(owner.querySelectorAll('.mq-anchor')).filter(function (el) {
       return el.closest('.doc-block, .doc-list-item') === owner;
     });
-    var exact = anchors.find(function (el) { return id && el.dataset.annotId === id; });
+    var exact = anchors.find(function (el) { return id && (el.dataset.logicId === id || el.dataset.annotId === id); });
     if (exact) return exact;
     var onLine = anchors.filter(function (el) { return line && el.dataset.line === line; });
     if (chip.hasAttribute('data-anchor-byte-start')) {
@@ -191,7 +213,7 @@
       band.classList.remove('is-keyed');
       band.querySelectorAll('.annot-chip').forEach(function (chip) {
         chip.classList.remove('is-margin-note');
-        if(chip.classList.contains('annot-implementation')) chip.open=false;
+        if(chip.classList.contains('annot-implementation')) setDisclosure(chip,implementationOpen(chip,false));
         ['left', 'top', 'width'].forEach(function (key) { chip.style.removeProperty(key); });
         delete chip.dataset.readerAnchor; delete chip.dataset.readerSide;
       });
@@ -401,7 +423,7 @@
         var fragments = anchorFragments(item.anchor);
         var width = Math.max(140, Math.min(190, Math.min.apply(Math, space) * .58));
         item.chip.classList.add('is-margin-note'); item.chip.style.width = width + 'px';
-        if(item.chip.classList.contains('annot-implementation')) item.chip.open=true;
+        if(item.chip.classList.contains('annot-implementation')) setDisclosure(item.chip,implementationOpen(item.chip,true));
         var height = item.chip.offsetHeight, stagger = [-58, 44, -34, 68][index % 4];
         var choices = nextY.map(function (y, side) {
           var fragment = side === 0 ? fragments[0] : fragments[fragments.length - 1];
@@ -446,7 +468,15 @@
     var choices = [];
     if (structure && data.structure_html) {
       structure.querySelectorAll('.call-picker,.loop-picker').forEach(function (el, i) { choices.push({index:i,value:el.value}); });
+      var destinations = new Map();
+      structure.querySelectorAll('a[data-document-href]').forEach(function (link) {
+        destinations.set(link.dataset.documentHref, link.getAttribute('href'));
+      });
       structure.innerHTML = data.structure_html;
+      restoreDisclosures(structure);
+      structure.querySelectorAll('a[data-document-href]').forEach(function (link) {
+        if(destinations.has(link.dataset.documentHref)) link.setAttribute('href', destinations.get(link.dataset.documentHref));
+      });
       if (window.marqdoInitDocument) window.marqdoInitDocument();
       var pickers = structure.querySelectorAll('.call-picker,.loop-picker');
       choices.forEach(function (choice) {
@@ -461,14 +491,33 @@
   function init() {
     dialog = document.getElementById('reader-dialog'); content = document.getElementById('reader-dialog-content');
     dialog.addEventListener('close', function () { restorePanels(); refreshAnnotations(); });
+    // Capture native summary activation before other handlers can stop bubbling.
+    // Keyboard activation also produces a click; never cancel the native toggle.
+    document.addEventListener('click', function(ev) {
+      var summary=ev.target.closest('.annot-implementation > summary, .annot-implementation .logic-source > summary');
+      if(!summary || summary.closest('#reader-dialog')) return;
+      var node=summary.parentElement, key=disclosureKey(node);
+      if(key) disclosureChoices.set(key,!node.open);
+      refreshAnnotations();
+    }, true);
     document.addEventListener('click', function (ev) {
-      var logic=ev.target.closest('[data-logic-id]');
+      var definition=ev.target.closest('.logic-definition');
+      if(definition && dialog.open) dialog.close();
+      var logic=ev.target.closest('button[data-logic-id]');
       if(logic) {
         ev.preventDefault();
         var note=document.getElementById(logic.dataset.logicId+'-note');
-        openDialog('实际逻辑 · '+logic.textContent,'logic');
-        var hint=document.createElement('p');hint.className='knowledge-hint';hint.textContent='这里展示源码实现，阅读不会执行；运行结果另有标注。';content.appendChild(hint);
-        var code=document.createElement('pre');code.textContent=note ? note.querySelector('.annot-value').textContent : '此片段的逻辑详情暂不可用。';content.appendChild(code);return;
+        var kind=note && note.querySelector('.logic-kind');
+        openDialog((kind ? kind.textContent : '内容详情')+' · '+logic.textContent,'logic');
+        var hint=document.createElement('p');hint.className='knowledge-hint';hint.textContent='这里展示源码与说明，阅读不会执行；运行结果另有标注。';content.appendChild(hint);
+        var body=note && note.querySelector('.logic-body');
+        if(body) {
+          var copy=body.cloneNode(true);copy.classList.remove('annot-value');
+          content.appendChild(copy);
+        } else {
+          var fallback=document.createElement('p');fallback.textContent='此片段的详情暂不可用。';content.appendChild(fallback);
+        }
+        return;
       }
       var knowledge=ev.target.closest('.knowledge-explain, [data-knowledge-link]');
       if(knowledge) {
@@ -483,6 +532,18 @@
       if (ev.target.closest('.reader-brand')) { ev.preventDefault(); window.scrollTo({top:0,behavior:'auto'}); }
       if (dialog.open && ev.target.closest('.outline-panel a')) { dialog.close(); }
     });
+    document.addEventListener('toggle', function(ev) {
+      var node=ev.target;
+      if(!node.matches('.annot-implementation, .annot-implementation .logic-source') || node.closest('#reader-dialog')) return;
+      var expected=layoutToggles.get(node);
+      layoutToggles.delete(node);
+      // Layout writes can coalesce into one native toggle event. They must not
+      // become user choices or schedule another reset/measure cycle.
+      if(expected===node.open) return;
+      var key=disclosureKey(node);
+      if(key) disclosureChoices.set(key,node.open);
+      refreshAnnotations();
+    }, true);
     function focusNote(ev, focus) {
       var trigger=ev.target.closest('.annot-chip,[data-logic-id]');
       if(!trigger || ev.relatedTarget && trigger.contains(ev.relatedTarget)) return;

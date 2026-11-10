@@ -4012,6 +4012,102 @@ body.notebook-page .wb-source-text { color: var(--nb-text); }
 </script>"#
 }
 
+
+/// Resolve links to documents in this View tree; retain the authored target so
+/// live responses and static exports can share the same read model.
+pub(crate) fn document_links(source: &str, files: &[PathBuf], rel: &str, links: &LinkMode) -> String {
+    fn attribute<'a>(tag: &'a str, name: &str) -> Option<&'a str> {
+        let start = tag.find(&format!(" {name}=\""))? + name.len() + 3;
+        tag[start..].split('"').next()
+    }
+    fn decode(value: &str) -> String {
+        value.replace("&quot;", "\"").replace("&#39;", "'")
+            .replace("&lt;", "<").replace("&gt;", ">").replace("&amp;", "&")
+    }
+    let mut out = String::new();
+    let mut rest = source;
+    while let Some(start) = rest.find("<a ") {
+        out.push_str(&rest[..start]);
+        rest = &rest[start..];
+        let Some(end) = rest.find('>') else { break };
+        let tag = &rest[..=end];
+        let mut replacement = None;
+        if let Some(original) = attribute(tag, "data-document-href") {
+            let target = decode(original);
+            let split = target.find(['?', '#']).unwrap_or(target.len());
+            let path = &target[..split];
+            if path.ends_with(".mq.md") && !path.contains(':') && !path.starts_with("//") {
+                let path = percent_decode_document_path(path);
+                let joined = if path.starts_with('/') { PathBuf::from(path.trim_start_matches('/')) }
+                    else { Path::new(rel).parent().unwrap_or(Path::new("")).join(path) };
+                let mut parts = Vec::new();
+                let mut valid = true;
+                for component in joined.components() {
+                    match component {
+                        Component::Normal(part) => parts.push(part.to_string_lossy().into_owned()),
+                        Component::ParentDir => { if parts.pop().is_none() { valid = false; break; } }
+                        Component::CurDir => {}
+                        _ => { valid = false; break; }
+                    }
+                }
+                let resolved = parts.join("/");
+                if valid && files.iter().any(|file| file.to_string_lossy().replace('\\', "/") == resolved) {
+                    if let Some(current) = attribute(tag, "href") {
+                        let suffix = &target[split..];
+                        let suffix = if matches!(links, LinkMode::Live) && suffix.starts_with('?') {
+                            format!("&{}", &suffix[1..])
+                        } else { suffix.to_string() };
+                        let href = format!("{}{suffix}", href_file(links, &resolved));
+                        replacement = Some(tag.replacen(&format!(" href=\"{current}\""), &format!(" href=\"{}\"", escape(&href)), 1));
+                    }
+                }
+            }
+        }
+        out.push_str(replacement.as_deref().unwrap_or(tag));
+        rest = &rest[end+1..];
+    }
+    out.push_str(rest);
+    out
+}
+
+#[cfg(test)]
+mod document_link_tests {
+    use super::*;
+    #[test]
+    fn document_links_round_trip_between_live_and_offline_views() {
+        let files = vec![PathBuf::from("docs/entry.mq.md"), PathBuf::from("read me.mq.md")];
+        let tag = r#"<a href="../read%20me.mq.md?stdin=a&amp;b=c#fn-2" data-document-href="../read%20me.mq.md?stdin=a&amp;b=c#fn-2">打开</a>"#;
+        let live = document_links(tag, &files, "docs/entry.mq.md", &LinkMode::Live);
+        assert!(live.contains("href=\"/file?path=read%20me.mq.md&amp;stdin=a&amp;b=c#fn-2\""), "{live}");
+        let offline = document_links(&live, &files, "docs/entry.mq.md", &LinkMode::Static {from: Some("docs/entry.mq.md".into())});
+        assert!(offline.contains("href=\"../read me.mq.md.html?stdin=a&amp;b=c#fn-2\""), "{offline}");
+    }
+    #[test]
+    fn unknown_paths_external_urls_and_encoded_unicode_stay_intact() {
+        let files = vec![PathBuf::from("next.mq.md")];
+        for target in ["../../next.mq.md", "https://example.com/next.mq.md", "missing.mq.md", "%中.mq.md"] {
+            let tag = format!("<a href=\"{target}\" data-document-href=\"{target}\">目标</a>");
+            assert_eq!(document_links(&tag, &files, "entry.mq.md", &LinkMode::Live), tag);
+        }
+    }
+}
+
+fn percent_decode_document_path(value: &str) -> String {
+    let bytes = value.as_bytes();
+    let mut out = Vec::new();
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i] == b'%' && i+2 < bytes.len() {
+            let hex = |b: u8| (b as char).to_digit(16).map(|v| v as u8);
+            if let (Some(a), Some(b)) = (hex(bytes[i+1]), hex(bytes[i+2])) {
+                out.push(a*16+b); i += 3; continue;
+            }
+        }
+        out.push(bytes[i]); i += 1;
+    }
+    String::from_utf8(out).unwrap_or_else(|_| value.to_string())
+}
+
 pub fn page_file(files: &[PathBuf], rel: &str, vm: &FileViewModel, links: &LinkMode) -> String {
     let nav = nav_html(files, Some(rel), links);
     let (status, status_label, out_text) = if vm.awaiting_input {
@@ -4124,10 +4220,11 @@ pub fn page_file(files: &[PathBuf], rel: &str, vm: &FileViewModel, links: &LinkM
     } else {
         vm.outline_html.clone()
     };
+    let structure_html = document_links(&vm.structure_html, files, rel, links);
     let structure_block = if outline_block.is_empty() {
         format!(
             r#"<div class="structure" id="structure">{structure}</div>"#,
-            structure = vm.structure_html
+            structure = structure_html
         )
     } else {
         format!(
@@ -4135,7 +4232,7 @@ pub fn page_file(files: &[PathBuf], rel: &str, vm: &FileViewModel, links: &LinkM
   <div class="structure" id="structure">{structure}</div>
   {outline}
 </div>"#,
-            structure = vm.structure_html,
+            structure = structure_html,
             outline = outline_block,
         )
     };

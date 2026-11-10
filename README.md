@@ -16,6 +16,10 @@ v2.2.0 起，`marqdo call` 可以直接调用这份文件里的一个函数。�
 开发标准库和拓展库请直接阅读[可执行库开发指南](doc/library-development.mq.md)：契约表、叙述式实现、遮蔽调用与多文件工程组织均有可运行示范。
 
 
+当前 CLI **2.7.1** 修复 View 详情展开后自动折叠，并改进函数、链接及结构化内容侧注；已有静态页面需重新导出。独立拓展库继续使用 **2.7.0**。参见[发布说明](doc/releases/v2.7.1.md)与[阅读示例](examples/view-details.mq.md)。
+
+CLI **2.7.1** preserves View disclosure choices across layout and live updates. Regenerate existing static exports to include the fix; independent extension packs stay at **2.7.0**.
+
 ## 核心优势：可执行知识（Executable Knowledge）
 
 > **Knowledge That Can Run —— 知识即可执行。**

@@ -6,6 +6,7 @@ mod debug_api;
 mod debug_page;
 mod document;
 mod html;
+mod logic;
 mod knowledge_present;
 mod knowledge_reading;
 mod notebook_api;
@@ -591,7 +592,7 @@ pub(crate) fn build_file_view_with_exec(
     Ok(FileViewModel {
         rel_path: rel.to_string(),
         source,
-        structure_html: structure,
+        structure_html: html::document_links(&structure, &root.files, rel, &LinkMode::Live),
         outline_html: outline,
         stdout,
         stderr,
