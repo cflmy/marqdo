@@ -6,6 +6,7 @@
 //! P0 形态：参数统一 `Val`（P1 起按契约提升为 `Int`/`String` 等以配合
 //! `structure Params` 与定理表）；`result.ok/error` 内联为库构造器。
 
+use std::collections::BTreeSet;
 use std::fmt::Write as _;
 
 use crate::prove::ir::{
@@ -54,7 +55,17 @@ fn emit_theorems(out: &mut String, fun: &FnPlan) {
     for param in &fun.params {
         let _ = write!(binders, " ({} : Val)", lean_ident(&param.name));
     }
+    let mut seen_theorem_names: BTreeSet<String> = BTreeSet::new();
     for claim in &fun.claims {
+        let theorem_name = lean_ident(&format!("{}.{}", fun.name, claim.id));
+        if !seen_theorem_names.insert(theorem_name.clone()) {
+            let _ = writeln!(
+                out,
+                "-- 定理 {} 重复（同 id 的定理只生成一次；check --proof 会给 proof.claim_duplicate）",
+                claim.id
+            );
+            continue;
+        }
         let premise_lean = claim
             .premise
             .as_deref()
@@ -68,11 +79,7 @@ fn emit_theorems(out: &mut String, fun: &FnPlan) {
         let _ = writeln!(out, "-- 定理 {}（策略 {tactic}；mq: {}）", claim.id, claim.line);
         match conclusion_lean {
             Some(conclusion) => {
-                let _ = writeln!(
-                    out,
-                    "theorem {} {binders}{premise_text} :",
-                    lean_ident(&format!("{}.{}", fun.name, claim.id))
-                );
+                let _ = writeln!(out, "theorem {theorem_name} {binders}{premise_text} :");
                 let _ = writeln!(
                     out,
                     "    ∀ (结果 : Val) (轨迹 : List Op),"
@@ -128,7 +135,13 @@ const LEAN_KEYWORDS: &[&str] = &[
 ];
 
 fn lean_ident(name: &str) -> String {
-    if LEAN_KEYWORDS.contains(&name) || name == "env" || name == "轨迹" || name == "结果" {
+    if LEAN_KEYWORDS.contains(&name)
+        || name == "env"
+        || name == "轨迹"
+        || name == "结果"
+        || name == "轨迹₀"
+        || name == "h_前提"
+    {
         format!("v_{name}")
     } else if name.chars().all(|c| c.is_alphanumeric() || c == '_' || c == '·')
         && !name.chars().next().is_some_and(|c| c.is_ascii_digit())
@@ -591,22 +604,33 @@ mod tests {
 /// 语义映射（§7.2）：
 /// - `结果.ok / 结果.value / 结果.error` → `mqAccess 结果 "ok"` 等；
 /// - `包含(轨迹, s)` → `(轨迹.map Op.name).contains s`；
-/// - `长度(轨迹)` → `(轨迹.length : Nat)`（与自然数比较）；
+/// - `长度(轨迹)` → `(轨迹.length : Nat)`，与整数比较走 Nat 运算；
 /// - 形参/算术/比较 → mq 辅助函数（Val 面）。
 fn claim_to_lean_bool(text: &str) -> Option<String> {
     let toks = super::proof_check::tokenize_claim(text).ok()?;
     let (_, ast) = super::proof_check::parse_claim_expr(&toks).ok()?;
-    Some(claim_term(&ast))
+    claim_term(&ast)
 }
 
-fn claim_term(ast: &super::proof_check::ClaimAst) -> String {
+/// `长度(轨迹)`：Nat 语境的锚点（轨迹长度与整数比较必须走 Nat 运算，
+/// 否则 `mqEq : Val → Val → Bool` 类型不匹配）。
+fn is_trace_len(ast: &super::proof_check::ClaimAst) -> bool {
+    matches!(
+        ast,
+        super::proof_check::ClaimAst::Call { name, args }
+            if name == "长度"
+                && matches!(args.first(), Some(super::proof_check::ClaimAst::Var(v)) if v == "轨迹")
+    )
+}
+
+fn claim_term(ast: &super::proof_check::ClaimAst) -> Option<String> {
     use super::proof_check::{ClaimAst as A, CTok};
     match ast {
-        A::Lit(CTok::Int(i)) => format!("(Val.int {i})"),
-        A::Lit(CTok::Num(n)) => format!("(Val.num {n:?})"),
-        A::Lit(CTok::Bool(b)) => format!("(Val.bool {b})"),
-        A::Lit(CTok::Text(s)) => format!("(Val.text {})", lean_string(s)),
-        A::Lit(other) => format!("-- 未知字面量 {other:?}"),
+        A::Lit(CTok::Int(i)) => Some(format!("(Val.int {i})")),
+        A::Lit(CTok::Num(n)) => Some(format!("(Val.num {n:?})")),
+        A::Lit(CTok::Bool(b)) => Some(format!("(Val.bool {b})")),
+        A::Lit(CTok::Text(s)) => Some(format!("(Val.text {})", lean_string(s))),
+        A::Lit(_) => None,
         A::Var(name) => {
             // 定理作用域里 `结果`/`轨迹` 是 ∀ 绑定的输出名（不加 v_ 前缀）；
             // `根.字段` → mqAccess 字段读取；其余按标识符规则（形参等）。
@@ -614,41 +638,68 @@ fn claim_term(ast: &super::proof_check::ClaimAst) -> String {
                 Some((r, f)) => (r, Some(f)),
                 None => (name.as_str(), None),
             };
-            match (root, field) {
+            let term = match (root, field) {
                 ("结果", Some(f)) => format!("(mqAccess 结果 {})", lean_string(f)),
                 ("轨迹", Some(f)) => format!("(mqAccess 轨迹 {})", lean_string(f)),
                 ("结果", None) => "结果".to_string(),
                 ("轨迹", None) => "轨迹".to_string(),
                 _ => lean_ident(name),
-            }
+            };
+            Some(term)
         }
         A::Call { name, args } => {
             // `轨迹`（定理作用域的输出轨迹）上的谓词有专用 Lean 形式。
             let on_trace = matches!(args.first(), Some(A::Var(v)) if v == "轨迹");
             match (name.as_str(), args.len(), on_trace) {
                 ("包含", 2, true) => {
-                    format!(
-                        "((轨迹.map Op.name).contains {})",
-                        strip_val_text(&claim_term(&args[1]))
-                    )
+                    let item = strip_val_text(&claim_term(&args[1])?);
+                    Some(format!("((轨迹.map Op.name).contains {item})"))
                 }
-                ("长度", 1, true) => "(轨迹.length : Nat)".to_string(),
+                ("长度", 1, true) => Some("(轨迹.length : Nat)".to_string()),
                 _ => {
-                    let rendered: Vec<String> = args.iter().map(claim_term).collect();
-                    match (name.as_str(), rendered.as_slice()) {
+                    let mut rendered = Vec::with_capacity(args.len());
+                    for arg in args {
+                        rendered.push(claim_term(arg)?);
+                    }
+                    let term = match (name.as_str(), rendered.as_slice()) {
                         ("包含", [list, item]) => format!("(mqContains {list} {item})"),
                         ("长度", [list]) => format!("(mqNatOf (mqLen {list}))"),
                         ("下标", [list, index]) => {
                             format!("(mqAccess {list} (mqStrOfNat {index}))")
                         }
                         _ => format!("({} {})", name, rendered.join(" ")),
-                    }
+                    };
+                    Some(term)
                 }
             }
         }
         A::Bin { op, left, right } => {
-            let (l, r) = (claim_term(left), claim_term(right));
-            match *op {
+            // Nat 语境：操作数是 `长度(轨迹)` 或整数字面量 → 原生 Nat 运算。
+            if is_trace_len(left) || is_trace_len(right) {
+                let nat = |a: &A| -> Option<String> {
+                    if is_trace_len(a) {
+                        Some("(轨迹.length : Nat)".to_string())
+                    } else if let A::Lit(CTok::Int(i)) = a {
+                        Some(i.to_string())
+                    } else {
+                        None
+                    }
+                };
+                let (l, r) = (nat(left)?, nat(right)?);
+                return match *op {
+                    "=" => Some(format!("({l} = {r})")),
+                    "≠" => Some(format!("({l} ≠ {r})")),
+                    "<" => Some(format!("({l} < {r})")),
+                    "≤" => Some(format!("({l} ≤ {r})")),
+                    ">" => Some(format!("({l} > {r})")),
+                    "≥" => Some(format!("({l} ≥ {r})")),
+                    "+" => Some(format!("({l} + {r})")),
+                    "-" => Some(format!("({l} - {r})")),
+                    _ => None,
+                };
+            }
+            let (l, r) = (claim_term(left)?, claim_term(right)?);
+            let term = match *op {
                 "+" => format!("(mqAdd {l} {r})"),
                 "-" => format!("(mqSub {l} {r})"),
                 "*" => format!("(mqMul {l} {r})"),
@@ -661,16 +712,18 @@ fn claim_term(ast: &super::proof_check::ClaimAst) -> String {
                 "≥" => format!("(mqGe {l} {r})"),
                 "且" => format!("(mqAnd {l} {r})"),
                 "或" => format!("(mqOr {l} {r})"),
-                other => format!("-- 未知算子 {other}"),
-            }
+                _ => return None,
+            };
+            Some(term)
         }
         A::Un { op, expr } => {
-            let e = claim_term(expr);
-            match *op {
+            let e = claim_term(expr)?;
+            let term = match *op {
                 "非" => format!("(mqNot {e})"),
                 "-" => format!("(mqNeg {e})"),
-                other => format!("-- 未知一元算子 {other}"),
-            }
+                _ => return None,
+            };
+            Some(term)
         }
     }
 }

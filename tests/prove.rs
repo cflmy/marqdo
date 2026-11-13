@@ -668,3 +668,167 @@ fn p1_g_emit_with_claims_is_deterministic() {
     assert!(plan.contains("\"claims\":[{"), "{plan}");
     assert!(plan.contains("\"line\":16"), "{plan}");
 }
+
+// ============================================================ 审查修复的回归测试
+
+/// 缺陷 1：表格单元格里的副作用调用必须被拒绝，不许静默丢弃
+/// （静默丢弃会让含副作用的函数在 Lean 里伪装成"无操作"）。
+#[test]
+fn p2_a_impure_call_in_table_cell_is_rejected() {
+    let s = Scratch::new("p2_impure_tbl");
+    s.write(
+        "record.mq.md",
+        r#"---
+markup: occlusion
+---
+
+# 副作用实验
+
+## 记录
++ `名`
+
+**数据 =**
+| 步骤 |
+|---|
+| [落笔](工程.写(名=`名`)) |
+| [收笔](工程.收(名=`名`)) |
+
+**x = [取值](access(`数据`, "步骤"))**
+
+*x*
+"#,
+    );
+    let r = s.run(&["prove", "record.mq.md", "--report-only", "--json"]);
+    assert_eq!(r.code, 0, "拒绝是 advisory，exit 0：{}", r.stderr);
+    let v: serde_json::Value = serde_json::from_str(&r.stdout).expect("valid JSON");
+    assert_eq!(v["status"], "rejected", "{v}");
+    let rejected = serde_json::to_string(&v["functions"][0]["rejected"]).unwrap();
+    assert!(
+        rejected.contains("proof.unsupported"),
+        "必须有 proof.unsupported：{v}"
+    );
+    // 关键：函数里没有任何 Op（调用没被当作不透明操作处理）→ 整个函数拒绝。
+    assert_eq!(v["functions"][0]["ops"].as_array().map(Vec::len), Some(0));
+}
+
+/// 缺陷 2：同名不同元数的调用点 → `/元数` 后缀的独立 Op，构造器与使用一致。
+#[test]
+fn p2_b_op_arity_mismatch_gets_suffixed_ctor() {
+    let s = Scratch::new("p2_arity");
+    s.write(
+        "machine.mq.md",
+        r#"---
+markup: occlusion
+---
+
+# 机器
+
+## 可选参数
++ `a`
++ `b` = 1
+
+**r = [加一](自身.加一(a=`a`))**
+**s = [加一](自身.加一(a=`a`, b=`b`))**
+
+*r*
+
+## 加一
++ `a`
++ `b` = 1
+
+**t = `a` + `b`**
+
+*t*
+"#,
+    );
+    let r = s.run(&["prove", "machine.mq.md", "--emit", "out"]);
+    assert_eq!(r.code, 0, "stderr={}", r.stderr);
+    let lean = read(&s.dir, "out/Generated/machine_mq.lean");
+    // 两个构造器，元数各自正确。
+    assert!(
+        lean.contains("| «调用:自身.加一» (参数1 : Val)"),
+        "{lean}"
+    );
+    assert!(
+        lean.contains("| «调用:自身.加一/2» (参数1 : Val) (参数2 : Val)"),
+        "{lean}"
+    );
+    // 使用点各自带对个数的实参。
+    assert!(lean.contains("Op.«调用:自身.加一» a)"), "{lean}");
+    assert!(lean.contains("Op.«调用:自身.加一/2» a b)"), "{lean}");
+}
+
+/// 缺陷 3：`长度(轨迹) = 2` 必须生成 Nat 比较，不是 mqEq（Nat≠Val）。
+#[test]
+fn p2_c_trace_length_claim_uses_nat_operators() {
+    let s = Scratch::new("p2_len");
+    s.provision_lib();
+    s.write(
+        "count.mq.md",
+        r#"---
+markup: occlusion
+import:
+  result: lib/result.mq.md
+---
+
+# 轨迹计数
+
+## 两步
++ `金额`
+
+| 定理 | 结论 | 策略 |
+|---|---|---|
+| 恰两步 | 长度(轨迹) = 2 | auto |
+
+**a = [一步](result.ok(value=1))**
+**b = [两步](result.ok(value=2))**
+
+*b*
+"#,
+    );
+    let r = s.run(&["prove", "count.mq.md", "--emit", "out"]);
+    assert_eq!(r.code, 0, "stderr={}", r.stderr);
+    let lean = read(&s.dir, "out/Generated/count_mq.lean");
+    assert!(
+        lean.contains("((轨迹.length : Nat) = 2)"),
+        "Nat 比较：{lean}"
+    );
+    assert!(!lean.contains("mqEq (轨迹.length"), "不许出现类型不匹配：{lean}");
+}
+
+/// 缺陷 4：谓词名遮蔽整个模块只报一次；无关函数的形参不误报。
+#[test]
+fn p2_d_name_shadow_reported_once() {
+    let s = Scratch::new("p2_shadow");
+    s.write(
+        "audit.mq.md",
+        r#"---
+markup: occlusion
+---
+
+# 审计
+
+## 包含
++ `n`
+
+**y = `n`**
+
+*y*
+
+## 核对
++ `金额`
+
+| 定理 | 结论 |
+|---|---|
+| 恒真 | 结果.ok = True |
+
+**x = `金额`**
+
+*x*
+"#,
+    );
+    let r = s.run(&["check", "audit.mq.md", "--proof", "--json"]);
+    assert_eq!(r.code, 1, "{}", r.stdout);
+    let count = r.stdout.matches("proof.name_shadow").count();
+    assert_eq!(count, 1, "只报一次：{}", r.stdout);
+}

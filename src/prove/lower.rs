@@ -442,7 +442,7 @@ impl<'m> Lowerer<'m> {
             }
             Stmt::Call { call, span } => {
                 // 语句形式调用：值丢弃，但有效应的调用必须留下轨迹。
-                if let IrExpr::Op { id, args } = self.lower_call_expr(call, fun, body) {
+                if let IrExpr::Op { id, args } = self.lower_call_expr(call, fun, span.line, body) {
                     body.steps.push(Step::Trace {
                         op: id,
                         args,
@@ -523,7 +523,7 @@ impl<'m> Lowerer<'m> {
 
     fn lower_expr(&self, expr: &Expr, fun: &Function, line: u32, body: &mut Body) -> IrExpr {
         match expr {
-            Expr::Call(call) => self.lower_call_expr(call, fun, body),
+            Expr::Call(call) => self.lower_call_expr(call, fun, line, body),
             Expr::Occluded { payload, .. } => match payload {
                 Some(payload) => self.lower_expr(payload, fun, line, body),
                 None => IrExpr::Pure(PureExpr::None),
@@ -543,20 +543,33 @@ impl<'m> Lowerer<'m> {
                         );
                         IrExpr::Op { id, args: Vec::new() }
                     }
-                    _ => IrExpr::Pure(PureExpr::None),
+                    _ => {
+                        // 诚实边界（审查修复）：字面量容器（列表/映射/插值）里的调用
+                        // 不能变成纯片段的一部分，也不许静默丢弃——静默丢弃会让
+                        // 含副作用调用的函数伪装成"无操作"。拒绝并提示改写。
+                        if !collect_calls(other).is_empty() {
+                            body.rejected.push(reject(
+                                self.module,
+                                Span::new(line, 1),
+                                "proof.unsupported",
+                                "列表/映射字面量里的调用不在 P0 纯片段：先把调用绑定到变量（`x` = [调用](…)`），再放进字面量",
+                            ));
+                        }
+                        IrExpr::Pure(PureExpr::None)
+                    }
                 },
             },
         }
     }
 
     /// 调用 → 内联构造器 / 纯内建 / 不透明 Op。
-    fn lower_call_expr(&self, call: &CallExpr, fun: &Function, body: &mut Body) -> IrExpr {
+    fn lower_call_expr(&self, call: &CallExpr, fun: &Function, line: u32, body: &mut Body) -> IrExpr {
         let mut args: Vec<PureExpr> = Vec::with_capacity(call.args.len());
         for arg in call.args.iter() {
             let value = match arg {
                 Arg::Positional(value) | Arg::Named { value, .. } => value,
             };
-            args.push(self.lower_arg(value, fun, body));
+            args.push(self.lower_arg(value, fun, line, body));
         }
         match resolve_for_exec(self.module, fun, call) {
             Target::Builtin(name) => lower_builtin(name, args, body),
@@ -626,11 +639,11 @@ impl<'m> Lowerer<'m> {
 
     /// 实参降级：纯表达式直接用；不透明子调用先绑定临时变量再引用。
     /// 临时名全局递增（`实参N`），避免内联展开时遮蔽调用者的同名变量。
-    fn lower_arg(&self, value: &Expr, fun: &Function, body: &mut Body) -> PureExpr {
+    fn lower_arg(&self, value: &Expr, fun: &Function, line: u32, body: &mut Body) -> PureExpr {
         if let Some(pure) = self.lower_pure(value, fun, body) {
             return pure;
         }
-        match self.lower_expr(value, fun, 0, body) {
+        match self.lower_expr(value, fun, line, body) {
             // 嵌套纯调用（lower_pure 因解析上下文失败的回退路径）。
             IrExpr::Pure(pure) => pure,
             IrExpr::Op { id, args } => {
@@ -1176,7 +1189,14 @@ struct Body {
 
 impl Body {
     fn register_op(&mut self, display: &str, effect: impl Into<String>, arity: usize) -> String {
-        let id = format!("调用:{display}");
+        let base = format!("调用:{display}");
+        // 同名不同元数的调用点（可选参数等）→ 加 `/元数` 后缀：构造器声明与
+        // 每个使用点的实参个数保持一致，否则生成的 Lean 无法编译。
+        let id = match self.ops.iter().find(|o| o.id == base) {
+            Some(o) if o.arity == arity => base,
+            Some(_) => format!("{base}/{arity}"),
+            None => base,
+        };
         if self.op_ids.insert(id.clone()) {
             let effect = effect.into();
             self.op_effects.insert(effect.clone());

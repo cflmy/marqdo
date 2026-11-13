@@ -21,41 +21,44 @@ pub const RESERVED_CLAIM_NAMES: &[&str] = &["结果", "轨迹"];
 /// 谓词封闭集合（§7.3.5：改集合需重新评审 ADR）。
 pub const PREDICATES: &[(&str, usize)] = &[("包含", 2), ("长度", 1), ("下标", 2)];
 
-/// 入口：对整个模块做定理表校验。
+/// 入口：对整个模块做定理表校验（只看主文件；与契约检查同一范围，
+/// import 库文件不重复校验——诊断的行号锚在主文件上才有意义）。
 pub fn check_proofs(module: &Module, path: Option<&Path>) -> Vec<Diagnostic> {
     let mut out = Vec::new();
     let mut function_names: Vec<String> = Vec::new();
     collect_function_names(module, &mut function_names);
-    let has_claims = module_has_claims(module);
-    walk_checks(
-        module,
-        &module.functions,
-        path,
-        &function_names,
-        has_claims,
-        &mut out,
-    );
-    for (_, child) in module.import_modules.iter() {
-        out.extend(check_proofs_imported(child, path));
+    // 谓词名遮蔽是模块级事实（与单个函数无关），整个模块只报一次；
+    // 诊断锚在被遮蔽的函数上（任意深度）。
+    for pred in PREDICATES {
+        if function_names.iter().any(|n| n == pred.0) {
+            let Some(fun) = find_by_name(&module.functions, pred.0) else {
+                continue;
+            };
+            out.push(proof_diag(
+                module,
+                path,
+                fun.span,
+                "proof.name_shadow",
+                format!(
+                    "函数名 `{}` 与定理谓词 `{}` 同名（谓词集合封闭：包含/长度/下标）",
+                    fun.name, pred.0
+                ),
+                format!("把函数 `{}` 改名，避免定理表里的 `{}` 歧义", fun.name, pred.0),
+            ));
+        }
     }
+    walk_checks(module, &module.functions, path, &mut out);
     out
 }
 
-fn check_proofs_imported(module: &Module, path: Option<&Path>) -> Vec<Diagnostic> {
-    // import 的库文件自带定理表也按同规则校验（诊断指向本文件行号即可）。
-    let mut out = Vec::new();
-    let mut function_names: Vec<String> = Vec::new();
-    collect_function_names(module, &mut function_names);
-    let has_claims = module_has_claims(module);
-    walk_checks(
-        module,
-        &module.functions,
-        path,
-        &function_names,
-        has_claims,
-        &mut out,
-    );
-    out
+fn walk_checks(module: &Module, funs: &[Function], path: Option<&Path>, out: &mut Vec<Diagnostic>) {
+    for fun in funs {
+        check_claim_duplicates(module, fun, path, out);
+        check_name_shadow(module, fun, path, out);
+        check_misplaced_and_malformed(module, fun, path, out);
+        check_claim_symbols(module, fun, path, out);
+        walk_checks(module, &fun.children, path, out);
+    }
 }
 
 fn collect_function_names(module: &Module, out: &mut Vec<String>) {
@@ -71,33 +74,17 @@ fn collect_function_names(module: &Module, out: &mut Vec<String>) {
     }
 }
 
-fn module_has_claims(module: &Module) -> bool {
-    fn go(funs: &[Function]) -> bool {
-        funs.iter()
-            .any(|f| !f.claims.is_empty() || go(&f.children))
+/// 在函数树里按显示名找函数（诊断锚点用）。
+fn find_by_name<'a>(funs: &'a [Function], name: &str) -> Option<&'a Function> {
+    for f in funs {
+        if f.name == name {
+            return Some(f);
+        }
+        if let Some(inner) = find_by_name(&f.children, name) {
+            return Some(inner);
+        }
     }
-    go(&module.functions)
-        || module
-            .import_modules
-            .values()
-            .any(|m| module_has_claims(m))
-}
-
-fn walk_checks(
-    module: &Module,
-    funs: &[Function],
-    path: Option<&Path>,
-    function_names: &[String],
-    has_claims: bool,
-    out: &mut Vec<Diagnostic>,
-) {
-    for fun in funs {
-        check_claim_duplicates(module, fun, path, out);
-        check_name_shadow(module, fun, function_names, has_claims, path, out);
-        check_misplaced_and_malformed(module, fun, path, out);
-        check_claim_symbols(module, fun, path, out);
-        walk_checks(module, &fun.children, path, function_names, has_claims, out);
-    }
+    None
 }
 
 fn proof_diag(
@@ -134,17 +121,15 @@ fn check_claim_duplicates(module: &Module, fun: &Function, path: Option<&Path>, 
     }
 }
 
-/// 遮蔽检查（§7.3.4）：保留名 `结果`/`轨迹` 不得被形参占用；
-/// 谓词名 `包含/长度/下标` 不得与用户函数同名（有定理表时才有意义）。
+/// 遮蔽检查（§7.3.4）：只看**自带定理表的函数**——形参 `结果`/`轨迹` 会
+/// 与该函数定理作用域的输出绑定名冲突；没有定理表的函数不受影响。
 fn check_name_shadow(
     module: &Module,
     fun: &Function,
-    function_names: &[String],
-    has_claims: bool,
     path: Option<&Path>,
     out: &mut Vec<Diagnostic>,
 ) {
-    if fun.claims.is_empty() && !has_claims {
+    if fun.claims.is_empty() {
         return;
     }
     for param in &fun.params {
@@ -160,21 +145,6 @@ fn check_name_shadow(
                     fun.name
                 ),
                 format!("把形参 `{}` 改名；`结果`/`轨迹` 在定理里指返回值与操作轨迹", param.name),
-            ));
-        }
-    }
-    for pred in PREDICATES {
-        if function_names.iter().any(|n| n == pred.0) {
-            out.push(proof_diag(
-                module,
-                path,
-                fun.span,
-                "proof.name_shadow",
-                format!(
-                    "函数名 `{}` 与定理谓词 `{}` 同名（谓词集合封闭：包含/长度/下标）",
-                    fun.name, pred.0
-                ),
-                format!("把函数 `{}` 改名，避免定理表里的 `{}` 歧义", fun.name, pred.0),
             ));
         }
     }
