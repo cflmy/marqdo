@@ -1,0 +1,43 @@
+name: Build Marqdo promotional video
+
+on:
+  push:
+    branches: [docs/promo-video-271]
+    paths:
+      - scripts/make-procurement-promo.py
+      - .github/workflows/promo-video.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-video:
+    if: github.ref_name == 'docs/promo-video-271'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Prepare video environment
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -qq -y ffmpeg fonts-noto-cjk
+          python -m pip install --quiet --disable-pip-version-check pillow numpy
+          ffmpeg -version | head -n 2
+      - name: Compose 32-second Marqdo video
+        run: python scripts/make-procurement-promo.py
+      - name: Verify deliverable
+        run: |
+          test -s assets/marketing/marqdo-2.7.1-promo.mp4
+          test -s assets/marketing/marqdo-2.7.1-poster.jpg
+          test -s assets/marketing/marqdo-2.7.1-promo.srt
+          ffprobe -v error -show_entries format=duration,size -of default=noprint_wrappers=1 assets/marketing/marqdo-2.7.1-promo.mp4
+      - name: Commit video into promotional branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add assets/marketing/marqdo-2.7.1-promo.mp4 assets/marketing/marqdo-2.7.1-poster.jpg assets/marketing/marqdo-2.7.1-promo.srt
+          git diff --cached --quiet || git commit -m "docs: render Marqdo 2.7.1 promotional video from existing assets"
+          git push origin HEAD:docs/promo-video-271
