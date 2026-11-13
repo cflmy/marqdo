@@ -1,24 +1,105 @@
-# Marqdo
+# Marqdo — Your SKILL is now a TOOL.
 
-**代码即文档。文档即知识库。知识即可执行。**
+<p align="center"><strong>Write it. Inspect it. Call it.</strong></p>
+<p align="center"><em>让 SKILL 真正成为工具：文档即知识，知识即可执行。</em></p>
 
-Marqdo 把 Markdown **标记当作编程语法**：同一个 `.mq.md` 文件，既是给人读的文稿，也是给机器跑的程序。写文档的过程就是在写可执行逻辑——大型项目里，说明、示例与实现不再分叉成三份真相。它不是「又一个 Markdown 编程语言」，而是**文档原生的编程运行时（Document-native runtime）**——一门关于**可执行知识（Executable Knowledge）**的语言。
+<p align="center">
+<a href="https://github.com/cflmy/marqdo/releases/tag/v2.7.1"><img alt="release" src="https://img.shields.io/badge/release-v2.7.1-DDBA86?style=flat-square"></a>
+<a href="LICENSE"><img alt="Apache-2.0" src="https://img.shields.io/badge/license-Apache--2.0-blue?style=flat-square"></a>
+<img alt="Rust runtime" src="https://img.shields.io/badge/runtime-Rust-B38E68?style=flat-square">
+<img alt="Pure by default" src="https://img.shields.io/badge/call-pure_by_default-467C83?style=flat-square">
+</p>
 
-v2.2.0 起，`marqdo call` 可以直接调用这份文件里的一个函数。读的是同一页说明，跑的是同一个实现。知识因此可以当工具用，测试也不必再包一层 `# main`。
+**Marqdo is a Rust-based, document-native runtime for executable AI skills and tools.** Write human-readable prose, GFM tables, parameter contracts, and real functions in one `.mq.md` document. Call a function by its heading, inspect the implementation, and grant side effects explicitly.
 
-欢迎访问 [marqdo 官方网站](https://www.marqdo.com/) 阅读更多特性与可执行文档。
+**Not a prompt wrapper.** The document is interpreted as a program by Marqdo; its tool functions are not merely natural-language instructions.
 
-**链接语法**：[doc/design/link-syntax.md](doc/design/link-syntax.md) · 语法宪法：[doc/design/markdown-mapping.md](doc/design/markdown-mapping.md) · 对象：[objects.md](doc/design/objects.md) · 调用实参：[call-arguments.md](doc/design/call-arguments.md) · 用户站：[user-site.md](doc/design/user-site.md) · 浏览：[view.md](doc/design/view.md) · 调试：[view-debug.md](doc/design/view-debug.md) · OKF 清单：[catalog-cli.md](doc/design/catalog-cli.md) · Engineering Knowledge：[engineering-knowledge.md](doc/design/engineering-knowledge.md) · VS Code 扩展：[vscode-extension.md](doc/design/vscode-extension.md)（分支 **`vscode-extension`**；提交约定 [vscode-extension-commit.md](doc/design/vscode-extension-commit.md)） · **AI Skill**：[skills/marqdo/](skills/marqdo/)（说明 [ai-skill.md](doc/design/ai-skill.md)） · 官方扩展：[ext-llm.md](doc/design/ext-llm.md)（`ext/llm`）· [ext-agent.md](doc/design/ext-agent.md)（智能体开发框架）· [ext-cli.md](doc/design/ext-cli.md)（`marqdo ext list/add/remove`） · 原生插件 ABI：[ext-abi.md](doc/design/ext-abi.md)（`lib/plugin`） · 金样例：[tests/](tests/) · 用户文档：[public/](public/) · 变更：[CHANGELOG.md](CHANGELOG.md)
+<p align="center">
+<a href="#quickstart--one-function-one-command">Quickstart</a> ·
+<a href="#a-procurement-skill-with-a-600-budget">Procurement demo</a> ·
+<a href="#explore-the-view">View</a> ·
+<a href="doc/library-development.mq.md">Guide</a> ·
+<a href="https://www.marqdo.com/">Website</a> ·
+<a href="doc/releases/v2.7.1.md">Release notes</a>
+</p>
+
+![Animated illustrative procurement walkthrough](assets/marketing/procurement-flow.svg)
+
+<sub>Animated **illustration** of expected behavior in the offline purchasing example (allowed simulated order vs. rejected over-budget request), **not** an actual terminal recording. No real purchase is made.</sub>
+
+## Quickstart — one function, one command
+
+Install the [2.7.1 CLI release for Windows or Linux](https://github.com/cflmy/marqdo/releases/tag/v2.7.1), then run from this repository's root:
+
+```bash
+marqdo call examples/calculator.mq.md 计算器.加法 a=2 b=3
+# => 5
+```
+
+The function heading is the callable name. The function's explanation, parameters, return contract, and implementation live **in the same source file**. Use `--json` for machine-readable call results and diagnostics. No LLM key is needed for this quickstart.
+
+## A procurement skill with a ¥600 budget
+
+[Read the complete executable procurement document](examples/procurement/index.mq.md) · [How to run and verify the example](examples/procurement/README.md)
+
+This is a **seven-tool, offline demonstration**. It knows the local supplier directory, queries a static price catalog, checks the budget, and conditionally creates a **simulated** work order. It also documents receipt handling, negotiation and supplier switching as unconnected stubs.
+
+```bash
+# 1. Approve suppliers: paused or blacklisted entries are excluded.
+marqdo call examples/procurement/index.mq.md 查询采购商 "采购商状态='正常'" --json
+
+# 2. Quote: SUP_JN, 8 ball bearings × ¥36 = ¥288 (sample price).
+marqdo call examples/procurement/index.mq.md 查询采购商价格 "采购商标识符='SUP_JN'" 数量=8 --json
+
+# 3. Budget: ¥600 - ¥120 = ¥480.
+marqdo call examples/procurement/index.mq.md 查询余额 已花费=120 --json
+
+# 4. Recheck supplier, quote, delivery and budget before a local mock order.
+marqdo call examples/procurement/index.mq.md 向采购商发工单 "采购商标识符='SUP_JN'" 数量=8 单价=36 已花费=120 交付要求天数=7 --effects time.read,process.control --json
+
+# 5. Over budget: ¥600 - ¥360 = ¥240 < ¥288. The mock work order must be denied.
+marqdo call examples/procurement/index.mq.md 向采购商发工单 "采购商标识符='SUP_JN'" 数量=8 单价=36 已花费=360 交付要求天数=7 --effects time.read,process.control --json
+```
+
+| Case | Budget check | Expected business result |
+|---|---|---|
+| `已花费=120` | ¥480 available ≥ ¥288 | `ok: true`, **local simulation only, not sent** |
+| `已花费=360` | ¥240 available < ¥288 | `ok: false`, budget denial |
+| `SUP_YY` | Supplier on blacklist | Excluded from quote / order |
+
+**Why this matters:** The document doesn't merely tell an agent to obey a limit. The work-order **function itself** calls supplier validation, price lookup, and `查询余额` before returning an order record. Agent instructions and callable business logic can be inspected together.
+
+> **Important limits:** Price and supplier records are fixtures; `已花费` is caller supplied. No authoritative budget ledger, concurrent reservation, live supplier prices, ERP messaging, real receipt, or payment is implemented. A successful **simulated** order is **not** a real transaction. The demo is a testable starting point, not a financial safety guarantee.
+
+## Explore the View
+
+Marqdo 2.7.1 improves the interactive reading experience: implementation details stay open when manually expanded, structured values are presented more clearly, and function/source links are easier to inspect. It **does not introduce new language syntax or APIs**.
+
+```bash
+marqdo view examples/procurement --no-open
+```
+
+![View-inspired procurement function concept](assets/marketing/procurement-view-concept.svg)
+
+<sub>**View-inspired concept illustration**, showing the `向采购商发工单` budget gate; **not a captured screenshot of the CLI**. Open the actual file with the command above to see the real 2.7.1 View.</sub>
+
+## One document, multiple uses
+
+| Prompt-oriented agent skill | Marqdo executable skill |
+|---|---|
+| Natural-language tool instructions | Natural-language guidance **and** executable functions |
+| Description and code often separated | Heading, parameter table, return table and implementation in one `.mq.md` |
+| Validation may require separate wiring | Named function calls can be checked, executed and tested |
+| Prompts ask a model to comply | Runtime permissions control **declared** effects of a function call |
+| Hard to follow implementation through files | View links readable content and implementation details |
+
+Agent Skills already support scripts; Marqdo's claim is **one document-native language surface** for authoring, inspecting, executing and reusing functions. This is **not** a claim of full formal verification, zero-delay execution, or OS-level isolation of all plugin/process behavior.
+
+**Resources:** [Release v2.7.1](https://github.com/cflmy/marqdo/releases/tag/v2.7.1) · [Procurement example](examples/procurement/index.mq.md) · [Executable library authoring](doc/library-development.mq.md) · [Function calling](public/features/22-函数调用.mq.md) · [Link syntax](doc/design/link-syntax.md) · [Website](https://www.marqdo.com/)
 
 ---
 
-标准库单文件本身就是手册：直接阅读[文件库](lib/文件.mq.md)、[集合库](lib/表.mq.md)等源码，按函数标题下的参数表、返回契约和动作说明调用；[工程实践](examples/stdlib-handbook/索引.mq.md)演示文件整理、CSV 汇总与文档维护。
-开发标准库和拓展库请直接阅读[可执行库开发指南](doc/library-development.mq.md)：契约表、叙述式实现、遮蔽调用与多文件工程组织均有可运行示范。
-
-
-当前 CLI **2.7.1** 修复 View 详情展开后自动折叠，并改进函数、链接及结构化内容侧注；已有静态页面需重新导出。独立拓展库继续使用 **2.7.0**。参见[发布说明](doc/releases/v2.7.1.md)与[阅读示例](examples/view-details.mq.md)。
-
-CLI **2.7.1** preserves View disclosure choices across layout and live updates. Regenerate existing static exports to include the fix; independent extension packs stay at **2.7.0**.
+## Deep dive · 语言、设计与执行系统
 
 ## 核心优势：可执行知识（Executable Knowledge）
 

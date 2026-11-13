@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1340" height="740" viewBox="0 0 1340 740" role="img" aria-label="View-inspired editorial concept for the procurement function, not a real screenshot">
+<rect x="0" y="0" width="1340" height="740" rx="0" fill="#f8f6f0" stroke="none"/>
+<rect x="0" y="0" width="1340" height="68" rx="0" fill="#f2ede4" stroke="none"/>
+<text x="69" y="45" fill="#8d7358" font-size="29" font-family="Georgia,serif" font-weight="600">marqdo</text>
+<text x="577" y="43" fill="#665d53" font-size="17" font-family="ui-monospace,Consolas,'Noto Sans CJK SC',monospace" font-weight="400">文档   函数   执行   变量</text>
+<text x="1030" y="44" fill="#998773" font-size="13" font-family="ui-monospace,Consolas,'Noto Sans CJK SC',monospace" font-weight="400">VIEW CONCEPT / NOT CAPTURE</text>
+<line x1="325" y1="113" x2="325" y2="688" stroke="#e0d5c7"/><line x1="1032" y1="113" x2="1032" y2="688" stroke="#e0d5c7"/>
+<text x="374" y="128" fill="#b0895e" font-size="16" font-family="Georgia,'Noto Serif CJK SC',serif" font-weight="400">采购智能体</text>
+<text x="372" y="196" fill="#39352d" font-size="37" font-family="'Noto Serif CJK SC',Georgia,serif" font-weight="600">向采购商发工单</text>
+<text x="374" y="238" fill="#5d5851" font-size="17" font-family="ui-monospace,Consolas,'Noto Sans CJK SC',monospace" font-weight="400">核对准入、价格、交付与预算之后，生成本地模拟工单。</text>
+<line x1="374" y1="267" x2="993" y2="267" stroke="#b69b78"/>
+<text x="375" y="309" fill="#514a41" font-size="21" font-family="ui-monospace,Consolas,'Noto Sans CJK SC',monospace" font-weight="600">参数</text>
+<text x="375" y="348" fill="#5b5146" font-size="17" font-family="ui-monospace,Consolas,'Noto Sans CJK SC',monospace" font-weight="400">采购商标识符</text>
+<text x="625" y="348" fill="#96754f" font-size="17" font-family="ui-monospace,Consolas,'Noto Sans CJK SC',monospace" font-weight="400">text</text>
+<text x="811" y="348" fill="#8e8171" font-size="17" font-family="ui-monospace,Consolas,'Noto Sans CJK SC',monospace" font-weight="400">必填</text>
+<line x1="374" y1="365" x2="994" y2="365" stroke="#ded6c9"/>
+<text x="375" y="392" fill="#5b5146" font-size="17" font-family="ui-monospace,Consolas,'Noto Sans CJK SC',monospace" font-weight="400">数量 / 单价 / 已花费</text>
+<text x="625" y="392" fill="#96754f" font-size="17" font-family="ui-monospace,Consolas,'Noto Sans CJK SC',monospace" font-weight="400">number</text>
+<text x="811" y="392" fill="#8e8171" font-size="17" font-family="ui-monospace,Consolas,'Noto Sans CJK SC',monospace" font-weight="400">必填</text>
+<line x1="374" y1="408" x2="994" y2="408" stroke="#ded6c9"/>
+<text x="374" y="463" fill="#5e584f" font-size="18" font-family="ui-monospace,Consolas,'Noto Sans CJK SC',monospace" font-weight="400">发单前，必须再次查询并核对本轮的可用余额。</text>
+<rect x="373" y="483" width="618" height="48" rx="8" fill="#ebe3d5" stroke="none"/>
+<text x="391" y="513" fill="#805b35" font-size="18" font-family="ui-monospace,Consolas,'Noto Sans CJK SC',monospace" font-weight="400">预算 = [重新查询预算](查询余额(...))</text>
+<text x="374" y="565" fill="#7b5b4b" font-size="19" font-family="ui-monospace,Consolas,'Noto Sans CJK SC',monospace" font-weight="400">1. 剩余额度 &lt; 本单金额</text>
+<text x="374" y="612" fill="#a06b5f" font-size="18" font-family="ui-monospace,Consolas,'Noto Sans CJK SC',monospace" font-weight="400">   返回 [预算不足，拒绝模拟工单](...)</text>
+<text x="375" y="682" fill="#8c8276" font-size="16" font-family="ui-monospace,Consolas,'Noto Sans CJK SC',monospace" font-weight="400">仅在全部检查通过时产生“本地模拟、未发送”的结果。</text>
+<path d="M 408 503 C 295 503 278 339 146 339" stroke="#ba9a75" stroke-width="1.7" fill="none"/><circle cx="408" cy="503" r="4.3" fill="#ba9a75"/>
+<text x="73" y="281" fill="#a78255" font-size="15" font-family="ui-monospace,Consolas,'Noto Sans CJK SC',monospace" font-weight="400">BUDGET CHECK</text>
+<text x="73" y="315" fill="#756350" font-size="18" font-family="ui-monospace,Consolas,'Noto Sans CJK SC',monospace" font-weight="400">已花费 ¥360</text>
+<text x="73" y="343" fill="#756350" font-size="18" font-family="ui-monospace,Consolas,'Noto Sans CJK SC',monospace" font-weight="400">剩余额度 ¥240</text>
+<path d="M 823 602 C 1010 586 1026 396 1122 396" stroke="#b7837e" stroke-width="1.7" fill="none"/><circle cx="823" cy="602" r="4.3" fill="#b7837e"/>
+<text x="1080" y="319" fill="#a67871" font-size="15" font-family="ui-monospace,Consolas,'Noto Sans CJK SC',monospace" font-weight="400">REJECTION</text>
+<text x="1080" y="354" fill="#945e55" font-size="22" font-family="ui-monospace,Consolas,'Noto Sans CJK SC',monospace" font-weight="700">¥240 &lt; ¥288</text>
+<text x="1080" y="393" fill="#945e55" font-size="19" font-family="ui-monospace,Consolas,'Noto Sans CJK SC',monospace" font-weight="400">拒绝工单</text>
+</svg>

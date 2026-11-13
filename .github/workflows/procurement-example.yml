@@ -1,0 +1,28 @@
+name: procurement-example-smoke
+on:
+  push:
+    branches: [main, docs/executable-skill-showcase-271]
+    paths: ["examples/procurement/**", ".github/workflows/procurement-example.yml"]
+  pull_request:
+    paths: ["examples/procurement/**", ".github/workflows/procurement-example.yml"]
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch released v2.7.1 Linux CLI
+        run: |
+          curl -fL --retry 3 "https://github.com/cflmy/marqdo/releases/download/v2.7.1/marqdo-2.7.1-x86_64-unknown-linux-gnu.zip" -o /tmp/marqdo.zip
+          unzip -q /tmp/marqdo.zip -d /tmp
+          BIN="$(find /tmp -type f -name marqdo | head -n 1)"
+          test -n "$BIN"
+          chmod +x "$BIN"
+          echo "CLI_BIN=$BIN" >> "$GITHUB_ENV"
+      - name: Check and run procurement skill
+        run: |
+          "$CLI_BIN" check examples/procurement/index.mq.md
+          "$CLI_BIN" call examples/procurement/index.mq.md 查询余额 已花费=120 --json
+          "$CLI_BIN" call examples/procurement/index.mq.md 向采购商发工单 "采购商标识符='SUP_JN'" 数量=8 单价=36 已花费=120 交付要求天数=7 --effects time.read,process.control --json | tee /tmp/allowed.json
+          "$CLI_BIN" call examples/procurement/index.mq.md 向采购商发工单 "采购商标识符='SUP_JN'" 数量=8 单价=36 已花费=360 交付要求天数=7 --effects time.read,process.control --json | tee /tmp/denied.json
+          grep -q '本地模拟' /tmp/allowed.json
+          grep -q '采购金额超过' /tmp/denied.json
