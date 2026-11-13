@@ -1,0 +1,29 @@
+1
+00:00:00,000 --> 00:00:03,900
+Your SKILL is now a TOOL.
+让 SKILL 真正成为工具。
+
+2
+00:00:03,900 --> 00:00:09,000
+One readable document. Callable business logic.
+规则、数据、工具在同一份文档里。
+
+3
+00:00:09,000 --> 00:00:17,400
+Five verified CLI calls, from quote to decision.
+真实 CLI 结果：询价、预算、模拟发单。
+
+4
+00:00:17,400 --> 00:00:23,400
+¥120 spent: mock order. ¥360 spent: rejected.
+¥120 时模拟通过；¥360 时预算不足。
+
+5
+00:00:23,400 --> 00:00:29,000
+Inspect the actual document in Marqdo View.
+查看 Marqdo 真实 View 页面。
+
+6
+00:00:29,000 --> 00:00:32,000
+github.com/cflmy/marqdo
+开源 · Marqdo 2.7.1
