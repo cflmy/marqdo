@@ -1,0 +1,46 @@
+name: Build cinematic Markdown-to-execution video
+
+on:
+  push:
+    branches: [docs/markdown-execution-cinematic-v2]
+    paths:
+      - "scripts/render-markdown-execution-promo.py"
+      - ".github/workflows/build-markdown-execution-video.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  video:
+    if: github.ref_name == 'docs/markdown-execution-cinematic-v2'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Prepare fonts, Chrome and Python tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg fonts-noto-cjk
+          python -m pip install --quiet pillow numpy markdown-it-py selenium
+          google-chrome --version
+      - name: Render promo video from two original images and Marqdo source
+        run: python scripts/render-markdown-execution-promo.py
+      - name: Check resulting video
+        run: |
+          test -s assets/marketing/marqdo-2.7.1-markdown-to-execution.mp4
+          test -s assets/marketing/marqdo-2.7.1-markdown-to-execution-cover.jpg
+          test -s assets/marketing/marqdo-2.7.1-markdown-to-execution.srt
+          ffprobe -v error -show_entries format=duration,size:stream=codec_name,width,height -of json assets/marketing/marqdo-2.7.1-markdown-to-execution.mp4
+      - name: Commit compiled video, poster and subtitles
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add assets/marketing/marqdo-2.7.1-markdown-to-execution.mp4 \
+                  assets/marketing/marqdo-2.7.1-markdown-to-execution-cover.jpg \
+                  assets/marketing/marqdo-2.7.1-markdown-to-execution.srt \
+                  assets/marketing/marqdo-procurement-standard-markdown.png
+          git diff --cached --quiet || git commit -m "docs: publish cinematic Markdown-to-execution promotional film"
+          git push origin HEAD:docs/markdown-execution-cinematic-v2
