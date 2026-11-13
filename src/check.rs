@@ -23,20 +23,26 @@ use crate::load;
 
 /// 读取文件 + 装载（含 import）后做全量契约互查。
 pub fn check_path(path: &Path) -> Result<Vec<Diagnostic>> {
-    check_path_opts(path, false)
+    check_path_opts(path, false, false)
 }
 
 /// `implicit_labels` enables the fuzzy M5 check (prose above `>` calls).
 ///
 /// It is **off by default**: describing a call in prose is freeform, so the
 /// check is inherently ambiguous and would be noisy — opt in when you want it.
-pub fn check_path_opts(path: &Path, implicit_labels: bool) -> Result<Vec<Diagnostic>> {
+///
+/// `proof` enables the theorem-table check (`check --proof`, ADR 0010,
+/// 默认关)：表形、名字、片段、遮蔽。
+pub fn check_path_opts(path: &Path, implicit_labels: bool, proof: bool) -> Result<Vec<Diagnostic>> {
     let module = load::load_module(path)?;
     let mut out = check_module(&module, Some(path));
     if implicit_labels {
         if let Ok(source) = std::fs::read_to_string(path) {
             out.extend(crate::label::check_implicit(&module, &source, Some(path)));
         }
+    }
+    if proof {
+        out.extend(crate::prove::proof_check::check_proofs(&module, Some(path)));
     }
     Ok(out)
 }
@@ -211,6 +217,11 @@ fn edit_distance(a: &str, b: &str) -> usize {
         std::mem::swap(&mut prev, &mut cur);
     }
     prev[b.len()]
+}
+
+/// 供 `prove::proof_check` 复用的最近名建议（编辑距离 ≤ 2）。
+pub fn suggest_closest(name: &str, known: &[String]) -> Option<String> {
+    suggest(name, known)
 }
 
 fn suggest(name: &str, known: &[String]) -> Option<String> {

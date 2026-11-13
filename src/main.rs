@@ -218,6 +218,10 @@ enum Commands {
         /// Parse an unmarked file with the legacy grammar for migration review.
         #[arg(long)]
         legacy_markup: bool,
+
+        /// Validate theorem tables (ADR 0010; 默认关): shape, symbols, shadowing
+        #[arg(long)]
+        proof: bool,
     },
     /// Occlusion label queries: pending stubs (built-in words) or keyword search
     Labels {
@@ -495,6 +499,81 @@ enum Commands {
         #[command(subcommand)]
         action: WasmAction,
     },
+    /// Compile SKILL orchestration to Lean 4 and (P1+) prove theorems (推荐但不强制)
+    Prove {
+        /// Action (default: emit + report)
+        #[command(subcommand)]
+        action: Option<ProveAction>,
+
+        /// Program path (.mq.md; default ./index.mq.md)
+        #[arg(value_name = "FILE")]
+        file: Option<PathBuf>,
+
+        /// One JSON object on stdout (agent-facing stable contract)
+        #[arg(long)]
+        json: bool,
+
+        /// Only lower/emit these functions (display path, repeatable)
+        #[arg(long = "only", value_name = "FN")]
+        only: Vec<String>,
+
+        /// Output dir for emit (default .marqdo/prove/<key>/)
+        #[arg(long = "emit", short = 'o', value_name = "DIR")]
+        emit_dir: Option<PathBuf>,
+
+        /// Don't write artifacts; report only
+        #[arg(long)]
+        report_only: bool,
+
+        /// Downgrade this function wholesale to one opaque op (repeatable)
+        #[arg(long = "allow-opaque", value_name = "FN")]
+        allow_opaque: Vec<String>,
+
+        /// Type inference is strict by default; this relaxes to Val (weaker proofs)
+        #[arg(long = "no-strict-types")]
+        no_strict_types: bool,
+
+        /// CI strict mode: unjudged statuses exit 2 (P1+)
+        #[arg(long)]
+        require_lean: bool,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+enum ProveAction {
+    /// Generate deterministic Lean module + plan.json (no judging)
+    Emit {
+        #[arg(value_name = "FILE")]
+        file: Option<PathBuf>,
+        #[arg(long = "emit", short = 'o', value_name = "DIR")]
+        emit_dir: Option<PathBuf>,
+        #[arg(long)]
+        json: bool,
+        #[arg(long = "only", value_name = "FN")]
+        only: Vec<String>,
+        #[arg(long = "allow-opaque", value_name = "FN")]
+        allow_opaque: Vec<String>,
+        #[arg(long = "no-strict-types")]
+        no_strict_types: bool,
+    },
+    /// Report inline/opaque/rejected classification (no judging)
+    Audit {
+        #[arg(value_name = "FILE")]
+        file: Option<PathBuf>,
+        #[arg(long)]
+        json: bool,
+        #[arg(long = "only", value_name = "FN")]
+        only: Vec<String>,
+        #[arg(long = "allow-opaque", value_name = "FN")]
+        allow_opaque: Vec<String>,
+        #[arg(long = "no-strict-types")]
+        no_strict_types: bool,
+    },
+    /// Delete .marqdo/prove caches and certificates
+    Clean {
+        #[arg(long)]
+        json: bool,
+    },
 }
 
 #[derive(Subcommand, Debug)]
@@ -656,7 +735,9 @@ fn main() -> ExitCode {
     let cli = Cli::parse();
     let json_errors = matches!(
         &cli.command,
-        Commands::Run { json: true, .. } | Commands::Check { json: true, .. }
+        Commands::Run { json: true, .. }
+            | Commands::Check { json: true, .. }
+            | Commands::Prove { json: true, .. }
     );
     match try_main(cli) {
         Ok(code) => ExitCode::from(code as u8),
@@ -958,13 +1039,14 @@ fn try_main(cli: Cli) -> Result<i32> {
             implicit_labels,
             narrative_ratio,
             legacy_markup,
+            proof,
         } => {
             let mut diags = if legacy_markup {
                 marqdo::parse::expr::with_markup(marqdo::parse::expr::Markup::Classic, || {
-                    marqdo::check::check_path_opts(&file, implicit_labels)
+                    marqdo::check::check_path_opts(&file, implicit_labels, proof)
                 })?
             } else {
-                marqdo::check::check_path_opts(&file, implicit_labels)?
+                marqdo::check::check_path_opts(&file, implicit_labels, proof)?
             };
             if narrative_ratio {
                 diags.extend(marqdo::narrative_ratio::check_file(&file)?);
@@ -988,6 +1070,87 @@ fn try_main(cli: Cli) -> Result<i32> {
                 }
             }
             Ok(errors.min(1))
+        }
+        Commands::Prove {
+            action,
+            file,
+            json,
+            only,
+            emit_dir,
+            report_only,
+            allow_opaque,
+            no_strict_types,
+            require_lean,
+        } => {
+            // 子命令参数覆盖顶层默认；默认动作 = emit + 报告。
+            let (file, action_json, action_emit, action_only, action_opaque, action_relax) =
+                match &action {
+                    Some(ProveAction::Emit {
+                        file,
+                        emit_dir,
+                        json,
+                        only,
+                        allow_opaque,
+                        no_strict_types,
+                    }) => (
+                        file.clone(),
+                        *json,
+                        Some(emit_dir.clone()),
+                        only.clone(),
+                        allow_opaque.clone(),
+                        *no_strict_types,
+                    ),
+                    Some(ProveAction::Audit {
+                        file,
+                        json,
+                        only,
+                        allow_opaque,
+                        no_strict_types,
+                    }) => (
+                        file.clone(),
+                        *json,
+                        None,
+                        only.clone(),
+                        allow_opaque.clone(),
+                        *no_strict_types,
+                    ),
+                    Some(ProveAction::Clean { json }) => {
+                        let removed = marqdo::prove::clean()?;
+                        if *json {
+                            println!("{{\"ok\":true,\"removed\":{removed}}}");
+                        } else {
+                            println!("prove clean: 已删除 {removed} 项（.marqdo/prove）");
+                        }
+                        return Ok(0);
+                    }
+                    None => (file.clone(), false, Some(emit_dir.clone()), only.clone(), allow_opaque.clone(), no_strict_types),
+                };
+            let file = file.unwrap_or_else(|| PathBuf::from("index.mq.md"));
+            // emit 目标：显式 --emit 优先；None → mod.rs 用默认 `.marqdo/prove/<key8>`。
+            // audit 永不写盘；默认动作受 --report-only 控制；emit 子命令总是写盘。
+            let emit_target = action_emit.flatten();
+            let report_only = matches!(action, Some(ProveAction::Audit { .. }))
+                || (action.is_none() && report_only);
+            let opts = marqdo::prove::ProveOptions {
+                entry: None,
+                only: action_only,
+                allow_opaque: action_opaque,
+                emit_dir: emit_target,
+                strict_types: !action_relax,
+                require_lean,
+                report_only,
+            };
+            let report = marqdo::prove::prove_path(&file, &opts)?;
+            for d in &report.diagnostics {
+                // 诊断走 stderr（stdout 只放结果/报告）。
+                eprintln!("{}", d.format_message());
+            }
+            if json || action_json {
+                println!("{}", report.to_json());
+            } else {
+                print!("{}", report.to_text());
+            }
+            Ok(report.status.exit_code(require_lean))
         }
         Commands::Labels {
             paths,

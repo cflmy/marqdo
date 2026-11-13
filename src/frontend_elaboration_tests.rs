@@ -16,8 +16,12 @@ fn local_json(value: &Value) -> serde_json::Value {
 }
 
 fn document(id: &str, source: &str) -> (PathBuf, crate::ast::Module) {
-    let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("target/frontend-elaboration")
+    // Scratch belongs to the build target dir; honor CARGO_TARGET_DIR when set.
+    let base = std::env::var_os("CARGO_TARGET_DIR")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("target"));
+    let dir = base
+        .join("frontend-elaboration")
         .join(format!("{id}-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     let path = dir.join("main.mq.md");

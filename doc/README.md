@@ -19,6 +19,9 @@
 
 | 文档 | 摘要 |
 |------|------|
+| [design/prove-cli.md](design/prove-cli.md) | **Proposed：`marqdo prove` 设计**；SKILL 控制平面 → Lean 4、函数级定理表与语言习惯审查、离线判定片段、`proved`/`checked` 诚实性契约、无公理 TCB |
+| [roadmap/prove.md](roadmap/prove.md) | **Proposed：`marqdo prove` 实施路线**；P0–P3 周计划、8 类测试矩阵（单调性/一致性/不执行/子集/定理表/CLI/缓存/编码）、CI 与验收证据 |
+| [adr/0010-skill-proof-boundary.md](adr/0010-skill-proof-boundary.md) | **ADR 0010**：定理表作为契约表第四角色、可证子集封闭、Lean 为唯一 `proved` 来源、顾问式不强制 |
 | [roadmap/agent-reliability-crossrepo-2026-10-27.md](roadmap/agent-reliability-crossrepo-2026-10-27.md) | **Proposed：跨仓 Agent 可靠性开发计划**；M-A0–M-A6 ∥ Q-A0–Q-A7 排期、依赖图、F01–F20 映射、MA-T*/QA-* 验收与第一刀切片；协议真源仍见下方设计文档 |
 | [design/agent-reliability-tools-resources-2026-10-27.md](design/agent-reliability-tools-resources-2026-10-27.md) | **Proposed：智能体能力补足**；基于 `16f26d7`，增量设计错误恢复、检查点/效应账本、结构化工具、输出通道、上下文与只读资源视图；含跨仓边界、阶段计划和故障验收 |
 | [research/agent-capabilities-2026-10-27.md](research/agent-capabilities-2026-10-27.md) | **官方能力调研与源码复核**；OpenAI/Claude/Gemini/LangGraph/Deep Agents/MCP，求道当前问题 F01–F20；区分现有能力、设计推导与待实测项 |
