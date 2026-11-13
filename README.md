@@ -15,6 +15,7 @@
 **Not a prompt wrapper.** The document is interpreted as a program by Marqdo; its tool functions are not merely natural-language instructions.
 
 <p align="center">
+<a href="#one-markdown-file-three-views-real-execution">56s film</a> ·
 <a href="#quickstart--one-function-one-command">Quickstart</a> ·
 <a href="#a-procurement-skill-with-a-600-budget">Procurement demo</a> ·
 <a href="#explore-the-view">View</a> ·
@@ -23,9 +24,26 @@
 <a href="doc/releases/v2.7.1.md">Release notes</a>
 </p>
 
-![Verified Marqdo procurement calls animated from actual CLI results](assets/marketing/procurement-cli.gif)
+## One Markdown file. Three views. Real execution.
 
-<sub>Animated walkthrough assembled from **real Marqdo 2.7.1 function-call results**, including the accepted **simulated** order and an over-budget refusal. Curated frames, not a recording of typing or a production transaction. [Reproduce the capture](scripts/capture-procurement-showcase.py) · [CI run](https://github.com/cflmy/marqdo/actions/runs/43358103498).</sub>
+[![Watch Marqdo 2.7.1 — from Markdown to execution](assets/marketing/marqdo-2.7.1-markdown-to-execution-cover.jpg)](assets/marketing/marqdo-2.7.1-markdown-to-execution.mp4)
+
+**[▶ Watch the 56-second film](assets/marketing/marqdo-2.7.1-markdown-to-execution.mp4)** · [Bilingual captions](assets/marketing/marqdo-2.7.1-markdown-to-execution.srt) · [Reproducible video source](scripts/render-markdown-execution-promo.py)
+
+> **The point is not to invent a new document format.** A `.mq.md` file uses Markdown headings, paragraphs and tables. Ordinary Markdown renderers still show a readable document. Marqdo adds explicit execution semantics and a View that can inspect functions, values and their relationships on the same document.
+
+![Three views, one source — source Markdown, rendered Markdown, executable View](assets/marketing/source-markdown-view-concept.png)
+
+<sub>**Concept artwork** showing the design principle: **source → ordinary Markdown rendering → Marqdo View**. Illustrative labels are not a live execution trace. The video includes [a real View screenshot](assets/marketing/user-procurement-view.png), [a standard Markdown rendering](assets/marketing/marqdo-procurement-standard-markdown.png) produced from the actual procurement source, and a business example verified with the 2.7.1 CLI.</sub>
+
+**One `.mq.md` source, three ways to interact:**
+
+| Source | Standard Markdown | Marqdo runtime + View |
+|---|---|---|
+| Edit the same Markdown text | Read headings, prose and data tables | Inspect the same document's calls, values and effects |
+| No separate prompt or tool implementation specification needed | Works as ordinary readable documentation | Call named functions with `marqdo call` |
+
+
 
 ## Quickstart — one function, one command
 
@@ -43,6 +61,10 @@ The function heading is the callable name. The function's explanation, parameter
 [Read the complete executable procurement document](examples/procurement/index.mq.md) · [How to run and verify the example](examples/procurement/README.md)
 
 This is a **seven-tool, offline demonstration**. It knows the local supplier directory, queries a static price catalog, checks the budget, and conditionally creates a **simulated** work order. It also documents receipt handling, negotiation and supplier switching as unconnected stubs.
+
+![Animated results from real Marqdo 2.7.1 function calls](assets/marketing/procurement-cli.gif)
+
+<sub>**Real CLI results**, edited into a short animation; the accepted order is explicitly **simulated** and never sent. [Capture workflow](scripts/capture-procurement-showcase.py) · [Passing checks](https://github.com/cflmy/marqdo/actions/runs/43358288563).</sub>
 
 ```bash
 # 1. Approve suppliers: paused or blacklisted entries are excluded.
@@ -79,9 +101,9 @@ Marqdo 2.7.1 improves the interactive reading experience: implementation details
 marqdo view examples/procurement --no-open
 ```
 
-![Actual Marqdo 2.7.1 View screenshot of procurement function](assets/marketing/procurement-view.png)
+![Marqdo View — original detailed screenshot provided by the project author](assets/marketing/user-procurement-view.png)
 
-<sub>**Actual screenshot** captured in Chromium from a Marqdo **2.7.1** View static export, scrolled to `向采购商发工单`. It shows the real rendered document, not a promotional mockup. [Screenshot generation source](scripts/capture-procurement-showcase.py).</sub>
+<sub>**Original View screenshot provided by the project author.** Notice the natural document typography, values in the margins, and curved connections originating from function calls in the prose. [Additional automated View capture](assets/marketing/procurement-view.png) · [Static Markdown rendering](assets/marketing/marqdo-procurement-standard-markdown.png).</sub>
 
 ## One document, multiple uses
 
