@@ -49,7 +49,7 @@ This is a **seven-tool, offline demonstration**. It knows the local supplier dir
 marqdo call examples/procurement/index.mq.md 查询采购商 "采购商状态='正常'" --json
 
 # 2. Quote: SUP_JN, 8 ball bearings × ¥36 = ¥288 (sample price).
-marqdo call examples/procurement/index.mq.md 查询采购商价格 "采购商标识符='SUP_JN'" 数量=8 --json
+marqdo call examples/procurement/index.mq.md 查询采购商价格 "采购商标识符='SUP_JN'" 数量=8 有效秒数=300 --json
 
 # 3. Budget: ¥600 - ¥120 = ¥480.
 marqdo call examples/procurement/index.mq.md 查询余额 已花费=120 --json

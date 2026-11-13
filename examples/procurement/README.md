@@ -15,7 +15,7 @@ This is a **local simulation** in one callable `.mq.md` source. It has no extern
 ```bash
 marqdo check examples/procurement/index.mq.md --narrative-ratio
 marqdo call examples/procurement/index.mq.md 查询采购商 "采购商状态='正常'" --json
-marqdo call examples/procurement/index.mq.md 查询采购商价格 "采购商标识符='SUP_JN'" 数量=8 --json
+marqdo call examples/procurement/index.mq.md 查询采购商价格 "采购商标识符='SUP_JN'" 数量=8 有效秒数=300 --json
 marqdo call examples/procurement/index.mq.md 查询余额 已花费=120 --json
 marqdo call examples/procurement/index.mq.md 向采购商发工单 "采购商标识符='SUP_JN'" 数量=8 单价=36 已花费=120 交付要求天数=7 --effects time.read,process.control --json
 marqdo call examples/procurement/index.mq.md 向采购商发工单 "采购商标识符='SUP_JN'" 数量=8 单价=36 已花费=360 交付要求天数=7 --effects time.read,process.control --json
