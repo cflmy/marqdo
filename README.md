@@ -23,9 +23,9 @@
 <a href="doc/releases/v2.7.1.md">Release notes</a>
 </p>
 
-![Animated illustrative procurement walkthrough](assets/marketing/procurement-flow.svg)
+![Verified Marqdo procurement calls animated from actual CLI results](assets/marketing/procurement-cli.gif)
 
-<sub>Animated **illustration** of expected behavior in the offline purchasing example (allowed simulated order vs. rejected over-budget request), **not** an actual terminal recording. No real purchase is made.</sub>
+<sub>Animated walkthrough assembled from **real Marqdo 2.7.1 function-call results**, including the accepted **simulated** order and an over-budget refusal. Curated frames, not a recording of typing or a production transaction. [Reproduce the capture](scripts/capture-procurement-showcase.py) · [CI run](https://github.com/cflmy/marqdo/actions/runs/43358103498).</sub>
 
 ## Quickstart — one function, one command
 
@@ -79,9 +79,9 @@ Marqdo 2.7.1 improves the interactive reading experience: implementation details
 marqdo view examples/procurement --no-open
 ```
 
-![View-inspired procurement function concept](assets/marketing/procurement-view-concept.svg)
+![Actual Marqdo 2.7.1 View screenshot of procurement function](assets/marketing/procurement-view.png)
 
-<sub>**View-inspired concept illustration**, showing the `向采购商发工单` budget gate; **not a captured screenshot of the CLI**. Open the actual file with the command above to see the real 2.7.1 View.</sub>
+<sub>**Actual screenshot** captured in Chromium from a Marqdo **2.7.1** View static export, scrolled to `向采购商发工单`. It shows the real rendered document, not a promotional mockup. [Screenshot generation source](scripts/capture-procurement-showcase.py).</sub>
 
 ## One document, multiple uses
 
