@@ -50,8 +50,9 @@ fn emit_theorems(out: &mut String, fun: &FnPlan) {
         return;
     }
     let fun_name = lean_ident(&fun.name);
-    // 定理形参：`env 轨迹₀` + 函数形参。
-    let mut binders = String::from("(env : Env) (轨迹₀ : List Op)");
+    // 定理形参：`env` + 函数形参（Lean 标识符仅 ASCII，中文名入 guillemet）。
+    // run 从空轨迹起跑（§2：轨迹是语法产物，函数入口为空）。
+    let mut binders = String::from("(env : Env)");
     for param in &fun.params {
         let _ = write!(binders, " ({} : Val)", lean_ident(&param.name));
     }
@@ -72,31 +73,47 @@ fn emit_theorems(out: &mut String, fun: &FnPlan) {
             .and_then(claim_to_lean_bool);
         let conclusion_lean = claim_to_lean_bool(&claim.conclusion);
         let premise_text = match (&claim.premise, premise_lean) {
-            (Some(_), Some(lean)) => format!(" (h_前提 : mqTruth {lean})"),
+            (Some(_), Some(lean)) => format!(" («h_前提» : mqTruth {lean})"),
             _ => String::new(),
         };
         let tactic = claim.tactic.as_deref().unwrap_or("auto");
         let _ = writeln!(out, "-- 定理 {}（策略 {tactic}；mq: {}）", claim.id, claim.line);
         match conclusion_lean {
             Some(conclusion) => {
+                let run_args = fun
+                    .params
+                    .iter()
+                    .map(|p| lean_ident(&p.name))
+                    .collect::<Vec<_>>()
+                    .join(" ");
                 let _ = writeln!(out, "theorem {theorem_name} {binders}{premise_text} :");
+                let _ = writeln!(out, "    ∀ («结果» : Val) («轨迹» : List Op),");
+                // 等式方向：`(结果, 轨迹) = run …`（输出变量在左，simp_all 才能把
+                // 输出值替换进目标；反向等式 simp 不会替换）。
                 let _ = writeln!(
                     out,
-                    "    ∀ (结果 : Val) (轨迹 : List Op),"
+                    "      ((«结果», «轨迹») = {fun_name} env [] {run_args}) →"
                 );
-                let _ = writeln!(
-                    out,
-                    "      ({fun_name} env 轨迹₀ {} = (结果, 轨迹)) →",
-                    fun.params
-                        .iter()
-                        .map(|p| lean_ident(&p.name))
-                        .collect::<Vec<_>>()
-                        .join(" ")
-                );
-                let _ = writeln!(out, "      {conclusion} := by");
-                let _ = writeln!(out, "  intro 结果 轨迹 h_run");
+                let _ = writeln!(out, "      mqTruth {conclusion} := by");
+                let _ = writeln!(out, "  intro «结果» «轨迹» h_run");
                 let _ = writeln!(out, "  unfold {fun_name} at h_run");
-                let _ = writeln!(out, "  split at h_run <;> simp_all <;> omega");
+                // 每个分支：simp_all（完整默认集处理 List.map/contains/length 的
+                // 结构化消去；等式替换输出；Op.name 方程化简）+ 附加域定义
+                // （mqAccess/mqResultOk/mqEq 字段与构造）。互斥比较假设由库中
+                // @[simp] 矛盾引理消掉，剩余线性算术交给 omega。
+                let _ = writeln!(
+                    out,
+                    "  try split at h_run
+  all_goals
+    simp_all [mqTruth, Op.name, mqAccess, mqResultOk, mqEq]
+    try
+      first
+      | exact (mqGt_mqLe_false ‹mqGt _ (Val.int _) = true› ‹mqLe _ (Val.int _) = true›).elim
+      | exact (mqLe_mqGt_false ‹mqLe _ (Val.int _) = true› ‹mqGt _ (Val.int _) = true›).elim
+      | exact (mqLt_mqGe_false ‹mqLt _ (Val.int _) = true› ‹mqGe _ (Val.int _) = true›).elim
+      | exact (mqGe_mqLt_false ‹mqGe _ (Val.int _) = true› ‹mqLt _ (Val.int _) = true›).elim
+      | omega"
+                );
             }
             _ => {
                 let _ = writeln!(
@@ -108,12 +125,16 @@ fn emit_theorems(out: &mut String, fun: &FnPlan) {
     }
 }
 
-/// 命名空间：文件名的安全标识符（保留 unicode 字母；不安全字符 → `_`）。
+/// 命名空间：文件名的安全标识符。Lean 4 的 `namespace` 命令**只接受 ASCII**
+/// 名字（实测 `namespace 审批` 报 "expected token"），所以非 ASCII 字符
+/// 确定性编码为 `uXXXX`（码点十六进制），保证同名文件 → 同名空间。
 pub fn namespace_of(stem: &str) -> String {
     let mut out = String::new();
     for ch in stem.chars() {
-        if ch.is_alphanumeric() || ch == '_' {
+        if ch.is_ascii_alphanumeric() || ch == '_' {
             out.push(ch);
+        } else if !ch.is_ascii() {
+            out.push_str(&format!("u{:04X}", ch as u32));
         } else {
             out.push('_');
         }
@@ -127,7 +148,8 @@ pub fn namespace_of(stem: &str) -> String {
     out
 }
 
-/// Lean 保留字与本模块保留名（含点/空格的用 `«…»`；关键字加前缀）。
+/// Lean 保留字（`def 审批` 这类裸中文名在 Lean 里是语法错误——
+/// 标识符仅 ASCII；非 ASCII 名一律进 guillemet `«…»`）。
 const LEAN_KEYWORDS: &[&str] = &[
     "fun", "let", "in", "do", "match", "with", "if", "then", "else", "true", "false", "and", "or",
     "not", "def", "theorem", "abbrev", "structure", "inductive", "where", "deriving", "open",
@@ -135,26 +157,31 @@ const LEAN_KEYWORDS: &[&str] = &[
 ];
 
 fn lean_ident(name: &str) -> String {
-    if LEAN_KEYWORDS.contains(&name)
-        || name == "env"
-        || name == "轨迹"
-        || name == "结果"
-        || name == "轨迹₀"
-        || name == "h_前提"
-    {
-        format!("v_{name}")
-    } else if name.chars().all(|c| c.is_alphanumeric() || c == '_' || c == '·')
-        && !name.chars().next().is_some_and(|c| c.is_ascii_digit())
-    {
+    let ascii_safe = !name.is_empty()
+        && name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
+        && !name.chars().next().is_some_and(|c| c.is_ascii_digit());
+    if LEAN_KEYWORDS.contains(&name) || name == "env" {
+        // 关键字与本模块保留名（函数体里用户变量撞名时改名）。
+        // 改名形式必须纯 ASCII（裸 `v_结果` 仍是 Lean 语法错误）。
+        format!("v_{}", namespace_of(name))
+    } else if name == "轨迹" || name == "结果" || name == "h_前提" {
+        // 定理作用域保留名：函数体里的用户变量/形参撞名 → v_ 前缀
+        // （定理的 ∀ 绑定名由 emit_theorems/claim_term 直接写 `«…»`，不走这里）。
+        format!("v_{}", namespace_of(name))
+    } else if ascii_safe {
         name.to_string()
     } else {
-        format!("«{name}»")
+        // 中文名/含点/含特殊字符 → guillemet；`:` 会截断记号，替换为 `_`。
+        format!("«{}»", name.replace(':', "_"))
     }
 }
 
 fn op_ctor(op_id: &str) -> String {
-    // `调用:人工审核` → `«调用:人工审核»`（guillemet 标识符）。
-    format!("«{op_id}»")
+    // `调用:人工审核` → `«调用_人工审核»`（guillemet 标识符）。
+    // Lean 的 guillemet 记号不接受 `:`（会截断记号），标识符里替换为 `_`；
+    // Op.name 的**字符串显示**保持原始 id，轨迹名不变。
+    let safe = op_id.replace(':', "_");
+    format!("«{safe}»")
 }
 
 fn emit_op_inductive(out: &mut String, plan: &Plan) {
@@ -169,10 +196,11 @@ fn emit_op_inductive(out: &mut String, plan: &Plan) {
     }
     if ops.is_empty() {
         let _ = writeln!(out, "inductive Op where");
-        let _ = writeln!(out, "  | 无操作 deriving Repr, BEq");
+        // 占位构造器也走 op_ctor（裸中文构造器是 Lean 语法错误）。
+        let _ = writeln!(out, "  | {} deriving Repr, BEq", op_ctor("无操作"));
         let _ = writeln!(out);
         let _ = writeln!(out, "def Op.name : Op → String");
-        let _ = writeln!(out, "  | .无操作 => \"\"");
+        let _ = writeln!(out, "  | .{} => \"\"", op_ctor("无操作"));
         return;
     }
     let _ = writeln!(out, "inductive Op where");
@@ -180,7 +208,7 @@ fn emit_op_inductive(out: &mut String, plan: &Plan) {
         let fields = match op.arity {
             0 => String::new(),
             n => (1..=n)
-                .map(|i| format!("(参数{i} : Val)"))
+                .map(|i| format!("(«参数{i}» : Val)"))
                 .collect::<Vec<_>>()
                 .join(" "),
         };
@@ -191,22 +219,27 @@ fn emit_op_inductive(out: &mut String, plan: &Plan) {
     let _ = writeln!(out, "def Op.name : Op → String");
     for op in &ops {
         let label = op.id.strip_prefix("调用:").unwrap_or(&op.id);
-        let blanks = " ".repeat(op.arity);
+        // 多参构造器的模式必须绑定实参（`_ _`），否则类型不匹配。
+        let blanks = " _".repeat(op.arity);
         let _ = writeln!(out, "  | .{} {}=> \"{}\"", op_ctor(&op.id), blanks, label);
     }
+    let _ = writeln!(out);
+    // Env 依赖本文件的 Op（库无法预知），所以每文件自带：
+    // `env` 是"不透明操作 → 返回值"的任意函数——后置条件对一切 env 成立。
+    let _ = writeln!(out, "abbrev Env := Op → Val");
 }
 
 fn emit_function(out: &mut String, fun: &FnPlan) {
     let name = lean_ident(&fun.name);
     // 参数列表：`def f (env : Env) (轨迹 : List Op) (p1 : Val) …`
-    let mut sig = String::from("(env : Env) (轨迹 : List Op)");
+    let mut sig = String::from("(env : Env) («轨迹» : List Op)");
     for param in &fun.params {
         let _ = write!(sig, " ({} : Val)", lean_ident(&param.name));
     }
     let _ = writeln!(out, "-- {} 返回 {}", fun.name, fun.result_ty.name());
     let _ = writeln!(out, "def {name} {sig} : Val × List Op :=");
     if fun.steps.is_empty() {
-        let _ = writeln!(out, "  (Val.none, 轨迹)");
+        let _ = writeln!(out, "  (Val.none, «轨迹»)");
         return;
     }
     emit_seq(out, &mut String::from("  "), &[&fun.steps]);
@@ -221,7 +254,7 @@ fn emit_seq(out: &mut String, indent: &mut String, chunks: &[&[Step]]) {
     match chunks.split_first() {
         None => {
             // 走到末尾都没有 return：Marqdo 返回 None（诚实占位，不译运行时）。
-            let _ = writeln!(out, "{indent}(Val.none, 轨迹)");
+            let _ = writeln!(out, "{indent}(Val.none, «轨迹»)");
         }
         Some((first, rest)) => match first.split_first() {
             None => emit_seq(out, indent, rest),
@@ -254,7 +287,7 @@ fn emit_step(out: &mut String, indent: &mut String, step: &Step, more: &[Step], 
                     );
                     let _ = writeln!(
                         out,
-                        "{indent}let 轨迹 := 轨迹 ++ [Op.{} {}]",
+                        "{indent}let «轨迹» := «轨迹» ++ [Op.{} {}]",
                         op_ctor(id),
                         emit_args(args)
                     );
@@ -276,7 +309,7 @@ fn emit_step(out: &mut String, indent: &mut String, step: &Step, more: &[Step], 
                 IrExpr::Op { id, args } => {
                     let _ = writeln!(
                         out,
-                        "{indent}(env (Op.{} {}), 轨迹 ++ [Op.{} {}])",
+                        "{indent}(env (Op.{} {}), «轨迹» ++ [Op.{} {}])",
                         op_ctor(id),
                         emit_args(args),
                         op_ctor(id),
@@ -284,7 +317,7 @@ fn emit_step(out: &mut String, indent: &mut String, step: &Step, more: &[Step], 
                     );
                 }
                 other => {
-                    let _ = writeln!(out, "{indent}({}, 轨迹)", emit_expr(other));
+                    let _ = writeln!(out, "{indent}({}, «轨迹»)", emit_expr(other));
                 }
             }
         }
@@ -292,7 +325,7 @@ fn emit_step(out: &mut String, indent: &mut String, step: &Step, more: &[Step], 
             let _ = writeln!(out, "{indent}-- mq: {line}:1");
             let _ = writeln!(
                 out,
-                "{indent}let 轨迹 := 轨迹 ++ [Op.{} {}]",
+                "{indent}let «轨迹» := «轨迹» ++ [Op.{} {}]",
                 op_ctor(op),
                 emit_args(args)
             );
@@ -488,12 +521,15 @@ mod tests {
 
     #[test]
     fn lean_ident_keeps_chinese_and_quotes_dotted() {
-        assert_eq!(lean_ident("金额"), "金额");
+        // Lean 标识符仅 ASCII：中文名入 guillemet。
+        assert_eq!(lean_ident("金额"), "«金额»");
         assert_eq!(lean_ident("审批台.审批"), "«审批台.审批»");
+        // 纯 ASCII 名保持裸写。
+        assert_eq!(lean_ident("x_1"), "x_1");
         // 与本模块保留名冲突的变量必须改名（确定性映射）。
         assert_eq!(lean_ident("env"), "v_env");
-        assert_eq!(lean_ident("轨迹"), "v_轨迹");
-        assert_eq!(lean_ident("结果"), "v_结果");
+        assert_eq!(lean_ident("轨迹"), "v_u8F68u8FF9");
+        assert_eq!(lean_ident("结果"), "v_u7ED3u679C");
         assert_eq!(lean_ident("let"), "v_let");
     }
 
@@ -507,7 +543,8 @@ mod tests {
     #[test]
     fn namespace_sanitizes_unsafe_chars_deterministically() {
         assert_eq!(namespace_of("approval.mq"), "approval_mq");
-        assert_eq!(namespace_of("示例"), "示例");
+        assert_eq!(namespace_of("示例"), "u793Au4F8B");
+        // 命名空间绝不含非 ASCII（Lean namespace 命令只收 ASCII）。
         assert_eq!(namespace_of("1abc"), "M1abc");
         assert_eq!(namespace_of(""), "M");
     }
@@ -571,13 +608,13 @@ mod tests {
         assert!(out1.contains("import MarqdoProof"));
         assert!(out1.contains("namespace Generated.demo"));
         // Op 按首现顺序：写盘在读盘前。
-        let write_pos = out1.find("«调用:写盘»").expect("write op");
-        let read_pos = out1.find("«调用:读盘»").expect("read op");
+        let write_pos = out1.find("«调用_写盘»").expect("write op");
+        let read_pos = out1.find("«调用_读盘»").expect("read op");
         assert!(write_pos < read_pos);
         // Op 元数：读盘 0 元 → 无参构造器。
-        assert!(out1.contains("| «调用:读盘»"), "{out1}");
+        assert!(out1.contains("| «调用_读盘»"), "{out1}");
         // Return 直译成对（字面量自带括号，形成双重括号——合法 Lean）。
-        assert!(out1.contains("((Val.int 7), 轨迹)"), "{out1}");
+        assert!(out1.contains("((Val.int 7), «轨迹»)"), "{out1}");
         // 溯源注释。
         assert!(out1.contains("-- mq: 3:1"));
         // 无时间戳。
@@ -593,8 +630,9 @@ mod tests {
             functions: vec![],
         };
         let (name, out) = emit_module(&plan, "空");
-        assert_eq!(name, "空.lean");
-        assert!(out.contains("| 无操作"));
+        assert_eq!(name, "u7A7A.lean");
+        // 占位构造器同样 guillemet 化（裸中文构造器是 Lean 语法错误）。
+        assert!(out.contains("| «无操作»"));
         assert!(!out.contains("«调用:"));
     }
 }
@@ -632,17 +670,17 @@ fn claim_term(ast: &super::proof_check::ClaimAst) -> Option<String> {
         A::Lit(CTok::Text(s)) => Some(format!("(Val.text {})", lean_string(s))),
         A::Lit(_) => None,
         A::Var(name) => {
-            // 定理作用域里 `结果`/`轨迹` 是 ∀ 绑定的输出名（不加 v_ 前缀）；
-            // `根.字段` → mqAccess 字段读取；其余按标识符规则（形参等）。
+            // 定理作用域里 `结果`/`轨迹` 是 ∀ 绑定的输出名（`«结果»`/`«轨迹»`，
+            // 不加 v_ 前缀）；`根.字段` → mqAccess 字段读取；其余按标识符规则。
             let (root, field) = match name.split_once('.') {
                 Some((r, f)) => (r, Some(f)),
                 None => (name.as_str(), None),
             };
             let term = match (root, field) {
-                ("结果", Some(f)) => format!("(mqAccess 结果 {})", lean_string(f)),
-                ("轨迹", Some(f)) => format!("(mqAccess 轨迹 {})", lean_string(f)),
-                ("结果", None) => "结果".to_string(),
-                ("轨迹", None) => "轨迹".to_string(),
+                ("结果", Some(f)) => format!("(mqAccess «结果» {})", lean_string(f)),
+                ("轨迹", Some(f)) => format!("(mqAccess «轨迹» {})", lean_string(f)),
+                ("结果", None) => "«结果»".to_string(),
+                ("轨迹", None) => "«轨迹»".to_string(),
                 _ => lean_ident(name),
             };
             Some(term)
@@ -653,9 +691,9 @@ fn claim_term(ast: &super::proof_check::ClaimAst) -> Option<String> {
             match (name.as_str(), args.len(), on_trace) {
                 ("包含", 2, true) => {
                     let item = strip_val_text(&claim_term(&args[1])?);
-                    Some(format!("((轨迹.map Op.name).contains {item})"))
+                    Some(format!("((«轨迹».map Op.name).contains {item})"))
                 }
-                ("长度", 1, true) => Some("(轨迹.length : Nat)".to_string()),
+                ("长度", 1, true) => Some("(«轨迹».length : Nat)".to_string()),
                 _ => {
                     let mut rendered = Vec::with_capacity(args.len());
                     for arg in args {
@@ -678,7 +716,7 @@ fn claim_term(ast: &super::proof_check::ClaimAst) -> Option<String> {
             if is_trace_len(left) || is_trace_len(right) {
                 let nat = |a: &A| -> Option<String> {
                     if is_trace_len(a) {
-                        Some("(轨迹.length : Nat)".to_string())
+                        Some("(«轨迹».length : Nat)".to_string())
                     } else if let A::Lit(CTok::Int(i)) = a {
                         Some(i.to_string())
                     } else {

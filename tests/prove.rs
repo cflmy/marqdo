@@ -274,9 +274,9 @@ fn p0_d_side_effect_import_is_opaque_op() {
     assert_eq!(r.code, 0, "stderr={}", r.stderr);
     let lean = read(&s.dir, "out/Generated/approval_mq.lean");
     // 工程外部调用：Op 构造器 + Env 查询 + 追踪，不展开。
-    assert!(lean.contains("«调用:工程.送审»"), "op ctor missing:\n{lean}");
-    assert!(lean.contains("env (Op.«调用:工程.送审»"), "env query missing");
-    assert!(lean.contains("[Op.«调用:工程.送审»"), "trace append missing");
+    assert!(lean.contains("«调用_工程.送审»"), "op ctor missing:\n{lean}");
+    assert!(lean.contains("env (Op.«调用_工程.送审»"), "env query missing");
+    assert!(lean.contains("[Op.«调用_工程.送审»"), "trace append missing");
     // result.ok 内联为 Val 构造器，不是 Op。
     assert!(!lean.contains("result.ok»"), "result.ok must inline, not be an Op");
     assert!(lean.contains("mqResultOk"), "result.ok → mqResultOk");
@@ -314,13 +314,13 @@ fn p0_f_branch_continuation_not_swallowed() {
     let lean = read(&s.dir, "out/Generated/box_mq.lean");
     // 分支后的 return 必须出现在两个臂里（回归：此前续延被分支吞掉）。
     assert_eq!(
-        lean.matches("(输出, 轨迹)").count(),
+        lean.matches("(«输出», «轨迹»)").count(),
         2,
         "return must appear in both arms:\n{lean}"
     );
     // 两臂各自绑定。
-    assert!(lean.contains("let 输出 := (Val.text \"正\")"), "{lean}");
-    assert!(lean.contains("let 输出 := (Val.text \"负\")"), "{lean}");
+    assert!(lean.contains("let «输出» := (Val.text \"正\")"), "{lean}");
+    assert!(lean.contains("let «输出» := (Val.text \"负\")"), "{lean}");
 }
 
 #[test]
@@ -484,16 +484,16 @@ fn p1_b_emit_theorem_scaffold() {
         "{lean}"
     );
     // 前提进绑定；包含(轨迹, …) 翻成操作名成员测试。
-    assert!(lean.contains("(h_前提 : mqTruth (mqGt 金额 (Val.int 10000)))"), "{lean}");
+    assert!(lean.contains("(«h_前提» : mqTruth (mqGt «金额» (Val.int 10000)))"), "{lean}");
     assert!(
-        lean.contains("((轨迹.map Op.name).contains \"人工审核\")"),
+        lean.contains("((«轨迹».map Op.name).contains \"人工审核\")"),
         "{lean}"
     );
     // 结果.ok → mqAccess 字段读取。
-    assert!(lean.contains("(mqAccess 结果 \"ok\")"), "{lean}");
+    assert!(lean.contains("(mqAccess «结果» \"ok\")"), "{lean}");
     // 策略脚本（§7.2）：unfold → split → simp_all/omega。
     assert!(lean.contains("unfold «审批台.审批» at h_run"), "{lean}");
-    assert!(lean.contains("split at h_run <;> simp_all <;> omega"), "{lean}");
+    assert!(lean.contains("split at h_run\n  all_goals\n    simp_all [mqTruth, Op.name, mqAccess, mqResultOk, mqEq]"), "{lean}");
 }
 
 /// check --proof（默认关）：不传 --proof 时定理问题不报。
@@ -746,16 +746,16 @@ markup: occlusion
     let lean = read(&s.dir, "out/Generated/machine_mq.lean");
     // 两个构造器，元数各自正确。
     assert!(
-        lean.contains("| «调用:自身.加一» (参数1 : Val)"),
+        lean.contains("| «调用_自身.加一» («参数1» : Val)"),
         "{lean}"
     );
     assert!(
-        lean.contains("| «调用:自身.加一/2» (参数1 : Val) (参数2 : Val)"),
+        lean.contains("| «调用_自身.加一/2» («参数1» : Val) («参数2» : Val)"),
         "{lean}"
     );
     // 使用点各自带对个数的实参。
-    assert!(lean.contains("Op.«调用:自身.加一» a)"), "{lean}");
-    assert!(lean.contains("Op.«调用:自身.加一/2» a b)"), "{lean}");
+    assert!(lean.contains("Op.«调用_自身.加一» a)"), "{lean}");
+    assert!(lean.contains("Op.«调用_自身.加一/2» a b)"), "{lean}");
 }
 
 /// 缺陷 3：`长度(轨迹) = 2` 必须生成 Nat 比较，不是 mqEq（Nat≠Val）。
@@ -790,10 +790,10 @@ import:
     assert_eq!(r.code, 0, "stderr={}", r.stderr);
     let lean = read(&s.dir, "out/Generated/count_mq.lean");
     assert!(
-        lean.contains("((轨迹.length : Nat) = 2)"),
+        lean.contains("((«轨迹».length : Nat) = 2)"),
         "Nat 比较：{lean}"
     );
-    assert!(!lean.contains("mqEq (轨迹.length"), "不许出现类型不匹配：{lean}");
+    assert!(!lean.contains("mqEq («轨迹».length"), "不许出现类型不匹配：{lean}");
 }
 
 /// 缺陷 4：谓词名遮蔽整个模块只报一次；无关函数的形参不误报。

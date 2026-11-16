@@ -791,3 +791,37 @@ pub fn audit_path(path: &Path) -> Result<AuditReport>;             // 不判定
 - `审批.mq.md`（审批单 + 人工审核）+ `风控.mq.md`（风险分级）+ `lib/工单.mq.md`（建单）：三条定理（大额必经人工 / 恰两步轨迹 / 必有回执）提取成功
 - 真实解释器三场景交叉验证：5000 元 → `auto`（1 步轨迹）；20000/60000 元 → 人工建单 `T-20000`/`T-60000`（`需人工 → 创建` 恰两步）——与定理表逐条吻合
 - 负例：破坏定理表（未知符号 + 重复 id + 谓词元数错）→ `check --proof` 各报一码且默认关静默；emit 仍 advisory 可用；双次 emit 字节一致
+
+### Lean 环境实装与真机证明（2026-11-16，Lean 4.35.0 / lake 5.0.0）
+
+工具链：`lean-4.35.0-linux.tar.zst` 解包至 `target/toolchain/lean-4.35.0-linux/`（无 elan，
+直接 PATH）；语义底座 `MarqdoProof`（`Val` + `mq*` 辅助 + 矛盾引理，无 `axiom`/`opaque`）
+经 lake 构建于 `target/proof/skill-proof/`（库源同步在 `doc/verification/skill-proof/`，
+发布时装入 `verification/skill-proof/`——checkout 中该目录属 root）。
+
+实测发现并修正的发射器缺陷（均有测试覆盖）：
+
+| 缺陷 | Lean 行为 | 修复 |
+|---|---|---|
+| `namespace Generated.审批_mq` | `namespace` 命令只接受 ASCII 名（`namespace 审批` 直接语法错误） | 非 ASCII 字符确定性编码 `uXXXX`：`Generated.u5BA1u6279_mq` |
+| 裸中文标识符 `def 审批单`、`(h_前提 : …)`、`v_结果` | Lean 标识符仅 ASCII，全部语法错误 | 非 ASCII 一律 guillemet `«…»`；改名形式走同一编码（`v_u7ED3u679C`） |
+| Op 构造器 `«调用:人工审核»` | guillemet 记号内 `:` 截断记号 | 标识符内 `:` → `_`；`Op.name` 字符串显示保持原 id |
+| 多参构造器模式 `.«调用:x» =>` | 模式未绑定实参，类型不匹配 | `Op.name` 臂补 `_ _` |
+| 占位构造器裸中文 `无操作` | 语法错误 | 占位构造器也走 `op_ctor` |
+| `h_run : … = (结果, 轨迹)` 反向等式 | simp_all 不做反向替换，输出值进不了目标 | 定理陈述翻转：`((结果, 轨迹) = run env [] …)` |
+| 分支互斥假设（`mqGt=true ∧ mqLe=true`） | simp_all 不链式应用蕴含引理 | 库中矛盾引理 + 脚本显式 `.elim`（`exact (mqGt_mqLe_false ‹…› ‹…›).elim`） |
+| 无分支函数上 `split at h_run` | 硬报错（无 if/match 可拆），挡住本可证明的平凡断言 | `try split at h_run` |
+
+驱动脚本 `target/proof/run-lean-check.sh`（P1 第 2 周 `--require-lean` 集成雏形）：
+prove 生成 → `lake env lean` → `proved / unproved / lean-error` 三态分类。
+
+真机证明结果：
+
+| 目标 | 结果 |
+|---|---|
+| 业务样例 `审批.mq.md`（3 定理：大额必经人工 / 恰两步轨迹 / 必有回执） | `lake env lean` 0 error，全部 **proved** |
+| 6 个带定理的测试夹具（p1_theorem / a_deterministic / d_opaque_op / f_continuation / p2_arity / p2_len） | 5 个 **proved**；`p2_len`（计数器）如实 **unproved**——其断言 `长度(轨迹) = 2` 为假命题（函数零操作，轨迹恒空），Lean 拒绝即正确行为 |
+| 全量 Rust 测试 | 499 通过；仅剩 2 个已记录的环境受限失败（python3 缺失 / playwright root 属主），与 prove 改动无关 |
+
+诚实性核对：`p2_len` 的 unproved 正是"绝不 lean 无法证明的 marqdo 可以证明"的落实——
+生成侧把语法合法但语义为假的断言如实交给 Lean，判定侧不会虚报 proved。
