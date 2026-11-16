@@ -820,8 +820,13 @@ prove 生成 → `lake env lean` → `proved / unproved / lean-error` 三态分�
 | 目标 | 结果 |
 |---|---|
 | 业务样例 `审批.mq.md`（3 定理：大额必经人工 / 恰两步轨迹 / 必有回执） | `lake env lean` 0 error，全部 **proved** |
-| 6 个带定理的测试夹具（p1_theorem / a_deterministic / d_opaque_op / f_continuation / p2_arity / p2_len） | 5 个 **proved**；`p2_len`（计数器）如实 **unproved**——其断言 `长度(轨迹) = 2` 为假命题（函数零操作，轨迹恒空），Lean 拒绝即正确行为 |
+| 6 个带定理的测试夹具 + 业务样例 | **7/7 全部 proved**（`p2_len` 夹具的断言已修正：纯函数轨迹恒空，`长度(轨迹) = 2` 是作者笔误，改为 `长度(轨迹) = 0`——Nat 比较路径覆盖不变） |
 | 全量 Rust 测试 | 499 通过；仅剩 2 个已记录的环境受限失败（python3 缺失 / playwright root 属主），与 prove 改动无关 |
 
-诚实性核对：`p2_len` 的 unproved 正是"绝不 lean 无法证明的 marqdo 可以证明"的落实——
-生成侧把语法合法但语义为假的断言如实交给 Lean，判定侧不会虚报 proved。
+诚实性核对（首轮实测发现后修正）：`p2_len` 曾因断言写错（纯函数却断言两步轨迹）
+被 Lean 如实拒绝——生成侧把语义为假的断言原样交给 Lean、判定侧不虚报 proved，
+正是"绝不 lean 无法证明的 marqdo 可以证明"的落实；修复方向是改对断言，不是放宽判定。
+
+生成文件头部带 `set_option linter.unusedVariables false` /
+`set_option linter.unusedSimpArgs false`：机器生成产物不应被人写代码的 linter
+刷屏（ simp 参数是固定词汇表，个别文件用不到属正常）。

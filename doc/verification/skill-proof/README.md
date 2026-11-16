@@ -43,7 +43,8 @@ lake env lean <generated>.lean            # exit 0 且无 error ⇒ 该文件全
 
 ## 实测结论（2026-11-16，Lean 4.35.0 / lake 5.0.0）
 
-- 业务样例（审批.mq.md，3 条定理）：`lake env lean` 0 error，全部证明。
-- 10 个测试夹具生成文件：9 个 0 error；`p2_len`（计数器）的
-  `长度(轨迹) = 2` 为**假命题**（该函数不产生操作，轨迹恒空）——Lean 如实
-  未证，符合"绝不 lean 无法证明的 marqdo 可以证明"。
+- 业务样例（审批.mq.md，3 条定理）：`lake env lean` 0 error 0 warning，全部证明。
+- 6 个带定理的测试夹具 + 业务样例：**7/7 全部 proved**（驱动脚本三态分类：
+  proved / unproved / lean-error）。
+- 首轮曾发现 `p2_len` 夹具断言写错（纯函数却断言两步轨迹）被 Lean 如实拒绝——
+  修复方向是改对断言，不是放宽判定："绝不 lean 无法证明的 marqdo 可以证明"。

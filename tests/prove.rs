@@ -773,12 +773,12 @@ import:
 
 # 轨迹计数
 
-## 两步
+## 纯计算
 + `金额`
 
 | 定理 | 结论 | 策略 |
 |---|---|---|
-| 恰两步 | 长度(轨迹) = 2 | auto |
+| 空轨迹 | 长度(轨迹) = 0 | auto |
 
 **a = [一步](result.ok(value=1))**
 **b = [两步](result.ok(value=2))**
@@ -790,7 +790,7 @@ import:
     assert_eq!(r.code, 0, "stderr={}", r.stderr);
     let lean = read(&s.dir, "out/Generated/count_mq.lean");
     assert!(
-        lean.contains("((«轨迹».length : Nat) = 2)"),
+        lean.contains("((«轨迹».length : Nat) = 0)"),
         "Nat 比较：{lean}"
     );
     assert!(!lean.contains("mqEq («轨迹».length"), "不许出现类型不匹配：{lean}");

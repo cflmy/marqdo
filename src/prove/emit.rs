@@ -22,6 +22,10 @@ pub fn emit_module(plan: &Plan, module_stem: &str) -> (String, String) {
     let mut out = String::new();
     let _ = writeln!(out, "import {LIBRARY_IMPORT}");
     let _ = writeln!(out, "open MarqdoProof");
+    // 机器生成的证明产物：关闭面向人写代码的 linter（未用变量/simp 参数是
+    // 生成器的固定词汇表带来的正常噪声，不是问题）。
+    let _ = writeln!(out, "set_option linter.unusedVariables false");
+    let _ = writeln!(out, "set_option linter.unusedSimpArgs false");
     let _ = writeln!(out);
     let _ = writeln!(out, "-- 由 `marqdo prove emit` 生成：确定性输出，请勿手改。");
     let _ = writeln!(out, "-- 源：{}（sha256 {}）", plan.module, plan.source_sha256);
