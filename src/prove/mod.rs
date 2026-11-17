@@ -9,6 +9,8 @@
 //! 判定（离线 ⑤ / Lean ⑥）在 P1/P2 接入；状态只到 `unverified` / `rejected` /
 //! `error`。
 
+pub mod cache;
+pub mod driver;
 pub mod emit;
 pub mod ir;
 pub mod lower;
@@ -97,7 +99,7 @@ impl Verdict {
     }
 }
 
-/// 选项（§8.2；P0 生效的子集见字段注释）。
+/// 选项（§8.2）。
 #[derive(Debug, Clone)]
 pub struct ProveOptions {
     pub entry: Option<String>,
@@ -107,6 +109,16 @@ pub struct ProveOptions {
     pub strict_types: bool,
     pub require_lean: bool,
     pub report_only: bool,
+    /// 绕过证书缓存（`--no-cache` / `MARQDO_PROOF_NO_CACHE`）。
+    pub no_cache: bool,
+    /// 显式 lean 路径（`--lean` / `MARQDO_PROOF_LEAN`）。
+    pub lean: Option<PathBuf>,
+    /// 单次 lean 调用超时（默认 120s）。
+    pub timeout: std::time::Duration,
+    /// 是否执行判定（`prove emit`/`audit` 子命令 = false，只生成不证）。
+    pub judge: bool,
+    /// `maxHeartbeats`（默认随 lean）。
+    pub max_heartbeats: Option<u64>,
 }
 
 impl Default for ProveOptions {
@@ -119,8 +131,30 @@ impl Default for ProveOptions {
             strict_types: true,
             require_lean: false,
             report_only: false,
+            no_cache: false,
+            lean: None,
+            timeout: std::time::Duration::from_secs(120),
+            judge: true,
+            max_heartbeats: None,
         }
     }
+}
+
+/// 单条定理的判定面（§3.5 claims）。
+#[derive(Debug, Clone)]
+pub struct ClaimReport {
+    pub id: String,
+    pub premise: Option<String>,
+    pub conclusion: String,
+    pub tactic: Option<String>,
+    /// `proved` / `unproved` / `unverified`（判定层给出前与函数一致）。
+    pub status: Verdict,
+    /// `trace`（P2 离线）/ `lean` / 空（未判定）。
+    pub decided_by: String,
+    /// 映射回 `.mq.md` 的行号（失败证据）。
+    pub source_line: Option<u32>,
+    /// Lean 原始报错片段（unproved 时）。
+    pub evidence: Option<String>,
 }
 
 /// 单函数报告。
@@ -133,8 +167,18 @@ pub struct FunctionReport {
     pub ops: Vec<(String, String)>,
     /// 拒绝原因（code, message, line）。
     pub rejected: Vec<(String, String, u32)>,
-    /// 定理声明（id, premise, conclusion, tactic）。
-    pub claims: Vec<(String, Option<String>, String, Option<String>)>,
+    /// 定理声明 + 判定。
+    pub claims: Vec<ClaimReport>,
+}
+
+/// Lean 判定信息（`lean: null` 表示没跑）。
+#[derive(Debug, Clone)]
+pub struct LeanInfo {
+    pub toolchain: String,
+    pub library_sha256: String,
+    pub module_sha256: String,
+    /// `hit` / `miss`。
+    pub cache: &'static str,
 }
 
 /// 整体报告。
@@ -142,15 +186,18 @@ pub struct FunctionReport {
 pub struct Report {
     pub file: String,
     pub source_sha256: String,
+    /// 产物目录 id（`.marqdo/prove/<artifact_id>`）。
+    pub artifact_id: Option<String>,
     pub status: Verdict,
     pub functions: Vec<FunctionReport>,
     pub diagnostics: Vec<Diagnostic>,
     pub emitted: Vec<PathBuf>,
+    pub lean: Option<LeanInfo>,
     pub duration_ms: u128,
 }
 
 impl Report {
-    /// JSON 面（§3.5；`status` 枚举稳定，`lean` 恒 null 直到 P1）。
+    /// JSON 面（§3.5；`status` 枚举稳定）。
     pub fn to_json(&self) -> serde_json::Value {
         use serde_json::json;
         json!({
@@ -158,17 +205,33 @@ impl Report {
             "status": self.status.as_str(),
             "file": self.file,
             "source_sha256": self.source_sha256,
-            "artifact_id": serde_json::Value::Null,
+            "artifact_id": match &self.artifact_id {
+                Some(id) => json!(format!("mq://prove/{id}")),
+                None => serde_json::Value::Null,
+            },
             "functions": self.functions.iter().map(|f| json!({
                 "name": f.name,
                 "status": f.verdict.as_str(),
                 "tier": f.tier.as_str(),
-                "claims": f.claims.iter().map(|(id, premise, conclusion, tactic)| json!({
-                    "id": id,
-                    "premise": premise,
-                    "conclusion": conclusion,
-                    "tactic": tactic,
-                })).collect::<Vec<_>>(),
+                "claims": f.claims.iter().map(|c| {
+                    let mut j = json!({
+                        "id": c.id,
+                        "premise": c.premise,
+                        "conclusion": c.conclusion,
+                        "tactic": c.tactic,
+                        "status": c.status.as_str(),
+                    });
+                    if !c.decided_by.is_empty() {
+                        j["decided_by"] = json!(c.decided_by);
+                    }
+                    if let Some(line) = c.source_line {
+                        j["line"] = json!(line);
+                    }
+                    if let Some(ev) = &c.evidence {
+                        j["evidence"] = json!(ev);
+                    }
+                    j
+                }).collect::<Vec<_>>(),
                 "obligations": [],
                 "ops": f.ops.iter().map(|(id, effect)| json!({
                     "id": id, "effect": effect,
@@ -177,7 +240,15 @@ impl Report {
                     "code": code, "message": message, "line": line,
                 })).collect::<Vec<_>>(),
             })).collect::<Vec<_>>(),
-            "lean": serde_json::Value::Null,
+            "lean": match &self.lean {
+                Some(info) => json!({
+                    "toolchain": info.toolchain,
+                    "library_sha256": info.library_sha256,
+                    "module_sha256": info.module_sha256,
+                    "cache": info.cache,
+                }),
+                None => serde_json::Value::Null,
+            },
             "assumptions": [],
             "diagnostics": self.diagnostics.iter().map(|d| d.to_json()).collect::<Vec<_>>(),
             "emitted": self.emitted.iter().map(|p| p.display().to_string()).collect::<Vec<_>>(),
@@ -196,14 +267,14 @@ impl Report {
             .count();
         let ops: usize = self.functions.iter().map(|f| f.ops.len()).sum();
         out.push_str(&format!("prove: {}\n", self.file));
+        let cache_note = match &self.lean {
+            Some(info) => format!("（lean · cache: {}）", info.cache),
+            None => String::new(),
+        };
         out.push_str(&format!(
             "  status: {}{}\n",
             self.status.as_str(),
-            if self.status == Verdict::Unverified {
-                "（P0：仅降级与生成，判定将在 P1 提供）"
-            } else {
-                ""
-            }
+            cache_note
         ));
         out.push_str(&format!(
             "  functions: {functions} · opaque ops: {ops} · rejected: {rejected}\n"
@@ -213,12 +284,39 @@ impl Report {
                 let codes: Vec<&str> = f.rejected.iter().map(|(c, _, _)| c.as_str()).collect();
                 out.push_str(&format!("  rejected: {} ({})\n", f.name, codes.join(", ")));
             }
+            for c in &f.claims {
+                match (c.status, &c.evidence) {
+                    (Verdict::Proved, _) => {
+                        out.push_str(&format!("  proved: {}.{}\n", f.name, c.id));
+                    }
+                    (Verdict::Unproved, Some(ev)) => {
+                        let line = c
+                            .source_line
+                            .map(|l| format!(":{l}"))
+                            .unwrap_or_default();
+                        out.push_str(&format!(
+                            "  unproved: {}.{line}{} — {}\n",
+                            f.name,
+                            c.id,
+                            first_line(ev)
+                        ));
+                    }
+                    (Verdict::Unverified, _) => {
+                        out.push_str(&format!("  unverified: {}.{}\n", f.name, c.id));
+                    }
+                    _ => {}
+                }
+            }
         }
         for p in &self.emitted {
             out.push_str(&format!("  emitted: {}\n", p.display()));
         }
         out
     }
+}
+
+fn first_line(s: &str) -> String {
+    s.lines().next().unwrap_or("").to_string()
 }
 
 /// P0 主入口：装载 → 降级 → 定型 → 生成。
@@ -249,6 +347,8 @@ pub fn prove_path(path: &Path, opts: &ProveOptions) -> Result<Report> {
 
     // ④ 生成（--report-only 时跳过写盘）。
     let mut emitted: Vec<PathBuf> = Vec::new();
+    let mut artifact_dir: Option<PathBuf> = None;
+    let mut generated_lean: Option<(PathBuf, String)> = None;
     if !opts.report_only {
         let dir = match &opts.emit_dir {
             Some(dir) => dir.clone(),
@@ -266,13 +366,15 @@ pub fn prove_path(path: &Path, opts: &ProveOptions) -> Result<Report> {
             .with_context(|| format!("写入 {}", plan_path.display()))?;
         emitted.push(relative_cwd(&lean_path));
         emitted.push(relative_cwd(&plan_path));
+        artifact_dir = Some(dir.clone());
+        generated_lean = Some((lean_path, lean));
     }
 
     // 汇总：错误诊断 → error；有拒绝函数 → rejected；否则 unverified。
     let has_type_errors = diagnostics
         .iter()
         .any(|d| matches!(d.severity, crate::diagnostics::Severity::Error));
-    let functions = summarize(&lowered, &opts.only);
+    let mut functions = summarize(&lowered, &opts.only);
     let mut status = Verdict::Unverified;
     if !functions.is_empty() {
         status = functions
@@ -284,15 +386,300 @@ pub fn prove_path(path: &Path, opts: &ProveOptions) -> Result<Report> {
         status = Verdict::Error;
     }
 
+    // ⑤ Lean 判定（P1）：有定理、有产物、非 report-only 时进行。
+    let mut lean_info: Option<LeanInfo> = None;
+    let claims_present = plan.functions.iter().any(|f| !f.claims.is_empty());
+    if claims_present && opts.judge && !opts.report_only {
+        match judge_with_lean(
+            &plan,
+            &source_sha256,
+            artifact_dir.as_deref(),
+            &generated_lean,
+            opts,
+            &mut functions,
+            &mut diagnostics,
+        ) {
+            Ok((verdict, info)) => {
+                lean_info = info;
+                if let Some(v) = verdict {
+                    status = v;
+                }
+            }
+            Err(err) => {
+                diagnostics.push(
+                    Diagnostic::new(None, crate::diagnostics::Span::new(0, 0), format!("{err:#}"))
+                        .with_code("proof.lean_error"),
+                );
+                status = Verdict::Error;
+            }
+        }
+    } else if claims_present && opts.report_only {
+        // report-only：不判定、不写盘；未证状态如实保留（恒返回 0 由 exit_code 处理）。
+    }
+
+    // 函数级状态聚合（判定后重算）：文件状态只看**有定理**的函数
+    // 与被拒绝的函数——无定理函数没有义务，不该拖低整体（但它们
+    // 自己的行如实保留 unverified / tier none）。
+    {
+        let relevant = functions.iter().filter(|f| {
+            !f.claims.is_empty() || f.verdict == Verdict::Rejected
+        });
+        for f in relevant {
+            status = Verdict::worst(status, f.verdict);
+        }
+    }
+
     Ok(Report {
         file: file_display,
         source_sha256,
+        artifact_id: artifact_dir
+            .as_ref()
+            .map(|d| d.file_name().map(|n| n.to_string_lossy().to_string()))
+            .unwrap_or(None),
         status,
         functions,
         diagnostics,
         emitted,
+        lean: lean_info,
         duration_ms: started.elapsed().as_millis(),
     })
+}
+
+/// 单一判定来源：缓存证书 → Lean 现算。返回（整体判定，lean 信息）。
+#[allow(clippy::too_many_arguments)]
+fn judge_with_lean(
+    plan: &crate::prove::ir::Plan,
+    source_sha256: &str,
+    artifact_dir: Option<&Path>,
+    generated_lean: &Option<(PathBuf, String)>,
+    opts: &ProveOptions,
+    functions: &mut [FunctionReport],
+    diagnostics: &mut Vec<Diagnostic>,
+) -> Result<(Option<Verdict>, Option<LeanInfo>)> {
+    use crate::diagnostics::Span;
+    let Some((lean_path, lean_src)) = generated_lean else {
+        return Ok((None, None));
+    };
+
+    // 缓存键素材：工具链版本先探测（没有工具链就谈不上判定）。
+    let toolchain = match driver::Toolchain::discover(opts.lean.as_deref()) {
+        Ok(t) => t,
+        Err(err) => {
+            if opts.require_lean {
+                return Err(err);
+            }
+            diagnostics.push(
+                Diagnostic::new(None, Span::new(0, 0), format!("{err:#}"))
+                    .with_code("proof.lean_missing"),
+            );
+            return Ok((None, None));
+        }
+    };
+    let Some(toolchain) = toolchain else {
+        // 没找到工具链：保持 unverified（诚实：没跑就是没跑）。
+        // --require-lean 时退出码由 Verdict::exit_code 升到 2（§3.3 F3）。
+        if opts.require_lean {
+            diagnostics.push(
+                Diagnostic::new(
+                    None,
+                    Span::new(0, 0),
+                    "--require-lean：未找到 Lean 工具链（PATH/MARQDO_PROOF_LEAN/--lean）",
+                )
+                .with_code("proof.lean_missing"),
+            );
+        }
+        return Ok((None, None));
+    };
+
+    // 库（内嵌源 → olean，按内容哈希缓存）。
+    let cache_root = Path::new(".marqdo/prove");
+    let (lib_dir, library_sha256) = driver::ensure_library(cache_root, &toolchain)?;
+    let module_sha256 = cache::sha256_hex(lean_src.as_bytes());
+    let plan_sha = cache::sha256_hex(plan.to_stable_json().as_bytes());
+    let key = cache::cache_key(
+        source_sha256,
+        &plan_sha,
+        &library_sha256,
+        &toolchain.version,
+        env!("CARGO_PKG_VERSION"),
+    );
+
+    let mut artifact_fallback: Option<PathBuf> = None;
+    let artifact: &Path = match artifact_dir {
+        Some(d) => d,
+        None => {
+            let d = default_emit_dir(source_sha256);
+            // 极少见：report-only 之外无产物目录（理论上不可达）——现建。
+            let _ = std::fs::create_dir_all(&d);
+            // 借用问题：把目录放成一个本地 owned 值，再取引用。
+            artifact_fallback.get_or_insert(d).as_path()
+        }
+    };
+
+    // ① 证书命中 → 跳过判定。
+    if !opts.no_cache {
+        if let Some(cert) = cache::load(artifact, &key) {
+            apply_claims(functions, &cert.claims, &cert.span_map, diagnostics);
+            let status = cert.status;
+            return Ok((
+                Some(status),
+                Some(LeanInfo {
+                    toolchain: toolchain.version,
+                    library_sha256,
+                    module_sha256,
+                    cache: "hit",
+                }),
+            ));
+        }
+    }
+
+    // ② 现算：lake env lean 等价的直接 lean 调用（LEAN_PATH 指向底座 olean）。
+    let outcome = driver::check_module(
+        &toolchain,
+        &lib_dir,
+        lean_path,
+        lean_src,
+        opts.timeout,
+        opts.max_heartbeats,
+    )?;
+
+    // ③ 证据 → 诊断（proof.claim_failed，指回源码行）。
+    let claim_records: Vec<cache::ClaimRecord> = outcome
+        .claims
+        .iter()
+        .map(|c| cache::ClaimRecord {
+            id: c.claim.clone(),
+            function: c.function.clone(),
+            status: c.status,
+            source_line: c.source_line,
+        })
+        .collect();
+    apply_outcome(functions, &outcome.claims, diagnostics);
+
+    let cert = cache::Certificate {
+        key: key.clone(),
+        status: outcome.status,
+        tier: "lean",
+        source_sha256: source_sha256.to_string(),
+        library_sha256: library_sha256.clone(),
+        toolchain: toolchain.version.clone(),
+        module_sha256: module_sha256.clone(),
+        claims: claim_records,
+        span_map: outcome.span_map.clone(),
+        marqdo: env!("CARGO_PKG_VERSION").to_string(),
+    };
+    if let Err(err) = cache::store(artifact, &cert) {
+        diagnostics.push(
+            Diagnostic::new(
+                None,
+                Span::new(0, 0),
+                format!("证书写入失败（不阻塞判定）：{err:#}"),
+            )
+            .with_code("proof.cache_write"),
+        );
+    }
+
+    Ok((
+        Some(outcome.status),
+        Some(LeanInfo {
+            toolchain: toolchain.version,
+            library_sha256,
+            module_sha256,
+            cache: "miss",
+        }),
+    ))
+}
+
+/// 把判定结果按 (函数, 定理 id) 贴回函数报告。
+fn apply_outcome(
+    functions: &mut [FunctionReport],
+    claims: &[driver::ClaimOutcome],
+    diagnostics: &mut Vec<Diagnostic>,
+) {
+    use crate::diagnostics::Span;
+    for c in claims {
+        let matches_fn = |f: &FunctionReport| {
+            f.name == c.function
+                || emit::lean_ident(&f.name)
+                    .trim_matches('«')
+                    .trim_matches('»')
+                    == c.function
+        };
+        let Some(pos) = functions.iter().position(matches_fn) else {
+            continue;
+        };
+        let f = &mut functions[pos];
+        if let Some(claim) = f.claims.iter_mut().find(|x| x.id == c.claim) {
+            claim.status = c.status;
+            claim.decided_by = "lean".into();
+            claim.source_line = c.source_line;
+            claim.evidence = (!c.detail.is_empty()).then(|| c.detail.clone());
+            if c.status == Verdict::Unproved {
+                diagnostics.push(
+                    Diagnostic::new(
+                        None,
+                        Span::new(c.source_line.unwrap_or(0), 0),
+                        format!(
+                            "定理 {}.{} 未证：{}",
+                            c.function,
+                            c.claim,
+                            first_line(&c.detail)
+                        ),
+                    )
+                    .with_code("proof.claim_failed"),
+                );
+            }
+            f.verdict = f
+                .claims
+                .iter()
+                .map(|x| x.status)
+                .fold(Verdict::Proved, Verdict::worst);
+            f.tier = Tier::Lean;
+        }
+    }
+}
+
+/// 证书命中的同款贴回。
+fn apply_claims(
+    functions: &mut [FunctionReport],
+    claims: &[cache::ClaimRecord],
+    span_map: &[(u32, u32)],
+    diagnostics: &mut Vec<Diagnostic>,
+) {
+    use crate::diagnostics::Span;
+    for c in claims {
+        let source_line = c.source_line.or_else(|| {
+            span_map
+                .first()
+                .map(|(_, m)| *m)
+        });
+        if let Some(f) = functions
+            .iter_mut()
+            .find(|f| f.name == c.function)
+        {
+            if let Some(claim) = f.claims.iter_mut().find(|x| x.id == c.id) {
+                claim.status = c.status;
+                claim.decided_by = "lean".into();
+                claim.source_line = source_line;
+                if c.status == Verdict::Unproved {
+                    diagnostics.push(
+                        Diagnostic::new(
+                            None,
+                            Span::new(source_line.unwrap_or(0), 0),
+                            format!("定理 {}.{} 未证（缓存）", f.name, c.id),
+                        )
+                        .with_code("proof.claim_failed"),
+                    );
+                }
+                f.verdict = f
+                    .claims
+                    .iter()
+                    .map(|x| x.status)
+                    .fold(Verdict::Proved, Verdict::worst);
+                f.tier = Tier::Lean;
+            }
+        }
+    }
 }
 
 fn summarize(lowered: &[Lowered], only: &[String]) -> Vec<FunctionReport> {
@@ -312,13 +699,15 @@ fn summarize(lowered: &[Lowered], only: &[String]) -> Vec<FunctionReport> {
                     Vec::new(),
                     plan.claims
                         .iter()
-                        .map(|c| {
-                            (
-                                c.id.clone(),
-                                c.premise.clone(),
-                                c.conclusion.clone(),
-                                c.tactic.clone(),
-                            )
+                        .map(|c| ClaimReport {
+                            id: c.id.clone(),
+                            premise: c.premise.clone(),
+                            conclusion: c.conclusion.clone(),
+                            tactic: c.tactic.clone(),
+                            status: Verdict::Unverified,
+                            decided_by: String::new(),
+                            source_line: None,
+                            evidence: None,
                         })
                         .collect(),
                 ),

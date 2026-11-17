@@ -536,6 +536,22 @@ enum Commands {
         /// CI strict mode: unjudged statuses exit 2 (P1+)
         #[arg(long)]
         require_lean: bool,
+
+        /// Explicit lean binary (else MARQDO_PROOF_LEAN, else PATH)
+        #[arg(long, value_name = "PATH")]
+        lean: Option<PathBuf>,
+
+        /// Per-lean-call timeout in seconds (default 120)
+        #[arg(long, value_name = "SEC", default_value_t = 120)]
+        timeout: u64,
+
+        /// Bypass the certificate cache (also MARQDO_PROOF_NO_CACHE)
+        #[arg(long)]
+        no_cache: bool,
+
+        /// maxHeartbeats for lean (default: lean's own)
+        #[arg(long, value_name = "N")]
+        heartbeats: Option<u64>,
     },
 }
 
@@ -1081,6 +1097,10 @@ fn try_main(cli: Cli) -> Result<i32> {
             allow_opaque,
             no_strict_types,
             require_lean,
+            lean,
+            timeout,
+            no_cache,
+            heartbeats,
         } => {
             // 子命令参数覆盖顶层默认；默认动作 = emit + 报告。
             let (file, action_json, action_emit, action_only, action_opaque, action_relax) =
@@ -1131,6 +1151,9 @@ fn try_main(cli: Cli) -> Result<i32> {
             let emit_target = action_emit.flatten();
             let report_only = matches!(action, Some(ProveAction::Audit { .. }))
                 || (action.is_none() && report_only);
+            // emit 子命令只生成不判定（§8.2）。
+            let judge = !matches!(action, Some(ProveAction::Emit { .. }));
+            let no_cache = no_cache || std::env::var_os("MARQDO_PROOF_NO_CACHE").is_some();
             let opts = marqdo::prove::ProveOptions {
                 entry: None,
                 only: action_only,
@@ -1139,6 +1162,11 @@ fn try_main(cli: Cli) -> Result<i32> {
                 strict_types: !action_relax,
                 require_lean,
                 report_only,
+                judge,
+                no_cache,
+                lean,
+                timeout: std::time::Duration::from_secs(timeout),
+                max_heartbeats: heartbeats,
             };
             let report = marqdo::prove::prove_path(&file, &opts)?;
             for d in &report.diagnostics {

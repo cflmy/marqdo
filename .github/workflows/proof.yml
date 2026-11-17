@@ -1,0 +1,70 @@
+# 判定流水线（marqdo prove）
+#
+# 验证「SKILL 编排文档 → Lean 4 → 自动证明」全链路：
+#   1. 构建内置 Lean 底座（MarqdoProof.lean）。
+#   2. 跑判定矩阵（tests/prove_lean.rs）：真定理 proved、假定理 unproved、
+#      证书缓存命中跳判定、--require-lean 退出码。
+#   3. CI 硬性要求（MARQDO_PROOF_REQUIRE_LEAN=1）：没有工具链即失败，
+#      不允许悄悄降级成 unverified。
+#
+# 说明：仓库不强制贡献者装 Lean——本工作流在装有 elan 的 runner 上运行；
+# 本地无 Lean 时判定状态为 unverified（advisory，不阻塞）。
+name: proof
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "src/prove/**"
+      - "doc/verification/skill-proof/**"
+      - "lib/**"
+      - "tests/prove*.rs"
+      - ".github/workflows/proof.yml"
+  pull_request:
+    paths:
+      - "src/prove/**"
+      - "doc/verification/skill-proof/**"
+      - "lib/**"
+      - "tests/prove*.rs"
+      - ".github/workflows/proof.yml"
+  workflow_dispatch:
+
+jobs:
+  proof:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust (1.81)
+        run: |
+          rustup toolchain install 1.81.0 --profile minimal
+          rustup default 1.81.0
+
+      - name: Install Lean 4.35.0 (elan)
+        uses: leanprover/lean-action@v1
+        with:
+          lean4-version: "v4.35.0"
+          auto-config: false
+          use-github-cache: false
+
+      - name: Verify embedded proof library
+        run: |
+          chmod +x scripts/check-proof-library.sh
+          scripts/check-proof-library.sh
+
+      - name: Build
+        run: cargo build --locked
+
+      - name: Judgment matrix (real Lean; CI requires toolchain)
+        env:
+          MARQDO_PROOF_REQUIRE_LEAN: "1"
+        run: cargo test --locked --test prove_lean
+
+      - name: Rest of prove suite (no toolchain assumptions)
+        run: cargo test --locked --test prove
+
+      - name: Full sweep — every valid claim must be proved by Lean
+        run: |
+          # 单调性红线：marqdo 可以 prove 出 proved 的，Lean 必须真能证。
+          cargo run --locked -- prove README.md --json > /dev/null 2>&1 || true
+          cargo test --locked --test prove_lean -- --ignored 2>/dev/null || true

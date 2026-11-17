@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| 状态 | **计划（Proposed）· 未实现**；决策已定（§10），实施见 [roadmap/prove.md](../roadmap/prove.md) |
+| 状态 | **实施中（Partial）**：P0 全部、P1 Lean 判定已落地（见 §12）；P2 离线符号执行、P3 目录模式进行中。路线图：[roadmap/prove.md](../roadmap/prove.md) |
 | 日期 | 2026-11-13 |
 | 层归属 | **Language**：定理表角色 + `check --proof`（§7，[ADR 0010](../adr/0010-skill-proof-boundary.md)）· **Runtime**：`prove` 管线（§4–§6、§8）· **Document**：`verification/skill-proof` 证据 |
 | 相关 | [core-surface.md](core-surface.md)（复用 `table` 构造，不新增标记）· [layers.md](layers.md)（准入）· [markdown-mapping-v0.3.md](markdown-mapping-v0.3.md) · [ADR 0010](../adr/0010-skill-proof-boundary.md) · [verification/replay-policy](../../verification/replay-policy/README.md)（Lean 伴随判定的先例） |
@@ -830,3 +830,37 @@ prove 生成 → `lake env lean` → `proved / unproved / lean-error` 三态分�
 生成文件头部带 `set_option linter.unusedVariables false` /
 `set_option linter.unusedSimpArgs false`：机器生成产物不应被人写代码的 linter
 刷屏（ simp 参数是固定词汇表，个别文件用不到属正常）。
+
+### P1 Lean 判定落地（2026-11-17，commit 见 git log）
+
+新增 `src/prove/driver.rs` + `src/prove/cache.rs`，判定接进 `prove` 默认动作：
+
+| 组件 | 实现 | 与设计的偏差 |
+|---|---|---|
+| 工具链发现（§8.4） | `--lean` → `MARQDO_PROOF_LEAN` → `PATH`；显式给路径但不可执行 → `error[proof.lean_missing]` **不回退**；都找不到 → 状态保持 `unverified`（`--require-lean` 时退 2） | 一致 |
+| 底座构建 | `MarqdoProof.lean` **内嵌**进 marqdo 二进制（`include_str!`），按内容 sha256 前 8 位落盘缓存，`lean -o MarqdoProof.olean` 直接构建 + `LEAN_PATH` 指给被检模块 | **不经 lake**：运行时只依赖 `lean` 一个二进制（无 elan/lake 也判定）；lakefile 保留给人/CI 用。`scripts/check-proof-library.sh` 校验内嵌源与 `doc/verification/skill-proof/` 逐字节一致并输出库 sha256 |
+| 判定调用 | `lean <模块>` + 超时（默认 120s，`--timeout`；try_wait 轮询，超时杀进程判 `error`）；`--heartbeats` 透传 `-DmaxHeartbeats` | 一致 |
+| 结果解析 | `unsolved goals` → `unproved`；其它 `error` → `error`；干净编译 → `proved`；`sorry`（策略 `none`）→ `unverified` | 一致（§4.4 E4） |
+| 证据映射 | 生成文件 `-- mq: LINE:COL` + 定理头 `-- 定理 <id>（策略 …；mq: N）` → 证书 `span_map`；unproved 定理的诊断指回定理表行，附 Lean 原始目标上下文 | 一致（§8.5） |
+| 证书缓存（§8.3） | 键 = sha256(源码 ⊕ plan ⊕ 库 sha256 ⊕ lean 版本 ⊕ marqdo 版本)；命中 → 跳过判定，`lean.cache: "hit"`；`--no-cache` / `MARQDO_PROOF_NO_CACHE` 绕过 | plan.json schema 即结构化 plan（无独立 schema 文件） |
+| 状态/退出码（§3.3） | E1 假定理 unproved 退 1；F2 `--report-only` 恒 0 不判定；F3 `--require-lean` 无工具链退 2；`prove emit` 子命令只生成不判定 | 一致 |
+
+**实测抓出的判定层缺陷**（均有回归测试，tests/prove_lean.rs + driver 单元测试）：
+
+| 缺陷 | 后果 | 修复 |
+|---|---|---|
+| 错误头 `<file>:47:62: error` 解析取了**列号** 62 | unsolved 目标错配到下一个定理（相邻 61–76 区间），甲定理的失败记到乙定理头上 | 取倒数第二个数字段为行号 |
+| 干净编译时 driver 不产出逐定理记录 | 所有定理停留在 `unverified`，证书 `claims: []` | 无错定理一律补 `proved`（或 sorry → `unverified`） |
+| 函数全名含点（`台账.记录.记过即记`）按第一个点切分 | claim id 拼错（`记录.记过即记`），匹配不上报告 | 从定理头注释直接取 claim id，函数名 = 定理名剥掉 claim 后缀 |
+| 无定理函数把文件状态拖成 unverified | 没有义务的函数（纯编排胶水）使整体永远到不了 proved | 文件状态只聚合**有定理**与**被拒绝**的函数；无定理函数自身行仍如实 `unverified` |
+| 测试夹具 `长度(轨迹) = 0` 断言写错（函数体有一次调用） | Lean 如实拒绝——生成侧诚实、判定侧不虚报 | 修正夹具断言为 `= 1`（不是放宽判定） |
+
+测试矩阵（`tests/prove_lean.rs`，独立测试目标，`required-features = ["cli"]`）：
+A1 真定理 proved · E1 假定理 unproved 退 1 · E4 策略 none → unverified 退 0 ·
+F2 report-only 恒 0 · F3 require-lean 无工具链退 2 · F4 emit 子命令不判定 ·
+G1 假 lean 计数器证"命中跳判定"（含 `--no-cache` 复判） · G2 真证书命中 ·
+G2b `--no-cache` 强制 miss。无工具链时自动 SKIP，`MARQDO_PROOF_REQUIRE_LEAN=1`
+（CI）则缺失即失败。
+
+CI：`.github/workflows/proof.yml` —— 装 Lean 4.35.0 → 底座校验 →
+`MARQDO_PROOF_REQUIRE_LEAN=1` 跑判定矩阵（CI 不许静默降级）→ prove 主套件。

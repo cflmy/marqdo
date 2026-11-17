@@ -99,6 +99,16 @@ fn emit_theorems(out: &mut String, fun: &FnPlan) {
                     "      ((«结果», «轨迹») = {fun_name} env [] {run_args}) →"
                 );
                 let _ = writeln!(out, "      mqTruth {conclusion} := by");
+                if tactic == "none" {
+                    // 策略 none：定理生成但不证明（E4：状态 unverified，
+                    // driver 依 sorry 判 unverified，绝不冒充 proved）。
+                    let _ = writeln!(out, "  intro «结果» «轨迹» h_run");
+                    let _ = writeln!(out, "  unfold {fun_name} at h_run");
+                    let _ = writeln!(out, "  try split at h_run");
+                    let _ = writeln!(out, "  all_goals");
+                    let _ = writeln!(out, "    sorry");
+                    continue;
+                }
                 let _ = writeln!(out, "  intro «结果» «轨迹» h_run");
                 let _ = writeln!(out, "  unfold {fun_name} at h_run");
                 // 每个分支：simp_all（完整默认集处理 List.map/contains/length 的
@@ -160,7 +170,7 @@ const LEAN_KEYWORDS: &[&str] = &[
     "namespace", "end", "import", "by", "have", "show", "assume", "from", "at", "exists",
 ];
 
-fn lean_ident(name: &str) -> String {
+pub(crate) fn lean_ident(name: &str) -> String {
     let ascii_safe = !name.is_empty()
         && name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
         && !name.chars().next().is_some_and(|c| c.is_ascii_digit());

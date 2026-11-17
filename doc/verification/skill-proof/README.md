@@ -48,3 +48,11 @@ lake env lean <generated>.lean            # exit 0 且无 error ⇒ 该文件全
   proved / unproved / lean-error）。
 - 首轮曾发现 `p2_len` 夹具断言写错（纯函数却断言两步轨迹）被 Lean 如实拒绝——
   修复方向是改对断言，不是放宽判定："绝不 lean 无法证明的 marqdo 可以证明"。
+
+## 驱动集成（P1，2026-11-17）
+
+`marqdo prove` 的判定驱动把本库**内嵌**进 marqdo 二进制（`include_str!`），
+按内容哈希落盘缓存后直接 `lean -o MarqdoProof.olean` 构建，被检模块经
+`LEAN_PATH` 引用——运行时只依赖 `lean` 一个二进制，不需要 lake/elan。
+本目录的 lakefile 保留给人与 CI 使用；`scripts/check-proof-library.sh`
+负责校验内嵌副本与本目录逐字节一致，并输出库 sha256（写入判定证书）。
