@@ -14,6 +14,7 @@ pub mod driver;
 pub mod emit;
 pub mod ir;
 pub mod lower;
+pub mod offline;
 pub mod proof_check;
 pub mod types;
 
@@ -386,10 +387,14 @@ pub fn prove_path(path: &Path, opts: &ProveOptions) -> Result<Report> {
         status = Verdict::Error;
     }
 
-    // ⑤ Lean 判定（P1）：有定理、有产物、非 report-only 时进行。
+    // ⑤ 判定（P2）：离线符号执行先行（毫秒级，checked ≠ proved），
+    // 有 Lean 工具链时随即复核（checked 升 proved；分歧 → error，永不落绿）。
     let mut lean_info: Option<LeanInfo> = None;
     let claims_present = plan.functions.iter().any(|f| !f.claims.is_empty());
     if claims_present && opts.judge && !opts.report_only {
+        // ⑤a 离线（§5）：F1–F5 片段内给 checked/反例，超出片段不猜。
+        judge_offline(&plan, &mut functions, &mut diagnostics);
+        // ⑤b Lean 复核（§8）：证书缓存 → 现算。
         match judge_with_lean(
             &plan,
             &source_sha256,
@@ -443,6 +448,77 @@ pub fn prove_path(path: &Path, opts: &ProveOptions) -> Result<Report> {
         lean: lean_info,
         duration_ms: started.elapsed().as_millis(),
     })
+}
+
+/// 离线判定（§5）：checked/反例贴回定理，绝不冒充 proved。
+/// 单调性护栏在此埋点：离线结论会在 judge_with_lean 里被 Lean 复核。
+fn judge_offline(
+    plan: &crate::prove::ir::Plan,
+    functions: &mut [FunctionReport],
+    diagnostics: &mut Vec<Diagnostic>,
+) {
+    use crate::diagnostics::Span;
+    let debug = std::env::var("MARQDO_PROOF_DEBUG").is_ok_and(|v| v == "1");
+    for f in plan.functions.iter() {
+        for claim in &f.claims {
+            let verdict = offline::check_claim(f, claim);
+            if debug {
+                eprintln!(
+                    "[offline] {}.{} → {:?}",
+                    f.name, claim.id, verdict
+                );
+            }
+            let Some(fr) = functions.iter_mut().find(|x| x.name == f.name) else {
+                continue;
+            };
+            let Some(cr) = fr.claims.iter_mut().find(|c| c.id == claim.id) else {
+                continue;
+            };
+            match verdict {
+                offline::OfflineVerdict::Checked { cases } => {
+                    cr.status = Verdict::Checked;
+                    cr.decided_by = "trace".into();
+                    cr.evidence = Some(format!("离线符号执行：{cases} 条路径全部关闭（F1–F5）"));
+                    cr.source_line = Some(claim.line);
+                    fr.tier = Tier::Offline;
+                }
+                offline::OfflineVerdict::Unproved { counterexample } => {
+                    cr.status = Verdict::Unproved;
+                    cr.decided_by = "trace".into();
+                    cr.source_line = Some(claim.line);
+                    cr.evidence = counterexample.as_ref().map(|c| {
+                        format!(
+                            "反例（离线符号执行）：{} — 路径 #{}",
+                            c.detail, c.path_id
+                        )
+                    });
+                    if let Some(c) = &counterexample {
+                        diagnostics.push(
+                            Diagnostic::new(
+                                None,
+                                Span::new(claim.line, 0),
+                                format!(
+                                    "定理 {}.{} 反例：{}",
+                                    f.name, claim.id, c.detail
+                                ),
+                            )
+                            .with_code("proof.claim_failed"),
+                        );
+                    }
+                    fr.tier = Tier::Offline;
+                }
+                offline::OfflineVerdict::Unverified { reason } => {
+                    // 不猜：保留 unverified（不写 evidence，让位给 Lean 结果）。
+                    let _ = reason;
+                }
+            }
+            fr.verdict = fr
+                .claims
+                .iter()
+                .map(|x| x.status)
+                .fold(Verdict::Proved, Verdict::worst);
+        }
+    }
 }
 
 /// 单一判定来源：缓存证书 → Lean 现算。返回（整体判定，lean 信息）。
@@ -533,8 +609,8 @@ fn judge_with_lean(
         }
     }
 
-    // ② 现算：lake env lean 等价的直接 lean 调用（LEAN_PATH 指向底座 olean）。
-    let outcome = driver::check_module(
+    // ② 现算：lean 直接调用（LEAN_PATH 指向底座 olean）。
+    let mut outcome = driver::check_module(
         &toolchain,
         &lib_dir,
         lean_path,
@@ -542,6 +618,14 @@ fn judge_with_lean(
         opts.timeout,
         opts.max_heartbeats,
     )?;
+    // 测试注入（roadmap P2 单调性护栏）：让首条定理在 Lean 侧"关不掉"，
+    // 验证离线 checked + Lean unproved ⇒ error[proof.divergence] 的护栏真的咬人。
+    if std::env::var("MARQDO_PROOF_INJECT_DIVERGENCE").is_ok_and(|v| v == "1") {
+        if let Some(first) = outcome.claims.iter_mut().find(|c| c.status == Verdict::Proved) {
+            first.status = Verdict::Unproved;
+            first.detail = "injected divergence (MARQDO_PROOF_INJECT_DIVERGENCE)".into();
+        }
+    }
 
     // ③ 证据 → 诊断（proof.claim_failed，指回源码行）。
     let claim_records: Vec<cache::ClaimRecord> = outcome
@@ -610,6 +694,31 @@ fn apply_outcome(
         };
         let f = &mut functions[pos];
         if let Some(claim) = f.claims.iter_mut().find(|x| x.id == c.claim) {
+            // 单调性护栏（§5.4）：离线结论必须被 Lean 复核印证。
+            // checked 但 Lean 关不掉，或离线反例被 Lean 证出来 ⇒ 判定器有 bug。
+            let divergence = match (claim.status, c.status) {
+                (Verdict::Checked, Verdict::Unproved)
+                | (Verdict::Unproved, Verdict::Proved) => true,
+                _ => false,
+            };
+            if divergence {
+                diagnostics.push(
+                    Diagnostic::new(
+                        None,
+                        Span::new(claim.source_line.unwrap_or(0), 0),
+                        format!(
+                            "离线与 Lean 判定分歧：定理 {}.{} 离线 {:?}，Lean {}——判定器缺陷，拒绝落绿",
+                            f.name, c.claim, claim.status, c.status.as_str()
+                        ),
+                    )
+                    .with_code("proof.divergence"),
+                );
+                claim.status = Verdict::Error;
+                claim.decided_by = "lean".into();
+                f.verdict = Verdict::Error;
+                f.tier = Tier::Lean;
+                continue;
+            }
             claim.status = c.status;
             claim.decided_by = "lean".into();
             claim.source_line = c.source_line;

@@ -864,3 +864,33 @@ G2b `--no-cache` 强制 miss。无工具链时自动 SKIP，`MARQDO_PROOF_REQUIR
 
 CI：`.github/workflows/proof.yml` —— 装 Lean 4.35.0 → 底座校验 →
 `MARQDO_PROOF_REQUIRE_LEAN=1` 跑判定矩阵（CI 不许静默降级）→ prove 主套件。
+
+### P2 离线判定落地（2026-11-17）
+
+新增 `src/prove/offline.rs`（片段 F1–F5 的符号执行）+ `tests/prove_corpus.rs`
+（40 夹具单调性语料库）：
+
+| 组件 | 实现 |
+|---|---|
+| 符号执行（§5.3） | 状态 `Var → SymVal`（Const/Struct/OpResult/Param/Unknown）；If 逐分支克隆状态并**接续 If 之后的语句**（Return 常在外层）；每个 Return 收集 (路径条件, 结果, 轨迹, 变量快照) |
+| 可行性 | 前提区间 ∩ 路径条件为空 → 路径不可行，空真关闭（Lean 侧对应假设矛盾，simp 可消） |
+| F2 轨迹 | 包含/长度逐路径求值（Op.name 显示名与 Lean 一致） |
+| F3 字面 | `result.ok/error/value_or` 结构求值（与 mqResultOk/mqError/mqValueOr 语义一致） |
+| F4 自由原子 | 外部返回值布尔判定只二分；路径条件里出现同键原子才可关闭（hypothesis）；反例路径含自由原子 → 保守放弃见证 |
+| F5 区间 | **收紧后的诚实范围**：字面重述（同原子）→ hypothesis 关闭；区间违反 → 确定性否定 + 区间端点见证（反例）；区间**蕴含**（10000 ⊢ 9999）数学上真，但当前 Lean 脚本无 Val 比较传递引理，simp+omega 关不掉——离线同样保守 unverified（等库补引理再放开），否则必触发 divergence |
+| 状态 | 离线 closed → `checked`（decided_by=trace，**不是 proved**）；反例 → `unproved` + `proof.claim_failed` 诊断（指回定理表行 + 见证如 `金额 = 10001`） |
+| 单调性护栏（§5.4） | 有 Lean 时逐定理复核：离线 checked 但 Lean unproved，或离线反例被 Lean 证出 → `error[proof.divergence]` 退 1，永不落绿；`MARQDO_PROOF_INJECT_DIVERGENCE=1` 测试注入验证护栏咬人 |
+| 语料库 | `tests/prove/fixtures/` 8 类 × 5 = 40 夹具（literal/trace/interval/free-bool/branches/composition/counterexample/beyond）；`corpus_monotonicity_offline_subset_of_lean` 强制 offline ⊆ lean；`corpus_offline_never_claims_proved` 无 Lean 时禁 proved |
+
+**实测抓出并修复的缺陷**（均有测试）：
+
+| 缺陷 | 修复 |
+|---|---|
+| If 分支后丢弃剩余步骤（Return 在 If 外层的常见编排全部丢结果） | 两支克隆状态并接续后续语句 |
+| `negated` 字段与 op 翻转双重否定，取反原子被收集函数丢弃 | 移除字段，否定一律折进 op/expected |
+| 嵌套分支（else 里再嵌 if）Lean 只拆一层 | `try split at h_run` 按最大 if 深度重复发射 |
+| simp 清单缺 `mqResultError`/`mqValueOr`/`mqAnd/mqOr/mqNot` | 全部补入（l2/l5/f1 由分歧护栏暴露） |
+
+**已记录的文法限制**：分支条件尚不支持字段访问（`access(审核, "ok")` 作条件
+解析失败）——F4 的"路径条件含自由原子"场景目前由单元测试覆盖，语料库中以
+分支后的结构化结论代替；文法放开后 prove 侧无需改动（offline.cond_atom 已支持）。

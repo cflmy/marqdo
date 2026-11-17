@@ -493,7 +493,11 @@ fn p1_b_emit_theorem_scaffold() {
     assert!(lean.contains("(mqAccess «结果» \"ok\")"), "{lean}");
     // 策略脚本（§7.2）：unfold → split → simp_all/omega。
     assert!(lean.contains("unfold «审批台.审批» at h_run"), "{lean}");
-    assert!(lean.contains("split at h_run\n  all_goals\n    simp_all [mqTruth, Op.name, mqAccess, mqResultOk, mqEq]"), "{lean}");
+    assert!(
+        lean.contains("try split at h_run")
+            && lean.contains("all_goals\n    simp_all [mqTruth, Op.name, mqAccess, mqResultOk, mqResultError, mqValueOr, mqAnd, mqOr, mqNot, mqEq]"),
+        "{lean}"
+    );
 }
 
 /// check --proof（默认关）：不传 --proof 时定理问题不报。

@@ -49,6 +49,21 @@ pub fn emit_module(plan: &Plan, module_stem: &str) -> (String, String) {
 }
 
 /// 定理脚手架（§7.2）：受限文法可解析的命题 → `theorem` 陈述 + `sorry`
+/// 函数体里 if 的最大嵌套深度（0 = 无分支）。
+fn max_if_depth(steps: &[Step]) -> usize {
+    fn walk(steps: &[Step], depth: usize) -> usize {
+        let mut max = depth;
+        for s in steps {
+            if let Step::If { then, otherwise, .. } = s {
+                max = max.max(walk(then, depth + 1));
+                max = max.max(walk(otherwise, depth + 1));
+            }
+        }
+        max
+    }
+    walk(steps, 0)
+}
+
 fn emit_theorems(out: &mut String, fun: &FnPlan) {
     if fun.claims.is_empty() {
         return;
@@ -111,15 +126,19 @@ fn emit_theorems(out: &mut String, fun: &FnPlan) {
                 }
                 let _ = writeln!(out, "  intro «结果» «轨迹» h_run");
                 let _ = writeln!(out, "  unfold {fun_name} at h_run");
+                // 嵌套分支（else 里再嵌 if）需要逐层拆：按最大 if 深度发射
+                // `try split at h_run`（拆无可拆时 try 吞掉，幂等）。
+                for _ in 0..=max_if_depth(&fun.steps) {
+                    let _ = writeln!(out, "  try split at h_run");
+                }
                 // 每个分支：simp_all（完整默认集处理 List.map/contains/length 的
                 // 结构化消去；等式替换输出；Op.name 方程化简）+ 附加域定义
                 // （mqAccess/mqResultOk/mqEq 字段与构造）。互斥比较假设由库中
                 // @[simp] 矛盾引理消掉，剩余线性算术交给 omega。
                 let _ = writeln!(
                     out,
-                    "  try split at h_run
-  all_goals
-    simp_all [mqTruth, Op.name, mqAccess, mqResultOk, mqEq]
+                    "  all_goals
+    simp_all [mqTruth, Op.name, mqAccess, mqResultOk, mqResultError, mqValueOr, mqAnd, mqOr, mqNot, mqEq]
     try
       first
       | exact (mqGt_mqLe_false ‹mqGt _ (Val.int _) = true› ‹mqLe _ (Val.int _) = true›).elim
