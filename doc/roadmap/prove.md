@@ -2,11 +2,11 @@
 
 | | |
 |---|---|
-| 状态 | **计划（Proposed）· 未开工** |
+| 状态 | **已实施（P0–P3 落地，2.8.0）**——落地记录：[design/prove-cli.md §12](../design/prove-cli.md)；foreach / 跨模块 assume-guarantee / 假设表 T3 显式延期 2.9 |
 | 日期 | 2026-11-13 |
 | 设计 | [design/prove-cli.md](../design/prove-cli.md)（命令面、离线片段、定理表、语言习惯审查） |
 | 决策 | [ADR 0010](../adr/0010-skill-proof-boundary.md)（定理表角色、子集边界、顾问式定位） |
-| 目标版本 | CLI 2.8.0 |
+| 目标版本 | CLI 2.8.0（已发） |
 | 总工期 | 6.5 人周（单人；P0+P1 共 3 周可演示） |
 
 ---

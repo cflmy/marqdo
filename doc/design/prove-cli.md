@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| 状态 | **实施中（Partial）**：P0 全部、P1 Lean 判定已落地（见 §12）；P2 离线符号执行、P3 目录模式进行中。路线图：[roadmap/prove.md](../roadmap/prove.md) |
+| 状态 | **已实施（Implemented · 2.8.0）**：P0–P3 落地记录见 §12；遗留项（foreach、跨模块 assume-guarantee、假设表 T3）显式延期至 2.9，理由见 §12.4。路线图：[roadmap/prove.md](../roadmap/prove.md) |
 | 日期 | 2026-11-13 |
 | 层归属 | **Language**：定理表角色 + `check --proof`（§7，[ADR 0010](../adr/0010-skill-proof-boundary.md)）· **Runtime**：`prove` 管线（§4–§6、§8）· **Document**：`verification/skill-proof` 证据 |
 | 相关 | [core-surface.md](core-surface.md)（复用 `table` 构造，不新增标记）· [layers.md](layers.md)（准入）· [markdown-mapping-v0.3.md](markdown-mapping-v0.3.md) · [ADR 0010](../adr/0010-skill-proof-boundary.md) · [verification/replay-policy](../../verification/replay-policy/README.md)（Lean 伴随判定的先例） |
@@ -894,3 +894,35 @@ CI：`.github/workflows/proof.yml` —— 装 Lean 4.35.0 → 底座校验 →
 **已记录的文法限制**：分支条件尚不支持字段访问（`access(审核, "ok")` 作条件
 解析失败）——F4 的"路径条件含自由原子"场景目前由单元测试覆盖，语料库中以
 分支后的结构化结论代替；文法放开后 prove 侧无需改动（offline.cond_atom 已支持）。
+
+### P3 组合与产品化（2026-11-17）
+
+| 任务 | 状态 | 实现 |
+|---|---|---|
+| `--all` 目录模式 + `--max-files` | ✅ | 递归收集（跳过 target/dist/node_modules/.git/.marqdo，上限 200）；目录不带 --all → 拒绝；聚合 JSON `{"kind":"prove-all","status":…,"files":[…]}`；整体状态差者胜（A6 测试：假 lean 分歧在目录模式同样触发护栏、整体退 1） |
+| 差分一致性 T4（B 组） | ✅ | `tests/conformance.rs`：5 个纯函数语料（算术/中文标识符/分支比较/字符串拼接/i64 边界）解释器求值 == Lean `example … = Val.… := by simp`；B4 result.ok 结构字段读取两侧一致。B2（除零/模零）保持已记录偏差：解释器为运行时错误，P1 库模型返回 `.int 0`（MarqdoProof.lean 注释） |
+| 调试注入 `--fault-inject offline-claim` | ✅ | 等价于 `MARQDO_PROOF_INJECT_DIVERGENCE=1`（A3 分歧护栏验证入口） |
+| 跨函数组合 | 部分 | 同模块直线纯函数**内联**（≤24 语句、无分支、effect=pure）已落地；跨模块调用=不透明操作（效应未知，护栏兜底）；**assume-guarantee 后置条件复用 → 2.9**（依赖假设表 T3） |
+| `foreach` | 延期 | 维持 `proof.foreach_pending` 拒绝；有限列表 fold 编码需要库级归纳引理，冒进会先于 Lean 关闭路径、破坏单调性护栏可信度（§12.4） |
+| 文档 | ✅ | 教程 §13.8（prove 章节）、skills/marqdo/reference.md（定理表）、本设计文档状态行、roadmap 落地记录；README/CHANGELOG/doc/releases 因仓库权限（root 属主）待人工合入，内容已在 §12.5 |
+
+#### §12.4 延期理由（2.9）
+
+1. **foreach**：可证子集刻意无循环（返回路径有限性是反例枚举与 Lean 分支
+   拆解的共同根基）。fold 编码需 `List.length` 归纳引理入 MarqdoProof.lean，
+   且离线判定器需要"有限列表"的证据语法——两件事都没有通过 40 夹具语料库
+   的单调性验证，不该在发布版里冒险。
+2. **跨模块 assume-guarantee**：需要假设表（T3）承载被调者后置条件，并把
+   假设作为 `hypothesis` 关闭理由暴露给证书。当前跨模块调用是不透明操作，
+   诚实且护栏可兜底；半吊子假设复用会制造"看起来证了其实靠假设"的绿灯。
+3. **分支条件字段访问**（`access(审核, "ok")` 作条件）：解析器文法限制，
+   prove 侧已就绪（offline cond_atom 支持任意键），放开即生效。
+
+#### §12.5 待仓库权限合入的内容
+
+以下文件 root 属主、当前工作目录不可写（uid=1000）：
+
+- `CHANGELOG.md`：v2.8.0 条目（见 `doc/roadmap/prove-release-2.8.0.md`）
+- `README.md`：版本行 2.7.1→2.8.0 + prove 简介（同上文件附文案）
+- `doc/releases/v2.8.0.md`：双语发布说明（同上文件附全文）
+- `skills/marqdo-dev/index.mq.md`：`prove` 任务（契约见本节 §12.3 表）

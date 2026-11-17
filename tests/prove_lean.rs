@@ -389,6 +389,64 @@ fn e4_tactic_none_yields_unverified() {
     assert_eq!(out.status.code(), Some(0), "advisory：unverified 不阻塞");
 }
 
+/// A6：`--all` 目录模式——整体取最差（差者胜），目录不带 --all 拒绝。
+#[test]
+fn a6_all_aggregates_worst_status_and_exit() {
+    if !toolchain_available() {
+        skip_or_fail("a6_all");
+        return;
+    }
+    let s = Scratch::new("a6_all");
+    let lean_path = install_fake_lean(&s.dir);
+    s.write("good.mq.md", LEDGER_OK);
+    // 坏定理文件：unproved（LEDGER_BAD 是 `长度(轨迹) = 0`，真实执行 1 步）。
+    let bad = LEDGER_BAD.replace("台账", "坏台账");
+    s.write("坏/坏.mq.md", &bad);
+
+    // 目录不带 --all → 退 1。
+    let dir_out = s
+        .marqdo()
+        .arg("prove")
+        .arg(".")
+        .output()
+        .expect("run prove dir");
+    let dir_err = String::from_utf8_lossy(&dir_out.stderr);
+    assert!(dir_err.contains("是目录"), "{dir_err}");
+    assert_eq!(dir_out.status.code(), Some(1));
+
+    // --all：假 lean 恒报 proved，坏定理离线反例与之分歧 → 护栏 error（§6 A3
+    // 在目录模式同样生效）；整体取最差 = error，退 1。
+    let all_out = s
+        .marqdo()
+        .arg("prove")
+        .arg("--all")
+        .arg(".")
+        .arg("--lean")
+        .arg(&lean_path)
+        .arg("--json")
+        .output()
+        .expect("run prove --all");
+    let json: serde_json::Value =
+        serde_json::from_slice(&all_out.stdout).expect("prove-all json");
+    assert_eq!(json["kind"], "prove-all");
+    assert_eq!(json["status"], "error", "{json}");
+    assert_eq!(json["file_count"], 2);
+    assert_eq!(all_out.status.code(), Some(1), "整体最差 error 应退 1");
+    let files = json["files"].as_array().expect("files");
+    let bad_file = files
+        .iter()
+        .find(|f| f["file"].as_str().is_some_and(|n| n.contains("坏")))
+        .expect("bad file row");
+    assert_eq!(bad_file["status"], "error");
+    let codes: Vec<&str> = bad_file["diagnostics"]
+        .as_array()
+        .expect("diagnostics")
+        .iter()
+        .filter_map(|d| d["code"].as_str())
+        .collect();
+    assert!(codes.contains(&"proof.divergence"), "{codes:?}");
+}
+
 /// 真定理 → proved（冒烟：真 Lean 全链路）。
 #[test]
 fn a1_true_claim_proved() {

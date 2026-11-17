@@ -33,9 +33,35 @@ def mqAccess : Val → String → Val
 
 -- ---------------------------------------------------------------- 算术
 
-/-- `+`：仅 int 参与算术；其它形状 → `none`（定型检查在源语言侧拒绝混合算术）。 -/
+/-- 显示串：标量与解释器 `Value::as_display` 对齐（T4 差分一致性）。
+容器做一层显示（值经 mqDisplayScalar），嵌套容器超出 `+` 片段——
+记录为有意简化，语料不依赖嵌套容器拼接。非递归 ⇒ 无终止性负担。 -/
+def mqDisplayScalar : Val → String
+  | .int n => toString n
+  | .num x => toString x
+  | .bool b => if b then "True" else "False"
+  | .text s => s
+  | _ => "…"
+
+def mqDisplay : Val → String
+  | .int n => toString n
+  | .num x => toString x
+  | .bool b => if b then "True" else "False"
+  | .text s => s
+  | .list xs => "[" ++ String.intercalate ", " (xs.map mqDisplayScalar) ++ "]"
+  | .map ps => "{" ++ String.intercalate ", " (ps.map (fun p => p.1 ++ ": " ++ mqDisplayScalar p.2)) ++ "}"
+  | _ => "None"
+
+/-- `+`：int 算术 + 文本拼接 + num 混合，与解释器 `eval_binary(Add)` 一致。
+偏差：解释器 i64 溢出报运行时错误；Lean `Int` 无界（语料只测界内值）。 -/
 def mqAdd : Val → Val → Val
   | .int a, .int b => .int (a + b)
+  | .num a, .num b => .num (a + b)
+  | .int a, .num b => .num (Float.ofInt a + b)
+  | .num a, .int b => .num (a + Float.ofInt b)
+  | .text a, .text b => .text (a ++ b)
+  | .text a, b => .text (a ++ mqDisplay b)
+  | a, .text b => .text (mqDisplay a ++ b)
   | _, _ => .none
 
 def mqSub : Val → Val → Val
