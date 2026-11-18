@@ -13,7 +13,7 @@ use anyhow::Result;
 use crate::ast::{self, Arg, BinaryOp, CallExpr, Expr, Function, Module, Stmt};
 use crate::diagnostics::{Diagnostic, Severity, Span};
 use crate::prove::ir::{
-    BinOp, ClaimPlan, Expr as IrExpr, FnPlan, InterpPart, OpDecl, ParamPlan, Plan, PlanTy,
+    AssumptionPlan, BinOp, ClaimPlan, Expr as IrExpr, FnPlan, InterpPart, OpDecl, ParamPlan, Plan, PlanTy,
     PureExpr, Step, UnOp, SCHEMA,
 };
 use crate::sema::bind::{call_display, resolve_for_exec};
@@ -148,7 +148,10 @@ impl<'m> Lowerer<'m> {
                     line: c.line,
                 })
                 .collect(),
-            assumptions: Vec::new(),
+            assumptions: fun.assumptions.iter().map(|a|AssumptionPlan{
+                op:a.op.clone(), premise:a.premise.clone(),
+                postcondition:a.postcondition.clone()
+            }).collect(),
         };
         Lowered {
             display: display.to_string(),
