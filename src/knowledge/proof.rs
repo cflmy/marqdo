@@ -165,6 +165,7 @@ pub fn index_links(prove_dir:&Path, semantic:&SemanticProject)->Value {
             let Some(claims)=link["claims"].as_array() else {continue};
             for claim in claims {
                 let mut entry=claim.clone();
+                entry["receipt_artifact"]=json!(folder.file_name().to_string_lossy().to_string());
                 let owner=claim["owner_symbol_id"].as_str().and_then(|id|owners.get(id));
                 let theorem_present=claim["owner_symbol_id"].as_str().is_some_and(|id|
                     semantic.claims.iter().any(|c|
@@ -229,4 +230,62 @@ pub fn index_links(prove_dir:&Path, semantic:&SemanticProject)->Value {
     }
     json!({"schema_version":1,"role":"proof_receipts_not_execution_authority",
         "claims":entries})
+}
+
+
+/// Recheck every locally cached *usable* Lean receipt with an actual Lean
+/// invocation. Hash-only certificates are not trusted for --verify. An error
+/// at one folder revokes all its receipts; no JSON proof flag can override it.
+pub fn replay_index(
+    prove_dir:&Path, index:&mut Value,
+    toolchain:&crate::prove::driver::Toolchain,
+    timeout:std::time::Duration
+)->Result<()> {
+    let (libdir,_)=crate::prove::driver::ensure_library(prove_dir,toolchain)?;
+    let mut replayed:BTreeMap<String,Vec<(String,String)>>=BTreeMap::new();
+    let mut rejected:std::collections::BTreeSet<String>=std::collections::BTreeSet::new();
+    let Some(entries)=index["claims"].as_array_mut() else {return Ok(())};
+    let artifacts:std::collections::BTreeSet<_>=entries.iter()
+        .filter(|e|e["usable"]==true)
+        .filter_map(|e|e["receipt_artifact"].as_str().map(str::to_owned))
+        .collect();
+    for id in artifacts {
+        if id=="." || id==".." || id.contains('/') || id.contains('\\'){
+            rejected.insert(id);
+            continue;
+        }
+        let src_dir=prove_dir.join(&id).join("Generated");
+        let files=fs::read_dir(&src_dir).ok().into_iter()
+            .flat_map(|items|items.flatten())
+            .filter(|f|f.path().extension().is_some_and(|ext|ext=="lean"))
+            .map(|f|f.path()).collect::<Vec<_>>();
+        if files.len()!=1 {rejected.insert(id);continue;}
+        let path=&files[0];
+        let Ok(source)=fs::read_to_string(path) else {rejected.insert(id);continue};
+        let Ok(outcome)=crate::prove::driver::check_module(
+            toolchain,&libdir,path,&source,timeout,None) else {
+                rejected.insert(id);continue;
+            };
+        if outcome.status!=Verdict::Proved ||
+            fs::read_to_string(path).ok().as_deref()!=Some(source.as_str()) {
+            rejected.insert(id);continue;
+        }
+        replayed.insert(id,outcome.claims.into_iter()
+            .filter(|c|c.status==Verdict::Proved)
+            .map(|c|(c.function,c.claim)).collect());
+    }
+    for entry in entries {
+        if entry["usable"]!=true {continue;}
+        let id=entry["receipt_artifact"].as_str().unwrap_or("");
+        let found=replayed.get(id).is_some_and(|claims|claims.iter().any(|(fun,claim)|
+            entry["function"]==fun.as_str() && entry["claim_id"]==claim.as_str()));
+        if !found || rejected.contains(id) {
+            entry["usable"]=json!(false);
+            entry["status"]=json!("unverified");
+            entry["stale_reason"]=json!("lean_kernel_replay_failed");
+        } else {
+            entry["kernel_replayed"]=json!(true);
+        }
+    }
+    Ok(())
 }
