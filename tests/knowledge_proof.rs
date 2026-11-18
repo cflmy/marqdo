@@ -58,6 +58,46 @@ fn links_bind_to_exact_owner_and_stale_after_source_change() {
 }
 
 #[test]
+fn dependency_change_invalidates_caller_proof_even_if_caller_source_is_unchanged() {
+    let dir=root("transitive");
+    let lib=dir.join("rates.mq.md");
+    let app=dir.join("main.mq.md");
+    fs::write(&lib,"# rates\n\n## lookup\n\n*2*\n").unwrap();
+    fs::write(&app,r#"---
+import:
+  rates: rates.mq.md
+---
+
+# main
+
+## compute
+
+**tax = [计算税额](rates.lookup())**
+*tax*
+"#).unwrap();
+    let before=compile_project(&CompileOptions::for_path(&dir).unwrap()).unwrap();
+    let owner=before.semantics.artifacts.iter()
+        .find(|a|a.display_name=="main.compute").unwrap();
+    let old_closure=owner.hashes.closure.clone();
+    let receipt=link_report(&before,&app,&report(&app,Verdict::Checked,"trace",None),&dir);
+    assert_eq!(receipt["claims"].as_array().unwrap().len(),1,
+        "function identity must resolve exactly");
+    let proof=dir.join(".marqdo/prove/first");
+    fs::create_dir_all(&proof).unwrap();
+    fs::write(proof.join("knowledge-links.json"),
+        serde_json::to_vec(&receipt).unwrap()).unwrap();
+    fs::write(&lib,"# rates\n\n## lookup\n\n*3*\n").unwrap();
+    let after=compile_project(&CompileOptions::for_path(&dir).unwrap()).unwrap();
+    let revised=after.semantics.artifacts.iter()
+        .find(|a|a.display_name=="main.compute").unwrap();
+    assert_ne!(old_closure,revised.hashes.closure,
+        "callee implementation changes must invalidate caller closure");
+    let index=index_links(&dir.join(".marqdo/prove"),&after.semantics);
+    assert_eq!(index["claims"][0]["status"],"stale");
+    fs::remove_dir_all(dir).unwrap();
+}
+
+#[test]
 fn fake_lean_status_with_no_matching_certificate_cannot_be_proved() {
     let dir=root("forge");
     let file=dir.join("main.mq.md");
