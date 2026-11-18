@@ -32,7 +32,7 @@ fn lookup<'a>(functions:&'a [Function],segments:&[&str])->Option<&'a Function>{
     if candidates.next().is_some(){return None}
     if tail.is_empty(){Some(found)}else{lookup(&found.children,tail)}
 }
-fn load_function(compiled:&Compilation,artifact:&SemanticArtifact)->Option<Function>{
+pub(super) fn load_function(compiled:&Compilation,artifact:&SemanticArtifact)->Option<Function>{
     let text=fs::read_to_string(compiled.semantics.root.join(&artifact.source.file)).ok()?;
     let parsed=crate::parse::parse_source(&text).ok()?;
     lookup(&parsed.functions,&artifact.display_name.split('.').collect::<Vec<_>>()).cloned()
@@ -57,7 +57,7 @@ fn projection(fun:&Function)->Option<&str>{
         _=>None
     }
 }
-fn forwarder(fun:&Function)->Option<&CallExpr>{
+pub(super) fn forwarder(fun:&Function)->Option<&CallExpr>{
     match fun.body.as_slice(){
         [Stmt::Return{value,..}]=>unwrap_call(value),
         [Stmt::Assign{name,value,..},Stmt::Return{value:Expr::Var(result),..}]
@@ -167,7 +167,7 @@ fn candidate(compiled:&Compilation,call:&BoundCall)->Option<Prepared>{
 pub(super) fn eligible(compiled:&Compilation,call:&BoundCall)->bool{
     candidate(compiled,call).is_some()
 }
-fn closures(compiled:&Compilation,call:&BoundCall)->Result<BTreeSet<(String,String)>>{
+pub(super) fn closures(compiled:&Compilation,call:&BoundCall)->Result<BTreeSet<(String,String)>>{
     let set=compiled.semantics.artifacts.iter()
         .filter(|a|a.symbol_id.as_ref()==Some(&call.caller)||
                     a.symbol_id.as_ref()==Some(&call.target))
