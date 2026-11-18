@@ -75,6 +75,40 @@ fn fake_lean_status_with_no_matching_certificate_cannot_be_proved() {
 }
 
 #[test]
+fn real_prove_pipeline_emits_function_bound_knowledge_sidecar_without_lean() {
+    let dir=root("pipeline");
+    let file=dir.join("main.mq.md");
+    fs::write(&file,r#"---
+markup: occlusion
+---
+
+# main
+
+## compute
+
+| 定理 | 结论 | 前提 | 策略 |
+|---|---|---|---|
+| 无外部操作 | 长度(轨迹) = 0 | | auto |
+
+**x = [演算](2 * 3)**
+*x*
+"#).unwrap();
+    let out=dir.join(".marqdo/prove/manual");
+    let opts=marqdo::prove::ProveOptions {
+        emit_dir:Some(out.clone()),judge:false,..Default::default()
+    };
+    let report=marqdo::prove::prove_path(&file,&opts).unwrap();
+    assert!(report.functions.iter().any(|f|!f.claims.is_empty()));
+    let linkage:serde_json::Value=serde_json::from_slice(
+        &fs::read(out.join("knowledge-links.json")).unwrap()).unwrap();
+    assert_eq!(linkage["schema_version"],1);
+    assert_eq!(linkage["claims"][0]["claim_id"],"无外部操作");
+    assert_eq!(linkage["claims"][0]["proof_scope"],"function");
+    assert_ne!(linkage["claims"][0]["status"],"proved");
+    fs::remove_dir_all(dir).unwrap();
+}
+
+#[test]
 fn stale_duplicate_claims_are_never_selected_by_position() {
     let dir=root("duplicate");
     let file=dir.join("main.mq.md");
