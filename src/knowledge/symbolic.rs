@@ -101,6 +101,33 @@ pub fn emit_lean(goals:&[(String,SymbolicGoal)])->String{
 mod tests{
     use super::*;
     #[test]
+    fn branch_condition_generates_symbolic_lean_obligation() {
+        let root=std::env::temp_dir().join(format!(
+            "marqdo-symbolic-branch-{}",std::process::id()));
+        let _=std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        std::fs::write(root.join("math.mq.md"),
+            "# math\n\n## exact\n+ `n`\n\n| 参数 | 类型 | 说明 |\n|---|---|---|\n| n | int | integer |\n\n| 定理 | 结论 | 前提 | 策略 |\n|---|---|---|---|\n| c | 结果 = 2 | n > 0 | auto |\n\n*2*\n").unwrap();
+        std::fs::write(root.join("main.mq.md"),
+            "---\nimport:\n  math: math.mq.md\n---\n# main\n\n## f\n+ `n`\n\n| 参数 | 类型 | 说明 |\n|---|---|---|\n| n | int | integer |\n\n1. `n` > 0\n  **v = [调用](math.math.exact(`n`))**\n2. *\n  **v = 0**\n\n*v*\n").unwrap();
+        let c=crate::sema::ir::compile_project(
+            &crate::sema::ir::CompileOptions::for_path(&root).unwrap()).unwrap();
+        let call=c.semantics.bound_calls.iter().find(|x|
+            x.call_site=="math.math.exact").expect("import binding");
+        assert_eq!(call.path_guards.len(),1);
+        assert!(call.control_blocker.is_none());
+        let goal=plan(&c.semantics,call,"n > 0")
+            .expect("path condition should imply imported precondition");
+        assert!(goal.runtime_domain_verified);
+        assert_eq!(goal.guard_index,0);
+        let source=emit_lean(&[("branch-call".into(),goal)]);
+        assert!(source.contains("theorem path_vc_0"));
+        assert!(source.contains("exact h0"));
+        assert!(!source.contains("sorry"));
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
     fn symbolic_guards_cannot_be_invented_from_unsupported_calls(){
         assert!(proposition("lib.fetch(x) > 0",&BTreeMap::new()).is_none());
     }
