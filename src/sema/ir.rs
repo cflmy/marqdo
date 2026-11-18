@@ -238,6 +238,8 @@ pub struct KnowledgeStep {
 /// Static call site bound to a SymbolId (G02).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BoundCall {
+    /// Exact owning function symbol at the AST callsite.
+    pub caller: SymbolId,
     pub target: SymbolId,
     pub call_site: String,
     pub source: SourceLocation,
@@ -709,6 +711,7 @@ fn artifact_for_function(
             CallClass::Bound { target, effects: call_effects } => {
                 dependencies.push(ArtifactId(target.as_str().to_string()));
                 bound_calls.push(BoundCall {
+                    caller:symbol.id.clone(),
                     target,
                     call_site: call_display(call),
                     source,
@@ -1534,6 +1537,7 @@ fn claim_json(claim: &KnowledgeClaim) -> Value {
 fn step_json(step: &KnowledgeStep) -> Value { json!({"id":step.id.0,"anchor_id":step.anchor_id,"definition_digest":step.definition_digest.0,"reference":step.reference,"kind":step.kind,"calls":step.calls.iter().map(SymbolId::as_str).collect::<Vec<_>>(),"effects":step.effects.values(),"source":{"file":step.source.file,"line":step.source.line,"end_line":step.source.end_line}}) }
 fn bound_call_json(call: &BoundCall) -> Value {
     json!({
+        "caller":call.caller.as_str(),
         "target": call.target.as_str(),
         "call_site": call.call_site,
         "source": {"file": call.source.file, "line": call.source.line, "end_line": call.source.end_line},
