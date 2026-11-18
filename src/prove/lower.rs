@@ -608,6 +608,7 @@ impl<'m> Lowerer<'m> {
                 // contract reuse; Lean verifies the actual substituted body.
                 if body.inline_depth < 4
                     && imported_pure_leaf(target)
+                    && imported_leaf_arithmetic_safe(target,call)
                     && call.args.len()==target.params.len()
                     && call.args.iter().all(|a|matches!(a,Arg::Positional(_)))
                 {
@@ -943,6 +944,69 @@ fn imported_pure_leaf(fun:&Function)->bool {
         Stmt::Return {value,..}=>closed(value,&params),
         _=>false,
     }
+}
+
+/// The interpreter uses bounded i64 while Lean's arithmetic is unbounded.
+/// Therefore imported source expansion of arithmetic is allowed only if all
+/// arithmetic subexpressions close to checked i64 constants after applying
+/// the *actual* call arguments. Unknown/overflow/div-zero stays opaque.
+fn imported_leaf_arithmetic_safe(target:&Function, call:&CallExpr)->bool {
+    let Some(Stmt::Return {value,..})=target.body.first() else {return false};
+    if target.params.len()!=call.args.len(){return false}
+    let bindings:Vec<(&str,&Expr)>=target.params.iter().zip(call.args.iter())
+        .filter_map(|(p,a)|match a {
+            Arg::Positional(expr)=>Some((p.name.as_str(),expr)),
+            _=>None
+        }).collect();
+    if bindings.len()!=call.args.len(){return false}
+    fn int_value(expr:&Expr,bindings:&[(&str,&Expr)],depth:usize)->Option<i64>{
+        if depth>24 {return None}
+        match expr{
+            Expr::Literal(ast::Literal::Int(n))=>Some(*n),
+            Expr::Var(v)=> {
+                let bound=bindings.iter().find(|(key,_)|*key==v.as_str())?.1;
+                // A bound argument must be self-contained to avoid recursion
+                int_value(bound,&[],depth+1)
+            }
+            Expr::Occluded {payload:Some(inner),..}=>
+                int_value(inner,bindings,depth+1),
+            Expr::Unary {op:ast::UnaryOp::Neg,expr}=>
+                int_value(expr,bindings,depth+1)?.checked_neg(),
+            Expr::Binary {op,left,right}=>{
+                let x=int_value(left,bindings,depth+1)?;
+                let y=int_value(right,bindings,depth+1)?;
+                match op{
+                    BinaryOp::Add=>x.checked_add(y),
+                    BinaryOp::Sub=>x.checked_sub(y),
+                    BinaryOp::Mul=>x.checked_mul(y),
+                    BinaryOp::Div=>x.checked_div(y),
+                    _=>None,
+                }
+            }
+            _=>None,
+        }
+    }
+    fn safe(expr:&Expr,bindings:&[(&str,&Expr)])->bool{
+        match expr{
+            Expr::Literal(_)=>true,
+            Expr::Var(v)=>bindings.iter().any(|(key,_)|*key==v.as_str()),
+            Expr::Occluded{payload:Some(inner),..}=>safe(inner,bindings),
+            Expr::Unary {op,expr}=>match op {
+                ast::UnaryOp::Neg=>int_value(
+                    &Expr::Unary{op:*op,expr:expr.clone()},bindings,0).is_some(),
+                ast::UnaryOp::Not=>safe(expr,bindings),
+            },
+            Expr::Binary {op,left,right}=>{
+                match op {
+                    BinaryOp::Add|BinaryOp::Sub|BinaryOp::Mul|BinaryOp::Div=>
+                        int_value(expr,bindings,0).is_some(),
+                    _=>safe(left,bindings)&&safe(right,bindings),
+                }
+            }
+            _=>false,
+        }
+    }
+    safe(value,&bindings)
 }
 
 /// 无 sema 效应表时的库函数效应回退（与 sema 的 imported_effects 同思路的保守版）。
