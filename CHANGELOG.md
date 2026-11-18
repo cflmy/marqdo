@@ -2,13 +2,31 @@
 
 ## Unreleased
 
+## Ext pack v2.8.1 — 2026-11-18
+
+### Highlights
+
+**AI native durable workflow（CLI 仍为 v2.8.0）**：`ext/ai` 以插件侧步骤机交付持久化
+工作流（`workflow`/`flow`/`context`/`recovery`），含有界模型选择、作用域上下文、
+只读失败恢复、`inspect`/`list` 与可隔离 `resume_dir`。不改解释器栈挂起，不宣称
+外部写 exactly-once。详见 [双语发布说明](doc/releases/ext-2.8.1.md)。
+
+```bash
+marqdo ext add agent   # CDN latest → 2.8.1
+# 或：MARQDO_EXT_VERSION=2.8.1 marqdo ext add agent
+```
+
+**核心表面 Δ（Core surface Δ）**：**无增删**——仅 Extension / Agent Runtime。
+
 ### Added
 
-- `ext/ai/workflow` now exposes read-only `inspect`/`list`, a host-relative
-  `resume_dir` on every operation, and repeatable offline workflow fixtures.
-- Agent ABI registers `agent_workflow_inspect` and `agent_workflow_list`.
-- AI 工作流拓展库新增只读 `inspect`/`list`、各操作的 `resume_dir` 隔离，
-  离线集成夹具改为按时间戳生成运行 ID，可重复执行。
+- `ext/ai/workflow`：`open/next/commit/cancel/tick/retry_*`，以及只读 `inspect`/`list`
+  与各操作的 host-relative `resume_dir`。
+- `ext/ai/flow` · `context` · `recovery`：ask/choose、作用域打包、CheckpointV2 恢复面。
+- Agent ABI：`agent_workflow_*`、`agent_choice_parse`、`agent_context_scope`、
+  `agent_input_*`、`agent_parallel_report`。
+- Offline fixtures：`tests/ext/ai-native-flow.mq.md`、`tests/ext/ai-native-workflow.mq.md`；
+  CI：`.github/workflows/native-ai-flow.yml`。
 
 ### Fixed
 
@@ -16,13 +34,13 @@
   contract; the repaired-choice path is fully scoped.
 - CI builds the agent cdylib and runs offline integration without the removed
   `run --effects` flag, using `MARQDO_AGENT_PLUGIN` instead.
+- Atomic checkpoint/effect temp names no longer collide under parallel writes;
+  resume tests no longer race on process-wide cwd.
 
 ### Changed
 
-- 分支已合并 v2.8.0：`Cargo.toml`/`Cargo.lock`、发布工作流与全部拓展包
-  统一到 2.8.0 依赖锁，后续发版不再从 2.7.1 基线分叉。
-- The branch now includes v2.8.0, so its crate versions, lockfile and release
-  workflows match the current release line instead of the 2.7.1 baseline.
+- 扩展包 SemVer **2.8.1**（`ext/VERSION`）；与 CLI **v2.8.0** 可独立安装。
+- 分支已合并 v2.8.0 依赖锁后的 AI 工作流增量，不再从 2.7.1 基线分叉。
 
 ## v2.8.0 — 2026-11-17
 
