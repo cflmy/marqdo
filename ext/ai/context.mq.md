@@ -25,6 +25,8 @@ This helper does not yet infer class/function scopes automatically.
 |---|---|---|
 | result | map | Bounded ContextPackV2 and compaction evidence |
 
+Use `user`, `file`="", `class`="", `function`="", `budget_tokens`=2048 as the inputs for this operation.
+
 Keep the latest request and current function first. Low-priority file context
 may be dropped under pressure; any important constraint must be in a retained
 field, not in a discardable tool transcript.
