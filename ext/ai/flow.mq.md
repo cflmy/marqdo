@@ -87,3 +87,61 @@ Reuse the built-in subtask scheduler. Each child document returns via its
 `# main`, and successful siblings remain visible if another child fails.
 
 Return *[Run bounded Marqdo document tasks](subtask.run_many(tasks=`tasks`, limit=`limit`, timeout_ms=`timeout_ms`))*.
+
+
+## input
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| id | text | required | Stable step ID |
+| question | text | required | User-visible question |
+| options | list | required | User-visible choices |
+| source_revision | text | required | Pinned Marqdo source revision |
+| session_id | text | None | Host-attested session |
+| principal_ref | text | None | Host-attested user scope |
+| freeform | bool | True | Allow custom user reply |
+
+| 返回 | 类型 | 说明 |
+|---|---|---|
+| result | map | waiting_input or previously committed reply |
+
+Use `id`, `question`, `options`, `source_revision`, `session_id`=None, `principal_ref`=None, `freeform`=True as the inputs for this operation.
+
+This does not park an interpreter stack. The caller persists a step-boundary
+checkpoint, displays the question, and on a new turn uses reply to continue.
+The host, not the LLM, must attest session and principal IDs.
+
+We retain **p = [Locate native agent plugin](plugin.native_path(name="agent"))**.
+1. `p`
+  We **[Load native agent plugin](plugin.load(path=`p`))**.
+2. *
+  Return *[No native gate available](json.parse(text="{\"ok\":false,\"status\":\"unavailable\"}"))*.
+
+Return *[Persist one waiting input gate](agent_input_open(id=`id`, question=`question`, options=`options`, source_revision=`source_revision`, session_id=`session_id`, principal_ref=`principal_ref`, freeform=`freeform`))*.
+
+## reply
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| id | text | required | Existing waiting step |
+| reply | text | required | New user response |
+| source_revision | text | required | Current pinned source revision |
+| session_id | text | None | Host-attested session |
+| principal_ref | text | None | Host-attested user scope |
+
+| 返回 | 类型 | 说明 |
+|---|---|---|
+| result | map | Resolved answer, invalid reply or explicit conflict |
+
+Use `id`, `reply`, `source_revision`, `session_id`=None, `principal_ref`=None as the inputs for this operation.
+
+Matching repeated replies are idempotent. A conflicting reply, changed document
+or changed session fails without executing any SKILL or side effect.
+
+We retain **p = [Locate native agent plugin](plugin.native_path(name="agent"))**.
+1. `p`
+  We **[Load native agent plugin](plugin.load(path=`p`))**.
+2. *
+  Return *[No native gate available](json.parse(text="{\"ok\":false,\"status\":\"unavailable\"}"))*.
+
+Return *[Commit the verified user reply](agent_input_resume(id=`id`, reply=`reply`, source_revision=`source_revision`, session_id=`session_id`, principal_ref=`principal_ref`))*.
