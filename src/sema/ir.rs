@@ -1722,6 +1722,51 @@ import:
     }
 
     #[test]
+    fn public_anchors_survive_unrelated_insertions_and_track_definition_changes() {
+        let root = root();
+        let file = root.join("main.mq.md");
+        let source = |prefix: &str, amount: i32| format!(
+            "# main\n\n## calculate\n\n{prefix}**x = [计算税额]({amount} * 2)**\n*x*\n"
+        );
+        fs::write(&file, source("", 3)).unwrap();
+        let one = compile_project(&CompileOptions::for_path(&root).unwrap()).unwrap();
+        let anchor1 = one.semantics.steps.iter().find(|s| s.anchor_id.is_some()).unwrap();
+        let identity = anchor1.anchor_id.clone();
+        let digest1 = anchor1.definition_digest.clone();
+        fs::write(&file, source("**other = [准备参数](1)**\n", 3)).unwrap();
+        let two = compile_project(&CompileOptions::for_path(&root).unwrap()).unwrap();
+        let anchor2 = two.semantics.steps.iter()
+            .find(|s| s.anchor_id == identity).unwrap();
+        assert_eq!(anchor1.anchor_id, anchor2.anchor_id);
+        assert_eq!(digest1, anchor2.definition_digest);
+        assert_ne!(anchor1.id, anchor2.id, "legacy ordinal step id may move");
+        fs::write(&file, source("**other = [准备参数](1)**\n", 4)).unwrap();
+        let three = compile_project(&CompileOptions::for_path(&root).unwrap()).unwrap();
+        let anchor3 = three.semantics.steps.iter()
+            .find(|s| s.anchor_id == identity).unwrap();
+        assert_ne!(digest1, anchor3.definition_digest);
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn duplicate_labels_fail_closed_in_public_anchor_projection() {
+        let root = root();
+        fs::write(root.join("main.mq.md"),
+            "# main\n\n## f\n\n**x = [重复](1)**\n**y = [重复](2)**\n*y*\n").unwrap();
+        let compilation = compile_project(&CompileOptions::for_path(&root).unwrap()).unwrap();
+        let duplicated: Vec<_> = compilation.semantics.refs.iter()
+            .filter(|r| r.label == "重复").collect();
+        assert_eq!(duplicated.len(), 2);
+        assert!(duplicated.iter().all(|r| r.anchor_id.is_none()));
+        let out = root.join(".marqdo");
+        write_semantic_projections(&out, &compilation).unwrap();
+        let anchors: Value = serde_json::from_str(
+            &fs::read_to_string(out.join("anchors.json")).unwrap()).unwrap();
+        assert!(anchors["anchors"].as_array().unwrap().is_empty());
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
     fn named_steps_classify_observe_derive_iterate_call() {
         let root = root();
         fs::write(
