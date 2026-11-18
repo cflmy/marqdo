@@ -12,7 +12,7 @@ import:
 Offline test: the same Marqdo program advances through model choice, user
 input and terminal state with plugin-owned durable checkpoints.
 
-**steps = > json.parse text=[{"id":"intent","kind":"model","options":["chat","office"]},{"id":"confirm","kind":"input","question":"Continue?","options":["yes","no"]},{"id":"end","kind":"return"}]**
+**steps = > json.parse text=[{"id":"intent","kind":"model","prompt":"Choose next skill","options":["chat","office"]},{"id":"confirm","kind":"input","question":"Continue?","options":["yes","no"]},{"id":"end","kind":"return"}]**
 **opened = > workflow.open id="abi_flow_ci_20261118" steps=`steps` source_revision="flow-v1"**
 **o = > json.get value=`opened` key="ok"**
 1. `o`
