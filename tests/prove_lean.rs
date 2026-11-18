@@ -335,7 +335,7 @@ markup: occlusion
 | constant | 结果 = 2 | n > 0 | auto |
 
 *2*
-"#.replace('`',"`").as_str());
+"#);
     s.write("main.mq.md",r#"---
 markup: occlusion
 import:
