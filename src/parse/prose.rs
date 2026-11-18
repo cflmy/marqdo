@@ -59,7 +59,7 @@ pub fn classify_narrative_target(target: &str) -> NarrativeLinkKind {
     let t = target.trim();
     // Compiler-owned mq:// anchor addresses are inert knowledge references,
     // never external URLs or auto-executable code.
-    if t.starts_with("mq://") && t.contains("#anchor-") {
+    if t.starts_with("mq://") && (t.contains("#anchor-") || t.contains("#claim-")) {
         return NarrativeLinkKind::Narrate;
     }
     if t.starts_with("http://")
