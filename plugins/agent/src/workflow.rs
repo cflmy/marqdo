@@ -100,7 +100,50 @@ fn validate_steps(args: &Value) -> Result<Value, String> {
             return Err("parallel step requires tasks array".into());
         }
     }
+    // Resolve all branch targets against frozen, forward-only step IDs.
+    for (i, s) in steps.iter().enumerate() {
+        let targets = s.get("next").and_then(Value::as_str).into_iter()
+            .chain(s.get("routes").and_then(Value::as_object)
+                .into_iter().flat_map(|m| m.values().filter_map(Value::as_str)));
+        for target in targets {
+            let position = steps.iter().position(|x|x["id"]==target)
+                .ok_or_else(|| format!("unknown workflow target: {target}"))?;
+            if position <= i {
+                return Err("workflow routes must move forward to avoid loops".into());
+            }
+        }
+        if let Some(routes)=s.get("routes").and_then(Value::as_object) {
+            if !matches!(s["kind"].as_str(),Some("model"|"input")) {
+                return Err("only choice steps may declare routes".into());
+            }
+            for key in routes.keys() {
+                if !s["options"].as_array().is_some_and(|opts|
+                    opts.iter().any(|x|x==key.as_str())) {
+                    return Err("route label is not a declared choice".into());
+                }
+            }
+        }
+    }
     Ok(Value::Array(steps.clone()))
+}
+
+fn advance_cursor(step:&Value, value:&Value, steps:&[Value], current:usize)->Result<usize,String> {
+    let target=if let Some(routes)=step.get("routes").and_then(Value::as_object) {
+        let label=value.as_str().ok_or("routed choice must return a text label")?;
+        Some(routes.get(label).and_then(Value::as_str)
+            .ok_or("chosen option is missing a declared route")?)
+    } else {
+        step.get("next").and_then(Value::as_str)
+    };
+    match target {
+        None=>Ok(current+1),
+        Some(name)=> {
+            let n=steps.iter().position(|s|s["id"]==name)
+                .ok_or("unknown target after checkpoint recovery")?;
+            if n<=current {return Err("cyclic route refused".into())}
+            Ok(n)
+        }
+    }
 }
 
 fn state(ckpt: &Value) -> Result<(&Value,usize),String> {
@@ -279,15 +322,16 @@ pub fn commit(args: &Value) -> Result<Value,String> {
         "return" => response.clone(),
         _ => return Err("invalid step kind".into()),
     };
+    let target=advance_cursor(step,&value,steps,index)?;
     let mut new_meta=meta.clone();
-    new_meta["cursor"]=json!(index+1);
+    new_meta["cursor"]=json!(target);
     new_meta["completed"].as_array_mut().ok_or("completed not array")?
         .push(json!({"step_id":step_id,"value":value}));
-    let terminal=index+1==steps.len();
+    let terminal=target==steps.len();
     save(args,id,&new_meta,if terminal {"succeeded"} else {"running"})?;
     Ok(json!({"ok":true,"id":id,
         "status":if terminal {"succeeded"} else {"advanced"},
-        "cursor":index+1,"value":value,"reused":false}))
+        "cursor":target,"value":value,"reused":false}))
 }
 
 /// Produce a plan containing only previously failed *read-only* child tasks.
@@ -375,14 +419,16 @@ pub fn retry_commit(args: &Value) -> Result<Value,String> {
     let report=parallel::report(&json!({"results":next}))?;
     let mut updated=meta.clone();
     if report["ok"]==true {
-        updated["cursor"]=json!(index+1);
+        let target=advance_cursor(step,&report,
+            updated["steps"].as_array().ok_or("steps missing")?,index)?;
+        updated["cursor"]=json!(target);
         updated["partial"]=Value::Null;
         updated["completed"].as_array_mut().ok_or("completed not list")?
             .push(json!({"step_id":step["id"],"value":report}));
-        let finished=index+1==updated["steps"].as_array().ok_or("steps missing")?.len();
+        let finished=target==updated["steps"].as_array().ok_or("steps missing")?.len();
         save(args,id,&updated,if finished {"succeeded"} else {"running"})?;
         Ok(json!({"ok":true,"status":if finished {"succeeded"} else {"advanced"},
-            "cursor":index+1,"result":report}))
+            "cursor":target,"result":report}))
     } else {
         updated["partial"]=report.clone();
         save(args,id,&updated,if report["uncertain"].as_u64().unwrap_or(0)>0 {
@@ -450,6 +496,28 @@ mod tests {
         a["steps"]=json!([{"id":"publish","kind":"skill","skill":"office"}]);
         open(&a).unwrap();
         assert_eq!(next(&a).unwrap()["status"],"manual_review");
+    }
+
+    #[test]
+    fn routes_skip_unselected_skill_branches() {
+        let mut a=fixture();
+        a["steps"]=json!([
+            {"id":"decide","kind":"model","prompt":"Pick","options":["chat","office"],
+              "routes":{"chat":"chat_skill","office":"office_skill"}},
+            {"id":"chat_skill","kind":"skill","skill":"chat","effect_class":"read","next":"done"},
+            {"id":"office_skill","kind":"skill","skill":"office","effect_class":"read","next":"done"},
+            {"id":"done","kind":"return"}
+        ]);
+        open(&a).unwrap();
+        let mut c=a.clone();
+        c["step_id"]=json!("decide");
+        c["response"]=json!("office");
+        assert_eq!(commit(&c).unwrap()["cursor"],2);
+        assert_eq!(next(&a).unwrap()["step"]["id"],"office_skill");
+        c["step_id"]=json!("office_skill");
+        c["response"]=json!({"ok":true,"value":{"code":0}});
+        assert_eq!(commit(&c).unwrap()["cursor"],3);
+        assert_eq!(next(&a).unwrap()["step"]["id"],"done");
     }
 
     #[test]
