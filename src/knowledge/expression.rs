@@ -193,7 +193,7 @@ fn candidate(c:&Compilation,call:&BoundCall)->Option<Prepared>{
     })
 }
 fn single_artifact<'a>(c:&'a Compilation,
-    symbol:&crate::sema::ir::SymbolId)->Option<&'a SemanticArtifact>{
+    symbol:&crate::sema::SymbolId)->Option<&'a SemanticArtifact>{
     let mut found=c.semantics.artifacts.iter().filter(|a|
         a.kind=="function"&&a.symbol_id.as_ref()==Some(symbol));
     let item=found.next()?;
