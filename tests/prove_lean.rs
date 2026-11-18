@@ -579,6 +579,92 @@ import:
     assert!(!invalid.status.success(),"unsupported caller conclusion cannot inherit proof");
 }
 
+/// A source-derived arithmetic theorem is imported by a caller without
+/// inlining the callee body. False or stale contracts never become axioms.
+#[test]
+fn pure_expression_composition_proves_and_replays_real_lean(){
+    if !toolchain_available(){
+        skip_or_fail("pure_expression_composition_proves_and_replays_real_lean");
+        return;
+    }
+    let s=Scratch::new("composed-pure-expr");
+    let callee=r#"---
+markup: occlusion
+---
+# math
+## increment
++ `n`
+
+| 参数 | 类型 | 说明 |
+|---|---|---|
+| n | int | integer |
+
+| 定理 | 结论 | 策略 |
+|---|---|---|
+| plus | 结果 = n + 1 | auto |
+
+*`n` + 1*
+"#;
+    s.write("math.mq.md",callee);
+    let caller=r#"---
+markup: occlusion
+import:
+  math: math.mq.md
+---
+# main
+## forward
++ `input`
+
+| 参数 | 类型 | 说明 |
+|---|---|---|
+| input | int | integer |
+
+| 定理 | 结论 | 策略 |
+|---|---|---|
+| inc | 结果 = input + 1 | auto |
+
+**v = [递增](math.math.increment(`input`))**
+*v*
+"#;
+    s.write("main.mq.md",caller);
+    let out=s.marqdo().args(["knowledge","compose","--strict","--json","."])
+        .output().expect("compose pure expression");
+    assert!(out.status.success(),"{} {}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr));
+    let report:serde_json::Value=serde_json::from_slice(&out.stdout).unwrap();
+    let proved=report["results"].as_array().unwrap().iter().find(|r|
+        r["scope"]=="number_contract_int_model_pure_expression_forwarder"
+        &&r["status"]=="lean_kernel_proved_model")
+        .unwrap_or_else(||panic!("no checked arithmetic composition: {report}"));
+    let cert=proved["artifact"].as_str().unwrap();
+    let dir=s.dir.join(cert).parent().unwrap().to_path_buf();
+    let callee_lean=fs::read_to_string(dir.join("CalleeModule.lean")).unwrap();
+    let caller_lean=fs::read_to_string(dir.join("CallerModule.lean")).unwrap();
+    assert!(callee_lean.contains("(v0 + (1 : Int))"));
+    assert!(caller_lean.starts_with("import CalleeModule"));
+    assert!(caller_lean.contains("using (callee_contract"));
+    assert!(!caller_lean.contains("sorry"));
+    let replay=s.marqdo().args(["knowledge","replay",cert,"--json","."])
+        .output().expect("replay arithmetic certificate");
+    assert!(replay.status.success(),"{} {}",
+        String::from_utf8_lossy(&replay.stdout),
+        String::from_utf8_lossy(&replay.stderr));
+    let record:serde_json::Value=serde_json::from_slice(&replay.stdout).unwrap();
+    assert_eq!(record["status"],"lean_kernel_replayed");
+    assert_eq!(record["full_marqdo_runtime_semantics_proved"],false);
+    s.write("math.mq.md",&callee.replace("结果 = n + 1","结果 = n + 2"));
+    let stale=s.marqdo().args(["knowledge","replay",cert,"--json","."])
+        .output().expect("reject forged arithmetic contract");
+    assert!(!stale.status.success(),"changed theorem declaration cannot be replayed");
+    s.write("math.mq.md",callee);
+    s.write("main.mq.md",&caller.replace("结果 = input + 1",
+        "结果 = input + 2"));
+    let false_caller=s.marqdo().args(["knowledge","replay",cert,"--json","."])
+        .output().expect("reject false caller claim");
+    assert!(!false_caller.status.success(),"caller mismatch cannot inherit callee proof");
+}
+
 /// A stronger symbolic branch guard implies the callee requires clause in
 /// the Lean Int model. It does NOT prove dynamic Marqdo Number semantics.
 #[test]
