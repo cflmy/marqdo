@@ -1394,6 +1394,7 @@ const SEMANTIC_NAMES: &[&str] = &[
     "refs.json",
     "steps.json",
     "anchors.json",
+    "proof-index.json",
     "bound_calls.json",
     "dynamic_calls.json",
     "artifacts",
@@ -1445,7 +1446,7 @@ pub fn write_semantic_projections(out_dir: &Path, compilation: &Compilation) -> 
     fs::create_dir_all(gen_dir.join("artifacts"))?;
     fs::create_dir_all(gen_dir.join("graph"))?;
     fs::create_dir_all(gen_dir.join("verification"))?;
-    write_generation_tree(&gen_dir, compilation)?;
+    write_generation_tree(&gen_dir, compilation, &out_dir.join("prove"))?;
 
     // Publish journal + CAS (M-R6): record expected CURRENT before switching.
     let expected = fs::read_to_string(out_dir.join("CURRENT"))
@@ -1508,7 +1509,7 @@ pub fn write_semantic_projections(out_dir: &Path, compilation: &Compilation) -> 
     Ok(())
 }
 
-fn write_generation_tree(stage: &Path, compilation: &Compilation) -> Result<()> {
+fn write_generation_tree(stage: &Path, compilation: &Compilation, prove_root: &Path) -> Result<()> {
     let project = compilation.semantics.to_json();
     write_json(
         &stage.join("project.json"),
@@ -1522,6 +1523,8 @@ fn write_generation_tree(stage: &Path, compilation: &Compilation) -> Result<()> 
     write_json(&stage.join("symbols.json"), &json!({"schema_version":SCHEMA_VERSION,"symbols":compilation.index.symbols().iter().map(|s|json!({"id":s.id.as_str(),"module":s.module.as_str(),"kind":s.kind.as_str(),"callable":s.callable.map(|c|c.as_str()),"name":s.name,"declaration_path":s.declaration_path,"source":{"file":rel_uri(compilation.index.root().path(),&s.source),"line":s.line}})).collect::<Vec<_>>() }))?;
     write_json(&stage.join("refs.json"), &json!({"schema_version":SCHEMA_VERSION,"refs":project["refs"]}))?;
     write_json(&stage.join("steps.json"), &json!({"schema_version":SCHEMA_VERSION,"steps":project["steps"]}))?;
+    write_json(&stage.join("proof-index.json"),
+        &crate::knowledge::proof::index_links(prove_root, &compilation.semantics))?;
     write_json(&stage.join("anchors.json"), &json!({
         "schema_version":SCHEMA_VERSION,
         "role":"stable_public_knowledge_addresses",
