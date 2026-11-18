@@ -22,6 +22,7 @@ pub mod vc;
 pub mod symbolic;
 pub mod composition;
 pub mod projection;
+pub mod expression;
 pub mod preflight;
 pub mod reuse;
 pub mod util;
