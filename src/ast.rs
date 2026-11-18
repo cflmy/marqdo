@@ -97,6 +97,18 @@ pub struct Function {
     pub var_contracts: HashMap<String, crate::contract::Contract>,
     /// 定理表（ADR 0010）：函数级命题声明；首条可执行语句之前提取，不参与运行。
     pub claims: Vec<Claim>,
+    /// Non-executable modular assumptions, never accepted as proven facts.
+    pub assumptions: Vec<Assumption>,
+}
+
+/// Author-declared operation contract. Call-site obligations must still be
+/// proved and callee implementation identity checked before it can be reused.
+#[derive(Debug, Clone)]
+pub struct Assumption {
+    pub op: String,
+    pub premise: Option<String>,
+    pub postcondition: String,
+    pub line: u32,
 }
 
 /// 一条定理声明（设计 §7.1）：`| 定理 | 结论 | 前提 | 策略 |` 的一行。
