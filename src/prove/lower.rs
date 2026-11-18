@@ -979,7 +979,9 @@ fn imported_leaf_arithmetic_safe(target:&Function, call:&CallExpr)->bool {
                     BinaryOp::Add=>x.checked_add(y),
                     BinaryOp::Sub=>x.checked_sub(y),
                     BinaryOp::Mul=>x.checked_mul(y),
-                    BinaryOp::Div=>x.checked_div(y),
+                    // Division semantics (integer rounding/Num coercion)
+                    // require a differential proof before source transparency.
+                    BinaryOp::Div=>None,
                     _=>None,
                 }
             }
