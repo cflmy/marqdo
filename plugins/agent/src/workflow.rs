@@ -171,6 +171,16 @@ fn next_doc(ckpt: &Value, id: &str, reused: bool) -> Result<Value,String> {
             "cursor":index,"step":step,"completed":meta["completed"],
             "partial": meta.get("partial").cloned().unwrap_or(Value::Null)}));
     }
+    // Never auto-dispatch effectful or unclassified child documents.
+    // Those must be executed using the existing EffectLedger policy and an
+    // independently verified receipt, not an arbitrary model instruction.
+    if (step["kind"]=="skill" || step["kind"]=="parallel")
+        && step["effect_class"]!="read"
+    {
+        return Ok(json!({"ok":false,"id":id,"status":"manual_review",
+            "cursor":index,"step":step,
+            "reason":"automatic child dispatch requires an explicit read-only effect class"}));
+    }
     let waiting=match step["kind"].as_str().unwrap_or("") {
         "model"=>"waiting_model",
         "input"=>"waiting_input",
@@ -432,6 +442,14 @@ mod tests {
         assert_eq!(commit(&c).unwrap()["status"],"succeeded");
         assert_eq!(next(&a).unwrap()["status"],"succeeded");
         assert_eq!(open(&a).unwrap()["status"],"succeeded");
+    }
+
+    #[test]
+    fn unknown_and_write_effects_never_auto_dispatch() {
+        let mut a=fixture();
+        a["steps"]=json!([{"id":"publish","kind":"skill","skill":"office"}]);
+        open(&a).unwrap();
+        assert_eq!(next(&a).unwrap()["status"],"manual_review");
     }
 
     #[test]
