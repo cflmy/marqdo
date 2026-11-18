@@ -35,6 +35,9 @@ pub fn analyze(semantic:&SemanticProject, proof_index:&Value)->Value{
         let callee=call.target.as_str();
         let caller=owner_of_call(semantic,call);
         let caller_id=caller.unwrap_or("<unknown-caller>");
+        let assumption=semantic.assumptions.iter()
+            .find(|a|a.owner.as_str()==caller_id &&
+                (a.operation==call.call_site || a.operation==callee));
         let id=format!("{}:{}:{}",call.source.file,call.source.line,callee);
         let exported=semantic.claims.iter().any(|c|c.owner.as_str()==callee);
         let receipts=linked_claims(proof_index,callee);
@@ -80,7 +83,15 @@ pub fn analyze(semantic:&SemanticProject, proof_index:&Value)->Value{
             "source":{"file":call.source.file,"line":call.source.line},
             "status":status,"contracts":contracts,
             "caller_proof_required":true,
-            "runtime_link_required":true
+            "runtime_link_required":true,
+            "caller_assumption":assumption.map(|a|json!({
+                "id":a.id,"premise":a.premise,
+                "postcondition":a.postcondition,
+                "verified":false,
+                "status":"requires_lean_callsite_derivation"
+            })),
+            "caller_assumption_binding":if assumption.is_some(){"declared_unproved"}
+                else {"absent"}
         }));
         if let Some(caller)=caller {
             links.entry(caller.to_string()).or_default().push(callee.into());
