@@ -171,6 +171,7 @@ fn rejection_diagnostics(c:&Compilation,call:&BoundCall)->Value{
 pub fn prove(compiled:&Compilation,out:&Path,toolchain:&Toolchain)->Result<Value>{
     let mut records=Vec::new();
     for call in &compiled.semantics.bound_calls{
+        if super::unified::covers(compiled,&call.caller){continue}
         let Some((source,client,identity,n))=candidate(compiled,call) else {
             // Projection contracts have their own independently replayable
             // backend, and must not also appear as unsupported constant claims.
@@ -238,6 +239,14 @@ pub fn prove(compiled:&Compilation,out:&Path,toolchain:&Toolchain)->Result<Value
     }
     records.extend(super::projection::prove(compiled,out,toolchain)?);
     records.extend(super::expression::prove(compiled,out,toolchain)?);
+    records.extend(super::unified::prove(compiled,out,toolchain)?);
+    for record in &mut records {
+        if record["evidence"].is_null(){
+            record["evidence"]=if record["status"]=="lean_kernel_proved_model"{
+                super::evidence::model_proved()
+            }else{super::evidence::unknown("unproved_or_unsupported_fragment")};
+        }
+    }
     Ok(json!({"schema_version":1,"role":"restricted_composed_lean_module",
         "results":records,
         "full_marqdo_runtime_semantics_proved":false}))
@@ -266,6 +275,9 @@ pub fn replay(compiled:&Compilation,certificate:&Path,lean:&Toolchain)->Result<V
     }
     if receipt["kind"]=="marqdo_pure_expression_composition"{
         return super::expression::replay(compiled,certificate,lean)
+    }
+    if receipt["kind"]=="marqdo_unified_modular_contract"{
+        return super::unified::replay(compiled,certificate,lean)
     }
     anyhow::ensure!(receipt["schema_version"]==1
         &&receipt["kind"]=="marqdo_restricted_composition"
