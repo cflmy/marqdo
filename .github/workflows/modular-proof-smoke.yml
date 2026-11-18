@@ -24,6 +24,10 @@ jobs:
         run: cargo test --locked --lib knowledge::projection -- --nocapture
       - name: Compile pure-expression VC backend
         run: cargo test --locked --lib knowledge::expression::tests -- --nocapture
+      - name: Unified contract engine and evidence lattice unit tests
+        run: |
+          cargo test --locked --lib knowledge::unified::tests -- --nocapture
+          cargo test --locked --lib knowledge::evidence::tests -- --nocapture
       - name: Compile path-sensitive VCs
         run: cargo test --locked --lib knowledge::symbolic::tests -- --nocapture
       - name: Compile closed-argument VCs
@@ -48,6 +52,10 @@ jobs:
         env:
           MARQDO_PROOF_REQUIRE_LEAN: "1"
         run: cargo test --locked --test prove_lean pure_expression_composition_proves_and_replays_real_lean -- --nocapture
+      - name: Three module DAG and branching caller with independent Lean replay
+        env:
+          MARQDO_PROOF_REQUIRE_LEAN: "1"
+        run: cargo test --locked --test prove_lean unified_modular_contract_proves_multicall_branch_and_transitive_dag -- --nocapture
       - name: Regenerated provenance for original Lean certificates
         env:
           MARQDO_PROOF_REQUIRE_LEAN: "1"
