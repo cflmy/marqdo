@@ -490,6 +490,75 @@ import:
         "old composed proof must not survive callee source change");
 }
 
+/// A stronger symbolic branch guard implies the callee requires clause in
+/// the Lean Int model. It does NOT prove dynamic Marqdo Number semantics.
+#[test]
+fn symbolic_path_implication_uses_real_lean_without_runtime_promotion() {
+    if !toolchain_available() {
+        skip_or_fail("symbolic_path_implication_uses_real_lean_without_runtime_promotion");
+        return;
+    }
+    let s=Scratch::new("modular-symbolic-omega");
+    s.write("math.mq.md",r#"---
+markup: occlusion
+---
+
+# math
+
+## exact
++ `n`
+
+| 参数 | 类型 | 说明 |
+|---|---|---|
+| n | int | integer |
+
+| 定理 | 结论 | 前提 | 策略 |
+|---|---|---|---|
+| constant | 结果 = 2 | n > 0 | auto |
+
+*2*
+"#);
+    s.write("main.mq.md",r#"---
+markup: occlusion
+import:
+  math: math.mq.md
+---
+
+# main
+
+## guarded
++ `n`
+
+| 参数 | 类型 | 说明 |
+|---|---|---|
+| n | int | integer |
+
+1. `n` > 10
+  **x = [带条件调用](math.math.exact(`n`))**
+2. *
+  **x = 0**
+
+*x*
+"#);
+    let proof=s.marqdo().args(["prove","math.mq.md","--json"])
+        .output().expect("prove callee first");
+    assert!(proof.status.success(),
+        "callee must be proved: {}",String::from_utf8_lossy(&proof.stdout));
+    let out=s.marqdo().args([
+        "knowledge","proof-deps","--verify","--json","."
+    ]).output().expect("prove conditional Int path");
+    let json:serde_json::Value=serde_json::from_slice(&out.stdout)
+        .unwrap_or_else(|_|panic!("stderr={} stdout={}",
+            String::from_utf8_lossy(&out.stderr),
+            String::from_utf8_lossy(&out.stdout)));
+    assert!(json["symbolic_path_lean_model_proved"].as_u64().unwrap_or(0)>=1,
+        "Lean must discharge n > 10 entails n > 0: {json}");
+    assert_eq!(json["symbolic_proof_scope"],
+        "integer_path_model_not_runtime_equivalence");
+    assert_eq!(json["proof_completion"],
+        "not_established_by_dependency_analysis");
+}
+
 /// G2：真证书命中（用真 lean 跑一次后，证书生效；第二次 cache: hit 且快）。
 #[test]
 fn g2_certificate_hit_after_real_run() {
