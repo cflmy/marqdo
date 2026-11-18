@@ -15,6 +15,12 @@ jobs:
         run: |
           cargo build -p marqdo_plugin_agent --locked
           cargo build -p marqdo_plugin_llm --locked
+      - name: Native agent choice and bounded recovery unit tests
+        run: cargo test -p marqdo_plugin_agent --locked
+      - name: Check short AI flow documents
+        run: |
+          cargo run --locked -- check ext/ai/flow.mq.md
+          cargo run --locked -- check ext/ai/recovery.mq.md
       - name: Workbench contracts (M00–M06 / F-subset)
         run: cargo test --test workbench_contracts --locked
       - name: Offline executable-knowledge gate
