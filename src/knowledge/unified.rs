@@ -331,8 +331,19 @@ impl Plan{
 fn candidate(c:&Compilation,root:&str)->Option<Plan>{
     Builder::new(c).plan(root)
 }
+/// Retain the stable legacy certificate format for simple one-call
+/// forwarders. Use the unified engine for actual sequential, branched or
+/// transitive contracts, where the legacy shape cannot represent the proof.
+fn advanced(c:&Compilation,plan:&Plan)->bool{
+    if plan.nodes.len()>2{return true}
+    if c.semantics.bound_calls.iter()
+        .filter(|call|call.caller.as_str()==plan.root).count()>1{return true}
+    let Some(artifact)=unique_artifact(c,&plan.root) else{return false};
+    let Some(function)=load_function(c,artifact) else{return false};
+    function.body.iter().any(|stmt|matches!(stmt,Stmt::Branch{..}))
+}
 pub(super) fn covers(c:&Compilation,root:&SymbolId)->bool{
-    candidate(c,root.as_str()).is_some()
+    candidate(c,root.as_str()).is_some_and(|plan|advanced(c,&plan))
 }
 pub(super) fn prove(c:&Compilation,out:&Path,lean:&Toolchain)->Result<Vec<Value>>{
     let roots=c.semantics.bound_calls.iter().map(|call|call.caller.as_str())
@@ -340,6 +351,7 @@ pub(super) fn prove(c:&Compilation,out:&Path,lean:&Toolchain)->Result<Vec<Value>
     let mut results=Vec::new();
     for root in roots{
         let Some(plan)=candidate(c,root)else{continue};
+        if !advanced(c,&plan){continue}
         let key=plan.key(&lean.version);
         let dir=out.join("composed").join(format!("unified-{}",&key[7..23]));
         fs::create_dir_all(&dir)?;
