@@ -312,6 +312,63 @@ import:
         "parameter substitution across file boundary must be Lean proved: {json}");
 }
 
+/// Real inter-module certificate + closed actual-argument bridge, checked by
+/// a second Lean invocation. Graph status is not itself a caller theorem.
+#[test]
+fn modular_closed_callsite_proof_uses_real_lean_kernel(){
+    if !toolchain_available(){
+        skip_or_fail("modular_closed_callsite_proof_uses_real_lean_kernel");
+        return;
+    }
+    let s=Scratch::new("modular-closed-vc");
+    s.write("math.mq.md",r#"---
+markup: occlusion
+---
+
+# math
+
+## exact
++ `n`
+
+| 定理 | 结论 | 前提 | 策略 |
+|---|---|---|---|
+| constant | 结果 = 2 | n > 0 | auto |
+
+*2*
+"#.replace('`',"`").as_str());
+    s.write("main.mq.md",r#"---
+markup: occlusion
+import:
+  math: math.mq.md
+---
+
+# main
+
+## caller
+
+**x = [获得数字](math.math.exact(3))**
+*x*
+"#);
+    let proof=s.marqdo().args(["prove","math.mq.md","--json"])
+        .output().expect("prove imported contract");
+    assert!(proof.status.success(),
+        "callee proof failed: {}",String::from_utf8_lossy(&proof.stdout));
+    let result=s.marqdo().args([
+        "knowledge","proof-deps","--verify","--json","."
+    ]).output().expect("verify modular goals");
+    let json:serde_json::Value=serde_json::from_slice(&result.stdout)
+        .unwrap_or_else(|_|panic!("{}",
+            String::from_utf8_lossy(&result.stderr)));
+    assert_eq!(json["lean_preconditions_verified"],1,
+        "no kernel checked callsite: {json}");
+    let call=json["obligations"].as_array().unwrap().iter()
+        .find(|o|o["call_site"]=="math.math.exact").unwrap();
+    assert_eq!(call["contracts"][0]["call_precondition_status"],"lean_kernel_verified");
+    assert_eq!(call["contracts"][0]["status"],"available_as_contract");
+    assert_eq!(json["proof_completion"],"not_established_by_dependency_analysis");
+    assert!(s.dir.join(".marqdo/modular/closed-goals.lean").exists());
+}
+
 /// G2：真证书命中（用真 lean 跑一次后，证书生效；第二次 cache: hit 且快）。
 #[test]
 fn g2_certificate_hit_after_real_run() {
