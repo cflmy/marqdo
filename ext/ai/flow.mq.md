@@ -79,14 +79,20 @@ We retain **ok = [Read validation status](json.get(value=`parsed`, key="ok"))**.
 
 | 返回 | 类型 | 说明 |
 |---|---|---|
-| result | list | Ordered child outcomes, including failures |
+| result | map | Succeeded, partial, failed or uncertain child outcomes |
 
 Use `tasks`, `limit`=2, `timeout_ms`=30000 as the inputs for this operation.
 
 Reuse the built-in subtask scheduler. Each child document returns via its
 `# main`, and successful siblings remain visible if another child fails.
 
-Return *[Run bounded Marqdo document tasks](subtask.run_many(tasks=`tasks`, limit=`limit`, timeout_ms=`timeout_ms`))*.
+We retain **results = [Run bounded Marqdo document tasks](subtask.run_many(tasks=`tasks`, limit=`limit`, timeout_ms=`timeout_ms`))**.
+We retain **p = [Locate native agent plugin](plugin.native_path(name="agent"))**.
+1. `p`
+  We **[Load native agent plugin](plugin.load(path=`p`))**.
+  Return *[Preserve success, failure and uncertain child outcomes](agent_parallel_report(results=`results`))*.
+2. *
+  Return *[Native result classifier unavailable](json.parse(text="{\"ok\":false,\"status\":\"unavailable\"}"))*.
 
 
 ## input
