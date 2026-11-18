@@ -96,13 +96,29 @@ pub fn analyze(semantic:&SemanticProject, proof_index:&Value)->Value{
     }
     obligations.sort_by(|a,b|a["id"].as_str().cmp(&b["id"].as_str()));
     let cycles=find_cycles(&links);
-    let complete=obligations.is_empty();
+    let verified_claims:Vec<Value>=semantic.claims.iter().map(|c|{
+        let found=linked_claims(proof_index,c.owner.as_str()).iter().any(|r|
+            r["claim_anchor_id"]==c.anchor_id &&
+            r["conclusion"]==c.conclusion &&
+            r["premise"]==json!(c.premise) &&
+            r["status"]=="proved" && r["usable"]==true);
+        json!({"claim_anchor_id":c.anchor_id,"owner":c.owner.as_str(),
+            "status":if found {"proved_with_local_lean_receipt"} else {"unverified"}})
+    }).collect();
+    let linked=obligations.iter().all(|o|o["status"]=="callee_contracts_verified")
+        && cycles.is_empty();
+    let declarations_proved=!verified_claims.is_empty()
+        && verified_claims.iter().all(|c|c["status"]=="proved_with_local_lean_receipt");
+    let audit_passes=linked && declarations_proved;
     json!({
         "schema_version":1,
         "kind":"modular_proof_obligations",
-        "status":if complete {"no_cross_call_obligations"} else {"open_obligations"},
-        // Only call graph / verified-contract edges. This is a planner, not
-        // a theorem proving the caller; no automatic upgrade to "proved".
+        "status":if audit_passes {"dependency_receipts_valid"}
+            else {"open_obligations"},
+        "audit_passes":audit_passes,
+        "verified_claims":verified_claims,
+        // Even a successful audit is NOT a modular Lean theorem:
+        // the runtime-link and caller entailment obligations remain.
         "proof_completion":"not_established_by_dependency_analysis",
         "obligations":obligations,
         "cycles":cycles
