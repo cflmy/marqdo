@@ -1009,6 +1009,7 @@ fn imported_leaf_arithmetic_safe(target:&Function, call:&CallExpr)->bool {
         }
     }
     safe(value,&bindings)
+        && bindings.iter().all(|(_,argument)|safe(argument,&[]))
 }
 
 /// 无 sema 效应表时的库函数效应回退（与 sema 的 imported_effects 同思路的保守版）。
