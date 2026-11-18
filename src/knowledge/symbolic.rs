@@ -12,6 +12,7 @@ pub struct SymbolicGoal{
     pub guard_index:usize,
     pub binders:Vec<String>,
     pub runtime_domain_verified:bool,
+    pub abstract_integer_model_supported:bool,
 }
 fn identifier(s:&str)->bool {
     !s.is_empty()&&s.chars().all(|c|c.is_alphanumeric()||c=='_')
@@ -62,7 +63,11 @@ pub fn plan(semantic:&SemanticProject,call:&BoundCall,premise:&str)->Option<Symb
         caller_bind.insert(param.name.clone(),format!("({variable} : Int)"));
         binders.push(variable);
     }
-    let domain=caller.params.iter().all(|p|p.ty.eq_ignore_ascii_case("int"));
+    // Marqdo canonical Number may include Int, Num and Formula.
+    // Proof is over Int only; never claim a runtime type proof here.
+    let model_supported=caller.params.iter()
+        .all(|p|p.ty.eq_ignore_ascii_case("number"));
+    if !model_supported {return None}
     let mut callee_bind=BTreeMap::new();
     for (formal,arg) in callee.params.iter().zip(call.args.iter()){
         if arg.name.as_ref().is_some_and(|s|s!=&formal.name){return None}
@@ -77,10 +82,11 @@ pub fn plan(semantic:&SemanticProject,call:&BoundCall,premise:&str)->Option<Symb
     let wanted=proposition(premise,&callee_bind)?;
     let all=call.path_guards.iter().map(|guard|proposition(guard,&caller_bind))
         .collect::<Option<Vec<_>>>()?;
-    let idx=all.iter().position(|guard|guard==&wanted)?;
+    let idx=all.iter().position(|guard|guard==&wanted);
     Some(SymbolicGoal {
         proposition:wanted,guard_propositions:all,guard_index:idx,
-        binders,runtime_domain_verified:domain
+        binders,runtime_domain_verified:false,
+        abstract_integer_model_supported:model_supported
     })
 }
 pub fn emit_lean(goals:&[(String,SymbolicGoal)])->String{
@@ -91,8 +97,13 @@ pub fn emit_lean(goals:&[(String,SymbolicGoal)])->String{
         let hypotheses=g.guard_propositions.iter().enumerate()
             .map(|(n,p)|format!("(h{n} : {p})"))
             .collect::<Vec<_>>().join(" ");
-        text.push_str(&format!("theorem path_vc_{i} {vars} {hypotheses} : {} := by\n  exact h{}\n",
-            g.proposition,g.guard_index));
+        let tactic=if let Some(n)=g.guard_index {
+            format!("  exact h{n}")
+        } else {
+            "  omega".to_string()
+        };
+        text.push_str(&format!("theorem path_vc_{i} {vars} {hypotheses} : {} := by\n{tactic}\n",
+            g.proposition));
     }
     text.push_str("end MarqdoSymbolic\n");
     text
@@ -118,8 +129,9 @@ mod tests{
         assert!(call.control_blocker.is_none());
         let goal=plan(&c.semantics,call,"n > 0")
             .expect("path condition should imply imported precondition");
-        assert!(goal.runtime_domain_verified);
-        assert_eq!(goal.guard_index,0);
+        assert!(!goal.runtime_domain_verified);
+        assert!(goal.abstract_integer_model_supported);
+        assert_eq!(goal.guard_index,Some(0));
         let source=emit_lean(&[("branch-call".into(),goal)]);
         assert!(source.contains("theorem path_vc_0"));
         assert!(source.contains("exact h0"));
