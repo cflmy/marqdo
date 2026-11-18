@@ -36,3 +36,7 @@ jobs:
         env:
           MARQDO_PROOF_REQUIRE_LEAN: "1"
         run: cargo test --locked --test prove_lean composition_emits_independently_replayable_caller_certificate -- --nocapture
+      - name: Symbolic path implication with real Lean
+        env:
+          MARQDO_PROOF_REQUIRE_LEAN: "1"
+        run: cargo test --locked --test prove_lean symbolic_path_implication_uses_real_lean_without_runtime_promotion -- --nocapture
