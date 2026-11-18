@@ -16,6 +16,8 @@ on:
     branches: [main]
     paths:
       - "src/prove/**"
+      - "src/knowledge/**"
+      - "src/sema/ir.rs"
       - "doc/verification/skill-proof/**"
       - "lib/**"
       - "tests/prove*.rs"
@@ -23,6 +25,8 @@ on:
   pull_request:
     paths:
       - "src/prove/**"
+      - "src/knowledge/**"
+      - "src/sema/ir.rs"
       - "doc/verification/skill-proof/**"
       - "lib/**"
       - "tests/prove*.rs"
@@ -58,6 +62,8 @@ jobs:
       - name: Build
         run: cargo build --locked
 
+      - name: Module proof composition and path-sensitive VC unit tests
+        run: cargo test --locked --lib knowledge::
       - name: Judgment matrix (real Lean; CI requires toolchain)
         env:
           MARQDO_PROOF_REQUIRE_LEAN: "1"
