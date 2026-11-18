@@ -84,7 +84,10 @@ fn candidate(compiled:&Compilation,call:&BoundCall)
         ||es.params.len()!=call.args.len()
         ||call.args.len()!=runtime.args.len(){return None}
     if cs.params.iter().chain(es.params.iter())
-        .any(|p|!p.ty.eq_ignore_ascii_case("int")||!p.required){return None}
+        // Marqdo currently canonicalizes int/num/float to "number".
+        // This certificate is explicitly about the *Lean Int model*, NOT
+        // all runtime Number variants. Runtime-equivalence remains false.
+        .any(|p|!p.ty.eq_ignore_ascii_case("number")||!p.required){return None}
     let arg_expr=call.args.iter().zip(es.params.iter()).map(|(a,p)|{
         if a.name.as_ref().is_some_and(|x|x!=&p.name){return None}
         if let Some(v)=a.integer {return Some(format!("({v} : Int)"))}
@@ -166,7 +169,7 @@ pub fn prove(compiled:&Compilation,out:&Path,toolchain:&Toolchain)->Result<Value
         let Some((source,client,identity,n))=candidate(compiled,call) else {
             records.push(json!({"caller":call.caller.as_str(),
                 "callee":call.target.as_str(),"status":"unsupported_fragment",
-                "reason":"requires_pure_typed_int_forwarder_with_constant_claims",
+                "reason":"requires_pure_number_contract_int_model_forwarder_with_constant_claims",
                 "diagnostics":rejection_diagnostics(compiled,call)}));
             continue;
         };
@@ -201,7 +204,7 @@ pub fn prove(compiled:&Compilation,out:&Path,toolchain:&Toolchain)->Result<Value
         }
         let cert=json!({
             "schema_version":1,"kind":"marqdo_restricted_composition",
-            "scope":"typed_int_pure_forwarder_constant_postcondition",
+            "scope":"number_contract_int_model_pure_forwarder_constant_result",
             "status":"lean_kernel_proved_model",
             "identity":identity,"caller":call.caller.as_str(),
             "callee":call.target.as_str(),
@@ -222,7 +225,7 @@ pub fn prove(compiled:&Compilation,out:&Path,toolchain:&Toolchain)->Result<Value
         fs::write(&receipt,serde_json::to_vec_pretty(&cert)?)?;
         records.push(json!({"identity":identity,
             "status":"lean_kernel_proved_model","artifact":receipt,
-            "scope":"typed_int_pure_forwarder_constant_postcondition"}));
+            "scope":"number_contract_int_model_pure_forwarder_constant_result"}));
     }
     Ok(json!({"schema_version":1,"role":"restricted_composed_lean_module",
         "results":records,
@@ -237,7 +240,7 @@ pub fn replay(compiled:&Compilation,certificate:&Path,lean:&Toolchain)->Result<V
     let receipt:Value=serde_json::from_slice(&fs::read(certificate)?)?;
     anyhow::ensure!(receipt["schema_version"]==1
         &&receipt["kind"]=="marqdo_restricted_composition"
-        &&receipt["scope"]=="typed_int_pure_forwarder_constant_postcondition"
+        &&receipt["scope"]=="number_contract_int_model_pure_forwarder_constant_result"
         &&receipt["status"]=="lean_kernel_proved_model",
         "proof.compose_invalid_certificate: unexpected status or scope");
     anyhow::ensure!(receipt["toolchain"]==lean.version,
