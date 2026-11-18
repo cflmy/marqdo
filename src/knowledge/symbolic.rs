@@ -26,6 +26,13 @@ fn term(expr:&A,bindings:&BTreeMap<String,String>)->Option<(String,bool)>{
             let (l,lb)=term(left,bindings)?;
             let (r,rb)=term(right,bindings)?;
             match *op{
+                "+" | "-" if !lb && !rb=>Some((format!("({l} {op} {r})"),false)),
+                // omega only reasons about *linear* arithmetic. A variable
+                // multiplied by another variable is never assumed linear.
+                "*" if !lb && !rb
+                    && (matches!(left.as_ref(),A::Lit(T::Int(_)))
+                        ||matches!(right.as_ref(),A::Lit(T::Int(_))))=>
+                    Some((format!("({l} * {r})"),false)),
                 "=" | "≠" | "<" | "≤" | ">" | "≥" if !lb && !rb=>
                     Some((format!("({l} {op} {r})"),true)),
                 "且" if lb && rb=>Some((format!("({l} ∧ {r})"),true)),
@@ -36,6 +43,10 @@ fn term(expr:&A,bindings:&BTreeMap<String,String>)->Option<(String,bool)>{
         A::Un{op:"非",expr}=>{
             let (inner,boolean)=term(expr,bindings)?;
             boolean.then(||(format!("(¬ {inner})"),true))
+        },
+        A::Un{op:"-",expr}=>{
+            let (inner,boolean)=term(expr,bindings)?;
+            (!boolean).then(||(format!("(-{inner})"),false))
         },
         _=>None
     }
@@ -139,6 +150,28 @@ mod tests{
         std::fs::remove_dir_all(root).unwrap();
     }
 
+    #[test]
+    fn linear_arithmetic_path_goals_are_supported_but_nonlinear_goals_fail_closed(){
+        let params=BTreeMap::from([("n".into(),"(v0 : Int)".into()),
+            ("m".into(),"(v1 : Int)".into())]);
+        let stronger=proposition("n + 5 > 10",&params)
+            .expect("linear path condition");
+        let weaker=proposition("n > 0",&params)
+            .expect("linear callee precondition");
+        let goal=SymbolicGoal{
+            proposition:weaker,guard_propositions:vec![stronger],
+            guard_index:None,binders:vec!["v0".into(),"v1".into()],
+            runtime_domain_verified:false,abstract_integer_model_supported:true
+        };
+        let generated=emit_lean(&[("linear".into(),goal)]);
+        assert!(generated.contains("omega"));
+        assert!(generated.contains("+"));
+        assert!(proposition("n * m > 0",&params).is_none(),
+            "nonlinear multiplication cannot silently enter omega fragment");
+        assert!(proposition("n * 3 > 0",&params).is_some());
+        assert!(proposition("-n < 0",&params).is_some());
+        assert!(proposition("n / 2 > 0",&params).is_none());
+    }
     #[test]
     fn symbolic_guards_cannot_be_invented_from_unsupported_calls(){
         assert!(proposition("lib.fetch(x) > 0",&BTreeMap::new()).is_none());
