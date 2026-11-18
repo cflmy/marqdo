@@ -490,6 +490,95 @@ import:
         "old composed proof must not survive callee source change");
 }
 
+/// Projection of an imported symbolic parameter is proved in two distinct
+/// Lean modules. The caller imports ONLY the callee theorem and its interface.
+#[test]
+fn projection_composition_proves_symbolic_caller_and_replays_from_source(){
+    if !toolchain_available(){
+        skip_or_fail("projection_composition_proves_symbolic_caller_and_replays_from_source");
+        return;
+    }
+    let s=Scratch::new("composed-replay-projection");
+    s.write("math.mq.md",r#"---
+markup: occlusion
+---
+# math
+
+## identity
++ \`n\`
+
+| 参数 | 类型 | 说明 |
+|---|---|---|
+| n | int | integer |
+
+| 定理 | 结论 | 策略 |
+|---|---|---|
+| exact | 结果 = n | auto |
+
+*\`n\`*
+"#);
+    s.write("main.mq.md",r#"---
+markup: occlusion
+import:
+  math: math.mq.md
+---
+# main
+
+## forward
++ \`input\`
+
+| 参数 | 类型 | 说明 |
+|---|---|---|
+| input | int | integer |
+
+| 定理 | 结论 | 策略 |
+|---|---|---|
+| forwarded | 结果 = input | auto |
+
+**value = [调用](math.math.identity(\`input\`))**
+*value*
+"#);
+    let out=s.marqdo().args(["knowledge","compose","--strict","--json","."])
+        .output().expect("compose symbolic projection");
+    assert!(out.status.success(),"stderr={} stdout={}",
+        String::from_utf8_lossy(&out.stderr),
+        String::from_utf8_lossy(&out.stdout));
+    let json:serde_json::Value=serde_json::from_slice(&out.stdout).unwrap();
+    let proved=json["results"].as_array().unwrap().iter()
+        .find(|r|r["status"]=="lean_kernel_proved_model"&&
+            r["scope"]=="number_contract_int_model_pure_forwarder_parameter_projection")
+        .unwrap_or_else(||panic!("missing parameterized caller theorem: {json}"));
+    let cert=proved["artifact"].as_str().unwrap();
+    let dir=s.dir.join(cert).parent().unwrap().to_path_buf();
+    let caller=fs::read_to_string(dir.join("CallerModule.lean")).unwrap();
+    let callee=fs::read_to_string(dir.join("CalleeModule.lean")).unwrap();
+    assert!(callee.contains("callee_contract"));
+    assert!(caller.contains("import CalleeModule"));
+    assert!(caller.contains("using (callee_contract"));
+    assert!(caller.contains("= v0"),"caller conclusion must be symbolic");
+    assert!(!caller.contains("sorry"));
+    let replay=s.marqdo().args(["knowledge","replay",cert,"--json","."])
+        .output().expect("replay parameterized theorem");
+    assert!(replay.status.success(),"{} {}",
+        String::from_utf8_lossy(&replay.stdout),
+        String::from_utf8_lossy(&replay.stderr));
+    let report:serde_json::Value=serde_json::from_slice(&replay.stdout).unwrap();
+    assert_eq!(report["status"],"lean_kernel_replayed");
+    assert_eq!(report["full_marqdo_runtime_semantics_proved"],false);
+    let original=fs::read_to_string(s.dir.join("math.mq.md")).unwrap();
+    fs::write(s.dir.join("math.mq.md"),original.replace("*\`n\`*","*0*")).unwrap();
+    let stale=s.marqdo().args(["knowledge","replay",cert,"--json","."])
+        .output().expect("replay changed projection");
+    assert!(!stale.status.success(),"modified callee cannot retain proof");
+    fs::write(s.dir.join("math.mq.md"),original).unwrap();
+    let main=fs::read_to_string(s.dir.join("main.mq.md")).unwrap();
+    fs::write(s.dir.join("main.mq.md"),
+        main.replace("结果 = input","结果 = 999")).unwrap();
+    let invalid=s.marqdo().args(["knowledge","replay",cert,"--json","."])
+        .output().expect("replay changed caller claim");
+    assert!(!invalid.status.success(),"unsupported caller conclusion cannot inherit proof");
+}
+
 /// A stronger symbolic branch guard implies the callee requires clause in
 /// the Lean Int model. It does NOT prove dynamic Marqdo Number semantics.
 #[test]
