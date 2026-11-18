@@ -58,6 +58,20 @@ fn links_bind_to_exact_owner_and_stale_after_source_change() {
 }
 
 #[test]
+fn altered_theorem_conclusion_cannot_reuse_a_matching_function_name() {
+    let dir=root("altered-claim");
+    let file=dir.join("main.mq.md");
+    fs::write(&file,"# main\n\n## compute\n\n| 定理 | 结论 | 前提 | 策略 |\n|---|---|---|---|\n| rule | 结果 = 6 | | auto |\n\n**x = [演算](2 * 3)**\n*x*\n").unwrap();
+    let c=compile_project(&CompileOptions::for_path(&dir).unwrap()).unwrap();
+    let mut fake=report(&file,Verdict::Proved,"lean",None);
+    fake.functions[0].claims[0].conclusion="结果 = 999".into();
+    let linkage=link_report(&c,&file,&fake,&dir);
+    assert!(linkage["claims"].as_array().unwrap().is_empty());
+    assert_eq!(linkage["unresolved"][0]["reason"],"theorem_declaration_missing_or_changed");
+    fs::remove_dir_all(dir).unwrap();
+}
+
+#[test]
 fn dependency_change_invalidates_caller_proof_even_if_caller_source_is_unchanged() {
     let dir=root("transitive");
     let lib=dir.join("rates.mq.md");
