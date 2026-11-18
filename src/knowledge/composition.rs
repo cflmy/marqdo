@@ -52,7 +52,7 @@ fn claim_is_constant(compiled:&Compilation,owner:&SemanticArtifact,n:i64)->bool{
     owner.symbol_id.as_ref().is_some_and(|id|
         compiled.semantics.claims.iter().any(|c|
             c.owner==*id
-            && c.premise.as_deref().is_none_or(|p|p.trim().is_empty())
+            && c.premise.as_deref().map_or(true,|p|p.trim().is_empty())
             && c.conclusion.trim()==format!("结果 = {n}")))
 }
 fn candidate(compiled:&Compilation,call:&BoundCall)
@@ -68,6 +68,9 @@ fn candidate(compiled:&Compilation,call:&BoundCall)
     let callee=function(compiled,ce)?;
     let forwarded=forwarded(&caller)?;
     let runtime=forwarded.for_evaluation().ok()?;
+    if crate::sema::bind::call_display(&runtime)!=call.call_site
+       ||compiled.semantics.bound_calls.iter().filter(|item|
+            item.caller==call.caller).count()!=1 {return None}
     if runtime.path.as_ref().is_none()||runtime.receiver.is_some()
         ||caller.is_object()||callee.is_object(){return None}
     let n=constant_return(&callee)?;
