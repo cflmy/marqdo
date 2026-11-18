@@ -434,6 +434,23 @@ fn g2_certificate_hit_after_real_run() {
     assert_eq!(json2["status"], "proved");
     assert_eq!(json2["lean"]["cache"], "hit", "第二次必须命中证书缓存");
     assert!(json2["duration_ms"].as_u64().unwrap() < 5000, "命中后必须快");
+
+    // Even a genuine local certificate ceases to be usable if the generated
+    // Lean source has been edited; a matching JSON hash is not enough.
+    let generated=s.dir.join(".marqdo/prove").join(proof_id).join("Generated");
+    let lean_file=fs::read_dir(&generated).unwrap().map(|e|e.unwrap().path())
+        .find(|p|p.extension().is_some_and(|ext|ext=="lean")).unwrap();
+    let mut modified=fs::read_to_string(&lean_file).unwrap();
+    modified.push_str("\n-- local tampering\n");
+    fs::write(&lean_file,modified).unwrap();
+    let republish=s.marqdo().args([
+        "knowledge","台账.mq.md","--out",".marqdo"
+    ]).output().unwrap();
+    assert!(republish.status.success(),"{}",String::from_utf8_lossy(&republish.stderr));
+    let stale:serde_json::Value=serde_json::from_slice(
+        &fs::read(s.dir.join(".marqdo/proof-index.json")).unwrap()).unwrap();
+    assert_eq!(stale["claims"][0]["usable"],false,
+        "modified generated module cannot reuse genuine Lean receipt: {stale}");
 }
 
 /// G2b：--no-cache 绕过证书。
