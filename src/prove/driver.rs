@@ -121,6 +121,23 @@ pub fn ensure_library(cache_root: &Path, lean: &Toolchain) -> Result<(PathBuf, S
 }
 
 /// 判定一个生成的 Lean 模块。
+/// Compile a self-contained Lean module for a reusable, independent caller
+/// proof. Source and output must both be inside the immutable build directory.
+pub fn compile_import_module(lean:&Toolchain,src:&Path,olean:&Path,
+    import_root:&Path,timeout:Duration)->Result<()> {
+    let original=std::fs::read(src)?;
+    let mut command=Command::new(&lean.lean);
+    command.env("LEAN_PATH",import_root)
+        .arg("-o").arg(olean).arg(src);
+    let (log,status,timed_out)=run_with_timeout(&mut command,timeout)?;
+    anyhow::ensure!(!timed_out,"proof.compose_timeout: {}",src.display());
+    anyhow::ensure!(status==Some(0)&&olean.is_file(),
+        "proof.compose_lean_failed: {log}");
+    anyhow::ensure!(std::fs::read(src)?==original,
+        "proof.compose_source_race: generated Lean changed during verification");
+    Ok(())
+}
+
 /// Re-check a generated, closed proof-obligation module with the Lean kernel.
 /// No local JSON certificate or Rust-side decision may replace this check.
 pub fn check_closed_goals(
