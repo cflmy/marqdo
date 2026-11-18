@@ -18,6 +18,7 @@ pub mod metrics;
 pub mod policy;
 pub mod proof;
 pub mod modular;
+pub mod vc;
 pub mod preflight;
 pub mod reuse;
 pub mod util;
