@@ -1,0 +1,159 @@
+//! Conservative inter-module proof dependency planning.
+//!
+//! This is NOT a rule that a proved callee theorem magically proves its
+//! caller. It records which Lean-checked callee contracts a caller could rely
+//! on and refuses to discharge parameter-dependent preconditions by guesswork.
+//! The independently proved caller claim remains a separate obligation.
+
+use std::collections::{BTreeMap, BTreeSet};
+use serde_json::{json, Value};
+use crate::sema::ir::{BoundCall, SemanticProject};
+
+fn owner_of_call<'a>(semantic:&'a SemanticProject, call:&BoundCall)->Option<&'a str>{
+    // Function headers have source positions; for a call site inside nested
+    // functions the latest preceding declaration in the same file wins.
+    semantic.artifacts.iter()
+        .filter(|a|a.kind=="function" && a.source.file==call.source.file
+            && a.source.line<=call.source.line)
+        .max_by_key(|a|a.source.line)
+        .and_then(|a|a.symbol_id.as_ref().map(|id|id.as_str()))
+}
+
+fn linked_claims<'a>(proofs:&'a Value, symbol:&str)->Vec<&'a Value>{
+    proofs["claims"].as_array().into_iter()
+        .flat_map(|rows|rows.iter())
+        .filter(|r|r["owner_symbol_id"].as_str()==Some(symbol))
+        .collect()
+}
+
+pub fn analyze(semantic:&SemanticProject, proof_index:&Value)->Value{
+    let known:BTreeSet<&str>=semantic.artifacts.iter()
+        .filter_map(|a|a.symbol_id.as_ref().map(|id|id.as_str())).collect();
+    let mut obligations=Vec::new();
+    let mut links:BTreeMap<String,Vec<String>>=BTreeMap::new();
+    for call in &semantic.bound_calls {
+        let callee=call.target.as_str();
+        let caller=owner_of_call(semantic,call);
+        let caller_id=caller.unwrap_or("<unknown-caller>");
+        let id=format!("{}:{}:{}",call.source.file,call.source.line,callee);
+        let exported=semantic.claims.iter().any(|c|c.owner.as_str()==callee);
+        let receipts=linked_claims(proof_index,callee);
+        let contracts:Vec<Value>=semantic.claims.iter()
+            .filter(|c|c.owner.as_str()==callee)
+            .map(|c|{
+                let matched=receipts.iter().find(|r|
+                    r["claim_anchor_id"]==c.anchor_id
+                    && r["conclusion"]==c.conclusion
+                    && r["premise"]==json!(c.premise));
+                let verified=matched.is_some_and(|r|r["status"]=="proved"
+                    && r["usable"]==true);
+                let unconditional=c.premise.as_deref()
+                    .is_none_or(|s|s.trim().is_empty());
+                json!({
+                    "claim_anchor_id":c.anchor_id,
+                    "premise":c.premise,
+                    "conclusion":c.conclusion,
+                    "callee_certificate_valid":verified,
+                    // An unbound premise is a caller-side proof obligation;
+                    // it is never discharged merely because callee was proved.
+                    "call_precondition_status":if unconditional {"none"}
+                        else {"requires_lean_proof_with_actual_arguments"},
+                    "status":if !verified {"missing_verified_callee_claim"}
+                        else if !unconditional {"precondition_pending"}
+                        else {"available_as_contract"}
+                })
+            }).collect();
+        let all_available=exported && !contracts.is_empty()
+            && contracts.iter().all(|x|x["status"]=="available_as_contract");
+        let status=if !known.contains(callee) {
+            "external_without_semantic_definition"
+        } else if !exported {
+            "callee_without_declared_contract"
+        } else if all_available {
+            "callee_contracts_verified"
+        } else {
+            "proof_obligations_pending"
+        };
+        obligations.push(json!({
+            "id":id,"caller":caller,"callee":callee,
+            "call_site":call.call_site,
+            "source":{"file":call.source.file,"line":call.source.line},
+            "status":status,"contracts":contracts,
+            "caller_proof_required":true,
+            "runtime_link_required":true
+        }));
+        if let Some(caller)=caller {
+            links.entry(caller.to_string()).or_default().push(callee.into());
+        }
+    }
+    for call in &semantic.dynamic_calls {
+        obligations.push(json!({
+            "id":format!("{}:{}:dynamic",call.source.file,call.source.line),
+            "source":{"file":call.source.file,"line":call.source.line},
+            "status":"dynamic_or_unresolved_no_modular_proof",
+            "reason":call.reason,"caller_proof_required":true
+        }));
+    }
+    obligations.sort_by(|a,b|a["id"].as_str().cmp(&b["id"].as_str()));
+    let cycles=find_cycles(&links);
+    let complete=obligations.is_empty();
+    json!({
+        "schema_version":1,
+        "kind":"modular_proof_obligations",
+        "status":if complete {"no_cross_call_obligations"} else {"open_obligations"},
+        // Only call graph / verified-contract edges. This is a planner, not
+        // a theorem proving the caller; no automatic upgrade to "proved".
+        "proof_completion":"not_established_by_dependency_analysis",
+        "obligations":obligations,
+        "cycles":cycles
+    })
+}
+
+fn find_cycles(graph:&BTreeMap<String,Vec<String>>)->Vec<Vec<String>>{
+    fn visit<'a>(node:&'a str,g:&'a BTreeMap<String,Vec<String>>,
+        visiting:&mut BTreeSet<String>,done:&mut BTreeSet<String>,
+        stack:&mut Vec<String>,cycles:&mut Vec<Vec<String>>){
+        if done.contains(node){return}
+        if !visiting.insert(node.to_string()){
+            if let Some(start)=stack.iter().position(|x|x==node){
+                let mut cycle=stack[start..].to_vec();
+                cycle.push(node.to_string());
+                cycles.push(cycle);
+            }
+            return
+        }
+        stack.push(node.to_string());
+        if let Some(next)=g.get(node){
+            for target in next {visit(target,g,visiting,done,stack,cycles)}
+        }
+        stack.pop();visiting.remove(node);done.insert(node.to_string());
+    }
+    let mut visiting=BTreeSet::new();
+    let mut done=BTreeSet::new();
+    let mut cycles=Vec::new();
+    for key in graph.keys(){visit(key,graph,&mut visiting,&mut done,&mut Vec::new(),&mut cycles)}
+    cycles
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn contracts_never_discharge_callsite_preconditions_implicitly(){
+        let source=std::env::temp_dir().join(format!("marqdo-modular-{}",std::process::id()));
+        let _=std::fs::remove_dir_all(&source);
+        std::fs::create_dir_all(&source).unwrap();
+        std::fs::write(source.join("callee.mq.md"),
+            "# callee\n\n## f\n\n| 定理 | 结论 | 前提 | 策略 |\n|---|---|---|---|\n| c | 结果 = 2 | x > 0 | auto |\n\n*2*\n").unwrap();
+        std::fs::write(source.join("main.mq.md"),
+            "---\nimport:\n  callee: callee.mq.md\n---\n# main\n\n## call\n\n**x = [外部调用](callee.f())**\n*x*\n").unwrap();
+        let compilation=crate::sema::ir::compile_project(
+            &crate::sema::ir::CompileOptions::for_path(&source).unwrap()).unwrap();
+        let report=analyze(&compilation.semantics,&json!({"claims":[]}));
+        let obligations=report["obligations"].as_array().unwrap();
+        assert!(!obligations.is_empty());
+        assert!(obligations.iter().all(|x|x["status"]!="proved"));
+        assert_eq!(report["proof_completion"],"not_established_by_dependency_analysis");
+        std::fs::remove_dir_all(source).unwrap();
+    }
+}
