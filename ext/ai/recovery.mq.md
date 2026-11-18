@@ -24,6 +24,8 @@ current permission and source revision; a saved checkpoint is not authorization.
 |---|---|---|
 | result | map | Safe recovery action with budget |
 
+Use `error`, `attempts`=0, `effect_class`="read", `cancelled`=False, `fingerprint_repeats`=0 as the inputs for this operation.
+
 This returns an action, not an automatic retry or permission to execute. For
 write or unknown effect, consult the effect ledger before taking another step.
 
@@ -42,6 +44,8 @@ Return *[Select a bounded recovery action](agent.error_decide_retry(error=`error
 |---|---|---|
 | result | map | CheckpointV2 write result |
 
+Use `id`, `task`=None, `status`="waiting_input", `effect_ledger_watermark`=None as the inputs for this operation.
+
 Use the existing atomic checkpoint writer. When ledger evidence is absent,
 a resumed writer requires manual review rather than automatic repetition.
 This function saves metadata; it does not suspend a Rust execution frame.
@@ -57,6 +61,8 @@ Return *[Save a versioned checkpoint](agent.resume_save(id=`id`, task=`task`, st
 | 返回 | 类型 | 说明 |
 |---|---|---|
 | result | map | Checkpoint or missing/unsafe recovery status |
+
+Use `id` as the inputs for this operation.
 
 Loading a checkpoint does not execute any saved step. The caller must inspect
 recovery_mode and write_auto_resume before dispatching any effectful operation.
