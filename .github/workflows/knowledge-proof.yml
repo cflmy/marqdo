@@ -17,6 +17,8 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - name: Compile tests and run semantic anchor unit cases
         run: cargo test --locked --lib sema::ir::tests -- --nocapture
+      - name: Module composition, symbolic paths and proof VC unit tests
+        run: cargo test --locked --lib knowledge:: -- --nocapture
       - name: Knowledge / proof linkage tests
         run: cargo test --locked --test knowledge_proof -- --nocapture
       - name: Existing proof contracts
