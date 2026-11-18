@@ -320,6 +320,7 @@ impl<'a> Cursor<'a> {
             contract: None,
             var_contracts: std::collections::HashMap::new(),
             claims: Vec::new(),
+            assumptions: Vec::new(),
         };
         // Prose decls pending promotion (name → optional default text).
         let mut prose_decls: Vec<(String, Option<String>, u32)> = Vec::new();
@@ -2080,6 +2081,14 @@ fn extract_function_contract(fun: &mut Function, lines: &[ClassifiedLine]) -> Re
         let Some(parsed) = crate::contract::parse_contract_table(pairs, span.line, end_line, quote)
         else {
             // 非契约形状：先试定理表（ADR 0010），再按普通表保留。
+            if let Some(parsed) = crate::contract::parse_assumption_table(pairs, span.line) {
+                if prefix_zone {
+                    fun.assumptions.extend(parsed.map_err(|msg|
+                        bail_at(None, span, format!("proof.assumption_malformed: {msg}")))?);
+                    i += 1;
+                    continue;
+                }
+            }
             match crate::contract::parse_claim_table(pairs, span.line) {
                 // 合法定理表：只在「首个可执行行之前」生效；提取后从 body 移除。
                 // 其余位置仍是普通表，由 `check --proof` 报 proof.claim_misplaced。
