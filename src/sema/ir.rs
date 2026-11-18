@@ -1910,6 +1910,23 @@ import:
     }
 
     #[test]
+    fn theorem_claims_are_addressable_but_never_implicitly_proved() {
+        let root=root();
+        fs::write(root.join("main.mq.md"),
+            "# main\n\n## f\n\n| 定理 | 结论 | 前提 | 策略 |\n|---|---|---|---|\n| 安全性质 | 长度(轨迹) = 0 | | auto |\n\n[阅读定理](#@安全性质)\n**x = [演算](2 * 3)**\n*x*\n").unwrap();
+        let c=compile_project(&CompileOptions::for_path(&root).unwrap()).unwrap();
+        assert_eq!(c.semantics.claims.len(),1);
+        let claim=&c.semantics.claims[0];
+        let link=c.semantics.refs.iter().find(|r|r.label=="阅读定理").unwrap();
+        assert_eq!(link.target_claim.as_deref(),Some(claim.anchor_id.as_str()));
+        assert_eq!(link.resolution,"claim");
+        assert!(link.target.is_none());
+        let serialized=c.semantics.to_json();
+        assert_eq!(serialized["claims"][0]["verification"],"declared_unverified");
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
     fn duplicate_labels_fail_closed_in_public_anchor_projection() {
         let root = root();
         fs::write(root.join("main.mq.md"),
