@@ -788,17 +788,25 @@ fn callsite_control(fun:&Function)->BTreeMap<u32,CallsiteControl>{
                         blocker:Some("call_in_condition_not_modeled".into())
                     });
                     let mut negated=Vec::new();
+                    let mut prior_unknown_condition=false;
                     for arm in arms{
                         let mut path=conditions.to_vec();
                         path.extend(negated.iter().cloned());
-                        let mut arm_block=block.clone();
+                        // A previous unmodelled if/elif test also controls the
+                        // reachability of all later arms, including else.
+                        let mut arm_block=if prior_unknown_condition {
+                            Some("prior_non_pure_branch_guard".into())
+                        } else {block.clone()};
                         if let Some(cond)=&arm.condition{
                             match guard_text(cond){
                                 Some(guard)=>{
                                     path.push(guard.clone());
                                     negated.push(format!("非 ({guard})"));
                                 },
-                                None=>arm_block=Some("non_pure_branch_guard".into())
+                                None=>{
+                                    arm_block=Some("non_pure_branch_guard".into());
+                                    prior_unknown_condition=true;
+                                }
                             }
                         }
                         walk(&arm.body,&path,arm_block,output);
