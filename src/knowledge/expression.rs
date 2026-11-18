@@ -211,6 +211,7 @@ pub(super) fn eligible(c:&Compilation,call:&BoundCall)->bool{
 pub(super) fn prove(c:&Compilation,out:&Path,lean:&Toolchain)->Result<Vec<Value>>{
     let mut results=Vec::new();
     for call in &c.semantics.bound_calls{
+        if super::unified::covers(c,&call.caller){continue}
         let Some(plan)=candidate(c,call) else{continue};
         let closure=closures(c,call)?;
         let key=sha(format!("{}|{:?}|{}",plan.identity,closure,lean.version).as_bytes());
