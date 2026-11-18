@@ -57,6 +57,11 @@ pub struct NarrativeLink {
 /// Classify a link target without parsing it as an expression.
 pub fn classify_narrative_target(target: &str) -> NarrativeLinkKind {
     let t = target.trim();
+    // Compiler-owned mq:// anchor addresses are inert knowledge references,
+    // never external URLs or auto-executable code.
+    if t.starts_with("mq://") && t.contains("#anchor-") {
+        return NarrativeLinkKind::Narrate;
+    }
     if t.starts_with("http://")
         || t.starts_with("https://")
         || t.starts_with("mailto:")
