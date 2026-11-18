@@ -170,6 +170,16 @@ fn check_misplaced_and_malformed(
                 continue;
             }
         };
+        if let Some(assumption)=contract::parse_assumption_table(pairs,span.line){
+            let (code,msg)=match assumption {
+                Ok(_)=>("proof.assumption_misplaced",
+                    "假设表必须在第一条可执行语句之前；此处不会自动生效".to_string()),
+                Err(err)=>("proof.assumption_malformed",err)
+            };
+            out.push(proof_diag(module,path,span,code,msg,
+                "移动并修正 | 假设 | 前置 | 后置 | 表到函数开头".into()));
+            continue;
+        }
         match contract::parse_claim_table(pairs, span.line) {
             Some(Ok(_rows)) => {
                 // 合法定理形却还在 body：一定是位置不对（prefix zone 内会被提取）。
