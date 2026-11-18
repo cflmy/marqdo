@@ -93,6 +93,7 @@ fn validate_steps(args: &Value) -> Result<Value, String> {
                 .ok_or_else(|| "choice step requires options list".to_string())?;
             let _ = choice::parse_choice(&json!({"reply":"","options":options}))?;
             if kind == "input" { let _ = field(s, "question")?; }
+            if kind == "model" { let _ = field(s, "prompt")?; }
         }
         if kind == "skill" { let _ = field(s, "skill")?; }
         if kind == "parallel" && !s.get("tasks").is_some_and(Value::is_array) {
@@ -406,7 +407,7 @@ mod tests {
             "resume_dir":format!("target/workflow-test-{}-{n}",std::process::id()),
             "source_revision":"v1",
             "steps":[
-                {"id":"choose","kind":"model","options":["chat","office"]},
+                {"id":"choose","kind":"model","prompt":"Choose a skill","options":["chat","office"]},
                 {"id":"answer","kind":"input","question":"OK?","options":["yes","no"]},
                 {"id":"end","kind":"return"}
             ]})
