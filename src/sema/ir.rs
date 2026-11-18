@@ -271,7 +271,11 @@ fn checked_constant_int(expr: &Expr, depth: usize) -> Option<i64> {
 }
 
 fn static_call_args(call:&CallExpr)->Vec<StaticCallArg>{
-    call.args.iter().map(|a|{
+    // The exact same alias/modifier expansion used by runtime resolution
+    // must determine the proof's argument list. An invalid normalization
+    // must never yield a recoverable proof argument.
+    let Ok(normalized)=call.for_evaluation() else {return Vec::new()};
+    normalized.args.iter().map(|a|{
         let (name,expr)=match a {
             crate::ast::Arg::Positional(expr)=>(None,expr),
             crate::ast::Arg::Named{name,value}=>(Some(name.clone()),value)
