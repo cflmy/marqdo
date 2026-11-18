@@ -361,6 +361,8 @@ import:
             String::from_utf8_lossy(&result.stderr)));
     assert_eq!(json["lean_preconditions_verified"],1,
         "no kernel checked callsite: {json}");
+    assert!(json["lean_receipts_replayed"].as_u64().unwrap_or(0)>=1,
+        "callee theorem must be replayed by Lean, not trusted from JSON: {json}");
     let call=json["obligations"].as_array().unwrap().iter()
         .find(|o|o["call_site"]=="math.math.exact").unwrap();
     assert_eq!(call["contracts"][0]["call_precondition_status"],"lean_kernel_verified");
