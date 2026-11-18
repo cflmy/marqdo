@@ -52,6 +52,10 @@ jobs:
         env:
           MARQDO_PROOF_REQUIRE_LEAN: "1"
         run: cargo test --locked --test prove_lean g2_certificate_hit_after_real_run -- --nocapture
+      - name: Linear symbolic arithmetic path implication with real Lean
+        env:
+          MARQDO_PROOF_REQUIRE_LEAN: "1"
+        run: cargo test --locked --test prove_lean arithmetic_symbolic_path_implication_uses_real_lean -- --nocapture
       - name: Symbolic path implication with real Lean
         env:
           MARQDO_PROOF_REQUIRE_LEAN: "1"
