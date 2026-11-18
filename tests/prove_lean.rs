@@ -226,6 +226,50 @@ fn g1_cache_hit_skips_judging() {
     let _ = fs::remove_file(&log);
 }
 
+/// Source-transparent, leaf-pure imported call is verified with real Lean.
+#[test]
+fn modular_pure_leaf_import_proved_by_real_lean() {
+    if !toolchain_available() {
+        skip_or_fail("modular_pure_leaf_import_proved_by_real_lean");
+        return;
+    }
+    let scratch=Scratch::new("modular-pure-import");
+    scratch.write("rates.mq.md",r#"# rates
+
+## lookup
+
+*2*
+"#);
+    scratch.write("main.mq.md",r#"---
+markup: occlusion
+import:
+  rates: rates.mq.md
+---
+
+# main
+
+## compute
+
+| 定理 | 结论 | 策略 |
+|---|---|---|
+| 返回值正确 | 结果 = 2 | auto |
+
+**tax = [查询](rates.rates.lookup())**
+*tax*
+"#);
+    let out=scratch.marqdo().args(["prove","main.mq.md","--json"]).output()
+        .expect("prove pure imported leaf");
+    let result:serde_json::Value=serde_json::from_slice(&out.stdout)
+        .unwrap_or_else(|_| panic!("stderr={} stdout={}",
+            String::from_utf8_lossy(&out.stderr),
+            String::from_utf8_lossy(&out.stdout)));
+    assert_eq!(result["status"],"proved",
+        "imported pure leaf must be proved by real Lean: {result}");
+    let ops=&result["functions"][0]["ops"];
+    assert!(ops.as_array().is_some_and(|a|a.is_empty()),
+        "pure leaf import cannot be treated as an opaque environment op: {ops}");
+}
+
 /// G2：真证书命中（用真 lean 跑一次后，证书生效；第二次 cache: hit 且快）。
 #[test]
 fn g2_certificate_hit_after_real_run() {
