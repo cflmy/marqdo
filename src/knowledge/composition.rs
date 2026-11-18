@@ -334,7 +334,8 @@ import:
         let call=c.semantics.bound_calls.iter().find(|x|
             x.call_site=="math.math.exact").unwrap();
         let (callee,caller,_,result)=candidate(&c,call)
-            .expect("typed pure forwarder must be eligible");
+            .unwrap_or_else(||panic!("composition candidate rejected: {}",
+                rejection_diagnostics(&c,call)));
         assert_eq!(result,2);
         assert!(callee.contains("theorem callee_contract"));
         assert!(caller.starts_with("import CalleeModule"));
