@@ -152,17 +152,8 @@ pub fn input_resume(args: &Value) -> Result<Value, String> {
         return Ok(json!({"ok":false,"status":"conflict","id":id,
             "error":{"code":"input.scope_or_revision_changed"}}));
     }
-    if existing["status"] == "resumed" {
-        if existing["result"] == reply {
-            return Ok(json!({"ok":true,"status":"resumed","id":id,
-                "value":reply,"reused":true}));
-        }
-        return Ok(json!({"ok":false,"status":"conflict","id":id,
-            "error":{"code":"input.already_answered"}}));
-    }
-    if existing["status"] != "waiting_input" {
-        return Ok(json!({"ok":false,"status":"conflict","id":id}));
-    }
+    // Normalize the answer before duplicate detection: the index "2" and
+    // the selected label "office" must be the same committed response.
     let allowed = crate::choice::parse_choice(&json!({
         "options": meta["options"], "reply": reply
     }))?;
@@ -174,6 +165,17 @@ pub fn input_resume(args: &Value) -> Result<Value, String> {
         return Ok(json!({"ok":false,"status":"invalid","id":id,
             "error":{"code":"input.invalid_choice"}}));
     };
+    if existing["status"] == "resumed" {
+        if existing["result"] == normalized {
+            return Ok(json!({"ok":true,"status":"resumed","id":id,
+                "value":normalized,"reused":true}));
+        }
+        return Ok(json!({"ok":false,"status":"conflict","id":id,
+            "error":{"code":"input.already_answered"}}));
+    }
+    if existing["status"] != "waiting_input" {
+        return Ok(json!({"ok":false,"status":"conflict","id":id}));
+    }
     let saved = resume::resume_save(&json!({
         "id": id, "resume_dir": args.get("resume_dir"),
         "checkpoint_v2": true,
@@ -212,6 +214,7 @@ mod tests {
         let v = json!({"id":id,"resume_dir":dir,"reply":"2",
             "source_revision":"v1","session_id":"s1","principal_ref":"u1"});
         assert_eq!(input_resume(&v).unwrap()["value"], "office");
+        assert_eq!(input_resume(&v).unwrap()["reused"], true);
         assert_eq!(input_resume(&json!({"id":id,"resume_dir":dir,
             "reply":"office","source_revision":"v1","session_id":"s1",
             "principal_ref":"u1"})).unwrap()["reused"], true);
