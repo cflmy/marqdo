@@ -757,6 +757,8 @@ fn guard_text(expr:&Expr)->Option<String>{
         Expr::Occluded {payload:Some(e),..}=>guard_text(e),
         Expr::Unary {op:crate::ast::UnaryOp::Not,expr}=>
             Some(format!("非 ({})",guard_text(expr)?)),
+        Expr::Unary {op:crate::ast::UnaryOp::Neg,expr}=>
+            Some(format!("-({})",guard_text(expr)?)),
         Expr::Binary {op,left,right}=>{
             let symbol=match op {
                 crate::ast::BinaryOp::Eq=>"=",
@@ -767,6 +769,12 @@ fn guard_text(expr:&Expr)->Option<String>{
                 crate::ast::BinaryOp::Ge=>"≥",
                 crate::ast::BinaryOp::And=>"且",
                 crate::ast::BinaryOp::Or=>"或",
+                // Preserve source arithmetic in *guard obligations* only.
+                // This does not certify i64 overflow or dynamic Number
+                // behavior; the symbolic Lean Int backend checks linearity.
+                crate::ast::BinaryOp::Add=>"+",
+                crate::ast::BinaryOp::Sub=>"-",
+                crate::ast::BinaryOp::Mul=>"*",
                 _=>return None
             };
             Some(format!("({} {} {})",
