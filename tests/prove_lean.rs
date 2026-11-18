@@ -903,7 +903,7 @@ import:
     let caller=fs::read_to_string(folder.join(format!("{caller_name}.lean"))).unwrap();
     assert!(caller.contains("import M"));
     assert!(caller.contains("have hc"));
-    assert!(caller.contains("split_ifs"));
+    assert!(caller.contains("by_cases"));
     assert!(!caller.contains("sorry"));
     assert_eq!(receipt["full_marqdo_runtime_semantics_proved"],false);
     let replay=s.marqdo().args(["knowledge","replay",certificate,"--json","."])
