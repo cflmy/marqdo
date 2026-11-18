@@ -9,6 +9,9 @@ on:
       - "doc/verification/skill-proof/**"
       - ".github/workflows/modular-proof-smoke.yml"
   workflow_dispatch:
+concurrency:
+  group: modular-proof-smoke-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 jobs:
   modular:
     runs-on: ubuntu-latest
