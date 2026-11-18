@@ -335,6 +335,18 @@ fn compile_index(index: ProjectIndex) -> Result<Compilation> {
     }
     close_effect_dependencies(&mut artifacts);
     resolve_anchor_references(&mut refs);
+    for reference in refs.iter().filter(|r| r.resolution == "unresolved_anchor") {
+        diagnostics.push(
+            Diagnostic::new(
+                Some(root.path().join(&reference.source.file)),
+                Span::new(reference.source.line as usize, 1),
+                format!("knowledge anchor target not found or ambiguous: {}",
+                    reference.link_target.as_deref().unwrap_or("<missing>")),
+            )
+            .with_code("knowledge.anchor_unresolved")
+            .with_severity(Severity::Warning)
+        );
+    }
     let resolved_effects: BTreeMap<_,_> = artifacts.iter()
         .map(|artifact|(artifact.artifact_id.clone(),artifact.effects.clone())).collect();
     for bound in &mut bound_calls {
