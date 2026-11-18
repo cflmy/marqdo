@@ -73,6 +73,7 @@ pub fn analyze_with_verified(semantic:&SemanticProject, proof_index:&Value,
                     "symbolic_model_proposition":symbolic.as_ref().map(|g|g.proposition.as_str()),
                     "symbolic_model_guard_count":symbolic.as_ref().map(|g|g.guard_propositions.len()),
                     "symbolic_model_runtime_domain_verified":symbolic.as_ref().map(|g|g.runtime_domain_verified),
+                    "symbolic_int_abstract_supported":symbolic.as_ref().map(|g|g.abstract_integer_model_supported),
                     "path_guards":call.path_guards,
                     "control_blocker":call.control_blocker,
                     "call_precondition_status":if unconditional {"none"}
