@@ -91,6 +91,8 @@ fn ensure_dir(root: &Path) -> Result<(), String> {
     fs::create_dir_all(root).map_err(|e| format!("effects mkdir: {e}"))
 }
 
+static EFFECT_TEMP_SEQUENCE: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
 fn atomic_write_json(path: &Path, doc: &Value) -> Result<(), String> {
     let parent = path
         .parent()
@@ -102,7 +104,8 @@ fn atomic_write_json(path: &Path, doc: &Value) -> Result<(), String> {
             .and_then(|s| s.to_str())
             .unwrap_or("op.json"),
         std::process::id(),
-        now_rfc3339().replace(':', "")
+        format!("{}-{}", now_rfc3339().replace(':', ""),
+            EFFECT_TEMP_SEQUENCE.fetch_add(1, std::sync::atomic::Ordering::Relaxed))
     );
     let tmp = parent.join(tmp_name);
     let text = serde_json::to_string_pretty(doc).map_err(|e| e.to_string())?;
