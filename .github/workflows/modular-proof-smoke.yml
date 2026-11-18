@@ -1,0 +1,31 @@
+name: modular-proof-smoke
+on:
+  pull_request:
+    paths:
+      - "src/knowledge/**"
+      - "src/sema/ir.rs"
+      - "src/prove/**"
+      - "tests/prove_lean.rs"
+      - "doc/verification/skill-proof/**"
+      - ".github/workflows/modular-proof-smoke.yml"
+  workflow_dispatch:
+jobs:
+  modular:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Compile isolated modular proof candidates
+        run: cargo test --locked --lib knowledge::composition::tests -- --nocapture
+      - name: Compile path-sensitive VCs
+        run: cargo test --locked --lib knowledge::symbolic::tests -- --nocapture
+      - name: Compile closed-argument VCs
+        run: cargo test --locked --lib knowledge::vc::tests -- --nocapture
+      - name: Install Lean 4.35
+        run: |
+          curl -sSf https://elan.lean-lang.org/elan-init.sh | sh -s -- -y --default-toolchain leanprover/lean4:v4.35.0
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+      - name: Independently composed Lean modules
+        env:
+          MARQDO_PROOF_REQUIRE_LEAN: "1"
+        run: cargo test --locked --test prove_lean composition_emits_independently_replayable_caller_certificate -- --nocapture
