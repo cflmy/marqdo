@@ -96,7 +96,7 @@ We **destination = [Resolve the new archive inside the granted root](fs.resolve(
 
   | argument |
   |---|
-  | tar |
+  | "C:\\Windows\\System32\\tar.exe" |
   | "--format=zip" |
   | "-cf" |
   | `destination` |
