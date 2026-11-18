@@ -9,7 +9,7 @@ use anyhow::{Context,Result};
 use serde_json::{json,Value};
 use sha2::{Digest,Sha256};
 use crate::{
-    ast::{Arg,CallExpr,Expr,Function,Literal,Stmt},
+    ast::{CallExpr,Expr,Function,Literal,Stmt},
     prove::driver::{Toolchain,compile_import_module},
     sema::ir::{Compilation,SemanticArtifact,BoundCall}
 };
@@ -185,4 +185,100 @@ pub fn prove(compiled:&Compilation,out:&Path,toolchain:&Toolchain)->Result<Value
     Ok(json!({"schema_version":1,"role":"restricted_composed_lean_module",
         "results":records,
         "full_marqdo_runtime_semantics_proved":false}))
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn pure_forwarder_can_be_compiled_into_two_independent_lean_sources(){
+        let root=std::env::temp_dir().join(
+            format!("marqdo-compose-unit-{}",std::process::id()));
+        let _=fs::remove_dir_all(&root);
+        fs::create_dir_all(&root).unwrap();
+        fs::write(root.join("math.mq.md"),r#"---
+markup: occlusion
+---
+
+# math
+
+## exact
++ `n`
+
+| 参数 | 类型 | 说明 |
+|---|---|---|
+| n | int | integer |
+
+| 定理 | 结论 | 策略 |
+|---|---|---|
+| fixed | 结果 = 2 | auto |
+
+*2*
+"#).unwrap();
+        fs::write(root.join("main.mq.md"),r#"---
+markup: occlusion
+import:
+  math: math.mq.md
+---
+
+# main
+
+## forward
++ `n`
+
+| 参数 | 类型 | 说明 |
+|---|---|---|
+| n | int | integer |
+
+| 定理 | 结论 | 策略 |
+|---|---|---|
+| same | 结果 = 2 | auto |
+
+**v = [调用](math.math.exact(`n`))**
+*v*
+"#).unwrap();
+        let c=crate::sema::ir::compile_project(
+            &crate::sema::ir::CompileOptions::for_path(&root).unwrap()).unwrap();
+        let call=c.semantics.bound_calls.iter().find(|x|
+            x.call_site=="math.math.exact").unwrap();
+        let (callee,caller,_,result)=candidate(&c,call)
+            .expect("typed pure forwarder must be eligible");
+        assert_eq!(result,2);
+        assert!(callee.contains("theorem callee_contract"));
+        assert!(caller.starts_with("import CalleeModule"));
+        assert!(caller.contains("using (callee_contract"));
+        // Branching is explicitly outside the certificate scope.
+        fs::write(root.join("main.mq.md"),r#"---
+import:
+  math: math.mq.md
+---
+
+# main
+
+## forward
++ `n`
+
+| 参数 | 类型 | 说明 |
+|---|---|---|
+| n | int | integer |
+
+| 定理 | 结论 | 策略 |
+|---|---|---|
+| same | 结果 = 2 | auto |
+
+1. `n` > 0
+  **v = [调用](math.math.exact(`n`))**
+2. *
+  **v = 0**
+
+*v*
+"#).unwrap();
+        let changed=crate::sema::ir::compile_project(
+            &crate::sema::ir::CompileOptions::for_path(&root).unwrap()).unwrap();
+        let guarded=changed.semantics.bound_calls.iter().find(|x|
+            x.call_site=="math.math.exact").unwrap();
+        assert!(candidate(&changed,guarded).is_none());
+        fs::remove_dir_all(root).unwrap();
+    }
 }
