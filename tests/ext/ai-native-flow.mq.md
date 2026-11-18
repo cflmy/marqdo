@@ -36,6 +36,13 @@ rather than guessing another SKILL or importing the full document.
 2. *
   > sys.exit code=13
 
+**packed = > context.compose user="Test the route" class="main" function="probe" budget_tokens=2048**
+**pack_schema = > json.get value=`packed` key="schema"**
+1. `pack_schema` == "ContextPackV2"
+  **_ = 1**
+2. *
+  > sys.exit code=15
+
 **gate = > flow.input id="ai_native_flow_ci_gate" question="Continue?" options=`opts` source_revision="fixture-v1" freeform=False**
 **answered = > flow.reply id="ai_native_flow_ci_gate" reply="office" source_revision="fixture-v1"**
 **answer = > json.get value=`answered` key="value"**
