@@ -210,6 +210,17 @@ pub struct KnowledgeClaim {
     pub source: SourceLocation,
 }
 
+/// Declared operation assumption, not an accepted proof or runtime binding.
+#[derive(Debug, Clone)]
+pub struct KnowledgeAssumption {
+    pub id: String,
+    pub owner: SymbolId,
+    pub operation: String,
+    pub premise: Option<String>,
+    pub postcondition: String,
+    pub source: SourceLocation,
+}
+
 #[derive(Debug, Clone)]
 pub struct KnowledgeStep {
     pub id: ArtifactId,
@@ -250,6 +261,7 @@ pub struct SemanticProject {
     pub refs: Vec<KnowledgeRef>,
     pub steps: Vec<KnowledgeStep>,
     pub claims: Vec<KnowledgeClaim>,
+    pub assumptions: Vec<KnowledgeAssumption>,
     pub bound_calls: Vec<BoundCall>,
     pub dynamic_calls: Vec<DynamicCall>,
 }
@@ -301,6 +313,7 @@ fn compile_index(index: ProjectIndex) -> Result<Compilation> {
     let mut refs = Vec::new();
     let mut steps = Vec::new();
     let mut claims = Vec::new();
+    let mut assumptions = Vec::new();
     let mut bound_calls = Vec::new();
     let mut dynamic_calls = Vec::new();
     let mut local_by_name: BTreeMap<(ModuleId, String), SymbolId> = BTreeMap::new();
@@ -339,6 +352,29 @@ fn compile_index(index: ProjectIndex) -> Result<Compilation> {
                     premise:claim.premise.clone(),
                     line:claim.line,
                     source:source_location(index.root().path(),path,claim.line,claim.line),
+                });
+            }
+            let mut assumption_counts=BTreeMap::new();
+            for assumption in &function.assumptions {
+                *assumption_counts.entry(assumption.op.as_str()).or_insert(0usize)+=1;
+            }
+            for assumption in &function.assumptions {
+                if assumption_counts.get(assumption.op.as_str())!=Some(&1) {
+                    diagnostics.push(Diagnostic::new(Some(path.as_path()),
+                        Span::new(assumption.line,1),
+                        format!("ambiguous assumption operation: {}",assumption.op))
+                        .with_code("proof.assumption_duplicate")
+                        .with_severity(Severity::Warning));
+                    continue;
+                }
+                assumptions.push(KnowledgeAssumption{
+                    id:format!("{}#assumption-{}",symbol.id.as_str(),
+                        digest(assumption.op.as_bytes()).0.trim_start_matches("sha256:")),
+                    owner:symbol.id.clone(),
+                    operation:assumption.op.clone(),
+                    premise:assumption.premise.clone(),
+                    postcondition:assumption.postcondition.clone(),
+                    source:source_location(index.root().path(),path,assumption.line,assumption.line)
                 });
             }
             let owned_links: Vec<_> = narrative_links
@@ -411,6 +447,7 @@ fn compile_index(index: ProjectIndex) -> Result<Compilation> {
     refs.sort_by(|a, b| a.id.cmp(&b.id));
     steps.sort_by(|a, b| a.id.0.cmp(&b.id.0));
     claims.sort_by(|a,b| a.anchor_id.cmp(&b.anchor_id));
+    assumptions.sort_by(|a,b|a.id.cmp(&b.id));
     bound_calls.sort_by(|a, b| {
         a.source
             .file
@@ -435,6 +472,7 @@ fn compile_index(index: ProjectIndex) -> Result<Compilation> {
             refs,
             steps,
             claims,
+            assumptions,
             bound_calls,
             dynamic_calls,
         },
@@ -1470,6 +1508,7 @@ impl SemanticProject {
             "refs": self.refs.iter().map(ref_json).collect::<Vec<_>>(),
             "steps": self.steps.iter().map(step_json).collect::<Vec<_>>(),
             "claims": self.claims.iter().map(claim_json).collect::<Vec<_>>(),
+            "assumptions": self.assumptions.iter().map(assumption_json).collect::<Vec<_>>(),
             "bound_calls": self.bound_calls.iter().map(bound_call_json).collect::<Vec<_>>(),
             "dynamic_calls": self.dynamic_calls.iter().map(dynamic_call_json).collect::<Vec<_>>(),
         })
@@ -1480,6 +1519,12 @@ pub fn artifact_json(artifact: &SemanticArtifact) -> Value {
     json!({"schema_version": SCHEMA_VERSION, "artifact_id": artifact.artifact_id.0, "symbol_id": artifact.symbol_id.as_ref().map(SymbolId::as_str), "display_name": artifact.display_name, "kind": artifact.kind, "callable": artifact.callable, "source": {"file": artifact.source.file, "line": artifact.source.line, "end_line": artifact.source.end_line}, "signature": artifact.signature.as_ref().map(|s| json!({"receiver":s.receiver,"params":s.params.iter().map(|p|json!({"name":p.name,"type":p.ty,"required":p.required,"default_digest":p.default_digest.as_ref().map(|d|&d.0),"unit":p.unit})).collect::<Vec<_>>(),"returns":s.returns,"effects":s.effects.values()})), "contract":{"params":artifact.contract.params,"returns":artifact.contract.returns,"fields":artifact.contract.fields}, "effects":artifact.effects.values(), "dependencies":artifact.dependencies.iter().map(|d|&d.0).collect::<Vec<_>>(), "provenance":artifact.provenance.iter().map(|p|json!({"uri":p.uri,"locator":p.locator,"content_digest":p.content_digest.as_ref().map(|d|&d.0),"relation":p.relation})).collect::<Vec<_>>(), "applicability":artifact.applicability, "hashes":{"interface":artifact.hashes.interface.0,"implementation":artifact.hashes.implementation.0,"evidence":artifact.hashes.evidence.0,"artifact":artifact.hashes.artifact.0,"closure":artifact.hashes.closure.0}, "verification":{"parse":artifact.verification.parse,"resolve":artifact.verification.resolve,"contract":artifact.verification.contract,"execution":artifact.verification.execution,"tests":artifact.verification.tests,"evidence":artifact.verification.evidence,"domain":artifact.verification.domain,"methods":artifact.verification.methods}, "lifecycle":artifact.lifecycle})
 }
 fn ref_json(reference: &KnowledgeRef) -> Value { json!({"id":reference.id,"anchor_id":reference.anchor_id,"link_target":reference.link_target,"target_anchor":reference.target_anchor,"target_claim":reference.target_claim,"label":reference.label,"context":reference.context,"source":{"file":reference.source.file,"line":reference.source.line,"end_line":reference.source.end_line},"resolution":reference.resolution,"target":reference.target.as_ref().map(SymbolId::as_str)}) }
+fn assumption_json(a:&KnowledgeAssumption)->Value{
+    json!({"id":a.id,"owner":a.owner.as_str(),"operation":a.operation,
+        "premise":a.premise,"postcondition":a.postcondition,
+        "verification":"declared_not_proved",
+        "source":{"file":a.source.file,"line":a.source.line}})
+}
 fn claim_json(claim: &KnowledgeClaim) -> Value {
     json!({"anchor_id":claim.anchor_id,"owner":claim.owner.as_str(),
         "label":claim.label,"conclusion":claim.conclusion,"premise":claim.premise,
@@ -1512,6 +1557,7 @@ const SEMANTIC_NAMES: &[&str] = &[
     "steps.json",
     "anchors.json",
     "claims.json",
+    "assumptions.json",
     "proof-index.json",
     "proof-obligations.json",
     "bound_calls.json",
@@ -1648,6 +1694,11 @@ fn write_generation_tree(stage: &Path, compilation: &Compilation, prove_root: &P
         "claims":project["claims"]
     }))?;
     let proofs=crate::knowledge::proof::index_links(prove_root, &compilation.semantics);
+    write_json(&stage.join("assumptions.json"), &json!({
+        "schema_version":SCHEMA_VERSION,
+        "role":"declared_modular_contracts_require_callsite_proof",
+        "assumptions":project["assumptions"]
+    }))?;
     write_json(&stage.join("proof-index.json"), &proofs)?;
     write_json(&stage.join("proof-obligations.json"),
         &crate::knowledge::modular::analyze(&compilation.semantics, &proofs))?;
@@ -1681,6 +1732,10 @@ fn write_generation_tree(stage: &Path, compilation: &Compilation, prove_root: &P
             })
         })
         .collect();
+    for assumption in &compilation.semantics.assumptions {
+        edges.push(json!({"from":assumption.owner.as_str(),
+            "to":assumption.id,"kind":"declares_assumption"}));
+    }
     for claim in &compilation.semantics.claims {
         edges.push(json!({"from":claim.owner.as_str(),
             "to":claim.anchor_id,"kind":"declares_claim"}));
