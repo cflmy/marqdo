@@ -155,3 +155,60 @@ marqdo knowledge proof-deps --verify --strict --json .
 - `proof_completion` 仍为 `not_established_by_dependency_analysis`。目前缺少通用符号实参、分支路径条件、任意效应 ABI 的正式组合证明与可重放的跨模块结论证明证书。**不得将依赖图审计通过升级为完整模块化 proved。**
 
 新增 `tests/prove_lean.rs` 场景验证被调定理与调用前置条件**双重重放**，且实参不满足前置条件时必然退出非零；新增单元测试覆盖实际工程导入、整数溢出和未绑定实参。此处描述的是提交的实现及其预期测试，最终验收仍以最新提交 CI 结果为准。
+
+
+## M7：路径敏感符号证明和独立组合证书（限定子集）
+
+### 路径条件
+
+`SemanticProject.BoundCall` 保存调用身份、归一化实参、直接变量、
+进入该调用点的分支条件（包括 else 否定条件）以及无法证明时的
+`control_blocker`。副作用条件、循环、迭代和未知运算不作为已证前提。
+
+`src/knowledge/symbolic.rs` 对纯整数比较和布尔条件产生带
+`(v0 : Int)` 等量词绑定与路径假设的 Lean 定理；调用 Lean 核验后仅为
+`symbolic_path_lean_model_proved`，不等于运行时契约通过。数学 Int 与
+Marqdo 动态值、有界 i64 语义对应仍需独立证明。
+
+### 独立 Lean 组合证明（首个真正闭环）
+
+```sh
+marqdo knowledge compose --json --strict .
+marqdo knowledge replay .marqdo/modular/composed/{proof-id}/composition-certificate.json --json .
+```
+
+`compose` 仅接受：不同文件间的唯一静态调用；纯整数函数；
+调用方直接返回或一次局部赋值再返回被调结果；被调方只有一条整数常量返回；
+参数均有明确 int 契约、无默认参数；实参仅为调用方参数或安全整数常量；
+双方具有相同的无条件结果定理；无分支、循环、递归、异常、ABI 效应。
+
+分别生成 `CalleeModule.lean` 和 `CallerModule.lean`：
+
+- 被调方源码生成定义，其契约由 Lean 证明。
+- 调用方 `import CalleeModule`，只使用被调方证明的契约，不展开其函数体。
+- 两模块独立生成 .olean 并通过真实 Lean 4 核验。
+- `composition-certificate.json` 绑定符号、源码闭包、Lean 版本、Lean 源文件
+  和编译模块哈希，证明作用域限定为
+  `typed_int_pure_forwarder_constant_postcondition`。
+- `replay` 必须从**当前项目**重新编译出相同的 Lean 源，匹配依赖闭包，
+  然后独立重新执行两个 Lean 模块并校验产物哈希；源码/证书有变即失效。
+
+此证书状态是 `lean_kernel_proved_model`，**不是** Marqdo 运行时全部语义已证。
+
+### 异常、循环、递归与 ABI 的保守边界
+
+`MarqdoModularProof.lean` 用 `Exit.ok / Exit.error / Exit.diverged`
+显式区分成功、异常、不终止；`total_sequence_sound` 证明包含异常和
+发散结果的总正确性契约只有在前置条件桥接被证明后才能组合。
+异常结果和发散结果不能等同于正常返回。
+
+这是经过 Lean 检查的**抽象组合规则**，并非已证明所有插件、循环与递归
+实现满足这一模型。遇到 ABI 不透明效应、无法验证的异常处理、缺失循环
+不变式/终止性或递归下降变元时，编译器保守拒绝组合。
+
+### 未达到完整通用系统的部分
+
+动态类型语义保持、复杂算术的安全条件、任意路径的 WP、
+循环不变式与终止性、递归归纳证明、插件状态转换可信契约、
+并发效应，以及一般性参数化后置条件的源码无关组合，目前仍不完整。
+不能将已完成的限定子集扩大宣传为完整的通用模块化证明系统。
