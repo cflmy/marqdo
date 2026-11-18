@@ -117,11 +117,18 @@ marqdo view examples/procurement --no-open
 
 Agent Skills already support scripts; Marqdo's claim is **one document-native language surface** for authoring, inspecting, executing and reusing functions. This is **not** a claim of full formal verification, zero-delay execution, or OS-level isolation of all plugin/process behavior.
 
-**Resources:** [Release v2.7.1](https://github.com/cflmy/marqdo/releases/tag/v2.7.1) · [Procurement example](examples/procurement/index.mq.md) · [Executable library authoring](doc/library-development.mq.md) · [Function calling](public/features/22-函数调用.mq.md) · [Link syntax](doc/design/link-syntax.md) · [Website](https://www.marqdo.com/)
+**Resources:** [Release v2.8.0](https://github.com/cflmy/marqdo/releases/tag/v2.8.0) · [Procurement example](examples/procurement/index.mq.md) · [Executable library authoring](doc/library-development.mq.md) · [Function calling](public/features/22-函数调用.mq.md) · [Link syntax](doc/design/link-syntax.md) · [Website](https://www.marqdo.com/)
 
 ---
 
 ## Deep dive · 语言、设计与执行系统
+
+标准库单文件本身就是手册：直接阅读[文件库](lib/文件.mq.md)、[集合库](lib/表.mq.md)等源码，按函数标题下的参数表、返回契约和动作说明调用；[工程实践](examples/stdlib-handbook/索引.mq.md)演示文件整理、CSV 汇总与文档维护。
+开发标准库和拓展库请直接阅读[可执行库开发指南](doc/library-development.mq.md)：契约表、叙述式实现、遮蔽调用与多文件工程组织均有可运行示范。
+
+当前 CLI **2.8.0** 新增 `marqdo prove`：知识文件的定理表编译为 Lean 4 并自动判定真假——没有 Lean 工具链也能离线符号执行（诚实降级，绝不冒充证明），有 Lean 时全链路证明并给出反例见证。参见[发布说明](doc/releases/v2.8.0.md)。
+
+CLI **2.8.0** adds `marqdo prove`: theorem tables in knowledge files compile to Lean 4 and are judged automatically — offline symbolic execution without a toolchain (honest degradation, never impersonating a proof), full proofs with counterexample witnesses when Lean is available.
 
 ## 核心优势：可执行知识（Executable Knowledge）
 
@@ -242,6 +249,7 @@ Agent Skills already support scripts; Marqdo's claim is **one document-native la
 3. **程序即 AI 长期记忆**：`.mq.md` 工程 = 可执行知识库 = AI 的世界模型（Executable Knowledge Representation）。
 4. **链接即调用 / 可执行知识图**：`[描述](类.函数)` 既是文档链接，也是类/函数调用；编译器解析目标、校验签名、返回 LinkInfo；`view` 显示调用点；`.mq.md` 之间的链接长成文档图 + 知识图 + 程序图（Executable Knowledge Graph）。
 5. **知识可测试**：文档中的示例表自动执行；知识与执行结果不一致会被机器报告——Knowledge-Code Coherence 从理念变为日常。
+6. **知识可证明**：知识文件内的定理表 → Lean 4 定理 → 自动判定（`marqdo prove`）；离线符号执行与 Lean 单调一致，分歧显式报错——Trusted Knowledge，判定器缺陷优先于任何绿灯。
 6. **可靠性基准**：让同一个 AI 分别用 Python / TypeScript / Marqdo 完成真实任务，测量生成长度、语法 / 语义错误率、修复轮次、token 消耗与人类阅读 / 修改成本——用实验数据证明「文档型语法降低 LLM 生成熵」。
 
 ---

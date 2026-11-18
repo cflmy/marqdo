@@ -1,6 +1,6 @@
 [package]
 name = "marqdo"
-version = "2.7.1"
+version = "2.8.0"
 edition = "2021"
 license = "Apache-2.0"
 description = "Marqdo — Markdown markers as an interpreted programming language"
@@ -10,6 +10,12 @@ repository = "https://github.com/cflmy/marqdo"
 [[bin]]
 name = "marqdo"
 path = "src/main.rs"
+required-features = ["cli"]
+
+# Lean 判定集成测试（独立目标：缓存/判定/退出码矩阵，见 tests/prove_lean.rs）。
+[[test]]
+name = "prove_lean"
+path = "tests/prove_lean.rs"
 required-features = ["cli"]
 
 [features]

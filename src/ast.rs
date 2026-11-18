@@ -95,6 +95,22 @@ pub struct Function {
     pub contract: Option<crate::contract::Contract>,
     /// 集合契约（T2.1）：变量名 → 字段契约（紧邻 `` `名` = `` 绑定之前的文档表）。
     pub var_contracts: HashMap<String, crate::contract::Contract>,
+    /// 定理表（ADR 0010）：函数级命题声明；首条可执行语句之前提取，不参与运行。
+    pub claims: Vec<Claim>,
+}
+
+/// 一条定理声明（设计 §7.1）：`| 定理 | 结论 | 前提 | 策略 |` 的一行。
+#[derive(Debug, Clone)]
+pub struct Claim {
+    /// 定理 id（函数内唯一；重复由 `check --proof` 报 `proof.claim_duplicate`）。
+    pub id: String,
+    /// 受限表达式文本（参数、`结果`、`轨迹`、三个谓词、算术/比较/布尔）。
+    pub conclusion: String,
+    pub premise: Option<String>,
+    /// `auto`（默认）或 `none`；其他值由 `check --proof` 报 unsupported。
+    pub tactic: Option<String>,
+    /// 表行所在行号（锚定漂移检测）。
+    pub line: u32,
 }
 
 impl Function {

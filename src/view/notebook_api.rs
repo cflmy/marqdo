@@ -609,7 +609,7 @@ mod replay_api_tests {
         let relative=format!("target/api-replay-seeded-{pid}.mq.md");let path=root.join(&relative);
         let wrapper=root.join(format!("target/api-replay-wrapper-{pid}.py"));let marker=root.join(format!("target/api-replay-marker-{pid}"));
         let marker_literal=serde_json::to_string(&marker.display().to_string()).unwrap();
-        let script=format!("#!/usr/bin/python3\nimport os,sys\nfrom pathlib import Path\nPath({marker_literal}).write_text('started')\nos.execv(sys.executable,[sys.executable]+sys.argv[1:])\n");
+        let script=format!("#!/usr/bin/env python3\nimport os,sys\nfrom pathlib import Path\nPath({marker_literal}).write_text('started')\nos.execv(sys.executable,[sys.executable]+sys.argv[1:])\n");
         std::fs::write(&wrapper,script).unwrap();std::fs::set_permissions(&wrapper,std::fs::Permissions::from_mode(0o755)).unwrap();
         let command=serde_json::to_string(&wrapper.display().to_string()).unwrap();
         let source=format!("---\nimport:\n  foreign: lib/foreign.mq.md\n---\n# main\n\n`kernels` =\n| 名称 | 语言 | 命令 |\n|---|---|---|\n| py | python | {command} |\n\n`units` =\n| 单元 | 内核 |\n|---|---|\n| a | py |\n\n`initial` =\n| 内核 | 名称 | 值 |\n|---|---|---|\n| py | n | 1 |\n\n`会话` = > foreign.session kernels=`kernels` cells=`units` values=`initial`\n\n`a` =\n```python\nprint(n)\n```\n");

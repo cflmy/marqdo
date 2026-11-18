@@ -30,6 +30,7 @@ export ZIG_GLOBAL_CACHE_DIR="${ZIG_GLOBAL_CACHE_DIR:-$_tc/zigcache}"
 export ZIG_LOCAL_CACHE_DIR="${ZIG_LOCAL_CACHE_DIR:-$_tc/zigcache}"
 
 _prepend_existing "$_zshim/bin"
+_prepend_existing "$_tc/bin"
 _prepend_existing "$_tc/python/bin"
 _prepend_existing "$_tc/go/bin"
 _prepend_existing "$_tc/cargo/bin"

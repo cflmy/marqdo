@@ -200,6 +200,15 @@ Advance at most one step. Model text is a candidate, never direct
 execution. Waiting for a user returns immediately without holding a thread.
 A caller repeats tick after verified completion; UI replies use commit.
 
+`tick` is the only wrapper that may execute a document child, and it only does
+so after the checkpoint reports a read-only `ready_tool` step. When the action
+is `waiting_input`, return the state unchanged so the host can display the
+question and commit the attested answer on a later call. A blocked, uncertain
+or cancelled checkpoint is returned as-is; recovery must use `retry_plan` or an
+operator decision instead of silently ticking again. The returned state always
+describes the committed boundary, not an optimistic guess about a running
+child.
+
 We retain **state = [Load the next action](next(id=`id`, source_revision=`source_revision`, session_id=`session_id`, principal_ref=`principal_ref`, resume_dir=`resume_dir`))**.
 We retain **status = [Read action status](json.get(value=`state`, key="status"))**.
 1. `status` == "waiting_model"

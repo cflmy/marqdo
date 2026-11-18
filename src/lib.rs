@@ -45,6 +45,7 @@ pub mod runtime;
 pub mod workbench;
 pub mod parse;
 pub mod project;
+pub mod prove;
 pub mod repair;
 pub mod sema;
 pub mod value;

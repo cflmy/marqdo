@@ -218,6 +218,10 @@ enum Commands {
         /// Parse an unmarked file with the legacy grammar for migration review.
         #[arg(long)]
         legacy_markup: bool,
+
+        /// Validate theorem tables (ADR 0010; 默认关): shape, symbols, shadowing
+        #[arg(long)]
+        proof: bool,
     },
     /// Occlusion label queries: pending stubs (built-in words) or keyword search
     Labels {
@@ -495,6 +499,110 @@ enum Commands {
         #[command(subcommand)]
         action: WasmAction,
     },
+    /// Compile SKILL orchestration to Lean 4 and (P1+) prove theorems (推荐但不强制)
+    Prove {
+        /// Action (default: emit + report)
+        #[command(subcommand)]
+        action: Option<ProveAction>,
+
+        /// Program path (.mq.md; default ./index.mq.md)
+        #[arg(value_name = "FILE")]
+        file: Option<PathBuf>,
+
+        /// One JSON object on stdout (agent-facing stable contract)
+        #[arg(long)]
+        json: bool,
+
+        /// Only lower/emit these functions (display path, repeatable)
+        #[arg(long = "only", value_name = "FN")]
+        only: Vec<String>,
+
+        /// Output dir for emit (default .marqdo/prove/<key>/)
+        #[arg(long = "emit", short = 'o', value_name = "DIR")]
+        emit_dir: Option<PathBuf>,
+
+        /// Don't write artifacts; report only
+        #[arg(long)]
+        report_only: bool,
+
+        /// Downgrade this function wholesale to one opaque op (repeatable)
+        #[arg(long = "allow-opaque", value_name = "FN")]
+        allow_opaque: Vec<String>,
+
+        /// Type inference is strict by default; this relaxes to Val (weaker proofs)
+        #[arg(long = "no-strict-types")]
+        no_strict_types: bool,
+
+        /// CI strict mode: unjudged statuses exit 2 (P1+)
+        #[arg(long)]
+        require_lean: bool,
+
+        /// Explicit lean binary (else MARQDO_PROOF_LEAN, else PATH)
+        #[arg(long, value_name = "PATH")]
+        lean: Option<PathBuf>,
+
+        /// Per-lean-call timeout in seconds (default 120)
+        #[arg(long, value_name = "SEC", default_value_t = 120)]
+        timeout: u64,
+
+        /// Bypass the certificate cache (also MARQDO_PROOF_NO_CACHE)
+        #[arg(long)]
+        no_cache: bool,
+
+        /// maxHeartbeats for lean (default: lean's own)
+        #[arg(long, value_name = "N")]
+        heartbeats: Option<u64>,
+
+        /// Directory mode: recursively prove every .mq.md (aggregated, worst status wins)
+        #[arg(long)]
+        all: bool,
+
+        /// Cap for --all file collection (default 200)
+        #[arg(long = "max-files", value_name = "N", default_value_t = 200)]
+        max_files: usize,
+
+        /// Debug fault injection: `offline-claim` flips one Lean-proved claim to
+        /// force proof.divergence (monotonicity tripwire verification)
+        #[arg(long = "fault-inject", value_name = "SPEC")]
+        fault_inject: Option<String>,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+enum ProveAction {
+    /// Generate deterministic Lean module + plan.json (no judging)
+    Emit {
+        #[arg(value_name = "FILE")]
+        file: Option<PathBuf>,
+        #[arg(long = "emit", short = 'o', value_name = "DIR")]
+        emit_dir: Option<PathBuf>,
+        #[arg(long)]
+        json: bool,
+        #[arg(long = "only", value_name = "FN")]
+        only: Vec<String>,
+        #[arg(long = "allow-opaque", value_name = "FN")]
+        allow_opaque: Vec<String>,
+        #[arg(long = "no-strict-types")]
+        no_strict_types: bool,
+    },
+    /// Report inline/opaque/rejected classification (no judging)
+    Audit {
+        #[arg(value_name = "FILE")]
+        file: Option<PathBuf>,
+        #[arg(long)]
+        json: bool,
+        #[arg(long = "only", value_name = "FN")]
+        only: Vec<String>,
+        #[arg(long = "allow-opaque", value_name = "FN")]
+        allow_opaque: Vec<String>,
+        #[arg(long = "no-strict-types")]
+        no_strict_types: bool,
+    },
+    /// Delete .marqdo/prove caches and certificates
+    Clean {
+        #[arg(long)]
+        json: bool,
+    },
 }
 
 #[derive(Subcommand, Debug)]
@@ -656,7 +764,9 @@ fn main() -> ExitCode {
     let cli = Cli::parse();
     let json_errors = matches!(
         &cli.command,
-        Commands::Run { json: true, .. } | Commands::Check { json: true, .. }
+        Commands::Run { json: true, .. }
+            | Commands::Check { json: true, .. }
+            | Commands::Prove { json: true, .. }
     );
     match try_main(cli) {
         Ok(code) => ExitCode::from(code as u8),
@@ -675,6 +785,85 @@ fn main() -> ExitCode {
             ExitCode::from(1)
         }
     }
+}
+
+/// `prove --all`：逐文件出报告，整体取最差状态（差者胜，§3.2）。
+/// JSON：`{"schema":1,"kind":"prove-all","status":…,"files":[…],"duration_ms":…}`。
+fn run_prove_all(
+    dir: &std::path::Path,
+    max_files: usize,
+    opts: &marqdo::prove::ProveOptions,
+    json: bool,
+    require_lean: bool,
+) -> Result<i32> {
+    let mut files = collect_mq_files(dir)?;
+    anyhow::ensure!(
+        !files.is_empty(),
+        "目录中没有 .mq.md 文件：{}",
+        dir.display()
+    );
+    anyhow::ensure!(
+        files.len() <= max_files,
+        "--max-files {max_files} 已达上限（实际 {} 个文件；请调大或缩小范围）",
+        files.len()
+    );
+    files.sort();
+    let started = std::time::Instant::now();
+    let mut worst = marqdo::prove::Verdict::Proved;
+    let mut file_items: Vec<serde_json::Value> = Vec::new();
+    let mut text_rows: Vec<(String, marqdo::prove::Verdict, usize)> = Vec::new();
+    for f in &files {
+        let report = marqdo::prove::prove_path(f, opts)?;
+        for d in &report.diagnostics {
+            eprintln!("{}", d.format_message());
+        }
+        let claims: usize = report
+            .functions
+            .iter()
+            .map(|fun| fun.claims.len())
+            .sum();
+        worst = marqdo::prove::Verdict::worst(worst, report.status);
+        text_rows.push((
+            f.strip_prefix(dir).unwrap_or(f).display().to_string(),
+            report.status,
+            claims,
+        ));
+        let mut item = report.to_json();
+        if let Some(obj) = item.as_object_mut() {
+            obj.insert(
+                "file".into(),
+                serde_json::Value::String(
+                    f.strip_prefix(dir).unwrap_or(f).display().to_string(),
+                ),
+            );
+        }
+        file_items.push(item);
+    }
+    let duration_ms = started.elapsed().as_millis() as u64;
+    if json {
+        let agg = serde_json::json!({
+            "schema": 1,
+            "kind": "prove-all",
+            "root": dir.display().to_string(),
+            "status": worst.as_str(),
+            "files": file_items,
+            "file_count": files.len(),
+            "duration_ms": duration_ms,
+        });
+        println!("{agg}");
+    } else {
+        println!(
+            "prove --all {}：{} 个文件，{} ms，整体 {}",
+            dir.display(),
+            files.len(),
+            duration_ms,
+            worst.as_str()
+        );
+        for (rel, status, claims) in &text_rows {
+            println!("  {rel}: {}（定理 {claims}）", status.as_str());
+        }
+    }
+    Ok(worst.exit_code(require_lean))
 }
 
 /// Resolve the value-path spelling introduced for executable knowledge without
@@ -958,13 +1147,14 @@ fn try_main(cli: Cli) -> Result<i32> {
             implicit_labels,
             narrative_ratio,
             legacy_markup,
+            proof,
         } => {
             let mut diags = if legacy_markup {
                 marqdo::parse::expr::with_markup(marqdo::parse::expr::Markup::Classic, || {
-                    marqdo::check::check_path_opts(&file, implicit_labels)
+                    marqdo::check::check_path_opts(&file, implicit_labels, proof)
                 })?
             } else {
-                marqdo::check::check_path_opts(&file, implicit_labels)?
+                marqdo::check::check_path_opts(&file, implicit_labels, proof)?
             };
             if narrative_ratio {
                 diags.extend(marqdo::narrative_ratio::check_file(&file)?);
@@ -988,6 +1178,138 @@ fn try_main(cli: Cli) -> Result<i32> {
                 }
             }
             Ok(errors.min(1))
+        }
+        Commands::Prove {
+            action,
+            file,
+            json,
+            only,
+            emit_dir,
+            report_only,
+            allow_opaque,
+            no_strict_types,
+            require_lean,
+            lean,
+            timeout,
+            no_cache,
+            heartbeats,
+            all,
+            max_files,
+            fault_inject,
+        } => {
+            // 调试注入（§6 A3）：仅面向测试的分歧触发器。
+            if fault_inject.as_deref() == Some("offline-claim") {
+                std::env::set_var("MARQDO_PROOF_INJECT_DIVERGENCE", "1");
+            }
+            // 子命令参数覆盖顶层默认；默认动作 = emit + 报告。
+            let (file, action_json, action_emit, action_only, action_opaque, action_relax) =
+                match &action {
+                    Some(ProveAction::Emit {
+                        file,
+                        emit_dir,
+                        json,
+                        only,
+                        allow_opaque,
+                        no_strict_types,
+                    }) => (
+                        file.clone(),
+                        *json,
+                        Some(emit_dir.clone()),
+                        only.clone(),
+                        allow_opaque.clone(),
+                        *no_strict_types,
+                    ),
+                    Some(ProveAction::Audit {
+                        file,
+                        json,
+                        only,
+                        allow_opaque,
+                        no_strict_types,
+                    }) => (
+                        file.clone(),
+                        *json,
+                        None,
+                        only.clone(),
+                        allow_opaque.clone(),
+                        *no_strict_types,
+                    ),
+                    Some(ProveAction::Clean { json }) => {
+                        let removed = marqdo::prove::clean()?;
+                        if *json {
+                            println!("{{\"ok\":true,\"removed\":{removed}}}");
+                        } else {
+                            println!("prove clean: 已删除 {removed} 项（.marqdo/prove）");
+                        }
+                        return Ok(0);
+                    }
+                    None => (file.clone(), false, Some(emit_dir.clone()), only.clone(), allow_opaque.clone(), no_strict_types),
+                };
+            let file = file.unwrap_or_else(|| PathBuf::from("index.mq.md"));
+            // emit 目标：显式 --emit 优先；None → mod.rs 用默认 `.marqdo/prove/<key8>`。
+            // audit 永不写盘；默认动作受 --report-only 控制；emit 子命令总是写盘。
+            let emit_target = action_emit.flatten();
+            let report_only = matches!(action, Some(ProveAction::Audit { .. }))
+                || (action.is_none() && report_only);
+            // emit 子命令只生成不判定（§8.2）。
+            let judge = !matches!(action, Some(ProveAction::Emit { .. }));
+            let no_cache = no_cache || std::env::var_os("MARQDO_PROOF_NO_CACHE").is_some();
+            // 目录必须显式 --all（§3.2 proof.need_all）。
+            if file.is_dir() {
+                if !all {
+                    eprintln!(
+                        "error: {} 是目录：逐文件证明请加 --all（--max-files 默认 200）",
+                        file.display()
+                    );
+                    return Ok(1);
+                }
+                let out_json = json || action_json;
+                let code = run_prove_all(
+                    &file,
+                    max_files,
+                    &marqdo::prove::ProveOptions {
+                        entry: None,
+                        only: action_only,
+                        allow_opaque: action_opaque,
+                        emit_dir: emit_target,
+                        strict_types: !action_relax,
+                        require_lean,
+                        report_only,
+                        judge,
+                        no_cache,
+                        lean,
+                        timeout: std::time::Duration::from_secs(timeout),
+                        max_heartbeats: heartbeats,
+                    },
+                    out_json,
+                    require_lean,
+                )?;
+                return Ok(code);
+            }
+            let opts = marqdo::prove::ProveOptions {
+                entry: None,
+                only: action_only,
+                allow_opaque: action_opaque,
+                emit_dir: emit_target,
+                strict_types: !action_relax,
+                require_lean,
+                report_only,
+                judge,
+                no_cache,
+                lean,
+                timeout: std::time::Duration::from_secs(timeout),
+                max_heartbeats: heartbeats,
+            };
+            let report = marqdo::prove::prove_path(&file, &opts)?;
+            for d in &report.diagnostics {
+                // 诊断走 stderr（stdout 只放结果/报告）。
+                eprintln!("{}", d.format_message());
+            }
+            if json || action_json {
+                println!("{}", report.to_json());
+            } else {
+                print!("{}", report.to_text());
+            }
+            Ok(report.status.exit_code(require_lean))
         }
         Commands::Labels {
             paths,

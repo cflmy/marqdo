@@ -19,8 +19,12 @@ fn line(text: &str, marker: &str) -> u32 {
         + 1
 }
 fn root(label: &str) -> PathBuf {
-    let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("target/source-map")
+    // Scratch belongs to the build target dir; honor CARGO_TARGET_DIR when set.
+    let base = std::env::var_os("CARGO_TARGET_DIR")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("target"));
+    let dir = base
+        .join("source-map")
         .join(format!("{label}-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     dir

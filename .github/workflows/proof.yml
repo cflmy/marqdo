@@ -1,0 +1,115 @@
+# 判定流水线（marqdo prove）
+#
+# 验证「SKILL 编排文档 → Lean 4 → 自动证明」全链路：
+#   1. 构建内置 Lean 底座（MarqdoProof.lean）。
+#   2. 跑判定矩阵（tests/prove_lean.rs）：真定理 proved、假定理 unproved、
+#      证书缓存命中跳判定、--require-lean 退出码。
+#   3. CI 硬性要求（MARQDO_PROOF_REQUIRE_LEAN=1）：没有工具链即失败，
+#      不允许悄悄降级成 unverified。
+#
+# 说明：仓库不强制贡献者装 Lean——本工作流在装有 elan 的 runner 上运行；
+# 本地无 Lean 时判定状态为 unverified（advisory，不阻塞）。
+name: proof
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "src/prove/**"
+      - "doc/verification/skill-proof/**"
+      - "lib/**"
+      - "tests/prove*.rs"
+      - ".github/workflows/proof.yml"
+  pull_request:
+    paths:
+      - "src/prove/**"
+      - "doc/verification/skill-proof/**"
+      - "lib/**"
+      - "tests/prove*.rs"
+      - ".github/workflows/proof.yml"
+  workflow_dispatch:
+
+jobs:
+  proof:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust (1.81)
+        run: |
+          rustup toolchain install 1.81.0 --profile minimal
+          rustup default 1.81.0
+
+      # leanprover/lean-action@v1 已移除 lean4-version；本仓库运行时只需 lean 二进制
+      # （底座内嵌、不经 lake）。用 elan 钉 v4.35.0，与 doc/verification/skill-proof/lean-toolchain 一致。
+      - name: Install Lean 4.35.0 (elan)
+        run: |
+          curl -sSf https://elan.lean-lang.org/elan-init.sh | sh -s -- -y --default-toolchain leanprover/lean4:v4.35.0
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+          "$HOME/.elan/bin/lean" --version
+
+      - name: Verify embedded proof library
+        run: |
+          chmod +x scripts/check-proof-library.sh
+          scripts/check-proof-library.sh
+
+      - name: Build
+        run: cargo build --locked
+
+      - name: Judgment matrix (real Lean; CI requires toolchain)
+        env:
+          MARQDO_PROOF_REQUIRE_LEAN: "1"
+        run: cargo test --locked --test prove_lean
+
+      - name: Rest of prove suite (no toolchain assumptions)
+        run: cargo test --locked --test prove
+
+      - name: Corpus monotonicity — offline_checked ⊆ lean_proved (40 fixtures)
+        env:
+          MARQDO_PROOF_REQUIRE_LEAN: "1"
+        run: cargo test --locked --test prove_corpus
+
+      - name: T4 differential consistency — interpreter == Lean
+        env:
+          MARQDO_PROOF_REQUIRE_LEAN: "1"
+        run: cargo test --locked --test conformance
+
+      - name: Full sweep — divergence guard bites on injected fault
+        env:
+          MARQDO_PROOF_REQUIRE_LEAN: "1"
+        run: |
+          # A3：注入分歧必须显式失败（error[proof.divergence]，退 1）——
+          # 护栏失灵（静默落绿）比单点失败严重得多。
+          set -e
+          tmp=$(mktemp -d)
+          cat > "$tmp/审批.mq.md" <<'FIXTURE'
+          ---
+          markup: occlusion
+          ---
+
+          # 台账
+
+          ## 记录
+          + `金额`
+
+          | 定理 | 结论 | 策略 |
+          |---|---|---|
+          | 记过即记 | 长度(轨迹) = 1 | auto |
+
+          **结果 = [登记](result.ok(value=`金额`))**
+
+          *结果*
+          FIXTURE
+          set +e
+          out=$(cargo run --locked -- prove "$tmp/审批.mq.md" --fault-inject offline-claim --json 2>/dev/null)
+          code=$?
+          echo "$out" | head -c 400
+          if [ "$code" -ne 1 ]; then
+            echo "::error::注入分歧未被拦截（exit=$code）——单调性护栏失灵"
+            exit 1
+          fi
+          echo "$out" | grep -q "proof.divergence" || {
+            echo "::error::未出现 proof.divergence 诊断"
+            exit 1
+          }
+          echo "divergence guard OK"

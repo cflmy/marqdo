@@ -265,6 +265,117 @@ const TYPE_HEADERS: &[&str] = &["类型", "type"];
 const DESC_HEADERS: &[&str] = &["说明", "描述", "备注", "注释", "desc", "description"];
 const NULLABLE_HEADERS: &[&str] = &["可空", "nullable", "optional"];
 
+// ---------- 定理表识别（ADR 0010 / 设计 §7.1） ----------
+
+/// 定理表头（第一列）词表：`定理/证明/claim/theorem`。
+pub const CLAIM_NAME_HEADERS: &[&str] = &["定理", "证明", "claim", "theorem"];
+/// 结论列词表（必填列）。
+pub const CLAIM_CONCLUSION_HEADERS: &[&str] = &["结论", "conclusion"];
+/// 前提列词表（可缺省）。
+pub const CLAIM_PREMISE_HEADERS: &[&str] = &["前提", "premise", "assumes"];
+/// 策略列词表（可缺省）。
+pub const CLAIM_TACTIC_HEADERS: &[&str] = &["策略", "tactic"];
+
+/// 表头是否命中定理表第一列（只看词，不看列形）。
+pub fn header_hits_claim(headers: &[String]) -> bool {
+    find_col(headers, CLAIM_NAME_HEADERS).is_some()
+}
+
+/// 定理表认领判定（设计 §7.1 规则 1/5）：
+/// - `None`：表头不命中定理词表 → 普通表；
+/// - `Some(Ok(rows))`：命中且列形正确（有结论列，无 `类型` 列）→ 定理表；
+/// - `Some(Err(e))`：命中但有形状问题（歧义/行数不齐/缺名）→ `check --proof` 报。
+pub fn parse_claim_table(
+    pairs: &[(String, Expr)],
+    start_line: u32,
+) -> Option<Result<Vec<crate::ast::Claim>, ClaimTableError>> {
+    let headers: Vec<String> = pairs.iter().map(|(k, _)| k.clone()).collect();
+    if !header_hits_claim(&headers) {
+        return None;
+    }
+    // 同时有 `类型` 列与 `结论` 列 → 歧义，不猜（§7.1 规则 5）。
+    if find_col(&headers, TYPE_HEADERS).is_some()
+        && find_col(&headers, CLAIM_CONCLUSION_HEADERS).is_some()
+    {
+        return Some(Err(ClaimTableError {
+            code: "proof.claim_ambiguous",
+            message: "表同时含 `类型` 与 `结论` 列——契约表与定理表不猜，请拆开或改名".into(),
+        }));
+    }
+    // 无结论列 → 不是定理表（两列的 `定理/说明` 是普通说明表，§7.3.5）。
+    let Some(conclusion_col) = find_col(&headers, CLAIM_CONCLUSION_HEADERS) else {
+        return None;
+    };
+    let premise_col = find_col(&headers, CLAIM_PREMISE_HEADERS);
+    let tactic_col = find_col(&headers, CLAIM_TACTIC_HEADERS);
+    // 第一列=定理名；若第一列不是命中列，命中列才是名字列。
+    let name_col = find_col(&headers, CLAIM_NAME_HEADERS).unwrap_or(0);
+
+    let names = col_rows(&pairs[name_col].1).unwrap_or_default();
+    let conclusions = claim_col_rows(&pairs[conclusion_col].1);
+    if names.len() != conclusions.len() {
+        return Some(Err(ClaimTableError {
+            code: "proof.claim_malformed",
+            message: format!(
+                "定理/结论 列行数不一致（{} vs {}）",
+                names.len(),
+                conclusions.len()
+            ),
+        }));
+    }
+    let premises = premise_col
+        .map(|c| claim_col_rows(&pairs[c].1))
+        .unwrap_or_default();
+    let tactics = tactic_col
+        .map(|c| col_rows(&pairs[c].1).unwrap_or_default())
+        .unwrap_or_default();
+    if !premises.is_empty() && premises.len() != names.len() {
+        return Some(Err(ClaimTableError {
+            code: "proof.claim_malformed",
+            message: "前提 列行数与 定理 列不一致".into(),
+        }));
+    }
+    if !tactics.is_empty() && tactics.len() != names.len() {
+        return Some(Err(ClaimTableError {
+            code: "proof.claim_malformed",
+            message: "策略 列行数与 定理 列不一致".into(),
+        }));
+    }
+
+    let mut rows = Vec::new();
+    for (i, name) in names.iter().enumerate() {
+        let name = name.trim();
+        if name.is_empty() {
+            return Some(Err(ClaimTableError {
+                code: "proof.claim_malformed",
+                message: format!("定理表第 {} 行缺定理名", i + 1),
+            }));
+        }
+        rows.push(crate::ast::Claim {
+            id: name.to_string(),
+            conclusion: conclusions[i].trim().to_string(),
+            // 空前提单元格 = 无前提（全称命题）。
+            premise: premises
+                .get(i)
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty()),
+            tactic: tactics
+                .get(i)
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty()),
+            line: start_line,
+        });
+    }
+    Some(Ok(rows))
+}
+
+/// 定理表形状错误（`check --proof` 才报；默认关）。
+#[derive(Debug, Clone)]
+pub struct ClaimTableError {
+    pub code: &'static str,
+    pub message: String,
+}
+
 fn norm_header(h: &str) -> String {
     h.trim().trim_matches('`').to_ascii_lowercase()
 }
@@ -295,6 +406,57 @@ fn col_rows(e: &Expr) -> Option<Vec<String>> {
     match e {
         Expr::List(items) => items.iter().map(cell_to_text).collect(),
         scalar => Some(vec![cell_to_text(scalar)?]),
+    }
+}
+
+/// 定理表单元格取文本：标量直取；比较/算术/布尔表达式按 `a op b` 还原
+/// （`金额 > 10000` 这类单元格会解析成 Binary，不能因为不是标量就丢行）。
+/// 不认识的形状 → None（该行按缺失处理，`check --proof` 会报 unknown_symbol）。
+fn claim_cell_text(e: &Expr) -> Option<String> {
+    if let Some(text) = cell_to_text(e) {
+        return Some(text);
+    }
+    match e {
+        Expr::Binary { op, left, right } => Some(format!(
+            "{} {} {}",
+            claim_cell_text(left)?,
+            op_token(*op),
+            claim_cell_text(right)?
+        )),
+        Expr::Unary { op, expr } => match op {
+            crate::ast::UnaryOp::Not => Some(format!("非 ({})", claim_cell_text(expr)?)),
+            crate::ast::UnaryOp::Neg => Some(format!("-({})", claim_cell_text(expr)?)),
+        },
+        _ => None,
+    }
+}
+
+fn op_token(op: crate::ast::BinaryOp) -> &'static str {
+    use crate::ast::BinaryOp as B;
+    match op {
+        B::Add => "+",
+        B::Sub => "-",
+        B::Mul => "*",
+        B::Div => "/",
+        B::Eq => "=",
+        B::Ne => "≠",
+        B::Lt => "<",
+        B::Le => "≤",
+        B::Gt => ">",
+        B::Ge => "≥",
+        B::And => "且",
+        B::Or => "或",
+    }
+}
+
+/// 定理表列取文本（行级 None 不整列丢弃——只丢该行该列）。
+fn claim_col_rows(e: &Expr) -> Vec<String> {
+    match e {
+        Expr::List(items) => items
+            .iter()
+            .map(|item| claim_cell_text(item).unwrap_or_default())
+            .collect(),
+        scalar => vec![claim_cell_text(scalar).unwrap_or_default()],
     }
 }
 

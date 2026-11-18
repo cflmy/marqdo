@@ -319,6 +319,7 @@ impl<'a> Cursor<'a> {
             dead_binds: Vec::new(),
             contract: None,
             var_contracts: std::collections::HashMap::new(),
+            claims: Vec::new(),
         };
         // Prose decls pending promotion (name → optional default text).
         let mut prose_decls: Vec<(String, Option<String>, u32)> = Vec::new();
@@ -2078,10 +2079,23 @@ fn extract_function_contract(fun: &mut Function, lines: &[ClassifiedLine]) -> Re
         let (end_line, quote) = table_quote(lines, span.line);
         let Some(parsed) = crate::contract::parse_contract_table(pairs, span.line, end_line, quote)
         else {
-            // 非契约形状：普通文档/数据表 → 原样保留（P1 零回归的关键）。
-            keep.push(stmt.clone());
-            i += 1;
-            continue;
+            // 非契约形状：先试定理表（ADR 0010），再按普通表保留。
+            match crate::contract::parse_claim_table(pairs, span.line) {
+                // 合法定理表：只在「首个可执行行之前」生效；提取后从 body 移除。
+                // 其余位置仍是普通表，由 `check --proof` 报 proof.claim_misplaced。
+                Some(Ok(rows)) if prefix_zone => {
+                    fun.claims.extend(rows);
+                    i += 1;
+                    continue;
+                }
+                // 畸形/歧义/错位的定理形表：保持普通表（默认关），
+                // `check --proof` 重扫 body 时报 malformed/ambiguous/misplaced。
+                _ => {
+                    keep.push(stmt.clone());
+                    i += 1;
+                    continue;
+                }
+            }
         };
         let piece = parsed?; // 契约形状但畸形 → 必产诊断（contract.malformed）
         let is_fn_contract = !piece.params.is_empty() || piece.returns.is_some();
