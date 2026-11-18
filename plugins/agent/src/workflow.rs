@@ -245,6 +245,71 @@ pub fn next(args: &Value) -> Result<Value,String> {
     next_doc(&ckpt,id,false)
 }
 
+/// Read a workflow summary without advancing it or running any step.
+/// The caller-supplied identity must match the checkpoint, exactly like next.
+pub fn inspect(args:&Value)->Result<Value,String> {
+    let id=field(args,"id")?;
+    let ckpt=read(args,id)?;
+    if ckpt["ok"]!=true || !check_context(args,&ckpt) {
+        return Ok(json!({"ok":false,"id":id,"status":"not_found_or_mismatched"}));
+    }
+    let (meta,index)=state(&ckpt)?;
+    let steps=meta["steps"].as_array().ok_or("invalid steps")?;
+    let completed=meta["completed"].as_array().ok_or("invalid completed")?;
+    // `status` is the durable checkpoint status; `action` is what tick would
+    // observe next (waiting_model, waiting_input, ready_tool, ...).
+    let action=next_doc(&ckpt,id,false)?.get("status").cloned().unwrap_or(Value::Null);
+    Ok(json!({
+        "ok":true,"id":id,
+        "status":ckpt["status"].as_str().unwrap_or("running"),
+        "action":action,
+        "cursor":index,
+        "total_steps":steps.len(),
+        "completed_steps":completed.len(),
+        "completed":meta["completed"],
+        "step":steps.get(index).cloned().unwrap_or(Value::Null),
+        "partial":meta.get("partial").cloned().unwrap_or(Value::Null),
+        "identity":meta["identity"],
+        "updated_at":ckpt.get("updated_at").cloned().unwrap_or(Value::Null)
+    }))
+}
+
+/// List workflow checkpoints in the (host-relative) resume directory.
+/// Non-workflow checkpoints and corrupt entries are omitted. When the caller
+/// supplies an attested session or principal, only matching runs are returned.
+pub fn list(args:&Value)->Result<Value,String> {
+    let dir=storage(args)?;
+    let session=args.get("session_id").and_then(Value::as_str);
+    let principal=args.get("principal_ref").and_then(Value::as_str);
+    let mut items=Vec::new();
+    let rd=fs::read_dir(&dir).map_err(|e|format!("workflow list: {e}"))?;
+    for ent in rd.flatten() {
+        let path=ent.path();
+        if path.extension().and_then(|x|x.to_str())!=Some("json") { continue; }
+        if path.file_name().and_then(|x|x.to_str())
+            .map(|x|x.starts_with('.')).unwrap_or(false) { continue; }
+        let Ok(text)=fs::read_to_string(&path) else { continue };
+        let Ok(doc)=serde_json::from_str::<Value>(&text) else { continue };
+        let meta=&doc["meta"];
+        if meta["kind"].as_str()!=Some("MarqdoAgentFlowV1") { continue; }
+        if session.is_some() && meta["identity"]["session_id"].as_str()!=session { continue; }
+        if principal.is_some() && meta["identity"]["principal_ref"].as_str()!=principal { continue; }
+        let steps=meta["steps"].as_array().map(|x|x.len()).unwrap_or(0);
+        let completed=meta["completed"].as_array().map(|x|x.len()).unwrap_or(0);
+        items.push(json!({
+            "id":doc.get("id").cloned().unwrap_or(Value::Null),
+            "status":doc.get("status").cloned().unwrap_or(Value::Null),
+            "cursor":meta.get("cursor").cloned().unwrap_or(Value::Null),
+            "total_steps":steps,
+            "completed_steps":completed,
+            "source_revision":meta["identity"]["source_revision"],
+            "updated_at":doc.get("updated_at").cloned().unwrap_or(Value::Null)
+        }));
+    }
+    items.sort_by(|a,b| a["id"].as_str().cmp(&b["id"].as_str()));
+    Ok(json!({"ok":true,"items":items,"resume_dir":dir.to_string_lossy()}))
+}
+
 /// Commit a verified result for the exact current step. All mutations are
 /// serialized with a lock; a completed step cannot be committed a second time.
 pub fn commit(args: &Value) -> Result<Value,String> {
@@ -576,6 +641,29 @@ mod tests {
         let out=next(&a).unwrap();
         assert_eq!(out["completed"][0]["value"]["items"][0]["result"]["value"]["value"],"keep");
         assert_eq!(out["completed"][0]["value"]["items"][1]["result"]["value"]["value"],"fixed");
+    }
+
+    #[test]
+    fn inspect_and_list_are_read_only_and_session_scoped() {
+        let mut a=fixture();
+        a["session_id"]=json!("s1");
+        a["principal_ref"]=json!("u1");
+        open(&a).unwrap();
+        let seen=inspect(&a).unwrap();
+        assert_eq!(seen["status"],"running");
+        assert_eq!(seen["action"],"waiting_model");
+        assert_eq!(seen["total_steps"],3);
+        assert_eq!(seen["completed_steps"],0);
+        assert_eq!(seen["step"]["id"],"choose");
+        // Inspection must not consume the current step.
+        assert_eq!(next(&a).unwrap()["status"],"waiting_model");
+        let listed=list(&a).unwrap();
+        assert!(listed["items"].as_array().unwrap()
+            .iter().any(|x|x["id"]==a["id"]));
+        let mut other=a.clone();
+        other["session_id"]=json!("s2");
+        assert_eq!(inspect(&other).unwrap()["status"],"not_found_or_mismatched");
+        assert!(list(&other).unwrap()["items"].as_array().unwrap().is_empty());
     }
 
     #[test]

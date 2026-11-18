@@ -846,6 +846,8 @@ kb_ffi!(agent_input_resume, input::input_resume, "agent_input_resume");
 kb_ffi!(agent_parallel_report, parallel::report, "agent_parallel_report");
 kb_ffi!(agent_workflow_open, workflow::open, "agent_workflow_open");
 kb_ffi!(agent_workflow_next, workflow::next, "agent_workflow_next");
+kb_ffi!(agent_workflow_inspect, workflow::inspect, "agent_workflow_inspect");
+kb_ffi!(agent_workflow_list, workflow::list, "agent_workflow_list");
 kb_ffi!(agent_workflow_commit, workflow::commit, "agent_workflow_commit");
 kb_ffi!(agent_workflow_cancel, workflow::cancel, "agent_workflow_cancel");
 kb_ffi!(agent_workflow_retry_plan, workflow::retry_plan, "agent_workflow_retry_plan");
@@ -984,12 +986,14 @@ pub unsafe extern "C" fn marqdo_plugin_init(host: *const MarqdoHostApi) -> c_int
         ("agent_input_open", "id,question,options,source_revision", agent_input_open),
         ("agent_input_resume", "id,reply,source_revision", agent_input_resume),
         ("agent_parallel_report", "results", agent_parallel_report),
-        ("agent_workflow_open", "id,steps,source_revision", agent_workflow_open),
-        ("agent_workflow_next", "id,source_revision", agent_workflow_next),
-        ("agent_workflow_commit", "id,step_id,response,source_revision", agent_workflow_commit),
-        ("agent_workflow_cancel", "id,source_revision", agent_workflow_cancel),
-        ("agent_workflow_retry_plan", "id,source_revision", agent_workflow_retry_plan),
-        ("agent_workflow_retry_commit", "id,results,source_revision", agent_workflow_retry_commit),
+        ("agent_workflow_open", "id,steps,source_revision,session_id,principal_ref,resume_dir", agent_workflow_open),
+        ("agent_workflow_next", "id,source_revision,session_id,principal_ref,resume_dir", agent_workflow_next),
+        ("agent_workflow_inspect", "id,source_revision,session_id,principal_ref,resume_dir", agent_workflow_inspect),
+        ("agent_workflow_list", "session_id,principal_ref,resume_dir", agent_workflow_list),
+        ("agent_workflow_commit", "id,step_id,response,source_revision,session_id,principal_ref,resume_dir", agent_workflow_commit),
+        ("agent_workflow_cancel", "id,source_revision,session_id,principal_ref,resume_dir", agent_workflow_cancel),
+        ("agent_workflow_retry_plan", "id,source_revision,session_id,principal_ref,resume_dir", agent_workflow_retry_plan),
+        ("agent_workflow_retry_commit", "id,results,source_revision,session_id,principal_ref,resume_dir", agent_workflow_retry_commit),
         ("agent_error_make", "code,message,category", agent_error_make),
         ("agent_error_decide_retry", "error,attempts,effect_class", agent_error_decide_retry),
         ("agent_tools_register", "spec,specs", agent_tools_register),

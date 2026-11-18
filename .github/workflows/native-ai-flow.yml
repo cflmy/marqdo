@@ -20,7 +20,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
-      - name: Build plugin and run native tests
+      - name: Build the agent plugin
+        run: cargo build -p marqdo_plugin_agent --locked
+      - name: Run native agent and workflow tests
         run: cargo test -p marqdo_plugin_agent --locked
       - name: Check the public Marqdo ABI libraries
         run: |
@@ -28,7 +30,11 @@ jobs:
           cargo run --locked -- check ext/ai/context.mq.md
           cargo run --locked -- check ext/ai/recovery.mq.md
           cargo run --locked -- check ext/ai/workflow.mq.md
+          cargo run --locked -- check tests/ext/ai-native-flow.mq.md
+          cargo run --locked -- check tests/ext/ai-native-workflow.mq.md
       - name: Exercise offline integration through Marqdo
+        env:
+          MARQDO_AGENT_PLUGIN: ${{ github.workspace }}/target/debug/libagent.so
         run: |
-          cargo run --locked -- run tests/ext/ai-native-flow.mq.md --effects plugin,fs.write
-          cargo run --locked -- run tests/ext/ai-native-workflow.mq.md --effects plugin,fs.write
+          cargo run --locked -- run tests/ext/ai-native-flow.mq.md
+          cargo run --locked -- run tests/ext/ai-native-workflow.mq.md

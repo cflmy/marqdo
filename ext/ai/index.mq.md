@@ -10,7 +10,9 @@ stream collection and usage; [provider adapters](llm/index.mq.md) describe OpenA
 and Ollama requests. [Agents](agent.mq.md) own call-site context, the explicit tool registry,
 policy routing, observations, workbook planning and continuation. [CoW trials](sandbox.mq.md)
 own isolated file changes and promotion. [Native flow](flow.mq.md) provides short, verified model choices and bounded document
-concurrency; [context](context.mq.md) packs explicit source scopes; [recovery](recovery.mq.md)
+concurrency; [workflow](workflow.mq.md) drives a durable forward-only step plan with
+`inspect`/`list` progress queries and failed-only read recovery; [context](context.mq.md)
+packs explicit source scopes; [recovery](recovery.mq.md)
 uses the native error policy and versioned checkpoints. These are lightweight
 interfaces, not a second agent runtime.
 [Step routing](policies/step-route.mq.md) is readable

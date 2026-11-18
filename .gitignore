@@ -1,5 +1,7 @@
 /target/
 /dist/
+# Plugin unit tests use package-relative scratch checkpoints.
+/plugins/agent/target/
 
 # Copied by gold harness for ABI plugins
 /tests/lib/demo.dll

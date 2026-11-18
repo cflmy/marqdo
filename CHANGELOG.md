@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+### Added
+
+- `ext/ai/workflow` now exposes read-only `inspect`/`list`, a host-relative
+  `resume_dir` on every operation, and repeatable offline workflow fixtures.
+- Agent ABI registers `agent_workflow_inspect` and `agent_workflow_list`.
+- AI 工作流拓展库新增只读 `inspect`/`list`、各操作的 `resume_dir` 隔离，
+  离线集成夹具改为按时间戳生成运行 ID，可重复执行。
+
+### Fixed
+
+- `flow.choose` no longer leaks a branch-local `parsed` value into the function
+  contract; the repaired-choice path is fully scoped.
+- CI builds the agent cdylib and runs offline integration without the removed
+  `run --effects` flag, using `MARQDO_AGENT_PLUGIN` instead.
+
 ## v2.7.1 — 2026-11-11
 
 CLI 修复发布：View 实际逻辑的手动开合不再被布局重排或运行结果刷新覆盖；函数、链接、列表和记录按内容排版，手机详情整行展示。核心仍为 19 个构造；拓展库保留 2.7.0。

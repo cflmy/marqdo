@@ -16,10 +16,16 @@ continuation or exactly-once external writes based on a checkpoint file.
 | ext/ai/flow.mq.md | start/wait/parallel | Existing Marqdo subtask scheduler, failure-preserving parallel result aggregation |
 | ext/ai/flow.mq.md | enter | Resolve only author-supplied registered skill name, run via standard subtask path |
 | ext/ai/recovery.mq.md | decide/save/load | Native error policy and CheckpointV2; no implicit unsafe re-execution |
+| ext/ai/workflow.mq.md | open/next/commit/cancel | Durable forward-only step machine with per-step commit boundaries |
+| ext/ai/workflow.mq.md | inspect/list | Read-only progress summary and checkpoint discovery scoped by session/principal |
+| ext/ai/workflow.mq.md | tick/retry_plan/retry_commit/retry_failed | One-step execution and failed-only read-only recovery |
 
 The native agent plugin provides `agent_choice_parse`, `agent_context_scope`,
-`agent_input_open`, `agent_input_resume` and `agent_parallel_report`.
+`agent_input_open`, `agent_input_resume`, `agent_parallel_report`, and the
+`agent_workflow_*` primitives including `inspect` and `list`.
 Plugin errors must be visible, never converted into a fabricated successful answer.
+All workflow wrappers accept a host-relative `resume_dir`, so tests and callers
+can isolate checkpoints instead of sharing the default `.marqdo/agent-resume`.
 
 ## Invariants
 
@@ -94,9 +100,12 @@ runtime gates, including crash injection and multi-worker concurrency, pass.
 
 ## Plugin-only workflow (November 18 revision)
 
-The Agent ABI plugin implements `agent_workflow_open/next/commit/cancel`.
-The small `ext/ai/workflow.mq.md` library wraps these primitives and provides
-`tick` to execute exactly one safe decision or document task per call.
+The Agent ABI plugin implements
+`agent_workflow_open/next/inspect/list/commit/cancel` plus the failed-only
+retry primitives. The small `ext/ai/workflow.mq.md` library wraps these
+primitives and provides `tick` to execute exactly one safe decision or document
+task per call. `inspect` and `list` are strictly read-only: they report progress
+or discover checkpoints without advancing a cursor or running a step.
 Source definitions have only five step kinds: `model`, `input`, `skill`,
 `parallel` and `return`. Model text is verified against declared options.
 `input` intentionally returns a waiting status; the UI supplies an answer

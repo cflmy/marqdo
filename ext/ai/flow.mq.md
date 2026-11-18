@@ -65,20 +65,20 @@ We retain **err = [Check model transport error](json.get(value=`turn`, key="erro
 2. *
   We retain **reply = [Read model answer](json.get(value=`turn`, key="text"))**.
   We retain **parsed = [Validate the model reply](parse_choice(reply=`reply`, options=`options`))**.
-We retain **ok = [Read validation status](json.get(value=`parsed`, key="ok"))**.
-1. `ok`
-  Return *parsed*.
-2. `repair`
-  We retain **fix = "Your answer was not an exact allowed option. Return only ONE option name from:\n" + opts**.
-  We retain **fixed = [Retry the format only once](m.ask(prompt=`fix`))**.
-  We retain **repair_error = [Read transport error](json.get(value=`fixed`, key="error"))**.
-  1. `repair_error`
-    Return *fixed*.
-  2. *
-    We retain **again = [Read corrected answer](json.get(value=`fixed`, key="text"))**.
-    Return *[Validate the repaired reply](parse_choice(reply=`again`, options=`options`))*.
-3. *
-  Return *parsed*.
+  We retain **ok = [Read validation status](json.get(value=`parsed`, key="ok"))**.
+  1. `ok`
+    Return *parsed*.
+  2. `repair`
+    We retain **fix = "Your answer was not an exact allowed option. Return only ONE option name from:\n" + opts**.
+    We retain **fixed = [Retry the format only once](m.ask(prompt=`fix`))**.
+    We retain **repair_error = [Read transport error](json.get(value=`fixed`, key="error"))**.
+    1. `repair_error`
+      Return *fixed*.
+    2. *
+      We retain **again = [Read corrected answer](json.get(value=`fixed`, key="text"))**.
+      Return *[Validate the repaired reply](parse_choice(reply=`again`, options=`options`))*.
+  3. *
+    Return *parsed*.
 
 ## parallel
 

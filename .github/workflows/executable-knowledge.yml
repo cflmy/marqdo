@@ -26,9 +26,11 @@ jobs:
           cargo run --locked -- check ext/ai/workflow.mq.md
           cargo run --locked -- check tests/ext/ai-native-workflow.mq.md
       - name: Native AI flow interpreter smoke (offline)
+        env:
+          MARQDO_AGENT_PLUGIN: ${{ github.workspace }}/target/debug/libagent.so
         run: |
-          cargo run --locked -- run tests/ext/ai-native-flow.mq.md --effects plugin,fs.write
-          cargo run --locked -- run tests/ext/ai-native-workflow.mq.md --effects plugin,fs.write
+          cargo run --locked -- run tests/ext/ai-native-flow.mq.md
+          cargo run --locked -- run tests/ext/ai-native-workflow.mq.md
       - name: Workbench contracts (M00–M06 / F-subset)
         run: cargo test --test workbench_contracts --locked
       - name: Offline executable-knowledge gate
