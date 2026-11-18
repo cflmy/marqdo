@@ -207,7 +207,7 @@ mod tests {
             .iter().find(|x|x["callee"]==callee.owner.as_str()).unwrap();
         assert_eq!(first["contracts"][0]["status"],"precondition_pending");
         assert_eq!(first["contracts"][0]["call_precondition_status"],
-            "requires_lean_proof_with_actual_arguments");
+            "requires_symbolic_callsite_proof");
         assert_eq!(conditional["audit_passes"],false);
         std::fs::remove_dir_all(source).unwrap();
     }
