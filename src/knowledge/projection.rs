@@ -27,7 +27,9 @@ struct Prepared {
 }
 fn lookup<'a>(functions:&'a [Function],segments:&[&str])->Option<&'a Function>{
     let (head,tail)=segments.split_first()?;
-    let found=functions.iter().find(|f|f.name==*head)?;
+    let mut candidates=functions.iter().filter(|f|f.name==*head);
+    let found=candidates.next()?;
+    if candidates.next().is_some(){return None}
     if tail.is_empty(){Some(found)}else{lookup(&found.children,tail)}
 }
 fn load_function(compiled:&Compilation,artifact:&SemanticArtifact)->Option<Function>{
@@ -74,10 +76,14 @@ fn exact_unconditional_claim(compiled:&Compilation,artifact:&SemanticArtifact,
 }
 fn candidate(compiled:&Compilation,call:&BoundCall)->Option<Prepared>{
     let sem=&compiled.semantics;
-    let ca=sem.artifacts.iter().find(|a|
-        a.kind=="function"&&a.symbol_id.as_ref()==Some(&call.caller))?;
-    let ce=sem.artifacts.iter().find(|a|
-        a.kind=="function"&&a.symbol_id.as_ref()==Some(&call.target))?;
+    let mut caller_artifacts=sem.artifacts.iter().filter(|a|
+        a.kind=="function"&&a.symbol_id.as_ref()==Some(&call.caller));
+    let ca=caller_artifacts.next()?;
+    if caller_artifacts.next().is_some(){return None}
+    let mut callee_artifacts=sem.artifacts.iter().filter(|a|
+        a.kind=="function"&&a.symbol_id.as_ref()==Some(&call.target));
+    let ce=callee_artifacts.next()?;
+    if callee_artifacts.next().is_some(){return None}
     if ca.source.file==ce.source.file||call.caller==call.target||
         !ca.effects.is_pure()||!ce.effects.is_pure()||
         !call.required_effects.is_pure()||
