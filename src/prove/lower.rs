@@ -602,6 +602,20 @@ impl<'m> Lowerer<'m> {
                 }
             }
             Target::Import { bind, lib, fun: target, .. } => {
+                // Source-level verification of a tightly restricted imported
+                // pure leaf: one return expression, only literal/parameter
+                // arithmetic, exact positional args. This is NOT abstract
+                // contract reuse; Lean verifies the actual substituted body.
+                if body.inline_depth < 4
+                    && imported_pure_leaf(target)
+                    && call.args.len()==target.params.len()
+                    && call.args.iter().all(|a|matches!(a,Arg::Positional(_)))
+                {
+                    body.inline_depth+=1;
+                    let lowered=self.inline_body(target,&args,body);
+                    body.inline_depth-=1;
+                    return lowered;
+                }
                 // lib/result 的构造器内联为结构（§4.5；真实库名是 ok/error/value_or）。
                 if bind == "result" && matches!(target.name.as_str(), "ok" | "error" | "value_or") {
                     return IrExpr::Pure(PureExpr::Ctor {
@@ -906,6 +920,28 @@ fn effect_label_of_host(host: HostFn) -> String {
             .first()
             .map(|s| (*s).to_string())
             .unwrap_or_else(|| "unknown".into())
+    }
+}
+
+/// Imported source transparency is enabled only for a pure expression
+/// fragment that cannot inspect module globals or call external operations.
+fn imported_pure_leaf(fun:&Function)->bool {
+    fn closed(expr:&Expr,params:&std::collections::BTreeSet<&str>)->bool {
+        match expr {
+            Expr::Literal(_)=>true,
+            Expr::Var(v)=>params.contains(v.as_str()),
+            Expr::Occluded {payload:Some(inner),..}=>closed(inner,params),
+            Expr::Unary {expr,..}=>closed(expr,params),
+            Expr::Binary {left,right,..}=>closed(left,params)&&closed(right,params),
+            _=>false,
+        }
+    }
+    if fun.is_object() || fun.body.len()!=1{return false}
+    let params:std::collections::BTreeSet<&str>=fun.params.iter()
+        .map(|p|p.name.as_str()).collect();
+    match &fun.body[0]{
+        Stmt::Return {value,..}=>closed(value,&params),
+        _=>false,
     }
 }
 
