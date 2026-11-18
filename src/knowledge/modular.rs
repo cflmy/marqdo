@@ -48,7 +48,7 @@ pub fn analyze(semantic:&SemanticProject, proof_index:&Value)->Value{
                 let verified=matched.is_some_and(|r|r["status"]=="proved"
                     && r["usable"]==true);
                 let unconditional=c.premise.as_deref()
-                    .is_none_or(|s|s.trim().is_empty());
+                    .map_or(true,|s|s.trim().is_empty());
                 json!({
                     "claim_anchor_id":c.anchor_id,
                     "premise":c.premise,
