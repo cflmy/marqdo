@@ -52,6 +52,22 @@ pub fn link_report(compiled: &Compilation, file: &Path, report: &Report, dir: &P
             .filter(|s|s.id.0.starts_with(&format!("{}#step-",symbol.as_str())))
             .filter_map(|s|s.anchor_id.as_deref()).collect();
         for claim in &f.claims {
+            // A proof receipt must be bound to the exact theorem declaration
+            // present in the same AST, not merely to a similarly named function.
+            let mut matching_claims=compiled.semantics.claims.iter().filter(|decl|
+                decl.owner==*symbol && decl.label==claim.id
+                && decl.conclusion==claim.conclusion
+                && decl.premise==claim.premise);
+            let Some(declared)=matching_claims.next() else {
+                unresolved.push(json!({"function":f.name,"claim":claim.id,
+                    "reason":"theorem_declaration_missing_or_changed"}));
+                continue;
+            };
+            if matching_claims.next().is_some() {
+                unresolved.push(json!({"function":f.name,"claim":claim.id,
+                    "reason":"ambiguous_theorem_declaration"}));
+                continue;
+            }
             let cert_ok=cert.as_ref().is_some_and(|(v,_)|
                 v["claims"].as_array().is_some_and(|records|
                     records.iter().any(|r|
@@ -62,8 +78,7 @@ pub fn link_report(compiled: &Compilation, file: &Path, report: &Report, dir: &P
                 "unverified"
             } else { claim.status.as_str() };
             claims.push(json!({
-                "claim_anchor_id":format!("{}#claim-{}",symbol.as_str(),
-                    sha(claim.id.as_bytes()).trim_start_matches("sha256:")),
+                "claim_anchor_id":declared.anchor_id,
                 "owner_symbol_id":symbol.as_str(),
                 "function":f.name,"claim_id":claim.id,
                 "premise":claim.premise,"conclusion":claim.conclusion,
