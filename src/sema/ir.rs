@@ -339,7 +339,7 @@ fn compile_index(index: ProjectIndex) -> Result<Compilation> {
         diagnostics.push(
             Diagnostic::new(
                 Some(root.path().join(&reference.source.file)),
-                Span::new(reference.source.line as usize, 1),
+                Span::new(reference.source.line, 1),
                 format!("knowledge anchor target not found or ambiguous: {}",
                     reference.link_target.as_deref().unwrap_or("<missing>")),
             )
