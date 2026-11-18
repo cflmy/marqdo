@@ -396,6 +396,81 @@ import:
                 c["call_precondition_status"]=="refuted_closed_precondition"))));
 }
 
+/// Two independent Lean modules: the caller imports only the proved callee
+/// theorem. The certificate explicitly limits its scope to pure Int forwarders.
+#[test]
+fn composition_emits_independently_replayable_caller_certificate(){
+    if !toolchain_available(){
+        skip_or_fail("composition_emits_independently_replayable_caller_certificate");
+        return;
+    }
+    let s=Scratch::new("composed-replay-int");
+    s.write("math.mq.md",r#"---
+markup: occlusion
+---
+
+# math
+
+## exact
++ `n`
+
+| 参数 | 类型 | 说明 |
+|---|---|---|
+| n | int | integer |
+
+| 定理 | 结论 | 策略 |
+|---|---|---|
+| fixed | 结果 = 2 | auto |
+
+*2*
+"#);
+    s.write("main.mq.md",r#"---
+markup: occlusion
+import:
+  math: math.mq.md
+---
+
+# main
+
+## forward
++ `n`
+
+| 参数 | 类型 | 说明 |
+|---|---|---|
+| n | int | integer |
+
+| 定理 | 结论 | 策略 |
+|---|---|---|
+| same | 结果 = 2 | auto |
+
+**v = [调用](math.math.exact(`n`))**
+*v*
+"#);
+    let result=s.marqdo().args([
+        "knowledge","compose","--strict","--json","."
+    ]).output().expect("compose independent theorem");
+    assert_eq!(result.status.code(),Some(0),
+        "stderr={} stdout={}",String::from_utf8_lossy(&result.stderr),
+        String::from_utf8_lossy(&result.stdout));
+    let json:serde_json::Value=serde_json::from_slice(&result.stdout).unwrap();
+    let successful=json["results"].as_array().unwrap().iter()
+        .find(|row|row["status"]=="lean_kernel_proved_model")
+        .expect("independent callee+caller proof");
+    let file=std::path::PathBuf::from(successful["artifact"].as_str().unwrap());
+    let receipt:serde_json::Value=serde_json::from_slice(
+        &fs::read(s.dir.join(file)).unwrap()).unwrap();
+    assert_eq!(receipt["scope"],
+        "typed_int_pure_forwarder_constant_postcondition");
+    assert_eq!(receipt["full_marqdo_runtime_semantics_proved"],
+        serde_json::Value::Null);
+    let folder=s.dir.join(successful["artifact"].as_str().unwrap())
+        .parent().unwrap().to_path_buf();
+    let caller=fs::read_to_string(folder.join("CallerModule.lean")).unwrap();
+    assert!(caller.contains("import CalleeModule"));
+    assert!(caller.contains("using (callee_contract"));
+    assert!(!caller.contains("sorry"));
+}
+
 /// G2：真证书命中（用真 lean 跑一次后，证书生效；第二次 cache: hit 且快）。
 #[test]
 fn g2_certificate_hit_after_real_run() {
