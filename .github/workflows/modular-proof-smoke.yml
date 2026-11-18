@@ -25,6 +25,10 @@ jobs:
         run: |
           curl -sSf https://elan.lean-lang.org/elan-init.sh | sh -s -- -y --default-toolchain leanprover/lean4:v4.35.0
           echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+      - name: Lean proof of exception, ABI and fuel-bound models
+        run: |
+          lean doc/verification/skill-proof/MarqdoModularProof.lean
+          lean doc/verification/skill-proof/MarqdoEffects.lean
       - name: Independently composed Lean modules
         env:
           MARQDO_PROOF_REQUIRE_LEAN: "1"
