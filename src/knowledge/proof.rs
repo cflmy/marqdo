@@ -20,6 +20,36 @@ fn generated_module_valid(folder:&Path,expected:&Value)->bool {
     let Ok(source)=fs::read(generated.path()) else{return false};
     sha(&source).trim_start_matches("sha256:")==expected.as_str().unwrap_or("")
 }
+/// Never accept a mutable cached Lean source as proof authority. Rebuild the
+/// expected module and plan from the current Marqdo source with the same
+/// compiler pipeline used by prove_path; a forged axiom/sorry in the cached
+/// Lean file will not match the deterministic generated source.
+fn cached_translation_matches_current(
+    folder:&Path, entry:&Value,semantic:&SemanticProject
+)->bool {
+    let Some(rel)=entry["source_file"].as_str() else{return false};
+    let Some(display)=entry["proof_module_display"].as_str() else{return false};
+    let abs=semantic.root.join(rel);
+    let Ok(module)=crate::load::load_module(&abs) else{return false};
+    let Some(source_sha)=module.source.sha256.as_deref() else{return false};
+    if entry["source_sha256"]!=source_sha{return false}
+    let effects=crate::prove::lower::effect_map(&abs);
+    let Ok((plan,_))=crate::prove::lower::build_plan(
+        &module,source_sha,display,effects,&[]) else{return false};
+    if fs::read(folder.join("plan.json")).ok().as_deref()
+        !=Some(plan.to_stable_json().as_bytes()) {
+        return false;
+    }
+    let (generated_name,expected)=crate::prove::emit::emit_module(
+        &plan,&crate::prove::emit::stem_of(display));
+    let generated=folder.join("Generated").join(generated_name);
+    if fs::read(generated).ok().as_deref()!=Some(expected.as_bytes()) {
+        return false;
+    }
+    sha(expected.as_bytes()).trim_start_matches("sha256:")
+        ==entry["module_sha256"].as_str().unwrap_or("")
+}
+
 fn certificate_identity_valid(folder:&Path,cert:&Value)->bool {
     let Ok(plan)=fs::read(folder.join("plan.json")) else {return false};
     let source=cert["source_sha256"].as_str().unwrap_or("");
@@ -121,7 +151,8 @@ pub fn link_report(compiled: &Compilation, file: &Path, report: &Report, dir: &P
                 "source_sha256":report.source_sha256,
                 "library_sha256":report.lean.as_ref().map(|l|l.library_sha256.as_str()),
                 "toolchain":report.lean.as_ref().map(|l|l.toolchain.as_str()),
-                "module_sha256":report.lean.as_ref().map(|l|l.module_sha256.as_str())
+                "module_sha256":report.lean.as_ref().map(|l|l.module_sha256.as_str()),
+                "proof_module_display":report.file
             }));
         }
     }
@@ -182,7 +213,9 @@ pub fn index_links(prove_dir:&Path, semantic:&SemanticProject)->Value {
                     && fs::read(semantic.root.join(&a.source.file)).ok().is_some_and(
                         |raw|sha(&raw).trim_start_matches("sha256:")==claim["source_sha256"])
                 });
-                let certified=entry["status"]=="proved" && entry["decided_by"]=="lean"
+                let certified=cached_translation_matches_current(
+                    &folder.path(),&entry,semantic)
+                    && entry["status"]=="proved" && entry["decided_by"]=="lean"
                     && entry["certificate_digest"].as_str().is_some_and(|digest|
                         fs::read(folder.path().join("certificate.json")).ok().is_some_and(|bytes| {
                             if sha(&bytes)!=digest { return false; }
