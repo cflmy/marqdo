@@ -52,6 +52,8 @@ jobs:
         run: |
           chmod +x scripts/check-proof-library.sh
           scripts/check-proof-library.sh
+      - name: Verify modular assume-guarantee logic and required bridge counterexample
+        run: lean doc/verification/skill-proof/MarqdoModularProof.lean
 
       - name: Build
         run: cargo build --locked
