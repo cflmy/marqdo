@@ -233,6 +233,18 @@ pub fn prove(compiled:&Compilation,out:&Path,toolchain:&Toolchain)->Result<Value
 }
 
 
+
+/// Strict receipt-to-source correspondence; any duplicate row is a hard failure.
+fn ensure_exact_closures(
+    rows:usize,
+    received:&std::collections::BTreeSet<(String,String)>,
+    expected:&std::collections::BTreeSet<(String,String)>
+)->Result<()>{
+    anyhow::ensure!(rows==expected.len() && received==expected,
+        "proof.compose_stale_or_ambiguous_closure");
+    Ok(())
+}
+
 /// Replay a composition certificate *against the current project source*.
 /// The certificate never supplies Lean source code: it must byte-match source
 /// recompiled from the current Marqdo AST, and both Lean modules are rechecked.
@@ -277,8 +289,7 @@ pub fn replay(compiled:&Compilation,certificate:&Path,lean:&Toolchain)->Result<V
         Ok((r["id"].as_str().context("proof.compose_invalid_closure_id")?.to_owned(),
             r["closure"].as_str().context("proof.compose_invalid_closure_hash")?.to_owned()))
     }).collect::<Result<std::collections::BTreeSet<_>>>()?;
-    anyhow::ensure!(received.len()==2 && actual_closures==expected_closures,
-        "proof.compose_stale_or_ambiguous_closure");
+    ensure_exact_closures(received.len(),&actual_closures,&expected_closures)?;
     let folder=certificate.parent().context("missing certificate parent")?;
     let callee_path=folder.join("CalleeModule.lean");
     let caller_path=folder.join("CallerModule.lean");
@@ -306,6 +317,25 @@ pub fn replay(compiled:&Compilation,certificate:&Path,lean:&Toolchain)->Result<V
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn certificate_closures_must_be_exact_and_unique(){
+        use std::collections::BTreeSet;
+        let expected=BTreeSet::from([
+            ("caller".into(),"sha256:a".into()),
+            ("callee".into(),"sha256:b".into())
+        ]);
+        assert!(ensure_exact_closures(2,&expected,&expected).is_ok());
+        assert!(ensure_exact_closures(3,&expected,&expected).is_err());
+        let missing=BTreeSet::from([("caller".into(),"sha256:a".into())]);
+        assert!(ensure_exact_closures(1,&missing,&expected).is_err());
+        let mut injected=expected.clone();
+        injected.insert(("third".into(),"sha256:c".into()));
+        assert!(ensure_exact_closures(3,&injected,&expected).is_err());
+        let mut changed=expected.clone();
+        changed.remove(&("callee".into(),"sha256:b".into()));
+        changed.insert(("callee".into(),"sha256:wrong".into()));
+        assert!(ensure_exact_closures(2,&changed,&expected).is_err());
+    }
     #[test]
     fn pure_forwarder_can_be_compiled_into_two_independent_lean_sources(){
         let root=std::env::temp_dir().join(
