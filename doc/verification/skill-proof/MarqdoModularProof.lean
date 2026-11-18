@@ -46,7 +46,7 @@ example :
       Implements (fun x => g (f x)) (composed first second)) := by
   intro h
   let f : Nat → Nat := fun _ => 0
-  let g : Nat → Nat := fun _ => 0
+  let g : Nat → Nat := fun y => y
   let first : Contract Nat Nat := {
     requires := fun _ => True
     ensures := fun _ _ => True
@@ -60,12 +60,12 @@ example :
     trivial
   have hg : Implements g second := by
     intro y hy
-    simp [g] at *
-    omega
+    simpa [second, g] using hy
   have hcomp := h f g first second hf hg
   have target := hcomp 0 True.intro
   rcases target with ⟨y, _, hy⟩
-  have : (0 : Nat) = 1 := hy
-  contradiction
+  have impossible : (0 : Nat) = 1 := by
+    simpa [second, g, f] using hy
+  exact Nat.zero_ne_one impossible
 
 end MarqdoModularProof
