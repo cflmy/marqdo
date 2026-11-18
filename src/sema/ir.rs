@@ -185,6 +185,10 @@ pub struct KnowledgeRef {
     pub id: String,
     /// Stable public address of the marked step, absent for ambiguous labels.
     pub anchor_id: Option<String>,
+    /// Original Markdown target when this reference occurs in prose.
+    pub link_target: Option<String>,
+    /// Resolved stable anchor target; never an executable call.
+    pub target_anchor: Option<String>,
     pub label: String,
     pub context: String,
     pub source: SourceLocation,
@@ -330,6 +334,7 @@ fn compile_index(index: ProjectIndex) -> Result<Compilation> {
         }
     }
     close_effect_dependencies(&mut artifacts);
+    resolve_anchor_references(&mut refs);
     let resolved_effects: BTreeMap<_,_> = artifacts.iter()
         .map(|artifact|(artifact.artifact_id.clone(),artifact.effects.clone())).collect();
     for bound in &mut bound_calls {
@@ -541,6 +546,35 @@ fn anchor_definition_digest(source: &str, line: u32, label: &str, kind: &str) ->
     digest(format!("{kind}\0{label}\0{}", body.unwrap_or("<unknown-source-line>")))
 }
 
+/// Explicit knowledge references are inert: resolving a link never invokes a
+/// function. Short #@label binds ONLY inside the current function. Full
+/// mq://...#anchor-<sha256> targets support cross-module references.
+fn resolve_anchor_references(refs: &mut [KnowledgeRef]) {
+    let declared: BTreeSet<String> = refs.iter()
+        .filter_map(|r| r.anchor_id.clone()).collect();
+    for reference in refs {
+        let Some(raw) = reference.link_target.as_deref() else {continue};
+        let sought = if let Some(label) = raw.trim().strip_prefix("#@") {
+            let Some(owner) = reference.id.split("#ref-").next() else {continue};
+            if label.is_empty() {continue}
+            Some(format!("{}#anchor-{}", owner,
+                digest(normalize_anchor_label(label).as_bytes()).0.trim_start_matches("sha256:")))
+        } else if raw.starts_with("mq://") && raw.contains("#anchor-") {
+            Some(raw.trim().to_string())
+        } else { None };
+        if let Some(target) = sought {
+            if declared.contains(&target) {
+                reference.target_anchor = Some(target);
+                reference.resolution = "anchor".into();
+                reference.target = None;
+            } else {
+                reference.resolution = "unresolved_anchor".into();
+                reference.target = None;
+            }
+        }
+    }
+}
+
 fn artifact_for_function(
     index: &ProjectIndex,
     module_id: &ModuleId,
@@ -610,6 +644,8 @@ fn artifact_for_function(
         let definition_digest = anchor_definition_digest(source_text, named.line, &named.label, &named.kind);
         refs.push(KnowledgeRef {
             anchor_id: anchor.clone(),
+            link_target: None,
+            target_anchor: None,
             id: ref_id.clone(),
             label: named.label.clone(),
             context: named.context.clone(),
@@ -649,6 +685,8 @@ fn artifact_for_function(
         // a public executable anchor of its own.
         refs.push(KnowledgeRef {
             anchor_id: None,
+            link_target: Some(link.target.clone()),
+            target_anchor: None,
             id: ref_id.clone(),
             label: link.label.clone(),
             context: "narrative".into(),
@@ -1368,7 +1406,7 @@ impl SemanticProject {
 pub fn artifact_json(artifact: &SemanticArtifact) -> Value {
     json!({"schema_version": SCHEMA_VERSION, "artifact_id": artifact.artifact_id.0, "symbol_id": artifact.symbol_id.as_ref().map(SymbolId::as_str), "display_name": artifact.display_name, "kind": artifact.kind, "callable": artifact.callable, "source": {"file": artifact.source.file, "line": artifact.source.line, "end_line": artifact.source.end_line}, "signature": artifact.signature.as_ref().map(|s| json!({"receiver":s.receiver,"params":s.params.iter().map(|p|json!({"name":p.name,"type":p.ty,"required":p.required,"default_digest":p.default_digest.as_ref().map(|d|&d.0),"unit":p.unit})).collect::<Vec<_>>(),"returns":s.returns,"effects":s.effects.values()})), "contract":{"params":artifact.contract.params,"returns":artifact.contract.returns,"fields":artifact.contract.fields}, "effects":artifact.effects.values(), "dependencies":artifact.dependencies.iter().map(|d|&d.0).collect::<Vec<_>>(), "provenance":artifact.provenance.iter().map(|p|json!({"uri":p.uri,"locator":p.locator,"content_digest":p.content_digest.as_ref().map(|d|&d.0),"relation":p.relation})).collect::<Vec<_>>(), "applicability":artifact.applicability, "hashes":{"interface":artifact.hashes.interface.0,"implementation":artifact.hashes.implementation.0,"evidence":artifact.hashes.evidence.0,"artifact":artifact.hashes.artifact.0,"closure":artifact.hashes.closure.0}, "verification":{"parse":artifact.verification.parse,"resolve":artifact.verification.resolve,"contract":artifact.verification.contract,"execution":artifact.verification.execution,"tests":artifact.verification.tests,"evidence":artifact.verification.evidence,"domain":artifact.verification.domain,"methods":artifact.verification.methods}, "lifecycle":artifact.lifecycle})
 }
-fn ref_json(reference: &KnowledgeRef) -> Value { json!({"id":reference.id,"anchor_id":reference.anchor_id,"label":reference.label,"context":reference.context,"source":{"file":reference.source.file,"line":reference.source.line,"end_line":reference.source.end_line},"resolution":reference.resolution,"target":reference.target.as_ref().map(SymbolId::as_str)}) }
+fn ref_json(reference: &KnowledgeRef) -> Value { json!({"id":reference.id,"anchor_id":reference.anchor_id,"link_target":reference.link_target,"target_anchor":reference.target_anchor,"label":reference.label,"context":reference.context,"source":{"file":reference.source.file,"line":reference.source.line,"end_line":reference.source.end_line},"resolution":reference.resolution,"target":reference.target.as_ref().map(SymbolId::as_str)}) }
 fn step_json(step: &KnowledgeStep) -> Value { json!({"id":step.id.0,"anchor_id":step.anchor_id,"definition_digest":step.definition_digest.0,"reference":step.reference,"kind":step.kind,"calls":step.calls.iter().map(SymbolId::as_str).collect::<Vec<_>>(),"effects":step.effects.values(),"source":{"file":step.source.file,"line":step.source.line,"end_line":step.source.end_line}}) }
 fn bound_call_json(call: &BoundCall) -> Value {
     json!({
@@ -1555,6 +1593,12 @@ fn write_generation_tree(stage: &Path, compilation: &Compilation, prove_root: &P
             })
         })
         .collect();
+    for reference in &compilation.semantics.refs {
+        if let Some(target) = &reference.target_anchor {
+            let owner = reference.id.split("#ref-").next().unwrap_or("");
+            edges.push(json!({"from":owner,"to":target,"kind":"references_anchor"}));
+        }
+    }
     for step in &compilation.semantics.steps {
         if let Some(anchor) = &step.anchor_id {
             if let Some(owner) = step.id.0.split('#').next() {
@@ -1748,6 +1792,24 @@ import:
         let anchor3 = three.semantics.steps.iter()
             .find(|s| s.anchor_id == identity).unwrap();
         assert_ne!(digest1, anchor3.definition_digest);
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn markdown_knowledge_links_bind_only_to_registered_anchors() {
+        let root=root();
+        fs::write(root.join("main.mq.md"),
+            "# main\n\n## f\n\n[说明](#@演算)\n[不存在](#@没有)\n**x = [演算](2 * 3)**\n*x*\n"
+        ).unwrap();
+        let c=compile_project(&CompileOptions::for_path(&root).unwrap()).unwrap();
+        let target=c.semantics.steps.iter().find_map(|s|s.anchor_id.as_deref()).unwrap();
+        let link=c.semantics.refs.iter().find(|r|r.label=="说明").unwrap();
+        assert_eq!(link.target_anchor.as_deref(),Some(target));
+        assert_eq!(link.resolution,"anchor");
+        assert!(link.target.is_none(),"narrative links must never become executable calls");
+        let bad=c.semantics.refs.iter().find(|r|r.label=="不存在").unwrap();
+        assert_eq!(bad.resolution,"unresolved_anchor");
+        assert!(bad.target_anchor.is_none());
         fs::remove_dir_all(root).unwrap();
     }
 
