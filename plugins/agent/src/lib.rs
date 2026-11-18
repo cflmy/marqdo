@@ -7,6 +7,7 @@ mod corpus;
 mod effects;
 mod eng;
 mod error;
+mod input;
 mod kb;
 mod mcp_client;
 mod mcp_server;
@@ -838,6 +839,8 @@ kb_ffi!(agent_resume_clear, resume::resume_clear, "agent_resume_clear");
 kb_ffi!(agent_resume_list, resume::resume_list, "agent_resume_list");
 kb_ffi!(agent_choice_parse, choice::parse_choice, "agent_choice_parse");
 kb_ffi!(agent_context_scope, context_scope::project, "agent_context_scope");
+kb_ffi!(agent_input_open, input::input_open, "agent_input_open");
+kb_ffi!(agent_input_resume, input::input_resume, "agent_input_resume");
 kb_ffi!(agent_error_make, error::make_error, "agent_error_make");
 kb_ffi!(agent_error_decide_retry, error::decide_retry, "agent_error_decide_retry");
 kb_ffi!(agent_tools_register, tools::tools_register, "agent_tools_register");
@@ -969,6 +972,8 @@ pub unsafe extern "C" fn marqdo_plugin_init(host: *const MarqdoHostApi) -> c_int
         ("agent_resume_list", "resume_dir", agent_resume_list),
         ("agent_choice_parse", "reply,options", agent_choice_parse),
         ("agent_context_scope", "source,scope,class,function", agent_context_scope),
+        ("agent_input_open", "id,question,options,source_revision", agent_input_open),
+        ("agent_input_resume", "id,reply,source_revision", agent_input_resume),
         ("agent_error_make", "code,message,category", agent_error_make),
         ("agent_error_decide_retry", "error,attempts,effect_class", agent_error_decide_retry),
         ("agent_tools_register", "spec,specs", agent_tools_register),
