@@ -19,7 +19,10 @@ pub mod capture;
 pub mod narrative_ratio;
 #[cfg(feature = "cli")]
 pub mod catalog;
-#[cfg(feature = "cli")]
+// `sema::ir` unconditionally emits `proof-index.json` and
+// `proof-obligations.json` through this module, so it is part of the core
+// compiler rather than the CLI surface. Gating it on `cli` broke library
+// consumers that disable default features (E0433).
 pub mod knowledge;
 pub mod check;
 pub mod contract;

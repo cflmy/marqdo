@@ -1,3 +1,9 @@
+marqdo (2.9.1-1ppa1) noble; urgency=medium
+
+  * Release 2.9.1; see the reviewed upstream CHANGELOG.
+
+ -- Marqdo Maintainers <cflmy@users.noreply.github.com>  Wed, 18 Nov 2026 18:43:10 +0800
+
 marqdo (2.8.0-1ppa1) noble; urgency=medium
 
   * Release 2.8.0; see the reviewed upstream CHANGELOG.

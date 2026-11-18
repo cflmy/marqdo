@@ -1,6 +1,22 @@
 # Changelog
 
-## Unreleased
+## v2.9.1 — 2026-11-18 · Full release / 正式补丁版本
+
+Marqdo 2.9.1 修复 2.9.0 的库构建回归：`knowledge` 属于核心编译器，不再由 `cli` 特性门控，`default-features = false` 的下游库恢复可编译；并新增 feature-matrix CI 守卫。无运行时语义、插件 ABI 或证书格式变化。
+
+**EN:** 2.9.1 fixes the 2.9.0 library regression where the core compiler's `knowledge` module was gated on `cli`, breaking `default-features = false` consumers; a feature-matrix CI gate now prevents regressions. No runtime semantics, plugin ABI or certificate format changes.
+
+### Fixed
+
+- Library builds with `--no-default-features` again. `sema::ir` unconditionally
+  emits `proof-index.json` / `proof-obligations.json` through `knowledge`, but
+  `knowledge` was gated on `cli`; it is now part of the core compiler, so
+  downstream crates using `default-features = false` no longer hit
+  `E0433: could not find knowledge in the crate root`.
+- CI: `feature-matrix` checks the library with no features, `cli` only, and
+  default features to prevent feature-gate regressions.
+
+详情 / Details: [2.9.1 release notes](doc/releases/v2.9.1.md).
 
 ## v2.9.0 — 2026-11-18 · Full release / 正式完整版本
 
