@@ -242,6 +242,8 @@ pub struct StaticCallArg {
     pub name: Option<String>,
     pub integer: Option<i64>,
     pub expression_digest: Digest,
+    /// Only a direct identifier; arbitrary expressions do not become symbolic identities.
+    pub symbol: Option<String>,
 }
 
 fn checked_constant_int(expr: &Expr, depth: usize) -> Option<i64> {
@@ -280,7 +282,8 @@ fn static_call_args(call:&CallExpr)->Vec<StaticCallArg>{
         };
         StaticCallArg {
             name, integer:checked_constant_int(expr,0),
-            expression_digest:digest(format!("{expr:?}"))
+            expression_digest:digest(format!("{expr:?}")),
+            symbol:match expr {Expr::Var(v)=>Some(v.clone()),_=>None}
         }
     }).collect()
 }
@@ -295,6 +298,10 @@ pub struct BoundCall {
     pub source: SourceLocation,
     /// Exact, ordered actual arguments with conservative closed-int decoding.
     pub args: Vec<StaticCallArg>,
+    /// Guard predicates are source-derived and never independently trusted.
+    pub path_guards: Vec<String>,
+    /// Loop, unknown guard, etc: no modular proof may pass this callsite.
+    pub control_blocker: Option<String>,
     pub required_effects: EffectSet,
 }
 
@@ -733,6 +740,92 @@ fn resolve_anchor_references(refs: &mut [KnowledgeRef], claims: &[KnowledgeClaim
     }
 }
 
+#[derive(Clone,Default)]
+struct CallsiteControl {
+    guards: Vec<String>,
+    blocker: Option<String>,
+}
+
+/// Only side-effect-free boolean and integer-comparison guards are projected.
+/// Unknown guards and any loops remain explicit unresolved obligations.
+fn guard_text(expr:&Expr)->Option<String>{
+    match expr {
+        Expr::Var(v)=>Some(v.clone()),
+        Expr::Literal(crate::ast::Literal::Int(n))=>Some(n.to_string()),
+        Expr::Literal(crate::ast::Literal::Bool(v))=>Some(
+            if *v {"真"}else{"假"}.into()),
+        Expr::Occluded {payload:Some(e),..}=>guard_text(e),
+        Expr::Unary {op:crate::ast::UnaryOp::Not,expr}=>
+            Some(format!("非 ({})",guard_text(expr)?)),
+        Expr::Binary {op,left,right}=>{
+            let symbol=match op {
+                crate::ast::BinaryOp::Eq=>"=",
+                crate::ast::BinaryOp::Ne=>"≠",
+                crate::ast::BinaryOp::Lt=>"<",
+                crate::ast::BinaryOp::Le=>"≤",
+                crate::ast::BinaryOp::Gt=>">",
+                crate::ast::BinaryOp::Ge=>"≥",
+                crate::ast::BinaryOp::And=>"且",
+                crate::ast::BinaryOp::Or=>"或",
+                _=>return None
+            };
+            Some(format!("({} {} {})",
+                guard_text(left)?,symbol,guard_text(right)?))
+        },
+        _=>None
+    }
+}
+fn callsite_control(fun:&Function)->BTreeMap<u32,CallsiteControl>{
+    fn walk(items:&[Stmt],conditions:&[String],block:Option<String>,
+        output:&mut BTreeMap<u32,CallsiteControl>){
+        for stmt in items{
+            match stmt {
+                Stmt::Branch{arms,span}=>{
+                    // Calls within branch test expressions require separate
+                    // evaluation-order reasoning and must not borrow arm facts.
+                    output.entry(span.line).or_insert_with(||CallsiteControl{
+                        guards:conditions.to_vec(),
+                        blocker:Some("call_in_condition_not_modeled".into())
+                    });
+                    let mut negated=Vec::new();
+                    for arm in arms{
+                        let mut path=conditions.to_vec();
+                        path.extend(negated.iter().cloned());
+                        let mut arm_block=block.clone();
+                        if let Some(cond)=&arm.condition{
+                            match guard_text(cond){
+                                Some(guard)=>{
+                                    path.push(guard.clone());
+                                    negated.push(format!("非 ({guard})"));
+                                },
+                                None=>arm_block=Some("non_pure_branch_guard".into())
+                            }
+                        }
+                        walk(&arm.body,&path,arm_block,output);
+                    }
+                },
+                Stmt::While{body,span,..}|Stmt::ForEach{body,span,..}=>{
+                    output.insert(span.line,CallsiteControl{
+                        guards:conditions.to_vec(),
+                        blocker:Some("loop_or_iterator_requires_invariant".into())
+                    });
+                    walk(body,conditions,
+                        Some("loop_or_iterator_requires_invariant".into()),output);
+                },
+                _=>{
+                    let line=crate::ast::stmt_line(stmt);
+                    output.insert(line,CallsiteControl{
+                        guards:conditions.to_vec(),blocker:block.clone()
+                    });
+                }
+            }
+        }
+    }
+    let mut found=BTreeMap::new();
+    walk(&fun.body,&[],None,&mut found);
+    found
+}
+
 fn artifact_for_function(
     index: &ProjectIndex,
     module_id: &ModuleId,
@@ -753,6 +846,7 @@ fn artifact_for_function(
     Vec<super::provenance::ProvenanceDiag>,
 ) {
     let calls = collect_call_sites(function);
+    let controls=callsite_control(function);
     let mut effects = direct_effects(index, ast_module, function, &calls);
     let mut dependencies = Vec::new();
     let mut bound_calls = Vec::new();
@@ -768,6 +862,8 @@ fn artifact_for_function(
                     call_site: call_display(call),
                     source,
                     args:static_call_args(call),
+                    path_guards:controls.get(line).map(|c|c.guards.clone()).unwrap_or_default(),
+                    control_blocker:controls.get(line).and_then(|c|c.blocker.clone()),
                     required_effects: call_effects,
                 });
             }
@@ -1594,9 +1690,11 @@ fn bound_call_json(call: &BoundCall) -> Value {
         "target": call.target.as_str(),
         "call_site": call.call_site,
         "args":call.args.iter().map(|a|json!({
-            "name":a.name,"integer":a.integer,
+            "name":a.name,"integer":a.integer,"symbol":a.symbol,
             "expression_digest":a.expression_digest.0
         })).collect::<Vec<_>>(),
+        "path_guards":call.path_guards,
+        "control_blocker":call.control_blocker,
         "source": {"file": call.source.file, "line": call.source.line, "end_line": call.source.end_line},
         "required_effects": call.required_effects.values(),
         "binding": "BoundCall",
