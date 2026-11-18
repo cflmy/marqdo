@@ -2,6 +2,28 @@
 
 ## Unreleased
 
+### Added
+
+- `ext/ai/workflow` now exposes read-only `inspect`/`list`, a host-relative
+  `resume_dir` on every operation, and repeatable offline workflow fixtures.
+- Agent ABI registers `agent_workflow_inspect` and `agent_workflow_list`.
+- AI 工作流拓展库新增只读 `inspect`/`list`、各操作的 `resume_dir` 隔离，
+  离线集成夹具改为按时间戳生成运行 ID，可重复执行。
+
+### Fixed
+
+- `flow.choose` no longer leaks a branch-local `parsed` value into the function
+  contract; the repaired-choice path is fully scoped.
+- CI builds the agent cdylib and runs offline integration without the removed
+  `run --effects` flag, using `MARQDO_AGENT_PLUGIN` instead.
+
+### Changed
+
+- 分支已合并 v2.8.0：`Cargo.toml`/`Cargo.lock`、发布工作流与全部拓展包
+  统一到 2.8.0 依赖锁，后续发版不再从 2.7.1 基线分叉。
+- The branch now includes v2.8.0, so its crate versions, lockfile and release
+  workflows match the current release line instead of the 2.7.1 baseline.
+
 ## v2.8.0 — 2026-11-17
 
 `marqdo prove` 正式发布：定理表 → Lean 4 证明 → 自动判定。离线符号执行（F1–F5）无工具链可用，`checked` 永远弱于 `proved`；单调性护栏让判定器缺陷显式失败；假定理给出反例见证；证书缓存与目录模式面向智能体批量出证。
