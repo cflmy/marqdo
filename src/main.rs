@@ -1836,8 +1836,42 @@ fn try_main(cli: Cli) -> Result<i32> {
                             accepted.extend(goals.into_iter().map(|(id,_)|id));
                         }
                     }
+                    let mut symbolic_checked=0usize;
+                    if let Some(lean)=toolchain.as_ref(){
+                        let symbolic:Vec<(String,marqdo::knowledge::symbolic::SymbolicGoal)>=
+                            compiled.semantics.bound_calls.iter().flat_map(|call|{
+                                compiled.semantics.claims.iter()
+                                    .filter(|c|c.owner==call.target)
+                                    .filter(|c|receipts["claims"].as_array().is_some_and(|rows|
+                                        rows.iter().any(|r|
+                                            r["claim_anchor_id"]==c.anchor_id
+                                            && r["status"]=="proved"
+                                            && r["usable"]==true)))
+                                    .filter_map(|c|Some((
+                                        c.anchor_id.clone(),
+                                        marqdo::knowledge::symbolic::plan(
+                                            &compiled.semantics,call,c.premise.as_deref()?)?
+                                    )))
+                                    .filter(|(_,g)|g.runtime_domain_verified)
+                                    .collect::<Vec<_>>()
+                            }).collect();
+                        if !symbolic.is_empty(){
+                            let target=out.join("modular");
+                            std::fs::create_dir_all(&target)?;
+                            let path=target.join("symbolic-path-goals.lean");
+                            std::fs::write(&path,
+                                marqdo::knowledge::symbolic::emit_lean(&symbolic))?;
+                            marqdo::prove::driver::check_closed_goals(lean,&path,
+                                std::time::Duration::from_secs(120))?;
+                            symbolic_checked=symbolic.len();
+                        }
+                    }
                     let mut report=marqdo::knowledge::modular::analyze_with_verified(
                         &compiled.semantics,&receipts,&accepted);
+                    report["symbolic_path_lean_model_proved"]=
+                        serde_json::json!(symbolic_checked);
+                    report["symbolic_proof_scope"]=
+                        serde_json::json!("integer_path_model_not_runtime_equivalence");
                     report["lean_preconditions_verified"]=serde_json::json!(accepted.len());
                     report["lean_toolchain"]=serde_json::json!(verified_toolchain);
                     report["lean_receipts_replayed"]=serde_json::json!(replayed);
