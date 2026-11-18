@@ -9,7 +9,7 @@ use crate::sema::ir::{BoundCall,SemanticProject};
 pub struct SymbolicGoal{
     pub proposition:String,
     pub guard_propositions:Vec<String>,
-    pub guard_index:usize,
+    pub guard_index:Option<usize>,
     pub binders:Vec<String>,
     pub runtime_domain_verified:bool,
     pub abstract_integer_model_supported:bool,
