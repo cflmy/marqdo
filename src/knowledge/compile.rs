@@ -21,7 +21,8 @@ pub fn compile(opts: KnowledgeOptions) -> Result<KnowledgeGraph> {
     // Legacy EKC retrieval catalog writes only under `ekc/` and must never
     // overwrite `graph/edges.json` (G01).
     let semantic_root = if opts.path.is_file() {
-        opts.path.parent().unwrap_or_else(|| Path::new(".")).to_path_buf()
+        opts.path.parent().filter(|p| !p.as_os_str().is_empty())
+            .unwrap_or_else(|| Path::new(".")).to_path_buf()
     } else {
         opts.path.clone()
     };
