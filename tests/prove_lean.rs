@@ -367,6 +367,31 @@ import:
     assert_eq!(call["contracts"][0]["status"],"available_as_contract");
     assert_eq!(json["proof_completion"],"not_established_by_dependency_analysis");
     assert!(s.dir.join(".marqdo/modular/closed-goals.lean").exists());
+    // A proved callee cannot authorize a call with an invalid actual.
+    s.write("main.mq.md",r#"---
+markup: occlusion
+import:
+  math: math.mq.md
+---
+
+# main
+
+## caller
+
+**x = [无效调用](math.math.exact(0))**
+*x*
+"#);
+    let invalid=s.marqdo().args([
+        "knowledge","proof-deps","--verify","--json","--strict","."
+    ]).output().expect("reject false contract premise");
+    assert_eq!(invalid.status.code(),Some(2),
+        "false instantiated precondition must fail closed");
+    let denied:serde_json::Value=serde_json::from_slice(&invalid.stdout).unwrap();
+    assert_eq!(denied["lean_preconditions_verified"],0);
+    assert!(denied["obligations"].as_array().unwrap().iter()
+        .any(|o|o["contracts"].as_array().is_some_and(|contracts|
+            contracts.iter().any(|c|
+                c["call_precondition_status"]=="refuted_closed_precondition"))));
 }
 
 /// G2：真证书命中（用真 lean 跑一次后，证书生效；第二次 cache: hit 且快）。
