@@ -323,7 +323,7 @@ fn compile_index(index: ProjectIndex) -> Result<Compilation> {
             }
             for claim in &function.claims {
                 if claim_counts.get(claim.id.as_str())!=Some(&1) {
-                    diagnostics.push(Diagnostic::new(Some(path),
+                    diagnostics.push(Diagnostic::new(Some(path.as_path()),
                         Span::new(claim.line,1),
                         format!("ambiguous theorem declaration: {}",claim.id))
                         .with_code("knowledge.claim_duplicate")
