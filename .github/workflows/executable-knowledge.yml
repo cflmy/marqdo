@@ -21,6 +21,7 @@ jobs:
         run: |
           cargo run --locked -- check ext/ai/flow.mq.md
           cargo run --locked -- check ext/ai/recovery.mq.md
+          cargo run --locked -- check ext/ai/context.mq.md
       - name: Workbench contracts (M00–M06 / F-subset)
         run: cargo test --test workbench_contracts --locked
       - name: Offline executable-knowledge gate
