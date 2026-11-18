@@ -22,6 +22,8 @@ jobs:
         run: cargo test --locked --lib knowledge::composition::tests -- --nocapture
       - name: Compile parameter-projection proof backend
         run: cargo test --locked --lib knowledge::projection -- --nocapture
+      - name: Compile pure-expression VC backend
+        run: cargo test --locked --lib knowledge::expression::tests -- --nocapture
       - name: Compile path-sensitive VCs
         run: cargo test --locked --lib knowledge::symbolic::tests -- --nocapture
       - name: Compile closed-argument VCs
@@ -42,6 +44,10 @@ jobs:
         env:
           MARQDO_PROOF_REQUIRE_LEAN: "1"
         run: cargo test --locked --test prove_lean projection_composition_proves_symbolic_caller_and_replays_from_source -- --nocapture
+      - name: Independent arithmetic contract composition with real Lean
+        env:
+          MARQDO_PROOF_REQUIRE_LEAN: "1"
+        run: cargo test --locked --test prove_lean pure_expression_composition_proves_and_replays_real_lean -- --nocapture
       - name: Regenerated provenance for original Lean certificates
         env:
           MARQDO_PROOF_REQUIRE_LEAN: "1"
