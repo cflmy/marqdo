@@ -16,6 +16,7 @@ pub mod learn;
 pub mod lifecycle;
 pub mod metrics;
 pub mod policy;
+pub mod proof;
 pub mod preflight;
 pub mod reuse;
 pub mod util;
