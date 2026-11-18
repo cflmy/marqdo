@@ -250,6 +250,15 @@ fn g2_certificate_hit_after_real_run() {
         "only verified Lean receipts should carry proved: {linkage}");
     assert_eq!(linkage["claims"][0]["proof_scope"], "function");
     assert!(linkage["claims"][0]["certificate_digest"].as_str().is_some());
+    let publish=s.marqdo().args([
+        "knowledge","台账.mq.md","--out",".marqdo"
+    ]).output().expect("publish verified knowledge");
+    assert!(publish.status.success(),"knowledge compile failed: {}",
+        String::from_utf8_lossy(&publish.stderr));
+    let proof_index: serde_json::Value = serde_json::from_slice(
+        &fs::read(s.dir.join(".marqdo/proof-index.json")).unwrap()).unwrap();
+    assert_eq!(proof_index["claims"][0]["status"],"proved");
+    assert_eq!(proof_index["claims"][0]["usable"],true);
 
     // 第二次：命中证书。
     let out2 = s.marqdo().arg("prove").arg("台账.mq.md").arg("--json").output().expect("second prove");
