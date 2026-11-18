@@ -7,17 +7,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 use serde_json::{json, Value};
-use crate::sema::ir::{BoundCall, SemanticProject};
-
-fn owner_of_call<'a>(semantic:&'a SemanticProject, call:&BoundCall)->Option<&'a str>{
-    // Function headers have source positions; for a call site inside nested
-    // functions the latest preceding declaration in the same file wins.
-    semantic.artifacts.iter()
-        .filter(|a|a.kind=="function" && a.source.file==call.source.file
-            && a.source.line<=call.source.line)
-        .max_by_key(|a|a.source.line)
-        .and_then(|a|a.symbol_id.as_ref().map(|id|id.as_str()))
-}
+use crate::sema::ir::SemanticProject;
 
 fn linked_claims<'a>(proofs:&'a Value, symbol:&str)->Vec<&'a Value>{
     proofs["claims"].as_array().into_iter()
@@ -33,8 +23,8 @@ pub fn analyze(semantic:&SemanticProject, proof_index:&Value)->Value{
     let mut links:BTreeMap<String,Vec<String>>=BTreeMap::new();
     for call in &semantic.bound_calls {
         let callee=call.target.as_str();
-        let caller=owner_of_call(semantic,call);
-        let caller_id=caller.unwrap_or("<unknown-caller>");
+        let caller_id=call.caller.as_str();
+        let caller=Some(caller_id);
         let assumption=semantic.assumptions.iter()
             .find(|a|a.owner.as_str()==caller_id &&
                 (a.operation==call.call_site || a.operation==callee));
