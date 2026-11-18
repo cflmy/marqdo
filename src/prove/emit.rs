@@ -139,6 +139,7 @@ fn emit_theorems(out: &mut String, fun: &FnPlan) {
                     out,
                     "  all_goals
     simp_all [mqTruth, Op.name, mqAccess, mqResultOk, mqResultError, mqValueOr, mqAnd, mqOr, mqNot, mqEq]
+    try simp_all [mqAdd, mqSub, mqMul, mqNeg]
     try
       first
       | exact (mqGt_mqLe_false ‹mqGt _ (Val.int _) = true› ‹mqLe _ (Val.int _) = true›).elim

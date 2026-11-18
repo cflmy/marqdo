@@ -1,0 +1,91 @@
+# One-time, fail-closed promotion from verified main to immutable v2.9.0.
+# GITHUB_TOKEN-created tag pushes do not recursively start tag workflows.
+# Explicit workflow_dispatch is used to run the existing multi-platform
+# Release workflow against the immutable tag itself.
+name: Release v2.9.0 promotion
+on:
+  push:
+    branches: [main]
+    paths:
+      - "Cargo.toml"
+      - "doc/releases/v2.9.0.md"
+      - ".github/workflows/release-v2.9.yml"
+  pull_request:
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/marqdo-wasm/Cargo.toml"
+      - "ext/VERSION"
+      - "doc/releases/v2.9.0.md"
+      - ".github/workflows/release-v2.9.yml"
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: write
+concurrency:
+  group: release-v2.9-promotion
+  cancel-in-progress: false
+jobs:
+  verify-and-dispatch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Verify complete, matching release metadata
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import re, pathlib
+          want = '2.9.0'
+          for file in ['Cargo.toml', 'crates/marqdo-wasm/Cargo.toml']:
+              data = pathlib.Path(file).read_text()
+              assert re.search(r'^version\s*=\s*"2\.9\.0"\s*$', data, re.M), file
+          lock = pathlib.Path('Cargo.lock').read_text()
+          for name in ['marqdo', 'marqdo-wasm']:
+              assert re.search(r'\[\[package\]\]\nname = "'+name+r'"\nversion = "2\.9\.0"', lock), name
+          assert pathlib.Path('ext/VERSION').read_text().strip() == want
+          assert pathlib.Path('doc/releases/v2.9.0.md').exists()
+          PY
+          git diff --exit-code
+      - name: Install pinned Lean checker
+        run: |
+          curl -sSf https://elan.lean-lang.org/elan-init.sh | sh -s -- -y --default-toolchain leanprover/lean4:v4.35.0
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+      - name: Validate Lean and source-derived proof library
+        run: |
+          lean --version
+          bash scripts/check-proof-library.sh
+          lean doc/verification/skill-proof/MarqdoModularProof.lean
+          lean doc/verification/skill-proof/MarqdoEffects.lean
+      - name: Build and gate source semantics, actual Lean and compatibility
+        env:
+          MARQDO_PROOF_REQUIRE_LEAN: "1"
+        run: |
+          cargo build --locked
+          cargo test --locked --lib knowledge::
+          cargo test --locked --test knowledge_proof
+          cargo test --locked --test prove_lean
+          cargo test --locked --test prove_corpus
+          cargo test --locked --test conformance
+          cargo test --locked --test executable_knowledge
+          cargo test --locked --test release_handbook
+      - name: Create v2.9.0 only once and dispatch full platform release
+        if: github.repository == 'cflmy/marqdo' && github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if git ls-remote --exit-code --tags origin refs/tags/v2.9.0 >/dev/null 2>&1; then
+            echo "v2.9.0 already exists; refusing to replace or re-dispatch assets"
+            exit 1
+          fi
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a v2.9.0 "$GITHUB_SHA" -m "Marqdo v2.9.0 full: Verified Knowledge Compiler"
+          git push origin refs/tags/v2.9.0
+          gh workflow run release.yml --ref v2.9.0
+          echo "Dispatched Release workflow for immutable tag v2.9.0"

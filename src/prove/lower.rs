@@ -13,7 +13,7 @@ use anyhow::Result;
 use crate::ast::{self, Arg, BinaryOp, CallExpr, Expr, Function, Module, Stmt};
 use crate::diagnostics::{Diagnostic, Severity, Span};
 use crate::prove::ir::{
-    BinOp, ClaimPlan, Expr as IrExpr, FnPlan, InterpPart, OpDecl, ParamPlan, Plan, PlanTy,
+    AssumptionPlan, BinOp, ClaimPlan, Expr as IrExpr, FnPlan, InterpPart, OpDecl, ParamPlan, Plan, PlanTy,
     PureExpr, Step, UnOp, SCHEMA,
 };
 use crate::sema::bind::{call_display, resolve_for_exec};
@@ -148,7 +148,10 @@ impl<'m> Lowerer<'m> {
                     line: c.line,
                 })
                 .collect(),
-            assumptions: Vec::new(),
+            assumptions: fun.assumptions.iter().map(|a|AssumptionPlan{
+                op:a.op.clone(), premise:a.premise.clone(),
+                postcondition:a.postcondition.clone()
+            }).collect(),
         };
         Lowered {
             display: display.to_string(),
@@ -599,6 +602,21 @@ impl<'m> Lowerer<'m> {
                 }
             }
             Target::Import { bind, lib, fun: target, .. } => {
+                // Source-level verification of a tightly restricted imported
+                // pure leaf: one return expression, only literal/parameter
+                // arithmetic, exact positional args. This is NOT abstract
+                // contract reuse; Lean verifies the actual substituted body.
+                if body.inline_depth < 4
+                    && imported_pure_leaf(target)
+                    && imported_leaf_arithmetic_safe(target,call)
+                    && call.args.len()==target.params.len()
+                    && call.args.iter().all(|a|matches!(a,Arg::Positional(_)))
+                {
+                    body.inline_depth+=1;
+                    let lowered=self.inline_body(target,&args,body);
+                    body.inline_depth-=1;
+                    return lowered;
+                }
                 // lib/result 的构造器内联为结构（§4.5；真实库名是 ok/error/value_or）。
                 if bind == "result" && matches!(target.name.as_str(), "ok" | "error" | "value_or") {
                     return IrExpr::Pure(PureExpr::Ctor {
@@ -904,6 +922,94 @@ fn effect_label_of_host(host: HostFn) -> String {
             .map(|s| (*s).to_string())
             .unwrap_or_else(|| "unknown".into())
     }
+}
+
+/// Imported source transparency is enabled only for a pure expression
+/// fragment that cannot inspect module globals or call external operations.
+fn imported_pure_leaf(fun:&Function)->bool {
+    fn closed(expr:&Expr,params:&std::collections::BTreeSet<&str>)->bool {
+        match expr {
+            Expr::Literal(_)=>true,
+            Expr::Var(v)=>params.contains(v.as_str()),
+            Expr::Occluded {payload:Some(inner),..}=>closed(inner,params),
+            Expr::Unary {expr,..}=>closed(expr,params),
+            Expr::Binary {left,right,..}=>closed(left,params)&&closed(right,params),
+            _=>false,
+        }
+    }
+    if fun.is_object() || fun.body.len()!=1{return false}
+    let params:std::collections::BTreeSet<&str>=fun.params.iter()
+        .map(|p|p.name.as_str()).collect();
+    match &fun.body[0]{
+        Stmt::Return {value,..}=>closed(value,&params),
+        _=>false,
+    }
+}
+
+/// The interpreter uses bounded i64 while Lean's arithmetic is unbounded.
+/// Therefore imported source expansion of arithmetic is allowed only if all
+/// arithmetic subexpressions close to checked i64 constants after applying
+/// the *actual* call arguments. Unknown/overflow/div-zero stays opaque.
+fn imported_leaf_arithmetic_safe(target:&Function, call:&CallExpr)->bool {
+    let Some(Stmt::Return {value,..})=target.body.first() else {return false};
+    if target.params.len()!=call.args.len(){return false}
+    let bindings:Vec<(&str,&Expr)>=target.params.iter().zip(call.args.iter())
+        .filter_map(|(p,a)|match a {
+            Arg::Positional(expr)=>Some((p.name.as_str(),expr)),
+            _=>None
+        }).collect();
+    if bindings.len()!=call.args.len(){return false}
+    fn int_value(expr:&Expr,bindings:&[(&str,&Expr)],depth:usize)->Option<i64>{
+        if depth>24 {return None}
+        match expr{
+            Expr::Literal(ast::Literal::Int(n))=>Some(*n),
+            Expr::Var(v)=> {
+                let bound=bindings.iter().find(|(key,_)|*key==v.as_str())?.1;
+                // A bound argument must be self-contained to avoid recursion
+                int_value(bound,&[],depth+1)
+            }
+            Expr::Occluded {payload:Some(inner),..}=>
+                int_value(inner,bindings,depth+1),
+            Expr::Unary {op:ast::UnaryOp::Neg,expr}=>
+                int_value(expr,bindings,depth+1)?.checked_neg(),
+            Expr::Binary {op,left,right}=>{
+                let x=int_value(left,bindings,depth+1)?;
+                let y=int_value(right,bindings,depth+1)?;
+                match op{
+                    BinaryOp::Add=>x.checked_add(y),
+                    BinaryOp::Sub=>x.checked_sub(y),
+                    BinaryOp::Mul=>x.checked_mul(y),
+                    // Division semantics (integer rounding/Num coercion)
+                    // require a differential proof before source transparency.
+                    BinaryOp::Div=>None,
+                    _=>None,
+                }
+            }
+            _=>None,
+        }
+    }
+    fn safe(expr:&Expr,bindings:&[(&str,&Expr)])->bool{
+        match expr{
+            Expr::Literal(_)=>true,
+            Expr::Var(v)=>bindings.iter().any(|(key,_)|*key==v.as_str()),
+            Expr::Occluded{payload:Some(inner),..}=>safe(inner,bindings),
+            Expr::Unary {op,expr}=>match op {
+                ast::UnaryOp::Neg=>int_value(
+                    &Expr::Unary{op:*op,expr:expr.clone()},bindings,0).is_some(),
+                ast::UnaryOp::Not=>safe(expr,bindings),
+            },
+            Expr::Binary {op,left,right}=>{
+                match op {
+                    BinaryOp::Add|BinaryOp::Sub|BinaryOp::Mul|BinaryOp::Div=>
+                        int_value(expr,bindings,0).is_some(),
+                    _=>safe(left,bindings)&&safe(right,bindings),
+                }
+            }
+            _=>false,
+        }
+    }
+    safe(value,&bindings)
+        && bindings.iter().all(|(_,argument)|safe(argument,&[]))
 }
 
 /// 无 sema 效应表时的库函数效应回退（与 sema 的 imported_effects 同思路的保守版）。

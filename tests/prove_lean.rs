@@ -226,6 +226,712 @@ fn g1_cache_hit_skips_judging() {
     let _ = fs::remove_file(&log);
 }
 
+/// Source-transparent, leaf-pure imported call is verified with real Lean.
+#[test]
+fn modular_pure_leaf_import_proved_by_real_lean() {
+    if !toolchain_available() {
+        skip_or_fail("modular_pure_leaf_import_proved_by_real_lean");
+        return;
+    }
+    let scratch=Scratch::new("modular-pure-import");
+    scratch.write("rates.mq.md",r#"# rates
+
+## lookup
+
+*2*
+"#);
+    scratch.write("main.mq.md",r#"---
+markup: occlusion
+import:
+  rates: rates.mq.md
+---
+
+# main
+
+## compute
+
+| 定理 | 结论 | 策略 |
+|---|---|---|
+| 返回值正确 | 结果 = 2 | auto |
+
+**tax = [查询](rates.rates.lookup())**
+*tax*
+"#);
+    let out=scratch.marqdo().args(["prove","main.mq.md","--json"]).output()
+        .expect("prove pure imported leaf");
+    let result:serde_json::Value=serde_json::from_slice(&out.stdout)
+        .unwrap_or_else(|_| panic!("stderr={} stdout={}",
+            String::from_utf8_lossy(&out.stderr),
+            String::from_utf8_lossy(&out.stdout)));
+    assert_eq!(result["status"],"proved",
+        "imported pure leaf must be proved by real Lean: {result}");
+    let ops=&result["functions"][0]["ops"];
+    assert!(ops.as_array().is_some_and(|a|a.is_empty()),
+        "pure leaf import cannot be treated as an opaque environment op: {ops}");
+}
+
+/// Pure cross-module parameter substitution is checked by real Lean, not JSON status.
+#[test]
+fn modular_pure_leaf_import_with_argument_proved_by_real_lean(){
+    if !toolchain_available(){
+        skip_or_fail("modular_pure_leaf_import_with_argument_proved_by_real_lean");
+        return;
+    }
+    let scratch=Scratch::new("modular-parameterized");
+    scratch.write("numbers.mq.md",r#"# numbers
+
+## increment
++ `n`
+
+*`n` + 1*
+"#);
+    scratch.write("main.mq.md",r#"---
+markup: occlusion
+import:
+  numbers: numbers.mq.md
+---
+
+# main
+
+## compute
+
+| 定理 | 结论 | 策略 |
+|---|---|---|
+| 参数绑定正确 | 结果 = 4 | auto |
+
+**value = [加一](numbers.numbers.increment(3))**
+*value*
+"#);
+    let out=scratch.marqdo().args(["prove","main.mq.md","--json"])
+        .output().expect("prove imported parameterized leaf");
+    let json:serde_json::Value=serde_json::from_slice(&out.stdout)
+        .unwrap_or_else(|_|panic!("stderr={} stdout={}",
+            String::from_utf8_lossy(&out.stderr),
+            String::from_utf8_lossy(&out.stdout)));
+    assert_eq!(json["status"],"proved",
+        "parameter substitution across file boundary must be Lean proved: {json}");
+}
+
+/// Real inter-module certificate + closed actual-argument bridge, checked by
+/// a second Lean invocation. Graph status is not itself a caller theorem.
+#[test]
+fn modular_closed_callsite_proof_uses_real_lean_kernel(){
+    if !toolchain_available(){
+        skip_or_fail("modular_closed_callsite_proof_uses_real_lean_kernel");
+        return;
+    }
+    let s=Scratch::new("modular-closed-vc");
+    s.write("math.mq.md",r#"---
+markup: occlusion
+---
+
+# math
+
+## exact
++ `n`
+
+| 定理 | 结论 | 前提 | 策略 |
+|---|---|---|---|
+| constant | 结果 = 2 | n > 0 | auto |
+
+*2*
+"#);
+    s.write("main.mq.md",r#"---
+markup: occlusion
+import:
+  math: math.mq.md
+---
+
+# main
+
+## caller
+
+**x = [获得数字](math.math.exact(3))**
+*x*
+"#);
+    let proof=s.marqdo().args(["prove","math.mq.md","--json"])
+        .output().expect("prove imported contract");
+    assert!(proof.status.success(),
+        "callee proof failed: {}",String::from_utf8_lossy(&proof.stdout));
+    let result=s.marqdo().args([
+        "knowledge","proof-deps","--verify","--json","."
+    ]).output().expect("verify modular goals");
+    let json:serde_json::Value=serde_json::from_slice(&result.stdout)
+        .unwrap_or_else(|_|panic!("{}",
+            String::from_utf8_lossy(&result.stderr)));
+    assert_eq!(json["lean_preconditions_verified"],1,
+        "no kernel checked callsite: {json}");
+    assert!(json["lean_receipts_replayed"].as_u64().unwrap_or(0)>=1,
+        "callee theorem must be replayed by Lean, not trusted from JSON: {json}");
+    let call=json["obligations"].as_array().unwrap().iter()
+        .find(|o|o["call_site"]=="math.math.exact").unwrap();
+    assert_eq!(call["contracts"][0]["call_precondition_status"],"lean_kernel_verified");
+    assert_eq!(call["contracts"][0]["status"],"available_as_contract");
+    assert_eq!(json["proof_completion"],"not_established_by_dependency_analysis");
+    assert!(s.dir.join(".marqdo/modular/closed-goals.lean").exists());
+    // A proved callee cannot authorize a call with an invalid actual.
+    s.write("main.mq.md",r#"---
+markup: occlusion
+import:
+  math: math.mq.md
+---
+
+# main
+
+## caller
+
+**x = [无效调用](math.math.exact(0))**
+*x*
+"#);
+    let invalid=s.marqdo().args([
+        "knowledge","proof-deps","--verify","--json","--strict","."
+    ]).output().expect("reject false contract premise");
+    assert_eq!(invalid.status.code(),Some(2),
+        "false instantiated precondition must fail closed");
+    let denied:serde_json::Value=serde_json::from_slice(&invalid.stdout).unwrap();
+    assert_eq!(denied["lean_preconditions_verified"],0);
+    assert!(denied["obligations"].as_array().unwrap().iter()
+        .any(|o|o["contracts"].as_array().is_some_and(|contracts|
+            contracts.iter().any(|c|
+                c["call_precondition_status"]=="refuted_closed_precondition"))));
+}
+
+/// Two independent Lean modules: the caller imports only the proved callee
+/// theorem. The certificate explicitly limits its scope to pure Int forwarders.
+#[test]
+fn composition_emits_independently_replayable_caller_certificate(){
+    if !toolchain_available(){
+        skip_or_fail("composition_emits_independently_replayable_caller_certificate");
+        return;
+    }
+    let s=Scratch::new("composed-replay-int");
+    s.write("math.mq.md",r#"---
+markup: occlusion
+---
+
+# math
+
+## exact
++ `n`
+
+| 参数 | 类型 | 说明 |
+|---|---|---|
+| n | int | integer |
+
+| 定理 | 结论 | 策略 |
+|---|---|---|
+| fixed | 结果 = 2 | auto |
+
+*2*
+"#);
+    s.write("main.mq.md",r#"---
+markup: occlusion
+import:
+  math: math.mq.md
+---
+
+# main
+
+## forward
++ `n`
+
+| 参数 | 类型 | 说明 |
+|---|---|---|
+| n | int | integer |
+
+| 定理 | 结论 | 策略 |
+|---|---|---|
+| same | 结果 = 2 | auto |
+
+**v = [调用](math.math.exact(`n`))**
+*v*
+"#);
+    let result=s.marqdo().args([
+        "knowledge","compose","--strict","--json","."
+    ]).output().expect("compose independent theorem");
+    assert_eq!(result.status.code(),Some(0),
+        "stderr={} stdout={}",String::from_utf8_lossy(&result.stderr),
+        String::from_utf8_lossy(&result.stdout));
+    let json:serde_json::Value=serde_json::from_slice(&result.stdout).unwrap();
+    let successful=json["results"].as_array().unwrap().iter()
+        .find(|row|row["status"]=="lean_kernel_proved_model")
+        .expect("independent callee+caller proof");
+    let file=std::path::PathBuf::from(successful["artifact"].as_str().unwrap());
+    let receipt:serde_json::Value=serde_json::from_slice(
+        &fs::read(s.dir.join(file)).unwrap()).unwrap();
+    assert_eq!(receipt["scope"],
+        "number_contract_int_model_pure_forwarder_constant_result");
+    assert_eq!(receipt["full_marqdo_runtime_semantics_proved"],
+        serde_json::Value::Null);
+    let folder=s.dir.join(successful["artifact"].as_str().unwrap())
+        .parent().unwrap().to_path_buf();
+    let caller=fs::read_to_string(folder.join("CallerModule.lean")).unwrap();
+    assert!(caller.contains("import CalleeModule"));
+    assert!(caller.contains("using (callee_contract"));
+    assert!(!caller.contains("sorry"));
+    // Replay is tied to currently compiled Marqdo source, not just a copied
+    // certificate or an arbitrary Lean theorem with the same display name.
+    let cert=successful["artifact"].as_str().unwrap();
+    let replay=s.marqdo().args(["knowledge","replay",cert,"--json","."])
+        .output().expect("independent proof replay");
+    assert!(replay.status.success(),
+        "replay stderr={} stdout={}",
+        String::from_utf8_lossy(&replay.stderr),
+        String::from_utf8_lossy(&replay.stdout));
+    let verified:serde_json::Value=serde_json::from_slice(&replay.stdout).unwrap();
+    assert_eq!(verified["status"],"lean_kernel_replayed");
+    assert_eq!(verified["full_marqdo_runtime_semantics_proved"],false);
+
+    let original=fs::read_to_string(s.dir.join("math.mq.md")).unwrap();
+    fs::write(s.dir.join("math.mq.md"),original.replace("*2*","*3*")).unwrap();
+    let changed=s.marqdo().args(["knowledge","replay",cert,"--json","."])
+        .output().expect("reject stale source");
+    assert!(!changed.status.success(),
+        "old composed proof must not survive callee source change");
+}
+
+/// Projection of an imported symbolic parameter is proved in two distinct
+/// Lean modules. The caller imports ONLY the callee theorem and its interface.
+#[test]
+fn projection_composition_proves_symbolic_caller_and_replays_from_source(){
+    if !toolchain_available(){
+        skip_or_fail("projection_composition_proves_symbolic_caller_and_replays_from_source");
+        return;
+    }
+    let s=Scratch::new("composed-replay-projection");
+    s.write("math.mq.md",r#"---
+markup: occlusion
+---
+# math
+
+## identity
++ `n`
+
+| 参数 | 类型 | 说明 |
+|---|---|---|
+| n | int | integer |
+
+| 定理 | 结论 | 策略 |
+|---|---|---|
+| exact | 结果 = n | auto |
+
+*`n`*
+"#);
+    s.write("main.mq.md",r#"---
+markup: occlusion
+import:
+  math: math.mq.md
+---
+# main
+
+## forward
++ `input`
+
+| 参数 | 类型 | 说明 |
+|---|---|---|
+| input | int | integer |
+
+| 定理 | 结论 | 策略 |
+|---|---|---|
+| forwarded | 结果 = input | auto |
+
+**value = [调用](math.math.identity(`input`))**
+*value*
+"#);
+    let out=s.marqdo().args(["knowledge","compose","--strict","--json","."])
+        .output().expect("compose symbolic projection");
+    assert!(out.status.success(),"stderr={} stdout={}",
+        String::from_utf8_lossy(&out.stderr),
+        String::from_utf8_lossy(&out.stdout));
+    let json:serde_json::Value=serde_json::from_slice(&out.stdout).unwrap();
+    let proved=json["results"].as_array().unwrap().iter()
+        .find(|r|r["status"]=="lean_kernel_proved_model"&&
+            r["scope"]=="number_contract_int_model_pure_forwarder_parameter_projection")
+        .unwrap_or_else(||panic!("missing parameterized caller theorem: {json}"));
+    let cert=proved["artifact"].as_str().unwrap();
+    let dir=s.dir.join(cert).parent().unwrap().to_path_buf();
+    let caller=fs::read_to_string(dir.join("CallerModule.lean")).unwrap();
+    let callee=fs::read_to_string(dir.join("CalleeModule.lean")).unwrap();
+    assert!(callee.contains("callee_contract"));
+    assert!(caller.contains("import CalleeModule"));
+    assert!(caller.contains("using (callee_contract"));
+    assert!(caller.contains("= v0"),"caller conclusion must be symbolic");
+    assert!(!caller.contains("sorry"));
+    let replay=s.marqdo().args(["knowledge","replay",cert,"--json","."])
+        .output().expect("replay parameterized theorem");
+    assert!(replay.status.success(),"{} {}",
+        String::from_utf8_lossy(&replay.stdout),
+        String::from_utf8_lossy(&replay.stderr));
+    let report:serde_json::Value=serde_json::from_slice(&replay.stdout).unwrap();
+    assert_eq!(report["status"],"lean_kernel_replayed");
+    assert_eq!(report["full_marqdo_runtime_semantics_proved"],false);
+    let original=fs::read_to_string(s.dir.join("math.mq.md")).unwrap();
+    fs::write(s.dir.join("math.mq.md"),original.replace("*`n`*","*0*")).unwrap();
+    let stale=s.marqdo().args(["knowledge","replay",cert,"--json","."])
+        .output().expect("replay changed projection");
+    assert!(!stale.status.success(),"modified callee cannot retain proof");
+    fs::write(s.dir.join("math.mq.md"),original).unwrap();
+    let main=fs::read_to_string(s.dir.join("main.mq.md")).unwrap();
+    fs::write(s.dir.join("main.mq.md"),
+        main.replace("结果 = input","结果 = 999")).unwrap();
+    let invalid=s.marqdo().args(["knowledge","replay",cert,"--json","."])
+        .output().expect("replay changed caller claim");
+    assert!(!invalid.status.success(),"unsupported caller conclusion cannot inherit proof");
+}
+
+/// A source-derived arithmetic theorem is imported by a caller without
+/// inlining the callee body. False or stale contracts never become axioms.
+#[test]
+fn pure_expression_composition_proves_and_replays_real_lean(){
+    if !toolchain_available(){
+        skip_or_fail("pure_expression_composition_proves_and_replays_real_lean");
+        return;
+    }
+    let s=Scratch::new("composed-pure-expr");
+    let callee=r#"---
+markup: occlusion
+---
+# math
+## increment
++ `n`
+
+| 参数 | 类型 | 说明 |
+|---|---|---|
+| n | int | integer |
+
+| 定理 | 结论 | 策略 |
+|---|---|---|
+| plus | 结果 = n + 1 | auto |
+
+*`n` + 1*
+"#;
+    s.write("math.mq.md",callee);
+    let caller=r#"---
+markup: occlusion
+import:
+  math: math.mq.md
+---
+# main
+## forward
++ `input`
+
+| 参数 | 类型 | 说明 |
+|---|---|---|
+| input | int | integer |
+
+| 定理 | 结论 | 策略 |
+|---|---|---|
+| inc | 结果 = input + 1 | auto |
+
+**v = [递增](math.math.increment(`input`))**
+*v*
+"#;
+    s.write("main.mq.md",caller);
+    let out=s.marqdo().args(["knowledge","compose","--strict","--json","."])
+        .output().expect("compose pure expression");
+    assert!(out.status.success(),"{} {}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr));
+    let report:serde_json::Value=serde_json::from_slice(&out.stdout).unwrap();
+    let proved=report["results"].as_array().unwrap().iter().find(|r|
+        r["scope"]=="number_contract_int_model_pure_expression_forwarder"
+        &&r["status"]=="lean_kernel_proved_model")
+        .unwrap_or_else(||panic!("no checked arithmetic composition: {report}"));
+    let cert=proved["artifact"].as_str().unwrap();
+    let dir=s.dir.join(cert).parent().unwrap().to_path_buf();
+    let callee_lean=fs::read_to_string(dir.join("CalleeModule.lean")).unwrap();
+    let caller_lean=fs::read_to_string(dir.join("CallerModule.lean")).unwrap();
+    assert!(callee_lean.contains("(v0 + (1 : Int))"));
+    assert!(caller_lean.starts_with("import CalleeModule"));
+    assert!(caller_lean.contains("using (callee_contract"));
+    assert!(!caller_lean.contains("sorry"));
+    let replay=s.marqdo().args(["knowledge","replay",cert,"--json","."])
+        .output().expect("replay arithmetic certificate");
+    assert!(replay.status.success(),"{} {}",
+        String::from_utf8_lossy(&replay.stdout),
+        String::from_utf8_lossy(&replay.stderr));
+    let record:serde_json::Value=serde_json::from_slice(&replay.stdout).unwrap();
+    assert_eq!(record["status"],"lean_kernel_replayed");
+    assert_eq!(record["full_marqdo_runtime_semantics_proved"],false);
+    s.write("math.mq.md",&callee.replace("结果 = n + 1","结果 = n + 2"));
+    let stale=s.marqdo().args(["knowledge","replay",cert,"--json","."])
+        .output().expect("reject forged arithmetic contract");
+    assert!(!stale.status.success(),"changed theorem declaration cannot be replayed");
+    s.write("math.mq.md",callee);
+    s.write("main.mq.md",&caller.replace("结果 = input + 1",
+        "结果 = input + 2"));
+    let false_caller=s.marqdo().args(["knowledge","replay",cert,"--json","."])
+        .output().expect("reject false caller claim");
+    assert!(!false_caller.status.success(),"caller mismatch cannot inherit callee proof");
+}
+
+/// A stronger symbolic branch guard implies the callee requires clause in
+/// the Lean Int model. It does NOT prove dynamic Marqdo Number semantics.
+#[test]
+fn symbolic_path_implication_uses_real_lean_without_runtime_promotion() {
+    if !toolchain_available() {
+        skip_or_fail("symbolic_path_implication_uses_real_lean_without_runtime_promotion");
+        return;
+    }
+    let s=Scratch::new("modular-symbolic-omega");
+    s.write("math.mq.md",r#"---
+markup: occlusion
+---
+
+# math
+
+## exact
++ `n`
+
+| 参数 | 类型 | 说明 |
+|---|---|---|
+| n | int | integer |
+
+| 定理 | 结论 | 前提 | 策略 |
+|---|---|---|---|
+| constant | 结果 = 2 | n > 0 | auto |
+
+*2*
+"#);
+    s.write("main.mq.md",r#"---
+markup: occlusion
+import:
+  math: math.mq.md
+---
+
+# main
+
+## guarded
++ `n`
+
+| 参数 | 类型 | 说明 |
+|---|---|---|
+| n | int | integer |
+
+1. `n` > 10
+  **x = [带条件调用](math.math.exact(`n`))**
+2. *
+  **x = 0**
+
+*x*
+"#);
+    let proof=s.marqdo().args(["prove","math.mq.md","--json"])
+        .output().expect("prove callee first");
+    assert!(proof.status.success(),
+        "callee must be proved: {}",String::from_utf8_lossy(&proof.stdout));
+    let out=s.marqdo().args([
+        "knowledge","proof-deps","--verify","--json","."
+    ]).output().expect("prove conditional Int path");
+    let json:serde_json::Value=serde_json::from_slice(&out.stdout)
+        .unwrap_or_else(|_|panic!("stderr={} stdout={}",
+            String::from_utf8_lossy(&out.stderr),
+            String::from_utf8_lossy(&out.stdout)));
+    assert!(json["symbolic_path_lean_model_proved"].as_u64().unwrap_or(0)>=1,
+        "Lean must discharge n > 10 entails n > 0: {json}");
+    assert_eq!(json["symbolic_proof_scope"],
+        "integer_path_model_not_runtime_equivalence");
+    assert_eq!(json["proof_completion"],
+        "not_established_by_dependency_analysis");
+}
+
+/// An arithmetic source guard is instantiated at a symbolic call site,
+/// then Lean proves the linear implication (never runtime Number equivalence).
+#[test]
+fn arithmetic_symbolic_path_implication_uses_real_lean(){
+    if !toolchain_available(){
+        skip_or_fail("arithmetic_symbolic_path_implication_uses_real_lean");
+        return;
+    }
+    let s=Scratch::new("symbolic-linear-path");
+    s.write("math.mq.md",r#"---
+markup: occlusion
+---
+# math
+## exact
++ `n`
+
+| 参数 | 类型 | 说明 |
+|---|---|---|
+| n | int | integer |
+
+| 定理 | 结论 | 前提 | 策略 |
+|---|---|---|---|
+| constant | 结果 = 2 | n > 0 | auto |
+
+*2*
+"#);
+    s.write("main.mq.md",r#"---
+markup: occlusion
+import:
+  math: math.mq.md
+---
+# main
+## guarded
++ `n`
+
+| 参数 | 类型 | 说明 |
+|---|---|---|
+| n | int | integer |
+
+1. `n` + 5 > 10
+  **x = [条件调用](math.math.exact(`n`))**
+2. *
+  **x = 0**
+
+*x*
+"#);
+    let callee=s.marqdo().args(["prove","math.mq.md","--json"])
+        .output().expect("verify source callee");
+    assert!(callee.status.success(),
+        "callee proof must precede callsite discharge: {}",
+        String::from_utf8_lossy(&callee.stdout));
+    let audit=s.marqdo().args(["knowledge","proof-deps","--verify","--json","."])
+        .output().expect("verify symbolic linear path");
+    let json:serde_json::Value=serde_json::from_slice(&audit.stdout)
+        .unwrap_or_else(|_|panic!("stderr={} stdout={}",
+            String::from_utf8_lossy(&audit.stderr),
+            String::from_utf8_lossy(&audit.stdout)));
+    assert!(json["symbolic_path_lean_model_proved"].as_u64().unwrap_or(0)>=1,
+        "n + 5 > 10 must imply n > 0 in kernel-checked Int model: {json}");
+    assert_eq!(json["symbolic_proof_scope"],
+        "integer_path_model_not_runtime_equivalence");
+    assert_eq!(json["proof_completion"],
+        "not_established_by_dependency_analysis");
+}
+
+/// One proof pipeline for three transitive modules, two sequential calls,
+/// an exhaustive branch, and a caller inequality claim. No callee source is
+/// inlined into the importing Lean module; every module has its own theorem.
+#[test]
+fn unified_modular_contract_proves_multicall_branch_and_transitive_dag(){
+    if !toolchain_available(){
+        skip_or_fail("unified_modular_contract_proves_multicall_branch_and_transitive_dag");
+        return;
+    }
+    let s=Scratch::new("unified-contract-three-module");
+    s.write("math.mq.md",r#"---
+markup: occlusion
+---
+# math
+
+## increment
++ `n`
+
+| 参数 | 类型 | 说明 |
+|---|---|---|
+| n | int | integer |
+
+| 定理 | 结论 | 策略 |
+|---|---|---|
+| increment_post | 结果 = n + 1 | auto |
+
+*`n` + 1*
+"#);
+    let ops=r#"---
+markup: occlusion
+import:
+  math: math.mq.md
+---
+# ops
+
+## twice
++ `n`
+
+| 参数 | 类型 | 说明 |
+|---|---|---|
+| n | int | integer |
+
+| 定理 | 结论 | 策略 |
+|---|---|---|
+| twice_post | 结果 = n + 2 | auto |
+
+**a = [第一次](math.math.increment(`n`))**
+**b = [第二次](math.math.increment(`a`))**
+*b*
+"#;
+    s.write("ops.mq.md",ops);
+    let main=r#"---
+markup: occlusion
+import:
+  math: math.mq.md
+  ops: ops.mq.md
+---
+# main
+
+## guarded
++ `n`
+
+| 参数 | 类型 | 说明 |
+|---|---|---|
+| n | int | integer |
+
+| 定理 | 结论 | 策略 |
+|---|---|---|
+| result_floor | 结果 ≥ 1 | auto |
+
+1. `n` > 0
+  **x = [调用复合模块](ops.ops.twice(`n`))**
+  *x*
+2. *
+  **y = [调用叶模块](math.math.increment(0))**
+  *y*
+"#;
+    s.write("main.mq.md",main);
+    let output=s.marqdo().args(["knowledge","compose","--strict","--json","."])
+        .output().expect("compose uniform DAG");
+    assert!(output.status.success(),"stderr={} stdout={}",
+        String::from_utf8_lossy(&output.stderr),
+        String::from_utf8_lossy(&output.stdout));
+    let report:serde_json::Value=serde_json::from_slice(&output.stdout).unwrap();
+    let record=report["results"].as_array().unwrap().iter().find(|row|
+        row["scope"]=="pure_number_int_model_sequential_branch_dag"
+        &&row["status"]=="lean_kernel_proved_model"
+        &&row["evidence"]["grade"]=="model_proved"
+        &&row["artifact"].as_str().is_some_and(|p|{
+            let path=s.dir.join(p);
+            let cert:serde_json::Value=serde_json::from_slice(
+                &fs::read(path).unwrap_or_default()).unwrap_or_default();
+            cert["modules"].as_array().is_some_and(|nodes|nodes.len()==3)
+        })).unwrap_or_else(||panic!("three-module caller theorem not proved: {report}"));
+    let certificate=record["artifact"].as_str().unwrap();
+    let folder=s.dir.join(certificate).parent().unwrap().to_path_buf();
+    let receipt:serde_json::Value=serde_json::from_slice(
+        &fs::read(s.dir.join(certificate)).unwrap()).unwrap();
+    let modules=receipt["modules"].as_array().unwrap();
+    assert_eq!(modules.len(),3);
+    let caller_name=modules[2]["module"].as_str().unwrap();
+    let caller=fs::read_to_string(folder.join(format!("{caller_name}.lean"))).unwrap();
+    assert!(caller.contains("import M"));
+    assert!(caller.contains("have hc"));
+    assert!(caller.contains("by_cases"));
+    assert!(!caller.contains("sorry"));
+    assert_eq!(receipt["full_marqdo_runtime_semantics_proved"],false);
+    let replay=s.marqdo().args(["knowledge","replay",certificate,"--json","."])
+        .output().expect("replay unified proof");
+    assert!(replay.status.success(),"stdout={} stderr={}",
+        String::from_utf8_lossy(&replay.stdout),
+        String::from_utf8_lossy(&replay.stderr));
+    let replayed:serde_json::Value=serde_json::from_slice(&replay.stdout).unwrap();
+    assert_eq!(replayed["status"],"lean_kernel_replayed");
+    assert_eq!(replayed["evidence"]["grade"],"model_proved");
+
+    s.write("ops.mq.md",&ops.replace("结果 = n + 2","结果 = n + 3"));
+    let stale=s.marqdo().args(["knowledge","replay",certificate,"--json","."])
+        .output().expect("reject changed intermediate proof contract");
+    assert!(!stale.status.success(),"stale transitive dependency must fail");
+
+    s.write("ops.mq.md",ops);
+    s.write("main.mq.md",&main.replace("结果 ≥ 1","结果 ≥ 100"));
+    let wrong=s.marqdo().args(["knowledge","compose","--strict","--json","."])
+        .output().expect("reject invalid caller theorem");
+    let output_json:serde_json::Value=serde_json::from_slice(&wrong.stdout)
+        .unwrap_or_default();
+    assert!(!output_json["results"].as_array().into_iter().flat_map(|a|a.iter())
+        .any(|r|r["scope"]=="pure_number_int_model_sequential_branch_dag"
+            &&r["status"]=="lean_kernel_proved_model"
+            &&r["identity"]==receipt["identity"]));
+}
+
 /// G2：真证书命中（用真 lean 跑一次后，证书生效；第二次 cache: hit 且快）。
 #[test]
 fn g2_certificate_hit_after_real_run() {
@@ -241,6 +947,24 @@ fn g2_certificate_hit_after_real_run() {
     let json: serde_json::Value = serde_json::from_slice(&out.stdout).expect("json");
     assert_eq!(json["status"], "proved", "真定理必须 proved：{json}");
     assert_eq!(json["lean"]["cache"], "miss");
+    let proof_id = json["artifact_id"].as_str().unwrap().rsplit('/').next().unwrap();
+    let link_path = s.dir.join(".marqdo/prove").join(proof_id).join("knowledge-links.json");
+    let linkage: serde_json::Value = serde_json::from_slice(
+        &fs::read(&link_path).expect("real Lean proof must emit a knowledge linkage"))
+        .expect("knowledge linkage JSON");
+    assert_eq!(linkage["claims"][0]["status"], "proved",
+        "only verified Lean receipts should carry proved: {linkage}");
+    assert_eq!(linkage["claims"][0]["proof_scope"], "function");
+    assert!(linkage["claims"][0]["certificate_digest"].as_str().is_some());
+    let publish=s.marqdo().args([
+        "knowledge","台账.mq.md","--out",".marqdo"
+    ]).output().expect("publish verified knowledge");
+    assert!(publish.status.success(),"knowledge compile failed: {}",
+        String::from_utf8_lossy(&publish.stderr));
+    let proof_index: serde_json::Value = serde_json::from_slice(
+        &fs::read(s.dir.join(".marqdo/proof-index.json")).unwrap()).unwrap();
+    assert_eq!(proof_index["claims"][0]["status"],"proved");
+    assert_eq!(proof_index["claims"][0]["usable"],true);
 
     // 第二次：命中证书。
     let out2 = s.marqdo().arg("prove").arg("台账.mq.md").arg("--json").output().expect("second prove");
@@ -248,6 +972,23 @@ fn g2_certificate_hit_after_real_run() {
     assert_eq!(json2["status"], "proved");
     assert_eq!(json2["lean"]["cache"], "hit", "第二次必须命中证书缓存");
     assert!(json2["duration_ms"].as_u64().unwrap() < 5000, "命中后必须快");
+
+    // Even a genuine local certificate ceases to be usable if the generated
+    // Lean source has been edited; a matching JSON hash is not enough.
+    let generated=s.dir.join(".marqdo/prove").join(proof_id).join("Generated");
+    let lean_file=fs::read_dir(&generated).unwrap().map(|e|e.unwrap().path())
+        .find(|p|p.extension().is_some_and(|ext|ext=="lean")).unwrap();
+    let mut modified=fs::read_to_string(&lean_file).unwrap();
+    modified.push_str("\n-- local tampering\n");
+    fs::write(&lean_file,modified).unwrap();
+    let republish=s.marqdo().args([
+        "knowledge","台账.mq.md","--out",".marqdo"
+    ]).output().unwrap();
+    assert!(republish.status.success(),"{}",String::from_utf8_lossy(&republish.stderr));
+    let stale:serde_json::Value=serde_json::from_slice(
+        &fs::read(s.dir.join(".marqdo/proof-index.json")).unwrap()).unwrap();
+    assert_eq!(stale["claims"][0]["usable"],false,
+        "modified generated module cannot reuse genuine Lean receipt: {stale}");
 }
 
 /// G2b：--no-cache 绕过证书。

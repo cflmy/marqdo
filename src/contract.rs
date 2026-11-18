@@ -369,6 +369,43 @@ pub fn parse_claim_table(
     Some(Ok(rows))
 }
 
+/// Parse the v2.9 modular assumption table. An assumption is metadata,
+/// never a runtime statement or an independently verified theorem.
+pub fn parse_assumption_table(
+    pairs: &[(String, Expr)], line: u32,
+) -> Option<std::result::Result<Vec<crate::ast::Assumption>,String>> {
+    const OP: &[&str] = &["假设","assumption"];
+    const PRE: &[&str] = &["前置","requires","precondition"];
+    const POST: &[&str] = &["后置","ensures","postcondition"];
+    let headers:Vec<String>=pairs.iter().map(|(k,_)|k.clone()).collect();
+    let op=find_col(&headers,OP)?;
+    let post=match find_col(&headers,POST){
+        Some(i)=>i,
+        None=>return Some(Err("assumption table requires a 后置 / ensures column".into()))
+    };
+    let op_names=col_rows(&pairs[op].1).unwrap_or_default();
+    let posts=claim_col_rows(&pairs[post].1);
+    let pres=find_col(&headers,PRE).map(|i|claim_col_rows(&pairs[i].1));
+    if op_names.len()!=posts.len()
+        || pres.as_ref().is_some_and(|p|p.len()!=op_names.len()) {
+        return Some(Err("assumption table columns have different row counts".into()));
+    }
+    let mut results=Vec::new();
+    for (i,name) in op_names.into_iter().enumerate(){
+        if name.trim().is_empty() || posts[i].trim().is_empty() {
+            return Some(Err(format!("assumption row {} lacks operation or postcondition",i+1)));
+        }
+        results.push(crate::ast::Assumption{
+            op:name.trim().to_string(),
+            premise:pres.as_ref().and_then(|p|p.get(i))
+                .map(|s|s.trim().to_string()).filter(|s|!s.is_empty()),
+            postcondition:posts[i].trim().to_string(),
+            line,
+        });
+    }
+    Some(Ok(results))
+}
+
 /// 定理表形状错误（`check --proof` 才报；默认关）。
 #[derive(Debug, Clone)]
 pub struct ClaimTableError {

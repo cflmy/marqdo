@@ -4,7 +4,7 @@
 <p align="center"><em>让 SKILL 真正成为工具：文档即知识，知识即可执行。</em></p>
 
 <p align="center">
-<a href="https://github.com/cflmy/marqdo/releases/tag/v2.7.1"><img alt="release" src="https://img.shields.io/badge/release-v2.7.1-DDBA86?style=flat-square"></a>
+<a href="https://github.com/cflmy/marqdo/releases/tag/v2.9.0"><img alt="release" src="https://img.shields.io/badge/release-v2.9.0-DDBA86?style=flat-square"></a>
 <a href="LICENSE"><img alt="Apache-2.0" src="https://img.shields.io/badge/license-Apache--2.0-blue?style=flat-square"></a>
 <img alt="Rust runtime" src="https://img.shields.io/badge/runtime-Rust-B38E68?style=flat-square">
 <img alt="Pure by default" src="https://img.shields.io/badge/call-pure_by_default-467C83?style=flat-square">
@@ -21,8 +21,12 @@
 <a href="#explore-the-view">View</a> ·
 <a href="doc/library-development.mq.md">Guide</a> ·
 <a href="https://www.marqdo.com/">Website</a> ·
-<a href="doc/releases/v2.7.1.md">Release notes</a>
+<a href="doc/releases/v2.9.0.md">Release notes</a>
 </p>
+
+## Marqdo 2.9.0 — Verified Knowledge Compiler
+
+Knowledge statements and claims have stable addresses; verified pure contracts compose across static modules and produce independently replayable Lean certificates. Evidence distinguishes abstract `model_proved` from true runtime `proved`. Unsupported runtime effects and semantics are explicitly unverified. [Proof scope and acceptance](doc/design/verified-knowledge-compiler-boundaries.md) · [Release notes](doc/releases/v2.9.0.md).
 
 ## One Markdown file. Three views. Real execution.
 
@@ -47,7 +51,7 @@
 
 ## Quickstart — one function, one command
 
-Install the [2.7.1 CLI release for Windows or Linux](https://github.com/cflmy/marqdo/releases/tag/v2.7.1), then run from this repository's root:
+Install the [latest 2.9.0 CLI release for Windows or Linux](https://github.com/cflmy/marqdo/releases/tag/v2.9.0), then run from this repository's root:
 
 ```bash
 marqdo call examples/calculator.mq.md 计算器.加法 a=2 b=3

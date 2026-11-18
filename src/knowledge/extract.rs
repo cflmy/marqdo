@@ -27,6 +27,7 @@ pub fn extract_graph(opts: &ExtractOptions) -> Result<KnowledgeGraph> {
     let root = if opts.path.is_file() {
         opts.path
             .parent()
+            .filter(|p| !p.as_os_str().is_empty())
             .map(|p| p.to_path_buf())
             .unwrap_or_else(|| PathBuf::from("."))
     } else {

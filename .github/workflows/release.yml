@@ -5,6 +5,7 @@ on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -51,6 +52,7 @@ jobs:
           New-Item -ItemType Directory -Force -Path dist | Out-Null
           Push-Location vscode-extension
           npm ci
+          npm version "$ver" --no-git-tag-version --allow-same-version
           npm run compile
           npx @vscode/vsce package --no-dependencies -o "../dist/marqdo-$ver.vsix"
           Pop-Location

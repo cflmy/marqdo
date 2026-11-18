@@ -609,6 +609,29 @@ enum ProveAction {
 enum KnowledgeAction {
     /// Compile L0–L4 projections (default)
     Compile,
+    /// Inspect verified theorem receipts and inter-module proof obligations.
+    ProofDeps {
+        /// Fail if the receipt/contract graph contains unresolved obligations.
+        #[arg(long)]
+        strict: bool,
+        /// Actually discharge closed callsite preconditions in Lean; without
+        /// this switch the command only emits pending proof obligations.
+        #[arg(long)]
+        verify: bool,
+    },
+    /// Emit independent Lean callee+caller proofs for restricted pure forwarders.
+    /// Unsupported constructs are rejected and never receive certificates.
+    Compose {
+        /// Exit nonzero if any call is unsupported or Lean rejects it.
+        #[arg(long)]
+        strict: bool,
+    },
+    /// Independently replay a previously issued composition certificate
+    /// against current source, Lean modules and toolchain.
+    Replay {
+        #[arg(value_name = "CERTIFICATE")]
+        certificate: PathBuf,
+    },
     /// Inspect stable project symbols by exact URI or display name
     Inspect {
         /// Symbol URI (`mq://…`) or declaration name
@@ -1768,6 +1791,153 @@ fn try_main(cli: Cli) -> Result<i32> {
                 KnowledgeAction::Compile => {
                     write_knowledge(KnowledgeOptions { path, out_dir: out })?;
                     Ok(0)
+                }
+                KnowledgeAction::Replay { certificate } => {
+                    let root=if path.is_file(){
+                        path.parent().filter(|p|!p.as_os_str().is_empty())
+                            .unwrap_or_else(||std::path::Path::new(".")).to_path_buf()
+                    }else{path.clone()};
+                    let compiled=marqdo::sema::ir::compile_project(
+                        &marqdo::sema::ir::CompileOptions{
+                            project_root:root,
+                            entry:path.is_file().then_some(path),
+                            lock_mode:marqdo::sema::ir::LockMode::Off
+                        })?;
+                    let lean=marqdo::prove::driver::Toolchain::discover(None)?
+                        .ok_or_else(||anyhow::anyhow!("proof.compose_lean_missing"))?;
+                    let proof=marqdo::knowledge::composition::replay(
+                        &compiled,&certificate,&lean)?;
+                    if json{println!("{proof}");}else{
+                        println!("{}",serde_json::to_string_pretty(&proof)?);
+                    }
+                    Ok(0)
+                }
+                KnowledgeAction::Compose { strict } => {
+                    let root=if path.is_file(){
+                        path.parent().filter(|p|!p.as_os_str().is_empty())
+                            .unwrap_or_else(||std::path::Path::new(".")).to_path_buf()
+                    }else{path.clone()};
+                    let compiled=marqdo::sema::ir::compile_project(
+                        &marqdo::sema::ir::CompileOptions{
+                            project_root:root,
+                            entry:path.is_file().then_some(path),
+                            lock_mode:marqdo::sema::ir::LockMode::Off
+                        })?;
+                    let lean=marqdo::prove::driver::Toolchain::discover(None)?
+                        .ok_or_else(||anyhow::anyhow!(
+                            "proof.compose_lean_missing: Lean required"))?;
+                    let result=marqdo::knowledge::composition::prove(
+                        &compiled,&out.join("modular"),&lean)?;
+                    let failures=result["results"].as_array().map_or(true,|entries|
+                        entries.is_empty()||entries.iter().any(|e|
+                            e["status"]!="lean_kernel_proved_model"));
+                    if json {println!("{result}");} else {
+                        println!("{}",serde_json::to_string_pretty(&result)?);
+                    }
+                    Ok(if strict && failures {2} else {0})
+                }
+                KnowledgeAction::ProofDeps { strict,verify } => {
+                    let semantic_root=if path.is_file() {
+                        path.parent().filter(|p|!p.as_os_str().is_empty())
+                            .unwrap_or_else(||std::path::Path::new(".")).to_path_buf()
+                    } else {path.clone()};
+                    let compiled=marqdo::sema::ir::compile_project(
+                        &marqdo::sema::ir::CompileOptions {
+                            project_root:semantic_root,
+                            entry:path.is_file().then_some(path),
+                            lock_mode:marqdo::sema::ir::LockMode::Off,
+                        })?;
+                    let mut receipts=marqdo::knowledge::proof::index_links(
+                        &out.join("prove"),&compiled.semantics);
+                    let toolchain=if verify {
+                        Some(marqdo::prove::driver::Toolchain::discover(None)?
+                            .ok_or_else(||anyhow::anyhow!(
+                                "proof.modular_lean_missing: Lean is required for --verify"))?)
+                    } else {None};
+                    if let Some(lean)=toolchain.as_ref(){
+                        marqdo::knowledge::proof::replay_index(
+                            &out.join("prove"),&mut receipts,lean,
+                            std::time::Duration::from_secs(120))?;
+                    }
+                    let replayed=receipts["claims"].as_array().map_or(0,|records|
+                        records.iter().filter(|c|c["kernel_replayed"]==true).count());
+                    let draft=marqdo::knowledge::modular::analyze(
+                        &compiled.semantics,&receipts);
+                    let mut accepted=std::collections::BTreeSet::new();
+                    let verified_toolchain=toolchain.as_ref().map(|t|t.version.clone());
+                    if verify {
+                        let goals:Vec<(String,marqdo::knowledge::vc::Goal)>=draft["obligations"]
+                            .as_array().into_iter().flat_map(|rows|rows.iter())
+                            .flat_map(|row|row["contracts"].as_array().into_iter()
+                                .flat_map(|contracts|contracts.iter()))
+                            .filter_map(|c|{
+                                if c["callee_certificate_valid"]!=true
+                                    || c["closed_host_check"]!=true {return None}
+                                Some((
+                                    c["precondition_goal_key"].as_str()?.to_string(),
+                                    marqdo::knowledge::vc::Goal{
+                                        holds:true,
+                                        proposition:c["lean_proposition"].as_str()?.to_string()
+                                    }
+                                ))
+                            }).collect();
+                        if !goals.is_empty(){
+                            let toolchain=toolchain.as_ref().expect("verify implies Lean");
+                            let target=out.join("modular");
+                            std::fs::create_dir_all(&target)?;
+                            let lean_file=target.join("closed-goals.lean");
+                            let content=marqdo::knowledge::vc::emit_lean(&goals);
+                            std::fs::write(&lean_file,content)?;
+                            marqdo::prove::driver::check_closed_goals(
+                                &toolchain,&lean_file,std::time::Duration::from_secs(120))?;
+                            accepted.extend(goals.into_iter().map(|(id,_)|id));
+                        }
+                    }
+                    let mut symbolic_checked=0usize;
+                    if let Some(lean)=toolchain.as_ref(){
+                        let symbolic:Vec<(String,marqdo::knowledge::symbolic::SymbolicGoal)>=
+                            compiled.semantics.bound_calls.iter().flat_map(|call|{
+                                compiled.semantics.claims.iter()
+                                    .filter(|c|c.owner==call.target)
+                                    .filter(|c|receipts["claims"].as_array().is_some_and(|rows|
+                                        rows.iter().any(|r|
+                                            r["claim_anchor_id"]==c.anchor_id
+                                            && r["status"]=="proved"
+                                            && r["usable"]==true)))
+                                    .filter_map(|c|Some((
+                                        c.anchor_id.clone(),
+                                        marqdo::knowledge::symbolic::plan(
+                                            &compiled.semantics,call,c.premise.as_deref()?)?
+                                    )))
+                                    .filter(|(_,g)|g.abstract_integer_model_supported)
+                                    .collect::<Vec<_>>()
+                            }).collect();
+                        if !symbolic.is_empty(){
+                            let target=out.join("modular");
+                            std::fs::create_dir_all(&target)?;
+                            let path=target.join("symbolic-path-goals.lean");
+                            std::fs::write(&path,
+                                marqdo::knowledge::symbolic::emit_lean(&symbolic))?;
+                            marqdo::prove::driver::check_closed_goals(lean,&path,
+                                std::time::Duration::from_secs(120))?;
+                            symbolic_checked=symbolic.len();
+                        }
+                    }
+                    let mut report=marqdo::knowledge::modular::analyze_with_verified(
+                        &compiled.semantics,&receipts,&accepted);
+                    report["symbolic_path_lean_model_proved"]=
+                        serde_json::json!(symbolic_checked);
+                    report["symbolic_proof_scope"]=
+                        serde_json::json!("integer_path_model_not_runtime_equivalence");
+                    report["lean_preconditions_verified"]=serde_json::json!(accepted.len());
+                    report["lean_toolchain"]=serde_json::json!(verified_toolchain);
+                    report["lean_receipts_replayed"]=serde_json::json!(replayed);
+                    if json {
+                        println!("{report}");
+                    } else {
+                        println!("{}",serde_json::to_string_pretty(&report)?);
+                    }
+                    Ok(if strict && report["audit_passes"]!=true {2} else {0})
                 }
                 KnowledgeAction::Inspect { symbol } => {
                     // A supplied directory is an explicit compilation scope;

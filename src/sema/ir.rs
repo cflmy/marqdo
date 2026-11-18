@@ -183,6 +183,14 @@ pub struct SemanticArtifact {
 #[derive(Debug, Clone)]
 pub struct KnowledgeRef {
     pub id: String,
+    /// Stable public address of the marked step, absent for ambiguous labels.
+    pub anchor_id: Option<String>,
+    /// Original Markdown target when this reference occurs in prose.
+    pub link_target: Option<String>,
+    /// Resolved stable anchor target; never an executable call.
+    pub target_anchor: Option<String>,
+    /// Reference to a theorem declaration, not a proof certificate.
+    pub target_claim: Option<String>,
     pub label: String,
     pub context: String,
     pub source: SourceLocation,
@@ -190,9 +198,36 @@ pub struct KnowledgeRef {
     pub target: Option<SymbolId>,
 }
 
+/// Stable identity and unproved declaration of a v2.8.0 function theorem.
+#[derive(Debug, Clone)]
+pub struct KnowledgeClaim {
+    pub anchor_id: String,
+    pub owner: SymbolId,
+    pub label: String,
+    pub conclusion: String,
+    pub premise: Option<String>,
+    pub line: u32,
+    pub source: SourceLocation,
+}
+
+/// Declared operation assumption, not an accepted proof or runtime binding.
+#[derive(Debug, Clone)]
+pub struct KnowledgeAssumption {
+    pub id: String,
+    pub owner: SymbolId,
+    pub operation: String,
+    pub premise: Option<String>,
+    pub postcondition: String,
+    pub source: SourceLocation,
+}
+
 #[derive(Debug, Clone)]
 pub struct KnowledgeStep {
     pub id: ArtifactId,
+    /// Stable public anchor; legacy #step-N is kept as an internal step identity.
+    pub anchor_id: Option<String>,
+    /// Hash of the authored source line (or fallback label when line unavailable).
+    pub definition_digest: Digest,
     pub reference: String,
     pub kind: String,
     pub calls: Vec<SymbolId>,
@@ -200,12 +235,73 @@ pub struct KnowledgeStep {
     pub source: SourceLocation,
 }
 
+/// Fully static i64 call-site argument. Non-constant expressions are kept
+/// as unresolved proof obligations rather than guessed values.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StaticCallArg {
+    pub name: Option<String>,
+    pub integer: Option<i64>,
+    pub expression_digest: Digest,
+    /// Only a direct identifier; arbitrary expressions do not become symbolic identities.
+    pub symbol: Option<String>,
+}
+
+fn checked_constant_int(expr: &Expr, depth: usize) -> Option<i64> {
+    if depth > 32 { return None; }
+    match expr {
+        Expr::Literal(crate::ast::Literal::Int(n)) => Some(*n),
+        Expr::Occluded { payload: Some(inner), .. } =>
+            checked_constant_int(inner, depth+1),
+        Expr::Unary {op: crate::ast::UnaryOp::Neg, expr} =>
+            checked_constant_int(expr,depth+1)?.checked_neg(),
+        Expr::Binary {op,left,right} => {
+            let a=checked_constant_int(left,depth+1)?;
+            let b=checked_constant_int(right,depth+1)?;
+            match op {
+                crate::ast::BinaryOp::Add=>a.checked_add(b),
+                crate::ast::BinaryOp::Sub=>a.checked_sub(b),
+                crate::ast::BinaryOp::Mul=>a.checked_mul(b),
+                // Division and its rounding/coercion are not yet proven
+                // equivalent to the Lean abstract numeric model.
+                _=>None
+            }
+        },
+        _=>None
+    }
+}
+
+fn static_call_args(call:&CallExpr)->Vec<StaticCallArg>{
+    // The exact same alias/modifier expansion used by runtime resolution
+    // must determine the proof's argument list. An invalid normalization
+    // must never yield a recoverable proof argument.
+    let Ok(normalized)=call.for_evaluation() else {return Vec::new()};
+    normalized.args.iter().map(|a|{
+        let (name,expr)=match a {
+            crate::ast::Arg::Positional(expr)=>(None,expr),
+            crate::ast::Arg::Named{name,value}=>(Some(name.clone()),value)
+        };
+        StaticCallArg {
+            name, integer:checked_constant_int(expr,0),
+            expression_digest:digest(format!("{expr:?}")),
+            symbol:match expr {Expr::Var(v)=>Some(v.clone()),_=>None}
+        }
+    }).collect()
+}
+
 /// Static call site bound to a SymbolId (G02).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BoundCall {
+    /// Exact owning function symbol at the AST callsite.
+    pub caller: SymbolId,
     pub target: SymbolId,
     pub call_site: String,
     pub source: SourceLocation,
+    /// Exact, ordered actual arguments with conservative closed-int decoding.
+    pub args: Vec<StaticCallArg>,
+    /// Guard predicates are source-derived and never independently trusted.
+    pub path_guards: Vec<String>,
+    /// Loop, unknown guard, etc: no modular proof may pass this callsite.
+    pub control_blocker: Option<String>,
     pub required_effects: EffectSet,
 }
 
@@ -225,6 +321,8 @@ pub struct SemanticProject {
     pub artifacts: Vec<SemanticArtifact>,
     pub refs: Vec<KnowledgeRef>,
     pub steps: Vec<KnowledgeStep>,
+    pub claims: Vec<KnowledgeClaim>,
+    pub assumptions: Vec<KnowledgeAssumption>,
     pub bound_calls: Vec<BoundCall>,
     pub dynamic_calls: Vec<DynamicCall>,
 }
@@ -275,6 +373,8 @@ fn compile_index(index: ProjectIndex) -> Result<Compilation> {
     let mut artifacts = Vec::new();
     let mut refs = Vec::new();
     let mut steps = Vec::new();
+    let mut claims = Vec::new();
+    let mut assumptions = Vec::new();
     let mut bound_calls = Vec::new();
     let mut dynamic_calls = Vec::new();
     let mut local_by_name: BTreeMap<(ModuleId, String), SymbolId> = BTreeMap::new();
@@ -291,6 +391,53 @@ fn compile_index(index: ProjectIndex) -> Result<Compilation> {
         let module_symbols = index.symbols_in_module(module_id);
         for symbol in index.symbols_in_module(module_id) {
             let function = by_path.get(&symbol.declaration_path).expect("symbol collected from module");
+            let mut claim_counts=BTreeMap::new();
+            for claim in &function.claims {
+                *claim_counts.entry(claim.id.as_str()).or_insert(0usize)+=1;
+            }
+            for claim in &function.claims {
+                if claim_counts.get(claim.id.as_str())!=Some(&1) {
+                    diagnostics.push(Diagnostic::new(Some(path.as_path()),
+                        Span::new(claim.line,1),
+                        format!("ambiguous theorem declaration: {}",claim.id))
+                        .with_code("knowledge.claim_duplicate")
+                        .with_severity(Severity::Warning));
+                    continue;
+                }
+                claims.push(KnowledgeClaim {
+                    anchor_id: format!("{}#claim-{}",symbol.id.as_str(),
+                        digest(claim.id.as_bytes()).0.trim_start_matches("sha256:")),
+                    owner:symbol.id.clone(),
+                    label:claim.id.clone(),
+                    conclusion:claim.conclusion.clone(),
+                    premise:claim.premise.clone(),
+                    line:claim.line,
+                    source:source_location(index.root().path(),path,claim.line,claim.line),
+                });
+            }
+            let mut assumption_counts=BTreeMap::new();
+            for assumption in &function.assumptions {
+                *assumption_counts.entry(assumption.op.as_str()).or_insert(0usize)+=1;
+            }
+            for assumption in &function.assumptions {
+                if assumption_counts.get(assumption.op.as_str())!=Some(&1) {
+                    diagnostics.push(Diagnostic::new(Some(path.as_path()),
+                        Span::new(assumption.line,1),
+                        format!("ambiguous assumption operation: {}",assumption.op))
+                        .with_code("proof.assumption_duplicate")
+                        .with_severity(Severity::Warning));
+                    continue;
+                }
+                assumptions.push(KnowledgeAssumption{
+                    id:format!("{}#assumption-{}",symbol.id.as_str(),
+                        digest(assumption.op.as_bytes()).0.trim_start_matches("sha256:")),
+                    owner:symbol.id.clone(),
+                    operation:assumption.op.clone(),
+                    premise:assumption.premise.clone(),
+                    postcondition:assumption.postcondition.clone(),
+                    source:source_location(index.root().path(),path,assumption.line,assumption.line)
+                });
+            }
             let owned_links: Vec<_> = narrative_links
                 .iter()
                 .filter(|link| enclosing_symbol(&module_symbols, link.line).is_some_and(|s| s.id == symbol.id))
@@ -304,6 +451,7 @@ fn compile_index(index: ProjectIndex) -> Result<Compilation> {
                     path,
                     function,
                     symbol,
+                    text,
                     &local_by_name,
                     &owned_links,
                     &module_prov,
@@ -323,6 +471,20 @@ fn compile_index(index: ProjectIndex) -> Result<Compilation> {
         }
     }
     close_effect_dependencies(&mut artifacts);
+    resolve_anchor_references(&mut refs, &claims);
+    for reference in refs.iter().filter(|r|
+        r.resolution=="unresolved_anchor" || r.resolution=="ambiguous_anchor") {
+        let source_path=root.path().join(&reference.source.file);
+        diagnostics.push(Diagnostic::new(
+                Some(source_path.as_path()),
+                Span::new(reference.source.line, 1),
+                format!("knowledge target cannot be uniquely resolved: {}",
+                    reference.link_target.as_deref().unwrap_or("<missing>")))
+            .with_code(if reference.resolution=="ambiguous_anchor" {
+                "knowledge.anchor_ambiguous"
+            } else {"knowledge.anchor_unresolved"})
+            .with_severity(Severity::Warning));
+    }
     let resolved_effects: BTreeMap<_,_> = artifacts.iter()
         .map(|artifact|(artifact.artifact_id.clone(),artifact.effects.clone())).collect();
     for bound in &mut bound_calls {
@@ -345,6 +507,8 @@ fn compile_index(index: ProjectIndex) -> Result<Compilation> {
     artifacts.sort_by(|a, b| a.artifact_id.0.cmp(&b.artifact_id.0));
     refs.sort_by(|a, b| a.id.cmp(&b.id));
     steps.sort_by(|a, b| a.id.0.cmp(&b.id.0));
+    claims.sort_by(|a,b| a.anchor_id.cmp(&b.anchor_id));
+    assumptions.sort_by(|a,b|a.id.cmp(&b.id));
     bound_calls.sort_by(|a, b| {
         a.source
             .file
@@ -368,6 +532,8 @@ fn compile_index(index: ProjectIndex) -> Result<Compilation> {
             artifacts,
             refs,
             steps,
+            claims,
+            assumptions,
             bound_calls,
             dynamic_calls,
         },
@@ -514,6 +680,168 @@ fn resolve_narrative_target(
     })
 }
 
+/// The label is a human-facing name, not an execution permission.
+fn normalize_anchor_label(label: &str) -> String {
+    label.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
+fn public_anchor(owner: &SymbolId, label: &str, counts: &BTreeMap<String, usize>) -> Option<String> {
+    let normalized = normalize_anchor_label(label);
+    if normalized.is_empty() || counts.get(&normalized) != Some(&1) {
+        return None;
+    }
+    // Full SHA-256 avoids truncation collisions; unrelated step insertions
+    // do not change the address, while changing the label intentionally does.
+    Some(format!("{}#anchor-{}", owner.as_str(), digest(normalized.as_bytes()).0.trim_start_matches("sha256:")))
+}
+
+fn anchor_definition_digest(source: &str, line: u32, label: &str, kind: &str) -> Digest {
+    let body = if line > 0 { source.lines().nth(line as usize - 1) } else { None };
+    digest(format!("{kind}\0{label}\0{}", body.unwrap_or("<unknown-source-line>")))
+}
+
+/// Explicit knowledge references are inert: resolving a link never invokes a
+/// function. Short #@label binds ONLY inside the current function. Full
+/// mq://...#anchor-<sha256> targets support cross-module references.
+fn resolve_anchor_references(refs: &mut [KnowledgeRef], claims: &[KnowledgeClaim]) {
+    let declared: BTreeSet<String> = refs.iter()
+        .filter_map(|r| r.anchor_id.clone()).collect();
+    let theorem_ids: BTreeSet<String> = claims.iter().map(|c|c.anchor_id.clone()).collect();
+    for reference in refs {
+        let Some(raw) = reference.link_target.as_deref() else {continue};
+        let sought = if let Some(label) = raw.trim().strip_prefix("#@") {
+            let Some(owner) = reference.id.split("#ref-").next() else {continue};
+            if label.is_empty() {continue}
+            Some((format!("{}#anchor-{}", owner,
+                digest(normalize_anchor_label(label).as_bytes()).0.trim_start_matches("sha256:")),
+                format!("{}#claim-{}", owner,
+                    digest(label.as_bytes()).0.trim_start_matches("sha256:"))))
+        } else if raw.starts_with("mq://")
+            && (raw.contains("#anchor-") || raw.contains("#claim-")) {
+            Some((raw.trim().to_string(), raw.trim().to_string()))
+        } else { None };
+        if let Some((anchor, claim)) = sought {
+            let step_match=declared.contains(&anchor);
+            let theorem_match=theorem_ids.contains(&claim);
+            match (step_match,theorem_match) {
+                (true,false)=>{
+                    reference.target_anchor=Some(anchor);
+                    reference.resolution="anchor".into();
+                }
+                (false,true)=>{
+                    reference.target_claim=Some(claim);
+                    reference.resolution="claim".into();
+                }
+                (true,true)=>reference.resolution="ambiguous_anchor".into(),
+                _=>reference.resolution="unresolved_anchor".into()
+            }
+            reference.target=None;
+        }
+    }
+}
+
+#[derive(Clone,Default)]
+struct CallsiteControl {
+    guards: Vec<String>,
+    blocker: Option<String>,
+}
+
+/// Only side-effect-free boolean and integer-comparison guards are projected.
+/// Unknown guards and any loops remain explicit unresolved obligations.
+fn guard_text(expr:&Expr)->Option<String>{
+    match expr {
+        Expr::Var(v)=>Some(v.clone()),
+        Expr::Literal(crate::ast::Literal::Int(n))=>Some(n.to_string()),
+        Expr::Literal(crate::ast::Literal::Bool(v))=>Some(
+            if *v {"真"}else{"假"}.into()),
+        Expr::Occluded {payload:Some(e),..}=>guard_text(e),
+        Expr::Unary {op:crate::ast::UnaryOp::Not,expr}=>
+            Some(format!("非 ({})",guard_text(expr)?)),
+        Expr::Unary {op:crate::ast::UnaryOp::Neg,expr}=>
+            Some(format!("-({})",guard_text(expr)?)),
+        Expr::Binary {op,left,right}=>{
+            let symbol=match op {
+                crate::ast::BinaryOp::Eq=>"=",
+                crate::ast::BinaryOp::Ne=>"≠",
+                crate::ast::BinaryOp::Lt=>"<",
+                crate::ast::BinaryOp::Le=>"≤",
+                crate::ast::BinaryOp::Gt=>">",
+                crate::ast::BinaryOp::Ge=>"≥",
+                crate::ast::BinaryOp::And=>"且",
+                crate::ast::BinaryOp::Or=>"或",
+                // Preserve source arithmetic in *guard obligations* only.
+                // This does not certify i64 overflow or dynamic Number
+                // behavior; the symbolic Lean Int backend checks linearity.
+                crate::ast::BinaryOp::Add=>"+",
+                crate::ast::BinaryOp::Sub=>"-",
+                crate::ast::BinaryOp::Mul=>"*",
+                _=>return None
+            };
+            Some(format!("({} {} {})",
+                guard_text(left)?,symbol,guard_text(right)?))
+        },
+        _=>None
+    }
+}
+fn callsite_control(fun:&Function)->BTreeMap<u32,CallsiteControl>{
+    fn walk(items:&[Stmt],conditions:&[String],block:Option<String>,
+        output:&mut BTreeMap<u32,CallsiteControl>){
+        for stmt in items{
+            match stmt {
+                Stmt::Branch{arms,span}=>{
+                    // Calls within branch test expressions require separate
+                    // evaluation-order reasoning and must not borrow arm facts.
+                    output.entry(span.line).or_insert_with(||CallsiteControl{
+                        guards:conditions.to_vec(),
+                        blocker:Some("call_in_condition_not_modeled".into())
+                    });
+                    let mut negated=Vec::new();
+                    let mut prior_unknown_condition=false;
+                    for arm in arms{
+                        let mut path=conditions.to_vec();
+                        path.extend(negated.iter().cloned());
+                        // A previous unmodelled if/elif test also controls the
+                        // reachability of all later arms, including else.
+                        let mut arm_block=if prior_unknown_condition {
+                            Some("prior_non_pure_branch_guard".into())
+                        } else {block.clone()};
+                        if let Some(cond)=&arm.condition{
+                            match guard_text(cond){
+                                Some(guard)=>{
+                                    path.push(guard.clone());
+                                    negated.push(format!("非 ({guard})"));
+                                },
+                                None=>{
+                                    arm_block=Some("non_pure_branch_guard".into());
+                                    prior_unknown_condition=true;
+                                }
+                            }
+                        }
+                        walk(&arm.body,&path,arm_block,output);
+                    }
+                },
+                Stmt::While{body,span,..}|Stmt::ForEach{body,span,..}=>{
+                    output.insert(span.line,CallsiteControl{
+                        guards:conditions.to_vec(),
+                        blocker:Some("loop_or_iterator_requires_invariant".into())
+                    });
+                    walk(body,conditions,
+                        Some("loop_or_iterator_requires_invariant".into()),output);
+                },
+                _=>{
+                    let line=crate::ast::stmt_line(stmt);
+                    output.insert(line,CallsiteControl{
+                        guards:conditions.to_vec(),blocker:block.clone()
+                    });
+                }
+            }
+        }
+    }
+    let mut found=BTreeMap::new();
+    walk(&fun.body,&[],None,&mut found);
+    found
+}
+
 fn artifact_for_function(
     index: &ProjectIndex,
     module_id: &ModuleId,
@@ -521,6 +849,7 @@ fn artifact_for_function(
     path: &Path,
     function: &Function,
     symbol: &SymbolDecl,
+    source_text: &str,
     local_by_name: &BTreeMap<(ModuleId, String), SymbolId>,
     narrative_links: &[crate::parse::NarrativeLink],
     module_prov: &super::provenance::ModuleProvenance,
@@ -533,6 +862,7 @@ fn artifact_for_function(
     Vec<super::provenance::ProvenanceDiag>,
 ) {
     let calls = collect_call_sites(function);
+    let controls=callsite_control(function);
     let mut effects = direct_effects(index, ast_module, function, &calls);
     let mut dependencies = Vec::new();
     let mut bound_calls = Vec::new();
@@ -543,9 +873,13 @@ fn artifact_for_function(
             CallClass::Bound { target, effects: call_effects } => {
                 dependencies.push(ArtifactId(target.as_str().to_string()));
                 bound_calls.push(BoundCall {
+                    caller:symbol.id.clone(),
                     target,
                     call_site: call_display(call),
                     source,
+                    args:static_call_args(call),
+                    path_guards:controls.get(line).map(|c|c.guards.clone()).unwrap_or_default(),
+                    control_blocker:controls.get(line).and_then(|c|c.blocker.clone()),
                     required_effects: call_effects,
                 });
             }
@@ -560,6 +894,12 @@ fn artifact_for_function(
         }
     }
     let named = collect_named_steps(function);
+    // Only a unique author-visible label in this function receives a public
+    // address. Duplicate names are deliberately not resolved by source order.
+    let mut label_counts = BTreeMap::new();
+    for site in &named {
+        *label_counts.entry(normalize_anchor_label(&site.label)).or_insert(0usize) += 1;
+    }
     let mut refs = Vec::new();
     let mut steps = Vec::new();
     let mut step_n = 0u32;
@@ -572,7 +912,13 @@ fn artifact_for_function(
             }
         });
         let ref_id = format!("{}#ref-{}", symbol.id.as_str(), step_n);
+        let anchor = public_anchor(&symbol.id, &named.label, &label_counts);
+        let definition_digest = anchor_definition_digest(source_text, named.line, &named.label, &named.kind);
         refs.push(KnowledgeRef {
+            anchor_id: anchor.clone(),
+            link_target: None,
+            target_anchor: None,
+            target_claim: None,
             id: ref_id.clone(),
             label: named.label.clone(),
             context: named.context.clone(),
@@ -589,6 +935,8 @@ fn artifact_for_function(
         }
         steps.push(KnowledgeStep {
             id: ArtifactId(format!("{}#step-{}", symbol.id.as_str(), step_n)),
+            anchor_id: anchor,
+            definition_digest,
             reference: ref_id,
             kind: named.kind.clone(),
             calls: target.into_iter().collect(),
@@ -606,7 +954,13 @@ fn artifact_for_function(
             crate::parse::NarrativeLinkKind::Navigation => None,
         };
         let ref_id = format!("{}#ref-{}", symbol.id.as_str(), step_n);
+        // A narrative link is a reference, not a definition. It never creates
+        // a public executable anchor of its own.
         refs.push(KnowledgeRef {
+            anchor_id: None,
+            link_target: Some(link.target.clone()),
+            target_anchor: None,
+            target_claim: None,
             id: ref_id.clone(),
             label: link.label.clone(),
             context: "narrative".into(),
@@ -620,6 +974,8 @@ fn artifact_for_function(
         });
         steps.push(KnowledgeStep {
             id: ArtifactId(format!("{}#step-{}", symbol.id.as_str(), step_n)),
+            anchor_id: None,
+            definition_digest: anchor_definition_digest(source_text, link.line, &link.label, link.kind.as_str()),
             reference: ref_id,
             kind: link.kind.as_str().into(),
             calls: target.into_iter().collect(),
@@ -763,10 +1119,14 @@ fn classify_call(
             }) else {
                 return CallClass::Other;
             };
-            let decl = if path.len() >= 2 {
-                path[1..].to_vec()
-            } else if let Some(d) = declaration_path_of(lib, fun) {
+            // Resolve the *declaration* path in the imported module, not
+            // the syntactic call path: `rates.lookup()` may refer to a
+            // nested `# rates / ## lookup` function. Losing the parent
+            // would silently break transitive proof invalidation.
+            let decl = if let Some(d) = declaration_path_of(lib, fun) {
                 d
+            } else if path.len() >= 2 {
+                path[1..].to_vec()
             } else {
                 return CallClass::Other;
             };
@@ -1315,6 +1675,8 @@ impl SemanticProject {
             "artifacts": self.artifacts.iter().map(artifact_json).collect::<Vec<_>>(),
             "refs": self.refs.iter().map(ref_json).collect::<Vec<_>>(),
             "steps": self.steps.iter().map(step_json).collect::<Vec<_>>(),
+            "claims": self.claims.iter().map(claim_json).collect::<Vec<_>>(),
+            "assumptions": self.assumptions.iter().map(assumption_json).collect::<Vec<_>>(),
             "bound_calls": self.bound_calls.iter().map(bound_call_json).collect::<Vec<_>>(),
             "dynamic_calls": self.dynamic_calls.iter().map(dynamic_call_json).collect::<Vec<_>>(),
         })
@@ -1324,12 +1686,31 @@ impl SemanticProject {
 pub fn artifact_json(artifact: &SemanticArtifact) -> Value {
     json!({"schema_version": SCHEMA_VERSION, "artifact_id": artifact.artifact_id.0, "symbol_id": artifact.symbol_id.as_ref().map(SymbolId::as_str), "display_name": artifact.display_name, "kind": artifact.kind, "callable": artifact.callable, "source": {"file": artifact.source.file, "line": artifact.source.line, "end_line": artifact.source.end_line}, "signature": artifact.signature.as_ref().map(|s| json!({"receiver":s.receiver,"params":s.params.iter().map(|p|json!({"name":p.name,"type":p.ty,"required":p.required,"default_digest":p.default_digest.as_ref().map(|d|&d.0),"unit":p.unit})).collect::<Vec<_>>(),"returns":s.returns,"effects":s.effects.values()})), "contract":{"params":artifact.contract.params,"returns":artifact.contract.returns,"fields":artifact.contract.fields}, "effects":artifact.effects.values(), "dependencies":artifact.dependencies.iter().map(|d|&d.0).collect::<Vec<_>>(), "provenance":artifact.provenance.iter().map(|p|json!({"uri":p.uri,"locator":p.locator,"content_digest":p.content_digest.as_ref().map(|d|&d.0),"relation":p.relation})).collect::<Vec<_>>(), "applicability":artifact.applicability, "hashes":{"interface":artifact.hashes.interface.0,"implementation":artifact.hashes.implementation.0,"evidence":artifact.hashes.evidence.0,"artifact":artifact.hashes.artifact.0,"closure":artifact.hashes.closure.0}, "verification":{"parse":artifact.verification.parse,"resolve":artifact.verification.resolve,"contract":artifact.verification.contract,"execution":artifact.verification.execution,"tests":artifact.verification.tests,"evidence":artifact.verification.evidence,"domain":artifact.verification.domain,"methods":artifact.verification.methods}, "lifecycle":artifact.lifecycle})
 }
-fn ref_json(reference: &KnowledgeRef) -> Value { json!({"id":reference.id,"label":reference.label,"context":reference.context,"source":{"file":reference.source.file,"line":reference.source.line,"end_line":reference.source.end_line},"resolution":reference.resolution,"target":reference.target.as_ref().map(SymbolId::as_str)}) }
-fn step_json(step: &KnowledgeStep) -> Value { json!({"id":step.id.0,"reference":step.reference,"kind":step.kind,"calls":step.calls.iter().map(SymbolId::as_str).collect::<Vec<_>>(),"effects":step.effects.values(),"source":{"file":step.source.file,"line":step.source.line,"end_line":step.source.end_line}}) }
+fn ref_json(reference: &KnowledgeRef) -> Value { json!({"id":reference.id,"anchor_id":reference.anchor_id,"link_target":reference.link_target,"target_anchor":reference.target_anchor,"target_claim":reference.target_claim,"label":reference.label,"context":reference.context,"source":{"file":reference.source.file,"line":reference.source.line,"end_line":reference.source.end_line},"resolution":reference.resolution,"target":reference.target.as_ref().map(SymbolId::as_str)}) }
+fn assumption_json(a:&KnowledgeAssumption)->Value{
+    json!({"id":a.id,"owner":a.owner.as_str(),"operation":a.operation,
+        "premise":a.premise,"postcondition":a.postcondition,
+        "verification":"declared_not_proved",
+        "source":{"file":a.source.file,"line":a.source.line}})
+}
+fn claim_json(claim: &KnowledgeClaim) -> Value {
+    json!({"anchor_id":claim.anchor_id,"owner":claim.owner.as_str(),
+        "label":claim.label,"conclusion":claim.conclusion,"premise":claim.premise,
+        "verification":"declared_unverified",
+        "source":{"file":claim.source.file,"line":claim.line}})
+}
+fn step_json(step: &KnowledgeStep) -> Value { json!({"id":step.id.0,"anchor_id":step.anchor_id,"definition_digest":step.definition_digest.0,"reference":step.reference,"kind":step.kind,"calls":step.calls.iter().map(SymbolId::as_str).collect::<Vec<_>>(),"effects":step.effects.values(),"source":{"file":step.source.file,"line":step.source.line,"end_line":step.source.end_line}}) }
 fn bound_call_json(call: &BoundCall) -> Value {
     json!({
+        "caller":call.caller.as_str(),
         "target": call.target.as_str(),
         "call_site": call.call_site,
+        "args":call.args.iter().map(|a|json!({
+            "name":a.name,"integer":a.integer,"symbol":a.symbol,
+            "expression_digest":a.expression_digest.0
+        })).collect::<Vec<_>>(),
+        "path_guards":call.path_guards,
+        "control_blocker":call.control_blocker,
         "source": {"file": call.source.file, "line": call.source.line, "end_line": call.source.end_line},
         "required_effects": call.required_effects.values(),
         "binding": "BoundCall",
@@ -1349,6 +1730,11 @@ const SEMANTIC_NAMES: &[&str] = &[
     "symbols.json",
     "refs.json",
     "steps.json",
+    "anchors.json",
+    "claims.json",
+    "assumptions.json",
+    "proof-index.json",
+    "proof-obligations.json",
     "bound_calls.json",
     "dynamic_calls.json",
     "artifacts",
@@ -1400,7 +1786,7 @@ pub fn write_semantic_projections(out_dir: &Path, compilation: &Compilation) -> 
     fs::create_dir_all(gen_dir.join("artifacts"))?;
     fs::create_dir_all(gen_dir.join("graph"))?;
     fs::create_dir_all(gen_dir.join("verification"))?;
-    write_generation_tree(&gen_dir, compilation)?;
+    write_generation_tree(&gen_dir, compilation, &out_dir.join("prove"))?;
 
     // Publish journal + CAS (M-R6): record expected CURRENT before switching.
     let expected = fs::read_to_string(out_dir.join("CURRENT"))
@@ -1463,7 +1849,7 @@ pub fn write_semantic_projections(out_dir: &Path, compilation: &Compilation) -> 
     Ok(())
 }
 
-fn write_generation_tree(stage: &Path, compilation: &Compilation) -> Result<()> {
+fn write_generation_tree(stage: &Path, compilation: &Compilation, prove_root: &Path) -> Result<()> {
     let project = compilation.semantics.to_json();
     write_json(
         &stage.join("project.json"),
@@ -1477,6 +1863,37 @@ fn write_generation_tree(stage: &Path, compilation: &Compilation) -> Result<()> 
     write_json(&stage.join("symbols.json"), &json!({"schema_version":SCHEMA_VERSION,"symbols":compilation.index.symbols().iter().map(|s|json!({"id":s.id.as_str(),"module":s.module.as_str(),"kind":s.kind.as_str(),"callable":s.callable.map(|c|c.as_str()),"name":s.name,"declaration_path":s.declaration_path,"source":{"file":rel_uri(compilation.index.root().path(),&s.source),"line":s.line}})).collect::<Vec<_>>() }))?;
     write_json(&stage.join("refs.json"), &json!({"schema_version":SCHEMA_VERSION,"refs":project["refs"]}))?;
     write_json(&stage.join("steps.json"), &json!({"schema_version":SCHEMA_VERSION,"steps":project["steps"]}))?;
+    write_json(&stage.join("claims.json"), &json!({
+        "schema_version":SCHEMA_VERSION,
+        "role":"theorem_declarations_not_proof_results",
+        "claims":project["claims"]
+    }))?;
+    let proofs=crate::knowledge::proof::index_links(prove_root, &compilation.semantics);
+    write_json(&stage.join("assumptions.json"), &json!({
+        "schema_version":SCHEMA_VERSION,
+        "role":"declared_modular_contracts_require_callsite_proof",
+        "assumptions":project["assumptions"]
+    }))?;
+    write_json(&stage.join("proof-index.json"), &proofs)?;
+    write_json(&stage.join("proof-obligations.json"),
+        &crate::knowledge::modular::analyze(&compilation.semantics, &proofs))?;
+    write_json(&stage.join("anchors.json"), &json!({
+        "schema_version":SCHEMA_VERSION,
+        "role":"stable_public_knowledge_addresses",
+        "anchors": compilation.semantics.steps.iter()
+            .filter(|step| step.anchor_id.is_some())
+            .map(|step| json!({
+                "anchor_id":step.anchor_id,
+                "owner":step.id.0.split('#').next(),
+                "label":compilation.semantics.refs.iter()
+                    .find(|r| r.id == step.reference).map(|r| r.label.as_str()),
+                "step_id":step.id.0,
+                "kind":step.kind,
+                "source":step_json(step)["source"],
+                "definition_digest":step.definition_digest.0,
+                "effects":step.effects.values(),
+            })).collect::<Vec<_>>()
+    }))?;
     write_json(&stage.join("bound_calls.json"), &json!({"schema_version":SCHEMA_VERSION,"bound_calls":project["bound_calls"]}))?;
     write_json(&stage.join("dynamic_calls.json"), &json!({"schema_version":SCHEMA_VERSION,"dynamic_calls":project["dynamic_calls"]}))?;
     write_json(&stage.join("graph/nodes.json"), &json!({"schema_version":SCHEMA_VERSION,"nodes":project["artifacts"]}))?;
@@ -1490,7 +1907,33 @@ fn write_generation_tree(stage: &Path, compilation: &Compilation) -> Result<()> 
             })
         })
         .collect();
+    for assumption in &compilation.semantics.assumptions {
+        edges.push(json!({"from":assumption.owner.as_str(),
+            "to":assumption.id,"kind":"declares_assumption"}));
+    }
+    for claim in &compilation.semantics.claims {
+        edges.push(json!({"from":claim.owner.as_str(),
+            "to":claim.anchor_id,"kind":"declares_claim"}));
+    }
+    for reference in &compilation.semantics.refs {
+        if let Some(claim) = &reference.target_claim {
+            let owner=reference.id.split("#ref-").next().unwrap_or("");
+            edges.push(json!({"from":owner,"to":claim,"kind":"references_claim"}));
+        }
+        if let Some(target) = &reference.target_anchor {
+            let owner = reference.id.split("#ref-").next().unwrap_or("");
+            edges.push(json!({"from":owner,"to":target,"kind":"references_anchor"}));
+        }
+    }
     for step in &compilation.semantics.steps {
+        if let Some(anchor) = &step.anchor_id {
+            if let Some(owner) = step.id.0.split('#').next() {
+                edges.push(json!({"from":owner,"to":anchor,"kind":"defines_anchor"}));
+            }
+            for target in &step.calls {
+                edges.push(json!({"from":anchor,"to":target.as_str(),"kind":"calls"}));
+            }
+        }
         if step.kind == "narrate" {
             for target in &step.calls {
                 edges.push(json!({
@@ -1648,6 +2091,106 @@ import:
             go.effects.values()
         );
         assert!(!go.effects.is_pure());
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn public_anchors_survive_unrelated_insertions_and_track_definition_changes() {
+        let root = root();
+        let file = root.join("main.mq.md");
+        let source = |prefix: &str, amount: i32| format!(
+            "# main\n\n## calculate\n\n{prefix}**x = [计算税额]({amount} * 2)**\n*x*\n"
+        );
+        fs::write(&file, source("", 3)).unwrap();
+        let one = compile_project(&CompileOptions::for_path(&root).unwrap()).unwrap();
+        let anchor1 = one.semantics.steps.iter().find(|s| s.anchor_id.is_some()).unwrap();
+        let identity = anchor1.anchor_id.clone();
+        let digest1 = anchor1.definition_digest.clone();
+        fs::write(&file, source("**other = [准备参数](1)**\n", 3)).unwrap();
+        let two = compile_project(&CompileOptions::for_path(&root).unwrap()).unwrap();
+        let anchor2 = two.semantics.steps.iter()
+            .find(|s| s.anchor_id == identity).unwrap();
+        assert_eq!(anchor1.anchor_id, anchor2.anchor_id);
+        assert_eq!(digest1, anchor2.definition_digest);
+        assert_ne!(anchor1.id, anchor2.id, "legacy ordinal step id may move");
+        fs::write(&file, source("**other = [准备参数](1)**\n", 4)).unwrap();
+        let three = compile_project(&CompileOptions::for_path(&root).unwrap()).unwrap();
+        let anchor3 = three.semantics.steps.iter()
+            .find(|s| s.anchor_id == identity).unwrap();
+        assert_ne!(digest1, anchor3.definition_digest);
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn markdown_knowledge_links_bind_only_to_registered_anchors() {
+        let root=root();
+        fs::write(root.join("main.mq.md"),
+            "# main\n\n## f\n\n[说明](#@演算)\n[不存在](#@没有)\n**x = [演算](2 * 3)**\n*x*\n"
+        ).unwrap();
+        let c=compile_project(&CompileOptions::for_path(&root).unwrap()).unwrap();
+        let target=c.semantics.steps.iter().find_map(|s|s.anchor_id.as_deref()).unwrap();
+        let link=c.semantics.refs.iter().find(|r|r.label=="说明").unwrap();
+        assert_eq!(link.target_anchor.as_deref(),Some(target));
+        assert_eq!(link.resolution,"anchor");
+        assert!(link.target.is_none(),"narrative links must never become executable calls");
+        let bad=c.semantics.refs.iter().find(|r|r.label=="不存在").unwrap();
+        assert_eq!(bad.resolution,"unresolved_anchor");
+        assert!(bad.target_anchor.is_none());
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn canonical_mq_uri_resolves_across_functions_without_calling_knowledge() {
+        let root=root();
+        let src=root.join("main.mq.md");
+        fs::write(&src,"# main\n\n## source\n\n**x = [演算](2 * 3)**\n*x*\n").unwrap();
+        let initial=compile_project(&CompileOptions::for_path(&root).unwrap()).unwrap();
+        let anchor=initial.semantics.steps.iter().find_map(|s|s.anchor_id.clone()).unwrap();
+        let updated=format!(
+            "# main\n\n## source\n\n**x = [演算](2 * 3)**\n*x*\n\n## consumer\n\n[阅读计算知识]({anchor})\n*None*\n"
+        );
+        fs::write(&src,updated).unwrap();
+        let parsed=compile_project(&CompileOptions::for_path(&root).unwrap()).unwrap();
+        let read=parsed.semantics.refs.iter().find(|r|r.label=="阅读计算知识").unwrap();
+        assert_eq!(read.target_anchor.as_deref(),Some(anchor.as_str()));
+        assert_eq!(read.resolution,"anchor");
+        assert!(read.target.is_none());
+        assert!(parsed.semantics.bound_calls.iter().all(|c|c.call_site!="阅读计算知识"));
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn theorem_claims_are_addressable_but_never_implicitly_proved() {
+        let root=root();
+        fs::write(root.join("main.mq.md"),
+            "# main\n\n## f\n\n| 定理 | 结论 | 前提 | 策略 |\n|---|---|---|---|\n| 安全性质 | 长度(轨迹) = 0 | | auto |\n\n[阅读定理](#@安全性质)\n**x = [演算](2 * 3)**\n*x*\n").unwrap();
+        let c=compile_project(&CompileOptions::for_path(&root).unwrap()).unwrap();
+        assert_eq!(c.semantics.claims.len(),1);
+        let claim=&c.semantics.claims[0];
+        let link=c.semantics.refs.iter().find(|r|r.label=="阅读定理").unwrap();
+        assert_eq!(link.target_claim.as_deref(),Some(claim.anchor_id.as_str()));
+        assert_eq!(link.resolution,"claim");
+        assert!(link.target.is_none());
+        let serialized=c.semantics.to_json();
+        assert_eq!(serialized["claims"][0]["verification"],"declared_unverified");
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn duplicate_labels_fail_closed_in_public_anchor_projection() {
+        let root = root();
+        fs::write(root.join("main.mq.md"),
+            "# main\n\n## f\n\n**x = [重复](1)**\n**y = [重复](2)**\n*y*\n").unwrap();
+        let compilation = compile_project(&CompileOptions::for_path(&root).unwrap()).unwrap();
+        let duplicated: Vec<_> = compilation.semantics.refs.iter()
+            .filter(|r| r.label == "重复").collect();
+        assert_eq!(duplicated.len(), 2);
+        assert!(duplicated.iter().all(|r| r.anchor_id.is_none()));
+        let out = root.join(".marqdo");
+        write_semantic_projections(&out, &compilation).unwrap();
+        let anchors: Value = serde_json::from_str(
+            &fs::read_to_string(out.join("anchors.json")).unwrap()).unwrap();
+        assert!(anchors["anchors"].as_array().unwrap().is_empty());
         fs::remove_dir_all(root).unwrap();
     }
 
