@@ -110,6 +110,30 @@ mod tests {
         assert!(!lean.contains("sorry"));
     }
     #[test]
+    fn real_project_call_actuals_generate_closed_goal_without_claiming_proof(){
+        let root=std::env::temp_dir().join(
+            format!("marqdo-closed-vc-{}",std::process::id()));
+        let _=std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        std::fs::write(root.join("math.mq.md"),
+            "# math\n\n## exact\n+ `n`\n\n| 定理 | 结论 | 前提 | 策略 |\n|---|---|---|---|\n| c | 结果 = 2 | n > 0 | auto |\n\n*2*\n").unwrap();
+        std::fs::write(root.join("main.mq.md"),
+            "---\nimport:\n  math: math.mq.md\n---\n# main\n\n## f\n\n**v = [调用](math.math.exact(3))**\n*v*\n").unwrap();
+        let compiled=crate::sema::ir::compile_project(
+            &crate::sema::ir::CompileOptions::for_path(&root).unwrap()).unwrap();
+        let call=compiled.semantics.bound_calls.iter().find(
+            |c|c.call_site=="math.math.exact").expect("real imported bound call");
+        assert_eq!(call.args.len(),1);
+        assert_eq!(call.args[0].integer,Some(3));
+        let goal=instantiate(&compiled.semantics,call,"n > 0").unwrap();
+        assert!(goal.holds);
+        assert!(goal.proposition.contains("(3 : Int)"));
+        assert!(instantiate(&compiled.semantics,call,"n > 10")
+            .is_some_and(|goal|!goal.holds));
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
     fn overflowing_i64_expression_is_not_silently_lean_unbounded(){
         let ast=proof_check::parse_claim_expr(
             &proof_check::tokenize_claim("x + 1 > 0").unwrap()).unwrap().1;
