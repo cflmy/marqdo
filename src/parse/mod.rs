@@ -2560,6 +2560,31 @@ mod tests {
     use crate::ast::Stmt;
 
     #[test]
+    fn assumption_tables_are_metadata_and_never_runtime_steps() {
+        let src=r#"# main
+
+## guarded
+
+| 假设 | 前置 | 后置 |
+|---|---|---|
+| backend.fetch | 金额 > 0 | 返回.ok = True |
+
+| 定理 | 结论 | 前提 | 策略 |
+|---|---|---|---|
+| 安全 | 长度(轨迹) = 0 | | auto |
+
+*1*
+"#;
+        let m=parse_source(src).unwrap();
+        let f=&m.functions[0].children[0];
+        assert_eq!(f.assumptions.len(),1);
+        assert_eq!(f.assumptions[0].op,"backend.fetch");
+        assert_eq!(f.assumptions[0].premise.as_deref(),Some("金额 > 0"));
+        assert_eq!(f.claims.len(),1);
+        assert_eq!(f.body.len(),1,"assumption and theorem tables must not execute");
+    }
+
+    #[test]
     fn parse_formula_meta_var_standalone() {
         let src = "# main\n\n$$\n% marqdo: var=f\nx^2 - 2\n$$\n";
         let m = parse_source(src).unwrap();
