@@ -90,12 +90,14 @@ import:
 |---|---|---|---|
 | rule | 结果 = 6 | | auto |
 
-**tax = [计算税额](rates.lookup())**
+**tax = [计算税额](rates.rates.lookup())**
 *tax*
 "#).unwrap();
     let before=compile_project(&CompileOptions::for_path(&dir).unwrap()).unwrap();
     let owner=before.semantics.artifacts.iter()
         .find(|a|a.display_name=="main.compute").unwrap();
+    assert!(!owner.dependencies.is_empty(),
+        "imported call must be a bound dependency; check full class path");
     let old_closure=owner.hashes.closure.clone();
     let receipt=link_report(&before,&app,&report(&app,Verdict::Checked,"trace",None),&dir);
     assert_eq!(receipt["claims"].as_array().unwrap().len(),1,
