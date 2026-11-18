@@ -171,6 +171,23 @@ mod tests {
         assert!(!obligations.is_empty());
         assert!(obligations.iter().all(|x|x["status"]!="proved"));
         assert_eq!(report["proof_completion"],"not_established_by_dependency_analysis");
+        // Even a caller-supplied "valid" callee receipt cannot discharge the
+        // actual-argument bridge for a conditional requires clause.
+        let callee=compilation.semantics.claims.iter().find(|c|c.label=="c").unwrap();
+        let forged=json!({"claims":[{
+            "owner_symbol_id":callee.owner.as_str(),
+            "claim_anchor_id":callee.anchor_id,
+            "conclusion":callee.conclusion,
+            "premise":callee.premise,
+            "status":"proved","usable":true
+        }]});
+        let conditional=analyze(&compilation.semantics,&forged);
+        let first=conditional["obligations"].as_array().unwrap()
+            .iter().find(|x|x["callee"]==callee.owner.as_str()).unwrap();
+        assert_eq!(first["contracts"][0]["status"],"precondition_pending");
+        assert_eq!(first["contracts"][0]["call_precondition_status"],
+            "requires_lean_proof_with_actual_arguments");
+        assert_eq!(conditional["audit_passes"],false);
         std::fs::remove_dir_all(source).unwrap();
     }
 }
