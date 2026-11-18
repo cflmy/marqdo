@@ -425,12 +425,16 @@ fn fnv64(s: &str) -> u64 {
 mod tests {
     use super::*;
 
+    // Avoid process-global set_current_dir: Rust executes tests concurrently.
+    // Keep each ledger in its own repository-relative, unique directory.
+    static SCRATCH_SEQ: std::sync::atomic::AtomicU64 =
+        std::sync::atomic::AtomicU64::new(0);
+
     fn scratch(tag: &str) -> PathBuf {
-        let dir = std::env::temp_dir().join(format!(
+        let seq = SCRATCH_SEQ.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        let dir = PathBuf::from("target").join(format!(
             "mq-effects-{}-{}-{}",
-            tag,
-            std::process::id(),
-            now_rfc3339().replace(':', "")
+            tag, std::process::id(), seq
         ));
         let _ = fs::remove_dir_all(&dir);
         fs::create_dir_all(&dir).unwrap();
@@ -440,14 +444,13 @@ mod tests {
     #[test]
     fn prepare_dedupe_and_collision() {
         let dir = scratch("prep");
-        let prev = std::env::current_dir().unwrap();
-        std::env::set_current_dir(&dir).unwrap();
+        let ledger_dir = dir.join("led").to_string_lossy().to_string();
         let a = effects_prepare(&json!({
             "operation_id": "op1",
             "idempotency_key": "idem1",
             "args_digest": "sha256:a",
             "effect_class": "write",
-            "ledger_dir": "led",
+            "ledger_dir": ledger_dir.clone(),
             "logical_run_id": "run1",
         }))
         .unwrap();
@@ -458,7 +461,7 @@ mod tests {
             "operation_id": "op1",
             "idempotency_key": "idem1",
             "args_digest": "sha256:a",
-            "ledger_dir": "led",
+            "ledger_dir": ledger_dir.clone(),
         }))
         .unwrap();
         assert_eq!(again["deduped"], true);
@@ -467,43 +470,41 @@ mod tests {
             "operation_id": "op2",
             "idempotency_key": "idem1",
             "args_digest": "sha256:b",
-            "ledger_dir": "led",
+            "ledger_dir": ledger_dir.clone(),
         }));
         assert!(clash.unwrap_err().contains("collision"));
 
-        std::env::set_current_dir(prev).unwrap();
         let _ = fs::remove_dir_all(&dir);
     }
 
     #[test]
     fn transition_and_watermark_gates_write_resume() {
         let dir = scratch("wm");
-        let prev = std::env::current_dir().unwrap();
-        std::env::set_current_dir(&dir).unwrap();
+        let ledger_dir = dir.join("led").to_string_lossy().to_string();
         effects_prepare(&json!({
             "operation_id": "op_w",
             "idempotency_key": "idem_w",
             "args_digest": "sha256:w",
             "effect_class": "write",
-            "ledger_dir": "led",
+            "ledger_dir": ledger_dir.clone(),
             "logical_run_id": "run1",
         }))
         .unwrap();
         effects_transition(&json!({
             "operation_id": "op_w",
             "state": "started",
-            "ledger_dir": "led",
+            "ledger_dir": ledger_dir.clone(),
         }))
         .unwrap();
         // Crash window: unknown — write auto-resume must stay closed.
         effects_transition(&json!({
             "operation_id": "op_w",
             "state": "unknown",
-            "ledger_dir": "led",
+            "ledger_dir": ledger_dir.clone(),
         }))
         .unwrap();
         let wm1 = effects_watermark(&json!({
-            "ledger_dir": "led",
+            "ledger_dir": ledger_dir.clone(),
             "logical_run_id": "run1",
         }))
         .unwrap();
@@ -513,12 +514,12 @@ mod tests {
         effects_reconcile(&json!({
             "operation_id": "op_w",
             "outcome": "committed",
-            "ledger_dir": "led",
+            "ledger_dir": ledger_dir.clone(),
             "result_ref": "receipt:1",
         }))
         .unwrap();
         let wm2 = effects_watermark(&json!({
-            "ledger_dir": "led",
+            "ledger_dir": ledger_dir.clone(),
             "logical_run_id": "run1",
         }))
         .unwrap();
@@ -526,7 +527,6 @@ mod tests {
         assert_eq!(wm2["open_unknown"], 0);
         assert!(wm2["watermark"].as_str().unwrap().starts_with("sha256-lite:"));
 
-        std::env::set_current_dir(prev).unwrap();
         let _ = fs::remove_dir_all(&dir);
     }
 
@@ -535,32 +535,31 @@ mod tests {
         // Write "succeeds" locally only after reconcile; retry while unknown must not
         // look write_auto_resume_safe (MA-T03 watermark gate).
         let dir = scratch("mat03");
-        let prev = std::env::current_dir().unwrap();
-        std::env::set_current_dir(&dir).unwrap();
+        let ledger_dir = dir.join("led").to_string_lossy().to_string();
         effects_prepare(&json!({
             "operation_id": "op_kill",
             "idempotency_key": "run|s|write_probe|sha256-lite:1",
             "args_digest": "sha256-lite:1",
             "effect_class": "write",
-            "ledger_dir": "led",
+            "ledger_dir": ledger_dir.clone(),
             "logical_run_id": "run_kill",
         }))
         .unwrap();
         effects_transition(&json!({
             "operation_id": "op_kill",
             "state": "started",
-            "ledger_dir": "led",
+            "ledger_dir": ledger_dir.clone(),
         }))
         .unwrap();
         // Crash before commit:
         effects_transition(&json!({
             "operation_id": "op_kill",
             "state": "unknown",
-            "ledger_dir": "led",
+            "ledger_dir": ledger_dir.clone(),
         }))
         .unwrap();
         let wm = effects_watermark(&json!({
-            "ledger_dir": "led",
+            "ledger_dir": ledger_dir.clone(),
             "logical_run_id": "run_kill",
         }))
         .unwrap();
@@ -572,7 +571,7 @@ mod tests {
             "idempotency_key": "run|s|write_probe|sha256-lite:1",
             "args_digest": "sha256-lite:1",
             "effect_class": "write",
-            "ledger_dir": "led",
+            "ledger_dir": ledger_dir.clone(),
             "logical_run_id": "run_kill",
         }))
         .unwrap();
@@ -582,42 +581,39 @@ mod tests {
         effects_reconcile(&json!({
             "operation_id": "op_kill",
             "outcome": "committed",
-            "ledger_dir": "led",
+            "ledger_dir": ledger_dir.clone(),
             "result_ref": "effect:op_kill",
         }))
         .unwrap();
         let wm2 = effects_watermark(&json!({
-            "ledger_dir": "led",
+            "ledger_dir": ledger_dir.clone(),
             "logical_run_id": "run_kill",
         }))
         .unwrap();
         assert_eq!(wm2["write_auto_resume_safe"], true);
         assert_eq!(wm2["pending_writes"], 0);
 
-        std::env::set_current_dir(prev).unwrap();
         let _ = fs::remove_dir_all(&dir);
     }
 
     #[test]
     fn illegal_skip_started() {
         let dir = scratch("bad");
-        let prev = std::env::current_dir().unwrap();
-        std::env::set_current_dir(&dir).unwrap();
+        let ledger_dir = dir.join("led").to_string_lossy().to_string();
         effects_prepare(&json!({
             "operation_id": "op_x",
             "idempotency_key": "idem_x",
             "args_digest": "sha256:x",
-            "ledger_dir": "led",
+            "ledger_dir": ledger_dir.clone(),
         }))
         .unwrap();
         let err = effects_transition(&json!({
             "operation_id": "op_x",
             "state": "committed",
-            "ledger_dir": "led",
+            "ledger_dir": ledger_dir.clone(),
         }))
         .unwrap_err();
         assert!(err.contains("illegal transition"));
-        std::env::set_current_dir(prev).unwrap();
         let _ = fs::remove_dir_all(&dir);
     }
 }
