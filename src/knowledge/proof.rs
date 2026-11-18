@@ -123,7 +123,7 @@ pub fn index_links(prove_dir:&Path, semantic:&SemanticProject)->Value {
                     && claim["semantic_hashes"]["implementation"]==a.hashes.implementation.0
                     && claim["semantic_hashes"]["closure"]==a.hashes.closure.0
                     && fs::read(semantic.root.join(&a.source.file)).ok().is_some_and(
-                        |raw|sha(&raw)==claim["source_sha256"])
+                        |raw|sha(&raw).trim_start_matches("sha256:")==claim["source_sha256"])
                 });
                 let certified=entry["status"]=="proved" && entry["decided_by"]=="lean"
                     && entry["certificate_digest"].as_str().is_some_and(|digest|
