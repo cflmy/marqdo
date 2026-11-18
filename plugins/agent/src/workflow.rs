@@ -118,7 +118,7 @@ fn validate_steps(args: &Value) -> Result<Value, String> {
             }
             for key in routes.keys() {
                 if !s["options"].as_array().is_some_and(|opts|
-                    opts.iter().any(|x|x==key.as_str())) {
+                    opts.iter().any(|x|x.as_str()==Some(key.as_str()))) {
                     return Err("route label is not a declared choice".into());
                 }
             }
