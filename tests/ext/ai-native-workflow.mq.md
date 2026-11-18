@@ -34,7 +34,7 @@ input and terminal state with plugin-owned durable checkpoints.
 2. *
   > sys.exit code=23
 
-**second = > workflow.next id="abi_flow_ci_20261118" source_revision="flow-v1"**
+**second = > workflow.tick id="abi_flow_ci_20261118" source_revision="flow-v1"**
 **second_state = > json.get value=`second` key="status"**
 1. `second_state` == "waiting_input"
   **_ = 1**
@@ -48,7 +48,7 @@ input and terminal state with plugin-owned durable checkpoints.
 2. *
   > sys.exit code=25
 
-**c3 = > workflow.commit id="abi_flow_ci_20261118" step_id="end" response="finished" source_revision="flow-v1"**
+**c3 = > workflow.tick id="abi_flow_ci_20261118" source_revision="flow-v1"**
 **complete = > workflow.next id="abi_flow_ci_20261118" source_revision="flow-v1"**
 **status = > json.get value=`complete` key="status"**
 1. `status` == "succeeded"
