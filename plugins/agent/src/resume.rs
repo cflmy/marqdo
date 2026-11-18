@@ -85,6 +85,8 @@ fn ensure_dir(root: &Path) -> Result<(), String> {
 }
 
 /// Atomic durable write: unique temp → write → flush/fsync → rename.
+static TEMP_SEQUENCE: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
 fn atomic_write_json(path: &Path, doc: &Value) -> Result<(), String> {
     let parent = path
         .parent()
@@ -96,7 +98,8 @@ fn atomic_write_json(path: &Path, doc: &Value) -> Result<(), String> {
             .and_then(|s| s.to_str())
             .unwrap_or("ckpt.json"),
         std::process::id(),
-        now_rfc3339().replace(':', "")
+        format!("{}-{}", now_rfc3339().replace(':', ""),
+            TEMP_SEQUENCE.fetch_add(1, std::sync::atomic::Ordering::Relaxed))
     );
     let tmp = parent.join(tmp_name);
     let text = serde_json::to_string_pretty(doc).map_err(|e| e.to_string())?;
@@ -396,7 +399,8 @@ mod tests {
             .duration_since(UNIX_EPOCH)
             .unwrap()
             .as_nanos();
-        let dir = std::env::temp_dir().join(format!("marqdo-resume-{label}-{nanos}"));
+        // Do not mutate process-wide cwd from concurrent Rust unit tests.
+        let dir = PathBuf::from("target").join(format!("marqdo-resume-{label}-{nanos}"));
         fs::create_dir_all(&dir).unwrap();
         dir
     }
@@ -410,10 +414,7 @@ mod tests {
     #[test]
     fn atomic_v2_roundtrip_and_legacy_manual_review() {
         let dir = scratch("v2");
-        // Use relative path via env cwd — chdir into scratch for this test.
-        let prev = std::env::current_dir().unwrap();
-        std::env::set_current_dir(&dir).unwrap();
-        let rel = "ckpts";
+        let rel = dir.join("ckpts").to_string_lossy().to_string();
         let saved = resume_save(&json!({
             "id": "run1",
             "schema": "CheckpointV2",
@@ -491,23 +492,20 @@ mod tests {
         assert_eq!(unsafe_ck["recovery_mode"], "checkpoint_v2_read_only");
         assert_eq!(unsafe_ck["write_auto_resume"], false);
 
-        std::env::set_current_dir(prev).unwrap();
         let _ = fs::remove_dir_all(&dir);
     }
 
     #[test]
     fn corrupt_checkpoint_reports_error() {
         let dir = scratch("corrupt");
-        let prev = std::env::current_dir().unwrap();
-        std::env::set_current_dir(&dir).unwrap();
-        fs::create_dir_all("ckpts").unwrap();
-        fs::write("ckpts/bad.json", "{not-json").unwrap();
-        let loaded = resume_load(&json!({"id": "bad", "resume_dir": "ckpts"})).unwrap();
+        let ckpts = dir.join("ckpts");
+        fs::create_dir_all(&ckpts).unwrap();
+        fs::write(ckpts.join("bad.json"), "{not-json").unwrap();
+        let loaded = resume_load(&json!({"id": "bad", "resume_dir": ckpts.to_string_lossy()})).unwrap();
         assert_eq!(loaded["found"], true);
         assert_eq!(loaded["ok"], false);
         assert_eq!(loaded["error"]["code"], "checkpoint.corrupt");
         assert_eq!(loaded["recovery_mode"], "manual_review");
-        std::env::set_current_dir(prev).unwrap();
         let _ = fs::remove_dir_all(&dir);
     }
 }

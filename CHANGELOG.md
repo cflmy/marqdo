@@ -17,6 +17,48 @@ Marqdo 2.9.0（full）发布可寻址知识制品、统一纯函数模块化契�
 
 详情 / Details: [2.9.0 release notes](doc/releases/v2.9.0.md) · [Trust boundaries](doc/design/verified-knowledge-compiler-boundaries.md).
 
+## Ext pack v2.8.1 — 2026-11-18
+
+### Highlights
+
+**AI native durable workflow（CLI 仍为 v2.8.0）**：`ext/ai` 以插件侧步骤机交付持久化
+工作流（`workflow`/`flow`/`context`/`recovery`），含有界模型选择、作用域上下文、
+只读失败恢复、`inspect`/`list` 与可隔离 `resume_dir`。Windows 打包使用 `path.join`
+根路径与 `System32\tar.exe`。详见 [双语发布说明](doc/releases/ext-2.8.1.md)。
+
+```bash
+marqdo ext add agent   # CDN latest → 2.8.1
+# 或：MARQDO_EXT_VERSION=2.8.1 marqdo ext add agent
+```
+
+**核心表面 Δ（Core surface Δ）**：**无增删**——仅 Extension / Agent Runtime。
+
+### Added
+
+- `ext/ai/workflow`：`open/next/commit/cancel/tick/retry_*`，以及只读 `inspect`/`list`
+  与各操作的 host-relative `resume_dir`。
+- `ext/ai/flow` · `context` · `recovery`：ask/choose、作用域打包、CheckpointV2 恢复面。
+- Agent ABI：`agent_workflow_*`、`agent_choice_parse`、`agent_context_scope`、
+  `agent_input_*`、`agent_parallel_report`。
+- Offline fixtures：`tests/ext/ai-native-flow.mq.md`、`tests/ext/ai-native-workflow.mq.md`；
+  CI：`.github/workflows/native-ai-flow.yml`。
+
+### Fixed
+
+- `flow.choose` no longer leaks a branch-local `parsed` value into the function
+  contract; the repaired-choice path is fully scoped.
+- CI builds the agent cdylib and runs offline integration without the removed
+  `run --effects` flag, using `MARQDO_AGENT_PLUGIN` instead.
+- Atomic checkpoint/effect temp names no longer collide under parallel writes;
+  resume tests no longer race on process-wide cwd.
+- Windows `extension-release`：engineering root 使用 `path.join` / cwd 回退；
+  ZIP 显式调用 `System32\tar.exe`（bsdtar）；`packs.ci` 授予 `fs.read`。
+
+### Changed
+
+- 扩展包 SemVer **2.8.1**（`ext/VERSION`）；与 CLI **v2.8.0** 可独立安装。
+- 分支已合并 v2.8.0 依赖锁后的 AI 工作流增量，不再从 2.7.1 基线分叉。
+
 ## v2.8.0 — 2026-11-17
 
 `marqdo prove` 正式发布：定理表 → Lean 4 证明 → 自动判定。离线符号执行（F1–F5）无工具链可用，`checked` 永远弱于 `proved`；单调性护栏让判定器缺陷显式失败；假定理给出反例见证；证书缓存与目录模式面向智能体批量出证。

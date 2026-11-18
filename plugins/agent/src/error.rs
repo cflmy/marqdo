@@ -82,6 +82,10 @@ pub fn decide_retry(args: &Value) -> Result<Value, String> {
         .get("max_arg_repairs")
         .and_then(|v| v.as_u64())
         .unwrap_or(1) as u32;
+    let max_output_repair = args
+        .get("max_output_repairs")
+        .and_then(|v| v.as_u64())
+        .unwrap_or(1) as u32;
     let effect_class = args
         .get("effect_class")
         .and_then(|v| v.as_str())
@@ -145,6 +149,12 @@ pub fn decide_retry(args: &Value) -> Result<Value, String> {
         "invalid_arguments" if recovery == "repair_args" && attempts < max_arg_repair => Ok(
             decision("repair_args", "one_arg_repair", attempts, max_arg_repair),
         ),
+        "invalid_output" if recovery == "repair_output" && attempts < max_output_repair => Ok(
+            decision("repair_output", "one_format_repair", attempts, max_output_repair),
+        ),
+        "context_overflow" if recovery == "compact_context" && attempts == 0 => Ok(
+            decision("compact_context", "one_bounded_compaction", attempts, 1),
+        ),
         "auth" | "forbidden" | "policy_denied" => Ok(decision(
             "needs_input",
             category,
@@ -172,13 +182,17 @@ fn decision(action: &str, reason: &str, attempts: u32, max_attempts: u32) -> Val
         "reason": reason,
         "attempts_used": attempts,
         "max_attempts": max_attempts,
-        "auto": matches!(action, "retry_step" | "repair_args"),
+        "auto": matches!(action, "retry_step" | "repair_args" | "repair_output" | "compact_context"),
     })
 }
 
 fn infer_category(code: &str) -> &'static str {
     let c = code.to_ascii_lowercase();
-    if c.contains("timeout") || c.contains("429") || c.contains("5xx") || c.contains("connect") {
+    if c.contains("context_overflow") || c.contains("context_length") {
+        "context_overflow"
+    } else if c.contains("invalid_choice") || c.contains("invalid_output") {
+        "invalid_output"
+    } else if c.contains("timeout") || c.contains("429") || c.contains("5xx") || c.contains("connect") {
         "transient"
     } else if c.contains("schema") || c.contains("argument") {
         "invalid_arguments"
@@ -212,6 +226,8 @@ fn default_recovery(category: &str, effect_state: &str) -> &'static str {
     match category {
         "transient" => "retry_step",
         "invalid_arguments" => "repair_args",
+        "invalid_output" => "repair_output",
+        "context_overflow" => "compact_context",
         "auth" | "forbidden" | "policy_denied" | "needs_input" => "needs_input",
         "budget_exhausted" => "return_partial",
         "cancelled" => "stop",
@@ -257,6 +273,27 @@ mod tests {
         .unwrap();
         assert_eq!(d["action"], "manual_review");
         assert_eq!(d["auto"], false);
+    }
+
+    #[test]
+    fn output_repair_is_bounded_and_read_only() {
+        let err = make_error(&json!({"code": "model.invalid_choice"})).unwrap();
+        assert_eq!(err["category"], "invalid_output");
+        let first = decide_retry(&json!({"error": err, "attempts": 0})).unwrap();
+        assert_eq!(first["action"], "repair_output");
+        let next = decide_retry(&json!({"error": err, "attempts": 1})).unwrap();
+        assert_eq!(next["action"], "stop");
+        let write = decide_retry(&json!({
+            "error": err, "attempts": 0, "effect_class": "write"
+        })).unwrap();
+        assert_eq!(write["action"], "manual_review");
+    }
+
+    #[test]
+    fn compaction_is_not_an_unbounded_model_loop() {
+        let err = make_error(&json!({"code": "model.context_overflow"})).unwrap();
+        assert_eq!(decide_retry(&json!({"error": err, "attempts": 0})).unwrap()["action"], "compact_context");
+        assert_eq!(decide_retry(&json!({"error": err, "attempts": 1})).unwrap()["action"], "stop");
     }
 
     #[test]

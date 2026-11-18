@@ -32,11 +32,15 @@ jobs:
           cargo build --release -p marqdo -p marqdo_plugin_agent -p marqdo_plugin_quantum -p marqdo_plugin_linalg -p marqdo_plugin_llm -p marqdo_plugin_engineering
           bash scripts/build-web-plugin.sh
       - name: Build and validate the runner's exact pack bytes
-        shell: pwsh
-        run: ./target/release/marqdo.exe call skills/marqdo-release/packs.mq.md ci --effects plugin,fs.write,environment.read --fs-root . --require-ok --json
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./target/release/marqdo.exe call skills/marqdo-release/packs.mq.md ci --effects plugin,fs.read,fs.write,environment.read --fs-root . --require-ok --json
       - name: Attach source and Windows native packs without replacement
-        shell: pwsh
-        run: ./target/release/marqdo.exe call skills/marqdo-release/packs.mq.md attach_ci --effects plugin,fs.read,environment.read --fs-root . --require-ok --json
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./target/release/marqdo.exe call skills/marqdo-release/packs.mq.md attach_ci --effects plugin,fs.read,environment.read --fs-root . --require-ok --json
 
   linux:
     runs-on: ubuntu-latest
@@ -59,6 +63,6 @@ jobs:
           cargo build --release -p marqdo -p marqdo_plugin_agent -p marqdo_plugin_quantum -p marqdo_plugin_linalg -p marqdo_plugin_llm -p marqdo_plugin_engineering
           bash scripts/build-web-plugin.sh
       - name: Build and validate the runner's exact pack bytes
-        run: target/release/marqdo call skills/marqdo-release/packs.mq.md ci --effects plugin,fs.write,environment.read --fs-root . --require-ok --json
+        run: target/release/marqdo call skills/marqdo-release/packs.mq.md ci --effects plugin,fs.read,fs.write,environment.read --fs-root . --require-ok --json
       - name: Attach Linux native pack without replacement
         run: target/release/marqdo call skills/marqdo-release/packs.mq.md attach_ci --effects plugin,fs.read,environment.read --fs-root . --require-ok --json

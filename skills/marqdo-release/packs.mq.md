@@ -15,7 +15,7 @@ import:
 
 This leaf builds source and one platform's native extension archives for an authorized version. It does not publish, choose a version, create a tag or edit version files. The extension-release workflow runs the same tasks on Windows and Linux after local.tag pushes ext-vX.Y.Z. Its attach_ci task creates the exact tagged release through the native service boundary and attaches three assets with the existing gh upload tool; assets.publish subsequently verifies those exact bytes before R2 publication.
 
-Build all six maintained native plugins first. The native_dir contract is a directory containing their platform library names, normally target/release. Source discovery and staging use native Marqdo filesystem operations. Only ZIP encoding uses the existing platform tool: Info-ZIP on Linux, the installed bsdtar on Windows. Compiler and format boundaries do not require Python or a generated shell program.
+Build all six maintained native plugins first. The native_dir contract is a directory containing their platform library names, normally target/release. Source discovery and staging use native Marqdo filesystem operations. Only ZIP encoding uses the existing platform tool: Info-ZIP on Linux, 7-Zip on Windows. Compiler and format boundaries do not require Python or a generated shell program.
 
 ## libraries
 
@@ -74,7 +74,7 @@ Return *[Reject an unsupported native target](result.error(code="packs.platform"
 
 Use `stage`, `entry`, `output` and `platform` only after build preflight. Native resolution validates the stage and output paths first; the encoder receives individual arguments and one named staging subtree. It cannot expand a generated shell expression. A failed encoder can leave the selected incomplete archive for inspection; this task never reuses it as successful output or deletes unrelated files.
 
-The Windows runner supplies bsdtar with ZIP format support; Linux supplies Info-ZIP. Format encoding is the only external operation here. Reads, directory creation, copies, hashes and final ZIP validation remain separate explicit native tasks. The caller removes only its owned temporary stage after the child exits. Existing archives require inspection or a different output directory, keeping reruns from silently replacing publication candidates.
+The Windows runner supplies 7-Zip with ZIP format support; Linux supplies Info-ZIP. Format encoding is the only external operation here. Reads, directory creation, copies, hashes and final ZIP validation remain separate explicit native tasks. The caller removes only its owned temporary stage after the child exits. Existing archives require inspection or a different output directory, keeping reruns from silently replacing publication candidates.
 
 1. [This output already belongs to an earlier attempt](fs.exists(path=`output`))
   Return *[Preserve the existing archive](result.error(code="packs.output_exists", message=`output`, operation="_archive"))*.
@@ -96,13 +96,14 @@ We **destination = [Resolve the new archive inside the granted root](fs.resolve(
 
   | argument |
   |---|
-  | tar |
-  | "--format=zip" |
-  | "-cf" |
+  | "C:\\Program Files\\7-Zip\\7z.exe" |
+  | a |
+  | "-tzip" |
   | `destination` |
   | `entry` |
 
-Return *[Encode only the explicitly staged format subtree](engineering.checked(argv=`argv`, cwd=`stage`, timeout_ms=300000, max_output=65536))*.
+We **checkout = [Use the absolute runtime checkout as the plugin root](sys.cwd())**.
+Return *[Encode only the explicitly staged format subtree](engineering.checked(argv=`argv`, cwd=`stage`, timeout_ms=300000, max_output=65536, root=`checkout`))*.
 
 ## _receipt
 
