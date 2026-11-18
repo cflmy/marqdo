@@ -469,6 +469,25 @@ import:
     assert!(caller.contains("import CalleeModule"));
     assert!(caller.contains("using (callee_contract"));
     assert!(!caller.contains("sorry"));
+    // Replay is tied to currently compiled Marqdo source, not just a copied
+    // certificate or an arbitrary Lean theorem with the same display name.
+    let cert=successful["artifact"].as_str().unwrap();
+    let replay=s.marqdo().args(["knowledge","replay",cert,"--json","."])
+        .output().expect("independent proof replay");
+    assert!(replay.status.success(),
+        "replay stderr={} stdout={}",
+        String::from_utf8_lossy(&replay.stderr),
+        String::from_utf8_lossy(&replay.stdout));
+    let verified:serde_json::Value=serde_json::from_slice(&replay.stdout).unwrap();
+    assert_eq!(verified["status"],"lean_kernel_replayed");
+    assert_eq!(verified["full_marqdo_runtime_semantics_proved"],false);
+
+    let original=fs::read_to_string(s.dir.join("math.mq.md")).unwrap();
+    fs::write(s.dir.join("math.mq.md"),original.replace("*2*","*3*")).unwrap();
+    let changed=s.marqdo().args(["knowledge","replay",cert,"--json","."])
+        .output().expect("reject stale source");
+    assert!(!changed.status.success(),
+        "old composed proof must not survive callee source change");
 }
 
 /// G2：真证书命中（用真 lean 跑一次后，证书生效；第二次 cache: hit 且快）。
