@@ -56,4 +56,16 @@ input and terminal state with plugin-owned durable checkpoints.
 2. *
   > sys.exit code=26
 
+**partial_steps = > json.parse text=[{"id":"children","kind":"parallel","tasks":[]}]**
+**new_batch = > workflow.open id="abi_flow_partial_ci_20261118" steps=`partial_steps` source_revision="flow-v1"**
+**parts = > json.parse text=[{"ok":true,"value":{"code":0,"value":"useful"}},{"ok":false,"error":"timeout"}]**
+**stopped = > workflow.commit id="abi_flow_partial_ci_20261118" step_id="children" response=`parts` source_revision="flow-v1"**
+**reloaded = > workflow.next id="abi_flow_partial_ci_20261118" source_revision="flow-v1"**
+**partial = > json.get value=`reloaded` key="partial"**
+**survivors = > json.get value=`partial` key="succeeded"**
+1. `survivors` == 1
+  **_ = 1**
+2. *
+  > sys.exit code=27
+
 Return *"durable-agent-flow-ok"*.
