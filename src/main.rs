@@ -626,6 +626,12 @@ enum KnowledgeAction {
         #[arg(long)]
         strict: bool,
     },
+    /// Independently replay a previously issued composition certificate
+    /// against current source, Lean modules and toolchain.
+    Replay {
+        #[arg(value_name = "CERTIFICATE")]
+        certificate: PathBuf,
+    },
     /// Inspect stable project symbols by exact URI or display name
     Inspect {
         /// Symbol URI (`mq://…`) or declaration name
@@ -1784,6 +1790,26 @@ fn try_main(cli: Cli) -> Result<i32> {
             match action.unwrap_or(KnowledgeAction::Compile) {
                 KnowledgeAction::Compile => {
                     write_knowledge(KnowledgeOptions { path, out_dir: out })?;
+                    Ok(0)
+                }
+                KnowledgeAction::Replay { certificate } => {
+                    let root=if path.is_file(){
+                        path.parent().filter(|p|!p.as_os_str().is_empty())
+                            .unwrap_or_else(||std::path::Path::new(".")).to_path_buf()
+                    }else{path.clone()};
+                    let compiled=marqdo::sema::ir::compile_project(
+                        &marqdo::sema::ir::CompileOptions{
+                            project_root:root,
+                            entry:path.is_file().then_some(path),
+                            lock_mode:marqdo::sema::ir::LockMode::Off
+                        })?;
+                    let lean=marqdo::prove::driver::Toolchain::discover(None)?
+                        .ok_or_else(||anyhow::anyhow!("proof.compose_lean_missing"))?;
+                    let proof=marqdo::knowledge::composition::replay(
+                        &compiled,&certificate,&lean)?;
+                    if json{println!("{proof}");}else{
+                        println!("{}",serde_json::to_string_pretty(&proof)?);
+                    }
                     Ok(0)
                 }
                 KnowledgeAction::Compose { strict } => {
