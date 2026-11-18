@@ -17,6 +17,13 @@ fn linked_claims<'a>(proofs:&'a Value, symbol:&str)->Vec<&'a Value>{
 }
 
 pub fn analyze(semantic:&SemanticProject, proof_index:&Value)->Value{
+    analyze_with_verified(semantic,proof_index,&BTreeSet::new())
+}
+
+/// The accepted set must come from the real Lean kernel, never from the host
+/// calculator or an untrusted JSON status.
+pub fn analyze_with_verified(semantic:&SemanticProject, proof_index:&Value,
+    kernel_verified:&BTreeSet<String>)->Value{
     let known:BTreeSet<&str>=semantic.artifacts.iter()
         .filter_map(|a|a.symbol_id.as_ref().map(|id|id.as_str())).collect();
     let mut obligations=Vec::new();
@@ -42,6 +49,13 @@ pub fn analyze(semantic:&SemanticProject, proof_index:&Value)->Value{
                     && r["usable"]==true);
                 let unconditional=c.premise.as_deref()
                     .map_or(true,|s|s.trim().is_empty());
+                let goal=if unconditional {None} else {
+                    c.premise.as_deref().and_then(|pre|
+                        super::vc::instantiate(semantic,call,pre))
+                };
+                let key=format!("{}#{}",id,c.anchor_id);
+                let kernel_passed=goal.as_ref().is_some_and(|g|
+                    g.holds && kernel_verified.contains(&key));
                 json!({
                     "claim_anchor_id":c.anchor_id,
                     "premise":c.premise,
@@ -49,11 +63,18 @@ pub fn analyze(semantic:&SemanticProject, proof_index:&Value)->Value{
                     "callee_certificate_valid":verified,
                     // An unbound premise is a caller-side proof obligation;
                     // it is never discharged merely because callee was proved.
+                    "precondition_goal_key":if unconditional {None} else {Some(key)},
+                    "lean_proposition":goal.as_ref().map(|g|g.proposition.as_str()),
+                    "closed_host_check":goal.as_ref().map(|g|g.holds),
                     "call_precondition_status":if unconditional {"none"}
-                        else {"requires_lean_proof_with_actual_arguments"},
+                        else if kernel_passed {"lean_kernel_verified"}
+                        else if goal.as_ref().is_some_and(|g|!g.holds) {"refuted_closed_precondition"}
+                        else if goal.is_some() {"requires_lean_kernel"}
+                        else {"requires_symbolic_callsite_proof"},
                     "status":if !verified {"missing_verified_callee_claim"}
-                        else if !unconditional {"precondition_pending"}
-                        else {"available_as_contract"}
+                        else if unconditional || kernel_passed {"available_as_contract"}
+                        else if goal.as_ref().is_some_and(|g|!g.holds) {"precondition_refuted"}
+                        else {"precondition_pending"}
                 })
             }).collect();
         let all_available=exported && !contracts.is_empty()
