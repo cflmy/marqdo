@@ -279,6 +279,107 @@ pub fn commit(args: &Value) -> Result<Value,String> {
         "cursor":index+1,"value":value,"reused":false}))
 }
 
+/// Produce a plan containing only previously failed *read-only* child tasks.
+/// "uncertain" children and effectful plans cannot be blindly retried.
+pub fn retry_plan(args: &Value) -> Result<Value,String> {
+    let id=field(args,"id")?;
+    let ckpt=read(args,id)?;
+    if ckpt["ok"]!=true || !check_context(args,&ckpt) {
+        return Ok(json!({"ok":false,"status":"not_found_or_mismatched"}));
+    }
+    let (meta,index)=state(&ckpt)?;
+    if ckpt["status"]!="blocked" {
+        return Ok(json!({"ok":false,"status":"not_retryable"}));
+    }
+    let step=&meta["steps"][index];
+    if step["kind"]!="parallel" || step["effect_class"]!="read"
+        || meta["partial"]["uncertain"].as_u64().unwrap_or(1)!=0
+    {
+        return Ok(json!({"ok":false,"status":"manual_reconciliation_required"}));
+    }
+    let Some(items)=meta["partial"]["items"].as_array() else {
+        return Err("partial report has no items".into());
+    };
+    let Some(tasks)=step["tasks"].as_array() else {
+        return Err("parallel plan has no tasks".into());
+    };
+    if items.len()!=tasks.len() {
+        return Err("partial report task count mismatch".into());
+    }
+    let mut failed=Vec::new();
+    let mut indices=Vec::new();
+    for (i,item) in items.iter().enumerate() {
+        if item["index"]!=i {
+            return Err("out-of-order child result index".into());
+        }
+        if item["status"]=="failed" {
+            failed.push(tasks[i].clone());
+            indices.push(i);
+        } else if item["status"]!="succeeded" {
+            return Ok(json!({"ok":false,"status":"manual_reconciliation_required"}));
+        }
+    }
+    Ok(json!({"ok":true,"status":"retry_read_only",
+        "id":id,"step_id":step["id"],"tasks":failed,"indices":indices}))
+}
+
+/// Merge only the failed child slots with verified new outcomes.
+/// Successful results and their order remain untouched.
+pub fn retry_commit(args: &Value) -> Result<Value,String> {
+    let id=field(args,"id")?;
+    let _guard=lock(args,id)?;
+    let ckpt=read(args,id)?;
+    if ckpt["ok"]!=true || !check_context(args,&ckpt) {
+        return Ok(json!({"ok":false,"status":"not_found_or_mismatched"}));
+    }
+    let (meta,index)=state(&ckpt)?;
+    if ckpt["status"]!="blocked" {
+        return Ok(json!({"ok":false,"status":"not_retryable"}));
+    }
+    let step=&meta["steps"][index];
+    if step["kind"]!="parallel" || step["effect_class"]!="read"
+        || meta["partial"]["uncertain"].as_u64().unwrap_or(1)!=0
+    {
+        return Ok(json!({"ok":false,"status":"manual_reconciliation_required"}));
+    }
+    let items=meta["partial"]["items"].as_array()
+        .ok_or("invalid partial report")?;
+    let incoming=args.get("results").and_then(Value::as_array)
+        .ok_or("retry_commit requires results list")?;
+    let expected=items.iter().filter(|it|it["status"]=="failed").count();
+    if incoming.len()!=expected {
+        return Err("retry result count differs from failed child count".into());
+    }
+    let mut next=Vec::with_capacity(items.len());
+    let mut replacement=incoming.iter();
+    for item in items {
+        if item["status"]=="succeeded" {
+            next.push(item["result"].clone());
+        } else if item["status"]=="failed" {
+            next.push(replacement.next().ok_or("missing retry result")?.clone());
+        } else {
+            return Ok(json!({"ok":false,"status":"manual_reconciliation_required"}));
+        }
+    }
+    let report=parallel::report(&json!({"results":next}))?;
+    let mut updated=meta.clone();
+    if report["ok"]==true {
+        updated["cursor"]=json!(index+1);
+        updated["partial"]=Value::Null;
+        updated["completed"].as_array_mut().ok_or("completed not list")?
+            .push(json!({"step_id":step["id"],"value":report}));
+        let finished=index+1==updated["steps"].as_array().ok_or("steps missing")?.len();
+        save(args,id,&updated,if finished {"succeeded"} else {"running"})?;
+        Ok(json!({"ok":true,"status":if finished {"succeeded"} else {"advanced"},
+            "cursor":index+1,"result":report}))
+    } else {
+        updated["partial"]=report.clone();
+        save(args,id,&updated,if report["uncertain"].as_u64().unwrap_or(0)>0 {
+            "uncertain" } else {"blocked"})?;
+        Ok(json!({"ok":false,"status":"blocked","report":report}))
+    }
+}
+
 pub fn cancel(args: &Value) -> Result<Value,String> {
     let id=field(args,"id")?;
     let _guard=lock(args,id)?;
@@ -364,6 +465,30 @@ mod tests {
         assert_eq!(after["partial"]["succeeded"],1);
         assert_eq!(after["partial"]["failed"],1);
         assert_eq!(commit(&c).unwrap()["status"],"blocked");
+    }
+
+    #[test]
+    fn retries_only_failed_read_only_children_without_redoing_successes() {
+        let mut a=fixture();
+        a["steps"]=json!([{"id":"batch","kind":"parallel","effect_class":"read",
+            "tasks":[{"path":"a.mq.md"},{"path":"b.mq.md"}]}]);
+        open(&a).unwrap();
+        let mut c=a.clone();
+        c["step_id"]=json!("batch");
+        c["response"]=json!([
+            {"ok":true,"value":{"code":0,"value":"keep"}},
+            {"ok":false,"error":"temporary timeout"}
+        ]);
+        assert_eq!(commit(&c).unwrap()["status"],"blocked");
+        let plan=retry_plan(&a).unwrap();
+        assert_eq!(plan["indices"],json!([1]));
+        assert_eq!(plan["tasks"].as_array().unwrap().len(),1);
+        let mut retry=a.clone();
+        retry["results"]=json!([{"ok":true,"value":{"code":0,"value":"fixed"}}]);
+        assert_eq!(retry_commit(&retry).unwrap()["status"],"succeeded");
+        let out=next(&a).unwrap();
+        assert_eq!(out["completed"][0]["value"]["items"][0]["result"]["value"]["value"],"keep");
+        assert_eq!(out["completed"][0]["value"]["items"][1]["result"]["value"]["value"],"fixed");
     }
 
     #[test]
