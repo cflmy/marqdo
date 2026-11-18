@@ -241,6 +241,15 @@ fn g2_certificate_hit_after_real_run() {
     let json: serde_json::Value = serde_json::from_slice(&out.stdout).expect("json");
     assert_eq!(json["status"], "proved", "真定理必须 proved：{json}");
     assert_eq!(json["lean"]["cache"], "miss");
+    let proof_id = json["artifact_id"].as_str().unwrap().rsplit('/').next().unwrap();
+    let link_path = s.dir.join(".marqdo/prove").join(proof_id).join("knowledge-links.json");
+    let linkage: serde_json::Value = serde_json::from_slice(
+        &fs::read(&link_path).expect("real Lean proof must emit a knowledge linkage"))
+        .expect("knowledge linkage JSON");
+    assert_eq!(linkage["claims"][0]["status"], "proved",
+        "only verified Lean receipts should carry proved: {linkage}");
+    assert_eq!(linkage["claims"][0]["proof_scope"], "function");
+    assert!(linkage["claims"][0]["certificate_digest"].as_str().is_some());
 
     // 第二次：命中证书。
     let out2 = s.marqdo().arg("prove").arg("台账.mq.md").arg("--json").output().expect("second prove");
