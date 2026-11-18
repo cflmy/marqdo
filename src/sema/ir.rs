@@ -235,8 +235,6 @@ pub struct KnowledgeStep {
     pub source: SourceLocation,
 }
 
-/// Static call site bound to a SymbolId (G02).
-#[derive(Debug, Clone, PartialEq, Eq)]
 /// Fully static i64 call-site argument. Non-constant expressions are kept
 /// as unresolved proof obligations rather than guessed values.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -287,6 +285,8 @@ fn static_call_args(call:&CallExpr)->Vec<StaticCallArg>{
     }).collect()
 }
 
+/// Static call site bound to a SymbolId (G02).
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BoundCall {
     /// Exact owning function symbol at the AST callsite.
     pub caller: SymbolId,
