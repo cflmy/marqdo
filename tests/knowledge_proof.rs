@@ -105,7 +105,7 @@ import:
 fn complete_knowledge_publish_contains_anchors_refs_and_proof_receipts() {
     let dir=root("publish");
     let file=dir.join("main.mq.md");
-    fs::write(&file,"# main\n\n## compute\n\n[查看知识](#@演算)\n**x = [演算](2 * 3)**\n*x*\n").unwrap();
+    fs::write(&file,"# main\n\n## compute\n\n| 定理 | 结论 | 前提 | 策略 |\n|---|---|---|---|\n| rule | 结果 = 6 | | auto |\n\n[查看知识](#@演算)\n[查看定理](#@rule)\n**x = [演算](2 * 3)**\n*x*\n").unwrap();
     let out=dir.join(".marqdo");
     marqdo::knowledge::write_knowledge(marqdo::knowledge::KnowledgeOptions{
         path:dir.clone(),out_dir:out.clone()
@@ -117,6 +117,12 @@ fn complete_knowledge_publish_contains_anchors_refs_and_proof_receipts() {
         &fs::read(out.join("refs.json")).unwrap()).unwrap();
     assert!(refs["refs"].as_array().unwrap().iter()
         .any(|r|r["label"]=="查看知识" && r["resolution"]=="anchor"));
+    let claims:serde_json::Value=serde_json::from_slice(
+        &fs::read(out.join("claims.json")).unwrap()).unwrap();
+    assert_eq!(claims["claims"].as_array().unwrap().len(),1);
+    assert_eq!(claims["claims"][0]["verification"],"declared_unverified");
+    assert!(refs["refs"].as_array().unwrap().iter()
+        .any(|r|r["label"]=="查看定理" && r["resolution"]=="claim"));
     let index:serde_json::Value=serde_json::from_slice(
         &fs::read(out.join("proof-index.json")).unwrap()).unwrap();
     assert_eq!(index["claims"].as_array().unwrap().len(),0);
