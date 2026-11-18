@@ -399,6 +399,37 @@ import:
         assert!(callee.contains("theorem callee_contract"));
         assert!(caller.starts_with("import CalleeModule"));
         assert!(caller.contains("using (callee_contract"));
+        // Duplicate matching declarations must not be treated as a
+        // unique contractual source of truth.
+        let duplicate=std::fs::read_to_string(root.join("math.mq.md")).unwrap()
+            .replace("| fixed | 结果 = 2 | auto |",
+                     "| fixed | 结果 = 2 | auto |\n| other | 结果 = 2 | auto |");
+        std::fs::write(root.join("math.mq.md"),duplicate).unwrap();
+        let ambiguous=crate::sema::ir::compile_project(
+            &crate::sema::ir::CompileOptions::for_path(&root).unwrap()).unwrap();
+        let ambiguous_call=ambiguous.semantics.bound_calls.iter().find(|x|
+            x.call_site=="math.math.exact").unwrap();
+        assert!(candidate(&ambiguous,ambiguous_call).is_none(),
+            "duplicate constant claims must fail closed");
+        std::fs::write(root.join("math.mq.md"),r#"---
+markup: occlusion
+---
+
+# math
+
+## exact
++ `n`
+
+| 参数 | 类型 | 说明 |
+|---|---|---|
+| n | int | integer |
+
+| 定理 | 结论 | 策略 |
+|---|---|---|
+| fixed | 结果 = 2 | auto |
+
+*2*
+"#).unwrap();
         // Branching is explicitly outside the certificate scope.
         fs::write(root.join("main.mq.md"),r#"---
 import:
