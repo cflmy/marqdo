@@ -225,3 +225,12 @@ marqdo knowledge replay .marqdo/modular/composed/{proof-id}/composition-certific
 `knowledge replay` 现在要求证明证书的 identity 在当前语义工程中**恰好对应一个**可组合的 BoundCall；禁止采用 `find first` 策略选择多个候选中的第一个。调用方与被调用方的 closure 收据必须与重编译得到的**两个精确身份与哈希**集合完全一致：重复、额外注入、缺失、替换记录均拒绝重放。
 
 `composition.rs` 新增单元回归测试 `certificate_closures_must_be_exact_and_unique`。这仅加固证书来源绑定，不扩大已证明的运行时语义范围。CI 需以分支最新 head 为准；不同提交上曾经成功的检查不等于本提交已验证。
+
+
+## M9：合约声明歧义与同模块伪组合防护
+
+组合候选现在要求被调函数和调用方各自恰好拥有 **一条** 符合目标常量结果的无条件定理声明。此前使用 `any` 的逻辑可能让两个不同名称、同一结论的声明被当成唯一证据；现在这种情况按歧义处理并拒绝出证。测试在真实的 `.mq.md` 表格中构造两个同结论声明。
+
+此外，当前受限组合证明只面向不同源文件的静态导入调用，显式拒绝同文件以及自调用，避免将本地调用伪装成可复用跨模块契约证书。此项是准入安全性改进，不表示抽象插件、分支、循环和递归已经实现具体语义证明。
+
+验证仍须以最终提交的 GitHub Actions 为准，尤其关注 `modular-proof-smoke`、`proof` 和 `knowledge-proof-integration`。工作流无作业失败不应解释为单元测试失败或测试成功，必须另行定位 YAML / GitHub Actions 工作流事件层面问题。
