@@ -56,7 +56,7 @@ input and terminal state with plugin-owned durable checkpoints.
 2. *
   > sys.exit code=26
 
-**partial_steps = > json.parse text=[{"id":"children","kind":"parallel","tasks":[]}]**
+**partial_steps = > json.parse text=[{"id":"children","kind":"parallel","effect_class":"read","tasks":[{"path":"worker-a.mq.md"},{"path":"worker-b.mq.md"}]}]**
 **new_batch = > workflow.open id="abi_flow_partial_ci_20261118" steps=`partial_steps` source_revision="flow-v1"**
 **parts = > json.parse text=[{"ok":true,"value":{"code":0,"value":"useful"}},{"ok":false,"error":"timeout"}]**
 **stopped = > workflow.commit id="abi_flow_partial_ci_20261118" step_id="children" response=`parts` source_revision="flow-v1"**
@@ -67,5 +67,19 @@ input and terminal state with plugin-owned durable checkpoints.
   **_ = 1**
 2. *
   > sys.exit code=27
+
+**retry_plan = > workflow.retry_plan id="abi_flow_partial_ci_20261118" source_revision="flow-v1"**
+**allowed = > json.get value=`retry_plan` key="ok"**
+1. `allowed`
+  **_ = 1**
+2. *
+  > sys.exit code=28
+**repaired = > json.parse text=[{"ok":true,"value":{"code":0,"value":"repaired"}}]**
+**merged = > workflow.retry_commit id="abi_flow_partial_ci_20261118" results=`repaired` source_revision="flow-v1"**
+**merged_ok = > json.get value=`merged` key="ok"**
+1. `merged_ok`
+  **_ = 1**
+2. *
+  > sys.exit code=29
 
 Return *"durable-agent-flow-ok"*.
