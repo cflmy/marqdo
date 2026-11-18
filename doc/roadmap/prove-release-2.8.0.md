@@ -60,7 +60,7 @@ monotonicity guardrails fail loudly on judger defects, fake theorems get
 counterexample witnesses, and certificate caching plus directory mode
 support agent-scale proving.
 
-详见 [双语发布说明](doc/roadmap/prove-release-2.8.0.md)。
+详见 [双语发布说明](../releases/v2.8.0.md)。
 ```
 
 ### 4.2 `README.md` 修改
@@ -70,7 +70,7 @@ support agent-scale proving.
 ```markdown
 当前 CLI **2.8.0** 新增 `marqdo prove`：知识文件的定理表编译为 Lean 4 并自动
 判定真假——没有 Lean 工具链也能离线符号执行（诚实降级，绝不冒充证明），
-有 Lean 时全链路证明并给出反例见证。参见[发布说明](doc/roadmap/prove-release-2.8.0.md)。
+有 Lean 时全链路证明并给出反例见证。参见[发布说明](../releases/v2.8.0.md)。
 
 CLI **2.8.0** adds `marqdo prove`: theorem tables in knowledge files compile
 to Lean 4 and are judged automatically — offline symbolic execution without

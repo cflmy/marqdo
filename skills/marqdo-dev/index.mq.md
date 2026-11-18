@@ -130,6 +130,50 @@ We **checked = [检查真实文件及其可读性](engineering.run(argv=`argv`))
 We **checked = [执行实际离线构建与验收](engineering.run(argv=`argv`, timeout_ms=300000, max_output=2097152))**.
 验收结束后返回*[按真实退出状态判断结果并保留输出](engineering.check_exit(outcome=`checked`))*。
 
+## prove
++ `path`
++ `all`
++ `max_files`
++ `require_lean`
++ `json`
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| path | text | "." | 单个 `.mq.md` 或目录（目录需要 all=True） |
+| all | bool | False | 目录模式：递归收集 .mq.md 逐文件出证，整体取最差状态 |
+| max_files | text | "200" | 目录收集上限（--max-files 的值，文本形式） |
+| require_lean | bool | False | CI 严格模式：未判定状态退 2 |
+| json | bool | False | 单个 JSON 对象输出（智能体可读契约） |
+
+| 返回 | 类型 | 说明 |
+|---|---|---|
+| result | map | Result：真实 `marqdo prove` 退出状态、标准输出与错误输出 |
+
+证明知识文件的定理表：先离线符号执行（毫秒级 checked，不是 proved），有 Lean 工具链时由 Lean 复核升级 proved；假定理给出路径见证反例；离线与 Lean 分歧触发 proof.divergence 错误并退 1，永不落绿。这个任务调用真实 CLI——不带 Lean 时状态如实停留在 unverified/checked（咨询性退 0），require_lean=True 才把未判定当作阻塞。
+
+目录模式逐文件出证书，整体状态按 error > unproved > rejected > unverified > checked > proved 取最差；证书缓存在 .marqdo/prove/，重复运行命中缓存。通过只说明所选文件判定完成，不能替代 test 任务的运行时验收；两者结合才是完整验收。
+
+1. len(text.trim(`path`)) == 0
+  Return *[要求明确的证明范围](result.error(code="dev.prove_path", message="path is required", operation="prove"))*.
+
+`argv` =
+
+| argument |
+|---|
+| "prove" |
+| "path" |
+
+1. `all` == True
+  We **argv = [切换目录模式](table.append(list=`argv`, item="--all"))** and **argv = [追加收集上限标记](table.append(list=`argv`, item="--max-files"))** and **argv = [追加原样传入的上限文本](table.append(list=`argv`, item=`max_files`))**.
+1. not `all`
+  We **argv = [追加原样传入的证明路径](table.append(list=`argv`, item=`path`))**.
+1. `require_lean` == True
+  We **argv = [追加严格模式](table.append(list=`argv`, item="--require-lean"))**.
+1. `json` == True
+  We **argv = [追加机器可读输出](table.append(list=`argv`, item="--json"))**.
+We **checked = [执行真实证明管线](engineering.run(argv=`argv`, timeout_ms=600000, max_output=4194304))**.
+验收结束后返回*[按真实退出状态判断结果并保留输出](engineering.check_exit(outcome=`checked`))*。
+
 ## build_browser
 
 | 参数 | 类型 | 默认 | 说明 |

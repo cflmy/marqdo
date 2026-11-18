@@ -918,11 +918,8 @@ CI：`.github/workflows/proof.yml` —— 装 Lean 4.35.0 → 底座校验 →
 3. **分支条件字段访问**（`access(审核, "ok")` 作条件）：解析器文法限制，
    prove 侧已就绪（offline cond_atom 支持任意键），放开即生效。
 
-#### §12.5 待仓库权限合入的内容
+#### §12.5 待仓库权限合入的内容（已于 2026-11-18 合入）
 
-以下文件 root 属主、当前工作目录不可写（uid=1000）：
-
-- `CHANGELOG.md`：v2.8.0 条目（见 `doc/roadmap/prove-release-2.8.0.md`）
-- `README.md`：版本行 2.7.1→2.8.0 + prove 简介（同上文件附文案）
-- `doc/releases/v2.8.0.md`：双语发布说明（同上文件附全文）
-- `skills/marqdo-dev/index.mq.md`：`prove` 任务（契约见本节 §12.3 表）
+`CHANGELOG.md`（v2.8.0 条目）、`README.md`（版本行 + 愿景第 6 条）、
+`doc/releases/v2.8.0.md`（双语发版说明）、`skills/marqdo-dev/index.mq.md`
+（`prove` 任务）——权限放开后已全部合入原文，见各自文件。

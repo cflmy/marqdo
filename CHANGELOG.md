@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+## v2.8.0 — 2026-11-17
+
+`marqdo prove` 正式发布：定理表 → Lean 4 证明 → 自动判定。离线符号执行（F1–F5）无工具链可用，`checked` 永远弱于 `proved`；单调性护栏让判定器缺陷显式失败；假定理给出反例见证；证书缓存与目录模式面向智能体批量出证。
+
+`marqdo prove` ships: theorem tables compile to Lean 4 and are judged automatically. Offline symbolic execution works without a toolchain, monotonicity guardrails fail loudly on judger defects, fake theorems get counterexample witnesses, and certificate caching plus directory mode support agent-scale proving.
+
+详见 [双语发布说明](doc/releases/v2.8.0.md)。
+
 ## v2.7.1 — 2026-11-11
 
 CLI 修复发布：View 实际逻辑的手动开合不再被布局重排或运行结果刷新覆盖；函数、链接、列表和记录按内容排版，手机详情整行展示。核心仍为 19 个构造；拓展库保留 2.7.0。
