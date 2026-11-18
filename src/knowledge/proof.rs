@@ -101,9 +101,17 @@ pub fn link_report(compiled: &Compilation, file: &Path, report: &Report, dir: &P
         }
     }
     claims.sort_by(|a,b|a["claim_anchor_id"].as_str().cmp(&b["claim_anchor_id"].as_str()));
+    let assumptions:Vec<Value>=compiled.semantics.assumptions.iter()
+        .filter(|a|compiled.semantics.root.join(&a.source.file)
+            .canonicalize().ok().as_deref()==file.canonicalize().ok().as_deref())
+        .map(|a|json!({"id":a.id,"owner":a.owner.as_str(),
+            "operation":a.operation,"premise":a.premise,
+            "postcondition":a.postcondition,
+            "status":"declared_not_disclosed_as_proved"}))
+        .collect();
     json!({"schema_version":1,"kind":"knowledge_proof_linkage",
         "source_sha256":report.source_sha256,"file":report.file,
-        "claims":claims,"unresolved":unresolved})
+        "claims":claims,"assumptions":assumptions,"unresolved":unresolved})
 }
 
 pub fn emit_links(file: &Path, report: &Report, dir: &Path) -> Result<()> {
