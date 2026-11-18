@@ -58,6 +58,46 @@ fn links_bind_to_exact_owner_and_stale_after_source_change() {
 }
 
 #[test]
+fn overflowing_actual_argument_cannot_be_source_inlined_to_lean_int() {
+    let dir=root("overflow-actual-arg");
+    fs::write(dir.join("numbers.mq.md"),r#"# numbers
+
+## identity
++ `n`
+
+*`n`*
+"#).unwrap();
+    let file=dir.join("main.mq.md");
+    fs::write(&file,r#"---
+import:
+  numbers: numbers.mq.md
+---
+
+# main
+
+## compute
+
+| 定理 | 结论 | 策略 |
+|---|---|---|
+| bad | 结果 = 0 | auto |
+
+**value = [溢出](numbers.numbers.identity(9223372036854775807 + 1))**
+*value*
+"#).unwrap();
+    let out=dir.join("prove");
+    let _=marqdo::prove::prove_path(&file,&marqdo::prove::ProveOptions{
+        emit_dir:Some(out.clone()),judge:false,..Default::default()
+    }).unwrap();
+    let plan:serde_json::Value=serde_json::from_slice(
+        &fs::read(out.join("plan.json")).unwrap()).unwrap();
+    let f=plan["functions"].as_array().unwrap().iter()
+        .find(|x|x["name"]=="main.compute").unwrap();
+    assert!(!f["ops"].as_array().unwrap().is_empty(),
+        "an overflowing actual argument must not be silently turned into Lean Int");
+    fs::remove_dir_all(dir).unwrap();
+}
+
+#[test]
 fn overflowing_imported_arithmetic_cannot_be_source_inlined_to_lean_int() {
     let dir=root("overflow-import");
     fs::write(dir.join("numbers.mq.md"),r#"# numbers
