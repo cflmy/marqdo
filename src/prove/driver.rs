@@ -121,6 +121,21 @@ pub fn ensure_library(cache_root: &Path, lean: &Toolchain) -> Result<(PathBuf, S
 }
 
 /// 判定一个生成的 Lean 模块。
+/// Re-check a generated, closed proof-obligation module with the Lean kernel.
+/// No local JSON certificate or Rust-side decision may replace this check.
+pub fn check_closed_goals(
+    toolchain:&Toolchain, source:&Path, timeout:Duration
+)->Result<()>{
+    let mut command=Command::new(&toolchain.lean);
+    command.arg(source);
+    let (log,code,timed_out)=run_with_timeout(&mut command,timeout)?;
+    anyhow::ensure!(!timed_out,
+        "proof.modular_timeout: Lean did not finish within {}s",timeout.as_secs());
+    anyhow::ensure!(code==Some(0),
+        "proof.modular_unproved: Lean rejected callsite goals: {log}");
+    Ok(())
+}
+
 pub fn check_module(
     lean: &Toolchain,
     lib_dir: &Path,
