@@ -1777,7 +1777,8 @@ fn try_main(cli: Cli) -> Result<i32> {
                 }
                 KnowledgeAction::ProofDeps { strict } => {
                     let semantic_root=if path.is_file() {
-                        path.parent().unwrap_or_else(|| std::path::Path::new(".")).to_path_buf()
+                        path.parent().filter(|p|!p.as_os_str().is_empty())
+                            .unwrap_or_else(||std::path::Path::new(".")).to_path_buf()
                     } else {path.clone()};
                     let compiled=marqdo::sema::ir::compile_project(
                         &marqdo::sema::ir::CompileOptions {
