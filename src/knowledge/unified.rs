@@ -186,7 +186,7 @@ impl<'a> Builder<'a>{
         let mut matches=self.compilation.semantics.bound_calls.iter().filter(|bc|
             bc.caller.as_str()==owner &&bc.source.line==line&&
             bc.call_site==display);
-        let bound=matches.next()?;
+        let bound=matches.next()?.clone();
         if matches.next().is_some()||bound.control_blocker.is_some()
             ||!bound.required_effects.is_pure()||bound.args.len()!=call.args.len(){
             return None
@@ -252,17 +252,17 @@ impl<'a> Builder<'a>{
             return None
         }
         let result=(||->Option<Built>{
-            let a=unique_artifact(self.compilation,symbol)?;
+            let a=unique_artifact(self.compilation,symbol)?.clone();
             if !a.effects.is_pure(){return None}
             let sig=a.signature.as_ref()?;
             if !basic_signature(&sig.params){return None}
-            let fun:Function=load_function(self.compilation,a)?;
+            let fun:Function=load_function(self.compilation,&a)?;
             if fun.is_object()||fun.params.len()!=sig.params.len()
                 ||!fun.params.iter().zip(&sig.params)
                     .all(|(f,p)|f.name==p.name){return None}
             let env=sig.params.iter().enumerate().map(|(i,p)|
                 (p.name.clone(),format!("v{i}"))).collect::<BTreeMap<_,_>>();
-            let contract=result_claim(self.compilation,a,&env)?;
+            let contract=result_claim(self.compilation,&a,&env)?;
             let mut call_uses=Vec::new();
             let body=self.block(&fun.body,env,symbol,&mut call_uses,0)?;
             // No semantically relevant BoundCall may remain unmodeled:
@@ -291,7 +291,7 @@ impl<'a> Builder<'a>{
                     "  have hc{i} := {callee_contract}{}\n",args_text(&use_.args)));
             }
             source.push_str(&format!(
-                "  simp only [{fname}] at *\n  split_ifs <;> omega\n"));
+                "  simp only [{fname}] at * <;> (try split_ifs) <;> omega\n"));
             let operator=contract.split_whitespace().next()?.to_string();
             Some(Built{
                 symbol:symbol.to_owned(),artifact:a.artifact_id.0.clone(),
