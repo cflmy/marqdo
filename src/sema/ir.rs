@@ -317,7 +317,19 @@ fn compile_index(index: ProjectIndex) -> Result<Compilation> {
         let module_symbols = index.symbols_in_module(module_id);
         for symbol in index.symbols_in_module(module_id) {
             let function = by_path.get(&symbol.declaration_path).expect("symbol collected from module");
+            let mut claim_counts=BTreeMap::new();
             for claim in &function.claims {
+                *claim_counts.entry(claim.id.as_str()).or_insert(0usize)+=1;
+            }
+            for claim in &function.claims {
+                if claim_counts.get(claim.id.as_str())!=Some(&1) {
+                    diagnostics.push(Diagnostic::new(Some(path),
+                        Span::new(claim.line,1),
+                        format!("ambiguous theorem declaration: {}",claim.id))
+                        .with_code("knowledge.claim_duplicate")
+                        .with_severity(Severity::Warning));
+                    continue;
+                }
                 claims.push(KnowledgeClaim {
                     anchor_id: format!("{}#claim-{}",symbol.id.as_str(),
                         digest(claim.id.as_bytes()).0.trim_start_matches("sha256:")),
@@ -363,17 +375,17 @@ fn compile_index(index: ProjectIndex) -> Result<Compilation> {
     }
     close_effect_dependencies(&mut artifacts);
     resolve_anchor_references(&mut refs, &claims);
-    for reference in refs.iter().filter(|r| r.resolution == "unresolved_anchor") {
-        diagnostics.push(
-            Diagnostic::new(
+    for reference in refs.iter().filter(|r|
+        r.resolution=="unresolved_anchor" || r.resolution=="ambiguous_anchor") {
+        diagnostics.push(Diagnostic::new(
                 Some(root.path().join(&reference.source.file)),
                 Span::new(reference.source.line, 1),
-                format!("knowledge anchor target not found or ambiguous: {}",
-                    reference.link_target.as_deref().unwrap_or("<missing>")),
-            )
-            .with_code("knowledge.anchor_unresolved")
-            .with_severity(Severity::Warning)
-        );
+                format!("knowledge target cannot be uniquely resolved: {}",
+                    reference.link_target.as_deref().unwrap_or("<missing>")))
+            .with_code(if reference.resolution=="ambiguous_anchor" {
+                "knowledge.anchor_ambiguous"
+            } else {"knowledge.anchor_unresolved"})
+            .with_severity(Severity::Warning));
     }
     let resolved_effects: BTreeMap<_,_> = artifacts.iter()
         .map(|artifact|(artifact.artifact_id.clone(),artifact.effects.clone())).collect();
