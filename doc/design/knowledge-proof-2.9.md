@@ -212,3 +212,9 @@ marqdo knowledge replay .marqdo/modular/composed/{proof-id}/composition-certific
 循环不变式与终止性、递归归纳证明、插件状态转换可信契约、
 并发效应，以及一般性参数化后置条件的源码无关组合，目前仍不完整。
 不能将已完成的限定子集扩大宣传为完整的通用模块化证明系统。
+
+### 2026-11-18 类型安全修正
+
+目前类型表源文本中的 `int` 被契约解析器归一化为 `number`，它也允许 Num 和 Formula。因此**不能**把 `number` 的证明自动解释为任意 Marqdo 运行时输入均为 i64。组合证书作用域改为 `number_contract_int_model_pure_forwarder_constant_result`，且根报告固定标注 `full_marqdo_runtime_semantics_proved: false`。这仅证明整数抽象模型上的独立模块组合。完整运行时证明必须新增可执行类型收窄及类型保持定理。
+
+另新增 `MarqdoEffects.lean`：把状态、插件异常、未决结果和耗尽 fuel 的循环统一建模，证明异常与未决结果不能充当成功返回；该抽象 ABI 契约仍须具体插件的实现见证，不能由表格声明自动授予。
