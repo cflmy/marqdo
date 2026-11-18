@@ -117,6 +117,39 @@ fn candidate(compiled:&Compilation,call:&BoundCall)
     Some((callee_src,caller_src,format!("{}#{}",ca.artifact_id.0,
         ce.artifact_id.0),n))
 }
+/// Explain why a caller cannot receive a scoped composition certificate.
+/// Missing evidence is reported, never fixed up by guessing call identities.
+fn rejection_diagnostics(c:&Compilation,call:&BoundCall)->Value{
+    let caller=c.semantics.artifacts.iter().find(|a|
+        a.symbol_id.as_ref()==Some(&call.caller));
+    let callee=c.semantics.artifacts.iter().find(|a|
+        a.symbol_id.as_ref()==Some(&call.target));
+    let cf=caller.and_then(|a|function(c,a));
+    let ef=callee.and_then(|a|function(c,a));
+    let constant=ef.as_ref().and_then(constant_return);
+    json!({
+        "caller_semantics_resolved":caller.is_some(),
+        "callee_semantics_resolved":callee.is_some(),
+        "caller_effects":caller.map(|a|a.effects.values()),
+        "callee_effects":callee.map(|a|a.effects.values()),
+        "call_effects":call.required_effects.values(),
+        "caller_forward_shape":cf.as_ref().and_then(forwarded).is_some(),
+        "callee_constant_return":constant,
+        "caller_has_expected_claim":caller.zip(constant).is_some_and(|(a,n)|
+            claim_is_constant(c,a,n)),
+        "callee_has_expected_claim":callee.zip(constant).is_some_and(|(a,n)|
+            claim_is_constant(c,a,n)),
+        "caller_signature":caller.and_then(|a|a.signature.as_ref())
+            .map(|s|s.params.iter().map(|p|json!({"name":p.name,"type":p.ty,
+                "required":p.required})).collect::<Vec<_>>()),
+        "callee_signature":callee.and_then(|a|a.signature.as_ref())
+            .map(|s|s.params.iter().map(|p|json!({"name":p.name,"type":p.ty,
+                "required":p.required})).collect::<Vec<_>>()),
+        "actual_arguments":call.args.iter().map(|a|json!({
+            "name":a.name,"symbol":a.symbol,"integer":a.integer})).collect::<Vec<_>>(),
+        "path_guards":call.path_guards,"control_blocker":call.control_blocker
+    })
+}
 /// Emit one sealed bundle per eligible call. An unsuccessful Lean command
 /// never creates a certificate; the JSON report carries the failure.
 pub fn prove(compiled:&Compilation,out:&Path,toolchain:&Toolchain)->Result<Value>{
@@ -125,7 +158,8 @@ pub fn prove(compiled:&Compilation,out:&Path,toolchain:&Toolchain)->Result<Value
         let Some((source,client,identity,n))=candidate(compiled,call) else {
             records.push(json!({"caller":call.caller.as_str(),
                 "callee":call.target.as_str(),"status":"unsupported_fragment",
-                "reason":"requires_pure_typed_int_forwarder_with_constant_claims"}));
+                "reason":"requires_pure_typed_int_forwarder_with_constant_claims",
+                "diagnostics":rejection_diagnostics(compiled,call)}));
             continue;
         };
         let key=sha(format!("{}|{}|{}|{}",identity,
