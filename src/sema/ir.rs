@@ -377,8 +377,9 @@ fn compile_index(index: ProjectIndex) -> Result<Compilation> {
     resolve_anchor_references(&mut refs, &claims);
     for reference in refs.iter().filter(|r|
         r.resolution=="unresolved_anchor" || r.resolution=="ambiguous_anchor") {
+        let source_path=root.path().join(&reference.source.file);
         diagnostics.push(Diagnostic::new(
-                Some(root.path().join(&reference.source.file)),
+                Some(source_path.as_path()),
                 Span::new(reference.source.line, 1),
                 format!("knowledge target cannot be uniquely resolved: {}",
                     reference.link_target.as_deref().unwrap_or("<missing>")))
