@@ -20,6 +20,7 @@ pub mod proof;
 pub mod modular;
 pub mod vc;
 pub mod symbolic;
+pub mod composition;
 pub mod preflight;
 pub mod reuse;
 pub mod util;
