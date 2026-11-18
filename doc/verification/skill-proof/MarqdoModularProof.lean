@@ -120,7 +120,7 @@ theorem error_not_success {α ε : Type} (e : ε) :
   cases hv
 
 theorem diverged_not_success {α ε : Type} :
-    ¬ (∃ v : α, Exit.diverged = Exit.ok v) := by
+    ¬ (∃ v : α, (Exit.diverged : Exit α ε) = Exit.ok v) := by
   intro h
   obtain ⟨v, hv⟩ := h
   cases hv
