@@ -95,7 +95,8 @@ pub fn link_report(compiled: &Compilation, file: &Path, report: &Report, dir: &P
                 "source_file":owner.source.file,
                 "source_sha256":report.source_sha256,
                 "library_sha256":report.lean.as_ref().map(|l|l.library_sha256.as_str()),
-                "toolchain":report.lean.as_ref().map(|l|l.toolchain.as_str())
+                "toolchain":report.lean.as_ref().map(|l|l.toolchain.as_str()),
+                "module_sha256":report.lean.as_ref().map(|l|l.module_sha256.as_str())
             }));
         }
     }
@@ -132,7 +133,14 @@ pub fn index_links(prove_dir:&Path, semantic:&SemanticProject)->Value {
             for claim in claims {
                 let mut entry=claim.clone();
                 let owner=claim["owner_symbol_id"].as_str().and_then(|id|owners.get(id));
-                let fresh=owner.is_some_and(|a| {
+                let theorem_present=claim["owner_symbol_id"].as_str().is_some_and(|id|
+                    semantic.claims.iter().any(|c|
+                        c.owner.as_str()==id
+                        && claim["claim_anchor_id"]==c.anchor_id
+                        && claim["claim_id"]==c.label
+                        && claim["conclusion"]==c.conclusion
+                        && claim["premise"]==json!(c.premise)));
+                let fresh=theorem_present && owner.is_some_and(|a| {
                     claim["source_file"]==a.source.file
                     && claim["semantic_hashes"]["interface"]==a.hashes.interface.0
                     && claim["semantic_hashes"]["implementation"]==a.hashes.implementation.0
@@ -142,8 +150,22 @@ pub fn index_links(prove_dir:&Path, semantic:&SemanticProject)->Value {
                 });
                 let certified=entry["status"]=="proved" && entry["decided_by"]=="lean"
                     && entry["certificate_digest"].as_str().is_some_and(|digest|
-                        fs::read(folder.path().join("certificate.json")).ok().is_some_and(
-                            |bytes|sha(&bytes)==digest));
+                        fs::read(folder.path().join("certificate.json")).ok().is_some_and(|bytes| {
+                            if sha(&bytes)!=digest { return false; }
+                            let Ok(cert)=serde_json::from_slice::<Value>(&bytes) else {
+                                return false
+                            };
+                            cert["schema"]==1 && cert["tier"]=="lean"
+                                && cert["source_sha256"]==entry["source_sha256"]
+                                && cert["library_sha256"]==entry["library_sha256"]
+                                && cert["toolchain"]==entry["toolchain"]
+                                && cert["module_sha256"]==entry["module_sha256"]
+                                && cert["claims"].as_array().is_some_and(|records|
+                                    records.iter().any(|r|
+                                        r["id"]==entry["claim_id"]
+                                        && r["function"]==entry["function"]
+                                        && r["status"]=="proved"))
+                        }));
                 if !fresh {
                     entry["status"]=json!("stale");
                     entry["stale_reason"]=json!("source_or_semantic_dependency_changed");
