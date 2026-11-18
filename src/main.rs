@@ -1909,7 +1909,7 @@ fn try_main(cli: Cli) -> Result<i32> {
                                         marqdo::knowledge::symbolic::plan(
                                             &compiled.semantics,call,c.premise.as_deref()?)?
                                     )))
-                                    .filter(|(_,g)|g.runtime_domain_verified)
+                                    .filter(|(_,g)|g.abstract_integer_model_supported)
                                     .collect::<Vec<_>>()
                             }).collect();
                         if !symbolic.is_empty(){
