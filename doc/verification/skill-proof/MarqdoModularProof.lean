@@ -69,4 +69,60 @@ example :
       simpa [second, g, f] using hpair.right
     exact Nat.zero_ne_one impossible
 
+-- Execution is a *partial* result: host/plugin failures and divergence
+-- must remain visible. Loops/recursion can be reasoned about only after
+-- separate termination proofs, and ABI effects require a proven contract.
+inductive Exit (α ε : Type) where
+  | ok (value : α)
+  | error (reason : ε)
+  | diverged
+
+def sequence {α β ε : Type}
+    (first : Exit α ε) (next : α → Exit β ε) : Exit β ε :=
+  match first with
+  | .ok value => next value
+  | .error e => .error e
+  | .diverged => .diverged
+
+structure TotalContract (α β : Type) where
+  requires : α → Prop
+  ensures : α → β → Prop
+
+def Satisfies {α β ε : Type}
+    (run : α → Exit β ε) (c : TotalContract α β) : Prop :=
+  ∀ x, c.requires x → ∃ y, run x = .ok y ∧ c.ensures x y
+
+def combined {α β γ : Type}
+    (first : TotalContract α β)
+    (second : TotalContract β γ) : TotalContract α γ where
+  requires := first.requires
+  ensures := fun x z => ∃ y, first.ensures x y ∧ second.ensures y z
+
+theorem total_sequence_sound {α β γ ε : Type}
+    (f : α → Exit β ε) (g : β → Exit γ ε)
+    (cf : TotalContract α β) (cg : TotalContract β γ)
+    (hf : Satisfies f cf)
+    (hg : Satisfies g cg)
+    (bridge : ∀ x y, cf.requires x → cf.ensures x y →
+        cg.requires y) :
+    Satisfies (fun x => sequence (f x) g) (combined cf cg) := by
+  intro x hx
+  obtain ⟨y, hrunF, hpostF⟩ := hf x hx
+  obtain ⟨z, hrunG, hpostG⟩ := hg y (bridge x y hx hpostF)
+  refine ⟨z, ?_, ⟨y, hpostF, hpostG⟩⟩
+  simpa [sequence, hrunF] using hrunG
+
+-- A crashing plugin and a diverging loop cannot satisfy a total contract.
+theorem error_not_success {α ε : Type} (e : ε) :
+    ¬ (∃ v : α, Exit.error e = Exit.ok v) := by
+  intro h
+  obtain ⟨v, hv⟩ := h
+  cases hv
+
+theorem diverged_not_success {α ε : Type} :
+    ¬ (∃ v : α, Exit.diverged = Exit.ok v) := by
+  intro h
+  obtain ⟨v, hv⟩ := h
+  cases hv
+
 end MarqdoModularProof
