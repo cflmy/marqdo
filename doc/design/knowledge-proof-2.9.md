@@ -9,7 +9,7 @@
 - 同函数重复的标记名称**不产生公共锚点**；必须重命名，不得静默采用首个。
 - `definition_digest` 来自该语句源码位置的内容，与稳定身份分开；语句内容更改时身份保留、定义指纹改变。
 - 两种文档引用不执行目标：同函数的 `[阅读依据](#@演算)` 和跨模块绝对地址 `[阅读依据](mq://...#anchor-<sha256>)`。后者应从编译生成的 anchors.json 拿完整 ID，不应凭空手写。
-- 普通 `[说明](https://...)` 仍为导航，原来表达式位置的 `[描述](payload)` 仍依照原 Marqdo 执行规则求值。
+- 2.8.0 定理表每条唯一声明生成稳定 `ClaimId = SymbolId#claim-sha256(定理名称)`；正文 `[阅读定理](#@定理名称)` 可以定位**声明**，但不会读取或伪造证明状态；同一名称同时匹配知识步骤和定理声明时标记 `ambiguous_anchor`，不猜测。\n- 普通 `[说明](https://...)` 仍为导航，原来表达式位置的 `[描述](payload)` 仍依照原 Marqdo 执行规则求值。
 - **链接不意味着执行权**：解析到知识锚点只生成引用边，不自动调用函数、加载插件或赋予权限。
 
 ## 制品
@@ -19,7 +19,7 @@
 | 路径 | 内容 |
 |---|---|
 | `steps.json` / `refs.json` | 增量字段 `anchor_id`、`definition_digest`、`link_target`、`target_anchor` |
-| `anchors.json` | 稳定公共步骤索引，附所有者、标记文本、源码、效应、定义指纹 |
+| `claims.json` | 定理声明索引，初始状态固定为 `declared_unverified`，不等同于证明通过 |\n| `anchors.json` | 稳定公共步骤索引，附所有者、标记文本、源码、效应、定义指纹 |
 | `graph/edges.json` | `defines_anchor`、`references_anchor`、知识步骤到已解析调用目标的 `calls` |
 | `proof-index.json` | 可用或过期的证明收据索引；它不是可执行授权，也不自动证明步骤 |
 
