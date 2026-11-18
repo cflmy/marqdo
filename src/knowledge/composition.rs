@@ -134,7 +134,15 @@ fn rejection_diagnostics(c:&Compilation,call:&BoundCall)->Value{
         "callee_effects":callee.map(|a|a.effects.values()),
         "call_effects":call.required_effects.values(),
         "caller_forward_shape":cf.as_ref().and_then(forwarded).is_some(),
+        "caller_ast_body":cf.as_ref().map(|f|format!("{:?}",f.body)),
+        "callee_ast_body":ef.as_ref().map(|f|format!("{:?}",f.body)),
         "callee_constant_return":constant,
+        "runtime_forward_name":cf.as_ref().and_then(forwarded)
+            .and_then(|f|f.for_evaluation().ok())
+            .map(|c|crate::sema::bind::call_display(&c)),
+        "bound_call_name":call.call_site,
+        "caller_bound_call_count":c.semantics.bound_calls.iter()
+            .filter(|item|item.caller==call.caller).count(),
         "caller_has_expected_claim":caller.zip(constant).is_some_and(|(a,n)|
             claim_is_constant(c,a,n)),
         "callee_has_expected_claim":callee.zip(constant).is_some_and(|(a,n)|
