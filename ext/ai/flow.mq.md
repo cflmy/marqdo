@@ -24,6 +24,8 @@ Only the requested function and its inputs need to be in the model prompt.
 |---|---|---|
 | result | map | {ok,value,status} or {ok:false,error} |
 
+Use `reply`, `options` as the inputs for this operation.
+
 Parsing accepts one exact name, a labeled name, a fenced name or a 1-based
 index. Ambiguous prose fails closed. Parsing never runs a tool or SKILL.
 
@@ -47,6 +49,8 @@ Return *[Parse and verify the choice](agent_choice_parse(reply=`reply`, options=
 | 返回 | 类型 | 说明 |
 |---|---|---|
 | result | map | Verified choice result, or explicit failure |
+
+Use `input`, `options`, `model`=None, `repair`=True as the inputs for this operation.
 
 Only ask for the option name. A failed first parse can receive one short
 format correction; never silently select the nearest-looking option.
@@ -76,6 +80,8 @@ We retain **ok = [Read validation status](json.get(value=`parsed`, key="ok"))**.
 | 返回 | 类型 | 说明 |
 |---|---|---|
 | result | list | Ordered child outcomes, including failures |
+
+Use `tasks`, `limit`=2, `timeout_ms`=30000 as the inputs for this operation.
 
 Reuse the built-in subtask scheduler. Each child document returns via its
 `# main`, and successful siblings remain visible if another child fails.
