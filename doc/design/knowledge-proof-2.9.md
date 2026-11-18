@@ -234,3 +234,27 @@ marqdo knowledge replay .marqdo/modular/composed/{proof-id}/composition-certific
 此外，当前受限组合证明只面向不同源文件的静态导入调用，显式拒绝同文件以及自调用，避免将本地调用伪装成可复用跨模块契约证书。此项是准入安全性改进，不表示抽象插件、分支、循环和递归已经实现具体语义证明。
 
 验证仍须以最终提交的 GitHub Actions 为准，尤其关注 `modular-proof-smoke`、`proof` 和 `knowledge-proof-integration`。工作流无作业失败不应解释为单元测试失败或测试成功，必须另行定位 YAML / GitHub Actions 工作流事件层面问题。
+
+
+## M10：带符号实参的独立模块组合证书（受限整数投影）
+
+`src/knowledge/projection.rs` 现实现一条**源码驱动、Lean 内核证明、证书可重放**的参数化调用路径：
+
+- 被调函数在单一返回语句中返回唯一的形参，且该函数必须是无副作用的静态目标；
+- 调用方仅直接返回被调调用结果，或将该调用赋给局部变量后立刻返回；
+- 支持多个形参及重排后的实参，实参只能是调用方形参或已通过安全静态求值的 i64 常量；
+- 被调方声明唯一无条件契约 `结果 = 被投影形参`，调用方声明唯一无条件契约 `结果 = 对应实际形参或常量`；
+- 正式构建 `CalleeModule.lean`，以真实返回源生成 `callee_contract`；`CallerModule.lean` 导入前者，经实际实参实例化、以 `simpa [caller]` 得出调用方定理，**不在调用方展开被调实现**；
+- `composition-certificate.json` 与源码的唯一符号、精确双依赖闭包、工具链版本、Lean 源和编译产物摘要绑定；重放时从当前 `.mq.md` 重新生成两份 Lean 源并重新执行 Lean；
+- 重复函数名、重复语义实体、重名合同结论、未知或不匹配实参、路径条件、控制阻碍、效应函数、同文件调用、动态调度、源码漂移全部拒绝出证或重放。
+
+使用既有接口：
+
+```sh
+marqdo knowledge compose --strict --json .
+marqdo knowledge replay .marqdo/modular/composed/projection-*/composition-certificate.json --json .
+```
+
+新增真实 Lean 测试 `projection_composition_proves_symbolic_caller_and_replays_from_source`，以及参数重排/错误结论/重复声明单元测试。专项 CI `modular-proof-smoke` 运行这条路径。
+
+**严守边界**：这里的后置条件组合是抽象 Lean `Int` 模型中的`返回等于某个形参`关系，而不是任意谓词、循环不变式、递归归纳或有状态插件契约。Marqdo 的 `int` 声明会归一化到可容纳非整数值的 `number`，故证书显式只给出 `lean_kernel_proved_model`，不能声称动态运行时完全对应。用户定义的插件效应、异常、循环和递归仅有抽象逻辑，不得提升为源码级已证明执行。实现仍处于实验性 Draft，未达到完整通用模块化证明标准。
