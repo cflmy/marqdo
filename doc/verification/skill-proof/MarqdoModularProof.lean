@@ -63,9 +63,10 @@ example :
     simpa [second, g] using hy
   have hcomp := h f g first second hf hg
   have target := hcomp 0 True.intro
-  rcases target with ⟨y, _, hy⟩
-  have impossible : (0 : Nat) = 1 := by
-    simpa [second, g, f] using hy
-  exact Nat.zero_ne_one impossible
+  cases target with
+  | intro y hpair =>
+    have impossible : (0 : Nat) = 1 := by
+      simpa [second, g, f] using hpair.right
+    exact Nat.zero_ne_one impossible
 
 end MarqdoModularProof
