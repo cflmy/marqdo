@@ -189,11 +189,25 @@ pub struct KnowledgeRef {
     pub link_target: Option<String>,
     /// Resolved stable anchor target; never an executable call.
     pub target_anchor: Option<String>,
+    /// Reference to a theorem declaration, not a proof certificate.
+    pub target_claim: Option<String>,
     pub label: String,
     pub context: String,
     pub source: SourceLocation,
     pub resolution: String,
     pub target: Option<SymbolId>,
+}
+
+/// Stable identity and unproved declaration of a v2.8.0 function theorem.
+#[derive(Debug, Clone)]
+pub struct KnowledgeClaim {
+    pub anchor_id: String,
+    pub owner: SymbolId,
+    pub label: String,
+    pub conclusion: String,
+    pub premise: Option<String>,
+    pub line: u32,
+    pub source: SourceLocation,
 }
 
 #[derive(Debug, Clone)]
@@ -235,6 +249,7 @@ pub struct SemanticProject {
     pub artifacts: Vec<SemanticArtifact>,
     pub refs: Vec<KnowledgeRef>,
     pub steps: Vec<KnowledgeStep>,
+    pub claims: Vec<KnowledgeClaim>,
     pub bound_calls: Vec<BoundCall>,
     pub dynamic_calls: Vec<DynamicCall>,
 }
@@ -285,6 +300,7 @@ fn compile_index(index: ProjectIndex) -> Result<Compilation> {
     let mut artifacts = Vec::new();
     let mut refs = Vec::new();
     let mut steps = Vec::new();
+    let mut claims = Vec::new();
     let mut bound_calls = Vec::new();
     let mut dynamic_calls = Vec::new();
     let mut local_by_name: BTreeMap<(ModuleId, String), SymbolId> = BTreeMap::new();
@@ -301,6 +317,18 @@ fn compile_index(index: ProjectIndex) -> Result<Compilation> {
         let module_symbols = index.symbols_in_module(module_id);
         for symbol in index.symbols_in_module(module_id) {
             let function = by_path.get(&symbol.declaration_path).expect("symbol collected from module");
+            for claim in &function.claims {
+                claims.push(KnowledgeClaim {
+                    anchor_id: format!("{}#claim-{}",symbol.id.as_str(),
+                        digest(claim.id.as_bytes()).0.trim_start_matches("sha256:")),
+                    owner:symbol.id.clone(),
+                    label:claim.id.clone(),
+                    conclusion:claim.conclusion.clone(),
+                    premise:claim.premise.clone(),
+                    line:claim.line,
+                    source:source_location(index.root().path(),path,claim.line,claim.line),
+                });
+            }
             let owned_links: Vec<_> = narrative_links
                 .iter()
                 .filter(|link| enclosing_symbol(&module_symbols, link.line).is_some_and(|s| s.id == symbol.id))
@@ -334,7 +362,7 @@ fn compile_index(index: ProjectIndex) -> Result<Compilation> {
         }
     }
     close_effect_dependencies(&mut artifacts);
-    resolve_anchor_references(&mut refs);
+    resolve_anchor_references(&mut refs, &claims);
     for reference in refs.iter().filter(|r| r.resolution == "unresolved_anchor") {
         diagnostics.push(
             Diagnostic::new(
@@ -369,6 +397,7 @@ fn compile_index(index: ProjectIndex) -> Result<Compilation> {
     artifacts.sort_by(|a, b| a.artifact_id.0.cmp(&b.artifact_id.0));
     refs.sort_by(|a, b| a.id.cmp(&b.id));
     steps.sort_by(|a, b| a.id.0.cmp(&b.id.0));
+    claims.sort_by(|a,b| a.anchor_id.cmp(&b.anchor_id));
     bound_calls.sort_by(|a, b| {
         a.source
             .file
@@ -392,6 +421,7 @@ fn compile_index(index: ProjectIndex) -> Result<Compilation> {
             artifacts,
             refs,
             steps,
+            claims,
             bound_calls,
             dynamic_calls,
         },
@@ -561,28 +591,39 @@ fn anchor_definition_digest(source: &str, line: u32, label: &str, kind: &str) ->
 /// Explicit knowledge references are inert: resolving a link never invokes a
 /// function. Short #@label binds ONLY inside the current function. Full
 /// mq://...#anchor-<sha256> targets support cross-module references.
-fn resolve_anchor_references(refs: &mut [KnowledgeRef]) {
+fn resolve_anchor_references(refs: &mut [KnowledgeRef], claims: &[KnowledgeClaim]) {
     let declared: BTreeSet<String> = refs.iter()
         .filter_map(|r| r.anchor_id.clone()).collect();
+    let theorem_ids: BTreeSet<String> = claims.iter().map(|c|c.anchor_id.clone()).collect();
     for reference in refs {
         let Some(raw) = reference.link_target.as_deref() else {continue};
         let sought = if let Some(label) = raw.trim().strip_prefix("#@") {
             let Some(owner) = reference.id.split("#ref-").next() else {continue};
             if label.is_empty() {continue}
-            Some(format!("{}#anchor-{}", owner,
-                digest(normalize_anchor_label(label).as_bytes()).0.trim_start_matches("sha256:")))
-        } else if raw.starts_with("mq://") && raw.contains("#anchor-") {
-            Some(raw.trim().to_string())
+            Some((format!("{}#anchor-{}", owner,
+                digest(normalize_anchor_label(label).as_bytes()).0.trim_start_matches("sha256:")),
+                format!("{}#claim-{}", owner,
+                    digest(label.as_bytes()).0.trim_start_matches("sha256:"))))
+        } else if raw.starts_with("mq://")
+            && (raw.contains("#anchor-") || raw.contains("#claim-")) {
+            Some((raw.trim().to_string(), raw.trim().to_string()))
         } else { None };
-        if let Some(target) = sought {
-            if declared.contains(&target) {
-                reference.target_anchor = Some(target);
-                reference.resolution = "anchor".into();
-                reference.target = None;
-            } else {
-                reference.resolution = "unresolved_anchor".into();
-                reference.target = None;
+        if let Some((anchor, claim)) = sought {
+            let step_match=declared.contains(&anchor);
+            let theorem_match=theorem_ids.contains(&claim);
+            match (step_match,theorem_match) {
+                (true,false)=>{
+                    reference.target_anchor=Some(anchor);
+                    reference.resolution="anchor".into();
+                }
+                (false,true)=>{
+                    reference.target_claim=Some(claim);
+                    reference.resolution="claim".into();
+                }
+                (true,true)=>reference.resolution="ambiguous_anchor".into(),
+                _=>reference.resolution="unresolved_anchor".into()
             }
+            reference.target=None;
         }
     }
 }
@@ -658,6 +699,8 @@ fn artifact_for_function(
             anchor_id: anchor.clone(),
             link_target: None,
             target_anchor: None,
+            target_claim: None,
+            target_claim: None,
             id: ref_id.clone(),
             label: named.label.clone(),
             context: named.context.clone(),
@@ -1409,6 +1452,7 @@ impl SemanticProject {
             "artifacts": self.artifacts.iter().map(artifact_json).collect::<Vec<_>>(),
             "refs": self.refs.iter().map(ref_json).collect::<Vec<_>>(),
             "steps": self.steps.iter().map(step_json).collect::<Vec<_>>(),
+            "claims": self.claims.iter().map(claim_json).collect::<Vec<_>>(),
             "bound_calls": self.bound_calls.iter().map(bound_call_json).collect::<Vec<_>>(),
             "dynamic_calls": self.dynamic_calls.iter().map(dynamic_call_json).collect::<Vec<_>>(),
         })
@@ -1418,7 +1462,13 @@ impl SemanticProject {
 pub fn artifact_json(artifact: &SemanticArtifact) -> Value {
     json!({"schema_version": SCHEMA_VERSION, "artifact_id": artifact.artifact_id.0, "symbol_id": artifact.symbol_id.as_ref().map(SymbolId::as_str), "display_name": artifact.display_name, "kind": artifact.kind, "callable": artifact.callable, "source": {"file": artifact.source.file, "line": artifact.source.line, "end_line": artifact.source.end_line}, "signature": artifact.signature.as_ref().map(|s| json!({"receiver":s.receiver,"params":s.params.iter().map(|p|json!({"name":p.name,"type":p.ty,"required":p.required,"default_digest":p.default_digest.as_ref().map(|d|&d.0),"unit":p.unit})).collect::<Vec<_>>(),"returns":s.returns,"effects":s.effects.values()})), "contract":{"params":artifact.contract.params,"returns":artifact.contract.returns,"fields":artifact.contract.fields}, "effects":artifact.effects.values(), "dependencies":artifact.dependencies.iter().map(|d|&d.0).collect::<Vec<_>>(), "provenance":artifact.provenance.iter().map(|p|json!({"uri":p.uri,"locator":p.locator,"content_digest":p.content_digest.as_ref().map(|d|&d.0),"relation":p.relation})).collect::<Vec<_>>(), "applicability":artifact.applicability, "hashes":{"interface":artifact.hashes.interface.0,"implementation":artifact.hashes.implementation.0,"evidence":artifact.hashes.evidence.0,"artifact":artifact.hashes.artifact.0,"closure":artifact.hashes.closure.0}, "verification":{"parse":artifact.verification.parse,"resolve":artifact.verification.resolve,"contract":artifact.verification.contract,"execution":artifact.verification.execution,"tests":artifact.verification.tests,"evidence":artifact.verification.evidence,"domain":artifact.verification.domain,"methods":artifact.verification.methods}, "lifecycle":artifact.lifecycle})
 }
-fn ref_json(reference: &KnowledgeRef) -> Value { json!({"id":reference.id,"anchor_id":reference.anchor_id,"link_target":reference.link_target,"target_anchor":reference.target_anchor,"label":reference.label,"context":reference.context,"source":{"file":reference.source.file,"line":reference.source.line,"end_line":reference.source.end_line},"resolution":reference.resolution,"target":reference.target.as_ref().map(SymbolId::as_str)}) }
+fn ref_json(reference: &KnowledgeRef) -> Value { json!({"id":reference.id,"anchor_id":reference.anchor_id,"link_target":reference.link_target,"target_anchor":reference.target_anchor,"target_claim":reference.target_claim,"label":reference.label,"context":reference.context,"source":{"file":reference.source.file,"line":reference.source.line,"end_line":reference.source.end_line},"resolution":reference.resolution,"target":reference.target.as_ref().map(SymbolId::as_str)}) }
+fn claim_json(claim: &KnowledgeClaim) -> Value {
+    json!({"anchor_id":claim.anchor_id,"owner":claim.owner.as_str(),
+        "label":claim.label,"conclusion":claim.conclusion,"premise":claim.premise,
+        "verification":"declared_unverified",
+        "source":{"file":claim.source.file,"line":claim.line}})
+}
 fn step_json(step: &KnowledgeStep) -> Value { json!({"id":step.id.0,"anchor_id":step.anchor_id,"definition_digest":step.definition_digest.0,"reference":step.reference,"kind":step.kind,"calls":step.calls.iter().map(SymbolId::as_str).collect::<Vec<_>>(),"effects":step.effects.values(),"source":{"file":step.source.file,"line":step.source.line,"end_line":step.source.end_line}}) }
 fn bound_call_json(call: &BoundCall) -> Value {
     json!({
@@ -1444,6 +1494,7 @@ const SEMANTIC_NAMES: &[&str] = &[
     "refs.json",
     "steps.json",
     "anchors.json",
+    "claims.json",
     "proof-index.json",
     "bound_calls.json",
     "dynamic_calls.json",
@@ -1573,6 +1624,11 @@ fn write_generation_tree(stage: &Path, compilation: &Compilation, prove_root: &P
     write_json(&stage.join("symbols.json"), &json!({"schema_version":SCHEMA_VERSION,"symbols":compilation.index.symbols().iter().map(|s|json!({"id":s.id.as_str(),"module":s.module.as_str(),"kind":s.kind.as_str(),"callable":s.callable.map(|c|c.as_str()),"name":s.name,"declaration_path":s.declaration_path,"source":{"file":rel_uri(compilation.index.root().path(),&s.source),"line":s.line}})).collect::<Vec<_>>() }))?;
     write_json(&stage.join("refs.json"), &json!({"schema_version":SCHEMA_VERSION,"refs":project["refs"]}))?;
     write_json(&stage.join("steps.json"), &json!({"schema_version":SCHEMA_VERSION,"steps":project["steps"]}))?;
+    write_json(&stage.join("claims.json"), &json!({
+        "schema_version":SCHEMA_VERSION,
+        "role":"theorem_declarations_not_proof_results",
+        "claims":project["claims"]
+    }))?;
     write_json(&stage.join("proof-index.json"),
         &crate::knowledge::proof::index_links(prove_root, &compilation.semantics))?;
     write_json(&stage.join("anchors.json"), &json!({
@@ -1605,7 +1661,15 @@ fn write_generation_tree(stage: &Path, compilation: &Compilation, prove_root: &P
             })
         })
         .collect();
+    for claim in &compilation.semantics.claims {
+        edges.push(json!({"from":claim.owner.as_str(),
+            "to":claim.anchor_id,"kind":"declares_claim"}));
+    }
     for reference in &compilation.semantics.refs {
+        if let Some(claim) = &reference.target_claim {
+            let owner=reference.id.split("#ref-").next().unwrap_or("");
+            edges.push(json!({"from":owner,"to":claim,"kind":"references_claim"}));
+        }
         if let Some(target) = &reference.target_anchor {
             let owner = reference.id.split("#ref-").next().unwrap_or("");
             edges.push(json!({"from":owner,"to":target,"kind":"references_anchor"}));
