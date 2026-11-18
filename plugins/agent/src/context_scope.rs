@@ -97,7 +97,13 @@ pub fn project(args: &Value) -> Result<Value, String> {
         .and_then(Value::as_u64)
         .unwrap_or(1600)
         .clamp(32, 16000) as usize;
-    let marks = headings(&source);
+    // YAML frontmatter may look like a setext Markdown heading; never treat it
+    // as a Marqdo class or function boundary.
+    let front_end = frontmatter_end(&source);
+    let marks: Vec<Section> = headings(&source)
+        .into_iter()
+        .filter(|heading| heading.start >= front_end)
+        .collect();
     let results: Vec<(usize, usize)> = match scope {
         "file" => {
             let end = marks.first().map_or(source.len(), |h| h.start);
