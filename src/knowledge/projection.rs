@@ -179,6 +179,7 @@ pub(super) fn closures(compiled:&Compilation,call:&BoundCall)->Result<BTreeSet<(
 pub(super) fn prove(compiled:&Compilation,out:&Path,lean:&Toolchain)->Result<Vec<Value>>{
     let mut rows=Vec::new();
     for call in &compiled.semantics.bound_calls{
+        if super::unified::covers(compiled,&call.caller){continue}
         let Some(plan)=candidate(compiled,call) else{continue};
         let dependencies=closures(compiled,call)?;
         let key=sha(format!("{}|{:?}|{}",plan.identity,dependencies,lean.version).as_bytes());
