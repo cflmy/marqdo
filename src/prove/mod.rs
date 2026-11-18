@@ -450,6 +450,7 @@ pub fn prove_path(path: &Path, opts: &ProveOptions) -> Result<Report> {
     };
     // Knowledge linkage is advisory. Failing to bind must not invent a proof
     // or change the judgment of the underlying v2.8.0 prover.
+    #[cfg(feature = "cli")]
     if let Some(dir) = artifact_dir.as_deref() {
         if let Err(err) = crate::knowledge::proof::emit_links(path, &report, dir) {
             eprintln!("warning[knowledge.proof_linkage]: {err:#}");
