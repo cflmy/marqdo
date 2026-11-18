@@ -237,12 +237,60 @@ pub struct KnowledgeStep {
 
 /// Static call site bound to a SymbolId (G02).
 #[derive(Debug, Clone, PartialEq, Eq)]
+/// Fully static i64 call-site argument. Non-constant expressions are kept
+/// as unresolved proof obligations rather than guessed values.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StaticCallArg {
+    pub name: Option<String>,
+    pub integer: Option<i64>,
+    pub expression_digest: Digest,
+}
+
+fn checked_constant_int(expr: &Expr, depth: usize) -> Option<i64> {
+    if depth > 32 { return None; }
+    match expr {
+        Expr::Literal(crate::ast::Literal::Int(n)) => Some(*n),
+        Expr::Occluded { payload: Some(inner), .. } =>
+            checked_constant_int(inner, depth+1),
+        Expr::Unary {op: crate::ast::UnaryOp::Neg, expr} =>
+            checked_constant_int(expr,depth+1)?.checked_neg(),
+        Expr::Binary {op,left,right} => {
+            let a=checked_constant_int(left,depth+1)?;
+            let b=checked_constant_int(right,depth+1)?;
+            match op {
+                crate::ast::BinaryOp::Add=>a.checked_add(b),
+                crate::ast::BinaryOp::Sub=>a.checked_sub(b),
+                crate::ast::BinaryOp::Mul=>a.checked_mul(b),
+                // Division and its rounding/coercion are not yet proven
+                // equivalent to the Lean abstract numeric model.
+                _=>None
+            }
+        },
+        _=>None
+    }
+}
+
+fn static_call_args(call:&CallExpr)->Vec<StaticCallArg>{
+    call.args.iter().map(|a|{
+        let (name,expr)=match a {
+            crate::ast::Arg::Positional(expr)=>(None,expr),
+            crate::ast::Arg::Named{name,value}=>(Some(name.clone()),value)
+        };
+        StaticCallArg {
+            name, integer:checked_constant_int(expr,0),
+            expression_digest:digest(format!("{expr:?}"))
+        }
+    }).collect()
+}
+
 pub struct BoundCall {
     /// Exact owning function symbol at the AST callsite.
     pub caller: SymbolId,
     pub target: SymbolId,
     pub call_site: String,
     pub source: SourceLocation,
+    /// Exact, ordered actual arguments with conservative closed-int decoding.
+    pub args: Vec<StaticCallArg>,
     pub required_effects: EffectSet,
 }
 
@@ -715,6 +763,7 @@ fn artifact_for_function(
                     target,
                     call_site: call_display(call),
                     source,
+                    args:static_call_args(call),
                     required_effects: call_effects,
                 });
             }
@@ -1540,6 +1589,10 @@ fn bound_call_json(call: &BoundCall) -> Value {
         "caller":call.caller.as_str(),
         "target": call.target.as_str(),
         "call_site": call.call_site,
+        "args":call.args.iter().map(|a|json!({
+            "name":a.name,"integer":a.integer,
+            "expression_digest":a.expression_digest.0
+        })).collect::<Vec<_>>(),
         "source": {"file": call.source.file, "line": call.source.line, "end_line": call.source.end_line},
         "required_effects": call.required_effects.values(),
         "binding": "BoundCall",
