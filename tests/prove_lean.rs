@@ -460,7 +460,7 @@ import:
     let receipt:serde_json::Value=serde_json::from_slice(
         &fs::read(s.dir.join(file)).unwrap()).unwrap();
     assert_eq!(receipt["scope"],
-        "typed_int_pure_forwarder_constant_postcondition");
+        "number_contract_int_model_pure_forwarder_constant_result");
     assert_eq!(receipt["full_marqdo_runtime_semantics_proved"],
         serde_json::Value::Null);
     let folder=s.dir.join(successful["artifact"].as_str().unwrap())
