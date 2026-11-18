@@ -46,8 +46,14 @@ fn record(grade:EvidenceGrade,basis:&str,kernel_replayed:bool,
         "not_execution_authority":true
     })
 }
+/// Kernel checked at issuance; no independent replay has happened yet.
 pub fn model_proved()->Value{
     record(EvidenceGrade::ModelProved,"source_regenerated_lean_kernel",
+        false,false)
+}
+/// Source-regenerated modules were independently recompiled on replay.
+pub fn model_replayed()->Value{
+    record(EvidenceGrade::ModelProved,"independently_replayed_lean_kernel",
         true,false)
 }
 pub fn unknown(reason:&str)->Value{
@@ -83,6 +89,11 @@ mod tests{
     use super::*;
     #[test]
     fn grades_do_not_promote_abstract_integer_proofs(){
+        let fresh=model_proved();
+        assert_eq!(fresh["kernel_replayed"],false);
+        assert_eq!(fresh["grade"],"model_proved");
+        let replayed=model_replayed();
+        assert_eq!(replayed["kernel_replayed"],true);
         let proved=for_receipt("proved",true,true);
         assert_eq!(proved["grade"],"model_proved");
         assert_eq!(proved["full_marqdo_runtime_semantics_proved"],false);

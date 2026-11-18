@@ -459,7 +459,7 @@ pub(super) fn replay(c:&Compilation,certificate:&Path,lean:&Toolchain)->Result<V
     }
     Ok(json!({"schema_version":1,"kind":"independent_composition_replay",
         "status":"lean_kernel_replayed","scope":SCOPE,"identity":root,
-        "evidence":super::evidence::model_proved(),
+        "evidence":super::evidence::model_replayed(),
         "current_source_verified":true,
         "full_marqdo_runtime_semantics_proved":false}))
 }
