@@ -1,8 +1,9 @@
 # Marqdo native agent flow — implementation contract
 
-Status: **incremental, draft**. This document distinguishes implemented interfaces from
-the required interpreter/runtime changes. Do not claim stack-level suspension or
-exactly-once external writes based on a checkpoint file.
+Status: **incremental, draft**. The core orchestration now has a plugin-only
+alternative to interpreter-stack suspension: a durable finite step state machine
+with explicit safe commit boundaries. Do not claim arbitrary stack-level
+continuation or exactly-once external writes based on a checkpoint file.
 
 ## Author surface (implemented in this branch)
 
@@ -89,3 +90,42 @@ back. On recovery, reconcile child attempts and reuse successful results.
 
 Do not merge the branch as a completed runtime refactor until the relevant
 runtime gates, including crash injection and multi-worker concurrency, pass.
+
+
+## Plugin-only workflow (November 18 revision)
+
+The Agent ABI plugin implements `agent_workflow_open/next/commit/cancel`.
+The small `ext/ai/workflow.mq.md` library wraps these primitives and provides
+`tick` to execute exactly one safe decision or document task per call.
+Source definitions have only five step kinds: `model`, `input`, `skill`,
+`parallel` and `return`. Model text is verified against declared options.
+`input` intentionally returns a waiting status; the UI supplies an answer
+through `commit` on a later invocation. There is no interpreter thread to
+hold and no need for a separate qdagent orchestration server.
+
+The checkpoint records the source revision, caller-provided session and
+principal scope, next step index and the completed outputs. The same step
+cannot be silently committed twice. Mixed child outcomes preserve completed
+siblings in the checkpoint and **block** further automatic execution until
+the unknown/failed child operations are reconciled.
+
+The state engine does not execute arbitrary unregistered tools directly:
+`tick` delegates to existing Marqdo ABI-backed SKILL/subtask functions.
+This is an implementation of **durable step-state recovery**, not a claim
+of transparent recovery for a suspended foreign function or native call.
+It provides the practical workflow needed for short qdagent SKILLs without
+altering the Marqdo interpreter.
+
+### Security/reliability boundary still required for production
+
+- The host must attest source digest, principal, session, permissions and
+  registry, rather than accepting values copied from an LLM response.
+- Effectful child tools must use the existing EffectLedger and external
+  receipt reconciliation; no automatic re-dispatch after an uncertain write.
+- Cancelling a workflow checkpoint does not automatically cancel previously
+  spawned external children; the supervisor must propagate cancellation.
+- The current task runner is step-atomic, not a durable parallel child lease
+  scheduler. A future plugin-only child manifest may use the host's existing
+  `runtime` query API, but must not bypass process.exec or file-root grants.
+- Cross-process locks need a lease/owner-aware stale-lock recovery path;
+  a stale lock currently fails closed and requires operator review.
