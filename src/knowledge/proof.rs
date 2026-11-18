@@ -10,6 +10,31 @@ use crate::{prove::{Report, Verdict}, sema::ir::{Compilation, SemanticArtifact, 
 fn sha(bytes: &[u8]) -> String {
     format!("sha256:{:x}", Sha256::digest(bytes))
 }
+fn generated_module_valid(folder:&Path,expected:&Value)->bool {
+    let source_dir=folder.join("Generated");
+    let Ok(files)=fs::read_dir(&source_dir) else {return false};
+    let mut candidates=files.flatten().filter(|f|
+        f.path().extension().is_some_and(|ext|ext=="lean")).collect::<Vec<_>>();
+    if candidates.len()!=1{return false}
+    let Some(generated)=candidates.pop() else{return false};
+    let Ok(source)=fs::read(generated.path()) else{return false};
+    sha(&source).trim_start_matches("sha256:")==expected.as_str().unwrap_or("")
+}
+fn certificate_identity_valid(folder:&Path,cert:&Value)->bool {
+    let Ok(plan)=fs::read(folder.join("plan.json")) else {return false};
+    let source=cert["source_sha256"].as_str().unwrap_or("");
+    let library=cert["library_sha256"].as_str().unwrap_or("");
+    let toolchain=cert["toolchain"].as_str().unwrap_or("");
+    let actual_library=crate::prove::cache::sha256_hex(
+        crate::prove::driver::LIBRARY_SRC.as_bytes());
+    let expected_key=crate::prove::cache::cache_key(
+        source,&crate::prove::cache::sha256_hex(&plan),
+        library,toolchain,env!("CARGO_PKG_VERSION"));
+    library==actual_library
+        && cert["marqdo"]==env!("CARGO_PKG_VERSION")
+        && cert["key"]==expected_key
+        && generated_module_valid(folder,&cert["module_sha256"])
+}
 
 fn certificate(dir: &Path, report: &Report) -> Option<(Value, String)> {
     let bytes = fs::read(dir.join("certificate.json")).ok()?;
@@ -164,6 +189,7 @@ pub fn index_links(prove_dir:&Path, semantic:&SemanticProject)->Value {
                                 return false
                             };
                             cert["schema"]==1 && cert["tier"]=="lean"
+                                && certificate_identity_valid(&folder.path(),&cert)
                                 && cert["source_sha256"]==entry["source_sha256"]
                                 && cert["library_sha256"]==entry["library_sha256"]
                                 && cert["toolchain"]==entry["toolchain"]
