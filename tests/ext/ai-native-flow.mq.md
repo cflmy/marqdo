@@ -22,6 +22,13 @@ rather than guessing another SKILL or importing the full document.
 2. *
   > sys.exit code=11
 
+**structured = > flow.parse_choice reply="{\"choice\":\"chat\"}" options=`opts`**
+**structure_value = > json.get value=`structured` key="value"**
+1. `structure_value` == "chat"
+  **_ = 1**
+2. *
+  > sys.exit code=16
+
 **invalid = > flow.parse_choice reply="chat 或 office" options=`opts`**
 **not_ok = > json.get value=`invalid` key="ok"**
 1. `not_ok`
