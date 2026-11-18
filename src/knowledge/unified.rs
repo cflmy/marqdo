@@ -211,7 +211,7 @@ impl<'a> Builder<'a>{
         Some(format!("({}{})",id_for(callee),args_text(&args)))
     }
     fn block(&mut self,items:&[Stmt],mut env:BTreeMap<String,String>,
-        owner:&str,uses:&mut Vec<CallUse>,depth:usize)->Option<String>{
+        owner:&str,uses:&mut Vec<CallUse>,conditions:&mut Vec<String>,depth:usize)->Option<String>{
         if depth>=32{return None}
         for (index,st) in items.iter().enumerate(){
             match st{
@@ -228,10 +228,11 @@ impl<'a> Builder<'a>{
                     let mut otherwise=None;
                     for arm in arms.iter().rev(){
                         let expression=self.block(&arm.body,env.clone(),
-                            owner,uses,depth+1)?;
+                            owner,uses,conditions,depth+1)?;
                         otherwise=Some(if let Some(condition)=&arm.condition{
                             let cond=self.condition(condition,&env,owner,
                                 span.line,uses,0)?;
+                            if !conditions.contains(&cond){conditions.push(cond.clone())}
                             let rest=otherwise?;
                             format!("(if {cond} then {expression} else {rest})")
                         }else{
@@ -264,7 +265,9 @@ impl<'a> Builder<'a>{
                 (p.name.clone(),format!("v{i}"))).collect::<BTreeMap<_,_>>();
             let contract=result_claim(self.compilation,&a,&env)?;
             let mut call_uses=Vec::new();
-            let body=self.block(&fun.body,env,symbol,&mut call_uses,0)?;
+            let mut conditions=Vec::new();
+            let body=self.block(&fun.body,env,symbol,&mut call_uses,
+                &mut conditions,0)?;
             // No semantically relevant BoundCall may remain unmodeled:
             // every source call requires a unique static binding.
             let source_count=self.compilation.semantics.bound_calls.iter()
@@ -290,8 +293,19 @@ impl<'a> Builder<'a>{
                 source.push_str(&format!(
                     "  have hc{i} := {callee_contract}{}\n",args_text(&use_.args)));
             }
-            source.push_str(&format!(
-                "  simp only [{fname}] at * <;> (try split_ifs) <;> omega\n"));
+            // `split_ifs` is a Mathlib tactic, unavailable under the
+            // pinned core Lean toolchain. Case-split on source-derived
+            // conditions using core `by_cases`, then simplify each case.
+            let mut tactic=format!("  simp only [{fname}] at *");
+            for (i,condition) in conditions.iter().enumerate(){
+                tactic.push_str(&format!(" <;> by_cases h{i} : {condition}"));
+            }
+            if conditions.is_empty(){
+                tactic.push_str(" <;> omega\n");
+            }else{
+                tactic.push_str(" <;> simp_all <;> omega\n");
+            }
+            source.push_str(&tactic);
             let operator=contract.split_whitespace().next()?.to_string();
             Some(Built{
                 symbol:symbol.to_owned(),artifact:a.artifact_id.0.clone(),
