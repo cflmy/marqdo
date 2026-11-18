@@ -58,6 +58,43 @@ fn links_bind_to_exact_owner_and_stale_after_source_change() {
 }
 
 #[test]
+fn assumption_table_is_in_proof_ir_but_cannot_grant_proved_status() {
+    let dir=root("assumptions");
+    let file=dir.join("main.mq.md");
+    fs::write(&file,r#"---
+markup: occlusion
+---
+
+# main
+
+## call
+
+| 假设 | 前置 | 后置 |
+|---|---|---|
+| provider.lookup | 金额 > 0 | 返回 = 2 |
+
+| 定理 | 结论 | 前提 | 策略 |
+|---|---|---|---|
+| no_effect | 长度(轨迹) = 0 | | auto |
+
+*1*
+"#).unwrap();
+    let out=dir.join("prove");
+    let report=marqdo::prove::prove_path(&file,
+        &marqdo::prove::ProveOptions{
+            emit_dir:Some(out.clone()),judge:false,..Default::default()
+        }).unwrap();
+    let plan:serde_json::Value=serde_json::from_slice(
+        &fs::read(out.join("plan.json")).unwrap()).unwrap();
+    let f=plan["functions"].as_array().unwrap().iter()
+        .find(|x|x["name"]=="main.call").unwrap();
+    assert_eq!(f["assumptions"][0]["op"],"provider.lookup");
+    assert_eq!(f["assumptions"][0]["premise"],"金额 > 0");
+    assert_ne!(report.status,Verdict::Proved);
+    fs::remove_dir_all(dir).unwrap();
+}
+
+#[test]
 fn strict_modular_cli_exposes_unproved_conditions_as_nonzero_exit() {
     let dir=root("strict-modular");
     let file=dir.join("main.mq.md");
