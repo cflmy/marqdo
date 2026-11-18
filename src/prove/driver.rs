@@ -126,9 +126,12 @@ pub fn ensure_library(cache_root: &Path, lean: &Toolchain) -> Result<(PathBuf, S
 pub fn check_closed_goals(
     toolchain:&Toolchain, source:&Path, timeout:Duration
 )->Result<()>{
+    let source_before=std::fs::read(source)?;
     let mut command=Command::new(&toolchain.lean);
     command.arg(source);
     let (log,code,timed_out)=run_with_timeout(&mut command,timeout)?;
+    anyhow::ensure!(std::fs::read(source)?==source_before,
+        "proof.modular_source_race: Lean goal module changed during verification");
     anyhow::ensure!(!timed_out,
         "proof.modular_timeout: Lean did not finish within {}s",timeout.as_secs());
     anyhow::ensure!(code==Some(0),
