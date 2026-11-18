@@ -505,7 +505,7 @@ markup: occlusion
 # math
 
 ## identity
-+ \`n\`
++ `n`
 
 | 参数 | 类型 | 说明 |
 |---|---|---|
@@ -515,7 +515,7 @@ markup: occlusion
 |---|---|---|
 | exact | 结果 = n | auto |
 
-*\`n\`*
+*`n`*
 "#);
     s.write("main.mq.md",r#"---
 markup: occlusion
@@ -525,7 +525,7 @@ import:
 # main
 
 ## forward
-+ \`input\`
++ `input`
 
 | 参数 | 类型 | 说明 |
 |---|---|---|
@@ -535,7 +535,7 @@ import:
 |---|---|---|
 | forwarded | 结果 = input | auto |
 
-**value = [调用](math.math.identity(\`input\`))**
+**value = [调用](math.math.identity(`input`))**
 *value*
 "#);
     let out=s.marqdo().args(["knowledge","compose","--strict","--json","."])
@@ -566,7 +566,7 @@ import:
     assert_eq!(report["status"],"lean_kernel_replayed");
     assert_eq!(report["full_marqdo_runtime_semantics_proved"],false);
     let original=fs::read_to_string(s.dir.join("math.mq.md")).unwrap();
-    fs::write(s.dir.join("math.mq.md"),original.replace("*\`n\`*","*0*")).unwrap();
+    fs::write(s.dir.join("math.mq.md"),original.replace("*`n`*","*0*")).unwrap();
     let stale=s.marqdo().args(["knowledge","replay",cert,"--json","."])
         .output().expect("replay changed projection");
     assert!(!stale.status.success(),"modified callee cannot retain proof");
