@@ -609,6 +609,12 @@ enum ProveAction {
 enum KnowledgeAction {
     /// Compile L0–L4 projections (default)
     Compile,
+    /// Inspect verified theorem receipts and inter-module proof obligations.
+    ProofDeps {
+        /// Fail if the receipt/contract graph contains unresolved obligations.
+        #[arg(long)]
+        strict: bool,
+    },
     /// Inspect stable project symbols by exact URI or display name
     Inspect {
         /// Symbol URI (`mq://…`) or declaration name
@@ -1768,6 +1774,27 @@ fn try_main(cli: Cli) -> Result<i32> {
                 KnowledgeAction::Compile => {
                     write_knowledge(KnowledgeOptions { path, out_dir: out })?;
                     Ok(0)
+                }
+                KnowledgeAction::ProofDeps { strict } => {
+                    let semantic_root=if path.is_file() {
+                        path.parent().unwrap_or_else(|| std::path::Path::new(".")).to_path_buf()
+                    } else {path.clone()};
+                    let compiled=marqdo::sema::ir::compile_project(
+                        &marqdo::sema::ir::CompileOptions {
+                            project_root:semantic_root,
+                            entry:path.is_file().then_some(path),
+                            lock_mode:marqdo::sema::ir::LockMode::Off,
+                        })?;
+                    let receipts=marqdo::knowledge::proof::index_links(
+                        &out.join("prove"),&compiled.semantics);
+                    let report=marqdo::knowledge::modular::analyze(
+                        &compiled.semantics,&receipts);
+                    if json {
+                        println!("{report}");
+                    } else {
+                        println!("{}",serde_json::to_string_pretty(&report)?);
+                    }
+                    Ok(if strict && report["audit_passes"]!=true {2} else {0})
                 }
                 KnowledgeAction::Inspect { symbol } => {
                     // A supplied directory is an explicit compilation scope;
