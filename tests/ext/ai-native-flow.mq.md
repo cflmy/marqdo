@@ -20,6 +20,8 @@ rather than guessing another SKILL or importing the full document.
 1. `value` == "office"
   **_ = 1**
 2. *
+  **debug_pick = > json.stringify value=`pick`**
+  > print text=`debug_pick`
   > sys.exit code=11
 
 **structured = > flow.parse_choice reply="{\"choice\":\"chat\"}" options=`opts`**
