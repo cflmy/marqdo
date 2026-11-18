@@ -218,3 +218,10 @@ marqdo knowledge replay .marqdo/modular/composed/{proof-id}/composition-certific
 目前类型表源文本中的 `int` 被契约解析器归一化为 `number`，它也允许 Num 和 Formula。因此**不能**把 `number` 的证明自动解释为任意 Marqdo 运行时输入均为 i64。组合证书作用域改为 `number_contract_int_model_pure_forwarder_constant_result`，且根报告固定标注 `full_marqdo_runtime_semantics_proved: false`。这仅证明整数抽象模型上的独立模块组合。完整运行时证明必须新增可执行类型收窄及类型保持定理。
 
 另新增 `MarqdoEffects.lean`：把状态、插件异常、未决结果和耗尽 fuel 的循环统一建模，证明异常与未决结果不能充当成功返回；该抽象 ABI 契约仍须具体插件的实现见证，不能由表格声明自动授予。
+
+ 
+## M8：组合证书闭包与调用身份加固（2026-11-18）
+
+`knowledge replay` 现在要求证明证书的 identity 在当前语义工程中**恰好对应一个**可组合的 BoundCall；禁止采用 `find first` 策略选择多个候选中的第一个。调用方与被调用方的 closure 收据必须与重编译得到的**两个精确身份与哈希**集合完全一致：重复、额外注入、缺失、替换记录均拒绝重放。
+
+`composition.rs` 新增单元回归测试 `certificate_closures_must_be_exact_and_unique`。这仅加固证书来源绑定，不扩大已证明的运行时语义范围。CI 需以分支最新 head 为准；不同提交上曾经成功的检查不等于本提交已验证。
