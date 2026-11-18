@@ -49,11 +49,13 @@ fn constant_return(fun:&Function)->Option<i64>{
     }
 }
 fn claim_is_constant(compiled:&Compilation,owner:&SemanticArtifact,n:i64)->bool{
+    // Treat duplicate eligible claims as ambiguity, never as evidence.
+    // A single matching declaration is required at the exact owner SymbolId.
     owner.symbol_id.as_ref().is_some_and(|id|
-        compiled.semantics.claims.iter().any(|c|
+        compiled.semantics.claims.iter().filter(|c|
             c.owner==*id
             && c.premise.as_deref().map_or(true,|p|p.trim().is_empty())
-            && c.conclusion.trim()==format!("结果 = {n}")))
+            && c.conclusion.trim()==format!("结果 = {n}")).count()==1)
 }
 fn candidate(compiled:&Compilation,call:&BoundCall)
   ->Option<(String,String,String,i64)>{
@@ -61,6 +63,9 @@ fn candidate(compiled:&Compilation,call:&BoundCall)
         a.symbol_id.as_ref()==Some(&call.caller) && a.kind=="function")?;
     let ce=compiled.semantics.artifacts.iter().find(|a|
         a.symbol_id.as_ref()==Some(&call.target) && a.kind=="function")?;
+    // The contract is strictly inter-module: local recursion and aliases
+    // must not inherit an import-composition certificate.
+    if ca.source.file==ce.source.file || call.caller==call.target{return None}
     if !ca.effects.is_pure()||!ce.effects.is_pure()
         ||!call.required_effects.is_pure()
         ||call.control_blocker.is_some()||!call.path_guards.is_empty(){return None}
