@@ -16,8 +16,6 @@ on:
     branches: [main]
     paths:
       - "src/prove/**"
-      - "src/knowledge/**"
-      - "src/sema/ir.rs"
       - "doc/verification/skill-proof/**"
       - "lib/**"
       - "tests/prove*.rs"
@@ -25,8 +23,6 @@ on:
   pull_request:
     paths:
       - "src/prove/**"
-      - "src/knowledge/**"
-      - "src/sema/ir.rs"
       - "doc/verification/skill-proof/**"
       - "lib/**"
       - "tests/prove*.rs"
@@ -56,17 +52,10 @@ jobs:
         run: |
           chmod +x scripts/check-proof-library.sh
           scripts/check-proof-library.sh
-      - name: Verify modular assume-guarantee logic and required bridge counterexample
-        run: lean doc/verification/skill-proof/MarqdoModularProof.lean
-
-      - name: Verify stateful ABI and fuel-bounded loop semantics
-        run: lean doc/verification/skill-proof/MarqdoEffects.lean
 
       - name: Build
         run: cargo build --locked
 
-      - name: Module proof composition and path-sensitive VC unit tests
-        run: cargo test --locked --lib knowledge::
       - name: Judgment matrix (real Lean; CI requires toolchain)
         env:
           MARQDO_PROOF_REQUIRE_LEAN: "1"

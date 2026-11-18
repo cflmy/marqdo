@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+## v2.9.0 — 2026-11-18 · Full release / 正式完整版本
+
+Marqdo Verified Knowledge Compiler: source-addressable knowledge proof artifacts, bounded Lean 4 modular contract composition, precise evidence grades, independent replay, and fail-closed unsupported semantics.
+
+- Unified source-derived pure-function proof DAG with symbolic parameters, sequential calls, total conditional branches, multi-module imports, and kernel-checked caller contracts.
+- Stable statement and theorem anchors, dependency closure signatures, proof indexes and source-change invalidation.
+- `proved`, `model_proved`, `tested`, `assumed`, `unknown`, `refuted`, `stale` are distinct; Lean Int-model proofs **do not** prove the complete Marqdo `number` or i64 runtime.
+- Independent Lean replay and negative regression tests for changed source, missing preconditions, unsupported effects, and false caller conclusions.
+- Full CLI/WASM/ext version synchronization, Windows/Linux native archives and editor release packaging (completion requires actual release workflow and asset verification).
+- Existing `marqdo prove` behavior, classic knowledge references, and `marqdo call` remain supported. Unsupported loops, recursive functions, dynamic dispatch, plugins and unverified runtime behaviors never become auto-proved.
+
+Marqdo 2.9.0（full）发布可寻址知识制品、统一纯函数模块化契约组合、真实 Lean 证书独立重放与证据等级；保留旧证明证书重放。仅支持明确的纯整数抽象子集，不宣称完整运行时正确性或所有函数自动可证。
+
+详情 / Details: [2.9.0 release notes](doc/releases/v2.9.0.md) · [Trust boundaries](doc/design/verified-knowledge-compiler-boundaries.md).
+
 ## v2.8.0 — 2026-11-17
 
 `marqdo prove` 正式发布：定理表 → Lean 4 证明 → 自动判定。离线符号执行（F1–F5）无工具链可用，`checked` 永远弱于 `proved`；单调性护栏让判定器缺陷显式失败；假定理给出反例见证；证书缓存与目录模式面向智能体批量出证。
