@@ -1814,6 +1814,26 @@ import:
     }
 
     #[test]
+    fn canonical_mq_uri_resolves_across_functions_without_calling_knowledge() {
+        let root=root();
+        let src=root.join("main.mq.md");
+        fs::write(&src,"# main\n\n## source\n\n**x = [演算](2 * 3)**\n*x*\n").unwrap();
+        let initial=compile_project(&CompileOptions::for_path(&root).unwrap()).unwrap();
+        let anchor=initial.semantics.steps.iter().find_map(|s|s.anchor_id.clone()).unwrap();
+        let updated=format!(
+            "# main\n\n## source\n\n**x = [演算](2 * 3)**\n*x*\n\n## consumer\n\n[阅读计算知识]({anchor})\n*None*\n"
+        );
+        fs::write(&src,updated).unwrap();
+        let parsed=compile_project(&CompileOptions::for_path(&root).unwrap()).unwrap();
+        let read=parsed.semantics.refs.iter().find(|r|r.label=="阅读计算知识").unwrap();
+        assert_eq!(read.target_anchor.as_deref(),Some(anchor.as_str()));
+        assert_eq!(read.resolution,"anchor");
+        assert!(read.target.is_none());
+        assert!(parsed.semantics.bound_calls.iter().all(|c|c.call_site!="阅读计算知识"));
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
     fn duplicate_labels_fail_closed_in_public_anchor_projection() {
         let root = root();
         fs::write(root.join("main.mq.md"),
