@@ -6,6 +6,7 @@ import:
   plugin: lib/plugin.mq.md
   json: lib/json.mq.md
   flow: ext/ai/flow.mq.md
+  subtask: lib/subtask.mq.md
 ---
 
 Every step is an explicit commit boundary. The plugin stores accepted outputs,
@@ -161,3 +162,84 @@ We retain **status = [Read action status](json.get(value=`state`, key="status"))
   Return *[Commit the completed workflow](commit(id=`id`, step_id=`step_id`, response=`value`, source_revision=`source_revision`, session_id=`session_id`, principal_ref=`principal_ref`))*.
 4. *
   Return *state*.
+
+
+## retry_plan
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| id | text | required | Blocked workflow ID |
+| source_revision | text | required | Pinned source revision |
+| session_id | text | None | Trusted session |
+| principal_ref | text | None | Trusted principal |
+
+| 返回 | 类型 | 说明 |
+|---|---|---|
+| result | map | Failed-only read-task list or manual_review |
+
+Use `id`, `source_revision`, `session_id`=None, `principal_ref`=None as the inputs for this operation.
+
+Only a parallel step explicitly declared read-only and with no uncertain
+effects may return a retry plan. Completed siblings are not included.
+
+We retain **p = [Locate Agent ABI plugin](plugin.native_path(name="agent"))**.
+1. `p`
+  We **[Load Agent ABI plugin](plugin.load(path=`p`))**.
+  Return *[Select failed read-only children](agent_workflow_retry_plan(id=`id`, source_revision=`source_revision`, session_id=`session_id`, principal_ref=`principal_ref`))*.
+2. *
+  Return *[Native plugin unavailable](json.parse(text="{\"ok\":false,\"status\":\"unavailable\"}"))*.
+
+## retry_commit
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| id | text | required | Blocked workflow ID |
+| results | list | required | New outcomes for failed children only |
+| source_revision | text | required | Pinned source revision |
+| session_id | text | None | Trusted session |
+| principal_ref | text | None | Trusted principal |
+
+| 返回 | 类型 | 说明 |
+|---|---|---|
+| result | map | Merged persistent report, or still blocked |
+
+Use `id`, `results`, `source_revision`, `session_id`=None, `principal_ref`=None as the inputs for this operation.
+
+Re-use successful child results from the checkpoint. New results fill failed
+slots only, in original order; a newly uncertain outcome blocks further work.
+
+We retain **p = [Locate Agent ABI plugin](plugin.native_path(name="agent"))**.
+1. `p`
+  We **[Load Agent ABI plugin](plugin.load(path=`p`))**.
+  Return *[Merge verified read-only retries](agent_workflow_retry_commit(id=`id`, results=`results`, source_revision=`source_revision`, session_id=`session_id`, principal_ref=`principal_ref`))*.
+2. *
+  Return *[Native plugin unavailable](json.parse(text="{\"ok\":false,\"status\":\"unavailable\"}"))*.
+
+## retry_failed
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| id | text | required | Blocked workflow ID |
+| source_revision | text | required | Pinned source revision |
+| session_id | text | None | Trusted session |
+| principal_ref | text | None | Trusted principal |
+| limit | number | 2 | Max concurrent failed children |
+| timeout_ms | number | 30000 | Child timeout |
+
+| 返回 | 类型 | 说明 |
+|---|---|---|
+| result | map | Recovered workflow, partial results or manual review |
+
+Use `id`, `source_revision`, `session_id`=None, `principal_ref`=None, `limit`=2, `timeout_ms`=30000 as the inputs for this operation.
+
+Run only the failed read-only tasks returned by the native checkpoint checker.
+Unknown external writes never reach this path.
+
+We retain **plan = [Inspect safe retry manifest](retry_plan(id=`id`, source_revision=`source_revision`, session_id=`session_id`, principal_ref=`principal_ref`))**.
+We retain **can_retry = [Check permitted recovery](json.get(value=`plan`, key="ok"))**.
+1. `can_retry`
+  We retain **tasks = [Read failed-only children](json.get(value=`plan`, key="tasks"))**.
+  We retain **outcomes = [Execute failed read-only children only](subtask.run_many(tasks=`tasks`, limit=`limit`, timeout_ms=`timeout_ms`))**.
+  Return *[Merge with preserved completed children](retry_commit(id=`id`, results=`outcomes`, source_revision=`source_revision`, session_id=`session_id`, principal_ref=`principal_ref`))*.
+2. *
+  Return *plan*.
