@@ -23,8 +23,12 @@ jobs:
           cargo run --locked -- check ext/ai/recovery.mq.md
           cargo run --locked -- check ext/ai/context.mq.md
           cargo run --locked -- check tests/ext/ai-native-flow.mq.md
+          cargo run --locked -- check ext/ai/workflow.mq.md
+          cargo run --locked -- check tests/ext/ai-native-workflow.mq.md
       - name: Native AI flow interpreter smoke (offline)
-        run: cargo run --locked -- run tests/ext/ai-native-flow.mq.md
+        run: |
+          cargo run --locked -- run tests/ext/ai-native-flow.mq.md
+          cargo run --locked -- run tests/ext/ai-native-workflow.mq.md
       - name: Workbench contracts (M00–M06 / F-subset)
         run: cargo test --test workbench_contracts --locked
       - name: Offline executable-knowledge gate
