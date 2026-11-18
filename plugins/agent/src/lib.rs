@@ -848,6 +848,8 @@ kb_ffi!(agent_workflow_open, workflow::open, "agent_workflow_open");
 kb_ffi!(agent_workflow_next, workflow::next, "agent_workflow_next");
 kb_ffi!(agent_workflow_commit, workflow::commit, "agent_workflow_commit");
 kb_ffi!(agent_workflow_cancel, workflow::cancel, "agent_workflow_cancel");
+kb_ffi!(agent_workflow_retry_plan, workflow::retry_plan, "agent_workflow_retry_plan");
+kb_ffi!(agent_workflow_retry_commit, workflow::retry_commit, "agent_workflow_retry_commit");
 kb_ffi!(agent_error_make, error::make_error, "agent_error_make");
 kb_ffi!(agent_error_decide_retry, error::decide_retry, "agent_error_decide_retry");
 kb_ffi!(agent_tools_register, tools::tools_register, "agent_tools_register");
@@ -986,6 +988,8 @@ pub unsafe extern "C" fn marqdo_plugin_init(host: *const MarqdoHostApi) -> c_int
         ("agent_workflow_next", "id,source_revision", agent_workflow_next),
         ("agent_workflow_commit", "id,step_id,response,source_revision", agent_workflow_commit),
         ("agent_workflow_cancel", "id,source_revision", agent_workflow_cancel),
+        ("agent_workflow_retry_plan", "id,source_revision", agent_workflow_retry_plan),
+        ("agent_workflow_retry_commit", "id,results,source_revision", agent_workflow_retry_commit),
         ("agent_error_make", "code,message,category", agent_error_make),
         ("agent_error_decide_retry", "error,attempts,effect_class", agent_error_decide_retry),
         ("agent_tools_register", "spec,specs", agent_tools_register),
