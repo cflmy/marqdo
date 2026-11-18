@@ -36,6 +36,14 @@ rather than guessing another SKILL or importing the full document.
 2. *
   > sys.exit code=13
 
+**gate = > flow.input id="ai_native_flow_ci_gate" question="Continue?" options=`opts` source_revision="fixture-v1" freeform=False**
+**answered = > flow.reply id="ai_native_flow_ci_gate" reply="office" source_revision="fixture-v1"**
+**answer = > json.get value=`answered` key="value"**
+1. `answer` == "office"
+  **_ = 1**
+2. *
+  > sys.exit code=14
+
 Return *"ai-flow-native-ok"*.
 
 ## probe
