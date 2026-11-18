@@ -43,8 +43,35 @@ fn strip_label(s: &str) -> &str {
     }
 }
 
+fn structured_reply(raw: &str) -> Option<String> {
+    let parsed: Value = serde_json::from_str(raw).ok()?;
+    if let Some(s) = parsed.as_str() {
+        return Some(s.to_string());
+    }
+    if let Some(list) = parsed.as_array() {
+        if list.len() == 1 {
+            return list[0].as_str().map(str::to_string);
+        }
+        return None;
+    }
+    let map = parsed.as_object()?;
+    // Refuse conflicting structured decisions instead of choosing first.
+    let values: Vec<&str> = ["choice", "selected", "option", "选择"]
+        .iter()
+        .filter_map(|key| map.get(*key).and_then(Value::as_str))
+        .collect();
+    if values.is_empty() || values.iter().any(|s| *s != values[0]) {
+        return None;
+    }
+    Some(values[0].to_string())
+}
+
 fn single_choice(options: &[String], reply: &str) -> Option<String> {
     let raw = strip_label(strip_fence(reply));
+    // Structured single-choice replies are accepted only through known fields,
+    // and then still validated against the caller's exact allowlist.
+    let decoded = structured_reply(raw);
+    let raw = decoded.as_deref().unwrap_or(raw);
     // Small models often prepend a short selection verb. Accept only the
     // verb followed by a complete allowed value; explanations stay invalid.
     let raw = raw.trim();
@@ -130,6 +157,9 @@ mod tests {
         assert_eq!(check("2")["value"], "office");
         assert_eq!(check("我选择 chat")["value"], "chat");
         assert_eq!(check("I choose office")["value"], "office");
+        assert_eq!(check(r#"{"choice":"chat"}"#)["value"], "chat");
+        assert_eq!(check("[\"office\"]")["value"], "office");
+        assert_eq!(check("```json\n{\"selected\":\"office\"}\n```")["value"], "office");
     }
 
     #[test]
@@ -139,6 +169,13 @@ mod tests {
             assert_eq!(result["ok"], false, "accepted {reply:?}");
             assert_eq!(result["value"], Value::Null);
         }
+    }
+
+    #[test]
+    fn refuses_conflicting_structured_decisions() {
+        assert_eq!(check(r#"{"choice":"chat","option":"office"}"#)["ok"], false);
+        assert_eq!(check(r#"{"choice":"../private.mq.md"}"#)["ok"], false);
+        assert_eq!(check(r#"["chat","office"]"#)["ok"], false);
     }
 
     #[test]
