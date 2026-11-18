@@ -40,12 +40,13 @@ jobs:
           rustup toolchain install 1.81.0 --profile minimal
           rustup default 1.81.0
 
+      # leanprover/lean-action@v1 已移除 lean4-version；本仓库运行时只需 lean 二进制
+      # （底座内嵌、不经 lake）。用 elan 钉 v4.35.0，与 doc/verification/skill-proof/lean-toolchain 一致。
       - name: Install Lean 4.35.0 (elan)
-        uses: leanprover/lean-action@v1
-        with:
-          lean4-version: "v4.35.0"
-          auto-config: false
-          use-github-cache: false
+        run: |
+          curl -sSf https://elan.lean-lang.org/elan-init.sh | sh -s -- -y --default-toolchain leanprover/lean4:v4.35.0
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+          "$HOME/.elan/bin/lean" --version
 
       - name: Verify embedded proof library
         run: |
