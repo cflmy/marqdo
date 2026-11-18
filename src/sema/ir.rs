@@ -183,6 +183,8 @@ pub struct SemanticArtifact {
 #[derive(Debug, Clone)]
 pub struct KnowledgeRef {
     pub id: String,
+    /// Stable public address of the marked step, absent for ambiguous labels.
+    pub anchor_id: Option<String>,
     pub label: String,
     pub context: String,
     pub source: SourceLocation,
@@ -193,6 +195,10 @@ pub struct KnowledgeRef {
 #[derive(Debug, Clone)]
 pub struct KnowledgeStep {
     pub id: ArtifactId,
+    /// Stable public anchor; legacy #step-N is kept as an internal step identity.
+    pub anchor_id: Option<String>,
+    /// Hash of the authored source line (or fallback label when line unavailable).
+    pub definition_digest: Digest,
     pub reference: String,
     pub kind: String,
     pub calls: Vec<SymbolId>,
@@ -304,6 +310,7 @@ fn compile_index(index: ProjectIndex) -> Result<Compilation> {
                     path,
                     function,
                     symbol,
+                    text,
                     &local_by_name,
                     &owned_links,
                     &module_prov,
@@ -514,6 +521,26 @@ fn resolve_narrative_target(
     })
 }
 
+/// The label is a human-facing name, not an execution permission.
+fn normalize_anchor_label(label: &str) -> String {
+    label.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
+fn public_anchor(owner: &SymbolId, label: &str, counts: &BTreeMap<String, usize>) -> Option<String> {
+    let normalized = normalize_anchor_label(label);
+    if normalized.is_empty() || counts.get(&normalized) != Some(&1) {
+        return None;
+    }
+    // Full SHA-256 avoids truncation collisions; unrelated step insertions
+    // do not change the address, while changing the label intentionally does.
+    Some(format!("{}#anchor-{}", owner.as_str(), digest(normalized.as_bytes()).0.trim_start_matches("sha256:")))
+}
+
+fn anchor_definition_digest(source: &str, line: u32, label: &str, kind: &str) -> Digest {
+    let body = if line > 0 { source.lines().nth(line as usize - 1) } else { None };
+    digest(format!("{kind}\0{label}\0{}", body.unwrap_or("<unknown-source-line>")))
+}
+
 fn artifact_for_function(
     index: &ProjectIndex,
     module_id: &ModuleId,
@@ -521,6 +548,7 @@ fn artifact_for_function(
     path: &Path,
     function: &Function,
     symbol: &SymbolDecl,
+    source_text: &str,
     local_by_name: &BTreeMap<(ModuleId, String), SymbolId>,
     narrative_links: &[crate::parse::NarrativeLink],
     module_prov: &super::provenance::ModuleProvenance,
@@ -560,6 +588,12 @@ fn artifact_for_function(
         }
     }
     let named = collect_named_steps(function);
+    // Only a unique author-visible label in this function receives a public
+    // address. Duplicate names are deliberately not resolved by source order.
+    let mut label_counts = BTreeMap::new();
+    for site in &named {
+        *label_counts.entry(normalize_anchor_label(&site.label)).or_insert(0usize) += 1;
+    }
     let mut refs = Vec::new();
     let mut steps = Vec::new();
     let mut step_n = 0u32;
@@ -572,7 +606,10 @@ fn artifact_for_function(
             }
         });
         let ref_id = format!("{}#ref-{}", symbol.id.as_str(), step_n);
+        let anchor = public_anchor(&symbol.id, &named.label, &label_counts);
+        let definition_digest = anchor_definition_digest(source_text, named.line, &named.label, &named.kind);
         refs.push(KnowledgeRef {
+            anchor_id: anchor.clone(),
             id: ref_id.clone(),
             label: named.label.clone(),
             context: named.context.clone(),
@@ -589,6 +626,8 @@ fn artifact_for_function(
         }
         steps.push(KnowledgeStep {
             id: ArtifactId(format!("{}#step-{}", symbol.id.as_str(), step_n)),
+            anchor_id: anchor,
+            definition_digest,
             reference: ref_id,
             kind: named.kind.clone(),
             calls: target.into_iter().collect(),
@@ -606,7 +645,10 @@ fn artifact_for_function(
             crate::parse::NarrativeLinkKind::Navigation => None,
         };
         let ref_id = format!("{}#ref-{}", symbol.id.as_str(), step_n);
+        // A narrative link is a reference, not a definition. It never creates
+        // a public executable anchor of its own.
         refs.push(KnowledgeRef {
+            anchor_id: None,
             id: ref_id.clone(),
             label: link.label.clone(),
             context: "narrative".into(),
@@ -620,6 +662,8 @@ fn artifact_for_function(
         });
         steps.push(KnowledgeStep {
             id: ArtifactId(format!("{}#step-{}", symbol.id.as_str(), step_n)),
+            anchor_id: None,
+            definition_digest: anchor_definition_digest(source_text, link.line, &link.label, link.kind.as_str()),
             reference: ref_id,
             kind: link.kind.as_str().into(),
             calls: target.into_iter().collect(),
@@ -1324,8 +1368,8 @@ impl SemanticProject {
 pub fn artifact_json(artifact: &SemanticArtifact) -> Value {
     json!({"schema_version": SCHEMA_VERSION, "artifact_id": artifact.artifact_id.0, "symbol_id": artifact.symbol_id.as_ref().map(SymbolId::as_str), "display_name": artifact.display_name, "kind": artifact.kind, "callable": artifact.callable, "source": {"file": artifact.source.file, "line": artifact.source.line, "end_line": artifact.source.end_line}, "signature": artifact.signature.as_ref().map(|s| json!({"receiver":s.receiver,"params":s.params.iter().map(|p|json!({"name":p.name,"type":p.ty,"required":p.required,"default_digest":p.default_digest.as_ref().map(|d|&d.0),"unit":p.unit})).collect::<Vec<_>>(),"returns":s.returns,"effects":s.effects.values()})), "contract":{"params":artifact.contract.params,"returns":artifact.contract.returns,"fields":artifact.contract.fields}, "effects":artifact.effects.values(), "dependencies":artifact.dependencies.iter().map(|d|&d.0).collect::<Vec<_>>(), "provenance":artifact.provenance.iter().map(|p|json!({"uri":p.uri,"locator":p.locator,"content_digest":p.content_digest.as_ref().map(|d|&d.0),"relation":p.relation})).collect::<Vec<_>>(), "applicability":artifact.applicability, "hashes":{"interface":artifact.hashes.interface.0,"implementation":artifact.hashes.implementation.0,"evidence":artifact.hashes.evidence.0,"artifact":artifact.hashes.artifact.0,"closure":artifact.hashes.closure.0}, "verification":{"parse":artifact.verification.parse,"resolve":artifact.verification.resolve,"contract":artifact.verification.contract,"execution":artifact.verification.execution,"tests":artifact.verification.tests,"evidence":artifact.verification.evidence,"domain":artifact.verification.domain,"methods":artifact.verification.methods}, "lifecycle":artifact.lifecycle})
 }
-fn ref_json(reference: &KnowledgeRef) -> Value { json!({"id":reference.id,"label":reference.label,"context":reference.context,"source":{"file":reference.source.file,"line":reference.source.line,"end_line":reference.source.end_line},"resolution":reference.resolution,"target":reference.target.as_ref().map(SymbolId::as_str)}) }
-fn step_json(step: &KnowledgeStep) -> Value { json!({"id":step.id.0,"reference":step.reference,"kind":step.kind,"calls":step.calls.iter().map(SymbolId::as_str).collect::<Vec<_>>(),"effects":step.effects.values(),"source":{"file":step.source.file,"line":step.source.line,"end_line":step.source.end_line}}) }
+fn ref_json(reference: &KnowledgeRef) -> Value { json!({"id":reference.id,"anchor_id":reference.anchor_id,"label":reference.label,"context":reference.context,"source":{"file":reference.source.file,"line":reference.source.line,"end_line":reference.source.end_line},"resolution":reference.resolution,"target":reference.target.as_ref().map(SymbolId::as_str)}) }
+fn step_json(step: &KnowledgeStep) -> Value { json!({"id":step.id.0,"anchor_id":step.anchor_id,"definition_digest":step.definition_digest.0,"reference":step.reference,"kind":step.kind,"calls":step.calls.iter().map(SymbolId::as_str).collect::<Vec<_>>(),"effects":step.effects.values(),"source":{"file":step.source.file,"line":step.source.line,"end_line":step.source.end_line}}) }
 fn bound_call_json(call: &BoundCall) -> Value {
     json!({
         "target": call.target.as_str(),
@@ -1349,6 +1393,7 @@ const SEMANTIC_NAMES: &[&str] = &[
     "symbols.json",
     "refs.json",
     "steps.json",
+    "anchors.json",
     "bound_calls.json",
     "dynamic_calls.json",
     "artifacts",
@@ -1477,6 +1522,23 @@ fn write_generation_tree(stage: &Path, compilation: &Compilation) -> Result<()> 
     write_json(&stage.join("symbols.json"), &json!({"schema_version":SCHEMA_VERSION,"symbols":compilation.index.symbols().iter().map(|s|json!({"id":s.id.as_str(),"module":s.module.as_str(),"kind":s.kind.as_str(),"callable":s.callable.map(|c|c.as_str()),"name":s.name,"declaration_path":s.declaration_path,"source":{"file":rel_uri(compilation.index.root().path(),&s.source),"line":s.line}})).collect::<Vec<_>>() }))?;
     write_json(&stage.join("refs.json"), &json!({"schema_version":SCHEMA_VERSION,"refs":project["refs"]}))?;
     write_json(&stage.join("steps.json"), &json!({"schema_version":SCHEMA_VERSION,"steps":project["steps"]}))?;
+    write_json(&stage.join("anchors.json"), &json!({
+        "schema_version":SCHEMA_VERSION,
+        "role":"stable_public_knowledge_addresses",
+        "anchors": compilation.semantics.steps.iter()
+            .filter(|step| step.anchor_id.is_some())
+            .map(|step| json!({
+                "anchor_id":step.anchor_id,
+                "owner":step.id.0.split('#').next(),
+                "label":compilation.semantics.refs.iter()
+                    .find(|r| r.id == step.reference).map(|r| r.label.as_str()),
+                "step_id":step.id.0,
+                "kind":step.kind,
+                "source":step_json(step)["source"],
+                "definition_digest":step.definition_digest.0,
+                "effects":step.effects.values(),
+            })).collect::<Vec<_>>()
+    }))?;
     write_json(&stage.join("bound_calls.json"), &json!({"schema_version":SCHEMA_VERSION,"bound_calls":project["bound_calls"]}))?;
     write_json(&stage.join("dynamic_calls.json"), &json!({"schema_version":SCHEMA_VERSION,"dynamic_calls":project["dynamic_calls"]}))?;
     write_json(&stage.join("graph/nodes.json"), &json!({"schema_version":SCHEMA_VERSION,"nodes":project["artifacts"]}))?;
@@ -1491,6 +1553,14 @@ fn write_generation_tree(stage: &Path, compilation: &Compilation) -> Result<()> 
         })
         .collect();
     for step in &compilation.semantics.steps {
+        if let Some(anchor) = &step.anchor_id {
+            if let Some(owner) = step.id.0.split('#').next() {
+                edges.push(json!({"from":owner,"to":anchor,"kind":"defines_anchor"}));
+            }
+            for target in &step.calls {
+                edges.push(json!({"from":anchor,"to":target.as_str(),"kind":"calls"}));
+            }
+        }
         if step.kind == "narrate" {
             for target in &step.calls {
                 edges.push(json!({
