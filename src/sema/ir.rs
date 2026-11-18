@@ -1509,6 +1509,7 @@ const SEMANTIC_NAMES: &[&str] = &[
     "anchors.json",
     "claims.json",
     "proof-index.json",
+    "proof-obligations.json",
     "bound_calls.json",
     "dynamic_calls.json",
     "artifacts",
@@ -1642,8 +1643,10 @@ fn write_generation_tree(stage: &Path, compilation: &Compilation, prove_root: &P
         "role":"theorem_declarations_not_proof_results",
         "claims":project["claims"]
     }))?;
-    write_json(&stage.join("proof-index.json"),
-        &crate::knowledge::proof::index_links(prove_root, &compilation.semantics))?;
+    let proofs=crate::knowledge::proof::index_links(prove_root, &compilation.semantics);
+    write_json(&stage.join("proof-index.json"), &proofs)?;
+    write_json(&stage.join("proof-obligations.json"),
+        &crate::knowledge::modular::analyze(&compilation.semantics, &proofs))?;
     write_json(&stage.join("anchors.json"), &json!({
         "schema_version":SCHEMA_VERSION,
         "role":"stable_public_knowledge_addresses",
