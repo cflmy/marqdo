@@ -72,3 +72,42 @@ We retain **p = [Locate native agent plugin](plugin.native_path(name="agent"))**
   Return *[No native parser available](json.parse(text="{\"ok\":false,\"status\":\"unavailable\",\"text\":null}"))*.
 
 Return *[Project the requested document scope](agent_context_scope(source=`source`, scope=`scope`, class=`class`, function=`function`, max_chars=`max_chars`))*.
+
+
+## compose
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| user | text | required | Latest user input |
+| class | text | required | Current class name |
+| function | text | required | Current function name |
+| source | text | None | Override current entry source |
+| budget_tokens | number | 2048 | Small-model context budget |
+
+| 返回 | 类型 | 说明 |
+|---|---|---|
+| result | map | ContextPackV2 or an explicit failed selector |
+
+Use `user`, `class`, `function`, `source`=None, `budget_tokens`=2048 as the inputs for this operation.
+
+Project file, class and function scopes independently. Refuse ambiguous names
+rather than silently importing an unrelated class or the entire source. The
+latest user input stays in the retained portion of the resulting context pack.
+
+We retain **f = [Select file preface](scope(scope="file", source=`source`, max_chars=500))**.
+We retain **c = [Select current class](scope(scope="class", class=`class`, source=`source`, max_chars=800))**.
+We retain **n = [Select current function](scope(scope="function", class=`class`, function=`function`, source=`source`, max_chars=1500))**.
+We retain **f_ok = [Check file selection](json.get(value=`f`, key="ok"))**.
+We retain **c_ok = [Check class selection](json.get(value=`c`, key="ok"))**.
+We retain **n_ok = [Check function selection](json.get(value=`n`, key="ok"))**.
+1. not `f_ok`
+  Return *f*.
+2. not `c_ok`
+  Return *c*.
+3. not `n_ok`
+  Return *n*.
+4. *
+  We retain **ft = [Read file preface](json.get(value=`f`, key="text"))**.
+  We retain **ct = [Read class explanation](json.get(value=`c`, key="text"))**.
+  We retain **nt = [Read function explanation](json.get(value=`n`, key="text"))**.
+  Return *[Compact only the selected scopes](pack(user=`user`, file=`ft`, class=`ct`, function=`nt`, budget_tokens=`budget_tokens`))*.
