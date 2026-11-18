@@ -57,15 +57,26 @@ format correction; never silently select the nearest-looking option.
 
 We retain **opts = [Encode allowed values](json.stringify(value=`options`))**.
 We retain **prompt = "Choose exactly one of these options. Return its name only, no explanation:\n" + opts + "\nInput:\n" + input**.
-We retain **reply = [Ask the model once](llm.ask(prompt=`prompt`, model=`model`))**.
-We retain **parsed = [Validate the model reply](parse_choice(reply=`reply`, options=`options`))**.
+We retain **m = [Build one model handle](llm.create(model=`model`))**.
+We retain **turn = [Ask the model once](m.ask(prompt=`prompt`))**.
+We retain **err = [Check model transport error](json.get(value=`turn`, key="error"))**.
+1. `err`
+  Return *turn*.
+2. *
+  We retain **reply = [Read model answer](json.get(value=`turn`, key="text"))**.
+  We retain **parsed = [Validate the model reply](parse_choice(reply=`reply`, options=`options`))**.
 We retain **ok = [Read validation status](json.get(value=`parsed`, key="ok"))**.
 1. `ok`
   Return *parsed*.
 2. `repair`
   We retain **fix = "Your answer was not an exact allowed option. Return only ONE option name from:\n" + opts**.
-  We retain **again = [Retry the format only once](llm.ask(prompt=`fix`, model=`model`))**.
-  Return *[Validate the repaired reply](parse_choice(reply=`again`, options=`options`))*.
+  We retain **fixed = [Retry the format only once](m.ask(prompt=`fix`))**.
+  We retain **repair_error = [Read transport error](json.get(value=`fixed`, key="error"))**.
+  1. `repair_error`
+    Return *fixed*.
+  2. *
+    We retain **again = [Read corrected answer](json.get(value=`fixed`, key="text"))**.
+    Return *[Validate the repaired reply](parse_choice(reply=`again`, options=`options`))*.
 3. *
   Return *parsed*.
 
