@@ -36,7 +36,7 @@ fn report(file:&PathBuf, status:Verdict, decided_by:&str, lean:Option<LeanInfo>)
 fn links_bind_to_exact_owner_and_stale_after_source_change() {
     let dir=root("stale");
     let file=dir.join("main.mq.md");
-    fs::write(&file,"# main\n\n## compute\n\n**x = [演算](2 * 3)**\n*x*\n").unwrap();
+    fs::write(&file,"# main\n\n## compute\n\n| 定理 | 结论 | 前提 | 策略 |\n|---|---|---|---|\n| rule | 结果 = 6 | | auto |\n\n**x = [演算](2 * 3)**\n*x*\n").unwrap();
     let compiled=compile_project(&CompileOptions::for_path(&dir).unwrap()).unwrap();
     let receipt=link_report(&compiled,&file,&report(&file,Verdict::Checked,"trace",None),&dir);
     assert_eq!(receipt["claims"][0]["status"],"checked");
@@ -50,7 +50,7 @@ fn links_bind_to_exact_owner_and_stale_after_source_change() {
     let current=index_links(&dir.join(".marqdo/prove"),&compiled.semantics);
     assert_eq!(current["claims"][0]["status"],"checked");
     assert_eq!(current["claims"][0]["usable"],false);
-    fs::write(&file,"# main\n\n## compute\n\n**x = [演算](2 * 4)**\n*x*\n").unwrap();
+    fs::write(&file,"# main\n\n## compute\n\n| 定理 | 结论 | 前提 | 策略 |\n|---|---|---|---|\n| rule | 结果 = 6 | | auto |\n\n**x = [演算](2 * 4)**\n*x*\n").unwrap();
     let changed=compile_project(&CompileOptions::for_path(&dir).unwrap()).unwrap();
     let stale=index_links(&dir.join(".marqdo/prove"),&changed.semantics);
     assert_eq!(stale["claims"][0]["status"],"stale");
@@ -71,6 +71,10 @@ import:
 # main
 
 ## compute
+
+| 定理 | 结论 | 前提 | 策略 |
+|---|---|---|---|
+| rule | 结果 = 6 | | auto |
 
 **tax = [计算税额](rates.lookup())**
 *tax*
@@ -126,7 +130,7 @@ fn complete_knowledge_publish_contains_anchors_refs_and_proof_receipts() {
 fn fake_lean_status_with_no_matching_certificate_cannot_be_proved() {
     let dir=root("forge");
     let file=dir.join("main.mq.md");
-    fs::write(&file,"# main\n\n## compute\n\n**x = [演算](2 * 3)**\n*x*\n").unwrap();
+    fs::write(&file,"# main\n\n## compute\n\n| 定理 | 结论 | 前提 | 策略 |\n|---|---|---|---|\n| rule | 结果 = 6 | | auto |\n\n**x = [演算](2 * 3)**\n*x*\n").unwrap();
     let compiled=compile_project(&CompileOptions::for_path(&dir).unwrap()).unwrap();
     let lean=LeanInfo{
         toolchain:"Lean 4.35".into(),library_sha256:"lib".into(),
@@ -177,7 +181,7 @@ markup: occlusion
 fn stale_duplicate_claims_are_never_selected_by_position() {
     let dir=root("duplicate");
     let file=dir.join("main.mq.md");
-    fs::write(&file,"# main\n\n## compute\n\n**x = [演算](2 * 3)**\n*x*\n").unwrap();
+    fs::write(&file,"# main\n\n## compute\n\n| 定理 | 结论 | 前提 | 策略 |\n|---|---|---|---|\n| rule | 结果 = 6 | | auto |\n\n**x = [演算](2 * 3)**\n*x*\n").unwrap();
     let compiled=compile_project(&CompileOptions::for_path(&dir).unwrap()).unwrap();
     let receipt=link_report(&compiled,&file,&report(&file,Verdict::Checked,"trace",None),&dir);
     for name in ["a","b"] {
