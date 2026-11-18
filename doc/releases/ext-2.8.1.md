@@ -2,14 +2,18 @@
 
 ## 1. 一句话
 
-独立拓展包 **2.8.1**（CLI 仍为 **2.8.0**）：`ext/ai` 交付插件侧持久化工作流——显式 `open/next/commit/cancel`、
-有界模型选择、作用域上下文、只读失败恢复，以及 `inspect/list` 与可隔离的 `resume_dir`。
-不改解释器栈挂起语义，也不宣称外部写的 exactly-once。
+独立拓展包 **2.8.1**（CLI 仍为 **2.8.0**）：`ext/ai` 交付插件侧持久化工作流——显式
+`open/next/commit/cancel`、有界模型选择、作用域上下文、只读失败恢复，以及
+`inspect/list` 与可隔离的 `resume_dir`。Windows `extension-release` 使用原生
+`path.join` 根路径与 `C:\Windows\System32\tar.exe`（bsdtar）打包。不改解释器栈
+挂起语义，也不宣称外部写的 exactly-once。
 
-Independent extension pack **2.8.1** (CLI remains **2.8.0**): `ext/ai` ships a plugin-only
-durable workflow — explicit `open/next/commit/cancel`, bounded model choice, scoped
-context packing, failed-only read-only recovery, plus `inspect/list` and isolatable
-`resume_dir`. No interpreter-stack suspension and no exactly-once external-write claim.
+Independent extension pack **2.8.1** (CLI remains **2.8.0**): `ext/ai` ships a
+plugin-only durable workflow — explicit `open/next/commit/cancel`, bounded model
+choice, scoped context packing, failed-only read-only recovery, plus
+`inspect/list` and isolatable `resume_dir`. Windows `extension-release` packs
+with native `path.join` roots and `C:\Windows\System32\tar.exe` (bsdtar). No
+interpreter-stack suspension and no exactly-once external-write claim.
 
 ## 2. 亮点（Highlights）
 
@@ -21,6 +25,7 @@ context packing, failed-only read-only recovery, plus `inspect/list` and isolata
 | 作用域上下文 | Markdown 感知的 file/class/function 摘录；歧义拒绝；不把整库 import 塞进提示 |
 | 安全并行恢复 | 保留成功兄弟结果；仅重试已分类为只读的失败子任务；写/未知效应不自动派发 |
 | 可观测性 | `inspect`/`list` 只读进度；测试与调用方可传入 host-relative `resume_dir` |
+| Windows CI | engineering root 用 `path.join`；ZIP 用 `System32\tar.exe --format=zip` |
 
 设计契约：[native-agent-flow-v3.md](../design/native-agent-flow-v3.md)。
 

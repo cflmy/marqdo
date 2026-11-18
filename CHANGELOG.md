@@ -2,17 +2,18 @@
 
 ## Unreleased
 
-## Ext pack v2.8.3 — 2026-11-18
+## Ext pack v2.8.1 — 2026-11-18
 
 ### Highlights
 
-**AI native durable workflow + Windows pack CI fix（CLI 仍为 v2.8.0）**：能力同 2.8.1；
-修复 Windows engineering root，以及 Git Bash 下误用 GNU `tar` 导致 zip 失败——改用
-`C:\Windows\System32\tar.exe`。详见 [双语发布说明](doc/releases/ext-2.8.3.md)。
+**AI native durable workflow（CLI 仍为 v2.8.0）**：`ext/ai` 以插件侧步骤机交付持久化
+工作流（`workflow`/`flow`/`context`/`recovery`），含有界模型选择、作用域上下文、
+只读失败恢复、`inspect`/`list` 与可隔离 `resume_dir`。Windows 打包使用 `path.join`
+根路径与 `System32\tar.exe`。详见 [双语发布说明](doc/releases/ext-2.8.1.md)。
 
 ```bash
-marqdo ext add agent   # CDN latest → 2.8.3
-# 或：MARQDO_EXT_VERSION=2.8.3 marqdo ext add agent
+marqdo ext add agent   # CDN latest → 2.8.1
+# 或：MARQDO_EXT_VERSION=2.8.1 marqdo ext add agent
 ```
 
 **核心表面 Δ（Core surface Δ）**：**无增删**——仅 Extension / Agent Runtime。
@@ -35,13 +36,12 @@ marqdo ext add agent   # CDN latest → 2.8.3
   `run --effects` flag, using `MARQDO_AGENT_PLUGIN` instead.
 - Atomic checkpoint/effect temp names no longer collide under parallel writes;
   resume tests no longer race on process-wide cwd.
-- Windows `extension-release`：engineering root 使用 `path.join` / cwd 回退，
-  `packs.ci` 传入绝对 checkout，并授予 `fs.read`。
-- Windows ZIP 编码显式调用 `System32\tar.exe`（bsdtar），避免 Git Bash GNU tar。
+- Windows `extension-release`：engineering root 使用 `path.join` / cwd 回退；
+  ZIP 显式调用 `System32\tar.exe`（bsdtar）；`packs.ci` 授予 `fs.read`。
 
 ### Changed
 
-- 扩展包 SemVer **2.8.3**（`ext/VERSION`）；与 CLI **v2.8.0** 可独立安装。
+- 扩展包 SemVer **2.8.1**（`ext/VERSION`）；与 CLI **v2.8.0** 可独立安装。
 - 分支已合并 v2.8.0 依赖锁后的 AI 工作流增量，不再从 2.7.1 基线分叉。
 
 ## v2.8.0 — 2026-11-17
