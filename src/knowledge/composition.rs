@@ -172,6 +172,9 @@ pub fn prove(compiled:&Compilation,out:&Path,toolchain:&Toolchain)->Result<Value
     let mut records=Vec::new();
     for call in &compiled.semantics.bound_calls{
         let Some((source,client,identity,n))=candidate(compiled,call) else {
+            // Projection contracts have their own independently replayable
+            // backend, and must not also appear as unsupported constant claims.
+            if super::projection::eligible(compiled,call){continue}
             records.push(json!({"caller":call.caller.as_str(),
                 "callee":call.target.as_str(),"status":"unsupported_fragment",
                 "reason":"requires_pure_number_contract_int_model_forwarder_with_constant_claims",
@@ -232,6 +235,7 @@ pub fn prove(compiled:&Compilation,out:&Path,toolchain:&Toolchain)->Result<Value
             "status":"lean_kernel_proved_model","artifact":receipt,
             "scope":"number_contract_int_model_pure_forwarder_constant_result"}));
     }
+    records.extend(super::projection::prove(compiled,out,toolchain)?);
     Ok(json!({"schema_version":1,"role":"restricted_composed_lean_module",
         "results":records,
         "full_marqdo_runtime_semantics_proved":false}))
@@ -255,6 +259,9 @@ fn ensure_exact_closures(
 /// recompiled from the current Marqdo AST, and both Lean modules are rechecked.
 pub fn replay(compiled:&Compilation,certificate:&Path,lean:&Toolchain)->Result<Value>{
     let receipt:Value=serde_json::from_slice(&fs::read(certificate)?)?;
+    if receipt["kind"]=="marqdo_parameter_projection_composition"{
+        return super::projection::replay(compiled,certificate,lean)
+    }
     anyhow::ensure!(receipt["schema_version"]==1
         &&receipt["kind"]=="marqdo_restricted_composition"
         &&receipt["scope"]=="number_contract_int_model_pure_forwarder_constant_result"
