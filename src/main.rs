@@ -619,6 +619,13 @@ enum KnowledgeAction {
         #[arg(long)]
         verify: bool,
     },
+    /// Emit independent Lean callee+caller proofs for restricted pure forwarders.
+    /// Unsupported constructs are rejected and never receive certificates.
+    Compose {
+        /// Exit nonzero if any call is unsupported or Lean rejects it.
+        #[arg(long)]
+        strict: bool,
+    },
     /// Inspect stable project symbols by exact URI or display name
     Inspect {
         /// Symbol URI (`mq://…`) or declaration name
@@ -1778,6 +1785,30 @@ fn try_main(cli: Cli) -> Result<i32> {
                 KnowledgeAction::Compile => {
                     write_knowledge(KnowledgeOptions { path, out_dir: out })?;
                     Ok(0)
+                }
+                KnowledgeAction::Compose { strict } => {
+                    let root=if path.is_file(){
+                        path.parent().filter(|p|!p.as_os_str().is_empty())
+                            .unwrap_or_else(||std::path::Path::new(".")).to_path_buf()
+                    }else{path.clone()};
+                    let compiled=marqdo::sema::ir::compile_project(
+                        &marqdo::sema::ir::CompileOptions{
+                            project_root:root,
+                            entry:path.is_file().then_some(path),
+                            lock_mode:marqdo::sema::ir::LockMode::Off
+                        })?;
+                    let lean=marqdo::prove::driver::Toolchain::discover(None)?
+                        .ok_or_else(||anyhow::anyhow!(
+                            "proof.compose_lean_missing: Lean required"))?;
+                    let result=marqdo::knowledge::composition::prove(
+                        &compiled,&out.join("modular"),&lean)?;
+                    let failures=result["results"].as_array().map_or(true,|entries|
+                        entries.is_empty()||entries.iter().any(|e|
+                            e["status"]!="lean_kernel_proved_model"));
+                    if json {println!("{result}");} else {
+                        println!("{}",serde_json::to_string_pretty(&result)?);
+                    }
+                    Ok(if strict && failures {2} else {0})
                 }
                 KnowledgeAction::ProofDeps { strict,verify } => {
                     let semantic_root=if path.is_file() {
