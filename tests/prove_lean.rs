@@ -799,6 +799,139 @@ import:
         "not_established_by_dependency_analysis");
 }
 
+/// One proof pipeline for three transitive modules, two sequential calls,
+/// an exhaustive branch, and a caller inequality claim. No callee source is
+/// inlined into the importing Lean module; every module has its own theorem.
+#[test]
+fn unified_modular_contract_proves_multicall_branch_and_transitive_dag(){
+    if !toolchain_available(){
+        skip_or_fail("unified_modular_contract_proves_multicall_branch_and_transitive_dag");
+        return;
+    }
+    let s=Scratch::new("unified-contract-three-module");
+    s.write("math.mq.md",r#"---
+markup: occlusion
+---
+# math
+
+## increment
++ `n`
+
+| 参数 | 类型 | 说明 |
+|---|---|---|
+| n | int | integer |
+
+| 定理 | 结论 | 策略 |
+|---|---|---|
+| increment_post | 结果 = n + 1 | auto |
+
+*`n` + 1*
+"#);
+    let ops=r#"---
+markup: occlusion
+import:
+  math: math.mq.md
+---
+# ops
+
+## twice
++ `n`
+
+| 参数 | 类型 | 说明 |
+|---|---|---|
+| n | int | integer |
+
+| 定理 | 结论 | 策略 |
+|---|---|---|
+| twice_post | 结果 = n + 2 | auto |
+
+**a = [第一次](math.math.increment(`n`))**
+**b = [第二次](math.math.increment(`a`))**
+*b*
+"#;
+    s.write("ops.mq.md",ops);
+    let main=r#"---
+markup: occlusion
+import:
+  math: math.mq.md
+  ops: ops.mq.md
+---
+# main
+
+## guarded
++ `n`
+
+| 参数 | 类型 | 说明 |
+|---|---|---|
+| n | int | integer |
+
+| 定理 | 结论 | 策略 |
+|---|---|---|
+| result_floor | 结果 ≥ 1 | auto |
+
+1. `n` > 0
+  **x = [调用复合模块](ops.ops.twice(`n`))**
+  *x*
+2. *
+  **y = [调用叶模块](math.math.increment(0))**
+  *y*
+"#;
+    s.write("main.mq.md",main);
+    let output=s.marqdo().args(["knowledge","compose","--strict","--json","."])
+        .output().expect("compose uniform DAG");
+    assert!(output.status.success(),"stderr={} stdout={}",
+        String::from_utf8_lossy(&output.stderr),
+        String::from_utf8_lossy(&output.stdout));
+    let report:serde_json::Value=serde_json::from_slice(&output.stdout).unwrap();
+    let record=report["results"].as_array().unwrap().iter().find(|row|
+        row["scope"]=="pure_number_int_model_sequential_branch_dag"
+        &&row["status"]=="lean_kernel_proved_model"
+        &&row["evidence"]["grade"]=="model_proved"
+        &&row["artifact"].as_str().is_some_and(|p|{
+            let path=s.dir.join(p);
+            let cert:serde_json::Value=serde_json::from_slice(
+                &fs::read(path).unwrap_or_default()).unwrap_or_default();
+            cert["modules"].as_array().is_some_and(|nodes|nodes.len()==3)
+        })).unwrap_or_else(||panic!("three-module caller theorem not proved: {report}"));
+    let certificate=record["artifact"].as_str().unwrap();
+    let folder=s.dir.join(certificate).parent().unwrap().to_path_buf();
+    let receipt:serde_json::Value=serde_json::from_slice(
+        &fs::read(s.dir.join(certificate)).unwrap()).unwrap();
+    let modules=receipt["modules"].as_array().unwrap();
+    assert_eq!(modules.len(),3);
+    let caller_name=modules[2]["module"].as_str().unwrap();
+    let caller=fs::read_to_string(folder.join(format!("{caller_name}.lean"))).unwrap();
+    assert!(caller.contains("import M"));
+    assert!(caller.contains("have hc"));
+    assert!(caller.contains("split_ifs"));
+    assert!(!caller.contains("sorry"));
+    assert_eq!(receipt["full_marqdo_runtime_semantics_proved"],false);
+    let replay=s.marqdo().args(["knowledge","replay",certificate,"--json","."])
+        .output().expect("replay unified proof");
+    assert!(replay.status.success(),"stdout={} stderr={}",
+        String::from_utf8_lossy(&replay.stdout),
+        String::from_utf8_lossy(&replay.stderr));
+    let replayed:serde_json::Value=serde_json::from_slice(&replay.stdout).unwrap();
+    assert_eq!(replayed["status"],"lean_kernel_replayed");
+    assert_eq!(replayed["evidence"]["grade"],"model_proved");
+
+    s.write("ops.mq.md",&ops.replace("结果 = n + 2","结果 = n + 3"));
+    let stale=s.marqdo().args(["knowledge","replay",certificate,"--json","."])
+        .output().expect("reject changed intermediate proof contract");
+    assert!(!stale.status.success(),"stale transitive dependency must fail");
+
+    s.write("ops.mq.md",ops);
+    s.write("main.mq.md",&main.replace("结果 ≥ 1","结果 ≥ 100"));
+    let wrong=s.marqdo().args(["knowledge","compose","--strict","--json","."])
+        .output().expect("reject invalid caller theorem");
+    let output_json:serde_json::Value=serde_json::from_slice(&wrong.stdout)
+        .unwrap_or_default();
+    assert!(!output_json["results"].as_array().into_iter().flat_map(|a|a.iter())
+        .any(|r|r["scope"]=="pure_number_int_model_sequential_branch_dag"
+            &&r["status"]=="lean_kernel_proved_model"
+            &&r["identity"]==receipt["identity"]));
+}
+
 /// G2：真证书命中（用真 lean 跑一次后，证书生效；第二次 cache: hit 且快）。
 #[test]
 fn g2_certificate_hit_after_real_run() {
