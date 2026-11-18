@@ -103,16 +103,16 @@ fn candidate(compiled:&Compilation,call:&BoundCall)
     // This callee theorem is verified from the translated source *inside its
     // own module*. The caller only imports its proved interface theorem.
     let callee_src=format!(
-        "-- pure typed-int fragment of {}\\n\
-         def callee {callee_binders} : Int := ({n} : Int)\\n\
-         theorem callee_contract {callee_binders} : callee {callee_args} = ({n} : Int) := by rfl\\n",
+        "-- pure typed-int fragment of {}\n\
+         def callee {callee_binders} : Int := ({n} : Int)\n\
+         theorem callee_contract {callee_binders} : callee {callee_args} = ({n} : Int) := by rfl\n",
         ce.artifact_id.0);
     let caller_src=format!(
-        "import CalleeModule\\n\
-         -- exact forwarded import call from {}\\n\
-         def caller {caller_binders} : Int := callee {arg_expr}\\n\
-         theorem caller_contract {caller_binders} : caller {caller_args} = ({n} : Int) := by\\n\
-         \\x20 simpa [caller] using (callee_contract {arg_expr})\\n",
+        "import CalleeModule\n\
+         -- exact forwarded import call from {}\n\
+         def caller {caller_binders} : Int := callee {arg_expr}\n\
+         theorem caller_contract {caller_binders} : caller {caller_args} = ({n} : Int) := by\n\
+         \x20\x20simpa [caller] using (callee_contract {arg_expr})\n",
         ca.artifact_id.0);
     Some((callee_src,caller_src,format!("{}#{}",ca.artifact_id.0,
         ce.artifact_id.0),n))
