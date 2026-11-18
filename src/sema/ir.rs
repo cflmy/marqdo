@@ -913,10 +913,14 @@ fn classify_call(
             }) else {
                 return CallClass::Other;
             };
-            let decl = if path.len() >= 2 {
-                path[1..].to_vec()
-            } else if let Some(d) = declaration_path_of(lib, fun) {
+            // Resolve the *declaration* path in the imported module, not
+            // the syntactic call path: `rates.lookup()` may refer to a
+            // nested `# rates / ## lookup` function. Losing the parent
+            // would silently break transitive proof invalidation.
+            let decl = if let Some(d) = declaration_path_of(lib, fun) {
                 d
+            } else if path.len() >= 2 {
+                path[1..].to_vec()
             } else {
                 return CallClass::Other;
             };
