@@ -167,7 +167,8 @@ fn next_doc(ckpt: &Value, id: &str, reused: bool) -> Result<Value,String> {
     let status=ckpt["status"].as_str().unwrap_or("running");
     if status=="blocked" || status=="uncertain" || status=="cancelled" {
         return Ok(json!({"ok":false,"id":id,"status":status,
-            "cursor":index,"step":step,"completed":meta["completed"]}));
+            "cursor":index,"step":step,"completed":meta["completed"],
+            "partial": meta.get("partial").cloned().unwrap_or(Value::Null)}));
     }
     let waiting=match step["kind"].as_str().unwrap_or("") {
         "model"=>"waiting_model",
@@ -234,20 +235,33 @@ pub fn commit(args: &Value) -> Result<Value,String> {
             valid["value"].clone()
         }
         "skill" => {
-            if response["ok"]!=true {
-                return Ok(json!({"ok":false,"status":"tool_not_verified",
-                    "reason":"only verified successful tool result may be committed"}));
+            // A completed wait is not equivalent to a successful child process.
+            let exit = response.get("value").and_then(|v| v.get("code"))
+                .or_else(|| response.get("code")).and_then(Value::as_i64);
+            if response["ok"]==false || exit != Some(0) {
+                return Ok(json!({"ok":false,
+                    "status":if exit.is_none() {"uncertain"} else {"failed"},
+                    "reason":"child process exit code zero is required before commit"}));
             }
             response.clone()
         }
         "parallel" => {
-            let report=parallel::report(&json!({"results":response}))?;
+            let report=if response["schema"]=="AgentParallelResultV1" {
+                response.clone()
+            } else {
+                parallel::report(&json!({"results":response}))?
+            };
             if report["ok"]!=true {
-                return Ok(json!({"ok":false,
-                    "status": if report["uncertain"].as_u64().unwrap_or(0)>0 {
-                        "uncertain" } else {"partial"},
-                    "report":report,
-                    "reason":"preserve successful children; reconcile or retry failed children separately"}));
+                let status=if report["uncertain"].as_u64().unwrap_or(0)>0 {
+                    "uncertain"
+                } else {"blocked"};
+                // Save the full manifest of successful and failed siblings before
+                // returning. Do not run failed/unknown children automatically.
+                let mut frozen=meta.clone();
+                frozen["partial"]=report.clone();
+                save(args,id,&frozen,status)?;
+                return Ok(json!({"ok":false,"status":status,
+                    "report":report,"reason":"child results retained for reconciliation"}));
             }
             report
         }
@@ -331,6 +345,25 @@ mod tests {
         c["response"]=json!("chat or office");
         assert_eq!(commit(&c).unwrap()["status"],"invalid_choice");
         assert_eq!(next(&a).unwrap()["status"],"waiting_model");
+    }
+
+    #[test]
+    fn partial_children_remain_durable_and_unknown_requires_reconciliation() {
+        let mut a=fixture();
+        a["steps"]=json!([{"id":"batch","kind":"parallel","tasks":[{"skill":"a"},{"skill":"b"}]}]);
+        open(&a).unwrap();
+        let mut c=a.clone();
+        c["step_id"]=json!("batch");
+        c["response"]=json!([
+            {"ok":true,"value":{"code":0,"value":"useful"}},
+            {"ok":false,"error":"connection lost"}
+        ]);
+        assert_eq!(commit(&c).unwrap()["status"],"blocked");
+        let after=next(&a).unwrap();
+        assert_eq!(after["status"],"blocked");
+        assert_eq!(after["partial"]["succeeded"],1);
+        assert_eq!(after["partial"]["failed"],1);
+        assert_eq!(commit(&c).unwrap()["status"],"blocked");
     }
 
     #[test]
