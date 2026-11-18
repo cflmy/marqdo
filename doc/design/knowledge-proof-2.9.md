@@ -123,3 +123,35 @@ Lean 才能得出组合契约成立。文件含一个缺少桥接前提时组合
 
 **该特性是源码透明的跨模块证明（有限展开），不是抽象契约复用。**
 只有独立证明调用点前置条件、将已证被调契约接入调用方而无需展开实现，并由 Lean 校验接口桥接，才算真正完成通用 assume–guarantee 模块化证明。
+
+
+## M6：真实 Lean 的封闭调用前置条件（2026-11-18）
+
+模块化校验现在有两种不同的操作：
+
+```sh
+# 纯分析：不会冒充 Lean 已检查
+marqdo knowledge proof-deps --json .
+
+# 要求真实 Lean：先重放被调函数证明，再检查可闭合的调用点前提
+marqdo knowledge proof-deps --verify --json .
+
+# 审计严格退出码；不是“整个程序的模块化定理已被证明”
+marqdo knowledge proof-deps --verify --strict --json .
+```
+
+工作过程：
+
+1. `BoundCall` 保留精确的 caller/target 知识身份，以及**按解释器执行约定归一化后的实参**（名称、顺序、保守静态整数值、源表达式摘要）。
+2. `knowledge/vc.rs` 用被调方函数签名，将受限前提（整数比较/加减乘/布尔连接）绑定到**真实实参**。拒绝除法、溢出、动态变量、不匹配的命名/顺序参数及无法解释的谓词。
+3. 先校验原 `certificate.json` 的复合缓存键、`plan.json`、嵌入证明库哈希、生成 Lean 文件 SHA、源码和语义闭包。
+4. `--verify` 额外使用现有 Lean 工具链**重新检查被调方生成的 Lean 定理**。仅当重放后的确具有精确匹配的 proved 定理时，才承认该条 callee 收据。
+5. 从验证过的收据与闭合前提生成 `closed-goals.lean`，对每个目标使用 `theorem vc_i : ... := by decide`；调用 Lean 4 核验。Rust 计算的布尔结果只能用于提前拒绝，不能独立充当证据。
+6. `proof-obligations.json` 与实时 JSON 审计报告分别记录 `precondition_pending` / `precondition_refuted` / `lean_kernel_verified` 等状态。无工具链、超时、证书篡改、Lean 不接受、源变更全部拒绝进入成功状态。
+
+两个严格区分的边界：
+
+- `lean_kernel_verified` 表示**当前闭合调用点的条件命题已被核验**，而非调用方的完整结论定理。
+- `proof_completion` 仍为 `not_established_by_dependency_analysis`。目前缺少通用符号实参、分支路径条件、任意效应 ABI 的正式组合证明与可重放的跨模块结论证明证书。**不得将依赖图审计通过升级为完整模块化 proved。**
+
+新增 `tests/prove_lean.rs` 场景验证被调定理与调用前置条件**双重重放**，且实参不满足前置条件时必然退出非零；新增单元测试覆盖实际工程导入、整数溢出和未绑定实参。此处描述的是提交的实现及其预期测试，最终验收仍以最新提交 CI 结果为准。
