@@ -45,6 +45,12 @@ fn strip_label(s: &str) -> &str {
 
 fn single_choice(options: &[String], reply: &str) -> Option<String> {
     let raw = strip_label(strip_fence(reply));
+    // Small models often prepend a short selection verb. Accept only the
+    // verb followed by a complete allowed value; explanations stay invalid.
+    let raw = raw.trim();
+    let raw = ["我选择", "我选", "I choose ", "I pick ", "选中"].iter()
+        .find_map(|p| raw.strip_prefix(p).map(str::trim))
+        .unwrap_or(raw);
     let value = canonical(raw);
     // Never infer a routing decision from arbitrary prose.
     let matches: Vec<&String> = options
@@ -122,6 +128,8 @@ mod tests {
         assert_eq!(check("选择：office")["value"], "office");
         assert_eq!(check("```text\nchat\n```")["value"], "chat");
         assert_eq!(check("2")["value"], "office");
+        assert_eq!(check("我选择 chat")["value"], "chat");
+        assert_eq!(check("I choose office")["value"], "office");
     }
 
     #[test]
