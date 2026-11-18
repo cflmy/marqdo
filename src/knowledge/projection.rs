@@ -288,7 +288,8 @@ markup: occlusion
 ---
 # math
 ## select
-+ \`first\`, \`second\`
++ `first`
++ `second`
 
 | 参数 | 类型 | 说明 |
 |---|---|---|
@@ -299,7 +300,7 @@ markup: occlusion
 |---|---|---|
 | proj | 结果 = second | auto |
 
-*\`second\`*
+*`second`*
 "#;
         let caller=r#"---
 markup: occlusion
@@ -308,7 +309,8 @@ import:
 ---
 # main
 ## use
-+ \`x\`, \`y\`
++ `x`
++ `y`
 
 | 参数 | 类型 | 说明 |
 |---|---|---|
@@ -319,7 +321,7 @@ import:
 |---|---|---|
 | forwarded | 结果 = x | auto |
 
-**v = [选择](math.math.select(\`y\`, \`x\`))**
+**v = [选择](math.math.select(`y`, `x`))**
 *v*
 "#;
         fs::write(root.join("math.mq.md"),callee).unwrap();
@@ -339,8 +341,8 @@ import:
         // Reordering the actuals without changing the asserted result must
         // invalidate the caller contract; source is the authority.
         let incorrect=caller.replace(
-            "math.math.select(\`y\`, \`x\`)",
-            "math.math.select(\`x\`, \`y\`)");
+            "math.math.select(`y`, `x`)",
+            "math.math.select(`x`, `y`)");
         fs::write(root.join("main.mq.md"),incorrect).unwrap();
         let changed=crate::sema::ir::compile_project(
             &crate::sema::ir::CompileOptions::for_path(&root).unwrap()).unwrap();
