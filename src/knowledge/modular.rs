@@ -53,6 +53,10 @@ pub fn analyze_with_verified(semantic:&SemanticProject, proof_index:&Value,
                     c.premise.as_deref().and_then(|pre|
                         super::vc::instantiate(semantic,call,pre))
                 };
+                let symbolic=if unconditional {None} else {
+                    c.premise.as_deref().and_then(|pre|
+                        super::symbolic::plan(semantic,call,pre))
+                };
                 let key=format!("{}#{}",id,c.anchor_id);
                 let kernel_passed=goal.as_ref().is_some_and(|g|
                     g.holds && kernel_verified.contains(&key));
@@ -66,10 +70,16 @@ pub fn analyze_with_verified(semantic:&SemanticProject, proof_index:&Value,
                     "precondition_goal_key":if unconditional {None} else {Some(key)},
                     "lean_proposition":goal.as_ref().map(|g|g.proposition.as_str()),
                     "closed_host_check":goal.as_ref().map(|g|g.holds),
+                    "symbolic_model_proposition":symbolic.as_ref().map(|g|g.proposition.as_str()),
+                    "symbolic_model_guard_count":symbolic.as_ref().map(|g|g.guard_propositions.len()),
+                    "symbolic_model_runtime_domain_verified":symbolic.as_ref().map(|g|g.runtime_domain_verified),
+                    "path_guards":call.path_guards,
+                    "control_blocker":call.control_blocker,
                     "call_precondition_status":if unconditional {"none"}
                         else if kernel_passed {"lean_kernel_verified"}
                         else if goal.as_ref().is_some_and(|g|!g.holds) {"refuted_closed_precondition"}
                         else if goal.is_some() {"requires_lean_kernel"}
+                        else if symbolic.is_some() {"symbolic_path_lean_model_pending"}
                         else {"requires_symbolic_callsite_proof"},
                     "status":if !verified {"missing_verified_callee_claim"}
                         else if unconditional || kernel_passed {"available_as_contract"}
@@ -77,10 +87,14 @@ pub fn analyze_with_verified(semantic:&SemanticProject, proof_index:&Value,
                         else {"precondition_pending"}
                 })
             }).collect();
-        let all_available=exported && !contracts.is_empty()
+        let controls_sufficient=call.control_blocker.is_none()
+            && call.required_effects.is_pure();
+        let all_available=controls_sufficient && exported && !contracts.is_empty()
             && contracts.iter().all(|x|x["status"]=="available_as_contract");
         let status=if !known.contains(callee) {
             "external_without_semantic_definition"
+        } else if !controls_sufficient {
+            "unmodeled_control_or_effect"
         } else if !exported {
             "callee_without_declared_contract"
         } else if all_available {
@@ -95,6 +109,10 @@ pub fn analyze_with_verified(semantic:&SemanticProject, proof_index:&Value,
             "status":status,"contracts":contracts,
             "caller_proof_required":true,
             "runtime_link_required":true,
+            "path_guards":call.path_guards,
+            "control_blocker":call.control_blocker,
+            "effects":call.required_effects.values(),
+            "runtime_effect_model":"not_established_by_knowledge_audit",
             "caller_assumption":assumption.map(|a|json!({
                 "id":a.id,"premise":a.premise,
                 "postcondition":a.postcondition,
