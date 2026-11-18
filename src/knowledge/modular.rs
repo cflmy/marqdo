@@ -173,7 +173,7 @@ mod tests {
         std::fs::write(source.join("callee.mq.md"),
             "# callee\n\n## f\n\n| 定理 | 结论 | 前提 | 策略 |\n|---|---|---|---|\n| c | 结果 = 2 | x > 0 | auto |\n\n*2*\n").unwrap();
         std::fs::write(source.join("main.mq.md"),
-            "---\nimport:\n  callee: callee.mq.md\n---\n# main\n\n## call\n\n**x = [外部调用](callee.f())**\n*x*\n").unwrap();
+            "---\nimport:\n  callee: callee.mq.md\n---\n# main\n\n## call\n\n**x = [外部调用](callee.callee.f())**\n*x*\n").unwrap();
         let compilation=crate::sema::ir::compile_project(
             &crate::sema::ir::CompileOptions::for_path(&source).unwrap()).unwrap();
         let report=analyze(&compilation.semantics,&json!({"claims":[]}));
