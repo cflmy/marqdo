@@ -174,7 +174,8 @@ pub fn prove(compiled:&Compilation,out:&Path,toolchain:&Toolchain)->Result<Value
         let Some((source,client,identity,n))=candidate(compiled,call) else {
             // Projection contracts have their own independently replayable
             // backend, and must not also appear as unsupported constant claims.
-            if super::projection::eligible(compiled,call){continue}
+            if super::projection::eligible(compiled,call)
+                ||super::expression::eligible(compiled,call){continue}
             records.push(json!({"caller":call.caller.as_str(),
                 "callee":call.target.as_str(),"status":"unsupported_fragment",
                 "reason":"requires_pure_number_contract_int_model_forwarder_with_constant_claims",
@@ -236,6 +237,7 @@ pub fn prove(compiled:&Compilation,out:&Path,toolchain:&Toolchain)->Result<Value
             "scope":"number_contract_int_model_pure_forwarder_constant_result"}));
     }
     records.extend(super::projection::prove(compiled,out,toolchain)?);
+    records.extend(super::expression::prove(compiled,out,toolchain)?);
     Ok(json!({"schema_version":1,"role":"restricted_composed_lean_module",
         "results":records,
         "full_marqdo_runtime_semantics_proved":false}))
@@ -261,6 +263,9 @@ pub fn replay(compiled:&Compilation,certificate:&Path,lean:&Toolchain)->Result<V
     let receipt:Value=serde_json::from_slice(&fs::read(certificate)?)?;
     if receipt["kind"]=="marqdo_parameter_projection_composition"{
         return super::projection::replay(compiled,certificate,lean)
+    }
+    if receipt["kind"]=="marqdo_pure_expression_composition"{
+        return super::expression::replay(compiled,certificate,lean)
     }
     anyhow::ensure!(receipt["schema_version"]==1
         &&receipt["kind"]=="marqdo_restricted_composition"
