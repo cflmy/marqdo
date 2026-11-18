@@ -151,3 +151,28 @@ We retain **p = [Locate native agent plugin](plugin.native_path(name="agent"))**
   Return *[No native gate available](json.parse(text="{\"ok\":false,\"status\":\"unavailable\"}"))*.
 
 Return *[Commit the verified user reply](agent_input_resume(id=`id`, reply=`reply`, source_revision=`source_revision`, session_id=`session_id`, principal_ref=`principal_ref`))*.
+
+
+## enter
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| skill | text | required | Model-selected registered name |
+| registry | map | required | Trusted name → path mapping |
+
+| 返回 | 类型 | 说明 |
+|---|---|---|
+| result | map | Subtask result, or blocked unknown skill |
+
+Use `skill`, `registry` as the inputs for this operation.
+
+Never execute a raw model-generated path. Resolve a registered skill name to
+an author-controlled document, then call its `# main` through the normal Marqdo
+subtask and effect permissions. The caller must provide a trusted registry.
+
+We retain **path = [Resolve registered SKILL](json.get(value=`registry`, key=`skill`))**.
+1. not `path`
+  Return *[Unknown skill is blocked](json.parse(text="{\"ok\":false,\"status\":\"unsupported_skill\"}"))*.
+2. *
+  We retain **task = [Spawn registered Marqdo document](subtask.spawn(path=`path`))**.
+  Return *[Await the subtask result](subtask.wait(id=`task`))*.
