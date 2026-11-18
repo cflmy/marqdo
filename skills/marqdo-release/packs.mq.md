@@ -102,7 +102,8 @@ We **destination = [Resolve the new archive inside the granted root](fs.resolve(
   | `destination` |
   | `entry` |
 
-Return *[Encode only the explicitly staged format subtree](engineering.checked(argv=`argv`, cwd=`stage`, timeout_ms=300000, max_output=65536))*.
+We **checkout = [Use the absolute runtime checkout as the plugin root](sys.cwd())**.
+Return *[Encode only the explicitly staged format subtree](engineering.checked(argv=`argv`, cwd=`stage`, timeout_ms=300000, max_output=65536, root=`checkout`))*.
 
 ## _receipt
 

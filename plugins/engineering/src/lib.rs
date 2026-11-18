@@ -32,10 +32,16 @@ fn read_bounded(mut r: impl Read, max: u64) -> Result<Vec<u8>, String> {
     if b.len() as u64 > max { return Err("bounded input limit exceeded".into()); }
     Ok(b)
 }
+fn strip_verbatim(path: &Path) -> &Path {
+    path.strip_prefix(r"\\?\").unwrap_or(path)
+}
+
 fn scoped(root: &Path, relative: &str) -> Result<PathBuf, String> {
     let p = root.join(relative).canonicalize().map_err(|_| "path does not exist")?;
-    if !p.starts_with(root) { return Err("artifact path escapes the selected root".into()); }
-    Ok(p)
+    if p.starts_with(root) || strip_verbatim(&p).starts_with(strip_verbatim(root)) {
+        return Ok(p);
+    }
+    Err("artifact path escapes the selected root".into())
 }
 fn homes(root: &Path) -> Vec<PathBuf> {
     let mut out = Vec::new();
@@ -498,8 +504,24 @@ fn gzip_text(p: &Value) -> Answer {
     Ok(json!(String::from_utf8(plain).map_err(|_| "gzip text is not UTF-8")?))
 }
 
+fn resolve_root(request: &Value) -> Result<PathBuf, String> {
+    let raw = request.get("root").and_then(Value::as_str).unwrap_or(".");
+    let selected = PathBuf::from(raw);
+    if let Ok(path) = selected.canonicalize() {
+        return Ok(path);
+    }
+    // Relative grants must still resolve when the caller only passed "." and the
+    // process cwd is the intended checkout (Windows runners are sensitive here).
+    if raw == "." || raw.is_empty() {
+        return std::env::current_dir()
+            .and_then(|p| p.canonicalize())
+            .map_err(|e| format!("root does not exist ({raw}: {e})"));
+    }
+    Err(format!("root does not exist ({raw})"))
+}
+
 fn dispatch(request:&Value)->Answer {
-    let root=PathBuf::from(request.get("root").and_then(Value::as_str).unwrap_or(".")).canonicalize().map_err(|_|"root does not exist")?;
+    let root=resolve_root(request)?;
     let op=field(request,"operation")?;
     let empty=json!({});let p=request.get("payload").unwrap_or(&empty);
     match op {

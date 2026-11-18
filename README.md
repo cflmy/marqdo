@@ -117,7 +117,7 @@ marqdo view examples/procurement --no-open
 
 Agent Skills already support scripts; Marqdo's claim is **one document-native language surface** for authoring, inspecting, executing and reusing functions. This is **not** a claim of full formal verification, zero-delay execution, or OS-level isolation of all plugin/process behavior.
 
-**Resources:** [Release v2.8.0](https://github.com/cflmy/marqdo/releases/tag/v2.8.0) · [Ext pack 2.8.1](https://github.com/cflmy/marqdo/releases/tag/ext-v2.8.1) · [Procurement example](examples/procurement/index.mq.md) · [Executable library authoring](doc/library-development.mq.md) · [Function calling](public/features/22-函数调用.mq.md) · [Link syntax](doc/design/link-syntax.md) · [Website](https://www.marqdo.com/)
+**Resources:** [Release v2.8.0](https://github.com/cflmy/marqdo/releases/tag/v2.8.0) · [Ext pack 2.8.2](https://github.com/cflmy/marqdo/releases/tag/ext-v2.8.2) · [Procurement example](examples/procurement/index.mq.md) · [Executable library authoring](doc/library-development.mq.md) · [Function calling](public/features/22-函数调用.mq.md) · [Link syntax](doc/design/link-syntax.md) · [Website](https://www.marqdo.com/)
 
 ---
 
@@ -128,11 +128,11 @@ Agent Skills already support scripts; Marqdo's claim is **one document-native la
 
 当前 CLI **2.8.0** 新增 `marqdo prove`：知识文件的定理表编译为 Lean 4 并自动判定真假——没有 Lean 工具链也能离线符号执行（诚实降级，绝不冒充证明），有 Lean 时全链路证明并给出反例见证。参见[发布说明](doc/releases/v2.8.0.md)。
 
-独立拓展包 **2.8.1**（CLI 仍为 2.8.0）：`ext/ai` 插件侧持久化工作流（选择 / 作用域上下文 / 只读失败恢复 / `inspect`）。`marqdo ext add agent` → CDN latest。参见[拓展包说明](doc/releases/ext-2.8.1.md)。
+独立拓展包 **2.8.2**（CLI 仍为 2.8.0）：`ext/ai` 插件侧持久化工作流（选择 / 作用域上下文 / 只读失败恢复 / `inspect`）。`marqdo ext add agent` → CDN latest。参见[拓展包说明](doc/releases/ext-2.8.2.md)。
 
 CLI **2.8.0** adds `marqdo prove`: theorem tables in knowledge files compile to Lean 4 and are judged automatically — offline symbolic execution without a toolchain (honest degradation, never impersonating a proof), full proofs with counterexample witnesses when Lean is available.
 
-Ext pack **2.8.1** (CLI remains 2.8.0): plugin-only durable AI workflows with bounded choice, scoped context, failed-only read-only recovery and `inspect`.
+Ext pack **2.8.2** (CLI remains 2.8.0): plugin-only durable AI workflows with bounded choice, scoped context, failed-only read-only recovery and `inspect`.
 
 ## 核心优势：可执行知识（Executable Knowledge）
 

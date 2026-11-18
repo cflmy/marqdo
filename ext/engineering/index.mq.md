@@ -71,7 +71,7 @@ authentication is resolved inside the plugin from existing stores.
 We **loaded = [Load this package's native boundary](_load())** and
 **base = [Read the granted runtime working root](sys.cwd())** and **resolved_root = root**.
 1. not [The requested root is already absolute](paths.is_absolute(path=`root`))
-  We **resolved_root = base + "/" + root** so process and native filesystem locations agree.
+  We **resolved_root = [Join the runtime cwd with the relative grant](paths.join(a=`base`, b=`root`))** so Windows and Unix separators stay native.
 
 `request_data` =
 
