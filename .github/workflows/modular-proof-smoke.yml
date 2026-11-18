@@ -36,6 +36,10 @@ jobs:
         env:
           MARQDO_PROOF_REQUIRE_LEAN: "1"
         run: cargo test --locked --test prove_lean composition_emits_independently_replayable_caller_certificate -- --nocapture
+      - name: Regenerated provenance for original Lean certificates
+        env:
+          MARQDO_PROOF_REQUIRE_LEAN: "1"
+        run: cargo test --locked --test prove_lean g2_certificate_hit_after_real_run -- --nocapture
       - name: Symbolic path implication with real Lean
         env:
           MARQDO_PROOF_REQUIRE_LEAN: "1"
