@@ -95,8 +95,8 @@ pub fn input_open(args: &Value) -> Result<Value, String> {
         let same = meta["question"] == query
             && meta["options"] == labels
             && meta["source_revision"] == version
-            && meta["session_id"] == args.get("session_id").unwrap_or(&Value::Null)
-            && meta["principal_ref"] == args.get("principal_ref").unwrap_or(&Value::Null);
+            && meta["session_id"] == *args.get("session_id").unwrap_or(&Value::Null)
+            && meta["principal_ref"] == *args.get("principal_ref").unwrap_or(&Value::Null);
         if same && existing["ok"] == true {
             let status = existing["status"].as_str().unwrap_or("unknown");
             return Ok(json!({
