@@ -176,3 +176,60 @@ We retain **path = [Resolve registered SKILL](json.get(value=`registry`, key=`sk
 2. *
   We retain **task = [Spawn registered Marqdo document](subtask.spawn(path=`path`))**.
   Return *[Await the subtask result](subtask.wait(id=`task`))*.
+
+
+## ask
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| prompt | text | required | Short local prompt |
+| model | any | None | Configured model selection |
+
+| 返回 | 类型 | 说明 |
+|---|---|---|
+| result | text | Model reply (not yet a verified tool call) |
+
+Use `prompt`, `model`=None as the inputs for this operation.
+
+Ask only what the current function needs. The reply remains data until an
+explicit verifier accepts it. The LLM adapter owns provider configuration.
+
+Return *[Ask the configured model](llm.ask(prompt=`prompt`, model=`model`))*.
+
+## start
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| path | text | required | Trusted registered Marqdo document |
+| args | list | None | Optional child CLI arguments |
+
+| 返回 | 类型 | 说明 |
+|---|---|---|
+| result | number | Child task handle |
+
+Use `path`, `args`=None as the inputs for this operation.
+
+Start an isolated SKILL document asynchronously, after the calling host has
+validated its path and required process.exec permission. No model-generated
+raw path is a valid grant.
+
+Return *[Start one Marqdo document](subtask.spawn(path=`path`, args=`args`))*.
+
+## wait
+
+| 参数 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| id | number | required | Child task handle |
+| timeout_ms | number | 30000 | Maximum wait time |
+| cancel | bool | False | Cancel on timeout |
+
+| 返回 | 类型 | 说明 |
+|---|---|---|
+| result | map | Child result, timeout or cancellation |
+
+Use `id`, `timeout_ms`=30000, `cancel`=False as the inputs for this operation.
+
+A successful wait protocol is not proof of a successful child execution:
+inspect the child exit code before using its result.
+
+Return *[Wait for the child](subtask.wait_timeout(id=`id`, timeout_ms=`timeout_ms`, cancel=`cancel`))*.
