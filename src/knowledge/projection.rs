@@ -272,3 +272,92 @@ pub(super) fn replay(compiled:&Compilation,certificate:&Path,lean:&Toolchain)
         "current_source_verified":true,
         "full_marqdo_runtime_semantics_proved":false}))
 }
+
+
+#[cfg(test)]
+mod tests{
+    use super::*;
+    #[test]
+    fn symbolic_projection_uses_only_the_selected_actual(){
+        let root=std::env::temp_dir().join(format!(
+            "marqdo-projection-unit-{}",std::process::id()));
+        let _=fs::remove_dir_all(&root);
+        fs::create_dir_all(&root).unwrap();
+        let callee=r#"---
+markup: occlusion
+---
+# math
+## select
++ \`first\`, \`second\`
+
+| 参数 | 类型 | 说明 |
+|---|---|---|
+| first | int | integer |
+| second | int | integer |
+
+| 定理 | 结论 | 策略 |
+|---|---|---|
+| proj | 结果 = second | auto |
+
+*\`second\`*
+"#;
+        let caller=r#"---
+markup: occlusion
+import:
+  math: math.mq.md
+---
+# main
+## use
++ \`x\`, \`y\`
+
+| 参数 | 类型 | 说明 |
+|---|---|---|
+| x | int | integer |
+| y | int | integer |
+
+| 定理 | 结论 | 策略 |
+|---|---|---|
+| forwarded | 结果 = x | auto |
+
+**v = [选择](math.math.select(\`y\`, \`x\`))**
+*v*
+"#;
+        fs::write(root.join("math.mq.md"),callee).unwrap();
+        fs::write(root.join("main.mq.md"),caller).unwrap();
+        let project=crate::sema::ir::compile_project(
+            &crate::sema::ir::CompileOptions::for_path(&root).unwrap()).unwrap();
+        let call=project.semantics.bound_calls.iter().find(|c|
+            c.call_site=="math.math.select").expect("static call");
+        let proof=candidate(&project,call).expect("symbolic projection");
+        assert_eq!(proof.parameter_index,1);
+        assert_eq!(proof.result_label,"x");
+        assert!(proof.callee_source.contains(":= v1"));
+        assert!(proof.caller_source.contains("callee v1 v0"));
+        assert!(proof.caller_source.contains("= v0"));
+        assert!(!proof.caller_source.contains("sorry"));
+
+        // Reordering the actuals without changing the asserted result must
+        // invalidate the caller contract; source is the authority.
+        let incorrect=caller.replace(
+            "math.math.select(\`y\`, \`x\`)",
+            "math.math.select(\`x\`, \`y\`)");
+        fs::write(root.join("main.mq.md"),incorrect).unwrap();
+        let changed=crate::sema::ir::compile_project(
+            &crate::sema::ir::CompileOptions::for_path(&root).unwrap()).unwrap();
+        let call=changed.semantics.bound_calls.iter().find(|c|
+            c.call_site=="math.math.select").unwrap();
+        assert!(candidate(&changed,call).is_none());
+
+        // A declaration with an unsatisfied precondition is NOT a proof.
+        fs::write(root.join("main.mq.md"),caller).unwrap();
+        fs::write(root.join("math.mq.md"),
+            callee.replace("| proj | 结果 = second | auto |",
+                "| proj | 结果 = second | auto |\n| other | 结果 = second | auto |")).unwrap();
+        let ambiguous=crate::sema::ir::compile_project(
+            &crate::sema::ir::CompileOptions::for_path(&root).unwrap()).unwrap();
+        let call=ambiguous.semantics.bound_calls.iter().find(|c|
+            c.call_site=="math.math.select").unwrap();
+        assert!(candidate(&ambiguous,call).is_none());
+        fs::remove_dir_all(root).unwrap();
+    }
+}
