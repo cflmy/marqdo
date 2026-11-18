@@ -306,7 +306,7 @@ mod tests{
     fn arithmetic_contract_requires_exact_structural_match(){
         let params=vec![CanonicalParam{name:"n".into(),ty:"number".into(),
             required:true,default_digest:None,unit:None}];
-        let lhs=crate::parse::parse_expr("n + 1").unwrap();
+        let lhs=crate::parse::parse_expr("`n` + 1").unwrap();
         let want=Term::source(&lhs,&params,0).unwrap();
         let good=proof_check::parse_claim_expr(
             &proof_check::tokenize_claim("n + 1").unwrap()).unwrap().1;
@@ -314,6 +314,6 @@ mod tests{
         let bad=proof_check::parse_claim_expr(
             &proof_check::tokenize_claim("n + 2").unwrap()).unwrap().1;
         assert_ne!(Term::claim(&bad,&params,0),Some(want));
-        assert!(Term::source(&crate::parse::parse_expr("n / 2").unwrap(),&params,0).is_none());
+        assert!(Term::source(&crate::parse::parse_expr("`n` / 2").unwrap(),&params,0).is_none());
     }
 }
