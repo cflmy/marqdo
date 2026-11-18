@@ -98,6 +98,31 @@ import:
 }
 
 #[test]
+fn complete_knowledge_publish_contains_anchors_refs_and_proof_receipts() {
+    let dir=root("publish");
+    let file=dir.join("main.mq.md");
+    fs::write(&file,"# main\n\n## compute\n\n[查看知识](#@演算)\n**x = [演算](2 * 3)**\n*x*\n").unwrap();
+    let out=dir.join(".marqdo");
+    marqdo::knowledge::write_knowledge(marqdo::knowledge::KnowledgeOptions{
+        path:dir.clone(),out_dir:out.clone()
+    }).unwrap();
+    let anchors:serde_json::Value=serde_json::from_slice(
+        &fs::read(out.join("anchors.json")).unwrap()).unwrap();
+    assert_eq!(anchors["anchors"].as_array().unwrap().len(),1);
+    let refs:serde_json::Value=serde_json::from_slice(
+        &fs::read(out.join("refs.json")).unwrap()).unwrap();
+    assert!(refs["refs"].as_array().unwrap().iter()
+        .any(|r|r["label"]=="查看知识" && r["resolution"]=="anchor"));
+    let index:serde_json::Value=serde_json::from_slice(
+        &fs::read(out.join("proof-index.json")).unwrap()).unwrap();
+    assert_eq!(index["claims"].as_array().unwrap().len(),0);
+    let generated=fs::read_to_string(out.join("CURRENT")).unwrap();
+    assert!(out.join("generations").join(generated.trim())
+        .join("anchors.json").is_file());
+    fs::remove_dir_all(dir).unwrap();
+}
+
+#[test]
 fn fake_lean_status_with_no_matching_certificate_cannot_be_proved() {
     let dir=root("forge");
     let file=dir.join("main.mq.md");
