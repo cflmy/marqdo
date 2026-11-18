@@ -65,6 +65,8 @@ pub fn analyze_with_verified(semantic:&SemanticProject, proof_index:&Value,
                     "premise":c.premise,
                     "conclusion":c.conclusion,
                     "callee_certificate_valid":verified,
+                    "callee_evidence":super::evidence::for_receipt(
+                        if verified {"proved"}else{"unverified"},verified,false),
                     // An unbound premise is a caller-side proof obligation;
                     // it is never discharged merely because callee was proved.
                     "precondition_goal_key":if unconditional {None} else {Some(key)},
@@ -109,6 +111,7 @@ pub fn analyze_with_verified(semantic:&SemanticProject, proof_index:&Value,
             "source":{"file":call.source.file,"line":call.source.line},
             "status":status,"contracts":contracts,
             "caller_proof_required":true,
+            "evidence":super::evidence::unknown("dependency_audit_is_not_caller_proof"),
             "runtime_link_required":true,
             "path_guards":call.path_guards,
             "control_blocker":call.control_blocker,
@@ -118,6 +121,7 @@ pub fn analyze_with_verified(semantic:&SemanticProject, proof_index:&Value,
                 "id":a.id,"premise":a.premise,
                 "postcondition":a.postcondition,
                 "verified":false,
+                "evidence":super::evidence::assumed(),
                 "status":"requires_lean_callsite_derivation"
             })),
             "caller_assumption_binding":if assumption.is_some(){"declared_unproved"}
