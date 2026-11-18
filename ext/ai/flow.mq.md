@@ -28,7 +28,7 @@ Parsing accepts one exact name, a labeled name, a fenced name or a 1-based
 index. Ambiguous prose fails closed. Parsing never runs a tool or SKILL.
 
 We retain **p = [Locate the installed agent plugin](plugin.native_path(name="agent"))**.
-1. p
+1. `p`
   We **[Load the agent plugin](plugin.load(path=`p`))**.
 2. *
   Return *[Missing native parser](json.parse(text="{\"ok\":false,\"status\":\"unavailable\",\"value\":null}"))*.
@@ -56,7 +56,7 @@ We retain **prompt = "Choose exactly one of these options. Return its name only,
 We retain **reply = [Ask the model once](llm.ask(prompt=`prompt`, model=`model`))**.
 We retain **parsed = [Validate the model reply](parse_choice(reply=`reply`, options=`options`))**.
 We retain **ok = [Read validation status](json.get(value=`parsed`, key="ok"))**.
-1. ok
+1. `ok`
   Return *parsed*.
 2. `repair`
   We retain **fix = "Your answer was not an exact allowed option. Return only ONE option name from:\n" + opts**.
@@ -78,6 +78,6 @@ We retain **ok = [Read validation status](json.get(value=`parsed`, key="ok"))**.
 | result | list | Ordered child outcomes, including failures |
 
 Reuse the built-in subtask scheduler. Each child document returns via its
-# main, and successful siblings remain visible if another child fails.
+`# main`, and successful siblings remain visible if another child fails.
 
 Return *[Run bounded Marqdo document tasks](subtask.run_many(tasks=`tasks`, limit=`limit`, timeout_ms=`timeout_ms`))*.
