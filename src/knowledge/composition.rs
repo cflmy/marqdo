@@ -188,6 +188,63 @@ pub fn prove(compiled:&Compilation,out:&Path,toolchain:&Toolchain)->Result<Value
 }
 
 
+/// Replay a composition certificate *against the current project source*.
+/// The certificate never supplies Lean source code: it must byte-match source
+/// recompiled from the current Marqdo AST, and both Lean modules are rechecked.
+pub fn replay(compiled:&Compilation,certificate:&Path,lean:&Toolchain)->Result<Value>{
+    let receipt:Value=serde_json::from_slice(&fs::read(certificate)?)?;
+    anyhow::ensure!(receipt["schema_version"]==1
+        &&receipt["kind"]=="marqdo_restricted_composition"
+        &&receipt["scope"]=="typed_int_pure_forwarder_constant_postcondition"
+        &&receipt["status"]=="lean_kernel_proved_model",
+        "proof.compose_invalid_certificate: unexpected status or scope");
+    anyhow::ensure!(receipt["toolchain"]==lean.version,
+        "proof.compose_stale_toolchain");
+    let identity=receipt["identity"].as_str().context("missing identity")?;
+    let Some((callee,caller,_,n,call))=compiled.semantics.bound_calls.iter()
+        .filter_map(|call|{
+            let (a,b,id,n)=candidate(compiled,call)?;
+            (id==identity).then_some((a,b,id,n,call))
+        }).next() else {anyhow::bail!("proof.compose_stale_source: candidate missing");};
+    anyhow::ensure!(receipt["claimed_result"]==n,
+        "proof.compose_claim_changed");
+    anyhow::ensure!(receipt["caller"]==call.caller.as_str()
+        &&receipt["callee"]==call.target.as_str(),
+        "proof.compose_symbol_changed");
+    for symbol in [&call.caller,&call.target]{
+        let artifact=compiled.semantics.artifacts.iter()
+            .find(|a|a.symbol_id.as_ref()==Some(symbol))
+            .context("proof.compose_missing_artifact")?;
+        anyhow::ensure!(receipt["source_closures"].as_array()
+            .is_some_and(|items|items.iter().any(|r|
+                r["id"]==artifact.artifact_id.0
+                &&r["closure"]==artifact.hashes.closure.0)),
+            "proof.compose_stale_closure");
+    }
+    let folder=certificate.parent().context("missing certificate parent")?;
+    let callee_path=folder.join("CalleeModule.lean");
+    let caller_path=folder.join("CallerModule.lean");
+    anyhow::ensure!(fs::read_to_string(&callee_path)?==callee
+        &&fs::read_to_string(&caller_path)?==caller,
+        "proof.compose_generated_source_mismatch");
+    anyhow::ensure!(receipt["callee_source_sha256"]==sha(callee.as_bytes())
+        &&receipt["caller_source_sha256"]==sha(caller.as_bytes()),
+        "proof.compose_hash_mismatch");
+    let callee_obj=folder.join("CalleeModule.olean");
+    let caller_obj=folder.join("CallerModule.olean");
+    compile_import_module(lean,&callee_path,&callee_obj,folder,
+        Duration::from_secs(120))?;
+    compile_import_module(lean,&caller_path,&caller_obj,folder,
+        Duration::from_secs(120))?;
+    anyhow::ensure!(receipt["callee_compiled_sha256"]==sha(&fs::read(&callee_obj)?)
+        &&receipt["caller_compiled_sha256"]==sha(&fs::read(&caller_obj)?),
+        "proof.compose_replay_output_changed");
+    Ok(json!({"schema_version":1,"kind":"independent_composition_replay",
+        "status":"lean_kernel_replayed","scope":receipt["scope"],
+        "identity":identity,"current_source_verified":true,
+        "full_marqdo_runtime_semantics_proved":false}))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
