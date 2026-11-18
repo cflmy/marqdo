@@ -1790,12 +1790,24 @@ fn try_main(cli: Cli) -> Result<i32> {
                             entry:path.is_file().then_some(path),
                             lock_mode:marqdo::sema::ir::LockMode::Off,
                         })?;
-                    let receipts=marqdo::knowledge::proof::index_links(
+                    let mut receipts=marqdo::knowledge::proof::index_links(
                         &out.join("prove"),&compiled.semantics);
+                    let toolchain=if verify {
+                        Some(marqdo::prove::driver::Toolchain::discover(None)?
+                            .ok_or_else(||anyhow::anyhow!(
+                                "proof.modular_lean_missing: Lean is required for --verify"))?)
+                    } else {None};
+                    if let Some(lean)=toolchain.as_ref(){
+                        marqdo::knowledge::proof::replay_index(
+                            &out.join("prove"),&mut receipts,lean,
+                            std::time::Duration::from_secs(120))?;
+                    }
+                    let replayed=receipts["claims"].as_array().map_or(0,|records|
+                        records.iter().filter(|c|c["kernel_replayed"]==true).count());
                     let draft=marqdo::knowledge::modular::analyze(
                         &compiled.semantics,&receipts);
                     let mut accepted=std::collections::BTreeSet::new();
-                    let mut verified_toolchain=None;
+                    let verified_toolchain=toolchain.as_ref().map(|t|t.version.clone());
                     if verify {
                         let goals:Vec<(String,marqdo::knowledge::vc::Goal)>=draft["obligations"]
                             .as_array().into_iter().flat_map(|rows|rows.iter())
@@ -1813,9 +1825,7 @@ fn try_main(cli: Cli) -> Result<i32> {
                                 ))
                             }).collect();
                         if !goals.is_empty(){
-                            let toolchain=marqdo::prove::driver::Toolchain::discover(None)?
-                                .ok_or_else(||anyhow::anyhow!(
-                                    "proof.modular_lean_missing: Lean is required for --verify"))?;
+                            let toolchain=toolchain.as_ref().expect("verify implies Lean");
                             let target=out.join("modular");
                             std::fs::create_dir_all(&target)?;
                             let lean_file=target.join("closed-goals.lean");
@@ -1824,13 +1834,13 @@ fn try_main(cli: Cli) -> Result<i32> {
                             marqdo::prove::driver::check_closed_goals(
                                 &toolchain,&lean_file,std::time::Duration::from_secs(120))?;
                             accepted.extend(goals.into_iter().map(|(id,_)|id));
-                            verified_toolchain=Some(toolchain.version);
                         }
                     }
                     let mut report=marqdo::knowledge::modular::analyze_with_verified(
                         &compiled.semantics,&receipts,&accepted);
                     report["lean_preconditions_verified"]=serde_json::json!(accepted.len());
                     report["lean_toolchain"]=serde_json::json!(verified_toolchain);
+                    report["lean_receipts_replayed"]=serde_json::json!(replayed);
                     if json {
                         println!("{report}");
                     } else {
