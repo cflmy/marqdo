@@ -142,6 +142,8 @@ pub fn link_report(compiled: &Compilation, file: &Path, report: &Report, dir: &P
                 "decided_by":if proved {"lean"} else if status=="checked" {"offline"} else {"none"},
                 "certificate_digest":if proved {cert.as_ref().map(|(_,h)|h.as_str())} else {None},
                 "proof_scope":"function",
+                "evidence":super::evidence::for_receipt(
+                    status,proved,false),
                 "related_anchor_ids":steps,
                 "related_anchor_relation":"defined_in_same_function_not_individually_proved",
                 "semantic_hashes":{"interface":owner.hashes.interface.0,
@@ -261,6 +263,13 @@ pub fn index_links(prove_dir:&Path, semantic:&SemanticProject)->Value {
             e["usable"]=json!(false);
         }
     }
+    // Evidence is orthogonal to legacy `status`: a verified Lean receipt
+    // means model_proved, NOT unrestricted Marqdo runtime correctness.
+    for e in &mut entries {
+        e["evidence"]=super::evidence::for_receipt(
+            e["status"].as_str().unwrap_or("unknown"),
+            e["usable"]==true,e["kernel_replayed"]==true);
+    }
     json!({"schema_version":1,"role":"proof_receipts_not_execution_authority",
         "claims":entries})
 }
@@ -319,6 +328,9 @@ pub fn replay_index(
         } else {
             entry["kernel_replayed"]=json!(true);
         }
+        entry["evidence"]=super::evidence::for_receipt(
+            entry["status"].as_str().unwrap_or("unknown"),
+            entry["usable"]==true,entry["kernel_replayed"]==true);
     }
     Ok(())
 }
