@@ -246,26 +246,39 @@ pub fn replay(compiled:&Compilation,certificate:&Path,lean:&Toolchain)->Result<V
     anyhow::ensure!(receipt["toolchain"]==lean.version,
         "proof.compose_stale_toolchain");
     let identity=receipt["identity"].as_str().context("missing identity")?;
-    let Some((callee,caller,_,n,call))=compiled.semantics.bound_calls.iter()
+    // A certificate identity is a unique proof subject, not a search hint.
+    // Reject ambiguous candidates instead of silently selecting the first.
+    let matching=compiled.semantics.bound_calls.iter()
         .filter_map(|call|{
             let (a,b,id,n)=candidate(compiled,call)?;
             (id==identity).then_some((a,b,id,n,call))
-        }).next() else {anyhow::bail!("proof.compose_stale_source: candidate missing");};
+        }).collect::<Vec<_>>();
+    anyhow::ensure!(matching.len()==1,
+        "proof.compose_ambiguous_or_stale_source: expected exactly one callsite");
+    let (callee,caller,_,n,call)=matching.into_iter().next()
+        .context("proof.compose_missing_candidate")?;
     anyhow::ensure!(receipt["claimed_result"]==n,
         "proof.compose_claim_changed");
     anyhow::ensure!(receipt["caller"]==call.caller.as_str()
         &&receipt["callee"]==call.target.as_str(),
         "proof.compose_symbol_changed");
-    for symbol in [&call.caller,&call.target]{
-        let artifact=compiled.semantics.artifacts.iter()
-            .find(|a|a.symbol_id.as_ref()==Some(symbol))
-            .context("proof.compose_missing_artifact")?;
-        anyhow::ensure!(receipt["source_closures"].as_array()
-            .is_some_and(|items|items.iter().any(|r|
-                r["id"]==artifact.artifact_id.0
-                &&r["closure"]==artifact.hashes.closure.0)),
-            "proof.compose_stale_closure");
-    }
+    // Exact-set comparison blocks duplicate, injected, and omitted dependency
+    // rows. The receipt does not get to choose the dependency closure.
+    let expected_closures=compiled.semantics.artifacts.iter()
+        .filter(|a|a.symbol_id.as_ref()==Some(&call.caller)
+            ||a.symbol_id.as_ref()==Some(&call.target))
+        .map(|a|(a.artifact_id.0.clone(),a.hashes.closure.0.clone()))
+        .collect::<std::collections::BTreeSet<_>>();
+    anyhow::ensure!(expected_closures.len()==2,
+        "proof.compose_ambiguous_artifact");
+    let received=receipt["source_closures"].as_array()
+        .context("proof.compose_missing_source_closures")?;
+    let actual_closures=received.iter().map(|r|{
+        Ok((r["id"].as_str().context("proof.compose_invalid_closure_id")?.to_owned(),
+            r["closure"].as_str().context("proof.compose_invalid_closure_hash")?.to_owned()))
+    }).collect::<Result<std::collections::BTreeSet<_>>>()?;
+    anyhow::ensure!(received.len()==2 && actual_closures==expected_closures,
+        "proof.compose_stale_or_ambiguous_closure");
     let folder=certificate.parent().context("missing certificate parent")?;
     let callee_path=folder.join("CalleeModule.lean");
     let caller_path=folder.join("CallerModule.lean");
