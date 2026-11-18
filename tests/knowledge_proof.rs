@@ -95,6 +95,43 @@ markup: occlusion
 }
 
 #[test]
+fn modular_assumption_projection_is_never_self_certifying() {
+    let dir=root("assumption-projection");
+    let src=dir.join("main.mq.md");
+    fs::write(&src,r#"---
+markup: occlusion
+---
+
+# main
+
+## compute
+
+| 假设 | 前置 | 后置 |
+|---|---|---|
+| rates.lookup | 金额 > 0 | 返回 = 2 |
+
+| 定理 | 结论 | 前提 | 策略 |
+|---|---|---|---|
+| has_result | 结果 = 2 | | auto |
+
+*2*
+"#).unwrap();
+    let out=dir.join(".marqdo");
+    marqdo::knowledge::write_knowledge(marqdo::knowledge::KnowledgeOptions{
+        path:dir.clone(),out_dir:out.clone()
+    }).unwrap();
+    let a:serde_json::Value=serde_json::from_slice(
+        &fs::read(out.join("assumptions.json")).unwrap()).unwrap();
+    assert_eq!(a["assumptions"][0]["operation"],"rates.lookup");
+    assert_eq!(a["assumptions"][0]["verification"],"declared_not_proved");
+    let plan:serde_json::Value=serde_json::from_slice(
+        &fs::read(out.join("proof-obligations.json")).unwrap()).unwrap();
+    assert_ne!(plan["status"],"proved");
+    assert_eq!(plan["proof_completion"],"not_established_by_dependency_analysis");
+    fs::remove_dir_all(dir).unwrap();
+}
+
+#[test]
 fn strict_modular_cli_exposes_unproved_conditions_as_nonzero_exit() {
     let dir=root("strict-modular");
     let file=dir.join("main.mq.md");
