@@ -270,6 +270,48 @@ import:
         "pure leaf import cannot be treated as an opaque environment op: {ops}");
 }
 
+/// Pure cross-module parameter substitution is checked by real Lean, not JSON status.
+#[test]
+fn modular_pure_leaf_import_with_argument_proved_by_real_lean(){
+    if !toolchain_available(){
+        skip_or_fail("modular_pure_leaf_import_with_argument_proved_by_real_lean");
+        return;
+    }
+    let scratch=Scratch::new("modular-parameterized");
+    scratch.write("numbers.mq.md",r#"# numbers
+
+## increment
++ `n`
+
+*`n` + 1*
+"#);
+    scratch.write("main.mq.md",r#"---
+markup: occlusion
+import:
+  numbers: numbers.mq.md
+---
+
+# main
+
+## compute
+
+| 定理 | 结论 | 策略 |
+|---|---|---|
+| 参数绑定正确 | 结果 = 4 | auto |
+
+**value = [加一](numbers.numbers.increment(3))**
+*value*
+"#);
+    let out=scratch.marqdo().args(["prove","main.mq.md","--json"])
+        .output().expect("prove imported parameterized leaf");
+    let json:serde_json::Value=serde_json::from_slice(&out.stdout)
+        .unwrap_or_else(|_|panic!("stderr={} stdout={}",
+            String::from_utf8_lossy(&out.stderr),
+            String::from_utf8_lossy(&out.stdout)));
+    assert_eq!(json["status"],"proved",
+        "parameter substitution across file boundary must be Lean proved: {json}");
+}
+
 /// G2：真证书命中（用真 lean 跑一次后，证书生效；第二次 cache: hit 且快）。
 #[test]
 fn g2_certificate_hit_after_real_run() {
