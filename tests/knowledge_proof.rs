@@ -58,6 +58,27 @@ fn links_bind_to_exact_owner_and_stale_after_source_change() {
 }
 
 #[test]
+fn strict_modular_cli_exposes_unproved_conditions_as_nonzero_exit() {
+    let dir=root("strict-modular");
+    let file=dir.join("main.mq.md");
+    fs::write(&file,"# main\n\n## compute\n\n| 定理 | 结论 | 前提 | 策略 |\n|---|---|---|---|\n| obligation | 结果 = 6 | | auto |\n\n**x = [演算](2 * 3)**\n*x*\n").unwrap();
+    let output=std::process::Command::new(env!("CARGO_BIN_EXE_marqdo"))
+        .arg("knowledge").arg("proof-deps")
+        .arg(&dir).arg("--json").arg("--strict")
+        .arg("--out").arg(dir.join(".marqdo"))
+        .output().expect("run knowledge proof-deps");
+    assert_eq!(output.status.code(),Some(2),
+        "unproven claims must fail strict audit: stdout={} stderr={}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr));
+    let report:serde_json::Value=serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(report["audit_passes"],false);
+    assert_eq!(report["verified_claims"][0]["status"],"unverified");
+    assert_eq!(report["proof_completion"],"not_established_by_dependency_analysis");
+    fs::remove_dir_all(dir).unwrap();
+}
+
+#[test]
 fn altered_theorem_conclusion_cannot_reuse_a_matching_function_name() {
     let dir=root("altered-claim");
     let file=dir.join("main.mq.md");
