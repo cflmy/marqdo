@@ -10,6 +10,30 @@
 <img alt="Pure by default" src="https://img.shields.io/badge/call-pure_by_default-467C83?style=flat-square">
 </p>
 
+> ## Architecture update — where current Marqdo development lives
+>
+> **This repository is the historical Marqdo v2 line (latest v2.9.1).** Because
+> the language/runtime, CLI, protocol contracts and independent tools have
+> different architectures and release/version axes, Marqdo development was split
+> across multiple repositories. The current implementation, releases and
+> developer entry point is:
+>
+> **➜ [`cflmy/marqdo-cli`](https://git.cflmy.cn/cflmy/marqdo-cli)**
+> ([latest release](https://git.cflmy.cn/cflmy/marqdo-cli/releases/tag/v3.0.0-beta.1))
+>
+> Start new work from `marqdo-cli`. It is an independent Rust implementation
+> with a new language contract (RFC-LANG-0002), a different package format and a
+> different plugin ABI; the v2 syntax/package/plugin ABI in this repository is
+> **not** compatible with it and there is no legacy execution path. Independent
+> extension fixtures are kept separately in
+> [`cflmy/marqdo-extension-conformance`](https://git.cflmy.cn/cflmy/marqdo-extension-conformance).
+> Knowledge/Proof/View are designed as external Tool repositories consuming the
+> public CLI protocols, not as built-in commands of this repository.
+>
+> **中文说明：** 由于架构原因，Marqdo 的语言运行时、CLI、协议与独立工具已拆分到多个仓库开发。本仓库保留 v2 历史线；**最新实现、发布与开发入口是
+> [`cflmy/marqdo-cli`](https://git.cflmy.cn/cflmy/marqdo-cli)**。新开发请从
+> `marqdo-cli` 开始；v2 的语法、包格式和插件 ABI 与它不兼容，不存在旧语法兼容执行路径。
+
 **Marqdo is a Rust-based, document-native runtime for executable AI skills and tools.** Write human-readable prose, GFM tables, parameter contracts, and real functions in one `.mq.md` document. Call a function by its heading, inspect the implementation, and grant side effects explicitly.
 
 **Not a prompt wrapper.** The document is interpreted as a program by Marqdo; its tool functions are not merely natural-language instructions.
