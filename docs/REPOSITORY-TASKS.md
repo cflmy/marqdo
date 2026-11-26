@@ -2,15 +2,25 @@
 
 按仓库领取任务。标为 **大改** 的条目可涉及模块拆分、实现重写或发布切换。责任仓库应先限定本轮交付范围，涉及公共接口时与实际消费者一起验收。
 
-先推进 CLI 外部 Bundle、九个标准库，以及 HTTP、Regex、Archive 的迁出。这些改动在同一候选组合中验证后切换基础发行。官网和 VS Code 可独立推进。[迁移台账](MIGRATION.md) · [开发流程](DEVELOPMENT.md)
+生态治理采用“根 → 领域聚合 → 功能组件”最多两级 Gitlink：功能仓库实现与修复、领域聚合仓库维护合同与组合验收、主仓库固定 gitlink、治理与发行。`planned` 组件不创建占位 gitlink 或伪造入口。当前没有 active 领域；Web 领域为 planned（聚合仓 `marqdo-ext-web`，子组件 `marqdo-web-design`/`marqdo-web-preview` 在其 catalog 登记）。先推进 CLI 外部 Bundle、九个标准库，以及 HTTP、Regex、Archive 的迁出；这些改动在同一候选组合中验证后切换基础发行。官网和 VS Code 可独立推进。[迁移台账](MIGRATION.md) · [开发流程](DEVELOPMENT.md)
 
 ## 集成和语言
 
 | 仓库 | 要完成的任务 |
 | --- | --- |
-| `marqdo` | 固定已验收的组件组合，完成跨仓库工单闭环、CI 和生态发行验证。 |
+| `marqdo` | 固定已验收的组件组合与领域 gitlink，完成跨仓库工单闭环、CI 和生态发行验证。推进递归治理校验（domain 角色与全局依赖 DAG）、声明驱动集成计划、统一 CLI 制品输入与递归影响分析；保留现有 conformance/View/Knowledge/Prove/Lint 真实门禁。 |
 | `marqdo-cli` | **大改**。拆分内核构建和基础发行装配，接受显式外部标准库 Bundle。完成领域能力迁出后，移除旧标准库入口和被替代的专用宿主实现。 |
 | `marqdo-extension-conformance` | 更新真实 CLI 的公共契约测试，覆盖 Bundle 切换、五类扩展机制及其权限边界。 |
+
+## 领域聚合（planned）
+
+领域聚合仓库只做治理、唯一合同、示例、跨组件验收与交付协调，不含生产实现。激活前保持 planned，子组件在其自身 `components.toml` 登记，根 catalog 不重复登记。
+
+| 仓库 | 要完成的任务 |
+| --- | --- |
+| `marqdo-ext-web` | Web 领域聚合：维护唯一作者合同 `docs/WEB-DESIGN.md`、§8 组合示例与领域 CI；验证真实 Analysis 风险（WEB-00），协调设计合同变更与 Design/Preview 配对候选；在子组件通过 WEB-01..04 后以领域 gitlink 接入根（WEB-05）。 |
+| `marqdo-web-design` | WEB-01：消费真实 CLI Analysis 3，解释精确组件引用、递归布局、有限场景与依赖，输出稳定诊断、组件图和源身份；WEB-03：handoff、单组件切片与漂移标识。独立 Rust library，禁止复制 parser/启动服务。 |
+| `marqdo-web-preview` | WEB-02：通用离线预览渲染器与有限状态交互、响应式、安全负例、Tool 打包；作为唯一 `web` 命令入口消费 Design 公开 API，禁止任务专用 JS、第二套解析或生产服务器。 |
 
 ## 工具和产品
 
@@ -25,7 +35,7 @@
 
 ## 标准库
 
-每个仓库交付可独立测试的模块，共同组成默认 Bundle。
+每个仓库交付可独立测试的模块，共同组成默认 Bundle。聚合仓库 `marqdo-stdlib` 尚未创建，九个 `std-*` 当前保持根 catalog 的 planned 直属记录；CLI 内置标准库仍是现行发行权威，迁移完成前不得声称拆分完成。
 
 | 仓库 | 要完成的任务 |
 | --- | --- |
@@ -57,7 +67,7 @@
 | `marqdo-ext-storage` | 定义本地与对象存储接口，先验证一套读写和错误处理流程。 |
 | `marqdo-ext-cache` | 交付带 TTL 和失效行为的缓存。 |
 | `marqdo-ext-security` | 交付应用身份、会话与授权，复用加密扩展。 |
-| `marqdo-ext-web` | **大改**。依据现行 HTTP 接口重建页面、路由和组件，完成一个 Markdown/GFM 应用。 |
+| `marqdo-ext-web` | 已改为 Web 领域聚合仓库，任务见「领域聚合」小节；不再作为 HTTP 页面/路由渲染实现。 |
 | `marqdo-ext-browser` | **大改**。按现行运行时边界适配浏览器宿主、WASM、DOM 和事件。 |
 | `marqdo-ext-document` | 交付 Markdown 结构查询与显式编辑接口。 |
 | `marqdo-ext-archive` | 实现归档与安全解包，为 CLI 移除旧压缩入口提供可验证的替代。 |

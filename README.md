@@ -2,6 +2,8 @@
 
 **Marqdo 是一门以 Markdown 为源文档的编程语言。** 用 `.mq.md` 可以把业务规则、公式、解释和可执行步骤写在同一份文档中。读者用 Markdown 阅读器查看正文，开发者用 Marqdo 检查、运行和验证其中的程序。这个仓库维护生态组件的集成、验收和发行入口。
 
+生态治理采用有限分层：主仓库固定领域聚合仓库，领域聚合仓库固定本领域功能仓库，最多两级 Gitlink。主仓库和聚合仓库只做治理、组合与验收，不实现子组件业务；Web 领域把设计文档直接作为原型与工程交付的源材料，详见 [架构边界](docs/ARCHITECTURE.md)。
+
 ## 为什么开发 Marqdo
 
 规则通常写在说明文档里，实现放在脚本里，结果再写进报告。三份内容分开维护后，读者很难确认某个结果用了哪条规则，也很难重新验证。Marqdo 让解释和计算随同一份源文档修改、评审和运行。它适合写带示例的算法说明、可重跑的分析流程，以及需要交代验证过程的知识文档。
@@ -95,7 +97,6 @@ marqdo run hello.mq.md
 | [marqdo-ext-storage](https://git.cflmy.cn/cflmy/marqdo-ext-storage) | 本地和对象存储接口 |
 | [marqdo-ext-cache](https://git.cflmy.cn/cflmy/marqdo-ext-cache) | TTL、缓存和失效 |
 | [marqdo-ext-security](https://git.cflmy.cn/cflmy/marqdo-ext-security) | 应用身份、会话及权限模型 |
-| [marqdo-ext-web](https://git.cflmy.cn/cflmy/marqdo-ext-web) | Markdown/GFM 渲染、页面、路由和组件 |
 | [marqdo-ext-browser](https://git.cflmy.cn/cflmy/marqdo-ext-browser) | 浏览器宿主、WASM 适配、DOM 和事件 |
 | [marqdo-ext-document](https://git.cflmy.cn/cflmy/marqdo-ext-document) | Markdown 结构与显式文档编辑 |
 | [marqdo-ext-archive](https://git.cflmy.cn/cflmy/marqdo-ext-archive) | 压缩、安全归档和解包 |
@@ -103,17 +104,30 @@ marqdo run hello.mq.md
 | [marqdo-ext-regex](https://git.cflmy.cn/cflmy/marqdo-ext-regex) | 正则匹配、捕获、扫描和替换 |
 | [marqdo-ext-datetime](https://git.cflmy.cn/cflmy/marqdo-ext-datetime) | IANA 时区、DST 和高级日历 |
 
+### Web 领域聚合
+
+Web 领域以设计文档为源材料，提供可交互的原型预览与工程交付；它不复刻前端框架，HTTP、数据库、认证和浏览器运行时仍是独立可选能力。领域当前为 `planned`，在主仓库登记为 planned domain，尚未以 gitlink 接入；子组件在领域仓库的 `components.toml` 登记，不重复登记到本仓库。唯一作者合同见 [WEB-DESIGN](https://git.cflmy.cn/cflmy/marqdo-ext-web/src/branch/main/docs/WEB-DESIGN.md)。
+
+| 仓库 | 职责 |
+| --- | --- |
+| [marqdo-ext-web](https://git.cflmy.cn/cflmy/marqdo-ext-web) | Web 领域聚合：唯一设计合同、示例、组合验收与交付协调，不含生产实现 |
+| [marqdo-web-design](https://git.cflmy.cn/cflmy/marqdo-web-design) | 设计文档解释、校验、组件/依赖图、诊断与 handoff（独立 Rust library） |
+| [marqdo-web-preview](https://git.cflmy.cn/cflmy/marqdo-web-preview) | 通用离线预览渲染、有限状态交互与 `web` Tool 发行 |
+
 ## 参与开发
 
-在负责的独立仓库提交实现和测试。主仓库用 Git 子模块固定已通过联合验收的组件组合。需要验证当前组合时，克隆主仓库后运行：
+在负责的独立仓库提交实现和测试。主仓库用 Git 子模块按“根 → 领域 → 功能”最多两级固定已通过联合验收的组合。需要验证当前组合时，克隆主仓库后运行：
 
 ```sh
 git clone https://git.cflmy.cn/cflmy/marqdo.git
 cd marqdo
-git submodule update --init
+git submodule update --init --recursive
 python3 scripts/check-layout.py --checkouts
+python3 -m unittest discover -s tests/integration
 ```
 
-[各仓库任务](docs/REPOSITORY-TASKS.md) · [组件目录](components.toml) · [架构边界](docs/ARCHITECTURE.md) · [开发流程](docs/DEVELOPMENT.md) · [迁移台账](docs/MIGRATION.md) · [AGENTS](AGENTS.md)
+`check-layout.py` 校验每层 catalog 与 gitlink、权威远端、全局 ID 与依赖图；`--checkouts` 要求子模块已初始化，缺失或不一致会明确失败。`planned` 组件与空仓不计入完成率，也不创建占位 gitlink。
+
+[各仓库任务](docs/REPOSITORY-TASKS.md) · [组件目录](components.toml) · [架构边界](docs/ARCHITECTURE.md) · [开发流程](docs/DEVELOPMENT.md) · [迁移台账](docs/MIGRATION.md) · [架构决策记录](docs/adr/README.md) · [AGENTS](AGENTS.md)
 
 旧版实现与文档可在历史标签查阅。 [v2.9.1 历史树](https://git.cflmy.cn/cflmy/marqdo/src/tag/v2.9.1)

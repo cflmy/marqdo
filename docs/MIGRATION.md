@@ -12,6 +12,9 @@
 | [marqdo-lint](https://git.cflmy.cn/cflmy/marqdo-lint) | `main` | v0.2.0 |
 | [marqdo-prove](https://git.cflmy.cn/cflmy/marqdo-prove) | `master` | v0.1.0-beta.1 |
 | [marqdo-view](https://git.cflmy.cn/cflmy/marqdo-view) | `master` | v0.3.0 |
+| [marqdo-ext-web](https://git.cflmy.cn/cflmy/marqdo-ext-web) | `main` | Web 领域聚合，planned；唯一设计合同在 `docs/WEB-DESIGN.md` |
+| [marqdo-web-design](https://git.cflmy.cn/cflmy/marqdo-web-design) | `main` | Web Design 组件，planned；初始开发文档 |
+| [marqdo-web-preview](https://git.cflmy.cn/cflmy/marqdo-web-preview) | `main` | Web Preview 组件，planned；初始开发文档 |
 
 CLI gitlink 采用 RC.4 正式发布源码，以匹配冻结归档和现有 View/Lint 契约。
 其文档后续提交曾用于 Knowledge 的独立 CI；生态候选以自身测试判定实际组合。
@@ -19,11 +22,25 @@ Conformance 使用 CLI 已固定的真实 fixture 提交。
 
 ## 标准库和扩展目录
 
-主仓库的 [标准库目录](../stdlib/README.md) 和 [扩展目录](../extensions/README.md) 提供各组件的开发入口。各组件独立维护源码与验收资料，接入状态以 [组件目录](../components.toml) 为准。
+主仓库的 [标准库目录](../stdlib/README.md) 和 [扩展目录](../extensions/README.md) 提供各组件的开发入口。组件独立维护源码与验收资料，接入状态以 [组件目录](../components.toml) 与该组件所在层的 catalog 为准；聚合领域的子组件在领域仓库自己的 `components.toml` 登记。
 
-**标准库** · [core](https://git.cflmy.cn/cflmy/marqdo-std-core) · [collections](https://git.cflmy.cn/cflmy/marqdo-std-collections) · [text](https://git.cflmy.cn/cflmy/marqdo-std-text) · [encoding](https://git.cflmy.cn/cflmy/marqdo-std-encoding) · [data](https://git.cflmy.cn/cflmy/marqdo-std-data) · [io](https://git.cflmy.cn/cflmy/marqdo-std-io) · [fs](https://git.cflmy.cn/cflmy/marqdo-std-fs) · [system](https://git.cflmy.cn/cflmy/marqdo-std-system) · [net](https://git.cflmy.cn/cflmy/marqdo-std-net)
+**标准库（planned，聚合仓库 marqdo-stdlib 尚未创建）** · [core](https://git.cflmy.cn/cflmy/marqdo-std-core) · [collections](https://git.cflmy.cn/cflmy/marqdo-std-collections) · [text](https://git.cflmy.cn/cflmy/marqdo-std-text) · [encoding](https://git.cflmy.cn/cflmy/marqdo-std-encoding) · [data](https://git.cflmy.cn/cflmy/marqdo-std-data) · [io](https://git.cflmy.cn/cflmy/marqdo-std-io) · [fs](https://git.cflmy.cn/cflmy/marqdo-std-fs) · [system](https://git.cflmy.cn/cflmy/marqdo-std-system) · [net](https://git.cflmy.cn/cflmy/marqdo-std-net)
 
-**扩展** · [math](https://git.cflmy.cn/cflmy/marqdo-ext-math) · [linalg](https://git.cflmy.cn/cflmy/marqdo-ext-linalg) · [quantum](https://git.cflmy.cn/cflmy/marqdo-ext-quantum) · [http](https://git.cflmy.cn/cflmy/marqdo-ext-http) · [websocket](https://git.cflmy.cn/cflmy/marqdo-ext-websocket) · [ai](https://git.cflmy.cn/cflmy/marqdo-ext-ai) · [mcp](https://git.cflmy.cn/cflmy/marqdo-ext-mcp) · [crypto](https://git.cflmy.cn/cflmy/marqdo-ext-crypto) · [database](https://git.cflmy.cn/cflmy/marqdo-ext-database) · [storage](https://git.cflmy.cn/cflmy/marqdo-ext-storage) · [cache](https://git.cflmy.cn/cflmy/marqdo-ext-cache) · [security](https://git.cflmy.cn/cflmy/marqdo-ext-security) · [web](https://git.cflmy.cn/cflmy/marqdo-ext-web) · [browser](https://git.cflmy.cn/cflmy/marqdo-ext-browser) · [document](https://git.cflmy.cn/cflmy/marqdo-ext-document) · [archive](https://git.cflmy.cn/cflmy/marqdo-ext-archive) · [engineering](https://git.cflmy.cn/cflmy/marqdo-ext-engineering) · [regex](https://git.cflmy.cn/cflmy/marqdo-ext-regex) · [datetime](https://git.cflmy.cn/cflmy/marqdo-ext-datetime)
+**扩展（planned，独立组件）** · [math](https://git.cflmy.cn/cflmy/marqdo-ext-math) · [linalg](https://git.cflmy.cn/cflmy/marqdo-ext-linalg) · [quantum](https://git.cflmy.cn/cflmy/marqdo-ext-quantum) · [http](https://git.cflmy.cn/cflmy/marqdo-ext-http) · [websocket](https://git.cflmy.cn/cflmy/marqdo-ext-websocket) · [ai](https://git.cflmy.cn/cflmy/marqdo-ext-ai) · [mcp](https://git.cflmy.cn/cflmy/marqdo-ext-mcp) · [crypto](https://git.cflmy.cn/cflmy/marqdo-ext-crypto) · [database](https://git.cflmy.cn/cflmy/marqdo-ext-database) · [storage](https://git.cflmy.cn/cflmy/marqdo-ext-storage) · [cache](https://git.cflmy.cn/cflmy/marqdo-ext-cache) · [security](https://git.cflmy.cn/cflmy/marqdo-ext-security) · [browser](https://git.cflmy.cn/cflmy/marqdo-ext-browser) · [document](https://git.cflmy.cn/cflmy/marqdo-ext-document) · [archive](https://git.cflmy.cn/cflmy/marqdo-ext-archive) · [engineering](https://git.cflmy.cn/cflmy/marqdo-ext-engineering) · [regex](https://git.cflmy.cn/cflmy/marqdo-ext-regex) · [datetime](https://git.cflmy.cn/cflmy/marqdo-ext-datetime)
+
+**Web 领域（planned domain）** · 聚合 [marqdo-ext-web](https://git.cflmy.cn/cflmy/marqdo-ext-web)（唯一合同 `docs/WEB-DESIGN.md`）· 子组件 [marqdo-web-design](https://git.cflmy.cn/cflmy/marqdo-web-design) · [marqdo-web-preview](https://git.cflmy.cn/cflmy/marqdo-web-preview)
+
+## 分层治理与领域聚合（2026-11-26 起）
+
+根 catalog 支持唯一的新增类型 `kind = "domain"`（聚合治理角色），治理树最多两级：**根 → 领域聚合 → 功能组件**。规则要点：
+
+- 每个拥有子模块的聚合仓库只登记直接子组件；全局 ID 与权威远端唯一；功能仓库仍只有一个父级。Gitlink 是提交身份唯一权威，`.gitmodules` 是权威远端唯一记录。
+- 聚合仓库可拥有 `components.toml`、`.gitmodules`、领域公共规范、跨组件集成测试、综合示例、发布装配脚本、ADR 与维护指南；**禁止**生产实现与源码复制。
+- `planned` 组件不创建占位 gitlink、不伪造 `entry`、不计入完成率；空仓状态只登记在本台账。根 catalog 不得同时登记计划中的聚合与其后代路径；未激活领域继续保留现有直属 planned 记录。
+- 领域激活门禁：子组件具备真实入口与候选提交、领域 catalog 与 gitlink 一致、领域 CI 通过、根 `check-layout.py --checkouts` 递归校验通过、存在依赖关系的组件以同候选证据验证。
+- 主仓库 `scripts/check-layout.py` 已引入 domain 角色与递归校验；统一 CLI 制品准备、声明驱动调度、递归影响分析仍在推进，CI 证据以真实候选为准。
+
+当前状态：**没有任何 active 领域**。Web 领域为 planned（`extensions/web`，聚合仓 marqdo-ext-web，子组件 design/preview 在其 catalog 登记）；标准库聚合 marqdo-stdlib 尚未创建，九个 `std-*` 保持根 catalog 的 planned 直属记录；HTTP/WebSocket 等仍为独立 planned 扩展，等至少两个真实组件形成共同边界后再评估聚合。首批 Web 实施工单为 WEB-00（合同与真实 Analysis 风险探测）、WEB-01（Design）、WEB-02（Preview）、WEB-03（handoff/组件图）、WEB-04（组合案例与框架交付）、WEB-05（根接入与冷安装），WEB-06（components）为候选；工单在对应责任仓库创建。Web 合同语义冲突由 marqdo-ext-web 协调，不回流 CLI 核心。
 
 ## 阶段与阻塞
 
@@ -38,6 +55,7 @@ Conformance 使用 CLI 已固定的真实 fixture 提交。
 | M1 集成骨架 | 六个 gitlink、布局门禁和 RC.4 组合 | 查看候选 Woodpecker 运行及各组件独立 CI |
 | M2 标准库切换 | planned，CLI RC.4 提供官方完整 Bundle | [CLI 外部 Bundle](https://git.cflmy.cn/cflmy/marqdo-cli/issues/11) 和 [九组件切换](https://git.cflmy.cn/cflmy/marqdo/issues/2)，包括 HTTP、Regex、Archive 迁出与同步删除旧路径 |
 | M3 跨仓闭环 | 工单、人工候选、同 SHA 门禁 | [跨仓库 CI](https://git.cflmy.cn/cflmy/marqdo/issues/3) 跟踪真实缺陷闭环、候选通知鉴权、去重和影响分析 |
+| M4 领域接入 | Web 领域 planned：三仓文档与工单就绪；根 catalog 登记 planned domain | W-M0 真实 CLI 风险探测、WEB-01/02 实现、领域 gitlink、根递归校验与冷安装验收；Stdlib 聚合按 STD-01..04 独立推进 |
 | 后续领域 | 空仓和预期职责 | 逐组件开展最小真实功能、独立 CI、制品与接入 |
 
 ### 标准库切换顺序
@@ -89,7 +107,7 @@ Conformance 使用 CLI 已固定的真实 fixture 提交。
 | foreign | CLI 现有 Foreign / 独立可选会话扩展（待 ADR） | one-shot run/call 已有；不恢复 set_cmd/register 等隐式动态机制；session/replay 需真实设计 |
 | fs | std-fs / document / engineering | 40 个 H2 涵盖文件操作；新版14个 H2；二进制、递归、原子、临时、读写组合；文本 patch/工程 sync 归相应扩展 |
 | hash | crypto | SHA/HMAC 等，密码学不进入内核 |
-| html | web | escape/unescape 作为纯 Web 辅助模块 |
+| html | web（合同见 WEB-DESIGN） | HTML escape/unescape 属渲染安全细节，按 WEB-DESIGN 与 Preview 安全合同处理；不恢复旧页面/模板插件模型 |
 | json | std-data | parse/stringify 已有；get/keys/set 等可复用 collections；严格 Result |
 | log | std-system | 结构化、level、输出门面，不引入服务框架 |
 | math | std-core / math | abs/min/max/clamp 基础归 Core；数值、超越、公式、CAS、绘图归 Math；随机归 System |
@@ -121,7 +139,7 @@ Conformance 使用 CLI 已固定的真实 fixture 提交。
 | `ext/net` | HTTP、WebSocket、URL，低层 TCP/TLS 归 Std Net。 |
 | `ext/data` | Database/Cache/Storage；form/admin/api/view 的 Web 部分归 Web，数据验证及查询归唯一相应库。旧 Web Go plugin 的 DB、storage、cache 子模块分别迁移。 |
 | `ext/security` | Security + Crypto；旧 Go plugin auth/OIDC/RBAC/tenant/password 按归属拆分，不混入 Host capability。 |
-| `ext/web` + `plugins/web` | Web、HTTP、WebSocket、Browser、Database、Security 等拆分；保留原生 GFM 组件与布局表达，删除 monolithic Go plugin 调度与重复模块，重新适配公开协议。 |
+| `ext/web` + `plugins/web` | 拆为 Web 设计原型领域（唯一合同见 marqdo-ext-web `docs/WEB-DESIGN.md`：设计文档解释、递归组件、有限场景、离线预览与 handoff）与 HTTP/WebSocket/Browser/Database/Security 各自独立组件；删除 monolithic Go plugin 调度与旧页面模型，不恢复旧 Web Artifact 兼容层。 |
 | `ext/engineering` + `plugins/engineering` | Engineering；Git 操作、文件、archive 分配给已有权威库，避免重复平台操作。 |
 | `crates/marqdo-wasm`、旧 browser examples | Browser 组件参考；语言核心可移植性需要 CLI 工单，而非复制旧执行器。 |
 | 旧 `src/knowledge`/proof/view/lint/对应历史 CI 与 examples | 独立 Tool，只迁移所需知识、算法和 fixture；当前公共 Analysis/Observation 优先；新旧协议不并存。 |

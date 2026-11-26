@@ -1,49 +1,99 @@
 # 开发、验收与发行
 
-## 从工单到集成
+生态采用**逐层候选晋升**：功能仓库修实现，领域聚合仓库固定组合并做领域验收，主仓库固定整个递归树并做生态验收。任何一层失败都停在该层，不让未验证组合进入受保护的分支；回退根 gitlink 即可复现上一个已接受组合，不重写子仓库历史。
 
-1. 在会修改代码的责任仓库寻找或创建工单。记录复现输入、组件 SHA、平台、公共契约、预期/实际结果，以及可执行正负例。涉及其他仓库时，各仓库保留自己负责的工单，在消费者工单标明依赖和回归条件。例：HTTP 的 SSE 分块错误归 HTTP；模型事件拼接错误归 AI；握手或字节流原语错误先由标准库或 CLI 的所有者定位。
-2. 在组件仓库提交 PR，运行独立 CI。公共协议改动同时验证真实产生者和消费者，附测试命令、制品摘要、平台、CI URL。组件源码审核通过后推送可由 CI 获取的精确提交。
-3. 在主仓库提交集成 PR。先初始化相关组件，再以 detached HEAD 锁定审核过的 SHA 并暂存 gitlink。同一份工具契约或 Stdlib 切换需要同时更新多个组件时，在一个候选中提交整组 gitlink。
-4. 基线移动时重验候选组合。留下真实失败证据并路由责任工单。通过同 SHA 的必需门禁后合并，随后关闭集成追踪及已解决的关联工单。
+## 责任仓库与工单
 
-官网内容与托管变更在 marqdo-site 提交，编辑器行为与 VSIX 在 marqdo-vscode 提交。涉及公开 CLI 或 View 契约时沿用跨仓工单流程，消费者用实际发行制品验收。[官网仓库](https://git.cflmy.cn/cflmy/marqdo-site) · [VS Code 仓库](https://git.cflmy.cn/cflmy/marqdo-vscode)
+1. 先确定唯一责任仓库：功能行为在功能仓库；领域合同、示例与组合在领域聚合仓库；gitlink、跨领域集成、发行组合与治理在主仓库。拿不准时按“第一个违反公开合同的所有者”定责，而不是按错误最后显示的仓库。
+2. 在责任仓库找到或建立工单，按 `.gitea/ISSUE_TEMPLATE/change.md` 记录：责任组件与类型、影响消费者、根/领域/组件 SHA、CLI 与依赖制品摘要及平台、最小 fixture 与命令、实际与预期结果、权威合同链接、修复范围、验收命令。
+3. 跨仓库阻塞在上游仓库开工单，并在消费者工单记录回归条件；不同问题拆分，重复发现追加证据。任何维护者或 AI 都可以读其它仓库定位，但修改必须进入对应责任仓库的独立提交。
 
-```sh
-git submodule update --init
-git -C tools/view fetch origin
-git -C tools/view checkout --detach <审核通过的提交>
-git add tools/view
-git diff --cached --submodule=log
+## 分层候选流程
+
+以 Web 领域为例，一般组件同理：
+
+```text
+功能提交 C2（功能仓库，通过组件 CI）
+  -> 领域 PR 将 gitlink 更新到 C2，通过领域 CI，形成 B2
+  -> 主仓库 PR 将领域 gitlink 更新到 B2，通过根递归校验与受影响组合验收，形成 A2
 ```
 
-## 验收
+- 子模块的 detached HEAD 只用于复现与集成；开发应在子仓库独立创建分支后推送，禁止 `git submodule update --remote` 在发布/验收中追踪浮动分支。
+- 同一份公共合同切换需要多个组件同步变化时，在一个候选组合中提交整组 gitlink，配对候选联调通过后再晋升；不允许主分支出现半套协议。
+- 领域激活（planned → active）的门禁：两个功能仓具备真实 `entry` 与候选提交；领域 `components.toml` 与 gitlink 一致；领域 CI 通过；根递归校验通过；Design/Preview 等有依赖关系的组件以同候选证据验证。未满足前不得写占位 gitlink。
+
+## 递归校验与组合检查
+
+```sh
+git submodule update --init --recursive
+python3 scripts/check-layout.py            # 根层：catalog/gitlink/远端/白名单
+python3 scripts/check-layout.py --checkouts # 递归：各 active 领域固定提交、全局图与依赖
+python3 -m unittest discover -s tests/integration
+bash scripts/integration.sh                # 生态候选：真实 CLI 制品 + 组件验收
+```
+
+- 校验器读取 Git tree 中固定提交的 catalog，不以工作区改动替代候选；`--checkouts` 需要子模块已初始化，缺失、错误 HEAD、脏工作区、错误入口都明确 FAIL/UNVERIFIED，不静默跳过。
+- 没有 active 领域时，新校验规则同样接受合法的直属功能组件，这不是历史协议兼容。
+- 未知的 active 入口、未声明的 gitlink、目录与 catalog 不一致都必须让候选失败。`planned` 不进入验收计数。
+- 当前 CI 为 `layout` 与 `candidate` 两段；统一 CLI 制品准备、声明驱动调度与递归影响分析仍在推进（见 `.woodpecker/eco.yml` 与主仓库工单），不得以本文件描述当作已实现。
+
+## 三层验收
 
 | 层 | 责任与证据 |
 | --- | --- |
-| C1 组件 CI | 独立构建与测试、授权负例、固定依赖、打包 smoke，由组件仓库维护 |
+| C1 组件 CI | 责任组件独立检出、独立构建与测试、授权负例、固定依赖、打包 smoke；由组件仓库维护 |
 | C2 公共契约 | 真实 CLI 和 Worker、独立 Conformance 与消费者，覆盖当前协议、失败和正确身份 |
-| C3 生态集成 | 结构、公开冷克隆、精确 gitlink、官方基础发行、CLI Tool 和契约消费回归 |
+| C3 生态集成 | 递归结构校验、公开冷克隆、精确 gitlink、官方基础发行、CLI Tool 与契约消费回归 |
 
-本候选先对全部 active 组件运行集成。Woodpecker 的 `layout` 校验 Git tree，随后初始化公开直连子模块。`candidate` 用官方冻结归档验证冷安装、Conformance、View、Knowledge、Prove 和 Lint。View 的集成测试包含安装、静态核验、显式执行、Observation 和移除。C1 的完整构建、View 的全浏览器矩阵、Prove 的 Lean 后端以及 CLI 的 strict VM 和性能门禁沿用各组件独立流程。
+三层不是重复跑三次测试：同一候选、同一制品、同一环境的有效证据可以复用；身份不匹配必须重跑。每个 active 组件提供独立验收入口（建议 `scripts/ci.sh` 或 `scripts/integration.sh`），从显式传入的 `MARQDO_BIN`、Bundle/依赖制品位置和隔离输出目录读取输入，不自行拉取浮动 CLI 或其它组件 main。
 
-本地运行需要 Linux x86_64/glibc ≥ 2.39、Python 3.11+、jsonschema、Git、Rust、C 编译器和 curl。
+## 统一 CLI 与制品输入
 
-```sh
-git submodule update --init
-python3 scripts/check-layout.py --checkouts
-python3 -m unittest discover -s tests/integration
-bash scripts/integration.sh
-```
+- 生态候选使用**固定、可验证**的 CLI/Worker/Stdlib 候选制品；输入必须绑定 CLI gitlink SHA、目标平台、归档/二进制/Bundle digest、工具链与锁。
+- 当前候选的冻结制品适配器以正式 RC.4 为基线，临时从 View 的 `frozen-beta.sh` 获取；这属于待替换的过渡实现，CLI 版本不得由任一消费者决定。主仓库统一制品准备落地后，在此切换并记录证据。
+- 组件验收只读取传入制品，不自行下载未知版本；开发目录覆盖入口（如 `MARQDO_STDLIB_DIR`）不得当作发行行为。缺失、摘要不符或平台不符必须拒绝。
 
-集成日志记录候选提交、每个 gitlink、二进制摘要及各检查退出码。对产物默认要求 digest 与来源提交一致。当前候选的冻结制品适配器以正式 RC.4 为基线。更新 CLI 基线时须同步修改其可验证制品入口及相关消费者，并同时审查源提交、锁定摘要和发布平台。
+## 影响范围与调度
 
-组件更多后才缩小日常影响范围。算法必须用新旧依赖图并集计算反向闭包，再加测试配对与受影响场景。CLI、Stdlib、未知边或集成策略变更保守全量测试。发布全量验证并绑定精确提交、运行环境、依赖与制品摘要。任何必需 FAIL 或 UNVERIFIED 都阻止对应阶段验收。
+比较已接受根提交与候选递归展开的 `(global_id, parent, remote, SHA, state)`；领域指针变化必须展开差异，不能只标记父节点。变更叶子加入集合后，取反向传递依赖闭包，再加所在祖先领域及需要协同验收的 `checks_with`（固定点去重、不作为构建先决）；公共协议/权限/根集成逻辑变化触发相应全量 conformance 与消费者。删除或移动组件用新旧图并集计算受影响者。无法确定影响范围时全量而非跳过；正式发行执行所有 active 组件与完整测试。
 
-跨仓候选目前由维护者手动提交。自动化接入时，事件只用于唤醒，记录仓库、完整 SHA、CI URL。服务验证签名、仓库允许列表、真实 CI 结果和提交可达性，按仓库和 SHA 去重。机器人只写候选分支与 PR，维护者负责合并；凭据仅放服务端或平台 Secret，测试任务使用非特权身份。
+## 工单路由与状态
+
+| 现象 | 责任归属 |
+| --- | --- |
+| 组件表头正确但 Design 未识别 | web-design（若 Analysis 的真实 AST 正确） |
+| Link 中 `not_loaded` 错误处理 | web-design；若 CLI candidate 违反公开 resolver 合同则 CLI |
+| 手机布局溢出、场景实例串扰 | web-preview |
+| 特定设计模板不符合合同 | web-components（激活后）或作者项目，不修改核心 renderer 迎合坏模板 |
+| Web 设计约定出现冲突 | marqdo-ext-web 协调，Design/Preview 各自提交 |
+| 真实生产框架渲染/业务错误 | 目标应用仓库，不归 Web 原型 |
+| SSE 或网络传输错误 | Ext-Net 的 HTTP/WS 或 CLI Resource 真正责任方 |
+| 固定 SHA 组合构建失败 | 若各组件公开制品正确，由所属聚合/根修复装配，否则责任组件 |
+
+状态流：`open → triaged → in-progress / blocked → component-verified → integrated`。可用现有 Git 平台标签与关联链接，不设计新工单数据库；阻塞项不能以 mock PASS 关闭。组件 PR 合并后可关闭组件修复工单，但消费者/领域或生态集成任务保留到真实候选组合通过。
+
+## 自动化权限
+
+先实现人工触发与 PR/CI 门禁，不开发自动 Agent 管理平台。Webhook 只作通知（记录仓库、完整 SHA、CI URL）；上级通过 API 验证存在性、审批与权限后再创建候选 PR，不得自动合入或提升权限。外部不可信 PR、未批准 gitlink 或脚本不得在拥有跨仓库写权限/发版密钥的 runner 中运行；区分只读 checkout/test token、受限 issue/PR token、受保护发布权限。日志不得输出凭证、完整 Analysis 或生产 API key。
 
 ## 发行与回滚
 
-先验证完整候选组合，再由组件各自发布不可变制品。基础发行包含同源 CLI、Worker 与单一标准库 Bundle；工具和扩展使用各自权威制品与 CLI 的现行安装机制。主仓库发布记录应从 gitlink 和真实制品生成，包含主仓库 SHA、组件 SHA、各自版本、归档摘要、构建环境、平台和测试记录。
+- 组件可独立 SemVer 发布；领域可发布经过验证的组合制品；根生态 release 固定整个 gitlink 树。独立版本不代表维护多套现行协议。
+- 每份证据记录根及递归组件 SHA、制品摘要、真实命令、退出码、环境/工具链、日志、测试范围与未验证项。复用现有 manifest/evidence 模式，不复制成新的权威锁。
+- Git tree 是源码身份权威；Cargo.lock/`marqdo.lock`/现行 Bundle manifest 是对应依赖权威。记录不可变归档校验和、可信来源及获取方法；摘要校验不是发布者身份认证。
+- 基础发行包含同源 CLI、必需 Worker 与单一标准库 Bundle；不使用浮动 branch/标签名作为发布依据。发布失败保留日志，使用新候选；已有标签和资产保持不可变。回滚用新集成提交恢复上一组通过的 gitlink。
 
-发布前在空 HOME、无 checkout 和禁网环境验证基础安装。每个声称支持的平台都要实机证据。失败候选保留日志；发布失败使用新的候选，已有标签和资产保持不可变。回滚用新集成提交恢复上一组通过的 gitlink，安全修复场景先审查回退风险。
+## Web 领域开发约束
+
+- 唯一作者合同是 `marqdo-ext-web` 的 `docs/WEB-DESIGN.md`；Design 是唯一解释实现，Preview 不另加解析规则。合同变更在该领域走 ADR，并让 Design/Preview 以配对候选一次切换。
+- Design 只消费公开 CLI `check --emit` 的 Analysis 3，不复制 Markdown/语言解析器、不依赖 CLI 私有 Rust crate；Preview 只消费 Design 的公开 crate/固定 revision，`,...` 不通过 `../design` 长期路径依赖，最终发布以 `Cargo.lock` 固定真实依赖身份。
+- 首版不迁移 WASM、不新增 CLI 语义、不要求旧 plugin 回调；模拟状态、原型标识与“未实现真实功能”必须对作者可见。
+- 真实验收使用真实浏览器 `file://` 制品、真实 CLI 正负例与真实冷安装；原型测试 PASS 不能当作生产测试 PASS。
+
+## 本地环境
+
+需要 Linux x86_64/glibc ≥ 2.39、Python 3.11+、Git、Rust、C 编译器和 curl；`integration.sh` 另需 jsonschema 与冻结 CLI 归档。详细命令与组件验收入口见各仓库 `README.md` 与 [各仓库任务](REPOSITORY-TASKS.md)。
+
+## 迁移台账
+
+标准库与扩展的现状、历史归属和切换顺序以 [迁移台账](MIGRATION.md) 为准。当前 CLI 内置标准库仍是基础发行的现行权威；`marqdo-stdlib` 聚合与九个功能仓库的迁移完成前，不得声称 Stdlib 拆分完成，也不得先删旧实现造成产品回归。
