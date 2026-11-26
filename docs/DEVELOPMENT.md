@@ -23,7 +23,7 @@ git diff --cached --submodule=log
 | C2 公共契约 | 真实 CLI 和 Worker、独立 Conformance 与消费者，覆盖当前协议、失败和正确身份 |
 | C3 生态集成 | 结构、公开冷克隆、精确 gitlink、官方基础发行、CLI Tool 和契约消费回归 |
 
-本候选先对全部 active 组件运行集成。Woodpecker 的 `layout` 校验 Git tree，随后初始化公开直连子模块。`candidate` 用官方冻结归档验证冷安装、Conformance、View、Knowledge、Prove 和 Lint。C1 的完整构建、View 的全浏览器矩阵、Prove 的 Lean 后端以及 CLI 的 strict VM 和性能门禁沿用各组件独立流程。
+本候选先对全部 active 组件运行集成。Woodpecker 的 `layout` 校验 Git tree，随后初始化公开直连子模块。`candidate` 用官方冻结归档验证冷安装、Conformance、View、Knowledge、Prove 和 Lint。View 的集成测试包含安装、静态核验、显式执行、Observation 和移除。C1 的完整构建、View 的全浏览器矩阵、Prove 的 Lean 后端以及 CLI 的 strict VM 和性能门禁沿用各组件独立流程。
 
 本地运行需要 Linux x86_64/glibc ≥ 2.39、Python 3.11+、jsonschema、Git、Rust、C 编译器和 curl。
 

@@ -104,12 +104,13 @@ def validate(revision, checkouts):
     for path, item in active.items():
         prefix = f"submodule.{path}."
         require(config.pop(prefix + "path", None) == path, f"missing or invalid submodule path: {path}")
-        url = config.pop(prefix + "url", "")
-        require(re.fullmatch(rf"https://git\.cflmy\.cn/cflmy/marqdo-{NAME}\.git", url), f"invalid submodule URL: {path}")
-        if item["kind"] == "stdlib":
-            require(url.endswith(f"/marqdo-{item['id']}.git"), f"invalid standard library repo name: {path}")
+        name = item["id"]
         if item["kind"] == "extension":
-            require(url.endswith(f"/marqdo-ext-{item['id']}.git"), f"invalid extension repo name: {path}")
+            name = f"ext-{name}"
+        elif item["kind"] == "test":
+            name = "extension-conformance"
+        url = config.pop(prefix + "url", "")
+        require(url == f"https://git.cflmy.cn/cflmy/marqdo-{name}.git", f"invalid submodule URL: {path}")
         if checkouts:
             checkout = ROOT / path
             sha = gitlinks[path]

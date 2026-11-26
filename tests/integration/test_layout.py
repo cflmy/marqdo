@@ -80,6 +80,11 @@ class LayoutTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "invalid submodule URL"):
             layout.validate("HEAD", False)
 
+    def test_rejects_wrong_repository_at_authority(self):
+        self.candidate(url="https://git.cflmy.cn/cflmy/marqdo-view.git")
+        with self.assertRaisesRegex(ValueError, "invalid submodule URL"):
+            layout.validate("HEAD", False)
+
     def test_rejects_unstaged_checkout(self):
         self.candidate()
         with self.assertRaisesRegex(ValueError, "missing submodule checkout"):

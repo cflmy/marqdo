@@ -59,6 +59,28 @@ python3 cli/tools/ci/verify_extension_contracts.py \
     "$MARQDO_BIN" tool install dist/marqdo-view/tool.json
     "$MARQDO_BIN" view verify examples/mixed-modes/index.mq.md
     "$MARQDO_BIN" view export examples/tables-math --out "$work/view-export"
+    setsid "$MARQDO_BIN" view examples/control-flow --port 0 --no-open >"$work/view-server.log" 2>&1 &
+    view_pid=$!
+    stop_view() {
+        kill -- "-$view_pid" 2>/dev/null || true
+        wait "$view_pid" 2>/dev/null || true
+    }
+    trap stop_view EXIT
+    view_url=""
+    for attempt in {1..100}; do
+        view_url="$(grep -m1 -o 'http://127\.0\.0\.1:[0-9]\+/' "$work/view-server.log" || true)"
+        if [[ -n "$view_url" ]] || ! kill -0 "$view_pid" 2>/dev/null; then
+            break
+        fi
+        sleep 0.1
+    done
+    if [[ -z "$view_url" ]]; then
+        cat "$work/view-server.log" >&2
+        exit 1
+    fi
+    python3 scripts/acceptance-run.py "$view_url"
+    stop_view
+    trap - EXIT
     python3 scripts/check-observation.py stream-snapshot
     "$MARQDO_BIN" tool remove view
     if "$MARQDO_BIN" view --version; then

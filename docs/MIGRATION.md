@@ -31,8 +31,8 @@ Conformance 使用 CLI 已固定的真实 fixture 提交。
 | --- | --- | --- |
 | M0 盘点 | 自建 Git、历史标签、已有六组件和新仓位 | 通过真实远端候选持续维护台账 |
 | M1 集成骨架 | 六个 gitlink、布局门禁和 RC.4 组合 | 查看候选 Woodpecker 运行及各组件独立 CI |
-| M2 标准库切换 | planned，CLI RC.4 提供官方完整 Bundle | CLI 接受显式外部 Bundle；九个标准库真实模块；HTTP、Regex、Archive 迁出与同步删除旧路径 |
-| M3 跨仓闭环 | 工单、人工候选、同 SHA 门禁 | 以一个真实跨仓缺陷完成独立修复与消费者验收，建立通知鉴权和去重后再启用自动发起候选 |
+| M2 标准库切换 | planned，CLI RC.4 提供官方完整 Bundle | [CLI 外部 Bundle](https://git.cflmy.cn/cflmy/marqdo-cli/issues/11) 和 [九组件切换](https://git.cflmy.cn/cflmy/marqdo/issues/2)，包括 HTTP、Regex、Archive 迁出与同步删除旧路径 |
+| M3 跨仓闭环 | 工单、人工候选、同 SHA 门禁 | [跨仓库 CI](https://git.cflmy.cn/cflmy/marqdo/issues/3) 跟踪真实缺陷闭环、候选通知鉴权、去重和影响分析 |
 | 后续领域 | 空仓和预期职责 | 逐组件开展最小真实功能、独立 CI、制品与接入 |
 
 ### 标准库切换顺序
