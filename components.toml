@@ -3,7 +3,8 @@
 # 递归展平后全局 ID 与权威远端唯一；禁止在根同时登记某个计划中聚合及其后代路径。
 # kind = "domain" 是治理角色：requires = []，release 为 none（普通领域）或 base（Stdlib Bundle 聚合），
 # 聚合仓自身不含生产实现；其子组件在领域仓库自己的 components.toml 登记。
-# planned 的 requires 是设计输入，接入前须核对实际 imports 和发布依赖；planned 不创建占位 gitlink。
+# planned 的 requires 是设计输入，激活前须核对实际 imports 和发布依赖。
+# 已发布的仓库提交可以作为 planned gitlink 固定，发行验收以 active 状态为准。
 
 [[component]]
 id = "cli"

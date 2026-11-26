@@ -65,7 +65,7 @@ marqdo run hello.mq.md
 
 ### 标准库
 
-标准库组件负责低层通用能力，验收后共同组成基础发行的标准库 Bundle。 这些组件标为 `planned`，开发在对应独立仓库进行。 [标准库目录](stdlib/README.md)
+标准库组件负责低层通用能力，验收后共同组成基础发行的标准库 Bundle。`stdlib/` 的子模块固定各独立仓库的开发提交，状态为 `planned`。 [标准库目录](stdlib/README.md)
 
 | 仓库 | 职责 |
 | --- | --- |
@@ -81,7 +81,7 @@ marqdo run hello.mq.md
 
 ### 领域扩展
 
-领域扩展负责按需安装的算法、协议和业务能力。 这些组件标为 `planned`，开发在对应独立仓库进行。 [领域扩展目录](extensions/README.md)
+领域扩展负责按需安装的算法、协议和业务能力。`extensions/` 的子模块链接各独立仓库，功能从 `planned` 状态开始开发。 [领域扩展目录](extensions/README.md)
 
 | 仓库 | 职责 |
 | --- | --- |
@@ -106,7 +106,7 @@ marqdo run hello.mq.md
 
 ### Web 领域聚合
 
-Web 领域以设计文档为源材料，提供可交互的原型预览与工程交付；它不复刻前端框架，HTTP、数据库、认证和浏览器运行时仍是独立可选能力。领域当前为 `planned`，在主仓库登记为 planned domain，尚未以 gitlink 接入；子组件在领域仓库的 `components.toml` 登记，不重复登记到本仓库。唯一作者合同见 [WEB-DESIGN](https://git.cflmy.cn/cflmy/marqdo-ext-web/src/branch/main/docs/WEB-DESIGN.md)。
+Web 领域以设计文档为源材料，面向可交互的原型预览与工程交付。HTTP、数据库、认证和浏览器运行时各自独立维护。`extensions/web` 链接 `planned` 的 Web 领域仓，Design 和 Preview 由该领域仓固定。 [WEB-DESIGN](https://git.cflmy.cn/cflmy/marqdo-ext-web/src/branch/main/docs/WEB-DESIGN.md)
 
 | 仓库 | 职责 |
 | --- | --- |
@@ -116,7 +116,7 @@ Web 领域以设计文档为源材料，提供可交互的原型预览与工程�
 
 ## 参与开发
 
-在负责的独立仓库提交实现和测试。主仓库用 Git 子模块按“根 → 领域 → 功能”最多两级固定已通过联合验收的组合。需要验证当前组合时，克隆主仓库后运行：
+在负责的独立仓库提交实现和测试。主仓库用 Git 子模块按“根 → 领域 → 功能”最多两级固定提交，组件的发行状态由 catalog 独立记录。需要获取当前组合时，运行：
 
 ```sh
 git clone https://git.cflmy.cn/cflmy/marqdo.git
@@ -126,7 +126,7 @@ python3 scripts/check-layout.py --checkouts
 python3 -m unittest discover -s tests/integration
 ```
 
-`check-layout.py` 校验每层 catalog 与 gitlink、权威远端、全局 ID 与依赖图；`--checkouts` 要求子模块已初始化，缺失或不一致会明确失败。`planned` 组件与空仓不计入完成率，也不创建占位 gitlink。
+`check-layout.py` 校验每层 catalog、gitlink、权威远端、全局 ID 和依赖图。`--checkouts` 同时核对递归检出的实际提交。`planned` 子模块提供固定开发快照，只有 `active` 组件进入发行验收。
 
 [各仓库任务](docs/REPOSITORY-TASKS.md) · [组件目录](components.toml) · [架构边界](docs/ARCHITECTURE.md) · [开发流程](docs/DEVELOPMENT.md) · [迁移台账](docs/MIGRATION.md) · [架构决策记录](docs/adr/README.md) · [AGENTS](AGENTS.md)
 

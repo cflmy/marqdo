@@ -19,11 +19,11 @@
 - **领域（`kind = "domain"`）**：工程治理角色，不是语言层也不是运行协议。领域仓库只登记直属子组件，可拥有 `components.toml`、`.gitmodules`、领域公共规范、跨组件集成测试、综合示例、发布装配脚本、ADR 与维护指南；禁止在其中建立 renderer、解析器、数据库驱动等生产实现，也禁止把子仓库源码复制进普通目录。领域 `requires = []`，`release` 为 `none`（普通领域）或 `base`（Stdlib Bundle 聚合）。
 - **功能组件**：`kind` 仍为 `core/stdlib/extension/tool/test`，在责任仓库独立实现、测试和发版；`release` 与 `kind` 的对应关系不变（base/optional/none）。
 - **唯一归属**：一个功能只有一个权威实现，一个组件只有一个治理归属，一个公共边界只有一套现行合同。已有仓库直接复用，不能因为命名不符创建重复实现。
-- **`planned` 纪律**：planned 组件没有 gitlink、没有实际实现文件、禁止伪造 `entry`；空仓与预期职责只登记在 [迁移台账](MIGRATION.md)。激活领域时，其子组件记录迁入领域仓库自己的 `components.toml`，并在同一根候选清理旧的直属 planned 记录；根 catalog 不得同时登记某个计划中聚合及其后代路径。未激活的其他领域保留现有直属 planned 记录。
+- **`planned` 纪律**：已有仓库可以通过 gitlink 固定已发布的开发提交。尚无提交的仓库登记在 [迁移台账](MIGRATION.md)。组件通过联合验收后才晋升为 `active` 并登记实际 `entry`。将直属组件迁入领域时，在同一根候选转移清单和 gitlink，保证一个组件只有一个父级。
 - **聚合准入**：功能拆分须至少有一种独立价值（独立维护责任、显著不同依赖/安全/平台边界、独立版本与制品、可重复独立验收）。若两个仓库几乎每个 PR 都必须一起改动且接口未稳定，应先收敛合同或合并，不能无限拆分。
 - **工具目录**（`tools/`）暂不聚合，现有四个 Tool 保持原路径。
 
-**当前状态**（以 [components.toml](../components.toml) 与 [迁移台账](MIGRATION.md) 为准）：根仓库有六个直属 active 组件（`cli`、`conformance`、`view`、`knowledge`、`prove`、`lint`）；**尚未激活任何领域**。标准库九个 `std-*` 仍为根 catalog 的 planned 直属记录，`marqdo-stdlib` 聚合尚在计划中；Web 领域 `web` 为 planned domain（`extensions/web`），其 `web-design`/`web-preview` 子组件在 `marqdo-ext-web` 自己的 catalog 登记。其余候选领域继续作为 planned 直属组件或台账条目存在，不创建占位仓库。
+**当前状态**（以 [components.toml](../components.toml) 与 [迁移台账](MIGRATION.md) 为准）：根仓库有六个直属 active 组件（`cli`、`conformance`、`view`、`knowledge`、`prove`、`lint`）。九个标准库和十八个独立扩展是根层的 planned 子模块。`extensions/web` 是 planned 领域子模块，Design 和 Preview 由 Web 领域仓挂载。`marqdo-stdlib` 聚合和 `web-components` 仍在计划中。
 
 ## 语言与产品层（不因仓库变多而改变）
 
@@ -47,7 +47,7 @@
 | Git tree gitlink | 精确提交身份 |
 | Cargo.lock / `marqdo.lock` / 现行 Bundle manifest | 相应依赖与制品身份 |
 
-主仓库 `scripts/check-layout.py` 在根 tree 上校验 catalog、gitlink、远端与文件白名单；`--checkouts` 模式下递归读取每个 active 领域固定提交的 catalog 与 `.gitmodules`，逐层验证 gitlink、远端、HEAD/dirty、入口，并展平为全局图校验全局 ID/远端唯一、active 依赖 planned、stdlib/extension/tool 边界、依赖 DAG 无环与深度限制。展平结果是内存对象或临时报告，用于测试调度，不是第二份可提交 catalog。CI 集成、统一制品输入与真实远端逐层证据仍在推进，见 [开发流程](DEVELOPMENT.md)。
+主仓库 `scripts/check-layout.py` 校验 catalog、gitlink、远端与文件白名单。`--checkouts` 递归读取每个已挂载领域的固定提交，逐层验证 gitlink、远端、工作树和活跃入口，并检查全局 ID、依赖边界和无环性。CI 用 `--domain-paths` 在检出子组件前校验领域远端。 [开发流程](DEVELOPMENT.md)
 
 ## 各领域排他边界
 
@@ -74,7 +74,7 @@ Web 领域的产品定义是**文档原生、可交互的前端设计原型及�
 - **Web Design** `marqdo-web-design`（planned）：独立 Rust library，唯一解释作者合同、消费真实 CLI Analysis、产出设计模型/诊断/handoff；不启动服务、不渲染 DOM、不复制 CLI parser。
 - **Web Preview** `marqdo-web-preview`（planned）：独立 executable + `tool.json`，注册唯一 `web` 命令；消费 Design 公开 API，生成离线安全预览与有限状态交互；不自行解释表格、不写任务专用 JS、不启动生产服务器。
 - **组件模板** `web-components`：候选，只有至少两个独立真实复用模板及稳定合同后才准入，不阻塞首版。
-- **边界**：首版不迁移 WASM、不重新实现语言、不要求旧 plugin 回调，不新增 CLI Web 关键字或 `@component` 语义；复杂视觉、真实登录/支付/数据库/网络和任意状态管理交给生产实现。Web 领域当前为 planned，未在根提交 gitlink；激活门禁见 [开发流程](DEVELOPMENT.md)。
+- **边界**：首版不迁移 WASM、不重新实现语言、不要求旧 plugin 回调，不新增 CLI Web 关键字或 `@component` 语义；复杂视觉、真实登录/支付/数据库/网络和任意状态管理交给生产实现。Web 领域已通过 gitlink 固定开发提交，状态为 `planned`。 [开发流程](DEVELOPMENT.md)
 
 ## 新增能力与公共边界
 

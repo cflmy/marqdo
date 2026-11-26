@@ -124,9 +124,12 @@ class LayoutTests(unittest.TestCase):
     def git(self, *args, cwd=None):
         return subprocess.check_output(["git", "-C", cwd or self.root, *args]).decode()
 
-    def candidate(self, metadata=CLI, url=CORE_URL, extra=None, file=None):
+    def candidate(self, metadata=CLI, url=CORE_URL, extra=None, file=None, extra_url=None):
         (self.root / "components.toml").write_text(metadata)
-        (self.root / ".gitmodules").write_text(f'[submodule "cli"]\npath = cli\nurl = {url}\n')
+        modules = f'[submodule "cli"]\npath = cli\nurl = {url}\n'
+        if extra_url:
+            modules += f'[submodule "{extra}"]\npath = {extra}\nurl = {extra_url}\n'
+        (self.root / ".gitmodules").write_text(modules)
         self.git("add", ".gitmodules", "components.toml")
         self.git("update-index", "--add", "--cacheinfo", f"160000,{self.sha},cli")
         if extra:
@@ -156,10 +159,16 @@ class LayoutTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "unexpected tracked path or mode"):
             layout.validate("HEAD", False)
 
-    def test_rejects_planned_gitlink(self):
+    def test_rejects_a_planned_gitlink_without_a_registered_remote(self):
         self.candidate(CLI + PLANNED, extra="stdlib/core")
-        with self.assertRaisesRegex(ValueError, "gitlink/catalog mismatch"):
+        with self.assertRaisesRegex(ValueError, "missing or invalid submodule path: stdlib/core"):
             layout.validate("HEAD", False)
+
+    def test_accepts_a_planned_gitlink_with_its_remote(self):
+        self.candidate(CLI + PLANNED, extra="stdlib/core",
+                       extra_url="https://git.cflmy.cn/cflmy/marqdo-std-core.git")
+        root = layout.validate("HEAD", False)[0]
+        self.assertEqual(root.linked["stdlib/core"]["state"], "planned")
 
     def test_rejects_active_dependency_on_planned(self):
         self.candidate(CLI.replace("requires = []", 'requires = ["std-core"]') + PLANNED)
@@ -325,6 +334,17 @@ class HierarchicalLayoutTests(unittest.TestCase):
         layout.validate("HEAD", True)
         layout.validate("HEAD", False)
 
+    def test_accepts_a_planned_domain_and_planned_child_gitlinks(self):
+        web = WEB_DOMAIN.replace('state = "active"', 'state = "planned"').replace(
+            'entry = "scripts/integration.sh"\n', '')
+        children = DOMAIN.replace('state = "active"', 'state = "planned"').replace(
+            'entry = "scripts/ci.sh"\n', '')
+        self.assemble(root_catalog=CLI + web, domain_catalog=children)
+        root, domain = layout.validate("HEAD", True)
+        self.assertEqual(root.linked["extensions/web"]["state"], "planned")
+        self.assertEqual(set(domain.linked), {"design", "preview"})
+        self.assertTrue(all(child["state"] == "planned" for child in domain.linked.values()))
+
     def test_non_checkout_mode_only_validates_the_root_layer(self):
         self.assemble()
         shutil.rmtree(self.root / "extensions" / "web")
@@ -487,8 +507,9 @@ release = "base"
             "design": "https://git.cflmy.cn/cflmy/marqdo-ext-design.git",
             "preview": "https://git.cflmy.cn/cflmy/marqdo-web-preview.git",
         })
+        shutil.rmtree(self.root / "extensions/web/design")
         with self.assertRaisesRegex(ValueError, "invalid submodule URL: design"):
-            layout.validate("HEAD", True)
+            layout.validate("HEAD", False, expand_domains=True)
 
     # -- global graph failures ---------------------------------------------
 

@@ -9,6 +9,12 @@ steps:
       - python3 scripts/check-layout.py
       - python3 -m unittest discover -s tests/integration
       - git submodule update --init
+      - |
+        set -eu
+        domains="$(python3 scripts/check-layout.py --domain-paths)"
+        for domain in $domains; do
+          git -C "$domain" submodule update --init
+        done
       - python3 scripts/check-layout.py --checkouts
 
   candidate:

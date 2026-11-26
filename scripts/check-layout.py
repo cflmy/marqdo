@@ -5,8 +5,8 @@ The checker follows the hierarchical governance rules of the Marqdo ecosystem
 specification (sections 2-4, 13):
 
 * the root catalog describes direct components and domain aggregates;
-* an active ``kind = "domain"`` gitlink is only expanded when ``--checkouts``
-  is requested, at its exact pinned commit;
+* a registered ``kind = "domain"`` gitlink is expanded at its exact pinned
+  commit for ``--checkouts`` or to validate URLs before updating its children;
 * each aggregate layer has its own ``components.toml`` / ``.gitmodules`` and
   registers only its direct children;
 * governance depth is limited to two gitlink levels (root -> domain -> leaf);
@@ -59,7 +59,7 @@ def nfc(value):
 class Layer:
     """One governance level: the root tree or one expanded domain aggregate."""
 
-    def __init__(self, repo, revision, label, depth, order, components, gitlinks, active, planned, urls):
+    def __init__(self, repo, revision, label, depth, order, components, gitlinks, linked, urls):
         self.repo = Path(repo)
         self.revision = revision
         self.label = label
@@ -67,8 +67,7 @@ class Layer:
         self.order = order
         self.components = components
         self.gitlinks = gitlinks
-        self.active = active
-        self.planned = planned
+        self.linked = linked
         self.urls = urls
 
 
@@ -209,16 +208,16 @@ def tree_entries(repo, revision, label):
     return entries
 
 
-def check_root_tree(entries, active, planned, label):
+def check_root_tree(entries, linked, unlinked, label):
     allowed_readmes = CATEGORY_READMES | {
         f'{item["path"]}/README.md'
-        for item in planned
+        for item in unlinked
         if item["kind"] in {"stdlib", "extension", "domain"}
     }
     for path, (mode, _) in entries.items():
         root = path.split("/", 1)[0]
         require(
-            path in active or (mode == "100644" and path in allowed_readmes)
+            path in linked or (mode == "100644" and path in allowed_readmes)
             or (mode in {"100644", "100755"} and (
                 path in ROOT_FILES or root in ROOT_DIRS and "/" in path or path.startswith("tests/integration/")
             )),
@@ -226,15 +225,15 @@ def check_root_tree(entries, active, planned, label):
         )
 
 
-def check_domain_tree(entries, active, planned, label):
+def check_domain_tree(entries, linked, unlinked, label):
     """Aggregate layers only carry governance, docs, examples and tests.
 
     Production implementations stay in the child repositories: an aggregate
     may not add a renderer, parser or driver under its own tree.
     """
-    allowed_readmes = {f'{item["path"]}/README.md' for item in planned}
+    allowed_readmes = {f'{item["path"]}/README.md' for item in unlinked}
     for path, (mode, _) in entries.items():
-        if path in active:
+        if path in linked:
             continue
         if mode == "100644" and path in allowed_readmes:
             continue
@@ -264,7 +263,7 @@ def read_submodules(repo, revision, label):
     return config
 
 
-def check_submodules(config, active, depth, label, urls):
+def check_submodules(config, linked, depth, label, urls):
     """Match ``.gitmodules`` sections by ``path``, not by section name.
 
     Git configuration keys are keyed by the submodule section name, which is
@@ -290,7 +289,7 @@ def check_submodules(config, active, depth, label, urls):
         require(path not in by_path, f"{label}: duplicate submodule path: {path}")
         by_path[path] = fields["url"]
     require(not extras, f"{label}: unexpected submodule settings: {sorted(extras)}")
-    for path, component in active.items():
+    for path, component in linked.items():
         require(path in by_path, f"{label}: missing or invalid submodule path: {path}")
         url = by_path.pop(path)
         expected = expected_remote(component, depth)
@@ -310,17 +309,18 @@ def read_layer(repo, revision, label, depth):
         order.append(check_component(raw, depth, label, components, paths, path_keys))
     entries = tree_entries(repo, revision, label)
     gitlinks = {path: sha for path, (mode, sha) in entries.items() if mode == "160000"}
-    active = {item["path"]: item for item in order if item["state"] == "active"}
-    planned = [item for item in order if item["state"] == "planned"]
-    require(gitlinks.keys() == active.keys(),
-            f"{label}: gitlink/catalog mismatch: {sorted(gitlinks.keys() ^ active.keys())}")
+    active_paths = {item["path"] for item in order if item["state"] == "active"}
+    mismatch = (active_paths - gitlinks.keys()) | (gitlinks.keys() - paths)
+    require(not mismatch, f"{label}: gitlink/catalog mismatch: {sorted(mismatch)}")
+    linked = {item["path"]: item for item in order if item["path"] in gitlinks}
+    unlinked = [item for item in order if item["path"] not in gitlinks]
     if depth == 0:
-        check_root_tree(entries, active, planned, label)
+        check_root_tree(entries, linked, unlinked, label)
     else:
-        check_domain_tree(entries, active, planned, label)
+        check_domain_tree(entries, linked, unlinked, label)
     urls = {}
-    check_submodules(read_submodules(repo, revision, label), active, depth, label, urls)
-    return Layer(repo, revision, label, depth, order, components, gitlinks, active, planned, urls)
+    check_submodules(read_submodules(repo, revision, label), linked, depth, label, urls)
+    return Layer(repo, revision, label, depth, order, components, gitlinks, linked, urls)
 
 
 def verify_checkout(layer, component):
@@ -342,9 +342,10 @@ def verify_checkout(layer, component):
         status.append("--ignore-submodules=all")
     require(not git(*status, cwd=checkout),
             f"{layer.label}: dirty submodule: {path}")
-    entry = checkout / component["entry"]
-    require(entry.is_file() and entry.resolve() == entry,
-            f"{layer.label}: missing or symbolic entry: {path}/{component['entry']}")
+    if component["state"] == "active":
+        entry = checkout / component["entry"]
+        require(entry.is_file() and entry.resolve() == entry,
+                f"{layer.label}: missing or symbolic entry: {path}/{component['entry']}")
     return checkout
 
 
@@ -402,35 +403,50 @@ def validate_graph(layers):
         raise ValueError(f"root: requires DAG cycle: {error}") from None
 
 
-def validate(revision, checkouts):
+def validate(revision, checkouts, expand_domains=False):
     layers = [read_layer(ROOT, revision, "root", 0)]
-    if checkouts:
+    if checkouts or expand_domains:
         root = layers[0]
-        for component in root.active.values():
-            verify_checkout(root, component)
-        for path, component in root.active.items():
+        for path, component in root.linked.items():
             if component["kind"] != "domain":
+                if checkouts:
+                    verify_leaf(root, component)
                 continue
-            domain_repo = ROOT / path
+            domain_repo = verify_checkout(root, component)
             domain = read_layer(domain_repo, root.gitlinks[path],
                                 f"domain {component['id']} ({path})", 1)
             layers.append(domain)
-            for child in domain.active.values():
-                verify_leaf(domain, child)
+            if checkouts:
+                for child in domain.linked.values():
+                    verify_leaf(domain, child)
     validate_graph(layers)
-    for layer in layers:
-        for component in layer.order:
-            if component["state"] == "active":
-                print(f'{component["id"]} {component["path"]} {layer.gitlinks[component["path"]]}')
+    return layers
 
 
 def main():
     parser = argparse.ArgumentParser(description="Validate a Marqdo ecosystem Git tree")
     parser.add_argument("revision", nargs="?", default="HEAD")
     parser.add_argument("--checkouts", action="store_true")
+    paths = parser.add_mutually_exclusive_group()
+    paths.add_argument("--active-paths", action="store_true", help="print only direct active component paths")
+    paths.add_argument("--domain-paths", action="store_true", help="validate domain URLs and print domain paths")
     args = parser.parse_args()
     try:
-        validate(git("rev-parse", "--verify", args.revision + "^{commit}").strip(), args.checkouts)
+        revision = git("rev-parse", "--verify", args.revision + "^{commit}").strip()
+        layers = validate(revision, args.checkouts, expand_domains=args.domain_paths)
+        if args.active_paths:
+            for path, component in sorted(layers[0].linked.items()):
+                if component["state"] == "active":
+                    print(path)
+        elif args.domain_paths:
+            for path, component in sorted(layers[0].linked.items()):
+                if component["kind"] == "domain":
+                    print(path)
+        else:
+            for layer in layers:
+                for path, component in sorted(layer.linked.items()):
+                    relative = (layer.repo / path).relative_to(ROOT).as_posix()
+                    print(f'{component["id"]} {relative} {layer.gitlinks[path]} {component["state"]}')
     except (AttributeError, KeyError, OSError, subprocess.CalledProcessError, TypeError, ValueError) as error:
         sys.exit(f"layout: {error}")
 

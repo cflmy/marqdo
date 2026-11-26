@@ -156,7 +156,7 @@ marqdo/                         # 生态主仓库（唯一根）
 └── AGENTS.md
 ```
 
-实际仓库名以自建权威远端盘点为准；已有仓库直接复用，不能因为命名不符创建重复实现。上图不表示所有候选仓库需要立刻建立。首批只激活 Stdlib 聚合（随现有库源码拆分推进）和 Web 聚合（Design、Preview）；其他候选领域在至少两个真实组件、共同测试或发行边界成立时转换。计划中的组件应保持 planned，不创建占位 gitlink，不将其计入完成率。未激活聚合仓时，其内部规划仅列在迁移台账中；不得在根 catalog 同时登记计划中的聚合与其后代路径。激活聚合时将原直属 planned 记录迁至该聚合自己的 catalog，并在同一根候选清理旧记录；尚未激活的其他领域可继续保留现有直属 planned 记录。工具目录暂不聚合，已有四个 Tool 保持原路径。
+实际仓库名以自建权威远端盘点为准；已有仓库直接复用，不能因为命名不符创建重复实现。上图不表示所有候选仓库需要立刻建立。首批只激活 Stdlib 聚合（随现有库源码拆分推进）和 Web 聚合（Design、Preview）；其他候选领域在至少两个真实组件、共同测试或发行边界成立时转换。计划中的组件保持 planned，已有仓库可通过 gitlink 固定真实开发提交，激活后才计入完成率。规划中的领域及其后代分别登记在各自父级的 catalog 中。激活聚合时将原直属 planned 记录迁至该聚合自己的 catalog，并在同一根候选清理旧记录；尚未激活的其他领域可继续保留现有直属 planned 记录。工具目录暂不聚合，已有四个 Tool 保持原路径。
 
 ### 3.2 聚合仓库的准入及内容
 
@@ -266,7 +266,7 @@ release = "optional"
 ### 4.2 校验算法（主仓库 G01/G02）
 
 1. 读取指定候选 commit 的根 `components.toml` 和 `.gitmodules`，不要从可能已修改的工作区文件取代它。拒绝重复 TOML 字段、未知类型、非法路径、绝对路径、`..`、大小写或 NFC 冲突、同级路径重叠。
-2. 使用 `git ls-tree -rz --full-tree REV` 获取当前层 gitlink 和普通文件。active 与 gitlink 一一对应；planned 无 gitlink、无实际实现文件。聚合层普通文件仅限 docs/examples/scripts/tests/治理配置等白名单，功能层内部不套聚合白名单。
+2. 使用 `git ls-tree -rz --full-tree REV` 获取当前层 gitlink 和普通文件。active 必须有 gitlink；已发布的 planned 组件可有 gitlink，且父仓库只记录它的固定提交。聚合层普通文件仅限 docs/examples/scripts/tests/治理配置等白名单，功能层内部不套聚合白名单。
 3. 先验证当前层 `.gitmodules` 的直属路径和远端，再检出确切 SHA（逐层进行）。允许的 URL 由维护者批准的自建 HTTPS 远端及明确的迁移映射决定；拒绝 `file://`、任意外部 URL、submodule update command、相对跳转、重复物理仓库及未批准别名。不要在未检查嵌套 `.gitmodules` 前使用携带凭证的盲目递归拉取。
 4. 每个 domain 检出后在其固定 commit 重复步骤 1–3，深度最多 2；功能叶子不得再注册未批准 gitlink。检查 `HEAD` 与父 gitlink 一致、可获取、工作树无修改、入口为真实常规文件、无符号链接逃逸。缺失时明确 FAIL/UNVERIFIED，不静默略过。
 5. 展平全局 ID、父级、逻辑路径、权威 URL、SHA、类型、state。全局 ID 与远端唯一；解析 `requires` / `checks_with` 至全局 ID；active 不依赖 planned；禁止 stdlib 依赖 extension/tool，禁止 core 构建依赖其他功能，禁止直接依赖 domain，禁止循环 DAG。检查实际 package imports/lock/Cargo/Tool requires 是否与治理声明相符；无法静态确定时列出验证项而非假装完整。
@@ -278,7 +278,7 @@ release = "optional"
 
 1. 在自建远端核对现有仓库、可达性、分支保护和权限。保留根旧历史、标签及现有有效 gitlink。建立专门 `architecture/domains` 候选分支，不强推或删除历史。
 2. 在主仓库先开发递归 checker 和临时 Git 仓库测试，现有六组件继续验证。该分支最终只保留一套新规则；没有 active domain 时新 checker 同样支持合法的直属功能组件，这不是历史协议兼容。
-3. 建立 `marqdo-ext-web`（或复用已存在的 Web 权威仓库）；只有实际 Design/Preview 仓库具备可用入口与候选提交后才注册 active。维护者确认每个子库远端已推送，领域子模块锁定 SHA 并独立通过领域 CI，再在根挂入领域 commit。
+3. 建立 `marqdo-ext-web`（或复用已存在的 Web 权威仓库）；只有实际 Design/Preview 仓库具备可用入口与候选提交后才注册 active。维护者确认每个子库远端已推送，领域子模块锁定 SHA，根可先固定 planned 组合。域内和根的联合验证通过后再激活。
 4. 对已有直属组件移动，先在目标聚合仓库新增同一个远端同一个 SHA 的 gitlink（在领域候选上），验证该聚合仓库，根候选移除旧路径 gitlink 与旧清单记录、加入聚合 gitlink；一次 PR 内切换，不允许集成主分支同时出现两份同一远端。旧源码、历史工单不复制，旧根快照仍可重现。
 5. 仅修改本轮相关治理文件和集成脚本。不得借此重构 CLI、Knowledge、Prove、View、Lint 的功能代码。涉及其验收入口时各自发工单，配对候选提交验证。根候选失败时不晋升；回退根 gitlink 组合即可，不重写子仓历史。
 
