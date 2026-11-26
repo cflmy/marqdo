@@ -149,7 +149,8 @@ Conformance 使用 CLI 已固定的真实 fixture 提交。
 | 组合验收入口 | M2 候选 PASS（组件 entry + 跨仓组合 + 负例 + 相邻离线安装 + CLI 确定性打包） | `scripts/acceptance-stdlib.py`、[M2 候选证据](evidence/2026-11-26-stdlib-m2-candidate.md)、[根 PR #11](https://git.cflmy.cn/cflmy/marqdo/pulls/11) |
 | CLI 旧源树删除 | 候选完成：CLI 仓已无 `stdlib/` 源树、无编译期 fallback，pin 指向生态 Bundle | [marqdo-cli#11](https://git.cflmy.cn/cflmy/marqdo-cli/issues/11)、[CLI PR #17](https://git.cflmy.cn/cflmy/marqdo-cli/pulls/17)、[Phase B 证据](https://git.cflmy.cn/cflmy/marqdo-cli/src/branch/migration/cli-stdlib-phase-b/docs/evidence/2026-11-27-issue-11-phase-b.md) |
 | 统一 CLI/Worker/Bundle 制品输入（ECO-02 核心） | 已落地：integration.sh 由同一根候选派生全部输入，不再使用 View 冻结制品 | 根 `scripts/integration.sh`、[marqdo#7](https://git.cflmy.cn/cflmy/marqdo/issues/7) |
-| 根组合与切换 | M3 候选：固定 CLI Phase B 与组件提交，待 CI/晋升；主分支仍为迁移前组合 `484cb10` | [M3 证据](evidence/2026-11-27-stdlib-m3-candidate.md)、根 PR #12 |
+| 根组合与切换 | **已晋升**：`main` = `f4e292e`，固定 CLI Phase B `deadf6e` 与六个 std/三个 ext 组件；根生态 CI（pipeline 38）PASS | [M3 证据](evidence/2026-11-27-stdlib-m3-candidate.md)、[根 PR #12](https://git.cflmy.cn/cflmy/marqdo/pulls/12) |
+| M4 发行级验收 | 离线冷安装 PASS（`ubuntu:24.04 --network none`，归档 `sha256:377d2787...`）；多平台不在本线支持矩阵 | [M3 证据的晋升章节](evidence/2026-11-27-stdlib-m3-candidate.md#晋升与-m4-验收) |
 
 ## v2 功能历史索引
 

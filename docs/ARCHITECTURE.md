@@ -23,7 +23,7 @@
 - **聚合准入**：功能拆分须至少有一种独立价值（独立维护责任、显著不同依赖/安全/平台边界、独立版本与制品、可重复独立验收）。若两个仓库几乎每个 PR 都必须一起改动且接口未稳定，应先收敛合同或合并，不能无限拆分。
 - **工具目录**（`tools/`）暂不聚合，现有四个 Tool 保持原路径。
 
-**当前状态**（以 [components.toml](../components.toml) 与 [迁移台账](MIGRATION.md) 为准）：根仓库有六个直属 active 组件（`cli`、`conformance`、`view`、`knowledge`、`prove`、`lint`）。九个标准库和十八个独立扩展是根层的 planned 子模块。`extensions/web` 是 planned 领域子模块，Design 和 Preview 由 Web 领域仓挂载。`marqdo-stdlib` 聚合和 `web-components` 仍在计划中。
+**当前状态**（以 [components.toml](../components.toml) 与 [迁移台账](MIGRATION.md) 为准）：根仓库有六个核心/工具 active 组件（`cli`、`conformance`、`view`、`knowledge`、`prove`、`lint`）和六个已交付源码的 active 标准库组件（`std-collections/data/fs/io/system/text`）。`std-core/encoding/net` 与十八个独立扩展仍是根层 planned 子模块。`extensions/web` 是 planned 领域子模块，Design 和 Preview 由 Web 领域仓挂载。`marqdo-stdlib` 聚合和 `web-components` 仍在计划中。
 
 ## 语言与产品层（不因仓库变多而改变）
 

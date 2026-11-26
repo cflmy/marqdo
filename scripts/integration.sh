@@ -136,17 +136,18 @@ python3 cli/tools/ci/verify_extension_contracts.py \
 )
 
 # 7. Evidence identity for the accepted candidate.
-python3 - "$work" "$source_sha" "$bundle_digest" "$bundle_aliases" "$archive" <<'PY'
+root_commit="$(git rev-parse HEAD)"
+python3 - "$work" "$root_commit" "$source_sha" "$bundle_digest" "$bundle_aliases" "$archive" <<'PY'
 import hashlib, json, pathlib, sys
 work = pathlib.Path(sys.argv[1])
-archive = pathlib.Path(sys.argv[5])
+archive = pathlib.Path(sys.argv[6])
 evidence = {
     "schema": "marqdo.ecosystem-integration",
     "schema_version": 1,
     "root_commit": sys.argv[2],
-    "cli_source_sha": sys.argv[2],
-    "stdlib_tree_digest": sys.argv[3],
-    "stdlib_aliases_digest": sys.argv[4],
+    "cli_source_sha": sys.argv[3],
+    "stdlib_tree_digest": sys.argv[4],
+    "stdlib_aliases_digest": sys.argv[5],
     "archive": archive.name,
     "archive_sha256": "sha256:" + hashlib.sha256(archive.read_bytes()).hexdigest(),
     "status": "PASS",
