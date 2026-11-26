@@ -57,7 +57,7 @@ bash scripts/integration.sh                # 生态候选：真实 CLI 制品 + 
 
 ## 影响范围与调度
 
-比较已接受根提交与候选递归展开的 `(global_id, parent, remote, SHA, state)`；领域指针变化必须展开差异，不能只标记父节点。变更叶子加入集合后，取反向传递依赖闭包，再加所在祖先领域及需要协同验收的 `checks_with`（固定点去重、不作为构建先决）；公共协议/权限/根集成逻辑变化触发相应全量 conformance 与消费者。删除或移动组件用新旧图并集计算受影响者。无法确定影响范围时全量而非跳过；正式发行执行所有 active 组件与完整测试。
+根 `scripts/impact.py` 比较已接受根提交与候选递归展开的 `(global_id, parent, remote, SHA, state)`：领域指针变化展开到子组件身份，不能只标记父节点；变更叶子加入集合后，取 `requires` 新旧图并集的反向传递依赖闭包，再加所在祖先领域及 `checks_with` 固定点（协同验收不是构建先决）。领域无法展开（缺对象/检出）时结果标 UNVERIFIED 并**全量**扩大范围，不静默跳过；`--fail-on-unverified` 可把该情形变成硬失败。`integration.sh` 将报告写入候选证据（changed/affected/checks_with/fallback），正式发行仍执行所有 active 组件与完整测试。
 
 ## 工单路由与状态
 

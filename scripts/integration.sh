@@ -33,6 +33,22 @@ python3 -c 'import jsonschema'
 python3 scripts/check-layout.py --checkouts > "$work/layout.txt"
 cat "$work/layout.txt"
 
+# Recursive impact analysis against the accepted root commit: the change set
+# comes from the recursively expanded (global_id, parent, remote, SHA, state)
+# identities, then reverse `requires` closure, parent domains and `checks_with`
+# fixed point. An undetermined scope widens to the full candidate.
+accepted_ref="${MARQDO_ACCEPTED_REF:-}"
+if [[ -z "$accepted_ref" && -n "${CI_COMMIT_TARGET_BRANCH:-}" ]] \
+    && git rev-parse --verify "origin/$CI_COMMIT_TARGET_BRANCH" >/dev/null 2>&1; then
+    accepted_ref="origin/$CI_COMMIT_TARGET_BRANCH"
+elif [[ -z "$accepted_ref" ]] && git rev-parse --verify origin/main >/dev/null 2>&1; then
+    accepted_ref="origin/main"
+fi
+if [[ -n "$accepted_ref" ]]; then
+    python3 scripts/impact.py --accepted "$accepted_ref" --candidate HEAD \
+        --out "$work/impact.json"
+fi
+
 # 1. One Bundle, produced by the root-owned producer from the pinned gitlinks.
 python3 scripts/build-stdlib.py --out "$work/stdlib" | tee "$work/bundle.json"
 bundle_digest="$(python3 -c 'import json,sys; print(json.load(sys.stdin)["tree_digest"])' < "$work/bundle.json")"
@@ -150,6 +166,17 @@ evidence = {
     "stdlib_aliases_digest": sys.argv[5],
     "archive": archive.name,
     "archive_sha256": "sha256:" + hashlib.sha256(archive.read_bytes()).hexdigest(),
+    "impact": (
+        {
+            "changed": impact["changed"],
+            "affected": impact["affected"],
+            "checks_with": impact["checks_with"],
+            "fallback": impact["fallback"],
+            "unverified": impact["unverified"],
+        }
+        if impact
+        else None
+    ),
     "status": "PASS",
 }
 (work / "integration-evidence.json").write_text(json.dumps(evidence, indent=2) + "\n")
