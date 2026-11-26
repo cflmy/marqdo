@@ -1,2 +1,0 @@
-# Ignore temporary files while editing patches
-extend-diff-ignore = "^vendor/"

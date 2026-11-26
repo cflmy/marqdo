@@ -1,1 +1,0 @@
-> article · table-bound detail

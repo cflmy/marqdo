@@ -1,0 +1,25 @@
+when:
+  event: [push, pull_request, manual]
+
+steps:
+  layout:
+    image: rust:1.100-bookworm
+    commands:
+      - apt-get update && apt-get install -y --no-install-recommends ca-certificates git python3
+      - python3 scripts/check-layout.py
+      - python3 -m unittest discover -s tests/integration
+      - git submodule update --init
+      - python3 scripts/check-layout.py --checkouts
+
+  candidate:
+    # Match the Linux/glibc environment already used by View for the RC.4 artifact.
+    image: mcr.microsoft.com/playwright:v1.49.0-noble
+    depends_on: [layout]
+    commands:
+      - apt-get update && apt-get install -y --no-install-recommends ca-certificates curl git python3 python3-jsonschema build-essential
+      - |
+        set -eu
+        curl -fsSL --retry 3 https://sh.rustup.rs -o /tmp/marqdo-rustup.sh
+        sh /tmp/marqdo-rustup.sh -y --profile minimal --default-toolchain 1.100.0 --no-modify-path
+        export PATH="$HOME/.cargo/bin:$PATH"
+        bash scripts/integration.sh

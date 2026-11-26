@@ -1,7 +1,0 @@
-[package]
-name = "marqdo-plugin-sdk"
-version = "2.0.0"
-edition = "2021"
-
-[dependencies]
-serde_json = "1"

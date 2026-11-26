@@ -1,0 +1,382 @@
+# 生态组件职责与构建关系。精确提交由 Git tree 的 gitlink 锁定。
+# planned 的 requires 是设计输入，接入前须核对实际 imports 和发布依赖。
+
+[[component]]
+id = "cli"
+path = "cli"
+kind = "core"
+state = "active"
+owner = "cflmy"
+scope = "语言语义、运行时、受控宿主和公共协议"
+requires = []
+checks_with = ["conformance"]
+release = "base"
+entry = "tools/release/smoke.py"
+
+[[component]]
+id = "conformance"
+path = "tests/conformance"
+kind = "test"
+state = "active"
+owner = "cflmy"
+scope = "可执行的独立公共协议测试"
+requires = ["cli"]
+checks_with = []
+release = "none"
+entry = "scripts/build_all.sh"
+
+[[component]]
+id = "view"
+path = "tools/view"
+kind = "tool"
+state = "active"
+owner = "cflmy"
+scope = "阅读、运行观察与静态导出"
+requires = ["cli"]
+checks_with = []
+release = "optional"
+entry = "scripts/acceptance.sh"
+
+[[component]]
+id = "knowledge"
+path = "tools/knowledge"
+kind = "tool"
+state = "active"
+owner = "cflmy"
+scope = "静态知识编译与检索"
+requires = ["cli"]
+checks_with = []
+release = "optional"
+entry = "scripts/ci.sh"
+
+[[component]]
+id = "prove"
+path = "tools/prove"
+kind = "tool"
+state = "active"
+owner = "cflmy"
+scope = "证明依赖、证书及 Lean 后端"
+requires = ["cli"]
+checks_with = []
+release = "optional"
+entry = "scripts/package-tool.sh"
+
+[[component]]
+id = "lint"
+path = "tools/lint"
+kind = "tool"
+state = "active"
+owner = "cflmy"
+scope = "静态规则、诊断及显式修复"
+requires = ["cli"]
+checks_with = []
+release = "optional"
+entry = "scripts/package-tool.sh"
+
+[[component]]
+id = "std-core"
+path = "stdlib/core"
+kind = "stdlib"
+state = "planned"
+owner = "cflmy"
+scope = "Result 与基础数值"
+requires = ["cli"]
+checks_with = []
+release = "base"
+
+[[component]]
+id = "std-collections"
+path = "stdlib/collections"
+kind = "stdlib"
+state = "planned"
+owner = "cflmy"
+scope = "List、Map 和 Table 值操作"
+requires = ["cli", "std-core"]
+checks_with = []
+release = "base"
+
+[[component]]
+id = "std-text"
+path = "stdlib/text"
+kind = "stdlib"
+state = "planned"
+owner = "cflmy"
+scope = "Unicode 文本、字节值与 UTF-8"
+requires = ["cli", "std-core", "std-collections"]
+checks_with = []
+release = "base"
+
+[[component]]
+id = "std-encoding"
+path = "stdlib/encoding"
+kind = "stdlib"
+state = "planned"
+owner = "cflmy"
+scope = "Base64、Base32 和 Hex"
+requires = ["cli", "std-core", "std-text"]
+checks_with = []
+release = "base"
+
+[[component]]
+id = "std-data"
+path = "stdlib/data"
+kind = "stdlib"
+state = "planned"
+owner = "cflmy"
+scope = "JSON、CSV、TOML 与 GFM 数据转换"
+requires = ["cli", "std-collections", "std-text", "std-encoding"]
+checks_with = []
+release = "base"
+
+[[component]]
+id = "std-io"
+path = "stdlib/io"
+kind = "stdlib"
+state = "planned"
+owner = "cflmy"
+scope = "Console、Stream、格式化和官方 print 别名"
+requires = ["cli", "std-core", "std-text"]
+checks_with = []
+release = "base"
+
+[[component]]
+id = "std-fs"
+path = "stdlib/fs"
+kind = "stdlib"
+state = "planned"
+owner = "cflmy"
+scope = "文件、目录与路径"
+requires = ["cli", "std-io", "std-text"]
+checks_with = []
+release = "base"
+
+[[component]]
+id = "std-system"
+path = "stdlib/system"
+kind = "stdlib"
+state = "planned"
+owner = "cflmy"
+scope = "时钟、UTC、环境、进程与随机"
+requires = ["cli", "std-text", "std-io"]
+checks_with = []
+release = "base"
+
+[[component]]
+id = "std-net"
+path = "stdlib/net"
+kind = "stdlib"
+state = "planned"
+owner = "cflmy"
+scope = "TCP、UDP、TLS 和网络字节流"
+requires = ["cli", "std-io", "std-system"]
+checks_with = []
+release = "base"
+
+[[component]]
+id = "math"
+path = "extensions/math"
+kind = "extension"
+state = "planned"
+owner = "cflmy"
+scope = "数值算法、统计、符号数学及绘图"
+requires = ["cli", "std-core", "std-collections", "std-text"]
+checks_with = []
+release = "optional"
+
+[[component]]
+id = "linalg"
+path = "extensions/linalg"
+kind = "extension"
+state = "planned"
+owner = "cflmy"
+scope = "复数、矩阵、分解及数值线性代数"
+requires = ["cli", "math"]
+checks_with = []
+release = "optional"
+
+[[component]]
+id = "quantum"
+path = "extensions/quantum"
+kind = "extension"
+state = "planned"
+owner = "cflmy"
+scope = "量子电路、态向量、采样与模拟"
+requires = ["cli", "linalg"]
+checks_with = []
+release = "optional"
+
+[[component]]
+id = "http"
+path = "extensions/http"
+kind = "extension"
+state = "planned"
+owner = "cflmy"
+scope = "HTTP、URL、SSE 与报文生命周期"
+requires = ["cli", "std-net", "std-text", "std-encoding"]
+checks_with = []
+release = "optional"
+
+[[component]]
+id = "websocket"
+path = "extensions/websocket"
+kind = "extension"
+state = "planned"
+owner = "cflmy"
+scope = "WebSocket 握手、帧与连接语义"
+requires = ["cli", "http"]
+checks_with = []
+release = "optional"
+
+[[component]]
+id = "ai"
+path = "extensions/ai"
+kind = "extension"
+state = "planned"
+owner = "cflmy"
+scope = "模型协议、流式输出与工具调用数据"
+requires = ["cli", "http", "std-data"]
+checks_with = []
+release = "optional"
+
+[[component]]
+id = "mcp"
+path = "extensions/mcp"
+kind = "extension"
+state = "planned"
+owner = "cflmy"
+scope = "MCP 协议、传输、发现和调用"
+requires = ["cli", "http", "std-system"]
+checks_with = []
+release = "optional"
+
+[[component]]
+id = "crypto"
+path = "extensions/crypto"
+kind = "extension"
+state = "planned"
+owner = "cflmy"
+scope = "成熟密码学实现的封装"
+requires = ["cli", "std-encoding"]
+checks_with = []
+release = "optional"
+
+[[component]]
+id = "database"
+path = "extensions/database"
+kind = "extension"
+state = "planned"
+owner = "cflmy"
+scope = "SQL 参数绑定、事务和驱动连接"
+requires = ["cli", "std-data"]
+checks_with = []
+release = "optional"
+
+[[component]]
+id = "storage"
+path = "extensions/storage"
+kind = "extension"
+state = "planned"
+owner = "cflmy"
+scope = "本地和对象存储接口"
+requires = ["cli", "std-fs"]
+checks_with = []
+release = "optional"
+
+[[component]]
+id = "cache"
+path = "extensions/cache"
+kind = "extension"
+state = "planned"
+owner = "cflmy"
+scope = "TTL、缓存和失效"
+requires = ["cli", "std-system"]
+checks_with = []
+release = "optional"
+
+[[component]]
+id = "security"
+path = "extensions/security"
+kind = "extension"
+state = "planned"
+owner = "cflmy"
+scope = "应用身份、会话及权限模型"
+requires = ["cli", "crypto", "http"]
+checks_with = []
+release = "optional"
+
+[[component]]
+id = "web"
+path = "extensions/web"
+kind = "extension"
+state = "planned"
+owner = "cflmy"
+scope = "Markdown/GFM 渲染、页面、路由和组件"
+requires = ["cli", "http"]
+checks_with = []
+release = "optional"
+
+[[component]]
+id = "browser"
+path = "extensions/browser"
+kind = "extension"
+state = "planned"
+owner = "cflmy"
+scope = "浏览器宿主、WASM 适配、DOM 和事件"
+requires = ["cli"]
+checks_with = []
+release = "optional"
+
+[[component]]
+id = "document"
+path = "extensions/document"
+kind = "extension"
+state = "planned"
+owner = "cflmy"
+scope = "Markdown 结构与显式文档编辑"
+requires = ["cli", "std-fs", "std-text"]
+checks_with = []
+release = "optional"
+
+[[component]]
+id = "archive"
+path = "extensions/archive"
+kind = "extension"
+state = "planned"
+owner = "cflmy"
+scope = "压缩、安全归档和解包"
+requires = ["cli", "std-text", "std-fs"]
+checks_with = []
+release = "optional"
+
+[[component]]
+id = "engineering"
+path = "extensions/engineering"
+kind = "extension"
+state = "planned"
+owner = "cflmy"
+scope = "工程操作、文件补丁与产物"
+requires = ["cli", "document", "archive"]
+checks_with = []
+release = "optional"
+
+[[component]]
+id = "regex"
+path = "extensions/regex"
+kind = "extension"
+state = "planned"
+owner = "cflmy"
+scope = "正则匹配、捕获、扫描和替换"
+requires = ["cli", "std-text"]
+checks_with = []
+release = "optional"
+
+[[component]]
+id = "datetime"
+path = "extensions/datetime"
+kind = "extension"
+state = "planned"
+owner = "cflmy"
+scope = "IANA 时区、DST 和高级日历"
+requires = ["cli", "std-system"]
+checks_with = []
+release = "optional"
