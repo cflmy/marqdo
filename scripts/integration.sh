@@ -157,6 +157,8 @@ python3 - "$work" "$root_commit" "$source_sha" "$bundle_digest" "$bundle_aliases
 import hashlib, json, pathlib, sys
 work = pathlib.Path(sys.argv[1])
 archive = pathlib.Path(sys.argv[6])
+impact_path = work / "impact.json"
+impact = json.loads(impact_path.read_text()) if impact_path.is_file() else None
 evidence = {
     "schema": "marqdo.ecosystem-integration",
     "schema_version": 1,
