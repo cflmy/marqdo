@@ -3,8 +3,7 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 root="$PWD"
-python3 scripts/check-layout.py --checkouts
-active="$(git ls-tree -r HEAD | awk '$1 == "160000" { print $4 }')"
+active="$(python3 scripts/check-layout.py --checkouts --active-paths)"
 expected=$'cli\ntests/conformance\ntools/knowledge\ntools/lint\ntools/prove\ntools/view'
 if [[ "$active" != "$expected" ]]; then
     echo "UNVERIFIED: update the integration plan for the changed active component set" >&2
@@ -17,7 +16,7 @@ echo "integration evidence: $work"
 exec > >(tee "$work/run.log") 2>&1
 set -x
 git rev-parse HEAD
-git submodule status
+git submodule status --recursive
 uname -m
 ldd --version
 cargo --version

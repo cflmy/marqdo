@@ -16,3 +16,87 @@
 [submodule "tools/lint"]
 	path = tools/lint
 	url = https://git.cflmy.cn/cflmy/marqdo-lint.git
+[submodule "extensions/ai"]
+	path = extensions/ai
+	url = https://git.cflmy.cn/cflmy/marqdo-ext-ai.git
+[submodule "extensions/archive"]
+	path = extensions/archive
+	url = https://git.cflmy.cn/cflmy/marqdo-ext-archive.git
+[submodule "extensions/browser"]
+	path = extensions/browser
+	url = https://git.cflmy.cn/cflmy/marqdo-ext-browser.git
+[submodule "extensions/cache"]
+	path = extensions/cache
+	url = https://git.cflmy.cn/cflmy/marqdo-ext-cache.git
+[submodule "extensions/crypto"]
+	path = extensions/crypto
+	url = https://git.cflmy.cn/cflmy/marqdo-ext-crypto.git
+[submodule "extensions/database"]
+	path = extensions/database
+	url = https://git.cflmy.cn/cflmy/marqdo-ext-database.git
+[submodule "extensions/datetime"]
+	path = extensions/datetime
+	url = https://git.cflmy.cn/cflmy/marqdo-ext-datetime.git
+[submodule "extensions/document"]
+	path = extensions/document
+	url = https://git.cflmy.cn/cflmy/marqdo-ext-document.git
+[submodule "extensions/engineering"]
+	path = extensions/engineering
+	url = https://git.cflmy.cn/cflmy/marqdo-ext-engineering.git
+[submodule "extensions/http"]
+	path = extensions/http
+	url = https://git.cflmy.cn/cflmy/marqdo-ext-http.git
+[submodule "extensions/linalg"]
+	path = extensions/linalg
+	url = https://git.cflmy.cn/cflmy/marqdo-ext-linalg.git
+[submodule "extensions/math"]
+	path = extensions/math
+	url = https://git.cflmy.cn/cflmy/marqdo-ext-math.git
+[submodule "extensions/mcp"]
+	path = extensions/mcp
+	url = https://git.cflmy.cn/cflmy/marqdo-ext-mcp.git
+[submodule "extensions/quantum"]
+	path = extensions/quantum
+	url = https://git.cflmy.cn/cflmy/marqdo-ext-quantum.git
+[submodule "extensions/regex"]
+	path = extensions/regex
+	url = https://git.cflmy.cn/cflmy/marqdo-ext-regex.git
+[submodule "extensions/security"]
+	path = extensions/security
+	url = https://git.cflmy.cn/cflmy/marqdo-ext-security.git
+[submodule "extensions/storage"]
+	path = extensions/storage
+	url = https://git.cflmy.cn/cflmy/marqdo-ext-storage.git
+[submodule "extensions/web"]
+	path = extensions/web
+	url = https://git.cflmy.cn/cflmy/marqdo-ext-web.git
+[submodule "extensions/websocket"]
+	path = extensions/websocket
+	url = https://git.cflmy.cn/cflmy/marqdo-ext-websocket.git
+[submodule "stdlib/collections"]
+	path = stdlib/collections
+	url = https://git.cflmy.cn/cflmy/marqdo-std-collections.git
+[submodule "stdlib/core"]
+	path = stdlib/core
+	url = https://git.cflmy.cn/cflmy/marqdo-std-core.git
+[submodule "stdlib/data"]
+	path = stdlib/data
+	url = https://git.cflmy.cn/cflmy/marqdo-std-data.git
+[submodule "stdlib/encoding"]
+	path = stdlib/encoding
+	url = https://git.cflmy.cn/cflmy/marqdo-std-encoding.git
+[submodule "stdlib/fs"]
+	path = stdlib/fs
+	url = https://git.cflmy.cn/cflmy/marqdo-std-fs.git
+[submodule "stdlib/io"]
+	path = stdlib/io
+	url = https://git.cflmy.cn/cflmy/marqdo-std-io.git
+[submodule "stdlib/net"]
+	path = stdlib/net
+	url = https://git.cflmy.cn/cflmy/marqdo-std-net.git
+[submodule "stdlib/system"]
+	path = stdlib/system
+	url = https://git.cflmy.cn/cflmy/marqdo-std-system.git
+[submodule "stdlib/text"]
+	path = stdlib/text
+	url = https://git.cflmy.cn/cflmy/marqdo-std-text.git

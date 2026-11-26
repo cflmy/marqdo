@@ -22,7 +22,7 @@ Conformance 使用 CLI 已固定的真实 fixture 提交。
 
 ## 标准库和扩展目录
 
-主仓库的 [标准库目录](../stdlib/README.md) 和 [扩展目录](../extensions/README.md) 提供各组件的开发入口。组件独立维护源码与验收资料，接入状态以 [组件目录](../components.toml) 与该组件所在层的 catalog 为准；聚合领域的子组件在领域仓库自己的 `components.toml` 登记。
+主仓库的 [标准库目录](../stdlib/README.md) 和 [扩展目录](../extensions/README.md) 通过 Git 子模块固定独立仓库的开发提交。Web Design 和 Preview 从 Web 领域聚合仓递归获取。是否参加发行验收以 [组件目录](../components.toml) 与该组件所在层的 catalog 为准。
 
 **标准库（planned，聚合仓库 marqdo-stdlib 尚未创建）** · [core](https://git.cflmy.cn/cflmy/marqdo-std-core) · [collections](https://git.cflmy.cn/cflmy/marqdo-std-collections) · [text](https://git.cflmy.cn/cflmy/marqdo-std-text) · [encoding](https://git.cflmy.cn/cflmy/marqdo-std-encoding) · [data](https://git.cflmy.cn/cflmy/marqdo-std-data) · [io](https://git.cflmy.cn/cflmy/marqdo-std-io) · [fs](https://git.cflmy.cn/cflmy/marqdo-std-fs) · [system](https://git.cflmy.cn/cflmy/marqdo-std-system) · [net](https://git.cflmy.cn/cflmy/marqdo-std-net)
 
@@ -36,7 +36,7 @@ Conformance 使用 CLI 已固定的真实 fixture 提交。
 
 - 每个拥有子模块的聚合仓库只登记直接子组件；全局 ID 与权威远端唯一；功能仓库仍只有一个父级。Gitlink 是提交身份唯一权威，`.gitmodules` 是权威远端唯一记录。
 - 聚合仓库可拥有 `components.toml`、`.gitmodules`、领域公共规范、跨组件集成测试、综合示例、发布装配脚本、ADR 与维护指南；**禁止**生产实现与源码复制。
-- `planned` 组件不创建占位 gitlink、不伪造 `entry`、不计入完成率；空仓状态只登记在本台账。根 catalog 不得同时登记计划中的聚合与其后代路径；未激活领域继续保留现有直属 planned 记录。
+- 已有 `planned` 仓的 gitlink 固定真实开发提交。尚无提交的组件只登记计划，激活以后再填写真实 `entry` 并计入完成率。领域及其后代分别登记在各自父仓库。
 - 领域激活门禁：子组件具备真实入口与候选提交、领域 catalog 与 gitlink 一致、领域 CI 通过、根 `check-layout.py --checkouts` 递归校验通过、存在依赖关系的组件以同候选证据验证。
 - 主仓库 `scripts/check-layout.py` 已引入 domain 角色与递归校验；统一 CLI 制品准备、声明驱动调度、递归影响分析仍在推进，CI 证据以真实候选为准。
 
@@ -52,7 +52,7 @@ Conformance 使用 CLI 已固定的真实 fixture 提交。
 | 阶段 | 当前范围 | 后续验收 |
 | --- | --- | --- |
 | M0 盘点 | 自建 Git、历史标签、已有六组件和新仓位 | 通过真实远端候选持续维护台账 |
-| M1 集成骨架 | 六个 gitlink、布局门禁和 RC.4 组合 | 查看候选 Woodpecker 运行及各组件独立 CI |
+| M1 集成骨架 | 六个 active gitlink，另固定 28 个直属和 2 个 Web 子级的 planned 开发提交 | 查看候选 Woodpecker 运行及各组件独立 CI |
 | M2 标准库切换 | planned，CLI RC.4 提供官方完整 Bundle | [CLI 外部 Bundle](https://git.cflmy.cn/cflmy/marqdo-cli/issues/11) 和 [九组件切换](https://git.cflmy.cn/cflmy/marqdo/issues/2)，包括 HTTP、Regex、Archive 迁出与同步删除旧路径 |
 | M3 跨仓闭环 | 工单、人工候选、同 SHA 门禁 | [跨仓库 CI](https://git.cflmy.cn/cflmy/marqdo/issues/3) 跟踪真实缺陷闭环、候选通知鉴权、去重和影响分析 |
 | M4 领域接入 | Web 领域 planned：三仓文档与工单就绪；根 catalog 登记 planned domain | W-M0 真实 CLI 风险探测、WEB-01/02 实现、领域 gitlink、根递归校验与冷安装验收；Stdlib 聚合按 STD-01..04 独立推进 |

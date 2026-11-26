@@ -20,7 +20,7 @@
 
 - 子模块的 detached HEAD 只用于复现与集成；开发应在子仓库独立创建分支后推送，禁止 `git submodule update --remote` 在发布/验收中追踪浮动分支。
 - 同一份公共合同切换需要多个组件同步变化时，在一个候选组合中提交整组 gitlink，配对候选联调通过后再晋升；不允许主分支出现半套协议。
-- 领域激活（planned → active）的门禁：两个功能仓具备真实 `entry` 与候选提交；领域 `components.toml` 与 gitlink 一致；领域 CI 通过；根递归校验通过；Design/Preview 等有依赖关系的组件以同候选证据验证。未满足前不得写占位 gitlink。
+- 领域激活（planned → active）的门禁：两个功能仓具备真实 `entry` 与候选提交，领域 `components.toml` 与 gitlink 一致，领域 CI 和根递归校验通过，Design/Preview 等有依赖关系的组件获得同候选证据。已发布的开发提交可先作为 `planned` 子模块固定。
 
 ## 递归校验与组合检查
 
@@ -32,7 +32,7 @@ python3 -m unittest discover -s tests/integration
 bash scripts/integration.sh                # 生态候选：真实 CLI 制品 + 组件验收
 ```
 
-- 校验器读取 Git tree 中固定提交的 catalog，不以工作区改动替代候选；`--checkouts` 需要子模块已初始化，缺失、错误 HEAD、脏工作区、错误入口都明确 FAIL/UNVERIFIED，不静默跳过。
+- 校验器读取 Git tree 中固定提交的 catalog，不以工作区改动替代候选；`--checkouts` 需要子模块已初始化，缺失、错误 HEAD、脏工作区、错误入口都明确 FAIL/UNVERIFIED，不静默跳过。CI 先验证并检出直属子模块，再用 `--domain-paths` 校验领域的子模块远端，最后逐个领域检出直属子库。
 - 没有 active 领域时，新校验规则同样接受合法的直属功能组件，这不是历史协议兼容。
 - 未知的 active 入口、未声明的 gitlink、目录与 catalog 不一致都必须让候选失败。`planned` 不进入验收计数。
 - 当前 CI 为 `layout` 与 `candidate` 两段；统一 CLI 制品准备、声明驱动调度与递归影响分析仍在推进（见 `.woodpecker/eco.yml` 与主仓库工单），不得以本文件描述当作已实现。
