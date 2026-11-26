@@ -16,8 +16,11 @@
 | std-fs | `cflmy/marqdo-std-fs@63bceae58736f13770c7eead02535726d08c19d0`（PR #2） |
 | std-data | `cflmy/marqdo-std-data@848af7a357ceda2cfc20721b93406cf4be705889`（PR #2） |
 | std-collections | `cflmy/marqdo-std-collections@490765226866ac74b7365471c202e7638187bff8`（PR #2） |
+| ext-http（显式 Package） | `cflmy/marqdo-ext-http@368b33d241`（PR #2，合并后精确 SHA 以根 gitlink 为准） |
+| ext-regex（显式 Package） | `cflmy/marqdo-ext-regex@6e7e633798`（PR #2） |
+| ext-archive（显式 Package） | `cflmy/marqdo-ext-archive@aba6b60934`（PR #2） |
 
-`std-core`、`std-encoding`、`std-net` 保持 `planned`，不加入 Bundle；HTTP/Regex/Archive 领域模块仍未迁移（ext-* issue #1），不进入默认 Bundle。
+`std-core`、`std-encoding`、`std-net` 保持 `planned`，不加入 Bundle。HTTP/Regex/Archive 已迁为显式 Package（`index.mq.md` + `marqdo.yaml`，消费者经 `@alias` 导入），不进入默认 Bundle；其源码候选已合并到各自仓库 main，根候选固定对应提交并执行显式 Package 消费门禁（`kind = "explicit-package"`）。
 
 ## 唯一 Bundle 制品
 
@@ -41,6 +44,7 @@
 | 组件独立验收 | `MARQDO_BIN=<RC.4 由 452e9a3 构建> MARQDO_STDLIB_DIR=<新 Bundle> scripts/test.sh`（各仓） | 6/6 PASS，共 17 个 case（collections 1、text 2、data 3、io 4、fs 2、system 5） |
 | 跨仓组合 | `scripts/acceptance-stdlib.py --cli <CLI> --bundle <新 Bundle>` | PASS：官方 `print`/`打印` 别名、Table 值操作+GFM 跨模块、默认 Bundle smoke |
 | Table 等价性 | 组合 fixture 终值与迁移前原 `stdlib/tests/table.mq.md` 终值 | 逐字节一致 |
+| 显式 Package 消费 | `scripts/acceptance-stdlib.py` 内 http/regex/archive 各自 `scripts/test.sh`（临时消费者工程 + `marqdo lock` + `@alias` 导入） | PASS（原领域测试终值与迁移前基线一致） |
 | 失败负例 | 缺显式 Bundle、篡改模块摘要 | 均按预期失败（exit 1），不静默回退 |
 | 相邻安装离线运行 | 把新 Bundle 放到 CLI 二进制旁 `stdlib/`，不设 `MARQDO_STDLIB_DIR` | PASS（默认离线安装路径可用） |
 | CLI 打包 | Phase A `pack-stdlib.py --stdlib-dir <新 Bundle>` ×2 + 篡改输入 | 确定性 PASS；篡改拒绝 |
@@ -51,7 +55,7 @@ CLI 身份（sha256）：由 `452e9a3` 构建的 RC.4 二进制 `sha256:0377b855
 
 - 完整 `scripts/integration.sh` 的既有消费者门禁（Conformance/View/Knowledge/Prove/Lint）本轮**未执行**：该流程仍取冻结 RC.4 制品，本次未替换为统一制品输入（ECO-02，marqdo#7）；不能把本次 PASS 当作生态发行验收。
 - CLI Phase B（删除仓内官方标准库源树、pin 切换）未做，等待 CLI PR #12 合并与本候选组件 PR 合并。
-- HTTP/Regex/Archive 领域模块迁移未完成（ext-* issue #1），默认 Bundle 因此移除这三个模块但尚未提供显式 Package 消费证据。
+- HTTP/Regex/Archive 已成为显式 Package 且组件内测试通过；本候选的根组合门禁只验证了独立 Package 行为，尚未验证真实应用项目的 `git` 依赖锁定/同步与发布分发，也尚未从默认 Bundle 删除后验证既有 `std:` 用户的迁移提示（按合同不保留 fallback）。
 - 未做完整产品归档冷安装（新 Bundle + 新 CLI 发行归档）与多平台证据；Windows/macOS 未验证。
 - 根主分支未改动，回退方式为放弃本候选分支，迁移前组合 `484cb10` 仍可检出。
 

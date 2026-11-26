@@ -101,9 +101,9 @@ Conformance 使用 CLI 已固定的真实 fixture 提交。
 | `path.mq.md` | [std-fs#1](https://git.cflmy.cn/cflmy/marqdo-std-fs/issues/1) | `path.mq.md` | 8 |
 | `text.mq.md` | [std-text#1](https://git.cflmy.cn/cflmy/marqdo-std-text/issues/1) | `text.mq.md`（`utf8编码` 薄封装） | 1 |
 | `text/utf8.mq.md` | [std-text#1](https://git.cflmy.cn/cflmy/marqdo-std-text/issues/1) | `text/utf8.mq.md`（唯一编解码实现） | 10 |
-| `net/http.mq.md` | [ext-http#1](https://git.cflmy.cn/cflmy/marqdo-ext-http/issues/1) | 显式 Package 模块，**不进入默认 Bundle**，不再是 `std:` | 11 |
-| `regex.mq.md` | [ext-regex#1](https://git.cflmy.cn/cflmy/marqdo-ext-regex/issues/1) | 显式 Package 模块，**不进入默认 Bundle**，不再是 `std:` | 22 |
-| `compress.mq.md` | [ext-archive#1](https://git.cflmy.cn/cflmy/marqdo-ext-archive/issues/1) | 显式 Package 模块，**不进入默认 Bundle**，不再是 `std:` | 2 |
+| `net/http.mq.md` | [ext-http#1](https://git.cflmy.cn/cflmy/marqdo-ext-http/issues/1) | 显式 Package 入口 `index.mq.md`，**不进入默认 Bundle**，不再是 `std:` | 11 |
+| `regex.mq.md` | [ext-regex#1](https://git.cflmy.cn/cflmy/marqdo-ext-regex/issues/1) | 显式 Package 入口 `index.mq.md`，**不进入默认 Bundle**，不再是 `std:` | 22 |
+| `compress.mq.md` | [ext-archive#1](https://git.cflmy.cn/cflmy/marqdo-ext-archive/issues/1) | 显式 Package 入口 `index.mq.md`，**不进入默认 Bundle**，不再是 `std:` | 2 |
 | `demo.mq.md` | 不设接收仓；根 Bundle 组合 fixture | 不作为公开安装模块 | 2 |
 
 `std-core`、`std-encoding`、`std-net` 没有与之对应的旧模块：本轮不发空工单、不激活、不要求补齐未来规划；若已实现模块被本期 Bundle 实际依赖，再按真实依赖补充工单。
@@ -132,7 +132,7 @@ Conformance 使用 CLI 已固定的真实 fixture 提交。
 3. **Table 切分**：值操作以 `std:collections/table` 为唯一权威，GFM 序列化以 `std:data/table` 为唯一权威；不保留旧 `std:data/table` 的值操作兼容转发，已知消费者在同一候选内更新。
 4. **Text 去重**：UTF-8 编解码唯一实现在 `text/utf8.mq.md`，`text.mq.md#utf8编码` 为保留公开名称的薄封装。
 5. **IO 别名**：`io.mq.md` 保持官方 `print`/`打印` 的别名目标 `写值`，签名与 effects 不变；别名元数据仍由 Bundle 生产者生成。
-6. **三个领域模块**：HTTP/Regex/Archive 迁入既有扩展仓并退出默认 Bundle，不保留隐藏的 `std:` fallback；CLI 现有 `regex.*`/`compress.*` 宿主请求是历史例外，本轮不删除也不新增同类请求，彻底消除另开工单。
+6. **三个领域模块**：HTTP/Regex/Archive 迁入既有扩展仓，按现行 Package 布局以 `index.mq.md` 为唯一公开入口（消费者经 `@alias` 显式依赖），退出默认 Bundle，不保留隐藏的 `std:` fallback；HTTP 的 bundle 内相对 import 改为公开 `std:text/utf8`。CLI 现有 `regex.*`/`compress.*` 宿主请求是历史例外，本轮不删除也不新增同类请求，彻底消除另开工单。
 7. **`demo.mq.md`**：不作为公开库模块，转为根 Bundle 组合 fixture，避免为了放置文件创建无独立责任的新仓库。
 8. **staging 不是发行**：迁移期为了隔离测试，允许用基线 Bundle 覆盖组件模块并重算 digest 的 staging 组合；它不是官方发布源，最终只有根唯一生产路径。
 9. **CLI 侧最小修改**：Phase A 显式制品输入已落地；Phase B 删除仓内官方源树只在组件替代与根组合验收通过后执行，不同时进行核心重构。
@@ -144,7 +144,7 @@ Conformance 使用 CLI 已固定的真实 fixture 提交。
 | --- | --- | --- |
 | M0 盘点与派单 | 完成 | 本节、9 个接收仓 issue #1、[marqdo#9](https://git.cflmy.cn/cflmy/marqdo/issues/9) 评论 |
 | 组件接收（源码+断言） | 候选已推送（6 个 std 仓，同候选配对） | [std-text PR #2](https://git.cflmy.cn/cflmy/marqdo-std-text/pulls/2)、[std-system PR #2](https://git.cflmy.cn/cflmy/marqdo-std-system/pulls/2)、[std-io PR #2](https://git.cflmy.cn/cflmy/marqdo-std-io/pulls/2)、[std-fs PR #2](https://git.cflmy.cn/cflmy/marqdo-std-fs/pulls/2)、[std-data PR #2](https://git.cflmy.cn/cflmy/marqdo-std-data/pulls/2)、[std-collections PR #2](https://git.cflmy.cn/cflmy/marqdo-std-collections/pulls/2) |
-| 领域模块（http/regex/archive） | 未开始 | ext-http/ext-regex/ext-archive issue #1 |
+| 领域模块（http/regex/archive） | 候选已合并为显式 Package | [ext-http PR #2](https://git.cflmy.cn/cflmy/marqdo-ext-http/pulls/2)、[ext-regex PR #2](https://git.cflmy.cn/cflmy/marqdo-ext-regex/pulls/2)、[ext-archive PR #2](https://git.cflmy.cn/cflmy/marqdo-ext-archive/pulls/2) |
 | Bundle 唯一生产者 | 已实现，M2 候选真实构建两次逐字节一致 | `scripts/build-stdlib.py`、`scripts/stdlib-bundle.json`、`tests/integration/test_build_stdlib.py` |
 | 组合验收入口 | M2 候选 PASS（组件 entry + 跨仓组合 + 负例 + 相邻离线安装 + CLI 确定性打包） | `scripts/acceptance-stdlib.py`、[M2 候选证据](evidence/2026-11-26-stdlib-m2-candidate.md)、[根 PR #11](https://git.cflmy.cn/cflmy/marqdo/pulls/11) |
 | CLI 旧源树删除 | 未开始（等待根组合验收与 CLI PR 合并） | [marqdo-cli#11](https://git.cflmy.cn/cflmy/marqdo-cli/issues/11) Phase B、[CLI PR #12](https://git.cflmy.cn/cflmy/marqdo-cli/pulls/12) |

@@ -169,6 +169,26 @@ def load_components() -> list[dict]:
     ]
 
 
+def load_explicit_packages() -> list[dict]:
+    """Planned extensions that already publish an explicit Package entry.
+
+    A component is gated as an explicit package only when its pinned checkout
+    carries the current package layout (``marqdo.yaml`` + ``index.mq.md`` +
+    ``scripts/test.sh``); it is never silently loaded into the default Bundle.
+    """
+    catalog = tomllib.loads((ROOT / "components.toml").read_text())
+    packages = []
+    for component in catalog["component"]:
+        if component.get("kind") != "extension":
+            continue
+        checkout = ROOT / component["path"]
+        if (checkout / "marqdo.yaml").is_file() and (
+            checkout / "index.mq.md"
+        ).is_file() and (checkout / "scripts" / "test.sh").is_file():
+            packages.append(component)
+    return packages
+
+
 def component_gates(cli: str, bundle: Path) -> list[dict]:
     results = []
     for component in load_components():
@@ -190,6 +210,26 @@ def component_gates(cli: str, bundle: Path) -> list[dict]:
             {
                 "id": component["id"],
                 "entry": component["entry"],
+                "status": "PASS",
+                "output": output,
+            }
+        )
+    for component in load_explicit_packages():
+        entry = ROOT / component["path"] / "scripts" / "test.sh"
+        env = os.environ.copy()
+        env["MARQDO_BIN"] = cli
+        env["MARQDO_STDLIB_DIR"] = str(bundle)
+        result = run([str(entry)], cwd=ROOT / component["path"], env=env)
+        output = (result.stdout + result.stderr).decode(errors="replace").strip()
+        if result.returncode != 0:
+            raise AcceptanceError(
+                f"explicit package {component['id']} failed: {output}"
+            )
+        results.append(
+            {
+                "id": component["id"],
+                "entry": "scripts/test.sh",
+                "kind": "explicit-package",
                 "status": "PASS",
                 "output": output,
             }
