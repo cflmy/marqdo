@@ -35,7 +35,7 @@
 
 ## 标准库
 
-每个仓库交付可独立测试的模块，共同组成默认 Bundle。聚合仓库 `marqdo-stdlib` 尚未创建，九个 `std-*` 当前保持根 catalog 的 planned 直属记录；CLI 内置标准库仍是现行发行权威，迁移完成前不得声称拆分完成。
+每个仓库交付可独立测试的模块，共同组成默认 Bundle。聚合仓库 `marqdo-stdlib` 尚未创建，九个 `std-*` 当前保持根 catalog 的 planned 直属记录；CLI 内置标准库仍是现行发行权威，迁移完成前不得声称拆分完成。迁移的基线、模块/函数与断言台账、冻结发布路径见 [迁移台账](MIGRATION.md) 的“标准库源码归位迁移”一节；唯一 Bundle 生产者是根 `scripts/build-stdlib.py`，组合验收入口是 `scripts/acceptance-stdlib.py`。
 
 | 仓库 | 要完成的任务 |
 | --- | --- |

@@ -50,6 +50,8 @@ bash scripts/integration.sh                # 生态候选：真实 CLI 制品 + 
 ## 统一 CLI 与制品输入
 
 - 生态候选使用**固定、可验证**的 CLI/Worker/Stdlib 候选制品；输入必须绑定 CLI gitlink SHA、目标平台、归档/二进制/Bundle digest、工具链与锁。
+- 标准库 Bundle 的唯一生产者是根仓库的 `scripts/build-stdlib.py`：它从根提交的精确组件 gitlink 读取各 active `kind = "stdlib"` 组件的 `modules/`，校验发布路径（只发布 `.mq.md`、拒绝 symlink/子模块/大小写与 NFC 冲突、`tests/` 不入库），生成现行 `stdlib.json`（tree digest + aliases digest），配置在 `scripts/stdlib-bundle.json`。版本变化必须显式（`--baseline-manifest` 拒绝同版本不同摘要）。组件仓继续拥有源码与测试，根不复制模块。
+- 组合验收入口是根仓库的 `scripts/acceptance-stdlib.py`：只接受显式 `--cli` 与 `--bundle`（或按根 gitlink 构建），运行各 active 组件的 `entry`、跨仓组合 fixture（别名、Table 切分、默认 Bundle smoke）和必须失败的负例；提供 `--pack-tool` 时用 CLI 自己的打包器做两次确定性打包并核对摘要。CLI 自身打包请使用 Phase A 之后的 `--stdlib-dir` 输入，不再默认读取 CLI 源码树。
 - 当前候选的冻结制品适配器以正式 RC.4 为基线，临时从 View 的 `frozen-beta.sh` 获取；这属于待替换的过渡实现，CLI 版本不得由任一消费者决定。主仓库统一制品准备落地后，在此切换并记录证据。
 - 组件验收只读取传入制品，不自行下载未知版本；开发目录覆盖入口（如 `MARQDO_STDLIB_DIR`）不得当作发行行为。缺失、摘要不符或平台不符必须拒绝。
 

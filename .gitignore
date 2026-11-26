@@ -4,3 +4,6 @@
 /.integration-work/
 /__pycache__/
 **/__pycache__/
+
+# Local build/cache/scratch (DSH workspace tooling)
+/.build/

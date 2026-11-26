@@ -1,0 +1,13 @@
+{
+  "schema": "marqdo.stdlib-test-case",
+  "schema_version": 1,
+  "name": "aliases",
+  "file": "aliases.mq.md",
+  "args": [],
+  "stdin": "",
+  "env": {},
+  "expected_stdout": "alias-打印\nalias-print\n",
+  "expected_terminal": {
+    "type": "none"
+  }
+}

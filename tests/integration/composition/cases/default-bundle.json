@@ -1,0 +1,51 @@
+{
+  "schema": "marqdo.stdlib-test-case",
+  "schema_version": 1,
+  "name": "default-bundle",
+  "file": "default-bundle.mq.md",
+  "args": [],
+  "stdin": "",
+  "env": {},
+  "expected_stdout": "default-bundle\n",
+  "expected_terminal": {
+    "items": [
+      {
+        "decimal": "2",
+        "type": "int"
+      },
+      {
+        "decimal": "195",
+        "type": "int"
+      },
+      {
+        "decimal": "169",
+        "type": "int"
+      },
+      {
+        "type": "text",
+        "value": "é"
+      },
+      {
+        "type": "text",
+        "value": "[\"ok\", 3]"
+      },
+      {
+        "type": "text",
+        "value": "[1, 2]"
+      },
+      {
+        "type": "text",
+        "value": "a/b/c"
+      },
+      {
+        "type": "text",
+        "value": "2026-11-21T08:00:00.123Z"
+      },
+      {
+        "decimal": "2",
+        "type": "int"
+      }
+    ],
+    "type": "list"
+  }
+}

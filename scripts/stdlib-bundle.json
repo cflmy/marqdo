@@ -1,0 +1,13 @@
+{
+  "name": "marqdo-stdlib",
+  "version": "0.2.0",
+  "public_aliases": [
+    {
+      "public_names": ["print", "打印"],
+      "target_module": "io.mq.md",
+      "target_function": "写值",
+      "expected_signature": "params(值)",
+      "effects": ["host"]
+    }
+  ]
+}

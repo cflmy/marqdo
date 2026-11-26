@@ -65,30 +65,90 @@ Conformance 使用 CLI 已固定的真实 fixture 提交。
 3. HTTP、Regex、Archive 的真实替代和授权回归先行。候选同时移除 CLI 中旧领域宿主服务和旧导入。
 4. 验证同输入两次组装结果、摘要及路径负例、C1/C2/C3、独立冷安装和真实工具集成后，再切换基础发行。当前状态为 UNVERIFIED。
 
-## 现行 CLI 标准库迁移归属
+## 标准库源码归位迁移（marqdo#9，2026-11-26 M0 冻结）
 
-| CLI 当前路径 | 唯一目标组件 | 新 Bundle 路径 / 处理 |
-|---|---|---|
-| `clock.mq.md` | std-system | `system/clock.mq.md` |
-| `compress.mq.md` | archive 扩展 | 不入最终标准库；先建立等价扩展与替代后端再删除宿主 convenience service |
-| `data/csv.mq.md` | std-data | `data/csv.mq.md` |
-| `data/json.mq.md` | std-data | `data/json.mq.md` |
-| `data/table.mq.md` | std-collections + std-data（函数级切分） | 集合算法 `collections/table.mq.md`；GFM 序列化 `data/gfm.mq.md`；不复制函数 |
-| `datetime.mq.md` | std-system | `system/datetime.mq.md`（UTC/基础日历） |
-| `demo.mq.md` | std-io 的 examples 或主仓库综合示例（择一） | 不作为公开安装模块；若只是 IO 自测，归 std-io |
-| `env.mq.md` | std-system | `system/env.mq.md` |
-| `format.mq.md` | std-io | `io/format.mq.md` |
-| `fs/file.mq.md` | std-fs | `fs/file.mq.md` |
-| `io.mq.md` | std-io | `io/index.mq.md`；官方 print alias 指向唯一权威 `写值`（迁移时同步生成元数据） |
-| `io/console.mq.md` | std-io | `io/console.mq.md` |
-| `io/stream.mq.md` | std-io | `io/stream.mq.md` |
-| `net/http.mq.md` | http 扩展 | 转为普通 Package 的 HTTP 实现，依赖 std-net；保持报文算法及真实 TCP 对照测试 |
-| `path.mq.md` | std-fs | `fs/path.mq.md` |
-| `process.mq.md` | std-system | `system/process.mq.md` |
-| `random.mq.md` | std-system | `system/random.mq.md` |
-| `regex.mq.md` | regex 扩展 | 单一正则模块，迁移纯子集及外部引擎；替换后删除核心宿主服务 |
-| `text.mq.md` | std-text | 重复 UTF-8 实现合并入 `text/utf8.mq.md`；新增通用 `text/text.mq.md` 不复制 encoder |
-| `text/utf8.mq.md` | std-text | `text/utf8.mq.md`（唯一权威 encoder/decoder） |
+本节是标准库迁出的**唯一现行台账**，取代此前按未来目录规划起草的路径表（如 `system/clock.mq.md`、`io/index.mq.md`）；旧路径方案会改变公开 `std:` 路径，与“迁移不改语言/库语义”冲突，已作废。详细实施与验收见父仓工单 [marqdo#9](https://git.cflmy.cn/cflmy/marqdo/issues/9)，各接收仓子工单在对应仓库 issue #1。
+
+### 基线与身份（M0）
+
+| 对象 | 权威身份 |
+| --- | --- |
+| 根仓库 | `cflmy/marqdo@484cb10d66db9b92f0527499642ae6abddb3ef29` |
+| CLI 标准库源 | `cflmy/marqdo-cli@452e9a32bd9e40dba427d4180691c58bab74449e`（RC.4 发行组合；`stdlib/` 自 `4bbefc9` 起未变） |
+| 迁移前 Bundle | `marqdo-stdlib@0.1.0`，tree digest `sha256:5407d3665ba2fe105820d0f1af5efaafa10c277a69eb819c3225719813c8c713`（含 `tests/`） |
+| 公开函数台账 | 20 个模块、151 个 H2 函数，由基线 Bundle 上 `marqdo inspect --signature` 生成并记入各接收仓工单 |
+| CLI 显式 Bundle 输入 | [marqdo-cli#11](https://git.cflmy.cn/cflmy/marqdo-cli/issues/11) Phase A（PR #12）已提供 `--stdlib-dir`/pin 校验；Phase B（删除仓内源树）以本台账根组合验收为前置 |
+
+### 模块归属与冻结发布路径
+
+接收仓库负责源码、测试和后续缺陷；根只做组合、锁定和验收。`modules/` 镜像 Bundle 根相对路径，只收模块不收 `tests/`；官方 manifest 由根唯一生产者生成。
+
+| 原 CLI 路径（相对 `stdlib/`） | 接收仓 / 工单 | 冻结发布路径（Bundle 根相对） | 公开函数 |
+| --- | --- | --- | --- |
+| `clock.mq.md` | [std-system#1](https://git.cflmy.cn/cflmy/marqdo-std-system/issues/1) | `clock.mq.md` | 1 |
+| `datetime.mq.md` | [std-system#1](https://git.cflmy.cn/cflmy/marqdo-std-system/issues/1) | `datetime.mq.md` | 14 |
+| `env.mq.md` | [std-system#1](https://git.cflmy.cn/cflmy/marqdo-std-system/issues/1) | `env.mq.md` | 2 |
+| `process.mq.md` | [std-system#1](https://git.cflmy.cn/cflmy/marqdo-std-system/issues/1) | `process.mq.md` | 1 |
+| `random.mq.md` | [std-system#1](https://git.cflmy.cn/cflmy/marqdo-std-system/issues/1) | `random.mq.md` | 2 |
+| `format.mq.md` | [std-io#1](https://git.cflmy.cn/cflmy/marqdo-std-io/issues/1) | `format.mq.md` | 8 |
+| `io.mq.md` | [std-io#1](https://git.cflmy.cn/cflmy/marqdo-std-io/issues/1) | `io.mq.md` | 5 |
+| `io/console.mq.md` | [std-io#1](https://git.cflmy.cn/cflmy/marqdo-std-io/issues/1) | `io/console.mq.md` | 4 |
+| `io/stream.mq.md` | [std-io#1](https://git.cflmy.cn/cflmy/marqdo-std-io/issues/1) | `io/stream.mq.md` | 3 |
+| `data/json.mq.md` | [std-data#1](https://git.cflmy.cn/cflmy/marqdo-std-data/issues/1) | `data/json.mq.md` | 22 |
+| `data/csv.mq.md` | [std-data#1](https://git.cflmy.cn/cflmy/marqdo-std-data/issues/1) | `data/csv.mq.md` | 7 |
+| `data/table.mq.md` | [std-collections#1](https://git.cflmy.cn/cflmy/marqdo-std-collections/issues/1) / [std-data#1](https://git.cflmy.cn/cflmy/marqdo-std-data/issues/1) | `collections/table.mq.md`（8 个值操作）/ `data/table.mq.md`（4 个序列化） | 12 |
+| `fs/file.mq.md` | [std-fs#1](https://git.cflmy.cn/cflmy/marqdo-std-fs/issues/1) | `fs/file.mq.md` | 14 |
+| `path.mq.md` | [std-fs#1](https://git.cflmy.cn/cflmy/marqdo-std-fs/issues/1) | `path.mq.md` | 8 |
+| `text.mq.md` | [std-text#1](https://git.cflmy.cn/cflmy/marqdo-std-text/issues/1) | `text.mq.md`（`utf8编码` 薄封装） | 1 |
+| `text/utf8.mq.md` | [std-text#1](https://git.cflmy.cn/cflmy/marqdo-std-text/issues/1) | `text/utf8.mq.md`（唯一编解码实现） | 10 |
+| `net/http.mq.md` | [ext-http#1](https://git.cflmy.cn/cflmy/marqdo-ext-http/issues/1) | 显式 Package 模块，**不进入默认 Bundle**，不再是 `std:` | 11 |
+| `regex.mq.md` | [ext-regex#1](https://git.cflmy.cn/cflmy/marqdo-ext-regex/issues/1) | 显式 Package 模块，**不进入默认 Bundle**，不再是 `std:` | 22 |
+| `compress.mq.md` | [ext-archive#1](https://git.cflmy.cn/cflmy/marqdo-ext-archive/issues/1) | 显式 Package 模块，**不进入默认 Bundle**，不再是 `std:` | 2 |
+| `demo.mq.md` | 不设接收仓；根 Bundle 组合 fixture | 不作为公开安装模块 | 2 |
+
+`std-core`、`std-encoding`、`std-net` 没有与之对应的旧模块：本轮不发空工单、不激活、不要求补齐未来规划；若已实现模块被本期 Bundle 实际依赖，再按真实依赖补充工单。
+
+### 原测试断言归属
+
+每项必须在新归属留下真实执行证据；跨模块断言归根 Bundle 组合测试。
+
+| 原 `stdlib/tests/` 文件 | 接收仓 | 断言载体 |
+| --- | --- | --- |
+| `clock.mq.md`、`datetime.mq.md`、`env.mq.md`、`process.mq.md`、`random.mq.md` | std-system | 组件 case，覆盖原 Rust 断言 |
+| `console.mq.md`、`format.mq.md`、`io.mq.md`、`stream.mq.md` | std-io | 组件 case + resource 端点事件检查 |
+| `csv.mq.md`、`json.mq.md` | std-data | 组件 case，覆盖原 Rust 断言 |
+| `table.mq.md` | std-collections（值操作）+ std-data（GFM）+ 根组合 | 切分后的组件 case 与根组合用例 |
+| `fs.mq.md`、`path.mq.md` | std-fs | 组件 case，覆盖原 Rust 断言 |
+| `text.mq.md`、`utf8.mq.md` | std-text | 组件 case，覆盖原 Rust 断言 |
+| `http.mq.md` | ext-http | 领域回归（基线仅运行级覆盖，需补真实断言） |
+| `regex.mq.md` | ext-regex | 领域回归，覆盖原 Rust 断言 |
+| `compress.mq.md` | ext-archive | 领域回归，覆盖原 Rust 断言 |
+| `demo.mq.md` | 根 Bundle 组合测试 | 组合运行证据 |
+
+### 决策与取舍
+
+1. **冻结路径**：以 Bundle 根相对路径为公开身份，迁移不改 `std:` 导入路径；被旧台账规划改名（如 `system/clock.mq.md`、`io/index.mq.md`）的条目按本表冻结。
+2. **测试不随发行**：`tests/` 迁入组件仓并留在仓库外，默认 Bundle 只含模块；因此 Bundle 内容必然变化，版本与 digest 由 MIG-BUNDLE 唯一生产者显式更新，摘要算法不变。
+3. **Table 切分**：值操作以 `std:collections/table` 为唯一权威，GFM 序列化以 `std:data/table` 为唯一权威；不保留旧 `std:data/table` 的值操作兼容转发，已知消费者在同一候选内更新。
+4. **Text 去重**：UTF-8 编解码唯一实现在 `text/utf8.mq.md`，`text.mq.md#utf8编码` 为保留公开名称的薄封装。
+5. **IO 别名**：`io.mq.md` 保持官方 `print`/`打印` 的别名目标 `写值`，签名与 effects 不变；别名元数据仍由 Bundle 生产者生成。
+6. **三个领域模块**：HTTP/Regex/Archive 迁入既有扩展仓并退出默认 Bundle，不保留隐藏的 `std:` fallback；CLI 现有 `regex.*`/`compress.*` 宿主请求是历史例外，本轮不删除也不新增同类请求，彻底消除另开工单。
+7. **`demo.mq.md`**：不作为公开库模块，转为根 Bundle 组合 fixture，避免为了放置文件创建无独立责任的新仓库。
+8. **staging 不是发行**：迁移期为了隔离测试，允许用基线 Bundle 覆盖组件模块并重算 digest 的 staging 组合；它不是官方发布源，最终只有根唯一生产路径。
+9. **CLI 侧最小修改**：Phase A 显式制品输入已落地；Phase B 删除仓内官方源树只在组件替代与根组合验收通过后执行，不同时进行核心重构。
+10. **未创建的新仓**：不为缺失模块创建同名替代仓；`marqdo-stdlib` 聚合仓仍未建立，聚合治理按原独立计划推进，不阻塞本次源码归位。
+
+### 迁移状态
+
+| 项 | 状态 | 证据 |
+| --- | --- | --- |
+| M0 盘点与派单 | 完成 | 本节、9 个接收仓 issue #1、[marqdo#9](https://git.cflmy.cn/cflmy/marqdo/issues/9) 评论 |
+| 组件接收（源码+断言） | 候选已推送（6 个 std 仓） | [std-text PR #2](https://git.cflmy.cn/cflmy/marqdo-std-text/pulls/2)、[std-system PR #2](https://git.cflmy.cn/cflmy/marqdo-std-system/pulls/2)、[std-io PR #2](https://git.cflmy.cn/cflmy/marqdo-std-io/pulls/2)、[std-fs PR #2](https://git.cflmy.cn/cflmy/marqdo-std-fs/pulls/2)、[std-data PR #2](https://git.cflmy.cn/cflmy/marqdo-std-data/pulls/2)、[std-collections PR #2](https://git.cflmy.cn/cflmy/marqdo-std-collections/pulls/2) |
+| 领域模块（http/regex/archive） | 未开始 | ext-http/ext-regex/ext-archive issue #1 |
+| Bundle 唯一生产者 | 脚本与契约测试已落地，待根候选验收 | `scripts/build-stdlib.py`、`scripts/stdlib-bundle.json`、`tests/integration/test_build_stdlib.py` |
+| 组合验收入口 | 已落地，待根候选执行 | `scripts/acceptance-stdlib.py`、`tests/integration/composition/` |
+| CLI 旧源树删除 | 未开始（等待根组合验收） | [marqdo-cli#11](https://git.cflmy.cn/cflmy/marqdo-cli/issues/11) Phase B |
+| 根组合与切换 | 未开始 | 本仓 MIG-RELEASE 候选 |
 
 ## v2 功能历史索引
 
