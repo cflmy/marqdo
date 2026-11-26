@@ -12,6 +12,7 @@ NAME = r"[a-z][a-z0-9]*(?:-[a-z0-9]+)*"
 FIELDS = {"id", "path", "kind", "state", "owner", "scope", "requires", "checks_with", "release"}
 ROOT_FILES = {".gitattributes", ".gitignore", ".gitmodules", "AGENTS.md", "LICENSE", "README.md", "components.toml"}
 ROOT_DIRS = {".gitea", ".woodpecker", "docs", "examples", "scripts"}
+CATEGORY_READMES = {"stdlib/README.md", "extensions/README.md"}
 RELEASE_ROLES = {"core": "base", "stdlib": "base", "extension": "optional", "tool": "optional", "test": "none"}
 
 
@@ -83,13 +84,19 @@ def tree(revision):
 def validate(revision, checkouts):
     components = catalog(revision)
     active = {item["path"]: item for item in components.values() if item["state"] == "active"}
+    allowed_readmes = CATEGORY_READMES | {
+        f'{item["path"]}/README.md'
+        for item in components.values()
+        if item["state"] == "planned" and item["kind"] in {"stdlib", "extension"}
+    }
     entries = tree(revision)
     gitlinks = {path: sha for path, (mode, sha) in entries.items() if mode == "160000"}
     require(gitlinks.keys() == active.keys(), f"gitlink/catalog mismatch: {sorted(gitlinks.keys() ^ active.keys())}")
     for path, (mode, _) in entries.items():
         root = path.split("/", 1)[0]
         require(
-            path in active or (mode in {"100644", "100755"} and (
+            path in active or (mode == "100644" and path in allowed_readmes)
+            or (mode in {"100644", "100755"} and (
                 path in ROOT_FILES or root in ROOT_DIRS and "/" in path or path.startswith("tests/integration/")
             )),
             f"unexpected tracked path or mode: {path} ({mode})",

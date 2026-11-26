@@ -17,9 +17,9 @@ CLI gitlink 采用 RC.4 正式发布源码，以匹配冻结归档和现有 View
 其文档后续提交曾用于 Knowledge 的独立 CI；生态候选以自身测试判定实际组合。
 Conformance 使用 CLI 已固定的真实 fixture 提交。
 
-## 已创建空仓
+## 标准库和扩展目录
 
-以下仓库已通过自建 Git API 确认存在且为空。责任、预期依赖与状态见 [组件目录](../components.toml)。
+主仓库的 [标准库目录](../stdlib/README.md) 和 [扩展目录](../extensions/README.md) 提供各组件的开发入口。各组件独立维护源码与验收资料，接入状态以 [组件目录](../components.toml) 为准。
 
 **标准库** · [core](https://git.cflmy.cn/cflmy/marqdo-std-core) · [collections](https://git.cflmy.cn/cflmy/marqdo-std-collections) · [text](https://git.cflmy.cn/cflmy/marqdo-std-text) · [encoding](https://git.cflmy.cn/cflmy/marqdo-std-encoding) · [data](https://git.cflmy.cn/cflmy/marqdo-std-data) · [io](https://git.cflmy.cn/cflmy/marqdo-std-io) · [fs](https://git.cflmy.cn/cflmy/marqdo-std-fs) · [system](https://git.cflmy.cn/cflmy/marqdo-std-system) · [net](https://git.cflmy.cn/cflmy/marqdo-std-net)
 
