@@ -41,7 +41,10 @@ test -f "$work/stdlib/stdlib.json"
 
 # 2. CLI and Worker from the exact pinned CLI gitlink.
 source_sha="$(git -C cli rev-parse HEAD)"
-export CARGO_TARGET_DIR="$work/target"
+# The CLI release packager resolves its binaries from the pinned CLI checkout's
+# own target directory; keep the build there so the package step consumes the
+# same artifacts without a second build.
+export CARGO_TARGET_DIR="$root/cli/target"
 cargo build --manifest-path cli/Cargo.toml --locked --release \
     -p marqdo-cli -p marqdo-provider-worker
 version="$(python3 -c '
