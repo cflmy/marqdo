@@ -1,6 +1,0 @@
-name = "skill-proof"
-version = "0.1.0"
-defaultTargets = ["MarqdoProof"]
-
-[[lean_lib]]
-name = "MarqdoProof"

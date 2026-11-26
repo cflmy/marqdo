@@ -1,3 +1,0 @@
-namespace PolicyIdentity
-def digest : String := "27b416847d06b130a066e0eb967a9b30c678e953c51d2ebe2bed9a8444ee0238"
-end PolicyIdentity

@@ -1,2 +1,0 @@
-[tinycfg]
-template = ["node", "-e", "{inline}"]

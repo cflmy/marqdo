@@ -1,0 +1,19 @@
+when:
+  event: [push, pull_request, manual]
+
+steps:
+  layout:
+    image: python:3.13-bookworm
+    commands:
+      - apt-get update && apt-get install -y --no-install-recommends ca-certificates git
+      - python3 scripts/check-layout.py
+      - python3 -m unittest discover -s tests/integration
+      - git submodule update --init
+      - python3 scripts/check-layout.py --checkouts
+
+  candidate:
+    image: rust:1.100-trixie
+    depends_on: [layout]
+    commands:
+      - apt-get update && apt-get install -y --no-install-recommends ca-certificates curl git python3 python3-jsonschema build-essential
+      - bash scripts/integration.sh
