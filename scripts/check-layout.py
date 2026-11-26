@@ -285,7 +285,7 @@ def check_submodules(config, active, depth, label, urls):
     for name, fields in sections.items():
         require(set(fields) == {"path", "url"},
                 f"{label}: unexpected submodule settings: "
-                f"{sorted(f'submodule.{name}.{field}' for field in fields ^ {'path', 'url'})}")
+                f"{sorted(f'submodule.{name}.{field}' for field in set(fields) ^ {'path', 'url'})}")
         path = fields["path"]
         require(path not in by_path, f"{label}: duplicate submodule path: {path}")
         by_path[path] = fields["url"]

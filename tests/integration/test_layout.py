@@ -658,6 +658,15 @@ release = "optional"
                 with self.assertRaisesRegex(ValueError, "invalid submodule URL: cli"):
                     layout.validate("HEAD", False)
 
+    def test_accepts_a_submodule_section_name_that_differs_from_its_path(self):
+        self.root_repo(CLI, {"cli": "a" * 40}, {"cli": CORE_URL})
+        self.write(self.root, ".gitmodules",
+                   f'[submodule "core-runtime"]\n\tpath = cli\n\turl = {CORE_URL}\n')
+        self.stage(self.root)
+        self.gitlink(self.root, "cli", "a" * 40)
+        self.git("commit", "-qm", "named section")
+        layout.validate("HEAD", False)
+
     def test_rejects_a_wrong_domain_root_url(self):
         self.root_repo(CLI + WEB_DOMAIN,
                        {"cli": "a" * 40, "extensions/web": "b" * 40},
