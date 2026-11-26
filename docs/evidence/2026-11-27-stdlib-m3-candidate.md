@@ -7,8 +7,8 @@
 
 | 对象 | 身份 |
 | --- | --- |
-| 根候选 | `migration/stdlib-m2-candidate`（CLI Phase B 固定为 `72f57be`） |
-| CLI Phase B 候选 | `cflmy/marqdo-cli@72f57beee0d07990e6e4813f4c6cc485e8eba303`（PR #17；`stdlib/` 已删除，pin 指向生态 Bundle） |
+| 根候选 | `migration/stdlib-m2-candidate`（CLI Phase B 合并提交 `deadf6e`） |
+| CLI Phase B 合并 | `cflmy/marqdo-cli@deadf6edeea6dd0f5abf51c47e80204fd851baf0`（PR #17 fast-forward 合并；Phase B 代码提交 `72f57be`，另含 CI 脚本修复；`stdlib/` 已删除，pin 指向生态 Bundle） |
 | 生态 Bundle | `marqdo-stdlib@0.2.0`，source `cflmy/marqdo@48189243f7`，tree digest `sha256:db905508...`，aliases digest `sha256:5f513c0f...`（17 模块 + manifest） |
 | 组件固定 | 六个 std 与三个 ext 的已合并候选 SHA（M2 证据同一组） |
 | 发行归档（本地候选） | `marqdo-3.0.0-rc.4-x86_64-unknown-linux-gnu.tar.gz`，`sha256:9a926010ffe8e7353ee18b65fc568ced8bbf4b09b7592713f1213e2f3e3d40f9`（CLI `72f57be` + 新 Bundle） |
