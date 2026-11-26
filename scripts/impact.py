@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import subprocess
 import sys
 import tomllib
@@ -94,9 +95,10 @@ def submodule_urls(repo: Path, revision: str) -> dict[str, str]:
         if not record:
             continue
         key, _, value = record.decode(errors="replace").partition("\n")
-        parts = key.split(".")
-        if len(parts) == 4 and parts[0] == "submodule" and parts[3] in ("path", "url"):
-            pending.setdefault(parts[1], {})[parts[3]] = value
+        match = re.fullmatch(r"submodule\.(.+)\.(path|url)", key)
+        if match:
+            name, field = match.groups()
+            pending.setdefault(name, {})[field] = value
     for fields in pending.values():
         if "path" in fields and "url" in fields:
             urls[fields["path"]] = fields["url"]
@@ -249,6 +251,79 @@ def affected_set(
     return sorted(affected), sorted(domains), sorted(co_validation)
 
 
+def consumers_of(component_id: str, revision: str) -> dict:
+    """Consumers of one component at a revision (component-PR impact scope).
+
+    Uses the accepted graph only: a component candidate cannot change the root
+    graph it is evaluated against. Unknown component or unexpandable domain
+    widens the scope to the whole graph (never silently skip).
+    """
+    revision_sha = resolve(ROOT, revision)
+    graph, unverified = load_graph(ROOT, revision_sha, "root")
+    if component_id not in graph:
+        graph, unverified = load_graph(ROOT, revision_sha, "root")
+        return {
+            "schema": SCHEMA,
+            "schema_version": SCHEMA_VERSION,
+            "accepted": {"ref": revision, "revision": revision_sha},
+            "component": component_id,
+            "affected": sorted(graph),
+            "checks_with": [],
+            "domain_ancestors": [],
+            "fallback": "full",
+            "unverified": unverified
+            + [f"unknown component {component_id!r} at {revision_sha}; scope widened"],
+        }
+    dependents: dict[str, set[str]] = {key: set() for key in graph}
+    for component in graph.values():
+        for dependency in component.get("requires", []):
+            dependents.setdefault(dependency, set()).add(component["id"])
+    affected = {component_id}
+    queue = [component_id]
+    while queue:
+        current = queue.pop()
+        for consumer in dependents.get(current, set()):
+            if consumer not in affected:
+                affected.add(consumer)
+                queue.append(consumer)
+    domains = set()
+    for item in list(affected):
+        parent = graph[item].get("parent")
+        while parent:
+            if parent not in affected:
+                domains.add(parent)
+            parent = graph[parent].get("parent") if parent in graph else None
+    co_validation: set[str] = set()
+    while True:
+        additions = {
+            partner
+            for item in affected
+            for partner in graph[item].get("checks_with", [])
+            if partner not in affected
+        }
+        if not additions:
+            break
+        affected |= additions
+        co_validation |= additions
+    fallback = None
+    if unverified:
+        affected = set(graph)
+        domains = set()
+        co_validation = set()
+        fallback = "full"
+    return {
+        "schema": SCHEMA,
+        "schema_version": SCHEMA_VERSION,
+        "accepted": {"ref": revision, "revision": revision_sha},
+        "component": component_id,
+        "affected": sorted(affected),
+        "checks_with": sorted(co_validation),
+        "domain_ancestors": sorted(domains),
+        "fallback": fallback,
+        "unverified": unverified,
+    }
+
+
 def analyze(accepted_ref: str, candidate_ref: str) -> dict:
     accepted_revision = resolve(ROOT, accepted_ref)
     candidate_revision = resolve(ROOT, candidate_ref)
@@ -291,13 +366,21 @@ def main(argv: list[str]) -> int:
     parser.add_argument("--out", default=None)
     parser.add_argument("--json", action="store_true")
     parser.add_argument(
+        "--component",
+        default=None,
+        help="report consumers of one component at --accepted instead of a root diff",
+    )
+    parser.add_argument(
         "--fail-on-unverified",
         action="store_true",
         help="exit 2 when a domain cannot be expanded",
     )
     args = parser.parse_args(argv)
     try:
-        report = analyze(args.accepted, args.candidate)
+        if args.component:
+            report = consumers_of(args.component, args.accepted)
+        else:
+            report = analyze(args.accepted, args.candidate)
     except ImpactError as error:
         print(f"impact: error: {error}", file=sys.stderr)
         return 1
@@ -307,16 +390,23 @@ def main(argv: list[str]) -> int:
     if args.json:
         print(text, end="")
     else:
-        print(
-            f"accepted {report['accepted']['revision'][:12]} "
-            f"candidate {report['candidate']['revision'][:12]}"
-        )
-        print(
-            f"changed={report['counts']['changed']} "
-            f"affected={report['counts']['affected']}"
-        )
-        for item in report["changed"]:
-            print(f"  changed {item['id']}: {item['reason']}")
+        if "candidate" in report:
+            print(
+                f"accepted {report['accepted']['revision'][:12]} "
+                f"candidate {report['candidate']['revision'][:12]}"
+            )
+            print(
+                f"changed={report['counts']['changed']} "
+                f"affected={report['counts']['affected']}"
+            )
+            for item in report["changed"]:
+                print(f"  changed {item['id']}: {item['reason']}")
+        else:
+            print(
+                f"component {report['component']} at "
+                f"{report['accepted']['revision'][:12]}"
+            )
+            print(f"consumers={len(report['affected'])}")
         print("affected: " + ", ".join(report["affected"]))
         if report["checks_with"]:
             print("co-validation: " + ", ".join(report["checks_with"]))

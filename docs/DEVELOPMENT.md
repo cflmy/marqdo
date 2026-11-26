@@ -76,7 +76,7 @@ bash scripts/integration.sh                # 生态候选：真实 CLI 制品 + 
 
 ## 自动化权限
 
-先实现人工触发与 PR/CI 门禁，不开发自动 Agent 管理平台。Webhook 只作通知（记录仓库、完整 SHA、CI URL）；上级通过 API 验证存在性、审批与权限后再创建候选 PR，不得自动合入或提升权限。外部不可信 PR、未批准 gitlink 或脚本不得在拥有跨仓库写权限/发版密钥的 runner 中运行；区分只读 checkout/test token、受限 issue/PR token、受保护发布权限。日志不得输出凭证、完整 Analysis 或生产 API key。
+先实现人工触发与 PR/CI 门禁，不开发自动 Agent 管理平台。候选通知的授权校验由根 `scripts/candidate-notify.py` 承担：只接受规范化通知（仓库、类型、head/base SHA、CI 状态与 URL），校验仓库在根图远端允许列表内、提交在本地对象库可达、组件候选的 base 必须是 accepted 根图当前固定的 SHA、CI 为允许主机上的 success 且必须是 https；按 `(repository, head SHA)` 去重，拒绝重放，accepted 基线变化时标记 `revalidate` 并要求重跑门禁；影响范围复用 `scripts/impact.py`，无法确定时全量。校验器只输出计划（`auto_promote=false`、`auto_merge=false`、仅创建候选分支需人工评审），不合并、不推送、不扩权。Webhook 只作通知（记录仓库、完整 SHA、CI URL）；上级通过 API 验证存在性、审批与权限后再创建候选 PR，不得自动合入或提升权限。外部不可信 PR、未批准 gitlink 或脚本不得在拥有跨仓库写权限/发版密钥的 runner 中运行；区分只读 checkout/test token、受限 issue/PR token、受保护发布权限。日志不得输出凭证、完整 Analysis 或生产 API key。
 
 ## 发行与回滚
 
