@@ -13,6 +13,8 @@
 
 CLI 编译只需其自身实现。完整基础发行由 CLI、必需 Worker 和统一标准库 Bundle 构成。标准库组件只依赖 CLI 公共语义和更低层标准库，扩展可以依赖标准库与明确声明的其他扩展。Tools 使用公开协议与自身依赖，各工具的数据格式互操作须由产生者明确发布契约。组件依据各自发版制品独立构建，不依赖主仓库源码。
 
+官网和 VS Code 是独立的产品入口，消费 CLI 和 View 的发行制品，拥有各自的构建、验证、版本与发布流程。官网维护公开文档、示例和托管，VS Code 仓维护编辑器体验、CLI 适配和 VSIX。两者由主仓库提供开发入口，生态基础发行与集成 gitlink 继续由组件目录定义。[官网设计](https://git.cflmy.cn/cflmy/marqdo-site/src/branch/main/docs/ARCHITECTURE.md) · [VS Code 设计](https://git.cflmy.cn/cflmy/marqdo-vscode/src/branch/main/docs/ARCHITECTURE.md)
+
 组件的职责、阶段和依赖只在 [components.toml](../components.toml) 维护。子模块远端在 `.gitmodules`，提交在 Git tree，程序依赖仍在现行包清单及锁。`requires` 描述直接构建与制品依赖，`checks_with` 描述协同验收。计划中的依赖在真实接入前以 imports、构建输入和制品核实。依赖图必须无环。
 
 ## 新增能力与公共边界

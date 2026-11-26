@@ -27,6 +27,11 @@ Conformance 使用 CLI 已固定的真实 fixture 提交。
 
 ## 阶段与阻塞
 
+| 原分支 | 独立仓库与迁移状态 |
+| --- | --- |
+| `gh-pages` | 官网架构、v2.9.1 源内容和部署快照均已迁入 marqdo-site。原分支保留现有公共入口，部署切换以独立托管和路由验收为准。[托管切换工单](https://git.cflmy.cn/cflmy/marqdo-site/issues/1) |
+| `vscode-extension` | 扩展目录历史归档到 marqdo-vscode 的 `legacy-v2.8.0`。现行 CLI 适配和新版 VSIX 由扩展仓独立开发和验收。[首版实现工单](https://git.cflmy.cn/cflmy/marqdo-vscode/issues/1) |
+
 | 阶段 | 当前范围 | 后续验收 |
 | --- | --- | --- |
 | M0 盘点 | 自建 Git、历史标签、已有六组件和新仓位 | 通过真实远端候选持续维护台账 |
