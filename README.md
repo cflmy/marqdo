@@ -1,12 +1,111 @@
-# Marqdo 生态集成
+# Marqdo
 
-Marqdo 以 Markdown 编写可执行程序与可验证知识。这个仓库固定一组组件提交，维护组件责任、跨仓库验收和发行组合。
+**Marqdo 是一门以 Markdown 为源文档的编程语言。** 用 `.mq.md` 可以把业务规则、公式、解释和可执行步骤写在同一份文档中。读者用 Markdown 阅读器查看正文，开发者用 Marqdo 检查、运行和验证其中的程序。这个仓库维护生态组件的集成、验收和发行入口。
 
-## 使用与开发
+## 为什么开发 Marqdo
 
-- 安装语言、CLI 和默认标准库，请使用 [Marqdo CLI 的官方发行](https://git.cflmy.cn/cflmy/marqdo-cli/releases)。各工具和扩展在各自仓库提供安装说明。
-- 修改语言、标准库、领域扩展或工具，请先在 [组件目录](components.toml) 找到唯一责任仓库。开发和发布在该组件内独立进行。
-- 验证生态组合，请初始化此仓库的子模块。Git tree 的 gitlink 固定参与验收的源码提交。
+规则通常写在说明文档里，实现放在脚本里，结果再写进报告。三份内容分开维护后，读者很难确认某个结果用了哪条规则，也很难重新验证。Marqdo 让解释和计算随同一份源文档修改、评审和运行。它适合写带示例的算法说明、可重跑的分析流程，以及需要交代验证过程的知识文档。
+
+## 主要特性
+
+- **Markdown 原生**。文档保留 CommonMark/GFM 的结构，并支持公式。在 `.mq.md` 中，以 `@exec` 标明可执行区，以 `@knowledge` 标明说明与知识区。正文可以直接阅读。
+- **先检查，再运行**。`marqdo check` 静态检查语法与调用，`--refs` 检查文档引用。Analysis 提供结构化分析结果，供编辑器和独立工具使用。
+- **可观察的运行**。Rust 解释器显式运行文档代码，Observation 记录执行事件与结果。文件、网络、进程等外部操作受运行模式与能力授权约束。
+- **可组合的生态**。基础发行包含标准库。程序可以通过锁文件固定包与领域扩展的来源和摘要。阅读、知识索引、证明和静态诊断由独立工具提供。
+
+## 快速开始
+
+从 [CLI 发行页](https://git.cflmy.cn/cflmy/marqdo-cli/releases) 下载适合平台的发行包。把解包目录加入 `PATH`，保持 CLI、Worker 和旁置 `stdlib/` 的目录结构。将下面的内容保存为 `hello.mq.md`。
+
+````markdown
+# 问候示例
+
+这一节说明程序的用途。下方函数由 CLI 执行。
+
+## @exec main
+
+`params()`
+
+`打印("你好，Marqdo")`
+````
+
+```sh
+marqdo check hello.mq.md
+marqdo run hello.mq.md
+```
+
+```text
+你好，Marqdo
+```
+
+[CLI 使用指南](https://git.cflmy.cn/cflmy/marqdo-cli) · [语言规范](https://git.cflmy.cn/cflmy/marqdo-cli/src/branch/master/spec/mapping.md)
+
+## 仓库与职责
+
+### 已接入的核心和工具
+
+| 仓库 | 职责 |
+| --- | --- |
+| [marqdo](https://git.cflmy.cn/cflmy/marqdo) | 生态主仓库，维护仓库索引、固定提交组合、跨仓库验收与发行 |
+| [marqdo-cli](https://git.cflmy.cn/cflmy/marqdo-cli) | 语言规范、Rust 解释器、CLI、运行权限和公开协议 |
+| [marqdo-extension-conformance](https://git.cflmy.cn/cflmy/marqdo-extension-conformance) | 用冻结的真实 CLI 独立验收包、插件、Provider、Foreign 和 Tool |
+| [marqdo-knowledge](https://git.cflmy.cn/cflmy/marqdo-knowledge) | 使用公开 Analysis 编译、索引和检索知识文档 |
+| [marqdo-prove](https://git.cflmy.cn/cflmy/marqdo-prove) | 处理证明依赖、Lean 证书与独立重放 |
+| [marqdo-view](https://git.cflmy.cn/cflmy/marqdo-view) | 阅读和预览文档、显示执行观察、静态导出 |
+| [marqdo-lint](https://git.cflmy.cn/cflmy/marqdo-lint) | 静态规则、诊断定位与显式修复 |
+
+### 独立产品
+
+| 仓库 | 职责 |
+| --- | --- |
+| [marqdo-site](https://git.cflmy.cn/cflmy/marqdo-site) | 官网、入门文档、静态站点构建与托管 |
+| [marqdo-vscode](https://git.cflmy.cn/cflmy/marqdo-vscode) | VS Code 文件关联、编辑体验、CLI 集成与 VSIX 发布 |
+
+### 标准库
+
+标准库组件负责低层通用能力，验收后共同组成基础发行的标准库 Bundle。 这些组件标为 `planned`，开发在对应独立仓库进行。 [标准库目录](stdlib/README.md)
+
+| 仓库 | 职责 |
+| --- | --- |
+| [marqdo-std-core](https://git.cflmy.cn/cflmy/marqdo-std-core) | Result 与基础数值 |
+| [marqdo-std-collections](https://git.cflmy.cn/cflmy/marqdo-std-collections) | List、Map 和 Table 值操作 |
+| [marqdo-std-text](https://git.cflmy.cn/cflmy/marqdo-std-text) | Unicode 文本、字节值与 UTF-8 |
+| [marqdo-std-encoding](https://git.cflmy.cn/cflmy/marqdo-std-encoding) | Base64、Base32 和 Hex |
+| [marqdo-std-data](https://git.cflmy.cn/cflmy/marqdo-std-data) | JSON、CSV、TOML 与 GFM 数据转换 |
+| [marqdo-std-io](https://git.cflmy.cn/cflmy/marqdo-std-io) | Console、Stream、格式化和官方 print 别名 |
+| [marqdo-std-fs](https://git.cflmy.cn/cflmy/marqdo-std-fs) | 文件、目录与路径 |
+| [marqdo-std-system](https://git.cflmy.cn/cflmy/marqdo-std-system) | 时钟、UTC、环境、进程与随机 |
+| [marqdo-std-net](https://git.cflmy.cn/cflmy/marqdo-std-net) | TCP、UDP、TLS 和网络字节流 |
+
+### 领域扩展
+
+领域扩展负责按需安装的算法、协议和业务能力。 这些组件标为 `planned`，开发在对应独立仓库进行。 [领域扩展目录](extensions/README.md)
+
+| 仓库 | 职责 |
+| --- | --- |
+| [marqdo-ext-math](https://git.cflmy.cn/cflmy/marqdo-ext-math) | 数值算法、统计、符号数学及绘图 |
+| [marqdo-ext-linalg](https://git.cflmy.cn/cflmy/marqdo-ext-linalg) | 复数、矩阵、分解及数值线性代数 |
+| [marqdo-ext-quantum](https://git.cflmy.cn/cflmy/marqdo-ext-quantum) | 量子电路、态向量、采样与模拟 |
+| [marqdo-ext-http](https://git.cflmy.cn/cflmy/marqdo-ext-http) | HTTP、URL、SSE 与报文生命周期 |
+| [marqdo-ext-websocket](https://git.cflmy.cn/cflmy/marqdo-ext-websocket) | WebSocket 握手、帧与连接语义 |
+| [marqdo-ext-ai](https://git.cflmy.cn/cflmy/marqdo-ext-ai) | 模型协议、流式输出与工具调用数据 |
+| [marqdo-ext-mcp](https://git.cflmy.cn/cflmy/marqdo-ext-mcp) | MCP 协议、传输、发现和调用 |
+| [marqdo-ext-crypto](https://git.cflmy.cn/cflmy/marqdo-ext-crypto) | 成熟密码学实现的封装 |
+| [marqdo-ext-database](https://git.cflmy.cn/cflmy/marqdo-ext-database) | SQL 参数绑定、事务和驱动连接 |
+| [marqdo-ext-storage](https://git.cflmy.cn/cflmy/marqdo-ext-storage) | 本地和对象存储接口 |
+| [marqdo-ext-cache](https://git.cflmy.cn/cflmy/marqdo-ext-cache) | TTL、缓存和失效 |
+| [marqdo-ext-security](https://git.cflmy.cn/cflmy/marqdo-ext-security) | 应用身份、会话及权限模型 |
+| [marqdo-ext-web](https://git.cflmy.cn/cflmy/marqdo-ext-web) | Markdown/GFM 渲染、页面、路由和组件 |
+| [marqdo-ext-browser](https://git.cflmy.cn/cflmy/marqdo-ext-browser) | 浏览器宿主、WASM 适配、DOM 和事件 |
+| [marqdo-ext-document](https://git.cflmy.cn/cflmy/marqdo-ext-document) | Markdown 结构与显式文档编辑 |
+| [marqdo-ext-archive](https://git.cflmy.cn/cflmy/marqdo-ext-archive) | 压缩、安全归档和解包 |
+| [marqdo-ext-engineering](https://git.cflmy.cn/cflmy/marqdo-ext-engineering) | 工程操作、文件补丁与产物 |
+| [marqdo-ext-regex](https://git.cflmy.cn/cflmy/marqdo-ext-regex) | 正则匹配、捕获、扫描和替换 |
+| [marqdo-ext-datetime](https://git.cflmy.cn/cflmy/marqdo-ext-datetime) | IANA 时区、DST 和高级日历 |
+
+## 参与开发
+
+在负责的独立仓库提交实现和测试。主仓库用 Git 子模块固定已通过联合验收的组件组合。需要验证当前组合时，克隆主仓库后运行：
 
 ```sh
 git clone https://git.cflmy.cn/cflmy/marqdo.git
@@ -15,18 +114,6 @@ git submodule update --init
 python3 scripts/check-layout.py --checkouts
 ```
 
-## 组件与维护入口
+[各仓库任务](docs/REPOSITORY-TASKS.md) · [组件目录](components.toml) · [架构边界](docs/ARCHITECTURE.md) · [开发流程](docs/DEVELOPMENT.md) · [迁移台账](docs/MIGRATION.md) · [AGENTS](AGENTS.md)
 
-| 目录 | 内容 |
-| --- | --- |
-| [cli](cli) | 语言实现、宿主原语和公共协议 |
-| [tools](tools) | Knowledge、Prove、View、Lint，各自独立仓库 |
-| [tests/conformance](tests/conformance) | 独立公共契约测试 |
-| 标准库与扩展 | 九个 `marqdo-std-*`、十九个 `marqdo-ext-*` 已预建空仓，接入状态见迁移台账 |
-
-- [官网与用户文档](https://git.cflmy.cn/cflmy/marqdo-site) 负责站点内容、静态构建与托管。
-- [VS Code 扩展](https://git.cflmy.cn/cflmy/marqdo-vscode) 负责编辑器集成与 VSIX 发布。
-
-[架构和归属](docs/ARCHITECTURE.md) · [开发、验收和发布](docs/DEVELOPMENT.md) · [迁移台账](docs/MIGRATION.md) · [贡献者和 Agent 指引](AGENTS.md)
-
-v2 实现、历史文档和示例可从 Git 历史查阅。[v2.9.1 历史树](https://git.cflmy.cn/cflmy/marqdo/src/tag/v2.9.1)
+旧版实现与文档可在历史标签查阅。 [v2.9.1 历史树](https://git.cflmy.cn/cflmy/marqdo/src/tag/v2.9.1)

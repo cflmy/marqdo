@@ -52,18 +52,37 @@ class LayoutTests(unittest.TestCase):
     def git(self, *args, cwd=None):
         return subprocess.check_output(["git", "-C", cwd or self.root, *args]).decode()
 
-    def candidate(self, metadata=CLI, url="https://git.cflmy.cn/cflmy/marqdo-cli.git", extra=None):
+    def candidate(self, metadata=CLI, url="https://git.cflmy.cn/cflmy/marqdo-cli.git", extra=None, file=None):
         (self.root / "components.toml").write_text(metadata)
         (self.root / ".gitmodules").write_text(f'[submodule "cli"]\npath = cli\nurl = {url}\n')
         self.git("add", ".gitmodules", "components.toml")
         self.git("update-index", "--add", "--cacheinfo", f"160000,{self.sha},cli")
         if extra:
             self.git("update-index", "--add", "--cacheinfo", f"160000,{self.sha},{extra}")
+        if file:
+            path = self.root / file
+            path.parent.mkdir(parents=True)
+            path.write_text("Fixture")
+            self.git("add", file)
         self.git("-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", "candidate")
 
     def test_accepts_active_gitlink_and_planned_component(self):
         self.candidate(CLI + PLANNED)
         layout.validate("HEAD", False)
+
+    def test_accepts_a_planned_component_directory_readme(self):
+        self.candidate(CLI + PLANNED, file="stdlib/core/README.md")
+        layout.validate("HEAD", False)
+
+    def test_rejects_source_under_a_planned_component(self):
+        self.candidate(CLI + PLANNED, file="stdlib/core/result.mq.md")
+        with self.assertRaisesRegex(ValueError, "unexpected tracked path or mode"):
+            layout.validate("HEAD", False)
+
+    def test_rejects_an_unregistered_component_directory(self):
+        self.candidate(CLI + PLANNED, file="stdlib/missing/README.md")
+        with self.assertRaisesRegex(ValueError, "unexpected tracked path or mode"):
+            layout.validate("HEAD", False)
 
     def test_rejects_planned_gitlink(self):
         self.candidate(CLI + PLANNED, extra="stdlib/core")

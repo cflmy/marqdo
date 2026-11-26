@@ -1,6 +1,6 @@
 # 架构与所有权
 
-自建 Git `git.cflmy.cn/cflmy` 是代码、工单和合并的权威，`ci.cflmy.cn` 是 CI 权威。GitHub 作为镜像或分发渠道。生态主仓库以直接 Git submodule 固定组件提交，`stdlib/`、`extensions/`、`tools/` 是分类目录。
+自建 Git `git.cflmy.cn/cflmy` 是代码、工单和合并的权威，`ci.cflmy.cn` 是 CI 权威。GitHub 作为镜像或分发渠道。生态主仓库以直接 Git submodule 固定已接入组件的提交。标准库与扩展中的 planned 路径用 README 标明职责和独立仓库，完成接入验收后将对应目录替换为 gitlink。
 
 | 层 | 所有权 |
 | --- | --- |
