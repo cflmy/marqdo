@@ -1,0 +1,317 @@
+{
+  "schema": "marqdo.stdlib-test-case",
+  "schema_version": 1,
+  "name": "table-pure",
+  "file": "table.mq.md",
+  "args": [
+    "--mode",
+    "pure"
+  ],
+  "stdin": "",
+  "env": {},
+  "expected_stdout": "",
+  "expected_terminal": {
+    "items": [
+      {
+        "header": [
+          "分数"
+        ],
+        "rows": [
+          [
+            {
+              "decimal": "87",
+              "type": "int"
+            }
+          ],
+          [
+            {
+              "decimal": "92",
+              "type": "int"
+            }
+          ],
+          [
+            {
+              "decimal": "71",
+              "type": "int"
+            }
+          ]
+        ],
+        "type": "table"
+      },
+      {
+        "header": [
+          "名称",
+          "分数"
+        ],
+        "rows": [
+          [
+            {
+              "type": "text",
+              "value": "甲"
+            },
+            {
+              "decimal": "87",
+              "type": "int"
+            }
+          ],
+          [
+            {
+              "type": "text",
+              "value": "乙"
+            },
+            {
+              "decimal": "92",
+              "type": "int"
+            }
+          ]
+        ],
+        "type": "table"
+      },
+      {
+        "header": [
+          "名称",
+          "分数"
+        ],
+        "rows": [
+          [
+            {
+              "type": "text",
+              "value": "丙"
+            },
+            {
+              "decimal": "71",
+              "type": "int"
+            }
+          ],
+          [
+            {
+              "type": "text",
+              "value": "甲"
+            },
+            {
+              "decimal": "87",
+              "type": "int"
+            }
+          ],
+          [
+            {
+              "type": "text",
+              "value": "乙"
+            },
+            {
+              "decimal": "92",
+              "type": "int"
+            }
+          ]
+        ],
+        "type": "table"
+      },
+      {
+        "header": [
+          "名称",
+          "分数"
+        ],
+        "rows": [
+          [
+            {
+              "type": "text",
+              "value": "甲"
+            },
+            {
+              "decimal": "87",
+              "type": "int"
+            }
+          ],
+          [
+            {
+              "type": "text",
+              "value": "乙"
+            },
+            {
+              "decimal": "92",
+              "type": "int"
+            }
+          ],
+          [
+            {
+              "type": "text",
+              "value": "丙"
+            },
+            {
+              "decimal": "71",
+              "type": "int"
+            }
+          ],
+          [
+            {
+              "type": "text",
+              "value": "丁"
+            },
+            {
+              "decimal": "65",
+              "type": "int"
+            }
+          ]
+        ],
+        "type": "table"
+      },
+      {
+        "header": [
+          "名称",
+          "分数"
+        ],
+        "rows": [
+          [
+            {
+              "type": "text",
+              "value": "甲"
+            },
+            {
+              "decimal": "99",
+              "type": "int"
+            }
+          ],
+          [
+            {
+              "type": "text",
+              "value": "乙"
+            },
+            {
+              "decimal": "92",
+              "type": "int"
+            }
+          ],
+          [
+            {
+              "type": "text",
+              "value": "丙"
+            },
+            {
+              "decimal": "71",
+              "type": "int"
+            }
+          ]
+        ],
+        "type": "table"
+      },
+      {
+        "header": [
+          "名称",
+          "分数",
+          "名称",
+          "等级"
+        ],
+        "rows": [
+          [
+            {
+              "type": "text",
+              "value": "甲"
+            },
+            {
+              "decimal": "87",
+              "type": "int"
+            },
+            {
+              "type": "text",
+              "value": "甲"
+            },
+            {
+              "type": "text",
+              "value": "B"
+            }
+          ],
+          [
+            {
+              "type": "text",
+              "value": "乙"
+            },
+            {
+              "decimal": "92",
+              "type": "int"
+            },
+            {
+              "type": "text",
+              "value": "乙"
+            },
+            {
+              "type": "text",
+              "value": "A"
+            }
+          ]
+        ],
+        "type": "table"
+      },
+      {
+        "entries": {
+          "a": {
+            "items": [
+              {
+                "decimal": "1",
+                "type": "int"
+              },
+              {
+                "decimal": "3",
+                "type": "int"
+              }
+            ],
+            "type": "list"
+          },
+          "b": {
+            "items": [
+              {
+                "decimal": "2",
+                "type": "int"
+              }
+            ],
+            "type": "list"
+          }
+        },
+        "type": "map"
+      },
+      {
+        "header": [
+          "名称",
+          "分数"
+        ],
+        "rows": [
+          [
+            {
+              "type": "text",
+              "value": "甲"
+            },
+            {
+              "decimal": "87",
+              "type": "int"
+            }
+          ],
+          [
+            {
+              "type": "text",
+              "value": "乙"
+            },
+            {
+              "decimal": "92",
+              "type": "int"
+            }
+          ],
+          [
+            {
+              "type": "text",
+              "value": "丙"
+            },
+            {
+              "decimal": "71",
+              "type": "int"
+            }
+          ]
+        ],
+        "type": "table"
+      },
+      {
+        "type": "text",
+        "value": "| 名称 | 分数 |\n| --- | --- |\n| 甲 | 87 |\n| 乙 | 92 |\n| 丙 | 71 |"
+      }
+    ],
+    "type": "list"
+  }
+}

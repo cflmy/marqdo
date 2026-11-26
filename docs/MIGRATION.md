@@ -147,8 +147,9 @@ Conformance 使用 CLI 已固定的真实 fixture 提交。
 | 领域模块（http/regex/archive） | 候选已合并为显式 Package | [ext-http PR #2](https://git.cflmy.cn/cflmy/marqdo-ext-http/pulls/2)、[ext-regex PR #2](https://git.cflmy.cn/cflmy/marqdo-ext-regex/pulls/2)、[ext-archive PR #2](https://git.cflmy.cn/cflmy/marqdo-ext-archive/pulls/2) |
 | Bundle 唯一生产者 | 已实现，M2 候选真实构建两次逐字节一致 | `scripts/build-stdlib.py`、`scripts/stdlib-bundle.json`、`tests/integration/test_build_stdlib.py` |
 | 组合验收入口 | M2 候选 PASS（组件 entry + 跨仓组合 + 负例 + 相邻离线安装 + CLI 确定性打包） | `scripts/acceptance-stdlib.py`、[M2 候选证据](evidence/2026-11-26-stdlib-m2-candidate.md)、[根 PR #11](https://git.cflmy.cn/cflmy/marqdo/pulls/11) |
-| CLI 旧源树删除 | 未开始（等待根组合验收与 CLI PR 合并） | [marqdo-cli#11](https://git.cflmy.cn/cflmy/marqdo-cli/issues/11) Phase B、[CLI PR #12](https://git.cflmy.cn/cflmy/marqdo-cli/pulls/12) |
-| 根组合与切换 | M2 候选已验证，未晋升；主分支仍为迁移前组合 `484cb10` | M2 候选分支 `migration/stdlib-m2-candidate`、[证据](evidence/2026-11-26-stdlib-m2-candidate.md) |
+| CLI 旧源树删除 | 候选完成：CLI 仓已无 `stdlib/` 源树、无编译期 fallback，pin 指向生态 Bundle | [marqdo-cli#11](https://git.cflmy.cn/cflmy/marqdo-cli/issues/11)、[CLI PR #17](https://git.cflmy.cn/cflmy/marqdo-cli/pulls/17)、[Phase B 证据](https://git.cflmy.cn/cflmy/marqdo-cli/src/branch/migration/cli-stdlib-phase-b/docs/evidence/2026-11-27-issue-11-phase-b.md) |
+| 统一 CLI/Worker/Bundle 制品输入（ECO-02 核心） | 已落地：integration.sh 由同一根候选派生全部输入，不再使用 View 冻结制品 | 根 `scripts/integration.sh`、[marqdo#7](https://git.cflmy.cn/cflmy/marqdo/issues/7) |
+| 根组合与切换 | M3 候选：固定 CLI Phase B 与组件提交，待 CI/晋升；主分支仍为迁移前组合 `484cb10` | [M3 证据](evidence/2026-11-27-stdlib-m3-candidate.md)、根 PR #12 |
 
 ## v2 功能历史索引
 

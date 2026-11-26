@@ -1,0 +1,27 @@
+{
+  "schema": "marqdo.stdlib-test-case",
+  "schema_version": 1,
+  "name": "print-routing",
+  "file": "print-routing.mq.md",
+  "args": [],
+  "stdin": "",
+  "env": {},
+  "expected_stdout": "[\"文本\", 2, 1.5, [3, true], {a: 1, b: \"x\"}, None]\n[\"文本\", 2, 1.5, [3, true], {a: 1, b: \"x\"}, None]\nTable[名称 | 分数]{甲 | 87; 乙 | 92}\nTable[名称 | 分数]{甲 | 87; 乙 | 92}\n[Formula(\"a = 1\"), Code(\"text\", 9 bytes), FunctionRef(root:default::print-routing.mq.md::演示函数)]\n[Formula(\"a = 1\"), Code(\"text\", 9 bytes), FunctionRef(root:default::print-routing.mq.md::演示函数)]\n",
+  "expected_terminal": {
+    "type": "none"
+  },
+  "stdout_line_pairs": [
+    [
+      0,
+      1
+    ],
+    [
+      2,
+      3
+    ],
+    [
+      4,
+      5
+    ]
+  ]
+}

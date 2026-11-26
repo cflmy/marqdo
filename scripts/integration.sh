@@ -1,4 +1,11 @@
 #!/usr/bin/env bash
+# Ecosystem integration for one exact candidate combination.
+#
+# Inputs are the pinned root gitlinks: the root-owned Bundle producer assembles
+# the one stdlib Bundle, the CLI/Worker are built from the pinned `cli` commit,
+# the release archive is packaged with that explicit Bundle, and every consumer
+# runs against that same installed binary + adjacent Bundle. There is no
+# implicit artifact from View, no floating branch and no network-selected CLI.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
@@ -15,6 +22,7 @@ work="$(mktemp -d "$root/.integration-work/run.XXXXXX")"
 echo "integration evidence: $work"
 exec > >(tee "$work/run.log") 2>&1
 set -x
+
 git rev-parse HEAD
 git submodule status --recursive
 uname -m
@@ -22,43 +30,54 @@ ldd --version
 cargo --version
 python3 --version
 python3 -c 'import jsonschema'
+python3 scripts/check-layout.py --checkouts > "$work/layout.txt"
+cat "$work/layout.txt"
 
-unset MARQDO_STDLIB_DIR
-export CARGO_HOME="${CARGO_HOME:-$HOME/.cargo}"
-mkdir "$work/frozen"
-frozen="$root/tools/view/scripts/frozen-beta.sh"
-metadata="$("$frozen" metadata)"
-artifact="$(sed -n 's/^artifact=//p' <<<"$metadata")"
-if [[ -n "${MARQDO_INTEGRATION_ARCHIVE:-}" ]]; then
-    archive="$(realpath "$MARQDO_INTEGRATION_ARCHIVE")"
-    archive_sha="$(sed -n 's/^archive_sha=//p' <<<"$metadata")"
-    printf '%s  %s\n' "$archive_sha" "$archive" | sha256sum -c -
-    tar -xzf "$archive" -C "$work/frozen"
-    MARQDO_BIN="$work/frozen/$artifact/marqdo"
-    "$frozen" verify "$MARQDO_BIN"
-else
-    MARQDO_BIN="$("$frozen" fetch "$work/frozen")"
-    archive="$work/frozen/$artifact.tar.gz"
-fi
-export MARQDO_BIN
+# 1. One Bundle, produced by the root-owned producer from the pinned gitlinks.
+python3 scripts/build-stdlib.py --out "$work/stdlib" | tee "$work/bundle.json"
+bundle_digest="$(python3 -c 'import json,sys; print(json.load(sys.stdin)["tree_digest"])' < "$work/bundle.json")"
+bundle_aliases="$(python3 -c 'import json,sys; print(json.load(sys.stdin)["aliases_digest"])' < "$work/bundle.json")"
+test -f "$work/stdlib/stdlib.json"
+
+# 2. CLI and Worker from the exact pinned CLI gitlink.
 source_sha="$(git -C cli rev-parse HEAD)"
-test "$(cat "$(dirname "$MARQDO_BIN")/SOURCE_SHA")" = "$source_sha"
-sha256sum "$archive" "$MARQDO_BIN" "$(dirname "$MARQDO_BIN")/marqdo-provider-worker"
+export CARGO_TARGET_DIR="$work/target"
+cargo build --manifest-path cli/Cargo.toml --locked --release \
+    -p marqdo-cli -p marqdo-provider-worker
+version="$(python3 -c '
+import pathlib, tomllib
+data = tomllib.loads(pathlib.Path("cli/Cargo.toml").read_text())
+print(data["workspace"]["package"]["version"])
+')"
 
-# Standard-library source relocation candidate: the root producer builds the one
-# Bundle from the pinned component gitlinks; active component entries, the
-# cross-repository composition fixtures and the fail-closed negatives all run
-# against the same verified CLI artifact.
-python3 scripts/acceptance-stdlib.py \
-    --cli "$MARQDO_BIN" --work "$work/stdlib-acceptance" \
-    --evidence "$work/stdlib-acceptance.json"
-
+# 3. The release archive takes the Bundle as one explicit input.
+python3 cli/tools/release/package.py \
+    --source-sha "$source_sha" --version "$version" \
+    --stdlib-dir "$work/stdlib" --out-dir "$work/dist" | tee "$work/package.json"
+archive="$(find "$work/dist" -maxdepth 1 -name 'marqdo-*.tar.gz' -print -quit)"
 python3 cli/tools/release/smoke.py --archive "$archive"
+mkdir -p "$work/install"
+tar -xzf "$archive" -C "$work/install"
+installed="$(find "$work/install" -mindepth 1 -maxdepth 1 -type d -print -quit)"
+MARQDO_BIN="$installed/marqdo"
+export MARQDO_BIN
+test "$(cat "$installed/SOURCE_SHA")" = "$source_sha"
+test "$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["version"])' "$installed/stdlib/stdlib.json")" = "$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["version"])' "$work/stdlib/stdlib.json")"
+sha256sum "$archive" "$MARQDO_BIN" "$installed/marqdo-provider-worker"
+
+# 4. Root stdlib acceptance: component entries, explicit Packages, composition
+#    fixtures and fail-closed negatives with the same installed CLI/Bundle.
+python3 scripts/acceptance-stdlib.py \
+    --cli "$MARQDO_BIN" --bundle "$work/stdlib" \
+    --work "$work/stdlib-acceptance" --evidence "$work/stdlib-acceptance.json"
+
+# 5. Frozen independent public-contract fixtures against the same CLI.
 python3 cli/tools/ci/verify_extension_contracts.py \
     --source-repo cli --tested-sha "$source_sha" --cli "$MARQDO_BIN" \
-    --release-info "$(dirname "$MARQDO_BIN")/RELEASE_INFO.json" \
+    --release-info "$installed/RELEASE_INFO.json" \
     --fixtures tests/conformance --out "$work/conformance.json"
 
+# 6. Existing consumers, same installed binary and adjacent Bundle.
 (
     cd tools/view
     export MARQDO_TOOL_HOME="$work/view-registry"
@@ -95,7 +114,6 @@ python3 cli/tools/ci/verify_extension_contracts.py \
         exit 1
     fi
 )
-
 (
     cd tools/knowledge
     MARQDO_TEST_BIN="$MARQDO_BIN" cargo test --locked --test core_cli --test compile
@@ -113,4 +131,24 @@ python3 cli/tools/ci/verify_extension_contracts.py \
     "$MARQDO_BIN" tool remove lint
 )
 
-echo "PASS: ecosystem RC.4 candidate checks"
+# 7. Evidence identity for the accepted candidate.
+python3 - "$work" "$source_sha" "$bundle_digest" "$bundle_aliases" "$archive" <<'PY'
+import hashlib, json, pathlib, sys
+work = pathlib.Path(sys.argv[1])
+archive = pathlib.Path(sys.argv[5])
+evidence = {
+    "schema": "marqdo.ecosystem-integration",
+    "schema_version": 1,
+    "root_commit": sys.argv[2],
+    "cli_source_sha": sys.argv[2],
+    "stdlib_tree_digest": sys.argv[3],
+    "stdlib_aliases_digest": sys.argv[4],
+    "archive": archive.name,
+    "archive_sha256": "sha256:" + hashlib.sha256(archive.read_bytes()).hexdigest(),
+    "status": "PASS",
+}
+(work / "integration-evidence.json").write_text(json.dumps(evidence, indent=2) + "\n")
+print(json.dumps(evidence, indent=2))
+PY
+
+echo "PASS: ecosystem candidate (single CLI/Worker/Bundle artifact, consumers green)"

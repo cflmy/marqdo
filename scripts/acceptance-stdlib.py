@@ -157,6 +157,17 @@ def run_case(cli: str, bundle: Path, case: dict) -> dict:
         raise AcceptanceError(
             f"composition case {case['name']} stdout changed: {stdout!r}"
         )
+    lines = stdout.splitlines()
+    for left, right in case.get("stdout_line_pairs", []):
+        if left >= len(lines) or right >= len(lines):
+            raise AcceptanceError(
+                f"composition case {case['name']} has no line pair {left}/{right}"
+            )
+        if lines[left] != lines[right]:
+            raise AcceptanceError(
+                f"composition case {case['name']}: line {left} differs from line {right}: "
+                f"{lines[left]!r} != {lines[right]!r}"
+            )
     return {"name": case["name"], "status": "PASS"}
 
 
