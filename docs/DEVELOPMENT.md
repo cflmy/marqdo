@@ -7,6 +7,8 @@
 3. 在主仓库提交集成 PR。先初始化相关组件，再以 detached HEAD 锁定审核过的 SHA 并暂存 gitlink。同一份工具契约或 Stdlib 切换需要同时更新多个组件时，在一个候选中提交整组 gitlink。
 4. 基线移动时重验候选组合。留下真实失败证据并路由责任工单。通过同 SHA 的必需门禁后合并，随后关闭集成追踪及已解决的关联工单。
 
+官网内容与托管变更在 marqdo-site 提交，编辑器行为与 VSIX 在 marqdo-vscode 提交。涉及公开 CLI 或 View 契约时沿用跨仓工单流程，消费者用实际发行制品验收。[官网仓库](https://git.cflmy.cn/cflmy/marqdo-site) · [VS Code 仓库](https://git.cflmy.cn/cflmy/marqdo-vscode)
+
 ```sh
 git submodule update --init
 git -C tools/view fetch origin
