@@ -240,8 +240,8 @@ def component_gates(cli: str, bundle: Path) -> list[dict]:
 def negative_gates(cli: str, bundle: Path, work: Path) -> list[dict]:
     results = []
 
-    def expect_failure(name, command):
-        result = run(command)
+    def expect_failure(name, command, env_for_gate):
+        result = run(command, env=env_for_gate)
         if result.returncode == 0:
             raise AcceptanceError(f"negative gate {name} unexpectedly passed")
         results.append(
@@ -259,6 +259,7 @@ def negative_gates(cli: str, bundle: Path, work: Path) -> list[dict]:
     expect_failure(
         "missing-explicit-bundle",
         [cli, "run", str(ROOT / "tests/integration/composition/default-bundle.mq.md")],
+        env,
     )
 
     tampered = work / "tampered-bundle"
@@ -271,6 +272,7 @@ def negative_gates(cli: str, bundle: Path, work: Path) -> list[dict]:
     expect_failure(
         "tampered-module-digest",
         [cli, "run", str(ROOT / "tests/integration/composition/default-bundle.mq.md")],
+        env,
     )
     return results
 
