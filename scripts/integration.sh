@@ -4,7 +4,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 root="$PWD"
 active="$(python3 scripts/check-layout.py --checkouts --active-paths)"
-expected=$'cli\ntests/conformance\ntools/knowledge\ntools/lint\ntools/prove\ntools/view'
+expected=$'cli\nstdlib/collections\nstdlib/data\nstdlib/fs\nstdlib/io\nstdlib/system\nstdlib/text\ntests/conformance\ntools/knowledge\ntools/lint\ntools/prove\ntools/view'
 if [[ "$active" != "$expected" ]]; then
     echo "UNVERIFIED: update the integration plan for the changed active component set" >&2
     exit 1
@@ -44,6 +44,14 @@ export MARQDO_BIN
 source_sha="$(git -C cli rev-parse HEAD)"
 test "$(cat "$(dirname "$MARQDO_BIN")/SOURCE_SHA")" = "$source_sha"
 sha256sum "$archive" "$MARQDO_BIN" "$(dirname "$MARQDO_BIN")/marqdo-provider-worker"
+
+# Standard-library source relocation candidate: the root producer builds the one
+# Bundle from the pinned component gitlinks; active component entries, the
+# cross-repository composition fixtures and the fail-closed negatives all run
+# against the same verified CLI artifact.
+python3 scripts/acceptance-stdlib.py \
+    --cli "$MARQDO_BIN" --work "$work/stdlib-acceptance" \
+    --evidence "$work/stdlib-acceptance.json"
 
 python3 cli/tools/release/smoke.py --archive "$archive"
 python3 cli/tools/ci/verify_extension_contracts.py \

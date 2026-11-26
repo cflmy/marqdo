@@ -93,23 +93,25 @@ release = "base"
 id = "std-collections"
 path = "stdlib/collections"
 kind = "stdlib"
-state = "planned"
+state = "active"
 owner = "cflmy"
 scope = "List、Map 和 Table 值操作"
-requires = ["cli", "std-core"]
-checks_with = []
+requires = ["cli"]
+checks_with = ["std-data"]
 release = "base"
+entry = "scripts/test.sh"
 
 [[component]]
 id = "std-text"
 path = "stdlib/text"
 kind = "stdlib"
-state = "planned"
+state = "active"
 owner = "cflmy"
 scope = "Unicode 文本、字节值与 UTF-8"
-requires = ["cli", "std-core", "std-collections"]
+requires = ["cli"]
 checks_with = []
 release = "base"
+entry = "scripts/test.sh"
 
 [[component]]
 id = "std-encoding"
@@ -126,45 +128,49 @@ release = "base"
 id = "std-data"
 path = "stdlib/data"
 kind = "stdlib"
-state = "planned"
+state = "active"
 owner = "cflmy"
 scope = "JSON、CSV、TOML 与 GFM 数据转换"
-requires = ["cli", "std-collections", "std-text", "std-encoding"]
-checks_with = []
+requires = ["cli"]
+checks_with = ["std-collections"]
 release = "base"
+entry = "scripts/test.sh"
 
 [[component]]
 id = "std-io"
 path = "stdlib/io"
 kind = "stdlib"
-state = "planned"
+state = "active"
 owner = "cflmy"
 scope = "Console、Stream、格式化和官方 print 别名"
-requires = ["cli", "std-core", "std-text"]
+requires = ["cli"]
 checks_with = []
 release = "base"
+entry = "scripts/test.sh"
 
 [[component]]
 id = "std-fs"
 path = "stdlib/fs"
 kind = "stdlib"
-state = "planned"
+state = "active"
 owner = "cflmy"
 scope = "文件、目录与路径"
-requires = ["cli", "std-io", "std-text"]
+requires = ["cli"]
 checks_with = []
 release = "base"
+entry = "scripts/test.sh"
 
 [[component]]
 id = "std-system"
 path = "stdlib/system"
 kind = "stdlib"
-state = "planned"
+state = "active"
 owner = "cflmy"
 scope = "时钟、UTC、环境、进程与随机"
-requires = ["cli", "std-text", "std-io"]
+requires = ["cli"]
 checks_with = []
 release = "base"
+entry = "scripts/test.sh"
 
 [[component]]
 id = "std-net"
