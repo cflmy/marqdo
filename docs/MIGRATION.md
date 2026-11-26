@@ -143,12 +143,12 @@ Conformance 使用 CLI 已固定的真实 fixture 提交。
 | 项 | 状态 | 证据 |
 | --- | --- | --- |
 | M0 盘点与派单 | 完成 | 本节、9 个接收仓 issue #1、[marqdo#9](https://git.cflmy.cn/cflmy/marqdo/issues/9) 评论 |
-| 组件接收（源码+断言） | 候选已推送（6 个 std 仓） | [std-text PR #2](https://git.cflmy.cn/cflmy/marqdo-std-text/pulls/2)、[std-system PR #2](https://git.cflmy.cn/cflmy/marqdo-std-system/pulls/2)、[std-io PR #2](https://git.cflmy.cn/cflmy/marqdo-std-io/pulls/2)、[std-fs PR #2](https://git.cflmy.cn/cflmy/marqdo-std-fs/pulls/2)、[std-data PR #2](https://git.cflmy.cn/cflmy/marqdo-std-data/pulls/2)、[std-collections PR #2](https://git.cflmy.cn/cflmy/marqdo-std-collections/pulls/2) |
+| 组件接收（源码+断言） | 候选已推送（6 个 std 仓，同候选配对） | [std-text PR #2](https://git.cflmy.cn/cflmy/marqdo-std-text/pulls/2)、[std-system PR #2](https://git.cflmy.cn/cflmy/marqdo-std-system/pulls/2)、[std-io PR #2](https://git.cflmy.cn/cflmy/marqdo-std-io/pulls/2)、[std-fs PR #2](https://git.cflmy.cn/cflmy/marqdo-std-fs/pulls/2)、[std-data PR #2](https://git.cflmy.cn/cflmy/marqdo-std-data/pulls/2)、[std-collections PR #2](https://git.cflmy.cn/cflmy/marqdo-std-collections/pulls/2) |
 | 领域模块（http/regex/archive） | 未开始 | ext-http/ext-regex/ext-archive issue #1 |
-| Bundle 唯一生产者 | 脚本与契约测试已落地，待根候选验收 | `scripts/build-stdlib.py`、`scripts/stdlib-bundle.json`、`tests/integration/test_build_stdlib.py` |
-| 组合验收入口 | 已落地，待根候选执行 | `scripts/acceptance-stdlib.py`、`tests/integration/composition/` |
-| CLI 旧源树删除 | 未开始（等待根组合验收） | [marqdo-cli#11](https://git.cflmy.cn/cflmy/marqdo-cli/issues/11) Phase B |
-| 根组合与切换 | 未开始 | 本仓 MIG-RELEASE 候选 |
+| Bundle 唯一生产者 | 已实现，M2 候选真实构建两次逐字节一致 | `scripts/build-stdlib.py`、`scripts/stdlib-bundle.json`、`tests/integration/test_build_stdlib.py` |
+| 组合验收入口 | M2 候选 PASS（组件 entry + 跨仓组合 + 负例 + 相邻离线安装 + CLI 确定性打包） | `scripts/acceptance-stdlib.py`、[M2 候选证据](evidence/2026-11-26-stdlib-m2-candidate.md)、[根 PR #11](https://git.cflmy.cn/cflmy/marqdo/pulls/11) |
+| CLI 旧源树删除 | 未开始（等待根组合验收与 CLI PR 合并） | [marqdo-cli#11](https://git.cflmy.cn/cflmy/marqdo-cli/issues/11) Phase B、[CLI PR #12](https://git.cflmy.cn/cflmy/marqdo-cli/pulls/12) |
+| 根组合与切换 | M2 候选已验证，未晋升；主分支仍为迁移前组合 `484cb10` | M2 候选分支 `migration/stdlib-m2-candidate`、[证据](evidence/2026-11-26-stdlib-m2-candidate.md) |
 
 ## v2 功能历史索引
 
