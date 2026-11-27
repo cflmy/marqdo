@@ -7,7 +7,7 @@ container registry, per released CLI version:
 | --- | --- | --- |
 | `git.cflmy.cn/cflmy/marqdo-ci-shell:3.0.0-rc.5` | Ubuntu 24.04 (glibc 2.39), git/curl/python3/build tools, released CLI + Bundle (`MARQDO_BIN`/`MARQDO_STDLIB_DIR` preset) | standard library, extension, conformance and reconcile lanes |
 | `git.cflmy.cn/cflmy/marqdo-ci-rust:3.0.0-rc.5` | shell image + pinned Rust 1.100 toolchain (rustfmt/clippy) + warm cargo cache | Design/Preview and Rust tool lanes |
-| `git.cflmy.cn/cflmy/marqdo-ci-web:3.0.0-rc.5` (planned) | Playwright Chromium/Node + released CLI/Bundle + packaged preview web Tool | Web domain browser acceptance |
+| `git.cflmy.cn/cflmy/marqdo-ci-web:3.0.0-rc.5` (digest `0cccda995d77...`) | Ubuntu 24.04 + Node/Playwright Chromium（npmmirror 二进制源）+ released CLI/Bundle + packaged preview web Tool | Web domain browser acceptance |
 
 Rules:
 
