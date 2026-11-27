@@ -131,3 +131,5 @@ python3 -m unittest discover -s tests/integration
 [各仓库任务](docs/REPOSITORY-TASKS.md) · [组件目录](components.toml) · [架构边界](docs/ARCHITECTURE.md) · [开发流程](docs/DEVELOPMENT.md) · [迁移台账](docs/MIGRATION.md) · [架构决策记录](docs/adr/README.md) · [AGENTS](AGENTS.md)
 
 旧版实现与文档可在历史标签查阅。 [v2.9.1 历史树](https://git.cflmy.cn/cflmy/marqdo/src/tag/v2.9.1)
+
+根仓 CI 的触发条件见 [开发流程](docs/DEVELOPMENT.md#递归校验与组合检查)。
