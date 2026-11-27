@@ -22,6 +22,17 @@
   ```
   Rust 组件为 `marqdo-ci-rust` + `scripts/ci.sh`。CLI/根仍保留各自专用镜像与门禁（CLI Windows 交叉、根 Playwright/Docker 冷安装），属有限例外。
 
+## 实际流水线结果（2026-11-27 本机观测）
+
+| lane | 结果 |
+| --- | --- |
+| stdlib ×6 / extension ×3 / conformance（shell 镜像） | push/PR/manual lane **success**（例：conformance #12、std-text #12、collections #12、data #11、fs #11、io #11、system #11、ext-http #11、ext-regex #11、ext-archive #11） |
+| Design / Preview（rust 镜像） | pipeline 6/7 **success** |
+| knowledge / lint / prove（rust 镜像） | pipeline 22 / 12 / 17 **success** |
+| View（rust 构建 + Playwright 浏览器两步） | pipeline 24 **success**（rc.5 CLI 适配） |
+| 根 release 对账 | manual #71 **success**（创建 rc.5 追踪 Issue #22）；cron #72 **success**（幂等 tracked） |
+| 发布快速通知 | 临时 release 触发 std-text release pipeline #23 **success** → 根 manual #73 **success** 并创建追踪 Issue；测试 release/tag/Issue 已清理 |
+
 ## Woodpecker 接入
 
 - 19 个仓库已在 Woodpecker 激活（std ×6、ext ×3、conformance、Design/Preview、tool ×4、ext-web domain、根、CLI）。
@@ -41,6 +52,6 @@
 ## 未完成 / 限制
 
 - `marqdo-ci-web` 未发布：本地拉取 Playwright 基础镜像超时；Web 领域 CI lane 与浏览器验收仍待该镜像或等价的 runner 缓存方案。当前 Web 组件已有 Design/Preview 的 Rust image lane，domain 只有入口脚本。
-- Tool（view/knowledge/lint/prove）仍保留既有工作流/镜像，尚未全部迁到共享镜像；需在验证后统一。
+- View 已迁到 rust + Playwright 两步；knowledge/lint/prove 已迁到共享 rust 镜像。
 - 组件 release 发布工作流（source archive/tool bundle 上传 + 快速通知）尚未全部落地；当前 CLI rc.5 已发布，reconcile 可追踪新发布。
 - registry 镜像 digest/扫描策略、runner 拉取缓存与多架构未验证；CI 账号最小权限仍沿用现有项目 token（M0 记录限制）。

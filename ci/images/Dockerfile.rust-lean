@@ -1,0 +1,12 @@
+# Lean shared Rust CI image: shell base + host-only Rust toolchain and a warm
+# cargo cache. Cross targets, rust docs and unused manifests are stripped to
+# keep the registry pull small. Published by immutable tag; components only run
+# their own scripts/ci.sh.
+FROM marqdo-ci-shell:3.0.0-rc.5
+
+COPY rust-toolchain /opt/rust
+COPY cargo-home /opt/cargo-home
+ENV PATH=/opt/rust/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
+    CARGO_HOME=/opt/cargo-home
+
+RUN cargo --version && rustc --version && cargo fmt --version && cargo clippy --version
