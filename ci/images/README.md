@@ -16,9 +16,8 @@ Rules:
 - Images are public for anonymous pull; CI never needs registry push credentials.
 - Component lanes contain only their own `scripts/*` entry command. No per-repo
   image variance, apt installs, Rust toolchain downloads or CLI rebuilds.
-- Core CLI keeps its specialized Rust/Windows-cross gates; the root ecosystem
-  candidate keeps its Playwright/rustup image because it must build consumers and
-  run Docker archive checks. These two exceptions are documented in the
-  repository conventions, not copied per component.
+- Core CLI keeps its specialized Rust/Windows-cross gates. The root ecosystem
+  candidate uses the shared Rust toolchain to build the fixed CLI/Worker/Bundle
+  combination. View and Web keep browser coverage in their own workflows.
 - The images are CI infrastructure, not product releases; their provenance is
   recorded here and in `docs/evidence/`.

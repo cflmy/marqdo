@@ -32,15 +32,14 @@ steps:
       - python3 scripts/check-repo-conventions.py
 
   candidate:
-    # Match the Linux/glibc environment already used by View for the RC.4 artifact.
-    image: mcr.microsoft.com/playwright:v1.49.0-noble
+    image: git.cflmy.cn/cflmy/marqdo-ci-rust:3.0.0-rc.5@sha256:73481a35339157b1a3f3b23076517e96e302fbb5158e6ffcb1582acf22c6af94
     depends_on: [checkouts]
     when: *needs_candidate
     commands:
       - |
         set -eu
         for attempt in 1 2 3; do
-          if apt-get -o Acquire::By-Hash=force -o Acquire::Retries=3 update --error-on=any; then
+          if apt-get -o Acquire::By-Hash=force -o Acquire::http::Timeout=30 update --error-on=any; then
             break
           fi
           if [ "$attempt" -eq 3 ]; then
@@ -48,8 +47,6 @@ steps:
           fi
           sleep 15
         done
-        apt-get -o Acquire::Retries=3 install -y --no-install-recommends ca-certificates curl git python3 python3-jsonschema build-essential
-        curl -fsSL --retry 3 https://sh.rustup.rs -o /tmp/marqdo-rustup.sh
-        sh /tmp/marqdo-rustup.sh -y --profile minimal --default-toolchain 1.100.0 --no-modify-path
-        export PATH="$HOME/.cargo/bin:$PATH"
+        apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 install -y --no-install-recommends python3-jsonschema util-linux
+        unset MARQDO_BIN MARQDO_STDLIB_DIR
         bash scripts/integration.sh
