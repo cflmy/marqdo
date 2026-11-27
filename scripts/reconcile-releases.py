@@ -59,22 +59,23 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
 
 
 class Gitea:
-    def __init__(self, token: str):
+    def __init__(self, token: str, dispatch_token: str = ""):
         self.token = token
+        self.dispatch_token = dispatch_token
         self.opener = urllib.request.build_opener(NoRedirect())
 
-    def open(self, method, url, data=None, authenticated=False):
+    def open(self, method, url, data=None, authorization=None):
         headers = {}
-        if authenticated and self.token:
-            headers["Authorization"] = f"token {self.token}"
+        if authorization:
+            headers["Authorization"] = authorization
         if data is not None:
             headers["Content-Type"] = "application/json"
         request = urllib.request.Request(url, data=data, headers=headers, method=method)
         return self.opener.open(request, timeout=30)
 
-    def request(self, method, base, path, data=None, authenticated=False):
+    def request(self, method, base, path, data=None, authorization=None):
         try:
-            with self.open(method, base + path, data, authenticated) as response:
+            with self.open(method, base + path, data, authorization) as response:
                 payload = response.read(8 * MAX_INDEX_BYTES + 1)
                 require(len(payload) <= 8 * MAX_INDEX_BYTES, "API response exceeds size limit")
                 return json.loads(payload)
@@ -84,14 +85,20 @@ class Gitea:
             raise ApiUnavailable(f"{method} {path}: {error}") from error
 
     def get(self, path):
-        return self.request("GET", FORGE + "/api/v1", path, authenticated=True)
+        return self.request("GET", FORGE + "/api/v1", path,
+                            authorization=f"token {self.token}" if self.token else None)
 
     def post(self, path, data):
         return self.request("POST", FORGE + "/api/v1", path,
-                            json.dumps(data).encode(), authenticated=True)
+                            json.dumps(data).encode(), f"token {self.token}")
 
     def ci(self, path):
         return self.request("GET", CI + "/api", path)
+
+    def dispatch_ci(self, path, data=None):
+        return self.request("GET" if data is None else "POST", CI + "/api", path,
+                            None if data is None else json.dumps(data).encode(),
+                            f"Bearer {self.dispatch_token}")
 
     def asset(self, path, size, *, index=False):
         limit = MAX_INDEX_BYTES if index else MAX_ASSET_BYTES
@@ -180,12 +187,7 @@ def managed_repositories(root):
     return revision, graph, managed
 
 
-def verify_pipeline(client, repository, source_sha, evidence):
-    require(exact_fields(evidence, {"pipeline_number", "url", "source_sha"}),
-            "invalid component CI evidence")
-    number = evidence["pipeline_number"]
-    require(type(number) is int and number > 0 and evidence["source_sha"] == source_sha,
-            "release has no component CI evidence for its exact SHA")
+def ci_repository(client, repository):
     repo = client.ci(f"/repos/lookup/{repository}")
     forge_repo = client.get(f"/repos/{repository}")
     require(isinstance(repo, dict) and repo.get("full_name") == repository
@@ -193,9 +195,19 @@ def verify_pipeline(client, repository, source_sha, evidence):
             and isinstance(forge_repo, dict) and type(forge_repo.get("id")) is int
             and repo.get("forge_remote_id") == str(forge_repo["id"]),
             "CI repository identity mismatch")
-    expected_url = f"{CI}/repos/{repo['id']}/pipeline/{number}"
+    return repo["id"], forge_repo
+
+
+def verify_pipeline(client, repository, source_sha, evidence):
+    require(exact_fields(evidence, {"pipeline_number", "url", "source_sha"}),
+            "invalid component CI evidence")
+    number = evidence["pipeline_number"]
+    require(type(number) is int and number > 0 and evidence["source_sha"] == source_sha,
+            "release has no component CI evidence for its exact SHA")
+    repo_id, _ = ci_repository(client, repository)
+    expected_url = f"{CI}/repos/{repo_id}/pipeline/{number}"
     require(evidence["url"] == expected_url, "component CI URL mismatch")
-    pipeline = client.ci(f"/repos/{repo['id']}/pipelines/{number}")
+    pipeline = client.ci(f"/repos/{repo_id}/pipelines/{number}")
     workflow = "main" if repository == "cflmy/marqdo-cli" else "ci"
     require(isinstance(pipeline, dict) and pipeline.get("number") == number
             and pipeline.get("commit") == source_sha and pipeline.get("status") == "success"
@@ -425,13 +437,90 @@ def register_consumer_tasks(client, root_sha, entry, issue_cache):
             task.update(registration="blocked", error=str(error))
 
 
-def reconcile(client, root=PROJECT_ROOT, apply=False, report_out=None, cutoff=None):
+def verify_dispatch_identity(client):
+    actor = client.dispatch_ci("/user")
+    require(isinstance(actor, dict) and actor.get("login") == RECONCILE_ACCOUNT
+            and not actor.get("admin") and not actor.get("admin_env"),
+            "dispatch requires the non-admin reconcile account in Woodpecker")
+
+
+def dispatch_consumer(client, root_sha, task, published_at, can_start):
+    repo_id, forge_repo = ci_repository(client, task["repository"])
+    branch = forge_repo.get("default_branch")
+    require(match(BASENAME, branch), "consumer has an unsupported default branch name")
+    protected = client.get(f"/repos/{task['repository']}/branches/{branch}")
+    require(protected.get("protected") is True
+            and (protected.get("commit") or {}).get("id") == task["baseline_sha"],
+            "consumer default branch is unprotected or differs from the accepted gitlink")
+    ref = urllib.parse.urlencode({"ref": task["baseline_sha"]})
+    try:
+        config = client.get(f"/repos/{task['repository']}/contents/.woodpecker/upstream.yml?{ref}")
+    except ReconcileError as error:
+        if str(error).endswith(": HTTP 404"):
+            task["dispatch_status"] = "no-upstream-workflow"
+            return False
+        raise
+    require(config.get("type") == "file", "consumer upstream workflow is not a repository file")
+
+    api = f"/repos/{repo_id}"
+    permissions = client.dispatch_ci(f"{api}/permissions")
+    require(permissions.get("push") is True and permissions.get("admin") is False,
+            "dispatch needs project-level push permission without project admin")
+    require(type(task["issue"]) is int and task["issue"] > 0, "invalid consumer issue number")
+    key = hashlib.sha256(f"{root_sha}\n{task['key']}".encode()).hexdigest()
+    variables = {"MARQDO_UPSTREAM_ISSUE": str(task["issue"]), "MARQDO_UPSTREAM_TASK": key}
+
+    def corresponds(pipeline):
+        return (type(pipeline.get("number")) is int and pipeline["number"] > 0
+                and pipeline.get("event") == "manual" and pipeline.get("branch") == branch
+                and pipeline.get("selected_workflow") == "upstream"
+                and pipeline.get("author") == RECONCILE_ACCOUNT
+                and pipeline.get("commit") == task["baseline_sha"]
+                and pipeline.get("variables") == variables)
+
+    # Check Woodpecker's actual runs, including an accepted POST whose response
+    # was lost. A failed run remains evidence until the task inputs change.
+    pipelines = f"{api}/pipelines"
+    for page in range(1, MAX_PAGES + 1):
+        query = urllib.parse.urlencode(dict(event="manual", branch=branch, after=published_at,
+                                           page=page, perPage=PAGE_SIZE))
+        records = client.dispatch_ci(f"{pipelines}?{query}")
+        require(isinstance(records, list) and len(records) <= PAGE_SIZE, "invalid CI pipeline page")
+        existing = next((pipeline for pipeline in records if corresponds(pipeline)), None)
+        if existing or len(records) < PAGE_SIZE:
+            break
+    else:
+        raise ReconcileError("CI pipeline pagination limit reached")
+    started = False
+    if existing is None:
+        if not can_start:
+            task["dispatch_status"] = "queued-for-dispatch"
+            return False
+        verify_root_base(client, root_sha)
+        existing = client.dispatch_ci(pipelines, {"branch": branch, "workflow": "upstream",
+                                                  "variables": variables})
+        require(isinstance(existing, dict) and corresponds(existing),
+                "dispatched pipeline differs from the intended consumer task")
+        started = True
+    task["dispatch_status"] = existing["status"]
+    task["pipeline"] = f"{CI}/repos/{repo_id}/pipeline/{existing['number']}"
+    return started
+
+
+def reconcile(client, root=PROJECT_ROOT, apply=False, report_out=None, cutoff=None, dispatch=False):
     root_sha, graph, managed = managed_repositories(root)
     cutoff_time = timestamp(cutoff) if cutoff else None
     issues_url = f"/repos/{ROOT_REPOSITORY}/issues"
     issues = list(pages(client, issues_url, state="all", type="issues", labels=LABEL))
     if apply:
         verify_apply_context(client, root_sha)
+    dispatch_status, dispatch_error, starts = "disabled", None, 0
+    if apply and dispatch:
+        try:
+            verify_dispatch_identity(client)
+            dispatch_status = "enabled"
+        except ReconcileError as error:
+            dispatch_status, dispatch_error = "unavailable", str(error)
     labels = f"/repos/{ROOT_REPOSITORY}/labels"
     label_id = next((x["id"] for x in pages(client, labels) if x.get("name") == LABEL), None) if apply else None
     results, errors, consumer_issues = [], {}, {}
@@ -506,6 +595,15 @@ def reconcile(client, root=PROJECT_ROOT, apply=False, report_out=None, cutoff=No
                         and entry["status"] in {"created", "pending", "tracked"}
                         and (not trackers or trackers[0]["state"] == "open")):
                     register_consumer_tasks(client, root_sha, entry, consumer_issues)
+                    if dispatch_status == "enabled":
+                        for task in entry["consumer_tasks"]:
+                            if task["status"] != "pending" or task["registration"] != "recorded":
+                                continue
+                            try:
+                                starts += dispatch_consumer(client, root_sha, task, entry["published_at"],
+                                                            can_start=starts < 4)
+                            except ReconcileError as error:
+                                task.update(dispatch_status="blocked", dispatch_error=str(error))
                 results.append(entry)
             prefix = f"<!-- marqdo:release-reconcile repository={repository} tag="
             for issue in issues:
@@ -529,10 +627,13 @@ def reconcile(client, root=PROJECT_ROOT, apply=False, report_out=None, cutoff=No
         "root_repository": ROOT_REPOSITORY, "root_sha": root_sha,
         "apply": apply, "repositories": len(managed), "releases": len(results),
         "scan_complete": not errors, "scan_errors": errors, "results": results,
+        "dispatch_status": dispatch_status,
         "counts": {status: sum(item["status"] == status for item in results)
                    for status in sorted({item["status"] for item in results})},
         "generated_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
     }
+    if dispatch_error:
+        report["dispatch_error"] = dispatch_error
     if report_out:
         report_out.parent.mkdir(parents=True, exist_ok=True)
         report_out.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n")
@@ -549,6 +650,7 @@ def main(argv):
     parser.add_argument("--published-after", default=os.environ.get("MARQDO_RECONCILE_PUBLISHED_AFTER"))
     args = parser.parse_args(argv)
     token = os.environ.get("MARQDO_GIT_TOKEN", "")
+    dispatch_token = os.environ.get("MARQDO_WOODPECKER_DISPATCH_TOKEN", "")
     if args.apply and not token:
         parser.error("--apply requires MARQDO_GIT_TOKEN")
     try:
@@ -557,15 +659,16 @@ def main(argv):
     except ReconcileError as error:
         parser.error(str(error))
     try:
-        report = reconcile(Gitea(token), args.root.resolve(), args.apply,
-                           args.report_out, args.published_after)
+        report = reconcile(Gitea(token, dispatch_token), args.root.resolve(), args.apply,
+                           args.report_out, args.published_after, dispatch=bool(dispatch_token))
     except (OSError, ReconcileError) as error:
         print(f"reconcile: {error}", file=sys.stderr)
         return 1
     print(json.dumps(report, ensure_ascii=False, indent=2))
-    return int(not report["scan_complete"] or any(
+    return int(not report["scan_complete"] or report["dispatch_status"] == "unavailable" or any(
         "tracking_update" in item
-        or any(task.get("registration") == "blocked" for task in item.get("consumer_tasks", []))
+        or any(task.get("registration") == "blocked" or task.get("dispatch_status") == "blocked"
+               for task in item.get("consumer_tasks", []))
         for item in report["results"]))
 
 

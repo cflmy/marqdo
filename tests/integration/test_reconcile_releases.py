@@ -140,6 +140,52 @@ class ReconcileTest(unittest.TestCase):
     def run_scan(self, **kwargs):
         return reconcile.reconcile(self.forge, **kwargs)
 
+    def test_native_dispatch_reuses_a_run_for_the_same_task_and_root(self):
+        task = {"repository": REPO, "baseline_sha": BASE, "issue": 42, "key": "c" * 64}
+        routes = {
+            f"/repos/{REPO}/branches/master": {"protected": True, "commit": {"id": BASE}},
+            f"/repos/{REPO}/contents/.woodpecker/upstream.yml?ref={BASE}": {"type": "file"},
+            "/repos/cflmy/marqdo/branches/main": {"protected": True, "commit": {"id": BASE}},
+        }
+        runs = []
+        posts = []
+
+        def dispatch(path, data=None):
+            if path == "/repos/8/permissions":
+                return {"push": True, "admin": False}
+            if data is None:
+                self.assertTrue(path.startswith("/repos/8/pipelines?"))
+                return runs
+            self.assertEqual(path, "/repos/8/pipelines")
+            self.assertEqual(data["branch"], "master")
+            self.assertEqual(data["workflow"], "upstream")
+            self.assertEqual(data["variables"]["MARQDO_UPSTREAM_ISSUE"], "42")
+            posts.append(data)
+            runs.append({"number": 15, "status": "pending", "author": ACTOR["login"],
+                         "event": "manual", "branch": data["branch"], "commit": BASE,
+                         "selected_workflow": data["workflow"], "variables": data["variables"]})
+            return runs[-1]
+
+        with (patch.object(reconcile, "ci_repository", return_value=(8, {"default_branch": "master"})),
+              patch.object(self.forge, "get", side_effect=routes.__getitem__),
+              patch.object(self.forge, "dispatch_ci", side_effect=dispatch, create=True)):
+            self.assertTrue(reconcile.dispatch_consumer(self.forge, BASE, task, PUBLISHED, True))
+            self.assertFalse(reconcile.dispatch_consumer(self.forge, BASE, task, PUBLISHED, True))
+            self.assertEqual(task["pipeline"], f"{reconcile.CI}/repos/8/pipeline/15")
+            self.assertEqual(len(posts), 1)
+            routes[f"/repos/{REPO}/branches/master"]["protected"] = False
+            with self.assertRaisesRegex(reconcile.ReconcileError, "unprotected"):
+                reconcile.dispatch_consumer(self.forge, BASE, task, PUBLISHED, True)
+            self.assertEqual(len(posts), 1)
+
+    def test_dispatch_rejects_owner_or_admin_identity_before_writing_to_ci(self):
+        for identity in ({"login": "cflmy"}, {**ACTOR, "admin": True}):
+            with patch.object(self.forge, "dispatch_ci", return_value=identity, create=True) as ci:
+                report = self.run_scan(apply=True, dispatch=True)
+            ci.assert_called_once_with("/user")
+            self.assertTrue(report["scan_complete"])
+            self.assertEqual(report["dispatch_status"], "unavailable")
+
     def test_dry_run_fully_verifies_without_writing(self):
         report = self.run_scan()
         self.assertEqual(self.forge.writes, [])
