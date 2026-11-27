@@ -1,0 +1,12 @@
+# Shared Rust-component CI image: shell base + one pinned Rust toolchain
+# (rustfmt/clippy included) and a warm cargo cache. Published by immutable tag;
+# repositories only run their own scripts/ci.sh.
+FROM marqdo-ci-shell:3.0.0-rc.5
+
+COPY rust-toolchain /opt/rust
+COPY cargo-home /opt/cargo-home
+ENV PATH=/opt/rust/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
+    CARGO_HOME=/opt/cargo-home \
+    RUSTUP_HOME=/opt/rustup-unused
+
+RUN cargo --version && rustc --version && cargo fmt --version && cargo clippy --version

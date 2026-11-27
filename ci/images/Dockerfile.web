@@ -1,0 +1,24 @@
+# Shared Web-domain CI image: Playwright base (Node 20/Chromium, glibc 2.39),
+# the published CLI/Bundle and the packaged preview web Tool. The domain runs
+# its real browser acceptance without installing a Rust toolchain.
+FROM mcr.microsoft.com/playwright:v1.49.0-noble
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates curl git python3 \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY marqdo.tar.gz /tmp/marqdo.tar.gz
+COPY marqdo-web-preview.tgz /tmp/marqdo-web-preview.tgz
+
+RUN mkdir -p /opt/marqdo /opt/web-tool \
+    && tar -xzf /tmp/marqdo.tar.gz -C /opt/marqdo \
+    && tar -xzf /tmp/marqdo-web-preview.tgz -C /opt/web-tool --strip-components=1 \
+    && rm /tmp/marqdo.tar.gz /tmp/marqdo-web-preview.tgz
+
+ENV MARQDO_BIN=/opt/marqdo/marqdo-3.0.0-rc.5-x86_64-unknown-linux-gnu/marqdo \
+    MARQDO_STDLIB_DIR=/opt/marqdo/marqdo-3.0.0-rc.5-x86_64-unknown-linux-gnu/stdlib \
+    MARQDO_WEB_TOOL_JSON=/opt/web-tool/tool.json \
+    PLAYWRIGHT_BROWSERS_PATH=/ms-playwright \
+    MARQDO_CLI_VERSION=3.0.0-rc.5
+
+RUN test -x "$MARQDO_BIN" && "$MARQDO_BIN" --version && test -f "$MARQDO_WEB_TOOL_JSON"

@@ -1,0 +1,18 @@
+# Release discovery, asset verification and tracking-Issue reconciliation.
+#
+# Runs only from the protected default branch, on a manual trigger or the
+# `release-reconcile` cron. The fast path (component release workflows) only
+# asks this same workflow to run; correctness comes from this reconcile.
+when:
+  event: [manual, cron]
+  branch: [main]
+
+steps:
+  reconcile:
+    image: git.cflmy.cn/cflmy/marqdo-ci-shell:3.0.0-rc.5
+    environment:
+      MARQDO_GIT_TOKEN:
+        from_secret: gitea_token
+    commands:
+      - python3 scripts/reconcile-releases.py --apply --published-after 2026-11-27T02:00:00Z --report-out reconcile-report.json
+      - cat reconcile-report.json
