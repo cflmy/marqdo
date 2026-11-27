@@ -16,6 +16,11 @@ steps:
       MARQDO_GIT_TOKEN:
         from_secret: gitea_reconcile_token
     commands:
-      - python3 scripts/check-layout.py
-      - git submodule update --init
+      - |
+        set -eu
+        domains="$(python3 scripts/check-layout.py --root-domain-paths)"
+        for domain in $domains; do
+          git submodule update --init -- "$domain"
+        done
+      - python3 scripts/check-layout.py --domain-paths
       - python3 scripts/reconcile-releases.py --apply --published-after 2026-11-27T02:00:00Z --report-out reconcile-report.json

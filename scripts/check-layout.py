@@ -452,6 +452,7 @@ def main():
     paths.add_argument("--active-paths", action="store_true", help="print only direct active component paths")
     paths.add_argument("--active-entries", action="store_true", help="print validated active entries in dependency order")
     paths.add_argument("--domain-paths", action="store_true", help="validate domain URLs and print domain paths")
+    paths.add_argument("--root-domain-paths", action="store_true", help="print root domain gitlinks before checkout")
     args = parser.parse_args()
     try:
         revision = git("rev-parse", "--verify", args.revision + "^{commit}").strip()
@@ -463,7 +464,7 @@ def main():
             for path, component in sorted(layers[0].linked.items()):
                 if component["state"] == "active":
                     print(path)
-        elif args.domain_paths:
+        elif args.domain_paths or args.root_domain_paths:
             for path, component in sorted(layers[0].linked.items()):
                 if component["kind"] == "domain":
                     print(path)
