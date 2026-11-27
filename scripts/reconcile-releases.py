@@ -44,6 +44,15 @@ class ReconcileError(Exception):
     pass
 
 
+class ApiUnavailable(ReconcileError):
+    """The API could not supply the facts needed to complete the scan."""
+
+
+def http_error(method, path, status):
+    error = ApiUnavailable if status in {401, 403, 429} or status >= 500 else ReconcileError
+    return error(f"{method} {path}: HTTP {status}")
+
+
 class NoRedirect(urllib.request.HTTPRedirectHandler):
     def redirect_request(self, request, fp, code, message, headers, newurl):
         return None
@@ -70,9 +79,9 @@ class Gitea:
                 require(len(payload) <= 8 * MAX_INDEX_BYTES, "API response exceeds size limit")
                 return json.loads(payload)
         except urllib.error.HTTPError as error:
-            raise ReconcileError(f"{method} {path}: HTTP {error.code}") from error
+            raise http_error(method, path, error.code) from error
         except (OSError, ValueError, http.client.HTTPException) as error:
-            raise ReconcileError(f"{method} {path}: {error}") from error
+            raise ApiUnavailable(f"{method} {path}: {error}") from error
 
     def get(self, path):
         return self.request("GET", FORGE + "/api/v1", path, authenticated=True)
@@ -99,9 +108,9 @@ class Gitea:
                     if index:
                         payload.extend(chunk)
         except urllib.error.HTTPError as error:
-            raise ReconcileError(f"GET {path}: HTTP {error.code}") from error
+            raise http_error("GET", path, error.code) from error
         except (OSError, http.client.HTTPException) as error:
-            raise ReconcileError(f"GET {path}: {error}") from error
+            raise ApiUnavailable(f"GET {path}: {error}") from error
         require(received == size, f"asset {path} size mismatch")
         return digest.hexdigest(), bytes(payload)
 
@@ -472,6 +481,8 @@ def reconcile(client, root=PROJECT_ROOT, apply=False, report_out=None, cutoff=No
                         require(not old or old == {identity_marker(entry)},
                                 "published release identity or index digest changed")
                         entry["release_key"], entry["consumer_tasks"] = consumer_inputs(entry, graph)
+                except ApiUnavailable:
+                    raise
                 except ReconcileError as error:
                     entry.update(status="blocked", error=str(error))
 
@@ -553,7 +564,7 @@ def main(argv):
         return 1
     print(json.dumps(report, ensure_ascii=False, indent=2))
     return int(not report["scan_complete"] or any(
-        item["status"] == "blocked" or "tracking_update" in item
+        "tracking_update" in item
         or any(task.get("registration") == "blocked" for task in item.get("consumer_tasks", []))
         for item in report["results"]))
 

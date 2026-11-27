@@ -2,9 +2,12 @@
 
 import hashlib
 import importlib.util
+import io
 import json
+import os
 import sys
 import unittest
+from contextlib import redirect_stdout
 from pathlib import Path
 from unittest.mock import patch
 from urllib.parse import parse_qs, urlsplit
@@ -228,6 +231,25 @@ class ReconcileTest(unittest.TestCase):
         entry, = self.run_scan()["results"]
         self.assertEqual(entry["status"], "blocked")
         self.assertIn("cover the published assets", entry["error"])
+
+    def test_recorded_release_block_does_not_fail_a_complete_operational_scan(self):
+        self.forge.pipeline_sha = BASE
+        with (patch.dict(os.environ, {"MARQDO_GIT_TOKEN": "fixture"}),
+              patch.object(reconcile, "Gitea", return_value=self.forge),
+              redirect_stdout(io.StringIO()) as stdout):
+            result = reconcile.main(["--apply"])
+        self.assertEqual(result, 0)
+        report = json.loads(stdout.getvalue())
+        self.assertTrue(report["scan_complete"])
+        self.assertEqual(report["results"][0]["status"], "blocked")
+        self.assertEqual(len(self.forge.issues), 1)
+
+    def test_asset_api_outage_leaves_the_scan_incomplete(self):
+        with patch.object(self.forge, "asset", side_effect=reconcile.http_error("GET", "/asset", 503)):
+            report = self.run_scan(apply=True)
+        self.assertFalse(report["scan_complete"])
+        self.assertEqual(report["scan_errors"][REPO], "GET /asset: HTTP 503")
+        self.assertEqual(self.forge.writes, [])
 
     def test_validated_tracker_detects_an_updated_index_and_disappearing_release(self):
         self.run_scan(apply=True)
