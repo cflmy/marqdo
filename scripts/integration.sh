@@ -121,10 +121,19 @@ run_consumer() (
             MARQDO_STDLIB_DIR="$installed/stdlib" "./$entry"
             ;;
         web)
-            export MARQDO_WEB_TOOL_JSON="$PWD/preview/dist/marqdo-web-preview/tool.json"
-            test -f "$MARQDO_WEB_TOOL_JSON"
+            web_tool="$PWD/preview/dist/marqdo-web-preview/tool.json"
+            export MARQDO_TOOL_HOME="$MARQDO_CI_OUT/tool-home"
             cli_before="$(sha256sum "$MARQDO_BIN")"
-            "./$entry"
+            "$MARQDO_BIN" tool install "$web_tool"
+            example=examples/research-workspace
+            "$MARQDO_BIN" web check "$example/index.mq.md" --unit 工作台 --root "$example"
+            "$MARQDO_BIN" web preview "$example/index.mq.md" --unit 工作台 --root "$example" \
+                --out "$MARQDO_CI_OUT/preview"
+            test -s "$MARQDO_CI_OUT/preview/index.html"
+            "$MARQDO_BIN" web handoff "$example/index.mq.md" --unit 工作台 --root "$example" \
+                --out "$MARQDO_CI_OUT/handoff.md"
+            test -s "$MARQDO_CI_OUT/handoff.md"
+            "$MARQDO_BIN" tool remove web
             test "$(sha256sum "$MARQDO_BIN")" = "$cli_before"
             ;;
         view)
