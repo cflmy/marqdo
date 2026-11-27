@@ -24,6 +24,7 @@ TAG = "v0.1.0-rc.1"
 PUBLISHED = "2026-11-27T08:00:00+08:00"
 ASSET = "text-source.tar.gz"
 ISSUES = "/repos/cflmy/marqdo/issues"
+CONSUMER_ISSUES = "/repos/cflmy/marqdo-ext-archive/issues"
 FORGE = reconcile.FORGE
 ACTOR = {"login": reconcile.RECONCILE_ACCOUNT}
 COMPONENT = {"id": "std-text", "sha": BASE, "path": "stdlib/text",
@@ -34,6 +35,7 @@ class FakeForge:
     def __init__(self):
         self.writes = []
         self.issues = []
+        self.consumer_issues = []
         self.comments = {}
         self.pages = []
         self.pipeline_reads = []
@@ -77,6 +79,7 @@ class FakeForge:
             records = {
                 f"/repos/{REPO}/releases": self.releases,
                 ISSUES: self.issues,
+                CONSUMER_ISSUES: self.consumer_issues,
                 "/repos/cflmy/marqdo/labels": [{"id": 5, "name": reconcile.LABEL}],
                 **self.comments,
             }.get(path, [])
@@ -111,10 +114,11 @@ class FakeForge:
 
     def post(self, path, data):
         self.writes.append((path, data))
-        item = {"body": data["body"], "user": ACTOR}
-        if path == ISSUES:
-            item["number"] = 100 + len(self.issues)
-            self.issues.append(item)
+        item = {"body": data["body"], "user": ACTOR, "state": "open"}
+        if path in {ISSUES, CONSUMER_ISSUES}:
+            issues = self.issues if path == ISSUES else self.consumer_issues
+            item["number"] = 100 + len(issues)
+            issues.append(item)
         else:
             self.comments.setdefault(path, []).append(item)
         return item
@@ -144,6 +148,7 @@ class ReconcileTest(unittest.TestCase):
 
     def test_consumer_inputs_are_tied_to_assets_dependencies_and_accepted_sha(self):
         consumer = {"id": "archive", "state": "active", "sha": "c" * 40,
+                    "remote": FORGE + "/cflmy/marqdo-ext-archive.git",
                     "requires": ["std-text", "cli"], "checks_with": []}
         cli = {"id": "cli", "state": "active", "sha": "d" * 40,
                "requires": [], "checks_with": []}
@@ -168,6 +173,26 @@ class ReconcileTest(unittest.TestCase):
             self.assertEqual(task["status"], "waiting-for-dependencies")
             self.assertEqual(task["different_dependencies"], ["cli"])
         self.assertEqual(self.forge.writes, [])
+
+    def test_apply_creates_one_consumer_issue_and_records_new_inputs_in_it(self):
+        consumer = {"id": "archive", "state": "active", "sha": "c" * 40,
+                    "remote": FORGE + "/cflmy/marqdo-ext-archive.git",
+                    "requires": ["std-text"], "checks_with": []}
+        graph = {item["id"]: item for item in (COMPONENT, consumer)}
+        with patch.object(reconcile, "managed_repositories", return_value=(BASE, graph, {REPO: COMPONENT})):
+            entry, = self.run_scan(apply=True)["results"]
+            task, = entry["consumer_tasks"]
+            self.assertEqual(task["registration"], "recorded")
+            self.assertEqual(task["issue"], 100)
+            self.assertIn(FORGE + "/cflmy/marqdo/issues/100", self.forge.consumer_issues[0]["body"])
+            self.run_scan(apply=True)
+            self.assertEqual(len(self.forge.writes), 2)
+            consumer["sha"] = "e" * 40
+            self.run_scan(apply=True)
+            self.assertEqual(len(self.forge.consumer_issues), 1)
+            self.assertEqual(len(self.forge.comments[CONSUMER_ISSUES + "/100/comments"]), 1)
+            self.run_scan(apply=True)
+            self.assertEqual(len(self.forge.comments[CONSUMER_ISSUES + "/100/comments"]), 1)
 
     def test_apply_creates_one_verified_tracker_then_rechecks_it(self):
         entry, = self.run_scan(apply=True)["results"]

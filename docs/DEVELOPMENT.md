@@ -82,6 +82,8 @@ bash scripts/integration.sh                # 生态候选：真实 CLI 制品 + 
 
 正式发布对账使用 `python3 scripts/reconcile-releases.py --plan --published-after <ISO-8601 时间>`。从固定根及领域 tree 解析受管仓库，核对 Gitea tag、`release-evidence.json`、同 SHA Woodpecker 组件 CI 和资产字节摘要。根 `reconcile` 工作流从当前受保护的 `main` 串行运行，使用 `gitea_reconcile_token` 以专用非管理员账号写追踪工单。`historical-baseline` 表示已登记历史输入，`blocked` 表示发布验证未通过，`tracked` 表示已记录经验证的发布。消费者验收和父级接受均需各自的 CI 与 PR 证据。
 
+对已验证的发布，`--plan` 计算直接 active 消费者的输入摘要。受保护 `--apply` 按发布和消费者登记一条任务，基线变化时在原任务中记录新输入。输入附精确资产、依赖、消费者基线和根追踪编号。下游独立 CI 及批准后的晋升基于各自的真实结果。
+
 ## 发行与回滚
 
 - 组件可独立 SemVer 发布；领域可发布经过验证的组合制品；根生态 release 固定整个 gitlink 树。独立版本不代表维护多套现行协议。

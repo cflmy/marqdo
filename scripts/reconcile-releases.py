@@ -288,6 +288,9 @@ def consumer_inputs(entry, graph):
     tasks = []
     for consumer_id in entry["direct_consumers"]:
         consumer = graph[consumer_id]
+        remote = REPOSITORY.fullmatch(consumer.get("remote") or "")
+        require(remote is not None and match(SHA, consumer.get("sha")),
+                f"{consumer_id}: consumer is missing its managed repository or accepted SHA")
         inputs = {
             "release": release,
             "consumer": {"id": consumer_id, "source_sha": consumer["sha"]},
@@ -298,7 +301,7 @@ def consumer_inputs(entry, graph):
         }
         digest = hashlib.sha256(json.dumps(inputs, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
         key = hashlib.sha256(f"{release_key}\n{consumer_id}\n{digest}".encode()).hexdigest()
-        tasks.append({"consumer": consumer_id, "key": key, "digest": digest,
+        tasks.append({"consumer": consumer_id, "repository": remote[1], "key": key, "digest": digest,
                       "baseline_sha": consumer["sha"], "inputs": inputs,
                       "status": "waiting-for-dependencies" if conflicts else "pending",
                       "different_dependencies": conflicts})
@@ -353,10 +356,62 @@ def verify_apply_context(client, root_sha):
     root = client.get(f"/repos/{ROOT_REPOSITORY}")
     require(isinstance(root, dict) and root.get("default_branch") == "main",
             "apply requires the root default branch")
+    verify_root_base(client, root_sha)
+
+
+def verify_root_base(client, root_sha):
     branch = client.get(f"/repos/{ROOT_REPOSITORY}/branches/main")
     require(isinstance(branch, dict) and branch.get("protected") is True
             and (branch.get("commit") or {}).get("id") == root_sha,
             "apply requires the current protected root commit")
+
+
+def register_consumer_tasks(client, root_sha, entry, issue_cache):
+    for task in entry["consumer_tasks"]:
+        issues_url = f"/repos/{task['repository']}/issues"
+        marker = f"<!-- marqdo:upstream release={entry['release_key']} consumer={task['consumer']} -->"
+        body = "\n".join([
+            marker,
+            f"<!-- marqdo:candidate-inputs {task['key']} -->",
+            "",
+            f"- Root tracking issue: {FORGE}/{ROOT_REPOSITORY}/issues/{entry['issue']}",
+            f"- Root candidate: {root_sha}",
+            f"- Consumer baseline: {task['baseline_sha']}",
+            f"- Input digest: {task['digest']}",
+            f"- State: {task['status']}",
+            "",
+            "```json",
+            json.dumps(task["inputs"], ensure_ascii=False, sort_keys=True, indent=2),
+            "```",
+        ])
+        try:
+            if issues_url not in issue_cache:
+                issue_cache[issues_url] = list(pages(client, issues_url, state="all", type="issues"))
+            issues = issue_cache[issues_url]
+            matches = [issue for issue in issues if is_writer(issue)
+                       and (issue.get("body") or "").splitlines()[:1] == [marker]]
+            require(len(matches) <= 1, "multiple matching consumer tasks")
+            if matches:
+                issue = matches[0]
+                if issue["state"] == "open":
+                    comments = tracking_comments(client, issues_url, issue)
+                    key_line = f"<!-- marqdo:candidate-inputs {task['key']} -->"
+                    if not any(key_line in note.splitlines() for note in [issue["body"], *comments]):
+                        verify_root_base(client, root_sha)
+                        client.post(f"{issues_url}/{issue['number']}/comments", {"body": body})
+                else:
+                    task["registration"] = "closed"
+            else:
+                verify_root_base(client, root_sha)
+                issue = client.post(issues_url, {
+                    "title": f"[upstream] {entry['component']} {entry['tag']} for {task['consumer']}",
+                    "body": body,
+                })
+                issues.append(issue)
+            task["issue"] = issue["number"]
+            task.setdefault("registration", "recorded")
+        except ReconcileError as error:
+            task.update(registration="blocked", error=str(error))
 
 
 def reconcile(client, root=PROJECT_ROOT, apply=False, report_out=None, cutoff=None):
@@ -368,7 +423,7 @@ def reconcile(client, root=PROJECT_ROOT, apply=False, report_out=None, cutoff=No
         verify_apply_context(client, root_sha)
     labels = f"/repos/{ROOT_REPOSITORY}/labels"
     label_id = next((x["id"] for x in pages(client, labels) if x.get("name") == LABEL), None) if apply else None
-    results, errors = [], {}
+    results, errors, consumer_issues = [], {}, {}
     for repository, component in managed.items():
         known_tags = set()
         try:
@@ -434,6 +489,10 @@ def reconcile(client, root=PROJECT_ROOT, apply=False, report_out=None, cutoff=No
                     entry["issue"] = created["number"]
                     if entry["status"] == "pending":
                         entry["status"] = "created"
+                if (apply and entry.get("consumer_tasks") and not entry.get("tracking_update")
+                        and entry["status"] in {"created", "pending", "tracked"}
+                        and (not trackers or trackers[0]["state"] == "open")):
+                    register_consumer_tasks(client, root_sha, entry, consumer_issues)
                 results.append(entry)
             prefix = f"<!-- marqdo:release-reconcile repository={repository} tag="
             for issue in issues:
@@ -492,7 +551,9 @@ def main(argv):
         return 1
     print(json.dumps(report, ensure_ascii=False, indent=2))
     return int(not report["scan_complete"] or any(
-        item["status"] == "blocked" or "tracking_update" in item for item in report["results"]))
+        item["status"] == "blocked" or "tracking_update" in item
+        or any(task.get("registration") == "blocked" for task in item.get("consumer_tasks", []))
+        for item in report["results"]))
 
 
 if __name__ == "__main__":
