@@ -1,13 +1,26 @@
 when:
-  event: [push, pull_request, manual]
+  - event: [pull_request, manual]
+  - event: push
+    branch: main
 
 steps:
   layout:
-    image: rust:1.100-bookworm
+    image: git.cflmy.cn/cflmy/marqdo-ci-shell:3.0.0-rc.5@sha256:8184439a201da451271f37596f4e38afeab16e044d7591853779887ef5ec28c1
     commands:
-      - apt-get update && apt-get install -y --no-install-recommends ca-certificates git python3
       - python3 scripts/check-layout.py
       - python3 -m unittest discover -s tests/integration
+
+  checkouts:
+    image: git.cflmy.cn/cflmy/marqdo-ci-shell:3.0.0-rc.5@sha256:8184439a201da451271f37596f4e38afeab16e044d7591853779887ef5ec28c1
+    depends_on: [layout]
+    when: &needs_candidate
+      - event: manual
+      - event: [push, pull_request]
+        path:
+          # Governance, executable Markdown, packaging and unknown paths stay in scope.
+          exclude: [README.md, 'docs/evidence/*.md']
+          on_empty: true
+    commands:
       - git submodule update --init
       - |
         set -eu
@@ -21,7 +34,8 @@ steps:
   candidate:
     # Match the Linux/glibc environment already used by View for the RC.4 artifact.
     image: mcr.microsoft.com/playwright:v1.49.0-noble
-    depends_on: [layout]
+    depends_on: [checkouts]
+    when: *needs_candidate
     commands:
       - |
         set -eu

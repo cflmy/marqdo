@@ -35,7 +35,7 @@ bash scripts/integration.sh                # 生态候选：真实 CLI 制品 + 
 - 校验器读取 Git tree 中固定提交的 catalog，不以工作区改动替代候选；`--checkouts` 需要子模块已初始化，缺失、错误 HEAD、脏工作区、错误入口都明确 FAIL/UNVERIFIED，不静默跳过。CI 先验证并检出直属子模块，再用 `--domain-paths` 校验领域的子模块远端，最后逐个领域检出直属子库。
 - 没有 active 领域时，新校验规则同样接受合法的直属功能组件，这不是历史协议兼容。
 - 未知的 active 入口、未声明的 gitlink、目录与 catalog 不一致都必须让候选失败。`planned` 不进入验收计数。
-- 当前 CI 为 `layout` 与 `candidate` 两段；统一 CLI 制品准备、声明驱动调度与递归影响分析仍在推进（见 `.woodpecker/eco.yml` 与主仓库工单），不得以本文件描述当作已实现。
+- 根 `eco` 在 PR、`main` 推送和显式手动运行时执行。PR 始终保留 `layout` 状态。仅改动根 `README.md` 或 `docs/evidence/` 下的 Markdown 记录时，自动运行只执行轻量结构校验和脚本测试。混合改动、其他路径、缺失变更列表和手动运行都执行递归检出及完整生态验收。
 
 ## 三层验收
 
