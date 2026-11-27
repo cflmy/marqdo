@@ -186,6 +186,19 @@ class ReconcileTest(unittest.TestCase):
             self.assertTrue(report["scan_complete"])
             self.assertEqual(report["dispatch_status"], "unavailable")
 
+    def test_unavailable_dispatch_does_not_fail_a_complete_scan(self):
+        with (patch.dict(os.environ, {"MARQDO_GIT_TOKEN": "fixture",
+                                      "MARQDO_WOODPECKER_DISPATCH_TOKEN": "fixture"}),
+              patch.object(reconcile, "Gitea", return_value=self.forge),
+              patch.object(self.forge, "dispatch_ci", return_value={"login": "cflmy"}, create=True),
+              redirect_stdout(io.StringIO()) as stdout):
+            result = reconcile.main(["--apply"])
+        self.assertEqual(result, 0)
+        report = json.loads(stdout.getvalue())
+        self.assertTrue(report["scan_complete"])
+        self.assertEqual(report["dispatch_status"], "unavailable")
+        self.assertIn("non-admin reconcile account", report["dispatch_error"])
+
     def test_dry_run_fully_verifies_without_writing(self):
         report = self.run_scan()
         self.assertEqual(self.forge.writes, [])
