@@ -105,6 +105,24 @@ checks_with = ["web-preview"]
 release = "optional"
 '''
 
+APP = '''
+[[component]]
+id = "app-harness"
+path = "apps/harness"
+kind = "app"
+state = "planned"
+owner = "maintainer"
+scope = "official single-user agent application"
+requires = ["cli"]
+checks_with = []
+release = "optional"
+'''
+
+APP_ACTIVE = APP.replace('state = "planned"', 'state = "active"').replace(
+    'release = "optional"', 'release = "optional"\nentry = "scripts/ci.sh"')
+
+APP_URL = "https://git.cflmy.cn/cflmy/marqdo-app-harness.git"
+
 
 def catalog(*blocks):
     return "".join(blocks)
@@ -184,6 +202,119 @@ class LayoutTests(unittest.TestCase):
         self.candidate(url="https://git.cflmy.cn/cflmy/marqdo-view.git")
         with self.assertRaisesRegex(ValueError, "invalid submodule URL"):
             layout.validate("HEAD", False)
+
+    def root_fixture(self, metadata, modules, links, files=None):
+        (self.root / "components.toml").write_text(metadata)
+        if 'id = "cli"' in metadata and "path = cli" not in modules:
+            modules += f'[submodule "cli"]\npath = cli\nurl = {CORE_URL}\n'
+        if 'id = "cli"' in metadata and "cli" not in links:
+            links = {**links, "cli": self.sha}
+        (self.root / ".gitmodules").write_text(modules)
+        for relative, content in (files or {}).items():
+            path = self.root / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(content)
+        self.git("add", "-A")
+        for path, sha in links.items():
+            self.git("update-index", "--add", "--cacheinfo", f"160000,{sha},{path}")
+        self.git("-c", "user.name=Test", "-c", "user.email=test@example.invalid",
+                 "commit", "-qm", "app fixture")
+
+    def test_accepts_a_planned_app_gitlink(self):
+        self.root_fixture(
+            CLI + APP,
+            f'[submodule "cli"]\npath = cli\nurl = {CORE_URL}\n'
+            f'[submodule "apps/harness"]\npath = apps/harness\nurl = {APP_URL}\n',
+            {"cli": self.sha, "apps/harness": self.sha})
+        root = layout.validate("HEAD", False)[0]
+        self.assertEqual(root.linked["apps/harness"]["kind"], "app")
+        self.assertEqual(root.linked["apps/harness"]["state"], "planned")
+
+    def test_rejects_an_app_outside_the_apps_path(self):
+        self.root_fixture(
+            CLI + APP.replace('path = "apps/harness"', 'path = "apps/other"'),
+            f'[submodule "other"]\npath = apps/other\nurl = {APP_URL}\n',
+            {"apps/other": self.sha})
+        with self.assertRaisesRegex(ValueError, "invalid path: app-harness: apps/other"):
+            layout.validate("HEAD", False)
+
+    def test_rejects_an_app_id_without_the_app_prefix(self):
+        self.root_fixture(
+            CLI + APP.replace('id = "app-harness"', 'id = "harness"'),
+            f'[submodule "harness"]\npath = apps/harness\nurl = {APP_URL}\n',
+            {"apps/harness": self.sha})
+        with self.assertRaisesRegex(ValueError, "app id must start with 'app-'"):
+            layout.validate("HEAD", False)
+
+    def test_rejects_a_wrong_app_remote(self):
+        self.root_fixture(
+            CLI + APP,
+            f'[submodule "harness"]\npath = apps/harness\nurl = '
+            f'https://git.cflmy.cn/cflmy/marqdo-harness.git\n',
+            {"apps/harness": self.sha})
+        with self.assertRaisesRegex(ValueError, "invalid submodule URL: apps/harness"):
+            layout.validate("HEAD", False)
+
+    def test_rejects_an_app_with_a_base_release_role(self):
+        self.root_fixture(
+            CLI + APP.replace('release = "optional"', 'release = "base"'),
+            f'[submodule "harness"]\npath = apps/harness\nurl = {APP_URL}\n',
+            {"apps/harness": self.sha})
+        with self.assertRaisesRegex(ValueError, "invalid release role: app-harness"):
+            layout.validate("HEAD", False)
+
+    def test_rejects_an_app_dependency_on_a_domain(self):
+        domain = WEB_DOMAIN.replace('state = "active"', 'state = "planned"').replace(
+            'entry = "scripts/integration.sh"\n', '')
+        self.root_fixture(
+            CLI + domain + APP.replace('requires = ["cli"]', 'requires = ["cli", "web"]'),
+            f'[submodule "harness"]\npath = apps/harness\nurl = {APP_URL}\n',
+            {"apps/harness": self.sha})
+        with self.assertRaisesRegex(ValueError, "requires must not target a domain: app-harness -> web"):
+            layout.validate("HEAD", False)
+
+    def test_rejects_an_app_dependency_on_another_app(self):
+        second = APP.replace('id = "app-harness"', 'id = "app-other"').replace(
+            'path = "apps/harness"', 'path = "apps/other"').replace(
+            'requires = ["cli"]', 'requires = ["cli", "app-harness"]')
+        self.root_fixture(
+            CLI + APP + second,
+            f'[submodule "harness"]\npath = apps/harness\nurl = {APP_URL}\n'
+            f'[submodule "other"]\npath = apps/other\nurl = '
+            f'https://git.cflmy.cn/cflmy/marqdo-app-other.git\n',
+            {"apps/harness": self.sha, "apps/other": self.sha})
+        with self.assertRaisesRegex(ValueError, "app components cannot be dependencies: app-other -> app-harness"):
+            layout.validate("HEAD", False)
+
+    def test_rejects_a_component_dependency_on_an_app(self):
+        view = '''
+[[component]]
+id = "view"
+path = "tools/view"
+kind = "tool"
+state = "active"
+owner = "maintainer"
+scope = "read and observe"
+requires = ["cli", "app-harness"]
+checks_with = []
+release = "optional"
+entry = "scripts/acceptance.sh"
+'''
+        self.root_fixture(
+            CLI + APP_ACTIVE + view,
+            f'[submodule "cli"]\npath = cli\nurl = {CORE_URL}\n'
+            f'[submodule "harness"]\npath = apps/harness\nurl = {APP_URL}\n'
+            f'[submodule "view"]\npath = tools/view\nurl = https://git.cflmy.cn/cflmy/marqdo-view.git\n',
+            {"cli": self.sha, "apps/harness": self.sha, "tools/view": self.sha})
+        with self.assertRaisesRegex(ValueError, "app components cannot be dependencies: view -> app-harness"):
+            layout.validate("HEAD", False)
+
+    def test_rejects_an_app_inside_a_domain(self):
+        nested = {"id": "app-nested", "path": "harness", "kind": "app", "state": "planned",
+                  "owner": "maintainer", "scope": "nested", "requires": [], "checks_with": [],
+                  "release": "optional"}
+        with self.assertRaisesRegex(ValueError, "app kind is only allowed at the root layer"):
+            layout.check_component(nested, 1, "fixture domain", {}, set(), set())
 
     def test_rejects_unstaged_checkout(self):
         self.candidate()
@@ -436,6 +567,63 @@ entry = "scripts/acceptance.sh"
         self.assemble(design=design)
         with self.assertRaisesRegex(ValueError, r"domain web \(extensions/web\) leaf web-design \(design\): leaf must not register gitlinks"):
             layout.validate("HEAD", True)
+
+    def test_accepts_an_active_app_leaf_checkout(self):
+        core = self.leaf("core", entry="scripts/test.sh")
+        app = self.leaf("harness")
+        self.root_repo(catalog(CLI, APP_ACTIVE), {"cli": core[1], "apps/harness": app[1]},
+                       {"cli": CORE_URL, "apps/harness": APP_URL})
+        self.clone(core[0], self.root / "cli", core[1])
+        self.clone(app[0], self.root / "apps/harness", app[1])
+        layers = layout.validate("HEAD", True)
+        self.assertEqual(layers[0].linked["apps/harness"]["kind"], "app")
+        entries = list(layout.active_entries(layers))
+        self.assertIn(("app-harness", "app", "apps/harness", "scripts/ci.sh"), entries)
+        ids = [entry[0] for entry in entries]
+        self.assertLess(ids.index("cli"), ids.index("app-harness"))
+
+    def test_rejects_an_app_with_a_nested_gitlink(self):
+        core = self.leaf("core", entry="scripts/test.sh")
+        app = self.leaf_with_gitlink("harness")
+        self.root_repo(catalog(CLI, APP_ACTIVE), {"cli": core[1], "apps/harness": app[1]},
+                       {"cli": CORE_URL, "apps/harness": APP_URL})
+        self.clone(core[0], self.root / "cli", core[1])
+        self.clone(app[0], self.root / "apps/harness", app[1])
+        with self.assertRaisesRegex(
+                ValueError, r"leaf app-harness \(apps/harness\): leaf must not register gitlinks"):
+            layout.validate("HEAD", True)
+
+    def test_rejects_an_app_registered_by_a_domain_catalog(self):
+        nested = '''
+[[component]]
+id = "app-nested"
+path = "nested-app"
+kind = "app"
+state = "planned"
+owner = "maintainer"
+scope = "not allowed inside a domain"
+requires = []
+checks_with = []
+release = "optional"
+'''
+        core = self.leaf("core", entry="scripts/test.sh")
+        design = self.leaf("design")
+        preview = self.leaf("preview")
+        nested_leaf = self.leaf("nested-app")
+        domain_repo, domain_sha = self.domain(
+            DOMAIN + nested,
+            {"design": design[1], "preview": preview[1], "nested-app": nested_leaf[1]},
+            modules={
+                "design": "https://git.cflmy.cn/cflmy/marqdo-web-design.git",
+                "preview": "https://git.cflmy.cn/cflmy/marqdo-web-preview.git",
+                "nested-app": APP_URL,
+            })
+        self.root_repo(catalog(CLI, WEB_DOMAIN), {"cli": core[1], "extensions/web": domain_sha},
+                       {"cli": CORE_URL,
+                        "extensions/web": "https://git.cflmy.cn/cflmy/marqdo-ext-web.git"})
+        self.clone(domain_repo, self.root / "extensions/web", domain_sha)
+        with self.assertRaisesRegex(ValueError, "app kind is only allowed at the root layer: app-nested"):
+            layout.validate("HEAD", False, expand_domains=True)
 
     # -- catalog and layer failures ----------------------------------------
 
