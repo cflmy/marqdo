@@ -53,6 +53,7 @@ class FakeForge:
                         "published_at": PUBLISHED}
         self.releases = [self.release]
         self.protected = True
+        self.root_sha = BASE
         self.tag_sha = SOURCE
         self.pipeline_sha = SOURCE
         self.wrong_account = False
@@ -90,7 +91,7 @@ class FakeForge:
             f"/repos/{REPO}/tags/{TAG}": {"name": TAG, "commit": {"sha": self.tag_sha}},
             "/repos/cflmy/marqdo": {"default_branch": "main"},
             "/repos/cflmy/marqdo/branches/main": {"protected": self.protected,
-                                                 "commit": {"id": BASE}},
+                                                 "commit": {"id": self.root_sha}},
             "/user": ({"login": "admin", "is_admin": True} if self.wrong_account
                       else {**ACTOR, "is_admin": False}),
         }[path]
@@ -193,6 +194,14 @@ class ReconcileTest(unittest.TestCase):
             self.assertEqual(len(self.forge.comments[CONSUMER_ISSUES + "/100/comments"]), 1)
             self.run_scan(apply=True)
             self.assertEqual(len(self.forge.comments[CONSUMER_ISSUES + "/100/comments"]), 1)
+        new_root = "f" * 40
+        self.forge.root_sha = new_root
+        with patch.object(reconcile, "managed_repositories", return_value=(new_root, graph, {REPO: COMPONENT})):
+            self.run_scan(apply=True)
+            self.run_scan(apply=True)
+        notes = self.forge.comments[CONSUMER_ISSUES + "/100/comments"]
+        self.assertEqual(len(notes), 2)
+        self.assertIn(f"- Root candidate: {new_root}", notes[-1]["body"])
 
     def test_apply_creates_one_verified_tracker_then_rechecks_it(self):
         entry, = self.run_scan(apply=True)["results"]

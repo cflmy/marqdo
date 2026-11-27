@@ -396,7 +396,9 @@ def register_consumer_tasks(client, root_sha, entry, issue_cache):
                 if issue["state"] == "open":
                     comments = tracking_comments(client, issues_url, issue)
                     key_line = f"<!-- marqdo:candidate-inputs {task['key']} -->"
-                    if not any(key_line in note.splitlines() for note in [issue["body"], *comments]):
+                    baselines = [note.splitlines() for note in [issue["body"], *comments]
+                                 if note.splitlines()[:1] == [marker]]
+                    if not {key_line, f"- Root candidate: {root_sha}"} <= set(baselines[-1]):
                         verify_root_base(client, root_sha)
                         client.post(f"{issues_url}/{issue['number']}/comments", {"body": body})
                 else:
