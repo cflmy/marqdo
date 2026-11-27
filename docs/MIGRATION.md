@@ -6,7 +6,7 @@
 
 | 已有仓库 | 审计时默认分支 | 发行或证据 |
 | --- | --- | --- |
-| [marqdo-cli](https://git.cflmy.cn/cflmy/marqdo-cli) | `master` | v3.0.0-rc.4 |
+| [marqdo-cli](https://git.cflmy.cn/cflmy/marqdo-cli) | `master` | v3.0.0-rc.5 |
 | [marqdo-extension-conformance](https://git.cflmy.cn/cflmy/marqdo-extension-conformance) | `main` | 有独立固定 fixture |
 | [marqdo-knowledge](https://git.cflmy.cn/cflmy/marqdo-knowledge) | `master` | v0.1.0-beta.3 |
 | [marqdo-lint](https://git.cflmy.cn/cflmy/marqdo-lint) | `main` | v0.2.0 |
@@ -16,7 +16,7 @@
 | [marqdo-web-design](https://git.cflmy.cn/cflmy/marqdo-web-design) | `main` | Web Design 组件，planned；初始开发文档 |
 | [marqdo-web-preview](https://git.cflmy.cn/cflmy/marqdo-web-preview) | `main` | Web Preview 组件，planned；初始开发文档 |
 
-CLI gitlink 采用 RC.4 正式发布源码，以匹配冻结归档和现有 View/Lint 契约。
+CLI gitlink 采用 RC.5 正式发布源码（`c44b0f9`，tag `v3.0.0-rc.5`），以匹配冻结归档和现有 View/Lint 契约。
 其文档后续提交曾用于 Knowledge 的独立 CI；生态候选以自身测试判定实际组合。
 Conformance 使用 CLI 已固定的真实 fixture 提交。
 
@@ -53,7 +53,7 @@ Conformance 使用 CLI 已固定的真实 fixture 提交。
 | --- | --- | --- |
 | M0 盘点 | 自建 Git、历史标签、已有六组件和新仓位 | 通过真实远端候选持续维护台账 |
 | M1 集成骨架 | 六个 active gitlink，另固定 28 个直属和 2 个 Web 子级的 planned 开发提交 | 查看候选 Woodpecker 运行及各组件独立 CI |
-| M2 标准库切换 | planned，CLI RC.4 提供官方完整 Bundle | [CLI 外部 Bundle](https://git.cflmy.cn/cflmy/marqdo-cli/issues/11) 和 [九组件切换](https://git.cflmy.cn/cflmy/marqdo/issues/2)，包括 HTTP、Regex、Archive 迁出与同步删除旧路径 |
+| M2 标准库切换 | **已切换基础发行**：CLI/Worker/Stdlib rc.5 归档 + 单一外部 Bundle；HTTP/Regex/Archive 已验证 | [CLI 外部 Bundle](https://git.cflmy.cn/cflmy/marqdo-cli/issues/11) 与 [九组件切换](https://git.cflmy.cn/cflmy/marqdo/issues/2) 完成；strict/perf 门禁限制见 rc.5 release notes |
 | M3 跨仓闭环 | 工单、人工候选、同 SHA 门禁 | [跨仓库 CI](https://git.cflmy.cn/cflmy/marqdo/issues/3) 跟踪真实缺陷闭环、候选通知鉴权、去重和影响分析 |
 | M4 领域接入 | Web 领域 active：WEB-00..04 完成，领域 catalog/gitlink 固定 Design/Preview；根 catalog 激活与 gitlink 一次切换 | 根 `check-layout --checkouts`、领域组件入口、`web` Tool 冷安装与既有消费者同候选证据；Stdlib 聚合按 STD-01..04 独立推进 |
 | 后续领域 | 空仓和预期职责 | 逐组件开展最小真实功能、独立 CI、制品与接入 |
@@ -63,7 +63,7 @@ Conformance 使用 CLI 已固定的真实 fixture 提交。
 1. CLI 打包器与产品测试接受单一显式外部 Bundle 输入。内核独立编译；制品仍附带一个校验过的标准库。
 2. 标准库在各组件维护唯一生产源码和自测。组装拒绝冲突、符号链接或测试污染，调用 CLI 权威打包器。std-io 维护 print/打印 的别名元数据。
 3. HTTP、Regex、Archive 的真实替代和授权回归先行。候选同时移除 CLI 中旧领域宿主服务和旧导入。
-4. 验证同输入两次组装结果、摘要及路径负例、C1/C2/C3、独立冷安装和真实工具集成后，再切换基础发行。当前状态为 UNVERIFIED。
+4. 验证同输入两次组装结果、摘要及路径负例、C1/C2/C3、独立冷安装和真实工具集成后，再切换基础发行。**2026-11-27 已切换：rc.5 归档（sha256 `fd7a313e...`）发布，CLI gitlink 固定 `c44b0f9`；strict L1 与获批节点 G4 仍为 UNVERIFIED 限制，见根证据 `docs/evidence/2026-11-27-base-release-rc5-switch.md`。**
 
 ## 标准库源码归位迁移（marqdo#9，2026-11-26 M0 冻结）
 
