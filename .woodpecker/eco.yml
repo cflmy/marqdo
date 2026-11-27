@@ -16,6 +16,7 @@ steps:
           git -C "$domain" submodule update --init
         done
       - python3 scripts/check-layout.py --checkouts
+      - python3 scripts/check-repo-conventions.py
 
   candidate:
     # Match the Linux/glibc environment already used by View for the RC.4 artifact.
