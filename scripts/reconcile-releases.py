@@ -665,7 +665,7 @@ def main(argv):
         print(f"reconcile: {error}", file=sys.stderr)
         return 1
     print(json.dumps(report, ensure_ascii=False, indent=2))
-    return int(not report["scan_complete"] or report["dispatch_status"] == "unavailable" or any(
+    return int(not report["scan_complete"] or any(
         "tracking_update" in item
         or any(task.get("registration") == "blocked" or task.get("dispatch_status") == "blocked"
                for task in item.get("consumer_tasks", []))
