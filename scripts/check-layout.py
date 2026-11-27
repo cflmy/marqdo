@@ -423,18 +423,43 @@ def validate(revision, checkouts, expand_domains=False):
     return layers
 
 
+def active_entries(layers):
+    root = layers[0]
+    root_domains = {root.repo / path: item["id"] for path, item in root.linked.items()
+                    if item["kind"] == "domain"}
+    entries = {}
+    requirements = {}
+    for layer in layers:
+        parent = root_domains.get(layer.repo)
+        for path, item in sorted(layer.linked.items()):
+            if item["state"] != "active":
+                continue
+            component_id = item["id"]
+            relative = (layer.repo / path).relative_to(root.repo).as_posix()
+            entries[component_id] = (component_id, item["kind"], relative, item["entry"])
+            requirements[component_id] = list(item["requires"])
+            if parent in requirements:
+                requirements[parent].append(component_id)
+    for component_id in graphlib.TopologicalSorter(requirements).static_order():
+        yield entries[component_id]
+
+
 def main():
     parser = argparse.ArgumentParser(description="Validate a Marqdo ecosystem Git tree")
     parser.add_argument("revision", nargs="?", default="HEAD")
     parser.add_argument("--checkouts", action="store_true")
     paths = parser.add_mutually_exclusive_group()
     paths.add_argument("--active-paths", action="store_true", help="print only direct active component paths")
+    paths.add_argument("--active-entries", action="store_true", help="print validated active entries in dependency order")
     paths.add_argument("--domain-paths", action="store_true", help="validate domain URLs and print domain paths")
     args = parser.parse_args()
     try:
         revision = git("rev-parse", "--verify", args.revision + "^{commit}").strip()
-        layers = validate(revision, args.checkouts, expand_domains=args.domain_paths)
-        if args.active_paths:
+        layers = validate(revision, args.checkouts or args.active_entries, expand_domains=args.domain_paths)
+        if args.active_entries:
+            for entry in active_entries(layers):
+                print("\t".join(entry))
+        elif args.active_paths:
             for path, component in sorted(layers[0].linked.items()):
                 if component["state"] == "active":
                     print(path)

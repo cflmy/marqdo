@@ -334,6 +334,27 @@ class HierarchicalLayoutTests(unittest.TestCase):
         layout.validate("HEAD", True)
         layout.validate("HEAD", False)
 
+    def test_active_entries_use_the_dependency_order_and_include_a_new_leaf(self):
+        design = self.leaf("design")
+        catalog_text = DOMAIN.replace('state = "planned"', 'state = "active"').replace(
+            'checks_with = ["web-preview"]\nrelease = "optional"',
+            'checks_with = ["web-preview"]\nrelease = "optional"\nentry = "scripts/ci.sh"',
+        )
+        self.assemble(domain_catalog=catalog_text, design=design,
+                      extra_domain_link=("components", design[1]), domain_modules={
+                          "design": "https://git.cflmy.cn/cflmy/marqdo-web-design.git",
+                          "preview": "https://git.cflmy.cn/cflmy/marqdo-web-preview.git",
+                          "components": "https://git.cflmy.cn/cflmy/marqdo-web-components.git",
+                      })
+        layers = layout.validate("HEAD", True)
+        entries = list(layout.active_entries(layers))
+        ids = [entry[0] for entry in entries]
+        self.assertIn(("web-components", "extension", "extensions/web/components", "scripts/ci.sh"), entries)
+        self.assertLess(ids.index("cli"), ids.index("web-design"))
+        self.assertLess(ids.index("web-design"), ids.index("web-preview"))
+        self.assertLess(ids.index("web-components"), ids.index("web"))
+        self.assertEqual(set(ids), {"cli", "web", "web-design", "web-preview", "web-components"})
+
     def test_accepts_a_planned_domain_and_planned_child_gitlinks(self):
         web = WEB_DOMAIN.replace('state = "active"', 'state = "planned"').replace(
             'entry = "scripts/integration.sh"\n', '')

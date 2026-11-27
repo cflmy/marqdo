@@ -10,12 +10,30 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 root="$PWD"
-active="$(python3 scripts/check-layout.py --checkouts --active-paths)"
-expected=$'cli\nextensions/web\nstdlib/collections\nstdlib/data\nstdlib/fs\nstdlib/io\nstdlib/system\nstdlib/text\ntests/conformance\ntools/knowledge\ntools/lint\ntools/prove\ntools/view'
-if [[ "$active" != "$expected" ]]; then
-    echo "UNVERIFIED: update the integration plan for the changed active component set" >&2
-    exit 1
-fi
+plan="$(python3 scripts/check-layout.py --active-entries)"
+declare -a gates=()
+cli_smoke=
+while IFS=$'\t' read -r id kind path entry; do
+    case "$kind:$id:$entry" in
+        core:cli:tools/release/smoke.py) cli_smoke="$path/$entry"; gate=core ;;
+        stdlib:*:scripts/test.sh) gate=stdlib ;;
+        test:conformance:scripts/build_all.sh) gate=conformance ;;
+        domain:web:scripts/domain-acceptance.sh) gate=web ;;
+        tool:view:scripts/acceptance.sh) gate=view ;;
+        tool:knowledge:scripts/ci.sh) gate=knowledge ;;
+        tool:prove:scripts/package-tool.sh) gate=prove ;;
+        tool:lint:scripts/package-tool.sh) gate=lint ;;
+        tool:*:scripts/ci.sh|tool:*:scripts/integration.sh|extension:*:scripts/ci.sh|extension:*:scripts/integration.sh|test:*:scripts/ci.sh|test:*:scripts/integration.sh)
+            gate=entry
+            ;;
+        *)
+            echo "UNVERIFIED: unsupported integration entry $id ($kind): $entry" >&2
+            exit 1
+            ;;
+    esac
+    gates+=("$gate")
+done <<< "$plan"
+test -n "$cli_smoke"
 
 mkdir -p .integration-work
 work="$(mktemp -d "$root/.integration-work/run.XXXXXX")"
@@ -32,6 +50,7 @@ python3 --version
 python3 -c 'import jsonschema'
 python3 scripts/check-layout.py --checkouts > "$work/layout.txt"
 cat "$work/layout.txt"
+printf '%s\n' "$plan" > "$work/active-entries.tsv"
 
 # Recursive impact analysis against the accepted root commit: the change set
 # comes from the recursively expanded (global_id, parent, remote, SHA, state)
@@ -75,7 +94,7 @@ python3 cli/tools/release/package.py \
     --source-sha "$source_sha" --version "$version" \
     --stdlib-dir "$work/stdlib" --out-dir "$work/dist" | tee "$work/package.json"
 archive="$(find "$work/dist" -maxdepth 1 -name 'marqdo-*.tar.gz' -print -quit)"
-python3 cli/tools/release/smoke.py --archive "$archive"
+python3 "$cli_smoke" --archive "$archive"
 mkdir -p "$work/install"
 tar -xzf "$archive" -C "$work/install"
 installed="$(find "$work/install" -mindepth 1 -maxdepth 1 -type d -print -quit)"
@@ -85,105 +104,114 @@ test "$(cat "$installed/SOURCE_SHA")" = "$source_sha"
 test "$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["version"])' "$installed/stdlib/stdlib.json")" = "$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["version"])' "$work/stdlib/stdlib.json")"
 sha256sum "$archive" "$MARQDO_BIN" "$installed/marqdo-provider-worker"
 
-# 4. Root stdlib acceptance: component entries, explicit Packages, composition
-#    fixtures and fail-closed negatives with the same installed CLI/Bundle.
-python3 scripts/acceptance-stdlib.py \
-    --cli "$MARQDO_BIN" --bundle "$work/stdlib" \
-    --work "$work/stdlib-acceptance" --evidence "$work/stdlib-acceptance.json"
-
-# 5. Frozen independent public-contract fixtures against the same CLI.
-python3 cli/tools/ci/verify_extension_contracts.py \
-    --source-repo cli --tested-sha "$source_sha" --cli "$MARQDO_BIN" \
-    --release-info "$installed/RELEASE_INFO.json" \
-    --fixtures tests/conformance --out "$work/conformance.json"
-
-
-# 5.5 Web domain: component entries from the pinned domain gitlink, then a cold
-# install of the same-built web Tool with a generic check/preview/handoff run.
+# Tool consumers use the same candidate installation and the catalog order.
 # The candidate image uses a minimal Rust profile; component entries run
 # fmt/clippy, so add those components once when the active toolchain lacks them.
 if command -v rustup >/dev/null 2>&1 \
     && ! rustup component list --installed 2>/dev/null | grep -qx 'rustfmt.*'; then
     rustup component add rustfmt clippy
 fi
-(
-    cd extensions/web/design
-    MARQDO_BIN="$MARQDO_BIN" scripts/ci.sh
+
+run_consumer() (
+    cd "$root/$path"
+    export MARQDO_CI_OUT="$work/components/$id"
+    mkdir -p "$MARQDO_CI_OUT"
+    case "$gate" in
+        entry)
+            MARQDO_STDLIB_DIR="$installed/stdlib" "./$entry"
+            ;;
+        web)
+            web_tool="$PWD/preview/dist/marqdo-web-preview/tool.json"
+            export MARQDO_TOOL_HOME="$MARQDO_CI_OUT/tool-home"
+            cli_before="$(sha256sum "$MARQDO_BIN")"
+            "$MARQDO_BIN" tool install "$web_tool"
+            example=examples/research-workspace
+            "$MARQDO_BIN" web check "$example/index.mq.md" --unit 工作台 --root "$example"
+            "$MARQDO_BIN" web preview "$example/index.mq.md" --unit 工作台 --root "$example" \
+                --out "$MARQDO_CI_OUT/preview"
+            test -s "$MARQDO_CI_OUT/preview/index.html"
+            "$MARQDO_BIN" web handoff "$example/index.mq.md" --unit 工作台 --root "$example" \
+                --out "$MARQDO_CI_OUT/handoff.md"
+            test -s "$MARQDO_CI_OUT/handoff.md"
+            "$MARQDO_BIN" tool remove web
+            test "$(sha256sum "$MARQDO_BIN")" = "$cli_before"
+            ;;
+        view)
+            export MARQDO_TOOL_HOME="$work/view-registry"
+            scripts/package.sh
+            "$MARQDO_BIN" tool install dist/marqdo-view/tool.json
+            "$MARQDO_BIN" view verify examples/mixed-modes/index.mq.md
+            "$MARQDO_BIN" view export examples/tables-math --out "$work/view-export"
+            setsid "$MARQDO_BIN" view examples/control-flow --port 0 --no-open >"$work/view-server.log" 2>&1 &
+            view_pid=$!
+            stop_view() {
+                kill -- "-$view_pid" 2>/dev/null || true
+                wait "$view_pid" 2>/dev/null || true
+            }
+            trap stop_view EXIT
+            view_url=""
+            for attempt in {1..100}; do
+                view_url="$(grep -m1 -o 'http://127\.0\.0\.1:[0-9]\+/' "$work/view-server.log" || true)"
+                if [[ -n "$view_url" ]] || ! kill -0 "$view_pid" 2>/dev/null; then
+                    break
+                fi
+                sleep 0.1
+            done
+            if [[ -z "$view_url" ]]; then
+                cat "$work/view-server.log" >&2
+                exit 1
+            fi
+            python3 scripts/acceptance-run.py "$view_url"
+            stop_view
+            trap - EXIT
+            python3 scripts/check-observation.py stream-snapshot
+            "$MARQDO_BIN" tool remove view
+            if "$MARQDO_BIN" view --version; then
+                echo "view still dispatches after removal" >&2
+                exit 1
+            fi
+            ;;
+        knowledge)
+            MARQDO_TEST_BIN="$MARQDO_BIN" cargo test --locked --test core_cli --test compile
+            ;;
+        prove)
+            cargo test --locked --test analysis_document --test document_contract
+            ;;
+        lint)
+            export MARQDO_TOOL_HOME="$work/lint-registry"
+            "./$entry" "$work/lint"
+            "$MARQDO_BIN" tool install "$work/lint/tool.json"
+            "$MARQDO_BIN" lint examples/nested/inventory.mq.md --format json
+            "$MARQDO_BIN" tool remove lint
+            ;;
+    esac
 )
-(
-    cd extensions/web/preview
-    MARQDO_BIN="$MARQDO_BIN" scripts/ci.sh
-)
-web_tool="$root/extensions/web/preview/dist/marqdo-web-preview/tool.json"
-test -f "$web_tool"
-export MARQDO_TOOL_HOME="$work/web-tool-home"
-cli_before="$(sha256sum "$MARQDO_BIN" | cut -d' ' -f1)"
-"$MARQDO_BIN" tool install "$web_tool"
-"$MARQDO_BIN" web check extensions/web/examples/research-workspace/index.mq.md \
-    --unit 工作台 --root extensions/web/examples/research-workspace
-"$MARQDO_BIN" web preview extensions/web/examples/research-workspace/index.mq.md \
-    --unit 工作台 --root extensions/web/examples/research-workspace --out "$work/web-preview"
-test -f "$work/web-preview/index.html"
-"$MARQDO_BIN" web handoff extensions/web/examples/research-workspace/index.mq.md \
-    --unit 工作台 --root extensions/web/examples/research-workspace --out "$work/web-handoff.md"
-test -s "$work/web-handoff.md"
-"$MARQDO_BIN" tool remove web
-cli_after="$(sha256sum "$MARQDO_BIN" | cut -d' ' -f1)"
-test "$cli_before" = "$cli_after"
-echo "web domain: component entries + cold Tool install PASS"
-# 6. Existing consumers, same installed binary and adjacent Bundle.
-(
-    cd tools/view
-    export MARQDO_TOOL_HOME="$work/view-registry"
-    scripts/package.sh
-    "$MARQDO_BIN" tool install dist/marqdo-view/tool.json
-    "$MARQDO_BIN" view verify examples/mixed-modes/index.mq.md
-    "$MARQDO_BIN" view export examples/tables-math --out "$work/view-export"
-    setsid "$MARQDO_BIN" view examples/control-flow --port 0 --no-open >"$work/view-server.log" 2>&1 &
-    view_pid=$!
-    stop_view() {
-        kill -- "-$view_pid" 2>/dev/null || true
-        wait "$view_pid" 2>/dev/null || true
-    }
-    trap stop_view EXIT
-    view_url=""
-    for attempt in {1..100}; do
-        view_url="$(grep -m1 -o 'http://127\.0\.0\.1:[0-9]\+/' "$work/view-server.log" || true)"
-        if [[ -n "$view_url" ]] || ! kill -0 "$view_pid" 2>/dev/null; then
-            break
-        fi
-        sleep 0.1
-    done
-    if [[ -z "$view_url" ]]; then
-        cat "$work/view-server.log" >&2
-        exit 1
-    fi
-    python3 scripts/acceptance-run.py "$view_url"
-    stop_view
-    trap - EXIT
-    python3 scripts/check-observation.py stream-snapshot
-    "$MARQDO_BIN" tool remove view
-    if "$MARQDO_BIN" view --version; then
-        echo "view still dispatches after removal" >&2
-        exit 1
-    fi
-)
-(
-    cd tools/knowledge
-    MARQDO_TEST_BIN="$MARQDO_BIN" cargo test --locked --test core_cli --test compile
-)
-(
-    cd tools/prove
-    cargo test --locked --test analysis_document --test document_contract
-)
-(
-    cd tools/lint
-    export MARQDO_TOOL_HOME="$work/lint-registry"
-    scripts/package-tool.sh "$work/lint"
-    "$MARQDO_BIN" tool install "$work/lint/tool.json"
-    "$MARQDO_BIN" lint examples/nested/inventory.mq.md --format json
-    "$MARQDO_BIN" tool remove lint
-)
+
+stdlib_accepted=false
+index=0
+while IFS=$'\t' read -r -u 3 id kind path entry; do
+    gate="${gates[index]}"
+    index=$((index + 1))
+    echo "candidate gate: $id ($path/$entry)"
+    case "$gate" in
+        core) ;;  # CLI/Worker packaging and smoke ran before consumer gates.
+        stdlib)
+            if [ "$stdlib_accepted" = false ]; then
+                python3 scripts/acceptance-stdlib.py \
+                    --cli "$MARQDO_BIN" --bundle "$work/stdlib" \
+                    --work "$work/stdlib-acceptance" --evidence "$work/stdlib-acceptance.json"
+                stdlib_accepted=true
+            fi
+            ;;
+        conformance)
+            python3 cli/tools/ci/verify_extension_contracts.py \
+                --source-repo cli --tested-sha "$source_sha" --cli "$MARQDO_BIN" \
+                --release-info "$installed/RELEASE_INFO.json" \
+                --fixtures "$path" --out "$work/conformance.json"
+            ;;
+        *) run_consumer ;;
+    esac
+done 3<<< "$plan"
 
 # 7. Evidence identity for the accepted candidate.
 root_commit="$(git rev-parse HEAD)"
@@ -202,6 +230,7 @@ evidence = {
     "stdlib_aliases_digest": sys.argv[5],
     "archive": archive.name,
     "archive_sha256": "sha256:" + hashlib.sha256(archive.read_bytes()).hexdigest(),
+    "active_entries": [line.split("\t") for line in (work / "active-entries.tsv").read_text().splitlines()],
     "impact": (
         {
             "changed": impact["changed"],

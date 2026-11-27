@@ -35,6 +35,8 @@ bash scripts/integration.sh                # 生态候选：真实 CLI 制品 + 
 - 校验器读取 Git tree 中固定提交的 catalog，不以工作区改动替代候选；`--checkouts` 需要子模块已初始化，缺失、错误 HEAD、脏工作区、错误入口都明确 FAIL/UNVERIFIED，不静默跳过。CI 先验证并检出直属子模块，再用 `--domain-paths` 校验领域的子模块远端，最后逐个领域检出直属子库。
 - 没有 active 领域时，新校验规则同样接受合法的直属功能组件，这不是历史协议兼容。
 - 未知的 active 入口、未声明的 gitlink、目录与 catalog 不一致都必须让候选失败。`planned` 不进入验收计数。
+- `python3 scripts/check-layout.py --active-entries` 从已验证的根与领域 checkout 输出验收计划。根集成按依赖顺序使用同一次安装的 CLI 和 Bundle 执行计划，领域验收晚于其 active 子组件。通用入口接收 `MARQDO_BIN`、`MARQDO_STDLIB_DIR` 和 `MARQDO_CI_OUT`，已有公共契约、真实 Tool 冷安装等组合门禁继续使用各自的现有入口。
+- 根 Web 组合检查对该次构建的 Preview Tool 执行冷安装、`check`、`preview` 和 `handoff`。生产浏览器验收由 Web 聚合仓已有的 `scripts/domain-acceptance.sh` 负责。
 - 根 `eco` 在 PR、`main` 推送和显式手动运行时执行。PR 始终保留 `layout` 状态。仅改动根 `README.md` 或 `docs/evidence/` 下的 Markdown 记录时，自动运行只执行轻量结构校验和脚本测试。混合改动、其他路径、缺失变更列表和手动运行都执行递归检出及完整生态验收。
 
 ## 三层验收
