@@ -142,6 +142,33 @@ class ReconcileTest(unittest.TestCase):
         self.assertEqual(len(self.forge.downloads), 2)
         self.assertEqual(len(self.forge.pipeline_reads), 2)
 
+    def test_consumer_inputs_are_tied_to_assets_dependencies_and_accepted_sha(self):
+        consumer = {"id": "archive", "state": "active", "sha": "c" * 40,
+                    "requires": ["std-text", "cli"], "checks_with": []}
+        cli = {"id": "cli", "state": "active", "sha": "d" * 40,
+               "requires": [], "checks_with": []}
+        graph = {item["id"]: item for item in (COMPONENT, consumer, cli)}
+        with patch.object(reconcile, "managed_repositories", return_value=(BASE, graph, {REPO: COMPONENT})):
+            entry, = self.run_scan()["results"]
+            task, = entry["consumer_tasks"]
+            self.assertEqual(task["consumer"], "archive")
+            self.assertEqual(task["baseline_sha"], consumer["sha"])
+            self.assertEqual(task["inputs"]["release"]["assets"][0]["name"], ASSET)
+            self.assertEqual(task["inputs"]["accepted_dependencies"], [{"id": "cli", "source_sha": cli["sha"]}])
+            self.assertEqual(task["status"], "pending")
+            cli["sha"] = "e" * 40
+            first_key = task["key"]
+            entry, = self.run_scan()["results"]
+            task, = entry["consumer_tasks"]
+            self.assertNotEqual(task["key"], first_key)
+            self.forge.evidence["dependencies"] = [{"id": "cli", "source_sha": "d" * 40}]
+            self.forge.refresh_assets()
+            entry, = self.run_scan()["results"]
+            task, = entry["consumer_tasks"]
+            self.assertEqual(task["status"], "waiting-for-dependencies")
+            self.assertEqual(task["different_dependencies"], ["cli"])
+        self.assertEqual(self.forge.writes, [])
+
     def test_apply_creates_one_verified_tracker_then_rechecks_it(self):
         entry, = self.run_scan(apply=True)["results"]
         self.assertEqual(entry["status"], "created")

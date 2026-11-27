@@ -276,6 +276,35 @@ def identity_marker(entry):
     return f"<!-- marqdo:verified-release {entry['source_sha']} {entry['index_sha256']} -->"
 
 
+def consumer_inputs(entry, graph):
+    release_key = hashlib.sha256(
+        f"{entry['repository']}\n{entry['tag']}\n{entry['source_sha']}".encode()
+    ).hexdigest()
+    release = {key: entry[key] for key in ("repository", "tag", "source_sha", "index_sha256")}
+    release["assets"] = sorted(entry["assets"], key=lambda asset: asset["name"])
+    release["dependencies"] = sorted(entry["dependencies"], key=lambda dependency: dependency["id"])
+    conflicts = [dependency["id"] for dependency in release["dependencies"]
+                 if dependency["source_sha"] != graph[dependency["id"]]["sha"]]
+    tasks = []
+    for consumer_id in entry["direct_consumers"]:
+        consumer = graph[consumer_id]
+        inputs = {
+            "release": release,
+            "consumer": {"id": consumer_id, "source_sha": consumer["sha"]},
+            "accepted_dependencies": [
+                {"id": dep, "source_sha": graph[dep]["sha"]} for dep in sorted(consumer["requires"])
+                if dep != entry["component"]
+            ],
+        }
+        digest = hashlib.sha256(json.dumps(inputs, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+        key = hashlib.sha256(f"{release_key}\n{consumer_id}\n{digest}".encode()).hexdigest()
+        tasks.append({"consumer": consumer_id, "key": key, "digest": digest,
+                      "baseline_sha": consumer["sha"], "inputs": inputs,
+                      "status": "waiting-for-dependencies" if conflicts else "pending",
+                      "different_dependencies": conflicts})
+    return release_key, tasks
+
+
 def tracking_body(entry):
     lines = [entry["marker"], f"## {entry['repository']} {entry['tag']}",
              "", f"- Component: {entry['component']} ({entry['path']})",
@@ -290,6 +319,8 @@ def tracking_body(entry):
         *(f"- {a['name']} ({a['target']}, {a['size']} bytes): {a['sha256']}" for a in entry["assets"]),
         "", "## Pending consumer validation", "",
         f"- Direct consumers: {', '.join(entry['direct_consumers']) or 'none'}",
+        *(f"- {task['consumer']} at {task['baseline_sha']}: {task['status']} (inputs {task['digest']})"
+          for task in entry["consumer_tasks"]),
         f"- Affected: {', '.join(entry['affected']) or 'none'}",
         f"- Governance owner: {entry['governance_owner']}"])
 
@@ -383,6 +414,7 @@ def reconcile(client, root=PROJECT_ROOT, apply=False, report_out=None, cutoff=No
                                if line.startswith("<!-- marqdo:verified-release ")}
                         require(not old or old == {identity_marker(entry)},
                                 "published release identity or index digest changed")
+                        entry["release_key"], entry["consumer_tasks"] = consumer_inputs(entry, graph)
                 except ReconcileError as error:
                     entry.update(status="blocked", error=str(error))
 
@@ -391,7 +423,7 @@ def reconcile(client, root=PROJECT_ROOT, apply=False, report_out=None, cutoff=No
                     if entry["status"] == "pending" and any(
                             identity_marker(entry) in body.splitlines() for body in recorded):
                         entry["status"] = "tracked"
-                    elif apply and len(trackers) == 1 and entry["status"] in {"pending", "blocked"}:
+                    if apply and len(trackers) == 1 and entry["status"] in {"pending", "tracked", "blocked"}:
                         ensure_tracking_note(client, issues_url, trackers[0], entry, comments)
                 elif apply and entry["status"] in {"pending", "blocked"}:
                     require(label_id is not None, f"tracking label {LABEL!r} is missing")
