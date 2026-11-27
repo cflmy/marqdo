@@ -28,7 +28,7 @@ Conformance 使用 CLI 已固定的真实 fixture 提交。
 
 **扩展（planned，独立组件）** · [math](https://git.cflmy.cn/cflmy/marqdo-ext-math) · [linalg](https://git.cflmy.cn/cflmy/marqdo-ext-linalg) · [quantum](https://git.cflmy.cn/cflmy/marqdo-ext-quantum) · [http](https://git.cflmy.cn/cflmy/marqdo-ext-http) · [websocket](https://git.cflmy.cn/cflmy/marqdo-ext-websocket) · [ai](https://git.cflmy.cn/cflmy/marqdo-ext-ai) · [mcp](https://git.cflmy.cn/cflmy/marqdo-ext-mcp) · [crypto](https://git.cflmy.cn/cflmy/marqdo-ext-crypto) · [database](https://git.cflmy.cn/cflmy/marqdo-ext-database) · [storage](https://git.cflmy.cn/cflmy/marqdo-ext-storage) · [cache](https://git.cflmy.cn/cflmy/marqdo-ext-cache) · [security](https://git.cflmy.cn/cflmy/marqdo-ext-security) · [browser](https://git.cflmy.cn/cflmy/marqdo-ext-browser) · [document](https://git.cflmy.cn/cflmy/marqdo-ext-document) · [archive](https://git.cflmy.cn/cflmy/marqdo-ext-archive) · [engineering](https://git.cflmy.cn/cflmy/marqdo-ext-engineering) · [regex](https://git.cflmy.cn/cflmy/marqdo-ext-regex) · [datetime](https://git.cflmy.cn/cflmy/marqdo-ext-datetime)
 
-**Web 领域（planned domain）** · 聚合 [marqdo-ext-web](https://git.cflmy.cn/cflmy/marqdo-ext-web)（唯一合同 `docs/WEB-DESIGN.md`）· 子组件 [marqdo-web-design](https://git.cflmy.cn/cflmy/marqdo-web-design) · [marqdo-web-preview](https://git.cflmy.cn/cflmy/marqdo-web-preview)
+**Web 领域（active domain，WEB-05 起）** · 聚合 [marqdo-ext-web](https://git.cflmy.cn/cflmy/marqdo-ext-web)（唯一合同 `docs/WEB-DESIGN.md`）· 子组件 [marqdo-web-design](https://git.cflmy.cn/cflmy/marqdo-web-design) · [marqdo-web-preview](https://git.cflmy.cn/cflmy/marqdo-web-preview)
 
 ## 分层治理与领域聚合（2026-11-26 起）
 
@@ -40,7 +40,7 @@ Conformance 使用 CLI 已固定的真实 fixture 提交。
 - 领域激活门禁：子组件具备真实入口与候选提交、领域 catalog 与 gitlink 一致、领域 CI 通过、根 `check-layout.py --checkouts` 递归校验通过、存在依赖关系的组件以同候选证据验证。
 - 主仓库 `scripts/check-layout.py` 已引入 domain 角色与递归校验；统一 CLI 制品准备、声明驱动调度、递归影响分析仍在推进，CI 证据以真实候选为准。
 
-当前状态：**没有任何 active 领域**。Web 领域为 planned（`extensions/web`，聚合仓 marqdo-ext-web，子组件 design/preview 在其 catalog 登记）；标准库聚合 marqdo-stdlib 尚未创建，九个 `std-*` 保持根 catalog 的 planned 直属记录；HTTP/WebSocket 等仍为独立 planned 扩展，等至少两个真实组件形成共同边界后再评估聚合。首批 Web 实施工单为 WEB-00（合同与真实 Analysis 风险探测）、WEB-01（Design）、WEB-02（Preview）、WEB-03（handoff/组件图）、WEB-04（组合案例与框架交付）、WEB-05（根接入与冷安装），WEB-06（components）为候选；工单在对应责任仓库创建。Web 合同语义冲突由 marqdo-ext-web 协调，不回流 CLI 核心。
+当前状态：**有一个 active 领域**——Web（`extensions/web`，聚合仓 marqdo-ext-web，子组件 design/preview 已在其 catalog 激活并登记真实入口，web-components 仍 planned）；标准库聚合 marqdo-stdlib 尚未创建，九个 `std-*` 保持根 catalog 的 planned 直属记录；HTTP/WebSocket 等仍为独立 planned 扩展，等至少两个真实组件形成共同边界后再评估聚合。首批 Web 实施工单为 WEB-00（合同与真实 Analysis 风险探测）、WEB-01（Design）、WEB-02（Preview）、WEB-03（handoff/组件图）、WEB-04（组合案例与框架交付）、WEB-05（根接入与冷安装），WEB-06（components）为候选；工单在对应责任仓库创建。Web 合同语义冲突由 marqdo-ext-web 协调，不回流 CLI 核心。
 
 ## 阶段与阻塞
 
@@ -55,7 +55,7 @@ Conformance 使用 CLI 已固定的真实 fixture 提交。
 | M1 集成骨架 | 六个 active gitlink，另固定 28 个直属和 2 个 Web 子级的 planned 开发提交 | 查看候选 Woodpecker 运行及各组件独立 CI |
 | M2 标准库切换 | planned，CLI RC.4 提供官方完整 Bundle | [CLI 外部 Bundle](https://git.cflmy.cn/cflmy/marqdo-cli/issues/11) 和 [九组件切换](https://git.cflmy.cn/cflmy/marqdo/issues/2)，包括 HTTP、Regex、Archive 迁出与同步删除旧路径 |
 | M3 跨仓闭环 | 工单、人工候选、同 SHA 门禁 | [跨仓库 CI](https://git.cflmy.cn/cflmy/marqdo/issues/3) 跟踪真实缺陷闭环、候选通知鉴权、去重和影响分析 |
-| M4 领域接入 | Web 领域 planned：三仓文档与工单就绪；根 catalog 登记 planned domain | W-M0 真实 CLI 风险探测、WEB-01/02 实现、领域 gitlink、根递归校验与冷安装验收；Stdlib 聚合按 STD-01..04 独立推进 |
+| M4 领域接入 | Web 领域 active：WEB-00..04 完成，领域 catalog/gitlink 固定 Design/Preview；根 catalog 激活与 gitlink 一次切换 | 根 `check-layout --checkouts`、领域组件入口、`web` Tool 冷安装与既有消费者同候选证据；Stdlib 聚合按 STD-01..04 独立推进 |
 | 后续领域 | 空仓和预期职责 | 逐组件开展最小真实功能、独立 CI、制品与接入 |
 
 ### 标准库切换顺序

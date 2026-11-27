@@ -2,7 +2,7 @@
 
 按仓库领取任务。标为 **大改** 的条目可涉及模块拆分、实现重写或发布切换。责任仓库应先限定本轮交付范围，涉及公共接口时与实际消费者一起验收。
 
-生态治理采用“根 → 领域聚合 → 功能组件”最多两级 Gitlink：功能仓库实现与修复、领域聚合仓库维护合同与组合验收、主仓库固定 gitlink、治理与发行。`planned` 组件可以挂载真实开发提交，实际入口随验收登记。当前没有 active 领域；Web 领域为 planned（聚合仓 `marqdo-ext-web`，子组件 `marqdo-web-design`/`marqdo-web-preview` 在其 catalog 登记）。先推进 CLI 外部 Bundle、九个标准库，以及 HTTP、Regex、Archive 的迁出；这些改动在同一候选组合中验证后切换基础发行。官网和 VS Code 可独立推进。[迁移台账](MIGRATION.md) · [开发流程](DEVELOPMENT.md)
+生态治理采用“根 → 领域聚合 → 功能组件”最多两级 Gitlink：功能仓库实现与修复、领域聚合仓库维护合同与组合验收、主仓库固定 gitlink、治理与发行。`planned` 组件可以挂载真实开发提交，实际入口随验收登记。当前 Web 领域为 active（聚合仓 `marqdo-ext-web`，子组件 `marqdo-web-design`/`marqdo-web-preview` 在其 catalog 激活并登记真实入口；`web-components` 仍 planned）。先推进 CLI 外部 Bundle、九个标准库，以及 HTTP、Regex、Archive 的迁出；这些改动在同一候选组合中验证后切换基础发行。官网和 VS Code 可独立推进。[迁移台账](MIGRATION.md) · [开发流程](DEVELOPMENT.md)
 
 ## 集成和语言
 

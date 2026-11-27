@@ -11,7 +11,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 root="$PWD"
 active="$(python3 scripts/check-layout.py --checkouts --active-paths)"
-expected=$'cli\nstdlib/collections\nstdlib/data\nstdlib/fs\nstdlib/io\nstdlib/system\nstdlib/text\ntests/conformance\ntools/knowledge\ntools/lint\ntools/prove\ntools/view'
+expected=$'cli\nextensions/web\nstdlib/collections\nstdlib/data\nstdlib/fs\nstdlib/io\nstdlib/system\nstdlib/text\ntests/conformance\ntools/knowledge\ntools/lint\ntools/prove\ntools/view'
 if [[ "$active" != "$expected" ]]; then
     echo "UNVERIFIED: update the integration plan for the changed active component set" >&2
     exit 1
@@ -97,6 +97,34 @@ python3 cli/tools/ci/verify_extension_contracts.py \
     --release-info "$installed/RELEASE_INFO.json" \
     --fixtures tests/conformance --out "$work/conformance.json"
 
+
+# 5.5 Web domain: component entries from the pinned domain gitlink, then a cold
+# install of the same-built web Tool with a generic check/preview/handoff run.
+(
+    cd extensions/web/design
+    MARQDO_BIN="$MARQDO_BIN" scripts/ci.sh
+)
+(
+    cd extensions/web/preview
+    MARQDO_BIN="$MARQDO_BIN" scripts/ci.sh
+)
+web_tool="$root/extensions/web/preview/dist/marqdo-web-preview/tool.json"
+test -f "$web_tool"
+export MARQDO_TOOL_HOME="$work/web-tool-home"
+cli_before="$(sha256sum "$MARQDO_BIN" | cut -d' ' -f1)"
+"$MARQDO_BIN" tool install "$web_tool"
+"$MARQDO_BIN" web check extensions/web/examples/research-workspace/index.mq.md \
+    --unit 工作台 --root extensions/web/examples/research-workspace
+"$MARQDO_BIN" web preview extensions/web/examples/research-workspace/index.mq.md \
+    --unit 工作台 --root extensions/web/examples/research-workspace --out "$work/web-preview"
+test -f "$work/web-preview/index.html"
+"$MARQDO_BIN" web handoff extensions/web/examples/research-workspace/index.mq.md \
+    --unit 工作台 --root extensions/web/examples/research-workspace --out "$work/web-handoff.md"
+test -s "$work/web-handoff.md"
+"$MARQDO_BIN" tool remove web
+cli_after="$(sha256sum "$MARQDO_BIN" | cut -d' ' -f1)"
+test "$cli_before" = "$cli_after"
+echo "web domain: component entries + cold Tool install PASS"
 # 6. Existing consumers, same installed binary and adjacent Bundle.
 (
     cd tools/view

@@ -319,12 +319,13 @@ release = "optional"
 id = "web"
 path = "extensions/web"
 kind = "domain"
-state = "planned"
+state = "active"
 owner = "cflmy"
 scope = "Web 原型设计领域治理：唯一设计合同、组合验收与交付协调"
 requires = []
 checks_with = []
 release = "none"
+entry = "scripts/domain-acceptance.sh"
 
 [[component]]
 id = "browser"

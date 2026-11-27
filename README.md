@@ -106,7 +106,7 @@ marqdo run hello.mq.md
 
 ### Web 领域聚合
 
-Web 领域以设计文档为源材料，面向可交互的原型预览与工程交付。HTTP、数据库、认证和浏览器运行时各自独立维护。`extensions/web` 链接 `planned` 的 Web 领域仓，Design 和 Preview 由该领域仓固定。 [WEB-DESIGN](https://git.cflmy.cn/cflmy/marqdo-ext-web/src/branch/main/docs/WEB-DESIGN.md)
+Web 领域以设计文档为源材料，面向可交互的原型预览与工程交付。HTTP、数据库、认证和浏览器运行时各自独立维护。`extensions/web` 链接 active 的 Web 领域仓；Design 和 Preview 已在该领域 catalog 激活并登记真实入口，`web` Tool 通过冷安装验证。 [WEB-DESIGN](https://git.cflmy.cn/cflmy/marqdo-ext-web/src/branch/main/docs/WEB-DESIGN.md)
 
 | 仓库 | 职责 |
 | --- | --- |
