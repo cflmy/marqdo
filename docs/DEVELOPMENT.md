@@ -76,7 +76,9 @@ bash scripts/integration.sh                # 生态候选：真实 CLI 制品 + 
 
 ## 自动化权限
 
-先实现人工触发与 PR/CI 门禁，不开发自动 Agent 管理平台。候选通知的授权校验由根 `scripts/candidate-notify.py` 承担：只接受规范化通知（仓库、类型、head/base SHA、CI 状态与 URL），校验仓库在根图远端允许列表内、提交在本地对象库可达、组件候选的 base 必须是 accepted 根图当前固定的 SHA、CI 为允许主机上的 success 且必须是 https；按 `(repository, head SHA)` 去重，拒绝重放，accepted 基线变化时标记 `revalidate` 并要求重跑门禁；影响范围复用 `scripts/impact.py`，无法确定时全量。校验器只输出计划（`auto_promote=false`、`auto_merge=false`、仅创建候选分支需人工评审），不合并、不推送、不扩权。Webhook 只作通知（记录仓库、完整 SHA、CI URL）；上级通过 API 验证存在性、审批与权限后再创建候选 PR，不得自动合入或提升权限。外部不可信 PR、未批准 gitlink 或脚本不得在拥有跨仓库写权限/发版密钥的 runner 中运行；区分只读 checkout/test token、受限 issue/PR token、受保护发布权限。日志不得输出凭证、完整 Analysis 或生产 API key。
+先实现人工触发与 PR/CI 门禁，不开发自动 Agent 管理平台。候选通知的授权校验由根 `scripts/candidate-notify.py` 承担：只接受规范化通知（仓库、类型、head/base SHA、CI 状态与 URL），校验仓库在根图远端允许列表内、提交在本地对象库可达、组件候选的 base 必须是 accepted 根图当前固定的 SHA、CI 为允许主机上的 success 且必须是 https；按 `(repository, head SHA)` 去重，拒绝重放，accepted 基线变化时标记 `revalidate` 并要求重跑门禁；影响范围复用 `scripts/impact.py`，无法确定时全量。校验器只输出计划（`auto_promote=false`、`auto_merge=false`、仅创建候选分支需人工评审），不合并、不推送、不扩权。Webhook 只作通知（记录仓库、完整 SHA、CI URL）；上级通过 API 验证存在性、审批与权限后再创建候选 PR，不得自动合入或提升权限。
+
+经过授权的 webhook 入口由根 `scripts/webhook-adapter.py` 实现：先以仓库 webhook secret 校验 `X-Gitea-Signature`（HMAC-SHA256）原始 body，再只接受 `push`（非删除）与 `pull_request`（opened/synchronized/reopened）事件；仓库必须来自 accepted 根图的远端允许列表，base 使用 accepted 图当前固定 SHA（payload base 只作 hint），CI 聚合要求至少一个状态且全部 success、URL 为允许 CI 主机上的 https。校验通过后交给同一 `candidate-notify.py` 做可达性/去重/重放/基线重验与影响分析，输出计划（不合并、不推送、不建 PR）。通知丢失的恢复由同一脚本 `--reconcile` 承担：扫描允许列表仓库的开放 PR 与 head statuses，对未入账的成功候选执行同一验证（幂等状态文件，重复运行只报 duplicate）；API transient 错误有限退避重试，401/403 立即失败，不把触发成功当作下游已处理。外部不可信 PR、未批准 gitlink 或脚本不得在拥有跨仓库写权限/发版密钥的 runner 中运行；区分只读 checkout/test token、受限 issue/PR token、受保护发布权限。日志不得输出凭证、完整 Analysis 或生产 API key。
 
 ## 发行与回滚
 
