@@ -84,6 +84,8 @@ bash scripts/integration.sh                # 生态候选：真实 CLI 制品 + 
 
 正式发布对账使用 `python3 scripts/reconcile-releases.py --plan --published-after <ISO-8601 时间>`。从固定根及领域 tree 解析受管仓库，核对 Gitea tag、`release-evidence.json`、同 SHA Woodpecker 组件 CI 和资产字节摘要。根 `reconcile` 工作流从当前受保护的 `main` 串行运行，只检出领域聚合仓，使用 `gitea_reconcile_token` 以专用非管理员账号写追踪工单。`historical-baseline` 表示已登记历史输入，`blocked` 表示发布验证未通过，`tracked` 表示已记录经验证的发布。扫描完整且追踪写入成功时，已报告的发布阻塞保留为 `blocked`，工作流仍成功结束。消费者验收和父级接受均需各自的 CI 与 PR 证据。
 
+消费者通过已接受 Git 树里的 `.woodpecker/upstream.yml` 接入派发。根只在该消费者的受保护默认分支精确匹配 gitlink 时触发，发送本仓任务编号和幂等键。Woodpecker 原生触发要求项目级 push 权限，该角色同时可以管理该项目的 CI secret。仅把这一角色授予专用非管理员 `marqdo-reconcile` 在已接入的消费者仓，并通过 Woodpecker 登录为该账号生成 token。根仓 `woodpecker_reconcile_token` 限于受保护 `main` 的 manual/cron 配置，部署时核对账号和具体仓权限。触发凭据只在根协调步骤使用，消费者测试无需该凭据。根报告通过已存在的同任务 Woodpecker 流水线识别重复或失联的触发结果。
+
 对已验证的发布，`--plan` 计算直接 active 消费者的输入摘要。受保护 `--apply` 按发布和消费者登记一条任务，基线变化时在原任务中记录新输入。输入附精确资产、依赖、消费者基线和根追踪编号。下游独立 CI 及批准后的晋升基于各自的真实结果。
 
 ## 发行与回滚
