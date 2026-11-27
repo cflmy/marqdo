@@ -17,12 +17,12 @@
 
 | 门禁 | 命令 | 结果 |
 | --- | --- | --- |
-| 递归布局 | `python3 scripts/check-layout.py --checkouts` | 待本地/CI 记录 |
-| 根集成测试 | `python3 -m unittest discover -s tests/integration` | 待记录 |
-| 领域组件入口 | `extensions/web/design/scripts/ci.sh`、`extensions/web/preview/scripts/ci.sh` | 由 `integration.sh` 5.5 执行 |
-| web Tool 冷安装 | `tool install` → `web check/preview/handoff` → `tool remove`，CLI SHA 前后一致 | 由 `integration.sh` 5.5 执行 |
-| 领域验收 | `extensions/web/scripts/domain-acceptance.sh`（三案例 + 生产 API/浏览器 E2E） | 本地 WEB-04 已 PASS；CI 图像浏览器可用时执行 |
-| 既有消费者 | Conformance/View/Knowledge/Prove/Lint 同一 CLI/Bundle | 由 `integration.sh` 6 执行 |
+| 递归布局 | `python3 scripts/check-layout.py --checkouts` | **PASS**（根 + Web 域 + Design/Preview active 入口；本地候选） |
+| 根集成测试 | `python3 -m unittest discover -s tests/integration` | **71 tests OK**（本地候选） |
+| 领域组件入口 | `extensions/web/design/scripts/ci.sh`、`extensions/web/preview/scripts/ci.sh` | **PASS**（本地候选；24/24 Design，web Tool install/check/preview/handoff/remove） |
+| web Tool 冷安装 | `tool install` → `web check/preview/handoff` → `tool remove`，CLI SHA 前后一致 | **PASS**（CLI `sha256:6ede3b9e...` 前后一致；本地候选） |
+| 领域验收 | `extensions/web/scripts/domain-acceptance.sh`（三案例 + 生产 API/浏览器 E2E） | **PASS**（WEB-04 证据：三案例 + API + Chromium E2E，同一领域提交） |
+| 既有消费者 | Conformance/View/Knowledge/Prove/Lint 同一 CLI/Bundle | 由 `integration.sh` 6 在 CI candidate 执行（CI 为最终门禁） |
 
 ## 边界
 
