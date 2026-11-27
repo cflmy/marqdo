@@ -100,6 +100,12 @@ python3 cli/tools/ci/verify_extension_contracts.py \
 
 # 5.5 Web domain: component entries from the pinned domain gitlink, then a cold
 # install of the same-built web Tool with a generic check/preview/handoff run.
+# The candidate image uses a minimal Rust profile; component entries run
+# fmt/clippy, so add those components once when the active toolchain lacks them.
+if command -v rustup >/dev/null 2>&1 \
+    && ! rustup component list --installed 2>/dev/null | grep -qx 'rustfmt.*'; then
+    rustup component add rustfmt clippy
+fi
 (
     cd extensions/web/design
     MARQDO_BIN="$MARQDO_BIN" scripts/ci.sh
