@@ -11,8 +11,8 @@ The affected set is computed in the order the development contract requires:
 1. changed or removed leaves;
 2. reverse transitive closure over `requires` edges from the union of both
    graphs (removed edges cannot hide a consumer);
-3. parent domains of affected components;
-4. `checks_with` fixed point (co-validation is not a build prerequisite).
+3. `checks_with` and reverse dependency fixed point;
+4. parent domains of affected components in both graphs.
 
 When a domain cannot be expanded (missing object/checkout) the result is marked
 UNVERIFIED and the whole domain is treated as affected rather than silently
@@ -217,37 +217,42 @@ def changed_components(
 def affected_set(
     accepted: dict[str, dict], candidate: dict[str, dict], changed: list[dict]
 ) -> tuple[list[str], list[str], list[str]]:
-    graph = {**accepted, **candidate}
-    dependents: dict[str, set[str]] = {component_id: set() for component_id in graph}
-    for component in graph.values():
-        for dependency in component.get("requires", []):
-            dependents.setdefault(dependency, set()).add(component["id"])
+    dependents: dict[str, set[str]] = {}
+    partners: dict[str, set[str]] = {}
+    parents: dict[str, set[str]] = {}
+    for graph in (accepted, candidate):
+        for component_id, component in graph.items():
+            for dependency in component.get("requires", []):
+                dependents.setdefault(dependency, set()).add(component_id)
+            for partner in component.get("checks_with", []):
+                partners.setdefault(component_id, set()).add(partner)
+                partners.setdefault(partner, set()).add(component_id)
+            if component.get("parent"):
+                parents.setdefault(component_id, set()).add(component["parent"])
+
     affected = {item["id"] for item in changed}
     queue = list(affected)
     while queue:
+        for consumer in dependents.get(queue.pop(), set()) - affected:
+            affected.add(consumer)
+            queue.append(consumer)
+
+    build_affected = affected.copy()
+    queue = list(affected)
+    while queue:
         current = queue.pop()
-        for consumer in dependents.get(current, set()):
-            if consumer not in affected:
-                affected.add(consumer)
-                queue.append(consumer)
+        additions = (partners.get(current, set()) | dependents.get(current, set())) - affected
+        affected.update(additions)
+        queue.extend(additions)
+    co_validation = {partner for current in affected for partner in partners.get(current, set())}
+    co_validation -= build_affected
+
     domains = set()
-    for component_id in list(affected):
-        parent = graph[component_id].get("parent")
-        while parent:
-            if parent not in affected:
-                domains.add(parent)
-            parent = graph[parent].get("parent") if parent in graph else None
-    co_validation: set[str] = set()
-    while True:
-        additions = set()
-        for component_id in affected:
-            for partner in graph[component_id].get("checks_with", []):
-                if partner not in affected:
-                    additions.add(partner)
-        if not additions:
-            break
-        affected |= additions
-        co_validation |= additions
+    queue = list(affected)
+    while queue:
+        for parent in parents.get(queue.pop(), set()) - affected - domains:
+            domains.add(parent)
+            queue.append(parent)
     return sorted(affected), sorted(domains), sorted(co_validation)
 
 
@@ -261,56 +266,14 @@ def consumers_of(component_id: str, revision: str) -> dict:
     revision_sha = resolve(ROOT, revision)
     graph, unverified = load_graph(ROOT, revision_sha, "root")
     if component_id not in graph:
-        graph, unverified = load_graph(ROOT, revision_sha, "root")
-        return {
-            "schema": SCHEMA,
-            "schema_version": SCHEMA_VERSION,
-            "accepted": {"ref": revision, "revision": revision_sha},
-            "component": component_id,
-            "affected": sorted(graph),
-            "checks_with": [],
-            "domain_ancestors": [],
-            "fallback": "full",
-            "unverified": unverified
-            + [f"unknown component {component_id!r} at {revision_sha}; scope widened"],
-        }
-    dependents: dict[str, set[str]] = {key: set() for key in graph}
-    for component in graph.values():
-        for dependency in component.get("requires", []):
-            dependents.setdefault(dependency, set()).add(component["id"])
-    affected = {component_id}
-    queue = [component_id]
-    while queue:
-        current = queue.pop()
-        for consumer in dependents.get(current, set()):
-            if consumer not in affected:
-                affected.add(consumer)
-                queue.append(consumer)
-    domains = set()
-    for item in list(affected):
-        parent = graph[item].get("parent")
-        while parent:
-            if parent not in affected:
-                domains.add(parent)
-            parent = graph[parent].get("parent") if parent in graph else None
-    co_validation: set[str] = set()
-    while True:
-        additions = {
-            partner
-            for item in affected
-            for partner in graph[item].get("checks_with", [])
-            if partner not in affected
-        }
-        if not additions:
-            break
-        affected |= additions
-        co_validation |= additions
-    fallback = None
+        unverified.append(
+            f"unknown component {component_id!r} at {revision_sha}; scope widened"
+        )
+    fallback = "full" if unverified else None
     if unverified:
-        affected = set(graph)
-        domains = set()
-        co_validation = set()
-        fallback = "full"
+        affected, domains, co_validation = sorted(graph), [], []
+    else:
+        affected, domains, co_validation = affected_set(graph, graph, [{"id": component_id}])
     return {
         "schema": SCHEMA,
         "schema_version": SCHEMA_VERSION,

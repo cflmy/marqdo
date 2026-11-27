@@ -2,9 +2,8 @@
 
 Builds real temporary Git repositories for two root candidates and asserts the
 ordering required by the development contract: changed leaves, reverse
-`requires` closure over the union graph, parent domains, then `checks_with`
-fixed point; undetermined scope widens to the full candidate instead of being
-skipped.
+`requires` closure over the union graph, `checks_with` fixed point, then
+parent domains. Undetermined scope widens to the full candidate.
 """
 
 import importlib.util
@@ -206,6 +205,19 @@ class ImpactTest(unittest.TestCase):
             [("std-text", "dependencies")],
         )
         self.assertIn("std-text", report["affected"])
+
+    def test_removed_requires_edge_remains_in_the_impact_scope(self):
+        leaves = self.leaf_shas()
+        first = self.make_tree(COMPONENTS_V1, leaves)
+        without_dependency = COMPONENTS_V1.replace(
+            'requires = ["cli", "std-core"]', 'requires = ["cli"]'
+        )
+        second = self.make_tree(without_dependency, leaves)
+        before, _ = impact.load_graph(self.root, first, "before")
+        after, _ = impact.load_graph(self.root, second, "after")
+        affected, _, partners = impact.affected_set(before, after, [{"id": "std-core"}])
+        self.assertIn("std-text", affected)
+        self.assertIn("probe", partners)
 
     def test_domain_gitlink_change_expands_to_child_identity(self):
         child = init(self.root / "extensions/web")

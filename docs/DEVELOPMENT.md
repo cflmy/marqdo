@@ -80,6 +80,8 @@ bash scripts/integration.sh                # 生态候选：真实 CLI 制品 + 
 
 经过授权的 webhook 入口由根 `scripts/webhook-adapter.py` 实现：先以仓库 webhook secret 校验 `X-Gitea-Signature`（HMAC-SHA256）原始 body，再只接受 `push`（非删除）与 `pull_request`（opened/synchronized/reopened）事件；仓库必须来自 accepted 根图的远端允许列表，base 使用 accepted 图当前固定 SHA（payload base 只作 hint），CI 聚合要求至少一个状态且全部 success、URL 为允许 CI 主机上的 https。校验通过后交给同一 `candidate-notify.py` 做可达性/去重/重放/基线重验与影响分析，输出计划（不合并、不推送、不建 PR）。通知丢失的恢复由同一脚本 `--reconcile` 承担：扫描允许列表仓库的开放 PR 与 head statuses，对未入账的成功候选执行同一验证（幂等状态文件，重复运行只报 duplicate）；API transient 错误有限退避重试，401/403 立即失败，不把触发成功当作下游已处理。外部不可信 PR、未批准 gitlink 或脚本不得在拥有跨仓库写权限/发版密钥的 runner 中运行；区分只读 checkout/test token、受限 issue/PR token、受保护发布权限。日志不得输出凭证、完整 Analysis 或生产 API key。
 
+正式发布对账使用 `python3 scripts/reconcile-releases.py --plan --published-after <ISO-8601 时间>`。从固定根及领域 tree 解析受管仓库，核对 Gitea tag、`release-evidence.json`、同 SHA Woodpecker 组件 CI 和资产字节摘要。根 `reconcile` 工作流从当前受保护的 `main` 串行运行，使用 `gitea_reconcile_token` 以专用非管理员账号写追踪工单。`historical-baseline` 表示已登记历史输入，`blocked` 表示发布验证未通过，`tracked` 表示已记录经验证的发布。消费者验收和父级接受均需各自的 CI 与 PR 证据。
+
 ## 发行与回滚
 
 - 组件可独立 SemVer 发布；领域可发布经过验证的组合制品；根生态 release 固定整个 gitlink 树。独立版本不代表维护多套现行协议。
