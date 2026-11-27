@@ -5,3 +5,4 @@
 | ADR | 状态 | 主题 |
 | --- | --- | --- |
 | [0001](0001-hierarchical-ecosystem-and-web-domain.md) | 已采纳（实施记录） | 分层生态治理（根→领域→功能）与 Web 原型设计领域合同 |
+| [0002](0002-application-layer-and-harness-admission.md) | 已采纳（实施中） | 根层 `app` 角色、`marqdo-app-harness` 准入、DSH 上游与产品装配边界 |

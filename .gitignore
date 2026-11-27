@@ -7,3 +7,7 @@
 
 # Local build/cache/scratch (DSH workspace tooling)
 /.build/
+
+# Local audit/experiment scratch (issue #25)
+/.issue-work/
+/.app-verify/
