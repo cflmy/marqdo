@@ -18,7 +18,4 @@ steps:
     commands:
       - python3 scripts/check-layout.py
       - git submodule update --init
-      - |
-        set -eu
-        : "${MARQDO_GIT_TOKEN:?gitea_reconcile_token must be configured for cron/manual}"
-        python3 scripts/reconcile-releases.py --apply --published-after 2026-11-27T02:00:00Z --report-out reconcile-report.json
+      - python3 scripts/reconcile-releases.py --apply --published-after 2026-11-27T02:00:00Z --report-out reconcile-report.json
