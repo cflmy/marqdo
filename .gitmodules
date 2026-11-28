@@ -100,3 +100,6 @@
 [submodule "stdlib/text"]
 	path = stdlib/text
 	url = https://git.cflmy.cn/cflmy/marqdo-std-text.git
+[submodule "apps/harness"]
+	path = apps/harness
+	url = https://git.cflmy.cn/cflmy/marqdo-app-harness.git

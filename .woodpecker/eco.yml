@@ -50,3 +50,25 @@ steps:
         apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 install -y --no-install-recommends python3-jsonschema util-linux
         unset MARQDO_BIN MARQDO_STDLIB_DIR
         bash scripts/integration.sh
+
+  app:
+    # Dedicated Node lane: the app gitlink is built and tested against the same
+    # CLI/Bundle candidate the Rust candidate lane just produced. The Rust lane
+    # never installs Node or Electron.
+    image: node:24.22.3-bookworm
+    depends_on: [candidate]
+    when: *needs_candidate
+    commands:
+      - corepack enable
+      - corepack prepare pnpm@11.28.5 --activate
+      - |
+        set -eu
+        test -f .integration-work/app-candidate.json
+        export MARQDO_BIN="$(python3 -c 'import json;print(json.load(open(".integration-work/app-candidate.json"))["cli_path"])')"
+        export MARQDO_STDLIB_DIR="$(python3 -c 'import json;print(json.load(open(".integration-work/app-candidate.json"))["installed_dir"])')/stdlib"
+        test -x "$MARQDO_BIN"
+        test -f "$MARQDO_STDLIB_DIR/stdlib.json"
+        cd apps/harness
+        pnpm install --frozen-lockfile
+        pnpm run build
+        MARQDO_CI_OUT="$PWD/.ci" bash scripts/ci.sh

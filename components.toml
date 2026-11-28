@@ -392,3 +392,15 @@ scope = "IANA 时区、DST 和高级日历"
 requires = ["cli", "std-system"]
 checks_with = []
 release = "optional"
+
+[[component]]
+id = "app-harness"
+path = "apps/harness"
+kind = "app"
+state = "active"
+owner = "cflmy"
+scope = "官方单用户智能体应用、Marqdo 生态安装与更新、文稿执行、私人知识库"
+requires = ["cli"]
+checks_with = ["knowledge", "view"]
+release = "optional"
+entry = "scripts/ci.sh"

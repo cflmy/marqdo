@@ -32,6 +32,7 @@
 | `marqdo-lint` | 扩展静态规则和诊断定位，为可修复规则提供显式修复。 |
 | `marqdo-site` | **大改**。用现行 CLI 和 View 重建官网与入门内容，验证新站和旧链接后切换托管。 |
 | `marqdo-vscode` | **大改**。按现行 CLI 重做诊断和运行适配，先完成高亮、静态诊断、显式运行和可安装的 VSIX。 |
+| `marqdo-app-harness` | **大改**。官方单用户应用（DSH 下游）：产品 profile、生态安装/回退、文稿 PTC、私人知识、`/mdh` 工作台、独立 CI 与冷安装。父仓 `apps/harness`。 |
 
 ## 标准库
 

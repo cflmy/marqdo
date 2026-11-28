@@ -18,12 +18,13 @@
 
 - **领域（`kind = "domain"`）**：工程治理角色，不是语言层也不是运行协议。领域仓库只登记直属子组件，可拥有 `components.toml`、`.gitmodules`、领域公共规范、跨组件集成测试、综合示例、发布装配脚本、ADR 与维护指南；禁止在其中建立 renderer、解析器、数据库驱动等生产实现，也禁止把子仓库源码复制进普通目录。领域 `requires = []`，`release` 为 `none`（普通领域）或 `base`（Stdlib Bundle 聚合）。
 - **功能组件**：`kind` 仍为 `core/stdlib/extension/tool/test`，在责任仓库独立实现、测试和发版；`release` 与 `kind` 的对应关系不变（base/optional/none）。
+- **应用（`kind = "app"`）**：根层产品消费者，ID 为 `app-<name>`、路径为 `apps/<name>`、`release = "optional"`。应用是根 leaf，只依赖 active 的 `core/stdlib/extension/tool` 叶组件，不得被其它组件依赖，也不得登记在领域内。当前唯一应用为 `app-harness`（`apps/harness`）。
 - **唯一归属**：一个功能只有一个权威实现，一个组件只有一个治理归属，一个公共边界只有一套现行合同。已有仓库直接复用，不能因为命名不符创建重复实现。
 - **`planned` 纪律**：已有仓库可以通过 gitlink 固定已发布的开发提交。尚无提交的仓库登记在 [迁移台账](MIGRATION.md)。组件通过联合验收后才晋升为 `active` 并登记实际 `entry`。将直属组件迁入领域时，在同一根候选转移清单和 gitlink，保证一个组件只有一个父级。
 - **聚合准入**：功能拆分须至少有一种独立价值（独立维护责任、显著不同依赖/安全/平台边界、独立版本与制品、可重复独立验收）。若两个仓库几乎每个 PR 都必须一起改动且接口未稳定，应先收敛合同或合并，不能无限拆分。
 - **工具目录**（`tools/`）暂不聚合，现有四个 Tool 保持原路径。
 
-**当前状态**（以 [components.toml](../components.toml) 与 [迁移台账](MIGRATION.md) 为准）：根仓库有六个核心/工具 active 组件（`cli`、`conformance`、`view`、`knowledge`、`prove`、`lint`）和六个已交付源码的 active 标准库组件（`std-collections/data/fs/io/system/text`）。`std-core/encoding/net` 与十八个独立扩展仍是根层 planned 子模块。`extensions/web` 是 **active 领域**：Design/Preview 在其领域 catalog 激活并登记真实入口，`web-components` 仍 planned。`marqdo-stdlib` 聚合仍在计划中。
+**当前状态**（以 [components.toml](../components.toml) 与 [迁移台账](MIGRATION.md) 为准）：根仓库有六个核心/工具 active 组件（`cli`、`conformance`、`view`、`knowledge`、`prove`、`lint`）和六个已交付源码的 active 标准库组件（`std-collections/data/fs/io/system/text`）。`std-core/encoding/net` 与十八个独立扩展仍是根层 planned 子模块。`extensions/web` 是 **active 领域**：Design/Preview 在其领域 catalog 激活并登记真实入口，`web-components` 仍 planned。`marqdo-stdlib` 聚合仍在计划中。根层 `app-harness` 是 active 应用：它组合 CLI、Bundle、Tool 与私人知识，不进入 CLI 基础发行，也不被任何组件依赖。
 
 ## 语言与产品层（不因仓库变多而改变）
 

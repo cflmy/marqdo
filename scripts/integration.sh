@@ -19,6 +19,7 @@ while IFS=$'\t' read -r id kind path entry; do
         stdlib:*:scripts/test.sh) gate=stdlib ;;
         test:conformance:scripts/build_all.sh) gate=conformance ;;
         domain:web:scripts/domain-acceptance.sh) gate=web ;;
+        app:app-harness:scripts/ci.sh) gate=app ;;
         tool:view:scripts/acceptance.sh) gate=view ;;
         tool:knowledge:scripts/ci.sh) gate=knowledge ;;
         tool:prove:scripts/package-tool.sh) gate=prove ;;
@@ -104,6 +105,32 @@ test "$(cat "$installed/SOURCE_SHA")" = "$source_sha"
 test "$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["version"])' "$installed/stdlib/stdlib.json")" = "$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["version"])' "$work/stdlib/stdlib.json")"
 sha256sum "$archive" "$MARQDO_BIN" "$installed/marqdo-provider-worker"
 
+# Fixed identity handoff for the Node application lane. The manifest is a
+# consumer input, not a new lock: it names the exact archive, CLI source,
+# Bundle digest and installed binary produced above.
+python3 - "$work" "$archive" "$source_sha" "$bundle_digest" "$bundle_aliases" "$installed" "$root" <<'PY'
+import hashlib, json, pathlib, subprocess, sys
+work, archive, source_sha, bundle_digest, aliases, installed, root = map(pathlib.Path, sys.argv[1:])
+manifest = {
+    'schema': 'marqdo.app-candidate',
+    'schema_version': 1,
+    'candidate_root': str(root),
+    'archive': str(archive),
+    'archive_sha256': 'sha256:' + hashlib.sha256(archive.read_bytes()).hexdigest(),
+    'installed_dir': str(installed),
+    'cli_path': str(installed / 'marqdo'),
+    'cli_source_sha': source_sha,
+    'stdlib_tree_digest': bundle_digest,
+    'stdlib_aliases_digest': aliases,
+    'platform': 'x86_64-unknown-linux-gnu',
+    'app_gitlink': subprocess.check_output(
+        ['git', '-C', str(root / 'apps/harness'), 'rev-parse', 'HEAD'], text=True).strip(),
+}
+(work / 'app-candidate.json').write_text(json.dumps(manifest, indent=2) + '\n')
+(work.parent / 'app-candidate.json').write_text(json.dumps(manifest, indent=2) + '\n')
+print(json.dumps(manifest, indent=2))
+PY
+
 # Tool consumers use the same candidate installation and the catalog order.
 # The candidate image uses a minimal Rust profile; component entries run
 # fmt/clippy, so add those components once when the active toolchain lacks them.
@@ -135,6 +162,13 @@ run_consumer() (
             test -s "$MARQDO_CI_OUT/handoff.md"
             "$MARQDO_BIN" tool remove web
             test "$(sha256sum "$MARQDO_BIN")" = "$cli_before"
+            ;;
+        app)
+            # The Rust candidate lane builds the one CLI/Bundle artifact and
+            # emits its identity. The dedicated Node lane runs scripts/ci.sh
+            # against that exact artifact; this lane must not install Node.
+            test -x "$PWD/$entry"
+            echo "APP_LANE: candidate manifest $work/app-candidate.json"
             ;;
         view)
             export MARQDO_TOOL_HOME="$work/view-registry"
