@@ -46,9 +46,13 @@
 - `/mdh` 页面与 API：200；cross-site / 错误 Host / 不匹配 Origin → 403。
 - `scripts/package.sh`：预构建归档冷组合 PASS（748,901,507 bytes，sha256 `21a532d2949a25bae76a41b2a4e0f08d06f39a084db2f02a1cd1506ad5a24617`）。
 
+## CI 实跑
+
+- 父仓 PR#48 的 Woodpecker pipeline 已真实运行：首次 candidate 失败于 app-candidate manifest 把摘要字符串误转为 `Path`，修复后 pipeline #183 的 candidate 与 app lane 均成功（https://ci.cflmy.cn/repos/6/pipeline/183/1）。
+- 应用独立 CI 已启用并成功运行 app pipeline #2（https://ci.cflmy.cn/repos/21/pipeline/2/1）：install、build、test 全绿（commit `ee482a23c2e0ae3ca4c2b56281ea82e9fb58619d`）。
+
 ## UNVERIFIED
 
-- 父仓 PR#48 的 Woodpecker pipeline 已真实运行；首次 candidate 失败于 app-candidate manifest 把摘要字符串误转为 `Path`，已修复并等待 rerun 通过。Node lane 尚未在该次 pipeline 中执行完成。
 - 真实模型两轮任务（任务 A/B）未运行：本机没有模型凭据，没有用 fixture 冒充。
 - 浏览器自动化未运行；页面与 API 通过真实 HTTP 请求验证。
 - 上游同步演练未运行：镜像 HEAD 等于基线，没有更新的提交。
