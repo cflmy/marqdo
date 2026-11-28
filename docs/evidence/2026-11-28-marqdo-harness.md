@@ -1,14 +1,14 @@
 # Marqdo Harness 根消费者验收证据（2026-11-28）
 
 本文件记录主仓库对 `marqdo-app-harness` 的接入证据。应用自身状态与未验证范围以
-`apps/harness/docs/mdh/STATUS.md` 为准；本文件不重复、也不改写那些结论。
+`apps/harness/docs/mqdh/STATUS.md` 为准；本文件不重复、也不改写那些结论。
 
 ## 身份
 
 | 对象 | 身份 |
 | --- | --- |
 | 主仓库候选 | 本提交（`git rev-parse HEAD`） |
-| 应用 gitlink | `apps/harness` → `ee482a23c2e0ae3ca4c2b56281ea82e9fb58619d` |
+| 应用 gitlink | `apps/harness` → `9b6acf056987c833189d36a126720dd1448d0419`（MQDH 命名） |
 | 应用 origin | `https://git.cflmy.cn/cflmy/marqdo-app-harness.git` |
 | DSH 上游 | `4b399c39a6d1479cd84ca591b4d7c88e24d38a96`（`dsh-v0.2.3-alpha.2`） |
 | CLI gitlink | `63776735e924ade279cdf59d5c733dc24bfdabbb`（`v3.0.0-rc.6`） |
@@ -37,19 +37,19 @@
 
 ## 应用侧已复核证据
 
-证据全文见 `apps/harness/docs/mdh/evidence/`。
+证据全文见 `apps/harness/docs/mqdh/evidence/`。
 
 - 上游基线 `pnpm install --frozen-lockfile` 与 `pnpm run build`：10/10 gates PASS。
-- 下游 28 项测试：27 PASS；网络安装测试在 `MDH_TEST_INSTALL=1` 下 PASS（rc.5→rc.6→回退）。
+- 下游 29 项测试：28 PASS；网络安装测试在 `MQDH_TEST_INSTALL=1` 下 PASS（rc.5→rc.6→回退）。
 - 真实 CLI 执行 factorial `n=5` → `{"type":"int","decimal":"120"}`；除零 → `failed`；摘要不符 → `incomplete`。
 - 真实 `marqdo-knowledge` 编译/查询：`mode=compiled`，命中带精确源路径、摘要、span 与通道。
-- `/mdh` 页面与 API：200；cross-site / 错误 Host / 不匹配 Origin → 403。
+- `/mqdh` 页面与 API：200；cross-site / 错误 Host / 不匹配 Origin → 403。
 - `scripts/package.sh`：预构建归档冷组合 PASS（748,901,507 bytes，sha256 `21a532d2949a25bae76a41b2a4e0f08d06f39a084db2f02a1cd1506ad5a24617`）。
 
 ## CI 实跑
 
 - 父仓 PR#48 的 Woodpecker pipeline 已真实运行：首次 candidate 失败于 app-candidate manifest 把摘要字符串误转为 `Path`，修复后 pipeline #183 的 candidate 与 app lane 均成功（https://ci.cflmy.cn/repos/6/pipeline/183/1）。
-- 应用独立 CI 已启用并成功运行 app pipeline #2（https://ci.cflmy.cn/repos/21/pipeline/2/1）：install、build、test 全绿（commit `ee482a23c2e0ae3ca4c2b56281ea82e9fb58619d`）。
+- 应用独立 CI：pipeline #2（`ee482a2`）install/build/test PASS；重命名提交 `9b6acf0` 的 pipeline #3 同样 install/build/test PASS（https://ci.cflmy.cn/repos/21/pipeline/3/1）。
 
 ## UNVERIFIED
 
