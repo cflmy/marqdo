@@ -1,7 +1,7 @@
 # Marqdo 维护指引
 
 1. 从 [各仓库任务](docs/REPOSITORY-TASKS.md)、[组件目录](components.toml) 与 [架构边界](docs/ARCHITECTURE.md) 确定**唯一**责任仓库：功能缺陷在功能仓库，领域合同/组合在领域聚合仓库，gitlink、跨领域集成、发行组合与治理在主仓库。主仓库和聚合仓库不实现子组件业务。
-2. 治理树最多两级：根 → 领域聚合（`kind = "domain"`）→ 功能组件。每个组件只有一个父级，全局 ID 与权威远端唯一，领域聚合仓库只做治理、合同、示例和组合验收。已发布的 `planned` 仓库可以挂载真实 gitlink。激活时登记实际 `entry`，只有通过验收的 active 组件计入完成率。
+2. 治理树最多两级：根 → 领域聚合（`kind = "domain"`）→ 功能组件。每个组件只有一个父级，全局 ID 与权威远端唯一，领域聚合仓库只做治理、合同、示例和组合验收。根层另有 `kind = "app"` 产品应用（`app-<name>` → `apps/<name>`，`release = "optional"`）：它是根 leaf，只消费 active 叶组件，不能被其它组件依赖，也不进入 base 发行。已发布的 `planned` 仓库可以挂载真实 gitlink。激活时登记实际 `entry`，只有通过验收的 active 组件计入完成率。
 3. 找到或建立责任仓库的工单，按 `.gitea/ISSUE_TEMPLATE/change.md` 记录目标、当前提交、最小复现、公共契约、影响消费者和验收命令。跨仓库阻塞在上游开关联工单，并在消费者记录回归条件。不要按错误最终显示的仓库定责，找第一个违反公开合同的所有者。
 4. 在责任仓库独立修改、构建和测试。需要调整公共语义时，在 CLI 提交 ADR；调整 Web 作者面语义时，只在 `marqdo-ext-web` 的 [WEB-DESIGN 合同](https://git.cflmy.cn/cflmy/marqdo-ext-web/src/branch/main/docs/WEB-DESIGN.md) 走 ADR，并与实际消费者（Design/Preview）同候选验证；不得并列维护第二份现行规范或旧协议 fallback。
 5. 逐层晋升：功能提交 C2 通过组件 CI → 领域 PR 更新 gitlink 至 C2 并通过领域 CI（B2）→ 主仓库 PR 更新领域 gitlink 至 B2 并通过根递归校验与受影响组合验收（A2）。先推送子仓库提交，再在主仓库提交精确 gitlink；区分组件 CI、公共契约 CI 和生态 CI 证据。以 [开发流程](docs/DEVELOPMENT.md) 为准。

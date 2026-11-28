@@ -32,10 +32,14 @@ ROOT = Path(__file__).resolve().parents[1]
 NAME = r"[a-z][a-z0-9]*(?:-[a-z0-9]+)*"
 FIELDS = {"id", "path", "kind", "state", "owner", "scope", "requires", "checks_with", "release"}
 ROOT_FILES = {".gitattributes", ".gitignore", ".gitmodules", "AGENTS.md", "LICENSE", "README.md", "components.toml"}
-ROOT_DIRS = {".gitea", ".woodpecker", "ci", "docs", "examples", "scripts"}
+ROOT_DIRS = {".gitea", ".woodpecker", "apps", "ci", "docs", "examples", "scripts"}
 CATEGORY_READMES = {"stdlib/README.md", "extensions/README.md"}
 RELEASE_ROLES = {"core": "base", "stdlib": "base", "extension": "optional", "tool": "optional", "test": "none"}
 DOMAIN_RELEASE = {"none", "base"}
+# An app is a root-only, optional product consumer: it owns no runtime contract
+# and never becomes a dependency of another component. Its id carries the
+# `app-` prefix that maps onto `apps/<name>`.
+APP_RELEASE = {"optional"}
 DOMAIN_FILES = {".gitattributes", ".gitignore", ".gitmodules", "AGENTS.md", "LICENSE", "README.md", "components.toml"}
 DOMAIN_DIRS = {".gitea", ".woodpecker", "docs", "examples", "scripts", "tests"}
 DOMAIN_CHILD_KINDS = {"stdlib", "extension", "tool"}
@@ -106,6 +110,8 @@ def expected_root_path(component):
         return f"tools/{id}"
     if kind == "domain":
         return "stdlib" if id == "stdlib" else f"extensions/{id}"
+    if kind == "app":
+        return f"apps/{id.removeprefix('app-')}" if id.startswith("app-") else None
     return None
 
 
@@ -149,11 +155,16 @@ def check_component(raw, depth, label, by_id, paths, path_keys):
         require(id not in items and len(set(items)) == len(items), f"{label}: invalid {key}: {id}")
 
     kind = raw["kind"]
-    require(kind in RELEASE_ROLES or kind == "domain", f"{label}: unknown kind: {id}: {kind!r}")
+    require(kind in RELEASE_ROLES or kind in {"domain", "app"},
+            f"{label}: unknown kind: {id}: {kind!r}")
     if kind == "domain":
         require(depth == 0, f"{label}: domain kind is only allowed at the root layer: {id}")
         require(raw["release"] in DOMAIN_RELEASE, f"{label}: invalid release role: {id}")
         require(raw["requires"] == [], f"{label}: domain requires must be empty: {id}")
+    elif kind == "app":
+        require(depth == 0, f"{label}: app kind is only allowed at the root layer: {id}")
+        require(id.startswith("app-"), f"{label}: app id must start with 'app-': {id}")
+        require(raw["release"] in APP_RELEASE, f"{label}: invalid release role: {id}")
     else:
         require(depth == 0 or kind in DOMAIN_CHILD_KINDS,
                 f"{label}: component kind is not allowed inside a domain: {id} ({kind})")
@@ -385,8 +396,13 @@ def validate_graph(layers):
                     source_kind = component["kind"]
                     require(target_kind != "domain",
                             f"{layer.label}: requires must not target a domain: {id} -> {dependency}")
+                    require(target_kind != "app",
+                            f"{layer.label}: app components cannot be dependencies: {id} -> {dependency}")
                     if source_kind in {"core", "domain"}:
                         require(False, f"{layer.label}: dependency violation: {id} must not require {dependency}")
+                    if source_kind == "app":
+                        require(target_kind in {"core", "stdlib", "extension", "tool"},
+                                f"{layer.label}: app dependency violation: {id} -> {dependency}")
                     if source_kind == "stdlib":
                         require(target_kind in {"core", "stdlib"},
                                 f"{layer.label}: stdlib dependency violation: {id} -> {dependency}")
