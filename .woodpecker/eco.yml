@@ -69,6 +69,8 @@ steps:
         test -x "$MARQDO_BIN"
         test -f "$MARQDO_STDLIB_DIR/stdlib.json"
         cd apps/harness
-        pnpm install --frozen-lockfile
+        # The upstream hook installer refuses the submodule common config; CI
+        # is the documented skip path and hooks are not needed in this lane.
+        CI=true pnpm install --frozen-lockfile
         pnpm run build
         MARQDO_CI_OUT="$PWD/.ci" bash scripts/ci.sh

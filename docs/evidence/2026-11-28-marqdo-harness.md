@@ -8,7 +8,7 @@
 | 对象 | 身份 |
 | --- | --- |
 | 主仓库候选 | 本提交（`git rev-parse HEAD`） |
-| 应用 gitlink | `apps/harness` → `44282ead84e87e66390817da495aee8bad127ae7` |
+| 应用 gitlink | `apps/harness` → `ee482a23c2e0ae3ca4c2b56281ea82e9fb58619d` |
 | 应用 origin | `https://git.cflmy.cn/cflmy/marqdo-app-harness.git` |
 | DSH 上游 | `4b399c39a6d1479cd84ca591b4d7c88e24d38a96`（`dsh-v0.2.3-alpha.2`） |
 | CLI gitlink | `63776735e924ade279cdf59d5c733dc24bfdabbb`（`v3.0.0-rc.6`） |
