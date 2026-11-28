@@ -8,7 +8,7 @@
 | 对象 | 身份 |
 | --- | --- |
 | 主仓库候选 | 本提交（`git rev-parse HEAD`） |
-| 应用 gitlink | `apps/harness` → `d28c5e405108e50166620e73f211ebf944a22f79` |
+| 应用 gitlink | `apps/harness` → `44282ead84e87e66390817da495aee8bad127ae7` |
 | 应用 origin | `https://git.cflmy.cn/cflmy/marqdo-app-harness.git` |
 | DSH 上游 | `4b399c39a6d1479cd84ca591b4d7c88e24d38a96`（`dsh-v0.2.3-alpha.2`） |
 | CLI gitlink | `63776735e924ade279cdf59d5c733dc24bfdabbb`（`v3.0.0-rc.6`） |
@@ -48,7 +48,7 @@
 
 ## UNVERIFIED
 
-- 远端 Woodpecker 真实 pipeline 尚未在本轮运行；Node lane 配置与本地同等命令已通过。
+- 父仓 PR#48 的 Woodpecker pipeline 已真实运行；首次 candidate 失败于 app-candidate manifest 把摘要字符串误转为 `Path`，已修复并等待 rerun 通过。Node lane 尚未在该次 pipeline 中执行完成。
 - 真实模型两轮任务（任务 A/B）未运行：本机没有模型凭据，没有用 fixture 冒充。
 - 浏览器自动化未运行；页面与 API 通过真实 HTTP 请求验证。
 - 上游同步演练未运行：镜像 HEAD 等于基线，没有更新的提交。

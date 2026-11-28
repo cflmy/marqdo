@@ -110,7 +110,13 @@ sha256sum "$archive" "$MARQDO_BIN" "$installed/marqdo-provider-worker"
 # Bundle digest and installed binary produced above.
 python3 - "$work" "$archive" "$source_sha" "$bundle_digest" "$bundle_aliases" "$installed" "$root" <<'PY'
 import hashlib, json, pathlib, subprocess, sys
-work, archive, source_sha, bundle_digest, aliases, installed, root = map(pathlib.Path, sys.argv[1:])
+work = pathlib.Path(sys.argv[1])
+archive = pathlib.Path(sys.argv[2])
+source_sha = sys.argv[3]
+bundle_digest = sys.argv[4]
+aliases = sys.argv[5]
+installed = pathlib.Path(sys.argv[6])
+root = pathlib.Path(sys.argv[7])
 manifest = {
     'schema': 'marqdo.app-candidate',
     'schema_version': 1,
