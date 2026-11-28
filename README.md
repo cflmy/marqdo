@@ -60,7 +60,7 @@ marqdo run hello.mq.md
 
 | 仓库 | 职责 |
 | --- | --- |
-| [marqdo-app-harness](https://git.cflmy.cn/cflmy/marqdo-app-harness) | 官方单用户应用：生态安装、文稿程序化执行、私人知识库与 `/mdh` 工作台（DSH 下游） |
+| [marqdo-app-harness](https://git.cflmy.cn/cflmy/marqdo-app-harness) | 官方单用户应用：生态安装、文稿程序化执行、私人知识库与 `/mqdh` 工作台（DSH 下游） |
 | [marqdo-site](https://git.cflmy.cn/cflmy/marqdo-site) | 官网、入门文档、静态站点构建与托管 |
 | [marqdo-vscode](https://git.cflmy.cn/cflmy/marqdo-vscode) | VS Code 文件关联、编辑体验、CLI 集成与 VSIX 发布 |
 

@@ -7,7 +7,7 @@
 ## 背景
 
 生态此前只有 `core/stdlib/extension/tool/test/domain` 六种组件角色。Marqdo Harness
-（MDH）是一个**产品消费者**：它组合已发布的 CLI、单一 Bundle、Tool 与 Ext，向最终
+（MQDH）是一个**产品消费者**：它组合已发布的 CLI、单一 Bundle、Tool 与 Ext，向最终
 用户提供安装入口、文稿执行入口、私人知识库和成果复用。它既不发布语言/运行时合同，
 也不被任何基础组件依赖。直接复用 `tool` 或 `extension` 会把产品应用错误地放进
 `requires` 图，导致 CLI 基础发行被应用反向阻塞。
@@ -34,30 +34,30 @@
 - 保留 DSH 的 Git 历史、MIT `LICENSE` 与第三方声明；`origin` 为 Gitea 权威远端，
   `upstream` 为 `https://git.cflmy.cn/cflmy/deepseek-harness.git`（DSH 权威镜像）。
   GitHub 官方仓库只作为审计与回馈来源，不进入父仓 `.gitmodules`。
-- 发布名、包名（`@marqdo/*`）、命令（`mdh`）、应用标识和发行地址与 DeepSeek 官方
+- 发布名、包名（`@marqdo/*`）、命令（`mqdh`）、应用标识和发行地址与 DeepSeek 官方
   DSH 完全分离；不得复用官方上传工作流或凭证。
 - 首版支持平台以真实证据为准：Linux x86_64 / glibc ≥ 2.39；Node 24.22.3、
   pnpm 11.28.5（由选定 DSH 提交与锁文件决定）。Web 默认 loopback。
 
 ### 3. 产品装配
 
-- 唯一正式产品入口为 `mdh` 启动器，唯一产品 profile 为 `mdh`，组合为
-  `dsh-base` + `dsh-web-app` + 下游 `@marqdo/mdh-bundle`。
+- 唯一正式产品入口为 `mqdh` 启动器，唯一产品 profile 为 `mqdh`，组合为
+  `dsh-base` + `dsh-web-app` + 下游 `@marqdo/mqdh-bundle`。
 - 下游产品包集中在 fork 的 `packages/marqdo/*`，不散改上游包；必须修改的上游文件
-  逐项记录在 `docs/mdh/upstream-delta.md`。
+  逐项记录在 `docs/mqdh/upstream-delta.md`。
 - DSH 的 Node PTC 模型入口在产品 profile 中关闭；面向模型的文稿执行只经由
   `marqdo_program` 一条组合入口。上游 PTC 源码保留用于同步与基线，不作为第二个
   用户可选执行模式。
-- 应用运行数据使用独立 `MDH_HOME`；DSH 会话放在 `MDH_HOME/harness`，不覆盖用户
+- 应用运行数据使用独立 `MQDH_HOME`；DSH 会话放在 `MQDH_HOME/harness`，不覆盖用户
   已有的 DSH 数据。
 
 ### 4. 晋升门槛
 
 1. M0：登记 planned 条目并固定真实初始提交；`app-harness` 仍不计完成率，不登记
    `entry`。
-2. MDH-01..09 完成应用自身实现、独立 CI、冷安装与真实候选证据后，应用仓库登记
+2. MQDH-01..09 完成应用自身实现、独立 CI、冷安装与真实候选证据后，应用仓库登记
    `entry = "scripts/ci.sh"` 并推送。
-3. MDH-10：根 PR 只更新 gitlink、catalog、集成调度与证据；应用加入 `requires` 的
+3. MQDH-10：根 PR 只更新 gitlink、catalog、集成调度与证据；应用加入 `requires` 的
    组件必须已 active。根 Node lane 使用与 CLI/Bundle/Tool 相同的候选身份运行真实
    应用验收。
 4. 应用激活前不得成为 CLI 独立发行的前置；应用失败不得阻断合法的 CLI 基础发行，
